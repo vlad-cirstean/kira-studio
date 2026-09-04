@@ -1,8 +1,11 @@
 # Kira Version — Specification
 
 A visual Git graph tool. Primary delivery is a VS Code extension rendering into the
-bottom panel (alongside the terminal); the same application must run unmodified as a
-standalone Electron desktop app.
+bottom panel (alongside the terminal), built as a host-agnostic core and UI behind narrow
+capability ports (§3.3), of which VS Code is the one host implemented today. The UI bundle
+itself is unmodified regardless of what mounts it — `apps/harness` proves this daily by
+mounting the identical bundle against a mock bridge in a plain browser with no host present
+at all (§2.2).
 
 Status: **v1 requirements**. This document is the source of truth for scope, architecture,
 and phasing. §11 logs every decision taken and why; §9 and §12 record what is deliberately
@@ -26,10 +29,10 @@ out of v1. Interactive rebase is explicitly v2.
 
 | # | Constraint | Consequence |
 |---|---|---|
-| C1 | The whole app must run in a plain Electron shell with no VS Code present. | Every VS Code API touch lives behind a port (§3.3). Zero `import * as vscode` outside `packages/host-vscode`. Enforced by lint rule and a build-time import check. |
+| C1 | Every host capability the app needs is a narrow port in `packages/core/src/ports` (§3.3); no host API is reachable from outside its own host package. | Zero `import * as vscode` outside `packages/host-vscode`, enforced by lint rule and a build-time import check. `core`, `git`, `ipc` and `ui` therefore compile and run with no host present at all — which is what makes `apps/harness` a real Playwright target rather than a stub (§8.4, C4), what makes each capability independently fakeable in unit tests, and what makes a second host an addition rather than a rewrite (§2.2). |
 | C2 | Speed is a feature, not a nice-to-have. | Explicit performance budget (§5.1). Graph layout off the main thread, a virtualized grid whose DOM is bounded by the viewport rather than by history, no Vue reactivity over the commit array. |
 | C3 | Uses the user's own Git. | No bundled Git binary, no native bindings (§4.1). |
-| C4 | Frontend is validated with Playwright. | The UI must be runnable in a plain browser against a mock host bridge (§8.4). This falls out of C1 for free. |
+| C4 | Frontend is validated with Playwright. | The UI must be runnable in a plain browser against a mock host bridge (§8.4). This falls out of C1 for free — and is the *reason* C1 is worth keeping with only one host shipped, not merely a side effect of it. |
 
 ### 1.3 Naming
 
@@ -60,8 +63,8 @@ Consequences of the panel choice, all of which the layout must handle:
 
 - The panel is **short and wide** by default and is frequently resized. The graph is
   horizontally dense and vertically virtualized; the commit detail pane is a right-hand
-  column *inside* the webview, not a separate VS Code view, so it behaves identically in
-  Electron.
+  column *inside* the webview, not a separate VS Code view, so the panel owns its own layout
+  at every breakpoint.
 - The panel can be maximized (`workbench.action.toggleMaximizedPanel`) and moved left/right
   by the user. At narrow widths the detail pane collapses to an overlay drawer. Breakpoints
   in §6.3.
@@ -88,20 +91,44 @@ This is a scope decision, not an architectural one, so the code leaves the seam 
 building anything for it: anything platform-conditional goes behind a named strategy selected
 on `process.platform`, with the unimplemented platforms present as explicit cases that fail
 with "platform not supported yet" rather than as missing branches that silently misbehave.
-Today that is exactly two places - Git binary discovery (§4.2) and Electron packaging (P11).
-Adding a platform later should be implementing those cases and running the suites there, not
-untangling assumptions.
+Today that is exactly one place — Git binary discovery (§4.2). Adding a platform later should
+be implementing that case and running the suites there, not untangling assumptions.
 
 Concretely this means: no Windows path handling, no `\r\n` line-ending special cases beyond
 what git's own `core.autocrlf` does for us, no per-platform CI, and no Windows code-signing
 identity to acquire (§11 D26).
 
-### 2.2 Electron
+### 2.2 A second host is an addition, not a rewrite
 
-`packages/host-electron` provides a `BrowserWindow` loading the identical UI bundle, a main
-process implementing the same ports over Electron IPC, a repo picker (native dialog), and a
-theme shim that emits the same CSS custom properties VS Code injects (§3.4). No feature is
-VS Code-only.
+v1 ships one host: local desktop VS Code (§2.1.1, D6).
+
+An Electron shell *was* built at P3 — a `BrowserWindow` loading the identical UI bundle, a main
+process implementing the same ports over Electron IPC, a repo picker, and a theme shim emitting
+the same CSS custom properties VS Code injects (§3.4) — and was removed when the standalone
+desktop app left v1's scope; see `docs/plans/P4b-remove-electron.md` for the removal itself.
+`docs/plans/P3.md` remains in the tree as the unedited record of how that host was built the
+first time; this document does not pretend it never existed.
+
+The port seam that host required is kept deliberately, for three reasons:
+
+- **The harness is a real second consumer, running on every commit.** `apps/harness` mounts the
+  identical `packages/ui` against a mock bridge in a plain browser with no host present at all.
+  That is not a speculative future host — it is the Playwright suite's primary target (§8.4), and
+  it only works because `core`/`ipc`/`ui` compile and run with no host API reachable from them.
+  The seam is exercised continuously, not maintained on faith.
+- **A narrow, named boundary is worth having for its own sake.** Twelve small interfaces with one
+  implementation each is a legible surface: it is the complete list of what the app asks of its
+  environment, it makes each capability independently fakeable in unit tests
+  (`ports/testFakes.ts` exists for exactly this), and it keeps `packages/ui` from growing
+  host-shaped assumptions that are painful to unpick later.
+- **A future host is then an addition, not a rewrite.** What adding one actually costs, as a
+  checkable list: a `Transport` implementation (§3.5), one file per port under
+  `packages/host-<name>/src/ports/` (§3.3's table gains a column), an entry that mounts
+  `packages/ui` unchanged, a build target in `scripts/build.ts`, a Biome override granting that
+  package its host module, and a Playwright project. Nothing in `core`, `git`, `ipc` or `ui`
+  changes. For Electron specifically, add back what P4b deleted: a main process and window, a
+  preload `contextBridge`, a renderer HTML entry, a palette source for the `--vscode-*`
+  variables VS Code would otherwise inject, and packaging.
 
 ---
 
@@ -124,7 +151,7 @@ kira-version-vscode/
 ├── package.json                    workspace root; scripts: check, check:fast, test, build, package
 ├── tsconfig.base.json              TS7-clean options, shared by every package
 ├── tsconfig.json                   solution file referencing all packages
-├── playwright.config.ts            projects: harness (fast), electron, vscode
+├── playwright.config.ts            projects: harness (fast), vscode
 ├── docs/
 │   ├── SPEC.md                     this document
 │   ├── design/
@@ -136,7 +163,6 @@ kira-version-vscode/
 ├── scripts/
 │   ├── build.ts                    bundles hosts + ui via bun build / vite
 │   ├── package-vsix.ts             build then `vsce package --no-dependencies`
-│   ├── gen-theme-palettes.ts       derives Electron palettes from VS Code theme JSON (§3.4)
 │   └── gen-settings.ts             writes contributes.configuration from core's settings schema (D25)
 │
 ├── packages/
@@ -190,7 +216,7 @@ kira-version-vscode/
 │   │       └── validate.ts         boundary validation; a schema mismatch fails loudly
 │   │
 │   ├── ui/                         Vue 3 app. Imports core + ipc only. Never `vscode`.
-│   │   ├── vite.config.ts          one build, two entries (webview + Electron renderer) (W13)
+│   │   ├── vite.config.ts          one build, one entry (webview) (W13)
 │   │   └── src/
 │   │       ├── main.ts
 │   │       ├── App.vue
@@ -220,23 +246,13 @@ kira-version-vscode/
 │   │       │                       readTokens.ts      getComputedStyle bridge for numeric metrics
 │   │       └── icons/              codicon.css + the mapping of actions → codicon names
 │   │
-│   ├── host-vscode/                the ONLY package permitted to import `vscode`
-│   │   └── src/
-│   │       ├── extension.ts        activate/deactivate, command registration
-│   │       ├── panelView.ts        WebviewViewProvider for the panel container (§2.1)
-│   │       ├── html.ts             CSP, nonce, asset URIs, initial state injection
-│   │       ├── transport.ts        postMessage Transport implementation
-│   │       ├── webview/main.ts     browser-context entry mounted inside the webview; never imports `vscode`
-│   │       └── ports/              one file per port in core/src/ports
-│   │
-│   └── host-electron/
+│   └── host-vscode/                the ONLY package permitted to import `vscode`
 │       └── src/
-│           ├── main/               index.ts window.ts menu.ts recentRepos.ts
-│           │                       channel.ts  MessageChannelLike adapter over MessagePortMain
-│           ├── preload/            index.ts   contextBridge surface, nothing more
-│           │                       kiraBridge.ts  the surface's testable logic, DI'd from index.ts
-│           ├── renderer/           index.html + index.ts; mounts packages/ui unchanged
-│           ├── theme/              palettes.generated.css  (from scripts/gen-theme-palettes.ts)
+│           ├── extension.ts        activate/deactivate, command registration
+│           ├── panelView.ts        WebviewViewProvider for the panel container (§2.1)
+│           ├── html.ts             CSP, nonce, asset URIs, initial state injection
+│           ├── transport.ts        postMessage Transport implementation
+│           ├── webview/main.ts     browser-context entry mounted inside the webview; never imports `vscode`
 │           └── ports/              one file per port in core/src/ports
 │
 ├── apps/
@@ -260,7 +276,7 @@ kira-version-vscode/
     │                               colocation is impossible there without violating each
     │                               package's own tsconfig; mirrors tests/integration/'s pattern
     ├── e2e/                        Playwright against apps/harness
-    ├── integration/                real git + real hosts (electron, vscode)
+    ├── integration/                real git + real hosts (vscode)
     └── perf/                       time + heap budgets (§5.1), run locally (D28)
 ```
 
@@ -278,7 +294,7 @@ as an import specifier in exactly one package, and `bun:`/`Bun` in none (§8.1).
 ### 3.2 Process/thread topology
 
 ```
-┌─ host process (extension host | electron main) ──────────────┐
+┌─ host process (extension host) ──────────────────────────────┐
 │  RepoService ─ GitDriver ─ child_process(git)                │
 │      │           └─ persistent `git cat-file --batch`        │
 │      └─ RefWatcher (fs watch on .git)                        │
@@ -295,28 +311,36 @@ Git never runs in the renderer. The renderer never touches the filesystem.
 ### 3.3 Ports
 
 Every host capability the app needs, as a narrow interface in `packages/core/src/ports`.
-This list is the complete VS Code surface; anything not here must not be used.
+This list is the complete VS Code surface; anything not here must not be used. One column
+below per shipped host — v1 ships one. A second host adds a *column* here (and a directory
+under `packages/`) and changes nothing to the left of it (§2.2).
 
-| Port | Purpose | VS Code impl | Electron impl |
-|---|---|---|---|
-| `ProcessRunner` | spawn/exec git, stream stdout, kill, env injection | `child_process` | `child_process` |
-| `FileWatcher` | watch `.git` paths + worktree, debounced | `workspace.createFileSystemWatcher` / raw `fs.watch` for `.git` | `chokidar`-class watcher |
-| `WorkspaceRoots` | candidate repository roots, add/remove events | `workspace.workspaceFolders` | recent-repos store + native dialog |
-| `Storage` | small persisted key/value (per repo and global) | `Memento` (workspace + global) | JSON file in `app.getPath('userData')` |
-| `Secrets` | credentials the app itself holds (rare — Git owns auth) | `SecretStorage` | `safeStorage` |
-| `Clipboard` | copy sha, branch, message | `env.clipboard` | `clipboard` |
-| `ExternalOpener` | open compare/PR URLs | `env.openExternal` | `shell.openExternal` |
-| `Dialogs` | native confirm / pick folder / save file | `window.show*` | `dialog.show*` |
-| `Notifications` | toast + progress reporting | `window.withProgress`, `showMessage` | in-app toast component |
-| `EditorIntegration` | open a file at a revision, show a diff | `vscode.diff`, virtual `TextDocumentContentProvider` | internal diff view (§9) |
-| `Theme` | current theme kind + token CSS variables | injected by VS Code; we read | shim emits the same variable names |
-| `Logger` | leveled log to an output channel | `window.createOutputChannel` | file + devtools |
+| Port | Purpose | VS Code impl — `packages/host-vscode/src/ports` |
+|---|---|---|
+| `ProcessRunner` | spawn/exec git, stream stdout, kill, env injection | `child_process` |
+| `FileWatcher` | watch `.git` paths + worktree, debounced | `workspace.createFileSystemWatcher` / raw `fs.watch` for `.git` |
+| `WorkspaceRoots` | candidate repository roots, add/remove events | `workspace.workspaceFolders` |
+| `Storage` | small persisted key/value (per repo and global) | `Memento` (workspace + global) |
+| `Secrets` | credentials the app itself holds (rare — Git owns auth) | `SecretStorage` |
+| `Clipboard` | copy sha, branch, message | `env.clipboard` |
+| `ExternalOpener` | open compare/PR URLs | `env.openExternal` |
+| `Dialogs` | native confirm / pick folder / save file | `window.show*` |
+| `Notifications` | toast + progress reporting | `window.withProgress`, `showMessage` |
+| `EditorIntegration` | open a file at a revision, show a diff | `vscode.diff`, virtual `TextDocumentContentProvider` |
+| `Theme` | current theme kind + token CSS variables | injected by VS Code; we read |
+| `Logger` | leveled log to an output channel | `window.createOutputChannel` |
 
-`EditorIntegration` is the one port whose Electron implementation is genuinely different
-rather than merely a different call: in VS Code we hand the diff to the editor, in Electron
-we render it in-app. v1 ships a **read-only unified diff view inside the UI** used by both,
-with VS Code additionally offering "Open in editor" — this keeps the port honest and avoids
-an Electron feature hole.
+A port with one shipped implementation, like `Secrets`, is still the app's complete statement
+of what it needs from a host — the row stays even though nothing today exercises the gap a
+second host's implementation would fill.
+
+`EditorIntegration` is the one port whose contract is genuinely richer than a single call: v1
+ships a **read-only unified diff view inside the UI**, because §6.4 makes clicking a file open
+its diff in-panel the pane's primary interaction (D13, D14) — not because it works around a
+gap in some other host. VS Code additionally offers "Open in editor" (`vscode.diff`) on top of
+that baseline. Conflict resolution is exposed as an **optional capability the UI
+feature-detects rather than assumes** — a host with no merge editor of its own still gets the
+fallback affordances §7.11 describes.
 
 ### 3.4 Theming — VS Code propagates its theme, and we build on that
 
@@ -382,14 +406,13 @@ What VS Code injects into the webview document, with no API call on our side:
   user or theme author can override lane colours and badge colours from their own theme —
   the same courtesy other Git extensions extend.
 
-**The Electron side.** No VS Code, so nothing is injected. `scripts/gen-theme-palettes.ts`
-reads the JSON of VS Code's built-in Default Dark Modern, Default Light Modern, and the two
-high-contrast themes, and emits `palettes.generated.css` defining the same `--vscode-*`
-variable names for the subset we actually consume. The Electron host applies one based on the
-OS `prefers-color-scheme`, with a manual override. Result: **one stylesheet, no per-host
-branching, and the Electron build looks like VS Code because it is literally wearing VS Code's
-palette.** Because the generator reads theme files rather than hardcoding hex values,
-refreshing the palettes when VS Code updates its defaults is a script run.
+**What the fallback chains are for, with only one host shipped.** No non-VS-Code host injects
+`--vscode-*` today, so those fallback chains are what makes `vscode-tokens.css` legible outside
+VS Code at all — which is the harness's everyday situation. The harness supplies a small
+hand-written dev palette (`apps/harness/src/themeSwitcher.ts`), not the full contributed set,
+so the token layer's own fallbacks carry the rest. A future host without VS Code's own theme
+injection would sit on top of the same mechanism: supply (or generate) the `--vscode-*`
+variables it can, and let the fallback chain cover what it can't.
 
 **What we deliberately do not use:** `@vscode/webview-ui-toolkit` is deprecated and archived —
 building on it would be building on something unmaintained. We use plain components styled
@@ -409,10 +432,11 @@ else in the window.
   arrive in batches as the `git log` process produces them, so the first screenful renders
   before the walk completes.
 
-Transport in VS Code is `webview.postMessage` (structured clone, `ArrayBuffer` transferable);
-in Electron it is `ipcRenderer.invoke` + `MessagePort` for streams. Both implement the same
-`Transport` interface. Every message is versioned and validated at the boundary; a schema
-mismatch fails loudly rather than half-working.
+The contract is defined once, in `packages/ipc`. A host supplies a `Transport`
+(`packages/ipc/src/transport.ts`) rather than a protocol of its own — VS Code's is
+`webview.postMessage` (structured clone, `ArrayBuffer` transferable). Every message is
+versioned and validated at the boundary; a schema mismatch fails loudly rather than
+half-working.
 
 ---
 
@@ -1180,13 +1204,13 @@ offers:
   returns to our UI without a manual refresh.
 - **Abort** → `git <op> --abort`, always available.
 
-**The Electron gap, stated plainly.** A standalone Electron build has no merge editor and no
-host editor to delegate to. v1 does not close that gap. There, the banner offers Abort,
-Continue, "open the conflicted file in the system default editor" (`ExternalOpener`), and a
-read-only view of the conflict hunks. This is the one place where the Electron build is
-deliberately weaker than the VS Code build, and it is why `EditorIntegration` exposes conflict
-resolution as an **optional capability** the UI feature-detects rather than assumes. A built-in
-resolution UI is v2 (§9).
+**Resolve is a VS Code capability the port advertises, not a hard requirement of the port
+itself** (§3.3) — `EditorIntegration` exposes conflict resolution as an optional capability the
+UI feature-detects rather than assumes. A host without a merge editor to delegate to (none
+ships in v1, but the port is written for the case) falls back to Abort, Continue, "open the
+conflicted file in the system default editor" (`ExternalOpener`), and a read-only view of the
+conflict hunks — the same UI VS Code's own Continue/Abort already offer, minus Resolve. A
+built-in resolution UI is v2 (§9).
 
 **Non-goal:** we never auto-resolve, never pick a side, and never run `git checkout --theirs`
 on the user's behalf.
@@ -1246,9 +1270,6 @@ pre-flight → confirm → execute → reconcile shape.
   (`bun run build`) and packaging is `bunx @vscode/vsce package --no-dependencies`, which is
   valid because we bundle all dependencies. Node/npm remain required on the release machine
   only.
-- Electron likewise runs Node, not Bun — same rule, and it is the same rule, which is
-  convenient.
-
 **Verdict: adopt, with the runtime ban enforced mechanically.**
 
 ### 8.2 Biome — **compatible**
@@ -1271,7 +1292,7 @@ rather than abandoning Biome. Biome also enforces our architectural boundaries v
 ### 8.3 TypeScript 7 — **write TS7-clean now, switch the checker when `vue-tsc` supports it**
 
 TypeScript 7.0 (the Go-native compiler, "Project Corsa") went stable in July 2026 with 8–12×
-faster checks. Nothing about it conflicts with VS Code or Electron: **nothing is compiled by
+faster checks. Nothing about it conflicts with VS Code: **nothing is compiled by
 `tsc` at all.** Transformation is done by esbuild/Vite/`bun build`; TypeScript runs
 `noEmit` as a pure type checker. So the choice affects check wall-clock and editor feedback
 latency, and nothing about the shipped artifact. That also means it is reversible at any time,
@@ -1336,12 +1357,12 @@ Two suites:
    screenshot comparison on the graph column, in both light and dark themes.
 2. **Integration suite.** The real host, real Git, real repositories built by a fixture
    generator, driving actual operations and asserting on the repository state afterwards.
-   Under Electron this is Playwright's `_electron.launch` directly. Under VS Code, Playwright
-   can also drive the VS Code Electron binary (launch the downloaded build with the extension
-   installed, then work through the webview frame); `@vscode/test-electron` remains available
-   for extension-host-level tests that need the VS Code API rather than the UI. Slower tier,
-   Run on demand, on macOS only (D27), against the Git the developer has installed. The
-   OS and Git-version matrix this tier is shaped for arrives with the second platform.
+   Playwright drives VS Code's own Electron binary directly (launch the downloaded build with
+   the extension installed, then work through the webview frame); `@vscode/test-electron`
+   remains available for extension-host-level tests that need the VS Code API rather than the
+   UI. Slower tier, run on demand, on macOS only (D27), against the Git the developer has
+   installed. The OS and Git-version matrix this tier is shaped for arrives with the second
+   platform.
 
 Layer beneath both: `bun test` unit tests over `core` (layout, search, pre-flight planners)
 and `git` (porcelain parsers, against recorded fixtures).
@@ -1397,7 +1418,7 @@ frame budget.
 Vue 3.5+ (`<script setup>`, no Options API), `slickgrid` (the 6pac fork, MIT) for the commit
 list's virtualization and column model, Vite for the UI bundle and the harness dev
 server, esbuild (or `bun build`) for the host bundles, `@vscode/vsce` + `ovsx` for
-publishing, `electron-builder` for the desktop app.
+publishing.
 
 ---
 
@@ -1408,16 +1429,13 @@ Deferred to v2, listed so the v1 architecture does not preclude them:
 - **Rebase, including interactive rebase.** Explicitly v2. The graph must already model
   in-progress rebase state (§4.5 watches `rebase-merge`/`rebase-apply`) so v1 can *report*
   a rebase in progress and refuse to interfere.
-- Merge with conflict-resolution UI, and a **built-in three-way merge editor for the Electron
-  build** (7.11 - under VS Code the native merge editor already covers this, so the gap is
-  Electron-only).
 - **Remote and browser VS Code contexts** (2.1.1): SSH, WSL, Codespaces, dev containers,
   vscode.dev. Local desktop VS Code only.
 - **Support for Git older than 2.38** (4.2). Hard floor, not a degraded mode.
 - **Infinite scroll / eager full-history load** (5.1.1). Paged with an explicit Load more.
-- **Side-by-side diff.** v1 ships unified only; under VS Code "Open in editor" already gives a
+- **Side-by-side diff.** v1 ships unified only; "Open in editor" already gives VS Code users a
   native side-by-side view via `vscode.diff`, so building a second one would duplicate the
-  editor for most users to serve the Electron minority.
+  editor for the one host v1 ships.
 - **Localization.** English only, and no l10n infrastructure - no bundle, no string-id
   indirection. If it is ever wanted it is a mechanical change made then, not scaffolding
   carried now.
@@ -1447,7 +1465,7 @@ Phases are sequential; each ends at a checkpoint.
 | **P0** | Foundation | Monorepo per the normative tree in 3.1, Bun workspaces, Biome, **single TS 5.x checker with TS7-clean compiler options plus `tsgo` as an optional `check:fast`** (8.3), Vite, `packages/ipc` contract skeleton, `apps/harness` with mock bridge, Playwright wired to it, fixture-repo generator, perf-budget harness (time **and** heap). | `bun install && bun run check && bun run test` green locally on macOS; harness renders a placeholder UI; one Playwright test passes; `vue-tsc`/TS-7 state re-confirmed and versions pinned. |
 | **P1** | Git driver | `GitDriver`: discovery, version probe with the **2.38 hard-floor block state**, repo capability probe, spawn discipline (§4.3), streaming NUL parser, cancellation, write queue, `cat-file --batch`, typed error classification. | Unit tests over recorded porcelain fixtures; integration tests against generated repos; sub-2.38 Git produces the block state, never a half-working app. |
 | **P2** | History pipeline | Streaming `git log` walk with **paused long-lived-process paging (5.1.1)** and remaining-count query, ref query, status query, lane layout in a worker, packed transferable buffers, column-wise typed-array store with string interning (5.5). | First page within budget; repeated Load more to 100k within time **and heap** budget; layout unit tests over hand-built topologies incl. octopus merges. |
-| **P3** | Host bridge | RPC transport for both hosts, VS Code panel webview view registered and reachable, Electron shell booting the same bundle, state persistence/rehydration, **the shared settings schema driving both hosts (D25)**, theme token layer, the `readTokens` bridge, and Electron palette generation from VS Code theme JSON (3.4). | Panel opens in VS Code and shows live data; Electron app shows the same; hide/reveal rehydrates without re-running git; switching VS Code theme restyles the panel live, the graph surface included, with no reload. |
+| **P3** | Host bridge | RPC transport, VS Code panel webview view registered and reachable, state persistence/rehydration, **the shared settings schema (D25)**, theme token layer, the `readTokens` bridge. | Panel opens in VS Code and shows live data; hide/reveal rehydrates without re-running git; switching VS Code theme restyles the panel live, the graph surface included, with no reload. |
 | **P4** | Graph UI | Vue shell, the SlickGrid commit list over the typed-array store, **Load more button with remaining count and viewport/selection preservation**, the SVG graph column, branch/tag ref badges, columns, selection, refresh action, keyboard nav, responsive breakpoints (§6.3). | 60 fps scroll on the 100k repo; Playwright visual + interaction suite; accessibility pass on the virtualized list; visual regression green across all four theme kinds; side-by-side density review against the native workbench list (6.1). |
 | **P5** | Commit detail | Right pane: metadata, message/trailers/signature, parents, file tree with statuses and counts, **click-a-file-opens-its-diff** via the in-app unified diff view, copy actions. | Detail populated ≤80 ms; diff opens from tree click and follows keyboard selection; tree correct for renames, merges (parent selector), binary/LFS files. |
 | **P6** | Refs & checkout | Branch list and **tag list with full tag manipulation (§7.9)**, create branch, switch branch, detached checkout, delete/rename, **revert (7.10)**, **linked-worktree detection (D12)**, the **undo slot (7.12) seeded by branch and tag deletion**, the **in-progress/conflicted-state banner with VS Code merge-editor delegation, continue and abort (7.11)**, and the full checkout pre-flight engine (§7.5). | Pre-flight classification unit-tested exhaustively; integration tests cover clean-carry, blocked-by-tracked, blocked-by-untracked, in-progress-op; tag create/delete/push incl. annotated and remote-delete asymmetry; revert incl. merge-parent selection; an induced conflicting revert reaches the banner, gates other operations, and both continues and aborts cleanly; undo restores a deleted branch and a deleted annotated tag. |
@@ -1455,7 +1473,15 @@ Phases are sequential; each ends at a checkpoint.
 | **P8** | Stash | Stash create (incl. `-u`, message, pathspec), list, show, apply/pop/drop/branch, stashes rendered in the graph, and the pop-prediction engine via `merge-tree` (§7.6) wired into checkout resolution. | Prediction verified against actually-executed pops across clean and conflicting cases; a dropped stash is recoverable through the undo slot. |
 | **P9** | Reset | Soft/mixed/hard with per-mode consequence copy, pre-flight counts, typed confirmation for hard-with-dirty, reflog-backed undo completing the undo slot (7.12). | Integration tests assert repository state per mode; undo restores; guarded during in-progress operations. |
 | **P10** | Search | Input with case/whole-word/regex toggles, commit/refs(branches+tags)/both scope, hybrid client-side + git-backed matching, next/prev navigation, live regex validation, abort-on-supersede. | Semantics table fully covered by tests (each toggle × scope); ≤120 ms budget met; malformed regex never throws. |
-| **P11** | Ship | Electron packaging (`electron-builder`), `.vsix` packaging without `vscode:prepublish`, `extensionKind`/no-browser manifest declarations (2.1.1), **`engines.vscode` floor confirmed (D7)**, **SCM title button and status bar item (6.5)**, marketplace + OpenVSX metadata, docs, settings surface, telemetry-free release checklist. | Installable `.vsix` and a signed, notarized macOS build; full Playwright suite green on macOS. |
+| **P11** | Ship | `.vsix` packaging without `vscode:prepublish`, `extensionKind`/no-browser manifest declarations (2.1.1), **`engines.vscode` floor confirmed (D7)**, **SCM title button and status bar item (6.5)**, marketplace + OpenVSX metadata, docs, settings surface, telemetry-free release checklist. | Installable `.vsix`; full Playwright suite green on macOS. |
+
+**A note on P3's row, for anyone reconciling it against `docs/plans/P3.md`.** P3 originally also
+built and shipped a second, standalone desktop host booting the identical UI bundle, plus the
+palette generator that themed it from VS Code's own theme JSON — both real, working P3
+deliverables. That desktop host was removed from v1's scope after P3 closed; the row above
+describes the tree as it exists today, not as P3 left it. `docs/plans/P3.md` is kept unedited
+as the accurate record of what P3 actually built; the removal itself, and why the port seam it
+required is kept anyway, is recorded in `docs/plans/P4b-remove-electron.md`.
 
 ---
 
@@ -1475,8 +1501,8 @@ deliberately deferred rather than left undecided.**
 | D3 | Frontend framework | **Vue.** Svelte's advantages are real but land outside this app's hot paths, which are a viewport-bounded virtualized grid, workers and typed arrays — the framework renders no commit rows at all. Evaluated in 8.5. |
 | D3a | Commit-list rendering | **SlickGrid (6pac fork, MIT) for every column, with the graph column rendered as one small `<svg>` per row. No `<canvas>`.** The grid supplies the virtualization AGENTS.md's "prefer a library" rule asks us not to hand-roll, and driving it from a `CustomDataView` over the typed-array store keeps §5.5 intact. SVG rather than canvas because a graph column that is a *column* needs no second positioned surface to keep in sync with the rows, and because SVG takes its lane colours from the same CSS variables as everything else, deleting the theme-repaint problem in §3.4 rather than solving it. Per-row cost is bounded by the viewport, so the 100k requirement is met by virtualization, not by the drawing technique. Rendering detail in 5.3, the full evaluation in `docs/plans/P4.md`. |
 | D4 | TypeScript 7 | **Write TS7-clean code from day one, run a single TS 5.x checker until `vue-tsc` supports TS 7** (expected ~7.1, October 2026, inside this project's P0-P4 window). The originally-proposed two-checker split was wrong: `vue-tsc` checks whole programs, so TS 5.x would have been checking everything anyway. Full reasoning in 8.3. |
-| D5 | Theme | **Ride VS Code's injected theme.** It pushes the full workbench palette as `--vscode-*` CSS variables plus theme-kind body classes into every webview and keeps them live across theme switches. Electron wears the same variable names, generated from VS Code's own theme JSON. Details in 3.4, aesthetic rules in 6.1. |
-| D6 | Supported hosts | **Local desktop VS Code, plus the standalone Electron build.** Remote contexts (SSH, WSL, Codespaces, dev containers) and browser VS Code are out of scope and untested (2.1.1). |
+| D5 | Theme | **Ride VS Code's injected theme.** It pushes the full workbench palette as `--vscode-*` CSS variables plus theme-kind body classes into every webview and keeps them live across theme switches. Details in 3.4, aesthetic rules in 6.1. |
+| D6 | Supported hosts | **Local desktop VS Code.** Remote contexts (SSH, WSL, Codespaces, dev containers) and browser VS Code are out of scope and untested (2.1.1). See §2.2 for why the port seam every host implementation sits behind outlives having only one host to show for it. |
 | D7 | `engines.vscode` floor | **Roughly six months behind current stable — but raised without hesitation whenever a newer API genuinely earns it.** Reach is not worth working around a missing API. The concrete number is set at P0 from the then-current release and revisited at P11. |
 | D8 | v1 branch | **All v1 work lands on `feature/kickoff`.** Agents start from its tip and add on top for as long as phases remain unfinished; never rebased or force-pushed. A phase may be implemented on its own phase-scoped working branch rather than directly on `feature/kickoff`; once the phase is done, that branch's commits are replayed onto `feature/kickoff`, which stays the one history every later phase starts from regardless of which branch the implementation work happened on. See `AGENTS.md`. |
 
@@ -1488,9 +1514,9 @@ deliberately deferred rather than left undecided.**
 | D10 | Default history scope | **`--all`, with a current-branch-only toggle.** A graph tool showing one branch is not a graph tool, and paging removes the cost objection (4.4). |
 | D11 | Multiple repositories | **A switcher, one active repo at a time.** Submodules are detected and listed as additional switcher entries — they are real repositories, so it is nearly free — but get no dedicated UI. |
 | D12 | Linked worktrees | **Supported.** `--git-common-dir` already tells us we are in one, so detection is free at P1, and showing the other worktrees' HEADs as badges heads off the "why can't I check out this branch" confusion. Expensive to retrofit later. |
-| D13 | Diff view | **Unified only in v1; side-by-side is v2.** Under VS Code, "Open in editor" already gives a native side-by-side view via `vscode.diff`, so building our own would duplicate the editor for most users to serve the Electron minority. |
+| D13 | Diff view | **Unified only in v1; side-by-side is v2.** "Open in editor" already gives VS Code users a native side-by-side view via `vscode.diff`, so building our own would duplicate the editor for the one host v1 ships. |
 | D14 | Clicking a file | **Opens its diff in-panel** (6.4). Keeps the user in the graph and keeps both hosts behaving alike; "Open in editor" is the secondary action. |
-| D15 | Conflict resolution | **Delegated, not built.** VS Code resolves conflicts natively — the `merge-conflict` extension's inline actions and the SCM view's three-way merge editor work on any conflict markers, whoever created them. We detect, surface, gate operations and hand off; we never auto-resolve. The Electron build is deliberately weaker and gets a resolver in v2 (7.11). |
+| D15 | Conflict resolution | **Delegated, not built.** VS Code resolves conflicts natively — the `merge-conflict` extension's inline actions and the SCM view's three-way merge editor work on any conflict markers, whoever created them. We detect, surface, gate operations and hand off; we never auto-resolve (7.11). |
 | D16 | Undo | **Yes, in v1: single-level "undo last operation"** across reset, branch delete, tag delete and stash drop. The recovery data already exists in the reflog and `stash@{}` — we surface it rather than implement it. Limits stated in the UI, not hidden (7.12). |
 | D17 | VS Code integration points | **Three: command palette, an "Open Git Graph" button in the SCM view title, and a status bar item** showing branch plus ahead/behind. The status bar item sits beside VS Code's built-in one with a distinguishing icon and a setting to disable it (6.5). Blame gutter and editor title actions are v2. |
 
@@ -1510,8 +1536,8 @@ deliberately deferred rather than left undecided.**
 |---|---|---|
 | D23 | Telemetry | **None at all.** Nothing collected, so there is no opt-out to design and no privacy policy to write. Easier to never start than to remove later. |
 | D24 | Localization | **English only, and no l10n infrastructure** — no bundle, no string-id indirection, no scaffolding carried for a future that may not come. If it is ever wanted, it is a mechanical change made then. |
-| D25 | Settings | **One schema in `core`**, generating `contributes.configuration` for VS Code at build time and driving the Electron settings UI from the same source. Defined at P3, before ~15 settings accrete in two places. |
-| D26 | Licensing and distribution | **MIT; published to both the VS Code Marketplace and OpenVSX.** The signed Electron build needs an Apple Developer account for notarization — real cost and a real identity, to be decided **before** P11 rather than at it. No Windows certificate is needed while D27 holds. |
+| D25 | Settings | **One schema in `core`**, generating `contributes.configuration` for VS Code at build time. Defined at P3, before ~15 settings accrete in two places; a future host's own settings surface would generate from the same schema rather than inventing a second one. |
+| D26 | Licensing and distribution | **MIT; published to both the VS Code Marketplace and OpenVSX.** The `.vsix` is not notarized. The Apple Developer account and notarization requirement this row used to flag as a decide-before-P11 item belonged to the standalone desktop build (`docs/plans/P4b-remove-electron.md`) and was retired with it, not decided the hard way — no such cost or identity is needed for a `.vsix`. No Windows certificate is needed while D27 holds. |
 | D27 | Operating systems | **macOS only for v1.** Windows and Linux are not supported or tested. Platform-conditional code sits behind named strategies with the other platforms as explicit unimplemented cases, so adding one later is implementation rather than untangling (2.1.2). |
 | D28 | Continuous integration | **None for now.** No workflows, no hosted runners. `bun run check`, `bun test`, `test:e2e` and `test:perf` are run locally on macOS, and running them before closing a phase is part of the phase's exit criteria rather than something a pipeline enforces. The scripts are written to be CI-callable so adding a pipeline later is configuration, not rework. |
 
@@ -1524,8 +1550,10 @@ are the ones most likely to be asked about again.
 
 - **Interactive rebase**, and rebase generally (§9). The single largest v2 item. v1 already
   models in-progress rebase state so it can report and refuse rather than corrupt.
-- **A built-in conflict resolver for the Electron build** (D15). VS Code users are already
-  served; Electron users get abort, continue and a read-only view until v2.
+- ~~A built-in conflict resolver for the standalone desktop build~~ (D15) — **resolved by the
+  scope change, not carried to v2.** It existed to cover the one host with no native merge
+  editor; v1 now ships only VS Code, which already has one (§7.11), so there is no gap left to
+  defer. Re-adding a host without one would reopen this as a real v2 (or later) item.
 - **Side-by-side diff** (D13).
 - **Blame, file history, and pickaxe search** (`-S`/`-G`). Different mental models that do not
   belong behind v1's search box.
