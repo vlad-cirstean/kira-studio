@@ -215,6 +215,91 @@ export function revealItem(collectionId: string, itemId: string | null): void {
   }
 }
 
+// ---- mutations ----
+//
+// Every one of them re-lists rather than patching the local arrays: the tree is one call and a
+// pure computed over it (F15), so a re-list is both simpler and impossible to get out of step
+// with what Go actually stored. D13's inline rename doubles as the naming step for all three
+// creation paths — one naming interaction instead of a prompt dialog this app does not have, and
+// VS Code's own explorer behaviour, which is the tree this panel is modelled on.
+
+export async function createCollection(): Promise<void> {
+  const collection = await control.collectionsCreateCollection('New collection');
+  await loadCollections();
+  const key = collectionKey(collection.id);
+  collectionsState.selected = key;
+  collectionsState.renamingKey = key;
+}
+
+export async function createItem(
+  collectionId: string,
+  parentId: string | null,
+  kind: CollectionItemKind,
+): Promise<void> {
+  const item = await control.collectionsCreateItem({
+    collectionId,
+    parentId,
+    kind,
+    name: kind === 'folder' ? 'New folder' : 'New request',
+  });
+  await loadCollections();
+  revealItem(collectionId, parentId);
+  const key = itemKey(item.id);
+  collectionsState.selected = key;
+  collectionsState.renamingKey = key;
+}
+
+export async function renameRow(row: CollectionRowVm, name: string): Promise<void> {
+  collectionsState.renamingKey = null;
+  const target = row.kind === 'collection' ? 'collection' : 'item';
+  await control.collectionsRename(row.id, target, name);
+  await loadCollections();
+}
+
+export async function deleteRow(row: CollectionRowVm): Promise<void> {
+  const target = row.kind === 'collection' ? 'collection' : 'item';
+  await control.collectionsDelete(row.id, target);
+  // Deleting a request does **not** close its open tabs (D14's orphan rule): a tab is an editing
+  // surface with its own persisted state, and silently closing one because a tree row went away
+  // would lose work. Its cached saved request goes, though, so the tab reads as unsaved.
+  delete collectionsState.requests[row.id];
+  if (collectionsState.selected === row.key) collectionsState.selected = null;
+  await loadCollections();
+}
+
+/** Duplicating a folder or a request copies the row itself, not its subtree — moving and
+ *  reordering are D18/§8 OQ-9's, and a deep copy would need both. */
+export async function duplicateRow(row: CollectionRowVm): Promise<void> {
+  const name = `${row.name} copy`;
+  if (row.kind === 'folder') {
+    await control.collectionsCreateItem({
+      collectionId: row.collectionId,
+      parentId: row.parentId,
+      kind: 'folder',
+      name,
+    });
+  } else {
+    const saved = await fetchSavedRequest(row.id);
+    await control.collectionsCreateItem({
+      collectionId: row.collectionId,
+      parentId: row.parentId,
+      kind: 'request',
+      name,
+      request: saved,
+    });
+  }
+  await loadCollections();
+}
+
+export function beginRename(row: CollectionRowVm): void {
+  collectionsState.selected = row.key;
+  collectionsState.renamingKey = row.key;
+}
+
+export function cancelRename(): void {
+  collectionsState.renamingKey = null;
+}
+
 // ---- lookups the panel, the menus and the request view all share ----
 
 export function itemRecord(itemId: string): CollectionItemSummary | undefined {

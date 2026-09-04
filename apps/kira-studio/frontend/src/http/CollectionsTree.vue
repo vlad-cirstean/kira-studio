@@ -1,16 +1,27 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
+import { copyText } from '../clipboard';
 import { shortcutFor } from '../shortcuts/keys';
+import { confirmDialog } from '../state/confirmDialog';
+import { openContextMenu, runMenuShortcut } from '../state/contextMenu';
 import { settingsState } from '../state/settings';
 import { openCollectionRequestTab } from '../state/tabs';
 import TreeHost from '../theme/primitives/TreeHost.vue';
 import CollectionRow from './CollectionRow.vue';
+import { backgroundMenu, type CollectionMenuActions, menuForRow } from './menus';
 import {
+  beginRename,
   type CollectionRowVm,
+  cancelRename,
   collapseRow,
   collectionsState,
+  createCollection,
+  createItem,
+  deleteRow,
+  duplicateRow,
   expandRow,
   fetchSavedRequest,
+  renameRow,
   selectRow,
   toggleRow,
   visibleRows,
@@ -50,6 +61,47 @@ async function onOpen(row: CollectionRowVm): Promise<void> {
   openCollectionRequestTab(row.id, row.name, saved);
 }
 
+// The menu is a description (menus.ts) and this is the one place that knows how to perform any of
+// it — so the actions are injected rather than imported there, which also keeps that module free
+// of both the store's mutation half and the tab-opening path.
+const actions: CollectionMenuActions = {
+  open: (row) => void onOpen(row),
+  newRequest: (row) => void createItem(row.collectionId, folderTarget(row), 'request'),
+  newFolder: (row) => void createItem(row.collectionId, folderTarget(row), 'folder'),
+  newCollection: () => void createCollection(),
+  rename: beginRename,
+  duplicate: (row) => void duplicateRow(row),
+  remove: (row) => void confirmAndDelete(row),
+  copyUrl: (row) => void copyText(row.url),
+};
+
+/** Creating *into* a collection row means the root; into a folder row means that folder. */
+function folderTarget(row: CollectionRowVm): string | null {
+  return row.kind === 'collection' ? null : row.id;
+}
+
+async function confirmAndDelete(row: CollectionRowVm): Promise<void> {
+  const what = row.kind === 'collection' ? 'collection' : row.kind;
+  // A folder and a collection take their whole subtree with them (the migration's own cascade),
+  // which the prompt says out loud rather than leaving to be discovered.
+  const suffix = row.kind === 'request' ? '' : ' and everything inside it';
+  if (!(await confirmDialog(`Delete ${what} "${row.name}"${suffix}?`))) return;
+  await deleteRow(row);
+}
+
+function onContextMenu(row: CollectionRowVm, event: MouseEvent): void {
+  selectRow(row.key);
+  openContextMenu(event, menuForRow(row, actions));
+}
+
+function onBackgroundContextMenu(event: MouseEvent): void {
+  openContextMenu(event, backgroundMenu(actions));
+}
+
+function onRename(row: CollectionRowVm, name: string): void {
+  void renameRow(row, name);
+}
+
 // The same shape ProjectTree.vue has, over the existing tree.* shortcut ids (§3) — plus the
 // arrow keys, which are collapse/expand rather than a menu action and so dispatch directly.
 function onTreeKeydown(e: KeyboardEvent): void {
@@ -71,11 +123,20 @@ function onTreeKeydown(e: KeyboardEvent): void {
   }
   // Enter is the row's primary action, not a menu item — the same action double-click performs,
   // so it dispatches directly rather than through runMenuShortcut (ProjectTree.vue's own split).
-  if (shortcutFor(e, ['tree.open']) === 'tree.open') {
+  const id = shortcutFor(e, TREE_SHORTCUTS);
+  if (!id) return;
+  if (id === 'tree.open') {
     e.preventDefault();
     void onOpen(row);
+    return;
   }
+  // Everything else dispatches through the same menu builder a right-click would call, so the
+  // printed shortcut and the executed action are the same object and `disabled` gating is
+  // honoured for free (state/contextMenu.ts's own reasoning for runMenuShortcut).
+  if (runMenuShortcut(menuForRow(row, actions), id)) e.preventDefault();
 }
+
+const TREE_SHORTCUTS = ['tree.open', 'tree.rename', 'tree.delete', 'tree.duplicate'] as const;
 </script>
 
 <template>
@@ -85,6 +146,7 @@ function onTreeKeydown(e: KeyboardEvent): void {
     :rows="visibleRows"
     :row-height="rowHeight"
     :selected-key="collectionsState.selected"
+    @background-contextmenu="onBackgroundContextMenu"
     @keydown="onTreeKeydown"
   >
     <template #row="{ row, sticky, top }">
@@ -97,6 +159,9 @@ function onTreeKeydown(e: KeyboardEvent): void {
         @select="onSelect"
         @toggle="onToggle"
         @open="onOpen"
+        @contextmenu="onContextMenu"
+        @rename="onRename"
+        @cancel-rename="cancelRename"
       />
     </template>
   </TreeHost>

@@ -5,7 +5,7 @@ import EmptyState from '../theme/primitives/EmptyState.vue';
 import IconButton from '../theme/primitives/IconButton.vue';
 import LeftPanel from '../workbench/panels/LeftPanel.vue';
 import CollectionsTree from './CollectionsTree.vue';
-import { collectionsState, initCollections } from './state/collections';
+import { collectionsState, createCollection, initCollections } from './state/collections';
 
 // P4 C5: the placeholder is gone — this is a real tree now, mounted through the same LeftPanel
 // shell Studio's ProjectPanel.vue uses. `empty` is no longer hardcoded: it is "this app has no
@@ -23,6 +23,10 @@ onMounted(initCollections);
 function onSearch(value: string): void {
   collectionsState.search = value;
 }
+
+function onNewCollection(): void {
+  void createCollection();
+}
 </script>
 
 <template>
@@ -38,6 +42,13 @@ function onSearch(value: string): void {
         data-testid="new-request"
         @click="openHttpRequestTab"
       />
+      <IconButton
+        icon="new-folder"
+        aria-label="New collection"
+        v-tooltip="'New collection'"
+        data-testid="new-collection"
+        @click="onNewCollection"
+      />
     </template>
     <template #body>
       <CollectionsTree />
@@ -46,6 +57,9 @@ function onSearch(value: string): void {
       <EmptyState icon="globe" label="No collections yet">
         <button type="button" class="p-dlgbtn primary" data-testid="new-request-empty" @click="openHttpRequestTab">
           New request
+        </button>
+        <button type="button" class="p-dlgbtn" data-testid="new-collection-empty" @click="onNewCollection">
+          New collection
         </button>
       </EmptyState>
     </template>
