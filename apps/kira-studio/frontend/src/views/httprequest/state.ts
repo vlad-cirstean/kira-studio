@@ -4,8 +4,10 @@ import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
 import { findHttpRequestTab } from '../../state/tabs';
 import { classifyLoadError, createRuntimeStore, stopOp } from '../shared/viewOp';
 
-// P3 C2: the still-two-mode state ('none'|'json') translated onto the wire's six-mode union —
-// C4 widens the state itself; until then this is the whole of the mapping.
+// P3 C4/D5: the state's own six-mode fields, translated onto the wire union. Only the fields the
+// active mode's own serializer reads are populated — the rest stay at their zero value, since
+// `Body.Mode` is what Go's buildBody() actually switches on (D5: every other member is ignored).
+// D5: only enabled, named rows cross the wire (mirrors the header filter just below in send()).
 function buildBodyWire(state: HttpRequestTabState): HttpBodyWire {
   const empty: HttpBodyWire = {
     mode: 'none',
@@ -16,10 +18,42 @@ function buildBodyWire(state: HttpRequestTabState): HttpBodyWire {
     file: '',
     graphql: { query: '', variables: '' },
   };
-  if (state.bodyMode === 'json') {
-    return { ...empty, mode: 'raw', rawLanguage: 'json', raw: state.body };
+  switch (state.bodyMode) {
+    case 'none':
+      return empty;
+    case 'raw':
+      return { ...empty, mode: 'raw', rawLanguage: state.rawLanguage, raw: state.body };
+    case 'urlencoded':
+      return {
+        ...empty,
+        mode: 'urlencoded',
+        urlEncoded: state.urlEncoded
+          .filter((f) => f.enabled && f.name.trim() !== '')
+          .map((f) => ({ name: f.name, value: f.value })),
+      };
+    case 'formdata':
+      return {
+        ...empty,
+        mode: 'formdata',
+        formData: state.formData
+          .filter((f) => f.enabled && f.name.trim() !== '')
+          .map((f) => ({
+            name: f.name,
+            kind: f.kind,
+            value: f.value,
+            path: f.path,
+            contentType: f.contentType,
+          })),
+      };
+    case 'file':
+      return { ...empty, mode: 'file', file: state.binaryFile?.path ?? '' };
+    case 'graphql':
+      return {
+        ...empty,
+        mode: 'graphql',
+        graphql: { query: state.graphqlQuery, variables: state.graphqlVariables },
+      };
   }
-  return empty;
 }
 
 // D6: the response is runtime-only, never persisted (mirrors consoleTabStateSchema's own results

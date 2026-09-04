@@ -215,10 +215,15 @@ export const TAB_KINDS: { [K in TabKind]: TabKindDef<K> } = {
     defaultState: () => defaultHttpRequestTabState(),
     // D2: deliberately breaks with every Studio kind's "same target, fresh default state" — an
     // HTTP request's state *is* the request, so duplicating it to try a variant is the only
-    // reason anyone would. Headers are deep-copied since each is an object in an array.
+    // reason anyone would. P3 F10: headers/urlEncoded/formData are deep-copied since each row is
+    // an object in an array (a shallow spread would share row objects between the two tabs, so
+    // editing one's fields would edit the other's); binaryFile is copied as a fresh object.
     duplicateState: (tab: HttpRequestTabRecord): HttpRequestTabState => ({
       ...tab.state,
       headers: tab.state.headers.map((h) => ({ ...h })),
+      urlEncoded: tab.state.urlEncoded.map((f) => ({ ...f })),
+      formData: tab.state.formData.map((f) => ({ ...f })),
+      binaryFile: tab.state.binaryFile ? { ...tab.state.binaryFile } : null,
     }),
     // D2: the response lives in the view's own runtime store (views/httprequest/state.ts),
     // freed by cleanupTabRuntime — there is no page store of this kind's own to drop.

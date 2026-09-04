@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { HttpMethod } from '@shared/domain/http';
+import type { HttpBodyMode, HttpMethod } from '@shared/domain/http';
 import type { HttpRequestTabRecord } from '@shared/domain/tabs';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { beautifyJson } from '../../beautify';
@@ -82,12 +82,14 @@ function setRequestPane(pane: 'params' | 'headers' | 'body'): void {
   patchHttpRequestTabState(props.tab.id, { requestPane: pane });
 }
 
+// P3 C4: the state schema is now the full six-mode union (D8) — this control stays the P2 two-way
+// toggle only until C5 extracts RequestBodyPane.vue and replaces it with D9's six-way one.
 const BODY_MODE_OPTIONS = [
   { value: 'none' as const, label: 'None', testid: 'http-body-mode-none' },
-  { value: 'json' as const, label: 'JSON', testid: 'http-body-mode-json' },
+  { value: 'raw' as const, label: 'JSON', testid: 'http-body-mode-raw' },
 ];
 
-function setBodyMode(mode: 'none' | 'json'): void {
+function setBodyMode(mode: HttpBodyMode): void {
   patchHttpRequestTabState(props.tab.id, { bodyMode: mode });
 }
 
@@ -202,7 +204,7 @@ onUnmounted(() => {
               />
               <span class="p-push" />
               <IconButton
-                v-if="tab.state.bodyMode === 'json'"
+                v-if="tab.state.bodyMode === 'raw'"
                 icon="expand-all"
                 v-tooltip="'Beautify'"
                 data-testid="http-body-beautify"
@@ -213,7 +215,7 @@ onUnmounted(() => {
               {{ beautifyError }}
             </MessageStrip>
             <CodeMirrorHost
-              v-if="tab.state.bodyMode === 'json'"
+              v-if="tab.state.bodyMode === 'raw'"
               :doc="tab.state.body"
               language="json"
               :read-only="false"

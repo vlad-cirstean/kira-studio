@@ -20,8 +20,9 @@ export interface HttpRedirectHop {
 }
 
 // P3 D2/D5: Postman's own `mode` spelling — httpclient.BodyMode's wire values. Kept distinct from
-// the (still two-mode, until P3 C4) state schema's own httpBodyModeSchema — the wire never carries
-// P2's legacy 'json' alias, only what Go actually understands.
+// the state schema's own httpBodyModeSchema below (same six values, D2) — the wire never carries
+// P2's legacy 'json' alias, only what Go actually understands; state.ts's send() has already
+// resolved the alias by the time it builds this.
 export type HttpBodyModeWire = 'none' | 'raw' | 'urlencoded' | 'formdata' | 'file' | 'graphql';
 
 // httpclient.Field — one urlencoded row.
@@ -93,8 +94,74 @@ export const httpHeaderSchema = /*#__PURE__*/ z.object({
 });
 export type HttpHeaderState = z.infer<typeof httpHeaderSchema>;
 
-export const httpBodyModeSchema = /*#__PURE__*/ z.enum(['none', 'json']);
-export type HttpBodyMode = z.infer<typeof httpBodyModeSchema>;
+// P3 D2: Postman's own `mode` spelling — F2's format column verbatim. 'file' is what Postman's UI
+// calls **binary**: one local file as the entire body.
+export const HTTP_BODY_MODES = [
+  'none',
+  'raw',
+  'urlencoded',
+  'formdata',
+  'file',
+  'graphql',
+] as const;
+export type HttpBodyMode = (typeof HTTP_BODY_MODES)[number];
+
+// P3 D8: P2 shipped bodyMode: 'json'; D2 splits that into `raw` + `rawLanguage`, and
+// `rawLanguage`'s own .default('json') below completes the mapping, so this preprocess is the
+// whole of the legacy alias. Works only because C3 landed first — nothing parses a restored tab's
+// state without it (F1), so this preprocess would never run on the value that needs it.
+export const httpBodyModeSchema = /*#__PURE__*/ z.preprocess(
+  (v) => (v === 'json' ? 'raw' : v),
+  z.enum(HTTP_BODY_MODES),
+);
+
+// P3 D2: Postman's raw sub-selector, F2's list verbatim, in Postman's own dropdown order.
+export const RAW_LANGUAGES = ['text', 'javascript', 'json', 'html', 'xml'] as const;
+export type HttpRawLanguage = (typeof RAW_LANGUAGES)[number];
+export const httpRawLanguageSchema = /*#__PURE__*/ z.enum(RAW_LANGUAGES);
+
+// P3 D7/D12: the default Content-Type per raw sub-language — mirrors Go's
+// contentTypeByRawLanguage map[string]string literal (internal/httpclient/body.go) exactly;
+// tests/unit/go-ts-vocabulary-parity.spec.ts guards the two from drifting apart.
+export const CONTENT_TYPE_BY_RAW_LANGUAGE: Readonly<Record<HttpRawLanguage, string>> = {
+  text: 'text/plain',
+  javascript: 'application/javascript',
+  json: 'application/json',
+  html: 'text/html',
+  xml: 'application/xml',
+};
+
+// P3 D8: one urlencoded row. `enabled` is builder state only, never wire state (P2 D6's rule for
+// headers, reused here) — a disabled row is simply filtered out before the send args are built.
+export const httpUrlEncodedFieldSchema = /*#__PURE__*/ z.object({
+  name: z.string(),
+  value: z.string(),
+  enabled: z.boolean().default(true),
+});
+export type HttpUrlEncodedFieldState = z.infer<typeof httpUrlEncodedFieldSchema>;
+
+// P3 D8: one form-data row — a text row uses `value`, a file row uses `path` (D4: never bytes)
+// plus `fileName`/`fileSize` so the builder can render `report.csv (1.2 MB)` with no round trip
+// back to disk. `contentType` is the row's own per-part override; blank means the mode's default
+// (D6/D7: the row's own Content type field when set, else application/octet-stream for a file).
+export const httpFormDataFieldSchema = /*#__PURE__*/ z.object({
+  name: z.string(),
+  kind: /*#__PURE__*/ z.enum(['text', 'file']).default('text'),
+  value: z.string().default(''),
+  path: z.string().default(''),
+  fileName: z.string().default(''),
+  fileSize: z.number().default(0),
+  contentType: z.string().default(''),
+  enabled: z.boolean().default(true),
+});
+export type HttpFormDataFieldState = z.infer<typeof httpFormDataFieldSchema>;
+
+// P3 D4/D8: the binary (Postman `file`) body's one chosen file — path only, never bytes.
+export const httpBinaryFileSchema = /*#__PURE__*/ z
+  .object({ path: z.string(), name: z.string(), size: z.number() })
+  .nullable()
+  .default(null);
+export type HttpBinaryFileState = z.infer<typeof httpBinaryFileSchema>;
 
 export const httpRequestPaneSchema = /*#__PURE__*/ z.enum(['params', 'headers', 'body']);
 export type HttpRequestPane = z.infer<typeof httpRequestPaneSchema>;
@@ -108,14 +175,26 @@ export type HttpResponseView = z.infer<typeof httpResponseViewSchema>;
 // D6: every field carries `.default()` so a tab saved by P2 still restores once a later phase
 // widens `bodyMode` or adds a field — the same discipline `keyValueTabStateSchema`'s own comment
 // records (tabs.ts), and it matters more here than anywhere else because `repos/tabs.go` drops a
-// row outright on a failed parse. There is deliberately no `params` array: the URL is the single
-// source of truth for the query string (D9), and the Params table is a derived editor over it.
+// row outright on a failed parse (P3 C3 fixes the restore path so these defaults actually fire).
+// There is deliberately no `params` array: the URL is the single source of truth for the query
+// string (D9), and the Params table is a derived editor over it.
+//
+// P3 D8: every body mode keeps its own buffer (flat siblings, not one nullable per-mode object) —
+// switching from raw to form-data and back must not lose the raw text, and flat keeps every field
+// individually `.default()`-able, which is what the restore-through-schema normalization (C3)
+// relies on.
 export const httpRequestTabStateSchema = /*#__PURE__*/ z.object({
   method: httpMethodSchema.default('GET'),
   url: z.string().default(''),
   headers: /*#__PURE__*/ z.array(httpHeaderSchema).default([]),
   bodyMode: httpBodyModeSchema.default('none'),
+  rawLanguage: httpRawLanguageSchema.default('json'),
   body: z.string().default(''),
+  urlEncoded: /*#__PURE__*/ z.array(httpUrlEncodedFieldSchema).default([]),
+  formData: /*#__PURE__*/ z.array(httpFormDataFieldSchema).default([]),
+  binaryFile: httpBinaryFileSchema,
+  graphqlQuery: z.string().default(''),
+  graphqlVariables: z.string().default(''),
   requestPane: httpRequestPaneSchema.default('params'),
   responsePane: httpResponsePaneSchema.default('body'),
   responseView: httpResponseViewSchema.default('pretty'),
