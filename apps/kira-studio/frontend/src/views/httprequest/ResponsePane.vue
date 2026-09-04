@@ -15,6 +15,7 @@ import RawExchangePane from './RawExchangePane.vue';
 import ResponseDiffDialog from './ResponseDiffDialog.vue';
 import ResponseHistoryList from './ResponseHistoryList.vue';
 import { runtime } from './state';
+import TimelinePane from './TimelinePane.vue';
 
 const props = defineProps<{ tab: HttpRequestTabRecord }>();
 
@@ -69,6 +70,8 @@ const RESPONSE_PANE_OPTIONS = [
   // P9 D12/F19: the fourth segment — never on screen at the same time as the body's own Pretty/Raw
   // toggle (gated on responsePane === 'body' below), so the shared "Raw" label never collides.
   { value: 'raw' as const, label: 'Raw', testid: 'http-response-pane-raw' },
+  // P10 D11/F19: the fifth segment — where the time went, per hop.
+  { value: 'timeline' as const, label: 'Timeline', testid: 'http-response-pane-timeline' },
 ];
 
 // P8 C1: HttpResponsePane, not an inline 'body' | 'headers' literal — the schema is the source of
@@ -217,6 +220,7 @@ function onBackToLatest(): void {
         <EmptyState v-else icon="arrow-right" label="Send a request to see the response" />
       </div>
       <RawExchangePane v-else-if="tab.state.responsePane === 'raw'" :tab="tab" />
+      <TimelinePane v-else-if="tab.state.responsePane === 'timeline'" :tab="tab" />
       <div v-else class="response-body">
         <template v-if="response">
           <span
