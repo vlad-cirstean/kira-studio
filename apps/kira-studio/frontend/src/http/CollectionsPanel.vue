@@ -15,6 +15,7 @@ import {
   initCollections,
   itemRecord,
 } from './state/collections';
+import { openDynamicValuesDialog } from './state/dynamicValues';
 import { openEnvironmentsDialog, openVariablesDialog } from './state/variables';
 
 // P4 C5: the placeholder is gone — this is a real tree now, mounted through the same LeftPanel
@@ -68,15 +69,22 @@ function onEnvironments(): void {
   openEnvironmentsDialog();
 }
 
-// D15: the palette's Import collection…, Variables… and Environments… entries. Registered by the
-// panel rather than a view, since the panel is mounted for the whole of Http mode — none is
-// tab-scoped.
+// P6 D11: the palette's own "Dynamic values…" entry — not scoped to any selection, unlike
+// Variables… above.
+function onDynamicValues(): void {
+  openDynamicValuesDialog();
+}
+
+// D15: the palette's Import collection…, Variables…, Environments… and (P6) Dynamic values…
+// entries. Registered by the panel rather than a view, since the panel is mounted for the whole
+// of Http mode — none is tab-scoped.
 let unregisterCommands: Array<() => void> = [];
 onMounted(() => {
   unregisterCommands = [
     registerCommand('http.import', onImport),
     registerCommand('http.variables', onVariablesCommand),
     registerCommand('http.environments', onEnvironments),
+    registerCommand('http.dynamicValues', onDynamicValues),
   ];
 });
 onUnmounted(() => {

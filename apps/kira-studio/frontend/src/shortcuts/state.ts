@@ -33,6 +33,13 @@ export const paletteCommands: PaletteCommand[] = [
   // tab to be scoped to.
   { id: 'http.variables', label: 'Variables…', run: () => runCommand('http.variables') },
   { id: 'http.environments', label: 'Environments…', run: () => runCommand('http.environments') },
+  // P6 D11: the reference dialog's palette entry, same "registered by CollectionsPanel.vue,
+  // mounted for the whole of Http mode" shape as the two above.
+  {
+    id: 'http.dynamicValues',
+    label: 'Dynamic values…',
+    run: () => runCommand('http.dynamicValues'),
+  },
   { id: 'open-settings', label: 'Open settings', run: () => (settingsOpen.value = true) },
   { id: 'toggle-project-panel', label: 'Toggle project panel', run: toggleProjectPanel },
   { id: 'toggle-operations-panel', label: 'Toggle operations panel', run: toggleOperationsPanel },

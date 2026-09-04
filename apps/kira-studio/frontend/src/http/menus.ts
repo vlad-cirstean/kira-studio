@@ -24,6 +24,9 @@ export interface CollectionMenuActions {
   variables(row: CollectionRowVm): void;
   /** P5 D3/D11: the background menu's own "Environments…" item. */
   environments(): void;
+  /** P6 D11: the background menu's own "Dynamic values…" item — opens the read-only reference
+   *  dialog. Not row-scoped, same as environments() above. */
+  dynamicValues(): void;
 }
 
 export function menuForRow(row: CollectionRowVm, actions: CollectionMenuActions): MenuItem[] {
@@ -168,6 +171,13 @@ export function backgroundMenu(actions: CollectionMenuActions): MenuItem[] {
       label: 'Environments…',
       icon: 'settings-gear',
       run: () => actions.environments(),
+    },
+    {
+      type: 'item',
+      id: 'dynamic-values',
+      label: 'Dynamic values…',
+      icon: 'symbol-variable',
+      run: () => actions.dynamicValues(),
     },
   ];
 }
