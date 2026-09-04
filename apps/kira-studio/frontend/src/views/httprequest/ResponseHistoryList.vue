@@ -5,6 +5,7 @@ import type { HttpRequestTabRecord } from '@shared/domain/tabs';
 import { computed, onMounted } from 'vue';
 import { formatBytes } from '../../format';
 import { confirmDialog } from '../../state/confirmDialog';
+import { patchHttpRequestTabState } from '../../state/tabs';
 import AppButton from '../../theme/primitives/AppButton.vue';
 import EmptyState from '../../theme/primitives/EmptyState.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
@@ -50,8 +51,12 @@ function relativeTime(iso: string): string {
   return days === 1 ? 'yesterday' : `${days}d ago`;
 }
 
+// D10: "click views the entry" swaps the *whole* response pane, not just the runtime pointer —
+// without switching back to Body, selecting a row would leave the user staring at the same list
+// they just clicked in, with no visible sign anything happened.
 function onRowClick(id: string): void {
   void viewHistoryEntry(props.tab.id, id);
+  patchHttpRequestTabState(props.tab.id, { responsePane: 'body' });
 }
 
 function onToggle(id: string): void {

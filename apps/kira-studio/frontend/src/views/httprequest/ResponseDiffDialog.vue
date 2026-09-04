@@ -218,7 +218,7 @@ onUnmounted(() => {
             v-for="row in unchangedHeaderRows"
             :key="row.name"
             class="diff-header-row unchanged"
-            data-testid="http-diff-header-row"
+            data-testid="http-diff-header-row-unchanged"
           >
             <span class="diff-header-status p-xs">{{ row.status }}</span>
             <span class="mono diff-header-name">{{ row.name }}</span>
