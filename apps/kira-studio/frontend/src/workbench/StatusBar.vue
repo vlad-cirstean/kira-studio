@@ -3,10 +3,7 @@ import { computed } from 'vue';
 import { formatBytes } from '../format';
 import { appMetricsState } from '../state/appMetrics';
 import { cacheStatsState } from '../state/cacheStats';
-import { layoutState, toggleOperationsPanel, toggleProjectPanel } from '../state/layout';
-import { settingsOpen } from '../state/settings';
 import CodiconIcon from '../theme/CodiconIcon.vue';
-import SettingsDialog from './SettingsDialog.vue';
 import { engineState } from './state/engine';
 
 // Summed across every process metrics.Sample covers (internal/metrics/ticker.go's Interval, 5s) —
@@ -100,47 +97,8 @@ const cacheSizeLabel = computed(() => {
         />
         engine {{ engineState.status }}
       </span>
-
-      <!-- Panel toggles live here, icon-only, with Settings — separated from the read-outs
-           above by a hairline, so "things I toggle" and "things I read" never mix. -->
-      <span class="p-sb-toggles">
-        <button
-          type="button"
-          class="p-status"
-          :class="{ 'is-on': layoutState.panel.project.visible }"
-          v-tooltip="'Connections'"
-          data-testid="toggle-project-panel"
-          @click="toggleProjectPanel"
-        >
-          <CodiconIcon name="layout-sidebar-left" :size="13" />
-        </button>
-        <button
-          type="button"
-          class="p-status"
-          :class="{ 'is-on': layoutState.panel.operations.visible }"
-          v-tooltip="'Operations'"
-          data-testid="toggle-operations-panel"
-          @click="toggleOperationsPanel"
-        >
-          <CodiconIcon name="layout-panel" :size="13" />
-        </button>
-        <button
-          type="button"
-          class="p-status"
-          v-tooltip="'Settings'"
-          data-testid="open-settings"
-          aria-label="Settings"
-          @click="settingsOpen = true"
-        >
-          <CodiconIcon name="settings-gear" :size="13" />
-        </button>
-      </span>
     </div>
   </div>
-
-  <Teleport to="body">
-    <SettingsDialog v-if="settingsOpen" @close="settingsOpen = false" />
-  </Teleport>
 </template>
 
 <style scoped>

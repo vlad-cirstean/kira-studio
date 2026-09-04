@@ -755,15 +755,6 @@
   align-items: center;
   gap: var(--kira-s-1);
 }
-.p-sb-toggles {
-  display: flex;
-  align-items: center;
-  gap: var(--kira-s-1);
-  margin-left: var(--kira-s-2);
-  padding-left: var(--kira-s-2);
-  border-left: var(--kira-border-width) solid var(--kira-border-strong);
-}
-
 /* ---------- empty state ---------- */
 .p-empty {
   flex: 1;
