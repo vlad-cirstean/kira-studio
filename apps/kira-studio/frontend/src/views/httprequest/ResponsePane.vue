@@ -1,24 +1,45 @@
 <script setup lang="ts">
 import { type HttpResponsePane, statusClass, statusHint } from '@shared/domain/http';
 import type { HttpRequestTabRecord } from '@shared/domain/tabs';
-import { computed } from 'vue';
+import { computed, onMounted } from 'vue';
 import { beautifyJson, beautifyXml, scanJson, scanXml } from '../../beautify';
 import CodeMirrorHost from '../../editor/CodeMirrorHost.vue';
 import { formatBytes } from '../../format';
 import { patchHttpRequestTabState } from '../../state/tabs';
+import AppButton from '../../theme/primitives/AppButton.vue';
 import EmptyState from '../../theme/primitives/EmptyState.vue';
 import MessageStrip from '../../theme/primitives/MessageStrip.vue';
 import SegmentedControl from '../../theme/primitives/SegmentedControl.vue';
+import { backToLatest, ensureHistoryLoaded, historyRuntime } from './history';
+import ResponseHistoryList from './ResponseHistoryList.vue';
 import { runtime } from './state';
 
 const props = defineProps<{ tab: HttpRequestTabRecord }>();
 
 const rt = computed(() => runtime[props.tab.id]);
-const response = computed(() => rt.value?.response ?? null);
+const historyRt = computed(() => historyRuntime[props.tab.id]);
+
+// P8 D11: the one initial "does this tab have any history at all" fetch — always, on mount,
+// regardless of the live response or which pane is selected (F9's sibling reasoning). This is
+// what lets a restored tab (no live response, D10) still say "N past responses".
+onMounted(() => {
+  ensureHistoryLoaded(props.tab.id);
+});
+
+// P8 D10: the source swap — a selected history entry's response, or the live one, or none. Every
+// consumer below (the status chip, the hint, elapsed/bytes, the redirect caption, the truncation
+// strip, the headers list, the binary note, prettyFormat, bodyText) reads only this one object,
+// unchanged from before this phase.
+const viewing = computed(() => historyRt.value?.viewing ?? null);
+const response = computed(() => viewing.value?.snapshot.response ?? rt.value?.response ?? null);
+
+const hasHistory = computed(() => (historyRt.value?.entries?.length ?? 0) > 0);
+const historyCount = computed(() => historyRt.value?.entries?.length ?? 0);
 
 const RESPONSE_PANE_OPTIONS = [
   { value: 'body' as const, label: 'Body', testid: 'http-response-pane-body' },
   { value: 'headers' as const, label: 'Headers', testid: 'http-response-pane-headers' },
+  { value: 'history' as const, label: 'History', testid: 'http-response-pane-history' },
 ];
 
 // P8 C1: HttpResponsePane, not an inline 'body' | 'headers' literal — the schema is the source of
@@ -26,6 +47,10 @@ const RESPONSE_PANE_OPTIONS = [
 // this handler's own type. RESPONSE_PANE_OPTIONS still lists only two entries until C4.
 function setResponsePane(pane: HttpResponsePane): void {
   patchHttpRequestTabState(props.tab.id, { responsePane: pane });
+}
+
+function viewHistory(): void {
+  setResponsePane('history');
 }
 
 // D12/C6/D13: scanJson/scanXml are the app's one "is this JSON"/"is this XML" gate (F13) — the
@@ -76,6 +101,22 @@ const bodyText = computed(() => {
   }
   return r.body;
 });
+
+// P8 D10: the two storage notices — only meaningful while viewing a stored entry (the live
+// response carries neither flag). Separate from, and additional to, bodyTruncated's own transfer
+// message (F9) — one is about the transfer, the other about what history chose to keep.
+const bodyStorageTruncated = computed(() => viewing.value?.snapshot.bodyStorageTruncated ?? false);
+const bodyNotStored = computed(() => (viewing.value ? !viewing.value.snapshot.bodyStored : false));
+
+const viewingTime = computed(() => {
+  const iso = viewing.value?.snapshot.entry.sentAt;
+  if (!iso) return '';
+  return new Date(iso).toLocaleTimeString([], { hour12: false });
+});
+
+function onBackToLatest(): void {
+  backToLatest(props.tab.id);
+}
 </script>
 
 <template>
@@ -84,22 +125,25 @@ const bodyText = computed(() => {
       {{ rt.error.message }}
     </MessageStrip>
 
-    <template v-if="response">
+    <template v-if="response || hasHistory">
       <div class="response-status-row p-toolbar">
-        <span class="p-chip" :class="statusClass(response.status)" data-testid="http-status">
-          {{ response.status }} {{ response.statusText }}
-        </span>
-        <span class="p-xs muted status-hint" v-tooltip="hint" data-testid="http-status-hint">{{ hint }}</span>
-        <span class="p-push" />
-        <span class="p-xs dim" data-testid="http-elapsed">{{ response.elapsedMs }} ms</span>
-        <span class="p-xs dim" data-testid="http-body-bytes">{{ formatBytes(response.bodyBytes) }}</span>
-        <SegmentedControl
-          v-if="tab.state.responsePane === 'body' && prettyFormat"
-          :model-value="tab.state.responseView"
-          :options="RESPONSE_VIEW_OPTIONS"
-          data-testid="http-response-view-toggle"
-          @update:model-value="setResponseView"
-        />
+        <template v-if="response">
+          <span class="p-chip" :class="statusClass(response.status)" data-testid="http-status">
+            {{ response.status }} {{ response.statusText }}
+          </span>
+          <span class="p-xs muted status-hint" v-tooltip="hint" data-testid="http-status-hint">{{ hint }}</span>
+          <span class="p-push" />
+          <span class="p-xs dim" data-testid="http-elapsed">{{ response.elapsedMs }} ms</span>
+          <span class="p-xs dim" data-testid="http-body-bytes">{{ formatBytes(response.bodyBytes) }}</span>
+          <SegmentedControl
+            v-if="tab.state.responsePane === 'body' && prettyFormat"
+            :model-value="tab.state.responseView"
+            :options="RESPONSE_VIEW_OPTIONS"
+            data-testid="http-response-view-toggle"
+            @update:model-value="setResponseView"
+          />
+        </template>
+        <span v-else class="p-push" />
         <SegmentedControl
           :model-value="tab.state.responsePane"
           :options="RESPONSE_PANE_OPTIONS"
@@ -108,29 +152,59 @@ const bodyText = computed(() => {
         />
       </div>
 
-      <MessageStrip v-if="response.bodyTruncated" tone="warn" data-testid="http-body-truncated">
+      <MessageStrip v-if="viewing" tone="note" data-testid="http-history-band">
+        Viewing the response from {{ viewingTime }} · {{ viewing?.snapshot.entry.method }}
+        {{ viewing?.snapshot.entry.url }}
+        <AppButton class="strip-action" data-testid="http-history-back" @click="onBackToLatest">
+          {{ rt?.response ? 'Back to latest' : 'Close' }}
+        </AppButton>
+      </MessageStrip>
+
+      <MessageStrip v-if="response?.bodyTruncated" tone="warn" data-testid="http-body-truncated">
         Response truncated at {{ formatBytes(response.bodyBytes) }} — the server sent more than that.
+      </MessageStrip>
+      <MessageStrip v-if="bodyStorageTruncated" tone="note" data-testid="http-history-truncated">
+        Only the first 256 KB of this response was kept in history.
+      </MessageStrip>
+      <MessageStrip v-if="bodyNotStored" tone="note" data-testid="http-history-binary-note">
+        This response's body was binary and was not kept — {{ response ? formatBytes(response.bodyBytes) : '' }}.
       </MessageStrip>
       <div v-if="redirectCaption" class="p-xs dim redirect-caption" data-testid="http-redirects">
         {{ redirectCaption }}
       </div>
 
-      <div v-if="tab.state.responsePane === 'headers'" class="response-headers" data-testid="http-response-headers">
-        <div v-for="(h, i) in response.headers" :key="i" class="response-header-row">
-          <span class="header-name mono">{{ h.name }}</span>
-          <span class="header-value mono">{{ h.value }}</span>
-        </div>
+      <ResponseHistoryList v-if="tab.state.responsePane === 'history'" :tab="tab" />
+      <div v-else-if="tab.state.responsePane === 'headers'" class="response-headers" data-testid="http-response-headers">
+        <template v-if="response">
+          <div v-for="(h, i) in response.headers" :key="i" class="response-header-row">
+            <span class="header-name mono">{{ h.name }}</span>
+            <span class="header-value mono">{{ h.value }}</span>
+          </div>
+        </template>
+        <EmptyState v-else icon="arrow-right" label="Send a request to see the response" />
       </div>
       <div v-else class="response-body">
-        <span v-if="response.bodyEncoding === 'base64'" class="p-sm muted binary-note" data-testid="http-response-binary">
-          {{ response.bodyBytes }} bytes of binary data
-        </span>
-        <CodeMirrorHost
-          v-else
-          :doc="bodyText"
-          :language="prettyFormat ?? 'plain'"
-          :read-only="true"
-        />
+        <template v-if="response">
+          <span
+            v-if="response.bodyEncoding === 'base64'"
+            class="p-sm muted binary-note"
+            data-testid="http-response-binary"
+          >
+            {{ response.bodyBytes }} bytes of binary data
+          </span>
+          <CodeMirrorHost v-else :doc="bodyText" :language="prettyFormat ?? 'plain'" :read-only="true" />
+        </template>
+        <EmptyState v-else icon="arrow-right" label="Send a request to see the response">
+          <button
+            v-if="hasHistory"
+            type="button"
+            class="history-hint-link"
+            data-testid="http-history-hint"
+            @click="viewHistory"
+          >
+            {{ historyCount }} past response{{ historyCount === 1 ? '' : 's' }} · View history
+          </button>
+        </EmptyState>
       </div>
     </template>
 
@@ -196,5 +270,15 @@ const bodyText = computed(() => {
 
 .header-value {
   overflow-wrap: anywhere;
+}
+
+.history-hint-link {
+  margin-top: var(--kira-s-2);
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--kira-accent);
+  cursor: pointer;
+  font-size: var(--kira-t-sm);
 }
 </style>

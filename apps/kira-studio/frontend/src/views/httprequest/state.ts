@@ -13,6 +13,7 @@ import { type ResolvedRequest, substituteBody } from '../../http/substituteReque
 import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
 import { findHttpRequestTab } from '../../state/tabs';
 import { classifyLoadError, createRuntimeStore, stopOp } from '../shared/viewOp';
+import { noteSendRecorded } from './history';
 
 export type { ResolvedRequest } from '../../http/substituteRequest';
 
@@ -186,11 +187,17 @@ export async function send(tabId: string): Promise<void> {
       body: resolved.body,
       collectionId,
       environmentId,
+      // P8 D2: the tab already knows it (http.ts:208) — '' for a scratch tab, exactly like
+      // collectionId's own "possibly empty" shape above.
+      itemId: tab.state.itemId ?? '',
     });
     if (rt.opId !== opId) return; // superseded by a newer send
     rt.status = 'idle';
     rt.opId = null;
     rt.response = response;
+    // P8 D11: refetches the History pane's list when it's the one showing, otherwise just marks
+    // it stale — a user who never opens the pane pays no IPC per send.
+    noteSendRecorded(tabId);
   } catch (err) {
     if (rt.opId !== opId) return;
     rt.opId = null;
