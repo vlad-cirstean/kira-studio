@@ -8,11 +8,14 @@ import LeftPanel from '../workbench/panels/LeftPanel.vue';
 import CollectionsTree from './CollectionsTree.vue';
 import ImportReportStrip from './ImportReportStrip.vue';
 import {
+  collectionRecord,
   collectionsState,
   createCollection,
   importCollection,
   initCollections,
+  itemRecord,
 } from './state/collections';
+import { openVariablesDialog } from './state/variables';
 
 // P4 C5: the placeholder is gone — this is a real tree now, mounted through the same LeftPanel
 // shell Studio's ProjectPanel.vue uses. `empty` is no longer hardcoded: it is "this app has no
@@ -39,13 +42,40 @@ function onImport(): void {
   void importCollection();
 }
 
-// D15: the palette's Import collection… entry. Registered by the panel rather than a view, since
-// the panel is mounted for the whole of Http mode — an import is not tab-scoped.
-let unregisterImport: (() => void) | null = null;
+// P5 D11: the palette's Variables… entry — opens the dialog for whichever collection is
+// currently selected in the tree (a collection row directly, or a folder/request's own
+// collection). A no-op with nothing selected, the same "view-scoped, no-op elsewhere" shape
+// view.run/http.save already have.
+function onVariablesCommand(): void {
+  const selected = collectionsState.selected;
+  if (!selected) return;
+  if (selected.startsWith('c:')) {
+    const id = selected.slice(2);
+    const collection = collectionRecord(id);
+    if (collection) void openVariablesDialog('collection', id, `Variables — ${collection.name}`);
+    return;
+  }
+  if (selected.startsWith('i:')) {
+    const item = itemRecord(selected.slice(2));
+    const collection = item ? collectionRecord(item.collectionId) : undefined;
+    if (item && collection) {
+      void openVariablesDialog('collection', item.collectionId, `Variables — ${collection.name}`);
+    }
+  }
+}
+
+// D15: the palette's Import collection… and Variables… entries. Registered by the panel rather
+// than a view, since the panel is mounted for the whole of Http mode — neither is tab-scoped.
+let unregisterCommands: Array<() => void> = [];
 onMounted(() => {
-  unregisterImport = registerCommand('http.import', onImport);
+  unregisterCommands = [
+    registerCommand('http.import', onImport),
+    registerCommand('http.variables', onVariablesCommand),
+  ];
 });
-onUnmounted(() => unregisterImport?.());
+onUnmounted(() => {
+  for (const off of unregisterCommands) off();
+});
 </script>
 
 <template>

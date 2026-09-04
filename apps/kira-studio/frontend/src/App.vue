@@ -3,6 +3,8 @@ import { onMounted, onUnmounted } from 'vue';
 import { control } from './bridge/control';
 import SaveRequestDialog from './http/SaveRequestDialog.vue';
 import { saveDialogState } from './http/state/collections';
+import { variablesDialogState } from './http/state/variables';
+import VariablesDialog from './http/VariablesDialog.vue';
 import ConnectionDialog from './project/ConnectionDialog.vue';
 import CommandPalette from './shortcuts/CommandPalette.vue';
 import { runCommand } from './shortcuts/commands';
@@ -66,6 +68,7 @@ onUnmounted(() => {
   </div>
   <ConnectionDialog v-if="connectionsState.dialog.open" />
   <SaveRequestDialog v-if="saveDialogState.open" />
+  <VariablesDialog v-if="variablesDialogState.open" />
   <UploadObjectDialog v-if="uploadDialogState.open" />
   <GenerateDataDialog v-if="fakeDataDialogState.open" />
   <ConfirmDialog />

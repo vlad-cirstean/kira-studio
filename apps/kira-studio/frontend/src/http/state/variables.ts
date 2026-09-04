@@ -1,4 +1,4 @@
-import type { HttpEnvironment } from '@shared/domain/variables';
+import type { HttpEnvironment, HttpVariable, VariableScope } from '@shared/domain/variables';
 import { computed, reactive } from 'vue';
 import { control } from '../../bridge/control';
 
@@ -41,4 +41,73 @@ export function initVariables(): void {
 export async function setActiveEnvironment(id: string): Promise<void> {
   await control.variablesSetActiveEnvironment(id);
   await loadEnvironments();
+}
+
+// ---- the variables dialog (D11/D12) — one scope's variable list ----
+
+interface VariablesDialogState {
+  open: boolean;
+  scope: VariableScope | null;
+  ownerId: string;
+  /** "Variables — <collection name>" or "Environment — <environment name>" (D11). */
+  title: string;
+  rows: HttpVariable[];
+}
+
+export const variablesDialogState = reactive<VariablesDialogState>({
+  open: false,
+  scope: null,
+  ownerId: '',
+  title: '',
+  rows: [],
+});
+
+export async function openVariablesDialog(
+  scope: VariableScope,
+  ownerId: string,
+  title: string,
+): Promise<void> {
+  variablesDialogState.scope = scope;
+  variablesDialogState.ownerId = ownerId;
+  variablesDialogState.title = title;
+  variablesDialogState.open = true;
+  await reloadVariablesDialog();
+}
+
+export function closeVariablesDialog(): void {
+  variablesDialogState.open = false;
+}
+
+async function reloadVariablesDialog(): Promise<void> {
+  const { scope, ownerId } = variablesDialogState;
+  if (!scope) return;
+  variablesDialogState.rows = await control.variablesList(scope, ownerId);
+}
+
+/** id: '' creates a new row (D19). Re-lists afterward — the same "one call, always correct"
+ *  discipline http/state/collections.ts's own mutations use. */
+export async function upsertVariable(args: {
+  id: string;
+  name: string;
+  value: string;
+  isSecret: boolean;
+}): Promise<void> {
+  const { scope, ownerId } = variablesDialogState;
+  if (!scope) return;
+  await control.variablesUpsert({ scope, ownerId, ...args });
+  await reloadVariablesDialog();
+}
+
+export async function deleteVariable(id: string): Promise<void> {
+  await control.variablesDelete(id);
+  await reloadVariablesDialog();
+}
+
+/** D12: a duplicate name within one scope is allowed by the schema and resolved first-wins by
+ *  sort_order — this is the dialog's own "which rows are the later, shadowed duplicates" check,
+ *  over the already-sort_order-ordered list List returns. */
+export function isDuplicateName(rows: HttpVariable[], index: number): boolean {
+  const name = rows[index]?.name.trim();
+  if (!name) return false;
+  return rows.slice(0, index).some((r) => r.name.trim() === name);
 }

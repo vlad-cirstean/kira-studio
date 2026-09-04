@@ -20,6 +20,8 @@ export interface CollectionMenuActions {
   copyUrl(row: CollectionRowVm): void;
   importCollection(): void;
   exportCollection(row: CollectionRowVm): void;
+  /** P5 D11: the collection row's own "Variables…" item — opens VariablesDialog scoped to it. */
+  variables(row: CollectionRowVm): void;
 }
 
 export function menuForRow(row: CollectionRowVm, actions: CollectionMenuActions): MenuItem[] {
@@ -98,8 +100,16 @@ export function menuForRow(row: CollectionRowVm, actions: CollectionMenuActions)
   ];
 
   if (row.kind === 'collection') {
-    // Export is a collection-level action: a collection is the unit of export, and the only thing
-    // carrying an `info` block (D2).
+    // Variables… and Export are both collection-level actions: a collection is the unit of
+    // export, and the only scope-owning row this menu ever sees (an environment's own variables
+    // open through EnvironmentsDialog's "Edit variables…" instead, D11).
+    items.push({
+      type: 'item',
+      id: 'variables',
+      label: 'Variables…',
+      icon: 'symbol-variable',
+      run: () => actions.variables(row),
+    });
     items.push({
       type: 'item',
       id: 'export',

@@ -28,6 +28,7 @@ import {
   toggleRow,
   visibleRows,
 } from './state/collections';
+import { openVariablesDialog } from './state/variables';
 
 // P4 D13: a real TreeHost consumer, with **not one line of tree mechanics** of its own —
 // virtualization, the pinned ancestor band and reveal-scroll all live in the primitive P1 factored
@@ -77,6 +78,7 @@ const actions: CollectionMenuActions = {
   copyUrl: (row) => void copyText(row.url),
   importCollection: () => void importCollection(),
   exportCollection: (row) => void exportCollection(row.id, row.name),
+  variables: (row) => void openVariablesDialog('collection', row.id, `Variables — ${row.name}`),
 };
 
 /** Creating *into* a collection row means the root; into a folder row means that folder. */
