@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { type HttpMethod, httpMethodClass } from '@shared/domain/http';
 import type { HttpRequestTabRecord } from '@shared/domain/tabs';
-import { computed, onMounted, onUnmounted } from 'vue';
+import { computed, onMounted, onUnmounted, watch } from 'vue';
 import EnvironmentSelect from '../../http/EnvironmentSelect.vue';
 import { openSaveDialog, savedRequestFor, saveRequest } from '../../http/state/collections';
+import { activeEnvironmentId, ensureVariablesLoaded } from '../../http/state/variables';
 import { registerCommand } from '../../shortcuts/commands';
 import { patchHttpRequestTabState } from '../../state/tabs';
 import AppButton from '../../theme/primitives/AppButton.vue';
@@ -17,7 +18,14 @@ import RequestBodyPane from './RequestBodyPane.vue';
 import RequestHeadersTable from './RequestHeadersTable.vue';
 import ResponsePane from './ResponsePane.vue';
 import { isDirty, toSavedRequest } from './saved';
-import { runtime, send, stop } from './state';
+import {
+  collectionIdFor,
+  mergedValuesAndSecrets,
+  resolveTabState,
+  runtime,
+  send,
+  stop,
+} from './state';
 import { httpRequestTitle, parseQuery, splitUrl } from './url';
 
 // MainView.vue keys this component by tab.id — same discipline as every other *View.vue.
@@ -72,6 +80,39 @@ function onSaveAs(): void {
 function onSend(): void {
   void send(props.tab.id);
 }
+
+// P5 D6/D7/D17: the same resolution send() runs, over the tab's *current* state — a live preview
+// of what would actually go out, without ever sending anything or reaching Go (a secret name is
+// classified 'deferred' and never appears here, D5: its plaintext never enters the renderer to
+// begin with). Only 'unknown' and 'dynamic' references are a warning — 'deferred' is correct and
+// will resolve fine at send time, and 'resolved' needs no callout at all.
+const collectionId = computed(() => collectionIdFor(props.tab.state));
+watch(
+  [collectionId, activeEnvironmentId],
+  ([cid, eid]) => {
+    void ensureVariablesLoaded('collection', cid);
+    void ensureVariablesLoaded('environment', eid);
+  },
+  { immediate: true },
+);
+const unresolvedRefs = computed(() => {
+  const { values, secretNames } = mergedValuesAndSecrets(
+    collectionId.value,
+    activeEnvironmentId.value,
+  );
+  const refs = resolveTabState(props.tab.state, values, secretNames).refs;
+  const byName = new Map(
+    refs.filter((r) => r.kind === 'unknown' || r.kind === 'dynamic').map((r) => [r.name, r]),
+  );
+  return [...byName.values()];
+});
+const unresolvedTooltip = computed(() =>
+  unresolvedRefs.value
+    .map((r) =>
+      r.kind === 'dynamic' ? `${r.name} (dynamic values arrive in a later phase)` : r.name,
+    )
+    .join(', '),
+);
 
 function onStop(): void {
   stop(props.tab.id);
@@ -150,6 +191,14 @@ onUnmounted(() => {
              which renders purely from TAB_KINDS — a dirty(tab) registry member that seven of the
              eight kinds would answer false to is shared machinery for a cosmetic gain (§8 OQ-8). -->
         <span v-if="dirty" class="dirty-mark" data-testid="http-dirty" v-tooltip="'Unsaved changes'">•</span>
+        <span
+          v-if="unresolvedRefs.length > 0"
+          class="p-chip warn"
+          data-testid="http-unresolved-chip"
+          v-tooltip="unresolvedTooltip"
+        >
+          {{ unresolvedRefs.length }} unresolved
+        </span>
       </template>
 
       <template #toolbar>

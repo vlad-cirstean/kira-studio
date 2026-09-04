@@ -21,14 +21,19 @@ type HttpService struct {
 
 // HttpSendArgs carries httpclient.Request's fields plus the op-log addressing every op needs
 // (OpID minted by the renderer, exactly as every data-plane op's already is — F16; TabID so the
-// Operations panel can resolve a tab column for a connectionless op, F9).
+// Operations panel can resolve a tab column for a connectionless op, F9). CollectionID/
+// EnvironmentID are P5 D6's own addition — both possibly empty (a scratch tab has no collection;
+// no environment may be selected) — and are used for exactly one thing: naming the scope stage 2
+// resolves secrets against.
 type HttpSendArgs struct {
-	OpID    string              `json:"opId"`
-	TabID   string              `json:"tabId"`
-	Method  string              `json:"method"`
-	URL     string              `json:"url"`
-	Headers []httpclient.Header `json:"headers"`
-	Body    httpclient.Body     `json:"body"`
+	OpID          string              `json:"opId"`
+	TabID         string              `json:"tabId"`
+	Method        string              `json:"method"`
+	URL           string              `json:"url"`
+	Headers       []httpclient.Header `json:"headers"`
+	Body          httpclient.Body     `json:"body"`
+	CollectionID  string              `json:"collectionId"`
+	EnvironmentID string              `json:"environmentId"`
 }
 
 // Send runs one HTTP request through Host.RunOp with ConnectionID: nil (D3, proven safe by F10 —
@@ -55,12 +60,27 @@ func (s *HttpService) Send(ctx context.Context, args HttpSendArgs) (httpclient.R
 
 	_, value, err := s.Deps.Router.Host().RunOp(ctx, spec,
 		func(runCtx context.Context, op *adapters.OpCtx) (any, error) {
+			// P5 D6/F3: op.SetCommand is called with the *unresolved* URL, both times — op_log.
+			// command is a persisted SQLite column rendered in the Operations panel, and a
+			// {{token}} in a URL is exactly the kind of thing a user puts a credential in.
+			// Resolving secrets before this line would write a plaintext credential into
+			// kira.sqlite on every send.
 			op.SetCommand(fmt.Sprintf("%s %s", args.Method, args.URL))
+
+			// Stage 2 (D6): secrets enter here and go no further — resolved.URL/Headers/Body are
+			// handed straight to httpclient.Send and never fed back into anything logged.
+			url, headers, body, resolveErr := s.Deps.HttpVars.ResolveRequest(
+				args.URL, args.Headers, args.Body, args.CollectionID, args.EnvironmentID,
+			)
+			if resolveErr != nil {
+				return nil, resolveErr
+			}
+
 			resp, sendErr := httpclient.Send(runCtx, httpclient.Request{
 				Method:  args.Method,
-				URL:     args.URL,
-				Headers: args.Headers,
-				Body:    args.Body,
+				URL:     url,
+				Headers: headers,
+				Body:    body,
 			})
 			if sendErr != nil {
 				return nil, sendErr

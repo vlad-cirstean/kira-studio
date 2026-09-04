@@ -126,6 +126,31 @@ async function reloadVariablesDialog(): Promise<void> {
   const { scope, ownerId } = variablesDialogState;
   if (!scope) return;
   variablesDialogState.rows = await control.variablesList(scope, ownerId);
+  listCache[cacheKey(scope, ownerId)] = variablesDialogState.rows;
+}
+
+// ---- the send-time value cache (D6/D7) ----
+//
+// send() needs each scope's non-secret values (and which names are secret, to defer them) without
+// a fresh round trip on every keystroke of a live "unresolved reference" preview — this is that
+// cache, kept in step with VariablesDialog's own edits above (the one place these rows change).
+
+function cacheKey(scope: VariableScope, ownerId: string): string {
+  return `${scope}:${ownerId}`;
+}
+
+const listCache = reactive<Record<string, HttpVariable[]>>({});
+
+/** Populates the cache for one scope if it is not already loaded — safe to call on every render;
+ *  a no-op for '' (a scratch tab's collection, or no active environment). */
+export async function ensureVariablesLoaded(scope: VariableScope, ownerId: string): Promise<void> {
+  if (!ownerId || listCache[cacheKey(scope, ownerId)]) return;
+  listCache[cacheKey(scope, ownerId)] = await control.variablesList(scope, ownerId);
+}
+
+export function cachedVariables(scope: VariableScope, ownerId: string): HttpVariable[] {
+  if (!ownerId) return [];
+  return listCache[cacheKey(scope, ownerId)] ?? [];
 }
 
 /** id: '' creates a new row (D19). Re-lists afterward — the same "one call, always correct"

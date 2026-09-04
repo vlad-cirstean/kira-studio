@@ -286,7 +286,8 @@ export const control = {
   // renderer-minted, exactly like every data-plane op's own beginOp) — never the webview's own
   // fetch (docs/ARCHITECTURE.md's "Go owns the network"). The generated Send drops the injected
   // ctx parameter from its TS signature (§6.1) — Wails still passes it through server-side, so a
-  // window closing mid-request still aborts it.
+  // window closing mid-request still aborts it. P5 D6: collectionId/environmentId name the scope
+  // stage 2 (Go) resolves secrets against — both '' is valid (a scratch tab, no environment).
   httpSend: (args: {
     opId: string;
     tabId: string;
@@ -294,6 +295,8 @@ export const control = {
     url: string;
     headers: HttpHeaderWire[];
     body: HttpBodyWire;
+    collectionId: string;
+    environmentId: string;
   }): Promise<HttpResponseWire> =>
     unwrap(HttpService.Send(args)).then((r) => trust<HttpResponseWire>(r)),
 
