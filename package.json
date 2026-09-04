@@ -6,7 +6,8 @@
   "license": "MIT",
   "private": true,
   "workspaces": [
-    "apps/*/frontend"
+    "apps/*/frontend",
+    "packages/*"
   ],
   "scripts": {
     "prepare": "git config core.hooksPath .githooks || true",
@@ -17,13 +18,14 @@
     "build:test": "cd apps/kira-studio/frontend && bun run build:test",
     "lint": "biome check .",
     "format": "biome check --write .",
-    "typecheck": "bun run typecheck:tests && bun run typecheck:web && bun run typecheck:unit",
+    "typecheck": "bun run typecheck:tests && bun run typecheck:web && bun run typecheck:unit && bun run typecheck:packages",
     "typecheck:tests": "tsgo --noEmit -p apps/kira-studio/tsconfig.tests.json",
     "typecheck:web": "vue-tsc --noEmit -p apps/kira-studio/frontend/tsconfig.json",
     "typecheck:unit": "tsgo --noEmit -p apps/kira-studio/tests/unit/tsconfig.json",
+    "typecheck:packages": "tsgo --noEmit -p packages/git-core/tsconfig.json",
     "test:ui": "bun run build:test && playwright test --config=apps/kira-studio/playwright.config.ts --project=ui",
     "test:ipc:fe": "bun run build:test && playwright test --config=apps/kira-studio/playwright.config.ts --project=ipc-frontend",
-    "test:unit": "bun test apps/kira-studio/tests/unit",
+    "test:unit": "bun test apps/kira-studio/tests/unit packages/git-core",
     "test:e2e-real": "bun run build && node node_modules/.bin/playwright test --config=apps/kira-studio/playwright.config.ts --project=e2e-real",
     "prepackage": "bun run setup",
     "package": "PATH=\"$PATH:$(go env GOPATH)/bin\" sh -c 'cd apps/kira-studio && wails3 task darwin:package:dmg && sh ../../scripts/sign-bundle.sh'",

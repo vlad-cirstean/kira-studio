@@ -1,0 +1,10 @@
+{
+  "name": "@kira/git-core",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Pure domain logic for Kira Studio's Git mode: commit store, graph layout, pre-flight analysis. No I/O, no DOM, no framework, no host.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  }
+}
