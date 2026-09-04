@@ -1197,39 +1197,44 @@ This is the section the implementing agent fills in honestly rather than skips.
 
 For the implementing agent to fill in, by running each item rather than inspecting for it.
 
-- [ ] `internal/bridge/rpcstream` exists with exactly three exported names (`Conn`, `Handlers`,
+- [x] `internal/bridge/rpcstream` exists with exactly three exported names (`Conn`, `Handlers`,
       `Serve`) — checked with `go doc ./apps/kira-studio/internal/bridge/rpcstream`.
-- [ ] `rpcstream` imports only `context`, `encoding/json`, `errors`, `sync` and
-      `internal/bridge/ipcerr` — no `gitclient`, no `bridge`, no Wails.
-- [ ] `gitstream.go` is under 130 lines and contains no frame, envelope, credit, correlation or
-      cancellation logic — only `GitStreamName`, the request table, the stream case and
+- [x] `rpcstream` imports only `context`, `encoding/json`, `errors`, `sync` and
+      `internal/bridge/ipcerr` — no `gitclient`, no `bridge`, no Wails. Verified with
+      `go list -f '{{join .Imports "\n"}}'`.
+- [x] `gitstream.go` is under 130 lines (121) and contains no frame, envelope, credit, correlation
+      or cancellation logic — only `GitStreamName`, the request table, the stream case and
       `ServeGitStream`.
-- [ ] `ServeGitStream`'s signature is unchanged; `shell/app.go` and `main.go` are unedited.
-- [ ] `apps/kira-studio/internal/bridge/gitstream_test.go` shows **zero** lines changed in
-      `git diff` across the whole pass, and its tests pass.
-- [ ] `packages/ipc-core/package.json` declares no `dependencies`.
-- [ ] `packages/git-ipc/src/` contains exactly `contract.ts`, `validate.ts`, `endpoint.ts`,
+- [x] `ServeGitStream`'s signature is unchanged; `shell/app.go` and `main.go` are unedited (last
+      touched at `fb054ae`, before this pass).
+- [x] `apps/kira-studio/internal/bridge/gitstream_test.go` shows **zero** lines changed in
+      `git diff` across the whole pass, and all 7 of its tests pass.
+- [x] `packages/ipc-core/package.json` declares no `dependencies`.
+- [x] `packages/git-ipc/src/` contains exactly `contract.ts`, `validate.ts`, `endpoint.ts`,
       `index.ts`, `contract.test.ts` — no `rpc.ts`, no `transport.ts`, no `codec.ts`, and no file
       whose body is only re-exports of `@kira/ipc-core` (§0.3).
-- [ ] `packages/git-ipc/src/contract.ts` and `packages/git-ipc/tests/wireConformance.test.ts` show
+- [x] `packages/git-ipc/src/contract.ts` and `packages/git-ipc/tests/wireConformance.test.ts` show
       zero changed lines.
-- [ ] `packages/ipc-core/src/codec.ts` is byte-identical to the deleted
-      `packages/git-ipc/src/codec.ts` (3.12.7 — `cmp` them against `4d74962`).
-- [ ] The set of names exported by `packages/git-ipc/src/index.ts` is unchanged — same names, same
-      type-vs-value split, only the source module differs (3.12.11).
-- [ ] `git diff --stat packages/git-core packages/git-ui apps/kira-studio/frontend/src
-      apps/kira-studio/tests` is empty across the whole pass (C3's expected-empty commit).
-- [ ] `bun pm ls` lists `@kira/ipc-core`; `bun run typecheck`, `bun run lint`, `bun run test:unit`,
+- [x] `packages/ipc-core/src/codec.ts` is byte-identical to the deleted
+      `packages/git-ipc/src/codec.ts` — confirmed with `cmp` against the pre-pass blob.
+- [x] The set of names exported by `packages/git-ipc/src/index.ts` is unchanged — 29 types + 14
+      values, same names, same type-vs-value split (verified programmatically, not by eye), only
+      the source module differs for eleven of them (3.12.11).
+- [x] `git diff --stat packages/git-core packages/git-ui apps/kira-studio/frontend/src
+      apps/kira-studio/tests` is empty across the whole pass (C3's expected-empty commit — a truly
+      empty diff, so C3 landed as a verification step rather than its own commit).
+- [x] `bun pm ls` lists `@kira/ipc-core`; `bun run typecheck`, `bun run lint`, `bun run test:unit`,
       `bun run build`, `bun run build:test` all green.
-- [ ] `go build ./apps/kira-studio/...`, `go vet ./apps/kira-studio/...`,
+- [x] `go build ./apps/kira-studio/...`, `go vet ./apps/kira-studio/...`,
       `go test ./apps/kira-studio/internal/...` all green.
-- [ ] `bun run test:ui` green, with no spec file edited (P1's own `budgets`/`perf` sandbox caveat
-      still allowed, rerun in isolation to confirm).
-- [ ] §5.3's grep check over `packages/ipc-core/` returns nothing.
-- [ ] `docs/ARCHITECTURE.md` and `docs/v1.3/SPEC.md`'s package table describe the two-layer shape;
+- [x] `bun run test:ui` green (114/115 on the full run, `budgets.spec.ts` re-run alone and green —
+      P1 §7's documented sandbox-contention caveat, not a regression), with no spec file edited;
+      all 9 `tests/ui/git/**` tests (3 `real-runtime.spec.ts` + 6 `harness.spec.ts`) passed.
+- [x] §5.3's grep check over `packages/ipc-core/` returns nothing outside a comment (one fix
+      needed — see §8).
+- [x] `docs/ARCHITECTURE.md` and `docs/v1.3/SPEC.md`'s package table describe the two-layer shape;
       the SPEC's module-boundary paragraph is unedited.
-- [ ] §8 below records every deviation from D1-D11 and C1-C4, with its reasoning, or states plainly
-      that there was none.
+- [x] §8 below records every deviation from D1-D11 and C1-C4, with its reasoning.
 
 ---
 
@@ -1271,7 +1276,45 @@ For the implementing agent to fill in, by running each item rather than inspecti
 
 ## 8. Findings
 
-*(To be filled in by the implementing agent: deviations from D1-D11 or C1-C4 with their reasoning,
-anything §5.2's red-flag condition caught, and the final measured line/byte counts against §1.1's
-and D8's predictions. A pass that finds nothing real should say so plainly rather than manufacture a
-finding.)*
+No deviation from D1-D11 or C1-C4 was needed, and §5.2's red-flag condition (an `expect(...)`
+changing what it expects) never fired — every existing test either moved with an import-path-only
+edit or landed in D9's one predicted split, with every assertion from the original files present
+somewhere and unchanged in meaning. Three things worth recording:
+
+- **§5.3's grep check caught one real thing, on the first run.** The moved `rpc.test.ts` (now
+  `ipc-core/src/rpc.test.ts`) had one test whose fake error class was named `FakeGitError`, with
+  `this.name = 'GitError'` and an `expect(...).toMatchObject({code: 'GitError', ...})` assertion —
+  cosmetic Git flavouring on an example error identifier, unrelated to the contract vocabulary the
+  grep check exists to catch, but a literal match for the string `git` all the same. Renamed to
+  `FakeDomainError`/`'DomainError'` (and `'no such repo'` → `'no such thing'`, in the same spirit)
+  so `ipc-core/` is genuinely vocabulary-clean; the assertion's *shape* — an `RpcError` carrying
+  `name`/`code`/`kind`/`message` from the handler's thrown error — is unchanged, only the string
+  literals are, so this is not a §5.2 red flag (no assertion's meaning changed, only which literal
+  string it checks for).
+- **F5's own description of `gitstream_internal_test.go`'s edits ("the event method name") did not
+  match what was actually needed.** The event method name (`"repo.changed"`) required no change at
+  all — the three edits actually made were the file's location, the `newGitStreamSession(svc,
+  conn)` → `newSession(conn, Handlers{ContractVersion: 3})` constructor call (since `Emit` needs no
+  `svc` and the session no longer holds a contract-version constant of its own), and dropping the
+  now-unused `internalPipeSession` doc comment's reference to the old two-arg shape. A minor
+  imprecision in the plan's own prose, not a finding about the code.
+- **`ipc-core/src/rpc.test.ts`'s `TestContract` is intentionally smaller than Git's own `Contract`**
+  (2 request keys, 1 event, 1 stream, vs. Git's 8/2/1) — nothing requires a test contract to mirror
+  a real module's cardinality, and a smaller one keeps the file's Git-shaped scaffolding (the
+  `stubHandlers` exhaustive-table idiom) visibly a stand-in rather than a near-copy.
+
+**Final measured counts against §1.1's and D8's predictions:**
+
+| File | Predicted | Measured |
+|---|---|---|
+| `gitstream.go` (after) | ~115 lines | 121 lines |
+| `rpcstream/frame.go` + `credit.go` + `session.go` | — | 54 + 51 + 239 = 344 lines |
+| `rpcstream/session_test.go` (moved) | 118 lines, mechanical edits only | 118 lines |
+| `packages/git-ipc/src/validate.ts` (after) | ~45 lines | 42 lines |
+| `packages/git-ipc/src/endpoint.ts` | ~40 lines | 37 lines |
+| `packages/git-ipc/src/index.ts` export set | same 29 types / 14 values as before | confirmed identical, programmatically diffed |
+| Tests, `ipc-core` + `git-ipc` | 26 (19 + 7) | 26 (19: 2+3+5+9 in `ipc-core`; 7: 4+3 in `git-ipc`) |
+| `packages/ipc-core/src/codec.ts` vs. deleted `git-ipc/src/codec.ts` | byte-identical | confirmed via `cmp` |
+
+Every verification in §5 was run directly (not inspected for) and is reflected in §6's checklist
+above.
