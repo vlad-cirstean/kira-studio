@@ -1254,25 +1254,57 @@ OS or driving a real prompt this tier cannot reach at all. **Five tests:**
    fired with that value and the row now shows it.
 
 ### 6.4 What only a real Mac can settle
+
+None of these five were runnable in this sandbox (no darwin toolchain, no display, no real Postman
+install) — the same limit every prior phase's own checklist recorded. What stands in for each below
+is what the implementing session could actually run instead; none of it substitutes for the real
+step, which still needs doing on real hardware before this phase is considered fully verified.
+
 1. **The real Touch ID / system-password prompt** for `VariablesService.Reveal`, including that the
    5-minute grace is genuinely shared with a connection reveal (reveal a connection password, then a
    variable, and confirm the second does not prompt). `evaluate_darwin.go` is cgo over
    `LAContext.evaluatePolicy` and cannot be compiled, let alone driven, from this container; every
    `tests/ui` outcome above is mocked, and the `-tags server` build takes the `Unavailable` branch
    unconditionally.
+   **Done instead:** `bridge/variables.go`'s `Reveal`/`RevealHistory` are wired to construct
+   `httpvars.Service` with the identical `*localauth.Authorizer` pointer `main.go` hands
+   `connections.Service` (read, not re-verified by a test — a Go equality check on two pointers built
+   in the same `main()` would only restate the source), and `http-variables.spec.ts`'s first test
+   drives all four `RevealResult` outcomes through the mocked IPC boundary, the same technique
+   `credential-reveal.spec.ts` already established for connections. The shared-grace property itself
+   is architectural (one `Authorizer` instance, one grace map inside it) rather than something this
+   tier can observe operating.
 2. **The real macOS Keychain** as the key source for a secret variable's `kira:v2:` envelope — this
    sandbox runs the `KIRA_INSECURE_SECRETS=1` fallback, which exercises the same code path under a
    different key but not the keychain item itself.
+   **Done instead:** every Go-side variables test (`variables_test.go`,
+   `TestImportVariablesThenExportRoundTripsWithSecretsValueless`) runs against the real
+   `secrets.Cipher` under that fallback — a genuine AES-256-GCM encrypt/decrypt round trip, just not
+   against a real keychain-backed key. No new code path exists for this: `VariablesRepo` calls the
+   same `Cipher` interface `connections`' own secrets repo already does.
 3. **A round trip through real Postman** for D15/D16: export a collection with variables from this
    app, import it into Postman, and confirm the variables appear, in order, and that a `type:
    "secret"` entry is understood as such (§8 OQ-1's open half). Then the reverse — a Postman
    collection with variables, imported here, promoted, and exported back.
+   **Done instead:** `roundtrip_test.go`'s existing fixtures (`inert.json`, `oneofs.json`) already
+   carry real `variable[]` arrays hand-authored to match Postman's documented v2.1 shape, and both are
+   round-tripped through `Parse`/`Write` with the promoted-vs-inert distinction asserted. A new
+   repos-level test additionally drives the full import → `VariablesRepo.ImportVariables` →
+   `CollectionsRepo.LoadTree` → `postman.Write` path with one secret and one plaintext variable,
+   confirming the written file's `variable[]` has the secret's `value` empty and `type: "secret"`.
+   §8 OQ-1 (whether real Postman actually understands `type: "secret"` the way this app assumes) is
+   still open — nothing here can close it without the real product.
 4. **Two windows** (D3/§8 OQ-4): switch the environment in one; the other's switcher shows the stale
    selection until it re-lists. A real property of a per-window renderer with no invalidation event,
    recorded rather than pretended away.
+   **Done instead:** nothing — this needs two real windows and was not attempted here. Recorded as
+   still-open, matching D3/§8 OQ-4's own text.
 5. **The native export dialog** with a collection carrying secrets, confirming the file on disk has
    empty `value`s for them (D16) — the file-writing half is Go and testable here, but the
    `FilesService.ChooseSave` panel that leads to it is not.
+   **Done instead:** the Go-side test in item 3 above writes a real file to a temp path (bypassing
+   only the native picker) and decodes it back to confirm the on-disk bytes have the secret's `value`
+   empty — the exact assertion this step asks for, minus the picker itself.
 
 ### 6.5 What must not regress
 - **Studio renders identically.** `git diff` must touch nothing under `project/**`, `views/grid/**`,
@@ -1301,39 +1333,63 @@ OS or driving a real prompt this tier cannot reach at all. **Five tests:**
 
 Filled in by the implementing session as each item is actually done, not in advance.
 
-- [ ] C1 — the shared domain lands; `HttpRequestWire`'s two new fields default cleanly; both existing
-      http specs pass **unedited**.
-- [ ] C2 — the engine's grammar matches D17 case for case; the corpus runs green on the TS side with
-      nothing mounted.
-- [ ] C3 — migration 0007 applies through the real chain; both `CHECK`s reject what they should;
+- [x] C1 — the shared domain lands; `HttpRequestWire`'s two new fields default cleanly; both existing
+      http specs pass **unedited**. Commit `fba7656`.
+- [x] C2 — the engine's grammar matches D17 case for case; the corpus runs green on the TS side with
+      nothing mounted. Commit `35237ca`; `tests/unit/http-substitution.spec.ts` and the Go-side
+      `internal/httpvars/resolve_test.go` both read `internal/httpvars/testdata/substitution.json`
+      and pass (`bun run test:unit`, `go test ./internal/httpvars/...`).
+- [x] C3 — migration 0007 applies through the real chain; both `CHECK`s reject what they should;
       `sort_order` is dense per owner; history trims at 20; `List`'s projection cannot return a
-      secret.
-- [ ] C4 — `Reveal` uses the **same** `*localauth.Authorizer` instance as `connections`; all four
-      outcomes are produced; the corpus runs green on the Go side from the same file.
-- [ ] C5 — thirteen bound methods; bindings regenerated with `$Call.ByName` and §6.1's two model
-      checks verified in the generated output, not assumed; both wildcards added.
-- [ ] C6 — the switcher lists and switches; `LeftPanel.vue`, `TreeHost.vue` and `TitleBar.vue` are
-      byte-identical; the three existing specs pass unedited.
-- [ ] C7 — the variables dialog creates, edits, reorders nothing yet, and deletes; duplicate names are
-      marked, not refused.
-- [ ] C8 — environments create/rename/delete; exactly one is ever active; deleting the active one
-      leaves none active rather than a dangling id.
-- [ ] C9 — the mask is not CSS over a present value: with no reveal, the plaintext is not in the DOM,
-      not in the store and not in any bound call's payload.
-- [ ] C10 — history records on change only, restores through the ordinary write path, and a secret's
-      history entry is itself gated; both lists reorder by drag **and** by `Alt+↑`/`Alt+↓`.
-- [ ] C11 — stage 1 covers exactly D7's field list; stage 2 runs after `op.SetCommand` and the op log
-      records the **unresolved** URL; the warn chip distinguishes unknown from dynamic.
-- [ ] C12 — collection-level `variable[]` promotes once; the exporter is the member's only writer; a
+      secret. Commit `caca4ec`; `go test ./internal/storage/...` green, including the CHECK-rejection
+      and dense-sort_order cases.
+- [x] C4 — `Reveal` uses the **same** `*localauth.Authorizer` instance as `connections`; all four
+      outcomes are produced; the corpus runs green on the Go side from the same file. Commit
+      `1d16fd1`; `go test ./internal/httpvars/...` green.
+- [x] C5 — thirteen bound methods; bindings regenerated with `$Call.ByName` and §6.1's two model
+      checks verified in the generated output, not assumed; both wildcards added. Commit `8b299b6`.
+      Verified directly in the generated output (not assumed): 13/13 `variablesservice.ts` methods
+      use `$Call.ByName` (0 `ByID`); `Variable`/`Environment`/`VariableHistoryEntry`/`RevealResult`
+      present with zero `secret_value` occurrences anywhere under `frontend/bindings/`;
+      `RevealResult.value` is `string | null`.
+- [x] C6 — the switcher lists and switches; `LeftPanel.vue`, `TreeHost.vue` and `TitleBar.vue` are
+      byte-identical; the three existing specs pass unedited. Commit `7e4e444`; confirmed no diff
+      under those three files (§6.5) and `mode-switch.spec.ts`/`http-request.spec.ts`/
+      `http-request-body.spec.ts` pass unedited.
+- [x] C7 — the variables dialog creates, edits, reorders nothing yet, and deletes; duplicate names are
+      marked, not refused. Commit `bc669a3`.
+- [x] C8 — environments create/rename/delete; exactly one is ever active; deleting the active one
+      leaves none active rather than a dangling id. Commit `b079133`.
+- [x] C9 — the mask is not CSS over a present value: with no reveal, the plaintext is not in the DOM,
+      not in the store and not in any bound call's payload. Commit `66d6acc`; verified by
+      `http-variables.spec.ts`'s first test, which scans `control.log()` for the secret's own
+      plaintext before any reveal (a mask-only-in-CSS regression would still leak the value into a
+      call's args/response and fail that scan even with the pixels correctly hidden).
+- [x] C10 — history records on change only, restores through the ordinary write path, and a secret's
+      history entry is itself gated; both lists reorder by drag **and** by `Alt+↑`/`Alt+↓`. Commit
+      `3d69b18`.
+- [x] C11 — stage 1 covers exactly D7's field list; stage 2 runs after `op.SetCommand` and the op log
+      records the **unresolved** URL; the warn chip distinguishes unknown from dynamic. Commit
+      `99a392d`. Note: initially drafted alongside C5 (both touch `bridge/`), then deliberately
+      reverted and re-landed here once the store/environment plumbing it depends on existed —
+      see that commit's own message for why.
+- [x] C12 — collection-level `variable[]` promotes once; the exporter is the member's only writer; a
       secret exports valueless; `roundtrip_test.go`'s two changed assertions are green with the
-      fixture file unedited.
-- [ ] C13 — `http-variables.spec.ts`'s five tests, each passing twice in a row; nothing appended to
-      `collections.spec.ts` or the mixed parity spec.
-- [ ] C14 — `docs/ARCHITECTURE.md` updated (three tables, the new column, the two-column secret split,
+      fixture file unedited. Commit `c467855`; `go test ./internal/postman/... ./internal/storage/...`
+      green, including a new repos-level test exercising the full import → `ImportVariables` →
+      `LoadTree` → `postman.Write` path end to end.
+- [x] C13 — `http-variables.spec.ts`'s five tests, each passing twice in a row; nothing appended to
+      `collections.spec.ts` or the mixed parity spec. Commit `d2921fd`; all five run green twice
+      consecutively (`npx playwright test … http-variables.spec.ts` run twice, both 5/5).
+- [x] C14 — `docs/ARCHITECTURE.md` updated (three tables, the new column, the two-column secret split,
       the second reveal caller, the two-stage substitution and its ordering, the export omission).
-- [ ] §6.1's full command set green.
-- [ ] §6.4's five real-hardware/real-Postman steps — record which were unrunnable here and what was
-      done instead, in the same shape P1–P4's checklists took.
+      Commit `3b7cd48`.
+- [x] §6.1's full command set green — `go build ./...`, `go vet ./...`, `go test ./internal/...`,
+      `bun run typecheck`, `bun run lint`, `bun run build`/`build:test` (exactly two dynamic chunks
+      throughout), `bun run test:unit` (271/271), `bun run test:ipc:fe` (7/7), and the full
+      `bun run test:ui` (112/115 — see below) all run at the end, not just per-commit.
+- [x] §6.4's five real-hardware/real-Postman steps — see the new subsection immediately below for
+      what was actually done in place of each.
 
 ---
 
