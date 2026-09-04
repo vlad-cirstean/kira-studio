@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { HttpBodyMode, HttpRawLanguage } from '@shared/domain/http';
+import type { HttpBodyMode, HttpCodeLanguage } from '@shared/domain/http';
 import type { HttpRequestTabRecord } from '@shared/domain/tabs';
 import { computed, ref } from 'vue';
 import CodeMirrorHost from '../../editor/CodeMirrorHost.vue';
@@ -11,40 +11,44 @@ import { beautifyFor, canBeautify } from '../shared/celleditor/formats';
 import BinaryBodyPicker from './BinaryBodyPicker.vue';
 import {
   BODY_MODE_OPTIONS,
+  CODE_LANGUAGE_OPTIONS,
   contentTypeCaption,
-  editorLanguageForRaw,
-  RAW_LANGUAGE_OPTIONS,
+  editorLanguageForCode,
   userContentTypeHeader,
 } from './body';
 import FormDataTable from './FormDataTable.vue';
-import GraphQlBodyPane from './GraphQlBodyPane.vue';
 import UrlEncodedTable from './UrlEncodedTable.vue';
 
-// P3 C5/D9: extracted from HttpRequestView.vue's own inline block (P2) — the mode selector, the
-// raw-language select, the auto-Content-Type caption and the per-mode editor host all live here
-// now so HttpRequestView.vue stays a layout shell. C7-C10 each add one more mode's editor below;
-// C5 lands `raw` (D9's caption/Beautify rules) plus the six-way selector all six modes will use.
+// C5/D9: extracted from HttpRequestView.vue's own inline block (P2) — the mode selector, the code-
+// language select, the auto-Content-Type caption and the per-mode editor host all live here now so
+// HttpRequestView.vue stays a layout shell. `raw` is a plain-text buffer with no sub-selector;
+// `code` keeps the language selector raw used to carry, narrowed to its four syntax-highlighted
+// languages.
 const props = defineProps<{ tab: HttpRequestTabRecord }>();
 
 function setBodyMode(mode: HttpBodyMode): void {
   patchHttpRequestTabState(props.tab.id, { bodyMode: mode });
 }
 
-function onRawLanguageChange(e: Event): void {
-  const rawLanguage = (e.target as HTMLSelectElement).value as HttpRawLanguage;
-  patchHttpRequestTabState(props.tab.id, { rawLanguage });
+function onCodeLanguageChange(e: Event): void {
+  const codeLanguage = (e.target as HTMLSelectElement).value as HttpCodeLanguage;
+  patchHttpRequestTabState(props.tab.id, { codeLanguage });
   beautifyError.value = null;
 }
 
-function onBodyChange(text: string): void {
+function onRawChange(text: string): void {
   patchHttpRequestTabState(props.tab.id, { body: text });
+}
+
+function onCodeChange(text: string): void {
+  patchHttpRequestTabState(props.tab.id, { code: text });
   beautifyError.value = null;
 }
 
 // D9: Beautify offered exactly where formats.ts's own canBeautify says a lossless reformatter
 // exists (json/xml) — reused, not re-derived (§3: no new beautify logic).
 const beautifyFormat = computed<'json' | 'xml' | null>(() => {
-  const lang = props.tab.state.rawLanguage;
+  const lang = props.tab.state.codeLanguage;
   if (lang !== 'json' && lang !== 'xml') return null;
   return canBeautify(lang) ? lang : null;
 });
@@ -53,23 +57,23 @@ const beautifyError = ref<string | null>(null);
 function onBeautifyBody(): void {
   const fmt = beautifyFormat.value;
   if (!fmt) return;
-  const result = beautifyFor(fmt, props.tab.state.body, 'indented');
+  const result = beautifyFor(fmt, props.tab.state.code, 'indented');
   if (result.ok) {
-    patchHttpRequestTabState(props.tab.id, { body: result.text });
+    patchHttpRequestTabState(props.tab.id, { code: result.text });
     beautifyError.value = null;
   } else {
     beautifyError.value = result.reason ?? 'could not format this body';
   }
 }
 
-const editorLanguage = computed(() => editorLanguageForRaw(props.tab.state.rawLanguage));
+const editorLanguage = computed(() => editorLanguageForCode(props.tab.state.codeLanguage));
 
 // D9: the honest alternative to Postman's greyed "hidden headers" list — states exactly what D7's
 // Content-Type precedence will do, without ever injecting a synthetic row into state.headers.
 const caption = computed(() =>
   contentTypeCaption(
     props.tab.state.bodyMode,
-    props.tab.state.rawLanguage,
+    props.tab.state.codeLanguage,
     userContentTypeHeader(props.tab.state.headers),
   ),
 );
@@ -85,19 +89,19 @@ const caption = computed(() =>
         @update:model-value="setBodyMode"
       />
       <select
-        v-if="tab.state.bodyMode === 'raw'"
+        v-if="tab.state.bodyMode === 'code'"
         class="p-select bordered"
-        data-testid="http-body-raw-language"
-        :value="tab.state.rawLanguage"
-        @change="onRawLanguageChange"
+        data-testid="http-body-code-language"
+        :value="tab.state.codeLanguage"
+        @change="onCodeLanguageChange"
       >
-        <option v-for="opt in RAW_LANGUAGE_OPTIONS" :key="opt.value" :value="opt.value">
+        <option v-for="opt in CODE_LANGUAGE_OPTIONS" :key="opt.value" :value="opt.value">
           {{ opt.label }}
         </option>
       </select>
       <span class="p-push" />
       <IconButton
-        v-if="tab.state.bodyMode === 'raw' && beautifyFormat"
+        v-if="tab.state.bodyMode === 'code' && beautifyFormat"
         icon="expand-all"
         v-tooltip="'Beautify'"
         data-testid="http-body-beautify"
@@ -116,14 +120,20 @@ const caption = computed(() =>
     <CodeMirrorHost
       v-if="tab.state.bodyMode === 'raw'"
       :doc="tab.state.body"
+      language="plain"
+      :read-only="false"
+      @update:doc="onRawChange"
+    />
+    <CodeMirrorHost
+      v-else-if="tab.state.bodyMode === 'code'"
+      :doc="tab.state.code"
       :language="editorLanguage"
       :read-only="false"
-      @update:doc="onBodyChange"
+      @update:doc="onCodeChange"
     />
     <UrlEncodedTable v-else-if="tab.state.bodyMode === 'urlencoded'" :tab="tab" />
     <FormDataTable v-else-if="tab.state.bodyMode === 'formdata'" :tab="tab" />
     <BinaryBodyPicker v-else-if="tab.state.bodyMode === 'file'" :tab="tab" />
-    <GraphQlBodyPane v-else-if="tab.state.bodyMode === 'graphql'" :tab="tab" />
   </div>
 </template>
 

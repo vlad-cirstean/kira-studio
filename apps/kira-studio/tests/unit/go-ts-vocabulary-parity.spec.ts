@@ -11,7 +11,7 @@ import { describe, expect, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import {
-  CONTENT_TYPE_BY_RAW_LANGUAGE,
+  CONTENT_TYPE_BY_CODE_LANGUAGE,
   HTTP_BODY_MODES,
 } from '../../../../packages/shared/domain/http';
 import { opKindSchema } from '../../../../packages/shared/domain/ops';
@@ -71,9 +71,8 @@ describe('Go/TS tab- and op-kind vocabulary parity (P2 D10)', () => {
 });
 
 // P3 D12: the same silent-drift shape as above, for the request body's own two small vocabularies
-// — D2 puts the same six mode strings in two languages, and D7 puts the same five Content-Type
-// values in two languages (Go decides what to send; body.ts decides what the caption claims will
-// be sent).
+// — the mode strings are duplicated in two languages, and so are the Content-Type-by-code-language
+// values (Go decides what to send; body.ts decides what the caption claims will be sent).
 describe('Go/TS HTTP body vocabulary parity (P3 D12)', () => {
   test('httpclient.validBodyModes (Go) matches HTTP_BODY_MODES minus the legacy json alias (TS)', () => {
     const source = readFileSync(
@@ -81,17 +80,17 @@ describe('Go/TS HTTP body vocabulary parity (P3 D12)', () => {
       'utf8',
     );
     const goModes = extractGoStringSet(source, 'validBodyModes');
-    // The legacy 'json' alias (httpBodyModeSchema's preprocess, D8) is input-only and deliberately
-    // has no Go counterpart — HTTP_BODY_MODES itself never contains it.
+    // The legacy 'json' alias (httpRequestTabStateSchema's preprocess) is input-only and
+    // deliberately has no Go counterpart — HTTP_BODY_MODES itself never contains it.
     expect(goModes).toEqual(new Set(HTTP_BODY_MODES));
   });
 
-  test('httpclient.contentTypeByRawLanguage (Go) matches CONTENT_TYPE_BY_RAW_LANGUAGE (TS)', () => {
+  test('httpclient.contentTypeByCodeLanguage (Go) matches CONTENT_TYPE_BY_CODE_LANGUAGE (TS)', () => {
     const source = readFileSync(
       resolve(import.meta.dir, '../../internal/httpclient/body.go'),
       'utf8',
     );
-    const goTable = extractGoStringMap(source, 'contentTypeByRawLanguage');
-    expect(goTable).toEqual(CONTENT_TYPE_BY_RAW_LANGUAGE);
+    const goTable = extractGoStringMap(source, 'contentTypeByCodeLanguage');
+    expect(goTable).toEqual(CONTENT_TYPE_BY_CODE_LANGUAGE);
   });
 });

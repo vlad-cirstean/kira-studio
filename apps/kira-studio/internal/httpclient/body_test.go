@@ -245,40 +245,7 @@ func TestBuildBody_URLEncodedOrderAndSpaceEncoding(t *testing.T) {
 	}
 }
 
-// §6.3 case 5: GraphQL variables survive losslessly, blank variables omit the key entirely, and
-// invalid JSON is refused (CodeBadRequest) before anything is sent.
-func TestBuildBody_GraphQLVariablesLossless(t *testing.T) {
-	var gotBody string
-	srv := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
-		data, _ := io.ReadAll(r.Body)
-		gotBody = string(data)
-	}))
-	defer srv.Close()
-
-	bigID := `{"id":1234567890123456789}`
-	resp := sendViaBuildBody(t, srv.URL, "POST", nil,
-		Body{Mode: "graphql", GraphQL: GraphQLBody{Query: "query { widget }", Variables: bigID}})
-	resp.Body.Close()
-	if want := `{"query":"query { widget }","variables":{"id":1234567890123456789}}`; gotBody != want {
-		t.Errorf("body = %q, want %q", gotBody, want)
-	}
-
-	resp = sendViaBuildBody(t, srv.URL, "POST", nil,
-		Body{Mode: "graphql", GraphQL: GraphQLBody{Query: "query { widget }"}})
-	resp.Body.Close()
-	if want := `{"query":"query { widget }"}`; gotBody != want {
-		t.Errorf("body = %q, want %q (blank variables must omit the key)", gotBody, want)
-	}
-
-	err := buildBodyErr(t, Body{Mode: "graphql", GraphQL: GraphQLBody{
-		Query: "query { widget }", Variables: "{not json",
-	}})
-	if code, ok := CodeOf(err); !ok || code != CodeBadRequest {
-		t.Fatalf("err code = %v (ok=%v), want CodeBadRequest", code, ok)
-	}
-}
-
-// §6.3 case 6: a binary body sets an exact Content-Length and no Content-Type (F3), and a missing
+// §6.3 case 5: a binary body sets an exact Content-Length and no Content-Type (F3), and a missing
 // path is CodeBadRequest with the path named in the message.
 func TestBuildBody_BinaryBodyLengthAndNoContentType(t *testing.T) {
 	dir := t.TempDir()
@@ -323,7 +290,7 @@ func TestBuildBody_BinaryBodyLengthAndNoContentType(t *testing.T) {
 	}
 }
 
-// §6.3 case 7: Content-Type precedence (D7) — a user-set application/vnd.api+json beats raw·json's
+// §6.3 case 6: Content-Type precedence (D7) — a user-set application/vnd.api+json beats code·json's
 // default, and a user-set bare multipart/form-data gets the generated boundary appended so the
 // body still parses server-side.
 func TestBuildBody_ContentTypePrecedence(t *testing.T) {
@@ -336,7 +303,7 @@ func TestBuildBody_ContentTypePrecedence(t *testing.T) {
 
 	resp := sendViaBuildBody(t, srv.URL, "POST",
 		[]Header{{Name: "Content-Type", Value: "application/vnd.api+json"}},
-		Body{Mode: "raw", RawLanguage: "json", Raw: `{"a":1}`})
+		Body{Mode: "code", CodeLanguage: "json", Code: `{"a":1}`})
 	resp.Body.Close()
 	if gotContentType != "application/vnd.api+json" {
 		t.Errorf("Content-Type = %q, want application/vnd.api+json (user value wins)", gotContentType)

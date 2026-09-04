@@ -1,16 +1,14 @@
 import {
-  CONTENT_TYPE_BY_RAW_LANGUAGE,
+  CONTENT_TYPE_BY_CODE_LANGUAGE,
   type HttpBodyMode,
+  type HttpCodeLanguage,
   type HttpHeaderState,
-  type HttpRawLanguage,
   type HttpRequestTabState,
 } from '@shared/domain/http';
 import type { EditorLanguageId } from '../../editor/languages';
 
-// P3 C5/D9: Postman's own six body-mode labels, in Postman's own order — F2's UI-label column,
-// not the wire's `mode` spelling (D2 keeps those two spellings deliberately distinct; BODY_MODE_OPTIONS
-// pairs the wire value with the label a human reads). `title` is the tooltip F12 leans on instead
-// of widening SegmentedControl for this one caller's label widths.
+// C5/D9: the five body-mode labels, in the builder's own order. `title` is the tooltip F12 leans
+// on instead of widening SegmentedControl for this one caller's label widths.
 export const BODY_MODE_OPTIONS: readonly {
   value: HttpBodyMode;
   label: string;
@@ -33,8 +31,14 @@ export const BODY_MODE_OPTIONS: readonly {
   {
     value: 'raw',
     label: 'raw',
-    title: 'Text, JavaScript, JSON, HTML or XML',
+    title: 'Plain text',
     testid: 'http-body-mode-raw',
+  },
+  {
+    value: 'code',
+    label: 'Code',
+    title: 'JavaScript, JSON, HTML or XML',
+    testid: 'http-body-mode-code',
   },
   {
     value: 'file',
@@ -42,37 +46,29 @@ export const BODY_MODE_OPTIONS: readonly {
     title: "One local file, sent as the request's entire body",
     testid: 'http-body-mode-file',
   },
-  {
-    value: 'graphql',
-    label: 'GraphQL',
-    title: 'A GraphQL query and variables',
-    testid: 'http-body-mode-graphql',
-  },
 ];
 
-// D2/F2: Postman's raw sub-selector, in its own dropdown order.
-export const RAW_LANGUAGE_OPTIONS: readonly { value: HttpRawLanguage; label: string }[] = [
-  { value: 'text', label: 'Text' },
+// The `code` mode's sub-selector, in the same order raw's own sub-selector used to list them
+// (minus Text, which is what plain `raw` now means).
+export const CODE_LANGUAGE_OPTIONS: readonly { value: HttpCodeLanguage; label: string }[] = [
   { value: 'javascript', label: 'JavaScript' },
   { value: 'json', label: 'JSON' },
   { value: 'html', label: 'HTML' },
   { value: 'xml', label: 'XML' },
 ];
 
-// C5: which CodeMirror grammar a raw sub-language renders with — only json/xml have a real
-// grammar in this app (languages.ts); text/javascript/html render unhighlighted (D1 declined a
-// JS/HTML grammar for this one raw sub-language each — no requirement beyond colour, unlike
-// GraphQL's D10).
-const RAW_LANGUAGE_TO_EDITOR: Readonly<Record<HttpRawLanguage, EditorLanguageId>> = {
-  text: 'plain',
+// Which CodeMirror grammar a code sub-language renders with — only json/xml have a real grammar
+// in this app (languages.ts); javascript/html render unhighlighted, exactly as they did as raw
+// sub-languages before the split (no requirement beyond colour for either).
+const CODE_LANGUAGE_TO_EDITOR: Readonly<Record<HttpCodeLanguage, EditorLanguageId>> = {
   javascript: 'plain',
   json: 'json',
   html: 'plain',
   xml: 'xml',
 };
 
-export function editorLanguageForRaw(rawLanguage: HttpRawLanguage): EditorLanguageId {
-  return RAW_LANGUAGE_TO_EDITOR[rawLanguage];
+export function editorLanguageForCode(codeLanguage: HttpCodeLanguage): EditorLanguageId {
+  return CODE_LANGUAGE_TO_EDITOR[codeLanguage];
 }
 
 /** The user's own Content-Type header value, if any enabled row sets one — case-insensitive,
@@ -88,19 +84,19 @@ export function userContentTypeHeader(headers: readonly HttpHeaderState[]): stri
 /** D7: the Content-Type Go's own default would apply for this mode — "" when the mode sends none
  *  at all (none, binary). Mirrors internal/httpclient/client.go's own Send precedence, read-only:
  *  this never talks to Go, it only states what D7 documents Go will do. */
-export function defaultContentTypeFor(mode: HttpBodyMode, rawLanguage: HttpRawLanguage): string {
+export function defaultContentTypeFor(mode: HttpBodyMode, codeLanguage: HttpCodeLanguage): string {
   switch (mode) {
     case 'none':
     case 'file':
       return '';
     case 'raw':
-      return CONTENT_TYPE_BY_RAW_LANGUAGE[rawLanguage];
+      return 'text/plain';
+    case 'code':
+      return CONTENT_TYPE_BY_CODE_LANGUAGE[codeLanguage];
     case 'urlencoded':
       return 'application/x-www-form-urlencoded';
     case 'formdata':
       return 'multipart/form-data; boundary=…';
-    case 'graphql':
-      return 'application/json';
   }
 }
 
@@ -109,14 +105,14 @@ export function defaultContentTypeFor(mode: HttpBodyMode, rawLanguage: HttpRawLa
  *  either), and 'none' has nothing to caption. */
 export function contentTypeCaption(
   mode: HttpBodyMode,
-  rawLanguage: HttpRawLanguage,
+  codeLanguage: HttpCodeLanguage,
   userContentType: string | undefined,
 ): string {
   const trimmed = (userContentType ?? '').trim();
   if (trimmed !== '') return `Content-Type: ${trimmed} (from your header)`;
   if (mode === 'none') return '';
   if (mode === 'file') return 'No Content-Type (binary)';
-  return `Content-Type: ${defaultContentTypeFor(mode, rawLanguage)} (auto)`;
+  return `Content-Type: ${defaultContentTypeFor(mode, codeLanguage)} (auto)`;
 }
 
 /** D9: the Body segment's own count badge — mirrors REQUEST_PANE_OPTIONS's existing
@@ -127,6 +123,8 @@ export function bodyBadgeLabel(state: HttpRequestTabState): string {
       return 'Body';
     case 'raw':
       return 'Body (raw)';
+    case 'code':
+      return 'Body (code)';
     case 'urlencoded': {
       const n = state.urlEncoded.filter((f) => f.enabled && f.name.trim() !== '').length;
       return n > 0 ? `Body (${n})` : 'Body';
@@ -137,7 +135,5 @@ export function bodyBadgeLabel(state: HttpRequestTabState): string {
     }
     case 'file':
       return state.binaryFile ? 'Body (1 file)' : 'Body';
-    case 'graphql':
-      return 'Body (GraphQL)';
   }
 }

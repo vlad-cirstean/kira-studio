@@ -1,4 +1,4 @@
-// body.go is P3's own file: one serializer per Postman body mode (D2/D5), turning a Body into
+// body.go is P3's own file: one serializer per request-body mode (D2/D5), turning a Body into
 // what net/http needs — a reader, a working GetBody for 307/308 replay (F4), an exact
 // Content-Length so nothing here is ever sent chunked (F5), and the mode's default Content-Type
 // (client.go's Send applies D7's precedence over it). No dependency (D1): mime/multipart's own
@@ -6,8 +6,6 @@
 package httpclient
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
 	"io"
 	"mime/multipart"
@@ -18,32 +16,31 @@ import (
 	"strings"
 )
 
-// BodyMode is Postman's own `mode` spelling (D2) — "file" is what its UI calls binary.
+// BodyMode is this app's own `mode` spelling, originally Postman's own (D2) before the raw/code
+// split — "file" is what the UI calls binary.
 type BodyMode string
 
 const (
 	BodyNone       BodyMode = "none"
 	BodyRaw        BodyMode = "raw"
+	BodyCode       BodyMode = "code"
 	BodyURLEncoded BodyMode = "urlencoded"
 	BodyFormData   BodyMode = "formdata"
-	// BodyFile — Postman's `file` mode: one local file as the entire body; the UI calls this
-	// **binary**.
-	BodyFile    BodyMode = "file"
-	BodyGraphQL BodyMode = "graphql"
+	// BodyFile — one local file as the entire body; the UI calls this **binary**.
+	BodyFile BodyMode = "file"
 )
 
 // validBodyModes — D12's parity guard reads this exact map[string]bool literal as plain text
 // (extractGoStringSet), so it stays a literal rather than being derived from the consts above.
 var validBodyModes = map[string]bool{
-	"none": true, "raw": true, "urlencoded": true, "formdata": true, "file": true, "graphql": true,
+	"none": true, "raw": true, "code": true, "urlencoded": true, "formdata": true, "file": true,
 }
 
-// contentTypeByRawLanguage — D7's default Content-Type per raw sub-language. A map[string]string
-// literal, not a switch, specifically so D12's parity test (extractGoStringMap) can read it as
-// plain text against CONTENT_TYPE_BY_RAW_LANGUAGE (http.ts) — do not "simplify" this into a
-// switch.
-var contentTypeByRawLanguage = map[string]string{
-	"text":       "text/plain",
+// contentTypeByCodeLanguage — D7's default Content-Type per `code` mode sub-language. A
+// map[string]string literal, not a switch, specifically so D12's parity test
+// (extractGoStringMap) can read it as plain text against CONTENT_TYPE_BY_CODE_LANGUAGE (http.ts)
+// — do not "simplify" this into a switch. Plain `raw` always sends text/plain and needs no table.
+var contentTypeByCodeLanguage = map[string]string{
 	"javascript": "application/javascript",
 	"json":       "application/json",
 	"html":       "text/html",
@@ -68,24 +65,18 @@ type FormField struct {
 	ContentType string `json:"contentType"`
 }
 
-// GraphQLBody carries the user's own query and variables text verbatim (D6) — Variables is never
-// decoded into a map, so a large integer literal in it survives byte-identical into the envelope,
-// the same losslessness beautify.ts's own header comment states for JSON.
-type GraphQLBody struct {
-	Query     string `json:"query"`
-	Variables string `json:"variables"`
-}
-
 // Body is a tagged union: Mode selects which member is meaningful and every other member is
-// ignored (D5).
+// ignored (D5). Raw is the plain-text buffer (raw mode only); Code/CodeLanguage are the
+// syntax-highlighted buffer and its language (code mode only) — two separate buffers so switching
+// between the two modes never loses either one's text.
 type Body struct {
-	Mode        string      `json:"mode"`
-	Raw         string      `json:"raw"`
-	RawLanguage string      `json:"rawLanguage"`
-	URLEncoded  []Field     `json:"urlEncoded"`
-	FormData    []FormField `json:"formData"`
-	File        string      `json:"file"`
-	GraphQL     GraphQLBody `json:"graphql"`
+	Mode         string      `json:"mode"`
+	Raw          string      `json:"raw"`
+	Code         string      `json:"code"`
+	CodeLanguage string      `json:"codeLanguage"`
+	URLEncoded   []Field     `json:"urlEncoded"`
+	FormData     []FormField `json:"formData"`
+	File         string      `json:"file"`
 }
 
 // buildBody turns a Body into what net/http needs. contentType is the default this mode implies
@@ -110,11 +101,11 @@ func buildBody(b Body, formBoundary string) (
 	case BodyNone:
 		return nil, nil, 0, "", nil
 	case BodyRaw:
-		return buildRaw(b.Raw, b.RawLanguage)
+		return buildRaw(b.Raw)
+	case BodyCode:
+		return buildCode(b.Code, b.CodeLanguage)
 	case BodyURLEncoded:
 		return buildURLEncoded(b.URLEncoded)
-	case BodyGraphQL:
-		return buildGraphQL(b.GraphQL)
 	case BodyFile:
 		return buildFile(b.File)
 	case BodyFormData:
@@ -123,10 +114,19 @@ func buildBody(b Body, formBoundary string) (
 	return nil, nil, 0, "", newError(CodeBadRequest, "unknown body mode: "+b.Mode, nil)
 }
 
-func buildRaw(raw, rawLanguage string) (io.ReadCloser, func() (io.ReadCloser, error), int64, string, error) {
+// buildRaw is plain text only — no sub-language, always text/plain.
+func buildRaw(raw string) (io.ReadCloser, func() (io.ReadCloser, error), int64, string, error) {
 	reader := func() io.ReadCloser { return io.NopCloser(strings.NewReader(raw)) }
 	return reader(), func() (io.ReadCloser, error) { return reader(), nil },
-		int64(len(raw)), contentTypeByRawLanguage[rawLanguage], nil
+		int64(len(raw)), "text/plain", nil
+}
+
+// buildCode is the syntax-highlighted sibling of buildRaw — same shape, its Content-Type depends
+// on which of the four code languages was chosen.
+func buildCode(code, codeLanguage string) (io.ReadCloser, func() (io.ReadCloser, error), int64, string, error) {
+	reader := func() io.ReadCloser { return io.NopCloser(strings.NewReader(code)) }
+	return reader(), func() (io.ReadCloser, error) { return reader(), nil },
+		int64(len(code)), contentTypeByCodeLanguage[codeLanguage], nil
 }
 
 // buildURLEncoded hand-writes the encoder rather than reusing url.Values.Encode (F6/D1): that
@@ -147,34 +147,6 @@ func buildURLEncoded(fields []Field) (io.ReadCloser, func() (io.ReadCloser, erro
 	reader := func() io.ReadCloser { return io.NopCloser(strings.NewReader(encoded)) }
 	return reader(), func() (io.ReadCloser, error) { return reader(), nil },
 		int64(len(encoded)), "application/x-www-form-urlencoded", nil
-}
-
-type graphQLEnvelope struct {
-	Query     string          `json:"query"`
-	Variables json.RawMessage `json:"variables,omitempty"`
-}
-
-// buildGraphQL marshals {query, variables} — the GraphQL-over-HTTP convention (§8 OQ-1). Variables
-// is carried as json.RawMessage, which copies the user's own bytes through unmodified rather than
-// decoding and re-encoding them, so a 19-digit id survives byte-identical (D6). Blank variables
-// omit the member entirely, since some servers reject a non-object `variables` and none require
-// the key.
-func buildGraphQL(g GraphQLBody) (io.ReadCloser, func() (io.ReadCloser, error), int64, string, error) {
-	env := graphQLEnvelope{Query: g.Query}
-	trimmed := strings.TrimSpace(g.Variables)
-	if trimmed != "" {
-		if !json.Valid([]byte(trimmed)) {
-			return nil, nil, 0, "", newError(CodeBadRequest, "GraphQL variables are not valid JSON", nil)
-		}
-		env.Variables = json.RawMessage(trimmed)
-	}
-	data, err := json.Marshal(env)
-	if err != nil {
-		return nil, nil, 0, "", newError(CodeHTTPTransport, "could not build GraphQL body: "+err.Error(), err)
-	}
-	reader := func() io.ReadCloser { return io.NopCloser(bytes.NewReader(data)) }
-	return reader(), func() (io.ReadCloser, error) { return reader(), nil },
-		int64(len(data)), "application/json", nil
 }
 
 // buildFile is the binary body: one whole local file, streamed by Go and never by the renderer

@@ -4,25 +4,27 @@ import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
 import { findHttpRequestTab } from '../../state/tabs';
 import { classifyLoadError, createRuntimeStore, stopOp } from '../shared/viewOp';
 
-// P3 C4/D5: the state's own six-mode fields, translated onto the wire union. Only the fields the
-// active mode's own serializer reads are populated — the rest stay at their zero value, since
-// `Body.Mode` is what Go's buildBody() actually switches on (D5: every other member is ignored).
-// D5: only enabled, named rows cross the wire (mirrors the header filter just below in send()).
+// The state's own five-mode fields, translated onto the wire union. Only the fields the active
+// mode's own serializer reads are populated — the rest stay at their zero value, since `Body.Mode`
+// is what Go's buildBody() actually switches on (D5: every other member is ignored). D5: only
+// enabled, named rows cross the wire (mirrors the header filter just below in send()).
 function buildBodyWire(state: HttpRequestTabState): HttpBodyWire {
   const empty: HttpBodyWire = {
     mode: 'none',
     raw: '',
-    rawLanguage: '',
+    code: '',
+    codeLanguage: '',
     urlEncoded: [],
     formData: [],
     file: '',
-    graphql: { query: '', variables: '' },
   };
   switch (state.bodyMode) {
     case 'none':
       return empty;
     case 'raw':
-      return { ...empty, mode: 'raw', rawLanguage: state.rawLanguage, raw: state.body };
+      return { ...empty, mode: 'raw', raw: state.body };
+    case 'code':
+      return { ...empty, mode: 'code', codeLanguage: state.codeLanguage, code: state.code };
     case 'urlencoded':
       return {
         ...empty,
@@ -47,12 +49,6 @@ function buildBodyWire(state: HttpRequestTabState): HttpBodyWire {
       };
     case 'file':
       return { ...empty, mode: 'file', file: state.binaryFile?.path ?? '' };
-    case 'graphql':
-      return {
-        ...empty,
-        mode: 'graphql',
-        graphql: { query: state.graphqlQuery, variables: state.graphqlVariables },
-      };
   }
 }
 

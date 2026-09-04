@@ -19,11 +19,11 @@ export interface HttpRedirectHop {
   url: string;
 }
 
-// P3 D2/D5: Postman's own `mode` spelling — httpclient.BodyMode's wire values. Kept distinct from
-// the state schema's own httpBodyModeSchema below (same six values, D2) — the wire never carries
-// P2's legacy 'json' alias, only what Go actually understands; state.ts's send() has already
-// resolved the alias by the time it builds this.
-export type HttpBodyModeWire = 'none' | 'raw' | 'urlencoded' | 'formdata' | 'file' | 'graphql';
+// The wire's own mode spelling — httpclient.BodyMode's values. Kept distinct from the state
+// schema's own httpBodyModeSchema below (same five values) — the wire never carries P2's legacy
+// 'json' alias, only what Go actually understands; state.ts's send() has already resolved the
+// alias by the time it builds this.
+export type HttpBodyModeWire = 'none' | 'raw' | 'code' | 'urlencoded' | 'formdata' | 'file';
 
 // httpclient.Field — one urlencoded row.
 export interface HttpFieldWire {
@@ -41,22 +41,19 @@ export interface HttpFormFieldWire {
   contentType: string;
 }
 
-// httpclient.GraphQLBody — the user's own query/variables text, carried verbatim.
-export interface HttpGraphQlBodyWire {
-  query: string;
-  variables: string;
-}
-
 // httpclient.Body — a tagged union: `mode` selects which member is meaningful, every other member
-// is ignored (P3 D5), replacing P2's `body: string; hasBody: boolean` pair.
+// is ignored (P3 D5), replacing P2's `body: string; hasBody: boolean` pair. `raw` is the plain-text
+// buffer (raw mode only); `code`/`codeLanguage` are the syntax-highlighted buffer and its language
+// (code mode only, one of CODE_LANGUAGES below) — two separate buffers so switching between the two
+// modes never loses either one's text (D8's "every mode keeps its own buffer" rule).
 export interface HttpBodyWire {
   mode: HttpBodyModeWire;
   raw: string;
-  rawLanguage: string;
+  code: string;
+  codeLanguage: string;
   urlEncoded: HttpFieldWire[];
   formData: HttpFormFieldWire[];
   file: string;
-  graphql: HttpGraphQlBodyWire;
 }
 
 // httpclient.Request — what `HttpService.Send` sends to Go.
@@ -94,44 +91,45 @@ export const httpHeaderSchema = /*#__PURE__*/ z.object({
 });
 export type HttpHeaderState = z.infer<typeof httpHeaderSchema>;
 
-// P3 D2: Postman's own `mode` spelling — F2's format column verbatim. 'file' is what Postman's UI
-// calls **binary**: one local file as the entire body.
-export const HTTP_BODY_MODES = [
-  'none',
-  'raw',
-  'urlencoded',
-  'formdata',
-  'file',
-  'graphql',
-] as const;
+// The request body's mode vocabulary. P3 originally spelled this after Postman's own Collection
+// v2.1 `body.mode` enum verbatim (`'none' | 'raw' | 'urlencoded' | 'formdata' | 'file' | 'graphql'`,
+// with `raw` carrying a `rawLanguage` sub-selector for Text/JavaScript/JSON/HTML/XML) specifically
+// so a future Postman import/export phase would not need a rename table. This app's own product
+// decision since then split that sub-selector in two: `raw` is plain text only, and JavaScript/
+// JSON/HTML/XML became their own top-level `code` mode (its own `codeLanguage` field, below).
+// GraphQL bodies are dropped entirely — not deprecated, removed.
+//
+// BREADCRUMB for whoever builds Postman collection import/export: this vocabulary no longer maps
+// 1:1 onto Postman's own `body.mode`. Postman still has one `raw` mode with a `language` sub-field
+// covering all five; this app now has two separate modes (`raw` == Postman raw·text, `code` ==
+// Postman raw·{javascript,json,html,xml}) and no `graphql` mode at all. A real translation belongs
+// at that import/export boundary — e.g. a Postman `raw` body with `language: 'json'` becomes this
+// app's `code` mode with `codeLanguage: 'json'` on import, and the reverse on export, and a
+// Postman `graphql` body has nowhere to land and needs its own explicit decision (refuse the mode,
+// or import it as `code`/json against the GraphQL-over-HTTP envelope). This is not implemented here
+// — just flagged so it is not rediscovered as a silent data-loss bug.
+export const HTTP_BODY_MODES = ['none', 'raw', 'code', 'urlencoded', 'formdata', 'file'] as const;
 export type HttpBodyMode = (typeof HTTP_BODY_MODES)[number];
+export const httpBodyModeSchema = /*#__PURE__*/ z.enum(HTTP_BODY_MODES);
 
-// P3 D8: P2 shipped bodyMode: 'json'; D2 splits that into `raw` + `rawLanguage`, and
-// `rawLanguage`'s own .default('json') below completes the mapping, so this preprocess is the
-// whole of the legacy alias. Works only because C3 landed first — nothing parses a restored tab's
-// state without it (F1), so this preprocess would never run on the value that needs it.
-export const httpBodyModeSchema = /*#__PURE__*/ z.preprocess(
-  (v) => (v === 'json' ? 'raw' : v),
-  z.enum(HTTP_BODY_MODES),
-);
+// The `code` mode's sub-selector — what used to be four of raw's five sub-languages (everything
+// but Text, which is what plain `raw` now means).
+export const CODE_LANGUAGES = ['javascript', 'json', 'html', 'xml'] as const;
+export type HttpCodeLanguage = (typeof CODE_LANGUAGES)[number];
+export const httpCodeLanguageSchema = /*#__PURE__*/ z.enum(CODE_LANGUAGES);
 
-// P3 D2: Postman's raw sub-selector, F2's list verbatim, in Postman's own dropdown order.
-export const RAW_LANGUAGES = ['text', 'javascript', 'json', 'html', 'xml'] as const;
-export type HttpRawLanguage = (typeof RAW_LANGUAGES)[number];
-export const httpRawLanguageSchema = /*#__PURE__*/ z.enum(RAW_LANGUAGES);
-
-// P3 D7/D12: the default Content-Type per raw sub-language — mirrors Go's
-// contentTypeByRawLanguage map[string]string literal (internal/httpclient/body.go) exactly;
-// tests/unit/go-ts-vocabulary-parity.spec.ts guards the two from drifting apart.
-export const CONTENT_TYPE_BY_RAW_LANGUAGE: Readonly<Record<HttpRawLanguage, string>> = {
-  text: 'text/plain',
+// The default Content-Type per code sub-language — mirrors Go's contentTypeByCodeLanguage
+// map[string]string literal (internal/httpclient/body.go) exactly; plain `raw` always sends
+// text/plain and needs no table. tests/unit/go-ts-vocabulary-parity.spec.ts guards the two Content-
+// Type tables from drifting apart.
+export const CONTENT_TYPE_BY_CODE_LANGUAGE: Readonly<Record<HttpCodeLanguage, string>> = {
   javascript: 'application/javascript',
   json: 'application/json',
   html: 'text/html',
   xml: 'application/xml',
 };
 
-// P3 D8: one urlencoded row. `enabled` is builder state only, never wire state (P2 D6's rule for
+// One urlencoded row. `enabled` is builder state only, never wire state (P2 D6's rule for
 // headers, reused here) — a disabled row is simply filtered out before the send args are built.
 export const httpUrlEncodedFieldSchema = /*#__PURE__*/ z.object({
   name: z.string(),
@@ -140,10 +138,10 @@ export const httpUrlEncodedFieldSchema = /*#__PURE__*/ z.object({
 });
 export type HttpUrlEncodedFieldState = z.infer<typeof httpUrlEncodedFieldSchema>;
 
-// P3 D8: one form-data row — a text row uses `value`, a file row uses `path` (D4: never bytes)
-// plus `fileName`/`fileSize` so the builder can render `report.csv (1.2 MB)` with no round trip
-// back to disk. `contentType` is the row's own per-part override; blank means the mode's default
-// (D6/D7: the row's own Content type field when set, else application/octet-stream for a file).
+// One form-data row — a text row uses `value`, a file row uses `path` (D4: never bytes) plus
+// `fileName`/`fileSize` so the builder can render `report.csv (1.2 MB)` with no round trip back to
+// disk. `contentType` is the row's own per-part override; blank means the mode's default (D6/D7:
+// the row's own Content type field when set, else application/octet-stream for a file).
 export const httpFormDataFieldSchema = /*#__PURE__*/ z.object({
   name: z.string(),
   kind: /*#__PURE__*/ z.enum(['text', 'file']).default('text'),
@@ -156,7 +154,7 @@ export const httpFormDataFieldSchema = /*#__PURE__*/ z.object({
 });
 export type HttpFormDataFieldState = z.infer<typeof httpFormDataFieldSchema>;
 
-// P3 D4/D8: the binary (Postman `file`) body's one chosen file — path only, never bytes.
+// The binary (Postman `file`) body's one chosen file — path only, never bytes.
 export const httpBinaryFileSchema = /*#__PURE__*/ z
   .object({ path: z.string(), name: z.string(), size: z.number() })
   .nullable()
@@ -172,35 +170,52 @@ export type HttpResponsePane = z.infer<typeof httpResponsePaneSchema>;
 export const httpResponseViewSchema = /*#__PURE__*/ z.enum(['pretty', 'raw']);
 export type HttpResponseView = z.infer<typeof httpResponseViewSchema>;
 
-// D6: every field carries `.default()` so a tab saved by P2 still restores once a later phase
-// widens `bodyMode` or adds a field — the same discipline `keyValueTabStateSchema`'s own comment
-// records (tabs.ts), and it matters more here than anywhere else because `repos/tabs.go` drops a
-// row outright on a failed parse (P3 C3 fixes the restore path so these defaults actually fire).
-// There is deliberately no `params` array: the URL is the single source of truth for the query
-// string (D9), and the Params table is a derived editor over it.
+// D6: every field carries `.default()` so a tab saved by an older version still restores once a
+// later phase widens `bodyMode` or adds a field — the same discipline `keyValueTabStateSchema`'s
+// own comment records (tabs.ts), and it matters more here than anywhere else because
+// `repos/tabs.go` drops a row outright on a failed parse (P3 C3 fixed the restore path so these
+// defaults actually fire, `state/tabKinds.ts`'s `parseState`). There is deliberately no `params`
+// array: the URL is the single source of truth for the query string (D9), and the Params table is
+// a derived editor over it.
 //
-// P3 D8: every body mode keeps its own buffer (flat siblings, not one nullable per-mode object) —
-// switching from raw to form-data and back must not lose the raw text, and flat keeps every field
-// individually `.default()`-able, which is what the restore-through-schema normalization (C3)
-// relies on.
-export const httpRequestTabStateSchema = /*#__PURE__*/ z.object({
+// Every body mode keeps its own buffer (flat siblings, not one nullable per-mode object) —
+// switching between modes must not lose any of their text, and flat keeps every field individually
+// `.default()`-able, which is what the restore-through-schema normalization (C3) relies on.
+const httpRequestTabStateShape = /*#__PURE__*/ z.object({
   method: httpMethodSchema.default('GET'),
   url: z.string().default(''),
   headers: /*#__PURE__*/ z.array(httpHeaderSchema).default([]),
   bodyMode: httpBodyModeSchema.default('none'),
-  rawLanguage: httpRawLanguageSchema.default('json'),
   body: z.string().default(''),
+  code: z.string().default(''),
+  codeLanguage: httpCodeLanguageSchema.default('json'),
   urlEncoded: /*#__PURE__*/ z.array(httpUrlEncodedFieldSchema).default([]),
   formData: /*#__PURE__*/ z.array(httpFormDataFieldSchema).default([]),
   binaryFile: httpBinaryFileSchema,
-  graphqlQuery: z.string().default(''),
-  graphqlVariables: z.string().default(''),
   requestPane: httpRequestPaneSchema.default('params'),
   responsePane: httpResponsePaneSchema.default('body'),
   responseView: httpResponseViewSchema.default('pretty'),
   // 0 = "the default half" — PanelSplitter's own convention for "no explicit size saved yet".
   requestPaneHeight: z.number().int().min(0).default(0),
 });
+
+// P2's own legacy alias, kept working: P2 shipped `bodyMode: 'json'` with its text in `body`. P3
+// mapped that mode value onto `raw` + `rawLanguage: 'json'`, since `raw` used to carry a language
+// sub-selector. Now that `raw` means plain text only, the equivalent mode is `code` with
+// `codeLanguage: 'json'` — and because `raw` and `code` are separate buffers, the legacy text has
+// to move from `body` into `code`, not just have its mode value renamed. That is the one thing a
+// per-field enum preprocess (mapping just `bodyMode`) cannot do, so this preprocesses the whole
+// object instead, only for exactly this legacy shape; every other value passes through untouched.
+// Works only because a restored tab's state is normalized through this schema at all
+// (`state/tabKinds.ts`'s `parseState`) — nothing parsed the restore path before that landed.
+export const httpRequestTabStateSchema = /*#__PURE__*/ z.preprocess((v) => {
+  if (v !== null && typeof v === 'object' && (v as Record<string, unknown>).bodyMode === 'json') {
+    const obj = v as Record<string, unknown>;
+    const legacyBody = typeof obj.body === 'string' ? obj.body : '';
+    return { ...obj, bodyMode: 'code', code: legacyBody, codeLanguage: 'json' };
+  }
+  return v;
+}, httpRequestTabStateShape);
 export type HttpRequestTabState = z.infer<typeof httpRequestTabStateSchema>;
 
 export function defaultHttpRequestTabState(): HttpRequestTabState {
