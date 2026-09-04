@@ -1,9 +1,10 @@
 /**
  * Forces one of VS Code's four theme kinds on <body>, the same signals §3.4 documents VS
  * Code injecting automatically, plus a small hand-written dev palette for the --vscode-*
- * tokens the placeholder shell reads. This is P0 fidelity, not P3's: the real
- * generated-from-VS-Code palettes (scripts/gen-theme-palettes.ts) land later. P0 only needs
- * four switchable kinds for the visual-regression baseline and the token-desync test (W8).
+ * tokens the placeholder shell reads. This palette is not a stand-in for something more
+ * complete arriving later — it is the harness's own, deliberately hand-maintained fixture,
+ * covering the four switchable kinds needed for the visual-regression baseline and the
+ * token-desync test (W8).
  */
 export const THEME_KINDS = [
   "vscode-light",

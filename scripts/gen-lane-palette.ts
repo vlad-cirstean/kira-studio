@@ -9,10 +9,11 @@
  *
  * **Only the "dark" kind's colours become the CSS literal fallback.** `--vscode-*` names VS
  * Code did not itself define as a colour id (a *contributed* id, like ours) are never found in
- * a theme's own JSON, so `gen-theme-palettes.ts` (which drives Electron's palette) omits them
- * entirely and the single literal fallback here governs Electron regardless of theme kind. That
- * looks like an oversight; it is the intended path — Electron gets one lane palette, VS Code
- * gets four, and neither generator needs to know about the other.
+ * a theme's own JSON, so nothing else can supply them at runtime when no VS Code is present —
+ * which is exactly the harness's everyday situation (`apps/harness/src/themeSwitcher.ts` injects
+ * only a small hand-written dev palette, not the full contributed set). The single literal
+ * fallback governs that case regardless of theme kind: one lane palette when nothing else
+ * provides one, four when VS Code does.
  *
  * Two checks are the substance of this file, not the colours themselves:
  *  - **Contrast**: every lane colour against its kind's `editor.background`, at the WCAG
@@ -25,8 +26,8 @@
  *
  * `--check` (wired into `bun run check` as `check:lane-palette`) regenerates both artifacts in
  * memory and fails if either differs from what's on disk — the same discipline
- * `gen-settings.ts`/`gen-theme-palettes.ts` already apply, catching a hand-edit or a stale file
- * after this script's own source table changed.
+ * `gen-settings.ts` already applies, catching a hand-edit or a stale file after this script's
+ * own source table changed.
  */
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
