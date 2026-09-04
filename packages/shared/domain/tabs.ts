@@ -27,6 +27,21 @@ export const RENDERABLE_TAB_KINDS: readonly TabKind[] = [
   'browse',
 ];
 
+// P1 D5: a tab's mode is a total function of its kind — no mode column, no migration. This lives
+// in shared/domain/ (not state/tabKinds.ts) because it must be importable with no Vue-state side
+// effects: `state/mode.ts`'s tabsForMode filter needs only this mapping, never the rest of the
+// per-kind registry (components, page stores, menu builders). All seven kinds are Studio's own
+// today; P2's first Http tab kind is the first entry that maps to 'http'.
+export const TAB_KIND_MODE: Record<TabKind, 'studio'> = {
+  data: 'studio',
+  definition: 'studio',
+  console: 'studio',
+  document: 'studio',
+  keyvalue: 'studio',
+  stream: 'studio',
+  browse: 'studio',
+};
+
 const pageSizeSchema = /*#__PURE__*/ z.union([
   z.literal(10),
   z.literal(100),

@@ -25,31 +25,28 @@ import {
   type KeyValueTabState,
   type StreamTabRecord,
   type StreamTabState,
+  type TabKind,
   type TabRecord,
 } from '@shared/domain/tabs';
 import { computed, reactive } from 'vue';
 import { control } from '../bridge/control';
-import { dropForTab as dropConsoleResultPagesForTab } from '../views/console/resultPages';
-import { drop as dropDocumentPagesForTab } from '../views/documents/page';
-import { drop as dropGridPagesForTab } from '../views/grid/page';
 import { clearPending } from '../views/grid/pendingChanges';
-import { drop as dropKeyValuePagesForTab } from '../views/keyvalue/page';
-import { drop as dropStreamPagesForTab } from '../views/stream/page';
 import { clearSelectedCellFor } from './cellSelection';
 import { connectionsState } from './connections';
 import { consoleDefaultFor } from './consoleDefaults';
 import { settingsState } from './settings';
+import { TAB_KINDS } from './tabKinds';
 import { cleanupTabRuntime } from './tabRuntime';
 
 // Frees whichever page store(s) a tab could have populated (§2.2) — a plain no-op lookup miss
 // for the stores a tab's own kind never touches, same discipline as calling
-// clearPending/clearSelectedCellFor unconditionally below regardless of tab kind.
+// clearPending/clearSelectedCellFor unconditionally below regardless of tab kind. Blind-calls
+// every registered kind's own dropper rather than branching on the tab's kind, because by the
+// time closeTab() calls this the tab record has already been spliced out of tabsState.tabs (F12).
 function dropPageStoresForTab(id: string): void {
-  dropGridPagesForTab(id);
-  dropConsoleResultPagesForTab(id);
-  dropDocumentPagesForTab(id);
-  dropKeyValuePagesForTab(id);
-  dropStreamPagesForTab(id);
+  for (const kind of Object.keys(TAB_KINDS) as TabKind[]) {
+    TAB_KINDS[kind].dropResources(id);
+  }
 }
 
 // The tab-closed signal: page stores plus the runtime record every view keeps its count,
@@ -351,83 +348,27 @@ export function openBrowseTab(
 }
 
 // Same target, fresh default state — the cheapest possible demonstration of §8.4's identity rule.
+// P1 D4/F12: reads TAB_KINDS[source.kind].duplicateState instead of a seven-branch if/else — each
+// kind's own entry already knows what "fresh" means for it (data/document/keyvalue/stream keep the
+// source's pageSize; the rest start fully blank).
 export function duplicateTab(id: string): string {
   const source = tabsState.tabs.find((t) => t.id === id);
   if (!source) return id;
 
   const newId = crypto.randomUUID();
-  let record: TabRecord;
-  if (source.kind === 'data') {
-    record = {
-      id: newId,
-      connectionId: source.connectionId,
-      path: source.path,
-      kind: 'data',
-      state: defaultDataTabState(source.state.pageSize),
-      order: tabsState.tabs.length,
-      active: true,
-    };
-  } else if (source.kind === 'definition') {
-    record = {
-      id: newId,
-      connectionId: source.connectionId,
-      path: source.path,
-      kind: 'definition',
-      state: defaultDefinitionTabState(),
-      order: tabsState.tabs.length,
-      active: true,
-    };
-  } else if (source.kind === 'document') {
-    record = {
-      id: newId,
-      connectionId: source.connectionId,
-      path: source.path,
-      kind: 'document',
-      state: defaultDocumentTabState(source.state.pageSize),
-      order: tabsState.tabs.length,
-      active: true,
-    };
-  } else if (source.kind === 'keyvalue') {
-    record = {
-      id: newId,
-      connectionId: source.connectionId,
-      path: source.path,
-      kind: 'keyvalue',
-      state: defaultKeyValueTabState(source.state.pageSize),
-      order: tabsState.tabs.length,
-      active: true,
-    };
-  } else if (source.kind === 'stream') {
-    record = {
-      id: newId,
-      connectionId: source.connectionId,
-      path: source.path,
-      kind: 'stream',
-      state: defaultStreamTabState(source.state.pageSize),
-      order: tabsState.tabs.length,
-      active: true,
-    };
-  } else if (source.kind === 'browse') {
-    record = {
-      id: newId,
-      connectionId: source.connectionId,
-      path: source.path,
-      kind: 'browse',
-      state: defaultBrowseTabState(),
-      order: tabsState.tabs.length,
-      active: true,
-    };
-  } else {
-    record = {
-      id: newId,
-      connectionId: source.connectionId,
-      path: source.path,
-      kind: 'console',
-      state: defaultConsoleTabState(),
-      order: tabsState.tabs.length,
-      active: true,
-    };
-  }
+  const def = TAB_KINDS[source.kind];
+  const record = {
+    id: newId,
+    connectionId: source.connectionId,
+    path: source.path,
+    kind: source.kind,
+    // `def.duplicateState` is one of seven concrete, kind-specific functions once `source.kind`
+    // narrows K — TS can't carry that narrowing through the TAB_KINDS[...] index, so this asserts
+    // it the same way openTab's own record construction does above.
+    state: (def.duplicateState as (tab: TabRecord) => TabRecord['state'])(source),
+    order: tabsState.tabs.length,
+    active: true,
+  } as unknown as TabRecord;
   deactivateAll();
   tabsState.tabs.push(record);
   tabsState.activeId = newId;
