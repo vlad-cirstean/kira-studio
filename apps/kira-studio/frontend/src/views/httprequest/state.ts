@@ -1,5 +1,6 @@
 import type { HttpBodyWire, HttpRequestTabState, HttpResponseWire } from '@shared/domain/http';
 import { control } from '../../bridge/control';
+import { loadDynamicGenerator } from '../../http/dynamic/catalog';
 import { itemRecord } from '../../http/state/collections';
 import { activeEnvironmentId, cachedVariables } from '../../http/state/variables';
 import { type Reference, resolve } from '../../http/substitute';
@@ -98,15 +99,21 @@ export interface ResolvedRequest {
  *  and the active body mode's own substitutable fields — a secret name is left verbatim and
  *  classified 'deferred' (Go finishes it, strictly after op.SetCommand, D6/F3). Pure over its
  *  arguments, called both by send() (to build the wire args) and by HttpRequestView.vue's own
- *  live "unresolved reference" chip (over the same tab state, before a send ever happens). */
+ *  live "unresolved reference" chip (over the same tab state, before a send ever happens).
+ *
+ *  P6 D2: `dynamic`, when supplied, is send()'s own {{$name}} generator callback — forwarded to
+ *  every `resolve()` call this function makes, unchanged. HttpRequestView.vue's live preview never
+ *  supplies it (F2: the chip must never generate a value, so it always calls this with three
+ *  arguments, never four). */
 export function resolveTabState(
   state: HttpRequestTabState,
   values: Readonly<Record<string, string>>,
   secretNames: readonly string[],
+  dynamic?: (name: string) => string | null,
 ): ResolvedRequest {
   const refs: Reference[] = [];
   const sub = (text: string): string => {
-    const result = resolve(text, values, secretNames);
+    const result = resolve(text, values, secretNames, dynamic);
     refs.push(...result.refs);
     return result.text;
   };
@@ -190,7 +197,15 @@ export async function send(tabId: string): Promise<void> {
   const collectionId = collectionIdFor(tab.state);
   const environmentId = activeEnvironmentId.value;
   const { values, secretNames } = mergedValuesAndSecrets(collectionId, environmentId);
-  const resolved = resolveTabState(tab.state, values, secretNames);
+  // P6 D7: the common case — no {{$...}} reference at all — is byte-for-byte today's behaviour:
+  // no await, no dynamic-generators chunk fetched or parsed. Only a request that actually
+  // references a dynamic value pays for a second pass (over a handful of short strings — the
+  // identical computation the live-preview chip already runs on every keystroke, F2) and the one
+  // memoised chunk load (paid once per session, views/grid/fakeData/generate.ts's own technique).
+  const first = resolveTabState(tab.state, values, secretNames);
+  const resolved = first.refs.some((r) => r.kind === 'dynamic')
+    ? resolveTabState(tab.state, values, secretNames, await loadDynamicGenerator())
+    : first;
 
   try {
     const response = await control.httpSend({
