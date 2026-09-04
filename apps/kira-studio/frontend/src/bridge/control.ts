@@ -14,6 +14,7 @@ import * as SchemaService from '@bindings/schemaservice.js';
 import * as SettingsService from '@bindings/settingsservice.js';
 import * as TabsService from '@bindings/tabsservice.js';
 import * as TreeService from '@bindings/treeservice.js';
+import * as VariablesService from '@bindings/variablesservice.js';
 import * as WindowsService from '@bindings/windowsservice.js';
 // P4: model.SavedRequest is a storage-package type, not a bridge one — CollectionsService's own
 // args/results reference it rather than restating it, so the renderer types against it through
@@ -43,6 +44,13 @@ import type { Settings, SettingsPatch } from '@shared/domain/settings';
 import type { TabRecord } from '@shared/domain/tabs';
 import type { ObjectMeta, TreeNode } from '@shared/domain/tree';
 import type { TreeVisibility } from '@shared/domain/tree-filter';
+import type {
+  HttpEnvironment,
+  HttpVariable,
+  HttpVariableHistoryEntry,
+  RevealResult,
+  VariableScope,
+} from '@shared/domain/variables';
 import { type AppMetricsSample, CHANNEL } from '@shared/protocol/events';
 // See bridge/port.ts's identical import for why this needs the directive below rather than the
 // require-an-error kind (P57 M1/M2 finding: a tsconfig "paths" entry for this exact specifier
@@ -103,6 +111,16 @@ function on<T>(name: string, cb: (payload: T) => void): () => void {
 // documented widen-then-narrow, not a silent bypass of a real check.
 function trust<T>(v: unknown): T {
   return v as T;
+}
+
+// model.VariableScope is a named Go string type (unlike, say, model.CollectionItem.Kind, which is
+// a plain `string`), so the generator emits a real TS `enum` for it — a plain 'collection' |
+// 'environment' literal is not structurally assignable to that nominal type. The same documented
+// widen-then-narrow `trust` already applies to every bound *result*; this is its one *argument*-
+// side counterpart, needed only because this is the one bound call whose input carries a Go named
+// enum type at all.
+function scopeArg(scope: VariableScope): WailsStorageModels.VariableScope {
+  return scope as unknown as WailsStorageModels.VariableScope;
 }
 
 export const control = {
@@ -395,4 +413,56 @@ export const control = {
     unwrap(CollectionsService.Import({ path })),
   collectionsExport: (collectionId: string, path: string): Promise<void> =>
     unwrap(CollectionsService.Export({ collectionId, path })),
+
+  // P5 D19: thirteen wrappers over VariablesService — typed against the shared domain mirrors
+  // (D20) rather than the generated models directly, the one difference from collectionsList's
+  // own precedent above (nothing here becomes tab state, so there is no equivalent reason to stay
+  // close to the wire shape).
+  variablesListEnvironments: (): Promise<HttpEnvironment[]> =>
+    unwrap(VariablesService.ListEnvironments()).then((r) => trust<HttpEnvironment[]>(r ?? [])),
+  variablesCreateEnvironment: (name: string): Promise<HttpEnvironment> =>
+    unwrap(VariablesService.CreateEnvironment({ name })).then((r) => trust<HttpEnvironment>(r)),
+  variablesRenameEnvironment: (id: string, name: string): Promise<void> =>
+    unwrap(VariablesService.RenameEnvironment({ id, name })),
+  variablesDeleteEnvironment: (id: string): Promise<void> =>
+    unwrap(VariablesService.DeleteEnvironment({ id })),
+  // id: '' selects "No environment" (D3).
+  variablesSetActiveEnvironment: (id: string): Promise<void> =>
+    unwrap(VariablesService.SetActiveEnvironment({ id })),
+  variablesReorderEnvironments: (ids: string[]): Promise<void> =>
+    unwrap(VariablesService.ReorderEnvironments({ ids })),
+
+  variablesList: (scope: VariableScope, ownerId: string): Promise<HttpVariable[]> =>
+    unwrap(VariablesService.List({ scope: scopeArg(scope), ownerId })).then((r) =>
+      trust<HttpVariable[]>(r ?? []),
+    ),
+  // id: '' creates a new row (D19).
+  variablesUpsert: (args: {
+    scope: VariableScope;
+    ownerId: string;
+    id: string;
+    name: string;
+    value: string;
+    isSecret: boolean;
+  }): Promise<HttpVariable> =>
+    unwrap(VariablesService.Upsert({ ...args, scope: scopeArg(args.scope) })).then((r) =>
+      trust<HttpVariable>(r),
+    ),
+  variablesDelete: (id: string): Promise<void> => unwrap(VariablesService.Delete({ id })),
+  variablesReorder: (scope: VariableScope, ownerId: string, ids: string[]): Promise<void> =>
+    unwrap(VariablesService.Reorder({ scope: scopeArg(scope), ownerId, ids })),
+
+  variablesHistory: (variableId: string): Promise<HttpVariableHistoryEntry[]> =>
+    unwrap(VariablesService.History({ variableId })).then((r) =>
+      trust<HttpVariableHistoryEntry[]>(r ?? []),
+    ),
+
+  // D8/D9: neither reveal call ever rejects — the outcome names what happened (revealed |
+  // cancelled | confirmation-required | error), the same contract connectionsReveal already has.
+  variablesReveal: (variableId: string, confirmed: boolean): Promise<RevealResult> =>
+    unwrap(VariablesService.Reveal({ variableId, confirmed })).then((r) => trust<RevealResult>(r)),
+  variablesRevealHistory: (historyId: string, confirmed: boolean): Promise<RevealResult> =>
+    unwrap(VariablesService.RevealHistory({ historyId, confirmed })).then((r) =>
+      trust<RevealResult>(r),
+    ),
 };

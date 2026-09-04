@@ -26,6 +26,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/config"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/connections"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/enginecache"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/httpvars"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/localauth"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/logging"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/metrics"
@@ -87,11 +88,15 @@ func main() {
 	// P5: the same "needs a Cipher, constructed separately from repos.New's aggregate" shape as
 	// secretsRepo just above.
 	repositories.Variables = repos.NewVariables(db.DB, cipher)
+	// P5 D8: the SAME authorizer instance connections.New below is given — that is what makes the
+	// reveal grace genuinely shared between a connection-password reveal and a variable reveal.
+	httpVarsSvc := httpvars.New(repositories.Variables, cipher, authorizer)
 
 	deps := appcore.Deps{
 		DB:        db.DB,
 		StartedAt: startedAt.UnixMilli(),
 		Repos:     repositories,
+		HttpVars:  httpVarsSvc,
 	}
 
 	// Read from the just-migrated (possibly still-default) settings row, same as production would
@@ -206,6 +211,7 @@ func main() {
 			application.NewService(&bridge.SchemaService{Deps: deps}),
 			application.NewService(&bridge.HttpService{Deps: deps}),
 			application.NewService(&bridge.CollectionsService{Deps: deps}),
+			application.NewService(&bridge.VariablesService{Deps: deps}),
 			application.NewService(&bridge.LifecycleService{Flusher: quitter, WindowFlusher: closeFlush}),
 		},
 		Assets: application.AssetOptions{

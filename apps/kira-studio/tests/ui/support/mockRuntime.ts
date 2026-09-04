@@ -90,6 +90,19 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   collectionsDelete: 'CollectionsService.Delete',
   collectionsImport: 'CollectionsService.Import',
   collectionsExport: 'CollectionsService.Export',
+  variablesListEnvironments: 'VariablesService.ListEnvironments',
+  variablesCreateEnvironment: 'VariablesService.CreateEnvironment',
+  variablesRenameEnvironment: 'VariablesService.RenameEnvironment',
+  variablesDeleteEnvironment: 'VariablesService.DeleteEnvironment',
+  variablesSetActiveEnvironment: 'VariablesService.SetActiveEnvironment',
+  variablesReorderEnvironments: 'VariablesService.ReorderEnvironments',
+  variablesList: 'VariablesService.List',
+  variablesUpsert: 'VariablesService.Upsert',
+  variablesDelete: 'VariablesService.Delete',
+  variablesReorder: 'VariablesService.Reorder',
+  variablesHistory: 'VariablesService.History',
+  variablesReveal: 'VariablesService.Reveal',
+  variablesRevealHistory: 'VariablesService.RevealHistory',
 };
 
 /** ipc.ts's legacy channel string (what every `ControlSnapshot.channel` and fixture is keyed by,
@@ -178,6 +191,11 @@ const WILDCARD_DEFAULTS: Readonly<Record<string, string>> = Object.freeze({
   // boots with none and asserts the panel still says "Collections") gets "no collections yet",
   // the same reasoning `queriesList: '[]'` already carries.
   [IPC.collectionsList]: JSON.stringify({ collections: [], items: [] }),
+  // P5 F9: the environment switcher and the variables dialog both fetch on mount, uncaught, the
+  // same trap collectionsList already needed a wildcard for — mode-switch.spec.ts,
+  // http-request.spec.ts and http-request-body.spec.ts all boot with no variables fixture at all.
+  [IPC.variablesListEnvironments]: '[]',
+  [IPC.variablesList]: '[]',
   [IPC.queriesList]: '[]',
   [IPC.queriesListConsole]: '[]',
   [IPC.queriesHistoryList]: '[]',
