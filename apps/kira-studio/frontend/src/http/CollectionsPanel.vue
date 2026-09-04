@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, onMounted } from 'vue';
 import { openHttpRequestTab } from '../state/tabs';
 import EmptyState from '../theme/primitives/EmptyState.vue';
 import IconButton from '../theme/primitives/IconButton.vue';
 import LeftPanel from '../workbench/panels/LeftPanel.vue';
 import CollectionsTree from './CollectionsTree.vue';
-import { collectionsState } from './state/collections';
+import { collectionsState, initCollections } from './state/collections';
 
 // P4 C5: the placeholder is gone — this is a real tree now, mounted through the same LeftPanel
 // shell Studio's ProjectPanel.vue uses. `empty` is no longer hardcoded: it is "this app has no
@@ -14,6 +14,11 @@ import { collectionsState } from './state/collections';
 // The `new-request` and `new-request-empty` testids are preserved exactly as P1 left them —
 // existing specs click them, and P4 has no reason to move Http's front door.
 const empty = computed(() => collectionsState.collections.length === 0);
+
+// The fetch belongs to the panel rather than the tree: LeftPanel renders #body only when it is
+// non-empty, so a tree that loaded itself on mount would never load at all on a fresh install —
+// no collections, no tree, no call, no collections.
+onMounted(initCollections);
 
 function onSearch(value: string): void {
   collectionsState.search = value;

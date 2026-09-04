@@ -1,6 +1,8 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, ref } from 'vue';
+import { shortcutFor } from '../shortcuts/keys';
 import { settingsState } from '../state/settings';
+import { openCollectionRequestTab } from '../state/tabs';
 import TreeHost from '../theme/primitives/TreeHost.vue';
 import CollectionRow from './CollectionRow.vue';
 import {
@@ -8,7 +10,7 @@ import {
   collapseRow,
   collectionsState,
   expandRow,
-  initCollections,
+  fetchSavedRequest,
   selectRow,
   toggleRow,
   visibleRows,
@@ -20,8 +22,6 @@ import {
 // a signal the row model was wrong; none did.
 const rowHeight = computed(() => (settingsState.appearance.rowDensity === 'compact' ? 22 : 28));
 const treeHostRef = ref<{ revealKey: (key: string) => Promise<void> } | null>(null);
-
-onMounted(initCollections);
 
 /** Called by the panel after a mutation adds a row worth scrolling to. */
 async function reveal(key: string): Promise<void> {
@@ -39,10 +39,15 @@ function onToggle(row: CollectionRowVm): void {
   toggleRow(row);
 }
 
-// A collection and a folder toggle on double-click; a request opens, which C6 wires.
-function onOpen(row: CollectionRowVm): void {
-  if (row.kind === 'request') return;
-  toggleRow(row);
+// A collection and a folder toggle on double-click; a request opens into the existing
+// 'http-request' tab kind (D14), reusing an already-open tab bound to the same row.
+async function onOpen(row: CollectionRowVm): Promise<void> {
+  if (row.kind !== 'request') {
+    toggleRow(row);
+    return;
+  }
+  const saved = await fetchSavedRequest(row.id);
+  openCollectionRequestTab(row.id, row.name, saved);
 }
 
 // The same shape ProjectTree.vue has, over the existing tree.* shortcut ids (§3) — plus the
@@ -63,6 +68,12 @@ function onTreeKeydown(e: KeyboardEvent): void {
     e.preventDefault();
     collapseRow(row);
     return;
+  }
+  // Enter is the row's primary action, not a menu item — the same action double-click performs,
+  // so it dispatches directly rather than through runMenuShortcut (ProjectTree.vue's own split).
+  if (shortcutFor(e, ['tree.open']) === 'tree.open') {
+    e.preventDefault();
+    void onOpen(row);
   }
 }
 </script>

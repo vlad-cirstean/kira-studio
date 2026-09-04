@@ -1,4 +1,9 @@
-import { defaultHttpRequestTabState, type HttpRequestTabState } from '@shared/domain/http';
+import type { HttpSavedRequest } from '@shared/domain/collections';
+import {
+  defaultHttpRequestTabState,
+  type HttpRequestTabState,
+  httpRequestTabStateSchema,
+} from '@shared/domain/http';
 import type { AppMode } from '@shared/domain/mode';
 import {
   asBrowseTab,
@@ -36,6 +41,7 @@ import {
 import { reactive } from 'vue';
 import { control } from '../bridge/control';
 import { clearPending } from '../views/grid/pendingChanges';
+import { fromSavedRequest } from '../views/httprequest/saved';
 import { clearSelectedCellFor } from './cellSelection';
 import { connectionsState } from './connections';
 import { consoleDefaultFor } from './consoleDefaults';
@@ -393,6 +399,52 @@ export function openHttpRequestTab(): string {
   return openTab('http-request', null, 'request', () => defaultHttpRequestTabState(), {
     reuse: false,
   }).id;
+}
+
+// P4 D14: a saved request opens the **existing** 'http-request' tab kind — the same view P2 and
+// P3 built, with its state sourced from a collection row instead of defaultHttpRequestTabState().
+// No new tab kind, so tabKindSchema, RENDERABLE_TAB_KINDS, TAB_KIND_MODE, tabRecordSchema and Go's
+// model.RenderableTabKinds are all byte-identical after this phase (F8).
+//
+// `path` stays the literal constant 'request'. P2 D2 explicitly offered P4 a real
+// `collection:<id>/request:<id>` path and F13 is why it is declined: duplicateTab copies `path`
+// verbatim while duplicateState clears `itemId`, so a duplicated tab would carry the saved
+// request's path identity with a state saying it is unsaved — and openTab's reuse lookup (keyed on
+// kind + connectionId + path) would then activate the *duplicate* when the user opened the
+// original. Keeping identity in exactly one place and doing the lookup explicitly is four lines
+// and has no such failure mode.
+export function openCollectionRequestTab(
+  itemId: string,
+  name: string,
+  saved: HttpSavedRequest,
+): OpenTabResult {
+  const existing = tabsState.tabs.find(
+    (t) => t.kind === 'http-request' && (t as HttpRequestTabRecord).state.itemId === itemId,
+  );
+  if (existing) {
+    activateTab(existing.id);
+    return { id: existing.id, reused: true };
+  }
+  // D4: the one boundary where a stored saved request becomes tab state, and so the one place it
+  // is Zod-parsed — reusing TabKindDef.parseState's own mechanism rather than adding a second
+  // trust boundary. fromSavedRequest carries F4's method coercion.
+  const state = httpRequestTabStateSchema.parse({
+    ...defaultHttpRequestTabState(),
+    ...fromSavedRequest(saved),
+    itemId,
+    name,
+  });
+  return openTab('http-request', null, 'request', () => state, { reuse: false });
+}
+
+/** Renaming a request in the tree patches every tab bound to it, so the view header and the tab
+ *  strip follow immediately (D14). A tab whose row was deleted keeps the name it last knew. */
+export function renameHttpRequestTabs(itemId: string, name: string): void {
+  for (const tab of tabsState.tabs) {
+    if (tab.kind !== 'http-request') continue;
+    if ((tab as HttpRequestTabRecord).state.itemId !== itemId) continue;
+    patchHttpRequestTabState(tab.id, { name });
+  }
 }
 
 // Same target, fresh default state — the cheapest possible demonstration of §8.4's identity rule.

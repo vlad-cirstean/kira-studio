@@ -1,9 +1,10 @@
-import type {
-  CollectionItemKind,
-  CollectionItemSummary,
-  CollectionSummary,
-  HttpSavedRequest,
-  ImportReport,
+import {
+  type CollectionItemKind,
+  type CollectionItemSummary,
+  type CollectionSummary,
+  type HttpSavedRequest,
+  httpSavedRequestSchema,
+  type ImportReport,
 } from '@shared/domain/collections';
 import { computed, reactive } from 'vue';
 import { control } from '../../bridge/control';
@@ -87,6 +88,23 @@ export async function loadCollections(): Promise<void> {
 export function initCollections(): void {
   if (collectionsState.loaded) return;
   void loadCollections();
+}
+
+/** Reads a saved request, caching it by item id. The cache is the dirty comparison's other half
+ *  (D15) as well as an open-cost saving: re-opening an already-open request costs no call. */
+export async function fetchSavedRequest(itemId: string): Promise<HttpSavedRequest> {
+  const cached = collectionsState.requests[itemId];
+  if (cached) return cached;
+  const saved = httpSavedRequestSchema.parse(await control.collectionsGetRequest(itemId));
+  collectionsState.requests[itemId] = saved;
+  return saved;
+}
+
+/** The saved side of the dirty comparison, or null when this tab's row has never been read (or no
+ *  longer resolves — D14's orphan rule). */
+export function savedRequestFor(itemId: string | null): HttpSavedRequest | null {
+  if (!itemId) return null;
+  return collectionsState.requests[itemId] ?? null;
 }
 
 // ---- the row model ----
