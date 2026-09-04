@@ -6,20 +6,18 @@
  *
  * `dist/ui` sits two levels up from `extensionUri` (this package's own folder), not inside it:
  * `package.json`'s `main: "../../dist/vscode/extension.js"` already commits this package to a
- * shared, repo-root `dist/` (W13's one build output for all three targets), and `dist/ui` is
- * one of that same root's siblings — `packages/host-electron/src/main/index.ts`'s
- * `RENDERER_HTML_PATH` reaches the same directory the same way, up from `dist/electron/`.
+ * shared, repo-root `dist/` (`scripts/build.ts`'s one build output per target), and `dist/ui` is
+ * one of that same root's siblings.
  */
 import { readFileSync } from "node:fs";
 import { CONTRACT_VERSION } from "@kira-version/ipc";
 import * as vscode from "vscode";
 
 /** Vite's own convention: an entry's manifest key is its input path relative to the build
- *  root. W13's `packages/ui/vite.config.ts` root is `packages/` — the closest common ancestor
- *  of this entry and `host-electron/src/renderer/index.html`, the other file that same Vite
- *  build produces (a single Vite invocation cannot emit an HTML entry that lives outside its
- *  configured root) — so the key is this file's `packages/`-relative path, not the shorter
- *  `src/webview/main.ts` a `host-vscode`-rooted build would have produced. */
+ *  root. `packages/ui/vite.config.ts`'s root is `packages/` (kept there rather than moved down
+ *  to `host-vscode` — see that file's own comment), so the key is this file's
+ *  `packages/`-relative path, not the shorter `src/webview/main.ts` a `host-vscode`-rooted
+ *  build would have produced. */
 const WEBVIEW_ENTRY = "host-vscode/src/webview/main.ts";
 
 interface ViteManifestEntry {
@@ -83,11 +81,9 @@ export function renderHtml(opts: RenderHtmlOptions): string {
   const distUi = vscode.Uri.joinPath(extensionUri, "..", "..", "dist", "ui");
   const assets = resolveUiAssets(webview, distUi);
   const csNonce = nonce();
-  // `KIRA_REPO` (`packages/host-electron/src/main/index.ts`'s own doc comment): the same
-  // dev/e2e-only convenience, extended here since P3 has no repo-picker UI on this host either.
-  // Electron carries it through `loadFile`'s `query` option because its HTML is a static file
-  // (W13); this host already rebuilds its document — and this bootstrap island — on every
-  // resolve, so the env var travels through the island instead.
+  // `KIRA_REPO`: a dev/e2e-only convenience, since P3 has no repo-picker UI on this host. This
+  // host rebuilds its document — and this bootstrap island — on every resolve, so the env var
+  // travels through the island rather than a query string.
   const bootstrap = {
     host: "vscode" as const,
     contractVersion: CONTRACT_VERSION,

@@ -4,10 +4,10 @@
  * shared by every resolve of the panel webview.
  *
  * `Storage` is deliberately not constructed here even though `docs/plans/P3.md`'s W10 lists it
- * among activate()'s ports: its own table names Electron's recent-repos/window-bounds as P3's
- * only real consumer, and VS Code has none yet (§9's "present but not exercised" is the thing
- * to avoid, not a port's own existence — `ports/storage.ts` is written and ready for whichever
- * phase gives VS Code its first caller).
+ * among activate()'s ports: `ports/storage.ts` is written and ready, but VS Code has no caller
+ * for it yet (§9's "present but not exercised" is the thing to avoid, not a port's own
+ * existence — whichever phase gives VS Code its first recent-repos/window-bounds consumer
+ * constructs it there).
  */
 import { coerceSettings, SETTINGS, type SettingKey, type Settings } from "@kira-version/core";
 import { NodeFileWatcher, NodeProcessRunner, RepoService } from "@kira-version/git";
