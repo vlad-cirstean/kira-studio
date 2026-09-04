@@ -1,4 +1,4 @@
-package bridge
+package rpcstream
 
 import (
 	"context"
@@ -8,10 +8,10 @@ import (
 	"time"
 )
 
-// internalPipeSession mirrors gitstream_test.go's own pipeSession — duplicated rather than
-// shared because this file lives in package bridge (not bridge_test), the one place
-// gitStreamSession/Emit are reachable at all, and the two files otherwise test genuinely
-// different things (the public wire contract vs. this one internal-only capability).
+// internalPipeSession mirrors gitstream_test.go's own pipeSession (package bridge_test) —
+// duplicated rather than shared because this file lives in package rpcstream, the one place
+// session/Emit are reachable at all, and the two files otherwise test genuinely different things
+// (the public wire contract vs. this one internal-only capability).
 type internalPipeSession struct {
 	in     chan []byte
 	out    chan []byte
@@ -40,16 +40,16 @@ func (p *internalPipeSession) Receive() ([]byte, error) {
 	}
 }
 
-// TestGitStreamSession_Emit_EventCrosses is §7's own exit-criterion proof for the event half of
-// the frame protocol: gitclient's Watcher has no production wiring into repo.changed yet (P2's
-// row, §0.2), so this is the honest place to prove 'evt' frames cross correctly — directly, since
-// nothing in P1's own production path calls Emit yet for a bridge_test-level (black-box) test to
-// observe.
-func TestGitStreamSession_Emit_EventCrosses(t *testing.T) {
+// TestSession_Emit_EventCrosses is §7's own exit-criterion proof for the event half of the frame
+// protocol: gitclient's Watcher has no production wiring into repo.changed yet (P2's row, §0.2), so
+// this is the honest place to prove 'evt' frames cross correctly — directly, since nothing in P1's
+// own production path calls Emit yet for a bridge_test-level (black-box) test to observe.
+func TestSession_Emit_EventCrosses(t *testing.T) {
 	conn := newInternalPipeSession()
-	// Emit never touches svc's fields — a zero-value GitService is enough to construct a session
-	// to Emit through.
-	session := newGitStreamSession(&GitService{}, conn)
+	// Emit never touches h — a zero-value Request/Stream pair (never invoked in this test) plus
+	// a contract version is enough to construct a session to Emit through.
+	const contractVersion = 3
+	session := newSession(conn, Handlers{ContractVersion: contractVersion})
 	defer session.close()
 
 	type payload struct {
@@ -60,12 +60,12 @@ func TestGitStreamSession_Emit_EventCrosses(t *testing.T) {
 
 	select {
 	case raw := <-conn.out:
-		var env gitEnvelope
+		var env envelope
 		if err := json.Unmarshal(raw, &env); err != nil {
 			t.Fatalf("unmarshal: %v", err)
 		}
-		if env.Version != gitContractVersion {
-			t.Errorf("Version = %d, want %d", env.Version, gitContractVersion)
+		if env.Version != contractVersion {
+			t.Errorf("Version = %d, want %d", env.Version, contractVersion)
 		}
 		if env.Body.T != "evt" || env.Body.Method != "repo.changed" {
 			t.Fatalf("Body = %+v, want an evt frame for repo.changed", env.Body)
