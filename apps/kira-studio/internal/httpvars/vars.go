@@ -24,8 +24,8 @@ type Authorizer interface {
 }
 
 // Deps is everything the service needs. Cipher is carried for parity with New's own signature and
-// with connections.Deps' identical field — every method here that actually touches secret_value
-// goes through Repo (which holds its own copy of the same Cipher), not this one directly.
+// with connections.Deps' identical field — every method here that actually touches a stored
+// secret goes through Repo (which holds its own copy of the same Cipher), not this one directly.
 type Deps struct {
 	Repo   *repos.VariablesRepo
 	Cipher *secrets.Cipher

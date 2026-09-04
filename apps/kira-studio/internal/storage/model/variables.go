@@ -22,8 +22,8 @@ type Environment struct {
 }
 
 // Variable is one http_variables row's **list projection** — P5 D4/D5. Value is ” whenever
-// IsSecret, and the encrypted secret_value column is not a field of this struct at all, so "the
-// list never returns a secret's plaintext or ciphertext" is a property of this type, not of a
+// IsSecret, and the row's own encrypted-secret column is not a field of this struct at all, so
+// "the list never returns a secret's plaintext or ciphertext" is a property of this type, not of a
 // per-row branch somewhere that could later be forgotten.
 type Variable struct {
 	ID        string        `json:"id"`

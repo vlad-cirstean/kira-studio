@@ -447,6 +447,20 @@ a Mac with neither biometry nor a login password), the app falls back to its exi
 `Test`, and `Duplicate` all continue to use the stored secret unprompted, exactly as before — this
 gate is about turning a secret into visible text, not about using it.
 
+**A second reveal caller, the same gate (P5).** A collection/environment variable's secret value
+goes through the identical `internal/localauth.Authorizer` — `main.go` constructs exactly one and
+hands it to both `connections.Service` and `internal/httpvars.Service`, which is what makes the
+5-minute grace genuinely process-wide rather than per-feature: revealing a connection password and
+then a variable's value inside that window prompts only once. `connections.RevealResult`'s Go type
+is not shared with `httpvars.RevealResult` — importing Studio's `internal/connections` from the
+Http-scoped `internal/httpvars` would be exactly the module-boundary violation the SPEC's own
+boundary section exists to prevent — so the four-outcome shape (`revealed | cancelled |
+confirmation-required | error`) is redeclared, not imported, on both the Go and the TypeScript
+side. *Sending* a request that substitutes a secret is unaffected by any of this: D9's line is that
+the gate is about *display*, not *use*, so a send never prompts, and stage 2 of the substitution
+(next section) is careful never to let the decrypted value reach anywhere a prompt-free path
+shouldn't put it.
+
 ```
 schema_version(version)
 settings(key, value)                                   -- fonts, sizes, budgets, toggles
@@ -466,11 +480,21 @@ ui_layout(key, value)                                   -- panel sizes, visibili
 windows(key, order, bounds_json)                        -- one row per workbench (P8)
 tabs(id, connection_id, path, kind, state_json, order, active, window_key)  -- session restore,
                                                        -- window_key ON DELETE CASCADE into windows
-http_collections(id, name, sort_order, origin_json, created_at, updated_at)  -- P4
+http_collections(id, name, sort_order, origin_json, variables_promoted,
+                 created_at, updated_at)                -- P4; variables_promoted added P5
 http_items(id, collection_id, parent_id, kind, name, sort_order, method, url,
            request_json, origin_json, created_at, updated_at)
                                                        -- the folder/request tree; parent_id and
                                                        -- collection_id both ON DELETE CASCADE
+http_environments(id, name, sort_order, is_active, created_at, updated_at)  -- P5; top-level,
+                                                       -- no collection_id; at most one is_active
+http_variables(id, collection_id, environment_id, name, value, is_secret, secret_value,
+               sort_order, created_at, updated_at)      -- P5; owned by exactly one of
+                                                       -- collection_id/environment_id (CHECK);
+                                                       -- value/secret_value are mutually exclusive
+http_variable_history(id, variable_id, value, is_secret, secret_value, recorded_at)
+                                                       -- P5; per-entry, capped at 20, variable_id
+                                                       -- ON DELETE CASCADE
 ```
 
 Migrations are forward-only numbered SQL files (`apps/kira-studio/internal/storage/migrations/`) applied on
@@ -494,19 +518,53 @@ object verbatim**, minus only its recursive `item` array. This exists because fi
 *retention* problem, not a parsing one: `encoding/json` drops every member a struct does not
 declare, so no typed model — library or hand-written — can round-trip the members this app does not
 model, and those members are most of a real collection once you get past the requests themselves
-(`auth` at three levels, `event[]` scripts, `variable[]` at four, saved `response[]` examples,
-`protocolProfileBehavior`, `request.proxy`/`certificate`, and the per-row `description` on headers,
-query params, urlencoded fields and form-data fields). Export therefore starts from `origin_json`
-and rewrites exactly three members — `url`, `header`, `body` — and only when re-running the
-importer over the origin's own member no longer yields what is stored; `method` is always written
-from `request_json`, and every other member is re-emitted byte-identically. `CollectionsRepo.SaveRequest`
-performs the same comparison and *sheds* each rewritten member from `origin_json`, so an edited
-request stops carrying a stale duplicate of its own body. The one thing not preserved is member
-order within a JSON object, since `map[string]json.RawMessage` re-marshals sorted — not semantic in
-JSON, and not something Postman's own exporter guarantees either. Scripts, auth and variables are
-preserved **inert**: never executed, never applied, never resolved. The honest consequence, which
-the import report states out loud, is that a request relying on collection-level Bearer auth will
-401 when sent from this app until the phase that builds an auth surface lands.
+(`auth` at three levels, `event[]` scripts, `variable[]` at four (collection, folder, item and
+`url.variable`), saved `response[]` examples, `protocolProfileBehavior`, `request.proxy`/
+`certificate`, and the per-row `description` on headers, query params, urlencoded fields and
+form-data fields). Export therefore starts from `origin_json` and rewrites exactly three members —
+`url`, `header`, `body` — and only when re-running the importer over the origin's own member no
+longer yields what is stored; `method` is always written from `request_json`, and every other
+member is re-emitted byte-identically. `CollectionsRepo.SaveRequest` performs the same comparison
+and *sheds* each rewritten member from `origin_json`, so an edited request stops carrying a stale
+duplicate of its own body. The one thing not preserved is member order within a JSON object, since
+`map[string]json.RawMessage` re-marshals sorted — not semantic in JSON, and not something Postman's
+own exporter guarantees either. Scripts and auth are preserved **inert** at every level: never
+executed, never applied. The honest consequence, which the import report states out loud, is that
+a request relying on collection-level Bearer auth will 401 when sent from this app until the phase
+that builds an auth surface lands. **Variables are the one exception, as of P5**: the
+*collection*-level `variable[]` is promoted out of `origin_json` into real, resolvable rows (next
+paragraph) — folder-, item- and `url.variable`-level variables stay inert, exactly as before.
+
+**Collection variables and environments (P5).** A variable is one `http_variables` row, owned by
+either a collection or an environment — never both, never neither, enforced by a `CHECK` rather
+than a discriminator column, since the two nullable foreign keys already carry that fact and give
+`ON DELETE CASCADE` for real. Environments are top-level: the SPEC's own P5 row calls them
+"separate" from a collection's own variables, and a scratch request tab (no `itemId`) belongs to no
+collection at all, so an environment-scoped variable set has to exist independently of one. At
+send time a reference resolves against the active environment first, then the request's own
+collection, then nothing. The security property — **a secret's plaintext never leaves this table
+except through a gated reveal** — is a fact about the schema, not a Go branch: `value` and
+`secret_value` are separate columns (`value = ''` whenever `is_secret = 1`, `secret_value` only
+then), so the list query the renderer's editor runs (`SELECT id, …, value, is_secret, sort_order …`)
+cannot return a secret's plaintext or ciphertext by construction — there is no column to forget to
+exclude. `internal/httpvars.Service.Reveal`/`RevealHistory` are the only paths to one, gated by the
+**same** `*internal/localauth.Authorizer` instance connections' own reveal uses (below), so a
+5-minute grace granted by either kind of reveal covers the other. History is a second table,
+`http_variable_history`, one row per prior value, capped at 20 per variable with the same
+dedupe-then-trim discipline `filter_history` already uses — recorded only when a value actually
+changes (a secret's change is detected by decrypting the stored value once and comparing plaintext,
+since GCM nonces make ciphertext comparison meaningless), and a restore writes through the ordinary
+update path, so the restore is itself in the history.
+
+A collection's own top-level `variable[]` is **promoted** out of `origin_json` into
+`http_variables` rows — the one exception to "everything not modelled stays inert" scripts/auth/
+variables get elsewhere in this section, because P5's SPEC row asks for exactly this level to be
+resolvable. Folder- and item-level `variable[]` stay inert, same as before. A pre-P5 collection
+(`variables_promoted = 0`) is promoted once, lazily, the first time its variables are listed;
+export re-emits `variable` from the rows rather than from `origin_json`, with a secret's `value`
+always `""` — the file a collection exports to is something a person shares, mails or commits, and
+writing a decrypted credential into it would defeat the masking feature at the exact moment it
+matters most.
 
 **A known, deliberate orphan.** `settings` stores leaves by key, and an existing installation may
 carry an `advanced.engineMemoryCapMb` row from before P58f M10 removed the setting end to end
@@ -746,6 +804,40 @@ native file dialog (`FilesService.ChooseOpen`, shared with S3's own upload dialo
 `{path, name, size}`; only `path` — a short string — rides the send args for a form-data file row
 or a binary body, and Go re-`os.Stat`s and streams it directly from disk. See the Process model
 section below for the control-plane arithmetic this is built against.
+
+**`{{name}}` substitution is two stages, in two languages, pinned by one shared corpus (P5).**
+Collection variables and named environments are resolved wherever a request references them — URL,
+header name and value, and the active body mode's own text fields (a form-data file row's `path`
+and the `file` body's own path are the one deliberate exception: that path is `os.Stat`-checked at
+send and came from a native picker, so a substituted one would be validated for the first time
+inside the request, failing on a string the user never typed). The engine itself — find `{{`, find
+the next `}}`, trim, look up, else pass through literally, one pass, no re-expansion — is
+implemented **twice**: `apps/kira-studio/frontend/src/http/substitute.ts` and
+`internal/httpvars/resolve.go`. Not a shared library, on purpose — a template engine like Handlebars
+or Mustache HTML-escapes by default, which would corrupt a JSON/XML body carrying a substituted
+`&`/`<`/`"`, and its "render or fail" contract has no seam for the classified per-reference report
+(`resolved | deferred | dynamic | unknown`) the unresolved-reference chip needs. The two
+implementations are pinned to identical behaviour by `internal/httpvars/testdata/substitution.json`,
+one JSON corpus read by both a Go test and a TS unit test — a stronger guard than two independently
+written test suites, and the same technique `tests/unit/go-ts-vocabulary-parity.spec.ts` already
+uses to keep a Go source and a TS source from drifting apart, applied to *behaviour* instead of a
+vocabulary list.
+
+**Why two stages, not one.** All of it in Go would put the engine somewhere P6's
+`@faker-js/faker`-backed `{{$dynamic}}` values cannot reach (a root `package.json` dependency,
+renderer-only); all of it in the renderer would mean a secret's plaintext has to live in the
+renderer's own store to be substituted, which is the exact bug P14 fixed for connection passwords,
+recreated one table later. So stage 1 (the renderer, `send()` in `views/httprequest/state.ts`)
+resolves every reference it can see — everything except a name that matches a *secret* entry, which
+it leaves verbatim and classifies `deferred`, never fetching or holding that value at all. Stage 2
+(`internal/httpvars.Service.ResolveRequest`, called from `bridge/http.go`'s `Send`) decrypts only
+the secrets a request's fields actually reference and finishes the rest. The ordering inside `Send`
+is load-bearing, not stylistic: `op.SetCommand` — which writes the human-readable command into
+`op_log.command`, a **persisted** column the Operations panel renders — is called with the
+*unresolved* URL, both before and after the request runs; stage 2 runs strictly after the first
+call and its resolved values never feed back into anything logged. A `{{token}}` in a query string
+is exactly the shape a user puts a credential in, so resolving before `SetCommand` would write a
+plaintext credential into `kira.sqlite` on every send.
 
 **Response headers are shown alphabetised, not in received order — a known property of
 `net/http`, not a bug.** Go's `http.Response.Header` is a `map[string][]string` with
