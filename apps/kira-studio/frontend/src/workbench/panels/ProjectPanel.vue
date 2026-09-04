@@ -7,11 +7,11 @@ import { connectionsState, openCreateDialog } from '../../state/connections';
 import { schemaDialogState } from '../../state/schemas';
 import CodiconIcon from '../../theme/CodiconIcon.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
-import LeftPanel from './LeftPanel.vue';
+import PanelShell from '../../theme/primitives/PanelShell.vue';
 </script>
 
 <template>
-  <LeftPanel
+  <PanelShell
     :search="treeState.search"
     :empty="connectionsState.records.length === 0"
     @update:search="treeState.search = $event"
@@ -37,7 +37,7 @@ import LeftPanel from './LeftPanel.vue';
       <span class="dim"><CodiconIcon name="database" :size="24" /></span>
       <span class="p-xs dim side-empty-text">Everything you connect to<br />shows up here.</span>
     </template>
-  </LeftPanel>
+  </PanelShell>
   <FiltersDialog />
   <SchemaDialog v-if="schemaDialogState.open" />
 </template>

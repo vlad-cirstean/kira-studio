@@ -4,7 +4,7 @@ import { registerCommand } from '../shortcuts/commands';
 import { openHttpRequestTab } from '../state/tabs';
 import EmptyState from '../theme/primitives/EmptyState.vue';
 import IconButton from '../theme/primitives/IconButton.vue';
-import LeftPanel from '../workbench/panels/LeftPanel.vue';
+import PanelShell from '../theme/primitives/PanelShell.vue';
 import CollectionsTree from './CollectionsTree.vue';
 import ImportReportStrip from './ImportReportStrip.vue';
 import {
@@ -19,15 +19,15 @@ import { openImportCurlDialog } from './state/curl';
 import { openDynamicValuesDialog } from './state/dynamicValues';
 import { openEnvironmentsDialog, openVariablesDialog } from './state/variables';
 
-// P4 C5: the placeholder is gone — this is a real tree now, mounted through the same LeftPanel
+// P4 C5: the placeholder is gone — this is a real tree now, mounted through the same PanelShell
 // shell Studio's ProjectPanel.vue uses. `empty` is no longer hardcoded: it is "this app has no
-// collections yet", which is also what gates LeftPanel's own search box (F14).
+// collections yet", which is also what gates PanelShell's own search box (F14).
 //
 // The `new-request` and `new-request-empty` testids are preserved exactly as P1 left them —
 // existing specs click them, and P4 has no reason to move Http's front door.
 const empty = computed(() => collectionsState.collections.length === 0);
 
-// The fetch belongs to the panel rather than the tree: LeftPanel renders #body only when it is
+// The fetch belongs to the panel rather than the tree: PanelShell renders #body only when it is
 // non-empty, so a tree that loaded itself on mount would never load at all on a fresh install —
 // no collections, no tree, no call, no collections.
 onMounted(initCollections);
@@ -101,7 +101,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <LeftPanel :empty="empty" :search="collectionsState.search" @update:search="onSearch">
+  <PanelShell :empty="empty" :search="collectionsState.search" @update:search="onSearch">
     <template #title>
       <span>Collections</span>
     </template>
@@ -161,7 +161,7 @@ onUnmounted(() => {
         </button>
       </EmptyState>
     </template>
-  </LeftPanel>
+  </PanelShell>
 </template>
 
 <style scoped>

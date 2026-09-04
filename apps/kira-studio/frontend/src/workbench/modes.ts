@@ -9,7 +9,7 @@ export interface ModeDef {
   label: string;
   icon: string;
   /** Mounted in the left-panel slot (WorkbenchShell.vue) — a whole self-contained panel that
-   *  wraps LeftPanel itself, the same way ProjectPanel.vue already does (D6). */
+   *  wraps PanelShell itself, the same way ProjectPanel.vue already does (D6). */
   panel: Component;
   /** MainView.vue's fallback when this mode has no active tab. */
   start: Component;

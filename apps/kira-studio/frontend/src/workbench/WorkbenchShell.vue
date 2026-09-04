@@ -10,7 +10,7 @@ import TabStrip from './panels/TabStrip.vue';
 import StatusBar from './StatusBar.vue';
 
 // P1 D6/C6: the left panel mounts whichever mode is active's own self-contained panel component
-// (ProjectPanel for Studio, http/CollectionsPanel for Http) — the shared LeftPanel slot Studio
+// (ProjectPanel for Studio, http/CollectionsPanel for Http) — the shared PanelShell slot Studio
 // used to have all to itself now comes from the registry, not a hardcoded <ProjectPanel />.
 const activeModePanel = computed(() => MODES[modeState.active].panel);
 

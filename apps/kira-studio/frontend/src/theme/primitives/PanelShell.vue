@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { nextTick, ref } from 'vue';
-import IconButton from '../../theme/primitives/IconButton.vue';
-import PanelSearchBox from '../../theme/primitives/PanelSearchBox.vue';
+import IconButton from './IconButton.vue';
+import PanelSearchBox from './PanelSearchBox.vue';
 
 // P1 D3: the mode-agnostic panel shell — header geometry, the search reveal/toggle and the
 // type-ahead redirect, moved verbatim out of ProjectPanel.vue (F7). What is NOT generic (the

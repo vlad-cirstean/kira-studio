@@ -822,10 +822,12 @@ drift, cannot double-persist into each other, and (per-window `tabs.window_key` 
 unaffected) cannot leak tabs across a window.
 
 **The left panel is a shell with pluggable content; the tree host is a separate, mode-agnostic
-primitive.** `workbench/panels/LeftPanel.vue` owns the header geometry, the search reveal/toggle
-and the VS-Code-style type-ahead redirect — the same panel shell both `ProjectPanel.vue` (Studio)
-and `http/CollectionsPanel.vue` (Http) mount into via its `#title`/`#actions`/`#body`/`#empty`
-slots, so a second left panel was never added (there are still exactly three layout panels).
+primitive.** `theme/primitives/PanelShell.vue` (P12 D10: moved out of `workbench/panels/`, since
+it is generic chrome with no Studio- or Api-specific knowledge) owns the header geometry, the
+search reveal/toggle and the VS-Code-style type-ahead redirect — the same panel shell both
+`ProjectPanel.vue` (Studio) and `http/CollectionsPanel.vue` (Http) mount into via its
+`#title`/`#actions`/`#body`/`#empty` slots, so a second left panel was never added (there are still
+exactly three layout panels).
 Separately, `theme/primitives/TreeHost.vue` is the virtualized-tree mechanics factored out of
 `ProjectTree.vue` — `VirtualList` wiring, the pinned-ancestor sticky band
 (`theme/primitives/stickyBand.ts`), reveal-scroll with band inset — generic over any row shape
