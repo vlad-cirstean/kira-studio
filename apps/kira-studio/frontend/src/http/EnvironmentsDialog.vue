@@ -128,6 +128,7 @@ function close(): void {
         :class="{ 'is-dragging': dragIndex === i }"
         draggable="true"
         data-testid="environment-row"
+        :data-id="env.id"
         @keydown="onKeydown($event, env.id)"
         @dragstart="onDragStart(i)"
         @dragover.prevent="onDragOver(i)"

@@ -101,6 +101,7 @@ function onKeydown(e: KeyboardEvent): void {
     class="variable-row"
     :class="{ 'is-dragging': dragging }"
     data-testid="variable-row"
+    :data-id="row.id"
     :draggable="!trailing"
     @keydown="onKeydown"
     @dragstart="emit('dragstart', index)"
