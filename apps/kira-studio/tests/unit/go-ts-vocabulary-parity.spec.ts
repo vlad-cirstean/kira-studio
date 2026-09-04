@@ -11,6 +11,7 @@ import { describe, expect, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import {
+  CODE_LANGUAGES,
   CONTENT_TYPE_BY_CODE_LANGUAGE,
   HTTP_BODY_MODES,
 } from '../../../../packages/shared/domain/http';
@@ -92,5 +93,18 @@ describe('Go/TS HTTP body vocabulary parity (P3 D12)', () => {
     );
     const goTable = extractGoStringMap(source, 'contentTypeByCodeLanguage');
     expect(goTable).toEqual(CONTENT_TYPE_BY_CODE_LANGUAGE);
+  });
+});
+
+// P4 D17: the Postman translation table lives only in Go, so most of it needs no parity guard.
+// One list does. If a fifth code language were ever added on the TypeScript side,
+// internal/postman/body.go's importer would silently stop recognising it — importing that
+// language's bodies as plain `raw` — and its exporter would silently stop emitting it, with
+// nothing failing anywhere.
+describe('Go/TS Postman code-language parity (P4 D17)', () => {
+  test('postman.postmanCodeLanguages (Go) matches CODE_LANGUAGES (TS)', () => {
+    const source = readFileSync(resolve(import.meta.dir, '../../internal/postman/body.go'), 'utf8');
+    const goLanguages = extractGoStringSet(source, 'postmanCodeLanguages');
+    expect(goLanguages).toEqual(new Set(CODE_LANGUAGES));
   });
 });

@@ -558,7 +558,60 @@ func TestMalformedItemsAreSkippedOrClassifiedStructurally(t *testing.T) {
 	}
 }
 
-// ---- 9. url.go's splitter/builder ----
+// ---- 9. An export re-imports to the same tree ----
+//
+// The bar §6.4 step 2 sets — "import that file into Postman" — needs real Postman. This is the
+// half that can be checked here: whatever Write emits, Parse reads back as the same tree, so an
+// export can never be a file this app itself would refuse or read differently. It runs over every
+// fixture in the corpus rather than one, since each isolates a different shape.
+
+func TestAnExportReImportsToTheSameTree(t *testing.T) {
+	for _, name := range []string{"nesting.json", "oneofs.json", "bodies.json", "inert.json", "malformed.json"} {
+		t.Run(name, func(t *testing.T) {
+			first := parseFile(t, name)
+
+			var written bytes.Buffer
+			if err := postman.Write(&written, first); err != nil {
+				t.Fatalf("Write: %v", err)
+			}
+			second, err := postman.Parse(bytes.NewReader(written.Bytes()))
+			if err != nil {
+				t.Fatalf("re-parsing our own export failed: %v", err)
+			}
+
+			if second.Name != first.Name {
+				t.Errorf("name: got %q, want %q", second.Name, first.Name)
+			}
+			// malformed.json's neither-folder-nor-request item was already dropped by the first
+			// parse, so it is not in the export either and the counts still match exactly —
+			// skipping is idempotent, not progressively lossy.
+			if len(second.Items) != len(first.Items) {
+				t.Fatalf("item count: got %d, want %d", len(second.Items), len(first.Items))
+			}
+			for i := range first.Items {
+				a, b := first.Items[i], second.Items[i]
+				if a.Name != b.Name || a.Kind != b.Kind || a.Order != b.Order || a.Parent != b.Parent {
+					t.Errorf("item %d: got {%s %s %d %d}, want {%s %s %d %d}",
+						i, b.Name, b.Kind, b.Order, b.Parent, a.Name, a.Kind, a.Order, a.Parent)
+				}
+				if a.Kind == postman.KindRequest && !reflect.DeepEqual(a.Request, b.Request) {
+					t.Errorf("item %d (%s): request changed\n got %+v\nwant %+v", i, a.Name, b.Request, a.Request)
+				}
+			}
+
+			// And the exported file is v2.1 by construction, whatever the input said (D10).
+			var doc map[string]any
+			if err := json.Unmarshal(written.Bytes(), &doc); err != nil {
+				t.Fatal(err)
+			}
+			if got := doc["info"].(map[string]any)["schema"]; got != postman.SchemaURL {
+				t.Errorf("info.schema = %v", got)
+			}
+		})
+	}
+}
+
+// ---- 10. url.go's splitter/builder ----
 
 func TestURLSplitAndBuild(t *testing.T) {
 	const raw = "{{baseUrl}}/users/:id?q=a+b#frag"
