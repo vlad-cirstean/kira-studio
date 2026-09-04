@@ -92,6 +92,18 @@ saying "Http"/"HTTP", since the module also hosts gRPC (P11) and "Api" is the na
 mode, not a synonym for "Http". P12's own plan is where the exact line between the two gets drawn
 file by file — this paragraph states the intent, not the full list.
 
+**Separation does not mean reimplementing shared infrastructure per module.** v1.3's own P1
+(`docs/v1.3/SPEC.md`) had to build a real correlated-RPC-with-credits protocol in Go for the Git
+stream, because nothing already existed there to reuse — that was genuine new capability, not
+duplication. The corrected principle, now stated there and repeated here so P12 doesn't rediscover
+it: once a piece of infrastructure is generic rather than module-specific (a transport protocol, a
+reveal-gate flow, and so on), it belongs in its own shared package/module the first time a second
+consumer is foreseeable, not duplicated per module and not deferred until that second consumer
+already exists. P5's own OQ-2 (the secret-reveal flow `internal/localauth` gates, needed by both a
+connection reveal in `project/` and a variable reveal in `http/`, with no shared home either can
+import without recreating the coupling this boundary exists to avoid) is exactly this situation —
+P12 is where that gets a real shared home rather than staying two copies with a comment each.
+
 ## Phasing
 
 This is a starting decomposition, not a fixed contract — `P1`'s own modularization work is expected
