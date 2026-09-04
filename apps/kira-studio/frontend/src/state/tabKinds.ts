@@ -1,16 +1,23 @@
 import type { ConnectionColor } from '@shared/domain/connection';
-import { defaultHttpRequestTabState, type HttpRequestTabState } from '@shared/domain/http';
+import {
+  defaultHttpRequestTabState,
+  type HttpRequestTabState,
+  httpRequestTabStateSchema,
+} from '@shared/domain/http';
 import {
   type BrowseTabRecord,
   type BrowseTabState,
+  browseTabStateSchema,
   type ConsoleTabRecord,
   type ConsoleTabState,
+  consoleTabStateSchema,
   type DataTabRecord,
   type DataTabState,
   type DefinitionTabRecord,
   type DefinitionTabState,
   type DocumentTabRecord,
   type DocumentTabState,
+  dataTabStateSchema,
   defaultBrowseTabState,
   defaultConsoleTabState,
   defaultDataTabState,
@@ -18,11 +25,15 @@ import {
   defaultDocumentTabState,
   defaultKeyValueTabState,
   defaultStreamTabState,
+  definitionTabStateSchema,
+  documentTabStateSchema,
   type HttpRequestTabRecord,
   type KeyValueTabRecord,
   type KeyValueTabState,
+  keyValueTabStateSchema,
   type StreamTabRecord,
   type StreamTabState,
+  streamTabStateSchema,
   TAB_KIND_MODE,
   type TabKind,
   type TabRecord,
@@ -53,6 +64,10 @@ export interface TabKindDef<K extends TabKind = TabKind> {
   railColor(tab: TabRecord): ConnectionColor | undefined;
   /** A brand-new tab of this kind, opened with nothing to inherit. */
   defaultState(): Extract<TabRecord, { kind: K }>['state'];
+  /** P3 D3: a restored record's raw `state`, normalized through this kind's own schema — the one
+   *  place every *TabStateSchema's `.default()` actually fires. `null` means "not parseable", and
+   *  the caller (hydrateTabs) keeps what was stored, merge-only, never resetting to defaultState(). */
+  parseState(raw: unknown): Extract<TabRecord, { kind: K }>['state'] | null;
   /** §8.4's "same target, fresh default state" — some kinds keep one field from the source
    *  (data/document/keyvalue/stream keep pageSize; the rest start fully blank). */
   duplicateState(tab: Extract<TabRecord, { kind: K }>): Extract<TabRecord, { kind: K }>['state'];
@@ -92,6 +107,18 @@ function noDrop(): void {
   // definition/browse have no page store of their own (F12) — nothing to free.
 }
 
+// P3 D3: every parseState below is a one-liner over the schema its own kind already imports —
+// this is the shared shape (safeParse, `.data` on success, `null` on failure) so each entry states
+// only which schema, not the pattern.
+function parseStateWith<S>(schema: {
+  safeParse(raw: unknown): { success: true; data: S } | { success: false };
+}): (raw: unknown) => S | null {
+  return (raw) => {
+    const result = schema.safeParse(raw);
+    return result.success ? result.data : null;
+  };
+}
+
 export const TAB_KINDS: { [K in TabKind]: TabKindDef<K> } = {
   data: {
     mode: TAB_KIND_MODE.data,
@@ -105,6 +132,7 @@ export const TAB_KINDS: { [K in TabKind]: TabKindDef<K> } = {
     duplicateState: (tab: DataTabRecord): DataTabState => defaultDataTabState(tab.state.pageSize),
     dropResources: dropGridPagesForTab,
     menuExtras: revealInProjectPanel,
+    parseState: parseStateWith(dataTabStateSchema),
   },
   definition: {
     mode: TAB_KIND_MODE.definition,
@@ -115,6 +143,7 @@ export const TAB_KINDS: { [K in TabKind]: TabKindDef<K> } = {
     duplicateState: (_tab: DefinitionTabRecord): DefinitionTabState => defaultDefinitionTabState(),
     dropResources: noDrop,
     menuExtras: revealInProjectPanel,
+    parseState: parseStateWith(definitionTabStateSchema),
   },
   console: {
     mode: TAB_KIND_MODE.console,
@@ -125,6 +154,7 @@ export const TAB_KINDS: { [K in TabKind]: TabKindDef<K> } = {
     duplicateState: (_tab: ConsoleTabRecord): ConsoleTabState => defaultConsoleTabState(),
     dropResources: dropConsoleResultPagesForTab,
     menuExtras: revealInProjectPanel,
+    parseState: parseStateWith(consoleTabStateSchema),
   },
   document: {
     mode: TAB_KIND_MODE.document,
@@ -136,6 +166,7 @@ export const TAB_KINDS: { [K in TabKind]: TabKindDef<K> } = {
       defaultDocumentTabState(tab.state.pageSize),
     dropResources: dropDocumentPagesForTab,
     menuExtras: revealInProjectPanel,
+    parseState: parseStateWith(documentTabStateSchema),
   },
   keyvalue: {
     mode: TAB_KIND_MODE.keyvalue,
@@ -149,6 +180,7 @@ export const TAB_KINDS: { [K in TabKind]: TabKindDef<K> } = {
       defaultKeyValueTabState(tab.state.pageSize),
     dropResources: dropKeyValuePagesForTab,
     menuExtras: revealInProjectPanel,
+    parseState: parseStateWith(keyValueTabStateSchema),
   },
   stream: {
     mode: TAB_KIND_MODE.stream,
@@ -160,6 +192,7 @@ export const TAB_KINDS: { [K in TabKind]: TabKindDef<K> } = {
       defaultStreamTabState(tab.state.pageSize),
     dropResources: dropStreamPagesForTab,
     menuExtras: revealInProjectPanel,
+    parseState: parseStateWith(streamTabStateSchema),
   },
   browse: {
     mode: TAB_KIND_MODE.browse,
@@ -170,6 +203,7 @@ export const TAB_KINDS: { [K in TabKind]: TabKindDef<K> } = {
     duplicateState: (_tab: BrowseTabRecord): BrowseTabState => defaultBrowseTabState(),
     dropResources: noDrop,
     menuExtras: revealInProjectPanel,
+    parseState: parseStateWith(browseTabStateSchema),
   },
   'http-request': {
     mode: TAB_KIND_MODE['http-request'],
@@ -191,5 +225,6 @@ export const TAB_KINDS: { [K in TabKind]: TabKindDef<K> } = {
     dropResources: noDrop,
     // D2: there is no project panel to reveal an HTTP request into.
     menuExtras: () => [],
+    parseState: parseStateWith(httpRequestTabStateSchema),
   },
 };

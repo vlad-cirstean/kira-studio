@@ -176,7 +176,16 @@ control.onConnectionState((state) => {
 });
 
 export async function hydrateTabs(): Promise<void> {
-  const tabs = await control.tabsList();
+  const raw = await control.tabsList();
+  // P3 D3: every restored record's state goes through its own kind's schema — the one place every
+  // *TabStateSchema's `.default()` actually fires (F1 of P2: nothing else parses a restored tab at
+  // all). Merge-only: a record that parses gets the defaults it was missing; one that fails to
+  // parse is kept exactly as it arrived, never reset to defaultState() (that would silently drop a
+  // required field's existing value, not fill in a missing one).
+  const tabs = raw.map((t) => {
+    const parsed = TAB_KINDS[t.kind].parseState(t.state);
+    return parsed ? ({ ...t, state: parsed } as TabRecord) : t;
+  });
   tabsState.tabs = tabs;
   // One restored active tab per mode (F18: SQL's `active` column has no uniqueness constraint,
   // so this needs no migration) — same "active, else first" fallback the old single-mode code
