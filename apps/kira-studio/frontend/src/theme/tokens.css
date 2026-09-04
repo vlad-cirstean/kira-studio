@@ -45,16 +45,21 @@
   --kira-border-width: 1px;
   --kira-statusbar-h: 22px;
   /* P1 D2/C8: the custom title bar (workbench/TitleBar.vue), on top of `Mac.TitleBarHiddenInset`
-     (internal/shell/window.go). --kira-titlebar-inset-left clears the macOS traffic-light cluster
-     — a real-Mac measurement this repo's Linux sandbox cannot take (§6.3), so it lands in this one
-     token to adjust once rather than a value repeated at every call site.
-     --kira-titlebar-h was 36px, taller than the traffic-light cluster AppKit actually renders for
-     a HiddenInset/UseToolbar window (reported against the real build: the bar read visibly taller
-     than the three buttons it was meant to frame, closer to VS Code's own compact hiddenInset bar
-     than to this). 28px is the standard macOS title-bar height figure rather than a second guess;
-     .mode-tab's own height/font-size were dropped in step with it (TitleBar.vue). Still a
-     Linux-sandbox estimate, not a measurement — nudge this one token again if it still reads off
-     on a real window. */
+     (internal/shell/window.go). A same-session attempt to shrink this to 28px on its own broke
+     the real build — AppKit's own HiddenInset/UseToolbar layout sizes the traffic-light cluster
+     by its own metrics, not by this div's CSS height, so the buttons spilled below a bar shorter
+     than what AppKit still reserved for them.
+     `internal/shell/window.go`'s `RepositionTrafficLights` (titlebar_darwin.go) now moves those
+     buttons onto this exact geometry by hand instead — the same effect Electron's
+     trafficLightPosition gives VS Code, which Wails v3 (pinned beta.16) has no option of its
+     own for — so this token and window.go's `trafficLightBarHeight`/`trafficLightLeftInset` now
+     describe the SAME box on both sides and must be changed together (kept in sync by hand, no
+     shared source between Go and CSS). --kira-titlebar-inset-left is deliberately more generous
+     than the buttons' own cluster width (leftInset + 3 buttons + 2 gaps) — it only has to clear
+     them, not match them pixel-for-pixel.
+     Neither value is a real-Mac measurement (this repo's Linux sandbox cannot take one, §6.3) —
+     a compact, VS-Code-like starting point. Change this token AND window.go's constants together;
+     changing only one reopens the exact mismatch the first attempt caused. */
   --kira-titlebar-h: 28px;
   --kira-titlebar-inset-left: 78px;
   --kira-shadow: 0 2px 8px rgb(0 0 0 / 0.32);

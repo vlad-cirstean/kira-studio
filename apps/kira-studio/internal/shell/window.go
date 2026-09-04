@@ -13,6 +13,21 @@ import (
 
 const boundsDebounce = 300 * time.Millisecond
 
+// trafficLightBarHeight/trafficLightLeftInset are RepositionTrafficLights' own target geometry —
+// kept in sync BY HAND with theme/tokens.css's --kira-titlebar-h/--kira-titlebar-inset-left
+// (there is no shared source between Go and CSS for this one pair, the same gap
+// --kira-titlebar-inset-left's own comment already names for the inset half). barHeight matches
+// the CSS bar's height exactly, so the buttons centre inside the same box the mode tabs do;
+// leftInset is deliberately smaller than --kira-titlebar-inset-left (78px) — the buttons' cluster
+// only needs to end before the mode tabs start, not fill the whole reserved run-up to them.
+// Neither number is a real-Mac measurement (this repo's Linux sandbox cannot take one, same
+// caveat as the CSS token) — a compact, VS-Code-like starting point, to be nudged once someone
+// can actually look at a real window.
+const (
+	trafficLightBarHeight = 28.0
+	trafficLightLeftInset = 13.0
+)
+
 // defaultWindowWidth and defaultWindowHeight are the first-launch window size on a screen large
 // enough to fit it unclamped — unconditional constants before P22 D6, now defaultBounds' upper
 // bound.
@@ -180,11 +195,30 @@ func Attach(win *application.WebviewWindow, d WindowDeps, key string) (detach fu
 		slog.Info(fmt.Sprintf("did-finish-load at uptime %dms", ms), "scope", "startup")
 	})
 
+	// Repositions the real macOS traffic-light buttons onto this app's own custom title bar
+	// geometry (repositionTrafficLightsImpl, a no-op on any other platform/build) rather than
+	// wherever AppKit's HiddenInset/UseToolbar layout would otherwise put them — the same effect
+	// Electron's trafficLightPosition gives VS Code, since Wails v3 (pinned beta.16) exposes no
+	// such option itself. Once at WindowRuntimeReady (first paint of this app's own CSS title
+	// bar) and again on every resize, since AppKit's own title-bar layout pass re-derives button
+	// position from its internal metrics on a resize and would otherwise silently undo this.
+	reposition := func() {
+		repositionTrafficLightsImpl(win.NativeWindow(), trafficLightBarHeight, trafficLightLeftInset)
+	}
+	offReadyReposition := win.OnWindowEvent(events.Common.WindowRuntimeReady, func(*application.WindowEvent) {
+		reposition()
+	})
+	offResizeReposition := win.OnWindowEvent(events.Common.WindowDidResize, func(*application.WindowEvent) {
+		reposition()
+	})
+
 	return func() {
 		offResize()
 		offMove()
 		offClosing()
 		offReady()
+		offReadyReposition()
+		offResizeReposition()
 		db.cancel()
 	}
 }
