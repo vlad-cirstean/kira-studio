@@ -3,7 +3,7 @@
 v1.1 shipped: the SlickGrid grid-engine migration, the connection auth/test-matrix hardening work,
 and a full post-migration code review, closed out through P29 (`docs/v1.1/SPEC.md`). This chapter's
 headline is a new, user-directed feature area: an **HTTP client** — request/response tooling for
-HTTP, WebSocket, and gRPC, living alongside the existing database client inside the same app.
+HTTP and gRPC, living alongside the existing database client inside the same app.
 
 ## What this chapter is about
 
@@ -11,8 +11,8 @@ The app gains a second top-level mode, **Http**, sitting beside the existing **S
 database client this app has always been) behind a **custom title bar** (matching the app's own
 background color, not the OS chrome) carrying the two mode tabs. Http mode is a full request client:
 
-- **Protocols**: HTTP, WebSocket, and gRPC only (no other protocol families in scope for this
-  chapter).
+- **Protocols**: HTTP and gRPC only (no other protocol families in scope for this chapter —
+  WebSocket was considered and explicitly dropped from scope for now).
 - **Collections**, organized in a left-hand panel the same way Studio's connection tree occupies
   that position today, stored on disk in **Postman Collection format** — with **import and export**
   of that format, so a user's existing Postman collections are portable in and out of this app.
@@ -59,5 +59,4 @@ gets its own Opus-authored plan under `plans/` before implementation starts, per
 | **P6 Response history** | Persist past responses per request (not just the most recent), browsable and comparable against each other | A response history entry is a saved snapshot of exactly what P2's response viewer already renders; sequenced after the core response viewer and after collections exist, since history is naturally scoped per saved request |
 | **P7 Raw request/response inspector and raw request editor** | View the exact bytes sent and received for a request (not the structured/parsed model P2's builder presents), and author/edit a request at that raw level directly | Advanced-debugging capability that sits on top of the structured request/response model P2-P3 establish; needs a real request/response cycle to inspect, so it follows rather than precedes the core |
 | **P8 Request timeline** | A step-by-step timing breakdown of a request's lifecycle — DNS resolution, connection, TLS handshake, wait/TTFB, content download — rather than a single elapsed-time figure | Needs real instrumentation of the HTTP client's own request lifecycle, which only exists once P2's core request path is built; sequenced after the raw inspector since both surface detail about the same underlying request execution |
-| **P9 WebSocket support** | Connect to a WebSocket endpoint, send and receive frames, and keep a message history for the session, hosted through the same tab/panel shell P1 built | The first of the two non-HTTP protocols; sequenced before gRPC as the architecturally simpler of the two (no schema/reflection concerns), so the tab-shell extension point P1 provides gets proven out on the simpler case first |
-| **P10 gRPC support** | Browse services/methods (via reflection or a supplied `.proto`) and issue unary and streaming gRPC calls, hosted through the same shell | The most architecturally distinct protocol in scope (schema-driven, streaming-capable), sequenced last so it lands on a shell and request/response/history/timeline model already proven out by every phase before it |
+| **P9 gRPC support** | Browse services/methods (via reflection or a supplied `.proto`) and issue unary and streaming gRPC calls, hosted through the same shell | The one non-HTTP protocol in scope for this chapter (WebSocket was dropped — see the chapter intro), schema-driven and streaming-capable, sequenced last so it lands on a shell and request/response/history/timeline model already proven out by every phase before it |
