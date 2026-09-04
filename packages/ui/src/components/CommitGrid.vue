@@ -303,6 +303,10 @@ function handleKeyDown(event: KeyboardEvent): boolean {
   }
 }
 
+// W15: `kira:layout-complete` fires exactly once, the first time a `LayoutChunk` is applied and
+// re-rendered — see App.vue's own doc comment on why it moved here rather than firing at mount.
+let layoutCompleteMarked = false;
+
 /** The row range that just gained lane layout (`GraphViewState.onChunkLayout`, W5) — rebuild the
  *  column set in case `laneCount` grew (the graph column's width formula depends on it), then
  *  invalidate exactly the rows that changed rather than the whole grid. */
@@ -313,6 +317,11 @@ function handleChunkLayout(range: LayoutRange): void {
   for (let row = range.from; row < range.to; row++) rows.push(row);
   grid.invalidateRows(rows);
   grid.render();
+  if (!layoutCompleteMarked) {
+    layoutCompleteMarked = true;
+    performance.mark("kira:layout-complete");
+    performance.measure("kira:layout-complete", undefined, "kira:layout-complete");
+  }
 }
 
 function scheduleResize(): void {
@@ -647,12 +656,38 @@ defineExpose({ scrollToRow });
   width: 100%;
 }
 
+/* SlickGrid's own dynamic stylesheet (`createCssRules`, `applyColumnWidths`) only ever writes
+   `height`/`left`/`right` onto these elements — never `position`. Its own upstream CSS (not
+   imported here, see this block's own opening comment) is what makes those declarations do
+   anything at all: a `left` on a statically-positioned cell is a no-op, and a `transform:
+   translateY()` on a statically-positioned row stacks *on top of* normal document flow instead
+   of replacing it, doubling every row's effective offset. These four rules are that minimum,
+   copied from `slick.grid.css`'s own `.slick-pane`/`.slick-viewport`/`.grid-canvas`/`.slick-row`/
+   `.slick-cell` selectors (upstream also gates the row rule on `.ui-widget-content`, the class
+   SlickGrid always adds to every row alongside `.slick-row`, so it's included here rather than
+   widening the selector to something upstream doesn't actually rely on). */
+.kv-commit-grid .slick-pane {
+  position: absolute;
+  outline: 0;
+  overflow: hidden;
+  width: 100%;
+}
+
 .kv-commit-grid .slick-viewport,
 .kv-commit-grid .grid-canvas {
+  position: relative;
+  outline: 0;
   background-color: var(--kv-panel-bg);
 }
 
-.kv-commit-grid .slick-row {
+.kv-commit-grid .slick-viewport {
+  width: 100%;
+}
+
+.kv-commit-grid .slick-row.ui-widget-content {
+  position: absolute;
+  border: 0;
+  width: 100%;
   background-color: transparent;
 }
 
@@ -684,6 +719,7 @@ defineExpose({ scrollToRow });
 }
 
 .kv-commit-grid .slick-cell {
+  position: absolute;
   border: none;
   padding: 0 var(--kv-space-2);
   display: flex;

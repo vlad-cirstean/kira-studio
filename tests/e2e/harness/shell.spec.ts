@@ -62,6 +62,15 @@ test.describe("theming", () => {
     test(`visual baseline: ${kind}`, async ({ page }) => {
       await page.goto(`/?scenario=clean&theme=${kind}`);
       await page.waitForSelector('[data-testid="connection-state"]');
+      // W15: `connection-state` appears before the grid's own rows have been laid out — a real,
+      // observed race (the same one `graph.spec.ts`'s own `ready()` documents), not a
+      // hypothetical one. Without this, the screenshot below captures rows mid-construction —
+      // still `position: static` for a frame before SlickGrid's row transforms apply — rather
+      // than the settled state this baseline is meant to describe.
+      await expect(page.locator('.slick-row[data-row="0"]')).toBeVisible();
+      await expect(
+        page.locator('.slick-row[data-row="0"] .kv-graph-svg circle.kv-node'),
+      ).toHaveCount(1);
       await expect(page).toHaveScreenshot(`shell-${kind}.png`);
     });
   }
