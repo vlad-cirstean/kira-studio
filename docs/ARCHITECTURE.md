@@ -25,7 +25,7 @@ authoritative for behavior: SPEC.md is the record of what v1 was *specified* to 
 | Shell | **Wails v3** (`v3.0.0-beta.16`), Go | a custom, hidden-inset title bar (`Mac.TitleBar: application.MacTitleBarHiddenInset`, P1) drawn by `workbench/TitleBar.vue` over a full-size-content window — not the OS-drawn bar; macOS 14+, `arm64` only |
 | Language | TypeScript 6 (`tsc`/`vue-tsc`) for `.ts` and `.vue`; **Go** for the shell | pinned below TypeScript 7 on purpose — TS7 ships no stable programmatic compiler API until 7.1, and `vue-tsc` (which `bun run typecheck:web` runs) consumes that API in-process; `@typescript/native-preview`'s `tsgo` binary (`typecheck:tests`/`typecheck:unit`) is a separate, already-latest-upstream tool in the meantime. Converge on one toolchain once TS 7.1 ships and `vue-tsc` adopts it (P19 F2/F4) |
 | Package manager / scripts / test runner | Bun | tooling only — every adapter is native Go, so nothing at runtime depends on it |
-| Renderer build | Vite (`vite build`, `apps/kira-studio/frontend/vite.config.ts`) | builds `apps/kira-studio/frontend/src` straight into `apps/kira-studio/frontend/dist`, which `apps/kira-studio/main.go` embeds via `//go:embed all:frontend/dist` and serves through Wails' `AssetOptions.Handler`. Two dynamically-imported chunks as of P15, still split under Vite 8/Rolldown (P19 C6): the query console's SQL Format button reaches `sql-formatter` only through `views/console/sqlFormatterEntry.ts`'s `await import()` (~37 KB gzip), and the data grid's Generate data… dialog reaches `@faker-js/faker` only through `views/grid/fakeData/fakerEntry.ts`'s `await import()` (~155 KB gzip) — both fetched on first use, neither costing a launch |
+| Renderer build | Vite (`vite build`, `apps/kira-studio/frontend/vite.config.ts`) | builds `apps/kira-studio/frontend/src` straight into `apps/kira-studio/frontend/dist`, which `apps/kira-studio/main.go` embeds via `//go:embed all:frontend/dist` and serves through Wails' `AssetOptions.Handler`. Lazily-imported chunks, still split under Vite 8/Rolldown (P19 C6): the query console's SQL Format button reaches `sql-formatter` only through `views/console/sqlFormatterEntry.ts`'s `await import()` (~37 KB gzip); the data grid's Generate data… dialog and, as of P6, Http mode's own send path and its dynamic-values reference dialog all reach `@faker-js/faker/locale/en` — but through **two** one-line entry files, `views/grid/fakeData/fakerEntry.ts` and `http/dynamic/fakerEntry.ts`, duplicated rather than shared because `http/**` may not import `views/**` (P1 D7). Rolldown folds the two content-identical entry files into one shared stub chunk and gives the underlying locale data its own shared chunk beneath it (`en-*.js`, ~155 KB gzip — the same bytes the single pre-P6 `fakerEntry-*.js` chunk carried, just reorganised into two files instead of one, not duplicated); `http/dynamic/generators.ts`, P6's own 58-entry `$name` → faker-call dispatch table, is genuinely new code and gets a third lazy chunk of its own (~0.8 KB gzip). All three are fetched on first use — the first *Generate data…* open, the first send referencing a `{{$name}}`, or the first open of the dynamic-values dialog — and none costs a launch or grows `index-*.js` by anything but each phase's own eager app code |
 | UI | Vue 3 (`<script setup>`, Composition API) | VDOM mode — Vapor mode evaluated and declined in P6 (`docs/v1.1/plans/P6-vue-vapor-mode.md`) |
 | Styling | Tailwind (v4, CSS-first config) | tokens mirror VS Code Dark Modern |
 | Text editing / viewing | CodeMirror 6 | definition tab's Source pane, cell editor, document view, command preview |
@@ -822,6 +822,56 @@ one JSON corpus read by both a Go test and a TS unit test — a stronger guard t
 written test suites, and the same technique `tests/unit/go-ts-vocabulary-parity.spec.ts` already
 uses to keep a Go source and a TS source from drifting apart, applied to *behaviour* instead of a
 vocabulary list.
+
+**`{{$name}}` dynamic values are P6's own extension of stage 1, and Go is not involved.**
+`substitute.ts`'s `resolve()` gains one optional fourth argument,
+`dynamic?: (name: string) => string | null`, consulted only inside the existing `$`-prefixed
+branch — `$` was already a distinct token kind checked before the values lookup even runs, on both
+sides, so P6 adds a resolver behind an existing branch and changes no scanning at all. The send
+path supplies `http/dynamic/catalog.ts`'s `loadDynamicGenerator()`; the live-preview chip that backs
+the unresolved-reference count never does, because that chip is a `computed` re-running the whole
+resolution on every keystroke — if it also generated, typing one character into a URL containing
+`{{$guid}}` would mint a fresh UUID the send would then never actually use. A recognised `$name` is
+generated **per occurrence, not per send** — two `{{$guid}}` references in one request yield two
+different values, matching Postman's own documented behaviour (Postman's own workaround for wanting
+one value twice is a pre-request script, which this app does not have) — and is classified
+`resolved`, the same as a stored variable; nothing downstream needs to tell them apart. An
+unrecognised `$name` — a typo, a Postman name this phase left out, or an argument form
+(`{{$randomInt:1,100}}`) this phase does not parse, since dynamic variables carry no argument
+syntax here or in Postman — is left verbatim and classified `dynamic`, exactly what `Resolve`'s `$`
+branch on the Go side still does with it; a send never fails over an unrecognised dynamic reference.
+
+**The vocabulary is 58 names, Postman's own `$name` spellings, and it is finite on purpose.**
+`http/dynamic/catalog.ts`'s `DYNAMIC_NAMES` (an eager `const` tuple, no faker import) maps each name
+to one `@faker-js/faker@10.6.0` call in `http/dynamic/generators.ts` (the lazy half, reached only
+through a dynamic `import()`) — every mapping was verified by execution against the installed
+version rather than guessed, which caught two calls a naive reading would expect that do not exist
+in faker 10 (`internet.color`, `location.streetName`). A name is included only when exactly one
+faker call produces it *and* it is plausibly useful in a request's URL, header or body; Postman's
+own set is 100+, and the ~45 left out are a deliberate exclusion, not an oversight — an ~17-name
+image family collapsing onto two faker calls, word-fragment families faker 10 removed outright,
+names with no single-call mapping, and names nobody would type without first being told they exist.
+`$timestamp` and `$isoTimestamp` are the one deliberate departure from "always faker": Postman
+defines both as the current time, not a random draw, so they read the clock
+(`Math.floor(Date.now() / 1000)` / `new Date().toISOString()`) rather than calling faker at all,
+even though they live in the same generator record as everything else. `tsc` — not a test — is what
+keeps the vocabulary and its dispatch in step: the dispatch is typed
+`Record<DynamicName, (f: Faker) => string>` over `DynamicName = (typeof DYNAMIC_NAMES)[number]`, so
+a tuple entry with no matching record line, or a record line whose key is not in the tuple, is a
+compile error.
+
+**Go is untouched by P6, and `op_log.command` needs no new rule for it.** A dynamic value is
+neither a secret (nothing to gate, nothing to decrypt) nor a stored variable (nothing to look up) —
+it is a renderer-only computation over a root `package.json` dependency, so P6 adds no Go file, no
+migration, no bound method, no bindings regeneration and no `packages/shared` change;
+`internal/httpvars/resolve.go` and `internal/httpvars/testdata/substitution.json` are
+byte-identical to what P5 left. `Resolve`'s existing `$` branch (leave verbatim, classify
+`KindDynamic`) is already the correct behaviour for whatever `$name` stage 1 could not generate — a
+typo or an excluded Postman name — the same honest "leave the token literal" treatment P5 chose for
+a secret whose decrypt fails. A generated value reaches `op_log.command` the same way a resolved
+variable already does, below, since `SetCommand` is called with the post-stage-1 URL either way —
+which is correct, not a leak: it is what was actually sent, and the secret-plaintext invariant this
+persisted column protects (next paragraph) does not apply to a value that was never a credential.
 
 **Why two stages, not one.** All of it in Go would put the engine somewhere P6's
 `@faker-js/faker`-backed `{{$dynamic}}` values cannot reach (a root `package.json` dependency,
