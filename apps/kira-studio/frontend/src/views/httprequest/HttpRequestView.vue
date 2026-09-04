@@ -1,19 +1,17 @@
 <script setup lang="ts">
-import type { HttpBodyMode, HttpMethod } from '@shared/domain/http';
+import type { HttpMethod } from '@shared/domain/http';
 import type { HttpRequestTabRecord } from '@shared/domain/tabs';
-import { computed, onMounted, onUnmounted, ref } from 'vue';
-import { beautifyJson } from '../../beautify';
-import CodeMirrorHost from '../../editor/CodeMirrorHost.vue';
+import { computed, onMounted, onUnmounted } from 'vue';
 import { registerCommand } from '../../shortcuts/commands';
 import { patchHttpRequestTabState } from '../../state/tabs';
 import AppButton from '../../theme/primitives/AppButton.vue';
-import IconButton from '../../theme/primitives/IconButton.vue';
-import MessageStrip from '../../theme/primitives/MessageStrip.vue';
 import PanelSplitter from '../../theme/primitives/PanelSplitter.vue';
 import SegmentedControl from '../../theme/primitives/SegmentedControl.vue';
 import TextField from '../../theme/primitives/TextField.vue';
 import ViewChrome from '../../theme/primitives/ViewChrome.vue';
+import { bodyBadgeLabel } from './body';
 import QueryParamsTable from './QueryParamsTable.vue';
+import RequestBodyPane from './RequestBodyPane.vue';
 import RequestHeadersTable from './RequestHeadersTable.vue';
 import ResponsePane from './ResponsePane.vue';
 import { runtime, send, stop } from './state';
@@ -75,40 +73,15 @@ const REQUEST_PANE_OPTIONS = computed(() => [
     label: headersCount.value > 0 ? `Headers (${headersCount.value})` : 'Headers',
     testid: 'http-request-pane-headers',
   },
-  { value: 'body' as const, label: 'Body', testid: 'http-request-pane-body' },
+  {
+    value: 'body' as const,
+    label: bodyBadgeLabel(props.tab.state),
+    testid: 'http-request-pane-body',
+  },
 ]);
 
 function setRequestPane(pane: 'params' | 'headers' | 'body'): void {
   patchHttpRequestTabState(props.tab.id, { requestPane: pane });
-}
-
-// P3 C4: the state schema is now the full six-mode union (D8) — this control stays the P2 two-way
-// toggle only until C5 extracts RequestBodyPane.vue and replaces it with D9's six-way one.
-const BODY_MODE_OPTIONS = [
-  { value: 'none' as const, label: 'None', testid: 'http-body-mode-none' },
-  { value: 'raw' as const, label: 'JSON', testid: 'http-body-mode-raw' },
-];
-
-function setBodyMode(mode: HttpBodyMode): void {
-  patchHttpRequestTabState(props.tab.id, { bodyMode: mode });
-}
-
-function onBodyChange(text: string): void {
-  patchHttpRequestTabState(props.tab.id, { body: text });
-  beautifyError.value = null;
-}
-
-// D12/F13: an edit, not a view toggle (unlike the response's own Pretty/Raw) — rewrites
-// state.body in place via the existing lossless beautifyJson, never JSON.stringify.
-const beautifyError = ref<string | null>(null);
-function onBeautifyBody(): void {
-  const result = beautifyJson(props.tab.state.body, 'indented');
-  if (result.ok) {
-    patchHttpRequestTabState(props.tab.id, { body: result.text });
-    beautifyError.value = null;
-  } else {
-    beautifyError.value = result.reason ?? 'could not format this body';
-  }
 }
 
 // D6: 0 means "the default half" — PanelSplitter itself needs a real pixel size.
@@ -194,34 +167,7 @@ onUnmounted(() => {
         <div class="request-pane" :style="{ flex: `0 0 ${requestPaneHeight}px` }" data-testid="http-request-pane">
           <QueryParamsTable v-if="tab.state.requestPane === 'params'" :tab="tab" />
           <RequestHeadersTable v-else-if="tab.state.requestPane === 'headers'" :tab="tab" />
-          <div v-else class="body-pane">
-            <div class="body-mode-row p-toolbar">
-              <SegmentedControl
-                :model-value="tab.state.bodyMode"
-                :options="BODY_MODE_OPTIONS"
-                data-testid="http-body-mode"
-                @update:model-value="setBodyMode"
-              />
-              <span class="p-push" />
-              <IconButton
-                v-if="tab.state.bodyMode === 'raw'"
-                icon="expand-all"
-                v-tooltip="'Beautify'"
-                data-testid="http-body-beautify"
-                @click="onBeautifyBody"
-              />
-            </div>
-            <MessageStrip v-if="beautifyError" tone="err" data-testid="http-body-beautify-error">
-              {{ beautifyError }}
-            </MessageStrip>
-            <CodeMirrorHost
-              v-if="tab.state.bodyMode === 'raw'"
-              :doc="tab.state.body"
-              language="json"
-              :read-only="false"
-              @update:doc="onBodyChange"
-            />
-          </div>
+          <RequestBodyPane v-else :tab="tab" />
         </div>
 
         <PanelSplitter
@@ -269,13 +215,6 @@ onUnmounted(() => {
 .request-splitter {
   height: var(--kira-s-2);
   flex-shrink: 0;
-}
-
-.body-pane {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
 }
 
 .response-pane-slot {

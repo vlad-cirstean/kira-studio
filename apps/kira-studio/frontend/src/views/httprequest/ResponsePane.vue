@@ -2,7 +2,7 @@
 import { statusClass, statusHint } from '@shared/domain/http';
 import type { HttpRequestTabRecord } from '@shared/domain/tabs';
 import { computed } from 'vue';
-import { beautifyJson, scanJson } from '../../beautify';
+import { beautifyJson, beautifyXml, scanJson, scanXml } from '../../beautify';
 import CodeMirrorHost from '../../editor/CodeMirrorHost.vue';
 import { formatBytes } from '../../format';
 import { patchHttpRequestTabState } from '../../state/tabs';
@@ -25,9 +25,19 @@ function setResponsePane(pane: 'body' | 'headers'): void {
   patchHttpRequestTabState(props.tab.id, { responsePane: pane });
 }
 
-// D12/C6: scanJson is the one "is this JSON" gate in the app (F13) — the Pretty/Raw toggle only
-// exists when there is something to prettify.
-const isJson = computed(() => (response.value ? scanJson(response.value.body).ok : false));
+// D12/C6/D13: scanJson/scanXml are the app's one "is this JSON"/"is this XML" gate (F13) — the
+// Pretty/Raw toggle only exists when there is something to prettify. The `<…>` bracket check
+// mirrors celleditor/detect.ts's own detectXml gate: scanXml alone accepts plain text with no
+// tags at all (a valid, tag-less node list), so without it every plain-text response would
+// misreport as XML.
+const prettyFormat = computed<'json' | 'xml' | null>(() => {
+  const body = response.value?.body;
+  if (body === undefined) return null;
+  if (scanJson(body).ok) return 'json';
+  const t = body.trim();
+  if (t.length > 0 && t[0] === '<' && t[t.length - 1] === '>' && scanXml(t).ok) return 'xml';
+  return null;
+});
 
 const RESPONSE_VIEW_OPTIONS = [
   { value: 'pretty' as const, label: 'Pretty', testid: 'http-response-view-pretty' },
@@ -50,14 +60,16 @@ const redirectCaption = computed(() => {
   return `${n} redirect${n === 1 ? '' : 's'} → ${r.finalUrl}`;
 });
 
-// D12: a view toggle, never an edit — Pretty renders beautifyJson(raw, 'indented'), Raw renders
-// the bytes exactly as received. Neither ever mutates response.body itself (it is read-only
-// runtime state, D6), so switching back to Raw always shows what the server actually sent.
+// D12/D13: a view toggle, never an edit — Pretty renders beautifyJson/beautifyXml(raw, 'indented')
+// depending on prettyFormat, Raw renders the bytes exactly as received. Neither ever mutates
+// response.body itself (it is read-only runtime state, D6), so switching back to Raw always shows
+// what the server actually sent.
 const bodyText = computed(() => {
   const r = response.value;
   if (!r) return '';
-  if (isJson.value && props.tab.state.responseView === 'pretty') {
-    return beautifyJson(r.body, 'indented').text;
+  if (props.tab.state.responseView === 'pretty') {
+    if (prettyFormat.value === 'json') return beautifyJson(r.body, 'indented').text;
+    if (prettyFormat.value === 'xml') return beautifyXml(r.body, 'indented').text;
   }
   return r.body;
 });
@@ -79,7 +91,7 @@ const bodyText = computed(() => {
         <span class="p-xs dim" data-testid="http-elapsed">{{ response.elapsedMs }} ms</span>
         <span class="p-xs dim" data-testid="http-body-bytes">{{ formatBytes(response.bodyBytes) }}</span>
         <SegmentedControl
-          v-if="tab.state.responsePane === 'body' && isJson"
+          v-if="tab.state.responsePane === 'body' && prettyFormat"
           :model-value="tab.state.responseView"
           :options="RESPONSE_VIEW_OPTIONS"
           data-testid="http-response-view-toggle"
@@ -113,7 +125,7 @@ const bodyText = computed(() => {
         <CodeMirrorHost
           v-else
           :doc="bodyText"
-          :language="isJson ? 'json' : 'plain'"
+          :language="prettyFormat ?? 'plain'"
           :read-only="true"
         />
       </div>
