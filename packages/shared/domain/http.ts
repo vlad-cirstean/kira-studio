@@ -94,6 +94,61 @@ export interface HttpWireExchange {
   requestBodyElided: boolean;
 }
 
+// P10 D4: one measured interval. Absent (an `undefined` field, never present as `0`) means the
+// phase did not happen — a reused connection has no DNS/connect/TLS (F3), a literal-IP URL has no
+// DNS (F5), a plain-`http://` URL has no TLS. That is a different fact from a phase that took no
+// measurable time, and the SPEC's own P10 row requires the two not be confused. Milliseconds,
+// fractional — not the truncated-to-integer unit `elapsedMs` above already uses (D4's own point:
+// the reused-connection case this exists to explain is exactly the sub-millisecond one).
+export interface HttpPhase {
+  startOffsetMs: number;
+  durationMs: number;
+}
+
+// P10 D9: one hop's full detail — every redirect hop plus the final one, projected from the same
+// httptrace collector `Response.redirects` above is derived from (D3). `headers` and
+// `headersElided` are populated for intermediate hops only (the final hop's headers are already
+// `HttpResponseWire.headers`, D9's do-not-duplicate rule) and capped at 8 KiB rendered per hop
+// (F21). `error` is set only on the hop a failed send died on (D15).
+export interface HttpTimelineHop {
+  index: number;
+  method: string;
+  url: string;
+  /** 0 when this hop never got a response (a failed send, D15). */
+  status: number;
+  statusText: string;
+  proto: string;
+  headers?: HttpHeaderWire[];
+  headersElided?: boolean;
+  reused: boolean;
+  idleMs?: number;
+  /** The peer actually spoken to — behind a proxy, the proxy (F12) — never GetConn's own
+   *  `hostPort`, which is not a stable identifier for what the user is talking to. */
+  remoteAddr?: string;
+  connAttempts: number;
+  /** Any 1xx informational response seen before the final one (F9) — the wait phase, when
+   *  present, ends at the first of these. */
+  info1xx?: number[];
+  startOffsetMs: number;
+  totalMs: number;
+  error?: string;
+  dns?: HttpPhase;
+  connect?: HttpPhase;
+  tls?: HttpPhase;
+  wait?: HttpPhase;
+  download?: HttpPhase;
+}
+
+// P10 D2/D3: `httptrace.ClientTrace` installed once on the send's context, bucketed by
+// `checkRedirect` — the same delimiter `Response.redirects` above is derived from — into one hop
+// per response actually seen (F1/F2). `totalMs` is measured directly (`time.Since` over the whole
+// send), never summed from hops' own totals (D5: the phases do not sum to a hop's duration, and a
+// hop's own total does not have to sum to the send's).
+export interface HttpTimeline {
+  hops: HttpTimelineHop[];
+  totalMs: number;
+}
+
 // httpclient.Response — what comes back. `body`'s meaning depends on `bodyEncoding`: 'utf8' is the
 // text itself, 'base64' is the raw bytes so a binary response never gets corrupted round-tripping
 // through Go's `encoding/json` (D4).
@@ -112,6 +167,14 @@ export interface HttpResponseWire {
   /** P9 D2/D7: absent when the send failed before a response existed (D15), a dump error occurred
    *  (D2), or this response was read back out of P8's history store (D7 strips it before Record). */
   wire?: HttpWireExchange;
+  /** P10 D2/D10: populated for a real live send's response, and — unlike `wire` above — kept on a
+   *  response read back out of P8's history store (D10: a timeline is ~550 B–3 KB, nowhere near
+   *  P8 D6's per-entry cap, so there is no reason to strip it the way `wire` is). Optional here —
+   *  not `?? {hops: [], totalMs: 0}` defaulted anywhere — so every `tests/ui`/`tests/unit` fixture
+   *  built before this phase (an `HttpResponseWire` object literal with no `timeline` field) stays
+   *  valid with no fixture edit (§6.6); `TimelinePane.vue`'s own empty state (D13) is what a
+   *  genuinely absent timeline renders as. */
+  timeline?: HttpTimeline;
 }
 
 // D6: the tab's own persisted headers table — `enabled` has no wire counterpart (a disabled
@@ -200,8 +263,15 @@ export type HttpRequestPane = z.infer<typeof httpRequestPaneSchema>;
 // P8 D10: 'history' is the third pane — F11 verified widening this enum cannot break a restored
 // tab (every stored value is still a member). P9 D12/F13: 'raw' is the fourth, verified safe by
 // the identical reasoning — the naming collision with responseView's own 'raw' value below is
-// resolved by F19 (the two are never rendered at once), not by renaming either.
-export const httpResponsePaneSchema = /*#__PURE__*/ z.enum(['body', 'headers', 'history', 'raw']);
+// resolved by F19 (the two are never rendered at once), not by renaming either. P10 D11/F19:
+// 'timeline' is the fifth, safe by the same reasoning again.
+export const httpResponsePaneSchema = /*#__PURE__*/ z.enum([
+  'body',
+  'headers',
+  'history',
+  'raw',
+  'timeline',
+]);
 export type HttpResponsePane = z.infer<typeof httpResponsePaneSchema>;
 
 export const httpResponseViewSchema = /*#__PURE__*/ z.enum(['pretty', 'raw']);
