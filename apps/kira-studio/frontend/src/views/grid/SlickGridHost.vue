@@ -2048,6 +2048,13 @@ onUnmounted(() => {
   grid = null;
   dataSource = null;
   viewportEl = null;
+  // Finding 7 (round 2) — `editorCtx` (editor.ts) is a module-level singleton; this mount's own
+  // closures (§5 D8, above) stay assigned to it after teardown otherwise, retained for nothing —
+  // bounded (the next grid to mount overwrites both before a `KiraCellEditor` it constructs could
+  // ever call either), but reset explicitly rather than leave a stale closure hanging off a
+  // singleton once the last data tab closes.
+  editorCtx.readValue = () => ({ text: '', isNull: true });
+  editorCtx.commit = () => {};
 });
 
 watch(
