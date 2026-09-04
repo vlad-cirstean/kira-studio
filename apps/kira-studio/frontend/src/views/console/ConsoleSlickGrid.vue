@@ -28,6 +28,7 @@ import {
   type DisplayRowIndex,
   displayPositionOf,
   type GridDataSourceState,
+  isRowVisible,
   type RowHandle,
 } from '../shared/slick/dataSource';
 import { KiraSlickGrid } from '../shared/slick/kiraSlickGrid';
@@ -291,6 +292,13 @@ function fieldAtCol(colIdx: number): string | undefined {
 let selectedRow: number | null = null;
 let selectedField: string | null = null;
 
+// Finding 2 (round 2) — round 1's fix above recomputed the highlight's display position on every
+// `matchedRows` change with no membership check: `displayPositionOf` is documented to fall through
+// to the NEAREST visible row on a miss (right for scroll-into-view, wrong here) — the selected
+// row itself getting filtered OUT (still tracked in `selectedRow`/`selectedField`, still driving
+// the cell-editor dock) used to paint the highlight onto a neighboring row instead of clearing it,
+// a visible mismatch between what's highlighted and what's actually being edited. `isRowVisible`
+// is the exact-match check `displayPositionOf` deliberately isn't.
 function refreshSelectionLayer(): void {
   if (!grid || !page) return;
   if (selectedRow === null || selectedField === null) return;
@@ -298,6 +306,10 @@ function refreshSelectionLayer(): void {
     displayRows: matchedRows(props.tabId),
     pageRowCount: page.rowCount,
   };
+  if (!isRowVisible(idx, selectedRow)) {
+    grid.setCellCssStyles('kira-cell-selected', {});
+    return;
+  }
   const pos = displayPositionOf(idx, selectedRow);
   grid.setCellCssStyles('kira-cell-selected', { [pos]: { [selectedField]: 'kira-cell-selected' } });
 }

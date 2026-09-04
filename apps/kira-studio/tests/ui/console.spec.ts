@@ -522,6 +522,86 @@ test('Query console — the one-cell selection highlight tracks its row through 
   await expect(cellAt(1)).not.toHaveClass(/kira-cell-selected/);
 });
 
+// Finding 2 (round 2) — round 1's fix (finding 6, above) recomputed the highlight's display
+// position on every `matchedRows` change with no membership check: `displayPositionOf` is
+// documented to fall through to the NEAREST visible row on a miss (correct for scroll-into-view,
+// wrong for a highlight). Reproduced here concretely: click n=3 (page row 2) while unfiltered,
+// then filter such that page row 2 itself (n=3) is hidden but page row 3 (n=4) stays visible —
+// pre-fix, `displayPositionOf`'s nearest-match fallback lands the highlight on n=4's cell instead
+// of clearing it, a visible mismatch against the cell-editor dock (still showing n=3's actual
+// value). Only the membership check itself is under test here; the round-1 regression (a
+// selected row that STAYS visible after filtering) is covered above.
+test('Query console — the one-cell selection highlight clears (not jumps) when its own row is filtered out (finding 2)', async ({
+  relaunch,
+}) => {
+  const CONNECTION_ID = 'conn-console-select-filtered-out';
+  const CONNECTION_SUMMARY = postgresConnectionSummary(
+    CONNECTION_ID,
+    'Console Select Filtered Out DB',
+    'amber',
+  );
+  const FIXTURE = orderItemsFixture(CONNECTION_ID);
+
+  const CONTROL: ControlSnapshot[] = [
+    { channel: IPC.connectionsList, response: [] },
+    {
+      channel: IPC.connectionsCreate,
+      args: connectionCreateArgs('Console Select Filtered Out DB', 'amber'),
+      response: CONNECTION_SUMMARY,
+    },
+    ...FIXTURE.control,
+  ];
+  const PORT: PortSnapshot[] = [
+    ...FIXTURE.port,
+    executeSnap(
+      CONNECTION_ID,
+      [
+        'SELECT 1 AS n UNION ALL SELECT 2 AS n UNION ALL SELECT 3 AS n UNION ALL SELECT 4 AS n UNION ALL SELECT 5 AS n ORDER BY n',
+      ],
+      [intColumnPage('n', ['1', '2', '3', '4', '5'])],
+    ),
+  ];
+
+  const { window: page } = await relaunch({ control: CONTROL, stream: PORT });
+  await connectAndExpand(page, 'Console Select Filtered Out DB', 'amber');
+  await openConsoleFromMenu(page, ORDER_ITEMS_PATH);
+  const consoleView = page.locator('[data-testid="console-view"]');
+  const results = consoleView.locator('[data-testid="console-result-grid"]');
+
+  await typeInto(
+    consoleView,
+    page,
+    'SELECT 1 AS n UNION ALL SELECT 2 AS n UNION ALL SELECT 3 AS n UNION ALL SELECT 4 AS n UNION ALL SELECT 5 AS n ORDER BY n;',
+  );
+  await page.click('[data-testid="console-run-statement"]');
+  await expect(results.locator('[data-testid="console-result-row"]')).toHaveCount(5);
+
+  const cellAt = (row: number) =>
+    results.locator(
+      `[data-testid="console-result-row"][data-row="${row}"] [data-testid="console-result-cell"][data-column="n"]`,
+    );
+
+  // --- click n=3 (page row 2) while unfiltered ---------------------------------------------------
+  await cellAt(2).click();
+  await expect(cellAt(2)).toHaveClass(/kira-cell-selected/);
+
+  // --- filter to n=1/2/4/5: page row 2 (n=3, the selected row) is hidden; page row 3 (n=4) stays
+  // visible and renders at display position 2 — the exact slot a nearest-match fallback would
+  // wrongly paint the highlight onto ---------------------------------------------------------------
+  await page.click('[data-testid="console-search"]');
+  const searchToolbar = consoleView.locator('[data-testid="console-search-toolbar"]');
+  await expect(searchToolbar).toBeVisible();
+  await page.click('[data-testid="console-search-regex"]');
+  await page.fill('[data-testid="console-search-input"]', '^[1245]$');
+  await expect(searchToolbar.locator('[data-testid="console-search-count"]')).toContainText('of 4');
+  await page.click('[data-testid="console-search-filter-rows"]');
+  await expect(results.locator('[data-testid="console-result-row"]')).toHaveCount(4);
+
+  // The highlight cleared entirely — it did not jump onto n=4's cell, the display position (2)
+  // n=3's stale slot used to occupy (n=3's own row, `data-row="2"`, no longer renders at all).
+  await expect(results.locator('.kira-cell-selected')).toHaveCount(0);
+});
+
 // P42 D8: a result chip's own right-click menu — Close, Close others, Close to the right, each
 // acting on the clicked chip and disabled (never hidden) when it would be a no-op.
 test('Query console — result-tab right-click: close, close others, close to the right (P42)', async ({
