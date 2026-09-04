@@ -24,8 +24,10 @@ export interface ControlSnapshot<T = unknown> {
    *  thrown error, so this is the shape a real business-rule rejection (not a schema-validation
    *  one, which never reaches the wire) takes. Mutually exclusive with `response` — a snapshot
    *  answers as one or the other, never both. No `tests/ipc/**` fixture sets this; the backend
-   *  capture/replay half has no concept of it. */
-  error?: { code: string; message: string };
+   *  capture/replay half has no concept of it. `details` is P10 D15's own addition — ipcerr.Error's
+   *  optional `json.RawMessage` field, so far only ever set by HttpService.Send's own failed-send
+   *  timeline; every other seeded error leaves it unset. */
+  error?: { code: string; message: string; details?: unknown };
 }
 
 /** One bulk-data snapshot. `payload` matches a PortRequest's own payload; `response` is logical,

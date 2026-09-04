@@ -246,15 +246,20 @@ function canonical(value: unknown): string {
   return JSON.stringify(value);
 }
 
-function runtimeErrorBody(code: string, message: string): string {
+function runtimeErrorBody(code: string, message: string, details?: unknown): string {
   // The exact shape apps/kira-studio/internal/bridge/transport_http.go's httpError writes for a bound
   // method's error (P57 §1.6/D5): `.message` is ipcerr.Error's own JSON encoding, `.cause` is
   // that same {code, message} as a real object. control.ts's `unwrap` reads `.cause` first, so a
-  // fixture miss surfaces as a diagnosable `E_FIXTURE_MISS`, not a raw network failure.
+  // fixture miss surfaces as a diagnosable `E_FIXTURE_MISS`, not a raw network failure. `details`
+  // is P10 D15's own addition — undefined drops the key from both the JSON-encoded `.message` and
+  // `.cause`, exactly what ipcerr.Error's own `omitempty` does for every producer that never sets
+  // it.
+  const body: Record<string, unknown> = { code, message };
+  if (details !== undefined) body.details = details;
   return JSON.stringify({
     kind: 'RuntimeError',
-    message: JSON.stringify({ code, message }),
-    cause: { code, message },
+    message: JSON.stringify(body),
+    cause: body,
   });
 }
 
@@ -414,7 +419,7 @@ export async function installControlMocks(
       await route.fulfill({
         status: 422,
         contentType: 'application/json',
-        body: runtimeErrorBody(snap.error.code, snap.error.message),
+        body: runtimeErrorBody(snap.error.code, snap.error.message, snap.error.details),
       });
       return;
     }

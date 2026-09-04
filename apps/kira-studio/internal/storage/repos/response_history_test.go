@@ -408,3 +408,73 @@ func TestResponseHistoryRecordStripsWireBeforePersisting(t *testing.T) {
 		t.Fatalf("decoded Response.Wire = %+v, want nil", snap.Response.Wire)
 	}
 }
+
+// ---- 9. P10 D10: a stored snapshot keeps its timeline ----
+//
+// The deliberate mirror of case 8 above: Wire is live-only and stripped (P9 D7), but Timeline is
+// small enough (F17) and valuable enough (D10) that it is kept — this is the test that would catch
+// a future refactor nil-ing the wrong field. A non-nil Timeline on the Response Record is given
+// comes back with the same hop count and the same hop URL after a Get.
+
+func TestResponseHistoryRecordKeepsTimeline(t *testing.T) {
+	r, db := newResponseHistoryRepo(t)
+	itemID := newItemFor(t, db)
+
+	withTimeline := rec(itemID, "tab1", 200, "body")
+	withTimeline.Response.Timeline = httpclient.Timeline{
+		Hops: []httpclient.TimelineHop{
+			{
+				Index: 0, Method: "GET", URL: "https://api.example.com/start", Status: 301,
+				Reused: false, ConnAttempts: 1,
+				DNS:     &httpclient.Phase{StartOffsetMs: 0, DurationMs: 1.5},
+				Connect: &httpclient.Phase{StartOffsetMs: 1.5, DurationMs: 0.4},
+			},
+			{
+				Index: 1, Method: "GET", URL: "https://api.example.com/orders", Status: 200,
+				Reused: true, ConnAttempts: 1,
+			},
+		},
+		TotalMs: 12.3,
+	}
+	if err := r.Record(withTimeline); err != nil {
+		t.Fatalf("Record: %v", err)
+	}
+
+	entries, err := r.List(itemID)
+	if err != nil || len(entries) != 1 {
+		t.Fatalf("List = %d entries, err %v, want 1", len(entries), err)
+	}
+	id := entries[0].ID
+
+	var rawSnapshot string
+	if err := db.QueryRow(`SELECT snapshot_json FROM http_response_history WHERE id = ?`, id).Scan(&rawSnapshot); err != nil {
+		t.Fatalf("query snapshot_json: %v", err)
+	}
+	if !strings.Contains(rawSnapshot, `"timeline"`) {
+		t.Fatalf("stored snapshot_json contains no \"timeline\" key at all:\n%s", rawSnapshot)
+	}
+
+	snap, err := r.Get(id)
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	if len(snap.Response.Timeline.Hops) != 2 {
+		t.Fatalf("decoded Timeline.Hops = %d entries, want 2: %+v", len(snap.Response.Timeline.Hops), snap.Response.Timeline.Hops)
+	}
+	if snap.Response.Timeline.Hops[0].URL != "https://api.example.com/start" {
+		t.Errorf("decoded Timeline.Hops[0].URL = %q, want https://api.example.com/start", snap.Response.Timeline.Hops[0].URL)
+	}
+	if snap.Response.Timeline.Hops[0].DNS == nil || snap.Response.Timeline.Hops[0].DNS.DurationMs != 1.5 {
+		t.Errorf("decoded Timeline.Hops[0].DNS = %+v, want a 1.5ms phase", snap.Response.Timeline.Hops[0].DNS)
+	}
+	if !snap.Response.Timeline.Hops[1].Reused {
+		t.Errorf("decoded Timeline.Hops[1].Reused = false, want true")
+	}
+	if snap.Response.Timeline.TotalMs != 12.3 {
+		t.Errorf("decoded Timeline.TotalMs = %v, want 12.3", snap.Response.Timeline.TotalMs)
+	}
+	// D10's own contrast: Wire is stripped, Timeline is not, in the same stored entry.
+	if snap.Response.Wire != nil {
+		t.Errorf("decoded Response.Wire = %+v, want nil (unrelated to Timeline, still stripped)", snap.Response.Wire)
+	}
+}
