@@ -57,9 +57,38 @@ func Parse(r io.Reader) (*Tree, error) {
 	origin["info"] = mustRaw(infoOrigin)
 
 	tree := &Tree{Name: name, Origin: origin, Report: Report{Warnings: map[string]int{}}}
-	countInertMembers(doc, &tree.Report)
+	// D15: the collection level is promoted, not inert — scripts and auth still count as inert
+	// here, but `variable` does not go through countInertMembers at this one level.
+	countScriptsAndAuth(doc, &tree.Report)
+	tree.Variables = decodeVariables(doc["variable"])
+	delete(tree.Origin, "variable")
+	if len(tree.Variables) > 0 {
+		tree.Report.warnN(WarnVariablesImported, len(tree.Variables))
+	}
 	walkItems(doc["item"], RootParent, tree)
 	return tree, nil
+}
+
+// decodeVariables decodes a collection-level `variable[]` array (D15). `key` is the name (F2's
+// own decodeScalarString, since Postman's variable.value is untyped); `type == "secret"` marks an
+// entry secret, and the original `type` string is preserved per entry so an unrecognised one
+// survives export unchanged.
+func decodeVariables(raw json.RawMessage) []Variable {
+	out := []Variable{}
+	for _, entry := range decodeArray(raw) {
+		obj := decodeObject(entry)
+		if obj == nil {
+			continue
+		}
+		name, ok := decodeScalarString(obj["key"])
+		if !ok || name == "" {
+			continue
+		}
+		value, _ := decodeScalarString(obj["value"])
+		typ, _ := decodeString(obj["type"])
+		out = append(out, Variable{Name: name, Value: value, Secret: typ == "secret", Type: typ})
+	}
+	return out
 }
 
 // checkSchemaVersion is D10: v2.1 parses, an absent or unrecognised `info.schema` parses anyway
@@ -135,16 +164,22 @@ func walkItems(raw json.RawMessage, parent int, t *Tree) {
 	}
 }
 
-// countInertMembers is D9's report half: scripts, auth blocks and variables are preserved verbatim
-// and never executed, applied or resolved, and the report says so exactly once so nobody believes
-// otherwise.
-func countInertMembers(obj map[string]json.RawMessage, rep *Report) {
+// countScriptsAndAuth is countInertMembers' shared half, used at every level including the
+// document's own — scripts and auth blocks are preserved verbatim and never executed or applied,
+// at any level, and the report says so exactly once so nobody believes otherwise.
+func countScriptsAndAuth(obj map[string]json.RawMessage, rep *Report) {
 	if events := decodeArray(obj["event"]); len(events) > 0 {
 		rep.warnN(WarnScriptsInert, len(events))
 	}
 	if auth := decodeObject(obj["auth"]); auth != nil {
 		rep.warn(WarnAuthInert)
 	}
+}
+
+// countInertMembers is D9's report half for the folder and item levels — variables stay inert at
+// these levels (D15 promotes only the collection level, walkItems' own two call sites below).
+func countInertMembers(obj map[string]json.RawMessage, rep *Report) {
+	countScriptsAndAuth(obj, rep)
 	if vars := decodeArray(obj["variable"]); len(vars) > 0 {
 		rep.warnN(WarnVariablesInert, len(vars))
 	}

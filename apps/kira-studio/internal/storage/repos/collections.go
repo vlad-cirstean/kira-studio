@@ -544,6 +544,38 @@ func (r *CollectionsRepo) LoadTree(collectionID string) (*postman.Tree, error) {
 
 	tree := &postman.Tree{Name: name, Origin: decodeOrigin(originJSON, collectionID)}
 
+	// D15/D16: the collection's own promoted variables, re-emitted from these rows — a secret
+	// row's `value` is already '' by construction (D4's own CHECK constraint), which is what
+	// makes D16's "a secret exports valueless" true here with no decrypt and no extra branch.
+	varRows, err := r.DB.Query(
+		`SELECT name, value, is_secret FROM http_variables WHERE collection_id = ? ORDER BY sort_order, name`,
+		collectionID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("repos/collections: query variables: %w", err)
+	}
+	for varRows.Next() {
+		var (
+			varName, varValue string
+			isSecretInt       int
+		)
+		if err := varRows.Scan(&varName, &varValue, &isSecretInt); err != nil {
+			varRows.Close()
+			return nil, fmt.Errorf("repos/collections: scan variable: %w", err)
+		}
+		secret := isSecretInt != 0
+		typ := ""
+		if secret {
+			typ = "secret"
+		}
+		tree.Variables = append(tree.Variables, postman.Variable{Name: varName, Value: varValue, Secret: secret, Type: typ})
+	}
+	if err := varRows.Err(); err != nil {
+		varRows.Close()
+		return nil, fmt.Errorf("repos/collections: variable rows: %w", err)
+	}
+	varRows.Close()
+
 	rows, err := r.DB.Query(
 		`SELECT id, parent_id, kind, name, sort_order, request_json, origin_json
 		   FROM http_items WHERE collection_id = ? ORDER BY sort_order, created_at, id`,

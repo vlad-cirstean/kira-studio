@@ -40,6 +40,13 @@ func Write(w io.Writer, t *Tree) error {
 	info["schema"] = mustRaw(SchemaURL)
 	doc["info"] = mustRaw(info)
 	doc["item"] = buildItems(t, RootParent)
+	// D15: `variable` is the exporter's fourth owned member, unconditionally — the rows *are* the
+	// collection's variables now, and origin no longer carries the member to compare against.
+	if len(t.Variables) > 0 {
+		doc["variable"] = buildVariables(t.Variables)
+	} else {
+		delete(doc, "variable")
+	}
 
 	enc := json.NewEncoder(w)
 	enc.SetEscapeHTML(false)
@@ -126,6 +133,30 @@ func buildRequest(origin json.RawMessage, saved model.SavedRequest) json.RawMess
 	}
 
 	return mustRaw(out)
+}
+
+// buildVariables emits `[{key, value, type?}]` — D16: a secret's `value` is always "" in the
+// written file, regardless of what LoadTree read (which is itself always "" for a secret row,
+// D4's own CHECK constraint), stated here rather than relied upon implicitly. `type` is "secret"
+// for any secret entry (even one created in this app, which never had an original Postman `type`
+// string) and otherwise the original string verbatim, when there was one.
+func buildVariables(vars []Variable) json.RawMessage {
+	rows := make([]map[string]any, 0, len(vars))
+	for _, v := range vars {
+		row := map[string]any{"key": v.Name}
+		switch {
+		case v.Secret:
+			row["value"] = ""
+			row["type"] = "secret"
+		default:
+			row["value"] = v.Value
+			if v.Type != "" {
+				row["type"] = v.Type
+			}
+		}
+		rows = append(rows, row)
+	}
+	return mustRaw(rows)
 }
 
 func buildHeaders(headers []model.SavedHeader) json.RawMessage {

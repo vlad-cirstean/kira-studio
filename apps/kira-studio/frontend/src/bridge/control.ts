@@ -414,7 +414,9 @@ export const control = {
     unwrap(CollectionsService.Delete({ id, target })),
   collectionsImport: (path: string): Promise<WailsModels.ImportReport> =>
     unwrap(CollectionsService.Import({ path })),
-  collectionsExport: (collectionId: string, path: string): Promise<void> =>
+  // P5 D16: ExportReport.secretCount is what lets the panel say "N secret values were not
+  // written" once, rather than that being a fact only discoverable by opening the file.
+  collectionsExport: (collectionId: string, path: string): Promise<WailsModels.ExportReport> =>
     unwrap(CollectionsService.Export({ collectionId, path })),
 
   // P5 D19: thirteen wrappers over VariablesService — typed against the shared domain mirrors

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import IconButton from '../theme/primitives/IconButton.vue';
-import { collectionsState, dismissReport } from './state/collections';
+import { collectionsState, dismissExportWarning, dismissReport } from './state/collections';
 
 // P4 D12: the import report is part of the feature, not decoration. Every warning kind is a case
 // where the app quietly does something other than what the file said — a script that is kept but
@@ -50,6 +50,20 @@ function plural(n: number, noun: string): string {
         v-tooltip="'Dismiss'"
         data-testid="import-report-dismiss"
         @click="dismissReport"
+      />
+    </span>
+  </div>
+  <!-- P5 D16: the export path's own strip, independent of the import one above (a session can
+       export without ever having imported). -->
+  <div v-if="collectionsState.exportWarning" class="p-strip warn" data-testid="export-warning">
+    <div class="report">{{ collectionsState.exportWarning }}</div>
+    <span class="strip-action">
+      <IconButton
+        icon="close"
+        aria-label="Dismiss"
+        v-tooltip="'Dismiss'"
+        data-testid="export-warning-dismiss"
+        @click="dismissExportWarning"
       />
     </span>
   </div>

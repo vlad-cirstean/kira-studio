@@ -52,17 +52,33 @@ type Item struct {
 	Origin map[string]json.RawMessage
 }
 
-// Tree is one collection: its name, its own origin object, and the flat ordered item list.
-// Both directions use it — Parse produces one, Write consumes one, and repos/collections.go maps
-// it onto rows in about twenty lines.
+// Tree is one collection: its name, its own origin object, the flat ordered item list, and its
+// own collection-level variables. Both directions use it — Parse produces one, Write consumes
+// one, and repos/collections.go maps it onto rows in about twenty lines.
 type Tree struct {
 	Name string
-	// Origin is the whole original collection object minus its `item` array and minus
-	// `info.name` (both of which are columns), '{}' for a collection created in this app.
+	// Origin is the whole original collection object minus its `item` array, minus `info.name`
+	// (both of which are columns) and minus `variable` (D15 — promoted into Variables below, and
+	// re-emitted from there, never from here). '{}' for a collection created in this app.
 	Origin map[string]json.RawMessage
 	Items  []Item
+	// Variables is the collection's own top-level `variable[]` (D15) — only this level is
+	// promoted; a folder's or an item's own `variable` member stays inert in its own Origin.
+	Variables []Variable
 	// Report is what Parse observed; Write leaves it zero.
 	Report Report
+}
+
+// Variable is one collection-level `variable[]` entry (D15).
+type Variable struct {
+	Name  string
+	Value string
+	// Secret is Type == "secret" (F2/OQ-1: unverified against a real Postman export from this
+	// sandbox, so any other Type value is treated as non-secret rather than refused).
+	Secret bool
+	// Type preserves the original `type` string verbatim, so an unrecognised one survives export
+	// unchanged; "" for a variable created in this app that was never secret.
+	Type string
 }
 
 // The eight warning kinds (D12), each corresponding to a decision the importer makes on the
@@ -76,6 +92,10 @@ const (
 	WarnUnresolvedFile    = "unresolved_file"
 	WarnInlineFileContent = "inline_file_content"
 	WarnMalformedItem     = "malformed_item"
+	// WarnVariablesImported is D15's promoted-count sibling to WarnVariablesInert: a collection-
+	// level variable[] is no longer inert, so it gets its own message rather than being folded
+	// into the inert count it no longer belongs to.
+	WarnVariablesImported = "variables_imported"
 	// WarnDisabledBody covers D7's last row: Postman keeps a disabled body and does not send it;
 	// this app has no equivalent and will send it.
 	WarnDisabledBody = "disabled_body"

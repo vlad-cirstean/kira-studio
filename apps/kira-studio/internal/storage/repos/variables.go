@@ -9,6 +9,7 @@ import (
 	"strconv"
 
 	"github.com/google/uuid"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/postman"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 )
 
@@ -793,4 +794,48 @@ func (r *VariablesRepo) promoteIfNeeded(collectionID string) error {
 // caller that wants to force promotion outside of List's own lazy trigger).
 func (r *VariablesRepo) PromoteImported(collectionID string) error {
 	return r.promoteIfNeeded(collectionID)
+}
+
+// ImportVariables writes a freshly-imported collection's own promoted `variable[]` (D15) as rows,
+// stamping variables_promoted = 1 immediately — these rows already *are* the promoted set, so
+// there is nothing left for promoteIfNeeded to do for this collection.
+//
+// Called by CollectionsService.Import right after CollectionsRepo.ImportTree creates the
+// collection row — deliberately a second call, not folded into that one transaction (F13's own
+// property does not extend here): encrypting a secret value needs this repo's own Cipher, which
+// CollectionsRepo does not have and should not be given (D4/F4's module boundary keeps
+// secret_value's only writers in this one repo).
+func (r *VariablesRepo) ImportVariables(collectionID string, vars []postman.Variable) error {
+	tx, err := r.db.Begin()
+	if err != nil {
+		return fmt.Errorf("repos/variables: begin: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	now := model.NowISO()
+	order := 0
+	for _, v := range vars {
+		if v.Name == "" {
+			continue
+		}
+		storedValue, storedSecret, err := r.encryptFor(v.Value, v.Secret)
+		if err != nil {
+			return err
+		}
+		if _, err := tx.Exec(
+			`INSERT INTO http_variables (id, collection_id, environment_id, name, value, is_secret, secret_value, sort_order, created_at, updated_at)
+			 VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, ?)`,
+			uuid.NewString(), collectionID, v.Name, storedValue, boolToInt(v.Secret), storedSecret, order, now, now,
+		); err != nil {
+			return fmt.Errorf("repos/variables: insert imported variable: %w", err)
+		}
+		order++
+	}
+	if _, err := tx.Exec(`UPDATE http_collections SET variables_promoted = 1, updated_at = ? WHERE id = ?`, now, collectionID); err != nil {
+		return fmt.Errorf("repos/variables: stamp promoted: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("repos/variables: commit: %w", err)
+	}
+	return nil
 }

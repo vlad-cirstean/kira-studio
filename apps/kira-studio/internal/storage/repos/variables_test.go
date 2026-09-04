@@ -1,9 +1,12 @@
 package repos_test
 
 import (
+	"bytes"
 	"database/sql"
+	"encoding/json"
 	"testing"
 
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/postman"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/secrets"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/repos"
@@ -257,5 +260,91 @@ func TestPromoteImportedIsOneShotAndIdempotent(t *testing.T) {
 	}
 	if len(rowsAgain) != 2 {
 		t.Fatalf("len(rowsAgain) = %d, want still 2 (idempotent, no duplicate rows)", len(rowsAgain))
+	}
+}
+
+// ---- 5. import → ImportVariables → LoadTree → export, end to end, secrets valueless (D15/D16) ----
+
+func TestImportVariablesThenExportRoundTripsWithSecretsValueless(t *testing.T) {
+	r, db := newVariablesRepo(t)
+	cr := &repos.CollectionsRepo{DB: db}
+
+	c, err := cr.CreateCollection("With variables")
+	if err != nil {
+		t.Fatalf("CreateCollection: %v", err)
+	}
+	vars := []postman.Variable{
+		{Name: "baseUrl", Value: "https://api.example.com"},
+		{Name: "apiKey", Value: "s3cr3t", Secret: true, Type: "secret"},
+	}
+	if err := r.ImportVariables(c.ID, vars); err != nil {
+		t.Fatalf("ImportVariables: %v", err)
+	}
+
+	// The rows exist with the right names, order and secret flags, and the list projection never
+	// carries the secret's plaintext (D5).
+	rows, err := r.List(model.VariableScopeCollection, c.ID)
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	if len(rows) != 2 {
+		t.Fatalf("len(rows) = %d, want 2", len(rows))
+	}
+	if rows[0].Name != "baseUrl" || rows[0].Value != "https://api.example.com" || rows[0].IsSecret {
+		t.Errorf("rows[0] = %+v", rows[0])
+	}
+	if rows[1].Name != "apiKey" || rows[1].Value != "" || !rows[1].IsSecret {
+		t.Errorf("rows[1] = %+v", rows[1])
+	}
+	plain, err := r.RevealValue(rows[1].ID)
+	if err != nil {
+		t.Fatalf("RevealValue: %v", err)
+	}
+	if plain != "s3cr3t" {
+		t.Errorf("RevealValue = %q, want s3cr3t", plain)
+	}
+
+	// The collection is stamped promoted — PromoteImported (List's own lazy trigger) must not
+	// duplicate these rows.
+	rows2, err := r.List(model.VariableScopeCollection, c.ID)
+	if err != nil {
+		t.Fatalf("List (again): %v", err)
+	}
+	if len(rows2) != 2 {
+		t.Fatalf("len(rows2) = %d, want still 2", len(rows2))
+	}
+
+	// Export re-emits `variable` from the rows, in order, with the secret's value empty and its
+	// type "secret" — D16, exercised through the real LoadTree -> postman.Write path.
+	tree, err := cr.LoadTree(c.ID)
+	if err != nil {
+		t.Fatalf("LoadTree: %v", err)
+	}
+	var buf bytes.Buffer
+	if err := postman.Write(&buf, tree); err != nil {
+		t.Fatalf("Write: %v", err)
+	}
+	var doc map[string]any
+	if err := json.Unmarshal(buf.Bytes(), &doc); err != nil {
+		t.Fatalf("decode written file: %v", err)
+	}
+	written, ok := doc["variable"].([]any)
+	if !ok || len(written) != 2 {
+		t.Fatalf("doc[\"variable\"] = %#v, want 2 entries", doc["variable"])
+	}
+	want := []map[string]any{
+		{"key": "baseUrl", "value": "https://api.example.com"},
+		{"key": "apiKey", "value": "", "type": "secret"},
+	}
+	for i, row := range written {
+		m, ok := row.(map[string]any)
+		if !ok || len(m) != len(want[i]) {
+			t.Fatalf("written[%d] = %#v, want %#v", i, row, want[i])
+		}
+		for k, v := range want[i] {
+			if m[k] != v {
+				t.Errorf("written[%d][%q] = %#v, want %#v", i, k, m[k], v)
+			}
+		}
 	}
 }

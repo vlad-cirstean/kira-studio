@@ -215,12 +215,31 @@ func TestEveryOneOfParsesAndSurvives(t *testing.T) {
 		}
 	})
 
-	t.Run("object descriptions, a string script.exec and a numeric variable value all survive", func(t *testing.T) {
-		// None of these is decoded at all — they live in origin as raw bytes, which is exactly why
-		// parsing cannot error on them.
-		for _, member := range []string{"variable", "event", "info"} {
+	t.Run("object descriptions and a string script.exec survive; a numeric variable value re-exports as its promoted row's own string", func(t *testing.T) {
+		// event/info are not decoded at all — they live in origin as raw bytes, which is exactly
+		// why parsing cannot error on them.
+		for _, member := range []string{"event", "info"} {
 			if !reflect.DeepEqual(out[member], in[member]) {
 				t.Fatalf("collection-level %q changed:\n got %#v\nwant %#v", member, out[member], in[member])
+			}
+		}
+		// P5 D15: collection-level `variable` is promoted, not inert — it round-trips through
+		// VariablesRepo's own TEXT columns, so a numeric/boolean `value` (F2's own untyped-value
+		// finding) re-exports as the equivalent JSON string rather than byte-identically. This is
+		// the same lossy-scalar handling `decodeScalarString` already applies to header/url values
+		// elsewhere in this package, not a new corner cut for variables specifically.
+		gotVars, ok := out["variable"].([]any)
+		if !ok || len(gotVars) != 3 {
+			t.Fatalf("out[\"variable\"] = %#v, want 3 promoted rows", out["variable"])
+		}
+		want := []map[string]any{
+			{"key": "port", "value": "8080", "type": "number"},
+			{"key": "secure", "value": "true", "type": "boolean"},
+			{"key": "baseUrl", "value": "https://api.example.com"},
+		}
+		for i, row := range gotVars {
+			if !reflect.DeepEqual(row, want[i]) {
+				t.Errorf("out[\"variable\"][%d] = %#v, want %#v", i, row, want[i])
 			}
 		}
 		if !reflect.DeepEqual(outItems["path variable segment"]["description"], inItems["path variable segment"]["description"]) {
@@ -452,10 +471,15 @@ func TestPreservedButInertSurvivesAFullCycle(t *testing.T) {
 	tree := parseFile(t, "inert.json")
 	in, out := decodeFile(t, "inert.json"), exported(t, tree)
 
-	for _, member := range []string{"auth", "event", "variable", "protocolProfileBehavior"} {
+	for _, member := range []string{"auth", "event", "protocolProfileBehavior"} {
 		if !reflect.DeepEqual(out[member], in[member]) {
 			t.Errorf("collection-level %q changed:\n got %#v\nwant %#v", member, out[member], in[member])
 		}
+	}
+	// P5 D15: the collection level's own `variable` is promoted, not inert — it re-exports from
+	// the rows (in order, names and values preserved) rather than surviving in origin untouched.
+	if !reflect.DeepEqual(out["variable"], in["variable"]) {
+		t.Errorf("promoted collection-level variable changed:\n got %#v\nwant %#v", out["variable"], in["variable"])
 	}
 	// info survives except the two members that are columns by construction.
 	inInfo, outInfo := in["info"].(map[string]any), out["info"].(map[string]any)
@@ -490,8 +514,13 @@ func TestPreservedButInertSurvivesAFullCycle(t *testing.T) {
 	if got := tree.Report.Warnings[postman.WarnAuthInert]; got != 2 {
 		t.Errorf("auth_inert = %d, want 2", got)
 	}
-	if got := tree.Report.Warnings[postman.WarnVariablesInert]; got != 3 {
-		t.Errorf("variables_inert = %d, want 3", got)
+	// P5 D15/F6: the collection level's 2 variables are promoted (counted below), not inert —
+	// only the "Orders" folder's own 1 variable stays inert.
+	if got := tree.Report.Warnings[postman.WarnVariablesInert]; got != 1 {
+		t.Errorf("variables_inert = %d, want 1", got)
+	}
+	if got := tree.Report.Warnings[postman.WarnVariablesImported]; got != 2 {
+		t.Errorf("variables_imported = %d, want 2", got)
 	}
 }
 

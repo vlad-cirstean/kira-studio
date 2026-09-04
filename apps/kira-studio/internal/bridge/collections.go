@@ -194,7 +194,8 @@ var importWarningDetail = []struct {
 }{
 	{postman.WarnScriptsInert, "%d pre-request/test scripts were kept but are not run — they survive an export unchanged."},
 	{postman.WarnAuthInert, "%d requests or folders carry an auth block. It is kept but not applied — those requests will need an Authorization header."},
-	{postman.WarnVariablesInert, "%d collection variables were kept but are not resolved yet."},
+	{postman.WarnVariablesInert, "%d folder- or item-level variables were kept but are not resolved yet."},
+	{postman.WarnVariablesImported, "%d collection variables were imported."},
 	{postman.WarnGraphQLBody, "%d GraphQL bodies were imported as JSON bodies carrying the same query."},
 	{postman.WarnUnsupportedMethod, "%d requests use a method this builder cannot show yet and will open as GET."},
 	{postman.WarnUnresolvedFile, "%d requests reference a file by a name or a path from another machine."},
@@ -229,6 +230,14 @@ func (s *CollectionsService) Import(args CollectionsImportArgs) (ImportReport, e
 	if err != nil {
 		return ImportReport{}, ipcerr.Internal(err.Error())
 	}
+	// D15/F13: a second call, deliberately — encrypting a secret variable needs VariablesRepo's
+	// own Cipher, which CollectionsRepo does not have (D4/F4's module boundary). See
+	// VariablesRepo.ImportVariables' own comment for why this cannot join ImportTree's transaction.
+	if len(tree.Variables) > 0 {
+		if err := s.Deps.Repos.Variables.ImportVariables(collection.ID, tree.Variables); err != nil {
+			return ImportReport{}, ipcerr.Internal(err.Error())
+		}
+	}
 
 	report := ImportReport{
 		CollectionID: collection.ID, Name: collection.Name,
@@ -252,30 +261,44 @@ type CollectionsExportArgs struct {
 	Path         string `json:"path"`
 }
 
+// ExportReport is Export's answer — D16: a secret is written valueless, and SecretCount is what
+// lets the renderer say so once, rather than that being a fact only discoverable by opening the
+// file.
+type ExportReport struct {
+	SecretCount int `json:"secretCount"`
+}
+
 // Export writes the collection at path as Collection v2.1 JSON. The file is written whole rather
 // than streamed: a collection is rows in a local table and the writer needs the tree in memory to
 // rebuild the nested arrays anyway.
-func (s *CollectionsService) Export(args CollectionsExportArgs) error {
+func (s *CollectionsService) Export(args CollectionsExportArgs) (ExportReport, error) {
 	if args.CollectionID == "" {
-		return ipcerr.BadRequest("collectionId is required")
+		return ExportReport{}, ipcerr.BadRequest("collectionId is required")
 	}
 	if args.Path == "" {
-		return ipcerr.BadRequest("path is required")
+		return ExportReport{}, ipcerr.BadRequest("path is required")
 	}
 	tree, err := s.Deps.Repos.Collections.LoadTree(args.CollectionID)
 	if err != nil {
-		return ipcerr.Internal(err.Error())
+		return ExportReport{}, ipcerr.Internal(err.Error())
 	}
 	f, err := os.Create(args.Path)
 	if err != nil {
-		return ipcerr.BadRequest(fmt.Sprintf("could not write %s: %s", args.Path, err))
+		return ExportReport{}, ipcerr.BadRequest(fmt.Sprintf("could not write %s: %s", args.Path, err))
 	}
 	if err := postman.Write(f, tree); err != nil {
 		_ = f.Close()
-		return ipcerr.Internal(err.Error())
+		return ExportReport{}, ipcerr.Internal(err.Error())
 	}
 	if err := f.Close(); err != nil {
-		return ipcerr.Internal(fmt.Sprintf("could not finish writing %s: %s", args.Path, err))
+		return ExportReport{}, ipcerr.Internal(fmt.Sprintf("could not finish writing %s: %s", args.Path, err))
 	}
-	return nil
+
+	secretCount := 0
+	for _, v := range tree.Variables {
+		if v.Secret {
+			secretCount++
+		}
+	}
+	return ExportReport{SecretCount: secretCount}, nil
 }

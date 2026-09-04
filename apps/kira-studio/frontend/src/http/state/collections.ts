@@ -60,6 +60,9 @@ interface CollectionsState {
   requests: Record<string, HttpSavedRequest>;
   busy: boolean;
   report: ImportReport | null;
+  /** D16: "N secret values were not written to the file" — set after an export that stripped at
+   *  least one, shown alongside the import report strip. */
+  exportWarning: string | null;
   loaded: boolean;
 }
 
@@ -73,6 +76,7 @@ export const collectionsState = reactive<CollectionsState>({
   requests: {},
   busy: false,
   report: null,
+  exportWarning: null,
   loaded: false,
 });
 
@@ -408,10 +412,16 @@ export function dismissReport(): void {
   collectionsState.report = null;
 }
 
-// ---- export (D10/D11) ----
+export function dismissExportWarning(): void {
+  collectionsState.exportWarning = null;
+}
+
+// ---- export (D10/D11/D16) ----
 
 /** Opens the native save dialog and writes the collection there as Collection v2.1 JSON. As with
- *  import, only the path crosses the bridge — Go writes the file. Returns false when cancelled. */
+ *  import, only the path crosses the bridge — Go writes the file. Returns false when cancelled.
+ *  D16: a secret exports valueless, and ExportReport.secretCount is what surfaces that once,
+ *  rather than it being a fact only discoverable by opening the file. */
 export async function exportCollection(collectionId: string, name: string): Promise<boolean> {
   // The extension Postman's own exporter writes, so the file is recognisable on disk and
   // re-importable without renaming.
@@ -419,7 +429,11 @@ export async function exportCollection(collectionId: string, name: string): Prom
   if (chosen.canceled || !chosen.filePath) return false;
   collectionsState.busy = true;
   try {
-    await control.collectionsExport(collectionId, chosen.filePath);
+    const report = await control.collectionsExport(collectionId, chosen.filePath);
+    collectionsState.exportWarning =
+      report.secretCount > 0
+        ? `${report.secretCount} secret value${report.secretCount === 1 ? ' was' : 's were'} not written to the file.`
+        : null;
     return true;
   } finally {
     collectionsState.busy = false;
