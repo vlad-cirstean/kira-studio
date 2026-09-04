@@ -56,12 +56,17 @@ export interface HttpBodyWire {
   file: string;
 }
 
-// httpclient.Request — what `HttpService.Send` sends to Go.
+// httpclient.Request — what `HttpService.Send` sends to Go. P5 D6: `collectionId`/`environmentId`
+// are both possibly empty (a scratch tab has no collection; no environment may be selected) — Go
+// treats an id that resolves to nothing as "no entries" rather than an error, so a deleted
+// environment never makes a request unsendable.
 export interface HttpRequestWire {
   method: HttpMethod;
   url: string;
   headers: HttpHeaderWire[];
   body: HttpBodyWire;
+  collectionId: string;
+  environmentId: string;
 }
 
 // httpclient.Response — what comes back. `body`'s meaning depends on `bodyEncoding`: 'utf8' is the
