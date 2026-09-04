@@ -1,9 +1,10 @@
 import { defineConfig, devices } from "@playwright/test";
 
 /**
- * Three projects declared, only `harness` runnable in P0. Declaring all three now means P3
- * wires a host into an existing slot rather than inventing test infrastructure while also
- * writing a host (§8.4).
+ * Two projects: `harness` drives `apps/harness` in a plain browser tab against a mock bridge
+ * (fast, runs on every commit); `vscode` drives a downloaded VS Code build with the extension
+ * installed (§8.4). A third project drove our own standalone desktop shell through P3 and was
+ * retired along with it — see `docs/plans/P4b-remove-electron.md`.
  */
 export default defineConfig({
   testDir: "tests/e2e",
@@ -39,11 +40,6 @@ export default defineConfig({
       testMatch: "harness/**/*.spec.ts",
       use: { ...devices["Desktop Chrome"], baseURL: "http://localhost:5173" },
     },
-    // From P3: Playwright driving the Electron host via _electron.launch.
-    {
-      name: "electron",
-      testMatch: "electron/**/*.spec.ts",
-    },
     // From P3: Playwright driving a downloaded VS Code build with the extension installed.
     {
       name: "vscode",
@@ -54,9 +50,9 @@ export default defineConfig({
   // (the version this repo pins) only declares `webServer` on the top-level `TestConfig`, not on
   // `TestProject` — confirmed by reading its own shipped `types/test.d.ts`, which has no
   // `webServer` member on any project-shaped interface. It only ever starts a server the
-  // `electron`/`vscode` projects don't reach (neither loads `http://localhost:5173`), so this is
-  // the closest correct equivalent to W15's "move it under harness" instruction until a
-  // Playwright version that supports per-project `webServer` is pinned.
+  // `vscode` project doesn't reach (it doesn't load `http://localhost:5173`), so this is the
+  // closest correct equivalent to W15's "move it under harness" instruction until a Playwright
+  // version that supports per-project `webServer` is pinned.
   webServer: {
     command: "bun run --filter '@kira-version/harness' dev",
     url: "http://localhost:5173",

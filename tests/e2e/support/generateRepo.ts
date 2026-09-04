@@ -5,7 +5,7 @@
  * only from `bun test`; the pinned `@playwright/test@1.62.1` cannot load *any* module that
  * contains an `import.meta` reference at all, even one this function never reaches at runtime —
  * confirmed with a one-line repro spec — so importing it, even for just this one export, breaks
- * every Electron/VS Code spec's module graph. Real git, same determinism hygiene
+ * every VS Code spec's module graph. Real git, same determinism hygiene
  * (`GIT_CONFIG_*` isolation, fixed author identity, a fixed-step commit date) as the original,
  * trimmed to the one topology these specs need.
  */

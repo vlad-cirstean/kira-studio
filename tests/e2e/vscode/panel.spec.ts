@@ -8,18 +8,17 @@ import { linear } from "../support/generateRepo.ts";
 
 /**
  * P3 W15 — the real VS Code host: a downloaded VS Code build launched with this repo's
- * extension loaded via `--extensionDevelopmentPath`, driven through Playwright the same way
- * `electron/shell.spec.ts` drives the Electron host, since VS Code is itself an Electron app.
+ * extension loaded via `--extensionDevelopmentPath`, driven through Playwright via
+ * `@vscode/test-electron`'s `_electron.launch` — VS Code's own Electron binary, a completely
+ * different thing from the standalone Electron shell this package used to also ship and build
+ * against, removed per `docs/plans/P4b-remove-electron.md`.
  *
- * There is no repo-picker UI yet (P4+), and unlike Electron's static HTML, `html.ts` rebuilds
- * its bootstrap island fresh on every `resolveWebviewView` — so `KIRA_REPO` is threaded through
- * there instead of `loadFile`'s `query` option (`html.ts`'s own doc comment explains the split).
+ * There is no repo-picker UI yet (P4+), so `html.ts` threads `KIRA_REPO` through its bootstrap
+ * island, rebuilt fresh on every `resolveWebviewView` (`html.ts`'s own doc comment explains why).
  *
- * `kiraVersion.theme.kind` is Electron-only (`packages/core/src/settings/schema.ts`'s
- * `hosts: ["electron"]`) — `toVsCodeConfiguration()` excludes it from this host's contributed
- * configuration entirely, so there is nothing to set from a VS Code settings command. What VS
- * Code genuinely owns is its own built-in colour theme, which `vscode-tokens.css` (W12) keys the
- * whole palette off — this file's theme test exercises exactly that, via
+ * There is no app-level theme setting to exercise from a VS Code settings command — v1 has none.
+ * What VS Code genuinely owns is its own built-in colour theme, which `vscode-tokens.css` (W12)
+ * keys the whole palette off — this file's theme test exercises exactly that, via
  * `workbench.action.selectTheme`, the same UI a person would use.
  *
  * **Environment reality (W15's own text, D27's macOS-only-e2e precedent).** `downloadAndUnzipVSCode()`
@@ -33,8 +32,8 @@ import { linear } from "../support/generateRepo.ts";
  * `EXTENSION_DEVELOPMENT_PATH` resolves off `process.cwd()`, not `import.meta.url`: the pinned
  * `@playwright/test@1.62.1`'s own test-file transform cannot load a spec that references
  * `import.meta` at all (confirmed with a one-line repro file, independently of any binary being
- * reachable) — the same finding `electron/shell.spec.ts` documents. `playwright.config.ts`'s
- * `testDir` is already root-relative, so Playwright always runs from the repo root.
+ * reachable). `playwright.config.ts`'s `testDir` is already root-relative, so Playwright always
+ * runs from the repo root.
  */
 
 const EXTENSION_DEVELOPMENT_PATH = resolve(process.cwd(), "packages", "host-vscode");
@@ -99,11 +98,11 @@ test.describe("vscode panel", () => {
 
       await expect(frame.getByTestId("connection-state")).toHaveText("connected");
       // P4 W11 deleted the live-data strip and its `repo-root`/`commit-count` testids — the real
-      // list is the replacement (same reasoning as the Electron spec's own update).
+      // list is the replacement.
       await expect(frame.locator(".slick-row")).toHaveCount(repo.commits.length);
       await expect(frame.locator(".kv-message-subject").first()).not.toBeEmpty();
-      // Same reasoning as the Electron spec's first test: nothing is cached before this
-      // session's very first stream, so every row this load emits comes from git.
+      // Nothing is cached before this session's very first stream, so every row this load emits
+      // comes from git.
       await expect(frame.getByTestId("chunk-source")).toHaveText("git");
     } finally {
       await app.close();
