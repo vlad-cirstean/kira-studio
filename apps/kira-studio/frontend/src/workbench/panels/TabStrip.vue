@@ -3,6 +3,7 @@ import type { TabRecord } from '@shared/domain/tabs';
 import { computed, nextTick, ref, watch } from 'vue';
 import { copyText } from '../../clipboard';
 import { openContextMenu } from '../../state/contextMenu';
+import { modeState, tabsForMode } from '../../state/mode';
 import { TAB_KINDS } from '../../state/tabKinds';
 import {
   activateTab,
@@ -92,13 +93,16 @@ function onContextMenu(e: MouseEvent, tab: TabRecord): void {
   ]);
 }
 
-const tabs = computed(() => tabsState.tabs);
+// P1 D5: this mode's own tabs only — an Http tab is never rendered in Studio's strip, or vice
+// versa (§6.2's "the empty tab-strip state" is this filter returning nothing for a mode with no
+// tab kinds registered yet).
+const tabs = computed(() => tabsForMode(modeState.active));
 
 // Selecting a tab from anywhere other than this strip itself (a tree double-click, Cmd/Ctrl+click
 // nav, session restore) previously left the strip's own scroll position untouched — the newly
 // active tab could be selected yet scrolled out of view, with nothing on screen indicating a
 // selection had even happened until the user scrolled the strip by hand to go find it.
-const activeTabId = computed(() => tabsState.tabs.find((t) => t.active)?.id ?? null);
+const activeTabId = computed(() => tabsState.activeIdByMode[modeState.active]);
 const stripRef = ref<HTMLElement | null>(null);
 
 watch(
@@ -122,20 +126,23 @@ function onWheel(e: WheelEvent): void {
 }
 
 // Drag-reorder (same shape as ColumnsMenu.vue's column drag): moveTab splices tabsState.tabs
-// live as the dragged tab crosses another one's midpoint, so the strip itself needs no local copy.
-const dragIndex = ref<number | null>(null);
+// live as the dragged tab crosses another one's midpoint, so the strip itself needs no local
+// copy. Tracks the dragged tab's id (P1 F15), not its index — this strip renders a filtered,
+// per-mode view of tabsState.tabs, so an index into it no longer addresses the same element in
+// the underlying array moveTab splices.
+const dragId = ref<string | null>(null);
 
-function onDragStart(index: number): void {
-  dragIndex.value = index;
+function onDragStart(id: string): void {
+  dragId.value = id;
 }
-function onDragOver(index: number): void {
-  const from = dragIndex.value;
-  if (from === null || from === index) return;
-  moveTab(from, index);
-  dragIndex.value = index;
+function onDragOver(id: string): void {
+  const from = dragId.value;
+  if (from === null || from === id) return;
+  moveTab(from, id);
+  dragId.value = id;
 }
 function onDragEnd(): void {
-  dragIndex.value = null;
+  dragId.value = null;
 }
 </script>
 
@@ -148,11 +155,11 @@ function onDragEnd(): void {
     @wheel="onWheel"
   >
     <button
-      v-for="(tab, index) in tabs"
+      v-for="tab in tabs"
       :key="tab.id"
       type="button"
       class="p-tab"
-      :class="{ 'is-active': tab.active, 'is-dragging': dragIndex === index }"
+      :class="{ 'is-active': tab.active, 'is-dragging': dragId === tab.id }"
       data-testid="tab"
       :data-tab-id="tab.id"
       :data-tab-kind="tab.kind"
@@ -163,8 +170,8 @@ function onDragEnd(): void {
       @click="onClick(tab)"
       @auxclick.middle="onMiddleClick(tab)"
       @contextmenu.prevent="onContextMenu($event, tab)"
-      @dragstart="onDragStart(index)"
-      @dragover.prevent="onDragOver(index)"
+      @dragstart="onDragStart(tab.id)"
+      @dragover.prevent="onDragOver(tab.id)"
       @dragend="onDragEnd"
     >
       <span class="p-tab-rail" />

@@ -1,3 +1,4 @@
+import type { AppMode } from '@shared/domain/mode';
 import {
   asBrowseTab,
   asConsoleTab,
@@ -25,15 +26,17 @@ import {
   type KeyValueTabState,
   type StreamTabRecord,
   type StreamTabState,
+  TAB_KIND_MODE,
   type TabKind,
   type TabRecord,
 } from '@shared/domain/tabs';
-import { computed, reactive } from 'vue';
+import { reactive } from 'vue';
 import { control } from '../bridge/control';
 import { clearPending } from '../views/grid/pendingChanges';
 import { clearSelectedCellFor } from './cellSelection';
 import { connectionsState } from './connections';
 import { consoleDefaultFor } from './consoleDefaults';
+import { modeState } from './mode';
 import { settingsState } from './settings';
 import { TAB_KINDS } from './tabKinds';
 import { cleanupTabRuntime } from './tabRuntime';
@@ -62,8 +65,9 @@ function dropAllPagesForTab(id: string): void {
 // operations panel, none of which may reach into each other — hence renderer/state/, not
 // workbench/state/ or views/grid/.
 export const tabsState = reactive({
-  tabs: [] as TabRecord[], // ordered
-  activeId: null as string | null,
+  tabs: [] as TabRecord[], // ordered, all modes interleaved
+  // P1 D5: one active tab per mode, not one app-wide — a tab's own mode is TAB_KIND_MODE[kind].
+  activeIdByMode: { studio: null, http: null } as Record<AppMode, string | null>,
   /** In-memory only: a restored tab has not loaded and shows "Reconnect & load" (§8.4). */
   hydrated: new Set<string>(),
 });
@@ -171,14 +175,33 @@ control.onConnectionState((state) => {
 export async function hydrateTabs(): Promise<void> {
   const tabs = await control.tabsList();
   tabsState.tabs = tabs;
-  const active = tabs.find((t) => t.active) ?? tabs[0];
-  tabsState.activeId = active?.id ?? null;
+  // One restored active tab per mode (F18: SQL's `active` column has no uniqueness constraint,
+  // so this needs no migration) — same "active, else first" fallback the old single-mode code
+  // used, just scoped to each mode's own subset.
+  for (const mode of ['studio', 'http'] as const) {
+    const modeTabs = tabs.filter((t) => TAB_KIND_MODE[t.kind] === mode);
+    const active = modeTabs.find((t) => t.active) ?? modeTabs[0];
+    tabsState.activeIdByMode[mode] = active?.id ?? null;
+  }
+  // The boot mode is whichever tab was active app-wide before this phase ever shipped a second
+  // mode — there is at most one such tab in a pre-P1 session, so this is unambiguous today and
+  // stays correct once P2 gives Http its own kinds (D5, §8 OQ-2).
+  const bootTab = tabs.find((t) => t.active) ?? tabs[0];
+  modeState.active = bootTab ? TAB_KIND_MODE[bootTab.kind] : 'studio';
   // hydrated stays empty — every restored tab shows Reconnect & load, and restoring never
   // connects anything (§8.4).
 }
 
-function deactivateAll(): void {
-  for (const t of tabsState.tabs) t.active = false;
+// Deactivates every other tab of `mode` and marks `id` active, in both the per-tab flag and
+// tabsState.activeIdByMode — the one thing every activation path (open, duplicate, activateTab)
+// shares. Also brings that mode forward (D5: "activating a tab from anywhere brings its mode
+// forward"), which is a no-op when the caller is already in that mode.
+function setActiveTabId(id: string, mode: AppMode): void {
+  for (const t of tabsState.tabs) {
+    if (TAB_KIND_MODE[t.kind] === mode) t.active = t.id === id;
+  }
+  tabsState.activeIdByMode[mode] = id;
+  modeState.active = mode;
 }
 
 // Result of an open*Tab call: `reused` tells the caller whether an existing tab was activated
@@ -232,9 +255,8 @@ function openTab<S>(
     // `kind` and `makeState()`'s return type agree at every call site below — TabRecord's own
     // discriminated union can't express that generically, so this is asserted rather than typed.
   } as unknown as TabRecord;
-  deactivateAll();
   tabsState.tabs.push(record);
-  tabsState.activeId = id;
+  setActiveTabId(id, TAB_KIND_MODE[kind]);
   // Opened from a live connection — nothing to reconnect.
   tabsState.hydrated.add(id);
   if (opts.recentKind) recordRecent(connectionId, path, opts.recentKind);
@@ -369,9 +391,8 @@ export function duplicateTab(id: string): string {
     order: tabsState.tabs.length,
     active: true,
   } as unknown as TabRecord;
-  deactivateAll();
   tabsState.tabs.push(record);
-  tabsState.activeId = newId;
+  setActiveTabId(newId, TAB_KIND_MODE[source.kind]);
   tabsState.hydrated.add(newId);
   saveNow();
   return newId;
@@ -380,19 +401,30 @@ export function duplicateTab(id: string): string {
 export function closeTab(id: string): void {
   const idx = tabsState.tabs.findIndex((t) => t.id === id);
   if (idx < 0) return;
-  const wasActive = tabsState.tabs[idx].active;
+  const closed = tabsState.tabs[idx];
+  const mode = TAB_KIND_MODE[closed.kind];
+  const wasActive = closed.active;
+  // Where the closed tab sat among its own mode's tabs, not the whole (multi-mode) array — needed
+  // below to pick "whatever landed in its spot" the same way the pre-mode code did with idx.
+  const modeIdxBefore = tabsState.tabs
+    .filter((t) => TAB_KIND_MODE[t.kind] === mode)
+    .findIndex((t) => t.id === id);
+
   tabsState.tabs.splice(idx, 1);
   tabsState.hydrated.delete(id);
   dropAllPagesForTab(id); // §2.2: closing a tab frees its cached page(s) immediately.
   clearSelectedCellFor(id);
   clearPending(id);
 
-  if (tabsState.tabs.length === 0) {
-    tabsState.activeId = null;
-  } else if (wasActive) {
-    const next = tabsState.tabs[Math.min(idx, tabsState.tabs.length - 1)];
-    next.active = true;
-    tabsState.activeId = next.id;
+  if (wasActive) {
+    const modeTabs = tabsState.tabs.filter((t) => TAB_KIND_MODE[t.kind] === mode);
+    if (modeTabs.length === 0) {
+      tabsState.activeIdByMode[mode] = null;
+    } else {
+      const next = modeTabs[Math.min(modeIdxBefore, modeTabs.length - 1)];
+      next.active = true;
+      tabsState.activeIdByMode[mode] = next.id;
+    }
   }
   saveNow();
 }
@@ -400,78 +432,97 @@ export function closeTab(id: string): void {
 export function closeOthers(id: string): void {
   const keep = tabsState.tabs.find((t) => t.id === id);
   if (!keep) return;
-  for (const t of tabsState.tabs) {
-    if (t.id !== id) {
-      tabsState.hydrated.delete(t.id);
-      dropAllPagesForTab(t.id);
-      clearSelectedCellFor(t.id);
-      clearPending(t.id);
-    }
+  // Scoped to the kept tab's own mode (D5) — "Close others" in one mode's strip never touches a
+  // tab that isn't even rendered there.
+  const mode = TAB_KIND_MODE[keep.kind];
+  const closeIds = new Set(
+    tabsState.tabs.filter((t) => t.id !== id && TAB_KIND_MODE[t.kind] === mode).map((t) => t.id),
+  );
+  for (const tabId of closeIds) {
+    tabsState.hydrated.delete(tabId);
+    dropAllPagesForTab(tabId);
+    clearSelectedCellFor(tabId);
+    clearPending(tabId);
   }
-  tabsState.tabs = [keep];
+  tabsState.tabs = tabsState.tabs.filter((t) => !closeIds.has(t.id));
   keep.active = true;
-  tabsState.activeId = id;
+  tabsState.activeIdByMode[mode] = id;
   saveNow();
 }
 
 export function closeToTheRight(id: string): void {
-  const idx = tabsState.tabs.findIndex((t) => t.id === id);
-  if (idx < 0) return;
-  for (const t of tabsState.tabs.slice(idx + 1)) {
-    tabsState.hydrated.delete(t.id);
-    dropAllPagesForTab(t.id);
-    clearSelectedCellFor(t.id);
-    clearPending(t.id);
+  const target = tabsState.tabs.find((t) => t.id === id);
+  if (!target) return;
+  const mode = TAB_KIND_MODE[target.kind];
+  // "To the right" is a strip-visual concept, so it's computed over this tab's own mode's subset
+  // (its own left-to-right order), not the whole multi-mode array.
+  const modeTabs = tabsState.tabs.filter((t) => TAB_KIND_MODE[t.kind] === mode);
+  const modeIdx = modeTabs.findIndex((t) => t.id === id);
+  const closeIds = new Set(modeTabs.slice(modeIdx + 1).map((t) => t.id));
+  for (const tabId of closeIds) {
+    tabsState.hydrated.delete(tabId);
+    dropAllPagesForTab(tabId);
+    clearSelectedCellFor(tabId);
+    clearPending(tabId);
   }
-  tabsState.tabs = tabsState.tabs.slice(0, idx + 1);
-  if (!tabsState.tabs.some((t) => t.active)) {
-    tabsState.tabs[idx].active = true;
-    tabsState.activeId = id;
+  tabsState.tabs = tabsState.tabs.filter((t) => !closeIds.has(t.id));
+  const remaining = tabsState.tabs.filter((t) => TAB_KIND_MODE[t.kind] === mode);
+  if (!remaining.some((t) => t.active)) {
+    target.active = true;
+    tabsState.activeIdByMode[mode] = id;
   }
   saveNow();
 }
 
 export function closeAll(): void {
-  for (const t of tabsState.tabs) {
-    tabsState.hydrated.delete(t.id);
-    dropAllPagesForTab(t.id);
-    clearSelectedCellFor(t.id);
-    clearPending(t.id);
+  // "Close all" always means "in the mode whose strip this menu opened from" (D5) — the current
+  // mode, since a tab's context menu can only ever come from a tab actually rendered there.
+  const mode = modeState.active;
+  const closeIds = new Set(
+    tabsState.tabs.filter((t) => TAB_KIND_MODE[t.kind] === mode).map((t) => t.id),
+  );
+  for (const tabId of closeIds) {
+    tabsState.hydrated.delete(tabId);
+    dropAllPagesForTab(tabId);
+    clearSelectedCellFor(tabId);
+    clearPending(tabId);
   }
-  tabsState.tabs = [];
-  tabsState.activeId = null;
+  tabsState.tabs = tabsState.tabs.filter((t) => !closeIds.has(t.id));
+  tabsState.activeIdByMode[mode] = null;
   saveNow();
 }
 
 export function activateTab(id: string): void {
   const target = tabsState.tabs.find((t) => t.id === id);
   if (!target) return;
-  for (const t of tabsState.tabs) t.active = t.id === id;
-  tabsState.activeId = id;
+  setActiveTabId(id, TAB_KIND_MODE[target.kind]);
   saveNow();
 }
 
 // Tab-strip drag-reorder: called live on every dragover as the dragged tab crosses another one's
-// midpoint, same "splice out, splice in" shape as ColumnsMenu.vue's own column drag. `from`/`to`
-// are plain indices into the already-ordered array, not ids, since the strip tracks the dragged
-// tab's current index itself.
-export function moveTab(from: number, to: number): void {
-  if (from === to) return;
+// midpoint, same "splice out, splice in" shape as ColumnsMenu.vue's own column drag. P1 F15: ids,
+// not indices — the strip now renders a filtered (per-mode) view of tabsState.tabs, so an index
+// into that view no longer addresses the same element in the underlying (multi-mode) array.
+export function moveTab(fromId: string, toId: string): void {
+  if (fromId === toId) return;
   const tabs = tabsState.tabs;
-  if (from < 0 || from >= tabs.length || to < 0 || to >= tabs.length) return;
+  const fromIdx = tabs.findIndex((t) => t.id === fromId);
+  if (fromIdx < 0 || !tabs.some((t) => t.id === toId)) return;
   const next = [...tabs];
-  const [moved] = next.splice(from, 1);
-  next.splice(to, 0, moved);
+  const [moved] = next.splice(fromIdx, 1);
+  const toIdx = next.findIndex((t) => t.id === toId);
+  next.splice(toIdx, 0, moved);
   tabsState.tabs = next;
   saveNow();
 }
 
-// D11: Control+Tab / Control+Shift+Tab — wraps around at either end, matching the tab strip's
-// own left-to-right visual order (`tabsState.tabs` is already kept in that order).
+// D11: Control+Tab / Control+Shift+Tab — wraps around at either end, matching the tab strip's own
+// left-to-right visual order, scoped to the current mode's own tabs (D5).
 function stepTab(delta: 1 | -1): void {
-  const tabs = tabsState.tabs;
+  const mode = modeState.active;
+  const tabs = tabsState.tabs.filter((t) => TAB_KIND_MODE[t.kind] === mode);
   if (tabs.length === 0) return;
-  const idx = tabs.findIndex((t) => t.id === tabsState.activeId);
+  const idx = tabs.findIndex((t) => t.id === tabsState.activeIdByMode[mode]);
   const next = tabs[(idx + delta + tabs.length) % tabs.length];
   activateTab(next.id);
 }
@@ -557,10 +608,6 @@ export function unmarkHydrated(id: string): void {
 export function isHydrated(id: string): boolean {
   return tabsState.hydrated.has(id);
 }
-
-export const activeTab = computed<TabRecord | null>(
-  () => tabsState.tabs.find((t) => t.id === tabsState.activeId) ?? null,
-);
 
 export function findDataTab(id: string): DataTabRecord | null {
   return asDataTab(tabsState.tabs.find((t) => t.id === id));

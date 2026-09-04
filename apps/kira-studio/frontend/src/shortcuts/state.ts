@@ -1,8 +1,9 @@
 import { reactive } from 'vue';
 import { openCreateDialog } from '../state/connections';
 import { toggleOperationsPanel, toggleProjectPanel } from '../state/layout';
+import { activeTab } from '../state/mode';
 import { settingsOpen } from '../state/settings';
-import { activateNextTab, activatePrevTab, closeTab, tabsState } from '../state/tabs';
+import { activateNextTab, activatePrevTab, closeTab } from '../state/tabs';
 import { runCommand } from './commands';
 
 export interface PaletteCommand {
@@ -38,7 +39,7 @@ export const paletteCommands: PaletteCommand[] = [
     id: 'tab-close',
     label: 'Close tab',
     run: () => {
-      if (tabsState.activeId) closeTab(tabsState.activeId);
+      if (activeTab.value) closeTab(activeTab.value.id);
     },
   },
 ];

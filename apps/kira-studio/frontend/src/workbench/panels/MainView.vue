@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { activeTab } from '../../state/tabs';
+import { activeTab } from '../../state/mode';
 import { TAB_VIEWS } from '../tabViews';
 import StudioStart from './StudioStart.vue';
 </script>

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { AppMode } from './mode';
 import { sortSpecSchema } from './queries';
 import { pathTail } from './tree';
 
@@ -32,7 +33,7 @@ export const RENDERABLE_TAB_KINDS: readonly TabKind[] = [
 // effects: `state/mode.ts`'s tabsForMode filter needs only this mapping, never the rest of the
 // per-kind registry (components, page stores, menu builders). All seven kinds are Studio's own
 // today; P2's first Http tab kind is the first entry that maps to 'http'.
-export const TAB_KIND_MODE: Record<TabKind, 'studio'> = {
+export const TAB_KIND_MODE: Record<TabKind, AppMode> = {
   data: 'studio',
   definition: 'studio',
   console: 'studio',

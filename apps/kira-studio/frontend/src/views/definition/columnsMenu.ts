@@ -1,6 +1,7 @@
 import { copyText } from '../../clipboard';
 import type { MenuItem } from '../../state/contextMenu';
-import { activeTab, findDataTab, openDataTab } from '../../state/tabs';
+import { activeTab } from '../../state/mode';
+import { findDataTab, openDataTab } from '../../state/tabs';
 import { dataQueryCommands } from '../../state/viewCommands';
 
 // D9: the definition view's Columns section reuses the tree's former column-row menu items, but it
