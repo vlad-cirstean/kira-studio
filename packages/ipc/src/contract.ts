@@ -13,7 +13,7 @@
 
 /** Which shell mounted the UI bundle. `"harness"` is a real value, not a test-only stand-in —
  *  the harness is a first-class Transport consumer (§8.4, C4). */
-export type HostKind = "vscode" | "electron" | "harness";
+export type HostKind = "vscode" | "harness";
 
 // ---------------------------------------------------------------------------------------
 // Structural copies of core's wire-relevant types — kept honest by wireConformance.test.ts.
@@ -38,12 +38,6 @@ export interface SettingsSnapshot {
   readonly "kiraVersion.graph.pageSize": number;
   readonly "kiraVersion.graph.scope": "all" | "head";
   readonly "kiraVersion.log.level": "off" | "error" | "warn" | "info" | "debug";
-  readonly "kiraVersion.theme.kind":
-    | "system"
-    | "light"
-    | "dark"
-    | "high-contrast"
-    | "high-contrast-light";
 }
 
 export interface RepoSummary {

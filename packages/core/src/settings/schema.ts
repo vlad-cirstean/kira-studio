@@ -14,7 +14,7 @@ import { assert } from "../util/assert.ts";
  *  (ipc may not import core and core may not import ipc, per §3.1's B3; kept honest by
  *  `tests/unit/ipc/wireConformance.test.ts`, same as `SettingsSnapshot`/`HeadState`/
  *  `DecorationRef`). */
-export type HostKind = "vscode" | "electron" | "harness";
+export type HostKind = "vscode" | "harness";
 
 export type SettingType = "string" | "number" | "boolean" | "enum";
 
@@ -27,10 +27,6 @@ export interface SettingDef<T> {
   readonly enum?: readonly string[];
   readonly minimum?: number;
   readonly maximum?: number;
-  /** Which hosts read this setting. Omitted means both — VS Code's `contributes.configuration`
-   *  gets a property for it, and so does Electron's settings UI (P4+). A setting scoped away
-   *  from `"vscode"` is omitted from the generated manifest entirely. */
-  readonly hosts?: readonly HostKind[];
   readonly scope?: "window" | "resource";
 }
 
@@ -64,14 +60,6 @@ export const SETTINGS = {
     default: "info",
     description: "Verbosity of kira-version's own diagnostic log.",
     enum: ["off", "error", "warn", "info", "debug"],
-  },
-  "kiraVersion.theme.kind": {
-    key: "kiraVersion.theme.kind",
-    type: "enum",
-    default: "system",
-    description: "Electron shell theme. VS Code's own theme is VS Code's business.",
-    enum: ["system", "light", "dark", "high-contrast", "high-contrast-light"],
-    hosts: ["electron"],
   },
 } as const satisfies Record<string, SettingDef<unknown>>;
 
@@ -175,14 +163,12 @@ export interface VsCodeConfigurationSchema {
   readonly properties: Record<string, unknown>;
 }
 
-/** Drives `scripts/gen-settings.ts`: one JSON Schema property per setting whose `hosts` doesn't
- *  exclude `"vscode"` (the default, when `hosts` is omitted). */
+/** Drives `scripts/gen-settings.ts`: one JSON Schema property per setting. */
 export function toVsCodeConfiguration(): VsCodeConfigurationSchema {
   const properties: Record<string, unknown> = {};
 
   for (const key of SETTING_KEYS) {
     const def: SettingDef<unknown> = SETTINGS[key];
-    if (def.hosts !== undefined && !def.hosts.includes("vscode")) continue;
 
     const property: Record<string, unknown> = {
       type: def.type === "enum" ? "string" : def.type,

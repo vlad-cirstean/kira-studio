@@ -1,7 +1,8 @@
 /**
- * Leveled logging to an output channel — VS Code's `window.createOutputChannel`, or a file plus
- * devtools console in Electron. `"off"` is a setting value (`kiraVersion.log.level`), never a
- * level a caller logs *at* — hence `Exclude<LogLevel, "off">` on `log()`.
+ * Leveled logging to an output channel — VS Code's `window.createOutputChannel` today;
+ * `ports/testFakes.ts`'s `FakeLogger` is the second implementation, for unit tests. `"off"` is
+ * a setting value (`kiraVersion.log.level`), never a level a caller logs *at* — hence
+ * `Exclude<LogLevel, "off">` on `log()`.
  */
 export type LogLevel = "off" | "error" | "warn" | "info" | "debug";
 

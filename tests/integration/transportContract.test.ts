@@ -95,7 +95,7 @@ async function setup(pageSize = 4) {
     roots,
     dialogs,
     settings: () => defaultSettings(),
-    host: "electron",
+    host: "vscode",
     logger: new FakeLogger(),
   });
   const [clientChannel, serverChannel] = createInMemoryChannelPair();
@@ -110,7 +110,7 @@ describe("transport contract: rpc.ts driven against createRepoHandlers over a re
     try {
       const result = await client.request("app.init", {});
       expect(result.contractVersion).toBe(CONTRACT_VERSION);
-      expect(result.host).toBe("electron");
+      expect(result.host).toBe("vscode");
       expect(result.git.kind).toBe("ok");
     } finally {
       client.dispose();

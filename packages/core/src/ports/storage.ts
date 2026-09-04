@@ -1,6 +1,7 @@
 /**
  * Small persisted key/value storage, in two scopes (§3.3: "per repo and global") — VS Code's
- * `Memento` (workspace + global) or a JSON file under Electron's `userData`.
+ * `Memento` (workspace + global) today; `ports/testFakes.ts`'s `FakeStorage` is the second
+ * implementation, for unit tests.
  */
 export type StorageScope = "global" | "workspace";
 

@@ -1,9 +1,8 @@
 /**
- * The current *resolved* theme — never `"system"`, which is a setting value
- * (`kiraVersion.theme.kind`) meaning "resolve it for me"; `Theme.current()` always reports one
- * of the four concrete kinds VS Code itself distinguishes. VS Code pushes its resolved theme
- * into the webview automatically (§3.4); Electron's implementation watches the OS theme and
- * applies the manual override itself.
+ * The current *resolved* theme — always one of the four concrete kinds VS Code itself
+ * distinguishes, never an unresolved "follow the OS" value. VS Code pushes its resolved theme
+ * into the webview automatically (§3.4); `ports/testFakes.ts`'s `FakeTheme` is the second
+ * implementation, for unit tests.
  */
 import type { Disposable } from "./disposable.ts";
 

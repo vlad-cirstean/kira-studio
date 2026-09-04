@@ -62,7 +62,6 @@ describe("ipc codec", () => {
         "kiraVersion.graph.pageSize": 5000,
         "kiraVersion.graph.scope": "all",
         "kiraVersion.log.level": "info",
-        "kiraVersion.theme.kind": "system",
       },
       git: { kind: "ok", path: "/usr/bin/git", version: "2.43.0" },
     };

@@ -75,18 +75,17 @@ function isPersistedViewStateShape(value: unknown): value is PersistedViewState 
  * current shape. **A `version` that is not the current one is discarded whole, never
  * partially applied** — a v1 state (P3's shape, no scroll/selection/column fields) is exactly
  * such a mismatch, and a half-applied older state is a bug that reproduces once per upgrade.
- * Every concrete `ViewStateStore` (VS Code's `getState`, Electron's `Storage`-backed one, this
- * file's in-memory one) calls this rather than trusting its raw source.
+ * Every concrete `ViewStateStore` (VS Code's `getState`, this file's in-memory one) calls this
+ * rather than trusting its raw source.
  */
 export function parsePersistedViewState(raw: unknown): PersistedViewState | null {
   return isPersistedViewStateShape(raw) ? raw : null;
 }
 
 /**
- * The harness's `ViewStateStore` (§3.1 lists the interface here; the harness is one of the
- * three hosts choosing an implementation at mount, alongside VS Code's `getState`/`setState`
- * and Electron's `Storage`-backed one) — and a convenient fake for `state/` unit tests, since
- * it needs no platform API.
+ * The harness's `ViewStateStore` (§3.1 lists the interface here; the harness is one of the two
+ * hosts choosing an implementation at mount, alongside VS Code's `getState`/`setState`) — and a
+ * convenient fake for `state/` unit tests, since it needs no platform API.
  */
 export class InMemoryViewStateStore implements ViewStateStore {
   #raw: unknown = null;

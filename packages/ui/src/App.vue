@@ -11,6 +11,7 @@
  * visible surface — everything else the strip showed now has a real UI equivalent (the repo
  * picker's own label, the rendered rows themselves).
  */
+import { SETTINGS } from "@kira-version/core";
 import type { HostKind, Transport } from "@kira-version/ipc";
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from "vue";
 import { BridgeClient } from "./bridge/client.ts";
@@ -65,16 +66,12 @@ const scrollRow = ref(0);
  *  nowhere in particular, which is correct: there is no prior position to restore. */
 const initialScrollRow = ref<number | undefined>(undefined);
 
-// `@kira-version/core`'s `defaultSettings()` is deliberately not imported here for this one
-// fallback: its settings schema module carries host-specific literals (`hosts: ["electron"]`,
-// used to filter VS Code's contributed configuration) that `scripts/build.ts`'s own bundle-
-// content check forbids in the shared UI bundle, on the same reasoning as its "no electron/
-// vscode references" rule for the other two bundles. `settingsState` is always populated by the
-// time this is actually read in practice (`bootstrap()` sets it synchronously, well before any
-// repo-dependent UI — including this value's only consumer, `LoadMoreButton.vue` — can mount),
-// so this mirrors `SETTINGS["kiraVersion.graph.pageSize"].default` (`packages/core/src/settings/
-// schema.ts`) as a literal rather than importing it.
-const FALLBACK_PAGE_SIZE = 5000;
+// `settingsState` is always populated by the time this is actually read in practice
+// (`bootstrap()` sets it synchronously, well before any repo-dependent UI — including this
+// value's only consumer, `LoadMoreButton.vue` — can mount), so this fallback is never really
+// exercised; it just needs to exist for the type. Sourced from the schema's own default rather
+// than a hand-copied literal, so it cannot drift.
+const FALLBACK_PAGE_SIZE = SETTINGS["kiraVersion.graph.pageSize"].default;
 
 const pageSize = computed(
   () => settingsState.value?.settings.value["kiraVersion.graph.pageSize"] ?? FALLBACK_PAGE_SIZE,

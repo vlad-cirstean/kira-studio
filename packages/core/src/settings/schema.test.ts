@@ -83,10 +83,8 @@ describe("coerceSettings", () => {
 });
 
 describe("toVsCodeConfiguration", () => {
-  test("has one property per non-electron-only setting, with description, default and enum intact", () => {
+  test("has one property per setting, with description, default and enum intact", () => {
     const { properties } = toVsCodeConfiguration();
-
-    expect(Object.keys(properties)).not.toContain("kiraVersion.theme.kind");
 
     const pageSize = properties["kiraVersion.graph.pageSize"] as Record<string, unknown>;
     expect(pageSize).toEqual({

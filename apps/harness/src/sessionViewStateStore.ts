@@ -9,10 +9,10 @@ const STORAGE_KEY = "kira-harness-viewState";
 /**
  * A `sessionStorage`-backed `ViewStateStore`, harness-only (P4 W13) — swapped in for the
  * previous `InMemoryViewStateStore` so a persisted field (a column resize, say) genuinely
- * survives a `page.reload()`, the one persistence path none of the three real hosts' own specs
- * can exercise: a VS Code/Electron webview's `getState`/`setState` survives a hide/reveal, not a
- * full page navigation, and neither host's real backing store (`globalState`, `Storage`) is
- * reachable from a Playwright spec driving the harness in a plain browser tab.
+ * survives a `page.reload()`, the one persistence path VS Code's own spec can't exercise: a
+ * VS Code webview's `getState`/`setState` survives a hide/reveal, not a full page navigation,
+ * and its real backing store (`globalState`) is not reachable from a Playwright spec driving
+ * the harness in a plain browser tab.
  *
  * `sessionStorage`, not `localStorage`: state should not leak from one Playwright test's browser
  * context into the next (each gets its own storage by default) or outlive the tab, matching a
