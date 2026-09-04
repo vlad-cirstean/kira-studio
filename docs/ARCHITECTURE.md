@@ -38,7 +38,7 @@ authoritative for behavior: SPEC.md is the record of what v1 was *specified* to 
 | UI tests | Playwright against the built bundle, real WebKit | every change validated |
 | Logging | Go `log/slog` | a daily-rolling file under `~/.kira-studio/logs/`, mirroring the configuration `electron-log` used to hold — single log file, single source of truth |
 | Data/console grid rendering (P22 Pass B cutover; P30 §3 extended it) | `slickgrid@5.20.0`'s core engine (MIT, `6pac/SlickGrid`), core `SlickGrid` class only — no `SlickDataView`, no plugin, no `slickgrid-vue` | **the only grid engine** — `views/grid/DataGrid.vue`, `GridRow.vue` and `__kiraGridEngine` are gone (P22 Pass B). `views/grid/SlickGridHost.vue` hosts a data tab (full parity: sort, editor, selection ranges, FK/PK nav, clipboard); `views/console/ConsoleSlickGrid.vue` hosts the query console's tabular results (P30 §3) over the same reusable layer, ~300 lines instead of a second 2000+-line host: `views/shared/slick/kiraSlickGrid.ts` (the tuned scroll/runway/chase mechanism, inherited unmodified), `views/shared/slick/dataSource.ts` (the `CustomDataView` bridge; its data-tab-specific half, `createDisplayValueExtractor`/`pendingRowClasses`, stays in `views/grid/slick/dataSource.ts`, which re-exports the rest), `views/shared/slick/slickTheme.css`, `views/shared/page/columns.ts` and `theme/cellClass.ts`. The console host has no selection-range model, sort, editor, context menu, clipboard, FK nav or persisted column widths — a console result has none of what those exist to serve. `@tanstack/vue-virtual` is no longer a dependency (P30 §3.6 C7) |
-| Outbound HTTP client (P2, body modes P3) | plain `net/http` (`apps/kira-studio/internal/httpclient/`), **no client/retry/URL-parsing/multipart-builder dependency at all** | the same "no driver dependency" shape the ClickHouse adapter already established (below): one package-level `*http.Client`, a 30s timeout applied via `context.WithTimeout` rather than `Client.Timeout` (so the Stop button and a timeout abort an in-flight body read the same way), redirects followed and every hop recorded up to 10, TLS verification always on, `http.ProxyFromEnvironment`. Reachable only from Go — the webview's own `fetch` is never used (`docs/ARCHITECTURE.md`'s own "Go owns the network" invariant, below). P3 adds every body mode this app's request builder supports — none/raw/code/urlencoded/formdata/file (`internal/httpclient/body.go`) — over the same one dependency-free package: a two-pass `mime/multipart` writer computes an *exact* `Content-Length` from a fixed boundary's deterministic framing before streaming a single byte, so a form-data or binary send is never chunked and never guesses |
+| Outbound HTTP client (P2, body modes P3, request timeline P10) | plain `net/http` (`apps/kira-studio/internal/httpclient/`), **no client/retry/URL-parsing/multipart-builder dependency at all** | the same "no driver dependency" shape the ClickHouse adapter already established (below): one package-level `*http.Client`, a 30s timeout applied via `context.WithTimeout` rather than `Client.Timeout` (so the Stop button and a timeout abort an in-flight body read the same way), redirects followed and every hop recorded up to 10, TLS verification always on, `http.ProxyFromEnvironment`. Reachable only from Go — the webview's own `fetch` is never used (`docs/ARCHITECTURE.md`'s own "Go owns the network" invariant, below). P3 adds every body mode this app's request builder supports — none/raw/code/urlencoded/formdata/file (`internal/httpclient/body.go`) — over the same one dependency-free package: a two-pass `mime/multipart` writer computes an *exact* `Content-Length` from a fixed boundary's deterministic framing before streaming a single byte, so a form-data or binary send is never chunked and never guesses. P10 adds one `net/http/httptrace.ClientTrace`, stdlib, installed once per send: every redirect hop's own DNS/connect/TLS/wait/download phases, bucketed by the same `checkRedirect` that already threads `Response.Redirects` through (below) |
 
 Driver libraries — the best-maintained option per engine, **Go-native for all ten kinds as of P58e
 M9.3** (checkpoint C2): `jackc/pgx/v5` (postgres), `go-sql-driver/mysql` (mariadb/mysql, via a shared
@@ -629,6 +629,20 @@ never itself evicted. No time-based expiry exists or is planned — unlike `op_l
 accumulate from machinery, a response history row is a result the user asked for, and a two-month-
 old response is not noise.
 
+**The timeline rides the same object into `kira.sqlite` the rendered exchange is stripped out of —
+deliberately not stripped itself (P10).** `Response.Wire` is nilled before `Record` marshals a
+snapshot (below); `Response.Timeline` is not, because the size argument that justifies stripping
+`Wire` does not transfer here: a no-redirect send's timeline is one envelope plus one hop, on the
+order of half a kilobyte, and even a 10-hop chain against the 8 KiB per-hop header cap (below) tops
+out around 90 KB — a fraction of the 256 KiB per-entry cap, absorbed by the existing byte budget
+with no new cap and no schema change (`stored_bytes` already counts whatever `snapshot_json`
+contains). The value is symmetric with `Wire`'s own absence: selecting a past response and
+switching to Timeline shows that response's *real*, previously-recorded timing — "the same request
+took 90 ms on Tuesday and 4 seconds today, and the difference is entirely TLS" becomes answerable
+from stored history the way `elapsedMs` alone never made it — while Raw, for the identical stored
+entry, still shows the "no raw view for a stored response" empty state P9 gives it (below). The two
+panes are allowed to behave differently for the same entry on purpose.
+
 **`scope_key` is the one axis List/trim/Clear key on — the saved request when there is one, else
 the tab — and it is a `GENERATED ALWAYS AS (COALESCE(item_id, 'tab:' || tab_id)) VIRTUAL` column,
 not a stored one or a second `WHERE` shape.** A stored column would need two writers (`Record` and
@@ -1053,6 +1067,55 @@ hidden) — computed from `resp.ProtoMajor` and the same `http.ProxyFromEnvironm
 transport itself makes, so the label can never disagree with what actually happened. A tool that
 quietly showed HTTP/1.1 text for an HTTP/2 exchange would be worse than no tool at all.
 
+**P10's timeline measures the same send with `net/http/httptrace`, and does not share the raw
+view's fidelity problem — a phase's timing is real regardless of framing.**
+`internal/httpclient/timeline.go`'s collector installs one `*httptrace.ClientTrace` on the send's
+context, attached only right *after* `httputil.DumpRequestOut` above already ran and only right
+before the real `sharedClient.Do` call — that dump issues its own throwaway `RoundTrip` on a fake
+in-memory connection to render the wire bytes, and installing the trace any earlier would have let
+that fake dial fire every hook as if it were the real one. `Response.Timeline` (`Hops
+[]TimelineHop`, `TotalMs`) buckets every hook by `checkRedirect`: net/http's own redirect-following
+continues to build each subsequent request with the original context (the SPEC's own "why here"
+reasoning, measured true), so `checkRedirect`'s one call between one hop's last trace event and the
+next hop's first is a free, exact delimiter — the alternative, bucketing on `GetConn`, is wrong: a
+transport that finds its pooled connection dead mid-hop retries with a second `GetConn`/`GotConn`
+pair and no redirect at all, which would invent a phantom hop. `Response.Redirects`, the P2 field
+this app already had, is now *derived* from the same collector (`redirectHops()`) rather than
+collected a second time, so the two views of one chain can never disagree.
+
+Each hop's five named phases — `dns`, `connect`, `tls`, `wait`, `download` — are `*Phase`
+(nullable), never a defaulted zero: **an absent phase and a zero-duration one are different
+facts.** A reused pooled connection fires no `DNSStart`/`ConnectStart`/`TLSHandshakeStart` hooks at
+all, so those three are nil rather than instant — the everyday case for a second send to a host
+already open (`sharedClient` is package-level precisely so this reuse happens), and the single best
+argument for representing it distinctly rather than as `0 ms`. A literal-IP URL has no name to
+resolve, so `dns` alone is nil while `connect` is real; a plain-`http://` URL has no `tls` phase,
+ever. `wait` (`WroteRequest` → `GotFirstResponseByte`) is guarded against two real cases: a server
+may answer before the request finishes writing (a `1xx`, or a rejection partway through a large
+upload), so `WroteRequest` either fires *after* the first response byte or never fires at all —
+either way `wait` is left nil rather than reporting a negative or decades-long interval. The five
+phases are never summed to claim a hop's own total: what is left over — a proxied request's own
+CONNECT-tunnel round trip is the one substantial case, since `ConnectStart`/`Done` there measure the
+dial to the *proxy* and the tunnel's own request/response has no hook at all — is rendered as a
+labelled, unattributed residue instead of padded away. A hop's own response headers are capped at 8
+KiB, truncated visibly (`headersElided`) rather than copying an adversarial server's unbounded
+`MaxResponseHeaderBytes` allowance into `Response` and, via history (above), into `kira.sqlite`.
+
+Unlike the raw view, the timeline does not degrade under HTTP/2 or behind a proxy: `DNSStart`,
+`ConnectStart`, `TLSHandshakeStart`, `WroteRequest` and `GotFirstResponseByte` all fire the same way
+regardless of framing, so a multiplexed h2 exchange's phases are exactly as real as HTTP/1.1's —
+`Timeline` carries no `fidelity` value at all, because there is nothing here to hedge. Behind an
+HTTP proxy the raw view's own dialer-level capture is unavailable outright (above), but the
+`httptrace` hooks live at a different layer and survive it: `TLSHandshakeStart`/`Done` still measure
+the real end-to-end handshake through the tunnel, `ConnectStart`/`Done` honestly measure the dial to
+the proxy rather than the origin, and the tunnel's own round trip is exactly the unattributed
+residue the previous paragraph names. `TimelinePane.vue` draws each hop as a static, five-segment
+waterfall bar plus the residue, from the existing `--kira-conn-*` connection-colour palette — no
+new colour token, no charting library, and never animated or shown while a send is in flight (the
+design system's LAW 12 governs a *moving* indicator for work still running; a finished exchange's
+own chart is a different object, and the ring plus the toolbar's own elapsed figure remain the only
+thing that shows a send is running).
+
 **The rendered exchange is live-only — stripped before it can reach `kira.sqlite`, never a fourth
 history cap.** `httpclient.Response.Wire *WireExchange` (`json:"wire,omitempty"`) rides back on the
 same object P8's `ResponseHistoryRepo.Record` already marshals into `snapshot_json` on every send —
@@ -1070,6 +1133,37 @@ P7's *Copy as curl* dialog already applies to a generated command (a copyable te
 every secret masked by construction), reused rather than a second reveal gate invented for a third
 surface — the raw pane's own masking note points at *Copy as curl* for anyone who needs the real
 values.
+
+**The same replacer now also closes a gap it did not open (P10).** `Response.Redirects[].URL` and
+`Response.FinalURL` — P2 fields, persisted to `kira.sqlite` by P8's `Record` since it landed — were
+never run through the masking above, so a secret substituted into a query string
+(`?api_key={{token}}`) reached the database in plaintext; P10 found this while widening masking to
+cover its own new per-hop URLs and per-hop response headers (a redirect's own `Location` header is
+a URL too), which would otherwise have opened the identical hole a second and third way.
+`bridge/http.go`'s `maskWireSecrets` widened to `maskSecrets(resp *httpclient.Response,
+usedSecrets)`, applying the same `strings.NewReplacer` to all four: `Wire.Request` (unchanged),
+every `Timeline.Hops[].URL` and `Timeline.Hops[].Headers[].Value`, and `Redirects[].URL`/`FinalURL`.
+Over-masking stays the only failure direction a `strings.Replacer` can take (a secret's literal
+value occurring elsewhere is masked too), never under-masking. A failed send's own partial timeline
+(next paragraph) is masked the identical way, before it ever reaches the copyable error surface it
+rides on — `maskSendErrTimeline`, called from inside the same closure that still has
+`usedSecrets` in scope, since `mapHttpError`, downstream of it, does not.
+
+**A failed send now carries the timeline it got as far as, closing P9's own forward pointer (its
+OQ-7, which asked that the two partial-result questions be settled together rather than each
+inventing its own channel).** `httpclient.Send` still returns `(Response{}, err)` on a transport
+failure exactly as before, but `err` — a `*httpclient.Error` — now carries a `Timeline` of its own,
+closed at the point of failure: DNS/connect/TLS phases filled exactly as a successful hop's would
+be (a refused connect or a DNS failure genuinely completes those hooks before the error surfaces),
+no `status`, `wait` or `download`, since none of those were ever measured. `ipcerr.Error` gains one
+optional field to carry it across the bridge, `Details json.RawMessage` with `omitempty` — the
+first structured-detail channel any bound method's error carries, and every other producer's JSON
+stays byte-identical, left nil. `control.ts`'s `unwrap()` reads `details` the same way it already
+reads `code`/`message`; `TimelinePane.vue` renders the partial hop with a failure sentence naming
+which measured phase the request never got past. This is deliberately the one cross-cutting change
+in the phase — it touches the error envelope every bound method returns, for one caller — and lands
+as its own commit for exactly that reason, droppable without unpicking the successful-send timeline
+that stands complete without it.
 
 **The raw *editor* is a third representation of tab state, parsed and generated entirely in
 renderer TypeScript exactly as P7's curl import/generate is, and it is pre-substitution by
