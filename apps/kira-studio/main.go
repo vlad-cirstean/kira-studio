@@ -26,6 +26,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/config"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/connections"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/enginecache"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitclient"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/localauth"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/logging"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/metrics"
@@ -147,6 +148,16 @@ func main() {
 	deps.Events = emitter
 	dialogs, attachDialogs := shell.NewDeferredDialogs()
 
+	// gitClient is Git mode's whole Go-side state (P1): discovery + the open-repo registry, over
+	// the one real Runner/Clock — held directly, not through appcore.Deps (D1: GitService is a
+	// thin adapter over it, the same shape httpclient.Send is over HttpService, and nothing else
+	// in this app needs to reach it). gitService is one shared instance, not a Deps-embedded value
+	// minted per site like most other services — RegisterGitStream below needs the exact same
+	// *bridge.GitService the Services list registers, since gitstream.go's frame dispatcher calls
+	// its methods directly in-process rather than through a second bound-call round trip.
+	gitClient := gitclient.NewClient(gitclient.NewExecRunner(), gitclient.NewRealClock())
+	gitService := &bridge.GitService{Client: gitClient, Dialogs: dialogs}
+
 	events := bridge.NewEvents(emitter)
 	eventsDetach := events.Attach(bridge.Sources{Connections: connectionsSvc, Oplog: oplogWiring, Metrics: metricsTicker})
 
@@ -203,6 +214,7 @@ func main() {
 			application.NewService(&bridge.SchemaService{Deps: deps}),
 			application.NewService(&bridge.HttpService{Deps: deps}),
 			application.NewService(&bridge.CollectionsService{Deps: deps}),
+			application.NewService(gitService),
 			application.NewService(&bridge.LifecycleService{Flusher: quitter, WindowFlusher: closeFlush}),
 		},
 		Assets: application.AssetOptions{

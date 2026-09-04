@@ -42,12 +42,17 @@ type FilesChooseOpenResult struct {
 type SaveFileRequest struct{ Directory, Filename string }
 type OpenFileRequest struct{ Title, FilterName, FilterPattern string }
 
+// OpenDirectoryRequest is repo.pick's own ask (P1 D-none: git.go's PickRepo is the one caller) —
+// a directory, not a file, so it carries no filter fields at all.
+type OpenDirectoryRequest struct{ Title string }
+
 // Dialogs is the native-dialog seam. internal/shell implements it over app.Dialog with the main
-// window attached for modality; files_test.go implements it with a recorder. Both methods return
+// window attached for modality; files_test.go implements it with a recorder. Every method returns
 // "" for a cancelled dialog, which is the only cancel signal Wails gives (P56 §1.2).
 type Dialogs interface {
 	SaveFile(req SaveFileRequest) (string, error)
 	OpenFile(req OpenFileRequest) (string, error)
+	OpenDirectory(req OpenDirectoryRequest) (string, error)
 }
 
 type FilesService struct {

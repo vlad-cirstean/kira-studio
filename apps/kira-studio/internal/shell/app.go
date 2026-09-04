@@ -97,6 +97,18 @@ func (d *dialogs) OpenFile(req bridge.OpenFileRequest) (string, error) {
 	return dlg.PromptForSingleSelection()
 }
 
+// OpenDirectory is repo.pick's own dialog (git.go's PickRepo) — the same builder as OpenFile,
+// switched to directories-only (Wails' own CanChooseFiles/CanChooseDirectories pair).
+func (d *dialogs) OpenDirectory(req bridge.OpenDirectoryRequest) (string, error) {
+	dlg := d.app.Dialog.OpenFile().AttachToWindow(d.window()).
+		CanChooseFiles(false).
+		CanChooseDirectories(true)
+	if req.Title != "" {
+		dlg.SetTitle(req.Title)
+	}
+	return dlg.PromptForSingleSelection()
+}
+
 // NewDeferredDialogs is NewDeferredEmitter's counterpart for FilesService: it too is built into
 // the Services list passed to application.New, before the *App (and the main window func) a
 // dialog needs exist. attach must be called with both immediately after New returns.
