@@ -526,21 +526,36 @@
    clicking that arrow now"). This div already existed for every column at rest (SlickGrid always
    builds it, per this rule's own comment above) — reused as the click target itself
    (onHeaderCellRendered's own listener) rather than adding a second element. Two things this
-   needs that the old "zero width until sorted" fix didn't: (1) a real, always-present hit target
-   — `width: 14px` now, even at rest, not `0` — the visible GLYPH stays conditional (no `content`
-   until `-asc`/`-desc`, unchanged below), only the CLICKABLE BOX is now permanent; this does
-   reopen a little of the space the earlier "starves `.slick-column-name` on a narrow column" fix
-   was guarding against, accepted here since a permanent sort control needs a permanent hit area —
-   14px is the smallest box that still matches this control's own visible glyph width; (2)
-   `position: relative` + a `z-index` above `.header-select-zone`'s own (below) — the zone is a
-   LATER DOM sibling appended by onHeaderCellRendered, so without an explicit stack order it would
-   paint on top and silently swallow every click aimed at this arrow, `stopPropagation` inside its
-   own listener notwithstanding (that only stops bubbling for whichever element the click actually
-   *hit* — hit-testing is a paint-order question, not a listener-order one). */
+   needed that the old "zero width until sorted" fix didn't: (1) a real, always-present hit target
+   — `width: 14px`, even at rest, not `0`; (2) `position: relative` + a `z-index` above
+   `.header-select-zone`'s own (below) — the zone is a LATER DOM sibling appended by
+   onHeaderCellRendered, so without an explicit stack order it would paint on top and silently
+   swallow every click aimed at this arrow, `stopPropagation` inside its own listener
+   notwithstanding (that only stops bubbling for whichever element the click actually *hit* —
+   hit-testing is a paint-order question, not a listener-order one).
+   A later pass made the glyph itself visible at rest too, not just the hit box — the redesign
+   above shipped with an inactive column's arrow invisible ("a real hit target, but you can't see
+   it's there"), which is exactly the discoverability gap the min-column-width fix in
+   `views/shared/page/columns.ts` (MIN_WIDTH, 40px -> 64px, also fixing a stale-stored-width bug
+   that could shrink a column to one character) was the other half of: with every column now at
+   least 64px, the header text and PK/FK badge have real room to spare, so the "space-starved
+   narrow column" risk the earlier zero-width design was guarding against is far less live than it
+   was when this was written. `codicon-unfold` (a stacked ⌃⌄, not `arrow-both`'s ↔ — checked by
+   actually rendering both, the vertical pairing reads as "sortable" where the horizontal one
+   doesn't) is the neutral, muted-colour default; `-asc`/`-desc` still override both the glyph and
+   the colour once a sort is actually applied. */
 .slick-grid-host .slick-sort-indicator {
   flex-shrink: 0;
   width: 14px;
   height: 13px;
+  /* Unchanged from the pre-existing at-rest geometry (0, not --kira-s-2) even though this state
+     now always shows a glyph — a narrow header's own click-target layout (cell-editor.spec.ts's
+     .header-select-zone coverage, the exact thing F8's original zero-width design was guarding)
+     is tuned against this box's existing width and position; widening it at rest, even by a few
+     px of margin, measurably shifted where the indicator's z-index:1 hit area sits and started
+     intercepting clicks meant for the zone underneath on the narrowest columns. The `-asc`/
+     `-desc` states keep their own margin, unchanged — a real sort is rarer and already had this
+     spacing before this pass. */
   margin: 0;
   border: none;
   background: none;
@@ -550,13 +565,19 @@
   z-index: 1;
   cursor: pointer;
   line-height: 1;
-  color: var(--kira-accent);
+  color: var(--kira-fg-muted);
   overflow: hidden;
+}
+.slick-grid-host .slick-sort-indicator::before {
+  content: "\eb73";
+}
+.slick-grid-host .slick-sort-indicator:hover {
+  color: var(--kira-fg);
 }
 .slick-grid-host .slick-sort-indicator-asc,
 .slick-grid-host .slick-sort-indicator-desc {
-  width: 13px;
   margin: 0 0 0 var(--kira-s-2);
+  color: var(--kira-accent);
 }
 .slick-grid-host .slick-sort-indicator-asc::before {
   content: "\eaa1";

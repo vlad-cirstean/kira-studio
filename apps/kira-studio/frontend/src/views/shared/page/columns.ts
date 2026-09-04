@@ -3,7 +3,12 @@ import { cellText, isNull } from '@shared/protocol/page';
 import { typeClassColor } from '../../../theme/icons';
 import { typeDescription } from '../typeGlossary';
 
-const MIN_WIDTH = 64;
+// Exported (was module-local) so SlickGridHost.vue/ConsoleSlickGrid.vue can clamp to the exact
+// same floor a freshly measured column already gets — a stored/dragged width used to be able to
+// undercut it (their own `minWidth: 40` was a different, lower number), which is how a column as
+// short as "id" could persist at a one-character-wide render across a reload (found against the
+// real app: minWidth only ever bounded an interactive drag, never a width read back from storage).
+export const MIN_WIDTH = 64;
 const MAX_WIDTH = 480;
 const CELL_PADDING = 20; // px, both sides combined plus a little breathing room
 const SAMPLE_ROWS = 50;

@@ -19,6 +19,7 @@ import {
   DEFAULT_COLUMN_WIDTH,
   GUTTER_WIDTH,
   initialWidthsByIndex,
+  MIN_WIDTH,
   resetMeasureCtx,
 } from '../shared/page/columns';
 import { setVisibleRows } from '../shared/page/visibleRows';
@@ -164,8 +165,12 @@ function buildColumns(page: TabularPage): KiraColumn[] {
       id: colField(i),
       field: colField(i),
       name: col.name,
+      // measured[i] already carries columns.ts's own MIN_WIDTH floor (measuredWidths' own
+      // Math.max clamp), and DEFAULT_COLUMN_WIDTH (96) is above it too — width itself needs no
+      // extra clamp here, unlike SlickGridHost.vue's storedWidths path. minWidth still needs to
+      // match, so an interactive drag can't undercut what a fresh render already guarantees.
       width: measured[i] ?? DEFAULT_COLUMN_WIDTH,
-      minWidth: 40,
+      minWidth: MIN_WIDTH,
       resizable: true,
       sortable: false,
       cssClass: classes.join(' '),

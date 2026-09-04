@@ -38,6 +38,7 @@ import {
   DEFAULT_COLUMN_WIDTH,
   GUTTER_WIDTH,
   initialWidths,
+  MIN_WIDTH,
   pageColumnIndexFor,
   resetMeasureCtx,
   resolveColumnOrder,
@@ -423,9 +424,16 @@ function buildColumns(
       id: name,
       field: name,
       name,
-      width: storedWidths[name] ?? measured[name] ?? DEFAULT_COLUMN_WIDTH,
-      // F9 — the app's own resize floor; onColumnsResized persists the drag (below).
-      minWidth: 40,
+      // Clamped to MIN_WIDTH even for a stored width (found against the real app: a width read
+      // back from a prior resize/session was never re-clamped, only an interactive drag was, so
+      // a column persisted at a pre-floor width — as narrow as one character for something as
+      // short as "id" — forever, across every reload, until manually widened again).
+      width: Math.max(MIN_WIDTH, storedWidths[name] ?? measured[name] ?? DEFAULT_COLUMN_WIDTH),
+      // F9 — the app's own resize floor; onColumnsResized persists the drag (below). Matches
+      // columns.ts's own MIN_WIDTH (a freshly measured column already can't go narrower) rather
+      // than a second, lower number — the mismatch between the two was what let a manual drag
+      // undercut the floor a fresh column never could.
+      minWidth: MIN_WIDTH,
       resizable: true,
       // F8 — creates the sort indicator divs; tristateMultiColumnSort/multiColumnSort (grid
       // options, below) make a click cycle asc -> desc -> none, this app's own header cycle.
