@@ -11,6 +11,7 @@ import EmptyState from '../../theme/primitives/EmptyState.vue';
 import MessageStrip from '../../theme/primitives/MessageStrip.vue';
 import SegmentedControl from '../../theme/primitives/SegmentedControl.vue';
 import { backToLatest, ensureHistoryLoaded, historyRuntime } from './history';
+import RawExchangePane from './RawExchangePane.vue';
 import ResponseDiffDialog from './ResponseDiffDialog.vue';
 import ResponseHistoryList from './ResponseHistoryList.vue';
 import { runtime } from './state';
@@ -65,11 +66,14 @@ const RESPONSE_PANE_OPTIONS = [
   { value: 'body' as const, label: 'Body', testid: 'http-response-pane-body' },
   { value: 'headers' as const, label: 'Headers', testid: 'http-response-pane-headers' },
   { value: 'history' as const, label: 'History', testid: 'http-response-pane-history' },
+  // P9 D12/F19: the fourth segment — never on screen at the same time as the body's own Pretty/Raw
+  // toggle (gated on responsePane === 'body' below), so the shared "Raw" label never collides.
+  { value: 'raw' as const, label: 'Raw', testid: 'http-response-pane-raw' },
 ];
 
 // P8 C1: HttpResponsePane, not an inline 'body' | 'headers' literal — the schema is the source of
-// truth for the pane vocabulary, so a widened schema (C4 adds 'history') can never desync from
-// this handler's own type. RESPONSE_PANE_OPTIONS still lists only two entries until C4.
+// truth for the pane vocabulary, so a widened schema (P8 adds 'history', P9 adds 'raw') can never
+// desync from this handler's own type.
 function setResponsePane(pane: HttpResponsePane): void {
   patchHttpRequestTabState(props.tab.id, { responsePane: pane });
 }
@@ -212,6 +216,7 @@ function onBackToLatest(): void {
         </template>
         <EmptyState v-else icon="arrow-right" label="Send a request to see the response" />
       </div>
+      <RawExchangePane v-else-if="tab.state.responsePane === 'raw'" :tab="tab" />
       <div v-else class="response-body">
         <template v-if="response">
           <span
