@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { HttpMethod } from '@shared/domain/http';
+import { type HttpMethod, httpMethodClass } from '@shared/domain/http';
 import type { HttpRequestTabRecord } from '@shared/domain/tabs';
 import { computed, onMounted, onUnmounted } from 'vue';
 import { registerCommand } from '../../shortcuts/commands';
@@ -28,17 +28,9 @@ const title = computed(() => httpRequestTitle(props.tab.state));
 const METHODS: readonly HttpMethod[] = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'];
 
 // D12: a method chip coloured by method family, over .p-chip's existing variants (F17) — zero
-// new CSS.
-const METHOD_CLASS: Record<HttpMethod, 'info' | 'ok' | 'warn' | 'err'> = {
-  GET: 'info',
-  HEAD: 'info',
-  OPTIONS: 'info',
-  POST: 'ok',
-  PUT: 'warn',
-  PATCH: 'warn',
-  DELETE: 'err',
-};
-const methodClass = computed(() => METHOD_CLASS[props.tab.state.method]);
+// new CSS. P4 D16: the map itself moved into the shared domain beside statusClass, since the
+// collections tree's own row needs it and `http/**` may not import `views/**`.
+const methodClass = computed(() => httpMethodClass(props.tab.state.method));
 
 function onMethodChange(e: Event): void {
   const method = (e.target as HTMLSelectElement).value as HttpMethod;

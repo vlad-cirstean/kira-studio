@@ -218,8 +218,14 @@ export const TAB_KINDS: { [K in TabKind]: TabKindDef<K> } = {
     // reason anyone would. P3 F10: headers/urlEncoded/formData are deep-copied since each row is
     // an object in an array (a shallow spread would share row objects between the two tabs, so
     // editing one's fields would edit the other's); binaryFile is copied as a fresh object.
+    // P4 D14: a duplicated tab is an **unsaved copy** — which is what duplicating a saved request
+    // to try a variant means. Clearing both is also what keeps `path` honest (F13): the duplicate
+    // carries the original's path, so leaving itemId set would make openTab's reuse lookup
+    // activate the copy when the user next opened the original from the tree.
     duplicateState: (tab: HttpRequestTabRecord): HttpRequestTabState => ({
       ...tab.state,
+      itemId: null,
+      name: '',
       headers: tab.state.headers.map((h) => ({ ...h })),
       urlEncoded: tab.state.urlEncoded.map((f) => ({ ...f })),
       formData: tab.state.formData.map((f) => ({ ...f })),

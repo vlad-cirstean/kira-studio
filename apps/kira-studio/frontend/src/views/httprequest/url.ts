@@ -62,8 +62,11 @@ function withScheme(base: string): string {
 }
 
 /** D2: the URL's path, else its host, else the raw text, else 'New request' — TabKindDef.title
- *  and the view header both call this. */
-export function httpRequestTitle(state: { url: string }): string {
+ *  and the view header both call this. P4 D14: a saved request's own name wins over all of it, so
+ *  "Create order" stops rendering as /v2/orders — one line here keeps the function pure and keeps
+ *  both consumers unchanged, rather than teaching either about collections. */
+export function httpRequestTitle(state: { url: string; name?: string }): string {
+  if (state.name) return state.name;
   const url = state.url.trim();
   if (!url) return 'New request';
   const { base } = splitUrl(url);

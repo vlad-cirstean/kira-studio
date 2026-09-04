@@ -192,6 +192,16 @@ const httpRequestTabStateShape = /*#__PURE__*/ z.object({
   urlEncoded: /*#__PURE__*/ z.array(httpUrlEncodedFieldSchema).default([]),
   formData: /*#__PURE__*/ z.array(httpFormDataFieldSchema).default([]),
   binaryFile: httpBinaryFileSchema,
+  // P4 D14: a saved request's identity and its name, both `.default()`ed like every other field
+  // so a tab saved before P4 restores unchanged. `itemId` is the http_items row this tab is bound
+  // to (null = a scratch request that has never been saved); it lives here rather than in the
+  // tab's `path` because duplicateTab copies `path` verbatim while duplicateState clears the id,
+  // which would leave two disagreeing sources of one fact and make openTab's reuse lookup
+  // activate the *duplicate* when the user opened the original (F13). `name` is what keeps
+  // httpRequestTitle pure: without it a saved request called "Create order" would show as
+  // /v2/orders everywhere, and the alternative is teaching every title consumer about collections.
+  itemId: z.string().nullable().default(null),
+  name: z.string().default(''),
   requestPane: httpRequestPaneSchema.default('params'),
   responsePane: httpResponsePaneSchema.default('body'),
   responseView: httpResponseViewSchema.default('pretty'),
@@ -268,4 +278,25 @@ export function statusClass(status: number): 'info' | 'ok' | 'warn' | 'err' {
   if (status >= 200 && status < 300) return 'ok';
   if (status >= 300 && status < 400) return 'warn';
   return 'err';
+}
+
+// P4 D16: statusClass's exact sibling, in its exact home. Two surfaces need the same map — the
+// request view's own method chip and the collections tree's per-row chip — and `http/**` may not
+// import `views/**` (biome.json), so it lives here rather than being copied into both.
+//
+// Takes a plain `string`, not HttpMethod: an imported PROPFIND (F4) has to have a colour rather
+// than throw. The eight enum members and every custom method this app's builder cannot show fall
+// through to 'info', which is the same neutral family GET already uses.
+const METHOD_CLASS: Readonly<Record<string, 'info' | 'ok' | 'warn' | 'err'>> = {
+  GET: 'info',
+  HEAD: 'info',
+  OPTIONS: 'info',
+  POST: 'ok',
+  PUT: 'warn',
+  PATCH: 'warn',
+  DELETE: 'err',
+};
+
+export function httpMethodClass(method: string): 'info' | 'ok' | 'warn' | 'err' {
+  return METHOD_CLASS[method.toUpperCase()] ?? 'info';
 }
