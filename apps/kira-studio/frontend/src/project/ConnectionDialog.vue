@@ -9,7 +9,7 @@ import {
   MIN_SERVER_VERSION,
 } from '@shared/domain/connection';
 import { canRoundTripToFields, formatConnectionUri, parseConnectionUri } from '@shared/domain/uri';
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { control } from '../bridge/control';
 import { confirmDialog } from '../state/confirmDialog';
 import { closeDialog, connectionsState, saveDialog } from '../state/connections';
@@ -21,6 +21,7 @@ import DialogFrame from '../theme/primitives/DialogFrame.vue';
 import IconButton from '../theme/primitives/IconButton.vue';
 import MessageStrip from '../theme/primitives/MessageStrip.vue';
 import TextField from '../theme/primitives/TextField.vue';
+import { wrapSelectionOnType } from '../theme/wrapSelection';
 import ColorPicker from './ColorPicker.vue';
 
 const KIND_LABEL: Record<ConnectionKind, string> = {
@@ -80,6 +81,14 @@ const secretStatus = computed(() => connectionsState.secretStorage);
 // on its fields directly, reaching the picker only through "Change engine".
 const step = ref<'engine' | 'details'>(isEdit.value ? 'details' : 'engine');
 const engineSearch = ref('');
+
+// P28 §4.2: step 2's own tab strip — General/Advanced/Pre-connect. Reset to 'General' whenever
+// step 2 is (re-)entered so "Change engine → back" never lands on a stale tab.
+type DetailTab = 'General' | 'Advanced' | 'Pre-connect';
+const activeTab = ref<DetailTab>('General');
+watch(step, (s) => {
+  if (s === 'details') activeTab.value = 'General';
+});
 
 const showPassword = ref(false);
 // P14 D1: a brand-new connection has no stored secret to reveal at all — whatever's typed is
@@ -264,6 +273,19 @@ function onPasswordInput(value: string): void {
   revealed.value = true;
 }
 
+// P28 §4.2: with the fields split across tabs, a field error is no longer always on screen — a
+// failed save must switch to the tab holding the first offending field, or the user never sees
+// why Save did nothing.
+const TAB_FOR_FIELD: Record<string, DetailTab> = {
+  name: 'General',
+  host: 'General',
+  port: 'General',
+  database: 'General',
+  uri: 'General',
+  preconnect: 'Pre-connect',
+  throttlePerSec: 'Advanced',
+};
+
 async function onSave(): Promise<void> {
   const d = draft.value;
   if (!d) return;
@@ -275,6 +297,10 @@ async function onSave(): Promise<void> {
       if (typeof key === 'string') errors[key] = issue.message;
     }
     fieldErrors.value = errors;
+    const firstField = parsed.error.issues[0]?.path[0];
+    if (typeof firstField === 'string' && firstField in TAB_FOR_FIELD) {
+      activeTab.value = TAB_FOR_FIELD[firstField];
+    }
     return;
   }
   fieldErrors.value = {};
@@ -419,6 +445,43 @@ const preconnectText = computed({
     </template>
     <template v-else>
       <div class="dialog-body-inner">
+          <nav class="p-tab-strip" role="tablist" aria-label="Connection detail tabs">
+            <button
+              type="button"
+              class="p-tab"
+              role="tab"
+              :class="{ 'is-active': activeTab === 'General' }"
+              :aria-selected="activeTab === 'General'"
+              data-testid="connection-tab-general"
+              @click="activeTab = 'General'"
+            >
+              General
+            </button>
+            <button
+              type="button"
+              class="p-tab"
+              role="tab"
+              :class="{ 'is-active': activeTab === 'Advanced' }"
+              :aria-selected="activeTab === 'Advanced'"
+              data-testid="connection-tab-advanced"
+              @click="activeTab = 'Advanced'"
+            >
+              Advanced
+            </button>
+            <button
+              type="button"
+              class="p-tab"
+              role="tab"
+              :class="{ 'is-active': activeTab === 'Pre-connect' }"
+              :aria-selected="activeTab === 'Pre-connect'"
+              data-testid="connection-tab-preconnect"
+              @click="activeTab = 'Pre-connect'"
+            >
+              Pre-connect
+            </button>
+          </nav>
+
+          <div v-if="activeTab === 'General'" class="tab-pane" role="tabpanel">
           <div class="field-row">
             <div class="field name-field">
               <label>Name</label>
@@ -578,7 +641,9 @@ const preconnectText = computed({
             </div>
             <p class="mono uri-note">{{ uriNote }}</p>
           </template>
+          </div>
 
+          <div v-else-if="activeTab === 'Advanced'" class="tab-pane" role="tabpanel">
           <label class="field checkbox">
             <input v-model="draft.readOnly" type="checkbox" data-testid="connection-readonly" />
             <span>Read-only</span>
@@ -595,10 +660,19 @@ const preconnectText = computed({
               extra planning round trip, not a second execution.
             </span>
           </label>
+          </div>
 
+          <div v-else class="tab-pane" role="tabpanel">
           <div class="field">
             <label>Pre-connect command <span class="dim">— optional</span></label>
-            <TextField v-model="preconnectText" size="md" class="mono" data-testid="connection-preconnect" />
+            <textarea
+              v-model="preconnectText"
+              class="p-textarea mono"
+              rows="4"
+              maxlength="2000"
+              data-testid="connection-preconnect"
+              @keydown="wrapSelectionOnType"
+            />
             <span class="helper-text">
               Runs in your shell before connecting — e.g. a port-forward or an SSO session-keeper.
             </span>
@@ -623,6 +697,7 @@ const preconnectText = computed({
               script.
             </span>
           </label>
+          </div>
 
           <span
             v-if="connectionsState.dialog.error"
@@ -635,7 +710,8 @@ const preconnectText = computed({
                unconditional plaintext warning — a null secretStatus (not hydrated yet) renders
                none of them rather than guessing. P35 D14: a file kind has no credentials at all,
                so none of the three states apply — the note would be describing something that
-               doesn't exist. -->
+               doesn't exist. Dialog-level, not tab-level: describes the connection as a whole and
+               must stay visible no matter which tab is active. -->
           <template v-if="!isFileStyle">
             <p
               v-if="secretStatus?.available && !secretStatus.insecureFallback"
@@ -820,6 +896,24 @@ const preconnectText = computed({
 .segmented button.active {
   background: var(--kira-bg-input);
   color: var(--kira-fg);
+}
+
+/* P28 §4.2: step 2's General/Advanced/Pre-connect tabs, using the app's existing .p-tab
+   primitive rather than .segmented (already spent on the Fields/URI mode switch above). */
+.p-tab-strip {
+  display: flex;
+  gap: var(--kira-s-2);
+  border-bottom: var(--kira-border-width) solid var(--kira-border);
+  padding-bottom: var(--kira-s-3);
+}
+
+.tab-pane {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kira-s-4);
+  /* Keeps the dialog from resizing under the cursor when switching tabs — the same concern
+     DialogFrame.vue's own fixed height records for SettingsDialog. */
+  min-height: 240px;
 }
 
 .uri-note {

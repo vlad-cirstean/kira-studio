@@ -142,6 +142,7 @@ test('preconnect — dialog field, and failure before connect', async ({ relaunc
   await page.click('[data-testid="add-connection"]');
   await expect(page.locator('[data-testid="connection-dialog"]')).toBeVisible();
   await page.click('[data-testid="connection-kind-postgres"]');
+  await page.click('[data-testid="connection-tab-preconnect"]');
   await expect(page.locator('[data-testid="connection-preconnect"]')).toBeVisible();
   await expect(page.locator('[data-testid="connection-preconnect-warning"]')).toHaveCount(0);
   await page.click('[data-testid="mode-uri"]');
@@ -158,6 +159,7 @@ test('preconnect — dialog field, and failure before connect', async ({ relaunc
   await page.fill('[data-testid="connection-port"]', '5432');
   await page.fill('[data-testid="connection-database"]', 'testdb');
   await page.fill('[data-testid="connection-username"]', 'testuser');
+  await page.click('[data-testid="connection-tab-preconnect"]');
   await page.fill('[data-testid="connection-preconnect"]', 'echo hi');
   await expect(page.locator('[data-testid="connection-preconnect-warning"]')).toBeVisible();
   await page.click('[data-testid="connection-save"]');
@@ -166,6 +168,7 @@ test('preconnect — dialog field, and failure before connect', async ({ relaunc
   // --- editing the just-created record shows it again ----------------------------------------
   await (await connectionRow(page, 'Preconnect Test')).click({ button: 'right' });
   await page.click('[data-testid="menu-item-edit"]');
+  await page.click('[data-testid="connection-tab-preconnect"]');
   await expect(page.locator('[data-testid="connection-preconnect"]')).toHaveValue('echo hi');
   await expect(page.locator('[data-testid="connection-preconnect-warning"]')).toBeVisible();
 
@@ -180,6 +183,7 @@ test('preconnect — dialog field, and failure before connect', async ({ relaunc
   await page.click('[data-testid="menu-item-edit"]');
   await page.fill('[data-testid="connection-host"]', '127.0.0.1');
   await page.fill('[data-testid="connection-port"]', '1'); // nothing listens here
+  await page.click('[data-testid="connection-tab-preconnect"]');
   await page.fill('[data-testid="connection-preconnect"]', 'echo nope >&2; exit 3');
   await page.click('[data-testid="connection-save"]');
   await expect(page.locator('[data-testid="connection-dialog"]')).toHaveCount(0);

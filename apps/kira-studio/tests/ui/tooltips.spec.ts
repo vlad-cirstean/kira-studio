@@ -171,6 +171,7 @@ test('tooltips — app-owned surface: delay, disabled controls, popovers, a11y',
   await page.fill('[data-testid="connection-database"]', 'kira_test');
   await page.fill('[data-testid="connection-username"]', 'postgres');
   await page.click('[data-testid="color-red"]');
+  await page.click('[data-testid="connection-tab-advanced"]');
   await page.click('[data-testid="connection-readonly"]');
   await page.click('[data-testid="connection-save"]');
   await expect(page.locator('[data-testid="connection-dialog"]')).toHaveCount(0);

@@ -175,7 +175,10 @@ async function connectAndExpand(
   await page.fill('[data-testid="connection-database"]', 'kira_test');
   await page.fill('[data-testid="connection-username"]', 'postgres');
   await page.click(`[data-testid="color-${color}"]`);
-  if (opts?.autoExplain) await page.click('[data-testid="connection-auto-explain"]');
+  if (opts?.autoExplain) {
+    await page.click('[data-testid="connection-tab-advanced"]');
+    await page.click('[data-testid="connection-auto-explain"]');
+  }
   await page.click('[data-testid="connection-save"]');
   await expect(page.locator('[data-testid="connection-dialog"]')).toHaveCount(0);
 
