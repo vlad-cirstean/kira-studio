@@ -59,6 +59,17 @@
       "name": "@kira/git-ipc",
       "version": "0.0.0",
     },
+    "packages/git-ui": {
+      "name": "@kira/git-ui",
+      "version": "0.0.0",
+      "dependencies": {
+        "@kira/git-core": "workspace:*",
+        "@kira/git-ipc": "workspace:*",
+        "@vscode/codicons": "0.0.46-24",
+        "slickgrid": "5.20.0",
+        "vue": "3.5.42",
+      },
+    },
   },
   "packages": {
     "@babel/helper-string-parser": ["@babel/helper-string-parser@7.29.7", "", {}, "sha512-Pb5ijPrZ89GDH8223L4UP8i6QApWxs04RbPQJTeWDV0/keR2E36MeKnyr6LYmUUvqRRI+Iv87SuF1W6ErINzYw=="],
@@ -136,6 +147,8 @@
     "@kira/git-core": ["@kira/git-core@workspace:packages/git-core"],
 
     "@kira/git-ipc": ["@kira/git-ipc@workspace:packages/git-ipc"],
+
+    "@kira/git-ui": ["@kira/git-ui@workspace:packages/git-ui"],
 
     "@kira/kira-studio-frontend": ["@kira/kira-studio-frontend@workspace:apps/kira-studio/frontend"],
 
