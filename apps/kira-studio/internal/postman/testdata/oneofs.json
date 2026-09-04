@@ -1,0 +1,68 @@
+{
+  "info": {
+    "name": "Every oneOf",
+    "description": { "content": "An **object** description", "type": "text/markdown" },
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "port", "value": 8080, "type": "number" },
+    { "key": "secure", "value": true, "type": "boolean" },
+    { "key": "baseUrl", "value": "https://api.example.com" }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": { "type": "text/javascript", "exec": "console.log('one string, not an array')" }
+    }
+  ],
+  "item": [
+    {
+      "name": "string request",
+      "request": "https://api.example.com/string-request"
+    },
+    {
+      "name": "string header block",
+      "request": {
+        "method": "GET",
+        "header": "X-First: 1\nX-Second: two",
+        "url": "https://api.example.com/string-header"
+      }
+    },
+    {
+      "name": "string url and string host",
+      "request": {
+        "method": "GET",
+        "url": {
+          "host": "api.example.com",
+          "path": "plain/path"
+        }
+      }
+    },
+    {
+      "name": "path variable segment",
+      "description": { "content": "an object description on an item", "type": "text/plain" },
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json",
+            "description": { "content": "a header description object", "type": "text/plain" }
+          }
+        ],
+        "url": {
+          "protocol": "https",
+          "host": ["api", "example", "com"],
+          "port": "8443",
+          "path": ["users", { "type": "string", "value": ":id" }, "orders"],
+          "query": [
+            { "key": "limit", "value": "10", "description": "how many" },
+            { "key": "cursor", "value": "abc", "disabled": true }
+          ],
+          "hash": "section",
+          "variable": [{ "key": "id", "value": "42" }]
+        }
+      }
+    }
+  ]
+}

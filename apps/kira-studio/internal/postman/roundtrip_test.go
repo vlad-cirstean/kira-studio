@@ -1,0 +1,613 @@
+// P4 §6.2: internal/postman is AGENTS.md's named category — a parser with several interacting
+// rules over a real wire format, where every failure mode is silent (a dropped event[] is
+// invisible until someone opens the export in Postman; a scrambled sort_order looks like the
+// user's own ordering). The one assertion that matters is D6's rule at scale:
+// import(origin.X) == stored.X ? origin.X : build(stored.X).
+package postman_test
+
+import (
+	"bytes"
+	"encoding/json"
+	"os"
+	"path/filepath"
+	"reflect"
+	"strings"
+	"testing"
+
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/postman"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
+)
+
+func parseFile(t *testing.T, name string) *postman.Tree {
+	t.Helper()
+	f, err := os.Open(filepath.Join("testdata", name))
+	if err != nil {
+		t.Fatalf("open %s: %v", name, err)
+	}
+	defer f.Close()
+	tree, err := postman.Parse(f)
+	if err != nil {
+		t.Fatalf("Parse(%s): %v", name, err)
+	}
+	return tree
+}
+
+// exported writes tree and decodes the result, so a test asserts against the real emitted bytes.
+func exported(t *testing.T, tree *postman.Tree) map[string]any {
+	t.Helper()
+	var buf bytes.Buffer
+	if err := postman.Write(&buf, tree); err != nil {
+		t.Fatalf("Write: %v", err)
+	}
+	var out map[string]any
+	if err := json.Unmarshal(buf.Bytes(), &out); err != nil {
+		t.Fatalf("re-decode written collection: %v\n%s", err, buf.String())
+	}
+	return out
+}
+
+func decodeFile(t *testing.T, name string) map[string]any {
+	t.Helper()
+	b, err := os.ReadFile(filepath.Join("testdata", name))
+	if err != nil {
+		t.Fatalf("read %s: %v", name, err)
+	}
+	var out map[string]any
+	if err := json.Unmarshal(b, &out); err != nil {
+		t.Fatalf("decode %s: %v", name, err)
+	}
+	return out
+}
+
+// items indexes an exported collection's item[] array by name, at any depth.
+func items(root map[string]any) map[string]map[string]any {
+	out := map[string]map[string]any{}
+	var walk func(v any)
+	walk = func(v any) {
+		arr, ok := v.([]any)
+		if !ok {
+			return
+		}
+		for _, entry := range arr {
+			obj, ok := entry.(map[string]any)
+			if !ok {
+				continue
+			}
+			if name, ok := obj["name"].(string); ok {
+				out[name] = obj
+			}
+			walk(obj["item"])
+		}
+	}
+	walk(root["item"])
+	return out
+}
+
+func requestOf(t *testing.T, item map[string]any) map[string]any {
+	t.Helper()
+	req, ok := item["request"].(map[string]any)
+	if !ok {
+		t.Fatalf("item %v has no object request", item["name"])
+	}
+	return req
+}
+
+// itemIndex finds the one item with this name in a parsed tree.
+func itemIndex(t *testing.T, tree *postman.Tree, name string) int {
+	t.Helper()
+	for i, item := range tree.Items {
+		if item.Name == name {
+			return i
+		}
+	}
+	t.Fatalf("no item named %q", name)
+	return -1
+}
+
+// ---- 1. Nesting and order ----
+
+func TestNestingAndOrderSurviveARoundTrip(t *testing.T) {
+	tree := parseFile(t, "nesting.json")
+
+	// Deliberately non-alphabetical siblings, at three depths.
+	type row struct {
+		name  string
+		depth int
+		order int
+	}
+	depth := func(i int) int {
+		d := 0
+		for tree.Items[i].Parent != postman.RootParent {
+			i = tree.Items[i].Parent
+			d++
+		}
+		return d
+	}
+	got := []row{}
+	for i, item := range tree.Items {
+		got = append(got, row{item.Name, depth(i), item.Order})
+	}
+	want := []row{
+		{"zulu", 0, 0}, {"mike", 1, 0}, {"delta", 2, 0}, {"alpha", 2, 1},
+		{"charlie", 1, 1}, {"bravo", 0, 1}, {"yankee", 0, 2},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("parsed tree shape:\n got %v\nwant %v", got, want)
+	}
+
+	// Written back, the arrays come out in the same order at the same depths — an unordered or
+	// map-shaped model would silently scramble a collection on its first round trip (F1).
+	out := exported(t, tree)
+	root, _ := out["item"].([]any)
+	names := []string{}
+	for _, entry := range root {
+		names = append(names, entry.(map[string]any)["name"].(string))
+	}
+	if want := []string{"zulu", "bravo", "yankee"}; !reflect.DeepEqual(names, want) {
+		t.Fatalf("root order: got %v, want %v", names, want)
+	}
+	zulu := root[0].(map[string]any)["item"].([]any)
+	inner := []string{zulu[0].(map[string]any)["name"].(string), zulu[1].(map[string]any)["name"].(string)}
+	if want := []string{"mike", "charlie"}; !reflect.DeepEqual(inner, want) {
+		t.Fatalf("zulu's order: got %v, want %v", inner, want)
+	}
+	mike := zulu[0].(map[string]any)["item"].([]any)
+	leaves := []string{mike[0].(map[string]any)["name"].(string), mike[1].(map[string]any)["name"].(string)}
+	if want := []string{"delta", "alpha"}; !reflect.DeepEqual(leaves, want) {
+		t.Fatalf("mike's order: got %v, want %v", leaves, want)
+	}
+}
+
+// ---- 2. Every oneOf from F2 in one file ----
+//
+// This is the file that would fail against the library D1 declined, which is why it exists: four
+// of these shapes are an unmarshal *error* there, i.e. a whole-file import failure on shapes the
+// published schema explicitly allows.
+
+func TestEveryOneOfParsesAndSurvives(t *testing.T) {
+	tree := parseFile(t, "oneofs.json")
+	in := decodeFile(t, "oneofs.json")
+	out := exported(t, tree)
+	inItems, outItems := items(in), items(out)
+
+	t.Run("a string request is the URL, with GET assumed", func(t *testing.T) {
+		got := tree.Items[itemIndex(t, tree, "string request")].Request
+		if got.Method != "GET" || got.URL != "https://api.example.com/string-request" {
+			t.Fatalf("got %+v", got)
+		}
+		// Untouched, so it is re-emitted verbatim — the whole-member form of D6's rule.
+		if outItems["string request"]["request"] != "https://api.example.com/string-request" {
+			t.Fatalf("string request was rewritten: %#v", outItems["string request"]["request"])
+		}
+	})
+
+	t.Run("a string header block splits into rows", func(t *testing.T) {
+		got := tree.Items[itemIndex(t, tree, "string header block")].Request.Headers
+		want := []model.SavedHeader{
+			{Name: "X-First", Value: "1", Enabled: true},
+			{Name: "X-Second", Value: "two", Enabled: true},
+		}
+		if !reflect.DeepEqual(got, want) {
+			t.Fatalf("got %+v, want %+v", got, want)
+		}
+		if h := requestOf(t, outItems["string header block"])["header"]; h != "X-First: 1\nX-Second: two" {
+			t.Fatalf("header block was rewritten: %#v", h)
+		}
+	})
+
+	t.Run("a string host and a string path reconstruct", func(t *testing.T) {
+		got := tree.Items[itemIndex(t, tree, "string url and string host")].Request.URL
+		if got != "api.example.com/plain/path" {
+			t.Fatalf("got %q", got)
+		}
+		if !reflect.DeepEqual(
+			requestOf(t, outItems["string url and string host"])["url"],
+			requestOf(t, inItems["string url and string host"])["url"],
+		) {
+			t.Fatal("an untouched url object was rewritten")
+		}
+	})
+
+	t.Run("a path-variable segment contributes its value, a disabled query param does not", func(t *testing.T) {
+		got := tree.Items[itemIndex(t, tree, "path variable segment")].Request.URL
+		if got != "https://api.example.com:8443/users/:id/orders?limit=10#section" {
+			t.Fatalf("got %q", got)
+		}
+	})
+
+	t.Run("object descriptions, a string script.exec and a numeric variable value all survive", func(t *testing.T) {
+		// None of these is decoded at all — they live in origin as raw bytes, which is exactly why
+		// parsing cannot error on them.
+		for _, member := range []string{"variable", "event", "info"} {
+			if !reflect.DeepEqual(out[member], in[member]) {
+				t.Fatalf("collection-level %q changed:\n got %#v\nwant %#v", member, out[member], in[member])
+			}
+		}
+		if !reflect.DeepEqual(outItems["path variable segment"]["description"], inItems["path variable segment"]["description"]) {
+			t.Fatal("an item's object description changed")
+		}
+		if !reflect.DeepEqual(
+			requestOf(t, outItems["path variable segment"])["header"],
+			requestOf(t, inItems["path variable segment"])["header"],
+		) {
+			t.Fatal("a header row's own description was dropped")
+		}
+	})
+}
+
+// ---- 3. Every body mode round-trips untouched, byte-identically ----
+
+func TestEveryBodyModeRoundTripsUntouched(t *testing.T) {
+	tree := parseFile(t, "bodies.json")
+	in, out := decodeFile(t, "bodies.json"), exported(t, tree)
+	inItems, outItems := items(in), items(out)
+
+	for name := range inItems {
+		wantBody := requestOf(t, inItems[name])["body"]
+		gotBody := requestOf(t, outItems[name])["body"]
+		if !reflect.DeepEqual(gotBody, wantBody) {
+			t.Errorf("%s: body changed\n got %#v\nwant %#v", name, gotBody, wantBody)
+		}
+	}
+}
+
+func TestImportTranslatesEveryBodyMode(t *testing.T) {
+	tree := parseFile(t, "bodies.json")
+	req := func(name string) model.SavedRequest { return tree.Items[itemIndex(t, tree, name)].Request }
+
+	cases := []struct {
+		item     string
+		mode     string
+		check    func(r model.SavedRequest) bool
+		describe string
+	}{
+		{"raw text", "raw", func(r model.SavedRequest) bool { return r.Body == "plain <b>text</b> & more" }, "raw·text stays plain text"},
+		{"raw no language", "raw", func(r model.SavedRequest) bool { return r.Body == "no options member at all" }, "an absent language is text"},
+		{"raw javascript", "code", func(r model.SavedRequest) bool { return r.CodeLanguage == "javascript" && r.Code == "const x = 1;" }, "raw·javascript becomes code"},
+		{"raw json", "code", func(r model.SavedRequest) bool { return r.CodeLanguage == "json" }, "raw·json becomes code"},
+		{"raw html", "code", func(r model.SavedRequest) bool { return r.CodeLanguage == "html" }, "raw·html becomes code"},
+		{"raw xml", "code", func(r model.SavedRequest) bool { return r.CodeLanguage == "xml" }, "raw·xml becomes code"},
+		{"raw unknown language", "raw", func(r model.SavedRequest) bool { return r.Body == "SELECT 1" }, "an unrecognised language degrades to plain text"},
+		{"file with src", "file", func(r model.SavedRequest) bool {
+			return r.BinaryFile != nil && r.BinaryFile.Path == "payload.bin" && r.BinaryFile.Name == "payload.bin"
+		}, "a file src is taken optimistically as a path"},
+		{"file with content only", "file", func(r model.SavedRequest) bool { return r.BinaryFile == nil }, "inline content writes no temp file"},
+		{"no body at all", "none", func(r model.SavedRequest) bool { return true }, "an absent body is none"},
+		{"disabled body", "raw", func(r model.SavedRequest) bool { return r.Body == "not sent by Postman" }, "a disabled body imports as its mode"},
+	}
+	for _, tc := range cases {
+		got := req(tc.item)
+		if got.BodyMode != tc.mode {
+			t.Errorf("%s: mode = %q, want %q", tc.item, got.BodyMode, tc.mode)
+			continue
+		}
+		if !tc.check(got) {
+			t.Errorf("%s (%s): %+v", tc.item, tc.describe, got)
+		}
+	}
+
+	t.Run("urlencoded keeps its disabled row", func(t *testing.T) {
+		got := req("urlencoded").URLEncoded
+		want := []model.SavedField{
+			{Name: "grant_type", Value: "password", Enabled: true},
+			{Name: "scope", Value: "read", Enabled: false},
+		}
+		if !reflect.DeepEqual(got, want) {
+			t.Fatalf("got %+v, want %+v", got, want)
+		}
+	})
+
+	t.Run("a formdata src array expands to one row per entry", func(t *testing.T) {
+		got := req("formdata").FormData
+		want := []model.SavedFormField{
+			{Name: "caption", Kind: "text", Value: "a text row", Enabled: true},
+			{Name: "notype", Kind: "text", Value: "type is absent, so text", Enabled: true},
+			{Name: "single", Kind: "file", Path: "/Users/someone/report.csv", FileName: "report.csv", ContentType: "text/csv", Enabled: true},
+			{Name: "many", Kind: "file", Path: "/Users/someone/a.png", FileName: "a.png", Enabled: true},
+			{Name: "many", Kind: "file", Path: "/Users/someone/b.png", FileName: "b.png", Enabled: true},
+			{Name: "none", Kind: "file", Enabled: true},
+		}
+		if !reflect.DeepEqual(got, want) {
+			t.Fatalf("got %+v\nwant %+v", got, want)
+		}
+	})
+
+	t.Run("a graphql body becomes the GraphQL-over-HTTP envelope as code·json", func(t *testing.T) {
+		got := req("graphql")
+		if got.BodyMode != "code" || got.CodeLanguage != "json" {
+			t.Fatalf("got mode %q/%q", got.BodyMode, got.CodeLanguage)
+		}
+		var envelope map[string]any
+		if err := json.Unmarshal([]byte(got.Code), &envelope); err != nil {
+			t.Fatalf("envelope is not JSON: %v (%s)", err, got.Code)
+		}
+		want := map[string]any{
+			"query":         "query Order($id: ID!) { order(id: $id) { id } }",
+			"operationName": "Order",
+			"variables":     map[string]any{"id": "42"},
+		}
+		if !reflect.DeepEqual(envelope, want) {
+			t.Fatalf("got %#v, want %#v", envelope, want)
+		}
+	})
+
+	t.Run("the report counts what it did on the user's behalf", func(t *testing.T) {
+		for kind, want := range map[string]int{
+			postman.WarnGraphQLBody:       1,
+			postman.WarnInlineFileContent: 1,
+			postman.WarnDisabledBody:      1,
+			// 'single' plus two 'many' entries plus the file-mode src.
+			postman.WarnUnresolvedFile: 4,
+		} {
+			if got := tree.Report.Warnings[kind]; got != want {
+				t.Errorf("warning %s = %d, want %d", kind, got, want)
+			}
+		}
+	})
+}
+
+// ---- 4. An edited body exports canonically, and its origin is shed ----
+
+func TestAnEditedBodyExportsCanonicallyAndShedsItsOrigin(t *testing.T) {
+	tree := parseFile(t, "bodies.json")
+
+	// The graphql case is the one that changes identity: an app with no GraphQL mode cannot claim
+	// to have edited a GraphQL body, so it exports as raw + language:"json".
+	idx := itemIndex(t, tree, "graphql")
+	tree.Items[idx].Request.Code = `{"query":"query { me { id } }"}`
+	tree.Items[idx].Origin = postman.ShedOrigin(tree.Items[idx].Origin, tree.Items[idx].Request)
+
+	rawIdx := itemIndex(t, tree, "raw text")
+	tree.Items[rawIdx].Request.Body = "edited"
+	tree.Items[rawIdx].Origin = postman.ShedOrigin(tree.Items[rawIdx].Origin, tree.Items[rawIdx].Request)
+
+	outItems := items(exported(t, tree))
+
+	gql := requestOf(t, outItems["graphql"])["body"].(map[string]any)
+	if gql["mode"] != "raw" || gql["raw"] != `{"query":"query { me { id } }"}` {
+		t.Fatalf("edited graphql body: %#v", gql)
+	}
+	language := gql["options"].(map[string]any)["raw"].(map[string]any)["language"]
+	if language != "json" {
+		t.Fatalf("edited graphql language = %v, want json", language)
+	}
+
+	raw := requestOf(t, outItems["raw text"])["body"].(map[string]any)
+	if raw["mode"] != "raw" || raw["raw"] != "edited" {
+		t.Fatalf("edited raw body: %#v", raw)
+	}
+	// language:"text" is written explicitly rather than omitted, so a Postman import shows the
+	// Text sub-selector instead of relying on a default this app does not control.
+	if raw["options"].(map[string]any)["raw"].(map[string]any)["language"] != "text" {
+		t.Fatalf("edited raw options: %#v", raw["options"])
+	}
+
+	t.Run("shedding removes the stale origin body and nothing else", func(t *testing.T) {
+		origin := tree.Items[rawIdx].Origin
+		var request map[string]json.RawMessage
+		if err := json.Unmarshal(origin["request"], &request); err != nil {
+			t.Fatalf("origin request: %v", err)
+		}
+		if _, ok := request["body"]; ok {
+			t.Fatal("the stale body is still in origin")
+		}
+		if _, ok := request["url"]; !ok {
+			t.Fatal("an untouched url was shed too")
+		}
+	})
+}
+
+// ---- 5. The unchanged-⇒-verbatim rule holds per member ----
+
+func TestTheVerbatimRuleIsPerMember(t *testing.T) {
+	in := decodeFile(t, "oneofs.json")
+	inItems := items(in)
+	const name = "path variable segment"
+
+	t.Run("editing only the URL rebuilds only the URL", func(t *testing.T) {
+		tree := parseFile(t, "oneofs.json")
+		idx := itemIndex(t, tree, name)
+		tree.Items[idx].Request.URL = "https://api.example.com/moved"
+		out := requestOf(t, items(exported(t, tree))[name])
+
+		url, ok := out["url"].(map[string]any)
+		if !ok {
+			t.Fatalf("url is not an object: %#v", out["url"])
+		}
+		if url["raw"] != "https://api.example.com/moved" {
+			t.Fatalf("url was not rebuilt: %#v", url)
+		}
+		// The old raw/host[]/path[]/query[] cannot linger and disagree with it.
+		if _, stale := url["query"]; stale {
+			t.Fatalf("a stale query survived the rebuild: %#v", url)
+		}
+		if !reflect.DeepEqual(out["header"], requestOf(t, inItems[name])["header"]) {
+			t.Fatal("header changed when only the URL was edited")
+		}
+	})
+
+	t.Run("editing only a header rebuilds only the header", func(t *testing.T) {
+		tree := parseFile(t, "oneofs.json")
+		idx := itemIndex(t, tree, name)
+		tree.Items[idx].Request.Headers = []model.SavedHeader{{Name: "Accept", Value: "text/csv", Enabled: true}}
+		out := requestOf(t, items(exported(t, tree))[name])
+
+		if !reflect.DeepEqual(out["url"], requestOf(t, inItems[name])["url"]) {
+			t.Fatal("url changed when only a header was edited")
+		}
+		header, ok := out["header"].([]any)
+		if !ok || len(header) != 1 {
+			t.Fatalf("header was not rebuilt: %#v", out["header"])
+		}
+		row := header[0].(map[string]any)
+		if row["key"] != "Accept" || row["value"] != "text/csv" {
+			t.Fatalf("rebuilt header row: %#v", row)
+		}
+	})
+}
+
+// ---- 6. Preserved but inert survives (D9) ----
+
+func TestPreservedButInertSurvivesAFullCycle(t *testing.T) {
+	tree := parseFile(t, "inert.json")
+	in, out := decodeFile(t, "inert.json"), exported(t, tree)
+
+	for _, member := range []string{"auth", "event", "variable", "protocolProfileBehavior"} {
+		if !reflect.DeepEqual(out[member], in[member]) {
+			t.Errorf("collection-level %q changed:\n got %#v\nwant %#v", member, out[member], in[member])
+		}
+	}
+	// info survives except the two members that are columns by construction.
+	inInfo, outInfo := in["info"].(map[string]any), out["info"].(map[string]any)
+	for _, member := range []string{"_postman_id", "description", "version"} {
+		if !reflect.DeepEqual(outInfo[member], inInfo[member]) {
+			t.Errorf("info.%s changed: got %#v, want %#v", member, outInfo[member], inInfo[member])
+		}
+	}
+	if outInfo["schema"] != postman.SchemaURL {
+		t.Errorf("info.schema = %v, want the v2.1 URL", outInfo["schema"])
+	}
+
+	inItems, outItems := items(in), items(out)
+	for _, name := range []string{"Orders", "Create order"} {
+		for _, member := range []string{"auth", "event", "variable", "protocolProfileBehavior", "response"} {
+			if !reflect.DeepEqual(outItems[name][member], inItems[name][member]) {
+				t.Errorf("%s.%s changed:\n got %#v\nwant %#v", name, member, outItems[name][member], inItems[name][member])
+			}
+		}
+	}
+	for _, member := range []string{"description", "proxy", "certificate"} {
+		got := requestOf(t, outItems["Create order"])[member]
+		want := requestOf(t, inItems["Create order"])[member]
+		if !reflect.DeepEqual(got, want) {
+			t.Errorf("Create order request.%s changed: got %#v, want %#v", member, got, want)
+		}
+	}
+
+	if got := tree.Report.Warnings[postman.WarnScriptsInert]; got != 4 {
+		t.Errorf("scripts_inert = %d, want 4", got)
+	}
+	if got := tree.Report.Warnings[postman.WarnAuthInert]; got != 2 {
+		t.Errorf("auth_inert = %d, want 2", got)
+	}
+	if got := tree.Report.Warnings[postman.WarnVariablesInert]; got != 3 {
+		t.Errorf("variables_inert = %d, want 3", got)
+	}
+}
+
+// ---- 7. The version gate (D10) ----
+
+func TestTheVersionGate(t *testing.T) {
+	f, err := os.Open(filepath.Join("testdata", "v2_0.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	if _, err := postman.Parse(f); err == nil {
+		t.Fatal("a v2.0.0 file was accepted")
+	} else if !strings.Contains(err.Error(), "v2.0.0") {
+		t.Fatalf("the refusal does not name the version found: %v", err)
+	}
+
+	// Hand-written and SDK-generated collections routinely omit the advisory URL; refusing a file
+	// for that is the validator mistake D1 declined.
+	tree := parseFile(t, "no_schema.json")
+	if len(tree.Items) != 1 {
+		t.Fatalf("a schema-less collection did not parse: %+v", tree.Items)
+	}
+}
+
+// ---- 8. The malformed cases (D3) ----
+
+func TestMalformedItemsAreSkippedOrClassifiedStructurally(t *testing.T) {
+	tree := parseFile(t, "malformed.json")
+
+	names := []string{}
+	for _, item := range tree.Items {
+		names = append(names, item.Name)
+	}
+	want := []string{"both members", "child", "nameless below", "/v1/derived/name", "/root-string", "custom method"}
+	if !reflect.DeepEqual(names, want) {
+		t.Fatalf("items: got %v, want %v", names, want)
+	}
+	if got := tree.Report.Warnings[postman.WarnMalformedItem]; got != 1 {
+		t.Errorf("malformed_item = %d, want 1", got)
+	}
+	if got := tree.Report.Warnings[postman.WarnUnsupportedMethod]; got != 1 {
+		t.Errorf("unsupported_method = %d, want 1", got)
+	}
+
+	// Both members present: `item` wins, and the `request` member survives untouched in origin,
+	// so the export re-emits exactly what came in.
+	both := tree.Items[itemIndex(t, tree, "both members")]
+	if both.Kind != postman.KindFolder {
+		t.Fatalf("an item with both members is not a folder: %v", both.Kind)
+	}
+	outItems := items(exported(t, tree))
+	inItems := items(decodeFile(t, "malformed.json"))
+	if !reflect.DeepEqual(outItems["both members"]["request"], inItems["both members"]["request"]) {
+		t.Fatal("the ill-formed item's own request member was not preserved")
+	}
+
+	// A custom method is stored verbatim; export restores it.
+	if got := tree.Items[itemIndex(t, tree, "custom method")].Request.Method; got != "PROPFIND" {
+		t.Fatalf("custom method = %q", got)
+	}
+	if got := requestOf(t, outItems["custom method"])["method"]; got != "PROPFIND" {
+		t.Fatalf("exported custom method = %v", got)
+	}
+}
+
+// ---- 9. url.go's splitter/builder ----
+
+func TestURLSplitAndBuild(t *testing.T) {
+	const raw = "{{baseUrl}}/users/:id?q=a+b#frag"
+
+	split := postman.Split(raw)
+	if split.Base != "{{baseUrl}}/users/:id" || split.Query != "q=a+b" || split.Hash != "frag" {
+		t.Fatalf("Split: %+v", split)
+	}
+
+	built := postman.Build(raw)
+	encoded, err := json.Marshal(built)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got map[string]any
+	if err := json.Unmarshal(encoded, &got); err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]any{
+		"raw": raw,
+		// A {{variable}} in the host is one segment, not three — P5's own syntax survives.
+		"host":  []any{"{{baseUrl}}"},
+		"path":  []any{"users", ":id"},
+		"query": []any{map[string]any{"key": "q", "value": "a+b"}},
+		"hash":  "frag",
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("Build:\n got %#v\nwant %#v", got, want)
+	}
+
+	// The whole point of writing `raw`: Import(Build(s)) == s by construction, for any s.
+	for _, s := range []string{
+		raw,
+		"https://api.example.com:8443/v2/orders?a=1&b=2#top",
+		"api.exa",
+		"",
+		"https://api.example.com",
+	} {
+		if got := postman.ImportURL(json.RawMessage(mustJSON(t, postman.Build(s)))); got != s {
+			t.Errorf("ImportURL(Build(%q)) = %q", s, got)
+		}
+	}
+}
+
+func mustJSON(t *testing.T, v any) []byte {
+	t.Helper()
+	b, err := json.Marshal(v)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return b
+}
