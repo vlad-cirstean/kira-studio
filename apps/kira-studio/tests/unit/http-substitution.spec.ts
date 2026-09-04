@@ -37,3 +37,42 @@ describe('http/substitute.ts (P5 D17/D18)', () => {
     });
   }
 });
+
+// P6 D2/D3: three TS-only cases for the optional fourth argument — Go has no dynamic branch to be
+// in parity with, so these live beside the corpus loop rather than inside it, and the corpus JSON
+// itself is untouched (D2 property 3).
+describe('http/substitute.ts resolve() dynamic callback (P6 D2/D3)', () => {
+  test('two occurrences of one name produce two different values', () => {
+    let n = 0;
+    const result = resolve('{{$guid}}/{{$guid}}', {}, [], () => String(n++));
+    expect(result.text).toBe('0/1');
+    expect(result.refs).toEqual([
+      { name: '$guid', kind: 'resolved' },
+      { name: '$guid', kind: 'resolved' },
+    ]);
+  });
+
+  test('a callback returning null leaves today’s behaviour exactly', () => {
+    const withNullCallback = resolve('{{$nope}}', {}, [], () => null);
+    const withNoCallback = resolve('{{$nope}}', {}, []);
+    expect(withNullCallback).toEqual(withNoCallback);
+    expect(withNullCallback.text).toBe('{{$nope}}');
+    expect(withNullCallback.refs).toEqual([{ name: '$nope', kind: 'dynamic' }]);
+  });
+
+  test('a dynamic reference adjacent to a variable, a secret and an unknown resolve independently', () => {
+    const result = resolve(
+      '{{$guid}} {{apiKey}} {{token}} {{missing}}',
+      { apiKey: 'abc123' },
+      ['token'],
+      () => 'GENERATED',
+    );
+    expect(result.text).toBe('GENERATED abc123 {{token}} {{missing}}');
+    expect(result.refs).toEqual([
+      { name: '$guid', kind: 'resolved' },
+      { name: 'apiKey', kind: 'resolved' },
+      { name: 'token', kind: 'deferred' },
+      { name: 'missing', kind: 'unknown' },
+    ]);
+  });
+});
