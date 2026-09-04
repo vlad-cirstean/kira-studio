@@ -38,7 +38,7 @@ authoritative for behavior: SPEC.md is the record of what v1 was *specified* to 
 | UI tests | Playwright against the built bundle, real WebKit | every change validated |
 | Logging | Go `log/slog` | a daily-rolling file under `~/.kira-studio/logs/`, mirroring the configuration `electron-log` used to hold — single log file, single source of truth |
 | Data/console grid rendering (P22 Pass B cutover; P30 §3 extended it) | `slickgrid@5.20.0`'s core engine (MIT, `6pac/SlickGrid`), core `SlickGrid` class only — no `SlickDataView`, no plugin, no `slickgrid-vue` | **the only grid engine** — `views/grid/DataGrid.vue`, `GridRow.vue` and `__kiraGridEngine` are gone (P22 Pass B). `views/grid/SlickGridHost.vue` hosts a data tab (full parity: sort, editor, selection ranges, FK/PK nav, clipboard); `views/console/ConsoleSlickGrid.vue` hosts the query console's tabular results (P30 §3) over the same reusable layer, ~300 lines instead of a second 2000+-line host: `views/shared/slick/kiraSlickGrid.ts` (the tuned scroll/runway/chase mechanism, inherited unmodified), `views/shared/slick/dataSource.ts` (the `CustomDataView` bridge; its data-tab-specific half, `createDisplayValueExtractor`/`pendingRowClasses`, stays in `views/grid/slick/dataSource.ts`, which re-exports the rest), `views/shared/slick/slickTheme.css`, `views/shared/page/columns.ts` and `theme/cellClass.ts`. The console host has no selection-range model, sort, editor, context menu, clipboard, FK nav or persisted column widths — a console result has none of what those exist to serve. `@tanstack/vue-virtual` is no longer a dependency (P30 §3.6 C7) |
-| Outbound HTTP client (P2, body modes P3) | plain `net/http` (`apps/kira-studio/internal/httpclient/`), **no client/retry/URL-parsing/multipart-builder dependency at all** | the same "no driver dependency" shape the ClickHouse adapter already established (below): one package-level `*http.Client`, a 30s timeout applied via `context.WithTimeout` rather than `Client.Timeout` (so the Stop button and a timeout abort an in-flight body read the same way), redirects followed and every hop recorded up to 10, TLS verification always on, `http.ProxyFromEnvironment`. Reachable only from Go — the webview's own `fetch` is never used (`docs/ARCHITECTURE.md`'s own "Go owns the network" invariant, below). P3 adds every body mode Postman's own format exposes (`internal/httpclient/body.go`) over the same one dependency-free package: a two-pass `mime/multipart` writer computes an *exact* `Content-Length` from a fixed boundary's deterministic framing before streaming a single byte, so a form-data or binary send is never chunked and never guesses |
+| Outbound HTTP client (P2, body modes P3) | plain `net/http` (`apps/kira-studio/internal/httpclient/`), **no client/retry/URL-parsing/multipart-builder dependency at all** | the same "no driver dependency" shape the ClickHouse adapter already established (below): one package-level `*http.Client`, a 30s timeout applied via `context.WithTimeout` rather than `Client.Timeout` (so the Stop button and a timeout abort an in-flight body read the same way), redirects followed and every hop recorded up to 10, TLS verification always on, `http.ProxyFromEnvironment`. Reachable only from Go — the webview's own `fetch` is never used (`docs/ARCHITECTURE.md`'s own "Go owns the network" invariant, below). P3 adds every body mode this app's request builder supports — none/raw/code/urlencoded/formdata/file (`internal/httpclient/body.go`) — over the same one dependency-free package: a two-pass `mime/multipart` writer computes an *exact* `Content-Length` from a fixed boundary's deterministic framing before streaming a single byte, so a form-data or binary send is never chunked and never guesses |
 
 Driver libraries — the best-maintained option per engine, **Go-native for all ten kinds as of P58e
 M9.3** (checkpoint C2): `jackc/pgx/v5` (postgres), `go-sql-driver/mysql` (mariadb/mysql, via a shared
@@ -621,25 +621,38 @@ its own migration story. `tabsSave` still writes `tabsState.tabs` straight back,
 drops any key no schema recognizes — deliberate, not lossy in a way that matters, since a garbage
 key had no reader to begin with.
 
-**An HTTP request body is one of six Postman modes, and the format's spelling and the UI's spelling
-deliberately differ (P3).** `packages/shared/domain/http.ts`'s `httpBodyModeSchema` —
-`'none' | 'raw' | 'urlencoded' | 'formdata' | 'file' | 'graphql'` — is Postman's own Collection
-v2.1 `body.mode` enum verbatim, because P4's Postman import/export and P7's curl generator both
-have to round-trip this exact vocabulary and a rename table is one more place each could drift; a
-Go/TS parity test (`tests/unit/go-ts-vocabulary-parity.spec.ts`, reading `internal/httpclient/
-body.go`'s `validBodyModes` as plain text) guards it. The builder's own labels are Postman's UI
-labels instead, which is where the two spellings part ways on purpose: `formdata` reads
-**form-data**, `urlencoded` reads **x-www-form-urlencoded**, and `file` — "one local file, sent
-as the request's entire body" — reads **binary**, exactly as Postman's own builder calls it. `raw`
-carries a second, independent sub-selector (`rawLanguage`: Text/JavaScript/JSON/HTML/XML) rather
-than each being its own mode — XML and JSON are raw sub-languages in Postman's own model, not body
-modes, however `docs/v1.2/SPEC.md`'s P3 phase row lists them. `Content-Type` is a **default Go
-applies only when the request carries none of its own** (raw's language, `application/x-www-form-
-urlencoded`, a generated `multipart/form-data; boundary=…`, `application/json` for GraphQL, and
-explicitly *no* header at all for a binary body, matching Postman's own documented behaviour) — a
-hand-set `Content-Type` header always wins, including the one edge case that needs an assist: a
+**An HTTP request body is one of five modes; there is no GraphQL mode.** `packages/shared/domain/
+http.ts`'s `httpBodyModeSchema` — `'none' | 'raw' | 'code' | 'urlencoded' | 'formdata' | 'file'` —
+started life (P3) as Postman's own Collection v2.1 `body.mode` enum verbatim (six modes, `raw`
+carrying a `rawLanguage` sub-selector across Text/JavaScript/JSON/HTML/XML), on the theory that a
+later Postman import/export phase would need to round-trip that exact vocabulary. A later product
+decision dropped GraphQL entirely (not deprecated — deleted: no query/variables state, no GraphQL
+`StreamLanguage`, no server-side envelope builder) and split `raw`'s sub-selector in two: `raw` is
+now plain text only, and JavaScript/JSON/HTML/XML became their own top-level `code` mode with its
+own `codeLanguage` field. **This means the mode vocabulary no longer maps 1:1 onto Postman's own
+`body.mode`** — Postman still has one `raw` mode with a `language` sub-field covering all five,
+this app now has two separate modes and no `graphql` mode at all. Whoever builds Postman collection
+import/export needs a real translation at that boundary (a Postman `raw` body with
+`language: 'json'` imports as this app's `code` mode with `codeLanguage: 'json'`, and the reverse
+on export; a Postman `graphql` body has nowhere to land and needs its own explicit decision) — see
+the breadcrumb comment on `HTTP_BODY_MODES` in `http.ts`. A Go/TS parity test
+(`tests/unit/go-ts-vocabulary-parity.spec.ts`, reading `internal/httpclient/body.go`'s
+`validBodyModes` as plain text) guards the two languages' mode and Content-Type vocabularies from
+drifting apart. The builder's own labels: `formdata` reads **form-data**, `urlencoded` reads
+**x-www-form-urlencoded**, `file` — "one local file, sent as the request's entire body" — reads
+**binary**, and `code` reads **Code**. `Content-Type` is a **default Go applies only when the
+request carries none of its own** (`text/plain` for raw, the `code` language's Content-Type,
+`application/x-www-form-urlencoded`, a generated `multipart/form-data; boundary=…`, and explicitly
+*no* header at all for a binary body, matching Postman's own documented behaviour for that one) —
+a hand-set `Content-Type` header always wins, including the one edge case that needs an assist: a
 user-typed bare `multipart/form-data` with no boundary gets Go's generated boundary appended,
 since the boundary is unknowable to the user and the header and the body must agree.
+
+**P2's legacy `bodyMode: 'json'` alias still restores correctly** — `httpRequestTabStateSchema`
+preprocesses that one legacy shape into `bodyMode: 'code'`, `codeLanguage: 'json'`, moving the
+saved text from the old `body` field into `code`'s own buffer rather than merely renaming the mode
+value, since `raw` and `code` are now separate buffers and a value-only rename would strand the
+legacy text where the (now plain-text) `raw` mode would never render it.
 
 **A file's bytes reach Go by path, never through the renderer or the control plane (P3).** The
 native file dialog (`FilesService.ChooseOpen`, shared with S3's own upload dialog) returns
