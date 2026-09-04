@@ -1,12 +1,9 @@
 <script setup lang="ts">
 import type { TabRecord } from '@shared/domain/tabs';
-import { tabTitle } from '@shared/domain/tabs';
-import { pathTail } from '@shared/domain/tree';
 import { computed, nextTick, ref, watch } from 'vue';
 import { copyText } from '../../clipboard';
-import { revealPath } from '../../project/state/tree';
-import { connectionRecord } from '../../state/connections';
 import { openContextMenu } from '../../state/contextMenu';
+import { TAB_KINDS } from '../../state/tabKinds';
 import {
   activateTab,
   closeAll,
@@ -21,26 +18,18 @@ import CodiconIcon from '../../theme/CodiconIcon.vue';
 import { connColorVar } from '../../theme/connColor';
 import { wheelToHorizontal } from '../../wheelScroll';
 
+// P1 D4/C4: title/icon/rail all read the tab-kind registry now — TabStrip.vue no longer knows
+// what a 'data' tab's icon is, or that a tab's colour comes from its connection.
 function colorFor(tab: TabRecord): string | undefined {
-  return connectionRecord(tab.connectionId)?.color;
+  return TAB_KINDS[tab.kind].railColor(tab);
 }
 
 function iconFor(tab: TabRecord): string {
-  if (tab.kind === 'definition') return 'file-code';
-  if (tab.kind === 'console') return 'terminal';
-  if (tab.kind === 'document') return 'json';
-  // P17: a 'keyvalue' tab is a redis key OR an s3 object — pathTail's own node kind (already
-  // computed below for the table/view/matview fallback) tells them apart with no extra state.
-  if (tab.kind === 'keyvalue') return pathTail(tab.path)?.kind === 'object' ? 'file' : 'symbol-key';
-  if (tab.kind === 'stream') return 'broadcast';
-  if (tab.kind === 'browse') return 'list-tree';
-  const tail = pathTail(tab.path);
-  const KIND_ICON: Record<string, string> = {
-    table: 'table',
-    view: 'eye',
-    matview: 'symbol-structure',
-  };
-  return (tail && KIND_ICON[tail.kind]) || 'table';
+  return TAB_KINDS[tab.kind].icon(tab);
+}
+
+function titleFor(tab: TabRecord): string {
+  return TAB_KINDS[tab.kind].title(tab);
 }
 
 function onClick(tab: TabRecord): void {
@@ -57,7 +46,8 @@ function onClose(e: MouseEvent, tab: TabRecord): void {
 }
 
 // §8.10's Tab row: Close · Close others · Close to the right · Close all · — · Duplicate tab ·
-// Copy name · Reveal in project panel (D22).
+// Copy name · plus whatever the tab's own kind appends (D22) — Studio's kinds all append
+// "Reveal in project panel" (F11); an Http tab kind supplies its own menuExtras, or none.
 function onContextMenu(e: MouseEvent, tab: TabRecord): void {
   openContextMenu(e, [
     {
@@ -89,24 +79,16 @@ function onContextMenu(e: MouseEvent, tab: TabRecord): void {
       id: 'duplicate-tab',
       label: 'Duplicate tab',
       icon: 'copy',
-      run: () => duplicateTab(tab.id),
+      run: () => void duplicateTab(tab.id),
     },
     {
       type: 'item',
       id: 'copy-name',
       label: 'Copy name',
       icon: 'copy',
-      run: () => copyText(tabTitle(tab)),
+      run: () => copyText(titleFor(tab)),
     },
-    {
-      type: 'item',
-      id: 'reveal-in-project-panel',
-      label: 'Reveal in project panel',
-      icon: 'target',
-      run: () => {
-        if (tab.connectionId) void revealPath(tab.connectionId, tab.path);
-      },
-    },
+    ...TAB_KINDS[tab.kind].menuExtras(tab),
   ]);
 }
 
@@ -187,7 +169,7 @@ function onDragEnd(): void {
     >
       <span class="p-tab-rail" />
       <CodiconIcon :name="iconFor(tab)" :size="13" class="tab-icon" />
-      <span class="tab-title">{{ tabTitle(tab) }}</span>
+      <span class="tab-title">{{ titleFor(tab) }}</span>
       <span
         class="tab-close"
         role="button"
