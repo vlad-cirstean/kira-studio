@@ -1,26 +1,32 @@
 <script setup lang="ts">
-import IconButton from '../theme/primitives/IconButton.vue';
-import TextField from '../theme/primitives/TextField.vue';
-import { treeState } from './state/tree';
+import IconButton from './IconButton.vue';
+import TextField from './TextField.vue';
+
+// P1 C2: project/SearchBox.vue, converted to a plain v-model instead of writing
+// treeState.search directly (F8) — a search box shared by more than one mode cannot import
+// Studio's tree state.
+defineProps<{ modelValue: string }>();
+const emit = defineEmits<{ 'update:modelValue': [value: string] }>();
 </script>
 
 <template>
   <div class="search-box-row">
     <div class="search-box">
       <TextField
-        v-model="treeState.search"
+        :model-value="modelValue"
         ui
         icon="search"
         placeholder="Search"
         data-testid="tree-search"
+        @update:model-value="emit('update:modelValue', $event)"
       />
       <IconButton
-        v-if="treeState.search"
+        v-if="modelValue"
         icon="close"
         class="clear-button"
         v-tooltip="'Clear search'"
         aria-label="Clear search"
-        @click="treeState.search = ''"
+        @click="emit('update:modelValue', '')"
       />
     </div>
   </div>
