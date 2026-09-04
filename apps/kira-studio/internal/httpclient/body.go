@@ -1,0 +1,374 @@
+// body.go is P3's own file: one serializer per Postman body mode (D2/D5), turning a Body into
+// what net/http needs — a reader, a working GetBody for 307/308 replay (F4), an exact
+// Content-Length so nothing here is ever sent chunked (F5), and the mode's default Content-Type
+// (client.go's Send applies D7's precedence over it). No dependency (D1): mime/multipart's own
+// deterministic framing for a fixed boundary (F15) is what makes the multipart dry run possible.
+package httpclient
+
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"io"
+	"mime/multipart"
+	"net/textproto"
+	"net/url"
+	"os"
+	"path/filepath"
+	"strings"
+)
+
+// BodyMode is Postman's own `mode` spelling (D2) — "file" is what its UI calls binary.
+type BodyMode string
+
+const (
+	BodyNone       BodyMode = "none"
+	BodyRaw        BodyMode = "raw"
+	BodyURLEncoded BodyMode = "urlencoded"
+	BodyFormData   BodyMode = "formdata"
+	// BodyFile — Postman's `file` mode: one local file as the entire body; the UI calls this
+	// **binary**.
+	BodyFile    BodyMode = "file"
+	BodyGraphQL BodyMode = "graphql"
+)
+
+// validBodyModes — D12's parity guard reads this exact map[string]bool literal as plain text
+// (extractGoStringSet), so it stays a literal rather than being derived from the consts above.
+var validBodyModes = map[string]bool{
+	"none": true, "raw": true, "urlencoded": true, "formdata": true, "file": true, "graphql": true,
+}
+
+// contentTypeByRawLanguage — D7's default Content-Type per raw sub-language. A map[string]string
+// literal, not a switch, specifically so D12's parity test (extractGoStringMap) can read it as
+// plain text against CONTENT_TYPE_BY_RAW_LANGUAGE (http.ts) — do not "simplify" this into a
+// switch.
+var contentTypeByRawLanguage = map[string]string{
+	"text":       "text/plain",
+	"javascript": "application/javascript",
+	"json":       "application/json",
+	"html":       "text/html",
+	"xml":        "application/xml",
+}
+
+// Field is one urlencoded row (D5).
+type Field struct {
+	Name  string `json:"name"`
+	Value string `json:"value"`
+}
+
+// FormField is one form-data row (D5). Kind == "file" means Path is an absolute local path (D4)
+// and Value is ignored; Kind == "text" means Value is the field's content and Path is ignored.
+// ContentType is a per-part override; "" means the per-mode default (the row's own Content type
+// field when set, else "application/octet-stream" for a file part, nothing for a text part).
+type FormField struct {
+	Name        string `json:"name"`
+	Kind        string `json:"kind"`
+	Value       string `json:"value"`
+	Path        string `json:"path"`
+	ContentType string `json:"contentType"`
+}
+
+// GraphQLBody carries the user's own query and variables text verbatim (D6) — Variables is never
+// decoded into a map, so a large integer literal in it survives byte-identical into the envelope,
+// the same losslessness beautify.ts's own header comment states for JSON.
+type GraphQLBody struct {
+	Query     string `json:"query"`
+	Variables string `json:"variables"`
+}
+
+// Body is a tagged union: Mode selects which member is meaningful and every other member is
+// ignored (D5).
+type Body struct {
+	Mode        string      `json:"mode"`
+	Raw         string      `json:"raw"`
+	RawLanguage string      `json:"rawLanguage"`
+	URLEncoded  []Field     `json:"urlEncoded"`
+	FormData    []FormField `json:"formData"`
+	File        string      `json:"file"`
+	GraphQL     GraphQLBody `json:"graphql"`
+}
+
+// buildBody turns a Body into what net/http needs. contentType is the default this mode implies
+// (D7 decides whether Send actually applies it); length is exact, never -1, so nothing here is
+// ever sent chunked (F5). formBoundary is the boundary a formdata body must use — client.go's
+// Content-Type precedence (D7) resolves it (the user's own header's boundary parameter, or a
+// freshly minted one) before calling this; every other mode ignores it.
+func buildBody(b Body, formBoundary string) (
+	body io.ReadCloser, getBody func() (io.ReadCloser, error), length int64, contentType string, err error,
+) {
+	if !validBodyModes[b.Mode] {
+		return nil, nil, 0, "", newError(CodeBadRequest, "unknown body mode: "+b.Mode, nil)
+	}
+	switch BodyMode(b.Mode) {
+	case BodyNone:
+		return nil, nil, 0, "", nil
+	case BodyRaw:
+		return buildRaw(b.Raw, b.RawLanguage)
+	case BodyURLEncoded:
+		return buildURLEncoded(b.URLEncoded)
+	case BodyGraphQL:
+		return buildGraphQL(b.GraphQL)
+	case BodyFile:
+		return buildFile(b.File)
+	case BodyFormData:
+		return buildFormData(b.FormData, formBoundary)
+	}
+	return nil, nil, 0, "", newError(CodeBadRequest, "unknown body mode: "+b.Mode, nil)
+}
+
+func buildRaw(raw, rawLanguage string) (io.ReadCloser, func() (io.ReadCloser, error), int64, string, error) {
+	reader := func() io.ReadCloser { return io.NopCloser(strings.NewReader(raw)) }
+	return reader(), func() (io.ReadCloser, error) { return reader(), nil },
+		int64(len(raw)), contentTypeByRawLanguage[rawLanguage], nil
+}
+
+// buildURLEncoded hand-writes the encoder rather than reusing url.Values.Encode (F6/D1): that
+// sorts keys, silently rewriting a user's field order, and cannot express a disabled row (the
+// renderer already dropped those before this ever runs, D5). url.QueryEscape encodes a space as
+// '+', which is correct in an application/x-www-form-urlencoded body — the deliberate opposite of
+// views/httprequest/url.ts's buildQuery, which encodeURIComponents a query-string space as '%20'.
+// The two encoders differ on purpose; neither is "fixed" into the other.
+func buildURLEncoded(fields []Field) (io.ReadCloser, func() (io.ReadCloser, error), int64, string, error) {
+	parts := make([]string, 0, len(fields))
+	for _, f := range fields {
+		if strings.TrimSpace(f.Name) == "" {
+			return nil, nil, 0, "", newError(CodeBadRequest, "a urlencoded field is missing a name", nil)
+		}
+		parts = append(parts, url.QueryEscape(f.Name)+"="+url.QueryEscape(f.Value))
+	}
+	encoded := strings.Join(parts, "&")
+	reader := func() io.ReadCloser { return io.NopCloser(strings.NewReader(encoded)) }
+	return reader(), func() (io.ReadCloser, error) { return reader(), nil },
+		int64(len(encoded)), "application/x-www-form-urlencoded", nil
+}
+
+type graphQLEnvelope struct {
+	Query     string          `json:"query"`
+	Variables json.RawMessage `json:"variables,omitempty"`
+}
+
+// buildGraphQL marshals {query, variables} — the GraphQL-over-HTTP convention (§8 OQ-1). Variables
+// is carried as json.RawMessage, which copies the user's own bytes through unmodified rather than
+// decoding and re-encoding them, so a 19-digit id survives byte-identical (D6). Blank variables
+// omit the member entirely, since some servers reject a non-object `variables` and none require
+// the key.
+func buildGraphQL(g GraphQLBody) (io.ReadCloser, func() (io.ReadCloser, error), int64, string, error) {
+	env := graphQLEnvelope{Query: g.Query}
+	trimmed := strings.TrimSpace(g.Variables)
+	if trimmed != "" {
+		if !json.Valid([]byte(trimmed)) {
+			return nil, nil, 0, "", newError(CodeBadRequest, "GraphQL variables are not valid JSON", nil)
+		}
+		env.Variables = json.RawMessage(trimmed)
+	}
+	data, err := json.Marshal(env)
+	if err != nil {
+		return nil, nil, 0, "", newError(CodeHTTPTransport, "could not build GraphQL body: "+err.Error(), err)
+	}
+	reader := func() io.ReadCloser { return io.NopCloser(bytes.NewReader(data)) }
+	return reader(), func() (io.ReadCloser, error) { return reader(), nil },
+		int64(len(data)), "application/json", nil
+}
+
+// buildFile is the binary body: one whole local file, streamed by Go and never by the renderer
+// (D4). Postman sets no Content-Type for this mode (F3), and neither do we. Re-`os.Stat`s at send
+// time rather than trusting a stored size — the file may have changed or vanished since it was
+// picked (D4).
+func buildFile(path string) (io.ReadCloser, func() (io.ReadCloser, error), int64, string, error) {
+	trimmed := strings.TrimSpace(path)
+	if trimmed == "" {
+		return nil, nil, 0, "", newError(CodeBadRequest, "no file chosen for the request body", nil)
+	}
+	info, err := os.Stat(trimmed)
+	if err != nil {
+		return nil, nil, 0, "", newError(CodeBadRequest, "could not read local file "+trimmed+": "+err.Error(), err)
+	}
+	if info.IsDir() {
+		return nil, nil, 0, "", newError(CodeBadRequest, trimmed+" is a directory, not a file", nil)
+	}
+	f, err := os.Open(trimmed)
+	if err != nil {
+		return nil, nil, 0, "", newError(CodeBadRequest, "could not read local file "+trimmed+": "+err.Error(), err)
+	}
+	getBody := func() (io.ReadCloser, error) {
+		reopened, openErr := os.Open(trimmed)
+		if openErr != nil {
+			return nil, openErr
+		}
+		return reopened, nil
+	}
+	return f, getBody, info.Size(), "", nil
+}
+
+// formPart pairs a FormField with the file size resolved once, at prepare time — reused for both
+// the dry-run count and the real stream (and any later GetBody replay), so a redirect's replayed
+// body reports the same Content-Length the first attempt did even if the file changed size in
+// between (D6).
+type formPart struct {
+	field FormField
+	size  int64 // meaningful only when field.Kind == "file"
+}
+
+func prepareFormParts(fields []FormField) ([]formPart, error) {
+	parts := make([]formPart, 0, len(fields))
+	for _, f := range fields {
+		if strings.TrimSpace(f.Name) == "" {
+			return nil, newError(CodeBadRequest, "a form-data field is missing a name", nil)
+		}
+		if f.Kind != "file" {
+			parts = append(parts, formPart{field: f})
+			continue
+		}
+		trimmed := strings.TrimSpace(f.Path)
+		if trimmed == "" {
+			return nil, newError(CodeBadRequest, "no file chosen for form-data field "+f.Name, nil)
+		}
+		info, err := os.Stat(trimmed)
+		if err != nil {
+			return nil, newError(CodeBadRequest, "could not read local file "+trimmed+": "+err.Error(), err)
+		}
+		if info.IsDir() {
+			return nil, newError(CodeBadRequest, trimmed+" is a directory, not a file", nil)
+		}
+		parts = append(parts, formPart{field: f, size: info.Size()})
+	}
+	return parts, nil
+}
+
+// quoteEscaper mirrors mime/multipart's own unexported one (used by CreateFormFile) — the package
+// gives no other way to build a Content-Disposition header for a caller-supplied Content-Type.
+var quoteEscaper = strings.NewReplacer("\\", "\\\\", `"`, "\\\"")
+
+func formPartHeader(f FormField) textproto.MIMEHeader {
+	h := make(textproto.MIMEHeader)
+	if f.Kind == "file" {
+		filename := filepath.Base(f.Path)
+		h.Set("Content-Disposition", fmt.Sprintf(`form-data; name="%s"; filename="%s"`,
+			quoteEscaper.Replace(f.Name), quoteEscaper.Replace(filename)))
+		ct := f.ContentType
+		if ct == "" {
+			ct = "application/octet-stream"
+		}
+		h.Set("Content-Type", ct)
+	} else {
+		h.Set("Content-Disposition", fmt.Sprintf(`form-data; name="%s"`, quoteEscaper.Replace(f.Name)))
+		if f.ContentType != "" {
+			h.Set("Content-Type", f.ContentType)
+		}
+	}
+	return h
+}
+
+// countWriter measures exactly what a real multipart.Writer pass would produce, without holding
+// any of it in memory (F15).
+type countWriter struct{ n int64 }
+
+func (c *countWriter) Write(p []byte) (int, error) {
+	c.n += int64(len(p))
+	return len(p), nil
+}
+
+// multipartLength is the dry run (F15/D6): the identical boundary and part headers as the real
+// pass, written to a counting writer; a file part adds its already-`os.Stat`'d size instead of
+// being read. Same boundary, same headers, same terminator ⇒ the count the real pass will produce.
+func multipartLength(parts []formPart, boundary string) (int64, error) {
+	cw := &countWriter{}
+	mw := multipart.NewWriter(cw)
+	if err := mw.SetBoundary(boundary); err != nil {
+		return 0, newError(CodeBadRequest, "invalid multipart boundary: "+err.Error(), err)
+	}
+	for _, p := range parts {
+		part, err := mw.CreatePart(formPartHeader(p.field))
+		if err != nil {
+			return 0, newError(CodeHTTPTransport, "could not build multipart body: "+err.Error(), err)
+		}
+		if p.field.Kind == "file" {
+			cw.n += p.size
+			continue
+		}
+		if _, err := part.Write([]byte(p.field.Value)); err != nil {
+			return 0, newError(CodeHTTPTransport, "could not build multipart body: "+err.Error(), err)
+		}
+	}
+	if err := mw.Close(); err != nil {
+		return 0, newError(CodeHTTPTransport, "could not build multipart body: "+err.Error(), err)
+	}
+	return cw.n, nil
+}
+
+// streamFormData is the real pass: written into an io.Pipe by one goroutine so the caller can
+// start reading before every part is ready, streaming each file straight from disk (D4) rather
+// than buffering it. io.CopyN with the size prepareFormParts already resolved means a file that
+// shrank in between fails loudly (io.ErrUnexpectedEOF, propagated via CloseWithError) and a file
+// that grew is truncated to the counted size — either way the bytes sent match Content-Length
+// (D6). The goroutine never outlives the request: it exits on its own first write error, and
+// cancelling the request closes pr, which turns the next write into io.ErrClosedPipe.
+func streamFormData(parts []formPart, boundary string) *io.PipeReader {
+	pr, pw := io.Pipe()
+	go func() {
+		var werr error
+		defer func() { _ = pw.CloseWithError(werr) }()
+
+		mw := multipart.NewWriter(pw)
+		if err := mw.SetBoundary(boundary); err != nil {
+			werr = err
+			return
+		}
+		for _, p := range parts {
+			part, err := mw.CreatePart(formPartHeader(p.field))
+			if err != nil {
+				werr = err
+				return
+			}
+			if p.field.Kind == "file" {
+				f, openErr := os.Open(p.field.Path)
+				if openErr != nil {
+					werr = openErr
+					return
+				}
+				_, copyErr := io.CopyN(part, f, p.size)
+				closeErr := f.Close()
+				if copyErr != nil {
+					werr = copyErr
+					return
+				}
+				if closeErr != nil {
+					werr = closeErr
+					return
+				}
+				continue
+			}
+			if _, err := part.Write([]byte(p.field.Value)); err != nil {
+				werr = err
+				return
+			}
+		}
+		werr = mw.Close()
+	}()
+	return pr
+}
+
+// mintBoundary hands back a fresh random boundary with no part written — multipart.NewWriter
+// generates one immediately, before anything is written to the (discarded) underlying writer.
+func mintBoundary() string {
+	return multipart.NewWriter(io.Discard).Boundary()
+}
+
+func buildFormData(fields []FormField, boundary string) (
+	io.ReadCloser, func() (io.ReadCloser, error), int64, string, error,
+) {
+	parts, err := prepareFormParts(fields)
+	if err != nil {
+		return nil, nil, 0, "", err
+	}
+	if boundary == "" {
+		boundary = mintBoundary()
+	}
+	length, err := multipartLength(parts, boundary)
+	if err != nil {
+		return nil, nil, 0, "", err
+	}
+	contentType := "multipart/form-data; boundary=" + boundary
+	getBody := func() (io.ReadCloser, error) { return streamFormData(parts, boundary), nil }
+	return streamFormData(parts, boundary), getBody, length, contentType, nil
+}
