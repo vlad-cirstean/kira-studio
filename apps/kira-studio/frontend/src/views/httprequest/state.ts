@@ -7,8 +7,8 @@ import type {
 } from '@shared/domain/http';
 import { control } from '../../bridge/control';
 import { loadDynamicGenerator } from '../../http/dynamic/catalog';
-import { itemRecord } from '../../http/state/collections';
-import { activeEnvironmentId, cachedVariables } from '../../http/state/variables';
+import { collectionIdFor } from '../../http/state/collections';
+import { activeEnvironmentId, mergedValuesAndSecrets } from '../../http/state/variables';
 import { type Reference, resolve } from '../../http/substitute';
 import { type ResolvedRequest, substituteBody } from '../../http/substituteRequest';
 import { findHttpRequestTab } from '../../http/tabs';
@@ -96,36 +96,6 @@ export function resolveTabState(
   const body = substituteBody(buildBodyWire(state), sub);
 
   return { url, headers, body, refs };
-}
-
-/** D2's precedence (environment over collection), read from the cache
- *  http/state/variables.ts keeps in step with its own dialog edits — a fresh IPC round trip on
- *  every keystroke of the chip's own preview would be needless; send() calls
- *  ensureVariablesLoaded first so the cache is fresh by the time this runs there. */
-export function mergedValuesAndSecrets(
-  collectionId: string,
-  environmentId: string,
-): { values: Record<string, string>; secretNames: string[] } {
-  const merged = new Map<string, { value: string; isSecret: boolean }>();
-  for (const v of cachedVariables('collection', collectionId)) {
-    merged.set(v.name, { value: v.value, isSecret: v.isSecret });
-  }
-  for (const v of cachedVariables('environment', environmentId)) {
-    merged.set(v.name, { value: v.value, isSecret: v.isSecret }); // environment wins
-  }
-  const values: Record<string, string> = {};
-  const secretNames: string[] = [];
-  for (const [name, entry] of merged) {
-    if (entry.isSecret) secretNames.push(name);
-    else values[name] = entry.value;
-  }
-  return { values, secretNames };
-}
-
-/** The collection a tab's own saved row belongs to, or '' for a scratch tab (D6). */
-export function collectionIdFor(state: HttpRequestTabState): string {
-  if (!state.itemId) return '';
-  return itemRecord(state.itemId)?.collectionId ?? '';
 }
 
 // D6: the response is runtime-only, never persisted (mirrors consoleTabStateSchema's own results

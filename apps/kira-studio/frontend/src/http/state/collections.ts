@@ -560,6 +560,14 @@ export function itemRecord(itemId: string): CollectionItemSummary | undefined {
   return collectionsState.items.find((item) => item.id === itemId);
 }
 
+/** The collection a tab's own saved row belongs to, or '' for a scratch tab (D6). Shared by both
+ *  protocols (P12 D9/F10) — both HttpRequestTabState and GrpcRequestTabState carry an `itemId`,
+ *  which is the only field this reads. */
+export function collectionIdFor(state: { itemId: string | null }): string {
+  if (!state.itemId) return '';
+  return itemRecord(state.itemId)?.collectionId ?? '';
+}
+
 export function collectionRecord(collectionId: string): CollectionSummary | undefined {
   return collectionsState.collections.find((c) => c.id === collectionId);
 }

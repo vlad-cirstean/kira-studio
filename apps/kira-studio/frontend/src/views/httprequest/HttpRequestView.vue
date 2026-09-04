@@ -5,10 +5,19 @@ import { computed, onMounted, onUnmounted, watch } from 'vue';
 import { isDynamicName } from '../../http/dynamic/catalog';
 import EnvironmentSelect from '../../http/EnvironmentSelect.vue';
 import { canEditAsRaw, generateRawRequest } from '../../http/raw/generate';
-import { openSaveDialog, savedRequestFor, saveRequest } from '../../http/state/collections';
+import {
+  collectionIdFor,
+  openSaveDialog,
+  savedRequestFor,
+  saveRequest,
+} from '../../http/state/collections';
 import { openCopyAsCurlDialog } from '../../http/state/curl';
 import { openEditRawDialog } from '../../http/state/raw';
-import { activeEnvironmentId, ensureVariablesLoaded } from '../../http/state/variables';
+import {
+  activeEnvironmentId,
+  ensureVariablesLoaded,
+  mergedValuesAndSecrets,
+} from '../../http/state/variables';
 import { patchHttpRequestTabState } from '../../http/tabs';
 import { registerCommand } from '../../shortcuts/commands';
 import AppButton from '../../theme/primitives/AppButton.vue';
@@ -23,15 +32,7 @@ import RequestBodyPane from './RequestBodyPane.vue';
 import RequestHeadersTable from './RequestHeadersTable.vue';
 import ResponsePane from './ResponsePane.vue';
 import { isDirty, toSavedRequest } from './saved';
-import {
-  collectionIdFor,
-  mergedValuesAndSecrets,
-  resolveForExport,
-  resolveTabState,
-  runtime,
-  send,
-  stop,
-} from './state';
+import { resolveForExport, resolveTabState, runtime, send, stop } from './state';
 import { httpRequestTitle, parseQuery, splitUrl } from './url';
 
 // MainView.vue keys this component by tab.id — same discipline as every other *View.vue.

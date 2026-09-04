@@ -194,6 +194,36 @@ export function isDuplicateName(rows: HttpVariable[], index: number): boolean {
   return rows.slice(0, index).some((r) => r.name.trim() === name);
 }
 
+// ---- the merged value/secret cache, shared by both protocols (P12 D9/F10) ----
+//
+// mergedValuesAndSecrets used to be hand-copied into views/grpcrequest/state.ts, which said so in
+// so many words ("the coupling P12 would have to unpick") — both views already import this module
+// for cachedVariables, so the fix is a move, not an abstraction.
+
+/** D2's precedence (environment over collection), read from the cache this module keeps in step
+ *  with its own dialog edits — a fresh IPC round trip on every keystroke of a live
+ *  "unresolved reference" preview would be needless; send()/call() call ensureVariablesLoaded
+ *  first so the cache is fresh by the time this runs there. */
+export function mergedValuesAndSecrets(
+  collectionId: string,
+  environmentId: string,
+): { values: Record<string, string>; secretNames: string[] } {
+  const merged = new Map<string, { value: string; isSecret: boolean }>();
+  for (const v of cachedVariables('collection', collectionId)) {
+    merged.set(v.name, { value: v.value, isSecret: v.isSecret });
+  }
+  for (const v of cachedVariables('environment', environmentId)) {
+    merged.set(v.name, { value: v.value, isSecret: v.isSecret }); // environment wins
+  }
+  const values: Record<string, string> = {};
+  const secretNames: string[] = [];
+  for (const [name, entry] of merged) {
+    if (entry.isSecret) secretNames.push(name);
+    else values[name] = entry.value;
+  }
+  return { values, secretNames };
+}
+
 // ---- the gated reveal (D5/D8/D9) ----
 
 /** A revealed variable's plaintext, keyed by variable id — transient, cleared on dialog close

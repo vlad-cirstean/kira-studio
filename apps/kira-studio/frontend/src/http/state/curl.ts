@@ -187,7 +187,7 @@ export function currentCurlCommand(): string {
 }
 
 /** D10 step 1's precedence, over the id a deferred *name* actually belongs to — environment wins
- *  over collection, mirroring mergedValuesAndSecrets' own merge order (views/httprequest/state.ts). */
+ *  over collection, mirroring mergedValuesAndSecrets' own merge order (./variables.ts). */
 function findSecretVariableId(
   name: string,
   collectionId: string,

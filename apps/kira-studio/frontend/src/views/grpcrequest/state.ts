@@ -7,8 +7,8 @@ import type {
 } from '@shared/domain/grpc';
 import { control } from '../../bridge/control';
 import { loadDynamicGenerator } from '../../http/dynamic/catalog';
-import { itemRecord } from '../../http/state/collections';
-import { activeEnvironmentId, cachedVariables } from '../../http/state/variables';
+import { collectionIdFor } from '../../http/state/collections';
+import { activeEnvironmentId, mergedValuesAndSecrets } from '../../http/state/variables';
 import { type Reference, resolve } from '../../http/substitute';
 import { findGrpcRequestTab } from '../../http/tabs';
 import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
@@ -18,35 +18,10 @@ import { noteGrpcCallRecorded } from './history';
 // D9: {{name}} substitution is reused exactly — the same two-token grammar http/substitute.ts's
 // resolve() already implements, over gRPC's own three substitutable fields (target, metadata,
 // message). Deliberately NOT protoPath/importPaths/caFile (picker-supplied local paths, P5 D7's
-// own rule). This duplicates views/httprequest/state.ts's own mergedValuesAndSecrets/
-// collectionIdFor rather than importing them — views/grpcrequest/** may not import
-// views/httprequest/** (biome.json, F18) — the same "a few lines is the coupling P12 would have to
-// unpick" trade domain/grpc.ts's own grpcMetadataSchema comment already makes.
-export function mergedValuesAndSecrets(
-  collectionId: string,
-  environmentId: string,
-): { values: Record<string, string>; secretNames: string[] } {
-  const merged = new Map<string, { value: string; isSecret: boolean }>();
-  for (const v of cachedVariables('collection', collectionId)) {
-    merged.set(v.name, { value: v.value, isSecret: v.isSecret });
-  }
-  for (const v of cachedVariables('environment', environmentId)) {
-    merged.set(v.name, { value: v.value, isSecret: v.isSecret }); // environment wins
-  }
-  const values: Record<string, string> = {};
-  const secretNames: string[] = [];
-  for (const [name, entry] of merged) {
-    if (entry.isSecret) secretNames.push(name);
-    else values[name] = entry.value;
-  }
-  return { values, secretNames };
-}
-
-/** The collection a tab's own saved row belongs to, or '' for a scratch tab. */
-export function collectionIdFor(state: GrpcRequestTabState): string {
-  if (!state.itemId) return '';
-  return itemRecord(state.itemId)?.collectionId ?? '';
-}
+// own rule). P12 D9/F10: mergedValuesAndSecrets/collectionIdFor used to be hand-copied here from
+// views/httprequest/state.ts, because views/grpcrequest/** may not import views/httprequest/**
+// (biome.json, F18) — now both live in http/state/{variables,collections}.ts, which both view
+// directories already import, so this is a move rather than an abstraction.
 
 export interface ResolvedGrpcRequest {
   target: string;

@@ -7,11 +7,16 @@ import CodeMirrorHost from '../../editor/CodeMirrorHost.vue';
 import { isDynamicName } from '../../http/dynamic/catalog';
 import EnvironmentSelect from '../../http/EnvironmentSelect.vue';
 import {
+  collectionIdFor,
   openSaveGrpcDialog,
   savedGrpcRequestFor,
   saveGrpcRequest,
 } from '../../http/state/collections';
-import { activeEnvironmentId, ensureVariablesLoaded } from '../../http/state/variables';
+import {
+  activeEnvironmentId,
+  ensureVariablesLoaded,
+  mergedValuesAndSecrets,
+} from '../../http/state/variables';
 import { patchGrpcRequestTabState } from '../../http/tabs';
 import { registerCommand } from '../../shortcuts/commands';
 import AppButton from '../../theme/primitives/AppButton.vue';
@@ -25,10 +30,8 @@ import SchemaBrowser from './SchemaBrowser.vue';
 import { isGrpcDirty, toSavedGrpcRequest } from './saved';
 import {
   call,
-  collectionIdFor,
   findMethod,
   loadSchema,
-  mergedValuesAndSecrets,
   resolveGrpcTabState,
   runtime,
   schemaRuntime,
