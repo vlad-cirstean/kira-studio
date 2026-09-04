@@ -117,8 +117,9 @@ export function clampColumnOverscan(
  * not better. This reuses `rowRangeBounds` (the exact arithmetic the deleted `DataGrid.vue`'s own
  * row axis ran, C1's own refactor) rather than restating it — originally so both grids' at-rest
  * window was provably the same number during the migration, and still the reason this arithmetic
- * lives in its own shared function rather than inline here — `tests/unit/row-range.spec.ts`
- * covers that arithmetic; this file's own test covers only the column-overscan clamp above.
+ * lives in its own shared function rather than inline here — `tests/unit/row-range-bounds.spec.ts`
+ * covers that arithmetic; this file's own test (kira-slick-grid.spec.ts) covers the column-overscan
+ * clamp and `countNewRows`, the batch-cap arithmetic below, neither of which live in columns.ts.
  *
  * Every SlickGrid method called below is public and documented in the published `.d.ts`:
  * `getVisibleRange`, `getDataLength`, `getOptions`, `getCanvasNode`. `vScrollDir` (a protected
