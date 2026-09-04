@@ -11,7 +11,9 @@ import { expect, test } from './fixtures';
 // coverage loss — see docs/AGENTS.md's P57 findings (M8) and P57-cutover.md §7. Only the two
 // scenarios below asserted pure rendering with no relaunch-persistence claim.
 
-test('the workbench is inset from the window edge on three sides (P31 D8)', async ({ kira }) => {
+test('the workbench is inset from the window edge on two sides, none from the title bar (P31 D8)', async ({
+  kira,
+}) => {
   const { window } = kira;
   const shell = window.locator('.workbench-shell');
   const padding = await shell.evaluate((el) => {
@@ -23,7 +25,10 @@ test('the workbench is inset from the window edge on three sides (P31 D8)', asyn
       left: style.paddingLeft,
     };
   });
-  expect(padding.top).toBe('6px');
+  // No top inset any more: a title-bar-height session fix moved that 6px into
+  // --kira-titlebar-h instead, since a gap here between the title bar and this shell's own
+  // content read as the bar's content being off-centre relative to the panel right below it.
+  expect(padding.top).toBe('0px');
   expect(padding.right).toBe('6px');
   expect(padding.left).toBe('6px');
   expect(padding.bottom).toBe('2px');

@@ -91,10 +91,16 @@ const gridStyle = computed(() => ({
   grid-template-columns: var(--project-w) var(--project-split-w) 1fr;
   grid-template-rows: 1fr var(--ops-split-h) var(--ops-h) var(--kira-statusbar-h);
   gap: var(--kira-gap);
-  /* Top/right/left inset from the window edge (P31 D8) is its own token, deliberately not
+  /* Right/left inset from the window edge (P31 D8) is its own token, deliberately not
      --kira-gap — that token also sizes the splitter track, and raising it would thicken every
-     resize bar. Bottom stays --kira-gap: the status bar reads as seated on the window edge. */
-  padding: var(--kira-window-inset) var(--kira-window-inset) var(--kira-gap);
+     resize bar. Bottom stays --kira-gap: the status bar reads as seated on the window edge.
+     No top inset (dropped alongside this session's own TitleBar.vue work): a padding-top here
+     put a visible gap between the title bar's own bottom edge and this shell's content, which
+     read as the title bar's content sitting off-centre relative to the panel right below it —
+     not a title-bar centering bug, an optical one from the two regions' combined rhythm.
+     --kira-titlebar-h absorbed the removed 6px instead, so the total vertical chrome is
+     unchanged; only which region owns it moved. */
+  padding: 0 var(--kira-window-inset) var(--kira-gap);
   background: var(--kira-bg-chrome);
 }
 
