@@ -1,4 +1,5 @@
 import { expect, test } from '../../ui/fixtures';
+import { gridCell } from '../../ui/support/grid';
 import { connectionRow, expandRow, findRow, openRowMenu } from '../../ui/support/tree';
 import type { ControlSnapshot } from '../support/types';
 import { controlSnapshots, portSnapshots } from './clickhouse.fixture';
@@ -68,7 +69,10 @@ test('clickhouse (frontend, mocked IPC) — tree, filter-by-value quoting, delet
   await expect(page.locator('[data-testid="data-grid"]')).toBeVisible();
   await expect(page.locator('[data-testid="grid-header-cell"][data-column="id"]')).toBeVisible();
 
-  const idCell = page.locator('[data-testid="grid-cell"][data-row="0"][data-column="id"]');
+  // `[data-testid="grid-cell"][data-row="N"]` alone is never valid for SlickGrid's DOM shape
+  // (data-row lives on the ancestor `.slick-row`, never the cell — tests/ui/support/grid.ts's own
+  // doc comment, P22 Pass B) — gridCell() scopes into the row correctly.
+  const idCell = gridCell(page, 0, 'id');
   await expect(idCell).toBeVisible();
   const idValue = (await idCell.innerText()).trim();
   await idCell.click({ button: 'right' });
