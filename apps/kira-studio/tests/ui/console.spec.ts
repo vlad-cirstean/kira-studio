@@ -769,3 +769,59 @@ test('Query console — two duplicate-named columns render and select their own 
   await secondDupCell.click();
   await expect.poll(cellEditorText).toBe('222');
 });
+
+// Finding 6 (round 2) — round 1's duplicate-column fix (above) addresses cells/selection by
+// index, but ConsoleSlickGrid.vue's own column WIDTH still read `initialWidths(page)[col.name]`
+// (columns.ts, name-keyed) — a duplicate name silently collapses onto whichever duplicate was
+// measured LAST, so both columns rendered at that one's own width. Reproduced here concretely: a
+// short value in the first "dup" column, a much longer one in the second — pre-fix, both columns
+// render at the second (longer) column's own measured width; post-fix, the first stays narrow.
+test("Query console — two duplicate-named columns each measure their own width, not the last one's (finding 6)", async ({
+  relaunch,
+}) => {
+  const CONNECTION_ID = 'conn-console-dup-cols-width';
+  const CONNECTION_SUMMARY = postgresConnectionSummary(
+    CONNECTION_ID,
+    'Console Dup Width DB',
+    'cyan',
+  );
+  const FIXTURE = orderItemsFixture(CONNECTION_ID);
+  const LONG_VALUE = '123456789012345678901234567890123456789012345678901234567890';
+
+  const CONTROL: ControlSnapshot[] = [
+    { channel: IPC.connectionsList, response: [] },
+    {
+      channel: IPC.connectionsCreate,
+      args: connectionCreateArgs('Console Dup Width DB', 'cyan'),
+      response: CONNECTION_SUMMARY,
+    },
+    ...FIXTURE.control,
+  ];
+  const PORT: PortSnapshot[] = [
+    ...FIXTURE.port,
+    executeSnap(CONNECTION_ID, ['SELECT 1 AS dup, 2 AS dup'], [dupColumnPage(['1', LONG_VALUE])]),
+  ];
+
+  const { window: page } = await relaunch({ control: CONTROL, stream: PORT });
+  await connectAndExpand(page, 'Console Dup Width DB', 'cyan');
+
+  await openConsoleFromMenu(page, ORDER_ITEMS_PATH);
+  const consoleView = page.locator('[data-testid="console-view"]');
+  const results = consoleView.locator('[data-testid="console-result-grid"]');
+
+  await typeInto(consoleView, page, 'SELECT 1 AS dup, 2 AS dup;');
+  await page.click('[data-testid="console-run-statement"]');
+
+  const row0 = results.locator('[data-testid="console-result-row"][data-row="0"]');
+  const firstDupCell = row0.locator('[data-testid="console-result-cell"][data-col-index="0"]');
+  const secondDupCell = row0.locator('[data-testid="console-result-cell"][data-col-index="1"]');
+  await expect(firstDupCell).toHaveText('1');
+  await expect(secondDupCell).toHaveText(LONG_VALUE);
+
+  const firstWidth = await firstDupCell.evaluate((el) => el.getBoundingClientRect().width);
+  const secondWidth = await secondDupCell.evaluate((el) => el.getBoundingClientRect().width);
+  // Pre-fix, both columns collapsed onto whichever duplicate was measured last (the long value),
+  // so firstWidth would equal secondWidth here — asserting a clear gap catches that regression
+  // without pinning to exact font-metric-dependent pixel counts.
+  expect(secondWidth - firstWidth).toBeGreaterThan(100);
+});

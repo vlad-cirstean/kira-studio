@@ -18,7 +18,7 @@ import {
   columnHeaderTooltip,
   DEFAULT_COLUMN_WIDTH,
   GUTTER_WIDTH,
-  initialWidths,
+  initialWidthsByIndex,
   resetMeasureCtx,
 } from '../shared/page/columns';
 import { setVisibleRows } from '../shared/page/visibleRows';
@@ -152,7 +152,10 @@ function buildColumns(page: TabularPage): KiraColumn[] {
       cellAttrs: { 'data-testid': 'console-result-gutter-cell' },
     },
   ];
-  const measured = initialWidths(page);
+  // Finding 6 (round 2) — indexed, not name-keyed (`initialWidths` would silently collide on a
+  // duplicate column name, e.g. `SELECT 1 AS x, 2 AS x`) — the one remaining name-keyed
+  // assumption in an otherwise fully index-addressed console path (colField(i), P30 §3 follow-up).
+  const measured = initialWidthsByIndex(page);
   page.columns.forEach((col, i) => {
     const classes = [`tc-${categoryForTypeClass(col.typeClass)}`];
     if (alignmentFor(col) === 'right') classes.push('kira-align-right');
@@ -161,7 +164,7 @@ function buildColumns(page: TabularPage): KiraColumn[] {
       id: colField(i),
       field: colField(i),
       name: col.name,
-      width: measured[col.name] ?? DEFAULT_COLUMN_WIDTH,
+      width: measured[i] ?? DEFAULT_COLUMN_WIDTH,
       minWidth: 40,
       resizable: true,
       sortable: false,

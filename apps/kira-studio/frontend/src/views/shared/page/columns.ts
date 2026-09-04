@@ -39,10 +39,11 @@ function getMeasureCtx(): CanvasRenderingContext2D {
 /** Drops the memoized measuring context so the next initialWidths() call re-reads the current
  *  appearance tokens (P31 D11) — without this, a font change leaves every unstored column sized
  *  for whatever font was active when this module first measured, for the rest of the session.
- *  Also drops initialWidths' own result cache below, for the same reason. */
+ *  Also drops initialWidths'/initialWidthsByIndex's own result caches below, for the same reason. */
 export function resetMeasureCtx(): void {
   measureCtx = null;
   widthsCache = new WeakMap();
+  namedWidthsCache = new WeakMap();
 }
 
 // P2 R1: the deleted DataGrid.vue's `widths` computed depended on the tab's stored columnWidths (so a resize
@@ -51,16 +52,29 @@ export function resetMeasureCtx(): void {
 // and up to 50 sample rows each, even though a resize never changes the page's own data. Pages are
 // frozen and stable by reference (same premise as nameIndexCache below), so a WeakMap keyed by the
 // page turns every measurement after the first, for a given page, into a reference check.
-let widthsCache = new WeakMap<TabularPage, Record<string, number>>();
+//
+// Cached by column POSITION, not name (finding 6, round 2) — a console result comes from ad-hoc SQL
+// (`SELECT 1 AS x, 2 AS x`), so `page.columns[i].name` is routinely not unique; a name-keyed cache
+// silently let the last duplicate's own measured width win for every column sharing that name. The
+// main grid's own pages (real DB tables) never have duplicate column names, so `initialWidths`
+// below — the name-keyed view every existing caller (SlickGridHost.vue) still wants — stays exactly
+// as correct as it always was for that caller; `initialWidthsByIndex` is the new, duplicate-safe
+// view `ConsoleSlickGrid.vue` addresses columns by everywhere else in that file (`colField(i)`,
+// P30 §3 follow-up fix). `namedWidthsCache` below is `initialWidths`' own second-level cache, kept
+// reference-stable across repeat calls exactly like the single cache this replaced (P2 R1's own
+// "no further measuring" guarantee, plus reference identity a caller could reasonably rely on).
+let widthsCache = new WeakMap<TabularPage, number[]>();
+let namedWidthsCache = new WeakMap<TabularPage, Record<string, number>>();
 
-/** Measures the wider of the header and a sample of the first rows, clamped to [64, 480] px. */
-export function initialWidths(page: TabularPage): Record<string, number> {
+/** Measures the wider of the header and a sample of the first rows, clamped to [64, 480] px —
+ *  positional, parallel to `page.columns`/`page.chunks`. */
+function measuredWidths(page: TabularPage): number[] {
   const cached = widthsCache.get(page);
   if (cached) return cached;
 
   const ctx = getMeasureCtx();
   const decoder = new TextDecoder();
-  const widths: Record<string, number> = {};
+  const widths: number[] = [];
   const sampleCount = Math.min(SAMPLE_ROWS, page.rowCount);
 
   for (let c = 0; c < page.columns.length; c++) {
@@ -72,10 +86,32 @@ export function initialWidths(page: TabularPage): Record<string, number> {
       const width = ctx.measureText(cellText(chunk, r, decoder)).width;
       if (width > max) max = width;
     }
-    widths[column.name] = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, Math.round(max + CELL_PADDING)));
+    widths.push(Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, Math.round(max + CELL_PADDING))));
   }
   widthsCache.set(page, widths);
   return widths;
+}
+
+/** Name-keyed view of `measuredWidths` — correct as long as `page.columns` has no duplicate
+ *  names (every real DB table): on a duplicate, the last one measured wins, same as it always has.
+ *  `initialWidthsByIndex` below is the duplicate-safe view. Its own cache, so repeat calls for the
+ *  same page return the exact same object (not just an equal one) without rebuilding it. */
+export function initialWidths(page: TabularPage): Record<string, number> {
+  const cached = namedWidthsCache.get(page);
+  if (cached) return cached;
+  const arr = measuredWidths(page);
+  const out: Record<string, number> = {};
+  page.columns.forEach((column, i) => {
+    out[column.name] = arr[i] as number;
+  });
+  namedWidthsCache.set(page, out);
+  return out;
+}
+
+/** Position-keyed view of `measuredWidths` — the one duplicate column names can't collide in
+ *  (finding 6, round 2). */
+export function initialWidthsByIndex(page: TabularPage): number[] {
+  return measuredWidths(page);
 }
 
 // P30 §3.6 C7: columnOffsets/columnRangeExtractor/observeScrollElementRect/
