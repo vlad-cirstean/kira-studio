@@ -2,6 +2,7 @@
 import type { ConnectionKind } from '@shared/domain/connection';
 import {
   AWS_STYLE_KINDS,
+  CONNECTION_THROTTLE_RANGE,
   connectionInputSchema,
   connectionKindSchema,
   DEFAULT_PORT,
@@ -315,8 +316,31 @@ async function onSave(): Promise<void> {
   }
 }
 
-const isValid = computed(() =>
-  draft.value ? connectionInputSchema.safeParse(draft.value).success : false,
+// P28 §5.6: TextField's modelValue is always a string, so this mirrors setPort's parse-on-input.
+function setThrottlePerSec(value: string): void {
+  const d = draft.value;
+  if (!d) return;
+  const n = Number.parseFloat(value);
+  d.throttlePerSec = Number.isNaN(n) ? 0 : n;
+}
+
+// Same split SettingsDialog.vue's own numeric fields use (P17 D6): the draft accepts whatever is
+// typed, validity is derived here and gates Save. 0 is always valid (unlimited); a non-zero value
+// outside CONNECTION_THROTTLE_RANGE is not — mirrors connections/input.go's Validate().
+const throttlePerSecError = computed<string | null>(() => {
+  const v = draft.value?.throttlePerSec ?? 0;
+  if (!Number.isFinite(v)) return 'Enter a number.';
+  if (v !== 0 && (v < CONNECTION_THROTTLE_RANGE.min || v > CONNECTION_THROTTLE_RANGE.max)) {
+    return `0 (unlimited), or ${CONNECTION_THROTTLE_RANGE.min}–${CONNECTION_THROTTLE_RANGE.max}`;
+  }
+  return null;
+});
+
+const isValid = computed(
+  () =>
+    !!draft.value &&
+    connectionInputSchema.safeParse(draft.value).success &&
+    !throttlePerSecError.value,
 );
 
 // SQS/S3 have no host/port at all (connection.ts's AWS_STYLE_KINDS/superRefine exception); fields
@@ -660,6 +684,30 @@ const preconnectText = computed({
               extra planning round trip, not a second execution.
             </span>
           </label>
+
+          <div class="field">
+            <label>Throttle commands <span class="dim">— per second</span></label>
+            <div class="size-input">
+              <TextField
+                type="number"
+                :min="0"
+                :max="CONNECTION_THROTTLE_RANGE.max"
+                step="0.5"
+                size="md"
+                :invalid="!!throttlePerSecError"
+                data-testid="connection-throttle"
+                :model-value="String(draft.throttlePerSec)"
+                @update:model-value="setThrottlePerSec"
+              />
+            </div>
+            <span v-if="throttlePerSecError" class="field-error" data-testid="connection-throttle-error">
+              {{ throttlePerSecError }}
+            </span>
+            <span v-else class="helper-text">
+              0 disables the limit. Reads served from cache are never throttled, and connecting is
+              never throttled. Applies immediately to a connected connection.
+            </span>
+          </div>
           </div>
 
           <div v-else class="tab-pane" role="tabpanel">
@@ -820,6 +868,14 @@ const preconnectText = computed({
   display: flex;
   gap: var(--kira-s-4);
   align-items: flex-start;
+}
+
+.size-input {
+  width: 96px;
+}
+
+.size-input :deep(.p-input) {
+  width: 100%;
 }
 
 .name-field {
