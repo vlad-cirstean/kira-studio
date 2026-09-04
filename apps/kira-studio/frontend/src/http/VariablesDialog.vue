@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { HttpVariable } from '@shared/domain/variables';
-import { computed, reactive, watch } from 'vue';
+import { computed, reactive, ref, watch } from 'vue';
 import { connectionsState } from '../state/connections';
 import DialogFrame from '../theme/primitives/DialogFrame.vue';
 import MessageStrip from '../theme/primitives/MessageStrip.vue';
@@ -8,6 +8,7 @@ import {
   closeVariablesDialog,
   deleteVariable,
   isDuplicateName,
+  reorderVariables,
   revealedValues,
   revealVariable,
   upsertVariable,
@@ -35,6 +36,11 @@ interface Draft {
 const drafts = reactive<Record<string, Draft>>({});
 const trailingDraft = reactive<Draft>({ name: '', value: '', isSecret: false });
 
+// D14: the drag-reorderable display order, seeded from the server's own sort_order every time the
+// list reloads (ColumnsMenu.vue's own precedent, adapted from a purely-local array to one that
+// commits through Reorder on drop rather than only on dialog close).
+const order = ref<string[]>([]);
+
 function syncDrafts(): void {
   for (const key of Object.keys(drafts)) delete drafts[key];
   for (const row of variablesDialogState.rows) {
@@ -43,6 +49,7 @@ function syncDrafts(): void {
   trailingDraft.name = '';
   trailingDraft.value = '';
   trailingDraft.isSecret = false;
+  order.value = variablesDialogState.rows.map((row) => row.id);
 }
 watch(() => variablesDialogState.rows, syncDrafts, { immediate: true });
 
@@ -57,9 +64,12 @@ watch(revealedValues, (values) => {
 });
 
 const displayRows = computed<HttpVariable[]>(() => {
-  const real = variablesDialogState.rows.map((row) => {
-    const draft = drafts[row.id] ?? { name: row.name, value: row.value, isSecret: row.isSecret };
-    return { ...row, name: draft.name, value: draft.value, isSecret: draft.isSecret };
+  const byId = new Map(variablesDialogState.rows.map((row) => [row.id, row]));
+  const real = order.value.flatMap((id) => {
+    const row = byId.get(id);
+    if (!row) return [];
+    const draft = drafts[id] ?? { name: row.name, value: row.value, isSecret: row.isSecret };
+    return [{ ...row, name: draft.name, value: draft.value, isSecret: draft.isSecret }];
   });
   const trailing: HttpVariable = {
     id: '',
@@ -157,6 +167,39 @@ function onReveal(id: string): void {
   void revealVariable(id, false);
 }
 
+// D14: drag — ColumnsMenu.vue's own dragstart/dragover.prevent/dragend shape, splicing the local
+// `order` array on every dragover and committing the full new order once, on drop.
+const dragIndex = ref<number | null>(null);
+
+function onDragStart(index: number): void {
+  dragIndex.value = index;
+}
+function onDragOver(index: number): void {
+  const from = dragIndex.value;
+  if (from === null || from === index || index >= order.value.length) return;
+  const next = [...order.value];
+  const [moved] = next.splice(from, 1);
+  next.splice(index, 0, moved);
+  order.value = next;
+  dragIndex.value = index;
+}
+async function onDragEnd(): Promise<void> {
+  dragIndex.value = null;
+  await reorderVariables(order.value);
+}
+
+// D14: Alt+↑/↓ — a keyboard-reachable equivalent, since a drag-only affordance is unusable from
+// the keyboard. Each keypress is its own discrete commit, not batched with a later drop.
+async function onMove(id: string, direction: 'up' | 'down'): Promise<void> {
+  const from = order.value.indexOf(id);
+  const to = direction === 'up' ? from - 1 : from + 1;
+  if (from === -1 || to < 0 || to >= order.value.length) return;
+  const next = [...order.value];
+  [next[from], next[to]] = [next[to], next[from]];
+  order.value = next;
+  await reorderVariables(order.value);
+}
+
 async function onRemove(id: string): Promise<void> {
   if (id === '') return;
   await deleteVariable(id);
@@ -195,6 +238,8 @@ function close(): void {
         v-for="(row, i) in displayRows"
         :key="row.id || 'trailing'"
         :row="row"
+        :index="i"
+        :dragging="dragIndex === i"
         :duplicate="isDuplicateName(displayRows, i)"
         :trailing="row.id === ''"
         :secrets-unavailable="!!connectionsState.secretStorage && !connectionsState.secretStorage.available"
@@ -204,6 +249,10 @@ function close(): void {
         @blur="onBlur(row.id)"
         @remove="onRemove(row.id)"
         @reveal="onReveal(row.id)"
+        @dragstart="onDragStart"
+        @dragover="onDragOver"
+        @dragend="onDragEnd"
+        @move="onMove(row.id, $event)"
       />
     </div>
   </DialogFrame>

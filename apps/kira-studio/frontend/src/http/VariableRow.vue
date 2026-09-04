@@ -1,21 +1,28 @@
 <script setup lang="ts">
 import type { HttpVariable } from '@shared/domain/variables';
 import { ref, watch } from 'vue';
+import CodiconIcon from '../theme/CodiconIcon.vue';
 import IconButton from '../theme/primitives/IconButton.vue';
 import TextField from '../theme/primitives/TextField.vue';
+import { historyMenuState, openHistoryMenu } from './state/variables';
+import VariableHistoryMenu from './VariableHistoryMenu.vue';
 
-// P5 D11/D12/D9: one row — a name field, a value field (masked for a secret, until revealed), a
-// secret checkbox, a duplicate-name warning chip, and a remove button. The history/grip handles
-// (D13/D14) are added by a later commit directly onto this component.
+// P5 D11/D12/D9/D13/D14: one row — a grip handle, a name field, a value field (masked for a
+// secret, until revealed), a secret checkbox, a history button/popover, a duplicate-name warning
+// chip, and a remove button.
 const props = defineProps<{
   row: HttpVariable;
   duplicate: boolean;
-  /** True for the trailing blank row — its remove button is always disabled, matching
-   *  FieldRowsTable.vue's own convention for the row shape this reimplements. */
+  /** True for the trailing blank row — its remove/history/reorder controls are all disabled,
+   *  matching FieldRowsTable.vue's own convention for the row shape this reimplements. */
   trailing?: boolean;
   /** D10: secrets.Status().available is false — ticking "secret" is refused, with the reason
    *  shown once at the dialog level rather than repeated per row. */
   secretsUnavailable?: boolean;
+  /** D14: this row's position in the drag-reorderable list, and whether it is the one currently
+   *  being dragged — both owned by the parent, since only it knows the full order. */
+  index: number;
+  dragging?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -26,6 +33,10 @@ const emit = defineEmits<{
   remove: [];
   /** Not yet revealed (row.value === '' && row.isSecret) — the eye IS the reveal action. */
   reveal: [];
+  dragstart: [index: number];
+  dragover: [index: number];
+  dragend: [];
+  move: [direction: 'up' | 'down'];
 }>();
 
 // D9/§1.4: "not yet revealed, the eye is the reveal action; once revealed, it's a free
@@ -61,10 +72,49 @@ function onValueInput(v: string): void {
 function onSecretChange(e: Event): void {
   emit('update:isSecret', (e.target as HTMLInputElement).checked);
 }
+
+const showHistory = ref(false);
+function onHistoryClick(): void {
+  showHistory.value = true;
+  void openHistoryMenu(props.row.id);
+}
+function onHistoryClose(): void {
+  showHistory.value = false;
+}
+
+// D14: Alt+↑/↓ moves the focused row — a drag-only affordance is unusable from the keyboard, and
+// every other control in this dialog is reachable by Tab.
+function onKeydown(e: KeyboardEvent): void {
+  if (props.trailing || !e.altKey) return;
+  if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    emit('move', 'up');
+  } else if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    emit('move', 'down');
+  }
+}
 </script>
 
 <template>
-  <div class="variable-row" data-testid="variable-row">
+  <div
+    class="variable-row"
+    :class="{ 'is-dragging': dragging }"
+    data-testid="variable-row"
+    :draggable="!trailing"
+    @keydown="onKeydown"
+    @dragstart="emit('dragstart', index)"
+    @dragover.prevent="emit('dragover', index)"
+    @dragend="emit('dragend')"
+  >
+    <span
+      class="drag-handle"
+      :class="{ 'is-disabled': trailing }"
+      aria-hidden="true"
+      data-testid="variable-grip"
+    >
+      <CodiconIcon name="gripper" :size="13" />
+    </span>
     <div class="cell name-cell">
       <TextField
         :model-value="row.name"
@@ -104,6 +154,19 @@ function onSecretChange(e: Event): void {
         @change="onSecretChange"
       />
     </label>
+    <div class="history-anchor">
+      <IconButton
+        icon="history"
+        :disabled="trailing"
+        v-tooltip="'History'"
+        data-testid="variable-history"
+        @click="onHistoryClick"
+      />
+      <VariableHistoryMenu
+        v-if="showHistory && historyMenuState.variableId === row.id"
+        @close="onHistoryClose"
+      />
+    </div>
     <IconButton
       icon="close"
       :disabled="props.trailing"
@@ -120,6 +183,21 @@ function onSecretChange(e: Event): void {
   align-items: center;
   gap: var(--kira-s-2);
   padding: var(--kira-s-2) var(--kira-s-3);
+}
+
+.variable-row.is-dragging {
+  opacity: 0.5;
+}
+
+.drag-handle {
+  display: flex;
+  align-items: center;
+  cursor: grab;
+  color: var(--kira-fg-dim);
+}
+
+.drag-handle.is-disabled {
+  visibility: hidden;
 }
 
 .cell {
@@ -139,5 +217,10 @@ function onSecretChange(e: Event): void {
 .secret-toggle {
   display: flex;
   align-items: center;
+}
+
+.history-anchor {
+  position: relative;
+  display: flex;
 }
 </style>

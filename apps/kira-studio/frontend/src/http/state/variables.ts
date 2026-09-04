@@ -1,4 +1,9 @@
-import type { HttpEnvironment, HttpVariable, VariableScope } from '@shared/domain/variables';
+import type {
+  HttpEnvironment,
+  HttpVariable,
+  HttpVariableHistoryEntry,
+  VariableScope,
+} from '@shared/domain/variables';
 import { computed, reactive } from 'vue';
 import { control } from '../../bridge/control';
 import { confirmDialog } from '../../state/confirmDialog';
@@ -142,6 +147,19 @@ export async function deleteVariable(id: string): Promise<void> {
   await reloadVariablesDialog();
 }
 
+/** D14: the full new order, in full — ConnectionsService.Reorder's own shape. */
+export async function reorderVariables(ids: string[]): Promise<void> {
+  const { scope, ownerId } = variablesDialogState;
+  if (!scope) return;
+  await control.variablesReorder(scope, ownerId, ids);
+  await reloadVariablesDialog();
+}
+
+export async function reorderEnvironmentsList(ids: string[]): Promise<void> {
+  await control.variablesReorderEnvironments(ids);
+  await loadEnvironments();
+}
+
 /** D12: a duplicate name within one scope is allowed by the schema and resolved first-wins by
  *  sort_order — this is the dialog's own "which rows are the later, shadowed duplicates" check,
  *  over the already-sort_order-ordered list List returns. */
@@ -181,4 +199,75 @@ export async function revealVariable(id: string, confirmed: boolean): Promise<vo
     default:
       variablesDialogState.error = result.error ?? 'Could not reveal the value.';
   }
+}
+
+// ---- the per-variable history popover (D13) ----
+
+interface HistoryMenuState {
+  open: boolean;
+  variableId: string | null;
+  entries: HttpVariableHistoryEntry[];
+}
+
+export const historyMenuState = reactive<HistoryMenuState>({
+  open: false,
+  variableId: null,
+  entries: [],
+});
+
+/** A revealed history entry's plaintext, keyed by history entry id — the same transient-map
+ *  discipline revealedValues follows, cleared when the popover closes. */
+export const revealedHistoryValues = reactive<Record<string, string>>({});
+
+export async function openHistoryMenu(variableId: string): Promise<void> {
+  historyMenuState.variableId = variableId;
+  historyMenuState.open = true;
+  historyMenuState.entries = await control.variablesHistory(variableId);
+}
+
+export function closeHistoryMenu(): void {
+  historyMenuState.open = false;
+  historyMenuState.variableId = null;
+  historyMenuState.entries = [];
+  for (const id of Object.keys(revealedHistoryValues)) delete revealedHistoryValues[id];
+}
+
+/** D8's same recurse-once shape, over http_variable_history instead of http_variables. */
+export async function revealHistoryEntry(historyId: string, confirmed: boolean): Promise<void> {
+  const result = await control.variablesRevealHistory(historyId, confirmed);
+  switch (result.outcome) {
+    case 'revealed':
+      if (result.value !== null) revealedHistoryValues[historyId] = result.value;
+      return;
+    case 'cancelled':
+      return;
+    case 'confirmation-required': {
+      const ok = await confirmDialog('Show this prior value? It will be displayed in plain text.', {
+        danger: false,
+      });
+      if (ok) await revealHistoryEntry(historyId, true);
+      return;
+    }
+    default:
+      variablesDialogState.error = result.error ?? 'Could not reveal this prior value.';
+  }
+}
+
+/** D13: restoring writes the prior value through the ordinary Upsert path, so the restore is
+ *  itself recorded in history and is therefore undoable. A secret entry is revealed first if it
+ *  has not been already — restoring is no less a reveal than the eye button is. */
+export async function restoreHistoryEntry(entry: HttpVariableHistoryEntry): Promise<void> {
+  const row = variablesDialogState.rows.find((r) => r.id === entry.variableId);
+  if (!row) return;
+  let value = entry.value;
+  if (entry.isSecret) {
+    if (revealedHistoryValues[entry.id] === undefined) {
+      await revealHistoryEntry(entry.id, false);
+    }
+    const revealed = revealedHistoryValues[entry.id];
+    if (revealed === undefined) return; // cancelled, unavailable, or errored
+    value = revealed;
+  }
+  await upsertVariable({ id: row.id, name: row.name, value, isSecret: entry.isSecret });
+  await openHistoryMenu(entry.variableId);
 }

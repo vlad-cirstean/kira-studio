@@ -1,6 +1,8 @@
 <script setup lang="ts">
-import { reactive, watch } from 'vue';
+import type { HttpEnvironment } from '@shared/domain/variables';
+import { computed, reactive, ref, watch } from 'vue';
 import { confirmDialog } from '../state/confirmDialog';
+import CodiconIcon from '../theme/CodiconIcon.vue';
 import AppButton from '../theme/primitives/AppButton.vue';
 import DialogFrame from '../theme/primitives/DialogFrame.vue';
 import IconButton from '../theme/primitives/IconButton.vue';
@@ -12,20 +14,30 @@ import {
   environmentsDialogState,
   openVariablesDialog,
   renameEnvironment,
+  reorderEnvironmentsList,
   setActiveEnvironment,
   variablesState,
 } from './state/variables';
 
-// P5 D3/D11: the environment list — name (inline-editable), *Edit variables…*, delete, an
-// *Active* radio, and *New environment*. Reordering (D14) and the grip handle land in a later
-// commit on this same file.
+// P5 D3/D11/D14: the environment list — name (inline-editable), *Edit variables…*, delete, an
+// *Active* radio, drag/keyboard reordering, and *New environment*.
 const nameDrafts = reactive<Record<string, string>>({});
+const order = ref<string[]>([]);
 
 function syncDrafts(): void {
   for (const key of Object.keys(nameDrafts)) delete nameDrafts[key];
   for (const env of variablesState.environments) nameDrafts[env.id] = env.name;
+  order.value = variablesState.environments.map((env) => env.id);
 }
 watch(() => variablesState.environments, syncDrafts, { immediate: true });
+
+const orderedEnvironments = computed<HttpEnvironment[]>(() => {
+  const byId = new Map(variablesState.environments.map((env) => [env.id, env]));
+  return order.value.flatMap((id) => {
+    const env = byId.get(id);
+    return env ? [env] : [];
+  });
+});
 
 async function onNameBlur(id: string): Promise<void> {
   const name = (nameDrafts[id] ?? '').trim();
@@ -56,6 +68,44 @@ async function onDelete(id: string, name: string): Promise<void> {
   await deleteEnvironment(id);
 }
 
+// D14: the same drag/keyboard reorder VariablesDialog.vue's own rows use.
+const dragIndex = ref<number | null>(null);
+function onDragStart(index: number): void {
+  dragIndex.value = index;
+}
+function onDragOver(index: number): void {
+  const from = dragIndex.value;
+  if (from === null || from === index) return;
+  const next = [...order.value];
+  const [moved] = next.splice(from, 1);
+  next.splice(index, 0, moved);
+  order.value = next;
+  dragIndex.value = index;
+}
+async function onDragEnd(): Promise<void> {
+  dragIndex.value = null;
+  await reorderEnvironmentsList(order.value);
+}
+async function onMove(id: string, direction: 'up' | 'down'): Promise<void> {
+  const from = order.value.indexOf(id);
+  const to = direction === 'up' ? from - 1 : from + 1;
+  if (from === -1 || to < 0 || to >= order.value.length) return;
+  const next = [...order.value];
+  [next[from], next[to]] = [next[to], next[from]];
+  order.value = next;
+  await reorderEnvironmentsList(order.value);
+}
+function onKeydown(e: KeyboardEvent, id: string): void {
+  if (!e.altKey) return;
+  if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    void onMove(id, 'up');
+  } else if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    void onMove(id, 'down');
+  }
+}
+
 function close(): void {
   closeEnvironmentsDialog();
 }
@@ -72,11 +122,20 @@ function close(): void {
   >
     <div class="environments-body">
       <div
-        v-for="env in variablesState.environments"
+        v-for="(env, i) in orderedEnvironments"
         :key="env.id"
         class="environment-row"
+        :class="{ 'is-dragging': dragIndex === i }"
+        draggable="true"
         data-testid="environment-row"
+        @keydown="onKeydown($event, env.id)"
+        @dragstart="onDragStart(i)"
+        @dragover.prevent="onDragOver(i)"
+        @dragend="onDragEnd"
       >
+        <span class="drag-handle" aria-hidden="true" data-testid="environment-grip">
+          <CodiconIcon name="gripper" :size="13" />
+        </span>
         <input
           type="radio"
           name="active-environment"
@@ -131,6 +190,17 @@ function close(): void {
   align-items: center;
   gap: var(--kira-s-2);
   padding: var(--kira-s-2) var(--kira-s-3);
+}
+
+.environment-row.is-dragging {
+  opacity: 0.5;
+}
+
+.drag-handle {
+  display: flex;
+  align-items: center;
+  cursor: grab;
+  color: var(--kira-fg-dim);
 }
 
 .name-field {
