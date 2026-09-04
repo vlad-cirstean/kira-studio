@@ -53,6 +53,7 @@ export const IPC = {
   filtersReplace: 'kira:filters:replace',
   opsRecent: 'kira:ops:recent',
   opsCancel: 'kira:ops:cancel',
+  httpSend: 'kira:http:send',
 
   windowsEnsure: 'kira:windows:ensure',
 

@@ -14,6 +14,10 @@ export const opKindSchema = /*#__PURE__*/ z.enum([
   // P33: a bulk-bytes file transfer (an S3 download) — distinct from 'read' so a multi-hundred-MB
   // transfer's op-log row is legible as a file transfer, not a mysteriously slow read.
   'transfer',
+  // P2: an outbound HTTP request/response exchange (internal/httpclient), the op log's first
+  // connectionless op kind — RunOp already tolerates a nil connection id end to end (F10), so
+  // this joins the same op log rather than getting one of its own (D3).
+  'http',
 ]);
 export type OpKind = z.infer<typeof opKindSchema>;
 

@@ -37,6 +37,8 @@ type OpFinish struct {
 var opKinds = map[string]bool{
 	"connect": true, "disconnect": true, "children": true, "describe": true, "definition": true,
 	"test": true, "read": true, "count": true, "mutate": true, "execute": true, "transfer": true,
+	// P2: the op log's first connectionless op kind (internal/httpclient via bridge/http.go).
+	"http": true,
 }
 
 var opStatuses = map[string]bool{

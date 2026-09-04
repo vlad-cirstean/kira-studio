@@ -3,6 +3,7 @@ import * as ConnectionsService from '@bindings/connectionsservice.js';
 import * as EngineService from '@bindings/engineservice.js';
 import * as FilesService from '@bindings/filesservice.js';
 import * as FiltersService from '@bindings/filtersservice.js';
+import * as HttpService from '@bindings/httpservice.js';
 import * as LayoutService from '@bindings/layoutservice.js';
 import * as LifecycleService from '@bindings/lifecycleservice.js';
 import type * as WailsModels from '@bindings/models.js';
@@ -19,6 +20,7 @@ import type {
   ConnectionSummary,
 } from '@shared/domain/connection';
 import type { ObjectDefinition } from '@shared/domain/definition';
+import type { HttpHeaderWire, HttpResponseWire } from '@shared/domain/http';
 import type { Layout, LayoutPatch } from '@shared/domain/layout';
 import type { OpRecord } from '@shared/domain/ops';
 import type {
@@ -256,6 +258,22 @@ export const control = {
     unwrap(OpsService.Recent({ limit })).then((r) => trust<OpRecord[]>(r ?? [])),
   opsCancel: (opId: string): Promise<void> => unwrap(OpsService.Cancel({ opId })),
   onOpUpdate: (cb: (record: OpRecord) => void): (() => void) => on(CHANNEL.opUpdate, cb),
+
+  // P2 D3: runs through the same op scheduler/op log the DB adapters use (opId is
+  // renderer-minted, exactly like every data-plane op's own beginOp) — never the webview's own
+  // fetch (docs/ARCHITECTURE.md's "Go owns the network"). The generated Send drops the injected
+  // ctx parameter from its TS signature (§6.1) — Wails still passes it through server-side, so a
+  // window closing mid-request still aborts it.
+  httpSend: (args: {
+    opId: string;
+    tabId: string;
+    method: string;
+    url: string;
+    headers: HttpHeaderWire[];
+    body: string;
+    hasBody: boolean;
+  }): Promise<HttpResponseWire> =>
+    unwrap(HttpService.Send(args)).then((r) => trust<HttpResponseWire>(r)),
 
   onAppMetrics: (cb: (sample: AppMetricsSample) => void): (() => void) =>
     on(CHANNEL.appMetrics, cb),

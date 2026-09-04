@@ -66,6 +66,7 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   filtersReplace: 'FiltersService.Replace',
   opsRecent: 'OpsService.Recent',
   opsCancel: 'OpsService.Cancel',
+  httpSend: 'HttpService.Send',
   windowsEnsure: 'WindowsService.Ensure',
   tabsList: 'TabsService.List',
   tabsSave: 'TabsService.Save',
