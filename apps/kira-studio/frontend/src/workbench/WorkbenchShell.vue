@@ -77,7 +77,10 @@ const gridStyle = computed(() => ({
 
 <style scoped>
 .workbench-shell {
-  height: 100%;
+  /* P1 C8: a flex child of App.vue's new .app-frame (TitleBar + WorkbenchShell), not a lone
+     fill-parent block any more. */
+  flex: 1;
+  min-height: 0;
   box-sizing: border-box;
   display: grid;
   grid-template-areas:

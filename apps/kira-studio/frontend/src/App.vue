@@ -18,6 +18,7 @@ import ContextMenu from './workbench/ContextMenu.vue';
 import GenerateDataDialog from './workbench/GenerateDataDialog.vue';
 import { initEngineState } from './workbench/state/engine';
 import { initTooltips } from './workbench/state/tooltip';
+import TitleBar from './workbench/TitleBar.vue';
 import UploadObjectDialog from './workbench/UploadObjectDialog.vue';
 import WorkbenchShell from './workbench/WorkbenchShell.vue';
 
@@ -57,7 +58,10 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <WorkbenchShell />
+  <div class="app-frame">
+    <TitleBar />
+    <WorkbenchShell />
+  </div>
   <ConnectionDialog v-if="connectionsState.dialog.open" />
   <UploadObjectDialog v-if="uploadDialogState.open" />
   <GenerateDataDialog v-if="fakeDataDialogState.open" />
@@ -66,3 +70,13 @@ onUnmounted(() => {
   <CommandPalette />
   <AppTooltip />
 </template>
+
+<style scoped>
+/* P1 C8: the frame TitleBar + WorkbenchShell now share — WorkbenchShell.vue's own root swapped
+   `height: 100%` for `flex: 1; min-height: 0` to match. */
+.app-frame {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+</style>
