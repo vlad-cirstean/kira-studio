@@ -5,15 +5,17 @@ import { computed, onMounted, onUnmounted, watch } from 'vue';
 import { isDynamicName } from '../../http/dynamic/catalog';
 import EnvironmentSelect from '../../http/EnvironmentSelect.vue';
 import { openSaveDialog, savedRequestFor, saveRequest } from '../../http/state/collections';
+import { openCopyAsCurlDialog } from '../../http/state/curl';
 import { activeEnvironmentId, ensureVariablesLoaded } from '../../http/state/variables';
 import { registerCommand } from '../../shortcuts/commands';
 import { patchHttpRequestTabState } from '../../state/tabs';
 import AppButton from '../../theme/primitives/AppButton.vue';
+import IconButton from '../../theme/primitives/IconButton.vue';
 import PanelSplitter from '../../theme/primitives/PanelSplitter.vue';
 import SegmentedControl from '../../theme/primitives/SegmentedControl.vue';
 import TextField from '../../theme/primitives/TextField.vue';
 import ViewChrome from '../../theme/primitives/ViewChrome.vue';
-import { bodyBadgeLabel } from './body';
+import { bodyBadgeLabel, defaultContentTypeFor } from './body';
 import QueryParamsTable from './QueryParamsTable.vue';
 import RequestBodyPane from './RequestBodyPane.vue';
 import RequestHeadersTable from './RequestHeadersTable.vue';
@@ -22,6 +24,7 @@ import { isDirty, toSavedRequest } from './saved';
 import {
   collectionIdFor,
   mergedValuesAndSecrets,
+  resolveForExport,
   resolveTabState,
   runtime,
   send,
@@ -80,6 +83,23 @@ function onSaveAs(): void {
 
 function onSend(): void {
   void send(props.tab.id);
+}
+
+// P7 D10: computes the frozen resolution exactly as send() does (resolveForExport — this file's
+// own './state', P6 D7's short-circuit preserved) and hands the store a plain result; the dialog
+// itself never reaches into views/** to get it. defaultContentType is P3 D7's own per-mode table,
+// computed here rather than inside http/curl/ so that module keeps its no-views-import property.
+async function onCopyAsCurl(): Promise<void> {
+  const resolution = await resolveForExport(props.tab.id);
+  if (!resolution) return;
+  openCopyAsCurlDialog(
+    resolution.method,
+    resolution.resolved,
+    resolution.deferredNames,
+    defaultContentTypeFor(props.tab.state.bodyMode, props.tab.state.codeLanguage),
+    collectionId.value,
+    activeEnvironmentId.value,
+  );
 }
 
 // P5 D6/D7/D17: the same resolution send() runs, over the tab's *current* state — a live preview
@@ -172,6 +192,8 @@ onMounted(() => {
     // D15: the palette's own Save request entry, view-scoped exactly like the two above — a no-op
     // when no request tab is mounted, which is runCommand's documented behaviour.
     registerCommand('http.save', onSave),
+    // P7 D10: same view-scoped shape as http.save above.
+    registerCommand('http.copyAsCurl', onCopyAsCurl),
   ];
 });
 onUnmounted(() => {
@@ -234,6 +256,13 @@ onUnmounted(() => {
         >
           Save
         </AppButton>
+        <IconButton
+          icon="terminal"
+          aria-label="Copy as curl"
+          v-tooltip="'Copy as curl…'"
+          data-testid="http-copy-as-curl"
+          @click="onCopyAsCurl"
+        />
         <AppButton
           icon="play"
           variant="primary"

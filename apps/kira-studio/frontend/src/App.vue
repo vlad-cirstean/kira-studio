@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted } from 'vue';
 import { control } from './bridge/control';
+import CopyAsCurlDialog from './http/CopyAsCurlDialog.vue';
 import DynamicValuesDialog from './http/DynamicValuesDialog.vue';
 import EnvironmentsDialog from './http/EnvironmentsDialog.vue';
 import ImportCurlDialog from './http/ImportCurlDialog.vue';
 import SaveRequestDialog from './http/SaveRequestDialog.vue';
 import { saveDialogState } from './http/state/collections';
-import { importCurlDialogState } from './http/state/curl';
+import { copyAsCurlDialogState, importCurlDialogState } from './http/state/curl';
 import { dynamicValuesDialogState } from './http/state/dynamicValues';
 import { environmentsDialogState, variablesDialogState } from './http/state/variables';
 import VariablesDialog from './http/VariablesDialog.vue';
@@ -77,6 +78,7 @@ onUnmounted(() => {
   <EnvironmentsDialog v-if="environmentsDialogState.open" />
   <DynamicValuesDialog v-if="dynamicValuesDialogState.open" />
   <ImportCurlDialog v-if="importCurlDialogState.open" />
+  <CopyAsCurlDialog v-if="copyAsCurlDialogState.open" />
   <UploadObjectDialog v-if="uploadDialogState.open" />
   <GenerateDataDialog v-if="fakeDataDialogState.open" />
   <ConfirmDialog />

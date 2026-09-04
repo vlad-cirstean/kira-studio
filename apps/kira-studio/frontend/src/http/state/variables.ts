@@ -203,8 +203,17 @@ export const revealedValues = reactive<Record<string, string>>({});
 
 /** D8: the same recurse-once shape ConnectionDialog.vue's own requestReveal uses — the pattern is
  *  copied, not imported (there is nothing importable to reuse, §1.4/OQ-2). Every outcome but
- *  confirmation-required is terminal. */
-export async function revealVariable(id: string, confirmed: boolean): Promise<void> {
+ *  confirmation-required is terminal.
+ *
+ *  P7 D10: `onError`, when supplied, receives an error/unavailable outcome's message instead of it
+ *  going into `variablesDialogState.error` — the *Copy as curl* reveal loop (http/state/curl.ts)
+ *  is not the variables dialog and has its own error sink to write into. Every existing caller
+ *  omits it and keeps today's behaviour exactly. */
+export async function revealVariable(
+  id: string,
+  confirmed: boolean,
+  onError?: (message: string) => void,
+): Promise<void> {
   const result = await control.variablesReveal(id, confirmed);
   switch (result.outcome) {
     case 'revealed':
@@ -218,11 +227,14 @@ export async function revealVariable(id: string, confirmed: boolean): Promise<vo
         'Show this variable’s value? It will be displayed in plain text.',
         { danger: false },
       );
-      if (ok) await revealVariable(id, true);
+      if (ok) await revealVariable(id, true, onError);
       return;
     }
-    default:
-      variablesDialogState.error = result.error ?? 'Could not reveal the value.';
+    default: {
+      const message = result.error ?? 'Could not reveal the value.';
+      if (onError) onError(message);
+      else variablesDialogState.error = message;
+    }
   }
 }
 
