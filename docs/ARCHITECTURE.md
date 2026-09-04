@@ -461,6 +461,21 @@ the gate is about *display*, not *use*, so a send never prompts, and stage 2 of 
 (next section) is careful never to let the decrypted value reach anywhere a prompt-free path
 shouldn't put it.
 
+**The general rule the gate actually enforces, stated once so a future surface inherits it rather
+than re-deriving it (P7).** *Copy as curl* — a generated command with a secret's real value
+substituted into it — is a third caller of the same reveal, on the strength of one rule: **any
+surface that renders a secret variable's substituted value as visible text is a reveal.** It
+defaults to masked (the command shows `{{name}}` literally, exactly what stage 1 leaves), it goes
+through the existing `revealVariable`/`localauth` gate when un-masked, and it never persists what
+it shows. Masked-by-default rather than prompt-on-open is deliberate: prompting the instant the
+dialog opens would tax the overwhelmingly common case — a request that references no secret at all,
+or a user who wants the shareable, `{{token}}`-carrying form — exactly the friction P14 identified
+as what gets a security feature switched off; masked-by-default costs one click only in the case
+that genuinely needs it. Nothing about *Copy as curl* is a fourth Go entry point: the reveal is the
+same bound `VariablesService.Reveal` call the variables dialog already makes, and the command string
+itself is renderer-only (next section) — it never reaches Go, so there is no second `op_log.command`
+ordering to get right.
+
 ```
 schema_version(version)
 settings(key, value)                                   -- fonts, sizes, budgets, toggles
@@ -888,6 +903,34 @@ is load-bearing, not stylistic: `op.SetCommand` — which writes the human-reada
 call and its resolved values never feed back into anything logged. A `{{token}}` in a query string
 is exactly the shape a user puts a credential in, so resolving before `SetCommand` would write a
 plaintext credential into `kira.sqlite` on every send.
+
+**Import/generate a curl command is two directions over the same vocabulary, entirely in the
+renderer, and Go is untouched by P7 too.** `apps/kira-studio/frontend/src/http/curl/` holds both:
+`tokenize.ts` wraps `shlex@3.0.0` (`split()`/`quote()`) — the one candidate, of everything measured,
+that survives an escaped-newline continuation, a genuinely empty argument, ANSI-C `$'…'` quoting, an
+un-expanded `$VAR` and an untouched `{{token}}` without corrupting any of them, and also solves the
+generation-side escaping; every published curl *parser*, by contrast, measurably mis-parses the
+commonest paste shapes and cannot know this app's own `none|raw|code|urlencoded|formdata|file`
+vocabulary regardless, so that half (`flags.ts`'s table, `parse.ts`'s walk) is hand-written.
+**Parse** (`parseCurl`) turns argv into a `Partial<HttpRequestTabState>` patch plus a closed
+`CurlWarningKind` union (mirrors `internal/postman`'s own warning-kind shape, P4) — mode selection
+turns on the request's *effective* Content-Type exactly as `internal/httpclient`'s own `buildBody`
+default table does, so an imported request sends what the pasted command actually would have.
+Import opens a **new** `'http-request'` tab (`openHttpRequestTab` + `patchHttpRequestTabState`) —
+never the tab the user might be mid-edit on. **Generate** (`toCurl`) takes an already-resolved
+request (method/URL/headers/body, no `{{ }}` awareness at all) and returns a command string,
+emitting exactly the client defaults that change how the *server* interprets the request (`-L`, the
+mode's own default `Content-Type`) and never the ones that only identify the client (`User-Agent`,
+the request deadline). Neither direction reaches Go: parse produces tab state, which
+`model.TabRecord.State` already treats as an opaque `json.RawMessage` (P3); generate needs the
+renderer's own dynamic-value generator and the reveal gate above, both of which only exist
+renderer-side. A hypothetical Go-side generator would be a second bound method holding a
+fully-resolved, credential-bearing request — one careless `op.SetCommand` or `slog.Info` away from
+writing a decrypted credential into `kira.sqlite`, exactly the hazard `SetCommand`'s
+unresolved-URL-first ordering above exists to avoid; the renderer has no op, no persisted column and
+no log sink; the hazard is absent there, not merely mitigated. So P7 adds no Go file, no migration,
+no bound method and no bindings regeneration — `internal/httpvars/`, `internal/httpclient/`,
+`internal/bridge/` and `internal/postman/` are byte-identical to what P6 left.
 
 **Response headers are shown alphabetised, not in received order — a known property of
 `net/http`, not a bug.** Go's `http.Response.Header` is a `map[string][]string` with
