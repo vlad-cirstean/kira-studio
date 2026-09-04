@@ -116,7 +116,12 @@ function onCopyResponse(): void {
           {{ elisionNote }}
         </MessageStrip>
         <div class="raw-editor">
-          <CodeMirrorHost :doc="wire.request" language="plain" :read-only="true" />
+          <CodeMirrorHost
+            :doc="wire.request"
+            language="plain"
+            :read-only="true"
+            data-testid="http-wire-request-editor"
+          />
         </div>
       </div>
 
@@ -133,7 +138,12 @@ function onCopyResponse(): void {
           />
         </div>
         <div class="raw-editor">
-          <CodeMirrorHost :doc="responseText" language="plain" :read-only="true" />
+          <CodeMirrorHost
+            :doc="responseText"
+            language="plain"
+            :read-only="true"
+            data-testid="http-wire-response-editor"
+          />
         </div>
         <MessageStrip tone="note" data-testid="http-wire-order-note">
           Response headers are shown alphabetised and in canonical case — Go's HTTP client does not
