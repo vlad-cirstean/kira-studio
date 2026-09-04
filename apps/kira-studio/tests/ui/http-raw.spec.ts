@@ -218,8 +218,23 @@ test('Http raw — the editor', async ({ relaunch }) => {
     'https://{{base_url}}/v2/orders',
   );
 
-  // D10: disabled with its tooltip for a formdata body.
+  // D10's own stated consequence: a urlencoded body has no raw-HTTP representation, so opening
+  // the dialog over one shows the mode-change warning *before* Apply is pressed — raw HTTP has
+  // nowhere for `urlencoded` to land, so the parse always folds it into `raw`.
   await page.click('[data-testid="http-request-pane-body"]');
+  await page.click('[data-testid="http-body-mode-urlencoded"]');
+  await page.locator('[data-testid="http-urlencoded-name"]').first().fill('q');
+  await page.locator('[data-testid="http-urlencoded-value"]').first().fill('1');
+  await page.click('[data-testid="http-edit-raw"]');
+  await expect(dialog).toBeVisible();
+  const modeChanged = page.locator('[data-testid="edit-raw-mode-changed"]');
+  await expect(modeChanged).toBeVisible();
+  await expect(modeChanged).toContainText('urlencoded');
+  await expect(modeChanged).toContainText('raw');
+  await page.click('[data-testid="edit-raw-cancel"]');
+  await expect(dialog).toHaveCount(0);
+
+  // D10: disabled with its tooltip for a formdata body.
   await page.click('[data-testid="http-body-mode-formdata"]');
   const editRawButton = page.locator('[data-testid="http-edit-raw"]');
   await expect(editRawButton).toBeDisabled();
