@@ -149,7 +149,11 @@ test('preconnect — dialog field, and failure before connect', async ({ relaunc
   await page.click('[data-testid="connection-tab-preconnect"]');
   await expect(page.locator('[data-testid="connection-preconnect"]')).toBeVisible();
   await expect(page.locator('[data-testid="connection-preconnect-warning"]')).toHaveCount(0);
+  // mode-uri lives on the General tab — the Pre-connect tab is mode-independent, so switching
+  // modes and coming back here still shows the same field.
+  await page.click('[data-testid="connection-tab-general"]');
   await page.click('[data-testid="mode-uri"]');
+  await page.click('[data-testid="connection-tab-preconnect"]');
   await expect(page.locator('[data-testid="connection-preconnect"]')).toBeVisible();
   await page.click('[data-testid="connection-cancel"]');
   await expect(page.locator('[data-testid="connection-dialog"]')).toHaveCount(0);

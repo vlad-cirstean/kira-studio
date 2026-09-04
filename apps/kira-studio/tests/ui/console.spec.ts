@@ -50,6 +50,7 @@ function connectionCreateArgs(name: string, color: string) {
     preconnect: null,
     preconnectSidecar: false,
     autoExplain: false,
+    throttlePerSec: 0,
   };
 }
 

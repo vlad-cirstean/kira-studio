@@ -450,8 +450,8 @@ gate is about turning a secret into visible text, not about using it.
 schema_version(version)
 settings(key, value)                                   -- fonts, sizes, budgets, toggles
 connections(id, name, kind, color, mode, read_only, host, port, database, username, password,
-            uri, options_json, preconnect, preconnect_sidecar, auto_explain, created_at,
-            updated_at, sort_order)
+            uri, options_json, preconnect, preconnect_sidecar, auto_explain, throttle_per_sec,
+            created_at, updated_at, sort_order)
 connection_filters(id, connection_id, node_kind, pattern, is_regex, action)  -- hide/show rules
 connection_ddl(connection_id, ddl, updated_at)          -- pasted DDL for the SQL language service
 saved_queries(id, connection_id, path, name, kind, body, pinned, created_at, used_at)
@@ -645,11 +645,39 @@ cheaper, measured against a real Postgres server.
 model had every control in the Settings dialog call `patchSettings()` from its own `@change`
 handler, writing to the app-wide store, the SQLite `settings` table and an app-wide `Emit`
 broadcast in one go per keystroke; P17 replaced that with a local draft edited freely and applied
-only on Save, plus a **Revert to Defaults** action that writes `model.DefaultSettings()`
-(`apps/kira-studio/internal/storage/model/settings.go`) — the same default set the Go side
-declares, so the two cannot disagree. `SettingsDialog.vue` is still the only caller of
-`patchSettings` in the tree. The app-wide side of the line is unchanged: settings remain
-**app-wide** in the per-window/app-wide split above, so a Save still broadcasts to every window.
+only on Save. `SettingsDialog.vue` is still the only caller of `patchSettings` in the tree. The
+app-wide side of the line is unchanged: settings remain **app-wide** in the per-window/app-wide
+split above, so a Save still broadcasts to every window.
+
+**Reverting a setting is per-leaf, not all-or-nothing.** P28 replaced the dialog's single
+*Revert to Defaults* footer button (which staged every section back to
+`model.DefaultSettings()` at once, discarding every other customization along with the one the
+user actually wanted to undo) with a small `IconButton icon="discard"` beside each of the nine
+editable leaves, disabled once the draft already equals that leaf's own default. Two generic
+`isAtDefault`/`resetLeaf` helpers drive all nine — the same discipline `diffSection` already
+applies to the Save-time patch — so a future leaf needs no dedicated handler. A reset still only
+stages the default into the draft; Save is what commits it, unchanged from P17.
+
+**A per-connection command throttle paces the adapter dispatch funnel, not any one adapter.** P28
+added `connections.throttle_per_sec` (0 = unlimited, the default) alongside `auto_explain` as a
+first-class column, not an `options_json` key — the same reasoning applies with more force here,
+since a rate limit is a *safety* setting an `options_json` value could be silently removed by
+pasting a connection URI. `internal/adapterhost/throttle.go`'s `throttleRegistry` wraps one
+`golang.org/x/time/rate.Limiter` per throttled connection (its own mutex, never `Host.mu`, so a
+config write never contends with the hot `running` map), with burst
+`max(1, min(10, round(perSec)))` — small enough to still pace sustained traffic, large enough that
+a correctly-configured limit doesn't stall the first click after an idle period. `Host.RunOp`
+(above) is the one gate: every real op kind (`read`/`count`/`mutate`/`execute`/`transfer`/
+`children`/`describe`/`definition`) waits for a token after the op is registered (so it stays
+cancellable) but before `op:start` is emitted (so `DurationMs` never counts queue time);
+`connect`/`disconnect`/`test` are never gated, so a misconfigured throttle can never lock a user
+out of fixing it, and a cache hit (returning before `RunOp` is ever reached) is never throttled
+either. A wait bounded at 30s expires into `E_TIMEOUT`; cancelling a queued op yields
+`E_CANCELLED` — no new `adapters.ErrorCode`, and neither op:start nor op:end is ever emitted for a
+queued-then-cancelled-or-timed-out op, since it never touched the database. The limiter's lifetime
+matches the live adapter's: installed just before `Connect`, replaced live on an `Update` to a
+currently-connected connection (so tuning a limit while hitting it applies immediately, no
+reconnect needed), and cleared in `Disconnect`.
 
 **Row coloring is a per-column text colour, not a row background.** P9's `appearance.rowColoring`
 setting (default on) does not paint a background, a stripe, a parity rule or a hash — it derives a

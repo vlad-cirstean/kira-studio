@@ -77,6 +77,7 @@ function mariadbCreateArgs(name: string) {
     preconnect: null,
     preconnectSidecar: false,
     autoExplain: false,
+    throttlePerSec: 0,
   };
 }
 
@@ -97,6 +98,7 @@ function mongoCreateArgs(name: string) {
     preconnect: null,
     preconnectSidecar: false,
     autoExplain: false,
+    throttlePerSec: 0,
   };
 }
 
@@ -117,6 +119,7 @@ function redisCreateArgs(name: string) {
     preconnect: null,
     preconnectSidecar: false,
     autoExplain: false,
+    throttlePerSec: 0,
   };
 }
 

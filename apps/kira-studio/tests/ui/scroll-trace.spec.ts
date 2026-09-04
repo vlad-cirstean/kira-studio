@@ -44,6 +44,7 @@ const CONTROL: ControlSnapshot[] = [
       preconnect: null,
       preconnectSidecar: false,
       autoExplain: false,
+      throttlePerSec: 0,
     },
     response: CONNECTION_SUMMARY,
   },
