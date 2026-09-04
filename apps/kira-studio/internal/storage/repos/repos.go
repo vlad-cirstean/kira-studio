@@ -7,7 +7,9 @@ import (
 
 // Repos is every storage repo that needs no cipher, constructed once at startup. SecretsRepo is
 // deliberately not a member — it needs a Cipher that does not exist until P55, so it is
-// constructed separately via NewSecrets (D5).
+// constructed separately via NewSecrets (D5). Variables follows the exact same shape (P5) via
+// NewVariables — set by main.go once the cipher is wired, rather than widening this constructor's
+// signature for the one repo among many that needs one.
 type Repos struct {
 	Settings      *SettingsRepo
 	Layout        *LayoutRepo
@@ -21,6 +23,7 @@ type Repos struct {
 	Metadata      *MetadataCacheRepo
 	Schema        *SchemaRepo
 	Collections   *CollectionsRepo
+	Variables     *VariablesRepo
 
 	stmts []*sql.Stmt // every prepared statement below, for Close.
 }

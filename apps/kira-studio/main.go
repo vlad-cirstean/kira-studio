@@ -84,6 +84,9 @@ func main() {
 		log.Fatalf("kira-studio-shell: storage repos: %v", err)
 	}
 	secretsRepo := repos.NewSecrets(db.DB, cipher)
+	// P5: the same "needs a Cipher, constructed separately from repos.New's aggregate" shape as
+	// secretsRepo just above.
+	repositories.Variables = repos.NewVariables(db.DB, cipher)
 
 	deps := appcore.Deps{
 		DB:        db.DB,
