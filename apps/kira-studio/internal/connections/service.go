@@ -40,6 +40,11 @@ type Backend interface {
 	Test(ctx context.Context, cfg model.ResolvedConnectionConfig) (serverVersion string, err error)
 	// Disconnect is fire-and-forget at every call site today, so it stays that shape here.
 	Disconnect(ctx context.Context, connectionID string) error
+	// SetThrottle installs (perSec > 0) or clears (perSec == 0) connectionID's command rate limit
+	// (P28 §5.5). Called just before Connect (attemptConnect) and, when the connection is
+	// currently connected, after a successful Update — so tuning the limit while hitting it
+	// applies live, with no disconnect/reconnect round trip.
+	SetThrottle(connectionID string, perSec float64)
 }
 
 // ConnectResult is engine-ops.ts's adapter:connect success payload, the part attemptConnect
@@ -310,6 +315,12 @@ func (s *Service) Update(id string, in Input) (model.ConnectionSummary, error) {
 	if err != nil {
 		return model.ConnectionSummary{}, wrapErr(err)
 	}
+	// P28 §5.5: applies live, but only while actually connected — an edit to a disconnected
+	// connection has nothing running to pace yet, and attemptConnect installs the right value on
+	// the next connect regardless.
+	if s.StateOf(id).Status == "connected" {
+		s.deps.Backend.SetThrottle(id, fields.ThrottlePerSec)
+	}
 	s.emitListChanged()
 	return updated, nil
 }
@@ -409,6 +420,12 @@ func (s *Service) Reveal(id string, confirmed bool) RevealResult {
 // (Preconnect/PreconnectSidecar/Options, e.g. sslmode or an S3 endpoint) are the same bug class:
 // a field left out of an allowlist defaults to "leaked" instead of "gated". A denylist means a
 // future new field defaults to gated instead of forgotten.
+//
+// P28 §5.5: ThrottlePerSec joins the exception list deliberately, not by oversight — it paces
+// commands against whatever destination is already resolved, so it never changes what a
+// destination-unchanged edit actually connects to. Leaving it out of the compare (the same way
+// Name/Color/ReadOnly/AutoExplain are) is what keeps "edit the throttle → Test connection" still
+// injecting the stored password instead of silently testing with none.
 func destinationUnchanged(in Input, stored model.ConnectionFields) bool {
 	return in.Kind == stored.Kind &&
 		in.Mode == stored.Mode &&
@@ -548,6 +565,8 @@ func (s *Service) attemptConnect(id string) (model.ConnectionState, error) {
 		started = true
 	}
 
+	// P28 §5.5: installed just before Connect, from the summary already read above.
+	s.deps.Backend.SetThrottle(id, r.throttlePerSec)
 	result, err := s.deps.Backend.Connect(context.Background(), r.config)
 	if err != nil {
 		if started {

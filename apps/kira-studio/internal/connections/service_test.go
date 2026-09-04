@@ -29,11 +29,17 @@ func intPtr(i int) *int       { return &i }
 // M9.3, so there is no more Node-served path left to exercise here, only Backend's own contract.
 // Connect blocks on release until it is closed, for TestInFlightConnectDedupe's slow-connect case.
 type fakeBackend struct {
-	mu         sync.Mutex
-	lastConfig model.ResolvedConnectionConfig
-	connectN   atomic.Int64
-	testN      atomic.Int64
-	release    chan struct{}
+	mu            sync.Mutex
+	lastConfig    model.ResolvedConnectionConfig
+	connectN      atomic.Int64
+	testN         atomic.Int64
+	release       chan struct{}
+	throttleCalls []throttleCall
+}
+
+type throttleCall struct {
+	connectionID string
+	perSec       float64
 }
 
 func newFakeBackend() *fakeBackend { return &fakeBackend{release: make(chan struct{})} }
@@ -62,6 +68,18 @@ func (b *fakeBackend) Test(ctx context.Context, cfg model.ResolvedConnectionConf
 }
 
 func (b *fakeBackend) Disconnect(ctx context.Context, connectionID string) error { return nil }
+
+func (b *fakeBackend) SetThrottle(connectionID string, perSec float64) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.throttleCalls = append(b.throttleCalls, throttleCall{connectionID: connectionID, perSec: perSec})
+}
+
+func (b *fakeBackend) throttleCallsSnapshot() []throttleCall {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return append([]throttleCall(nil), b.throttleCalls...)
+}
 
 func (b *fakeBackend) releaseSlow() { close(b.release) }
 

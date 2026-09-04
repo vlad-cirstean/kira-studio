@@ -13,6 +13,10 @@ type resolved struct {
 	config            model.ResolvedConnectionConfig
 	preconnect        *string
 	preconnectSidecar bool
+	// P28 §5.5: not a ResolvedConnectionConfig field (that shape carries a password and exists for
+	// adapters; a UI pacing knob doesn't belong in it) — carried alongside it purely so attemptConnect
+	// can hand it to Backend.SetThrottle from the summary it already read.
+	throttlePerSec float64
 }
 
 // resolve reads the row, reads the secret through SecretsRepo.Get, and injects the password into
@@ -46,6 +50,7 @@ func resolve(conns *repos.ConnectionsRepo, secrets *repos.SecretsRepo, id string
 		},
 		preconnect:        summary.Preconnect,
 		preconnectSidecar: summary.PreconnectSidecar,
+		throttlePerSec:    summary.ThrottlePerSec,
 	}, nil
 }
 

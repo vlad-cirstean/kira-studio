@@ -38,6 +38,12 @@ func NewRouter(deps adapters.Deps, cache *enginecache.Cache) *Router {
 // methods use.
 func (r *Router) Host() *Host { return r.host }
 
+// SetThrottle delegates to the host's own registry — P28 §5.5's connections.Backend method,
+// called on connect and on a live edit (connections/service.go), and cleared in Disconnect below.
+func (r *Router) SetThrottle(connectionID string, perSec float64) {
+	r.host.SetThrottle(connectionID, perSec)
+}
+
 // PushCacheConfig pushes engine-relevant settings (today: the L2 cache byte budget) into the
 // Go-native cache this router's Dispatcher reads (§4.9).
 func (r *Router) PushCacheConfig(settings model.Settings) {
@@ -119,6 +125,10 @@ func (r *Router) Disconnect(ctx context.Context, connectionID string) error {
 	adapters.DeleteLiveAdapter(connectionID)
 	// §2.2: disconnecting releases the connection's driver state and all its cached pages.
 	r.cache.DropConnection(connectionID)
+	// P28 §5.5: a limiter's lifetime matches the live adapter's — cleared alongside it, covering
+	// every disconnect path (Remove, onPreconnectExit, an explicit Disconnect) with no second call
+	// site needed in the service.
+	r.host.SetThrottle(connectionID, 0)
 	return nil
 }
 
