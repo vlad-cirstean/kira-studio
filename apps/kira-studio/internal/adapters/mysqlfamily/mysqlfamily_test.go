@@ -447,6 +447,14 @@ func runFamilySuite(t *testing.T, kind string, cfg model.ResolvedConnectionConfi
 		// never actually observable — the test would pass even with Sort silently dropped.
 		// "region_id IS NOT NULL" keeps both seeded customers (Acme Co, Globex both have a
 		// region), so descending-name order is a real, checkable assertion.
+		//
+		// round-2 finding 3: this must not assert the seeded rows' exact literal names — two later
+		// subtests in this same file ("mutate: update lands, affectedRows" and "mutate: update
+		// setting a column to its own current value still reports affectedRows=1") permanently
+		// rename these same two rows and never restore them, so a pinned-literal assertion here only
+		// passed on source-order coincidence within one process/container. Assert relative order
+		// (descending: first sorts after second alphabetically) instead, which holds regardless of
+		// what the rows are actually named by the time this runs.
 		filter := "region_id IS NOT NULL"
 		p, err := a.Read(context.Background(), adapters.ReadRequest{
 			Path:   nodePath(cfg.ID, seg("database", "kira_test"), seg("table", "customers")),
@@ -477,8 +485,11 @@ func runFamilySuite(t *testing.T, kind string, cfg model.ResolvedConnectionConfi
 			}
 			return *s
 		}
-		if first == nil || second == nil || *first != "Globex" || *second != "Acme Co" {
-			t.Errorf("sorted names = [%s, %s], want [Globex, Acme Co] (name desc)", deref(first), deref(second))
+		if first == nil || second == nil {
+			t.Fatalf("sorted names = [%s, %s], want two non-nil names", deref(first), deref(second))
+		}
+		if *first == *second || *first < *second {
+			t.Errorf("sorted names = [%s, %s], want first > second (name desc)", *first, *second)
 		}
 	})
 
