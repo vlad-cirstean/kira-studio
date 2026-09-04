@@ -80,7 +80,7 @@ async function submit(): Promise<void> {
           <span class="p-sm muted">Body</span>
           <textarea
             v-model="body"
-            class="p-input-styled"
+            class="p-textarea"
             rows="6"
             placeholder="Message body"
             data-testid="stream-add-message-body"
@@ -92,7 +92,7 @@ async function submit(): Promise<void> {
           <span class="p-sm muted">Headers (optional JSON object)</span>
           <textarea
             v-model="headers"
-            class="p-input-styled"
+            class="p-textarea"
             rows="3"
             placeholder='{"source": "manual"}'
             data-testid="stream-add-message-headers"
@@ -149,19 +149,6 @@ async function submit(): Promise<void> {
   flex-direction: row;
   align-items: center;
   gap: var(--kira-s-2);
-}
-
-.p-input-styled {
-  width: 100%;
-  border: var(--kira-border-width) solid var(--kira-border);
-  border-radius: var(--kira-radius);
-  background: var(--kira-bg-input);
-  color: var(--kira-fg);
-  font-family: var(--kira-font-family);
-  font-size: var(--kira-t-sm);
-  padding: var(--kira-s-2);
-  resize: vertical;
-  box-sizing: border-box;
 }
 
 .error-text {

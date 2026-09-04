@@ -232,6 +232,23 @@
   background: var(--kira-select);
 }
 
+/* ---------- P28 textarea ---------- */
+/* Promoted from StreamComposeMessage.vue's scoped .p-input-styled — the design-system's plain
+   multiline text control, for content with no CodeMirror language (a shell pre-connect command,
+   a free-text message body): a real <textarea>, not a hand-rolled editor. */
+.p-textarea {
+  width: 100%;
+  border: var(--kira-border-width) solid var(--kira-border);
+  border-radius: var(--kira-radius);
+  background: var(--kira-bg-input);
+  color: var(--kira-fg);
+  font-family: var(--kira-font-family);
+  font-size: var(--kira-t-sm);
+  padding: var(--kira-s-2);
+  resize: vertical;
+  box-sizing: border-box;
+}
+
 /* ---------- P5 select ---------- */
 /* `appearance: none` + a manual background-image arrow only restyles the CLOSED control — the
    opened option list is still a native, unstyled OS popup (a plain <select>'s listbox has no
