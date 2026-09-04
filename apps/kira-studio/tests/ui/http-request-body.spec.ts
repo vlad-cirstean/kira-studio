@@ -3,7 +3,7 @@ import type { ControlSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
 import { IPC } from './support/ipcChannels';
 
-// P3 §6.2: four tests, one httpSend snapshot each (the same one-snapshot-per-test constraint
+// Four tests, one httpSend snapshot each (the same one-snapshot-per-test constraint
 // http-request.spec.ts's own header comment states — a channel with more than one snapshot
 // matches on args, and the send's renderer-minted opId makes two sends in one test unmatchable).
 
@@ -58,7 +58,7 @@ const HTTP_SEND_OK = {
   redirects: [],
 };
 
-test('Http request body — raw XML round-trips through the builder and the wire', async ({
+test('Http request body — code · XML round-trips through the builder and the wire', async ({
   relaunch,
 }) => {
   const CONTROL: ControlSnapshot[] = [{ channel: IPC.httpSend, response: HTTP_SEND_OK }];
@@ -66,8 +66,8 @@ test('Http request body — raw XML round-trips through the builder and the wire
 
   await openHttpModeAndNewRequest(page);
   await openBodyPane(page);
-  await page.click('[data-testid="http-body-mode-raw"]');
-  await page.selectOption('[data-testid="http-body-raw-language"]', 'xml');
+  await page.click('[data-testid="http-body-mode-code"]');
+  await page.selectOption('[data-testid="http-body-code-language"]', 'xml');
 
   // --kira-syntax-tag: #569cd6 = rgb(86, 156, 214) (theme/tokens.css) — a tag name colored this
   // way is the observable proof the xml() grammar (not plain text) is active.
@@ -89,7 +89,7 @@ test('Http request body — raw XML round-trips through the builder and the wire
   const sendCalls = control.log().filter((e) => e.channel === IPC.httpSend);
   expect(sendCalls).toHaveLength(1);
   expect(sendCalls[0].args).toMatchObject({
-    body: { mode: 'raw', rawLanguage: 'xml', raw: BEAUTIFIED },
+    body: { mode: 'code', codeLanguage: 'xml', code: BEAUTIFIED },
   });
 });
 
@@ -151,7 +151,7 @@ test('Http request body — form-data with a real file field sends a path, never
   }
 });
 
-test('Http request body — binary and GraphQL both persist and restore', async ({ relaunch }) => {
+test('Http request body — binary and code both persist and restore', async ({ relaunch }) => {
   const RESTORED_TAB = {
     id: 'tab-binary-1',
     connectionId: null,
@@ -182,11 +182,10 @@ test('Http request body — binary and GraphQL both persist and restore', async 
     'image.png (12.1 KB)',
   );
 
-  await page.click('[data-testid="http-body-mode-graphql"]');
-  const QUERY = 'query Widget($id: ID!) { widget(id: $id) { name } }';
-  const VARIABLES = '{"id":1234567890123456789}';
-  await typeInto(page.locator('[data-testid="http-graphql-query"]'), page, QUERY);
-  await typeInto(page.locator('[data-testid="http-graphql-variables"]'), page, VARIABLES);
+  await page.click('[data-testid="http-body-mode-code"]');
+  await page.selectOption('[data-testid="http-body-code-language"]', 'javascript');
+  const CODE = 'fetch("/widgets").then((r) => r.json());';
+  await typeInto(page.locator('[data-testid="http-request-pane"]'), page, CODE);
 
   await expect
     .poll(
@@ -199,17 +198,17 @@ test('Http request body — binary and GraphQL both persist and restore', async 
       },
       { timeout: 3000 },
     )
-    .toMatchObject({ graphqlQuery: QUERY, graphqlVariables: VARIABLES });
+    .toMatchObject({ code: CODE, codeLanguage: 'javascript' });
 
   await page.click('[data-testid="http-send"]');
   const sendCalls = control.log().filter((e) => e.channel === IPC.httpSend);
   expect(sendCalls).toHaveLength(1);
   expect(sendCalls[0].args).toMatchObject({
-    body: { mode: 'graphql', graphql: { query: QUERY, variables: VARIABLES } },
+    body: { mode: 'code', codeLanguage: 'javascript', code: CODE },
   });
 });
 
-test('Http request body — a pre-P3 tab restores into raw · JSON', async ({ relaunch }) => {
+test('Http request body — a pre-P3 tab restores into code · JSON', async ({ relaunch }) => {
   const PRE_P3_TAB = {
     id: 'tab-pre-p3-1',
     connectionId: null,
@@ -233,13 +232,13 @@ test('Http request body — a pre-P3 tab restores into raw · JSON', async ({ re
   const { window: page } = await relaunch({ control: CONTROL });
 
   await expect(page.locator('[data-testid="http-request-view"]')).toBeVisible();
-  await expect(page.locator('[data-testid="http-body-mode-raw"]')).toHaveClass(/on/);
-  await expect(page.locator('[data-testid="http-body-raw-language"]')).toHaveValue('json');
+  await expect(page.locator('[data-testid="http-body-mode-code"]')).toHaveClass(/on/);
+  await expect(page.locator('[data-testid="http-body-code-language"]')).toHaveValue('json');
   const editor = page.locator('[data-testid="http-request-pane"] .cm-content');
   expect(await editor.innerText()).toBe('{"name":"gizmo"}');
 
-  // D3 + D8, the two halves of F1's fix, proven together: switching to a mode absent from the
-  // pre-P3 record renders an empty table rather than throwing.
+  // The legacy alias's other half: switching to a mode absent from the pre-P3 record renders an
+  // empty table rather than throwing.
   await page.click('[data-testid="http-body-mode-formdata"]');
   await expect(page.locator('[data-testid="http-formdata-table"]')).toBeVisible();
   await expect(page.locator('[data-testid="http-formdata-row"]')).toHaveCount(1); // the trailing blank row only
