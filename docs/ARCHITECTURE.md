@@ -25,7 +25,7 @@ authoritative for behavior: SPEC.md is the record of what v1 was *specified* to 
 | Shell | **Wails v3** (`v3.0.0-beta.16`), Go | a custom, hidden-inset title bar (`Mac.TitleBar: application.MacTitleBarHiddenInset`, P1) drawn by `workbench/TitleBar.vue` over a full-size-content window — not the OS-drawn bar; macOS 14+, `arm64` only |
 | Language | TypeScript 6 (`tsc`/`vue-tsc`) for `.ts` and `.vue`; **Go** for the shell | pinned below TypeScript 7 on purpose — TS7 ships no stable programmatic compiler API until 7.1, and `vue-tsc` (which `bun run typecheck:web` runs) consumes that API in-process; `@typescript/native-preview`'s `tsgo` binary (`typecheck:tests`/`typecheck:unit`) is a separate, already-latest-upstream tool in the meantime. Converge on one toolchain once TS 7.1 ships and `vue-tsc` adopts it (P19 F2/F4) |
 | Package manager / scripts / test runner | Bun | tooling only — every adapter is native Go, so nothing at runtime depends on it |
-| Renderer build | Vite (`vite build`, `apps/kira-studio/frontend/vite.config.ts`) | builds `apps/kira-studio/frontend/src` straight into `apps/kira-studio/frontend/dist`, which `apps/kira-studio/main.go` embeds via `//go:embed all:frontend/dist` and serves through Wails' `AssetOptions.Handler`. Lazily-imported chunks, still split under Vite 8/Rolldown (P19 C6): the query console's SQL Format button reaches `sql-formatter` only through `views/console/sqlFormatterEntry.ts`'s `await import()` (~37 KB gzip); the data grid's Generate data… dialog and, as of P6, Http mode's own send path and its dynamic-values reference dialog all reach `@faker-js/faker/locale/en` — but through **two** one-line entry files, `views/grid/fakeData/fakerEntry.ts` and `http/dynamic/fakerEntry.ts`, duplicated rather than shared because `http/**` may not import `views/**` (P1 D7). Rolldown folds the two content-identical entry files into one shared stub chunk and gives the underlying locale data its own shared chunk beneath it (`en-*.js`, ~155 KB gzip — the same bytes the single pre-P6 `fakerEntry-*.js` chunk carried, just reorganised into two files instead of one, not duplicated); `http/dynamic/generators.ts`, P6's own 58-entry `$name` → faker-call dispatch table, is genuinely new code and gets a third lazy chunk of its own (~0.8 KB gzip). All three are fetched on first use — the first *Generate data…* open, the first send referencing a `{{$name}}`, or the first open of the dynamic-values dialog — and none costs a launch or grows `index-*.js` by anything but each phase's own eager app code |
+| Renderer build | Vite (`vite build`, `apps/kira-studio/frontend/vite.config.ts`) | builds `apps/kira-studio/frontend/src` straight into `apps/kira-studio/frontend/dist`, which `apps/kira-studio/main.go` embeds via `//go:embed all:frontend/dist` and serves through Wails' `AssetOptions.Handler`. Lazily-imported chunks, still split under Vite 8/Rolldown (P19 C6): the query console's SQL Format button reaches `sql-formatter` only through `views/console/sqlFormatterEntry.ts`'s `await import()` (~37 KB gzip); the data grid's Generate data… dialog and, as of P6, Http mode's own send path and its dynamic-values reference dialog all reach `@faker-js/faker/locale/en` — but through **two** one-line entry files, `views/grid/fakeData/fakerEntry.ts` and `http/dynamic/fakerEntry.ts`, duplicated rather than shared because `http/**` may not import `views/**` (P1 D7). Rolldown folds the two content-identical entry files into one shared stub chunk and gives the underlying locale data its own shared chunk beneath it (`en-*.js`, ~155 KB gzip — the same bytes the single pre-P6 `fakerEntry-*.js` chunk carried, just reorganised into two files instead of one, not duplicated); `http/dynamic/generators.ts`, P6's own 58-entry `$name` → faker-call dispatch table, is genuinely new code and gets a third lazy chunk of its own (~0.8 KB gzip). A fourth, as of P8: the response-history pane's **Compare** action reaches `@codemirror/merge` only through `views/httprequest/mergeEntry.ts`'s own one-line `await import()` (~29 KB, ~10 KB gzip). All four are fetched on first use — the first *Generate data…* open, the first send referencing a `{{$name}}`, the first open of the dynamic-values dialog, or the first **Compare** press — and none costs a launch or grows `index-*.js` by anything but each phase's own eager app code |
 | UI | Vue 3 (`<script setup>`, Composition API) | VDOM mode — Vapor mode evaluated and declined in P6 (`docs/v1.1/plans/P6-vue-vapor-mode.md`) |
 | Styling | Tailwind (v4, CSS-first config) | tokens mirror VS Code Dark Modern |
 | Text editing / viewing | CodeMirror 6 | definition tab's Source pane, cell editor, document view, command preview |
@@ -510,6 +510,15 @@ http_variables(id, collection_id, environment_id, name, value, is_secret, secret
 http_variable_history(id, variable_id, value, is_secret, secret_value, recorded_at)
                                                        -- P5; per-entry, capped at 20, variable_id
                                                        -- ON DELETE CASCADE
+http_response_history(id, item_id, tab_id, scope_key, sent_at, method, url, environment,
+                       status, status_text, elapsed_ms, body_bytes, stored_bytes, snapshot_json)
+                                                       -- P8; one row per response actually
+                                                       -- received. scope_key is GENERATED ALWAYS
+                                                       -- AS (COALESCE(item_id, 'tab:'||tab_id))
+                                                       -- VIRTUAL. item_id ON DELETE CASCADE
+                                                       -- (real FK into http_items); tab_id is
+                                                       -- deliberately NOT a foreign key into
+                                                       -- tabs (below)
 ```
 
 Migrations are forward-only numbered SQL files (`apps/kira-studio/internal/storage/migrations/`) applied on
@@ -580,6 +589,71 @@ export re-emits `variable` from the rows rather than from `origin_json`, with a 
 always `""` — the file a collection exports to is something a person shares, mails or commits, and
 writing a decrypted credential into it would defeat the masking feature at the exact moment it
 matters most.
+
+**Response history is recorded in Go, inside the send op that already exists, from the stage-1
+request — never the resolved one (P8).** `bridge/http.go`'s `Send` closure gains one call, after
+the response is known and before it returns: `ResponseHistoryRepo.Record` writes one
+`http_response_history` row per response actually received, best-effort (a failed insert logs and
+the send still returns its response — a history feature must never be the reason a user loses the
+answer they were waiting for). What is stored of the request is `args`, not `ResolveRequest`'s
+output — the identical line `op.SetCommand`'s own unresolved-URL-first ordering already draws
+(above): a secret name is still spelled `{{name}}`, never its decrypted value, so a response-history
+entry carries no new secret exposure a saved request's own `tabs.state_json` didn't already have.
+The one thing that genuinely is new: a **response body** (e.g. a login endpoint's `{"token": …}`)
+is now persisted in the clear, which every comparable tool does and is a stated decision, not an
+oversight.
+
+Storage is bounded by three independent caps, because a response's body is the first payload this
+app's history/log tables have ever actually stored (`filter_history`/`http_variable_history` cap a
+*count* at 20; `op_log` adds an age cut on top — none of the three has ever needed a byte bound,
+since none stores anything bigger than a sentence). A **per-entry cap** (256 KiB, applied once to
+the request body and once to the response body) truncates a stored copy independently of
+`internal/httpclient`'s own 10 MiB transfer cap — two different questions ("how much can the
+viewer render once?" vs. "how much is it worth keeping twenty copies of, forever?") get two
+different, independently-flagged truncation booleans, so an entry can report *both*, *either*, or
+neither. A **binary response body is not stored at all** — `bodyEncoding: "base64"` inflates the
+single largest payload class by a third, and the response viewer already refuses to render it (P9
+is the phase that could, and therefore the phase where storing the bytes would start to earn its
+keep) — the entry keeps every other field, including the true `bodyBytes`, so the list still reads
+"412 KB · binary". A **per-scope count cap** (20, the same shape `filter_history`'s/
+`http_variable_history`'s own insert-then-trim SQL already uses) bounds one request's own history.
+And a **global byte budget** (128 MiB, the same order of magnitude as the L2 row cache's own
+`cache.l2BudgetMb` budget, deliberately) bounds the table itself regardless of how many requests
+exist — evicted oldest-first *across every scope*, the property neither of the first two caps can
+give on its own, as one `DELETE … WHERE id NOT IN (SELECT … SUM(stored_bytes) OVER (…) …)`
+window-function statement inside `Record`'s own transaction on every insert. The per-entry cap is
+what makes that statement safe: no single row can exceed the budget, so the row just inserted is
+never itself evicted. No time-based expiry exists or is planned — unlike `op_log`, whose rows
+accumulate from machinery, a response history row is a result the user asked for, and a two-month-
+old response is not noise.
+
+**`scope_key` is the one axis List/trim/Clear key on — the saved request when there is one, else
+the tab — and it is a `GENERATED ALWAYS AS (COALESCE(item_id, 'tab:' || tab_id)) VIRTUAL` column,
+not a stored one or a second `WHERE` shape.** A stored column would need two writers (`Record` and
+`Adopt`) to agree forever; a raw `COALESCE(...)` repeated in every `WHERE` would defeat the index
+and violate this codebase's own no-per-call-shape-SQL rule. `item_id` cascades for real (`db.go`'s
+DSN sets `_foreign_keys=1` on every connection, as everywhere else in this schema) — deleting a
+saved request, or the folder or collection above it, takes its history with it in one statement.
+**`tab_id` is deliberately *not* a foreign key into `tabs`**, and this is a correctness property,
+not an oversight: `TabsRepo.Save` deletes and re-inserts a window's entire tab set on a 1-second
+debounce that fires on every keystroke in the URL field, so `ON DELETE CASCADE` there would erase a
+scratch tab's whole response history about one second after the user typed a character. Instead, a
+scratch tab's history is swept once per launch (`ResponseHistoryRepo.SweepOrphans`, called from
+`main.go` beside `oplog`'s own startup prune) — `DELETE … WHERE item_id IS NULL AND tab_id NOT IN
+(SELECT id FROM tabs)`, using the `tabs` table itself as the liveness oracle, since a tab that is
+open is always a row there. The residue of running this only at launch rather than on tab close — a
+long session that opens and closes many scratch tabs keeps their rows until the next launch — is
+bounded by the global byte budget regardless, and is deliberate: a bound call on `closeTab` would be
+one more thing that can fail silently at the worst moment, during a quit.
+
+Saving a scratch request (**Save as…**) adopts its history onto the newly-created row —
+`ResponseHistoryRepo.Adopt` is one `UPDATE http_response_history SET item_id = ? WHERE item_id IS
+NULL AND tab_id = ?`, with `scope_key` following for free since it is generated, not written.
+Without this, ten minutes of iterating on a scratch request before finally saving it would silently
+discard everything sent while iterating — the exact moment the history is most useful. The reverse
+is not implemented: deleting a saved request cascades its history away, and there is no "orphan it
+back to the tab" path, since deleting a request is already an explicit, destructive action on the
+request itself.
 
 **A known, deliberate orphan.** `settings` stores leaves by key, and an existing installation may
 carry an `advanced.engineMemoryCapMb` row from before P58f M10 removed the setting end to end
@@ -941,6 +1015,49 @@ substitute — `[]Header{Name, Value}` sorted by name, one entry per value so a 
 (e.g. multiple `Set-Cookie`s) still survives — documented on the struct itself. A byte-level raw
 inspector, the phase that could recover the wire bytes directly (P7), is the one that can lift this
 if it ever matters.
+
+**Past responses are browsed by swapping a source object, not by mounting a second viewer
+(P8).** `ResponsePane.vue`'s entire rendering — the status chip, elapsed/byte figures, redirect
+caption, truncation strip, headers list, base64 note, and the Pretty/Raw-toggled body — was already
+a pure function of one `response` object (P2's own property). History adds a third
+**Body · Headers · History** segment and one extra line: `response` now reads a selected history
+entry's snapshot before falling back to the live one, so every one of those consumers needed no
+change at all. Selecting an entry also switches the response pane back to Body — "viewing" swaps
+the whole pane, not just a runtime pointer — and shows a `note`-tone banner naming the entry's time
+and method/URL with a **Back to latest** (or **Close**, for a restored tab with no live response)
+action; without it, an old response rendered where a live one usually appears would be
+indistinguishable from one that just arrived, which is the single worst failure this feature could
+have. Two more storage notices sit beside the existing transfer-truncation strip, not instead of
+it, since the two booleans mean different things (previous paragraph): *"only the first 256 KB of
+this response was kept in history"* and *"this response's body was binary and was not kept — N
+bytes"*. A restored tab does **not** auto-load its latest entry — it shows the ordinary empty state
+with one added line, *"N past responses · View history"* — the same "never imply an exchange
+happened when it did not" reasoning as the banner. The history runtime (`views/httprequest/
+history.ts`) is a `createRuntimeStore`, same shape as the response runtime beside it and never
+persisted for the identical reason (P2 D6): only the pane *choice* persists, a pointer at a
+response no more than the response itself does. Refresh is eager only while the History pane is
+the one showing (a send elsewhere just flags the list stale) and one unconditional fetch happens on
+every mount regardless of pane or live response — the same "fetch once, uncaught" shape
+`collectionsList`/`variablesListEnvironments` already use — which is what lets a restored tab say
+"N past responses" before the user ever opens the pane.
+
+**Comparing two entries reaches for `@codemirror/merge` for the one thing it's actually built for
+— the body — and a plain keyed comparison for headers, not the same algorithm twice (P8).**
+`ResponseDiffDialog.vue` mounts a real `MergeView`, both sides read-only, line-aligned and
+intra-line-highlighted; both bodies are pretty-printed through the same `beautifyJson`/`beautifyXml`
+the live pane already uses, but only when both sides are the *same* recognised format — a diff of
+two minified 40 KB single lines tells the user nothing, and pretty-printing is lossless by
+construction (P2), so it never misrepresents what came back. The headers table, by contrast, is
+reduced to added/removed/changed/unchanged by header **name** rather than by the library's own
+text-diff: headers are a keyed structure, not ordered prose, so a name-keyed comparison stays
+correct even when two servers emit the same set in a different order, and needs no diff algorithm
+of its own — @codemirror/merge's actual diff/LCS machinery earns its keep in the body view, not
+here. The library is a lazy chunk (`views/httprequest/mergeEntry.ts`, the same one-line
+dynamic-`import()` entry-file shape as `sqlFormatterEntry.ts` and the two `fakerEntry.ts` files,
+above), fetched only the first time anyone presses **Compare**, so it costs no launch bytes. A is
+fixed as the chronologically older of the two selected entries, never by click order, so the diff's
+direction is never a surprise; a binary body on either side withholds only the body level, with the
+summary and headers levels still shown and the reason stated inline.
 
 **Session restore never auto-reconnects.** On relaunch, previous tabs reopen but their connections
 are not. A restored tab renders a centred **Reconnect & load** button (`ReconnectGate`) and
