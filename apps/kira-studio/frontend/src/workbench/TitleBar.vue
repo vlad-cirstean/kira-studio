@@ -128,6 +128,13 @@ function onClick(mode: AppMode): void {
   height: var(--kira-h-sm);
   font-size: var(--kira-t-xs);
 }
+/* primitives.css's own .p-tab has no :hover rule at all — TabStrip.vue (its other consumer)
+   declares one locally in its own scoped style, and Vue's scoped CSS never leaks across
+   components, so every .p-tab user needs its own copy of this or gets none. Same rule
+   TabStrip.vue's own `.p-tab:hover:not(.is-active)` uses. */
+.mode-tab:hover:not(.is-active) {
+  background: var(--kira-hover);
+}
 
 /* margin-left: auto pushes this flush to the bar's right edge, inside the flex row .mode-tabs
    ignores entirely (it's absolutely positioned) — right-alignment via the row's own padding-right

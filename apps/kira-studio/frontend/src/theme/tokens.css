@@ -48,16 +48,16 @@
      (internal/shell/window.go). --kira-titlebar-inset-left clears the macOS traffic-light cluster
      — a real-Mac measurement this repo's Linux sandbox cannot take (§6.3), so it lands in this one
      token to adjust once rather than a value repeated at every call site.
-     Two earlier same-session attempts at shrinking --kira-titlebar-h, both reverted, were fighting
-     the wrong thing: `MacTitleBarHiddenInset`'s `UseToolbar: true` puts AppKit into its
-     NSToolbar-based unified-title-bar layout, which reserves more vertical space for the
-     traffic-light cluster than any CSS height this div was given actually matched — not a wrong
-     number, a wrong layout mode (window.go's own comment has the full account). Switching to
-     `MacTitleBarHidden` (no toolbar) removes that mismatch at the source: AppKit's plain,
-     non-toolbar title bar uses the standard macOS title-bar height, 28px, which is what this token
-     is now set to match. Still not a real-Mac measurement — confirm on an actual build before
-     trusting it further, the same caveat every value here has carried since P1. */
-  --kira-titlebar-h: 28px;
+     Three same-session attempts at shrinking --kira-titlebar-h below 36px, all reverted:
+     `MacTitleBarHiddenInset`'s `UseToolbar: true` layout genuinely needed the fix window.go's own
+     comment describes (switching to `MacTitleBarHidden`), but 28px — guessed as "the standard
+     macOS title-bar height" — was ALSO wrong even under `MacTitleBarHidden`, reported against the
+     real build as the bar's own content sitting crowded against its top edge rather than centred.
+     36px is the one value nobody has reported a problem with, across every title-bar mode this
+     token has been tried under. Do not shrink this again without a real screenshot (or better, a
+     real measurement) confirming it first — a plausible-sounding "standard" figure has now been
+     wrong twice. */
+  --kira-titlebar-h: 36px;
   --kira-titlebar-inset-left: 78px;
   --kira-shadow: 0 2px 8px rgb(0 0 0 / 0.32);
   --kira-shadow-dialog: 0 8px 28px rgb(0 0 0 / 0.45);
