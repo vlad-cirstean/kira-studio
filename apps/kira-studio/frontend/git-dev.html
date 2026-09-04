@@ -8,10 +8,12 @@
       http-equiv="Content-Security-Policy"
       content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data:"
     />
-    <title>Kira Studio — Git dev mount</title>
+    <title>Kira Studio — Git harness</title>
   </head>
   <body>
+    <!-- D5/OQ-1: ?scenario=<name> selects which src/git/harness/scenarios.ts entry backs the
+         mount — see src/git/harness/main.ts. No Wails runtime is loaded on this page at all. -->
     <div id="app" style="height: 100vh"></div>
-    <script type="module" src="/src/git/devMountStub.ts"></script>
+    <script type="module" src="/src/git/harness/main.ts"></script>
   </body>
 </html>

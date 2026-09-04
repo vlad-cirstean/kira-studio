@@ -1,6 +1,13 @@
 import { test as base, type Page } from '@playwright/test';
 import type { ControlSnapshot, PortSnapshot } from '../ipc/support/types';
 import { mergeBootSnapshots } from './support/bootSnapshots';
+import {
+  type GitStreamEventSnapshot,
+  type GitStreamRequestSnapshot,
+  type GitStreamStreamSnapshot,
+  installMockGitStream,
+  type MockGitStreamHandle,
+} from './support/mockGitStream';
 import { type ControlMockHandle, installControlMocks } from './support/mockRuntime';
 import { installMockStream, type MockStreamHandle } from './support/mockStream';
 import { startServer, type UiServer } from './support/server';
@@ -9,11 +16,21 @@ export interface KiraApp {
   window: Page;
   control: ControlMockHandle;
   stream: MockStreamHandle;
+  // v1.3 P1: the "git" stream's own mock handle — installed for every relaunch (composed with
+  // 'engine', mockGitStreamBrowser.js's own doc comment on why), but only ever actually opened by
+  // a spec that navigates into Git mode. tests/ui/git/*.spec.ts is where `gitStream` options are
+  // ever passed; every other spec gets the harmless empty default.
+  gitStream: MockGitStreamHandle;
 }
 
 export interface RelaunchOptions {
   control?: readonly ControlSnapshot[];
   stream?: readonly PortSnapshot[];
+  gitStream?: {
+    requests?: readonly GitStreamRequestSnapshot[];
+    streams?: readonly GitStreamStreamSnapshot[];
+    events?: readonly GitStreamEventSnapshot[];
+  };
   /** Playwright's own `BrowserContextOptions.timezoneId` (e.g. `'America/New_York'`) — this
    *  sandbox's own system timezone is UTC (P57 M5 finding, porting cell-editor.spec.ts), which
    *  silently makes any "local time differs from UTC" assertion vacuously true-or-false depending
@@ -77,6 +94,9 @@ export const test = base.extend<KiraFixtures, KiraWorkerFixtures>({
       // reload" — here there is exactly one navigation, so "before it" is the only rule).
       const control = await installControlMocks(page, mergeBootSnapshots(options?.control ?? []));
       const stream = await installMockStream(page, options?.stream ?? []);
+      // Installed after 'engine' (composition order, mockGitStreamBrowser.js's own doc comment) —
+      // still before the one navigation below, same "before it" rule as the other two.
+      const gitStream = await installMockGitStream(page, options?.gitStream ?? {});
 
       // P22 Pass B, C17 — SlickGrid is the ONLY grid engine now (DataGrid.vue/GridRow.vue and the
       // `__kiraGridEngine` flag this file used to set before boot are deleted — the user's own
@@ -86,7 +106,7 @@ export const test = base.extend<KiraFixtures, KiraWorkerFixtures>({
       await page.waitForSelector('[data-testid="status-bar"]');
 
       current = page;
-      return { window: page, control, stream };
+      return { window: page, control, stream, gitStream };
     };
 
     await use(launch);
