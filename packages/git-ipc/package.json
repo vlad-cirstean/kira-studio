@@ -1,0 +1,10 @@
+{
+  "name": "@kira/git-ipc",
+  "private": true,
+  "version": "0.0.0",
+  "description": "The transport contract Kira Studio's Git mode is host-agnostic behind: the request/event/stream type map, the Transport interface every host implements, the codec, and the one generic RPC endpoint.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  }
+}
