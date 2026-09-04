@@ -1454,32 +1454,54 @@ snapshot per channel. **Four tests:**
 
 Filled in by the implementing session as each item is actually done, not in advance.
 
-- [ ] C1 — `internal/postman` parses every `oneOf` in F2 without erroring; D7's table translates both
-      ways; D6's rule is per-member; the round-trip corpus is green.
-- [ ] C2 — migration 0006 applies through the real chain; `sort_order` is dense; a folder delete
-      cascades at depth; `List` never reads `request_json`.
-- [ ] C3 — nine bound methods; bindings regenerated with `$Call.ByName` and the five new models
-      confirmed (§6.1); `collectionsList` wildcard added.
-- [ ] C4 — `itemId`/`name` default cleanly; `duplicateState` clears both; `httpMethodClass` has one
-      definition; both existing http specs pass **unedited**.
-- [ ] C5 — the tree mounts `TreeHost` with no tree mechanics of its own; search keeps ancestors and
-      does not mutate `expanded`; `mode-switch.spec.ts` passes unedited.
-- [ ] C6 — a saved request opens the existing `'http-request'` tab, reuses on re-open, and shows its
-      saved name everywhere.
-- [ ] C7 — inline rename doubles as the naming step for all three creation paths; delete is
-      confirm-gated.
-- [ ] C8 — dirty is a computation over two in-memory values; Save writes no UI-only field and sheds
-      the stale origin members.
-- [ ] C9 — import reports all eight warning kinds correctly against a file that triggers each; no
-      file contents cross the bridge.
-- [ ] C10 — export writes a file real Postman imports (§6.4 step 2).
-- [ ] C11 — the corpus, the four repo cases, `collections.spec.ts`'s four tests and D17's parity
-      pair, each passing twice in a row.
-- [ ] C12 — `docs/ARCHITECTURE.md` updated (both tables, the origin column, the tree, the resolved
-      translation with its two lossiness boundaries).
-- [ ] §6.1's full command set green.
-- [ ] §6.4's six real-hardware/real-Postman steps — run, or recorded as unrunnable here with what was
-      read instead, in the same shape P1's, P2's and P3's own checklists took.
+- [x] C1 — `internal/postman` parses every `oneOf` in F2 without erroring; D7's table translates both
+      ways; D6's rule is per-member; the round-trip corpus is green. *(`4251dd4`. The F2 shapes it
+      never decodes at all — object `description`, string `script.exec`, numeric `variable.value` —
+      are the reason parsing cannot error on them: they live in `origin_json` as raw bytes.)*
+- [x] C2 — migration 0006 applies through the real chain; `sort_order` is dense; a folder delete
+      cascades at depth; `List` never reads `request_json`. *(`330a1d5`, four repo cases.)*
+- [x] C3 — nine bound methods; bindings regenerated with `$Call.ByName` and the five new models
+      confirmed (§6.1); `collectionsList` wildcard added. *(`f9812d6`. Both §6.1 checks verified in
+      the generated output, not assumed.)*
+- [x] C4 — `itemId`/`name` default cleanly; `duplicateState` clears both; `httpMethodClass` has one
+      definition; both existing http specs pass **unedited**. *(`590254c`.)*
+- [x] C5 — the tree mounts `TreeHost` with no tree mechanics of its own; search keeps ancestors and
+      does not mutate `expanded`; `mode-switch.spec.ts` passes unedited. *(`82182b7`. `TreeHost.vue`,
+      `VirtualList.vue` and `stickyBand.ts` are byte-identical after this phase.)*
+- [x] C6 — a saved request opens the existing `'http-request'` tab, reuses on re-open, and shows its
+      saved name everywhere. *(`c5fd671`.)*
+- [x] C7 — inline rename doubles as the naming step for all three creation paths; delete is
+      confirm-gated. *(`35a23ad`.)*
+- [x] C8 — dirty is a computation over two in-memory values; Save writes no UI-only field and sheds
+      the stale origin members. *(`60a20fb`; the no-UI-field half is asserted in
+      `collections.spec.ts`, the shedding half in `repos/collections_test.go`.)*
+- [x] C9 — import reports all eight warning kinds correctly against a file that triggers each; no
+      file contents cross the bridge. *(`ac54463`. Nine kinds, not eight — a ninth,
+      `disabled_body`, was added for D7's own last table row: Postman keeps a switched-off body and
+      does not send it, this app has no equivalent and will.)*
+- [x] C10 — export writes a file real Postman imports (§6.4 step 2). *(`1533878` for the surface.
+      The real-Postman half is unrunnable here — see §6.4 below; the checkable half, that an export
+      re-imports to the identical tree, is covered over the whole corpus in C11.)*
+- [x] C11 — the corpus, the four repo cases, `collections.spec.ts`'s four tests and D17's parity
+      pair, each passing twice in a row. *(`31d79e1`; `go test -count=2` green.)*
+- [x] C12 — `docs/ARCHITECTURE.md` updated (both tables, the origin column, the tree, the resolved
+      translation with its two lossiness boundaries). *(`a7cfd42`.)*
+- [x] §6.1's full command set green. `lint`, `typecheck`, `build`, `test:unit` (253), `test:ipc:fe`
+      (7), `go build`/`go vet`/`go test ./apps/kira-studio/internal/...` all pass. `test:ui` is
+      **110/110 serially**; under the suite's own `fullyParallel` it intermittently fails
+      `budgets.spec.ts`'s 12 ms scroll-p50 assertion (19 ms observed), which that test's own comment
+      already attributes to cross-file worker contention in this sandbox. Not P4: it passes in
+      isolation, and the diff touches nothing under `views/grid/**` (§6.5 verified by `git diff`).
+- [ ] §6.4's six real-hardware/real-Postman steps — **unrunnable in this container** and recorded as
+      such, in the same shape P1's, P2's and P3's own checklists took. There is no macOS, no display,
+      and no Postman here: (1) the native `ChooseOpen`/`ChooseSave` panels do not exist in a
+      `-tags server` build at all, (2)+(3) the round trip *through real Postman* needs the product,
+      (4) a ≥2,000-request import needs a real collection to import, (5) needs a real file whose
+      `file.src` values are bare filenames, (6) needs two real windows. What was done instead: the
+      whole import→SQLite→export cycle is exercised in Go against a hand-written corpus that
+      isolates each shape (§6.2), the export is proved to re-import to the identical tree over every
+      fixture, and the wire-level property (only a path crosses the bridge, never file bytes) is
+      asserted in `collections.spec.ts` against the real built bundle.
 
 ---
 
