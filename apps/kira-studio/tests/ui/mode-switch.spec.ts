@@ -11,9 +11,11 @@ import { connectionRow, expandRow, findRow, openRowMenu } from './support/tree';
 // P1 C9/§6.2: the mode seam, observed from outside. Studio's own connect/expand/open flow is
 // ported straight from tabs.spec.ts's own createAndConnect (C1-C8 promise Studio's rendered
 // output doesn't change) — what's new here is Http mode existing at all, and the five properties
-// §6.2 names: two mode tabs; Http is genuinely empty with its own left-panel title; switching back
-// restores Studio's tab untouched; switching mode writes nothing; the left panel's width survives;
-// ⌘B still works in either mode.
+// §6.2 names: [originally] two mode tabs, now three once v1.3 P1 adds Git (Studio's and Http's own
+// counts and behaviour are unchanged — this spec's own guarantee per docs/v1.3/plans/
+// P1-host-and-go-git-client.md §0.3); Http is genuinely empty with its own left-panel title;
+// switching back restores Studio's tab untouched; switching mode writes nothing; the left panel's
+// width survives; ⌘B still works in either mode.
 
 const CONNECTION_ID = 'conn-mode-switch';
 const FIXTURE = orderItemsFixture(CONNECTION_ID);
@@ -70,19 +72,20 @@ async function createAndConnect(page: import('@playwright/test').Page): Promise<
   await expandRow(page, 'database:kira_test/schema:app');
 }
 
-function modeTab(page: import('@playwright/test').Page, mode: 'studio' | 'http') {
+function modeTab(page: import('@playwright/test').Page, mode: 'studio' | 'http' | 'git') {
   return page.locator(`[data-testid="mode-tab"][data-mode="${mode}"]`);
 }
 
-test('mode switch — two mode tabs, an empty Http mode, and Studio state that survives the round trip', async ({
+test('mode switch — three mode tabs, an empty Http mode, and Studio state that survives the round trip', async ({
   relaunch,
 }) => {
   const { window: page, control } = await relaunch({ control: CONTROL });
 
-  // 1. two mode tabs, Studio active by default.
-  await expect(page.locator('[data-testid="mode-tab"]')).toHaveCount(2);
+  // 1. three mode tabs (Studio, Http, Git — v1.3 P1 adds the third), Studio active by default.
+  await expect(page.locator('[data-testid="mode-tab"]')).toHaveCount(3);
   await expect(modeTab(page, 'studio')).toHaveClass(/is-active/);
   await expect(modeTab(page, 'http')).not.toHaveClass(/is-active/);
+  await expect(modeTab(page, 'git')).not.toHaveClass(/is-active/);
   await expect(page.locator('[data-testid="project-panel"]')).toContainText('Connections');
 
   // Build a real Studio tab with non-default state (page size 1000) to prove it survives.

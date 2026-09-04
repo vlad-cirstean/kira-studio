@@ -29,6 +29,8 @@ var RenderableTabKinds = map[string]bool{
 	// P2: the first Http-mode tab kind (§2 F1) — this list is the one of the four kind
 	// vocabularies TypeScript's own exhaustiveness checks can't catch a miss on (D10's parity test).
 	"http-request": true,
+	// v1.3 P1: the one Git-mode tab kind (D6).
+	"git-graph": true,
 }
 
 // IsRenderableTabKind reports whether kind is one of the seven renderable tab kinds.

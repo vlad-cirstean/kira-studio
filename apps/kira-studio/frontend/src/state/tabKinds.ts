@@ -23,10 +23,14 @@ import {
   defaultDataTabState,
   defaultDefinitionTabState,
   defaultDocumentTabState,
+  defaultGitGraphTabState,
   defaultKeyValueTabState,
   defaultStreamTabState,
   definitionTabStateSchema,
   documentTabStateSchema,
+  type GitGraphTabRecord,
+  type GitGraphTabState,
+  gitGraphTabStateSchema,
   type HttpRequestTabRecord,
   type KeyValueTabRecord,
   type KeyValueTabState,
@@ -237,5 +241,22 @@ export const TAB_KINDS: { [K in TabKind]: TabKindDef<K> } = {
     // D2: there is no project panel to reveal an HTTP request into.
     menuExtras: () => [],
     parseState: parseStateWith(httpRequestTabStateSchema),
+  },
+  'git-graph': {
+    mode: TAB_KIND_MODE['git-graph'],
+    title: tabTitle,
+    icon: () => 'git-branch',
+    // D2's own precedent (http-request): no connection, so no rail.
+    railColor: () => undefined,
+    defaultState: () => defaultGitGraphTabState(),
+    // Mirrors http-request's own "state IS the identity, not a target to keep" — a duplicated
+    // git-graph tab starts at a fresh, unopened view rather than reusing the source's repoId.
+    duplicateState: (_tab: GitGraphTabRecord): GitGraphTabState => defaultGitGraphTabState(),
+    // git-ui owns its own view state end to end (GraphViewState/LayoutStore) — no page store of
+    // this kind's own for cleanupTabRuntime-adjacent bookkeeping to free.
+    dropResources: noDrop,
+    // There is no project panel to reveal a repository into (http-request's own reasoning).
+    menuExtras: () => [],
+    parseState: parseStateWith(gitGraphTabStateSchema),
   },
 };

@@ -16,13 +16,16 @@ export const tabKindSchema = /*#__PURE__*/ z.enum([
   // RENDERABLE_TAB_KINDS/TAB_KIND_MODE below and Go's model.RenderableTabKinds (the one silent
   // failure mode of the four, D10).
   'http-request',
+  // v1.3 P1 D6: the one Git-mode kind. Named for the surface ('git-graph'), not the mode, so a
+  // later phase's 'git-diff'/'git-search' can join without a rename.
+  'git-graph',
 ]);
 export type TabKind = z.infer<typeof tabKindSchema>;
 
 // 'data' and 'definition' (P19, was 'ddl') are renderable as of P4 (D18); 'console' joins them in
 // P5.5, 'document' in P8, 'keyvalue' in P9, 'stream' in P10, 'browse' in P41, 'http-request' in
-// P2. The restore path drops rows of any other kind with a `warn` — a closed vocabulary decided
-// once, same discipline as P1's Caps/connectionKind.
+// P2, 'git-graph' in v1.3 P1. The restore path drops rows of any other kind with a `warn` — a
+// closed vocabulary decided once, same discipline as P1's Caps/connectionKind.
 export const RENDERABLE_TAB_KINDS: readonly TabKind[] = [
   'data',
   'definition',
@@ -32,13 +35,14 @@ export const RENDERABLE_TAB_KINDS: readonly TabKind[] = [
   'stream',
   'browse',
   'http-request',
+  'git-graph',
 ];
 
 // P1 D5: a tab's mode is a total function of its kind — no mode column, no migration. This lives
 // in shared/domain/ (not state/tabKinds.ts) because it must be importable with no Vue-state side
 // effects: `state/mode.ts`'s tabsForMode filter needs only this mapping, never the rest of the
 // per-kind registry (components, page stores, menu builders). All seven Studio kinds map to
-// 'studio'; 'http-request' (P2) is the first entry that maps to 'http'.
+// 'studio'; 'http-request' (P2) maps to 'http'; 'git-graph' (v1.3 P1) is the first to map to 'git'.
 export const TAB_KIND_MODE: Record<TabKind, AppMode> = {
   data: 'studio',
   definition: 'studio',
@@ -48,6 +52,7 @@ export const TAB_KIND_MODE: Record<TabKind, AppMode> = {
   stream: 'studio',
   browse: 'studio',
   'http-request': 'http',
+  'git-graph': 'git',
 };
 
 const pageSizeSchema = /*#__PURE__*/ z.union([
@@ -172,6 +177,54 @@ export const streamTabStateSchema = /*#__PURE__*/ z.object({
 });
 export type StreamTabState = z.infer<typeof streamTabStateSchema>;
 
+// v1.3 P1 D7: a git-graph tab's session state is git-ui's own PersistedViewState
+// (@kira/git-ui's state/viewState.ts) — a structural copy, not an import (the module-boundary
+// rule: only apps/kira-studio may depend on git-ui, never the reverse, docs/v1.3/SPEC.md). The
+// column-width/detail-width defaults below are git-ui's own DEFAULT_COLUMN_WIDTHS/
+// DEFAULT_DETAIL_WIDTH literals, kept in step by inspection rather than an import for the same
+// reason. `.default()` on every field (mirroring every other *TabStateSchema's own added-field
+// discipline) keeps a tab saved under an older shape restorable rather than dropped outright.
+export const gitGraphColumnWidthsSchema = /*#__PURE__*/ z.object({
+  author: z.number(),
+  date: z.number(),
+  sha: z.number(),
+});
+export type GitGraphColumnWidths = z.infer<typeof gitGraphColumnWidthsSchema>;
+
+export const GIT_GRAPH_DEFAULT_COLUMN_WIDTHS: GitGraphColumnWidths = {
+  author: 140,
+  date: 120,
+  sha: 80,
+};
+export const GIT_GRAPH_DEFAULT_DETAIL_WIDTH = 380;
+
+export const gitGraphTabStateSchema = /*#__PURE__*/ z.object({
+  version: z.literal(2).default(2),
+  repoId: z.string().nullable().default(null),
+  loadedRows: z.number().int().min(0).default(0),
+  detailOpen: z.boolean().default(true),
+  scrollRow: z.number().int().min(0).default(0),
+  selectedSha: z.string().nullable().default(null),
+  columnWidths: gitGraphColumnWidthsSchema.default(GIT_GRAPH_DEFAULT_COLUMN_WIDTHS),
+  dateFormat: /*#__PURE__*/ z.enum(['relative', 'absolute']).default('relative'),
+  detailWidth: z.number().default(GIT_GRAPH_DEFAULT_DETAIL_WIDTH),
+});
+export type GitGraphTabState = z.infer<typeof gitGraphTabStateSchema>;
+
+export function defaultGitGraphTabState(): GitGraphTabState {
+  return {
+    version: 2,
+    repoId: null,
+    loadedRows: 0,
+    detailOpen: true,
+    scrollRow: 0,
+    selectedSha: null,
+    columnWidths: GIT_GRAPH_DEFAULT_COLUMN_WIDTHS,
+    dateFormat: 'relative',
+    detailWidth: GIT_GRAPH_DEFAULT_DETAIL_WIDTH,
+  };
+}
+
 const tabRecordBase = {
   id: z.string(),
   connectionId: z.string().nullable(),
@@ -217,6 +270,11 @@ export const tabRecordSchema = /*#__PURE__*/ z.discriminatedUnion('kind', [
     kind: z.literal('http-request'),
     state: httpRequestTabStateSchema,
   }),
+  /*#__PURE__*/ z.object({
+    ...tabRecordBase,
+    kind: z.literal('git-graph'),
+    state: gitGraphTabStateSchema,
+  }),
 ]);
 export type TabRecord = z.infer<typeof tabRecordSchema>;
 export type DataTabRecord = Extract<TabRecord, { kind: 'data' }>;
@@ -227,6 +285,7 @@ export type KeyValueTabRecord = Extract<TabRecord, { kind: 'keyvalue' }>;
 export type StreamTabRecord = Extract<TabRecord, { kind: 'stream' }>;
 export type BrowseTabRecord = Extract<TabRecord, { kind: 'browse' }>;
 export type HttpRequestTabRecord = Extract<TabRecord, { kind: 'http-request' }>;
+export type GitGraphTabRecord = Extract<TabRecord, { kind: 'git-graph' }>;
 
 export function asDataTab(tab: TabRecord | null | undefined): DataTabRecord | null {
   return tab && tab.kind === 'data' ? tab : null;
@@ -254,6 +313,10 @@ export function asBrowseTab(tab: TabRecord | null | undefined): BrowseTabRecord 
 
 export function asHttpRequestTab(tab: TabRecord | null | undefined): HttpRequestTabRecord | null {
   return tab && tab.kind === 'http-request' ? tab : null;
+}
+
+export function asGitGraphTab(tab: TabRecord | null | undefined): GitGraphTabRecord | null {
+  return tab && tab.kind === 'git-graph' ? tab : null;
 }
 
 export function defaultDataTabState(pageSize: PageSize): DataTabState {
@@ -306,5 +369,10 @@ export function tabTitle(record: TabRecord): string {
   // A console tab's path is often a container (connection root, database, schema) with no tail
   // name worth showing — 'Console' names the tab itself, same as a bare browser new-tab title.
   if (record.kind === 'console') return tail?.name ?? 'Console';
+  // A git-graph tab's `path` is a bare identity literal (D6, mirroring http-request's own
+  // 'request'), not a NodePath — there is exactly one per window in P1, so 'Git' names it the
+  // same way 'Console' names a console tab. A later phase can show the open repo's own name once
+  // there is somewhere in TabRecord to read one from.
+  if (record.kind === 'git-graph') return 'Git';
   return tail?.name ?? record.path;
 }

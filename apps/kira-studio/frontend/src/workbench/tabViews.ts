@@ -1,5 +1,6 @@
 import type { TabKind } from '@shared/domain/tabs';
 import type { Component } from 'vue';
+import GitGraphView from '../git/GitGraphView.vue';
 import BrowseTabView from '../views/browse/BrowseView.vue';
 import ConsoleTabView from '../views/console/ConsoleView.vue';
 import DefinitionTabView from '../views/definition/DefinitionView.vue';
@@ -22,4 +23,5 @@ export const TAB_VIEWS: Record<TabKind, Component> = {
   stream: StreamTabView,
   browse: BrowseTabView,
   'http-request': HttpRequestTabView,
+  'git-graph': GitGraphView,
 };

@@ -146,6 +146,34 @@
           }
         }
       }
+    },
+    {
+      "includes": ["apps/kira-studio/frontend/src/git/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["**/project/**"],
+                    "message": "v1.3 P1 §0.3: git/ must not import project/ — Studio's connection tree is not Git's to reach into."
+                  },
+                  {
+                    "group": ["**/http/**"],
+                    "message": "v1.3 P1 §0.3: git/ must not import http/ — Studio/Http/Git stay three separate modules (docs/v1.3/SPEC.md)."
+                  },
+                  {
+                    "group": ["**/views/**"],
+                    "message": "v1.3 P1 §0.3: git/ must not import views/ directly, mirroring http/'s own rule — dispatch through state/viewCommands.ts instead."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
     }
   ]
 }

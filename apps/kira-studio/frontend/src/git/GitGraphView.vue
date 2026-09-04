@@ -6,10 +6,11 @@
  * mode's actual UI, only the mount/unmount lifecycle and which concrete implementations of those
  * three arguments this app supplies.
  */
-import { InMemoryViewStateStore, type MountHandle, mount } from '@kira/git-ui';
+import { type MountHandle, mount } from '@kira/git-ui';
 import type { TabRecord } from '@shared/domain/tabs';
 import { onBeforeUnmount, onMounted, ref } from 'vue';
 import { createGitTransport } from './transport';
+import { createTabViewStateStore } from './viewStateStore';
 
 const props = defineProps<{ tab: TabRecord }>();
 
@@ -20,10 +21,10 @@ onMounted(() => {
   if (!container.value) return;
   handle = mount(container.value, {
     transport: createGitTransport(),
-    // C9 (D7) replaces this with a store backed by this tab's own persisted TabRecord.state —
-    // in-memory for now, so a mode switch loses scroll/selection until then rather than nothing
-    // mounting at all.
-    viewState: new InMemoryViewStateStore(),
+    // D7: backed by this tab's own persisted TabRecord.state (viewStateStore.ts) — a mode
+    // switch unmounts and remounts this component, and this is what restores scroll/selection/
+    // column widths rather than resetting them.
+    viewState: createTabViewStateStore(props.tab.id),
     host: 'kira-studio',
   });
 });

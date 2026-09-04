@@ -10,6 +10,7 @@ import {
   asConsoleTab,
   asDataTab,
   asDocumentTab,
+  asGitGraphTab,
   asHttpRequestTab,
   asKeyValueTab,
   asStreamTab,
@@ -27,8 +28,11 @@ import {
   defaultDataTabState,
   defaultDefinitionTabState,
   defaultDocumentTabState,
+  defaultGitGraphTabState,
   defaultKeyValueTabState,
   defaultStreamTabState,
+  type GitGraphTabRecord,
+  type GitGraphTabState,
   type HttpRequestTabRecord,
   type KeyValueTabRecord,
   type KeyValueTabState,
@@ -76,7 +80,7 @@ function dropAllPagesForTab(id: string): void {
 export const tabsState = reactive({
   tabs: [] as TabRecord[], // ordered, all modes interleaved
   // P1 D5: one active tab per mode, not one app-wide — a tab's own mode is TAB_KIND_MODE[kind].
-  activeIdByMode: { studio: null, http: null } as Record<AppMode, string | null>,
+  activeIdByMode: { studio: null, http: null, git: null } as Record<AppMode, string | null>,
   /** In-memory only: a restored tab has not loaded and shows "Reconnect & load" (§8.4). */
   hydrated: new Set<string>(),
 });
@@ -401,6 +405,14 @@ export function openHttpRequestTab(): string {
   }).id;
 }
 
+// v1.3 P1 D6: exactly one git-graph tab per window (unlike an HTTP request, there is nothing to
+// distinguish a second one by — git-ui's own App.vue is the whole repo/graph surface, not a
+// single request) — `reuse: true` with a constant path activates the existing tab instead of
+// minting a duplicate, the same way a Studio data tab reuses by (kind, connectionId, path).
+export function openGitGraphTab(): string {
+  return openTab('git-graph', null, 'graph', () => defaultGitGraphTabState(), { reuse: true }).id;
+}
+
 // P4 D14: a saved request opens the **existing** 'http-request' tab kind — the same view P2 and
 // P3 built, with its state sourced from a collection row instead of defaultHttpRequestTabState().
 // No new tab kind, so tabKindSchema, RENDERABLE_TAB_KINDS, TAB_KIND_MODE, tabRecordSchema and Go's
@@ -678,6 +690,15 @@ export function patchHttpRequestTabState(id: string, patch: Partial<HttpRequestT
   patchTabState(id, 'http-request', patch, { skipUnchanged: false });
 }
 
+// v1.3 P1 D7: git-ui's own PersistedViewState writes go through here (frontend/src/git/
+// viewStateStore.ts) — no skipUnchanged guard, mirroring http-request's own reasoning: a write
+// this small and this infrequent (git-ui's own `watch` already debounces nothing faster than a
+// scroll/selection change) is not worth the deep-equal comparison every hotter patcher above pays
+// for skipping.
+export function patchGitGraphTabState(id: string, patch: Partial<GitGraphTabState>): void {
+  patchTabState(id, 'git-graph', patch, { skipUnchanged: false });
+}
+
 export function markHydrated(id: string): void {
   tabsState.hydrated.add(id);
 }
@@ -696,6 +717,10 @@ export function isHydrated(id: string): boolean {
 
 export function findDataTab(id: string): DataTabRecord | null {
   return asDataTab(tabsState.tabs.find((t) => t.id === id));
+}
+
+export function findGitGraphTab(id: string): GitGraphTabRecord | null {
+  return asGitGraphTab(tabsState.tabs.find((t) => t.id === id));
 }
 
 export function findConsoleTab(id: string): ConsoleTabRecord | null {

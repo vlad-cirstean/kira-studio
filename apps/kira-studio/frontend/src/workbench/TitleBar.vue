@@ -7,7 +7,7 @@ import CodiconIcon from '../theme/CodiconIcon.vue';
 import { MODES } from './modes';
 import SettingsDialog from './SettingsDialog.vue';
 
-const MODE_ORDER: AppMode[] = ['studio', 'http'];
+const MODE_ORDER: AppMode[] = ['studio', 'http', 'git'];
 
 function onClick(mode: AppMode): void {
   setMode(mode);

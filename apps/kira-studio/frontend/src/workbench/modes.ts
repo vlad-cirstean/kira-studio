@@ -1,5 +1,7 @@
 import type { AppMode } from '@shared/domain/mode';
 import type { Component } from 'vue';
+import GitPanel from '../git/GitPanel.vue';
+import GitStart from '../git/GitStart.vue';
 import CollectionsPanel from '../http/CollectionsPanel.vue';
 import HttpStart from '../http/HttpStart.vue';
 import ProjectPanel from './panels/ProjectPanel.vue';
@@ -17,7 +19,11 @@ export interface ModeDef {
 
 // P1 D6/C6: mode content comes from a registry, mirroring D4's tab-kind registry. Http's own
 // entries are both EmptyState-based (§0.2) — P1 adds no HTTP functionality, only the seam.
+// v1.3 P1 C8/C9: Git's entries are EmptyState-based the same way — the third mode adds no
+// content of its own to this registry either, since git-ui itself is the surface (mounted per
+// tab by GitGraphView.vue, not here).
 export const MODES: Record<AppMode, ModeDef> = {
   studio: { label: 'Studio', icon: 'database', panel: ProjectPanel, start: StudioStart },
   http: { label: 'Http', icon: 'globe', panel: CollectionsPanel, start: HttpStart },
+  git: { label: 'Git', icon: 'git-branch', panel: GitPanel, start: GitStart },
 };
