@@ -72,6 +72,7 @@
   "dependencies": {
     "@floating-ui/dom": "1.8.0",
     "flatbuffers": "25.9.23",
+    "shlex": "3.0.0",
     "slickgrid": "5.20.0",
     "zod": "4.5.4"
   }
