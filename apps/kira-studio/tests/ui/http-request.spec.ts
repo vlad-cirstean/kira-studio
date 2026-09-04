@@ -82,8 +82,7 @@ test('Http request — send, view a JSON response, and Params-table <-> URL sync
     method: 'GET',
     url: 'https://api.example.com/users?limit=20',
     headers: [{ name: 'Accept', value: 'application/json' }],
-    hasBody: false,
-    body: '',
+    body: { mode: 'none' },
   });
 
   // Opening a tab persists it.

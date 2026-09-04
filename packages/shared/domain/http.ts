@@ -19,13 +19,51 @@ export interface HttpRedirectHop {
   url: string;
 }
 
+// P3 D2/D5: Postman's own `mode` spelling — httpclient.BodyMode's wire values. Kept distinct from
+// the (still two-mode, until P3 C4) state schema's own httpBodyModeSchema — the wire never carries
+// P2's legacy 'json' alias, only what Go actually understands.
+export type HttpBodyModeWire = 'none' | 'raw' | 'urlencoded' | 'formdata' | 'file' | 'graphql';
+
+// httpclient.Field — one urlencoded row.
+export interface HttpFieldWire {
+  name: string;
+  value: string;
+}
+
+// httpclient.FormField — one form-data row. `kind === 'file'` means `path` is an absolute local
+// path and `value` is ignored (D4: a file's bytes never cross this bridge, only its path does).
+export interface HttpFormFieldWire {
+  name: string;
+  kind: 'text' | 'file';
+  value: string;
+  path: string;
+  contentType: string;
+}
+
+// httpclient.GraphQLBody — the user's own query/variables text, carried verbatim.
+export interface HttpGraphQlBodyWire {
+  query: string;
+  variables: string;
+}
+
+// httpclient.Body — a tagged union: `mode` selects which member is meaningful, every other member
+// is ignored (P3 D5), replacing P2's `body: string; hasBody: boolean` pair.
+export interface HttpBodyWire {
+  mode: HttpBodyModeWire;
+  raw: string;
+  rawLanguage: string;
+  urlEncoded: HttpFieldWire[];
+  formData: HttpFormFieldWire[];
+  file: string;
+  graphql: HttpGraphQlBodyWire;
+}
+
 // httpclient.Request — what `HttpService.Send` sends to Go.
 export interface HttpRequestWire {
   method: HttpMethod;
   url: string;
   headers: HttpHeaderWire[];
-  body: string;
-  hasBody: boolean;
+  body: HttpBodyWire;
 }
 
 // httpclient.Response — what comes back. `body`'s meaning depends on `bodyEncoding`: 'utf8' is the

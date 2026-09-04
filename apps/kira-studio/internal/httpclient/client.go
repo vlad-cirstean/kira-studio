@@ -10,6 +10,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io"
+	"mime"
 	"net/http"
 	"net/url"
 	"sort"
@@ -60,12 +61,13 @@ type Header struct {
 
 // Request is the wire shape control.ts's httpSend sends. Headers/body/method go out unmodified —
 // P2's one design requirement (D1): no client library sits between this struct and the wire.
+// P3 D5: Body was Body string/HasBody bool (P2's only two modes); it is now one tagged union
+// (body.go) covering every mode Postman's own format exposes.
 type Request struct {
 	Method  string   `json:"method"`
 	URL     string   `json:"url"`
 	Headers []Header `json:"headers"`
-	Body    string   `json:"body"`
-	HasBody bool     `json:"hasBody"`
+	Body    Body     `json:"body"`
 }
 
 // RedirectHop is one followed redirect: the status that was returned, and the URL that returned
@@ -167,6 +169,18 @@ func classifySendErr(sendCtx context.Context, err error) *Error {
 	return newError(CodeHTTPTransport, err.Error(), err)
 }
 
+// headerValue reports the last value of a case-insensitively matching request header — mirrors
+// the loop Send's own Host/User-Agent detection already does, reused by D7's Content-Type guard.
+func headerValue(headers []Header, name string) (string, bool) {
+	value, found := "", false
+	for _, h := range headers {
+		if strings.EqualFold(h.Name, name) {
+			value, found = h.Value, true
+		}
+	}
+	return value, found
+}
+
 func flattenHeaders(h http.Header) []Header {
 	keys := make([]string, 0, len(h))
 	for k := range h {
@@ -207,14 +221,42 @@ func Send(ctx context.Context, req Request) (Response, error) {
 	hops := &[]RedirectHop{}
 	sendCtx = context.WithValue(sendCtx, redirectsCtxKey{}, hops)
 
-	var body io.Reader
-	if req.HasBody {
-		body = strings.NewReader(req.Body)
+	// P3 D7: a formdata body's boundary is resolved before buildBody runs, not after — a user-
+	// typed multipart/form-data Content-Type carrying its own boundary parameter must drive the
+	// actual multipart framing (the header and the body have to agree), and every other case mints
+	// one here so the Content-Type guard below always knows exactly which boundary was used.
+	userContentType, hasUserContentType := headerValue(req.Headers, "Content-Type")
+	formBoundary := ""
+	if req.Body.Mode == string(BodyFormData) {
+		if hasUserContentType {
+			if mt, params, mErr := mime.ParseMediaType(userContentType); mErr == nil && mt == "multipart/form-data" {
+				formBoundary = params["boundary"]
+			}
+		}
+		if formBoundary == "" {
+			formBoundary = mintBoundary()
+		}
 	}
 
-	httpReq, err := http.NewRequestWithContext(sendCtx, req.Method, u.String(), body)
+	bodyReader, getBody, length, defaultContentType, err := buildBody(req.Body, formBoundary)
 	if err != nil {
+		return Response{}, err
+	}
+
+	httpReq, err := http.NewRequestWithContext(sendCtx, req.Method, u.String(), nil)
+	if err != nil {
+		if bodyReader != nil {
+			_ = bodyReader.Close()
+		}
 		return Response{}, newError(CodeBadRequest, "could not build request: "+err.Error(), err)
+	}
+	// F4/F5: assigned explicitly rather than left to NewRequestWithContext's own auto-detection,
+	// which only recognises *strings.Reader/*bytes.Reader/*bytes.Buffer — every streamed mode
+	// (formdata, file) would otherwise get neither a working GetBody nor a known ContentLength.
+	if bodyReader != nil {
+		httpReq.Body = bodyReader
+		httpReq.GetBody = getBody
+		httpReq.ContentLength = length
 	}
 
 	// F20a: net/http silently ignores Header.Set("Host", …) — it writes req.Host/req.URL.Host
@@ -238,6 +280,24 @@ func Send(ctx context.Context, req Request) (Response, error) {
 	// when the caller didn't set that header itself. We never set it here, so a user-supplied
 	// Accept-Encoding above is passed through untouched and the response is reported as-received
 	// — no explicit "detect and skip decoding" branch is needed on top of that default.
+
+	// P3 D7: Content-Type is a default applied only when the user set none — matching Postman's
+	// own "if you manually select a Content-Type header, that value takes precedence" (F3). The one
+	// exception: a user-typed bare "multipart/form-data" (no boundary) can never be right, since the
+	// boundary is minted here and unknowable to the user, so the boundary this send actually used
+	// is appended to their value instead of left to silently mismatch the body.
+	switch {
+	case !hasUserContentType:
+		if defaultContentType != "" {
+			httpReq.Header.Set("Content-Type", defaultContentType)
+		}
+	case req.Body.Mode == string(BodyFormData):
+		if mt, params, mErr := mime.ParseMediaType(userContentType); mErr == nil && mt == "multipart/form-data" {
+			if _, ok := params["boundary"]; !ok {
+				httpReq.Header.Set("Content-Type", userContentType+"; boundary="+formBoundary)
+			}
+		}
+	}
 
 	start := time.Now()
 	resp, err := sharedClient.Do(httpReq)

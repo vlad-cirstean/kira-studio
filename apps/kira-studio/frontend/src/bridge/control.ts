@@ -20,7 +20,7 @@ import type {
   ConnectionSummary,
 } from '@shared/domain/connection';
 import type { ObjectDefinition } from '@shared/domain/definition';
-import type { HttpHeaderWire, HttpResponseWire } from '@shared/domain/http';
+import type { HttpBodyWire, HttpHeaderWire, HttpResponseWire } from '@shared/domain/http';
 import type { Layout, LayoutPatch } from '@shared/domain/layout';
 import type { OpRecord } from '@shared/domain/ops';
 import type {
@@ -270,8 +270,7 @@ export const control = {
     method: string;
     url: string;
     headers: HttpHeaderWire[];
-    body: string;
-    hasBody: boolean;
+    body: HttpBodyWire;
   }): Promise<HttpResponseWire> =>
     unwrap(HttpService.Send(args)).then((r) => trust<HttpResponseWire>(r)),
 

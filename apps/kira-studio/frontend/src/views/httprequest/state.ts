@@ -1,8 +1,26 @@
-import type { HttpResponseWire } from '@shared/domain/http';
+import type { HttpBodyWire, HttpRequestTabState, HttpResponseWire } from '@shared/domain/http';
 import { control } from '../../bridge/control';
 import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
 import { findHttpRequestTab } from '../../state/tabs';
 import { classifyLoadError, createRuntimeStore, stopOp } from '../shared/viewOp';
+
+// P3 C2: the still-two-mode state ('none'|'json') translated onto the wire's six-mode union —
+// C4 widens the state itself; until then this is the whole of the mapping.
+function buildBodyWire(state: HttpRequestTabState): HttpBodyWire {
+  const empty: HttpBodyWire = {
+    mode: 'none',
+    raw: '',
+    rawLanguage: '',
+    urlEncoded: [],
+    formData: [],
+    file: '',
+    graphql: { query: '', variables: '' },
+  };
+  if (state.bodyMode === 'json') {
+    return { ...empty, mode: 'raw', rawLanguage: 'json', raw: state.body };
+  }
+  return empty;
+}
 
 // D6: the response is runtime-only, never persisted (mirrors consoleTabStateSchema's own results
 // comment) — a restored tab's response pane starts empty, exactly like a fresh one.
@@ -42,7 +60,6 @@ export async function send(tabId: string): Promise<void> {
   const headers = tab.state.headers
     .filter((h) => h.enabled && h.name.trim() !== '')
     .map((h) => ({ name: h.name, value: h.value }));
-  const hasBody = tab.state.bodyMode === 'json';
 
   try {
     const response = await control.httpSend({
@@ -51,8 +68,7 @@ export async function send(tabId: string): Promise<void> {
       method: tab.state.method,
       url: tab.state.url,
       headers,
-      body: hasBody ? tab.state.body : '',
-      hasBody,
+      body: buildBodyWire(tab.state),
     });
     if (rt.opId !== opId) return; // superseded by a newer send
     rt.status = 'idle';

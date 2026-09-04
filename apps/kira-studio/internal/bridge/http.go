@@ -28,8 +28,7 @@ type HttpSendArgs struct {
 	Method  string              `json:"method"`
 	URL     string              `json:"url"`
 	Headers []httpclient.Header `json:"headers"`
-	Body    string              `json:"body"`
-	HasBody bool                `json:"hasBody"`
+	Body    httpclient.Body     `json:"body"`
 }
 
 // Send runs one HTTP request through Host.RunOp with ConnectionID: nil (D3, proven safe by F10 —
@@ -62,7 +61,6 @@ func (s *HttpService) Send(ctx context.Context, args HttpSendArgs) (httpclient.R
 				URL:     args.URL,
 				Headers: args.Headers,
 				Body:    args.Body,
-				HasBody: args.HasBody,
 			})
 			if sendErr != nil {
 				return nil, sendErr

@@ -96,10 +96,17 @@ type Body struct {
 func buildBody(b Body, formBoundary string) (
 	body io.ReadCloser, getBody func() (io.ReadCloser, error), length int64, contentType string, err error,
 ) {
-	if !validBodyModes[b.Mode] {
+	mode := b.Mode
+	if mode == "" {
+		// The zero-value Body{} (every httpclient.Request built with no Body field set at all,
+		// e.g. every pre-P3 test in this package) means "no body" — the same default HasBody's
+		// own zero value (false) gave P2.
+		mode = string(BodyNone)
+	}
+	if !validBodyModes[mode] {
 		return nil, nil, 0, "", newError(CodeBadRequest, "unknown body mode: "+b.Mode, nil)
 	}
-	switch BodyMode(b.Mode) {
+	switch BodyMode(mode) {
 	case BodyNone:
 		return nil, nil, 0, "", nil
 	case BodyRaw:
