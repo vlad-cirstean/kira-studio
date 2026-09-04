@@ -122,6 +122,12 @@ func connect(ctx context.Context, cfg model.ResolvedConnectionConfig, log func(l
 	// still connect anonymously, ignoring it, exactly as it did before P25 §1.4 — dial without SASL
 	// (the branch above skips it for a half-filled pair, same as an empty pair) and let the dial
 	// itself decide.
+	if halfFilledCreds {
+		// round-2 finding 6: against a PLAINTEXT broker this silently drops the half-typed
+		// credential with no trace — log it, matching the redis adapter's own INFO-refused
+		// precedent (internal/adapters/redis/adapter.go).
+		log("warn", "kafka: half-filled username/password ignored (both are required for SASL/PLAIN)")
+	}
 
 	cl, err := kgo.NewClient(opts...)
 	if err != nil {
