@@ -10,6 +10,10 @@
 import { describe, expect, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import {
+  CONTENT_TYPE_BY_RAW_LANGUAGE,
+  HTTP_BODY_MODES,
+} from '../../../../packages/shared/domain/http';
 import { opKindSchema } from '../../../../packages/shared/domain/ops';
 import { RENDERABLE_TAB_KINDS } from '../../../../packages/shared/domain/tabs';
 
@@ -29,6 +33,23 @@ function extractGoStringSet(source: string, varName: string): Set<string> {
   return new Set([...body.matchAll(/"([^"]+)":\s*true/g)].map((m) => m[1]));
 }
 
+/** P3 D12: the map[string]string sibling of extractGoStringSet — pulls every `"key": "value"`
+ *  entry out of a Go `var <name> = map[string]string{ ... }` literal. */
+function extractGoStringMap(source: string, varName: string): Record<string, string> {
+  const header = new RegExp(`var\\s+${varName}\\s*=\\s*map\\[string\\]string\\{`);
+  const headerMatch = header.exec(source);
+  if (!headerMatch) {
+    throw new Error(`could not find "var ${varName} = map[string]string{" in the Go source`);
+  }
+  const bodyStart = headerMatch.index + headerMatch[0].length;
+  const bodyEnd = source.indexOf('}', bodyStart);
+  if (bodyEnd < 0) throw new Error(`unterminated "${varName}" map literal`);
+  const body = source.slice(bodyStart, bodyEnd);
+  const out: Record<string, string> = {};
+  for (const m of body.matchAll(/"([^"]+)":\s*"([^"]*)"/g)) out[m[1]] = m[2];
+  return out;
+}
+
 describe('Go/TS tab- and op-kind vocabulary parity (P2 D10)', () => {
   test('model.RenderableTabKinds (Go) matches RENDERABLE_TAB_KINDS (TS)', () => {
     const source = readFileSync(
@@ -46,5 +67,31 @@ describe('Go/TS tab- and op-kind vocabulary parity (P2 D10)', () => {
     );
     const goKinds = extractGoStringSet(source, 'opKinds');
     expect(goKinds).toEqual(new Set(opKindSchema.options));
+  });
+});
+
+// P3 D12: the same silent-drift shape as above, for the request body's own two small vocabularies
+// — D2 puts the same six mode strings in two languages, and D7 puts the same five Content-Type
+// values in two languages (Go decides what to send; body.ts decides what the caption claims will
+// be sent).
+describe('Go/TS HTTP body vocabulary parity (P3 D12)', () => {
+  test('httpclient.validBodyModes (Go) matches HTTP_BODY_MODES minus the legacy json alias (TS)', () => {
+    const source = readFileSync(
+      resolve(import.meta.dir, '../../internal/httpclient/body.go'),
+      'utf8',
+    );
+    const goModes = extractGoStringSet(source, 'validBodyModes');
+    // The legacy 'json' alias (httpBodyModeSchema's preprocess, D8) is input-only and deliberately
+    // has no Go counterpart — HTTP_BODY_MODES itself never contains it.
+    expect(goModes).toEqual(new Set(HTTP_BODY_MODES));
+  });
+
+  test('httpclient.contentTypeByRawLanguage (Go) matches CONTENT_TYPE_BY_RAW_LANGUAGE (TS)', () => {
+    const source = readFileSync(
+      resolve(import.meta.dir, '../../internal/httpclient/body.go'),
+      'utf8',
+    );
+    const goTable = extractGoStringMap(source, 'contentTypeByRawLanguage');
+    expect(goTable).toEqual(CONTENT_TYPE_BY_RAW_LANGUAGE);
   });
 });
