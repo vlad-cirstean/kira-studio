@@ -67,6 +67,7 @@ import {
   createGridDataSource,
   displayPositionOf,
   type GridDataSourceState,
+  isRowVisible,
   pendingRowClasses,
   type RowHandle,
   rowAtDisplayPosition,
@@ -1287,6 +1288,63 @@ function toPositionSelection(sel: Selection): Selection {
   }
 }
 
+// Finding 1 (round 2) — `selectedCellCssClass: 'kira-cell-selected'` makes SlickGrid itself paint
+// the highlight straight off `selectionModel`'s own `SlickRange[]`, which lives in DISPLAY-POSITION
+// space and is only recomputed inside `setSelectedRanges` (slick.grid.ts). The filter-toggle watch
+// below swaps the data source and re-renders, but a display-position range built under the OLD
+// filter keeps pointing at whatever page row now happens to sit at that same position under the
+// NEW one — the highlight can visibly land on the wrong row while `rt().selection` (page-row space,
+// unaffected) still correctly targets the original one, so a subsequent Ctrl+C/Delete hits the
+// right data while the highlight lies about it. Same defect class as ConsoleSlickGrid.vue's own
+// finding-6 fix (its `refreshSelectionLayer`) — here the model owns the geometry, so the fix is to
+// re-push freshly-translated ranges rather than repaint a CSS layer by hand.
+//
+// A row/corner that fell out of the new filter (`isRowVisible` — never `displayPositionOf`'s own
+// nearest-match fallback, which would just as silently point the highlight at a neighboring row)
+// drops out of a 'row' selection, or clears a 'cell'/'range' selection entirely (a 'range' whose
+// anchor or focus row is no longer visible can't be re-expressed as one rectangle in the new
+// space). 'column' selections need no row-visibility check — they already span every display row.
+function refreshSelectionForFilterChange(): void {
+  if (!grid || !selectionModel) return;
+  const runtimeEntry = rt();
+  const sel = runtimeEntry?.selection ?? null;
+  if (!sel) return;
+  const idx = {
+    displayRows: currentDisplayRows(),
+    pageRowCount: getPage(props.tabId)?.rowCount ?? 0,
+  };
+
+  let visibleSel: Selection | null;
+  switch (sel.kind) {
+    case 'cell':
+      visibleSel = isRowVisible(idx, sel.row) ? sel : null;
+      break;
+    case 'range':
+      visibleSel = isRowVisible(idx, sel.anchorRow) && isRowVisible(idx, sel.row) ? sel : null;
+      break;
+    case 'row': {
+      const rows = sel.rows.filter((row) => isRowVisible(idx, row));
+      visibleSel = rows.length > 0 ? { kind: 'row', rows } : null;
+      break;
+    }
+    default:
+      visibleSel = sel;
+  }
+
+  const displayRowCount = currentDisplayRows()?.length ?? getPage(props.tabId)?.rowCount ?? 0;
+  const colCount = grid.getColumns().length - 1; // minus the gutter
+  pendingSelectionKind = visibleSel?.kind === 'column' ? 'column' : null;
+  // `setSelectedRanges([])`/`setSelectedRanges(ranges)` both fire `onSelectedRangesChanged`
+  // (below), which re-derives `rt().selection` from the ranges just pushed and refreshes the
+  // perimeter-fill layer — no need to assign `runtimeEntry.selection` or call `refreshSelEdges`
+  // here too, only to push the geometry.
+  selectionModel.setSelectedRanges(
+    visibleSel
+      ? rangesFromSelection(toPositionSelection(visibleSel), displayRowCount, colCount)
+      : [],
+  );
+}
+
 // D4 — the selection model owns the geometry, `rt().selection` owns the meaning. Fires on every
 // `setSelectedRanges` call: a click, a drag frame (cell mode: only on drag END — F1's own
 // `handleCellRangeSelected` returns early for `caller === 'onCellRangeSelecting'` — §4.1 item 3),
@@ -2020,6 +2078,10 @@ watch(
     lastCssLayerBand = { start: 0, end: -1 };
     grid.render();
     refreshSearchLayer();
+    // Finding 1 (round 2) — the selection model's own display-position ranges go stale the
+    // instant the filter renumbers rows; re-push them (or clear) before anything else reads
+    // `rt().selection`/the CSS-painted highlight against the new display space.
+    refreshSelectionForFilterChange();
   },
 );
 

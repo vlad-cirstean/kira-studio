@@ -2,7 +2,7 @@ import { DATA_OP } from '@shared/protocol/data-ops';
 import type { ColumnDescriptor } from '@shared/protocol/page';
 import type { ControlSnapshot, PortSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
-import { cellNavButton, gridCell } from './support/grid';
+import { cellNavButton, gridCell, gridRow } from './support/grid';
 import { IPC } from './support/ipcChannels';
 import {
   APP_CHILDREN,
@@ -1580,4 +1580,105 @@ test('P22 Pass B follow-up — a column-resize drag does not force a full grid r
       '[data-testid="grid-header-cell"][data-column="quantity"][data-rebuild-probe="1"]',
     ),
   ).toHaveCount(1);
+});
+
+// Finding 1 (round 2) — `selectedCellCssClass: 'kira-cell-selected'` makes SlickGrid itself paint
+// the highlight off `selectionModel`'s own DISPLAY-POSITION ranges, which the filter-toggle watch
+// used to never re-push: click id=2 (page row 1) while unfiltered (display position 1 == page row
+// 1), then filter to ids 2/4 (page rows 1 and 3) — id=4 renders down onto display position 1, the
+// exact slot a stale range would still point at. Pre-fix, the highlight visibly jumps onto id=4's
+// row instead of staying on id=2's, while `rt().selection` (unaffected — page-row space) still
+// correctly targets page row 1, so a destructive Delete would already hit the right row even
+// though the highlight lied about it; this test catches the highlight bug specifically, then
+// confirms Delete lands on the right row too.
+test('P22 Pass B follow-up — the cell selection highlight tracks its row through a filter change, and Delete still targets it (finding 1)', async ({
+  relaunch,
+}) => {
+  const CONNECTION_ID = 'conn-slick-select-highlight-filter';
+  const CONNECTION_SUMMARY = postgresConnectionSummary(
+    CONNECTION_ID,
+    'Select Highlight Filter DB',
+    'blue',
+  );
+  const FIXTURE = bigRowsFixture(CONNECTION_ID);
+
+  const CONTROL: ControlSnapshot[] = [
+    { channel: IPC.connectionsList, response: [] },
+    {
+      channel: IPC.connectionsCreate,
+      args: {
+        name: 'Select Highlight Filter DB',
+        kind: 'postgres',
+        color: 'blue',
+        mode: 'fields',
+        readOnly: false,
+        host: '127.0.0.1',
+        port: 5432,
+        database: 'kira_test',
+        username: 'postgres',
+        password: null,
+        uri: null,
+        options: {},
+        preconnect: null,
+        preconnectSidecar: false,
+        autoExplain: false,
+      },
+      response: CONNECTION_SUMMARY,
+    },
+    ...FIXTURE.control,
+  ];
+
+  const { window: page } = await relaunch({ control: CONTROL, stream: FIXTURE.port });
+  const isMac = await page.evaluate(() => navigator.userAgent.includes('Mac'));
+  const DELETE_KEY = isMac ? 'Meta+Backspace' : 'Delete';
+
+  await page.click('[data-testid="add-connection"]');
+  await page.click('[data-testid="connection-kind-postgres"]');
+  await page.fill('[data-testid="connection-name"]', 'Select Highlight Filter DB');
+  await page.fill('[data-testid="connection-host"]', '127.0.0.1');
+  await page.fill('[data-testid="connection-port"]', '5432');
+  await page.fill('[data-testid="connection-database"]', 'kira_test');
+  await page.fill('[data-testid="connection-username"]', 'postgres');
+  await page.click('[data-testid="color-blue"]');
+  await page.click('[data-testid="connection-save"]');
+  await expect(page.locator('[data-testid="connection-dialog"]')).toHaveCount(0);
+
+  const connRow = page.locator('[data-testid="tree-row"][data-kind="connection"]');
+  await openRowMenu(page, '');
+  await page.click('[data-testid="menu-item-connect"]');
+  await expect(connRow.locator('.status-dot')).toHaveAttribute('data-status', 'connected', {
+    timeout: 10_000,
+  });
+  await expandRow(page, '');
+  await expandRow(page, DB_PATH);
+  await expandRow(page, APP_PATH);
+  const bigRowsRow = await findRow(page, BIG_ROWS_PATH);
+  await bigRowsRow.dblclick();
+  await expect(page.locator('[data-testid="data-grid"] .slick-cell')).not.toHaveCount(0);
+
+  // --- click id=2 (page row 1) while unfiltered — display position 1 == page row 1 -------------
+  await gridCell(page, 1, 'id').click();
+  await expect(gridCell(page, 1, 'id')).toHaveClass(/kira-cell-selected/);
+
+  // --- filter to ids 2/4 (page rows 1 and 3): id=4 now renders at display position 1, the exact
+  // slot a stale, position-keyed highlight would still be pointing at ---------------------------
+  await page.click('[data-testid="toolbar-search"]');
+  await expect(page.locator('[data-testid="search-toolbar"]')).toBeVisible();
+  await page.click('[data-testid="search-regex"]');
+  await page.fill('[data-testid="search-input"]', '^[24]$');
+  await expect(page.locator('[data-testid="search-count"]')).toContainText('of 2');
+  await page.click('[data-testid="search-filter-rows"]');
+  await expect(page.locator('[data-testid="grid-row"]')).toHaveCount(2);
+
+  // The highlight followed id=2 (page row 1), not the display slot it used to occupy.
+  await expect(gridCell(page, 1, 'id')).toHaveClass(/kira-cell-selected/);
+  await expect(gridCell(page, 3, 'id')).not.toHaveClass(/kira-cell-selected/);
+
+  // --- a destructive shortcut still targets the highlighted row (id=2/page row 1), not id=4 -----
+  await page.evaluate(() =>
+    (document.querySelector('.grid-canvas') as HTMLElement | null)?.focus(),
+  );
+  await page.keyboard.press(DELETE_KEY);
+  await expect(gridRow(page, 1)).toHaveClass(/pending-delete/);
+  await expect(gridRow(page, 3)).not.toHaveClass(/pending-delete/);
 });

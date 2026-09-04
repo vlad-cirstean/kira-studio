@@ -98,6 +98,26 @@ export function displayPositionOf(idx: DisplayRowIndex, row: number): number {
   return Math.min(lo, Math.max(0, dr.length - 1));
 }
 
+/** Finding 2/round 2 — `displayPositionOf` deliberately falls through to the nearest visible row
+ *  on a miss (its own doc comment: correct for scroll-into-view, wrong for a highlight/selection
+ *  that must not silently jump to a neighboring row when its own row gets filtered out). Callers
+ *  that need to know "is this page row still on screen" before deciding whether to translate or
+ *  clear use this instead — an exact-match check, never a nearest-match fallback. Pending inserts
+ *  (`row >= idx.pageRowCount`) are never filtered, so they're always visible. */
+export function isRowVisible(idx: DisplayRowIndex, row: number): boolean {
+  if (row >= idx.pageRowCount) return true; // pending insert region
+  const dr = idx.displayRows;
+  if (!dr) return true; // unfiltered: identity
+  let lo = 0;
+  let hi = dr.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >>> 1;
+    if ((dr[mid] as number) < row) lo = mid + 1;
+    else hi = mid;
+  }
+  return dr[lo] === row;
+}
+
 /** A minimal structural stand-in for a pending insert — only `.id` is ever read on this path
  *  (Vue `:key` / discard identity, `views/grid/pendingChanges.ts`'s own `PendingInsert.id`
  *  comment). Kept local, rather than importing that grid-specific type, so this shared module
