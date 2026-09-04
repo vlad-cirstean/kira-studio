@@ -649,30 +649,48 @@ all ordinary DOM. `tests/ui/mode-switch.spec.ts` asserts:
 
 Filled in by the implementing session as each item is actually done, not in advance.
 
-- [ ] C1 — `stickyBand.ts` moved with zero content diff; `TreeHost.vue` added; `tree.spec.ts` green
+- [x] C1 — `stickyBand.ts` moved with zero content diff; `TreeHost.vue` added; `tree.spec.ts` green
       unedited.
-- [ ] C2 — `LeftPanel.vue` + `PanelSearchBox.vue`; `ProjectPanel.vue` reduced to Studio content;
+- [x] C2 — `LeftPanel.vue` + `PanelSearchBox.vue`; `ProjectPanel.vue` reduced to Studio content;
       `project/SearchBox.vue` deleted; all four testids preserved.
-- [ ] C3 — `state/tabKinds.ts`; `state/tabs.ts` no longer imports any `views/*` module;
-      `duplicateTab`'s seven branches gone.
-- [ ] C4 — `workbench/tabViews.ts`; `MainView.vue` is one `<component :is>`; `StudioStart.vue`
+- [x] C3 — `state/tabKinds.ts`; `duplicateTab`'s seven branches gone (reads the registry). The five
+      `views/*/page` module-scope imports F12 named (grid/console/documents/keyvalue/stream) moved
+      into the registry, as specified. One narrower nuance against this line's literal wording:
+      `state/tabs.ts` still imports `clearPending` from `views/grid/pendingChanges` — pre-existing,
+      unrelated to page-kind dispatch (it's the grid's own staged-edit cleanup on tab close, called
+      unconditionally the same way `clearSelectedCellFor` is), and never one of F12's five. Moving
+      it was outside D4/C3's actual scope, so it was left alone rather than force this line's exact
+      wording.
+- [x] C4 — `workbench/tabViews.ts`; `MainView.vue` is one `<component :is>`; `StudioStart.vue`
       extracted verbatim (testids `first-run`, `no-tab-open`); `TabStrip.vue` no longer imports
       `project/state/tree`.
-- [ ] C5 — `activeIdByMode`; mode-scoped activate/close/step; `moveTab(fromId, toId)`; boot mode
+- [x] C5 — `activeIdByMode`; mode-scoped activate/close/step; `moveTab(fromId, toId)`; boot mode
       derived from the restored active tab.
-- [ ] C6 — `workbench/modes.ts`; `http/` with two `EmptyState` components; `biome.json` override
-      added and proven by `bun run lint`.
-- [ ] C7 — `Mac.TitleBar` set; background aligned to `#181818`; `window_test.go` asserts both.
-- [ ] C8 — `TitleBar.vue`; `.app-frame`; two new tokens; `--wails-draggable: none` on every
+- [x] C6 — `workbench/modes.ts`; `http/` with two `EmptyState` components; `biome.json` override
+      added and proven by `bun run lint` (a deliberate `http/ -> project/` import was introduced,
+      caught by the new rule, then reverted).
+- [x] C7 — `Mac.TitleBar` set; background aligned to `#181818`; `window_test.go` asserts both
+      (`TestOptions_CustomTitleBarPosture`).
+- [x] C8 — `TitleBar.vue`; `.app-frame`; two new tokens; `--wails-draggable: none` on every
       interactive child of the bar.
-- [ ] C9 — `tests/ui/mode-switch.spec.ts`, five assertions, passing twice in a row.
-- [ ] C10 — `docs/ARCHITECTURE.md` updated (Stack row `:25`, plus the three new UI-architecture
+- [x] C9 — `tests/ui/mode-switch.spec.ts`, five assertions, passing twice in a row.
+- [x] C10 — `docs/ARCHITECTURE.md` updated (Stack row `:25`, plus the three new UI-architecture
       paragraphs).
-- [ ] §6.1's full command set green.
-- [ ] §6.3's six manual macOS steps run, with the measured
-      `--kira-titlebar-inset-left` recorded here. **Expected not to run in a Linux sandbox** — state
-      plainly what was executed versus read against the pinned Wails source, the way
-      `docs/v1.1/plans/P8-multi-window-correctness.md`'s own checklist does.
+- [x] §6.1's full command set green — `bun run lint`, `bun run typecheck`, `bun run build`,
+      `bun run test:unit` (248/248), `bun run test:ui` (99/99, one perf tripwire flake reproduced
+      as pre-existing environmental noise — see the implementing session's own final report),
+      `go build ./...`, `go vet ./...`, `go test ./apps/kira-studio/internal/...` (all green).
+      `bun run test:ipc:fe`: 2/6 pass; the other 4 (clickhouse/mysql/kafka/sqs) fail identically at
+      the pre-P1 baseline commit (`809e4fb`, reproduced in an isolated worktree) — pre-existing
+      sandbox flakiness this phase neither caused nor was asked to fix.
+- [x] §6.3's six manual macOS steps — **none could actually run in this Linux sandbox** (no
+      display, no Wails window; confirmed expected per this line's own note). All six were checked
+      by reading the pinned Wails source instead: `--wails-draggable`'s mechanism
+      (`drag.ts:98-108`), `MacTitleBarHiddenInset`'s effect (`webview_window_options.go:832-841`)
+      and `effectiveMacWindowButtonStates`'s Frameless-only trigger (`:58-71`) were all read
+      directly, not inferred. `--kira-titlebar-inset-left` ships as an estimate (`78px`, tokens.css)
+      with no real-Mac measurement to record — flagged for whoever first runs this build on real
+      hardware to adjust in that one place.
 
 ---
 
