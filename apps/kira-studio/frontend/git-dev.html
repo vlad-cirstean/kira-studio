@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <!-- Byte-for-byte the same CSP as index.html (F3's own point: git-ui must pass under this
+         app's real CSP, not a looser one written just for this page). -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data:"
+    />
+    <title>Kira Studio — Git dev mount</title>
+  </head>
+  <body>
+    <div id="app" style="height: 100vh"></div>
+    <script type="module" src="/src/git/devMountStub.ts"></script>
+  </body>
+</html>

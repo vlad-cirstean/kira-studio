@@ -51,6 +51,14 @@ export default defineConfig(({ command }) => {
         // Generated with `-b`, the bindings import "/wails/runtime.js" — a path Wails' own asset
         // server resolves inside the webview, not an npm package. Keep it literal.
         external: [/^\/wails\//],
+        // git-dev.html (F3): a second, dev-only entry that mounts git-ui against a stub
+        // Transport, for checking the module worker loads under this app's real CSP — reachable
+        // from `wails3 dev`'s server with no config (Vite serves any HTML file by path in dev
+        // mode) and built alongside index.html only for the two debugHooks bundles (build:dev,
+        // build:test), never the packaged production build.
+        input: debugHooks
+          ? { index: 'index.html', gitDev: 'git-dev.html' }
+          : { index: 'index.html' },
       },
     },
   };
