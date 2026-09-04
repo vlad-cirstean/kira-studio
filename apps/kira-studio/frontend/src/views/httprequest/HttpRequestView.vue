@@ -2,6 +2,7 @@
 import { type HttpMethod, httpMethodClass } from '@shared/domain/http';
 import type { HttpRequestTabRecord } from '@shared/domain/tabs';
 import { computed, onMounted, onUnmounted, watch } from 'vue';
+import { isDynamicName } from '../../http/dynamic/catalog';
 import EnvironmentSelect from '../../http/EnvironmentSelect.vue';
 import { openSaveDialog, savedRequestFor, saveRequest } from '../../http/state/collections';
 import { activeEnvironmentId, ensureVariablesLoaded } from '../../http/state/variables';
@@ -84,8 +85,14 @@ function onSend(): void {
 // P5 D6/D7/D17: the same resolution send() runs, over the tab's *current* state — a live preview
 // of what would actually go out, without ever sending anything or reaching Go (a secret name is
 // classified 'deferred' and never appears here, D5: its plaintext never enters the renderer to
-// begin with). Only 'unknown' and 'dynamic' references are a warning — 'deferred' is correct and
-// will resolve fine at send time, and 'resolved' needs no callout at all.
+// begin with). Only 'unknown' and an *uncatalogued* 'dynamic' reference are a warning — 'deferred'
+// is correct and will resolve fine at send time, a catalogued 'dynamic' name will too (P6 D8), and
+// 'resolved' needs no callout at all.
+//
+// P6 F2/D8: this computed calls resolveTabState with exactly three arguments, never four —
+// generation must never be a side effect of typing (the chip re-runs on every keystroke). A
+// catalogued $name is told apart from an unrecognised one by isDynamicName's Set lookup alone, so
+// the preview stays a pure function of the tab's text: no await, no chunk load, nothing generated.
 const collectionId = computed(() => collectionIdFor(props.tab.state));
 watch(
   [collectionId, activeEnvironmentId],
@@ -102,15 +109,15 @@ const unresolvedRefs = computed(() => {
   );
   const refs = resolveTabState(props.tab.state, values, secretNames).refs;
   const byName = new Map(
-    refs.filter((r) => r.kind === 'unknown' || r.kind === 'dynamic').map((r) => [r.name, r]),
+    refs
+      .filter((r) => r.kind === 'unknown' || (r.kind === 'dynamic' && !isDynamicName(r.name)))
+      .map((r) => [r.name, r]),
   );
   return [...byName.values()];
 });
 const unresolvedTooltip = computed(() =>
   unresolvedRefs.value
-    .map((r) =>
-      r.kind === 'dynamic' ? `${r.name} (dynamic values arrive in a later phase)` : r.name,
-    )
+    .map((r) => (r.kind === 'dynamic' ? `${r.name} — unknown dynamic value` : r.name))
     .join(', '),
 );
 
