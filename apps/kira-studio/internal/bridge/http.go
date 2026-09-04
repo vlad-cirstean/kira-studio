@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapterhost"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters"
@@ -76,7 +77,7 @@ func (s *HttpService) Send(ctx context.Context, args HttpSendArgs) (httpclient.R
 
 			// Stage 2 (D6): secrets enter here and go no further — resolved.URL/Headers/Body are
 			// handed straight to httpclient.Send and never fed back into anything logged.
-			url, headers, body, resolveErr := s.Deps.HttpVars.ResolveRequest(
+			url, headers, body, usedSecrets, resolveErr := s.Deps.HttpVars.ResolveRequest(
 				args.URL, args.Headers, args.Body, args.CollectionID, args.EnvironmentID,
 			)
 			if resolveErr != nil {
@@ -93,6 +94,13 @@ func (s *HttpService) Send(ctx context.Context, args HttpSendArgs) (httpclient.R
 				return nil, sendErr
 			}
 			op.SetCommand(fmt.Sprintf("%s %s → %d %s", args.Method, args.URL, resp.Status, resp.StatusText))
+
+			// P9 D6: the rendered exchange is built from the *resolved* request, so it carries every
+			// secret's plaintext — the exact situation P7 D10 already ruled on for a generated curl
+			// command (a copyable text surface). Masked here, at the point the values are already
+			// known, rather than inventing a second reveal gate (OQ-4): a secret's plaintext must
+			// never reach a copyable surface ungated (§0.3).
+			maskWireSecrets(resp.Wire, usedSecrets)
 
 			// P8 D2: recorded from args (stage 1 — F3), never from resolved. Best-effort: a
 			// failed insert logs and the send still returns its response — a history feature
@@ -117,6 +125,30 @@ func (s *HttpService) Send(ctx context.Context, args HttpSendArgs) (httpclient.R
 	}
 	resp, _ := value.(httpclient.Response)
 	return resp, nil
+}
+
+// maskWireSecrets is P9 D6: a no-op when there is no rendered exchange (a dump error, D2) or no
+// secret was actually substituted. Otherwise it replaces every secret's real value with {{name}}
+// inside resp.Wire.Request only — never ResponseHead, which never carried the request's secrets to
+// begin with. A strings.Replacer can only over-mask (a secret value that happens to occur elsewhere
+// in the request is masked too) and never under-mask, which is the safe direction (D6's own stated
+// property).
+func maskWireSecrets(wire *httpclient.WireExchange, usedSecrets map[string]string) {
+	if wire == nil || len(usedSecrets) == 0 {
+		return
+	}
+	pairs := make([]string, 0, len(usedSecrets)*2)
+	for name, value := range usedSecrets {
+		if value == "" {
+			continue
+		}
+		pairs = append(pairs, value, "{{"+name+"}}")
+	}
+	if len(pairs) == 0 {
+		return
+	}
+	wire.Request = strings.NewReplacer(pairs...).Replace(wire.Request)
+	wire.MaskedSecrets = len(usedSecrets)
 }
 
 // mapHttpError joins httpclient's own four-code vocabulary into the ipcerr family (D8) — not

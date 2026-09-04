@@ -9,7 +9,12 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/httpclient"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/httpvars"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/secrets"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/repos"
 )
 
 type corpusCase struct {
@@ -58,6 +63,77 @@ func TestResolveAgainstTheSharedCorpus(t *testing.T) {
 			}
 		})
 	}
+}
+
+// newResolveService opens a real (tmpfile-backed) SQLite database through the real migrations —
+// mirrors repos_test's own newVariablesRepo (variables_test.go); duplicated rather than imported
+// since that helper lives in an internal _test.go file of a different package. Auth is nil: none of
+// ResolveRequest's own path ever calls it (only Reveal/RevealHistory do). The returned
+// *repos.VariablesRepo is the exact instance the Service resolves secrets through — seeding via it
+// directly (rather than a second, independent instance) is what makes SecretsFor see the row.
+func newResolveService(t *testing.T) (*httpvars.Service, *repos.VariablesRepo, *repos.CollectionsRepo) {
+	t.Helper()
+	t.Setenv("KIRA_INSECURE_SECRETS", "1")
+	t.Setenv("KIRA_HOME", t.TempDir())
+	db, err := storage.Open()
+	if err != nil {
+		t.Fatalf("storage.Open: %v", err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+	variablesRepo := repos.NewVariables(db.DB, secrets.New())
+	return httpvars.New(variablesRepo, secrets.New(), nil), variablesRepo, &repos.CollectionsRepo{DB: db.DB}
+}
+
+// P9 §6.2: ResolveRequest's fourth return is exactly the secret name→value pairs it actually
+// substituted — the pair set P9 D6's masking replacer needs — and empty when the request
+// references none.
+func TestResolveRequestReturnsExactlyTheSecretsItSubstituted(t *testing.T) {
+	svc, variablesRepo, collections := newResolveService(t)
+	c, err := collections.CreateCollection("Orders")
+	if err != nil {
+		t.Fatalf("CreateCollection: %v", err)
+	}
+
+	t.Run("substitutes and reports exactly what it used", func(t *testing.T) {
+		if _, err := variablesRepo.Upsert(model.VariableScopeCollection, c.ID, "", "token", "sekret-value", true); err != nil {
+			t.Fatalf("Upsert: %v", err)
+		}
+
+		url, headers, body, used, err := svc.ResolveRequest(
+			"https://api.example.com/orders",
+			[]httpclient.Header{{Name: "Authorization", Value: "Bearer {{token}}"}},
+			httpclient.Body{Mode: "none"},
+			c.ID, "",
+		)
+		if err != nil {
+			t.Fatalf("ResolveRequest: %v", err)
+		}
+		if url != "https://api.example.com/orders" {
+			t.Errorf("url = %q, unexpectedly changed", url)
+		}
+		if len(headers) != 1 || headers[0].Value != "Bearer sekret-value" {
+			t.Fatalf("headers = %+v, want Authorization: Bearer sekret-value", headers)
+		}
+		if body.Mode != "none" {
+			t.Errorf("body.Mode = %q, want none", body.Mode)
+		}
+		if len(used) != 1 || used["token"] != "sekret-value" {
+			t.Fatalf("used = %+v, want {token: sekret-value}", used)
+		}
+	})
+
+	t.Run("empty when the request references no secret", func(t *testing.T) {
+		_, _, _, used, err := svc.ResolveRequest(
+			"https://api.example.com/orders?x={{plain}}",
+			nil, httpclient.Body{Mode: "none"}, c.ID, "",
+		)
+		if err != nil {
+			t.Fatalf("ResolveRequest: %v", err)
+		}
+		if len(used) != 0 {
+			t.Fatalf("used = %+v, want empty", used)
+		}
+	})
 }
 
 func TestNamesFindsEveryDistinctReferenceOnce(t *testing.T) {

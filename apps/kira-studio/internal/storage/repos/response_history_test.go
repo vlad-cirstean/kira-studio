@@ -361,3 +361,50 @@ func TestResponseHistoryAdopt(t *testing.T) {
 		t.Fatalf("List(tab:scratch-tab) after adopt = %d entries, err %v, want 0", len(entries), err)
 	}
 }
+
+// ---- 8. P9 D7/F12: a rendered exchange never reaches kira.sqlite ----
+//
+// A security assertion, not a CRUD round trip: it is the test that would catch a future refactor
+// reintroducing the field. A non-nil Wire on the Response Record is given comes back nil after a
+// Get, and the raw snapshot_json column contains no "wire" key at all — Wire's own
+// json:"wire,omitempty" tag means a stripped pointer omits the key entirely, not just nulls it.
+
+func TestResponseHistoryRecordStripsWireBeforePersisting(t *testing.T) {
+	r, db := newResponseHistoryRepo(t)
+	itemID := newItemFor(t, db)
+
+	withWire := rec(itemID, "tab1", 200, "body")
+	withWire.Response.Wire = &httpclient.WireExchange{
+		Request:      "GET /orders HTTP/1.1\r\nAuthorization: Bearer super-secret-token\r\n\r\n",
+		ResponseHead: "HTTP/1.1 200 OK\r\n\r\n",
+		Fidelity:     "exact",
+	}
+	if err := r.Record(withWire); err != nil {
+		t.Fatalf("Record: %v", err)
+	}
+
+	entries, err := r.List(itemID)
+	if err != nil || len(entries) != 1 {
+		t.Fatalf("List = %d entries, err %v, want 1", len(entries), err)
+	}
+	id := entries[0].ID
+
+	var rawSnapshot string
+	if err := db.QueryRow(`SELECT snapshot_json FROM http_response_history WHERE id = ?`, id).Scan(&rawSnapshot); err != nil {
+		t.Fatalf("query snapshot_json: %v", err)
+	}
+	if strings.Contains(rawSnapshot, "wire") {
+		t.Fatalf("stored snapshot_json contains a \"wire\" key — a secret would leak into kira.sqlite:\n%s", rawSnapshot)
+	}
+	if strings.Contains(rawSnapshot, "super-secret-token") {
+		t.Fatal("stored snapshot_json contains the rendered exchange's credential")
+	}
+
+	snap, err := r.Get(id)
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	if snap.Response.Wire != nil {
+		t.Fatalf("decoded Response.Wire = %+v, want nil", snap.Response.Wire)
+	}
+}

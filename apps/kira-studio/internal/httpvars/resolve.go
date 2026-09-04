@@ -153,9 +153,14 @@ func referencedFields(url string, headers []httpclient.Header, body httpclient.B
 // reference that still resolves to nothing — a stale id, a typo, a secret whose decrypt failed —
 // is left verbatim; Go never fails a send over one unresolved reference (D10), the server's own
 // response is the honest signal.
+//
+// P9 D6/F11: the fourth return, `used`, is every secret name→value pair actually substituted —
+// the same resolvedNames set this function already built for its own Debug log, widened to carry
+// the value too. bridge/http.go builds a strings.Replacer from it and masks P9's rendered exchange
+// back to {{name}}, so a secret's plaintext is never left in a copyable surface unmasked.
 func (s *Service) ResolveRequest(
 	url string, headers []httpclient.Header, body httpclient.Body, collectionID, environmentID string,
-) (string, []httpclient.Header, httpclient.Body, error) {
+) (string, []httpclient.Header, httpclient.Body, map[string]string, error) {
 	hasAnyReference := false
 	for _, field := range referencedFields(url, headers, body) {
 		if len(Names(field)) > 0 {
@@ -164,23 +169,23 @@ func (s *Service) ResolveRequest(
 		}
 	}
 	if !hasAnyReference {
-		return url, headers, body, nil
+		return url, headers, body, nil, nil
 	}
 
 	secretValues, err := s.deps.Repo.SecretsFor(collectionID, environmentID)
 	if err != nil {
-		return url, headers, body, err
+		return url, headers, body, nil, err
 	}
 	if len(secretValues) == 0 {
-		return url, headers, body, nil
+		return url, headers, body, nil, nil
 	}
 
-	resolvedNames := map[string]bool{}
+	used := map[string]string{}
 	resolveText := func(text string) string {
 		result := Resolve(text, secretValues, nil)
 		for _, ref := range result.Refs {
 			if ref.Kind == KindResolved {
-				resolvedNames[ref.Name] = true
+				used[ref.Name] = secretValues[ref.Name]
 			}
 		}
 		return result.Text
@@ -221,13 +226,13 @@ func (s *Service) ResolveRequest(
 
 	// D5: the count and the *names* of the secrets resolved, never their values, and only at
 	// Debug — connections.Service.Reveal's own "the subject, not the secret" precedent.
-	if len(resolvedNames) > 0 {
-		names := make([]string, 0, len(resolvedNames))
-		for name := range resolvedNames {
+	if len(used) > 0 {
+		names := make([]string, 0, len(used))
+		for name := range used {
 			names = append(names, name)
 		}
 		slog.Debug("resolved secret references for a send", "scope", "httpvars", "count", len(names), "names", names)
 	}
 
-	return resolvedURL, resolvedHeaders, resolvedBody, nil
+	return resolvedURL, resolvedHeaders, resolvedBody, used, nil
 }

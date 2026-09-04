@@ -67,6 +67,11 @@ func (r *ResponseHistoryRepo) Record(rec model.ResponseHistoryRecord) error {
 
 	reqBody, requestBodyStorageTruncated := capBody(rec.Body)
 	resp := rec.Response
+	// P9 D7/F12: the rendered exchange is live-only. It is the resolved request in text form, and
+	// even masked (P9 D6) it would double a snapshot's size for a pane that cannot be opened from a
+	// stored entry anyway (D7). Wire is a pointer with json:"wire,omitempty" (httpclient.Response),
+	// so nil here means a stored snapshot's JSON carries no "wire" key at all, not just a null one.
+	resp.Wire = nil
 	bodyStored := resp.BodyEncoding != "base64"
 	bodyStorageTruncated := false
 	if bodyStored {
