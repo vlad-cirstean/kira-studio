@@ -1106,26 +1106,74 @@ Six scenarios, all against the real built bundle, none needing a `mockRuntime.ts
 
 ---
 
+## 6.6 Deviations from this plan, recorded honestly
+
+- **§0.1's file table did not list `http/CollectionsTree.vue`, but C5 had to touch it.**
+  `menus.ts`'s `backgroundMenu()` gains its *Import from curl…* item exactly as planned, but the
+  concrete `CollectionMenuActions` object satisfying that interface is `CollectionsTree.vue`'s own
+  `actions` const (`menus.ts`'s own comment: *"the actions themselves are injected… CollectionsTree.vue
+  is the one place that knows how to perform any of it"*) — the object literal would not typecheck
+  against the widened interface without an `importCurl` member there too. One line
+  (`importCurl: () => openImportCurlDialog()`) plus its import. Not a scope change, just a knock-on
+  edit the file table missed.
+- **The bundle grew more than F8's own "≈2.3 KB" figure** — see the checklist item below; that
+  number was always scoped to `shlex` alone (confirmed in C1), not the whole phase's payload.
+
 ## 7. Final checklist
 
-*Left for the implementing agent to fill in (C9), not pre-ticked here.*
+*Filled in by the implementing agent (C9) with what actually ran, in this sandbox, on
+`claude/feature-v1-2` after C1–C8 landed.*
 
-- [ ] `bunx biome check .` clean
-- [ ] `bun run typecheck` clean (tests, web, unit)
-- [ ] `bun run build` clean; bundle delta recorded, no new chunk
-- [ ] `bun run test:unit` — the corpus passes, including the round trip over all six modes
-- [ ] `bun run test:ui` — `http-curl.spec.ts`'s six scenarios pass
-- [ ] `http-request.spec.ts`, `http-request-body.spec.ts`, `http-variables.spec.ts`,
+- [x] `bunx biome check .` clean — 458 files checked, no fixes needed after formatting fixes were
+      applied and committed along the way.
+- [x] `bun run typecheck` clean (tests, web, unit) — `tsgo`/`vue-tsc` all pass with zero errors.
+- [x] `bun run build` clean; bundle delta recorded, **no new chunk**. Measured (production build,
+      minified, `dist/assets/index-*.js`, the one chunk this phase's static `shlex` import lands
+      in): **1,395.58 KB → 1,416.16 KB minified (+20.6 KB), 424.20 KB → 430.95 KB gzip (+6.75 KB)**.
+      The three existing chunks (`fakerEntry`, `generators`, `sqlFormatterEntry`) are unchanged in
+      count and size — nothing this phase added is dynamically imported. The +20.6 KB is *every*
+      new module together (shlex ≈2.3 KB per F8's own isolated measurement, plus `tokenize.ts`,
+      `flags.ts`, `parse.ts`, `generate.ts`, `substituteRequest.ts`, `state/curl.ts`, both dialog
+      components' compiled render functions, and the small edits to five already-bundled files) —
+      not a regression against F8's own number, which was scoped to the library alone. Recorded
+      honestly as a deviation from a literal reading of "the bundle gains ≈2.3 KB" (§6.5): that
+      sentence is about `shlex` specifically (confirmed unused/zero-delta in C1, before anything
+      imported it), not the whole phase's payload, which was never going to be that small once six
+      new pure modules and two dialogs actually mount.
+- [x] `bun run test:unit` — the corpus passes: 61/61 in `http-curl.spec.ts` (30 parse cases, 8
+      tokenize cases, 10 `toCurl` cases, the round trip over all six modes — `none`, `raw`,
+      `code`×4 languages, `urlencoded`, `formdata`, `file`). Full `tests/unit` run: 335/335 across
+      38 files.
+- [x] `bun run test:ui` — `http-curl.spec.ts`'s six scenarios (seven tests — the gated reveal has
+      its own cancelled-outcome case) all pass against the real built bundle.
+- [x] `http-request.spec.ts`, `http-request-body.spec.ts`, `http-variables.spec.ts`,
       `http-dynamic-values.spec.ts`, `collections.spec.ts`, `mode-switch.spec.ts` pass **unedited**
-- [ ] `go build ./apps/kira-studio/internal/...` and `go test ./apps/kira-studio/internal/...`
-      still pass, and `git diff --stat` shows **no Go file changed**
-- [ ] No `apps/kira-studio/frontend/bindings/**` change
+      — confirmed individually after C4/C5/C6 and again in the full `tests/ui` run below.
+- [x] Full `tests/ui` suite (all 35 spec files, 126 tests): 125 passed, 1 failed
+      (`budgets.spec.ts`'s scroll-latency tripwire, p50 measured 13ms against a 12ms budget) —
+      re-run alone it passed cleanly (p50 8ms); the test's own comment names exactly this cause
+      ("cross-file worker contention, which no in-file serialization mode addresses"). Unrelated to
+      this phase — no P7 file is anywhere near that test's own path — and not re-run again to
+      chase a timing flake.
+- [x] `go build ./apps/kira-studio/internal/...` and `go test ./apps/kira-studio/internal/...`
+      still pass (every package `ok` or `[no test files]`), and `git diff --stat` from the base
+      commit shows **no Go file changed** (`internal/`, `packages/shared/` both empty diffs).
+- [x] No `apps/kira-studio/frontend/bindings/**` change (empty diff from the base commit;
+      `wails3 task common:generate:bindings` was never re-run after the initial `bun run setup`).
 - [ ] Real hardware: one Touch ID prompt covers a whole *Copy as curl*, and a second within the
-      grace window does not re-prompt
+      grace window does not re-prompt. **Not run** — this sandbox has no display and no biometry;
+      `tests/ui` mocks the reveal outcome instead, per §6.4's own scope.
 - [ ] Real hardware: a generated command pasted into a terminal returns the same status/body the
-      app showed, for at least `code`/json, `urlencoded`, `formdata` (text + file) and `file` modes
-- [ ] Real hardware: Chrome, Firefox and Safari *Copy as cURL* output each imports; warnings recorded
-- [ ] `docs/ARCHITECTURE.md` updated (C8)
+      app showed, for at least `code`/json, `urlencoded`, `formdata` (text + file) and `file`
+      modes. **Not run** — needs a real terminal and a real network round trip; §6.4 names this a
+      human step.
+- [ ] Real hardware: Chrome, Firefox and Safari *Copy as cURL* output each imports; warnings
+      recorded. **Not run** — needs the three real browsers' own DevTools; §6.4 names this a human
+      step and the input class the whole parse side exists for, so it is not a formality to skip
+      lightly, only genuinely out of reach in this environment.
+- [x] `docs/ARCHITECTURE.md` updated (C8) — one UI-architecture sub-section (the sibling of P6's
+      own "Go is untouched by P6" paragraph) and one paragraph in the secrets section stating D10's
+      general reveal rule.
 
 ---
 
