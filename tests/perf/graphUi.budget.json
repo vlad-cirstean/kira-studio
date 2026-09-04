@@ -1,0 +1,15 @@
+{
+  "firstPaintMs": 191.89999999990687,
+  "firstPageMs": 583.7999999998137,
+  "loadMoreMs": 400.079197,
+  "worstFrameMs": 33.30000000000109,
+  "medianFrameMs": 16.69999999999709,
+  "heapFirstPageMB": 62.71156692504883,
+  "heapFullMB": 42.233646392822266,
+  "layoutSubmitMs": 74.20000000018626,
+  "rowBuildMedianMs": 0.09999999962747097,
+  "rowBuildP99Ms": 0.20000000018626451,
+  "svgNodesPerRow": 3,
+  "bundleKB": 84.4189453125,
+  "scenarioBuildMsReference": 204.64327600000001
+}

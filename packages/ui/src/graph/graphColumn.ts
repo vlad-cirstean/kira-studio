@@ -9,6 +9,19 @@ import type { EdgeSegment, LayoutStore } from "./layoutStore.ts";
 import { nodeKindFor } from "./palette.ts";
 import { buildRowSvg, isStashRow, type RowSlice } from "./rowSvg.ts";
 
+/**
+ * W15's `rowBuildMs` (median + p99, recorded not gated) is defined as "sampled inside the graph
+ * column's formatter" — this is that sample point. Opt-in: `tests/perf/graphUi.ts` sets
+ * `window.__kiraRowBuildSamplesMs` to an empty array before scrolling and reads it back
+ * afterwards; every other caller (production, every other test) never sets it, so the formatter's
+ * only added cost outside a perf run is the one property read below.
+ */
+declare global {
+  interface Window {
+    __kiraRowBuildSamplesMs?: number[];
+  }
+}
+
 /** A row past `layout.rowCount` has text but no lanes yet (W5: text lands before lanes do) — a
  *  `lane: undefined` slice, which `rowSvg.ts`'s `planNode`/`buildRowSvg` already know draws
  *  nothing rather than guessing. `layout.laneCount` (the store's current high-water mark, not a
@@ -60,7 +73,14 @@ export function createGraphFormatter(
   return (row) => {
     const wrapper = document.createElement("div");
     wrapper.className = "kv-graph-cell";
-    wrapper.appendChild(buildRowSvg(readSlice(layout, store, row, reusable), rowHeight()));
+    const samples = window.__kiraRowBuildSamplesMs;
+    if (samples) {
+      const start = performance.now();
+      wrapper.appendChild(buildRowSvg(readSlice(layout, store, row, reusable), rowHeight()));
+      samples.push(performance.now() - start);
+    } else {
+      wrapper.appendChild(buildRowSvg(readSlice(layout, store, row, reusable), rowHeight()));
+    }
     return wrapper;
   };
 }

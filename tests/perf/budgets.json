@@ -1,8 +1,9 @@
 {
   "timeMs": {
-    "kira:page-parsed": 95.60000000009313,
-    "kira:first-paint": 102.5,
-    "kira:layout-complete": 102.5
+    "kira:page-parsed": 356.09999999962747,
+    "kira:first-paint": 469.29999999981374,
+    "kira:layout-complete": 569.3999999994412,
+    "kira:layout-submit": 94.79999999981374
   },
-  "heapMB": 2.7381858825683594
+  "heapMB": 15.357856750488281
 }

@@ -9,7 +9,8 @@
     { "path": "../packages/core" },
     { "path": "../packages/git" },
     { "path": "../packages/ipc" },
-    { "path": "../packages/ui" }
+    { "path": "../packages/ui" },
+    { "path": "../apps/harness" }
   ],
   "include": ["**/*.ts"]
 }

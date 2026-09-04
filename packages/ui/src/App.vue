@@ -160,10 +160,18 @@ onMounted(() => {
   requestAnimationFrame(() => {
     performance.mark("kira:first-paint");
     performance.measure("kira:first-paint", undefined, "kira:first-paint");
-    performance.mark("kira:layout-complete");
-    performance.measure("kira:layout-complete", undefined, "kira:layout-complete");
   });
 
+  // W15: `kira:layout-complete` used to be marked right here, in the same frame as
+  // `kira:first-paint` — correct only while this shell had no real grid to wait on (P0-P3, per
+  // this block's own git history). Now that one exists, marking it here would always measure
+  // ~0ms and hide the exact cost §5.1's budget separates out: `GraphViewState`'s own doc comment
+  // on `generation` names the reason first-paint and layout-complete are two different budgets
+  // at all — "text first, graph a frame later, never a blank list waiting on a worker". This
+  // mark now means what W15 needs it to mean: the *first* `LayoutChunk` has actually been
+  // applied and the rows it covers re-rendered with their lanes, not merely that the shell
+  // mounted. `CommitGrid.vue`'s own `handleChunkLayout` — the one place that event fires — marks
+  // it, once, the first time that happens; nothing here needs to know when that is.
   void bootstrap();
 });
 

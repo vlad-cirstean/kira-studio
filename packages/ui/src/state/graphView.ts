@@ -61,6 +61,7 @@ export class GraphViewState {
   #abortController: AbortController | undefined;
   #loadController: AbortController | undefined;
   #repoId: string | undefined;
+  #layoutSubmitMarked = false;
 
   constructor(bridge: BridgeClient, layoutClient: LayoutClient = createLayoutClient()) {
     this.#bridge = bridge;
@@ -250,7 +251,22 @@ export class GraphViewState {
     this.lastChunkSource.value = chunk.source;
 
     const { from, to } = chunk.commits;
+    // W15's `layoutSubmitMs` — the worker round trip for the *first* page only, so a first-page
+    // `firstPageMs`/`worstFrameMs` miss is attributable to this hop or not in one line rather
+    // than re-derived. Marked here, not measured externally, because this `await` is the only
+    // place that round trip is ever isolated from the rest of `#applyChunk`'s own work.
+    const markSubmit = !this.#layoutSubmitMarked;
+    if (markSubmit) performance.mark("kira:layout-submit-start");
     const layoutChunk = await this.#layoutClient.submit(this.store.layoutInput(from, to));
+    if (markSubmit) {
+      this.#layoutSubmitMarked = true;
+      performance.mark("kira:layout-submit-end");
+      performance.measure(
+        "kira:layout-submit",
+        "kira:layout-submit-start",
+        "kira:layout-submit-end",
+      );
+    }
     this.layout.append(layoutChunk);
     this.laneCount.value = this.layout.laneCount;
     for (const listener of this.#layoutListeners) listener({ from, to });
