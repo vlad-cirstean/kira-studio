@@ -8,6 +8,7 @@ import IconButton from '../../theme/primitives/IconButton.vue';
 import MessageStrip from '../../theme/primitives/MessageStrip.vue';
 import SegmentedControl from '../../theme/primitives/SegmentedControl.vue';
 import { beautifyFor, canBeautify } from '../shared/celleditor/formats';
+import BinaryBodyPicker from './BinaryBodyPicker.vue';
 import {
   BODY_MODE_OPTIONS,
   contentTypeCaption,
@@ -120,6 +121,7 @@ const caption = computed(() =>
     />
     <UrlEncodedTable v-else-if="tab.state.bodyMode === 'urlencoded'" :tab="tab" />
     <FormDataTable v-else-if="tab.state.bodyMode === 'formdata'" :tab="tab" />
+    <BinaryBodyPicker v-else-if="tab.state.bodyMode === 'file'" :tab="tab" />
   </div>
 </template>
 
