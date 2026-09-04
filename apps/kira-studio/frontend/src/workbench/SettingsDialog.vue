@@ -589,8 +589,8 @@ async function onSave(): Promise<void> {
       <span class="footer-status">
         <span v-if="saveError" class="field-error" data-testid="settings-save-error">{{ saveError }}</span>
         <span v-else class="helper-text" data-testid="settings-footer-status"
-          >Stored in <span class="mono">~/.kira-studio/kira.sqlite</span> ·
-          {{ isDirty ? 'Unsaved changes' : 'changes apply when you save' }}</span
+          >Stored in <span class="mono">~/.kira-studio/kira.sqlite</span><template v-if="isDirty">
+          · Unsaved changes</template></span
         >
       </span>
       <span class="footer-actions">
