@@ -33,6 +33,12 @@ const (
 	ChannelOpUpdate               = "kira:op:update"
 	ChannelAppMetrics             = "kira:app:metrics"
 	ChannelSchemaChanged          = "kira:schema:changed"
+	// ChannelGrpcCall is P11 D8's own new push channel — a server-streaming call's coalesced
+	// message batches, delivered with EmitTo (one window only, GrpcService.Call's own emitter
+	// call) rather than through this file's Events/Sources machinery: it has exactly one producer
+	// (the RunOp closure calling grpcclient.ServerStream), not a startup-wired long-lived source,
+	// so it needs no Sources entry and no Attach subscription.
+	ChannelGrpcCall = "kira:grpc:call"
 )
 
 // ChannelEngineState is declared for completeness and deliberately never emitted: nothing in

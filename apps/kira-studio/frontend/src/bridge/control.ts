@@ -4,6 +4,7 @@ import * as ConnectionsService from '@bindings/connectionsservice.js';
 import * as EngineService from '@bindings/engineservice.js';
 import * as FilesService from '@bindings/filesservice.js';
 import * as FiltersService from '@bindings/filtersservice.js';
+import * as GrpcService from '@bindings/grpcservice.js';
 import * as HttpService from '@bindings/httpservice.js';
 import * as LayoutService from '@bindings/layoutservice.js';
 import * as LifecycleService from '@bindings/lifecycleservice.js';
@@ -27,6 +28,12 @@ import type {
   ConnectionSummary,
 } from '@shared/domain/connection';
 import type { ObjectDefinition } from '@shared/domain/definition';
+import type {
+  GrpcCallEvent,
+  GrpcCallResultWire,
+  GrpcMetaPairWire,
+  GrpcSchemaWire,
+} from '@shared/domain/grpc';
 import type { HttpBodyWire, HttpHeaderWire, HttpResponseWire } from '@shared/domain/http';
 import type { Layout, LayoutPatch } from '@shared/domain/layout';
 import type { OpRecord } from '@shared/domain/ops';
@@ -325,6 +332,51 @@ export const control = {
 
   onAppMetrics: (cb: (sample: AppMetricsSample) => void): (() => void) =>
     on(CHANNEL.appMetrics, cb),
+
+  // P11 D3/D4: resolves a target's (or a .proto's) services and methods — reflection.Register's
+  // own cache lives in Go (grpcclient's descriptorCache), never here; `reload` bypasses it (the
+  // schema pane's own Reload button).
+  grpcDescribe: (args: {
+    descriptorMode: 'reflection' | 'proto';
+    target: string;
+    tls: { enabled: boolean; caFile: string; serverName: string };
+    metadata: GrpcMetaPairWire[];
+    protoPath: string;
+    importPaths: string[];
+    collectionId: string;
+    environmentId: string;
+    reload: boolean;
+  }): Promise<GrpcSchemaWire> =>
+    unwrap(GrpcService.Describe(args)).then((r) => trust<GrpcSchemaWire>(r)),
+
+  // P11 D7/D8: runs through the same op scheduler/op log HttpService.Send already does (opId
+  // renderer-minted, tabId/windowKey addressing exactly like httpSend/TabsService's own shape).
+  // `streaming` tells Go which of Unary/ServerStream to run — the renderer already knows this
+  // from the schema it resolved via grpcDescribe.
+  grpcCall: (args: {
+    opId: string;
+    tabId: string;
+    streaming: boolean;
+    descriptorMode: 'reflection' | 'proto';
+    target: string;
+    tls: { enabled: boolean; caFile: string; serverName: string };
+    protoPath: string;
+    importPaths: string[];
+    service: string;
+    method: string;
+    messageJson: string;
+    metadata: GrpcMetaPairWire[];
+    collectionId: string;
+    environmentId: string;
+    itemId?: string;
+  }): Promise<GrpcCallResultWire> =>
+    unwrap(GrpcService.Call({ ...args, windowKey, itemId: args.itemId ?? '' })).then((r) =>
+      trust<GrpcCallResultWire>(r),
+    ),
+
+  // P11 D8: one server-streaming call's coalesced message batches — EmitTo'd to this window only,
+  // so a stream in one window never wakes another.
+  onGrpcCall: (cb: (event: GrpcCallEvent) => void): (() => void) => on(CHANNEL.grpcCall, cb),
 
   // windowsEnsure registers this page's own windowKey with a `windows` row if it doesn't already
   // have one — always a no-op on the native shell (main.go's own window-creation paths already

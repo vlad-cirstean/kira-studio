@@ -22,20 +22,22 @@ const (
 	SourceProto      SourceMode = "proto"
 )
 
-// MetaPair is one gRPC metadata name/value pair — the resolved (D9/D10: already-substituted)
-// wire form.
+// MetaPair is one gRPC metadata name/value pair — bridge/grpc.go hands this straight across the
+// wire both ways (GrpcCallArgs.Metadata in, CallResult.Header/Trailer out), so it carries JSON
+// tags directly rather than a second bridge-owned type, the same way HttpSendArgs reuses
+// httpclient.Header verbatim.
 type MetaPair struct {
-	Name  string
-	Value string
+	Name  string `json:"name"`
+	Value string `json:"value"`
 }
 
 // TLSConfig is D6's dial-time TLS decision. InsecureSkipVerify is deliberately not a field here —
 // P2 D4's "verification is always on, with no per-request opt-out" (§0.2), and this package never
 // constructs a tls.Config that would bypass it.
 type TLSConfig struct {
-	Enabled    bool
-	CAFile     string
-	ServerName string
+	Enabled    bool   `json:"enabled"`
+	CAFile     string `json:"caFile"`
+	ServerName string `json:"serverName"`
 }
 
 // Source names one descriptor source (D4) — either a live server's reflection, or a supplied

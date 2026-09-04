@@ -217,6 +217,7 @@ func main() {
 			application.NewService(&bridge.QueriesService{Deps: deps}),
 			application.NewService(&bridge.SchemaService{Deps: deps}),
 			application.NewService(&bridge.HttpService{Deps: deps}),
+			application.NewService(&bridge.GrpcService{Deps: deps}),
 			application.NewService(&bridge.CollectionsService{Deps: deps}),
 			application.NewService(&bridge.VariablesService{Deps: deps}),
 			application.NewService(&bridge.ResponseHistoryService{Deps: deps}),
