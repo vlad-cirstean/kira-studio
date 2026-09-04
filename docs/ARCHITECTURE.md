@@ -39,6 +39,7 @@ authoritative for behavior: SPEC.md is the record of what v1 was *specified* to 
 | Logging | Go `log/slog` | a daily-rolling file under `~/.kira-studio/logs/`, mirroring the configuration `electron-log` used to hold — single log file, single source of truth |
 | Data/console grid rendering (P22 Pass B cutover; P30 §3 extended it) | `slickgrid@5.20.0`'s core engine (MIT, `6pac/SlickGrid`), core `SlickGrid` class only — no `SlickDataView`, no plugin, no `slickgrid-vue` | **the only grid engine** — `views/grid/DataGrid.vue`, `GridRow.vue` and `__kiraGridEngine` are gone (P22 Pass B). `views/grid/SlickGridHost.vue` hosts a data tab (full parity: sort, editor, selection ranges, FK/PK nav, clipboard); `views/console/ConsoleSlickGrid.vue` hosts the query console's tabular results (P30 §3) over the same reusable layer, ~300 lines instead of a second 2000+-line host: `views/shared/slick/kiraSlickGrid.ts` (the tuned scroll/runway/chase mechanism, inherited unmodified), `views/shared/slick/dataSource.ts` (the `CustomDataView` bridge; its data-tab-specific half, `createDisplayValueExtractor`/`pendingRowClasses`, stays in `views/grid/slick/dataSource.ts`, which re-exports the rest), `views/shared/slick/slickTheme.css`, `views/shared/page/columns.ts` and `theme/cellClass.ts`. The console host has no selection-range model, sort, editor, context menu, clipboard, FK nav or persisted column widths — a console result has none of what those exist to serve. `@tanstack/vue-virtual` is no longer a dependency (P30 §3.6 C7) |
 | Outbound HTTP client (P2, body modes P3, request timeline P10) | plain `net/http` (`apps/kira-studio/internal/httpclient/`), **no client/retry/URL-parsing/multipart-builder dependency at all** | the same "no driver dependency" shape the ClickHouse adapter already established (below): one package-level `*http.Client`, a 30s timeout applied via `context.WithTimeout` rather than `Client.Timeout` (so the Stop button and a timeout abort an in-flight body read the same way), redirects followed and every hop recorded up to 10, TLS verification always on, `http.ProxyFromEnvironment`. Reachable only from Go — the webview's own `fetch` is never used (`docs/ARCHITECTURE.md`'s own "Go owns the network" invariant, below). P3 adds every body mode this app's request builder supports — none/raw/code/urlencoded/formdata/file (`internal/httpclient/body.go`) — over the same one dependency-free package: a two-pass `mime/multipart` writer computes an *exact* `Content-Length` from a fixed boundary's deterministic framing before streaming a single byte, so a form-data or binary send is never chunked and never guesses. P10 adds one `net/http/httptrace.ClientTrace`, stdlib, installed once per send: every redirect hop's own DNS/connect/TLS/wait/download phases, bucketed by the same `checkRedirect` that already threads `Response.Redirects` through (below) |
+| Outbound gRPC client (P11) | `google.golang.org/grpc` + `google.golang.org/protobuf` (`dynamicpb`/`protojson`/`protodesc`/`protoregistry`, grpc-go's own reflection client) + `bufbuild/protocompile`, all in `apps/kira-studio/internal/grpcclient/` — **no generated `.pb.go` code, no `protoc`/`buf` build step** | dynamic, schema-at-runtime: a method is discovered via server reflection or a supplied `.proto` (compiled by `protocompile`, the same compiler `buf` uses, with no codegen), then called through `dynamicpb`/`protojson` against a descriptor `grpc.NewClient` never needed ahead of time. Unary and server-streaming only — client- and bidi-streaming are out of scope. The largest single dependency this app has taken, **≈14.2 MB** of binary (measured `linux/amd64`, no flags) — the *same order* as `pgx` + `mongo-driver/v2` + both AWS SDK clients + `franz-go` combined (≈13.5 MB), in a binary that already links ten database adapters. Every descriptor source (a reflection round-trip, a compiled `.proto`) gets its **own** private `*protoregistry.Files` — never `protoregistry.GlobalFiles`, which panics outright on a duplicate file path, a realistic outcome for two users' `.proto` files both declaring the same `package` |
 
 Driver libraries — the best-maintained option per engine, **Go-native for all ten kinds as of P58e
 M9.3** (checkpoint C2): `jackc/pgx/v5` (postgres), `go-sql-driver/mysql` (mariadb/mysql, via a shared
@@ -497,10 +498,13 @@ tabs(id, connection_id, path, kind, state_json, order, active, window_key)  -- s
                                                        -- window_key ON DELETE CASCADE into windows
 http_collections(id, name, sort_order, origin_json, variables_promoted,
                  created_at, updated_at)                -- P4; variables_promoted added P5
-http_items(id, collection_id, parent_id, kind, name, sort_order, method, url,
+http_items(id, collection_id, parent_id, kind, name, sort_order, method, url, protocol,
            request_json, origin_json, created_at, updated_at)
                                                        -- the folder/request tree; parent_id and
-                                                       -- collection_id both ON DELETE CASCADE
+                                                       -- collection_id both ON DELETE CASCADE.
+                                                       -- protocol ('http'|'grpc', default 'http',
+                                                       -- P11) added by ALTER TABLE, not a new
+                                                       -- migration's table — see below
 http_environments(id, name, sort_order, is_active, created_at, updated_at)  -- P5; top-level,
                                                        -- no collection_id; at most one is_active
 http_variables(id, collection_id, environment_id, name, value, is_secret, secret_value,
@@ -519,6 +523,17 @@ http_response_history(id, item_id, tab_id, scope_key, sent_at, method, url, envi
                                                        -- (real FK into http_items); tab_id is
                                                        -- deliberately NOT a foreign key into
                                                        -- tabs (below)
+grpc_call_history(id, item_id, tab_id, scope_key, called_at, target, method, streaming,
+                   code, code_name, status_message, elapsed_ms, message_count, message_bytes,
+                   stored_bytes, snapshot_json)
+                                                       -- P11; http_response_history's own shape,
+                                                       -- reused verbatim down to the generated
+                                                       -- scope_key and the ON DELETE CASCADE /
+                                                       -- deliberately-not-a-foreign-key split
+                                                       -- between item_id and tab_id (below). One
+                                                       -- row per *completed* call — unary or
+                                                       -- streaming, cancelled-with-partial-
+                                                       -- messages counts as completed (D11)
 ```
 
 Migrations are forward-only numbered SQL files (`apps/kira-studio/internal/storage/migrations/`) applied on
@@ -679,6 +694,47 @@ reads that key any more; the row is harmless and is recorded here so nobody redi
 wondering what still consumes it. The same judgement applies to `ui_layout`'s own `window.bounds`
 leaf: P8's `0002_p8_windows.sql` seeds the first `windows` row from it and then leaves the
 now-inert leaf row in place rather than deleting it.
+
+**A gRPC request is a `protocol` on the existing `http_items` row, not a third `kind` (P11).**
+`kind` stays structural — `'folder'` vs. a leaf — and `protocol` says which document shape
+`request_json` holds for a leaf: `'http'` → `model.SavedRequest`, `'grpc'` → the new
+`model.SavedGrpcRequest`. The alternative (a `kind: 'grpc-request'` value) would have meant every
+existing `kind === 'request'` check across the tree/collections/export code re-auditing whether it
+silently also needs to handle a third value; `protocol` instead reads as "which body shape," and
+every one of those checks stays exactly as narrow as it already was. `grpc_call_history` is
+deliberately its **own** table rather than a widened `http_response_history` — the two share almost
+every column name by convention, not by a shared struct or a shared repo, because the *rows*
+genuinely differ (a gRPC call's `code`/`code_name`/`streaming` have no HTTP equivalent, and an HTTP
+response's `status`/`redirects` have no gRPC one) and a nullable-column union of the two would have
+made every existing HTTP-only query and cap computation reason about rows it can never actually see.
+Storage bounds are the **same four shapes** `http_response_history` already established — per-message
+truncation (64 KiB, half HTTP's single-payload cap, since a streamed message is one of many rather
+than the one thing a response is), a 100-stored-message-per-entry elision with a true `message_count`
+kept alongside it (D11's own addition: unlike an HTTP response's one body, a streaming call's
+messages have no natural single-payload bound to truncate *to*, so a count cap does the job a byte
+cap did for HTTP), the same 20-per-scope trim, and a global byte budget — **32 MiB, a quarter of
+HTTP's 128 MiB**, reflecting that this is a newer, narrower-audience protocol inside the same app
+rather than a claim that a gRPC call matters four times less. `Adopt`/`SweepOrphans` and the
+generated `scope_key` are ports of `ResponseHistoryRepo`'s own mechanism, unchanged in shape.
+
+**gRPC's response pane has three segments — Messages, Metadata, History — and deliberately no Raw
+and no Timeline pane, which corrects a claim two earlier phases could only guess at.** P9's own
+OQ-9 and P10's own OQ-8 both flagged, while gRPC was still unbuilt, that a gRPC call might want a
+frame-level "raw" view (message headers, compressed flag, length, a hex/proto dump) or a per-message
+timeline in place of a redirect-hop waterfall, and each said explicitly that whichever phase built
+gRPC should decide rather than silently inheriting `RawExchangePane.vue`/`TimelinePane.vue`. P11's
+decision, now that gRPC exists: **absent, not a degraded pane, for both.** A raw view exists for
+HTTP because there is a real byte-level exchange underneath the parsed one worth showing when the
+parse is wrong or incomplete (P9's own reasoning) — gRPC's "raw" would be HTTP/2 DATA frames of
+length-prefixed protobuf, which is a debugging tool for gRPC's *transport*, not for the request a
+user actually authored, and the Messages segment (protojson, exactly what was sent and received) is
+already the honest, faithful view for this protocol. A timeline exists for HTTP because a redirect
+chain is a sequence of *hops*, each with its own DNS/connect/TLS/wait/download phases — a
+server-streaming call is one connection and many *messages* over time, a shape the Messages
+segment's own arrival offsets (`offsetMs`, D8) already renders without a second, hop-shaped pane
+pretending to fit it. Both OQ notes were right to flag the question and right not to answer it in
+advance; this paragraph is that answer, so neither claim is left standing as still-open once P11 has
+shipped.
 
 S3 connections reuse the existing `connections` columns, mirroring SQS's own fields-mode
 repurposing exactly: `host`/`port` are unused, `database` holds the **AWS region**, the AWS
