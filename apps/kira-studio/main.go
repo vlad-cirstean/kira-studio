@@ -140,6 +140,13 @@ func main() {
 	oplogWiring := oplog.New(router.Host(), repositories.Ops, settings.Advanced.OpLogRetentionDays)
 	oplogWiring.Start()
 
+	// P8 D7/F18: a scratch tab's response history is swept once per launch, beside oplog's own
+	// startup prune — tabs is the liveness oracle (TabsRepo.Save always re-inserts every tab
+	// that's currently open), so this removes only a closed tab's history, never a live one's.
+	if err := repositories.ResponseHistory.SweepOrphans(); err != nil {
+		slog.Warn("sweep orphaned response history", "scope", "startup", "err", err)
+	}
+
 	processSet := metrics.NewCachedPIDs(
 		func() ([]int32, error) { return metrics.AppProcessSet(metrics.AnchorNeedles, metrics.HelperNeedles) },
 		metrics.RescanEvery,
@@ -212,6 +219,7 @@ func main() {
 			application.NewService(&bridge.HttpService{Deps: deps}),
 			application.NewService(&bridge.CollectionsService{Deps: deps}),
 			application.NewService(&bridge.VariablesService{Deps: deps}),
+			application.NewService(&bridge.ResponseHistoryService{Deps: deps}),
 			application.NewService(&bridge.LifecycleService{Flusher: quitter, WindowFlusher: closeFlush}),
 		},
 		Assets: application.AssetOptions{

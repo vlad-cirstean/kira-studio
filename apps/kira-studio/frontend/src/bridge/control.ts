@@ -10,6 +10,7 @@ import * as LifecycleService from '@bindings/lifecycleservice.js';
 import type * as WailsModels from '@bindings/models.js';
 import * as OpsService from '@bindings/opsservice.js';
 import * as QueriesService from '@bindings/queriesservice.js';
+import * as ResponseHistoryService from '@bindings/responsehistoryservice.js';
 import * as SchemaService from '@bindings/schemaservice.js';
 import * as SettingsService from '@bindings/settingsservice.js';
 import * as TabsService from '@bindings/tabsservice.js';
@@ -38,6 +39,10 @@ import type {
   SavedQuery,
   SortSpec,
 } from '@shared/domain/queries';
+import type {
+  ResponseHistoryEntry,
+  ResponseHistorySnapshot,
+} from '@shared/domain/response-history';
 import type { ConnectionDdl } from '@shared/domain/schema';
 import type { SecretStorageStatus } from '@shared/domain/secrets';
 import type { Settings, SettingsPatch } from '@shared/domain/settings';
@@ -288,6 +293,10 @@ export const control = {
   // ctx parameter from its TS signature (§6.1) — Wails still passes it through server-side, so a
   // window closing mid-request still aborts it. P5 D6: collectionId/environmentId name the scope
   // stage 2 (Go) resolves secrets against — both '' is valid (a scratch tab, no environment).
+  // P8 D2: itemId travels alongside so Go can record a response-history entry under the right
+  // scope — '' for a scratch tab, exactly like collectionId/environmentId's own "possibly empty"
+  // shape above. Optional here (C3): a missing field decodes as Go's zero value ("") on the wire,
+  // and state.ts's send() only starts actually passing it in C4.
   httpSend: (args: {
     opId: string;
     tabId: string;
@@ -297,8 +306,11 @@ export const control = {
     body: HttpBodyWire;
     collectionId: string;
     environmentId: string;
+    itemId?: string;
   }): Promise<HttpResponseWire> =>
-    unwrap(HttpService.Send(args)).then((r) => trust<HttpResponseWire>(r)),
+    unwrap(HttpService.Send({ ...args, itemId: args.itemId ?? '' })).then((r) =>
+      trust<HttpResponseWire>(r),
+    ),
 
   onAppMetrics: (cb: (sample: AppMetricsSample) => void): (() => void) =>
     on(CHANNEL.appMetrics, cb),
@@ -470,4 +482,26 @@ export const control = {
     unwrap(VariablesService.RevealHistory({ historyId, confirmed })).then((r) =>
       trust<RevealResult>(r),
     ),
+
+  // P8 D8: five wrappers over ResponseHistoryService. List/Clear take both ids — '' for whichever
+  // doesn't apply — and the service computes the scope key the same way the generated SQLite
+  // column does, so the two sides can never disagree about what a scope is.
+  historyList: (itemId: string, tabId: string): Promise<ResponseHistoryEntry[]> =>
+    unwrap(ResponseHistoryService.List({ itemId, tabId })).then((r) =>
+      trust<ResponseHistoryEntry[]>(r ?? []),
+    ),
+  historyGet: (id: string): Promise<ResponseHistorySnapshot> =>
+    unwrap(ResponseHistoryService.Get({ id })).then((r) => trust<ResponseHistorySnapshot>(r)),
+  historyDelete: (id: string): Promise<void> => unwrap(ResponseHistoryService.Delete({ id })),
+  historyClear: (itemId: string, tabId: string): Promise<void> =>
+    unwrap(ResponseHistoryService.Clear({ itemId, tabId })),
+  // D14: called from http/state/collections.ts's Save-as path, immediately after the CreateItem
+  // that produced itemId.
+  historyAdopt: (tabId: string, itemId: string): Promise<number> =>
+    // Explicit type argument: tests/unit's tsconfig resolves the generated $CancellablePromise
+    // loosely, same as collectionsList above — a `.then` that reads a member off the result needs
+    // the awaited type named rather than handed straight to `trust`.
+    unwrap<WailsModels.ResponseHistoryAdoptResult>(
+      ResponseHistoryService.Adopt({ tabId, itemId }),
+    ).then((r) => r.adopted),
 };

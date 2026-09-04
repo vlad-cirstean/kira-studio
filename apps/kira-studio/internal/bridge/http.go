@@ -4,12 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapterhost"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/appcore"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/bridge/ipcerr"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/httpclient"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 )
 
 // HttpService is P2's one new bound service: a single outbound HTTP request run through the
@@ -34,6 +36,11 @@ type HttpSendArgs struct {
 	Body          httpclient.Body     `json:"body"`
 	CollectionID  string              `json:"collectionId"`
 	EnvironmentID string              `json:"environmentId"`
+	// ItemID is P8 D2's own addition: the saved request this tab is bound to, or "" for a
+	// scratch tab — supplied by state.ts's send() as tab.state.itemId ?? '' (the tab already
+	// knows it, http.ts:208), and used for exactly one thing, recording a response-history
+	// entry under the right scope.
+	ItemID string `json:"itemId"`
 }
 
 // Send runs one HTTP request through Host.RunOp with ConnectionID: nil (D3, proven safe by F10 —
@@ -86,6 +93,23 @@ func (s *HttpService) Send(ctx context.Context, args HttpSendArgs) (httpclient.R
 				return nil, sendErr
 			}
 			op.SetCommand(fmt.Sprintf("%s %s → %d %s", args.Method, args.URL, resp.Status, resp.StatusText))
+
+			// P8 D2: recorded from args (stage 1 — F3), never from resolved. Best-effort: a
+			// failed insert logs and the send still returns its response — a history feature
+			// must never be the reason a user loses the answer they were waiting for.
+			if err := s.Deps.Repos.ResponseHistory.Record(model.ResponseHistoryRecord{
+				ItemID:        args.ItemID,
+				TabID:         args.TabID,
+				EnvironmentID: args.EnvironmentID,
+				Method:        args.Method,
+				URL:           args.URL,
+				Headers:       args.Headers,
+				Body:          args.Body,
+				Response:      resp,
+			}); err != nil {
+				slog.Warn("recording response history failed", "scope", "bridge/http", "opId", args.OpID, "err", err)
+			}
+
 			return resp, nil
 		})
 	if err != nil {

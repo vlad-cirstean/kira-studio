@@ -97,6 +97,12 @@ export const IPC = {
   variablesReveal: 'kira:variables:reveal',
   variablesRevealHistory: 'kira:variables:revealHistory',
 
+  historyList: 'kira:history:list',
+  historyGet: 'kira:history:get',
+  historyDelete: 'kira:history:delete',
+  historyClear: 'kira:history:clear',
+  historyAdopt: 'kira:history:adopt',
+
   connectionState: 'kira:connection:state',
   connectionMetadataInvalidated: 'kira:connection:metadataInvalidated',
   connectionsChanged: 'kira:connections:changed',

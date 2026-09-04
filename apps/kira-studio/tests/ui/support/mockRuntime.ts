@@ -103,6 +103,11 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   variablesHistory: 'VariablesService.History',
   variablesReveal: 'VariablesService.Reveal',
   variablesRevealHistory: 'VariablesService.RevealHistory',
+  historyList: 'ResponseHistoryService.List',
+  historyGet: 'ResponseHistoryService.Get',
+  historyDelete: 'ResponseHistoryService.Delete',
+  historyClear: 'ResponseHistoryService.Clear',
+  historyAdopt: 'ResponseHistoryService.Adopt',
 };
 
 /** ipc.ts's legacy channel string (what every `ControlSnapshot.channel` and fixture is keyed by,
@@ -199,6 +204,11 @@ const WILDCARD_DEFAULTS: Readonly<Record<string, string>> = Object.freeze({
   [IPC.queriesList]: '[]',
   [IPC.queriesListConsole]: '[]',
   [IPC.queriesHistoryList]: '[]',
+  // P8 F11's sibling reasoning: mode-switch.spec.ts and both existing http-request*.spec.ts specs
+  // boot with no history fixture at all — ResponsePane.vue's History segment fetches on mount
+  // (C4), so "no history yet for a request never seen before" is the right default rather than a
+  // fixture miss.
+  [IPC.historyList]: '[]',
 });
 
 interface CallRequestBody {
