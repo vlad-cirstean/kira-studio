@@ -4,8 +4,10 @@ import type { HttpRequestTabRecord } from '@shared/domain/tabs';
 import { computed, onMounted, onUnmounted, watch } from 'vue';
 import { isDynamicName } from '../../http/dynamic/catalog';
 import EnvironmentSelect from '../../http/EnvironmentSelect.vue';
+import { canEditAsRaw, generateRawRequest } from '../../http/raw/generate';
 import { openSaveDialog, savedRequestFor, saveRequest } from '../../http/state/collections';
 import { openCopyAsCurlDialog } from '../../http/state/curl';
+import { openEditRawDialog } from '../../http/state/raw';
 import { activeEnvironmentId, ensureVariablesLoaded } from '../../http/state/variables';
 import { registerCommand } from '../../shortcuts/commands';
 import { patchHttpRequestTabState } from '../../state/tabs';
@@ -102,6 +104,29 @@ async function onCopyAsCurl(): Promise<void> {
   );
 }
 
+// P9 D10: the raw editor has no text form for a formdata/file body (a file part is bytes on disk,
+// not text) — disabled with a tooltip naming why, rather than generating an elided body the parser
+// would take literally.
+const canEditRaw = computed(() => canEditAsRaw(props.tab.state.bodyMode));
+const editRawTooltip = computed(() =>
+  canEditRaw.value
+    ? 'Edit as raw HTTP…'
+    : 'A form-data or binary body has no text form that can be edited and parsed back — a file part is bytes on disk, not text. Its wire form is in the response pane’s Raw view.',
+);
+
+// P9 D9: the buffer is generated pre-substitution, from the tab's own text — {{variables}} appear
+// literally. defaultContentType mirrors onCopyAsCurl's own computation, over the *unresolved* tab
+// state (never the live preview's resolved values — D9's whole point is that this is what the user
+// typed, not what would be sent).
+function onEditRaw(): void {
+  if (!canEditRaw.value) return;
+  const initialText = generateRawRequest(
+    props.tab.state,
+    defaultContentTypeFor(props.tab.state.bodyMode, props.tab.state.codeLanguage),
+  );
+  openEditRawDialog(props.tab.id, initialText, props.tab.state.bodyMode, props.tab.state.url);
+}
+
 // P5 D6/D7/D17: the same resolution send() runs, over the tab's *current* state — a live preview
 // of what would actually go out, without ever sending anything or reaching Go (a secret name is
 // classified 'deferred' and never appears here, D5: its plaintext never enters the renderer to
@@ -194,6 +219,9 @@ onMounted(() => {
     registerCommand('http.save', onSave),
     // P7 D10: same view-scoped shape as http.save above.
     registerCommand('http.copyAsCurl', onCopyAsCurl),
+    // P9 D8: same view-scoped shape — a no-op with no request tab mounted, and here also a no-op
+    // (not an error) for a formdata/file body, matching the toolbar button's own disabled state.
+    registerCommand('http.editRaw', onEditRaw),
   ];
 });
 onUnmounted(() => {
@@ -262,6 +290,14 @@ onUnmounted(() => {
           v-tooltip="'Copy as curl…'"
           data-testid="http-copy-as-curl"
           @click="onCopyAsCurl"
+        />
+        <IconButton
+          icon="code"
+          aria-label="Edit as raw HTTP"
+          :disabled="!canEditRaw"
+          v-tooltip="editRawTooltip"
+          data-testid="http-edit-raw"
+          @click="onEditRaw"
         />
         <AppButton
           icon="play"

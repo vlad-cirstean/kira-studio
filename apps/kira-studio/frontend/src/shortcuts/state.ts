@@ -28,6 +28,8 @@ export const paletteCommands: PaletteCommand[] = [
   { id: 'http.save', label: 'Save request', run: () => runCommand('http.save') },
   // P7 D10: view-scoped exactly like http.save above — a no-op with no request tab mounted.
   { id: 'http.copyAsCurl', label: 'Copy as curl…', run: () => runCommand('http.copyAsCurl') },
+  // P9 D8: same view-scoped shape — a no-op with no request tab mounted or a formdata/file body.
+  { id: 'http.editRaw', label: 'Edit as raw HTTP…', run: () => runCommand('http.editRaw') },
   // Registered by CollectionsPanel.vue, which is mounted for the whole of Http mode — an import
   // is not tab-scoped the way Save is.
   { id: 'http.import', label: 'Import collection…', run: () => runCommand('http.import') },

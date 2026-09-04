@@ -3,12 +3,14 @@ import { onMounted, onUnmounted } from 'vue';
 import { control } from './bridge/control';
 import CopyAsCurlDialog from './http/CopyAsCurlDialog.vue';
 import DynamicValuesDialog from './http/DynamicValuesDialog.vue';
+import EditRawRequestDialog from './http/EditRawRequestDialog.vue';
 import EnvironmentsDialog from './http/EnvironmentsDialog.vue';
 import ImportCurlDialog from './http/ImportCurlDialog.vue';
 import SaveRequestDialog from './http/SaveRequestDialog.vue';
 import { saveDialogState } from './http/state/collections';
 import { copyAsCurlDialogState, importCurlDialogState } from './http/state/curl';
 import { dynamicValuesDialogState } from './http/state/dynamicValues';
+import { editRawDialogState } from './http/state/raw';
 import { environmentsDialogState, variablesDialogState } from './http/state/variables';
 import VariablesDialog from './http/VariablesDialog.vue';
 import ConnectionDialog from './project/ConnectionDialog.vue';
@@ -79,6 +81,7 @@ onUnmounted(() => {
   <DynamicValuesDialog v-if="dynamicValuesDialogState.open" />
   <ImportCurlDialog v-if="importCurlDialogState.open" />
   <CopyAsCurlDialog v-if="copyAsCurlDialogState.open" />
+  <EditRawRequestDialog v-if="editRawDialogState.open" />
   <UploadObjectDialog v-if="uploadDialogState.open" />
   <GenerateDataDialog v-if="fakeDataDialogState.open" />
   <ConfirmDialog />
