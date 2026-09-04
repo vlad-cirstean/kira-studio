@@ -69,6 +69,31 @@ export interface HttpRequestWire {
   environmentId: string;
 }
 
+// P9 D3: three states, computed from resp.ProtoMajor/resp.Proto and whether a proxy applied to
+// this URL (http.ProxyFromEnvironment, the same function sharedClient.Transport.Proxy already is).
+// 'exact' — HTTP/1.1, no proxy: httputil.DumpRequestOut is byte-identical to the wire (P9 F7).
+// 'http2' — the exchange used HTTP/2, whose wire form is binary HPACK frames; the rendering below
+// is the equivalent HTTP/1.1 form (P9 F2). 'proxied' — HTTP/1.1 through a proxy: every byte matches
+// except the request line's target, which carried the absolute URL on the real wire (P9 F9).
+export type HttpWireFidelity = 'exact' | 'http2' | 'proxied';
+
+// P9 D13: the rendered exchange — Go's own `httpclient.WireExchange`, mirrored here. Live-only
+// (P9 D7): never stored in a P8 history snapshot, so `HttpResponseWire.wire` below is optional and
+// a restored/stored entry simply carries none.
+export interface HttpWireExchange {
+  /** The request as Go rendered it: exact bytes for `exact` (P9 F7), the equivalent HTTP/1.1
+   *  form otherwise (D3). Secret values are masked back to `{{name}}` (D6). */
+  request: string;
+  /** Status line + headers only — the body is not duplicated here (D5); the pane concatenates the
+   *  response object it already has. Alphabetised and canonicalised by net/http (F1/F10). */
+  responseHead: string;
+  fidelity: HttpWireFidelity;
+  /** How many distinct secret values were masked in `request` — 0 for a request using none. */
+  maskedSecrets: number;
+  /** True when a body was elided or truncated in `request` (D4). */
+  requestBodyElided: boolean;
+}
+
 // httpclient.Response — what comes back. `body`'s meaning depends on `bodyEncoding`: 'utf8' is the
 // text itself, 'base64' is the raw bytes so a binary response never gets corrupted round-tripping
 // through Go's `encoding/json` (D4).
@@ -84,6 +109,9 @@ export interface HttpResponseWire {
   elapsedMs: number;
   finalUrl: string;
   redirects: HttpRedirectHop[];
+  /** P9 D2/D7: absent when the send failed before a response existed (D15), a dump error occurred
+   *  (D2), or this response was read back out of P8's history store (D7 strips it before Record). */
+  wire?: HttpWireExchange;
 }
 
 // D6: the tab's own persisted headers table — `enabled` has no wire counterpart (a disabled
@@ -170,8 +198,10 @@ export const httpRequestPaneSchema = /*#__PURE__*/ z.enum(['params', 'headers', 
 export type HttpRequestPane = z.infer<typeof httpRequestPaneSchema>;
 
 // P8 D10: 'history' is the third pane — F11 verified widening this enum cannot break a restored
-// tab (every stored value is still a member).
-export const httpResponsePaneSchema = /*#__PURE__*/ z.enum(['body', 'headers', 'history']);
+// tab (every stored value is still a member). P9 D12/F13: 'raw' is the fourth, verified safe by
+// the identical reasoning — the naming collision with responseView's own 'raw' value below is
+// resolved by F19 (the two are never rendered at once), not by renaming either.
+export const httpResponsePaneSchema = /*#__PURE__*/ z.enum(['body', 'headers', 'history', 'raw']);
 export type HttpResponsePane = z.infer<typeof httpResponsePaneSchema>;
 
 export const httpResponseViewSchema = /*#__PURE__*/ z.enum(['pretty', 'raw']);
