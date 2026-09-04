@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { type HttpResponsePane, statusClass, statusHint } from '@shared/domain/http';
 import type { HttpRequestTabRecord } from '@shared/domain/tabs';
-import { computed, onMounted } from 'vue';
+import { computed, onMounted, watch } from 'vue';
 import { beautifyJson, beautifyXml, scanJson, scanXml } from '../../beautify';
 import CodeMirrorHost from '../../editor/CodeMirrorHost.vue';
 import { formatBytes } from '../../format';
@@ -25,6 +25,20 @@ const historyRt = computed(() => historyRuntime[props.tab.id]);
 onMounted(() => {
   ensureHistoryLoaded(props.tab.id);
 });
+
+// P8 D14/C5: Save as… adopts a scratch tab's history onto the newly-saved item (D14's `Adopt`
+// call lives in http/state/collections.ts, which may not import views/** — biome.json — so the
+// list's own refetch under the new scope happens reactively here instead, the moment
+// tab.state.itemId actually changes). Entries are reset to null first so ensureHistoryLoaded's
+// own "already loaded" guard doesn't skip the refetch.
+watch(
+  () => props.tab.state.itemId,
+  () => {
+    const hrt = historyRt.value;
+    if (hrt) hrt.entries = null;
+    ensureHistoryLoaded(props.tab.id);
+  },
+);
 
 // P8 D10: the source swap — a selected history entry's response, or the live one, or none. Every
 // consumer below (the status chip, the hint, elapsed/bytes, the redirect caption, the truncation

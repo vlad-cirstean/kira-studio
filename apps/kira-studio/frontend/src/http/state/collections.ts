@@ -359,6 +359,17 @@ export async function submitSaveDialog(
     request,
   });
   collectionsState.requests[item.id] = request;
+  // P8 D14: a scratch tab's response history follows it into the collection, before the tab's
+  // itemId is patched below. Best-effort, the same posture D2's own Go-side Record call takes —
+  // Save as… itself must succeed regardless of whether adopting its history did.
+  // ResponsePane.vue's own watch on tab.state.itemId is what refetches the list under the new
+  // scope once the patch below actually lands (http/** may not import views/**, so the refetch
+  // can't be triggered from here).
+  try {
+    await control.historyAdopt(tabId, item.id);
+  } catch (err) {
+    console.warn('adopting response history into the saved request failed', err);
+  }
   // The tab is now bound to a real row, so its title becomes the saved name and Save stops
   // falling back to Save as…
   patchHttpRequestTabState(tabId, { itemId: item.id, name });
