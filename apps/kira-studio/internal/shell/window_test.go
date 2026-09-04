@@ -172,8 +172,8 @@ func TestDefaultBounds(t *testing.T) {
 func TestOptions_CustomTitleBarPosture(t *testing.T) {
 	opts := shell.Options(shell.Harden(), model.WindowRecord{Key: "main"}, nil)
 
-	if opts.Mac.TitleBar != application.MacTitleBarHiddenInset {
-		t.Errorf("Mac.TitleBar = %+v, want MacTitleBarHiddenInset", opts.Mac.TitleBar)
+	if opts.Mac.TitleBar != application.MacTitleBarHidden {
+		t.Errorf("Mac.TitleBar = %+v, want MacTitleBarHidden", opts.Mac.TitleBar)
 	}
 	if opts.Frameless {
 		t.Error("Frameless = true, want false — Frameless hides the macOS traffic lights (F2)")

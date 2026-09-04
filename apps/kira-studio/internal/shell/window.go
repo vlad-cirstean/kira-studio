@@ -65,7 +65,7 @@ func Options(sec SecurityOptions, w model.WindowRecord, primaryWorkArea *applica
 	width, height := DefaultBounds(primaryWorkArea)
 	opts := application.WebviewWindowOptions{
 		// P1 D2: `Title` stays — AppKit still uses it for the window list and Mission Control
-		// even with `MacTitleBarHiddenInset`'s `HideTitle: true`.
+		// even with `MacTitleBarHidden`'s `HideTitle: true`.
 		Title:     "Kira Studio",
 		Width:     width,
 		Height:    height,
@@ -78,14 +78,22 @@ func Options(sec SecurityOptions, w model.WindowRecord, primaryWorkArea *applica
 		Name:             w.Key,
 		Permissions:      sec.Permissions,
 		EnableFileDrop:   false,
-		// P1 D2/F1/F2: `MacTitleBarHiddenInset`, deliberately NOT `Frameless: true` — Frameless
-		// would hide the traffic-light window controls (effectiveMacWindowButtonStates) and
-		// oblige the app to draw its own, which the custom title bar (TitleBar.vue) never asked
-		// for. HiddenInset keeps AppKit's controls, inset, with FullSizeContent: true — the
-		// Electron `titleBarStyle: 'hiddenInset'` shape this design wants.
+		// Deliberately NOT `Frameless: true` — Frameless would hide the traffic-light window
+		// controls (effectiveMacWindowButtonStates) and oblige the app to draw its own, which
+		// the custom title bar (TitleBar.vue) never asked for. Both `MacTitleBarHidden` and
+		// `MacTitleBarHiddenInset` keep AppKit's controls with `FullSizeContent: true` — the
+		// Electron `titleBarStyle: 'hidden'`/`'hiddenInset'` shape this design wants — but only
+		// `Hidden` has `UseToolbar: false`. `HiddenInset`'s `UseToolbar: true` was the actual
+		// source of this session's whole title-bar saga: it puts AppKit into its NSToolbar-based
+		// unified-title-bar layout, which reserves noticeably more vertical space for the
+		// traffic-light cluster than this app's own CSS bar assumed — no CSS height this app
+		// picked, 28px through 36px, ever actually matched it, because the mismatch was never a
+		// wrong number, it was the wrong layout mode entirely. Hidden's plain (non-toolbar) title
+		// bar uses the standard macOS title-bar height instead, which is what
+		// theme/tokens.css's `--kira-titlebar-h` is now sized to match.
 		Mac: application.MacWindow{
 			WebviewPreferences: sec.Webview,
-			TitleBar:           application.MacTitleBarHiddenInset,
+			TitleBar:           application.MacTitleBarHidden,
 		},
 	}
 

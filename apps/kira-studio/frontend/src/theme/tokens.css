@@ -44,20 +44,20 @@
   --kira-window-inset: 6px;
   --kira-border-width: 1px;
   --kira-statusbar-h: 22px;
-  /* P1 D2/C8: the custom title bar (workbench/TitleBar.vue), on top of `Mac.TitleBarHiddenInset`
+  /* P1 D2/C8: the custom title bar (workbench/TitleBar.vue), on top of `Mac.TitleBarHidden`
      (internal/shell/window.go). --kira-titlebar-inset-left clears the macOS traffic-light cluster
      — a real-Mac measurement this repo's Linux sandbox cannot take (§6.3), so it lands in this one
      token to adjust once rather than a value repeated at every call site.
-     Two same-session attempts on --kira-titlebar-h, both reverted: shrinking it to 28px alone left
-     AppKit's own HiddenInset/UseToolbar traffic-light cluster (sized by its own metrics, not by
-     this div's CSS height) taller than what the div reserved, spilling into the tab strip below;
-     repositioning the real buttons by hand via a native cgo/Cocoa shim (Wails v3, pinned
-     beta.16, has no Electron-style trafficLightPosition option of its own) reached the real
-     NSWindow but crashed the packaged app on launch. Do not reintroduce either approach without
-     a real macOS build in the loop to verify against — 36px is the value known to actually work,
-     left untouched; only the bar's own content (TitleBar.vue's mode tabs) is safe to keep
-     iterating on from a screenshot alone. */
-  --kira-titlebar-h: 36px;
+     Two earlier same-session attempts at shrinking --kira-titlebar-h, both reverted, were fighting
+     the wrong thing: `MacTitleBarHiddenInset`'s `UseToolbar: true` puts AppKit into its
+     NSToolbar-based unified-title-bar layout, which reserves more vertical space for the
+     traffic-light cluster than any CSS height this div was given actually matched — not a wrong
+     number, a wrong layout mode (window.go's own comment has the full account). Switching to
+     `MacTitleBarHidden` (no toolbar) removes that mismatch at the source: AppKit's plain,
+     non-toolbar title bar uses the standard macOS title-bar height, 28px, which is what this token
+     is now set to match. Still not a real-Mac measurement — confirm on an actual build before
+     trusting it further, the same caveat every value here has carried since P1. */
+  --kira-titlebar-h: 28px;
   --kira-titlebar-inset-left: 78px;
   --kira-shadow: 0 2px 8px rgb(0 0 0 / 0.32);
   --kira-shadow-dialog: 0 8px 28px rgb(0 0 0 / 0.45);
