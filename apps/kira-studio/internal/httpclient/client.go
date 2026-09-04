@@ -10,8 +10,10 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io"
+	"log/slog"
 	"mime"
 	"net/http"
+	"net/http/httputil"
 	"net/url"
 	"sort"
 	"strings"
@@ -93,6 +95,10 @@ type Response struct {
 	ElapsedMs     int           `json:"elapsedMs"`
 	FinalURL      string        `json:"finalUrl"`
 	Redirects     []RedirectHop `json:"redirects"`
+	// Wire is P9 D2/D7's rendered exchange — a pointer with omitempty so a stored snapshot's JSON
+	// (repos/response_history.go strips it to nil before marshalling, D7/F12) carries no "wire" key
+	// at all, not just a null one. Never fatal to compute: a dump error simply leaves this nil.
+	Wire *WireExchange `json:"wire,omitempty"`
 }
 
 type redirectsCtxKey struct{}
@@ -299,6 +305,12 @@ func Send(ctx context.Context, req Request) (Response, error) {
 		}
 	}
 
+	// P9 D2/F7: dumped from the request the transport is about to write, with body=false — F8
+	// measured that this is safe for a non-rewindable streaming body and that body=true would
+	// buffer an entire file upload through httputil.drainBody. The body is composed separately,
+	// under D4's cap, once Do returns.
+	reqHead, dumpErr := httputil.DumpRequestOut(httpReq, false)
+
 	start := time.Now()
 	resp, err := sharedClient.Do(httpReq)
 	if err != nil {
@@ -342,5 +354,35 @@ func Send(ctx context.Context, req Request) (Response, error) {
 		ElapsedMs:     int(elapsed.Milliseconds()),
 		FinalURL:      finalURL,
 		Redirects:     *hops,
+		Wire:          buildWireExchange(reqHead, dumpErr, httpReq, resp, req.Body, formBoundary),
 	}, nil
+}
+
+// buildWireExchange assembles P9 D2's rendering from what Send already computed — never fatal
+// (D2's own rule: "a debugging view must never be the reason a send fails"), so any error along the
+// way (the head dump, the body rendering, the response-head dump) is logged and simply leaves the
+// exchange nil rather than propagated.
+func buildWireExchange(
+	reqHead []byte, dumpErr error, httpReq *http.Request, resp *http.Response, body Body, formBoundary string,
+) *WireExchange {
+	if dumpErr != nil {
+		slog.Warn("rendering the outgoing request failed", "scope", "httpclient", "err", dumpErr)
+		return nil
+	}
+	bodyText, elided, bodyErr := renderRequestBody(body, formBoundary, httpReq.ContentLength)
+	if bodyErr != nil {
+		slog.Warn("rendering the request body failed", "scope", "httpclient", "err", bodyErr)
+		return nil
+	}
+	responseHead, headErr := renderResponseHead(resp)
+	if headErr != nil {
+		slog.Warn("rendering the response head failed", "scope", "httpclient", "err", headErr)
+		return nil
+	}
+	return &WireExchange{
+		Request:           string(reqHead) + bodyText,
+		ResponseHead:      responseHead,
+		Fidelity:          classifyFidelity(resp, httpReq),
+		RequestBodyElided: elided,
+	}
 }

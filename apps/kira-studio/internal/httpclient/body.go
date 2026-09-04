@@ -135,15 +135,25 @@ func buildCode(code, codeLanguage string) (io.ReadCloser, func() (io.ReadCloser,
 // '+', which is correct in an application/x-www-form-urlencoded body — the deliberate opposite of
 // views/httprequest/url.ts's buildQuery, which encodeURIComponents a query-string space as '%20'.
 // The two encoders differ on purpose; neither is "fixed" into the other.
-func buildURLEncoded(fields []Field) (io.ReadCloser, func() (io.ReadCloser, error), int64, string, error) {
+// encodeURLEncodedFields is buildURLEncoded's own encoder, factored out so wire.go's P9 D4
+// rendering can render the *encoded* string — the one that actually goes out — without a second
+// encoder that could drift from this one.
+func encodeURLEncodedFields(fields []Field) (string, error) {
 	parts := make([]string, 0, len(fields))
 	for _, f := range fields {
 		if strings.TrimSpace(f.Name) == "" {
-			return nil, nil, 0, "", newError(CodeBadRequest, "a urlencoded field is missing a name", nil)
+			return "", newError(CodeBadRequest, "a urlencoded field is missing a name", nil)
 		}
 		parts = append(parts, url.QueryEscape(f.Name)+"="+url.QueryEscape(f.Value))
 	}
-	encoded := strings.Join(parts, "&")
+	return strings.Join(parts, "&"), nil
+}
+
+func buildURLEncoded(fields []Field) (io.ReadCloser, func() (io.ReadCloser, error), int64, string, error) {
+	encoded, err := encodeURLEncodedFields(fields)
+	if err != nil {
+		return nil, nil, 0, "", err
+	}
 	reader := func() io.ReadCloser { return io.NopCloser(strings.NewReader(encoded)) }
 	return reader(), func() (io.ReadCloser, error) { return reader(), nil },
 		int64(len(encoded)), "application/x-www-form-urlencoded", nil
