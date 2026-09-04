@@ -1,11 +1,14 @@
 <script setup lang="ts">
 import type { HttpMethod } from '@shared/domain/http';
 import type { HttpRequestTabRecord } from '@shared/domain/tabs';
-import { computed, onMounted, onUnmounted } from 'vue';
+import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { beautifyJson } from '../../beautify';
 import CodeMirrorHost from '../../editor/CodeMirrorHost.vue';
 import { registerCommand } from '../../shortcuts/commands';
 import { patchHttpRequestTabState } from '../../state/tabs';
 import AppButton from '../../theme/primitives/AppButton.vue';
+import IconButton from '../../theme/primitives/IconButton.vue';
+import MessageStrip from '../../theme/primitives/MessageStrip.vue';
 import PanelSplitter from '../../theme/primitives/PanelSplitter.vue';
 import SegmentedControl from '../../theme/primitives/SegmentedControl.vue';
 import TextField from '../../theme/primitives/TextField.vue';
@@ -90,6 +93,20 @@ function setBodyMode(mode: 'none' | 'json'): void {
 
 function onBodyChange(text: string): void {
   patchHttpRequestTabState(props.tab.id, { body: text });
+  beautifyError.value = null;
+}
+
+// D12/F13: an edit, not a view toggle (unlike the response's own Pretty/Raw) — rewrites
+// state.body in place via the existing lossless beautifyJson, never JSON.stringify.
+const beautifyError = ref<string | null>(null);
+function onBeautifyBody(): void {
+  const result = beautifyJson(props.tab.state.body, 'indented');
+  if (result.ok) {
+    patchHttpRequestTabState(props.tab.id, { body: result.text });
+    beautifyError.value = null;
+  } else {
+    beautifyError.value = result.reason ?? 'could not format this body';
+  }
 }
 
 // D6: 0 means "the default half" — PanelSplitter itself needs a real pixel size.
@@ -183,11 +200,22 @@ onUnmounted(() => {
                 data-testid="http-body-mode"
                 @update:model-value="setBodyMode"
               />
+              <span class="p-push" />
+              <IconButton
+                v-if="tab.state.bodyMode === 'json'"
+                icon="expand-all"
+                v-tooltip="'Beautify'"
+                data-testid="http-body-beautify"
+                @click="onBeautifyBody"
+              />
             </div>
+            <MessageStrip v-if="beautifyError" tone="err" data-testid="http-body-beautify-error">
+              {{ beautifyError }}
+            </MessageStrip>
             <CodeMirrorHost
               v-if="tab.state.bodyMode === 'json'"
               :doc="tab.state.body"
-              language="plain"
+              language="json"
               :read-only="false"
               @update:doc="onBodyChange"
             />

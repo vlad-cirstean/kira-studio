@@ -2,6 +2,7 @@
 import { statusClass } from '@shared/domain/http';
 import type { HttpRequestTabRecord } from '@shared/domain/tabs';
 import { computed } from 'vue';
+import { beautifyJson, scanJson } from '../../beautify';
 import CodeMirrorHost from '../../editor/CodeMirrorHost.vue';
 import { patchHttpRequestTabState } from '../../state/tabs';
 import EmptyState from '../../theme/primitives/EmptyState.vue';
@@ -22,6 +23,31 @@ const RESPONSE_PANE_OPTIONS = [
 function setResponsePane(pane: 'body' | 'headers'): void {
   patchHttpRequestTabState(props.tab.id, { responsePane: pane });
 }
+
+// D12/C6: scanJson is the one "is this JSON" gate in the app (F13) — the Pretty/Raw toggle only
+// exists when there is something to prettify.
+const isJson = computed(() => (response.value ? scanJson(response.value.body).ok : false));
+
+const RESPONSE_VIEW_OPTIONS = [
+  { value: 'pretty' as const, label: 'Pretty', testid: 'http-response-view-pretty' },
+  { value: 'raw' as const, label: 'Raw', testid: 'http-response-view-raw' },
+];
+
+function setResponseView(view: 'pretty' | 'raw'): void {
+  patchHttpRequestTabState(props.tab.id, { responseView: view });
+}
+
+// D12: a view toggle, never an edit — Pretty renders beautifyJson(raw, 'indented'), Raw renders
+// the bytes exactly as received. Neither ever mutates response.body itself (it is read-only
+// runtime state, D6), so switching back to Raw always shows what the server actually sent.
+const bodyText = computed(() => {
+  const r = response.value;
+  if (!r) return '';
+  if (isJson.value && props.tab.state.responseView === 'pretty') {
+    return beautifyJson(r.body, 'indented').text;
+  }
+  return r.body;
+});
 </script>
 
 <template>
@@ -36,6 +62,13 @@ function setResponsePane(pane: 'body' | 'headers'): void {
           {{ response.status }} {{ response.statusText }}
         </span>
         <span class="p-push" />
+        <SegmentedControl
+          v-if="tab.state.responsePane === 'body' && isJson"
+          :model-value="tab.state.responseView"
+          :options="RESPONSE_VIEW_OPTIONS"
+          data-testid="http-response-view-toggle"
+          @update:model-value="setResponseView"
+        />
         <SegmentedControl
           :model-value="tab.state.responsePane"
           :options="RESPONSE_PANE_OPTIONS"
@@ -54,7 +87,12 @@ function setResponsePane(pane: 'body' | 'headers'): void {
         <span v-if="response.bodyEncoding === 'base64'" class="p-sm muted binary-note" data-testid="http-response-binary">
           {{ response.bodyBytes }} bytes of binary data
         </span>
-        <CodeMirrorHost v-else :doc="response.body" language="plain" :read-only="true" />
+        <CodeMirrorHost
+          v-else
+          :doc="bodyText"
+          :language="isJson ? 'json' : 'plain'"
+          :read-only="true"
+        />
       </div>
     </template>
 
