@@ -14,9 +14,9 @@ import { control } from '../../bridge/control';
 import {
   patchGrpcRequestTabState,
   patchHttpRequestTabState,
+  renameApiRequestTabs,
   renameGrpcRequestTabs,
-  renameHttpRequestTabs,
-} from '../../state/tabs';
+} from '../tabs';
 
 // P4 D13: Http's own tree store. Studio's tree is lazy because its data is remote — expanding a
 // node connects a connection and issues an IPC call, which is what its children cache, loading
@@ -306,7 +306,7 @@ export async function renameRow(row: CollectionRowVm, name: string): Promise<voi
   // Every tab bound to this row follows immediately, so the view header and the tab strip never
   // disagree with the tree (D14).
   if (row.kind === 'request' && row.protocol === 'grpc') renameGrpcRequestTabs(row.id, name);
-  else if (row.kind === 'request') renameHttpRequestTabs(row.id, name);
+  else if (row.kind === 'request') renameApiRequestTabs(row.id, name);
   await loadCollections();
 }
 

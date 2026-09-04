@@ -4,7 +4,7 @@ import type { GrpcRequestTabRecord } from '@shared/domain/tabs';
 import { computed, onMounted, ref, watch } from 'vue';
 import CodeMirrorHost from '../../editor/CodeMirrorHost.vue';
 import { formatBytes } from '../../format';
-import { patchGrpcRequestTabState } from '../../state/tabs';
+import { patchGrpcRequestTabState } from '../../http/tabs';
 import AppButton from '../../theme/primitives/AppButton.vue';
 import EmptyState from '../../theme/primitives/EmptyState.vue';
 import MessageStrip from '../../theme/primitives/MessageStrip.vue';

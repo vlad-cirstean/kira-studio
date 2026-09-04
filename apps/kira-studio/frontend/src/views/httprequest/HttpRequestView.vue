@@ -9,8 +9,8 @@ import { openSaveDialog, savedRequestFor, saveRequest } from '../../http/state/c
 import { openCopyAsCurlDialog } from '../../http/state/curl';
 import { openEditRawDialog } from '../../http/state/raw';
 import { activeEnvironmentId, ensureVariablesLoaded } from '../../http/state/variables';
+import { patchHttpRequestTabState } from '../../http/tabs';
 import { registerCommand } from '../../shortcuts/commands';
-import { patchHttpRequestTabState } from '../../state/tabs';
 import AppButton from '../../theme/primitives/AppButton.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
 import PanelSplitter from '../../theme/primitives/PanelSplitter.vue';

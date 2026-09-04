@@ -3,8 +3,8 @@ import type {
   ResponseHistorySnapshot,
 } from '@shared/domain/response-history';
 import { control } from '../../bridge/control';
+import { findHttpRequestTab } from '../../http/tabs';
 import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
-import { findHttpRequestTab } from '../../state/tabs';
 import { createRuntimeStore } from '../shared/viewOp';
 
 // P8 D11: the per-tab history runtime — never persisted (P2 D6's rule applied consistently: the

@@ -1,8 +1,8 @@
 import type { HttpBodyMode } from '@shared/domain/http';
 import { reactive } from 'vue';
-import { patchHttpRequestTabState } from '../../state/tabs';
 import type { RawWarning } from '../raw/parse';
 import { parseRawRequest } from '../raw/parse';
+import { patchHttpRequestTabState } from '../tabs';
 
 // P9 D8: the raw editor's own state — mirrors http/state/curl.ts's importCurlDialogState shape
 // (one `open` flag plus what the dialog needs to seed itself and to Apply). The pasted/generated
@@ -68,7 +68,7 @@ export function previewRaw(text: string): RawPreview {
 }
 
 /** D8/D9: Apply patches the *current* tab — never a fresh one (submitImportCurl's own
- *  openHttpRequestTab is deliberately not called here), because this is the current request being
+ *  openApiRequestTab is deliberately not called here), because this is the current request being
  *  re-authored, not a new one. Substitution still applies at send, unchanged: after this, the tab
  *  is an ordinary tab, and send() runs its usual two-stage resolution over whatever `{{name}}`
  *  references the hand-edited text carried (D9's whole point of parsing back into the model rather

@@ -5,7 +5,7 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { beautifyJson, beautifyXml, scanJson, scanXml } from '../../beautify';
 import CodeMirrorHost from '../../editor/CodeMirrorHost.vue';
 import { formatBytes } from '../../format';
-import { patchHttpRequestTabState } from '../../state/tabs';
+import { patchHttpRequestTabState } from '../../http/tabs';
 import AppButton from '../../theme/primitives/AppButton.vue';
 import EmptyState from '../../theme/primitives/EmptyState.vue';
 import MessageStrip from '../../theme/primitives/MessageStrip.vue';

@@ -11,8 +11,8 @@ import { itemRecord } from '../../http/state/collections';
 import { activeEnvironmentId, cachedVariables } from '../../http/state/variables';
 import { type Reference, resolve } from '../../http/substitute';
 import { type ResolvedRequest, substituteBody } from '../../http/substituteRequest';
+import { findHttpRequestTab } from '../../http/tabs';
 import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
-import { findHttpRequestTab } from '../../state/tabs';
 import { classifyLoadError, createRuntimeStore, stopOp } from '../shared/viewOp';
 import { noteSendRecorded } from './history';
 

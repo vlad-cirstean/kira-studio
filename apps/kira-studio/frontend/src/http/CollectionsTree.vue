@@ -5,7 +5,6 @@ import { shortcutFor } from '../shortcuts/keys';
 import { confirmDialog } from '../state/confirmDialog';
 import { openContextMenu, runMenuShortcut } from '../state/contextMenu';
 import { settingsState } from '../state/settings';
-import { openCollectionGrpcRequestTab, openCollectionRequestTab } from '../state/tabs';
 import TreeHost from '../theme/primitives/TreeHost.vue';
 import CollectionRow from './CollectionRow.vue';
 import { backgroundMenu, type CollectionMenuActions, menuForRow } from './menus';
@@ -33,6 +32,7 @@ import {
 import { openImportCurlDialog } from './state/curl';
 import { openDynamicValuesDialog } from './state/dynamicValues';
 import { openEnvironmentsDialog, openVariablesDialog } from './state/variables';
+import { openCollectionGrpcRequestTab, openCollectionRequestTab } from './tabs';
 
 // P4 D13: a real TreeHost consumer, with **not one line of tree mechanics** of its own —
 // virtualization, the pinned ancestor band and reveal-scroll all live in the primitive P1 factored

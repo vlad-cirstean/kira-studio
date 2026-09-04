@@ -1,11 +1,11 @@
 import type { HttpCodeLanguage } from '@shared/domain/http';
 import { reactive } from 'vue';
 import { copyText } from '../../clipboard';
-import { openHttpRequestTab, patchHttpRequestTabState } from '../../state/tabs';
 import { toCurl } from '../curl/generate';
 import { type ParsedCurl, parseCurl } from '../curl/parse';
 import type { CurlWarning } from '../curl/tokenize';
 import { applySecretValues, type ResolvedRequest } from '../substituteRequest';
+import { openApiRequestTab, patchHttpRequestTabState } from '../tabs';
 import { cachedVariables, revealedValues, revealVariable } from './variables';
 
 // P7 D12: the Import-from-curl dialog's own state — mirrors http/state/dynamicValues.ts's shape
@@ -92,7 +92,7 @@ export function previewCurl(text: string): CurlPreview {
 export function submitImportCurl(text: string): boolean {
   const parsed = parseCurl(text);
   if ('error' in parsed) return false;
-  const id = openHttpRequestTab();
+  const id = openApiRequestTab();
   patchHttpRequestTabState(id, parsed.state);
   closeImportCurlDialog();
   return true;

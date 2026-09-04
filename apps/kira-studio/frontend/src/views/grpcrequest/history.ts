@@ -1,7 +1,7 @@
 import type { GrpcCallHistoryEntry, GrpcCallSnapshot } from '@shared/domain/grpc-history';
 import { control } from '../../bridge/control';
+import { findGrpcRequestTab } from '../../http/tabs';
 import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
-import { findGrpcRequestTab } from '../../state/tabs';
 import { createRuntimeStore } from '../shared/viewOp';
 
 // P11 D11/D14: the per-tab gRPC history runtime — mirrors views/httprequest/history.ts's own

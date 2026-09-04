@@ -10,8 +10,8 @@ import { loadDynamicGenerator } from '../../http/dynamic/catalog';
 import { itemRecord } from '../../http/state/collections';
 import { activeEnvironmentId, cachedVariables } from '../../http/state/variables';
 import { type Reference, resolve } from '../../http/substitute';
+import { findGrpcRequestTab } from '../../http/tabs';
 import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
-import { findGrpcRequestTab } from '../../state/tabs';
 import { classifyLoadError, createRuntimeStore, stopOp } from '../shared/viewOp';
 import { noteGrpcCallRecorded } from './history';
 

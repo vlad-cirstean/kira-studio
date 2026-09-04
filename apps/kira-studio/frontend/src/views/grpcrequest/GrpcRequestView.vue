@@ -12,8 +12,8 @@ import {
   saveGrpcRequest,
 } from '../../http/state/collections';
 import { activeEnvironmentId, ensureVariablesLoaded } from '../../http/state/variables';
+import { patchGrpcRequestTabState } from '../../http/tabs';
 import { registerCommand } from '../../shortcuts/commands';
-import { patchGrpcRequestTabState } from '../../state/tabs';
 import AppButton from '../../theme/primitives/AppButton.vue';
 import PanelSplitter from '../../theme/primitives/PanelSplitter.vue';
 import SegmentedControl from '../../theme/primitives/SegmentedControl.vue';

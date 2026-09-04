@@ -1,9 +1,10 @@
 import { reactive } from 'vue';
+import { openApiRequestTab } from '../http/tabs';
 import { openCreateDialog } from '../state/connections';
 import { toggleOperationsPanel, toggleProjectPanel } from '../state/layout';
 import { activeTab } from '../state/mode';
 import { settingsOpen } from '../state/settings';
-import { activateNextTab, activatePrevTab, closeTab, openHttpRequestTab } from '../state/tabs';
+import { activateNextTab, activatePrevTab, closeTab } from '../state/tabs';
 import { runCommand } from './commands';
 
 export interface PaletteCommand {
@@ -20,7 +21,7 @@ export const paletteCommands: PaletteCommand[] = [
   { id: 'new-connection', label: 'New connection', run: () => openCreateDialog() },
   // D13: a one-click action worth a name, the same bar this list's own comment states — no menu
   // or accelerator change (HttpStart.vue/CollectionsPanel.vue's own buttons are the other two).
-  { id: 'http.newRequest', label: 'New request', run: () => void openHttpRequestTab() },
+  { id: 'http.newRequest', label: 'New request', run: () => void openApiRequestTab() },
   // P4 D15: the discoverability answer for Save, at the same bar this list's own comment states.
   // No ⌘S and no accelerator — shared/domain/shortcuts.ts is a closed map and a menu accelerator
   // needs the seven-file path P1 OQ-3 / P2 OQ-7 deferred as one deliberate pass. View-scoped like

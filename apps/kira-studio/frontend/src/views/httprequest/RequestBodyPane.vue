@@ -3,7 +3,7 @@ import type { HttpBodyMode, HttpCodeLanguage } from '@shared/domain/http';
 import type { HttpRequestTabRecord } from '@shared/domain/tabs';
 import { computed, ref } from 'vue';
 import CodeMirrorHost from '../../editor/CodeMirrorHost.vue';
-import { patchHttpRequestTabState } from '../../state/tabs';
+import { patchHttpRequestTabState } from '../../http/tabs';
 import IconButton from '../../theme/primitives/IconButton.vue';
 import MessageStrip from '../../theme/primitives/MessageStrip.vue';
 import SegmentedControl from '../../theme/primitives/SegmentedControl.vue';

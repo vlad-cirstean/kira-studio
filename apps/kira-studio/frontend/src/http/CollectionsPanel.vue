@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted } from 'vue';
 import { registerCommand } from '../shortcuts/commands';
-import { openHttpRequestTab } from '../state/tabs';
 import EmptyState from '../theme/primitives/EmptyState.vue';
 import IconButton from '../theme/primitives/IconButton.vue';
 import PanelShell from '../theme/primitives/PanelShell.vue';
@@ -18,6 +17,7 @@ import {
 import { openImportCurlDialog } from './state/curl';
 import { openDynamicValuesDialog } from './state/dynamicValues';
 import { openEnvironmentsDialog, openVariablesDialog } from './state/variables';
+import { openApiRequestTab } from './tabs';
 
 // P4 C5: the placeholder is gone — this is a real tree now, mounted through the same PanelShell
 // shell Studio's ProjectPanel.vue uses. `empty` is no longer hardcoded: it is "this app has no
@@ -111,7 +111,7 @@ onUnmounted(() => {
         aria-label="New request"
         v-tooltip="'New request'"
         data-testid="new-request"
-        @click="openHttpRequestTab"
+        @click="openApiRequestTab"
       />
       <IconButton
         icon="new-folder"
@@ -150,7 +150,7 @@ onUnmounted(() => {
     <template #empty>
       <ImportReportStrip />
       <EmptyState icon="globe" label="No collections yet">
-        <button type="button" class="p-dlgbtn primary" data-testid="new-request-empty" @click="openHttpRequestTab">
+        <button type="button" class="p-dlgbtn primary" data-testid="new-request-empty" @click="openApiRequestTab">
           New request
         </button>
         <button type="button" class="p-dlgbtn" data-testid="new-collection-empty" @click="onNewCollection">

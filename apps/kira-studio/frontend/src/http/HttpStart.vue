@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { openGrpcRequestTab, openHttpRequestTab } from '../state/tabs';
 import CodiconIcon from '../theme/CodiconIcon.vue';
 import { importCollection } from './state/collections';
 import { openImportCurlDialog } from './state/curl';
+import { openApiRequestTab, openGrpcRequestTab } from './tabs';
 
 // D13: the mode's front door — StudioStart.vue's own first-run shape verbatim (mark, title, one
 // line of copy, one p-dlgbtn primary button), the same `http/ -> state/` edge
@@ -29,7 +29,7 @@ function onImportCurl(): void {
       <div class="start-title">No request open</div>
       <div class="start-sub muted">Send an HTTP request and see its response here.</div>
       <div class="start-actions">
-        <button type="button" class="p-dlgbtn primary" data-testid="new-request-start" @click="openHttpRequestTab">
+        <button type="button" class="p-dlgbtn primary" data-testid="new-request-start" @click="openApiRequestTab">
           <span class="icon-box"><CodiconIcon name="add" :size="13" /></span>
           New request
         </button>

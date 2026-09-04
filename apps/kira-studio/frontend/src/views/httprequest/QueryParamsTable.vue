@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { HttpRequestTabRecord } from '@shared/domain/tabs';
 import { computed } from 'vue';
-import { patchHttpRequestTabState } from '../../state/tabs';
+import { patchHttpRequestTabState } from '../../http/tabs';
 import FieldRowsTable from './FieldRowsTable.vue';
 import { buildQuery, parseQuery, type QueryPair, splitUrl } from './url';
 
