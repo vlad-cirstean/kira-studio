@@ -1022,6 +1022,13 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  /* Positioning context for the EmptyState siblings below (`.no-rows` class, slickTheme.css's
+     unscoped `position: absolute; inset: 0` rule) — without it inset:0 has no positioned ancestor
+     anywhere up to <body>, so the placeholder expands to cover the whole app window instead of
+     just this row list, intercepting pointer events app-wide (the tree sidebar included) whenever
+     a stream view shows an empty state. Same fix SlickGridHost.vue already applies to its own
+     `.slick-grid-host` for the identical shared class. */
+  position: relative;
 }
 
 .list-body .p-empty {
