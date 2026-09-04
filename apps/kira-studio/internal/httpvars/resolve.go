@@ -145,6 +145,59 @@ func referencedFields(url string, headers []httpclient.Header, body httpclient.B
 	return fields
 }
 
+// Resolver is P11 D9/F21's own extraction: the reusable half of stage 2 — fetch every secret
+// reachable from one scope once, then substitute text and accumulate what was actually used. Two
+// protocols share it now (ResolveRequest below, and bridge/grpc.go's own resolution closure via
+// NewResolver), and gain no import of each other's protocol package for it: httpvars gains no gRPC
+// import, which is what keeps it protocol-neutral rather than becoming a two-protocol module.
+type Resolver struct {
+	secretValues map[string]string
+	used         map[string]string
+}
+
+// NewResolver fetches every secret reachable from collectionID/environmentID once
+// (repos.VariablesRepo.SecretsFor already applies D2's environment-over-collection precedence)
+// and returns a resolver that substitutes text and accumulates what it actually used.
+func (s *Service) NewResolver(collectionID, environmentID string) (*Resolver, error) {
+	secretValues, err := s.deps.Repo.SecretsFor(collectionID, environmentID)
+	if err != nil {
+		return nil, err
+	}
+	return &Resolver{secretValues: secretValues, used: map[string]string{}}, nil
+}
+
+// Any reports whether this scope has any secret at all — false means there is nothing this
+// resolver could ever substitute, so a caller can skip walking its own fields entirely.
+func (r *Resolver) Any() bool {
+	return len(r.secretValues) > 0
+}
+
+// Text resolves every {{name}} reference in text that names one of this scope's secrets, and
+// records each one actually substituted into Used(). A reference that still resolves to
+// nothing — a stale id, a typo, a secret whose decrypt failed — is left verbatim; this package
+// never fails a caller over one unresolved reference (D10 mirrors P9 D10's own rule), the server's
+// own response is the honest signal.
+func (r *Resolver) Text(text string) string {
+	result := Resolve(text, r.secretValues, nil)
+	for _, ref := range result.Refs {
+		if ref.Kind == KindResolved {
+			r.used[ref.Name] = r.secretValues[ref.Name]
+		}
+	}
+	return result.Text
+}
+
+// Used is every secret name→value pair actually substituted so far — what a caller's own masking
+// replacer (bridge/http.go's secretReplacer, shared unchanged by bridge/grpc.go, D10) is built
+// from, so a secret's plaintext is never left in a copyable surface unmasked. nil when nothing was
+// substituted, matching ResolveRequest's own pre-extraction contract.
+func (r *Resolver) Used() map[string]string {
+	if len(r.used) == 0 {
+		return nil
+	}
+	return r.used
+}
+
 // ResolveRequest is D6's stage 2, called from bridge/http.go strictly *after* op.SetCommand
 // (F3) — the URL/headers/body it is given must never feed back into anything logged or persisted.
 // It decrypts every secret variable reachable from collectionID/environmentID
@@ -153,6 +206,8 @@ func referencedFields(url string, headers []httpclient.Header, body httpclient.B
 // reference that still resolves to nothing — a stale id, a typo, a secret whose decrypt failed —
 // is left verbatim; Go never fails a send over one unresolved reference (D10), the server's own
 // response is the honest signal.
+//
+// P11 D9/F21: reimplemented on Resolver above — behaviour-identical (its own tests pass unedited).
 //
 // P9 D6/F11: the fourth return, `used`, is every secret name→value pair actually substituted —
 // the same resolvedNames set this function already built for its own Debug log, widened to carry
@@ -172,51 +227,40 @@ func (s *Service) ResolveRequest(
 		return url, headers, body, nil, nil
 	}
 
-	secretValues, err := s.deps.Repo.SecretsFor(collectionID, environmentID)
+	resolver, err := s.NewResolver(collectionID, environmentID)
 	if err != nil {
 		return url, headers, body, nil, err
 	}
-	if len(secretValues) == 0 {
+	if !resolver.Any() {
 		return url, headers, body, nil, nil
 	}
 
-	used := map[string]string{}
-	resolveText := func(text string) string {
-		result := Resolve(text, secretValues, nil)
-		for _, ref := range result.Refs {
-			if ref.Kind == KindResolved {
-				used[ref.Name] = secretValues[ref.Name]
-			}
-		}
-		return result.Text
-	}
-
-	resolvedURL := resolveText(url)
+	resolvedURL := resolver.Text(url)
 	resolvedHeaders := make([]httpclient.Header, len(headers))
 	for i, h := range headers {
-		resolvedHeaders[i] = httpclient.Header{Name: resolveText(h.Name), Value: resolveText(h.Value)}
+		resolvedHeaders[i] = httpclient.Header{Name: resolver.Text(h.Name), Value: resolver.Text(h.Value)}
 	}
 
 	resolvedBody := body
 	switch body.Mode {
 	case string(httpclient.BodyRaw):
-		resolvedBody.Raw = resolveText(body.Raw)
+		resolvedBody.Raw = resolver.Text(body.Raw)
 	case string(httpclient.BodyCode):
-		resolvedBody.Code = resolveText(body.Code)
+		resolvedBody.Code = resolver.Text(body.Code)
 	case string(httpclient.BodyURLEncoded):
 		fields := make([]httpclient.Field, len(body.URLEncoded))
 		for i, f := range body.URLEncoded {
-			fields[i] = httpclient.Field{Name: resolveText(f.Name), Value: resolveText(f.Value)}
+			fields[i] = httpclient.Field{Name: resolver.Text(f.Name), Value: resolver.Text(f.Value)}
 		}
 		resolvedBody.URLEncoded = fields
 	case string(httpclient.BodyFormData):
 		fields := make([]httpclient.FormField, len(body.FormData))
 		for i, f := range body.FormData {
 			out := f
-			out.Name = resolveText(f.Name)
-			out.ContentType = resolveText(f.ContentType)
+			out.Name = resolver.Text(f.Name)
+			out.ContentType = resolver.Text(f.ContentType)
 			if f.Kind == "text" {
-				out.Value = resolveText(f.Value)
+				out.Value = resolver.Text(f.Value)
 			}
 			// D7: a form-data file row's path is never substituted.
 			fields[i] = out
@@ -224,6 +268,7 @@ func (s *Service) ResolveRequest(
 		resolvedBody.FormData = fields
 	}
 
+	used := resolver.Used()
 	// D5: the count and the *names* of the secrets resolved, never their values, and only at
 	// Debug — connections.Service.Reveal's own "the subject, not the secret" precedent.
 	if len(used) > 0 {
