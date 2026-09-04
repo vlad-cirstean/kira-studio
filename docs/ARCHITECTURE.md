@@ -839,19 +839,27 @@ rows; nothing here is half-built toward them.
 
 **Three workspace packages carry the module's domain/transport/UI logic, and depend on nothing of
 this app's.** `packages/git-core` (pure domain: commit store, graph layout, pre-flight analysis —
-none of it exercised yet), `packages/git-ipc` (the `Transport` interface, the request/event/stream
-contract, the `createRpcClient`/`createRpcServer` frame-protocol machinery) and `packages/git-ui`
-(the Vue 3 app, `mount(container, {transport, viewState, host})` its entire host-facing surface)
-were ported from a previously-independent project (`origin/import/kira-version-vscode-kickoff`,
-reference material only, never merged into this repo's history) at chapter kickoff, unmodified
-since — P1's own exit criterion is `git status --short packages` staying empty under all three,
-checked directly rather than assumed, and it does. The dependency direction is one-way and
-lint-checkable (`biome.json`'s `apps/kira-studio/frontend/src/git/**` override): only
-`apps/kira-studio` depends on any of the three; none of them depends on it, on Wails, or on each
-other transitively beyond `git-ui → {git-core, git-ipc}`. A future second host (there is exactly
-one precedent for this shape actually happening — the source project's own VS Code host, dropped
-per "What deliberately does not come across" in the SPEC) would sit behind the same `Transport`
-seam these packages already define.
+none of it exercised yet), `packages/git-ipc` (Git's own contract, the `Transport` interface it
+instantiates, and the wiring that binds `packages/ipc-core`'s generic RPC endpoint to Git's
+version and method vocabulary) and `packages/git-ui` (the Vue 3 app, `mount(container, {transport,
+viewState, host})` its entire host-facing surface) were ported from a previously-independent
+project (`origin/import/kira-version-vscode-kickoff`, reference material only, never merged into
+this repo's history) at chapter kickoff, unmodified since — P1's own exit criterion is `git status
+--short packages` staying empty under all three, checked directly rather than assumed, and it
+does (`packages/git-ipc` is the one deliberate exception since kickoff: v1.3 P1 iter2
+(`docs/v1.3/plans/P1-host-and-go-git-client-iter2.md`) extracted its protocol-generic halves —
+`rpc.ts`, `transport.ts`, `codec.ts`, and the contract-independent half of `validate.ts` — into a
+fourth workspace package, `packages/ipc-core` (`@kira/ipc-core`, no module prefix because it is
+not a module — F9/D4), leaving `git-ipc` holding Git's contract plus the thin instantiation that
+binds it). The dependency direction is one-way and lint-checkable (`biome.json`'s
+`apps/kira-studio/frontend/src/git/**` and `packages/ipc-core/**` overrides): only
+`apps/kira-studio` depends on any of the module's packages; none of them depends on it, on Wails,
+or on each other transitively beyond `git-ui → {git-core, git-ipc}` and `git-ipc → ipc-core`. A
+future second host (there is exactly one precedent for this shape actually happening — the source
+project's own VS Code host, dropped per "What deliberately does not come across" in the SPEC)
+would sit behind the same `Transport` seam these packages already define; a future second module
+wanting the same request/response-plus-streaming shape (v1.2's own P12, possibly — SPEC's
+module-boundary paragraph) imports `packages/ipc-core` directly rather than rebuilding it.
 
 **`internal/gitclient` is the Node → Go port of the source's process-spawning half** — spawn
 discipline, discovery, identity, capabilities — structured the way `internal/httpclient` already
@@ -905,14 +913,21 @@ and `bridge/gitstream.go`'s frame dispatcher calls `GitService`'s methods direct
 function calls, to fulfil each of `@kira/git-ipc`'s contract request/stream keys. `HandleStream` is
 a map insert (`shell.RegisterGitStream` sits beside `RegisterEngineStream` as a sibling, `main.go`),
 so the second stream costs nothing structurally and needed no change to the first.
-- **`gitstream.go` is a Go transcription of `@kira/git-ipc`'s `createRpcServer`
-  (`packages/git-ipc/src/rpc.ts`)** — the versioned envelope, `req`/`res`/`evt`/`open`/`chunk`/
-  `end`/`credit`/`cancel`, a real `creditGate` (unused by P1's own stream handler, correct for
-  P2's first real emit loop), and the `removeActiveWork` idiom that keeps a completing request
-  from racing its own `cancel` frame and sending a stray response. One writer goroutine per
-  session (`*application.StreamConn.Send` is not documented safe for concurrent callers, and each
-  inbound `req`/`open` runs on its own goroutine) — the same "one writer" discipline the engine
-  stream's own `adapterhost.Session` already established.
+- **The frame protocol itself — the versioned envelope, `req`/`res`/`evt`/`open`/`chunk`/`end`/
+  `credit`/`cancel`, a real `creditGate` (unused by P1's own stream handler, correct for P2's
+  first real emit loop), and the `removeActiveWork` idiom that keeps a completing request from
+  racing its own `cancel` frame — lives in `internal/bridge/rpcstream`, a Go transcription of
+  `@kira/ipc-core`'s own `createRpcServer` (`packages/ipc-core/src/rpc.ts`), kept module-agnostic
+  since v1.3 P1 iter2** (`docs/v1.3/plans/P1-host-and-go-git-client-iter2.md`): it exports exactly
+  `Conn`, `Handlers` and `Serve`, never learns what a method means, and depends on nothing but
+  `internal/bridge/ipcerr`. `gitstream.go` is the thin adapter left behind — `GitStreamName`, the
+  Git request-key table, and `ServeGitStream`, which calls `rpcstream.Serve` with two dispatch
+  closures (`Handlers.Request`/`Handlers.Stream`) wired to `GitService`'s methods; it is under 130
+  lines and contains no frame, envelope, credit or correlation logic of its own. One writer
+  goroutine per session (`*application.StreamConn.Send` is not documented safe for concurrent
+  callers, and each inbound `req`/`open` runs on its own goroutine) — the same "one writer"
+  discipline the engine stream's own `adapterhost.Session` already established — is `rpcstream`'s
+  discipline now, unchanged from `gitstream.go`'s own before the split.
 - **The stream is a raw-bytes carrier; the payload encoding is chosen per data kind, not tied to
   one codec.** P1's own envelope crosses as UTF-8 JSON text both directions (`frontend/src/git/
   transport.ts`'s `MessageChannelLike.post` sends a `JSON.stringify`'d string, exactly like
