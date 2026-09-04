@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { type HttpResponsePane, statusClass, statusHint } from '@shared/domain/http';
 import type { HttpRequestTabRecord } from '@shared/domain/tabs';
-import { computed, onMounted, watch } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { beautifyJson, beautifyXml, scanJson, scanXml } from '../../beautify';
 import CodeMirrorHost from '../../editor/CodeMirrorHost.vue';
 import { formatBytes } from '../../format';
@@ -11,6 +11,7 @@ import EmptyState from '../../theme/primitives/EmptyState.vue';
 import MessageStrip from '../../theme/primitives/MessageStrip.vue';
 import SegmentedControl from '../../theme/primitives/SegmentedControl.vue';
 import { backToLatest, ensureHistoryLoaded, historyRuntime } from './history';
+import ResponseDiffDialog from './ResponseDiffDialog.vue';
 import ResponseHistoryList from './ResponseHistoryList.vue';
 import { runtime } from './state';
 
@@ -18,6 +19,16 @@ const props = defineProps<{ tab: HttpRequestTabRecord }>();
 
 const rt = computed(() => runtime[props.tab.id]);
 const historyRt = computed(() => historyRuntime[props.tab.id]);
+
+// P8 C6/D12: the dialog mounts only while a compare is in flight — the same "reached only from an
+// explicit click" gate that keeps @codemirror/merge's chunk unfetched until then (D13).
+const compareIds = ref<[string, string] | null>(null);
+function onCompare(ids: [string, string]): void {
+  compareIds.value = ids;
+}
+function closeCompare(): void {
+  compareIds.value = null;
+}
 
 // P8 D11: the one initial "does this tab have any history at all" fetch — always, on mount,
 // regardless of the live response or which pane is selected (F9's sibling reasoning). This is
@@ -187,7 +198,11 @@ function onBackToLatest(): void {
         {{ redirectCaption }}
       </div>
 
-      <ResponseHistoryList v-if="tab.state.responsePane === 'history'" :tab="tab" />
+      <ResponseHistoryList
+        v-if="tab.state.responsePane === 'history'"
+        :tab="tab"
+        @compare="onCompare"
+      />
       <div v-else-if="tab.state.responsePane === 'headers'" class="response-headers" data-testid="http-response-headers">
         <template v-if="response">
           <div v-for="(h, i) in response.headers" :key="i" class="response-header-row">
@@ -223,6 +238,8 @@ function onBackToLatest(): void {
     </template>
 
     <EmptyState v-else-if="!rt || rt.status === 'idle'" icon="arrow-right" label="Send a request to see the response" />
+
+    <ResponseDiffDialog v-if="compareIds" :ids="compareIds" @close="closeCompare" />
   </div>
 </template>
 
