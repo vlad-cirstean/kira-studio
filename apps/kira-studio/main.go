@@ -246,6 +246,7 @@ func main() {
 	})
 
 	shell.RegisterEngineStream(app, router)
+	shell.RegisterGitStream(app, gitService)
 
 	windowDeps := shell.WindowDeps{Windows: repositories.Windows, StartedAt: startedAt}
 

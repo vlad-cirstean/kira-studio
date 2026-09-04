@@ -130,6 +130,15 @@ func RegisterEngineStream(app *application.App, router *adapterhost.Router) {
 	})
 }
 
+// RegisterGitStream registers the second named stream (§3 Option C) — a sibling to
+// RegisterEngineStream, not a modification of it: HandleStream keys handlers by name (a map
+// insert), so this costs the engine stream nothing and needs no change to it.
+func RegisterGitStream(app *application.App, svc *bridge.GitService) {
+	app.HandleStream(bridge.GitStreamName, func(c *application.StreamConn) {
+		bridge.ServeGitStream(svc, c)
+	})
+}
+
 // AttachReopen is src/main/index.ts:141-145's `activate` handler: on macOS, closing the last
 // window leaves the app running (P56 D10), and clicking the Dock icon brings a window back.
 // Wails' own default reopen handler (events_common_darwin.go) only re-shows a hidden-but-extant
