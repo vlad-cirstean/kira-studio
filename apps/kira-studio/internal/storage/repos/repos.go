@@ -20,6 +20,7 @@ type Repos struct {
 	FilterHistory *FilterHistoryRepo
 	Metadata      *MetadataCacheRepo
 	Schema        *SchemaRepo
+	Collections   *CollectionsRepo
 
 	stmts []*sql.Stmt // every prepared statement below, for Close.
 }
@@ -60,6 +61,7 @@ func New(db *sql.DB) (*Repos, error) {
 		FilterHistory: &FilterHistoryRepo{DB: db},
 		Metadata:      &MetadataCacheRepo{DB: db},
 		Schema:        &SchemaRepo{DB: db},
+		Collections:   &CollectionsRepo{DB: db},
 		stmts:         []*sql.Stmt{settingsSelectAll, layoutSelectAll, tabsSelectAll, opsInsert, opsUpdate},
 	}, nil
 }

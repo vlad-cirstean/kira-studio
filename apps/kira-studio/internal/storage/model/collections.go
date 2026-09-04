@@ -2,6 +2,44 @@ package model
 
 import "fmt"
 
+// Collection is one http_collections row, minus origin_json — the summary the tree renders from.
+// P4 D2: `List` never selects origin_json (or request_json), which is why neither is here.
+type Collection struct {
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	SortOrder int    `json:"sortOrder"`
+	CreatedAt string `json:"createdAt"`
+	UpdatedAt string `json:"updatedAt"`
+}
+
+// CollectionItem is one http_items row, minus request_json and origin_json. Method and URL are
+// denormalized out of the saved request so the tree renders a method chip and searches URLs
+// without reading potentially large bodies; both are "" for a folder.
+type CollectionItem struct {
+	ID           string  `json:"id"`
+	CollectionID string  `json:"collectionId"`
+	ParentID     *string `json:"parentId"`
+	Kind         string  `json:"kind"`
+	Name         string  `json:"name"`
+	SortOrder    int     `json:"sortOrder"`
+	Method       string  `json:"method"`
+	URL          string  `json:"url"`
+	CreatedAt    string  `json:"createdAt"`
+	UpdatedAt    string  `json:"updatedAt"`
+}
+
+// The two item kinds. Postman carries no `type` field — a folder is "has an `item` member", a
+// request is "has a `request` member" (P4 F1) — so this vocabulary is this app's own.
+const (
+	CollectionItemFolder  = "folder"
+	CollectionItemRequest = "request"
+)
+
+// IsCollectionItemKind reports whether kind is one of the two.
+func IsCollectionItemKind(kind string) bool {
+	return kind == CollectionItemFolder || kind == CollectionItemRequest
+}
+
 // P4 D4: model.SavedRequest is what a saved collection request *is* — deliberately field-identical
 // to the request half of packages/shared/domain/http.ts's httpRequestTabStateSchema, so the
 // renderer can spread it straight into tab state. It is NOT tabs.state_json (the four UI-only

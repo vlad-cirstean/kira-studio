@@ -33,6 +33,7 @@ var names = []struct {
 	{3, "p18_connection_ddl", "0003_p18_connection_ddl.sql"},
 	{4, "p18_auto_explain", "0004_p18_auto_explain.sql"},
 	{5, "p28_throttle", "0005_p28_throttle.sql"},
+	{6, "p4_collections", "0006_p4_collections.sql"},
 }
 
 // All returns every migration in ascending version order.
