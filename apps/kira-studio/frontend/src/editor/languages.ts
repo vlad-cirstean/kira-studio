@@ -5,9 +5,10 @@ import { StreamLanguage, type StringStream } from '@codemirror/language';
 import type { Extension } from '@codemirror/state';
 import type { SqlDialect } from '../views/shared/sqlIdent';
 
-/** The six grammars an editor surface can request. `formats.ts` maps CellFormat onto the first
- *  four; `mongo`/`redis` are the addendum's console-only highlighting modes (D23). */
-export type EditorLanguageId = 'json' | 'xml' | 'sql' | 'mongo' | 'redis' | 'plain';
+/** The seven grammars an editor surface can request. `formats.ts` maps CellFormat onto the first
+ *  four; `mongo`/`redis` are the addendum's console-only highlighting modes (D23); `graphql` is
+ *  P3 D10's raw·GraphQL query pane. */
+export type EditorLanguageId = 'json' | 'xml' | 'sql' | 'mongo' | 'redis' | 'graphql' | 'plain';
 
 // P18 addendum D23: highlighting only, no completion language data — the console's own
 // `completionSources` prop (CodeMirrorHost.vue) carries the tab-specific source instead, so
@@ -103,6 +104,99 @@ const redisLanguage = StreamLanguage.define<RedisTokenState>({
   token: redisToken,
 });
 
+// P3 D10: the GraphQL query pane's grammar — highlighting only, no completion, no validation,
+// same as mongo/redis above (D1 declined cm6-graphql/graphql-language-service: both pull the
+// graphql reference implementation, a schema-aware parser, to deliver only colour here — we have
+// no schema to be aware of). `atField` tracks whether the next bare identifier is a selected
+// field name (after `{`, a newline, or `,`) or something else (an argument name, an alias target)
+// — the same "position, not meaning" heuristic mongoToken's `afterDot` uses.
+interface GraphQlTokenState {
+  atField: boolean;
+}
+
+const GRAPHQL_KEYWORDS = new Set([
+  'query',
+  'mutation',
+  'subscription',
+  'fragment',
+  'on',
+  'type',
+  'schema',
+  'scalar',
+  'interface',
+  'union',
+  'enum',
+  'input',
+  'extend',
+  'directive',
+  'implements',
+  'true',
+  'false',
+  'null',
+]);
+
+function graphqlToken(stream: StringStream, state: GraphQlTokenState): string | null {
+  if (stream.sol()) state.atField = true;
+  if (stream.match('"""')) {
+    while (!stream.eol() && !stream.match('"""', true)) stream.next();
+    state.atField = false;
+    return 'string';
+  }
+  if (stream.match(/^#.*/)) return 'comment';
+  if (stream.match(/^"(?:[^"\\]|\\.)*"?/)) {
+    state.atField = false;
+    return 'string';
+  }
+  if (stream.match(/^-?\d+(\.\d+)?([eE][+-]?\d+)?/)) {
+    state.atField = false;
+    return 'number';
+  }
+  if (stream.match(/^\$[A-Za-z_][A-Za-z0-9_]*/)) {
+    state.atField = false;
+    return 'variableName';
+  }
+  if (stream.match(/^@[A-Za-z_][A-Za-z0-9_]*/)) {
+    state.atField = false;
+    return 'attributeName';
+  }
+  if (stream.match('{')) {
+    state.atField = true;
+    return 'bracket';
+  }
+  if (stream.match(/^[}\])]/)) {
+    state.atField = false;
+    return 'bracket';
+  }
+  if (stream.match('(')) {
+    state.atField = false;
+    return 'bracket';
+  }
+  if (stream.match(',')) {
+    state.atField = true;
+    return 'punctuation';
+  }
+  if (stream.match(/^[:!=]/)) {
+    state.atField = false;
+    return 'punctuation';
+  }
+  if (stream.match(/^[A-Za-z_][A-Za-z0-9_]*/)) {
+    const word = stream.current();
+    const wasField = state.atField;
+    state.atField = false;
+    if (GRAPHQL_KEYWORDS.has(word)) return 'keyword';
+    return wasField ? 'propertyName' : 'variableName';
+  }
+  if (stream.eatSpace()) return null;
+  stream.next();
+  return null;
+}
+
+const graphqlLanguage = StreamLanguage.define<GraphQlTokenState>({
+  name: 'graphql',
+  startState: () => ({ atField: true }),
+  token: graphqlToken,
+});
+
 // P36 D30: a third shape in this file, beside "map to a vendored @codemirror/lang-sql dialect"
 // (postgres/mysql/sqlite above) and "hand-write a StreamLanguage" (mongo/redis above) — ClickHouse
 // has no vendored dialect, but its grammar is close enough to standard SQL that SQLDialect.define
@@ -175,6 +269,8 @@ export function languageExtension(id: EditorLanguageId, dialect?: SqlDialect): E
       return mongoLanguage.extension;
     case 'redis':
       return redisLanguage.extension;
+    case 'graphql':
+      return graphqlLanguage.extension;
     case 'plain':
       return [];
   }

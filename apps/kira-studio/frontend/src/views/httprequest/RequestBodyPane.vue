@@ -17,6 +17,7 @@ import {
   userContentTypeHeader,
 } from './body';
 import FormDataTable from './FormDataTable.vue';
+import GraphQlBodyPane from './GraphQlBodyPane.vue';
 import UrlEncodedTable from './UrlEncodedTable.vue';
 
 // P3 C5/D9: extracted from HttpRequestView.vue's own inline block (P2) — the mode selector, the
@@ -122,6 +123,7 @@ const caption = computed(() =>
     <UrlEncodedTable v-else-if="tab.state.bodyMode === 'urlencoded'" :tab="tab" />
     <FormDataTable v-else-if="tab.state.bodyMode === 'formdata'" :tab="tab" />
     <BinaryBodyPicker v-else-if="tab.state.bodyMode === 'file'" :tab="tab" />
+    <GraphQlBodyPane v-else-if="tab.state.bodyMode === 'graphql'" :tab="tab" />
   </div>
 </template>
 
