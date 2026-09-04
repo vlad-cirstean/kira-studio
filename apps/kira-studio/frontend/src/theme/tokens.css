@@ -53,15 +53,16 @@
      comment describes (switching to `MacTitleBarHidden`), but 28px — guessed as "the standard
      macOS title-bar height" — was ALSO wrong even under `MacTitleBarHidden`, reported against the
      real build as the bar's own content sitting crowded against its top edge rather than centred.
-     36px was the value that fixed that — grown further, to 42px, once the actual cause of the
-     "off-centre" read turned out to be one region over: WorkbenchShell.vue's own padding-top
-     (6px, P31 D8) put dead space between the title bar's bottom edge and the panel content right
-     below it, which read as the bar's own content being off-centre even though it was correctly
-     centred within its own box. That padding-top is now 0 and this token absorbed the 6px
-     instead, so the total vertical chrome stays the same. Do not shrink this again without a real
-     screenshot (or better, a real measurement) confirming it first — a plausible-sounding
-     "standard" figure has now been wrong twice. */
-  --kira-titlebar-h: 42px;
+     36px was the value that fixed that. The actual cause of the "off-centre" read turned out to
+     be one region over: WorkbenchShell.vue's own padding-top (6px, P31 D8) put dead space between
+     the title bar's bottom edge and the panel content right below it. That padding-top is now 0.
+     This token only needs a SMALL nudge to visually rebalance that removed space, not a full 1:1
+     pixel transfer — 38px, not 42px (a same-session overcorrection, reverted: adding the entire
+     6px back made the bar read as tall again, the exact complaint this whole change was meant to
+     fix). Do not change this again without a real screenshot (or better, a real measurement)
+     confirming it first — a plausible-sounding "standard" figure, and a plausible-sounding "exact"
+     compensation, have both been wrong here. */
+  --kira-titlebar-h: 38px;
   --kira-titlebar-inset-left: 78px;
   --kira-shadow: 0 2px 8px rgb(0 0 0 / 0.32);
   --kira-shadow-dialog: 0 8px 28px rgb(0 0 0 / 0.45);
