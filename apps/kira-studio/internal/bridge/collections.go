@@ -66,6 +66,18 @@ func (s *CollectionsService) GetRequest(args CollectionsItemArgs) (model.SavedRe
 	return req, nil
 }
 
+// GetGrpcRequest is GetRequest's own gRPC sibling (P11 D12).
+func (s *CollectionsService) GetGrpcRequest(args CollectionsItemArgs) (model.SavedGrpcRequest, error) {
+	if args.ItemID == "" {
+		return model.SavedGrpcRequest{}, ipcerr.BadRequest("itemId is required")
+	}
+	req, err := s.Deps.Repos.Collections.GetGrpcRequest(args.ItemID)
+	if err != nil {
+		return model.SavedGrpcRequest{}, ipcerr.Internal(err.Error())
+	}
+	return req, nil
+}
+
 type CollectionsSaveRequestArgs struct {
 	ItemID  string             `json:"itemId"`
 	Name    string             `json:"name"`
@@ -80,6 +92,27 @@ func (s *CollectionsService) SaveRequest(args CollectionsSaveRequestArgs) (ItemS
 		return ItemSummary{}, ipcerr.BadRequest("name is required")
 	}
 	item, err := s.Deps.Repos.Collections.SaveRequest(args.ItemID, args.Name, args.Request)
+	if err != nil {
+		return ItemSummary{}, ipcerr.Internal(err.Error())
+	}
+	return item, nil
+}
+
+type CollectionsSaveGrpcRequestArgs struct {
+	ItemID  string                 `json:"itemId"`
+	Name    string                 `json:"name"`
+	Request model.SavedGrpcRequest `json:"request"`
+}
+
+// SaveGrpcRequest is SaveRequest's own gRPC sibling (P11 D12).
+func (s *CollectionsService) SaveGrpcRequest(args CollectionsSaveGrpcRequestArgs) (ItemSummary, error) {
+	if args.ItemID == "" {
+		return ItemSummary{}, ipcerr.BadRequest("itemId is required")
+	}
+	if args.Name == "" {
+		return ItemSummary{}, ipcerr.BadRequest("name is required")
+	}
+	item, err := s.Deps.Repos.Collections.SaveGrpcRequest(args.ItemID, args.Name, args.Request)
 	if err != nil {
 		return ItemSummary{}, ipcerr.Internal(err.Error())
 	}
@@ -120,6 +153,29 @@ func (s *CollectionsService) CreateItem(args CollectionsCreateItemArgs) (ItemSum
 		return ItemSummary{}, ipcerr.BadRequest("name is required")
 	}
 	item, err := s.Deps.Repos.Collections.CreateItem(args.CollectionID, args.ParentID, args.Kind, args.Name, args.Request)
+	if err != nil {
+		return ItemSummary{}, ipcerr.Internal(err.Error())
+	}
+	return item, nil
+}
+
+type CollectionsCreateGrpcItemArgs struct {
+	CollectionID string                  `json:"collectionId"`
+	ParentID     *string                 `json:"parentId"`
+	Name         string                  `json:"name"`
+	Request      *model.SavedGrpcRequest `json:"request"`
+}
+
+// CreateGrpcItem is CreateItem's own gRPC sibling (P11 D12) — always a request, never a folder (a
+// gRPC request has no folder distinction of its own).
+func (s *CollectionsService) CreateGrpcItem(args CollectionsCreateGrpcItemArgs) (ItemSummary, error) {
+	if args.CollectionID == "" {
+		return ItemSummary{}, ipcerr.BadRequest("collectionId is required")
+	}
+	if args.Name == "" {
+		return ItemSummary{}, ipcerr.BadRequest("name is required")
+	}
+	item, err := s.Deps.Repos.Collections.CreateGrpcItem(args.CollectionID, args.ParentID, args.Name, args.Request)
 	if err != nil {
 		return ItemSummary{}, ipcerr.Internal(err.Error())
 	}
@@ -263,9 +319,13 @@ type CollectionsExportArgs struct {
 
 // ExportReport is Export's answer — D16: a secret is written valueless, and SecretCount is what
 // lets the renderer say so once, rather than that being a fact only discoverable by opening the
-// file.
+// file. SkippedGrpc is P11 D12/F22's own addition: Postman Collection v2.1 has no representation
+// for a gRPC request, so every protocol='grpc' item is skipped and the skip is reported — silently
+// dropping requests from an export would be the worst possible reading of "faithful round-trip"
+// (P4 D12's own rule, applied again).
 type ExportReport struct {
 	SecretCount int `json:"secretCount"`
+	SkippedGrpc int `json:"skippedGrpc"`
 }
 
 // Export writes the collection at path as Collection v2.1 JSON. The file is written whole rather
@@ -300,5 +360,11 @@ func (s *CollectionsService) Export(args CollectionsExportArgs) (ExportReport, e
 			secretCount++
 		}
 	}
-	return ExportReport{SecretCount: secretCount}, nil
+	skippedGrpc := 0
+	for _, item := range tree.Items {
+		if item.Protocol == "grpc" {
+			skippedGrpc++
+		}
+	}
+	return ExportReport{SecretCount: secretCount, SkippedGrpc: skippedGrpc}, nil
 }

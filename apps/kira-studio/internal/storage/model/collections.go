@@ -14,7 +14,8 @@ type Collection struct {
 
 // CollectionItem is one http_items row, minus request_json and origin_json. Method and URL are
 // denormalized out of the saved request so the tree renders a method chip and searches URLs
-// without reading potentially large bodies; both are "" for a folder.
+// without reading potentially large bodies; both are "" for a folder. Protocol (P11 D12) is
+// structural sibling data, not a third Kind value — see the two protocol constants below.
 type CollectionItem struct {
 	ID           string  `json:"id"`
 	CollectionID string  `json:"collectionId"`
@@ -24,8 +25,22 @@ type CollectionItem struct {
 	SortOrder    int     `json:"sortOrder"`
 	Method       string  `json:"method"`
 	URL          string  `json:"url"`
+	Protocol     string  `json:"protocol"`
 	CreatedAt    string  `json:"createdAt"`
 	UpdatedAt    string  `json:"updatedAt"`
+}
+
+// P11 D12: the two protocols a request item's request_json can hold — 'http' -> SavedRequest,
+// 'grpc' -> SavedGrpcRequest. Meaningless for a folder, which always reads back 'http' (the
+// column's own SQL default) but is never consulted.
+const (
+	ItemProtocolHTTP = "http"
+	ItemProtocolGrpc = "grpc"
+)
+
+// IsCollectionItemProtocol reports whether protocol is one of the two.
+func IsCollectionItemProtocol(protocol string) bool {
+	return protocol == ItemProtocolHTTP || protocol == ItemProtocolGrpc
 }
 
 // The two item kinds. Postman carries no `type` field — a folder is "has an `item` member", a

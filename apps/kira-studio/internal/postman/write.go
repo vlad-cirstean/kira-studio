@@ -58,11 +58,13 @@ func Write(w io.Writer, t *Tree) error {
 }
 
 // buildItems rebuilds one `item[]` array from the flat list, ordered by Order — the exact inverse
-// of walkItems, with no sorting anywhere else in the pipeline.
+// of walkItems, with no sorting anywhere else in the pipeline. D12/F22: a protocol='grpc' item is
+// skipped outright — the format has no representation for one, and CollectionsService.Export
+// counts the same skip (scanning t.Items itself) to report it rather than silently dropping it.
 func buildItems(t *Tree, parent int) json.RawMessage {
 	indices := []int{}
 	for i, item := range t.Items {
-		if item.Parent == parent {
+		if item.Parent == parent && item.Protocol != "grpc" {
 			indices = append(indices, i)
 		}
 	}

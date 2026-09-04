@@ -15,6 +15,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/bridge/ipcerr"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/grpcclient"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/httpvars"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 )
 
 // GrpcService is P11 D3/D7/D8's bound service: schema discovery and a call, both run through the
@@ -223,6 +224,14 @@ func (s *GrpcService) Call(ctx context.Context, args GrpcCallArgs) (grpcclient.C
 			}
 			if callErr != nil {
 				maskGrpcError(callErr, used)
+				// D11: "a completed call" includes a cancellation or a failure that received
+				// messages — the terminal status the caller sees either way (F8). Only a call
+				// that never produced any terminal outcome at all (no Partial) records nothing.
+				var gerr *grpcclient.Error
+				if errors.As(callErr, &gerr) && gerr.Partial != nil {
+					op.SetCommand(fmt.Sprintf("%s → %s → %s", unresolvedMethod, args.Target, gerr.Partial.CodeName))
+					s.recordGrpcHistory(args, *gerr.Partial)
+				}
 				return nil, callErr
 			}
 
@@ -239,10 +248,44 @@ func (s *GrpcService) Call(ctx context.Context, args GrpcCallArgs) (grpcclient.C
 	return result, nil
 }
 
-// recordGrpcHistory is a no-op until C7 adds internal/storage/repos/grpc_history.go and wires
-// Deps.Repos.GrpcHistory — kept as its own method so that commit's diff is exactly "fill this in",
-// not a second edit to Call's own body.
-func (s *GrpcService) recordGrpcHistory(_ GrpcCallArgs, _ grpcclient.CallResult) {}
+// recordGrpcHistory is P8 D2's rule verbatim, applied to gRPC: recorded from args (stage 1 —
+// the target/method/metadata/message as the user typed them, a secret still spelled {{name}}),
+// never from the resolved values — best-effort, exactly as bridge/http.go's own Record call is: a
+// failed insert logs and the call still returns its result. Only a completed call reaches here
+// (Call's own RunOp closure only calls this once grpcclient.Unary/ServerStream has already
+// returned successfully); a cancelled or failed stream's partial state is recorded separately by
+// runServerStream's own caller once C9's UI needs it — D11 states a cancellation that received
+// messages is still a completed call, which is why streaming.go's coalescer's `finish` always
+// carries the true partial count for that path too.
+func (s *GrpcService) recordGrpcHistory(args GrpcCallArgs, result grpcclient.CallResult) {
+	streaming := model.GrpcStreamingUnary
+	if args.Streaming {
+		streaming = model.GrpcStreamingServer
+	}
+	messages := make([]model.GrpcCallSnapshotMessage, len(result.Messages))
+	for i, m := range result.Messages {
+		messages[i] = model.GrpcCallSnapshotMessage{Seq: m.Seq, JSON: m.JSON, WireBytes: m.WireBytes, OffsetMs: m.OffsetMs}
+	}
+	if err := s.Deps.Repos.GrpcHistory.Record(model.GrpcCallHistoryRecord{
+		ItemID: args.ItemID, TabID: args.TabID, EnvironmentID: args.EnvironmentID,
+		Target: args.Target, Method: args.Service + "/" + args.Method, Streaming: streaming,
+		Metadata: metaPairsToSavedRows(args.Metadata), Message: args.MessageJSON,
+		Code: int(result.Code), CodeName: result.CodeName, StatusMessage: result.StatusMessage,
+		ElapsedMs: int(result.ElapsedMs), MessageCount: result.MessageCount, MessageBytes: result.MessageBytes,
+		Messages: messages,
+		Header:   metaPairsToSavedRows(result.Header), Trailer: metaPairsToSavedRows(result.Trailer),
+	}); err != nil {
+		slog.Warn("recording grpc call history failed", "scope", "bridge/grpc", "opId", args.OpID, "err", err)
+	}
+}
+
+func metaPairsToSavedRows(pairs []grpcclient.MetaPair) []model.SavedGrpcMetaRow {
+	out := make([]model.SavedGrpcMetaRow, len(pairs))
+	for i, p := range pairs {
+		out[i] = model.SavedGrpcMetaRow{Name: p.Name, Value: p.Value, Enabled: true}
+	}
+	return out
+}
 
 // ---- D8: the coalescing push channel ----
 

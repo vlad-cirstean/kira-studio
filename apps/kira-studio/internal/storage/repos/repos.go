@@ -25,6 +25,7 @@ type Repos struct {
 	Collections     *CollectionsRepo
 	Variables       *VariablesRepo
 	ResponseHistory *ResponseHistoryRepo
+	GrpcHistory     *GrpcHistoryRepo
 
 	stmts []*sql.Stmt // every prepared statement below, for Close.
 }
@@ -67,6 +68,7 @@ func New(db *sql.DB) (*Repos, error) {
 		Schema:          &SchemaRepo{DB: db},
 		Collections:     &CollectionsRepo{DB: db},
 		ResponseHistory: &ResponseHistoryRepo{DB: db},
+		GrpcHistory:     &GrpcHistoryRepo{DB: db},
 		stmts:           []*sql.Stmt{settingsSelectAll, layoutSelectAll, tabsSelectAll, opsInsert, opsUpdate},
 	}, nil
 }

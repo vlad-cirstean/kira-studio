@@ -46,7 +46,11 @@ type Item struct {
 	Name   string
 	// Order is the dense index within this item's own parent's `item[]` array.
 	Order int
-	// Request is meaningful only for KindRequest.
+	// Protocol is P11 D12/F22's own addition — 'http' or 'grpc', empty for anything Parse produces
+	// (an import can never create a gRPC row: the Postman format has no representation for one).
+	// Write skips every 'grpc' item before it ever reads Request, which is meaningless for one.
+	Protocol string
+	// Request is meaningful only for KindRequest, and only when Protocol != 'grpc'.
 	Request model.SavedRequest
 	// Origin is the original Postman item object verbatim, minus its own `item` array (D5).
 	Origin map[string]json.RawMessage

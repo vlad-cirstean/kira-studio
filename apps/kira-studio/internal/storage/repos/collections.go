@@ -28,7 +28,7 @@ type CollectionsRepo struct {
 // path for the one query that runs on every panel mount (D2).
 const (
 	collectionSelectColumns = `id, name, sort_order, created_at, updated_at`
-	itemSelectColumns       = `id, collection_id, parent_id, kind, name, sort_order, method, url, created_at, updated_at`
+	itemSelectColumns       = `id, collection_id, parent_id, kind, name, sort_order, method, url, protocol, created_at, updated_at`
 )
 
 // encodeJSON marshals with HTML escaping off — the same discipline internal/ipcfixture/write.go
@@ -107,7 +107,7 @@ func scanItem(row rowScanner) (model.CollectionItem, error) {
 	)
 	if err := row.Scan(
 		&item.ID, &item.CollectionID, &parent, &item.Kind, &item.Name,
-		&item.SortOrder, &item.Method, &item.URL, &item.CreatedAt, &item.UpdatedAt,
+		&item.SortOrder, &item.Method, &item.URL, &item.Protocol, &item.CreatedAt, &item.UpdatedAt,
 	); err != nil {
 		return model.CollectionItem{}, fmt.Errorf("repos/collections: scan item: %w", err)
 	}
@@ -123,10 +123,10 @@ func scanItem(row rowScanner) (model.CollectionItem, error) {
 // repos/saved_queries.go's drop-and-log on read.
 func (r *CollectionsRepo) GetRequest(itemID string) (model.SavedRequest, error) {
 	var (
-		kind string
-		body string
+		kind, protocol string
+		body           string
 	)
-	err := r.DB.QueryRow(`SELECT kind, request_json FROM http_items WHERE id = ?`, itemID).Scan(&kind, &body)
+	err := r.DB.QueryRow(`SELECT kind, protocol, request_json FROM http_items WHERE id = ?`, itemID).Scan(&kind, &protocol, &body)
 	if errors.Is(err, sql.ErrNoRows) {
 		return model.SavedRequest{}, fmt.Errorf("repos/collections: no item %s", itemID)
 	}
@@ -136,7 +136,45 @@ func (r *CollectionsRepo) GetRequest(itemID string) (model.SavedRequest, error) 
 	if kind != model.CollectionItemRequest {
 		return model.SavedRequest{}, fmt.Errorf("repos/collections: item %s is a %s, not a request", itemID, kind)
 	}
+	if protocol != model.ItemProtocolHTTP {
+		return model.SavedRequest{}, fmt.Errorf("repos/collections: item %s is a %s request, not http", itemID, protocol)
+	}
 	return decodeSavedRequest(itemID, body)
+}
+
+// GetGrpcRequest is GetRequest's own gRPC sibling (D12).
+func (r *CollectionsRepo) GetGrpcRequest(itemID string) (model.SavedGrpcRequest, error) {
+	var (
+		kind, protocol string
+		body           string
+	)
+	err := r.DB.QueryRow(`SELECT kind, protocol, request_json FROM http_items WHERE id = ?`, itemID).Scan(&kind, &protocol, &body)
+	if errors.Is(err, sql.ErrNoRows) {
+		return model.SavedGrpcRequest{}, fmt.Errorf("repos/collections: no item %s", itemID)
+	}
+	if err != nil {
+		return model.SavedGrpcRequest{}, fmt.Errorf("repos/collections: get grpc request %s: %w", itemID, err)
+	}
+	if kind != model.CollectionItemRequest {
+		return model.SavedGrpcRequest{}, fmt.Errorf("repos/collections: item %s is a %s, not a request", itemID, kind)
+	}
+	if protocol != model.ItemProtocolGrpc {
+		return model.SavedGrpcRequest{}, fmt.Errorf("repos/collections: item %s is a %s request, not grpc", itemID, protocol)
+	}
+	return decodeSavedGrpcRequest(itemID, body)
+}
+
+func decodeSavedGrpcRequest(itemID, body string) (model.SavedGrpcRequest, error) {
+	var req model.SavedGrpcRequest
+	if err := json.Unmarshal([]byte(body), &req); err != nil {
+		slog.Warn("collection grpc request is not valid JSON", "scope", "storage/collections", "id", itemID)
+		return model.SavedGrpcRequest{}, fmt.Errorf("repos/collections: item %s: request is not valid JSON", itemID)
+	}
+	if err := req.Validate(); err != nil {
+		slog.Warn("collection grpc request failed validation", "scope", "storage/collections", "id", itemID, "err", err)
+		return model.SavedGrpcRequest{}, fmt.Errorf("repos/collections: item %s: %w", itemID, err)
+	}
+	return req, nil
 }
 
 func decodeSavedRequest(itemID, body string) (model.SavedRequest, error) {
@@ -191,7 +229,7 @@ func (r *CollectionsRepo) CreateItem(collectionID string, parentID *string, kind
 
 	item := model.CollectionItem{
 		ID: uuid.NewString(), CollectionID: collectionID, ParentID: parentID, Kind: kind, Name: name,
-		CreatedAt: model.NowISO(), UpdatedAt: model.NowISO(),
+		Protocol: model.ItemProtocolHTTP, CreatedAt: model.NowISO(), UpdatedAt: model.NowISO(),
 	}
 	requestJSON := ""
 	if kind == model.CollectionItemRequest {
@@ -230,6 +268,55 @@ func (r *CollectionsRepo) CreateItem(collectionID string, parentID *string, kind
 	return item, nil
 }
 
+// CreateGrpcItem is CreateItem's own gRPC sibling (D12) — always kind 'request': a gRPC request
+// has no folder distinction of its own, folders stay protocol-neutral. request nil means "the
+// empty request a new row starts as" (reflection mode, TLS on, nothing else set).
+func (r *CollectionsRepo) CreateGrpcItem(collectionID string, parentID *string, name string, request *model.SavedGrpcRequest) (model.CollectionItem, error) {
+	if collectionID == "" {
+		return model.CollectionItem{}, fmt.Errorf("repos/collections: collectionId is required")
+	}
+	if name == "" {
+		return model.CollectionItem{}, fmt.Errorf("repos/collections: name is required")
+	}
+
+	req := model.SavedGrpcRequest{TLSMode: "tls", DescriptorMode: "reflection", ImportPaths: []string{}, Metadata: []model.SavedGrpcMetaRow{}}
+	if request != nil {
+		req = *request
+	}
+	if err := req.Validate(); err != nil {
+		return model.CollectionItem{}, fmt.Errorf("repos/collections: %w", err)
+	}
+	encoded, err := encodeJSON(req)
+	if err != nil {
+		return model.CollectionItem{}, fmt.Errorf("repos/collections: encode grpc request: %w", err)
+	}
+
+	item := model.CollectionItem{
+		ID: uuid.NewString(), CollectionID: collectionID, ParentID: parentID, Kind: model.CollectionItemRequest,
+		Name: name, Protocol: model.ItemProtocolGrpc, Method: req.Service + "/" + req.Method, URL: req.Target,
+		CreatedAt: model.NowISO(), UpdatedAt: model.NowISO(),
+	}
+
+	tx, err := r.DB.Begin()
+	if err != nil {
+		return model.CollectionItem{}, fmt.Errorf("repos/collections: begin: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	order, err := nextItemOrder(tx, collectionID, parentID)
+	if err != nil {
+		return model.CollectionItem{}, err
+	}
+	item.SortOrder = order
+	if err := insertItem(tx, item, string(encoded), "{}"); err != nil {
+		return model.CollectionItem{}, err
+	}
+	if err := tx.Commit(); err != nil {
+		return model.CollectionItem{}, fmt.Errorf("repos/collections: commit: %w", err)
+	}
+	return item, nil
+}
+
 func nextItemOrder(tx *sql.Tx, collectionID string, parentID *string) (int, error) {
 	var order int
 	err := tx.QueryRow(
@@ -244,12 +331,16 @@ func nextItemOrder(tx *sql.Tx, collectionID string, parentID *string) (int, erro
 }
 
 func insertItem(tx *sql.Tx, item model.CollectionItem, requestJSON, originJSON string) error {
+	protocol := item.Protocol
+	if protocol == "" {
+		protocol = model.ItemProtocolHTTP
+	}
 	_, err := tx.Exec(
 		`INSERT INTO http_items
-		   (id, collection_id, parent_id, kind, name, sort_order, method, url, request_json, origin_json, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		   (id, collection_id, parent_id, kind, name, sort_order, method, url, protocol, request_json, origin_json, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		item.ID, item.CollectionID, item.ParentID, item.Kind, item.Name, item.SortOrder,
-		item.Method, item.URL, requestJSON, originJSON, item.CreatedAt, item.UpdatedAt,
+		item.Method, item.URL, protocol, requestJSON, originJSON, item.CreatedAt, item.UpdatedAt,
 	)
 	if err != nil {
 		return fmt.Errorf("repos/collections: insert item: %w", err)
@@ -272,10 +363,10 @@ func (r *CollectionsRepo) SaveRequest(itemID, name string, request model.SavedRe
 	}
 
 	var (
-		kind       string
-		originJSON string
+		kind, protocol string
+		originJSON     string
 	)
-	err := r.DB.QueryRow(`SELECT kind, origin_json FROM http_items WHERE id = ?`, itemID).Scan(&kind, &originJSON)
+	err := r.DB.QueryRow(`SELECT kind, protocol, origin_json FROM http_items WHERE id = ?`, itemID).Scan(&kind, &protocol, &originJSON)
 	if errors.Is(err, sql.ErrNoRows) {
 		return model.CollectionItem{}, fmt.Errorf("repos/collections: no item %s", itemID)
 	}
@@ -284,6 +375,9 @@ func (r *CollectionsRepo) SaveRequest(itemID, name string, request model.SavedRe
 	}
 	if kind != model.CollectionItemRequest {
 		return model.CollectionItem{}, fmt.Errorf("repos/collections: item %s is a %s, not a request", itemID, kind)
+	}
+	if protocol != model.ItemProtocolHTTP {
+		return model.CollectionItem{}, fmt.Errorf("repos/collections: item %s is a %s request, not http", itemID, protocol)
 	}
 
 	shed, err := shedOriginJSON(originJSON, request)
@@ -302,6 +396,49 @@ func (r *CollectionsRepo) SaveRequest(itemID, name string, request model.SavedRe
 		name, request.Method, request.URL, string(encoded), shed, now, itemID,
 	); err != nil {
 		return model.CollectionItem{}, fmt.Errorf("repos/collections: save request %s: %w", itemID, err)
+	}
+	return r.getItem(itemID)
+}
+
+// SaveGrpcRequest is SaveRequest's own gRPC sibling (D12) — no origin-shedding (F22: a gRPC item
+// has no Postman origin, ever), so this is a plain rewrite.
+func (r *CollectionsRepo) SaveGrpcRequest(itemID, name string, request model.SavedGrpcRequest) (model.CollectionItem, error) {
+	if itemID == "" {
+		return model.CollectionItem{}, fmt.Errorf("repos/collections: itemId is required")
+	}
+	if name == "" {
+		return model.CollectionItem{}, fmt.Errorf("repos/collections: name is required")
+	}
+	if err := request.Validate(); err != nil {
+		return model.CollectionItem{}, fmt.Errorf("repos/collections: %w", err)
+	}
+
+	var kind, protocol string
+	err := r.DB.QueryRow(`SELECT kind, protocol FROM http_items WHERE id = ?`, itemID).Scan(&kind, &protocol)
+	if errors.Is(err, sql.ErrNoRows) {
+		return model.CollectionItem{}, fmt.Errorf("repos/collections: no item %s", itemID)
+	}
+	if err != nil {
+		return model.CollectionItem{}, fmt.Errorf("repos/collections: read item %s: %w", itemID, err)
+	}
+	if kind != model.CollectionItemRequest {
+		return model.CollectionItem{}, fmt.Errorf("repos/collections: item %s is a %s, not a request", itemID, kind)
+	}
+	if protocol != model.ItemProtocolGrpc {
+		return model.CollectionItem{}, fmt.Errorf("repos/collections: item %s is a %s request, not grpc", itemID, protocol)
+	}
+
+	encoded, err := encodeJSON(request)
+	if err != nil {
+		return model.CollectionItem{}, fmt.Errorf("repos/collections: encode grpc request: %w", err)
+	}
+	now := model.NowISO()
+	method := request.Service + "/" + request.Method
+	if _, err := r.DB.Exec(
+		`UPDATE http_items SET name = ?, method = ?, url = ?, request_json = ?, updated_at = ? WHERE id = ?`,
+		name, method, request.Target, string(encoded), now, itemID,
+	); err != nil {
+		return model.CollectionItem{}, fmt.Errorf("repos/collections: save grpc request %s: %w", itemID, err)
 	}
 	return r.getItem(itemID)
 }
@@ -577,7 +714,7 @@ func (r *CollectionsRepo) LoadTree(collectionID string) (*postman.Tree, error) {
 	varRows.Close()
 
 	rows, err := r.DB.Query(
-		`SELECT id, parent_id, kind, name, sort_order, request_json, origin_json
+		`SELECT id, parent_id, kind, name, sort_order, protocol, request_json, origin_json
 		   FROM http_items WHERE collection_id = ? ORDER BY sort_order, created_at, id`,
 		collectionID,
 	)
@@ -587,9 +724,9 @@ func (r *CollectionsRepo) LoadTree(collectionID string) (*postman.Tree, error) {
 	defer rows.Close()
 
 	type row struct {
-		id, kind, name, requestJSON, originJSON string
-		parent                                  *string
-		order                                   int
+		id, kind, name, protocol, requestJSON, originJSON string
+		parent                                            *string
+		order                                             int
 	}
 	all := []row{}
 	for rows.Next() {
@@ -597,7 +734,7 @@ func (r *CollectionsRepo) LoadTree(collectionID string) (*postman.Tree, error) {
 			rec    row
 			parent sql.NullString
 		)
-		if err := rows.Scan(&rec.id, &parent, &rec.kind, &rec.name, &rec.order, &rec.requestJSON, &rec.originJSON); err != nil {
+		if err := rows.Scan(&rec.id, &parent, &rec.kind, &rec.name, &rec.order, &rec.protocol, &rec.requestJSON, &rec.originJSON); err != nil {
 			return nil, fmt.Errorf("repos/collections: scan item: %w", err)
 		}
 		if parent.Valid {
@@ -619,14 +756,17 @@ func (r *CollectionsRepo) LoadTree(collectionID string) (*postman.Tree, error) {
 	for _, rec := range all {
 		item := postman.Item{
 			Parent: postman.RootParent, Kind: postman.ItemKind(rec.kind), Name: rec.name,
-			Order: rec.order, Origin: decodeOrigin(rec.originJSON, rec.id),
+			Order: rec.order, Protocol: rec.protocol, Origin: decodeOrigin(rec.originJSON, rec.id),
 		}
 		if rec.parent != nil {
 			if idx, ok := indexByID[*rec.parent]; ok {
 				item.Parent = idx
 			}
 		}
-		if item.Kind == postman.KindRequest {
+		// F22/D12: a gRPC item's request_json is a model.SavedGrpcRequest, not a SavedRequest —
+		// write.go skips every protocol='grpc' item before it ever reads .Request (postman has no
+		// representation for one), so it is left at its zero value here rather than decoded wrong.
+		if item.Kind == postman.KindRequest && rec.protocol == model.ItemProtocolHTTP {
 			req, err := decodeSavedRequest(rec.id, rec.requestJSON)
 			if err != nil {
 				return nil, err

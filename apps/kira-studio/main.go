@@ -146,6 +146,10 @@ func main() {
 	if err := repositories.ResponseHistory.SweepOrphans(); err != nil {
 		slog.Warn("sweep orphaned response history", "scope", "startup", "err", err)
 	}
+	// P11 D11: the same startup prune, for a scratch tab's gRPC call history.
+	if err := repositories.GrpcHistory.SweepOrphans(); err != nil {
+		slog.Warn("sweep orphaned grpc call history", "scope", "startup", "err", err)
+	}
 
 	processSet := metrics.NewCachedPIDs(
 		func() ([]int32, error) { return metrics.AppProcessSet(metrics.AnchorNeedles, metrics.HelperNeedles) },
@@ -221,6 +225,7 @@ func main() {
 			application.NewService(&bridge.CollectionsService{Deps: deps}),
 			application.NewService(&bridge.VariablesService{Deps: deps}),
 			application.NewService(&bridge.ResponseHistoryService{Deps: deps}),
+			application.NewService(&bridge.GrpcHistoryService{Deps: deps}),
 			application.NewService(&bridge.LifecycleService{Flusher: quitter, WindowFlusher: closeFlush}),
 		},
 		Assets: application.AssetOptions{

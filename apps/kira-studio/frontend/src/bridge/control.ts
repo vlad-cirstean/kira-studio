@@ -4,6 +4,7 @@ import * as ConnectionsService from '@bindings/connectionsservice.js';
 import * as EngineService from '@bindings/engineservice.js';
 import * as FilesService from '@bindings/filesservice.js';
 import * as FiltersService from '@bindings/filtersservice.js';
+import * as GrpcHistoryService from '@bindings/grpchistoryservice.js';
 import * as GrpcService from '@bindings/grpcservice.js';
 import * as HttpService from '@bindings/httpservice.js';
 import * as LayoutService from '@bindings/layoutservice.js';
@@ -34,6 +35,7 @@ import type {
   GrpcMetaPairWire,
   GrpcSchemaWire,
 } from '@shared/domain/grpc';
+import type { GrpcCallHistoryEntry, GrpcCallSnapshot } from '@shared/domain/grpc-history';
 import type { HttpBodyWire, HttpHeaderWire, HttpResponseWire } from '@shared/domain/http';
 import type { Layout, LayoutPatch } from '@shared/domain/layout';
 import type { OpRecord } from '@shared/domain/ops';
@@ -473,6 +475,15 @@ export const control = {
     request: WailsStorageModels.SavedRequest,
   ): Promise<WailsModels.ItemSummary> =>
     unwrap(CollectionsService.SaveRequest({ itemId, name, request })),
+  // P11 D12: GetRequest/SaveRequest's own gRPC siblings.
+  collectionsGetGrpcRequest: (itemId: string): Promise<WailsStorageModels.SavedGrpcRequest> =>
+    unwrap(CollectionsService.GetGrpcRequest({ itemId })),
+  collectionsSaveGrpcRequest: (
+    itemId: string,
+    name: string,
+    request: WailsStorageModels.SavedGrpcRequest,
+  ): Promise<WailsModels.ItemSummary> =>
+    unwrap(CollectionsService.SaveGrpcRequest({ itemId, name, request })),
   collectionsCreateCollection: (name: string): Promise<WailsModels.CollectionSummary> =>
     unwrap(CollectionsService.CreateCollection({ name })),
   collectionsCreateItem: (args: {
@@ -483,6 +494,14 @@ export const control = {
     name: string;
   }): Promise<WailsModels.ItemSummary> =>
     unwrap(CollectionsService.CreateItem({ ...args, request: args.request ?? null })),
+  // P11 D12: CreateItem's own gRPC sibling — always a request, never a folder.
+  collectionsCreateGrpcItem: (args: {
+    collectionId: string;
+    parentId: string | null;
+    request?: WailsStorageModels.SavedGrpcRequest | null;
+    name: string;
+  }): Promise<WailsModels.ItemSummary> =>
+    unwrap(CollectionsService.CreateGrpcItem({ ...args, request: args.request ?? null })),
   collectionsRename: (id: string, target: 'collection' | 'item', name: string): Promise<void> =>
     unwrap(CollectionsService.Rename({ id, target, name })),
   collectionsDelete: (id: string, target: 'collection' | 'item'): Promise<void> =>
@@ -567,4 +586,20 @@ export const control = {
     unwrap<WailsModels.ResponseHistoryAdoptResult>(
       ResponseHistoryService.Adopt({ tabId, itemId }),
     ).then((r) => r.adopted),
+
+  // P11 D11: GrpcHistoryService's own five wrappers — ResponseHistoryService's exact shape,
+  // reused verbatim for the second protocol's own history table.
+  grpcHistoryList: (itemId: string, tabId: string): Promise<GrpcCallHistoryEntry[]> =>
+    unwrap(GrpcHistoryService.List({ itemId, tabId })).then((r) =>
+      trust<GrpcCallHistoryEntry[]>(r ?? []),
+    ),
+  grpcHistoryGet: (id: string): Promise<GrpcCallSnapshot> =>
+    unwrap(GrpcHistoryService.Get({ id })).then((r) => trust<GrpcCallSnapshot>(r)),
+  grpcHistoryDelete: (id: string): Promise<void> => unwrap(GrpcHistoryService.Delete({ id })),
+  grpcHistoryClear: (itemId: string, tabId: string): Promise<void> =>
+    unwrap(GrpcHistoryService.Clear({ itemId, tabId })),
+  grpcHistoryAdopt: (tabId: string, itemId: string): Promise<number> =>
+    unwrap<WailsModels.GrpcHistoryAdoptResult>(GrpcHistoryService.Adopt({ tabId, itemId })).then(
+      (r) => r.adopted,
+    ),
 };
