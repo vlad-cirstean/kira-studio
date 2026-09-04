@@ -81,12 +81,20 @@ type Host struct {
 
 	mu      sync.Mutex
 	running map[string]runningOp
+
+	throttles *throttleRegistry
 }
 
 // NewHost constructs a Host. cache is used by the native Connect/Disconnect handlers
 // (disconnecting releases the connection's cached pages, §2.2 — see router.go).
 func NewHost(deps adapters.Deps, cache *enginecache.Cache) *Host {
-	return &Host{deps: deps, cache: cache, running: make(map[string]runningOp)}
+	return &Host{deps: deps, cache: cache, running: make(map[string]runningOp), throttles: newThrottleRegistry()}
+}
+
+// SetThrottle installs (perSec > 0) or clears (perSec <= 0) connectionID's command rate limit —
+// P28 §5.5's plumbing target, called by Router.SetThrottle.
+func (h *Host) SetThrottle(connectionID string, perSec float64) {
+	h.throttles.set(connectionID, perSec)
 }
 
 type opStartPayload struct {
@@ -132,6 +140,27 @@ func (h *Host) RunOp(ctx context.Context, spec OpSpec, fn func(context.Context, 
 		h.mu.Unlock()
 		cancel()
 	}()
+
+	// P28 §5.5: the throttle gate sits here — after registration (so a queued op is cancellable
+	// via CancelOp/the deferred cancel() above) but before op:start (so startedAt/DurationMs stay
+	// the adapter's own numbers, never counting client-side queue time). connect/disconnect/test
+	// are never in throttledKinds, so a misconfigured throttle can never lock a user out of fixing
+	// it. An op cancelled or timed out while queued returns here with neither op:start nor op:end
+	// ever emitted — it never touched the database, so it is not a database operation.
+	if spec.ConnectionID != nil && throttledKinds[spec.Kind] {
+		if limiter := h.throttles.limiterFor(*spec.ConnectionID); limiter != nil {
+			waitCtx, waitCancel := context.WithTimeout(derived, throttleMaxWait)
+			waitErr := limiter.Wait(waitCtx)
+			waitCancel()
+			if waitErr != nil {
+				if derived.Err() == context.Canceled {
+					return "", nil, adapters.New(adapters.CodeCancelled, "operation was cancelled while waiting for the connection's rate limit", waitErr)
+				}
+				msg := fmt.Sprintf("timed out after %s waiting for the connection's rate limit (%.4g/s)", throttleMaxWait, float64(limiter.Limit()))
+				return "", nil, adapters.New(adapters.CodeTimeout, msg, waitErr)
+			}
+		}
+	}
 
 	startedAt := model.NowISO()
 	h.emitJSON(oplog.EventOpStart, opStartPayload{
