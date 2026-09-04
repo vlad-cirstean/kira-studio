@@ -44,6 +44,10 @@ function bodyTextFor(state: HttpRequestTabState): string {
   }
 }
 
+function hasUserContentType(state: HttpRequestTabState): boolean {
+  return state.headers.some((h) => h.enabled && h.name.trim().toLowerCase() === 'content-type');
+}
+
 /**
  * P9 D9: tab state → raw HTTP/1.1 text, generated pre-substitution — `{{base_url}}`, `{{token}}`
  * and `{{$guid}}` all appear literally, verbatim, exactly as the tab's own fields hold them. A
@@ -52,12 +56,23 @@ function bodyTextFor(state: HttpRequestTabState): string {
  * are emitted — the same filter send() itself applies — since a disabled header sends nothing and
  * has no place in a request about to be sent.
  *
+ * `defaultContentType` mirrors D7's own precedent (client.go's Content-Type default, and
+ * http/curl/generate.ts's own `toCurl` — F16: computed by the caller, a views/ file, via
+ * defaultContentTypeFor, since http/** may not import views/**): emitted only when the user set no
+ * Content-Type header of their own. Without this, a no-edit round trip through the dialog (D11's
+ * own Content-Type → mode table has nothing to map from) would silently apply-and-send a `code`
+ * body with `raw`'s text/plain default instead of the mode's real one — a wire-level change, not a
+ * cosmetic one.
+ *
  * Never called for a `formdata`/`file` body (D10) — the caller refuses those before this runs.
  */
-export function generateRawRequest(state: HttpRequestTabState): string {
+export function generateRawRequest(state: HttpRequestTabState, defaultContentType: string): string {
   const lines = [`${state.method} ${state.url} HTTP/1.1`];
   for (const h of state.headers) {
     if (h.enabled && h.name.trim() !== '') lines.push(`${h.name}: ${h.value}`);
+  }
+  if (state.bodyMode !== 'none' && defaultContentType && !hasUserContentType(state)) {
+    lines.push(`Content-Type: ${defaultContentType}`);
   }
   const body = bodyTextFor(state);
   return `${lines.join('\n')}\n\n${body}`;

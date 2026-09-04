@@ -1,0 +1,181 @@
+import {
+  HTTP_METHODS,
+  type HttpCodeLanguage,
+  type HttpHeaderState,
+  type HttpRequestTabState,
+} from '@shared/domain/http';
+
+// P9 D11: the warning vocabulary — a closed union, mirroring http/curl/tokenize.ts's own
+// CurlWarningKind shape (P7 D4) so the dialog can render either list with the same component.
+export const RAW_WARNING_KINDS = ['chunked-transfer-encoding', 'content-length-dropped'] as const;
+export type RawWarningKind = (typeof RAW_WARNING_KINDS)[number];
+export interface RawWarning {
+  kind: RawWarningKind;
+  detail: string;
+}
+
+export interface ParsedRawRequest {
+  /** Only the fields raw HTTP text can express — urlEncoded/formData/binaryFile are untouched
+   *  (D10: a parsed body always lands in `raw` or `code`, never those three), so the caller's
+   *  patch leaves whatever those buffers already held (D8's own "every mode keeps its own
+   *  buffer" rule, applied here too). */
+  state: Pick<
+    HttpRequestTabState,
+    'method' | 'url' | 'headers' | 'bodyMode' | 'body' | 'code' | 'codeLanguage'
+  >;
+  warnings: RawWarning[];
+}
+
+/** D10 step 2's exact table: application/json → json; application/xml/text/xml → xml; text/html
+ *  → html; application/javascript → javascript; everything else (including
+ *  application/x-www-form-urlencoded) → null, which lands the body in `raw`. Deliberately a
+ *  narrower table than http/curl/parse.ts's own codeLanguageForContentType (no `+json`/`+xml`
+ *  suffixes, no `text/javascript`) — D10 states this exact table, not that broader one. */
+function codeLanguageForContentType(contentType: string): HttpCodeLanguage | null {
+  const type = contentType.split(';')[0].trim().toLowerCase();
+  if (type === 'application/json') return 'json';
+  if (type === 'application/xml' || type === 'text/xml') return 'xml';
+  if (type === 'text/html') return 'html';
+  if (type === 'application/javascript') return 'javascript';
+  return null;
+}
+
+function explicitContentType(headers: readonly HttpHeaderState[]): string | undefined {
+  let value: string | undefined;
+  for (const h of headers) {
+    if (h.name.trim().toLowerCase() === 'content-type') value = h.value;
+  }
+  return value;
+}
+
+/** Splits on '\n', stripping one trailing '\r' per line — tolerant of both a generate.ts-produced
+ *  buffer (\n) and a pasted one (\r\n); D11's grammar never depends on which line ending arrived. */
+function splitLines(text: string): string[] {
+  return text.split('\n').map((line) => (line.endsWith('\r') ? line.slice(0, -1) : line));
+}
+
+/** A leading-'/' target joins onto the tab's current origin (editing just the path); anything else
+ *  replaces the URL outright (D11 item 2) — including a `{{base_url}}/...` reference, which is not
+ *  a URI and must never go through `new URL()`. */
+function resolveTarget(currentUrl: string, target: string): string {
+  if (!target.startsWith('/')) return target;
+  try {
+    return new URL(currentUrl).origin + target;
+  } catch {
+    return target;
+  }
+}
+
+/**
+ * P9 D10/D11: raw HTTP/1.1 text → a tab state patch plus a warning list. Never throws — an
+ * unparseable request comes back as `{error}` (D11's four error cases), mirroring P7's own
+ * `ParsedCurl` shape so the dialog's warning/error strip needs no change (D11's own closing line).
+ *
+ * The grammar, in full, is D11 — restated here only where the code needs a comment to say why:
+ * 1. Request line: `METHOD SP target [SP HTTP-version]`. The version is optional and dropped — the
+ *    app speaks whatever the transport negotiates (F2), so accepting `HTTP/1.1` and then possibly
+ *    sending h2 would be exactly the lie D3 exists to prevent.
+ * 2. The target is taken verbatim, `{{…}}` and all — no `new URL()`, no normalisation.
+ * 3. Header lines until the first blank line, split at the first colon, value trimmed of one
+ *    leading space. Name case and line order are preserved exactly; a duplicate name is a second
+ *    row, never merged. An obs-fold continuation line (leading space/tab) is an error naming its
+ *    line number rather than being silently joined.
+ * 4. A `Host:` header is kept as an ordinary header row — never folded into the URL.
+ * 5. The body is everything after the first blank line, verbatim. `Transfer-Encoding: chunked`
+ *    warns rather than doing anything — buildBody always computes an exact Content-Length and
+ *    never sends chunked.
+ * 6. A `Content-Length` header is dropped with a note — Go computes the real one at send time.
+ */
+export function parseRawRequest(
+  text: string,
+  currentUrl: string,
+): ParsedRawRequest | { error: string } {
+  const lines = splitLines(text);
+
+  const requestLine = lines[0] ?? '';
+  const firstSpace = requestLine.indexOf(' ');
+  if (firstSpace === -1) {
+    return { error: 'The first line must be "METHOD target" — no space was found.' };
+  }
+  const methodToken = requestLine.slice(0, firstSpace);
+  if (!(HTTP_METHODS as readonly string[]).includes(methodToken)) {
+    return {
+      error: `'${methodToken}' is not one of this app's seven supported methods (${HTTP_METHODS.join(', ')}).`,
+    };
+  }
+  const method = methodToken as HttpRequestTabState['method'];
+
+  const afterMethod = requestLine.slice(firstSpace + 1).trim();
+  const versionMatch = afterMethod.match(/^(\S+)\s+HTTP\/\d\.\d$/);
+  const target = versionMatch ? versionMatch[1] : afterMethod;
+  if (target === '') {
+    return { error: 'No request target was found on the first line.' };
+  }
+  const url = resolveTarget(currentUrl, target);
+
+  const headers: HttpHeaderState[] = [];
+  const warnings: RawWarning[] = [];
+  let bodyStartLine = lines.length;
+  for (let i = 1; i < lines.length; i++) {
+    const line = lines[i];
+    if (line === '') {
+      bodyStartLine = i + 1;
+      break;
+    }
+    if (line[0] === ' ' || line[0] === '\t') {
+      return {
+        error: `Line ${i + 1} is an obsolete header-folding continuation line — this app does not join it onto the header above.`,
+      };
+    }
+    const colon = line.indexOf(':');
+    if (colon === -1) {
+      return {
+        error: `Line ${i + 1} ('${line}') has no ':' — every header line must be 'Name: value'.`,
+      };
+    }
+    const name = line.slice(0, colon);
+    const value = line.slice(colon + 1).replace(/^ /, '');
+
+    if (name.trim().toLowerCase() === 'content-length') {
+      warnings.push({
+        kind: 'content-length-dropped',
+        detail: `'${line}' was dropped — Go computes the real Content-Length at send time, and a stale hand-typed value would be silently overridden.`,
+      });
+      continue;
+    }
+    if (
+      name.trim().toLowerCase() === 'transfer-encoding' &&
+      value.trim().toLowerCase() === 'chunked'
+    ) {
+      warnings.push({
+        kind: 'chunked-transfer-encoding',
+        detail: `'${line}' was kept, but this app never sends a chunked body — it always computes an exact Content-Length instead.`,
+      });
+    }
+    headers.push({ name, value, enabled: true });
+  }
+
+  const body = bodyStartLine < lines.length ? lines.slice(bodyStartLine).join('\n') : '';
+
+  let bodyMode: HttpRequestTabState['bodyMode'] = 'none';
+  let bodyRaw = '';
+  let bodyCode = '';
+  let codeLanguage: HttpCodeLanguage = 'json';
+  if (body !== '') {
+    const contentType = explicitContentType(headers);
+    const lang = contentType ? codeLanguageForContentType(contentType) : null;
+    if (lang) {
+      bodyMode = 'code';
+      codeLanguage = lang;
+      bodyCode = body;
+    } else {
+      bodyMode = 'raw';
+      bodyRaw = body;
+    }
+  }
+
+  return {
+    state: { method, url, headers, bodyMode, body: bodyRaw, code: bodyCode, codeLanguage },
+    warnings,
+  };
+}
