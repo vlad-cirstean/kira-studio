@@ -2,6 +2,7 @@
 import { type HttpMethod, httpMethodClass } from '@shared/domain/http';
 import type { HttpRequestTabRecord } from '@shared/domain/tabs';
 import { computed, onMounted, onUnmounted } from 'vue';
+import EnvironmentSelect from '../../http/EnvironmentSelect.vue';
 import { openSaveDialog, savedRequestFor, saveRequest } from '../../http/state/collections';
 import { registerCommand } from '../../shortcuts/commands';
 import { patchHttpRequestTabState } from '../../state/tabs';
@@ -196,6 +197,7 @@ onUnmounted(() => {
           data-testid="http-request-pane-toggle"
           @update:model-value="setRequestPane"
         />
+        <EnvironmentSelect />
       </template>
 
       <div class="request-response-split">
