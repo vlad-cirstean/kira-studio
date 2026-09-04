@@ -169,7 +169,9 @@ export type HttpBinaryFileState = z.infer<typeof httpBinaryFileSchema>;
 export const httpRequestPaneSchema = /*#__PURE__*/ z.enum(['params', 'headers', 'body']);
 export type HttpRequestPane = z.infer<typeof httpRequestPaneSchema>;
 
-export const httpResponsePaneSchema = /*#__PURE__*/ z.enum(['body', 'headers']);
+// P8 D10: 'history' is the third pane — F11 verified widening this enum cannot break a restored
+// tab (every stored value is still a member).
+export const httpResponsePaneSchema = /*#__PURE__*/ z.enum(['body', 'headers', 'history']);
 export type HttpResponsePane = z.infer<typeof httpResponsePaneSchema>;
 
 export const httpResponseViewSchema = /*#__PURE__*/ z.enum(['pretty', 'raw']);

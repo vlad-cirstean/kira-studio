@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { statusClass, statusHint } from '@shared/domain/http';
+import { type HttpResponsePane, statusClass, statusHint } from '@shared/domain/http';
 import type { HttpRequestTabRecord } from '@shared/domain/tabs';
 import { computed } from 'vue';
 import { beautifyJson, beautifyXml, scanJson, scanXml } from '../../beautify';
@@ -21,7 +21,10 @@ const RESPONSE_PANE_OPTIONS = [
   { value: 'headers' as const, label: 'Headers', testid: 'http-response-pane-headers' },
 ];
 
-function setResponsePane(pane: 'body' | 'headers'): void {
+// P8 C1: HttpResponsePane, not an inline 'body' | 'headers' literal — the schema is the source of
+// truth for the pane vocabulary, so a widened schema (C4 adds 'history') can never desync from
+// this handler's own type. RESPONSE_PANE_OPTIONS still lists only two entries until C4.
+function setResponsePane(pane: HttpResponsePane): void {
   patchHttpRequestTabState(props.tab.id, { responsePane: pane });
 }
 
