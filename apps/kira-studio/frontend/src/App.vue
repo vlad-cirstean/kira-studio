@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted } from 'vue';
 import { control } from './bridge/control';
+import EnvironmentsDialog from './http/EnvironmentsDialog.vue';
 import SaveRequestDialog from './http/SaveRequestDialog.vue';
 import { saveDialogState } from './http/state/collections';
-import { variablesDialogState } from './http/state/variables';
+import { environmentsDialogState, variablesDialogState } from './http/state/variables';
 import VariablesDialog from './http/VariablesDialog.vue';
 import ConnectionDialog from './project/ConnectionDialog.vue';
 import CommandPalette from './shortcuts/CommandPalette.vue';
@@ -69,6 +70,7 @@ onUnmounted(() => {
   <ConnectionDialog v-if="connectionsState.dialog.open" />
   <SaveRequestDialog v-if="saveDialogState.open" />
   <VariablesDialog v-if="variablesDialogState.open" />
+  <EnvironmentsDialog v-if="environmentsDialogState.open" />
   <UploadObjectDialog v-if="uploadDialogState.open" />
   <GenerateDataDialog v-if="fakeDataDialogState.open" />
   <ConfirmDialog />

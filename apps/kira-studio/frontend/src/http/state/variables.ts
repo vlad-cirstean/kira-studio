@@ -43,6 +43,36 @@ export async function setActiveEnvironment(id: string): Promise<void> {
   await loadEnvironments();
 }
 
+export async function createEnvironment(name: string): Promise<HttpEnvironment> {
+  const env = await control.variablesCreateEnvironment(name);
+  await loadEnvironments();
+  return env;
+}
+
+export async function renameEnvironment(id: string, name: string): Promise<void> {
+  await control.variablesRenameEnvironment(id, name);
+  await loadEnvironments();
+}
+
+/** Deleting the active environment leaves none active (D3) — there is nothing to reassign. */
+export async function deleteEnvironment(id: string): Promise<void> {
+  await control.variablesDeleteEnvironment(id);
+  await loadEnvironments();
+}
+
+// ---- the environments dialog (D3/D11) — create/rename/delete/set-active ----
+
+export const environmentsDialogState = reactive({ open: false });
+
+export function openEnvironmentsDialog(): void {
+  environmentsDialogState.open = true;
+  void loadEnvironments();
+}
+
+export function closeEnvironmentsDialog(): void {
+  environmentsDialogState.open = false;
+}
+
 // ---- the variables dialog (D11/D12) — one scope's variable list ----
 
 interface VariablesDialogState {

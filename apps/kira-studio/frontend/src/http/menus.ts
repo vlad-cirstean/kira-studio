@@ -22,6 +22,8 @@ export interface CollectionMenuActions {
   exportCollection(row: CollectionRowVm): void;
   /** P5 D11: the collection row's own "Variables…" item — opens VariablesDialog scoped to it. */
   variables(row: CollectionRowVm): void;
+  /** P5 D3/D11: the background menu's own "Environments…" item. */
+  environments(): void;
 }
 
 export function menuForRow(row: CollectionRowVm, actions: CollectionMenuActions): MenuItem[] {
@@ -158,6 +160,14 @@ export function backgroundMenu(actions: CollectionMenuActions): MenuItem[] {
       label: 'Import collection…',
       icon: 'cloud-download',
       run: () => actions.importCollection(),
+    },
+    { type: 'separator' },
+    {
+      type: 'item',
+      id: 'environments',
+      label: 'Environments…',
+      icon: 'settings-gear',
+      run: () => actions.environments(),
     },
   ];
 }

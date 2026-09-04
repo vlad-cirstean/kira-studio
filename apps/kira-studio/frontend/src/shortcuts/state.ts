@@ -29,9 +29,10 @@ export const paletteCommands: PaletteCommand[] = [
   // Registered by CollectionsPanel.vue, which is mounted for the whole of Http mode — an import
   // is not tab-scoped the way Save is.
   { id: 'http.import', label: 'Import collection…', run: () => runCommand('http.import') },
-  // P5 D11: registered by CollectionsPanel.vue, mounted for the whole of Http mode — no tab to be
-  // scoped to. Environments… follows in a later commit, once its own dialog exists.
+  // P5 D3/D11: both registered by CollectionsPanel.vue, mounted for the whole of Http mode — no
+  // tab to be scoped to.
   { id: 'http.variables', label: 'Variables…', run: () => runCommand('http.variables') },
+  { id: 'http.environments', label: 'Environments…', run: () => runCommand('http.environments') },
   { id: 'open-settings', label: 'Open settings', run: () => (settingsOpen.value = true) },
   { id: 'toggle-project-panel', label: 'Toggle project panel', run: toggleProjectPanel },
   { id: 'toggle-operations-panel', label: 'Toggle operations panel', run: toggleOperationsPanel },

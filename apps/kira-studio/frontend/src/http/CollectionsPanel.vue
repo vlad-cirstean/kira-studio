@@ -15,7 +15,7 @@ import {
   initCollections,
   itemRecord,
 } from './state/collections';
-import { openVariablesDialog } from './state/variables';
+import { openEnvironmentsDialog, openVariablesDialog } from './state/variables';
 
 // P4 C5: the placeholder is gone — this is a real tree now, mounted through the same LeftPanel
 // shell Studio's ProjectPanel.vue uses. `empty` is no longer hardcoded: it is "this app has no
@@ -64,13 +64,19 @@ function onVariablesCommand(): void {
   }
 }
 
-// D15: the palette's Import collection… and Variables… entries. Registered by the panel rather
-// than a view, since the panel is mounted for the whole of Http mode — neither is tab-scoped.
+function onEnvironments(): void {
+  openEnvironmentsDialog();
+}
+
+// D15: the palette's Import collection…, Variables… and Environments… entries. Registered by the
+// panel rather than a view, since the panel is mounted for the whole of Http mode — none is
+// tab-scoped.
 let unregisterCommands: Array<() => void> = [];
 onMounted(() => {
   unregisterCommands = [
     registerCommand('http.import', onImport),
     registerCommand('http.variables', onVariablesCommand),
+    registerCommand('http.environments', onEnvironments),
   ];
 });
 onUnmounted(() => {
@@ -108,6 +114,15 @@ onUnmounted(() => {
         v-tooltip="'Import collection…'"
         data-testid="import-collection"
         @click="onImport"
+      />
+      <!-- P5 D3/D11: the environments dialog's own entry point — environments exist
+           independently of collections, so this lives in the panel's header, not the tree. -->
+      <IconButton
+        icon="settings-gear"
+        aria-label="Environments"
+        v-tooltip="'Environments…'"
+        data-testid="http-environments"
+        @click="onEnvironments"
       />
     </template>
     <template #body>
