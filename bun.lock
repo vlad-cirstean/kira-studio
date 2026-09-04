@@ -63,6 +63,9 @@
     "packages/git-ipc": {
       "name": "@kira/git-ipc",
       "version": "0.0.0",
+      "dependencies": {
+        "@kira/ipc-core": "workspace:*",
+      },
     },
     "packages/git-ui": {
       "name": "@kira/git-ui",
@@ -74,6 +77,10 @@
         "slickgrid": "5.20.0",
         "vue": "3.5.42",
       },
+    },
+    "packages/ipc-core": {
+      "name": "@kira/ipc-core",
+      "version": "0.0.0",
     },
   },
   "packages": {
@@ -154,6 +161,8 @@
     "@kira/git-ipc": ["@kira/git-ipc@workspace:packages/git-ipc"],
 
     "@kira/git-ui": ["@kira/git-ui@workspace:packages/git-ui"],
+
+    "@kira/ipc-core": ["@kira/ipc-core@workspace:packages/ipc-core"],
 
     "@kira/kira-studio-frontend": ["@kira/kira-studio-frontend@workspace:apps/kira-studio/frontend"],
 

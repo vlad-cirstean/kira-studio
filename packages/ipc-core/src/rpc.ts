@@ -3,10 +3,14 @@
  * request correlation, event dispatch, stream credits and cancellation — so a host and the
  * harness's mock cannot diverge on semantics; each contributes only a ~ten-line
  * `MessageChannelLike` adapter over whatever it actually has (a Wails stream here, a webview's
- * `postMessage` in the source project, a plain in-process queue in the harness).
+ * `postMessage` in the source project, a plain in-process queue in the harness). It never learns
+ * what a method means: the contract is a type parameter, and the version plus method vocabulary
+ * are an injected `EndpointConfig` — a module instantiates both once (see `@kira/git-ipc`'s
+ * `endpoint.ts`) and every consumer of that module's IPC surface is none the wiser.
  */
 import { dedupeTransferList, encode } from './codec';
 import type {
+  ContractShape,
   EventKey,
   EventPayload,
   ParamsOf,
@@ -15,14 +19,10 @@ import type {
   StreamChunkOf,
   StreamKey,
   StreamParamsOf,
-} from './contract';
+} from './contractShape';
+import { unwrapVersioned, type VersionedEnvelope, wrapVersioned } from './envelope';
+import type { ContractChannel } from './shape';
 import { type Transport, TransportError } from './transport';
-import {
-  assertContractShape,
-  unwrapVersioned,
-  type VersionedEnvelope,
-  wrapVersioned,
-} from './validate';
 
 /** The one thing every transport (real or mock) implements: post a message, optionally with a
  *  transfer list, and be told about incoming ones. Everything above this — correlation,
@@ -33,8 +33,8 @@ export interface MessageChannelLike {
   close(): void;
 }
 
-/** An error that crossed the wire as data: `code` and `message` always; `kind` is the git client's
- *  own error kind when the failure was a git error, carried structurally since this package
+/** An error that crossed the wire as data: `code` and `message` always; `kind` is a classified
+ *  error's own kind when the failure carries one, carried structurally since this package
  *  depends on nothing. Raw stderr never crosses — see `toWireError` below. */
 export interface WireError {
   readonly code: string;
@@ -54,24 +54,32 @@ export class RpcError extends Error {
   }
 }
 
+/** The version and method-shape vocabulary one module's contract binds these functions to —
+ *  everything the generic endpoint needs to know about a contract that a `ContractShape` type
+ *  parameter alone cannot carry into a runtime check. */
+export interface EndpointConfig {
+  readonly contractVersion: number;
+  readonly assertShape: (channel: ContractChannel, method: string, payload: unknown) => void;
+}
+
 // ---------------------------------------------------------------------------------------
 // The frame union. Every member crosses the wire wrapped by `wrapVersioned`.
 // ---------------------------------------------------------------------------------------
 
-type Frame =
+type Frame<C extends ContractShape> =
   | {
       readonly t: 'req';
       readonly id: number;
-      readonly method: RequestKey;
+      readonly method: RequestKey<C>;
       readonly params: unknown;
     }
   | { readonly t: 'res'; readonly id: number; readonly ok: true; readonly result: unknown }
   | { readonly t: 'res'; readonly id: number; readonly ok: false; readonly error: WireError }
-  | { readonly t: 'evt'; readonly method: EventKey; readonly payload: unknown }
+  | { readonly t: 'evt'; readonly method: EventKey<C>; readonly payload: unknown }
   | {
       readonly t: 'open';
       readonly id: number;
-      readonly method: StreamKey;
+      readonly method: StreamKey<C>;
       readonly params: unknown;
     }
   | { readonly t: 'chunk'; readonly id: number; readonly seq: number; readonly chunk: unknown }
@@ -94,16 +102,24 @@ function toWireError(error: unknown): WireError {
   return { code: 'Unknown', message: String(error) };
 }
 
-function post(channel: MessageChannelLike, frame: Frame): void {
-  const envelope = wrapVersioned(frame);
+function post<C extends ContractShape>(
+  channel: MessageChannelLike,
+  config: EndpointConfig,
+  frame: Frame<C>,
+): void {
+  const envelope = wrapVersioned(config.contractVersion, frame);
   const { payload, transfer } = encode(envelope);
   channel.post(payload, dedupeTransferList(transfer));
 }
 
-function receive(channel: MessageChannelLike, handleFrame: (frame: Frame) => void): () => void {
+function receive<C extends ContractShape>(
+  channel: MessageChannelLike,
+  config: EndpointConfig,
+  handleFrame: (frame: Frame<C>) => void,
+): () => void {
   return channel.onMessage((raw) => {
-    const envelope = raw as VersionedEnvelope<Frame>;
-    handleFrame(unwrapVersioned(envelope));
+    const envelope = raw as VersionedEnvelope<Frame<C>>;
+    handleFrame(unwrapVersioned(config.contractVersion, envelope));
   });
 }
 
@@ -141,8 +157,8 @@ interface PendingRequest {
   readonly reject: (error: unknown) => void;
 }
 
-interface PendingStream {
-  readonly method: StreamKey;
+interface PendingStream<C extends ContractShape> {
+  readonly method: StreamKey<C>;
   readonly onChunk: (chunk: unknown) => void | Promise<void>;
   readonly resolve: () => void;
   readonly reject: (error: unknown) => void;
@@ -153,12 +169,15 @@ interface PendingStream {
   done: boolean;
 }
 
-export function createRpcClient(channel: MessageChannelLike): Transport {
+export function createRpcClient<C extends ContractShape>(
+  channel: MessageChannelLike,
+  config: EndpointConfig,
+): Transport<C> {
   let nextId = 1;
   const pendingRequests = new Map<number, PendingRequest>();
-  const pendingStreams = new Map<number, PendingStream>();
-  const openStreamIdByMethod = new Map<StreamKey, number>();
-  const eventHandlers = new Map<EventKey, Set<(payload: unknown) => void>>();
+  const pendingStreams = new Map<number, PendingStream<C>>();
+  const openStreamIdByMethod = new Map<StreamKey<C>, number>();
+  const eventHandlers = new Map<EventKey<C>, Set<(payload: unknown) => void>>();
 
   function finishStream(id: number): void {
     const entry = pendingStreams.get(id);
@@ -168,7 +187,7 @@ export function createRpcClient(channel: MessageChannelLike): Transport {
     if (openStreamIdByMethod.get(entry.method) === id) openStreamIdByMethod.delete(entry.method);
   }
 
-  function handleFrame(frame: Frame): void {
+  function handleFrame(frame: Frame<C>): void {
     switch (frame.t) {
       case 'res': {
         const pending = pendingRequests.get(frame.id);
@@ -179,7 +198,7 @@ export function createRpcClient(channel: MessageChannelLike): Transport {
         return;
       }
       case 'evt': {
-        assertContractShape('event', frame.method, frame.payload);
+        config.assertShape('event', frame.method, frame.payload);
         for (const handler of eventHandlers.get(frame.method) ?? []) handler(frame.payload);
         return;
       }
@@ -190,7 +209,9 @@ export function createRpcClient(channel: MessageChannelLike): Transport {
           if (entry.done) return;
           await entry.onChunk(frame.chunk);
           if (entry.done) return;
-          channel.post(wrapVersioned<Frame>({ t: 'credit', id: frame.id, n: 1 }));
+          channel.post(
+            wrapVersioned<Frame<C>>(config.contractVersion, { t: 'credit', id: frame.id, n: 1 }),
+          );
         });
         return;
       }
@@ -215,21 +236,21 @@ export function createRpcClient(channel: MessageChannelLike): Transport {
     }
   }
 
-  const unsubscribe = receive(channel, handleFrame);
+  const unsubscribe = receive<C>(channel, config, handleFrame);
 
   return {
-    request<K extends RequestKey>(
+    request<K extends RequestKey<C>>(
       method: K,
-      params: ParamsOf<K>,
+      params: ParamsOf<C, K>,
       signal?: AbortSignal,
-    ): Promise<ResultOf<K>> {
+    ): Promise<ResultOf<C, K>> {
       if (signal?.aborted) {
         return Promise.reject(
           new TransportError('cancelled', `request '${method}' was already cancelled`),
         );
       }
       const id = nextId++;
-      return new Promise<ResultOf<K>>((resolve, reject) => {
+      return new Promise<ResultOf<C, K>>((resolve, reject) => {
         pendingRequests.set(id, { resolve: resolve as (result: unknown) => void, reject });
         if (signal) {
           signal.addEventListener(
@@ -237,17 +258,20 @@ export function createRpcClient(channel: MessageChannelLike): Transport {
             () => {
               if (!pendingRequests.has(id)) return;
               pendingRequests.delete(id);
-              post(channel, { t: 'cancel', id });
+              post<C>(channel, config, { t: 'cancel', id });
               reject(new TransportError('cancelled', `request '${method}' was cancelled`));
             },
             { once: true },
           );
         }
-        post(channel, { t: 'req', id, method, params });
+        post<C>(channel, config, { t: 'req', id, method, params });
       });
     },
 
-    on<K extends EventKey>(method: K, handler: (payload: EventPayload<K>) => void): () => void {
+    on<K extends EventKey<C>>(
+      method: K,
+      handler: (payload: EventPayload<C, K>) => void,
+    ): () => void {
       let set = eventHandlers.get(method);
       if (!set) {
         set = new Set();
@@ -258,10 +282,10 @@ export function createRpcClient(channel: MessageChannelLike): Transport {
       return () => set.delete(wrapped);
     },
 
-    stream<K extends StreamKey>(
+    stream<K extends StreamKey<C>>(
       method: K,
-      params: StreamParamsOf<K>,
-      onChunk: (chunk: StreamChunkOf<K>) => void,
+      params: StreamParamsOf<C, K>,
+      onChunk: (chunk: StreamChunkOf<C, K>) => void,
       signal?: AbortSignal,
     ): Promise<void> {
       // Opening a second stream for the same method supersedes the first (W2) — the same
@@ -271,7 +295,7 @@ export function createRpcClient(channel: MessageChannelLike): Transport {
         const prior = pendingStreams.get(priorId);
         if (prior && !prior.done) {
           finishStream(priorId);
-          post(channel, { t: 'cancel', id: priorId });
+          post<C>(channel, config, { t: 'cancel', id: priorId });
           prior.resolve();
         }
       }
@@ -284,7 +308,7 @@ export function createRpcClient(channel: MessageChannelLike): Transport {
 
       const id = nextId++;
       return new Promise<void>((resolve, reject) => {
-        const entry: PendingStream = {
+        const entry: PendingStream<C> = {
           method,
           onChunk: onChunk as (chunk: unknown) => void | Promise<void>,
           resolve,
@@ -301,15 +325,15 @@ export function createRpcClient(channel: MessageChannelLike): Transport {
             () => {
               if (entry.done) return;
               finishStream(id);
-              post(channel, { t: 'cancel', id });
+              post<C>(channel, config, { t: 'cancel', id });
               resolve();
             },
             { once: true },
           );
         }
 
-        post(channel, { t: 'open', id, method, params });
-        post(channel, { t: 'credit', id, n: INITIAL_STREAM_CREDIT });
+        post<C>(channel, config, { t: 'open', id, method, params });
+        post<C>(channel, config, { t: 'credit', id, n: INITIAL_STREAM_CREDIT });
       });
     },
 
@@ -337,50 +361,54 @@ export function createRpcClient(channel: MessageChannelLike): Transport {
 // createRpcServer — the host side of the endpoint.
 // ---------------------------------------------------------------------------------------
 
-export type RequestHandler<K extends RequestKey> = (
-  params: ParamsOf<K>,
+export type RequestHandler<C extends ContractShape, K extends RequestKey<C>> = (
+  params: ParamsOf<C, K>,
   ctx: { readonly signal: AbortSignal },
-) => Promise<ResultOf<K>>;
+) => Promise<ResultOf<C, K>>;
 
-export type StreamHandler<K extends StreamKey> = (
-  params: StreamParamsOf<K>,
+export type StreamHandler<C extends ContractShape, K extends StreamKey<C>> = (
+  params: StreamParamsOf<C, K>,
   ctx: {
     readonly signal: AbortSignal;
     /** Awaited by the handler: this is where the credit-based backpressure reaches back into
      *  whatever is producing chunks (W7 — P2's paused `git log`). */
-    readonly emit: (chunk: StreamChunkOf<K>) => Promise<void>;
+    readonly emit: (chunk: StreamChunkOf<C, K>) => Promise<void>;
   },
 ) => Promise<void>;
 
-export type ServerHandlers = {
-  readonly requests: { readonly [K in RequestKey]: RequestHandler<K> };
-  readonly streams: { readonly [K in StreamKey]: StreamHandler<K> };
+export type ServerHandlers<C extends ContractShape> = {
+  readonly requests: { readonly [K in RequestKey<C>]: RequestHandler<C, K> };
+  readonly streams: { readonly [K in StreamKey<C>]: StreamHandler<C, K> };
 };
 
-export interface RpcServer {
-  emit<K extends EventKey>(method: K, payload: EventPayload<K>): void;
+export interface RpcServer<C extends ContractShape> {
+  emit<K extends EventKey<C>>(method: K, payload: EventPayload<C, K>): void;
   dispose(): void;
 }
 
-export function createRpcServer(channel: MessageChannelLike, handlers: ServerHandlers): RpcServer {
+export function createRpcServer<C extends ContractShape>(
+  channel: MessageChannelLike,
+  handlers: ServerHandlers<C>,
+  config: EndpointConfig,
+): RpcServer<C> {
   const activeWork = new Map<number, AbortController>();
   const creditGates = new Map<number, CreditGate>();
 
-  async function handleRequest(id: number, method: RequestKey, params: unknown): Promise<void> {
+  async function handleRequest(id: number, method: RequestKey<C>, params: unknown): Promise<void> {
     const controller = new AbortController();
     activeWork.set(id, controller);
     try {
-      assertContractShape('request', method, params);
+      config.assertShape('request', method, params);
       const handler = handlers.requests[method];
       const result = await handler(params as never, { signal: controller.signal });
-      if (activeWork.delete(id)) post(channel, { t: 'res', id, ok: true, result });
+      if (activeWork.delete(id)) post<C>(channel, config, { t: 'res', id, ok: true, result });
     } catch (error) {
       if (activeWork.delete(id))
-        post(channel, { t: 'res', id, ok: false, error: toWireError(error) });
+        post<C>(channel, config, { t: 'res', id, ok: false, error: toWireError(error) });
     }
   }
 
-  async function handleOpen(id: number, method: StreamKey, params: unknown): Promise<void> {
+  async function handleOpen(id: number, method: StreamKey<C>, params: unknown): Promise<void> {
     const controller = new AbortController();
     activeWork.set(id, controller);
     const gate = new CreditGate();
@@ -396,28 +424,28 @@ export function createRpcServer(channel: MessageChannelLike, handlers: ServerHan
         ),
       ]);
       if (controller.signal.aborted) return;
-      post(channel, { t: 'chunk', id, seq, chunk });
+      post<C>(channel, config, { t: 'chunk', id, seq, chunk });
       seq++;
     }
 
     try {
-      assertContractShape('stream', method, params);
+      config.assertShape('stream', method, params);
       const handler = handlers.streams[method];
       await handler(params as never, { signal: controller.signal, emit: emit as never });
       if (activeWork.delete(id)) {
         creditGates.delete(id);
-        post(channel, { t: 'end', id });
+        post<C>(channel, config, { t: 'end', id });
       }
     } catch (error) {
       if (activeWork.delete(id)) {
         creditGates.delete(id);
-        if (controller.signal.aborted) post(channel, { t: 'end', id });
-        else post(channel, { t: 'end', id, error: toWireError(error) });
+        if (controller.signal.aborted) post<C>(channel, config, { t: 'end', id });
+        else post<C>(channel, config, { t: 'end', id, error: toWireError(error) });
       }
     }
   }
 
-  function handleFrame(frame: Frame): void {
+  function handleFrame(frame: Frame<C>): void {
     switch (frame.t) {
       case 'req':
         void handleRequest(frame.id, frame.method, frame.params);
@@ -446,11 +474,11 @@ export function createRpcServer(channel: MessageChannelLike, handlers: ServerHan
     }
   }
 
-  const unsubscribe = receive(channel, handleFrame);
+  const unsubscribe = receive<C>(channel, config, handleFrame);
 
   return {
-    emit<K extends EventKey>(method: K, payload: EventPayload<K>): void {
-      post(channel, { t: 'evt', method, payload });
+    emit<K extends EventKey<C>>(method: K, payload: EventPayload<C, K>): void {
+      post<C>(channel, config, { t: 'evt', method, payload });
     },
     dispose(): void {
       unsubscribe();

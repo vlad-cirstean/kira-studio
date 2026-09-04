@@ -1,12 +1,44 @@
 import { describe, expect, test } from 'bun:test';
-import type { PackedCommitChunk, StreamChunkOf } from './contract';
+import { wrapVersioned } from './envelope';
 import {
   createRpcClient,
   createRpcServer,
+  type EndpointConfig,
   type MessageChannelLike,
   type ServerHandlers,
 } from './rpc';
-import { CONTRACT_VERSION, wrapVersioned } from './validate';
+import { createContractShapeAsserter } from './shape';
+
+/** A neutral contract, standing in for a real module's own `Contract` (this file has no
+ *  knowledge of Git or any other module — see F1/D5). Small on purpose: just enough surface
+ *  (one plain request, one erroring request, one event, one stream) to exercise every frame kind
+ *  the protocol carries. */
+interface TestChunk {
+  readonly seq: number;
+}
+
+type TestContract = {
+  requests: {
+    'thing.close': { params: { readonly id: string }; result: Record<string, never> };
+    'thing.open': { params: { readonly path: string }; result: unknown };
+  };
+  events: {
+    'thing.changed': { readonly id: string; readonly kind: string };
+  };
+  streams: {
+    'thing.stream': { params: { readonly id: string }; chunk: TestChunk };
+  };
+};
+
+const CONTRACT_VERSION = 1;
+const config: EndpointConfig = {
+  contractVersion: CONTRACT_VERSION,
+  assertShape: createContractShapeAsserter({
+    requests: new Set(['thing.close', 'thing.open']),
+    events: new Set(['thing.changed']),
+    streams: new Set(['thing.stream']),
+  }),
+};
 
 function tick(times = 1): Promise<void> {
   return times <= 1
@@ -72,58 +104,25 @@ function createInMemoryChannelPair(): readonly [MessageChannelLike, MessageChann
   return [a, b] as const;
 }
 
-function emptyPackedChunk(): PackedCommitChunk {
-  return {
-    from: 0,
-    to: 0,
-    shaWidthBytes: 20,
-    shas: new ArrayBuffer(0),
-    parentOffsets: new ArrayBuffer(4),
-    parentShas: new ArrayBuffer(0),
-    identityIds: new ArrayBuffer(0),
-    times: new ArrayBuffer(0),
-    subjectBytes: new ArrayBuffer(0),
-    subjectOffsets: new ArrayBuffer(4),
-    dictionaryBase: 0,
-    dictionary: [],
-    decorations: [],
-  };
-}
-
-function chunkFor(seq: number): StreamChunkOf<'graph.stream'> {
-  return {
-    repoId: 'r1',
-    seq,
-    from: seq,
-    to: seq + 1,
-    source: 'git',
-    remaining: 0,
-    exhausted: false,
-    commits: emptyPackedChunk(),
-  };
+function chunkFor(seq: number): TestChunk {
+  return { seq };
 }
 
 function stubHandlers(
-  requestOverrides: Partial<ServerHandlers['requests']> = {},
-  streamOverrides: Partial<ServerHandlers['streams']> = {},
-): ServerHandlers {
+  requestOverrides: Partial<ServerHandlers<TestContract>['requests']> = {},
+  streamOverrides: Partial<ServerHandlers<TestContract>['streams']> = {},
+): ServerHandlers<TestContract> {
   const notImplemented = async (): Promise<never> => {
     throw new Error('not implemented in this test');
   };
   return {
     requests: {
-      'app.init': notImplemented,
-      'repo.list': notImplemented,
-      'repo.pick': notImplemented,
-      'repo.open': notImplemented,
-      'repo.close': notImplemented,
-      'graph.status': notImplemented,
-      'graph.loadMore': notImplemented,
-      'graph.refresh': notImplemented,
+      'thing.close': notImplemented,
+      'thing.open': notImplemented,
       ...requestOverrides,
     },
     streams: {
-      'graph.stream': notImplemented,
+      'thing.stream': notImplemented,
       ...streamOverrides,
     },
   };
@@ -133,15 +132,15 @@ describe('ipc rpc — request/response', () => {
   test("a request round-trips to its handler's result", async () => {
     const [a, b] = createInMemoryChannelPair();
     const handlers = stubHandlers({
-      'repo.close': async ({ repoId }) => {
-        expect(repoId).toBe('r1');
+      'thing.close': async ({ id }) => {
+        expect(id).toBe('r1');
         return {};
       },
     });
-    const server = createRpcServer(a, handlers);
-    const client = createRpcClient(b);
+    const server = createRpcServer<TestContract>(a, handlers, config);
+    const client = createRpcClient<TestContract>(b, config);
 
-    const result = await client.request('repo.close', { repoId: 'r1' });
+    const result = await client.request('thing.close', { id: 'r1' });
     expect(result).toEqual({});
 
     client.dispose();
@@ -150,26 +149,26 @@ describe('ipc rpc — request/response', () => {
 
   test("a request rejects with an RpcError carrying the handler's error kind", async () => {
     const [a, b] = createInMemoryChannelPair();
-    class FakeGitError extends Error {
+    class FakeDomainError extends Error {
       readonly kind = 'NotFound';
       constructor() {
-        super('no such repo');
-        this.name = 'GitError';
+        super('no such thing');
+        this.name = 'DomainError';
       }
     }
     const handlers = stubHandlers({
-      'repo.open': async () => {
-        throw new FakeGitError();
+      'thing.open': async () => {
+        throw new FakeDomainError();
       },
     });
-    const server = createRpcServer(a, handlers);
-    const client = createRpcClient(b);
+    const server = createRpcServer<TestContract>(a, handlers, config);
+    const client = createRpcClient<TestContract>(b, config);
 
-    await expect(client.request('repo.open', { path: '/nope' })).rejects.toMatchObject({
+    await expect(client.request('thing.open', { path: '/nope' })).rejects.toMatchObject({
       name: 'RpcError',
-      code: 'GitError',
+      code: 'DomainError',
       kind: 'NotFound',
-      message: 'no such repo',
+      message: 'no such thing',
     });
 
     client.dispose();
@@ -180,18 +179,18 @@ describe('ipc rpc — request/response', () => {
 describe('ipc rpc — events', () => {
   test('server.emit reaches every registered handler', async () => {
     const [a, b] = createInMemoryChannelPair();
-    const server = createRpcServer(a, stubHandlers());
-    const client = createRpcClient(b);
+    const server = createRpcServer<TestContract>(a, stubHandlers(), config);
+    const client = createRpcClient<TestContract>(b, config);
 
     const seen: unknown[] = [];
-    const unsubscribe = client.on('repo.changed', (payload) => seen.push(payload));
+    const unsubscribe = client.on('thing.changed', (payload) => seen.push(payload));
 
-    server.emit('repo.changed', { repoId: 'r1', kind: 'refsChanged' });
+    server.emit('thing.changed', { id: 'r1', kind: 'refsChanged' });
     await tick();
-    expect(seen).toEqual([{ repoId: 'r1', kind: 'refsChanged' }]);
+    expect(seen).toEqual([{ id: 'r1', kind: 'refsChanged' }]);
 
     unsubscribe();
-    server.emit('repo.changed', { repoId: 'r1', kind: 'worktreeChanged' });
+    server.emit('thing.changed', { id: 'r1', kind: 'worktreeChanged' });
     await tick();
     expect(seen).toHaveLength(1); // unsubscribed — did not receive the second event
 
@@ -207,7 +206,7 @@ describe('ipc rpc — streams', () => {
     const handlers = stubHandlers(
       {},
       {
-        'graph.stream': async (_params, { emit }) => {
+        'thing.stream': async (_params, { emit }) => {
           for (let i = 0; i < 10; i++) {
             await emit(chunkFor(i));
             emitCompleted++;
@@ -215,15 +214,15 @@ describe('ipc rpc — streams', () => {
         },
       },
     );
-    const server = createRpcServer(a, handlers);
-    const client = createRpcClient(b);
+    const server = createRpcServer<TestContract>(a, handlers, config);
+    const client = createRpcClient<TestContract>(b, config);
 
     const received: number[] = [];
     const freeze = deferred<void>();
     let firstChunkFrozen = false;
 
-    const streamPromise = client.stream('graph.stream', { repoId: 'r1' }, async (chunk) => {
-      received.push((chunk as StreamChunkOf<'graph.stream'>).seq);
+    const streamPromise = client.stream('thing.stream', { id: 'r1' }, async (chunk) => {
+      received.push(chunk.seq);
       if (!firstChunkFrozen) {
         firstChunkFrozen = true;
         await freeze.promise;
@@ -255,7 +254,7 @@ describe('ipc rpc — streams', () => {
     const handlers = stubHandlers(
       {},
       {
-        'graph.stream': async (_params, { signal, emit }) => {
+        'thing.stream': async (_params, { signal, emit }) => {
           for (let i = 0; i < 5; i++) {
             if (signal.aborted) {
               cancelled = true;
@@ -266,18 +265,18 @@ describe('ipc rpc — streams', () => {
         },
       },
     );
-    const server = createRpcServer(a, handlers);
-    const client = createRpcClient(b);
+    const server = createRpcServer<TestContract>(a, handlers, config);
+    const client = createRpcClient<TestContract>(b, config);
 
     const controller = new AbortController();
     const received: number[] = [];
     const freeze = deferred<void>();
     let frozen = false;
     const streamPromise = client.stream(
-      'graph.stream',
-      { repoId: 'r1' },
+      'thing.stream',
+      { id: 'r1' },
       async (chunk) => {
-        received.push((chunk as StreamChunkOf<'graph.stream'>).seq);
+        received.push(chunk.seq);
         // Freeze on the first chunk so the stream is still genuinely in-flight (the server
         // has run out of its initial credit and is blocked) when we cancel it below.
         if (!frozen) {
@@ -311,11 +310,11 @@ describe('ipc rpc — streams', () => {
     const handlers = stubHandlers(
       {},
       {
-        'graph.stream': async (params, { signal, emit }) => {
-          const { repoId } = params as { readonly repoId: string };
+        'thing.stream': async (params, { signal, emit }) => {
+          const { id } = params;
           for (let i = 0; i < 5; i++) {
             if (signal.aborted) {
-              cancelledIds.push(repoId);
+              cancelledIds.push(id);
               return;
             }
             await emit(chunkFor(i));
@@ -323,14 +322,14 @@ describe('ipc rpc — streams', () => {
         },
       },
     );
-    const server = createRpcServer(a, handlers);
-    const client = createRpcClient(b);
+    const server = createRpcServer<TestContract>(a, handlers, config);
+    const client = createRpcClient<TestContract>(b, config);
 
     const firstReceived: number[] = [];
     const freezeFirst = deferred<void>();
     let firstFrozen = false;
-    const firstPromise = client.stream('graph.stream', { repoId: 'r1' }, async (chunk) => {
-      firstReceived.push((chunk as StreamChunkOf<'graph.stream'>).seq);
+    const firstPromise = client.stream('thing.stream', { id: 'r1' }, async (chunk) => {
+      firstReceived.push(chunk.seq);
       if (!firstFrozen) {
         firstFrozen = true;
         await freezeFirst.promise;
@@ -340,8 +339,8 @@ describe('ipc rpc — streams', () => {
     await tick(2); // first chunk delivered and frozen — the stream is genuinely still open
 
     const secondReceived: number[] = [];
-    const secondPromise = client.stream('graph.stream', { repoId: 'r2' }, (chunk) => {
-      secondReceived.push((chunk as StreamChunkOf<'graph.stream'>).seq);
+    const secondPromise = client.stream('thing.stream', { id: 'r2' }, (chunk) => {
+      secondReceived.push(chunk.seq);
     });
 
     await expect(firstPromise).resolves.toBeUndefined();
@@ -361,28 +360,28 @@ describe('ipc rpc — streams', () => {
 describe('ipc rpc — protocol integrity', () => {
   test('a version mismatch throws loudly on receipt', () => {
     const [a, b] = createInMemoryChannelPair();
-    createRpcServer(a, stubHandlers());
-    const client = createRpcClient(b);
+    createRpcServer<TestContract>(a, stubHandlers(), config);
+    const client = createRpcClient<TestContract>(b, config);
     void client; // keep the client's onMessage registered
 
     const badEnvelope = {
       version: CONTRACT_VERSION + 1,
-      body: { t: 'evt', method: 'repo.changed', payload: {} },
+      body: { t: 'evt', method: 'thing.changed', payload: {} },
     };
     expect(() => a.post(badEnvelope)).toThrow(/contract version mismatch/);
   });
 
   test('wrapVersioned frames delivered directly are otherwise ignored if unrecognised', () => {
     const [a, b] = createInMemoryChannelPair();
-    createRpcServer(a, stubHandlers());
-    const client = createRpcClient(b);
+    createRpcServer<TestContract>(a, stubHandlers(), config);
+    const client = createRpcClient<TestContract>(b, config);
     void client;
 
     // A server -> client-only frame delivered to the server is a protocol bug, not silently
     // dropped.
-    expect(() => b.post(wrapVersioned({ t: 'res', id: 1, ok: true, result: {} }))).toThrow(
-      /unexpected frame/,
-    );
+    expect(() =>
+      b.post(wrapVersioned(config.contractVersion, { t: 'res', id: 1, ok: true, result: {} })),
+    ).toThrow(/unexpected frame/);
   });
 
   test('disposing the server aborts every in-flight stream for that channel', async () => {
@@ -391,7 +390,7 @@ describe('ipc rpc — protocol integrity', () => {
     const handlers = stubHandlers(
       {},
       {
-        'graph.stream': async (_params, { signal, emit }) => {
+        'thing.stream': async (_params, { signal, emit }) => {
           await emit(chunkFor(0));
           await new Promise<void>((resolve) => {
             signal.addEventListener('abort', () => {
@@ -402,12 +401,12 @@ describe('ipc rpc — protocol integrity', () => {
         },
       },
     );
-    const server = createRpcServer(a, handlers);
-    const client = createRpcClient(b);
+    const server = createRpcServer<TestContract>(a, handlers, config);
+    const client = createRpcClient<TestContract>(b, config);
 
     const received: number[] = [];
-    const streamPromise = client.stream('graph.stream', { repoId: 'r1' }, (chunk) => {
-      received.push((chunk as StreamChunkOf<'graph.stream'>).seq);
+    const streamPromise = client.stream('thing.stream', { id: 'r1' }, (chunk) => {
+      received.push(chunk.seq);
     });
 
     await tick(2);

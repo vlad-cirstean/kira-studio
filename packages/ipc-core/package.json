@@ -1,0 +1,10 @@
+{
+  "name": "@kira/ipc-core",
+  "private": true,
+  "version": "0.0.0",
+  "description": "The module-agnostic half of a correlated RPC-over-a-channel protocol: the codec, the versioned envelope, the contract-shape assertion, and the one generic RPC endpoint. No I/O, no DOM, no framework, no host, and no knowledge of any one module's contract — the contract is a type parameter and the version/vocabulary an injected config.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  }
+}
