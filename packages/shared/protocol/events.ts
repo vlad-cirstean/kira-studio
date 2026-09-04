@@ -26,6 +26,9 @@ export const CHANNEL = {
   opUpdate: 'kira:op:update',
   appMetrics: 'kira:app:metrics',
   schemaChanged: 'kira:schema:changed',
+  // P11 D8: a server-streaming call's coalesced message batches, delivered via EmitTo (one window
+  // only) — the one genuinely new push channel this phase adds.
+  grpcCall: 'kira:grpc:call',
 } as const;
 
 /** Summed across every process metrics.Sample covers (P56's ticker) — a single app-wide readout

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { grpcDescriptorModeSchema, grpcMetadataSchema, grpcTlsModeSchema } from './grpc';
 import {
   httpBinaryFileSchema,
   httpBodyModeSchema,
@@ -49,6 +50,30 @@ export function defaultHttpSavedRequest(): HttpSavedRequest {
   return httpSavedRequestSchema.parse({});
 }
 
+// P11 D12: the TypeScript mirror of Go's model.SavedGrpcRequest — the request half of
+// grpcRequestTabStateSchema (domain/grpc.ts), field name for field name, following
+// httpSavedRequestSchema's own precedent exactly: not the tab state (the four UI-only fields stay
+// out), and Go owns the type since it writes this document too.
+export const httpSavedGrpcRequestSchema = /*#__PURE__*/ z.object({
+  target: z.string().default(''),
+  tlsMode: grpcTlsModeSchema.default('tls'),
+  caFile: z.string().default(''),
+  serverName: z.string().default(''),
+  descriptorMode: grpcDescriptorModeSchema.default('reflection'),
+  protoPath: z.string().default(''),
+  importPaths: /*#__PURE__*/ z.array(z.string()).default([]),
+  service: z.string().default(''),
+  method: z.string().default(''),
+  message: z.string().default(''),
+  metadata: /*#__PURE__*/ z.array(grpcMetadataSchema).default([]),
+});
+export type HttpSavedGrpcRequest = z.infer<typeof httpSavedGrpcRequestSchema>;
+
+/** An empty saved gRPC request — what a brand-new collection row starts as. */
+export function defaultHttpSavedGrpcRequest(): HttpSavedGrpcRequest {
+  return httpSavedGrpcRequestSchema.parse({});
+}
+
 // The two flat row shapes CollectionsService.List answers with (D11). Mirrors of Go's
 // model.Collection / model.CollectionItem, typed rather than validated — the renderer builds the
 // tree from these, the same way TreeService.Children returns flat nodes.
@@ -61,7 +86,11 @@ export interface CollectionSummary {
 }
 
 /** `method` and `url` are denormalized out of the saved request so the tree renders a method chip
- *  and searches URLs without reading a body; both are '' for a folder. */
+ *  and searches URLs without reading a body; both are '' for a folder. `protocol` (P11 D12) is
+ *  structural sibling data, not a third `kind` value — `kind` stays 'folder' vs. a leaf, and
+ *  `protocol` says which document shape `request_json` holds for a leaf: 'http' ->
+ *  model.SavedRequest, 'grpc' -> model.SavedGrpcRequest. Meaningless for a folder, defaulted to
+ *  'http' there. */
 export interface CollectionItemSummary {
   id: string;
   collectionId: string;
@@ -71,12 +100,16 @@ export interface CollectionItemSummary {
   sortOrder: number;
   method: string;
   url: string;
+  protocol: CollectionItemProtocol;
   createdAt: string;
   updatedAt: string;
 }
 
 export const COLLECTION_ITEM_KINDS = ['folder', 'request'] as const;
 export type CollectionItemKind = (typeof COLLECTION_ITEM_KINDS)[number];
+
+export const COLLECTION_ITEM_PROTOCOLS = ['http', 'grpc'] as const;
+export type CollectionItemProtocol = (typeof COLLECTION_ITEM_PROTOCOLS)[number];
 
 /** Which of the two tables a tree row lives in — the renderer passes this rather than knowing. */
 export type CollectionTarget = 'collection' | 'item';

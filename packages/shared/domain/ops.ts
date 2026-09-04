@@ -18,6 +18,9 @@ export const opKindSchema = /*#__PURE__*/ z.enum([
   // connectionless op kind — RunOp already tolerates a nil connection id end to end (F10), so
   // this joins the same op log rather than getting one of its own (D3).
   'http',
+  // P11 D7: a gRPC unary or server-streaming call (internal/grpcclient) — the same connectionless
+  // op shape 'http' already established, joining the same op log rather than a second scheduler.
+  'grpc',
 ]);
 export type OpKind = z.infer<typeof opKindSchema>;
 

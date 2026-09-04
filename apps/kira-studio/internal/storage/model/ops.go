@@ -39,6 +39,8 @@ var opKinds = map[string]bool{
 	"test": true, "read": true, "count": true, "mutate": true, "execute": true, "transfer": true,
 	// P2: the op log's first connectionless op kind (internal/httpclient via bridge/http.go).
 	"http": true,
+	// P11 D7: a gRPC unary or server-streaming call (internal/grpcclient via bridge/grpc.go).
+	"grpc": true,
 }
 
 var opStatuses = map[string]bool{
