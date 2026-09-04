@@ -193,7 +193,7 @@ func TestKafka_AuthMatrix(t *testing.T) {
 		{
 			Name: "SASL broker, kira/wrong",
 			Config: func(c model.ResolvedConnectionConfig) model.ResolvedConnectionConfig {
-				c.Username, c.Password = testsupport.Strp("kira"), testsupport.Strp("wrong")
+				c.Username, c.Password = testsupport.Strp("kira"), testsupport.Strp("definitely-wrong")
 				return c
 			},
 			Expect: testsupport.Outcome{FailWith: adapters.CodeAuth},

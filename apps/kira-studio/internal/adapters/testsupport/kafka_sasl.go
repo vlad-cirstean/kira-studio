@@ -37,8 +37,14 @@ const (
 	// SASL-authenticated-but-authorization-refused principal clickhouse/mongo/redis's own matrices
 	// already have and kafka's did not. Static config, same as kira/kira, since PLAIN's credential
 	// table is boot-time only (no dynamic-user API the way SCRAM has).
+	//
+	// round-2 finding 7: the password must differ from the username (matrix.go's own
+	// FixturePassword comment states the rule this used to violate — a fixture password must never
+	// collide as a substring with any other fixture identifier, since the leak-assertion does a
+	// substring check). Currently inert since this row expects success, but fragile for a future
+	// case that reuses it.
 	KafkaSaslNoAclUsername = "kira_noacl"
-	KafkaSaslNoAclPassword = "kira_noacl"
+	KafkaSaslNoAclPassword = "kira-noacl-pw"
 )
 
 // KafkaSaslFixture is the SASL_PLAINTEXT/PLAIN counterpart to KafkaFixture — used only by the
