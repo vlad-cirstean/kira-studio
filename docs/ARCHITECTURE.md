@@ -22,7 +22,7 @@ authoritative for behavior: SPEC.md is the record of what v1 was *specified* to 
 
 | Concern | Choice | Note |
 |---|---|---|
-| Shell | **Wails v3** (`v3.0.0-beta.16`), Go | native title bar, macOS 14+, `arm64` only |
+| Shell | **Wails v3** (`v3.0.0-beta.16`), Go | a custom, hidden-inset title bar (`Mac.TitleBar: application.MacTitleBarHiddenInset`, P1) drawn by `workbench/TitleBar.vue` over a full-size-content window — not the OS-drawn bar; macOS 14+, `arm64` only |
 | Language | TypeScript 6 (`tsc`/`vue-tsc`) for `.ts` and `.vue`; **Go** for the shell | pinned below TypeScript 7 on purpose — TS7 ships no stable programmatic compiler API until 7.1, and `vue-tsc` (which `bun run typecheck:web` runs) consumes that API in-process; `@typescript/native-preview`'s `tsgo` binary (`typecheck:tests`/`typecheck:unit`) is a separate, already-latest-upstream tool in the meantime. Converge on one toolchain once TS 7.1 ships and `vue-tsc` adopts it (P19 F2/F4) |
 | Package manager / scripts / test runner | Bun | tooling only — every adapter is native Go, so nothing at runtime depends on it |
 | Renderer build | Vite (`vite build`, `apps/kira-studio/frontend/vite.config.ts`) | builds `apps/kira-studio/frontend/src` straight into `apps/kira-studio/frontend/dist`, which `apps/kira-studio/main.go` embeds via `//go:embed all:frontend/dist` and serves through Wails' `AssetOptions.Handler`. Two dynamically-imported chunks as of P15, still split under Vite 8/Rolldown (P19 C6): the query console's SQL Format button reaches `sql-formatter` only through `views/console/sqlFormatterEntry.ts`'s `await import()` (~37 KB gzip), and the data grid's Generate data… dialog reaches `@faker-js/faker` only through `views/grid/fakeData/fakerEntry.ts`'s `await import()` (~155 KB gzip) — both fetched on first use, neither costing a launch |
@@ -553,6 +553,47 @@ independent paging, projection, sort, filter and scroll state. Every tab kind �
 `definition`, `document`, `keyvalue`, `stream`, `console`, `browse` — follows this rule, including
 Browse (below), where `state.levelPath` is the one piece of Browse-specific state layered on top
 of the same identity.
+
+**A tab's mode is a function of its kind; switching modes writes nothing.** P1 introduced a
+second top-level mode alongside Studio (**Http**, still empty as of P1 — no request builder, no
+collections, nothing protocol-specific has landed yet), and the seam is deliberately the smallest
+thing that works: `TAB_KIND_MODE` (`packages/shared/domain/tabs.ts`) is a total, hand-maintained
+map from `TabKind` to `AppMode`, so there is no `mode` column, no migration and no Go change — a
+tab's mode is derived, never stored, the same shape the "page kind, never database type" rule
+above already uses. `state/mode.ts`'s `modeState` is a plain selection (`setMode`); `tabsState`
+(`state/tabs.ts`) keeps one active tab **per mode** (`activeIdByMode: Record<AppMode, string |
+null>`, not a single app-wide id), and `activateTab`/`closeTab`/`closeOthers`/`closeToTheRight`/
+`closeAll`/`stepTab` are all scoped to the current mode's own slice of the one shared `tabs` array.
+Switching mode touches no `TabRecord`, schedules no save and issues no IPC — the two modes cannot
+drift, cannot double-persist into each other, and (per-window `tabs.window_key` scoping,
+unaffected) cannot leak tabs across a window.
+
+**The left panel is a shell with pluggable content; the tree host is a separate, mode-agnostic
+primitive.** `workbench/panels/LeftPanel.vue` owns the header geometry, the search reveal/toggle
+and the VS-Code-style type-ahead redirect — the same panel shell both `ProjectPanel.vue` (Studio)
+and `http/CollectionsPanel.vue` (Http) mount into via its `#title`/`#actions`/`#body`/`#empty`
+slots, so a second left panel was never added (there are still exactly three layout panels).
+Separately, `theme/primitives/TreeHost.vue` is the virtualized-tree mechanics factored out of
+`ProjectTree.vue` — `VirtualList` wiring, the pinned-ancestor sticky band
+(`theme/primitives/stickyBand.ts`), reveal-scroll with band inset — generic over any row shape
+with `depth`/`hasChildren`/`expanded`/`key`. `ProjectTree.vue` still owns every Studio-specific
+behaviour (the connection-driven row model, the five openable-kind dispatch, context menus,
+keyboard shortcuts) unchanged; a future Http collections tree would mount `TreeHost` the same way,
+over its own row model, not a shared one — the two modes' tree *rows* have nothing in common
+(connect-before-expand, per-connection visibility, engine-dependent group folders), only how rows
+are virtualized and pinned.
+
+**The tab strip and content area are registry-driven, not a per-kind dispatch chain.**
+`state/tabKinds.ts`'s `TAB_KINDS` (component-free) supplies each `TabKind`'s title/icon/rail
+colour/default-and-duplicate state/page-store cleanup/context-menu extras;
+`workbench/tabViews.ts`'s `TAB_VIEWS` (statically imported, so the bundle's two dynamic chunks
+above are unaffected) supplies the view component. `MainView.vue` is one
+`<component :is="TAB_VIEWS[activeTab.kind]">` plus a mode-registry (`workbench/modes.ts`) fallback
+when the mode has no active tab, replacing what used to be a nine-branch `v-if`/`v-else-if` chain;
+`TabStrip.vue` reads the same `TAB_KINDS` registry for its icon/title/rail/context-menu instead of
+branching on `tab.kind` itself, and no longer imports `project/state/tree` at all. Adding a tab
+kind (P2+) means adding one registry entry each in `state/tabKinds.ts` and
+`workbench/tabViews.ts`, not editing a dispatch chain in three files.
 
 **Session restore never auto-reconnects.** On relaunch, previous tabs reopen but their connections
 are not. A restored tab renders a centred **Reconnect & load** button (`ReconnectGate`) and
