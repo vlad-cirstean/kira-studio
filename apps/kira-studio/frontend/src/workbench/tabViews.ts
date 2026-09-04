@@ -5,6 +5,7 @@ import ConsoleTabView from '../views/console/ConsoleView.vue';
 import DefinitionTabView from '../views/definition/DefinitionView.vue';
 import DocumentTabView from '../views/documents/DocumentView.vue';
 import DataTabView from '../views/grid/DataView.vue';
+import HttpRequestTabView from '../views/httprequest/HttpRequestView.vue';
 import KeyValueTabView from '../views/keyvalue/KeyValueView.vue';
 import StreamTabView from '../views/stream/StreamView.vue';
 
@@ -20,4 +21,5 @@ export const TAB_VIEWS: Record<TabKind, Component> = {
   keyvalue: KeyValueTabView,
   stream: StreamTabView,
   browse: BrowseTabView,
+  'http-request': HttpRequestTabView,
 };

@@ -1,4 +1,5 @@
 import type { ConnectionColor } from '@shared/domain/connection';
+import { defaultHttpRequestTabState, type HttpRequestTabState } from '@shared/domain/http';
 import {
   type BrowseTabRecord,
   type BrowseTabState,
@@ -17,6 +18,7 @@ import {
   defaultDocumentTabState,
   defaultKeyValueTabState,
   defaultStreamTabState,
+  type HttpRequestTabRecord,
   type KeyValueTabRecord,
   type KeyValueTabState,
   type StreamTabRecord,
@@ -31,6 +33,7 @@ import { revealPath } from '../project/state/tree';
 import { dropForTab as dropConsoleResultPagesForTab } from '../views/console/resultPages';
 import { drop as dropDocumentPagesForTab } from '../views/documents/page';
 import { drop as dropGridPagesForTab } from '../views/grid/page';
+import { httpRequestTitle } from '../views/httprequest/url';
 import { drop as dropKeyValuePagesForTab } from '../views/keyvalue/page';
 import { drop as dropStreamPagesForTab } from '../views/stream/page';
 import { connectionRecord } from './connections';
@@ -167,5 +170,26 @@ export const TAB_KINDS: { [K in TabKind]: TabKindDef<K> } = {
     duplicateState: (_tab: BrowseTabRecord): BrowseTabState => defaultBrowseTabState(),
     dropResources: noDrop,
     menuExtras: revealInProjectPanel,
+  },
+  'http-request': {
+    mode: TAB_KIND_MODE['http-request'],
+    title: (tab) => httpRequestTitle((tab as HttpRequestTabRecord).state),
+    icon: () => 'globe',
+    // D2: no connection, so no rail — TabStrip's own rail already resolves undefined to
+    // transparent (P1 F17).
+    railColor: () => undefined,
+    defaultState: () => defaultHttpRequestTabState(),
+    // D2: deliberately breaks with every Studio kind's "same target, fresh default state" — an
+    // HTTP request's state *is* the request, so duplicating it to try a variant is the only
+    // reason anyone would. Headers are deep-copied since each is an object in an array.
+    duplicateState: (tab: HttpRequestTabRecord): HttpRequestTabState => ({
+      ...tab.state,
+      headers: tab.state.headers.map((h) => ({ ...h })),
+    }),
+    // D2: the response lives in the view's own runtime store (views/httprequest/state.ts),
+    // freed by cleanupTabRuntime — there is no page store of this kind's own to drop.
+    dropResources: noDrop,
+    // D2: there is no project panel to reveal an HTTP request into.
+    menuExtras: () => [],
   },
 };

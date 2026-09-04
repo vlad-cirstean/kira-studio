@@ -84,13 +84,15 @@
                       "../console/**",
                       "../definition/**",
                       "../browse/**",
+                      "../httprequest/**",
                       "../../grid/**",
                       "../../documents/**",
                       "../../keyvalue/**",
                       "../../stream/**",
                       "../../console/**",
                       "../../definition/**",
-                      "../../browse/**"
+                      "../../browse/**",
+                      "../../httprequest/**"
                     ],
                     "message": "SPEC §11: views/<kind>/* must not import another views/<kind>/* — use views/shared/ instead."
                   }

@@ -1,9 +1,11 @@
+import { defaultHttpRequestTabState, type HttpRequestTabState } from '@shared/domain/http';
 import type { AppMode } from '@shared/domain/mode';
 import {
   asBrowseTab,
   asConsoleTab,
   asDataTab,
   asDocumentTab,
+  asHttpRequestTab,
   asKeyValueTab,
   asStreamTab,
   type BrowseTabRecord,
@@ -22,6 +24,7 @@ import {
   defaultDocumentTabState,
   defaultKeyValueTabState,
   defaultStreamTabState,
+  type HttpRequestTabRecord,
   type KeyValueTabRecord,
   type KeyValueTabState,
   type StreamTabRecord,
@@ -213,14 +216,16 @@ export interface OpenTabResult {
   reused: boolean;
 }
 
-// P39 F16/D12: the six openers below shared this exact sequence — find-existing-and-activate
-// (opt-in per caller via `reuse`), else create-and-push-and-activate, then an opt-in
+// P39 F16/D12: the six Studio openers below shared this exact sequence — find-existing-and-
+// activate (opt-in per caller via `reuse`), else create-and-push-and-activate, then an opt-in
 // recordRecent — differing only in which of those two opt-ins applied and which kind/state
-// constructor built the record. Kept internal: the six exported signatures (and every caller)
-// are unchanged.
+// constructor built the record. Kept internal: the six exported Studio signatures are unchanged.
+// P2 C5/F3: `connectionId` widens to `string | null` so openHttpRequestTab can share this same
+// sequence for a connectionless tab — `recentKind` stays Studio-only (RecentTableEntry itself
+// requires a real connectionId), so a null id and a recentKind are never both present at once.
 function openTab<S>(
   kind: TabRecord['kind'],
-  connectionId: string,
+  connectionId: string | null,
   path: string,
   makeState: () => S,
   opts: { reuse: boolean; recentKind?: RecentTableEntry['kind'] },
@@ -236,7 +241,7 @@ function openTab<S>(
       // left unhydrated by an earlier disconnect (or never hydrated after a session restore)
       // stays stuck behind the reconnect gate until its own button is clicked, even though the
       // very re-open that just happened proves the connection needs no reconnecting at all.
-      if (connectionsState.states[connectionId]?.status === 'connected') {
+      if (connectionId && connectionsState.states[connectionId]?.status === 'connected') {
         tabsState.hydrated.add(existing.id);
       }
       return { id: existing.id, reused: true };
@@ -257,9 +262,11 @@ function openTab<S>(
   } as unknown as TabRecord;
   tabsState.tabs.push(record);
   setActiveTabId(id, TAB_KIND_MODE[kind]);
-  // Opened from a live connection — nothing to reconnect.
+  // Opened from a live connection (or, for an HTTP tab, from nothing to reconnect at all) —
+  // either way there is no Reconnect gate to show.
   tabsState.hydrated.add(id);
-  if (opts.recentKind) recordRecent(connectionId, path, opts.recentKind);
+  // recentKind is Studio-only (F3) — every caller that sets it also passes a real connectionId.
+  if (opts.recentKind && connectionId) recordRecent(connectionId, path, opts.recentKind);
   saveNow();
   return { id, reused: false };
 }
@@ -367,6 +374,16 @@ export function openBrowseTab(
   return openTab('browse', connectionId, path, () => defaultBrowseTabState(), {
     reuse: !opts?.newTab,
   });
+}
+
+// P2 D2/D13: always a fresh tab — an HTTP request has no target to reuse by (its own id is its
+// identity, D2), the same "always new" shape openConsoleTab already has for the same reason.
+// `connectionId` is null (F3) and `path` is the literal constant 'request' (D2: non-empty per
+// F2, carrying no false uniqueness, safe through pathTail per F4).
+export function openHttpRequestTab(): string {
+  return openTab('http-request', null, 'request', () => defaultHttpRequestTabState(), {
+    reuse: false,
+  }).id;
 }
 
 // Same target, fresh default state — the cheapest possible demonstration of §8.4's identity rule.
@@ -593,6 +610,13 @@ export function patchBrowseTabState(id: string, patch: Partial<BrowseTabState>):
   patchTabState(id, 'browse', patch, { skipUnchanged: true });
 }
 
+// P2: no skipUnchanged guard — a Params-table edit rewriting the URL to the value it already had
+// (D9) is rare enough that the extra write is not worth the comparison every other patcher above
+// already accepts skipping for a hotter path (scroll offsets, page index).
+export function patchHttpRequestTabState(id: string, patch: Partial<HttpRequestTabState>): void {
+  patchTabState(id, 'http-request', patch, { skipUnchanged: false });
+}
+
 export function markHydrated(id: string): void {
   tabsState.hydrated.add(id);
 }
@@ -631,4 +655,8 @@ export function findStreamTab(id: string): StreamTabRecord | null {
 
 export function findBrowseTab(id: string): BrowseTabRecord | null {
   return asBrowseTab(tabsState.tabs.find((t) => t.id === id));
+}
+
+export function findHttpRequestTab(id: string): HttpRequestTabRecord | null {
+  return asHttpRequestTab(tabsState.tabs.find((t) => t.id === id));
 }

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { httpRequestTabStateSchema } from './http';
 import type { AppMode } from './mode';
 import { sortSpecSchema } from './queries';
 import { pathTail } from './tree';
@@ -11,13 +12,17 @@ export const tabKindSchema = /*#__PURE__*/ z.enum([
   'stream',
   'console',
   'browse',
+  // P2: the first Http-mode kind (§2 F1) — four vocabularies join it, this one plus
+  // RENDERABLE_TAB_KINDS/TAB_KIND_MODE below and Go's model.RenderableTabKinds (the one silent
+  // failure mode of the four, D10).
+  'http-request',
 ]);
 export type TabKind = z.infer<typeof tabKindSchema>;
 
 // 'data' and 'definition' (P19, was 'ddl') are renderable as of P4 (D18); 'console' joins them in
-// P5.5, 'document' in P8, 'keyvalue' in P9, 'stream' in P10, 'browse' in P41. The restore path
-// drops rows of any other kind with a `warn` — a closed vocabulary decided once, same discipline
-// as P1's Caps/connectionKind.
+// P5.5, 'document' in P8, 'keyvalue' in P9, 'stream' in P10, 'browse' in P41, 'http-request' in
+// P2. The restore path drops rows of any other kind with a `warn` — a closed vocabulary decided
+// once, same discipline as P1's Caps/connectionKind.
 export const RENDERABLE_TAB_KINDS: readonly TabKind[] = [
   'data',
   'definition',
@@ -26,13 +31,14 @@ export const RENDERABLE_TAB_KINDS: readonly TabKind[] = [
   'keyvalue',
   'stream',
   'browse',
+  'http-request',
 ];
 
 // P1 D5: a tab's mode is a total function of its kind — no mode column, no migration. This lives
 // in shared/domain/ (not state/tabKinds.ts) because it must be importable with no Vue-state side
 // effects: `state/mode.ts`'s tabsForMode filter needs only this mapping, never the rest of the
-// per-kind registry (components, page stores, menu builders). All seven kinds are Studio's own
-// today; P2's first Http tab kind is the first entry that maps to 'http'.
+// per-kind registry (components, page stores, menu builders). All seven Studio kinds map to
+// 'studio'; 'http-request' (P2) is the first entry that maps to 'http'.
 export const TAB_KIND_MODE: Record<TabKind, AppMode> = {
   data: 'studio',
   definition: 'studio',
@@ -41,6 +47,7 @@ export const TAB_KIND_MODE: Record<TabKind, AppMode> = {
   keyvalue: 'studio',
   stream: 'studio',
   browse: 'studio',
+  'http-request': 'http',
 };
 
 const pageSizeSchema = /*#__PURE__*/ z.union([
@@ -205,6 +212,11 @@ export const tabRecordSchema = /*#__PURE__*/ z.discriminatedUnion('kind', [
     kind: z.literal('browse'),
     state: browseTabStateSchema,
   }),
+  /*#__PURE__*/ z.object({
+    ...tabRecordBase,
+    kind: z.literal('http-request'),
+    state: httpRequestTabStateSchema,
+  }),
 ]);
 export type TabRecord = z.infer<typeof tabRecordSchema>;
 export type DataTabRecord = Extract<TabRecord, { kind: 'data' }>;
@@ -214,6 +226,7 @@ export type DocumentTabRecord = Extract<TabRecord, { kind: 'document' }>;
 export type KeyValueTabRecord = Extract<TabRecord, { kind: 'keyvalue' }>;
 export type StreamTabRecord = Extract<TabRecord, { kind: 'stream' }>;
 export type BrowseTabRecord = Extract<TabRecord, { kind: 'browse' }>;
+export type HttpRequestTabRecord = Extract<TabRecord, { kind: 'http-request' }>;
 
 export function asDataTab(tab: TabRecord | null | undefined): DataTabRecord | null {
   return tab && tab.kind === 'data' ? tab : null;
@@ -237,6 +250,10 @@ export function asStreamTab(tab: TabRecord | null | undefined): StreamTabRecord 
 
 export function asBrowseTab(tab: TabRecord | null | undefined): BrowseTabRecord | null {
   return tab && tab.kind === 'browse' ? tab : null;
+}
+
+export function asHttpRequestTab(tab: TabRecord | null | undefined): HttpRequestTabRecord | null {
+  return tab && tab.kind === 'http-request' ? tab : null;
 }
 
 export function defaultDataTabState(pageSize: PageSize): DataTabState {
