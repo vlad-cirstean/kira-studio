@@ -22,6 +22,9 @@ type ConnectionFields struct {
 	// on it, and warns when the threshold or a structural issue fires (never blocks). A first-class
 	// column, not an options_json key — see the migration's own comment for why.
 	AutoExplain bool `json:"autoExplain"`
+	// P28 §5.3: commands per second this connection is paced to; 0 = unlimited (default). A
+	// first-class column, not an options_json key — see the migration's own comment for why.
+	ThrottlePerSec float64 `json:"throttlePerSec"`
 }
 
 // ConnectionSummary mirrors packages/shared/domain/connection.ts's connectionSummarySchema.

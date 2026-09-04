@@ -1,10 +1,18 @@
 package connections
 
 import (
+	"math"
 	"strings"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/bridge/ipcerr"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
+)
+
+// ThrottlePerSecRange mirrors packages/shared/domain/connection.ts's CONNECTION_THROTTLE_RANGE —
+// 0 (unlimited) or 0.01-1000 commands/sec.
+const (
+	throttlePerSecMin = 0.01
+	throttlePerSecMax = 1000
 )
 
 // fileKinds mirrors connection.ts's FILE_KINDS: fields mode repurposes `database` for an absolute
@@ -45,6 +53,13 @@ func (in Input) Validate() error {
 		if trimmed == "" || len(*in.Preconnect) > 2000 {
 			return ipcerr.BadRequest("preconnect must be 1-2000 characters")
 		}
+	}
+	if math.IsNaN(in.ThrottlePerSec) || math.IsInf(in.ThrottlePerSec, 0) {
+		return ipcerr.BadRequest("throttlePerSec must be a finite number")
+	}
+	if in.ThrottlePerSec != 0 &&
+		(in.ThrottlePerSec < throttlePerSecMin || in.ThrottlePerSec > throttlePerSecMax) {
+		return ipcerr.BadRequest("throttlePerSec must be 0, or between 0.01 and 1000")
 	}
 
 	if in.Mode == "fields" {

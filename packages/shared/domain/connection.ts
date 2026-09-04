@@ -44,6 +44,10 @@ export const MIN_SERVER_VERSION: Partial<Record<ConnectionKind, string>> = {
   sqlite: 'Reads any SQLite 3 database file — no server required.',
 };
 
+// P28 §5.3: 0 (unlimited) or 0.01-1000 commands/sec — a token-bucket rate, not a minimum
+// interval, so a user reacting to "keep it under N/s" types the same number the server told them.
+export const CONNECTION_THROTTLE_RANGE = { min: 0.01, max: 1000 } as const;
+
 export const connectionColorSchema = /*#__PURE__*/ z.enum([
   'none',
   'red',
@@ -117,6 +121,13 @@ const connectionFieldsSchema = /*#__PURE__*/ z.object({
   // round-trips through the connection URI and the Copy URI menu item, and a behaviour that issues
   // an extra statement per run must not be switchable on by pasting a URI.
   autoExplain: z.boolean().default(false),
+  // P28 §5.3: commands/sec this connection is paced to; 0 = unlimited. `.default(0)` is
+  // load-bearing the same way preconnect's and autoExplain's are — an older stored row has no
+  // such key. The real {0} ∪ [0.01, 1000] bound (a value in (0, 0.01) makes no practical sense
+  // and is rejected) lives in the Go input validator (connections/input.go's Validate) and the
+  // dialog's own field error, matching every other numeric field's split between "this schema
+  // parses a stored row" and "Save enforces the real bound".
+  throttlePerSec: z.number().min(0).max(CONNECTION_THROTTLE_RANGE.max).default(0),
 });
 
 // SQS and S3 have no host/port at all (P10's D8, P17's own D8/D9 mirror) — fields mode repurposes

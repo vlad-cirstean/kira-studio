@@ -85,6 +85,7 @@ function defaultDraft(): ConnectionInput {
     preconnect: null,
     preconnectSidecar: false,
     autoExplain: false,
+    throttlePerSec: 0,
   };
 }
 

@@ -11,7 +11,8 @@ import (
 
 const connectionSelectColumns = `
 	id, name, kind, color, mode, read_only, host, port, database, username, uri,
-	options_json, preconnect, preconnect_sidecar, auto_explain, sort_order, created_at, updated_at
+	options_json, preconnect, preconnect_sidecar, auto_explain, throttle_per_sec, sort_order,
+	created_at, updated_at
 `
 
 type ConnectionsRepo struct {
@@ -38,7 +39,8 @@ func scanConnectionRow(row rowScanner) (*model.ConnectionSummary, error) {
 	)
 	if err := row.Scan(
 		&c.ID, &c.Name, &c.Kind, &c.Color, &c.Mode, &readOnly, &host, &port, &database,
-		&username, &uri, &options, &preconnect, &sidecar, &autoExplain, &c.SortOrder, &c.CreatedAt, &c.UpdatedAt,
+		&username, &uri, &options, &preconnect, &sidecar, &autoExplain, &c.ThrottlePerSec,
+		&c.SortOrder, &c.CreatedAt, &c.UpdatedAt,
 	); err != nil {
 		return nil, err
 	}
@@ -163,12 +165,13 @@ func (r *ConnectionsRepo) Insert(connID string, f model.ConnectionFields, create
 	if _, err := tx.Exec(`
 		INSERT INTO connections (
 			id, name, kind, color, mode, read_only, host, port, database, username, uri,
-			options_json, preconnect, preconnect_sidecar, auto_explain, created_at, updated_at, sort_order
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			options_json, preconnect, preconnect_sidecar, auto_explain, throttle_per_sec,
+			created_at, updated_at, sort_order
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`,
 		connID, f.Name, f.Kind, f.Color, f.Mode, boolToInt(f.ReadOnly), f.Host, f.Port, f.Database,
 		f.Username, f.URI, string(optionsJSON), f.Preconnect, boolToInt(f.PreconnectSidecar),
-		boolToInt(f.AutoExplain), createdAt, createdAt, sortOrder,
+		boolToInt(f.AutoExplain), f.ThrottlePerSec, createdAt, createdAt, sortOrder,
 	); err != nil {
 		return model.ConnectionSummary{}, fmt.Errorf("repos/connections: insert %s: %w", connID, err)
 	}
@@ -195,12 +198,12 @@ func (r *ConnectionsRepo) Update(connID string, f model.ConnectionFields, update
 		UPDATE connections
 		   SET name = ?, kind = ?, color = ?, mode = ?, read_only = ?, host = ?, port = ?,
 		       database = ?, username = ?, uri = ?, options_json = ?, preconnect = ?,
-		       preconnect_sidecar = ?, auto_explain = ?, updated_at = ?
+		       preconnect_sidecar = ?, auto_explain = ?, throttle_per_sec = ?, updated_at = ?
 		 WHERE id = ?
 	`,
 		f.Name, f.Kind, f.Color, f.Mode, boolToInt(f.ReadOnly), f.Host, f.Port, f.Database,
 		f.Username, f.URI, string(optionsJSON), f.Preconnect, boolToInt(f.PreconnectSidecar),
-		boolToInt(f.AutoExplain), updatedAt, connID,
+		boolToInt(f.AutoExplain), f.ThrottlePerSec, updatedAt, connID,
 	); err != nil {
 		return model.ConnectionSummary{}, fmt.Errorf("repos/connections: update %s: %w", connID, err)
 	}
