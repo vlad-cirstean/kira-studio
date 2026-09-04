@@ -106,6 +106,28 @@ and on nothing else; **only `apps/kira-studio` depends on any of them, and none 
 `apps/kira-studio`.** That direction is what the Go host implementation sits behind, and it is what
 a future second host would sit behind too.
 
+**Module separation does not mean reimplementing infrastructure per module.** P1 built a genuine
+correlated-RPC-with-credits protocol in Go (`internal/bridge/gitstream.go`) to speak `git-ipc`'s
+frame protocol server-side, because nothing in this codebase already had a Go implementation of
+that shape — Studio's own `engine` stream (`internal/bridge/stream.go`) is a thin 43-line adapter
+onto `adapterhost.Router`, a DB-specific page multiplexer with no correlation/credit/cancellation
+concept at all, so there was genuinely nothing to reuse there. That is a correct instance of
+building real new capability, not duplication. The thing to avoid is building *this same* generic
+capability a **second** time once Api's own package split (P12, `docs/v1.2/SPEC.md`) or any later
+module wants request/response-plus-streaming semantics of its own: the protocol-generic pieces —
+the frame envelope, correlation, credit accounting, cancellation, encode/decode — belong in their
+own shared package/module from the point a second consumer is foreseeable, not duplicated and not
+deferred until that consumer actually shows up. Concretely, this chapter's own P1 gets revisited
+(`plans/P1-host-and-go-git-client-iter2.md`) to split this out on both sides: on the Go side, the
+generic frame-protocol server implementation moves out of `gitstream.go` into its own
+Git-agnostic package, with `gitstream.go` reduced to the thin adapter wiring `gitclient.Client`
+into it; on the TypeScript side, `packages/git-ipc`'s already-generic `rpc.ts`/`codec.ts`/
+`transport.ts` (the RPC endpoint, correlation/credit/cancellation, the codec) move into their own
+package that `git-ipc` depends on, leaving `git-ipc` holding only the Git-specific contract types
+(`contract.ts`). Git-specific *domain* logic (discovery, the write queue, repo identity, the
+porcelain parsers) stays exactly where it is — this is about not duplicating the transport
+plumbing underneath, not about merging modules back together.
+
 ## What deliberately does not come across
 
 - **`packages/host-vscode`.** Nothing here is a VS Code extension. Its ports, its webview HTML/CSP
