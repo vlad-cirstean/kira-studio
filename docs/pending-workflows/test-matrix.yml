@@ -33,10 +33,18 @@ jobs:
         # matching db-compat.yml's own comment for the identical reason. A scheduled run has no
         # workflow_dispatch inputs at all, so `inputs.kind` reads empty rather than its declared
         # default — treated the same as "all".
+        #
+        # round-2 finding 10: `inputs.kind` is bound through `env:` (below) rather than
+        # interpolated directly into the run block, and `$KIND` is quoted — the standard fix for
+        # GitHub Actions' untrusted-`${{ }}`-in-`run:` script-injection shape. Low real risk here
+        # (workflow_dispatch already requires write access), but worth doing before this file is
+        # ever copied into .github/workflows/ (see this directory's own README).
+        env:
+          KIND: ${{ inputs.kind }}
         run: |
           set -eu
           ARGS=""
-          if [ -n "${{ inputs.kind }}" ] && [ "${{ inputs.kind }}" != "all" ]; then
-            ARGS="--only ${{ inputs.kind }}"
+          if [ -n "$KIND" ] && [ "$KIND" != "all" ]; then
+            ARGS="--only $KIND"
           fi
           sh scripts/test-matrix.sh $ARGS
