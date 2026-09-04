@@ -1,6 +1,7 @@
 import type { HttpEnvironment, HttpVariable, VariableScope } from '@shared/domain/variables';
 import { computed, reactive } from 'vue';
 import { control } from '../../bridge/control';
+import { confirmDialog } from '../../state/confirmDialog';
 
 // P5 D3/D11: the environment list and the app-global active selection — read-only at this point
 // (list and switch); editing, secrets, history and reordering land in later commits on this same
@@ -82,6 +83,8 @@ interface VariablesDialogState {
   /** "Variables — <collection name>" or "Environment — <environment name>" (D11). */
   title: string;
   rows: HttpVariable[];
+  /** A reveal failure's message (D10) — shown in the dialog's own MessageStrip. */
+  error: string | null;
 }
 
 export const variablesDialogState = reactive<VariablesDialogState>({
@@ -90,6 +93,7 @@ export const variablesDialogState = reactive<VariablesDialogState>({
   ownerId: '',
   title: '',
   rows: [],
+  error: null,
 });
 
 export async function openVariablesDialog(
@@ -101,11 +105,16 @@ export async function openVariablesDialog(
   variablesDialogState.ownerId = ownerId;
   variablesDialogState.title = title;
   variablesDialogState.open = true;
+  variablesDialogState.error = null;
   await reloadVariablesDialog();
 }
 
 export function closeVariablesDialog(): void {
   variablesDialogState.open = false;
+  // D5: a revealed value lives only in this transient map, never in tab state or a persisted
+  // column — dropped on close, the same honest "not scrubbed, just dropped" limit P14 §0.3 states
+  // for its own reveal map (JS offers no way to zero a string in memory).
+  for (const id of Object.keys(revealedValues)) delete revealedValues[id];
 }
 
 async function reloadVariablesDialog(): Promise<void> {
@@ -140,4 +149,36 @@ export function isDuplicateName(rows: HttpVariable[], index: number): boolean {
   const name = rows[index]?.name.trim();
   if (!name) return false;
   return rows.slice(0, index).some((r) => r.name.trim() === name);
+}
+
+// ---- the gated reveal (D5/D8/D9) ----
+
+/** A revealed variable's plaintext, keyed by variable id — transient, cleared on dialog close
+ *  (never written to tab state, never to a collection row). Not reactive-persisted anywhere else:
+ *  this is the one place a secret's plaintext exists in the renderer at all. */
+export const revealedValues = reactive<Record<string, string>>({});
+
+/** D8: the same recurse-once shape ConnectionDialog.vue's own requestReveal uses — the pattern is
+ *  copied, not imported (there is nothing importable to reuse, §1.4/OQ-2). Every outcome but
+ *  confirmation-required is terminal. */
+export async function revealVariable(id: string, confirmed: boolean): Promise<void> {
+  const result = await control.variablesReveal(id, confirmed);
+  switch (result.outcome) {
+    case 'revealed':
+      if (result.value !== null) revealedValues[id] = result.value;
+      return;
+    case 'cancelled':
+      // D11 (inherited via P14): cancelled on purpose — nothing to show for it.
+      return;
+    case 'confirmation-required': {
+      const ok = await confirmDialog(
+        'Show this variable’s value? It will be displayed in plain text.',
+        { danger: false },
+      );
+      if (ok) await revealVariable(id, true);
+      return;
+    }
+    default:
+      variablesDialogState.error = result.error ?? 'Could not reveal the value.';
+  }
 }
