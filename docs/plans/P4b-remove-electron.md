@@ -572,3 +572,120 @@ and the VS Code host did not move, the test-count arithmetic, suite status at ha
 decision made at the keyboard that this plan did not anticipate. Later phases read this section as
 part of the context they inherit; P5 in particular inherits a one-host tree and should not look for
 `packages/host-electron`._
+
+**The seam check (W11.8), by diff.** `git diff --stat 7680237 -- packages/ipc/src/transport.ts`
+is empty — zero changes, as its row in the "untouched" table demands. The same diff against
+`packages/core/src/ports/` touches exactly six files (`dialogs.ts`, `fileWatcher.ts`, `logger.ts`,
+`storage.ts`, `theme.ts`, `workspaceRoots.ts`); `git diff 7680237 -- packages/core/src/ports/ |
+grep -E '^[+-]' | grep -vE '^(\+\+\+|---)' | grep -vE '^\s*[+-]\s*\*'` returns nothing, i.e. every
+changed line in every one of those six files is a `*` JSDoc line — no interface, type or code line
+moved. `packages/host-vscode/src/ports/` has a zero-line diff stat (fully untouched) and
+`apps/harness/src/mockBridge.ts` changed exactly the one line W4 requires (dropping
+`"kiraVersion.theme.kind"` from its `toSettingsSnapshot()`, the same edit made in
+`packages/git/src/rpcHandlers.ts` and the harness's own copy). The claim the user actually cares
+about — removing a host does not restructure the app — holds by inspection, not just by argument.
+
+**The residual-`electron` grep (W11.7).** `grep -rniE 'electron' --include='*.ts' --include='*.vue'
+--include='*.json' --include='*.css' --include='*.html' --include='*.md' .`, excluding
+`node_modules/`, `.vscode-test/` (the downloaded VS Code build, gitignored, not repo content),
+`test-results/` (Playwright's own ephemeral output, gitignored), `docs/plans/P0.md` through
+`P4.md`, and `bun.lock`, returns hits in exactly these files:
+
+- `docs/plans/P4b-remove-electron.md` itself (this plan, describing what it removes) and
+  `docs/plans/README.md`'s one mention of this plan's filename as an example.
+- `package.json`'s `"@vscode/test-electron": "3.1.0"` dependency line — the trap this plan warns
+  against deleting.
+- `tests/e2e/vscode/panel.spec.ts` — the `_electron.launch`/`@vscode/test-electron` imports and
+  three call sites (unchanged per the W6/trap instruction), plus its rewritten header comment
+  explaining what those drive and are not.
+- `docs/SPEC.md` — §2.2 (the historical-shell paragraph and the "add back what P4b deleted"
+  sentence), the pre-existing unrelated libgit2/Electron-ABI mention in §4.1 (left as-is, out of
+  scope — a native-addon build concern, not a host concern), §8.4's integration-suite paragraph
+  (`_electron.launch` drives VS Code's own binary — kept per W9's explicit instruction, see below),
+  the §10 note, and D26.
+- `biome.json` — the repo-wide `electron` import-ban message, once per package override block
+  (Judgment call 3: kept deliberately, with no override anywhere).
+- `scripts/build.ts`, `packages/ui/vite.config.ts`, `playwright.config.ts` — one historical
+  cross-reference each to this plan's filename, in a rewritten header/inline comment.
+
+Two of these are **exceptions to a strict reading of W11.7's whitelist**, both inside §8.4 rather
+than the sanctioned §2.2/§10-note spots: the sentence naming `_electron.launch` and VS Code's own
+Electron binary, and the following sentence naming `@vscode/test-electron`. W9's own instruction
+for that section is explicit and more specific than the whitelist — "make sure the surviving text
+does not read as though `_electron.launch` is gone from the repo" — so that instruction was
+honored over the whitelist's letter; recorded here rather than left as a silent deviation.
+
+Two stale comments were **not** anticipated by W2/W4's file lists and were found only by running
+this grep: `packages/git/src/nodeProcessRunner.ts` and `nodeFileWatcher.ts` each justified sharing
+one Node-based implementation by naming "the extension host and Electron main" as the two Node
+hosts, and `packages/core/src/settings/schema.ts` quoted D25 in wording `docs/SPEC.md`'s own D25
+row no longer carries. All three were reworded to match the framing already used in
+`packages/core/src/ports/*` and in `docs/SPEC.md`'s current D25 (commit `5921b72`).
+
+**Test-count arithmetic.** P4's own hand-off recorded 661 passing. Deleting `packages/host-electron`
+removes eight `*.test.ts` files (`main/channel.test.ts` 5, `main/recentRepos.test.ts` 6,
+`ports/dialogs.test.ts` 4, `ports/logger.test.ts` 5, `ports/storage.test.ts` 6, `ports/theme.test.ts`
+5, `ports/workspaceRoots.test.ts` 2, `preload/kiraBridge.test.ts` 8 — 41 `test()`/`it()` calls
+total); `tests/e2e/electron/shell.spec.ts` is a Playwright spec, counted separately below, not in
+`bun run test`. 661 − 41 = 620, which is exactly what `bun run test` reports below.
+
+**Suite status at hand-off.**
+
+- `bun run check` — green (exit 0). Format, lint (16 pre-existing `useLiteralKeys` infos in
+  `packages/ui/src/state/viewState.ts`, not introduced by this work and not failures),
+  `check:types`, `check:vue`, `check:tokens`, `check:settings`, `check:lane-palette` all pass.
+  `check:theme-palettes` no longer exists as a step (W3).
+- `bun run test` — **620/620 pass, 0 fail**, 42,204 `expect()` calls, 61 files, matching the
+  arithmetic above exactly.
+- `bun run build` — both bundles produced (`dist/ui`, `dist/vscode/extension.js`), no
+  `dist/electron/`, bundle checks pass.
+- `bunx playwright test --project=harness` — **42/42 pass**, no visual baselines regenerated.
+- `bunx playwright test --project=vscode` — still blocked in this sandbox, unchanged from P0/P3/P4:
+  `downloadAndUnzipVSCode()` resolves version `1.136.1` and its download URL, then the transfer
+  itself aborts (`Error downloading, retrying (attempt N of 3): aborted`, all 3 attempts) — this is
+  the same network-egress limitation already recorded in P0/P3/P4, not something this unit of work's
+  Electron removal touches or could fix. Carried forward as inherited-open with the same closing
+  command: `bun run build && bunx playwright test --project=vscode` (or a manual
+  `--extensionDevelopmentPath` session) once the download succeeds in an unrestricted environment.
+- `bun run test:perf` — `run.ts`, `parserThroughput.ts`, `historyPipeline.ts` and
+  `streamRoundTrip.ts` pass within tolerance every run. `graphUi.ts` fails the same three metrics
+  P4's own W17 V4 already investigated and attributed to sandbox compositor noise, not a
+  regression: `firstPageMs` (actual ~515–530 ms against a 400 ms ceiling, inside P4's own recorded
+  ~520–590 ms range — the harness's synthetic-scenario-build cost, not the app; the real
+  `firstPageMs` measurement stays P4's `historyPipeline.ts` figure, ~130–135 ms here, comfortably
+  under budget), `worstFrameMs` (three consecutive runs read 66.6, 33.2 and 83.4 ms against a 32 ms
+  ceiling — noisier than P4's own trimodal 16.7/33.3/50.0 ms observations, but the same failure
+  class: headless Chromium's synthetic-vsync compositor quantizing frame deltas, not real paint
+  work), and `medianFrameMs` (16.70 ms against a 16.67 ms ceiling on every single run — the exact
+  "at the ceiling every run" reading P4 recorded). Across all three runs gathered here,
+  `rowBuildMedianMs` read 0.00 ms and `rowBuildP99Ms` read 0.20 ms — flat and near-zero on every
+  run including the 83.4 ms `worstFrameMs` one — which is P4's own strongest evidence repeated
+  here: this unit of work touches no rendering, layout or perf-critical code (only doc comments,
+  wiring and a schema-key removal), so a real work-cost regression would show up in
+  `rowBuildMedianMs`/`rowBuildP99Ms`, and it does not. Attributed as sandbox noise against P4's
+  recorded figures, per this plan's own W11.6 instruction.
+
+**Decisions made at the keyboard the plan text did not spell out.**
+
+- W4's `HostKind`/`hosts` field removal required deleting `"kiraVersion.theme.kind"` from
+  `packages/ipc/src/contract.ts`'s `SettingsSnapshot` interface (a structural mirror of
+  `core`'s settings, not explicitly named in W4's file list) to keep `bun run check:types` passing,
+  plus the three call sites that built a `SettingsSnapshot` literal:
+  `packages/git/src/rpcHandlers.ts`, `apps/harness/src/mockBridge.ts`, and a test fixture in
+  `packages/ipc/src/codec.test.ts`.
+- `tests/integration/transportContract.test.ts` hard-coded `host: "electron"` in a fixture and
+  asserted `result.host` against it; both changed to `"vscode"` since `HostKind` no longer has an
+  `"electron"` member.
+- `docs/SPEC.md`'s D25 row and §8.3 (not itemized individually in W9's text, found via this
+  session's own read-through and the grep sweep) needed the same Electron-framing removal as the
+  sections W9 does name.
+
+**`packages/core/src/ports` byte-identical, with one caveat.** Every interface, type and function
+signature under `packages/core/src/ports/` is unchanged from `7680237` — see the diff-stat proof
+above. `packages/ipc/src/contract.ts`'s `SettingsSnapshot` (a sibling structural type, outside
+`ports/`, kept honest against `core`'s own schema by `tests/unit/ipc/wireConformance.test.ts`) did
+lose one field, `"kiraVersion.theme.kind"`, as the direct consequence of deleting the setting that
+field existed only to carry — not a restructuring, and not inside the port interfaces themselves.
+
+Final commit on `claude/start-p2-gwlgly` implementing this plan: `5921b72` (this Findings section
+and its own commit follow).
