@@ -60,10 +60,11 @@ export function canRoundTripToFields(parsed: ParsedUri, kind: ConnectionKind): b
   if (kind !== 'postgres' && kind !== 'mongodb') return false;
   if (kind === 'postgres' && parsed.scheme !== 'postgres' && parsed.scheme !== 'postgresql')
     return false;
-  // mongodb+srv has no explicit port (resolved via DNS SRV) — the shared host check below already
-  // treats a null port as fine, so both schemes fall through it unchanged.
-  if (kind === 'mongodb' && parsed.scheme !== 'mongodb' && parsed.scheme !== 'mongodb+srv')
-    return false;
+  // mongodb+srv is excluded on purpose: formatConnectionUri only ever emits `mongodb://` (it
+  // derives the scheme from `kind`, which can't distinguish +srv), and the backend's
+  // buildURIFromFields hardcodes `mongodb://` too, so a +srv connection sent through fields mode
+  // and back would silently lose its scheme. Only plain mongodb:// round-trips.
+  if (kind === 'mongodb' && parsed.scheme !== 'mongodb') return false;
   if (!parsed.host || parsed.host.includes(',') || parsed.host.startsWith('/')) return false;
   for (const value of [parsed.username, parsed.password]) {
     if (value === null) continue;
