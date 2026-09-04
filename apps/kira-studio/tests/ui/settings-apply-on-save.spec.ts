@@ -93,7 +93,7 @@ test('Cancel and Escape both discard the draft', async ({ relaunch }) => {
   await page.click('[data-testid="settings-cancel"]');
 });
 
-test('Revert to Defaults stages every section; Save is what commits it', async ({ relaunch }) => {
+test('a per-setting reset stages only that leaf', async ({ relaunch }) => {
   const nonDefault = {
     ...defaultSettings,
     appearance: { ...defaultSettings.appearance, rowDensity: 'compact' as const, wordWrap: false },
@@ -105,12 +105,12 @@ test('Revert to Defaults stages every section; Save is what commits it', async (
   });
 
   await openSettings(page);
-  await page.click('[data-testid="settings-revert-defaults"]');
+  await page.click('[data-testid="settings-reset-appearance-rowDensity"]');
 
+  // Only the reset leaf moved — its sibling checkbox, still bound to the un-reset draft, stays
+  // exactly where the fixture put it.
   await expect(densityButton(page, 'comfortable')).toHaveClass(/active/);
-  await expect(page.locator('[data-testid="settings-word-wrap"]')).toBeChecked();
-  await page.click('[data-testid="settings-section-Cache"]');
-  await expect(page.locator('[data-testid="settings-cache-budget"]')).toHaveValue('64');
+  await expect(page.locator('[data-testid="settings-word-wrap"]')).not.toBeChecked();
   expect(settingsSetCalls(control)).toHaveLength(0);
 
   await page.click('[data-testid="settings-save"]');
@@ -118,12 +118,23 @@ test('Revert to Defaults stages every section; Save is what commits it', async (
   const calls = settingsSetCalls(control);
   expect(calls).toHaveLength(1);
   expect(calls[0].args).toEqual({
-    patch: {
-      appearance: { rowDensity: 'comfortable', wordWrap: true },
-      cache: { l2BudgetMb: 64 },
-      advanced: { opLogRetentionDays: 30 },
-    },
+    patch: { appearance: { rowDensity: 'comfortable' } },
   });
+});
+
+test('a leaf reset button is disabled once the draft matches the default', async ({ relaunch }) => {
+  const { window: page } = await relaunch();
+  await openSettings(page);
+
+  const reset = page.locator('[data-testid="settings-reset-appearance-rowDensity"]');
+  await expect(reset).toBeDisabled(); // fixture already at the default (comfortable)
+
+  await densityButton(page, 'compact').click();
+  await expect(reset).toBeEnabled();
+
+  await reset.click();
+  await expect(reset).toBeDisabled();
+  await expect(densityButton(page, 'comfortable')).toHaveClass(/active/);
 });
 
 // P12 round 1 finding #9: patchSettings used to apply the patch to settingsState (and re-render

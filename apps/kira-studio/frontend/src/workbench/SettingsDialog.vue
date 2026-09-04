@@ -18,6 +18,7 @@ import { patchSettings, settingsState } from '../state/settings';
 import CodiconIcon from '../theme/CodiconIcon.vue';
 import AppButton from '../theme/primitives/AppButton.vue';
 import DialogFrame from '../theme/primitives/DialogFrame.vue';
+import IconButton from '../theme/primitives/IconButton.vue';
 import TextField from '../theme/primitives/TextField.vue';
 
 const PAGE_SIZES = [10, 100, 1000, 10000] as const;
@@ -203,13 +204,13 @@ async function onClearCaches(): Promise<void> {
   await data.clearCaches();
 }
 
-// P17 D4: stages the defaults into the draft — Save still has to be clicked to commit them.
-// Every section, not just the active one (the SPEC row asks for "every setting").
-function onRevertDefaults(): void {
-  Object.assign(draft.appearance, defaultSettings.appearance);
-  Object.assign(draft.data, defaultSettings.data);
-  Object.assign(draft.cache, defaultSettings.cache);
-  Object.assign(draft.advanced, defaultSettings.advanced);
+// P28 §2.2: two generic helpers replace the single all-or-nothing Revert to Defaults — the same
+// discipline P17 D2 applied to diffSection, so a future leaf needs no edit here either.
+function isAtDefault<S extends keyof Settings, K extends keyof Settings[S]>(s: S, k: K): boolean {
+  return draft[s][k] === defaultSettings[s][k];
+}
+function resetLeaf<S extends keyof Settings, K extends keyof Settings[S]>(s: S, k: K): void {
+  draft[s][k] = defaultSettings[s][k];
 }
 
 // P17 D5: Cancel, Escape, the ✕ and the backdrop all route here — the draft dies with the
@@ -272,7 +273,16 @@ async function onSave(): Promise<void> {
           <template v-if="activeSection === 'Appearance'">
             <div class="sec-label first">Typography</div>
             <label class="field">
-              <span>Data font</span>
+              <div class="field-head">
+                <span>Data font</span>
+                <IconButton
+                  icon="discard"
+                  data-testid="settings-reset-appearance-fontFamily"
+                  :disabled="isAtDefault('appearance', 'fontFamily')"
+                  v-tooltip="'Reset to default'"
+                  @click="resetLeaf('appearance', 'fontFamily')"
+                />
+              </div>
               <select
                 class="p-select bordered"
                 data-testid="settings-font-family"
@@ -318,7 +328,16 @@ async function onSave(): Promise<void> {
             </label>
 
             <label class="field">
-              <span>Data font size</span>
+              <div class="field-head">
+                <span>Data font size</span>
+                <IconButton
+                  icon="discard"
+                  data-testid="settings-reset-appearance-fontSize"
+                  :disabled="isAtDefault('appearance', 'fontSize')"
+                  v-tooltip="'Reset to default'"
+                  @click="resetLeaf('appearance', 'fontSize')"
+                />
+              </div>
               <div class="size-input">
                 <TextField
                   type="number"
@@ -338,7 +357,16 @@ async function onSave(): Promise<void> {
             </label>
 
             <div class="field">
-              <span>Row height</span>
+              <div class="field-head">
+                <span>Row height</span>
+                <IconButton
+                  icon="discard"
+                  data-testid="settings-reset-appearance-rowDensity"
+                  :disabled="isAtDefault('appearance', 'rowDensity')"
+                  v-tooltip="'Reset to default'"
+                  @click="resetLeaf('appearance', 'rowDensity')"
+                />
+              </div>
               <div class="segmented">
                 <button
                   type="button"
@@ -375,38 +403,67 @@ async function onSave(): Promise<void> {
               </div>
             </div>
 
-            <label class="field checkbox">
-              <input
-                :checked="draft.appearance.wordWrap"
-                type="checkbox"
-                data-testid="settings-word-wrap"
-                @change="onWordWrapChange"
+            <div class="field checkbox-row">
+              <label class="field checkbox">
+                <input
+                  :checked="draft.appearance.wordWrap"
+                  type="checkbox"
+                  data-testid="settings-word-wrap"
+                  @change="onWordWrapChange"
+                />
+                <span>Word wrap</span>
+                <span class="helper-text"
+                  >Long lines wrap instead of scrolling — the query console, the Mongo console and
+                  the cell editor.</span
+                >
+              </label>
+              <IconButton
+                icon="discard"
+                class="p-push"
+                data-testid="settings-reset-appearance-wordWrap"
+                :disabled="isAtDefault('appearance', 'wordWrap')"
+                v-tooltip="'Reset to default'"
+                @click="resetLeaf('appearance', 'wordWrap')"
               />
-              <span>Word wrap</span>
-              <span class="helper-text"
-                >Long lines wrap instead of scrolling — the query console, the Mongo console and
-                the cell editor.</span
-              >
-            </label>
+            </div>
 
-            <label class="field checkbox">
-              <input
-                :checked="draft.appearance.rowColoring"
-                type="checkbox"
-                data-testid="settings-row-coloring"
-                @change="onRowColoringChange"
+            <div class="field checkbox-row">
+              <label class="field checkbox">
+                <input
+                  :checked="draft.appearance.rowColoring"
+                  type="checkbox"
+                  data-testid="settings-row-coloring"
+                  @change="onRowColoringChange"
+                />
+                <span>Row colouring</span>
+                <span class="helper-text"
+                  >Colour grid values by their column's data type. Off renders every row in the
+                  plain text colour.</span
+                >
+              </label>
+              <IconButton
+                icon="discard"
+                class="p-push"
+                data-testid="settings-reset-appearance-rowColoring"
+                :disabled="isAtDefault('appearance', 'rowColoring')"
+                v-tooltip="'Reset to default'"
+                @click="resetLeaf('appearance', 'rowColoring')"
               />
-              <span>Row colouring</span>
-              <span class="helper-text"
-                >Colour grid values by their column's data type. Off renders every row in the
-                plain text colour.</span
-              >
-            </label>
+            </div>
           </template>
 
           <template v-else-if="activeSection === 'Data'">
             <label class="field">
-              <span>Default page size</span>
+              <div class="field-head">
+                <span>Default page size</span>
+                <IconButton
+                  icon="discard"
+                  data-testid="settings-reset-data-defaultPageSize"
+                  :disabled="isAtDefault('data', 'defaultPageSize')"
+                  v-tooltip="'Reset to default'"
+                  @click="resetLeaf('data', 'defaultPageSize')"
+                />
+              </div>
               <select
                 class="p-select bordered"
                 data-testid="settings-default-page-size"
@@ -420,7 +477,16 @@ async function onSave(): Promise<void> {
 
           <template v-else-if="activeSection === 'Cache'">
             <label class="field">
-              <span>Result page cache budget (MB)</span>
+              <div class="field-head">
+                <span>Result page cache budget (MB)</span>
+                <IconButton
+                  icon="discard"
+                  data-testid="settings-reset-cache-l2BudgetMb"
+                  :disabled="isAtDefault('cache', 'l2BudgetMb')"
+                  v-tooltip="'Reset to default'"
+                  @click="resetLeaf('cache', 'l2BudgetMb')"
+                />
+              </div>
               <TextField
                 type="number"
                 :min="CACHE_L2_BUDGET_MB_RANGE.min"
@@ -455,7 +521,16 @@ async function onSave(): Promise<void> {
 
           <template v-else>
             <label class="field">
-              <span>Operation log retention (days)</span>
+              <div class="field-head">
+                <span>Operation log retention (days)</span>
+                <IconButton
+                  icon="discard"
+                  data-testid="settings-reset-advanced-opLogRetentionDays"
+                  :disabled="isAtDefault('advanced', 'opLogRetentionDays')"
+                  v-tooltip="'Reset to default'"
+                  @click="resetLeaf('advanced', 'opLogRetentionDays')"
+                />
+              </div>
               <TextField
                 type="number"
                 :min="OP_LOG_RETENTION_DAYS_RANGE.min"
@@ -473,7 +548,16 @@ async function onSave(): Promise<void> {
             <p class="muted-note">Takes effect after restart.</p>
 
             <label class="field">
-              <span>Expensive query threshold (rows)</span>
+              <div class="field-head">
+                <span>Expensive query threshold (rows)</span>
+                <IconButton
+                  icon="discard"
+                  data-testid="settings-reset-advanced-expensiveQueryRows"
+                  :disabled="isAtDefault('advanced', 'expensiveQueryRows')"
+                  v-tooltip="'Reset to default'"
+                  @click="resetLeaf('advanced', 'expensiveQueryRows')"
+                />
+              </div>
               <TextField
                 type="number"
                 :min="EXPENSIVE_QUERY_ROWS_RANGE.min"
@@ -502,9 +586,6 @@ async function onSave(): Promise<void> {
     </div>
 
     <template #footer>
-      <AppButton kind="dialog" data-testid="settings-revert-defaults" @click="onRevertDefaults">
-        Revert to Defaults
-      </AppButton>
       <span class="footer-status">
         <span v-if="saveError" class="field-error" data-testid="settings-save-error">{{ saveError }}</span>
         <span v-else class="helper-text" data-testid="settings-footer-status"
@@ -598,10 +679,31 @@ async function onSave(): Promise<void> {
   color: var(--kira-fg-muted);
 }
 
+/* P28 §2.2: label + per-setting reset icon, for every leaf whose field isn't a checkbox row. */
+.field-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--kira-s-2);
+}
+
 .field.checkbox {
   flex-direction: row;
   align-items: center;
   gap: var(--kira-s-3);
+}
+
+/* P28 §2.2: the reset icon sits OUTSIDE the checkbox's own <label> — a <button> inside a
+   <label for a checkbox> re-dispatches its click to that checkbox, which would toggle the very
+   setting the button resets. */
+.checkbox-row {
+  flex-direction: row;
+  align-items: flex-start;
+}
+
+.checkbox-row .field.checkbox {
+  flex: 1;
+  min-width: 0;
 }
 
 .field.checkbox input[type='checkbox'] {
