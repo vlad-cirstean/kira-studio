@@ -177,12 +177,37 @@ export class KiraSlickGrid extends SlickGrid<RowHandle, Column<any>> {
    *  instead of an unconditional extra render. See `scheduleChase` below for the re-arm loop this
    *  drives. Re-entrancy note (this file's own existing comment, above, on
    *  `velocity`/`mountedColumnCount`): reads of these fields must tolerate `undefined` on the very
-   *  first, pre-field-init call exactly like those two already do. */
-  private chaseHandle = 0;
-  private chaseWanted = false;
+   *  first, pre-field-init call exactly like those two already do.
+   *
+   *  Finding 5 (round 2) — `declare`d for the same reason `ancestorScrollHandler` above is: a plain
+   *  `= 0`/`= false`/`= -1` initializer runs *after* `super()` returns, which would unconditionally
+   *  clobber a write `getRenderedRange`/`scheduleChase` made *during* `super()` (via `init()` ->
+   *  `resizeCanvas()` -> `render()`, which this override's own comment already documents as a real,
+   *  observed call) back to its default — losing an armed `requestAnimationFrame` id exactly like
+   *  the `ancestorScrollHandler` bug lost its listener. Currently unreachable in practice (today's
+   *  construction-time values leave `chaseWanted` false on that first call, so `scheduleChase` never
+   *  runs early enough to matter — a numeric coincidence, not a guarantee), but defended the same way
+   *  regardless. Unlike `ancestorScrollHandler`, nothing guarantees a pre-`super()`-return write
+   *  actually happens here, so the constructor below (post-`super()`) nullish-assigns a real default
+   *  to each field — `??=`, never `=`, so it still can't clobber a genuine early write. */
+  private declare chaseHandle: number;
+  private declare chaseWanted: boolean;
   /** P22 iter2-onset D2 — `scrollEventSeq()` as of the previous chase callback, or -1 for "this is
-   *  the first callback of a chain, there is nothing to compare against yet". */
-  private chaseSeenSeq = -1;
+   *  the first callback of a chain, there is nothing to compare against yet". Finding 5: `declare`d
+   *  alongside `chaseHandle`/`chaseWanted` above, same reasoning. */
+  private declare chaseSeenSeq: number;
+
+  // Finding 5 — forwards to `SlickGrid`'s own constructor unchanged (this class has no constructor
+  // params of its own), then nullish-defaults the three `declare`d fields above: `??=` rather than
+  // `=` so a write `getRenderedRange`/`scheduleChase` already made *during* `super()` survives —
+  // only a field `super()` left genuinely untouched gets its default here.
+  // biome-ignore lint/suspicious/noExplicitAny: see the class-level comment above.
+  constructor(...args: ConstructorParameters<typeof SlickGrid<RowHandle, Column<any>>>) {
+    super(...args);
+    this.chaseHandle ??= 0;
+    this.chaseWanted ??= false;
+    this.chaseSeenSeq ??= -1;
+  }
 
   /** P22 iter2-pacing D1 — the fix itself. A catch-up render is gated on scroll *quiescence*, not
    *  on a frame token ("did a render already run this frame?"): that plan's own §3 F2 found the
