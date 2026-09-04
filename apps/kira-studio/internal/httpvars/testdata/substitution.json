@@ -1,0 +1,138 @@
+[
+  {
+    "name": "plain substitution",
+    "template": "Bearer {{token}}",
+    "values": { "token": "abc123" },
+    "secrets": [],
+    "want": "Bearer abc123",
+    "refs": [{ "name": "token", "kind": "resolved" }]
+  },
+  {
+    "name": "a name needing trimming",
+    "template": "{{ token }}",
+    "values": { "token": "abc123" },
+    "secrets": [],
+    "want": "abc123",
+    "refs": [{ "name": "token", "kind": "resolved" }]
+  },
+  {
+    "name": "an unknown name",
+    "template": "{{missing}}",
+    "values": {},
+    "secrets": [],
+    "want": "{{missing}}",
+    "refs": [{ "name": "missing", "kind": "unknown" }]
+  },
+  {
+    "name": "a secret name is deferred, never resolved from values",
+    "template": "{{apiKey}}",
+    "values": {},
+    "secrets": ["apiKey"],
+    "want": "{{apiKey}}",
+    "refs": [{ "name": "apiKey", "kind": "deferred" }]
+  },
+  {
+    "name": "a $-prefixed name is dynamic, left verbatim",
+    "template": "{{$randomEmail}}",
+    "values": {},
+    "secrets": [],
+    "want": "{{$randomEmail}}",
+    "refs": [{ "name": "$randomEmail", "kind": "dynamic" }]
+  },
+  {
+    "name": "empty braces are literal, not a reference",
+    "template": "a {{}} b",
+    "values": {},
+    "secrets": [],
+    "want": "a {{}} b",
+    "refs": []
+  },
+  {
+    "name": "an unterminated open brace is literal",
+    "template": "a {{b",
+    "values": { "b": "x" },
+    "secrets": [],
+    "want": "a {{b",
+    "refs": []
+  },
+  {
+    "name": "a close brace with no opener is literal",
+    "template": "a }} b",
+    "values": {},
+    "secrets": [],
+    "want": "a }} b",
+    "refs": []
+  },
+  {
+    "name": "a resolved value carrying {{x}} is not re-expanded",
+    "template": "{{a}}",
+    "values": { "a": "{{b}}", "b": "x" },
+    "secrets": [],
+    "want": "{{b}}",
+    "refs": [{ "name": "a", "kind": "resolved" }]
+  },
+  {
+    "name": "two references in one string",
+    "template": "{{a}}-{{b}}",
+    "values": { "a": "1", "b": "2" },
+    "secrets": [],
+    "want": "1-2",
+    "refs": [{ "name": "a", "kind": "resolved" }, { "name": "b", "kind": "resolved" }]
+  },
+  {
+    "name": "two references adjacent with no separator",
+    "template": "{{a}}{{b}}",
+    "values": { "a": "1", "b": "2" },
+    "secrets": [],
+    "want": "12",
+    "refs": [{ "name": "a", "kind": "resolved" }, { "name": "b", "kind": "resolved" }]
+  },
+  {
+    "name": "a name with a space",
+    "template": "{{base url}}",
+    "values": { "base url": "https://api.example.com" },
+    "secrets": [],
+    "want": "https://api.example.com",
+    "refs": [{ "name": "base url", "kind": "resolved" }]
+  },
+  {
+    "name": "a name with a hyphen",
+    "template": "{{x-api-key}}",
+    "values": { "x-api-key": "shh" },
+    "secrets": [],
+    "want": "shh",
+    "refs": [{ "name": "x-api-key", "kind": "resolved" }]
+  },
+  {
+    "name": "a value carrying &, < and \" survives byte-for-byte, unescaped",
+    "template": "{{v}}",
+    "values": { "v": "<a>&\"" },
+    "secrets": [],
+    "want": "<a>&\"",
+    "refs": [{ "name": "v", "kind": "resolved" }]
+  },
+  {
+    "name": "nesting is not a thing — {{a{{b}}}} takes a{{b as the name, finds nothing, passes through literally",
+    "template": "{{a{{b}}}}",
+    "values": {},
+    "secrets": [],
+    "want": "{{a{{b}}}}",
+    "refs": [{ "name": "a{{b", "kind": "unknown" }]
+  },
+  {
+    "name": "the empty string has no references",
+    "template": "",
+    "values": {},
+    "secrets": [],
+    "want": "",
+    "refs": []
+  },
+  {
+    "name": "plain text with no braces at all",
+    "template": "https://api.example.com/v1/orders",
+    "values": {},
+    "secrets": [],
+    "want": "https://api.example.com/v1/orders",
+    "refs": []
+  }
+]
