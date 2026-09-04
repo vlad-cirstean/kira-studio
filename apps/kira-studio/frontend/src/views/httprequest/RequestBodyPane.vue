@@ -15,6 +15,7 @@ import {
   RAW_LANGUAGE_OPTIONS,
   userContentTypeHeader,
 } from './body';
+import UrlEncodedTable from './UrlEncodedTable.vue';
 
 // P3 C5/D9: extracted from HttpRequestView.vue's own inline block (P2) — the mode selector, the
 // raw-language select, the auto-Content-Type caption and the per-mode editor host all live here
@@ -116,6 +117,7 @@ const caption = computed(() =>
       :read-only="false"
       @update:doc="onBodyChange"
     />
+    <UrlEncodedTable v-else-if="tab.state.bodyMode === 'urlencoded'" :tab="tab" />
   </div>
 </template>
 
