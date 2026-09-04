@@ -85,6 +85,12 @@ function viewHistory(): void {
   setResponsePane('history');
 }
 
+// D11: the two dead-end summaries become the way in to Timeline — the user who wonders about a
+// number clicks *that number*, rather than hunting for a fifth segment among five.
+function viewTimeline(): void {
+  setResponsePane('timeline');
+}
+
 // D12/C6/D13: scanJson/scanXml are the app's one "is this JSON"/"is this XML" gate (F13) — the
 // Pretty/Raw toggle only exists when there is something to prettify. The `<…>` bracket check
 // mirrors celleditor/detect.ts's own detectXml gate: scanXml alone accepts plain text with no
@@ -165,7 +171,15 @@ function onBackToLatest(): void {
           </span>
           <span class="p-xs muted status-hint" v-tooltip="hint" data-testid="http-status-hint">{{ hint }}</span>
           <span class="p-push" />
-          <span class="p-xs dim" data-testid="http-elapsed">{{ response.elapsedMs }} ms</span>
+          <button
+            type="button"
+            class="p-xs dim pane-jump-link"
+            data-testid="http-elapsed"
+            v-tooltip="'See where the time went'"
+            @click="viewTimeline"
+          >
+            {{ response.elapsedMs }} ms
+          </button>
           <span class="p-xs dim" data-testid="http-body-bytes">{{ formatBytes(response.bodyBytes) }}</span>
           <SegmentedControl
             v-if="tab.state.responsePane === 'body' && prettyFormat"
@@ -201,9 +215,16 @@ function onBackToLatest(): void {
       <MessageStrip v-if="bodyNotStored" tone="note" data-testid="http-history-binary-note">
         This response's body was binary and was not kept — {{ response ? formatBytes(response.bodyBytes) : '' }}.
       </MessageStrip>
-      <div v-if="redirectCaption" class="p-xs dim redirect-caption" data-testid="http-redirects">
+      <button
+        v-if="redirectCaption"
+        type="button"
+        class="p-xs dim redirect-caption pane-jump-link"
+        data-testid="http-redirects"
+        v-tooltip="'See where the time went'"
+        @click="viewTimeline"
+      >
         {{ redirectCaption }}
-      </div>
+      </button>
 
       <ResponseHistoryList
         v-if="tab.state.responsePane === 'history'"
@@ -272,7 +293,24 @@ function onBackToLatest(): void {
 }
 
 .redirect-caption {
+  display: block;
+  width: 100%;
   padding: var(--kira-s-2) var(--kira-s-3);
+  text-align: left;
+}
+
+/* D11: http-elapsed and http-redirects, still the same dim text they always were, now clickable —
+   a plain button reset rather than AppButton's own chrome, so the status row's look is unchanged. */
+.pane-jump-link {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  cursor: pointer;
+}
+
+.pane-jump-link:hover {
+  color: var(--kira-fg);
 }
 
 .response-body {
