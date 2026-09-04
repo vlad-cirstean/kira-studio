@@ -19,6 +19,7 @@ export interface CollectionMenuActions {
   remove(row: CollectionRowVm): void;
   copyUrl(row: CollectionRowVm): void;
   importCollection(): void;
+  exportCollection(row: CollectionRowVm): void;
 }
 
 export function menuForRow(row: CollectionRowVm, actions: CollectionMenuActions): MenuItem[] {
@@ -96,7 +97,17 @@ export function menuForRow(row: CollectionRowVm, actions: CollectionMenuActions)
     },
   ];
 
-  if (row.kind === 'folder') {
+  if (row.kind === 'collection') {
+    // Export is a collection-level action: a collection is the unit of export, and the only thing
+    // carrying an `info` block (D2).
+    items.push({
+      type: 'item',
+      id: 'export',
+      label: 'Export collection…',
+      icon: 'export',
+      run: () => actions.exportCollection(row),
+    });
+  } else {
     items.push({
       type: 'item',
       id: 'duplicate',

@@ -408,6 +408,24 @@ export function dismissReport(): void {
   collectionsState.report = null;
 }
 
+// ---- export (D10/D11) ----
+
+/** Opens the native save dialog and writes the collection there as Collection v2.1 JSON. As with
+ *  import, only the path crosses the bridge — Go writes the file. Returns false when cancelled. */
+export async function exportCollection(collectionId: string, name: string): Promise<boolean> {
+  // The extension Postman's own exporter writes, so the file is recognisable on disk and
+  // re-importable without renaming.
+  const chosen = await control.filesChooseSave(`${name}.postman_collection.json`);
+  if (chosen.canceled || !chosen.filePath) return false;
+  collectionsState.busy = true;
+  try {
+    await control.collectionsExport(collectionId, chosen.filePath);
+    return true;
+  } finally {
+    collectionsState.busy = false;
+  }
+}
+
 // ---- lookups the panel, the menus and the request view all share ----
 
 export function itemRecord(itemId: string): CollectionItemSummary | undefined {

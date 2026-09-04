@@ -20,6 +20,7 @@ import {
   deleteRow,
   duplicateRow,
   expandRow,
+  exportCollection,
   fetchSavedRequest,
   importCollection,
   renameRow,
@@ -75,6 +76,7 @@ const actions: CollectionMenuActions = {
   remove: (row) => void confirmAndDelete(row),
   copyUrl: (row) => void copyText(row.url),
   importCollection: () => void importCollection(),
+  exportCollection: (row) => void exportCollection(row.id, row.name),
 };
 
 /** Creating *into* a collection row means the root; into a folder row means that folder. */
