@@ -1,4 +1,5 @@
 import * as AppService from '@bindings/appservice.js';
+import * as CollectionsService from '@bindings/collectionsservice.js';
 import * as ConnectionsService from '@bindings/connectionsservice.js';
 import * as EngineService from '@bindings/engineservice.js';
 import * as FilesService from '@bindings/filesservice.js';
@@ -14,6 +15,10 @@ import * as SettingsService from '@bindings/settingsservice.js';
 import * as TabsService from '@bindings/tabsservice.js';
 import * as TreeService from '@bindings/treeservice.js';
 import * as WindowsService from '@bindings/windowsservice.js';
+// P4: model.SavedRequest is a storage-package type, not a bridge one — CollectionsService's own
+// args/results reference it rather than restating it, so the renderer types against it through
+// vite.config.ts's existing (until now unused) @bindings-internal alias.
+import type * as WailsStorageModels from '@bindings-internal/storage/model/models.js';
 import type {
   ConnectionInput,
   ConnectionState,
@@ -346,4 +351,48 @@ export const control = {
     unwrap(SchemaService.Set({ connectionId, ddl })).then((r) => trust<ConnectionDdl>(r)),
   onSchemaChanged: (cb: (ddl: ConnectionDdl) => void): (() => void) =>
     on(CHANNEL.schemaChanged, cb),
+
+  // P4 D11: nine wrappers over CollectionsService. These stay typed against the generated models
+  // rather than `trust<T>()`-ing a domain type, because the one place a saved request's shape
+  // genuinely has to be trusted is where it becomes tab state — `openCollectionRequestTab` Zod-
+  // parses it there (D4), which is the app's single trust boundary for this document rather than
+  // a second one here. Only a *path* ever crosses this bridge for import/export, never a file's
+  // bytes (D11/F16): Go reads and Go writes.
+  collectionsList: (): Promise<{
+    collections: WailsModels.CollectionSummary[];
+    items: WailsModels.ItemSummary[];
+  }> =>
+    // The explicit type argument is `connectionsTest`'s own precedent above: tests/unit's
+    // tsconfig resolves the generated $CancellablePromise loosely, so a `.then` that reads members
+    // off the result (rather than handing it straight to `trust`) needs the awaited type named.
+    unwrap<WailsModels.CollectionsTree>(CollectionsService.List()).then((r) => ({
+      collections: r.collections ?? [],
+      items: r.items ?? [],
+    })),
+  collectionsGetRequest: (itemId: string): Promise<WailsStorageModels.SavedRequest> =>
+    unwrap(CollectionsService.GetRequest({ itemId })),
+  collectionsSaveRequest: (
+    itemId: string,
+    name: string,
+    request: WailsStorageModels.SavedRequest,
+  ): Promise<WailsModels.ItemSummary> =>
+    unwrap(CollectionsService.SaveRequest({ itemId, name, request })),
+  collectionsCreateCollection: (name: string): Promise<WailsModels.CollectionSummary> =>
+    unwrap(CollectionsService.CreateCollection({ name })),
+  collectionsCreateItem: (args: {
+    collectionId: string;
+    parentId: string | null;
+    kind: 'folder' | 'request';
+    request?: WailsStorageModels.SavedRequest | null;
+    name: string;
+  }): Promise<WailsModels.ItemSummary> =>
+    unwrap(CollectionsService.CreateItem({ ...args, request: args.request ?? null })),
+  collectionsRename: (id: string, target: 'collection' | 'item', name: string): Promise<void> =>
+    unwrap(CollectionsService.Rename({ id, target, name })),
+  collectionsDelete: (id: string, target: 'collection' | 'item'): Promise<void> =>
+    unwrap(CollectionsService.Delete({ id, target })),
+  collectionsImport: (path: string): Promise<WailsModels.ImportReport> =>
+    unwrap(CollectionsService.Import({ path })),
+  collectionsExport: (collectionId: string, path: string): Promise<void> =>
+    unwrap(CollectionsService.Export({ collectionId, path })),
 };

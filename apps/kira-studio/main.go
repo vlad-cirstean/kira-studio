@@ -202,6 +202,7 @@ func main() {
 			application.NewService(&bridge.QueriesService{Deps: deps}),
 			application.NewService(&bridge.SchemaService{Deps: deps}),
 			application.NewService(&bridge.HttpService{Deps: deps}),
+			application.NewService(&bridge.CollectionsService{Deps: deps}),
 			application.NewService(&bridge.LifecycleService{Flusher: quitter, WindowFlusher: closeFlush}),
 		},
 		Assets: application.AssetOptions{

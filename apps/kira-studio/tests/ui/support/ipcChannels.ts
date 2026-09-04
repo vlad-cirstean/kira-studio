@@ -73,6 +73,16 @@ export const IPC = {
   schemaGet: 'kira:schema:get',
   schemaSet: 'kira:schema:set',
 
+  collectionsList: 'kira:collections:list',
+  collectionsGetRequest: 'kira:collections:getRequest',
+  collectionsSaveRequest: 'kira:collections:saveRequest',
+  collectionsCreateCollection: 'kira:collections:createCollection',
+  collectionsCreateItem: 'kira:collections:createItem',
+  collectionsRename: 'kira:collections:rename',
+  collectionsDelete: 'kira:collections:delete',
+  collectionsImport: 'kira:collections:import',
+  collectionsExport: 'kira:collections:export',
+
   connectionState: 'kira:connection:state',
   connectionMetadataInvalidated: 'kira:connection:metadataInvalidated',
   connectionsChanged: 'kira:connections:changed',

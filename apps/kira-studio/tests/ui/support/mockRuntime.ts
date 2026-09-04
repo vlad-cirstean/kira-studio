@@ -81,6 +81,15 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   queriesHistoryRecord: 'QueriesService.HistoryRecord',
   schemaGet: 'SchemaService.Get',
   schemaSet: 'SchemaService.Set',
+  collectionsList: 'CollectionsService.List',
+  collectionsGetRequest: 'CollectionsService.GetRequest',
+  collectionsSaveRequest: 'CollectionsService.SaveRequest',
+  collectionsCreateCollection: 'CollectionsService.CreateCollection',
+  collectionsCreateItem: 'CollectionsService.CreateItem',
+  collectionsRename: 'CollectionsService.Rename',
+  collectionsDelete: 'CollectionsService.Delete',
+  collectionsImport: 'CollectionsService.Import',
+  collectionsExport: 'CollectionsService.Export',
 };
 
 /** ipc.ts's legacy channel string (what every `ControlSnapshot.channel` and fixture is keyed by,
@@ -163,6 +172,12 @@ const WILDCARD_DEFAULTS: Readonly<Record<string, string>> = Object.freeze({
   [IPC.opsCancel]: 'null',
   [IPC.queriesHistoryRecord]: 'null',
   [IPC.treeDescribe]: JSON.stringify({ meta: EMPTY_OBJECT_META, source: 'server' }),
+  // P4 F11: Http's left panel fetches its whole tree on mount, and the call is NOT wrapped in a
+  // try/catch — a fixture miss would leave the panel permanently empty rather than degrade. Every
+  // spec that switches to Http mode without seeding a collections fixture (mode-switch.spec.ts
+  // boots with none and asserts the panel still says "Collections") gets "no collections yet",
+  // the same reasoning `queriesList: '[]'` already carries.
+  [IPC.collectionsList]: JSON.stringify({ collections: [], items: [] }),
   [IPC.queriesList]: '[]',
   [IPC.queriesListConsole]: '[]',
   [IPC.queriesHistoryList]: '[]',
