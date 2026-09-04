@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { statusClass } from '@shared/domain/http';
+import { statusClass, statusHint } from '@shared/domain/http';
 import type { HttpRequestTabRecord } from '@shared/domain/tabs';
 import { computed } from 'vue';
 import { beautifyJson, scanJson } from '../../beautify';
 import CodeMirrorHost from '../../editor/CodeMirrorHost.vue';
+import { formatBytes } from '../../format';
 import { patchHttpRequestTabState } from '../../state/tabs';
 import EmptyState from '../../theme/primitives/EmptyState.vue';
 import MessageStrip from '../../theme/primitives/MessageStrip.vue';
@@ -37,6 +38,18 @@ function setResponseView(view: 'pretty' | 'raw'): void {
   patchHttpRequestTabState(props.tab.id, { responseView: view });
 }
 
+// D11: the hint is always shown inline, not tooltip-only — the case that matters (4xx/5xx) is
+// exactly the case where the user should not have to discover a hover. `v-tooltip` still carries
+// the full sentence for when the caption itself is truncated by the row's width.
+const hint = computed(() => (response.value ? statusHint(response.value.status) : ''));
+
+const redirectCaption = computed(() => {
+  const r = response.value;
+  if (!r || r.redirects.length === 0) return '';
+  const n = r.redirects.length;
+  return `${n} redirect${n === 1 ? '' : 's'} → ${r.finalUrl}`;
+});
+
 // D12: a view toggle, never an edit — Pretty renders beautifyJson(raw, 'indented'), Raw renders
 // the bytes exactly as received. Neither ever mutates response.body itself (it is read-only
 // runtime state, D6), so switching back to Raw always shows what the server actually sent.
@@ -61,7 +74,10 @@ const bodyText = computed(() => {
         <span class="p-chip" :class="statusClass(response.status)" data-testid="http-status">
           {{ response.status }} {{ response.statusText }}
         </span>
+        <span class="p-xs muted status-hint" v-tooltip="hint" data-testid="http-status-hint">{{ hint }}</span>
         <span class="p-push" />
+        <span class="p-xs dim" data-testid="http-elapsed">{{ response.elapsedMs }} ms</span>
+        <span class="p-xs dim" data-testid="http-body-bytes">{{ formatBytes(response.bodyBytes) }}</span>
         <SegmentedControl
           v-if="tab.state.responsePane === 'body' && isJson"
           :model-value="tab.state.responseView"
@@ -75,6 +91,13 @@ const bodyText = computed(() => {
           data-testid="http-response-pane-toggle"
           @update:model-value="setResponsePane"
         />
+      </div>
+
+      <MessageStrip v-if="response.bodyTruncated" tone="warn" data-testid="http-body-truncated">
+        Response truncated at {{ formatBytes(response.bodyBytes) }} — the server sent more than that.
+      </MessageStrip>
+      <div v-if="redirectCaption" class="p-xs dim redirect-caption" data-testid="http-redirects">
+        {{ redirectCaption }}
       </div>
 
       <div v-if="tab.state.responsePane === 'headers'" class="response-headers" data-testid="http-response-headers">
@@ -110,6 +133,17 @@ const bodyText = computed(() => {
 
 .response-status-row {
   gap: var(--kira-s-2);
+}
+
+.status-hint {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.redirect-caption {
+  padding: var(--kira-s-2) var(--kira-s-3);
 }
 
 .response-body {
