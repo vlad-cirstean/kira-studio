@@ -47,8 +47,15 @@
   /* P1 D2/C8: the custom title bar (workbench/TitleBar.vue), on top of `Mac.TitleBarHiddenInset`
      (internal/shell/window.go). --kira-titlebar-inset-left clears the macOS traffic-light cluster
      — a real-Mac measurement this repo's Linux sandbox cannot take (§6.3), so it lands in this one
-     token to adjust once rather than a value repeated at every call site. */
-  --kira-titlebar-h: 36px;
+     token to adjust once rather than a value repeated at every call site.
+     --kira-titlebar-h was 36px, taller than the traffic-light cluster AppKit actually renders for
+     a HiddenInset/UseToolbar window (reported against the real build: the bar read visibly taller
+     than the three buttons it was meant to frame, closer to VS Code's own compact hiddenInset bar
+     than to this). 28px is the standard macOS title-bar height figure rather than a second guess;
+     .mode-tab's own height/font-size were dropped in step with it (TitleBar.vue). Still a
+     Linux-sandbox estimate, not a measurement — nudge this one token again if it still reads off
+     on a real window. */
+  --kira-titlebar-h: 28px;
   --kira-titlebar-inset-left: 78px;
   --kira-shadow: 0 2px 8px rgb(0 0 0 / 0.32);
   --kira-shadow-dialog: 0 8px 28px rgb(0 0 0 / 0.45);

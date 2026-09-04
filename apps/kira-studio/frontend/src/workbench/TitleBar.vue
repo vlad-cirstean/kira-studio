@@ -12,15 +12,12 @@ function onClick(mode: AppMode): void {
 
 <template>
   <div class="title-bar">
-    <div class="title-bar-left">
-      <span class="app-title" data-testid="app-title">Kira Studio</span>
-    </div>
     <div class="mode-tabs">
       <button
         v-for="mode in MODE_ORDER"
         :key="mode"
         type="button"
-        class="p-tab"
+        class="p-tab mode-tab"
         :class="{ 'is-active': modeState.active === mode }"
         data-testid="mode-tab"
         :data-mode="mode"
@@ -41,36 +38,20 @@ function onClick(mode: AppMode): void {
   --wails-draggable: drag;
   height: var(--kira-titlebar-h);
   min-height: var(--kira-titlebar-h);
-  /* Three equal-fraction tracks, the outer two left empty of any forced width: with nothing else
-     competing for space in the third column, `1fr`/`1fr` come out equal, which is what centers
-     .mode-tabs on the bar as a whole rather than on the space remaining after the title — the
-     usual trick for a title-left/content-centred bar without measuring either side by hand. */
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
+  display: flex;
   align-items: center;
+  /* No app title (removed — HideTitle already drops AppKit's own, and a second wordmark read as
+     redundant next to the mode switcher). With only one child, centering it in the whole bar
+     (padding included) is what a plain `justify-content: center` already does — no grid trick
+     needed once there is nothing on the other side to balance against. */
+  justify-content: center;
   padding-left: var(--kira-titlebar-inset-left);
   padding-right: var(--kira-s-3);
   background: var(--kira-bg-chrome);
   flex-shrink: 0;
 }
 
-.title-bar-left {
-  justify-self: start;
-  min-width: 0;
-  overflow: hidden;
-}
-
-.app-title {
-  font-size: var(--kira-t-sm);
-  font-weight: 600;
-  color: var(--kira-fg-muted);
-  letter-spacing: 0.2px;
-  white-space: nowrap;
-  user-select: none;
-}
-
 .mode-tabs {
-  justify-self: center;
   display: flex;
   align-items: center;
   gap: 2px;
@@ -79,7 +60,13 @@ function onClick(mode: AppMode): void {
 /* CRITICAL (D2): --wails-draggable inherits from .title-bar above, and isDraggableEvent
    (drag.ts:99-108) reads the event *target's* computed style — so every interactive child here
    must explicitly override it, or clicking a mode tab would also start a window drag. */
-.mode-tabs .p-tab {
+.mode-tab {
   --wails-draggable: none;
+  /* .p-tab's own height/font-size (--kira-h-md/--kira-t-sm) are sized for the main editor tab
+     strip, not a ~28px native macOS title bar — the same "step smaller than the primary tabs"
+     override ConsoleView.vue's own .result-tab already uses (P42 D6), here because the title bar
+     is shorter still. */
+  height: var(--kira-h-sm);
+  font-size: var(--kira-t-xs);
 }
 </style>
