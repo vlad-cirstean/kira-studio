@@ -217,7 +217,7 @@ export async function revealSecretValues(): Promise<void> {
       if (copyAsCurlDialogState.revealedSecretValues[name] !== undefined) continue;
       const id = findSecretVariableId(name, collectionId, environmentId);
       if (!id) continue;
-      await revealVariable(id, false, (message) => {
+      await revealVariable(id, (message) => {
         copyAsCurlDialogState.error = message;
       });
       const value = revealedValues[id];

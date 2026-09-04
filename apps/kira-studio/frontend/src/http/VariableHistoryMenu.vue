@@ -38,7 +38,7 @@ function notYetRevealed(entry: HttpVariableHistoryEntry): boolean {
 }
 
 function onReveal(id: string): void {
-  void revealHistoryEntry(id, false);
+  void revealHistoryEntry(id);
 }
 function onRestore(entry: HttpVariableHistoryEntry): void {
   void restoreHistoryEntry(entry);

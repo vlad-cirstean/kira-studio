@@ -6,7 +6,7 @@ import type {
 } from '@shared/domain/variables';
 import { computed, reactive } from 'vue';
 import { control } from '../../bridge/control';
-import { confirmDialog } from '../../state/confirmDialog';
+import { runReveal } from '../reveal';
 
 // P5 D3/D11: the environment list and the app-global active selection — read-only at this point
 // (list and switch); editing, secrets, history and reordering land in later commits on this same
@@ -201,9 +201,10 @@ export function isDuplicateName(rows: HttpVariable[], index: number): boolean {
  *  this is the one place a secret's plaintext exists in the renderer at all. */
 export const revealedValues = reactive<Record<string, string>>({});
 
-/** D8: the same recurse-once shape ConnectionDialog.vue's own requestReveal uses — the pattern is
- *  copied, not imported (there is nothing importable to reuse, §1.4/OQ-2). Every outcome but
- *  confirmation-required is terminal.
+/** P12 D13: runs over http/reveal.ts's shared recurse-once switch — the pattern used to be
+ *  hand-copied from ConnectionDialog.vue's own requestReveal (there was nothing importable to
+ *  reuse, §1.4/OQ-2); now it is the module's own shared loop, used here and by
+ *  revealHistoryEntry below.
  *
  *  P7 D10: `onError`, when supplied, receives an error/unavailable outcome's message instead of it
  *  going into `variablesDialogState.error` — the *Copy as curl* reveal loop (http/state/curl.ts)
@@ -211,31 +212,19 @@ export const revealedValues = reactive<Record<string, string>>({});
  *  omits it and keeps today's behaviour exactly. */
 export async function revealVariable(
   id: string,
-  confirmed: boolean,
   onError?: (message: string) => void,
 ): Promise<void> {
-  const result = await control.variablesReveal(id, confirmed);
-  switch (result.outcome) {
-    case 'revealed':
-      if (result.value !== null) revealedValues[id] = result.value;
-      return;
-    case 'cancelled':
-      // D11 (inherited via P14): cancelled on purpose — nothing to show for it.
-      return;
-    case 'confirmation-required': {
-      const ok = await confirmDialog(
-        'Show this variable’s value? It will be displayed in plain text.',
-        { danger: false },
-      );
-      if (ok) await revealVariable(id, true, onError);
-      return;
-    }
-    default: {
-      const message = result.error ?? 'Could not reveal the value.';
+  await runReveal(
+    (confirmed) => control.variablesReveal(id, confirmed),
+    (value) => {
+      revealedValues[id] = value;
+    },
+    (message) => {
       if (onError) onError(message);
       else variablesDialogState.error = message;
-    }
-  }
+    },
+    'Show this variable’s value? It will be displayed in plain text.',
+  );
 }
 
 // ---- the per-variable history popover (D13) ----
@@ -269,25 +258,19 @@ export function closeHistoryMenu(): void {
   for (const id of Object.keys(revealedHistoryValues)) delete revealedHistoryValues[id];
 }
 
-/** D8's same recurse-once shape, over http_variable_history instead of http_variables. */
-export async function revealHistoryEntry(historyId: string, confirmed: boolean): Promise<void> {
-  const result = await control.variablesRevealHistory(historyId, confirmed);
-  switch (result.outcome) {
-    case 'revealed':
-      if (result.value !== null) revealedHistoryValues[historyId] = result.value;
-      return;
-    case 'cancelled':
-      return;
-    case 'confirmation-required': {
-      const ok = await confirmDialog('Show this prior value? It will be displayed in plain text.', {
-        danger: false,
-      });
-      if (ok) await revealHistoryEntry(historyId, true);
-      return;
-    }
-    default:
-      variablesDialogState.error = result.error ?? 'Could not reveal this prior value.';
-  }
+/** P12 D13: runReveal's own second instantiation, over http_variable_history instead of
+ *  http_variables. */
+export async function revealHistoryEntry(historyId: string): Promise<void> {
+  await runReveal(
+    (confirmed) => control.variablesRevealHistory(historyId, confirmed),
+    (value) => {
+      revealedHistoryValues[historyId] = value;
+    },
+    (message) => {
+      variablesDialogState.error = message;
+    },
+    'Show this prior value? It will be displayed in plain text.',
+  );
 }
 
 /** D13: restoring writes the prior value through the ordinary Upsert path, so the restore is
@@ -299,7 +282,7 @@ export async function restoreHistoryEntry(entry: HttpVariableHistoryEntry): Prom
   let value = entry.value;
   if (entry.isSecret) {
     if (revealedHistoryValues[entry.id] === undefined) {
-      await revealHistoryEntry(entry.id, false);
+      await revealHistoryEntry(entry.id);
     }
     const revealed = revealedHistoryValues[entry.id];
     if (revealed === undefined) return; // cancelled, unavailable, or errored

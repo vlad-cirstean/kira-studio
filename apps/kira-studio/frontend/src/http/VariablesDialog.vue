@@ -152,7 +152,7 @@ async function onUpdateSecret(id: string, checked: boolean): Promise<void> {
     return;
   }
   if (id !== '' && revealedValues[id] === undefined) {
-    await revealVariable(id, false);
+    await revealVariable(id);
   }
   if (id !== '') {
     const value = revealedValues[id];
@@ -164,7 +164,7 @@ async function onUpdateSecret(id: string, checked: boolean): Promise<void> {
 }
 
 function onReveal(id: string): void {
-  void revealVariable(id, false);
+  void revealVariable(id);
 }
 
 // D14: drag — ColumnsMenu.vue's own dragstart/dragover.prevent/dragend shape, splicing the local
