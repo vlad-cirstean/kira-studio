@@ -660,3 +660,75 @@ func TestTestGatesOnPreconnectAndOptionsOnlyEdits(t *testing.T) {
 		}
 	})
 }
+
+// TestUpdateAppliesThrottleLiveOnlyWhenConnected covers §5.5's "applies live" rule directly: an
+// edit reaches Backend.SetThrottle while the connection is actually connected, but a throttle
+// edit to a connection with nothing running yet gets no such call (attemptConnect installs the
+// right value on the next connect regardless — no double-install to reconcile).
+func TestUpdateAppliesThrottleLiveOnlyWhenConnected(t *testing.T) {
+	h := newHarness(t)
+
+	t.Run("connected: Update pushes the new rate live", func(t *testing.T) {
+		created := mustCreate(t, h.svc, fieldsInput("throttle-connected"))
+		if _, err := h.svc.Connect(created.ID); err != nil {
+			t.Fatalf("Connect: %v", err)
+		}
+		// attemptConnect itself calls SetThrottle(id, 0) on the way to Connect — the assertion
+		// below only cares about the *last* call, so that first install is fine to ignore.
+
+		draft := fieldsInput("throttle-connected")
+		draft.ThrottlePerSec = 7.5
+		if _, err := h.svc.Update(created.ID, draft); err != nil {
+			t.Fatalf("Update: %v", err)
+		}
+
+		calls := h.backend.throttleCallsSnapshot()
+		if len(calls) == 0 {
+			t.Fatal("expected at least one SetThrottle call")
+		}
+		last := calls[len(calls)-1]
+		if last.connectionID != created.ID || last.perSec != 7.5 {
+			t.Errorf("last SetThrottle call = %+v, want {%s 7.5}", last, created.ID)
+		}
+	})
+
+	t.Run("disconnected: Update installs nothing", func(t *testing.T) {
+		created := mustCreate(t, h.svc, fieldsInput("throttle-disconnected"))
+
+		draft := fieldsInput("throttle-disconnected")
+		draft.ThrottlePerSec = 3
+		if _, err := h.svc.Update(created.ID, draft); err != nil {
+			t.Fatalf("Update: %v", err)
+		}
+
+		for _, c := range h.backend.throttleCallsSnapshot() {
+			if c.connectionID == created.ID {
+				t.Errorf("unexpected SetThrottle(%s, %v) for a never-connected connection", c.connectionID, c.perSec)
+			}
+		}
+	})
+}
+
+// TestTestInjectsStoredPasswordAcrossThrottleOnlyEdit is the §5.5 "easily-missed correctness
+// detail" regression test: destinationUnchanged must keep holding across a throttle-only edit, or
+// "edit the throttle → Test connection" silently stops injecting the stored password.
+func TestTestInjectsStoredPasswordAcrossThrottleOnlyEdit(t *testing.T) {
+	h := newHarness(t)
+	in := fieldsInput("has-secret-throttle")
+	in.Password = strPtr("s3cret")
+	created := mustCreate(t, h.svc, in)
+
+	draft := fieldsInput("has-secret-throttle")
+	draft.Password = nil
+	draft.ThrottlePerSec = 42
+
+	result := h.svc.Test(draft, created.ID)
+
+	if !result.OK {
+		t.Fatalf("Test(throttle-only edit).OK = false, want true (err: %v)", result.Error)
+	}
+	got := h.backend.lastConnectConfig().Password
+	if got == nil || *got != "s3cret" {
+		t.Fatalf("Backend.Test saw password %v, want the stored secret", got)
+	}
+}
