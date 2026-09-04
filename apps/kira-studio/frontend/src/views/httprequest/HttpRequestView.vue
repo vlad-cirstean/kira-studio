@@ -2,6 +2,7 @@
 import { type HttpMethod, httpMethodClass } from '@shared/domain/http';
 import type { HttpRequestTabRecord } from '@shared/domain/tabs';
 import { computed, onMounted, onUnmounted } from 'vue';
+import { openSaveDialog, savedRequestFor, saveRequest } from '../../http/state/collections';
 import { registerCommand } from '../../shortcuts/commands';
 import { patchHttpRequestTabState } from '../../state/tabs';
 import AppButton from '../../theme/primitives/AppButton.vue';
@@ -14,6 +15,7 @@ import QueryParamsTable from './QueryParamsTable.vue';
 import RequestBodyPane from './RequestBodyPane.vue';
 import RequestHeadersTable from './RequestHeadersTable.vue';
 import ResponsePane from './ResponsePane.vue';
+import { isDirty, toSavedRequest } from './saved';
 import { runtime, send, stop } from './state';
 import { httpRequestTitle, parseQuery, splitUrl } from './url';
 
@@ -39,6 +41,31 @@ function onMethodChange(e: Event): void {
 
 function onUrlInput(value: string): void {
   patchHttpRequestTabState(props.tab.id, { url: value });
+}
+
+// P4 D15: dirtiness is a computation over two things already in memory — the tab's own state and
+// the cached saved document — not a stored flag there would be something to set, clear, migrate or
+// get wrong. `savedRequestFor` answers null for a tab bound to nothing, and for D14's orphan case
+// (a row deleted in this window or another), which is what makes Save fall back to Save as…
+const saved = computed(() => savedRequestFor(props.tab.state.itemId));
+const dirty = computed(() => isDirty(props.tab.state, saved.value));
+const canSave = computed(() => props.tab.state.itemId !== null && saved.value !== null);
+
+function onSave(): void {
+  const itemId = props.tab.state.itemId;
+  if (!itemId || !saved.value) {
+    onSaveAs();
+    return;
+  }
+  void saveRequest(itemId, props.tab.state.name || title.value, toSavedRequest(props.tab.state));
+}
+
+function onSaveAs(): void {
+  openSaveDialog(
+    props.tab.id,
+    props.tab.state.name || title.value,
+    toSavedRequest(props.tab.state),
+  );
 }
 
 function onSend(): void {
@@ -93,6 +120,9 @@ onMounted(() => {
   unregisterCommands = [
     registerCommand('view.run', onSend),
     registerCommand('view.refresh', onSend),
+    // D15: the palette's own Save request entry, view-scoped exactly like the two above — a no-op
+    // when no request tab is mounted, which is runCommand's documented behaviour.
+    registerCommand('http.save', onSave),
   ];
 });
 onUnmounted(() => {
@@ -115,6 +145,10 @@ onUnmounted(() => {
     >
       <template #badges>
         <span class="p-chip" :class="methodClass" data-testid="http-method-chip">{{ tab.state.method }}</span>
+        <!-- D15: the dirty mark sits beside the name here and deliberately *not* on the tab strip,
+             which renders purely from TAB_KINDS — a dirty(tab) registry member that seven of the
+             eight kinds would answer false to is shared machinery for a cosmetic gain (§8 OQ-8). -->
+        <span v-if="dirty" class="dirty-mark" data-testid="http-dirty" v-tooltip="'Unsaved changes'">•</span>
       </template>
 
       <template #toolbar>
@@ -134,6 +168,15 @@ onUnmounted(() => {
           @update:model-value="onUrlInput"
           @enter="onSend"
         />
+        <AppButton
+          icon="save"
+          data-testid="http-save"
+          :disabled="canSave && !dirty"
+          v-tooltip="canSave ? 'Save request' : 'Save request to a collection'"
+          @click="onSave"
+        >
+          Save
+        </AppButton>
         <AppButton
           icon="play"
           variant="primary"
@@ -207,6 +250,12 @@ onUnmounted(() => {
 .request-splitter {
   height: var(--kira-s-2);
   flex-shrink: 0;
+}
+
+.dirty-mark {
+  color: var(--kira-warn);
+  font-size: var(--kira-t-lg);
+  line-height: 1;
 }
 
 .response-pane-slot {

@@ -8,6 +8,7 @@ import {
 } from '@shared/domain/collections';
 import { computed, reactive } from 'vue';
 import { control } from '../../bridge/control';
+import { patchHttpRequestTabState, renameHttpRequestTabs } from '../../state/tabs';
 
 // P4 D13: Http's own tree store. Studio's tree is lazy because its data is remote — expanding a
 // node connects a connection and issues an IPC call, which is what its children cache, loading
@@ -253,6 +254,9 @@ export async function renameRow(row: CollectionRowVm, name: string): Promise<voi
   collectionsState.renamingKey = null;
   const target = row.kind === 'collection' ? 'collection' : 'item';
   await control.collectionsRename(row.id, target, name);
+  // Every tab bound to this row follows immediately, so the view header and the tab strip never
+  // disagree with the tree (D14).
+  if (row.kind === 'request') renameHttpRequestTabs(row.id, name);
   await loadCollections();
 }
 
@@ -298,6 +302,78 @@ export function beginRename(row: CollectionRowVm): void {
 
 export function cancelRename(): void {
   collectionsState.renamingKey = null;
+}
+
+// ---- saving a request into a collection (D15) ----
+
+interface SaveDialogState {
+  open: boolean;
+  /** The tab being saved. */
+  tabId: string | null;
+  suggestedName: string;
+  request: HttpSavedRequest | null;
+}
+
+export const saveDialogState = reactive<SaveDialogState>({
+  open: false,
+  tabId: null,
+  suggestedName: '',
+  request: null,
+});
+
+/** Save as… — the request view opens this without importing the dialog component. */
+export function openSaveDialog(
+  tabId: string,
+  suggestedName: string,
+  request: HttpSavedRequest,
+): void {
+  saveDialogState.tabId = tabId;
+  saveDialogState.suggestedName = suggestedName;
+  saveDialogState.request = request;
+  saveDialogState.open = true;
+}
+
+export function closeSaveDialog(): void {
+  saveDialogState.open = false;
+  saveDialogState.request = null;
+  saveDialogState.tabId = null;
+}
+
+/** Creates the row, caches it as the tab's saved side, and binds the tab to it. */
+export async function submitSaveDialog(
+  collectionId: string,
+  parentId: string | null,
+  name: string,
+): Promise<void> {
+  const { tabId, request } = saveDialogState;
+  if (!tabId || !request) return;
+  const item = await control.collectionsCreateItem({
+    collectionId,
+    parentId,
+    kind: 'request',
+    name,
+    request,
+  });
+  collectionsState.requests[item.id] = request;
+  // The tab is now bound to a real row, so its title becomes the saved name and Save stops
+  // falling back to Save as…
+  patchHttpRequestTabState(tabId, { itemId: item.id, name });
+  await loadCollections();
+  revealItem(collectionId, parentId);
+  closeSaveDialog();
+}
+
+/** Save — writes an already-bound request back to its own row. */
+export async function saveRequest(
+  itemId: string,
+  name: string,
+  request: HttpSavedRequest,
+): Promise<void> {
+  await control.collectionsSaveRequest(itemId, name, request);
+  // The cache is the dirty comparison's saved side, so it must move in step with the write or the
+  // mark would stay lit after a successful save.
+  collectionsState.requests[itemId] = request;
+  await loadCollections();
 }
 
 // ---- lookups the panel, the menus and the request view all share ----

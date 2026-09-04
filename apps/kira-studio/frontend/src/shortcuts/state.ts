@@ -21,6 +21,11 @@ export const paletteCommands: PaletteCommand[] = [
   // D13: a one-click action worth a name, the same bar this list's own comment states — no menu
   // or accelerator change (HttpStart.vue/CollectionsPanel.vue's own buttons are the other two).
   { id: 'http.newRequest', label: 'New request', run: () => void openHttpRequestTab() },
+  // P4 D15: the discoverability answer for Save, at the same bar this list's own comment states.
+  // No ⌘S and no accelerator — shared/domain/shortcuts.ts is a closed map and a menu accelerator
+  // needs the seven-file path P1 OQ-3 / P2 OQ-7 deferred as one deliberate pass. View-scoped like
+  // view.run below, so it is a no-op when no request tab is mounted.
+  { id: 'http.save', label: 'Save request', run: () => runCommand('http.save') },
   { id: 'open-settings', label: 'Open settings', run: () => (settingsOpen.value = true) },
   { id: 'toggle-project-panel', label: 'Toggle project panel', run: toggleProjectPanel },
   { id: 'toggle-operations-panel', label: 'Toggle operations panel', run: toggleOperationsPanel },
