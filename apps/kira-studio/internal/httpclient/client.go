@@ -13,6 +13,7 @@ import (
 	"log/slog"
 	"mime"
 	"net/http"
+	"net/http/httptrace"
 	"net/http/httputil"
 	"net/url"
 	"sort"
@@ -99,24 +100,29 @@ type Response struct {
 	// (repos/response_history.go strips it to nil before marshalling, D7/F12) carries no "wire" key
 	// at all, not just a null one. Never fatal to compute: a dump error simply leaves this nil.
 	Wire *WireExchange `json:"wire,omitempty"`
+	// Timeline is P10's full chronological sequence of what happened while the request ran (D2,
+	// D10) — always populated for a response Send actually returns; unlike Wire, it is small
+	// enough (F17) that repos/response_history.go keeps it rather than stripping it.
+	Timeline Timeline `json:"timeline"`
 }
-
-type redirectsCtxKey struct{}
 
 // checkRedirect is sharedClient's CheckRedirect: net/http sets req.Response to the redirect
 // response before invoking this (net/http/client.go's do()), so the status of each hop is
-// available here even though CheckRedirect's own signature carries only requests. Each call's own
-// []RedirectHop is threaded through via a context value rather than a package-level field, since
-// sharedClient is shared across concurrent Send calls.
+// available here even though CheckRedirect's own signature carries only requests. tl is threaded
+// through via a context value rather than a package-level field, since sharedClient is shared
+// across concurrent Send calls (P10 D3: the collector that used to be a bare *[]RedirectHop).
 func checkRedirect(req *http.Request, via []*http.Request) error {
 	if len(via) >= maxRedirects {
 		return fmt.Errorf("httpclient: stopped after %d redirects", maxRedirects)
 	}
-	hops, _ := req.Context().Value(redirectsCtxKey{}).(*[]RedirectHop)
-	if hops != nil && req.Response != nil {
-		prev := via[len(via)-1]
-		*hops = append(*hops, RedirectHop{Status: req.Response.StatusCode, URL: prev.URL.String()})
+	tl, _ := req.Context().Value(timelineCtxKey{}).(*timeline)
+	if tl == nil || req.Response == nil {
+		return nil
 	}
+	// F13: the hop's own method, status text and headers are all readable here and nowhere else;
+	// req is the next request about to be issued, so its method/URL address the hop this call is
+	// opening (D9) before a single byte of it has gone out.
+	tl.closeHop(req.Response, req.Method, req.URL.String())
 	return nil
 }
 
@@ -164,15 +170,20 @@ func resolveURL(raw string) (*url.URL, error) {
 // classifySendErr distinguishes a timeout from a cancellation (F20/D8's own point: one is a
 // failure, the other is the user) by reading sendCtx.Err() rather than the wrapped error itself —
 // net/http wraps a context error inside a *url.Error, and this way there is exactly one place
-// that has to know that.
-func classifySendErr(sendCtx context.Context, err error) *Error {
-	if sendCtx.Err() != nil {
-		if sendCtx.Err() == context.DeadlineExceeded {
-			return newError(CodeTimeout, "request timed out", err)
-		}
-		return newError(CodeCancelled, "request was cancelled", err)
+// that has to know that. tl carries P10 D15's own addition: what was measured before the send
+// died, closed by the caller (finishFailed) before this is called.
+func classifySendErr(sendCtx context.Context, err error, tl Timeline) *Error {
+	var e *Error
+	switch {
+	case sendCtx.Err() == context.DeadlineExceeded:
+		e = newError(CodeTimeout, "request timed out", err)
+	case sendCtx.Err() != nil:
+		e = newError(CodeCancelled, "request was cancelled", err)
+	default:
+		e = newError(CodeHTTPTransport, err.Error(), err)
 	}
-	return newError(CodeHTTPTransport, err.Error(), err)
+	e.Timeline = &tl
+	return e
 }
 
 // headerValue reports the last value of a case-insensitively matching request header — mirrors
@@ -224,8 +235,18 @@ func Send(ctx context.Context, req Request) (Response, error) {
 
 	sendCtx, cancel := context.WithTimeout(ctx, defaultTimeout)
 	defer cancel()
-	hops := &[]RedirectHop{}
-	sendCtx = context.WithValue(sendCtx, redirectsCtxKey{}, hops)
+	// P10 D2/D3: one trace, inherited across every redirect hop because net/http's redirect path
+	// builds each subsequent request with ctx: ireq.ctx (F1) — replaces the old bare
+	// *[]RedirectHop; Response.Redirects below is now a projection of tl (D3).
+	//
+	// The ClientTrace itself is deliberately NOT attached to sendCtx here — httputil.DumpRequestOut
+	// below (P9 D2/F7) clones httpReq and RoundTrips it through its own throwaway *http.Transport
+	// (a fake in-memory dumpConn) to capture the wire bytes, and that fake RoundTrip fires every
+	// hook on whatever ClientTrace the request's context carries. Attaching the trace only to
+	// httpReq's context right before the real sharedClient.Do call (below) is what keeps that fake
+	// connection from being recorded as a real one.
+	tl := newTimeline(req.Method, u.String())
+	sendCtx = context.WithValue(sendCtx, timelineCtxKey{}, tl)
 
 	// P3 D7: a formdata body's boundary is resolved before buildBody runs, not after — a user-
 	// typed multipart/form-data Content-Type carrying its own boundary parameter must drive the
@@ -311,24 +332,32 @@ func Send(ctx context.Context, req Request) (Response, error) {
 	// under D4's cap, once Do returns.
 	reqHead, dumpErr := httputil.DumpRequestOut(httpReq, false)
 
+	// P10 D2: the trace goes on httpReq's own context only now, after the dump above — see the
+	// comment where tl was created.
+	httpReq = httpReq.WithContext(httptrace.WithClientTrace(sendCtx, tl.trace()))
+
 	start := time.Now()
 	resp, err := sharedClient.Do(httpReq)
 	if err != nil {
-		return Response{}, classifySendErr(sendCtx, err)
+		return Response{}, classifySendErr(sendCtx, err, tl.finishFailed(time.Now(), err.Error()))
 	}
 	defer resp.Body.Close()
 
 	limited := io.LimitReader(resp.Body, maxResponseBytes+1)
 	data, readErr := io.ReadAll(limited)
 	if readErr != nil {
-		return Response{}, classifySendErr(sendCtx, readErr)
+		return Response{}, classifySendErr(sendCtx, readErr, tl.finishFailed(time.Now(), readErr.Error()))
 	}
 	truncated := false
 	if len(data) > maxResponseBytes {
 		data = data[:maxResponseBytes]
 		truncated = true
 	}
-	elapsed := time.Since(start)
+	// now is also P10 D5's own "the hop's end" instant for the final hop's download phase — the
+	// same instant elapsed is computed from, so download for the final hop is genuinely "how long
+	// the body took", the number ElapsedMs has never separated out.
+	now := time.Now()
+	elapsed := now.Sub(start)
 
 	encoding := "utf8"
 	bodyStr := string(data)
@@ -353,8 +382,9 @@ func Send(ctx context.Context, req Request) (Response, error) {
 		BodyTruncated: truncated,
 		ElapsedMs:     int(elapsed.Milliseconds()),
 		FinalURL:      finalURL,
-		Redirects:     *hops,
+		Redirects:     tl.redirectHops(),
 		Wire:          buildWireExchange(reqHead, dumpErr, httpReq, resp, req.Body, formBoundary),
+		Timeline:      tl.finishFinal(now, resp),
 	}, nil
 }
 

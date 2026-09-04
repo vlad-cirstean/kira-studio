@@ -29,6 +29,11 @@ type Error struct {
 	Code    ErrorCode
 	Message string
 	Cause   error
+	// Timeline is P10 D15's own addition: what was measured before the send failed — non-nil only
+	// for a failure classifySendErr produces (a transport failure or a body-read failure), since
+	// only those run after newTimeline has installed a trace. Every other Error (a bad URL, an
+	// unsupported method) fails before a send is ever attempted, and leaves this nil.
+	Timeline *Timeline
 }
 
 func (e *Error) Error() string { return e.Message }
