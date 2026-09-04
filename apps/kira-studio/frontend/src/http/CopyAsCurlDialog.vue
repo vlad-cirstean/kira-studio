@@ -27,14 +27,17 @@ const hasRevealedAny = computed(
 );
 
 const stripTone = computed<'note' | 'warn'>(() => (hasRevealedAny.value ? 'warn' : 'note'));
+// D10 step 5: "the strip says which names are still masked" — true whether nothing has been
+// revealed yet, or a reveal for one name succeeded while another was cancelled/errored/declined.
 const stripText = computed(() => {
   const masked = maskedNames.value;
-  if (!hasRevealedAny.value) {
-    const n = copyAsCurlDialogState.deferredNames.length;
-    return `${n} secret ${n === 1 ? 'value is' : 'values are'} not shown. The command will not run as-is.`;
-  }
   if (masked.length === 0) return 'This command contains real secret values.';
-  return `This command contains real secret values. ${masked.length} ${masked.length === 1 ? 'value is' : 'values are'} still hidden: ${masked.join(', ')}.`;
+  const label = masked.length === 1 ? 'value is' : 'values are';
+  const names = masked.join(', ');
+  if (!hasRevealedAny.value) {
+    return `${masked.length} secret ${label} not shown: ${names}. The command will not run as-is.`;
+  }
+  return `This command contains real secret values. ${masked.length} ${label} still hidden: ${names}.`;
 });
 
 // P6 D12 fact 2: {{$…}} values are frozen into the command on open (D10 whole reason to exist) —

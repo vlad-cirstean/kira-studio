@@ -44,11 +44,37 @@ function basename(path: string): string {
   return parts[parts.length - 1] || path;
 }
 
-/** D7's "parses as k=v" test: a non-empty name before the first '='. */
+/** D7's "parses as k=v" test: a non-empty name before the first '='. Splitting happens on the raw
+ *  (possibly percent-encoded) text — an encoded '=' would already read back as '%3D', never a
+ *  literal '=', so the real separator is never ambiguous with an encoded one. */
 function parseAsKeyValue(piece: string): { name: string; value: string } | null {
   const eq = piece.indexOf('=');
   if (eq <= 0) return null;
   return { name: piece.slice(0, eq), value: piece.slice(eq + 1) };
+}
+
+/** The inverse of generate.ts's own `goQueryEscape` — decodes a piece's name/value back to plain
+ *  text before it lands in a `urlEncoded` row (D17's round trip requires this: `toCurl` emits the
+ *  already-encoded string as `--data-raw`, F13, so reconstructing the row has to undo that or a
+ *  re-send would double-encode it). A malformed %-sequence falls back to the literal text rather
+ *  than throwing — this is untrusted pasted input. */
+function decodeQueryComponent(s: string): string {
+  try {
+    return decodeURIComponent(s.replace(/\+/g, ' '));
+  } catch {
+    return s;
+  }
+}
+
+function toUrlEncodedRows(pieces: readonly string[]): HttpUrlEncodedFieldState[] {
+  return pieces.map((p) => {
+    const kv = parseAsKeyValue(p);
+    return {
+      name: decodeQueryComponent(kv?.name ?? ''),
+      value: decodeQueryComponent(kv?.value ?? ''),
+      enabled: true,
+    };
+  });
 }
 
 /** F11: which of this app's CODE_LANGUAGES a Content-Type's subtype maps onto, or null when the
@@ -98,6 +124,10 @@ export function parseCurl(text: string): ParsedCurl | { error: string } {
   const nonFlagArgs: string[] = [];
   const rawDataPieces: RawDataPiece[] = [];
   const formFields: HttpFormDataFieldState[] = [];
+  // D5's "any -d-family or -F flag -> POST" precedence has to see that -F was *used*, even for a
+  // `-F 'k=<f'` piece D8 drops entirely (form-file-content) — formFields.length alone would miss
+  // it once the row is gone.
+  let sawFormFlag = false;
 
   function pushHeader(name: string, value: string): void {
     headerRows.push({ name, value, enabled: true });
@@ -289,6 +319,7 @@ export function parseCurl(text: string): ParsedCurl | { error: string } {
         return;
       case 'form':
       case 'form-string':
+        sawFormFlag = true;
         handleFormFlag(id, v);
         return;
     }
@@ -367,7 +398,7 @@ export function parseCurl(text: string): ParsedCurl | { error: string } {
     method = 'PUT';
   } else if (getFlag) {
     method = 'GET';
-  } else if (rawDataPieces.length > 0 || formFields.length > 0) {
+  } else if (rawDataPieces.length > 0 || sawFormFlag) {
     method = 'POST';
   }
 
@@ -456,10 +487,7 @@ export function parseCurl(text: string): ParsedCurl | { error: string } {
           allKeyValue
         ) {
           bodyMode = 'urlencoded';
-          urlEncodedRows = literalPieces.map((p) => {
-            const kv = parseAsKeyValue(p);
-            return { name: kv?.name ?? '', value: kv?.value ?? '', enabled: true };
-          });
+          urlEncodedRows = toUrlEncodedRows(literalPieces);
         } else {
           const lang = codeLanguageForContentType(contentType);
           if (lang) {
@@ -473,10 +501,7 @@ export function parseCurl(text: string): ParsedCurl | { error: string } {
         }
       } else if (allKeyValue) {
         bodyMode = 'urlencoded';
-        urlEncodedRows = literalPieces.map((p) => {
-          const kv = parseAsKeyValue(p);
-          return { name: kv?.name ?? '', value: kv?.value ?? '', enabled: true };
-        });
+        urlEncodedRows = toUrlEncodedRows(literalPieces);
       } else {
         // F11: no Content-Type header means curl would have sent this as urlencoded regardless —
         // raw's own default is text/plain (§1.6), so an explicit header is added and named.

@@ -1,0 +1,409 @@
+{
+  "tokenize": [
+    {
+      "name": "curl prefix present",
+      "command": "curl -X POST https://x.test/a",
+      "argv": ["-X", "POST", "https://x.test/a"],
+      "warnings": []
+    },
+    {
+      "name": "curl prefix absent",
+      "command": "-X POST https://x.test/a",
+      "argv": ["-X", "POST", "https://x.test/a"],
+      "warnings": []
+    },
+    {
+      "name": "curl prefix as a full path",
+      "command": "/usr/bin/curl -X POST https://x.test/a",
+      "argv": ["-X", "POST", "https://x.test/a"],
+      "warnings": []
+    },
+    {
+      "name": "a backslash-newline continuation is not a phantom token",
+      "command": "curl -X POST 'https://x.test/a' \\\n  -H 'A: 1' \\\n  -d 'k=v'",
+      "argv": ["-X", "POST", "https://x.test/a", "-H", "A: 1", "-d", "k=v"],
+      "warnings": []
+    },
+    {
+      "name": "a genuinely empty -d '' is a real empty argument",
+      "command": "curl -d '' https://x.test/a",
+      "argv": ["-d", "", "https://x.test/a"],
+      "warnings": []
+    },
+    {
+      "name": "ANSI-C quoting decodes",
+      "command": "curl $'https://x.test/caf\\u00e9' -H $'X-A: b'",
+      "argv": ["https://x.test/café", "-H", "X-A: b"],
+      "warnings": []
+    },
+    {
+      "name": "an unterminated quote is a legible error, not a throw",
+      "command": "curl 'unterminated",
+      "error": "Got EOF while in a quoted string"
+    },
+    {
+      "name": "the walk stops at the first bare shell operator",
+      "command": "curl https://x.test/a ; rm -rf /",
+      "argv": ["https://x.test/a"],
+      "warnings": ["shell-operator"]
+    }
+  ],
+  "parse": [
+    {
+      "name": "a DevTools-shaped paste",
+      "command": "curl 'https://api.example.com/v1/orders' -H 'Authorization: Bearer abc.def' -H 'Content-Type: application/json' --data-raw '{\"id\":1}'",
+      "want": {
+        "method": "POST",
+        "url": "https://api.example.com/v1/orders",
+        "headers": [
+          { "name": "Authorization", "value": "Bearer abc.def", "enabled": true },
+          { "name": "Content-Type", "value": "application/json", "enabled": true }
+        ],
+        "bodyMode": "code",
+        "code": "{\"id\":1}"
+      },
+      "warnings": []
+    },
+    {
+      "name": "-d JSON with no Content-Type imports as raw with an added header",
+      "command": "curl https://x.test/a -d '{\"a\":1}'",
+      "want": {
+        "method": "POST",
+        "url": "https://x.test/a",
+        "headers": [
+          { "name": "Content-Type", "value": "application/x-www-form-urlencoded", "enabled": true }
+        ],
+        "bodyMode": "raw",
+        "body": "{\"a\":1}"
+      },
+      "warnings": ["implied-content-type"]
+    },
+    {
+      "name": "the same body with an explicit Content-Type imports as code/json",
+      "command": "curl https://x.test/a -H 'content-type: application/json' -d '{\"a\":1}'",
+      "want": {
+        "method": "POST",
+        "url": "https://x.test/a",
+        "headers": [{ "name": "content-type", "value": "application/json", "enabled": true }],
+        "bodyMode": "code",
+        "code": "{\"a\":1}"
+      },
+      "warnings": []
+    },
+    {
+      "name": "multiple -d flags merge into urlencoded rows, in order",
+      "command": "curl https://x.test/a -d 'a=1' -d 'b=2'",
+      "want": {
+        "method": "POST",
+        "url": "https://x.test/a",
+        "bodyMode": "urlencoded",
+        "urlEncoded": [
+          { "name": "a", "value": "1", "enabled": true },
+          { "name": "b", "value": "2", "enabled": true }
+        ]
+      },
+      "warnings": []
+    },
+    {
+      "name": "--json sets both headers and the data",
+      "command": "curl https://x.test/a --json '{\"a\":1}'",
+      "want": {
+        "method": "POST",
+        "url": "https://x.test/a",
+        "headers": [
+          { "name": "Content-Type", "value": "application/json", "enabled": true },
+          { "name": "Accept", "value": "application/json", "enabled": true }
+        ],
+        "bodyMode": "code",
+        "code": "{\"a\":1}"
+      },
+      "warnings": []
+    },
+    {
+      "name": "-F text plus a file field with ;type=",
+      "command": "curl https://x.test/upload -F 'note=hello' -F 'file=@/tmp/report.csv;type=text/csv'",
+      "want": {
+        "method": "POST",
+        "url": "https://x.test/upload",
+        "bodyMode": "formdata",
+        "formData": [
+          {
+            "name": "note",
+            "kind": "text",
+            "value": "hello",
+            "path": "",
+            "fileName": "",
+            "fileSize": 0,
+            "contentType": "",
+            "enabled": true
+          },
+          {
+            "name": "file",
+            "kind": "file",
+            "value": "",
+            "path": "/tmp/report.csv",
+            "fileName": "report.csv",
+            "fileSize": 0,
+            "contentType": "text/csv",
+            "enabled": true
+          }
+        ]
+      },
+      "warnings": []
+    },
+    {
+      "name": "-F 'k=<f' is dropped, and the method still counts the flag",
+      "command": "curl https://x.test/upload -F 'k=<f'",
+      "want": {
+        "method": "POST",
+        "url": "https://x.test/upload",
+        "bodyMode": "none"
+      },
+      "warnings": ["form-file-content"]
+    },
+    {
+      "name": "-F 'k=v;filename=other' keeps the row and warns about the override",
+      "command": "curl https://x.test/a -F 'k=v;filename=other'",
+      "want": {
+        "method": "POST",
+        "url": "https://x.test/a",
+        "bodyMode": "formdata",
+        "formData": [
+          {
+            "name": "k",
+            "kind": "text",
+            "value": "v",
+            "path": "",
+            "fileName": "",
+            "fileSize": 0,
+            "contentType": "",
+            "enabled": true
+          }
+        ]
+      },
+      "warnings": ["form-filename"]
+    },
+    {
+      "name": "--data-binary @path as the only data piece imports as file mode",
+      "command": "curl https://x.test/upload --data-binary @/tmp/blob.bin",
+      "want": {
+        "method": "POST",
+        "url": "https://x.test/upload",
+        "bodyMode": "file",
+        "binaryFile": { "path": "/tmp/blob.bin", "name": "blob.bin", "size": 0 }
+      },
+      "warnings": []
+    },
+    {
+      "name": "-d @path cannot be inlined and is dropped with a warning",
+      "command": "curl https://x.test/a -d @/tmp/file.txt",
+      "want": {
+        "method": "POST",
+        "url": "https://x.test/a",
+        "bodyMode": "none"
+      },
+      "warnings": ["data-file-inline"]
+    },
+    {
+      "name": "every --data-urlencode file form is dropped with a warning",
+      "command": "curl https://x.test/a --data-urlencode @/tmp/f1 --data-urlencode =@/tmp/f2 --data-urlencode name@/tmp/f3",
+      "want": {
+        "method": "POST",
+        "url": "https://x.test/a",
+        "bodyMode": "none"
+      },
+      "warnings": ["data-file-inline", "data-file-inline", "data-file-inline"]
+    },
+    {
+      "name": "a non-file --data-urlencode piece parses as an ordinary k=v pair",
+      "command": "curl https://x.test/a --data-urlencode 'a=hello world'",
+      "want": {
+        "method": "POST",
+        "url": "https://x.test/a",
+        "bodyMode": "urlencoded",
+        "urlEncoded": [{ "name": "a", "value": "hello world", "enabled": true }]
+      },
+      "warnings": []
+    },
+    {
+      "name": "-T uploads a file and infers PUT",
+      "command": "curl -T /tmp/upload.csv https://x.test/put",
+      "want": {
+        "method": "PUT",
+        "url": "https://x.test/put",
+        "bodyMode": "file",
+        "binaryFile": { "path": "/tmp/upload.csv", "name": "upload.csv", "size": 0 }
+      },
+      "warnings": []
+    },
+    {
+      "name": "-G moves -d data onto the query string verbatim, with no body",
+      "command": "curl -G https://x.test/search -d 'q=hello world'",
+      "want": {
+        "method": "GET",
+        "url": "https://x.test/search?q=hello world",
+        "bodyMode": "none"
+      },
+      "warnings": []
+    },
+    {
+      "name": "-u becomes an Authorization header and warns",
+      "command": "curl https://x.test/a -u alice:s3cr3t",
+      "want": {
+        "method": "GET",
+        "url": "https://x.test/a",
+        "headers": [{ "name": "Authorization", "value": "Basic YWxpY2U6czNjcjN0", "enabled": true }]
+      },
+      "warnings": ["credential-in-command"]
+    },
+    {
+      "name": "--oauth2-bearer becomes an Authorization header and warns",
+      "command": "curl https://x.test/a --oauth2-bearer sometoken123",
+      "want": {
+        "method": "GET",
+        "url": "https://x.test/a",
+        "headers": [{ "name": "Authorization", "value": "Bearer sometoken123", "enabled": true }]
+      },
+      "warnings": ["credential-in-command"]
+    },
+    {
+      "name": "-A sets User-Agent",
+      "command": "curl https://x.test/a -A 'MyAgent/1.0'",
+      "want": {
+        "method": "GET",
+        "url": "https://x.test/a",
+        "headers": [{ "name": "User-Agent", "value": "MyAgent/1.0", "enabled": true }]
+      },
+      "warnings": []
+    },
+    {
+      "name": "-e sets Referer",
+      "command": "curl https://x.test/a -e https://ref.example",
+      "want": {
+        "method": "GET",
+        "url": "https://x.test/a",
+        "headers": [{ "name": "Referer", "value": "https://ref.example", "enabled": true }]
+      },
+      "warnings": []
+    },
+    {
+      "name": "-b with a k=v pair sets Cookie",
+      "command": "curl https://x.test/a -b session=abc123",
+      "want": {
+        "method": "GET",
+        "url": "https://x.test/a",
+        "headers": [{ "name": "Cookie", "value": "session=abc123", "enabled": true }]
+      },
+      "warnings": []
+    },
+    {
+      "name": "-b naming a file is unsupported",
+      "command": "curl https://x.test/a -b cookies.txt",
+      "want": {
+        "method": "GET",
+        "url": "https://x.test/a"
+      },
+      "warnings": ["unsupported-flag"]
+    },
+    {
+      "name": "-I infers HEAD",
+      "command": "curl -I https://x.test/a",
+      "want": {
+        "method": "HEAD",
+        "url": "https://x.test/a"
+      },
+      "warnings": []
+    },
+    {
+      "name": "-X PROPFIND is coerced to GET and warns",
+      "command": "curl -X PROPFIND https://x.test/a",
+      "want": {
+        "method": "GET",
+        "url": "https://x.test/a"
+      },
+      "warnings": ["method-coerced"]
+    },
+    {
+      "name": "-k warns as unsupported and everything else still parses",
+      "command": "curl -k https://x.test/a",
+      "want": {
+        "method": "GET",
+        "url": "https://x.test/a"
+      },
+      "warnings": ["unsupported-flag"]
+    },
+    {
+      "name": "an unknown flag warns and the URL is still picked correctly",
+      "command": "curl --frobnicate https://x.test/a",
+      "want": {
+        "method": "GET",
+        "url": "https://x.test/a"
+      },
+      "warnings": ["unknown-flag"]
+    },
+    {
+      "name": "two URLs: the first wins, the extra warns",
+      "command": "curl https://x.test/a https://x.test/b",
+      "want": {
+        "method": "GET",
+        "url": "https://x.test/a"
+      },
+      "warnings": ["multiple-urls"]
+    },
+    {
+      "name": "no URL at all warns and leaves an empty, editable field",
+      "command": "curl -X POST",
+      "want": {
+        "method": "POST",
+        "url": ""
+      },
+      "warnings": ["no-url"]
+    },
+    {
+      "name": "-H 'Name;' sends an empty-valued header",
+      "command": "curl https://x.test/a -H 'X-Empty;'",
+      "want": {
+        "method": "GET",
+        "url": "https://x.test/a",
+        "headers": [{ "name": "X-Empty", "value": "", "enabled": true }]
+      },
+      "warnings": []
+    },
+    {
+      "name": "a header with no colon and no trailing ; is malformed",
+      "command": "curl https://x.test/a -H 'garbage-header'",
+      "want": {
+        "method": "GET",
+        "url": "https://x.test/a"
+      },
+      "warnings": ["header-malformed"]
+    },
+    {
+      "name": "the tokenizer's operator stop reaches parseCurl too — no 'rm' anywhere",
+      "command": "curl https://x.test/a ; rm -rf /",
+      "want": {
+        "method": "GET",
+        "url": "https://x.test/a"
+      },
+      "warnings": ["shell-operator"]
+    },
+    {
+      "name": "short-flag clustering expands -sSL",
+      "command": "curl -sSL https://x.test/a",
+      "want": {
+        "method": "GET",
+        "url": "https://x.test/a"
+      },
+      "warnings": []
+    },
+    {
+      "name": "--flag=value splits on the first =",
+      "command": "curl --request=DELETE https://x.test/a",
+      "want": {
+        "method": "DELETE",
+        "url": "https://x.test/a"
+      },
+      "warnings": []
+    }
+  ]
+}
