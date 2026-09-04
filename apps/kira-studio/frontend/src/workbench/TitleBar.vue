@@ -38,20 +38,23 @@ function onClick(mode: AppMode): void {
   --wails-draggable: drag;
   height: var(--kira-titlebar-h);
   min-height: var(--kira-titlebar-h);
-  display: flex;
-  align-items: center;
-  /* No app title (removed — HideTitle already drops AppKit's own, and a second wordmark read as
-     redundant next to the mode switcher). With only one child, centering it in the whole bar
-     (padding included) is what a plain `justify-content: center` already does — no grid trick
-     needed once there is nothing on the other side to balance against. */
-  justify-content: center;
-  padding-left: var(--kira-titlebar-inset-left);
-  padding-right: var(--kira-s-3);
+  position: relative;
   background: var(--kira-bg-chrome);
   flex-shrink: 0;
 }
 
+/* No app title (removed — HideTitle already drops AppKit's own, and a second wordmark read as
+   redundant next to the mode switcher). Centered on the bar's true full width via absolute
+   positioning, deliberately NOT `justify-content: center` inside a flex row padded by
+   --kira-titlebar-inset-left (78px left) against a plain --kira-s-3 (6px right) — that asymmetric
+   padding centers within the padded box, not the window, and reads visibly off-centre (shifted
+   right by roughly half the padding gap). --kira-titlebar-inset-left's own reserved zone stays
+   real — nothing else renders there — this just stops depending on it for centering math. */
 .mode-tabs {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
   display: flex;
   align-items: center;
   gap: 2px;

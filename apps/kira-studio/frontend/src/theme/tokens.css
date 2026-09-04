@@ -45,22 +45,19 @@
   --kira-border-width: 1px;
   --kira-statusbar-h: 22px;
   /* P1 D2/C8: the custom title bar (workbench/TitleBar.vue), on top of `Mac.TitleBarHiddenInset`
-     (internal/shell/window.go). A same-session attempt to shrink this to 28px on its own broke
-     the real build — AppKit's own HiddenInset/UseToolbar layout sizes the traffic-light cluster
-     by its own metrics, not by this div's CSS height, so the buttons spilled below a bar shorter
-     than what AppKit still reserved for them.
-     `internal/shell/window.go`'s `RepositionTrafficLights` (titlebar_darwin.go) now moves those
-     buttons onto this exact geometry by hand instead — the same effect Electron's
-     trafficLightPosition gives VS Code, which Wails v3 (pinned beta.16) has no option of its
-     own for — so this token and window.go's `trafficLightBarHeight`/`trafficLightLeftInset` now
-     describe the SAME box on both sides and must be changed together (kept in sync by hand, no
-     shared source between Go and CSS). --kira-titlebar-inset-left is deliberately more generous
-     than the buttons' own cluster width (leftInset + 3 buttons + 2 gaps) — it only has to clear
-     them, not match them pixel-for-pixel.
-     Neither value is a real-Mac measurement (this repo's Linux sandbox cannot take one, §6.3) —
-     a compact, VS-Code-like starting point. Change this token AND window.go's constants together;
-     changing only one reopens the exact mismatch the first attempt caused. */
-  --kira-titlebar-h: 28px;
+     (internal/shell/window.go). --kira-titlebar-inset-left clears the macOS traffic-light cluster
+     — a real-Mac measurement this repo's Linux sandbox cannot take (§6.3), so it lands in this one
+     token to adjust once rather than a value repeated at every call site.
+     Two same-session attempts on --kira-titlebar-h, both reverted: shrinking it to 28px alone left
+     AppKit's own HiddenInset/UseToolbar traffic-light cluster (sized by its own metrics, not by
+     this div's CSS height) taller than what the div reserved, spilling into the tab strip below;
+     repositioning the real buttons by hand via a native cgo/Cocoa shim (Wails v3, pinned
+     beta.16, has no Electron-style trafficLightPosition option of its own) reached the real
+     NSWindow but crashed the packaged app on launch. Do not reintroduce either approach without
+     a real macOS build in the loop to verify against — 36px is the value known to actually work,
+     left untouched; only the bar's own content (TitleBar.vue's mode tabs) is safe to keep
+     iterating on from a screenshot alone. */
+  --kira-titlebar-h: 36px;
   --kira-titlebar-inset-left: 78px;
   --kira-shadow: 0 2px 8px rgb(0 0 0 / 0.32);
   --kira-shadow-dialog: 0 8px 28px rgb(0 0 0 / 0.45);
