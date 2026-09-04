@@ -64,17 +64,29 @@ type WindowDeps struct {
 func Options(sec SecurityOptions, w model.WindowRecord, primaryWorkArea *application.Rect) application.WebviewWindowOptions {
 	width, height := DefaultBounds(primaryWorkArea)
 	opts := application.WebviewWindowOptions{
-		Title:            "Kira Studio",
-		Width:            width,
-		Height:           height,
-		MinWidth:         minWindowWidth,
-		MinHeight:        minWindowHeight,
-		BackgroundColour: application.NewRGB(24, 24, 27),
+		// P1 D2: `Title` stays — AppKit still uses it for the window list and Mission Control
+		// even with `MacTitleBarHiddenInset`'s `HideTitle: true`.
+		Title:     "Kira Studio",
+		Width:     width,
+		Height:    height,
+		MinWidth:  minWindowWidth,
+		MinHeight: minWindowHeight,
+		// P1 F3: matches --kira-bg-chrome (#181818, tokens.css) — was #18181B, invisible until
+		// the title-bar strip became the app's own paint over a transparent AppKit title bar.
+		BackgroundColour: application.NewRGB(24, 24, 24),
 		URL:              "/?window=" + w.Key,
 		Name:             w.Key,
 		Permissions:      sec.Permissions,
 		EnableFileDrop:   false,
-		Mac:              application.MacWindow{WebviewPreferences: sec.Webview},
+		// P1 D2/F1/F2: `MacTitleBarHiddenInset`, deliberately NOT `Frameless: true` — Frameless
+		// would hide the traffic-light window controls (effectiveMacWindowButtonStates) and
+		// oblige the app to draw its own, which the custom title bar (TitleBar.vue) never asked
+		// for. HiddenInset keeps AppKit's controls, inset, with FullSizeContent: true — the
+		// Electron `titleBarStyle: 'hiddenInset'` shape this design wants.
+		Mac: application.MacWindow{
+			WebviewPreferences: sec.Webview,
+			TitleBar:           application.MacTitleBarHiddenInset,
+		},
 	}
 
 	if w.Bounds != nil {

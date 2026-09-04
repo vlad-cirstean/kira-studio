@@ -166,6 +166,24 @@ func TestDefaultBounds(t *testing.T) {
 	}
 }
 
+// TestOptions_CustomTitleBarPosture pins P1 D2/F1-F3: a posture value asserted so a revert to
+// Frameless (which would silently hide the traffic lights, F2) or to the stale #18181B background
+// (F3) is never silent, the same shape TestHarden_DenyByDefaultPosture (security_test.go) uses.
+func TestOptions_CustomTitleBarPosture(t *testing.T) {
+	opts := shell.Options(shell.Harden(), model.WindowRecord{Key: "main"}, nil)
+
+	if opts.Mac.TitleBar != application.MacTitleBarHiddenInset {
+		t.Errorf("Mac.TitleBar = %+v, want MacTitleBarHiddenInset", opts.Mac.TitleBar)
+	}
+	if opts.Frameless {
+		t.Error("Frameless = true, want false — Frameless hides the macOS traffic lights (F2)")
+	}
+	wantBackground := application.NewRGB(24, 24, 24)
+	if opts.BackgroundColour != wantBackground {
+		t.Errorf("BackgroundColour = %+v, want %+v (matches --kira-bg-chrome, #181818)", opts.BackgroundColour, wantBackground)
+	}
+}
+
 // TestOptions_StoredBoundsOverrideTheClamp proves the clamp applies only to the no-stored-
 // rectangle path: a window with a persisted rectangle restores it exactly, regardless of what the
 // primary screen's work area would otherwise clamp the default to.
