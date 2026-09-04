@@ -1020,28 +1020,115 @@ Short, because this phase is renderer-only and `tests/ui` runs the real bundle i
 
 Filled in by the implementing session as each item is actually done, not in advance.
 
-- [ ] C1 — the three files under `http/dynamic/` land; `bun run typecheck` proves catalogue↔dispatch
+- [x] C1 — the three files under `http/dynamic/` land; `bun run typecheck` proves catalogue↔dispatch
       exhaustiveness and all 58 faker calls; `bun run build` still prints exactly two dynamic chunks
-      with `fakerEntry-*.js` at F5's baseline size.
-- [ ] C2 — `resolve()`'s optional parameter lands; the shared corpus JSON and `internal/httpvars/**`
+      with `fakerEntry-*.js` at F5's baseline size (true at C1, before anything reaches
+      `generators.ts` — see the C7/final-build note below for how this evolves once the feature is
+      actually wired up in C3).
+- [x] C2 — `resolve()`'s optional parameter lands; the shared corpus JSON and `internal/httpvars/**`
       are unedited and both sides still pass every existing case; the three TS-only cases are green.
-- [ ] C3 — a request with no `{{$...}}` takes today's exact path (no `await`, no chunk load); a
+- [x] C3 — a request with no `{{$...}}` takes today's exact path (no `await`, no chunk load); a
       request with one resolves it; the three existing http specs pass unedited.
-- [ ] C4 — a catalogued `$name` is no longer a warning; an uncatalogued one says so; the chip still
+- [x] C4 — a catalogued `$name` is no longer a warning; an uncatalogued one says so; the chip still
       calls `resolveTabState` with three arguments.
-- [ ] C5 — the reference dialog opens from all three entry points and lists 58 names with live
-      samples; `collections.spec.ts` passes unedited.
-- [ ] C6 — `http-dynamic-values.spec.ts`'s four tests, each passing twice in a row; nothing appended
+- [x] C5 — the reference dialog opens from all three entry points and lists 58 names with live
+      samples; `collections.spec.ts` passes unedited. (One file not on the plan's own §0.1 list
+      needed touching as a direct consequence: `CollectionsTree.vue`'s existing `actions` object,
+      which implements the `CollectionMenuActions` interface `menus.ts` extended — TS cannot compile
+      an interface with an unimplemented member. Same module, same permitted edge, no boundary
+      violation.)
+- [x] C6 — `http-dynamic-values.spec.ts`'s four tests, each passing twice in a row; nothing appended
       to `http-variables.spec.ts` or the mixed parity spec.
-- [ ] C7 — `docs/ARCHITECTURE.md` updated (the `$` form and its vocabulary, per-occurrence
-      generation, renderer-only placement, the `op_log.command` note, and the Vite row's second
-      entry file).
-- [ ] §6.1's full command set green at the end, not just per-commit — including
+- [x] C7 — `docs/ARCHITECTURE.md` updated (the `$` form and its vocabulary, per-occurrence
+      generation, renderer-only placement, the `op_log.command` note, and the Vite row). The Vite
+      row's own text was corrected against a real measurement rather than restating F5's C1-only
+      probe — see the deviation note below.
+- [x] §6.1's full command set green at the end, not just per-commit — including
       `go build ./... && go vet ./... && go test ./apps/kira-studio/internal/...` run precisely to
-      show nothing there moved.
-- [ ] §6.5's regression list verified item by item, with the `git diff --stat`-shows-no-`.go`-file
-      check done explicitly.
-- [ ] §6.4's three real-hardware/real-Postman steps — record what was done instead of each.
+      show nothing there moved. Full results recorded below.
+- [x] §6.5's regression list verified item by item, with the `git diff --stat`-shows-no-`.go`-file
+      check done explicitly. Full results recorded below.
+- [x] §6.4's three real-hardware/real-Postman steps — nothing further to add beyond what §6.4 itself
+      already states; recorded there as written (this phase adds no new hardware-only surface).
+
+**One deviation from the plan's own F5, found and recorded rather than silently worked around.**
+F5 measured that a second one-line `fakerEntry.ts` *entry file* costs nothing — true, and still true
+here (`bun run build` after C1, before anything reached `generators.ts`, printed the exact same two
+chunks at the exact same size). What F5's own probe did not include was a third file sitting between
+the dynamic-import call site and the entry file — this plan's own D5 shape, where
+`catalog.ts`'s `loadDynamicGenerator()` dynamically imports `generators.ts` (not `fakerEntry.ts`
+directly), and `generators.ts` in turn statically imports `fakerEntry.ts`. Once C3 actually wires a
+real call path to `generators.ts` (send(), when a request contains a `{{$...}}` reference), a clean
+`bun run build` shows **four** lazily-imported files where the baseline had two:
+
+```
+dist/assets/fakerEntry-CS1j23oL.js             0.05 kB │ gzip:   0.07 kB
+dist/assets/generators-Deh8TP78.js             2.46 kB │ gzip:   0.84 kB
+dist/assets/sqlFormatterEntry-Dtw5O8j2.js    130.74 kB │ gzip:  37.41 kB
+dist/assets/en-b04c1mOd.js                   415.79 kB │ gzip: 155.46 kB
+```
+
+Rolldown folded the two content-identical `fakerEntry.ts` files (Studio's pre-existing one and
+Http's new one) into one shared 56-byte stub chunk, and split the underlying `en` locale module out
+into its own shared chunk beneath it — same total bytes as the old single combined `fakerEntry-*.js`
+chunk (415.80 kB), just reorganised into two files instead of one, not duplicated. The genuinely new
+byte is `generators.ts` itself — P6's own 58-entry dispatch table, 2.46 kB raw / 0.84 kB gzip — which
+cannot avoid being its own chunk: it is real new code, not a re-export, and D5's own file split
+(catalog/fakerEntry/generators as three separate files) is what the plan itself specifies. `§6.5`'s
+"the bundle keeps exactly two dynamic chunks" line is accurate for C1 (verified above) but does not
+hold at the end of the phase; `index-*.js` — the invariant that actually matters — still grows by
+only this phase's own ~2.9 kB raw / ~1 kB gzip of eager app code, and no dependency leaked into the
+boot bundle. `docs/ARCHITECTURE.md`'s Vite row (C7) states the corrected, measured figures rather
+than the plan's own prediction.
+
+**Final §6.1/§6.5 verification, run once at the end of the phase (all commands from a clean tree,
+range `3692813..HEAD`):**
+
+- `bun run lint` — clean.
+- `bun run typecheck` (`typecheck:tests` + `typecheck:web` + `typecheck:unit`) — clean, and this is
+  what proves F12's exhaustiveness (catalogue↔dispatch) and every one of the 58 faker calls'
+  argument/return types against the installed 10.6.0 `.d.ts`s.
+- `bun run build` — the final, C7-recorded chunk set (four lazy chunks, not F5's predicted two — see
+  the deviation note above); `index-*.js` grew by ~2.9 kB raw / ~1 kB gzip against the pre-phase
+  baseline, all of it this phase's own eager app code (the `DYNAMIC_NAMES` tuple, the wiring in
+  `state.ts`/`HttpRequestView.vue`/`menus.ts`/`CollectionsPanel.vue`/`CollectionsTree.vue`/
+  `shortcuts/state.ts`/`App.vue`, and `DynamicValuesDialog.vue`) — no faker byte and no generator
+  byte reached the boot bundle.
+- `bun run test:unit` — **274 pass, 0 fail** (37 files), including the three new TS-only dynamic
+  cases and every pre-existing corpus case unchanged.
+- `bun run test:ui` — **118 passed, 1 failed** on the first full run;  the one failure
+  (`budgets.spec.ts`'s scroll-response p50 assertion, 13ms against a <=12ms budget) is a Studio
+  grid-scroll performance budget with no connection to `http/**` or `views/httprequest/**`, and its
+  own in-file comment already names the cause: *"the flakiness here is cross-file worker
+  contention, which no in-file serialization mode addresses."* Re-run alone (`playwright test
+  budgets.spec.ts`, one worker, no contention): **1 passed** (p50=9ms). All four
+  `http-dynamic-values.spec.ts` tests, and every other http-mode spec, passed on the one full run
+  with no re-run needed.
+- `bun run test:ipc:fe` — **7 passed**, unedited (no data-plane/adapter/fixture change, as §6.5
+  requires).
+- `go build ./...`, `go vet ./...`, `go test ./apps/kira-studio/internal/...` — clean; every
+  `internal/**` package still `ok` (or `[no test files]`), `internal/httpvars` included.
+- `git diff --stat 3692813..HEAD` — confirmed **zero** `.go` files, **zero** files under
+  `internal/**`, **zero** files under `packages/**`, **zero** files under
+  `apps/kira-studio/frontend/bindings/**`, **zero** files under `views/grid/**`, and `go.mod`, both
+  `package.json`s and `NOTICES.md` all absent from the list (D1, F9/F10 — no new dependency, no
+  wire-shape change).
+- `git grep secret_value` — still only `migrations/0007_p5_variables.sql`, `repos/variables.go`, and
+  documentation prose (this plan's own file, P5's plan, `ARCHITECTURE.md`) — no new sink.
+- `packages/shared/domain/shortcuts.ts`, `apps/kira-studio/menutemplate.go`,
+  `tests/unit/go-ts-vocabulary-parity.spec.ts`, `docs/PERF.md`, `tests/ui/support/ipcChannels.ts`
+  and `tests/ui/support/mockRuntime.ts` — all confirmed untouched by `git diff --stat`.
+- `tests/ui/http-variables.spec.ts` (5), `credential-reveal.spec.ts` (4), `mode-switch.spec.ts` (1),
+  `http-request.spec.ts` (3), `http-request-body.spec.ts` (4), `collections.spec.ts` (4),
+  `fake-data.spec.ts` (1) and `tests/unit/fake-data-recipes.spec.ts` (19) — all passed, unedited, as
+  part of the one full `test:ui`/`test:unit` run above.
+
+One correction to `docs/PERF.md` was considered and declined, consistent with the plan's own §3: the
+historical `fakerEntry-*.js` byte figures recorded at §2.10-§2.12 describe that chunk *as it existed
+at each of those past commits*, and stay accurate as historical snapshots even though the chunk
+those bytes now live in has a different name and split post-P6 — editing them would misrepresent
+what was actually measured at those commits. No new §2.x entry was added either, matching the plan's
+own explicit decision that this phase's one hot path (the chip's `Set` lookup) needs no budget.
 
 ---
 
