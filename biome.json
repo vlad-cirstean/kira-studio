@@ -30,8 +30,8 @@
           "level": "error",
           "options": {
             "paths": {
-              "vscode": "Only packages/host-vscode may import 'vscode' (B1, §3.1 C1).",
-              "electron": "Only packages/host-electron may import 'electron' (B1, §3.1 C1).",
+              "vscode": "Only packages/host-vscode may import 'vscode' (B1, §1.2 C1).",
+              "electron": "No package imports 'electron': v1 ships no Electron host. A future host package would get its own override, as host-vscode has for 'vscode' (§1.2 C1, §2.2).",
               "bun:test": "bun:test is only for *.test.ts files and scripts/** (B2, §8.1).",
               "bun:sqlite": "The bun: runtime is banned outside scripts/** and *.test.ts (B2, §8.1).",
               "bun:ffi": "The bun: runtime is banned outside scripts/** and *.test.ts (B2, §8.1).",
@@ -63,8 +63,8 @@
               "level": "error",
               "options": {
                 "paths": {
-                  "vscode": "Only packages/host-vscode may import 'vscode' (B1, §3.1 C1).",
-                  "electron": "Only packages/host-electron may import 'electron' (B1, §3.1 C1).",
+                  "vscode": "Only packages/host-vscode may import 'vscode' (B1, §1.2 C1).",
+                  "electron": "No package imports 'electron': v1 ships no Electron host. A future host package would get its own override, as host-vscode has for 'vscode' (§1.2 C1, §2.2).",
                   "bun:test": "bun:test is only for *.test.ts files and scripts/** (B2, §8.1).",
                   "bun:sqlite": "The bun: runtime is banned outside scripts/** and *.test.ts (B2, §8.1).",
                   "bun:ffi": "The bun: runtime is banned outside scripts/** and *.test.ts (B2, §8.1).",
@@ -72,8 +72,7 @@
                   "@kira-version/git": "B3 — core depends on nothing (§3.1).",
                   "@kira-version/ipc": "B3 — core depends on nothing (§3.1).",
                   "@kira-version/ui": "B3 — core depends on nothing (§3.1).",
-                  "@kira-version/host-vscode": "B3 — core depends on nothing (§3.1).",
-                  "@kira-version/host-electron": "B3 — core depends on nothing (§3.1)."
+                  "@kira-version/host-vscode": "B3 — core depends on nothing (§3.1)."
                 }
               }
             }
@@ -90,8 +89,8 @@
               "level": "error",
               "options": {
                 "paths": {
-                  "vscode": "Only packages/host-vscode may import 'vscode' (B1, §3.1 C1).",
-                  "electron": "Only packages/host-electron may import 'electron' (B1, §3.1 C1).",
+                  "vscode": "Only packages/host-vscode may import 'vscode' (B1, §1.2 C1).",
+                  "electron": "No package imports 'electron': v1 ships no Electron host. A future host package would get its own override, as host-vscode has for 'vscode' (§1.2 C1, §2.2).",
                   "bun:test": "bun:test is only for *.test.ts files and scripts/** (B2, §8.1).",
                   "bun:sqlite": "The bun: runtime is banned outside scripts/** and *.test.ts (B2, §8.1).",
                   "bun:ffi": "The bun: runtime is banned outside scripts/** and *.test.ts (B2, §8.1).",
@@ -99,8 +98,7 @@
                   "@kira-version/core": "B3 — ipc depends on nothing (§3.1).",
                   "@kira-version/git": "B3 — ipc depends on nothing (§3.1).",
                   "@kira-version/ui": "B3 — ipc depends on nothing (§3.1).",
-                  "@kira-version/host-vscode": "B3 — ipc depends on nothing (§3.1).",
-                  "@kira-version/host-electron": "B3 — ipc depends on nothing (§3.1)."
+                  "@kira-version/host-vscode": "B3 — ipc depends on nothing (§3.1)."
                 }
               }
             }
@@ -117,15 +115,14 @@
               "level": "error",
               "options": {
                 "paths": {
-                  "vscode": "Only packages/host-vscode may import 'vscode' (B1, §3.1 C1).",
-                  "electron": "Only packages/host-electron may import 'electron' (B1, §3.1 C1).",
+                  "vscode": "Only packages/host-vscode may import 'vscode' (B1, §1.2 C1).",
+                  "electron": "No package imports 'electron': v1 ships no Electron host. A future host package would get its own override, as host-vscode has for 'vscode' (§1.2 C1, §2.2).",
                   "bun:test": "bun:test is only for *.test.ts files and scripts/** (B2, §8.1).",
                   "bun:sqlite": "The bun: runtime is banned outside scripts/** and *.test.ts (B2, §8.1).",
                   "bun:ffi": "The bun: runtime is banned outside scripts/** and *.test.ts (B2, §8.1).",
                   "bun:jsc": "The bun: runtime is banned outside scripts/** and *.test.ts (B2, §8.1).",
                   "@kira-version/ui": "B3 — git may import core + ipc only (§3.1).",
-                  "@kira-version/host-vscode": "B3 — git may import core + ipc only (§3.1).",
-                  "@kira-version/host-electron": "B3 — git may import core + ipc only (§3.1)."
+                  "@kira-version/host-vscode": "B3 — git may import core + ipc only (§3.1)."
                 }
               }
             }
@@ -142,15 +139,14 @@
               "level": "error",
               "options": {
                 "paths": {
-                  "vscode": "Only packages/host-vscode may import 'vscode' (B1, §3.1 C1).",
-                  "electron": "Only packages/host-electron may import 'electron' (B1, §3.1 C1).",
+                  "vscode": "Only packages/host-vscode may import 'vscode' (B1, §1.2 C1).",
+                  "electron": "No package imports 'electron': v1 ships no Electron host. A future host package would get its own override, as host-vscode has for 'vscode' (§1.2 C1, §2.2).",
                   "bun:test": "bun:test is only for *.test.ts files and scripts/** (B2, §8.1).",
                   "bun:sqlite": "The bun: runtime is banned outside scripts/** and *.test.ts (B2, §8.1).",
                   "bun:ffi": "The bun: runtime is banned outside scripts/** and *.test.ts (B2, §8.1).",
                   "bun:jsc": "The bun: runtime is banned outside scripts/** and *.test.ts (B2, §8.1).",
                   "@kira-version/git": "B3 — ui may import core + ipc only (§3.1).",
-                  "@kira-version/host-vscode": "B3 — ui may import core + ipc only (§3.1).",
-                  "@kira-version/host-electron": "B3 — ui may import core + ipc only (§3.1)."
+                  "@kira-version/host-vscode": "B3 — ui may import core + ipc only (§3.1)."
                 }
               }
             }
@@ -167,28 +163,7 @@
               "level": "error",
               "options": {
                 "paths": {
-                  "electron": "Only packages/host-electron may import 'electron' (B1, §3.1 C1).",
-                  "bun:test": "bun:test is only for *.test.ts files and scripts/** (B2, §8.1).",
-                  "bun:sqlite": "The bun: runtime is banned outside scripts/** and *.test.ts (B2, §8.1).",
-                  "bun:ffi": "The bun: runtime is banned outside scripts/** and *.test.ts (B2, §8.1).",
-                  "bun:jsc": "The bun: runtime is banned outside scripts/** and *.test.ts (B2, §8.1)."
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    {
-      "includes": ["packages/host-electron/**"],
-      "linter": {
-        "rules": {
-          "style": {
-            "noRestrictedImports": {
-              "level": "error",
-              "options": {
-                "paths": {
-                  "vscode": "Only packages/host-vscode may import 'vscode' (B1, §3.1 C1).",
+                  "electron": "No package imports 'electron': v1 ships no Electron host. A future host package would get its own override, as host-vscode has for 'vscode' (§1.2 C1, §2.2).",
                   "bun:test": "bun:test is only for *.test.ts files and scripts/** (B2, §8.1).",
                   "bun:sqlite": "The bun: runtime is banned outside scripts/** and *.test.ts (B2, §8.1).",
                   "bun:ffi": "The bun: runtime is banned outside scripts/** and *.test.ts (B2, §8.1).",
@@ -209,8 +184,8 @@
               "level": "error",
               "options": {
                 "paths": {
-                  "vscode": "Only packages/host-vscode may import 'vscode' (B1, §3.1 C1).",
-                  "electron": "Only packages/host-electron may import 'electron' (B1, §3.1 C1)."
+                  "vscode": "Only packages/host-vscode may import 'vscode' (B1, §1.2 C1).",
+                  "electron": "No package imports 'electron': v1 ships no Electron host. A future host package would get its own override, as host-vscode has for 'vscode' (§1.2 C1, §2.2)."
                 }
               }
             },
