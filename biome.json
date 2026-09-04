@@ -120,6 +120,30 @@
           }
         }
       }
+    },
+    {
+      "includes": ["apps/kira-studio/frontend/src/http/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["**/project/**"],
+                    "message": "P1 D7: http/ must not import project/ — Studio's connection tree is not Http's to reach into."
+                  },
+                  {
+                    "group": ["**/views/**"],
+                    "message": "P1 D7: http/ must not import views/ directly, mirroring project/'s own rule — dispatch through state/viewCommands.ts instead."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
     }
   ]
 }

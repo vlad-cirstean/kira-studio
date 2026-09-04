@@ -1,12 +1,18 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { layoutState, setOperationsHeight, setProjectWidth } from '../state/layout';
+import { modeState } from '../state/mode';
 import PanelSplitter from '../theme/primitives/PanelSplitter.vue';
+import { MODES } from './modes';
 import MainView from './panels/MainView.vue';
 import OperationsPanel from './panels/OperationsPanel.vue';
-import ProjectPanel from './panels/ProjectPanel.vue';
 import TabStrip from './panels/TabStrip.vue';
 import StatusBar from './StatusBar.vue';
+
+// P1 D6/C6: the left panel mounts whichever mode is active's own self-contained panel component
+// (ProjectPanel for Studio, http/CollectionsPanel for Http) — the shared LeftPanel slot Studio
+// used to have all to itself now comes from the registry, not a hardcoded <ProjectPanel />.
+const activeModePanel = computed(() => MODES[modeState.active].panel);
 
 const projectVisible = computed(() => layoutState.panel.project.visible);
 const opsVisible = computed(() => layoutState.panel.operations.visible);
@@ -27,7 +33,7 @@ const gridStyle = computed(() => ({
       style="grid-area: project"
       data-testid="project-panel"
     >
-      <ProjectPanel />
+      <component :is="activeModePanel" />
     </div>
     <PanelSplitter
       v-if="projectVisible"
