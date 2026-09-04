@@ -792,7 +792,10 @@ func runFamilySuite(t *testing.T, kind string, cfg model.ResolvedConnectionConfi
 		if err != nil {
 			t.Fatalf("probe connect: %v", err)
 		}
-		defer probeDB.Close()
+		// Registered first, so its LIFO position is last: the DROP TABLE cleanup below must run
+		// against a still-open connection — a plain `defer probeDB.Close()` would close it before
+		// t.Cleanup callbacks even start (postgres_test.go's own pattern).
+		t.Cleanup(func() { _ = probeDB.Close() })
 		probeDB.ExecContext(ctx, "DROP TABLE IF EXISTS kira_test.p26_scratch")
 		t.Cleanup(func() { probeDB.ExecContext(context.Background(), "DROP TABLE IF EXISTS kira_test.p26_scratch") })
 
@@ -873,7 +876,10 @@ func runFamilySuite(t *testing.T, kind string, cfg model.ResolvedConnectionConfi
 		if err != nil {
 			t.Fatalf("probe connect: %v", err)
 		}
-		defer probeDB.Close()
+		// Registered first, so its LIFO position is last: the DROP TABLE cleanup below must run
+		// against a still-open connection — a plain `defer probeDB.Close()` would close it before
+		// t.Cleanup callbacks even start (postgres_test.go's own pattern).
+		t.Cleanup(func() { _ = probeDB.Close() })
 		if _, err := probeDB.ExecContext(ctx, "CREATE TABLE IF NOT EXISTS p26_insdel (id INT PRIMARY KEY, name VARCHAR(64))"); err != nil {
 			t.Fatalf("create scratch table: %v", err)
 		}

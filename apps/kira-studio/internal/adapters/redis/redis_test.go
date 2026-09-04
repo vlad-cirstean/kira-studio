@@ -734,7 +734,10 @@ func TestRedis_ConsoleCreatedKeyAppearsInTreeAndReads(t *testing.T) {
 		Addr: fixture.Host + ":" + strconv.Itoa(fixture.Port), Password: testsupport.RedisPassword,
 		DB: testsupport.RedisPrimaryDbIndex, Protocol: 2,
 	})
-	defer side.Close()
+	// Registered first, so its LIFO position is last: the DEL cleanup below must run against a
+	// still-open connection — a plain `defer side.Close()` would close it before t.Cleanup
+	// callbacks even start (postgres_test.go's own pattern).
+	t.Cleanup(func() { _ = side.Close() })
 	t.Cleanup(func() { _ = side.Del(context.Background(), key).Err() })
 
 	if _, err := a.Execute(ctx, model.ConsoleRequest{

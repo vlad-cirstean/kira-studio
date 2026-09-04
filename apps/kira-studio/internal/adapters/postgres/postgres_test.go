@@ -867,7 +867,10 @@ func TestPostgres_MutateDeleteRemovesTheRow(t *testing.T) {
 	if err != nil {
 		t.Fatalf("side connect: %v", err)
 	}
-	defer side.Close(context.Background())
+	// Registered first, so its LIFO position is last: the DROP TABLE cleanup below must run
+	// against a still-open connection — a plain `defer side.Close(...)` would close it before
+	// t.Cleanup callbacks even start (authmatrix_test.go's own pattern, mustExec included).
+	t.Cleanup(func() { _ = side.Close(context.Background()) })
 	if _, err := side.Exec(ctx, "CREATE TABLE IF NOT EXISTS app.p26_delete (id int PRIMARY KEY, name text)"); err != nil {
 		t.Fatalf("create scratch table: %v", err)
 	}
