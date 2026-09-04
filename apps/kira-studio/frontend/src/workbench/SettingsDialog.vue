@@ -11,7 +11,7 @@ import {
 } from '@shared/domain/settings';
 import { computed, reactive, ref } from 'vue';
 import { data } from '../bridge/data';
-import { fontStackAvailable, resolveFontFallback } from '../fonts';
+import { FONT_CHOICES, fontStackAvailable, resolveFontFallback } from '../fonts';
 import { formatBytes } from '../format';
 import { cacheStatsState } from '../state/cacheStats';
 import { patchSettings, settingsState } from '../state/settings';
@@ -83,8 +83,23 @@ const activeSection = ref<Section>('Appearance');
 const fontFamilyUnavailable = computed(() => !fontStackAvailable(draft.appearance.fontFamily));
 const fontFamilyFallback = computed(() => resolveFontFallback(draft.appearance.fontFamily));
 
-function onFontFamilyInput(e: Event): void {
-  draft.appearance.fontFamily = (e.target as HTMLInputElement).value;
+// P28 §1.2: computed once — fontStackAvailable's canvas probe is a per-call measurement, but the
+// dialog is created on open and destroyed on close (P17 D1), so no invalidation is needed for
+// the component's lifetime.
+const availableStacks = computed(() => {
+  const on = FONT_CHOICES.filter((f) => fontStackAvailable(f.stack));
+  const off = FONT_CHOICES.filter((f) => !fontStackAvailable(f.stack));
+  return { on, off };
+});
+
+// An already-stored value outside FONT_CHOICES must not be silently discarded by the dropdown —
+// prepended as its own "Current" option so the select always has a matching value.
+const currentFontIsListed = computed(() =>
+  FONT_CHOICES.some((f) => f.stack === draft.appearance.fontFamily),
+);
+
+function onFontFamilyChange(e: Event): void {
+  draft.appearance.fontFamily = (e.target as HTMLSelectElement).value;
 }
 
 function onFontSizeInput(e: Event): void {
@@ -258,20 +273,36 @@ async function onSave(): Promise<void> {
             <div class="sec-label first">Typography</div>
             <label class="field">
               <span>Data font</span>
-              <TextField
-                type="text"
-                size="md"
-                list="kira-font-families"
-                :invalid="fontFamilyUnavailable"
-                :model-value="draft.appearance.fontFamily"
-                @input="onFontFamilyInput"
-              />
-              <datalist id="kira-font-families">
-                <option value="Menlo, monospace" />
-                <option value="'SF Mono', Menlo, monospace" />
-                <option value="Monaco, monospace" />
-                <option value="ui-monospace, Menlo, monospace" />
-              </datalist>
+              <select
+                class="p-select bordered"
+                data-testid="settings-font-family"
+                :value="draft.appearance.fontFamily"
+                @change="onFontFamilyChange"
+              >
+                <optgroup v-if="!currentFontIsListed" label="Current">
+                  <option :value="draft.appearance.fontFamily">{{ draft.appearance.fontFamily }}</option>
+                </optgroup>
+                <optgroup label="On this Mac">
+                  <option
+                    v-for="f in availableStacks.on"
+                    :key="f.stack"
+                    :value="f.stack"
+                    :style="{ fontFamily: f.stack }"
+                  >
+                    {{ f.label }}
+                  </option>
+                </optgroup>
+                <optgroup label="Not installed">
+                  <option
+                    v-for="f in availableStacks.off"
+                    :key="f.stack"
+                    :value="f.stack"
+                    :style="{ fontFamily: f.stack }"
+                  >
+                    {{ f.label }}
+                  </option>
+                </optgroup>
+              </select>
               <span
                 class="font-preview"
                 data-testid="font-preview"

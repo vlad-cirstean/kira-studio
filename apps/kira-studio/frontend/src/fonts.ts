@@ -52,3 +52,30 @@ export function fontStackAvailable(stack: string): boolean {
   const bogus = measuredWidth(ctx, `${PROBE_SIZE} ${BOGUS_PROBE_FAMILY}`);
   return target !== bogus;
 }
+
+export interface FontChoice {
+  label: string;
+  stack: string;
+}
+
+// P28 §1.2: 15 named monospace stacks, macOS-first — system faces, Apple's own developer face,
+// and widely-installed developer fonts. Every stack ends in `monospace` (or `Menlo, monospace`)
+// deliberately, since --kira-font-family also drives `body` (theme/base.css), so an unresolved
+// stack must still land on a monospace face rather than the browser's proportional default.
+export const FONT_CHOICES: readonly FontChoice[] = [
+  { label: 'System monospace', stack: 'ui-monospace, Menlo, monospace' },
+  { label: 'Menlo', stack: 'Menlo, monospace' },
+  { label: 'SF Mono', stack: "'SF Mono', Menlo, monospace" },
+  { label: 'Monaco', stack: 'Monaco, monospace' },
+  { label: 'Andale Mono', stack: "'Andale Mono', Menlo, monospace" },
+  { label: 'PT Mono', stack: "'PT Mono', Menlo, monospace" },
+  { label: 'Courier New', stack: "'Courier New', Courier, monospace" },
+  { label: 'JetBrains Mono', stack: "'JetBrains Mono', Menlo, monospace" },
+  { label: 'Fira Code', stack: "'Fira Code', Menlo, monospace" },
+  { label: 'Source Code Pro', stack: "'Source Code Pro', Menlo, monospace" },
+  { label: 'IBM Plex Mono', stack: "'IBM Plex Mono', Menlo, monospace" },
+  { label: 'Cascadia Code', stack: "'Cascadia Code', Menlo, monospace" },
+  { label: 'Hack', stack: 'Hack, Menlo, monospace' },
+  { label: 'Inconsolata', stack: 'Inconsolata, Menlo, monospace' },
+  { label: 'Roboto Mono', stack: "'Roboto Mono', Menlo, monospace" },
+] as const;
