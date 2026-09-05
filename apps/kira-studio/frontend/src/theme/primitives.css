@@ -171,7 +171,11 @@
 }
 .p-input .ph,
 .p-input input::placeholder {
-  color: var(--kira-fg-disabled);
+  /* P16 D8: was --kira-fg-disabled (2.55:1 on --kira-bg-input — the worst-contrast text in the
+     app, and this is neither a disabled control nor the reserved-word set D9 renames — a
+     placeholder/prefix is the most-read low-contrast text in both modes). --kira-fg-muted clears
+     4.80:1 here and is still a visible step below --kira-fg, so "this is a hint" still reads. */
+  color: var(--kira-fg-muted);
 }
 /* P27: a filter/sort field's own prefix label ("WHERE", "ORDER BY", "SORT", "offset", "since")
    used to render in this exact same disabled grey regardless of whether the field held an applied
