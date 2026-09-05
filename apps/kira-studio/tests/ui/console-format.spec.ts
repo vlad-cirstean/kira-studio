@@ -248,6 +248,83 @@ test('Query console — Format on unparseable SQL leaves the text untouched', as
   await expect(strip).toHaveCount(0);
 });
 
+// P19 T12/D13 (reopening P13 §3): one statement the grammar rejects no longer takes the whole
+// press down with it — it's emitted verbatim, in place, and a warn strip (not err — the press
+// still did something useful) names which one.
+test('Query console — one unparseable statement no longer blocks the rest (P19 D13)', async ({
+  relaunch,
+}) => {
+  const CONNECTION_ID = 'conn-console-format-partial';
+  const CONNECTION_SUMMARY = postgresConnectionSummary(CONNECTION_ID, 'Format Partial DB', 'cyan');
+  const FIXTURE = orderItemsFixture(CONNECTION_ID);
+
+  const CONTROL: ControlSnapshot[] = [
+    { channel: IPC.connectionsList, response: [] },
+    {
+      channel: IPC.connectionsCreate,
+      args: postgresCreateArgs('Format Partial DB', 'cyan'),
+      response: CONNECTION_SUMMARY,
+    },
+    ...FIXTURE.control,
+  ];
+
+  const { window: page } = await relaunch({ control: CONTROL });
+  await connectAndExpandPostgres(page, 'Format Partial DB', 'cyan');
+  await openConsoleFromMenu(page, ORDER_ITEMS_PATH);
+  const view = page.locator('[data-testid="console-view"]');
+  await expect(view).toBeVisible();
+
+  await typeInto(view, page, 'select a,b from t;\n\\dt');
+  await page.click('[data-testid="console-format"]');
+
+  await expect(view.locator('[data-testid="console-format-error"]')).toHaveCount(0);
+  const warning = view.locator('[data-testid="console-format-warning"]');
+  await expect(warning).toBeVisible();
+  await expect(warning).toContainText('Formatted 1 of 2 statements');
+  await expect(warning).toContainText('statement 2');
+
+  const text = await consoleText(view);
+  expect(text).toContain('\\dt'); // the broken statement, verbatim
+  const lines = text.split('\n');
+  expect(lines[0]).toBe('select'); // the first statement still reformatted (keywordCase: preserve)
+});
+
+// P19 T12/D13/F19: keywordCase: 'preserve' (P13 D4) means Format only ever changes whitespace —
+// pressing it on an already-indented document changes nothing, and without this nothing
+// distinguished "already formatted" from "the button is dead".
+test('Query console — pressing Format twice shows "Already formatted" the second time (P19 D13)', async ({
+  relaunch,
+}) => {
+  const CONNECTION_ID = 'conn-console-format-twice';
+  const CONNECTION_SUMMARY = postgresConnectionSummary(CONNECTION_ID, 'Format Twice DB', 'magenta');
+  const FIXTURE = orderItemsFixture(CONNECTION_ID);
+
+  const CONTROL: ControlSnapshot[] = [
+    { channel: IPC.connectionsList, response: [] },
+    {
+      channel: IPC.connectionsCreate,
+      args: postgresCreateArgs('Format Twice DB', 'magenta'),
+      response: CONNECTION_SUMMARY,
+    },
+    ...FIXTURE.control,
+  ];
+
+  const { window: page } = await relaunch({ control: CONTROL });
+  await connectAndExpandPostgres(page, 'Format Twice DB', 'magenta');
+  await openConsoleFromMenu(page, ORDER_ITEMS_PATH);
+  const view = page.locator('[data-testid="console-view"]');
+  await expect(view).toBeVisible();
+
+  await typeInto(view, page, 'select a,b from t');
+  await page.click('[data-testid="console-format"]');
+  await expect(view.locator('[data-testid="console-format-note"]')).toHaveCount(0);
+
+  await page.click('[data-testid="console-format"]');
+  const note = view.locator('[data-testid="console-format-note"]');
+  await expect(note).toBeVisible();
+  await expect(note).toContainText('Already formatted');
+});
+
 test('Query console — Format reformats a Mongo aggregate pipeline', async ({ relaunch }) => {
   const CONNECTION_ID = 'conn-console-format-mongo';
   const CONNECTION_SUMMARY = mongoConnectionSummary(CONNECTION_ID, 'Format Mongo', 'green');

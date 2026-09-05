@@ -126,6 +126,12 @@ const savedMenuOpen = ref(false);
 // failed, F11) — a format failure is a client-side text operation with nowhere else to go, so it
 // gets its own component-local strip instead of a runtime-shape change.
 const formatError = ref<string | null>(null);
+// P19 D13: the two silent no-ops F19 named — a partial failure (some statements formatted, one
+// didn't) reads as a warn strip rather than err (the press still did something useful), and a
+// byte-identical result (an already-formatted document) says so explicitly rather than looking
+// like the button did nothing.
+const formatWarning = ref<string | null>(null);
+const formatNote = ref<string | null>(null);
 const canFormat = computed(() => canFormatConsole(connectionKind.value));
 
 // P18 (v1.1) C12/D12: the statement the cursor is currently in, undefined for a non-SQL console —
@@ -215,6 +221,8 @@ let lastEmitted = props.tab.state.text;
 // update:doc (the watcher below is what notices those instead). Shared so neither path can drift.
 function resetStalePreviewState(): void {
   formatError.value = null;
+  formatWarning.value = null;
+  formatNote.value = null;
   explainError.value = null;
   // D19: the auto-explain strip clears on the next document edit, same as the two above.
   clearAutoExplain(props.tab.id);
@@ -286,23 +294,42 @@ function onFormat(): void {
   const beforeIndex = before.findIndex(
     (s) => cursorPos.value >= s.start && cursorPos.value <= s.end,
   );
+  const originalText = props.tab.state.text;
   void (async () => {
-    const result = await formatConsoleText(kind, props.tab.state.text);
-    if (result.ok) {
-      // Explicit, not left to the watch() above alone: an already-formatted document formats to
-      // byte-identical text, which never triggers that watcher (props.tab.state.text doesn't
-      // change) — Format succeeding is still a "next action" that should clear a stale explain/
-      // auto-explain strip even when the text itself doesn't move (P12 round 1 finding #7).
-      resetStalePreviewState();
-      setText(props.tab.id, result.text);
-      if (beforeIndex >= 0) {
-        const after = splitSqlStatements(result.text, splitOptions);
-        const target = after[beforeIndex];
-        void nextTick(() => editorHost.value?.setCursor(target?.start ?? 0));
-      }
-    } else {
+    const result = await formatConsoleText(kind, originalText);
+    // Explicit, not left to the watch() above alone: an already-formatted document formats to
+    // byte-identical text, which never triggers that watcher (props.tab.state.text doesn't
+    // change) — Format succeeding is still a "next action" that should clear a stale explain/
+    // auto-explain strip even when the text itself doesn't move (P12 round 1 finding #7).
+    resetStalePreviewState();
+    if (!result.ok) {
       formatError.value = result.reason ?? 'could not format this query';
+      return;
     }
+    setText(props.tab.id, result.text);
+    if (beforeIndex >= 0) {
+      const after = splitSqlStatements(result.text, splitOptions);
+      const target = after[beforeIndex];
+      void nextTick(() => editorHost.value?.setCursor(target?.start ?? 0));
+    }
+    // D13: set only after setText's own reactive round trip has settled — the
+    // props.tab.state.text watcher above also calls resetStalePreviewState() whenever the text
+    // actually changed (a partial-success/full-success reformat always does), which would
+    // otherwise wipe these strips the instant they're set.
+    void nextTick(() => {
+      if (result.failures.length > 0) {
+        const first = result.failures[0];
+        if (first) {
+          const formattedCount = before.length - result.failures.length;
+          formatWarning.value = `Formatted ${formattedCount} of ${before.length} statements — statement ${first.index + 1} could not be parsed: ${first.reason}`;
+        }
+      } else if (result.text === originalText) {
+        // F19's other silent no-op: keywordCase: 'preserve' (P13 D4) means Format only ever
+        // touches whitespace — pressing it on an already-indented document changes nothing, and
+        // without this nothing distinguished "already formatted" from "the button is dead".
+        formatNote.value = 'Already formatted.';
+      }
+    });
   })();
 }
 
@@ -553,6 +580,12 @@ const statusLine = computed(() => {
         </MessageStrip>
         <MessageStrip v-if="formatError" tone="err" data-testid="console-format-error">
           {{ formatError }}
+        </MessageStrip>
+        <MessageStrip v-if="formatWarning" tone="warn" data-testid="console-format-warning">
+          {{ formatWarning }}
+        </MessageStrip>
+        <MessageStrip v-if="formatNote" tone="note" data-testid="console-format-note">
+          {{ formatNote }}
         </MessageStrip>
         <MessageStrip v-if="explainError" tone="err" data-testid="console-explain-error">
           {{ explainError }}

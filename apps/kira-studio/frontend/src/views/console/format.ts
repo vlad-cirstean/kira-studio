@@ -1,9 +1,8 @@
 import type { ConnectionKind } from '@shared/domain/connection';
 import { MONGO_CONSOLE_METHODS } from '@shared/domain/console';
 import { splitSqlStatements } from '@shared/domain/sql-split';
-import type { BeautifyResult } from '../../beautify';
 import { beautifyShellText } from '../shared/document/ejson';
-import { sqlDialectFor } from '../shared/sqlIdent';
+import { backslashEscapesFor, sqlDialectFor } from '../shared/sqlIdent';
 import { findMatchingParen, MONGO_STATEMENT_RE, splitTopLevelArgs } from './mongoStatement';
 
 /** true for the five SQL kinds and MongoDB — the only consoles with a real formatter behind
@@ -63,18 +62,6 @@ function firstLine(message: string): string {
   return idx === -1 ? message : message.slice(0, idx);
 }
 
-async function formatSql(kind: ConnectionKind, text: string): Promise<BeautifyResult> {
-  const mod = await loadSqlFormatter();
-  const dialect = formatterDialectFor(mod, kind);
-  if (!dialect) return { text, ok: false, reason: 'this console has nothing to format' };
-  try {
-    return { text: mod.formatDialect(text, { dialect, ...SQL_FORMAT_OPTIONS }), ok: true };
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    return { text, ok: false, reason: firstLine(message) };
-  }
-}
-
 // D5: one statement's own text, matched, method-checked and argument-beautified the same way
 // lintMongoConsole (lint.ts) already walks it — a format refusal here uses the linter's own
 // wording so a diagnostic and a format refusal never contradict each other.
@@ -117,24 +104,89 @@ function formatMongoStatement(
   return { text: `db.${collection}.${method}(\n${indented}\n)` };
 }
 
-function formatMongo(text: string): BeautifyResult {
-  const statements = splitSqlStatements(text, { backslashEscapes: true });
-  const formatted: string[] = [];
-  for (const stmt of statements) {
-    const result = formatMongoStatement(stmt.text);
-    if (result.reason !== undefined) return { text, ok: false, reason: result.reason };
-    formatted.push(result.text);
-  }
-  return { text: formatted.join(';\n\n'), ok: true };
+export interface FormatFailure {
+  /** Which statement, 0-based — the same index D12's caret mapping walks the before/after split
+   *  by. */
+  index: number;
+  reason: string;
 }
 
-/** Reformats `text` for `kind`'s own console language. Only ever called for a kind
- *  `canFormatConsole` accepted. Whitespace-only input is left unchanged. */
-export async function formatConsoleText(
-  kind: ConnectionKind,
-  text: string,
-): Promise<BeautifyResult> {
-  if (text.trim().length === 0) return { text, ok: true };
-  if (kind === 'mongodb') return formatMongo(text);
-  return formatSql(kind, text);
+export interface FormatResult {
+  text: string;
+  /** False only when NOTHING formatted (P13's own all-broken behaviour, preserved for
+   *  tests/ui/console-format.spec.ts's all-broken case: text untouched, one reason shown). True
+   *  whenever at least one statement formatted, even if others didn't — D13's own reopening of
+   *  P13 §3: a broken neighbour no longer takes the whole press down with it. */
+  ok: boolean;
+  /** Present only when `ok` is false, mirroring BeautifyResult's own `reason` — the P13-era
+   *  single-statement callers (formatConsoleText's own unit tests) still read this. */
+  reason?: string;
+  /** One entry per statement Format could not touch — empty when every statement formatted (the
+   *  common case) or when the whole document is whitespace-only. */
+  failures: FormatFailure[];
+}
+
+// P19 D13 (reopening P13 §3's declined statement-by-statement alternative): every statement that
+// formats, formats; one the grammar rejects is emitted VERBATIM, in place, never dropped — which
+// is what keeps D12's caret-by-index mapping exact (the statement count survives regardless of
+// how many failed). Splits with the same splitter and options Run all already uses
+// (ConsoleView.runAll's own splitSqlStatements call), so "what Format treats as a statement" and
+// "what Run all treats as a statement" can never disagree, and rejoins with `;\n\n` — the same
+// separator formatMongo already produced and what sql-formatter's own linesBetweenQueries: 1
+// produces for a single multi-statement call.
+export async function formatConsoleText(kind: ConnectionKind, text: string): Promise<FormatResult> {
+  if (text.trim().length === 0) return { text, ok: true, failures: [] };
+
+  const dialect = sqlDialectFor(kind);
+  const statements = splitSqlStatements(text, {
+    backslashEscapes: backslashEscapesFor(dialect),
+  });
+  if (statements.length === 0) return { text, ok: true, failures: [] };
+
+  // One statement's own text in, its formatted text or a failure reason out — resolved once,
+  // outside the map below, so the SQL branch's mod/dialect lookup (an async import, a per-kind
+  // table lookup) happens exactly once regardless of how many statements there are.
+  let formatOne: (stmtText: string) => { text: string; reason?: undefined } | { reason: string };
+  if (kind === 'mongodb') {
+    formatOne = formatMongoStatement;
+  } else {
+    const mod = await loadSqlFormatter();
+    const sqlDialectObject = formatterDialectFor(mod, kind);
+    if (!sqlDialectObject) {
+      return {
+        text,
+        ok: false,
+        reason: 'this console has nothing to format',
+        failures: statements.map((_, index) => ({
+          index,
+          reason: 'this console has nothing to format',
+        })),
+      };
+    }
+    formatOne = (stmtText) => {
+      try {
+        return {
+          text: mod.formatDialect(stmtText, { dialect: sqlDialectObject, ...SQL_FORMAT_OPTIONS }),
+        };
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        return { reason: firstLine(message) };
+      }
+    };
+  }
+
+  const failures: FormatFailure[] = [];
+  const out = statements.map((stmt, index) => {
+    const result = formatOne(stmt.text);
+    if (result.reason !== undefined) {
+      failures.push({ index, reason: result.reason });
+      return stmt.text;
+    }
+    return result.text;
+  });
+
+  if (failures.length === statements.length) {
+    return { text, ok: false, reason: failures[0]?.reason, failures };
+  }
+  return { text: out.join(';\n\n'), ok: true, failures };
 }
