@@ -822,6 +822,29 @@
   color: var(--kira-fg-muted);
 }
 
+/* ---------- P13 disclosure — a <details> whose marker is the app's own chevron ---------- */
+/* Codepoints confirmed against the installed @vscode/codicons version's own codicon.css
+   (.codicon-chevron-right:before/.codicon-chevron-down:before), not from memory. */
+.p-disclosure > summary {
+  list-style: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: var(--kira-s-2);
+}
+.p-disclosure > summary::-webkit-details-marker {
+  display: none;
+}
+.p-disclosure > summary::before {
+  content: "\eab6";
+  /* biome-ignore lint/a11y/useGenericFontNames: this is the app's icon font (codicon), not text. */
+  font-family: codicon;
+  font-size: 13px;
+}
+.p-disclosure[open] > summary::before {
+  content: "\eab4";
+}
+
 /* ---------- definition-view sections (P24 D31) ---------- */
 /* Shared by the five views/definition/*Section.vue components (Columns/Indexes/Constraints/
    Validation/Properties), collapsing five near-identical <style scoped> blocks into one. The

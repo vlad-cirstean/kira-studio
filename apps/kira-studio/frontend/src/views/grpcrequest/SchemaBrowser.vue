@@ -5,6 +5,7 @@ import { patchGrpcRequestTabState } from '../../api/tabs';
 import { control } from '../../bridge/control';
 import AppButton from '../../theme/primitives/AppButton.vue';
 import EmptyState from '../../theme/primitives/EmptyState.vue';
+import IconButton from '../../theme/primitives/IconButton.vue';
 import MessageStrip from '../../theme/primitives/MessageStrip.vue';
 import SegmentedControl from '../../theme/primitives/SegmentedControl.vue';
 import TextField from '../../theme/primitives/TextField.vue';
@@ -112,7 +113,7 @@ function selectMethod(service: string, method: string): void {
       <span class="p-xs muted">Import paths</span>
       <div v-for="(p, i) in tab.state.importPaths" :key="i" class="import-path-row">
         <span class="p-xs mono">{{ p }}</span>
-        <button type="button" class="p-xs dim remove-link" @click="removeImportPath(i)">Remove</button>
+        <IconButton icon="close" v-tooltip="'Remove'" @click="removeImportPath(i)" />
       </div>
       <div class="import-path-row">
         <TextField
@@ -189,16 +190,6 @@ function selectMethod(service: string, method: string): void {
   align-items: center;
   justify-content: space-between;
   gap: var(--kira-s-2);
-}
-
-.add-link,
-.remove-link {
-  background: none;
-  border: none;
-  padding: 0;
-  color: var(--kira-accent);
-  cursor: pointer;
-  text-align: left;
 }
 
 .service-list {

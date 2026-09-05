@@ -160,7 +160,6 @@ function close(): void {
         </AppButton>
         <IconButton
           icon="trash"
-          tone="danger"
           v-tooltip="'Delete'"
           data-testid="environment-remove"
           @click="onDelete(env.id, env.name)"

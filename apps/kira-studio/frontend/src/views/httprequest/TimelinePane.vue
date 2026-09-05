@@ -243,7 +243,7 @@ function residueNote(hop: HttpTimelineHop): string {
             Some response headers for this hop are not shown.
           </MessageStrip>
 
-          <details v-if="hop.headers && hop.headers.length > 0" class="hop-headers">
+          <details v-if="hop.headers && hop.headers.length > 0" class="p-disclosure hop-headers">
             <summary class="p-xs dim">Response headers</summary>
             <div v-for="(h, i) in hop.headers" :key="i" class="p-kv-row hop-header-row">
               <span class="p-kv-name mono">{{ h.name }}</span>
@@ -252,7 +252,7 @@ function residueNote(hop: HttpTimelineHop): string {
           </details>
           <details
             v-else-if="hop.index === activeTimeline!.hops.length - 1 && response?.headers.length"
-            class="hop-headers"
+            class="p-disclosure hop-headers"
           >
             <summary class="p-xs dim">Response headers</summary>
             <div v-for="(h, i) in response!.headers" :key="i" class="p-kv-row hop-header-row">

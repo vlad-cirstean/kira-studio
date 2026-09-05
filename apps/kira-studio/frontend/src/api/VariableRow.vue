@@ -169,7 +169,7 @@ function onKeydown(e: KeyboardEvent): void {
       />
     </div>
     <IconButton
-      icon="close"
+      icon="trash"
       :disabled="props.trailing"
       v-tooltip="'Remove'"
       data-testid="variable-remove"

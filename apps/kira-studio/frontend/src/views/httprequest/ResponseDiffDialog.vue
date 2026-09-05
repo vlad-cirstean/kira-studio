@@ -213,7 +213,7 @@ onUnmounted(() => {
           <span class="mono diff-header-value">{{ row.a ?? '—' }}</span>
           <span class="mono diff-header-value">{{ row.b ?? '—' }}</span>
         </div>
-        <details v-if="unchangedHeaderRows.length > 0" class="diff-header-unchanged">
+        <details v-if="unchangedHeaderRows.length > 0" class="p-disclosure diff-header-unchanged">
           <summary class="p-xs dim">{{ unchangedHeaderRows.length }} unchanged</summary>
           <div
             v-for="row in unchangedHeaderRows"

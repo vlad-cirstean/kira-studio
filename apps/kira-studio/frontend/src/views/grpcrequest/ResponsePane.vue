@@ -7,6 +7,7 @@ import CodeMirrorHost from '../../editor/CodeMirrorHost.vue';
 import { formatBytes } from '../../format';
 import AppButton from '../../theme/primitives/AppButton.vue';
 import EmptyState from '../../theme/primitives/EmptyState.vue';
+import IconButton from '../../theme/primitives/IconButton.vue';
 import MessageStrip from '../../theme/primitives/MessageStrip.vue';
 import SegmentedControl from '../../theme/primitives/SegmentedControl.vue';
 import {
@@ -192,14 +193,12 @@ const viewingTime = computed(() => {
             <span class="p-xs mono">{{ entry.method }}</span>
             <span class="p-xs dim">{{ new Date(entry.calledAt).toLocaleTimeString([], { hour12: false }) }}</span>
             <span class="p-push" />
-            <button
-              type="button"
-              class="p-xs dim remove-link"
+            <IconButton
+              icon="trash"
+              v-tooltip="'Delete'"
               data-testid="grpc-history-delete"
               @click.stop="deleteGrpcHistoryEntry(tab.id, entry.id)"
-            >
-              Delete
-            </button>
+            />
           </button>
         </div>
       </div>
@@ -339,13 +338,6 @@ const viewingTime = computed(() => {
 
 .history-row:hover {
   background: var(--kira-hover);
-}
-
-.remove-link {
-  background: none;
-  border: none;
-  padding: 0;
-  cursor: pointer;
 }
 
 .history-hint-link {
