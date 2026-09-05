@@ -23,8 +23,10 @@ import { openApiRequestTab } from './tabs';
 // shell Studio's ProjectPanel.vue uses. `empty` is no longer hardcoded: it is "this app has no
 // collections yet", which is also what gates PanelShell's own search box (F14).
 //
-// The `new-request` and `new-request-empty` testids are preserved exactly as P1 left them —
-// existing specs click them, and P4 has no reason to move Api's front door.
+// The header's own `new-request` testid is the one front door left (P1's own affordance) — P13
+// D6 removed the empty state's duplicate `new-request-empty`/`new-collection-empty`/
+// `import-collection-empty` actions entirely; tests/ui/api-ui-consistency.spec.ts asserts none of
+// the three exist, not that they are preserved.
 const empty = computed(() => collectionsState.collections.length === 0);
 
 // The fetch belongs to the panel rather than the tree: PanelShell renders #body only when it is
