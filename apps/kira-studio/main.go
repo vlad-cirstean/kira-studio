@@ -26,7 +26,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/config"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/connections"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/enginecache"
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/httpvars"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/apivars"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/localauth"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/logging"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/metrics"
@@ -90,13 +90,13 @@ func main() {
 	repositories.Variables = repos.NewVariables(db.DB, cipher)
 	// P5 D8: the SAME authorizer instance connections.New below is given — that is what makes the
 	// reveal grace genuinely shared between a connection-password reveal and a variable reveal.
-	httpVarsSvc := httpvars.New(repositories.Variables, cipher, authorizer)
+	apiVarsSvc := apivars.New(repositories.Variables, cipher, authorizer)
 
 	deps := appcore.Deps{
 		DB:        db.DB,
 		StartedAt: startedAt.UnixMilli(),
 		Repos:     repositories,
-		HttpVars:  httpVarsSvc,
+		ApiVars:   apiVarsSvc,
 	}
 
 	// Read from the just-migrated (possibly still-default) settings row, same as production would

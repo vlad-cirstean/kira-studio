@@ -6,10 +6,10 @@ import type {
   GrpcRequestTabState,
   GrpcSchemaWire,
 } from '@shared/domain/grpc';
+import { collectionIdFor } from '../../api/state/collections';
+import { activeEnvironmentId, mergedValuesAndSecrets } from '../../api/state/variables';
+import { findGrpcRequestTab } from '../../api/tabs';
 import { control } from '../../bridge/control';
-import { collectionIdFor } from '../../http/state/collections';
-import { activeEnvironmentId, mergedValuesAndSecrets } from '../../http/state/variables';
-import { findGrpcRequestTab } from '../../http/tabs';
 import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
 import { classifyLoadError, createRuntimeStore, stopOp } from '../shared/viewOp';
 import { noteGrpcCallRecorded } from './history';

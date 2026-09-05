@@ -67,7 +67,7 @@ function dropAllPagesForTab(id: string): void {
 export const tabsState = reactive({
   tabs: [] as TabRecord[], // ordered, all modes interleaved
   // P1 D5: one active tab per mode, not one app-wide — a tab's own mode is TAB_KIND_MODE[kind].
-  activeIdByMode: { studio: null, http: null } as Record<AppMode, string | null>,
+  activeIdByMode: { studio: null, api: null } as Record<AppMode, string | null>,
   /** In-memory only: a restored tab has not loaded and shows "Reconnect & load" (§8.4). */
   hydrated: new Set<string>(),
 });
@@ -187,7 +187,7 @@ export async function hydrateTabs(): Promise<void> {
   // One restored active tab per mode (F18: SQL's `active` column has no uniqueness constraint,
   // so this needs no migration) — same "active, else first" fallback the old single-mode code
   // used, just scoped to each mode's own subset.
-  for (const mode of ['studio', 'http'] as const) {
+  for (const mode of ['studio', 'api'] as const) {
     const modeTabs = tabs.filter((t) => TAB_KIND_MODE[t.kind] === mode);
     const active = modeTabs.find((t) => t.active) ?? modeTabs[0];
     tabsState.activeIdByMode[mode] = active?.id ?? null;

@@ -3,21 +3,21 @@ import { isDynamicName, isGrpcDirty, toSavedGrpcRequest } from '@kira/api-core';
 import { grpcRequestTitle } from '@shared/domain/grpc';
 import type { GrpcRequestTabRecord } from '@shared/domain/tabs';
 import { computed, onMounted, onUnmounted, watch } from 'vue';
-import { beautifyJson } from '../../beautify';
-import CodeMirrorHost from '../../editor/CodeMirrorHost.vue';
-import EnvironmentSelect from '../../http/EnvironmentSelect.vue';
+import EnvironmentSelect from '../../api/EnvironmentSelect.vue';
 import {
   collectionIdFor,
   openSaveGrpcDialog,
   savedGrpcRequestFor,
   saveGrpcRequest,
-} from '../../http/state/collections';
+} from '../../api/state/collections';
 import {
   activeEnvironmentId,
   ensureVariablesLoaded,
   mergedValuesAndSecrets,
-} from '../../http/state/variables';
-import { patchGrpcRequestTabState } from '../../http/tabs';
+} from '../../api/state/variables';
+import { patchGrpcRequestTabState } from '../../api/tabs';
+import { beautifyJson } from '../../beautify';
+import CodeMirrorHost from '../../editor/CodeMirrorHost.vue';
 import { registerCommand } from '../../shortcuts/commands';
 import AppButton from '../../theme/primitives/AppButton.vue';
 import PanelSplitter from '../../theme/primitives/PanelSplitter.vue';
@@ -191,7 +191,7 @@ onMounted(() => {
     registerCommand('view.run', onCall),
     registerCommand('view.refresh', onCall),
     registerCommand('view.format', onBeautify),
-    registerCommand('http.save', onSave),
+    registerCommand('api.save', onSave),
   ];
 });
 onUnmounted(() => {

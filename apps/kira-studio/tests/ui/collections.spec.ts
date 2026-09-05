@@ -7,7 +7,7 @@ import { IPC } from './support/ipcChannels';
 // snapshot answers args-blind, which is what lets a test assert on a call's args afterwards
 // without having to make them matchable up front).
 
-function modeTab(page: Page, mode: 'studio' | 'http'): Locator {
+function modeTab(page: Page, mode: 'studio' | 'api'): Locator {
   return page.locator(`[data-testid="mode-tab"][data-mode="${mode}"]`);
 }
 
@@ -76,7 +76,7 @@ const CREATE_ORDER_REQUEST = {
 };
 
 async function openHttpMode(page: Page): Promise<void> {
-  await modeTab(page, 'http').click();
+  await modeTab(page, 'api').click();
 }
 
 test('collections — the tree renders and a request opens into the existing tab kind', async ({

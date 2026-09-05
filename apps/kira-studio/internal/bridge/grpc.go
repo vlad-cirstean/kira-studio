@@ -14,7 +14,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/appcore"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/bridge/ipcerr"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/grpcclient"
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/httpvars"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/apivars"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 )
 
@@ -61,7 +61,7 @@ func (s *GrpcService) resolveGrpcSource(args GrpcDescribeArgs, used map[string]s
 	if !grpcHasAnyReference(args.Target, args.Metadata, "") {
 		return src, nil
 	}
-	resolver, err := s.Deps.HttpVars.NewResolver(args.CollectionID, args.EnvironmentID)
+	resolver, err := s.Deps.ApiVars.NewResolver(args.CollectionID, args.EnvironmentID)
 	if err != nil {
 		return grpcclient.Source{}, err
 	}
@@ -76,22 +76,22 @@ func (s *GrpcService) resolveGrpcSource(args GrpcDescribeArgs, used map[string]s
 	return src, nil
 }
 
-// grpcHasAnyReference mirrors httpvars' own referencedFields short-circuit (resolve.go) for
+// grpcHasAnyReference mirrors apivars' own referencedFields short-circuit (resolve.go) for
 // gRPC's own three substitutable fields — before ever querying a secret, is there anything to
 // resolve at all.
 func grpcHasAnyReference(target string, metadata []grpcclient.MetaPair, message string) bool {
-	if len(httpvars.Names(target)) > 0 {
+	if len(apivars.Names(target)) > 0 {
 		return true
 	}
 	for _, m := range metadata {
-		if len(httpvars.Names(m.Name)) > 0 || len(httpvars.Names(m.Value)) > 0 {
+		if len(apivars.Names(m.Name)) > 0 || len(apivars.Names(m.Value)) > 0 {
 			return true
 		}
 	}
-	return len(httpvars.Names(message)) > 0
+	return len(apivars.Names(message)) > 0
 }
 
-func resolveMetaPairs(resolver *httpvars.Resolver, pairs []grpcclient.MetaPair) []grpcclient.MetaPair {
+func resolveMetaPairs(resolver *apivars.Resolver, pairs []grpcclient.MetaPair) []grpcclient.MetaPair {
 	out := make([]grpcclient.MetaPair, len(pairs))
 	for i, m := range pairs {
 		out[i] = grpcclient.MetaPair{Name: resolver.Text(m.Name), Value: resolver.Text(m.Value)}
@@ -197,7 +197,7 @@ func (s *GrpcService) Call(ctx context.Context, args GrpcCallArgs) (grpcclient.C
 			}
 			resolvedMessage := args.MessageJSON
 			if grpcHasAnyReference("", nil, args.MessageJSON) {
-				resolver, err := s.Deps.HttpVars.NewResolver(args.CollectionID, args.EnvironmentID)
+				resolver, err := s.Deps.ApiVars.NewResolver(args.CollectionID, args.EnvironmentID)
 				if err != nil {
 					return nil, err
 				}

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { HttpVariableHistoryEntry } from '@shared/domain/variables';
+import type { ApiVariableHistoryEntry } from '@shared/domain/variables';
 import IconButton from '../theme/primitives/IconButton.vue';
 import PopoverPanel from '../theme/primitives/PopoverPanel.vue';
 import {
@@ -30,17 +30,17 @@ function relativeTime(iso: string): string {
   return days === 1 ? 'yesterday' : `${days}d ago`;
 }
 
-function displayValue(entry: HttpVariableHistoryEntry): string {
+function displayValue(entry: ApiVariableHistoryEntry): string {
   return entry.isSecret ? (revealedHistoryValues[entry.id] ?? '') : entry.value;
 }
-function notYetRevealed(entry: HttpVariableHistoryEntry): boolean {
+function notYetRevealed(entry: ApiVariableHistoryEntry): boolean {
   return entry.isSecret && revealedHistoryValues[entry.id] === undefined;
 }
 
 function onReveal(id: string): void {
   void revealHistoryEntry(id);
 }
-function onRestore(entry: HttpVariableHistoryEntry): void {
+function onRestore(entry: ApiVariableHistoryEntry): void {
   void restoreHistoryEntry(entry);
 }
 

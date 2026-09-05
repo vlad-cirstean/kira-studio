@@ -1,7 +1,7 @@
 import type { GrpcCallHistoryEntry, GrpcCallSnapshot } from '@shared/domain/grpc-history';
+import { createHistoryStore } from '../../api/state/history';
+import { findGrpcRequestTab } from '../../api/tabs';
 import { control } from '../../bridge/control';
-import { createHistoryStore } from '../../http/state/history';
-import { findGrpcRequestTab } from '../../http/tabs';
 
 // P11 D11/D14, P12 D12: the per-tab gRPC history runtime — mirrors
 // views/httprequest/history.ts's own shape exactly, over grpc_call_history instead of

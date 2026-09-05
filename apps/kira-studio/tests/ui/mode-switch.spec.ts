@@ -70,7 +70,7 @@ async function createAndConnect(page: import('@playwright/test').Page): Promise<
   await expandRow(page, 'database:kira_test/schema:app');
 }
 
-function modeTab(page: import('@playwright/test').Page, mode: 'studio' | 'http') {
+function modeTab(page: import('@playwright/test').Page, mode: 'studio' | 'api') {
   return page.locator(`[data-testid="mode-tab"][data-mode="${mode}"]`);
 }
 
@@ -82,7 +82,7 @@ test('mode switch — two mode tabs, an empty Http mode, and Studio state that s
   // 1. two mode tabs, Studio active by default.
   await expect(page.locator('[data-testid="mode-tab"]')).toHaveCount(2);
   await expect(modeTab(page, 'studio')).toHaveClass(/is-active/);
-  await expect(modeTab(page, 'http')).not.toHaveClass(/is-active/);
+  await expect(modeTab(page, 'api')).not.toHaveClass(/is-active/);
   await expect(page.locator('[data-testid="project-panel"]')).toContainText('Connections');
 
   // Build a real Studio tab with non-default state (page size 1000) to prove it survives.
@@ -105,12 +105,12 @@ test('mode switch — two mode tabs, an empty Http mode, and Studio state that s
 
   // 2. clicking Http shows the empty tab-strip state and Http's own empty content, with the left
   //    panel no longer titled "Connections".
-  await modeTab(page, 'http').click();
-  await expect(modeTab(page, 'http')).toHaveClass(/is-active/);
+  await modeTab(page, 'api').click();
+  await expect(modeTab(page, 'api')).toHaveClass(/is-active/);
   await expect(modeTab(page, 'studio')).not.toHaveClass(/is-active/);
   await expect(page.locator('[data-testid="tab-strip-empty"]')).toBeVisible();
   await expect(page.locator('[data-testid="tab"]')).toHaveCount(0);
-  await expect(page.locator('[data-testid="http-start"]')).toBeVisible();
+  await expect(page.locator('[data-testid="api-start"]')).toBeVisible();
   await expect(page.locator('[data-testid="project-panel"]')).not.toContainText('Connections');
   await expect(page.locator('[data-testid="project-panel"]')).toContainText('Collections');
 
@@ -145,7 +145,7 @@ test('mode switch — two mode tabs, an empty Http mode, and Studio state that s
   await page.click('[data-testid="toggle-project-panel"]');
   await expect(page.locator('[data-testid="project-panel"]')).toBeVisible();
 
-  await modeTab(page, 'http').click();
+  await modeTab(page, 'api').click();
   await page.click('[data-testid="toggle-project-panel"]');
   await expect(page.locator('[data-testid="project-panel"]')).toHaveCount(0);
   await page.click('[data-testid="toggle-project-panel"]');

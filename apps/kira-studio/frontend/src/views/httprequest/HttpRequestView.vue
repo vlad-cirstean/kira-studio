@@ -14,21 +14,21 @@ import {
 import { type HttpMethod, httpMethodClass } from '@shared/domain/http';
 import type { HttpRequestTabRecord } from '@shared/domain/tabs';
 import { computed, onMounted, onUnmounted, watch } from 'vue';
-import EnvironmentSelect from '../../http/EnvironmentSelect.vue';
+import EnvironmentSelect from '../../api/EnvironmentSelect.vue';
 import {
   collectionIdFor,
   openSaveDialog,
   savedRequestFor,
   saveRequest,
-} from '../../http/state/collections';
-import { openCopyAsCurlDialog } from '../../http/state/curl';
-import { openEditRawDialog } from '../../http/state/raw';
+} from '../../api/state/collections';
+import { openCopyAsCurlDialog } from '../../api/state/curl';
+import { openEditRawDialog } from '../../api/state/raw';
 import {
   activeEnvironmentId,
   ensureVariablesLoaded,
   mergedValuesAndSecrets,
-} from '../../http/state/variables';
-import { patchHttpRequestTabState } from '../../http/tabs';
+} from '../../api/state/variables';
+import { patchHttpRequestTabState } from '../../api/tabs';
 import { registerCommand } from '../../shortcuts/commands';
 import AppButton from '../../theme/primitives/AppButton.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
@@ -224,12 +224,12 @@ onMounted(() => {
     registerCommand('view.refresh', onSend),
     // D15: the palette's own Save request entry, view-scoped exactly like the two above — a no-op
     // when no request tab is mounted, which is runCommand's documented behaviour.
-    registerCommand('http.save', onSave),
-    // P7 D10: same view-scoped shape as http.save above.
-    registerCommand('http.copyAsCurl', onCopyAsCurl),
+    registerCommand('api.save', onSave),
+    // P7 D10: same view-scoped shape as api.save above.
+    registerCommand('api.copyAsCurl', onCopyAsCurl),
     // P9 D8: same view-scoped shape — a no-op with no request tab mounted, and here also a no-op
     // (not an error) for a formdata/file body, matching the toolbar button's own disabled state.
-    registerCommand('http.editRaw', onEditRaw),
+    registerCommand('api.editRaw', onEditRaw),
   ];
 });
 onUnmounted(() => {

@@ -46,7 +46,7 @@ export interface ResolvedRequest {
 }
 
 /**
- * P7 D11: the renderer's own "stage 2" — the twin of `internal/httpvars.ResolveRequest`'s own
+ * P7 D11: the renderer's own "stage 2" — the twin of `internal/apivars.ResolveRequest`'s own
  * second pass, over an already-resolved request rather than raw tab state. Everything stage 1
  * finished is already text, so this pass can only ever fill in a `deferred` span (a secret) — a
  * frozen `{{$guid}}` is not re-rolled because it is no longer a reference at all by the time this

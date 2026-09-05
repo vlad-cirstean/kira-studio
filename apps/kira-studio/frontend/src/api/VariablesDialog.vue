@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { HttpVariable } from '@shared/domain/variables';
+import type { ApiVariable } from '@shared/domain/variables';
 import { computed, reactive, ref, watch } from 'vue';
 import { connectionsState } from '../state/connections';
 import DialogFrame from '../theme/primitives/DialogFrame.vue';
@@ -63,7 +63,7 @@ watch(revealedValues, (values) => {
   }
 });
 
-const displayRows = computed<HttpVariable[]>(() => {
+const displayRows = computed<ApiVariable[]>(() => {
   const byId = new Map(variablesDialogState.rows.map((row) => [row.id, row]));
   const real = order.value.flatMap((id) => {
     const row = byId.get(id);
@@ -71,7 +71,7 @@ const displayRows = computed<HttpVariable[]>(() => {
     const draft = drafts[id] ?? { name: row.name, value: row.value, isSecret: row.isSecret };
     return [{ ...row, name: draft.name, value: draft.value, isSecret: draft.isSecret }];
   });
-  const trailing: HttpVariable = {
+  const trailing: ApiVariable = {
     id: '',
     scope: variablesDialogState.scope ?? 'collection',
     ownerId: variablesDialogState.ownerId,

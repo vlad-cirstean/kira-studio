@@ -1,5 +1,5 @@
 import { fromSavedGrpcRequest, fromSavedRequest } from '@kira/api-core';
-import type { HttpSavedGrpcRequest, HttpSavedRequest } from '@shared/domain/collections';
+import type { GrpcSavedRequest, HttpSavedRequest } from '@shared/domain/collections';
 import {
   defaultGrpcRequestTabState,
   type GrpcRequestTabState,
@@ -90,7 +90,7 @@ export function openGrpcRequestTab(): string {
 export function openCollectionGrpcRequestTab(
   itemId: string,
   name: string,
-  saved: HttpSavedGrpcRequest,
+  saved: GrpcSavedRequest,
 ): OpenTabResult {
   const existing = tabsState.tabs.find(
     (t) => t.kind === 'grpc-request' && (t as GrpcRequestTabRecord).state.itemId === itemId,

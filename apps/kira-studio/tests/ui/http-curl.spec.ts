@@ -11,13 +11,13 @@ import { IPC } from './support/ipcChannels';
 const NOW = '2026-01-01T00:00:00.000Z';
 const UUID_RE = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
 
-function modeTab(page: Page, mode: 'studio' | 'http'): Locator {
+function modeTab(page: Page, mode: 'studio' | 'api'): Locator {
   return page.locator(`[data-testid="mode-tab"][data-mode="${mode}"]`);
 }
 
 async function openHttpModeAndNewRequest(page: Page): Promise<void> {
-  await modeTab(page, 'http').click();
-  await expect(page.locator('[data-testid="http-start"]')).toBeVisible();
+  await modeTab(page, 'api').click();
+  await expect(page.locator('[data-testid="api-start"]')).toBeVisible();
   await page.click('[data-testid="new-request-start"]');
   await expect(page.locator('[data-testid="http-request-view"]')).toBeVisible();
 }
@@ -34,7 +34,7 @@ test('import populates a new tab, and the first tab is left intact', async ({ re
   const CONTROL: ControlSnapshot[] = [{ channel: IPC.collectionsList, response: TREE }];
   const { window: page } = await relaunch({ control: CONTROL });
 
-  await modeTab(page, 'http').click();
+  await modeTab(page, 'api').click();
   await expect(page.locator('[data-testid="collection-row"][data-id="col-1"]')).toBeVisible();
 
   // A first tab, open and edited, before the import ever happens.
@@ -105,8 +105,8 @@ test('warnings are shown before Import, and the coerced method sticks after impo
   ];
   const { window: page } = await relaunch({ control: CONTROL });
 
-  await modeTab(page, 'http').click();
-  await expect(page.locator('[data-testid="http-start"]')).toBeVisible();
+  await modeTab(page, 'api').click();
+  await expect(page.locator('[data-testid="api-start"]')).toBeVisible();
   await page.click('[data-testid="import-curl-start"]');
   await expect(page.locator('[data-testid="import-curl-dialog"]')).toBeVisible();
 
@@ -131,7 +131,7 @@ test('a parse error disables Import and shows the message', async ({ relaunch })
   ];
   const { window: page } = await relaunch({ control: CONTROL });
 
-  await modeTab(page, 'http').click();
+  await modeTab(page, 'api').click();
   await page.click('[data-testid="import-curl-start"]');
   await expect(page.locator('[data-testid="import-curl-dialog"]')).toBeVisible();
 

@@ -7,13 +7,13 @@ import { IPC } from './support/ipcChannels';
 // exact and http2/masked) and the editor (D8/D9/D10), each seeded through the same one-snapshot-
 // per-channel discipline http-request.spec.ts's own header comment states.
 
-function modeTab(page: Page, mode: 'studio' | 'http'): Locator {
+function modeTab(page: Page, mode: 'studio' | 'api'): Locator {
   return page.locator(`[data-testid="mode-tab"][data-mode="${mode}"]`);
 }
 
 async function openHttpModeAndNewRequest(page: Page): Promise<void> {
-  await modeTab(page, 'http').click();
-  await expect(page.locator('[data-testid="http-start"]')).toBeVisible();
+  await modeTab(page, 'api').click();
+  await expect(page.locator('[data-testid="api-start"]')).toBeVisible();
   await page.click('[data-testid="new-request-start"]');
 }
 

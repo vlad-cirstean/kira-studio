@@ -24,7 +24,7 @@ import { openApiRequestTab } from './tabs';
 // collections yet", which is also what gates PanelShell's own search box (F14).
 //
 // The `new-request` and `new-request-empty` testids are preserved exactly as P1 left them —
-// existing specs click them, and P4 has no reason to move Http's front door.
+// existing specs click them, and P4 has no reason to move Api's front door.
 const empty = computed(() => collectionsState.collections.length === 0);
 
 // The fetch belongs to the panel rather than the tree: PanelShell renders #body only when it is
@@ -47,7 +47,7 @@ function onImport(): void {
 // P5 D11: the palette's Variables… entry — opens the dialog for whichever collection is
 // currently selected in the tree (a collection row directly, or a folder/request's own
 // collection). A no-op with nothing selected, the same "view-scoped, no-op elsewhere" shape
-// view.run/http.save already have.
+// view.run/api.save already have.
 function onVariablesCommand(): void {
   const selected = collectionsState.selected;
   if (!selected) return;
@@ -84,15 +84,15 @@ function onImportCurl(): void {
 
 // D15: the palette's Import collection…, Variables…, Environments…, (P6) Dynamic values… and
 // (P7) Import from curl… entries. Registered by the panel rather than a view, since the panel is
-// mounted for the whole of Http mode — none is tab-scoped.
+// mounted for the whole of Api mode — none is tab-scoped.
 let unregisterCommands: Array<() => void> = [];
 onMounted(() => {
   unregisterCommands = [
-    registerCommand('http.import', onImport),
-    registerCommand('http.variables', onVariablesCommand),
-    registerCommand('http.environments', onEnvironments),
-    registerCommand('http.dynamicValues', onDynamicValues),
-    registerCommand('http.importCurl', onImportCurl),
+    registerCommand('api.import', onImport),
+    registerCommand('api.variables', onVariablesCommand),
+    registerCommand('api.environments', onEnvironments),
+    registerCommand('api.dynamicValues', onDynamicValues),
+    registerCommand('api.importCurl', onImportCurl),
   ];
 });
 onUnmounted(() => {
@@ -137,7 +137,7 @@ onUnmounted(() => {
         icon="settings-gear"
         aria-label="Environments"
         v-tooltip="'Environments…'"
-        data-testid="http-environments"
+        data-testid="api-environments"
         @click="onEnvironments"
       />
     </template>

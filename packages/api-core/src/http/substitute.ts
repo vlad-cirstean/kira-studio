@@ -5,8 +5,8 @@
 // names — `{{base url}}`, `{{x-api-key}}` — are not identifiers, so a path-expression grammar would
 // be the wrong shape entirely).
 //
-// Implemented identically in Go (internal/httpvars/resolve.go's Resolve) and pinned to that
-// file's behaviour by one shared corpus (internal/httpvars/testdata/substitution.json, D18) read
+// Implemented identically in Go (internal/apivars/resolve.go's Resolve) and pinned to that
+// file's behaviour by one shared corpus (internal/apivars/testdata/substitution.json, D18) read
 // by both a Go test and tests/unit/http-substitution.spec.ts.
 //
 // Pure and dependency-free by design — no Vue, no DOM, no `@shared` import — which is what makes

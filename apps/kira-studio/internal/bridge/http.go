@@ -78,7 +78,7 @@ func (s *HttpService) Send(ctx context.Context, args HttpSendArgs) (httpclient.R
 
 			// Stage 2 (D6): secrets enter here and go no further — resolved.URL/Headers/Body are
 			// handed straight to httpclient.Send and never fed back into anything logged.
-			url, headers, body, usedSecrets, resolveErr := s.Deps.HttpVars.ResolveRequest(
+			url, headers, body, usedSecrets, resolveErr := s.Deps.ApiVars.ResolveRequest(
 				args.URL, args.Headers, args.Body, args.CollectionID, args.EnvironmentID,
 			)
 			if resolveErr != nil {

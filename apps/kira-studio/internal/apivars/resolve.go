@@ -1,4 +1,4 @@
-package httpvars
+package apivars
 
 import (
 	"log/slog"
@@ -30,7 +30,7 @@ type SubstitutionResult struct {
 	Refs []Reference
 }
 
-// Resolve is the Go twin of frontend/src/http/substitute.ts's own `resolve` — the identical
+// Resolve is the Go twin of packages/api-core/src/http/substitute.ts's own `resolve` — the identical
 // two-token grammar (D17), pinned to the same behaviour by testdata/substitution.json (D18).
 //
 // The grammar, in full: scan for `{{`; from there scan for the next `}}`; no `}}` ⇒ the rest of
@@ -148,7 +148,7 @@ func referencedFields(url string, headers []httpclient.Header, body httpclient.B
 // Resolver is P11 D9/F21's own extraction: the reusable half of stage 2 — fetch every secret
 // reachable from one scope once, then substitute text and accumulate what was actually used. Two
 // protocols share it now (ResolveRequest below, and bridge/grpc.go's own resolution closure via
-// NewResolver), and gain no import of each other's protocol package for it: httpvars gains no gRPC
+// NewResolver), and gain no import of each other's protocol package for it: apivars gains no gRPC
 // import, which is what keeps it protocol-neutral rather than becoming a two-protocol module.
 type Resolver struct {
 	secretValues map[string]string
@@ -276,7 +276,7 @@ func (s *Service) ResolveRequest(
 		for name := range used {
 			names = append(names, name)
 		}
-		slog.Debug("resolved secret references for a send", "scope", "httpvars", "count", len(names), "names", names)
+		slog.Debug("resolved secret references for a send", "scope", "apivars", "count", len(names), "names", names)
 	}
 
 	return resolvedURL, resolvedHeaders, resolvedBody, used, nil

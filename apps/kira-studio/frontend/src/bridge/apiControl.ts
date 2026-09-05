@@ -22,9 +22,9 @@ import type {
   ResponseHistorySnapshot,
 } from '@shared/domain/response-history';
 import type {
-  HttpEnvironment,
-  HttpVariable,
-  HttpVariableHistoryEntry,
+  ApiEnvironment,
+  ApiVariable,
+  ApiVariableHistoryEntry,
   RevealResult,
   VariableScope,
 } from '@shared/domain/variables';
@@ -185,10 +185,10 @@ export const apiControl = {
   // (D20) rather than the generated models directly, the one difference from collectionsList's
   // own precedent above (nothing here becomes tab state, so there is no equivalent reason to stay
   // close to the wire shape).
-  variablesListEnvironments: (): Promise<HttpEnvironment[]> =>
-    unwrap(VariablesService.ListEnvironments()).then((r) => trust<HttpEnvironment[]>(r ?? [])),
-  variablesCreateEnvironment: (name: string): Promise<HttpEnvironment> =>
-    unwrap(VariablesService.CreateEnvironment({ name })).then((r) => trust<HttpEnvironment>(r)),
+  variablesListEnvironments: (): Promise<ApiEnvironment[]> =>
+    unwrap(VariablesService.ListEnvironments()).then((r) => trust<ApiEnvironment[]>(r ?? [])),
+  variablesCreateEnvironment: (name: string): Promise<ApiEnvironment> =>
+    unwrap(VariablesService.CreateEnvironment({ name })).then((r) => trust<ApiEnvironment>(r)),
   variablesRenameEnvironment: (id: string, name: string): Promise<void> =>
     unwrap(VariablesService.RenameEnvironment({ id, name })),
   variablesDeleteEnvironment: (id: string): Promise<void> =>
@@ -199,9 +199,9 @@ export const apiControl = {
   variablesReorderEnvironments: (ids: string[]): Promise<void> =>
     unwrap(VariablesService.ReorderEnvironments({ ids })),
 
-  variablesList: (scope: VariableScope, ownerId: string): Promise<HttpVariable[]> =>
+  variablesList: (scope: VariableScope, ownerId: string): Promise<ApiVariable[]> =>
     unwrap(VariablesService.List({ scope: scopeArg(scope), ownerId })).then((r) =>
-      trust<HttpVariable[]>(r ?? []),
+      trust<ApiVariable[]>(r ?? []),
     ),
   // id: '' creates a new row (D19).
   variablesUpsert: (args: {
@@ -211,17 +211,17 @@ export const apiControl = {
     name: string;
     value: string;
     isSecret: boolean;
-  }): Promise<HttpVariable> =>
+  }): Promise<ApiVariable> =>
     unwrap(VariablesService.Upsert({ ...args, scope: scopeArg(args.scope) })).then((r) =>
-      trust<HttpVariable>(r),
+      trust<ApiVariable>(r),
     ),
   variablesDelete: (id: string): Promise<void> => unwrap(VariablesService.Delete({ id })),
   variablesReorder: (scope: VariableScope, ownerId: string, ids: string[]): Promise<void> =>
     unwrap(VariablesService.Reorder({ scope: scopeArg(scope), ownerId, ids })),
 
-  variablesHistory: (variableId: string): Promise<HttpVariableHistoryEntry[]> =>
+  variablesHistory: (variableId: string): Promise<ApiVariableHistoryEntry[]> =>
     unwrap(VariablesService.History({ variableId })).then((r) =>
-      trust<HttpVariableHistoryEntry[]>(r ?? []),
+      trust<ApiVariableHistoryEntry[]>(r ?? []),
     ),
 
   // D8/D9: neither reveal call ever rejects — the outcome names what happened (revealed |

@@ -1,4 +1,4 @@
-package httpvars
+package apivars
 
 import (
 	"fmt"
@@ -53,7 +53,7 @@ func (s *Service) reveal(reason, id string, confirmed bool, decrypt func(string)
 	outcome, err := s.deps.Auth.Authorize(reason, confirmed)
 	if err != nil {
 		msg := err.Error()
-		slog.Warn(fmt.Sprintf("local authentication errored before revealing a %s (%s): %s", subject, id, msg), "scope", "httpvars")
+		slog.Warn(fmt.Sprintf("local authentication errored before revealing a %s (%s): %s", subject, id, msg), "scope", "apivars")
 		return RevealResult{Outcome: OutcomeError, Error: &msg}
 	}
 	switch outcome {
@@ -67,10 +67,10 @@ func (s *Service) reveal(reason, id string, confirmed bool, decrypt func(string)
 	value, err := decrypt(id)
 	if err != nil {
 		msg := err.Error()
-		slog.Warn(fmt.Sprintf("reveal failed for a %s (%s): %s", subject, id, msg), "scope", "httpvars")
+		slog.Warn(fmt.Sprintf("reveal failed for a %s (%s): %s", subject, id, msg), "scope", "apivars")
 		return RevealResult{Outcome: OutcomeError, Error: &msg}
 	}
 	// D5: the subject, never the value — connections.Service.Reveal's own precedent.
-	slog.Info(fmt.Sprintf("%s revealed for %s", subject, id), "scope", "httpvars")
+	slog.Info(fmt.Sprintf("%s revealed for %s", subject, id), "scope", "apivars")
 	return RevealResult{Outcome: OutcomeRevealed, Value: &value}
 }

@@ -1,5 +1,5 @@
 import { reactive } from 'vue';
-import { openApiRequestTab } from '../http/tabs';
+import { openApiRequestTab } from '../api/tabs';
 import { openCreateDialog } from '../state/connections';
 import { toggleOperationsPanel, toggleProjectPanel } from '../state/layout';
 import { activeTab } from '../state/mode';
@@ -20,33 +20,33 @@ export interface PaletteCommand {
 export const paletteCommands: PaletteCommand[] = [
   { id: 'new-connection', label: 'New connection', run: () => openCreateDialog() },
   // D13: a one-click action worth a name, the same bar this list's own comment states — no menu
-  // or accelerator change (HttpStart.vue/CollectionsPanel.vue's own buttons are the other two).
-  { id: 'http.newRequest', label: 'New request', run: () => void openApiRequestTab() },
+  // or accelerator change (ApiStart.vue/CollectionsPanel.vue's own buttons are the other two).
+  { id: 'api.newRequest', label: 'New request', run: () => void openApiRequestTab() },
   // P4 D15: the discoverability answer for Save, at the same bar this list's own comment states.
   // No ⌘S and no accelerator — shared/domain/shortcuts.ts is a closed map and a menu accelerator
   // needs the seven-file path P1 OQ-3 / P2 OQ-7 deferred as one deliberate pass. View-scoped like
   // view.run below, so it is a no-op when no request tab is mounted.
-  { id: 'http.save', label: 'Save request', run: () => runCommand('http.save') },
-  // P7 D10: view-scoped exactly like http.save above — a no-op with no request tab mounted.
-  { id: 'http.copyAsCurl', label: 'Copy as curl…', run: () => runCommand('http.copyAsCurl') },
+  { id: 'api.save', label: 'Save request', run: () => runCommand('api.save') },
+  // P7 D10: view-scoped exactly like api.save above — a no-op with no request tab mounted.
+  { id: 'api.copyAsCurl', label: 'Copy as curl…', run: () => runCommand('api.copyAsCurl') },
   // P9 D8: same view-scoped shape — a no-op with no request tab mounted or a formdata/file body.
-  { id: 'http.editRaw', label: 'Edit as raw HTTP…', run: () => runCommand('http.editRaw') },
-  // Registered by CollectionsPanel.vue, which is mounted for the whole of Http mode — an import
+  { id: 'api.editRaw', label: 'Edit as raw HTTP…', run: () => runCommand('api.editRaw') },
+  // Registered by CollectionsPanel.vue, which is mounted for the whole of Api mode — an import
   // is not tab-scoped the way Save is.
-  { id: 'http.import', label: 'Import collection…', run: () => runCommand('http.import') },
-  // P5 D3/D11: both registered by CollectionsPanel.vue, mounted for the whole of Http mode — no
+  { id: 'api.import', label: 'Import collection…', run: () => runCommand('api.import') },
+  // P5 D3/D11: both registered by CollectionsPanel.vue, mounted for the whole of Api mode — no
   // tab to be scoped to.
-  { id: 'http.variables', label: 'Variables…', run: () => runCommand('http.variables') },
-  { id: 'http.environments', label: 'Environments…', run: () => runCommand('http.environments') },
+  { id: 'api.variables', label: 'Variables…', run: () => runCommand('api.variables') },
+  { id: 'api.environments', label: 'Environments…', run: () => runCommand('api.environments') },
   // P6 D11: the reference dialog's palette entry, same "registered by CollectionsPanel.vue,
-  // mounted for the whole of Http mode" shape as the two above.
+  // mounted for the whole of Api mode" shape as the two above.
   {
-    id: 'http.dynamicValues',
+    id: 'api.dynamicValues',
     label: 'Dynamic values…',
-    run: () => runCommand('http.dynamicValues'),
+    run: () => runCommand('api.dynamicValues'),
   },
-  // P7 D12: same "registered by CollectionsPanel.vue, mounted for the whole of Http mode" shape.
-  { id: 'http.importCurl', label: 'Import from curl…', run: () => runCommand('http.importCurl') },
+  // P7 D12: same "registered by CollectionsPanel.vue, mounted for the whole of Api mode" shape.
+  { id: 'api.importCurl', label: 'Import from curl…', run: () => runCommand('api.importCurl') },
   { id: 'open-settings', label: 'Open settings', run: () => (settingsOpen.value = true) },
   { id: 'toggle-project-panel', label: 'Toggle project panel', run: toggleProjectPanel },
   { id: 'toggle-operations-panel', label: 'Toggle operations panel', run: toggleOperationsPanel },

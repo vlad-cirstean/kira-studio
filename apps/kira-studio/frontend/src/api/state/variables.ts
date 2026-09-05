@@ -1,7 +1,7 @@
 import type {
-  HttpEnvironment,
-  HttpVariable,
-  HttpVariableHistoryEntry,
+  ApiEnvironment,
+  ApiVariable,
+  ApiVariableHistoryEntry,
   VariableScope,
 } from '@shared/domain/variables';
 import { computed, reactive } from 'vue';
@@ -15,7 +15,7 @@ import { runReveal } from '../reveal';
 // impossible to get out of step with what Go actually stored.
 
 interface VariablesState {
-  environments: HttpEnvironment[];
+  environments: ApiEnvironment[];
   loaded: boolean;
 }
 
@@ -25,7 +25,7 @@ export const variablesState = reactive<VariablesState>({
 });
 
 /** D3: the app-global selection, or null when none is active ("No environment"). */
-const activeEnvironment = computed<HttpEnvironment | null>(
+const activeEnvironment = computed<ApiEnvironment | null>(
   () => variablesState.environments.find((e) => e.isActive) ?? null,
 );
 
@@ -49,7 +49,7 @@ export async function setActiveEnvironment(id: string): Promise<void> {
   await loadEnvironments();
 }
 
-export async function createEnvironment(name: string): Promise<HttpEnvironment> {
+export async function createEnvironment(name: string): Promise<ApiEnvironment> {
   const env = await control.variablesCreateEnvironment(name);
   await loadEnvironments();
   return env;
@@ -87,7 +87,7 @@ interface VariablesDialogState {
   ownerId: string;
   /** "Variables — <collection name>" or "Environment — <environment name>" (D11). */
   title: string;
-  rows: HttpVariable[];
+  rows: ApiVariable[];
   /** A reveal failure's message (D10) — shown in the dialog's own MessageStrip. */
   error: string | null;
 }
@@ -139,7 +139,7 @@ function cacheKey(scope: VariableScope, ownerId: string): string {
   return `${scope}:${ownerId}`;
 }
 
-const listCache = reactive<Record<string, HttpVariable[]>>({});
+const listCache = reactive<Record<string, ApiVariable[]>>({});
 
 /** Populates the cache for one scope if it is not already loaded — safe to call on every render;
  *  a no-op for '' (a scratch tab's collection, or no active environment). */
@@ -148,7 +148,7 @@ export async function ensureVariablesLoaded(scope: VariableScope, ownerId: strin
   listCache[cacheKey(scope, ownerId)] = await control.variablesList(scope, ownerId);
 }
 
-export function cachedVariables(scope: VariableScope, ownerId: string): HttpVariable[] {
+export function cachedVariables(scope: VariableScope, ownerId: string): ApiVariable[] {
   if (!ownerId) return [];
   return listCache[cacheKey(scope, ownerId)] ?? [];
 }
@@ -188,7 +188,7 @@ export async function reorderEnvironmentsList(ids: string[]): Promise<void> {
 /** D12: a duplicate name within one scope is allowed by the schema and resolved first-wins by
  *  sort_order — this is the dialog's own "which rows are the later, shadowed duplicates" check,
  *  over the already-sort_order-ordered list List returns. */
-export function isDuplicateName(rows: HttpVariable[], index: number): boolean {
+export function isDuplicateName(rows: ApiVariable[], index: number): boolean {
   const name = rows[index]?.name.trim();
   if (!name) return false;
   return rows.slice(0, index).some((r) => r.name.trim() === name);
@@ -262,7 +262,7 @@ export async function revealVariable(
 interface HistoryMenuState {
   open: boolean;
   variableId: string | null;
-  entries: HttpVariableHistoryEntry[];
+  entries: ApiVariableHistoryEntry[];
 }
 
 export const historyMenuState = reactive<HistoryMenuState>({
@@ -306,7 +306,7 @@ export async function revealHistoryEntry(historyId: string): Promise<void> {
 /** D13: restoring writes the prior value through the ordinary Upsert path, so the restore is
  *  itself recorded in history and is therefore undoable. A secret entry is revealed first if it
  *  has not been already — restoring is no less a reveal than the eye button is. */
-export async function restoreHistoryEntry(entry: HttpVariableHistoryEntry): Promise<void> {
+export async function restoreHistoryEntry(entry: ApiVariableHistoryEntry): Promise<void> {
   const row = variablesDialogState.rows.find((r) => r.id === entry.variableId);
   if (!row) return;
   let value = entry.value;

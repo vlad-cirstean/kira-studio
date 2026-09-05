@@ -8,13 +8,13 @@ import { IPC } from './support/ipcChannels';
 // sends in one test; OQ-8 hands the contained fix, a per-snapshot matchIgnoreKeys, forward for
 // whichever phase actually needs two responses on one channel).
 
-function modeTab(page: Page, mode: 'studio' | 'http'): Locator {
+function modeTab(page: Page, mode: 'studio' | 'api'): Locator {
   return page.locator(`[data-testid="mode-tab"][data-mode="${mode}"]`);
 }
 
 async function openHttpModeAndNewRequest(page: Page): Promise<void> {
-  await modeTab(page, 'http').click();
-  await expect(page.locator('[data-testid="http-start"]')).toBeVisible();
+  await modeTab(page, 'api').click();
+  await expect(page.locator('[data-testid="api-start"]')).toBeVisible();
   await page.click('[data-testid="new-request-start"]');
 }
 
@@ -156,7 +156,7 @@ test('Http request — restore from saved state, no reconnect gate', async ({ re
   const { window: page } = await relaunch({ control: CONTROL });
 
   // hydrateTabs derives the boot mode from the restored active tab's own kind.
-  await expect(modeTab(page, 'http')).toHaveClass(/is-active/);
+  await expect(modeTab(page, 'api')).toHaveClass(/is-active/);
   const view = page.locator('[data-testid="http-request-view"]');
   await expect(view).toBeVisible();
 

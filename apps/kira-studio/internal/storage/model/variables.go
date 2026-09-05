@@ -36,7 +36,7 @@ type Variable struct {
 }
 
 // VariableHistoryEntry is one http_variable_history row's list projection — the same "no secret
-// column here" discipline as Variable above. httpvars.Service.RevealHistory is the only path to a
+// column here" discipline as Variable above. apivars.Service.RevealHistory is the only path to a
 // secret history entry's plaintext.
 type VariableHistoryEntry struct {
 	ID         string `json:"id"`

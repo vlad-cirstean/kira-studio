@@ -2,7 +2,7 @@
 import { buildQuery, parseQuery, type QueryPair, splitUrl } from '@kira/api-core';
 import type { HttpRequestTabRecord } from '@shared/domain/tabs';
 import { computed } from 'vue';
-import { patchHttpRequestTabState } from '../../http/tabs';
+import { patchHttpRequestTabState } from '../../api/tabs';
 import FieldRowsTable from './FieldRowsTable.vue';
 
 // D9/D15/C6: a derived two-way editor over the URL, never a stored `params` array (D6) — `pairs`

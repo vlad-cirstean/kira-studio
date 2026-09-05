@@ -2,9 +2,9 @@
 import { GRPC_CODE_NAMES, type GrpcResponsePane, grpcCodeClass } from '@shared/domain/grpc';
 import type { GrpcRequestTabRecord } from '@shared/domain/tabs';
 import { computed, onMounted, ref, watch } from 'vue';
+import { patchGrpcRequestTabState } from '../../api/tabs';
 import CodeMirrorHost from '../../editor/CodeMirrorHost.vue';
 import { formatBytes } from '../../format';
-import { patchGrpcRequestTabState } from '../../http/tabs';
 import AppButton from '../../theme/primitives/AppButton.vue';
 import EmptyState from '../../theme/primitives/EmptyState.vue';
 import MessageStrip from '../../theme/primitives/MessageStrip.vue';

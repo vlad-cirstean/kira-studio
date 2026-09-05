@@ -1,14 +1,15 @@
-// Package httpvars is P5's Go-side half: collection variables, top-level named environments, the
-// gated secret reveal, and stage 2 of the two-stage {{name}} substitution (D6) — the half that
-// resolves a secret, strictly after bridge/http.go's op.SetCommand call (F3), so a decrypted
-// credential never reaches op_log.command.
+// Package apivars (P12 D1/D3: renamed from httpvars — it resolves gRPC targets and metadata too,
+// so the name means the module, not the HTTP protocol) is P5's Go-side half: collection variables,
+// top-level named environments, the gated secret reveal, and stage 2 of the two-stage {{name}}
+// substitution (D6) — the half that resolves a secret, strictly after bridge/http.go's
+// op.SetCommand call (F3), so a decrypted credential never reaches op_log.command.
 //
-// Http-scoped Go, beside internal/httpclient and internal/postman (D19) — imports
-// internal/storage/repos, internal/secrets and internal/localauth, and deliberately not
+// Api-scoped Go, beside internal/httpclient, internal/grpcclient and internal/postman (D19) —
+// imports internal/storage/repos, internal/secrets and internal/localauth, and deliberately not
 // internal/connections (D8: importing Studio's connections package from here would be exactly the
-// Studio<->Http coupling docs/v1.2/SPEC.md's module-boundary section exists to prevent) and not
+// Studio<->Api coupling docs/v1.2/SPEC.md's module-boundary section exists to prevent) and not
 // Wails.
-package httpvars
+package apivars
 
 import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/localauth"
@@ -38,7 +39,7 @@ type Service struct {
 	deps Deps
 }
 
-// New wires httpvars against the SAME *localauth.Authorizer instance connections.Service already
+// New wires apivars against the SAME *localauth.Authorizer instance connections.Service already
 // uses (D8) — main.go constructs exactly one Authorizer and passes it to both, which is what makes
 // the 5-minute reveal grace genuinely shared between a connection-password reveal and a variable
 // reveal.

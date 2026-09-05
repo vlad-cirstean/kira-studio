@@ -6,8 +6,8 @@ import (
 	"database/sql"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapterhost"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/apivars"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/connections"
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/httpvars"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/repos"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/tree"
 )
@@ -42,9 +42,10 @@ type Deps struct {
 	Tree        *tree.Service
 	Router      *adapterhost.Router // PushCacheConfig's Go-side half (bridge/settings.go); A17
 	Events      Emitter
-	// HttpVars is P5 D19 — the gated variable/history reveal and stage 2 of the two-stage
-	// {{name}} substitution (bridge/http.go's Send calls ResolveRequest directly; every other
-	// VariablesService method wraps Repos.Variables instead, the same split CollectionsService
-	// already has between Repos.Collections and nothing else).
-	HttpVars *httpvars.Service
+	// ApiVars (P12 D3: renamed from HttpVars — it resolves gRPC targets too) is P5 D19 — the
+	// gated variable/history reveal and stage 2 of the two-stage {{name}} substitution
+	// (bridge/http.go's Send calls ResolveRequest directly; every other VariablesService method
+	// wraps Repos.Variables instead, the same split CollectionsService already has between
+	// Repos.Collections and nothing else).
+	ApiVars *apivars.Service
 }

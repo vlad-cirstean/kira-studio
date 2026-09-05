@@ -95,7 +95,7 @@ function railColor(tab: TabRecord): ConnectionColor | undefined {
 }
 
 // Every Studio kind (F11): a tab addresses a tree node, so "Reveal in project panel" makes sense
-// for all seven — an Http tab kind (P2+) supplies its own menuExtras instead, or none at all.
+// for all seven — an Api tab kind (P2+) supplies its own menuExtras instead, or none at all.
 function revealInProjectPanel(tab: TabRecord): MenuItem[] {
   return [
     {

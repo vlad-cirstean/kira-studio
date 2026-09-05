@@ -14,7 +14,7 @@ import CodiconIcon from '../../theme/CodiconIcon.vue';
 import { connColorVar } from '../../theme/connColor';
 
 // P1 C4: Studio's two empty states, extracted verbatim out of MainView.vue's old dispatch
-// chain (F9) — the mode's own "nothing open" content, mirroring http/HttpStart.vue (C6).
+// chain (F9) — the mode's own "nothing open" content, mirroring api/ApiStart.vue (C6).
 
 // P16 design system's FirstRun.html: one door, no vestibule. The engine grid lives only in
 // the New connection dialog, never repeated at the top level.

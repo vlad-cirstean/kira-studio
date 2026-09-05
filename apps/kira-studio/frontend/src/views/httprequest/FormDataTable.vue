@@ -2,8 +2,8 @@
 import type { HttpFormDataFieldState } from '@shared/domain/http';
 import { contentTypeForFilename } from '@shared/domain/object-store';
 import type { HttpRequestTabRecord } from '@shared/domain/tabs';
+import { patchHttpRequestTabState } from '../../api/tabs';
 import { formatBytes } from '../../format';
-import { patchHttpRequestTabState } from '../../http/tabs';
 import AppButton from '../../theme/primitives/AppButton.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
 import TextField from '../../theme/primitives/TextField.vue';

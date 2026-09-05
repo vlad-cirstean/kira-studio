@@ -562,11 +562,11 @@ func (r *VariablesRepo) History(variableID string) ([]model.VariableHistoryEntry
 	return out, nil
 }
 
-// ---- the gated reveal's own accessors (D8) — called only after httpvars.Service has already
+// ---- the gated reveal's own accessors (D8) — called only after apivars.Service has already
 // authorized the reveal; neither method gates anything itself. ----
 
 // RevealValue decrypts one variable's stored secret. Returns an error for a variable that either
-// does not exist or is not a secret — httpvars.Service.Reveal turns that into its own
+// does not exist or is not a secret — apivars.Service.Reveal turns that into its own
 // never-throws RevealResult, exactly as connections.Service.Reveal already does for a decrypt
 // failure.
 func (r *VariablesRepo) RevealValue(variableID string) (string, error) {

@@ -7,13 +7,13 @@ import { IPC } from './support/ipcChannels';
 // sending twice — F12's whole point (P2 §8 OQ-8's predicted one-snapshot-per-channel limitation
 // does not bite here, because history never arrives through a second httpSend).
 
-function modeTab(page: Page, mode: 'studio' | 'http'): Locator {
+function modeTab(page: Page, mode: 'studio' | 'api'): Locator {
   return page.locator(`[data-testid="mode-tab"][data-mode="${mode}"]`);
 }
 
 async function openHttpModeAndNewRequest(page: Page): Promise<void> {
-  await modeTab(page, 'http').click();
-  await expect(page.locator('[data-testid="http-start"]')).toBeVisible();
+  await modeTab(page, 'api').click();
+  await expect(page.locator('[data-testid="api-start"]')).toBeVisible();
   await page.click('[data-testid="new-request-start"]');
 }
 
@@ -241,7 +241,7 @@ test('Http history — restore, and the storage notices', async ({ relaunch }) =
   const { window: page } = await relaunch({ control: CONTROL });
 
   // hydrateTabs derives the boot mode from the restored active tab's own kind.
-  await expect(modeTab(page, 'http')).toHaveClass(/is-active/);
+  await expect(modeTab(page, 'api')).toHaveClass(/is-active/);
   const view = page.locator('[data-testid="http-request-view"]');
   await expect(view).toBeVisible();
 

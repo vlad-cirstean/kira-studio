@@ -5,7 +5,7 @@ import { MODES } from '../modes';
 import { TAB_VIEWS } from '../tabViews';
 
 // P1 D6/C6: no active tab in the current mode falls back to that mode's own start component
-// (StudioStart for Studio, http/HttpStart for Http) instead of a hardcoded <StudioStart />.
+// (StudioStart for Studio, api/ApiStart for Api) instead of a hardcoded <StudioStart />.
 const modeStart = computed(() => MODES[modeState.active].start);
 </script>
 

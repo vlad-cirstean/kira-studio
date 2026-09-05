@@ -12,10 +12,10 @@ import type {
   HttpResponseWire,
   HttpTimeline,
 } from '@shared/domain/http';
+import { collectionIdFor } from '../../api/state/collections';
+import { activeEnvironmentId, mergedValuesAndSecrets } from '../../api/state/variables';
+import { findHttpRequestTab } from '../../api/tabs';
 import { control } from '../../bridge/control';
-import { collectionIdFor } from '../../http/state/collections';
-import { activeEnvironmentId, mergedValuesAndSecrets } from '../../http/state/variables';
-import { findHttpRequestTab } from '../../http/tabs';
 import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
 import { classifyLoadError, createRuntimeStore, stopOp } from '../shared/viewOp';
 import { noteSendRecorded } from './history';

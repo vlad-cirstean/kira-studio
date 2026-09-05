@@ -3,7 +3,7 @@ package bridge
 import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/appcore"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/bridge/ipcerr"
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/httpvars"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/apivars"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 )
 
@@ -11,7 +11,7 @@ import (
 // wrapper per method, with an explicit guard and an ipcerr translation). Every plain CRUD method
 // wraps Deps.Repos.Variables directly, exactly as CollectionsService wraps Deps.Repos.Collections
 // (P4 D11) — no service layer buys anything for a straight repo call. Reveal/RevealHistory are the
-// two exceptions: they need the Authorizer gate, so they go through Deps.HttpVars instead (D8).
+// two exceptions: they need the Authorizer gate, so they go through Deps.ApiVars instead (D8).
 type VariablesService struct{ Deps appcore.Deps }
 
 // ---- environments (D3) ----
@@ -199,13 +199,13 @@ type VariablesRevealArgs struct {
 	Confirmed bool `json:"confirmed"`
 }
 
-// Reveal never errors (P25 D9) — see httpvars.Service.Reveal's own comment.
-func (s *VariablesService) Reveal(args VariablesRevealArgs) httpvars.RevealResult {
+// Reveal never errors (P25 D9) — see apivars.Service.Reveal's own comment.
+func (s *VariablesService) Reveal(args VariablesRevealArgs) apivars.RevealResult {
 	if args.VariableID == "" {
 		msg := "variableId is required"
-		return httpvars.RevealResult{Outcome: httpvars.OutcomeError, Error: &msg}
+		return apivars.RevealResult{Outcome: apivars.OutcomeError, Error: &msg}
 	}
-	return s.Deps.HttpVars.Reveal(args.VariableID, args.Confirmed)
+	return s.Deps.ApiVars.Reveal(args.VariableID, args.Confirmed)
 }
 
 type VariablesRevealHistoryArgs struct {
@@ -213,10 +213,10 @@ type VariablesRevealHistoryArgs struct {
 	Confirmed bool   `json:"confirmed"`
 }
 
-func (s *VariablesService) RevealHistory(args VariablesRevealHistoryArgs) httpvars.RevealResult {
+func (s *VariablesService) RevealHistory(args VariablesRevealHistoryArgs) apivars.RevealResult {
 	if args.HistoryID == "" {
 		msg := "historyId is required"
-		return httpvars.RevealResult{Outcome: httpvars.OutcomeError, Error: &msg}
+		return apivars.RevealResult{Outcome: apivars.OutcomeError, Error: &msg}
 	}
-	return s.Deps.HttpVars.RevealHistory(args.HistoryID, args.Confirmed)
+	return s.Deps.ApiVars.RevealHistory(args.HistoryID, args.Confirmed)
 }

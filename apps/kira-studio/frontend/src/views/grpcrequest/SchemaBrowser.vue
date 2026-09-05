@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import type { GrpcRequestTabRecord } from '@shared/domain/tabs';
 import { computed, ref } from 'vue';
+import { patchGrpcRequestTabState } from '../../api/tabs';
 import { control } from '../../bridge/control';
-import { patchGrpcRequestTabState } from '../../http/tabs';
 import AppButton from '../../theme/primitives/AppButton.vue';
 import EmptyState from '../../theme/primitives/EmptyState.vue';
 import MessageStrip from '../../theme/primitives/MessageStrip.vue';

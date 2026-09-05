@@ -2,9 +2,9 @@ import type {
   ResponseHistoryEntry,
   ResponseHistorySnapshot,
 } from '@shared/domain/response-history';
+import { createHistoryStore } from '../../api/state/history';
+import { findHttpRequestTab } from '../../api/tabs';
 import { control } from '../../bridge/control';
-import { createHistoryStore } from '../../http/state/history';
-import { findHttpRequestTab } from '../../http/tabs';
 
 // P8 D11/P12 D12: the per-tab history runtime — never persisted (P2 D6's rule applied
 // consistently: the response is runtime-only, and a pointer at a stored response is not either).

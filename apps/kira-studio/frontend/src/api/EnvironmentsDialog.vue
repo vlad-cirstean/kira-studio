@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { HttpEnvironment } from '@shared/domain/variables';
+import type { ApiEnvironment } from '@shared/domain/variables';
 import { computed, reactive, ref, watch } from 'vue';
 import { confirmDialog } from '../state/confirmDialog';
 import CodiconIcon from '../theme/CodiconIcon.vue';
@@ -31,7 +31,7 @@ function syncDrafts(): void {
 }
 watch(() => variablesState.environments, syncDrafts, { immediate: true });
 
-const orderedEnvironments = computed<HttpEnvironment[]>(() => {
+const orderedEnvironments = computed<ApiEnvironment[]>(() => {
   const byId = new Map(variablesState.environments.map((env) => [env.id, env]));
   return order.value.flatMap((id) => {
     const env = byId.get(id);

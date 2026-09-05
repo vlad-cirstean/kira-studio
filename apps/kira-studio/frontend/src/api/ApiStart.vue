@@ -5,7 +5,7 @@ import { openImportCurlDialog } from './state/curl';
 import { openApiRequestTab, openGrpcRequestTab } from './tabs';
 
 // D13: the mode's front door — StudioStart.vue's own first-run shape verbatim (mark, title, one
-// line of copy, one p-dlgbtn primary button), the same `http/ -> state/` edge
+// line of copy, one p-dlgbtn primary button), the same `api/ -> state/` edge
 // CollectionsPanel.vue's own New request action uses (D7).
 //
 // P4 C9 adds a secondary action beside it: on a first run there is nothing to open, and importing
@@ -23,11 +23,11 @@ function onImportCurl(): void {
 </script>
 
 <template>
-  <div class="start" data-testid="http-start">
+  <div class="start" data-testid="api-start">
     <div class="start-inner">
       <span class="start-mark dim"><CodiconIcon name="globe" :size="32" /></span>
       <div class="start-title">No request open</div>
-      <div class="start-sub muted">Send an HTTP request and see its response here.</div>
+      <div class="start-sub muted">Send a request and see its response here.</div>
       <div class="start-actions">
         <button type="button" class="p-dlgbtn primary" data-testid="new-request-start" @click="openApiRequestTab">
           <span class="icon-box"><CodiconIcon name="add" :size="13" /></span>

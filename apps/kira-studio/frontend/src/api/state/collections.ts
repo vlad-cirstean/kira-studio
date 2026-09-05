@@ -3,9 +3,9 @@ import {
   type CollectionItemProtocol,
   type CollectionItemSummary,
   type CollectionSummary,
-  type HttpSavedGrpcRequest,
+  type GrpcSavedRequest,
+  grpcSavedRequestSchema,
   type HttpSavedRequest,
-  httpSavedGrpcRequestSchema,
   httpSavedRequestSchema,
   type ImportReport,
 } from '@shared/domain/collections';
@@ -18,7 +18,7 @@ import {
   renameGrpcRequestTabs,
 } from '../tabs';
 
-// P4 D13: Http's own tree store. Studio's tree is lazy because its data is remote — expanding a
+// P4 D13: Api's own tree store. Studio's tree is lazy because its data is remote — expanding a
 // node connects a connection and issues an IPC call, which is what its children cache, loading
 // set, 150 ms search debounce and "searching cached nodes only" note all exist for (F15). A
 // collections tree has none of that: the whole tree is rows in a local SQLite table, listable in
@@ -70,7 +70,7 @@ interface CollectionsState {
    *  other half (D15) and the reason opening an already-open request costs no call. */
   requests: Record<string, HttpSavedRequest>;
   /** P11 D12: GetGrpcRequest's own cache — grpcRequests' own sibling of `requests` above. */
-  grpcRequests: Record<string, HttpSavedGrpcRequest>;
+  grpcRequests: Record<string, GrpcSavedRequest>;
   busy: boolean;
   report: ImportReport | null;
   /** D16: "N secret values were not written to the file" — set after an export that stripped at
@@ -127,16 +127,16 @@ export function savedRequestFor(itemId: string | null): HttpSavedRequest | null 
 }
 
 /** fetchSavedRequest's own gRPC sibling. */
-export async function fetchSavedGrpcRequest(itemId: string): Promise<HttpSavedGrpcRequest> {
+export async function fetchSavedGrpcRequest(itemId: string): Promise<GrpcSavedRequest> {
   const cached = collectionsState.grpcRequests[itemId];
   if (cached) return cached;
-  const saved = httpSavedGrpcRequestSchema.parse(await control.collectionsGetGrpcRequest(itemId));
+  const saved = grpcSavedRequestSchema.parse(await control.collectionsGetGrpcRequest(itemId));
   collectionsState.grpcRequests[itemId] = saved;
   return saved;
 }
 
 /** savedRequestFor's own gRPC sibling. */
-export function savedGrpcRequestFor(itemId: string | null): HttpSavedGrpcRequest | null {
+export function savedGrpcRequestFor(itemId: string | null): GrpcSavedRequest | null {
   if (!itemId) return null;
   return collectionsState.grpcRequests[itemId] ?? null;
 }
@@ -367,7 +367,7 @@ export function cancelRename(): void {
 
 type SaveDialogPayload =
   | { protocol: 'http'; request: HttpSavedRequest }
-  | { protocol: 'grpc'; request: HttpSavedGrpcRequest };
+  | { protocol: 'grpc'; request: GrpcSavedRequest };
 
 interface SaveDialogState {
   open: boolean;
@@ -400,7 +400,7 @@ export function openSaveDialog(
 export function openSaveGrpcDialog(
   tabId: string,
   suggestedName: string,
-  request: HttpSavedGrpcRequest,
+  request: GrpcSavedRequest,
 ): void {
   saveDialogState.tabId = tabId;
   saveDialogState.suggestedName = suggestedName;
@@ -487,7 +487,7 @@ export async function saveRequest(
 export async function saveGrpcRequest(
   itemId: string,
   name: string,
-  request: HttpSavedGrpcRequest,
+  request: GrpcSavedRequest,
 ): Promise<void> {
   await control.collectionsSaveGrpcRequest(itemId, name, request);
   collectionsState.grpcRequests[itemId] = request;

@@ -8,13 +8,13 @@ import { IPC } from './support/ipcChannels';
 // entry's real timeline vs. Raw's own empty state (D10/P9 D7), and a failed send's partial
 // timeline (D15/C5).
 
-function modeTab(page: Page, mode: 'studio' | 'http'): Locator {
+function modeTab(page: Page, mode: 'studio' | 'api'): Locator {
   return page.locator(`[data-testid="mode-tab"][data-mode="${mode}"]`);
 }
 
 async function openHttpModeAndNewRequest(page: Page): Promise<void> {
-  await modeTab(page, 'http').click();
-  await expect(page.locator('[data-testid="http-start"]')).toBeVisible();
+  await modeTab(page, 'api').click();
+  await expect(page.locator('[data-testid="api-start"]')).toBeVisible();
   await page.click('[data-testid="new-request-start"]');
 }
 

@@ -13,11 +13,11 @@ export const tabKindSchema = /*#__PURE__*/ z.enum([
   'stream',
   'console',
   'browse',
-  // P2: the first Http-mode kind (§2 F1) — four vocabularies join it, this one plus
+  // P2: the first Api-mode kind (§2 F1) — four vocabularies join it, this one plus
   // RENDERABLE_TAB_KINDS/TAB_KIND_MODE below and Go's model.RenderableTabKinds (the one silent
   // failure mode of the four, D10).
   'http-request',
-  // P11 D2: the second kind inside the 'http' mode — a protocol AND a surface, following
+  // P11 D2: the second kind inside the 'api' mode — a protocol AND a surface, following
   // 'http-request''s own naming reasoning verbatim.
   'grpc-request',
 ]);
@@ -43,9 +43,9 @@ export const RENDERABLE_TAB_KINDS: readonly TabKind[] = [
 // in shared/domain/ (not state/tabKinds.ts) because it must be importable with no Vue-state side
 // effects: `state/mode.ts`'s tabsForMode filter needs only this mapping, never the rest of the
 // per-kind registry (components, page stores, menu builders). All seven Studio kinds map to
-// 'studio'; 'http-request' (P2) and 'grpc-request' (P11 D2) both map to 'http' — the SPEC's
-// "hosted through the same shell" is satisfied by a second kind inside the existing mode, not a
-// third mode.
+// 'studio'; 'http-request' (P2) and 'grpc-request' (P11 D2) both map to 'api' (P12 D2: renamed
+// from 'http') — the SPEC's "hosted through the same shell" is satisfied by a second kind inside
+// the existing mode, not a third mode.
 export const TAB_KIND_MODE: Record<TabKind, AppMode> = {
   data: 'studio',
   definition: 'studio',
@@ -54,8 +54,8 @@ export const TAB_KIND_MODE: Record<TabKind, AppMode> = {
   keyvalue: 'studio',
   stream: 'studio',
   browse: 'studio',
-  'http-request': 'http',
-  'grpc-request': 'http',
+  'http-request': 'api',
+  'grpc-request': 'api',
 };
 
 const pageSizeSchema = /*#__PURE__*/ z.union([

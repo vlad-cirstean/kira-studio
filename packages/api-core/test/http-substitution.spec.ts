@@ -1,5 +1,5 @@
-// P5 D18: the {{name}} substitution engine is written twice — once here (http/substitute.ts) and
-// once in Go (internal/httpvars/resolve.go) — and pinned to the same behaviour by one shared
+// P5 D18: the {{name}} substitution engine is written twice — once here (src/http/substitute.ts)
+// and once in Go (internal/apivars/resolve.go) — and pinned to the same behaviour by one shared
 // corpus, read by both a Go test and this one, rather than by two independently-imagined test
 // suites. A case added to the corpus must pass on both sides or one of them fails.
 
@@ -19,11 +19,9 @@ interface Case {
 
 const cases: Case[] = JSON.parse(
   readFileSync(
-    // P12 F15: this file moved (D19) and internal/httpvars renames to internal/apivars at C9 —
-    // touched by two different renames at once, so the path here changes twice across this phase.
     resolvePath(
       import.meta.dir,
-      '../../../apps/kira-studio/internal/httpvars/testdata/substitution.json',
+      '../../../apps/kira-studio/internal/apivars/testdata/substitution.json',
     ),
     'utf8',
   ),

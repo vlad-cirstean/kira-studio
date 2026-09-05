@@ -1,7 +1,7 @@
 import type { AppMode } from '@shared/domain/mode';
 import type { Component } from 'vue';
-import CollectionsPanel from '../http/CollectionsPanel.vue';
-import HttpStart from '../http/HttpStart.vue';
+import ApiStart from '../api/ApiStart.vue';
+import CollectionsPanel from '../api/CollectionsPanel.vue';
 import ProjectPanel from './panels/ProjectPanel.vue';
 import StudioStart from './panels/StudioStart.vue';
 
@@ -15,9 +15,9 @@ export interface ModeDef {
   start: Component;
 }
 
-// P1 D6/C6: mode content comes from a registry, mirroring D4's tab-kind registry. Http's own
+// P1 D6/C6: mode content comes from a registry, mirroring D4's tab-kind registry. Api's own
 // entries are both EmptyState-based (§0.2) — P1 adds no HTTP functionality, only the seam.
 export const MODES: Record<AppMode, ModeDef> = {
   studio: { label: 'Studio', icon: 'database', panel: ProjectPanel, start: StudioStart },
-  http: { label: 'Http', icon: 'globe', panel: CollectionsPanel, start: HttpStart },
+  api: { label: 'Api', icon: 'globe', panel: CollectionsPanel, start: ApiStart },
 };

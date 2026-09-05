@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { HttpVariable } from '@shared/domain/variables';
+import type { ApiVariable } from '@shared/domain/variables';
 import { ref, watch } from 'vue';
 import CodiconIcon from '../theme/CodiconIcon.vue';
 import IconButton from '../theme/primitives/IconButton.vue';
@@ -11,7 +11,7 @@ import VariableHistoryMenu from './VariableHistoryMenu.vue';
 // secret, until revealed), a secret checkbox, a history button/popover, a duplicate-name warning
 // chip, and a remove button.
 const props = defineProps<{
-  row: HttpVariable;
+  row: ApiVariable;
   duplicate: boolean;
   /** True for the trailing blank row — its remove/history/reorder controls are all disabled,
    *  matching FieldRowsTable.vue's own convention for the row shape this reimplements. */

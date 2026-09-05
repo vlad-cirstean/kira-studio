@@ -6,7 +6,7 @@ import (
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/appcore"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/grpcclient"
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/httpvars"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/apivars"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/secrets"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
@@ -61,7 +61,7 @@ func TestMaskGrpcError_NoOpWithNothingUsed(t *testing.T) {
 }
 
 // TestGrpcHasAnyReference is the short-circuit's own small table — the same "is there anything to
-// resolve at all" gate httpvars' own referencedFields walk exists for.
+// resolve at all" gate apivars' own referencedFields walk exists for.
 func TestGrpcHasAnyReference(t *testing.T) {
 	cases := []struct {
 		name     string
@@ -87,7 +87,7 @@ func TestGrpcHasAnyReference(t *testing.T) {
 }
 
 // newGrpcServiceForTest opens a real (tmpfile-backed) SQLite database through the real migrations
-// and wires a *GrpcService against it — mirrors httpvars/resolve_test.go's own newResolveService
+// and wires a *GrpcService against it — mirrors apivars/resolve_test.go's own newResolveService
 // and bridge/http_test.go's own newRepos-backed setup.
 func newGrpcServiceForTest(t *testing.T) (*GrpcService, *storage.DB, *repos.VariablesRepo, *repos.CollectionsRepo) {
 	t.Helper()
@@ -106,9 +106,9 @@ func newGrpcServiceForTest(t *testing.T) (*GrpcService, *storage.DB, *repos.Vari
 	cipher := secrets.New()
 	variablesRepo := repos.NewVariables(db.DB, cipher)
 	repositories.Variables = variablesRepo
-	httpVars := httpvars.New(variablesRepo, cipher, nil)
+	apiVars := apivars.New(variablesRepo, cipher, nil)
 
-	svc := &GrpcService{Deps: appcore.Deps{DB: db.DB, Repos: repositories, HttpVars: httpVars}}
+	svc := &GrpcService{Deps: appcore.Deps{DB: db.DB, Repos: repositories, ApiVars: apiVars}}
 	return svc, db, variablesRepo, repositories.Collections
 }
 

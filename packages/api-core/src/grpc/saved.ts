@@ -1,4 +1,4 @@
-import type { HttpSavedGrpcRequest } from '@kira/shared/domain/collections';
+import type { GrpcSavedRequest } from '@kira/shared/domain/collections';
 import type { GrpcRequestTabState } from '@kira/shared/domain/grpc';
 
 // P11 D15/D12: two views of the same request exist by construction — http_items.request_json
@@ -9,7 +9,7 @@ import type { GrpcRequestTabState } from '@kira/shared/domain/grpc';
 /** The request half of the tab's state. Dropping the four UI-only fields (itemId, name,
  *  requestPane/responsePane, requestPaneHeight) is what stops resizing the request pane from
  *  marking a request dirty. */
-export function toSavedGrpcRequest(state: GrpcRequestTabState): HttpSavedGrpcRequest {
+export function toSavedGrpcRequest(state: GrpcRequestTabState): GrpcSavedRequest {
   return {
     target: state.target,
     tlsMode: state.tlsMode,
@@ -27,7 +27,7 @@ export function toSavedGrpcRequest(state: GrpcRequestTabState): HttpSavedGrpcReq
 
 /** The same fields back, as a patch over tab state. Rows are copied so a stored document and a
  *  tab never share a row object. */
-export function fromSavedGrpcRequest(saved: HttpSavedGrpcRequest): Partial<GrpcRequestTabState> {
+export function fromSavedGrpcRequest(saved: GrpcSavedRequest): Partial<GrpcRequestTabState> {
   return {
     target: saved.target,
     tlsMode: saved.tlsMode,
@@ -45,15 +45,12 @@ export function fromSavedGrpcRequest(saved: HttpSavedGrpcRequest): Partial<GrpcR
 
 /** A structural comparison of the two documents — `null` for the saved side means "this tab is
  *  bound to a row we have not read", treated as not dirty. */
-export function isGrpcDirty(
-  state: GrpcRequestTabState,
-  saved: HttpSavedGrpcRequest | null,
-): boolean {
+export function isGrpcDirty(state: GrpcRequestTabState, saved: GrpcSavedRequest | null): boolean {
   if (!saved) return false;
   return !sameGrpcRequest(toSavedGrpcRequest(state), saved);
 }
 
-function sameGrpcRequest(a: HttpSavedGrpcRequest, b: HttpSavedGrpcRequest): boolean {
+function sameGrpcRequest(a: GrpcSavedRequest, b: GrpcSavedRequest): boolean {
   if (
     a.target !== b.target ||
     a.tlsMode !== b.tlsMode ||

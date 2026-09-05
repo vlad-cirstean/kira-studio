@@ -1,7 +1,7 @@
-// P5 D18: the shared corpus, Go side. frontend/src/http/substitute.ts's own resolve() runs the
+// P5 D18: the shared corpus, Go side. packages/api-core/src/http/substitute.ts's own resolve() runs the
 // identical cases (tests/unit/http-substitution.spec.ts) — a case added to testdata/
 // substitution.json must pass on both sides or one of them fails.
-package httpvars_test
+package apivars_test
 
 import (
 	"encoding/json"
@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/httpclient"
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/httpvars"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/apivars"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/secrets"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
@@ -48,7 +48,7 @@ func loadCorpus(t *testing.T) []corpusCase {
 func TestResolveAgainstTheSharedCorpus(t *testing.T) {
 	for _, c := range loadCorpus(t) {
 		t.Run(c.Name, func(t *testing.T) {
-			result := httpvars.Resolve(c.Template, c.Values, c.Secrets)
+			result := apivars.Resolve(c.Template, c.Values, c.Secrets)
 			if result.Text != c.Want {
 				t.Errorf("Text = %q, want %q", result.Text, c.Want)
 			}
@@ -71,7 +71,7 @@ func TestResolveAgainstTheSharedCorpus(t *testing.T) {
 // ResolveRequest's own path ever calls it (only Reveal/RevealHistory do). The returned
 // *repos.VariablesRepo is the exact instance the Service resolves secrets through — seeding via it
 // directly (rather than a second, independent instance) is what makes SecretsFor see the row.
-func newResolveService(t *testing.T) (*httpvars.Service, *repos.VariablesRepo, *repos.CollectionsRepo) {
+func newResolveService(t *testing.T) (*apivars.Service, *repos.VariablesRepo, *repos.CollectionsRepo) {
 	t.Helper()
 	t.Setenv("KIRA_INSECURE_SECRETS", "1")
 	t.Setenv("KIRA_HOME", t.TempDir())
@@ -81,7 +81,7 @@ func newResolveService(t *testing.T) (*httpvars.Service, *repos.VariablesRepo, *
 	}
 	t.Cleanup(func() { _ = db.Close() })
 	variablesRepo := repos.NewVariables(db.DB, secrets.New())
-	return httpvars.New(variablesRepo, secrets.New(), nil), variablesRepo, &repos.CollectionsRepo{DB: db.DB}
+	return apivars.New(variablesRepo, secrets.New(), nil), variablesRepo, &repos.CollectionsRepo{DB: db.DB}
 }
 
 // P9 §6.2: ResolveRequest's fourth return is exactly the secret name→value pairs it actually
@@ -137,7 +137,7 @@ func TestResolveRequestReturnsExactlyTheSecretsItSubstituted(t *testing.T) {
 }
 
 func TestNamesFindsEveryDistinctReferenceOnce(t *testing.T) {
-	got := httpvars.Names("{{a}}/{{b}}?x={{a}}&y={{ c }}")
+	got := apivars.Names("{{a}}/{{b}}?x={{a}}&y={{ c }}")
 	want := []string{"a", "b", "c"}
 	if len(got) != len(want) {
 		t.Fatalf("Names = %v, want %v", got, want)

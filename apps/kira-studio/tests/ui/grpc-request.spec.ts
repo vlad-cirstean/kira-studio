@@ -15,13 +15,13 @@ function row(page: Page, id: string): Locator {
 // from every other tests/ui spec) — the `Call` bound-call endpoint via installControlMocks'
 // snapshot machinery, and D8's own pushed message channel via F20's new `emitWailsEvent` helper.
 
-function modeTab(page: Page, mode: 'studio' | 'http'): Locator {
+function modeTab(page: Page, mode: 'studio' | 'api'): Locator {
   return page.locator(`[data-testid="mode-tab"][data-mode="${mode}"]`);
 }
 
 async function openHttpModeAndNewGrpcRequest(page: Page): Promise<void> {
-  await modeTab(page, 'http').click();
-  await expect(page.locator('[data-testid="http-start"]')).toBeVisible();
+  await modeTab(page, 'api').click();
+  await expect(page.locator('[data-testid="api-start"]')).toBeVisible();
   await page.click('[data-testid="new-grpc-request-start"]');
 }
 
@@ -227,7 +227,7 @@ test('gRPC request — a unary call renders its status, message and metadata', a
   ];
   const { window: page } = await relaunch({ control: CONTROL });
 
-  await expect(modeTab(page, 'http')).toHaveClass(/is-active/);
+  await expect(modeTab(page, 'api')).toHaveClass(/is-active/);
   await expect(page.locator('[data-testid="grpc-request-view"]')).toBeVisible();
 
   await page.click('[data-testid="grpc-call"]');
@@ -499,7 +499,7 @@ test('gRPC request — a request in a collection opens the grpc-request tab kind
     { channel: IPC.grpcDescribe, response: STREAM_SCHEMA },
   ];
   const { window: page } = await relaunch({ control: CONTROL });
-  await modeTab(page, 'http').click();
+  await modeTab(page, 'api').click();
 
   // *New gRPC request* from the tree's own context menu (D12's sibling of *New request*) creates
   // the row directly — D13's inline rename is this tree's own "name it and it's saved" step, in

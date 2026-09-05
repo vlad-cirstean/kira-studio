@@ -10,11 +10,11 @@ import { IPC } from './support/ipcChannels';
 
 const NOW = '2026-01-01T00:00:00.000Z';
 
-function modeTab(page: Page, mode: 'studio' | 'http'): Locator {
+function modeTab(page: Page, mode: 'studio' | 'api'): Locator {
   return page.locator(`[data-testid="mode-tab"][data-mode="${mode}"]`);
 }
 async function openHttpMode(page: Page): Promise<void> {
-  await modeTab(page, 'http').click();
+  await modeTab(page, 'api').click();
 }
 function collectionRow(page: Page, id: string): Locator {
   return page.locator(`[data-testid="collection-row"][data-id="${id}"]`);
@@ -326,8 +326,8 @@ test('precedence is environment-over-collection', async ({ relaunch }) => {
   await expect(page.locator('[data-testid="http-status"]')).toContainText('200');
 
   // Falls back to the collection's value with no environment active.
-  await page.selectOption('[data-testid="http-environment-select"]', '');
-  await expect(page.locator('[data-testid="http-environment-select"]')).toHaveValue('');
+  await page.selectOption('[data-testid="api-environment-select"]', '');
+  await expect(page.locator('[data-testid="api-environment-select"]')).toHaveValue('');
   await page.click('[data-testid="http-send"]');
   await expect(page.locator('[data-testid="http-status"]')).toContainText('200');
 

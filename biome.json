@@ -126,7 +126,7 @@
       }
     },
     {
-      "includes": ["apps/kira-studio/frontend/src/http/**"],
+      "includes": ["apps/kira-studio/frontend/src/api/**"],
       "linter": {
         "rules": {
           "style": {
@@ -136,11 +136,11 @@
                 "patterns": [
                   {
                     "group": ["**/project/**"],
-                    "message": "P1 D7: http/ must not import project/ — Studio's connection tree is not Http's to reach into."
+                    "message": "P1 D7: api/ must not import project/ — Studio's connection tree is not Api's to reach into."
                   },
                   {
                     "group": ["**/views/**"],
-                    "message": "P1 D7: http/ must not import views/ directly, mirroring project/'s own rule — dispatch through state/viewCommands.ts instead."
+                    "message": "P1 D7: api/ must not import views/ directly, mirroring project/'s own rule — dispatch through state/viewCommands.ts instead."
                   }
                 ]
               }

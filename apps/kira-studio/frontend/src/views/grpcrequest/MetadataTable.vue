@@ -2,7 +2,7 @@
 import type { GrpcMetadataState } from '@shared/domain/grpc';
 import type { GrpcRequestTabRecord } from '@shared/domain/tabs';
 import { computed } from 'vue';
-import { patchGrpcRequestTabState } from '../../http/tabs';
+import { patchGrpcRequestTabState } from '../../api/tabs';
 import IconButton from '../../theme/primitives/IconButton.vue';
 import TextField from '../../theme/primitives/TextField.vue';
 

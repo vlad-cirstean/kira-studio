@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import type { HttpRequestTabRecord } from '@shared/domain/tabs';
 import { computed } from 'vue';
+import { patchHttpRequestTabState } from '../../api/tabs';
 import { formatBytes } from '../../format';
-import { patchHttpRequestTabState } from '../../http/tabs';
 import AppButton from '../../theme/primitives/AppButton.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
 import { chooseBodyFile } from './files';

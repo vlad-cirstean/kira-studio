@@ -54,7 +54,10 @@ export function defaultHttpSavedRequest(): HttpSavedRequest {
 // grpcRequestTabStateSchema (domain/grpc.ts), field name for field name, following
 // httpSavedRequestSchema's own precedent exactly: not the tab state (the four UI-only fields stay
 // out), and Go owns the type since it writes this document too.
-export const httpSavedGrpcRequestSchema = /*#__PURE__*/ z.object({
+//
+// P12 D3: HttpSavedGrpcRequest → GrpcSavedRequest — a module prefix on a gRPC type, matching Go's
+// own model.SavedGrpcRequest.
+export const grpcSavedRequestSchema = /*#__PURE__*/ z.object({
   target: z.string().default(''),
   tlsMode: grpcTlsModeSchema.default('tls'),
   caFile: z.string().default(''),
@@ -67,11 +70,11 @@ export const httpSavedGrpcRequestSchema = /*#__PURE__*/ z.object({
   message: z.string().default(''),
   metadata: /*#__PURE__*/ z.array(grpcMetadataSchema).default([]),
 });
-export type HttpSavedGrpcRequest = z.infer<typeof httpSavedGrpcRequestSchema>;
+export type GrpcSavedRequest = z.infer<typeof grpcSavedRequestSchema>;
 
 /** An empty saved gRPC request — what a brand-new collection row starts as. */
-export function defaultHttpSavedGrpcRequest(): HttpSavedGrpcRequest {
-  return httpSavedGrpcRequestSchema.parse({});
+export function defaultGrpcSavedRequest(): GrpcSavedRequest {
+  return grpcSavedRequestSchema.parse({});
 }
 
 // The two flat row shapes CollectionsService.List answers with (D11). Mirrors of Go's

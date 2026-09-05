@@ -48,7 +48,7 @@ function onClose(e: MouseEvent, tab: TabRecord): void {
 
 // §8.10's Tab row: Close · Close others · Close to the right · Close all · — · Duplicate tab ·
 // Copy name · plus whatever the tab's own kind appends (D22) — Studio's kinds all append
-// "Reveal in project panel" (F11); an Http tab kind supplies its own menuExtras, or none.
+// "Reveal in project panel" (F11); an Api tab kind supplies its own menuExtras, or none.
 function onContextMenu(e: MouseEvent, tab: TabRecord): void {
   openContextMenu(e, [
     {
@@ -93,7 +93,7 @@ function onContextMenu(e: MouseEvent, tab: TabRecord): void {
   ]);
 }
 
-// P1 D5: this mode's own tabs only — an Http tab is never rendered in Studio's strip, or vice
+// P1 D5: this mode's own tabs only — an Api tab is never rendered in Studio's strip, or vice
 // versa (§6.2's "the empty tab-strip state" is this filter returning nothing for a mode with no
 // tab kinds registered yet).
 const tabs = computed(() => tabsForMode(modeState.active));
