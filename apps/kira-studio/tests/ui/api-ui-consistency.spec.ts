@@ -1,6 +1,7 @@
 import type { Locator, Page } from '@playwright/test';
 import type { ControlSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
+import { acceptConfirm } from './support/dialogs';
 import { IPC } from './support/ipcChannels';
 
 // P13 §7: a small, Api-only spec (the SPEC's module-boundary rule — "a single test file covering
@@ -610,4 +611,460 @@ test('filtering the response headers pane, and filtering the request headers tab
   await expect(allRows.nth(0).locator('[data-testid="http-header-value"]')).toHaveValue('Bearer x');
   await expect(allRows.nth(2).locator('[data-testid="http-header-name"]')).toHaveValue('X-Debug');
   await expect(allRows.nth(2).locator('[data-testid="http-header-value"]')).toHaveValue('off');
+});
+
+// P17 §4.4: this phase's own eight new cases — the pipe/fake namespace, the method select, and
+// the dialog->tab/duplicate/bulk-edit/overview surfaces item 3/4/5/8 built.
+
+test('typing "{{base_url | " in the URL field lists the six transforms, not the variable names (D13(b))', async ({
+  relaunch,
+}) => {
+  const CONTROL: ControlSnapshot[] = [
+    { channel: IPC.tabsList, response: [httpRequestTab('tab-1', 0, true, {})] },
+    ...p15bVariableControl(),
+  ];
+  const { window: page } = await relaunch({ control: CONTROL });
+
+  const url = page.locator('[data-testid="http-url"]');
+  await url.click();
+  await url.pressSequentially('https://{{');
+  await expect(url).toHaveValue('https://{{}}');
+  await url.pressSequentially('base_url | ');
+  await expect(url).toHaveValue('https://{{base_url | }}');
+
+  // Ctrl+Space forces the full list open on an empty word (completionKeymap's own "show me
+  // everything" binding, shared with the console) — after the pipe, that list is exactly the six
+  // transforms, never base_url/api_key.
+  await page.keyboard.press('Control+Space');
+  const suggestions = page.locator('.autocomplete-suggestions li');
+  await expect(suggestions).toHaveCount(6);
+  await expect(suggestions.filter({ hasText: 'base_url' })).toHaveCount(0);
+  await expect(suggestions.filter({ hasText: 'base64 encode' })).toBeVisible();
+
+  await suggestions.filter({ hasText: 'base64 encode' }).click();
+  await expect(url).toHaveValue('https://{{base_url | base64}}');
+});
+
+test('the URL field paints a piped reference resolved and an unrecognised transform unknown (D3 rule 4)', async ({
+  relaunch,
+}) => {
+  const CONTROL: ControlSnapshot[] = [
+    { channel: IPC.tabsList, response: [httpRequestTab('tab-1', 0, true, {})] },
+    ...p15bVariableControl(),
+  ];
+  const { window: page } = await relaunch({ control: CONTROL });
+
+  await page.fill(
+    '[data-testid="http-url"]',
+    'https://{{base_url | base64}}/v1?x={{base_url | nope}}',
+  );
+
+  const overlay = page.locator('.url-field .highlight-overlay');
+  await expect(overlay.locator('.cm-kira-var')).toHaveCount(1);
+  await expect(overlay.locator('.cm-kira-var-unknown')).toHaveCount(1);
+});
+
+test("hovering a piped secret names the transform and shows no value (§5's UI-half security assertion)", async ({
+  relaunch,
+}) => {
+  const CONTROL: ControlSnapshot[] = [
+    { channel: IPC.tabsList, response: [httpRequestTab('tab-1', 0, true, {})] },
+    ...p15bVariableControl(),
+  ];
+  const { window: page } = await relaunch({ control: CONTROL });
+
+  await page.fill('[data-testid="http-url"]', 'https://{{base_url}}/{{api_key | base64}}');
+
+  const secretSpan = page.locator('.url-field .cm-kira-var-secret');
+  await expect(secretSpan).toHaveCount(1);
+  const secretBox = await secretSpan.boundingBox();
+  if (!secretBox) throw new Error('secret reference span has no box');
+  await page.mouse.move(secretBox.x + secretBox.width / 2, secretBox.y + secretBox.height / 2);
+  const hover = page.locator('[data-testid="autocomplete-hover"]');
+  await expect(hover).toBeVisible();
+  await expect(hover).toContainText('secret — base64-encoded when the request is sent');
+  // The security assertion: no value, transformed or not, and the name isn't repeated either.
+  await expect(hover).not.toContainText('api_key');
+});
+
+test('the method select opens an app-drawn menu, and PATCH gets its own colour, distinct from PUT (D18/D19)', async ({
+  relaunch,
+}) => {
+  const NOW = '2026-01-01T00:00:00.000Z';
+  const TREE = {
+    collections: [
+      { id: 'col-1', name: 'Orders API', sortOrder: 0, createdAt: NOW, updatedAt: NOW },
+    ],
+    items: [
+      {
+        id: 'item-1',
+        collectionId: 'col-1',
+        parentId: null,
+        kind: 'request',
+        name: 'Health check',
+        sortOrder: 0,
+        method: 'GET',
+        url: 'https://api.example.com/healthz',
+        createdAt: NOW,
+        updatedAt: NOW,
+      },
+    ],
+  };
+  const HEALTH_REQUEST = {
+    method: 'GET',
+    url: 'https://api.example.com/healthz',
+    headers: [],
+    bodyMode: 'none',
+    body: '',
+    code: '',
+    codeLanguage: 'json',
+    urlEncoded: [],
+    formData: [],
+    binaryFile: null,
+  };
+  const CONTROL: ControlSnapshot[] = [
+    { channel: IPC.collectionsList, response: TREE },
+    { channel: IPC.collectionsGetRequest, response: HEALTH_REQUEST },
+  ];
+  const { window: page } = await relaunch({ control: CONTROL });
+  await modeTab(page, 'api').click();
+  await expect(page.locator('[data-testid="collection-row"][data-id="col-1"]')).toBeVisible();
+  await page.locator('[data-testid="collection-row"][data-id="col-1"]').locator('.twisty').click();
+  await page.locator('[data-testid="collection-row"][data-id="item-1"]').dblclick();
+  await expect(page.locator('[data-testid="http-request-view"]')).toBeVisible();
+
+  const trigger = page.locator('[data-testid="http-method-select"]');
+  await trigger.click();
+  await expect(page.locator('[data-testid="method-menu"]')).toBeVisible();
+  await expect(page.locator('[data-testid="method-menu-item-GET"] .codicon-check')).toHaveCount(1);
+
+  await page.click('[data-testid="method-menu-item-PATCH"]');
+  await expect(page.locator('[data-testid="method-menu"]')).toHaveCount(0);
+  await expect(trigger).toHaveAttribute('data-value', 'PATCH');
+
+  // "each a distinct colour" — the trigger's own resolved text colour actually differs between
+  // the two methods that used to share one family (PUT/PATCH both 'warn' under httpMethodClass).
+  const patchColor = await trigger.evaluate((el) => getComputedStyle(el).color);
+  await trigger.click();
+  await page.click('[data-testid="method-menu-item-PUT"]');
+  const putColor = await trigger.evaluate((el) => getComputedStyle(el).color);
+  expect(putColor).not.toBe(patchColor);
+});
+
+const P17_TREE = {
+  collections: [
+    {
+      id: 'col-1',
+      name: 'Orders API',
+      sortOrder: 0,
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    },
+  ],
+  items: [],
+};
+
+test('Variables… on a collection row opens a tab, a second invocation activates it rather than opening a second, and renaming retitles it (D16)', async ({
+  relaunch,
+}) => {
+  const RENAMED_TREE = {
+    collections: [{ ...P17_TREE.collections[0], name: 'Orders API v2' }],
+    items: [],
+  };
+  const CONTROL: ControlSnapshot[] = [
+    { channel: IPC.collectionsList, response: P17_TREE },
+    { channel: IPC.variablesListEnvironments, response: [] },
+    { channel: IPC.variablesList, args: { scope: 'collection', ownerId: 'col-1' }, response: [] },
+    { channel: IPC.collectionsRename, response: undefined },
+    { channel: IPC.collectionsList, response: RENAMED_TREE },
+  ];
+  const { window: page } = await relaunch({ control: CONTROL });
+  await modeTab(page, 'api').click();
+
+  const row = page.locator('[data-testid="collection-row"][data-id="col-1"]');
+  await expect(row).toBeVisible();
+  await row.click({ button: 'right' });
+  await page.click('[data-testid="menu-item-variables"]');
+  await expect(page.locator('[data-testid="variables-dialog"]')).toBeVisible();
+  await expect(page.locator('[data-testid="tab"]')).toHaveCount(1);
+
+  // D16's reuse: true — a second invocation activates the same tab, never a second one.
+  await row.click({ button: 'right' });
+  await page.click('[data-testid="menu-item-variables"]');
+  await expect(page.locator('[data-testid="tab"]')).toHaveCount(1);
+
+  // Renaming the collection follows through to the open tab's own name (D16, the same
+  // renameApiRequestTabs shape P4 D14 already established for a request tab).
+  await row.click({ button: 'right' });
+  await page.click('[data-testid="menu-item-rename"]');
+  await page.locator('[data-testid="collection-rename-input"]').fill('Orders API v2');
+  await page.keyboard.press('Enter');
+  await expect(page.locator('[data-testid="variable-set-target"]')).toContainText('Orders API v2');
+});
+
+test('duplicating an environment produces "<name> copy" carrying the same variable names, with the original still active (D17)', async ({
+  relaunch,
+}) => {
+  const ENV = { id: 'env-1', name: 'Prod', sortOrder: 0, isActive: true, description: '' };
+  const ENV_COPY = {
+    id: 'env-1-copy',
+    name: 'Prod copy',
+    sortOrder: 1,
+    isActive: false,
+    description: '',
+  };
+  const VAR_COPY = {
+    id: 'var-1-copy',
+    scope: 'environment',
+    ownerId: 'env-1-copy',
+    name: 'region',
+    value: 'us',
+    isSecret: false,
+    sortOrder: 0,
+    description: '',
+  };
+  const CONTROL: ControlSnapshot[] = [
+    { channel: IPC.collectionsList, response: P17_TREE },
+    { channel: IPC.variablesListEnvironments, response: [ENV] },
+    { channel: IPC.variablesDuplicateEnvironment, response: ENV_COPY },
+    { channel: IPC.variablesListEnvironments, response: [ENV, ENV_COPY] },
+    {
+      channel: IPC.variablesList,
+      args: { scope: 'environment', ownerId: 'env-1-copy' },
+      response: [VAR_COPY],
+    },
+  ];
+  const { window: page } = await relaunch({ control: CONTROL });
+  await modeTab(page, 'api').click();
+
+  await page.locator('[data-testid="tree-background"]').click({ button: 'right' });
+  await page.click('[data-testid="menu-item-environments"]');
+  await expect(page.locator('[data-testid="environments-dialog"]')).toBeVisible();
+
+  const originalRow = page.locator('[data-testid="environment-row"][data-id="env-1"]');
+  await originalRow.locator('[data-testid="environment-duplicate"]').click();
+
+  const copyRow = page.locator('[data-testid="environment-row"][data-id="env-1-copy"]');
+  await expect(copyRow).toBeVisible();
+  await expect(copyRow.locator('[data-testid="environment-name"]')).toHaveValue('Prod copy');
+  await expect(originalRow.locator('[data-testid="environment-active"]')).toBeChecked();
+  await expect(copyRow.locator('[data-testid="environment-active"]')).not.toBeChecked();
+
+  await copyRow.locator('[data-testid="environment-edit-variables"]').click();
+  await expect(page.locator('[data-testid="variables-dialog"]')).toBeVisible();
+  await expect(
+    page.locator('[data-testid="variable-row"]').first().locator('[data-testid="variable-name"]'),
+  ).toHaveValue('region');
+});
+
+test('the bulk editor: toggle, edit, live summary and rename warning, Apply through the confirm, and a secret left blank stays intact (item 5)', async ({
+  relaunch,
+}) => {
+  const ROW_KEPT = {
+    id: 'v-kept',
+    scope: 'collection',
+    ownerId: 'col-1',
+    name: 'kept',
+    value: 'v1',
+    isSecret: false,
+    sortOrder: 0,
+    description: '',
+  };
+  const ROW_SECRET = {
+    id: 'v-token',
+    scope: 'collection',
+    ownerId: 'col-1',
+    name: 'token',
+    value: '',
+    isSecret: true,
+    sortOrder: 1,
+    description: '',
+  };
+  const ROW_GONE = {
+    id: 'v-gone',
+    scope: 'collection',
+    ownerId: 'col-1',
+    name: 'gone',
+    value: 'x',
+    isSecret: false,
+    sortOrder: 2,
+    description: '',
+  };
+  const AFTER = [
+    { ...ROW_KEPT, value: 'v2' },
+    ROW_SECRET,
+    {
+      id: 'v-added',
+      scope: 'collection',
+      ownerId: 'col-1',
+      name: 'added',
+      value: 'z',
+      isSecret: false,
+      sortOrder: 1,
+      description: '',
+    },
+  ];
+  const CONTROL: ControlSnapshot[] = [
+    { channel: IPC.collectionsList, response: P17_TREE },
+    { channel: IPC.variablesListEnvironments, response: [] },
+    {
+      channel: IPC.variablesList,
+      args: { scope: 'collection', ownerId: 'col-1' },
+      response: [ROW_KEPT, ROW_SECRET, ROW_GONE],
+    },
+    {
+      channel: IPC.variablesApplyBulk,
+      response: { added: 1, updated: 1, removed: 1, reordered: false },
+    },
+    {
+      channel: IPC.variablesList,
+      args: { scope: 'collection', ownerId: 'col-1' },
+      response: AFTER,
+    },
+  ];
+  const { window: page } = await relaunch({ control: CONTROL });
+  await modeTab(page, 'api').click();
+
+  await page.locator('[data-testid="collection-row"][data-id="col-1"]').click({ button: 'right' });
+  await page.click('[data-testid="menu-item-variables"]');
+  await expect(page.locator('[data-testid="variables-dialog"]')).toBeVisible();
+  await expect(page.locator('[data-testid="variable-row"]')).toHaveCount(4); // 3 real + trailing
+
+  await page.click('[data-testid="variables-bulk-toggle"]');
+  const editor = page.locator('[data-testid="variables-bulk-textarea"] .cm-content');
+  await expect(editor).toBeVisible();
+  // The secret's own line is seeded empty, with the fixed marker comment above it (D21) — the
+  // seed already proves the renderer never had a plaintext to write out.
+  await expect(editor).toContainText('secret — the value is not shown here');
+
+  await editor.click();
+  await page.keyboard.press('ControlOrMeta+a');
+  await page.keyboard.insertText(
+    [
+      'kept=v2',
+      '',
+      '# secret — the value is not shown here and is left unchanged unless you type one',
+      'token=',
+      '',
+      'added=z',
+    ].join('\n'),
+  );
+
+  await expect(page.locator('[data-testid="variables-bulk-summary"]')).toContainText(
+    '1 added · 1 updated · 1 removed',
+  );
+  await expect(page.locator('[data-testid="variables-bulk-rename-warning"]')).toBeVisible();
+
+  await page.click('[data-testid="variables-bulk-apply"]');
+  await acceptConfirm(page);
+
+  await expect(page.locator('[data-testid="variables-bulk-editor"]')).toHaveCount(0);
+  const rows = page.locator('[data-testid="variable-row"]');
+  await expect(rows).toHaveCount(4); // kept, token, added + trailing
+  await expect(page.locator('[data-testid="variable-row"][data-id="v-token"]')).toBeVisible();
+  await expect(
+    page.locator('[data-testid="variable-row"][data-id="v-token"] [data-testid="variable-secret"]'),
+  ).toBeChecked();
+  await expect(page.locator('[data-testid="variable-row"][data-id="v-gone"]')).toHaveCount(0);
+  await expect(
+    page.locator('[data-testid="variable-row"][data-id="v-added"] [data-testid="variable-value"]'),
+  ).toHaveValue('z');
+});
+
+test('the overview panel opens from a request tab, lists both scopes with their chips, masks a secret, and Edit… opens the D16 tab (item 8)', async ({
+  relaunch,
+}) => {
+  const NOW = '2026-01-01T00:00:00.000Z';
+  const TREE = {
+    collections: [
+      { id: 'col-1', name: 'Orders API', sortOrder: 0, createdAt: NOW, updatedAt: NOW },
+    ],
+    items: [
+      {
+        id: 'item-1',
+        collectionId: 'col-1',
+        parentId: null,
+        kind: 'request',
+        name: 'Health check',
+        sortOrder: 0,
+        method: 'GET',
+        url: 'https://api.example.com/healthz',
+        createdAt: NOW,
+        updatedAt: NOW,
+      },
+    ],
+  };
+  const HEALTH_REQUEST = {
+    method: 'GET',
+    url: 'https://api.example.com/healthz',
+    headers: [],
+    bodyMode: 'none',
+    body: '',
+    code: '',
+    codeLanguage: 'json',
+    urlEncoded: [],
+    formData: [],
+    binaryFile: null,
+  };
+  const ENV = { id: 'env-1', name: 'Prod', sortOrder: 0, isActive: true, description: '' };
+  const ENV_VAR = {
+    id: 'var-env',
+    scope: 'environment',
+    ownerId: 'env-1',
+    name: 'region',
+    value: 'us-east',
+    isSecret: false,
+    sortOrder: 0,
+    description: '',
+  };
+  const COL_SECRET = {
+    id: 'var-col-secret',
+    scope: 'collection',
+    ownerId: 'col-1',
+    name: 'apiKey',
+    value: '',
+    isSecret: true,
+    sortOrder: 0,
+    description: '',
+  };
+  const CONTROL: ControlSnapshot[] = [
+    { channel: IPC.collectionsList, response: TREE },
+    { channel: IPC.collectionsGetRequest, response: HEALTH_REQUEST },
+    { channel: IPC.variablesListEnvironments, response: [ENV] },
+    {
+      channel: IPC.variablesList,
+      args: { scope: 'environment', ownerId: 'env-1' },
+      response: [ENV_VAR],
+    },
+    {
+      channel: IPC.variablesList,
+      args: { scope: 'collection', ownerId: 'col-1' },
+      response: [COL_SECRET],
+    },
+  ];
+  const { window: page } = await relaunch({ control: CONTROL });
+  await modeTab(page, 'api').click();
+  await expect(page.locator('[data-testid="collection-row"][data-id="col-1"]')).toBeVisible();
+  await page.locator('[data-testid="collection-row"][data-id="col-1"]').locator('.twisty').click();
+  await page.locator('[data-testid="collection-row"][data-id="item-1"]').dblclick();
+  await expect(page.locator('[data-testid="http-request-view"]')).toBeVisible();
+
+  await page.click('[data-testid="http-variables-overview-toggle"]');
+  await expect(page.locator('[data-testid="variables-overview"]')).toBeVisible();
+
+  const rows = page.locator('[data-testid="variables-overview-row"]');
+  await expect(rows).toHaveCount(2);
+  await expect(
+    page.locator('[data-testid="variables-overview-row"][data-scope="environment"]'),
+  ).toHaveCount(1);
+  await expect(
+    page.locator('[data-testid="variables-overview-row"][data-scope="collection"]'),
+  ).toHaveCount(1);
+  await expect(page.locator('[data-testid="variables-overview-secret"]')).toHaveCount(1);
+  await expect(page.locator('[data-testid="variables-overview-value"]')).toContainText('us-east');
+
+  await page.click('[data-testid="variables-overview-edit-environment"]');
+  await expect(
+    page.locator('[data-testid="variables-dialog"][data-scope="environment"]'),
+  ).toBeVisible();
 });

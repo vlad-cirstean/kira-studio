@@ -12,6 +12,7 @@ import {
   CONTENT_TYPE_BY_CODE_LANGUAGE,
   HTTP_BODY_MODES,
 } from '@kira/shared/domain/http';
+import { TRANSFORM_NAMES } from '../src/http/transforms';
 
 /** Pulls every `"key": true` entry out of a Go `var <name> = map[string]bool{ ... }` literal —
  *  tolerant of comments and multi-entries-per-line (both present in the real source), not a full
@@ -85,5 +86,22 @@ describe('Go/TS Postman code-language parity (P4 D17)', () => {
     );
     const goLanguages = extractGoStringSet(source, 'postmanCodeLanguages');
     expect(goLanguages).toEqual(new Set(CODE_LANGUAGES));
+  });
+});
+
+// P17 §4.3: the same silent-drift shape as the two describes above, for the six-transform closed
+// vocabulary a `{{name | transform}}` pipe may apply (D7) — apivars/transforms.go's own comment
+// names this exact test as the reason its `transformNames` map literal must keep this shape. A
+// transform added on one side and not the other is a failing test here, rather than a pipeline
+// that resolves in the renderer's live preview and silently falls back to `unknown` (or vice
+// versa) only once a request actually reaches Go's stage 2.
+describe('Go/TS transform vocabulary parity (P17 D7)', () => {
+  test('apivars.transformNames (Go) matches TRANSFORM_NAMES (TS)', () => {
+    const source = readFileSync(
+      resolve(import.meta.dir, '../../../apps/kira-studio/internal/apivars/transforms.go'),
+      'utf8',
+    );
+    const goNames = extractGoStringSet(source, 'transformNames');
+    expect(goNames).toEqual(new Set(TRANSFORM_NAMES));
   });
 });
