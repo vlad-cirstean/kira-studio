@@ -8,9 +8,9 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/apivars"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/appcore"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/grpcclient"
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/apivars"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/secrets"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
@@ -27,7 +27,7 @@ import (
 func TestMaskGrpcError_MasksMessageAndPartial(t *testing.T) {
 	const secret = "sk_live_super_secret_token"
 	const masked = "{{apiToken}}"
-	used := map[string]string{"apiToken": secret}
+	used := []apivars.UsedSecret{{Name: "apiToken", Rendered: secret, Placeholder: "{{apiToken}}"}}
 
 	err := grpcclient.Transport("dial tcp: bearer " + secret + " rejected")
 	err.Partial = &grpcclient.CallResult{
@@ -142,9 +142,9 @@ func TestRecordGrpcHistory_NeverPersistsResolvedSecrets(t *testing.T) {
 		OpID: "op1", TabID: "tab1", Streaming: false,
 		DescriptorMode: "reflection", Target: "api.example.com:443",
 		Service: "kira.probe.v1.Echo", Method: "Unary",
-		MessageJSON:   `{"token":"{{token}}"}`,
-		Metadata:      []grpcclient.MetaPair{{Name: "authorization", Value: "Bearer {{token}}"}},
-		CollectionID:  c.ID,
+		MessageJSON:  `{"token":"{{token}}"}`,
+		Metadata:     []grpcclient.MetaPair{{Name: "authorization", Value: "Bearer {{token}}"}},
+		CollectionID: c.ID,
 	}
 	// The CallResult as if the live call actually resolved and sent the secret — recordGrpcHistory
 	// must never be handed this and must never derive persisted fields from it; passed here as the
@@ -230,9 +230,20 @@ func TestResolveGrpcCallSource_ResolvesTargetAndMetadataInProtoDescriptorMode(t 
 	if len(src.Metadata) != 1 || src.Metadata[0].Value != "Bearer "+secretToken {
 		t.Errorf("Metadata = %+v, want authorization resolved to Bearer %s", src.Metadata, secretToken)
 	}
-	if used["host"] != secretHost || used["token"] != secretToken {
+	if usedRendered(used, "host") != secretHost || usedRendered(used, "token") != secretToken {
 		t.Errorf("used = %+v, want both host and token recorded", used)
 	}
+}
+
+// usedRendered is this file's own small lookup over []apivars.UsedSecret (P17 D9) — a test still
+// wants "what did this name render to", without caring about entry order.
+func usedRendered(used []apivars.UsedSecret, name string) string {
+	for _, u := range used {
+		if u.Name == name {
+			return u.Rendered
+		}
+	}
+	return ""
 }
 
 // fakeEmitter is appcore.Emitter's own test double: it records every EmitTo call so a test can
@@ -301,7 +312,7 @@ func TestRunServerStream_MasksDialTargetSecretBeforeEmittingErrorEvent(t *testin
 	emitter := &fakeEmitter{}
 	svc := &GrpcService{Deps: appcore.Deps{Events: emitter}}
 
-	used := map[string]string{"host": secretHost}
+	used := []apivars.UsedSecret{{Name: "host", Rendered: secretHost, Placeholder: "{{host}}"}}
 	req := grpcclient.CallRequest{
 		// Port 1: nothing ever listens there, so the dial fails almost instantly with
 		// "connection refused" rather than timing out.

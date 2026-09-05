@@ -5,16 +5,18 @@ package apivars_test
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/httpclient"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/apivars"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/httpclient"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/secrets"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
@@ -101,9 +103,21 @@ func newResolveService(t *testing.T) (*apivars.Service, *repos.VariablesRepo, *r
 	return apivars.New(variablesRepo, secrets.New(), nil), variablesRepo, &repos.CollectionsRepo{DB: db.DB}
 }
 
-// P9 §6.2: ResolveRequest's fourth return is exactly the secret name→value pairs it actually
-// substituted — the pair set P9 D6's masking replacer needs — and empty when the request
-// references none.
+// findUsed is resolve_test.go's own small lookup over ResolveRequest/Resolver.Used()'s
+// []UsedSecret (P17 D9) — a test still wants "is this name in there, and what did it render to",
+// without caring about entry order.
+func findUsed(used []apivars.UsedSecret, name string) (apivars.UsedSecret, bool) {
+	for _, u := range used {
+		if u.Name == name {
+			return u, true
+		}
+	}
+	return apivars.UsedSecret{}, false
+}
+
+// P9 §6.2, widened by P17 D9: ResolveRequest's fourth return is exactly the secret spans it
+// actually substituted — the (Rendered, Placeholder) pairs P9 D6's masking replacer needs — and
+// empty when the request references none.
 func TestResolveRequestReturnsExactlyTheSecretsItSubstituted(t *testing.T) {
 	svc, variablesRepo, collections := newResolveService(t)
 	c, err := collections.CreateCollection("Orders")
@@ -134,8 +148,9 @@ func TestResolveRequestReturnsExactlyTheSecretsItSubstituted(t *testing.T) {
 		if body.Mode != "none" {
 			t.Errorf("body.Mode = %q, want none", body.Mode)
 		}
-		if len(used) != 1 || used["token"] != "sekret-value" {
-			t.Fatalf("used = %+v, want {token: sekret-value}", used)
+		got, ok := findUsed(used, "token")
+		if len(used) != 1 || !ok || got.Rendered != "sekret-value" || got.Placeholder != "{{token}}" {
+			t.Fatalf("used = %+v, want one entry {token, sekret-value, {{token}}}", used)
 		}
 	})
 
@@ -197,6 +212,90 @@ func TestResolveRequestReturnsExactlyTheSecretsItSubstituted(t *testing.T) {
 		}
 		if !strings.Contains(gotRequestURI, "b=2") {
 			t.Errorf("server saw RequestURI = %q, lost the second, unrelated query param", gotRequestURI)
+		}
+	})
+
+	// P17 D9/§5: a piped secret's UsedSecret.Rendered is the *transformed* form, not the
+	// plaintext — the property bridge/http.go's secretReplacer is built on. This is the Go-level
+	// proof that the resolver itself hands out the right text; bridge/http_test.go proves the
+	// masking replacer built from it.
+	t.Run("a piped secret's Rendered is the transformed form, not the plaintext", func(t *testing.T) {
+		if _, err := variablesRepo.Upsert(model.VariableScopeCollection, c.ID, "", "piped", "hunter2", true); err != nil {
+			t.Fatalf("Upsert: %v", err)
+		}
+
+		_, headers, _, used, err := svc.ResolveRequest(
+			"https://api.example.com/orders",
+			[]httpclient.Header{{Name: "X-Signed", Value: "{{piped | base64}}"}},
+			httpclient.Body{Mode: "none"}, c.ID, "",
+		)
+		if err != nil {
+			t.Fatalf("ResolveRequest: %v", err)
+		}
+		wantB64 := base64.StdEncoding.EncodeToString([]byte("hunter2"))
+		if len(headers) != 1 || headers[0].Value != wantB64 {
+			t.Fatalf("headers = %+v, want X-Signed: %s", headers, wantB64)
+		}
+		got, ok := findUsed(used, "piped")
+		if !ok || got.Rendered != wantB64 || got.Placeholder != "{{piped | base64}}" {
+			t.Fatalf("used = %+v, want one entry {piped, %s, {{piped | base64}}}", used, wantB64)
+		}
+		if strings.Contains(got.Rendered, "hunter2") {
+			t.Fatalf("Rendered = %q must never contain the plaintext", got.Rendered)
+		}
+	})
+
+	// D9(d): a secret used both plainly and piped in one request produces two entries, one per
+	// distinct (Name, Placeholder) — the case a name-keyed model could not represent at all.
+	t.Run("a secret used both plainly and piped records two distinct entries", func(t *testing.T) {
+		if _, err := variablesRepo.Upsert(model.VariableScopeCollection, c.ID, "", "dual", "s3cr3t", true); err != nil {
+			t.Fatalf("Upsert: %v", err)
+		}
+
+		_, headers, _, used, err := svc.ResolveRequest(
+			"https://api.example.com/orders",
+			[]httpclient.Header{
+				{Name: "X-Plain", Value: "{{dual}}"},
+				{Name: "X-Signed", Value: "{{dual | base64}}"},
+			},
+			httpclient.Body{Mode: "none"}, c.ID, "",
+		)
+		if err != nil {
+			t.Fatalf("ResolveRequest: %v", err)
+		}
+		wantB64 := base64.StdEncoding.EncodeToString([]byte("s3cr3t"))
+		if len(headers) != 2 || headers[0].Value != "s3cr3t" || headers[1].Value != wantB64 {
+			t.Fatalf("headers = %+v, want plain s3cr3t and base64 %s", headers, wantB64)
+		}
+		var dualEntries []apivars.UsedSecret
+		for _, u := range used {
+			if u.Name == "dual" {
+				dualEntries = append(dualEntries, u)
+			}
+		}
+		if len(dualEntries) != 2 {
+			t.Fatalf("dualEntries = %+v, want exactly 2 (one per distinct placeholder)", dualEntries)
+		}
+	})
+
+	// P17 D11: `|` joins the URL-unsafe set — an unresolved piped reference in the URL must not
+	// put a raw `|` into the request line, exactly as finding 6's own space did.
+	t.Run("D11: an unresolved piped reference in the URL is percent-encoded, pipe included", func(t *testing.T) {
+		resolvedURL, _, _, _, err := svc.ResolveRequest(
+			"https://api.example.com/orders?a={{missing | upper}}&b=2",
+			nil, httpclient.Body{Mode: "none"}, c.ID, "",
+		)
+		if err != nil {
+			t.Fatalf("ResolveRequest: %v", err)
+		}
+		if strings.Contains(resolvedURL, "{{missing | upper}}") {
+			t.Fatalf("resolvedURL = %q still has a raw pipe/space inside the unresolved reference", resolvedURL)
+		}
+		if !strings.Contains(resolvedURL, "{{missing%20%7C%20upper}}") {
+			t.Fatalf("resolvedURL = %q, want the reference recognisable as {{missing%%20%%7C%%20upper}}", resolvedURL)
+		}
+		if _, err := url.Parse(resolvedURL); err != nil {
+			t.Fatalf("url.Parse(%q): %v", resolvedURL, err)
 		}
 	})
 }

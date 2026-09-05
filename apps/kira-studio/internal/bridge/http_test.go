@@ -2,6 +2,7 @@ package bridge
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapterhost"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/apivars"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/bridge/ipcerr"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/httpclient"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/oplog"
@@ -35,7 +37,7 @@ import (
 func TestMaskSecrets_RedirectURLsFinalURLAndTimelineHopsBeforePersisting(t *testing.T) {
 	const secret = "sk_live_super_secret_token"
 	const masked = "{{apiKey}}"
-	usedSecrets := map[string]string{"apiKey": secret}
+	usedSecrets := []apivars.UsedSecret{{Name: "apiKey", Rendered: secret, Placeholder: "{{apiKey}}"}}
 
 	resp := httpclient.Response{
 		Status: 200, StatusText: "OK", Proto: "HTTP/1.1",
@@ -136,7 +138,7 @@ func TestMaskSecrets_RedirectURLsFinalURLAndTimelineHopsBeforePersisting(t *test
 // successful one's.
 func TestMaskSendErrTimeline_MasksFailedSendHopURL(t *testing.T) {
 	const secret = "sk_live_super_secret_token"
-	usedSecrets := map[string]string{"apiKey": secret}
+	usedSecrets := []apivars.UsedSecret{{Name: "apiKey", Rendered: secret, Placeholder: "{{apiKey}}"}}
 
 	sendErr := &httpclient.Error{
 		Code: httpclient.CodeHTTPTransport, Message: "connect: connection refused",
@@ -169,7 +171,7 @@ func TestMaskSendErrTimeline_MasksFailedSendHopURL(t *testing.T) {
 // actually died on (carrying the secret in its own Error string).
 func TestMaskSendErrTimeline_MasksHopHeadersAndHopError(t *testing.T) {
 	const secret = "sk_live_super_secret_token"
-	usedSecrets := map[string]string{"apiKey": secret}
+	usedSecrets := []apivars.UsedSecret{{Name: "apiKey", Rendered: secret, Placeholder: "{{apiKey}}"}}
 
 	sendErr := &httpclient.Error{
 		Code: httpclient.CodeHTTPTransport, Message: "connect: connection refused",
@@ -227,7 +229,7 @@ func TestMaskSendErrTimeline_MasksHopHeadersAndHopError(t *testing.T) {
 // herr.Message verbatim either way.
 func TestMaskSendErrTimeline_MasksMessageForTransportAndBadURLErrors(t *testing.T) {
 	const secret = "sk_live_super_secret_token"
-	usedSecrets := map[string]string{"apiKey": secret}
+	usedSecrets := []apivars.UsedSecret{{Name: "apiKey", Rendered: secret, Placeholder: "{{apiKey}}"}}
 
 	cases := []struct {
 		name string
@@ -280,7 +282,7 @@ func TestMaskSendErrTimeline_MasksMessageForTransportAndBadURLErrors(t *testing.
 // would still be caught.
 func TestHttpSendFailure_OpLogErrorNeverContainsSecret(t *testing.T) {
 	const secret = "sk_live_super_secret_token"
-	usedSecrets := map[string]string{"apiKey": secret}
+	usedSecrets := []apivars.UsedSecret{{Name: "apiKey", Rendered: secret, Placeholder: "{{apiKey}}"}}
 
 	t.Setenv("KIRA_HOME", t.TempDir())
 	db, err := storage.Open()
@@ -365,7 +367,7 @@ func TestMaskSecrets_MasksURLEncodedBodyDespiteQueryEscape(t *testing.T) {
 	// exactly the ones the finding calls out.
 	const secretName = "apiKey"
 	const secretValue = "p@ss word+token"
-	usedSecrets := map[string]string{secretName: secretValue}
+	usedSecrets := []apivars.UsedSecret{{Name: secretName, Rendered: secretValue, Placeholder: "{{" + secretName + "}}"}}
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -422,7 +424,7 @@ func TestMaskSecrets_MasksPathEscapedSecret(t *testing.T) {
 	// path-escaped form is not already covered by the QueryEscape pair.
 	const secretName = "apiKey"
 	const secretValue = "p@ss word+token"
-	usedSecrets := map[string]string{secretName: secretValue}
+	usedSecrets := []apivars.UsedSecret{{Name: secretName, Rendered: secretValue, Placeholder: "{{" + secretName + "}}"}}
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -467,4 +469,111 @@ func TestMaskSecrets_MasksPathEscapedSecret(t *testing.T) {
 	assertMasked(t, "FinalURL", resp.FinalURL)
 	assertMasked(t, "Timeline.Hops[0].URL", resp.Timeline.Hops[0].URL)
 	assertMasked(t, "Wire.Request", resp.Wire.Request)
+}
+
+// TestMaskSecrets_MasksPipedSecretsBase64Form is P17 §5's own worked example: a secret piped
+// through `{{token | base64}}` never puts its plaintext on the wire at all — `UsedSecret.Rendered`
+// is the base64 form apivars.Resolver actually wrote — so the masking replacer must be built over
+// *that* rendered text, not the secret's plaintext (which would never match anything and leave
+// the base64-encoded credential sitting in every copyable surface, right next to the pane's own
+// "N secret values shown as {{name}}" claim). Every surface maskSecrets exists to cover is
+// exercised, mirroring TestMaskSecrets_RedirectURLsFinalURLAndTimelineHopsBeforePersisting's own
+// surface list.
+func TestMaskSecrets_MasksPipedSecretsBase64Form(t *testing.T) {
+	const plaintext = "sk_live_super_secret_token"
+	rendered := base64.StdEncoding.EncodeToString([]byte(plaintext))
+	usedSecrets := []apivars.UsedSecret{{Name: "apiKey", Rendered: rendered, Placeholder: "{{apiKey | base64}}"}}
+
+	resp := httpclient.Response{
+		Status: 200, StatusText: "OK", Proto: "HTTP/1.1",
+		FinalURL: "https://api.example.com/orders?token=" + rendered,
+		Wire:     &httpclient.WireExchange{Request: "Authorization: Bearer " + rendered + "\r\n"},
+		Timeline: httpclient.Timeline{
+			Hops: []httpclient.TimelineHop{{Index: 0, Method: "GET", URL: "https://api.example.com/orders?token=" + rendered}},
+		},
+	}
+
+	maskSecrets(&resp, usedSecrets)
+
+	assertMasked := func(t *testing.T, label, s string) {
+		t.Helper()
+		if strings.Contains(s, plaintext) {
+			t.Errorf("%s = %q still contains the raw plaintext secret", label, s)
+		}
+		if strings.Contains(s, rendered) {
+			t.Errorf("%s = %q still contains the unmasked base64 form", label, s)
+		}
+		if !strings.Contains(s, "{{apiKey | base64}}") {
+			t.Errorf("%s = %q, want it masked to {{apiKey | base64}}", label, s)
+		}
+	}
+	assertMasked(t, "FinalURL", resp.FinalURL)
+	assertMasked(t, "Wire.Request", resp.Wire.Request)
+	assertMasked(t, "Timeline.Hops[0].URL", resp.Timeline.Hops[0].URL)
+	if resp.Wire.MaskedSecrets != 1 {
+		t.Errorf("Wire.MaskedSecrets = %d, want 1", resp.Wire.MaskedSecrets)
+	}
+}
+
+// TestMaskSecrets_MasksBothPlainAndPipedFormsOfOneSecret is P17 D9(d)'s own case: a request using
+// a secret both plainly (`{{token}}`) and piped (`{{token | base64}}`) must mask BOTH wire forms —
+// the exact case a name-keyed masking model (this bridge's pre-P17 shape) could not represent at
+// all, since it can only ever record one value per secret name.
+func TestMaskSecrets_MasksBothPlainAndPipedFormsOfOneSecret(t *testing.T) {
+	const plaintext = "sk_live_super_secret_token"
+	b64 := base64.StdEncoding.EncodeToString([]byte(plaintext))
+	usedSecrets := []apivars.UsedSecret{
+		{Name: "token", Rendered: plaintext, Placeholder: "{{token}}"},
+		{Name: "token", Rendered: b64, Placeholder: "{{token | base64}}"},
+	}
+
+	resp := httpclient.Response{
+		Status: 200, StatusText: "OK", Proto: "HTTP/1.1",
+		Wire: &httpclient.WireExchange{
+			Request: "Authorization: Bearer " + plaintext + "\r\nX-Signed: " + b64 + "\r\n",
+		},
+	}
+
+	maskSecrets(&resp, usedSecrets)
+
+	if strings.Contains(resp.Wire.Request, plaintext) {
+		t.Errorf("Wire.Request = %q still contains the raw plaintext secret", resp.Wire.Request)
+	}
+	if strings.Contains(resp.Wire.Request, b64) {
+		t.Errorf("Wire.Request = %q still contains the unmasked base64 form", resp.Wire.Request)
+	}
+	if !strings.Contains(resp.Wire.Request, "{{token}}") {
+		t.Errorf("Wire.Request = %q, want the plain form masked to {{token}}", resp.Wire.Request)
+	}
+	if !strings.Contains(resp.Wire.Request, "{{token | base64}}") {
+		t.Errorf("Wire.Request = %q, want the piped form masked to {{token | base64}}", resp.Wire.Request)
+	}
+	// D9(e): two spellings of one secret still count as one secret.
+	if resp.Wire.MaskedSecrets != 1 {
+		t.Errorf("Wire.MaskedSecrets = %d, want 1 (distinct names, not distinct entries)", resp.Wire.MaskedSecrets)
+	}
+}
+
+// TestSecretReplacer_LongerRenderedFormIsNotShadowedByAShorterOne is D9(f): entries must be
+// sorted by len(Rendered) descending before the replacer is built, or a shorter rendered form
+// that is a prefix of a longer one shadows it — strings.Replacer matches at each position by the
+// earliest-listed pattern, not the longest, so listing the short one first would under-mask the
+// long one, leaking its own tail in plaintext right next to a masked placeholder.
+func TestSecretReplacer_LongerRenderedFormIsNotShadowedByAShorterOne(t *testing.T) {
+	// "AB" is a prefix of "ABCDEF" — listed in *ascending* length order here, on purpose, so the
+	// test actually exercises secretReplacer's own sort rather than happening to pass because the
+	// caller already listed them safely.
+	usedSecrets := []apivars.UsedSecret{
+		{Name: "short", Rendered: "AB", Placeholder: "{{short}}"},
+		{Name: "long", Rendered: "ABCDEF", Placeholder: "{{long}}"},
+	}
+	resp := httpclient.Response{
+		Wire: &httpclient.WireExchange{Request: "token=ABCDEF"},
+	}
+
+	maskSecrets(&resp, usedSecrets)
+
+	if resp.Wire.Request != "token={{long}}" {
+		t.Fatalf("Wire.Request = %q, want %q (the longer rendered form must win, not be shadowed by the shorter one's prefix match)", resp.Wire.Request, "token={{long}}")
+	}
 }

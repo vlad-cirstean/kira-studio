@@ -11,10 +11,10 @@ import (
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapterhost"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/apivars"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/appcore"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/bridge/ipcerr"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/grpcclient"
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/apivars"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 )
 
@@ -52,9 +52,11 @@ func validDescriptorMode(mode string) bool {
 // .proto file is read straight off disk. This short-circuit is correct only for Describe: Call
 // dials a real network target regardless of which descriptor source supplies its schema, so it
 // uses resolveGrpcCallSource below instead, which never skips target/metadata resolution.
-// used accumulates into whatever map the caller passes, so a single resolver's masking replacer
-// covers a whole bridge method.
-func (s *GrpcService) resolveGrpcSource(args GrpcDescribeArgs, used map[string]string) (grpcclient.Source, error) {
+// used accumulates into whatever slice the caller points at, so a single resolver's masking
+// replacer covers a whole bridge method (P17 D9: each entry is a distinct (Name, Placeholder)
+// pair now, not a name→value map — a resolver's own Used() already dedupes within itself, and this
+// function's only caller ever calls it once per resolver, so no further dedupe is needed here).
+func (s *GrpcService) resolveGrpcSource(args GrpcDescribeArgs, used *[]apivars.UsedSecret) (grpcclient.Source, error) {
 	src := grpcclient.Source{
 		Mode: grpcclient.SourceMode(args.DescriptorMode), Target: args.Target, TLS: args.TLS,
 		Metadata: args.Metadata, ProtoPath: args.ProtoPath, ImportPaths: args.ImportPaths,
@@ -74,9 +76,7 @@ func (s *GrpcService) resolveGrpcSource(args GrpcDescribeArgs, used map[string]s
 	}
 	src.Target = resolver.Text(args.Target)
 	src.Metadata = resolveMetaPairs(resolver, args.Metadata)
-	for name, value := range resolver.Used() {
-		used[name] = value
-	}
+	*used = append(*used, resolver.Used()...)
 	return src, nil
 }
 
@@ -109,12 +109,12 @@ func resolveMetaPairs(resolver *apivars.Resolver, pairs []grpcclient.MetaPair) [
 // It also resolves the request message in the same pass, through the same Resolver instance
 // (built at most once, only when there is anything at all to resolve), rather than Call building a
 // second one just for the message.
-func (s *GrpcService) resolveGrpcCallSource(args GrpcCallArgs) (grpcclient.Source, string, map[string]string, error) {
+func (s *GrpcService) resolveGrpcCallSource(args GrpcCallArgs) (grpcclient.Source, string, []apivars.UsedSecret, error) {
 	src := grpcclient.Source{
 		Mode: grpcclient.SourceMode(args.DescriptorMode), Target: args.Target, TLS: args.TLS,
 		Metadata: args.Metadata, ProtoPath: args.ProtoPath, ImportPaths: args.ImportPaths,
 	}
-	used := map[string]string{}
+	var used []apivars.UsedSecret
 	if !grpcHasAnyReference(args.Target, args.Metadata, args.MessageJSON) {
 		return src, args.MessageJSON, used, nil
 	}
@@ -128,9 +128,7 @@ func (s *GrpcService) resolveGrpcCallSource(args GrpcCallArgs) (grpcclient.Sourc
 	src.Target = resolver.Text(args.Target)
 	src.Metadata = resolveMetaPairs(resolver, args.Metadata)
 	resolvedMessage := resolver.Text(args.MessageJSON)
-	for name, value := range resolver.Used() {
-		used[name] = value
-	}
+	used = append(used, resolver.Used()...)
 	return src, resolvedMessage, used, nil
 }
 
@@ -148,8 +146,8 @@ func (s *GrpcService) Describe(ctx context.Context, args GrpcDescribeArgs) (grpc
 		return grpcclient.Schema{}, ipcerr.BadRequest("protoPath is required")
 	}
 
-	used := map[string]string{}
-	src, err := s.resolveGrpcSource(args, used)
+	var used []apivars.UsedSecret
+	src, err := s.resolveGrpcSource(args, &used)
 	if err != nil {
 		return grpcclient.Schema{}, mapGrpcError(err)
 	}
@@ -422,7 +420,7 @@ func (c *grpcCoalescer) flushLocked(done bool, status *grpcclient.CallResult, er
 // *grpcclient.Error the coalescer is about to emit. The Partial handed to EmitTo is a copy, taken
 // after masking, so nothing downstream (Call's own recordGrpcHistory read of the same error) can
 // alias the struct the coalescer has already queued for emission.
-func (s *GrpcService) runServerStream(ctx context.Context, args GrpcCallArgs, req grpcclient.CallRequest, used map[string]string) (grpcclient.CallResult, error) {
+func (s *GrpcService) runServerStream(ctx context.Context, args GrpcCallArgs, req grpcclient.CallRequest, used []apivars.UsedSecret) (grpcclient.CallResult, error) {
 	coalescer := newGrpcCoalescer(s.Deps.Events, args.WindowKey, args.OpID)
 
 	result, err := grpcclient.ServerStream(ctx, req, coalescer.push)
@@ -450,7 +448,7 @@ func (s *GrpcService) runServerStream(ctx context.Context, args GrpcCallArgs, re
 // the same strings.Replacer shape bridge/http.go's secretReplacer builds, a second consumer of the
 // one unexported helper this package already has (D10's own last row). A no-op for any error that
 // is not a *grpcclient.Error, or when nothing was actually substituted.
-func maskGrpcError(err error, used map[string]string) {
+func maskGrpcError(err error, used []apivars.UsedSecret) {
 	var gerr *grpcclient.Error
 	if !errors.As(err, &gerr) {
 		return

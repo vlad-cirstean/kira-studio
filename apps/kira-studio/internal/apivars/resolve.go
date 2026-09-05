@@ -118,11 +118,14 @@ var urlUnsafeReplacer = strings.NewReplacer(
 // untouched name and pipeline.
 //
 // P17 D6/D9: onResolved, when non-nil, is called exactly once per KindResolved reference with the
-// *rendered* text this function actually wrote — the pipeline already applied. It exists so
-// Resolver.text (below) can record what reached the wire without ever putting that text on a
-// Reference, which is reported outward. D8: dynamic's generator is still invoked once per
-// occurrence, at this same point in the walk — the pipeline wraps only its return value.
-func resolveWithSanitizer(text string, values map[string]string, secretNames []string, sanitize func(string) string, onResolved func(ref Reference, rendered string)) SubstitutionResult {
+// *rendered* text this function actually wrote (the pipeline already applied) and the
+// *normalized* placeholder it should be masked back to (ParseReference's own Normalized —
+// `{{name}}` or `{{name | base64}}`, one space either side of `|` regardless of how it was
+// typed). It exists so Resolver.text (below) can record what reached the wire without ever
+// putting that text on a Reference, which is reported outward. D8: dynamic's generator is still
+// invoked once per occurrence, at this same point in the walk — the pipeline wraps only its
+// return value.
+func resolveWithSanitizer(text string, values map[string]string, secretNames []string, sanitize func(string) string, onResolved func(ref Reference, rendered, placeholder string)) SubstitutionResult {
 	secrets := make(map[string]bool, len(secretNames))
 	for _, n := range secretNames {
 		secrets[n] = true
@@ -193,7 +196,7 @@ func resolveWithSanitizer(text string, values map[string]string, secretNames []s
 				}
 				ref := pushRef(KindResolved)
 				if onResolved != nil {
-					onResolved(ref, rendered)
+					onResolved(ref, rendered, parsed.Normalized)
 				}
 				out.WriteString(rendered)
 			} else {
@@ -276,7 +279,30 @@ func referencedFields(url string, headers []httpclient.Header, body httpclient.B
 // import, which is what keeps it protocol-neutral rather than becoming a two-protocol module.
 type Resolver struct {
 	secretValues map[string]string
-	used         map[string]string
+	used         []UsedSecret
+	usedSeen     map[string]bool
+}
+
+// UsedSecret is one substituted secret span: the text actually written into the request, and the
+// placeholder it is masked back to (P17 D9, §5 of the plan). Rendered is a secret's plaintext ONLY
+// when the span carried no pipeline — with one, it is the transformed form (base64, upper-cased,
+// URL-encoded…), which is exactly as sensitive and is what a caller's masking replacer must
+// register instead of the plaintext, or a pipe reopens finding 6/finding 4's exact bug class one
+// encoding later (§5.2).
+type UsedSecret struct {
+	// Name is the secret's variable name — used for the Debug log (names only, D5) and for
+	// counting distinct secrets (Wire.MaskedSecrets counts names, not entries, D9(e)).
+	Name string
+	// Rendered is the exact text this substitution wrote onto the wire — the plaintext when the
+	// span had no pipeline, the transformed form otherwise. Comes from the substitution walk
+	// itself (the onResolved callback), never re-derived, so the masking input and the wire
+	// content share one source by construction.
+	Rendered string
+	// Placeholder is ParseReference's own Normalized span — "{{name}}" or
+	// "{{name | base64}}" — what Rendered is masked back to. Normalized (single spaces) rather
+	// than the user's exact spacing, so two spellings of one span do not produce two placeholders
+	// for identical wire bytes.
+	Placeholder string
 }
 
 // NewResolver fetches every secret reachable from collectionID/environmentID once
@@ -287,7 +313,7 @@ func (s *Service) NewResolver(collectionID, environmentID string) (*Resolver, er
 	if err != nil {
 		return nil, err
 	}
-	return &Resolver{secretValues: secretValues, used: map[string]string{}}, nil
+	return &Resolver{secretValues: secretValues, usedSeen: map[string]bool{}}, nil
 }
 
 // Any reports whether this scope has any secret at all — false means there is nothing this
@@ -314,20 +340,30 @@ func (r *Resolver) URLText(text string) string {
 }
 
 func (r *Resolver) text(text string, sanitize func(string) string) string {
-	result := resolveWithSanitizer(text, r.secretValues, nil, sanitize, nil)
-	for _, ref := range result.Refs {
-		if ref.Kind == KindResolved {
-			r.used[ref.Name] = r.secretValues[ref.Name]
+	// P17 D9(b): the rendered text and its placeholder reach this resolver through
+	// resolveWithSanitizer's own onResolved callback, called from inside the substitution walk —
+	// never through a field on Reference, which is reported outward and must never carry a
+	// secret's rendered form. One entry per distinct (Name, Placeholder) pair (D9(d)): a request
+	// using both {{token}} and {{token | base64}} records two entries, so both wire forms get
+	// masked — a name-keyed map could not represent this.
+	onResolved := func(ref Reference, rendered, placeholder string) {
+		key := ref.Name + "\x00" + placeholder
+		if r.usedSeen[key] {
+			return
 		}
+		r.usedSeen[key] = true
+		r.used = append(r.used, UsedSecret{Name: ref.Name, Rendered: rendered, Placeholder: placeholder})
 	}
+	result := resolveWithSanitizer(text, r.secretValues, nil, sanitize, onResolved)
 	return result.Text
 }
 
-// Used is every secret name→value pair actually substituted so far — what a caller's own masking
-// replacer (bridge/http.go's secretReplacer, shared unchanged by bridge/grpc.go, D10) is built
-// from, so a secret's plaintext is never left in a copyable surface unmasked. nil when nothing was
-// substituted, matching ResolveRequest's own pre-extraction contract.
-func (r *Resolver) Used() map[string]string {
+// Used is every secret span actually substituted so far, one entry per distinct (Name,
+// Placeholder) pair — what a caller's own masking replacer (bridge/http.go's secretReplacer,
+// shared unchanged by bridge/grpc.go, D10) is built from, so a secret's plaintext or any
+// transformed form of it a pipe produced is never left in a copyable surface unmasked (D9, §5).
+// nil when nothing was substituted, matching ResolveRequest's own pre-extraction contract.
+func (r *Resolver) Used() []UsedSecret {
 	if len(r.used) == 0 {
 		return nil
 	}
@@ -345,13 +381,14 @@ func (r *Resolver) Used() map[string]string {
 //
 // P11 D9/F21: reimplemented on Resolver above — behaviour-identical (its own tests pass unedited).
 //
-// P9 D6/F11: the fourth return, `used`, is every secret name→value pair actually substituted —
-// the same resolvedNames set this function already built for its own Debug log, widened to carry
-// the value too. bridge/http.go builds a strings.Replacer from it and masks P9's rendered exchange
-// back to {{name}}, so a secret's plaintext is never left in a copyable surface unmasked.
+// P9 D6/F11, widened by P17 D9/D10: the fourth return, `used`, is every secret span actually
+// substituted — Resolver.Used()'s own []UsedSecret, one entry per distinct (name, placeholder)
+// pair. bridge/http.go builds a strings.Replacer from it and masks P9's rendered exchange back to
+// each entry's Placeholder, so neither a secret's plaintext nor any transformed form of it a pipe
+// produced is ever left in a copyable surface unmasked (§5).
 func (s *Service) ResolveRequest(
 	url string, headers []httpclient.Header, body httpclient.Body, collectionID, environmentID string,
-) (string, []httpclient.Header, httpclient.Body, map[string]string, error) {
+) (string, []httpclient.Header, httpclient.Body, []UsedSecret, error) {
 	hasAnyReference := false
 	for _, field := range referencedFields(url, headers, body) {
 		if len(Names(field)) > 0 {
@@ -405,12 +442,18 @@ func (s *Service) ResolveRequest(
 	}
 
 	used := resolver.Used()
-	// D5: the count and the *names* of the secrets resolved, never their values, and only at
+	// D5: the count and the *names* of the secrets resolved (deduplicated — a secret used both
+	// plainly and piped is still one name), never their values or rendered forms, and only at
 	// Debug — connections.Service.Reveal's own "the subject, not the secret" precedent.
 	if len(used) > 0 {
+		seenNames := make(map[string]bool, len(used))
 		names := make([]string, 0, len(used))
-		for name := range used {
-			names = append(names, name)
+		for _, u := range used {
+			if seenNames[u.Name] {
+				continue
+			}
+			seenNames[u.Name] = true
+			names = append(names, u.Name)
 		}
 		slog.Debug("resolved secret references for a send", "scope", "apivars", "count", len(names), "names", names)
 	}
