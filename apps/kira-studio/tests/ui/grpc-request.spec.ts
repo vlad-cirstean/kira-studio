@@ -1,6 +1,7 @@
 import type { Locator, Page } from '@playwright/test';
 import type { ControlSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
+import { acceptConfirm } from './support/dialogs';
 import { IPC } from './support/ipcChannels';
 import { CHANNEL_TO_FQN, emitWailsEvent } from './support/mockRuntime';
 
@@ -524,4 +525,90 @@ test('gRPC request — a request in a collection opens the grpc-request tab kind
   await expect(page.locator('[data-testid="grpc-method-chip"]')).toContainText(
     'demo.Items/ListItems',
   );
+});
+
+// P13 D15: the Beautify affordance the already-registered view.format command implied but had
+// no button for — identical behaviour to RequestBodyPane.vue's own http-body-beautify.
+test('gRPC request — Beautify formats the request message', async ({ relaunch }) => {
+  const CONTROL: ControlSnapshot[] = [
+    { channel: IPC.tabsList, response: [grpcTab({ message: '{"a":1,"b":"two"}' })] },
+  ];
+  const { window: page } = await relaunch({ control: CONTROL });
+  await expect(page.locator('[data-testid="grpc-request-view"]')).toBeVisible();
+
+  await page.click('[data-testid="grpc-beautify"]');
+  const BEAUTIFIED = '{\n  "a": 1,\n  "b": "two"\n}';
+  const editor = page.locator('[data-testid="grpc-message-editor"] .cm-content');
+  expect(await editor.innerText()).toBe(BEAUTIFIED);
+});
+
+// P13 D12: clearGrpcHistory has been implemented and bound since P11/P12, reachable from
+// nowhere until CallHistoryList.vue's own toolbar. F20's structural guard (the delete control is
+// no longer a <button> nested inside a <button>) lives in api-ui-consistency.spec.ts; this test
+// drives the Clear behaviour end to end.
+test('gRPC request — the history pane gets a real Clear action', async ({ relaunch }) => {
+  const ENTRY = {
+    id: 'call-1',
+    itemId: null,
+    tabId: 'tab-grpc-1',
+    calledAt: '2026-01-01T00:00:00.000Z',
+    target: 'demo.example.com:443',
+    method: 'demo.Echo/SayHello',
+    streaming: 'unary',
+    environment: '',
+    code: 0,
+    codeName: 'OK',
+    statusMessage: '',
+    elapsedMs: 5,
+    messageCount: 1,
+    messageBytes: 20,
+    storedBytes: 20,
+  };
+  const scope = { itemId: '', tabId: 'tab-grpc-1' };
+  const CONTROL: ControlSnapshot[] = [
+    // service/method set and a live call answered so the response section (and its History pane)
+    // stays mounted once the history list empties out — the same `hasResult || hasHistory` gate
+    // response-pane.vue's HTTP twin has.
+    {
+      channel: IPC.tabsList,
+      response: [grpcTab({ service: 'demo.Echo', method: 'SayHello' })],
+    },
+    {
+      channel: IPC.grpcCall,
+      response: {
+        code: 0,
+        codeName: 'OK',
+        statusMessage: '',
+        elapsedMs: 3,
+        header: [],
+        trailer: [],
+        messageCount: 1,
+        messageBytes: 10,
+        messages: [{ seq: 0, json: '{}', wireBytes: 10, offsetMs: 0 }],
+      },
+    },
+    { channel: IPC.grpcHistoryList, args: scope, response: [ENTRY] },
+    { channel: IPC.grpcHistoryClear, args: scope, response: undefined },
+    { channel: IPC.grpcHistoryList, args: scope, response: [] },
+  ];
+  const { window: page, control } = await relaunch({ control: CONTROL });
+
+  await page.click('[data-testid="grpc-call"]');
+  await expect(page.locator('[data-testid="grpc-status-chip"]')).toContainText('OK (0)');
+
+  await page.click('[data-testid="grpc-response-pane-history"]');
+  const clearBtn = page.locator('[data-testid="grpc-history-clear"]');
+  await expect(clearBtn).toBeEnabled();
+  await expect(page.locator('[data-testid="grpc-history-row"]')).toHaveCount(1);
+
+  await clearBtn.click();
+  await expect(page.locator('[data-testid="confirm-dialog-message"]')).toHaveText(
+    'Clear this request’s call history? This cannot be undone.',
+  );
+  await acceptConfirm(page);
+
+  await expect(page.locator('[data-testid="grpc-history-row"]')).toHaveCount(0);
+  await expect(clearBtn).toBeDisabled();
+
+  expect(control.log().filter((e) => e.channel === IPC.grpcHistoryClear)).toHaveLength(1);
 });
