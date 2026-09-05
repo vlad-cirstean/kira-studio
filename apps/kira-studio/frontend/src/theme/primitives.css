@@ -396,12 +396,17 @@
   color: var(--kira-fg);
 }
 .p-select.bordered {
-  height: var(--kira-h-md);
+  /* P16 D6: height inherited from .p-select (h-sm) — ten call sites, and only four actually sit
+     beside h-md controls; .md below is the opt-in for those, matching .p-input/.p-input.md and
+     .p-seg/.p-seg.md. */
   border: var(--kira-border-width) solid var(--kira-border-strong);
   background-color: var(--kira-bg-input);
   color: var(--kira-fg);
   padding: 0 var(--kira-s-2) 0 var(--kira-s-3);
   padding-right: calc(var(--kira-s-2) + 14px);
+}
+.p-select.md {
+  height: var(--kira-h-md);
 }
 .p-select:focus-visible {
   border-color: var(--kira-focus);

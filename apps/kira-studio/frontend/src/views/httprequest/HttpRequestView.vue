@@ -286,7 +286,7 @@ onUnmounted(() => {
 
       <template #toolbar>
         <select
-          class="p-select bordered method-select"
+          class="p-select bordered"
           data-testid="http-method-select"
           :value="tab.state.method"
           @change="onMethodChange"
@@ -376,13 +376,6 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   min-height: 0;
-}
-
-/* .p-select.bordered defaults to --kira-h-md (26px) — taller than the h-sm controls the
-   28px .p-toolbar it sits in holds (primitives.css's own LAW); match --kira-h-sm like
-   CellEditorView.vue's own .format-select does. */
-.method-select {
-  height: var(--kira-h-sm);
 }
 
 /* P15 D4: TextField's inheritAttrs: false lands a call site's own class/style on the inner

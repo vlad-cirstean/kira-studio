@@ -30,7 +30,7 @@ function onChange(e: Event): void {
 
 <template>
   <select
-    class="p-select bordered p-push environment-select"
+    class="p-select bordered p-push"
     data-testid="api-environment-select"
     :value="activeEnvironmentId"
     @change="onChange"
@@ -42,12 +42,3 @@ function onChange(e: Event): void {
     <option :value="MANAGE" data-testid="api-environment-manage">Manage environments…</option>
   </select>
 </template>
-
-<style scoped>
-/* .p-select.bordered defaults to --kira-h-md (26px) — taller than the h-sm controls the
-   28px .p-toolbar (ViewChrome's #toolbar-2) it sits in holds (primitives.css's own LAW);
-   match --kira-h-sm like CellEditorView.vue's own .format-select does. */
-.environment-select {
-  height: var(--kira-h-sm);
-}
-</style>

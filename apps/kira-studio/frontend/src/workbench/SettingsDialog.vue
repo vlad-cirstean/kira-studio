@@ -285,7 +285,7 @@ async function onSave(): Promise<void> {
                 />
               </div>
               <select
-                class="p-select bordered"
+                class="p-select bordered md"
                 data-testid="settings-font-family"
                 :value="draft.appearance.fontFamily"
                 @change="onFontFamilyChange"
@@ -464,7 +464,7 @@ async function onSave(): Promise<void> {
                 />
               </div>
               <select
-                class="p-select bordered"
+                class="p-select bordered md"
                 data-testid="settings-default-page-size"
                 :value="draft.data.defaultPageSize"
                 @change="onDefaultPageSizeChange"
@@ -657,7 +657,7 @@ async function onSave(): Promise<void> {
 
 .sec-label {
   font-size: var(--kira-t-sm);
-  color: var(--kira-fg-disabled);
+  color: var(--kira-fg-subtle);
   text-transform: uppercase;
   letter-spacing: 0.06em;
   padding-top: var(--kira-s-2);
@@ -741,7 +741,7 @@ async function onSave(): Promise<void> {
 }
 
 .helper-text {
-  color: var(--kira-fg-disabled);
+  color: var(--kira-fg-subtle);
   font-size: var(--kira-t-xs);
   line-height: 1.5;
 }
@@ -765,7 +765,7 @@ async function onSave(): Promise<void> {
 }
 
 .muted-note {
-  color: var(--kira-fg-disabled);
+  color: var(--kira-fg-subtle);
   font-size: var(--kira-t-xs);
 }
 
@@ -816,7 +816,7 @@ async function onSave(): Promise<void> {
 .row-preview-gutter {
   flex: 0 0 36px;
   justify-content: flex-end;
-  color: var(--kira-fg-disabled);
+  color: var(--kira-fg-subtle);
   font-size: var(--kira-t-xs);
   background: var(--kira-bg-elevated);
 }

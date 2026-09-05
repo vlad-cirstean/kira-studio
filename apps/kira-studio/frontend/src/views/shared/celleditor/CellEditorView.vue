@@ -617,9 +617,6 @@ const statusLine = computed(() => {
    <button>, which is why the chevron below is drawn explicitly instead of relying on one. */
 .format-select {
   max-width: 160px;
-  /* .p-select.bordered defaults to --kira-h-md (26px) — taller than the IconButtons/28px header
-     row it sits in here; match --kira-h-sm like everything else alongside it. */
-  height: var(--kira-h-sm);
   font-family: var(--kira-font-family);
 }
 
@@ -700,7 +697,7 @@ const statusLine = computed(() => {
   align-items: center;
   gap: var(--kira-s-2);
   padding: var(--kira-s-1) var(--kira-s-4);
-  color: var(--kira-fg-disabled);
+  color: var(--kira-fg-subtle);
   font-size: var(--kira-t-xs);
   background: var(--kira-bg-elevated);
   border-bottom: var(--kira-border-width) solid var(--kira-border);
@@ -714,6 +711,6 @@ const statusLine = computed(() => {
 .translate-pane-empty {
   flex: 1 1 45%;
   align-items: center;
-  color: var(--kira-fg-disabled);
+  color: var(--kira-fg-subtle);
 }
 </style>

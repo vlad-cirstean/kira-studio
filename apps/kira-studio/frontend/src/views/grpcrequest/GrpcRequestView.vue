@@ -256,7 +256,7 @@ onUnmounted(() => {
           @update:model-value="setTlsMode"
         />
         <select
-          class="p-select bordered method-select"
+          class="p-select bordered"
           data-testid="grpc-method-select"
           :value="selectedMethodValue"
           :disabled="methodOptions.length === 0"
@@ -340,13 +340,6 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   min-height: 0;
-}
-
-/* .p-select.bordered defaults to --kira-h-md (26px) — taller than the h-sm controls the
-   28px .p-toolbar it sits in holds (primitives.css's own LAW); match --kira-h-sm like
-   CellEditorView.vue's own .format-select does. */
-.method-select {
-  height: var(--kira-h-sm);
 }
 
 .request-response-split {

@@ -109,7 +109,7 @@ function onClearFile(index: number): void {
 
     <template #trailing="{ row, index }">
       <select
-        class="p-select bordered kind-select"
+        class="p-select bordered"
         data-testid="http-formdata-kind"
         :value="row.kind"
         @change="onKindChange(index, $event)"
@@ -165,10 +165,4 @@ function onClearFile(index: number): void {
   padding: 0;
 }
 
-/* .p-select.bordered defaults to --kira-h-md (26px) — taller than the 22px TextFields/
-   IconButtons beside it in this .field-row; match --kira-h-sm like CellEditorView.vue's own
-   .format-select does. */
-.kind-select {
-  height: var(--kira-h-sm);
-}
 </style>
