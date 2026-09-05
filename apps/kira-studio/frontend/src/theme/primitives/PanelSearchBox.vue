@@ -5,7 +5,14 @@ import TextField from './TextField.vue';
 // P1 C2: project/SearchBox.vue, converted to a plain v-model instead of writing
 // treeState.search directly (F8) — a search box shared by more than one mode cannot import
 // Studio's tree state.
-defineProps<{ modelValue: string }>();
+// P16 D10: `placeholder`/`testid` are optional, defaulting to the collections tree's own values —
+// PanelShell.vue's existing call site is byte-identical in behaviour (and tree.spec.ts's
+// `tree-search` selector untouched) while the six new Api call sites this phase adds get their
+// own label and a distinct data-testid.
+withDefaults(defineProps<{ modelValue: string; placeholder?: string; testid?: string }>(), {
+  placeholder: 'Search',
+  testid: 'tree-search',
+});
 const emit = defineEmits<{ 'update:modelValue': [value: string] }>();
 </script>
 
@@ -16,8 +23,8 @@ const emit = defineEmits<{ 'update:modelValue': [value: string] }>();
         :model-value="modelValue"
         ui
         icon="search"
-        placeholder="Search"
-        data-testid="tree-search"
+        :placeholder="placeholder"
+        :data-testid="testid"
         @update:model-value="emit('update:modelValue', $event)"
       />
       <IconButton
