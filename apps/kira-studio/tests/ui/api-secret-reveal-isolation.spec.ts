@@ -127,6 +127,69 @@ test('a secret revealed via Copy as curl does not skip re-auth in the later-open
   expect(control.log().filter((e) => e.channel === IPC.variablesReveal)).toHaveLength(2);
 });
 
+// Round-2 review finding 1: onUpdateSecret's read-back after `revealVariable(id)` used to consult
+// the *shared* revealedValues map instead of this call's own outcome. A variable revealed once
+// successfully earlier in the same dialog session leaves its plaintext sitting in that map — so a
+// later, freshly-*cancelled* re-auth (declining the confirm prompt when turning the secret flag
+// off) was indistinguishable from a fresh success, and the stale plaintext got committed via
+// Upsert despite the user explicitly declining. Fixed by having runReveal/revealVariable return
+// this call's own outcome and branching on that return value instead of the map.
+test('a cancelled re-auth does not commit a stale plaintext from an earlier successful reveal in the same session', async ({
+  relaunch,
+}) => {
+  const SECRET_VAR = {
+    id: 'var-apikey',
+    scope: 'collection',
+    ownerId: 'col-1',
+    name: 'apiKey',
+    value: '',
+    isSecret: true,
+    sortOrder: 0,
+  };
+
+  const CONTROL: ControlSnapshot[] = [
+    { channel: IPC.collectionsList, response: TREE },
+    { channel: IPC.variablesListEnvironments, response: [] },
+    {
+      channel: IPC.variablesList,
+      args: { scope: 'collection', ownerId: 'col-1' },
+      response: [SECRET_VAR],
+    },
+    {
+      channel: IPC.variablesReveal,
+      args: { variableId: 'var-apikey', confirmed: false },
+      response: { value: 's3cr3t-key', error: null, outcome: 'revealed' },
+    },
+    {
+      channel: IPC.variablesReveal,
+      args: { variableId: 'var-apikey', confirmed: false },
+      response: { value: null, error: null, outcome: 'cancelled' },
+    },
+  ];
+  const { window: page, control } = await relaunch({ control: CONTROL });
+
+  await openHttpMode(page);
+  await collectionRow(page, 'col-1').click({ button: 'right' });
+  await page.click('[data-testid="menu-item-variables"]');
+  await expect(page.locator('[data-testid="variables-dialog"]')).toBeVisible();
+
+  // First reveal succeeds — var-apikey's plaintext now sits in the shared revealedValues map,
+  // populated by this very dialog, well before the un-tick below.
+  await variableRow(page, 'var-apikey').locator('[data-testid="variable-reveal"]').click();
+  await expect(
+    variableRow(page, 'var-apikey').locator('[data-testid="variable-value"]'),
+  ).toHaveValue('s3cr3t-key');
+  expect(control.log().filter((e) => e.channel === IPC.variablesReveal)).toHaveLength(1);
+
+  // Un-ticking "secret" triggers a second, independent reveal call (D9) — this one is cancelled.
+  await variableRow(page, 'var-apikey').locator('[data-testid="variable-secret"]').uncheck();
+  expect(control.log().filter((e) => e.channel === IPC.variablesReveal)).toHaveLength(2);
+
+  // The stale success from the *first* reveal must not stand in for the second, cancelled one:
+  // no Upsert is ever sent, so the secret is never committed as plaintext.
+  expect(control.log().filter((e) => e.channel === IPC.variablesUpsert)).toHaveLength(0);
+});
+
 test("switching the history popover to a different row clears the previous row's revealed value", async ({
   relaunch,
 }) => {

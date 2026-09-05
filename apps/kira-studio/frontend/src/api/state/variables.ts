@@ -260,8 +260,8 @@ export function clearRevealed(): void {
 export async function revealVariable(
   id: string,
   onError?: (message: string) => void,
-): Promise<void> {
-  await runReveal(
+): Promise<string | undefined> {
+  return runReveal(
     (confirmed) => control.variablesReveal(id, confirmed),
     (value) => {
       revealedValues[id] = value;
@@ -317,8 +317,8 @@ export function closeHistoryMenu(): void {
 
 /** P12 D13: runReveal's own second instantiation, over api_variable_history instead of
  *  api_variables. */
-export async function revealHistoryEntry(historyId: string): Promise<void> {
-  await runReveal(
+export async function revealHistoryEntry(historyId: string): Promise<string | undefined> {
+  return runReveal(
     (confirmed) => control.variablesRevealHistory(historyId, confirmed),
     (value) => {
       revealedHistoryValues[historyId] = value;

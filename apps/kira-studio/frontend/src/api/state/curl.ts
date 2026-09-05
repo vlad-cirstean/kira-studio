@@ -10,7 +10,7 @@ import type { HttpCodeLanguage } from '@shared/domain/http';
 import { reactive } from 'vue';
 import { copyText } from '../../clipboard';
 import { openApiRequestTab, patchHttpRequestTabState } from '../tabs';
-import { cachedVariables, clearRevealed, revealedValues, revealVariable } from './variables';
+import { cachedVariables, clearRevealed, revealVariable } from './variables';
 
 // P7 D12: the Import-from-curl dialog's own state — mirrors http/state/dynamicValues.ts's shape
 // (one `open` flag, nothing tab-scoped). The pasted text itself is deliberately not stored here:
@@ -227,10 +227,12 @@ export async function revealSecretValues(): Promise<void> {
       if (copyAsCurlDialogState.revealedSecretValues[name] !== undefined) continue;
       const id = findSecretVariableId(name, collectionId, environmentId);
       if (!id) continue;
-      await revealVariable(id, (message) => {
+      // Finding 1 (v1.2 P14 round 2): branch on this call's own return value, not on the shared
+      // revealedValues map — a cancelled/unavailable/errored outcome here must not be masked by a
+      // stale success the map already holds from an earlier, unrelated reveal of the same id.
+      const value = await revealVariable(id, (message) => {
         copyAsCurlDialogState.error = message;
       });
-      const value = revealedValues[id];
       if (value !== undefined) copyAsCurlDialogState.revealedSecretValues[name] = value;
     }
   } finally {

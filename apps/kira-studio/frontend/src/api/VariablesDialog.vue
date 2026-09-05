@@ -153,14 +153,14 @@ async function onUpdateSecret(id: string, checked: boolean): Promise<void> {
     return;
   }
   if (id !== '') {
-    // Finding 5: always go through a real reveal call here, never short-circuited by a frontend
-    // cache that might hold a stale entry from an unrelated dialog (Copy as curl also writes into
-    // this same revealedValues map) or an arbitrarily old reveal from earlier in this same
-    // session — the backend's own grace window (internal/localauth) is the only cache this gate
-    // trusts, so a genuinely-recent reveal still skips the confirm prompt without this map
-    // pretending to be an authorization decision on its own.
-    await revealVariable(id);
-    const value = revealedValues[id];
+    // Finding 5 (round 1) / Finding 1 (round 2): always go through a real reveal call here, never
+    // short-circuited by a frontend cache that might hold a stale entry from an unrelated dialog
+    // (Copy as curl also writes into this same revealedValues map) or an arbitrarily old reveal
+    // from earlier in this same session — the backend's own grace window (internal/localauth) is
+    // the only cache this gate trusts. Branch on *this call's own* return value, not on the shared
+    // map: a cancelled/unavailable/errored outcome here must not be masked by a stale success the
+    // map already holds from an earlier, unrelated reveal of the same variable.
+    const value = await revealVariable(id);
     if (value === undefined) return; // cancelled, unavailable, or errored — stays secret
     draft.value = value;
   }
