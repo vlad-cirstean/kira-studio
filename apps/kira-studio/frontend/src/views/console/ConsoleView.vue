@@ -25,7 +25,12 @@ import ViewChrome from '../../theme/primitives/ViewChrome.vue';
 import { wheelToHorizontal } from '../../wheelScroll';
 import CellEditorDock from '../shared/celleditor/CellEditorDock.vue';
 import SearchToolbar from '../shared/page/SearchToolbar.vue';
-import { backslashEscapesFor, sqlDialectFor } from '../shared/sqlIdent';
+import {
+  backslashEscapesFor,
+  dollarQuotingFor,
+  type SqlDialect,
+  sqlDialectFor,
+} from '../shared/sqlIdent';
 import { useConnectionGate } from '../shared/useConnectionGate';
 import ConsoleResultGrid from './ConsoleResultGrid.vue';
 import ConsoleSavedMenu from './ConsoleSavedMenu.vue';
@@ -71,6 +76,14 @@ const connectionKind = computed<ConnectionKind | undefined>(
 );
 
 const dialect = computed(() => sqlDialectFor(connectionKind.value));
+
+// F10/P21 round 1: the one place backslashEscapes/dollarQuoting are paired for every
+// splitSqlStatements/statementAtCursor call below — dollarQuoting is Postgres-only (a MySQL
+// identifier containing two `$` used to read as an unterminated dollar-quote open tag and swallow
+// the rest of the document into one statement).
+function splitOptionsFor(d: SqlDialect | undefined) {
+  return { backslashEscapes: backslashEscapesFor(d), dollarQuoting: dollarQuotingFor(d) };
+}
 
 // P18 addendum D23: realities #10's wart, fixed as a side effect of needing per-engine behaviour
 // at all — a Mongo shell command has been coloured by the SQL grammar since P5.5. `language`
@@ -162,9 +175,8 @@ const canFormat = computed(() => canFormatConsole(connectionKind.value));
 // two can never disagree about which statement is "current".
 const statementAtCursorText = computed<string | undefined>(() => {
   if (dialect.value === undefined) return undefined;
-  return statementAtCursor(props.tab.state.text, cursorPos.value, {
-    backslashEscapes: backslashEscapesFor(dialect.value),
-  })?.text;
+  return statementAtCursor(props.tab.state.text, cursorPos.value, splitOptionsFor(dialect.value))
+    ?.text;
 });
 // D12: disabled-with-tooltip, not hidden — Explain applies to this *console*, just not to this
 // statement, which is a state (like the format button's own disabled-on-empty-text), not a
@@ -278,9 +290,11 @@ function runStatement(): void {
   // P12 round 2 finding #4: the toolbar's Run button is disabled while running (below), but the
   // command (⌘↵/palette) had no such gate — two overlapping runs raced explainOpId/opId bookkeeping.
   if (running.value) return;
-  const stmt = statementAtCursor(props.tab.state.text, cursorPos.value, {
-    backslashEscapes: backslashEscapesFor(dialect.value),
-  });
+  const stmt = statementAtCursor(
+    props.tab.state.text,
+    cursorPos.value,
+    splitOptionsFor(dialect.value),
+  );
   if (!stmt) return;
   void (async () => {
     await ensureConnectedForRun();
@@ -290,9 +304,9 @@ function runStatement(): void {
 
 function runAll(): void {
   if (running.value) return;
-  const statements = splitSqlStatements(props.tab.state.text, {
-    backslashEscapes: backslashEscapesFor(dialect.value),
-  }).map((s) => s.text);
+  const statements = splitSqlStatements(props.tab.state.text, splitOptionsFor(dialect.value)).map(
+    (s) => s.text,
+  );
   if (statements.length === 0) return;
   void (async () => {
     await ensureConnectedForRun();
@@ -312,7 +326,7 @@ function onStop(): void {
 function onFormat(): void {
   const kind = connectionKind.value;
   if (!kind || !canFormat.value) return;
-  const splitOptions = { backslashEscapes: backslashEscapesFor(dialect.value) };
+  const splitOptions = splitOptionsFor(dialect.value);
   const before = splitSqlStatements(props.tab.state.text, splitOptions);
   const beforeIndex = before.findIndex(
     (s) => cursorPos.value >= s.start && cursorPos.value <= s.end,

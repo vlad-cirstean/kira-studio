@@ -17,10 +17,16 @@ export interface LintSqlOptions {
    *  SplitSqlOptions.backslashEscapes (P2 R2); mirrors it exactly since these two lexers share the
    *  same quote-scanning rules. Defaults to true, the pre-P2-R2 universal behaviour. */
   backslashEscapes?: boolean;
+  /** Whether `$$.../$tag$...$tag$` opens a Postgres-style dollar-quoted string — see
+   *  sql-split.ts's SplitSqlOptions.dollarQuoting (F10/P21 round 1); mirrors it exactly for the
+   *  same reason (a MySQL identifier containing two `$` is not a dollar-quote open tag). Defaults
+   *  to true, the pre-fix universal behaviour. */
+  dollarQuoting?: boolean;
 }
 
 export function lintSql(source: string, options?: LintSqlOptions): LintIssue[] {
   const backslashEscapes = options?.backslashEscapes ?? true;
+  const dollarQuoting = options?.dollarQuoting ?? true;
   const issues: LintIssue[] = [];
   const n = source.length;
   let i = 0;
@@ -94,7 +100,7 @@ export function lintSql(source: string, options?: LintSqlOptions): LintIssue[] {
       continue;
     }
     // Postgres dollar-quoting: $$ ... $$ or $tag$ ... $tag$.
-    if (c === '$') {
+    if (c === '$' && dollarQuoting) {
       const match = /^\$([A-Za-z_][A-Za-z0-9_]*)?\$/.exec(source.slice(i));
       if (match) {
         const start = i;

@@ -29,3 +29,19 @@ describe('lintSql — backslash escaping is dialect-conditional (P2 R2, task #92
     expect(issues[0]?.message).toBe('unterminated string literal');
   });
 });
+
+// F10/P21 round 1: mirrors sql-split.ts's own dollarQuoting fix — `$` is a legal MySQL/MariaDB
+// identifier character, so an identifier containing two of them must not be misread as an
+// unterminated Postgres dollar-quote open tag on a non-Postgres dialect.
+describe('lintSql — dollar-quoting is dialect-conditional (F10/P21 round 1)', () => {
+  test('dollarQuoting: false treats $ as an ordinary character', () => {
+    const issues = lintSql('SELECT a$b$c FROM t', { dollarQuoting: false });
+    expect(issues).toHaveLength(0);
+  });
+
+  test('defaults to dollarQuoting: true when no options are given (a real Postgres tag)', () => {
+    const issues = lintSql('SELECT $$ never closes');
+    expect(issues).toHaveLength(1);
+    expect(issues[0]?.message).toBe('unterminated dollar-quoted string');
+  });
+});

@@ -73,6 +73,20 @@ describe('splitSqlStatements — lexical regimes (P44 F43)', () => {
     expect(unterminated[0]?.text).toBe('SELECT $$ never closes; SELECT 2');
   });
 
+  // F10/P21 round 1: `$` is a legal (if unusual) MySQL/MariaDB identifier character — an
+  // identifier containing two of them used to read as an unterminated dollar-quote open tag
+  // regardless of dialect, swallowing the rest of the document into one statement ("Run all"
+  // silently ran one statement instead of two).
+  test('6b. dollarQuoting: false treats $ as an ordinary character (MySQL identifiers)', () => {
+    const stmts = splitSqlStatements('SELECT a$b$c FROM t; SELECT 2', { dollarQuoting: false });
+    expect(stmts.map((s) => s.text)).toEqual(['SELECT a$b$c FROM t', 'SELECT 2']);
+  });
+
+  test('6c. splitSqlStatements defaults to dollarQuoting: true when no options are given', () => {
+    const stmts = splitSqlStatements('SELECT $$ never closes; SELECT 2');
+    expect(stmts).toHaveLength(1);
+  });
+
   test('7. backtick- and double-quoted identifiers protect their own semicolons', () => {
     const backtick = splitSqlStatements('SELECT `a;b` FROM t; SELECT 2');
     expect(backtick.map((s) => s.text)).toEqual(['SELECT `a;b` FROM t', 'SELECT 2']);

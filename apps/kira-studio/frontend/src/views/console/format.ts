@@ -2,7 +2,7 @@ import type { ConnectionKind } from '@shared/domain/connection';
 import { MONGO_CONSOLE_METHODS } from '@shared/domain/console';
 import { splitSqlStatements } from '@shared/domain/sql-split';
 import { beautifyShellText } from '../shared/document/ejson';
-import { backslashEscapesFor, sqlDialectFor } from '../shared/sqlIdent';
+import { backslashEscapesFor, dollarQuotingFor, sqlDialectFor } from '../shared/sqlIdent';
 import { findMatchingParen, MONGO_STATEMENT_RE, splitTopLevelArgs } from './mongoStatement';
 
 /** true for the five SQL kinds and MongoDB — the only consoles with a real formatter behind
@@ -140,6 +140,7 @@ export async function formatConsoleText(kind: ConnectionKind, text: string): Pro
   const dialect = sqlDialectFor(kind);
   const statements = splitSqlStatements(text, {
     backslashEscapes: backslashEscapesFor(dialect),
+    dollarQuoting: dollarQuotingFor(dialect),
   });
   if (statements.length === 0) return { text, ok: true, failures: [] };
 

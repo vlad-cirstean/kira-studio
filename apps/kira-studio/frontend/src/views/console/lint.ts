@@ -4,7 +4,12 @@ import { lintSql } from '@shared/domain/sql-lint';
 import type { ConsoleDiagnostic } from '../../editor/diagnostics';
 import { dialectObjectFor } from '../../editor/languages';
 import { tryParseShellText } from '../shared/document/ejson';
-import { backslashEscapesFor, type SqlDialect, sqlDialectFor } from '../shared/sqlIdent';
+import {
+  backslashEscapesFor,
+  dollarQuotingFor,
+  type SqlDialect,
+  sqlDialectFor,
+} from '../shared/sqlIdent';
 import type { DdlSchema } from './ddl';
 import { findMatchingParen, MONGO_STATEMENT_RE, splitTopLevelArgs } from './mongoStatement';
 import { ddlDiagnostics } from './sqlDiagnostics';
@@ -18,9 +23,10 @@ function lintSqlConsole(
   schema: DdlSchema | undefined,
 ): (text: string) => ConsoleDiagnostic[] {
   const backslashEscapes = backslashEscapesFor(dialect);
+  const dollarQuoting = dollarQuotingFor(dialect);
   const dialectObject = dialect && dialectObjectFor(dialect);
   return (text) => {
-    const lexical = lintSql(text, { backslashEscapes });
+    const lexical = lintSql(text, { backslashEscapes, dollarQuoting });
     if (!dialectObject || !schema || schema.tables.length === 0) return lexical;
     return [...lexical, ...ddlDiagnostics(dialectObject, text, schema)];
   };

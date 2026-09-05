@@ -56,6 +56,17 @@ export function backslashEscapesFor(dialect: SqlDialect | undefined): boolean {
   return dialect === undefined || BACKSLASH_ESCAPE_DIALECTS.has(dialect);
 }
 
+// F10/P21 round 1: sql-split.ts/sql-lint.ts's own dollar-quote scanning ($$.../$tag$...$tag$) used
+// to run unconditionally, a Postgres-only convention applied to every dialect. A MySQL identifier
+// containing two `$` (legal there — `$` is a valid, if unusual, identifier character) reads as a
+// dollar-quote open tag with no closing match, and the scanner then swallows the rest of the
+// document into one statement — "Run all" silently runs one statement instead of two. Only
+// Postgres gets dollar-quoting; undefined (dialect unknown) keeps the pre-fix universal behaviour,
+// matching backslashEscapesFor's own "unknown defaults to the more permissive reading" choice.
+export function dollarQuotingFor(dialect: SqlDialect | undefined): boolean {
+  return dialect === undefined || dialect === 'postgres';
+}
+
 // F3/P21 round 1: every generated string literal (Filter by this value, FK navigation, Copy as
 // INSERT) used to escape only `'`, never consulting backslashEscapesFor even though that helper
 // already exists and is already used for sql-split.ts/sql-lint.ts's own quote scanning. On
