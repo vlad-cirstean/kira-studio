@@ -159,15 +159,30 @@ type descriptorCacheEntry struct {
 // trip" property for any Source using one. Metadata *names* stay in the key (a plausible, cheap
 // signal that two calls address genuinely different schemas, e.g. a tenant-routing header), only
 // the value each name resolved to is dropped.
+//
+// Round-2 review finding 2: mode-aware, hashing only the fields the Source doc above says are
+// meaningful for that mode. Target/TLS/Metadata are reflection-only, ProtoPath/ImportPaths are
+// proto-only — hashing both regardless of mode meant Describe (bridge/grpc.go's
+// resolveGrpcSource, which sends proto mode's target unresolved and metadata as nil) and Call
+// (resolveGrpcCallSource, which sends the real resolved target and metadata rows) landed on
+// different keys for the very same proto Source whenever the target has a {{ref}} or there is any
+// metadata row — the normal case. InvalidateCache is only ever called from Describe, so Call's
+// entry was never actually invalidated by Reload in proto mode. Restricting the hash to the
+// fields that mode actually uses makes Describe's and Call's keys identical by construction.
 func cacheKey(src Source) string {
 	h := sha256.New()
-	fmt.Fprintf(h, "%s\x00%s\x00%t\x00%s\x00%s\x00", src.Mode, src.Target, src.TLS.Enabled, src.TLS.CAFile, src.TLS.ServerName)
-	for _, m := range src.Metadata {
-		fmt.Fprintf(h, "%s\x00", m.Name)
-	}
-	fmt.Fprintf(h, "%s\x00", src.ProtoPath)
-	for _, p := range src.ImportPaths {
-		fmt.Fprintf(h, "%s\x00", p)
+	fmt.Fprintf(h, "%s\x00", src.Mode)
+	switch src.Mode {
+	case SourceProto:
+		fmt.Fprintf(h, "%s\x00", src.ProtoPath)
+		for _, p := range src.ImportPaths {
+			fmt.Fprintf(h, "%s\x00", p)
+		}
+	default: // SourceReflection
+		fmt.Fprintf(h, "%s\x00%t\x00%s\x00%s\x00", src.Target, src.TLS.Enabled, src.TLS.CAFile, src.TLS.ServerName)
+		for _, m := range src.Metadata {
+			fmt.Fprintf(h, "%s\x00", m.Name)
+		}
 	}
 	return hex.EncodeToString(h.Sum(nil))
 }
