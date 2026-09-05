@@ -120,9 +120,11 @@ test('Http request body — form-data with a real file field sends a path, never
   await rows.nth(1).locator('[data-testid="http-formdata-kind"]').selectOption('file');
   await rows.nth(1).locator('[data-testid="http-formdata-name"]').fill('upload');
   await rows.nth(1).locator('[data-testid="http-formdata-choose-file"]').click();
-  await expect(rows.nth(1).locator('[data-testid="http-formdata-file-caption"]')).toHaveText(
-    'report.csv (2.0 KB)',
-  );
+  const fileCaption = rows.nth(1).locator('[data-testid="http-formdata-file-caption"]');
+  await expect(fileCaption).toHaveText('report.csv (2.0 KB)');
+  // Finding 7: the caption shows only the basename — the full path (a shared collection could
+  // point this at an arbitrary local file) must still be auditable somewhere before Send.
+  await expect(fileCaption).toHaveAttribute('data-kira-tip', '/tmp/report.csv');
 
   // Row 2 (now the trailing blank row): a text field the user leaves *disabled* — D5: only
   // enabled, named rows may ever cross the wire.
@@ -178,9 +180,11 @@ test('Http request body — binary and code both persist and restore', async ({ 
   const { window: page, control } = await relaunch({ control: CONTROL });
 
   await expect(page.locator('[data-testid="http-request-view"]')).toBeVisible();
-  await expect(page.locator('[data-testid="http-binary-file-caption"]')).toHaveText(
-    'image.png (12.1 KB)',
-  );
+  const binaryCaption = page.locator('[data-testid="http-binary-file-caption"]');
+  await expect(binaryCaption).toHaveText('image.png (12.1 KB)');
+  // Finding 7: same as the form-data file row — the full path must be auditable, not just the
+  // basename an imported (possibly malicious) collection chose to show.
+  await expect(binaryCaption).toHaveAttribute('data-kira-tip', '/tmp/image.png');
 
   await page.click('[data-testid="http-body-mode-code"]');
   await page.selectOption('[data-testid="http-body-code-language"]', 'javascript');

@@ -37,7 +37,11 @@ function onClearFile(): void {
   <div class="binary-body-picker">
     <AppButton data-testid="http-binary-choose-file" @click="onChooseFile">Choose file…</AppButton>
     <template v-if="tab.state.binaryFile">
-      <span class="p-sm muted binary-file-caption" data-testid="http-binary-file-caption">
+      <span
+        class="p-sm muted binary-file-caption"
+        data-testid="http-binary-file-caption"
+        v-tooltip="tab.state.binaryFile.path"
+      >
         {{ caption }}
       </span>
       <IconButton

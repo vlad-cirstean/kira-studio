@@ -101,7 +101,12 @@ function onClearFile(index: number): void {
         <AppButton data-testid="http-formdata-choose-file" @click="onChooseFile(index)">
           Choose file…
         </AppButton>
-        <span v-if="row.fileName" class="p-xs muted formdata-file-caption" data-testid="http-formdata-file-caption">
+        <span
+          v-if="row.fileName"
+          class="p-xs muted formdata-file-caption"
+          data-testid="http-formdata-file-caption"
+          v-tooltip="row.path"
+        >
           {{ row.fileName }} ({{ formatBytes(row.fileSize) }})
         </span>
         <IconButton
