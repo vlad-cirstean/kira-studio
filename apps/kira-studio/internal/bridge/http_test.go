@@ -132,6 +132,43 @@ func TestMaskSecrets_RedirectURLsFinalURLAndTimelineHopsBeforePersisting(t *test
 	assertMasked(t, "decoded FinalURL", snap.Response.FinalURL)
 }
 
+// TestMaskSecrets_MasksResponseHeadAndHeaders is P21 round 1 architecture/security finding 4:
+// maskSecrets masked the timeline and redirect chain but never resp.Wire.ResponseHead or
+// resp.Headers — the exact response half RawExchangePane.vue renders and
+// ResponseHistoryRepo.Record persists, under a UI note claiming the whole exchange is masked.
+// F16's own reasoning ("a Location header is a URL too") applies identically to a response header.
+func TestMaskSecrets_MasksResponseHeadAndHeaders(t *testing.T) {
+	const secret = "sk_live_super_secret_token"
+	const masked = "{{apiKey}}"
+	usedSecrets := []apivars.UsedSecret{{Name: "apiKey", Rendered: secret, Placeholder: "{{apiKey}}"}}
+
+	resp := httpclient.Response{
+		Status: 200, StatusText: "OK", Proto: "HTTP/1.1",
+		Headers: []httpclient.Header{
+			{Name: "X-Echo-Token", Value: secret},
+		},
+		Wire: &httpclient.WireExchange{
+			Request:      "GET / HTTP/1.1\r\n\r\n",
+			ResponseHead: "HTTP/1.1 200 OK\r\nX-Echo-Token: " + secret + "\r\n\r\n",
+		},
+	}
+
+	maskSecrets(&resp, usedSecrets)
+
+	if strings.Contains(resp.Wire.ResponseHead, secret) {
+		t.Errorf("Wire.ResponseHead = %q still contains the raw secret", resp.Wire.ResponseHead)
+	}
+	if !strings.Contains(resp.Wire.ResponseHead, masked) {
+		t.Errorf("Wire.ResponseHead = %q, want it to contain %q", resp.Wire.ResponseHead, masked)
+	}
+	if strings.Contains(resp.Headers[0].Value, secret) {
+		t.Errorf("Headers[0].Value = %q still contains the raw secret", resp.Headers[0].Value)
+	}
+	if !strings.Contains(resp.Headers[0].Value, masked) {
+		t.Errorf("Headers[0].Value = %q, want it to contain %q", resp.Headers[0].Value, masked)
+	}
+}
+
 // TestMaskSendErrTimeline_MasksFailedSendHopURL is D14's reach into D15's own new failure
 // channel: mapHttpError marshals herr.Timeline into ipcerr.Error.Details — a copyable surface,
 // per §0.3 — so a failed send's own hop URL must be masked before that happens too, not only a

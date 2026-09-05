@@ -227,7 +227,16 @@ func maskSecrets(resp *httpclient.Response, used []apivars.UsedSecret) {
 	}
 	if resp.Wire != nil {
 		resp.Wire.Request = replacer.Replace(resp.Wire.Request)
+		// F16's own reasoning ("a Location header is a URL too — the most likely place for a
+		// secret-bearing query string to reappear on a redirect") applies identically here:
+		// ResponseHead renders the final hop's own header list, the same bytes the Timeline pane
+		// already masks per-hop. Leaving it unmasked let RawExchangePane.vue's "N secret values
+		// are shown as {{name}}" note claim more than the code did.
+		resp.Wire.ResponseHead = replacer.Replace(resp.Wire.ResponseHead)
 		resp.Wire.MaskedSecrets = distinctSecretNames(used)
+	}
+	for i := range resp.Headers {
+		resp.Headers[i].Value = replacer.Replace(resp.Headers[i].Value)
 	}
 	for i := range resp.Timeline.Hops {
 		resp.Timeline.Hops[i].URL = replacer.Replace(resp.Timeline.Hops[i].URL)
