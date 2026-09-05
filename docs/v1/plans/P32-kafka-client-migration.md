@@ -820,6 +820,13 @@ AGENTS.md                           MOD  new "Native Kafka driver (librdkafka)" 
    make Kafka's `sslmode` consistent with Postgres's — at the cost of a security-relevant behaviour
    change landing inside a driver swap. Worth doing as its own small change if the consistency
    matters.
+
+   **Resolved, P21 round 1:** no — the other direction. Redis and MongoDB had drifted to Postgres's
+   *weaker* reading (`require`/`prefer` → no verification) with no native convention of their own to
+   justify it; they were changed to match Kafka's always-verify behaviour instead, with an explicit
+   `verify-none`/`insecure` value added for anyone who needs the old behaviour. Postgres and
+   MySQL/MariaDB keep their native library's own convention unchanged. See `docs/ARCHITECTURE.md`'s
+   "`sslmode` semantics per engine" for the settled per-engine table.
 4. **The Kafka adapter suite has to leave `bun test` — is the Electron-as-Node runner (D27/D28) the
    right destination?** This is no longer conditional: F21 verified that Bun cannot load the addon
    at *any* ABI, so `bun test` and this driver cannot coexist. What remains a choice is where the 16

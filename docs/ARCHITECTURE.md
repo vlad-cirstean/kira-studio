@@ -388,6 +388,23 @@ keyed by db index rather than by database name), with go-redis's `Protocol: 2` p
 its RESP3 default changes reply shapes for `HGETALL`/`CONFIG GET` and the console's own generic
 dispatch, from a flat array to a map.
 
+### `sslmode` semantics per engine (P21 round 1)
+
+`Options["sslmode"]` is this app's own vocabulary layered over five different native TLS
+conventions, and the same string means different things depending on the engine — deliberately for
+two of them, not the rest. **Postgres and MySQL/MariaDB** follow their native client library's own
+convention (libpq / MySQL's `--ssl-mode`): `require`/`prefer` encrypt without verifying the server
+certificate, `verify-full` verifies. That asymmetry is the documented, native behaviour of those
+engines' own connection strings and is kept on purpose. **Redis, MongoDB and Kafka have no such
+native precedent** — `sslmode` is this app's own invented option for them — so `require`/`prefer`/
+`verify-full` all verify (matching Kafka's original P58e behaviour); an explicit `verify-none` (or
+`insecure`) value is the escape hatch for anyone who genuinely needs a non-verifying connection.
+`disable` and an absent option mean plaintext everywhere. A `rediss://` URI implies `verify-full`
+even with no `sslmode` option set, matching the standard meaning of that scheme; a MySQL/MariaDB
+`mysql://`/`mariadb://` URI's query string is parsed for `sslmode` only — any other query parameter
+is dropped with a `warn` log rather than forwarded to the driver (go-sql-driver's `Params` field is
+executed as a literal `SET <k> = <v>` statement at connect time, not a bag of DSN options).
+
 ## Storage
 
 `~/.kira-studio/` (dir `0700`), containing `kira.sqlite` (`0600`) and `logs/`.
