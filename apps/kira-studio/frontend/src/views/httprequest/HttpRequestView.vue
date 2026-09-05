@@ -26,6 +26,7 @@ import { openCopyAsCurlDialog } from '../../api/state/curl';
 import { openEditRawDialog } from '../../api/state/raw';
 import { variableSupport } from '../../api/state/variableCompletion';
 import {
+  activeEnvironmentColor,
   activeEnvironmentId,
   ensureVariablesLoaded,
   mergedValuesAndSecrets,
@@ -279,6 +280,7 @@ onUnmounted(() => {
       refresh-testid="http-request-refresh"
       stop-testid="http-request-stop"
       :can-stop="running"
+      :env-color="activeEnvironmentColor"
       @refresh="onSend"
       @stop="onStop"
     >

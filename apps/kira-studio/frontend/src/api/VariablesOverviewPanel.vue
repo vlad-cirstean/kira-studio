@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import { copyText } from '../clipboard';
+import { connColorVar } from '../theme/connColor';
 import EmptyState from '../theme/primitives/EmptyState.vue';
 import PanelSearchBox from '../theme/primitives/PanelSearchBox.vue';
 import PopoverPanel from '../theme/primitives/PopoverPanel.vue';
@@ -45,6 +46,11 @@ function onCopy(name: string): void {
 const collectionName = computed(() => collectionRecord(props.collectionId)?.name ?? '');
 const environmentName = computed(
   () => variablesState.environments.find((e) => e.id === props.environmentId)?.name ?? '',
+);
+// P18 D17: the environment's own colour, beside "Edit environment variables…" — this panel
+// already names the environment there (P17 D20).
+const environmentColor = computed(
+  () => variablesState.environments.find((e) => e.id === props.environmentId)?.color ?? 'none',
 );
 
 function close(): void {
@@ -132,6 +138,13 @@ function editEnvironmentVariables(): void {
           data-testid="variables-overview-edit-environment"
           @click="editEnvironmentVariables"
         >
+          <span
+            v-if="environmentId"
+            class="p-conn-dot"
+            :class="{ none: environmentColor === 'none' }"
+            :style="{ '--kira-rail': connColorVar(environmentColor) }"
+            data-testid="variables-overview-environment-dot"
+          />
           Edit environment variables…
         </button>
       </div>
@@ -211,6 +224,9 @@ function editEnvironmentVariables(): void {
 
 .overview-link {
   all: unset;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kira-s-2);
   cursor: pointer;
   color: var(--kira-info);
   font-size: var(--kira-t-sm);

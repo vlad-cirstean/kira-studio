@@ -3,6 +3,7 @@ import type { ApiEnvironment } from '@shared/domain/variables';
 import { computed, reactive, ref, watch } from 'vue';
 import { confirmDialog } from '../state/confirmDialog';
 import CodiconIcon from '../theme/CodiconIcon.vue';
+import { connColorVar } from '../theme/connColor';
 import AppButton from '../theme/primitives/AppButton.vue';
 import DialogFrame from '../theme/primitives/DialogFrame.vue';
 import EmptyState from '../theme/primitives/EmptyState.vue';
@@ -73,7 +74,10 @@ async function onFieldBlur(id: string): Promise<void> {
     return;
   }
   if (name === current.name && description === current.description) return;
-  await updateEnvironment(id, name, description);
+  // updateEnvironment writes name/description/color as one row update (D19) — the colour swatch
+  // has no draft of its own here (P18 D17 puts the picker in VariableSetView.vue's own tab), so a
+  // name/description blur passes the row's own current colour through unchanged.
+  await updateEnvironment(id, name, description, current.color);
 }
 
 async function onNewEnvironment(): Promise<void> {
@@ -183,6 +187,12 @@ function close(): void {
         @dragover.prevent="onDragOver(i)"
         @dragend="onDragEnd"
       >
+        <span
+          class="p-conn-dot"
+          :class="{ none: env.color === 'none' }"
+          :style="{ '--kira-rail': connColorVar(env.color) }"
+          data-testid="environment-color-dot"
+        />
         <span
           class="drag-handle"
           aria-hidden="true"

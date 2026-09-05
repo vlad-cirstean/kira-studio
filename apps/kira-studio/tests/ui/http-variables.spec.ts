@@ -326,8 +326,12 @@ test('precedence is environment-over-collection', async ({ relaunch }) => {
   await expect(page.locator('[data-testid="http-status"]')).toContainText('200');
 
   // Falls back to the collection's value with no environment active.
-  await page.selectOption('[data-testid="api-environment-select"]', '');
-  await expect(page.locator('[data-testid="api-environment-select"]')).toHaveValue('');
+  await page.click('[data-testid="api-environment-select"]');
+  await page.click('[data-testid="api-environment-option-none"]');
+  await expect(page.locator('[data-testid="api-environment-select"]')).toHaveAttribute(
+    'data-value',
+    '',
+  );
   await page.click('[data-testid="http-send"]');
   await expect(page.locator('[data-testid="http-status"]')).toContainText('200');
 

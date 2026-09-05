@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { PaletteColor } from '@shared/domain/color';
 import type { TabRecord } from '@shared/domain/tabs';
 import { computed } from 'vue';
 import { connectionRecord } from '../../state/connections';
@@ -33,6 +34,13 @@ const props = defineProps<{
   // border.
   toolbarTestid?: string;
   toolbar2Testid?: string;
+  // P18 D17/D19: an Api view's active environment colour — LAW 07's rail/dot, from a source other
+  // than a connection. Mutually exclusive with `connection` below in practice (an Api tab's
+  // `tab.connectionId` is always empty, F20 #6) but resolved independently rather than assumed:
+  // when provided (even 'none'), it drives the rail/dot instead of `connection`, which is exactly
+  // how the reserved-but-empty slot in Api mode becomes the "a query console's own connection
+  // indicator" analogue the design system's LAW 07 describes.
+  envColor?: PaletteColor;
 }>();
 
 const emit = defineEmits<{ refresh: []; stop: [] }>();
@@ -41,6 +49,15 @@ const emit = defineEmits<{ refresh: []; stop: [] }>();
 // tab) and "a connection with no colour assigned" into the same `null` — ViewHeader's own
 // `connColor !== undefined` guard then rendered a dot for both. `undefined` only for the former.
 const connection = computed(() => connectionRecord(props.tab.connectionId));
+
+// P18 D19: the merged rail/dot colour — envColor (an Api view) when given, else the tab's own
+// connection colour (a Studio view, preserving F8's own null-vs-undefined distinction: `null` for
+// "has a connection with no colour assigned", `undefined` for "no connection at all" — only the
+// former still renders a dot, as a 'none' ring), else undefined when neither applies.
+const railColor = computed<PaletteColor | null | undefined>(() => {
+  if (props.envColor !== undefined) return props.envColor;
+  return connection.value ? (connection.value.color ?? null) : undefined;
+});
 
 const runState = useRunState(() => props.tab.id);
 </script>
@@ -51,7 +68,7 @@ const runState = useRunState(() => props.tab.id);
     :icon-color="iconColor"
     :path="path"
     :name="name"
-    :conn-color="connection ? (connection.color ?? null) : undefined"
+    :conn-color="railColor"
     :conn-kind="connection?.kind"
     :target-testid="targetTestid"
     :name-testid="nameTestid"
@@ -62,7 +79,7 @@ const runState = useRunState(() => props.tab.id);
     </template>
   </ViewHeader>
 
-  <div class="p-toolbar-rail" :style="{ '--kira-rail': connColorVar(connection?.color) }" />
+  <div class="p-toolbar-rail" :style="{ '--kira-rail': connColorVar(railColor) }" />
   <div class="p-toolbar" :class="{ last: !$slots['toolbar-2'] }" :data-testid="toolbarTestid">
     <div class="group">
       <IconButton icon="refresh" v-tooltip="'Refresh'" :data-testid="refreshTestid" :disabled="canRefresh === false" @click="emit('refresh')" />

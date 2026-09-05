@@ -1,9 +1,11 @@
 <script setup lang="ts">
+import type { PaletteColor } from '@shared/domain/color';
 import type { VariableSetTabRecord } from '@shared/domain/tabs';
 import type { ApiVariable } from '@shared/domain/variables';
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { connectionsState } from '../state/connections';
 import AppButton from '../theme/primitives/AppButton.vue';
+import ColorPicker from '../theme/primitives/ColorPicker.vue';
 import EmptyState from '../theme/primitives/EmptyState.vue';
 import IconButton from '../theme/primitives/IconButton.vue';
 import MessageStrip from '../theme/primitives/MessageStrip.vue';
@@ -93,7 +95,18 @@ async function onEnvFieldBlur(): Promise<void> {
     return;
   }
   if (name === env.name && envDescriptionDraft.value === env.description) return;
-  await updateEnvironment(env.id, name, envDescriptionDraft.value);
+  // updateEnvironment writes name/description/color as one row update (D19) — color has its own
+  // immediate handler below, so a name/description blur passes the environment's own current
+  // colour through unchanged rather than defaulting it back to 'none'.
+  await updateEnvironment(env.id, name, envDescriptionDraft.value, env.color);
+}
+// P18 D17/D19: a swatch click applies immediately, unlike name/description's blur-commit — a
+// colour choice is a discrete action with its own visible feedback (the swatch's own selection
+// ring), not text a user is still composing.
+async function onEnvColorChange(color: PaletteColor): Promise<void> {
+  const env = owningEnvironment.value;
+  if (!env) return;
+  await updateEnvironment(env.id, env.name, env.description, color);
 }
 async function onDuplicateEnvironment(): Promise<void> {
   if (owningEnvironment.value) await duplicateEnvironment(owningEnvironment.value.id);
@@ -345,7 +358,15 @@ function onBulkClose(): void {
 
 <template>
   <div class="variable-set-view" data-testid="variables-dialog" :data-scope="scope">
-    <ViewChrome :tab="tab" :icon="scope === 'environment' ? 'settings-gear' : 'symbol-variable'" :name="tab.state.name || 'Variables'" :can-refresh="false" :can-stop="false" target-testid="variable-set-target">
+    <ViewChrome
+      :tab="tab"
+      :icon="scope === 'environment' ? 'settings-gear' : 'symbol-variable'"
+      :name="tab.state.name || 'Variables'"
+      :can-refresh="false"
+      :can-stop="false"
+      target-testid="variable-set-target"
+      :env-color="scope === 'environment' ? (owningEnvironment?.color ?? 'none') : undefined"
+    >
       <template #toolbar-2>
         <PanelSearchBox
           v-if="!bulkMode"
@@ -402,6 +423,12 @@ function onBulkClose(): void {
             placeholder="description"
             data-testid="environment-description"
             @blur="onEnvFieldBlur"
+          />
+          <ColorPicker
+            :model-value="owningEnvironment.color"
+            label="Environment color"
+            data-testid="environment-color-picker"
+            @update:model-value="onEnvColorChange"
           />
           <AppButton data-testid="environment-duplicate" @click="onDuplicateEnvironment">
             Duplicate

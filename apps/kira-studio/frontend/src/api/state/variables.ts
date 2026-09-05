@@ -38,6 +38,15 @@ const activeEnvironment = computed<ApiEnvironment | null>(
  *  uses, and what control.httpSend's environmentId will carry at send time. */
 export const activeEnvironmentId = computed(() => activeEnvironment.value?.id ?? '');
 
+/** P18 D17/D19: the active environment's colour, for the request views' toolbar rail and head
+ *  dot (LAW 07) — 'none' with no environment active, the same "the rail slot stays reserved
+ *  either way" treatment a colour of 'none' already gets. Always defined (never undefined), so
+ *  ViewChrome's `envColor` prop always drives the dot rather than falling through to a
+ *  connection's own colour, which an Api tab never has (F20 #6). */
+export const activeEnvironmentColor = computed<PaletteColor>(
+  () => activeEnvironment.value?.color ?? 'none',
+);
+
 async function loadEnvironments(): Promise<void> {
   variablesState.environments = await control.variablesListEnvironments();
   variablesState.loaded = true;

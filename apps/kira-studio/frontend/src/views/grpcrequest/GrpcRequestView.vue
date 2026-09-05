@@ -12,6 +12,7 @@ import {
 } from '../../api/state/collections';
 import { variableSupport } from '../../api/state/variableCompletion';
 import {
+  activeEnvironmentColor,
   activeEnvironmentId,
   ensureVariablesLoaded,
   mergedValuesAndSecrets,
@@ -244,6 +245,7 @@ onUnmounted(() => {
       refresh-testid="grpc-request-refresh"
       stop-testid="grpc-request-stop"
       :can-stop="running"
+      :env-color="activeEnvironmentColor"
       @refresh="onCall"
       @stop="onStop"
     >
