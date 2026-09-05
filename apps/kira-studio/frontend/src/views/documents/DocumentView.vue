@@ -139,11 +139,34 @@ const iconColor = computed(() => connColorVar(connectionColor.value) ?? 'var(--k
 // loaded connection record and the tab's own path, purely for display — no new state.
 const pathPrefix = computed(() => ancestorPathPrefix(props.tab.connectionId, props.tab.path));
 
-const searchText = ref(props.tab.state.search);
+const searchText = ref('');
+
+// FilterToolbar.vue's own watch(() => props.tab.state.filter, ...) reasoning, verbatim:
+// patchDocumentTabState mutates tab.state in place, so a non-deep watch on `tab` itself would
+// never see it — this is what keeps the field in sync with a write that didn't come from typing
+// into it (onClearFilter, applyFromFilterHistory below).
+watch(
+  () => props.tab.state.search,
+  (search) => {
+    searchText.value = search;
+  },
+  { immediate: true },
+);
 
 function onSearchInput(): void {
+  // A blur fires on every focus loss, not just an edit — re-applying an unchanged filter would
+  // reset paging/count for no reason (FilterToolbar.applyWhere's own guard and reason).
+  if (searchText.value.trim() === props.tab.state.search.trim()) return;
   setSearch(props.tab.id, searchText.value);
   recordFilterHistory(searchText.value, props.tab.state.sort);
+}
+
+// AutocompleteField's own @escape only fires once its suggestion dropdown has already closed, so
+// by the time this runs focus is still genuinely on the field — FilterToolbar.onWhereEscape,
+// verbatim.
+function onSearchEscape(): void {
+  searchText.value = props.tab.state.search;
+  (document.activeElement as HTMLElement | null)?.blur();
 }
 
 // P18 D9/D13: candidate lists computed here (not inside filterCompletion.ts, which is plain and
@@ -159,12 +182,28 @@ const sortCandidates = computed(() => {
   return mongoSortCandidates(props.tab.id);
 });
 
-const sortText = ref(sortSpecToText(props.tab.state.sort));
+const sortText = ref('');
+
+watch(
+  () => props.tab.state.sort,
+  (sort) => {
+    sortText.value = sortSpecToText(sort);
+  },
+  { immediate: true },
+);
 
 function onSortInput(): void {
   const sort = parseSortText(sortText.value);
+  // Comparing the *text* form, not the object — SortSpec is a structure and Object.is would
+  // never match (FilterToolbar.applyWhere's own guard, adapted).
+  if (sortSpecToText(sort) === sortSpecToText(props.tab.state.sort)) return;
   setSort(props.tab.id, sort);
   recordFilterHistory(props.tab.state.search, sort);
+}
+
+function onSortEscape(): void {
+  sortText.value = sortSpecToText(props.tab.state.sort);
+  (document.activeElement as HTMLElement | null)?.blur();
 }
 
 // Mirrors FilterToolbar.vue's own history recording/Clear/apply — same generic {connectionId,
@@ -181,9 +220,9 @@ function recordFilterHistory(search: string, sort: SortSpec | null): void {
   );
 }
 
+// The two watchers above pick up whatever this writes to tab.state — no need to also assign
+// searchText/sortText by hand, which would be the one place the two could drift.
 function onClearFilter(): void {
-  searchText.value = '';
-  sortText.value = '';
   setSearch(props.tab.id, '');
   setSort(props.tab.id, null);
   recordFilterHistory('', null);
@@ -192,8 +231,6 @@ function onClearFilter(): void {
 const filterHistoryOpen = ref(false);
 
 function applyFromFilterHistory(where: string | null, orderBy: SortSpec | null): void {
-  searchText.value = where ?? '';
-  sortText.value = sortSpecToText(orderBy);
   setSearch(props.tab.id, where ?? '');
   setSort(props.tab.id, orderBy);
 }
@@ -666,6 +703,7 @@ onUnmounted(() => {
             :candidates="filterCandidates"
             language="mongo"
             @enter="onSearchInput"
+            @escape="onSearchEscape"
             @blur="onSearchInput"
           />
         </div>
@@ -680,6 +718,7 @@ onUnmounted(() => {
             :candidates="sortCandidates"
             language="mongo"
             @enter="onSortInput"
+            @escape="onSortEscape"
             @blur="onSortInput"
           />
         </div>

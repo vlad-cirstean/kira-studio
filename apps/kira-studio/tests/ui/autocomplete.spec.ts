@@ -1,5 +1,6 @@
 import type { Page } from '@playwright/test';
-import type { ControlSnapshot } from '../ipc/support/types';
+import { DATA_OP } from '@shared/protocol/data-ops';
+import type { ControlSnapshot, PortSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
 import { IPC } from './support/ipcChannels';
 import {
@@ -12,6 +13,7 @@ import {
   DB_PATH as MONGO_DB_PATH,
   connectAndExpandControl as mongoConnectAndExpandControl,
   mongoConnectionSummary,
+  WIDGETS_PATH,
   widgetsFixture,
 } from './support/mongoFixture';
 import {
@@ -296,6 +298,93 @@ test('autocomplete — Mongo filter row', async ({ relaunch, consoleErrors }) =>
 
   await filterInput.fill('');
   await page.keyboard.press('Enter');
+
+  expect(consoleErrors).toEqual([]);
+});
+
+function readOpsCount(ops: { op: string }[], op: string): number {
+  return ops.filter((o) => o.op === op).length;
+}
+
+// P19 D4/D5: the FILTER label lights up the same way SORT already does, an idle blur is a no-op
+// (doesn't repage/reset the exact count/re-issue a load), and Escape reverts an unsent edit.
+test('Mongo filter row — the FILTER label lights up, an idle blur is a no-op, Escape reverts', async ({
+  relaunch,
+  consoleErrors,
+}) => {
+  const CONNECTION_ID = 'conn-ac-mongo-noop';
+  const CONNECTION_SUMMARY = mongoConnectionSummary(CONNECTION_ID, 'Mongo', 'green');
+  const FIXTURE = widgetsFixture(CONNECTION_ID);
+  const APPLIED_FILTER = "{ name: 'widget-1' }";
+  const PORT: PortSnapshot[] = [
+    ...FIXTURE.port,
+    {
+      op: DATA_OP.count,
+      payload: {
+        connectionId: CONNECTION_ID,
+        path: WIDGETS_PATH,
+        filter: APPLIED_FILTER,
+        refresh: false,
+      },
+      response: { kind: 'count', value: 1, exact: true, stale: false, source: 'server' },
+    },
+  ];
+  const CONTROL: ControlSnapshot[] = [
+    { channel: IPC.connectionsList, response: [] },
+    {
+      channel: IPC.connectionsCreate,
+      args: mongoCreateArgs('Mongo'),
+      response: CONNECTION_SUMMARY,
+    },
+    ...FIXTURE.control,
+  ];
+  const { window: page, stream } = await relaunch({ control: CONTROL, stream: PORT });
+
+  await connectMongo(page, 'Mongo', 'green');
+  await (await findRow(page, `${MONGO_DB_PATH}/collection:widgets`)).dblclick();
+  await expect(page.locator('[data-testid="document-row"]').first()).toBeVisible({
+    timeout: 15_000,
+  });
+
+  const filterInput = page.locator('[data-testid="document-search"]');
+  // AutocompleteField's `.ph` prefix label is a sibling of the real <input> (both under one
+  // .p-input span), not a descendant of it -- data-testid lands on the input via $attrs.
+  const filterLabel = page.locator('span.p-input:has([data-testid="document-search"]) .ph');
+  await expect(filterLabel).toHaveText('FILTER');
+  await expect(filterLabel).not.toHaveClass(/ph-active/);
+
+  await filterInput.fill(APPLIED_FILTER);
+  await page.keyboard.press('Enter');
+  await expect(page.locator('[data-testid="document-row"]')).toHaveCount(1, { timeout: 10_000 });
+  await expect(filterLabel).toHaveClass(/ph-active/);
+
+  await filterInput.click();
+  await page.click('[data-testid="document-count"]');
+  await expect(page.locator('[data-testid="document-pager"]')).toContainText('of 1', {
+    timeout: 10_000,
+  });
+
+  // An idle blur (focus in, focus straight out, nothing typed) must not repage the collection,
+  // throw away the exact count just run, or issue a second read/count round trip.
+  const opsBeforeBlur = await stream.ops();
+  await filterInput.click();
+  await filterInput.evaluate((el) => (el as HTMLElement).blur());
+  await expect.poll(async () => (await stream.ops()).length).toBe(opsBeforeBlur.length);
+  expect(readOpsCount(await stream.ops(), DATA_OP.read)).toBe(
+    readOpsCount(opsBeforeBlur, DATA_OP.read),
+  );
+  expect(readOpsCount(await stream.ops(), DATA_OP.count)).toBe(1);
+  await expect(page.locator('[data-testid="document-pager"]')).toContainText('of 1');
+  await expect(filterLabel).toHaveClass(/ph-active/);
+
+  // Escape reverts an unsent edit rather than applying it.
+  await filterInput.click();
+  await filterInput.fill('{ bogus: 1 }');
+  await page.keyboard.press('Escape');
+  await expect(filterInput).toHaveValue(APPLIED_FILTER);
+  expect(readOpsCount(await stream.ops(), DATA_OP.read)).toBe(
+    readOpsCount(opsBeforeBlur, DATA_OP.read),
+  );
 
   expect(consoleErrors).toEqual([]);
 });
