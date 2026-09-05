@@ -6,7 +6,7 @@ import { EditorView } from '@codemirror/view';
 import { statusClass } from '@shared/domain/http';
 import type { ResponseHistorySnapshot } from '@shared/domain/response-history';
 import { computed, nextTick, onUnmounted, ref, watch } from 'vue';
-import { beautifyJson, beautifyXml, scanJson, scanXml } from '../../beautify';
+import { type BeautifyResult, beautifyJson, beautifyXml } from '../../beautify';
 import { control } from '../../bridge/control';
 import { languageExtension } from '../../editor/languages';
 import { kiraEditorTheme, kiraHighlightStyle } from '../../editor/theme';
@@ -57,31 +57,57 @@ void loadSnapshots();
 // headers levels; only the body diff is withheld, with the reason stated inline.
 const bothStored = computed(() => !!snapA.value?.bodyStored && !!snapB.value?.bodyStored);
 
-function detectFormat(body: string): 'json' | 'xml' | null {
-  if (scanJson(body).ok) return 'json';
-  const t = body.trim();
-  if (t.length > 0 && t[0] === '<' && t[t.length - 1] === '>' && scanXml(t).ok) return 'xml';
-  return null;
+interface DetectedBody {
+  format: 'json' | 'xml' | null;
+  result: BeautifyResult | null;
 }
+
+// Round-2 review finding 8: beautifyJson/beautifyXml run the exact same parse scanJson/scanXml
+// would — detected once per body here (memoized by `computed` below) and reused by both
+// commonFormat's own detection and bodyTextA/B's rendering, instead of parsing each body twice.
+// The `<…>` bracket check mirrors ResponsePane.vue's own (and celleditor/detect.ts's own
+// detectXml gate): an XML parse alone accepts plain text with no tags at all, so without it every
+// plain-text response would misreport as XML.
+function detectAndBeautify(body: string): DetectedBody {
+  const json = beautifyJson(body, 'indented');
+  if (json.ok) return { format: 'json', result: json };
+  const t = body.trim();
+  if (t.length > 0 && t[0] === '<' && t[t.length - 1] === '>') {
+    const xml = beautifyXml(body, 'indented');
+    if (xml.ok) return { format: 'xml', result: xml };
+  }
+  return { format: null, result: null };
+}
+
+const detectedA = computed<DetectedBody | null>(() =>
+  snapA.value ? detectAndBeautify(snapA.value.response.body) : null,
+);
+const detectedB = computed<DetectedBody | null>(() =>
+  snapB.value ? detectAndBeautify(snapB.value.response.body) : null,
+);
 
 // D12: both bodies are pretty-printed before diffing only when *both* are the same recognised
 // format — a minified-vs-minified diff of two 40 KB single lines tells the user nothing.
 // beautifyJson(text, 'indented') is lossless by construction (P2 F13), so this never
 // misrepresents what came back.
 const commonFormat = computed<'json' | 'xml' | null>(() => {
-  if (!snapA.value || !snapB.value) return null;
-  const a = detectFormat(snapA.value.response.body);
-  const b = detectFormat(snapB.value.response.body);
+  const a = detectedA.value?.format ?? null;
+  const b = detectedB.value?.format ?? null;
   return a && a === b ? a : null;
 });
 
-function prettyOrRaw(body: string): string {
-  if (commonFormat.value === 'json') return beautifyJson(body, 'indented').text;
-  if (commonFormat.value === 'xml') return beautifyXml(body, 'indented').text;
-  return body;
-}
-const bodyTextA = computed(() => (snapA.value ? prettyOrRaw(snapA.value.response.body) : ''));
-const bodyTextB = computed(() => (snapB.value ? prettyOrRaw(snapB.value.response.body) : ''));
+const bodyTextA = computed(() => {
+  if (!snapA.value) return '';
+  return commonFormat.value && detectedA.value?.result
+    ? detectedA.value.result.text
+    : snapA.value.response.body;
+});
+const bodyTextB = computed(() => {
+  if (!snapB.value) return '';
+  return commonFormat.value && detectedB.value?.result
+    ? detectedB.value.result.text
+    : snapB.value.response.body;
+});
 
 // D12 level 2: the headers table. Reduced to added/removed/changed/unchanged by header *name*
 // (case-insensitive) rather than by @codemirror/merge's own text-diff — headers are a keyed

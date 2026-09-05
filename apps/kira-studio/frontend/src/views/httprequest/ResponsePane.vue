@@ -3,7 +3,7 @@ import { type HttpResponsePane, statusClass, statusHint } from '@shared/domain/h
 import type { HttpRequestTabRecord } from '@shared/domain/tabs';
 import { computed, onMounted, ref, watch } from 'vue';
 import { patchHttpRequestTabState } from '../../api/tabs';
-import { beautifyJson, beautifyXml, scanJson, scanXml } from '../../beautify';
+import { beautifyJson, beautifyXml } from '../../beautify';
 import CodeMirrorHost from '../../editor/CodeMirrorHost.vue';
 import { formatBytes } from '../../format';
 import AppButton from '../../theme/primitives/AppButton.vue';
@@ -99,17 +99,27 @@ function viewTimeline(): void {
   setResponsePane('timeline');
 }
 
-// D12/C6/D13: scanJson/scanXml are the app's one "is this JSON"/"is this XML" gate (F13) — the
-// Pretty/Raw toggle only exists when there is something to prettify. The `<…>` bracket check
-// mirrors celleditor/detect.ts's own detectXml gate: scanXml alone accepts plain text with no
-// tags at all (a valid, tag-less node list), so without it every plain-text response would
-// misreport as XML.
-const prettyFormat = computed<'json' | 'xml' | null>(() => {
+// Round-2 review finding 8: beautifyJson/beautifyXml run the exact same parse scanJson/scanXml
+// would (both are `tryParseJson`/`tryParseXml` themselves, D10) — computed here once and reused by
+// both prettyFormat (the `ok` flag) and bodyText below (the `text` output), instead of parsing the
+// same body twice per render to answer a boolean and then again for the real output. The `<…>`
+// bracket check mirrors celleditor/detect.ts's own detectXml gate: an XML parse alone accepts
+// plain text with no tags at all (a valid, tag-less node list), so without it every plain-text
+// response would misreport as XML; xmlResult is skipped entirely once JSON already matched.
+const jsonResult = computed(() => {
   const body = response.value?.body;
-  if (body === undefined) return null;
-  if (scanJson(body).ok) return 'json';
+  return body === undefined ? null : beautifyJson(body, 'indented');
+});
+const xmlResult = computed(() => {
+  const body = response.value?.body;
+  if (body === undefined || jsonResult.value?.ok) return null;
   const t = body.trim();
-  if (t.length > 0 && t[0] === '<' && t[t.length - 1] === '>' && scanXml(t).ok) return 'xml';
+  if (t.length === 0 || t[0] !== '<' || t[t.length - 1] !== '>') return null;
+  return beautifyXml(body, 'indented');
+});
+const prettyFormat = computed<'json' | 'xml' | null>(() => {
+  if (jsonResult.value?.ok) return 'json';
+  if (xmlResult.value?.ok) return 'xml';
   return null;
 });
 
@@ -142,8 +152,8 @@ const bodyText = computed(() => {
   const r = response.value;
   if (!r) return '';
   if (props.tab.state.responseView === 'pretty') {
-    if (prettyFormat.value === 'json') return beautifyJson(r.body, 'indented').text;
-    if (prettyFormat.value === 'xml') return beautifyXml(r.body, 'indented').text;
+    if (prettyFormat.value === 'json') return jsonResult.value?.text ?? r.body;
+    if (prettyFormat.value === 'xml') return xmlResult.value?.text ?? r.body;
   }
   return r.body;
 });
