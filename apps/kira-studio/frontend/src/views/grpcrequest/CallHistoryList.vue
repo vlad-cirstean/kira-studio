@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { grpcCodeClass } from '@shared/domain/grpc';
-import type { GrpcCallHistoryEntry } from '@shared/domain/grpc-history';
+import {
+  GRPC_HISTORY_PER_SCOPE_LIMIT,
+  type GrpcCallHistoryEntry,
+} from '@shared/domain/grpc-history';
 import type { GrpcRequestTabRecord } from '@shared/domain/tabs';
 import { computed, onMounted } from 'vue';
 import { formatRelative } from '../../format';
@@ -30,6 +33,8 @@ const props = defineProps<{ tab: GrpcRequestTabRecord }>();
 const rt = computed(() => grpcHistoryRuntime[props.tab.id]);
 const entries = computed<GrpcCallHistoryEntry[]>(() => rt.value?.entries ?? []);
 const viewingId = computed(() => rt.value?.viewing?.id ?? null);
+// P18 D6: HTTP's own "the list is full" predicate, restated for gRPC's cap.
+const atCap = computed(() => entries.value.length >= GRPC_HISTORY_PER_SCOPE_LIMIT);
 
 onMounted(() => {
   ensureGrpcHistoryFresh(props.tab.id);
@@ -90,6 +95,11 @@ async function onClear(): Promise<void> {
         />
       </div>
     </div>
+
+    <div v-if="atCap" class="p-xs dim history-cap-note" data-testid="grpc-history-cap-note">
+      Only the last {{ GRPC_HISTORY_PER_SCOPE_LIMIT }} are kept — older calls are removed
+      automatically.
+    </div>
   </div>
 </template>
 
@@ -125,5 +135,11 @@ async function onClear(): Promise<void> {
 .history-row:hover,
 .history-row.is-viewing {
   background: var(--kira-hover);
+}
+
+.history-cap-note {
+  flex-shrink: 0;
+  padding: var(--kira-s-2) var(--kira-s-3);
+  border-top: var(--kira-border-width) solid var(--kira-border);
 }
 </style>

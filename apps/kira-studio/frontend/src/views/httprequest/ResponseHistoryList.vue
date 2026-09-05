@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { httpMethodToken, statusClass } from '@shared/domain/http';
-import type { ResponseHistoryEntry } from '@shared/domain/response-history';
+import {
+  HISTORY_PER_SCOPE_LIMIT,
+  type ResponseHistoryEntry,
+} from '@shared/domain/response-history';
 import type { HttpRequestTabRecord } from '@shared/domain/tabs';
 import { computed, onMounted, ref } from 'vue';
 import { patchHttpRequestTabState } from '../../api/tabs';
@@ -20,8 +23,8 @@ import {
   viewHistoryEntry,
 } from './history';
 
-// P8 D15: the History pane's list — one row per response, capped at 20 by construction (D6), so
-// no VirtualList/TreeHost involvement.
+// P8 D15: the History pane's list — one row per response, capped at HISTORY_PER_SCOPE_LIMIT by
+// construction (P18 D4/D6), so no VirtualList/TreeHost involvement.
 const props = defineProps<{ tab: HttpRequestTabRecord }>();
 const emit = defineEmits<{ compare: [ids: [string, string]] }>();
 
@@ -30,6 +33,11 @@ const entries = computed<ResponseHistoryEntry[]>(() => rt.value?.entries ?? []);
 const selected = computed(() => rt.value?.selected ?? []);
 const viewingId = computed(() => rt.value?.viewing?.id ?? null);
 const isScratch = computed(() => !props.tab.state.itemId);
+// P18 D6: the list is ≤ HISTORY_PER_SCOPE_LIMIT by construction (Record's own trim), so "the list
+// is full" is exactly this predicate — not a stored eviction count (rejected in the plan: List can
+// never say more than "the list is full" without a new column and write path). Not suppressed by
+// the filter (§6 OQ-5): the note describes what is *stored*, not what is currently shown.
+const atCap = computed(() => entries.value.length >= HISTORY_PER_SCOPE_LIMIT);
 
 onMounted(() => {
   ensureHistoryFresh(props.tab.id);
@@ -175,6 +183,11 @@ async function onClear(): Promise<void> {
         </div>
       </div>
     </div>
+
+    <div v-if="atCap" class="p-xs dim history-cap-note" data-testid="http-history-cap-note">
+      Only the last {{ HISTORY_PER_SCOPE_LIMIT }} are kept — older responses are removed
+      automatically.
+    </div>
   </div>
 </template>
 
@@ -237,5 +250,11 @@ async function onClear(): Promise<void> {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.history-cap-note {
+  flex-shrink: 0;
+  padding: var(--kira-s-2) var(--kira-s-3);
+  border-top: var(--kira-border-width) solid var(--kira-border);
 }
 </style>
