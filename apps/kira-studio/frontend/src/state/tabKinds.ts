@@ -46,6 +46,9 @@ import {
   type TabKind,
   type TabRecord,
   tabTitle,
+  type VariableSetTabRecord,
+  type VariableSetTabState,
+  variableSetTabStateSchema,
 } from '@shared/domain/tabs';
 import { pathTail } from '@shared/domain/tree';
 import { revealPath } from '../project/state/tree';
@@ -281,5 +284,32 @@ export const TAB_KINDS: { [K in TabKind]: TabKindDef<K> } = {
     // D2: there is no project panel to reveal a gRPC request into.
     menuExtras: () => [],
     parseState: parseStateWith(grpcRequestTabStateSchema),
+  },
+  'variable-set': {
+    mode: TAB_KIND_MODE['variable-set'],
+    // D16: the owner's last-known name, falling back to a generic title before the list has
+    // loaded after a restore (mirrors HttpRequestTabState's own `name` field's own convention).
+    title: (tab) => (tab as VariableSetTabRecord).state.name || 'Variables',
+    // D16: collection scope keeps the variable symbol; environment scope reads as a settings
+    // surface — distinguishable at a glance in a strip holding both.
+    icon: (tab) =>
+      (tab as VariableSetTabRecord).state.scope === 'environment'
+        ? 'settings-gear'
+        : 'symbol-variable',
+    // No connection, so no rail — same as the two request kinds.
+    railColor: () => undefined,
+    // Never reached through a generic "new tab of this kind" affordance — a variable-set tab is
+    // always opened contextually (openVariableSetTab) with a real scope/ownerId. This placeholder
+    // only satisfies TabKindDef's own required member.
+    defaultState: (): VariableSetTabState => ({ scope: 'collection', ownerId: '', name: '' }),
+    // A variable set has no variant-to-try story — "duplicate" returns the same target's own
+    // state, which is exactly what makes openTab's `reuse: true` correct rather than a bug (F8).
+    duplicateState: (tab: VariableSetTabRecord): VariableSetTabState => ({ ...tab.state }),
+    // The rows/error runtime lives in api/state/variables.ts, freed by its own
+    // registerTabRuntimeCleanup — not by this hook (mirrors http-request's own D2 reasoning).
+    dropResources: noDrop,
+    // No project-panel reveal for a variable set (mirrors grpc-request's own reasoning).
+    menuExtras: () => [],
+    parseState: parseStateWith(variableSetTabStateSchema),
   },
 };

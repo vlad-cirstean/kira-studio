@@ -20,6 +20,11 @@ export const tabKindSchema = /*#__PURE__*/ z.enum([
   // P11 D2: the second kind inside the 'api' mode — a protocol AND a surface, following
   // 'http-request''s own naming reasoning verbatim.
   'grpc-request',
+  // P17 D16: the third kind inside the 'api' mode — one collection's or one environment's
+  // variable set, opened as a tab rather than a dialog. One kind, not two: a collection's
+  // variable set and an environment's are the same table over the same rows differing only in
+  // `scope` (VariablesRepo itself is one repo for both, not two).
+  'variable-set',
 ]);
 export type TabKind = z.infer<typeof tabKindSchema>;
 
@@ -37,6 +42,7 @@ export const RENDERABLE_TAB_KINDS: readonly TabKind[] = [
   'browse',
   'http-request',
   'grpc-request',
+  'variable-set',
 ];
 
 // P1 D5: a tab's mode is a total function of its kind — no mode column, no migration. This lives
@@ -56,6 +62,7 @@ export const TAB_KIND_MODE: Record<TabKind, AppMode> = {
   browse: 'studio',
   'http-request': 'api',
   'grpc-request': 'api',
+  'variable-set': 'api',
 };
 
 const pageSizeSchema = /*#__PURE__*/ z.union([
@@ -180,6 +187,22 @@ export const streamTabStateSchema = /*#__PURE__*/ z.object({
 });
 export type StreamTabState = z.infer<typeof streamTabStateSchema>;
 
+// P17 D16: a variable-set tab's identity is `path` (`variables:collection:<id>` /
+// `variables:environment:<id>`, openTab's own `reuse: true` target) — `scope`/`ownerId` here are
+// what the view itself needs to query VariablesRepo, duplicated from `path` rather than parsed
+// back out of it. `name` is the owner's last-known name (mirrors HttpRequestTabState's own field):
+// the tab's title before the list has loaded after a restore, and what renameVariableSetTabs
+// patches on a collection/environment rename. Deliberately NOT here: the filter query and the
+// bulk-mode flag (P16 §8 OQ-8's "a lens, not a setting" rule, plus the specific hazard that
+// persisting bulk mode would restore a tab into an editor holding an unapplied buffer that no
+// longer matches the rows) — both stay component-local.
+export const variableSetTabStateSchema = /*#__PURE__*/ z.object({
+  scope: /*#__PURE__*/ z.enum(['collection', 'environment']),
+  ownerId: z.string(),
+  name: z.string().default(''),
+});
+export type VariableSetTabState = z.infer<typeof variableSetTabStateSchema>;
+
 const tabRecordBase = {
   id: z.string(),
   connectionId: z.string().nullable(),
@@ -230,6 +253,11 @@ export const tabRecordSchema = /*#__PURE__*/ z.discriminatedUnion('kind', [
     kind: z.literal('grpc-request'),
     state: grpcRequestTabStateSchema,
   }),
+  /*#__PURE__*/ z.object({
+    ...tabRecordBase,
+    kind: z.literal('variable-set'),
+    state: variableSetTabStateSchema,
+  }),
 ]);
 export type TabRecord = z.infer<typeof tabRecordSchema>;
 export type DataTabRecord = Extract<TabRecord, { kind: 'data' }>;
@@ -241,6 +269,7 @@ export type StreamTabRecord = Extract<TabRecord, { kind: 'stream' }>;
 export type BrowseTabRecord = Extract<TabRecord, { kind: 'browse' }>;
 export type HttpRequestTabRecord = Extract<TabRecord, { kind: 'http-request' }>;
 export type GrpcRequestTabRecord = Extract<TabRecord, { kind: 'grpc-request' }>;
+export type VariableSetTabRecord = Extract<TabRecord, { kind: 'variable-set' }>;
 
 export function asDataTab(tab: TabRecord | null | undefined): DataTabRecord | null {
   return tab && tab.kind === 'data' ? tab : null;
@@ -272,6 +301,10 @@ export function asHttpRequestTab(tab: TabRecord | null | undefined): HttpRequest
 
 export function asGrpcRequestTab(tab: TabRecord | null | undefined): GrpcRequestTabRecord | null {
   return tab && tab.kind === 'grpc-request' ? tab : null;
+}
+
+export function asVariableSetTab(tab: TabRecord | null | undefined): VariableSetTabRecord | null {
+  return tab && tab.kind === 'variable-set' ? tab : null;
 }
 
 export function defaultDataTabState(pageSize: PageSize): DataTabState {

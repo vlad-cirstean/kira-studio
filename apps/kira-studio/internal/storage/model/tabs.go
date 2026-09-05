@@ -31,6 +31,10 @@ var RenderableTabKinds = map[string]bool{
 	"http-request": true,
 	// P11 D2: the second kind inside the 'http' mode.
 	"grpc-request": true,
+	// P17 D16: the third kind inside the 'api' mode — one collection's or one environment's
+	// variable set, opened as a tab. This is the exact vocabulary F8 warns is easy to miss: a row
+	// of this kind is silently dropped on restore if this line is forgotten.
+	"variable-set": true,
 }
 
 // IsRenderableTabKind reports whether kind is one of the seven renderable tab kinds.

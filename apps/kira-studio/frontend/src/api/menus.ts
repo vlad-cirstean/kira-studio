@@ -26,7 +26,8 @@ export interface CollectionMenuActions {
    *  dialog, always into a fresh tab (never row-scoped, unlike importCollection above). */
   importCurl(): void;
   exportCollection(row: CollectionRowVm): void;
-  /** P5 D11: the collection row's own "Variables…" item — opens VariablesDialog scoped to it. */
+  /** P5 D11, re-homed to a tab by P17 D16: the collection row's own "Variables…" item — opens
+   *  (or activates) the variable-set tab scoped to it. */
   variables(row: CollectionRowVm): void;
   /** P5 D3/D11: the background menu's own "Environments…" item. */
   environments(): void;

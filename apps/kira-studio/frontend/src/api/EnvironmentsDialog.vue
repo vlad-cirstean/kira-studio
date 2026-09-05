@@ -15,12 +15,12 @@ import {
   deleteEnvironment,
   duplicateEnvironment,
   environmentsDialogState,
-  openVariablesDialog,
   reorderEnvironmentsList,
   setActiveEnvironment,
   updateEnvironment,
   variablesState,
 } from './state/variables';
+import { openVariableSetTab } from './tabs';
 
 // P5 D3/D11/D14, P17 D14: the environment list — name and description (both inline-editable, one
 // commit on blur), *Edit variables…*, delete, an *Active* radio, drag/keyboard reordering, and
@@ -80,8 +80,11 @@ async function onNewEnvironment(): Promise<void> {
   await createEnvironment('New environment');
 }
 
+// P17 D16: opens the variable-set tab and closes this dialog — the environments *list* stays a
+// dialog, but editing one's variables is a tab.
 function onEditVariables(id: string, name: string): void {
-  void openVariablesDialog('environment', id, `Environment — ${name}`);
+  openVariableSetTab('environment', id, name);
+  close();
 }
 
 async function onSetActive(id: string): Promise<void> {

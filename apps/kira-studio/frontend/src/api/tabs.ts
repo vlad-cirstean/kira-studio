@@ -13,10 +13,21 @@ import {
 import {
   asGrpcRequestTab,
   asHttpRequestTab,
+  asVariableSetTab,
   type GrpcRequestTabRecord,
   type HttpRequestTabRecord,
+  type VariableSetTabRecord,
+  type VariableSetTabState,
 } from '@shared/domain/tabs';
-import { activateTab, type OpenTabResult, openTab, patchTabState, tabsState } from '../state/tabs';
+import type { VariableScope } from '@shared/domain/variables';
+import {
+  activateTab,
+  closeTab,
+  type OpenTabResult,
+  openTab,
+  patchTabState,
+  tabsState,
+} from '../state/tabs';
 
 // P12 D9: the module's own tab helpers, moved out of state/tabs.ts (§1.4) — these are the
 // module's own code that happened to be written in a shell file, so this is a cut-and-paste onto
@@ -133,4 +144,49 @@ export function findHttpRequestTab(id: string): HttpRequestTabRecord | null {
 
 export function findGrpcRequestTab(id: string): GrpcRequestTabRecord | null {
   return asGrpcRequestTab(tabsState.tabs.find((t) => t.id === id));
+}
+
+// P17 D16: one tab kind, reused by scope — a collection's variable set and an environment's are
+// the same table over the same rows differing only in `scope` (VariablesRepo itself is one repo
+// for both, not two). `path` is `variables:<scope>:<ownerId>` and `reuse: true` — unlike a request
+// tab (P4 F13), a variable-set tab has no duplicate-carrying-the-original's-path hazard:
+// duplicateState (state/tabKinds.ts) returns the same owner, so a "duplicate" *is* the same tab's
+// target and reusing it is correct, not a bug.
+export function openVariableSetTab(
+  scope: VariableScope,
+  ownerId: string,
+  name: string,
+): OpenTabResult {
+  const path = `variables:${scope}:${ownerId}`;
+  const state: VariableSetTabState = { scope, ownerId, name };
+  return openTab('variable-set', null, path, () => state, { reuse: true });
+}
+
+/** Renaming a collection or environment patches every open tab bound to it (D16), the same
+ *  `renameApiRequestTabs`/`renameGrpcRequestTabs` shape. */
+export function renameVariableSetTabs(scope: VariableScope, ownerId: string, name: string): void {
+  for (const tab of tabsState.tabs) {
+    if (tab.kind !== 'variable-set') continue;
+    const vt = tab as VariableSetTabRecord;
+    if (vt.state.scope !== scope || vt.state.ownerId !== ownerId) continue;
+    patchVariableSetTabState(tab.id, { name });
+  }
+}
+
+export function patchVariableSetTabState(id: string, patch: Partial<VariableSetTabState>): void {
+  patchTabState(id, 'variable-set', patch, { skipUnchanged: false });
+}
+
+export function findVariableSetTab(id: string): VariableSetTabRecord | null {
+  return asVariableSetTab(tabsState.tabs.find((t) => t.id === id));
+}
+
+/** Deleting a collection or an environment closes any open tab for it (D16) — unlike a request
+ *  tab, a variable-set tab has no state of its own worth preserving once its owner is gone. */
+export function closeVariableSetTabsForOwner(scope: VariableScope, ownerId: string): void {
+  for (const tab of [...tabsState.tabs]) {
+    if (tab.kind !== 'variable-set') continue;
+    const vt = tab as VariableSetTabRecord;
+    if (vt.state.scope === scope && vt.state.ownerId === ownerId) closeTab(tab.id);
+  }
 }

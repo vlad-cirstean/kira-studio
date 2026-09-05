@@ -6,7 +6,9 @@ import type {
 } from '@shared/domain/variables';
 import { computed, reactive } from 'vue';
 import { control } from '../../bridge/control';
+import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
 import { runReveal } from '../reveal';
+import { closeVariableSetTabsForOwner, renameVariableSetTabs } from '../tabs';
 
 // P5 D3/D11: the environment list and the app-global active selection — read-only at this point
 // (list and switch); editing, secrets, history and reordering land in later commits on this same
@@ -55,19 +57,25 @@ export async function createEnvironment(name: string, description = ''): Promise
   return env;
 }
 
-/** P17 D14: replaces renameEnvironment — renaming and describing are one row update. */
+/** P17 D14: replaces renameEnvironment — renaming and describing are one row update. Also
+ *  patches any open variable-set tab for this environment (D16), the same rename-follows-tab rule
+ *  a collection's own rename already has. */
 export async function updateEnvironment(
   id: string,
   name: string,
   description: string,
 ): Promise<void> {
   await control.variablesUpdateEnvironment(id, name, description);
+  renameVariableSetTabs('environment', id, name);
   await loadEnvironments();
 }
 
-/** Deleting the active environment leaves none active (D3) — there is nothing to reassign. */
+/** Deleting the active environment leaves none active (D3) — there is nothing to reassign.
+ *  Closes any open variable-set tab for it too (D16) — unlike a request tab, it has no state of
+ *  its own worth preserving once its owner is gone. */
 export async function deleteEnvironment(id: string): Promise<void> {
   await control.variablesDeleteEnvironment(id);
+  closeVariableSetTabsForOwner('environment', id);
   await loadEnvironments();
 }
 
@@ -91,51 +99,67 @@ export function closeEnvironmentsDialog(): void {
   environmentsDialogState.open = false;
 }
 
-// ---- the variables dialog (D11/D12) — one scope's variable list ----
+// ---- the variable-set tab (P17 D16) — one scope's variable list, one runtime per open tab ----
+//
+// R10 re-homes what used to be the single VariablesDialog's own state (variablesDialogState) into
+// a per-tab runtime — createRuntimeStore's own shape (views/httprequest/state.ts:132's precedent),
+// since a variable-set tab, unlike the dialog it replaces, can now be open more than once at a
+// time (one per collection/environment).
 
-interface VariablesDialogState {
-  open: boolean;
-  scope: VariableScope | null;
-  ownerId: string;
-  /** "Variables — <collection name>" or "Environment — <environment name>" (D11). */
-  title: string;
+export interface VariableSetRuntime {
   rows: ApiVariable[];
-  /** A reveal failure's message (D10) — shown in the dialog's own MessageStrip. */
+  /** A reveal failure's message (D10) — shown in the view's own MessageStrip. */
   error: string | null;
 }
 
-export const variablesDialogState = reactive<VariablesDialogState>({
-  open: false,
-  scope: null,
-  ownerId: '',
-  title: '',
-  rows: [],
-  error: null,
+function defaultVariableSetRuntime(): VariableSetRuntime {
+  return { rows: [], error: null };
+}
+
+// P1 D7: api/ may not import views/shared/viewOp.ts's own createRuntimeStore (the module-boundary
+// lint rule) — this is that same small "one reactive record, keyed by tabId, created on first
+// touch" shape, inlined rather than hoisted somewhere both sides could reach, since this is the
+// only api/-side per-tab runtime that exists.
+export const variableSetRuntime = reactive({} as Record<string, VariableSetRuntime>);
+
+function ensureVariableSetRuntime(tabId: string): VariableSetRuntime {
+  if (!variableSetRuntime[tabId]) {
+    variableSetRuntime[tabId] = defaultVariableSetRuntime();
+  }
+  return variableSetRuntime[tabId];
+}
+
+registerTabRuntimeCleanup((tabId) => {
+  delete variableSetRuntime[tabId];
+  // Finding 5, re-homed: a stale reveal left behind by one tab must never let a different,
+  // later-opened tab (or a later-opened Copy as curl dialog) trust it in place of its own re-auth
+  // gate — the same reason closeVariablesDialog used to clear this on close.
+  clearRevealed();
 });
 
-export async function openVariablesDialog(
+/** Loads (or reloads) one scope's variable list into `tabId`'s own runtime — the tab-scoped
+ *  replacement for the old singleton dialog's reloadVariablesDialog. Also keeps the send-time
+ *  cache (below) in step, exactly as the dialog's own edits used to. */
+export async function loadVariableSetRows(
+  tabId: string,
   scope: VariableScope,
   ownerId: string,
-  title: string,
 ): Promise<void> {
-  variablesDialogState.scope = scope;
-  variablesDialogState.ownerId = ownerId;
-  variablesDialogState.title = title;
-  variablesDialogState.open = true;
-  variablesDialogState.error = null;
-  await reloadVariablesDialog();
+  const rows = await control.variablesList(scope, ownerId);
+  ensureVariableSetRuntime(tabId).rows = rows;
+  listCache[cacheKey(scope, ownerId)] = rows;
 }
 
-export function closeVariablesDialog(): void {
-  variablesDialogState.open = false;
-  clearRevealed();
+export function variableSetRows(tabId: string): ApiVariable[] {
+  return variableSetRuntime[tabId]?.rows ?? [];
 }
 
-async function reloadVariablesDialog(): Promise<void> {
-  const { scope, ownerId } = variablesDialogState;
-  if (!scope) return;
-  variablesDialogState.rows = await control.variablesList(scope, ownerId);
-  listCache[cacheKey(scope, ownerId)] = variablesDialogState.rows;
+export function variableSetError(tabId: string): string | null {
+  return variableSetRuntime[tabId]?.error ?? null;
+}
+
+export function setVariableSetError(tabId: string, message: string | null): void {
+  ensureVariableSetRuntime(tabId).error = message;
 }
 
 // ---- the send-time value cache (D6/D7) ----
@@ -164,30 +188,41 @@ export function cachedVariables(scope: VariableScope, ownerId: string): ApiVaria
 
 /** id: '' creates a new row (D19). Re-lists afterward — the same "one call, always correct"
  *  discipline http/state/collections.ts's own mutations use. */
-export async function upsertVariable(args: {
-  id: string;
-  name: string;
-  value: string;
-  isSecret: boolean;
-  description?: string;
-}): Promise<void> {
-  const { scope, ownerId } = variablesDialogState;
-  if (!scope) return;
+export async function upsertVariable(
+  tabId: string,
+  scope: VariableScope,
+  ownerId: string,
+  args: {
+    id: string;
+    name: string;
+    value: string;
+    isSecret: boolean;
+    description?: string;
+  },
+): Promise<void> {
   await control.variablesUpsert({ scope, ownerId, ...args });
-  await reloadVariablesDialog();
+  await loadVariableSetRows(tabId, scope, ownerId);
 }
 
-export async function deleteVariable(id: string): Promise<void> {
+export async function deleteVariable(
+  tabId: string,
+  scope: VariableScope,
+  ownerId: string,
+  id: string,
+): Promise<void> {
   await control.variablesDelete(id);
-  await reloadVariablesDialog();
+  await loadVariableSetRows(tabId, scope, ownerId);
 }
 
 /** D14: the full new order, in full — ConnectionsService.Reorder's own shape. */
-export async function reorderVariables(ids: string[]): Promise<void> {
-  const { scope, ownerId } = variablesDialogState;
-  if (!scope) return;
+export async function reorderVariables(
+  tabId: string,
+  scope: VariableScope,
+  ownerId: string,
+  ids: string[],
+): Promise<void> {
   await control.variablesReorder(scope, ownerId, ids);
-  await reloadVariablesDialog();
+  await loadVariableSetRows(tabId, scope, ownerId);
 }
 
 export async function reorderEnvironmentsList(ids: string[]): Promise<void> {
@@ -270,23 +305,20 @@ export function clearRevealed(): void {
  *  reuse, §1.4/OQ-2); now it is the module's own shared loop, used here and by
  *  revealHistoryEntry below.
  *
- *  P7 D10: `onError`, when supplied, receives an error/unavailable outcome's message instead of it
- *  going into `variablesDialogState.error` — the *Copy as curl* reveal loop (http/state/curl.ts)
- *  is not the variables dialog and has its own error sink to write into. Every existing caller
- *  omits it and keeps today's behaviour exactly. */
+ *  R10: `onError` is now required rather than falling back to a singleton dialog's error field —
+ *  there is no longer one such field to fall back to (a variable-set view writes into its own
+ *  tab's runtime via setVariableSetError; the *Copy as curl* reveal loop, http/state/curl.ts, has
+ *  its own error sink either way). */
 export async function revealVariable(
   id: string,
-  onError?: (message: string) => void,
+  onError: (message: string) => void,
 ): Promise<string | undefined> {
   return runReveal(
     (confirmed) => control.variablesReveal(id, confirmed),
     (value) => {
       revealedValues[id] = value;
     },
-    (message) => {
-      if (onError) onError(message);
-      else variablesDialogState.error = message;
-    },
+    onError,
     'Show this variable’s value? It will be displayed in plain text.',
   );
 }
@@ -295,12 +327,20 @@ export async function revealVariable(
 
 interface HistoryMenuState {
   open: boolean;
+  /** Which tab's own row this popover is restoring into — restoreHistoryEntry's own lookup key,
+   *  since rows now live in a per-tab runtime rather than one singleton dialog's own list. */
+  tabId: string | null;
+  scope: VariableScope | null;
+  ownerId: string;
   variableId: string | null;
   entries: ApiVariableHistoryEntry[];
 }
 
 export const historyMenuState = reactive<HistoryMenuState>({
   open: false,
+  tabId: null,
+  scope: null,
+  ownerId: '',
   variableId: null,
   entries: [],
 });
@@ -318,8 +358,16 @@ function clearRevealedHistory(): void {
  *  without ever firing its own `@close` — closeHistoryMenu below would never run for it. Clearing
  *  here too, before the new popover's own state lands, closes that gap regardless of whether the
  *  previous popover ever closes "cleanly". */
-export async function openHistoryMenu(variableId: string): Promise<void> {
+export async function openHistoryMenu(
+  tabId: string,
+  scope: VariableScope,
+  ownerId: string,
+  variableId: string,
+): Promise<void> {
   clearRevealedHistory();
+  historyMenuState.tabId = tabId;
+  historyMenuState.scope = scope;
+  historyMenuState.ownerId = ownerId;
   historyMenuState.variableId = variableId;
   historyMenuState.open = true;
   historyMenuState.entries = await control.variablesHistory(variableId);
@@ -327,6 +375,9 @@ export async function openHistoryMenu(variableId: string): Promise<void> {
 
 export function closeHistoryMenu(): void {
   historyMenuState.open = false;
+  historyMenuState.tabId = null;
+  historyMenuState.scope = null;
+  historyMenuState.ownerId = '';
   historyMenuState.variableId = null;
   historyMenuState.entries = [];
   clearRevealedHistory();
@@ -341,7 +392,7 @@ export async function revealHistoryEntry(historyId: string): Promise<string | un
       revealedHistoryValues[historyId] = value;
     },
     (message) => {
-      variablesDialogState.error = message;
+      if (historyMenuState.tabId) setVariableSetError(historyMenuState.tabId, message);
     },
     'Show this prior value? It will be displayed in plain text.',
   );
@@ -351,7 +402,9 @@ export async function revealHistoryEntry(historyId: string): Promise<string | un
  *  itself recorded in history and is therefore undoable. A secret entry is revealed first if it
  *  has not been already — restoring is no less a reveal than the eye button is. */
 export async function restoreHistoryEntry(entry: ApiVariableHistoryEntry): Promise<void> {
-  const row = variablesDialogState.rows.find((r) => r.id === entry.variableId);
+  const { tabId, scope, ownerId } = historyMenuState;
+  if (!tabId || !scope) return;
+  const row = variableSetRows(tabId).find((r) => r.id === entry.variableId);
   if (!row) return;
   let value = entry.value;
   if (entry.isSecret) {
@@ -362,12 +415,12 @@ export async function restoreHistoryEntry(entry: ApiVariableHistoryEntry): Promi
     if (revealed === undefined) return; // cancelled, unavailable, or errored
     value = revealed;
   }
-  await upsertVariable({
+  await upsertVariable(tabId, scope, ownerId, {
     id: row.id,
     name: row.name,
     value,
     isSecret: entry.isSecret,
     description: row.description,
   });
-  await openHistoryMenu(entry.variableId);
+  await openHistoryMenu(tabId, scope, ownerId, entry.variableId);
 }

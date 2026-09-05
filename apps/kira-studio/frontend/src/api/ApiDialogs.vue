@@ -14,13 +14,11 @@ import { saveDialogState } from './state/collections';
 import { copyAsCurlDialogState, importCurlDialogState } from './state/curl';
 import { dynamicValuesDialogState } from './state/dynamicValues';
 import { editRawDialogState } from './state/raw';
-import { environmentsDialogState, variablesDialogState } from './state/variables';
-import VariablesDialog from './VariablesDialog.vue';
+import { environmentsDialogState } from './state/variables';
 </script>
 
 <template>
   <SaveRequestDialog v-if="saveDialogState.open" />
-  <VariablesDialog v-if="variablesDialogState.open" />
   <EnvironmentsDialog v-if="environmentsDialogState.open" />
   <DynamicValuesDialog v-if="dynamicValuesDialogState.open" />
   <ImportCurlDialog v-if="importCurlDialogState.open" />

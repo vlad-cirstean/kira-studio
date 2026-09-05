@@ -5,7 +5,7 @@ import CodiconIcon from '../theme/CodiconIcon.vue';
 import Checkbox from '../theme/primitives/Checkbox.vue';
 import IconButton from '../theme/primitives/IconButton.vue';
 import TextField from '../theme/primitives/TextField.vue';
-import { historyMenuState, openHistoryMenu } from './state/variables';
+import { historyMenuState } from './state/variables';
 import VariableHistoryMenu from './VariableHistoryMenu.vue';
 
 // P5 D11/D12/D9/D13/D14: one row — a grip handle, a name field, a value field (masked for a
@@ -42,6 +42,10 @@ const emit = defineEmits<{
   dragover: [index: number];
   dragend: [];
   move: [direction: 'up' | 'down'];
+  /** R10: the parent knows the tab/scope/owner this row's history popover needs to open against
+   *  (state/variables.ts's openHistoryMenu now takes them explicitly) — this row only says
+   *  "the history button for this id was clicked". */
+  history: [];
 }>();
 
 // D9/§1.4: "not yet revealed, the eye is the reveal action; once revealed, it's a free
@@ -84,7 +88,7 @@ function onDescriptionInput(v: string): void {
 const showHistory = ref(false);
 function onHistoryClick(): void {
   showHistory.value = true;
-  void openHistoryMenu(props.row.id);
+  emit('history');
 }
 function onHistoryClose(): void {
   showHistory.value = false;

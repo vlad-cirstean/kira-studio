@@ -12,10 +12,12 @@ import {
 import { computed, reactive, ref, watch } from 'vue';
 import { control } from '../../bridge/control';
 import {
+  closeVariableSetTabsForOwner,
   patchGrpcRequestTabState,
   patchHttpRequestTabState,
   renameApiRequestTabs,
   renameGrpcRequestTabs,
+  renameVariableSetTabs,
 } from '../tabs';
 
 // P4 D13: Api's own tree store. Studio's tree is lazy because its data is remote — expanding a
@@ -341,6 +343,8 @@ export async function renameRow(row: CollectionRowVm, name: string): Promise<voi
   // disagree with the tree (D14).
   if (row.kind === 'request' && row.protocol === 'grpc') renameGrpcRequestTabs(row.id, name);
   else if (row.kind === 'request') renameApiRequestTabs(row.id, name);
+  // P17 D16: a collection's own variable-set tab follows a rename too.
+  else if (row.kind === 'collection') renameVariableSetTabs('collection', row.id, name);
   await loadCollections();
 }
 
@@ -352,6 +356,9 @@ export async function deleteRow(row: CollectionRowVm): Promise<void> {
   // would lose work. Its cached saved request goes, though, so the tab reads as unsaved.
   delete collectionsState.requests[row.id];
   delete collectionsState.grpcRequests[row.id];
+  // P17 D16: unlike a request tab, a variable-set tab has no state of its own worth preserving
+  // once its owner (the collection) is gone — deleting it closes any open tab for it.
+  if (row.kind === 'collection') closeVariableSetTabsForOwner('collection', row.id);
   if (collectionsState.selected === row.key) collectionsState.selected = null;
   await loadCollections();
 }

@@ -31,8 +31,8 @@ import {
 } from './state/collections';
 import { openImportCurlDialog } from './state/curl';
 import { openDynamicValuesDialog } from './state/dynamicValues';
-import { openEnvironmentsDialog, openVariablesDialog } from './state/variables';
-import { openCollectionGrpcRequestTab, openCollectionRequestTab } from './tabs';
+import { openEnvironmentsDialog } from './state/variables';
+import { openCollectionGrpcRequestTab, openCollectionRequestTab, openVariableSetTab } from './tabs';
 
 // P4 D13: a real TreeHost consumer, with **not one line of tree mechanics** of its own —
 // virtualization, the pinned ancestor band and reveal-scroll all live in the primitive P1 factored
@@ -91,7 +91,7 @@ const actions: CollectionMenuActions = {
   importCollection: () => void importCollection(),
   importCurl: () => openImportCurlDialog(),
   exportCollection: (row) => void exportCollection(row.id, row.name),
-  variables: (row) => void openVariablesDialog('collection', row.id, `Variables — ${row.name}`),
+  variables: (row) => openVariableSetTab('collection', row.id, row.name),
   environments: () => openEnvironmentsDialog(),
   dynamicValues: () => openDynamicValuesDialog(),
 };

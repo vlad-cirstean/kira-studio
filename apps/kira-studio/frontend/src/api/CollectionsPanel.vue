@@ -16,8 +16,8 @@ import {
 } from './state/collections';
 import { openImportCurlDialog } from './state/curl';
 import { openDynamicValuesDialog } from './state/dynamicValues';
-import { openEnvironmentsDialog, openVariablesDialog } from './state/variables';
-import { openApiRequestTab } from './tabs';
+import { openEnvironmentsDialog } from './state/variables';
+import { openApiRequestTab, openVariableSetTab } from './tabs';
 
 // P4 C5: the placeholder is gone — this is a real tree now, mounted through the same PanelShell
 // shell Studio's ProjectPanel.vue uses. `empty` is no longer hardcoded: it is "this app has no
@@ -46,24 +46,24 @@ function onImport(): void {
   void importCollection();
 }
 
-// P5 D11: the palette's Variables… entry — opens the dialog for whichever collection is
-// currently selected in the tree (a collection row directly, or a folder/request's own
-// collection). A no-op with nothing selected, the same "view-scoped, no-op elsewhere" shape
-// view.run/api.save already have.
+// P5 D11, re-homed to a tab by P17 D16: the palette's Variables… entry — opens the tab for
+// whichever collection is currently selected in the tree (a collection row directly, or a
+// folder/request's own collection). A no-op with nothing selected, the same "view-scoped, no-op
+// elsewhere" shape view.run/api.save already have.
 function onVariablesCommand(): void {
   const selected = collectionsState.selected;
   if (!selected) return;
   if (selected.startsWith('c:')) {
     const id = selected.slice(2);
     const collection = collectionRecord(id);
-    if (collection) void openVariablesDialog('collection', id, `Variables — ${collection.name}`);
+    if (collection) openVariableSetTab('collection', id, collection.name);
     return;
   }
   if (selected.startsWith('i:')) {
     const item = itemRecord(selected.slice(2));
     const collection = item ? collectionRecord(item.collectionId) : undefined;
     if (item && collection) {
-      void openVariablesDialog('collection', item.collectionId, `Variables — ${collection.name}`);
+      openVariableSetTab('collection', item.collectionId, collection.name);
     }
   }
 }
