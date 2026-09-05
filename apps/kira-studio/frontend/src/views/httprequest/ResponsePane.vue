@@ -63,14 +63,6 @@ const response = computed(() => viewing.value?.snapshot.response ?? rt.value?.re
 const hasHistory = computed(() => (historyRt.value?.entries?.length ?? 0) > 0);
 const historyCount = computed(() => historyRt.value?.entries?.length ?? 0);
 
-// P10 D15/C5: a failed send has no response (§1.6, unchanged) but can carry a partial timeline
-// (ipcerr.Error.Details) — this is what lets the segmented control (and so the Timeline pane)
-// mount for it at all, the same way it already does for a response-less tab that merely has
-// history (hasHistory above).
-const hasFailureTimeline = computed(
-  () => rt.value?.status === 'error' && !!rt.value.error?.timeline,
-);
-
 const RESPONSE_PANE_OPTIONS = [
   { value: 'body' as const, label: 'Body', testid: 'http-response-pane-body' },
   { value: 'headers' as const, label: 'Headers', testid: 'http-response-pane-headers' },
@@ -181,111 +173,107 @@ function onBackToLatest(): void {
       {{ rt.error.message }}
     </MessageStrip>
 
-    <template v-if="response || hasHistory || hasFailureTimeline">
-      <div class="response-status-row p-toolbar">
-        <template v-if="response">
-          <span class="p-chip" :class="statusClass(response.status)" data-testid="http-status">
-            {{ response.status }} {{ response.statusText }}
-          </span>
-          <span class="p-xs muted status-hint" v-tooltip="hint" data-testid="http-status-hint">{{ hint }}</span>
-          <span class="p-push" />
-          <button
-            type="button"
-            class="p-xs dim pane-jump-link"
-            data-testid="http-elapsed"
-            v-tooltip="'See where the time went'"
-            @click="viewTimeline"
-          >
-            {{ response.elapsedMs }} ms
-          </button>
-          <span class="p-xs dim" data-testid="http-body-bytes">{{ formatBytes(response.bodyBytes) }}</span>
-          <SegmentedControl
-            v-if="tab.state.responsePane === 'body' && prettyFormat"
-            :model-value="tab.state.responseView"
-            :options="RESPONSE_VIEW_OPTIONS"
-            data-testid="http-response-view-toggle"
-            @update:model-value="setResponseView"
-          />
-        </template>
-        <span v-else class="p-push" />
+    <div class="response-status-row p-toolbar">
+      <template v-if="response">
+        <span class="p-chip" :class="statusClass(response.status)" data-testid="http-status">
+          {{ response.status }} {{ response.statusText }}
+        </span>
+        <span class="p-xs muted status-hint" v-tooltip="hint" data-testid="http-status-hint">{{ hint }}</span>
+        <span class="p-push" />
+        <button
+          type="button"
+          class="p-xs dim pane-jump-link"
+          data-testid="http-elapsed"
+          v-tooltip="'See where the time went'"
+          @click="viewTimeline"
+        >
+          {{ response.elapsedMs }} ms
+        </button>
+        <span class="p-xs dim" data-testid="http-body-bytes">{{ formatBytes(response.bodyBytes) }}</span>
         <SegmentedControl
-          :model-value="tab.state.responsePane"
-          :options="RESPONSE_PANE_OPTIONS"
-          data-testid="http-response-pane-toggle"
-          @update:model-value="setResponsePane"
+          v-if="tab.state.responsePane === 'body' && prettyFormat"
+          :model-value="tab.state.responseView"
+          :options="RESPONSE_VIEW_OPTIONS"
+          data-testid="http-response-view-toggle"
+          @update:model-value="setResponseView"
         />
-      </div>
-
-      <MessageStrip v-if="viewing" tone="note" data-testid="http-history-band">
-        Viewing the response from {{ viewingTime }} · {{ viewing?.snapshot.entry.method }}
-        {{ viewing?.snapshot.entry.url }}
-        <AppButton class="strip-action" data-testid="http-history-back" @click="onBackToLatest">
-          {{ rt?.response ? 'Back to latest' : 'Close' }}
-        </AppButton>
-      </MessageStrip>
-
-      <MessageStrip v-if="response?.bodyTruncated" tone="warn" data-testid="http-body-truncated">
-        Response truncated at {{ formatBytes(response.bodyBytes) }} — the server sent more than that.
-      </MessageStrip>
-      <MessageStrip v-if="bodyStorageTruncated" tone="note" data-testid="http-history-truncated">
-        Only the first 256 KB of this response was kept in history.
-      </MessageStrip>
-      <MessageStrip v-if="bodyNotStored" tone="note" data-testid="http-history-binary-note">
-        This response's body was binary and was not kept — {{ response ? formatBytes(response.bodyBytes) : '' }}.
-      </MessageStrip>
-      <button
-        v-if="redirectCaption"
-        type="button"
-        class="p-xs dim redirect-caption pane-jump-link"
-        data-testid="http-redirects"
-        v-tooltip="'See where the time went'"
-        @click="viewTimeline"
-      >
-        {{ redirectCaption }}
-      </button>
-
-      <ResponseHistoryList
-        v-if="tab.state.responsePane === 'history'"
-        :tab="tab"
-        @compare="onCompare"
+      </template>
+      <span v-else class="p-push" />
+      <SegmentedControl
+        :model-value="tab.state.responsePane"
+        :options="RESPONSE_PANE_OPTIONS"
+        data-testid="http-response-pane-toggle"
+        @update:model-value="setResponsePane"
       />
-      <div v-else-if="tab.state.responsePane === 'headers'" class="response-headers" data-testid="http-response-headers">
-        <template v-if="response">
-          <div v-for="(h, i) in response.headers" :key="i" class="p-kv-row">
-            <span class="p-kv-name mono">{{ h.name }}</span>
-            <span class="p-kv-value mono">{{ h.value }}</span>
-          </div>
-        </template>
-        <EmptyState v-else icon="arrow-right" label="Send a request to see the response" />
-      </div>
-      <RawExchangePane v-else-if="tab.state.responsePane === 'raw'" :tab="tab" />
-      <TimelinePane v-else-if="tab.state.responsePane === 'timeline'" :tab="tab" />
-      <div v-else class="response-body">
-        <template v-if="response">
-          <span
-            v-if="response.bodyEncoding === 'base64'"
-            class="p-sm muted binary-note"
-            data-testid="http-response-binary"
-          >
-            {{ response.bodyBytes }} bytes of binary data
-          </span>
-          <CodeMirrorHost v-else :doc="bodyText" :language="prettyFormat ?? 'plain'" :read-only="true" />
-        </template>
-        <EmptyState v-else icon="arrow-right" label="Send a request to see the response">
-          <button
-            v-if="hasHistory"
-            type="button"
-            class="history-hint-link"
-            data-testid="http-history-hint"
-            @click="viewHistory"
-          >
-            {{ historyCount }} past response{{ historyCount === 1 ? '' : 's' }} · View history
-          </button>
-        </EmptyState>
-      </div>
-    </template>
+    </div>
 
-    <EmptyState v-else-if="!rt || rt.status === 'idle'" icon="arrow-right" label="Send a request to see the response" />
+    <MessageStrip v-if="viewing" tone="note" data-testid="http-history-band">
+      Viewing the response from {{ viewingTime }} · {{ viewing?.snapshot.entry.method }}
+      {{ viewing?.snapshot.entry.url }}
+      <AppButton class="strip-action" data-testid="http-history-back" @click="onBackToLatest">
+        {{ rt?.response ? 'Back to latest' : 'Close' }}
+      </AppButton>
+    </MessageStrip>
+
+    <MessageStrip v-if="response?.bodyTruncated" tone="warn" data-testid="http-body-truncated">
+      Response truncated at {{ formatBytes(response.bodyBytes) }} — the server sent more than that.
+    </MessageStrip>
+    <MessageStrip v-if="bodyStorageTruncated" tone="note" data-testid="http-history-truncated">
+      Only the first 256 KB of this response was kept in history.
+    </MessageStrip>
+    <MessageStrip v-if="bodyNotStored" tone="note" data-testid="http-history-binary-note">
+      This response's body was binary and was not kept — {{ response ? formatBytes(response.bodyBytes) : '' }}.
+    </MessageStrip>
+    <button
+      v-if="redirectCaption"
+      type="button"
+      class="p-xs dim redirect-caption pane-jump-link"
+      data-testid="http-redirects"
+      v-tooltip="'See where the time went'"
+      @click="viewTimeline"
+    >
+      {{ redirectCaption }}
+    </button>
+
+    <ResponseHistoryList
+      v-if="tab.state.responsePane === 'history'"
+      :tab="tab"
+      @compare="onCompare"
+    />
+    <div v-else-if="tab.state.responsePane === 'headers'" class="response-headers" data-testid="http-response-headers">
+      <template v-if="response">
+        <div v-for="(h, i) in response.headers" :key="i" class="p-kv-row">
+          <span class="p-kv-name mono">{{ h.name }}</span>
+          <span class="p-kv-value mono">{{ h.value }}</span>
+        </div>
+      </template>
+      <EmptyState v-else icon="arrow-right" label="Send a request to see the response" />
+    </div>
+    <RawExchangePane v-else-if="tab.state.responsePane === 'raw'" :tab="tab" />
+    <TimelinePane v-else-if="tab.state.responsePane === 'timeline'" :tab="tab" />
+    <div v-else class="response-body">
+      <template v-if="response">
+        <span
+          v-if="response.bodyEncoding === 'base64'"
+          class="p-sm muted binary-note"
+          data-testid="http-response-binary"
+        >
+          {{ response.bodyBytes }} bytes of binary data
+        </span>
+        <CodeMirrorHost v-else :doc="bodyText" :language="prettyFormat ?? 'plain'" :read-only="true" />
+      </template>
+      <EmptyState v-else icon="arrow-right" label="Send a request to see the response">
+        <button
+          v-if="hasHistory"
+          type="button"
+          class="history-hint-link"
+          data-testid="http-history-hint"
+          @click="viewHistory"
+        >
+          {{ historyCount }} past response{{ historyCount === 1 ? '' : 's' }} · View history
+        </button>
+      </EmptyState>
+    </div>
 
     <ResponseDiffDialog v-if="compareIds" :ids="compareIds" @close="closeCompare" />
   </div>
