@@ -62,3 +62,28 @@ describe('templateToken (item 10 — the {{variable}} completion popup only open
     expect(templateToken('{{a}}{{', 7)).toEqual({ from: 7, to: 7, word: '' });
   });
 });
+
+// P17 D13(a): once a `|` has been typed inside the reference, the token is the run *after the
+// last `|`*, not the whole `name | ...` text — this is what lets AutocompleteField offer a
+// transform name without splicing over the variable name that precedes it.
+describe('templateToken with a pipe (P17 D13(a))', () => {
+  test('{{token | b — the word is "b", starting right after the pipe and its space', () => {
+    expect(templateToken('{{token | b', 11)).toEqual({ from: 10, to: 11, word: 'b' });
+  });
+
+  test('{{token |  — no space skipped beyond the one already typed', () => {
+    expect(templateToken('{{token | ', 10)).toEqual({ from: 10, to: 10, word: '' });
+  });
+
+  test('{{token |b — no space between the pipe and the letter, still tokenizes from right after the pipe', () => {
+    expect(templateToken('{{token |b', 10)).toEqual({ from: 9, to: 10, word: 'b' });
+  });
+
+  test('{{token | base64 | u — the token is after the LAST pipe, for a chained pipeline', () => {
+    expect(templateToken('{{token | base64 | u', 20)).toEqual({ from: 19, to: 20, word: 'u' });
+  });
+
+  test('before any pipe, the token is still the name run from {{ (unaffected by this change)', () => {
+    expect(templateToken('{{tok', 5)).toEqual({ from: 2, to: 5, word: 'tok' });
+  });
+});

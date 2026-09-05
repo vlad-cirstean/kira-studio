@@ -50,6 +50,11 @@ export function wholeFieldToken(
 // by scanning only the text *before* the caret: a `}}` already typed before the caret means that
 // reference is closed and the caret has moved past it, even if more text (another `{{`) follows on
 // the line.
+//
+// P17 D13(a): if the run from `{{` to the caret contains a `|`, the token starts after the
+// *last* `|` plus any whitespace — so at `{{token | b`, the word is `b` with `from` pointing at
+// the `b`, which is what makes `accept` (it always replaces `wordStart`→caret) splice in a
+// transform name without overwriting the variable name before the pipe.
 export function templateToken(
   text: string,
   caret: number,
@@ -59,7 +64,12 @@ export function templateToken(
   if (open === -1) return null;
   const closedBeforeCaret = before.indexOf('}}', open + 2) !== -1;
   if (closedBeforeCaret) return null;
-  const from = open + 2;
+  const lastPipe = before.lastIndexOf('|');
+  let from = open + 2;
+  if (lastPipe > open) {
+    const afterPipe = before.slice(lastPipe + 1);
+    from = lastPipe + 1 + (afterPipe.length - afterPipe.trimStart().length);
+  }
   return { from, to: caret, word: text.slice(from, caret) };
 }
 

@@ -29,7 +29,15 @@ defineOptions({ inheritAttrs: false });
 const props = withDefaults(
   defineProps<{
     modelValue: string;
-    candidates: readonly Completion[];
+    /** P17 D13(b): a plain array for a static candidate list (every call site but the URL/header
+     *  fields' `{{...}}` completion), or a function of the current token's context for a list
+     *  that depends on *where* the caret is — `variableSupport` (variableCompletion.ts) returns
+     *  the six transforms after a `|` and the variable/dynamic names before one. `text` is the
+     *  field's own full value, `from`/`word` are `tokenAt`'s own current token — the same shape
+     *  `recompute` already derives, just exposed rather than kept internal. */
+    candidates:
+      | readonly Completion[]
+      | ((ctx: { text: string; from: number; word: string }) => readonly Completion[]);
     prefix?: string;
     /** P27: lights the prefix label up in `--kira-accent` instead of the default disabled grey —
      * set by a filter/sort field's caller when the underlying (applied, not just typed) value is
@@ -102,10 +110,19 @@ const hasNavigated = ref(false);
 // since none of these keys actually move the text cursor).
 const NAV_KEYS = new Set(['ArrowUp', 'ArrowDown', 'Enter', 'Tab', 'Escape']);
 
+// D13(b): resolved fresh on every recompute — a function candidates list is re-evaluated with the
+// *current* token context (text/from/word), so typing past a `|` swaps the list from variable
+// names to transform names without any extra wiring at the call site.
+const resolvedCandidates = computed<readonly Completion[]>(() =>
+  typeof props.candidates === 'function'
+    ? props.candidates({ text: props.modelValue, from: wordStart.value, word: currentWord.value })
+    : props.candidates,
+);
+
 const filtered = computed(() =>
   forceAll.value
-    ? props.candidates.slice(0, MAX_VISIBLE)
-    : rankCandidates(props.candidates, currentWord.value),
+    ? resolvedCandidates.value.slice(0, MAX_VISIBLE)
+    : rankCandidates(resolvedCandidates.value, currentWord.value),
 );
 
 function recompute(el: HTMLInputElement): void {
