@@ -6,7 +6,9 @@ import {
   publishSelectedCell,
   type SelectedCell,
 } from '../../state/cellSelection';
+import { openContextMenu } from '../../state/contextMenu';
 import { settingsState } from '../../state/settings';
+import MessageStrip from '../../theme/primitives/MessageStrip.vue';
 import VirtualList from '../../theme/primitives/VirtualList.vue';
 import DocumentRow from '../shared/document/DocumentRow.vue';
 import DocumentTree from '../shared/document/DocumentTree.vue';
@@ -21,6 +23,7 @@ import { datasetNumber } from '../shared/eventCoords';
 import { createMatchIndex } from '../shared/page/search';
 import { setVisibleRows } from '../shared/page/visibleRows';
 import ConsoleSlickGrid from './ConsoleSlickGrid.vue';
+import { rowAsJsonMenu } from './resultMenu';
 import { documentRow, getPage, keyValueRow, pageVersion, setVisibleWindow } from './resultPages';
 import { type Match, matchedRows, searchState } from './search';
 import { isResultDocExpanded, setAllResultDocsExpanded, toggleResultDocExpanded } from './state';
@@ -244,10 +247,46 @@ function selectKeyValueRowFromEvent(e: MouseEvent): void {
   const r = datasetNumber(e.currentTarget, 'row');
   if (r !== null) selectKeyValueRow(r);
 }
+
+// P19 D6/D11: the document and key-value branches' own row menu — "Copy as JSON" (this row) and
+// "Copy all as JSON" (every row currently displayed, i.e. rowIndices/documentRows — under an
+// active find-filter that's the filtered subset, same rule columnsToTsv's own callers already
+// follow). A copy failure lands here (component-local, P13 D9's strip precedent) since the
+// console has no actionError field the way documents/menu.ts's copyOrReportError writes into.
+const copyError = ref<string | null>(null);
+function onCopyError(message: string): void {
+  copyError.value = message;
+}
+
+function onDocumentRowContextMenu(e: MouseEvent, index: number): void {
+  e.preventDefault();
+  const body = documentRow(props.pageKey, index)?.body ?? '';
+  const allJson = documentRows.value.map((v) => documentRow(props.pageKey, v.index)?.body ?? '');
+  openContextMenu(e, rowAsJsonMenu({ json: body, allJson, onError: onCopyError }));
+}
+
+function onKeyValueRowContextMenu(e: MouseEvent, row: number): void {
+  e.preventDefault();
+  const kv = kvRowAt(row);
+  const json = JSON.stringify({ [kv.field]: kv.value }, null, 2);
+  const allJson = rowIndices.value.map((r) => {
+    const entry = kvRowAt(r);
+    return JSON.stringify({ [entry.field]: entry.value }, null, 2);
+  });
+  openContextMenu(e, rowAsJsonMenu({ json, allJson, onError: onCopyError }));
+}
+
+function onKeyValueRowContextMenuFromEvent(e: MouseEvent): void {
+  const r = datasetNumber(e.currentTarget, 'row');
+  if (r !== null) onKeyValueRowContextMenu(e, r);
+}
 </script>
 
 <template>
   <div class="console-result-grid" data-testid="console-result-grid">
+    <MessageStrip v-if="copyError" tone="err" data-testid="console-copy-error">
+      {{ copyError }}
+    </MessageStrip>
     <div v-if="!page || page.rowCount === 0" class="no-rows">{{ page ? 'No rows' : '' }}</div>
     <!-- P31 D19/P24 D8 precedent: filtering to zero matches is a distinct empty state from "no
          data loaded" — same discipline as KeyValueView.vue's own EmptyState pair. -->
@@ -285,6 +324,7 @@ function selectKeyValueRowFromEvent(e: MouseEvent): void {
           :search-match-current="isCurrentSearchMatch(view.index, 0)"
           @toggle="onToggleDocExpanded(view.id)"
           @select="selectDocumentRow(view.index)"
+          @contextmenu="onDocumentRowContextMenu($event, view.index)"
         >
           <template #body>
             <div
@@ -320,6 +360,7 @@ function selectKeyValueRowFromEvent(e: MouseEvent): void {
           :class="{ selected: isSelected(r, 0) }"
           :style="{ height: `${rowHeight}px` }"
           @click="selectKeyValueRowFromEvent"
+          @contextmenu="onKeyValueRowContextMenuFromEvent"
         >
           <div
             class="cell kv-field"
@@ -351,10 +392,17 @@ function selectKeyValueRowFromEvent(e: MouseEvent): void {
   min-height: 0;
   font-family: var(--kira-font-family);
   font-size: var(--kira-t-md);
+  /* P19 D6: the copy-error strip is an always-possible sibling above whichever one of
+     no-rows/ConsoleSlickGrid/VirtualList is the actual body — a plain block stack would let that
+     sibling's height double-count against the 100% above, so this becomes a column and the body
+     takes what's left. */
+  display: flex;
+  flex-direction: column;
 }
 
 .body {
-  height: 100%;
+  flex: 1;
+  min-height: 0;
 }
 
 .row {

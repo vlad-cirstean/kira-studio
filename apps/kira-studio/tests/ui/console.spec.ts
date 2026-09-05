@@ -5,6 +5,12 @@ import type { ControlSnapshot, LogicalPage, PortSnapshot } from '../ipc/support/
 import { expect, test } from './fixtures';
 import { IPC } from './support/ipcChannels';
 import {
+  DB_PATH as MONGO_DB_PATH,
+  connectAndExpandControl as mongoConnectAndExpandControl,
+  mongoConnectionSummary,
+  WIDGETS_PATH,
+} from './support/mongoFixture';
+import {
   APP_PATH,
   DB_PATH,
   ORDER_ITEMS_PATH,
@@ -1001,4 +1007,135 @@ test('Query console — a tabular selection copies as TSV/CSV/JSON, rows/columns
   await expect(page.locator('[data-testid="context-submenu"]')).toBeVisible();
   await page.click('[data-testid="menu-item-copy-rows-json"]');
   expect(await lastClipboardWrite(page)).toBe(JSON.stringify([{ a: '1', b: '2' }], null, 2));
+});
+
+// P19 T8/D6/D11: a Mongo document result's own row menu — "Copy as JSON" (this row's canonical
+// EJSON body, re-indented) and "Copy all as JSON" (every row currently displayed — under an
+// active find-filter, the filtered subset).
+function mongoCreateArgs(name: string) {
+  return {
+    name,
+    kind: 'mongodb',
+    color: 'green',
+    mode: 'fields',
+    readOnly: false,
+    host: '127.0.0.1',
+    port: 27017,
+    database: 'kira_test',
+    username: 'kira',
+    password: null,
+    uri: null,
+    options: {},
+    preconnect: null,
+    preconnectSidecar: false,
+    autoExplain: false,
+    throttlePerSec: 0,
+  };
+}
+
+test('Query console — a Mongo document result copies as JSON, one row or all displayed (P19 D6/D11)', async ({
+  relaunch,
+}) => {
+  const CONNECTION_ID = 'conn-console-doc-copy';
+  const CONNECTION_SUMMARY = mongoConnectionSummary(CONNECTION_ID, 'Console Doc Copy', 'green');
+  const BODIES = [
+    '{"_id":{"$oid":"000000000000000000000000"},"name":"alpha"}',
+    '{"_id":{"$oid":"000000000000000000000001"},"name":"beta"}',
+    '{"_id":{"$oid":"000000000000000000000002"},"name":"gamma"}',
+  ];
+  const CONTROL: ControlSnapshot[] = [
+    { channel: IPC.connectionsList, response: [] },
+    {
+      channel: IPC.connectionsCreate,
+      args: mongoCreateArgs('Console Doc Copy'),
+      response: CONNECTION_SUMMARY,
+    },
+    ...mongoConnectAndExpandControl(CONNECTION_ID),
+  ];
+  const PORT: PortSnapshot[] = [
+    {
+      op: DATA_OP.execute,
+      payload: {
+        connectionId: CONNECTION_ID,
+        path: WIDGETS_PATH,
+        statements: ['db.widgets.find()'],
+      },
+      response: {
+        kind: 'execute',
+        pages: [
+          {
+            kind: 'document',
+            ids: BODIES.map((_, i) => `{"$oid":"00000000000000000000000${i}"}`),
+            bodies: BODIES,
+            position: {
+              offset: 0,
+              pageSize: 3,
+              hasMore: false,
+              nextToken: null,
+              prevToken: null,
+              strategy: 'offset',
+            },
+          },
+        ],
+      },
+    },
+  ];
+
+  const { window: page } = await relaunch({ control: CONTROL, stream: PORT });
+  await installClipboardSpy(page);
+  await page.click('[data-testid="add-connection"]');
+  await page.click('[data-testid="connection-kind-mongodb"]');
+  await page.fill('[data-testid="connection-name"]', 'Console Doc Copy');
+  await page.fill('[data-testid="connection-host"]', '127.0.0.1');
+  await page.fill('[data-testid="connection-port"]', '27017');
+  await page.fill('[data-testid="connection-database"]', 'kira_test');
+  await page.fill('[data-testid="connection-username"]', 'kira');
+  await page.click('[data-testid="color-green"]');
+  await page.click('[data-testid="connection-save"]');
+  await expect(page.locator('[data-testid="connection-dialog"]')).toHaveCount(0);
+  const connRow = connectionRow(page);
+  await expect(connRow).toBeVisible();
+  await openRowMenu(page, '');
+  await page.click('[data-testid="menu-item-connect"]');
+  await expect(connRow.locator('.status-dot')).toHaveAttribute('data-status', 'connected', {
+    timeout: 10_000,
+  });
+  await expandRow(page, '');
+  await expandRow(page, MONGO_DB_PATH);
+  await openConsoleFromMenu(page, WIDGETS_PATH);
+
+  const consoleView = page.locator('[data-testid="console-view"]');
+  const results = consoleView.locator('[data-testid="console-result-grid"]');
+  await typeInto(consoleView, page, 'db.widgets.find()');
+  await page.click('[data-testid="console-run-statement"]');
+  const docRows = results.locator('[data-testid="console-result-doc-row"]');
+  await expect(docRows).toHaveCount(3);
+
+  // --- one row's own body -------------------------------------------------------------------
+  await docRows.nth(0).click({ button: 'right' });
+  await expect(page.locator('[data-testid="context-menu"]')).toBeVisible();
+  await page.click('[data-testid="menu-item-copy-as-json"]');
+  expect(await lastClipboardWrite(page)).toContain('"name": "alpha"');
+
+  // --- every displayed row -------------------------------------------------------------------
+  await docRows.nth(0).click({ button: 'right' });
+  await expect(page.locator('[data-testid="context-menu"]')).toBeVisible();
+  await page.click('[data-testid="menu-item-copy-all-as-json"]');
+  expect(JSON.parse(await lastClipboardWrite(page))).toHaveLength(3);
+
+  // --- narrowed to what the find-filter actually shows ----------------------------------------
+  await page.click('[data-testid="console-search"]');
+  const searchToolbar = consoleView.locator('[data-testid="console-search-toolbar"]');
+  await expect(searchToolbar).toBeVisible();
+  await page.fill('[data-testid="console-search-input"]', 'beta');
+  await expect(searchToolbar.locator('[data-testid="console-search-count"]')).toContainText('of 1');
+  await page.click('[data-testid="console-search-filter-rows"]');
+  await expect(docRows).toHaveCount(1);
+
+  await docRows.nth(0).click({ button: 'right' });
+  await expect(page.locator('[data-testid="context-menu"]')).toBeVisible();
+  await page.click('[data-testid="menu-item-copy-all-as-json"]');
+  const filtered = JSON.parse(await lastClipboardWrite(page));
+  expect(filtered).toHaveLength(1);
+  expect(filtered[0].name).toBe('beta');
 });
