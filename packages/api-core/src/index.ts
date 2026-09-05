@@ -21,6 +21,20 @@ export { type CurlRequest, toCurl } from './http/curl/generate';
 export { type ParsedCurl, parseCurl } from './http/curl/parse';
 export { type CurlWarning, type CurlWarningKind, tokenize } from './http/curl/tokenize';
 export {
+  type EnvDiff,
+  type EnvDiffAdd,
+  type EnvDiffRemove,
+  type EnvDiffUpdate,
+  type EnvEntry,
+  type EnvParseError,
+  type EnvParseResult,
+  type EnvRow,
+  parseEnv,
+  reconcileEnv,
+  SECRET_MARKER,
+  serializeEnv,
+} from './http/dotenv';
+export {
   ALIAS_TO_FAKE,
   DYNAMIC_NAMES,
   type DynamicName,
