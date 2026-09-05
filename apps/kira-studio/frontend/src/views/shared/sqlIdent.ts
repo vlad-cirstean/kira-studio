@@ -56,6 +56,17 @@ export function backslashEscapesFor(dialect: SqlDialect | undefined): boolean {
   return dialect === undefined || BACKSLASH_ESCAPE_DIALECTS.has(dialect);
 }
 
+// F3/P21 round 1: every generated string literal (Filter by this value, FK navigation, Copy as
+// INSERT) used to escape only `'`, never consulting backslashEscapesFor even though that helper
+// already exists and is already used for sql-split.ts/sql-lint.ts's own quote scanning. On
+// MySQL/MariaDB/ClickHouse a value containing a backslash either silently fails to match (`\n`
+// read as a newline) or produces an unterminated literal (a value ending in `\`) — the exact class
+// P34 F22 already fixed for *identifiers*; this is the literal half of the same fix.
+export function quoteLiteral(dialect: SqlDialect | undefined, value: string): string {
+  const escaped = backslashEscapesFor(dialect) ? value.replace(/\\/g, '\\\\') : value;
+  return `'${escaped.replace(/'/g, "''")}'`;
+}
+
 // A short, curated set of the reserved words most likely to collide with a real column name —
 // not exhaustive (a full per-dialect reserved-word list runs to hundreds of entries and shifts
 // with engine version); the same "curated, not exhaustive" call P18's own WHERE/ORDER BY

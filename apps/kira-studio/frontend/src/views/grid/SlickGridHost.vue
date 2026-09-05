@@ -1503,6 +1503,7 @@ function onGutterContextMenu(row: number, e: MouseEvent): void {
       snapshot: rowSnapshot,
       canEdit: canEditTable(),
       canDelete: canDeleteRows(),
+      dialect: currentDialect(),
     }),
   );
 }
@@ -1749,6 +1750,7 @@ function onKeydown(e: SlickEventData): void {
         snapshot: rowSnapshot,
         canEdit: canEditTable(),
         canDelete: canDeleteRows(),
+        dialect: currentDialect(),
       }),
       rowShortcut,
     );
@@ -1781,6 +1783,7 @@ function onKeydown(e: SlickEventData): void {
         snapshot: rowSnapshot,
         canEdit: canEditTable(),
         canDelete: canDeleteRows(),
+        dialect: currentDialect(),
       }),
       deleteShortcut,
     );

@@ -10,7 +10,7 @@ import {
   rowsToJson,
   rowsToTsv,
 } from '../shared/clipboardFormats';
-import { quoteIdent, type SqlDialect } from '../shared/sqlIdent';
+import { quoteIdent, quoteLiteral, type SqlDialect } from '../shared/sqlIdent';
 import {
   discardRowChange,
   duplicateAsInsert,
@@ -83,7 +83,7 @@ function foreignKeyValueFilter(
     const value = rowValues[columns[i] as string];
     if (value === undefined || value === null) return null;
     parts.push(
-      `${quoteIdent(dialect, referencedColumns[i] as string)} = '${value.replace(/'/g, "''")}'`,
+      `${quoteIdent(dialect, referencedColumns[i] as string)} = ${quoteLiteral(dialect, value)}`,
     );
   }
   return parts.join(' AND ');
@@ -188,7 +188,7 @@ export function cellMenu(ctx: CellMenuContext): MenuItem[] {
   const editDisabled = !ctx.canEdit || ctx.isDeleted;
   const filterExpr = ctx.isNull
     ? `${quoteIdent(ctx.dialect, ctx.columnName)} IS NULL`
-    : `${quoteIdent(ctx.dialect, ctx.columnName)} = '${ctx.text.replace(/'/g, "''")}'`;
+    : `${quoteIdent(ctx.dialect, ctx.columnName)} = ${quoteLiteral(ctx.dialect, ctx.text)}`;
   const fkCtx: FkNavContext = {
     connectionId: ctx.connectionId,
     dialect: ctx.dialect,
@@ -288,6 +288,9 @@ export interface RowMenuContext {
   canEdit: boolean;
   /** P36 D26: separate from canEdit — an engine can offer update without delete (or vice versa). */
   canDelete: boolean;
+  // F3/P21 round 1: Copy row(s) ▸ INSERT needs the dialect to quote both identifiers and literals
+  // correctly — undefined for a connection with no SQL surface (that submenu item never runs there).
+  dialect: SqlDialect | undefined;
 }
 
 function hasPendingChange(ctx: RowMenuContext): boolean {
@@ -332,7 +335,7 @@ export function rowMenu(ctx: RowMenuContext): MenuItem[] {
           type: 'item',
           id: 'copy-rows-insert',
           label: 'INSERT',
-          run: () => copyText(rowsToInsert(ctx.qualifiedName, snapshots)),
+          run: () => copyText(rowsToInsert(ctx.qualifiedName, snapshots, ctx.dialect)),
         },
       ],
     },

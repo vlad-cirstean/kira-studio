@@ -1,9 +1,16 @@
 // D6/D13: clipboard formatting for grid row copy and paste. A row is captured as its *display*
 // column order plus effective (possibly-staged) values — never the raw page/decode cache — so
 // what gets copied always matches what's on screen (D6's rationale).
+import { quoteIdent, quoteLiteral, type SqlDialect } from './sqlIdent';
+
 export interface RowSnapshot {
   columns: string[];
   values: Record<string, string | null>;
+  // F2/P21 round 1: which of `values` came from a cell the engine truncated (its 64 KiB display
+  // cap) — so a format that generates something meant to be *run* (rowsToInsert) can refuse to
+  // treat the truncated prefix as the real value, the same reason P24 D27 makes such a cell
+  // non-editable in the grid itself. Optional: most snapshot builders have no truncation to report.
+  truncated?: ReadonlySet<string>;
 }
 
 export function rowsToTsv(rows: RowSnapshot[]): string {
@@ -61,18 +68,40 @@ export function rowsToJson(rows: RowSnapshot[]): string {
 // A generated statement for the user to review/edit, same trust boundary as D5's WHERE clause —
 // every value is quoted text (or bare NULL), never a typed literal (P5's "never a typed JS
 // value" ground rule applies here too).
-export function rowsToInsert(qualifiedName: string, rows: RowSnapshot[]): string {
+//
+// F3/P21 round 1: the column list used to be hard-coded `"${c}"` regardless of dialect, which is a
+// *string literal* in a column position on MySQL/MariaDB (without ANSI_QUOTES) and ClickHouse —
+// this was the one clipboard format claiming to produce runnable SQL and unusable on 3 of 5
+// engines. Values now go through quoteLiteral (backslash-aware where the dialect needs it, F3) and
+// columns through quoteIdent, both dialect-driven like every other generated predicate in this
+// app. F2: a value the engine truncated is never written as a literal — INSERTing its 64 KiB
+// prefix as if it were the real value would silently corrupt the copy on execution — a comment
+// names the column instead so the omission is visible, not silent.
+export function rowsToInsert(
+  qualifiedName: string,
+  rows: RowSnapshot[],
+  dialect: SqlDialect | undefined,
+): string {
   if (rows.length === 0) return '';
   const columns = rows[0].columns;
-  const columnList = columns.map((c) => `"${c}"`).join(', ');
+  const columnList = columns.map((c) => quoteIdent(dialect, c)).join(', ');
+  const truncatedColumns = new Set<string>();
   const valueLines = rows.map((r) => {
     const values = columns.map((c) => {
+      if (r.truncated?.has(c)) {
+        truncatedColumns.add(c);
+        return 'NULL';
+      }
       const v = r.values[c];
-      return v === null || v === undefined ? 'NULL' : `'${v.replace(/'/g, "''")}'`;
+      return v === null || v === undefined ? 'NULL' : quoteLiteral(dialect, v);
     });
     return `  (${values.join(', ')})`;
   });
-  return `INSERT INTO ${qualifiedName} (${columnList})\nVALUES\n${valueLines.join(',\n')};`;
+  const truncatedNote =
+    truncatedColumns.size > 0
+      ? `-- ${[...truncatedColumns].join(', ')} truncated in the grid — NULL substituted, not the real value\n`
+      : '';
+  return `${truncatedNote}INSERT INTO ${qualifiedName} (${columnList})\nVALUES\n${valueLines.join(',\n')};`;
 }
 
 /** TSV if `text` contains a tab character, else CSV (quoted-field aware). */

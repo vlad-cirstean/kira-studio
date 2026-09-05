@@ -52,12 +52,21 @@ export function rowSnapshot(
   row: number,
 ): RowSnapshot {
   const values: Record<string, string | null> = {};
+  const truncatedSet = new Set<string>();
   for (let c = 0; c < order.length; c++) {
     const name = order[c] as string;
     const dc = displayCell(tabId, page, order, row, c);
     values[name] = dc.isNull ? null : dc.text;
+    // F2/P21 round 1: `.text` is only the 64 KiB prefix the engine sent for a truncated cell —
+    // carried here so a format that generates something meant to be *run* (rowsToInsert) can
+    // refuse to treat it as the real value.
+    if (dc.truncated) truncatedSet.add(name);
   }
-  return { columns: [...order], values };
+  return {
+    columns: [...order],
+    values,
+    truncated: truncatedSet.size > 0 ? truncatedSet : undefined,
+  };
 }
 
 /** P24 D10: while filtering, column-scoped ops (copy column values, the column-selection copy
