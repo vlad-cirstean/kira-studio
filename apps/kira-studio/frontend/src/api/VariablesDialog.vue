@@ -5,6 +5,7 @@ import { connectionsState } from '../state/connections';
 import AppButton from '../theme/primitives/AppButton.vue';
 import DialogFrame from '../theme/primitives/DialogFrame.vue';
 import MessageStrip from '../theme/primitives/MessageStrip.vue';
+import PanelSearchBox from '../theme/primitives/PanelSearchBox.vue';
 import {
   closeVariablesDialog,
   deleteVariable,
@@ -64,25 +65,54 @@ watch(revealedValues, (values) => {
   }
 });
 
-const displayRows = computed<ApiVariable[]>(() => {
+// P16 D14/§5: the filter box's own state — matches the row's `name` and nothing else. Not a
+// convenience choice: matching on `value` would turn the box into an oracle a user could type a
+// guess into and read the answer off whether a (masked, until revealed) secret row appeared. See
+// §5 of the P16 plan for the full analysis.
+const filterQuery = ref('');
+const isFiltered = computed(() => filterQuery.value.trim() !== '');
+
+// The full, unfiltered real-row list (drafts folded in) — kept separate from `displayRows` so
+// duplicate-name detection (below) and every write path still reason about every row, not just
+// the currently-visible ones.
+const allRealRows = computed<ApiVariable[]>(() => {
   const byId = new Map(variablesDialogState.rows.map((row) => [row.id, row]));
-  const real = order.value.flatMap((id) => {
+  return order.value.flatMap((id) => {
     const row = byId.get(id);
     if (!row) return [];
     const draft = drafts[id] ?? { name: row.name, value: row.value, isSecret: row.isSecret };
     return [{ ...row, name: draft.name, value: draft.value, isSecret: draft.isSecret }];
   });
-  const trailing: ApiVariable = {
-    id: '',
-    scope: variablesDialogState.scope ?? 'collection',
-    ownerId: variablesDialogState.ownerId,
-    name: trailingDraft.name,
-    value: trailingDraft.value,
-    isSecret: trailingDraft.isSecret,
-    sortOrder: real.length,
-  };
-  return [...real, trailing];
 });
+
+const trailingRow = computed<ApiVariable>(() => ({
+  id: '',
+  scope: variablesDialogState.scope ?? 'collection',
+  ownerId: variablesDialogState.ownerId,
+  name: trailingDraft.name,
+  value: trailingDraft.value,
+  isSecret: trailingDraft.isSecret,
+  sortOrder: allRealRows.value.length,
+}));
+
+// The trailing blank row is never filtered — it is the add affordance, not data, and hiding it
+// would make a filtered list un-appendable (F11/D13's own rule, applied here too).
+const displayRows = computed<ApiVariable[]>(() => {
+  const q = filterQuery.value.trim().toLowerCase();
+  const real = q
+    ? allRealRows.value.filter((row) => row.name.toLowerCase().includes(q))
+    : allRealRows.value;
+  return [...real, trailingRow.value];
+});
+
+// Duplicate-name detection against the full (unfiltered) list — a filter must not hide a real
+// duplicate-name warning just because the other same-named row happens not to match the filter.
+function duplicateFor(row: ApiVariable): boolean {
+  const full = [...allRealRows.value, trailingRow.value];
+  const idx = row.id === '' ? full.length - 1 : allRealRows.value.findIndex((r) => r.id === row.id);
+  if (idx === -1) return false;
+  return isDuplicateName(full, idx);
+}
 
 function draftFor(id: string): Draft {
   if (id === '') return trailingDraft;
@@ -174,12 +204,18 @@ function onReveal(id: string): void {
 
 // D14: drag — ColumnsMenu.vue's own dragstart/dragover.prevent/dragend shape, splicing the local
 // `order` array on every dragover and committing the full new order once, on drop.
+// P16 D14: both splice `order` by the *rendered* index, which a filter can move — but the deeper
+// reason reordering is refused while filtered is semantic, not just index-fragile: "move up" past
+// a neighbour the filter is hiding has no defined result, and silently reordering against the
+// unfiltered list would move a row the user cannot see. Refusing is the honest answer.
 const dragIndex = ref<number | null>(null);
 
 function onDragStart(index: number): void {
+  if (isFiltered.value) return;
   dragIndex.value = index;
 }
 function onDragOver(index: number): void {
+  if (isFiltered.value) return;
   const from = dragIndex.value;
   if (from === null || from === index || index >= order.value.length) return;
   const next = [...order.value];
@@ -189,6 +225,10 @@ function onDragOver(index: number): void {
   dragIndex.value = index;
 }
 async function onDragEnd(): Promise<void> {
+  if (isFiltered.value) {
+    dragIndex.value = null;
+    return;
+  }
   dragIndex.value = null;
   await reorderVariables(order.value);
 }
@@ -196,6 +236,7 @@ async function onDragEnd(): Promise<void> {
 // D14: Alt+↑/↓ — a keyboard-reachable equivalent, since a drag-only affordance is unusable from
 // the keyboard. Each keypress is its own discrete commit, not batched with a later drop.
 async function onMove(id: string, direction: 'up' | 'down'): Promise<void> {
+  if (isFiltered.value) return;
   const from = order.value.indexOf(id);
   const to = direction === 'up' ? from - 1 : from + 1;
   if (from === -1 || to < 0 || to >= order.value.length) return;
@@ -235,6 +276,11 @@ function close(): void {
       >
         {{ connectionsState.secretStorage.reason }}
       </MessageStrip>
+      <PanelSearchBox
+        v-model="filterQuery"
+        placeholder="Filter by name"
+        testid="variables-filter"
+      />
       <div class="header-row">
         <span class="cell">Name</span>
         <span class="cell">Value</span>
@@ -245,8 +291,9 @@ function close(): void {
         :row="row"
         :index="i"
         :dragging="dragIndex === i"
-        :duplicate="isDuplicateName(displayRows, i)"
+        :duplicate="duplicateFor(row)"
         :trailing="row.id === ''"
+        :filtered="isFiltered"
         :secrets-unavailable="!!connectionsState.secretStorage && !connectionsState.secretStorage.available"
         @update:name="onUpdateName(row.id, $event)"
         @update:value="onUpdateValue(row.id, $event)"

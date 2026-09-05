@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { DYNAMIC_NAMES, loadDynamicGenerator } from '@kira/api-core';
-import { onMounted, reactive } from 'vue';
+import { computed, onMounted, reactive, ref } from 'vue';
 import { copyText } from '../clipboard';
 import AppButton from '../theme/primitives/AppButton.vue';
 import DialogFrame from '../theme/primitives/DialogFrame.vue';
+import EmptyState from '../theme/primitives/EmptyState.vue';
+import PanelSearchBox from '../theme/primitives/PanelSearchBox.vue';
 import { closeDynamicValuesDialog } from './state/dynamicValues';
 
 // P6 D11: a read-only discovery surface for the 58-name catalogue — nothing here edits, saves, or
@@ -26,6 +28,18 @@ function reference(name: string): string {
   return `{{${name}}}`;
 }
 
+// P16 D15: matches the $name or its generated sample — a filter over today's flat 58-name list,
+// nothing more (P17 owns the catalogue's own fake. re-namespacing and autocomplete).
+const filterQuery = ref('');
+const isFiltered = computed(() => filterQuery.value.trim() !== '');
+const filteredNames = computed(() => {
+  const q = filterQuery.value.trim().toLowerCase();
+  if (!q) return DYNAMIC_NAMES;
+  return DYNAMIC_NAMES.filter(
+    (name) => name.toLowerCase().includes(q) || (samples[name] ?? '').toLowerCase().includes(q),
+  );
+});
+
 function onCopy(name: string): void {
   void copyText(reference(name));
 }
@@ -45,8 +59,15 @@ function close(): void {
     @close="close"
   >
     <div class="p-dialog-body list dynamic-values-body">
+      <PanelSearchBox v-model="filterQuery" placeholder="Filter" testid="dynamic-values-filter" />
+      <EmptyState
+        v-if="isFiltered && filteredNames.length === 0"
+        icon="search"
+        label="No matches"
+        data-testid="dynamic-values-filter-empty"
+      />
       <div
-        v-for="name in DYNAMIC_NAMES"
+        v-for="name in filteredNames"
         :key="name"
         class="p-row dynamic-values-row"
         data-testid="dynamic-values-row"

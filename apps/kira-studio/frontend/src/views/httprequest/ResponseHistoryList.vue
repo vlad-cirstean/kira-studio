@@ -2,7 +2,7 @@
 import { httpMethodClass, statusClass } from '@shared/domain/http';
 import type { ResponseHistoryEntry } from '@shared/domain/response-history';
 import type { HttpRequestTabRecord } from '@shared/domain/tabs';
-import { computed, onMounted } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { patchHttpRequestTabState } from '../../api/tabs';
 import { formatBytes, formatRelative } from '../../format';
 import { confirmDialog } from '../../state/confirmDialog';
@@ -10,6 +10,7 @@ import AppButton from '../../theme/primitives/AppButton.vue';
 import Checkbox from '../../theme/primitives/Checkbox.vue';
 import EmptyState from '../../theme/primitives/EmptyState.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
+import PanelSearchBox from '../../theme/primitives/PanelSearchBox.vue';
 import {
   clearHistory,
   deleteHistoryEntry,
@@ -34,10 +35,29 @@ onMounted(() => {
   ensureHistoryLoaded(props.tab.id);
 });
 
+// P16 D15: matches method, URL, status text, or environment name — the fields already on screen
+// in each row.
+const filterQuery = ref('');
+const isFiltered = computed(() => filterQuery.value.trim() !== '');
+const filteredEntries = computed<ResponseHistoryEntry[]>(() => {
+  const q = filterQuery.value.trim().toLowerCase();
+  if (!q) return entries.value;
+  return entries.value.filter(
+    (e) =>
+      e.method.toLowerCase().includes(q) ||
+      e.url.toLowerCase().includes(q) ||
+      e.statusText.toLowerCase().includes(q) ||
+      String(e.status).includes(q) ||
+      e.environment.toLowerCase().includes(q),
+  );
+});
+
 /** D15: the URL is shown on a second line only when it differs from the row above it — within
- *  one request's history the URL is usually identical, and repeating it twenty times is noise. */
+ *  one request's history the URL is usually identical, and repeating it twenty times is noise.
+ *  Indexes into `filteredEntries` (the rendered list), not `entries` — the row "above" is the
+ *  row visibly above it, under a filter too. */
 function showUrl(i: number): boolean {
-  return i === 0 || entries.value[i - 1]?.url !== entries.value[i]?.url;
+  return i === 0 || filteredEntries.value[i - 1]?.url !== filteredEntries.value[i]?.url;
 }
 
 // D10: "click views the entry" swaps the *whole* response pane, not just the runtime pointer —
@@ -106,9 +126,23 @@ async function onClear(): Promise<void> {
       </span>
     </EmptyState>
 
-    <div v-else class="history-rows">
+    <template v-else>
+      <PanelSearchBox
+        v-model="filterQuery"
+        placeholder="Filter history"
+        testid="http-history-filter"
+      />
+      <EmptyState
+        v-if="isFiltered && filteredEntries.length === 0"
+        icon="search"
+        label="No matches"
+        data-testid="http-history-filter-empty"
+      />
+    </template>
+
+    <div v-if="entries.length > 0 && filteredEntries.length > 0" class="history-rows">
       <div
-        v-for="(entry, i) in entries"
+        v-for="(entry, i) in filteredEntries"
         :key="entry.id"
         class="history-row"
         :class="{ 'is-viewing': entry.id === viewingId }"

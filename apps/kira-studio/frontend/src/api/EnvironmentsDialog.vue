@@ -7,6 +7,7 @@ import AppButton from '../theme/primitives/AppButton.vue';
 import DialogFrame from '../theme/primitives/DialogFrame.vue';
 import EmptyState from '../theme/primitives/EmptyState.vue';
 import IconButton from '../theme/primitives/IconButton.vue';
+import PanelSearchBox from '../theme/primitives/PanelSearchBox.vue';
 import TextField from '../theme/primitives/TextField.vue';
 import {
   closeEnvironmentsDialog,
@@ -40,6 +41,19 @@ const orderedEnvironments = computed<ApiEnvironment[]>(() => {
   });
 });
 
+// P16 D14/§5: filters by name only — the same rule (and the same reasoning: §5's own analysis of
+// why a value-matching filter over a secret-carrying list would be an oracle) as VariablesDialog's
+// own filter. Environments carry no secret, but "a name filter means matching the name" is simply
+// what the row asks for either way.
+const filterQuery = ref('');
+const isFiltered = computed(() => filterQuery.value.trim() !== '');
+const displayEnvironments = computed<ApiEnvironment[]>(() => {
+  const q = filterQuery.value.trim().toLowerCase();
+  return q
+    ? orderedEnvironments.value.filter((env) => env.name.toLowerCase().includes(q))
+    : orderedEnvironments.value;
+});
+
 async function onNameBlur(id: string): Promise<void> {
   const name = (nameDrafts[id] ?? '').trim();
   const current = variablesState.environments.find((e) => e.id === id);
@@ -69,12 +83,16 @@ async function onDelete(id: string, name: string): Promise<void> {
   await deleteEnvironment(id);
 }
 
-// D14: the same drag/keyboard reorder VariablesDialog.vue's own rows use.
+// D14: the same drag/keyboard reorder VariablesDialog.vue's own rows use — and the same refusal
+// while filtered (both splice `order` by the rendered index, which a filter can move, but the
+// deeper reason is semantic: "move up" past a filter-hidden neighbour has no defined result).
 const dragIndex = ref<number | null>(null);
 function onDragStart(index: number): void {
+  if (isFiltered.value) return;
   dragIndex.value = index;
 }
 function onDragOver(index: number): void {
+  if (isFiltered.value) return;
   const from = dragIndex.value;
   if (from === null || from === index) return;
   const next = [...order.value];
@@ -84,10 +102,15 @@ function onDragOver(index: number): void {
   dragIndex.value = index;
 }
 async function onDragEnd(): Promise<void> {
+  if (isFiltered.value) {
+    dragIndex.value = null;
+    return;
+  }
   dragIndex.value = null;
   await reorderEnvironmentsList(order.value);
 }
 async function onMove(id: string, direction: 'up' | 'down'): Promise<void> {
+  if (isFiltered.value) return;
   const from = order.value.indexOf(id);
   const to = direction === 'up' ? from - 1 : from + 1;
   if (from === -1 || to < 0 || to >= order.value.length) return;
@@ -97,7 +120,7 @@ async function onMove(id: string, direction: 'up' | 'down'): Promise<void> {
   await reorderEnvironmentsList(order.value);
 }
 function onKeydown(e: KeyboardEvent, id: string): void {
-  if (!e.altKey) return;
+  if (isFiltered.value || !e.altKey) return;
   if (e.key === 'ArrowUp') {
     e.preventDefault();
     void onMove(id, 'up');
@@ -122,12 +145,18 @@ function close(): void {
     @close="close"
   >
     <div class="p-dialog-body list">
+      <PanelSearchBox
+        v-if="variablesState.environments.length > 0"
+        v-model="filterQuery"
+        placeholder="Filter by name"
+        testid="environments-filter"
+      />
       <div
-        v-for="(env, i) in orderedEnvironments"
+        v-for="(env, i) in displayEnvironments"
         :key="env.id"
         class="environment-row"
         :class="{ 'is-dragging': dragIndex === i }"
-        draggable="true"
+        :draggable="!isFiltered"
         data-testid="environment-row"
         :data-id="env.id"
         @keydown="onKeydown($event, env.id)"
@@ -135,7 +164,12 @@ function close(): void {
         @dragover.prevent="onDragOver(i)"
         @dragend="onDragEnd"
       >
-        <span class="drag-handle" aria-hidden="true" data-testid="environment-grip">
+        <span
+          class="drag-handle"
+          aria-hidden="true"
+          data-testid="environment-grip"
+          v-tooltip="isFiltered ? 'Clear the filter to reorder' : undefined"
+        >
           <CodiconIcon name="gripper" :size="13" />
         </span>
         <input
@@ -170,6 +204,12 @@ function close(): void {
         icon="settings-gear"
         label="No environments yet"
         data-testid="environments-empty"
+      />
+      <EmptyState
+        v-else-if="isFiltered && displayEnvironments.length === 0"
+        icon="search"
+        label="No matches"
+        data-testid="environments-filter-empty"
       />
     </div>
     <template #footer>

@@ -24,6 +24,9 @@ const props = defineProps<{
    *  being dragged — both owned by the parent, since only it knows the full order. */
   index: number;
   dragging?: boolean;
+  /** P16 D14: true while the dialog's own filter is non-empty — reordering is refused ("move up"
+   *  past a filter-hidden neighbour has no defined result), and the drag handle says why. */
+  filtered?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -86,7 +89,7 @@ function onHistoryClose(): void {
 // D14: Alt+↑/↓ moves the focused row — a drag-only affordance is unusable from the keyboard, and
 // every other control in this dialog is reachable by Tab.
 function onKeydown(e: KeyboardEvent): void {
-  if (props.trailing || !e.altKey) return;
+  if (props.trailing || props.filtered || !e.altKey) return;
   if (e.key === 'ArrowUp') {
     e.preventDefault();
     emit('move', 'up');
@@ -103,7 +106,7 @@ function onKeydown(e: KeyboardEvent): void {
     :class="{ 'is-dragging': dragging }"
     data-testid="variable-row"
     :data-id="row.id"
-    :draggable="!trailing"
+    :draggable="!trailing && !filtered"
     @keydown="onKeydown"
     @dragstart="emit('dragstart', index)"
     @dragover.prevent="emit('dragover', index)"
@@ -114,6 +117,7 @@ function onKeydown(e: KeyboardEvent): void {
       :class="{ 'is-disabled': trailing }"
       aria-hidden="true"
       data-testid="variable-grip"
+      v-tooltip="filtered && !trailing ? 'Clear the filter to reorder' : undefined"
     >
       <CodiconIcon name="gripper" :size="13" />
     </span>

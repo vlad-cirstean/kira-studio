@@ -7,6 +7,7 @@ import AppButton from '../../theme/primitives/AppButton.vue';
 import EmptyState from '../../theme/primitives/EmptyState.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
 import MessageStrip from '../../theme/primitives/MessageStrip.vue';
+import PanelSearchBox from '../../theme/primitives/PanelSearchBox.vue';
 import SegmentedControl from '../../theme/primitives/SegmentedControl.vue';
 import TextField from '../../theme/primitives/TextField.vue';
 import { loadSchema, schemaRuntime } from './state';
@@ -62,6 +63,24 @@ function removeImportPath(i: number): void {
 function onReload(): void {
   void loadSchema(props.tab.id, true);
 }
+
+// P16 D15: matches service name or method name — a service whose own name matches shows all its
+// methods; otherwise only the methods that themselves match, and a service with no match at all
+// (name or any method) drops out entirely.
+const filterQuery = ref('');
+const isFiltered = computed(() => filterQuery.value.trim() !== '');
+const filteredServices = computed(() => {
+  const services = rt.value?.schema?.services ?? [];
+  const q = filterQuery.value.trim().toLowerCase();
+  if (!q) return services;
+  return services.flatMap((svc) => {
+    const svcMatches = svc.name.toLowerCase().includes(q);
+    const methods = svcMatches
+      ? svc.methods
+      : svc.methods.filter((m) => m.name.toLowerCase().includes(q));
+    return methods.length > 0 ? [{ ...svc, methods }] : [];
+  });
+});
 
 function selectMethod(service: string, method: string): void {
   const m = rt.value?.schema?.services
@@ -135,9 +154,15 @@ function selectMethod(service: string, method: string): void {
       {{ rt.error }}
     </MessageStrip>
 
+    <PanelSearchBox
+      v-if="rt?.schema && rt.schema.services.length > 0"
+      v-model="filterQuery"
+      placeholder="Filter services and methods"
+      testid="grpc-schema-filter"
+    />
     <div class="service-list" data-testid="grpc-service-list">
-      <template v-if="rt?.schema && rt.schema.services.length > 0">
-        <div v-for="svc in rt.schema.services" :key="svc.name" class="service-group">
+      <template v-if="rt?.schema && filteredServices.length > 0">
+        <div v-for="svc in filteredServices" :key="svc.name" class="service-group">
           <div class="def-section-title service-name" data-testid="grpc-service-name">{{ svc.name }}</div>
           <button
             v-for="m in svc.methods"
@@ -160,6 +185,12 @@ function selectMethod(service: string, method: string): void {
           </button>
         </div>
       </template>
+      <EmptyState
+        v-else-if="isFiltered && rt?.schema && rt.schema.services.length > 0"
+        icon="search"
+        label="No matches"
+        data-testid="grpc-schema-filter-empty"
+      />
       <EmptyState
         v-else-if="rt?.status !== 'loading'"
         icon="symbol-interface"
