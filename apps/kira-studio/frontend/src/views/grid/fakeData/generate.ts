@@ -1,6 +1,7 @@
 import type { Caps } from '@shared/caps';
 import type { MutationRowOp } from '@shared/domain/mutations';
 import { data } from '../../../bridge/data';
+import type { SqlDialect } from '../../shared/sqlIdent';
 import { parseTypeBounds, type TypeBounds } from './typeBounds';
 import type { ColumnPlan, GeneratorId, Recipe } from './types';
 
@@ -65,11 +66,27 @@ function randomIntText(faker: Faker, bounds: TypeBounds): string {
   return faker.number.int({ min: 0, max: 1_000_000 }).toString();
 }
 
-function formatTemporal(dateValue: Date, dataType: string): string {
+// F7/P21 round 1: the ISO-8601-with-`Z` fall-through is correct for Postgres (format_type's own
+// `timestamp without/with time zone`, both of which accept it) and harmless for SQLite (text
+// storage) — it is wrong for the mysql family, where `dataType` is COLUMN_TYPE: `datetime`/
+// `timestamp` reject the trailing `Z` outright in strict mode (Incorrect datetime value) or
+// truncate/mangle it otherwise, and `year` against a full ISO string is unambiguous — there is no
+// reading under which it works. ClickHouse's DateTime/DateTime64 text format is the same
+// space-separated shape as mysql's, for the same reason (no `T`/`Z`).
+export function formatTemporal(
+  dateValue: Date,
+  dataType: string,
+  dialect: SqlDialect | undefined,
+): string {
   const lower = dataType.toLowerCase();
   if (lower === 'date') return dateValue.toISOString().slice(0, 10);
   if (lower.startsWith('time') && !lower.startsWith('timestamp')) {
     return dateValue.toISOString().slice(11, 19);
+  }
+  if (dialect === 'mysql' || dialect === 'clickhouse') {
+    if (lower.startsWith('year')) return String(dateValue.getUTCFullYear());
+    // 'YYYY-MM-DD HH:MM:SS' — mysql's/ClickHouse's own accepted text format, no 'T'/'Z'.
+    return dateValue.toISOString().replace('T', ' ').slice(0, 19);
   }
   return dateValue.toISOString();
 }
@@ -79,6 +96,7 @@ function fakerCall(
   id: GeneratorId,
   bounds: TypeBounds,
   dataType: string,
+  dialect: SqlDialect | undefined,
 ): () => string {
   switch (id) {
     case 'person.fullName':
@@ -108,11 +126,11 @@ function fakerCall(
     case 'finance.amount':
       return () => faker.finance.amount({ dec: bounds.scale ?? 2 });
     case 'date.recent':
-      return () => formatTemporal(faker.date.recent(), dataType);
+      return () => formatTemporal(faker.date.recent(), dataType, dialect);
     case 'date.birthdate':
-      return () => formatTemporal(faker.date.birthdate(), dataType);
+      return () => formatTemporal(faker.date.birthdate(), dataType, dialect);
     case 'date.past':
-      return () => formatTemporal(faker.date.past(), dataType);
+      return () => formatTemporal(faker.date.past(), dataType, dialect);
     case 'lorem.sentence':
       return () => clamp(faker.lorem.sentence(), bounds.maxLength);
     case 'lorem.words':
@@ -141,6 +159,7 @@ function resolveGenerator(
   recipe: Recipe,
   bounds: TypeBounds,
   dataType: string,
+  dialect: SqlDialect | undefined,
 ): (rowIndex: number) => string | null {
   switch (recipe.kind) {
     case 'skip':
@@ -161,7 +180,7 @@ function resolveGenerator(
         const members = bounds.enumMembers;
         return () => faker.helpers.arrayElement(members);
       }
-      const call = fakerCall(faker, recipe.generatorId, bounds, dataType);
+      const call = fakerCall(faker, recipe.generatorId, bounds, dataType, dialect);
       return () => call();
     }
   }
@@ -172,7 +191,11 @@ interface ColumnGenerator {
   run: ((rowIndex: number) => string | null) | null; // null = omit this column entirely (skip)
 }
 
-function buildGenerators(faker: Faker, plans: ColumnPlan[]): ColumnGenerator[] {
+function buildGenerators(
+  faker: Faker,
+  plans: ColumnPlan[],
+  dialect: SqlDialect | undefined,
+): ColumnGenerator[] {
   return plans.map((plan) => ({
     name: plan.column.name,
     run:
@@ -183,6 +206,7 @@ function buildGenerators(faker: Faker, plans: ColumnPlan[]): ColumnGenerator[] {
             plan.recipe,
             parseTypeBounds(plan.column.dataType),
             plan.column.dataType,
+            dialect,
           ),
   }));
 }
@@ -214,10 +238,11 @@ export async function previewFirstRows(
   plans: ColumnPlan[],
   seed: number,
   count: number,
+  dialect: SqlDialect | undefined,
 ): Promise<MutationRowOp[]> {
   const faker = await getFaker();
   faker.seed(seed);
-  return generateBatch(buildGenerators(faker, plans), 0, count);
+  return generateBatch(buildGenerators(faker, plans, dialect), 0, count);
 }
 
 export class GenerationError extends Error {
@@ -237,6 +262,7 @@ export interface RunGenerationArgs {
   plans: ColumnPlan[];
   total: number;
   seed: number;
+  dialect: SqlDialect | undefined;
   /** Fired right before each batch's data.mutate is sent, so the caller can capture the op id for
    *  a Stop button (D7 — commits otherwise have no op id to cancel at all, F4). */
   onBatchStart: (opId: string) => void;
@@ -251,7 +277,7 @@ export interface RunGenerationArgs {
 export async function runGeneration(args: RunGenerationArgs): Promise<void> {
   const faker = await getFaker();
   faker.seed(args.seed);
-  const generators = buildGenerators(faker, args.plans);
+  const generators = buildGenerators(faker, args.plans, args.dialect);
 
   let committed = 0;
   while (committed < args.total) {

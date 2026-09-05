@@ -113,12 +113,18 @@ export function parseTypeBounds(dataType: string): TypeBounds {
   }
 
   // mysqlfamily reads COLUMN_TYPE, not DATA_TYPE (F10), so an unsigned int arrives as
-  // "int unsigned" (occasionally with a now-vestigial display width, "int(10) unsigned").
-  const unsignedMatch = unwrapped.match(/^(\w+)(?:\s*\(\s*\d+\s*\))?\s+unsigned$/i);
-  const base = (unsignedMatch ? unsignedMatch[1] : unwrapped).toLowerCase();
+  // "int unsigned" (occasionally with a now-vestigial display width, "int(10) unsigned"). F6/P21
+  // round 1: the display-width group used to be stripped only on the unsigned branch — MariaDB
+  // still emits one for signed integers too (int(11), bigint(20), smallint(6), tinyint(4)), which
+  // wasn't a key in SQL_INT_RANGES, so parseTypeBounds silently returned {} and generation fell
+  // through to its unbounded 0..1,000,000 default against columns with real, much narrower
+  // ranges. Stripped on both branches now via one match, signed or not.
+  const intMatch = unwrapped.match(/^(\w+)(?:\s*\(\s*\d+\s*\))?(?:\s+(unsigned))?$/i);
+  const base = (intMatch ? intMatch[1] : unwrapped).toLowerCase();
+  const unsigned = !!intMatch?.[2];
   const sqlInt = SQL_INT_RANGES[base];
   if (sqlInt) {
-    const signed = !unsignedMatch;
+    const signed = !unsigned;
     return {
       intRange: signed
         ? { min: sqlInt.min, max: sqlInt.max }

@@ -95,7 +95,12 @@ async function onTogglePreview(): Promise<void> {
   previewError.value = null;
   try {
     // D10: the same seed as a real run, so this is literally the first rows that run would write.
-    const ops = await previewFirstRows(plans.value, seed.value, Math.min(5, rowCount.value));
+    const ops = await previewFirstRows(
+      plans.value,
+      seed.value,
+      Math.min(5, rowCount.value),
+      sqlDialect.value,
+    );
     previewStatements.value = ops.length
       ? (await data.preview({ connectionId: t.connectionId, path: t.path, ops })).statements
       : [];
@@ -121,6 +126,7 @@ async function onGenerate(): Promise<void> {
       plans: plans.value,
       total: rowCount.value,
       seed: seed.value,
+      dialect: sqlDialect.value,
       onBatchStart: (opId) => {
         currentOpId.value = opId;
       },

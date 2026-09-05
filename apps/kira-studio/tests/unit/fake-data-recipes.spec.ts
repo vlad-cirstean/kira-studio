@@ -195,6 +195,32 @@ describe('parseTypeBounds (P15 D5) — the per-dialect declared-type lexer', () 
     });
   });
 
+  // F6/P21 round 1: MariaDB still emits a display width for *signed* integers too (int(11),
+  // bigint(20), smallint(6), tinyint(4)) — the old regex only stripped it on the unsigned branch,
+  // so these fell through to {} and generation used the unbounded 0..1,000,000 default against a
+  // column whose real range could be as narrow as -128..127.
+  test('a signed MariaDB display width is stripped just like the unsigned one', () => {
+    expect(parseTypeBounds('smallint(6)')).toEqual({
+      intRange: { min: -32768n, max: 32767n },
+      signed: true,
+    });
+    expect(parseTypeBounds('tinyint(4)')).toEqual({
+      intRange: { min: -128n, max: 127n },
+      signed: true,
+    });
+    expect(parseTypeBounds('int(11)')).toEqual({
+      intRange: { min: -2147483648n, max: 2147483647n },
+      signed: true,
+    });
+  });
+
+  test('a signed display width and unsigned together still clear the range to zero-based', () => {
+    expect(parseTypeBounds('int(10) unsigned')).toEqual({
+      intRange: { min: 0n, max: 4294967295n },
+      signed: false,
+    });
+  });
+
   test('bigint is a signed 64-bit BigInt range, never a JS number', () => {
     const bounds = parseTypeBounds('bigint');
     expect(bounds.intRange).toEqual({
