@@ -2,5 +2,9 @@
   "name": "@kira/shared",
   "version": "0.0.0",
   "private": true,
-  "type": "module"
+  "type": "module",
+  "dependencies": {
+    "flatbuffers": "25.9.23",
+    "zod": "4.5.4"
+  }
 }

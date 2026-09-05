@@ -63,12 +63,15 @@
         "@faker-js/faker": "10.6.0",
         "@kira/shared": "workspace:*",
         "shlex": "3.0.0",
-        "zod": "4.5.4",
       },
     },
     "packages/shared": {
       "name": "@kira/shared",
       "version": "0.0.0",
+      "dependencies": {
+        "flatbuffers": "25.9.23",
+        "zod": "4.5.4",
+      },
     },
   },
   "packages": {
