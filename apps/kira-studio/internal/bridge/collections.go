@@ -254,7 +254,7 @@ var importWarningDetail = []struct {
 	{postman.WarnVariablesImported, "%d collection variables were imported."},
 	{postman.WarnGraphQLBody, "%d GraphQL bodies were imported as JSON bodies carrying the same query."},
 	{postman.WarnUnsupportedMethod, "%d requests use a method this builder cannot show yet and will open as GET."},
-	{postman.WarnUnresolvedFile, "%d requests reference a file by a name or a path from another machine."},
+	{postman.WarnUnresolvedFile, "%d requests reference a file by a name or a path from another machine. The content is not carried over — a file must be chosen before sending."},
 	{postman.WarnInlineFileContent, "%d binary bodies carry inline content rather than a file. The content is kept, but a file must be chosen before sending."},
 	{postman.WarnDisabledBody, "%d request bodies are switched off in Postman. They are kept, and this app will send them."},
 	{postman.WarnMalformedItem, "%d items were neither a folder nor a request and were skipped."},

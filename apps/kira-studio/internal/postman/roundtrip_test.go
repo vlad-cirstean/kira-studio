@@ -293,8 +293,11 @@ func TestImportTranslatesEveryBodyMode(t *testing.T) {
 		{"raw xml", "code", func(r model.SavedRequest) bool { return r.CodeLanguage == "xml" }, "raw·xml becomes code"},
 		{"raw unknown language", "raw", func(r model.SavedRequest) bool { return r.Body == "SELECT 1" }, "an unrecognised language degrades to plain text"},
 		{"file with src", "file", func(r model.SavedRequest) bool {
-			return r.BinaryFile != nil && r.BinaryFile.Path == "payload.bin" && r.BinaryFile.Name == "payload.bin"
-		}, "a file src is taken optimistically as a path"},
+			// P21 round 1 finding 3: src is attacker-controlled input from an imported collection,
+			// not a path this app resolved — Path stays empty (the send path already refuses an
+			// empty Path) until the user re-picks the file themselves. Name is kept for display.
+			return r.BinaryFile != nil && r.BinaryFile.Path == "" && r.BinaryFile.Name == "payload.bin"
+		}, "a file src is never carried into a live, sendable path"},
 		{"file with content only", "file", func(r model.SavedRequest) bool { return r.BinaryFile == nil }, "inline content writes no temp file"},
 		{"no body at all", "none", func(r model.SavedRequest) bool { return true }, "an absent body is none"},
 		{"disabled body", "raw", func(r model.SavedRequest) bool { return r.Body == "not sent by Postman" }, "a disabled body imports as its mode"},
@@ -322,13 +325,16 @@ func TestImportTranslatesEveryBodyMode(t *testing.T) {
 	})
 
 	t.Run("a formdata src array expands to one row per entry", func(t *testing.T) {
+		// P21 round 1 finding 3: an imported src is never carried into a live, sendable Path —
+		// only FileName (for display) survives the import. Path stays empty until the user
+		// re-picks the file themselves.
 		got := req("formdata").FormData
 		want := []model.SavedFormField{
 			{Name: "caption", Kind: "text", Value: "a text row", Enabled: true},
 			{Name: "notype", Kind: "text", Value: "type is absent, so text", Enabled: true},
-			{Name: "single", Kind: "file", Path: "/Users/someone/report.csv", FileName: "report.csv", ContentType: "text/csv", Enabled: true},
-			{Name: "many", Kind: "file", Path: "/Users/someone/a.png", FileName: "a.png", Enabled: true},
-			{Name: "many", Kind: "file", Path: "/Users/someone/b.png", FileName: "b.png", Enabled: true},
+			{Name: "single", Kind: "file", FileName: "report.csv", ContentType: "text/csv", Enabled: true},
+			{Name: "many", Kind: "file", FileName: "a.png", Enabled: true},
+			{Name: "many", Kind: "file", FileName: "b.png", Enabled: true},
 			{Name: "none", Kind: "file", Enabled: true},
 		}
 		if !reflect.DeepEqual(got, want) {

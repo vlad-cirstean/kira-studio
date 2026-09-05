@@ -170,11 +170,20 @@ func importFormData(raw json.RawMessage, rep *Report) []model.SavedFormField {
 			paths = []string{""}
 		}
 		for _, path := range paths {
+			// F5/P21 round 1 finding 3: an imported src is attacker-controlled input, not a path
+			// this app resolved itself — a collection can be shared or handed over by anyone, and
+			// the schema itself calls src a *name*, not a path. Carrying it straight into a live,
+			// sendable Path would let a crafted collection name an arbitrary local file (an SSH
+			// key, say) and stream it to a URL the user pasted in without reading, the moment they
+			// press Send. So the row is left in the same "no file chosen" state prepareFormParts
+			// already refuses with a legible message — the imported name is kept only for display
+			// (FileName), never as something Send can open, until the user re-picks the file
+			// through FilesService.ChooseOpen.
 			if path != "" && rep != nil {
 				rep.warn(WarnUnresolvedFile)
 			}
 			out = append(out, model.SavedFormField{
-				Name: key, Kind: "file", Path: path, FileName: baseName(path),
+				Name: key, Kind: "file", Path: "", FileName: baseName(path),
 				ContentType: contentType, Enabled: !disabled,
 			})
 		}
@@ -222,7 +231,11 @@ func importFileBody(raw json.RawMessage, rep *Report) *model.SavedFile {
 	if rep != nil {
 		rep.warn(WarnUnresolvedFile)
 	}
-	return &model.SavedFile{Path: src, Name: baseName(src)}
+	// Same reasoning as formdata's file rows just above: src is attacker-controlled input from an
+	// imported collection, not a path this app resolved — Path stays empty (the send path already
+	// refuses an empty Path with "no file chosen for the request body") until the user re-picks the
+	// file themselves. Name is kept only for display.
+	return &model.SavedFile{Path: "", Name: baseName(src)}
 }
 
 // graphqlEnvelope builds `{"query":…,"variables":…,"operationName":…}` — byte-for-byte what this
