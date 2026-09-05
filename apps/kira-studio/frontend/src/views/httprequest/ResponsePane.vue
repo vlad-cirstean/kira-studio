@@ -13,6 +13,7 @@ import AppButton from '../../theme/primitives/AppButton.vue';
 import EmptyState from '../../theme/primitives/EmptyState.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
 import MessageStrip from '../../theme/primitives/MessageStrip.vue';
+import PanelSearchBox from '../../theme/primitives/PanelSearchBox.vue';
 import SegmentedControl from '../../theme/primitives/SegmentedControl.vue';
 import { backToLatest, ensureHistoryLoaded, historyRuntime } from './history';
 import RawExchangePane from './RawExchangePane.vue';
@@ -171,6 +172,19 @@ function onBackToLatest(): void {
   backToLatest(props.tab.id);
 }
 
+// P16 D12: the response headers pane's own filter — matches name OR value (unlike D14's
+// variables filter, a header's value is the thing being hunted, is server-provided, and §5 shows
+// it can never be a secret's plaintext). Component-local: a lens over what's on screen, not a
+// setting — P24 D7's "a closed toolbar must never leave rows hidden with no visible cause" is
+// satisfied trivially since the box is always visible while the pane is.
+const headerFilter = ref('');
+const filteredHeaders = computed(() => {
+  const q = headerFilter.value.trim().toLowerCase();
+  const all = response.value?.headers ?? [];
+  if (!q) return all;
+  return all.filter((h) => h.name.toLowerCase().includes(q) || h.value.toLowerCase().includes(q));
+});
+
 // P16 D11: the find bar over the response body and the raw exchange's two documents. Component-
 // local (not tab state, D11's own note): a lens over what's already on screen, not a setting.
 const findOpen = ref(false);
@@ -326,11 +340,25 @@ onUnmounted(() => {
       :tab="tab"
       @compare="onCompare"
     />
-    <div v-else-if="tab.state.responsePane === 'headers'" class="response-headers" data-testid="http-response-headers">
+    <div v-else-if="tab.state.responsePane === 'headers'" class="response-headers-pane" data-testid="http-response-headers">
       <template v-if="response">
-        <div v-for="(h, i) in response.headers" :key="i" class="p-kv-row">
-          <span class="p-kv-name mono">{{ h.name }}</span>
-          <span class="p-kv-value mono">{{ h.value }}</span>
+        <PanelSearchBox
+          v-model="headerFilter"
+          placeholder="Filter headers"
+          testid="http-response-headers-filter"
+        />
+        <span
+          v-if="headerFilter.trim()"
+          class="p-xs subtle response-headers-count"
+          data-testid="http-response-headers-count"
+        >
+          {{ filteredHeaders.length }} of {{ response.headers.length }} headers
+        </span>
+        <div class="response-headers">
+          <div v-for="(h, i) in filteredHeaders" :key="i" class="p-kv-row">
+            <span class="p-kv-name mono">{{ h.name }}</span>
+            <span class="p-kv-value mono">{{ h.value }}</span>
+          </div>
         </div>
       </template>
       <EmptyState v-else icon="arrow-right" label="Send a request to see the response" />
@@ -432,6 +460,17 @@ onUnmounted(() => {
 
 .binary-note {
   padding: var(--kira-s-3);
+}
+
+.response-headers-pane {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.response-headers-count {
+  padding: var(--kira-s-2) var(--kira-s-3) 0;
 }
 
 .response-headers {
