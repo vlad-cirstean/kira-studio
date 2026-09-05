@@ -665,26 +665,26 @@ my JSON body" is a regression the user did not ask for, and this batch is user-d
 
 ## Checklist
 
-- [ ] **N1** `TemplateSpan` grows `from`/`to`/`name`; `classifyReference` extracted from `resolve`
+- [x] **N1** `TemplateSpan` grows `from`/`to`/`name`; `classifyReference` extracted from `resolve`
       and *called by* it; both plus `splitTemplateSpans` exported from `@kira/api-core`; the
       substitution corpus passes unedited *(item 10, foundation)*
-- [ ] **N2** `rangeHighlights` prop + `ViewPlugin` + compartment + clamp/sort rules in
+- [x] **N2** `rangeHighlights` prop + `ViewPlugin` + compartment + clamp/sort rules in
       `CodeMirrorHost`; three `.cm-kira-var*` rules in `editor/theme.ts`; `variableCompletion.ts`
       built on `mergedValuesAndSecrets`; body editor coloured *(item 10, body)*
-- [ ] **N3** `AutocompleteField` gains `rangeHighlights`, `tokenAt`, `hoverAt`; `posAtCoords`
+- [x] **N3** `AutocompleteField` gains `rangeHighlights`, `tokenAt`, `hoverAt`; `posAtCoords`
       exposed by `CodeMirrorHost`; hover panel via `pointReference`; URL field and header/param
       value cells switch to `AutocompleteField`; existing two call sites unchanged *(item 10, fields)*
-- [ ] **N4** `WELL_KNOWN_REQUEST_HEADERS` (~55, categorised) in api-core; `nameCandidates` on
+- [x] **N4** `WELL_KNOWN_REQUEST_HEADERS` (~55, categorised) in api-core; `nameCandidates` on
       `FieldRowsTable`; headers table wired with `wholeFieldToken` *(item 7)*
-- [ ] **N5** `closeBrackets()` behind `autoCloseBrackets` on `CodeMirrorHost`, on for the body
+- [x] **N5** `closeBrackets()` behind `autoCloseBrackets` on `CodeMirrorHost`, on for the body
       editor and off for the console; `autoClosePairsOnType` in `theme/wrapSelection.ts` with
       step-over and pair-delete; `isComposing` bailout; `editor/wrapSelection.ts`'s comment updated
       *(item 11)*
-- [ ] **N6** arrow navigation in `FieldRowsTable` and `MetadataTable`, `defaultPrevented`-guarded,
+- [x] **N6** arrow navigation in `FieldRowsTable` and `MetadataTable`, `defaultPrevented`-guarded,
       inputs only, positional columns, trailing row included *(item 12)*
-- [ ] **N7** unit coverage (§4's three), the six new `api-ui-consistency` cases, and the
+- [x] **N7** unit coverage (§4's three), the six new `api-ui-consistency` cases, and the
       pass-unedited list
-- [ ] full `bun run test:ui` once, after N7; fixes land as follow-up commits
+- [x] full `bun run test:ui` once, after N7; fixes land as follow-up commits (164/166 pass; the two failures — `budgets.spec.ts`, `perf.spec.ts` — are pre-existing scroll-performance timing tripwires reproduced identically against the unmodified base commit, unrelated to this phase)
 
 ---
 
