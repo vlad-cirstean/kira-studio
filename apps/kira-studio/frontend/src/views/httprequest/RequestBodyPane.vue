@@ -90,7 +90,7 @@ const caption = computed(() =>
       />
       <select
         v-if="tab.state.bodyMode === 'code'"
-        class="p-select bordered"
+        class="p-select bordered code-language-select"
         data-testid="http-body-code-language"
         :value="tab.state.codeLanguage"
         @change="onCodeLanguageChange"
@@ -148,6 +148,13 @@ const caption = computed(() =>
 .body-mode-row {
   gap: var(--kira-s-2);
   overflow-x: auto;
+}
+
+/* .p-select.bordered defaults to --kira-h-md (26px) — taller than the h-sm controls the
+   28px .p-toolbar it sits in holds (primitives.css's own LAW); match --kira-h-sm like
+   CellEditorView.vue's own .format-select does. */
+.code-language-select {
+  height: var(--kira-h-sm);
 }
 
 .body-caption {
