@@ -75,7 +75,8 @@
     .p-input .ph { color: var(--fg-disabled); }
     /* ---------- P5 select ---------- */
     .p-select { height: var(--h-sm); display: inline-flex; align-items: center; gap: var(--s-2); padding: 0 var(--s-2) 0 var(--s-3); border-radius: var(--r-sm); color: var(--fg-muted); font-size: var(--t-sm); cursor: pointer; flex-shrink: 0; }
-    .p-select.bordered { height: var(--h-md); border: var(--bw) solid var(--border-strong); background: var(--bg-input); color: var(--fg); padding: 0 var(--s-2) 0 var(--s-3); }
+    .p-select.bordered { border: var(--bw) solid var(--border-strong); background: var(--bg-input); color: var(--fg); padding: 0 var(--s-2) 0 var(--s-3); }
+    .p-select.md { height: var(--h-md); }
     /* ---------- P6 segmented ---------- */
     .p-seg { display: inline-flex; height: var(--h-sm); border: var(--bw) solid var(--border-strong); border-radius: var(--r-sm); overflow: hidden; flex-shrink: 0; }
     .p-seg.md { height: var(--h-md); }
