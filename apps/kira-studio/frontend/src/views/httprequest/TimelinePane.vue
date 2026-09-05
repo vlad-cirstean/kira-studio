@@ -160,6 +160,33 @@ function residueNote(hop: HttpTimelineHop): string {
   if (!residueIsNotable(hop)) return '';
   return `${formatMs(residueMs(hop))} of this hop is not attributed to a phase — for a request through an HTTP proxy this is the CONNECT tunnel setup, which Go does not report separately.`;
 }
+
+// D11: a "note" that fires on the common case (a reused connection is the common case) is a
+// caption, not a full-width tinted banner — up to five MessageStrips per hop could push ~180px
+// of banner between a 10px bar and the next hop's caption. Same four sentences, same order, same
+// testids — now p-xs dim caption lines instead of .p-strip banners.
+interface HopNote {
+  testid: string;
+  text: string;
+}
+function hopNotes(hop: HttpTimelineHop): HopNote[] {
+  const notes: HopNote[] = [];
+  const reuse = reuseNote(hop);
+  if (reuse) notes.push({ testid: 'http-timeline-reuse-note', text: reuse });
+  const attempts = attemptsNote(hop);
+  if (attempts) notes.push({ testid: 'http-timeline-attempts-note', text: attempts });
+  const info1xx = info1xxNote(hop);
+  if (info1xx) notes.push({ testid: 'http-timeline-1xx-note', text: info1xx });
+  const residue = residueNote(hop);
+  if (residue) notes.push({ testid: 'http-timeline-gap-note', text: residue });
+  if (hop.headersElided) {
+    notes.push({
+      testid: 'http-timeline-headers-elided-note',
+      text: 'Some response headers for this hop are not shown.',
+    });
+  }
+  return notes;
+}
 </script>
 
 <template>
@@ -179,8 +206,18 @@ function residueNote(hop: HttpTimelineHop): string {
         This timeline was recorded when the response was received.
       </MessageStrip>
 
-      <div v-if="!failedTimeline" class="p-xs dim timeline-summary" data-testid="http-timeline-summary">
-        {{ summary }}
+      <div v-if="!failedTimeline" class="timeline-summary-row">
+        <div class="p-xs dim timeline-summary" data-testid="http-timeline-summary">
+          {{ summary }}
+        </div>
+        <div class="timeline-legend p-xs dim" data-testid="http-timeline-legend">
+          <span v-for="seg in PHASE_SEGMENTS" :key="seg.key" class="legend-item">
+            <span class="legend-swatch" :style="{ backgroundColor: seg.colorVar }" />{{ seg.label }}
+          </span>
+          <span class="legend-item">
+            <span class="legend-swatch" :style="{ backgroundColor: RESIDUE_COLOR }" />Unattributed
+          </span>
+        </div>
       </div>
 
       <div class="timeline-hops">
@@ -227,21 +264,9 @@ function residueNote(hop: HttpTimelineHop): string {
             </template>
           </div>
 
-          <MessageStrip v-if="reuseNote(hop)" tone="note" data-testid="http-timeline-reuse-note">
-            {{ reuseNote(hop) }}
-          </MessageStrip>
-          <MessageStrip v-if="attemptsNote(hop)" tone="note" data-testid="http-timeline-attempts-note">
-            {{ attemptsNote(hop) }}
-          </MessageStrip>
-          <MessageStrip v-if="info1xxNote(hop)" tone="note" data-testid="http-timeline-1xx-note">
-            {{ info1xxNote(hop) }}
-          </MessageStrip>
-          <MessageStrip v-if="residueNote(hop)" tone="note" data-testid="http-timeline-gap-note">
-            {{ residueNote(hop) }}
-          </MessageStrip>
-          <MessageStrip v-if="hop.headersElided" tone="note" data-testid="http-timeline-headers-elided-note">
-            Some response headers for this hop are not shown.
-          </MessageStrip>
+          <div v-if="hopNotes(hop).length > 0" class="hop-notes p-xs dim">
+            <div v-for="n in hopNotes(hop)" :key="n.testid" :data-testid="n.testid">{{ n.text }}</div>
+          </div>
 
           <details v-if="hop.headers && hop.headers.length > 0" class="p-disclosure hop-headers">
             <summary class="p-xs dim">Response headers</summary>
@@ -261,15 +286,6 @@ function residueNote(hop: HttpTimelineHop): string {
             </div>
           </details>
         </div>
-      </div>
-
-      <div v-if="!failedTimeline" class="timeline-legend p-xs dim" data-testid="http-timeline-legend">
-        <span v-for="seg in PHASE_SEGMENTS" :key="seg.key" class="legend-item">
-          <span class="legend-swatch" :style="{ backgroundColor: seg.colorVar }" />{{ seg.label }}
-        </span>
-        <span class="legend-item">
-          <span class="legend-swatch" :style="{ backgroundColor: RESIDUE_COLOR }" />Unattributed
-        </span>
       </div>
     </template>
 
@@ -293,6 +309,13 @@ function residueNote(hop: HttpTimelineHop): string {
   flex-direction: column;
   gap: var(--kira-s-2);
   padding: var(--kira-s-3);
+}
+
+.timeline-summary-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--kira-s-3);
 }
 
 .timeline-summary {
@@ -361,6 +384,12 @@ function residueNote(hop: HttpTimelineHop): string {
 
 .hop-phase[data-present='false'] {
   opacity: 0.6;
+}
+
+.hop-notes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kira-s-1);
 }
 
 .hop-headers {
