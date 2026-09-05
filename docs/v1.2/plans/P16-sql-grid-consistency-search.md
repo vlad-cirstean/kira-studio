@@ -1223,47 +1223,55 @@ cause"* treatment on restore. Deliberately not done; the affordance is a lens, n
 
 ## Checklist
 
-- [ ] **Q1** `RunState` label wrapped and given `min-width: 7ch; text-align: right`; the LAW-12
+- [x] **Q1** `RunState` label wrapped and given `min-width: 7ch; text-align: right`; the LAW-12
       reflow `ViewChrome.vue:88-90` claims to prevent is actually prevented *(item 1a)*
-- [ ] **Q2** `PagerControls` moves from `DataToolbar`'s `#toolbar` to `DataView`'s `#toolbar-end`,
+- [x] **Q2** `PagerControls` moves from `DataToolbar`'s `#toolbar` to `DataView`'s `#toolbar-end`,
       **last**; page-size picker stays; every `pager-*` testid unchanged *(item 1b)*
-- [ ] **Q3** `headerAwareMinWidth` + `HeaderChrome` in `columns.ts`; `getMeasureCtx` keyed by size
+- [x] **Q3** `headerAwareMinWidth` + `HeaderChrome` in `columns.ts`; `getMeasureCtx` keyed by size
       token; `MIN_WIDTH_CAP = 200`; consumed as both `width` floor and `minWidth` in
       `SlickGridHost.vue`; `ConsoleSlickGrid.vue` passes zero sort/badge chrome and renders
-      unchanged *(item 2)*
-- [ ] **Q4** `.slick-viewport { overscroll-behavior: none }`; `slickTheme.css:20-46`'s comment
+      unchanged *(item 2)* — the header-chrome constants were corrected in a follow-up commit once
+      `tests/ui`'s own new D4 case (against a real captured FK column) caught them 8px short: the
+      container's own `gap` between flex children is a separate spacing from a child's own margin,
+      not the same one counted twice
+- [x] **Q4** `.slick-viewport { overscroll-behavior: none }`; `slickTheme.css:20-46`'s comment
       rewritten with F3's frozen-pane table, the "only one branch is expressible" argument and the
       one-word revert *(item 3)*
-- [ ] **Q5** `.p-select.bordered` loses its `height`; `.p-select.md` added; six local overrides
+- [x] **Q5** `.p-select.bordered` loses its `height`; `.p-select.md` added; six local overrides
       deleted (`CellEditorView`, `FormDataTable`, `HttpRequestView`, `RequestBodyPane`,
       `GrpcRequestView`, `EnvironmentSelect`); `SettingsDialog`'s two selects gain `md`;
       `GenerateDataDialog` and `SaveRequestDialog` gain nothing and thereby match their rows
       *(item 4a)*
-- [ ] **Q6** `parts/_style.css` mirrors Q5; `parts/bodies/Console.html:27`'s inline height patch
+- [x] **Q6** `parts/_style.css` mirrors Q5; `parts/bodies/Console.html:27`'s inline height patch
       deleted; `node build.mjs` re-run *(item 4b)*
-- [ ] **Q7** `.p-input` `--kira-s-3` → `--kira-s-4`; `.p-textarea` → `var(--kira-s-2)
+- [x] **Q7** `.p-input` `--kira-s-3` → `--kira-s-4`; `.p-textarea` → `var(--kira-s-2)
       var(--kira-s-4)`; `.has-stepper input` `--kira-s-1` → `--kira-s-2`; a comment recording why
       the padding may not move onto the inner `<input>` *(item 5)*
-- [ ] **Q8** `.p-input .ph` / `::placeholder` → `--kira-fg-muted` *(item 6a)*
-- [ ] **Q9** `--kira-fg-subtle: #8a8a8a` in `tokens.css` (+ `--color-subtle` in `base.css`); F8's
+- [x] **Q8** `.p-input .ph` / `::placeholder` → `--kira-fg-muted` *(item 6a)*
+- [x] **Q9** `--kira-fg-subtle: #8a8a8a` in `tokens.css` (+ `--color-subtle` in `base.css`); F8's
       second table retinted; F8's seven genuinely-disabled rules untouched; the three non-`color`
-      uses untouched *(item 6b)*
-- [ ] **Q10** `PanelSearchBox` gains optional `placeholder` and `testid`, defaults preserving
+      uses untouched — plus two `.drag-handle` sites (`api/VariableRow.vue`,
+      `api/EnvironmentsDialog.vue`) F8's own table didn't spell out by line but which match the
+      same pattern as `ColumnsMenu.vue`'s own drag handle, already in F8's list *(item 6b)*
+- [x] **Q10** `PanelSearchBox` gains optional `placeholder` and `testid`, defaults preserving
       `PanelShell`'s call *(items 7, 8)*
-- [ ] **Q11** `CodeMirrorHost.scrollRangeIntoView`; `.cm-kira-find-match(-current)` in
+- [x] **Q11** `CodeMirrorHost.scrollRangeIntoView`; `.cm-kira-find-match(-current)` in
       `editor/theme.ts` on the existing `--kira-search-match` pair; `editor/findRanges.ts`
       *(item 7a)*
-- [ ] **Q12** `ResponseFindBar.vue` over multi-target docs (Body ×1, Raw ×2); opened from the
+- [x] **Q12** `ResponseFindBar.vue` over multi-target docs (Body ×1, Raw ×2); opened from the
       response status row and from `view.find`; Enter/Shift+Enter/Escape *(item 7b)*
-- [ ] **Q13** response headers pane filters on name or value, with an `N of M` line *(item 7c)*
-- [ ] **Q14** `FieldRowsTable`/`FormDataTable`/`MetadataTable` filter with original indices carried
+- [x] **Q13** response headers pane filters on name or value, with an `N of M` line *(item 7c)*
+- [x] **Q14** `FieldRowsTable`/`FormDataTable`/`MetadataTable` filter with original indices carried
       through every write path; trailing blank row never filtered; `search` toggle in `#toolbar-2`
       *(items 7d, 8a)*
-- [ ] **Q15** Variables + Environments filter **by name only** with reordering disabled while
+- [x] **Q15** Variables + Environments filter **by name only** with reordering disabled while
       filtered; History, Dynamic values and the gRPC schema browser filter *(item 8b)*
-- [ ] **Q16** §4's spec updates and the ten new cases, including case 9 (D13's index carry-through)
+- [x] **Q16** §4's spec updates and the ten new cases, including case 9 (D13's index carry-through)
       and case 10 (§5's secret-oracle invariant, in `api-secret-reveal-isolation.spec.ts`)
-- [ ] full `bun run test:ui` once, after Q16; fixes land as follow-up commits
+- [x] full `bun run test:ui` once, after Q16; fixes land as follow-up commits (172/173 pass; the
+      one failure, `budgets.spec.ts`'s own "interaction budgets — scroll…" case, is the
+      pre-existing cross-file-worker-contention flake its own comment already documents — confirmed
+      unrelated by re-running it in isolation, where it passes)
 
 ---
 
