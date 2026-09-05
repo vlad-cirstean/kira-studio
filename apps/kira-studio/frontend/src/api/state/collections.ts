@@ -9,7 +9,7 @@ import {
   httpSavedRequestSchema,
   type ImportReport,
 } from '@shared/domain/collections';
-import { computed, reactive } from 'vue';
+import { computed, reactive, ref, watch } from 'vue';
 import { control } from '../../bridge/control';
 import {
   patchGrpcRequestTabState,
@@ -143,23 +143,57 @@ export function savedGrpcRequestFor(itemId: string | null): GrpcSavedRequest | n
 
 // ---- the row model ----
 
+/** Finding 14: childrenOf used to filter+sort the whole flat `items` array on every single call,
+ *  and both visibleRows and subtreeMatches call it once per row per level — an O(N²)-ish walk on
+ *  every keystroke for a collection of any real size. Built once per `items` change (a computed,
+ *  not per childrenOf call), keyed by collectionId+parentId, each bucket pre-sorted once. */
+const childrenIndex = computed<Map<string, CollectionItemSummary[]>>(() => {
+  const index = new Map<string, CollectionItemSummary[]>();
+  for (const item of collectionsState.items) {
+    const key = `${item.collectionId}\x00${item.parentId ?? ''}`;
+    const bucket = index.get(key);
+    if (bucket) bucket.push(item);
+    else index.set(key, [item]);
+  }
+  for (const bucket of index.values()) bucket.sort((a, b) => a.sortOrder - b.sortOrder);
+  return index;
+});
+
 function childrenOf(collectionId: string, parentId: string | null): CollectionItemSummary[] {
-  return collectionsState.items
-    .filter((item) => item.collectionId === collectionId && item.parentId === parentId)
-    .sort((a, b) => a.sortOrder - b.sortOrder);
+  return childrenIndex.value.get(`${collectionId}\x00${parentId ?? ''}`) ?? [];
 }
 
+// Finding 14: the same 150ms debounce this app already uses for a fast typist
+// (project/state/tree.ts's own SEARCH_DEBOUNCE_MS) — collectionsState.search itself stays
+// immediate (so the input never stutters), and activeSearchQuery/visibleRows read the debounced
+// value instead, so a fast typist causes one recompute per pause rather than one per character.
+const SEARCH_DEBOUNCE_MS = 150;
+const debouncedSearch = ref('');
+let searchDebounceTimer: ReturnType<typeof setTimeout> | undefined;
+watch(
+  () => collectionsState.search,
+  (value) => {
+    clearTimeout(searchDebounceTimer);
+    searchDebounceTimer = setTimeout(() => {
+      debouncedSearch.value = value;
+    }, SEARCH_DEBOUNCE_MS);
+  },
+);
+
 /** Lower-cased once per render rather than per row. '' means "no search active". */
-export const activeSearchQuery = computed(() => collectionsState.search.trim().toLowerCase());
+export const activeSearchQuery = computed(() => debouncedSearch.value.trim().toLowerCase());
 
 function rowMatches(name: string, url: string, query: string): boolean {
   if (!query) return false;
   return name.toLowerCase().includes(query) || url.toLowerCase().includes(query);
 }
 
-/** True when this subtree contains a match, so an ancestor of a hit still renders. */
+/** True when this subtree contains a match, so an ancestor of a hit still renders. Finding 14: a
+ *  request row can never have children (only a folder or collection can), so it skips the
+ *  childrenOf lookup entirely rather than querying an index bucket that can only ever be empty. */
 function subtreeMatches(item: CollectionItemSummary, query: string): boolean {
   if (rowMatches(item.name, item.url, query)) return true;
+  if (item.kind === 'request') return false;
   return childrenOf(item.collectionId, item.id).some((child) => subtreeMatches(child, query));
 }
 
