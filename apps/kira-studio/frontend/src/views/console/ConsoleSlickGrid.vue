@@ -5,14 +5,18 @@ import type {
   CustomDataView,
   FormatterResultWithText,
   OnClickEventArgs,
+  OnHeaderClickEventArgs,
   SlickEventData,
 } from 'slickgrid';
-import { SlickEventHandler } from 'slickgrid';
+import { SlickEventHandler, SlickHybridSelectionModel, type SlickRange } from 'slickgrid';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import { copyText } from '../../clipboard';
 import { publishSelectedCell } from '../../state/cellSelection';
+import { openContextMenu } from '../../state/contextMenu';
 import { appearanceVersion, settingsState } from '../../state/settings';
 import { type CellClassFlags, cellClass } from '../../theme/cellClass';
 import { categoryForTypeClass } from '../../theme/icons';
+import { columnsToTsv, type RowSnapshot, rowsToTsv } from '../shared/clipboardFormats';
 import {
   alignmentFor,
   columnHeaderTooltip,
@@ -29,12 +33,17 @@ import {
   type DisplayRowIndex,
   displayPositionOf,
   type GridDataSourceState,
-  isRowVisible,
   type RowHandle,
 } from '../shared/slick/dataSource';
 import { KiraSlickGrid } from '../shared/slick/kiraSlickGrid';
+import {
+  rangesFromSelection,
+  type Selection,
+  selectionFromRanges,
+} from '../shared/slick/selection';
 import '../shared/slick/slickTheme.css';
 import 'slickgrid/dist/styles/css/slick.grid.css';
+import { tabularCellMenu, tabularColumnMenu, tabularRangeMenu, tabularRowMenu } from './resultMenu';
 import { cell, getPage, setVisibleWindow } from './resultPages';
 import { type Match, matchedRows, searchState } from './search';
 
@@ -42,10 +51,17 @@ import { type Match, matchedRows, searchState } from './search';
 // same KiraSlickGrid/dataSource.ts/slickTheme.css layer views/grid/SlickGridHost.vue already uses
 // (F1's own table: that host itself is bound to a data tab and cannot be reused directly, but the
 // layer beneath it has no such dependency). A console result has no pager, no sort, no
-// pending-changes, no persisted column widths/order and no selection *ranges* — every one of
-// SlickGridHost.vue's other features exists to serve those, so this file only wires the handful
-// that a read-only result set actually needs: gutter, cell colour/alignment, a one-cell selection
-// highlight, and (added across §3.6's later commits) search and the decode-window report.
+// pending-changes and no persisted column widths/order — every one of SlickGridHost.vue's other
+// features exists to serve those, so this file only wires the handful a read-only result set
+// actually needs: gutter, cell colour/alignment, search, and the decode-window report.
+//
+// P19 D8: the selection model is the one exception — P43 iter2 D22's "never more than one cell
+// selected at once" finding is superseded here, configured identically to SlickGridHost.vue's own
+// SlickHybridSelectionModel (rows/columns/free-form ranges, ⌘C and a context menu per kind,
+// resultMenu.ts) so the console doesn't reinvent a different selection model than the app's main
+// grid uses. What stays console-specific: no pending-changes-aware rowSnapshot, no Copy as INSERT
+// (no addressable table), no paste/delete/duplicate (read-only by construction), and a filter
+// change clears the selection outright rather than remapping it (D8 point 1).
 //
 // §3.5 rule 1: the scroll mechanism (KiraSlickGrid's runway/budget/chase) is inherited, never
 // re-derived — `grid.velocity`/`lastScrollEventAt`/`scrollEventSeq` are wired the same four-field
@@ -134,7 +150,9 @@ function tooltipAttrs(content: ReturnType<typeof columnHeaderTooltip>): Record<s
 
 // §3.4: no persisted column widths — always the measured/default width, reset on every remount
 // (`:key="pageKey"` in ConsoleResultGrid.vue). §3.4: every column gets `sortable: false` (no
-// re-query path); the gutter alone is unselectable/unfocusable ("nothing selects a row here").
+// re-query path). P19 F14/D8: the gutter is now focusable/selectable — `rowSelectColumnIds`
+// (below) needs it to compute a row selection when the active cell lands there; Tab/Left-arrow
+// landing on the gutter is the one side effect (SlickGridHost.vue's own F14 finding, verbatim).
 function buildColumns(page: TabularPage): KiraColumn[] {
   const cols: KiraColumn[] = [
     {
@@ -146,8 +164,8 @@ function buildColumns(page: TabularPage): KiraColumn[] {
       maxWidth: GUTTER_WIDTH,
       resizable: false,
       sortable: false,
-      focusable: false,
-      selectable: false,
+      focusable: true,
+      selectable: true,
       cssClass: 'kira-gutter',
       formatter: gutterFormatter,
       cellAttrs: { 'data-testid': 'console-result-gutter-cell' },
@@ -296,51 +314,70 @@ function fieldAtCol(colIdx: number): string | undefined {
   return c ? String(c.field) : undefined;
 }
 
-// Finding 6 — the one-cell selection layer used to be keyed directly by DISPLAY position
-// (`args.row`, below), which goes stale the moment `matchedRows(tabId)` changes what that
-// position means (e.g. toggling "hide non-matching rows" after a click): the highlight can end
-// up sitting on the wrong row. Tracked here as the underlying page row/field instead (never a
-// display position) so the matchedRows watch below can recompute and reapply the layer on a
-// filter change, the same way refreshSearchLayer already does for search matches.
-let selectedRow: number | null = null;
-let selectedField: string | null = null;
+// P19 D8: a real SlickHybridSelectionModel, configured identically to SlickGridHost.vue's own
+// (the SPEC row's own framing: "so the query console doesn't reinvent a different selection model
+// than the app's main grid uses") — superseding P43 iter2 D22's one-cell-only finding, which this
+// phase's own row asks to reopen. `currentSelection` is this file's own `rt().selection`
+// equivalent: plain, non-reactive (rule 2), page-row space (never a display position), populated
+// by onSelectedRangesChanged below and read by onCopy/onKeydown/onContextMenu.
+let selectionModel: SlickHybridSelectionModel | null = null;
+// One-shot flag consumed by the next onSelectedRangesChanged call — selection.ts's own documented
+// shape (selectionFromRanges' own `pendingKind` parameter).
+let pendingSelectionKind: 'column' | null = null;
+let currentSelection: Selection | null = null;
 
-// Finding 2 (round 2) — round 1's fix above recomputed the highlight's display position on every
-// `matchedRows` change with no membership check: `displayPositionOf` is documented to fall through
-// to the NEAREST visible row on a miss (right for scroll-into-view, wrong here) — the selected
-// row itself getting filtered OUT (still tracked in `selectedRow`/`selectedField`, still driving
-// the cell-editor dock) used to paint the highlight onto a neighboring row instead of clearing it,
-// a visible mismatch between what's highlighted and what's actually being edited. `isRowVisible`
-// is the exact-match check `displayPositionOf` deliberately isn't.
-function refreshSelectionLayer(): void {
-  if (!grid || !page) return;
-  if (selectedRow === null || selectedField === null) return;
-  const idx: DisplayRowIndex = {
-    displayRows: matchedRows(props.tabId),
-    pageRowCount: page.rowCount,
-  };
-  if (!isRowVisible(idx, selectedRow)) {
-    grid.setCellCssStyles('kira-cell-selected', {});
-    return;
+// The translation `selection.ts` deliberately leaves to its caller: a `SlickRange`'s rows are
+// DISPLAY positions, `Selection`'s are PAGE rows — SlickGridHost.vue's own toPageRowSelection,
+// using this file's existing dataSource.getItem(pos).row rather than a second index structure
+// (D8 point 1: "the console already has the translation").
+function toPageRowSelection(sel: Selection): Selection {
+  if (!dataSource) return sel;
+  const toPageRow = (pos: number) => dataSource?.getItem(Math.max(0, pos)).row ?? pos;
+  switch (sel.kind) {
+    case 'cell':
+      return { ...sel, row: toPageRow(sel.row) };
+    case 'range':
+      return { ...sel, anchorRow: toPageRow(sel.anchorRow), row: toPageRow(sel.row) };
+    case 'row':
+      return { ...sel, rows: sel.rows.map(toPageRow) };
+    default:
+      return sel;
   }
-  const pos = displayPositionOf(idx, selectedRow);
-  grid.setCellCssStyles('kira-cell-selected', { [pos]: { [selectedField]: 'kira-cell-selected' } });
 }
 
-// §3.4: no `SlickHybridSelectionModel` (a console result never has more than one cell selected at
-// once — P43 iter2 D22's own finding, carried over) — `enableCellNavigation: true` (below) plus
-// this click handler plus a single-entry `setCellCssStyles` layer give the same visual result at
-// O(1) instead of registering the full selection-range plugin for a shape it never needs.
+// Fires on every setSelectedRanges call: a click, a drag end, the gutter's own row-select click,
+// this file's own header-click column push (below).
+function onSelectedRangesChanged(_e: unknown, ranges: SlickRange[]): void {
+  const rowMode = selectionModel?.currentSelectionModeIsRow() ?? false;
+  const kind = pendingSelectionKind;
+  pendingSelectionKind = null;
+  const posSel = selectionFromRanges(ranges, rowMode, kind);
+  currentSelection = posSel ? toPageRowSelection(posSel) : null;
+}
+
+// F15: no `.header-select-zone`, no `onHeaderCellRendered` subscription — a console result has no
+// sort at all (every column is `sortable: false`) and no re-query path, so a plain header body
+// click is free to mean "select this column" outright.
+function onGridHeaderClick(_e: unknown, args: OnHeaderClickEventArgs): void {
+  if (!grid || !selectionModel || !page) return;
+  if (args.column.id === GUTTER_FIELD) return;
+  const displayCol = colIndexFromField(String(args.column.field));
+  if (displayCol < 0) return;
+  const displayRowCount = matchedRows(props.tabId)?.length ?? page.rowCount;
+  const colCount = grid.getColumns().length - 1; // minus the gutter
+  pendingSelectionKind = 'column';
+  selectionModel.setSelectedRanges(
+    rangesFromSelection({ kind: 'column', cols: [displayCol] }, displayRowCount, colCount),
+  );
+}
+
+// The click handler's other job (unchanged): publishing into the read-only cell-editor dock. The
+// one-cell `kira-cell-selected` bookkeeping this used to carry (selectedRow/selectedField/
+// setCellCssStyles) is gone — `selectedCellCssClass` now makes SlickGrid itself paint the
+// highlight straight off `selectionModel`'s own ranges (D8 point 2).
 function onGridClick(_e: SlickEventData, args: OnClickEventArgs): void {
   if (!grid || !dataSource || !page) return;
-  if (args.cell === 0) {
-    // Finding 6 — the gutter selects nothing, but a stale highlight from an earlier cell click
-    // must not linger on screen implying that cell is still selected.
-    selectedRow = null;
-    selectedField = null;
-    grid.setCellCssStyles('kira-cell-selected', {});
-    return;
-  }
+  if (args.cell === 0) return; // the gutter selects a row via rowSelectColumnIds, not a publish
   const field = fieldAtCol(args.cell);
   if (!field) return;
   const pageCol = colIndexFromField(field);
@@ -348,9 +385,6 @@ function onGridClick(_e: SlickEventData, args: OnClickEventArgs): void {
   const column = page.columns[pageCol];
   if (!column) return;
   const handle = dataSource.getItem(args.row);
-  selectedRow = handle.row;
-  selectedField = field;
-  refreshSelectionLayer();
   const view = cell(props.pageKey, handle.row, pageCol);
   publishSelectedCell({
     tabId: props.tabId,
@@ -366,6 +400,163 @@ function onGridClick(_e: SlickEventData, args: OnClickEventArgs): void {
     // to, so this stays view-only in the cell editor panel — same as ConsoleResultGrid.vue's own
     // former `selectTabularCell`.
   });
+}
+
+function cellAt(row: number, col: number): { text: string; isNull: boolean } {
+  return cell(props.pageKey, row, col);
+}
+
+function rowSnapshotFor(row: number): RowSnapshot {
+  if (!page) return { columns: [], values: {} };
+  const values: Record<string, string | null> = {};
+  page.columns.forEach((col, i) => {
+    const dc = cellAt(row, i);
+    values[col.name] = dc.isNull ? null : dc.text;
+  });
+  return { columns: page.columns.map((c) => c.name), values };
+}
+
+// D9's own column-scoped rule, ported: a column-scoped op walks only the *visible* rows under the
+// current find-filter — copying every loaded row from a result showing 12 would be a silent
+// mismatch. No `views/grid/slick/rowValues.ts` import (console can't import grid/**, F13) — these
+// two are small enough to keep local rather than promote a third file for them.
+function rowsForColumnOps(): number[] {
+  const displayRows = matchedRows(props.tabId);
+  if (displayRows) return [...displayRows];
+  return Array.from({ length: page?.rowCount ?? 0 }, (_, i) => i);
+}
+
+function visibleRowsInSpan(r0: number, r1: number): number[] {
+  const lo = Math.min(r0, r1);
+  const hi = Math.max(r0, r1);
+  const displayRows = matchedRows(props.tabId);
+  if (!displayRows) return Array.from({ length: hi - lo + 1 }, (_, i) => lo + i);
+  return displayRows.filter((r) => r >= lo && r <= hi);
+}
+
+// D9: ⌘/Ctrl+C over the current selection, format-aware per kind — the same four branches
+// SlickGridHost.vue's own onCopy has, minus the pending-changes-aware rowSnapshot (a console
+// result has none) and minus Copy as INSERT (no addressable table).
+function onCopy(): void {
+  const sel = currentSelection;
+  if (!sel || !page) return;
+  if (sel.kind === 'cell') {
+    const dc = cellAt(sel.row, sel.col);
+    void copyText(dc.isNull ? '' : dc.text);
+    return;
+  }
+  if (sel.kind === 'range') {
+    const cols = Array.from({ length: sel.col - sel.anchorCol + 1 }, (_, i) => sel.anchorCol + i);
+    void copyText(columnsToTsv(visibleRowsInSpan(sel.anchorRow, sel.row), cols, cellAt));
+    return;
+  }
+  if (sel.kind === 'row') {
+    void copyText(rowsToTsv(sel.rows.map(rowSnapshotFor)));
+    return;
+  }
+  void copyText(columnsToTsv(rowsForColumnOps(), sel.cols, cellAt));
+}
+
+// D9: right-click opens the menu that matches whatever's currently selected (a range/column
+// selection covering the clicked cell), falling back to a plain single-cell menu otherwise — the
+// gutter opens the row menu for the clicked row (or the current row selection, if it's in it).
+function onGridContextMenu(e: SlickEventData): void {
+  if (!grid || !dataSource || !page) return;
+  e.preventDefault();
+  const hit = grid.getCellFromEvent(e);
+  if (!hit) return;
+  const nativeLike = e as unknown as MouseEvent;
+  const pageRow = dataSource.getItem(hit.row).row;
+
+  if (hit.cell === 0) {
+    const sel = currentSelection;
+    const rows = sel?.kind === 'row' && sel.rows.includes(pageRow) ? sel.rows : [pageRow];
+    openContextMenu(nativeLike, tabularRowMenu({ snapshots: rows.map(rowSnapshotFor) }));
+    return;
+  }
+
+  const field = fieldAtCol(hit.cell);
+  const pageCol = field ? colIndexFromField(field) : -1;
+  if (pageCol < 0) return;
+  const column = page.columns[pageCol];
+  if (!column) return;
+  const displayCol = hit.cell - 1;
+  const sel = currentSelection;
+
+  if (
+    sel?.kind === 'range' &&
+    displayCol >= sel.anchorCol &&
+    displayCol <= sel.col &&
+    pageRow >= sel.anchorRow &&
+    pageRow <= sel.row
+  ) {
+    const cols = Array.from({ length: sel.col - sel.anchorCol + 1 }, (_, i) => sel.anchorCol + i);
+    openContextMenu(
+      nativeLike,
+      tabularRangeMenu({
+        rows: visibleRowsInSpan(sel.anchorRow, sel.row),
+        cols,
+        columnNames: cols.map((c) => page?.columns[c]?.name ?? ''),
+        cellAt,
+      }),
+    );
+    return;
+  }
+  if (sel?.kind === 'column' && sel.cols.includes(displayCol)) {
+    openContextMenu(
+      nativeLike,
+      tabularColumnMenu({
+        columnName: column.name,
+        rows: rowsForColumnOps(),
+        col: displayCol,
+        cellAt,
+      }),
+    );
+    return;
+  }
+
+  const dc = cellAt(pageRow, pageCol);
+  openContextMenu(
+    nativeLike,
+    tabularCellMenu({ columnName: column.name, isNull: dc.isNull, text: dc.text }),
+  );
+}
+
+function onGridHeaderContextMenu(e: SlickEventData, args: { column: KiraColumn }): void {
+  if (!grid || !selectionModel || !page) return;
+  if (args.column.id === GUTTER_FIELD) return;
+  e.preventDefault();
+  const displayCol = colIndexFromField(String(args.column.field));
+  if (displayCol < 0) return;
+  const column = page.columns[displayCol];
+  if (!column) return;
+  const displayRowCount = matchedRows(props.tabId)?.length ?? page.rowCount;
+  const colCount = grid.getColumns().length - 1;
+  pendingSelectionKind = 'column';
+  selectionModel.setSelectedRanges(
+    rangesFromSelection({ kind: 'column', cols: [displayCol] }, displayRowCount, colCount),
+  );
+  openContextMenu(
+    e as unknown as MouseEvent,
+    tabularColumnMenu({
+      columnName: column.name,
+      rows: rowsForColumnOps(),
+      col: displayCol,
+      cellAt,
+    }),
+  );
+}
+
+// D1: local, DOM-focus-scoped copy — never a native Electron accelerator. F6 — `handleKeyDown`
+// triggers `onKeyDown` first and honours `stopImmediatePropagation`, checked right after this
+// fires — the same contract SlickGridHost.vue's own onKeydown relies on.
+function onKeydown(e: SlickEventData): void {
+  const key = (e.key ?? '').toLowerCase();
+  if ((e.ctrlKey || e.metaKey) && key === 'c') {
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    onCopy();
+  }
 }
 
 // P40 D10/D17: the same "hide non-matching rows" toggle grid/documents/keyvalue share (P24 D2) —
@@ -465,6 +656,10 @@ onMounted(() => {
     asyncEditorLoading: false,
     editorCellNavOnLRKeys: false,
     explicitInitialization: false,
+    // P19 D8: SlickGrid's own selection layer, straight off selectionModel's ranges — the same
+    // swap SlickGridHost.vue's own grid options make.
+    selectedCellCssClass: 'kira-cell-selected',
+    multiSelect: true,
     dataItemColumnValueExtractor: (item: RowHandle, columnDef: KiraColumn) =>
       dataSource?.extractValue(item, String(columnDef.field)),
   });
@@ -472,10 +667,31 @@ onMounted(() => {
   grid.lastScrollEventAt = () => lastOffsetT;
   grid.scrollEventSeq = () => scrollEventSeq;
 
+  // P19 D8: identical configuration to SlickGridHost.vue's own — the row's own words are "rows,
+  // columns, or an arbitrary free-form cell range", exactly the four-kind Selection model the data
+  // grid already has. enableMultiSelection: false carries over for the same reason: Selection has
+  // no shape for a disjoint multi-cell selection.
+  selectionModel = new SlickHybridSelectionModel({
+    selectionType: 'mixed',
+    rowSelectColumnIds: [GUTTER_FIELD],
+    selectActiveCell: true,
+    selectActiveRow: true,
+    dragToSelect: true,
+    autoScrollWhenDrag: true,
+    enableMultiSelection: false,
+    showDragHandle: false,
+  });
+  grid.setSelectionModel(selectionModel);
+
   eventHandler = new SlickEventHandler();
   eventHandler.subscribe(grid.onRendered, tagRenderedRows);
   eventHandler.subscribe(grid.onRendered, onGridRendered);
   eventHandler.subscribe(grid.onClick, onGridClick);
+  eventHandler.subscribe(grid.onHeaderClick, onGridHeaderClick);
+  eventHandler.subscribe(grid.onContextMenu, onGridContextMenu);
+  eventHandler.subscribe(grid.onHeaderContextMenu, onGridHeaderContextMenu);
+  eventHandler.subscribe(grid.onKeyDown, onKeydown);
+  eventHandler.subscribe(selectionModel.onSelectedRangesChanged, onSelectedRangesChanged);
 
   viewportEl = grid.getViewports()[1] ?? grid.getViewports()[0] ?? null;
   if (viewportEl) {
@@ -498,6 +714,10 @@ onUnmounted(() => {
   if (viewportEl) viewportEl.removeEventListener('scroll', onViewportScroll);
   eventHandler?.unsubscribeAll();
   eventHandler = null;
+  // C4 (SlickGridHost.vue) — grid.destroy() never calls selectionModel.destroy() itself.
+  selectionModel?.destroy();
+  selectionModel = null;
+  currentSelection = null;
   // §9.1/F8 (SlickGridHost.vue) — `true` also nulls SlickGrid's own internal element references
   // and unbinds every listener the library itself registered; the app forgetting this call was
   // the whole risk (KiraSlickGrid's own `destroy` override additionally fixes the library's
@@ -540,7 +760,12 @@ watch(
     grid.invalidateAllRows();
     grid.render();
     refreshSearchLayer();
-    refreshSelectionLayer(); // finding 6 — keep the one-cell highlight on the right row too.
+    // P19 D8 point 1: a selection identifies page rows via a display-position range built under
+    // the OLD filter; under the NEW one that same range can silently point at a different row.
+    // Unlike SlickGridHost.vue's own refreshSelectionForFilterChange (which remaps), this just
+    // clears — the same reasoning ConsoleResultGrid.vue's own one-click highlight already uses on
+    // a page swap ("a row index into a page that has been replaced identifies nothing").
+    selectionModel?.setSelectedRanges([]);
   },
 );
 

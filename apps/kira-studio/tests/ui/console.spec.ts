@@ -443,7 +443,15 @@ test('Query console — result-set strip, new-vs-reuse toggle, find toolbar (P40
 // the stale layer entry still points at. Pre-fix, the highlight visibly jumps onto n=4's row
 // instead of staying on n=2's. The gutter-click half (clearing a stale highlight instead of
 // leaving it behind) is covered in the same test, at the end.
-test('Query console — the one-cell selection highlight tracks its row through a filter change and a gutter click (finding 6)', async ({
+// P19 D8: the console's tabular result now carries a real SlickHybridSelectionModel (superseding
+// finding 6's own one-cell layer, below) — configured identically to SlickGridHost.vue's own, so
+// a filter change is handled the same simpler way D8 point 1 chose over that finding's per-row
+// remap: a display-position range built under the OLD filter can silently point at a different
+// page row under the NEW one, so the console just clears the selection outright rather than
+// tracking it (ConsoleResultGrid.vue's own one-click highlight already clears on a page swap for
+// the identical reason). A gutter click is also new behaviour: the gutter is now focusable/
+// selectable (F14), so `rowSelectColumnIds` turns it into a real row selection.
+test('Query console — a filter change clears the tabular selection, and a gutter click selects the whole row (P19 D8)', async ({
   relaunch,
 }) => {
   const CONNECTION_ID = 'conn-console-select-filter';
@@ -503,8 +511,8 @@ test('Query console — the one-cell selection highlight tracks its row through 
   await cellAt(1).click();
   await expect(cellAt(1)).toHaveClass(/kira-cell-selected/);
 
-  // --- filter to n=2/n=4 (page rows 1 and 3): n=4 now renders at display position 1, the exact
-  // slot a stale, position-keyed highlight would still be pointing at ------------------------
+  // --- filter to n=2/n=4 (page rows 1 and 3): the selection clears outright, not just when the
+  // selected row itself drops out of view --------------------------------------------------------
   await page.click('[data-testid="console-search"]');
   const searchToolbar = consoleView.locator('[data-testid="console-search-toolbar"]');
   await expect(searchToolbar).toBeVisible();
@@ -513,25 +521,21 @@ test('Query console — the one-cell selection highlight tracks its row through 
   await expect(searchToolbar.locator('[data-testid="console-search-count"]')).toContainText('of 2');
   await page.click('[data-testid="console-search-filter-rows"]');
   await expect(results.locator('[data-testid="console-result-row"]')).toHaveCount(2);
+  await expect(results.locator('.kira-cell-selected')).toHaveCount(0);
 
-  // The highlight followed n=2 (page row 1), not the display slot it used to occupy.
-  await expect(cellAt(1)).toHaveClass(/kira-cell-selected/);
-  await expect(cellAt(3)).not.toHaveClass(/kira-cell-selected/);
-
-  // --- a gutter click clears the highlight instead of leaving it stuck on n=2 -------------------
+  // --- a gutter click on the still-visible n=2 (page row 1, now at a different display slot)
+  // selects the whole row — `data-row` is the corrected PAGE row (tagRenderedRows), so cellAt(1)/
+  // gutterAt(1) keep addressing n=2 regardless of what display position it now occupies ----------
   await gutterAt(1).click();
-  await expect(cellAt(1)).not.toHaveClass(/kira-cell-selected/);
+  await expect(cellAt(1)).toHaveClass(/kira-cell-selected/);
 });
 
-// Finding 2 (round 2) — round 1's fix (finding 6, above) recomputed the highlight's display
-// position on every `matchedRows` change with no membership check: `displayPositionOf` is
-// documented to fall through to the NEAREST visible row on a miss (correct for scroll-into-view,
-// wrong for a highlight). Reproduced here concretely: click n=3 (page row 2) while unfiltered,
-// then filter such that page row 2 itself (n=3) is hidden but page row 3 (n=4) stays visible —
-// pre-fix, `displayPositionOf`'s nearest-match fallback lands the highlight on n=4's cell instead
-// of clearing it, a visible mismatch against the cell-editor dock (still showing n=3's actual
-// value). Only the membership check itself is under test here; the round-1 regression (a
-// selected row that STAYS visible after filtering) is covered above.
+// Finding 2 (round 2), from before P19 D8's selection-model rewrite (above): a stale,
+// position-keyed highlight's nearest-match fallback used to land on a neighboring cell instead of
+// clearing when its own row was filtered out. D8 point 1 now clears on any filter change
+// regardless (a strict superset), so this case still holds — kept as its own test since a
+// filtered-OUT row is the sharper regression case for "does it clear at all", independent of the
+// "does it land on the wrong cell" question the test above now covers differently.
 test('Query console — the one-cell selection highlight clears (not jumps) when its own row is filtered out (finding 2)', async ({
   relaunch,
 }) => {
@@ -825,4 +829,176 @@ test("Query console — two duplicate-named columns each measure their own width
   // so firstWidth would equal secondWidth here — asserting a clear gap catches that regression
   // without pinning to exact font-metric-dependent pixel counts.
   expect(secondWidth - firstWidth).toBeGreaterThan(100);
+});
+
+// P19 T7/D9/D10: a selection over the tabular result copies as TSV/CSV/JSON, both via ⌘/Ctrl+C
+// and a context menu, per selection kind (cell/range/row/column). Same clipboard-spy technique as
+// autocomplete.spec.ts's own installClipboardSpy — this tier runs WebKit, which has no
+// Chromium-style clipboard-permission grant to make, so spying on writeText proves what actually
+// landed without a real OS clipboard round trip.
+async function installClipboardSpy(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    (window as unknown as { __clipboard: string[] }).__clipboard = [];
+    navigator.clipboard.writeText = (text: string) => {
+      (window as unknown as { __clipboard: string[] }).__clipboard.push(text);
+      return Promise.resolve();
+    };
+  });
+}
+async function lastClipboardWrite(page: Page): Promise<string> {
+  return page.evaluate(
+    () => (window as unknown as { __clipboard: string[] }).__clipboard.at(-1) ?? '',
+  );
+}
+
+function twoColPage(rows: [string, string][]): LogicalPage {
+  const columns: ColumnDescriptor[] = [
+    {
+      name: 'a',
+      dataType: 'int4',
+      typeClass: 'number',
+      nullable: true,
+      isPrimaryKey: false,
+      generated: false,
+    },
+    {
+      name: 'b',
+      dataType: 'int4',
+      typeClass: 'number',
+      nullable: true,
+      isPrimaryKey: false,
+      generated: false,
+    },
+  ];
+  return {
+    kind: 'tabular',
+    columns,
+    rows: rows.map(([a, b]) => [a, b]),
+    position: {
+      offset: 0,
+      pageSize: rows.length,
+      hasMore: false,
+      nextToken: null,
+      prevToken: null,
+      strategy: 'offset',
+    },
+    truncatedCells: 0,
+  };
+}
+
+test('Query console — a tabular selection copies as TSV/CSV/JSON, rows/columns/ranges alike (P19 D9/D10)', async ({
+  relaunch,
+}) => {
+  const CONNECTION_ID = 'conn-console-copy-selection';
+  const CONNECTION_SUMMARY = postgresConnectionSummary(CONNECTION_ID, 'Console Copy DB', 'cyan');
+  const FIXTURE = orderItemsFixture(CONNECTION_ID);
+
+  const CONTROL: ControlSnapshot[] = [
+    { channel: IPC.connectionsList, response: [] },
+    {
+      channel: IPC.connectionsCreate,
+      args: connectionCreateArgs('Console Copy DB', 'cyan'),
+      response: CONNECTION_SUMMARY,
+    },
+    ...FIXTURE.control,
+  ];
+  const PORT: PortSnapshot[] = [
+    ...FIXTURE.port,
+    executeSnap(
+      CONNECTION_ID,
+      ['SELECT 1 AS a, 2 AS b UNION ALL SELECT 3 AS a, 4 AS b UNION ALL SELECT 5 AS a, 6 AS b'],
+      [
+        twoColPage([
+          ['1', '2'],
+          ['3', '4'],
+          ['5', '6'],
+        ]),
+      ],
+    ),
+  ];
+
+  const { window: page } = await relaunch({ control: CONTROL, stream: PORT });
+  await installClipboardSpy(page);
+  await connectAndExpand(page, 'Console Copy DB', 'cyan');
+  await openConsoleFromMenu(page, ORDER_ITEMS_PATH);
+  const consoleView = page.locator('[data-testid="console-view"]');
+  const results = consoleView.locator('[data-testid="console-result-grid"]');
+
+  await typeInto(
+    consoleView,
+    page,
+    'SELECT 1 AS a, 2 AS b UNION ALL SELECT 3 AS a, 4 AS b UNION ALL SELECT 5 AS a, 6 AS b;',
+  );
+  await page.click('[data-testid="console-run-statement"]');
+  await expect(results.locator('[data-testid="console-result-row"]')).toHaveCount(3);
+
+  const cellAt = (row: number, col: number) =>
+    results.locator(
+      `[data-testid="console-result-row"][data-row="${row}"] [data-testid="console-result-cell"][data-col-index="${col}"]`,
+    );
+  const gutterAt = (row: number) =>
+    results.locator(`.slick-row[data-row="${row}"] [data-testid="console-result-gutter-cell"]`);
+  const headerAt = (col: number) =>
+    results.locator(
+      `[data-testid="console-result-header-cell"][data-column="${col === 0 ? 'a' : 'b'}"]`,
+    );
+
+  // Copy is exercised through the context menu throughout, matching interaction.spec.ts's own
+  // established convention for the data grid's identical selection kinds — a direct
+  // page.keyboard.press chord depends on SlickGrid's own internal focus sink actually holding
+  // real DOM focus after a plain Playwright click, which that suite never relies on either.
+
+  // --- gutter click selects the whole row; the row menu's JSON copies every column ---------------
+  await gutterAt(0).click();
+  await expect(cellAt(0, 0)).toHaveClass(/kira-cell-selected/);
+  await expect(cellAt(0, 1)).toHaveClass(/kira-cell-selected/);
+  await gutterAt(0).click({ button: 'right' });
+  await expect(page.locator('[data-testid="context-menu"]')).toBeVisible();
+  await page.locator('[data-testid="menu-item-copy-rows"]').hover();
+  await expect(page.locator('[data-testid="context-submenu"]')).toBeVisible();
+  await page.click('[data-testid="menu-item-copy-rows-tsv"]');
+  expect(await lastClipboardWrite(page)).toBe('1\t2');
+
+  // --- a header click selects the whole column; its own menu copies the column's values ----------
+  await headerAt(1).click();
+  await expect(cellAt(0, 1)).toHaveClass(/kira-cell-selected/);
+  await expect(cellAt(1, 1)).toHaveClass(/kira-cell-selected/);
+  await headerAt(1).click({ button: 'right' });
+  await expect(page.locator('[data-testid="context-menu"]')).toBeVisible();
+  await page.click('[data-testid="menu-item-copy-column"]');
+  expect(await lastClipboardWrite(page)).toBe('2\n4\n6');
+
+  // --- a shift-click range spans two rows x two columns; its own menu copies it as TSV ------------
+  await cellAt(0, 0).click();
+  await cellAt(1, 1).click({ modifiers: ['Shift'] });
+  await expect(cellAt(0, 0)).toHaveClass(/kira-cell-selected/);
+  await expect(cellAt(1, 1)).toHaveClass(/kira-cell-selected/);
+  await expect(cellAt(2, 0)).not.toHaveClass(/kira-cell-selected/);
+  await cellAt(0, 0).click({ button: 'right' });
+  await expect(page.locator('[data-testid="context-menu"]')).toBeVisible();
+  await page.click('[data-testid="menu-item-copy"]');
+  expect(await lastClipboardWrite(page)).toBe('1\t2\n3\t4');
+
+  // --- right-click a single cell offers Copy as JSON -------------------------------------------
+  await cellAt(2, 0).click({ button: 'right' });
+  await expect(page.locator('[data-testid="context-menu"]')).toBeVisible();
+  await page.click('[data-testid="menu-item-copy-as-json"]');
+  expect(await lastClipboardWrite(page)).toBe(JSON.stringify('5'));
+
+  // --- right-click within the still-active range offers Copy as CSV -----------------------------
+  await cellAt(0, 0).click();
+  await cellAt(1, 1).click({ modifiers: ['Shift'] });
+  await cellAt(0, 1).click({ button: 'right' });
+  await expect(page.locator('[data-testid="context-menu"]')).toBeVisible();
+  await page.click('[data-testid="menu-item-copy-as-csv"]');
+  expect(await lastClipboardWrite(page)).toBe('1,2\r\n3,4');
+
+  // --- right-click the gutter offers Copy row(s) ▸ JSON ------------------------------------------
+  await gutterAt(0).click();
+  await gutterAt(0).click({ button: 'right' });
+  await expect(page.locator('[data-testid="context-menu"]')).toBeVisible();
+  await page.locator('[data-testid="menu-item-copy-rows"]').hover();
+  await expect(page.locator('[data-testid="context-submenu"]')).toBeVisible();
+  await page.click('[data-testid="menu-item-copy-rows-json"]');
+  expect(await lastClipboardWrite(page)).toBe(JSON.stringify([{ a: '1', b: '2' }], null, 2));
 });
