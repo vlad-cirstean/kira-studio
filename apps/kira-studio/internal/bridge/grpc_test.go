@@ -1,7 +1,11 @@
 package bridge
 
 import (
+	"context"
+	"os"
+	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/appcore"
@@ -183,5 +187,150 @@ func TestRecordGrpcHistory_NeverPersistsResolvedSecrets(t *testing.T) {
 		if strings.Contains(m.Value, secretToken) {
 			t.Fatalf("decoded Metadata %+v still contains the raw secret", m)
 		}
+	}
+}
+
+// TestResolveGrpcCallSource_ResolvesTargetAndMetadataInProtoDescriptorMode is finding 3: the old
+// resolveGrpcSource (Describe's own stage 2) short-circuited on any non-reflection descriptor mode
+// — correct for Describe (a .proto file needs no target), wrong for Call, which reuses the exact
+// same function and always needs a real network target and its metadata resolved, .proto schema
+// source or not. resolveGrpcCallSource is Call's own replacement, with no such short-circuit.
+func TestResolveGrpcCallSource_ResolvesTargetAndMetadataInProtoDescriptorMode(t *testing.T) {
+	svc, _, variablesRepo, collections := newGrpcServiceForTest(t)
+	c, err := collections.CreateCollection("Probes")
+	if err != nil {
+		t.Fatalf("CreateCollection: %v", err)
+	}
+	const secretHost = "internal-secret-host.example.com"
+	const secretToken = "sk_live_super_secret_token"
+	if _, err := variablesRepo.Upsert(model.VariableScopeCollection, c.ID, "", "host", secretHost, true); err != nil {
+		t.Fatalf("Upsert host secret: %v", err)
+	}
+	if _, err := variablesRepo.Upsert(model.VariableScopeCollection, c.ID, "", "token", secretToken, true); err != nil {
+		t.Fatalf("Upsert token secret: %v", err)
+	}
+
+	args := GrpcCallArgs{
+		OpID: "op1", TabID: "tab1", DescriptorMode: "proto",
+		Target:    "{{host}}:443",
+		ProtoPath: "/tmp/probe.proto",
+		Metadata:  []grpcclient.MetaPair{{Name: "authorization", Value: "Bearer {{token}}"}},
+		Service:   "kira.probe.v1.Echo", Method: "Unary",
+		MessageJSON:  `{"ok":true}`,
+		CollectionID: c.ID,
+	}
+
+	src, _, used, err := svc.resolveGrpcCallSource(args)
+	if err != nil {
+		t.Fatalf("resolveGrpcCallSource: %v", err)
+	}
+	if src.Target != secretHost+":443" {
+		t.Errorf("Target = %q, want it resolved to %q:443", src.Target, secretHost)
+	}
+	if len(src.Metadata) != 1 || src.Metadata[0].Value != "Bearer "+secretToken {
+		t.Errorf("Metadata = %+v, want authorization resolved to Bearer %s", src.Metadata, secretToken)
+	}
+	if used["host"] != secretHost || used["token"] != secretToken {
+		t.Errorf("used = %+v, want both host and token recorded", used)
+	}
+}
+
+// fakeEmitter is appcore.Emitter's own test double: it records every EmitTo call so a test can
+// inspect exactly what runServerStream pushed to the renderer, including the terminal error event
+// finding 4 is about.
+type fakeEmitter struct {
+	mu   sync.Mutex
+	sent []GrpcCallEvent
+}
+
+func (f *fakeEmitter) Emit(name string, data any) {}
+func (f *fakeEmitter) EmitTo(windowKey string, name string, data any) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if evt, ok := data.(GrpcCallEvent); ok {
+		f.sent = append(f.sent, evt)
+	}
+}
+func (f *fakeEmitter) EmitFocused(name string, data any) {}
+
+func (f *fakeEmitter) terminal() *GrpcCallEvent {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for i := range f.sent {
+		if f.sent[i].Done {
+			return &f.sent[i]
+		}
+	}
+	return nil
+}
+
+// echoStreamProto is a minimal server-streaming schema — just enough for resolveMethod (a .proto
+// descriptor source, so schema resolution needs no network round trip of its own) to validate the
+// call before grpcclient.ServerStream ever tries to dial.
+const echoStreamProto = `syntax = "proto3";
+package kira.probe.v1;
+
+message EchoRequest {
+  string text = 1;
+}
+
+message EchoResponse {
+  string text = 1;
+}
+
+service Echo {
+  rpc ServerStream(EchoRequest) returns (stream EchoResponse);
+}
+`
+
+// TestRunServerStream_MasksDialTargetSecretBeforeEmittingErrorEvent is finding 4: a failed
+// streaming call used to emit its terminal error event (D8's push channel, the renderer's own
+// preferred error source over Call's return value — views/grpcrequest/state.ts) before Call's own
+// maskGrpcError ever ran, so a secret substituted into the dial target leaked straight to the
+// renderer unmasked. runServerStream now masks before emitting; this dials a real (unreachable)
+// TCP port with the secret spelled directly into the target, so grpcclient.ServerStream's own
+// dial-failure message — which embeds the literal address it tried — is exactly the vector this
+// proves closed, with no server or reflection round trip required.
+func TestRunServerStream_MasksDialTargetSecretBeforeEmittingErrorEvent(t *testing.T) {
+	const secretHost = "127.0.0.1"
+	protoPath := filepath.Join(t.TempDir(), "echo.proto")
+	if err := os.WriteFile(protoPath, []byte(echoStreamProto), 0o644); err != nil {
+		t.Fatalf("write proto: %v", err)
+	}
+
+	emitter := &fakeEmitter{}
+	svc := &GrpcService{Deps: appcore.Deps{Events: emitter}}
+
+	used := map[string]string{"host": secretHost}
+	req := grpcclient.CallRequest{
+		// Port 1: nothing ever listens there, so the dial fails almost instantly with
+		// "connection refused" rather than timing out.
+		Target:      secretHost + ":1",
+		Source:      grpcclient.Source{Mode: grpcclient.SourceProto, ProtoPath: protoPath},
+		FullMethod:  "/kira.probe.v1.Echo/ServerStream",
+		MessageJSON: `{"text":"hi"}`,
+	}
+	args := GrpcCallArgs{OpID: "call-1", WindowKey: "win-1"}
+
+	_, err := svc.runServerStream(context.Background(), args, req, used)
+	if err == nil {
+		t.Fatal("expected a dial failure")
+	}
+	if strings.Contains(err.Error(), secretHost) {
+		t.Fatalf("returned error %q still contains the raw secret", err.Error())
+	}
+
+	terminal := emitter.terminal()
+	if terminal == nil {
+		t.Fatal("no terminal (done) event was emitted")
+	}
+	if terminal.Error == nil {
+		t.Fatal("terminal event carries no Error")
+	}
+	if strings.Contains(terminal.Error.Message, secretHost) {
+		t.Fatalf("emitted terminal event Error.Message = %q still contains the raw secret", terminal.Error.Message)
+	}
+	if !strings.Contains(terminal.Error.Message, "{{host}}") {
+		t.Fatalf("emitted terminal event Error.Message = %q, want it masked to {{host}}", terminal.Error.Message)
 	}
 }

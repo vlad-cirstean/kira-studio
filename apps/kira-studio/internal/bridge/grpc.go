@@ -45,11 +45,15 @@ func validDescriptorMode(mode string) bool {
 	return mode == string(grpcclient.SourceReflection) || mode == string(grpcclient.SourceProto)
 }
 
-// resolveGrpcSource is D9's stage 2 for a descriptor source: target and metadata are the two
-// substitutable fields — protoPath/importPaths/caFile are picker-supplied local paths, never
+// resolveGrpcSource is Describe's own stage 2 for a descriptor source: target and metadata are the
+// two substitutable fields — protoPath/importPaths/caFile are picker-supplied local paths, never
 // substituted (P5 D7's own rule for a form-data file row's path, re-handed rather than reopened).
-// A .proto source resolves nothing (there is no target to reach). used accumulates into whatever
-// map the caller passes, so a single resolver's masking replacer covers a whole bridge method.
+// A .proto descriptor source resolves nothing, because Describe needs no target to reach one — a
+// .proto file is read straight off disk. This short-circuit is correct only for Describe: Call
+// dials a real network target regardless of which descriptor source supplies its schema, so it
+// uses resolveGrpcCallSource below instead, which never skips target/metadata resolution.
+// used accumulates into whatever map the caller passes, so a single resolver's masking replacer
+// covers a whole bridge method.
 func (s *GrpcService) resolveGrpcSource(args GrpcDescribeArgs, used map[string]string) (grpcclient.Source, error) {
 	src := grpcclient.Source{
 		Mode: grpcclient.SourceMode(args.DescriptorMode), Target: args.Target, TLS: args.TLS,
@@ -97,6 +101,37 @@ func resolveMetaPairs(resolver *apivars.Resolver, pairs []grpcclient.MetaPair) [
 		out[i] = grpcclient.MetaPair{Name: resolver.Text(m.Name), Value: resolver.Text(m.Value)}
 	}
 	return out
+}
+
+// resolveGrpcCallSource is Call's own stage 2: unlike Describe, a call always needs its target and
+// metadata resolved regardless of descriptor mode (a .proto file only supplies the schema — the
+// network target it calls is real either way), so there is no descriptor-mode short-circuit here.
+// It also resolves the request message in the same pass, through the same Resolver instance
+// (built at most once, only when there is anything at all to resolve), rather than Call building a
+// second one just for the message.
+func (s *GrpcService) resolveGrpcCallSource(args GrpcCallArgs) (grpcclient.Source, string, map[string]string, error) {
+	src := grpcclient.Source{
+		Mode: grpcclient.SourceMode(args.DescriptorMode), Target: args.Target, TLS: args.TLS,
+		Metadata: args.Metadata, ProtoPath: args.ProtoPath, ImportPaths: args.ImportPaths,
+	}
+	used := map[string]string{}
+	if !grpcHasAnyReference(args.Target, args.Metadata, args.MessageJSON) {
+		return src, args.MessageJSON, used, nil
+	}
+	resolver, err := s.Deps.ApiVars.NewResolver(args.CollectionID, args.EnvironmentID)
+	if err != nil {
+		return grpcclient.Source{}, "", nil, err
+	}
+	if !resolver.Any() {
+		return src, args.MessageJSON, used, nil
+	}
+	src.Target = resolver.Text(args.Target)
+	src.Metadata = resolveMetaPairs(resolver, args.Metadata)
+	resolvedMessage := resolver.Text(args.MessageJSON)
+	for name, value := range resolver.Used() {
+		used[name] = value
+	}
+	return src, resolvedMessage, used, nil
 }
 
 // Describe resolves a target's services and methods (D4). §0.3/D10: the reflection call's own
@@ -185,28 +220,9 @@ func (s *GrpcService) Call(ctx context.Context, args GrpcCallArgs) (grpcclient.C
 			// {{secret}}-shaped authorization value might live in must never reach it resolved.
 			op.SetCommand(fmt.Sprintf("%s → %s", unresolvedMethod, args.Target))
 
-			used := map[string]string{}
-			resolveArgs := GrpcDescribeArgs{
-				DescriptorMode: args.DescriptorMode, Target: args.Target, TLS: args.TLS,
-				Metadata: args.Metadata, ProtoPath: args.ProtoPath, ImportPaths: args.ImportPaths,
-				CollectionID: args.CollectionID, EnvironmentID: args.EnvironmentID,
-			}
-			src, resolveErr := s.resolveGrpcSource(resolveArgs, used)
+			src, resolvedMessage, used, resolveErr := s.resolveGrpcCallSource(args)
 			if resolveErr != nil {
 				return nil, resolveErr
-			}
-			resolvedMessage := args.MessageJSON
-			if grpcHasAnyReference("", nil, args.MessageJSON) {
-				resolver, err := s.Deps.ApiVars.NewResolver(args.CollectionID, args.EnvironmentID)
-				if err != nil {
-					return nil, err
-				}
-				if resolver.Any() {
-					resolvedMessage = resolver.Text(args.MessageJSON)
-					for name, value := range resolver.Used() {
-						used[name] = value
-					}
-				}
 			}
 
 			callReq := grpcclient.CallRequest{
@@ -218,12 +234,17 @@ func (s *GrpcService) Call(ctx context.Context, args GrpcCallArgs) (grpcclient.C
 			var result grpcclient.CallResult
 			var callErr error
 			if args.Streaming {
-				result, callErr = s.runServerStream(runCtx, args, callReq)
+				// runServerStream masks its own terminal error before emitting it to the
+				// renderer (D8's push channel) — masking here too, after the fact, would be too
+				// late for that already-emitted event (finding 4).
+				result, callErr = s.runServerStream(runCtx, args, callReq, used)
 			} else {
 				result, callErr = grpcclient.Unary(runCtx, callReq)
+				if callErr != nil {
+					maskGrpcError(callErr, used)
+				}
 			}
 			if callErr != nil {
-				maskGrpcError(callErr, used)
 				// D11: "a completed call" includes a cancellation or a failure that received
 				// messages — the terminal status the caller sees either way (F8). Only a call
 				// that never produced any terminal outcome at all (no Partial) records nothing.
@@ -393,14 +414,26 @@ func (c *grpcCoalescer) flushLocked(done bool, status *grpcclient.CallResult, er
 // long-held bound call does not block the control plane), pushing every message through the
 // coalescer above, and returning the terminal CallResult so a caller that misses every event still
 // ends in a correct final state.
-func (s *GrpcService) runServerStream(ctx context.Context, args GrpcCallArgs, req grpcclient.CallRequest) (grpcclient.CallResult, error) {
+//
+// Finding 4: a failed call's error must be masked *before* coalescer.finish emits it — Call's own
+// masking, applied to the returned error after this function returns, runs too late for an event
+// that has already gone out over the D8 push channel (and the renderer prefers that event's error
+// over Call's own return value). used is threaded in so masking can happen here, on the same
+// *grpcclient.Error the coalescer is about to emit. The Partial handed to EmitTo is a copy, taken
+// after masking, so nothing downstream (Call's own recordGrpcHistory read of the same error) can
+// alias the struct the coalescer has already queued for emission.
+func (s *GrpcService) runServerStream(ctx context.Context, args GrpcCallArgs, req grpcclient.CallRequest, used map[string]string) (grpcclient.CallResult, error) {
 	coalescer := newGrpcCoalescer(s.Deps.Events, args.WindowKey, args.OpID)
 
 	result, err := grpcclient.ServerStream(ctx, req, coalescer.push)
 	if err != nil {
+		maskGrpcError(err, used)
 		var gerr *grpcclient.Error
 		if errors.As(err, &gerr) && gerr.Partial != nil {
-			coalescer.finish(gerr.Partial, &GrpcCallEventErr{Code: gerr.Code, Message: gerr.Message})
+			partial := *gerr.Partial
+			coalescer.finish(&partial, &GrpcCallEventErr{Code: gerr.Code, Message: gerr.Message})
+		} else if errors.As(err, &gerr) {
+			coalescer.finish(nil, &GrpcCallEventErr{Code: gerr.Code, Message: gerr.Message})
 		} else {
 			coalescer.finish(nil, &GrpcCallEventErr{Code: grpcclient.CodeTransport, Message: err.Error()})
 		}
