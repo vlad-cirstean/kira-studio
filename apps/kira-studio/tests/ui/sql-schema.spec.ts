@@ -5,8 +5,11 @@ import { IPC } from './support/ipcChannels';
 import {
   APP_PATH,
   DB_PATH,
+  ORDER_ITEMS_PATH,
   orderItemsFixture,
+  POSTGRES_CAPS,
   postgresConnectionSummary,
+  SERVER_VERSION,
 } from './support/postgresFixture';
 import { connectionRow, expandRow, openRowMenu } from './support/tree';
 
@@ -396,4 +399,189 @@ test('hovering a known column shows its verbatim declared type (D8)', async ({ r
   const hover = page.locator('.cm-kira-hover');
   await expect(hover).toBeVisible({ timeout: 5_000 });
   await expect(hover).toContainText('numeric(10,2)');
+});
+
+// P19 T14/D15: "Fill from connection" stages TreeService.Definition's real output for every
+// relation the tree already has cached — one call per relation, never a saved write until Save
+// is pressed. A small, purpose-built two-table schema (rather than orderItemsFixture's own ~16
+// relation APP_PATH) so the fixture stays reviewable: one treeDefinition snapshot per table.
+test('the Schema (DDL) dialog fills itself from the connection (D15)', async ({ relaunch }) => {
+  const CONNECTION_ID = 'conn-sql-schema-fill';
+  const CONNECTION_SUMMARY = postgresConnectionSummary(CONNECTION_ID, 'Fill DB', 'blue');
+  const SCHEMA_PATH = 'database:small_db/schema:pub';
+  const T1_PATH = `${SCHEMA_PATH}/table:t1`;
+  const T2_PATH = `${SCHEMA_PATH}/table:t2`;
+
+  const T1_DEFINITION = {
+    path: T1_PATH,
+    kind: 'table' as const,
+    qualifiedName: 'pub.t1',
+    statements: ['CREATE TABLE pub.t1 (\n    id integer NOT NULL\n)'],
+    language: 'sql' as const,
+    origin: 'composed' as const,
+    notes: [],
+    constraints: [],
+    documentSchema: null,
+    sections: [],
+    generatedAt: '2026-01-01T00:00:00.000Z',
+  };
+  const T2_DEFINITION = {
+    ...T1_DEFINITION,
+    path: T2_PATH,
+    qualifiedName: 'pub.t2',
+    statements: ['CREATE TABLE pub.t2 (\n    id integer NOT NULL\n)'],
+  };
+
+  const CONTROL: ControlSnapshot[] = [
+    { channel: IPC.connectionsList, response: [] },
+    {
+      channel: IPC.connectionsCreate,
+      args: postgresCreateArgs('Fill DB', 'blue'),
+      response: CONNECTION_SUMMARY,
+    },
+    {
+      channel: IPC.connectionsConnect,
+      args: { id: CONNECTION_ID },
+      response: {
+        connectionId: CONNECTION_ID,
+        status: 'connected',
+        serverVersion: SERVER_VERSION,
+        error: null,
+        since: 1735689600000,
+        caps: POSTGRES_CAPS,
+      },
+    },
+    {
+      channel: IPC.treeChildren,
+      args: { connectionId: CONNECTION_ID, path: '', refresh: false },
+      response: {
+        nodes: [
+          { kind: 'database', name: 'small_db', path: 'database:small_db', hasChildren: true },
+        ],
+        source: 'server',
+        truncated: false,
+      },
+    },
+    {
+      channel: IPC.treeChildren,
+      args: { connectionId: CONNECTION_ID, path: 'database:small_db', refresh: false },
+      response: {
+        nodes: [{ kind: 'schema', name: 'pub', path: SCHEMA_PATH, hasChildren: true }],
+        source: 'server',
+        truncated: false,
+      },
+    },
+    {
+      channel: IPC.treeChildren,
+      args: { connectionId: CONNECTION_ID, path: SCHEMA_PATH, refresh: false },
+      response: {
+        nodes: [
+          { kind: 'table', name: 't1', path: T1_PATH, hasChildren: false },
+          { kind: 'table', name: 't2', path: T2_PATH, hasChildren: false },
+        ],
+        source: 'server',
+        truncated: false,
+      },
+    },
+    {
+      channel: IPC.treeDefinition,
+      args: { connectionId: CONNECTION_ID, path: T1_PATH, refresh: false, tabId: null },
+      response: { definition: T1_DEFINITION, source: 'server' },
+    },
+    {
+      channel: IPC.treeDefinition,
+      args: { connectionId: CONNECTION_ID, path: T2_PATH, refresh: false, tabId: null },
+      response: { definition: T2_DEFINITION, source: 'server' },
+    },
+  ];
+
+  const { window: page, control } = await relaunch({ control: CONTROL });
+
+  await page.click('[data-testid="add-connection"]');
+  await page.click('[data-testid="connection-kind-postgres"]');
+  await page.fill('[data-testid="connection-name"]', 'Fill DB');
+  await page.fill('[data-testid="connection-host"]', '127.0.0.1');
+  await page.fill('[data-testid="connection-port"]', '5432');
+  await page.fill('[data-testid="connection-database"]', 'kira_test');
+  await page.fill('[data-testid="connection-username"]', 'postgres');
+  await page.click('[data-testid="color-blue"]');
+  await page.click('[data-testid="connection-save"]');
+  await expect(page.locator('[data-testid="connection-dialog"]')).toHaveCount(0);
+  const connRow = connectionRow(page);
+  await expect(connRow).toBeVisible();
+  await openRowMenu(page, '');
+  await page.click('[data-testid="menu-item-connect"]');
+  await expect(connRow.locator('.status-dot')).toHaveAttribute('data-status', 'connected', {
+    timeout: 10_000,
+  });
+  await expandRow(page, '');
+  await expandRow(page, 'database:small_db');
+  await expandRow(page, SCHEMA_PATH); // populates treeState.children for consoleRelationNames/D15
+
+  const fillButton = page.locator('[data-testid="schema-fill-from-connection"]');
+
+  await openRowMenu(page, '');
+  await page.click('[data-testid="menu-item-schema"]');
+  const dialog = page.locator('[data-testid="schema-dialog"]');
+  await expect(dialog).toBeVisible();
+  const summary = page.locator('[data-testid="schema-parse-summary"]');
+
+  await expect(fillButton).toBeEnabled();
+  await fillButton.click();
+  await expect(fillButton).toBeVisible({ timeout: 5_000 }); // filling finished, button is back
+
+  expect(control.log().filter((e) => e.channel === IPC.treeDefinition)).toHaveLength(2);
+  await expect(dialog.locator('.cm-content')).toContainText('CREATE TABLE pub.t1');
+  await expect(dialog.locator('.cm-content')).toContainText('CREATE TABLE pub.t2');
+  await expect(summary).toContainText('2 tables');
+
+  // Nothing was saved — the user still presses Save themselves.
+  expect(control.log().filter((e) => e.channel === IPC.schemaSet)).toHaveLength(0);
+});
+
+// P19 T14/D16: without this, D14/D15 are two features nobody can find, which is how the current
+// one ended up reported as broken. Dismissal is per connection, not per tab — opening a SECOND
+// console on the same connection keeps it dismissed.
+test('a SQL console with no schema document says so, dismissibly, per connection (D16)', async ({
+  relaunch,
+}) => {
+  const CONNECTION_ID = 'conn-sql-schema-hint';
+  const CONNECTION_SUMMARY = postgresConnectionSummary(CONNECTION_ID, 'Hint DB', 'magenta');
+  const CONTROL: ControlSnapshot[] = [
+    { channel: IPC.connectionsList, response: [] },
+    {
+      channel: IPC.connectionsCreate,
+      args: postgresCreateArgs('Hint DB', 'magenta'),
+      response: CONNECTION_SUMMARY,
+    },
+    ...orderItemsFixture(CONNECTION_ID).control,
+    // No schemaGet override — an empty document, same as "with no DDL document" above.
+  ];
+  const { window: page } = await relaunch({ control: CONTROL });
+
+  await connectAndExpandPostgres(page, 'Hint DB', 'magenta');
+  await openConsoleFromMenu(page, APP_PATH);
+  const view = page.locator('[data-testid="console-view"]');
+  await expect(view).toBeVisible();
+
+  const hint = view.locator('[data-testid="console-no-schema-hint"]');
+  await expect(hint).toBeVisible();
+  await expect(hint).toContainText('table and column completion is off');
+
+  await hint.locator('[data-testid="console-no-schema-hint-setup"]').click();
+  await expect(page.locator('[data-testid="schema-dialog"]')).toBeVisible();
+  await page.click('[data-testid="schema-dialog-close"]');
+
+  await hint.locator('[data-testid="console-no-schema-hint-dismiss"]').click();
+  await expect(hint).toHaveCount(0);
+
+  // A second console on the SAME connection stays dismissed — the preference is per connection.
+  // Only one view is ever mounted at a time (MainView.vue's own single-<component> invariant), so
+  // this checks the new tab is the active one, not that two console-views coexist.
+  await expandRow(page, APP_PATH);
+  await openConsoleFromMenu(page, ORDER_ITEMS_PATH);
+  const activeTab = page.locator('[data-testid="tab"][data-active="true"]');
+  await expect(activeTab).toHaveAttribute('data-tab-kind', 'console');
+  await expect(view).toBeVisible();
+  await expect(view.locator('[data-testid="console-no-schema-hint"]')).toHaveCount(0);
 });

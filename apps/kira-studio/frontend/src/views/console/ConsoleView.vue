@@ -10,7 +10,13 @@ import { dialectObjectFor } from '../../editor/languages';
 import { registerCommand } from '../../shortcuts/commands';
 import { connectionRecord } from '../../state/connections';
 import { openContextMenu } from '../../state/contextMenu';
-import { ddlSchemaFor, ensureDdl } from '../../state/schemas';
+import {
+  ddlSchemaFor,
+  dismissNoSchemaHint,
+  ensureDdl,
+  isNoSchemaHintDismissed,
+  openSchemaDialog,
+} from '../../state/schemas';
 import CodiconIcon from '../../theme/CodiconIcon.vue';
 import AppButton from '../../theme/primitives/AppButton.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
@@ -88,6 +94,23 @@ watch(
   { immediate: true },
 );
 const ddlSchema = computed(() => ddlSchemaFor(props.tab.connectionId ?? '', dialect.value));
+
+// P19 D16: without this, D14/D15 are two features nobody can find, which is how the current one
+// ended up reported as broken. `dialect.value` (not `language.value`) gates it to the five SQL
+// kinds only — Mongo/Redis completion never depended on a DDL document to begin with.
+const showNoSchemaHint = computed(
+  () =>
+    dialect.value !== undefined &&
+    ddlSchema.value.tables.length === 0 &&
+    !!props.tab.connectionId &&
+    !isNoSchemaHintDismissed(props.tab.connectionId),
+);
+function onSetUpSchema(): void {
+  if (props.tab.connectionId) openSchemaDialog(props.tab.connectionId);
+}
+function onDismissNoSchemaHint(): void {
+  if (props.tab.connectionId) dismissNoSchemaHint(props.tab.connectionId);
+}
 
 // D21/D22: undefined for any kind with no console at all, which a mounted ConsoleView never
 // actually has (caps.sql gates the tab) — `language.value !== 'plain'` covers that without
@@ -575,6 +598,31 @@ const statusLine = computed(() => {
       </template>
 
       <template #strips>
+        <MessageStrip
+          v-if="showNoSchemaHint"
+          tone="note"
+          data-testid="console-no-schema-hint"
+        >
+          <span class="auto-explain-message"
+            >No schema for this connection — table and column completion is off.</span
+          >
+          <button
+            type="button"
+            class="auto-explain-action"
+            data-testid="console-no-schema-hint-setup"
+            @click="onSetUpSchema"
+          >
+            Set one up ▸
+          </button>
+          <button
+            type="button"
+            class="auto-explain-action"
+            data-testid="console-no-schema-hint-dismiss"
+            @click="onDismissNoSchemaHint"
+          >
+            Dismiss
+          </button>
+        </MessageStrip>
         <MessageStrip v-if="rt?.status === 'error' && rt.error" tone="err" data-testid="console-error">
           {{ rt.error.message }}
         </MessageStrip>

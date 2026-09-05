@@ -1,8 +1,10 @@
 import type { ConnectionKind } from '@shared/domain/connection';
+import { definitionText } from '@shared/domain/definition';
 import type { ConnectionDdl } from '@shared/domain/schema';
 import { reactive } from 'vue';
 import { control } from '../bridge/control';
 import { dialectObjectFor } from '../editor/languages';
+import { rowKey, treeState } from '../project/state/tree';
 import { type DdlSchema, EMPTY_DDL_SCHEMA, parseDdl } from '../views/console/ddl';
 import { type SqlDialect, sqlDialectFor } from '../views/shared/sqlIdent';
 
@@ -110,6 +112,87 @@ export function ddlParseSummary(kind: ConnectionKind | undefined, text: string):
   const tableWord = schema.tables.length === 1 ? 'table' : 'tables';
   const columnWord = columns === 1 ? 'column' : 'columns';
   return `${schema.tables.length} ${tableWord}, ${columns} ${columnWord}`;
+}
+
+export interface ConnectionRelation {
+  path: string;
+  name: string;
+}
+
+// D15: every table/view/matview node already cached anywhere under this connection's tree —
+// "using whatever the tree has already loaded, expanding nothing" — project/state/tree.ts's own
+// rowKey format (`${connectionId}|${path}`) makes a plain prefix scan the whole lookup; no new
+// round trip, no new cache. Widened from D14's own consoleRelationNames (one console's own
+// container) to every container this connection has ever had expanded, since the dialog fills a
+// whole connection's document, not one console's.
+export function connectionRelationsFromTree(connectionId: string): ConnectionRelation[] {
+  const prefix = rowKey(connectionId, '');
+  const out: ConnectionRelation[] = [];
+  for (const key of Object.keys(treeState.children)) {
+    if (!key.startsWith(prefix)) continue;
+    for (const node of treeState.children[key] ?? []) {
+      if (node.kind === 'table' || node.kind === 'view' || node.kind === 'matview') {
+        out.push({ path: node.path, name: node.name });
+      }
+    }
+  }
+  return out;
+}
+
+export interface FillProgress {
+  done: number;
+  total: number;
+}
+
+// D15: fetches each relation's own real definition — control.treeDefinition, the same call the
+// definition view already makes per object, on the same connection, with the same permissions —
+// and appends its statements (definitionText, packages/shared/domain/definition.ts's one
+// definition of "the Source pane's document"): exactly the CREATE TABLE / ALTER TABLE ADD
+// CONSTRAINT / CREATE VIEW / COMMENT ON vocabulary parseDdl consumes (F24). Sequential, not
+// parallel — a large schema is a real wait, and `onProgress` is what a footer label reads from —
+// and a relation whose definition fails is skipped with a note rather than aborting the rest: one
+// permission-denied view must not lose the other forty-six tables. `isCancelled` is polled once
+// per relation, not mid-fetch, so a Cancel takes effect after the in-flight request settles, never
+// leaving a half-written response applied.
+export async function fillDdlFromConnection(
+  connectionId: string,
+  relations: readonly ConnectionRelation[],
+  onProgress?: (progress: FillProgress) => void,
+  isCancelled?: () => boolean,
+): Promise<string> {
+  const blocks: string[] = [];
+  for (let i = 0; i < relations.length; i++) {
+    if (isCancelled?.()) break;
+    const relation = relations[i];
+    if (!relation) continue;
+    onProgress?.({ done: i, total: relations.length });
+    try {
+      const { definition } = await control.treeDefinition(connectionId, relation.path, false);
+      blocks.push(definitionText(definition));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      // A SQL comment: parseDdl ignores it by construction (ddl.ts's own statement-vocabulary
+      // switch skips anything it doesn't recognise), so a failed relation never corrupts the
+      // document — it just isn't in it, with a visible reason.
+      blocks.push(`-- could not read ${relation.name}: ${message}`);
+    }
+  }
+  onProgress?.({ done: relations.length, total: relations.length });
+  return blocks.join('\n\n');
+}
+
+// D16: per connection, runtime-only — a console tab is not the place to grow a new persisted
+// preference (views/console/state.ts's own "ConsoleViewRuntime … runtime-only, never saved"
+// rule). A real reactive() Set, not a plain one — ConsoleView.vue reads isNoSchemaHintDismissed
+// from a computed, which needs Vue to see the .add() below as a real mutation.
+const dismissedNoSchemaHints = reactive(new Set<string>());
+
+export function isNoSchemaHintDismissed(connectionId: string): boolean {
+  return dismissedNoSchemaHints.has(connectionId);
+}
+
+export function dismissNoSchemaHint(connectionId: string): void {
+  dismissedNoSchemaHints.add(connectionId);
 }
 
 function applyRemote(ddl: ConnectionDdl): void {
