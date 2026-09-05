@@ -218,7 +218,7 @@ func TestPromoteImportedIsOneShotAndIdempotent(t *testing.T) {
 	now := model.NowISO()
 	collectionID := "collection-pre-p5"
 	if _, err := db.Exec(
-		`INSERT INTO http_collections (id, name, sort_order, origin_json, created_at, updated_at)
+		`INSERT INTO api_collections (id, name, sort_order, origin_json, created_at, updated_at)
 		 VALUES (?, 'Legacy', 0, ?, ?, ?)`,
 		collectionID,
 		`{"variable":[{"key":"baseUrl","value":"https://api.example.com"},{"key":"apiKey","value":"","type":"secret"}]}`,
@@ -236,14 +236,14 @@ func TestPromoteImportedIsOneShotAndIdempotent(t *testing.T) {
 	}
 
 	var promoted int
-	if err := db.QueryRow(`SELECT variables_promoted FROM http_collections WHERE id = ?`, collectionID).Scan(&promoted); err != nil {
+	if err := db.QueryRow(`SELECT variables_promoted FROM api_collections WHERE id = ?`, collectionID).Scan(&promoted); err != nil {
 		t.Fatalf("read variables_promoted: %v", err)
 	}
 	if promoted != 1 {
 		t.Fatalf("variables_promoted = %d, want 1", promoted)
 	}
 	var originJSON string
-	if err := db.QueryRow(`SELECT origin_json FROM http_collections WHERE id = ?`, collectionID).Scan(&originJSON); err != nil {
+	if err := db.QueryRow(`SELECT origin_json FROM api_collections WHERE id = ?`, collectionID).Scan(&originJSON); err != nil {
 		t.Fatalf("read origin_json: %v", err)
 	}
 	if originJSON != `{}` {

@@ -5,7 +5,7 @@ import { control } from '../../bridge/control';
 
 // P11 D11/D14, P12 D12: the per-tab gRPC history runtime — mirrors
 // views/httprequest/history.ts's own shape exactly, over grpc_call_history instead of
-// http_response_history, now sharing http/state/history.ts's createHistoryStore factory rather
+// api_response_history, now sharing api/state/history.ts's createHistoryStore factory rather
 // than a second hand-copied 100 lines (F9). gRPC has no compare selection, so it passes no Extra.
 const {
   runtime,

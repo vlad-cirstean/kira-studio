@@ -288,8 +288,8 @@ export function closeHistoryMenu(): void {
   for (const id of Object.keys(revealedHistoryValues)) delete revealedHistoryValues[id];
 }
 
-/** P12 D13: runReveal's own second instantiation, over http_variable_history instead of
- *  http_variables. */
+/** P12 D13: runReveal's own second instantiation, over api_variable_history instead of
+ *  api_variables. */
 export async function revealHistoryEntry(historyId: string): Promise<void> {
   await runReveal(
     (confirmed) => control.variablesRevealHistory(historyId, confirmed),

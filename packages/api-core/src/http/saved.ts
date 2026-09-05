@@ -1,7 +1,7 @@
 import type { HttpSavedRequest } from '@kira/shared/domain/collections';
 import { HTTP_METHODS, type HttpMethod, type HttpRequestTabState } from '@kira/shared/domain/http';
 
-// P4 D15: two views of the same request exist by construction — http_items.request_json (the
+// P4 D15: two views of the same request exist by construction — api_items.request_json (the
 // saved one) and tabs.state_json (the tab's, autosaved on the existing 1 s debounce). P4 does not
 // merge them, deliberately:
 //
@@ -55,7 +55,7 @@ export function fromSavedRequest(saved: HttpSavedRequest): Partial<HttpRequestTa
 // seven, and httpRequestTabStateSchema's enum would *throw* on the rest (a Zod .default() only
 // fires for `undefined`, never for a bad value). So the coercion happens here — the one function
 // every read path goes through — rather than at each call site. The original spelling stays in
-// http_items.request_json and in origin_json, so an untouched request still exports as PROPFIND;
+// api_items.request_json and in origin_json, so an untouched request still exports as PROPFIND;
 // widening the vocabulary is a request-builder change and P4's §8 OQ-3 hands it forward.
 const BUILDER_METHODS = new Set<string>(HTTP_METHODS);
 

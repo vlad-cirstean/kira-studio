@@ -95,7 +95,7 @@ func TestMaskSecrets_RedirectURLsFinalURLAndTimelineHopsBeforePersisting(t *test
 
 	var rawSnapshot string
 	if err := db.DB.QueryRow(
-		`SELECT snapshot_json FROM http_response_history WHERE id = ?`, entries[0].ID,
+		`SELECT snapshot_json FROM api_response_history WHERE id = ?`, entries[0].ID,
 	).Scan(&rawSnapshot); err != nil {
 		t.Fatalf("query snapshot_json: %v", err)
 	}

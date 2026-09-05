@@ -59,7 +59,7 @@ func (r *CollectionsRepo) List() ([]model.Collection, []model.CollectionItem, er
 }
 
 func (r *CollectionsRepo) listCollections() ([]model.Collection, error) {
-	rows, err := r.DB.Query(`SELECT ` + collectionSelectColumns + ` FROM http_collections ORDER BY sort_order, name`)
+	rows, err := r.DB.Query(`SELECT ` + collectionSelectColumns + ` FROM api_collections ORDER BY sort_order, name`)
 	if err != nil {
 		return nil, fmt.Errorf("repos/collections: query collections: %w", err)
 	}
@@ -80,7 +80,7 @@ func (r *CollectionsRepo) listCollections() ([]model.Collection, error) {
 }
 
 func (r *CollectionsRepo) listItems() ([]model.CollectionItem, error) {
-	rows, err := r.DB.Query(`SELECT ` + itemSelectColumns + ` FROM http_items ORDER BY collection_id, sort_order`)
+	rows, err := r.DB.Query(`SELECT ` + itemSelectColumns + ` FROM api_items ORDER BY collection_id, sort_order`)
 	if err != nil {
 		return nil, fmt.Errorf("repos/collections: query items: %w", err)
 	}
@@ -126,7 +126,7 @@ func (r *CollectionsRepo) GetRequest(itemID string) (model.SavedRequest, error) 
 		kind, protocol string
 		body           string
 	)
-	err := r.DB.QueryRow(`SELECT kind, protocol, request_json FROM http_items WHERE id = ?`, itemID).Scan(&kind, &protocol, &body)
+	err := r.DB.QueryRow(`SELECT kind, protocol, request_json FROM api_items WHERE id = ?`, itemID).Scan(&kind, &protocol, &body)
 	if errors.Is(err, sql.ErrNoRows) {
 		return model.SavedRequest{}, fmt.Errorf("repos/collections: no item %s", itemID)
 	}
@@ -148,7 +148,7 @@ func (r *CollectionsRepo) GetGrpcRequest(itemID string) (model.SavedGrpcRequest,
 		kind, protocol string
 		body           string
 	)
-	err := r.DB.QueryRow(`SELECT kind, protocol, request_json FROM http_items WHERE id = ?`, itemID).Scan(&kind, &protocol, &body)
+	err := r.DB.QueryRow(`SELECT kind, protocol, request_json FROM api_items WHERE id = ?`, itemID).Scan(&kind, &protocol, &body)
 	if errors.Is(err, sql.ErrNoRows) {
 		return model.SavedGrpcRequest{}, fmt.Errorf("repos/collections: no item %s", itemID)
 	}
@@ -197,7 +197,7 @@ func (r *CollectionsRepo) CreateCollection(name string) (model.Collection, error
 		return model.Collection{}, fmt.Errorf("repos/collections: name is required")
 	}
 	var order int
-	if err := r.DB.QueryRow(`SELECT COALESCE(MAX(sort_order) + 1, 0) FROM http_collections`).Scan(&order); err != nil {
+	if err := r.DB.QueryRow(`SELECT COALESCE(MAX(sort_order) + 1, 0) FROM api_collections`).Scan(&order); err != nil {
 		return model.Collection{}, fmt.Errorf("repos/collections: next collection order: %w", err)
 	}
 	c := model.Collection{
@@ -205,7 +205,7 @@ func (r *CollectionsRepo) CreateCollection(name string) (model.Collection, error
 		CreatedAt: model.NowISO(), UpdatedAt: model.NowISO(),
 	}
 	if _, err := r.DB.Exec(
-		`INSERT INTO http_collections (id, name, sort_order, origin_json, created_at, updated_at)
+		`INSERT INTO api_collections (id, name, sort_order, origin_json, created_at, updated_at)
 		 VALUES (?, ?, ?, '{}', ?, ?)`,
 		c.ID, c.Name, c.SortOrder, c.CreatedAt, c.UpdatedAt,
 	); err != nil {
@@ -320,7 +320,7 @@ func (r *CollectionsRepo) CreateGrpcItem(collectionID string, parentID *string, 
 func nextItemOrder(tx *sql.Tx, collectionID string, parentID *string) (int, error) {
 	var order int
 	err := tx.QueryRow(
-		`SELECT COALESCE(MAX(sort_order) + 1, 0) FROM http_items
+		`SELECT COALESCE(MAX(sort_order) + 1, 0) FROM api_items
 		  WHERE collection_id = ? AND parent_id IS ?`,
 		collectionID, parentID,
 	).Scan(&order)
@@ -336,7 +336,7 @@ func insertItem(tx *sql.Tx, item model.CollectionItem, requestJSON, originJSON s
 		protocol = model.ItemProtocolHTTP
 	}
 	_, err := tx.Exec(
-		`INSERT INTO http_items
+		`INSERT INTO api_items
 		   (id, collection_id, parent_id, kind, name, sort_order, method, url, protocol, request_json, origin_json, created_at, updated_at)
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		item.ID, item.CollectionID, item.ParentID, item.Kind, item.Name, item.SortOrder,
@@ -366,7 +366,7 @@ func (r *CollectionsRepo) SaveRequest(itemID, name string, request model.SavedRe
 		kind, protocol string
 		originJSON     string
 	)
-	err := r.DB.QueryRow(`SELECT kind, protocol, origin_json FROM http_items WHERE id = ?`, itemID).Scan(&kind, &protocol, &originJSON)
+	err := r.DB.QueryRow(`SELECT kind, protocol, origin_json FROM api_items WHERE id = ?`, itemID).Scan(&kind, &protocol, &originJSON)
 	if errors.Is(err, sql.ErrNoRows) {
 		return model.CollectionItem{}, fmt.Errorf("repos/collections: no item %s", itemID)
 	}
@@ -390,7 +390,7 @@ func (r *CollectionsRepo) SaveRequest(itemID, name string, request model.SavedRe
 	}
 	now := model.NowISO()
 	if _, err := r.DB.Exec(
-		`UPDATE http_items
+		`UPDATE api_items
 		    SET name = ?, method = ?, url = ?, request_json = ?, origin_json = ?, updated_at = ?
 		  WHERE id = ?`,
 		name, request.Method, request.URL, string(encoded), shed, now, itemID,
@@ -414,7 +414,7 @@ func (r *CollectionsRepo) SaveGrpcRequest(itemID, name string, request model.Sav
 	}
 
 	var kind, protocol string
-	err := r.DB.QueryRow(`SELECT kind, protocol FROM http_items WHERE id = ?`, itemID).Scan(&kind, &protocol)
+	err := r.DB.QueryRow(`SELECT kind, protocol FROM api_items WHERE id = ?`, itemID).Scan(&kind, &protocol)
 	if errors.Is(err, sql.ErrNoRows) {
 		return model.CollectionItem{}, fmt.Errorf("repos/collections: no item %s", itemID)
 	}
@@ -435,7 +435,7 @@ func (r *CollectionsRepo) SaveGrpcRequest(itemID, name string, request model.Sav
 	now := model.NowISO()
 	method := request.Service + "/" + request.Method
 	if _, err := r.DB.Exec(
-		`UPDATE http_items SET name = ?, method = ?, url = ?, request_json = ?, updated_at = ? WHERE id = ?`,
+		`UPDATE api_items SET name = ?, method = ?, url = ?, request_json = ?, updated_at = ? WHERE id = ?`,
 		name, method, request.Target, string(encoded), now, itemID,
 	); err != nil {
 		return model.CollectionItem{}, fmt.Errorf("repos/collections: save grpc request %s: %w", itemID, err)
@@ -463,7 +463,7 @@ func shedOriginJSON(originJSON string, request model.SavedRequest) (string, erro
 }
 
 func (r *CollectionsRepo) getItem(itemID string) (model.CollectionItem, error) {
-	row := r.DB.QueryRow(`SELECT `+itemSelectColumns+` FROM http_items WHERE id = ?`, itemID)
+	row := r.DB.QueryRow(`SELECT `+itemSelectColumns+` FROM api_items WHERE id = ?`, itemID)
 	return scanItem(row)
 }
 
@@ -486,7 +486,7 @@ func (r *CollectionsRepo) Rename(id, target, name string) error {
 
 // Delete removes a collection (and its whole item tree) or one item (and its subtree). The cascade
 // is genuine: db.go's DSN sets _foreign_keys=1 on every connection the pool opens, so
-// http_items.parent_id REFERENCES http_items(id) ON DELETE CASCADE deletes a subtree at any depth
+// api_items.parent_id REFERENCES api_items(id) ON DELETE CASCADE deletes a subtree at any depth
 // in one statement, with no recursive delete in Go (F9). Surviving siblings are re-indexed dense.
 func (r *CollectionsRepo) Delete(id, target string) error {
 	table, err := targetTable(target)
@@ -509,7 +509,7 @@ func (r *CollectionsRepo) Delete(id, target string) error {
 	)
 	if target == "item" {
 		var parent sql.NullString
-		err := tx.QueryRow(`SELECT collection_id, parent_id FROM http_items WHERE id = ?`, id).Scan(&collectionID, &parent)
+		err := tx.QueryRow(`SELECT collection_id, parent_id FROM api_items WHERE id = ?`, id).Scan(&collectionID, &parent)
 		if errors.Is(err, sql.ErrNoRows) {
 			return fmt.Errorf("repos/collections: no item %s", id)
 		}
@@ -542,9 +542,9 @@ func (r *CollectionsRepo) Delete(id, target string) error {
 func targetTable(target string) (string, error) {
 	switch target {
 	case "collection":
-		return "http_collections", nil
+		return "api_collections", nil
 	case "item":
-		return "http_items", nil
+		return "api_items", nil
 	}
 	return "", fmt.Errorf("repos/collections: unrecognised target %q", target)
 }
@@ -565,7 +565,7 @@ func requireOneRow(res sql.Result, target, id string) error {
 // hundred rows, always rewritten inside one transaction, so gap management buys nothing.
 func reindexSiblings(tx *sql.Tx, collectionID string, parentID *string) error {
 	rows, err := tx.Query(
-		`SELECT id FROM http_items WHERE collection_id = ? AND parent_id IS ? ORDER BY sort_order, created_at, id`,
+		`SELECT id FROM api_items WHERE collection_id = ? AND parent_id IS ? ORDER BY sort_order, created_at, id`,
 		collectionID, parentID,
 	)
 	if err != nil {
@@ -587,7 +587,7 @@ func reindexSiblings(tx *sql.Tx, collectionID string, parentID *string) error {
 	rows.Close()
 
 	for order, id := range ids {
-		if _, err := tx.Exec(`UPDATE http_items SET sort_order = ? WHERE id = ?`, order, id); err != nil {
+		if _, err := tx.Exec(`UPDATE api_items SET sort_order = ? WHERE id = ?`, order, id); err != nil {
 			return fmt.Errorf("repos/collections: reindex %s: %w", id, err)
 		}
 	}
@@ -613,7 +613,7 @@ func (r *CollectionsRepo) ImportTree(tree *postman.Tree) (model.Collection, erro
 	defer func() { _ = tx.Rollback() }()
 
 	var order int
-	if err := tx.QueryRow(`SELECT COALESCE(MAX(sort_order) + 1, 0) FROM http_collections`).Scan(&order); err != nil {
+	if err := tx.QueryRow(`SELECT COALESCE(MAX(sort_order) + 1, 0) FROM api_collections`).Scan(&order); err != nil {
 		return model.Collection{}, fmt.Errorf("repos/collections: next collection order: %w", err)
 	}
 	now := model.NowISO()
@@ -621,7 +621,7 @@ func (r *CollectionsRepo) ImportTree(tree *postman.Tree) (model.Collection, erro
 		ID: uuid.NewString(), Name: tree.Name, SortOrder: order, CreatedAt: now, UpdatedAt: now,
 	}
 	if _, err := tx.Exec(
-		`INSERT INTO http_collections (id, name, sort_order, origin_json, created_at, updated_at)
+		`INSERT INTO api_collections (id, name, sort_order, origin_json, created_at, updated_at)
 		 VALUES (?, ?, ?, ?, ?, ?)`,
 		collection.ID, collection.Name, collection.SortOrder, string(originJSON), now, now,
 	); err != nil {
@@ -671,7 +671,7 @@ func (r *CollectionsRepo) LoadTree(collectionID string) (*postman.Tree, error) {
 		name       string
 		originJSON string
 	)
-	err := r.DB.QueryRow(`SELECT name, origin_json FROM http_collections WHERE id = ?`, collectionID).Scan(&name, &originJSON)
+	err := r.DB.QueryRow(`SELECT name, origin_json FROM api_collections WHERE id = ?`, collectionID).Scan(&name, &originJSON)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("repos/collections: no collection %s", collectionID)
 	}
@@ -685,7 +685,7 @@ func (r *CollectionsRepo) LoadTree(collectionID string) (*postman.Tree, error) {
 	// row's `value` is already '' by construction (D4's own CHECK constraint), which is what
 	// makes D16's "a secret exports valueless" true here with no decrypt and no extra branch.
 	varRows, err := r.DB.Query(
-		`SELECT name, value, is_secret FROM http_variables WHERE collection_id = ? ORDER BY sort_order, name`,
+		`SELECT name, value, is_secret FROM api_variables WHERE collection_id = ? ORDER BY sort_order, name`,
 		collectionID,
 	)
 	if err != nil {
@@ -715,7 +715,7 @@ func (r *CollectionsRepo) LoadTree(collectionID string) (*postman.Tree, error) {
 
 	rows, err := r.DB.Query(
 		`SELECT id, parent_id, kind, name, sort_order, protocol, request_json, origin_json
-		   FROM http_items WHERE collection_id = ? ORDER BY sort_order, created_at, id`,
+		   FROM api_items WHERE collection_id = ? ORDER BY sort_order, created_at, id`,
 		collectionID,
 	)
 	if err != nil {

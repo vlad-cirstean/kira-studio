@@ -142,7 +142,7 @@ func TestListIgnoresRequestJSONWhileGetRequestRefusesIt(t *testing.T) {
 		t.Fatal(err)
 	}
 	item := mustCreateItem(t, r, collection.ID, nil, model.CollectionItemRequest, "broken")
-	if _, err := r.DB.Exec(`UPDATE http_items SET request_json = ? WHERE id = ?`, "{not json", item.ID); err != nil {
+	if _, err := r.DB.Exec(`UPDATE api_items SET request_json = ? WHERE id = ?`, "{not json", item.ID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -168,7 +168,7 @@ func TestListIgnoresRequestJSONWhileGetRequestRefusesIt(t *testing.T) {
 	}
 
 	// A parseable document that fails model.SavedRequest.Validate is refused the same way.
-	if _, err := r.DB.Exec(`UPDATE http_items SET request_json = ? WHERE id = ?`,
+	if _, err := r.DB.Exec(`UPDATE api_items SET request_json = ? WHERE id = ?`,
 		`{"method":"GET","bodyMode":"telepathy","codeLanguage":"json"}`, item.ID); err != nil {
 		t.Fatal(err)
 	}
@@ -218,7 +218,7 @@ func TestSaveRequestShedsOnlyTheChangedOriginMembers(t *testing.T) {
 	}
 
 	var originJSON string
-	if err := r.DB.QueryRow(`SELECT origin_json FROM http_items WHERE id = ?`, itemID).Scan(&originJSON); err != nil {
+	if err := r.DB.QueryRow(`SELECT origin_json FROM api_items WHERE id = ?`, itemID).Scan(&originJSON); err != nil {
 		t.Fatal(err)
 	}
 	var origin map[string]json.RawMessage

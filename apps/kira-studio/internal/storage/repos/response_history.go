@@ -59,7 +59,7 @@ func (r *ResponseHistoryRepo) Record(rec model.ResponseHistoryRecord) error {
 	environment := ""
 	if rec.EnvironmentID != "" {
 		if err := tx.QueryRow(
-			`SELECT name FROM http_environments WHERE id = ?`, rec.EnvironmentID,
+			`SELECT name FROM api_environments WHERE id = ?`, rec.EnvironmentID,
 		).Scan(&environment); err != nil && err != sql.ErrNoRows {
 			return fmt.Errorf("repos/response_history: resolve environment: %w", err)
 		}
@@ -115,7 +115,7 @@ func (r *ResponseHistoryRepo) Record(rec model.ResponseHistoryRecord) error {
 	storedBytes := len(snapshotJSON)
 
 	if _, err := tx.Exec(
-		`INSERT INTO http_response_history
+		`INSERT INTO api_response_history
 		   (id, item_id, tab_id, sent_at, method, url, environment, status, status_text,
 		    elapsed_ms, body_bytes, stored_bytes, snapshot_json)
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -128,9 +128,9 @@ func (r *ResponseHistoryRepo) Record(rec model.ResponseHistoryRecord) error {
 
 	// Per-scope count cap — the exact shape filter_history.go/variables.go's own trim uses.
 	if _, err := tx.Exec(
-		`DELETE FROM http_response_history
+		`DELETE FROM api_response_history
 		  WHERE scope_key = ?
-		    AND id NOT IN (SELECT id FROM http_response_history
+		    AND id NOT IN (SELECT id FROM api_response_history
 		                     WHERE scope_key = ?
 		                     ORDER BY sent_at DESC, rowid DESC LIMIT ?)`,
 		scopeKey, scopeKey, historyPerScopeLimit,
@@ -142,11 +142,11 @@ func (r *ResponseHistoryRepo) Record(rec model.ResponseHistoryRecord) error {
 	// makes this safe: no single row can exceed the budget, so the row just inserted is never
 	// itself evicted.
 	if _, err := tx.Exec(
-		`DELETE FROM http_response_history WHERE id NOT IN (
+		`DELETE FROM api_response_history WHERE id NOT IN (
 		   SELECT id FROM (
 		     SELECT id, SUM(stored_bytes) OVER (ORDER BY sent_at DESC, rowid DESC
 		                                        ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS running
-		       FROM http_response_history
+		       FROM api_response_history
 		   ) WHERE running <= ?)`,
 		historyByteBudget,
 	); err != nil {
@@ -204,7 +204,7 @@ func scanResponseHistoryEntry(row rowScanner) (model.ResponseHistoryEntry, error
 func (r *ResponseHistoryRepo) List(scopeKey string) ([]model.ResponseHistoryEntry, error) {
 	rows, err := r.DB.Query(
 		`SELECT `+responseHistoryEntryColumns+`
-		   FROM http_response_history
+		   FROM api_response_history
 		  WHERE scope_key = ?
 		  ORDER BY sent_at DESC, rowid DESC`,
 		scopeKey,
@@ -235,7 +235,7 @@ func (r *ResponseHistoryRepo) List(scopeKey string) ([]model.ResponseHistoryEntr
 func (r *ResponseHistoryRepo) Get(id string) (model.ResponseHistorySnapshot, error) {
 	row := r.DB.QueryRow(
 		`SELECT `+responseHistoryEntryColumns+`, snapshot_json
-		   FROM http_response_history WHERE id = ?`,
+		   FROM api_response_history WHERE id = ?`,
 		id,
 	)
 	var (
@@ -270,7 +270,7 @@ func (r *ResponseHistoryRepo) Get(id string) (model.ResponseHistorySnapshot, err
 
 // Delete removes one entry.
 func (r *ResponseHistoryRepo) Delete(id string) error {
-	if _, err := r.DB.Exec(`DELETE FROM http_response_history WHERE id = ?`, id); err != nil {
+	if _, err := r.DB.Exec(`DELETE FROM api_response_history WHERE id = ?`, id); err != nil {
 		return fmt.Errorf("repos/response_history: delete: %w", err)
 	}
 	return nil
@@ -278,7 +278,7 @@ func (r *ResponseHistoryRepo) Delete(id string) error {
 
 // Clear removes every entry in one scope.
 func (r *ResponseHistoryRepo) Clear(scopeKey string) error {
-	if _, err := r.DB.Exec(`DELETE FROM http_response_history WHERE scope_key = ?`, scopeKey); err != nil {
+	if _, err := r.DB.Exec(`DELETE FROM api_response_history WHERE scope_key = ?`, scopeKey); err != nil {
 		return fmt.Errorf("repos/response_history: clear: %w", err)
 	}
 	return nil
@@ -288,7 +288,7 @@ func (r *ResponseHistoryRepo) Clear(scopeKey string) error {
 // follows via the generated column (F8) with no second write.
 func (r *ResponseHistoryRepo) Adopt(tabID, itemID string) (int, error) {
 	res, err := r.DB.Exec(
-		`UPDATE http_response_history SET item_id = ? WHERE item_id IS NULL AND tab_id = ?`,
+		`UPDATE api_response_history SET item_id = ? WHERE item_id IS NULL AND tab_id = ?`,
 		itemID, tabID,
 	)
 	if err != nil {
@@ -307,7 +307,7 @@ func (r *ResponseHistoryRepo) Adopt(tabID, itemID string) (int, error) {
 // there is a tab that was actually closed.
 func (r *ResponseHistoryRepo) SweepOrphans() error {
 	if _, err := r.DB.Exec(
-		`DELETE FROM http_response_history
+		`DELETE FROM api_response_history
 		  WHERE item_id IS NULL AND tab_id NOT IN (SELECT id FROM tabs)`,
 	); err != nil {
 		return fmt.Errorf("repos/response_history: sweep orphans: %w", err)

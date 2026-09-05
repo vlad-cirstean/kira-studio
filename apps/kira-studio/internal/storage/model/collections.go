@@ -2,7 +2,7 @@ package model
 
 import "fmt"
 
-// Collection is one http_collections row, minus origin_json — the summary the tree renders from.
+// Collection is one api_collections row, minus origin_json — the summary the tree renders from.
 // P4 D2: `List` never selects origin_json (or request_json), which is why neither is here.
 type Collection struct {
 	ID        string `json:"id"`
@@ -12,7 +12,7 @@ type Collection struct {
 	UpdatedAt string `json:"updatedAt"`
 }
 
-// CollectionItem is one http_items row, minus request_json and origin_json. Method and URL are
+// CollectionItem is one api_items row, minus request_json and origin_json. Method and URL are
 // denormalized out of the saved request so the tree renders a method chip and searches URLs
 // without reading potentially large bodies; both are "" for a folder. Protocol (P11 D12) is
 // structural sibling data, not a third Kind value — see the two protocol constants below.

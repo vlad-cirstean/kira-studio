@@ -2,7 +2,7 @@ package model
 
 import "fmt"
 
-// VariableScope discriminates which owner an http_variables row belongs to. It is computed on
+// VariableScope discriminates which owner an api_variables row belongs to. It is computed on
 // scan from which foreign key is non-null (P5 D4) — never a stored column, so there is no second
 // source of the same fact to drift from the CHECK the migration already enforces.
 type VariableScope string
@@ -12,7 +12,7 @@ const (
 	VariableScopeEnvironment VariableScope = "environment"
 )
 
-// Environment is one http_environments row (P5 D3/D4). IsActive is the app-global selection — the
+// Environment is one api_environments row (P5 D3/D4). IsActive is the app-global selection — the
 // repo guarantees at most one row carries it.
 type Environment struct {
 	ID        string `json:"id"`
@@ -21,7 +21,7 @@ type Environment struct {
 	IsActive  bool   `json:"isActive"`
 }
 
-// Variable is one http_variables row's **list projection** — P5 D4/D5. Value is ” whenever
+// Variable is one api_variables row's **list projection** — P5 D4/D5. Value is ” whenever
 // IsSecret, and the row's own encrypted-secret column is not a field of this struct at all, so
 // "the list never returns a secret's plaintext or ciphertext" is a property of this type, not of a
 // per-row branch somewhere that could later be forgotten.
@@ -35,7 +35,7 @@ type Variable struct {
 	SortOrder int           `json:"sortOrder"`
 }
 
-// VariableHistoryEntry is one http_variable_history row's list projection — the same "no secret
+// VariableHistoryEntry is one api_variable_history row's list projection — the same "no secret
 // column here" discipline as Variable above. apivars.Service.RevealHistory is the only path to a
 // secret history entry's plaintext.
 type VariableHistoryEntry struct {

@@ -6,7 +6,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/httpclient"
 )
 
-// ResponseHistoryEntry is one http_response_history row's list projection — no body, ever (D4's
+// ResponseHistoryEntry is one api_response_history row's list projection — no body, ever (D4's
 // List never selects snapshot_json). ItemID is nil for a scratch tab's own history.
 type ResponseHistoryEntry struct {
 	ID          string  `json:"id"`

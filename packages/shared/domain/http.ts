@@ -300,7 +300,7 @@ const httpRequestTabStateShape = /*#__PURE__*/ z.object({
   formData: /*#__PURE__*/ z.array(httpFormDataFieldSchema).default([]),
   binaryFile: httpBinaryFileSchema,
   // P4 D14: a saved request's identity and its name, both `.default()`ed like every other field
-  // so a tab saved before P4 restores unchanged. `itemId` is the http_items row this tab is bound
+  // so a tab saved before P4 restores unchanged. `itemId` is the api_items row this tab is bound
   // to (null = a scratch request that has never been saved); it lives here rather than in the
   // tab's `path` because duplicateTab copies `path` verbatim while duplicateState clears the id,
   // which would leave two disagreeing sources of one fact and make openTab's reuse lookup

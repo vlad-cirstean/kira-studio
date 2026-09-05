@@ -110,7 +110,7 @@ func (s *HttpService) Send(ctx context.Context, args HttpSendArgs) (httpclient.R
 			// kira.sqlite unmasked since P8 landed. Masked here, at the point the values are
 			// already known, rather than inventing a second reveal gate (OQ-4): a secret's
 			// plaintext must never reach a copyable surface ungated, nor kira.sqlite outside
-			// http_variables.secret_value (§0.3).
+			// api_variables.secret_value (§0.3).
 			maskSecrets(&resp, usedSecrets)
 
 			// P8 D2: recorded from args (stage 1 — F3), never from resolved. Best-effort: a

@@ -1,7 +1,7 @@
 import type { GrpcSavedRequest } from '@kira/shared/domain/collections';
 import type { GrpcRequestTabState } from '@kira/shared/domain/grpc';
 
-// P11 D15/D12: two views of the same request exist by construction — http_items.request_json
+// P11 D15/D12: two views of the same request exist by construction — api_items.request_json
 // (the saved one) and tabs.state_json (the tab's, autosaved) — mirrors
 // views/httprequest/saved.ts's own reasoning exactly, not merged for the identical reason (opening
 // a saved request and trying something must not be destructive).

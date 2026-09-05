@@ -19,9 +19,9 @@ const (
 	grpcHistoryPerScopeCap = 20
 )
 
-// grpcHistoryByteBudget is D11's table-wide ceiling — a quarter of http_response_history's
+// grpcHistoryByteBudget is D11's table-wide ceiling — a quarter of api_response_history's
 // 128 MiB, since a gRPC call's stored payload is capped an order of magnitude lower (100 × 64 KiB
-// worst case ≈ 6.4 MiB per entry, against http_response_history's 256 KiB) and the two budgets are
+// worst case ≈ 6.4 MiB per entry, against api_response_history's 256 KiB) and the two budgets are
 // independent. A var, not a const, only so SetGrpcHistoryByteBudgetForTest can shrink it for one
 // test (mirrors response_history.go's own historyByteBudget/SetHistoryByteBudgetForTest split).
 var grpcHistoryByteBudget = 32 * 1024 * 1024
@@ -64,7 +64,7 @@ func (r *GrpcHistoryRepo) Record(rec model.GrpcCallHistoryRecord) error {
 	environment := ""
 	if rec.EnvironmentID != "" {
 		if err := tx.QueryRow(
-			`SELECT name FROM http_environments WHERE id = ?`, rec.EnvironmentID,
+			`SELECT name FROM api_environments WHERE id = ?`, rec.EnvironmentID,
 		).Scan(&environment); err != nil && err != sql.ErrNoRows {
 			return fmt.Errorf("repos/grpc_history: resolve environment: %w", err)
 		}
@@ -114,7 +114,7 @@ func (r *GrpcHistoryRepo) Record(rec model.GrpcCallHistoryRecord) error {
 		return fmt.Errorf("repos/grpc_history: insert: %w", err)
 	}
 
-	// Per-scope count cap — the exact shape http_response_history's own trim uses.
+	// Per-scope count cap — the exact shape api_response_history's own trim uses.
 	scopeKey := "tab:" + rec.TabID
 	if itemID != nil {
 		scopeKey = *itemID

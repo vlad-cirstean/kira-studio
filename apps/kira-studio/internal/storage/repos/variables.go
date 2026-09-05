@@ -17,11 +17,11 @@ import (
 // different table (P5 D13).
 const variableHistoryLimit = 20
 
-// VariablesRepo owns three tables (P5 D4): http_environments, http_variables and
-// http_variable_history. One repo for both scopes (collection and environment), not two: a
+// VariablesRepo owns three tables (P5 D4): api_environments, api_variables and
+// api_variable_history. One repo for both scopes (collection and environment), not two: a
 // collection variable and an environment variable share every field, every secret rule, the same
 // history table and the same dense-sort_order arithmetic — the asymmetry that split
-// http_collections from http_items (P4 D2) does not exist here.
+// api_collections from api_items (P4 D2) does not exist here.
 //
 // No prepared statement: these queries run on dialog open/edit, not per keystroke (mirrors
 // CollectionsRepo's own reasoning).
@@ -42,7 +42,7 @@ func NewVariables(db *sql.DB, cipher Cipher) *VariablesRepo {
 // ---- environments (D3) ----
 
 func (r *VariablesRepo) ListEnvironments() ([]model.Environment, error) {
-	rows, err := r.db.Query(`SELECT id, name, sort_order, is_active FROM http_environments ORDER BY sort_order, name`)
+	rows, err := r.db.Query(`SELECT id, name, sort_order, is_active FROM api_environments ORDER BY sort_order, name`)
 	if err != nil {
 		return nil, fmt.Errorf("repos/variables: list environments: %w", err)
 	}
@@ -71,13 +71,13 @@ func (r *VariablesRepo) CreateEnvironment(name string) (model.Environment, error
 		return model.Environment{}, fmt.Errorf("repos/variables: name is required")
 	}
 	var order int
-	if err := r.db.QueryRow(`SELECT COALESCE(MAX(sort_order) + 1, 0) FROM http_environments`).Scan(&order); err != nil {
+	if err := r.db.QueryRow(`SELECT COALESCE(MAX(sort_order) + 1, 0) FROM api_environments`).Scan(&order); err != nil {
 		return model.Environment{}, fmt.Errorf("repos/variables: next environment order: %w", err)
 	}
 	now := model.NowISO()
 	e := model.Environment{ID: uuid.NewString(), Name: name, SortOrder: order}
 	if _, err := r.db.Exec(
-		`INSERT INTO http_environments (id, name, sort_order, is_active, created_at, updated_at)
+		`INSERT INTO api_environments (id, name, sort_order, is_active, created_at, updated_at)
 		 VALUES (?, ?, ?, 0, ?, ?)`,
 		e.ID, e.Name, e.SortOrder, now, now,
 	); err != nil {
@@ -90,7 +90,7 @@ func (r *VariablesRepo) RenameEnvironment(id, name string) error {
 	if id == "" || name == "" {
 		return fmt.Errorf("repos/variables: id and name are required")
 	}
-	res, err := r.db.Exec(`UPDATE http_environments SET name = ?, updated_at = ? WHERE id = ?`, name, model.NowISO(), id)
+	res, err := r.db.Exec(`UPDATE api_environments SET name = ?, updated_at = ? WHERE id = ?`, name, model.NowISO(), id)
 	if err != nil {
 		return fmt.Errorf("repos/variables: rename environment %s: %w", id, err)
 	}
@@ -109,7 +109,7 @@ func (r *VariablesRepo) DeleteEnvironment(id string) error {
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	res, err := tx.Exec(`DELETE FROM http_environments WHERE id = ?`, id)
+	res, err := tx.Exec(`DELETE FROM api_environments WHERE id = ?`, id)
 	if err != nil {
 		return fmt.Errorf("repos/variables: delete environment %s: %w", id, err)
 	}
@@ -134,11 +134,11 @@ func (r *VariablesRepo) SetActiveEnvironment(id string) error {
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	if _, err := tx.Exec(`UPDATE http_environments SET is_active = 0`); err != nil {
+	if _, err := tx.Exec(`UPDATE api_environments SET is_active = 0`); err != nil {
 		return fmt.Errorf("repos/variables: clear active environment: %w", err)
 	}
 	if id != "" {
-		res, err := tx.Exec(`UPDATE http_environments SET is_active = 1, updated_at = ? WHERE id = ?`, model.NowISO(), id)
+		res, err := tx.Exec(`UPDATE api_environments SET is_active = 1, updated_at = ? WHERE id = ?`, model.NowISO(), id)
 		if err != nil {
 			return fmt.Errorf("repos/variables: set active environment %s: %w", id, err)
 		}
@@ -159,7 +159,7 @@ func (r *VariablesRepo) ReorderEnvironments(ids []string) error {
 	}
 	defer func() { _ = tx.Rollback() }()
 	for order, id := range ids {
-		if _, err := tx.Exec(`UPDATE http_environments SET sort_order = ? WHERE id = ?`, order, id); err != nil {
+		if _, err := tx.Exec(`UPDATE api_environments SET sort_order = ? WHERE id = ?`, order, id); err != nil {
 			return fmt.Errorf("repos/variables: reorder environment %s: %w", id, err)
 		}
 	}
@@ -173,7 +173,7 @@ func (r *VariablesRepo) ReorderEnvironments(ids []string) error {
 // already have — CollectionsRepo.reindexSiblings' own discipline (P4 D2), applied to a table with
 // no parent to scope by.
 func reindexEnvironments(tx *sql.Tx) error {
-	rows, err := tx.Query(`SELECT id FROM http_environments ORDER BY sort_order, created_at, id`)
+	rows, err := tx.Query(`SELECT id FROM api_environments ORDER BY sort_order, created_at, id`)
 	if err != nil {
 		return fmt.Errorf("repos/variables: read environments: %w", err)
 	}
@@ -192,7 +192,7 @@ func reindexEnvironments(tx *sql.Tx) error {
 	}
 	rows.Close()
 	for order, id := range ids {
-		if _, err := tx.Exec(`UPDATE http_environments SET sort_order = ? WHERE id = ?`, order, id); err != nil {
+		if _, err := tx.Exec(`UPDATE api_environments SET sort_order = ? WHERE id = ?`, order, id); err != nil {
 			return fmt.Errorf("repos/variables: reindex environment %s: %w", id, err)
 		}
 	}
@@ -232,7 +232,7 @@ func (r *VariablesRepo) List(scope model.VariableScope, ownerID string) ([]model
 	}
 
 	rows, err := r.db.Query(
-		`SELECT id, name, value, is_secret, sort_order FROM http_variables
+		`SELECT id, name, value, is_secret, sort_order FROM api_variables
 		  WHERE `+column+` = ? ORDER BY sort_order, name`,
 		ownerID,
 	)
@@ -287,7 +287,7 @@ func (r *VariablesRepo) Upsert(scope model.VariableScope, ownerID, id, name, val
 			return model.Variable{}, fmt.Errorf("repos/variables: ownerId is required")
 		}
 		var order int
-		if err := tx.QueryRow(`SELECT COALESCE(MAX(sort_order) + 1, 0) FROM http_variables WHERE `+mustScopeColumn(scope)+` = ?`, ownerID).Scan(&order); err != nil {
+		if err := tx.QueryRow(`SELECT COALESCE(MAX(sort_order) + 1, 0) FROM api_variables WHERE `+mustScopeColumn(scope)+` = ?`, ownerID).Scan(&order); err != nil {
 			return model.Variable{}, fmt.Errorf("repos/variables: next variable order: %w", err)
 		}
 		v := model.Variable{ID: uuid.NewString(), Scope: scope, OwnerID: ownerID, Name: name, Value: value, IsSecret: isSecret, SortOrder: order}
@@ -298,7 +298,7 @@ func (r *VariablesRepo) Upsert(scope model.VariableScope, ownerID, id, name, val
 			environmentID = &ownerID
 		}
 		if _, err := tx.Exec(
-			`INSERT INTO http_variables (id, collection_id, environment_id, name, value, is_secret, secret_value, sort_order, created_at, updated_at)
+			`INSERT INTO api_variables (id, collection_id, environment_id, name, value, is_secret, secret_value, sort_order, created_at, updated_at)
 			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			v.ID, collectionID, environmentID, v.Name, storedValue, boolToInt(v.IsSecret), storedSecret, v.SortOrder, now, now,
 		); err != nil {
@@ -322,7 +322,7 @@ func (r *VariablesRepo) Upsert(scope model.VariableScope, ownerID, id, name, val
 		oldSortOrder                int
 	)
 	err = tx.QueryRow(
-		`SELECT collection_id, environment_id, value, is_secret, secret_value, sort_order FROM http_variables WHERE id = ?`, id,
+		`SELECT collection_id, environment_id, value, is_secret, secret_value, sort_order FROM api_variables WHERE id = ?`, id,
 	).Scan(&collectionID, &environmentID, &oldValue, &oldSecretInt, &oldSecretValue, &oldSortOrder)
 	if errors.Is(err, sql.ErrNoRows) {
 		return model.Variable{}, fmt.Errorf("repos/variables: no variable %s", id)
@@ -339,7 +339,7 @@ func (r *VariablesRepo) Upsert(scope model.VariableScope, ownerID, id, name, val
 	}
 
 	if _, err := tx.Exec(
-		`UPDATE http_variables SET name = ?, value = ?, is_secret = ?, secret_value = ?, updated_at = ? WHERE id = ?`,
+		`UPDATE api_variables SET name = ?, value = ?, is_secret = ?, secret_value = ?, updated_at = ? WHERE id = ?`,
 		name, storedValue, boolToInt(isSecret), storedSecret, now, id,
 	); err != nil {
 		return model.Variable{}, fmt.Errorf("repos/variables: update variable %s: %w", id, err)
@@ -368,7 +368,7 @@ func mustScopeColumn(scope model.VariableScope) string {
 	return c
 }
 
-// encryptFor turns a plaintext into the pair of columns http_variables actually stores (D4's
+// encryptFor turns a plaintext into the pair of columns api_variables actually stores (D4's
 // CHECK: exactly one of value/secret_value is populated).
 func (r *VariablesRepo) encryptFor(value string, isSecret bool) (storedValue string, storedSecret *string, err error) {
 	if !isSecret {
@@ -415,17 +415,17 @@ func (r *VariablesRepo) recordHistory(tx *sql.Tx, variableID, oldPlain string, o
 		}
 	}
 	if _, err := tx.Exec(
-		`INSERT INTO http_variable_history (id, variable_id, value, is_secret, secret_value, recorded_at)
+		`INSERT INTO api_variable_history (id, variable_id, value, is_secret, secret_value, recorded_at)
 		 VALUES (?, ?, ?, ?, ?, ?)`,
 		uuid.NewString(), variableID, value, boolToInt(oldSecret), secretValue, now,
 	); err != nil {
 		return fmt.Errorf("repos/variables: insert history: %w", err)
 	}
 	if _, err := tx.Exec(`
-		DELETE FROM http_variable_history
+		DELETE FROM api_variable_history
 		 WHERE variable_id = ?
 		   AND id NOT IN (
-		     SELECT id FROM http_variable_history
+		     SELECT id FROM api_variable_history
 		      WHERE variable_id = ?
 		      ORDER BY recorded_at DESC, rowid DESC
 		      LIMIT ?
@@ -449,7 +449,7 @@ func (r *VariablesRepo) Delete(id string) error {
 	defer func() { _ = tx.Rollback() }()
 
 	var collectionID, environmentID sql.NullString
-	err = tx.QueryRow(`SELECT collection_id, environment_id FROM http_variables WHERE id = ?`, id).Scan(&collectionID, &environmentID)
+	err = tx.QueryRow(`SELECT collection_id, environment_id FROM api_variables WHERE id = ?`, id).Scan(&collectionID, &environmentID)
 	if errors.Is(err, sql.ErrNoRows) {
 		return fmt.Errorf("repos/variables: no variable %s", id)
 	}
@@ -457,7 +457,7 @@ func (r *VariablesRepo) Delete(id string) error {
 		return fmt.Errorf("repos/variables: read variable %s: %w", id, err)
 	}
 
-	res, err := tx.Exec(`DELETE FROM http_variables WHERE id = ?`, id)
+	res, err := tx.Exec(`DELETE FROM api_variables WHERE id = ?`, id)
 	if err != nil {
 		return fmt.Errorf("repos/variables: delete variable %s: %w", id, err)
 	}
@@ -483,7 +483,7 @@ func reindexVariables(tx *sql.Tx, scope model.VariableScope, ownerID string) err
 	if err != nil {
 		return err
 	}
-	rows, err := tx.Query(`SELECT id FROM http_variables WHERE `+column+` = ? ORDER BY sort_order, created_at, id`, ownerID)
+	rows, err := tx.Query(`SELECT id FROM api_variables WHERE `+column+` = ? ORDER BY sort_order, created_at, id`, ownerID)
 	if err != nil {
 		return fmt.Errorf("repos/variables: read siblings: %w", err)
 	}
@@ -502,7 +502,7 @@ func reindexVariables(tx *sql.Tx, scope model.VariableScope, ownerID string) err
 	}
 	rows.Close()
 	for order, id := range ids {
-		if _, err := tx.Exec(`UPDATE http_variables SET sort_order = ? WHERE id = ?`, order, id); err != nil {
+		if _, err := tx.Exec(`UPDATE api_variables SET sort_order = ? WHERE id = ?`, order, id); err != nil {
 			return fmt.Errorf("repos/variables: reindex %s: %w", id, err)
 		}
 	}
@@ -521,7 +521,7 @@ func (r *VariablesRepo) Reorder(scope model.VariableScope, ownerID string, ids [
 	}
 	defer func() { _ = tx.Rollback() }()
 	for order, id := range ids {
-		if _, err := tx.Exec(`UPDATE http_variables SET sort_order = ? WHERE id = ?`, order, id); err != nil {
+		if _, err := tx.Exec(`UPDATE api_variables SET sort_order = ? WHERE id = ?`, order, id); err != nil {
 			return fmt.Errorf("repos/variables: reorder %s: %w", id, err)
 		}
 	}
@@ -535,7 +535,7 @@ func (r *VariablesRepo) Reorder(scope model.VariableScope, ownerID string, ids [
 // ciphertext (the same list-projection discipline as List above). Reveal is the gated path to one.
 func (r *VariablesRepo) History(variableID string) ([]model.VariableHistoryEntry, error) {
 	rows, err := r.db.Query(
-		`SELECT id, variable_id, value, is_secret, recorded_at FROM http_variable_history
+		`SELECT id, variable_id, value, is_secret, recorded_at FROM api_variable_history
 		  WHERE variable_id = ? ORDER BY recorded_at DESC, rowid DESC`,
 		variableID,
 	)
@@ -574,7 +574,7 @@ func (r *VariablesRepo) RevealValue(variableID string) (string, error) {
 		isSecretInt int
 		secretValue sql.NullString
 	)
-	err := r.db.QueryRow(`SELECT is_secret, secret_value FROM http_variables WHERE id = ?`, variableID).Scan(&isSecretInt, &secretValue)
+	err := r.db.QueryRow(`SELECT is_secret, secret_value FROM api_variables WHERE id = ?`, variableID).Scan(&isSecretInt, &secretValue)
 	if errors.Is(err, sql.ErrNoRows) {
 		return "", fmt.Errorf("repos/variables: no variable %s", variableID)
 	}
@@ -591,14 +591,14 @@ func (r *VariablesRepo) RevealValue(variableID string) (string, error) {
 	return plain, nil
 }
 
-// RevealHistoryValue is RevealValue's sibling over http_variable_history — a secret's old value is
+// RevealHistoryValue is RevealValue's sibling over api_variable_history — a secret's old value is
 // exactly as sensitive as its current one (D13).
 func (r *VariablesRepo) RevealHistoryValue(historyID string) (string, error) {
 	var (
 		isSecretInt int
 		secretValue sql.NullString
 	)
-	err := r.db.QueryRow(`SELECT is_secret, secret_value FROM http_variable_history WHERE id = ?`, historyID).Scan(&isSecretInt, &secretValue)
+	err := r.db.QueryRow(`SELECT is_secret, secret_value FROM api_variable_history WHERE id = ?`, historyID).Scan(&isSecretInt, &secretValue)
 	if errors.Is(err, sql.ErrNoRows) {
 		return "", fmt.Errorf("repos/variables: no history entry %s", historyID)
 	}
@@ -638,7 +638,7 @@ func (r *VariablesRepo) SecretsFor(collectionID, environmentID string) (map[stri
 }
 
 func (r *VariablesRepo) mergeSecrets(out map[string]string, column, ownerID string) error {
-	rows, err := r.db.Query(`SELECT name, secret_value FROM http_variables WHERE `+column+` = ? AND is_secret = 1`, ownerID)
+	rows, err := r.db.Query(`SELECT name, secret_value FROM api_variables WHERE `+column+` = ? AND is_secret = 1`, ownerID)
 	if err != nil {
 		return fmt.Errorf("repos/variables: query secrets: %w", err)
 	}
@@ -717,7 +717,7 @@ func (r *VariablesRepo) promoteIfNeeded(collectionID string) error {
 		originJSON string
 		promoted   bool
 	)
-	err = tx.QueryRow(`SELECT origin_json, variables_promoted FROM http_collections WHERE id = ?`, collectionID).Scan(&originJSON, &promoted)
+	err = tx.QueryRow(`SELECT origin_json, variables_promoted FROM api_collections WHERE id = ?`, collectionID).Scan(&originJSON, &promoted)
 	if errors.Is(err, sql.ErrNoRows) {
 		return fmt.Errorf("repos/variables: no collection %s", collectionID)
 	}
@@ -747,7 +747,7 @@ func (r *VariablesRepo) promoteIfNeeded(collectionID string) error {
 
 	if len(entries) > 0 {
 		var order int
-		if err := tx.QueryRow(`SELECT COALESCE(MAX(sort_order) + 1, 0) FROM http_variables WHERE collection_id = ?`, collectionID).Scan(&order); err != nil {
+		if err := tx.QueryRow(`SELECT COALESCE(MAX(sort_order) + 1, 0) FROM api_variables WHERE collection_id = ?`, collectionID).Scan(&order); err != nil {
 			return fmt.Errorf("repos/variables: next variable order: %w", err)
 		}
 		now := model.NowISO()
@@ -762,7 +762,7 @@ func (r *VariablesRepo) promoteIfNeeded(collectionID string) error {
 				return err
 			}
 			if _, err := tx.Exec(
-				`INSERT INTO http_variables (id, collection_id, environment_id, name, value, is_secret, secret_value, sort_order, created_at, updated_at)
+				`INSERT INTO api_variables (id, collection_id, environment_id, name, value, is_secret, secret_value, sort_order, created_at, updated_at)
 				 VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, ?)`,
 				uuid.NewString(), collectionID, entry.Key, storedValue, boolToInt(isSecret), storedSecret, order, now, now,
 			); err != nil {
@@ -777,7 +777,7 @@ func (r *VariablesRepo) promoteIfNeeded(collectionID string) error {
 		return fmt.Errorf("repos/variables: encode origin: %w", err)
 	}
 	if _, err := tx.Exec(
-		`UPDATE http_collections SET origin_json = ?, variables_promoted = 1, updated_at = ? WHERE id = ?`,
+		`UPDATE api_collections SET origin_json = ?, variables_promoted = 1, updated_at = ? WHERE id = ?`,
 		string(encodedOrigin), model.NowISO(), collectionID,
 	); err != nil {
 		return fmt.Errorf("repos/variables: stamp promoted: %w", err)
@@ -823,7 +823,7 @@ func (r *VariablesRepo) ImportVariables(collectionID string, vars []postman.Vari
 			return err
 		}
 		if _, err := tx.Exec(
-			`INSERT INTO http_variables (id, collection_id, environment_id, name, value, is_secret, secret_value, sort_order, created_at, updated_at)
+			`INSERT INTO api_variables (id, collection_id, environment_id, name, value, is_secret, secret_value, sort_order, created_at, updated_at)
 			 VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, ?)`,
 			uuid.NewString(), collectionID, v.Name, storedValue, boolToInt(v.Secret), storedSecret, order, now, now,
 		); err != nil {
@@ -831,7 +831,7 @@ func (r *VariablesRepo) ImportVariables(collectionID string, vars []postman.Vari
 		}
 		order++
 	}
-	if _, err := tx.Exec(`UPDATE http_collections SET variables_promoted = 1, updated_at = ? WHERE id = ?`, now, collectionID); err != nil {
+	if _, err := tx.Exec(`UPDATE api_collections SET variables_promoted = 1, updated_at = ? WHERE id = ?`, now, collectionID); err != nil {
 		return fmt.Errorf("repos/variables: stamp promoted: %w", err)
 	}
 	if err := tx.Commit(); err != nil {

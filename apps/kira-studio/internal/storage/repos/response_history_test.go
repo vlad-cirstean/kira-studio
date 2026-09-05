@@ -227,7 +227,7 @@ func TestResponseHistoryGlobalByteBudgetEvictsOldestAcrossScopes(t *testing.T) {
 
 	var midBytes int
 	if err := db.QueryRow(
-		`SELECT COALESCE(SUM(stored_bytes), 0) FROM http_response_history WHERE snapshot_json LIKE '%"mid-%'`,
+		`SELECT COALESCE(SUM(stored_bytes), 0) FROM api_response_history WHERE snapshot_json LIKE '%"mid-%'`,
 	).Scan(&midBytes); err != nil {
 		t.Fatalf("sum mid-*/stored_bytes: %v", err)
 	}
@@ -263,7 +263,7 @@ func TestResponseHistoryGlobalByteBudgetEvictsOldestAcrossScopes(t *testing.T) {
 
 	var survivingOld int
 	if err := db.QueryRow(
-		`SELECT COUNT(*) FROM http_response_history WHERE snapshot_json LIKE '%"old-%'`,
+		`SELECT COUNT(*) FROM api_response_history WHERE snapshot_json LIKE '%"old-%'`,
 	).Scan(&survivingOld); err != nil {
 		t.Fatalf("count old-* survivors: %v", err)
 	}
@@ -273,7 +273,7 @@ func TestResponseHistoryGlobalByteBudgetEvictsOldestAcrossScopes(t *testing.T) {
 
 	var newestSurvived int
 	if err := db.QueryRow(
-		`SELECT COUNT(*) FROM http_response_history WHERE snapshot_json LIKE '%"newest"%'`,
+		`SELECT COUNT(*) FROM api_response_history WHERE snapshot_json LIKE '%"newest"%'`,
 	).Scan(&newestSurvived); err != nil {
 		t.Fatalf("count newest: %v", err)
 	}
@@ -390,7 +390,7 @@ func TestResponseHistoryRecordStripsWireBeforePersisting(t *testing.T) {
 	id := entries[0].ID
 
 	var rawSnapshot string
-	if err := db.QueryRow(`SELECT snapshot_json FROM http_response_history WHERE id = ?`, id).Scan(&rawSnapshot); err != nil {
+	if err := db.QueryRow(`SELECT snapshot_json FROM api_response_history WHERE id = ?`, id).Scan(&rawSnapshot); err != nil {
 		t.Fatalf("query snapshot_json: %v", err)
 	}
 	if strings.Contains(rawSnapshot, "wire") {
@@ -447,7 +447,7 @@ func TestResponseHistoryRecordKeepsTimeline(t *testing.T) {
 	id := entries[0].ID
 
 	var rawSnapshot string
-	if err := db.QueryRow(`SELECT snapshot_json FROM http_response_history WHERE id = ?`, id).Scan(&rawSnapshot); err != nil {
+	if err := db.QueryRow(`SELECT snapshot_json FROM api_response_history WHERE id = ?`, id).Scan(&rawSnapshot); err != nil {
 		t.Fatalf("query snapshot_json: %v", err)
 	}
 	if !strings.Contains(rawSnapshot, `"timeline"`) {

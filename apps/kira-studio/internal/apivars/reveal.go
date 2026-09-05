@@ -39,7 +39,7 @@ func (s *Service) Reveal(variableID string, confirmed bool) RevealResult {
 	return s.reveal(revealReason, variableID, confirmed, s.deps.Repo.RevealValue, "variable")
 }
 
-// RevealHistory is Reveal's sibling over http_variable_history (D13) — a secret's old value is
+// RevealHistory is Reveal's sibling over api_variable_history (D13) — a secret's old value is
 // exactly as sensitive as its current one, so it goes through the same gate.
 func (s *Service) RevealHistory(historyID string, confirmed bool) RevealResult {
 	if historyID == "" {
