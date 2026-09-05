@@ -10,6 +10,8 @@ import (
 	"sync"
 
 	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/reflect/protodesc"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/reflect/protoregistry"
 	"google.golang.org/protobuf/types/dynamicpb"
@@ -130,26 +132,54 @@ type resolved struct {
 // surface), so an unbounded map here was a real, unbounded leak, compounded by every dynamic
 // metadata value (e.g. {{$guid}}, an ordinary P6 feature) previously minting its own cache key —
 // see cacheKey's own comment below.
-const maxCachedDescriptors = 32
+//
+// Round-2 review finding 9: a plain entry count doesn't actually cap the resource (memory) the
+// original finding was about — 32 entries of a large API surface's registry could still retain
+// hundreds of MB for the life of the process. Rebounded here by an approximate byte budget
+// instead (maxCachedDescriptorBytes below), tracked via each entry's own descriptor-set size at
+// insert time (approxDescriptorBytes) — chosen over simply lowering the count because a fixed
+// count can never adapt to how large any one Source's descriptor set actually is: a byte budget
+// evicts exactly when it should, whether that is one huge registry or many small ones.
+//
+// A var, not a const: descriptor_cache_test.go temporarily lowers it to exercise eviction against
+// a real, small compiled descriptor set rather than needing to allocate 64+ MiB of registries in a
+// test to cross the production default.
+var maxCachedDescriptorBytes int64 = 64 * 1024 * 1024 // 64 MiB
 
 // descriptorCache is D4's in-memory-only cache, keyed by the Source's own fields — which for
 // reflection includes the resolved target (§0.3/D10). The key is a SHA-256 digest, never the
 // fields themselves: this map is unexported, has no accessor that returns a key, is never
 // serialised and never logged, which is what keeps a secret out of it even though the fields it
 // is derived from can contain one. map[string]*list.Element + container/list is this codebase's
-// own established count-bounded-cache shape (internal/enginecache.ByteLru, budgeted by bytes
-// rather than count) — not reused directly: that type's EntryMeta is shaped for the DB-adapter
-// query cache (ConnectionID/Path/Label) and grpcclient imports nothing else in this module, a
-// property worth keeping for a package this self-contained.
+// own established budgeted-cache shape (internal/enginecache.ByteLru) — not reused directly:
+// that type's EntryMeta is shaped for the DB-adapter query cache (ConnectionID/Path/Label) and
+// grpcclient imports nothing else in this module, a property worth keeping for a package this
+// self-contained.
 var descriptorCache = struct {
-	mu    sync.Mutex
-	byKey map[string]*list.Element // Value is *descriptorCacheEntry
-	order *list.List               // front = least recently used, back = most recently used
+	mu         sync.Mutex
+	byKey      map[string]*list.Element // Value is *descriptorCacheEntry
+	order      *list.List               // front = least recently used, back = most recently used
+	totalBytes int64
 }{byKey: map[string]*list.Element{}, order: list.New()}
 
 type descriptorCacheEntry struct {
-	key string
-	r   *resolved
+	key   string
+	r     *resolved
+	bytes int64
+}
+
+// approxDescriptorBytes sums the encoded size of every file registered in files — an
+// approximation (it re-marshals each FileDescriptorProto rather than tracking whatever the wire
+// size once was), cheap enough to pay once per Put and never per Get. A nil files (an empty
+// *resolved{}, as this package's own tests construct) ranges over nothing and costs 0, exactly
+// like protoregistry.Files' own nil-receiver-safe RangeFiles.
+func approxDescriptorBytes(files *protoregistry.Files) int64 {
+	var total int64
+	files.RangeFiles(func(fd protoreflect.FileDescriptor) bool {
+		total += int64(proto.Size(protodesc.ToFileDescriptorProto(fd)))
+		return true
+	})
+	return total
 }
 
 // cacheKey excludes metadata *values* on purpose (finding 12): reflection's own resolved metadata
@@ -201,19 +231,30 @@ func descriptorCacheGet(key string) (*resolved, bool) {
 }
 
 func descriptorCachePut(key string, r *resolved) {
+	size := approxDescriptorBytes(r.files)
+
 	descriptorCache.mu.Lock()
 	defer descriptorCache.mu.Unlock()
 	if el, ok := descriptorCache.byKey[key]; ok {
-		el.Value.(*descriptorCacheEntry).r = r
+		entry := el.Value.(*descriptorCacheEntry)
+		descriptorCache.totalBytes += size - entry.bytes
+		entry.r, entry.bytes = r, size
 		descriptorCache.order.MoveToBack(el)
-		return
+	} else {
+		el := descriptorCache.order.PushBack(&descriptorCacheEntry{key: key, r: r, bytes: size})
+		descriptorCache.byKey[key] = el
+		descriptorCache.totalBytes += size
 	}
-	el := descriptorCache.order.PushBack(&descriptorCacheEntry{key: key, r: r})
-	descriptorCache.byKey[key] = el
-	for descriptorCache.order.Len() > maxCachedDescriptors {
+	// order.Len() > 1: always keep at least the entry just inserted, even alone over budget — a
+	// single Source whose own descriptor set exceeds maxCachedDescriptorBytes should still get the
+	// documented "a Call following a Describe costs no second round trip" property, not be evicted
+	// by its own Put before anything can ever hit it.
+	for descriptorCache.totalBytes > maxCachedDescriptorBytes && descriptorCache.order.Len() > 1 {
 		oldest := descriptorCache.order.Front()
+		entry := oldest.Value.(*descriptorCacheEntry)
 		descriptorCache.order.Remove(oldest)
-		delete(descriptorCache.byKey, oldest.Value.(*descriptorCacheEntry).key)
+		delete(descriptorCache.byKey, entry.key)
+		descriptorCache.totalBytes -= entry.bytes
 	}
 }
 
@@ -252,6 +293,7 @@ func InvalidateCache(src Source) {
 	if el, ok := descriptorCache.byKey[key]; ok {
 		descriptorCache.order.Remove(el)
 		delete(descriptorCache.byKey, key)
+		descriptorCache.totalBytes -= el.Value.(*descriptorCacheEntry).bytes
 	}
 }
 

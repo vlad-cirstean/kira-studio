@@ -2,6 +2,7 @@ package grpcclient
 
 import (
 	"container/list"
+	"context"
 	"strconv"
 	"testing"
 )
@@ -93,22 +94,45 @@ func TestInvalidateCache_ProtoModeEvictsEntryCallWouldUse(t *testing.T) {
 	}
 }
 
-// TestDescriptorCache_EvictsLeastRecentlyUsedPastCap is finding 12's other half: the cache used to
-// be an unbounded map, so a session that Describes many distinct Sources (each a possibly
-// multi-megabyte descriptor registry) grew it without limit. Exercises descriptorCachePut/Get
-// directly — synthetic keys and empty *resolved values, no real network or .proto file needed —
-// since the eviction policy itself, not descriptor resolution, is what this guards.
-func TestDescriptorCache_EvictsLeastRecentlyUsedPastCap(t *testing.T) {
+// TestDescriptorCache_EvictsLeastRecentlyUsedPastByteBudget is finding 12's other half, refined by
+// round-2 review finding 9: the cache used to be an unbounded map (finding 12), then bounded by a
+// plain entry count — but 32 entries of a large API surface's registry could still retain hundreds
+// of MB for the life of the process, which doesn't actually cap the resource (memory) the original
+// finding was about. Rebounded by an approximate byte budget instead, tracked via
+// approxDescriptorBytes at Put time.
+//
+// Driven by a real compiled descriptor set (echo.proto, same fixture descriptors_test.go's own
+// TestDescribe_Proto_WellKnownImport uses) reused across every synthetic key — every entry is
+// therefore the exact same known size, so the budget can be set to a small multiple of it
+// (`capacity` entries) without needing to allocate 64+ MiB of registries just to cross the
+// production default.
+func TestDescriptorCache_EvictsLeastRecentlyUsedPastByteBudget(t *testing.T) {
+	protoPath := writeProto(t, "echo.proto", echoProtoSource)
+	compiled, err := resolveProto(context.Background(), Source{Mode: SourceProto, ProtoPath: protoPath})
+	if err != nil {
+		t.Fatalf("resolveProto: %v", err)
+	}
+	entryBytes := approxDescriptorBytes(compiled.files)
+	if entryBytes == 0 {
+		t.Fatal("a real compiled descriptor set has a nonzero approximate size — fixture is broken")
+	}
+
+	const capacity = 3
+	origBudget := maxCachedDescriptorBytes
+	maxCachedDescriptorBytes = entryBytes * capacity
+	t.Cleanup(func() { maxCachedDescriptorBytes = origBudget })
+
 	descriptorCache.mu.Lock()
 	descriptorCache.byKey = map[string]*list.Element{}
 	descriptorCache.order.Init()
+	descriptorCache.totalBytes = 0
 	descriptorCache.mu.Unlock()
 
-	keys := make([]string, 0, maxCachedDescriptors+5)
-	for i := 0; i < maxCachedDescriptors+5; i++ {
+	keys := make([]string, 0, capacity+5)
+	for i := 0; i < capacity+5; i++ {
 		key := "synthetic-key-" + strconv.Itoa(i)
 		keys = append(keys, key)
-		descriptorCachePut(key, &resolved{})
+		descriptorCachePut(key, compiled)
 	}
 
 	// Touch the very first surviving key (keys[5], the oldest that wasn't already evicted just by
@@ -118,7 +142,7 @@ func TestDescriptorCache_EvictsLeastRecentlyUsedPastCap(t *testing.T) {
 	if _, ok := descriptorCacheGet(keys[5]); !ok {
 		t.Fatalf("keys[5] (%s) should still be cached before the touch", keys[5])
 	}
-	descriptorCachePut("one-more-key", &resolved{})
+	descriptorCachePut("one-more-key", compiled)
 
 	if _, ok := descriptorCacheGet(keys[5]); !ok {
 		t.Errorf("keys[5] was evicted despite being touched (moved to most-recently-used) just before the insert that should have evicted keys[6] instead")
@@ -127,11 +151,47 @@ func TestDescriptorCache_EvictsLeastRecentlyUsedPastCap(t *testing.T) {
 		t.Errorf("keys[6] should have been evicted as the true least-recently-used entry, but is still cached")
 	}
 
-	// The cache never grew past its cap at any point.
+	// The cache's tracked byte total never grew past its budget at any point, and stays in sync
+	// with what is actually still cached.
 	descriptorCache.mu.Lock()
-	size := descriptorCache.order.Len()
+	total, count := descriptorCache.totalBytes, descriptorCache.order.Len()
 	descriptorCache.mu.Unlock()
-	if size > maxCachedDescriptors {
-		t.Errorf("cache size = %d, want at most %d", size, maxCachedDescriptors)
+	if total > maxCachedDescriptorBytes {
+		t.Errorf("totalBytes = %d, want at most the %d-byte budget", total, maxCachedDescriptorBytes)
+	}
+	if int64(count) != capacity {
+		t.Errorf("cached entry count = %d, want exactly %d (capacity entries of equal size)", count, capacity)
+	}
+	if total != int64(count)*entryBytes {
+		t.Errorf("totalBytes = %d, want %d (tracked total out of sync with what's cached)", total, int64(count)*entryBytes)
+	}
+}
+
+// TestDescriptorCache_SingleOversizedEntrySurvivesItsOwnPut proves the "always keep at least one"
+// guard in descriptorCachePut: a Source whose own descriptor set alone exceeds the byte budget
+// must still get the documented "a Call following a Describe costs no second round trip" property
+// — it must not evict itself before anything can ever hit it.
+func TestDescriptorCache_SingleOversizedEntrySurvivesItsOwnPut(t *testing.T) {
+	protoPath := writeProto(t, "echo.proto", echoProtoSource)
+	compiled, err := resolveProto(context.Background(), Source{Mode: SourceProto, ProtoPath: protoPath})
+	if err != nil {
+		t.Fatalf("resolveProto: %v", err)
+	}
+	entryBytes := approxDescriptorBytes(compiled.files)
+
+	origBudget := maxCachedDescriptorBytes
+	maxCachedDescriptorBytes = entryBytes / 2 // deliberately smaller than the one entry
+	t.Cleanup(func() { maxCachedDescriptorBytes = origBudget })
+
+	descriptorCache.mu.Lock()
+	descriptorCache.byKey = map[string]*list.Element{}
+	descriptorCache.order.Init()
+	descriptorCache.totalBytes = 0
+	descriptorCache.mu.Unlock()
+
+	descriptorCachePut("oversized", compiled)
+
+	if _, ok := descriptorCacheGet("oversized"); !ok {
+		t.Error("the single entry just inserted was evicted by its own Put despite exceeding the budget alone")
 	}
 }
