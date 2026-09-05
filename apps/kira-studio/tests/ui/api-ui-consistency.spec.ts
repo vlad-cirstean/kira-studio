@@ -232,3 +232,186 @@ test('a request tab with a body shows a tab-strip badge; one with none does not 
   await expect(withBody.locator('[data-testid="tab-badge"]')).toHaveCount(1);
   await expect(withoutBody.locator('[data-testid="tab-badge"]')).toHaveCount(0);
 });
+
+// P15b §4: six cases guarding this phase's own end-to-end behaviour — header-name autocomplete,
+// {{variable}} colouring/hover/completion, and arrow-key navigation across the request tables.
+
+const P15B_ENV = { id: 'env-p15b', name: 'Prod', sortOrder: 0, isActive: true };
+const P15B_BASE_URL_VAR = {
+  id: 'var-base-url',
+  scope: 'environment',
+  ownerId: 'env-p15b',
+  name: 'base_url',
+  value: 'api.example.com',
+  isSecret: false,
+  sortOrder: 0,
+};
+const P15B_SECRET_VAR = {
+  id: 'var-api-key',
+  scope: 'environment',
+  ownerId: 'env-p15b',
+  name: 'api_key',
+  value: '',
+  isSecret: true,
+  sortOrder: 1,
+};
+
+function p15bVariableControl(): ControlSnapshot[] {
+  return [
+    { channel: IPC.variablesListEnvironments, response: [P15B_ENV] },
+    {
+      channel: IPC.variablesList,
+      args: { scope: 'environment', ownerId: 'env-p15b' },
+      response: [P15B_BASE_URL_VAR, P15B_SECRET_VAR],
+    },
+  ];
+}
+
+test('the URL field: typing {{ auto-closes, and accepting a suggestion produces a clean reference', async ({
+  relaunch,
+}) => {
+  const CONTROL: ControlSnapshot[] = [
+    { channel: IPC.tabsList, response: [httpRequestTab('tab-1', 0, true, {})] },
+    ...p15bVariableControl(),
+  ];
+  const { window: page } = await relaunch({ control: CONTROL });
+
+  const url = page.locator('[data-testid="http-url"]');
+  await url.click();
+  // D5(b) rule 1 composing twice: `{` gives `{|}`, a second `{` gives `{{|}}` — the reference the
+  // user was going to type, caret where the name goes.
+  await url.pressSequentially('{{');
+  await expect(url).toHaveValue('{{}}');
+
+  // D3(b)'s templateToken opens the popup once there is a non-empty word inside the reference.
+  await url.pressSequentially('b');
+  await expect(url).toHaveValue('{{b}}');
+  const suggestions = page.locator('.autocomplete-suggestions li');
+  await expect(suggestions.filter({ hasText: 'base_url' })).toBeVisible();
+
+  // Accepting produces `{{base_url}}` — not `{{base_url}}}}` — the exact interaction between
+  // auto-close and accept a reviewer cannot check by reading alone.
+  await page.keyboard.press('Tab');
+  await expect(url).toHaveValue('{{base_url}}');
+  await expect(suggestions).toHaveCount(0);
+});
+
+test('the URL field paints a resolved reference and an unknown one differently', async ({
+  relaunch,
+}) => {
+  const CONTROL: ControlSnapshot[] = [
+    { channel: IPC.tabsList, response: [httpRequestTab('tab-1', 0, true, {})] },
+    ...p15bVariableControl(),
+  ];
+  const { window: page } = await relaunch({ control: CONTROL });
+
+  await page.fill('[data-testid="http-url"]', 'https://{{base_url}}/v1?missing={{not_defined}}');
+
+  const overlay = page.locator('.url-field .highlight-overlay');
+  await expect(overlay.locator('.cm-kira-var')).toHaveCount(1);
+  await expect(overlay.locator('.cm-kira-var-unknown')).toHaveCount(1);
+});
+
+test('hovering a resolved reference shows its value; hovering a secret never does', async ({
+  relaunch,
+}) => {
+  const CONTROL: ControlSnapshot[] = [
+    { channel: IPC.tabsList, response: [httpRequestTab('tab-1', 0, true, {})] },
+    ...p15bVariableControl(),
+  ];
+  const { window: page } = await relaunch({ control: CONTROL });
+
+  await page.fill('[data-testid="http-url"]', 'https://{{base_url}}/{{api_key}}');
+
+  const resolvedSpan = page.locator('.url-field .cm-kira-var');
+  await expect(resolvedSpan).toHaveCount(1);
+  const resolvedBox = await resolvedSpan.boundingBox();
+  if (!resolvedBox) throw new Error('resolved reference span has no box');
+  await page.mouse.move(
+    resolvedBox.x + resolvedBox.width / 2,
+    resolvedBox.y + resolvedBox.height / 2,
+  );
+  const hover = page.locator('[data-testid="autocomplete-hover"]');
+  await expect(hover).toBeVisible();
+  await expect(hover).toContainText('api.example.com');
+  await expect(hover).toContainText('environment variable');
+
+  // Move away, then hover the secret reference — a fresh token, so the panel re-arms.
+  await page.mouse.move(0, 0);
+  await expect(hover).toHaveCount(0);
+
+  const secretSpan = page.locator('.url-field .cm-kira-var-secret');
+  await expect(secretSpan).toHaveCount(1);
+  const secretBox = await secretSpan.boundingBox();
+  if (!secretBox) throw new Error('secret reference span has no box');
+  await page.mouse.move(secretBox.x + secretBox.width / 2, secretBox.y + secretBox.height / 2);
+  await expect(hover).toBeVisible();
+  await expect(hover).toContainText('resolved when the request is sent');
+  // The security property, not a UX one: the secret's plaintext (empty in this fixture, but the
+  // point stands architecturally — mergedValuesAndSecrets never hands a secret's value to
+  // variableCompletion.ts at all, F5) never appears, and neither does the word "value".
+  await expect(hover).not.toContainText('api_key');
+});
+
+test('a header-name cell suggests Content-Type, and typing Content-T then accepting does not duplicate it', async ({
+  relaunch,
+}) => {
+  const CONTROL: ControlSnapshot[] = [
+    { channel: IPC.tabsList, response: [httpRequestTab('tab-1', 0, true, {})] },
+  ];
+  const { window: page } = await relaunch({ control: CONTROL });
+
+  await page.click('[data-testid="http-request-pane-headers"]');
+  const nameInput = page.locator('[data-testid="http-header-name"]').first();
+  await nameInput.click();
+  await nameInput.pressSequentially('cont');
+  const suggestions = page.locator('.autocomplete-suggestions li');
+  await expect(suggestions.filter({ hasText: 'Content-Type' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await nameInput.fill('');
+
+  // F1's own concatenation bug, asserted so it cannot come back: the default word-run tokenizer
+  // has no `-`, so accepting after `Content-T` would otherwise produce `Content-Content-Type`.
+  await nameInput.click();
+  await nameInput.pressSequentially('Content-T');
+  await expect(suggestions.filter({ hasText: 'Content-Type' })).toBeVisible();
+  await page.keyboard.press('Tab');
+  await expect(nameInput).toHaveValue('Content-Type');
+});
+
+test('ArrowDown moves focus down a column, but not while the completion popup is navigating (D6)', async ({
+  relaunch,
+}) => {
+  const CONTROL: ControlSnapshot[] = [
+    {
+      channel: IPC.tabsList,
+      response: [
+        httpRequestTab('tab-1', 0, true, {
+          headers: [
+            { name: 'Authorization', value: 'Bearer x', enabled: true },
+            { name: 'Accept', value: 'application/json', enabled: true },
+          ],
+        }),
+      ],
+    },
+  ];
+  const { window: page } = await relaunch({ control: CONTROL });
+
+  await page.click('[data-testid="http-request-pane-headers"]');
+  const names = page.locator('[data-testid="http-header-name"]');
+  await expect(names).toHaveCount(3); // two real rows plus the trailing blank one
+
+  await names.nth(0).click();
+  await page.keyboard.press('ArrowDown');
+  await expect(names.nth(1)).toBeFocused();
+
+  // While the popup is open and navigating, ArrowDown must move the *popup* selection, not focus.
+  await names.nth(0).click();
+  await names.nth(0).fill('');
+  await names.nth(0).pressSequentially('cont');
+  const suggestions = page.locator('.autocomplete-suggestions li');
+  await expect(suggestions.filter({ hasText: 'Content-Type' })).toBeVisible();
+  await page.keyboard.press('ArrowDown');
+  await expect(names.nth(0)).toBeFocused();
+  await expect(names.nth(1)).not.toBeFocused();
+});
