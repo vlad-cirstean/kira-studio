@@ -21,17 +21,19 @@ const target = ref('');
 const saving = ref(false);
 const error = ref<string | null>(null);
 
-/** Every collection, each followed by its own folders indented beneath it. The value encodes both
- *  halves because a folder id alone does not say which collection it belongs to. */
-const targets = computed(() => {
-  const out: { value: string; label: string }[] = [];
-  for (const collection of collectionsState.collections) {
-    out.push({ value: `${collection.id}:`, label: collection.name });
-    for (const folder of folderPaths(collection.id)) {
-      out.push({ value: `${collection.id}:${folder.id}`, label: `    ${folder.label}` });
-    }
-  }
-  return out;
+/** Every collection, each carrying its own folders as a real <optgroup> (F7) — the value encodes
+ *  both halves because a folder id alone does not say which collection it belongs to. */
+const collectionTargets = computed(() =>
+  collectionsState.collections.map((collection) => ({
+    id: collection.id,
+    name: collection.name,
+    folders: folderPaths(collection.id),
+  })),
+);
+
+const firstTargetValue = computed(() => {
+  const first = collectionTargets.value[0];
+  return first ? `${first.id}:` : '';
 });
 
 watch(
@@ -39,7 +41,7 @@ watch(
   (open) => {
     if (!open) return;
     name.value = saveDialogState.suggestedName;
-    target.value = targets.value[0]?.value ?? '';
+    target.value = firstTargetValue.value;
     saving.value = false;
     error.value = null;
   },
@@ -71,30 +73,35 @@ function splitTarget(value: string): [string, string | null] {
 <template>
   <DialogFrame
     title="Save request"
-    :width="440"
+    :width="480"
     test-id="save-request-dialog"
     close-test-id="save-request-close"
     @close="closeSaveDialog"
   >
-    <div class="save-form">
+    <div class="p-dialog-body">
       <label class="field-label p-sm muted">Name</label>
       <TextField v-model="name" data-testid="save-request-name" @enter="onSave" />
 
       <label class="field-label p-sm muted">Save to</label>
       <select v-model="target" class="p-select bordered" data-testid="save-request-target">
-        <option v-for="option in targets" :key="option.value" :value="option.value">
-          {{ option.label }}
-        </option>
+        <optgroup v-for="c in collectionTargets" :key="c.id" :label="c.name">
+          <option :value="`${c.id}:`">(collection root)</option>
+          <option v-for="f in c.folders" :key="f.id" :value="`${c.id}:${f.id}`">{{ f.label }}</option>
+        </optgroup>
       </select>
 
-      <MessageStrip v-if="targets.length === 0" tone="warn" data-testid="save-request-no-target">
+      <MessageStrip
+        v-if="collectionTargets.length === 0"
+        tone="warn"
+        data-testid="save-request-no-target"
+      >
         Create a collection first — a request needs somewhere to live.
       </MessageStrip>
       <MessageStrip v-if="error" tone="err" data-testid="save-request-error">{{ error }}</MessageStrip>
     </div>
 
     <template #footer>
-      <span class="footer-actions p-push">
+      <span class="p-dialog-actions p-push">
         <AppButton kind="dialog" data-testid="save-request-cancel" @click="closeSaveDialog">Cancel</AppButton>
         <AppButton
           kind="dialog"
@@ -111,18 +118,7 @@ function splitTarget(value: string): [string, string | null] {
 </template>
 
 <style scoped>
-.save-form {
-  display: flex;
-  flex-direction: column;
-  gap: var(--kira-s-2);
-}
-
 .field-label {
   margin-top: var(--kira-s-2);
-}
-
-.footer-actions {
-  display: flex;
-  gap: var(--kira-s-2);
 }
 </style>

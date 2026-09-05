@@ -2,6 +2,7 @@
 import type { ApiVariable } from '@shared/domain/variables';
 import { computed, reactive, ref, watch } from 'vue';
 import { connectionsState } from '../state/connections';
+import AppButton from '../theme/primitives/AppButton.vue';
 import DialogFrame from '../theme/primitives/DialogFrame.vue';
 import MessageStrip from '../theme/primitives/MessageStrip.vue';
 import {
@@ -219,7 +220,7 @@ function close(): void {
     close-test-id="variables-dialog-close"
     @close="close"
   >
-    <div class="variables-dialog-body">
+    <div class="p-dialog-body list">
       <MessageStrip v-if="variablesDialogState.error" tone="err" data-testid="variables-error">
         {{ variablesDialogState.error }}
       </MessageStrip>
@@ -255,15 +256,16 @@ function close(): void {
         @move="onMove(row.id, $event)"
       />
     </div>
+
+    <template #footer>
+      <span class="p-dialog-actions end">
+        <AppButton kind="dialog" data-testid="variables-close" @click="close">Close</AppButton>
+      </span>
+    </template>
   </DialogFrame>
 </template>
 
 <style scoped>
-.variables-dialog-body {
-  display: flex;
-  flex-direction: column;
-}
-
 .header-row {
   display: flex;
   gap: var(--kira-s-2);

@@ -33,7 +33,7 @@ function close(): void {
     close-test-id="import-curl-dialog-close"
     @close="close"
   >
-    <div class="import-curl-body">
+    <div class="p-dialog-body">
       <textarea
         v-model="text"
         class="p-textarea curl-textarea"
@@ -65,7 +65,7 @@ function close(): void {
     </div>
 
     <template #footer>
-      <span class="footer-actions p-push">
+      <span class="p-dialog-actions p-push">
         <AppButton kind="dialog" data-testid="import-curl-cancel" @click="close">Cancel</AppButton>
         <AppButton
           kind="dialog"
@@ -82,13 +82,6 @@ function close(): void {
 </template>
 
 <style scoped>
-.import-curl-body {
-  display: flex;
-  flex-direction: column;
-  gap: var(--kira-s-2);
-  padding: var(--kira-s-3);
-}
-
 .curl-textarea {
   min-height: 120px;
 }
@@ -101,8 +94,4 @@ function close(): void {
   gap: var(--kira-s-1);
 }
 
-.footer-actions {
-  display: flex;
-  gap: var(--kira-s-2);
-}
 </style>

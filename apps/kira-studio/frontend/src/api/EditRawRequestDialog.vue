@@ -47,12 +47,12 @@ function close(): void {
   <DialogFrame
     title="Edit as raw HTTP"
     :width="680"
-    max-height="85vh"
+    max-height="80vh"
     test-id="edit-raw-dialog"
     close-test-id="edit-raw-dialog-close"
     @close="close"
   >
-    <div class="edit-raw-body">
+    <div class="p-dialog-body">
       <div class="p-sm muted" data-testid="edit-raw-hint">{{ hint }}</div>
 
       <div class="raw-editor">
@@ -93,7 +93,7 @@ function close(): void {
     </div>
 
     <template #footer>
-      <span class="footer-actions p-push">
+      <span class="p-dialog-actions p-push">
         <AppButton kind="dialog" data-testid="edit-raw-cancel" @click="close">Cancel</AppButton>
         <AppButton
           kind="dialog"
@@ -110,13 +110,6 @@ function close(): void {
 </template>
 
 <style scoped>
-.edit-raw-body {
-  display: flex;
-  flex-direction: column;
-  gap: var(--kira-s-2);
-  padding: var(--kira-s-3);
-}
-
 .raw-editor {
   height: 320px;
   border: var(--kira-border-width) solid var(--kira-border);
@@ -132,8 +125,4 @@ function close(): void {
   gap: var(--kira-s-1);
 }
 
-.footer-actions {
-  display: flex;
-  gap: var(--kira-s-2);
-}
 </style>

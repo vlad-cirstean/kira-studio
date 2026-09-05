@@ -11,6 +11,7 @@ import { control } from '../../bridge/control';
 import { languageExtension } from '../../editor/languages';
 import { kiraEditorTheme, kiraHighlightStyle } from '../../editor/theme';
 import { formatBytes } from '../../format';
+import AppButton from '../../theme/primitives/AppButton.vue';
 import DialogFrame from '../../theme/primitives/DialogFrame.vue';
 import MessageStrip from '../../theme/primitives/MessageStrip.vue';
 import { loadMerge } from './mergeEntry';
@@ -239,6 +240,12 @@ onUnmounted(() => {
         <div ref="mergeHostRef" class="diff-merge-host" data-testid="http-diff-merge"></div>
       </template>
     </div>
+
+    <template #footer>
+      <span class="p-dialog-actions end">
+        <AppButton kind="dialog" data-testid="http-diff-close" @click="emit('close')">Close</AppButton>
+      </span>
+    </template>
   </DialogFrame>
 </template>
 

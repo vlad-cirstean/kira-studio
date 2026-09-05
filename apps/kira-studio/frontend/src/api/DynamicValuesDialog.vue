@@ -2,6 +2,7 @@
 import { DYNAMIC_NAMES, loadDynamicGenerator } from '@kira/api-core';
 import { onMounted, reactive } from 'vue';
 import { copyText } from '../clipboard';
+import AppButton from '../theme/primitives/AppButton.vue';
 import DialogFrame from '../theme/primitives/DialogFrame.vue';
 import { closeDynamicValuesDialog } from './state/dynamicValues';
 
@@ -38,12 +39,12 @@ function close(): void {
   <DialogFrame
     title="Dynamic values"
     :width="480"
-    max-height="70vh"
+    max-height="80vh"
     test-id="dynamic-values-dialog"
     close-test-id="dynamic-values-dialog-close"
     @close="close"
   >
-    <div class="dynamic-values-body">
+    <div class="p-dialog-body list dynamic-values-body">
       <div
         v-for="name in DYNAMIC_NAMES"
         :key="name"
@@ -62,15 +63,19 @@ function close(): void {
         }}</span>
       </div>
     </div>
+
+    <template #footer>
+      <span class="p-dialog-actions end">
+        <AppButton kind="dialog" data-testid="dynamic-values-close" @click="close">Close</AppButton>
+      </span>
+    </template>
   </DialogFrame>
 </template>
 
 <style scoped>
+/* p-dialog-body.list supplies display/flex-direction/padding/gap; this body also needs to scroll
+   within the dialog's own fixed max-height. */
 .dynamic-values-body {
-  display: flex;
-  flex-direction: column;
-  padding: var(--kira-s-2);
-  gap: 1px;
   overflow-y: auto;
 }
 

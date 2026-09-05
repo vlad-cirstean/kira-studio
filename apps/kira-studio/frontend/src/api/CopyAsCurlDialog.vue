@@ -2,6 +2,7 @@
 import { computed } from 'vue';
 import AppButton from '../theme/primitives/AppButton.vue';
 import DialogFrame from '../theme/primitives/DialogFrame.vue';
+import MessageStrip from '../theme/primitives/MessageStrip.vue';
 import {
   closeCopyAsCurlDialog,
   copyAsCurlDialogState,
@@ -69,13 +70,13 @@ function close(): void {
 <template>
   <DialogFrame
     title="Copy as curl"
-    :width="640"
+    :width="680"
     max-height="80vh"
     test-id="copy-as-curl-dialog"
     close-test-id="copy-as-curl-dialog-close"
     @close="close"
   >
-    <div class="copy-as-curl-body">
+    <div class="p-dialog-body">
       <textarea
         class="p-textarea mono command-text"
         :value="command"
@@ -84,36 +85,35 @@ function close(): void {
         data-testid="copy-as-curl-command"
       />
 
-      <div
+      <MessageStrip
         v-if="copyAsCurlDialogState.deferredNames.length > 0"
-        class="p-strip"
-        :class="stripTone"
+        :tone="stripTone"
         data-testid="copy-as-curl-strip"
       >
-        <div class="strip-text">{{ stripText }}</div>
-        <span v-if="maskedNames.length > 0" class="strip-action">
-          <AppButton
-            kind="dialog"
-            :disabled="copyAsCurlDialogState.revealing"
-            data-testid="copy-as-curl-reveal"
-            @click="onReveal"
-          >
-            Show secret values
-          </AppButton>
-        </span>
-      </div>
+        {{ stripText }}
+        <AppButton
+          v-if="maskedNames.length > 0"
+          class="strip-action"
+          kind="dialog"
+          :disabled="copyAsCurlDialogState.revealing"
+          data-testid="copy-as-curl-reveal"
+          @click="onReveal"
+        >
+          Show secret values
+        </AppButton>
+      </MessageStrip>
 
       <div v-if="hasDynamicValue" class="p-sm muted" data-testid="copy-as-curl-dynamic-note">
         {{ dynamicNote }}
       </div>
 
-      <div v-if="copyAsCurlDialogState.error" class="p-strip err" data-testid="copy-as-curl-error">
+      <MessageStrip v-if="copyAsCurlDialogState.error" tone="err" data-testid="copy-as-curl-error">
         {{ copyAsCurlDialogState.error }}
-      </div>
+      </MessageStrip>
     </div>
 
     <template #footer>
-      <span class="footer-actions p-push">
+      <span class="p-dialog-actions p-push">
         <AppButton kind="dialog" data-testid="copy-as-curl-close" @click="close">Close</AppButton>
         <AppButton
           kind="dialog"
@@ -129,23 +129,7 @@ function close(): void {
 </template>
 
 <style scoped>
-.copy-as-curl-body {
-  display: flex;
-  flex-direction: column;
-  gap: var(--kira-s-2);
-  padding: var(--kira-s-3);
-}
-
 .command-text {
   min-height: 180px;
-}
-
-.strip-text {
-  min-width: 0;
-}
-
-.footer-actions {
-  display: flex;
-  gap: var(--kira-s-2);
 }
 </style>

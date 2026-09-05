@@ -120,7 +120,7 @@ function close(): void {
     close-test-id="environments-dialog-close"
     @close="close"
   >
-    <div class="environments-body">
+    <div class="p-dialog-body list">
       <div
         v-for="(env, i) in orderedEnvironments"
         :key="env.id"
@@ -171,21 +171,17 @@ function close(): void {
       </div>
     </div>
     <template #footer>
-      <AppButton kind="dialog" variant="primary" data-testid="new-environment" @click="onNewEnvironment">
-        New environment
-      </AppButton>
+      <span class="p-dialog-actions">
+        <AppButton kind="dialog" variant="primary" data-testid="new-environment" @click="onNewEnvironment">
+          New environment
+        </AppButton>
+        <AppButton kind="dialog" data-testid="environments-close" @click="close">Close</AppButton>
+      </span>
     </template>
   </DialogFrame>
 </template>
 
 <style scoped>
-.environments-body {
-  display: flex;
-  flex-direction: column;
-  padding: var(--kira-s-2);
-  gap: var(--kira-s-1);
-}
-
 .environment-row {
   display: flex;
   align-items: center;
