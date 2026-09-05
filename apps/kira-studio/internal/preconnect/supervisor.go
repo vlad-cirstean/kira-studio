@@ -337,18 +337,27 @@ func exitDetail(out outcome, tail *string) string {
 // withAugmentedPath replaces the PATH= entry in env — never appending a second one — with
 // itself plus preconnect.ts:119's exact fallback locations.
 func withAugmentedPath(env []string) []string {
+	const fallback = "/usr/local/bin:/opt/homebrew/bin"
 	out := make([]string, 0, len(env)+1)
 	found := false
 	for _, kv := range env {
 		if strings.HasPrefix(kv, "PATH=") {
-			out = append(out, kv+":/usr/local/bin:/opt/homebrew/bin")
+			// A leading empty PATH element is `.` to /bin/sh — never emit one, whether the
+			// existing PATH= value is empty or missing entirely: cmd.Dir is the user's home
+			// directory, so a leading `.` there would run an arbitrary file dropped in ~ (named
+			// e.g. kubectl, aws, psql) in preference to nothing.
+			if existing := strings.TrimPrefix(kv, "PATH="); existing != "" {
+				out = append(out, kv+":"+fallback)
+			} else {
+				out = append(out, "PATH="+fallback)
+			}
 			found = true
 			continue
 		}
 		out = append(out, kv)
 	}
 	if !found {
-		out = append(out, "PATH=:/usr/local/bin:/opt/homebrew/bin")
+		out = append(out, "PATH="+fallback)
 	}
 	return out
 }
