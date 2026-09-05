@@ -190,18 +190,26 @@ func maskSecrets(resp *httpclient.Response, usedSecrets map[string]string) {
 }
 
 // maskSendErrTimeline is D14's reach into D15's own new failure channel: a failed send's Timeline
-// (herr.Timeline, always attached by classifySendErr) carries the same resolved hop URLs a
-// successful send's Response.Timeline does, and mapHttpError below — called outside this
-// function's caller's closure, past where usedSecrets is in scope — is what turns it into
-// ipcerr.Error.Details, a copyable surface. A no-op when err is not an *httpclient.Error, carries
-// no Timeline, or no secret was actually substituted.
+// (herr.Timeline, attached by classifySendErr for a transport failure) carries the same resolved
+// hop URLs a successful send's Response.Timeline does, and mapHttpError below — called outside
+// this function's caller's closure, past where usedSecrets is in scope — is what turns it into
+// ipcerr.Error.Details, a copyable surface. herr.Message itself is masked too: both
+// classifySendErr's transport-error path (client.go's err.Error() wraps the dialed, i.e. resolved,
+// URL) and resolveURL's bad-URL-parse-error path (client.go:159, raised before a Timeline even
+// exists) can embed the resolved URL straight into the message net/http or url.Parse produced —
+// exactly the message RunOp's own err.Error() persists verbatim to op_log.error (host.go). A
+// no-op when err is not an *httpclient.Error or no secret was actually substituted.
 func maskSendErrTimeline(err error, usedSecrets map[string]string) {
 	var herr *httpclient.Error
-	if !errors.As(err, &herr) || herr.Timeline == nil {
+	if !errors.As(err, &herr) {
 		return
 	}
 	replacer := secretReplacer(usedSecrets)
 	if replacer == nil {
+		return
+	}
+	herr.Message = replacer.Replace(herr.Message)
+	if herr.Timeline == nil {
 		return
 	}
 	for i := range herr.Timeline.Hops {

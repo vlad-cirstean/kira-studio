@@ -1,10 +1,15 @@
 package bridge
 
 import (
+	"context"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapterhost"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/httpclient"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/oplog"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/repos"
@@ -145,5 +150,140 @@ func TestMaskSendErrTimeline_MasksFailedSendHopURL(t *testing.T) {
 	}
 	if !strings.Contains(got, "{{apiKey}}") {
 		t.Fatalf("Timeline.Hops[0].URL = %q, want it masked to {{apiKey}}", got)
+	}
+}
+
+// TestMaskSendErrTimeline_MasksMessageForTransportAndBadURLErrors is finding 1 of the round-1
+// review: client.go's classifySendErr (transport failure) and resolveURL (bad-URL-parse failure)
+// both build herr.Message from the *resolved* URL — net/http's own *url.Error and url.Parse's own
+// error both embed the URL they were given verbatim — yet maskSendErrTimeline used to touch only
+// herr.Timeline.Hops[].URL, never herr.Message itself. A bad-URL-parse failure in particular has no
+// Timeline at all (it fails before classifySendErr ever runs), so that path went entirely
+// unmasked. Both shapes are covered here since gRPC's own mapHttpError/RunOp.Error() reads
+// herr.Message verbatim either way.
+func TestMaskSendErrTimeline_MasksMessageForTransportAndBadURLErrors(t *testing.T) {
+	const secret = "sk_live_super_secret_token"
+	usedSecrets := map[string]string{"apiKey": secret}
+
+	cases := []struct {
+		name string
+		err  *httpclient.Error
+	}{
+		{
+			name: "transport error (has a Timeline)",
+			err: &httpclient.Error{
+				Code:    httpclient.CodeHTTPTransport,
+				Message: `Get "https://api.example.com/orders?token=` + secret + `": dial tcp: connection refused`,
+				Timeline: &httpclient.Timeline{
+					Hops: []httpclient.TimelineHop{{Index: 0, Method: "GET", URL: "https://api.example.com/orders?token=" + secret}},
+				},
+			},
+		},
+		{
+			name: "bad-request URL-parse error (no Timeline yet)",
+			err: &httpclient.Error{
+				Code:    httpclient.CodeBadRequest,
+				Message: `invalid URL: parse "https://api.example.com/orders?token=` + secret + `\x7f": net/url: invalid control character in URL`,
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			maskSendErrTimeline(tc.err, usedSecrets)
+			if strings.Contains(tc.err.Message, secret) {
+				t.Fatalf("Message = %q still contains the raw secret", tc.err.Message)
+			}
+			if !strings.Contains(tc.err.Message, "{{apiKey}}") {
+				t.Fatalf("Message = %q, want it masked to {{apiKey}}", tc.err.Message)
+			}
+
+			// mapHttpError marshals herr.Message straight into ipcerr.Error.Message — the value
+			// control.ts unwraps and the renderer can copy — so it must never carry the secret.
+			mapped := mapHttpError(tc.err)
+			if strings.Contains(mapped.Error(), secret) {
+				t.Fatalf("mapHttpError(...).Error() = %q still contains the raw secret", mapped.Error())
+			}
+		})
+	}
+}
+
+// TestHttpSendFailure_OpLogErrorNeverContainsSecret proves finding 1 end to end, through the exact
+// path a live failed send takes: RunOp's own err.Error() (host.go) is persisted verbatim to
+// op_log.error by oplog's Wiring — reproduced here against a real Host and a real, migrated SQLite
+// database (storage.Open(), the same helper the redirect/timeline masking test above uses) rather
+// than calling maskSendErrTimeline in isolation, so a future refactor of RunOp's own error-handling
+// would still be caught.
+func TestHttpSendFailure_OpLogErrorNeverContainsSecret(t *testing.T) {
+	const secret = "sk_live_super_secret_token"
+	usedSecrets := map[string]string{"apiKey": secret}
+
+	t.Setenv("KIRA_HOME", t.TempDir())
+	db, err := storage.Open()
+	if err != nil {
+		t.Fatalf("storage.Open: %v", err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+
+	opsRepo := &repos.OpsRepo{DB: db.DB}
+	host := adapterhost.NewHost(adapters.Deps{}, nil)
+	wiring := oplog.New(host, opsRepo, 30)
+
+	done := make(chan model.OpRecord, 4)
+	unsubscribe := wiring.OnUpdate(func(rec model.OpRecord) {
+		if rec.Status != "running" {
+			done <- rec
+		}
+	})
+	defer unsubscribe()
+
+	wiring.Start()
+	defer wiring.Stop()
+
+	tabID := "tab1"
+	spec := adapterhost.OpSpec{OpID: "op-http-fail", Kind: "http", TabID: &tabID}
+	_, _, runErr := host.RunOp(context.Background(), spec,
+		func(ctx context.Context, op *adapters.OpCtx) (any, error) {
+			// The exact shape bridge/http.go's Send closure produces for a transport failure whose
+			// message embeds the resolved (secret-bearing) URL, masked exactly as that closure now
+			// does before returning it to RunOp.
+			sendErr := &httpclient.Error{
+				Code:    httpclient.CodeHTTPTransport,
+				Message: `Get "https://api.example.com/orders?token=` + secret + `": dial tcp: connection refused`,
+				Timeline: &httpclient.Timeline{
+					Hops: []httpclient.TimelineHop{{Index: 0, Method: "GET", URL: "https://api.example.com/orders?token=" + secret}},
+				},
+			}
+			maskSendErrTimeline(sendErr, usedSecrets)
+			return nil, sendErr
+		})
+	if runErr == nil {
+		t.Fatal("expected RunOp to return the send error")
+	}
+	if strings.Contains(mapHttpError(runErr).Error(), secret) {
+		t.Fatalf("mapHttpError(runErr).Error() still contains the raw secret")
+	}
+
+	select {
+	case rec := <-done:
+		if rec.Error == nil {
+			t.Fatal("op_log row has no error recorded")
+		}
+		if strings.Contains(*rec.Error, secret) {
+			t.Fatalf("op_log.error = %q still contains the raw secret", *rec.Error)
+		}
+		if !strings.Contains(*rec.Error, "{{apiKey}}") {
+			t.Fatalf("op_log.error = %q, want it masked to {{apiKey}}", *rec.Error)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for the op:end update")
+	}
+
+	var rawError string
+	if err := db.DB.QueryRow(`SELECT error FROM op_log WHERE id = ?`, "op-http-fail").Scan(&rawError); err != nil {
+		t.Fatalf("query op_log.error: %v", err)
+	}
+	if strings.Contains(rawError, secret) {
+		t.Fatalf("stored op_log.error column contains the raw secret: %q", rawError)
 	}
 }
