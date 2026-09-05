@@ -524,8 +524,14 @@
   font-style: normal;
 }
 
-/* F8: two divs when sortColNumberInSeparateSpan is on — `.slick-sort-indicator` (the chevron,
-   codicon-arrow-up/-down at --kira-accent, CodiconIcon.vue's own glyph reproduced as a
+/* P19 F28 correction: this comment block's own next line used to say the chevron painted "at
+   --kira-accent" — stale even at P19's own base commit (c13b8af). The rule further down
+   (`.slick-sort-indicator-asc`/`-desc`, its own "Neutral, not var(--kira-accent)" comment) already
+   moved this to --kira-fg/--kira-fg-muted, deliberately, for a different reason (the panel-toggle
+   shape-over-colour convention) — P19 D19's accent->--kira-state-on sweep does NOT apply here;
+   doing it anyway would recolour a control that was never actually the reported collision.
+   F8: two divs when sortColNumberInSeparateSpan is on — `.slick-sort-indicator` (the chevron,
+   codicon-arrow-up/-down, CodiconIcon.vue's own glyph reproduced as a
    font-family + content pseudo-element rather than an <i> node) and `.slick-sort-indicator-
    numbered` (DataGrid.vue's own `.sort-order` badge).
    Unlike the incumbent's own `.sort-indicator`/`.sort-order` (`v-if`, so an inactive column's

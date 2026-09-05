@@ -72,7 +72,10 @@ withDefaults(
 }
 
 /* P31 D38: a plain dot, not a number — "is this deviating from default?" doesn't need a count on
-   the icon itself, only in the tooltip a caller already supplies. */
+   the icon itself, only in the tooltip a caller already supplies.
+   P19 D19: moved off --kira-accent onto --kira-state-on, alongside .ph.ph-active (primitives.css)
+   — this means the same "narrowed/filtered right now" as that label, and both should read as one
+   colour, not two. */
 .p-iconbtn.has-indicator::after {
   content: '';
   position: absolute;
@@ -81,6 +84,6 @@ withDefaults(
   width: 5px;
   height: 5px;
   border-radius: 50%;
-  background: var(--kira-accent);
+  background: var(--kira-state-on);
 }
 </style>

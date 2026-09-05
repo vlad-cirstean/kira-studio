@@ -678,7 +678,7 @@ onUnmounted(() => {
             icon="filter"
             data-testid="stream-filter-partition"
             v-tooltip="'Filter by partition'"
-            :style="selectedPartitions.length ? { color: 'var(--kira-accent)' } : undefined"
+            :style="selectedPartitions.length ? { color: 'var(--kira-state-on)' } : undefined"
             @click="onTogglePartitionMenu"
           >
             {{ partitionButtonLabel }}
