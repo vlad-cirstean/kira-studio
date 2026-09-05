@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import AppButton from '../theme/primitives/AppButton.vue';
 import DialogFrame from '../theme/primitives/DialogFrame.vue';
 import MessageStrip from '../theme/primitives/MessageStrip.vue';
@@ -13,7 +13,22 @@ import { closeImportCurlDialog, previewCurl, submitImportCurl } from './state/cu
 // "-k was ignored" is beside it, while it can still be edited.
 const text = ref('');
 
-const preview = computed(() => previewCurl(text.value));
+// Finding 15: for a large pasted curl command (a big JSON body, say), re-lexing the whole text on
+// every single keystroke just to update a one-line summary has no business running that often —
+// the textarea itself (`text`) stays bound immediately so typing never stutters; the preview below
+// reads a debounced copy instead. 400ms mirrors this app's own precedent for the identical
+// shape (project/SchemaDialog.vue's own parse-summary debounce).
+const debouncedText = ref('');
+let previewTimer: ReturnType<typeof setTimeout> | undefined;
+onBeforeUnmount(() => clearTimeout(previewTimer));
+watch(text, (value) => {
+  clearTimeout(previewTimer);
+  previewTimer = setTimeout(() => {
+    debouncedText.value = value;
+  }, 400);
+});
+
+const preview = computed(() => previewCurl(debouncedText.value));
 
 function onImport(): void {
   submitImportCurl(text.value);

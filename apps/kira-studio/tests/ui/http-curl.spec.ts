@@ -123,6 +123,30 @@ test('warnings are shown before Import, and the coerced method sticks after impo
   await expect(page.locator('[data-testid="http-method-chip"]')).toHaveText('GET');
 });
 
+// Finding 15: the preview used to re-lex the entire pasted text on every keystroke — typing
+// character-by-character (unlike .fill's single input event) is what actually exercises the
+// debounce this fix adds.
+test('the curl preview is debounced, not re-lexed on every keystroke', async ({ relaunch }) => {
+  const CONTROL: ControlSnapshot[] = [
+    { channel: IPC.collectionsList, response: { collections: [], items: [] } },
+  ];
+  const { window: page } = await relaunch({ control: CONTROL });
+
+  await modeTab(page, 'api').click();
+  await expect(page.locator('[data-testid="api-start"]')).toBeVisible();
+  await page.click('[data-testid="import-curl-start"]');
+  await expect(page.locator('[data-testid="import-curl-dialog"]')).toBeVisible();
+
+  const summary = page.locator('[data-testid="import-curl-summary"]');
+  await page.click('[data-testid="import-curl-textarea"]');
+  await page.keyboard.type('curl https://api.example.com/orders');
+
+  // Immediately after typing, before the debounce settles, the preview has not caught up yet.
+  await expect(summary).toHaveText('');
+
+  await expect(summary).toContainText('api.example.com/orders');
+});
+
 // ---- 3. A parse error disables Import ----
 
 test('a parse error disables Import and shows the message', async ({ relaunch }) => {
