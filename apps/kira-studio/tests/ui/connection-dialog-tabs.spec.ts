@@ -200,3 +200,101 @@ test('a save that fails validation on a Pre-connect-tab field switches to that t
   await expect(page.locator('[data-testid="connection-tab-preconnect"]')).toHaveClass(/is-active/);
   await expect(page.locator('[data-testid="connection-dialog"]')).toBeVisible();
 });
+
+// P19 D1/D2: one width (620) and one height (520) for the whole dialog, both steps and every
+// tab/sub-tab/engine family included — see docs/v1.2/plans/P19-connection-dialog-mongo-console-sql-tooling.md.
+
+async function dialogBox(page: import('@playwright/test').Page) {
+  const box = await page.locator('[data-testid="connection-dialog"] .dialog').boundingBox();
+  if (!box) throw new Error('connection dialog box not found');
+  return box;
+}
+
+async function dialogBodyFits(page: import('@playwright/test').Page): Promise<boolean> {
+  const { scrollHeight, clientHeight } = await page
+    .locator('[data-testid="connection-dialog"] .dialog-body')
+    .evaluate((el) => ({ scrollHeight: el.scrollHeight, clientHeight: el.clientHeight }));
+  return scrollHeight <= clientHeight;
+}
+
+test("the dialog's box never moves, across every step, tab, sub-tab and engine family", async ({
+  relaunch,
+}) => {
+  const { window: page } = await relaunch({
+    control: [{ channel: IPC.connectionsList, response: [] }],
+  });
+
+  await page.click('[data-testid="add-connection"]');
+  await expect(page.locator('[data-testid="connection-dialog"]')).toBeVisible();
+  const reference = await dialogBox(page);
+  expect(await dialogBodyFits(page)).toBe(true);
+
+  const assertUnchanged = async () => {
+    expect(await dialogBox(page)).toEqual(reference);
+    expect(await dialogBodyFits(page)).toBe(true);
+  };
+
+  // Step 1 -> step 2 (Postgres, a SQL kind with the min-version note and auto-explain).
+  await page.click('[data-testid="connection-kind-postgres"]');
+  await assertUnchanged();
+
+  await page.click('[data-testid="connection-tab-advanced"]');
+  await assertUnchanged();
+  await page.click('[data-testid="connection-tab-preconnect"]');
+  await assertUnchanged();
+  await page.click('[data-testid="connection-tab-general"]');
+  await assertUnchanged();
+
+  // Fields <-> Connection URI, both directions.
+  await page.click('[data-testid="mode-uri"]');
+  await assertUnchanged();
+  await page.click('[data-testid="mode-fields"]');
+  await assertUnchanged();
+
+  // Pre-connect: typing grows the pane by a warning line + a sidecar checkbox + its helper.
+  await page.click('[data-testid="connection-tab-preconnect"]');
+  await assertUnchanged();
+  await page.fill('[data-testid="connection-preconnect"]', 'echo hello');
+  await expect(page.locator('[data-testid="connection-preconnect-warning"]')).toBeVisible();
+  await expect(page.locator('[data-testid="connection-preconnect-sidecar"]')).toBeVisible();
+  await assertUnchanged();
+
+  // Change engine -> a file-style kind (sqlite: no host/port/user/password).
+  await page.click('[data-testid="connection-tab-general"]');
+  await page.click('button:has-text("Change engine")');
+  await assertUnchanged();
+  await page.click('[data-testid="connection-kind-sqlite"]');
+  await assertUnchanged();
+  await page.click('[data-testid="connection-tab-advanced"]');
+  await assertUnchanged(); // no auto-explain block for a non-SQL kind
+
+  // Change engine -> an AWS-style kind (sqs: no min-version note, no database, no password).
+  await page.click('[data-testid="connection-tab-general"]');
+  await page.click('button:has-text("Change engine")');
+  await assertUnchanged();
+  await page.click('[data-testid="connection-kind-sqs"]');
+  await assertUnchanged();
+});
+
+test('typing in the engine search filters the tile grid without moving the dialog box', async ({
+  relaunch,
+}) => {
+  const { window: page } = await relaunch({
+    control: [{ channel: IPC.connectionsList, response: [] }],
+  });
+
+  await page.click('[data-testid="add-connection"]');
+  await expect(page.locator('[data-testid="connection-dialog"]')).toBeVisible();
+  const reference = await dialogBox(page);
+  expect(await dialogBodyFits(page)).toBe(true);
+
+  // Narrows the 10-tile/3-column grid from four rows to one.
+  await page.fill('[data-testid="connection-engine-search"]', 'postgres');
+  await expect(page.locator('[data-testid="connection-kind"] button')).toHaveCount(1);
+  expect(await dialogBox(page)).toEqual(reference);
+  expect(await dialogBodyFits(page)).toBe(true);
+
+  await page.fill('[data-testid="connection-engine-search"]', '');
+  await expect(page.locator('[data-testid="connection-kind"] button')).toHaveCount(10);
+  expect(await dialogBox(page)).toEqual(reference);
+});
