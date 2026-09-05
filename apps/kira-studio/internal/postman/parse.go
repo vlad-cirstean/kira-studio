@@ -86,7 +86,8 @@ func decodeVariables(raw json.RawMessage) []Variable {
 		}
 		value, _ := decodeScalarString(obj["value"])
 		typ, _ := decodeString(obj["type"])
-		out = append(out, Variable{Name: name, Value: value, Secret: typ == "secret", Type: typ})
+		description := decodeDescription(obj["description"])
+		out = append(out, Variable{Name: name, Value: value, Secret: typ == "secret", Type: typ, Description: description})
 	}
 	return out
 }

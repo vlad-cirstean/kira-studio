@@ -33,6 +33,7 @@ const emit = defineEmits<{
   'update:name': [value: string];
   'update:value': [value: string];
   'update:isSecret': [value: boolean];
+  'update:description': [value: string];
   blur: [];
   remove: [];
   /** Not yet revealed (row.value === '' && row.isSecret) — the eye IS the reveal action. */
@@ -75,6 +76,9 @@ function onValueInput(v: string): void {
 }
 function onSecretChange(checked: boolean): void {
   emit('update:isSecret', checked);
+}
+function onDescriptionInput(v: string): void {
+  emit('update:description', v);
 }
 
 const showHistory = ref(false);
@@ -149,6 +153,15 @@ function onKeydown(e: KeyboardEvent): void {
         v-tooltip="notYetRevealed() ? 'Reveal' : 'Toggle visibility'"
         data-testid="variable-reveal"
         @click="onEyeClick"
+      />
+    </div>
+    <div class="cell description-cell">
+      <TextField
+        :model-value="row.description"
+        placeholder="description"
+        data-testid="variable-description"
+        @update:model-value="onDescriptionInput"
+        @blur="emit('blur')"
       />
     </div>
     <label class="secret-toggle" v-tooltip="secretsUnavailable ? 'Secret storage is unavailable' : 'Secret'">

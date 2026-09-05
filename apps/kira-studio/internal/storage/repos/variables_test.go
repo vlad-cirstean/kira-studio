@@ -42,19 +42,19 @@ func newCollectionFor(t *testing.T, db *sql.DB) string {
 func TestVariablesSortOrderIsDenseAndScopeIndependent(t *testing.T) {
 	r, db := newVariablesRepo(t)
 	collectionID := newCollectionFor(t, db)
-	env, err := r.CreateEnvironment("Staging")
+	env, err := r.CreateEnvironment("Staging", "")
 	if err != nil {
 		t.Fatalf("CreateEnvironment: %v", err)
 	}
 
 	var collectionIDs, envIDs []string
 	for _, name := range []string{"a", "b", "c"} {
-		v, err := r.Upsert(model.VariableScopeCollection, collectionID, "", name, name, false)
+		v, err := r.Upsert(model.VariableScopeCollection, collectionID, "", name, name, false, "")
 		if err != nil {
 			t.Fatalf("Upsert(collection, %s): %v", name, err)
 		}
 		collectionIDs = append(collectionIDs, v.ID)
-		w, err := r.Upsert(model.VariableScopeEnvironment, env.ID, "", name, name, false)
+		w, err := r.Upsert(model.VariableScopeEnvironment, env.ID, "", name, name, false, "")
 		if err != nil {
 			t.Fatalf("Upsert(environment, %s): %v", name, err)
 		}
@@ -115,13 +115,13 @@ func TestVariableHistoryRecordsOnChangeDedupedAndTrimmed(t *testing.T) {
 	r, db := newVariablesRepo(t)
 	collectionID := newCollectionFor(t, db)
 
-	v, err := r.Upsert(model.VariableScopeCollection, collectionID, "", "baseUrl", "v1", false)
+	v, err := r.Upsert(model.VariableScopeCollection, collectionID, "", "baseUrl", "v1", false, "")
 	if err != nil {
 		t.Fatalf("create: %v", err)
 	}
 
 	// Writing the same value twice records nothing: no prior value was actually replaced.
-	if _, err := r.Upsert(model.VariableScopeCollection, collectionID, v.ID, "baseUrl", "v1", false); err != nil {
+	if _, err := r.Upsert(model.VariableScopeCollection, collectionID, v.ID, "baseUrl", "v1", false, ""); err != nil {
 		t.Fatalf("no-op upsert: %v", err)
 	}
 	hist, err := r.History(v.ID)
@@ -133,7 +133,7 @@ func TestVariableHistoryRecordsOnChangeDedupedAndTrimmed(t *testing.T) {
 	}
 
 	// A real change records the value it replaced.
-	if _, err := r.Upsert(model.VariableScopeCollection, collectionID, v.ID, "baseUrl", "v2", false); err != nil {
+	if _, err := r.Upsert(model.VariableScopeCollection, collectionID, v.ID, "baseUrl", "v2", false, ""); err != nil {
 		t.Fatalf("upsert v2: %v", err)
 	}
 	hist, err = r.History(v.ID)
@@ -146,7 +146,7 @@ func TestVariableHistoryRecordsOnChangeDedupedAndTrimmed(t *testing.T) {
 
 	// Restoring writes through the ordinary path, so it is itself recorded — the value being
 	// replaced (v2) becomes the newest history entry.
-	if _, err := r.Upsert(model.VariableScopeCollection, collectionID, v.ID, "baseUrl", hist[0].Value, false); err != nil {
+	if _, err := r.Upsert(model.VariableScopeCollection, collectionID, v.ID, "baseUrl", hist[0].Value, false, ""); err != nil {
 		t.Fatalf("restore: %v", err)
 	}
 	hist, err = r.History(v.ID)
@@ -159,7 +159,7 @@ func TestVariableHistoryRecordsOnChangeDedupedAndTrimmed(t *testing.T) {
 
 	// Trimmed at 20, oldest dropped first.
 	for i := 0; i < 25; i++ {
-		if _, err := r.Upsert(model.VariableScopeCollection, collectionID, v.ID, "baseUrl", "gen"+string(rune('a'+i)), false); err != nil {
+		if _, err := r.Upsert(model.VariableScopeCollection, collectionID, v.ID, "baseUrl", "gen"+string(rune('a'+i)), false, ""); err != nil {
 			t.Fatalf("upsert gen%d: %v", i, err)
 		}
 	}
@@ -183,7 +183,7 @@ func TestVariablesListNeverReturnsASecret(t *testing.T) {
 	r, db := newVariablesRepo(t)
 	collectionID := newCollectionFor(t, db)
 
-	created, err := r.Upsert(model.VariableScopeCollection, collectionID, "", "apiKey", "s3cr3t", true)
+	created, err := r.Upsert(model.VariableScopeCollection, collectionID, "", "apiKey", "s3cr3t", true, "")
 	if err != nil {
 		t.Fatalf("Upsert(secret): %v", err)
 	}
@@ -358,10 +358,10 @@ func TestSecretsForDuplicateNameResolvesFirstWinsBySortOrder(t *testing.T) {
 	r, db := newVariablesRepo(t)
 	collectionID := newCollectionFor(t, db)
 
-	if _, err := r.Upsert(model.VariableScopeCollection, collectionID, "", "token", "first-value", true); err != nil {
+	if _, err := r.Upsert(model.VariableScopeCollection, collectionID, "", "token", "first-value", true, ""); err != nil {
 		t.Fatalf("Upsert(first): %v", err)
 	}
-	if _, err := r.Upsert(model.VariableScopeCollection, collectionID, "", "token", "second-value", true); err != nil {
+	if _, err := r.Upsert(model.VariableScopeCollection, collectionID, "", "token", "second-value", true, ""); err != nil {
 		t.Fatalf("Upsert(second): %v", err)
 	}
 
@@ -381,15 +381,15 @@ func TestSecretsForDuplicateNameResolvesFirstWinsBySortOrder(t *testing.T) {
 func TestSecretsForEnvironmentStillOverridesCollectionDespiteFirstWins(t *testing.T) {
 	r, db := newVariablesRepo(t)
 	collectionID := newCollectionFor(t, db)
-	env, err := r.CreateEnvironment("Staging")
+	env, err := r.CreateEnvironment("Staging", "")
 	if err != nil {
 		t.Fatalf("CreateEnvironment: %v", err)
 	}
 
-	if _, err := r.Upsert(model.VariableScopeCollection, collectionID, "", "token", "collection-value", true); err != nil {
+	if _, err := r.Upsert(model.VariableScopeCollection, collectionID, "", "token", "collection-value", true, ""); err != nil {
 		t.Fatalf("Upsert(collection): %v", err)
 	}
-	if _, err := r.Upsert(model.VariableScopeEnvironment, env.ID, "", "token", "env-value", true); err != nil {
+	if _, err := r.Upsert(model.VariableScopeEnvironment, env.ID, "", "token", "env-value", true, ""); err != nil {
 		t.Fatalf("Upsert(environment): %v", err)
 	}
 

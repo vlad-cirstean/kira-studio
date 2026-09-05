@@ -5,9 +5,13 @@
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
-    { "key": "port", "value": 8080, "type": "number" },
+    { "key": "port", "value": 8080, "type": "number", "description": { "content": "Port number" } },
     { "key": "secure", "value": true, "type": "boolean" },
-    { "key": "baseUrl", "value": "https://api.example.com" }
+    {
+      "key": "baseUrl",
+      "value": "https://api.example.com",
+      "description": "The tenant's public base URL"
+    }
   ],
   "event": [
     {

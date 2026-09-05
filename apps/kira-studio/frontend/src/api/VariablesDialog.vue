@@ -33,10 +33,11 @@ interface Draft {
   name: string;
   value: string;
   isSecret: boolean;
+  description: string;
 }
 
 const drafts = reactive<Record<string, Draft>>({});
-const trailingDraft = reactive<Draft>({ name: '', value: '', isSecret: false });
+const trailingDraft = reactive<Draft>({ name: '', value: '', isSecret: false, description: '' });
 
 // D14: the drag-reorderable display order, seeded from the server's own sort_order every time the
 // list reloads (ColumnsMenu.vue's own precedent, adapted from a purely-local array to one that
@@ -46,11 +47,17 @@ const order = ref<string[]>([]);
 function syncDrafts(): void {
   for (const key of Object.keys(drafts)) delete drafts[key];
   for (const row of variablesDialogState.rows) {
-    drafts[row.id] = { name: row.name, value: row.value, isSecret: row.isSecret };
+    drafts[row.id] = {
+      name: row.name,
+      value: row.value,
+      isSecret: row.isSecret,
+      description: row.description,
+    };
   }
   trailingDraft.name = '';
   trailingDraft.value = '';
   trailingDraft.isSecret = false;
+  trailingDraft.description = '';
   order.value = variablesDialogState.rows.map((row) => row.id);
 }
 watch(() => variablesDialogState.rows, syncDrafts, { immediate: true });
@@ -80,8 +87,21 @@ const allRealRows = computed<ApiVariable[]>(() => {
   return order.value.flatMap((id) => {
     const row = byId.get(id);
     if (!row) return [];
-    const draft = drafts[id] ?? { name: row.name, value: row.value, isSecret: row.isSecret };
-    return [{ ...row, name: draft.name, value: draft.value, isSecret: draft.isSecret }];
+    const draft = drafts[id] ?? {
+      name: row.name,
+      value: row.value,
+      isSecret: row.isSecret,
+      description: row.description,
+    };
+    return [
+      {
+        ...row,
+        name: draft.name,
+        value: draft.value,
+        isSecret: draft.isSecret,
+        description: draft.description,
+      },
+    ];
   });
 });
 
@@ -92,6 +112,7 @@ const trailingRow = computed<ApiVariable>(() => ({
   name: trailingDraft.name,
   value: trailingDraft.value,
   isSecret: trailingDraft.isSecret,
+  description: trailingDraft.description,
   sortOrder: allRealRows.value.length,
 }));
 
@@ -116,7 +137,7 @@ function duplicateFor(row: ApiVariable): boolean {
 
 function draftFor(id: string): Draft {
   if (id === '') return trailingDraft;
-  if (!drafts[id]) drafts[id] = { name: '', value: '', isSecret: false };
+  if (!drafts[id]) drafts[id] = { name: '', value: '', isSecret: false, description: '' };
   return drafts[id];
 }
 
@@ -126,18 +147,22 @@ function onUpdateName(id: string, value: string): void {
 function onUpdateValue(id: string, value: string): void {
   draftFor(id).value = value;
 }
+function onUpdateDescription(id: string, value: string): void {
+  draftFor(id).description = value;
+}
 
 /** Commits whatever the draft currently holds — the trailing row only if it has a name yet. */
 async function commitDraft(id: string): Promise<void> {
   const draft = draftFor(id);
   if (id === '') {
     if (draft.name.trim() === '') return; // nothing typed yet — not a row to create
-    const { value, isSecret } = draft;
+    const { value, isSecret, description } = draft;
     const name = draft.name.trim();
     trailingDraft.name = '';
     trailingDraft.value = '';
     trailingDraft.isSecret = false;
-    await upsertVariable({ id: '', name, value, isSecret });
+    trailingDraft.description = '';
+    await upsertVariable({ id: '', name, value, isSecret, description });
     return;
   }
   const row = variablesDialogState.rows.find((r) => r.id === id);
@@ -151,6 +176,7 @@ async function commitDraft(id: string): Promise<void> {
     name: draft.name.trim(),
     value: draft.value,
     isSecret: draft.isSecret,
+    description: draft.description,
   });
 }
 
@@ -166,7 +192,12 @@ async function onBlur(id: string): Promise<void> {
     draft.name = row.name;
     return;
   }
-  if (draft.name === row.name && draft.value === row.value && draft.isSecret === row.isSecret)
+  if (
+    draft.name === row.name &&
+    draft.value === row.value &&
+    draft.isSecret === row.isSecret &&
+    draft.description === row.description
+  )
     return;
   await commitDraft(id);
 }
@@ -284,6 +315,7 @@ function close(): void {
       <div class="header-row">
         <span class="cell">Name</span>
         <span class="cell">Value</span>
+        <span class="cell">Description</span>
       </div>
       <VariableRow
         v-for="(row, i) in displayRows"
@@ -298,6 +330,7 @@ function close(): void {
         @update:name="onUpdateName(row.id, $event)"
         @update:value="onUpdateValue(row.id, $event)"
         @update:is-secret="onUpdateSecret(row.id, $event)"
+        @update:description="onUpdateDescription(row.id, $event)"
         @blur="onBlur(row.id)"
         @remove="onRemove(row.id)"
         @reveal="onReveal(row.id)"

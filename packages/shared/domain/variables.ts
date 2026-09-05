@@ -9,9 +9,10 @@
 export const VARIABLE_SCOPES = ['collection', 'environment'] as const;
 export type VariableScope = (typeof VARIABLE_SCOPES)[number];
 
-// D12: the row model, deliberately without `enabled`, `description` or `type` — see the plan's own
-// table for why each is left out. `value` is '' whenever `isSecret` — a secret's plaintext never
-// crosses the bridge except through the gated Reveal (D5).
+// D12: the row model, deliberately without `enabled` or `type` — see the plan's own table for why
+// each is left out. `value` is '' whenever `isSecret` — a secret's plaintext never crosses the
+// bridge except through the gated Reveal (D5). `description` is P17 D14 — a plain field, not a
+// secret, added alongside the four already here.
 export interface ApiVariable {
   id: string;
   scope: VariableScope;
@@ -20,15 +21,18 @@ export interface ApiVariable {
   value: string;
   isSecret: boolean;
   sortOrder: number;
+  description: string;
 }
 
 // D3: the active environment is app-global, a column on the row itself rather than a layout leaf
-// or a settings key.
+// or a settings key. `description` is P17 D14 — app-local free text, no Postman round-trip
+// question at all (unlike a variable's, F10).
 export interface ApiEnvironment {
   id: string;
   name: string;
   sortOrder: number;
   isActive: boolean;
+  description: string;
 }
 
 // D13: history is per-entry — an environment has no history of its own, only its entries do.

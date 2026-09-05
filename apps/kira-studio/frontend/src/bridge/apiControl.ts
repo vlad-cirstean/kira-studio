@@ -189,10 +189,13 @@ export const apiControl = {
   // close to the wire shape).
   variablesListEnvironments: (): Promise<ApiEnvironment[]> =>
     unwrap(VariablesService.ListEnvironments()).then((r) => trust<ApiEnvironment[]>(r ?? [])),
-  variablesCreateEnvironment: (name: string): Promise<ApiEnvironment> =>
-    unwrap(VariablesService.CreateEnvironment({ name })).then((r) => trust<ApiEnvironment>(r)),
-  variablesRenameEnvironment: (id: string, name: string): Promise<void> =>
-    unwrap(VariablesService.RenameEnvironment({ id, name })),
+  variablesCreateEnvironment: (name: string, description = ''): Promise<ApiEnvironment> =>
+    unwrap(VariablesService.CreateEnvironment({ name, description })).then((r) =>
+      trust<ApiEnvironment>(r),
+    ),
+  // P17 D14: replaces variablesRenameEnvironment — renaming and describing are one row update.
+  variablesUpdateEnvironment: (id: string, name: string, description: string): Promise<void> =>
+    unwrap(VariablesService.UpdateEnvironment({ id, name, description })),
   variablesDeleteEnvironment: (id: string): Promise<void> =>
     unwrap(VariablesService.DeleteEnvironment({ id })),
   // id: '' selects "No environment" (D3).
@@ -213,10 +216,15 @@ export const apiControl = {
     name: string;
     value: string;
     isSecret: boolean;
+    description?: string;
   }): Promise<ApiVariable> =>
-    unwrap(VariablesService.Upsert({ ...args, scope: scopeArg(args.scope) })).then((r) =>
-      trust<ApiVariable>(r),
-    ),
+    unwrap(
+      VariablesService.Upsert({
+        ...args,
+        scope: scopeArg(args.scope),
+        description: args.description ?? '',
+      }),
+    ).then((r) => trust<ApiVariable>(r)),
   variablesDelete: (id: string): Promise<void> => unwrap(VariablesService.Delete({ id })),
   variablesReorder: (scope: VariableScope, ownerId: string, ids: string[]): Promise<void> =>
     unwrap(VariablesService.Reorder({ scope: scopeArg(scope), ownerId, ids })),

@@ -24,6 +24,7 @@ function variable(overrides: Partial<ApiVariable>): ApiVariable {
     value: 'value',
     isSecret: false,
     sortOrder: 0,
+    description: '',
     ...overrides,
   };
 }

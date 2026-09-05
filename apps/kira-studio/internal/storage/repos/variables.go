@@ -42,7 +42,7 @@ func NewVariables(db *sql.DB, cipher Cipher) *VariablesRepo {
 // ---- environments (D3) ----
 
 func (r *VariablesRepo) ListEnvironments() ([]model.Environment, error) {
-	rows, err := r.db.Query(`SELECT id, name, sort_order, is_active FROM api_environments ORDER BY sort_order, name`)
+	rows, err := r.db.Query(`SELECT id, name, sort_order, is_active, description FROM api_environments ORDER BY sort_order, name`)
 	if err != nil {
 		return nil, fmt.Errorf("repos/variables: list environments: %w", err)
 	}
@@ -54,7 +54,7 @@ func (r *VariablesRepo) ListEnvironments() ([]model.Environment, error) {
 			e        model.Environment
 			isActive int
 		)
-		if err := rows.Scan(&e.ID, &e.Name, &e.SortOrder, &isActive); err != nil {
+		if err := rows.Scan(&e.ID, &e.Name, &e.SortOrder, &isActive, &e.Description); err != nil {
 			return nil, fmt.Errorf("repos/variables: scan environment: %w", err)
 		}
 		e.IsActive = isActive != 0
@@ -66,7 +66,7 @@ func (r *VariablesRepo) ListEnvironments() ([]model.Environment, error) {
 	return out, nil
 }
 
-func (r *VariablesRepo) CreateEnvironment(name string) (model.Environment, error) {
+func (r *VariablesRepo) CreateEnvironment(name, description string) (model.Environment, error) {
 	if name == "" {
 		return model.Environment{}, fmt.Errorf("repos/variables: name is required")
 	}
@@ -75,24 +75,29 @@ func (r *VariablesRepo) CreateEnvironment(name string) (model.Environment, error
 		return model.Environment{}, fmt.Errorf("repos/variables: next environment order: %w", err)
 	}
 	now := model.NowISO()
-	e := model.Environment{ID: uuid.NewString(), Name: name, SortOrder: order}
+	e := model.Environment{ID: uuid.NewString(), Name: name, SortOrder: order, Description: description}
 	if _, err := r.db.Exec(
-		`INSERT INTO api_environments (id, name, sort_order, is_active, created_at, updated_at)
-		 VALUES (?, ?, ?, 0, ?, ?)`,
-		e.ID, e.Name, e.SortOrder, now, now,
+		`INSERT INTO api_environments (id, name, sort_order, is_active, description, created_at, updated_at)
+		 VALUES (?, ?, ?, 0, ?, ?, ?)`,
+		e.ID, e.Name, e.SortOrder, e.Description, now, now,
 	); err != nil {
 		return model.Environment{}, fmt.Errorf("repos/variables: insert environment: %w", err)
 	}
 	return e, nil
 }
 
-func (r *VariablesRepo) RenameEnvironment(id, name string) error {
+// UpdateEnvironment replaces RenameEnvironment (P17 D14): renaming and describing are one row
+// update, and one IPC call for one blur is worse than one call carrying both fields.
+func (r *VariablesRepo) UpdateEnvironment(id, name, description string) error {
 	if id == "" || name == "" {
 		return fmt.Errorf("repos/variables: id and name are required")
 	}
-	res, err := r.db.Exec(`UPDATE api_environments SET name = ?, updated_at = ? WHERE id = ?`, name, model.NowISO(), id)
+	res, err := r.db.Exec(
+		`UPDATE api_environments SET name = ?, description = ?, updated_at = ? WHERE id = ?`,
+		name, description, model.NowISO(), id,
+	)
 	if err != nil {
-		return fmt.Errorf("repos/variables: rename environment %s: %w", id, err)
+		return fmt.Errorf("repos/variables: update environment %s: %w", id, err)
 	}
 	return requireOneRow(res, "environment", id)
 }
@@ -232,7 +237,7 @@ func (r *VariablesRepo) List(scope model.VariableScope, ownerID string) ([]model
 	}
 
 	rows, err := r.db.Query(
-		`SELECT id, name, value, is_secret, sort_order FROM api_variables
+		`SELECT id, name, value, is_secret, sort_order, description FROM api_variables
 		  WHERE `+column+` = ? ORDER BY sort_order, name`,
 		ownerID,
 	)
@@ -245,7 +250,7 @@ func (r *VariablesRepo) List(scope model.VariableScope, ownerID string) ([]model
 	for rows.Next() {
 		v := model.Variable{Scope: scope, OwnerID: ownerID}
 		var isSecret int
-		if err := rows.Scan(&v.ID, &v.Name, &v.Value, &isSecret, &v.SortOrder); err != nil {
+		if err := rows.Scan(&v.ID, &v.Name, &v.Value, &isSecret, &v.SortOrder, &v.Description); err != nil {
 			return nil, fmt.Errorf("repos/variables: scan variable: %w", err)
 		}
 		v.IsSecret = isSecret != 0
@@ -262,7 +267,7 @@ func (r *VariablesRepo) List(scope model.VariableScope, ownerID string) ([]model
 // user just typed it into a revealed, editable field, the same as ConnectionDialog's password
 // field. D13: an update that actually changes the stored value records the value it replaced,
 // inside the same transaction, before trimming to variableHistoryLimit.
-func (r *VariablesRepo) Upsert(scope model.VariableScope, ownerID, id, name, value string, isSecret bool) (model.Variable, error) {
+func (r *VariablesRepo) Upsert(scope model.VariableScope, ownerID, id, name, value string, isSecret bool, description string) (model.Variable, error) {
 	if _, err := scopeColumn(scope); err != nil {
 		return model.Variable{}, err
 	}
@@ -290,7 +295,7 @@ func (r *VariablesRepo) Upsert(scope model.VariableScope, ownerID, id, name, val
 		if err := tx.QueryRow(`SELECT COALESCE(MAX(sort_order) + 1, 0) FROM api_variables WHERE `+mustScopeColumn(scope)+` = ?`, ownerID).Scan(&order); err != nil {
 			return model.Variable{}, fmt.Errorf("repos/variables: next variable order: %w", err)
 		}
-		v := model.Variable{ID: uuid.NewString(), Scope: scope, OwnerID: ownerID, Name: name, Value: value, IsSecret: isSecret, SortOrder: order}
+		v := model.Variable{ID: uuid.NewString(), Scope: scope, OwnerID: ownerID, Name: name, Value: value, IsSecret: isSecret, SortOrder: order, Description: description}
 		var collectionID, environmentID *string
 		if scope == model.VariableScopeCollection {
 			collectionID = &ownerID
@@ -298,9 +303,9 @@ func (r *VariablesRepo) Upsert(scope model.VariableScope, ownerID, id, name, val
 			environmentID = &ownerID
 		}
 		if _, err := tx.Exec(
-			`INSERT INTO api_variables (id, collection_id, environment_id, name, value, is_secret, secret_value, sort_order, created_at, updated_at)
-			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-			v.ID, collectionID, environmentID, v.Name, storedValue, boolToInt(v.IsSecret), storedSecret, v.SortOrder, now, now,
+			`INSERT INTO api_variables (id, collection_id, environment_id, name, value, is_secret, secret_value, sort_order, description, created_at, updated_at)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			v.ID, collectionID, environmentID, v.Name, storedValue, boolToInt(v.IsSecret), storedSecret, v.SortOrder, v.Description, now, now,
 		); err != nil {
 			return model.Variable{}, fmt.Errorf("repos/variables: insert variable: %w", err)
 		}
@@ -339,8 +344,8 @@ func (r *VariablesRepo) Upsert(scope model.VariableScope, ownerID, id, name, val
 	}
 
 	if _, err := tx.Exec(
-		`UPDATE api_variables SET name = ?, value = ?, is_secret = ?, secret_value = ?, updated_at = ? WHERE id = ?`,
-		name, storedValue, boolToInt(isSecret), storedSecret, now, id,
+		`UPDATE api_variables SET name = ?, value = ?, is_secret = ?, secret_value = ?, description = ?, updated_at = ? WHERE id = ?`,
+		name, storedValue, boolToInt(isSecret), storedSecret, description, now, id,
 	); err != nil {
 		return model.Variable{}, fmt.Errorf("repos/variables: update variable %s: %w", id, err)
 	}
@@ -356,7 +361,7 @@ func (r *VariablesRepo) Upsert(scope model.VariableScope, ownerID, id, name, val
 		return model.Variable{}, fmt.Errorf("repos/variables: commit: %w", err)
 	}
 
-	out := model.Variable{ID: id, Scope: resolvedScope, OwnerID: resolvedOwner, Name: name, Value: value, IsSecret: isSecret, SortOrder: oldSortOrder}
+	out := model.Variable{ID: id, Scope: resolvedScope, OwnerID: resolvedOwner, Name: name, Value: value, IsSecret: isSecret, SortOrder: oldSortOrder, Description: description}
 	if out.IsSecret {
 		out.Value = ""
 	}
@@ -832,9 +837,9 @@ func (r *VariablesRepo) ImportVariables(collectionID string, vars []postman.Vari
 			return err
 		}
 		if _, err := tx.Exec(
-			`INSERT INTO api_variables (id, collection_id, environment_id, name, value, is_secret, secret_value, sort_order, created_at, updated_at)
-			 VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, ?)`,
-			uuid.NewString(), collectionID, v.Name, storedValue, boolToInt(v.Secret), storedSecret, order, now, now,
+			`INSERT INTO api_variables (id, collection_id, environment_id, name, value, is_secret, secret_value, sort_order, description, created_at, updated_at)
+			 VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			uuid.NewString(), collectionID, v.Name, storedValue, boolToInt(v.Secret), storedSecret, order, v.Description, now, now,
 		); err != nil {
 			return fmt.Errorf("repos/variables: insert imported variable: %w", err)
 		}

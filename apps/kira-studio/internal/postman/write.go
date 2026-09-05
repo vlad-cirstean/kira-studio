@@ -156,6 +156,12 @@ func buildVariables(vars []Variable) json.RawMessage {
 				row["type"] = v.Type
 			}
 		}
+		// P17 D14: re-emitted as a plain string when non-empty, regardless of the shape it
+		// arrived in — round-tripping an opaque object through a column the user can edit is not
+		// honest (a description that arrived as an object's "content" member becomes that string).
+		if v.Description != "" {
+			row["description"] = v.Description
+		}
 		rows = append(rows, row)
 	}
 	return mustRaw(rows)

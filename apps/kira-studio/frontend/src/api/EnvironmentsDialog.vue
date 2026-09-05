@@ -15,20 +15,26 @@ import {
   deleteEnvironment,
   environmentsDialogState,
   openVariablesDialog,
-  renameEnvironment,
   reorderEnvironmentsList,
   setActiveEnvironment,
+  updateEnvironment,
   variablesState,
 } from './state/variables';
 
-// P5 D3/D11/D14: the environment list — name (inline-editable), *Edit variables…*, delete, an
-// *Active* radio, drag/keyboard reordering, and *New environment*.
+// P5 D3/D11/D14, P17 D14: the environment list — name and description (both inline-editable, one
+// commit on blur), *Edit variables…*, delete, an *Active* radio, drag/keyboard reordering, and
+// *New environment*.
 const nameDrafts = reactive<Record<string, string>>({});
+const descriptionDrafts = reactive<Record<string, string>>({});
 const order = ref<string[]>([]);
 
 function syncDrafts(): void {
   for (const key of Object.keys(nameDrafts)) delete nameDrafts[key];
-  for (const env of variablesState.environments) nameDrafts[env.id] = env.name;
+  for (const key of Object.keys(descriptionDrafts)) delete descriptionDrafts[key];
+  for (const env of variablesState.environments) {
+    nameDrafts[env.id] = env.name;
+    descriptionDrafts[env.id] = env.description;
+  }
   order.value = variablesState.environments.map((env) => env.id);
 }
 watch(() => variablesState.environments, syncDrafts, { immediate: true });
@@ -54,16 +60,19 @@ const displayEnvironments = computed<ApiEnvironment[]>(() => {
     : orderedEnvironments.value;
 });
 
-async function onNameBlur(id: string): Promise<void> {
+// P17 D14: renaming and describing are one row update — both fields' drafts commit together
+// whichever one blurred, rather than two separate IPC calls for two cells of one row.
+async function onFieldBlur(id: string): Promise<void> {
   const name = (nameDrafts[id] ?? '').trim();
+  const description = descriptionDrafts[id] ?? '';
   const current = variablesState.environments.find((e) => e.id === id);
   if (!current) return;
   if (name === '') {
     nameDrafts[id] = current.name;
     return;
   }
-  if (name === current.name) return;
-  await renameEnvironment(id, name);
+  if (name === current.name && description === current.description) return;
+  await updateEnvironment(id, name, description);
 }
 
 async function onNewEnvironment(): Promise<void> {
@@ -184,7 +193,14 @@ function close(): void {
           v-model="nameDrafts[env.id]"
           class="name-field"
           data-testid="environment-name"
-          @blur="onNameBlur(env.id)"
+          @blur="onFieldBlur(env.id)"
+        />
+        <TextField
+          v-model="descriptionDrafts[env.id]"
+          class="description-field"
+          placeholder="description"
+          data-testid="environment-description"
+          @blur="onFieldBlur(env.id)"
         />
         <AppButton
           data-testid="environment-edit-variables"
@@ -243,6 +259,11 @@ function close(): void {
 }
 
 .name-field {
+  flex: 1;
+  min-width: 0;
+}
+
+.description-field {
   flex: 1;
   min-width: 0;
 }

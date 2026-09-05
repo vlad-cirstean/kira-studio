@@ -25,30 +25,34 @@ func (s *VariablesService) ListEnvironments() ([]model.Environment, error) {
 }
 
 type VariablesCreateEnvironmentArgs struct {
-	Name string `json:"name"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
 }
 
 func (s *VariablesService) CreateEnvironment(args VariablesCreateEnvironmentArgs) (model.Environment, error) {
 	if args.Name == "" {
 		return model.Environment{}, ipcerr.BadRequest("name is required")
 	}
-	env, err := s.Deps.Repos.Variables.CreateEnvironment(args.Name)
+	env, err := s.Deps.Repos.Variables.CreateEnvironment(args.Name, args.Description)
 	if err != nil {
 		return model.Environment{}, ipcerr.Internal(err.Error())
 	}
 	return env, nil
 }
 
-type VariablesRenameEnvironmentArgs struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
+// VariablesUpdateEnvironmentArgs replaces VariablesRenameEnvironmentArgs (P17 D14): renaming and
+// describing an environment are one row update — one IPC call for one blur is worse than one.
+type VariablesUpdateEnvironmentArgs struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
 }
 
-func (s *VariablesService) RenameEnvironment(args VariablesRenameEnvironmentArgs) error {
+func (s *VariablesService) UpdateEnvironment(args VariablesUpdateEnvironmentArgs) error {
 	if args.ID == "" || args.Name == "" {
 		return ipcerr.BadRequest("id and name are required")
 	}
-	if err := s.Deps.Repos.Variables.RenameEnvironment(args.ID, args.Name); err != nil {
+	if err := s.Deps.Repos.Variables.UpdateEnvironment(args.ID, args.Name, args.Description); err != nil {
 		return ipcerr.Internal(err.Error())
 	}
 	return nil
@@ -121,12 +125,13 @@ func (s *VariablesService) List(args VariablesScopeArgs) ([]model.Variable, erro
 // VariablesUpsertArgs's ID is "" for a create (D19). Value is always the plaintext — the one
 // direction D5 never restricts: the user just typed it into a revealed, editable field.
 type VariablesUpsertArgs struct {
-	Scope    model.VariableScope `json:"scope"`
-	OwnerID  string              `json:"ownerId"`
-	ID       string              `json:"id"`
-	Name     string              `json:"name"`
-	Value    string              `json:"value"`
-	IsSecret bool                `json:"isSecret"`
+	Scope       model.VariableScope `json:"scope"`
+	OwnerID     string              `json:"ownerId"`
+	ID          string              `json:"id"`
+	Name        string              `json:"name"`
+	Value       string              `json:"value"`
+	IsSecret    bool                `json:"isSecret"`
+	Description string              `json:"description"`
 }
 
 func (s *VariablesService) Upsert(args VariablesUpsertArgs) (model.Variable, error) {
@@ -136,7 +141,7 @@ func (s *VariablesService) Upsert(args VariablesUpsertArgs) (model.Variable, err
 	if args.Name == "" {
 		return model.Variable{}, ipcerr.BadRequest("name is required")
 	}
-	v, err := s.Deps.Repos.Variables.Upsert(args.Scope, args.OwnerID, args.ID, args.Name, args.Value, args.IsSecret)
+	v, err := s.Deps.Repos.Variables.Upsert(args.Scope, args.OwnerID, args.ID, args.Name, args.Value, args.IsSecret, args.Description)
 	if err != nil {
 		return model.Variable{}, ipcerr.Internal(err.Error())
 	}

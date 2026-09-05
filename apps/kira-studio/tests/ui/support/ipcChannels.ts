@@ -85,7 +85,7 @@ export const IPC = {
 
   variablesListEnvironments: 'kira:variables:listEnvironments',
   variablesCreateEnvironment: 'kira:variables:createEnvironment',
-  variablesRenameEnvironment: 'kira:variables:renameEnvironment',
+  variablesUpdateEnvironment: 'kira:variables:updateEnvironment',
   variablesDeleteEnvironment: 'kira:variables:deleteEnvironment',
   variablesSetActiveEnvironment: 'kira:variables:setActiveEnvironment',
   variablesReorderEnvironments: 'kira:variables:reorderEnvironments',

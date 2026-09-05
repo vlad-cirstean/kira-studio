@@ -38,6 +38,7 @@ var names = []struct {
 	{8, "p8_response_history", "0008_p8_response_history.sql"},
 	{9, "p11_grpc", "0009_p11_grpc.sql"},
 	{10, "p12_api_rename", "0010_p12_api_rename.sql"},
+	{11, "p17_variable_description", "0011_p17_variable_description.sql"},
 }
 
 // All returns every migration in ascending version order.

@@ -132,7 +132,7 @@ func TestRecordGrpcHistory_NeverPersistsResolvedSecrets(t *testing.T) {
 		t.Fatalf("CreateCollection: %v", err)
 	}
 	const secretToken = "sk_live_super_secret_token"
-	if _, err := variablesRepo.Upsert(model.VariableScopeCollection, c.ID, "", "token", secretToken, true); err != nil {
+	if _, err := variablesRepo.Upsert(model.VariableScopeCollection, c.ID, "", "token", secretToken, true, ""); err != nil {
 		t.Fatalf("Upsert secret: %v", err)
 	}
 
@@ -203,10 +203,10 @@ func TestResolveGrpcCallSource_ResolvesTargetAndMetadataInProtoDescriptorMode(t 
 	}
 	const secretHost = "internal-secret-host.example.com"
 	const secretToken = "sk_live_super_secret_token"
-	if _, err := variablesRepo.Upsert(model.VariableScopeCollection, c.ID, "", "host", secretHost, true); err != nil {
+	if _, err := variablesRepo.Upsert(model.VariableScopeCollection, c.ID, "", "host", secretHost, true, ""); err != nil {
 		t.Fatalf("Upsert host secret: %v", err)
 	}
-	if _, err := variablesRepo.Upsert(model.VariableScopeCollection, c.ID, "", "token", secretToken, true); err != nil {
+	if _, err := variablesRepo.Upsert(model.VariableScopeCollection, c.ID, "", "token", secretToken, true, ""); err != nil {
 		t.Fatalf("Upsert token secret: %v", err)
 	}
 

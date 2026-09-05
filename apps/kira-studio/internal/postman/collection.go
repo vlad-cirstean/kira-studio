@@ -83,6 +83,10 @@ type Variable struct {
 	// Type preserves the original `type` string verbatim, so an unrecognised one survives export
 	// unchanged; "" for a variable created in this app that was never secret.
 	Type string
+	// Description is P17 D14/F10 — Postman carries one on a variable[] entry, decoded leniently
+	// (a plain string, or an object's own "content" member — decodeDescription) and re-emitted as
+	// a plain string on export, "" when absent.
+	Description string
 }
 
 // The eight warning kinds (D12), each corresponding to a decision the importer makes on the
@@ -175,6 +179,22 @@ func decodeScalarString(raw json.RawMessage) (string, bool) {
 		return n.String(), true
 	}
 	return "", false
+}
+
+// decodeDescription is P17 D14/F10's own leniency rule: Postman writes a `description` member
+// either as a plain string or as an object carrying the text under its own "content" member — this
+// reads either shape and returns "" for anything else, rather than refusing to decode a variable
+// whose description arrived in the richer object form.
+func decodeDescription(raw json.RawMessage) string {
+	if s, ok := decodeString(raw); ok {
+		return s
+	}
+	if obj := decodeObject(raw); obj != nil {
+		if s, ok := decodeString(obj["content"]); ok {
+			return s
+		}
+	}
+	return ""
 }
 
 func decodeBool(raw json.RawMessage) (bool, bool) {

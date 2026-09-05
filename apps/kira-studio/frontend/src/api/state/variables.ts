@@ -49,14 +49,19 @@ export async function setActiveEnvironment(id: string): Promise<void> {
   await loadEnvironments();
 }
 
-export async function createEnvironment(name: string): Promise<ApiEnvironment> {
-  const env = await control.variablesCreateEnvironment(name);
+export async function createEnvironment(name: string, description = ''): Promise<ApiEnvironment> {
+  const env = await control.variablesCreateEnvironment(name, description);
   await loadEnvironments();
   return env;
 }
 
-export async function renameEnvironment(id: string, name: string): Promise<void> {
-  await control.variablesRenameEnvironment(id, name);
+/** P17 D14: replaces renameEnvironment — renaming and describing are one row update. */
+export async function updateEnvironment(
+  id: string,
+  name: string,
+  description: string,
+): Promise<void> {
+  await control.variablesUpdateEnvironment(id, name, description);
   await loadEnvironments();
 }
 
@@ -157,6 +162,7 @@ export async function upsertVariable(args: {
   name: string;
   value: string;
   isSecret: boolean;
+  description?: string;
 }): Promise<void> {
   const { scope, ownerId } = variablesDialogState;
   if (!scope) return;
@@ -349,6 +355,12 @@ export async function restoreHistoryEntry(entry: ApiVariableHistoryEntry): Promi
     if (revealed === undefined) return; // cancelled, unavailable, or errored
     value = revealed;
   }
-  await upsertVariable({ id: row.id, name: row.name, value, isSecret: entry.isSecret });
+  await upsertVariable({
+    id: row.id,
+    name: row.name,
+    value,
+    isSecret: entry.isSecret,
+    description: row.description,
+  });
   await openHistoryMenu(entry.variableId);
 }

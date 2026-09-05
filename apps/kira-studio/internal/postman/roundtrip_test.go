@@ -232,10 +232,15 @@ func TestEveryOneOfParsesAndSurvives(t *testing.T) {
 		if !ok || len(gotVars) != 3 {
 			t.Fatalf("out[\"variable\"] = %#v, want 3 promoted rows", out["variable"])
 		}
+		// P17 D14/F10: "port"'s description arrived as an object (`{content: ...}, Postman's own
+		// richer shape, mirroring info.description above) and re-exports as a plain string —
+		// decodeDescription's own leniency, and buildVariables' own "never round-trip an opaque
+		// object through a column the user can edit" rule. "baseUrl"'s arrived as a plain string
+		// and survives unchanged. "secure" has no description at all and gets no member.
 		want := []map[string]any{
-			{"key": "port", "value": "8080", "type": "number"},
+			{"key": "port", "value": "8080", "type": "number", "description": "Port number"},
 			{"key": "secure", "value": "true", "type": "boolean"},
-			{"key": "baseUrl", "value": "https://api.example.com"},
+			{"key": "baseUrl", "value": "https://api.example.com", "description": "The tenant's public base URL"},
 		}
 		for i, row := range gotVars {
 			if !reflect.DeepEqual(row, want[i]) {
