@@ -136,7 +136,13 @@ export function duplicateAsInsert(tabId: string, row: number): string | null {
       continue;
     }
     const view = cell(tabId, row, col);
-    if (!view.isNull) stageInsertValue(tabId, id, descriptor.name, view.text);
+    // F2/P21 round 1: a truncated cell's `.text` is only the 64 KiB prefix the engine sent, the
+    // same reason P24 D27 makes such a cell non-editable ("committing the buffer verbatim would
+    // write the truncated text over the real value"). Duplicating it staged that prefix as a real
+    // insert value, silently corrupting the copy on Commit. Left unset (null, addInsertRow's own
+    // default) instead — the same "not carried over" treatment an unresolved value already gets —
+    // rather than ever staging a value known to be wrong.
+    if (!view.isNull && !view.truncated) stageInsertValue(tabId, id, descriptor.name, view.text);
   }
   return id;
 }
@@ -179,6 +185,15 @@ export function discardInsertRow(tabId: string, insertId: string): void {
   p.inserts = p.inserts.filter((i) => i.id !== insertId);
 }
 
+// F2/P21 round 1: buildPlan used to drop an update/delete outright whenever primaryKeyOf
+// returned null (no PK column left in the current projection — e.g. Hide column applied to the
+// PK, or a saved/restored tab whose projection happens to exclude it) — silently, with the row
+// still staged and no op ever sent. commitPending then saw ops.length === 0, returned null, and
+// the caller (which only distinguishes success from a thrown rejection) reported success: no
+// error, the pending badge cleared, nothing changed on the server. Thrown instead, so a staged
+// change that cannot be addressed fails loudly, the same way any other commit failure already does.
+class UnaddressableRowError extends Error {}
+
 // D8: delete, then update, then insert — mirrors the adapter's own execution order so the
 // *Preview command* panel shows exactly what mutate() will run.
 function buildPlan(tabId: string): MutationRowOp[] | null {
@@ -187,11 +202,21 @@ function buildPlan(tabId: string): MutationRowOp[] | null {
   const ops: MutationRowOp[] = [];
   for (const row of p.deletes) {
     const key = primaryKeyOf(tabId, row);
-    if (key) ops.push({ kind: 'delete', key });
+    if (!key) {
+      throw new UnaddressableRowError(
+        'A staged delete has no primary key in the current view (it may be hidden) — reload and try again.',
+      );
+    }
+    ops.push({ kind: 'delete', key });
   }
   for (const edit of p.edits.values()) {
     const key = primaryKeyOf(tabId, edit.row);
-    if (key) ops.push({ kind: 'update', key, changes: edit.changes });
+    if (!key) {
+      throw new UnaddressableRowError(
+        'A staged edit has no primary key in the current view (it may be hidden) — reload and try again.',
+      );
+    }
+    ops.push({ kind: 'update', key, changes: edit.changes });
   }
   for (const insert of p.inserts) {
     ops.push({ kind: 'insert', values: insert.values });
