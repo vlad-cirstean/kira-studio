@@ -129,6 +129,26 @@ export function contentTypeCaption(
   return `Content-Type: ${defaultContentTypeFor(mode, codeLanguage)} (auto)`;
 }
 
+/** P15 D8: what counts as "this request has a body", per mode — the tab-strip badge's predicate
+ *  (state/tabKinds.ts's `badge()`), sharing bodyBadgeLabel's own per-mode reading of state rather
+ *  than re-deriving it. */
+export function hasRequestBody(state: HttpRequestTabState): boolean {
+  switch (state.bodyMode) {
+    case 'none':
+      return false;
+    case 'raw':
+      return state.body.trim() !== '';
+    case 'code':
+      return state.code.trim() !== '';
+    case 'urlencoded':
+      return state.urlEncoded.some((f) => f.enabled && f.name.trim() !== '');
+    case 'formdata':
+      return state.formData.some((f) => f.enabled && f.name.trim() !== '');
+    case 'file':
+      return state.binaryFile !== null;
+  }
+}
+
 /** D9: the Body segment's own count badge — mirrors REQUEST_PANE_OPTIONS's existing
  *  "bake the count into the label" technique for Params/Headers (HttpRequestView.vue). */
 export function bodyBadgeLabel(state: HttpRequestTabState): string {

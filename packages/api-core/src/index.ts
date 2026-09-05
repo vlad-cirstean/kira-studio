@@ -14,6 +14,7 @@ export {
   defaultContentTypeFor,
   editorLanguageForCode,
   type HttpBodySelection,
+  hasRequestBody,
   userContentTypeHeader,
 } from './http/body';
 export { type CurlRequest, toCurl } from './http/curl/generate';

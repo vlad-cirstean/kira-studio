@@ -33,6 +33,12 @@ function titleFor(tab: TabRecord): string {
   return TAB_KINDS[tab.kind].title(tab);
 }
 
+// P15 D8: undefined for a kind with no badge() member at all (most kinds); null for a kind that
+// has one but has nothing to flag on this particular tab.
+function badgeFor(tab: TabRecord): { icon: string; tooltip: string } | null | undefined {
+  return TAB_KINDS[tab.kind].badge?.(tab);
+}
+
 function onClick(tab: TabRecord): void {
   activateTab(tab.id);
 }
@@ -177,6 +183,14 @@ function onDragEnd(): void {
       <span class="p-tab-rail" />
       <CodiconIcon :name="iconFor(tab)" :size="13" class="tab-icon" />
       <span class="tab-title">{{ titleFor(tab) }}</span>
+      <CodiconIcon
+        v-if="badgeFor(tab)"
+        :name="badgeFor(tab)!.icon"
+        :size="12"
+        class="tab-badge"
+        v-tooltip="badgeFor(tab)!.tooltip"
+        data-testid="tab-badge"
+      />
       <span
         class="tab-close"
         role="button"
@@ -232,6 +246,11 @@ function onDragEnd(): void {
   text-overflow: ellipsis;
   white-space: nowrap;
   min-width: 0;
+}
+
+.tab-badge {
+  flex-shrink: 0;
+  color: var(--kira-fg-muted);
 }
 
 .tab-close {

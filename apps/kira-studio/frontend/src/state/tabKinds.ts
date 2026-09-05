@@ -1,4 +1,4 @@
-import { httpRequestTitle } from '@kira/api-core';
+import { hasRequestBody, httpRequestTitle } from '@kira/api-core';
 import type { ConnectionColor } from '@shared/domain/connection';
 import {
   defaultGrpcRequestTabState,
@@ -82,6 +82,12 @@ export interface TabKindDef<K extends TabKind = TabKind> {
   dropResources(tabId: string): void;
   /** Appended to the tab strip's own six generic context-menu items (F11). */
   menuExtras(tab: TabRecord): MenuItem[];
+  /** P15 D8: a small state mark after the tab's title — undefined for a kind with nothing to
+   *  flag (every kind but 'http-request' today; P4 D15 declined this for `dirty`, a shared "seven
+   *  kinds answer false" cost for a cosmetic gain — this member is optional instead, so those
+   *  seven kinds grow no line, and answers a question about a tab you're *not* looking at, which
+   *  the view's own live dirty mark cannot). */
+  badge?(tab: TabRecord): { icon: string; tooltip: string } | null;
 }
 
 const KIND_ICON: Record<string, string> = {
@@ -244,6 +250,13 @@ export const TAB_KINDS: { [K in TabKind]: TabKindDef<K> } = {
     // D2: there is no project panel to reveal an HTTP request into.
     menuExtras: () => [],
     parseState: parseStateWith(httpRequestTabStateSchema),
+    // P15 D8: answers a question about a tab you're not looking at — gRPC is deliberately left
+    // out (a call always has a message body, so the mark would be on every tab always, which is
+    // not information; §8 OQ-3).
+    badge: (tab) =>
+      hasRequestBody((tab as HttpRequestTabRecord).state)
+        ? { icon: 'symbol-namespace', tooltip: 'This request has a body' }
+        : null,
   },
   'grpc-request': {
     mode: TAB_KIND_MODE['grpc-request'],
