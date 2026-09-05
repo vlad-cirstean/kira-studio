@@ -1,6 +1,7 @@
 package grpcclient
 
 import (
+	"container/list"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -123,21 +124,46 @@ type resolved struct {
 	warnings []string
 }
 
+// maxCachedDescriptors bounds descriptorCache by entry count (finding 12) — a plain LRU, evicting
+// the least-recently-used Source's descriptors once the cache holds more than this many. Each
+// entry can be a multi-megabyte descriptor registry (a large .proto, or a server with a big API
+// surface), so an unbounded map here was a real, unbounded leak, compounded by every dynamic
+// metadata value (e.g. {{$guid}}, an ordinary P6 feature) previously minting its own cache key —
+// see cacheKey's own comment below.
+const maxCachedDescriptors = 32
+
 // descriptorCache is D4's in-memory-only cache, keyed by the Source's own fields — which for
-// reflection includes the resolved target and metadata (§0.3/D10). The key is a SHA-256 digest,
-// never the fields themselves: this map is unexported, has no accessor that returns a key, is
-// never serialised and never logged, which is what keeps a secret out of it even though the
-// fields it is derived from can contain one.
+// reflection includes the resolved target (§0.3/D10). The key is a SHA-256 digest, never the
+// fields themselves: this map is unexported, has no accessor that returns a key, is never
+// serialised and never logged, which is what keeps a secret out of it even though the fields it
+// is derived from can contain one. map[string]*list.Element + container/list is this codebase's
+// own established count-bounded-cache shape (internal/enginecache.ByteLru, budgeted by bytes
+// rather than count) — not reused directly: that type's EntryMeta is shaped for the DB-adapter
+// query cache (ConnectionID/Path/Label) and grpcclient imports nothing else in this module, a
+// property worth keeping for a package this self-contained.
 var descriptorCache = struct {
 	mu    sync.Mutex
-	byKey map[string]*resolved
-}{byKey: map[string]*resolved{}}
+	byKey map[string]*list.Element // Value is *descriptorCacheEntry
+	order *list.List               // front = least recently used, back = most recently used
+}{byKey: map[string]*list.Element{}, order: list.New()}
 
+type descriptorCacheEntry struct {
+	key string
+	r   *resolved
+}
+
+// cacheKey excludes metadata *values* on purpose (finding 12): reflection's own resolved metadata
+// used to be hashed in full, so a dynamic value substituted fresh per call (e.g. {{$guid}} in an
+// auth header) minted a brand-new key on every single call, guaranteeing a cache miss — defeating
+// the documented "a Call following a Describe on the same Source costs no second reflection round
+// trip" property for any Source using one. Metadata *names* stay in the key (a plausible, cheap
+// signal that two calls address genuinely different schemas, e.g. a tenant-routing header), only
+// the value each name resolved to is dropped.
 func cacheKey(src Source) string {
 	h := sha256.New()
 	fmt.Fprintf(h, "%s\x00%s\x00%t\x00%s\x00%s\x00", src.Mode, src.Target, src.TLS.Enabled, src.TLS.CAFile, src.TLS.ServerName)
 	for _, m := range src.Metadata {
-		fmt.Fprintf(h, "%s\x00%s\x00", m.Name, m.Value)
+		fmt.Fprintf(h, "%s\x00", m.Name)
 	}
 	fmt.Fprintf(h, "%s\x00", src.ProtoPath)
 	for _, p := range src.ImportPaths {
@@ -146,16 +172,44 @@ func cacheKey(src Source) string {
 	return hex.EncodeToString(h.Sum(nil))
 }
 
+// descriptorCacheGet/Put/evictLocked assume descriptorCache.mu is already held by the caller —
+// kept as separate functions only so resolveSource's own hit/miss shape stays readable.
+func descriptorCacheGet(key string) (*resolved, bool) {
+	descriptorCache.mu.Lock()
+	defer descriptorCache.mu.Unlock()
+	el, ok := descriptorCache.byKey[key]
+	if !ok {
+		return nil, false
+	}
+	descriptorCache.order.MoveToBack(el)
+	return el.Value.(*descriptorCacheEntry).r, true
+}
+
+func descriptorCachePut(key string, r *resolved) {
+	descriptorCache.mu.Lock()
+	defer descriptorCache.mu.Unlock()
+	if el, ok := descriptorCache.byKey[key]; ok {
+		el.Value.(*descriptorCacheEntry).r = r
+		descriptorCache.order.MoveToBack(el)
+		return
+	}
+	el := descriptorCache.order.PushBack(&descriptorCacheEntry{key: key, r: r})
+	descriptorCache.byKey[key] = el
+	for descriptorCache.order.Len() > maxCachedDescriptors {
+		oldest := descriptorCache.order.Front()
+		descriptorCache.order.Remove(oldest)
+		delete(descriptorCache.byKey, oldest.Value.(*descriptorCacheEntry).key)
+	}
+}
+
 func resolveSource(ctx context.Context, src Source) (*resolved, error) {
 	key := cacheKey(src)
 
-	descriptorCache.mu.Lock()
-	r, ok := descriptorCache.byKey[key]
-	descriptorCache.mu.Unlock()
-	if ok {
+	if r, ok := descriptorCacheGet(key); ok {
 		return r, nil
 	}
 
+	var r *resolved
 	var err error
 	switch src.Mode {
 	case SourceReflection:
@@ -169,9 +223,7 @@ func resolveSource(ctx context.Context, src Source) (*resolved, error) {
 		return nil, err
 	}
 
-	descriptorCache.mu.Lock()
-	descriptorCache.byKey[key] = r
-	descriptorCache.mu.Unlock()
+	descriptorCachePut(key, r)
 	return r, nil
 }
 
@@ -179,9 +231,13 @@ func resolveSource(ctx context.Context, src Source) (*resolved, error) {
 // Descriptors are never invalidated by a timer: a cached-but-stale schema silently disagreeing
 // with a live server is a worse failure than one refetch.
 func InvalidateCache(src Source) {
+	key := cacheKey(src)
 	descriptorCache.mu.Lock()
-	delete(descriptorCache.byKey, cacheKey(src))
-	descriptorCache.mu.Unlock()
+	defer descriptorCache.mu.Unlock()
+	if el, ok := descriptorCache.byKey[key]; ok {
+		descriptorCache.order.Remove(el)
+		delete(descriptorCache.byKey, key)
+	}
 }
 
 // Describe resolves src's services and methods (D3) — from server reflection or a compiled
