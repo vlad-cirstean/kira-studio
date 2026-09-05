@@ -133,6 +133,9 @@ function phaseTooltip(hop: HttpTimelineHop, key: PhaseSegment['key']): string {
       ? 'No TLS handshake — the connection was reused.'
       : 'No TLS handshake — the request used plain HTTP.';
   }
+  if (key === 'download') {
+    return 'No download — no response bytes ever arrived.';
+  }
   // wait
   return 'The server began responding before the request was fully sent, so there is no wait interval to report.';
 }
