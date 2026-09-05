@@ -31,11 +31,14 @@ export { canEditAsRaw, generateRawRequest } from './http/raw/generate';
 export { type ParsedRawRequest, parseRawRequest, type RawWarning } from './http/raw/parse';
 export { fromSavedRequest, isDirty, toBuilderMethod, toSavedRequest } from './http/saved';
 export {
+  classifyReference,
   type Reference,
   type ReferenceKind,
   resolve,
   type SubstitutionResult,
   sanitizeUrlSpan,
+  splitTemplateSpans,
+  type TemplateSpan,
 } from './http/substitute';
 export {
   applySecretValues,

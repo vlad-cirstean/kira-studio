@@ -54,6 +54,25 @@ export interface SubstitutionResult {
  * `{{name with spaces}}` from injecting a raw space/`&`/`#`/`=` into `url.Parse`'s RawQuery or the
  * request line itself, without corrupting a name a later pass still needs to match.
  */
+/** P15b D1: the classification `resolve` gives a name, extracted from its own branch order
+ *  (`$`-prefixed → dynamic, then secret → deferred, then a known value → resolved, else unknown)
+ *  so the highlighter (`variableHighlight.ts`), the hover (`variableCompletion.ts`) and this
+ *  function itself agree, by construction, about what "unknown" means — `resolve` below *calls*
+ *  this rather than duplicating the order, which is the whole point (D1's own doc comment). A
+ *  `$`-prefixed name is classified 'dynamic' regardless of `isDynamicName` — whether it is
+ *  *catalogued* is a presentation detail for the caller (HttpRequestView.vue already does this,
+ *  F5), not a fifth kind this function would need to grow. */
+export function classifyReference(
+  name: string,
+  values: Readonly<Record<string, string>>,
+  secretNames: readonly string[],
+): ReferenceKind {
+  if (name.startsWith('$')) return 'dynamic';
+  if (secretNames.includes(name)) return 'deferred';
+  if (Object.hasOwn(values, name)) return 'resolved';
+  return 'unknown';
+}
+
 export function resolve(
   text: string,
   values: Readonly<Record<string, string>>,
@@ -61,7 +80,6 @@ export function resolve(
   dynamic?: (name: string) => string | null,
   sanitizeUnresolved?: (span: string) => string,
 ): SubstitutionResult {
-  const secrets = new Set(secretNames);
   const refs: Reference[] = [];
   let out = '';
   let i = 0;
@@ -86,7 +104,8 @@ export function resolve(
       out += span;
       continue;
     }
-    if (name.startsWith('$')) {
+    const kind = classifyReference(name, values, secretNames);
+    if (kind === 'dynamic') {
       // D2: a generated value is, from every consumer's point of view, finished — the text is
       // final and nothing downstream has work to do — which is exactly what 'resolved' already
       // means. No fifth ReferenceKind (Go's union would need one it could never produce).
@@ -100,14 +119,14 @@ export function resolve(
       out += sanitizeUnresolved ? sanitizeUnresolved(span) : span;
       continue;
     }
-    if (secrets.has(name)) {
+    if (kind === 'deferred') {
       // Never sanitized: a downstream pass (Go's apivars.Resolve) still has to find this span by
       // its exact, untouched name.
       refs.push({ name, kind: 'deferred' });
       out += span;
       continue;
     }
-    if (Object.hasOwn(values, name)) {
+    if (kind === 'resolved') {
       refs.push({ name, kind: 'resolved' });
       out += values[name];
       continue;
@@ -143,10 +162,17 @@ export function sanitizeUrlSpan(span: string): string {
 }
 
 /** One span of splitTemplateSpans' own walk — `text` is the literal run for a non-reference span,
- *  or the whole `{{name}}` (delimiters included) for a reference span. */
+ *  or the whole `{{name}}` (delimiters included) for a reference span. P15b D1: `from`/`to` are
+ *  the span's offsets into the original `text` (so `input.slice(from, to) === text` always holds
+ *  — the invariant every consumer of the offsets depends on), and `name` is the trimmed reference
+ *  name, `''` for a literal span. Additive: every existing caller (`url.ts`'s `buildQuery`,
+ *  `escape.ts`'s `goQueryEscape`) reads only `text`/`isReference` and is unaffected. */
 export interface TemplateSpan {
   text: string;
   isReference: boolean;
+  from: number;
+  to: number;
+  name: string;
 }
 
 /**
@@ -168,17 +194,25 @@ export function splitTemplateSpans(text: string): TemplateSpan[] {
   while (i < text.length) {
     const open = text.indexOf('{{', i);
     if (open === -1) {
-      spans.push({ text: text.slice(i), isReference: false });
+      spans.push({ text: text.slice(i), isReference: false, from: i, to: text.length, name: '' });
       break;
     }
     const close = text.indexOf('}}', open + 2);
     if (close === -1) {
-      spans.push({ text: text.slice(i), isReference: false });
+      spans.push({ text: text.slice(i), isReference: false, from: i, to: text.length, name: '' });
       break;
     }
-    if (open > i) spans.push({ text: text.slice(i, open), isReference: false });
+    if (open > i) {
+      spans.push({ text: text.slice(i, open), isReference: false, from: i, to: open, name: '' });
+    }
     const name = text.slice(open + 2, close).trim();
-    spans.push({ text: text.slice(open, close + 2), isReference: name !== '' });
+    spans.push({
+      text: text.slice(open, close + 2),
+      isReference: name !== '',
+      from: open,
+      to: close + 2,
+      name,
+    });
     i = close + 2;
   }
   return spans;

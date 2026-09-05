@@ -13,26 +13,30 @@ import { buildQuery, parseQuery } from '../src/http/url';
 describe('http/substitute.ts splitTemplateSpans', () => {
   test('splits literal text around a {{name}} reference', () => {
     expect(splitTemplateSpans('a{{b}}c')).toEqual([
-      { text: 'a', isReference: false },
-      { text: '{{b}}', isReference: true },
-      { text: 'c', isReference: false },
+      { text: 'a', isReference: false, from: 0, to: 1, name: '' },
+      { text: '{{b}}', isReference: true, from: 1, to: 6, name: 'b' },
+      { text: 'c', isReference: false, from: 6, to: 7, name: '' },
     ]);
   });
 
   test("an empty {{}} is not a reference — matches resolve()'s own rule", () => {
     expect(splitTemplateSpans('a{{}}b')).toEqual([
-      { text: 'a', isReference: false },
-      { text: '{{}}', isReference: false },
-      { text: 'b', isReference: false },
+      { text: 'a', isReference: false, from: 0, to: 1, name: '' },
+      { text: '{{}}', isReference: false, from: 1, to: 5, name: '' },
+      { text: 'b', isReference: false, from: 5, to: 6, name: '' },
     ]);
   });
 
   test('an unterminated {{ is left as trailing literal', () => {
-    expect(splitTemplateSpans('a{{b')).toEqual([{ text: 'a{{b', isReference: false }]);
+    expect(splitTemplateSpans('a{{b')).toEqual([
+      { text: 'a{{b', isReference: false, from: 0, to: 4, name: '' },
+    ]);
   });
 
   test('a plain string with no braces is one literal span', () => {
-    expect(splitTemplateSpans('plain')).toEqual([{ text: 'plain', isReference: false }]);
+    expect(splitTemplateSpans('plain')).toEqual([
+      { text: 'plain', isReference: false, from: 0, to: 5, name: '' },
+    ]);
   });
 });
 

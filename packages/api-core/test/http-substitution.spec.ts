@@ -6,7 +6,13 @@
 import { describe, expect, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { resolve as resolvePath } from 'node:path';
-import { type Reference, resolve, sanitizeUrlSpan } from '../src/http/substitute';
+import {
+  classifyReference,
+  type Reference,
+  resolve,
+  sanitizeUrlSpan,
+  splitTemplateSpans,
+} from '../src/http/substitute';
 
 interface Case {
   name: string;
@@ -123,5 +129,76 @@ describe('http/substitute.ts resolve() sanitizeUrlSpan (P14 round-2 finding 6)',
     const result = resolve('{{$weird generator}}', {}, [], () => null, sanitizeUrlSpan);
     expect(result.text).toBe('{{$weird%20generator}}');
     expect(result.refs).toEqual([{ name: '$weird generator', kind: 'dynamic' }]);
+  });
+});
+
+// P15b D1: classifyReference is resolve()'s own branch order, extracted so the highlighter and the
+// hover agree with the send path about what each reference name means — this pins the precedence
+// order itself ($dynamic before secret before value before unknown), independent of resolve()'s
+// own corpus-driven cases above.
+describe('http/substitute.ts classifyReference precedence (P15b D1)', () => {
+  test('a $-prefixed name is dynamic even when it also happens to be a known value or secret', () => {
+    expect(classifyReference('$guid', { $guid: 'x' }, ['$guid'])).toBe('dynamic');
+    expect(classifyReference('$guid', {}, [])).toBe('dynamic');
+  });
+
+  test('a secret name is deferred even when the same name is also present in values', () => {
+    expect(classifyReference('token', { token: 'leaked?' }, ['token'])).toBe('deferred');
+  });
+
+  test('a name present in values (and not a secret) is resolved', () => {
+    expect(classifyReference('host', { host: 'api.example.com' }, [])).toBe('resolved');
+  });
+
+  test('a name in neither values nor secretNames is unknown', () => {
+    expect(classifyReference('nope', { host: 'x' }, ['token'])).toBe('unknown');
+  });
+});
+
+// P15b D1: splitTemplateSpans' offsets are the seam the colouring/hover work is built on — every
+// span's `text` must equal `input.slice(from, to)`, which is the invariant every consumer (the
+// range-highlight plugin, the hover lookup) depends on to paint or query the right characters.
+describe('http/substitute.ts splitTemplateSpans offsets (P15b D1)', () => {
+  function assertOffsetsMatch(input: string): void {
+    for (const span of splitTemplateSpans(input)) {
+      expect(input.slice(span.from, span.to)).toBe(span.text);
+    }
+  }
+
+  test('adjacent references carry contiguous, non-overlapping offsets', () => {
+    const input = '{{a}}{{b}}';
+    assertOffsetsMatch(input);
+    const spans = splitTemplateSpans(input);
+    expect(spans).toEqual([
+      { text: '{{a}}', isReference: true, from: 0, to: 5, name: 'a' },
+      { text: '{{b}}', isReference: true, from: 5, to: 10, name: 'b' },
+    ]);
+  });
+
+  test('an unterminated {{ is one trailing literal span with no name', () => {
+    const input = 'before {{unterminated';
+    assertOffsetsMatch(input);
+    expect(splitTemplateSpans(input)).toEqual([
+      { text: input, isReference: false, from: 0, to: input.length, name: '' },
+    ]);
+  });
+
+  test('an empty {{}} is a non-reference span with an empty name', () => {
+    const input = 'x{{}}y';
+    assertOffsetsMatch(input);
+    const spans = splitTemplateSpans(input);
+    expect(spans[1]).toEqual({ text: '{{}}', isReference: false, from: 1, to: 5, name: '' });
+  });
+
+  test('the grammar’s own documented nesting oddity: {{a{{b}}}} takes "a{{b" as the name', () => {
+    const input = '{{a{{b}}}}';
+    assertOffsetsMatch(input);
+    const spans = splitTemplateSpans(input);
+    // find `{{` at 0, find the next `}}` at 7 — the name is `a{{b`, then `}}` (two chars) remains
+    // as a trailing literal.
+    expect(spans).toEqual([
+      { text: '{{a{{b}}', isReference: true, from: 0, to: 8, name: 'a{{b' },
+      { text: '}}', isReference: false, from: 8, to: 10, name: '' },
+    ]);
   });
 });
