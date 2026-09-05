@@ -29,13 +29,15 @@ import type {
   VariableScope,
 } from '@shared/domain/variables';
 import { CHANNEL } from '@shared/protocol/events';
-import { on, trust, unwrap, windowKey } from './control';
+import { on, trust, unwrap, windowKey } from './rpc';
 
 // P12 D11: the module's own binding surface, split out of control.ts's single 605-line file
 // (F13) — the 39 of 106 methods whose prefix is httpSend, grpc*, onGrpcCall, collections*,
-// variables*, history* or grpcHistory*. Every call site is unchanged (control.ts composes this
-// back into the one exported `control` object below), and mockRuntime.ts's channel map is
-// unchanged — this is a source-file split, not a binding-surface change.
+// variables*, history* or grpcHistory*. Every call site is unchanged (bridge/index.ts composes
+// this into the one exported `control` object — round-1 review finding 19 moved that composition,
+// and this file's own on/trust/unwrap/windowKey import, out of control.ts and into rpc.ts/index.ts
+// so this file never imports control.ts, which composes it back in), and mockRuntime.ts's channel
+// map is unchanged — this is a source-file split, not a binding-surface change.
 
 // model.VariableScope is a named Go string type (unlike, say, model.CollectionItem.Kind, which is
 // a plain `string`), so the generator emits a real TS `enum` for it — a plain 'collection' |
