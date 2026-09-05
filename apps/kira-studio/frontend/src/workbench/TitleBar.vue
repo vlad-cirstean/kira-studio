@@ -27,6 +27,7 @@ function onClick(mode: AppMode): void {
         :data-mode="mode"
         @click="onClick(mode)"
       >
+        <CodiconIcon :name="MODES[mode].icon" :size="13" />
         {{ MODES[mode].label }}
       </button>
     </div>
@@ -121,12 +122,15 @@ function onClick(mode: AppMode): void {
    must explicitly override it, or clicking a mode tab would also start a window drag. */
 .mode-tab {
   --wails-draggable: none;
-  /* .p-tab's own height/font-size (--kira-h-md/--kira-t-sm) are sized for the main editor tab
-     strip, not a ~36px native macOS title bar — the same "step smaller than the primary tabs"
-     override ConsoleView.vue's own .result-tab already uses (P42 D6), here because the title bar
-     is shorter still. */
-  height: var(--kira-h-sm);
-  font-size: var(--kira-t-xs);
+  /* P15 D9: .p-tab's own metrics (--kira-h-md/--kira-t-sm, 26px/11px) — was shrunk to
+     --kira-h-sm/--kira-t-xs (22px/10px) on the premise of a "~36px native macOS title bar" that
+     predates --kira-titlebar-h settling at 38px (tokens.css:76-88's own history of two reverted
+     guesses at that value): 26px inside 38px leaves 6px of clearance, the same --kira-s-3 the bar
+     already uses as its own right padding — no smaller than the app's other tabs read as smaller
+     targets for no reason. gap matches .p-tab's own (redeclared for clarity, not a different
+     value) now that the icon below needs one. */
+  padding: 0 var(--kira-s-5);
+  gap: var(--kira-s-2);
 }
 /* primitives.css's own .p-tab has no :hover rule at all — TabStrip.vue (its other consumer)
    declares one locally in its own scoped style, and Vue's scoped CSS never leaks across
