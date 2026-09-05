@@ -119,7 +119,7 @@ function close(): void {
 
 .raw-editor {
   height: 320px;
-  border: 1px solid var(--kira-border);
+  border: var(--kira-border-width) solid var(--kira-border);
   border-radius: var(--kira-radius);
   overflow: hidden;
 }
@@ -129,7 +129,7 @@ function close(): void {
   padding-left: var(--kira-s-4);
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--kira-s-1);
 }
 
 .footer-actions {

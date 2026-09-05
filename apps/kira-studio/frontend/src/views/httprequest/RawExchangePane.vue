@@ -190,7 +190,7 @@ function onCopyResponse(): void {
 .raw-editor {
   flex: 1;
   min-height: 200px;
-  border: 1px solid var(--kira-border);
+  border: var(--kira-border-width) solid var(--kira-border);
   border-radius: var(--kira-radius);
   overflow: hidden;
 }

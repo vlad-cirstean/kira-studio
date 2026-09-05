@@ -121,7 +121,7 @@ function close(): void {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--kira-s-1);
 }
 
 .entry-time {

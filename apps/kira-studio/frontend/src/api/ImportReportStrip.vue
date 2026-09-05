@@ -82,6 +82,6 @@ function plural(n: number, noun: string): string {
   padding-left: var(--kira-s-4);
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--kira-s-1);
 }
 </style>

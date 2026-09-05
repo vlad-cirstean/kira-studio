@@ -227,7 +227,7 @@ function onTwistyClick(e: MouseEvent): void {
   /* The same yellow search-match tint every other search-capable view in the app uses. */
   background: var(--kira-search-match);
   color: inherit;
-  border-radius: 2px;
+  border-radius: var(--kira-radius-sm);
 }
 
 .rename-input {
@@ -237,7 +237,7 @@ function onTwistyClick(e: MouseEvent): void {
   color: var(--kira-fg);
   background: var(--kira-bg-input);
   border: var(--kira-border-width) solid var(--kira-accent);
-  border-radius: 2px;
+  border-radius: var(--kira-radius-sm);
   padding: 0 var(--kira-s-1);
   outline: none;
 }

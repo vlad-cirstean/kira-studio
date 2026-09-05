@@ -182,7 +182,7 @@ async function onClear(): Promise<void> {
   gap: var(--kira-s-2);
   padding: var(--kira-s-2) var(--kira-s-3);
   cursor: pointer;
-  border-bottom: 1px solid var(--kira-border);
+  border-bottom: var(--kira-border-width) solid var(--kira-border);
 }
 
 .history-row:hover,
@@ -191,7 +191,7 @@ async function onClear(): Promise<void> {
 }
 
 .history-checkbox {
-  margin-top: 2px;
+  margin-top: var(--kira-s-1);
   flex-shrink: 0;
 }
 
@@ -200,7 +200,7 @@ async function onClear(): Promise<void> {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--kira-s-1);
 }
 
 .history-row-line {

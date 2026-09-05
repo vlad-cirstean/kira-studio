@@ -310,7 +310,7 @@ function residueNote(hop: HttpTimelineHop): string {
   flex-direction: column;
   gap: var(--kira-s-1);
   padding: var(--kira-s-2);
-  border: 1px solid var(--kira-border);
+  border: var(--kira-border-width) solid var(--kira-border);
   border-radius: var(--kira-radius);
 }
 
@@ -337,7 +337,7 @@ function residueNote(hop: HttpTimelineHop): string {
   position: relative;
   height: 10px;
   background: var(--kira-bg-input);
-  border-radius: 3px;
+  border-radius: var(--kira-radius-sm);
   overflow: hidden;
 }
 
@@ -369,7 +369,7 @@ function residueNote(hop: HttpTimelineHop): string {
 
 /* p-kv-row supplies display/gap/font-size; this row also carries its own vertical breathing room. */
 .hop-header-row {
-  padding: 2px 0;
+  padding: var(--kira-s-1) 0;
 }
 
 .timeline-legend {
@@ -388,7 +388,7 @@ function residueNote(hop: HttpTimelineHop): string {
 .legend-swatch {
   width: 8px;
   height: 8px;
-  border-radius: 2px;
+  border-radius: var(--kira-radius-sm);
   display: inline-block;
 }
 </style>

@@ -285,7 +285,7 @@ onUnmounted(() => {
   display: grid;
   grid-template-columns: 72px 160px 1fr 1fr;
   gap: var(--kira-s-2);
-  padding: 2px 0;
+  padding: var(--kira-s-1) 0;
   font-size: var(--kira-t-xs);
 }
 

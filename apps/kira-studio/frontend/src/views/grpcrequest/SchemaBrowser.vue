@@ -227,7 +227,7 @@ function selectMethod(service: string, method: string): void {
   padding: var(--kira-s-2);
   background: none;
   border: none;
-  border-radius: 4px;
+  border-radius: var(--kira-radius-sm);
   cursor: pointer;
   text-align: left;
   font: inherit;
