@@ -396,8 +396,8 @@ const preconnectText = computed({
           : 'New connection'
         : `${isEdit ? 'Edit' : 'New'} ${KIND_LABEL[draft.kind]} connection`
     "
-    :width="step === 'engine' ? 620 : 560"
-    max-height="80vh"
+    :width="620"
+    :height="520"
     test-id="connection-dialog"
     close-test-id="connection-dialog-close"
     @close="closeDialog"
@@ -840,6 +840,10 @@ const preconnectText = computed({
 
 .engine-body {
   gap: var(--kira-s-5);
+  /* D3: with the dialog's own height fixed (D1), the grid must collapse upward from a stable
+     top edge as filteredKinds shrinks, rather than the body re-centring the remaining rows. */
+  flex: 1;
+  min-height: 0;
 }
 
 .field {
@@ -950,9 +954,6 @@ const preconnectText = computed({
   display: flex;
   flex-direction: column;
   gap: var(--kira-s-4);
-  /* Keeps the dialog from resizing under the cursor when switching tabs — the same concern
-     DialogFrame.vue's own fixed height records for SettingsDialog. */
-  min-height: 240px;
 }
 
 .uri-note {
@@ -1012,6 +1013,7 @@ const preconnectText = computed({
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: var(--kira-s-3);
+  align-content: start;
 }
 
 .kind {
