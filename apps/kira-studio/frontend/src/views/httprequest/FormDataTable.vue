@@ -136,6 +136,9 @@ function onClearFile(index: number): void {
   flex: 1;
   min-width: 0;
 }
+.field-cell :deep(.p-input) {
+  width: 100%;
+}
 
 .formdata-file-caption {
   white-space: nowrap;

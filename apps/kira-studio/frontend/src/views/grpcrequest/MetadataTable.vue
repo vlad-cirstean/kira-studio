@@ -101,4 +101,7 @@ function removeRow(index: number): void {
   flex: 1;
   min-width: 0;
 }
+.metadata-cell :deep(.p-input) {
+  width: 100%;
+}
 </style>
