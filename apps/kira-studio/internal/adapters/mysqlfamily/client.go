@@ -46,6 +46,16 @@ func BuildConfig(cfg model.ResolvedConnectionConfig, database string, profile Pr
 	mc.ConnectionAttributes = "program_name:kira-studio"
 	mc.Timeout = connectTimeout
 
+	// options is what the sslmode switch below reads from. In fields mode it's exactly cfg.Options
+	// (populated by the renderer). In URI mode we start from cfg.Options too (for parity, though the
+	// renderer only populates it on a fields<->URI flip) and layer in the URI's own query string —
+	// but only the keys this adapter actually understands, translated into real config, never handed
+	// to the driver as literal session-variable text (see below).
+	options := map[string]any{}
+	for k, v := range cfg.Options {
+		options[k] = v
+	}
+
 	if cfg.Mode == "uri" && cfg.URI != nil && *cfg.URI != "" {
 		parsed, err := url.Parse(*cfg.URI)
 		if err != nil {
@@ -64,14 +74,25 @@ func BuildConfig(cfg model.ResolvedConnectionConfig, database string, profile Pr
 			}
 		}
 		mc.DBName = strings.TrimPrefix(parsed.Path, "/")
+		// The driver's own Params field is not a bag of DSN options: go-sql-driver concatenates
+		// every entry into a literal `SET <k> = <v>, ...` and executes it verbatim at connect time
+		// (handleParams). Splicing an arbitrary URI query string into that would both break the
+		// only documented TLS path for these two engines (?sslmode=... would try `SET sslmode =
+		// ...` and fail with "Unknown system variable") and run unescaped user text as SQL. So only
+		// translate known keys into real config; everything else is dropped with a warn log rather
+		// than forwarded to the driver.
 		for key, values := range parsed.Query() {
 			if len(values) == 0 {
 				continue
 			}
-			if mc.Params == nil {
-				mc.Params = map[string]string{}
+			switch key {
+			case "sslmode":
+				options["sslmode"] = values[0]
+			default:
+				if log != nil {
+					log("warn", "mysql-family: ignoring unrecognized connection URI option \""+key+"\"")
+				}
 			}
-			mc.Params[key] = values[0]
 		}
 	} else {
 		host := ""
@@ -97,7 +118,7 @@ func BuildConfig(cfg model.ResolvedConnectionConfig, database string, profile Pr
 		mc.DBName = database
 	}
 
-	if sslmode, ok := cfg.Options["sslmode"].(string); ok && sslmode != "" && sslmode != "disable" {
+	if sslmode, ok := options["sslmode"].(string); ok && sslmode != "" && sslmode != "disable" {
 		tlsName := "kira-" + cfg.ID
 		switch sslmode {
 		case "require", "prefer":
