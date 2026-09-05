@@ -249,6 +249,55 @@
   box-sizing: border-box;
 }
 
+/* ---------- P15 checkbox ---------- */
+/* Ported from docs/design/kira-design-system/parts/_dlgcss.html's own `.box`/`.box.on` — the one
+   checkbox object the design system already specified with no primitive consuming it. The real
+   <input> is the styled box (appearance: none), not a sibling hidden input — see Checkbox.vue's
+   own comment for why. margin-top/flex-shrink match `.box` exactly: a checkbox beside a wrapped
+   label sits flush with the label's first line, and never shrinks in a flex row. */
+.p-check {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  margin-top: var(--kira-s-1);
+  flex-shrink: 0;
+}
+.p-check input[type="checkbox"] {
+  appearance: none;
+  margin: 0;
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  border: var(--kira-border-width) solid var(--kira-border-strong);
+  background: var(--kira-bg-input);
+  cursor: pointer;
+}
+.p-check input[type="checkbox"]:checked,
+.p-check input[type="checkbox"]:indeterminate {
+  background: var(--kira-accent);
+  border-color: var(--kira-accent);
+}
+.p-check input[type="checkbox"]:focus-visible {
+  outline: var(--kira-border-width) solid var(--kira-focus);
+  outline-offset: 1px;
+}
+.p-check input[type="checkbox"]:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+.p-check .glyph {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--kira-accent-fg);
+  pointer-events: none;
+}
+
 /* ---------- P13 dialog body ---------- */
 /* The column wrapper every DialogFrame consumer puts inside .dialog-body (which is the scroll
    container and deliberately has no padding of its own). Promoted from the identical
