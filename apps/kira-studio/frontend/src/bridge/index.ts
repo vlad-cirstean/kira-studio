@@ -46,7 +46,7 @@ import { on, trust, unwrap, windowKey } from './rpc';
 // imports. Neither half imports the other; both depend only on rpc.ts's shared on/trust/unwrap/
 // windowKey. control.ts itself is now a thin re-export of this module, so every existing
 // `import { control } from '.../bridge/control'` call site (~200 of them) is unchanged.
-export const studioControl = {
+const studioControl = {
   appInfo: (): Promise<WailsModels.AppInfo> => unwrap(AppService.Info()),
   settingsGetAll: (): Promise<Settings> =>
     unwrap(SettingsService.GetAll()).then((r) => trust<Settings>(r)),

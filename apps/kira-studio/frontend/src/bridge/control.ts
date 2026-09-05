@@ -6,5 +6,5 @@
 // and this file is a thin re-export so every existing `import { control } from '.../bridge/control'`
 // call site — and anything reaching for the shared rpc.ts primitives through this path — is
 // unchanged.
-export { control, studioControl } from './index';
+export { control } from './index';
 export { on, trust, unwrap, windowKey } from './rpc';
