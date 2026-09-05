@@ -76,6 +76,13 @@ const props = defineProps<{
    *  silently reaching every other CodeMirrorHost. On for the request body editor
    *  (RequestBodyPane.vue), which has no such lint. */
   autoCloseBrackets?: boolean;
+  /** P19 D12: off by default, so every existing host (the cell editor, the definition viewer, the
+   *  document editor, the op-log detail rows) stays byte-for-byte unchanged — P13 OQ-2's own
+   *  reason not to fix this as a side effect. On, the external-sync dispatch below clamps the
+   *  existing selection into the new document instead of resetting it to offset 0 and scrolling
+   *  to the top; the caller (ConsoleView.onFormat) is responsible for mapping the caret across
+   *  whatever the external write actually changed. */
+  keepSelectionOnExternalSync?: boolean;
 }>();
 
 // Every prior use of this host is read-only (definitions, previews, op-log detail rows); the query
@@ -288,6 +295,17 @@ defineExpose({
       effects: EditorView.scrollIntoView(EditorSelection.range(from, to), { y: 'center' }),
     });
   },
+  // P19 D12(2): scrollRangeIntoView's own precedent for a caller-driven imperative — used by
+  // ConsoleView.onFormat to put the caret back in the statement it was in after a reformat, once
+  // it has computed where that statement now starts.
+  setCursor: (pos: number): void => {
+    if (!view) return;
+    const clamped = Math.min(Math.max(0, pos), view.state.doc.length);
+    view.dispatch({
+      selection: EditorSelection.cursor(clamped),
+      effects: EditorView.scrollIntoView(clamped),
+    });
+  },
 });
 
 watch(
@@ -298,6 +316,19 @@ watch(
     // sees this watcher fire right after the emit above — without the guard it would reset the
     // document to what's already there and jump the cursor to 0 on every keystroke.
     if (doc === view.state.doc.toString()) return;
+    if (props.keepSelectionOnExternalSync) {
+      // Clamped, not preserved verbatim — the new document can be shorter than wherever the
+      // caret used to sit. The caller (ConsoleView.onFormat) is what maps the caret to somewhere
+      // meaningful in the new text; this is only the floor that keeps a stale offset from landing
+      // past the end of a shrunk document.
+      const pos = Math.min(view.state.selection.main.head, doc.length);
+      view.dispatch({
+        changes: { from: 0, to: view.state.doc.length, insert: doc },
+        selection: EditorSelection.cursor(pos),
+        annotations: externalSync.of(true),
+      });
+      return;
+    }
     view.dispatch({
       changes: { from: 0, to: view.state.doc.length, insert: doc },
       selection: { anchor: 0 },
