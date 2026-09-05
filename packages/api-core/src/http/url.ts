@@ -4,6 +4,8 @@
 // the URL field updates the Params table and never rewrites the URL; editing the table rewrites
 // the URL (HttpRequestView.vue owns that direction — this module only splits/builds strings).
 
+import { splitTemplateSpans } from './substitute';
+
 export interface SplitUrl {
   base: string;
   /** Without the leading '?'. */
@@ -52,9 +54,20 @@ export function parseQuery(query: string): QueryPair[] {
 }
 
 /** encodeURIComponent each half — never URLSearchParams.toString(), which encodes a space as
- *  '+' instead of '%20' and would silently rewrite what the user typed. */
+ *  '+' instead of '%20' and would silently rewrite what the user typed. Finding 16: a `{{name}}`
+ *  reference living inside a name or value is left untouched rather than being encoded into
+ *  `%7B%7Bname%7D%7D`, a form neither substitution engine (this package's own `resolve`, nor
+ *  internal/apivars/resolve.go) recognises any more. */
+function encodeQueryComponent(s: string): string {
+  return splitTemplateSpans(s)
+    .map((span) => (span.isReference ? span.text : encodeURIComponent(span.text)))
+    .join('');
+}
+
 export function buildQuery(pairs: readonly QueryPair[]): string {
-  return pairs.map((p) => `${encodeURIComponent(p.name)}=${encodeURIComponent(p.value)}`).join('&');
+  return pairs
+    .map((p) => `${encodeQueryComponent(p.name)}=${encodeQueryComponent(p.value)}`)
+    .join('&');
 }
 
 function withScheme(base: string): string {

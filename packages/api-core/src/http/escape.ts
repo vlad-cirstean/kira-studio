@@ -4,8 +4,20 @@
 // and raw/generate.ts each hand-rolled this identically as a private `goQueryEscape` — living in
 // two separate directories (http/curl/, http/raw/) was the reason they were never merged; now that
 // both are one package's src/http/ tree, this is the one exported copy.
-export function goQueryEscape(s: string): string {
+import { splitTemplateSpans } from './substitute';
+
+function escapeLiteral(s: string): string {
   return encodeURIComponent(s)
     .replace(/[!*'()]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`)
     .replace(/%20/g, '+');
+}
+
+// Finding 16: url.ts's buildQuery own twin bug — a urlencoded field's name/value can still carry a
+// literal `{{name}}` reference (a deferred secret in a Copy-as-curl/Raw export, say), which this
+// used to escape whole into a form neither substitution engine recognises any more. A reference
+// span is left untouched; only the literal spans around it are escaped.
+export function goQueryEscape(s: string): string {
+  return splitTemplateSpans(s)
+    .map((span) => (span.isReference ? span.text : escapeLiteral(span.text)))
+    .join('');
 }

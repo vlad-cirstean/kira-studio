@@ -103,6 +103,34 @@ test('Http request — send, view a JSON response, and Params-table <-> URL sync
   await expect(responseHeaders).toContainText('application/json');
 });
 
+// Finding 16: buildQuery used to encodeURIComponent a query param whole, including any literal
+// {{name}} reference inside it — turning it into %7B%7Bname%7D%7D, a form neither substitution
+// engine recognises any more.
+test('Http request — adding a query param leaves an existing {{variable}} reference untouched', async ({
+  relaunch,
+}) => {
+  const { window: page } = await relaunch({ control: [] });
+
+  await openHttpModeAndNewRequest(page);
+  await page.fill('[data-testid="http-url"]', 'https://api.example.com/orders?region={{region}}');
+
+  const paramRows = page.locator('[data-testid="http-param-row"]');
+  await expect(paramRows.first().locator('[data-testid="http-param-name"]')).toHaveValue('region');
+  await expect(paramRows.first().locator('[data-testid="http-param-value"]')).toHaveValue(
+    '{{region}}',
+  );
+
+  // Add a second param via the table's own trailing blank row.
+  const trailing = paramRows.nth(1);
+  await trailing.locator('[data-testid="http-param-name"]').fill('limit');
+  await trailing.locator('[data-testid="http-param-value"]').fill('10');
+
+  // The existing {{region}} reference must survive un-mangled, not %7B%7Bregion%7D%7D.
+  await expect(page.locator('[data-testid="http-url"]')).toHaveValue(
+    'https://api.example.com/orders?region={{region}}&limit=10',
+  );
+});
+
 test('Http request — a 404 shows its own hint', async ({ relaunch }) => {
   const NOT_FOUND_RESPONSE = {
     status: 404,

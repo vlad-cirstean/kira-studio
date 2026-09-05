@@ -106,3 +106,45 @@ export function resolve(
 
   return { text: out, refs };
 }
+
+/** One span of splitTemplateSpans' own walk — `text` is the literal run for a non-reference span,
+ *  or the whole `{{name}}` (delimiters included) for a reference span. */
+export interface TemplateSpan {
+  text: string;
+  isReference: boolean;
+}
+
+/**
+ * Splits `text` into alternating literal and `{{...}}` reference spans, using the exact same
+ * find-`{{`-then-find-`}}` grammar `resolve` above walks (including its own "an empty `{{}}` is
+ * not a reference" rule) — for a caller that needs to transform only the literal parts (URL-
+ * encoding a query param or a urlencoded body field, say) without a values/secretNames table to
+ * actually resolve anything, and without corrupting a reference — resolved, deferred, or not —
+ * into a form the substitution engine can no longer recognise.
+ *
+ * Finding 16: buildQuery (url.ts) and goQueryEscape (escape.ts) both used to `encodeURIComponent`/
+ * escape a query param or urlencoded field whole, including any literal `{{name}}` inside it —
+ * turning it into `%7B%7Bname%7D%7D`, which neither this module's `resolve` nor
+ * internal/apivars/resolve.go recognises any more.
+ */
+export function splitTemplateSpans(text: string): TemplateSpan[] {
+  const spans: TemplateSpan[] = [];
+  let i = 0;
+  while (i < text.length) {
+    const open = text.indexOf('{{', i);
+    if (open === -1) {
+      spans.push({ text: text.slice(i), isReference: false });
+      break;
+    }
+    const close = text.indexOf('}}', open + 2);
+    if (close === -1) {
+      spans.push({ text: text.slice(i), isReference: false });
+      break;
+    }
+    if (open > i) spans.push({ text: text.slice(i, open), isReference: false });
+    const name = text.slice(open + 2, close).trim();
+    spans.push({ text: text.slice(open, close + 2), isReference: name !== '' });
+    i = close + 2;
+  }
+  return spans;
+}
