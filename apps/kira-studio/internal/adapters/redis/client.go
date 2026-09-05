@@ -34,12 +34,18 @@ type connectFields struct {
 func resolveFields(cfg model.ResolvedConnectionConfig, log func(level, message string)) (connectFields, int, error) {
 	var host, username, password, database string
 	var port int
+	// uriWantsTLS is true only for the standard `rediss://` scheme — the universally documented
+	// spelling for a TLS Redis connection. Previously this parser never read the scheme at all, so
+	// a rediss:// URI silently connected in plaintext (with the password on the wire) whenever no
+	// sslmode option happened to be set.
+	uriWantsTLS := false
 
 	if cfg.Mode == "uri" && cfg.URI != nil && *cfg.URI != "" {
 		u, err := url.Parse(*cfg.URI)
 		if err != nil {
 			return connectFields{}, 0, adapters.New(adapters.CodeConnect, "could not parse the connection URI", err)
 		}
+		uriWantsTLS = u.Scheme == "rediss"
 		host = u.Hostname()
 		if p := u.Port(); p != "" {
 			port, _ = strconv.Atoi(p)
@@ -74,18 +80,26 @@ func resolveFields(cfg model.ResolvedConnectionConfig, log func(level, message s
 	}
 
 	var tlsConfig *tls.Config
-	if sslmode, ok := cfg.Options["sslmode"].(string); ok && sslmode != "" && sslmode != "disable" {
+	sslmode, hasSslmode := cfg.Options["sslmode"].(string)
+	switch {
+	case hasSslmode && sslmode != "" && sslmode != "disable":
 		switch sslmode {
-		case "require", "prefer":
-			tlsConfig = &tls.Config{InsecureSkipVerify: true} //nolint:gosec // matches client.ts's own rejectUnauthorized:false for these two modes
-		case "verify-full":
+		// Unlike Postgres's "require" (encrypt only, no verification — a libpq convention this
+		// app has no reason to inherit for Redis), require/prefer/verify-full all verify here,
+		// matching the Kafka adapter's own reasoning: "require" without verification accepts any
+		// certificate, including an attacker's, with no indication anywhere in the UI.
+		case "require", "prefer", "verify-full":
 			tlsConfig = &tls.Config{ServerName: host}
+		case "verify-none", "insecure":
+			tlsConfig = &tls.Config{InsecureSkipVerify: true} //nolint:gosec // explicit opt-out, not the default
 		default:
 			// An unrecognized sslmode must fail loudly rather than silently fall back to a
 			// plaintext connection — a typo here would otherwise send credentials and data
 			// unencrypted while the user believes TLS is configured.
 			return connectFields{}, 0, adapters.New(adapters.CodeConnect, `redis: unknown sslmode "`+sslmode+`"`, nil)
 		}
+	case uriWantsTLS:
+		tlsConfig = &tls.Config{ServerName: host}
 	}
 
 	defaultDbIndex := defaultDBIndex
