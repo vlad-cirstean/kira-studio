@@ -5,23 +5,12 @@ import { connectionRecord, connectionsState } from '../../state/connections';
 import { openGenerateDataDialog } from '../../state/fakeData';
 import IconButton from '../../theme/primitives/IconButton.vue';
 import SegmentedControl from '../../theme/primitives/SegmentedControl.vue';
-import PagerControls from '../shared/page/PagerControls.vue';
 import { pageSizeOptions } from '../shared/page/sizes';
 import ColumnsMenu from './ColumnsMenu.vue';
 import { canGenerateDataFor } from './fakeData/generate';
 import { getPage } from './page';
 import { addInsertRow, discardInsertRow, pendingFor, toggleDelete } from './pendingChanges';
-import {
-  goFirst,
-  goLast,
-  goNext,
-  goPrev,
-  goToPage,
-  runCount,
-  runtime,
-  setPageSize,
-  toggleSearchOpen,
-} from './state';
+import { runCount, runtime, setPageSize, toggleSearchOpen } from './state';
 
 // P48 D10: takes `tab` as a prop like every other view's toolbar, rather than reading the
 // nullable, globally-computed activeDataTab — this component only ever renders while its tab is
@@ -68,21 +57,6 @@ const generateDataTooltip = computed(() => {
   return 'This connection does not support generating rows';
 });
 
-function onFirst(): void {
-  void goFirst(props.tab.id);
-}
-function onPrev(): void {
-  void goPrev(props.tab.id);
-}
-function onNext(): void {
-  void goNext(props.tab.id);
-}
-function onLast(): void {
-  void goLast(props.tab.id);
-}
-function onJump(pageIndex: number): void {
-  void goToPage(props.tab.id, pageIndex);
-}
 function onCount(): void {
   void runCount(props.tab.id);
 }
@@ -167,23 +141,9 @@ function onDeleteRow(): void {
        DocumentView.vue) rather than assuming its own hand-rolled equivalent (F1/F3). -->
   <div class="sep" />
 
-  <!-- FIX-1: absolute-position pager, kept as a jump-to-page input (D7's cursor/offset paging
-       has no notion of "row 1–200" to display without the count query having already run). -->
-  <PagerControls
-    :page-index="tab.state.pageIndex"
-    :page-size="tab.state.pageSize"
-    :count="rt?.count?.value ?? null"
-    :has-more="!!rt?.hasMore"
-    testid-prefix=""
-    last-tooltip="Count rows first"
-    :strategy="rt?.lastStrategy"
-    @first="onFirst"
-    @prev="onPrev"
-    @next="onNext"
-    @last="onLast"
-    @jump="onJump"
-  />
-
+  <!-- P16 D1: the pager itself moved to DataView.vue's #toolbar-end (right edge of the toolbar,
+       last); the page-size picker stays here — a setting the user sets once per tab, not
+       navigation used repeatedly. -->
   <SegmentedControl
     :model-value="tab.state.pageSize"
     :options="PAGE_SIZE_OPTIONS"
