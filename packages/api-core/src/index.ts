@@ -13,6 +13,7 @@ export {
   contentTypeCaption,
   defaultContentTypeFor,
   editorLanguageForCode,
+  type HttpBodySelection,
   userContentTypeHeader,
 } from './http/body';
 export { type CurlRequest, toCurl } from './http/curl/generate';

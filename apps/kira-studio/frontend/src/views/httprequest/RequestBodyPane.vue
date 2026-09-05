@@ -4,9 +4,10 @@ import {
   CODE_LANGUAGE_OPTIONS,
   contentTypeCaption,
   editorLanguageForCode,
+  type HttpBodySelection,
   userContentTypeHeader,
 } from '@kira/api-core';
-import type { HttpBodyMode, HttpCodeLanguage } from '@shared/domain/http';
+import type { HttpCodeLanguage } from '@shared/domain/http';
 import type { HttpRequestTabRecord } from '@shared/domain/tabs';
 import { computed, ref } from 'vue';
 import { patchHttpRequestTabState } from '../../api/tabs';
@@ -26,8 +27,26 @@ import UrlEncodedTable from './UrlEncodedTable.vue';
 // languages.
 const props = defineProps<{ tab: HttpRequestTabRecord }>();
 
-function setBodyMode(mode: HttpBodyMode): void {
-  patchHttpRequestTabState(props.tab.id, { bodyMode: mode });
+// P15 D6: JSON is a UI-level segment over the same `bodyMode`/`codeLanguage` storage — no schema,
+// wire or Go change (§5 of the plan spells out why: the entire delta below is presentation).
+const selection = computed<HttpBodySelection>(() =>
+  props.tab.state.bodyMode === 'code' && props.tab.state.codeLanguage === 'json'
+    ? 'json'
+    : props.tab.state.bodyMode,
+);
+
+function setSelection(next: HttpBodySelection): void {
+  if (next === 'json') {
+    patchHttpRequestTabState(props.tab.id, { bodyMode: 'code', codeLanguage: 'json' });
+    return;
+  }
+  if (next === 'code' && props.tab.state.codeLanguage === 'json') {
+    // Otherwise `selection` above would snap straight back to 'json' and this segment would be
+    // unclickable — Code always means a non-JSON language now that JSON has its own segment.
+    patchHttpRequestTabState(props.tab.id, { bodyMode: 'code', codeLanguage: 'javascript' });
+    return;
+  }
+  patchHttpRequestTabState(props.tab.id, { bodyMode: next });
 }
 
 function onCodeLanguageChange(e: Event): void {
@@ -83,13 +102,13 @@ const caption = computed(() =>
   <div class="body-pane">
     <div class="body-mode-row p-toolbar">
       <SegmentedControl
-        :model-value="tab.state.bodyMode"
+        :model-value="selection"
         :options="BODY_MODE_OPTIONS"
         data-testid="http-body-mode"
-        @update:model-value="setBodyMode"
+        @update:model-value="setSelection"
       />
       <select
-        v-if="tab.state.bodyMode === 'code'"
+        v-if="tab.state.bodyMode === 'code' && tab.state.codeLanguage !== 'json'"
         class="p-select bordered code-language-select"
         data-testid="http-body-code-language"
         :value="tab.state.codeLanguage"

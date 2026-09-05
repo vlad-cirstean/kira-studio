@@ -204,6 +204,11 @@ export type HttpHeaderState = z.infer<typeof httpHeaderSchema>;
 // Postman `graphql` body has nowhere to land and needs its own explicit decision (refuse the mode,
 // or import it as `code`/json against the GraphQL-over-HTTP envelope). This is not implemented here
 // — just flagged so it is not rediscovered as a silent data-loss bug.
+//
+// P15 D6: `code` + `codeLanguage: 'json'` is now *presented* as its own top-level `JSON` segment in
+// RequestBodyPane.vue — a UI-level promotion over this exact same storage, not a new mode. Do not
+// be surprised that a `JSON` segment exists with no `'json'` entry in HTTP_BODY_MODES below; there
+// is deliberately no new wire/Go value here.
 export const HTTP_BODY_MODES = ['none', 'raw', 'code', 'urlencoded', 'formdata', 'file'] as const;
 export type HttpBodyMode = (typeof HTTP_BODY_MODES)[number];
 export const httpBodyModeSchema = /*#__PURE__*/ z.enum(HTTP_BODY_MODES);

@@ -7,10 +7,18 @@ import {
   type HttpRequestTabState,
 } from '@kira/shared/domain/http';
 
-// C5/D9: the five body-mode labels, in the builder's own order. `title` is the tooltip F12 leans
-// on instead of widening SegmentedControl for this one caller's label widths.
+// P15 D6: a UI-level body-mode selection — HTTP_BODY_MODES itself is unchanged (still six values,
+// no 'json'); this is only what the segmented control in RequestBodyPane.vue renders and reads,
+// layered over the same `bodyMode`/`codeLanguage` storage. See RequestBodyPane.vue's own
+// `selection` computed for the mapping.
+export type HttpBodySelection = HttpBodyMode | 'json';
+
+// C5/D9: the body-mode labels, in the builder's own order. `title` is the tooltip F12 leans on
+// instead of widening SegmentedControl for this one caller's label widths. P15 D6: `json` is a
+// presentation-only segment between raw and code — selecting it patches
+// `{bodyMode: 'code', codeLanguage: 'json'}`, so it needs no schema/wire value of its own.
 export const BODY_MODE_OPTIONS: readonly {
-  value: HttpBodyMode;
+  value: HttpBodySelection;
   label: string;
   title: string;
   testid: string;
@@ -35,9 +43,15 @@ export const BODY_MODE_OPTIONS: readonly {
     testid: 'http-body-mode-raw',
   },
   {
+    value: 'json',
+    label: 'JSON',
+    title: 'A JSON body',
+    testid: 'http-body-mode-json',
+  },
+  {
     value: 'code',
     label: 'Code',
-    title: 'JavaScript, JSON, HTML or XML',
+    title: 'JavaScript, HTML or XML',
     testid: 'http-body-mode-code',
   },
   {
@@ -49,10 +63,10 @@ export const BODY_MODE_OPTIONS: readonly {
 ];
 
 // The `code` mode's sub-selector, in the same order raw's own sub-selector used to list them
-// (minus Text, which is what plain `raw` now means).
+// (minus Text, which is what plain `raw` now means, and minus JSON, which is its own top-level
+// segment now — P15 D6).
 export const CODE_LANGUAGE_OPTIONS: readonly { value: HttpCodeLanguage; label: string }[] = [
   { value: 'javascript', label: 'JavaScript' },
-  { value: 'json', label: 'JSON' },
   { value: 'html', label: 'HTML' },
   { value: 'xml', label: 'XML' },
 ];
@@ -124,7 +138,7 @@ export function bodyBadgeLabel(state: HttpRequestTabState): string {
     case 'raw':
       return 'Body (raw)';
     case 'code':
-      return 'Body (code)';
+      return state.codeLanguage === 'json' ? 'Body (JSON)' : 'Body (code)';
     case 'urlencoded': {
       const n = state.urlEncoded.filter((f) => f.enabled && f.name.trim() !== '').length;
       return n > 0 ? `Body (${n})` : 'Body';
