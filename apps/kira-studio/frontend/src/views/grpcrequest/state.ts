@@ -55,6 +55,11 @@ export function resolveGrpcTabState(
   return { target, metadata, message, refs };
 }
 
+// D15: the live view's own ceiling — an infinite stream must not grow the renderer without bound.
+// The oldest messages are dropped once this is exceeded; trueMessageCount (below) keeps the real
+// total so D17's "showing the most recent 10,000 of N" sentence can still name it.
+const MAX_LIVE_MESSAGES = 10_000;
+
 // D6: the response is runtime-only, never persisted.
 export interface GrpcRequestViewRuntime {
   status: 'idle' | 'running' | 'error' | 'cancelled';
@@ -62,12 +67,17 @@ export interface GrpcRequestViewRuntime {
   streaming: boolean;
   error: { code: string; message: string } | null;
   result: GrpcCallResultWire | null;
+  /** Capped at MAX_LIVE_MESSAGES (D15) — the oldest are spliced off the head as new ones arrive. */
   messages: GrpcMessageWire[];
-  /** Set once a terminal event/return confirms the live count — separate from messages.length so
-   *  D17's "showing the most recent 10,000 of N" sentence can name the true N even after D15's own
-   *  live-view ceiling drops older ones (not yet reached by any server this app has tested against,
-   *  kept here so the UI is ready for it). */
+  /** The true count of every message this call has produced so far — kept incrementally
+   *  (never re-derived from messages.length, which is capped) so D17's "showing the most recent
+   *  10,000 of N" sentence can name the real N once messages.length has hit the ceiling. */
   trueMessageCount: number;
+  /** Running total of wireBytes across every message received so far, updated once per push
+   *  rather than re-`reduce`d over `messages` on every read — the same reasoning as
+   *  trueMessageCount, and what makes the response pane's own byte total O(1) per message instead
+   *  of O(N) per push (finding 11). */
+  messageBytes: number;
 }
 
 function defaultRuntime(): GrpcRequestViewRuntime {
@@ -79,6 +89,7 @@ function defaultRuntime(): GrpcRequestViewRuntime {
     result: null,
     messages: [],
     trueMessageCount: 0,
+    messageBytes: 0,
   };
 }
 
@@ -196,7 +207,11 @@ function ensureGrpcCallSubscription(): void {
       const rt = runtime[tabId];
       if (!rt || rt.opId !== event.callId) continue;
       rt.messages.push(...event.messages);
-      rt.trueMessageCount = Math.max(rt.trueMessageCount, rt.messages.length);
+      rt.trueMessageCount += event.messages.length;
+      for (const m of event.messages) rt.messageBytes += m.wireBytes;
+      if (rt.messages.length > MAX_LIVE_MESSAGES) {
+        rt.messages.splice(0, rt.messages.length - MAX_LIVE_MESSAGES);
+      }
       if (event.done) {
         rt.opId = null;
         if (event.error) {
@@ -235,6 +250,7 @@ export async function call(tabId: string): Promise<void> {
   rt.result = null;
   rt.messages = [];
   rt.trueMessageCount = 0;
+  rt.messageBytes = 0;
   rt.streaming = streaming;
 
   const collectionId = collectionIdFor(tab.state);
@@ -271,7 +287,11 @@ export async function call(tabId: string): Promise<void> {
     rt.status = 'idle';
     rt.opId = null;
     rt.result = result;
-    if (!streaming && result.messages) rt.messages = result.messages;
+    if (!streaming && result.messages) {
+      rt.messages = result.messages;
+      rt.trueMessageCount = result.messages.length;
+      rt.messageBytes = result.messages.reduce((n, m) => n + m.wireBytes, 0);
+    }
     noteGrpcCallRecorded(tabId);
   } catch (err) {
     if (rt.opId !== opId) return;

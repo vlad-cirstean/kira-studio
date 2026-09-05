@@ -382,6 +382,79 @@ test('gRPC request — a server-streaming call appends messages as they arrive',
   await expect(page.locator('[data-testid="grpc-request-stop"]')).toBeDisabled();
 });
 
+// Finding 11: the live message list used to grow without bound and re-`reduce` its whole array
+// on every single push. Sends one batch well past the 10,000-message live-view ceiling
+// (state.ts's MAX_LIVE_MESSAGES) in a single event — real messages arrive one at a time, but a
+// live server sending 10,000+ individual push events in a test would only slow the suite down,
+// never exercise a code path this batch doesn't already cover identically.
+test('gRPC request — the live message list caps at 10,000 and shows the true total', async ({
+  relaunch,
+}) => {
+  const CONTROL: ControlSnapshot[] = [
+    {
+      channel: IPC.tabsList,
+      response: [
+        grpcTab({
+          target: 'demo.example.com:443',
+          service: 'demo.Items',
+          method: 'ListItems',
+          message: '{"pageSize":10}',
+        }),
+      ],
+    },
+    { channel: IPC.grpcDescribe, response: STREAM_SCHEMA },
+  ];
+  const { window: page } = await relaunch({ control: CONTROL });
+  const getOpId = await holdGrpcCallPending(page);
+
+  await expect(page.locator('[data-testid="grpc-request-view"]')).toBeVisible();
+  await page.click('[data-testid="grpc-call"]');
+  await expect.poll(getOpId).toBeTruthy();
+  const callId = getOpId() as string;
+
+  const total = 10_037;
+  const batch = Array.from({ length: total }, (_, i) => ({
+    seq: i,
+    json: `{"i":${i}}`,
+    wireBytes: 10,
+    offsetMs: i,
+  }));
+  await emitWailsEvent(page, IPC.grpcCall, { callId, seq: 0, messages: batch, done: false });
+
+  await expect(page.locator('[data-testid="grpc-live-messages-elided"]')).toHaveText(
+    `Showing the most recent 10000 of ${total} messages.`,
+  );
+  // The oldest 37 messages were dropped, not the newest — the ones a live user is watching arrive.
+  await expect(page.locator('[data-testid="grpc-message-offset"]').first()).toHaveText('+37 ms');
+
+  await emitWailsEvent(page, IPC.grpcCall, {
+    callId,
+    seq: total,
+    messages: [],
+    done: true,
+    status: {
+      code: 0,
+      codeName: 'OK',
+      statusMessage: '',
+      elapsedMs: total,
+      header: [],
+      trailer: [],
+      messageCount: total,
+      messageBytes: total * 10,
+    },
+  });
+
+  // The true total (10,037 × 10 bytes = 100,370) is what the byte summary shows too — it is kept
+  // as a running total (state.ts's rt.messageBytes), not re-derived from the now-capped array.
+  await expect(page.locator('[data-testid="grpc-message-summary"]')).toContainText(
+    '10000 messages',
+  );
+  await expect(page.locator('[data-testid="grpc-message-summary"]')).toContainText('98.0 KB');
+  await expect(page.locator('[data-testid="grpc-live-messages-elided"]')).toHaveText(
+    `Showing the most recent 10000 of ${total} messages.`,
+  );
+});
+
 test('gRPC request — Stop cancels an in-flight stream and keeps what arrived', async ({
   relaunch,
 }) => {
@@ -675,5 +748,8 @@ test('gRPC request — a stored streaming history entry with elided messages sho
     'Showing the first 100 of 137 messages.',
   );
   await page.click('[data-testid="grpc-response-pane-messages"]');
-  await expect(page.locator('[data-testid="grpc-message-entry"]')).toHaveCount(100);
+  // The message list is virtualized (finding 11) — only the visible window actually renders, so
+  // the 100-message data length is asserted through the status row's own summary rather than a
+  // DOM node count.
+  await expect(page.locator('[data-testid="grpc-message-summary"]')).toContainText('100 messages');
 });

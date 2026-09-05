@@ -9,6 +9,7 @@ import AppButton from '../../theme/primitives/AppButton.vue';
 import EmptyState from '../../theme/primitives/EmptyState.vue';
 import MessageStrip from '../../theme/primitives/MessageStrip.vue';
 import SegmentedControl from '../../theme/primitives/SegmentedControl.vue';
+import VirtualList from '../../theme/primitives/VirtualList.vue';
 import CallHistoryList from './CallHistoryList.vue';
 import { backToLatestGrpc, ensureGrpcHistoryLoaded, grpcHistoryRuntime } from './history';
 import { runtime } from './state';
@@ -59,10 +60,11 @@ const statusMessage = computed(() =>
 const elapsedMs = computed(() =>
   viewing.value ? viewing.value.snapshot.entry.elapsedMs : (liveResult.value?.elapsedMs ?? 0),
 );
+// Finding 11: rt.messageBytes is a running total kept incrementally by state.ts's own push
+// handler — reading it here is O(1); the old `rt.value.messages.reduce(...)` re-summed the whole
+// (potentially 10,000-message) array on every single push.
 const messageBytes = computed(() =>
-  viewing.value
-    ? viewing.value.snapshot.entry.messageBytes
-    : (rt.value?.messages.reduce((n, m) => n + m.wireBytes, 0) ?? 0),
+  viewing.value ? viewing.value.snapshot.entry.messageBytes : (rt.value?.messageBytes ?? 0),
 );
 const messages = computed(() =>
   viewing.value
@@ -73,6 +75,12 @@ const messages = computed(() =>
         offsetMs: m.offsetMs,
       }))
     : liveMessages.value,
+);
+// D15/D17: the live view keeps only the most recent MAX_LIVE_MESSAGES (state.ts) — this is true
+// only for a live, still/just-streamed call, never a stored history entry's own capped snapshot
+// (finding 8's own "first N of M" note above covers that case with its own wording).
+const liveMessagesElided = computed(
+  () => !viewing.value && (rt.value?.trueMessageCount ?? 0) > messages.value.length,
 );
 const header = computed(() =>
   viewing.value ? viewing.value.snapshot.header : (liveResult.value?.header ?? []),
@@ -106,6 +114,22 @@ function toggleExpanded(seq: number): void {
   else next.add(seq);
   expanded.value = next;
 }
+
+// Finding 11: the message list is now a VirtualList (below), which needs one known height per
+// row — MESSAGE_ROW_HEIGHT for a collapsed header, or that plus MESSAGE_DETAIL_HEIGHT for an
+// expanded one (a fixed, internally-scrollable box, not an auto-growing one — the same "one
+// resolved height per row" contract OperationsPanel.vue's own expandable row already follows). A
+// per-row rowHeights array is passed only while something is actually expanded (the rare,
+// deliberate case): the common case — a stream appending thousands of collapsed messages — stays
+// on VirtualList's O(1) uniform-height path instead of remapping every row on every single push.
+const MESSAGE_ROW_HEIGHT = 22; // matches --kira-h-sm
+const MESSAGE_DETAIL_HEIGHT = 200;
+const messageRowHeights = computed<readonly number[] | undefined>(() => {
+  if (expanded.value.size === 0) return undefined;
+  return messages.value.map((m) =>
+    expanded.value.has(m.seq) ? MESSAGE_ROW_HEIGHT + MESSAGE_DETAIL_HEIGHT : MESSAGE_ROW_HEIGHT,
+  );
+});
 // D14: a unary call is the same pane with exactly one entry, expanded.
 watch(
   messages,
@@ -182,6 +206,15 @@ const viewingTime = computed(() => {
         Stopped after {{ messages.length }} message{{ messages.length === 1 ? '' : 's' }}.
       </MessageStrip>
 
+      <!-- D15/D17: the live view's own ceiling (state.ts's MAX_LIVE_MESSAGES) — finding 11. -->
+      <MessageStrip
+        v-if="liveMessagesElided"
+        tone="note"
+        data-testid="grpc-live-messages-elided"
+      >
+        Showing the most recent {{ messages.length }} of {{ rt?.trueMessageCount }} messages.
+      </MessageStrip>
+
       <CallHistoryList v-if="tab.state.responsePane === 'history'" :tab="tab" />
       <div v-else-if="tab.state.responsePane === 'metadata'" class="metadata-groups" data-testid="grpc-response-metadata">
         <div class="metadata-group">
@@ -202,15 +235,27 @@ const viewingTime = computed(() => {
         </div>
       </div>
       <div v-else class="message-list" data-testid="grpc-message-list">
-        <div v-for="m in messages" :key="m.seq" class="message-entry" data-testid="grpc-message-entry">
-          <button type="button" class="message-header" @click="toggleExpanded(m.seq)">
-            <span class="p-xs dim" data-testid="grpc-message-offset">+{{ m.offsetMs }} ms</span>
-            <span class="p-xs dim">{{ formatBytes(m.wireBytes) }}</span>
-            <span class="p-push" />
-            <span class="p-xs dim">#{{ m.seq }}</span>
-          </button>
-          <CodeMirrorHost v-if="expanded.has(m.seq)" :doc="m.json" language="json" :read-only="true" />
-        </div>
+        <VirtualList
+          v-if="messages.length > 0"
+          class="message-virtual-list"
+          :items="messages"
+          :row-height="MESSAGE_ROW_HEIGHT"
+          :row-heights="messageRowHeights"
+        >
+          <template #default="{ item: m }">
+            <div class="message-entry" data-testid="grpc-message-entry">
+              <button type="button" class="message-header" @click="toggleExpanded(m.seq)">
+                <span class="p-xs dim" data-testid="grpc-message-offset">+{{ m.offsetMs }} ms</span>
+                <span class="p-xs dim">{{ formatBytes(m.wireBytes) }}</span>
+                <span class="p-push" />
+                <span class="p-xs dim">#{{ m.seq }}</span>
+              </button>
+              <div v-if="expanded.has(m.seq)" class="message-detail">
+                <CodeMirrorHost :doc="m.json" language="json" :read-only="true" />
+              </div>
+            </div>
+          </template>
+        </VirtualList>
         <EmptyState v-if="messages.length === 0" icon="arrow-right" label="Call this method to see its response">
           <button
             v-if="hasHistory"
@@ -251,23 +296,34 @@ const viewingTime = computed(() => {
 .message-list {
   flex: 1;
   min-height: 0;
-  overflow: auto;
   display: flex;
   flex-direction: column;
 }
 
-.message-entry {
-  border-bottom: var(--kira-border-width) solid var(--kira-border);
+.message-virtual-list {
+  flex: 1;
+  min-height: 0;
 }
 
+.message-entry {
+  display: flex;
+  flex-direction: column;
+}
+
+/* height (not padding) so this row's own rendered height stays exactly MESSAGE_ROW_HEIGHT
+   (22px, the script's own numeric constant, kept equal to --kira-h-sm here) — VirtualList
+   positions every row assuming that exact height, border included via box-sizing. */
 .message-header {
   width: 100%;
+  height: var(--kira-h-sm);
+  box-sizing: border-box;
   display: flex;
   align-items: center;
   gap: var(--kira-s-2);
-  padding: var(--kira-s-2) var(--kira-s-3);
+  padding: 0 var(--kira-s-3);
   background: none;
   border: none;
+  border-bottom: var(--kira-border-width) solid var(--kira-border);
   cursor: pointer;
   font: inherit;
   color: var(--kira-fg);
@@ -275,6 +331,16 @@ const viewingTime = computed(() => {
 
 .message-header:hover {
   background: var(--kira-hover);
+}
+
+/* Fixed height (not auto-grow) for the same reason .message-header's is — MUST stay numerically
+   equal to the script's own MESSAGE_DETAIL_HEIGHT (200px); a JSON document taller than this
+   scrolls inside CodeMirrorHost's own scroller instead of growing the row. */
+.message-detail {
+  height: 200px;
+  box-sizing: border-box;
+  overflow: auto;
+  border-bottom: var(--kira-border-width) solid var(--kira-border);
 }
 
 .metadata-groups {
