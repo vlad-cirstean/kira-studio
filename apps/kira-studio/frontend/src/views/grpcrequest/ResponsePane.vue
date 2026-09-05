@@ -209,7 +209,7 @@ const viewingTime = computed(() => {
             <span class="p-kv-name mono">{{ h.name }}</span>
             <span class="p-kv-value mono">{{ h.value }}</span>
           </div>
-          <EmptyState v-if="header.length === 0" icon="arrow-right" label="No header metadata" />
+          <div v-if="header.length === 0" class="p-xs dim">No header metadata</div>
         </div>
         <div class="metadata-group">
           <div class="metadata-group-title p-xs muted">Trailer</div>
@@ -217,7 +217,7 @@ const viewingTime = computed(() => {
             <span class="p-kv-name mono">{{ t.name }}</span>
             <span class="p-kv-value mono">{{ t.value }}</span>
           </div>
-          <EmptyState v-if="trailer.length === 0" icon="arrow-right" label="No trailer metadata" />
+          <div v-if="trailer.length === 0" class="p-xs dim">No trailer metadata</div>
         </div>
       </div>
       <div v-else class="message-list" data-testid="grpc-message-list">
@@ -230,7 +230,7 @@ const viewingTime = computed(() => {
           </button>
           <CodeMirrorHost v-if="expanded.has(m.seq)" :doc="m.json" language="json" :read-only="true" />
         </div>
-        <EmptyState v-if="messages.length === 0" icon="arrow-right" label="Call this method to see its response here">
+        <EmptyState v-if="messages.length === 0" icon="arrow-right" label="Call this method to see its response">
           <button
             v-if="hasHistory"
             type="button"
@@ -244,7 +244,7 @@ const viewingTime = computed(() => {
       </div>
     </template>
 
-    <EmptyState v-else icon="arrow-right" label="Call this method to see its response here" />
+    <EmptyState v-else icon="arrow-right" label="Call this method to see its response" />
   </div>
 </template>
 

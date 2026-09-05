@@ -5,6 +5,7 @@ import { confirmDialog } from '../state/confirmDialog';
 import CodiconIcon from '../theme/CodiconIcon.vue';
 import AppButton from '../theme/primitives/AppButton.vue';
 import DialogFrame from '../theme/primitives/DialogFrame.vue';
+import EmptyState from '../theme/primitives/EmptyState.vue';
 import IconButton from '../theme/primitives/IconButton.vue';
 import TextField from '../theme/primitives/TextField.vue';
 import {
@@ -165,9 +166,12 @@ function close(): void {
           @click="onDelete(env.id, env.name)"
         />
       </div>
-      <div v-if="variablesState.environments.length === 0" class="empty" data-testid="environments-empty">
-        No environments yet.
-      </div>
+      <EmptyState
+        v-if="variablesState.environments.length === 0"
+        icon="settings-gear"
+        label="No environments yet"
+        data-testid="environments-empty"
+      />
     </div>
     <template #footer>
       <span class="p-dialog-actions">
@@ -204,9 +208,4 @@ function close(): void {
   min-width: 0;
 }
 
-.empty {
-  padding: var(--kira-s-4);
-  color: var(--kira-fg-disabled);
-  text-align: center;
-}
 </style>

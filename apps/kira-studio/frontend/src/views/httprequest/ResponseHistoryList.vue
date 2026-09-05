@@ -105,11 +105,15 @@ async function onClear(): Promise<void> {
     <EmptyState
       v-if="entries.length === 0"
       icon="history"
-      label="No past responses yet. Sending this request will record one."
+      label="No past responses yet"
       data-testid="http-history-empty"
     >
-      <span v-if="isScratch" class="p-xs dim scratch-note">
-        Scratch requests keep their history until the tab is closed — save this request to keep it.
+      <span class="p-xs dim scratch-note">
+        Sending this request will record one.
+        <template v-if="isScratch">
+          Scratch requests keep their history until the tab is closed — save this request to keep
+          it.
+        </template>
       </span>
     </EmptyState>
 

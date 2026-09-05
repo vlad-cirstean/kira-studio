@@ -149,16 +149,10 @@ onUnmounted(() => {
     </template>
     <template #empty>
       <ImportReportStrip />
-      <EmptyState icon="globe" label="No collections yet">
-        <button type="button" class="p-dlgbtn primary" data-testid="new-request-empty" @click="openApiRequestTab">
-          New request
-        </button>
-        <button type="button" class="p-dlgbtn" data-testid="new-collection-empty" @click="onNewCollection">
-          New collection
-        </button>
-        <button type="button" class="p-dlgbtn" data-testid="import-collection-empty" @click="onImport">
-          Import collection…
-        </button>
+      <EmptyState icon="folder-library" label="No collections yet">
+        <span class="p-xs dim side-empty-text"
+          >Create one from the <b>+</b> above, or import a Postman collection.</span
+        >
       </EmptyState>
     </template>
   </PanelShell>
@@ -175,6 +169,10 @@ onUnmounted(() => {
 .tree-body {
   flex: 1;
   min-height: 0;
+}
+
+.side-empty-text {
+  line-height: 1.5;
 }
 
 .spin {

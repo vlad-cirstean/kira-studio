@@ -273,11 +273,11 @@ function residueNote(hop: HttpTimelineHop): string {
       </div>
     </template>
 
-    <EmptyState v-else-if="response" icon="watch" label="This response has no timeline." data-testid="http-timeline-empty" />
+    <EmptyState v-else-if="response" icon="watch" label="No timeline for this response" data-testid="http-timeline-empty" />
     <EmptyState
       v-else-if="rt?.status === 'error'"
       icon="warning"
-      label="This request failed before any timeline data was captured."
+      label="This request failed before any timeline was captured"
       data-testid="http-timeline-empty"
     />
     <EmptyState v-else icon="arrow-right" label="Send a request to see the response" />

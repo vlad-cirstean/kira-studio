@@ -55,14 +55,19 @@ const elisionNote = computed(() =>
 );
 
 // D7: distinct from a live dump failure (D2) — a stored entry can never have a raw view at all,
-// while a dump failure is this send's own, and is worth naming differently.
-const emptyReason = computed(() => {
+// while a dump failure is this send's own, and is worth naming differently. A sentence belongs in
+// a strip, a label belongs in a label (F13/D10) — so the terse label and the longer explanation
+// are two separate computeds rather than one concatenated string.
+const emptyLabel = computed(() => {
   if (!response.value) return '';
   if (wire.value) return '';
-  if (viewingStored.value) {
-    return 'No raw view for a stored response — the raw exchange is kept only for the response currently in this tab.';
-  }
-  return 'The raw exchange could not be rendered for this response.';
+  return viewingStored.value
+    ? 'No raw view for a stored response'
+    : 'The raw exchange could not be rendered';
+});
+const emptyExplanation = computed(() => {
+  if (!response.value || wire.value || !viewingStored.value) return '';
+  return 'The raw exchange is kept only for the response currently in this tab.';
 });
 
 const requestCaption = computed(() => {
@@ -152,7 +157,12 @@ function onCopyResponse(): void {
       </div>
     </template>
 
-    <EmptyState v-else-if="emptyReason" icon="file-binary" :label="emptyReason" />
+    <template v-else-if="emptyLabel">
+      <MessageStrip v-if="emptyExplanation" tone="note" data-testid="http-raw-empty-note">
+        {{ emptyExplanation }}
+      </MessageStrip>
+      <EmptyState icon="file-binary" :label="emptyLabel" />
+    </template>
     <EmptyState v-else icon="arrow-right" label="Send a request to see the response" />
   </div>
 </template>

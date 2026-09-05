@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { ApiVariableHistoryEntry } from '@shared/domain/variables';
+import EmptyState from '../theme/primitives/EmptyState.vue';
 import IconButton from '../theme/primitives/IconButton.vue';
 import PopoverPanel from '../theme/primitives/PopoverPanel.vue';
 import {
@@ -58,9 +59,12 @@ function close(): void {
     @close="close"
   >
     <div class="history-menu">
-      <div v-if="historyMenuState.entries.length === 0" class="empty" data-testid="variable-history-empty">
-        No previous values.
-      </div>
+      <EmptyState
+        v-if="historyMenuState.entries.length === 0"
+        icon="history"
+        label="No previous values"
+        data-testid="variable-history-empty"
+      />
       <div
         v-for="entry in historyMenuState.entries"
         :key="entry.id"
@@ -101,12 +105,6 @@ function close(): void {
   max-height: 320px;
   overflow: auto;
   padding: var(--kira-s-2);
-}
-
-.empty {
-  padding: var(--kira-s-4);
-  color: var(--kira-fg-disabled);
-  text-align: center;
 }
 
 .history-entry {

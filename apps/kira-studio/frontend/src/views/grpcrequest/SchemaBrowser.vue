@@ -158,7 +158,7 @@ function selectMethod(service: string, method: string): void {
       <EmptyState
         v-else-if="rt?.status !== 'loading'"
         icon="symbol-interface"
-        label="Choose a source above to browse this server's services."
+        label="Choose a source above to browse this server's services"
       />
     </div>
   </div>
