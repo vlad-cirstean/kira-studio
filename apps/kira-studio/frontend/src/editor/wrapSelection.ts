@@ -9,6 +9,15 @@ import { EditorView } from '@codemirror/view';
 // unterminated string literal never gets a chance to look unterminated. This handler only ever
 // fires over a real, non-empty selection; a collapsed cursor falls through to the editor's
 // ordinary single-character insert, leaving every existing typing/lint behavior untouched.
+//
+// P15b D5(a): `closeBrackets()` itself now exists in this app, behind `CodeMirrorHost.vue`'s own
+// `autoCloseBrackets` prop — but only where the reason above does not apply. The console
+// (`ConsoleView.vue`, the one `lintSource` caller, F3) never passes it and keeps exactly this
+// selection-only behavior; the request body editor (`RequestBodyPane.vue`, which has no lint of
+// its own to protect) is the one surface where the fuller `closeBrackets()` is turned on. This
+// handler itself is unconditional either way — it fires on every CodeMirrorHost regardless of that
+// prop, since a non-empty-selection wrap is never the thing `closeBrackets()`'s own auto-close
+// would have silently "fixed".
 const WRAP_PAIRS: Record<string, string> = {
   '(': ')',
   '[': ']',

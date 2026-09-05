@@ -38,3 +38,66 @@ export function wrapSelectionOnType(e: KeyboardEvent): void {
   el.selectionEnd = end + 1;
   el.dispatchEvent(new Event('input', { bubbles: true }));
 }
+
+// P15b D5(b): every close character this pair table can produce — a quote is its own closer too
+// (WRAP_PAIRS['\''] === '\''), so this Set has one entry per distinct closing character regardless
+// of how many opening keys map to it.
+const CLOSERS = new Set(Object.values(WRAP_PAIRS));
+
+/** Attach as a plain `keydown` listener (alongside `wrapSelectionOnType`, never instead of it — a
+ *  non-empty selection wraps, a collapsed caret auto-closes, and the two can never both fire for
+ *  one keystroke) on a text `<input>`/`<textarea>`. Three rules, none needing remembered state —
+ *  each is decided purely from the text immediately around the caret, so paste/undo can never
+ *  leave this somewhere it doesn't understand:
+ *
+ *  1. a collapsed caret plus a typed opening char inserts the pair, caret left between them;
+ *  2. typing a closing char immediately before an identical one already there steps over it
+ *     instead of inserting a second (`{}` then `}` → `{}`, caret after — checked *before* rule 1,
+ *     since a quote is both an opener and its own closer);
+ *  3. Backspace with the caret between an empty pair (`{|}`) deletes both in one keystroke.
+ *
+ *  `e.isComposing` bails out — a CJK/IME composition keydown must never be mistaken for a literal
+ *  bracket/quote keystroke (not exercised by this sandbox's tests; recorded, not claimed, per the
+ *  plan's own §4). */
+export function autoClosePairsOnType(e: KeyboardEvent): void {
+  if (e.metaKey || e.ctrlKey || e.altKey || e.isComposing) return;
+  const el = e.target;
+  if (!(el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement)) return;
+  const start = el.selectionStart;
+  const end = el.selectionEnd;
+  // Every rule below is a collapsed-caret rule — a real (non-empty) selection is wrapSelectionOnType's
+  // own territory, never this function's.
+  if (start === null || end === null || start !== end) return;
+
+  if (e.key === 'Backspace') {
+    if (start === 0) return;
+    const before = el.value[start - 1];
+    const after = el.value[start];
+    if (WRAP_PAIRS[before] !== after) return;
+    e.preventDefault();
+    const value = el.value;
+    el.value = value.slice(0, start - 1) + value.slice(start + 1);
+    el.selectionStart = start - 1;
+    el.selectionEnd = start - 1;
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    return;
+  }
+
+  if (CLOSERS.has(e.key) && el.value[start] === e.key) {
+    // The value itself is unchanged — only the caret moves past the character already there — so
+    // no 'input' event fires, matching what a real "step over" keystroke does to a v-model.
+    e.preventDefault();
+    el.selectionStart = start + 1;
+    el.selectionEnd = start + 1;
+    return;
+  }
+
+  const close = WRAP_PAIRS[e.key];
+  if (!close) return;
+  e.preventDefault();
+  const value = el.value;
+  el.value = `${value.slice(0, start)}${e.key}${close}${value.slice(start)}`;
+  el.selectionStart = start + 1;
+  el.selectionEnd = start + 1;
+  el.dispatchEvent(new Event('input', { bubbles: true }));
+}

@@ -149,6 +149,7 @@ const caption = computed(() =>
       language="plain"
       :read-only="false"
       :range-highlights="variables?.rangeHighlights"
+      auto-close-brackets
       @update:doc="onRawChange"
     />
     <CodeMirrorHost
@@ -157,6 +158,7 @@ const caption = computed(() =>
       :language="editorLanguage"
       :read-only="false"
       :range-highlights="variables?.rangeHighlights"
+      auto-close-brackets
       @update:doc="onCodeChange"
     />
     <UrlEncodedTable v-else-if="tab.state.bodyMode === 'urlencoded'" :tab="tab" :variables="variables" />

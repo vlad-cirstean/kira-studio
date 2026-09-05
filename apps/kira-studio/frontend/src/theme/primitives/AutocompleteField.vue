@@ -6,7 +6,7 @@ import type { RangeHighlight } from '../../editor/variableHighlight';
 import type { SqlDialect } from '../../views/shared/sqlIdent';
 import CodiconIcon from '../CodiconIcon.vue';
 import { computeFloatPosition, pointReference } from '../floatingPosition';
-import { wrapSelectionOnType } from '../wrapSelection';
+import { autoClosePairsOnType, wrapSelectionOnType } from '../wrapSelection';
 import { type Completion, MAX_VISIBLE, rankCandidates, tokenAt } from './completion';
 
 // Mirrors TextField.vue's own inheritAttrs:false — data-testid and friends belong on the real
@@ -177,11 +177,13 @@ function accept(completion: Completion): void {
 function onKeydown(e: KeyboardEvent): void {
   // D3(c): any keystroke closes the hover panel — the same close set the completion popup uses.
   closeHover();
-  // Item 5: a bracket/quote typed over a selection wraps it (wrapSelection.ts) rather than
-  // running through the completion machinery below — onInput's own listener picks up the
-  // synthetic 'input' event this dispatches, same as any other edit.
+  // Item 5 / P15b D5(b): a bracket/quote typed over a selection wraps it, a collapsed caret
+  // auto-closes it (theme/wrapSelection.ts, the two can never both fire for one keystroke) —
+  // rather than running through the completion machinery below; onInput's own listener picks up
+  // the synthetic 'input' event either one dispatches, same as any other edit.
   const before = (e.target as HTMLInputElement).value;
   wrapSelectionOnType(e);
+  autoClosePairsOnType(e);
   if ((e.target as HTMLInputElement).value !== before) return;
   // Ctrl+Space / Cmd+Space: explicit "show me everything", matching completionKeymap's own
   // binding (docs/v1/plans/P18-autocomplete.md realities #8) so the console and these plain fields

@@ -3,6 +3,8 @@ import {
   acceptCompletion,
   autocompletion,
   type CompletionSource,
+  closeBrackets,
+  closeBracketsKeymap,
   completionKeymap,
 } from '@codemirror/autocomplete';
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
@@ -59,6 +61,14 @@ const props = defineProps<{
    *  (variableCompletion.ts is the one caller today, painting `{{variable}}` references). Ignored
    *  (no extra colour) when absent, which every prior host stays. */
   rangeHighlights?: (doc: string) => readonly RangeHighlight[];
+  /** P15b D5(a): `@codemirror/autocomplete`'s own `closeBrackets()` — off by default, so every
+   *  existing host (most importantly the console, `ConsoleView.vue`) is untouched. `false`/absent
+   *  is not merely "this host never asked" for the console specifically: `editor/wrapSelection.ts`'s
+   *  own doc comment records *why* auto-close stays off there (its lint must see an unterminated
+   *  string literal to catch it) — this prop is what lets that reason apply to one surface without
+   *  silently reaching every other CodeMirrorHost. On for the request body editor
+   *  (RequestBodyPane.vue), which has no such lint. */
+  autoCloseBrackets?: boolean;
 }>();
 
 // Every prior use of this host is read-only (definitions, previews, op-log detail rows); the query
@@ -90,6 +100,7 @@ const lintCompartment = new Compartment();
 const hoverCompartment = new Compartment();
 const wordWrapCompartment = new Compartment();
 const rangeCompartment = new Compartment();
+const closeBracketsCompartment = new Compartment();
 
 // P42 D14/D14a: every editable and read-only surface mounts through this one host, so this is
 // the one place a wrap setting has to live. `settingsState.appearance.wordWrap` defaults to
@@ -194,6 +205,19 @@ function resolveRangeHighlights(): Extension[] {
   return props.rangeHighlights ? [rangeHighlightPlugin(props.rangeHighlights)] : [];
 }
 
+// D5(a): `false`/absent by default — every existing host (the console included) is untouched.
+// `closeBracketsKeymap` carries Backspace's own pair-delete behaviour (typing inside an
+// auto-inserted empty pair and hitting Backspace removes both) — `Prec.highest` mirrors
+// `CONSOLE_COMPLETION_KEYMAP`'s own reasoning just above: `keymap.of(defaultKeymap)` is bound
+// earlier in this file's extensions array, and an earlier-bound keymap wins a same-key collision
+// by array order, so without this Backspace would always fall to defaultKeymap's ordinary
+// delete-one-character behaviour first.
+function resolveAutoCloseBrackets(): Extension[] {
+  return props.autoCloseBrackets
+    ? [closeBrackets(), Prec.highest(keymap.of(closeBracketsKeymap))]
+    : [];
+}
+
 onMounted(() => {
   const state = EditorState.create({
     doc: props.doc,
@@ -212,6 +236,7 @@ onMounted(() => {
       lintCompartment.of(resolveLint()),
       hoverCompartment.of(resolveHover()),
       rangeCompartment.of(resolveRangeHighlights()),
+      closeBracketsCompartment.of(resolveAutoCloseBrackets()),
       syntaxHighlighting(kiraHighlightStyle),
       kiraEditorTheme,
       languageCompartment.of(resolveLanguage()),
@@ -311,6 +336,14 @@ watch(
   () => {
     if (!view) return;
     view.dispatch({ effects: rangeCompartment.reconfigure(resolveRangeHighlights()) });
+  },
+);
+
+watch(
+  () => props.autoCloseBrackets,
+  () => {
+    if (!view) return;
+    view.dispatch({ effects: closeBracketsCompartment.reconfigure(resolveAutoCloseBrackets()) });
   },
 );
 

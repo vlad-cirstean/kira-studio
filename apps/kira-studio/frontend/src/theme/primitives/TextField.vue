@@ -1,7 +1,16 @@
 <script setup lang="ts">
 import { computed, ref, useAttrs } from 'vue';
 import CodiconIcon from '../CodiconIcon.vue';
-import { wrapSelectionOnType } from '../wrapSelection';
+import { autoClosePairsOnType, wrapSelectionOnType } from '../wrapSelection';
+
+// P15b D5(b): a non-empty selection wraps (wrapSelectionOnType), a collapsed caret auto-closes
+// (autoClosePairsOnType) — the two can never both fire for one keystroke, since whichever one acts
+// first (only wrapSelectionOnType can, on a non-empty selection) leaves the selection non-empty
+// afterward, which is exactly the guard the second function bails out on.
+function onKeydown(e: KeyboardEvent): void {
+  wrapSelectionOnType(e);
+  autoClosePairsOnType(e);
+}
 
 // P4. inheritAttrs is off because the one attribute every call site actually needs to land
 // correctly — data-testid — belongs on the real <input> a test drives, not on this wrapping
@@ -72,7 +81,7 @@ function stepBy(dir: 1 | -1): void {
       :value="modelValue"
       :placeholder="placeholder"
       @input="emit('update:modelValue', ($event.target as HTMLInputElement).value)"
-      @keydown="wrapSelectionOnType"
+      @keydown="onKeydown"
       @keydown.enter="emit('enter')"
       @blur="emit('blur', $event)"
     />
