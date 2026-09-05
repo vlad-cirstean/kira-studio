@@ -415,3 +415,199 @@ test('ArrowDown moves focus down a column, but not while the completion popup is
   await expect(names.nth(0)).toBeFocused();
   await expect(names.nth(1)).not.toBeFocused();
 });
+
+// P16 §4: the Api half of this phase's own new coverage — D6 (dropdown height parity), D8/D9
+// (the two retinted tokens), D11 (the response find bar), D12/D13 (the headers pane filter and
+// the request tables' index-carry-through under a filter).
+
+test('http-method-select and http-url report the same height (D6)', async ({ relaunch }) => {
+  const CONTROL: ControlSnapshot[] = [
+    { channel: IPC.tabsList, response: [httpRequestTab('tab-1', 0, true, {})] },
+  ];
+  const { window: page } = await relaunch({ control: CONTROL });
+
+  const methodHeight = await page
+    .locator('[data-testid="http-method-select"]')
+    .evaluate((el) => (el as HTMLElement).offsetHeight);
+  const urlBoxHeight = await page
+    .locator('.p-input:has([data-testid="http-url"])')
+    .evaluate((el) => (el as HTMLElement).offsetHeight);
+  expect(urlBoxHeight).toBe(methodHeight);
+});
+
+test('a placeholder is muted text, and .dim text is subtle text (D8/D9)', async ({ relaunch }) => {
+  const RESPONSE = {
+    status: 200,
+    statusText: 'OK',
+    proto: 'HTTP/1.1',
+    headers: [],
+    body: '',
+    bodyEncoding: 'utf8',
+    bodyBytes: 0,
+    bodyTruncated: false,
+    elapsedMs: 5,
+    finalUrl: 'https://api.example.com/',
+    redirects: [],
+  };
+  const CONTROL: ControlSnapshot[] = [
+    { channel: IPC.tabsList, response: [httpRequestTab('tab-1', 0, true, {})] },
+    { channel: IPC.httpSend, response: RESPONSE },
+  ];
+  const { window: page } = await relaunch({ control: CONTROL });
+
+  // D8: pins the two tokens against a future well-meaning revert — computed colour, not the
+  // token's own declared value, since ::placeholder pseudo-elements don't expose custom
+  // properties directly to getComputedStyle on the real element.
+  const [placeholderColor, mutedToken] = await page.evaluate(() => {
+    const input = document.querySelector('[data-testid="http-url"]') as HTMLElement;
+    const cs = getComputedStyle(input, '::placeholder');
+    const root = getComputedStyle(document.documentElement);
+    return [cs.color, root.getPropertyValue('--kira-fg-muted').trim()];
+  });
+  expect(placeholderColor).not.toBe('');
+  // Convert the muted token (a hex string) and the computed placeholder colour to the same
+  // rgb(...) form the browser reports, via a throwaway element.
+  const mutedRgb = await page.evaluate((hex) => {
+    const probe = document.createElement('span');
+    probe.style.color = hex;
+    document.body.appendChild(probe);
+    const rgb = getComputedStyle(probe).color;
+    probe.remove();
+    return rgb;
+  }, mutedToken);
+  expect(placeholderColor).toBe(mutedRgb);
+
+  // D9: a `.dim` element (the elapsed-time caption in the response status row, shown once a
+  // response has landed) now reads --kira-fg-subtle, not --kira-fg-disabled.
+  await page.click('[data-testid="http-send"]');
+  await expect(page.locator('[data-testid="http-elapsed"]')).toBeVisible();
+  const [dimColor, subtleRgb] = await page.evaluate(() => {
+    const el = document.querySelector('[data-testid="http-elapsed"]') as HTMLElement;
+    const probe = document.createElement('span');
+    probe.style.color = getComputedStyle(document.documentElement)
+      .getPropertyValue('--kira-fg-subtle')
+      .trim();
+    document.body.appendChild(probe);
+    const rgb = getComputedStyle(probe).color;
+    probe.remove();
+    return [getComputedStyle(el).color, rgb];
+  });
+  expect(dimColor).toBe(subtleRgb);
+});
+
+test('the response find bar counts and steps through matches, and Escape clears them (D11)', async ({
+  relaunch,
+}) => {
+  const RESPONSE_BODY = '{"id":1,"name":"Ada","note":"Ada Lovelace"}'; // "Ada" appears twice
+  const RESPONSE = {
+    status: 200,
+    statusText: 'OK',
+    proto: 'HTTP/1.1',
+    headers: [{ name: 'Content-Type', value: 'application/json' }],
+    body: RESPONSE_BODY,
+    bodyEncoding: 'utf8',
+    bodyBytes: RESPONSE_BODY.length,
+    bodyTruncated: false,
+    elapsedMs: 10,
+    finalUrl: 'https://api.example.com/users',
+    redirects: [],
+  };
+  const CONTROL: ControlSnapshot[] = [
+    {
+      channel: IPC.tabsList,
+      response: [httpRequestTab('tab-1', 0, true, { url: 'https://api.example.com/users' })],
+    },
+    { channel: IPC.httpSend, response: RESPONSE },
+  ];
+  const { window: page } = await relaunch({ control: CONTROL });
+
+  await page.click('[data-testid="http-send"]');
+  await expect(page.locator('[data-testid="http-status"]')).toContainText('200');
+
+  await page.click('[data-testid="http-find-toggle"]');
+  await expect(page.locator('[data-testid="http-find-bar"]')).toBeVisible();
+  await page.fill('[data-testid="http-find-input"]', 'Ada');
+  await expect(page.locator('[data-testid="http-find-count"]')).toHaveText('1 of 2');
+  await page.click('[data-testid="http-find-next"]');
+  await expect(page.locator('[data-testid="http-find-count"]')).toHaveText('2 of 2');
+  await expect(page.locator('.cm-kira-find-match-current')).toHaveCount(1);
+
+  await page.keyboard.press('Escape');
+  await expect(page.locator('[data-testid="http-find-bar"]')).toHaveCount(0);
+  await expect(page.locator('.cm-kira-find-match')).toHaveCount(0);
+  await expect(page.locator('.cm-kira-find-match-current')).toHaveCount(0);
+});
+
+test('filtering the response headers pane, and filtering the request headers table without losing a row’s identity (D12/D13)', async ({
+  relaunch,
+}) => {
+  const RESPONSE = {
+    status: 200,
+    statusText: 'OK',
+    proto: 'HTTP/1.1',
+    headers: [
+      { name: 'Content-Type', value: 'application/json' },
+      { name: 'X-Request-Id', value: 'abc123' },
+      { name: 'Cache-Control', value: 'no-store' },
+    ],
+    body: '{}',
+    bodyEncoding: 'utf8',
+    bodyBytes: 2,
+    bodyTruncated: false,
+    elapsedMs: 5,
+    finalUrl: 'https://api.example.com/users',
+    redirects: [],
+  };
+  const CONTROL: ControlSnapshot[] = [
+    {
+      channel: IPC.tabsList,
+      response: [
+        httpRequestTab('tab-1', 0, true, {
+          url: 'https://api.example.com/users',
+          headers: [
+            { name: 'Authorization', value: 'Bearer x', enabled: true },
+            { name: 'Accept', value: 'application/json', enabled: true },
+            { name: 'X-Debug', value: 'on', enabled: true },
+          ],
+        }),
+      ],
+    },
+    { channel: IPC.httpSend, response: RESPONSE },
+  ];
+  const { window: page } = await relaunch({ control: CONTROL });
+
+  // D12: the response headers pane's own filter, by name or value.
+  await page.click('[data-testid="http-send"]');
+  await page.click('[data-testid="http-response-pane-headers"]');
+  await expect(page.locator('[data-testid="http-response-headers"] .p-kv-row')).toHaveCount(3);
+  await page.fill('[data-testid="http-response-headers-filter"]', 'no-store');
+  await expect(page.locator('[data-testid="http-response-headers"] .p-kv-row')).toHaveCount(1);
+  await expect(page.locator('[data-testid="http-response-headers-count"]')).toHaveText(
+    '1 of 3 headers',
+  );
+  await page.fill('[data-testid="http-response-headers-filter"]', '');
+
+  // D13/F11: the request headers table's own filter, and the index-carry-through hazard —
+  // filtering down to one real row and editing it must write to *that* row, never to whichever
+  // position it happens to land on in the filtered list.
+  await page.click('[data-testid="http-request-pane-headers"]');
+  await page.click('[data-testid="http-field-filter-toggle"]');
+  await page.fill('[data-testid="http-field-filter"]', 'Debug');
+  const filteredRows = page.locator('[data-testid="http-header-row"]');
+  await expect(filteredRows).toHaveCount(2); // X-Debug + the trailing blank row, never hidden
+  await filteredRows.first().locator('[data-testid="http-header-value"]').fill('off');
+
+  // Closing the toggle clears the filter and restores every row (D13's own rule) — the edit above
+  // must have landed on X-Debug (real position 2), not on Authorization (position 0, the filtered
+  // list's own position 0) and not on the trailing row.
+  await page.click('[data-testid="http-field-filter-toggle"]');
+  await expect(page.locator('[data-testid="http-field-filter"]')).toHaveCount(0);
+  const allRows = page.locator('[data-testid="http-header-row"]');
+  await expect(allRows).toHaveCount(4); // three real rows + trailing
+  await expect(allRows.nth(0).locator('[data-testid="http-header-name"]')).toHaveValue(
+    'Authorization',
+  );
+  await expect(allRows.nth(0).locator('[data-testid="http-header-value"]')).toHaveValue('Bearer x');
+  await expect(allRows.nth(2).locator('[data-testid="http-header-name"]')).toHaveValue('X-Debug');
+  await expect(allRows.nth(2).locator('[data-testid="http-header-value"]')).toHaveValue('off');
+});

@@ -178,3 +178,16 @@ test('an out-of-range value blocks Save until corrected', async ({ relaunch }) =
   await expect(page.locator('[data-testid="settings-save"]')).toBeEnabled();
   await expect(page.locator('[data-testid="settings-cache-budget-error"]')).toHaveCount(0);
 });
+
+// P16 D6: SettingsDialog is one of the two call sites this phase's own .p-select.md opt-in
+// exists for — its two selects sit correctly at h-md (26px) beside size="md" TextFields, unlike
+// the ten default-h-sm call sites the height flip itself fixes.
+test('the font-family select is 26px, matching its own row (D6)', async ({ relaunch }) => {
+  const { window: page } = await relaunch();
+  await openSettings(page);
+
+  const height = await page
+    .locator('[data-testid="settings-font-family"]')
+    .evaluate((el) => (el as HTMLElement).offsetHeight);
+  expect(height).toBe(26);
+});

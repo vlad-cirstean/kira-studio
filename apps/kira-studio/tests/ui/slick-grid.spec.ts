@@ -2,7 +2,7 @@ import { DATA_OP } from '@shared/protocol/data-ops';
 import type { ColumnDescriptor } from '@shared/protocol/page';
 import type { ControlSnapshot, PortSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
-import { cellNavButton, gridCell, gridRow } from './support/grid';
+import { cellNavButton, gridCell, gridRow, gridScroller } from './support/grid';
 import { IPC } from './support/ipcChannels';
 import {
   APP_CHILDREN,
@@ -1800,4 +1800,110 @@ test('P22 Pass B follow-up — a range selection under an active filter only cop
   // in between (which don't render while the filter is active, so their own class can't be
   // asserted via a DOM lookup for an absent row) and not the pre-fix range's full 90-row span.
   await expect(page.locator('.p-chip.warn')).toHaveText('4 rows pending');
+});
+
+// P16 D3/D4: two new-coverage cases from §4 of the P16 plan. order_items (F2's own real-capture
+// table) has two short-data FK columns (order_id/product_id, values '1'/'2'/'5') — exactly the
+// combination whose header furniture (padding + sort indicator + FK badge, ~50px) the old flat
+// 64px floor didn't reserve room for.
+test('P16 D3/D4 — a column min-width knows what its header renders, and overscroll agrees on all four edges', async ({
+  relaunch,
+}) => {
+  const CONNECTION_ID = 'conn-slick-header-chrome';
+  const CONNECTION_SUMMARY = postgresConnectionSummary(CONNECTION_ID, 'Header Chrome DB', 'amber');
+  const control: ControlSnapshot[] = [
+    { channel: IPC.connectionsList, response: [] },
+    {
+      channel: IPC.connectionsCreate,
+      args: {
+        name: 'Header Chrome DB',
+        kind: 'postgres',
+        color: 'amber',
+        mode: 'fields',
+        readOnly: false,
+        host: '127.0.0.1',
+        port: 5432,
+        database: 'kira_test',
+        username: 'postgres',
+        password: null,
+        uri: null,
+        options: {},
+        preconnect: null,
+        preconnectSidecar: false,
+        autoExplain: false,
+        throttlePerSec: 0,
+      },
+      response: CONNECTION_SUMMARY,
+    },
+    ...orderItemsFixture(CONNECTION_ID).control,
+  ];
+  const { window: page } = await relaunch({
+    control,
+    stream: orderItemsFixture(CONNECTION_ID).port,
+  });
+  await page.click('[data-testid="add-connection"]');
+  await page.click('[data-testid="connection-kind-postgres"]');
+  await page.fill('[data-testid="connection-name"]', 'Header Chrome DB');
+  await page.fill('[data-testid="connection-host"]', '127.0.0.1');
+  await page.fill('[data-testid="connection-port"]', '5432');
+  await page.fill('[data-testid="connection-database"]', 'kira_test');
+  await page.fill('[data-testid="connection-username"]', 'postgres');
+  await page.click('[data-testid="color-amber"]');
+  await page.click('[data-testid="connection-save"]');
+  await expect(page.locator('[data-testid="connection-dialog"]')).toHaveCount(0);
+
+  const connRow = page.locator('[data-testid="tree-row"][data-kind="connection"]');
+  await openRowMenu(page, '');
+  await page.click('[data-testid="menu-item-connect"]');
+  await expect(connRow.locator('.status-dot')).toHaveAttribute('data-status', 'connected', {
+    timeout: 10_000,
+  });
+  await expandRow(page, '');
+  await expandRow(page, DB_PATH);
+  await expandRow(page, APP_PATH);
+  const row = await findRow(page, ORDER_ITEMS_PATH);
+  await row.dblclick();
+
+  const header = page.locator('[data-testid="grid-header-cell"][data-column="product_id"]');
+  await expect(header).toBeVisible();
+  const nameEl = header.locator('.slick-column-name');
+  const notEllipsised = () =>
+    nameEl.evaluate((el) => (el as HTMLElement).scrollWidth <= (el as HTMLElement).clientWidth + 1);
+
+  // D4 case 3: the header text is not ellipsised at rest — the item's own success condition,
+  // measured rather than screenshotted.
+  await expect.poll(notEllipsised).toBe(true);
+
+  // D4 case 4: dragging the resize handle to the far left cannot crop the header again — the
+  // floor itself is header-aware now, not the old flat 64px MIN_WIDTH (which left barely any room
+  // for an FK column's own header furniture, F2's own arithmetic).
+  const handle = header.locator('.slick-resizable-handle');
+  const box = await handle.boundingBox();
+  if (!box) throw new Error('resize handle has no bounding box');
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width / 2 - 500, box.y + box.height / 2, { steps: 10 });
+  await page.mouse.up();
+  await expect.poll(notEllipsised).toBe(true);
+
+  // D3: every .slick-viewport reports overscroll-behavior: none, and a wheel scroll past the top
+  // edge leaves scrollTop at 0 (the bounce itself is not assertable in this sandbox — §4 names
+  // that limit explicitly).
+  const viewportCount = await page.locator('.slick-viewport').count();
+  expect(viewportCount).toBeGreaterThan(0);
+  const behaviors = await page
+    .locator('.slick-viewport')
+    .evaluateAll((els) => els.map((el) => getComputedStyle(el).overscrollBehavior));
+  for (const b of behaviors) expect(b).toBe('none');
+
+  const scroller = gridScroller(page);
+  await expect(scroller).toHaveJSProperty('scrollTop', 0);
+  const scrollerBox = await scroller.boundingBox();
+  if (!scrollerBox) throw new Error('grid scroller has no bounding box');
+  await page.mouse.move(
+    scrollerBox.x + scrollerBox.width / 2,
+    scrollerBox.y + scrollerBox.height / 2,
+  );
+  await page.mouse.wheel(0, -400);
+  await expect(scroller).toHaveJSProperty('scrollTop', 0);
 });

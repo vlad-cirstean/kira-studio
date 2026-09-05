@@ -1223,6 +1223,34 @@ test('data view — pagination, count, projection, sort, filter, search, stop, N
   await expect.poll(() => firstGutterNumber(page), { timeout: 15_000 }).toBe('1');
   await expect.poll(() => lastGutterNumber(page)).toBe('100');
 
+  // --- P16 D1: the pager sits at the toolbar's right edge, after toolbar-search — a relative
+  // position, not a pixel one, so a token/spacing change can't break it. ---------------------
+  const pagerBox = await page.locator('[data-testid="pager"]').boundingBox();
+  const searchToggleBox = await page.locator('[data-testid="toolbar-search"]').boundingBox();
+  if (!pagerBox || !searchToggleBox) throw new Error('pager or toolbar-search has no bounding box');
+  expect(pagerBox.x).toBeGreaterThan(searchToggleBox.x);
+  await expect(page.locator('[data-testid="pager-next"]')).toBeEnabled();
+
+  // --- P16 D2: the run-state label reserves its own width — the LAW-12 assertion, and the only
+  // one that can catch the toolbar-reflow regression this phase's own D2 fixes. -----------------
+  const runStateLabel = page.locator('.p-run-state .label').first();
+  await expect(runStateLabel).toBeVisible();
+  const { offsetWidth: widthAfterFirstLoad, minWidth } = await runStateLabel.evaluate((el) => {
+    const e = el as HTMLElement;
+    return {
+      offsetWidth: e.offsetWidth,
+      minWidth: Number.parseFloat(getComputedStyle(e).minWidth),
+    };
+  });
+  expect(minWidth).toBeGreaterThan(0);
+  expect(widthAfterFirstLoad).toBeGreaterThanOrEqual(Math.floor(minWidth));
+  // A second, independently-timed load produces its own elapsed-time text — LAW 12's own promise
+  // is that the reserved gutter's outer width can never move regardless of what that text is.
+  await page.click('[data-testid="toolbar-refresh"]');
+  await expect
+    .poll(() => runStateLabel.evaluate((el) => (el as HTMLElement).offsetWidth))
+    .toBe(widthAfterFirstLoad);
+
   // --- pagination: next/prev/first, page sizes ---------------------------------------------
   await page.click('[data-testid="pager-next"]');
   await expect.poll(() => firstGutterNumber(page)).toBe('101');

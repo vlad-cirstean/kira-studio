@@ -272,3 +272,76 @@ test("switching the history popover to a different row clears the previous row's
   await expect(page.locator('[data-testid="variable-history-masked"]')).toBeVisible();
   await expect(page.locator('[data-testid="variable-history-value"]')).toHaveCount(0);
 });
+
+// P16 §5/D14: the variables filter matches the row's `name` and nothing else — this is the test
+// that pins §5's own invariant, that a filter box can never become an oracle a user probes a
+// masked secret's plaintext with. Beside D14's second rule: reordering is refused while filtered.
+test('the variables filter matches a secret’s name, never its plaintext, and disables reordering while filtered', async ({
+  relaunch,
+}) => {
+  const SECRET_VAR = {
+    id: 'var-apikey',
+    scope: 'collection',
+    ownerId: 'col-1',
+    name: 'apiKey',
+    value: '',
+    isSecret: true,
+    sortOrder: 0,
+  };
+  const PLAIN_VAR = {
+    id: 'var-region',
+    scope: 'collection',
+    ownerId: 'col-1',
+    name: 'region',
+    value: 'us-east-1',
+    isSecret: false,
+    sortOrder: 1,
+  };
+  // The mock backend's own record of what this secret decrypts to — never sent to the renderer
+  // for an unrevealed row (D5's projection guarantee, SECRET_VAR.value above is ''), so this
+  // string exists in this test only to prove the filter can't be used to guess it.
+  const SECRET_PLAINTEXT = 's3cr3t-key';
+
+  const CONTROL: ControlSnapshot[] = [
+    { channel: IPC.collectionsList, response: TREE },
+    {
+      channel: IPC.variablesList,
+      args: { scope: 'collection', ownerId: 'col-1' },
+      response: [SECRET_VAR, PLAIN_VAR],
+    },
+  ];
+  const { window: page, control } = await relaunch({ control: CONTROL });
+
+  await openHttpMode(page);
+  await collectionRow(page, 'col-1').click({ button: 'right' });
+  await page.click('[data-testid="menu-item-variables"]');
+  await expect(page.locator('[data-testid="variables-dialog"]')).toBeVisible();
+
+  const realRows = page.locator('[data-testid="variable-row"]:not([data-id=""])');
+  await expect(realRows).toHaveCount(2);
+
+  // Typing the secret's own plaintext into the filter matches nothing — not the secret row (whose
+  // name is "apiKey", not this string) and not the other row either.
+  await page.fill('[data-testid="variables-filter"]', SECRET_PLAINTEXT);
+  await expect(realRows).toHaveCount(0);
+
+  // The variable's own *name* matches, as a name filter should.
+  await page.fill('[data-testid="variables-filter"]', 'apiKey');
+  await expect(realRows).toHaveCount(1);
+  await expect(variableRow(page, 'var-apikey')).toBeVisible();
+
+  // D14: reordering is refused while filtered — the row itself carries `:draggable`, the drag
+  // handle says why via its own tooltip, and Alt+↑ is a no-op.
+  await expect(variableRow(page, 'var-apikey')).toHaveAttribute('draggable', 'false');
+  await expect(
+    variableRow(page, 'var-apikey').locator('[data-testid="variable-grip"]'),
+  ).toHaveAttribute('data-kira-tip', 'Clear the filter to reorder');
+  await variableRow(page, 'var-apikey').locator('[data-testid="variable-name"]').focus();
+  await page.keyboard.press('Alt+ArrowUp');
+  expect(control.log().filter((e) => e.channel === IPC.variablesReorder)).toHaveLength(0);
+
+  // Clearing the filter restores every row, and reordering.
+  await page.fill('[data-testid="variables-filter"]', '');
+  await expect(realRows).toHaveCount(2);
+  await expect(variableRow(page, 'var-apikey')).toHaveAttribute('draggable', 'true');
+});
