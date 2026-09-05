@@ -152,10 +152,14 @@ async function onUpdateSecret(id: string, checked: boolean): Promise<void> {
     await commitDraft(id);
     return;
   }
-  if (id !== '' && revealedValues[id] === undefined) {
-    await revealVariable(id);
-  }
   if (id !== '') {
+    // Finding 5: always go through a real reveal call here, never short-circuited by a frontend
+    // cache that might hold a stale entry from an unrelated dialog (Copy as curl also writes into
+    // this same revealedValues map) or an arbitrarily old reveal from earlier in this same
+    // session — the backend's own grace window (internal/localauth) is the only cache this gate
+    // trusts, so a genuinely-recent reveal still skips the confirm prompt without this map
+    // pretending to be an authorization decision on its own.
+    await revealVariable(id);
     const value = revealedValues[id];
     if (value === undefined) return; // cancelled, unavailable, or errored — stays secret
     draft.value = value;

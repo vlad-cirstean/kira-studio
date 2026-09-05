@@ -10,7 +10,7 @@ import type { HttpCodeLanguage } from '@shared/domain/http';
 import { reactive } from 'vue';
 import { copyText } from '../../clipboard';
 import { openApiRequestTab, patchHttpRequestTabState } from '../tabs';
-import { cachedVariables, revealedValues, revealVariable } from './variables';
+import { cachedVariables, clearRevealed, revealedValues, revealVariable } from './variables';
 
 // P7 D12: the Import-from-curl dialog's own state — mirrors http/state/dynamicValues.ts's shape
 // (one `open` flag, nothing tab-scoped). The pasted text itself is deliberately not stored here:
@@ -170,6 +170,12 @@ export function closeCopyAsCurlDialog(): void {
   for (const key of Object.keys(copyAsCurlDialogState.revealedSecretValues)) {
     delete copyAsCurlDialogState.revealedSecretValues[key];
   }
+  // Finding 5: revealSecretValues below calls the *shared* revealVariable (state/variables.ts),
+  // which writes into variables.ts's own revealedValues map, not this dialog's own
+  // revealedSecretValues — closing only the latter left a stale entry there for
+  // VariablesDialog.vue's own "already revealed" check to silently trust later, with no re-auth
+  // prompt at all.
+  clearRevealed();
 }
 
 /** D10 step 2/4: the command for the *current* reveal state — masked (every deferred span still

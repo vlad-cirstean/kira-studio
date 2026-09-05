@@ -116,10 +116,7 @@ export async function openVariablesDialog(
 
 export function closeVariablesDialog(): void {
   variablesDialogState.open = false;
-  // D5: a revealed value lives only in this transient map, never in tab state or a persisted
-  // column — dropped on close, the same honest "not scrubbed, just dropped" limit P14 §0.3 states
-  // for its own reveal map (JS offers no way to zero a string in memory).
-  for (const id of Object.keys(revealedValues)) delete revealedValues[id];
+  clearRevealed();
 }
 
 async function reloadVariablesDialog(): Promise<void> {
@@ -236,8 +233,20 @@ export function mergedValuesAndSecrets(
 
 /** A revealed variable's plaintext, keyed by variable id — transient, cleared on dialog close
  *  (never written to tab state, never to a collection row). Not reactive-persisted anywhere else:
- *  this is the one place a secret's plaintext exists in the renderer at all. */
+ *  this is the one place a secret's plaintext exists in the renderer at all. Shared with
+ *  state/curl.ts's own reveal loop (revealSecretValues calls the same revealVariable below), so
+ *  clearRevealed is exported rather than kept private — every dialog that can populate this map
+ *  must also be able to clear it (finding 5: a stale entry left behind by one dialog must never
+ *  let a *different*, later-opened dialog trust it in place of its own re-auth gate). */
 export const revealedValues = reactive<Record<string, string>>({});
+
+/** Drops every revealed secret's plaintext from memory — called by every dialog/popover close
+ *  path that can populate revealedValues (closeVariablesDialog here, closeCopyAsCurlDialog in
+ *  curl.ts), the same honest "not scrubbed, just dropped" limit P14 §0.3 states for its own reveal
+ *  map (JS offers no way to zero a string in memory). */
+export function clearRevealed(): void {
+  for (const id of Object.keys(revealedValues)) delete revealedValues[id];
+}
 
 /** P12 D13: runs over http/reveal.ts's shared recurse-once switch — the pattern used to be
  *  hand-copied from ConnectionDialog.vue's own requestReveal (there was nothing importable to
@@ -283,7 +292,17 @@ export const historyMenuState = reactive<HistoryMenuState>({
  *  discipline revealedValues follows, cleared when the popover closes. */
 export const revealedHistoryValues = reactive<Record<string, string>>({});
 
+function clearRevealedHistory(): void {
+  for (const id of Object.keys(revealedHistoryValues)) delete revealedHistoryValues[id];
+}
+
+/** Finding 5: VariableRow.vue's popover is `v-if`-gated on `historyMenuState.variableId ===
+ *  row.id`, so switching from one row's history button to another's unmounts the first popover
+ *  without ever firing its own `@close` — closeHistoryMenu below would never run for it. Clearing
+ *  here too, before the new popover's own state lands, closes that gap regardless of whether the
+ *  previous popover ever closes "cleanly". */
 export async function openHistoryMenu(variableId: string): Promise<void> {
+  clearRevealedHistory();
   historyMenuState.variableId = variableId;
   historyMenuState.open = true;
   historyMenuState.entries = await control.variablesHistory(variableId);
@@ -293,7 +312,7 @@ export function closeHistoryMenu(): void {
   historyMenuState.open = false;
   historyMenuState.variableId = null;
   historyMenuState.entries = [];
-  for (const id of Object.keys(revealedHistoryValues)) delete revealedHistoryValues[id];
+  clearRevealedHistory();
 }
 
 /** P12 D13: runReveal's own second instantiation, over api_variable_history instead of
