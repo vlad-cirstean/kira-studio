@@ -105,6 +105,21 @@
       "warnings": []
     },
     {
+      "name": "finding 5: a single --data-raw with multiple '&'-joined fields splits into separate urlencoded rows",
+      "command": "curl https://x.test/a --data-raw 'username=alice&password=hunter2&remember=1'",
+      "want": {
+        "method": "POST",
+        "url": "https://x.test/a",
+        "bodyMode": "urlencoded",
+        "urlEncoded": [
+          { "name": "username", "value": "alice", "enabled": true },
+          { "name": "password", "value": "hunter2", "enabled": true },
+          { "name": "remember", "value": "1", "enabled": true }
+        ]
+      },
+      "warnings": []
+    },
+    {
       "name": "--json sets both headers and the data",
       "command": "curl https://x.test/a --json '{\"a\":1}'",
       "want": {

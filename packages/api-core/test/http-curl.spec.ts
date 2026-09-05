@@ -326,6 +326,36 @@ describe('parseCurl(toCurl(x)) round-trips every mode (P7 D17)', () => {
     expect(result.state.urlEncoded).toEqual([{ name: 'q', value: 'a&b=c+d e%f', enabled: true }]);
   });
 
+  // Finding 5 (v1.2 P14 round 2): toCurl joins a multi-row urlencoded body into exactly one
+  // --data-raw with its rows '&'-joined (F13) — the same shape every browser's "Copy as cURL"
+  // produces for a form POST. parseAsKeyValue used to split that one piece at only the *first*
+  // '=' and never on '&', collapsing every field after the first into the first row's own value.
+  test('urlencoded, with two or more fields, round-trips as separate rows (not collapsed into one)', () => {
+    const result = roundTrip(
+      req({
+        method: 'POST',
+        body: {
+          ...EMPTY_BODY,
+          mode: 'urlencoded',
+          urlEncoded: [
+            { name: 'username', value: 'alice' },
+            { name: 'password', value: 'hunter2' },
+            { name: 'remember', value: '1' },
+          ],
+        },
+        defaultContentType: 'application/x-www-form-urlencoded',
+      }),
+    );
+    expect('error' in result).toBe(false);
+    if ('error' in result) return;
+    expect(result.state.bodyMode).toBe('urlencoded');
+    expect(result.state.urlEncoded).toEqual([
+      { name: 'username', value: 'alice', enabled: true },
+      { name: 'password', value: 'hunter2', enabled: true },
+      { name: 'remember', value: '1', enabled: true },
+    ]);
+  });
+
   test('formdata — a text row, a file row, and a text value starting with @', () => {
     const result = roundTrip(
       req({

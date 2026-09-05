@@ -66,15 +66,27 @@ function decodeQueryComponent(s: string): string {
   }
 }
 
-function toUrlEncodedRows(pieces: readonly string[]): HttpUrlEncodedFieldState[] {
-  return pieces.map((p) => {
-    const kv = parseAsKeyValue(p);
-    return {
-      name: decodeQueryComponent(kv?.name ?? ''),
-      value: decodeQueryComponent(kv?.value ?? ''),
-      enabled: true,
-    };
-  });
+/** Finding 5 (v1.2 P14 round 2): a `-d`/`--data-raw`/`--data-binary` piece is wire-ready text —
+ *  this app's own `toCurl` joins a multi-row urlencoded body into exactly one `--data-raw` with
+ *  its rows `&`-joined (F13, generate.ts), and the browser "Copy as cURL" shape every form POST
+ *  produces is the same single-flag, `&`-joined piece — so an unescaped `&` there really does
+ *  separate fields; splitting on it here is `toCurl`'s join, undone. `--data-urlencode`'s value is
+ *  different: it is literal text curl itself percent-encodes before sending (D8), so an `&` inside
+ *  it is an ordinary character, never a field separator, and must not be split. */
+function toUrlEncodedRows(pieces: readonly RawDataPiece[]): HttpUrlEncodedFieldState[] {
+  const rows: HttpUrlEncodedFieldState[] = [];
+  for (const piece of pieces) {
+    const subPieces = piece.id === 'data-urlencode' ? [piece.text] : piece.text.split('&');
+    for (const sub of subPieces) {
+      const kv = parseAsKeyValue(sub);
+      rows.push({
+        name: decodeQueryComponent(kv?.name ?? ''),
+        value: decodeQueryComponent(kv?.value ?? ''),
+        enabled: true,
+      });
+    }
+  }
+  return rows;
 }
 
 /** F11: which of this app's CODE_LANGUAGES a Content-Type's subtype maps onto, or null when the
@@ -450,7 +462,7 @@ export function parseCurl(text: string): ParsedCurl | { error: string } {
     bodyMode = 'file';
     binaryFile = { path, name: basename(path), size: 0 };
   } else if (rawDataPieces.length > 0) {
-    const literalPieces: string[] = [];
+    const literalPieces: RawDataPiece[] = [];
     for (const piece of rawDataPieces) {
       if (piece.id === 'data' && piece.text.startsWith('@')) {
         warnings.push({
@@ -473,14 +485,14 @@ export function parseCurl(text: string): ParsedCurl | { error: string } {
         });
         continue;
       }
-      literalPieces.push(piece.text);
+      literalPieces.push(piece);
     }
 
     if (literalPieces.length === 0) {
       bodyMode = 'none';
     } else {
       const contentType = explicitContentType(headerRows);
-      const allKeyValue = literalPieces.every((p) => parseAsKeyValue(p) !== null);
+      const allKeyValue = literalPieces.every((p) => parseAsKeyValue(p.text) !== null);
       if (contentType !== undefined) {
         if (
           contentType.split(';')[0].trim().toLowerCase() === 'application/x-www-form-urlencoded' &&
@@ -493,10 +505,10 @@ export function parseCurl(text: string): ParsedCurl | { error: string } {
           if (lang) {
             bodyMode = 'code';
             codeLanguage = lang;
-            bodyCode = literalPieces.join('&');
+            bodyCode = literalPieces.map((p) => p.text).join('&');
           } else {
             bodyMode = 'raw';
-            bodyRaw = literalPieces.join('&');
+            bodyRaw = literalPieces.map((p) => p.text).join('&');
           }
         }
       } else if (allKeyValue) {
@@ -506,7 +518,7 @@ export function parseCurl(text: string): ParsedCurl | { error: string } {
         // F11: no Content-Type header means curl would have sent this as urlencoded regardless —
         // raw's own default is text/plain (§1.6), so an explicit header is added and named.
         bodyMode = 'raw';
-        bodyRaw = literalPieces.join('&');
+        bodyRaw = literalPieces.map((p) => p.text).join('&');
         pushHeader('Content-Type', 'application/x-www-form-urlencoded');
         warnings.push({
           kind: 'implied-content-type',
