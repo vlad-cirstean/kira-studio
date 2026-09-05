@@ -29,7 +29,7 @@ defineOptions({ inheritAttrs: false });
 const props = withDefaults(
   defineProps<{
     modelValue: string;
-    candidates: Completion[];
+    candidates: readonly Completion[];
     prefix?: string;
     /** P27: lights the prefix label up in `--kira-accent` instead of the default disabled grey —
      * set by a filter/sort field's caller when the underlying (applied, not just typed) value is

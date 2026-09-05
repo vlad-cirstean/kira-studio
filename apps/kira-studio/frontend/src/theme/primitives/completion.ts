@@ -69,7 +69,7 @@ export const MAX_VISIBLE = 12;
 // Case-insensitive: exact-prefix matches first (stable within the group, i.e. in candidate-list
 // order), then substring matches — a prefix match is almost always what someone typing the start
 // of an identifier wants to see ranked first.
-export function rankCandidates(candidates: Completion[], word: string): Completion[] {
+export function rankCandidates(candidates: readonly Completion[], word: string): Completion[] {
   const w = word.toLowerCase();
   if (!w) return [];
   const starts: Completion[] = [];

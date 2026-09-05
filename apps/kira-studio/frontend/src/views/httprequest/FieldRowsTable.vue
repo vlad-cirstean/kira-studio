@@ -2,7 +2,8 @@
 import { computed } from 'vue';
 import AutocompleteField from '../../theme/primitives/AutocompleteField.vue';
 import Checkbox from '../../theme/primitives/Checkbox.vue';
-import { templateToken } from '../../theme/primitives/completion';
+import type { Completion } from '../../theme/primitives/completion';
+import { templateToken, wholeFieldToken } from '../../theme/primitives/completion';
 import IconButton from '../../theme/primitives/IconButton.vue';
 import TextField from '../../theme/primitives/TextField.vue';
 import type { VariableSupport } from './variableCompletion';
@@ -34,6 +35,11 @@ const props = withDefaults(
      *  caller that has not been wired (form-data's own slot wires this itself, D4's "form-data
      *  value cells" too, since it overrides the `value` slot entirely). */
     valueVariableSupport?: VariableSupport;
+    /** P15b D7 (item 7): when present, the name cell renders as an AutocompleteField over this
+     *  list, using `wholeFieldToken` (F1: the default word-run tokenizer has no `-`, so typing
+     *  `Content-T` would tokenize as just `T` and accepting a suggestion would produce
+     *  `Content-Content-Type`). Absent for every caller but the headers table. */
+    nameCandidates?: readonly Completion[];
   }>(),
   { showEnabled: false, namePlaceholder: 'key', valuePlaceholder: 'value' },
 );
@@ -75,7 +81,17 @@ function removeRow(index: number): void {
         @update:model-value="toggleEnabled(i)"
       />
       <div class="field-cell">
+        <AutocompleteField
+          v-if="nameCandidates"
+          :model-value="row.name"
+          :placeholder="namePlaceholder"
+          :data-testid="`${testidPrefix}-name`"
+          :candidates="nameCandidates"
+          :token-at="wholeFieldToken"
+          @update:model-value="updateField(i, 'name', $event)"
+        />
         <TextField
+          v-else
           :model-value="row.name"
           :placeholder="namePlaceholder"
           :data-testid="`${testidPrefix}-name`"

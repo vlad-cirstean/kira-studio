@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { WELL_KNOWN_REQUEST_HEADERS } from '@kira/api-core';
 import type { HttpHeaderState } from '@shared/domain/http';
 import type { HttpRequestTabRecord } from '@shared/domain/tabs';
 import { patchHttpRequestTabState } from '../../api/tabs';
@@ -31,6 +32,7 @@ function onUpdateRows(headers: HttpHeaderState[]): void {
     value-placeholder="value"
     testid-prefix="http-header"
     container-testid="http-headers-table"
+    :name-candidates="WELL_KNOWN_REQUEST_HEADERS"
     :value-variable-support="variables"
     @update:rows="onUpdateRows"
   />
