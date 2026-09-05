@@ -1,42 +1,24 @@
 import * as AppService from '@bindings/appservice.js';
-import * as CollectionsService from '@bindings/collectionsservice.js';
 import * as ConnectionsService from '@bindings/connectionsservice.js';
 import * as EngineService from '@bindings/engineservice.js';
 import * as FilesService from '@bindings/filesservice.js';
 import * as FiltersService from '@bindings/filtersservice.js';
-import * as GrpcHistoryService from '@bindings/grpchistoryservice.js';
-import * as GrpcService from '@bindings/grpcservice.js';
-import * as HttpService from '@bindings/httpservice.js';
 import * as LayoutService from '@bindings/layoutservice.js';
 import * as LifecycleService from '@bindings/lifecycleservice.js';
 import type * as WailsModels from '@bindings/models.js';
 import * as OpsService from '@bindings/opsservice.js';
 import * as QueriesService from '@bindings/queriesservice.js';
-import * as ResponseHistoryService from '@bindings/responsehistoryservice.js';
 import * as SchemaService from '@bindings/schemaservice.js';
 import * as SettingsService from '@bindings/settingsservice.js';
 import * as TabsService from '@bindings/tabsservice.js';
 import * as TreeService from '@bindings/treeservice.js';
-import * as VariablesService from '@bindings/variablesservice.js';
 import * as WindowsService from '@bindings/windowsservice.js';
-// P4: model.SavedRequest is a storage-package type, not a bridge one — CollectionsService's own
-// args/results reference it rather than restating it, so the renderer types against it through
-// vite.config.ts's existing (until now unused) @bindings-internal alias.
-import type * as WailsStorageModels from '@bindings-internal/storage/model/models.js';
 import type {
   ConnectionInput,
   ConnectionState,
   ConnectionSummary,
 } from '@shared/domain/connection';
 import type { ObjectDefinition } from '@shared/domain/definition';
-import type {
-  GrpcCallEvent,
-  GrpcCallResultWire,
-  GrpcMetaPairWire,
-  GrpcSchemaWire,
-} from '@shared/domain/grpc';
-import type { GrpcCallHistoryEntry, GrpcCallSnapshot } from '@shared/domain/grpc-history';
-import type { HttpBodyWire, HttpHeaderWire, HttpResponseWire } from '@shared/domain/http';
 import type { Layout, LayoutPatch } from '@shared/domain/layout';
 import type { OpRecord } from '@shared/domain/ops';
 import type {
@@ -48,23 +30,12 @@ import type {
   SavedQuery,
   SortSpec,
 } from '@shared/domain/queries';
-import type {
-  ResponseHistoryEntry,
-  ResponseHistorySnapshot,
-} from '@shared/domain/response-history';
 import type { ConnectionDdl } from '@shared/domain/schema';
 import type { SecretStorageStatus } from '@shared/domain/secrets';
 import type { Settings, SettingsPatch } from '@shared/domain/settings';
 import type { TabRecord } from '@shared/domain/tabs';
 import type { ObjectMeta, TreeNode } from '@shared/domain/tree';
 import type { TreeVisibility } from '@shared/domain/tree-filter';
-import type {
-  HttpEnvironment,
-  HttpVariable,
-  HttpVariableHistoryEntry,
-  RevealResult,
-  VariableScope,
-} from '@shared/domain/variables';
 import { type AppMetricsSample, CHANNEL } from '@shared/protocol/events';
 // See bridge/port.ts's identical import for why this needs the directive below rather than the
 // require-an-error kind (P57 M1/M2 finding: a tsconfig "paths" entry for this exact specifier
@@ -72,7 +43,8 @@ import { type AppMetricsSample, CHANNEL } from '@shared/protocol/events';
 // biome-ignore lint/suspicious/noTsIgnore: an "unused directive" kind fails where this resolves fine (see comment above)
 // @ts-ignore
 import { Events } from '/wails/runtime.js';
-import { windowKey } from '../state/window';
+import { windowKey as windowKeyValue } from '../state/window';
+import { apiControl } from './apiControl';
 
 // P57 D5. Wails delivers a bound method's error as a RuntimeError whose .message is
 // ipcerr.Error's own JSON encoding and whose .cause is that same {code, message} as an object
@@ -117,7 +89,10 @@ export function unwrap<T>(p: Promise<T>): Promise<T> {
   });
 }
 
-function on<T>(name: string, cb: (payload: T) => void): () => void {
+// P12 D11: exported so apiControl.ts (the module's own 39-method binding surface, split out of
+// this file) can share it rather than a second copy — every bound call, both protocols, goes
+// through the same on/trust/unwrap/windowKey.
+export function on<T>(name: string, cb: (payload: T) => void): () => void {
   return Events.On(name, (ev: { data: T }) => cb(ev.data));
 }
 
@@ -134,21 +109,13 @@ function on<T>(name: string, cb: (payload: T) => void): () => void {
 // wire the way a Zod schema does. The Go value is always one of the valid members — the same
 // trust boundary window.kira's Electron IPC handlers implicitly had — so `trust` is a deliberate,
 // documented widen-then-narrow, not a silent bypass of a real check.
-function trust<T>(v: unknown): T {
+export function trust<T>(v: unknown): T {
   return v as T;
 }
 
-// model.VariableScope is a named Go string type (unlike, say, model.CollectionItem.Kind, which is
-// a plain `string`), so the generator emits a real TS `enum` for it — a plain 'collection' |
-// 'environment' literal is not structurally assignable to that nominal type. The same documented
-// widen-then-narrow `trust` already applies to every bound *result*; this is its one *argument*-
-// side counterpart, needed only because this is the one bound call whose input carries a Go named
-// enum type at all.
-function scopeArg(scope: VariableScope): WailsStorageModels.VariableScope {
-  return scope as unknown as WailsStorageModels.VariableScope;
-}
+export const windowKey = windowKeyValue;
 
-export const control = {
+export const studioControl = {
   appInfo: (): Promise<WailsModels.AppInfo> => unwrap(AppService.Info()),
   settingsGetAll: (): Promise<Settings> =>
     unwrap(SettingsService.GetAll()).then((r) => trust<Settings>(r)),
@@ -307,78 +274,8 @@ export const control = {
   opsCancel: (opId: string): Promise<void> => unwrap(OpsService.Cancel({ opId })),
   onOpUpdate: (cb: (record: OpRecord) => void): (() => void) => on(CHANNEL.opUpdate, cb),
 
-  // P2 D3: runs through the same op scheduler/op log the DB adapters use (opId is
-  // renderer-minted, exactly like every data-plane op's own beginOp) — never the webview's own
-  // fetch (docs/ARCHITECTURE.md's "Go owns the network"). The generated Send drops the injected
-  // ctx parameter from its TS signature (§6.1) — Wails still passes it through server-side, so a
-  // window closing mid-request still aborts it. P5 D6: collectionId/environmentId name the scope
-  // stage 2 (Go) resolves secrets against — both '' is valid (a scratch tab, no environment).
-  // P8 D2: itemId travels alongside so Go can record a response-history entry under the right
-  // scope — '' for a scratch tab, exactly like collectionId/environmentId's own "possibly empty"
-  // shape above. Optional here (C3): a missing field decodes as Go's zero value ("") on the wire,
-  // and state.ts's send() only starts actually passing it in C4.
-  httpSend: (args: {
-    opId: string;
-    tabId: string;
-    method: string;
-    url: string;
-    headers: HttpHeaderWire[];
-    body: HttpBodyWire;
-    collectionId: string;
-    environmentId: string;
-    itemId?: string;
-  }): Promise<HttpResponseWire> =>
-    unwrap(HttpService.Send({ ...args, itemId: args.itemId ?? '' })).then((r) =>
-      trust<HttpResponseWire>(r),
-    ),
-
   onAppMetrics: (cb: (sample: AppMetricsSample) => void): (() => void) =>
     on(CHANNEL.appMetrics, cb),
-
-  // P11 D3/D4: resolves a target's (or a .proto's) services and methods — reflection.Register's
-  // own cache lives in Go (grpcclient's descriptorCache), never here; `reload` bypasses it (the
-  // schema pane's own Reload button).
-  grpcDescribe: (args: {
-    descriptorMode: 'reflection' | 'proto';
-    target: string;
-    tls: { enabled: boolean; caFile: string; serverName: string };
-    metadata: GrpcMetaPairWire[];
-    protoPath: string;
-    importPaths: string[];
-    collectionId: string;
-    environmentId: string;
-    reload: boolean;
-  }): Promise<GrpcSchemaWire> =>
-    unwrap(GrpcService.Describe(args)).then((r) => trust<GrpcSchemaWire>(r)),
-
-  // P11 D7/D8: runs through the same op scheduler/op log HttpService.Send already does (opId
-  // renderer-minted, tabId/windowKey addressing exactly like httpSend/TabsService's own shape).
-  // `streaming` tells Go which of Unary/ServerStream to run — the renderer already knows this
-  // from the schema it resolved via grpcDescribe.
-  grpcCall: (args: {
-    opId: string;
-    tabId: string;
-    streaming: boolean;
-    descriptorMode: 'reflection' | 'proto';
-    target: string;
-    tls: { enabled: boolean; caFile: string; serverName: string };
-    protoPath: string;
-    importPaths: string[];
-    service: string;
-    method: string;
-    messageJson: string;
-    metadata: GrpcMetaPairWire[];
-    collectionId: string;
-    environmentId: string;
-    itemId?: string;
-  }): Promise<GrpcCallResultWire> =>
-    unwrap(GrpcService.Call({ ...args, windowKey, itemId: args.itemId ?? '' })).then((r) =>
-      trust<GrpcCallResultWire>(r),
-    ),
-
-  // P11 D8: one server-streaming call's coalesced message batches — EmitTo'd to this window only,
-  // so a stream in one window never wakes another.
-  onGrpcCall: (cb: (event: GrpcCallEvent) => void): (() => void) => on(CHANNEL.grpcCall, cb),
 
   // windowsEnsure registers this page's own windowKey with a `windows` row if it doesn't already
   // have one — always a no-op on the native shell (main.go's own window-creation paths already
@@ -449,157 +346,10 @@ export const control = {
     unwrap(SchemaService.Set({ connectionId, ddl })).then((r) => trust<ConnectionDdl>(r)),
   onSchemaChanged: (cb: (ddl: ConnectionDdl) => void): (() => void) =>
     on(CHANNEL.schemaChanged, cb),
-
-  // P4 D11: nine wrappers over CollectionsService. These stay typed against the generated models
-  // rather than `trust<T>()`-ing a domain type, because the one place a saved request's shape
-  // genuinely has to be trusted is where it becomes tab state — `openCollectionRequestTab` Zod-
-  // parses it there (D4), which is the app's single trust boundary for this document rather than
-  // a second one here. Only a *path* ever crosses this bridge for import/export, never a file's
-  // bytes (D11/F16): Go reads and Go writes.
-  collectionsList: (): Promise<{
-    collections: WailsModels.CollectionSummary[];
-    items: WailsModels.ItemSummary[];
-  }> =>
-    // The explicit type argument is `connectionsTest`'s own precedent above: tests/unit's
-    // tsconfig resolves the generated $CancellablePromise loosely, so a `.then` that reads members
-    // off the result (rather than handing it straight to `trust`) needs the awaited type named.
-    unwrap<WailsModels.CollectionsTree>(CollectionsService.List()).then((r) => ({
-      collections: r.collections ?? [],
-      items: r.items ?? [],
-    })),
-  collectionsGetRequest: (itemId: string): Promise<WailsStorageModels.SavedRequest> =>
-    unwrap(CollectionsService.GetRequest({ itemId })),
-  collectionsSaveRequest: (
-    itemId: string,
-    name: string,
-    request: WailsStorageModels.SavedRequest,
-  ): Promise<WailsModels.ItemSummary> =>
-    unwrap(CollectionsService.SaveRequest({ itemId, name, request })),
-  // P11 D12: GetRequest/SaveRequest's own gRPC siblings.
-  collectionsGetGrpcRequest: (itemId: string): Promise<WailsStorageModels.SavedGrpcRequest> =>
-    unwrap(CollectionsService.GetGrpcRequest({ itemId })),
-  collectionsSaveGrpcRequest: (
-    itemId: string,
-    name: string,
-    request: WailsStorageModels.SavedGrpcRequest,
-  ): Promise<WailsModels.ItemSummary> =>
-    unwrap(CollectionsService.SaveGrpcRequest({ itemId, name, request })),
-  collectionsCreateCollection: (name: string): Promise<WailsModels.CollectionSummary> =>
-    unwrap(CollectionsService.CreateCollection({ name })),
-  collectionsCreateItem: (args: {
-    collectionId: string;
-    parentId: string | null;
-    kind: 'folder' | 'request';
-    request?: WailsStorageModels.SavedRequest | null;
-    name: string;
-  }): Promise<WailsModels.ItemSummary> =>
-    unwrap(CollectionsService.CreateItem({ ...args, request: args.request ?? null })),
-  // P11 D12: CreateItem's own gRPC sibling — always a request, never a folder.
-  collectionsCreateGrpcItem: (args: {
-    collectionId: string;
-    parentId: string | null;
-    request?: WailsStorageModels.SavedGrpcRequest | null;
-    name: string;
-  }): Promise<WailsModels.ItemSummary> =>
-    unwrap(CollectionsService.CreateGrpcItem({ ...args, request: args.request ?? null })),
-  collectionsRename: (id: string, target: 'collection' | 'item', name: string): Promise<void> =>
-    unwrap(CollectionsService.Rename({ id, target, name })),
-  collectionsDelete: (id: string, target: 'collection' | 'item'): Promise<void> =>
-    unwrap(CollectionsService.Delete({ id, target })),
-  collectionsImport: (path: string): Promise<WailsModels.ImportReport> =>
-    unwrap(CollectionsService.Import({ path })),
-  // P5 D16: ExportReport.secretCount is what lets the panel say "N secret values were not
-  // written" once, rather than that being a fact only discoverable by opening the file.
-  collectionsExport: (collectionId: string, path: string): Promise<WailsModels.ExportReport> =>
-    unwrap(CollectionsService.Export({ collectionId, path })),
-
-  // P5 D19: thirteen wrappers over VariablesService — typed against the shared domain mirrors
-  // (D20) rather than the generated models directly, the one difference from collectionsList's
-  // own precedent above (nothing here becomes tab state, so there is no equivalent reason to stay
-  // close to the wire shape).
-  variablesListEnvironments: (): Promise<HttpEnvironment[]> =>
-    unwrap(VariablesService.ListEnvironments()).then((r) => trust<HttpEnvironment[]>(r ?? [])),
-  variablesCreateEnvironment: (name: string): Promise<HttpEnvironment> =>
-    unwrap(VariablesService.CreateEnvironment({ name })).then((r) => trust<HttpEnvironment>(r)),
-  variablesRenameEnvironment: (id: string, name: string): Promise<void> =>
-    unwrap(VariablesService.RenameEnvironment({ id, name })),
-  variablesDeleteEnvironment: (id: string): Promise<void> =>
-    unwrap(VariablesService.DeleteEnvironment({ id })),
-  // id: '' selects "No environment" (D3).
-  variablesSetActiveEnvironment: (id: string): Promise<void> =>
-    unwrap(VariablesService.SetActiveEnvironment({ id })),
-  variablesReorderEnvironments: (ids: string[]): Promise<void> =>
-    unwrap(VariablesService.ReorderEnvironments({ ids })),
-
-  variablesList: (scope: VariableScope, ownerId: string): Promise<HttpVariable[]> =>
-    unwrap(VariablesService.List({ scope: scopeArg(scope), ownerId })).then((r) =>
-      trust<HttpVariable[]>(r ?? []),
-    ),
-  // id: '' creates a new row (D19).
-  variablesUpsert: (args: {
-    scope: VariableScope;
-    ownerId: string;
-    id: string;
-    name: string;
-    value: string;
-    isSecret: boolean;
-  }): Promise<HttpVariable> =>
-    unwrap(VariablesService.Upsert({ ...args, scope: scopeArg(args.scope) })).then((r) =>
-      trust<HttpVariable>(r),
-    ),
-  variablesDelete: (id: string): Promise<void> => unwrap(VariablesService.Delete({ id })),
-  variablesReorder: (scope: VariableScope, ownerId: string, ids: string[]): Promise<void> =>
-    unwrap(VariablesService.Reorder({ scope: scopeArg(scope), ownerId, ids })),
-
-  variablesHistory: (variableId: string): Promise<HttpVariableHistoryEntry[]> =>
-    unwrap(VariablesService.History({ variableId })).then((r) =>
-      trust<HttpVariableHistoryEntry[]>(r ?? []),
-    ),
-
-  // D8/D9: neither reveal call ever rejects — the outcome names what happened (revealed |
-  // cancelled | confirmation-required | error), the same contract connectionsReveal already has.
-  variablesReveal: (variableId: string, confirmed: boolean): Promise<RevealResult> =>
-    unwrap(VariablesService.Reveal({ variableId, confirmed })).then((r) => trust<RevealResult>(r)),
-  variablesRevealHistory: (historyId: string, confirmed: boolean): Promise<RevealResult> =>
-    unwrap(VariablesService.RevealHistory({ historyId, confirmed })).then((r) =>
-      trust<RevealResult>(r),
-    ),
-
-  // P8 D8: five wrappers over ResponseHistoryService. List/Clear take both ids — '' for whichever
-  // doesn't apply — and the service computes the scope key the same way the generated SQLite
-  // column does, so the two sides can never disagree about what a scope is.
-  historyList: (itemId: string, tabId: string): Promise<ResponseHistoryEntry[]> =>
-    unwrap(ResponseHistoryService.List({ itemId, tabId })).then((r) =>
-      trust<ResponseHistoryEntry[]>(r ?? []),
-    ),
-  historyGet: (id: string): Promise<ResponseHistorySnapshot> =>
-    unwrap(ResponseHistoryService.Get({ id })).then((r) => trust<ResponseHistorySnapshot>(r)),
-  historyDelete: (id: string): Promise<void> => unwrap(ResponseHistoryService.Delete({ id })),
-  historyClear: (itemId: string, tabId: string): Promise<void> =>
-    unwrap(ResponseHistoryService.Clear({ itemId, tabId })),
-  // D14: called from http/state/collections.ts's Save-as path, immediately after the CreateItem
-  // that produced itemId.
-  historyAdopt: (tabId: string, itemId: string): Promise<number> =>
-    // Explicit type argument: tests/unit's tsconfig resolves the generated $CancellablePromise
-    // loosely, same as collectionsList above — a `.then` that reads a member off the result needs
-    // the awaited type named rather than handed straight to `trust`.
-    unwrap<WailsModels.ResponseHistoryAdoptResult>(
-      ResponseHistoryService.Adopt({ tabId, itemId }),
-    ).then((r) => r.adopted),
-
-  // P11 D11: GrpcHistoryService's own five wrappers — ResponseHistoryService's exact shape,
-  // reused verbatim for the second protocol's own history table.
-  grpcHistoryList: (itemId: string, tabId: string): Promise<GrpcCallHistoryEntry[]> =>
-    unwrap(GrpcHistoryService.List({ itemId, tabId })).then((r) =>
-      trust<GrpcCallHistoryEntry[]>(r ?? []),
-    ),
-  grpcHistoryGet: (id: string): Promise<GrpcCallSnapshot> =>
-    unwrap(GrpcHistoryService.Get({ id })).then((r) => trust<GrpcCallSnapshot>(r)),
-  grpcHistoryDelete: (id: string): Promise<void> => unwrap(GrpcHistoryService.Delete({ id })),
-  grpcHistoryClear: (itemId: string, tabId: string): Promise<void> =>
-    unwrap(GrpcHistoryService.Clear({ itemId, tabId })),
-  grpcHistoryAdopt: (tabId: string, itemId: string): Promise<number> =>
-    unwrap<WailsModels.GrpcHistoryAdoptResult>(GrpcHistoryService.Adopt({ tabId, itemId })).then(
-      (r) => r.adopted,
-    ),
 };
+
+// P12 D11: one exported object, composed from Studio's 67 methods and the module's own 39
+// (apiControl.ts) — every one of the ~200 `control.xxx()` call sites in the app is unchanged, and
+// mockRuntime.ts's channel map is unchanged, since neither the method names nor their bound-call
+// FQNs moved.
+export const control = { ...studioControl, ...apiControl };
