@@ -205,7 +205,7 @@ bun run dev        # installs everything needed, then `wails3 task dev` — nati
 | `bun run package` | Builds the native Wails bundle and the `.dmg` around it, and ad-hoc signs both — `apps/kira-studio/bin/Kira Studio.{app,dmg}` (`prepackage` runs `bun run setup` first, same as `dev`) |
 | `bun run verify:packaging` | Confirms the packaged bundle still ships no auto-update behavior |
 
-**App data:** the app keeps `kira.sqlite` and `logs/` under `~/.kira-studio/`. The `KIRA_HOME`
+**App data:** the app keeps `kira.db` and `logs/` under `~/.kira-studio/`. The `KIRA_HOME`
 environment variable relocates that whole directory — the test suite uses it to keep tests off a
 developer's real data.
 

@@ -21,9 +21,13 @@ func KiraHome() string {
 	return filepath.Join(dir, ".kira-studio")
 }
 
-// DbPath is the Go build's own database file — deliberately not kira.sqlite (P52 §5.1): a
-// different filename lets the Electron and Go builds coexist on one machine without colliding,
-// and post-cutover kira.sqlite is simply never read again.
+// DbPath is the Go build's own database file, named kira.db. Originally chosen (P52 §5.1) so the
+// since-removed Electron build's kira.sqlite could coexist on one machine without colliding —
+// there has been no Electron build since P57, so that reason is gone, but there is also no
+// installed base still on the old name to migrate, so the file stays kira.db rather than being
+// renamed for its own sake (P21 round 1 architecture/security finding 9). docs/ARCHITECTURE.md
+// names this file kira.db throughout; if you find it saying kira.sqlite anywhere, that is the doc
+// drifting, not this file.
 func DbPath() string {
 	return filepath.Join(KiraHome(), "kira.db")
 }

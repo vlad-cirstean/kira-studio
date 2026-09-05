@@ -32,7 +32,7 @@ authoritative for behavior: SPEC.md is the record of what v1 was *specified* to 
 | Icons | `@vscode/codicons` | UI chrome |
 | Validation | Zod (TypeScript side) / hand-written model decoders (Go side) | Zod's remaining TypeScript-side job is connection-dialog input — the engine wire protocol it used to guard (`src/engine/{control,rpc,data,stdio-main}.ts`) went with `src/engine/`'s deletion (P58f). Rows read back out of SQLite are validated in Go (`apps/kira-studio/internal/storage/model/`) |
 | Lint + format | Biome, default rules | single tool, no ESLint/Prettier |
-| Storage | SQLite at `~/.kira-studio/kira.sqlite`, accessed **from Go** | `database/sql` + `modernc.org/sqlite` (pure-Go, no cgo — the same driver the sqlite adapter package already used for browsing external files, now also backing the app's own database); `SetMaxOpenConns(1)`. No ORM — the Drizzle dependency and every consumer of it are gone |
+| Storage | SQLite at `~/.kira-studio/kira.db`, accessed **from Go** | `database/sql` + `modernc.org/sqlite` (pure-Go, no cgo — the same driver the sqlite adapter package already used for browsing external files, now also backing the app's own database); `SetMaxOpenConns(1)`. No ORM — the Drizzle dependency and every consumer of it are gone |
 | Packaging | `wails3 task darwin:package:dmg` + `scripts/sign-bundle.sh` | ad-hoc signed (identity `-`), both the `.app` and the `.dmg` around it; ships as a styled disk image with an `/Applications` shortcut (P10), no auto-update, no notarization; no `runtime/` tree to vendor or sign any more (P58f) |
 | DB tests | Testcontainers, driven from Bun | `packages/db-fixtures/` no longer holds per-engine specs (P58f D1) — it survives as the shared fixture corpus (`fixtures/*.sql`, `support/*.ts`) that Go's `testsupport` package and `apps/kira-studio/tests/e2e-real/` both seed from; real containers, real data; Colima |
 | UI tests | Playwright against the built bundle, real WebKit | every change validated |
@@ -407,7 +407,7 @@ executed as a literal `SET <k> = <v>` statement at connect time, not a bag of DS
 
 ## Storage
 
-`~/.kira-studio/` (dir `0700`), containing `kira.sqlite` (`0600`) and `logs/`.
+`~/.kira-studio/` (dir `0700`), containing `kira.db` (`0600`) and `logs/`.
 
 Credentials in the `connections` table's `password` column are **encrypted at rest** (P25), now from
 Go rather than through Electron's `safeStorage`. The design `safeStorage` used is kept deliberately,
@@ -584,7 +584,7 @@ foreign key now names `api_items`, and a collection delete still cascades throug
 collection's own variable, that variable's history and the item-scoped response-history row in one
 statement.
 
-**Collections are stored, not filed (P4).** A Postman collection lives in `kira.sqlite` as a
+**Collections are stored, not filed (P4).** A Postman collection lives in `kira.db` as a
 normalized `api_collections`/`api_items` tree, not as a `.json` file on disk that the app edits
 in place. `item` is an *ordered array* in the format, so `sort_order` is data rather than
 presentation, and it is rewritten dense within a parent on any insert or delete — the same
@@ -685,7 +685,7 @@ never itself evicted. No time-based expiry exists or is planned — unlike `op_l
 accumulate from machinery, a response history row is a result the user asked for, and a two-month-
 old response is not noise.
 
-**The timeline rides the same object into `kira.sqlite` the rendered exchange is stripped out of —
+**The timeline rides the same object into `kira.db` the rendered exchange is stripped out of —
 deliberately not stripped itself (P10).** `Response.Wire` is nilled before `Record` marshals a
 snapshot (below); `Response.Timeline` is not, because the size argument that justifies stripping
 `Wire` does not transfer here: a no-redirect send's timeline is one envelope plus one hop, on the
@@ -1180,7 +1180,7 @@ is load-bearing, not stylistic: `op.SetCommand` — which writes the human-reada
 *unresolved* URL, both before and after the request runs; stage 2 runs strictly after the first
 call and its resolved values never feed back into anything logged. A `{{token}}` in a query string
 is exactly the shape a user puts a credential in, so resolving before `SetCommand` would write a
-plaintext credential into `kira.sqlite` on every send.
+plaintext credential into `kira.db` on every send.
 
 **Import/generate a curl command is two directions over the same vocabulary, entirely in the
 renderer, and Go is untouched by P7 too.** `packages/api-core/src/http/curl/` holds both:
@@ -1204,7 +1204,7 @@ the request deadline). Neither direction reaches Go: parse produces tab state, w
 renderer's own dynamic-value generator and the reveal gate above, both of which only exist
 renderer-side. A hypothetical Go-side generator would be a second bound method holding a
 fully-resolved, credential-bearing request — one careless `op.SetCommand` or `slog.Info` away from
-writing a decrypted credential into `kira.sqlite`, exactly the hazard `SetCommand`'s
+writing a decrypted credential into `kira.db`, exactly the hazard `SetCommand`'s
 unresolved-URL-first ordering above exists to avoid; the renderer has no op, no persisted column and
 no log sink; the hazard is absent there, not merely mitigated. So P7 adds no Go file, no migration,
 no bound method and no bindings regeneration — `internal/apivars/`, `internal/httpclient/`,
@@ -1287,7 +1287,7 @@ CONNECT-tunnel round trip is the one substantial case, since `ConnectStart`/`Don
 dial to the *proxy* and the tunnel's own request/response has no hook at all — is rendered as a
 labelled, unattributed residue instead of padded away. A hop's own response headers are capped at 8
 KiB, truncated visibly (`headersElided`) rather than copying an adversarial server's unbounded
-`MaxResponseHeaderBytes` allowance into `Response` and, via history (above), into `kira.sqlite`.
+`MaxResponseHeaderBytes` allowance into `Response` and, via history (above), into `kira.db`.
 
 Unlike the raw view, the timeline does not degrade under HTTP/2 or behind a proxy: `DNSStart`,
 `ConnectStart`, `TLSHandshakeStart`, `WroteRequest` and `GotFirstResponseByte` all fire the same way
@@ -1304,7 +1304,7 @@ design system's LAW 12 governs a *moving* indicator for work still running; a fi
 own chart is a different object, and the ring plus the toolbar's own elapsed figure remain the only
 thing that shows a send is running).
 
-**The rendered exchange is live-only — stripped before it can reach `kira.sqlite`, never a fourth
+**The rendered exchange is live-only — stripped before it can reach `kira.db`, never a fourth
 history cap.** `httpclient.Response.Wire *WireExchange` (`json:"wire,omitempty"`) rides back on the
 same object P8's `ResponseHistoryRepo.Record` already marshals into `snapshot_json` on every send —
 so `Record` sets `resp.Wire = nil` before marshalling, one line, and the omitted-when-nil tag means
@@ -1323,7 +1323,7 @@ surface — the raw pane's own masking note points at *Copy as curl* for anyone 
 values.
 
 **The same replacer now also closes a gap it did not open (P10).** `Response.Redirects[].URL` and
-`Response.FinalURL` — P2 fields, persisted to `kira.sqlite` by P8's `Record` since it landed — were
+`Response.FinalURL` — P2 fields, persisted to `kira.db` by P8's `Record` since it landed — were
 never run through the masking above, so a secret substituted into a query string
 (`?api_key={{token}}`) reached the database in plaintext; P10 found this while widening masking to
 cover its own new per-hop URLs and per-hop response headers (a redirect's own `Location` header is
@@ -1942,7 +1942,7 @@ must not disconnect, lock out, or otherwise disturb a `bun run dev` instance alr
 same machine. One exception is deliberate (P25 F10): on a real macOS dev machine the app's Keychain
 item is shared with the developer's own login keychain, so a test that saves a connection password
 touches the same OS-level encryption key a `bun run dev` session would. This is safe — each test's
-*secrets* stay isolated in its own temp `KIRA_HOME`'s `kira.sqlite`, only the underlying key is
+*secrets* stay isolated in its own temp `KIRA_HOME`'s `kira.db`, only the underlying key is
 shared, and no test ever rotates or clears that key.
 
 **`tests/unit/` needs nothing external and finishes in about a second** (`bun test tests/unit`) —

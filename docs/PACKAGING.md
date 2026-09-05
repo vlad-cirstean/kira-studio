@@ -225,7 +225,7 @@ human to launch the packaged app and use it.
 5. Gatekeeper: an unsigned, unnotarized build needs right-click → Open, or
    `xattr -dr com.apple.quarantine "/Applications/Kira Studio.app"`. Expected, not a defect. —
    *not yet run*
-6. `~/.kira-studio/` is created with `kira.sqlite` and `logs/` on first launch — the real home, since
+6. `~/.kira-studio/` is created with `kira.db` and `logs/` on first launch — the real home, since
    `KIRA_HOME` is unset in a packaged run. — *not yet run*
 7. Create a connection, expand the tree, open a data tab, scroll, open the cell editor, quit cleanly.
    The View menu has no Reload / Toggle DevTools in a `-tags production` build. — *not yet run*
