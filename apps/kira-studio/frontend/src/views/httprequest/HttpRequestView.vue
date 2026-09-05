@@ -13,7 +13,7 @@ import {
 } from '@kira/api-core';
 import { type HttpMethod, httpMethodClass } from '@shared/domain/http';
 import type { HttpRequestTabRecord } from '@shared/domain/tabs';
-import { computed, onMounted, onUnmounted, watch } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import EnvironmentSelect from '../../api/EnvironmentSelect.vue';
 import {
   collectionIdFor,
@@ -34,6 +34,7 @@ import AppButton from '../../theme/primitives/AppButton.vue';
 import AutocompleteField from '../../theme/primitives/AutocompleteField.vue';
 import { templateToken } from '../../theme/primitives/completion';
 import IconButton from '../../theme/primitives/IconButton.vue';
+import PanelSearchBox from '../../theme/primitives/PanelSearchBox.vue';
 import PanelSplitter from '../../theme/primitives/PanelSplitter.vue';
 import SegmentedControl from '../../theme/primitives/SegmentedControl.vue';
 import ViewChrome from '../../theme/primitives/ViewChrome.vue';
@@ -212,6 +213,26 @@ function setRequestPane(pane: 'params' | 'headers' | 'body'): void {
   patchHttpRequestTabState(props.tab.id, { requestPane: pane });
 }
 
+// P16 D13: the request tables' own filter — Studio's own idiom (toolbar-search toggling a
+// SearchToolbar row) applied here: an always-present filter row above a three-row headers table
+// would be chrome for its own sake, so it's a toggle in #toolbar-2 instead. Shown only while the
+// visible pane is actually a row table (Params, Headers, or Body in urlencoded/form-data mode) —
+// the raw/code/binary/JSON body modes have nothing this filter could match. Component-local, not
+// tab state: a lens, not a setting (§8 OQ-8's own rule for every filter this phase adds).
+const fieldFilterOpen = ref(false);
+const fieldFilterQuery = ref('');
+const showFieldFilterToggle = computed(
+  () =>
+    props.tab.state.requestPane !== 'body' ||
+    props.tab.state.bodyMode === 'urlencoded' ||
+    props.tab.state.bodyMode === 'formdata',
+);
+function toggleFieldFilter(): void {
+  fieldFilterOpen.value = !fieldFilterOpen.value;
+  // D13's own rule: closing the row must restore every hidden row.
+  if (!fieldFilterOpen.value) fieldFilterQuery.value = '';
+}
+
 // D6: 0 means "the default half" — PanelSplitter itself needs a real pixel size.
 const DEFAULT_REQUEST_PANE_HEIGHT = 260;
 const requestPaneHeight = computed(
@@ -343,14 +364,38 @@ onUnmounted(() => {
           data-testid="http-request-pane-toggle"
           @update:model-value="setRequestPane"
         />
+        <IconButton
+          v-if="showFieldFilterToggle"
+          icon="search"
+          :active="fieldFilterOpen"
+          v-tooltip="'Filter'"
+          data-testid="http-field-filter-toggle"
+          @click="toggleFieldFilter"
+        />
         <EnvironmentSelect />
       </template>
 
       <div class="request-response-split">
         <div class="request-pane" :style="{ flex: `0 0 ${requestPaneHeight}px` }" data-testid="http-request-pane">
-          <QueryParamsTable v-if="tab.state.requestPane === 'params'" :tab="tab" :variables="variables" />
-          <RequestHeadersTable v-else-if="tab.state.requestPane === 'headers'" :tab="tab" :variables="variables" />
-          <RequestBodyPane v-else :tab="tab" :variables="variables" />
+          <PanelSearchBox
+            v-if="fieldFilterOpen && showFieldFilterToggle"
+            v-model="fieldFilterQuery"
+            placeholder="Filter"
+            testid="http-field-filter"
+          />
+          <QueryParamsTable
+            v-if="tab.state.requestPane === 'params'"
+            :tab="tab"
+            :variables="variables"
+            :filter-query="fieldFilterQuery"
+          />
+          <RequestHeadersTable
+            v-else-if="tab.state.requestPane === 'headers'"
+            :tab="tab"
+            :variables="variables"
+            :filter-query="fieldFilterQuery"
+          />
+          <RequestBodyPane v-else :tab="tab" :variables="variables" :filter-query="fieldFilterQuery" />
         </div>
 
         <PanelSplitter

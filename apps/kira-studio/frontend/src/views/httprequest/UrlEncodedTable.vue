@@ -11,6 +11,8 @@ const props = defineProps<{
   tab: HttpRequestTabRecord;
   /** P15b D4: HttpRequestView.vue's own variableSupport(...) — forwarded to the value cell. */
   variables?: VariableSupport;
+  /** P16 D13: HttpRequestView.vue's own #toolbar-2 filter box, forwarded to FieldRowsTable. */
+  filterQuery?: string;
 }>();
 
 function blankField(): HttpUrlEncodedFieldState {
@@ -32,6 +34,7 @@ function onUpdateRows(urlEncoded: HttpUrlEncodedFieldState[]): void {
     testid-prefix="http-urlencoded"
     container-testid="http-urlencoded-table"
     :value-variable-support="variables"
+    :filter-query="filterQuery"
     @update:rows="onUpdateRows"
   />
 </template>

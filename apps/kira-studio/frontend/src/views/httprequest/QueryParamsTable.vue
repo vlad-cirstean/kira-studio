@@ -14,6 +14,8 @@ const props = defineProps<{
   tab: HttpRequestTabRecord;
   /** P15b D4: HttpRequestView.vue's own variableSupport(...) — forwarded to the value cell. */
   variables?: VariableSupport;
+  /** P16 D13: HttpRequestView.vue's own #toolbar-2 filter box, forwarded to FieldRowsTable. */
+  filterQuery?: string;
 }>();
 
 const pairs = computed<QueryPair[]>(() => parseQuery(splitUrl(props.tab.state.url).query));
@@ -39,6 +41,7 @@ function onUpdateRows(next: QueryPair[]): void {
     testid-prefix="http-param"
     container-testid="http-params-table"
     :value-variable-support="variables"
+    :filter-query="filterQuery"
     @update:rows="onUpdateRows"
   />
 </template>

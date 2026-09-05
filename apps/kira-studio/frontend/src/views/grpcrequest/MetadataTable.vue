@@ -11,13 +11,36 @@ import TextField from '../../theme/primitives/TextField.vue';
 // shape — views/grpcrequest/** may not import views/httprequest/** (biome.json), and the shape is
 // small enough that duplicating it costs less than the coupling reuse would have created (D5's own
 // grpcMetadataSchema comment makes the identical trade).
-const props = defineProps<{ tab: GrpcRequestTabRecord }>();
+const props = defineProps<{
+  tab: GrpcRequestTabRecord;
+  /** P16 D13: GrpcRequestView.vue's own #toolbar-2 filter box — a plain case-insensitive
+   *  substring test over name-or-value, same rule FieldRowsTable.vue's own copy follows. */
+  filterQuery?: string;
+}>();
 
 function blankRow(): GrpcMetadataState {
   return { name: '', value: '', enabled: true };
 }
 
-const displayRows = computed<GrpcMetadataState[]>(() => [...props.tab.state.metadata, blankRow()]);
+// P16 D13/F11: `index` is the row's real position in `tab.state.metadata` — its write-through
+// index — carried alongside the row through filtering (F18: this file's own copy of
+// FieldRowsTable.vue's identical fix, for the identical reason). The trailing blank row is
+// appended last and unconditionally: it is the add affordance, not data.
+interface DisplayEntry {
+  row: GrpcMetadataState;
+  index: number;
+}
+
+const displayRows = computed<DisplayEntry[]>(() => {
+  const q = (props.filterQuery ?? '').trim().toLowerCase();
+  const withIndex = props.tab.state.metadata.map((row, index) => ({ row, index }));
+  const filtered = q
+    ? withIndex.filter(
+        ({ row }) => row.name.toLowerCase().includes(q) || row.value.toLowerCase().includes(q),
+      )
+    : withIndex;
+  return [...filtered, { row: blankRow(), index: props.tab.state.metadata.length }];
+});
 
 function updateField(index: number, field: 'name' | 'value', value: string): void {
   const next = [...props.tab.state.metadata];
@@ -106,39 +129,39 @@ function onContainerKeydown(e: KeyboardEvent): void {
 <template>
   <div class="metadata-table" data-testid="grpc-metadata-table" @keydown="onContainerKeydown">
     <div
-      v-for="(row, i) in displayRows"
-      :key="i"
+      v-for="entry in displayRows"
+      :key="entry.index"
       class="metadata-row"
       data-testid="grpc-metadata-row"
     >
       <Checkbox
-        :model-value="row.enabled"
-        :disabled="i >= tab.state.metadata.length"
+        :model-value="entry.row.enabled"
+        :disabled="entry.index >= tab.state.metadata.length"
         data-testid="grpc-metadata-enabled"
-        @update:model-value="toggleEnabled(i)"
+        @update:model-value="toggleEnabled(entry.index)"
       />
       <div class="metadata-cell">
         <TextField
-          :model-value="row.name"
+          :model-value="entry.row.name"
           placeholder="key (lowercase, - _ . only)"
           data-testid="grpc-metadata-name"
-          @update:model-value="updateField(i, 'name', $event)"
+          @update:model-value="updateField(entry.index, 'name', $event)"
         />
       </div>
       <div class="metadata-cell">
         <TextField
-          :model-value="row.value"
+          :model-value="entry.row.value"
           placeholder="value"
           data-testid="grpc-metadata-value"
-          @update:model-value="updateField(i, 'value', $event)"
+          @update:model-value="updateField(entry.index, 'value', $event)"
         />
       </div>
       <IconButton
         icon="close"
-        :disabled="i >= tab.state.metadata.length"
+        :disabled="entry.index >= tab.state.metadata.length"
         v-tooltip="'Remove'"
         data-testid="grpc-metadata-remove"
-        @click="removeRow(i)"
+        @click="removeRow(entry.index)"
       />
     </div>
   </div>
@@ -151,7 +174,10 @@ function onContainerKeydown(e: KeyboardEvent): void {
   flex-direction: column;
   gap: var(--kira-s-2);
   overflow: auto;
-  height: 100%;
+  /* P16 D13: flex:1 rather than height:100% — GrpcRequestView.vue's own filter row, when open, is
+     a sibling above this in the same flex-column parent. */
+  flex: 1;
+  min-height: 0;
 }
 
 .metadata-row {

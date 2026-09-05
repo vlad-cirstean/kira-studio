@@ -40,13 +40,36 @@ const props = withDefaults(
      *  `Content-T` would tokenize as just `T` and accepting a suggestion would produce
      *  `Content-Content-Type`). Absent for every caller but the headers table. */
     nameCandidates?: readonly Completion[];
+    /** P16 D13: the toolbar's own filter box text, forwarded down — absent/empty shows every row.
+     *  A plain case-insensitive substring test over name-or-value (both are user-authored request
+     *  content, never a secret's plaintext — §5). */
+    filterQuery?: string;
   }>(),
   { showEnabled: false, namePlaceholder: 'key', valuePlaceholder: 'value' },
 );
 
 const emit = defineEmits<{ 'update:rows': [rows: T[]] }>();
 
-const displayRows = computed<T[]>(() => [...props.rows, props.blankRow()]);
+// P16 D13/F11: `index` is the row's position in `props.rows` — i.e. its real write-through index
+// — carried alongside the row through filtering, never the position in `displayRows` (which a
+// filter can move). The trailing blank row is appended last and unconditionally, at
+// `index: props.rows.length`: it is the add affordance, not data, and hiding it under a filter
+// would make a filtered table un-appendable.
+interface DisplayEntry {
+  row: T;
+  index: number;
+}
+
+const displayRows = computed<DisplayEntry[]>(() => {
+  const q = (props.filterQuery ?? '').trim().toLowerCase();
+  const withIndex = props.rows.map((row, index) => ({ row, index }));
+  const filtered = q
+    ? withIndex.filter(
+        ({ row }) => row.name.toLowerCase().includes(q) || row.value.toLowerCase().includes(q),
+      )
+    : withIndex;
+  return [...filtered, { row: props.blankRow(), index: props.rows.length }];
+});
 
 function updateField(index: number, field: 'name' | 'value', value: string): void {
   const next = [...props.rows];
@@ -150,67 +173,72 @@ function onContainerKeydown(e: KeyboardEvent): void {
 
 <template>
   <div class="field-rows-table" :data-testid="containerTestid" @keydown="onContainerKeydown">
-    <div v-for="(row, i) in displayRows" :key="i" class="field-row" :data-testid="`${testidPrefix}-row`">
+    <div
+      v-for="entry in displayRows"
+      :key="entry.index"
+      class="field-row"
+      :data-testid="`${testidPrefix}-row`"
+    >
       <Checkbox
         v-if="showEnabled"
-        :model-value="!!row.enabled"
-        :disabled="i >= rows.length"
+        :model-value="!!entry.row.enabled"
+        :disabled="entry.index >= rows.length"
         :data-testid="`${testidPrefix}-enabled`"
-        @update:model-value="toggleEnabled(i)"
+        @update:model-value="toggleEnabled(entry.index)"
       />
       <div class="field-cell">
         <AutocompleteField
           v-if="nameCandidates"
-          :model-value="row.name"
+          :model-value="entry.row.name"
           :placeholder="namePlaceholder"
           :data-testid="`${testidPrefix}-name`"
           :candidates="nameCandidates"
           :token-at="wholeFieldToken"
-          @update:model-value="updateField(i, 'name', $event)"
+          @update:model-value="updateField(entry.index, 'name', $event)"
         />
         <TextField
           v-else
-          :model-value="row.name"
+          :model-value="entry.row.name"
           :placeholder="namePlaceholder"
           :data-testid="`${testidPrefix}-name`"
-          @update:model-value="updateField(i, 'name', $event)"
+          @update:model-value="updateField(entry.index, 'name', $event)"
         />
       </div>
       <slot
         name="value"
-        :row="row"
-        :index="i"
-        :is-trailing="i >= rows.length"
-        :update="(v: string) => updateField(i, 'value', v)"
+        :row="entry.row"
+        :index="entry.index"
+        :is-trailing="entry.index >= rows.length"
+        :update="(v: string) => updateField(entry.index, 'value', v)"
       >
         <div class="field-cell">
           <AutocompleteField
             v-if="valueVariableSupport"
-            :model-value="row.value"
+            :model-value="entry.row.value"
             :placeholder="valuePlaceholder"
             :data-testid="`${testidPrefix}-value`"
             :candidates="valueVariableSupport.candidates"
             :token-at="templateToken"
             :range-highlights="valueVariableSupport.rangeHighlights"
             :hover-at="valueVariableSupport.hoverAt"
-            @update:model-value="updateField(i, 'value', $event)"
+            @update:model-value="updateField(entry.index, 'value', $event)"
           />
           <TextField
             v-else
-            :model-value="row.value"
+            :model-value="entry.row.value"
             :placeholder="valuePlaceholder"
             :data-testid="`${testidPrefix}-value`"
-            @update:model-value="updateField(i, 'value', $event)"
+            @update:model-value="updateField(entry.index, 'value', $event)"
           />
         </div>
       </slot>
-      <slot name="trailing" :row="row" :index="i" :is-trailing="i >= rows.length" />
+      <slot name="trailing" :row="entry.row" :index="entry.index" :is-trailing="entry.index >= rows.length" />
       <IconButton
         icon="close"
-        :disabled="i >= rows.length"
+        :disabled="entry.index >= rows.length"
         v-tooltip="'Remove'"
         :data-testid="`${testidPrefix}-remove`"
-        @click="removeRow(i)"
+        @click="removeRow(entry.index)"
       />
     </div>
   </div>
@@ -223,7 +251,11 @@ function onContainerKeydown(e: KeyboardEvent): void {
   flex-direction: column;
   gap: var(--kira-s-2);
   overflow: auto;
-  height: 100%;
+  /* P16 D13: flex:1 rather than height:100% — this is no longer always its flex-column parent's
+     only child (HttpRequestView.vue's own filter row, when open, is a sibling above it), and a
+     percentage height would ignore that sibling's own space and overflow past it. */
+  flex: 1;
+  min-height: 0;
 }
 
 .field-row {

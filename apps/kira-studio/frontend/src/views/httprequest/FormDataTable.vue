@@ -22,6 +22,8 @@ const props = defineProps<{
    *  own `value` slot (a text/file kind switch), so it wires the AutocompleteField itself rather
    *  than through `valueVariableSupport`. */
   variables?: VariableSupport;
+  /** P16 D13: HttpRequestView.vue's own #toolbar-2 filter box, forwarded to FieldRowsTable. */
+  filterQuery?: string;
 }>();
 
 function blankField(): HttpFormDataFieldState {
@@ -82,6 +84,7 @@ function onClearFile(index: number): void {
     value-placeholder="value"
     testid-prefix="http-formdata"
     container-testid="http-formdata-table"
+    :filter-query="filterQuery"
     @update:rows="onUpdateRows"
   >
     <template #value="{ row, update }">

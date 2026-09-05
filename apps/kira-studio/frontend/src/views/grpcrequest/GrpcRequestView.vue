@@ -2,7 +2,7 @@
 import { isDynamicName, isGrpcDirty, toSavedGrpcRequest } from '@kira/api-core';
 import { grpcRequestTitle } from '@shared/domain/grpc';
 import type { GrpcRequestTabRecord } from '@shared/domain/tabs';
-import { computed, onMounted, onUnmounted, watch } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import EnvironmentSelect from '../../api/EnvironmentSelect.vue';
 import {
   collectionIdFor,
@@ -21,6 +21,7 @@ import CodeMirrorHost from '../../editor/CodeMirrorHost.vue';
 import { registerCommand } from '../../shortcuts/commands';
 import AppButton from '../../theme/primitives/AppButton.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
+import PanelSearchBox from '../../theme/primitives/PanelSearchBox.vue';
 import PanelSplitter from '../../theme/primitives/PanelSplitter.vue';
 import SegmentedControl from '../../theme/primitives/SegmentedControl.vue';
 import TextField from '../../theme/primitives/TextField.vue';
@@ -180,6 +181,16 @@ function setRequestPane(pane: 'message' | 'metadata' | 'schema'): void {
   patchGrpcRequestTabState(props.tab.id, { requestPane: pane });
 }
 
+// P16 D13: the metadata table's own filter — same toggle-in-#toolbar-2 idiom as
+// HttpRequestView.vue's request tables (Studio's own toolbar-search precedent). Only relevant on
+// the Metadata pane. Component-local, not tab state — a lens, not a setting.
+const fieldFilterOpen = ref(false);
+const fieldFilterQuery = ref('');
+function toggleFieldFilter(): void {
+  fieldFilterOpen.value = !fieldFilterOpen.value;
+  if (!fieldFilterOpen.value) fieldFilterQuery.value = '';
+}
+
 function onMessageInput(value: string): void {
   patchGrpcRequestTabState(props.tab.id, { message: value });
 }
@@ -300,6 +311,14 @@ onUnmounted(() => {
           data-testid="grpc-beautify"
           @click="onBeautify"
         />
+        <IconButton
+          v-if="tab.state.requestPane === 'metadata'"
+          icon="search"
+          :active="fieldFilterOpen"
+          v-tooltip="'Filter'"
+          data-testid="grpc-field-filter-toggle"
+          @click="toggleFieldFilter"
+        />
         <EnvironmentSelect />
       </template>
 
@@ -313,7 +332,15 @@ onUnmounted(() => {
             data-testid="grpc-message-editor"
             @update:doc="onMessageInput"
           />
-          <MetadataTable v-else-if="tab.state.requestPane === 'metadata'" :tab="tab" />
+          <template v-else-if="tab.state.requestPane === 'metadata'">
+            <PanelSearchBox
+              v-if="fieldFilterOpen"
+              v-model="fieldFilterQuery"
+              placeholder="Filter"
+              testid="grpc-field-filter"
+            />
+            <MetadataTable :tab="tab" :filter-query="fieldFilterQuery" />
+          </template>
           <SchemaBrowser v-else :tab="tab" />
         </div>
 

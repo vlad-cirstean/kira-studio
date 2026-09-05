@@ -12,6 +12,8 @@ const props = defineProps<{
   tab: HttpRequestTabRecord;
   /** P15b D4: HttpRequestView.vue's own variableSupport(...) — forwarded to the value cell. */
   variables?: VariableSupport;
+  /** P16 D13: HttpRequestView.vue's own #toolbar-2 filter box, forwarded to FieldRowsTable. */
+  filterQuery?: string;
 }>();
 
 function blankHeader(): HttpHeaderState {
@@ -34,6 +36,7 @@ function onUpdateRows(headers: HttpHeaderState[]): void {
     container-testid="http-headers-table"
     :name-candidates="WELL_KNOWN_REQUEST_HEADERS"
     :value-variable-support="variables"
+    :filter-query="filterQuery"
     @update:rows="onUpdateRows"
   />
 </template>

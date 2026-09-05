@@ -32,6 +32,9 @@ const props = defineProps<{
    *  editable editor hosts below (raw and code/JSON) with `{{variable}}` references exactly like
    *  the URL/header fields (N3); the rest is forwarded to the urlencoded/form-data value cells. */
   variables?: VariableSupport;
+  /** P16 D13: HttpRequestView.vue's own #toolbar-2 filter box, forwarded to whichever body mode
+   *  is a row table (urlencoded, form-data) — a no-op for the raw/code/binary modes below. */
+  filterQuery?: string;
 }>();
 
 // P15 D6: JSON is a UI-level segment over the same `bodyMode`/`codeLanguage` storage — no schema,
@@ -161,8 +164,18 @@ const caption = computed(() =>
       auto-close-brackets
       @update:doc="onCodeChange"
     />
-    <UrlEncodedTable v-else-if="tab.state.bodyMode === 'urlencoded'" :tab="tab" :variables="variables" />
-    <FormDataTable v-else-if="tab.state.bodyMode === 'formdata'" :tab="tab" :variables="variables" />
+    <UrlEncodedTable
+      v-else-if="tab.state.bodyMode === 'urlencoded'"
+      :tab="tab"
+      :variables="variables"
+      :filter-query="filterQuery"
+    />
+    <FormDataTable
+      v-else-if="tab.state.bodyMode === 'formdata'"
+      :tab="tab"
+      :variables="variables"
+      :filter-query="filterQuery"
+    />
     <BinaryBodyPicker v-else-if="tab.state.bodyMode === 'file'" :tab="tab" />
   </div>
 </template>
