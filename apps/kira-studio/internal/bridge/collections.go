@@ -2,6 +2,7 @@ package bridge
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/appcore"
@@ -289,8 +290,19 @@ func (s *CollectionsService) Import(args CollectionsImportArgs) (ImportReport, e
 	// D15/F13: a second call, deliberately — encrypting a secret variable needs VariablesRepo's
 	// own Cipher, which CollectionsRepo does not have (D4/F4's module boundary). See
 	// VariablesRepo.ImportVariables' own comment for why this cannot join ImportTree's transaction.
+	//
+	// P21 round 1 architecture/security finding 10: the two commits are not atomic across that
+	// boundary. If this second one fails — the realistic case is a `type: "secret"` variable on a
+	// machine where secret storage is unavailable — the collection and its whole request tree
+	// ImportTree just committed would otherwise be left behind, visible in the panel, while the
+	// renderer reports the import as failed. Deleting it (ON DELETE CASCADE on api_items makes this
+	// one statement) keeps what's on disk matching the reported outcome.
 	if len(tree.Variables) > 0 {
 		if err := s.Deps.Repos.Variables.ImportVariables(collection.ID, tree.Variables); err != nil {
+			if delErr := s.Deps.Repos.Collections.Delete(collection.ID, "collection"); delErr != nil {
+				slog.Error("rolling back a collection import after ImportVariables failed",
+					"scope", "bridge/collections", "collectionId", collection.ID, "importVariablesErr", err, "deleteErr", delErr)
+			}
 			return ImportReport{}, ipcerr.Internal(err.Error())
 		}
 	}
