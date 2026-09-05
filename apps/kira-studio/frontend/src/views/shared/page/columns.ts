@@ -12,6 +12,12 @@ export const MIN_WIDTH = 64;
 const MAX_WIDTH = 480;
 const CELL_PADDING = 20; // px, both sides combined plus a little breathing room
 const SAMPLE_ROWS = 50;
+// P16 D4: the ceiling on headerAwareMinWidth below — without one, a column named
+// `customer_subscription_renewal_reason` would become undraggable below ~280px. Under MAX_WIDTH's
+// 480 and above 42-58px of header chrome plus ~20 characters of name, which covers the
+// overwhelming majority of real column names; past it, ellipsising is the right answer and
+// columnHeaderTooltip already carries the full name.
+const MIN_WIDTH_CAP = 200;
 
 // P48 F9: one constant behind what were three separate spellings of the same gutter width — the
 // deleted DataGrid.vue's own, ConsoleResultGrid.vue's now-deleted tabular-branch copy (a bare `56`
@@ -26,29 +32,62 @@ export const DEFAULT_COLUMN_WIDTH = 96;
 // column axis it belonged to (P30 §3.6 C7) — SlickGrid clamps by canvas width instead.
 export const OVERSCAN_PX = 560;
 
-let measureCtx: CanvasRenderingContext2D | null = null;
+// P16 D4: a small Map keyed by size token, generalized from one memoized context — the header
+// (--kira-t-sm, 11px) and the body sample (--kira-font-size/--kira-t-md, 12px) are measured at
+// their own actual render size rather than over-reserving every column by the larger of the two.
+let measureCtxBySize = new Map<string, CanvasRenderingContext2D>();
 
-function getMeasureCtx(): CanvasRenderingContext2D {
-  if (measureCtx) return measureCtx;
+function getMeasureCtx(sizeToken = '--kira-font-size'): CanvasRenderingContext2D {
+  const cached = measureCtxBySize.get(sizeToken);
+  if (cached) return cached;
   const canvas = document.createElement('canvas');
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('2D canvas context is unavailable — cannot measure column widths');
   const root = getComputedStyle(document.documentElement);
   const family = root.getPropertyValue('--kira-font-family').trim() || 'monospace';
-  const size = root.getPropertyValue('--kira-font-size').trim() || '12px';
+  const size = root.getPropertyValue(sizeToken).trim() || '12px';
   ctx.font = `${size} ${family}`;
-  measureCtx = ctx;
+  measureCtxBySize.set(sizeToken, ctx);
   return ctx;
 }
 
-/** Drops the memoized measuring context so the next initialWidths() call re-reads the current
- *  appearance tokens (P31 D11) — without this, a font change leaves every unstored column sized
- *  for whatever font was active when this module first measured, for the rest of the session.
- *  Also drops initialWidths'/initialWidthsByIndex's own result caches below, for the same reason. */
+/** Drops the memoized measuring contexts so the next initialWidths()/headerAwareMinWidth() call
+ *  re-reads the current appearance tokens (P31 D11) — without this, a font change leaves every
+ *  unstored column sized for whatever font was active when this module first measured, for the
+ *  rest of the session. Also drops initialWidths'/initialWidthsByIndex's own result caches below,
+ *  for the same reason. */
 export function resetMeasureCtx(): void {
-  measureCtx = null;
+  measureCtxBySize = new Map();
   widthsCache = new WeakMap();
   namedWidthsCache = new WeakMap();
+}
+
+/** What a header cell spends before its name gets a pixel — read off slickTheme.css's own rules
+ *  for `.slick-header-column` (padding + flex gaps) and `.slick-sort-indicator` (a fixed 14px
+ *  box, built only for a sortable column). */
+export interface HeaderChrome {
+  /** `.slick-header-column`'s own `padding: 0 var(--kira-s-4)`, both sides. */
+  padding: number; // 16
+  /** `.slick-sort-indicator`'s `width: 14px` + one `gap: var(--kira-s-2)`, or 0 when the column
+   *  is not sortable (SlickGrid builds the div only under `m.sortable`). */
+  sortControl: number; // 18 | 0
+  /** The PK/FK `.header-key` badge plus its own `margin-left: var(--kira-s-2)`, or 0. */
+  keyBadge: number; // 16 | 0
+}
+
+/** The narrowest this column may ever be drawn without its own header name ellipsising — the flat
+ *  MIN_WIDTH floor when that is already enough, and never more than MIN_WIDTH_CAP (P16 D4). Feeds
+ *  both a column's initial `width` and its `minWidth` (SlickGridHost.vue) — fixing only the
+ *  initial width would leave a drag able to crop the header again. */
+export function headerAwareMinWidth(name: string, chrome: HeaderChrome): number {
+  const headerText = getMeasureCtx('--kira-t-sm').measureText(name).width;
+  return Math.min(
+    MIN_WIDTH_CAP,
+    Math.max(
+      MIN_WIDTH,
+      Math.ceil(headerText + chrome.padding + chrome.sortControl + chrome.keyBadge),
+    ),
+  );
 }
 
 // P2 R1: the deleted DataGrid.vue's `widths` computed depended on the tab's stored columnWidths (so a resize

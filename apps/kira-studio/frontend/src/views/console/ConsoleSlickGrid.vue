@@ -18,8 +18,8 @@ import {
   columnHeaderTooltip,
   DEFAULT_COLUMN_WIDTH,
   GUTTER_WIDTH,
+  headerAwareMinWidth,
   initialWidthsByIndex,
-  MIN_WIDTH,
   resetMeasureCtx,
 } from '../shared/page/columns';
 import { setVisibleRows } from '../shared/page/visibleRows';
@@ -161,6 +161,11 @@ function buildColumns(page: TabularPage): KiraColumn[] {
     const classes = [`tc-${categoryForTypeClass(col.typeClass)}`];
     if (alignmentFor(col) === 'right') classes.push('kira-align-right');
     const tooltip = columnHeaderTooltip(col, col.dataType);
+    // P16 D5: every column here is `sortable: false` (no re-query path, below) and renders no
+    // PK/FK badge, so this reduces to `max(MIN_WIDTH, ceil(headerText + 16))` — the console
+    // grid's header furniture is 16px of padding only, which measuredWidths' own CELL_PADDING
+    // already covered, so this is provably unchanged for every name short enough to matter.
+    const floor = headerAwareMinWidth(col.name, { padding: 16, sortControl: 0, keyBadge: 0 });
     cols.push({
       id: colField(i),
       field: colField(i),
@@ -170,7 +175,7 @@ function buildColumns(page: TabularPage): KiraColumn[] {
       // extra clamp here, unlike SlickGridHost.vue's storedWidths path. minWidth still needs to
       // match, so an interactive drag can't undercut what a fresh render already guarantees.
       width: measured[i] ?? DEFAULT_COLUMN_WIDTH,
-      minWidth: MIN_WIDTH,
+      minWidth: floor,
       resizable: true,
       sortable: false,
       cssClass: classes.join(' '),

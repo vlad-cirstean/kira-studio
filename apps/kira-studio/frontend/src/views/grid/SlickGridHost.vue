@@ -37,8 +37,8 @@ import {
   columnHeaderTooltip,
   DEFAULT_COLUMN_WIDTH,
   GUTTER_WIDTH,
+  headerAwareMinWidth,
   initialWidths,
-  MIN_WIDTH,
   pageColumnIndexFor,
   resetMeasureCtx,
   resolveColumnOrder,
@@ -411,6 +411,7 @@ function buildColumns(
   const measured = initialWidths(page);
   const byName = new Map(page.columns.map((c) => [c.name, c]));
   const metaByName = new Map(meta?.columns.map((c) => [c.name, c]) ?? []);
+  const fkNames = foreignKeyNamesFor(meta);
   order.forEach((name, displayIndex) => {
     const descriptor = byName.get(name);
     const classes = [`tc-${descriptor ? categoryForTypeClass(descriptor.typeClass) : 'other'}`];
@@ -420,20 +421,29 @@ function buildColumns(
       dataTypeFor(name, descriptor, metaByName),
       metaByName.get(name)?.comment,
     );
+    // P16 D4: a per-column floor that knows what the header actually renders — padding, the sort
+    // indicator (every column here is sortable, below) and the PK/FK badge (keyLabelFor is the
+    // same call onHeaderCellRendered makes for the badge itself, so a column widens for its badge
+    // at the same moment the badge appears). Fed into both `width` and `minWidth` below: fixing
+    // only the initial width would leave a drag able to crop the header again.
+    const floor = headerAwareMinWidth(name, {
+      padding: 16,
+      sortControl: 18,
+      keyBadge: keyLabelFor(descriptor, name, fkNames) ? 16 : 0,
+    });
     cols.push({
       id: name,
       field: name,
       name,
-      // Clamped to MIN_WIDTH even for a stored width (found against the real app: a width read
+      // Clamped to `floor` even for a stored width (found against the real app: a width read
       // back from a prior resize/session was never re-clamped, only an interactive drag was, so
       // a column persisted at a pre-floor width — as narrow as one character for something as
       // short as "id" — forever, across every reload, until manually widened again).
-      width: Math.max(MIN_WIDTH, storedWidths[name] ?? measured[name] ?? DEFAULT_COLUMN_WIDTH),
-      // F9 — the app's own resize floor; onColumnsResized persists the drag (below). Matches
-      // columns.ts's own MIN_WIDTH (a freshly measured column already can't go narrower) rather
-      // than a second, lower number — the mismatch between the two was what let a manual drag
-      // undercut the floor a fresh column never could.
-      minWidth: MIN_WIDTH,
+      width: Math.max(floor, storedWidths[name] ?? measured[name] ?? DEFAULT_COLUMN_WIDTH),
+      // F9 — the app's own resize floor; onColumnsResized persists the drag (below). Header-aware
+      // (D4) rather than the flat columns.ts MIN_WIDTH — the mismatch between a flat floor and a
+      // header's real furniture was what let a manual drag crop the header text again.
+      minWidth: floor,
       resizable: true,
       // F8 — creates the sort indicator divs; tristateMultiColumnSort/multiColumnSort (grid
       // options, below) make a click cycle asc -> desc -> none, this app's own header cycle.
