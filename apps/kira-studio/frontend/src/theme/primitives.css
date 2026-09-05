@@ -130,7 +130,12 @@
   display: inline-flex;
   align-items: center;
   gap: var(--kira-s-2);
-  padding: 0 var(--kira-s-3);
+  /* P16 D7: 8px, the inset every other text surface in the app uses (.p-toolbar, .p-view-head,
+     .p-th/.p-td, .slick-cell/.slick-header-column) — this was the one outlier at 6px. Goes on the
+     box, never on `.p-input input` below: AutocompleteField.vue paints a read-only CodeMirror
+     overlay behind the real <input>, both inside `.input-wrap`, with the two engines' first glyph
+     aligned on the same pixel — padding on the inner <input> would break that alignment. */
+  padding: 0 var(--kira-s-4);
   border-radius: var(--kira-radius-sm);
   border: var(--kira-border-width) solid var(--kira-border-strong);
   background: var(--kira-bg-input);
@@ -194,7 +199,7 @@
   padding-right: 0;
 }
 .p-input.has-stepper input {
-  padding-right: var(--kira-s-1);
+  padding-right: var(--kira-s-2);
 }
 .p-input .stepper {
   display: flex;
@@ -244,7 +249,9 @@
   color: var(--kira-fg);
   font-family: var(--kira-font-family);
   font-size: var(--kira-t-sm);
-  padding: var(--kira-s-2);
+  /* P16 D7: 4px vertical, 8px horizontal — matches .p-input's own gutter (its multiline sibling
+     was tighter still, by another 2px). */
+  padding: var(--kira-s-2) var(--kira-s-4);
   resize: vertical;
   box-sizing: border-box;
 }
