@@ -137,3 +137,98 @@ test('gRPC history Clear tracks whether there is anything to clear (D12)', async
   });
   await expect(withEntries.window.locator('[data-testid="grpc-history-clear"]')).toBeEnabled();
 });
+
+// P15 §4: four cases guarding this phase's own end-to-end behaviour, not the restyles themselves —
+// the response pane's chrome present from tab-open (D1), JSON as a top-level body segment (D6),
+// and the tab-strip badge (D8).
+
+async function openHttpModeAndNewRequest(page: Page): Promise<void> {
+  await modeTab(page, 'api').click();
+  await expect(page.locator('[data-testid="api-start"]')).toBeVisible();
+  await page.click('[data-testid="new-request-start"]');
+}
+
+test('a freshly opened request tab shows the response pane switcher before any send (D1)', async ({
+  relaunch,
+}) => {
+  const { window: page } = await relaunch({});
+  await openHttpModeAndNewRequest(page);
+
+  // Present from the moment the tab opens — asserted as a presence so a future refactor cannot
+  // quietly re-hide it behind a first send again.
+  await expect(page.locator('[data-testid="http-response-pane-toggle"]')).toBeVisible();
+
+  // Each pane owns its own empty state — switching to Headers on a never-sent tab renders one
+  // rather than throwing.
+  await page.click('[data-testid="http-response-pane-headers"]');
+  const headers = page.locator('[data-testid="http-response-headers"]');
+  await expect(headers.locator('.p-empty')).toHaveText('Send a request to see the response');
+});
+
+test('the body-mode segmented control has a JSON segment (D6)', async ({ relaunch }) => {
+  const { window: page } = await relaunch({});
+  await openHttpModeAndNewRequest(page);
+  await page.click('[data-testid="http-request-pane-body"]');
+
+  await page.click('[data-testid="http-body-mode-json"]');
+  await expect(page.locator('[data-testid="http-body-mode-json"]')).toHaveClass(/on/);
+  // Same segmented control the request pane's own toggle uses for the Body segment's count/kind
+  // badge — selecting JSON is reflected there end to end, without asserting storage directly.
+  await expect(page.locator('[data-testid="http-request-pane-body"]')).toHaveText('Body (JSON)');
+});
+
+function httpRequestTab(
+  id: string,
+  order: number,
+  active: boolean,
+  state: Record<string, unknown>,
+): Record<string, unknown> {
+  return {
+    id,
+    connectionId: null,
+    path: 'request',
+    kind: 'http-request',
+    order,
+    active,
+    state: {
+      method: 'GET',
+      url: '',
+      headers: [],
+      bodyMode: 'none',
+      body: '',
+      code: '',
+      codeLanguage: 'json',
+      urlEncoded: [],
+      formData: [],
+      binaryFile: null,
+      itemId: null,
+      name: '',
+      requestPane: 'body',
+      responsePane: 'body',
+      responseView: 'pretty',
+      requestPaneHeight: 0,
+      ...state,
+    },
+  };
+}
+
+test('a request tab with a body shows a tab-strip badge; one with none does not (D8)', async ({
+  relaunch,
+}) => {
+  const CONTROL: ControlSnapshot[] = [
+    {
+      channel: IPC.tabsList,
+      response: [
+        httpRequestTab('tab-has-body', 0, true, { bodyMode: 'raw', body: 'hello' }),
+        httpRequestTab('tab-no-body', 1, false, { bodyMode: 'none' }),
+      ],
+    },
+  ];
+  const { window: page } = await relaunch({ control: CONTROL });
+
+  await expect(page.locator('[data-testid="http-request-view"]')).toBeVisible();
+  const withBody = page.locator('[data-testid="tab"][data-tab-id="tab-has-body"]');
+  const withoutBody = page.locator('[data-testid="tab"][data-tab-id="tab-no-body"]');
+  await expect(withBody.locator('[data-testid="tab-badge"]')).toHaveCount(1);
+  await expect(withoutBody.locator('[data-testid="tab-badge"]')).toHaveCount(0);
+});

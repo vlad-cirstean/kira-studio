@@ -236,8 +236,11 @@ test('Http request body — a pre-P3 tab restores into code · JSON', async ({ r
   const { window: page } = await relaunch({ control: CONTROL });
 
   await expect(page.locator('[data-testid="http-request-view"]')).toBeVisible();
-  await expect(page.locator('[data-testid="http-body-mode-code"]')).toHaveClass(/on/);
-  await expect(page.locator('[data-testid="http-body-code-language"]')).toHaveValue('json');
+  // P15 D6: code + codeLanguage: 'json' is presented as the top-level JSON segment now, with no
+  // code-language <select> to assert on for it (JSON's own segment, item 6) — same stored state
+  // (bodyMode: 'code', codeLanguage: 'json'), new presentation.
+  await expect(page.locator('[data-testid="http-body-mode-json"]')).toHaveClass(/on/);
+  await expect(page.locator('[data-testid="http-body-code-language"]')).toHaveCount(0);
   const editor = page.locator('[data-testid="http-request-pane"] .cm-content');
   expect(await editor.innerText()).toBe('{"name":"gizmo"}');
 

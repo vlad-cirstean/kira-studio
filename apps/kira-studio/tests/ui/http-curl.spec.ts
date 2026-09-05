@@ -83,7 +83,9 @@ test('import populates a new tab, and the first tab is left intact', async ({ re
     'application/json',
   );
 
-  await expect(page.locator('[data-testid="http-request-pane-body"]')).toContainText('Body (code)');
+  // P15 D6: a JSON body is presented as the top-level JSON segment now, not "Body (code)" — same
+  // stored state (bodyMode: 'code', codeLanguage: 'json'), new presentation.
+  await expect(page.locator('[data-testid="http-request-pane-body"]')).toContainText('Body (JSON)');
   await page.click('[data-testid="http-request-pane-body"]');
   const editor = page.locator('[data-testid="http-request-pane"]').locator('.cm-content');
   await expect(editor).toContainText('{"id":1}');
