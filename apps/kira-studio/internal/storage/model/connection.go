@@ -56,11 +56,14 @@ var connectionKinds = map[string]bool{
 	"mongodb": true, "redis": true, "kafka": true, "sqs": true, "s3": true,
 }
 
-// connectionColors mirrors connection.ts's connectionColorSchema — the whole storable set, not
-// CONNECTION_COLOR_CHOICES (the picker's offered subset). P42 F27: a connection saved with a
-// retired colour must keep parsing, listing and painting its own rail, so trimming this set to
-// match the picker would silently corrupt existing rows.
-var connectionColors = map[string]bool{
+// paletteColors mirrors domain/color.ts's paletteColorSchema — the whole storable set, not
+// PALETTE_COLOR_CHOICES/CONNECTION_COLOR_CHOICES (the picker's offered subset). P42 F27: a row
+// saved with a retired colour must keep parsing, listing and painting its own rail, so trimming
+// this set to match the picker would silently corrupt existing rows. P18 D18: renamed from
+// connectionColors now that an environment's colour (this phase) draws from the same palette —
+// ValidConnectionColor below stays as a one-line alias so repos/connections.go and the connection
+// bridge are untouched.
+var paletteColors = map[string]bool{
 	"none": true, "red": true, "orange": true, "amber": true, "olive": true, "green": true,
 	"teal": true, "cyan": true, "blue": true, "indigo": true, "violet": true, "magenta": true,
 	"grey": true,
@@ -69,8 +72,12 @@ var connectionColors = map[string]bool{
 // ValidConnectionKind mirrors connection.ts's connectionKindSchema.
 func ValidConnectionKind(v string) bool { return connectionKinds[v] }
 
-// ValidConnectionColor mirrors connection.ts's connectionColorSchema (the full 13-colour set).
-func ValidConnectionColor(v string) bool { return connectionColors[v] }
+// ValidPaletteColor mirrors domain/color.ts's paletteColorSchema (the full 13-colour set).
+func ValidPaletteColor(v string) bool { return paletteColors[v] }
+
+// ValidConnectionColor is ValidPaletteColor under its original name — kept so
+// repos/connections.go and the connection bridge need no changes.
+func ValidConnectionColor(v string) bool { return ValidPaletteColor(v) }
 
 // ValidConnectionMode mirrors connection.ts's connectionModeSchema.
 func ValidConnectionMode(v string) bool { return v == "fields" || v == "uri" }

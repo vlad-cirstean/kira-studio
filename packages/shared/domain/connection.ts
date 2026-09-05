@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { capsSchema } from '../caps';
+import { PALETTE_COLOR_CHOICES, type PaletteColor, paletteColorSchema } from './color';
 
 export const connectionKindSchema = /*#__PURE__*/ z.enum([
   'postgres',
@@ -48,24 +49,15 @@ export const MIN_SERVER_VERSION: Partial<Record<ConnectionKind, string>> = {
 // interval, so a user reacting to "keep it under N/s" types the same number the server told them.
 export const CONNECTION_THROTTLE_RANGE = { min: 0.01, max: 1000 } as const;
 
-export const connectionColorSchema = /*#__PURE__*/ z.enum([
-  'none',
-  'red',
-  'orange',
-  'amber',
-  'olive',
-  'green',
-  'teal',
-  'cyan',
-  'blue',
-  'indigo',
-  'violet',
-  'magenta',
-  'grey',
-]); // D18; matches --kira-conn-* in tokens.css. 'none' is a real, stored value (the P16 design
-// system's default — "no colour is the default, the rail slot stays reserved either way") rather
-// than the field being nullable, so no DB/schema change is needed to add it.
-export type ConnectionColor = z.infer<typeof connectionColorSchema>;
+// P18 D18: promoted to domain/color.ts as paletteColorSchema/PaletteColor/PALETTE_COLOR_CHOICES —
+// one palette *by construction* now that an environment's colour (this phase) draws from the same
+// set. These three names stay as aliases so nothing in Studio (or its call sites' comments) has to
+// change.
+export const connectionColorSchema = paletteColorSchema; // D18; matches --kira-conn-* in
+// tokens.css. 'none' is a real, stored value (the design system's own default — "no colour is the
+// default, the rail slot stays reserved either way") rather than the field being nullable, so no
+// DB/schema change is needed to add it.
+export type ConnectionColor = PaletteColor;
 
 /** P42 D34/D35: the *offered* subset, not the storable one — `connectionColorSchema` above stays
  *  whole on purpose (F27: a connection saved with a retired colour must keep parsing, listing and
@@ -74,16 +66,7 @@ export type ConnectionColor = z.infer<typeof connectionColorSchema>;
  *  lightness/chroma (`oklch(0.72 0.09 h)`) — roughly double the full eleven-hue ring's own worst
  *  gap (25.6°, blue↔indigo), which is what makes a 2px tab rail or a 5px status dot legible at
  *  all. Retired from the picker: `orange`, `olive`, `teal`, `indigo`, `violet`. */
-export const CONNECTION_COLOR_CHOICES: readonly ConnectionColor[] = [
-  'none',
-  'red',
-  'amber',
-  'green',
-  'cyan',
-  'blue',
-  'magenta',
-  'grey',
-];
+export const CONNECTION_COLOR_CHOICES: readonly ConnectionColor[] = PALETTE_COLOR_CHOICES;
 
 export const connectionModeSchema = /*#__PURE__*/ z.enum(['fields', 'uri']);
 export type ConnectionMode = z.infer<typeof connectionModeSchema>;

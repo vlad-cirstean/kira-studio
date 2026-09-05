@@ -19,12 +19,12 @@ import CodiconIcon from '../theme/CodiconIcon.vue';
 import EngineIcon from '../theme/EngineIcon.vue';
 import AppButton from '../theme/primitives/AppButton.vue';
 import Checkbox from '../theme/primitives/Checkbox.vue';
+import ColorPicker from '../theme/primitives/ColorPicker.vue';
 import DialogFrame from '../theme/primitives/DialogFrame.vue';
 import IconButton from '../theme/primitives/IconButton.vue';
 import MessageStrip from '../theme/primitives/MessageStrip.vue';
 import TextField from '../theme/primitives/TextField.vue';
 import { wrapSelectionOnType } from '../theme/wrapSelection';
-import ColorPicker from './ColorPicker.vue';
 
 const KIND_LABEL: Record<ConnectionKind, string> = {
   postgres: 'PostgreSQL',
@@ -514,7 +514,7 @@ const preconnectText = computed({
             </div>
             <div class="field color-field">
               <label>Color</label>
-              <ColorPicker v-model="draft.color" />
+              <ColorPicker v-model="draft.color" label="Connection color" />
             </div>
           </div>
           <span v-if="fieldErrors.name" class="field-error">{{ fieldErrors.name }}</span>

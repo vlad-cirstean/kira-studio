@@ -1,16 +1,23 @@
 <script setup lang="ts">
-import { CONNECTION_COLOR_CHOICES, type ConnectionColor } from '@shared/domain/connection';
+import { PALETTE_COLOR_CHOICES, type PaletteColor } from '@shared/domain/color';
 
-defineProps<{ modelValue: ConnectionColor }>();
-const emit = defineEmits<{ 'update:modelValue': [ConnectionColor] }>();
+// P18 D18: promoted from project/ColorPicker.vue — api/** may not import project/** (biome.json),
+// and an environment (api/**) needs this swatch radiogroup too, exactly the promotion P15 D5 made
+// for Checkbox. Unchanged except the aria-label becoming a `label` prop (Studio's own connection
+// dialog and the Api module's environment tab want different words for the same control) and the
+// prop type moving to the shared PaletteColor (ConnectionColor is now an alias of it).
+withDefaults(defineProps<{ modelValue: PaletteColor; label?: string }>(), {
+  label: 'Colour',
+});
+const emit = defineEmits<{ 'update:modelValue': [PaletteColor] }>();
 
-// P42 D34: the offered subset, not the full storable enum — a connection already saved with a
-// retired colour keeps its own rail regardless (connColor.ts), it just isn't offered here again.
-const colors = CONNECTION_COLOR_CHOICES;
+// P42 D34: the offered subset, not the full storable enum — a row already saved with a retired
+// colour keeps its own rail regardless (connColor.ts), it just isn't offered here again.
+const colors = PALETTE_COLOR_CHOICES;
 </script>
 
 <template>
-  <div class="color-picker" role="radiogroup" aria-label="Connection color">
+  <div class="color-picker" role="radiogroup" :aria-label="label">
     <button
       v-for="color in colors"
       :key="color"
