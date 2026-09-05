@@ -470,8 +470,11 @@ test('gRPC request — the live message list caps at 10,000 and shows the true t
 
   // The true total (10,037 × 10 bytes = 100,370) is what the byte summary shows too — it is kept
   // as a running total (state.ts's rt.messageBytes), not re-derived from the now-capped array.
+  // Round-2 review finding 10: the message *count* alongside it must be the same true total, not
+  // messages.length (capped at 10,000) — the old capped reading contradicted the elided-messages
+  // strip's own "10000 of 10037" right below it.
   await expect(page.locator('[data-testid="grpc-message-summary"]')).toContainText(
-    '10000 messages',
+    `${total} messages`,
   );
   await expect(page.locator('[data-testid="grpc-message-summary"]')).toContainText('98.0 KB');
   await expect(page.locator('[data-testid="grpc-live-messages-elided"]')).toHaveText(
@@ -773,7 +776,9 @@ test('gRPC request — a stored streaming history entry with elided messages sho
   );
   await page.click('[data-testid="grpc-response-pane-messages"]');
   // The message list is virtualized (finding 11) — only the visible window actually renders, so
-  // the 100-message data length is asserted through the status row's own summary rather than a
-  // DOM node count.
-  await expect(page.locator('[data-testid="grpc-message-summary"]')).toContainText('100 messages');
+  // the data length is asserted through the status row's own summary rather than a DOM node
+  // count. Round-2 review finding 10: that summary must read the stored entry's true messageCount
+  // (137) here, not the 100 messages the elided snapshot actually carries — otherwise it
+  // contradicts the "first 100 of 137" strip right above it.
+  await expect(page.locator('[data-testid="grpc-message-summary"]')).toContainText('137 messages');
 });

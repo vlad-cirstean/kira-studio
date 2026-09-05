@@ -76,6 +76,14 @@ const messages = computed(() =>
       }))
     : liveMessages.value,
 );
+// Round-2 review finding 10: the summary line used to read messages.length — capped at
+// MAX_LIVE_MESSAGES for a live call (state.ts) and at maxGrpcStoredMessages for a stored entry
+// (finding 8) — right next to a separate elided-messages strip stating the true, uncapped total,
+// two contradictory counts on screen at once for the same response. Sourced from the true total
+// instead: rt.trueMessageCount for live, the stored entry's own true messageCount for history.
+const messageCount = computed(() =>
+  viewing.value ? viewing.value.snapshot.entry.messageCount : (rt.value?.trueMessageCount ?? 0),
+);
 // D15/D17: the live view keeps only the most recent MAX_LIVE_MESSAGES (state.ts) — this is true
 // only for a live, still/just-streamed call, never a stored history entry's own capped snapshot
 // (finding 8's own "first N of M" note above covers that case with its own wording).
@@ -168,7 +176,7 @@ const viewingTime = computed(() => {
           <span class="p-push" />
           <span class="p-xs dim" data-testid="grpc-elapsed">{{ elapsedMs }} ms</span>
           <span class="p-xs dim" data-testid="grpc-message-summary">
-            {{ messages.length }} message{{ messages.length === 1 ? '' : 's' }} · {{ formatBytes(messageBytes) }}
+            {{ messageCount }} message{{ messageCount === 1 ? '' : 's' }} · {{ formatBytes(messageBytes) }}
           </span>
         </template>
         <span v-else class="p-push" />
