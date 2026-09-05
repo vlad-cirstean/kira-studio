@@ -117,6 +117,10 @@
                   {
                     "group": ["**/views/**"],
                     "message": "SPEC §11: project/ must not import views/ directly — dispatch through state/viewCommands.ts instead."
+                  },
+                  {
+                    "group": ["**/http/**", "**/api/**"],
+                    "message": "P12 D16(c): project/ must not import http/ or api/ — the mirror of the rule that already stopped api/ importing project/."
                   }
                 ]
               }
@@ -141,6 +145,96 @@
                   {
                     "group": ["**/views/**"],
                     "message": "P1 D7: api/ must not import views/ directly, mirroring project/'s own rule — dispatch through state/viewCommands.ts instead."
+                  },
+                  {
+                    "group": ["**/workbench/**"],
+                    "message": "P12 D16(a)/D10: api/ must not import workbench/ — PanelShell is a theme primitive now, so this ban is exception-free."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": [
+        "apps/kira-studio/frontend/src/state/**",
+        "apps/kira-studio/frontend/src/shortcuts/**"
+      ],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["**/views/httprequest/**", "**/views/grpcrequest/**"],
+                    "message": "P12 D16(b): state/ and shortcuts/ must not reach into the Api module's own views — go through api/tabs.ts instead. (Not a blanket views/ ban: state/tabKinds.ts and state/schemas.ts legitimately import Studio's own view modules.)"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": [
+        "apps/kira-studio/frontend/src/views/httprequest/**",
+        "apps/kira-studio/frontend/src/views/grpcrequest/**"
+      ],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["**/project/**"],
+                    "message": "P12 D16(d): views/httprequest/ and views/grpcrequest/ must not import project/ — Studio's connection tree is not the Api views' to reach into either."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["packages/api-core/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["vue", "@codemirror/*", "**/apps/**", "@bindings*"],
+                    "message": "P12 D16(e): packages/api-core is pure, DOM-free logic — no Vue, no CodeMirror, no app, no bindings."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["packages/shared/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["**/apps/**", "@kira/api-core"],
+                    "message": "P12 D16(f): packages/shared is the base layer (shared -> api-core -> app) — it must not import the app or the package built on top of it."
                   }
                 ]
               }
