@@ -20,7 +20,7 @@ const {
   runtime,
   ensure: ensureRuntime,
   load: loadHistory,
-  ensureLoaded: ensureHistoryLoaded,
+  ensureFresh: ensureHistoryFresh,
   noteRecorded: noteSendRecorded,
   view: viewHistoryEntry,
   backToLatest,
@@ -37,7 +37,7 @@ const {
 
 export {
   backToLatest,
-  ensureHistoryLoaded,
+  ensureHistoryFresh,
   loadHistory,
   noteSendRecorded,
   runtime as historyRuntime,

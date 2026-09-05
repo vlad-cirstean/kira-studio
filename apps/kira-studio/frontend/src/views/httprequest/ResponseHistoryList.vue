@@ -14,7 +14,7 @@ import PanelSearchBox from '../../theme/primitives/PanelSearchBox.vue';
 import {
   clearHistory,
   deleteHistoryEntry,
-  ensureHistoryLoaded,
+  ensureHistoryFresh,
   historyRuntime,
   toggleSelected,
   viewHistoryEntry,
@@ -32,7 +32,7 @@ const viewingId = computed(() => rt.value?.viewing?.id ?? null);
 const isScratch = computed(() => !props.tab.state.itemId);
 
 onMounted(() => {
-  ensureHistoryLoaded(props.tab.id);
+  ensureHistoryFresh(props.tab.id);
 });
 
 // P16 D15: matches method, URL, status text, or environment name — the fields already on screen

@@ -11,7 +11,7 @@ import MessageStrip from '../../theme/primitives/MessageStrip.vue';
 import SegmentedControl from '../../theme/primitives/SegmentedControl.vue';
 import VirtualList from '../../theme/primitives/VirtualList.vue';
 import CallHistoryList from './CallHistoryList.vue';
-import { backToLatestGrpc, ensureGrpcHistoryLoaded, grpcHistoryRuntime } from './history';
+import { backToLatestGrpc, ensureGrpcHistoryFresh, grpcHistoryRuntime } from './history';
 import { runtime } from './state';
 
 // D14: three segments — Messages · Metadata · History — and deliberately no Raw, no Timeline (D14
@@ -23,7 +23,7 @@ const rt = computed(() => runtime[props.tab.id]);
 const historyRt = computed(() => grpcHistoryRuntime[props.tab.id]);
 
 onMounted(() => {
-  ensureGrpcHistoryLoaded(props.tab.id);
+  ensureGrpcHistoryFresh(props.tab.id);
 });
 
 watch(
@@ -31,7 +31,7 @@ watch(
   () => {
     const hrt = historyRt.value;
     if (hrt) hrt.entries = null;
-    ensureGrpcHistoryLoaded(props.tab.id);
+    ensureGrpcHistoryFresh(props.tab.id);
   },
 );
 

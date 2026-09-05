@@ -10,7 +10,7 @@ import { control } from '../../bridge/control';
 const {
   runtime,
   load: loadGrpcHistory,
-  ensureLoaded: ensureGrpcHistoryLoaded,
+  ensureFresh: ensureGrpcHistoryFresh,
   noteRecorded: noteGrpcCallRecorded,
   view: viewGrpcHistoryEntry,
   backToLatest: backToLatestGrpc,
@@ -26,7 +26,7 @@ const {
 
 export {
   backToLatestGrpc,
-  ensureGrpcHistoryLoaded,
+  ensureGrpcHistoryFresh,
   loadGrpcHistory,
   noteGrpcCallRecorded,
   runtime as grpcHistoryRuntime,

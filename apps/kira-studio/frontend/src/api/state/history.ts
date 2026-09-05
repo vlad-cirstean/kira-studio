@@ -77,19 +77,23 @@ export function createHistoryStore<Entry, Snapshot, Extra extends object = Recor
     }
   }
 
-  /** The one initial load a tab's history ever gets unprompted — called from the response pane's
-   *  own mount, whether or not History is the currently-selected pane. Idempotent via the loading
-   *  guard, so a second caller mounting first pays no double fetch. */
-  function ensureLoaded(tabId: string): void {
+  /** The one refetch a tab's history ever gets unprompted: on the pane's own mount, and whenever
+   *  the pane becomes visible again. Fetches when the list has never loaded (entries === null) OR
+   *  when a send/call happened while this pane was not showing (stale, D1). Idempotent via the
+   *  loading guard, so two callers mounting in the same tick pay one fetch. */
+  function ensureFresh(tabId: string): void {
     const rt = ensure(tabId);
-    if (rt.entries === null && !rt.loading) void load(tabId);
+    if ((rt.entries === null || rt.stale) && !rt.loading) void load(tabId);
   }
 
   /** Eager when the History pane is showing, lazy (just a `stale` flag) otherwise — a user who
-   *  never opens the pane pays no IPC per send/call. */
+   *  never opens the pane pays no IPC per send/call. D3: a send/call always asks for *this*
+   *  response, so it also clears any stored entry currently being viewed — leaving one on screen
+   *  after a fresh send is the same complaint as a stale list. */
   function noteRecorded(tabId: string): void {
     const tab = opts.findTab(tabId);
     const rt = ensure(tabId);
+    rt.viewing = null;
     if (tab?.state.responsePane === 'history') {
       void load(tabId);
     } else {
@@ -132,5 +136,5 @@ export function createHistoryStore<Entry, Snapshot, Extra extends object = Recor
     await load(tabId);
   }
 
-  return { runtime, ensure, load, ensureLoaded, noteRecorded, view, backToLatest, del, clearAll };
+  return { runtime, ensure, load, ensureFresh, noteRecorded, view, backToLatest, del, clearAll };
 }

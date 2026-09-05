@@ -12,7 +12,7 @@ import MessageStrip from '../../theme/primitives/MessageStrip.vue';
 import {
   clearGrpcHistory,
   deleteGrpcHistoryEntry,
-  ensureGrpcHistoryLoaded,
+  ensureGrpcHistoryFresh,
   grpcHistoryRuntime,
   viewGrpcHistoryEntry,
 } from './history';
@@ -32,7 +32,7 @@ const entries = computed<GrpcCallHistoryEntry[]>(() => rt.value?.entries ?? []);
 const viewingId = computed(() => rt.value?.viewing?.id ?? null);
 
 onMounted(() => {
-  ensureGrpcHistoryLoaded(props.tab.id);
+  ensureGrpcHistoryFresh(props.tab.id);
 });
 
 function onRowClick(id: string): void {

@@ -15,7 +15,7 @@ import IconButton from '../../theme/primitives/IconButton.vue';
 import MessageStrip from '../../theme/primitives/MessageStrip.vue';
 import PanelSearchBox from '../../theme/primitives/PanelSearchBox.vue';
 import SegmentedControl from '../../theme/primitives/SegmentedControl.vue';
-import { backToLatest, ensureHistoryLoaded, historyRuntime } from './history';
+import { backToLatest, ensureHistoryFresh, historyRuntime } from './history';
 import RawExchangePane from './RawExchangePane.vue';
 import ResponseDiffDialog from './ResponseDiffDialog.vue';
 import ResponseFindBar, { type FindBarHost, type FindBarTarget } from './ResponseFindBar.vue';
@@ -42,20 +42,20 @@ function closeCompare(): void {
 // regardless of the live response or which pane is selected (F9's sibling reasoning). This is
 // what lets a restored tab (no live response, D10) still say "N past responses".
 onMounted(() => {
-  ensureHistoryLoaded(props.tab.id);
+  ensureHistoryFresh(props.tab.id);
 });
 
 // P8 D14/C5: Save as… adopts a scratch tab's history onto the newly-saved item (D14's `Adopt`
 // call lives in http/state/collections.ts, which may not import views/** — biome.json — so the
 // list's own refetch under the new scope happens reactively here instead, the moment
-// tab.state.itemId actually changes). Entries are reset to null first so ensureHistoryLoaded's
+// tab.state.itemId actually changes). Entries are reset to null first so ensureHistoryFresh's
 // own "already loaded" guard doesn't skip the refetch.
 watch(
   () => props.tab.state.itemId,
   () => {
     const hrt = historyRt.value;
     if (hrt) hrt.entries = null;
-    ensureHistoryLoaded(props.tab.id);
+    ensureHistoryFresh(props.tab.id);
   },
 );
 
