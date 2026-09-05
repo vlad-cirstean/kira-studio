@@ -348,3 +348,56 @@ func TestImportVariablesThenExportRoundTripsWithSecretsValueless(t *testing.T) {
 		}
 	}
 }
+
+// TestSecretsForDuplicateNameResolvesFirstWinsBySortOrder is finding 2 of the round-1 review:
+// mergeSecrets used to have no ORDER BY at all, leaving a duplicate name's winner undefined
+// (whatever order SQLite happened to return rows in), where the documented rule (P5 D12) is
+// first-wins by sort_order — the same rule mergedValuesAndSecrets (frontend/src/api/state/
+// variables.ts) and findSecretVariableId (curl.ts) already implement.
+func TestSecretsForDuplicateNameResolvesFirstWinsBySortOrder(t *testing.T) {
+	r, db := newVariablesRepo(t)
+	collectionID := newCollectionFor(t, db)
+
+	if _, err := r.Upsert(model.VariableScopeCollection, collectionID, "", "token", "first-value", true); err != nil {
+		t.Fatalf("Upsert(first): %v", err)
+	}
+	if _, err := r.Upsert(model.VariableScopeCollection, collectionID, "", "token", "second-value", true); err != nil {
+		t.Fatalf("Upsert(second): %v", err)
+	}
+
+	secrets, err := r.SecretsFor(collectionID, "")
+	if err != nil {
+		t.Fatalf("SecretsFor: %v", err)
+	}
+	if got := secrets["token"]; got != "first-value" {
+		t.Fatalf("SecretsFor()[\"token\"] = %q, want %q (first-wins by sort_order)", got, "first-value")
+	}
+}
+
+// TestSecretsForEnvironmentStillOverridesCollectionDespiteFirstWins guards the interaction finding
+// 2's fix has to respect: first-wins applies *within* a scope, never across scopes — an
+// environment-scope variable must still override a same-named collection-scope one (D2), even
+// though mergeSecrets now skips a later same-named row within either individual scope's own query.
+func TestSecretsForEnvironmentStillOverridesCollectionDespiteFirstWins(t *testing.T) {
+	r, db := newVariablesRepo(t)
+	collectionID := newCollectionFor(t, db)
+	env, err := r.CreateEnvironment("Staging")
+	if err != nil {
+		t.Fatalf("CreateEnvironment: %v", err)
+	}
+
+	if _, err := r.Upsert(model.VariableScopeCollection, collectionID, "", "token", "collection-value", true); err != nil {
+		t.Fatalf("Upsert(collection): %v", err)
+	}
+	if _, err := r.Upsert(model.VariableScopeEnvironment, env.ID, "", "token", "env-value", true); err != nil {
+		t.Fatalf("Upsert(environment): %v", err)
+	}
+
+	secrets, err := r.SecretsFor(collectionID, env.ID)
+	if err != nil {
+		t.Fatalf("SecretsFor: %v", err)
+	}
+	if got := secrets["token"]; got != "env-value" {
+		t.Fatalf("SecretsFor()[\"token\"] = %q, want %q (environment overrides collection)", got, "env-value")
+	}
+}

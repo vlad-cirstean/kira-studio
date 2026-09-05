@@ -200,6 +200,17 @@ export function isDuplicateName(rows: ApiVariable[], index: number): boolean {
 // so many words ("the coupling P12 would have to unpick") — both views already import this module
 // for cachedVariables, so the fix is a move, not an abstraction.
 
+/** D12: a duplicate name within one scope resolves first-wins by sort_order — cachedVariables
+ *  already returns each scope's rows in that order, so the first row claiming a name is the one
+ *  that wins; a later same-named row is skipped rather than overwriting it. */
+function firstWinsByName(rows: ApiVariable[]): Map<string, { value: string; isSecret: boolean }> {
+  const out = new Map<string, { value: string; isSecret: boolean }>();
+  for (const v of rows) {
+    if (!out.has(v.name)) out.set(v.name, { value: v.value, isSecret: v.isSecret });
+  }
+  return out;
+}
+
 /** D2's precedence (environment over collection), read from the cache this module keeps in step
  *  with its own dialog edits — a fresh IPC round trip on every keystroke of a live
  *  "unresolved reference" preview would be needless; send()/call() call ensureVariablesLoaded
@@ -208,12 +219,9 @@ export function mergedValuesAndSecrets(
   collectionId: string,
   environmentId: string,
 ): { values: Record<string, string>; secretNames: string[] } {
-  const merged = new Map<string, { value: string; isSecret: boolean }>();
-  for (const v of cachedVariables('collection', collectionId)) {
-    merged.set(v.name, { value: v.value, isSecret: v.isSecret });
-  }
-  for (const v of cachedVariables('environment', environmentId)) {
-    merged.set(v.name, { value: v.value, isSecret: v.isSecret }); // environment wins
+  const merged = firstWinsByName(cachedVariables('collection', collectionId));
+  for (const [name, entry] of firstWinsByName(cachedVariables('environment', environmentId))) {
+    merged.set(name, entry); // environment wins over collection (D2), regardless of within-scope order
   }
   const values: Record<string, string> = {};
   const secretNames: string[] = [];

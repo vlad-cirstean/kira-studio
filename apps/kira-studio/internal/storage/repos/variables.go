@@ -637,19 +637,27 @@ func (r *VariablesRepo) SecretsFor(collectionID, environmentID string) (map[stri
 	return out, nil
 }
 
+// mergeSecrets is one scope's own resolution pass (collection, then environment — SecretsFor's own
+// call order, D2). D12: a duplicate name within *this* scope resolves first-wins by sort_order —
+// ORDER BY makes that the query's own row order, and seen skips a later row sharing an
+// already-decrypted name rather than overwriting it. seen is local to this call, never shared with
+// the caller's out map, so a later call for a higher-precedence scope (environment) still
+// overrides an already-set name from a prior, lower-precedence call — first-wins applies within a
+// scope, never across scopes.
 func (r *VariablesRepo) mergeSecrets(out map[string]string, column, ownerID string) error {
-	rows, err := r.db.Query(`SELECT name, secret_value FROM api_variables WHERE `+column+` = ? AND is_secret = 1`, ownerID)
+	rows, err := r.db.Query(`SELECT name, secret_value FROM api_variables WHERE `+column+` = ? AND is_secret = 1 ORDER BY sort_order`, ownerID)
 	if err != nil {
 		return fmt.Errorf("repos/variables: query secrets: %w", err)
 	}
 	defer rows.Close()
+	seen := map[string]bool{}
 	for rows.Next() {
 		var name string
 		var secretValue sql.NullString
 		if err := rows.Scan(&name, &secretValue); err != nil {
 			return fmt.Errorf("repos/variables: scan secret: %w", err)
 		}
-		if !secretValue.Valid {
+		if !secretValue.Valid || seen[name] {
 			continue
 		}
 		plain, err := r.cipher.Decrypt(secretValue.String)
@@ -657,6 +665,7 @@ func (r *VariablesRepo) mergeSecrets(out map[string]string, column, ownerID stri
 			slog.Warn("a secret variable could not be decrypted while resolving a request", "scope", "storage/variables", "name", name, "err", err)
 			continue
 		}
+		seen[name] = true
 		out[name] = plain
 	}
 	return rows.Err()
