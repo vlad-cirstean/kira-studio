@@ -1,4 +1,4 @@
-import type { HttpRequestTabState } from '@kira/shared/domain/http';
+import type { HttpBodyWire, HttpHeaderWire, HttpRequestTabState } from '@kira/shared/domain/http';
 import { goQueryEscape } from '../escape';
 
 // P9 D10: the raw editor is generated for these four modes only — `formdata`/`file` have no text
@@ -66,4 +66,46 @@ export function generateRawRequest(state: HttpRequestTabState, defaultContentTyp
   }
   const body = bodyTextFor(state);
   return `${lines.join('\n')}\n\n${body}`;
+}
+
+/** P18 D8: a stored history entry's Raw pane reader — the same rendering as `generateRawRequest`
+ *  above, given the four fields a `ResponseHistorySnapshot.request` actually carries (method, url,
+ *  headers, body) rather than a live tab's `HttpRequestTabState`. A small adapter, not a second
+ *  generator: the stored request is already the "as sent" projection (headers/urlEncoded rows are
+ *  the enabled, named ones only — the wire shape, not the builder's row list with its own
+ *  `enabled` flags), so this needs no filtering `generateRawRequest`'s own loop does. */
+export function generateRawRequestFromStored(
+  request: { method: string; url: string; headers: HttpHeaderWire[]; body: HttpBodyWire },
+  defaultContentType: string,
+): string {
+  const lines = [`${request.method} ${request.url} HTTP/1.1`];
+  for (const h of request.headers) lines.push(`${h.name}: ${h.value}`);
+  const hasContentType = request.headers.some(
+    (h) => h.name.trim().toLowerCase() === 'content-type',
+  );
+  if (request.body.mode !== 'none' && defaultContentType && !hasContentType) {
+    lines.push(`Content-Type: ${defaultContentType}`);
+  }
+  return `${lines.join('\n')}\n\n${storedBodyTextFor(request.body)}`;
+}
+
+/** `bodyTextFor`'s own switch, over the wire's `HttpBodyWire` shape (`mode`/`raw`/`urlEncoded`)
+ *  rather than the builder's `bodyMode`/`body`/`urlEncoded` — same four editable modes (D10),
+ *  `formdata`/`file` never reached since a stored entry's request is always one of the other four
+ *  or empty. */
+function storedBodyTextFor(body: HttpBodyWire): string {
+  switch (body.mode) {
+    case 'none':
+      return '';
+    case 'raw':
+      return body.raw;
+    case 'code':
+      return body.code;
+    case 'urlencoded':
+      return body.urlEncoded
+        .map((f) => `${goQueryEscape(f.name)}=${goQueryEscape(f.value)}`)
+        .join('&');
+    default:
+      return '';
+  }
 }

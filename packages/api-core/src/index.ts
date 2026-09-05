@@ -47,7 +47,11 @@ export {
 } from './http/dynamic/catalog';
 export { goQueryEscape, goQueryEscapeLiteral } from './http/escape';
 export { type HeaderCompletion, WELL_KNOWN_REQUEST_HEADERS } from './http/headers';
-export { canEditAsRaw, generateRawRequest } from './http/raw/generate';
+export {
+  canEditAsRaw,
+  generateRawRequest,
+  generateRawRequestFromStored,
+} from './http/raw/generate';
 export { type ParsedRawRequest, parseRawRequest, type RawWarning } from './http/raw/parse';
 export { fromSavedRequest, isDirty, toBuilderMethod, toSavedRequest } from './http/saved';
 export {

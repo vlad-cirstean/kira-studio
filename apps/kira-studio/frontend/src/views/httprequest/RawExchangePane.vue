@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import type { HttpWireFidelity } from '@shared/domain/http';
+import { defaultContentTypeFor, generateRawRequestFromStored } from '@kira/api-core';
+import type { HttpCodeLanguage, HttpResponseWire, HttpWireFidelity } from '@shared/domain/http';
 import type { HttpRequestTabRecord } from '@shared/domain/tabs';
 import { computed, ref } from 'vue';
 import { copyText } from '../../clipboard';
@@ -36,6 +37,44 @@ const response = computed(
 );
 const wire = computed(() => response.value?.wire ?? null);
 
+// P18 D8: a stored entry never has a `wire` (P9 D7 nulls it before persisting), which is why the
+// Raw segment used to render nothing at all while viewing one — the stored request/response are
+// sitting right there in the snapshot with nothing rendering either. This reconstructs both
+// documents from the four fields the snapshot actually carries, generated in the renderer rather
+// than stored (P9 D7's own objection — storing rendered text would double a snapshot — does not
+// apply here: nothing new is stored, only computed from what already is).
+const showReconstructed = computed(() => !wire.value && !!viewingStored.value);
+
+const storedRequestText = computed(() => {
+  const req = viewingStored.value?.snapshot.request;
+  if (!req) return '';
+  // req.body.codeLanguage is the wire's plain `string` (HttpBodyWire), not the narrow
+  // HttpCodeLanguage union tab state carries — this is this app's own stored data, always one of
+  // the four, so the cast is safe (defaultContentTypeFor's Record falls back to undefined -> ''
+  // for anything else, the same as an unset content type).
+  return generateRawRequestFromStored(
+    req,
+    defaultContentTypeFor(req.body.mode, req.body.codeLanguage as HttpCodeLanguage),
+  );
+});
+
+function buildResponseHead(r: HttpResponseWire): string {
+  const lines = [`${r.proto} ${r.status} ${r.statusText}`];
+  for (const h of r.headers) lines.push(`${h.name}: ${h.value}`);
+  return lines.join('\n');
+}
+
+const storedResponseText = computed(() => {
+  if (!showReconstructed.value || !response.value) return '';
+  return `${buildResponseHead(response.value)}\n\n${response.value.body}`;
+});
+
+// P18 D8: requestBodyStorageTruncated finally gets a reader (F8) — this is the one place a
+// stored entry's request can be seen at all, so it is also the one place this flag can be shown.
+const requestBodyStorageTruncated = computed(
+  () => viewingStored.value?.snapshot.requestBodyStorageTruncated ?? false,
+);
+
 const FIDELITY_TEXT: Readonly<Record<HttpWireFidelity, string>> = {
   exact: 'These are the exact bytes this app wrote to the connection.',
   http2:
@@ -64,20 +103,11 @@ const elisionNote = computed(() =>
     : '',
 );
 
-// D7: distinct from a live dump failure (D2) — a stored entry can never have a raw view at all,
-// while a dump failure is this send's own, and is worth naming differently. A sentence belongs in
-// a strip, a label belongs in a label (F13/D10) — so the terse label and the longer explanation
-// are two separate computeds rather than one concatenated string.
+// D7/D8: a live dump failure is this send's own — the only case left with no raw view at all,
+// now that a stored entry always gets the reconstruction (F7: the request side is always stored).
 const emptyLabel = computed(() => {
-  if (!response.value) return '';
-  if (wire.value) return '';
-  return viewingStored.value
-    ? 'No raw view for a stored response'
-    : 'The raw exchange could not be rendered';
-});
-const emptyExplanation = computed(() => {
-  if (!response.value || wire.value || !viewingStored.value) return '';
-  return 'The raw exchange is kept only for the response currently in this tab.';
+  if (!response.value || wire.value || showReconstructed.value) return '';
+  return 'The raw exchange could not be rendered';
 });
 
 const requestCaption = computed(() => {
@@ -87,15 +117,16 @@ const requestCaption = computed(() => {
   return r ? '→ request' : '';
 });
 
+// D8: the unified document each editor renders — the live wire's own text, or the reconstruction,
+// so the rest of the template (copy buttons, find-bar targets) reads one source regardless.
+const requestText = computed(() => wire.value?.request ?? storedRequestText.value);
 const responseText = computed(() => {
-  const w = wire.value;
-  const r = response.value;
-  if (!w || !r) return '';
-  return `${w.responseHead}\n${r.body}`;
+  if (wire.value && response.value) return `${wire.value.responseHead}\n${response.value.body}`;
+  return storedResponseText.value;
 });
 
 function onCopyRequest(): void {
-  if (wire.value) void copyText(wire.value.request);
+  void copyText(requestText.value);
 }
 
 function onCopyResponse(): void {
@@ -111,7 +142,7 @@ const responseHostRef = ref<FindBarHost | null>(null);
 defineExpose({
   requestHost: requestHostRef,
   responseHost: responseHostRef,
-  getDocs: () => ({ request: wire.value?.request ?? '', response: responseText.value }),
+  getDocs: () => ({ request: requestText.value, response: responseText.value }),
 });
 </script>
 
@@ -145,7 +176,7 @@ defineExpose({
         <div class="raw-editor">
           <CodeMirrorHost
             ref="requestHostRef"
-            :doc="wire.request"
+            :doc="requestText"
             language="plain"
             :read-only="true"
             :range-highlights="requestHighlights"
@@ -183,10 +214,74 @@ defineExpose({
       </div>
     </template>
 
-    <template v-else-if="emptyLabel">
-      <MessageStrip v-if="emptyExplanation" tone="note" data-testid="http-raw-empty-note">
-        {{ emptyExplanation }}
+    <!-- P18 D8: a stored entry's Raw pane, reconstructed from the four stage-1 fields the
+         snapshot carries rather than a live `wire` dump (which P9 D7 never stores). Not claimed as
+         one of P9 D3's three HttpWireFidelity values — a reconstruction is none of them — so this
+         gets its own honest strip rather than a fourth, misleading fidelity value. -->
+    <template v-else-if="showReconstructed">
+      <MessageStrip tone="note" data-testid="http-raw-reconstructed">
+        Reconstructed from what this request was recorded as — not the exact bytes on the wire.
       </MessageStrip>
+      <MessageStrip
+        v-if="requestBodyStorageTruncated"
+        tone="note"
+        data-testid="http-history-request-truncated"
+      >
+        Only the first 256 KB of this request's body was kept in history.
+      </MessageStrip>
+
+      <div class="raw-section">
+        <div class="raw-section-header">
+          <span class="p-xs dim mono raw-caption" data-testid="http-wire-request-caption">
+            {{ requestCaption }}
+          </span>
+          <span class="p-push" />
+          <IconButton
+            icon="copy"
+            aria-label="Copy request"
+            v-tooltip="'Copy request'"
+            data-testid="http-wire-request-copy"
+            @click="onCopyRequest"
+          />
+        </div>
+        <div class="raw-editor">
+          <CodeMirrorHost
+            ref="requestHostRef"
+            :doc="requestText"
+            language="plain"
+            :read-only="true"
+            :range-highlights="requestHighlights"
+            data-testid="http-wire-request-editor"
+          />
+        </div>
+      </div>
+
+      <div class="raw-section">
+        <div class="raw-section-header">
+          <span class="p-xs dim mono raw-caption">←</span>
+          <span class="p-push" />
+          <IconButton
+            icon="copy"
+            aria-label="Copy response"
+            v-tooltip="'Copy response'"
+            data-testid="http-wire-response-copy"
+            @click="onCopyResponse"
+          />
+        </div>
+        <div class="raw-editor">
+          <CodeMirrorHost
+            ref="responseHostRef"
+            :doc="responseText"
+            language="plain"
+            :read-only="true"
+            :range-highlights="responseHighlights"
+            data-testid="http-wire-response-editor"
+          />
+        </div>
+      </div>
+    </template>
+
+    <template v-else-if="emptyLabel">
       <EmptyState icon="file-binary" :label="emptyLabel" />
     </template>
     <EmptyState v-else icon="arrow-right" label="Send a request to see the response" />
