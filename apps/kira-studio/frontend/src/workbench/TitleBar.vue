@@ -27,8 +27,8 @@ function onClick(mode: AppMode): void {
         :data-mode="mode"
         @click="onClick(mode)"
       >
-        <CodiconIcon :name="MODES[mode].icon" :size="13" />
-        {{ MODES[mode].label }}
+        <span class="icon-box"><CodiconIcon :name="MODES[mode].icon" :size="13" /></span>
+        <span class="mode-label">{{ MODES[mode].label }}</span>
       </button>
     </div>
 
@@ -131,6 +131,19 @@ function onClick(mode: AppMode): void {
      value) now that the icon below needs one. */
   padding: 0 var(--kira-s-5);
   gap: var(--kira-s-2);
+}
+/* P18 D15/F18: the icon now sits in a real .icon-box (this app's own stated law — AppButton.vue's
+   own comment, primitives.css:25-32 — "icons never float unboxed next to text") and the label in a
+   real <span>, so both are real flex items instead of a bare glyph plus an anonymous text-run box.
+   Unboxed, the icon item's width was the glyph's *advance*, but its ink varies per glyph (F18's own
+   measurement from the codicon font: database's right side bearing is 2.4px, globe's is 0.8px) —
+   so the icon-to-label gap read differently on the two tabs and matched neither's own declared 4px.
+   A 16px flex-centred icon-box centres the advance, not the ink, making the slot glyph-independent
+   — the whole point of the law — and gives a test an actual element+rect to measure (an anonymous
+   flex item has neither). line-height: 1 keeps the label's own box ink-tight rather than inheriting
+   Tailwind preflight's 1.5, so both flex items are ink-tight boxes centred on one axis. */
+.mode-tab .mode-label {
+  line-height: 1;
 }
 /* primitives.css's own .p-tab has no :hover rule at all — TabStrip.vue (its other consumer)
    declares one locally in its own scoped style, and Vue's scoped CSS never leaks across
