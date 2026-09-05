@@ -6,7 +6,7 @@ import (
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/appcore"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/bridge"
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/bridge/ipcerr"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/ipcerr"
 )
 
 // TestConnectionsServiceRejectsBareID is a regression test for the P2 R1 finding that

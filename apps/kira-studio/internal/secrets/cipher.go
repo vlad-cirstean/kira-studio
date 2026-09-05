@@ -12,7 +12,7 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/bridge/ipcerr"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/ipcerr"
 )
 
 // envelopePrefix bumps to kira:v2: (P52 §6.4): the cipher genuinely changes (AES-256-GCM under

@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/bridge/ipcerr"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/ipcerr"
 )
 
 func fakeLoadOK() ([]byte, error) { return bytes.Repeat([]byte{0x01}, 32), nil }

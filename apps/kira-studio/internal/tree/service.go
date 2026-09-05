@@ -10,7 +10,7 @@ import (
 	"encoding/json"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters"
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/bridge/ipcerr"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/ipcerr"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/repos"
 )

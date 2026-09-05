@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/bridge/ipcerr"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/ipcerr"
 )
 
 // The four wire shapes, byte for byte packages/shared/protocol/ipc.ts:133-149's.

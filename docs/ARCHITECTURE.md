@@ -978,6 +978,16 @@ resolved (P12 D17) — this is an audit, not a restructuring.**
 | `adapterhost.Host.RunOp` is the Api module's op scheduler | Accepted **by design**, not neglect — one op log beats a second dead ring on every request tab or a second `useRunState`/ops store, and both `bridge/http.go` and `bridge/grpc.go` pass `ConnectionID: nil` into the same scheduler every DB adapter uses |
 | `ConnectionsService.SecretsStatus` is the Api module's only call into a Studio service (`http/VariablesDialog.vue`'s own OS-keychain check) | Accepted, documented. It reports a *process-wide platform fact*, not a connection fact, and lives on `ConnectionsService` only because Studio's connections needed it first; the honest fix is a `SecretsService` of its own — a new bound method, out of scope for a phase whose row forbids adding one |
 
+**Go-side layering (P21 round 1): no domain package imports `internal/bridge`.** The frontend has
+`biome.json`'s `noRestrictedImports` enforcing its own module graph; the Go side has the equivalent
+rule but no linter behind it, so `internal/ipcerr` (the one error type every bound method returns,
+shaped for `bridge/rpc.ts`'s own `unwrap()`) used to live at `internal/bridge/ipcerr` — an import
+path that asserted a dependency on the IPC transport layer from three packages *below* it
+(`connections`, `secrets`, `tree`). It moved to `internal/ipcerr`, a sibling of `internal/bridge`
+rather than a child of it; `apps/kira-studio/internal/layering_test.go`'s
+`TestDomainPackagesDoNotImportBridge` runs `go list -deps` against the named domain packages so a
+future import back into `internal/bridge/...` fails a test rather than drifting in unnoticed.
+
 **Three duplications P11 (and earlier phases) wrote down as P12's to unpick are unpicked; a fourth,
 proposed, is declined with a reason.**
 

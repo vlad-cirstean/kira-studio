@@ -2,8 +2,8 @@ package bridge
 
 import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/appcore"
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/bridge/ipcerr"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/connections"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/ipcerr"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 )
 

@@ -2,7 +2,7 @@ package bridge
 
 import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/appcore"
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/bridge/ipcerr"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/ipcerr"
 )
 
 // WindowsService is renderer-boot registration for the window this page is (P8 D2). On the
