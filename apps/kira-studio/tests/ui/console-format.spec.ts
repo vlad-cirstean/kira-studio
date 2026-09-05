@@ -1,4 +1,5 @@
 import type { Locator, Page } from '@playwright/test';
+import { DATA_OP } from '@shared/protocol/data-ops';
 import type { ControlSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
 import { IPC } from './support/ipcChannels';
@@ -302,4 +303,61 @@ test('Query console — Redis has no Format button (D6)', async ({ relaunch }) =
   // button is an oversight rather than a deliberate decision.
   await expect(view.locator('[data-testid="console-run-statement"]')).toBeVisible();
   await expect(view.locator('[data-testid="console-format"]')).toHaveCount(0);
+});
+
+// P19 T11/D12: closes v1.1 P13's own OQ-2 — the caret used to jump to offset 0 on every format,
+// which also silently re-pointed *Run statement* at the first statement regardless of where the
+// user was actually working.
+test('Query console — Format leaves the caret in the statement it was in, so Run statement still targets it (P19 D12)', async ({
+  relaunch,
+}) => {
+  const CONNECTION_ID = 'conn-console-format-caret';
+  const CONNECTION_SUMMARY = postgresConnectionSummary(CONNECTION_ID, 'Format Caret DB', 'amber');
+  const FIXTURE = orderItemsFixture(CONNECTION_ID);
+
+  const CONTROL: ControlSnapshot[] = [
+    { channel: IPC.connectionsList, response: [] },
+    {
+      channel: IPC.connectionsCreate,
+      args: postgresCreateArgs('Format Caret DB', 'amber'),
+      response: CONNECTION_SUMMARY,
+    },
+    ...FIXTURE.control,
+  ];
+
+  const { window: page, stream } = await relaunch({ control: CONTROL });
+  await connectAndExpandPostgres(page, 'Format Caret DB', 'amber');
+  await openConsoleFromMenu(page, ORDER_ITEMS_PATH);
+  const view = page.locator('[data-testid="console-view"]');
+  await expect(view).toBeVisible();
+
+  await typeInto(view, page, 'select 1 as a;\nselect 2 as b;\nselect 3 as c;');
+  await expect(view.locator('.cm-line')).toHaveCount(3);
+
+  // Put the caret in the SECOND statement — typing left it at the very end (line 3); one Up
+  // arrow from there lands in line 2, deterministically (a mouse click's target coordinate can
+  // land ambiguously between two adjacent lines under font-metric rounding). Escape first closes
+  // any completion popup still open from typing, which would otherwise steal the Up arrow to
+  // navigate its own suggestion list instead of moving the real caret.
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('ArrowUp');
+  // ArrowUp alone preserves the goal column, which (typing left the caret at the very end of
+  // line 3, the same column as line 2's own last character) lands exactly on the boundary
+  // between statement 2 and statement 3 rather than inside statement 2 — Home moves it
+  // unambiguously into the middle of line 2's own text instead.
+  await page.keyboard.press('Home');
+  await page.keyboard.press('ArrowRight');
+
+  await page.click('[data-testid="console-format"]');
+  // Formatting rewrote every offset in the document — this is only proof the press itself
+  // completed, not that the caret landed anywhere in particular.
+  await expect(view.locator('.cm-content')).toContainText('as c');
+
+  await page.click('[data-testid="console-run-statement"]');
+  const executed = (await stream.ops()).filter((o) => o.op === DATA_OP.execute).at(-1);
+  const statements = (executed?.payload as { statements?: string[] } | undefined)?.statements;
+  expect(statements).toHaveLength(1);
+  expect(statements?.[0]).toContain('as b');
+  expect(statements?.[0]).not.toContain('as a');
+  expect(statements?.[0]).not.toContain('as c');
 });

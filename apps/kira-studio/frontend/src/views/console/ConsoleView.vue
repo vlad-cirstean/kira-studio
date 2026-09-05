@@ -189,7 +189,7 @@ function onShowAutoExplainPlan(): void {
 // Typed as the bare exposed shape (rather than InstanceType<typeof CodeMirrorHost>) so this ref
 // doesn't read as a type-only use of the CodeMirrorHost import — same convention as
 // ConsoleSavedMenu.vue's promptInput/views/shared/page/SearchToolbar.vue's own template ref.
-const editorHost = ref<{ focus: () => void } | null>(null);
+const editorHost = ref<{ focus: () => void; setCursor: (pos: number) => void } | null>(null);
 // The saved-queries popover unmounts its own focused entry on close (ConsoleSavedMenu's apply()
 // closes right after loading), and nothing else in the tree reclaims focus — without this the
 // editor is left unfocused (DOM focus falls to <body>) right after a saved query loads, even
@@ -273,9 +273,19 @@ function onStop(): void {
   stop(props.tab.id);
 }
 
+// P19 D12(3): maps the caret across the reformat by statement INDEX, not offset — formatting
+// rewrites every offset in the document, so an offset means nothing afterwards, whereas the
+// statement the user was working in is exactly what they expect to still be under the caret (and
+// what Run statement itself reads, P13 OQ-2). Exact whenever the statement count is preserved,
+// which D13 guarantees (a statement Format couldn't format is emitted verbatim, never dropped).
 function onFormat(): void {
   const kind = connectionKind.value;
   if (!kind || !canFormat.value) return;
+  const splitOptions = { backslashEscapes: backslashEscapesFor(dialect.value) };
+  const before = splitSqlStatements(props.tab.state.text, splitOptions);
+  const beforeIndex = before.findIndex(
+    (s) => cursorPos.value >= s.start && cursorPos.value <= s.end,
+  );
   void (async () => {
     const result = await formatConsoleText(kind, props.tab.state.text);
     if (result.ok) {
@@ -285,6 +295,11 @@ function onFormat(): void {
       // auto-explain strip even when the text itself doesn't move (P12 round 1 finding #7).
       resetStalePreviewState();
       setText(props.tab.id, result.text);
+      if (beforeIndex >= 0) {
+        const after = splitSqlStatements(result.text, splitOptions);
+        const target = after[beforeIndex];
+        void nextTick(() => editorHost.value?.setCursor(target?.start ?? 0));
+      }
     } else {
       formatError.value = result.reason ?? 'could not format this query';
     }
@@ -577,6 +592,7 @@ const statusLine = computed(() => {
           :completion-sources="completionSources"
           :lint-source="lintSource"
           :hover-source="hoverSource"
+          keep-selection-on-external-sync
           @update:doc="onDocChange"
           @update:cursor="cursorPos = $event"
         />
