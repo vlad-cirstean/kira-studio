@@ -45,17 +45,11 @@ func Connect(ctx context.Context, cfg model.ResolvedConnectionConfig, log func(l
 		SetDriverInfo(&options.DriverInfo{Name: "kira-studio"})
 
 	if sslmode, ok := cfg.Options["sslmode"].(string); ok && sslmode != "" && sslmode != "disable" {
-		switch sslmode {
-		case "require", "prefer":
-			clientOpts.SetTLSConfig(&tls.Config{InsecureSkipVerify: true}) //nolint:gosec // matches client.ts's own tlsAllowInvalidCertificates
-		case "verify-full":
-			clientOpts.SetTLSConfig(&tls.Config{})
-		default:
-			// An unrecognized sslmode must fail loudly rather than silently fall back to a
-			// plaintext connection — a typo here would otherwise send credentials and data
-			// unencrypted while the user believes TLS is configured.
-			return nil, adapters.New(adapters.CodeConnect, `mongodb: unknown sslmode "`+sslmode+`"`, nil)
+		tlsConfig, err := tlsConfigForSslmode(sslmode)
+		if err != nil {
+			return nil, err
 		}
+		clientOpts.SetTLSConfig(tlsConfig)
 	}
 
 	// mongo.Connect (v2) is lazy — it validates and parses options but opens no socket. The real
@@ -75,6 +69,26 @@ func Connect(ctx context.Context, cfg model.ResolvedConnectionConfig, log func(l
 	}
 
 	return &ClientHandle{Client: client, DefaultDatabase: defaultDatabase}, nil
+}
+
+// tlsConfigForSslmode is the pure half of the sslmode switch, split out for unit testing. Unlike
+// Postgres's "require" (encrypt only, no verification — a libpq convention this app has no reason
+// to inherit for MongoDB, which has no such precedent of its own), require/prefer/verify-full all
+// verify here, matching the Kafka adapter's reasoning: "require" without verification accepts any
+// certificate, including an attacker's, with no indication anywhere in the UI. verify-none/insecure
+// is the explicit opt-out for anyone who genuinely needs the old behaviour.
+func tlsConfigForSslmode(sslmode string) (*tls.Config, error) {
+	switch sslmode {
+	case "require", "prefer", "verify-full":
+		return &tls.Config{}, nil
+	case "verify-none", "insecure":
+		return &tls.Config{InsecureSkipVerify: true}, nil //nolint:gosec // explicit opt-out, not the default
+	default:
+		// An unrecognized sslmode must fail loudly rather than silently fall back to a plaintext
+		// connection — a typo here would otherwise send credentials and data unencrypted while the
+		// user believes TLS is configured.
+		return nil, adapters.New(adapters.CodeConnect, `mongodb: unknown sslmode "`+sslmode+`"`, nil)
+	}
 }
 
 func buildURIFromFields(cfg model.ResolvedConnectionConfig) string {
