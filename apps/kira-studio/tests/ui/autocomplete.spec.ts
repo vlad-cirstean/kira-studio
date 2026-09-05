@@ -413,7 +413,10 @@ async function lastClipboardWrite(page: Page): Promise<string> {
   );
 }
 
-test('Mongo document row — Copy document / Copy _id', async ({ relaunch, consoleErrors }) => {
+test('Mongo document row — Copy document / Copy as JSON / Copy _id', async ({
+  relaunch,
+  consoleErrors,
+}) => {
   const CONNECTION_ID = 'conn-ac-mongo-copy';
   const CONNECTION_SUMMARY = mongoConnectionSummary(CONNECTION_ID, 'Mongo', 'green');
   const FIXTURE = widgetsFixture(CONNECTION_ID);
@@ -443,6 +446,17 @@ test('Mongo document row — Copy document / Copy _id', async ({ relaunch, conso
   const copiedDoc = await lastClipboardWrite(page);
   expect(copiedDoc).toContain('ObjectId("000000000000000000000000")');
   expect(copiedDoc).toContain('"name": "widget-0"');
+
+  // P19 D6 (parity half): the same "Copy as JSON" item the console's own document result gained
+  // (resultMenu.ts), copying the canonical extended JSON body — not the shell form above.
+  await firstRow.click({ button: 'right' });
+  await expect(page.locator('[data-testid="context-menu"]')).toBeVisible();
+  await page.click('[data-testid="menu-item-copy-as-json"]');
+  await expect(page.locator('[data-testid="context-menu"]')).toHaveCount(0);
+  const copiedJson = await lastClipboardWrite(page);
+  expect(copiedJson).toContain('"$oid": "000000000000000000000000"');
+  expect(copiedJson).toContain('"name": "widget-0"');
+  expect(copiedJson).not.toContain('ObjectId(');
 
   await firstRow.click({ button: 'right' });
   await expect(page.locator('[data-testid="context-menu"]')).toBeVisible();

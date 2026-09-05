@@ -1,9 +1,18 @@
+import { beautifyJson } from '../../beautify';
 import { copyText } from '../../clipboard';
 import { confirmDialog } from '../../state/confirmDialog';
 import type { MenuItem } from '../../state/contextMenu';
 import { parseIdLabel, toShellText } from '../shared/document/ejson';
 import { deleteDocument } from './mutations';
 import { setActionError, setAllExpanded, toggleExpanded } from './state';
+
+// P19 D6 (parity half): the row's body is already canonical extended JSON (ejson.ts's own
+// header rule) — re-indented through beautify.ts's JSON scanner, falling back to the raw body if
+// it does not scan (a truncated body, say).
+function prettyJson(text: string): string {
+  const r = beautifyJson(text, 'indented');
+  return r.ok ? r.text : text;
+}
 
 // A rejected clipboard write (denied permission, an unfocused window) must not vanish the same
 // way an unhandled promise rejection would — ContextMenu.vue's `onItemClick` is never awaited by
@@ -59,6 +68,15 @@ export function rowMenu(
       // P27 D12: the shell form (ObjectId(...), ISODate(...), ...) — what the tree already shows,
       // and what saveDocumentEdit/parseDocumentLiteral already accept back.
       run: () => copyOrReportError(tabId, toShellText(body)),
+    },
+    {
+      type: 'item',
+      id: 'copy-as-json',
+      label: 'Copy as JSON',
+      // P19 D6: canonical extended JSON, not relaxed and not shell — it's what the app already
+      // has in hand (no re-encode) and what mongoimport/mongosh accept, mirroring the console's
+      // own document-result menu (resultMenu.ts).
+      run: () => copyOrReportError(tabId, prettyJson(body)),
     },
     {
       type: 'item',
