@@ -6,6 +6,7 @@ import CodiconIcon from '../../theme/CodiconIcon.vue';
 import AppButton from '../../theme/primitives/AppButton.vue';
 import Checkbox from '../../theme/primitives/Checkbox.vue';
 import PopoverPanel from '../../theme/primitives/PopoverPanel.vue';
+import { nextProjectionFromSelectedColumns } from './menu';
 import { runtime, setColumnOrder, setProjection } from './state';
 
 const props = defineProps<{ tabId: string; caps: Caps | null }>();
@@ -83,8 +84,7 @@ function onDragEnd(): void {
 }
 
 function close(): void {
-  const isEverything = selected.value.size === columnNames.value.length;
-  const nextProjection = isEverything ? null : [...selected.value];
+  const nextProjection = nextProjectionFromSelectedColumns([...selected.value], columnNames.value);
   if (!sameProjection(nextProjection, currentProjection())) {
     void setProjection(props.tabId, nextProjection);
   }

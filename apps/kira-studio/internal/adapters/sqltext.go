@@ -123,6 +123,14 @@ func ResolveProjection(columns []model.ColumnMeta, requested []string) ([]model.
 		resolved = append(resolved, col)
 	}
 	sort.Slice(resolved, func(i, j int) bool { return resolved[i].Position < resolved[j].Position })
+	// F1/P21 round 1: belt-and-braces. The renderer now maps every "would end up with zero
+	// selected columns" case back to null ("all columns") at its own choke points, but a resolved
+	// projection of zero columns has no honest reading, and every SQL adapter's selectList would
+	// otherwise become an empty string — SELECT  FROM ... — a syntax error rather than a
+	// classified, actionable one.
+	if len(resolved) == 0 {
+		return nil, New(CodeQuery, "projection selects zero columns", nil)
+	}
 	return resolved, nil
 }
 

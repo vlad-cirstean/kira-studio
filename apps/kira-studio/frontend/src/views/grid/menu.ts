@@ -20,6 +20,36 @@ import {
 } from './pendingChanges';
 import { setFilter, setProjection, setSort } from './state';
 
+// F1/P21 round 1: the pure half of ColumnsMenu.vue's own close() — "None" seeds `selected` from
+// the table/view's primary-key columns, which is empty for any relation with no primary key (every
+// Postgres/MySQL view or matview, and any PK-less table). Zero selected columns falls back to null
+// ("all columns") rather than a projection selecting nothing, the same fallback
+// nextProjectionAfterHidingColumn below uses.
+export function nextProjectionFromSelectedColumns(
+  selectedColumnNames: readonly string[],
+  allColumnNames: readonly string[],
+): string[] | null {
+  if (selectedColumnNames.length === 0 || selectedColumnNames.length === allColumnNames.length) {
+    return null;
+  }
+  return [...selectedColumnNames];
+}
+
+// F1/P21 round 1: the pure half of "Hide column" — split out so the boundary case (hiding the
+// last remaining column) is covered without exercising setProjection's own real load() pipeline.
+// Returns null ("all columns", ResolveProjection's own meaning for it) rather than an empty array
+// when nothing would be left selected; every SQL adapter turns a non-nil empty projection into
+// `SELECT  FROM ...`, a syntax error that then persists in tabs.state_json across a reload.
+export function nextProjectionAfterHidingColumn(
+  currentProjection: string[] | null,
+  allColumnNames: string[],
+  columnName: string,
+): string[] | null {
+  const current = currentProjection ?? allColumnNames;
+  const next = current.filter((c) => c !== columnName);
+  return next.length === 0 ? null : next;
+}
+
 // Produced locally from the path, never round-tripped to the engine for a string join — the same
 // discipline SlickGridHost.vue's own qualifiedName() and project/menus.ts's qualifiedNameFor use.
 const QUALIFIED_KINDS = new Set(['schema', 'table', 'view', 'matview']);
@@ -348,6 +378,10 @@ export interface HeaderMenuContext {
   currentSort: 'asc' | 'desc' | null;
   currentProjection: string[] | null;
   allColumnNames: string[];
+  // F2/P21 round 1: ColumnsMenu.vue locks a primary-key column's checkbox ("PK columns can't be
+  // hidden — a row can't be identified/edited without it"); Hide column had no equivalent guard at
+  // all, a second, unlocked way to drop a PK column out of the projection.
+  isPrimaryKeyColumn: boolean;
   columnValues: () => string[]; // the loaded page's values only (§8.5's own scope boundary)
 }
 
@@ -386,13 +420,20 @@ export function headerMenu(ctx: HeaderMenuContext): MenuItem[] {
       type: 'item',
       id: 'hide-column',
       label: 'Hide column',
+      // F2/P21 round 1: a primary-key column can't be hidden from here either, matching
+      // ColumnsMenu.vue's own checkbox lock.
+      disabled: ctx.isPrimaryKeyColumn,
       // D8: reuses the same setProjection() ColumnsMenu.vue calls — no second, competing
       // "which columns are shown" mechanism.
       run: () => {
-        const current = ctx.currentProjection ?? ctx.allColumnNames;
+        if (ctx.isPrimaryKeyColumn) return;
         void setProjection(
           ctx.tabId,
-          current.filter((c) => c !== ctx.columnName),
+          nextProjectionAfterHidingColumn(
+            ctx.currentProjection,
+            ctx.allColumnNames,
+            ctx.columnName,
+          ),
         );
       },
     },

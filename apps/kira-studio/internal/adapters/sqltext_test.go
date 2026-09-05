@@ -311,6 +311,27 @@ func TestResolveProjection_OrdinalOrderAndDedup(t *testing.T) {
 	}
 }
 
+// P21 round 1 functional finding F1: a non-nil, empty requested slice used to resolve to "project
+// zero columns" — every SQL adapter's selectList then became an empty string, `SELECT  FROM ...`.
+// The renderer now avoids ever sending one, but ResolveProjection refuses it directly too.
+func TestResolveProjection_EmptyNonNilRequestedIsRejected(t *testing.T) {
+	if _, err := ResolveProjection(testColumns(), []string{}); err == nil {
+		t.Fatal("ResolveProjection([]string{}): expected an error, got nil")
+	}
+}
+
+// nil (as opposed to an empty slice) still means "every column" — the one distinction
+// ResolveProjection's own contract rests on.
+func TestResolveProjection_NilRequestedMeansEveryColumn(t *testing.T) {
+	got, err := ResolveProjection(testColumns(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(got, testColumns()) {
+		t.Errorf("got %+v, want every column", got)
+	}
+}
+
 func assertTokenDecodesTo(t *testing.T, token *string, fp string, want []string) {
 	t.Helper()
 	if token == nil {

@@ -24,6 +24,21 @@ function targetTabForTable(connectionId: string, tablePath: string): string {
   return openDataTab(connectionId, tablePath).id;
 }
 
+// F1/P21 round 1: the pure half of "Add to projection". `currentProjection === null` means "every
+// column shown" (ResolveProjection's own meaning for it) — the named column is already in it, so
+// there is nothing to do; a `null` return here means exactly that ("no update needed"), never "set
+// the projection to null" — the caller below never forwards it to setProjection. The old
+// `current ? [...current, columnName] : [columnName]` treated a null projection the same as an
+// empty one and replaced "everything" with just this one column, the exact opposite of what "Add"
+// says and reading as data loss ("my grid lost all its columns").
+export function nextProjectionAfterAddingColumn(
+  currentProjection: string[] | null,
+  columnName: string,
+): string[] | null {
+  if (currentProjection === null || currentProjection.includes(columnName)) return null;
+  return [...currentProjection, columnName];
+}
+
 export function columnsSectionMenu(
   connectionId: string,
   tablePath: string,
@@ -45,12 +60,9 @@ export function columnsSectionMenu(
       run: () => {
         const tabId = targetTabForTable(connectionId, tablePath);
         const tab = findDataTab(tabId);
-        const current = tab?.state.projection ?? null;
-        if (current?.includes(columnName)) return;
-        void dataQueryCommands().setProjection(
-          tabId,
-          current ? [...current, columnName] : [columnName],
-        );
+        const next = nextProjectionAfterAddingColumn(tab?.state.projection ?? null, columnName);
+        if (next === null) return;
+        void dataQueryCommands().setProjection(tabId, next);
       },
     },
     {
