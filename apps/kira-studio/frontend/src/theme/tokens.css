@@ -29,6 +29,14 @@
      independently (P31 D20/D21). Values are the expressions already in use, so no colour changes. */
   --kira-search-match: color-mix(in srgb, var(--kira-warn) 25%, transparent);
   --kira-search-match-current: var(--kira-warn);
+  /* P19 D17: "a filter/sort/projection is applied right now". Deliberately NOT --kira-accent:
+     that token means primary action / focus / selection everywhere else, and the three filter
+     fields that carry this cue paint their own value through a CodeMirror overlay in
+     --kira-syntax-keyword (#569cd6) and --kira-syntax-name (#9cdcfe) — within 8 degrees of hue of
+     --kira-accent's own #0078d4, so "this filter is on" was indistinguishable from "this is part
+     of the query". #4ec9b0 is ~168 degrees: the one region no syntax token, and no other state
+     colour (--kira-warn/--kira-error/--kira-ok/--kira-info), occupies. */
+  --kira-state-on: #4ec9b0;
 
   /* Layout tokens for the reworked "detached" chrome: rounded, floating panels, thin borders.
      Radius tier system (VS Code Modern UI, docs/design/kira-design-system): sm for interactive

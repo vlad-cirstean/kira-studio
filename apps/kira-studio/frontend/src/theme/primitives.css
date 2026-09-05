@@ -177,15 +177,17 @@
      4.80:1 here and is still a visible step below --kira-fg, so "this is a hint" still reads. */
   color: var(--kira-fg-muted);
 }
-/* P27: a filter/sort field's own prefix label ("WHERE", "ORDER BY", "SORT", "offset", "since")
-   used to render in this exact same disabled grey regardless of whether the field held an applied
-   value — no visual difference between "nothing is filtered/sorted" and "this view is filtered/
-   sorted right now." `--kira-accent` is this app's existing "this is on" colour elsewhere
-   (IconButton.vue's `.is-primary`/`.has-indicator`, DataGrid.vue's own sort chevron) — reused here
-   rather than a new one. Each caller (FilterToolbar.vue, DocumentView.vue, StreamView.vue) decides
-   "active" off its own persisted tab state, not the live edit buffer. */
+/* P27: a filter/sort field's own prefix label ("WHERE", "ORDER BY", "SORT", "FILTER", "offset",
+   "since") used to render in this exact same disabled grey regardless of whether the field held
+   an applied value — no visual difference between "nothing is filtered/sorted" and "this view is
+   filtered/sorted right now." Each caller (FilterToolbar.vue, DocumentView.vue, StreamView.vue)
+   decides "active" off its own persisted tab state, not the live edit buffer.
+   P19 D18: moved off `--kira-accent` onto `--kira-state-on` (tokens.css) — three of these five
+   call sites sit beside a CodeMirror syntax overlay painting the field's own value in
+   --kira-syntax-keyword/--kira-syntax-name, both within 8 degrees of --kira-accent's own hue, so
+   "this filter is on" read as indistinguishable from "this is part of the query". */
 .p-input .ph.ph-active {
-  color: var(--kira-accent);
+  color: var(--kira-state-on);
 }
 
 /* Hide the OS-native up/down spinner — .p-input .stepper below draws the app's own. */
