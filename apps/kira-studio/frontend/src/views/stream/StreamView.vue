@@ -82,8 +82,12 @@ const isBatch = computed(() => caps.value?.pagination === 'batch');
 // Item 2/3/4: Kafka gets the offset/partition/timestamp filter row and Add-message (no Delete —
 // a topic's log is immutable, kafkaCaps.canDelete stays false permanently). SQS gets Add and
 // Delete but no filter row at all (queue-based, no topic/partition/offset concept to filter by).
+// P21 round 1 architecture/security finding 11: isKafka/isSqs used to gate whether the compose
+// dialog rendered and whether Delete was offered — ARCHITECTURE.md states the UI reads only Caps
+// to decide what to show, never a connection.kind check (kind-based *wording*, like the tooltip
+// text below, is the one thing the doc carves out as fine). isKafka survives only as wording/data
+// selection now; isSqs had no remaining use once the v-ifs below read canInsert/canDelete instead.
 const isKafka = computed(() => connRecord.value?.kind === 'kafka');
-const isSqs = computed(() => connRecord.value?.kind === 'sqs');
 const canInsert = computed(() => caps.value?.canInsert ?? false);
 const canDelete = computed(() => caps.value?.canDelete ?? false);
 
@@ -620,14 +624,14 @@ onUnmounted(() => {
               @click="composeOpen = !composeOpen"
             />
             <StreamComposeMessage
-              v-if="composeOpen && (isKafka || isSqs)"
+              v-if="composeOpen && canInsert"
               :tab-id="tab.id"
               :kind="isKafka ? 'kafka' : 'sqs'"
               @close="composeOpen = false"
             />
           </div>
           <IconButton
-            v-if="isSqs && canDelete"
+            v-if="canDelete"
             icon="trash"
             data-testid="stream-delete-message"
             :disabled="!hasSelectedRow"
