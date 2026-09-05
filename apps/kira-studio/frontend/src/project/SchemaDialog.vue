@@ -112,7 +112,7 @@ async function onSave(): Promise<void> {
       <span>Schema (DDL)<template v-if="connectionName"> — {{ connectionName }}</template></span>
     </template>
 
-    <div class="dialog-body-inner">
+    <div class="p-dialog-body schema-dialog-body">
       <span class="help">
         Paste this connection's own schema — table and column definitions the SQL console
         completes, checks and hovers against. Nothing here ever reads from the connection itself.
@@ -142,7 +142,7 @@ async function onSave(): Promise<void> {
         saveError
       }}</span>
       <span v-else class="help">Applies to <span class="mono">{{ connectionName }}</span> only</span>
-      <span class="footer-actions p-push">
+      <span class="p-dialog-actions p-push">
         <AppButton kind="dialog" @click="closeSchemaDialog">Cancel</AppButton>
         <AppButton kind="dialog" variant="primary" :disabled="saving" @click="onSave">
           Save schema
@@ -153,11 +153,7 @@ async function onSave(): Promise<void> {
 </template>
 
 <style scoped>
-.dialog-body-inner {
-  padding: var(--kira-s-5);
-  display: flex;
-  flex-direction: column;
-  gap: var(--kira-s-4);
+.schema-dialog-body {
   height: 60vh;
 }
 
@@ -194,10 +190,5 @@ async function onSave(): Promise<void> {
 .empty-note {
   font-size: var(--kira-t-xs);
   color: var(--kira-fg-disabled);
-}
-
-.footer-actions {
-  display: flex;
-  gap: var(--kira-s-3);
 }
 </style>

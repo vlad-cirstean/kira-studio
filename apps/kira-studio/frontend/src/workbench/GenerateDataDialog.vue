@@ -331,7 +331,7 @@ function onSequenceStartChange(index: number, start: number): void {
     </div>
 
     <template #footer>
-      <span class="footer-actions p-push">
+      <span class="p-dialog-actions end p-push">
         <RunState
           v-if="running"
           status="running"
@@ -424,13 +424,5 @@ function onSequenceStartChange(index: number, start: number): void {
 .preview-body {
   height: 200px;
   margin-top: var(--kira-s-2);
-}
-
-.footer-actions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: var(--kira-s-3);
-  width: 100%;
 }
 </style>

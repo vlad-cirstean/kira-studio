@@ -148,7 +148,7 @@ const connectionName = computed(
       <span>Tree filters<template v-if="connectionName"> — {{ connectionName }}</template></span>
     </template>
 
-    <div class="dialog-body-inner">
+    <div class="p-dialog-body">
       <span class="help">
         Ticked types and objects are shown; unticking one hides it and everything under it.
         Nothing you have not unticked is ever hidden — an object created later shows up too.
@@ -251,7 +251,7 @@ const connectionName = computed(
 
     <template #footer>
       <span class="help">Applies to <span class="mono">{{ connectionName }}</span> only</span>
-      <span class="footer-actions p-push">
+      <span class="p-dialog-actions p-push">
         <AppButton kind="dialog" @click="closeFiltersDialog">Cancel</AppButton>
         <AppButton kind="dialog" variant="primary" @click="onSave">Save filters</AppButton>
       </span>
@@ -260,12 +260,6 @@ const connectionName = computed(
 </template>
 
 <style scoped>
-.dialog-body-inner {
-  padding: var(--kira-s-5);
-  display: flex;
-  flex-direction: column;
-  gap: var(--kira-s-4);
-}
 
 .help {
   font-size: var(--kira-t-xs);
@@ -419,10 +413,5 @@ const connectionName = computed(
 
 .cached-note {
   align-self: flex-start;
-}
-
-.footer-actions {
-  display: flex;
-  gap: var(--kira-s-3);
 }
 </style>

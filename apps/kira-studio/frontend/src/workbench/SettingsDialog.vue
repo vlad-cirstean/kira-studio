@@ -593,7 +593,7 @@ async function onSave(): Promise<void> {
           · Unsaved changes</template></span
         >
       </span>
-      <span class="footer-actions">
+      <span class="p-dialog-actions">
         <AppButton kind="dialog" data-testid="settings-cancel" @click="onDismiss">Cancel</AppButton>
         <AppButton
           kind="dialog"
@@ -838,10 +838,5 @@ async function onSave(): Promise<void> {
   min-width: 0;
   display: flex;
   align-items: center;
-}
-
-.footer-actions {
-  display: flex;
-  gap: var(--kira-s-3);
 }
 </style>

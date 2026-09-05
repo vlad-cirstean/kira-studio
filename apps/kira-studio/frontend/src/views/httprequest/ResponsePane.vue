@@ -241,9 +241,9 @@ function onBackToLatest(): void {
       />
       <div v-else-if="tab.state.responsePane === 'headers'" class="response-headers" data-testid="http-response-headers">
         <template v-if="response">
-          <div v-for="(h, i) in response.headers" :key="i" class="response-header-row">
-            <span class="header-name mono">{{ h.name }}</span>
-            <span class="header-value mono">{{ h.value }}</span>
+          <div v-for="(h, i) in response.headers" :key="i" class="p-kv-row">
+            <span class="p-kv-name mono">{{ h.name }}</span>
+            <span class="p-kv-value mono">{{ h.value }}</span>
           </div>
         </template>
         <EmptyState v-else icon="arrow-right" label="Send a request to see the response" />
@@ -342,21 +342,6 @@ function onBackToLatest(): void {
   gap: var(--kira-s-1);
 }
 
-.response-header-row {
-  display: flex;
-  gap: var(--kira-s-3);
-  font-size: var(--kira-t-xs);
-}
-
-.header-name {
-  color: var(--kira-fg-muted);
-  flex-shrink: 0;
-  min-width: 160px;
-}
-
-.header-value {
-  overflow-wrap: anywhere;
-}
 
 .history-hint-link {
   margin-top: var(--kira-s-2);

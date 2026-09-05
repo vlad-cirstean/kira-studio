@@ -206,17 +206,17 @@ const viewingTime = computed(() => {
       <div v-else-if="tab.state.responsePane === 'metadata'" class="metadata-groups" data-testid="grpc-response-metadata">
         <div class="metadata-group">
           <div class="metadata-group-title p-xs muted">Header</div>
-          <div v-for="(h, i) in header" :key="`h${i}`" class="response-header-row">
-            <span class="header-name mono">{{ h.name }}</span>
-            <span class="header-value mono">{{ h.value }}</span>
+          <div v-for="(h, i) in header" :key="`h${i}`" class="p-kv-row">
+            <span class="p-kv-name mono">{{ h.name }}</span>
+            <span class="p-kv-value mono">{{ h.value }}</span>
           </div>
           <EmptyState v-if="header.length === 0" icon="arrow-right" label="No header metadata" />
         </div>
         <div class="metadata-group">
           <div class="metadata-group-title p-xs muted">Trailer</div>
-          <div v-for="(t, i) in trailer" :key="`t${i}`" class="response-header-row">
-            <span class="header-name mono">{{ t.name }}</span>
-            <span class="header-value mono">{{ t.value }}</span>
+          <div v-for="(t, i) in trailer" :key="`t${i}`" class="p-kv-row">
+            <span class="p-kv-name mono">{{ t.name }}</span>
+            <span class="p-kv-value mono">{{ t.value }}</span>
           </div>
           <EmptyState v-if="trailer.length === 0" icon="arrow-right" label="No trailer metadata" />
         </div>
@@ -311,21 +311,6 @@ const viewingTime = computed(() => {
   margin-bottom: var(--kira-s-1);
 }
 
-.response-header-row {
-  display: flex;
-  gap: var(--kira-s-3);
-  font-size: var(--kira-t-xs);
-}
-
-.header-name {
-  color: var(--kira-fg-muted);
-  flex-shrink: 0;
-  min-width: 160px;
-}
-
-.header-value {
-  overflow-wrap: anywhere;
-}
 
 .history-pane {
   flex: 1;

@@ -245,9 +245,9 @@ function residueNote(hop: HttpTimelineHop): string {
 
           <details v-if="hop.headers && hop.headers.length > 0" class="hop-headers">
             <summary class="p-xs dim">Response headers</summary>
-            <div v-for="(h, i) in hop.headers" :key="i" class="hop-header-row">
-              <span class="header-name mono">{{ h.name }}</span>
-              <span class="header-value mono">{{ h.value }}</span>
+            <div v-for="(h, i) in hop.headers" :key="i" class="p-kv-row hop-header-row">
+              <span class="p-kv-name mono">{{ h.name }}</span>
+              <span class="p-kv-value mono">{{ h.value }}</span>
             </div>
           </details>
           <details
@@ -255,9 +255,9 @@ function residueNote(hop: HttpTimelineHop): string {
             class="hop-headers"
           >
             <summary class="p-xs dim">Response headers</summary>
-            <div v-for="(h, i) in response!.headers" :key="i" class="hop-header-row">
-              <span class="header-name mono">{{ h.name }}</span>
-              <span class="header-value mono">{{ h.value }}</span>
+            <div v-for="(h, i) in response!.headers" :key="i" class="p-kv-row hop-header-row">
+              <span class="p-kv-name mono">{{ h.name }}</span>
+              <span class="p-kv-value mono">{{ h.value }}</span>
             </div>
           </details>
         </div>
@@ -367,21 +367,9 @@ function residueNote(hop: HttpTimelineHop): string {
   margin-top: var(--kira-s-1);
 }
 
+/* p-kv-row supplies display/gap/font-size; this row also carries its own vertical breathing room. */
 .hop-header-row {
-  display: flex;
-  gap: var(--kira-s-3);
-  font-size: var(--kira-t-xs);
   padding: 2px 0;
-}
-
-.header-name {
-  color: var(--kira-fg-muted);
-  flex-shrink: 0;
-  min-width: 160px;
-}
-
-.header-value {
-  overflow-wrap: anywhere;
 }
 
 .timeline-legend {

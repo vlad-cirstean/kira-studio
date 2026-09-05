@@ -249,6 +249,53 @@
   box-sizing: border-box;
 }
 
+/* ---------- P13 dialog body ---------- */
+/* The column wrapper every DialogFrame consumer puts inside .dialog-body (which is the scroll
+   container and deliberately has no padding of its own). Promoted from the identical
+   `.dialog-body-inner` in FiltersDialog.vue/ConnectionDialog.vue/SchemaDialog.vue. */
+.p-dialog-body {
+  display: flex;
+  flex-direction: column;
+  padding: var(--kira-s-5);
+  gap: var(--kira-s-4);
+}
+/* A dialog whose body is a LIST of rows, not a form of fields — the rows carry their own
+   padding, so the wrapper only insets them from the frame. */
+.p-dialog-body.list {
+  padding: var(--kira-s-2);
+  gap: var(--kira-s-1);
+}
+
+/* ---------- P13 dialog footer actions ---------- */
+/* Promoted from the eleven identical/near-identical local `.footer-actions` rules across Studio
+   and Api dialogs — see each consumer for what, if anything, it still overrides locally. */
+.p-dialog-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--kira-s-3);
+}
+.p-dialog-actions.end {
+  justify-content: flex-end;
+  width: 100%;
+}
+
+/* ---------- P13 key/value row ---------- */
+/* The name/value row shared by the response headers pane, the gRPC metadata pane and the
+   timeline's per-hop header list — promoted from three byte-identical local copies. */
+.p-kv-row {
+  display: flex;
+  gap: var(--kira-s-3);
+  font-size: var(--kira-t-xs);
+}
+.p-kv-name {
+  color: var(--kira-fg-muted);
+  flex-shrink: 0;
+  min-width: 160px;
+}
+.p-kv-value {
+  overflow-wrap: anywhere;
+}
+
 /* ---------- P5 select ---------- */
 /* `appearance: none` + a manual background-image arrow only restyles the CLOSED control — the
    opened option list is still a native, unstyled OS popup (a plain <select>'s listbox has no

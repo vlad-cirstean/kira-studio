@@ -432,7 +432,7 @@ const preconnectText = computed({
     </template>
 
     <template v-if="step === 'engine'">
-      <div class="dialog-body-inner engine-body">
+      <div class="p-dialog-body engine-body">
         <TextField
           v-model="engineSearch"
           icon="search"
@@ -468,7 +468,7 @@ const preconnectText = computed({
       </div>
     </template>
     <template v-else>
-      <div class="dialog-body-inner">
+      <div class="p-dialog-body">
           <nav class="p-tab-strip" role="tablist" aria-label="Connection detail tabs">
             <button
               type="button"
@@ -785,7 +785,7 @@ const preconnectText = computed({
     </template>
 
     <template v-if="step === 'engine'" #footer>
-      <span class="footer-actions p-push">
+      <span class="p-dialog-actions footer-actions p-push">
         <AppButton kind="dialog" data-testid="connection-cancel" @click="closeDialog">Cancel</AppButton>
         <AppButton kind="dialog" variant="primary" @click="continueToDetails">
           Continue
@@ -814,7 +814,7 @@ const preconnectText = computed({
           }}
         </span>
       </div>
-      <div class="footer-actions">
+      <div class="p-dialog-actions footer-actions">
         <AppButton kind="dialog" data-testid="connection-cancel" @click="closeDialog">Cancel</AppButton>
         <AppButton
           kind="dialog"
@@ -839,13 +839,6 @@ const preconnectText = computed({
 .engine-mark {
   display: flex;
   flex-shrink: 0;
-}
-
-.dialog-body-inner {
-  padding: var(--kira-s-5);
-  display: flex;
-  flex-direction: column;
-  gap: var(--kira-s-4);
 }
 
 .engine-body {
@@ -1018,9 +1011,9 @@ const preconnectText = computed({
   white-space: nowrap;
 }
 
+/* p-dialog-actions supplies display/align-items/gap; this dialog's footer-actions can sit beside
+   a variable-width .test-area sibling, so it still needs its own flex-shrink guard. */
 .footer-actions {
-  display: flex;
-  gap: var(--kira-s-3);
   flex-shrink: 0;
 }
 
