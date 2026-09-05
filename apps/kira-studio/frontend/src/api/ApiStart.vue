@@ -33,6 +33,8 @@ function onImportCurl(): void {
           <span class="icon-box"><CodiconIcon name="add" :size="13" /></span>
           New request
         </button>
+      </div>
+      <div class="start-actions">
         <button type="button" class="p-dlgbtn" data-testid="new-grpc-request-start" @click="openGrpcRequestTab">
           <span class="icon-box"><CodiconIcon name="symbol-interface" :size="13" /></span>
           New gRPC request
@@ -58,10 +60,12 @@ function onImportCurl(): void {
   align-items: center;
   justify-content: center;
   padding: var(--kira-s-6);
+  overflow: auto;
 }
 
 .start-inner {
-  width: 360px;
+  width: 420px;
+  max-width: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -84,5 +88,7 @@ function onImportCurl(): void {
   display: flex;
   gap: var(--kira-s-2);
   align-items: center;
+  flex-wrap: wrap;
+  justify-content: center;
 }
 </style>
