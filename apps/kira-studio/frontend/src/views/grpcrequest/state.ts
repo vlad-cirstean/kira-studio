@@ -64,6 +64,16 @@ const MAX_LIVE_MESSAGES = 10_000;
 export interface GrpcRequestViewRuntime {
   status: 'idle' | 'running' | 'error' | 'cancelled';
   opId: string | null;
+  /** F5/P21 round 1: the streaming event subscriber's own key, set alongside `opId` when a call
+   *  starts and never cleared early the way `opId` is. Messages arrive over the event channel
+   *  while the call's own CallResult returns over the control plane — a separate HTTP request —
+   *  with nothing ordering the two. If the control-plane response lands first, the return path
+   *  below clears `opId` (its own "am I still the call in flight" guard) before the terminal
+   *  event — carrying up to grpcCoalesceMaxBatch (64) trailing messages plus the terminal status —
+   *  has necessarily been delivered; matching the event against `opId` then drops that terminal
+   *  event outright. Matching against `lastCallId` instead keeps the event subscriber correct
+   *  regardless of which side finishes first, since only a *new* call ever changes it. */
+  lastCallId: string | null;
   streaming: boolean;
   error: { code: string; message: string } | null;
   result: GrpcCallResultWire | null;
@@ -84,6 +94,7 @@ function defaultRuntime(): GrpcRequestViewRuntime {
   return {
     status: 'idle',
     opId: null,
+    lastCallId: null,
     streaming: false,
     error: null,
     result: null,
@@ -213,7 +224,7 @@ function ensureGrpcCallSubscription(): void {
   control.onGrpcCall((event) => {
     for (const tabId of Object.keys(runtime)) {
       const rt = runtime[tabId];
-      if (!rt || rt.opId !== event.callId) continue;
+      if (!rt || rt.lastCallId !== event.callId) continue;
       rt.messages.push(...event.messages);
       rt.trueMessageCount += event.messages.length;
       for (const m of event.messages) rt.messageBytes += m.wireBytes;
@@ -254,6 +265,7 @@ export async function call(tabId: string): Promise<void> {
   const opId = crypto.randomUUID();
   rt.status = 'running';
   rt.opId = opId;
+  rt.lastCallId = opId;
   rt.error = null;
   rt.result = null;
   rt.messages = [];
