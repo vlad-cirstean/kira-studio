@@ -428,8 +428,8 @@ function buildColumns(
     // only the initial width would leave a drag able to crop the header again.
     const floor = headerAwareMinWidth(name, {
       padding: 16,
-      sortControl: 18,
-      keyBadge: keyLabelFor(descriptor, name, fkNames) ? 16 : 0,
+      sortControl: 22,
+      keyBadge: keyLabelFor(descriptor, name, fkNames) ? 20 : 0,
     });
     cols.push({
       id: name,

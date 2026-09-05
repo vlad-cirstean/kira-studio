@@ -63,16 +63,22 @@ export function resetMeasureCtx(): void {
 }
 
 /** What a header cell spends before its name gets a pixel — read off slickTheme.css's own rules
- *  for `.slick-header-column` (padding + flex gaps) and `.slick-sort-indicator` (a fixed 14px
- *  box, built only for a sortable column). */
+ *  for `.slick-header-column` (`display: flex; gap: var(--kira-s-2)`, so every adjacent pair of
+ *  flex children gets its own 4px gap in addition to any margin a child declares on itself) and
+ *  `.slick-sort-indicator`/`.header-key` (measured directly in a real header:
+ *  `.slick-column-name`'s own available width against its `scrollWidth`). */
 export interface HeaderChrome {
   /** `.slick-header-column`'s own `padding: 0 var(--kira-s-4)`, both sides. */
   padding: number; // 16
-  /** `.slick-sort-indicator`'s `width: 14px` + one `gap: var(--kira-s-2)`, or 0 when the column
-   *  is not sortable (SlickGrid builds the div only under `m.sortable`). */
-  sortControl: number; // 18 | 0
-  /** The PK/FK `.header-key` badge plus its own `margin-left: var(--kira-s-2)`, or 0. */
-  keyBadge: number; // 16 | 0
+  /** The flex gap before `.slick-sort-indicator` (4) + its own `width: 14px`, plus the flex gap
+   *  before the always-present, 0px-at-rest `.slick-sort-indicator-numbered` (4) — 0 when the
+   *  column is not sortable (SlickGrid builds neither div under `m.sortable`). */
+  sortControl: number; // 22 | 0
+  /** The flex gap before the PK/FK `.header-key` badge (4) + the badge's own
+   *  `margin-left: var(--kira-s-2)` (4) + its rendered content width ("PK"/"FK" at
+   *  `--kira-t-xs` in the monospace stack, ~12px) — the gap and the badge's own margin are two
+   *  separate spacings, not one. 0 when the column has no PK/FK badge. */
+  keyBadge: number; // 20 | 0
 }
 
 /** The narrowest this column may ever be drawn without its own header name ellipsising — the flat
