@@ -364,12 +364,35 @@ export function overviewRows(collectionId: string, environmentId: string): Varia
  *  let a *different*, later-opened dialog trust it in place of its own re-auth gate). */
 export const revealedValues = reactive<Record<string, string>>({});
 
+// Mirrors internal/localauth.GraceWindow: the reveal gate's own grace is fixed rather than
+// sliding "so a long editing session can't hold one authentication open indefinitely" — a property
+// that used to be undone downstream, because nothing here ever re-masked a revealed value once the
+// grace it came from had actually expired (only a tab *close* cleared it, which may be hours away
+// for a persistent tab). Keep in sync with GraceWindow by hand; there is no shared constant to
+// import across the Go/TS boundary for a time.Duration.
+const REVEAL_GRACE_WINDOW_MS = 5 * 60 * 1000;
+
+const revealExpiryTimers: Record<string, ReturnType<typeof setTimeout>> = {};
+
+function scheduleRevealExpiry(id: string): void {
+  clearTimeout(revealExpiryTimers[id]);
+  revealExpiryTimers[id] = setTimeout(() => {
+    delete revealExpiryTimers[id];
+    delete revealedValues[id];
+  }, REVEAL_GRACE_WINDOW_MS);
+}
+
 /** Drops every revealed secret's plaintext from memory — called by every dialog/popover close
  *  path that can populate revealedValues (closeVariablesDialog here, closeCopyAsCurlDialog in
  *  curl.ts), the same honest "not scrubbed, just dropped" limit P14 §0.3 states for its own reveal
- *  map (JS offers no way to zero a string in memory). */
+ *  map (JS offers no way to zero a string in memory). Also cancels this id's grace-expiry timer
+ *  (finding 5) so a delayed callback can't fire against a map a later reveal has since repopulated. */
 export function clearRevealed(): void {
   for (const id of Object.keys(revealedValues)) delete revealedValues[id];
+  for (const id of Object.keys(revealExpiryTimers)) {
+    clearTimeout(revealExpiryTimers[id]);
+    delete revealExpiryTimers[id];
+  }
 }
 
 /** P12 D13: runs over http/reveal.ts's shared recurse-once switch — the pattern used to be
@@ -389,6 +412,7 @@ export async function revealVariable(
     (confirmed) => control.variablesReveal(id, confirmed),
     (value) => {
       revealedValues[id] = value;
+      scheduleRevealExpiry(id);
     },
     onError,
     'Show this variable’s value? It will be displayed in plain text.',

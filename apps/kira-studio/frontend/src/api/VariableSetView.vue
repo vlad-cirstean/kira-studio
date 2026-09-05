@@ -143,10 +143,24 @@ function syncDrafts(): void {
 }
 watch(rows, syncDrafts, { immediate: true });
 
+// Which id's draft currently mirrors a revealed plaintext, and what that plaintext was — so a
+// later grace-window expiry (state/variables.ts's own scheduleRevealExpiry) can re-mask the field
+// it filled in, without clobbering a value the user has since typed themselves (finding 5: a
+// revealed value used to stay legible on screen for the life of the tab, well past the 5-minute
+// auth grace it came from, because closing the tab was the only thing that ever cleared it).
+const revealMirroredValue: Record<string, string> = {};
+
 watch(revealedValues, (values) => {
   for (const [id, value] of Object.entries(values)) {
     const draft = drafts[id];
     if (draft && draft.value === '') draft.value = value;
+    revealMirroredValue[id] = value;
+  }
+  for (const id of Object.keys(revealMirroredValue)) {
+    if (id in values) continue;
+    const draft = drafts[id];
+    if (draft && draft.value === revealMirroredValue[id]) draft.value = '';
+    delete revealMirroredValue[id];
   }
 });
 
