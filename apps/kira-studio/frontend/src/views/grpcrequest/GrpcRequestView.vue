@@ -88,13 +88,24 @@ function onMethodSelect(e: Event): void {
 
 // D4: the schema is fetched once a reflection target (or a .proto path) exists — mirrors
 // views/httprequest/HttpRequestView.vue's own ensureVariablesLoaded watch shape.
+//
+// Finding 13: debounced the same 150ms this app already uses for a fast typist
+// (project/state/tree.ts's own SEARCH_DEBOUNCE_MS) — without it, every keystroke of a live
+// target/protoPath fired its own Describe round trip, most of them against a partial, not-yet-
+// finished string. loadSchema's own generation-id guard (state.ts) is still what makes a stale
+// response harmless if one lands late regardless.
+const SCHEMA_LOAD_DEBOUNCE_MS = 150;
+let schemaLoadTimer: ReturnType<typeof setTimeout> | undefined;
 watch(
   () =>
     [props.tab.state.descriptorMode, props.tab.state.target, props.tab.state.protoPath] as const,
   ([mode, target, protoPath]) => {
+    clearTimeout(schemaLoadTimer);
     if (mode === 'reflection' && !target) return;
     if (mode === 'proto' && !protoPath) return;
-    void loadSchema(props.tab.id);
+    schemaLoadTimer = setTimeout(() => {
+      void loadSchema(props.tab.id);
+    }, SCHEMA_LOAD_DEBOUNCE_MS);
   },
   { immediate: true },
 );
@@ -197,6 +208,7 @@ onMounted(() => {
 });
 onUnmounted(() => {
   for (const off of unregisterCommands) off();
+  clearTimeout(schemaLoadTimer);
 });
 </script>
 

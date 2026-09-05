@@ -112,10 +112,14 @@ export interface GrpcSchemaRuntime {
   status: 'idle' | 'loading' | 'error';
   schema: GrpcSchemaWire | null;
   error: string | null;
+  /** Finding 13: bumped on every loadSchema call, mirroring call()'s own opId guard — a response
+   *  for a stale (superseded) load is dropped rather than applied, the same "the most recent call
+   *  wins" rule opId already gives call()'s own terminal event/return race. */
+  genId: number;
 }
 
 function defaultSchemaRuntime(): GrpcSchemaRuntime {
-  return { status: 'idle', schema: null, error: null };
+  return { status: 'idle', schema: null, error: null, genId: 0 };
 }
 
 const { runtime: schemaRuntime, ensureRuntime: ensureSchemaRuntime } =
@@ -147,6 +151,10 @@ export async function loadSchema(tabId: string, reload = false): Promise<void> {
   const rt = ensureSchemaRuntime(tabId);
   rt.status = 'loading';
   rt.error = null;
+  // Finding 13: mirrors call()'s own opId guard — a debounced watcher still fires one loadSchema
+  // per settled keystroke, and a slow response for an earlier (now-stale) target string could
+  // otherwise land after a newer one and clobber it.
+  const myGen = ++rt.genId;
 
   const collectionId = collectionIdFor(tab.state);
   const environmentId = activeEnvironmentId.value;
@@ -174,11 +182,11 @@ export async function loadSchema(tabId: string, reload = false): Promise<void> {
       environmentId,
       reload,
     });
-    if (!findGrpcRequestTab(tabId)) return;
+    if (!findGrpcRequestTab(tabId) || rt.genId !== myGen) return;
     rt.status = 'idle';
     rt.schema = schema;
   } catch (err) {
-    if (!findGrpcRequestTab(tabId)) return;
+    if (!findGrpcRequestTab(tabId) || rt.genId !== myGen) return;
     rt.status = 'error';
     rt.error = err instanceof Error ? err.message : String(err);
   }

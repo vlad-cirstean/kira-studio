@@ -173,6 +173,30 @@ test('gRPC request — open a tab and browse a schema', async ({ relaunch }) => 
   );
 });
 
+// Finding 13: GrpcRequestView.vue's own watcher used to call loadSchema immediately on every
+// keystroke of the target field, with no debounce — a fast typist fired one Describe round trip
+// per character. Typing character-by-character (page.keyboard.type, unlike page.fill's single
+// input event) is what actually exercises that path.
+test('gRPC request — typing the target debounces schema loads to one call', async ({
+  relaunch,
+}) => {
+  const CONTROL: ControlSnapshot[] = [{ channel: IPC.grpcDescribe, response: UNARY_SCHEMA }];
+  const { window: page, control } = await relaunch({ control: CONTROL });
+
+  await openHttpModeAndNewGrpcRequest(page);
+  await page.click('[data-testid="grpc-target"]');
+  await page.keyboard.type('demo.example.com:443');
+
+  // Nothing has fired yet — still inside the debounce window.
+  expect(control.log().filter((e) => e.channel === IPC.grpcDescribe)).toHaveLength(0);
+
+  await expect
+    .poll(() => control.log().filter((e) => e.channel === IPC.grpcDescribe).length)
+    .toBe(1);
+  const call = control.log().filter((e) => e.channel === IPC.grpcDescribe)[0];
+  expect(call?.args).toMatchObject({ target: 'demo.example.com:443' });
+});
+
 test('gRPC request — choosing a method seeds the Message editor with its template', async ({
   relaunch,
 }) => {
