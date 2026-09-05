@@ -59,3 +59,23 @@ func (v Variable) Validate() error {
 	}
 	return nil
 }
+
+// VariableBulkEntry is one line of a parsed `.env` bulk edit (P17 D21/D22/D23) — the renderer's
+// own dotenv.ts `EnvEntry`, carried across the bridge. HasValue is false for a bare `KEY=` line
+// (D22 rule 3: a secret row whose line carries no value keeps its stored secret untouched).
+type VariableBulkEntry struct {
+	Name        string `json:"name"`
+	Value       string `json:"value"`
+	HasValue    bool   `json:"hasValue"`
+	Description string `json:"description"`
+}
+
+// VariableBulkResult is ApplyBulk's own answer — the same counts the renderer's own
+// dotenv.ts#reconcileEnv already computed locally for its live summary, so returning them here is
+// also the guard that the two reconciles agree (§4 of the plan).
+type VariableBulkResult struct {
+	Added     int  `json:"added"`
+	Updated   int  `json:"updated"`
+	Removed   int  `json:"removed"`
+	Reordered bool `json:"reordered"`
+}

@@ -24,6 +24,8 @@ import type {
 import type {
   ApiEnvironment,
   ApiVariable,
+  ApiVariableBulkEntry,
+  ApiVariableBulkResult,
   ApiVariableHistoryEntry,
   RevealResult,
   VariableScope,
@@ -231,6 +233,16 @@ export const apiControl = {
   variablesDelete: (id: string): Promise<void> => unwrap(VariablesService.Delete({ id })),
   variablesReorder: (scope: VariableScope, ownerId: string, ids: string[]): Promise<void> =>
     unwrap(VariablesService.Reorder({ scope: scopeArg(scope), ownerId, ids })),
+  // P17 D21-D23/item 5: one scope's whole variable set, replaced atomically by a parsed `.env`
+  // entry list — see repos/variables.go's own ApplyBulk.
+  variablesApplyBulk: (
+    scope: VariableScope,
+    ownerId: string,
+    entries: ApiVariableBulkEntry[],
+  ): Promise<ApiVariableBulkResult> =>
+    unwrap(VariablesService.ApplyBulk({ scope: scopeArg(scope), ownerId, entries })).then((r) =>
+      trust<ApiVariableBulkResult>(r),
+    ),
 
   variablesHistory: (variableId: string): Promise<ApiVariableHistoryEntry[]> =>
     unwrap(VariablesService.History({ variableId })).then((r) =>

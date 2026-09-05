@@ -1,9 +1,9 @@
 package bridge
 
 import (
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/apivars"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/appcore"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/bridge/ipcerr"
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/apivars"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 )
 
@@ -188,6 +188,28 @@ func (s *VariablesService) Reorder(args VariablesReorderArgs) error {
 		return ipcerr.Internal(err.Error())
 	}
 	return nil
+}
+
+// VariablesApplyBulkArgs is P17 D21-D23/item 5: one scope's whole variable set, replaced by a
+// parsed `.env` entry list in one transaction (VariablesRepo.ApplyBulk).
+type VariablesApplyBulkArgs struct {
+	Scope   model.VariableScope       `json:"scope"`
+	OwnerID string                    `json:"ownerId"`
+	Entries []model.VariableBulkEntry `json:"entries"`
+}
+
+func (s *VariablesService) ApplyBulk(args VariablesApplyBulkArgs) (model.VariableBulkResult, error) {
+	if err := validScope(args.Scope); err != nil {
+		return model.VariableBulkResult{}, err
+	}
+	if args.OwnerID == "" {
+		return model.VariableBulkResult{}, ipcerr.BadRequest("ownerId is required")
+	}
+	result, err := s.Deps.Repos.Variables.ApplyBulk(args.Scope, args.OwnerID, args.Entries)
+	if err != nil {
+		return model.VariableBulkResult{}, ipcerr.Internal(err.Error())
+	}
+	return result, nil
 }
 
 // ---- history (D13) ----

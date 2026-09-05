@@ -632,6 +632,202 @@ func (r *VariablesRepo) Reorder(scope model.VariableScope, ownerID string, ids [
 	return nil
 }
 
+// ApplyBulk is P17 D22/D23's own transaction: one scope's whole variable set replaced by a parsed
+// `.env` entry list in a single atomic step — match by name (positionally for a duplicate key,
+// mirroring dotenv.ts#reconcileEnv exactly, §4's own guard that the two reconciles agree), update/
+// insert/delete per D22's five rules, record history through the existing recordHistory helper for
+// every value that actually changed, then re-index sort_order dense in the entries' own order.
+//
+// Why one transaction and not N Upsert + M Delete + one Reorder from the renderer: a fifteen-line
+// paste would be sixteen IPC round trips with no atomicity — a failure halfway would leave a set
+// that is neither the old one nor the new one, and the user's own pasted text is the only record
+// of what they meant.
+func (r *VariablesRepo) ApplyBulk(scope model.VariableScope, ownerID string, entries []model.VariableBulkEntry) (model.VariableBulkResult, error) {
+	column, err := scopeColumn(scope)
+	if err != nil {
+		return model.VariableBulkResult{}, err
+	}
+	if ownerID == "" {
+		return model.VariableBulkResult{}, fmt.Errorf("repos/variables: ownerId is required")
+	}
+
+	tx, err := r.db.Begin()
+	if err != nil {
+		return model.VariableBulkResult{}, fmt.Errorf("repos/variables: begin: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	rows, err := tx.Query(
+		`SELECT id, name, value, is_secret, secret_value, description FROM api_variables
+		  WHERE `+column+` = ? ORDER BY sort_order`,
+		ownerID,
+	)
+	if err != nil {
+		return model.VariableBulkResult{}, fmt.Errorf("repos/variables: read existing: %w", err)
+	}
+	type existingRow struct {
+		id, name, value, description string
+		isSecret                     int
+		secretValue                  sql.NullString
+	}
+	var existing []existingRow
+	for rows.Next() {
+		var er existingRow
+		if err := rows.Scan(&er.id, &er.name, &er.value, &er.isSecret, &er.secretValue, &er.description); err != nil {
+			rows.Close()
+			return model.VariableBulkResult{}, fmt.Errorf("repos/variables: scan existing: %w", err)
+		}
+		existing = append(existing, er)
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return model.VariableBulkResult{}, fmt.Errorf("repos/variables: existing rows: %w", err)
+	}
+	rows.Close()
+
+	pools := map[string][]existingRow{}
+	for _, er := range existing {
+		pools[er.name] = append(pools[er.name], er)
+	}
+	nextIndex := map[string]int{}
+	matched := map[string]bool{}
+
+	now := model.NowISO()
+	var result model.VariableBulkResult
+	finalOrder := make([]string, 0, len(entries))
+
+	for _, entry := range entries {
+		pool := pools[entry.Name]
+		idx := nextIndex[entry.Name]
+		if idx < len(pool) {
+			er := pool[idx]
+			nextIndex[entry.Name] = idx + 1
+			matched[er.id] = true
+			finalOrder = append(finalOrder, er.id)
+
+			if er.isSecret != 0 {
+				switch {
+				case entry.HasValue:
+					// D22 rule 3: a typed plaintext replaces the secret value; history records the
+					// value it replaced through the existing helper.
+					if changed, oldPlain, ok := r.valueChanged(er.value, true, er.secretValue, entry.Value); changed && ok {
+						if err := r.recordHistory(tx, er.id, oldPlain, true, er.secretValue, now); err != nil {
+							return model.VariableBulkResult{}, err
+						}
+					}
+					storedValue, storedSecret, err := r.encryptFor(entry.Value, true)
+					if err != nil {
+						return model.VariableBulkResult{}, err
+					}
+					if _, err := tx.Exec(
+						`UPDATE api_variables SET value = ?, secret_value = ?, description = ?, updated_at = ? WHERE id = ?`,
+						storedValue, storedSecret, entry.Description, now, er.id,
+					); err != nil {
+						return model.VariableBulkResult{}, fmt.Errorf("repos/variables: bulk update secret %s: %w", er.id, err)
+					}
+					result.Updated++
+				case entry.Description != er.description:
+					if _, err := tx.Exec(
+						`UPDATE api_variables SET description = ?, updated_at = ? WHERE id = ?`,
+						entry.Description, now, er.id,
+					); err != nil {
+						return model.VariableBulkResult{}, fmt.Errorf("repos/variables: bulk update description %s: %w", er.id, err)
+					}
+					result.Updated++
+				}
+				// entry.HasValue == false and the description is unchanged: nothing touched at
+				// all — the property that makes it safe to open this editor on a set full of
+				// secrets and press Apply without thinking.
+				continue
+			}
+
+			valueChanged := entry.Value != er.value
+			descriptionChanged := entry.Description != er.description
+			if valueChanged || descriptionChanged {
+				if valueChanged {
+					if changed, oldPlain, ok := r.valueChanged(er.value, false, er.secretValue, entry.Value); changed && ok {
+						if err := r.recordHistory(tx, er.id, oldPlain, false, er.secretValue, now); err != nil {
+							return model.VariableBulkResult{}, err
+						}
+					}
+				}
+				if _, err := tx.Exec(
+					`UPDATE api_variables SET value = ?, description = ?, updated_at = ? WHERE id = ?`,
+					entry.Value, entry.Description, now, er.id,
+				); err != nil {
+					return model.VariableBulkResult{}, fmt.Errorf("repos/variables: bulk update %s: %w", er.id, err)
+				}
+				result.Updated++
+			}
+			continue
+		}
+
+		// D22 rule 2: an unmatched line creates a new, non-secret row — there is no `.env` syntax
+		// for the secret flag, so bulk edit cannot create a secret (OQ-6).
+		newID := uuid.NewString()
+		var collectionID, environmentID *string
+		if scope == model.VariableScopeCollection {
+			collectionID = &ownerID
+		} else {
+			environmentID = &ownerID
+		}
+		if _, err := tx.Exec(
+			`INSERT INTO api_variables (id, collection_id, environment_id, name, value, is_secret, secret_value, sort_order, description, created_at, updated_at)
+			 VALUES (?, ?, ?, ?, ?, 0, NULL, 0, ?, ?, ?)`,
+			newID, collectionID, environmentID, entry.Name, entry.Value, entry.Description, now, now,
+		); err != nil {
+			return model.VariableBulkResult{}, fmt.Errorf("repos/variables: bulk insert %s: %w", entry.Name, err)
+		}
+		matched[newID] = true
+		finalOrder = append(finalOrder, newID)
+		result.Added++
+	}
+
+	// D22 rule 4: an existing row whose name appears in no line is deleted, cascading its history.
+	priorSurviving := make([]string, 0, len(finalOrder))
+	for _, er := range existing {
+		if matched[er.id] {
+			priorSurviving = append(priorSurviving, er.id)
+			continue
+		}
+		if _, err := tx.Exec(`DELETE FROM api_variables WHERE id = ?`, er.id); err != nil {
+			return model.VariableBulkResult{}, fmt.Errorf("repos/variables: bulk delete %s: %w", er.id, err)
+		}
+		result.Removed++
+	}
+
+	// D22 rule 5: line order becomes sort_order, dense, in the entries' own final order — a
+	// reorder-only edit (no add/update/remove) is detected by comparing the surviving rows' own
+	// relative order against what it was before.
+	existingIDs := make(map[string]bool, len(existing))
+	for _, er := range existing {
+		existingIDs[er.id] = true
+	}
+	survivingFinalOrder := make([]string, 0, len(priorSurviving))
+	for _, id := range finalOrder {
+		if existingIDs[id] {
+			survivingFinalOrder = append(survivingFinalOrder, id)
+		}
+	}
+	for i := range survivingFinalOrder {
+		if survivingFinalOrder[i] != priorSurviving[i] {
+			result.Reordered = true
+			break
+		}
+	}
+
+	for i, id := range finalOrder {
+		if _, err := tx.Exec(`UPDATE api_variables SET sort_order = ? WHERE id = ?`, i, id); err != nil {
+			return model.VariableBulkResult{}, fmt.Errorf("repos/variables: bulk reindex %s: %w", id, err)
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return model.VariableBulkResult{}, fmt.Errorf("repos/variables: commit: %w", err)
+	}
+	return result, nil
+}
+
 // History returns one variable's prior values, newest first — never a secret's plaintext or
 // ciphertext (the same list-projection discipline as List above). Reveal is the gated path to one.
 func (r *VariablesRepo) History(variableID string) ([]model.VariableHistoryEntry, error) {

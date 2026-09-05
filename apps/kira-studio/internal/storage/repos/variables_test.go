@@ -508,3 +508,149 @@ func TestDuplicateEnvironmentCopiesCiphertextVerbatimNoHistoryNeverActive(t *tes
 		t.Fatalf("History(dup) = %+v, want none copied", dupHistory)
 	}
 }
+
+// ---- 6. ApplyBulk (P17 D22/D23): the two properties that matter most ----
+
+func TestApplyBulkLeavesAnUntouchedSecretByteIdentical(t *testing.T) {
+	r, db := newVariablesRepo(t)
+	collectionID := newCollectionFor(t, db)
+
+	created, err := r.Upsert(model.VariableScopeCollection, collectionID, "", "apiKey", "s3cr3t", true, "d")
+	if err != nil {
+		t.Fatalf("Upsert(secret): %v", err)
+	}
+	var before string
+	if err := db.QueryRow(`SELECT secret_value FROM api_variables WHERE id = ?`, created.ID).Scan(&before); err != nil {
+		t.Fatalf("read secret_value before: %v", err)
+	}
+
+	// The bulk editor's own "untouched" shape: a bare `KEY=` line, HasValue: false, same
+	// description — the property that makes it safe to open the editor and press Apply without
+	// re-typing every secret.
+	result, err := r.ApplyBulk(model.VariableScopeCollection, collectionID, []model.VariableBulkEntry{
+		{Name: "apiKey", Value: "", HasValue: false, Description: "d"},
+	})
+	if err != nil {
+		t.Fatalf("ApplyBulk: %v", err)
+	}
+	if result.Added != 0 || result.Updated != 0 || result.Removed != 0 || result.Reordered {
+		t.Fatalf("result = %+v, want an untouched no-op", result)
+	}
+
+	var after string
+	if err := db.QueryRow(`SELECT secret_value FROM api_variables WHERE id = ?`, created.ID).Scan(&after); err != nil {
+		t.Fatalf("read secret_value after: %v", err)
+	}
+	if before != after {
+		t.Fatalf("secret_value changed across an untouched ApplyBulk: before %q, after %q", before, after)
+	}
+
+	rows, err := r.List(model.VariableScopeCollection, collectionID)
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	if len(rows) != 1 || !rows[0].IsSecret {
+		t.Fatalf("rows = %+v, want the one secret row intact", rows)
+	}
+}
+
+func TestApplyBulkNewSecretValueRecordsExactlyOneHistoryRow(t *testing.T) {
+	r, db := newVariablesRepo(t)
+	collectionID := newCollectionFor(t, db)
+
+	created, err := r.Upsert(model.VariableScopeCollection, collectionID, "", "apiKey", "old-secret", true, "")
+	if err != nil {
+		t.Fatalf("Upsert(secret): %v", err)
+	}
+
+	result, err := r.ApplyBulk(model.VariableScopeCollection, collectionID, []model.VariableBulkEntry{
+		{Name: "apiKey", Value: "new-secret", HasValue: true, Description: ""},
+	})
+	if err != nil {
+		t.Fatalf("ApplyBulk: %v", err)
+	}
+	if result.Updated != 1 || result.Added != 0 || result.Removed != 0 {
+		t.Fatalf("result = %+v, want exactly one update", result)
+	}
+
+	hist, err := r.History(created.ID)
+	if err != nil {
+		t.Fatalf("History: %v", err)
+	}
+	if len(hist) != 1 || !hist[0].IsSecret {
+		t.Fatalf("hist = %+v, want exactly one secret history row (the value it replaced)", hist)
+	}
+	revealed, err := r.RevealValue(created.ID)
+	if err != nil {
+		t.Fatalf("RevealValue: %v", err)
+	}
+	if revealed != "new-secret" {
+		t.Fatalf("RevealValue = %q, want %q", revealed, "new-secret")
+	}
+}
+
+// TestApplyBulkFullReconcile exercises every D22 rule in one transaction: an update, a create
+// (new, non-secret), a delete, and a description-only change on a secret whose value line was
+// left untouched.
+func TestApplyBulkFullReconcile(t *testing.T) {
+	r, db := newVariablesRepo(t)
+	collectionID := newCollectionFor(t, db)
+
+	kept, err := r.Upsert(model.VariableScopeCollection, collectionID, "", "kept", "old-value", false, "")
+	if err != nil {
+		t.Fatalf("Upsert(kept): %v", err)
+	}
+	gone, err := r.Upsert(model.VariableScopeCollection, collectionID, "", "gone", "x", false, "")
+	if err != nil {
+		t.Fatalf("Upsert(gone): %v", err)
+	}
+	secret, err := r.Upsert(model.VariableScopeCollection, collectionID, "", "secretVar", "s3cr3t", true, "old desc")
+	if err != nil {
+		t.Fatalf("Upsert(secretVar): %v", err)
+	}
+
+	result, err := r.ApplyBulk(model.VariableScopeCollection, collectionID, []model.VariableBulkEntry{
+		{Name: "kept", Value: "new-value", HasValue: true, Description: ""},
+		{Name: "secretVar", Value: "", HasValue: false, Description: "new desc"},
+		{Name: "brandNew", Value: "v", HasValue: true, Description: ""},
+	})
+	if err != nil {
+		t.Fatalf("ApplyBulk: %v", err)
+	}
+	if result.Added != 1 || result.Updated != 2 || result.Removed != 1 {
+		t.Fatalf("result = %+v, want {Added:1 Updated:2 Removed:1}", result)
+	}
+
+	rows, err := r.List(model.VariableScopeCollection, collectionID)
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	byName := map[string]model.Variable{}
+	for _, row := range rows {
+		byName[row.Name] = row
+	}
+	if len(rows) != 3 {
+		t.Fatalf("rows = %+v, want exactly 3 (kept, secretVar, brandNew — gone removed)", rows)
+	}
+	if v, ok := byName["kept"]; !ok || v.Value != "new-value" || v.ID != kept.ID {
+		t.Errorf("kept = %+v, want value updated with the same id", v)
+	}
+	if _, ok := byName["gone"]; ok {
+		t.Error("gone still present, want removed")
+	}
+	if v, ok := byName["secretVar"]; !ok || v.ID != secret.ID || v.Description != "new desc" {
+		t.Errorf("secretVar = %+v, want description updated, same id, value still masked", v)
+	}
+	if v, ok := byName["brandNew"]; !ok || v.IsSecret {
+		t.Errorf("brandNew = %+v, want a new non-secret row", v)
+	}
+
+	// The removed row's history is gone too (cascade, same as Delete).
+	var count int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM api_variable_history WHERE variable_id = ?`, gone.ID).Scan(&count); err != nil {
+		t.Fatalf("count history: %v", err)
+	}
+	if count != 0 {
+		t.Errorf("history rows for the removed variable = %d, want 0 (cascaded)", count)
+	}
+}
