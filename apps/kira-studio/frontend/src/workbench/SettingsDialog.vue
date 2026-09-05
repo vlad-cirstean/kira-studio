@@ -17,6 +17,7 @@ import { cacheStatsState } from '../state/cacheStats';
 import { patchSettings, settingsState } from '../state/settings';
 import CodiconIcon from '../theme/CodiconIcon.vue';
 import AppButton from '../theme/primitives/AppButton.vue';
+import Checkbox from '../theme/primitives/Checkbox.vue';
 import DialogFrame from '../theme/primitives/DialogFrame.vue';
 import IconButton from '../theme/primitives/IconButton.vue';
 import TextField from '../theme/primitives/TextField.vue';
@@ -111,12 +112,12 @@ function setRowDensity(density: RowDensity): void {
   draft.appearance.rowDensity = density;
 }
 
-function onWordWrapChange(e: Event): void {
-  draft.appearance.wordWrap = (e.target as HTMLInputElement).checked;
+function onWordWrapChange(checked: boolean): void {
+  draft.appearance.wordWrap = checked;
 }
 
-function onRowColoringChange(e: Event): void {
-  draft.appearance.rowColoring = (e.target as HTMLInputElement).checked;
+function onRowColoringChange(checked: boolean): void {
+  draft.appearance.rowColoring = checked;
 }
 
 const rowPreviewHeight = computed(() => (draft.appearance.rowDensity === 'compact' ? 22 : 28));
@@ -405,11 +406,10 @@ async function onSave(): Promise<void> {
 
             <div class="field checkbox-row">
               <label class="field checkbox">
-                <input
-                  :checked="draft.appearance.wordWrap"
-                  type="checkbox"
+                <Checkbox
+                  :model-value="draft.appearance.wordWrap"
                   data-testid="settings-word-wrap"
-                  @change="onWordWrapChange"
+                  @update:model-value="onWordWrapChange"
                 />
                 <span>Word wrap</span>
                 <span class="helper-text"
@@ -429,11 +429,10 @@ async function onSave(): Promise<void> {
 
             <div class="field checkbox-row">
               <label class="field checkbox">
-                <input
-                  :checked="draft.appearance.rowColoring"
-                  type="checkbox"
+                <Checkbox
+                  :model-value="draft.appearance.rowColoring"
                   data-testid="settings-row-coloring"
-                  @change="onRowColoringChange"
+                  @update:model-value="onRowColoringChange"
                 />
                 <span>Row colouring</span>
                 <span class="helper-text"
@@ -704,13 +703,6 @@ async function onSave(): Promise<void> {
 .checkbox-row .field.checkbox {
   flex: 1;
   min-width: 0;
-}
-
-.field.checkbox input[type='checkbox'] {
-  width: 14px;
-  height: 14px;
-  accent-color: var(--kira-accent);
-  cursor: pointer;
 }
 
 .size-input {

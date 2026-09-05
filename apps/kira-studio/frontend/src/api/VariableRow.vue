@@ -2,6 +2,7 @@
 import type { ApiVariable } from '@shared/domain/variables';
 import { ref, watch } from 'vue';
 import CodiconIcon from '../theme/CodiconIcon.vue';
+import Checkbox from '../theme/primitives/Checkbox.vue';
 import IconButton from '../theme/primitives/IconButton.vue';
 import TextField from '../theme/primitives/TextField.vue';
 import { historyMenuState, openHistoryMenu } from './state/variables';
@@ -69,8 +70,8 @@ function onNameInput(v: string): void {
 function onValueInput(v: string): void {
   emit('update:value', v);
 }
-function onSecretChange(e: Event): void {
-  emit('update:isSecret', (e.target as HTMLInputElement).checked);
+function onSecretChange(checked: boolean): void {
+  emit('update:isSecret', checked);
 }
 
 const showHistory = ref(false);
@@ -147,12 +148,11 @@ function onKeydown(e: KeyboardEvent): void {
       />
     </div>
     <label class="secret-toggle" v-tooltip="secretsUnavailable ? 'Secret storage is unavailable' : 'Secret'">
-      <input
-        type="checkbox"
-        :checked="row.isSecret"
+      <Checkbox
+        :model-value="row.isSecret"
         :disabled="secretsUnavailable && !row.isSecret"
         data-testid="variable-secret"
-        @change="onSecretChange"
+        @update:model-value="onSecretChange"
       />
     </label>
     <div class="history-anchor">

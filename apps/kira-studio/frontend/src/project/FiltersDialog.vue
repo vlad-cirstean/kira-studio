@@ -5,6 +5,7 @@ import { computed, nextTick, ref, watch } from 'vue';
 import { connectionRecord } from '../state/connections';
 import CodiconIcon from '../theme/CodiconIcon.vue';
 import AppButton from '../theme/primitives/AppButton.vue';
+import Checkbox from '../theme/primitives/Checkbox.vue';
 import DialogFrame from '../theme/primitives/DialogFrame.vue';
 import TextField from '../theme/primitives/TextField.vue';
 import {
@@ -170,10 +171,9 @@ const connectionName = computed(
             :data-testid="`filter-kind-row-${row.kind}`"
             :data-state="row.hidden ? 'off' : 'on'"
           >
-            <input
-              type="checkbox"
-              :checked="!row.hidden"
-              @change="onToggleKind(row.kind)"
+            <Checkbox
+              :model-value="!row.hidden"
+              @update:model-value="onToggleKind(row.kind)"
             />
             <span class="kind-label">{{ row.label }}</span>
             <span class="kind-count">{{ row.count }}</span>
@@ -219,12 +219,11 @@ const connectionName = computed(
             </button>
             <span v-else class="twisty-spacer" />
             <label class="object-checkbox-label" v-tooltip="row.disabledReason ?? undefined">
-              <input
-                type="checkbox"
-                :checked="row.state !== 'off'"
-                :indeterminate.prop="row.state === 'partial'"
+              <Checkbox
+                :model-value="row.state !== 'off'"
+                :indeterminate="row.state === 'partial'"
                 :disabled="row.disabled"
-                @change="onToggleNode(row)"
+                @update:model-value="onToggleNode(row)"
               />
               <span class="object-name">{{ row.name }}</span>
             </label>
@@ -326,19 +325,6 @@ const connectionName = computed(
   gap: var(--kira-s-2);
   height: var(--kira-h-md);
   cursor: default;
-}
-
-.kind-row input,
-.object-checkbox-label input {
-  width: 14px;
-  height: 14px;
-  accent-color: var(--kira-accent);
-  cursor: pointer;
-  flex-shrink: 0;
-}
-
-.object-checkbox-label input:disabled {
-  cursor: not-allowed;
 }
 
 .kind-label,

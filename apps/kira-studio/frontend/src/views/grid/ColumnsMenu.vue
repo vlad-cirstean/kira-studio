@@ -4,6 +4,7 @@ import { computed, ref } from 'vue';
 import { findDataTab } from '../../state/tabs';
 import CodiconIcon from '../../theme/CodiconIcon.vue';
 import AppButton from '../../theme/primitives/AppButton.vue';
+import Checkbox from '../../theme/primitives/Checkbox.vue';
 import PopoverPanel from '../../theme/primitives/PopoverPanel.vue';
 import { runtime, setColumnOrder, setProjection } from './state';
 
@@ -133,13 +134,12 @@ function close(): void {
           @dragend="onDragEnd"
         >
           <span class="drag-handle" aria-hidden="true"><CodiconIcon name="gripper" :size="13" /></span>
-          <input
-            type="checkbox"
-            :checked="selected.has(name)"
+          <Checkbox
+            :model-value="selected.has(name)"
             :disabled="pkNames.has(name)"
             v-tooltip="pkNames.has(name) ? 'Primary key — always shown' : undefined"
             data-testid="columns-menu-item"
-            @change="toggle(name)"
+            @update:model-value="toggle(name)"
           />
           {{ name }}
         </label>

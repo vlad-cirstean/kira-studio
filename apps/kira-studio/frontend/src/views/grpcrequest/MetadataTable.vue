@@ -3,6 +3,7 @@ import type { GrpcMetadataState } from '@shared/domain/grpc';
 import type { GrpcRequestTabRecord } from '@shared/domain/tabs';
 import { computed } from 'vue';
 import { patchGrpcRequestTabState } from '../../api/tabs';
+import Checkbox from '../../theme/primitives/Checkbox.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
 import TextField from '../../theme/primitives/TextField.vue';
 
@@ -47,12 +48,11 @@ function removeRow(index: number): void {
       class="metadata-row"
       data-testid="grpc-metadata-row"
     >
-      <input
-        type="checkbox"
-        :checked="row.enabled"
+      <Checkbox
+        :model-value="row.enabled"
         :disabled="i >= tab.state.metadata.length"
         data-testid="grpc-metadata-enabled"
-        @change="toggleEnabled(i)"
+        @update:model-value="toggleEnabled(i)"
       />
       <div class="metadata-cell">
         <TextField

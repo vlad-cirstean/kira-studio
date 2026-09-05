@@ -18,6 +18,7 @@ import { schemaDialectFor } from '../state/schemas';
 import CodiconIcon from '../theme/CodiconIcon.vue';
 import EngineIcon from '../theme/EngineIcon.vue';
 import AppButton from '../theme/primitives/AppButton.vue';
+import Checkbox from '../theme/primitives/Checkbox.vue';
 import DialogFrame from '../theme/primitives/DialogFrame.vue';
 import IconButton from '../theme/primitives/IconButton.vue';
 import MessageStrip from '../theme/primitives/MessageStrip.vue';
@@ -669,13 +670,13 @@ const preconnectText = computed({
 
           <div v-else-if="activeTab === 'Advanced'" class="tab-pane" role="tabpanel">
           <label class="field checkbox">
-            <input v-model="draft.readOnly" type="checkbox" data-testid="connection-readonly" />
+            <Checkbox v-model="draft.readOnly" data-testid="connection-readonly" />
             <span>Read-only</span>
             <span class="helper-text">Blocks every mutation path for this connection — grid edits, DDL, and console writes.</span>
           </label>
 
           <label v-if="isSqlKind" class="field checkbox">
-            <input v-model="draft.autoExplain" type="checkbox" data-testid="connection-auto-explain" />
+            <Checkbox v-model="draft.autoExplain" data-testid="connection-auto-explain" />
             <span>Auto-explain SELECT queries</span>
             <span class="helper-text">
               Runs the database's own EXPLAIN before each SELECT this connection issues from a
@@ -732,11 +733,7 @@ const preconnectText = computed({
           <span v-if="fieldErrors.preconnect" class="field-error">{{ fieldErrors.preconnect }}</span>
 
           <label v-if="preconnectText" class="field checkbox">
-            <input
-              v-model="draft.preconnectSidecar"
-              type="checkbox"
-              data-testid="connection-preconnect-sidecar"
-            />
+            <Checkbox v-model="draft.preconnectSidecar" data-testid="connection-preconnect-sidecar" />
             <span>Keep it running, disconnect if it dies</span>
             <span class="helper-text">
               On: the command stays alive for the whole session — e.g. a port-forward — and this
@@ -888,13 +885,6 @@ const preconnectText = computed({
   align-items: center;
   gap: var(--kira-s-3);
   flex-wrap: wrap;
-  cursor: pointer;
-}
-
-.field.checkbox input[type='checkbox'] {
-  width: 14px;
-  height: 14px;
-  accent-color: var(--kira-accent);
   cursor: pointer;
 }
 

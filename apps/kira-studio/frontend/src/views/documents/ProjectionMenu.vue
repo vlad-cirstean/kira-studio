@@ -3,6 +3,7 @@ import type { Caps } from '@shared/caps';
 import { ref } from 'vue';
 import { findDocumentTab } from '../../state/tabs';
 import AppButton from '../../theme/primitives/AppButton.vue';
+import Checkbox from '../../theme/primitives/Checkbox.vue';
 import PopoverPanel from '../../theme/primitives/PopoverPanel.vue';
 import { fieldNamesOnPage } from './page';
 import { setProjection } from './state';
@@ -63,11 +64,10 @@ function close(): void {
       </div>
       <div v-else class="columns-menu-list">
         <label v-for="name in fieldNames" :key="name" class="columns-menu-item p-row">
-          <input
-            type="checkbox"
-            :checked="selected.has(name)"
+          <Checkbox
+            :model-value="selected.has(name)"
             data-testid="document-projection-menu-item"
-            @change="toggle(name)"
+            @update:model-value="toggle(name)"
           />
           {{ name }}
         </label>

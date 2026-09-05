@@ -7,6 +7,7 @@ import { patchHttpRequestTabState } from '../../api/tabs';
 import { formatBytes, formatRelative } from '../../format';
 import { confirmDialog } from '../../state/confirmDialog';
 import AppButton from '../../theme/primitives/AppButton.vue';
+import Checkbox from '../../theme/primitives/Checkbox.vue';
 import EmptyState from '../../theme/primitives/EmptyState.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
 import {
@@ -114,14 +115,12 @@ async function onClear(): Promise<void> {
         data-testid="http-history-row"
         @click="onRowClick(entry.id)"
       >
-        <input
-          type="checkbox"
-          class="history-checkbox"
+        <Checkbox
           data-testid="http-history-checkbox"
-          :checked="selected.includes(entry.id)"
+          :model-value="selected.includes(entry.id)"
           :disabled="!selected.includes(entry.id) && selected.length >= 2"
           @click.stop
-          @change="onToggle(entry.id)"
+          @update:model-value="onToggle(entry.id)"
         />
         <div class="history-row-main">
           <div class="history-row-line">
@@ -180,11 +179,6 @@ async function onClear(): Promise<void> {
 .history-row:hover,
 .history-row.is-viewing {
   background: var(--kira-hover);
-}
-
-.history-checkbox {
-  margin-top: var(--kira-s-1);
-  flex-shrink: 0;
 }
 
 .history-row-main {

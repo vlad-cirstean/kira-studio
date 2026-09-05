@@ -1,5 +1,6 @@
 <script setup lang="ts" generic="T extends { name: string; value: string; enabled?: boolean }">
 import { computed } from 'vue';
+import Checkbox from '../../theme/primitives/Checkbox.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
 import TextField from '../../theme/primitives/TextField.vue';
 
@@ -58,13 +59,12 @@ function removeRow(index: number): void {
 <template>
   <div class="field-rows-table" :data-testid="containerTestid">
     <div v-for="(row, i) in displayRows" :key="i" class="field-row" :data-testid="`${testidPrefix}-row`">
-      <input
+      <Checkbox
         v-if="showEnabled"
-        type="checkbox"
-        :checked="row.enabled"
+        :model-value="!!row.enabled"
         :disabled="i >= rows.length"
         :data-testid="`${testidPrefix}-enabled`"
-        @change="toggleEnabled(i)"
+        @update:model-value="toggleEnabled(i)"
       />
       <div class="field-cell">
         <TextField

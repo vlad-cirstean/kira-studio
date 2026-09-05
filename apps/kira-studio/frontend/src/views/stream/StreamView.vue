@@ -17,6 +17,7 @@ import { patchStreamTabState } from '../../state/tabs';
 import { cellClass } from '../../theme/cellClass';
 import { connColorVar } from '../../theme/connColor';
 import AppButton from '../../theme/primitives/AppButton.vue';
+import Checkbox from '../../theme/primitives/Checkbox.vue';
 import EmptyState from '../../theme/primitives/EmptyState.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
 import MessageStrip from '../../theme/primitives/MessageStrip.vue';
@@ -706,10 +707,9 @@ onUnmounted(() => {
                 class="partition-option"
                 :data-testid="`stream-filter-partition-option-${p}`"
               >
-                <input
-                  type="checkbox"
-                  :checked="isPartitionSelected(p)"
-                  @change="onTogglePartition(p)"
+                <Checkbox
+                  :model-value="isPartitionSelected(p)"
+                  @update:model-value="onTogglePartition(p)"
                 />
                 <span>partition {{ p }}</span>
               </label>
