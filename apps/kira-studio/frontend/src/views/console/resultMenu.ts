@@ -98,7 +98,12 @@ export function tabularRangeMenu(ctx: TabularRangeMenuContext): MenuItem[] {
 }
 
 export interface TabularRowMenuContext {
-  snapshots: RowSnapshot[];
+  // A1/P21 round 1: a thunk, not a pre-materialized array — grid/menu.ts's own rowMenu() takes
+  // this same shape for the identical reason (headerMenu's columnValues already did): building
+  // the menu must not decode every selected row across every column when none of the three items
+  // below may ever run. Memoize at the call site if more than one item might run in the same menu
+  // instance (grid/menu.ts's snapshotsThunk is the reference shape).
+  snapshots: () => RowSnapshot[];
 }
 
 // D9's 'row' row: Copy rows ▸ TSV/CSV/JSON. No INSERT -- a console result comes from ad-hoc SQL
@@ -115,19 +120,19 @@ export function tabularRowMenu(ctx: TabularRowMenuContext): MenuItem[] {
           type: 'item',
           id: 'copy-rows-tsv',
           label: 'TSV',
-          run: () => copyText(rowsToTsv(ctx.snapshots)),
+          run: () => copyText(rowsToTsv(ctx.snapshots())),
         },
         {
           type: 'item',
           id: 'copy-rows-csv',
           label: 'CSV',
-          run: () => copyText(rowsToCsv(ctx.snapshots)),
+          run: () => copyText(rowsToCsv(ctx.snapshots())),
         },
         {
           type: 'item',
           id: 'copy-rows-json',
           label: 'JSON',
-          run: () => copyText(rowsToJson(ctx.snapshots)),
+          run: () => copyText(rowsToJson(ctx.snapshots())),
         },
       ],
     },

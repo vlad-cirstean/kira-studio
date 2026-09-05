@@ -293,6 +293,14 @@ export interface RowMenuContext {
   dialect: SqlDialect | undefined;
 }
 
+// A1/P21 round 1: memoized once per rowMenu() call so the four Copy row(s) submenu items share one
+// pass over ctx.rows — building the menu itself must never pay for a decode only one of those four
+// items (if any) will ever ask for.
+function snapshotsThunk(ctx: RowMenuContext): () => RowSnapshot[] {
+  let cached: RowSnapshot[] | null = null;
+  return () => (cached ??= ctx.rows.map(ctx.snapshot));
+}
+
 function hasPendingChange(ctx: RowMenuContext): boolean {
   const p = pendingFor(ctx.tabId);
   if (!p) return false;
@@ -302,7 +310,14 @@ function hasPendingChange(ctx: RowMenuContext): boolean {
 // D6: Copy row(s) ▸ TSV/CSV/JSON/INSERT, Duplicate row(s), Revert row(s), Delete row(s) — all act
 // on the full row selection.
 export function rowMenu(ctx: RowMenuContext): MenuItem[] {
-  const snapshots = ctx.rows.map(ctx.snapshot);
+  // A1/P21 round 1: building the menu used to eagerly decode every selected row across every
+  // column (ctx.rows.map(ctx.snapshot)) whether or not any of the four items below ever runs —
+  // including on every Delete keypress, which routes through this same builder (P21 D5's "printed
+  // shortcut and executed action can't drift" rule) purely to dispatch, never reading snapshots at
+  // all. headerMenu's own columnValues already takes this shape (a thunk, invoked inside run());
+  // this mirrors it, memoized once so the four Copy row(s) items share a single pass if more than
+  // one is ever used.
+  const snapshots = snapshotsThunk(ctx);
   return [
     {
       type: 'submenu',
@@ -317,25 +332,25 @@ export function rowMenu(ctx: RowMenuContext): MenuItem[] {
           // Display-only (P21 D5) — the row-selection branch of DataGrid.vue's onCopy already
           // produces this exact TSV output on Cmd/Ctrl+C.
           shortcut: 'grid.copy',
-          run: () => copyText(rowsToTsv(snapshots)),
+          run: () => copyText(rowsToTsv(snapshots())),
         },
         {
           type: 'item',
           id: 'copy-rows-csv',
           label: 'CSV',
-          run: () => copyText(rowsToCsv(snapshots)),
+          run: () => copyText(rowsToCsv(snapshots())),
         },
         {
           type: 'item',
           id: 'copy-rows-json',
           label: 'JSON',
-          run: () => copyText(rowsToJson(snapshots)),
+          run: () => copyText(rowsToJson(snapshots())),
         },
         {
           type: 'item',
           id: 'copy-rows-insert',
           label: 'INSERT',
-          run: () => copyText(rowsToInsert(ctx.qualifiedName, snapshots, ctx.dialect)),
+          run: () => copyText(rowsToInsert(ctx.qualifiedName, snapshots(), ctx.dialect)),
         },
       ],
     },

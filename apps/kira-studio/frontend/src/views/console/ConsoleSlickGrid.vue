@@ -471,7 +471,14 @@ function onGridContextMenu(e: SlickEventData): void {
   if (hit.cell === 0) {
     const sel = currentSelection;
     const rows = sel?.kind === 'row' && sel.rows.includes(pageRow) ? sel.rows : [pageRow];
-    openContextMenu(nativeLike, tabularRowMenu({ snapshots: rows.map(rowSnapshotFor) }));
+    // A1/P21 round 1: lazy and memoized, matching grid/menu.ts's own rowMenu() fix — building the
+    // menu must not decode every selected row across every column before the user has picked one
+    // of the three items that actually need it.
+    let cachedSnapshots: RowSnapshot[] | null = null;
+    openContextMenu(
+      nativeLike,
+      tabularRowMenu({ snapshots: () => (cachedSnapshots ??= rows.map(rowSnapshotFor)) }),
+    );
     return;
   }
 

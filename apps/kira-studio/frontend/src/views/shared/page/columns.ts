@@ -304,13 +304,42 @@ export function alignmentFor(descriptor: ColumnDescriptor): 'left' | 'right' {
 }
 
 /** The display order: stored order filtered to live columns, then any new columns appended. */
+// A2/P21 round 1: `kept.includes(n)` made the reordered branch O(cols²) — harmless at a normal
+// column count, but resolveColumnOrder is called *per cell* by displayCell/rowSnapshot (not once
+// per bulk operation, which is its own separate fix at those call sites), so a wide table with a
+// stored column order turned a full-page copy into ~600,000 calls each doing an O(cols²) scan —
+// an unrecoverable hang, not a slowdown. Fixed two ways: a Set instead of `.includes` makes a
+// single call O(cols) regardless, and memoizing per (page, stored) — pages are frozen and
+// reference-stable (the same premise nameIndexCache/widthsCache below already rely on) — makes
+// repeat calls with an unchanged column order O(1).
+const columnOrderCache = new WeakMap<TabularPage, WeakMap<object, string[]>>();
+// A stable, non-null key so `resolveColumnOrder(page, null)` — the common case — shares one cache
+// slot per page rather than never hitting the cache at all (null can't be a WeakMap key).
+const NULL_STORED_KEY: object = {};
+
 export function resolveColumnOrder(page: TabularPage, stored: string[] | null): string[] {
+  const key: object = stored ?? NULL_STORED_KEY;
+  let perPage = columnOrderCache.get(page);
+  if (!perPage) {
+    perPage = new WeakMap();
+    columnOrderCache.set(page, perPage);
+  }
+  const cached = perPage.get(key);
+  if (cached) return cached;
+
   const names = page.columns.map((c) => c.name);
-  if (!stored) return names;
-  const known = new Set(names);
-  const kept = stored.filter((n) => known.has(n));
-  const missing = names.filter((n) => !kept.includes(n));
-  return [...kept, ...missing];
+  let result: string[];
+  if (!stored) {
+    result = names;
+  } else {
+    const known = new Set(names);
+    const kept = stored.filter((n) => known.has(n));
+    const keptSet = new Set(kept);
+    const missing = names.filter((n) => !keptSet.has(n));
+    result = [...kept, ...missing];
+  }
+  perPage.set(key, result);
+  return result;
 }
 
 // Pages are frozen and stable by reference (page.ts's setPage), so a WeakMap keyed by the page
