@@ -8,11 +8,13 @@ import { readFileSync } from 'node:fs';
 import { resolve as resolvePath } from 'node:path';
 import {
   classifyReference,
+  parseReference,
   type Reference,
   resolve,
   sanitizeUrlSpan,
   splitTemplateSpans,
 } from '../src/http/substitute';
+import { applyPipeline } from '../src/http/transforms';
 
 interface Case {
   name: string;
@@ -200,5 +202,151 @@ describe('http/substitute.ts splitTemplateSpans offsets (P15b D1)', () => {
       { text: '{{a{{b}}', isReference: true, from: 0, to: 8, name: 'a{{b' },
       { text: '}}', isReference: false, from: 8, to: 10, name: '' },
     ]);
+  });
+});
+
+// P17 D8: the SPEC's second question — a pipe applies AFTER per-occurrence dynamic-value
+// generation, not before. The one assertion that pins it: two occurrences of the same
+// `{{$guid | upper}}`-shaped reference must generate two *different* values (P6 D3's own
+// per-occurrence freshness, untouched by D6) and each must be independently transformed — never
+// the same value generated once and reused.
+describe('http/substitute.ts resolve() pipe/dynamic-value ordering (P17 D8)', () => {
+  test('two occurrences of {{$guid | upper}} yield two different upper-cased values', () => {
+    let n = 0;
+    const result = resolve('{{$guid | upper}}/{{$guid | upper}}', {}, [], () => `id-${n++}`);
+    expect(result.text).toBe('ID-0/ID-1');
+    expect(result.text).not.toBe('ID-0/ID-0');
+    expect(result.refs).toEqual([
+      { name: '$guid', kind: 'resolved', pipeline: ['upper'] },
+      { name: '$guid', kind: 'resolved', pipeline: ['upper'] },
+    ]);
+  });
+});
+
+// P17 D3: parseReference's own rule table, independent of resolve()'s corpus-driven cases above.
+describe('http/substitute.ts parseReference (P17 D3)', () => {
+  test('no pipe at all: the whole input is the name', () => {
+    expect(parseReference('token')).toEqual({
+      name: 'token',
+      pipeline: [],
+      normalized: '{{token}}',
+    });
+  });
+
+  test('one recognised transform', () => {
+    expect(parseReference('token | upper')).toEqual({
+      name: 'token',
+      pipeline: ['upper'],
+      normalized: '{{token | upper}}',
+    });
+  });
+
+  test('three chained recognised transforms', () => {
+    expect(parseReference('token | base64 | upper | lower')).toEqual({
+      name: 'token',
+      pipeline: ['base64', 'upper', 'lower'],
+      normalized: '{{token | base64 | upper | lower}}',
+    });
+  });
+
+  test('an unrecognised segment falls back to treating the whole input as the name', () => {
+    expect(parseReference('token | base46')).toEqual({
+      name: 'token | base46',
+      pipeline: [],
+      normalized: '{{token | base46}}',
+    });
+  });
+
+  test('an empty name before the pipe falls back to the whole input as the name', () => {
+    expect(parseReference('| upper')).toEqual({
+      name: '| upper',
+      pipeline: [],
+      normalized: '{{| upper}}',
+    });
+  });
+
+  test('a whitespace-only segment is not a recognised transform, so the whole input is the name', () => {
+    expect(parseReference('token |   ')).toEqual({
+      name: 'token |   ',
+      pipeline: [],
+      normalized: '{{token |   }}',
+    });
+  });
+
+  test('normalized is stable across spacing variants — the property D9’s masking placeholder depends on', () => {
+    // Three spellings of the same span (differing only in whitespace around the name and the
+    // pipe) must produce the exact same normalized placeholder, so two spellings of one span do
+    // not produce two placeholders for identical wire bytes.
+    const variants = ['token|upper', 'token | upper', 'token   |   upper'].map(
+      (v) => parseReference(v).normalized,
+    );
+    expect(new Set(variants).size).toBe(1);
+    expect(variants[0]).toBe('{{token | upper}}');
+  });
+});
+
+// P17 D7: each transform's own round trip and its failure mode, plus the two byte-level traps the
+// table calls out by name — bare `btoa` throwing on a non-ASCII value, and base64-valid-but-
+// invalid-UTF-8 input to base64decode.
+describe('http/substitute.ts transforms (P17 D7)', () => {
+  test('base64 round-trips through base64decode', () => {
+    expect(applyPipeline(['base64'], 'abc123')).toBe('YWJjMTIz');
+    expect(applyPipeline(['base64', 'base64decode'], 'abc123')).toBe('abc123');
+  });
+
+  test('base64 over a non-ASCII value does not throw the way bare btoa would', () => {
+    // '日' (U+65E5) has a code point > 255 — bare `btoa('日')` throws a DOMException/RangeError.
+    // Routing through TextEncoder first (D7) is what makes this agree with Go's
+    // base64.StdEncoding.EncodeToString([]byte(s)), which happily encodes the UTF-8 bytes.
+    expect(applyPipeline(['base64'], '日')).toBe('5pel');
+    expect(applyPipeline(['base64', 'base64decode'], '日')).toBe('日');
+  });
+
+  test('base64decode fails (not throws) on invalid base64', () => {
+    expect(applyPipeline(['base64decode'], '!!!not-base64!!!')).toBeNull();
+  });
+
+  test('base64decode fails on valid base64 that decodes to invalid UTF-8', () => {
+    // "/w==" is valid base64 for the single byte 0xFF, which is not valid UTF-8 on its own —
+    // TextDecoder('utf-8', {fatal: true}) is what makes this a failure (D5), matching Go's
+    // separate utf8.Valid check after a successful base64 decode.
+    expect(applyPipeline(['base64decode'], '/w==')).toBeNull();
+  });
+
+  test('upper/lower round-trip and never fail', () => {
+    expect(applyPipeline(['upper'], 'aB3')).toBe('AB3');
+    expect(applyPipeline(['lower'], 'aB3')).toBe('ab3');
+  });
+
+  test('urlencode/urldecode round-trip, space as +', () => {
+    expect(applyPipeline(['urlencode'], 'a b+c')).toBe('a+b%2Bc');
+    expect(applyPipeline(['urlencode', 'urldecode'], 'a b+c')).toBe('a b+c');
+  });
+
+  test('urldecode fails on a malformed % escape', () => {
+    expect(applyPipeline(['urldecode'], '%zz')).toBeNull();
+  });
+
+  test('an empty pipeline returns the value unchanged', () => {
+    expect(applyPipeline([], 'unchanged')).toBe('unchanged');
+  });
+});
+
+// P17 D11 (finding 4 extended): `|` joins the URL-unsafe set alongside space/&/#/= — a pipeline
+// that never resolves (an unknown name piped through a real transform name) must not put a raw
+// `|` into a request line either.
+describe('http/substitute.ts sanitizeUrlSpan pipe handling (P17 D11)', () => {
+  test('an unresolved piped reference in a URL is sanitized, pipe included, and the URL still parses', () => {
+    const result = resolve(
+      'https://api.example.com/orders?a={{missing | upper}}&b=2',
+      {},
+      [],
+      undefined,
+      sanitizeUrlSpan,
+    );
+    expect(result.text).toBe('https://api.example.com/orders?a={{missing%20%7C%20upper}}&b=2');
+    expect(result.refs).toEqual([{ name: 'missing', kind: 'unknown', pipeline: ['upper'] }]);
+    const parsed = new URL(result.text);
+    expect(parsed.searchParams.get('b')).toBe('2');
   });
 });

@@ -2,18 +2,32 @@
   {
     "name": "plain substitution",
     "template": "Bearer {{token}}",
-    "values": { "token": "abc123" },
+    "values": {
+      "token": "abc123"
+    },
     "secrets": [],
     "want": "Bearer abc123",
-    "refs": [{ "name": "token", "kind": "resolved" }]
+    "refs": [
+      {
+        "name": "token",
+        "kind": "resolved"
+      }
+    ]
   },
   {
     "name": "a name needing trimming",
     "template": "{{ token }}",
-    "values": { "token": "abc123" },
+    "values": {
+      "token": "abc123"
+    },
     "secrets": [],
     "want": "abc123",
-    "refs": [{ "name": "token", "kind": "resolved" }]
+    "refs": [
+      {
+        "name": "token",
+        "kind": "resolved"
+      }
+    ]
   },
   {
     "name": "an unknown name",
@@ -21,7 +35,12 @@
     "values": {},
     "secrets": [],
     "want": "{{missing}}",
-    "refs": [{ "name": "missing", "kind": "unknown" }]
+    "refs": [
+      {
+        "name": "missing",
+        "kind": "unknown"
+      }
+    ]
   },
   {
     "name": "a secret name is deferred, never resolved from values",
@@ -29,7 +48,12 @@
     "values": {},
     "secrets": ["apiKey"],
     "want": "{{apiKey}}",
-    "refs": [{ "name": "apiKey", "kind": "deferred" }]
+    "refs": [
+      {
+        "name": "apiKey",
+        "kind": "deferred"
+      }
+    ]
   },
   {
     "name": "a $-prefixed name is dynamic, left verbatim",
@@ -37,7 +61,12 @@
     "values": {},
     "secrets": [],
     "want": "{{$randomEmail}}",
-    "refs": [{ "name": "$randomEmail", "kind": "dynamic" }]
+    "refs": [
+      {
+        "name": "$randomEmail",
+        "kind": "dynamic"
+      }
+    ]
   },
   {
     "name": "empty braces are literal, not a reference",
@@ -50,7 +79,9 @@
   {
     "name": "an unterminated open brace is literal",
     "template": "a {{b",
-    "values": { "b": "x" },
+    "values": {
+      "b": "x"
+    },
     "secrets": [],
     "want": "a {{b",
     "refs": []
@@ -66,58 +97,116 @@
   {
     "name": "a resolved value carrying {{x}} is not re-expanded",
     "template": "{{a}}",
-    "values": { "a": "{{b}}", "b": "x" },
+    "values": {
+      "a": "{{b}}",
+      "b": "x"
+    },
     "secrets": [],
     "want": "{{b}}",
-    "refs": [{ "name": "a", "kind": "resolved" }]
+    "refs": [
+      {
+        "name": "a",
+        "kind": "resolved"
+      }
+    ]
   },
   {
     "name": "two references in one string",
     "template": "{{a}}-{{b}}",
-    "values": { "a": "1", "b": "2" },
+    "values": {
+      "a": "1",
+      "b": "2"
+    },
     "secrets": [],
     "want": "1-2",
-    "refs": [{ "name": "a", "kind": "resolved" }, { "name": "b", "kind": "resolved" }]
+    "refs": [
+      {
+        "name": "a",
+        "kind": "resolved"
+      },
+      {
+        "name": "b",
+        "kind": "resolved"
+      }
+    ]
   },
   {
     "name": "two references adjacent with no separator",
     "template": "{{a}}{{b}}",
-    "values": { "a": "1", "b": "2" },
+    "values": {
+      "a": "1",
+      "b": "2"
+    },
     "secrets": [],
     "want": "12",
-    "refs": [{ "name": "a", "kind": "resolved" }, { "name": "b", "kind": "resolved" }]
+    "refs": [
+      {
+        "name": "a",
+        "kind": "resolved"
+      },
+      {
+        "name": "b",
+        "kind": "resolved"
+      }
+    ]
   },
   {
     "name": "a name with a space",
     "template": "{{base url}}",
-    "values": { "base url": "https://api.example.com" },
+    "values": {
+      "base url": "https://api.example.com"
+    },
     "secrets": [],
     "want": "https://api.example.com",
-    "refs": [{ "name": "base url", "kind": "resolved" }]
+    "refs": [
+      {
+        "name": "base url",
+        "kind": "resolved"
+      }
+    ]
   },
   {
     "name": "a name with a hyphen",
     "template": "{{x-api-key}}",
-    "values": { "x-api-key": "shh" },
+    "values": {
+      "x-api-key": "shh"
+    },
     "secrets": [],
     "want": "shh",
-    "refs": [{ "name": "x-api-key", "kind": "resolved" }]
+    "refs": [
+      {
+        "name": "x-api-key",
+        "kind": "resolved"
+      }
+    ]
   },
   {
     "name": "a value carrying &, < and \" survives byte-for-byte, unescaped",
     "template": "{{v}}",
-    "values": { "v": "<a>&\"" },
+    "values": {
+      "v": "<a>&\""
+    },
     "secrets": [],
     "want": "<a>&\"",
-    "refs": [{ "name": "v", "kind": "resolved" }]
+    "refs": [
+      {
+        "name": "v",
+        "kind": "resolved"
+      }
+    ]
   },
   {
-    "name": "nesting is not a thing — {{a{{b}}}} takes a{{b as the name, finds nothing, passes through literally",
+    "name": "nesting is not a thing \u2014 {{a{{b}}}} takes a{{b as the name, finds nothing, passes through literally",
     "template": "{{a{{b}}}}",
     "values": {},
     "secrets": [],
     "want": "{{a{{b}}}}",
-    "refs": [{ "name": "a{{b", "kind": "unknown" }]
+    "refs": [
+      {
+        "name": "a{{b",
+        "kind": "unknown"
+      }
+    ]
   },
   {
     "name": "the empty string has no references",
@@ -134,5 +223,113 @@
     "secrets": [],
     "want": "https://api.example.com/v1/orders",
     "refs": []
+  },
+  {
+    "name": "P17 D6/D7: a piped value is transformed left to right (base64)",
+    "template": "{{token | base64}}",
+    "values": {
+      "token": "abc123"
+    },
+    "secrets": [],
+    "want": "YWJjMTIz",
+    "refs": [
+      {
+        "name": "token",
+        "kind": "resolved",
+        "pipeline": ["base64"]
+      }
+    ]
+  },
+  {
+    "name": "P17 D6: a piped secret is left verbatim, byte-for-byte as typed (deferred)",
+    "template": "{{token | base64}}",
+    "values": {},
+    "secrets": ["token"],
+    "want": "{{token | base64}}",
+    "refs": [
+      {
+        "name": "token",
+        "kind": "deferred",
+        "pipeline": ["base64"]
+      }
+    ]
+  },
+  {
+    "name": "P17 D3: whitespace around the name and the pipe does not change the parse",
+    "template": "{{ token|upper }}",
+    "values": {
+      "token": "abc123"
+    },
+    "secrets": [],
+    "want": "ABC123",
+    "refs": [
+      {
+        "name": "token",
+        "kind": "resolved",
+        "pipeline": ["upper"]
+      }
+    ]
+  },
+  {
+    "name": "P17 D7: chained transforms apply left to right",
+    "template": "{{token | base64 | upper}}",
+    "values": {
+      "token": "abc123"
+    },
+    "secrets": [],
+    "want": "YWJJMTIZ",
+    "refs": [
+      {
+        "name": "token",
+        "kind": "resolved",
+        "pipeline": ["base64", "upper"]
+      }
+    ]
+  },
+  {
+    "name": "P17 D3 rule 4: an unrecognised transform segment makes the whole span the name",
+    "template": "{{token | base46}}",
+    "values": {
+      "token": "abc123"
+    },
+    "secrets": [],
+    "want": "{{token | base46}}",
+    "refs": [
+      {
+        "name": "token | base46",
+        "kind": "unknown"
+      }
+    ]
+  },
+  {
+    "name": "P17 D3 rule 4: a variable literally named a|b still resolves (backward compatibility)",
+    "template": "{{a|b}}",
+    "values": {
+      "a|b": "resolved-value"
+    },
+    "secrets": [],
+    "want": "resolved-value",
+    "refs": [
+      {
+        "name": "a|b",
+        "kind": "resolved"
+      }
+    ]
+  },
+  {
+    "name": "P17 D5: a transform that cannot be applied leaves the span verbatim and is unknown",
+    "template": "{{token | base64decode}}",
+    "values": {
+      "token": "!!!not-base64!!!"
+    },
+    "secrets": [],
+    "want": "{{token | base64decode}}",
+    "refs": [
+      {
+        "name": "token",
+        "kind": "unknown",
+        "pipeline": ["base64decode"]
+      }
+    ]
   }
 ]

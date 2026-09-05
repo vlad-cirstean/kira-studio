@@ -6,7 +6,10 @@
 // both are one package's src/http/ tree, this is the one exported copy.
 import { splitTemplateSpans } from './substitute';
 
-function escapeLiteral(s: string): string {
+// P17 D7: exported (was file-local `escapeLiteral`) so `transforms.ts`'s `urlencode` transform can
+// reuse this repo's own byte-for-byte match of Go's `url.QueryEscape` rather than re-deriving it —
+// the whole reason that transform is cheap to get right.
+export function goQueryEscapeLiteral(s: string): string {
   return encodeURIComponent(s)
     .replace(/[!*'()]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`)
     .replace(/%20/g, '+');
@@ -18,6 +21,6 @@ function escapeLiteral(s: string): string {
 // span is left untouched; only the literal spans around it are escaped.
 export function goQueryEscape(s: string): string {
   return splitTemplateSpans(s)
-    .map((span) => (span.isReference ? span.text : escapeLiteral(span.text)))
+    .map((span) => (span.isReference ? span.text : goQueryEscapeLiteral(span.text)))
     .join('');
 }

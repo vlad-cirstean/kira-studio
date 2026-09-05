@@ -26,13 +26,15 @@ export {
   isDynamicName,
   loadDynamicGenerator,
 } from './http/dynamic/catalog';
-export { goQueryEscape } from './http/escape';
+export { goQueryEscape, goQueryEscapeLiteral } from './http/escape';
 export { type HeaderCompletion, WELL_KNOWN_REQUEST_HEADERS } from './http/headers';
 export { canEditAsRaw, generateRawRequest } from './http/raw/generate';
 export { type ParsedRawRequest, parseRawRequest, type RawWarning } from './http/raw/parse';
 export { fromSavedRequest, isDirty, toBuilderMethod, toSavedRequest } from './http/saved';
 export {
   classifyReference,
+  type ParsedReference,
+  parseReference,
   type Reference,
   type ReferenceKind,
   resolve,
@@ -46,6 +48,12 @@ export {
   type ResolvedRequest,
   substituteBody,
 } from './http/substituteRequest';
+export {
+  applyPipeline,
+  isTransformName,
+  TRANSFORM_NAMES,
+  type TransformName,
+} from './http/transforms';
 export {
   buildQuery,
   httpRequestTitle,
