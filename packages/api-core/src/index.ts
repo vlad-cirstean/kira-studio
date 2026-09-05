@@ -21,9 +21,13 @@ export { type CurlRequest, toCurl } from './http/curl/generate';
 export { type ParsedCurl, parseCurl } from './http/curl/parse';
 export { type CurlWarning, type CurlWarningKind, tokenize } from './http/curl/tokenize';
 export {
+  ALIAS_TO_FAKE,
   DYNAMIC_NAMES,
   type DynamicName,
+  FAKE_NAMES,
+  type FakeName,
   isDynamicName,
+  isFakeName,
   loadDynamicGenerator,
 } from './http/dynamic/catalog';
 export { goQueryEscape, goQueryEscapeLiteral } from './http/escape';
@@ -33,6 +37,7 @@ export { type ParsedRawRequest, parseRawRequest, type RawWarning } from './http/
 export { fromSavedRequest, isDirty, toBuilderMethod, toSavedRequest } from './http/saved';
 export {
   classifyReference,
+  isDynamicReference,
   type ParsedReference,
   parseReference,
   type Reference,

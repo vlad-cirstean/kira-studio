@@ -1,92 +1,109 @@
-// P6 D4/D5: the lazy half of the dynamic-value vocabulary — statically imports `./fakerEntry`
-// (fine here: this module itself is reached only through `catalog.ts`'s dynamic `import()`), and
-// exports one `Record<DynamicName, (f: Faker) => string>` entry per D4's catalogue.
+// P6 D4/D5, re-keyed by P17 D12: the lazy half of the dynamic-value vocabulary — statically
+// imports `./fakerEntry` (fine here: this module itself is reached only through `catalog.ts`'s
+// dynamic `import()`), and exports one `Record<FakeName, (f: Faker) => string>` entry per D12's
+// catalogue — one generator per faker capability, addressed by its `fake.module.method` name
+// rather than by every Postman spelling that reaches it.
 //
-// F12: this is the other half of the compile-time exhaustiveness guarantee `catalog.ts` sets up —
-// `Record<DynamicName, ...>` over a `const`-asserted tuple's derived union means a tuple entry with
-// no record line, or a record line whose key is not a tuple entry, is a `tsc` error, not something
-// a test has to catch. That is why this file has no accompanying unit test (§6.2/AGENTS.md: a
-// 58-entry map of one-line faker calls whose completeness the compiler already proves is exactly
-// the "thin pass-through wrapper" category that earns nothing).
+// F12/D12: this is the other half of the compile-time exhaustiveness guarantee `catalog.ts` sets
+// up — `Record<FakeName, ...>` over a `const`-asserted tuple's derived union means a tuple entry
+// with no record line, or a record line whose key is not a tuple entry, is a `tsc` error, not
+// something a test has to catch. That is why this file has no accompanying unit test (§6.2/
+// AGENTS.md: a 57-entry map of one-line faker calls whose completeness the compiler already
+// proves is exactly the "thin pass-through wrapper" category that earns nothing).
 //
 // F11: every call below was executed against the installed `@faker-js/faker@10.6.0` before being
-// written down. The five that return a non-string (`$randomInt`, `$randomBoolean`,
-// `$randomLatitude`, `$randomLongitude`) are `String(...)`-wrapped at the call site so the record's
-// value type stays `() => string` throughout.
-import type { DynamicName } from './catalog';
+// written down. The five that return a non-string (`number.int`, `datatype.boolean`,
+// `location.latitude`, `location.longitude`) are `String(...)`-wrapped at the call site so the
+// record's value type stays `() => string` throughout.
+import {
+  ALIAS_TO_FAKE,
+  type DynamicName,
+  type FakeName,
+  isDynamicName,
+  isFakeName,
+} from './catalog';
 import { faker } from './fakerEntry';
 
 type Faker = typeof faker;
 
-export const GENERATORS: Record<DynamicName, (f: Faker) => string> = {
-  $guid: (f) => f.string.uuid(),
-  $randomUUID: (f) => f.string.uuid(),
-  // D9: the clock, not the RNG — Postman defines both as reading the current time, so neither
-  // goes through faker even though they live in this same lazy-loaded record (D7 explains why
-  // they are not split into their own code path).
-  $timestamp: () => String(Math.floor(Date.now() / 1000)),
-  $isoTimestamp: () => new Date().toISOString(),
-  $randomInt: (f) => String(f.number.int({ min: 0, max: 1000 })),
-  $randomBoolean: (f) => String(f.datatype.boolean()),
-  $randomAlphaNumeric: (f) => f.string.alphanumeric(),
-  $randomColor: (f) => f.color.human(),
-  $randomHexColor: (f) => f.color.rgb({ format: 'hex' }),
-  $randomFirstName: (f) => f.person.firstName(),
-  $randomLastName: (f) => f.person.lastName(),
-  $randomFullName: (f) => f.person.fullName(),
-  $randomNamePrefix: (f) => f.person.prefix(),
-  $randomNameSuffix: (f) => f.person.suffix(),
-  $randomJobTitle: (f) => f.person.jobTitle(),
-  $randomPhoneNumber: (f) => f.phone.number(),
-  $randomEmail: (f) => f.internet.email(),
-  $randomExampleEmail: (f) => f.internet.exampleEmail(),
-  $randomUserName: (f) => f.internet.username(),
-  $randomPassword: (f) => f.internet.password(),
-  $randomUrl: (f) => f.internet.url(),
-  $randomDomainName: (f) => f.internet.domainName(),
-  $randomDomainSuffix: (f) => f.internet.domainSuffix(),
-  $randomProtocol: (f) => f.internet.protocol(),
-  $randomIP: (f) => f.internet.ipv4(),
-  $randomIPV6: (f) => f.internet.ipv6(),
-  $randomMACAddress: (f) => f.internet.mac(),
-  $randomUserAgent: (f) => f.internet.userAgent(),
-  $randomSemver: (f) => f.system.semver(),
-  $randomCity: (f) => f.location.city(),
-  $randomCountry: (f) => f.location.country(),
-  $randomCountryCode: (f) => f.location.countryCode(),
-  $randomStreetAddress: (f) => f.location.streetAddress(),
-  $randomLatitude: (f) => String(f.location.latitude()),
-  $randomLongitude: (f) => String(f.location.longitude()),
+export const GENERATORS: Record<FakeName, (f: Faker) => string> = {
+  'fake.string.uuid': (f) => f.string.uuid(),
+  // D9/D12: the clock, not the RNG — Postman defines both $timestamp/$isoTimestamp as reading the
+  // current time, so neither goes through faker even though they live in this same lazy-loaded
+  // record (D7 explains why they are not split into their own code path). The namespace's only
+  // two non-faker entries (D12).
+  'fake.date.timestamp': () => String(Math.floor(Date.now() / 1000)),
+  'fake.date.iso': () => new Date().toISOString(),
+  'fake.number.int': (f) => String(f.number.int({ min: 0, max: 1000 })),
+  'fake.datatype.boolean': (f) => String(f.datatype.boolean()),
+  'fake.string.alphanumeric': (f) => f.string.alphanumeric(),
+  'fake.color.human': (f) => f.color.human(),
+  'fake.color.rgbHex': (f) => f.color.rgb({ format: 'hex' }),
+  'fake.person.firstName': (f) => f.person.firstName(),
+  'fake.person.lastName': (f) => f.person.lastName(),
+  'fake.person.fullName': (f) => f.person.fullName(),
+  'fake.person.prefix': (f) => f.person.prefix(),
+  'fake.person.suffix': (f) => f.person.suffix(),
+  'fake.person.jobTitle': (f) => f.person.jobTitle(),
+  'fake.phone.number': (f) => f.phone.number(),
+  'fake.internet.email': (f) => f.internet.email(),
+  'fake.internet.exampleEmail': (f) => f.internet.exampleEmail(),
+  'fake.internet.username': (f) => f.internet.username(),
+  'fake.internet.password': (f) => f.internet.password(),
+  'fake.internet.url': (f) => f.internet.url(),
+  'fake.internet.domainName': (f) => f.internet.domainName(),
+  'fake.internet.domainSuffix': (f) => f.internet.domainSuffix(),
+  'fake.internet.protocol': (f) => f.internet.protocol(),
+  'fake.internet.ipv4': (f) => f.internet.ipv4(),
+  'fake.internet.ipv6': (f) => f.internet.ipv6(),
+  'fake.internet.mac': (f) => f.internet.mac(),
+  'fake.internet.userAgent': (f) => f.internet.userAgent(),
+  'fake.system.semver': (f) => f.system.semver(),
+  'fake.location.city': (f) => f.location.city(),
+  'fake.location.country': (f) => f.location.country(),
+  'fake.location.countryCode': (f) => f.location.countryCode(),
+  'fake.location.streetAddress': (f) => f.location.streetAddress(),
+  'fake.location.latitude': (f) => String(f.location.latitude()),
+  'fake.location.longitude': (f) => String(f.location.longitude()),
   // D9: dates go through faker and are always ISO-formatted — an HTTP body wants a full
   // timestamp, not P15's column-type-dependent truncation (`generate.ts`'s `formatTemporal`).
-  $randomDatePast: (f) => f.date.past().toISOString(),
-  $randomDateFuture: (f) => f.date.future().toISOString(),
-  $randomDateRecent: (f) => f.date.recent().toISOString(),
-  $randomMonth: (f) => f.date.month(),
-  $randomWeekday: (f) => f.date.weekday(),
-  $randomCompanyName: (f) => f.company.name(),
-  $randomCatchPhrase: (f) => f.company.catchPhrase(),
-  $randomProductName: (f) => f.commerce.productName(),
-  $randomDepartment: (f) => f.commerce.department(),
-  $randomPrice: (f) => f.commerce.price(),
-  $randomCurrencyCode: (f) => f.finance.currencyCode(),
-  $randomBankAccount: (f) => f.finance.accountNumber(),
-  $randomBitcoin: (f) => f.finance.bitcoinAddress(),
-  $randomWord: (f) => f.word.sample(),
-  $randomWords: (f) => f.word.words(),
-  $randomLoremWord: (f) => f.lorem.word(),
-  $randomLoremWords: (f) => f.lorem.words(),
-  $randomLoremSentence: (f) => f.lorem.sentence(),
-  $randomLoremParagraph: (f) => f.lorem.paragraph(),
-  $randomLoremSlug: (f) => f.lorem.slug(),
-  $randomFileName: (f) => f.system.fileName(),
-  $randomFileExt: (f) => f.system.fileExt(),
-  $randomMimeType: (f) => f.system.mimeType(),
+  'fake.date.past': (f) => f.date.past().toISOString(),
+  'fake.date.future': (f) => f.date.future().toISOString(),
+  'fake.date.recent': (f) => f.date.recent().toISOString(),
+  'fake.date.month': (f) => f.date.month(),
+  'fake.date.weekday': (f) => f.date.weekday(),
+  'fake.company.name': (f) => f.company.name(),
+  'fake.company.catchPhrase': (f) => f.company.catchPhrase(),
+  'fake.commerce.productName': (f) => f.commerce.productName(),
+  'fake.commerce.department': (f) => f.commerce.department(),
+  'fake.commerce.price': (f) => f.commerce.price(),
+  'fake.finance.currencyCode': (f) => f.finance.currencyCode(),
+  'fake.finance.accountNumber': (f) => f.finance.accountNumber(),
+  'fake.finance.bitcoinAddress': (f) => f.finance.bitcoinAddress(),
+  'fake.word.sample': (f) => f.word.sample(),
+  'fake.word.words': (f) => f.word.words(),
+  'fake.lorem.word': (f) => f.lorem.word(),
+  'fake.lorem.words': (f) => f.lorem.words(),
+  'fake.lorem.sentence': (f) => f.lorem.sentence(),
+  'fake.lorem.paragraph': (f) => f.lorem.paragraph(),
+  'fake.lorem.slug': (f) => f.lorem.slug(),
+  'fake.system.fileName': (f) => f.system.fileName(),
+  'fake.system.fileExt': (f) => f.system.fileExt(),
+  'fake.system.mimeType': (f) => f.system.mimeType(),
 };
 
 /** `catalog.ts`'s own point of contact with this record — the faker instance lives only in this
  *  module (it is the one place `./fakerEntry` is statically imported), so this is the seam that
- *  lets `catalog.ts` stay faker-free at the type level while still calling into the record. */
-export function generate(name: DynamicName): string {
-  return GENERATORS[name](faker);
+ *  lets `catalog.ts` stay faker-free at the type level while still calling into the record.
+ *
+ *  D12: accepts either spelling — a Postman `$name` (resolved through `ALIAS_TO_FAKE` first) or a
+ *  `fake.` name directly — and returns `null` for anything else, matching D13's "an uncatalogued
+ *  name behaves exactly as if no generator were supplied" contract. */
+export function generate(name: string): string | null {
+  const fakeName: FakeName | undefined = isDynamicName(name)
+    ? ALIAS_TO_FAKE[name as DynamicName]
+    : isFakeName(name)
+      ? name
+      : undefined;
+  return fakeName ? GENERATORS[fakeName](faker) : null;
 }

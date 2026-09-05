@@ -108,20 +108,29 @@ export interface SubstitutionResult {
  * `{{name with spaces}}` from injecting a raw space/`&`/`#`/`=` into `url.Parse`'s RawQuery or the
  * request line itself, without corrupting a name a later pass still needs to match.
  */
+/** P17 D12: a name is dynamic-shaped if it is `$`-prefixed (Postman's own spelling) or
+ *  `fake.`-prefixed (this app's additive, permanent alias namespace — never a migration of the
+ *  former, D12) — the one predicate `classifyReference` below and Go's own resolve.go share,
+ *  rather than two copies of the same two-prefix check drifting apart. */
+export function isDynamicReference(name: string): boolean {
+  return name.startsWith('$') || name.startsWith('fake.');
+}
+
 /** P15b D1: the classification `resolve` gives a name, extracted from its own branch order
- *  (`$`-prefixed → dynamic, then secret → deferred, then a known value → resolved, else unknown)
- *  so the highlighter (`variableHighlight.ts`), the hover (`variableCompletion.ts`) and this
- *  function itself agree, by construction, about what "unknown" means — `resolve` below *calls*
- *  this rather than duplicating the order, which is the whole point (D1's own doc comment). A
- *  `$`-prefixed name is classified 'dynamic' regardless of `isDynamicName` — whether it is
- *  *catalogued* is a presentation detail for the caller (HttpRequestView.vue already does this,
- *  F5), not a fifth kind this function would need to grow. */
+ *  (dynamic-shaped → dynamic, then secret → deferred, then a known value → resolved, else
+ *  unknown) so the highlighter (`variableHighlight.ts`), the hover (`variableCompletion.ts`) and
+ *  this function itself agree, by construction, about what "unknown" means — `resolve` below
+ *  *calls* this rather than duplicating the order, which is the whole point (D1's own doc
+ *  comment). A dynamic-shaped name is classified 'dynamic' regardless of `isDynamicName`/
+ *  `isFakeName` — whether it is *catalogued* is a presentation detail for the caller
+ *  (HttpRequestView.vue already does this, F5), not a fifth kind this function would need to
+ *  grow. */
 export function classifyReference(
   name: string,
   values: Readonly<Record<string, string>>,
   secretNames: readonly string[],
 ): ReferenceKind {
-  if (name.startsWith('$')) return 'dynamic';
+  if (isDynamicReference(name)) return 'dynamic';
   if (secretNames.includes(name)) return 'deferred';
   if (Object.hasOwn(values, name)) return 'resolved';
   return 'unknown';

@@ -331,5 +331,32 @@
         "pipeline": ["base64decode"]
       }
     ]
+  },
+  {
+    "name": "P17 D12: an uncatalogued/unsupplied fake. reference is left verbatim, dynamic",
+    "template": "{{fake.internet.email}}",
+    "values": {},
+    "secrets": [],
+    "want": "{{fake.internet.email}}",
+    "refs": [
+      {
+        "name": "fake.internet.email",
+        "kind": "dynamic"
+      }
+    ]
+  },
+  {
+    "name": "P17 D12: a piped fake. reference with no generator is left verbatim, dynamic, pipeline recorded",
+    "template": "{{fake.internet.email | upper}}",
+    "values": {},
+    "secrets": [],
+    "want": "{{fake.internet.email | upper}}",
+    "refs": [
+      {
+        "name": "fake.internet.email",
+        "kind": "dynamic",
+        "pipeline": ["upper"]
+      }
+    ]
   }
 ]

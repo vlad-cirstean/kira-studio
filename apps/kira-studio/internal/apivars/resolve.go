@@ -17,6 +17,14 @@ const (
 	KindUnknown  ReferenceKind = "unknown"
 )
 
+// IsDynamicReference is the Go twin of packages/api-core/src/http/substitute.ts's own
+// isDynamicReference (P17 D12) — a name is dynamic-shaped if it is `$`-prefixed (Postman's own
+// spelling) or `fake.`-prefixed (this app's additive, permanent alias namespace, never a
+// migration of the former).
+func IsDynamicReference(name string) bool {
+	return strings.HasPrefix(name, "$") || strings.HasPrefix(name, "fake.")
+}
+
 // Reference is one {{name}} reference Resolve found, and how it was classified.
 type Reference struct {
 	Name string
@@ -173,10 +181,11 @@ func resolveWithSanitizer(text string, values map[string]string, secretNames []s
 		}
 
 		switch {
-		case strings.HasPrefix(name, "$"):
-			// D6 dynamic row: Go never generates a `{{$name}}` value itself (P6's generator is
-			// JS-only) — so a dynamic reference here is always left verbatim, with its own
-			// pipeline untouched, exactly as stage 1's own uncatalogued-generator branch does.
+		case IsDynamicReference(name):
+			// D6 dynamic row: Go never generates a `{{$name}}`/`{{fake.x.y}}` value itself (P6's
+			// generator is JS-only) — so a dynamic reference here is always left verbatim, with
+			// its own pipeline untouched, exactly as stage 1's own uncatalogued-generator branch
+			// does.
 			pushRef(KindDynamic)
 			out.WriteString(sanitizeOrVerbatim(span))
 		case secrets[name]:
