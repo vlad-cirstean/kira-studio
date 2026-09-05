@@ -14,9 +14,12 @@ import (
 // insert-then-trim/global-sweep pattern, following a precedent rather than duplicating an
 // abstraction that exists), the fourth (maxGrpcStoredMessages) is genuinely new.
 const (
-	maxGrpcMessageBytes    = 64 * 1024
-	maxGrpcStoredMessages  = 100
-	grpcHistoryPerScopeCap = 20
+	maxGrpcMessageBytes   = 64 * 1024
+	maxGrpcStoredMessages = 100
+	// grpcHistoryPerScopeCap is P18 D4's raise from 20 to 30 — mirrored into TS as
+	// GRPC_HISTORY_PER_SCOPE_LIMIT (packages/shared/domain/grpc-history.ts) and pinned equal by
+	// tests/unit/go-ts-vocabulary-parity.spec.ts.
+	grpcHistoryPerScopeCap = 30
 )
 
 // grpcHistoryByteBudget is D11's table-wide ceiling — a quarter of api_response_history's
@@ -34,15 +37,16 @@ type GrpcHistoryRepo struct {
 // reason storedSnapshot (response_history.go) leaves it out: Get rebuilds it from the row's own
 // summary columns, so there is no second copy of the same fact to drift from what List reads.
 type storedGrpcSnapshot struct {
-	Target         string                          `json:"target"`
-	Method         string                          `json:"method"`
-	Streaming      string                          `json:"streaming"`
-	Message        string                          `json:"message"`
-	Metadata       []model.SavedGrpcMetaRow        `json:"metadata"`
-	Messages       []model.GrpcCallSnapshotMessage `json:"messages"`
-	MessagesElided bool                            `json:"messagesElided"`
-	Header         []model.SavedGrpcMetaRow        `json:"header"`
-	Trailer        []model.SavedGrpcMetaRow        `json:"trailer"`
+	Target                  string                          `json:"target"`
+	Method                  string                          `json:"method"`
+	Streaming               string                          `json:"streaming"`
+	Message                 string                          `json:"message"`
+	RequestMessageTruncated bool                            `json:"requestMessageTruncated"`
+	Metadata                []model.SavedGrpcMetaRow        `json:"metadata"`
+	Messages                []model.GrpcCallSnapshotMessage `json:"messages"`
+	MessagesElided          bool                            `json:"messagesElided"`
+	Header                  []model.SavedGrpcMetaRow        `json:"header"`
+	Trailer                 []model.SavedGrpcMetaRow        `json:"trailer"`
 }
 
 // Record is the whole storage policy (D11), in one transaction: apply the four caps, marshal,
@@ -70,6 +74,22 @@ func (r *GrpcHistoryRepo) Record(rec model.GrpcCallHistoryRecord) error {
 		}
 	}
 
+	// D7/F9a: the request message, capped at 256 KiB — response_history.go's own
+	// maxHistoryBodyBytes (same package: "the request body a user typed" is one policy, not two).
+	// This was the one free-form string in either history table with no per-entry cap at all, which
+	// broke the global sweep's own safety invariant (F9a) — the sweep is safe only because no
+	// single row can exceed its budget, and an uncapped multi-MiB request message could make the
+	// running-sum window match zero rows, deleting the entire table including the row just
+	// inserted. maxGrpcMessageBytes (64 KiB) stays reserved for *response* messages, of which a
+	// call can store up to maxGrpcStoredMessages of; a request message is exactly one per entry, so
+	// it gets HTTP's own request-body cap instead.
+	message := rec.Message
+	requestMessageTruncated := false
+	if len(message) > maxHistoryBodyBytes {
+		message = message[:maxHistoryBodyBytes]
+		requestMessageTruncated = true
+	}
+
 	messages := make([]model.GrpcCallSnapshotMessage, 0, len(rec.Messages))
 	for _, m := range rec.Messages {
 		if len(messages) >= maxGrpcStoredMessages {
@@ -89,7 +109,7 @@ func (r *GrpcHistoryRepo) Record(rec model.GrpcCallHistoryRecord) error {
 
 	snap := storedGrpcSnapshot{
 		Target: rec.Target, Method: rec.Method, Streaming: rec.Streaming,
-		Message: rec.Message, Metadata: rec.Metadata,
+		Message: message, RequestMessageTruncated: requestMessageTruncated, Metadata: rec.Metadata,
 		Messages: messages, MessagesElided: messagesElided,
 		Header: rec.Header, Trailer: rec.Trailer,
 	}
@@ -233,7 +253,8 @@ func (r *GrpcHistoryRepo) Get(id string) (model.GrpcCallSnapshot, error) {
 
 	return model.GrpcCallSnapshot{
 		Entry: e, Target: snap.Target, Method: snap.Method, Streaming: snap.Streaming,
-		Message: snap.Message, Metadata: snap.Metadata,
+		Message: snap.Message, RequestMessageTruncated: snap.RequestMessageTruncated,
+		Metadata: snap.Metadata,
 		Messages: snap.Messages, MessagesElided: snap.MessagesElided,
 		Header: snap.Header, Trailer: snap.Trailer,
 	}, nil

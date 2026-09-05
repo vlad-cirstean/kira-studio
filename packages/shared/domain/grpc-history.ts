@@ -4,6 +4,10 @@
 // result is runtime-only), so neither earns a Zod-parse boundary.
 import type { GrpcMessageWire, GrpcMetaPairWire } from './grpc';
 
+// P18 D4: mirrors repos/grpc_history.go's own grpcHistoryPerScopeCap, pinned equal by
+// tests/unit/go-ts-vocabulary-parity.spec.ts.
+export const GRPC_HISTORY_PER_SCOPE_LIMIT = 30;
+
 // The list row — no message content, ever (D11's List projection never selects snapshot_json).
 export interface GrpcCallHistoryEntry {
   id: string;
@@ -37,6 +41,9 @@ export interface GrpcCallSnapshot {
   method: string;
   streaming: 'unary' | 'server';
   message: string;
+  // P18 D7: the request message was stored truncated at the 256 KiB per-entry cap — mirrors
+  // ResponseHistorySnapshot's own requestBodyStorageTruncated.
+  requestMessageTruncated: boolean;
   metadata: GrpcMetaPairWire[];
   messages: GrpcCallHistoryMessage[];
   // D11's own "showing the first 100 of N" flag — the true count is entry.messageCount.

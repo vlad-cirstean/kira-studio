@@ -87,16 +87,20 @@ type GrpcCallSnapshotMessage struct {
 // columns (mirrors ResponseHistorySnapshot's own D4), the stage-1 request, every message this
 // phase chose to keep, and D11's own storage-cap flags.
 type GrpcCallSnapshot struct {
-	Entry          GrpcCallHistoryEntry      `json:"entry"`
-	Target         string                    `json:"target"`
-	Method         string                    `json:"method"`
-	Streaming      string                    `json:"streaming"`
-	Message        string                    `json:"message"` // the stage-1 request JSON the user authored
-	Metadata       []SavedGrpcMetaRow        `json:"metadata"`
-	Messages       []GrpcCallSnapshotMessage `json:"messages"`
-	MessagesElided bool                      `json:"messagesElided"`
-	Header         []SavedGrpcMetaRow        `json:"header"`
-	Trailer        []SavedGrpcMetaRow        `json:"trailer"`
+	Entry     GrpcCallHistoryEntry `json:"entry"`
+	Target    string               `json:"target"`
+	Method    string               `json:"method"`
+	Streaming string               `json:"streaming"`
+	Message   string               `json:"message"` // the stage-1 request JSON the user authored
+	// RequestMessageTruncated (P18 D7): the request message was stored truncated at the 256 KiB
+	// per-entry cap (repos/grpc_history.go's own maxHistoryBodyBytes reuse) — mirrors
+	// ResponseHistorySnapshot's own requestBodyStorageTruncated.
+	RequestMessageTruncated bool                      `json:"requestMessageTruncated"`
+	Metadata                []SavedGrpcMetaRow        `json:"metadata"`
+	Messages                []GrpcCallSnapshotMessage `json:"messages"`
+	MessagesElided          bool                      `json:"messagesElided"`
+	Header                  []SavedGrpcMetaRow        `json:"header"`
+	Trailer                 []SavedGrpcMetaRow        `json:"trailer"`
 }
 
 // GrpcCallHistoryRecord is Record's one argument — the bridge's own call site builds this from

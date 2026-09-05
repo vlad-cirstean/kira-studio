@@ -30,7 +30,7 @@ func grpcRec(itemID, tabID string, messages int) model.GrpcCallHistoryRecord {
 	}
 }
 
-// ---- 1. The per-scope count cap: 25 recorded against one item_id leaves the 20 newest ----
+// ---- 1. The per-scope count cap: 35 recorded against one item_id leaves the 30 newest (P18 D4) ----
 
 func TestGrpcHistoryPerScopeCountCap(t *testing.T) {
 	r := newGrpcHistoryRepo(t)
@@ -44,7 +44,7 @@ func TestGrpcHistoryPerScopeCountCap(t *testing.T) {
 		t.Fatalf("CreateGrpcItem: %v", err)
 	}
 
-	for i := 0; i < 25; i++ {
+	for i := 0; i < 35; i++ {
 		if err := r.Record(grpcRec(item.ID, "tab1", 1)); err != nil {
 			t.Fatalf("Record(%d): %v", i, err)
 		}
@@ -54,8 +54,8 @@ func TestGrpcHistoryPerScopeCountCap(t *testing.T) {
 	if err != nil {
 		t.Fatalf("List: %v", err)
 	}
-	if len(entries) != 20 {
-		t.Fatalf("List returned %d entries, want 20", len(entries))
+	if len(entries) != 30 {
+		t.Fatalf("List returned %d entries, want 30", len(entries))
 	}
 }
 
@@ -91,6 +91,65 @@ func TestGrpcHistoryPerMessageTruncation(t *testing.T) {
 	}
 	if len(snap.Messages[0].JSON) != 64*1024 {
 		t.Errorf("stored message = %d bytes, want exactly the 64 KiB cap", len(snap.Messages[0].JSON))
+	}
+}
+
+// ---- 2b. The request message cap (P18 D7/F9a): a 1 MiB request message is stored at 256 KiB,
+// flagged; a 64 KiB one is stored whole, unflagged ----
+
+func TestGrpcHistoryRequestMessageTruncation(t *testing.T) {
+	r := newGrpcHistoryRepo(t)
+
+	bigMessage := `{"text":"` + strings.Repeat("x", 1024*1024) + `"}`
+	rec := grpcRec("", "tab1", 0)
+	rec.Message = bigMessage
+	if err := r.Record(rec); err != nil {
+		t.Fatalf("Record: %v", err)
+	}
+
+	entries, err := r.List("tab:tab1")
+	if err != nil || len(entries) != 1 {
+		t.Fatalf("List: %d entries, err %v", len(entries), err)
+	}
+	snap, err := r.Get(entries[0].ID)
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	if !snap.RequestMessageTruncated {
+		t.Error("RequestMessageTruncated = false, want true")
+	}
+	if len(snap.Message) != 256*1024 {
+		t.Errorf("stored request message = %d bytes, want exactly the 256 KiB cap", len(snap.Message))
+	}
+	// Every other field survives intact — the cap touches only Message.
+	if snap.Target != rec.Target || snap.Method != rec.Method {
+		t.Error("Target/Method were not preserved alongside the truncated message")
+	}
+}
+
+func TestGrpcHistoryRequestMessageUnderCapNotTruncated(t *testing.T) {
+	r := newGrpcHistoryRepo(t)
+
+	okMessage := `{"text":"` + strings.Repeat("y", 64*1024) + `"}`
+	rec := grpcRec("", "tab1", 0)
+	rec.Message = okMessage
+	if err := r.Record(rec); err != nil {
+		t.Fatalf("Record: %v", err)
+	}
+
+	entries, err := r.List("tab:tab1")
+	if err != nil || len(entries) != 1 {
+		t.Fatalf("List: %d entries, err %v", len(entries), err)
+	}
+	snap, err := r.Get(entries[0].ID)
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	if snap.RequestMessageTruncated {
+		t.Error("RequestMessageTruncated = true, want false (under the cap)")
+	}
+	if snap.Message != okMessage {
+		t.Error("Message was altered even though it is under the cap")
 	}
 }
 
@@ -168,6 +227,37 @@ func TestGrpcHistoryGlobalByteBudgetEvictsOldestAcrossScopes(t *testing.T) {
 	newEntries, err := r.List("tab:tab2")
 	if err != nil || len(newEntries) != 1 {
 		t.Fatalf("List(tab:tab2) = %d entries, err %v, want 1 (the newest must survive)", len(newEntries), err)
+	}
+}
+
+// ---- 5. F9a: an oversized request message must not empty the whole table via the global sweep
+// (the invariant the sweep depends on is that no single row can exceed the budget — D7's cap
+// restores that for the request message, the one free-form field that previously had none) ----
+
+func TestGrpcHistoryOversizedRequestMessageDoesNotEmptyTable(t *testing.T) {
+	r := newGrpcHistoryRepo(t)
+
+	// Shrink the budget far below what even a capped (256 KiB) row costs, reproducing the
+	// pre-D7 hazard: on the old code, an *uncapped* multi-MiB request message would make every
+	// row's running-sum window (newest first) exceed this budget, so the sweep's own
+	// `WHERE running <= ?` would match zero rows and delete the entire table, including the row
+	// just inserted. With D7's cap in place, the row is bounded at ~256 KiB and the budget below
+	// is set well above that, so the row must survive.
+	repos.SetGrpcHistoryByteBudgetForTest(t, 300*1024)
+
+	bigMessage := `{"text":"` + strings.Repeat("x", 2*1024*1024) + `"}` // 2 MiB, far over any per-row budget pre-cap
+	rec := grpcRec("", "tab1", 0)
+	rec.Message = bigMessage
+	if err := r.Record(rec); err != nil {
+		t.Fatalf("Record: %v", err)
+	}
+
+	entries, err := r.List("tab:tab1")
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("List returned %d entries, want 1 (the just-inserted row must survive the sweep)", len(entries))
 	}
 }
 
