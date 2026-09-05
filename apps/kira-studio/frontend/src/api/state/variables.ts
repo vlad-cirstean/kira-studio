@@ -1,6 +1,8 @@
 import type {
   ApiEnvironment,
   ApiVariable,
+  ApiVariableBulkEntry,
+  ApiVariableBulkResult,
   ApiVariableHistoryEntry,
   VariableScope,
 } from '@shared/domain/variables';
@@ -223,6 +225,22 @@ export async function reorderVariables(
 ): Promise<void> {
   await control.variablesReorder(scope, ownerId, ids);
   await loadVariableSetRows(tabId, scope, ownerId);
+}
+
+/** P17 D21-D23/item 5: applies a parsed `.env` entry list atomically (VariablesRepo.ApplyBulk),
+ *  then re-lists — the same "one call, always correct" discipline every other mutation here uses.
+ *  The returned counts are ApplyBulk's own, from the server-side reconcile — BulkVariablesEditor's
+ *  own live summary is computed independently (dotenv.ts#reconcileEnv) for the pre-Apply preview,
+ *  and the two are expected to agree (§4 of the plan). */
+export async function applyBulkVariables(
+  tabId: string,
+  scope: VariableScope,
+  ownerId: string,
+  entries: ApiVariableBulkEntry[],
+): Promise<ApiVariableBulkResult> {
+  const result = await control.variablesApplyBulk(scope, ownerId, entries);
+  await loadVariableSetRows(tabId, scope, ownerId);
+  return result;
 }
 
 export async function reorderEnvironmentsList(ids: string[]): Promise<void> {

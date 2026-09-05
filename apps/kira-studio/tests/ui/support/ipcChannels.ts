@@ -94,6 +94,7 @@ export const IPC = {
   variablesUpsert: 'kira:variables:upsert',
   variablesDelete: 'kira:variables:delete',
   variablesReorder: 'kira:variables:reorder',
+  variablesApplyBulk: 'kira:variables:applyBulk',
   variablesHistory: 'kira:variables:history',
   variablesReveal: 'kira:variables:reveal',
   variablesRevealHistory: 'kira:variables:revealHistory',

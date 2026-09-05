@@ -101,6 +101,7 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   variablesUpsert: 'VariablesService.Upsert',
   variablesDelete: 'VariablesService.Delete',
   variablesReorder: 'VariablesService.Reorder',
+  variablesApplyBulk: 'VariablesService.ApplyBulk',
   variablesHistory: 'VariablesService.History',
   variablesReveal: 'VariablesService.Reveal',
   variablesRevealHistory: 'VariablesService.RevealHistory',

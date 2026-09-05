@@ -10,6 +10,7 @@ import MessageStrip from '../theme/primitives/MessageStrip.vue';
 import PanelSearchBox from '../theme/primitives/PanelSearchBox.vue';
 import TextField from '../theme/primitives/TextField.vue';
 import ViewChrome from '../theme/primitives/ViewChrome.vue';
+import BulkVariablesEditor from './BulkVariablesEditor.vue';
 import { collectionRecord, collectionsState, initCollections } from './state/collections';
 import {
   deleteVariable,
@@ -328,6 +329,18 @@ async function onRemove(id: string): Promise<void> {
 function onHistoryClickFor(row: ApiVariable): void {
   void openHistoryMenu(props.tab.id, scope.value, ownerId.value, row.id);
 }
+
+// ---- bulk `.env` mode (R11, item 5) ----
+//
+// A component-local lens, not tab state (D16's "a lens, not a setting" rule, same as filterQuery
+// above): reopening this tab must never silently resurrect an unapplied text buffer. `v-if` below
+// (not `v-show`) is load-bearing — it means BulkVariablesEditor is freshly mounted every time bulk
+// mode is entered, so its own baseline snapshot is always taken from the rows the table holds *at
+// that moment*, never a stale one from an earlier visit.
+const bulkMode = ref(false);
+function onBulkClose(): void {
+  bulkMode.value = false;
+}
 </script>
 
 <template>
@@ -335,9 +348,19 @@ function onHistoryClickFor(row: ApiVariable): void {
     <ViewChrome :tab="tab" :icon="scope === 'environment' ? 'settings-gear' : 'symbol-variable'" :name="tab.state.name || 'Variables'" :can-refresh="false" :can-stop="false" target-testid="variable-set-target">
       <template #toolbar-2>
         <PanelSearchBox
+          v-if="!bulkMode"
           v-model="filterQuery"
           placeholder="Filter by name"
           testid="variables-filter"
+        />
+        <IconButton
+          v-if="ownerExists"
+          icon="code"
+          :active="bulkMode"
+          aria-label="Edit as .env text"
+          v-tooltip="'Edit as .env text'"
+          data-testid="variables-bulk-toggle"
+          @click="bulkMode = !bulkMode"
         />
       </template>
 
@@ -346,6 +369,14 @@ function onHistoryClickFor(row: ApiVariable): void {
         icon="warning"
         label="This variable set no longer exists"
         data-testid="variable-set-orphan"
+      />
+      <BulkVariablesEditor
+        v-else-if="bulkMode"
+        :tab-id="tab.id"
+        :scope="scope"
+        :owner-id="ownerId"
+        :rows="rows"
+        @close="onBulkClose"
       />
       <div v-else class="p-dialog-body list">
         <MessageStrip v-if="error" tone="err" data-testid="variables-error">
