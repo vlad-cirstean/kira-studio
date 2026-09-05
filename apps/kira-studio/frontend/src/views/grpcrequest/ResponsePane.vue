@@ -1,5 +1,10 @@
 <script setup lang="ts">
-import { GRPC_CODE_NAMES, type GrpcResponsePane, grpcCodeClass } from '@shared/domain/grpc';
+import {
+  GRPC_CODE_NAMES,
+  type GrpcResponsePane,
+  grpcCodeClass,
+  grpcCodeHint,
+} from '@shared/domain/grpc';
 import type { GrpcRequestTabRecord } from '@shared/domain/tabs';
 import { computed, onMounted, ref, watch } from 'vue';
 import { patchGrpcRequestTabState } from '../../api/tabs';
@@ -97,9 +102,12 @@ const trailer = computed(() =>
   viewing.value ? viewing.value.snapshot.trailer : (liveResult.value?.trailer ?? []),
 );
 
-const hasResult = computed(
-  () => !!viewing.value || !!liveResult.value || (rt.value?.status ?? 'idle') !== 'idle',
-);
+// P18 D14: the chip/hint/elapsed/summary group only makes sense once there is a code to show —
+// same gate the template already used for that group, named here so the hint computed can share
+// it without duplicating the condition.
+const hasCode = computed(() => !!liveResult.value || !!viewing.value);
+// P18 D13: the code's own meaning, on its own always-visible line — statusHint's exact shape.
+const codeHint = computed(() => (hasCode.value ? grpcCodeHint(code.value) : ''));
 
 const RESPONSE_PANE_OPTIONS = [
   { value: 'messages' as const, label: 'Messages', testid: 'grpc-response-pane-messages' },
@@ -164,121 +172,123 @@ const viewingTime = computed(() => {
       {{ rt.error.message }}
     </MessageStrip>
 
-    <template v-if="hasResult || hasHistory">
-      <div class="response-status-row p-toolbar">
-        <template v-if="code !== undefined && (liveResult || viewing)">
-          <span class="p-chip" :class="grpcCodeClass(code)" data-testid="grpc-status-chip">
-            {{ codeName }} ({{ code }})
-          </span>
-          <span v-if="statusMessage" class="p-xs muted status-hint" data-testid="grpc-status-message">{{
-            statusMessage
-          }}</span>
-          <span class="p-push" />
-          <span class="p-xs dim" data-testid="grpc-elapsed">{{ elapsedMs }} ms</span>
-          <span class="p-xs dim" data-testid="grpc-message-summary">
-            {{ messageCount }} message{{ messageCount === 1 ? '' : 's' }} · {{ formatBytes(messageBytes) }}
-          </span>
-        </template>
-        <span v-else class="p-push" />
-        <SegmentedControl
-          :model-value="tab.state.responsePane"
-          :options="RESPONSE_PANE_OPTIONS"
-          data-testid="grpc-response-pane-toggle"
-          @update:model-value="setResponsePane"
-        />
-      </div>
+    <!-- P18 D14 (P15 D1's gRPC sibling): the status row, the pane switcher and every strip render
+         from tab-open — only the response-dependent *contents* below stay conditional. A freshly-
+         opened tab used to show no Messages/Metadata/History switcher at all. -->
+    <div class="response-status-row p-toolbar">
+      <template v-if="hasCode">
+        <span class="p-chip" :class="grpcCodeClass(code)" data-testid="grpc-status-chip">
+          {{ codeName }} ({{ code }})
+        </span>
+        <span class="p-push" />
+        <span class="p-xs dim" data-testid="grpc-elapsed">{{ elapsedMs }} ms</span>
+        <span class="p-xs dim" data-testid="grpc-message-summary">
+          {{ messageCount }} message{{ messageCount === 1 ? '' : 's' }} · {{ formatBytes(messageBytes) }}
+        </span>
+      </template>
+      <span v-else class="p-push" />
+      <SegmentedControl
+        :model-value="tab.state.responsePane"
+        :options="RESPONSE_PANE_OPTIONS"
+        data-testid="grpc-response-pane-toggle"
+        @update:model-value="setResponsePane"
+      />
+    </div>
 
-      <MessageStrip v-if="viewing" tone="note" data-testid="grpc-history-band">
-        Viewing the call from {{ viewingTime }} · {{ viewing?.snapshot.method }}
-        <AppButton class="strip-action" data-testid="grpc-history-back" @click="onBackToLatest">
-          {{ rt?.result ? 'Back to latest' : 'Close' }}
-        </AppButton>
-      </MessageStrip>
+    <!-- P18 D13 (P15 D2's gRPC sibling): the code's own meaning, always visible, never truncated —
+         the server's own statusMessage moves to its own line right below it, free to wrap instead
+         of being ellipsised inside the toolbar row it used to share. -->
+    <div v-if="codeHint" class="p-sm muted status-hint" data-testid="grpc-status-hint">{{ codeHint }}</div>
+    <div v-if="statusMessage" class="p-xs dim status-message" data-testid="grpc-status-message">{{ statusMessage }}</div>
 
-      <!-- D11: a streaming call's history entry stores only the first maxGrpcStoredMessages
-           (finding 8) — this is the one place that ever becomes visible now that ServerStream
-           actually fills Messages/MessageCount in. -->
-      <MessageStrip
-        v-if="viewing?.snapshot.messagesElided"
-        tone="note"
-        data-testid="grpc-history-messages-elided"
-      >
-        Showing the first {{ messages.length }} of {{ viewing.snapshot.entry.messageCount }} messages.
-      </MessageStrip>
+    <MessageStrip v-if="viewing" tone="note" data-testid="grpc-history-band">
+      Viewing the call from {{ viewingTime }} · {{ viewing?.snapshot.method }}
+      <AppButton class="strip-action" data-testid="grpc-history-back" @click="onBackToLatest">
+        {{ rt?.result ? 'Back to latest' : 'Close' }}
+      </AppButton>
+    </MessageStrip>
 
-      <MessageStrip
-        v-if="rt?.status === 'cancelled'"
-        tone="warn"
-        data-testid="grpc-stopped-strip"
-      >
-        Stopped after {{ messages.length }} message{{ messages.length === 1 ? '' : 's' }}.
-      </MessageStrip>
+    <!-- D11: a streaming call's history entry stores only the first maxGrpcStoredMessages
+         (finding 8) — this is the one place that ever becomes visible now that ServerStream
+         actually fills Messages/MessageCount in. -->
+    <MessageStrip
+      v-if="viewing?.snapshot.messagesElided"
+      tone="note"
+      data-testid="grpc-history-messages-elided"
+    >
+      Showing the first {{ messages.length }} of {{ viewing.snapshot.entry.messageCount }} messages.
+    </MessageStrip>
 
-      <!-- D15/D17: the live view's own ceiling (state.ts's MAX_LIVE_MESSAGES) — finding 11. -->
-      <MessageStrip
-        v-if="liveMessagesElided"
-        tone="note"
-        data-testid="grpc-live-messages-elided"
-      >
-        Showing the most recent {{ messages.length }} of {{ rt?.trueMessageCount }} messages.
-      </MessageStrip>
+    <MessageStrip
+      v-if="rt?.status === 'cancelled'"
+      tone="warn"
+      data-testid="grpc-stopped-strip"
+    >
+      Stopped after {{ messages.length }} message{{ messages.length === 1 ? '' : 's' }}.
+    </MessageStrip>
 
-      <CallHistoryList v-if="tab.state.responsePane === 'history'" :tab="tab" />
-      <div v-else-if="tab.state.responsePane === 'metadata'" class="metadata-groups" data-testid="grpc-response-metadata">
-        <div class="metadata-group">
-          <div class="metadata-group-title p-xs muted">Header</div>
-          <div v-for="(h, i) in header" :key="`h${i}`" class="p-kv-row">
-            <span class="p-kv-name mono">{{ h.name }}</span>
-            <span class="p-kv-value mono">{{ h.value }}</span>
-          </div>
-          <div v-if="header.length === 0" class="p-xs dim">No header metadata</div>
+    <!-- D15/D17: the live view's own ceiling (state.ts's MAX_LIVE_MESSAGES) — finding 11. -->
+    <MessageStrip
+      v-if="liveMessagesElided"
+      tone="note"
+      data-testid="grpc-live-messages-elided"
+    >
+      Showing the most recent {{ messages.length }} of {{ rt?.trueMessageCount }} messages.
+    </MessageStrip>
+
+    <CallHistoryList v-if="tab.state.responsePane === 'history'" :tab="tab" />
+    <div v-else-if="tab.state.responsePane === 'metadata'" class="metadata-groups" data-testid="grpc-response-metadata">
+      <div class="metadata-group">
+        <div class="metadata-group-title p-xs muted">Header</div>
+        <div v-for="(h, i) in header" :key="`h${i}`" class="p-kv-row">
+          <span class="p-kv-name mono">{{ h.name }}</span>
+          <span class="p-kv-value mono">{{ h.value }}</span>
         </div>
-        <div class="metadata-group">
-          <div class="metadata-group-title p-xs muted">Trailer</div>
-          <div v-for="(t, i) in trailer" :key="`t${i}`" class="p-kv-row">
-            <span class="p-kv-name mono">{{ t.name }}</span>
-            <span class="p-kv-value mono">{{ t.value }}</span>
-          </div>
-          <div v-if="trailer.length === 0" class="p-xs dim">No trailer metadata</div>
-        </div>
+        <div v-if="header.length === 0" class="p-xs dim">No header metadata</div>
       </div>
-      <div v-else class="message-list" data-testid="grpc-message-list">
-        <VirtualList
-          v-if="messages.length > 0"
-          class="message-virtual-list"
-          :items="messages"
-          :row-height="MESSAGE_ROW_HEIGHT"
-          :row-heights="messageRowHeights"
-        >
-          <template #default="{ item: m }">
-            <div class="message-entry" data-testid="grpc-message-entry">
-              <button type="button" class="message-header" @click="toggleExpanded(m.seq)">
-                <span class="p-xs dim" data-testid="grpc-message-offset">+{{ m.offsetMs }} ms</span>
-                <span class="p-xs dim">{{ formatBytes(m.wireBytes) }}</span>
-                <span class="p-push" />
-                <span class="p-xs dim">#{{ m.seq }}</span>
-              </button>
-              <div v-if="expanded.has(m.seq)" class="message-detail">
-                <CodeMirrorHost :doc="m.json" language="json" :read-only="true" />
-              </div>
+      <div class="metadata-group">
+        <div class="metadata-group-title p-xs muted">Trailer</div>
+        <div v-for="(t, i) in trailer" :key="`t${i}`" class="p-kv-row">
+          <span class="p-kv-name mono">{{ t.name }}</span>
+          <span class="p-kv-value mono">{{ t.value }}</span>
+        </div>
+        <div v-if="trailer.length === 0" class="p-xs dim">No trailer metadata</div>
+      </div>
+    </div>
+    <div v-else class="message-list" data-testid="grpc-message-list">
+      <VirtualList
+        v-if="messages.length > 0"
+        class="message-virtual-list"
+        :items="messages"
+        :row-height="MESSAGE_ROW_HEIGHT"
+        :row-heights="messageRowHeights"
+      >
+        <template #default="{ item: m }">
+          <div class="message-entry" data-testid="grpc-message-entry">
+            <button type="button" class="message-header" @click="toggleExpanded(m.seq)">
+              <span class="p-xs dim" data-testid="grpc-message-offset">+{{ m.offsetMs }} ms</span>
+              <span class="p-xs dim">{{ formatBytes(m.wireBytes) }}</span>
+              <span class="p-push" />
+              <span class="p-xs dim">#{{ m.seq }}</span>
+            </button>
+            <div v-if="expanded.has(m.seq)" class="message-detail">
+              <CodeMirrorHost :doc="m.json" language="json" :read-only="true" />
             </div>
-          </template>
-        </VirtualList>
-        <EmptyState v-if="messages.length === 0" icon="arrow-right" label="Call this method to see its response">
-          <button
-            v-if="hasHistory"
-            type="button"
-            class="history-hint-link"
-            data-testid="grpc-history-hint"
-            @click="viewHistory"
-          >
-            {{ historyCount }} past call{{ historyCount === 1 ? '' : 's' }} · View history
-          </button>
-        </EmptyState>
-      </div>
-    </template>
-
-    <EmptyState v-else icon="arrow-right" label="Call this method to see its response" />
+          </div>
+        </template>
+      </VirtualList>
+      <EmptyState v-if="messages.length === 0" icon="arrow-right" label="Call this method to see its response">
+        <button
+          v-if="hasHistory"
+          type="button"
+          class="history-hint-link"
+          data-testid="grpc-history-hint"
+          @click="viewHistory"
+        >
+          {{ historyCount }} past call{{ historyCount === 1 ? '' : 's' }} · View history
+        </button>
+      </EmptyState>
+    </div>
   </div>
 </template>
 
@@ -294,11 +304,14 @@ const viewingTime = computed(() => {
   gap: var(--kira-s-2);
 }
 
+/* P18 D13: no longer the toolbar's own truncatable caption (F13) — free to wrap, like HTTP's own
+   .status-hint (ResponsePane.vue). */
 .status-hint {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  min-width: 0;
+  padding: 0 var(--kira-s-3) var(--kira-s-1);
+}
+
+.status-message {
+  padding: 0 var(--kira-s-3) var(--kira-s-2);
 }
 
 .message-list {

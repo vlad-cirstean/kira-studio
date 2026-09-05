@@ -123,6 +123,36 @@ export function grpcMethodClass(_method: string): 'info' | 'ok' | 'warn' | 'err'
   return 'info';
 }
 
+// P18 D13 (P15 D2's gRPC sibling): a per-code sentence, statusHint's own shape and register
+// (domain/http.ts) — lowercase, no trailing period, a sentence a person can act on. Lives here,
+// not in the view, for grpcCodeClass's own stated reason: http/** may not import views/**, and the
+// collections tree already needs code vocabulary. No Go mirror, matching statusHint.
+export const GRPC_CODE_HINTS: Readonly<Record<number, string>> = {
+  0: 'the call completed',
+  1: 'the call was cancelled before it completed',
+  2: 'the server returned an error it could not classify more specifically',
+  3: 'the server rejected the request message itself',
+  4: 'the call ran past its deadline before the server answered',
+  5: 'the server has no such method or resource',
+  6: 'the resource the call tried to create already exists',
+  7: 'the caller is authenticated but not allowed to make this call',
+  8: 'a resource limit was exceeded, such as a quota or the available disk space',
+  9: 'the system is not in a state required for the call to proceed',
+  10: 'the call was aborted, typically due to a concurrency conflict',
+  11: 'the operation was attempted past the valid range, such as seeking past the end of a file',
+  12: 'the server does not implement this method',
+  13: 'the server encountered an internal invariant violation',
+  14: 'the server could not be reached, or is not accepting calls right now',
+  15: 'unrecoverable data loss or corruption occurred',
+  16: 'the call carried no valid credentials',
+};
+
+/** A per-code sentence, falling back to a generic one for a code outside the table — a code is a
+ *  wire integer, and a server may send one this app does not otherwise recognise. */
+export function grpcCodeHint(code: number): string {
+  return GRPC_CODE_HINTS[code] ?? 'an unrecognised status code';
+}
+
 /** D5: {name, value, enabled} — deliberately the same three fields as httpHeaderSchema
  *  (domain/http.ts) with the same "enabled is builder-state-only" rule (P2 D6), because it is the
  *  same idea and a person moving between the two tabs should not have to learn a second one. Not
