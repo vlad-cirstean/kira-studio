@@ -270,7 +270,15 @@ test('SQL console completes tables, columns and aliases once a DDL document exis
   expect(consoleErrors).toEqual([]);
 });
 
-test('with no DDL document, the console is unchanged (D5)', async ({ relaunch, consoleErrors }) => {
+// P19 D14: the language service's own behaviour with an empty schema is exactly what this phase
+// changes — table names now come from the tree's own cache (consoleRelationNames,
+// mongoCollectionNames' identical technique carried to SQL) even with no DDL document, while
+// column completion still needs one (F25: a table/view is a leaf in the tree, its columns moved
+// into the definition view — the tree has relation names only). Keyword completion is untouched.
+test('with no DDL document, table names still complete from the tree; columns do not (D5/D14)', async ({
+  relaunch,
+  consoleErrors,
+}) => {
   const CONNECTION_ID = 'conn-sql-schema-3';
   const CONNECTION_SUMMARY = postgresConnectionSummary(CONNECTION_ID, 'Schema DB', 'green');
   const CONTROL: ControlSnapshot[] = [
@@ -287,17 +295,30 @@ test('with no DDL document, the console is unchanged (D5)', async ({ relaunch, c
   const { window: page } = await relaunch({ control: CONTROL });
 
   await connectAndExpandPostgres(page, 'Schema DB', 'green');
+  // D14's own supply: the tree's cache of this console's own container — expanding it is what
+  // populates treeState.children, exactly the way opening it in the project tree already would.
+  await expandRow(page, APP_PATH);
   await openConsoleFromMenu(page, APP_PATH);
   const view = page.locator('[data-testid="console-view"]');
   await expect(view).toBeVisible();
 
-  await typeInto(view, page, 'select * from ');
-  await expect(page.locator('.cm-tooltip-autocomplete')).toHaveCount(0, { timeout: 3_000 });
-
-  await page.keyboard.type('sel');
   const tooltip = page.locator('.cm-tooltip-autocomplete');
+  await typeInto(view, page, 'select * from ');
+  await expect(tooltip).toBeVisible({ timeout: 5_000 });
+  await expect(tooltip).toContainText('order_items');
+  await expect(tooltip).toContainText('customers');
+  await page.keyboard.press('Escape');
+
+  // Keyword completion is untouched.
+  await clearAndType(view, page, 'sel');
   await expect(tooltip).toBeVisible({ timeout: 5_000 });
   await expect(tooltip).toContainText('SELECT');
+  await page.keyboard.press('Escape');
+
+  // No column completion — F25's own "columns aren't in the tree" limitation, D15's own reason
+  // to exist.
+  await clearAndType(view, page, 'select * from order_items oi where oi.');
+  await expect(tooltip).toHaveCount(0, { timeout: 3_000 });
 
   expect(consoleErrors).toEqual([]);
 });

@@ -1,6 +1,7 @@
 import { type CompletionSource, snippet } from '@codemirror/autocomplete';
 import type { ConnectionKind } from '@shared/domain/connection';
 import { MONGO_CONSOLE_METHODS } from '@shared/domain/console';
+import { decodePath, encodePath, type PathSegment } from '@shared/domain/tree';
 import { rowKey, treeState } from '../../project/state/tree';
 import {
   MONGO_QUERY_OPERATORS,
@@ -8,7 +9,7 @@ import {
   type MongoValueConstructor,
 } from '../shared/mongoVocabulary';
 import { sqlDialectFor } from '../shared/sqlIdent';
-import type { DdlSchema } from './ddl';
+import { type DdlSchema, EMPTY_DDL_SCHEMA } from './ddl';
 import { sqlCompletionSources } from './sqlLanguageService';
 
 // P27 D17: reuses the same {insert, caretOffsetFromEnd} vocabulary the filter bar's plain
@@ -36,6 +37,37 @@ function mongoCollectionNames(connectionId: string, path: string): string[] {
   if (!segment) return [];
   const nodes = treeState.children[rowKey(connectionId, segment)] ?? [];
   return nodes.filter((n) => n.kind === 'collection').map((n) => n.name);
+}
+
+const RELATION_CONTAINER_KINDS = new Set(['database', 'schema']);
+
+// P19 D14: mongoCollectionNames' own technique, carried to SQL — reads the tree's own cache, no
+// new round trip, no new cache, an empty list is the honest degradation. Walks the console's own
+// path back to the last database:/schema: segment (a table/view/matview console keeps its parent
+// container in its own path; a console opened on the container itself already ends there) and
+// reads whatever that row's own children already are. A console opened from the connection root
+// has no such segment and yields []; project/state/tree.ts's own F19 finding means this can never
+// see 'column' nodes (they moved into the definition view), only relation names.
+export function consoleRelationNames(connectionId: string, path: string): string[] {
+  let segments: PathSegment[];
+  try {
+    segments = decodePath(connectionId, path).segments;
+  } catch {
+    return [];
+  }
+  let cut = -1;
+  for (let i = segments.length - 1; i >= 0; i--) {
+    if (RELATION_CONTAINER_KINDS.has(segments[i]?.kind ?? '')) {
+      cut = i;
+      break;
+    }
+  }
+  if (cut < 0) return [];
+  const containerPath = encodePath(segments.slice(0, cut + 1));
+  const nodes = treeState.children[rowKey(connectionId, containerPath)] ?? [];
+  return nodes
+    .filter((n) => n.kind === 'table' || n.kind === 'view' || n.kind === 'matview')
+    .map((n) => n.name);
 }
 
 // D21: three contextual positions, each independent of the others — offering a method the engine
@@ -157,6 +189,10 @@ export function consoleCompletionSources(
   if (kind === 'mongodb' && connectionId) return [mongoCompletionSource(connectionId, path)];
   if (kind === 'redis') return [redisCompletionSource()];
   const dialect = sqlDialectFor(kind);
-  if (dialect && schema) return sqlCompletionSources(dialect, schema, database);
-  return undefined;
+  if (!dialect) return undefined;
+  // P19 D14: layered now, not all-or-nothing — a DDL document (schema) still wins when one
+  // exists, but a connection with none still gets table-name completion from the tree's own
+  // cache (relations), the same technique mongoCompletionSource already uses for collections.
+  const relations = connectionId ? consoleRelationNames(connectionId, path) : [];
+  return sqlCompletionSources(dialect, schema ?? EMPTY_DDL_SCHEMA, database, relations);
 }
