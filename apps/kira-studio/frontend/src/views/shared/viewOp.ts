@@ -139,6 +139,13 @@ export function applyLoadFailure(
     return;
   }
   if (failure.kind === 'disconnected') {
+    // F10/P21 round 1: left at 'loading' here for four of five views (only console's own
+    // onDisconnected passed 'idle' along) — the ReconnectGate sits behind whatever status was
+    // last set, so a tab that disconnects mid-load stayed on its loading UI behind the gate
+    // instead of the same idle/error state a reconnect-then-load cycle leaves it in anyway. It
+    // self-corrected once onReconnectAndLoad -> load() -> beginOp() ran, but that made the
+    // invariant hold by luck at a distance rather than by construction.
+    rt.status = 'idle';
     opts?.onDisconnected?.();
     unmarkHydrated(tabId);
     return;
