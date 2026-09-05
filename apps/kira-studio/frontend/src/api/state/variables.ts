@@ -210,8 +210,12 @@ function firstWinsByName(rows: ApiVariable[]): Map<string, { value: string; isSe
 
 /** D2's precedence (environment over collection), read from the cache this module keeps in step
  *  with its own dialog edits — a fresh IPC round trip on every keystroke of a live
- *  "unresolved reference" preview would be needless; send()/call() call ensureVariablesLoaded
- *  first so the cache is fresh by the time this runs there. */
+ *  "unresolved reference" preview would be needless. Correction (round-2 review): neither send()
+ *  nor call() calls ensureVariablesLoaded themselves — HttpRequestView.vue/GrpcRequestView.vue
+ *  each fire it, unawaited, on mount and on collection/environment change, well before this ever
+ *  runs for the same tab in the ordinary case. This function does not itself guarantee the cache
+ *  is loaded; a scope this call site has genuinely never seen simply reads as empty here (§0's own
+ *  "an honest unresolved reference is fine" posture), same as before any load ever ran. */
 export function mergedValuesAndSecrets(
   collectionId: string,
   environmentId: string,
