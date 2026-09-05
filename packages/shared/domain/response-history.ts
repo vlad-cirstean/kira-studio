@@ -4,6 +4,11 @@
 // becomes tab state (the response is runtime-only, P2 D6), so neither earns a Zod-parse boundary.
 import type { HttpBodyWire, HttpHeaderWire, HttpResponseWire } from './http';
 
+// P18 D4: mirrors repos/response_history.go's own historyPerScopeLimit, pinned equal by
+// tests/unit/go-ts-vocabulary-parity.spec.ts. The one place a renderer needs the cap's value —
+// "the list is full" is `entries.length >= HISTORY_PER_SCOPE_LIMIT`, not a second hand-written 30.
+export const HISTORY_PER_SCOPE_LIMIT = 30;
+
 // The list row — no body, ever (D4's List projection never selects snapshot_json).
 export interface ResponseHistoryEntry {
   id: string;

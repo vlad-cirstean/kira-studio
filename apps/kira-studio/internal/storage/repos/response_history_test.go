@@ -68,13 +68,13 @@ func rec(itemID, tabID string, status int, body string) model.ResponseHistoryRec
 	}
 }
 
-// ---- 1. The per-scope count cap: 25 recorded against one item_id leaves the 20 newest ----
+// ---- 1. The per-scope count cap: 35 recorded against one item_id leaves the 30 newest (P18 D4) ----
 
 func TestResponseHistoryPerScopeCountCap(t *testing.T) {
 	r, db := newResponseHistoryRepo(t)
 	itemID := newItemFor(t, db)
 
-	for i := 0; i < 25; i++ {
+	for i := 0; i < 35; i++ {
 		if err := r.Record(rec(itemID, "tab1", 200, "body")); err != nil {
 			t.Fatalf("Record(%d): %v", i, err)
 		}
@@ -84,8 +84,8 @@ func TestResponseHistoryPerScopeCountCap(t *testing.T) {
 	if err != nil {
 		t.Fatalf("List: %v", err)
 	}
-	if len(entries) != 20 {
-		t.Fatalf("List returned %d entries, want 20", len(entries))
+	if len(entries) != 30 {
+		t.Fatalf("List returned %d entries, want 30", len(entries))
 	}
 }
 
@@ -244,7 +244,7 @@ func TestResponseHistoryGlobalByteBudgetEvictsOldestAcrossScopes(t *testing.T) {
 	}
 
 	// The property a per-scope cap alone cannot give (D6): item2 never had more than two entries
-	// (well under its own 20-row cap), yet it lost one to the *global* sweep because the two
+	// (well under its own 30-row cap), yet it lost one to the *global* sweep because the two
 	// oldest rows in the whole table happened to belong to two different scopes.
 	e1, err := r.List(item1)
 	if err != nil {
