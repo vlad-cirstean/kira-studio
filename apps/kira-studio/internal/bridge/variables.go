@@ -72,6 +72,18 @@ func (s *VariablesService) DeleteEnvironment(args VariablesEnvironmentIDArgs) er
 	return nil
 }
 
+// DuplicateEnvironment is P17 D17/item 4 — see repos/variables.go's own DuplicateEnvironment.
+func (s *VariablesService) DuplicateEnvironment(args VariablesEnvironmentIDArgs) (model.Environment, error) {
+	if args.ID == "" {
+		return model.Environment{}, ipcerr.BadRequest("id is required")
+	}
+	env, err := s.Deps.Repos.Variables.DuplicateEnvironment(args.ID)
+	if err != nil {
+		return model.Environment{}, ipcerr.Internal(err.Error())
+	}
+	return env, nil
+}
+
 // SetActiveEnvironment's id may be "" — D3: that selects "No environment", the first half of the
 // repo's own transaction alone.
 func (s *VariablesService) SetActiveEnvironment(args VariablesEnvironmentIDArgs) error {

@@ -94,6 +94,7 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   variablesCreateEnvironment: 'VariablesService.CreateEnvironment',
   variablesUpdateEnvironment: 'VariablesService.UpdateEnvironment',
   variablesDeleteEnvironment: 'VariablesService.DeleteEnvironment',
+  variablesDuplicateEnvironment: 'VariablesService.DuplicateEnvironment',
   variablesSetActiveEnvironment: 'VariablesService.SetActiveEnvironment',
   variablesReorderEnvironments: 'VariablesService.ReorderEnvironments',
   variablesList: 'VariablesService.List',

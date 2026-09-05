@@ -102,6 +102,102 @@ func (r *VariablesRepo) UpdateEnvironment(id, name, description string) error {
 	return requireOneRow(res, "environment", id)
 }
 
+// DuplicateEnvironment is P17 D17/item 4: a raw-column copy of one environment and its variables —
+// F9's own precedent (connections.Service.Duplicate's "a raw column copy, not decrypt-then-
+// re-encrypt — the plaintext is never used, so there is no reason for this path to need the OS
+// key at all"), applied verbatim here since api_variables.secret_value holds the same kira:v2:
+// envelope connections.password does.
+//
+//  1. A new environment row, name+" copy", description copied, sort_order = MAX+1,
+//     is_active = 0 — the active environment is a single app-global selection (D3); duplicating
+//     the active one must not create a second active row or silently steal the selection.
+//  2. Every variable row copied with a fresh id, secret_value copied as the raw ciphertext column
+//     (never decrypted) — duplication needs no OS key, prompts no reveal gate, and works on a
+//     machine whose keychain entry is missing.
+//  3. No api_variable_history rows are copied — a clone's rows were created just now, and it has
+//     no prior values; copying history would put a *second* variable's secret ciphertext into a
+//     history row the user never wrote.
+func (r *VariablesRepo) DuplicateEnvironment(id string) (model.Environment, error) {
+	if id == "" {
+		return model.Environment{}, fmt.Errorf("repos/variables: id is required")
+	}
+	tx, err := r.db.Begin()
+	if err != nil {
+		return model.Environment{}, fmt.Errorf("repos/variables: begin: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	var srcName, srcDescription string
+	err = tx.QueryRow(`SELECT name, description FROM api_environments WHERE id = ?`, id).Scan(&srcName, &srcDescription)
+	if errors.Is(err, sql.ErrNoRows) {
+		return model.Environment{}, fmt.Errorf("repos/variables: no environment %s", id)
+	}
+	if err != nil {
+		return model.Environment{}, fmt.Errorf("repos/variables: read environment %s: %w", id, err)
+	}
+
+	var order int
+	if err := tx.QueryRow(`SELECT COALESCE(MAX(sort_order) + 1, 0) FROM api_environments`).Scan(&order); err != nil {
+		return model.Environment{}, fmt.Errorf("repos/variables: next environment order: %w", err)
+	}
+
+	now := model.NowISO()
+	newEnv := model.Environment{
+		ID: uuid.NewString(), Name: srcName + " copy", SortOrder: order, IsActive: false, Description: srcDescription,
+	}
+	if _, err := tx.Exec(
+		`INSERT INTO api_environments (id, name, sort_order, is_active, description, created_at, updated_at)
+		 VALUES (?, ?, ?, 0, ?, ?, ?)`,
+		newEnv.ID, newEnv.Name, newEnv.SortOrder, newEnv.Description, now, now,
+	); err != nil {
+		return model.Environment{}, fmt.Errorf("repos/variables: insert duplicated environment: %w", err)
+	}
+
+	rows, err := tx.Query(
+		`SELECT name, value, is_secret, secret_value, sort_order, description FROM api_variables
+		  WHERE environment_id = ? ORDER BY sort_order`,
+		id,
+	)
+	if err != nil {
+		return model.Environment{}, fmt.Errorf("repos/variables: read source variables: %w", err)
+	}
+	type srcRow struct {
+		name, value, description string
+		isSecret                 int
+		secretValue              sql.NullString
+		sortOrder                int
+	}
+	var srcRows []srcRow
+	for rows.Next() {
+		var sr srcRow
+		if err := rows.Scan(&sr.name, &sr.value, &sr.isSecret, &sr.secretValue, &sr.sortOrder, &sr.description); err != nil {
+			rows.Close()
+			return model.Environment{}, fmt.Errorf("repos/variables: scan source variable: %w", err)
+		}
+		srcRows = append(srcRows, sr)
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return model.Environment{}, fmt.Errorf("repos/variables: source variable rows: %w", err)
+	}
+	rows.Close()
+
+	for _, sr := range srcRows {
+		if _, err := tx.Exec(
+			`INSERT INTO api_variables (id, collection_id, environment_id, name, value, is_secret, secret_value, sort_order, description, created_at, updated_at)
+			 VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			uuid.NewString(), newEnv.ID, sr.name, sr.value, sr.isSecret, sr.secretValue, sr.sortOrder, sr.description, now, now,
+		); err != nil {
+			return model.Environment{}, fmt.Errorf("repos/variables: insert duplicated variable: %w", err)
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return model.Environment{}, fmt.Errorf("repos/variables: commit: %w", err)
+	}
+	return newEnv, nil
+}
+
 // DeleteEnvironment cascades its variables and their history (ON DELETE CASCADE, D4). Deleting the
 // active environment simply leaves none active (D3) — there is nothing further to reassign.
 func (r *VariablesRepo) DeleteEnvironment(id string) error {

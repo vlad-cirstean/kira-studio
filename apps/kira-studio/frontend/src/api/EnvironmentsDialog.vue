@@ -13,6 +13,7 @@ import {
   closeEnvironmentsDialog,
   createEnvironment,
   deleteEnvironment,
+  duplicateEnvironment,
   environmentsDialogState,
   openVariablesDialog,
   reorderEnvironmentsList,
@@ -90,6 +91,12 @@ async function onSetActive(id: string): Promise<void> {
 async function onDelete(id: string, name: string): Promise<void> {
   if (!(await confirmDialog(`Delete environment "${name}"? Its variables go with it.`))) return;
   await deleteEnvironment(id);
+}
+
+// P17 D17: "Duplicate" is this app's existing vocabulary (connections.Service.Duplicate, the
+// tree menu's own duplicate item) — not a synonym invented for this one surface.
+async function onDuplicate(id: string): Promise<void> {
+  await duplicateEnvironment(id);
 }
 
 // D14: the same drag/keyboard reorder VariablesDialog.vue's own rows use — and the same refusal
@@ -208,6 +215,12 @@ function close(): void {
         >
           Edit variables…
         </AppButton>
+        <IconButton
+          icon="copy"
+          v-tooltip="'Duplicate'"
+          data-testid="environment-duplicate"
+          @click="onDuplicate(env.id)"
+        />
         <IconButton
           icon="trash"
           v-tooltip="'Delete'"

@@ -401,3 +401,110 @@ func TestSecretsForEnvironmentStillOverridesCollectionDespiteFirstWins(t *testin
 		t.Fatalf("SecretsFor()[\"token\"] = %q, want %q (environment overrides collection)", got, "env-value")
 	}
 }
+
+// ---- 5. DuplicateEnvironment (P17 D17): a raw-ciphertext copy, no history, never active ----
+
+func TestDuplicateEnvironmentCopiesCiphertextVerbatimNoHistoryNeverActive(t *testing.T) {
+	r, db := newVariablesRepo(t)
+
+	env, err := r.CreateEnvironment("Staging", "a description")
+	if err != nil {
+		t.Fatalf("CreateEnvironment: %v", err)
+	}
+	if err := r.SetActiveEnvironment(env.ID); err != nil {
+		t.Fatalf("SetActiveEnvironment: %v", err)
+	}
+	plain, err := r.Upsert(model.VariableScopeEnvironment, env.ID, "", "apiKey", "s3cr3t-value", true, "")
+	if err != nil {
+		t.Fatalf("Upsert(secret): %v", err)
+	}
+	// A second, real edit so the source variable actually has history — proving the clone
+	// carries none of it is meaningless against a variable that never had any.
+	if _, err := r.Upsert(model.VariableScopeEnvironment, env.ID, plain.ID, "apiKey", "s3cr3t-value-2", true, ""); err != nil {
+		t.Fatalf("Upsert(secret, changed): %v", err)
+	}
+	srcHistory, err := r.History(plain.ID)
+	if err != nil {
+		t.Fatalf("History: %v", err)
+	}
+	if len(srcHistory) == 0 {
+		t.Fatal("source variable has no history — this fixture doesn't exercise the guard")
+	}
+
+	dup, err := r.DuplicateEnvironment(env.ID)
+	if err != nil {
+		t.Fatalf("DuplicateEnvironment: %v", err)
+	}
+	if dup.Name != "Staging copy" {
+		t.Errorf("dup.Name = %q, want %q", dup.Name, "Staging copy")
+	}
+	if dup.Description != "a description" {
+		t.Errorf("dup.Description = %q, want copied from source", dup.Description)
+	}
+	if dup.IsActive {
+		t.Error("dup.IsActive = true, want false even though the source is active (D3)")
+	}
+
+	// The source environment must remain the active one — duplicating must not steal the
+	// selection or create a second active row.
+	envs, err := r.ListEnvironments()
+	if err != nil {
+		t.Fatalf("ListEnvironments: %v", err)
+	}
+	activeCount := 0
+	for _, e := range envs {
+		if e.IsActive {
+			activeCount++
+			if e.ID != env.ID {
+				t.Errorf("active environment = %s, want the original %s", e.ID, env.ID)
+			}
+		}
+	}
+	if activeCount != 1 {
+		t.Fatalf("active environment count = %d, want exactly 1", activeCount)
+	}
+
+	dupVars, err := r.List(model.VariableScopeEnvironment, dup.ID)
+	if err != nil {
+		t.Fatalf("List(dup): %v", err)
+	}
+	if len(dupVars) != 1 || dupVars[0].Name != "apiKey" || !dupVars[0].IsSecret {
+		t.Fatalf("dupVars = %+v, want one secret row named apiKey", dupVars)
+	}
+	if dupVars[0].ID == plain.ID {
+		t.Fatal("the duplicated variable shares the source's own id")
+	}
+
+	// The property that matters: the copy's secret_value column is byte-identical to the
+	// source's — a raw column copy, never a decrypt/re-encrypt (which would produce a different
+	// ciphertext even for the same plaintext, since AES-GCM uses a fresh nonce per encryption).
+	var srcCipher, dupCipher string
+	if err := db.QueryRow(`SELECT secret_value FROM api_variables WHERE name = 'apiKey' AND environment_id = ?`, env.ID).Scan(&srcCipher); err != nil {
+		t.Fatalf("read source ciphertext: %v", err)
+	}
+	if err := db.QueryRow(`SELECT secret_value FROM api_variables WHERE name = 'apiKey' AND environment_id = ?`, dup.ID).Scan(&dupCipher); err != nil {
+		t.Fatalf("read duplicate ciphertext: %v", err)
+	}
+	if srcCipher != dupCipher {
+		t.Fatalf("ciphertext changed across the duplicate — source %q, copy %q (expected byte-identical)", srcCipher, dupCipher)
+	}
+	// Both still decrypt to the same plaintext (sanity: the byte-identical ciphertext is not
+	// simply empty or garbage).
+	revealed, err := r.RevealValue(dupVars[0].ID)
+	if err != nil {
+		t.Fatalf("RevealValue(dup): %v", err)
+	}
+	if revealed != "s3cr3t-value-2" {
+		t.Fatalf("RevealValue(dup) = %q, want %q", revealed, "s3cr3t-value-2")
+	}
+
+	// No history rows copied — the clone's row has none, even though the source (the same name,
+	// a distinct id) does.
+	dupHistory, err := r.History(dupVars[0].ID)
+	if err != nil {
+		t.Fatalf("History(dup): %v", err)
+	}
+	if len(dupHistory) != 0 {
+		t.Fatalf("History(dup) = %+v, want none copied", dupHistory)
+	}
+}

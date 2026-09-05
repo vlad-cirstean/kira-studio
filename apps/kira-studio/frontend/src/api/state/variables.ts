@@ -71,6 +71,13 @@ export async function deleteEnvironment(id: string): Promise<void> {
   await loadEnvironments();
 }
 
+/** P17 D17/item 4: a raw-ciphertext duplicate — no history copied, never active. */
+export async function duplicateEnvironment(id: string): Promise<ApiEnvironment> {
+  const env = await control.variablesDuplicateEnvironment(id);
+  await loadEnvironments();
+  return env;
+}
+
 // ---- the environments dialog (D3/D11) — create/rename/delete/set-active ----
 
 export const environmentsDialogState = reactive({ open: false });

@@ -198,6 +198,9 @@ export const apiControl = {
     unwrap(VariablesService.UpdateEnvironment({ id, name, description })),
   variablesDeleteEnvironment: (id: string): Promise<void> =>
     unwrap(VariablesService.DeleteEnvironment({ id })),
+  // P17 D17/item 4: a raw-ciphertext duplicate — see repos/variables.go's own DuplicateEnvironment.
+  variablesDuplicateEnvironment: (id: string): Promise<ApiEnvironment> =>
+    unwrap(VariablesService.DuplicateEnvironment({ id })).then((r) => trust<ApiEnvironment>(r)),
   // id: '' selects "No environment" (D3).
   variablesSetActiveEnvironment: (id: string): Promise<void> =>
     unwrap(VariablesService.SetActiveEnvironment({ id })),
