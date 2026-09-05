@@ -5,6 +5,7 @@
 // still needs them, but do not appear here — a package's public surface is not everything it
 // happens to export internally.
 
+export { WELL_KNOWN_REQUEST_METADATA } from './grpc/metadata';
 export { fromSavedGrpcRequest, isGrpcDirty, toSavedGrpcRequest } from './grpc/saved';
 export {
   BODY_MODE_OPTIONS,

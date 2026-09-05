@@ -1,9 +1,13 @@
 <script setup lang="ts">
+import { WELL_KNOWN_REQUEST_METADATA } from '@kira/api-core';
 import type { GrpcMetadataState } from '@shared/domain/grpc';
 import type { GrpcRequestTabRecord } from '@shared/domain/tabs';
 import { computed } from 'vue';
+import type { VariableSupport } from '../../api/state/variableCompletion';
 import { patchGrpcRequestTabState } from '../../api/tabs';
+import AutocompleteField from '../../theme/primitives/AutocompleteField.vue';
 import Checkbox from '../../theme/primitives/Checkbox.vue';
+import { templateToken, wholeFieldToken } from '../../theme/primitives/completion';
 import IconButton from '../../theme/primitives/IconButton.vue';
 import TextField from '../../theme/primitives/TextField.vue';
 
@@ -16,6 +20,9 @@ const props = defineProps<{
   /** P16 D13: GrpcRequestView.vue's own #toolbar-2 filter box — a plain case-insensitive
    *  substring test over name-or-value, same rule FieldRowsTable.vue's own copy follows. */
   filterQuery?: string;
+  /** P18 D10: GrpcRequestView.vue's own variableSupport(...) — forwarded to the value cell, the
+   *  highest-value one of the three surfaces (an Authorization bearer is the canonical case). */
+  variables?: VariableSupport;
 }>();
 
 function blankRow(): GrpcMetadataState {
@@ -141,15 +148,29 @@ function onContainerKeydown(e: KeyboardEvent): void {
         @update:model-value="toggleEnabled(entry.index)"
       />
       <div class="metadata-cell">
-        <TextField
+        <AutocompleteField
           :model-value="entry.row.name"
           placeholder="key (lowercase, - _ . only)"
           data-testid="grpc-metadata-name"
+          :candidates="WELL_KNOWN_REQUEST_METADATA"
+          :token-at="wholeFieldToken"
           @update:model-value="updateField(entry.index, 'name', $event)"
         />
       </div>
       <div class="metadata-cell">
+        <AutocompleteField
+          v-if="variables"
+          :model-value="entry.row.value"
+          placeholder="value"
+          data-testid="grpc-metadata-value"
+          :candidates="variables.candidates"
+          :token-at="templateToken"
+          :range-highlights="variables.rangeHighlights"
+          :hover-at="variables.hoverAt"
+          @update:model-value="updateField(entry.index, 'value', $event)"
+        />
         <TextField
+          v-else
           :model-value="entry.row.value"
           placeholder="value"
           data-testid="grpc-metadata-value"

@@ -10,6 +10,7 @@ import {
   savedGrpcRequestFor,
   saveGrpcRequest,
 } from '../../api/state/collections';
+import { variableSupport } from '../../api/state/variableCompletion';
 import {
   activeEnvironmentId,
   ensureVariablesLoaded,
@@ -21,11 +22,12 @@ import { beautifyJson } from '../../beautify';
 import CodeMirrorHost from '../../editor/CodeMirrorHost.vue';
 import { registerCommand } from '../../shortcuts/commands';
 import AppButton from '../../theme/primitives/AppButton.vue';
+import AutocompleteField from '../../theme/primitives/AutocompleteField.vue';
+import { templateToken } from '../../theme/primitives/completion';
 import IconButton from '../../theme/primitives/IconButton.vue';
 import PanelSearchBox from '../../theme/primitives/PanelSearchBox.vue';
 import PanelSplitter from '../../theme/primitives/PanelSplitter.vue';
 import SegmentedControl from '../../theme/primitives/SegmentedControl.vue';
-import TextField from '../../theme/primitives/TextField.vue';
 import ViewChrome from '../../theme/primitives/ViewChrome.vue';
 import MetadataTable from './MetadataTable.vue';
 import ResponsePane from './ResponsePane.vue';
@@ -154,6 +156,11 @@ watch(
   },
   { immediate: true },
 );
+// P18 D10: HttpRequestView.vue's own one-line computed, over the collection/environment watch
+// this view already runs (immediately above) — rangeHighlights/hoverAt/candidates for the target
+// field, the metadata value cells, and (rangeHighlights only) the message editor.
+const variables = computed(() => variableSupport(collectionId.value, activeEnvironmentId.value));
+
 const unresolvedRefs = computed(() => {
   const { values, secretNames } = mergedValuesAndSecrets(
     collectionId.value,
@@ -256,11 +263,15 @@ onUnmounted(() => {
       </template>
 
       <template #toolbar>
-        <TextField
+        <AutocompleteField
           :model-value="tab.state.target"
           placeholder="api.example.com:443"
           style="flex: 1"
           data-testid="grpc-target"
+          :candidates="variables.candidates"
+          :token-at="templateToken"
+          :range-highlights="variables.rangeHighlights"
+          :hover-at="variables.hoverAt"
           @update:model-value="onTargetInput"
           @enter="onCall"
         />
@@ -349,6 +360,8 @@ onUnmounted(() => {
             :doc="tab.state.message"
             language="json"
             :read-only="false"
+            :range-highlights="variables.rangeHighlights"
+            auto-close-brackets
             data-testid="grpc-message-editor"
             @update:doc="onMessageInput"
           />
@@ -359,7 +372,7 @@ onUnmounted(() => {
               placeholder="Filter"
               testid="grpc-field-filter"
             />
-            <MetadataTable :tab="tab" :filter-query="fieldFilterQuery" />
+            <MetadataTable :tab="tab" :filter-query="fieldFilterQuery" :variables="variables" />
           </template>
           <SchemaBrowser v-else :tab="tab" />
         </div>
