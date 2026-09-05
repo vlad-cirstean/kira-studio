@@ -264,6 +264,17 @@ onUnmounted(() => {
         >
           {{ unresolvedRefs.length }} unresolved
         </span>
+        <!-- P15 D7 (OQ-2): the first control ever placed in a view head — LAW 09's "the head names
+             the target" holds everywhere else. Same testid/disabled/tooltip, only the slot moved. -->
+        <AppButton
+          icon="save"
+          data-testid="http-save"
+          :disabled="canSave && !dirty"
+          v-tooltip="canSave ? 'Save request' : 'Save request to a collection'"
+          @click="onSave"
+        >
+          Save
+        </AppButton>
       </template>
 
       <template #toolbar>
@@ -275,23 +286,28 @@ onUnmounted(() => {
         >
           <option v-for="m in METHODS" :key="m" :value="m">{{ m }}</option>
         </select>
-        <TextField
-          :model-value="tab.state.url"
-          placeholder="https://api.example.com/users"
-          style="flex: 1"
-          data-testid="http-url"
-          @update:model-value="onUrlInput"
-          @enter="onSend"
-        />
+        <div class="url-field">
+          <TextField
+            :model-value="tab.state.url"
+            placeholder="https://api.example.com/users"
+            data-testid="http-url"
+            @update:model-value="onUrlInput"
+            @enter="onSend"
+          />
+        </div>
         <AppButton
-          icon="save"
-          data-testid="http-save"
-          :disabled="canSave && !dirty"
-          v-tooltip="canSave ? 'Save request' : 'Save request to a collection'"
-          @click="onSave"
+          icon="play"
+          variant="primary"
+          data-testid="http-send"
+          :disabled="running"
+          v-tooltip="'Send'"
+          @click="onSend"
         >
-          Save
+          Send
         </AppButton>
+      </template>
+
+      <template #toolbar-end>
         <IconButton
           icon="terminal"
           aria-label="Copy as curl"
@@ -307,16 +323,6 @@ onUnmounted(() => {
           data-testid="http-edit-raw"
           @click="onEditRaw"
         />
-        <AppButton
-          icon="play"
-          variant="primary"
-          data-testid="http-send"
-          :disabled="running"
-          v-tooltip="'Send'"
-          @click="onSend"
-        >
-          Send
-        </AppButton>
       </template>
 
       <template #toolbar-2>
@@ -366,6 +372,19 @@ onUnmounted(() => {
    CellEditorView.vue's own .format-select does. */
 .method-select {
   height: var(--kira-h-sm);
+}
+
+/* P15 D4: TextField's inheritAttrs: false lands a call site's own class/style on the inner
+   <input>, never the wrapping .p-input box that actually sizes it (F3) — the app's existing
+   wrapper + :deep(.p-input) idiom, used at ten other call sites, fixes it here too. Was
+   `style="flex: 1"` directly on <TextField>, which landed on the input (already flex: 1) and did
+   nothing — the URL field never grew with the window. */
+.url-field {
+  flex: 1;
+  min-width: 0;
+}
+.url-field :deep(.p-input) {
+  width: 100%;
 }
 
 .request-response-split {
