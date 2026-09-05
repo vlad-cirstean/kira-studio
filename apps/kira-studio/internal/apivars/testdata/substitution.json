@@ -358,5 +358,69 @@
         "pipeline": ["upper"]
       }
     ]
+  },
+  {
+    "name": "F4/P21 round 1: base64decode tolerates an unpadded value, matching browser atob's forgiving decode",
+    "template": "{{token | base64decode}}",
+    "values": {
+      "token": "YQ"
+    },
+    "secrets": [],
+    "want": "a",
+    "refs": [
+      {
+        "name": "token",
+        "kind": "resolved",
+        "pipeline": ["base64decode"]
+      }
+    ]
+  },
+  {
+    "name": "F4/P21 round 1: base64decode strips embedded whitespace, matching atob",
+    "template": "{{token | base64decode}}",
+    "values": {
+      "token": "a GVsbG8="
+    },
+    "secrets": [],
+    "want": "hello",
+    "refs": [
+      {
+        "name": "token",
+        "kind": "resolved",
+        "pipeline": ["base64decode"]
+      }
+    ]
+  },
+  {
+    "name": "F4/P21 round 1: urldecode of a byte sequence that isn't valid UTF-8 fails on both sides",
+    "template": "{{token | urldecode}}",
+    "values": {
+      "token": "%FF"
+    },
+    "secrets": [],
+    "want": "{{token | urldecode}}",
+    "refs": [
+      {
+        "name": "token",
+        "kind": "unknown",
+        "pipeline": ["urldecode"]
+      }
+    ]
+  },
+  {
+    "name": "F4/P21 round 1: upper applies full Unicode special casing (ß -> SS), not a simple one-rune mapping",
+    "template": "{{token | upper}}",
+    "values": {
+      "token": "straße"
+    },
+    "secrets": [],
+    "want": "STRASSE",
+    "refs": [
+      {
+        "name": "token",
+        "kind": "resolved",
+        "pipeline": ["upper"]
+      }
+    ]
   }
 ]
