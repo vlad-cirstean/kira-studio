@@ -1,19 +1,29 @@
 <script setup lang="ts">
 import type { HttpWireFidelity } from '@shared/domain/http';
 import type { HttpRequestTabRecord } from '@shared/domain/tabs';
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { copyText } from '../../clipboard';
 import CodeMirrorHost from '../../editor/CodeMirrorHost.vue';
+import type { RangeHighlight } from '../../editor/variableHighlight';
 import EmptyState from '../../theme/primitives/EmptyState.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
 import MessageStrip from '../../theme/primitives/MessageStrip.vue';
 import { historyRuntime } from './history';
+import type { FindBarHost } from './ResponseFindBar.vue';
 import { runtime } from './state';
 
 // P9 D12/D14/D15: the inspector — the SPEC's own "view the exact bytes sent and received", with
 // its fidelity stated rather than assumed. F16: lives here (views/httprequest/), not http/, because
 // it is mounted from inside ResponsePane.vue and needs CodeMirrorHost/theme/primitives.
-const props = defineProps<{ tab: HttpRequestTabRecord }>();
+const props = defineProps<{
+  tab: HttpRequestTabRecord;
+  /** P16 D11: ResponseFindBar's own painted matches for each of this pane's two documents — the
+   *  bar itself has no template access to these editors, since they're this component's own
+   *  children. Absent (no find bar open) paints nothing, same as every other rangeHighlights
+   *  caller when its prop is absent. */
+  requestHighlights?: (doc: string) => readonly RangeHighlight[];
+  responseHighlights?: (doc: string) => readonly RangeHighlight[];
+}>();
 
 // P8 D10's own source swap, duplicated here rather than threaded down as props — the same
 // "each pane computes its own runtime over the tab id" shape ResponseHistoryList.vue already
@@ -91,6 +101,18 @@ function onCopyRequest(): void {
 function onCopyResponse(): void {
   void copyText(responseText.value);
 }
+
+// P16 D11: the two hosts and their docs, exposed for ResponsePane.vue's own find-bar targets
+// (`targets: { doc, host }[]`) — `getDocs()` rather than exposed computed refs, since it's called
+// from inside ResponsePane's own reactive computed (any reactive state it reads there is tracked
+// exactly as if read directly, regardless of which component's function reads it).
+const requestHostRef = ref<FindBarHost | null>(null);
+const responseHostRef = ref<FindBarHost | null>(null);
+defineExpose({
+  requestHost: requestHostRef,
+  responseHost: responseHostRef,
+  getDocs: () => ({ request: wire.value?.request ?? '', response: responseText.value }),
+});
 </script>
 
 <template>
@@ -122,9 +144,11 @@ function onCopyResponse(): void {
         </MessageStrip>
         <div class="raw-editor">
           <CodeMirrorHost
+            ref="requestHostRef"
             :doc="wire.request"
             language="plain"
             :read-only="true"
+            :range-highlights="requestHighlights"
             data-testid="http-wire-request-editor"
           />
         </div>
@@ -144,9 +168,11 @@ function onCopyResponse(): void {
         </div>
         <div class="raw-editor">
           <CodeMirrorHost
+            ref="responseHostRef"
             :doc="responseText"
             language="plain"
             :read-only="true"
+            :range-highlights="responseHighlights"
             data-testid="http-wire-response-editor"
           />
         </div>

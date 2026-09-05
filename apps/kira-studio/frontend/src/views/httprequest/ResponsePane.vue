@@ -1,18 +1,23 @@
 <script setup lang="ts">
 import { type HttpResponsePane, statusClass, statusHint } from '@shared/domain/http';
 import type { HttpRequestTabRecord } from '@shared/domain/tabs';
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { patchHttpRequestTabState } from '../../api/tabs';
 import { beautifyJson, beautifyXml } from '../../beautify';
 import CodeMirrorHost from '../../editor/CodeMirrorHost.vue';
+import { findRanges } from '../../editor/findRanges';
+import type { RangeHighlight } from '../../editor/variableHighlight';
 import { formatBytes } from '../../format';
+import { registerCommand } from '../../shortcuts/commands';
 import AppButton from '../../theme/primitives/AppButton.vue';
 import EmptyState from '../../theme/primitives/EmptyState.vue';
+import IconButton from '../../theme/primitives/IconButton.vue';
 import MessageStrip from '../../theme/primitives/MessageStrip.vue';
 import SegmentedControl from '../../theme/primitives/SegmentedControl.vue';
 import { backToLatest, ensureHistoryLoaded, historyRuntime } from './history';
 import RawExchangePane from './RawExchangePane.vue';
 import ResponseDiffDialog from './ResponseDiffDialog.vue';
+import ResponseFindBar, { type FindBarHost, type FindBarTarget } from './ResponseFindBar.vue';
 import ResponseHistoryList from './ResponseHistoryList.vue';
 import { runtime } from './state';
 import TimelinePane from './TimelinePane.vue';
@@ -165,6 +170,75 @@ const viewingTime = computed(() => {
 function onBackToLatest(): void {
   backToLatest(props.tab.id);
 }
+
+// P16 D11: the find bar over the response body and the raw exchange's two documents. Component-
+// local (not tab state, D11's own note): a lens over what's already on screen, not a setting.
+const findOpen = ref(false);
+function toggleFind(): void {
+  findOpen.value = !findOpen.value;
+}
+function closeFind(): void {
+  findOpen.value = false;
+}
+
+const bodyHostRef = ref<FindBarHost | null>(null);
+const rawPaneRef = ref<{
+  requestHost: FindBarHost | null;
+  responseHost: FindBarHost | null;
+  getDocs: () => { request: string; response: string };
+} | null>(null);
+const findBarRef = ref<{ query: string; currentGlobal: number } | null>(null);
+
+// D11: one target for the Body pane, two (request wire, response wire) for the Raw pane — the
+// only two panes with a `rangeHighlights` compartment free (F12: the request body's own is taken
+// by P15b's {{variable}} colouring).
+const findTargets = computed<readonly FindBarTarget[]>(() => {
+  if (!findOpen.value) return [];
+  if (props.tab.state.responsePane === 'body') {
+    return [{ doc: bodyText.value, host: bodyHostRef.value }];
+  }
+  if (props.tab.state.responsePane === 'raw') {
+    const docs = rawPaneRef.value?.getDocs();
+    if (!docs) return [];
+    return [
+      { doc: docs.request, host: rawPaneRef.value?.requestHost ?? null },
+      { doc: docs.response, host: rawPaneRef.value?.responseHost ?? null },
+    ];
+  }
+  return [];
+});
+
+// Paints exactly the matches the bar itself counts and steps through, onto whichever editor(s)
+// are actually on screen. Reads `findBarRef`'s exposed `query`/`currentGlobal` (and `findTargets`)
+// synchronously in this computed's own evaluation — not inside the closures it returns — so this
+// recomputes, and so each editor's `rangeHighlights` prop reference changes (CodeMirrorHost's own
+// watch on that prop is what triggers a repaint), exactly when the query or the current match does.
+const perTargetHighlighters = computed<((doc: string) => readonly RangeHighlight[])[]>(() => {
+  const bar = findBarRef.value;
+  const query = bar?.query ?? '';
+  const currentGlobal = bar?.currentGlobal ?? -1;
+  const targets = findTargets.value;
+  if (!query) return targets.map(() => () => []);
+  let cursor = 0;
+  return targets.map((t) => {
+    const localCurrent = currentGlobal - cursor;
+    cursor += findRanges(t.doc, query).length;
+    return (doc: string): readonly RangeHighlight[] => findRanges(doc, query, localCurrent);
+  });
+});
+const bodyHighlights = computed(() => perTargetHighlighters.value[0]);
+const rawRequestHighlights = computed(() => perTargetHighlighters.value[0]);
+const rawResponseHighlights = computed(() => perTargetHighlighters.value[1]);
+
+let unregisterCommands: Array<() => void> = [];
+onMounted(() => {
+  // D11: opened from the response status row's own search button, and by view.find — mirrors
+  // DataView.vue's own registration, mounted only while this tab is the active one.
+  unregisterCommands = [registerCommand('view.find', toggleFind)];
+});
+onUnmounted(() => {
+  for (const off of unregisterCommands) off();
+});
 </script>
 
 <template>
@@ -198,6 +272,17 @@ function onBackToLatest(): void {
         />
       </template>
       <span v-else class="p-push" />
+      <!-- D11: only the two panes with a rangeHighlights compartment free (Body, Raw) get the
+           find affordance — Headers has its own separate filter (D12), and History/Timeline are
+           lists, not one searchable document. -->
+      <IconButton
+        v-if="tab.state.responsePane === 'body' || tab.state.responsePane === 'raw'"
+        icon="search"
+        :active="findOpen"
+        v-tooltip="'Find in response'"
+        data-testid="http-find-toggle"
+        @click="toggleFind"
+      />
       <SegmentedControl
         :model-value="tab.state.responsePane"
         :options="RESPONSE_PANE_OPTIONS"
@@ -250,7 +335,13 @@ function onBackToLatest(): void {
       </template>
       <EmptyState v-else icon="arrow-right" label="Send a request to see the response" />
     </div>
-    <RawExchangePane v-else-if="tab.state.responsePane === 'raw'" :tab="tab" />
+    <RawExchangePane
+      v-else-if="tab.state.responsePane === 'raw'"
+      ref="rawPaneRef"
+      :tab="tab"
+      :request-highlights="rawRequestHighlights"
+      :response-highlights="rawResponseHighlights"
+    />
     <TimelinePane v-else-if="tab.state.responsePane === 'timeline'" :tab="tab" />
     <div v-else class="response-body">
       <template v-if="response">
@@ -261,7 +352,14 @@ function onBackToLatest(): void {
         >
           {{ response.bodyBytes }} bytes of binary data
         </span>
-        <CodeMirrorHost v-else :doc="bodyText" :language="prettyFormat ?? 'plain'" :read-only="true" />
+        <CodeMirrorHost
+          v-else
+          ref="bodyHostRef"
+          :doc="bodyText"
+          :language="prettyFormat ?? 'plain'"
+          :read-only="true"
+          :range-highlights="bodyHighlights"
+        />
       </template>
       <EmptyState v-else icon="arrow-right" label="Send a request to see the response">
         <button
@@ -275,6 +373,14 @@ function onBackToLatest(): void {
         </button>
       </EmptyState>
     </div>
+
+    <!-- D11: docked below the pane it searches (LAW 03), not floating over it. -->
+    <ResponseFindBar
+      v-if="findOpen && (tab.state.responsePane === 'body' || tab.state.responsePane === 'raw')"
+      ref="findBarRef"
+      :targets="findTargets"
+      @close="closeFind"
+    />
 
     <ResponseDiffDialog v-if="compareIds" :ids="compareIds" @close="closeCompare" />
   </div>
