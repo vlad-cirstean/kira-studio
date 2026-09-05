@@ -68,10 +68,88 @@ function removeRow(index: number): void {
     props.rows.filter((_, i) => i !== index),
   );
 }
+
+// P15b D6 (item 12): arrow-key navigation across this table's rows, one container-level handler —
+// not a shared `theme/rowKeyNav.ts`-shaped module (OQ-4): `views/grpcrequest/**` may not import
+// `views/httprequest/**` (biome.json), MetadataTable.vue is `views/grpcrequest`'s own literal copy
+// of this table (F18's own trade, accepted deliberately), and this handler is small enough that
+// duplicating it costs less than the coupling a shared module would create.
+//
+// Column identity is positional among a row's *text* inputs — `input:not([type="checkbox"])`
+// excludes the enabled-checkbox column (a real `<input type="checkbox">`, Checkbox.vue) from the
+// count, so form-data's own extra content-type field in the trailing slot does not shift the
+// mapping for rows that lack it (it simply has no target there, and navigation into it does
+// nothing rather than landing on the wrong field).
+function textInputsIn(row: Element): HTMLInputElement[] {
+  return Array.from(row.querySelectorAll<HTMLInputElement>('input:not([type="checkbox"])'));
+}
+
+function onContainerKeydown(e: KeyboardEvent): void {
+  // AutocompleteField's own popup binds ArrowUp/ArrowDown while open with preventDefault and no
+  // stopPropagation (F4) — this guard is what keeps the popup's own selection move from also
+  // moving focus to another row.
+  if (e.defaultPrevented) return;
+  if (
+    e.key !== 'ArrowDown' &&
+    e.key !== 'ArrowUp' &&
+    e.key !== 'ArrowLeft' &&
+    e.key !== 'ArrowRight'
+  ) {
+    return;
+  }
+  const el = e.target;
+  // Only real text inputs participate — a <select> (form-data's kind picker) or a <button> (Choose
+  // file, Remove) stays Tab-reachable and keeps its own native arrow behaviour untouched.
+  if (!(el instanceof HTMLInputElement) || el.type === 'checkbox') return;
+
+  const row = el.closest<HTMLElement>('.field-row');
+  const container = row?.parentElement;
+  if (!row || !container) return;
+  const rows = Array.from(container.children).filter(
+    (child): child is HTMLElement =>
+      child instanceof HTMLElement && child.classList.contains('field-row'),
+  );
+  const rowIndex = rows.indexOf(row);
+  const inputsInRow = textInputsIn(row);
+  const colIndex = inputsInRow.indexOf(el);
+  if (colIndex === -1) return;
+
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    // No wrap at either end — the trailing blank row is itself a normal target, so ArrowDown from
+    // the last real row reaches it exactly as a click would.
+    const targetRow = rows[rowIndex + (e.key === 'ArrowDown' ? 1 : -1)];
+    const target = targetRow ? textInputsIn(targetRow)[colIndex] : undefined;
+    if (!target) return;
+    e.preventDefault();
+    const offset = Math.min(el.selectionStart ?? 0, target.value.length);
+    target.focus();
+    target.setSelectionRange(offset, offset);
+    return;
+  }
+
+  // ArrowLeft/ArrowRight: native everywhere except a field edge — a real (non-collapsed) selection
+  // is left to the browser's own left/right-collapses-selection behaviour.
+  const start = el.selectionStart;
+  const end = el.selectionEnd;
+  if (start === null || end === null || start !== end) return;
+  if (e.key === 'ArrowRight' && start === el.value.length) {
+    const target = inputsInRow[colIndex + 1];
+    if (!target) return;
+    e.preventDefault();
+    target.focus();
+    target.setSelectionRange(0, 0);
+  } else if (e.key === 'ArrowLeft' && start === 0) {
+    const target = inputsInRow[colIndex - 1];
+    if (!target) return;
+    e.preventDefault();
+    target.focus();
+    target.setSelectionRange(target.value.length, target.value.length);
+  }
+}
 </script>
 
 <template>
-  <div class="field-rows-table" :data-testid="containerTestid">
+  <div class="field-rows-table" :data-testid="containerTestid" @keydown="onContainerKeydown">
     <div v-for="(row, i) in displayRows" :key="i" class="field-row" :data-testid="`${testidPrefix}-row`">
       <Checkbox
         v-if="showEnabled"

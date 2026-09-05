@@ -38,10 +38,73 @@ function removeRow(index: number): void {
     metadata: props.tab.state.metadata.filter((_, i) => i !== index),
   });
 }
+
+// P15b D6 (item 12): arrow-key navigation across this table's rows — a literal copy of
+// views/httprequest/FieldRowsTable.vue's own handler (F18/OQ-4: `views/grpcrequest/**` may not
+// import `views/httprequest/**`, biome.json, and this handler is small enough that duplicating it
+// costs less than the coupling a shared module would create). See that file's own comment for the
+// full rule set.
+function textInputsIn(row: Element): HTMLInputElement[] {
+  return Array.from(row.querySelectorAll<HTMLInputElement>('input:not([type="checkbox"])'));
+}
+
+function onContainerKeydown(e: KeyboardEvent): void {
+  if (e.defaultPrevented) return;
+  if (
+    e.key !== 'ArrowDown' &&
+    e.key !== 'ArrowUp' &&
+    e.key !== 'ArrowLeft' &&
+    e.key !== 'ArrowRight'
+  ) {
+    return;
+  }
+  const el = e.target;
+  if (!(el instanceof HTMLInputElement) || el.type === 'checkbox') return;
+
+  const row = el.closest<HTMLElement>('.metadata-row');
+  const container = row?.parentElement;
+  if (!row || !container) return;
+  const rows = Array.from(container.children).filter(
+    (child): child is HTMLElement =>
+      child instanceof HTMLElement && child.classList.contains('metadata-row'),
+  );
+  const rowIndex = rows.indexOf(row);
+  const inputsInRow = textInputsIn(row);
+  const colIndex = inputsInRow.indexOf(el);
+  if (colIndex === -1) return;
+
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    const targetRow = rows[rowIndex + (e.key === 'ArrowDown' ? 1 : -1)];
+    const target = targetRow ? textInputsIn(targetRow)[colIndex] : undefined;
+    if (!target) return;
+    e.preventDefault();
+    const offset = Math.min(el.selectionStart ?? 0, target.value.length);
+    target.focus();
+    target.setSelectionRange(offset, offset);
+    return;
+  }
+
+  const start = el.selectionStart;
+  const end = el.selectionEnd;
+  if (start === null || end === null || start !== end) return;
+  if (e.key === 'ArrowRight' && start === el.value.length) {
+    const target = inputsInRow[colIndex + 1];
+    if (!target) return;
+    e.preventDefault();
+    target.focus();
+    target.setSelectionRange(0, 0);
+  } else if (e.key === 'ArrowLeft' && start === 0) {
+    const target = inputsInRow[colIndex - 1];
+    if (!target) return;
+    e.preventDefault();
+    target.focus();
+    target.setSelectionRange(target.value.length, target.value.length);
+  }
+}
 </script>
 
 <template>
-  <div class="metadata-table" data-testid="grpc-metadata-table">
+  <div class="metadata-table" data-testid="grpc-metadata-table" @keydown="onContainerKeydown">
     <div
       v-for="(row, i) in displayRows"
       :key="i"
