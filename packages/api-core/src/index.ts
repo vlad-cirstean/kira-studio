@@ -33,6 +33,7 @@ export {
   type ReferenceKind,
   resolve,
   type SubstitutionResult,
+  sanitizeUrlSpan,
 } from './http/substitute';
 export {
   applySecretValues,

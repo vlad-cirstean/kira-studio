@@ -4,9 +4,13 @@
 package apivars_test
 
 import (
+	"context"
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/httpclient"
@@ -132,6 +136,54 @@ func TestResolveRequestReturnsExactlyTheSecretsItSubstituted(t *testing.T) {
 		}
 		if len(used) != 0 {
 			t.Fatalf("used = %+v, want empty", used)
+		}
+	})
+
+	// Round-2 review finding 6: a reference that never resolves — a stale id, a typo, or a secret
+	// whose decrypt failed — is left verbatim in the URL by design (D10). Resolver.Text/URLText
+	// always call Resolve with secretNames nil (D9/F21's own extraction), so a name that turns out
+	// not to be any of this scope's secrets falls into the exact same branch a decrypt failure
+	// would — reproduced here with a plain unresolvable name, since the fixture already has a
+	// space in it (a real Postman variable-name shape, substitute.ts's own doc). The raw space
+	// used to reach net/http's own request line unescaped, which the *server* rejects with a 400
+	// before ever reading a single header — driven through a real httpclient.Send against a real
+	// httptest server, not just url.Parse (which tolerates the raw space and never errors, so it
+	// alone would not have caught this).
+	t.Run("finding 6: an unresolved reference with a space in its name doesn't break the request line", func(t *testing.T) {
+		var gotRequestURI string
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			gotRequestURI = r.RequestURI
+			w.WriteHeader(http.StatusTeapot)
+		}))
+		defer srv.Close()
+
+		resolvedURL, _, _, _, err := svc.ResolveRequest(
+			srv.URL+"/orders?a={{base url}}&b=2",
+			nil, httpclient.Body{Mode: "none"}, c.ID, "",
+		)
+		if err != nil {
+			t.Fatalf("ResolveRequest: %v", err)
+		}
+		if strings.Contains(resolvedURL, "{{base url}}") {
+			t.Fatalf("resolvedURL = %q still has a raw space inside the unresolved reference", resolvedURL)
+		}
+		if !strings.Contains(resolvedURL, "{{base%20url}}") {
+			t.Fatalf("resolvedURL = %q, want the reference recognisable as {{base%%20url}}", resolvedURL)
+		}
+
+		resp, err := httpclient.Send(context.Background(), httpclient.Request{Method: "GET", URL: resolvedURL})
+		if err != nil {
+			t.Fatalf("Send: %v", err)
+		}
+		// The server actually received and parsed a well-formed request line — "the reference
+		// itself isn't found by the server" (it's an unresolved {{...}} token, not this app's
+		// concern) shows up as *this handler's own* status, never a client-side 400 from a
+		// malformed request line the server bounced before routing it anywhere.
+		if resp.Status != http.StatusTeapot {
+			t.Errorf("resp.Status = %d, want %d (the handler's own answer) — the request line reached the server intact", resp.Status, http.StatusTeapot)
+		}
+		if !strings.Contains(gotRequestURI, "b=2") {
+			t.Errorf("server saw RequestURI = %q, lost the second, unrelated query param", gotRequestURI)
 		}
 	})
 }

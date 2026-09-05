@@ -6,7 +6,7 @@
 import { describe, expect, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { resolve as resolvePath } from 'node:path';
-import { type Reference, resolve } from '../src/http/substitute';
+import { type Reference, resolve, sanitizeUrlSpan } from '../src/http/substitute';
 
 interface Case {
   name: string;
@@ -77,5 +77,51 @@ describe('http/substitute.ts resolve() dynamic callback (P6 D2/D3)', () => {
       { name: 'token', kind: 'deferred' },
       { name: 'missing', kind: 'unknown' },
     ]);
+  });
+});
+
+// Finding 6 (v1.2 P14 round 2): a template-reference span left literal because it names nothing
+// (`unknown`) or generates nothing (`dynamic`, no catalogued generator) must not survive into the
+// final URL carrying a raw space/&/#/= — those break url.Parse's RawQuery or the request line
+// itself. `sanitizeUrlSpan` (the optional 5th argument) is applied to exactly those two kinds and
+// never to `deferred` — a secret span a later, Go-side pass still has to find byte-identical.
+describe('http/substitute.ts resolve() sanitizeUrlSpan (P14 round-2 finding 6)', () => {
+  test('an unresolved {{base url}}-shaped reference in a query value survives as safe, parseable text', () => {
+    const result = resolve(
+      'https://api.example.com/orders?a={{base url}}&b=2',
+      {},
+      [],
+      undefined,
+      sanitizeUrlSpan,
+    );
+    expect(result.text).toBe('https://api.example.com/orders?a={{base%20url}}&b=2');
+    expect(result.refs).toEqual([{ name: 'base url', kind: 'unknown' }]);
+    // Proves the fix's own stated bar: the resulting URL actually parses, and the query string it
+    // parses into is well-formed — the second, unrelated param survives untouched.
+    const parsed = new URL(result.text);
+    expect(parsed.searchParams.get('b')).toBe('2');
+  });
+
+  test('a deferred secret reference is never sanitized — a later pass still needs its exact name', () => {
+    const result = resolve(
+      '{{secret with spaces}}',
+      {},
+      ['secret with spaces'],
+      undefined,
+      sanitizeUrlSpan,
+    );
+    expect(result.text).toBe('{{secret with spaces}}');
+    expect(result.refs).toEqual([{ name: 'secret with spaces', kind: 'deferred' }]);
+  });
+
+  test('a resolved value and ordinary literal text are unaffected', () => {
+    const result = resolve('{{host}}/a b', { host: 'x.test' }, [], undefined, sanitizeUrlSpan);
+    expect(result.text).toBe('x.test/a b');
+  });
+
+  test('an uncatalogued dynamic reference is sanitized the same way as unknown', () => {
+    const result = resolve('{{$weird generator}}', {}, [], () => null, sanitizeUrlSpan);
+    expect(result.text).toBe('{{$weird%20generator}}');
+    expect(result.refs).toEqual([{ name: '$weird generator', kind: 'dynamic' }]);
   });
 });

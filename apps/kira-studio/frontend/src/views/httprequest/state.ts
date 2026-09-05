@@ -3,6 +3,7 @@ import {
   type Reference,
   type ResolvedRequest,
   resolve,
+  sanitizeUrlSpan,
   substituteBody,
 } from '@kira/api-core';
 import type {
@@ -92,8 +93,17 @@ export function resolveTabState(
     refs.push(...result.refs);
     return result.text;
   };
+  // Finding 6 (v1.2 P14 round 2): the URL is the one field with query-string delimiter syntax to
+  // break — a genuinely-terminal unresolved reference (a typo, an uncatalogued {{$generator}})
+  // must not inject a raw space/&/#/= into it. A 'deferred' secret is unaffected either way:
+  // sanitizeUrlSpan is never applied to it, so Go's own apivars.Resolve still finds it untouched.
+  const subUrl = (text: string): string => {
+    const result = resolve(text, values, secretNames, dynamic, sanitizeUrlSpan);
+    refs.push(...result.refs);
+    return result.text;
+  };
 
-  const url = sub(state.url);
+  const url = subUrl(state.url);
   const headers = state.headers
     .filter((h) => h.enabled && h.name.trim() !== '')
     .map((h) => ({ name: sub(h.name), value: sub(h.value) }));

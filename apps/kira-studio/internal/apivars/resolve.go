@@ -39,9 +39,36 @@ type SubstitutionResult struct {
 // nothing, and passes through literally. One pass only: a resolved value that itself contains
 // `{{other}}` is never re-expanded.
 func Resolve(text string, values map[string]string, secretNames []string) SubstitutionResult {
+	return resolveWithSanitizer(text, values, secretNames, nil)
+}
+
+// urlUnsafeReplacer is the Go twin of packages/api-core/src/http/substitute.ts's own
+// sanitizeUrlSpan (finding 6, v1.2 P14 round 2) — percent-encodes only the characters that would
+// otherwise break url.Parse's RawQuery or the request line itself (a space is what actually turns
+// a send into a 400; &/#/= are the query string's own structural delimiters), leaving `{{`/`}}`
+// and the reference name's ordinary characters exactly as typed.
+var urlUnsafeReplacer = strings.NewReplacer(
+	" ", "%20", "\t", "%09", "\r", "%0D", "\n", "%0A",
+	"&", "%26", "#", "%23", "=", "%3D",
+)
+
+// resolveWithSanitizer is Resolve's real body — sanitize, when non-nil, is applied to a reference
+// span left literal because it will never be resolved by anyone downstream: KindUnknown (no such
+// name — including a secret whose decrypt failed, since Resolver.Text always calls this with
+// secretNames nil, so a still-missing secret name falls into this same branch) and KindDynamic (Go
+// never generates a `{{$name}}` value itself — P6's generator is JS-only). Deliberately never
+// applied to KindDeferred: a later pass elsewhere still has to find that span by its exact,
+// untouched name.
+func resolveWithSanitizer(text string, values map[string]string, secretNames []string, sanitize func(string) string) SubstitutionResult {
 	secrets := make(map[string]bool, len(secretNames))
 	for _, n := range secretNames {
 		secrets[n] = true
+	}
+	sanitizeOrVerbatim := func(span string) string {
+		if sanitize != nil {
+			return sanitize(span)
+		}
+		return span
 	}
 
 	refs := []Reference{}
@@ -70,7 +97,7 @@ func Resolve(text string, values map[string]string, secretNames []string) Substi
 			out.WriteString(span)
 		case strings.HasPrefix(name, "$"):
 			refs = append(refs, Reference{Name: name, Kind: KindDynamic})
-			out.WriteString(span)
+			out.WriteString(sanitizeOrVerbatim(span))
 		case secrets[name]:
 			refs = append(refs, Reference{Name: name, Kind: KindDeferred})
 			out.WriteString(span)
@@ -80,7 +107,7 @@ func Resolve(text string, values map[string]string, secretNames []string) Substi
 				out.WriteString(value)
 			} else {
 				refs = append(refs, Reference{Name: name, Kind: KindUnknown})
-				out.WriteString(span)
+				out.WriteString(sanitizeOrVerbatim(span))
 			}
 		}
 	}
@@ -178,7 +205,19 @@ func (r *Resolver) Any() bool {
 // never fails a caller over one unresolved reference (D10 mirrors P9 D10's own rule), the server's
 // own response is the honest signal.
 func (r *Resolver) Text(text string) string {
-	result := Resolve(text, r.secretValues, nil)
+	return r.text(text, nil)
+}
+
+// URLText is Text's twin for the one field with query-string delimiter syntax to break (finding
+// 6, v1.2 P14 round 2): a secret whose decrypt failed still resolves to nothing and is left
+// verbatim by Text's own contract above, but for the URL specifically that verbatim span must not
+// inject a raw space/&/#/= into url.Parse's RawQuery or the request line itself.
+func (r *Resolver) URLText(text string) string {
+	return r.text(text, urlUnsafeReplacer.Replace)
+}
+
+func (r *Resolver) text(text string, sanitize func(string) string) string {
+	result := resolveWithSanitizer(text, r.secretValues, nil, sanitize)
 	for _, ref := range result.Refs {
 		if ref.Kind == KindResolved {
 			r.used[ref.Name] = r.secretValues[ref.Name]
@@ -235,7 +274,7 @@ func (s *Service) ResolveRequest(
 		return url, headers, body, nil, nil
 	}
 
-	resolvedURL := resolver.Text(url)
+	resolvedURL := resolver.URLText(url)
 	resolvedHeaders := make([]httpclient.Header, len(headers))
 	for i, h := range headers {
 		resolvedHeaders[i] = httpclient.Header{Name: resolver.Text(h.Name), Value: resolver.Text(h.Value)}

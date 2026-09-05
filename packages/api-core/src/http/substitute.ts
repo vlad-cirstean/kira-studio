@@ -44,12 +44,22 @@ export interface SubstitutionResult {
  * site but send() does, most importantly HttpRequestView.vue's live preview (F2) — must never
  * generate anything, which is why this is the *only* place `dynamic` is consulted rather than a
  * capability the engine always has.
+ *
+ * Finding 6 (v1.2 P14 round 2): `sanitizeUnresolved`, when supplied, is applied to a reference
+ * span that is left literal because it will *never* be resolved by anyone downstream — `unknown`
+ * (no such name anywhere) and `dynamic` (an uncatalogued generator) — before it is written to
+ * `out`. A `deferred` span (a secret) is never sanitized here even when supplied: Go's own
+ * apivars.Resolve still has to find it by its exact, untouched name. This is how a caller
+ * embedding the result in a URL (state.ts's own `resolveTabState`) keeps a genuinely-terminal
+ * `{{name with spaces}}` from injecting a raw space/`&`/`#`/`=` into `url.Parse`'s RawQuery or the
+ * request line itself, without corrupting a name a later pass still needs to match.
  */
 export function resolve(
   text: string,
   values: Readonly<Record<string, string>>,
   secretNames: readonly string[],
   dynamic?: (name: string) => string | null,
+  sanitizeUnresolved?: (span: string) => string,
 ): SubstitutionResult {
   const secrets = new Set(secretNames);
   const refs: Reference[] = [];
@@ -87,10 +97,12 @@ export function resolve(
         continue;
       }
       refs.push({ name, kind: 'dynamic' });
-      out += span;
+      out += sanitizeUnresolved ? sanitizeUnresolved(span) : span;
       continue;
     }
     if (secrets.has(name)) {
+      // Never sanitized: a downstream pass (Go's apivars.Resolve) still has to find this span by
+      // its exact, untouched name.
       refs.push({ name, kind: 'deferred' });
       out += span;
       continue;
@@ -101,10 +113,33 @@ export function resolve(
       continue;
     }
     refs.push({ name, kind: 'unknown' });
-    out += span;
+    out += sanitizeUnresolved ? sanitizeUnresolved(span) : span;
   }
 
   return { text: out, refs };
+}
+
+// Finding 6's own character set — a space (the HTTP request line's own token delimiter, the one
+// that actually turns a send into a 400) plus the query-string's structural delimiters (&, #, =)
+// and the other ASCII whitespace bytes that are just as line-breaking as a space. Braces and an
+// ordinary reference name's own characters are deliberately not in this table — they pass through
+// a plain find-and-replace unchanged, which is what keeps the token recognisable as `{{name}}`.
+const URL_UNSAFE_PATTERN = /[ \t\r\n&#=]/g;
+const URL_UNSAFE_ENCODED: Readonly<Record<string, string>> = {
+  ' ': '%20',
+  '\t': '%09',
+  '\r': '%0D',
+  '\n': '%0A',
+  '&': '%26',
+  '#': '%23',
+  '=': '%3D',
+};
+
+/** `resolve`'s `sanitizeUnresolved` for a URL: percent-encodes only the characters that would
+ *  otherwise break `url.Parse`'s RawQuery or the request line itself (finding 6) — everything
+ *  else in the span, `{{`/`}}` included, is left exactly as typed. */
+export function sanitizeUrlSpan(span: string): string {
+  return span.replace(URL_UNSAFE_PATTERN, (c) => URL_UNSAFE_ENCODED[c]);
 }
 
 /** One span of splitTemplateSpans' own walk — `text` is the literal run for a non-reference span,
