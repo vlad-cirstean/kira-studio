@@ -730,6 +730,13 @@
   font-size: var(--kira-t-xs);
   color: var(--kira-fg-subtle);
 }
+/* LAW 12: the label's width changes as elapsed time ticks up (the widest is
+   "9999 ms", 7 characters); reserve that width so it never reflows controls
+   to its left. 7ch tracks the monospace font-family above with no token. */
+.p-run-state .label {
+  min-width: 7ch;
+  text-align: right;
+}
 .p-run-state .ring {
   width: 11px;
   height: 11px;

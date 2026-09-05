@@ -25,6 +25,6 @@ const label = computed(() => {
     :class="{ 'is-running': status === 'running', 'is-error': status === 'error' }"
     v-tooltip="title"
   >
-    {{ label }}<span class="ring" />
+    <span class="label">{{ label }}</span><span class="ring" />
   </span>
 </template>
