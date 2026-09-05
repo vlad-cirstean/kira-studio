@@ -33,9 +33,13 @@ export function createHistoryStore<Entry, Snapshot, Extra extends object = Recor
   const runtime = reactive({} as Record<string, Runtime>);
 
   function ensure(tabId: string): Runtime {
-    let rt = runtime[tabId];
-    if (!rt) {
-      rt = {
+    // D2: always hand back runtime[tabId] — never the freshly-built literal. `runtime` is a deep
+    // reactive(); reading the indexed property returns the tracked proxy, but returning the local
+    // object on the creating call hands out the untracked target instead, so a write through it
+    // (e.g. noteRecorded's own `rt.stale = true` on a tab's first-ever call) mutates the right
+    // memory but triggers no effect. One extra lookup, permanently closes that class of bug (F4).
+    if (!runtime[tabId]) {
+      runtime[tabId] = {
         entries: null,
         loading: false,
         stale: false,
@@ -43,9 +47,8 @@ export function createHistoryStore<Entry, Snapshot, Extra extends object = Recor
         error: null,
         ...(opts.extra ? opts.extra() : ({} as Extra)),
       };
-      runtime[tabId] = rt;
     }
-    return rt;
+    return runtime[tabId] as Runtime;
   }
 
   registerTabRuntimeCleanup((tabId) => {
