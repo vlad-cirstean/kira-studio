@@ -967,7 +967,7 @@ const preconnectText = computed({
 }
 
 .helper-text {
-  color: var(--kira-fg-disabled);
+  color: var(--kira-fg-subtle);
   font-size: var(--kira-t-xs);
   line-height: 1.5;
   width: 100%;

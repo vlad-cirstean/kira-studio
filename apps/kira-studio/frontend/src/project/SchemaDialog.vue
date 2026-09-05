@@ -159,7 +159,7 @@ async function onSave(): Promise<void> {
 
 .help {
   font-size: var(--kira-t-xs);
-  color: var(--kira-fg-disabled);
+  color: var(--kira-fg-subtle);
   line-height: 1.5;
 }
 
@@ -189,6 +189,6 @@ async function onSave(): Promise<void> {
 
 .empty-note {
   font-size: var(--kira-t-xs);
-  color: var(--kira-fg-disabled);
+  color: var(--kira-fg-subtle);
 }
 </style>

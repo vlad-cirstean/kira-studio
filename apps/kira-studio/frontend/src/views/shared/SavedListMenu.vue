@@ -126,7 +126,7 @@ defineSlots<{
   display: flex;
   background: transparent;
   border: none;
-  color: var(--kira-fg-disabled);
+  color: var(--kira-fg-subtle);
   cursor: pointer;
   padding: 0;
   flex-shrink: 0;

@@ -235,7 +235,7 @@ const rawLanguage = computed(() =>
 
 .no-issues,
 .no-plan {
-  color: var(--kira-fg-disabled);
+  color: var(--kira-fg-subtle);
   margin: 0;
 }
 
@@ -276,7 +276,7 @@ const rawLanguage = computed(() =>
 }
 
 .plan-detail {
-  color: var(--kira-fg-disabled);
+  color: var(--kira-fg-subtle);
   font-size: var(--kira-t-xs);
 }
 

@@ -116,7 +116,7 @@ function onContextMenu(ev: MouseEvent, col: ColumnMeta): void {
 }
 
 .type-info {
-  color: var(--kira-fg-disabled);
+  color: var(--kira-fg-subtle);
   vertical-align: middle;
   margin-left: var(--kira-s-1);
   cursor: help;

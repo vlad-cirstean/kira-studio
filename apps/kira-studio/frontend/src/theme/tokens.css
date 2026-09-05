@@ -6,7 +6,11 @@
   --kira-bg-input: #313131; /* input + dropdown */
   --kira-fg: #cccccc;
   --kira-fg-muted: #9d9d9d;
-  --kira-fg-disabled: #6e6e6e;
+  /* Tertiary, non-interactive text: separators, captions, row numbers, NULL markers, empty-state
+     copy. Not a disabled control — WCAG 1.4.3 exempts those, which is why --kira-fg-disabled below
+     may stay under 4.5:1 and this may not. 4.77:1 on --kira-bg, 4.72:1 on --kira-bg-elevated. */
+  --kira-fg-subtle: #8a8a8a;
+  --kira-fg-disabled: #6e6e6e; /* :disabled / .is-disabled only */
   --kira-border: #2b2b2b; /* contrastBorder / panel.border */
   --kira-border-strong: #313131; /* widget.border */
   --kira-focus: #0078d4;

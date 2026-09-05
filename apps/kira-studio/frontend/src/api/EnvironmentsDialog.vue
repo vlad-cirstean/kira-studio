@@ -199,7 +199,7 @@ function close(): void {
   display: flex;
   align-items: center;
   cursor: grab;
-  color: var(--kira-fg-disabled);
+  color: var(--kira-fg-subtle);
 }
 
 .name-field {

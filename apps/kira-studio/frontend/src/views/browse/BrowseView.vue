@@ -283,7 +283,7 @@ onMounted(() => {
 }
 
 .crumb-sep {
-  color: var(--kira-fg-disabled);
+  color: var(--kira-fg-subtle);
 }
 
 .filter-field {

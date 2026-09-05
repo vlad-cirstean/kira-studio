@@ -292,7 +292,7 @@
      rule exists: matching the incumbent's box model, not just its paint. */
   padding-left: 0;
   background: var(--kira-bg-elevated);
-  color: var(--kira-fg-disabled);
+  color: var(--kira-fg-subtle);
   font-size: var(--kira-t-xs);
   /* P22 iter2-pacing D7 item 1: `text-align: right` is what makes this work under `.slick-cell`'s
      own `display: block` (as it was until the next rule below landed). D7 item 2's `display: flex`
@@ -446,7 +446,7 @@
    two fewer DOM operations and one fewer retained element per NULL cell, and the truncation
    tooltip moves from a 6px span to the whole cell (appendCellHtml's own `toolTip` -> `title`). */
 .slick-grid-host .slick-cell.cell-null {
-  color: var(--kira-fg-disabled);
+  color: var(--kira-fg-subtle);
   font-style: italic;
 }
 .slick-grid-host .slick-cell.cell-truncated::after {

@@ -111,7 +111,7 @@ function close(): void {
 }
 
 .entry-time {
-  color: var(--kira-fg-disabled);
+  color: var(--kira-fg-subtle);
   font-size: var(--kira-t-sm);
 }
 
@@ -122,7 +122,7 @@ function close(): void {
 }
 
 .entry-value.masked {
-  color: var(--kira-fg-disabled);
+  color: var(--kira-fg-subtle);
   letter-spacing: 2px;
 }
 </style>

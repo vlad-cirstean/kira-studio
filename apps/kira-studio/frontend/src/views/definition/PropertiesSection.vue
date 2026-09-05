@@ -38,7 +38,7 @@ defineProps<{
 }
 
 .def-prop-detail {
-  color: var(--kira-fg-disabled);
+  color: var(--kira-fg-subtle);
   font-size: var(--kira-t-sm);
 }
 </style>

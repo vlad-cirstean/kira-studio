@@ -962,7 +962,7 @@ onUnmounted(() => {
 
 /* view header: 28px, connection colour appears only as the dot (LAW — see template comment) */
 .path {
-  color: var(--kira-fg-disabled);
+  color: var(--kira-fg-subtle);
 }
 
 /* Task #64: the compose-message popover was rendered as a sibling of ViewChrome, far from the

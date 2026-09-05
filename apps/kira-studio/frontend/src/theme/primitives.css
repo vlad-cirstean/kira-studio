@@ -11,7 +11,7 @@
   color: var(--kira-fg-muted);
 }
 .dim {
-  color: var(--kira-fg-disabled);
+  color: var(--kira-fg-subtle);
 }
 .p-sm {
   font-size: var(--kira-t-sm);
@@ -599,7 +599,7 @@
   align-items: center;
   padding: 0 var(--kira-s-3);
   font-size: var(--kira-t-xs);
-  color: var(--kira-fg-disabled);
+  color: var(--kira-fg-subtle);
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
@@ -715,7 +715,7 @@
   white-space: nowrap;
 }
 .p-view-target .path {
-  color: var(--kira-fg-disabled);
+  color: var(--kira-fg-subtle);
 }
 
 /* ---------- LAW: work-in-progress is a ring + elapsed time in the toolbar
@@ -728,7 +728,7 @@
   gap: var(--kira-s-2);
   font-family: var(--kira-font-family);
   font-size: var(--kira-t-xs);
-  color: var(--kira-fg-disabled);
+  color: var(--kira-fg-subtle);
 }
 .p-run-state .ring {
   width: 11px;
@@ -828,14 +828,14 @@
 }
 .p-td.gutter {
   justify-content: flex-end;
-  color: var(--kira-fg-disabled);
+  color: var(--kira-fg-subtle);
   font-size: var(--kira-t-xs);
   background: var(--kira-bg-elevated);
   border-right-color: var(--kira-border-strong);
   position: relative;
 }
 .p-td.null {
-  color: var(--kira-fg-disabled);
+  color: var(--kira-fg-subtle);
   font-style: italic;
 }
 .p-td.num {
@@ -876,7 +876,7 @@
   align-items: center;
   justify-content: center;
   gap: var(--kira-s-4);
-  color: var(--kira-fg-disabled);
+  color: var(--kira-fg-subtle);
 }
 .p-empty .big {
   width: 24px;

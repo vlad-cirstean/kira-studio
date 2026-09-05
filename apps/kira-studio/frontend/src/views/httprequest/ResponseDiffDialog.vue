@@ -349,7 +349,7 @@ onUnmounted(() => {
 }
 
 .diff-header-head {
-  color: var(--kira-fg-disabled);
+  color: var(--kira-fg-subtle);
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }

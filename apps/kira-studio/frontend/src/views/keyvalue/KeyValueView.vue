@@ -996,7 +996,7 @@ onUnmounted(() => {
   margin-left: var(--kira-s-3);
   flex-shrink: 0;
   background: var(--kira-bg-input);
-  color: var(--kira-fg-disabled);
+  color: var(--kira-fg-subtle);
 }
 
 .search-match {

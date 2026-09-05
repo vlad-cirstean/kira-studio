@@ -116,6 +116,6 @@ const cacheSizeLabel = computed(() => {
   min-width: 9ch; /* "1234.5 MB" */
 }
 .metric-sep {
-  color: var(--kira-fg-disabled);
+  color: var(--kira-fg-subtle);
 }
 </style>

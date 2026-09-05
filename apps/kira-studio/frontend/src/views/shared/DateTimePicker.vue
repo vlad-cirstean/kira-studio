@@ -388,7 +388,7 @@ const secondText = computed<string>({
   align-items: center;
   justify-content: center;
   height: var(--kira-h-xs);
-  color: var(--kira-fg-disabled);
+  color: var(--kira-fg-subtle);
   font-size: var(--kira-t-xs);
 }
 
@@ -424,6 +424,6 @@ const secondText = computed<string>({
 }
 
 .dtp-clock-sep {
-  color: var(--kira-fg-disabled);
+  color: var(--kira-fg-subtle);
 }
 </style>

@@ -12,6 +12,7 @@
   --color-input: var(--kira-bg-input);
   --color-fg: var(--kira-fg);
   --color-muted: var(--kira-fg-muted);
+  --color-subtle: var(--kira-fg-subtle);
   --color-disabled: var(--kira-fg-disabled);
   --color-border: var(--kira-border);
   --color-border-strong: var(--kira-border-strong);

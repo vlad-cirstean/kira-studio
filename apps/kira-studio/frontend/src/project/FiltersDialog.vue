@@ -262,7 +262,7 @@ const connectionName = computed(
 
 .help {
   font-size: var(--kira-t-xs);
-  color: var(--kira-fg-disabled);
+  color: var(--kira-fg-subtle);
   line-height: 1.5;
 }
 
@@ -340,7 +340,7 @@ const connectionName = computed(
 .kind-count,
 .object-count {
   font-size: var(--kira-t-xs);
-  color: var(--kira-fg-disabled);
+  color: var(--kira-fg-subtle);
 }
 
 .object-checkbox-label {
@@ -373,7 +373,7 @@ const connectionName = computed(
 
 .empty-note {
   font-size: var(--kira-t-xs);
-  color: var(--kira-fg-disabled);
+  color: var(--kira-fg-subtle);
   padding: var(--kira-s-2);
 }
 

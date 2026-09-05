@@ -187,7 +187,7 @@ function close(): void {
 .drag-handle {
   display: flex;
   align-items: center;
-  color: var(--kira-fg-disabled);
+  color: var(--kira-fg-subtle);
   cursor: grab;
   flex-shrink: 0;
 }
