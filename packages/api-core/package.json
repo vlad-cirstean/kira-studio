@@ -9,5 +9,12 @@
     "@faker-js/faker": "10.6.0",
     "@kira/shared": "workspace:*",
     "shlex": "3.0.0"
+  },
+  "devDependencies": {
+    "bun-types": "1.4.0"
+  },
+  "scripts": {
+    "typecheck": "tsgo --noEmit -p tsconfig.json",
+    "test": "bun test test"
   }
 }
