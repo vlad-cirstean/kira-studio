@@ -260,21 +260,40 @@ onUnmounted(() => {
         >
           {{ unresolvedRefs.length }} unresolved
         </span>
+        <!-- P18 D14 (P15 D7's gRPC sibling): the first control HTTP's own head ever placed there —
+             this is its second instance, not a new precedent (LAW 09's own "the head names the
+             target" exception). Same testid/disabled/tooltip, only the slot moved. -->
+        <AppButton
+          icon="save"
+          data-testid="grpc-save"
+          :disabled="canSave && !dirty"
+          v-tooltip="canSave ? 'Save request' : 'Save request to a collection'"
+          @click="onSave"
+        >
+          Save
+        </AppButton>
       </template>
 
       <template #toolbar>
-        <AutocompleteField
-          :model-value="tab.state.target"
-          placeholder="api.example.com:443"
-          style="flex: 1"
-          data-testid="grpc-target"
-          :candidates="variables.candidates"
-          :token-at="templateToken"
-          :range-highlights="variables.rangeHighlights"
-          :hover-at="variables.hoverAt"
-          @update:model-value="onTargetInput"
-          @enter="onCall"
-        />
+        <!-- P18 D14 (P15 D4's gRPC sibling): style="flex: 1" directly on AutocompleteField was a
+             no-op (F14) -- TextField/AutocompleteField set inheritAttrs: false, so a call-site
+             style lands on the inner <input> (already flex: 1) and never on the wrapping .p-input
+             box that actually sizes it. The app's existing wrapper + :deep(.p-input) idiom (used
+             at ten other call sites, HttpRequestView.vue's own .url-field among them) fixes it
+             here too — the target field now actually grows with the window. -->
+        <div class="grpc-target-field">
+          <AutocompleteField
+            :model-value="tab.state.target"
+            placeholder="api.example.com:443"
+            data-testid="grpc-target"
+            :candidates="variables.candidates"
+            :token-at="templateToken"
+            :range-highlights="variables.rangeHighlights"
+            :hover-at="variables.hoverAt"
+            @update:model-value="onTargetInput"
+            @enter="onCall"
+          />
+        </div>
         <SegmentedControl
           :model-value="tab.state.tlsMode"
           :options="TLS_OPTIONS"
@@ -291,15 +310,6 @@ onUnmounted(() => {
           <option value="" disabled>Choose a method…</option>
           <option v-for="opt in methodOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
         </select>
-        <AppButton
-          icon="save"
-          data-testid="grpc-save"
-          :disabled="canSave && !dirty"
-          v-tooltip="canSave ? 'Save request' : 'Save request to a collection'"
-          @click="onSave"
-        >
-          Save
-        </AppButton>
         <AppButton
           icon="play"
           variant="primary"
@@ -395,6 +405,16 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
+/* P18 D14/F14: HttpRequestView.vue's own .url-field idiom, verbatim — the wrapper (not the inner
+   input) is what actually sizes in the toolbar row. */
+.grpc-target-field {
+  flex: 1;
+  min-width: 0;
+}
+.grpc-target-field :deep(.p-input) {
+  width: 100%;
+}
+
 .overview-anchor {
   position: relative;
   display: flex;
