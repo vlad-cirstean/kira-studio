@@ -20,6 +20,7 @@ import { beautifyJson } from '../../beautify';
 import CodeMirrorHost from '../../editor/CodeMirrorHost.vue';
 import { registerCommand } from '../../shortcuts/commands';
 import AppButton from '../../theme/primitives/AppButton.vue';
+import IconButton from '../../theme/primitives/IconButton.vue';
 import PanelSplitter from '../../theme/primitives/PanelSplitter.vue';
 import SegmentedControl from '../../theme/primitives/SegmentedControl.vue';
 import TextField from '../../theme/primitives/TextField.vue';
@@ -279,6 +280,13 @@ onUnmounted(() => {
           :options="REQUEST_PANE_OPTIONS"
           data-testid="grpc-request-pane-toggle"
           @update:model-value="setRequestPane"
+        />
+        <IconButton
+          v-if="tab.state.requestPane === 'message'"
+          icon="expand-all"
+          v-tooltip="'Beautify'"
+          data-testid="grpc-beautify"
+          @click="onBeautify"
         />
         <EnvironmentSelect />
       </template>

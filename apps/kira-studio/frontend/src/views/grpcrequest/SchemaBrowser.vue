@@ -110,12 +110,17 @@ function selectMethod(service: string, method: string): void {
     </div>
 
     <div v-if="tab.state.descriptorMode === 'proto'" class="import-paths" data-testid="grpc-import-paths">
-      <span class="p-xs muted">Import paths</span>
-      <div v-for="(p, i) in tab.state.importPaths" :key="i" class="import-path-row">
-        <span class="p-xs mono">{{ p }}</span>
-        <IconButton icon="close" v-tooltip="'Remove'" @click="removeImportPath(i)" />
+      <span class="def-section-title">Import paths</span>
+      <div class="import-path-list">
+        <div v-for="(p, i) in tab.state.importPaths" :key="i" class="p-row">
+          <span class="p-xs mono import-path-text" v-tooltip="p">{{ p }}</span>
+          <IconButton icon="close" class="p-push" v-tooltip="'Remove'" @click="removeImportPath(i)" />
+        </div>
+        <div v-if="tab.state.importPaths.length === 0" class="p-xs dim">
+          No import paths — the .proto file's own directory is used
+        </div>
       </div>
-      <div class="import-path-row">
+      <div class="add-row">
         <TextField
           v-model="newImportPath"
           placeholder="Add an import path…"
@@ -133,13 +138,13 @@ function selectMethod(service: string, method: string): void {
     <div class="service-list" data-testid="grpc-service-list">
       <template v-if="rt?.schema && rt.schema.services.length > 0">
         <div v-for="svc in rt.schema.services" :key="svc.name" class="service-group">
-          <div class="service-name" data-testid="grpc-service-name">{{ svc.name }}</div>
+          <div class="def-section-title service-name" data-testid="grpc-service-name">{{ svc.name }}</div>
           <button
             v-for="m in svc.methods"
             :key="m.name"
             type="button"
-            class="method-row"
-            :class="{ active: tab.state.service === svc.name && tab.state.method === m.name }"
+            class="p-row method-row"
+            :class="{ 'is-selected': tab.state.service === svc.name && tab.state.method === m.name }"
             data-testid="grpc-method-row"
             @click="selectMethod(svc.name, m.name)"
           >
@@ -185,10 +190,25 @@ function selectMethod(service: string, method: string): void {
   border-bottom: var(--kira-border-width) solid var(--kira-border);
 }
 
-.import-path-row {
+/* D14: a real cap + scroll, so a large .proto tree's import list can never push the source row
+   and the whole service browser off the pane. */
+.import-path-list {
+  max-height: 132px;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.import-path-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.add-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: var(--kira-s-2);
 }
 
@@ -204,33 +224,18 @@ function selectMethod(service: string, method: string): void {
 }
 
 .service-name {
-  font-size: var(--kira-t-xs);
-  color: var(--kira-fg-muted);
   padding: var(--kira-s-1) 0;
 }
 
+/* p-row supplies height/display/align-items/gap/padding/border-radius/color/font-size/cursor
+   and its own hover + is-selected states; this button only needs what .p-row does not supply. */
 .method-row {
   width: 100%;
-  display: flex;
-  align-items: center;
   justify-content: space-between;
-  gap: var(--kira-s-2);
-  padding: var(--kira-s-2);
   background: none;
   border: none;
-  border-radius: var(--kira-radius-sm);
-  cursor: pointer;
   text-align: left;
   font: inherit;
-  color: var(--kira-fg);
-}
-
-.method-row:hover {
-  background: var(--kira-hover);
-}
-
-.method-row.active {
-  background: var(--kira-select);
 }
 
 .method-name {

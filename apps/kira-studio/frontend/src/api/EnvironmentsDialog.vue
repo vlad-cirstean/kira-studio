@@ -153,7 +153,6 @@ function close(): void {
           @blur="onNameBlur(env.id)"
         />
         <AppButton
-          kind="dialog"
           data-testid="environment-edit-variables"
           @click="onEditVariables(env.id, env.name)"
         >
