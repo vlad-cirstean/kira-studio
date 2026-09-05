@@ -52,8 +52,11 @@ export interface RawPreview {
   modeChanged: { from: HttpBodyMode; to: HttpBodyMode } | null;
 }
 
-/** D12/C6's own reasoning: parseRawRequest is pure and synchronous, so there is nothing to
- *  debounce or cache — recomputed on every keystroke, exactly like previewCurl. */
+/** Pure and synchronous — safe to call as often as a caller likes. Round-2 review finding 7:
+ *  EditRawRequestDialog.vue debounces its own calls into this (400ms, mirroring
+ *  ImportCurlDialog.vue's identical debounce over previewCurl below) rather than calling it
+ *  straight from the editor's `@update:doc`, since the raw buffer here is always the full
+ *  generated request, not something typically hand-typed short. */
 export function previewRaw(text: string): RawPreview {
   const result = parseRawRequest(text, editRawDialogState.originalUrl);
   if ('error' in result) {

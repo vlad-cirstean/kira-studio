@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import CodeMirrorHost from '../editor/CodeMirrorHost.vue';
 import AppButton from '../theme/primitives/AppButton.vue';
 import DialogFrame from '../theme/primitives/DialogFrame.vue';
@@ -13,16 +13,34 @@ import { applyEditRaw, closeEditRawDialog, editRawDialogState, previewRaw } from
 // numbers (F17 — no new primitive, no new dependency).
 const text = ref('');
 
+// Round-2 review finding 7 (the same class ImportCurlDialog.vue's own finding 15 fixed for curl
+// import, worse here since this buffer is always the full generated request, not something
+// typically hand-pasted small): re-parsing the whole buffer on every single keystroke just to
+// update a preview has no business running that often — the editor itself (`text`) stays bound
+// immediately so typing never stutters; the preview below reads a debounced copy instead. 400ms
+// mirrors ImportCurlDialog.vue's own precedent for the identical shape.
+const debouncedText = ref('');
+let previewTimer: ReturnType<typeof setTimeout> | undefined;
+onBeforeUnmount(() => clearTimeout(previewTimer));
+
 watch(
   () => editRawDialogState.open,
   (open) => {
     if (!open) return;
     text.value = editRawDialogState.initialText;
+    clearTimeout(previewTimer);
+    debouncedText.value = editRawDialogState.initialText;
   },
   { immediate: true },
 );
+watch(text, (value) => {
+  clearTimeout(previewTimer);
+  previewTimer = setTimeout(() => {
+    debouncedText.value = value;
+  }, 400);
+});
 
-const preview = computed(() => previewRaw(text.value));
+const preview = computed(() => previewRaw(debouncedText.value));
 
 // Built in script rather than the template: a literal '{{variables}}' inside a template mustache
 // would be misread by the Vue compiler as the interpolation's own closing '}}' — CopyAsCurlDialog.vue's

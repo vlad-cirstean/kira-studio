@@ -80,8 +80,9 @@ export interface CurlPreview {
   error: string | null;
 }
 
-/** D12: recomputed on every keystroke — parseCurl is pure and synchronous, so there is nothing to
- *  debounce or cache. An empty paste is neither an error nor a preview: the dialog just shows
+/** D12: parseCurl is pure and synchronous, so there is nothing to cache — but not free enough to
+ *  call on every keystroke unthrottled (finding 15): ImportCurlDialog.vue debounces its own calls
+ *  into this (400ms). An empty paste is neither an error nor a preview: the dialog just shows
  *  nothing yet. */
 export function previewCurl(text: string): CurlPreview {
   if (text.trim() === '') return { summary: '', warnings: [], error: null };
