@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/url"
 	"strings"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapterhost"
@@ -140,18 +141,30 @@ func (s *HttpService) Send(ctx context.Context, args HttpSendArgs) (httpclient.R
 
 // secretReplacer builds P9 D6's own strings.Replacer over every non-empty secret value — nil when
 // there is nothing to mask (no secret was actually substituted). A strings.Replacer can only
-// over-mask (a secret value that happens to occur elsewhere is masked too) and never under-mask,
-// which is the safe direction (D6's own stated property).
+// over-mask (a secret value that happens to occur elsewhere is masked too) and never under-mask a
+// surface that carries the secret's own plaintext verbatim — D6's own stated property, which does
+// not by itself cover a surface that carries a *re-encoded* form instead (finding 6: a
+// urlencoded body's rendered wire text is url.QueryEscape's own output, never the plaintext
+// buildURLEncoded started from), so each secret's QueryEscape'd form is registered as an
+// additional pair below, alongside the plaintext one.
 func secretReplacer(usedSecrets map[string]string) *strings.Replacer {
 	if len(usedSecrets) == 0 {
 		return nil
 	}
-	pairs := make([]string, 0, len(usedSecrets)*2)
+	pairs := make([]string, 0, len(usedSecrets)*4)
 	for name, value := range usedSecrets {
 		if value == "" {
 			continue
 		}
-		pairs = append(pairs, value, "{{"+name+"}}")
+		placeholder := "{{" + name + "}}"
+		pairs = append(pairs, value, placeholder)
+		// F: url.QueryEscape rewrites space/+//=&%@: and non-ASCII — most real passwords and any
+		// base64 token — so a urlencoded body's rendered wire text (encodeURLEncodedFields' own
+		// output, wire.go's renderRequestBody) would otherwise carry the secret in cleartext,
+		// just percent-encoded, with the pane still claiming "N secret values shown as {{name}}".
+		if encoded := url.QueryEscape(value); encoded != value {
+			pairs = append(pairs, encoded, placeholder)
+		}
 	}
 	if len(pairs) == 0 {
 		return nil

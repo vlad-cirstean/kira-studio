@@ -2,6 +2,9 @@ package bridge
 
 import (
 	"context"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -285,5 +288,62 @@ func TestHttpSendFailure_OpLogErrorNeverContainsSecret(t *testing.T) {
 	}
 	if strings.Contains(rawError, secret) {
 		t.Fatalf("stored op_log.error column contains the raw secret: %q", rawError)
+	}
+}
+
+// TestMaskSecrets_MasksURLEncodedBodyDespiteQueryEscape is finding 6: secretReplacer used to build
+// its strings.Replacer over each secret's own *plaintext*, but a urlencoded body's rendered wire
+// text (resp.Wire.Request) is the *url.QueryEscape'd* form buildURLEncoded/encodeURLEncodedFields
+// actually produced — url.QueryEscape rewrites space, '+', '@' (among others), so a secret value
+// containing any of them survived masking in cleartext, right next to the pane's own "N secret
+// values shown as {{name}}" claim. Driven through a real httpclient.Send (a real httptest server),
+// not a hand-built Response, so a future change to how the wire text is rendered would still be
+// caught here.
+func TestMaskSecrets_MasksURLEncodedBodyDespiteQueryEscape(t *testing.T) {
+	// Contains a space, a '+', and an '@' — three of the characters url.QueryEscape rewrites,
+	// exactly the ones the finding calls out.
+	const secretName = "apiKey"
+	const secretValue = "p@ss word+token"
+	usedSecrets := map[string]string{secretName: secretValue}
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	resp, err := httpclient.Send(context.Background(), httpclient.Request{
+		Method: "POST",
+		URL:    srv.URL + "/x",
+		Body: httpclient.Body{
+			Mode:       "urlencoded",
+			URLEncoded: []httpclient.Field{{Name: "token", Value: secretValue}},
+		},
+	})
+	if err != nil {
+		t.Fatalf("Send: %v", err)
+	}
+	if resp.Wire == nil {
+		t.Fatal("resp.Wire is nil — nothing to mask")
+	}
+	// Confirms the fixture actually exercises the bug this test guards: the encoded form must
+	// differ from the plaintext, and both must be present in the unmasked wire text.
+	encoded := url.QueryEscape(secretValue)
+	if encoded == secretValue {
+		t.Fatalf("QueryEscape(%q) = %q did not change — this fixture no longer exercises the bug", secretValue, encoded)
+	}
+	if !strings.Contains(resp.Wire.Request, encoded) {
+		t.Fatalf("unmasked wire request does not contain the encoded secret %q at all:\n%s", encoded, resp.Wire.Request)
+	}
+
+	maskSecrets(&resp, usedSecrets)
+
+	if strings.Contains(resp.Wire.Request, secretValue) {
+		t.Fatalf("masked wire request still contains the raw secret:\n%s", resp.Wire.Request)
+	}
+	if strings.Contains(resp.Wire.Request, encoded) {
+		t.Fatalf("masked wire request still contains the QueryEscape'd secret %q:\n%s", encoded, resp.Wire.Request)
+	}
+	if !strings.Contains(resp.Wire.Request, "{{apiKey}}") {
+		t.Fatalf("masked wire request does not contain the masked placeholder:\n%s", resp.Wire.Request)
 	}
 }
