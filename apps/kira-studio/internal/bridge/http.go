@@ -212,6 +212,14 @@ func maskSecrets(resp *httpclient.Response, usedSecrets map[string]string) {
 // exists) can embed the resolved URL straight into the message net/http or url.Parse produced —
 // exactly the message RunOp's own err.Error() persists verbatim to op_log.error (host.go). A
 // no-op when err is not an *httpclient.Error or no secret was actually substituted.
+//
+// Round-2 review finding 3: this used to mask only Hops[i].URL, unlike maskSecrets' success path
+// which additionally masks Hops[i].Headers[j].Value (e.g. a Location header carrying a
+// secret-bearing redirect URL) — those two fields need the exact same treatment here. Separately,
+// httpclient/timeline.go's finishFailed writes a *second*, independent copy of the resolved URL
+// into Hops[i].Error via err.Error(), a field masking herr.Message alone never reaches since it is
+// a wholly different field. Both are rendered by TimelinePane.vue for a failed send (the
+// failed-hop chip and the "Response headers" disclosure), so both are masked here too.
 func maskSendErrTimeline(err error, usedSecrets map[string]string) {
 	var herr *httpclient.Error
 	if !errors.As(err, &herr) {
@@ -227,6 +235,10 @@ func maskSendErrTimeline(err error, usedSecrets map[string]string) {
 	}
 	for i := range herr.Timeline.Hops {
 		herr.Timeline.Hops[i].URL = replacer.Replace(herr.Timeline.Hops[i].URL)
+		herr.Timeline.Hops[i].Error = replacer.Replace(herr.Timeline.Hops[i].Error)
+		for j := range herr.Timeline.Hops[i].Headers {
+			herr.Timeline.Hops[i].Headers[j].Value = replacer.Replace(herr.Timeline.Hops[i].Headers[j].Value)
+		}
 	}
 }
 

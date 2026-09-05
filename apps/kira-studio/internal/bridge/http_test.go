@@ -2,6 +2,7 @@ package bridge
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapterhost"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/bridge/ipcerr"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/httpclient"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/oplog"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage"
@@ -153,6 +155,65 @@ func TestMaskSendErrTimeline_MasksFailedSendHopURL(t *testing.T) {
 	}
 	if !strings.Contains(got, "{{apiKey}}") {
 		t.Fatalf("Timeline.Hops[0].URL = %q, want it masked to {{apiKey}}", got)
+	}
+}
+
+// TestMaskSendErrTimeline_MasksHopHeadersAndHopError is round-2 review finding 3:
+// maskSendErrTimeline masked only Hops[i].URL, unlike maskSecrets' success-path twin which also
+// masks Hops[i].Headers[j].Value (e.g. a Location header carrying a secret-bearing redirect URL).
+// Separately, httpclient/timeline.go's finishFailed writes a second, independent copy of the
+// resolved URL into Hops[i].Error via err.Error() — a field masking herr.Message alone never
+// reaches. Both are rendered by TimelinePane.vue for a failed send (the failed-hop chip and the
+// "Response headers" disclosure). Reproduces the shape D15 describes: a redirect hop that
+// completed normally (carrying a secret-bearing Location header) followed by the hop the send
+// actually died on (carrying the secret in its own Error string).
+func TestMaskSendErrTimeline_MasksHopHeadersAndHopError(t *testing.T) {
+	const secret = "sk_live_super_secret_token"
+	usedSecrets := map[string]string{"apiKey": secret}
+
+	sendErr := &httpclient.Error{
+		Code: httpclient.CodeHTTPTransport, Message: "connect: connection refused",
+		Timeline: &httpclient.Timeline{
+			Hops: []httpclient.TimelineHop{
+				{
+					Index: 0, Method: "GET",
+					URL: "https://api.example.com/orders?token=" + secret, Status: 301,
+					Headers: []httpclient.Header{
+						{Name: "Location", Value: "https://api.example.com/orders/final?token=" + secret},
+					},
+				},
+				{
+					Index: 1, Method: "GET",
+					URL:   "https://api.example.com/orders/final?token=" + secret,
+					Error: `Get "https://api.example.com/orders/final?token=` + secret + `": dial tcp: connection refused`,
+				},
+			},
+		},
+	}
+
+	maskSendErrTimeline(sendErr, usedSecrets)
+
+	assertMasked := func(t *testing.T, label, s string) {
+		t.Helper()
+		if strings.Contains(s, secret) {
+			t.Errorf("%s = %q still contains the raw secret", label, s)
+		}
+		if !strings.Contains(s, "{{apiKey}}") {
+			t.Errorf("%s = %q, want it masked to {{apiKey}}", label, s)
+		}
+	}
+	assertMasked(t, "Hops[0].Headers[0].Value (Location)", sendErr.Timeline.Hops[0].Headers[0].Value)
+	assertMasked(t, "Hops[1].Error", sendErr.Timeline.Hops[1].Error)
+
+	// End to end through the copyable surface: mapHttpError marshals the whole Timeline into
+	// ipcerr.Error.Details.
+	mapped := mapHttpError(sendErr)
+	var ie *ipcerr.Error
+	if !errors.As(mapped, &ie) {
+		t.Fatalf("mapHttpError(...) = %T, want *ipcerr.Error", mapped)
+	}
+	if strings.Contains(string(ie.Details), secret) {
+		t.Fatalf("ipcerr.Error.Details still contains the raw secret:\n%s", ie.Details)
 	}
 }
 
