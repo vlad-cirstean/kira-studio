@@ -3,11 +3,15 @@ import { MySQL, PostgreSQL, SQLDialect, SQLite, sql } from '@codemirror/lang-sql
 import { xml } from '@codemirror/lang-xml';
 import { StreamLanguage, type StringStream } from '@codemirror/language';
 import type { Extension } from '@codemirror/state';
+import type { EditorLanguageId } from '@shared/domain/editor';
 import type { SqlDialect } from '../views/shared/sqlIdent';
 
 /** The six grammars an editor surface can request. `formats.ts` maps CellFormat onto the first
- *  four; `mongo`/`redis` are the addendum's console-only highlighting modes (D23). */
-export type EditorLanguageId = 'json' | 'xml' | 'sql' | 'mongo' | 'redis' | 'plain';
+ *  four; `mongo`/`redis` are the addendum's console-only highlighting modes (D23). P12 F14: the
+ *  type itself now lives in packages/shared/domain/editor.ts, so a package with no CodeMirror
+ *  dependency (packages/api-core) can still type against it — re-exported here so no other
+ *  importer has to change. */
+export type { EditorLanguageId };
 
 // P18 addendum D23: highlighting only, no completion language data — the console's own
 // `completionSources` prop (CodeMirrorHost.vue) carries the tab-specific source instead, so

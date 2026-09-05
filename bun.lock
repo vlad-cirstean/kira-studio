@@ -53,6 +53,20 @@
       "name": "@kira/kira-studio-frontend",
       "version": "0.0.0",
     },
+    "packages/api-core": {
+      "name": "@kira/api-core",
+      "version": "0.0.0",
+      "dependencies": {
+        "@faker-js/faker": "10.6.0",
+        "@kira/shared": "workspace:*",
+        "shlex": "3.0.0",
+        "zod": "4.5.4",
+      },
+    },
+    "packages/shared": {
+      "name": "@kira/shared",
+      "version": "0.0.0",
+    },
   },
   "packages": {
     "@babel/helper-string-parser": ["@babel/helper-string-parser@7.29.7", "", {}, "sha512-Pb5ijPrZ89GDH8223L4UP8i6QApWxs04RbPQJTeWDV0/keR2E36MeKnyr6LYmUUvqRRI+Iv87SuF1W6ErINzYw=="],
@@ -129,7 +143,11 @@
 
     "@js-sdsl/ordered-map": ["@js-sdsl/ordered-map@4.4.2", "", {}, "sha512-iUKgm52T8HOE/makSxjqoWhe95ZJA1/G1sYsGev2JDKUSS14KAgg1LHb+Ba+IPow0xflbnSkOsZcO08C7w1gYw=="],
 
+    "@kira/api-core": ["@kira/api-core@workspace:packages/api-core"],
+
     "@kira/kira-studio-frontend": ["@kira/kira-studio-frontend@workspace:apps/kira-studio/frontend"],
+
+    "@kira/shared": ["@kira/shared@workspace:packages/shared"],
 
     "@kwsites/file-exists": ["@kwsites/file-exists@1.1.1", "", { "dependencies": { "debug": "^4.1.1" } }, "sha512-m9/5YGR18lIwxSFDwfE3oA7bWuq9kdau6ugN4H2rJeyhFQZcG9AgSHkQtSD15a8WvTgfz9aikZMrKPHvbpqFiw=="],
 
