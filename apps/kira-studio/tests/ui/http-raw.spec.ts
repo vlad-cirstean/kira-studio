@@ -113,7 +113,12 @@ test('Http raw — the inspector, http2 and masked', async ({ relaunch }) => {
   expect(requestText).not.toContain('sk_live_');
 });
 
-test('Http raw — no raw view for a stored entry', async ({ relaunch }) => {
+// P18 D8: this test used to be named "no raw view for a stored entry" and asserted the empty
+// state F8 found — the Raw pane could show nothing at all for a stored entry, since a stored
+// entry never has a `wire` (P9 D7 nulls it before persisting) and nothing reconstructed one from
+// what *is* stored. It now reconstructs both documents from the snapshot's own stage-1 request/
+// response fields, so this asserts that reconstruction instead of an empty state.
+test('Http raw — a stored entry reconstructs its raw view (P18 D8)', async ({ relaunch }) => {
   const ENTRY = {
     id: 'e1',
     itemId: null,
@@ -174,9 +179,11 @@ test('Http raw — no raw view for a stored entry', async ({ relaunch }) => {
   await expect(page.locator('[data-testid="http-history-band"]')).toBeVisible();
 
   await page.click('[data-testid="http-response-pane-raw"]');
-  const emptyRaw = page.locator('[data-testid="http-raw-pane"] .p-empty');
-  await expect(emptyRaw).toBeVisible();
-  await expect(emptyRaw).toContainText('No raw view for a stored response');
+  await expect(page.locator('[data-testid="http-raw-reconstructed"]')).toBeVisible();
+  const requestEditor = page.locator('[data-testid="http-wire-request-editor"] .cm-content');
+  expect(await requestEditor.innerText()).toContain('GET https://api.example.com/orders HTTP/1.1');
+  const responseEditor = page.locator('[data-testid="http-wire-response-editor"] .cm-content');
+  expect(await responseEditor.innerText()).toContain('{"id":1,"name":"Ada"}');
 
   // Switching back to Body still renders the stored entry — the fourth segment did not disturb
   // P8's source swap.

@@ -666,9 +666,12 @@ test('gRPC request — the history pane gets a real Clear action', async ({ rela
   };
   const scope = { itemId: '', tabId: 'tab-grpc-1' };
   const CONTROL: ControlSnapshot[] = [
-    // service/method set and a live call answered so the response section (and its History pane)
-    // stays mounted once the history list empties out — the same `hasResult || hasHistory` gate
-    // response-pane.vue's HTTP twin has.
+    // P18 D14: the response section is now a panel from tab-open (F12), not gated on
+    // hasResult || hasHistory — so ResponsePane.vue's own mount-time "does this tab have any
+    // history" probe fires immediately, before either the call or the pane switch below (empty).
+    // P18 D1: switching to History afterwards then genuinely refetches (the call was made while
+    // Messages was showing, so it went through the lazy/stale branch) — one more real list() call
+    // than this fixture needed before that fix, which is why there are three answers, not two.
     {
       channel: IPC.tabsList,
       response: [grpcTab({ service: 'demo.Echo', method: 'SayHello' })],
@@ -687,6 +690,7 @@ test('gRPC request — the history pane gets a real Clear action', async ({ rela
         messages: [{ seq: 0, json: '{}', wireBytes: 10, offsetMs: 0 }],
       },
     },
+    { channel: IPC.grpcHistoryList, args: scope, response: [] },
     { channel: IPC.grpcHistoryList, args: scope, response: [ENTRY] },
     { channel: IPC.grpcHistoryClear, args: scope, response: undefined },
     { channel: IPC.grpcHistoryList, args: scope, response: [] },
@@ -781,4 +785,243 @@ test('gRPC request — a stored streaming history entry with elided messages sho
   // (137) here, not the 100 messages the elided snapshot actually carries — otherwise it
   // contradicts the "first 100 of 137" strip right above it.
   await expect(page.locator('[data-testid="grpc-message-summary"]')).toContainText('137 messages');
+});
+
+// ---- P18: item 1 (D1/D3), item 3 (D13/D14) ----
+
+test('gRPC request — the history list refreshes after a call made while another pane was showing (P18 D1)', async ({
+  relaunch,
+}) => {
+  const NEWEST = {
+    id: 'live-2',
+    itemId: null,
+    tabId: 'tab-grpc-1',
+    calledAt: '2026-01-01T00:05:00.000Z',
+    target: 'demo.example.com:443',
+    method: 'demo.Echo/SayHello',
+    streaming: 'unary',
+    environment: '',
+    code: 0,
+    codeName: 'OK',
+    statusMessage: '',
+    elapsedMs: 3,
+    messageCount: 1,
+    messageBytes: 10,
+    storedBytes: 60,
+  };
+  const OLDEST = {
+    id: 'live-1',
+    itemId: null,
+    tabId: 'tab-grpc-1',
+    calledAt: '2026-01-01T00:00:00.000Z',
+    target: 'demo.example.com:443',
+    method: 'demo.Echo/SayHello',
+    streaming: 'unary',
+    environment: '',
+    code: 0,
+    codeName: 'OK',
+    statusMessage: '',
+    elapsedMs: 30,
+    messageCount: 1,
+    messageBytes: 10,
+    storedBytes: 60,
+  };
+  const scope = { itemId: '', tabId: 'tab-grpc-1' };
+  const CONTROL: ControlSnapshot[] = [
+    {
+      channel: IPC.tabsList,
+      response: [grpcTab({ service: 'demo.Echo', method: 'SayHello' })],
+    },
+    // Same two-answer shape as http-history.spec.ts's own D1 case: the first is the response
+    // pane's own mount-time "does this tab have any history" probe (empty), before either call;
+    // the second is what reopening History actually fetches after both calls.
+    { channel: IPC.grpcHistoryList, args: scope, response: [] },
+    { channel: IPC.grpcHistoryList, args: scope, response: [NEWEST, OLDEST] },
+    {
+      channel: IPC.grpcCall,
+      response: {
+        code: 0,
+        codeName: 'OK',
+        statusMessage: '',
+        elapsedMs: 3,
+        header: [],
+        trailer: [],
+        messageCount: 1,
+        messageBytes: 10,
+        messages: [{ seq: 0, json: '{}', wireBytes: 10, offsetMs: 0 }],
+      },
+    },
+  ];
+  const { window: page } = await relaunch({ control: CONTROL });
+
+  // Both calls happen with the Messages pane showing (the default) — never opening History in
+  // between, so both take the lazy branch.
+  await expect(page.locator('[data-testid="grpc-response-pane-messages"]')).toHaveClass(/on/);
+  await page.click('[data-testid="grpc-call"]');
+  await expect(page.locator('[data-testid="grpc-status-chip"]')).toContainText('OK (0)');
+  await page.click('[data-testid="grpc-call"]');
+  await expect(page.locator('[data-testid="grpc-status-chip"]')).toContainText('OK (0)');
+
+  await page.click('[data-testid="grpc-response-pane-history"]');
+
+  const rows = page.locator('[data-testid="grpc-history-row"]');
+  await expect(rows).toHaveCount(2);
+});
+
+test('gRPC request — calling while viewing a stored call shows the new one (P18 D3)', async ({
+  relaunch,
+}) => {
+  const STORED = {
+    id: 'stored-1',
+    itemId: null,
+    tabId: 'tab-grpc-1',
+    calledAt: '2026-01-01T00:00:00.000Z',
+    target: 'demo.example.com:443',
+    method: 'demo.Echo/SayHello',
+    streaming: 'unary',
+    environment: '',
+    code: 5,
+    codeName: 'NotFound',
+    statusMessage: 'no such user',
+    elapsedMs: 8,
+    messageCount: 0,
+    messageBytes: 0,
+    storedBytes: 60,
+  };
+  const STORED_SNAPSHOT = {
+    entry: STORED,
+    target: 'demo.example.com:443',
+    method: 'demo.Echo/SayHello',
+    streaming: 'unary',
+    message: '{}',
+    metadata: [],
+    messages: [],
+    messagesElided: false,
+    header: [],
+    trailer: [],
+  };
+  const scope = { itemId: '', tabId: 'tab-grpc-1' };
+  const CONTROL: ControlSnapshot[] = [
+    {
+      channel: IPC.tabsList,
+      response: [grpcTab({ service: 'demo.Echo', method: 'SayHello' })],
+    },
+    { channel: IPC.grpcHistoryList, args: scope, response: [STORED] },
+    { channel: IPC.grpcHistoryGet, args: { id: 'stored-1' }, response: STORED_SNAPSHOT },
+    {
+      channel: IPC.grpcCall,
+      response: {
+        code: 0,
+        codeName: 'OK',
+        statusMessage: '',
+        elapsedMs: 3,
+        header: [],
+        trailer: [],
+        messageCount: 1,
+        messageBytes: 10,
+        messages: [{ seq: 0, json: '{}', wireBytes: 10, offsetMs: 0 }],
+      },
+    },
+  ];
+  const { window: page } = await relaunch({ control: CONTROL });
+
+  await page.click('[data-testid="grpc-response-pane-history"]');
+  await page.click('[data-testid="grpc-history-row"]');
+
+  const band = page.locator('[data-testid="grpc-history-band"]');
+  await expect(band).toBeVisible();
+  await expect(page.locator('[data-testid="grpc-status-chip"]')).toContainText('NotFound (5)');
+
+  await page.click('[data-testid="grpc-call"]');
+
+  await expect(band).toHaveCount(0);
+  await expect(page.locator('[data-testid="grpc-status-chip"]')).toContainText('OK (0)');
+});
+
+test('a freshly opened gRPC tab shows the response pane switcher before any call (P18 D14)', async ({
+  relaunch,
+}) => {
+  const { window: page } = await relaunch({
+    control: [{ channel: IPC.tabsList, response: [grpcTab({})] }],
+  });
+
+  // Present from the moment the tab opens — the HTTP twin of this case (D1) at
+  // api-ui-consistency.spec.ts:152, mirrored here now that F12 closed the gRPC gap.
+  await expect(page.locator('[data-testid="grpc-response-pane-toggle"]')).toBeVisible();
+  await expect(page.locator('[data-testid="grpc-status-chip"]')).toHaveCount(0);
+
+  // Each pane still owns its own empty state — switching to Metadata on a never-called tab
+  // renders the group headers with no rows rather than throwing.
+  await page.click('[data-testid="grpc-response-pane-metadata"]');
+  await expect(page.locator('[data-testid="grpc-response-metadata"]')).toContainText(
+    'No header metadata',
+  );
+});
+
+test('a non-OK status shows what the code means and what the server said (P18 D13)', async ({
+  relaunch,
+}) => {
+  const CONTROL: ControlSnapshot[] = [
+    {
+      channel: IPC.tabsList,
+      response: [grpcTab({ service: 'demo.Echo', method: 'SayHello' })],
+    },
+    {
+      channel: IPC.grpcCall,
+      response: {
+        code: 5,
+        codeName: 'NotFound',
+        statusMessage: 'no user with that id',
+        elapsedMs: 4,
+        header: [],
+        trailer: [],
+        messageCount: 0,
+        messageBytes: 0,
+        messages: [],
+      },
+    },
+  ];
+  const { window: page } = await relaunch({ control: CONTROL });
+
+  await page.click('[data-testid="grpc-call"]');
+
+  const hint = page.locator('[data-testid="grpc-status-hint"]');
+  const message = page.locator('[data-testid="grpc-status-message"]');
+  await expect(hint).toBeVisible();
+  await expect(hint).toContainText('the server has no such method or resource');
+  await expect(message).toBeVisible();
+  await expect(message).toHaveText('no user with that id');
+});
+
+test('the gRPC target field fills the toolbar row (P18 D14)', async ({ relaunch }) => {
+  const { window: page } = await relaunch({
+    control: [{ channel: IPC.tabsList, response: [grpcTab({})] }],
+  });
+
+  const target = page.locator('[data-testid="grpc-target"]');
+  const widthAt = () => target.evaluate((el) => el.getBoundingClientRect().width);
+  // Fixed-width neighbours (TLS toggle, method select, Call) whose own width must stay put while
+  // the target field grows or shrinks with the window — the exact defect F14 found (a no-op
+  // `style="flex: 1"` on the field itself, which never grew at all).
+  const tlsWidthAt = () =>
+    page
+      .locator('[data-testid="grpc-tls-toggle"]')
+      .evaluate((el) => el.getBoundingClientRect().width);
+
+  const viewport = page.viewportSize();
+  if (!viewport) throw new Error('no viewport');
+
+  const widthBefore = await widthAt();
+  const tlsBefore = await tlsWidthAt();
+
+  const delta = 200;
+  await page.setViewportSize({ width: viewport.width + delta, height: viewport.height });
+
+  const widthAfter = await widthAt();
+  const tlsAfter = await tlsWidthAt();
+
+  // The target field grows by roughly the window's own delta (it is the row's one flexible
+  // element); its fixed-width neighbour does not move at all.
+  expect(widthAfter - widthBefore).toBeGreaterThan(delta * 0.5);
+  expect(Math.abs(tlsAfter - tlsBefore)).toBeLessThanOrEqual(1);
 });

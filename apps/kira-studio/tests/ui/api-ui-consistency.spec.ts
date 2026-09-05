@@ -1068,3 +1068,156 @@ test('the overview panel opens from a request tab, lists both scopes with their 
     page.locator('[data-testid="variables-dialog"][data-scope="environment"]'),
   ).toBeVisible();
 });
+
+// P18 D10/D12: gRPC parity with the URL-field (:300) and header-name (:357) cases above — closing
+// F15 (no {{variable}} colouring anywhere in gRPC) and P15b #7 (no metadata-name completion).
+
+const GRPC_P18_ENV = { id: 'env-p18', name: 'Prod', sortOrder: 0, isActive: true };
+const GRPC_P18_BASE_URL_VAR = {
+  id: 'var-target',
+  scope: 'environment',
+  ownerId: 'env-p18',
+  name: 'target',
+  value: 'demo.example.com:443',
+  isSecret: false,
+  sortOrder: 0,
+};
+
+function grpcP18VariableControl(): ControlSnapshot[] {
+  return [
+    { channel: IPC.variablesListEnvironments, response: [GRPC_P18_ENV] },
+    {
+      channel: IPC.variablesList,
+      args: { scope: 'environment', ownerId: 'env-p18' },
+      response: [GRPC_P18_BASE_URL_VAR],
+    },
+  ];
+}
+
+test('the gRPC target paints a resolved reference and an unknown one differently (P18 D10)', async ({
+  relaunch,
+}) => {
+  const CONTROL: ControlSnapshot[] = [
+    { channel: IPC.tabsList, response: [grpcTab({})] },
+    ...grpcP18VariableControl(),
+  ];
+  const { window: page } = await relaunch({ control: CONTROL });
+
+  await page.fill('[data-testid="grpc-target"]', '{{target}}/{{not_defined}}');
+
+  const overlay = page.locator('.grpc-target-field .highlight-overlay');
+  await expect(overlay.locator('.cm-kira-var')).toHaveCount(1);
+  await expect(overlay.locator('.cm-kira-var-unknown')).toHaveCount(1);
+});
+
+test('a metadata name cell suggests grpc-timeout (P18 D12)', async ({ relaunch }) => {
+  const CONTROL: ControlSnapshot[] = [{ channel: IPC.tabsList, response: [grpcTab({})] }];
+  const { window: page } = await relaunch({ control: CONTROL });
+
+  await page.click('[data-testid="grpc-request-pane-metadata"]');
+  const nameInput = page.locator('[data-testid="grpc-metadata-name"]').first();
+  await nameInput.click();
+  await nameInput.pressSequentially('grpc-time');
+  const suggestions = page.locator('.autocomplete-suggestions li');
+  await expect(suggestions.filter({ hasText: 'grpc-timeout' })).toBeVisible();
+  await page.keyboard.press('Tab');
+  await expect(nameInput).toHaveValue('grpc-timeout');
+});
+
+// P18 D19: the environment select is app-drawn now (P17 D18's precedent) — a colour dot on the
+// closed state and per row, and the closed height/border/padding unchanged (P16 D6, extending the
+// http-method-select/http-url case at :424).
+
+const GRPC_ENV_COLOR_A = {
+  id: 'env-a',
+  name: 'Prod',
+  sortOrder: 0,
+  isActive: true,
+  description: '',
+  color: 'blue',
+};
+const GRPC_ENV_COLOR_B = {
+  id: 'env-b',
+  name: 'Staging',
+  sortOrder: 1,
+  isActive: false,
+  description: '',
+  color: 'none',
+};
+
+test('the environment select opens an app-drawn menu carrying each environment’s colour, and its closed height matches the controls beside it (P18 D19)', async ({
+  relaunch,
+}) => {
+  const CONTROL: ControlSnapshot[] = [
+    { channel: IPC.tabsList, response: [httpRequestTab('tab-1', 0, true, {})] },
+    { channel: IPC.variablesListEnvironments, response: [GRPC_ENV_COLOR_A, GRPC_ENV_COLOR_B] },
+  ];
+  const { window: page } = await relaunch({ control: CONTROL });
+
+  const select = page.locator('[data-testid="api-environment-select"]');
+  await expect(select).toBeVisible();
+  await expect(select.locator('.p-conn-dot')).toBeVisible();
+
+  // P16 D6's own rule, extended: the closed control's height matches its neighbours in the same
+  // toolbar row, unaffected by the native-<select> -> app-drawn-<button> swap.
+  const selectHeight = await select.evaluate((el) => (el as HTMLElement).offsetHeight);
+  const urlBoxHeight = await page
+    .locator('.p-input:has([data-testid="http-url"])')
+    .evaluate((el) => (el as HTMLElement).offsetHeight);
+  expect(selectHeight).toBe(urlBoxHeight);
+
+  await select.click();
+  const menu = page.locator('[data-testid="api-environment-menu"]');
+  await expect(menu).toBeVisible();
+
+  const noneRow = page.locator('[data-testid="api-environment-option-none"]');
+  await expect(noneRow.locator('.p-conn-dot.none')).toBeVisible();
+
+  const rows = page.locator('[data-testid="api-environment-option"]');
+  await expect(rows).toHaveCount(2);
+  const prodRow = rows.filter({ hasText: 'Prod' });
+  const stagingRow = rows.filter({ hasText: 'Staging' });
+  await expect(prodRow.locator('.p-conn-dot')).not.toHaveClass(/none/);
+  await expect(stagingRow.locator('.p-conn-dot')).toHaveClass(/none/);
+
+  await prodRow.click();
+  await expect(menu).toHaveCount(0);
+  await expect(select).toHaveAttribute('data-value', 'env-a');
+});
+
+// P18 D17: an environment's colour reaches the request view's toolbar cap and head dot, and
+// changes live when the active environment changes — LAW 07's rail/dot, the exact analogue of a
+// query console's own connection indicator, filling the slot F20 #6 found reserved-but-empty.
+
+test('an environment’s colour reaches the request view’s toolbar cap and head dot, and changes when the active environment changes (P18 D17)', async ({
+  relaunch,
+}) => {
+  const CONTROL: ControlSnapshot[] = [
+    { channel: IPC.tabsList, response: [httpRequestTab('tab-1', 0, true, {})] },
+    // Two answers, consumed in order: env-a active (initial mount), then env-b active (the
+    // reload setActiveEnvironment triggers after the switch below) — the same "list re-fetched
+    // after every mutation" shape variablesSetActiveEnvironment/loadEnvironments already has.
+    { channel: IPC.variablesListEnvironments, response: [GRPC_ENV_COLOR_A, GRPC_ENV_COLOR_B] },
+    {
+      channel: IPC.variablesListEnvironments,
+      response: [
+        { ...GRPC_ENV_COLOR_A, isActive: false },
+        { ...GRPC_ENV_COLOR_B, isActive: true },
+      ],
+    },
+    { channel: IPC.variablesSetActiveEnvironment, args: { id: 'env-b' }, response: null },
+  ];
+  const { window: page } = await relaunch({ control: CONTROL });
+
+  const rail = page.locator('[data-testid="http-request-view"] .p-toolbar-rail');
+  await expect(rail).toHaveAttribute('style', /--kira-conn-blue/);
+
+  const headDot = page.locator('.p-view-head .p-conn-dot');
+  await expect(headDot).not.toHaveClass(/none/);
+  await expect(headDot).toHaveAttribute('style', /--kira-conn-blue/);
+
+  await page.click('[data-testid="api-environment-select"]');
+  await page.click('[data-testid="api-environment-option"][data-value="env-b"]');
+
+  await expect(headDot).toHaveClass(/none/);
+});

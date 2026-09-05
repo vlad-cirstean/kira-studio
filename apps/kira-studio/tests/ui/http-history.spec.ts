@@ -393,3 +393,282 @@ test('Http history — compare two responses', async ({ relaunch }) => {
     '{\n  "id": 1,\n  "name": "Ada",\n  "active": true\n}',
   );
 });
+
+// ---- P18 D1: the live-update bug, and its exact repro ----
+
+const SEND_RESPONSE = {
+  status: 200,
+  statusText: 'OK',
+  proto: 'HTTP/1.1',
+  headers: [],
+  body: '',
+  bodyEncoding: 'utf8',
+  bodyBytes: 0,
+  bodyTruncated: false,
+  elapsedMs: 5,
+  finalUrl: 'https://api.example.com/orders',
+  redirects: [],
+};
+
+test('Http history — the list refreshes after a send made while another pane was showing (P18 D1)', async ({
+  relaunch,
+}) => {
+  const NEWEST = {
+    id: 'live-2',
+    itemId: null,
+    tabId: 't1',
+    sentAt: '2024-06-01T10:05:00.000Z',
+    method: 'GET',
+    url: 'https://api.example.com/orders',
+    environment: '',
+    status: 200,
+    statusText: 'OK',
+    elapsedMs: 5,
+    bodyBytes: 0,
+    storedBytes: 60,
+  };
+  const OLDEST = {
+    id: 'live-1',
+    itemId: null,
+    tabId: 't1',
+    sentAt: '2024-06-01T10:00:00.000Z',
+    method: 'GET',
+    url: 'https://api.example.com/orders',
+    environment: '',
+    status: 200,
+    statusText: 'OK',
+    elapsedMs: 50,
+    bodyBytes: 0,
+    storedBytes: 60,
+  };
+
+  const CONTROL: ControlSnapshot[] = [
+    // Two historyList answers for the same (itemId: '') scope, consumed in order (mockRuntime.ts
+    // strips tabId from the match key, so a scratch tab's own random id never has to be
+    // predicted): the first is ResponsePane.vue's own "does this tab have any history at all"
+    // mount-time probe (P8 D11), before either send — empty. The second is what a real reopen of
+    // the History pane fetches after both sends. Pre-fix, this second answer is never asked for
+    // at all: `entries` is already non-null (from the first, empty answer) and `stale` has no
+    // reader, so ensureLoaded's own guard silently returns without refetching.
+    { channel: IPC.historyList, args: { itemId: '' }, response: [] },
+    { channel: IPC.historyList, args: { itemId: '' }, response: [NEWEST, OLDEST] },
+    // One snapshot only (F16's own rule in this file's header comment): a send's opId is
+    // renderer-minted, so two sends in one test can only share one httpSend answer.
+    { channel: IPC.httpSend, response: SEND_RESPONSE },
+  ];
+  const { window: page } = await relaunch({ control: CONTROL });
+
+  await openHttpModeAndNewRequest(page);
+  await page.fill('[data-testid="http-url"]', 'https://api.example.com/orders');
+
+  // Both sends happen with the Body pane showing (the default, and where a user is after every
+  // send) — never opening History in between, so both take the lazy branch (F3's exact repro).
+  await expect(page.locator('[data-testid="http-response-pane-body"]')).toHaveClass(/on/);
+  await page.click('[data-testid="http-send"]');
+  await expect(page.locator('[data-testid="http-status"]')).toContainText('200');
+  await page.click('[data-testid="http-send"]');
+  await expect(page.locator('[data-testid="http-status"]')).toContainText('200');
+
+  // Only now does the pane switch to History — this is the one call site (ResponseHistoryList's
+  // own onMounted) the bug lived in.
+  await page.click('[data-testid="http-response-pane-history"]');
+
+  const rows = page.locator('[data-testid="http-history-row"]');
+  await expect(rows).toHaveCount(2);
+  // Newest first — the same order Record's own per-scope trim/List orders by (and the order this
+  // test's own List answer above is already sorted in, matching every other test in this file).
+  await expect(rows.nth(0)).toContainText('5 ms');
+  await expect(rows.nth(1)).toContainText('50 ms');
+});
+
+test('Http history — sending while viewing a stored response shows the new one (P18 D3)', async ({
+  relaunch,
+}) => {
+  const STORED = {
+    id: 'stored-1',
+    itemId: null,
+    tabId: 't1',
+    sentAt: '2024-06-01T09:00:00.000Z',
+    method: 'GET',
+    url: 'https://api.example.com/orders',
+    environment: '',
+    status: 404,
+    statusText: 'Not Found',
+    elapsedMs: 20,
+    bodyBytes: 0,
+    storedBytes: 60,
+  };
+  const STORED_SNAPSHOT = {
+    entry: STORED,
+    request: EMPTY_REQUEST,
+    response: {
+      status: 404,
+      statusText: 'Not Found',
+      proto: 'HTTP/1.1',
+      headers: [],
+      body: '',
+      bodyEncoding: 'utf8',
+      bodyBytes: 0,
+      bodyTruncated: false,
+      elapsedMs: 20,
+      finalUrl: 'https://api.example.com/orders',
+      redirects: [],
+    },
+    bodyStored: true,
+    bodyStorageTruncated: false,
+    requestBodyStorageTruncated: false,
+  };
+
+  const CONTROL: ControlSnapshot[] = [
+    { channel: IPC.historyList, response: [STORED] },
+    { channel: IPC.historyGet, response: STORED_SNAPSHOT },
+    { channel: IPC.httpSend, response: SEND_RESPONSE },
+  ];
+  const { window: page } = await relaunch({ control: CONTROL });
+
+  await openHttpModeAndNewRequest(page);
+  await page.fill('[data-testid="http-url"]', 'https://api.example.com/orders');
+  await page.click('[data-testid="http-response-pane-history"]');
+  await page.click('[data-testid="http-history-row"]');
+
+  const band = page.locator('[data-testid="http-history-band"]');
+  await expect(band).toBeVisible();
+  await expect(page.locator('[data-testid="http-status"]')).toContainText('404');
+
+  // D10's own click also switches the pane back to Body — send from there, the same place a user
+  // actually is after clicking a history row.
+  await page.click('[data-testid="http-send"]');
+
+  await expect(band).toHaveCount(0);
+  await expect(page.locator('[data-testid="http-status"]')).toContainText('200');
+});
+
+test('Http history — a full list says only the last thirty are kept (P18 D6)', async ({
+  relaunch,
+}) => {
+  function entryAt(i: number): unknown {
+    return {
+      id: `cap-${i}`,
+      itemId: null,
+      tabId: 't1',
+      sentAt: `2024-06-01T10:${String(i).padStart(2, '0')}:00.000Z`,
+      method: 'GET',
+      url: 'https://api.example.com/orders',
+      environment: '',
+      status: 200,
+      statusText: 'OK',
+      elapsedMs: 5,
+      bodyBytes: 0,
+      storedBytes: 60,
+    };
+  }
+  const THIRTY = Array.from({ length: 30 }, (_, i) => entryAt(i));
+  const TWENTY_NINE = THIRTY.slice(1);
+
+  const FULL_CONTROL: ControlSnapshot[] = [{ channel: IPC.historyList, response: THIRTY }];
+  {
+    const { window: page } = await relaunch({ control: FULL_CONTROL });
+    await openHttpModeAndNewRequest(page);
+    await page.click('[data-testid="http-response-pane-history"]');
+    await expect(page.locator('[data-testid="http-history-row"]')).toHaveCount(30);
+    await expect(page.locator('[data-testid="http-history-cap-note"]')).toBeVisible();
+    await expect(page.locator('[data-testid="http-history-cap-note"]')).toContainText(
+      'the last 30',
+    );
+  }
+
+  const UNDER_CAP_CONTROL: ControlSnapshot[] = [
+    { channel: IPC.historyList, response: TWENTY_NINE },
+  ];
+  {
+    const { window: page } = await relaunch({ control: UNDER_CAP_CONTROL });
+    await openHttpModeAndNewRequest(page);
+    await page.click('[data-testid="http-response-pane-history"]');
+    await expect(page.locator('[data-testid="http-history-row"]')).toHaveCount(29);
+    await expect(page.locator('[data-testid="http-history-cap-note"]')).toHaveCount(0);
+  }
+});
+
+// ---- P18 D8: a stored entry's Raw pane shows what was sent ----
+
+test('Http history — a stored entry’s Raw view shows what was sent (P18 D8)', async ({
+  relaunch,
+}) => {
+  const ENTRY = {
+    id: 'raw-1',
+    itemId: null,
+    tabId: 't1',
+    sentAt: '2024-06-01T09:00:00.000Z',
+    method: 'POST',
+    url: 'https://api.example.com/orders',
+    environment: '',
+    status: 201,
+    statusText: 'Created',
+    elapsedMs: 30,
+    bodyBytes: 2,
+    storedBytes: 200,
+  };
+  const SNAPSHOT = {
+    entry: ENTRY,
+    request: {
+      method: 'POST',
+      url: 'https://api.example.com/orders',
+      headers: [
+        { name: 'Authorization', value: 'Bearer {{token}}' },
+        { name: 'Content-Type', value: 'application/json' },
+      ],
+      body: {
+        mode: 'raw',
+        raw: '{}',
+        code: '',
+        codeLanguage: '',
+        urlEncoded: [],
+        formData: [],
+        file: '',
+      },
+    },
+    response: {
+      status: 201,
+      statusText: 'Created',
+      proto: 'HTTP/1.1',
+      headers: [{ name: 'Content-Type', value: 'application/json' }],
+      body: '{"id":1}',
+      bodyEncoding: 'utf8',
+      bodyBytes: 8,
+      bodyTruncated: false,
+      elapsedMs: 30,
+      finalUrl: 'https://api.example.com/orders',
+      redirects: [],
+    },
+    bodyStored: true,
+    bodyStorageTruncated: false,
+    requestBodyStorageTruncated: true,
+  };
+
+  const CONTROL: ControlSnapshot[] = [
+    { channel: IPC.historyList, response: [ENTRY] },
+    { channel: IPC.historyGet, response: SNAPSHOT },
+  ];
+  const { window: page } = await relaunch({ control: CONTROL });
+
+  await openHttpModeAndNewRequest(page);
+  await page.click('[data-testid="http-response-pane-history"]');
+  await page.click('[data-testid="http-history-row"]');
+
+  await page.click('[data-testid="http-response-pane-raw"]');
+
+  await expect(page.locator('[data-testid="http-raw-reconstructed"]')).toBeVisible();
+  await expect(page.locator('[data-testid="http-history-request-truncated"]')).toBeVisible();
+
+  const requestEditor = page.locator('[data-testid="http-wire-request-editor"] .cm-content');
+  await expect(requestEditor).toBeVisible();
+  const requestText = await requestEditor.innerText();
+  expect(requestText).toContain('POST https://api.example.com/orders HTTP/1.1');
+  expect(requestText).toContain('Authorization: Bearer {{token}}');
+  expect(requestText).toContain('{}');
+
+  const responseEditor = page.locator('[data-testid="http-wire-response-editor"] .cm-content');
+  const responseText = await responseEditor.innerText();
+  expect(responseText).toContain('201 Created');
+  expect(responseText).toContain('{"id":1}');
+});

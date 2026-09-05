@@ -229,7 +229,11 @@ test('Http timeline — the elapsed figure and the redirect caption open the tim
   await expect(page.locator('[data-testid="http-timeline-pane"]')).toBeVisible();
 });
 
-test('Http timeline — a stored history entry has a real timeline, unlike Raw', async ({
+// P18 D8: this test used to contrast Timeline (has real data for a stored entry) against Raw
+// (nothing at all, F8's own gap) — Raw now reconstructs its two documents from the same stored
+// snapshot, so the two panes are no longer "one works, one doesn't"; both do, from different
+// stored fields (D10's own timeline vs D8's own request/response reconstruction).
+test('Http timeline — a stored history entry has a real timeline, and Raw reconstructs its own view', async ({
   relaunch,
 }) => {
   const ENTRY = {
@@ -308,12 +312,12 @@ test('Http timeline — a stored history entry has a real timeline, unlike Raw',
     'ms',
   );
 
-  // D7's own empty state still shows for the same stored entry — the deliberate contrast this
-  // phase's D10 is built to draw, not an accident of two panes independently forgetting a case.
+  // P18 D8: the same stored entry's Raw pane now reconstructs its own view too, from the
+  // snapshot's stage-1 request/response fields rather than the timeline's own separate data.
   await page.click('[data-testid="http-response-pane-raw"]');
-  const emptyRaw = page.locator('[data-testid="http-raw-pane"] .p-empty');
-  await expect(emptyRaw).toBeVisible();
-  await expect(emptyRaw).toContainText('No raw view for a stored response');
+  await expect(page.locator('[data-testid="http-raw-reconstructed"]')).toBeVisible();
+  const requestEditor = page.locator('[data-testid="http-wire-request-editor"] .cm-content');
+  expect(await requestEditor.innerText()).toContain('GET https://api.example.com/orders HTTP/1.1');
 });
 
 test('Http timeline — a failed send carries the timeline it got as far as', async ({

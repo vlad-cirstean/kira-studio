@@ -152,3 +152,41 @@ test('mode switch — two mode tabs, an empty Http mode, and Studio state that s
   await expect(page.locator('[data-testid="project-panel"]')).toBeVisible();
   await expect(page.locator('[data-testid="project-panel"]')).toContainText('Collections');
 });
+
+// P18 D15/F18: the mode tab's icon used to be an unboxed <i> and its label a bare text node — an
+// anonymous flex item with no element, no class, and no rect a test could measure at all. This is
+// the guard that becomes possible only once both are real, boxed elements: (a) the icon-box and
+// the label share a vertical centre line, and (b) the icon-box -> label gap is the same on both
+// tabs — false before this fix (F18's own measurement: an unboxed icon's ink varies per glyph, so
+// `database`'s own right side bearing (2.4px) differed from `globe`'s (0.8px)).
+test('a mode tab’s icon and label share a centre line, and both tabs measure the same gap (P18 D15)', async ({
+  relaunch,
+}) => {
+  const { window: page } = await relaunch({ control: [] });
+
+  async function boxesFor(mode: 'studio' | 'api') {
+    const tab = modeTab(page, mode);
+    const iconBox = await tab.locator('.icon-box').boundingBox();
+    const labelBox = await tab.locator('.mode-label').boundingBox();
+    if (!iconBox || !labelBox) {
+      throw new Error(`mode tab "${mode}" is missing a measurable .icon-box/.mode-label`);
+    }
+    return { iconBox, labelBox };
+  }
+
+  const studio = await boxesFor('studio');
+  const api = await boxesFor('api');
+
+  // (a) icon and label are vertically centred on the same line, on both tabs.
+  for (const { iconBox, labelBox } of [studio, api]) {
+    const iconCentre = iconBox.y + iconBox.height / 2;
+    const labelCentre = labelBox.y + labelBox.height / 2;
+    expect(Math.abs(iconCentre - labelCentre)).toBeLessThanOrEqual(1);
+  }
+
+  // (b) the icon-box -> label gap is the same on both tabs — glyph-independent, since a
+  // fixed-size .icon-box centres each glyph's *advance*, not its ink.
+  const studioGap = studio.labelBox.x - (studio.iconBox.x + studio.iconBox.width);
+  const apiGap = api.labelBox.x - (api.iconBox.x + api.iconBox.width);
+  expect(Math.abs(studioGap - apiGap)).toBeLessThanOrEqual(0.5);
+});
