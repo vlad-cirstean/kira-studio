@@ -178,7 +178,6 @@ function onBackToLatest(): void {
         <span class="p-chip" :class="statusClass(response.status)" data-testid="http-status">
           {{ response.status }} {{ response.statusText }}
         </span>
-        <span class="p-xs muted status-hint" v-tooltip="hint" data-testid="http-status-hint">{{ hint }}</span>
         <span class="p-push" />
         <button
           type="button"
@@ -206,6 +205,8 @@ function onBackToLatest(): void {
         @update:model-value="setResponsePane"
       />
     </div>
+
+    <div v-if="hint" class="p-sm muted status-hint" data-testid="http-status-hint">{{ hint }}</div>
 
     <MessageStrip v-if="viewing" tone="note" data-testid="http-history-band">
       Viewing the response from {{ viewingTime }} · {{ viewing?.snapshot.entry.method }}
@@ -292,10 +293,7 @@ function onBackToLatest(): void {
 }
 
 .status-hint {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  min-width: 0;
+  padding: 0 var(--kira-s-3) var(--kira-s-2);
 }
 
 .redirect-caption {
