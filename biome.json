@@ -213,7 +213,7 @@
               "options": {
                 "patterns": [
                   {
-                    "group": ["vue", "@codemirror/*", "**/apps/**", "@bindings*"],
+                    "group": ["vue", "@codemirror/*", "**/apps/**", "@bindings*/**"],
                     "message": "P12 D16(e): packages/api-core is pure, DOM-free logic — no Vue, no CodeMirror, no app, no bindings."
                   }
                 ]
