@@ -10,7 +10,7 @@ import { beautifyJson, beautifyXml, scanJson, scanXml } from '../../beautify';
 import { control } from '../../bridge/control';
 import { languageExtension } from '../../editor/languages';
 import { kiraEditorTheme, kiraHighlightStyle } from '../../editor/theme';
-import { formatBytes } from '../../format';
+import { formatBytes, formatRelative } from '../../format';
 import AppButton from '../../theme/primitives/AppButton.vue';
 import DialogFrame from '../../theme/primitives/DialogFrame.vue';
 import MessageStrip from '../../theme/primitives/MessageStrip.vue';
@@ -183,24 +183,40 @@ onUnmounted(() => {
     <MessageStrip v-else-if="loadError" tone="err">{{ loadError }}</MessageStrip>
     <div v-else-if="snapA && snapB" class="diff-body">
       <div class="diff-summary" data-testid="http-diff-summary">
-        <div class="diff-summary-col">
-          <span class="p-chip" :class="statusClass(snapA.entry.status)" data-testid="http-diff-status-a">
-            {{ snapA.entry.status }} {{ snapA.entry.statusText }}
-          </span>
-          <span class="p-xs dim">{{ snapA.entry.elapsedMs }} ms</span>
-          <span class="p-xs dim">{{ formatBytes(snapA.entry.bodyBytes) }}</span>
+        <div class="diff-summary-side">
+          <span v-tooltip="snapA.entry.sentAt" class="p-xs dim diff-summary-time">{{
+            formatRelative(snapA.entry.sentAt)
+          }}</span>
+          <div class="diff-summary-col">
+            <span class="p-chip" :class="statusClass(snapA.entry.status)" data-testid="http-diff-status-a">
+              {{ snapA.entry.status }} {{ snapA.entry.statusText }}
+            </span>
+            <span class="p-xs dim">{{ snapA.entry.elapsedMs }} ms</span>
+            <span class="p-xs dim">{{ formatBytes(snapA.entry.bodyBytes) }}</span>
+          </div>
         </div>
         <span class="diff-arrow">→</span>
-        <div class="diff-summary-col">
-          <span class="p-chip" :class="statusClass(snapB.entry.status)" data-testid="http-diff-status-b">
-            {{ snapB.entry.status }} {{ snapB.entry.statusText }}
-          </span>
-          <span class="p-xs dim">{{ snapB.entry.elapsedMs }} ms</span>
-          <span class="p-xs dim">{{ formatBytes(snapB.entry.bodyBytes) }}</span>
+        <div class="diff-summary-side">
+          <span v-tooltip="snapB.entry.sentAt" class="p-xs dim diff-summary-time">{{
+            formatRelative(snapB.entry.sentAt)
+          }}</span>
+          <div class="diff-summary-col">
+            <span class="p-chip" :class="statusClass(snapB.entry.status)" data-testid="http-diff-status-b">
+              {{ snapB.entry.status }} {{ snapB.entry.statusText }}
+            </span>
+            <span class="p-xs dim">{{ snapB.entry.elapsedMs }} ms</span>
+            <span class="p-xs dim">{{ formatBytes(snapB.entry.bodyBytes) }}</span>
+          </div>
         </div>
       </div>
 
       <div class="diff-headers" data-testid="http-diff-headers">
+        <div class="diff-header-row diff-header-head p-xs dim">
+          <span></span>
+          <span></span>
+          <span>before</span>
+          <span>after</span>
+        </div>
         <div
           v-for="row in changedHeaderRows"
           :key="row.name"
@@ -230,7 +246,7 @@ onUnmounted(() => {
       </div>
 
       <MessageStrip v-if="!bothStored" tone="note" data-testid="http-diff-not-comparable">
-        At least one response's body was not kept in history (D5), so it can't be compared.
+        At least one response's body was not kept in history, so it can't be compared.
       </MessageStrip>
       <template v-else>
         <div v-if="!commonFormat" class="p-xs dim diff-raw-note">
@@ -270,6 +286,16 @@ onUnmounted(() => {
   flex-shrink: 0;
 }
 
+.diff-summary-side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kira-s-1);
+}
+
+.diff-summary-time {
+  align-self: flex-start;
+}
+
 .diff-summary-col {
   display: flex;
   align-items: center;
@@ -294,6 +320,12 @@ onUnmounted(() => {
   gap: var(--kira-s-2);
   padding: var(--kira-s-1) 0;
   font-size: var(--kira-t-xs);
+}
+
+.diff-header-head {
+  color: var(--kira-fg-disabled);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 .diff-header-row.added .diff-header-status {

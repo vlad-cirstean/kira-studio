@@ -1,5 +1,5 @@
 import { reactive } from 'vue';
-import { openApiRequestTab } from '../api/tabs';
+import { openApiRequestTab, openGrpcRequestTab } from '../api/tabs';
 import { openCreateDialog } from '../state/connections';
 import { toggleOperationsPanel, toggleProjectPanel } from '../state/layout';
 import { activeTab } from '../state/mode';
@@ -22,6 +22,9 @@ export const paletteCommands: PaletteCommand[] = [
   // D13: a one-click action worth a name, the same bar this list's own comment states — no menu
   // or accelerator change (ApiStart.vue/CollectionsPanel.vue's own buttons are the other two).
   { id: 'api.newRequest', label: 'New request', run: () => void openApiRequestTab() },
+  // P13 D21: the same one-click bar, filling the gap P12's own F24 finding named — the action
+  // already exists in three other places (ApiStart.vue, api/menus.ts's row and background menus).
+  { id: 'api.newGrpcRequest', label: 'New gRPC request', run: () => void openGrpcRequestTab() },
   // P4 D15: the discoverability answer for Save, at the same bar this list's own comment states.
   // No ⌘S and no accelerator — shared/domain/shortcuts.ts is a closed map and a menu accelerator
   // needs the seven-file path P1 OQ-3 / P2 OQ-7 deferred as one deliberate pass. View-scoped like
