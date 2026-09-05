@@ -24,12 +24,25 @@ var builderMethods = map[string]bool{
 	"HEAD": true, "OPTIONS": true,
 }
 
-// Parse reads one collection. The only two refusals are "not a JSON object with an info block"
-// and D10's version gate — everything else degrades and is reported.
+// maxCollectionBytes bounds Parse's own io.ReadAll (P21 round 1 architecture/security finding 11):
+// P4 §8 OQ-5 flagged the *latency* a pathological collection could cost; the memory side — a
+// user-chosen file read whole into memory, then decoded into a map[string]json.RawMessage plus a
+// cloneOrigin copy per node — was never bounded. 64 MiB is generously above any real Postman
+// export and matches the control plane's own "if it's bigger than this, something is wrong"
+// ceiling used elsewhere in this app.
+const maxCollectionBytes = 64 << 20
+
+// Parse reads one collection. The only three refusals are "the file is implausibly large",
+// "not a JSON object with an info block", and D10's version gate — everything else degrades and
+// is reported.
 func Parse(r io.Reader) (*Tree, error) {
-	data, err := io.ReadAll(r)
+	limited := io.LimitReader(r, maxCollectionBytes+1)
+	data, err := io.ReadAll(limited)
 	if err != nil {
 		return nil, fmt.Errorf("postman: read: %w", err)
+	}
+	if len(data) > maxCollectionBytes {
+		return nil, fmt.Errorf("postman: collection file is larger than %d bytes", maxCollectionBytes)
 	}
 	var doc map[string]json.RawMessage
 	if err := json.Unmarshal(data, &doc); err != nil {
