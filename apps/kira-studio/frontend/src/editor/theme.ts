@@ -122,6 +122,24 @@ export const kiraEditorTheme = EditorView.theme(
       overflow: 'hidden',
       textOverflow: 'ellipsis',
     },
+    // P15b D2: `{{variable}}` colouring — painted by the `rangeHighlights` seam
+    // (variableHighlight.ts), never by a grammar (F1's own finding: resolved/unresolved is a
+    // property of the text *and* the current variable set, not something a StreamLanguage could
+    // express honestly). No new tokens (P13's "does not change a value in tokens.css") — reuses
+    // the syntax name colour and the app's existing warn colour.
+    '.cm-kira-var': {
+      color: 'var(--kira-syntax-name)',
+    },
+    '.cm-kira-var-secret': {
+      color: 'var(--kira-syntax-name)',
+      textDecoration: 'underline dotted var(--kira-syntax-meta)',
+    },
+    // --kira-warn rather than --kira-error deliberately: an unresolved reference is not an error —
+    // it may be about to be typed (HttpRequestView.vue already renders it as a `p-chip warn`).
+    '.cm-kira-var-unknown': {
+      color: 'var(--kira-warn)',
+      textDecoration: 'underline wavy var(--kira-warn)',
+    },
   },
   { dark: true },
 );

@@ -23,6 +23,7 @@ import type { SqlDialect } from '../views/shared/sqlIdent';
 import type { ConsoleDiagnostic } from './diagnostics';
 import { type EditorLanguageId, languageExtension } from './languages';
 import { kiraEditorTheme, kiraHighlightStyle } from './theme';
+import { type RangeHighlight, rangeHighlightPlugin } from './variableHighlight';
 import { wrapSelectionOnType } from './wrapSelection';
 
 const props = defineProps<{
@@ -53,6 +54,11 @@ const props = defineProps<{
    *  setting (there is only ever one line to wrap), and the root sizes to that one line instead of
    *  filling its container. */
   singleLine?: boolean;
+  /** P15b D2: pure text in, ranges out — the exact shape `lintSource` above already keeps. Each
+   *  range is painted with `Decoration.mark({class})`; the host never learns what a range means
+   *  (variableCompletion.ts is the one caller today, painting `{{variable}}` references). Ignored
+   *  (no extra colour) when absent, which every prior host stays. */
+  rangeHighlights?: (doc: string) => readonly RangeHighlight[];
 }>();
 
 // Every prior use of this host is read-only (definitions, previews, op-log detail rows); the query
@@ -83,6 +89,7 @@ const autocompleteCompartment = new Compartment();
 const lintCompartment = new Compartment();
 const hoverCompartment = new Compartment();
 const wordWrapCompartment = new Compartment();
+const rangeCompartment = new Compartment();
 
 // P42 D14/D14a: every editable and read-only surface mounts through this one host, so this is
 // the one place a wrap setting has to live. `settingsState.appearance.wordWrap` defaults to
@@ -181,6 +188,12 @@ function resolveHover(): Extension[] {
   return props.hoverSource ? [hoverTooltip(props.hoverSource)] : [];
 }
 
+// D2: additive — an absent rangeHighlights is simply no extension, same shape as resolveLint()/
+// resolveHover() above.
+function resolveRangeHighlights(): Extension[] {
+  return props.rangeHighlights ? [rangeHighlightPlugin(props.rangeHighlights)] : [];
+}
+
 onMounted(() => {
   const state = EditorState.create({
     doc: props.doc,
@@ -198,6 +211,7 @@ onMounted(() => {
       autocompleteCompartment.of(resolveAutocomplete()),
       lintCompartment.of(resolveLint()),
       hoverCompartment.of(resolveHover()),
+      rangeCompartment.of(resolveRangeHighlights()),
       syntaxHighlighting(kiraHighlightStyle),
       kiraEditorTheme,
       languageCompartment.of(resolveLanguage()),
@@ -227,6 +241,12 @@ onUnmounted(() => {
 // would naturally reclaim it.
 defineExpose({
   focus: () => view?.focus(),
+  // P15b D3(c): CodeMirror's own coordinate hit-testing over the overlay that is already painting
+  // the same text at the same viewport coordinates as the real `<input>` sitting on top of it
+  // (AutocompleteField.vue) — exact, and font-agnostic (it does not re-assume the monospace grid
+  // the overlay's *painted* alignment depends on). `null` when the point falls outside any
+  // character (matches `EditorView.posAtCoords`'s own contract).
+  posAtCoords: (x: number, y: number): number | null => view?.posAtCoords({ x, y }) ?? null,
 });
 
 watch(
@@ -283,6 +303,14 @@ watch(
   () => {
     if (!view) return;
     view.dispatch({ effects: hoverCompartment.reconfigure(resolveHover()) });
+  },
+);
+
+watch(
+  () => props.rangeHighlights,
+  () => {
+    if (!view) return;
+    view.dispatch({ effects: rangeCompartment.reconfigure(resolveRangeHighlights()) });
   },
 );
 

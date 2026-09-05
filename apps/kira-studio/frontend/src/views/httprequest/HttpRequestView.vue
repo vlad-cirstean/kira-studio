@@ -41,6 +41,7 @@ import RequestBodyPane from './RequestBodyPane.vue';
 import RequestHeadersTable from './RequestHeadersTable.vue';
 import ResponsePane from './ResponsePane.vue';
 import { resolveForExport, resolveTabState, runtime, send, stop } from './state';
+import { variableSupport } from './variableCompletion';
 
 // MainView.vue keys this component by tab.id — same discipline as every other *View.vue.
 const props = defineProps<{ tab: HttpRequestTabRecord }>();
@@ -155,6 +156,11 @@ watch(
   },
   { immediate: true },
 );
+// P15b D4: one computed, over the same collectionId/activeEnvironmentId this file already watches
+// (immediately above) — rangeHighlights/hoverAt/candidates for the URL field, the request body
+// editor, and (via FieldRowsTable's own props) the header/param/form-data value cells.
+const variables = computed(() => variableSupport(collectionId.value, activeEnvironmentId.value));
+
 const unresolvedRefs = computed(() => {
   const { values, secretNames } = mergedValuesAndSecrets(
     collectionId.value,
@@ -339,7 +345,7 @@ onUnmounted(() => {
         <div class="request-pane" :style="{ flex: `0 0 ${requestPaneHeight}px` }" data-testid="http-request-pane">
           <QueryParamsTable v-if="tab.state.requestPane === 'params'" :tab="tab" />
           <RequestHeadersTable v-else-if="tab.state.requestPane === 'headers'" :tab="tab" />
-          <RequestBodyPane v-else :tab="tab" />
+          <RequestBodyPane v-else :tab="tab" :range-highlights="variables.rangeHighlights" />
         </div>
 
         <PanelSplitter

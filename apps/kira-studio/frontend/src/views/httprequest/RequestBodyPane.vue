@@ -12,6 +12,7 @@ import type { HttpRequestTabRecord } from '@shared/domain/tabs';
 import { computed, ref } from 'vue';
 import { patchHttpRequestTabState } from '../../api/tabs';
 import CodeMirrorHost from '../../editor/CodeMirrorHost.vue';
+import type { RangeHighlight } from '../../editor/variableHighlight';
 import IconButton from '../../theme/primitives/IconButton.vue';
 import MessageStrip from '../../theme/primitives/MessageStrip.vue';
 import SegmentedControl from '../../theme/primitives/SegmentedControl.vue';
@@ -25,7 +26,13 @@ import UrlEncodedTable from './UrlEncodedTable.vue';
 // HttpRequestView.vue stays a layout shell. `raw` is a plain-text buffer with no sub-selector;
 // `code` keeps the language selector raw used to carry, narrowed to its four syntax-highlighted
 // languages.
-const props = defineProps<{ tab: HttpRequestTabRecord }>();
+const props = defineProps<{
+  tab: HttpRequestTabRecord;
+  /** P15b D4: HttpRequestView.vue's own variableSupport(...).rangeHighlights — forwarded verbatim
+   *  to both editable editor hosts below (raw and code/JSON) so a `{{variable}}` reference in the
+   *  body is coloured exactly like the URL/header fields will be (N3). */
+  rangeHighlights?: (doc: string) => readonly RangeHighlight[];
+}>();
 
 // P15 D6: JSON is a UI-level segment over the same `bodyMode`/`codeLanguage` storage — no schema,
 // wire or Go change (§5 of the plan spells out why: the entire delta below is presentation).
@@ -141,6 +148,7 @@ const caption = computed(() =>
       :doc="tab.state.body"
       language="plain"
       :read-only="false"
+      :range-highlights="rangeHighlights"
       @update:doc="onRawChange"
     />
     <CodeMirrorHost
@@ -148,6 +156,7 @@ const caption = computed(() =>
       :doc="tab.state.code"
       :language="editorLanguage"
       :read-only="false"
+      :range-highlights="rangeHighlights"
       @update:doc="onCodeChange"
     />
     <UrlEncodedTable v-else-if="tab.state.bodyMode === 'urlencoded'" :tab="tab" />
