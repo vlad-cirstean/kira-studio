@@ -105,7 +105,7 @@ function close(): void {
 
 .empty {
   padding: var(--kira-s-4);
-  color: var(--kira-fg-dim);
+  color: var(--kira-fg-disabled);
   text-align: center;
 }
 
@@ -125,7 +125,7 @@ function close(): void {
 }
 
 .entry-time {
-  color: var(--kira-fg-dim);
+  color: var(--kira-fg-disabled);
   font-size: var(--kira-t-sm);
 }
 
@@ -136,7 +136,7 @@ function close(): void {
 }
 
 .entry-value.masked {
-  color: var(--kira-fg-dim);
+  color: var(--kira-fg-disabled);
   letter-spacing: 2px;
 }
 </style>

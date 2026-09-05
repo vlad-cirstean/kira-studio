@@ -17,7 +17,7 @@
     "dev": "PATH=\"$PATH:$(go env GOPATH)/bin\" sh -c 'cd apps/kira-studio && wails3 task dev'",
     "build": "cd apps/kira-studio/frontend && bun run build",
     "build:test": "cd apps/kira-studio/frontend && bun run build:test",
-    "lint": "biome check .",
+    "lint": "biome check . && sh scripts/check-tokens.sh",
     "format": "biome check --write .",
     "typecheck": "bun run typecheck:tests && bun run typecheck:web && bun run typecheck:unit",
     "typecheck:tests": "tsgo --noEmit -p apps/kira-studio/tsconfig.tests.json",

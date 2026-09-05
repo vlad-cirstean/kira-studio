@@ -194,7 +194,7 @@ function onKeydown(e: KeyboardEvent): void {
   display: flex;
   align-items: center;
   cursor: grab;
-  color: var(--kira-fg-dim);
+  color: var(--kira-fg-disabled);
 }
 
 .drag-handle.is-disabled {
@@ -211,7 +211,7 @@ function onKeydown(e: KeyboardEvent): void {
 
 .masked-value {
   flex: 1;
-  color: var(--kira-fg-dim);
+  color: var(--kira-fg-disabled);
   letter-spacing: 2px;
 }
 

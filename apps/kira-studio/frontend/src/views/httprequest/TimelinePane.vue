@@ -336,7 +336,7 @@ function residueNote(hop: HttpTimelineHop): string {
 .hop-track {
   position: relative;
   height: 10px;
-  background: var(--kira-bg-inset);
+  background: var(--kira-bg-input);
   border-radius: 3px;
   overflow: hidden;
 }

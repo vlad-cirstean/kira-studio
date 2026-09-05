@@ -201,7 +201,7 @@ function close(): void {
   display: flex;
   align-items: center;
   cursor: grab;
-  color: var(--kira-fg-dim);
+  color: var(--kira-fg-disabled);
 }
 
 .name-field {
@@ -211,7 +211,7 @@ function close(): void {
 
 .empty {
   padding: var(--kira-s-4);
-  color: var(--kira-fg-dim);
+  color: var(--kira-fg-disabled);
   text-align: center;
 }
 </style>

@@ -142,7 +142,7 @@ function selectMethod(service: string, method: string): void {
             data-testid="grpc-method-row"
             @click="selectMethod(svc.name, m.name)"
           >
-            <span class="method-name">{{ m.name }}</span>
+            <span class="method-name mono">{{ m.name }}</span>
             <span
               v-if="m.serverStreaming || m.clientStreaming"
               class="p-chip ok"
@@ -243,7 +243,6 @@ function selectMethod(service: string, method: string): void {
 }
 
 .method-name {
-  font-family: var(--kira-font-mono);
   font-size: var(--kira-t-sm);
 }
 </style>

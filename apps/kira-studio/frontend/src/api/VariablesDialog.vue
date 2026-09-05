@@ -268,7 +268,7 @@ function close(): void {
   display: flex;
   gap: var(--kira-s-2);
   padding: var(--kira-s-2) var(--kira-s-3);
-  color: var(--kira-fg-dim);
+  color: var(--kira-fg-disabled);
   font-size: var(--kira-t-sm);
   border-bottom: var(--kira-border-width) solid var(--kira-border);
 }
