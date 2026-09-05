@@ -210,7 +210,11 @@ test('Http raw — the editor', async ({ relaunch }) => {
   await page.click('[data-testid="edit-raw-apply"]');
   await expect(dialog).toHaveCount(0);
 
-  await expect(page.locator('[data-testid="http-method-select"]')).toHaveValue('PUT');
+  // P17 D18: the method select is an app-drawn button now, not a native <select>.
+  await expect(page.locator('[data-testid="http-method-select"]')).toHaveAttribute(
+    'data-value',
+    'PUT',
+  );
   await page.click('[data-testid="http-request-pane-headers"]');
   await expect(page.locator('[data-testid="http-header-name"]').first()).toHaveValue('X-Added');
   await expect(page.locator('[data-testid="http-header-value"]').first()).toHaveValue('yes');

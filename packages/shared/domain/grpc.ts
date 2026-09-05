@@ -115,8 +115,10 @@ export function grpcCodeClass(code: number): 'info' | 'ok' | 'warn' | 'err' {
  *  than in views/grpcrequest/. The tree's own denormalised columns (method/url, reused verbatim
  *  for a gRPC row's "pkg.Service/Method" and target) carry no streaming flag — that lives in the
  *  method's own descriptor, which a collections row cannot resolve without a live call — so every
- *  gRPC row gets the one neutral class every custom HTTP method already falls through to
- *  (httpMethodClass's own 'info' default). */
+ *  gRPC row gets the one neutral class from the status family (P17 D19 retired `httpMethodClass`
+ *  in favour of `httpMethodToken`'s own seven-plus-'other' vocabulary for HTTP methods
+ *  specifically; a gRPC call has no per-verb distinction to colour-code at all, so this stays on
+ *  the plain status palette rather than adopting that new one). */
 export function grpcMethodClass(_method: string): 'info' | 'ok' | 'warn' | 'err' {
   return 'info';
 }

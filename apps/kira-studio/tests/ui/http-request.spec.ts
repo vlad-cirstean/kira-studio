@@ -188,7 +188,11 @@ test('Http request — restore from saved state, no reconnect gate', async ({ re
   const view = page.locator('[data-testid="http-request-view"]');
   await expect(view).toBeVisible();
 
-  await expect(page.locator('[data-testid="http-method-select"]')).toHaveValue('POST');
+  // P17 D18: the method select is an app-drawn button now, not a native <select>.
+  await expect(page.locator('[data-testid="http-method-select"]')).toHaveAttribute(
+    'data-value',
+    'POST',
+  );
   await expect(page.locator('[data-testid="http-url"]')).toHaveValue(
     'https://api.example.com/widgets',
   );

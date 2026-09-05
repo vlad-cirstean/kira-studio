@@ -116,6 +116,24 @@
   --kira-conn-magenta: #cb8eb6;
   --kira-conn-grey: #9fa5ac;
 
+  /* P17 D19: eight method-colour aliases, borrowed from the connection palette above rather than
+     new hues — it was already tuned for "one lightness and one chroma for N things, so none
+     shouts louder than another", exactly the property seven HTTP methods need. GET/POST/PUT/DELETE
+     keep the hue family they read as today (blue/green/amber/red, ex-httpMethodClass's info/ok/
+     warn/err); PATCH moves off amber (shared with PUT under the old four-family map) onto violet,
+     which is what "each a distinct colour" requires. An indirection, not `var(--kira-conn-blue)`
+     at each call site: colour means *connection identity* in Studio, and a method is a different
+     vocabulary that happens to want the same hues (the same reasoning `--kira-search-match`
+     already applied to `--kira-warn`). */
+  --kira-method-get: var(--kira-conn-blue);
+  --kira-method-post: var(--kira-conn-green);
+  --kira-method-put: var(--kira-conn-amber);
+  --kira-method-patch: var(--kira-conn-violet);
+  --kira-method-delete: var(--kira-conn-red);
+  --kira-method-head: var(--kira-conn-teal);
+  --kira-method-options: var(--kira-conn-cyan);
+  --kira-method-other: var(--kira-conn-grey);
+
   /* Syntax tokens for CodeMirror (§3's editor surfaces: DDL, cell editor, document view,
      command preview, console). Dark Modern's default token colours. */
   --kira-syntax-comment: #6a9955;

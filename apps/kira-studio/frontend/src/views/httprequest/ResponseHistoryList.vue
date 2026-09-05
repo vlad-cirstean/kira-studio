@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { httpMethodClass, statusClass } from '@shared/domain/http';
+import { httpMethodToken, statusClass } from '@shared/domain/http';
 import type { ResponseHistoryEntry } from '@shared/domain/response-history';
 import type { HttpRequestTabRecord } from '@shared/domain/tabs';
 import { computed, onMounted, ref } from 'vue';
@@ -159,7 +159,7 @@ async function onClear(): Promise<void> {
         <div class="history-row-main">
           <div class="history-row-line">
             <span v-tooltip="entry.sentAt" class="p-xs dim history-time">{{ formatRelative(entry.sentAt) }}</span>
-            <span class="p-chip" :class="httpMethodClass(entry.method)">{{ entry.method }}</span>
+            <span class="p-chip p-method" :class="httpMethodToken(entry.method)">{{ entry.method }}</span>
             <span class="p-chip" :class="statusClass(entry.status)">{{ entry.status }} {{ entry.statusText }}</span>
             <span class="p-xs dim">{{ entry.elapsedMs }} ms</span>
             <span class="p-xs dim">{{ formatBytes(entry.bodyBytes) }}</span>

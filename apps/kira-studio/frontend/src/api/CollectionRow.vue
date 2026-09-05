@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { grpcMethodClass } from '@shared/domain/grpc';
-import { httpMethodClass } from '@shared/domain/http';
+import { httpMethodToken } from '@shared/domain/http';
 import { computed, nextTick, ref, watch } from 'vue';
 import CodiconIcon from '../theme/CodiconIcon.vue';
 import { activeSearchQuery, type CollectionRowVm, collectionsState } from './state/collections';
@@ -131,7 +131,7 @@ function onTwistyClick(e: MouseEvent): void {
     >
       gRPC
     </span>
-    <span v-else-if="row.kind === 'request'" class="p-chip method" :class="httpMethodClass(row.method)">{{
+    <span v-else-if="row.kind === 'request'" class="p-chip method p-method" :class="httpMethodToken(row.method)">{{
       row.method
     }}</span>
     <CodiconIcon v-else :name="icon" :size="13" class="node-icon" />

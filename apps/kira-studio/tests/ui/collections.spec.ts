@@ -127,7 +127,12 @@ test('collections — the tree renders and a request opens into the existing tab
   await expect(page.locator('[data-testid="tab"]')).toHaveCount(1);
   await expect(page.locator('[data-testid="tab"]')).toContainText('Create order');
   await expect(page.locator('[data-testid="http-request-target"]')).toContainText('Create order');
-  await expect(page.locator('[data-testid="http-method-select"]')).toHaveValue('POST');
+  // P17 D18: the method select is an app-drawn button now, not a native <select> — the tab's
+  // state still shows through data-value, the same fact toHaveValue used to assert.
+  await expect(page.locator('[data-testid="http-method-select"]')).toHaveAttribute(
+    'data-value',
+    'POST',
+  );
   await expect(page.locator('[data-testid="http-url"]')).toHaveValue(
     'https://api.example.com/v2/orders',
   );

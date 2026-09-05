@@ -392,23 +392,37 @@ export function statusClass(status: number): 'info' | 'ok' | 'warn' | 'err' {
   return 'err';
 }
 
-// P4 D16: statusClass's exact sibling, in its exact home. Two surfaces need the same map — the
-// request view's own method chip and the collections tree's per-row chip — and `http/**` may not
-// import `views/**` (biome.json), so it lives here rather than being copied into both.
+// P4 D16, P17 D19: statusClass's exact sibling, in its exact home. Three surfaces need the same
+// map — the request view's own method chip/select, the response history list's chip, and the
+// collections tree's per-row chip — and `http/**` may not import `views/**` (biome.json), so it
+// lives here rather than being copied into all three.
 //
-// Takes a plain `string`, not HttpMethod: an imported PROPFIND (F4) has to have a colour rather
-// than throw. The eight enum members and every custom method this app's builder cannot show fall
-// through to 'info', which is the same neutral family GET already uses.
-const METHOD_CLASS: Readonly<Record<string, 'info' | 'ok' | 'warn' | 'err'>> = {
-  GET: 'info',
-  HEAD: 'info',
-  OPTIONS: 'info',
-  POST: 'ok',
-  PUT: 'warn',
-  PATCH: 'warn',
-  DELETE: 'err',
+// Takes a plain `string`, not HttpMethod: an imported PROPFIND (F4) has to have a token rather
+// than throw. `httpMethodClass`'s four-family map (GET/HEAD/OPTIONS -> info, POST -> ok,
+// PUT/PATCH -> warn, DELETE -> err) could not express "each of the five distinct" the SPEC asks
+// for — PUT and PATCH shared one family — so P17 D19 replaces it outright with a seven-method (plus
+// 'other') token, each aliased in tokens.css to a hue from the twelve-colour connection palette
+// rather than the four-family status palette. Nothing here reads httpMethodClass any more.
+const METHOD_TOKEN: Readonly<Record<string, MethodToken>> = {
+  GET: 'get',
+  POST: 'post',
+  PUT: 'put',
+  PATCH: 'patch',
+  DELETE: 'delete',
+  HEAD: 'head',
+  OPTIONS: 'options',
 };
 
-export function httpMethodClass(method: string): 'info' | 'ok' | 'warn' | 'err' {
-  return METHOD_CLASS[method.toUpperCase()] ?? 'info';
+export type MethodToken =
+  | 'get'
+  | 'post'
+  | 'put'
+  | 'patch'
+  | 'delete'
+  | 'head'
+  | 'options'
+  | 'other';
+
+export function httpMethodToken(method: string): MethodToken {
+  return METHOD_TOKEN[method.toUpperCase()] ?? 'other';
 }

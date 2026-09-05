@@ -11,10 +11,11 @@ import {
   splitUrl,
   toSavedRequest,
 } from '@kira/api-core';
-import { type HttpMethod, httpMethodClass } from '@shared/domain/http';
+import { type HttpMethod, httpMethodToken } from '@shared/domain/http';
 import type { HttpRequestTabRecord } from '@shared/domain/tabs';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import EnvironmentSelect from '../../api/EnvironmentSelect.vue';
+import MethodSelect from '../../api/MethodSelect.vue';
 import {
   collectionIdFor,
   openSaveDialog,
@@ -54,15 +55,13 @@ const running = computed(() => rt.value?.status === 'running');
 
 const title = computed(() => httpRequestTitle(props.tab.state));
 
-const METHODS: readonly HttpMethod[] = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'];
+// D12/P17 D19: a method chip coloured per-method (not per-family any more — httpMethodToken
+// replaces httpMethodClass outright, F13/D19), over .p-method's new tinted-background rule. P4
+// D16's own reasoning still holds: the map lives in the shared domain beside statusClass, since
+// the collections tree's own row needs it too and `http/**` may not import `views/**`.
+const methodToken = computed(() => httpMethodToken(props.tab.state.method));
 
-// D12: a method chip coloured by method family, over .p-chip's existing variants (F17) — zero
-// new CSS. P4 D16: the map itself moved into the shared domain beside statusClass, since the
-// collections tree's own row needs it and `http/**` may not import `views/**`.
-const methodClass = computed(() => httpMethodClass(props.tab.state.method));
-
-function onMethodChange(e: Event): void {
-  const method = (e.target as HTMLSelectElement).value as HttpMethod;
+function onMethodChange(method: HttpMethod): void {
   patchHttpRequestTabState(props.tab.id, { method });
 }
 
@@ -284,7 +283,7 @@ onUnmounted(() => {
       @stop="onStop"
     >
       <template #badges>
-        <span class="p-chip" :class="methodClass" data-testid="http-method-chip">{{ tab.state.method }}</span>
+        <span class="p-chip p-method" :class="methodToken" data-testid="http-method-chip">{{ tab.state.method }}</span>
         <!-- D15: the dirty mark sits beside the name here and deliberately *not* on the tab strip,
              which renders purely from TAB_KINDS — a dirty(tab) registry member that seven of the
              eight kinds would answer false to is shared machinery for a cosmetic gain (§8 OQ-8). -->
@@ -311,14 +310,11 @@ onUnmounted(() => {
       </template>
 
       <template #toolbar>
-        <select
-          class="p-select bordered"
-          data-testid="http-method-select"
-          :value="tab.state.method"
-          @change="onMethodChange"
-        >
-          <option v-for="m in METHODS" :key="m" :value="m">{{ m }}</option>
-        </select>
+        <MethodSelect
+          :model-value="tab.state.method"
+          testid="http-method-select"
+          @update:model-value="onMethodChange"
+        />
         <div class="url-field">
           <AutocompleteField
             :model-value="tab.state.url"
