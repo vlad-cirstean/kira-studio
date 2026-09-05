@@ -15,7 +15,9 @@
 import { describe, expect, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { GRPC_HISTORY_PER_SCOPE_LIMIT } from '../../../../packages/shared/domain/grpc-history';
 import { opKindSchema } from '../../../../packages/shared/domain/ops';
+import { HISTORY_PER_SCOPE_LIMIT } from '../../../../packages/shared/domain/response-history';
 import { RENDERABLE_TAB_KINDS } from '../../../../packages/shared/domain/tabs';
 
 /** Pulls every `"key": true` entry out of a Go `var <name> = map[string]bool{ ... }` literal —
@@ -32,6 +34,14 @@ function extractGoStringSet(source: string, varName: string): Set<string> {
   if (bodyEnd < 0) throw new Error(`unterminated "${varName}" map literal`);
   const body = source.slice(bodyStart, bodyEnd);
   return new Set([...body.matchAll(/"([^"]+)":\s*true/g)].map((m) => m[1]));
+}
+
+/** Pulls a `<name> = <integer>` constant literal out of a Go source file (F22's technique) —
+ *  tolerant of it living inside a `const ( ... )` block with a comment above it. */
+function extractGoIntConst(source: string, constName: string): number {
+  const m = new RegExp(`\\b${constName}\\s*=\\s*(\\d+)\\b`).exec(source);
+  if (!m) throw new Error(`could not find "${constName} = <n>" in the Go source`);
+  return Number(m[1]);
 }
 
 describe('Go/TS tab- and op-kind vocabulary parity (P2 D10)', () => {
@@ -51,5 +61,23 @@ describe('Go/TS tab- and op-kind vocabulary parity (P2 D10)', () => {
     );
     const goKinds = extractGoStringSet(source, 'opKinds');
     expect(goKinds).toEqual(new Set(opKindSchema.options));
+  });
+});
+
+describe('Go/TS history retention cap parity (P18 D4)', () => {
+  test('response_history.go historyPerScopeLimit matches HISTORY_PER_SCOPE_LIMIT (TS)', () => {
+    const source = readFileSync(
+      resolve(import.meta.dir, '../../internal/storage/repos/response_history.go'),
+      'utf8',
+    );
+    expect(extractGoIntConst(source, 'historyPerScopeLimit')).toBe(HISTORY_PER_SCOPE_LIMIT);
+  });
+
+  test('grpc_history.go grpcHistoryPerScopeCap matches GRPC_HISTORY_PER_SCOPE_LIMIT (TS)', () => {
+    const source = readFileSync(
+      resolve(import.meta.dir, '../../internal/storage/repos/grpc_history.go'),
+      'utf8',
+    );
+    expect(extractGoIntConst(source, 'grpcHistoryPerScopeCap')).toBe(GRPC_HISTORY_PER_SCOPE_LIMIT);
   });
 });
