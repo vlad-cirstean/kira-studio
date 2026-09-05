@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { pathTail } from '@shared/domain/tree';
 import { computed } from 'vue';
+import { formatRelative } from '../../format';
 import { connectionRecord, connectionsState, openCreateDialog } from '../../state/connections';
 import {
   openDataTab,
@@ -39,16 +40,6 @@ function iconColorFor(entry: RecentTableEntry): string {
     return connColorVar(connectionFor(entry)?.color) ?? 'var(--kira-fg-muted)';
   }
   return 'var(--kira-info)';
-}
-
-function formatRelative(openedAt: number): string {
-  const minutes = Math.floor((Date.now() - openedAt) / 60000);
-  if (minutes < 1) return 'just now';
-  if (minutes < 60) return `${minutes} m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours} h ago`;
-  const days = Math.floor(hours / 24);
-  return days === 1 ? 'yesterday' : `${days} d ago`;
 }
 
 function openRecent(entry: RecentTableEntry): void {

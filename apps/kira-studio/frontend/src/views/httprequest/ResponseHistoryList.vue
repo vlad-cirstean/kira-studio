@@ -4,7 +4,7 @@ import type { ResponseHistoryEntry } from '@shared/domain/response-history';
 import type { HttpRequestTabRecord } from '@shared/domain/tabs';
 import { computed, onMounted } from 'vue';
 import { patchHttpRequestTabState } from '../../api/tabs';
-import { formatBytes } from '../../format';
+import { formatBytes, formatRelative } from '../../format';
 import { confirmDialog } from '../../state/confirmDialog';
 import AppButton from '../../theme/primitives/AppButton.vue';
 import EmptyState from '../../theme/primitives/EmptyState.vue';
@@ -37,18 +37,6 @@ onMounted(() => {
  *  one request's history the URL is usually identical, and repeating it twenty times is noise. */
 function showUrl(i: number): boolean {
   return i === 0 || entries.value[i - 1]?.url !== entries.value[i]?.url;
-}
-
-/** No shared "relative time" helper reaches views/httprequest/ (http/VariableHistoryMenu.vue's own
- *  comment records the same gap for http/**) — a small, self-contained duplicate of the same idea. */
-function relativeTime(iso: string): string {
-  const minutes = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
-  if (minutes < 1) return 'just now';
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  return days === 1 ? 'yesterday' : `${days}d ago`;
 }
 
 // D10: "click views the entry" swaps the *whole* response pane, not just the runtime pointer —
@@ -137,7 +125,7 @@ async function onClear(): Promise<void> {
         />
         <div class="history-row-main">
           <div class="history-row-line">
-            <span v-tooltip="entry.sentAt" class="p-xs dim history-time">{{ relativeTime(entry.sentAt) }}</span>
+            <span v-tooltip="entry.sentAt" class="p-xs dim history-time">{{ formatRelative(entry.sentAt) }}</span>
             <span class="p-chip" :class="httpMethodClass(entry.method)">{{ entry.method }}</span>
             <span class="p-chip" :class="statusClass(entry.status)">{{ entry.status }} {{ entry.statusText }}</span>
             <span class="p-xs dim">{{ entry.elapsedMs }} ms</span>

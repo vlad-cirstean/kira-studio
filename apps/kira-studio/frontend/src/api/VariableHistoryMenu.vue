@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { ApiVariableHistoryEntry } from '@shared/domain/variables';
+import { formatRelative } from '../format';
 import EmptyState from '../theme/primitives/EmptyState.vue';
 import IconButton from '../theme/primitives/IconButton.vue';
 import PopoverPanel from '../theme/primitives/PopoverPanel.vue';
@@ -17,19 +18,6 @@ import {
 // action, which writes it back through the ordinary Upsert path (so the restore is itself
 // recorded, and therefore undoable).
 const emit = defineEmits<{ close: [] }>();
-
-/** No shared "relative time" helper reaches http/** (state/** is the one directory both project/**
- *  and http/** may import, and it has no such utility) — this is a plain, small, self-contained
- *  duplicate of the same idea StudioStart.vue's own formatRelative already is. */
-function relativeTime(iso: string): string {
-  const minutes = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
-  if (minutes < 1) return 'just now';
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  return days === 1 ? 'yesterday' : `${days}d ago`;
-}
 
 function displayValue(entry: ApiVariableHistoryEntry): string {
   return entry.isSecret ? (revealedHistoryValues[entry.id] ?? '') : entry.value;
@@ -72,7 +60,7 @@ function close(): void {
         data-testid="variable-history-entry"
       >
         <div class="entry-main">
-          <span class="entry-time">{{ relativeTime(entry.recordedAt) }}</span>
+          <span class="entry-time">{{ formatRelative(entry.recordedAt) }}</span>
           <span v-if="notYetRevealed(entry)" class="entry-value masked" data-testid="variable-history-masked">
             ••••••••
           </span>
