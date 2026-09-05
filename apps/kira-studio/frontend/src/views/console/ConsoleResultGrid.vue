@@ -15,6 +15,7 @@ import DocumentTree from '../shared/document/DocumentTree.vue';
 import {
   type DocumentRowView,
   rowHeight as documentRowHeight,
+  pruneRows,
   rowsVersion,
   rowView,
   togglePath,
@@ -95,6 +96,11 @@ function onVisibleRangeDocs(range: { start: number; end: number }): void {
   if (from === undefined || to === undefined) return;
   setVisibleRows(props.tabId, from, to + 1);
   setVisibleWindow(props.pageKey, from, to + 1);
+  // A4/P21 round 1: rows.ts's own parseCache is pruned to the rendered window everywhere else
+  // (DocumentView.vue's own onVisibleRange) but had no call site here at all — a Mongo console
+  // result's parsed node trees stayed resident for the life of the result instead of the rendered
+  // window docs/ARCHITECTURE.md's Caching section already documents for this tier.
+  pruneRows(props.pageKey, from, to + 1);
 }
 
 // P42 D11: the same head-row/DocumentTree pair the Mongo data tab renders (rowView/rowHeight —
