@@ -3,14 +3,14 @@ import { decodePath } from '@shared/domain/tree';
 import { copyText } from '../../clipboard';
 import type { MenuItem } from '../../state/contextMenu';
 import { openDataTab } from '../../state/tabs';
-import { quoteIdent, type SqlDialect } from '../shared/sqlIdent';
 import {
   type RowSnapshot,
   rowsToCsv,
   rowsToInsert,
   rowsToJson,
   rowsToTsv,
-} from './clipboardFormats';
+} from '../shared/clipboardFormats';
+import { quoteIdent, type SqlDialect } from '../shared/sqlIdent';
 import {
   discardRowChange,
   duplicateAsInsert,

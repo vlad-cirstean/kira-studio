@@ -1,9 +1,9 @@
 import type { ObjectMeta } from '@shared/domain/tree';
 import type { TabularPage } from '@shared/protocol/page';
 import type { MenuItem } from '../../../state/contextMenu';
+import type { RowSnapshot } from '../../shared/clipboardFormats';
 import { pageColumnIndexFor } from '../../shared/page/columns';
 import type { SqlDialect } from '../../shared/sqlIdent';
-import type { RowSnapshot } from '../clipboardFormats';
 import { type FkNavContext, foreignKeyNavItems, referencedByItems } from '../menu';
 import { cell } from '../page';
 import { stagedValue } from '../pendingChanges';

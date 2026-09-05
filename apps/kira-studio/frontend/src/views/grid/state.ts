@@ -12,15 +12,15 @@ import {
   registerTabReload,
   reloadTabsForTarget,
 } from '../../state/viewCommands';
+import type { Selection } from '../shared/slick/selection';
 import { applyLoadFailure, beginOp, createRuntimeStore, stopOp } from '../shared/viewOp';
 import { setPage } from './page';
 import { clearPending } from './pendingChanges';
 
-export type Selection =
-  | { kind: 'cell'; row: number; col: number }
-  | { kind: 'range'; anchorRow: number; anchorCol: number; row: number; col: number }
-  | { kind: 'row'; rows: number[] }
-  | { kind: 'column'; cols: number[] };
+// P19 D7: the type itself moved to views/shared/slick/selection.ts (the file that already owns
+// its geometry, and which views/console/ now needs too) — re-exported here so every existing
+// `import type { Selection } from './state'` site is unchanged.
+export type { Selection };
 
 export interface DataViewRuntime {
   status: 'idle' | 'loading' | 'error' | 'cancelled';

@@ -33,6 +33,12 @@ import AppButton from '../../theme/primitives/AppButton.vue';
 import EmptyState from '../../theme/primitives/EmptyState.vue';
 import { wrapSelectionOnType } from '../../theme/wrapSelection';
 import {
+  columnsToTsv,
+  parseDelimited,
+  type RowSnapshot,
+  rowsToTsv,
+} from '../shared/clipboardFormats';
+import {
   alignmentFor,
   columnHeaderTooltip,
   DEFAULT_COLUMN_WIDTH,
@@ -47,7 +53,6 @@ import { setSearchFiltering } from '../shared/page/searchFilter';
 import { type EdgeHash, searchCellLayers } from '../shared/slick/cssLayers';
 import { KiraSlickGrid } from '../shared/slick/kiraSlickGrid';
 import { sqlDialectFor } from '../shared/sqlIdent';
-import { columnsToTsv, parseDelimited, type RowSnapshot, rowsToTsv } from './clipboardFormats';
 import { cellMenu, headerMenu, rowMenu } from './menu';
 import {
   addInsertRow,
@@ -85,8 +90,8 @@ import '../shared/slick/slickTheme.css';
 import 'slickgrid/dist/styles/css/slick.grid.css';
 import { setVisibleRows } from '../shared/page/visibleRows';
 import * as scrollTrace from '../shared/slick/scrollTrace';
+import { rangesFromSelection, selectionFromRanges } from '../shared/slick/selection';
 import { getPage, pageVersion, setVisibleWindow } from './page';
-import { rangesFromSelection, selectionFromRanges } from './slick/selection';
 import { parseTextSortTerms } from './sortTerms';
 import { runtime, type Selection, setSort } from './state';
 
@@ -1262,7 +1267,7 @@ function onColumnsResized(): void {
   suppressWidthEcho = false;
 }
 
-// C4/§5 D4 — `selectionFromRanges`/`rangesFromSelection` (slick/selection.ts) are deliberately
+// C4/§5 D4 — `selectionFromRanges`/`rangesFromSelection` (shared/slick/selection.ts) are deliberately
 // row-space-agnostic; these two glue functions are the one place that translates between a
 // `SlickRange`'s own display-position rows and `Selection`'s page rows, via dataSource.ts's own
 // rowAtDisplayPosition/displayPositionOf (identity today, real once C12 wires a live filter).

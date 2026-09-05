@@ -3,7 +3,7 @@ import { SlickRange } from 'slickgrid';
 import {
   rangesFromSelection,
   selectionFromRanges,
-} from '../../frontend/src/views/grid/slick/selection';
+} from '../../frontend/src/views/shared/slick/selection';
 
 // P22 Pass B, C4/§5 D4 — selectionFromRanges/rangesFromSelection: the four Selection kinds, the
 // ±1 gutter column offset (SlickRange's own cell space includes the frozen gutter at index 0;

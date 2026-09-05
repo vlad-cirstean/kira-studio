@@ -1,5 +1,13 @@
 import { SlickRange } from 'slickgrid';
-import type { Selection } from '../state';
+
+// P19 D7: moved from views/grid/state.ts — this is the file that already owns the geometry this
+// type describes, and views/console/ needs it too (biome.json forbids views/console/** importing
+// views/grid/**). views/grid/state.ts re-exports it so nothing there had to change its import.
+export type Selection =
+  | { kind: 'cell'; row: number; col: number }
+  | { kind: 'range'; anchorRow: number; anchorCol: number; row: number; col: number }
+  | { kind: 'row'; rows: number[] }
+  | { kind: 'column'; cols: number[] };
 
 // P22 Pass B, C4/§5 D4 — pure functions, unit-testable without a DOM. `SlickHybridSelectionModel`
 // owns the geometry (`SlickRange[]`, always in *display-position* space — SlickGrid indexes the
