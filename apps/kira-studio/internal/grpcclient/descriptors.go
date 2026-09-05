@@ -83,8 +83,12 @@ type Method struct {
 
 // CallResult is the terminal outcome of a call (call.go's Unary/ServerStream) — D16: a non-OK
 // gRPC status lives HERE, not in the returned error. Messages carries every message this call
-// produced: exactly one for Unary (D14: "a unary call is the same pane with exactly one entry"),
-// N for ServerStream (which also streams each one to its own onMessage callback as it arrives).
+// produced, up to maxStoredMessages: exactly one for Unary (D14: "a unary call is the same pane
+// with exactly one entry"), up to that cap for ServerStream (which also streams each one to its
+// own onMessage callback as it arrives, uncapped — this field exists for recordGrpcHistory's own
+// persistence input and a caller that missed live events, not as the live view's own source).
+// MessageCount/MessageBytes are always the true, uncapped totals regardless of len(Messages) —
+// what an elision check (repos/grpc_history.go) must compare against, not this slice's length.
 type CallResult struct {
 	Code          int32      `json:"code"`
 	CodeName      string     `json:"codeName"`

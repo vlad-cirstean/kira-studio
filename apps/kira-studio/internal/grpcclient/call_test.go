@@ -2,6 +2,7 @@ package grpcclient
 
 import (
 	"context"
+	"reflect"
 	"strings"
 	"sync"
 	"testing"
@@ -109,6 +110,41 @@ func TestServerStream_MessagesInOrderWithOffsets(t *testing.T) {
 			t.Errorf("message %d: OffsetMs = %d went backwards from %d", i, m.OffsetMs, got[i-1].OffsetMs)
 		}
 	}
+	// Finding 8: CallResult.Messages used to stay nil for a server-streaming call (only Unary set
+	// it), even though the doc comment claimed otherwise and recordGrpcHistory (bridge/grpc.go)
+	// builds a history entry's persisted `messages` from exactly this field.
+	if !reflect.DeepEqual(result.Messages, got) {
+		t.Fatalf("result.Messages = %+v, want it to match what onMessage received: %+v", result.Messages, got)
+	}
+}
+
+// TestServerStream_MessagesElidedAboveCap is finding 8's own cap: CallResult.Messages is bounded
+// at maxStoredMessages regardless of how many messages the stream actually produced — MessageCount
+// stays the true total either way, which is what repos/grpc_history.go's own elision check
+// compares against, not len(Messages).
+func TestServerStream_MessagesElidedAboveCap(t *testing.T) {
+	const total = maxStoredMessages + 37
+	server := startEchoServer(t, echoProtoSource, &echoImpl{streamMessages: total}, false)
+	src, _ := echoSource(t)
+
+	result, err := ServerStream(context.Background(), CallRequest{
+		Target: server.addr, Source: src, FullMethod: "/kira.probe.v1.Echo/ServerStream",
+		MessageJSON: `{"text":"go"}`,
+	}, nil)
+	if err != nil {
+		t.Fatalf("ServerStream: %v", err)
+	}
+	if result.MessageCount != total {
+		t.Fatalf("MessageCount = %d, want the true total %d", result.MessageCount, total)
+	}
+	if len(result.Messages) != maxStoredMessages {
+		t.Fatalf("len(Messages) = %d, want exactly the %d-message cap", len(result.Messages), maxStoredMessages)
+	}
+	for i, m := range result.Messages {
+		if m.Seq != i {
+			t.Errorf("Messages[%d].Seq = %d, want %d", i, m.Seq, i)
+		}
+	}
 }
 
 // TestServerStream_CancelledMidStream is §6.2 case 4: cancellation mid-stream — the messages
@@ -153,6 +189,11 @@ func TestServerStream_CancelledMidStream(t *testing.T) {
 	}
 	if gerr.Partial.MessageCount != delivered {
 		t.Errorf("Partial.MessageCount = %d, want %d (the messages actually delivered to onMessage)", gerr.Partial.MessageCount, delivered)
+	}
+	// Finding 8: the partial path never populated Messages either — a cancellation that received
+	// messages is still a completed call (D11) and recordGrpcHistory persists from this same field.
+	if len(gerr.Partial.Messages) != delivered {
+		t.Errorf("Partial.Messages = %d entries, want %d (the messages actually delivered to onMessage)", len(gerr.Partial.Messages), delivered)
 	}
 }
 

@@ -163,6 +163,17 @@ const viewingTime = computed(() => {
         </AppButton>
       </MessageStrip>
 
+      <!-- D11: a streaming call's history entry stores only the first maxGrpcStoredMessages
+           (finding 8) — this is the one place that ever becomes visible now that ServerStream
+           actually fills Messages/MessageCount in. -->
+      <MessageStrip
+        v-if="viewing?.snapshot.messagesElided"
+        tone="note"
+        data-testid="grpc-history-messages-elided"
+      >
+        Showing the first {{ messages.length }} of {{ viewing.snapshot.entry.messageCount }} messages.
+      </MessageStrip>
+
       <MessageStrip
         v-if="rt?.status === 'cancelled'"
         tone="warn"

@@ -612,3 +612,68 @@ test('gRPC request — the history pane gets a real Clear action', async ({ rela
 
   expect(control.log().filter((e) => e.channel === IPC.grpcHistoryClear)).toHaveLength(1);
 });
+
+// Finding 8: a server-streaming call's history entry used to always store zero messages (call.go's
+// ServerStream never populated CallResult.Messages), so grpc-history.ts's own messagesElided field
+// never carried real data. Viewing a stored streaming entry whose call produced more than the
+// 100-message cap must now show the "first N of M" note the domain type's own comment always
+// described but nothing rendered.
+test('gRPC request — a stored streaming history entry with elided messages shows a note', async ({
+  relaunch,
+}) => {
+  const ENTRY = {
+    id: 'call-elided-1',
+    itemId: null,
+    tabId: 'tab-grpc-1',
+    calledAt: '2026-01-01T00:00:00.000Z',
+    target: 'demo.example.com:443',
+    method: 'demo.Echo/ServerStream',
+    streaming: 'server',
+    environment: '',
+    code: 0,
+    codeName: 'OK',
+    statusMessage: '',
+    elapsedMs: 500,
+    messageCount: 137,
+    messageBytes: 13700,
+    storedBytes: 13700,
+  };
+  const SNAPSHOT = {
+    entry: ENTRY,
+    target: 'demo.example.com:443',
+    method: 'demo.Echo/ServerStream',
+    streaming: 'server',
+    message: '{}',
+    metadata: [],
+    messages: Array.from({ length: 100 }, (_, i) => ({
+      seq: i,
+      json: '{}',
+      wireBytes: 100,
+      offsetMs: i,
+      truncated: false,
+    })),
+    messagesElided: true,
+    header: [],
+    trailer: [],
+  };
+  const scope = { itemId: '', tabId: 'tab-grpc-1' };
+  const CONTROL: ControlSnapshot[] = [
+    {
+      channel: IPC.tabsList,
+      response: [grpcTab({ service: 'demo.Echo', method: 'ServerStream' })],
+    },
+    { channel: IPC.grpcHistoryList, args: scope, response: [ENTRY] },
+    { channel: IPC.grpcHistoryGet, args: { id: 'call-elided-1' }, response: SNAPSHOT },
+  ];
+  const { window: page } = await relaunch({ control: CONTROL });
+
+  await page.click('[data-testid="grpc-response-pane-history"]');
+  await page.click('[data-testid="grpc-history-row"]');
+
+  await expect(page.locator('[data-testid="grpc-history-band"]')).toBeVisible();
+  await expect(page.locator('[data-testid="grpc-history-messages-elided"]')).toHaveText(
+    'Showing the first 100 of 137 messages.',
+  );
+  await page.click('[data-testid="grpc-response-pane-messages"]');
+  await expect(page.locator('[data-testid="grpc-message-entry"]')).toHaveCount(100);
+});

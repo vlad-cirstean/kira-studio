@@ -20,6 +20,16 @@ import (
 // (never hidden) as codes.ResourceExhausted when exceeded (F9).
 const maxRecvMsgSize = 16 * 1024 * 1024
 
+// maxStoredMessages bounds ServerStream's own in-memory CallResult.Messages accumulator — kept
+// numerically equal to repos/grpc_history.go's own maxGrpcStoredMessages (that package cannot be
+// imported here, storage sitting above this client in the dependency order, and one bound int is
+// not worth a shared-constants package). Without this, a long-running stream would grow
+// CallResult.Messages without limit for the full life of the call, long before Record ever gets a
+// chance to cap what it persists — MessageCount/MessageBytes (below) keep counting the true totals
+// regardless, which is what recordGrpcHistory's own elision check (repos/grpc_history.go) compares
+// against, not the length of this already-capped slice.
+const maxStoredMessages = 100
+
 // CallRequest carries everything Unary/ServerStream need: the target and its TLS decision (D6),
 // the Source the method's descriptor resolves from (reusing Describe's own cache, D4), the fully
 // qualified "/pkg.Service/Method" path, the request message JSON and the metadata — every field
@@ -202,6 +212,7 @@ func ServerStream(ctx context.Context, req CallRequest, onMessage func(Message))
 	start := time.Now()
 	var count, totalBytes int
 	var header metadata.MD
+	messages := make([]Message, 0, maxStoredMessages)
 	for {
 		out := dynamicpb.NewMessage(method.Output())
 		recvErr := stream.RecvMsg(out)
@@ -216,6 +227,7 @@ func ServerStream(ctx context.Context, req CallRequest, onMessage func(Message))
 			partial := CallResult{
 				ElapsedMs: elapsed.Milliseconds(), Header: mdToPairs(header),
 				Trailer: mdToPairs(stream.Trailer()), MessageCount: count, MessageBytes: totalBytes,
+				Messages: messages,
 			}
 			code, message, asError := terminalOutcome(callCtx, recvErr)
 			partial.Code, partial.CodeName, partial.StatusMessage = int32(code), code.String(), message
@@ -237,6 +249,9 @@ func ServerStream(ctx context.Context, req CallRequest, onMessage func(Message))
 		msg := Message{Seq: count, JSON: js, WireBytes: wire, OffsetMs: time.Since(start).Milliseconds()}
 		count++
 		totalBytes += wire
+		if len(messages) < maxStoredMessages {
+			messages = append(messages, msg)
+		}
 		if onMessage != nil {
 			onMessage(msg)
 		}
@@ -249,6 +264,6 @@ func ServerStream(ctx context.Context, req CallRequest, onMessage func(Message))
 	return CallResult{
 		Code: int32(codes.OK), CodeName: codes.OK.String(),
 		ElapsedMs: elapsed.Milliseconds(), Header: mdToPairs(header), Trailer: mdToPairs(stream.Trailer()),
-		MessageCount: count, MessageBytes: totalBytes,
+		MessageCount: count, MessageBytes: totalBytes, Messages: messages,
 	}, nil
 }

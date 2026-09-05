@@ -81,7 +81,11 @@ func (r *GrpcHistoryRepo) Record(rec model.GrpcCallHistoryRecord) error {
 		}
 		messages = append(messages, m)
 	}
-	messagesElided := len(rec.Messages) > maxGrpcStoredMessages
+	// Finding 8: compared against the call's own true MessageCount, not len(rec.Messages) — the
+	// caller (grpcclient.ServerStream) already bounds its own Messages slice at the identical cap
+	// to keep a long-running stream's in-memory footprint flat, so the slice's length alone can no
+	// longer tell an elided call apart from one that produced exactly maxGrpcStoredMessages.
+	messagesElided := rec.MessageCount > maxGrpcStoredMessages
 
 	snap := storedGrpcSnapshot{
 		Target: rec.Target, Method: rec.Method, Streaming: rec.Streaming,
