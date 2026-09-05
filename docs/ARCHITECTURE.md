@@ -25,7 +25,7 @@ authoritative for behavior: SPEC.md is the record of what v1 was *specified* to 
 | Shell | **Wails v3** (`v3.0.0-beta.16`), Go | a custom, hidden-inset title bar (`Mac.TitleBar: application.MacTitleBarHiddenInset`, P1) drawn by `workbench/TitleBar.vue` over a full-size-content window — not the OS-drawn bar; macOS 14+, `arm64` only |
 | Language | TypeScript 6 (`tsc`/`vue-tsc`) for `.ts` and `.vue`; **Go** for the shell | pinned below TypeScript 7 on purpose — TS7 ships no stable programmatic compiler API until 7.1, and `vue-tsc` (which `bun run typecheck:web` runs) consumes that API in-process; `@typescript/native-preview`'s `tsgo` binary (`typecheck:tests`/`typecheck:unit`) is a separate, already-latest-upstream tool in the meantime. Converge on one toolchain once TS 7.1 ships and `vue-tsc` adopts it (P19 F2/F4) |
 | Package manager / scripts / test runner | Bun | tooling only — every adapter is native Go, so nothing at runtime depends on it |
-| Renderer build | Vite (`vite build`, `apps/kira-studio/frontend/vite.config.ts`) | builds `apps/kira-studio/frontend/src` straight into `apps/kira-studio/frontend/dist`, which `apps/kira-studio/main.go` embeds via `//go:embed all:frontend/dist` and serves through Wails' `AssetOptions.Handler`. Lazily-imported chunks, still split under Vite 8/Rolldown (P19 C6): the query console's SQL Format button reaches `sql-formatter` only through `views/console/sqlFormatterEntry.ts`'s `await import()` (~37 KB gzip); the data grid's Generate data… dialog and, as of P6, Http mode's own send path and its dynamic-values reference dialog all reach `@faker-js/faker/locale/en` — but through **two** one-line entry files, `views/grid/fakeData/fakerEntry.ts` and `http/dynamic/fakerEntry.ts`, duplicated rather than shared because `http/**` may not import `views/**` (P1 D7). Rolldown folds the two content-identical entry files into one shared stub chunk and gives the underlying locale data its own shared chunk beneath it (`en-*.js`, ~155 KB gzip — the same bytes the single pre-P6 `fakerEntry-*.js` chunk carried, just reorganised into two files instead of one, not duplicated); `http/dynamic/generators.ts`, P6's own 58-entry `$name` → faker-call dispatch table, is genuinely new code and gets a third lazy chunk of its own (~0.8 KB gzip). A fourth, as of P8: the response-history pane's **Compare** action reaches `@codemirror/merge` only through `views/httprequest/mergeEntry.ts`'s own one-line `await import()` (~29 KB, ~10 KB gzip). All four are fetched on first use — the first *Generate data…* open, the first send referencing a `{{$name}}`, the first open of the dynamic-values dialog, or the first **Compare** press — and none costs a launch or grows `index-*.js` by anything but each phase's own eager app code |
+| Renderer build | Vite (`vite build`, `apps/kira-studio/frontend/vite.config.ts`) | builds `apps/kira-studio/frontend/src` straight into `apps/kira-studio/frontend/dist`, which `apps/kira-studio/main.go` embeds via `//go:embed all:frontend/dist` and serves through Wails' `AssetOptions.Handler`. Lazily-imported chunks, still split under Vite 8/Rolldown (P19 C6): the query console's SQL Format button reaches `sql-formatter` only through `views/console/sqlFormatterEntry.ts`'s `await import()` (~37 KB gzip); the data grid's Generate data… dialog and, as of P6, Api mode's own send path and its dynamic-values reference dialog all reach `@faker-js/faker/locale/en` — but through **two** one-line entry files, `views/grid/fakeData/fakerEntry.ts` and `packages/api-core/src/http/dynamic/fakerEntry.ts`, duplicated rather than shared because the latter is P12 D16(e)'s own no-app-import package, not just P1 D7's biome rule. Rolldown folds the two content-identical entry files into one shared stub chunk and gives the underlying locale data its own shared chunk beneath it (`en-*.js`, ~155 KB gzip — the same bytes the single pre-P6 `fakerEntry-*.js` chunk carried, just reorganised into two files instead of one, not duplicated); `packages/api-core/src/http/dynamic/generators.ts`, P6's own 58-entry `$name` → faker-call dispatch table, is genuinely new code and gets a third lazy chunk of its own (~0.8 KB gzip). A fourth, as of P8: the response-history pane's **Compare** action reaches `@codemirror/merge` only through `views/httprequest/mergeEntry.ts`'s own one-line `await import()` (~29 KB, ~10 KB gzip). All four are fetched on first use — the first *Generate data…* open, the first send referencing a `{{$name}}`, the first open of the dynamic-values dialog, or the first **Compare** press — and none costs a launch or grows `index-*.js` by anything but each phase's own eager app code |
 | UI | Vue 3 (`<script setup>`, Composition API) | VDOM mode — Vapor mode evaluated and declined in P6 (`docs/v1.1/plans/P6-vue-vapor-mode.md`) |
 | Styling | Tailwind (v4, CSS-first config) | tokens mirror VS Code Dark Modern |
 | Text editing / viewing | CodeMirror 6 | definition tab's Source pane, cell editor, document view, command preview |
@@ -450,11 +450,11 @@ gate is about turning a secret into visible text, not about using it.
 
 **A second reveal caller, the same gate (P5).** A collection/environment variable's secret value
 goes through the identical `internal/localauth.Authorizer` — `main.go` constructs exactly one and
-hands it to both `connections.Service` and `internal/httpvars.Service`, which is what makes the
+hands it to both `connections.Service` and `internal/apivars.Service`, which is what makes the
 5-minute grace genuinely process-wide rather than per-feature: revealing a connection password and
 then a variable's value inside that window prompts only once. `connections.RevealResult`'s Go type
-is not shared with `httpvars.RevealResult` — importing Studio's `internal/connections` from the
-Http-scoped `internal/httpvars` would be exactly the module-boundary violation the SPEC's own
+is not shared with `apivars.RevealResult` — importing Studio's `internal/connections` from the
+Api-scoped `internal/apivars` would be exactly the module-boundary violation the SPEC's own
 boundary section exists to prevent — so the four-outcome shape (`revealed | cancelled |
 confirmation-required | error`) is redeclared, not imported, on both the Go and the TypeScript
 side. *Sending* a request that substitutes a secret is unaffected by any of this: D9's line is that
@@ -496,37 +496,37 @@ ui_layout(key, value)                                   -- panel sizes, visibili
 windows(key, order, bounds_json)                        -- one row per workbench (P8)
 tabs(id, connection_id, path, kind, state_json, order, active, window_key)  -- session restore,
                                                        -- window_key ON DELETE CASCADE into windows
-http_collections(id, name, sort_order, origin_json, variables_promoted,
+api_collections(id, name, sort_order, origin_json, variables_promoted,
                  created_at, updated_at)                -- P4; variables_promoted added P5
-http_items(id, collection_id, parent_id, kind, name, sort_order, method, url, protocol,
+api_items(id, collection_id, parent_id, kind, name, sort_order, method, url, protocol,
            request_json, origin_json, created_at, updated_at)
                                                        -- the folder/request tree; parent_id and
                                                        -- collection_id both ON DELETE CASCADE.
                                                        -- protocol ('http'|'grpc', default 'http',
                                                        -- P11) added by ALTER TABLE, not a new
                                                        -- migration's table — see below
-http_environments(id, name, sort_order, is_active, created_at, updated_at)  -- P5; top-level,
+api_environments(id, name, sort_order, is_active, created_at, updated_at)  -- P5; top-level,
                                                        -- no collection_id; at most one is_active
-http_variables(id, collection_id, environment_id, name, value, is_secret, secret_value,
+api_variables(id, collection_id, environment_id, name, value, is_secret, secret_value,
                sort_order, created_at, updated_at)      -- P5; owned by exactly one of
                                                        -- collection_id/environment_id (CHECK);
                                                        -- value/secret_value are mutually exclusive
-http_variable_history(id, variable_id, value, is_secret, secret_value, recorded_at)
+api_variable_history(id, variable_id, value, is_secret, secret_value, recorded_at)
                                                        -- P5; per-entry, capped at 20, variable_id
                                                        -- ON DELETE CASCADE
-http_response_history(id, item_id, tab_id, scope_key, sent_at, method, url, environment,
+api_response_history(id, item_id, tab_id, scope_key, sent_at, method, url, environment,
                        status, status_text, elapsed_ms, body_bytes, stored_bytes, snapshot_json)
                                                        -- P8; one row per response actually
                                                        -- received. scope_key is GENERATED ALWAYS
                                                        -- AS (COALESCE(item_id, 'tab:'||tab_id))
                                                        -- VIRTUAL. item_id ON DELETE CASCADE
-                                                       -- (real FK into http_items); tab_id is
+                                                       -- (real FK into api_items); tab_id is
                                                        -- deliberately NOT a foreign key into
                                                        -- tabs (below)
 grpc_call_history(id, item_id, tab_id, scope_key, called_at, target, method, streaming,
                    code, code_name, status_message, elapsed_ms, message_count, message_bytes,
                    stored_bytes, snapshot_json)
-                                                       -- P11; http_response_history's own shape,
+                                                       -- P11; api_response_history's own shape,
                                                        -- reused verbatim down to the generated
                                                        -- scope_key and the ON DELETE CASCADE /
                                                        -- deliberately-not-a-foreign-key split
@@ -543,11 +543,35 @@ no ORM; the Drizzle dependency went out with the Electron shell. Every row read 
 `apps/kira-studio/internal/storage/model/` before use, so a hand-edited or stale-shape row fails loudly
 instead of propagating zero values into the UI.
 
+**The six collection/variable/history tables above were `http_*` through 0009; `0010_p12_api_rename.sql`
+renames them to `api_*` (P12 D14).** `api_items` has stored gRPC requests since P11's own
+`protocol` column, and `api_variables` resolves a gRPC call's target and metadata too
+(`internal/apivars`) — the name was not stale, it was wrong, and pre-ship is the last moment a
+rename like this is free (the same reasoning that renamed the keychain service name "Safe Storage"
+→ "Secrets" earlier in this document). `grpc_call_history` is **not** renamed — it holds gRPC calls
+only, and was already correct. The migration is `ALTER TABLE … RENAME TO …` for each of the six
+tables, then `DROP INDEX` + `CREATE INDEX` for each of the seven indexes on them (SQLite has no
+`ALTER INDEX RENAME`); every other table's own `REFERENCES` clause into these six — including
+`grpc_call_history.item_id`, which points at `api_items` — is rewritten by SQLite automatically,
+since `db.go` sets `_foreign_keys=1` on every pooled connection, so no explicit rewrite appears in
+the migration's own SQL. `0006`-`0009` are left untouched (they are already applied on every
+developer database, and `migrate.go` refuses outright to run against a `schema_version` newer than
+the build knows about) — a fresh install still creates `http_*` in `0006`-`0009` and immediately
+renames it in `0010`, which is what forward-only migration means. `migrate_rename_test.go` is the
+one test in this repo that exercises a migration against seeded data rather than an empty schema:
+it seeds a v9-shaped database (a collection, a folder, an HTTP and a gRPC request item, a
+collection variable, an environment and its own variable, a variable-history row, a
+response-history row and a `grpc_call_history` row), applies migration 10, and asserts every row
+survives under the new names, both generated `scope_key` columns still compute, `grpc_call_history`'s
+foreign key now names `api_items`, and a collection delete still cascades through items, the
+collection's own variable, that variable's history and the item-scoped response-history row in one
+statement.
+
 **Collections are stored, not filed (P4).** A Postman collection lives in `kira.sqlite` as a
-normalized `http_collections`/`http_items` tree, not as a `.json` file on disk that the app edits
+normalized `api_collections`/`api_items` tree, not as a `.json` file on disk that the app edits
 in place. `item` is an *ordered array* in the format, so `sort_order` is data rather than
 presentation, and it is rewritten dense within a parent on any insert or delete — the same
-discipline `TabsRepo.Save` applies to `tabs."order"`. `http_items.parent_id` is a self-reference
+discipline `TabsRepo.Save` applies to `tabs."order"`. `api_items.parent_id` is a self-reference
 with `ON DELETE CASCADE`, which is genuinely enforced because `db.go`'s DSN sets `_foreign_keys=1`
 on every connection the pool opens: deleting a folder deletes its subtree at any depth in one
 statement, with no recursive delete in Go.
@@ -574,7 +598,7 @@ that builds an auth surface lands. **Variables are the one exception, as of P5**
 *collection*-level `variable[]` is promoted out of `origin_json` into real, resolvable rows (next
 paragraph) — folder-, item- and `url.variable`-level variables stay inert, exactly as before.
 
-**Collection variables and environments (P5).** A variable is one `http_variables` row, owned by
+**Collection variables and environments (P5).** A variable is one `api_variables` row, owned by
 either a collection or an environment — never both, never neither, enforced by a `CHECK` rather
 than a discriminator column, since the two nullable foreign keys already carry that fact and give
 `ON DELETE CASCADE` for real. Environments are top-level: the SPEC's own P5 row calls them
@@ -586,17 +610,17 @@ except through a gated reveal** — is a fact about the schema, not a Go branch:
 `secret_value` are separate columns (`value = ''` whenever `is_secret = 1`, `secret_value` only
 then), so the list query the renderer's editor runs (`SELECT id, …, value, is_secret, sort_order …`)
 cannot return a secret's plaintext or ciphertext by construction — there is no column to forget to
-exclude. `internal/httpvars.Service.Reveal`/`RevealHistory` are the only paths to one, gated by the
+exclude. `internal/apivars.Service.Reveal`/`RevealHistory` are the only paths to one, gated by the
 **same** `*internal/localauth.Authorizer` instance connections' own reveal uses (below), so a
 5-minute grace granted by either kind of reveal covers the other. History is a second table,
-`http_variable_history`, one row per prior value, capped at 20 per variable with the same
+`api_variable_history`, one row per prior value, capped at 20 per variable with the same
 dedupe-then-trim discipline `filter_history` already uses — recorded only when a value actually
 changes (a secret's change is detected by decrypting the stored value once and comparing plaintext,
 since GCM nonces make ciphertext comparison meaningless), and a restore writes through the ordinary
 update path, so the restore is itself in the history.
 
 A collection's own top-level `variable[]` is **promoted** out of `origin_json` into
-`http_variables` rows — the one exception to "everything not modelled stays inert" scripts/auth/
+`api_variables` rows — the one exception to "everything not modelled stays inert" scripts/auth/
 variables get elsewhere in this section, because P5's SPEC row asks for exactly this level to be
 resolvable. Folder- and item-level `variable[]` stay inert, same as before. A pre-P5 collection
 (`variables_promoted = 0`) is promoted once, lazily, the first time its variables are listed;
@@ -608,7 +632,7 @@ matters most.
 **Response history is recorded in Go, inside the send op that already exists, from the stage-1
 request — never the resolved one (P8).** `bridge/http.go`'s `Send` closure gains one call, after
 the response is known and before it returns: `ResponseHistoryRepo.Record` writes one
-`http_response_history` row per response actually received, best-effort (a failed insert logs and
+`api_response_history` row per response actually received, best-effort (a failed insert logs and
 the send still returns its response — a history feature must never be the reason a user loses the
 answer they were waiting for). What is stored of the request is `args`, not `ResolveRequest`'s
 output — the identical line `op.SetCommand`'s own unresolved-URL-first ordering already draws
@@ -619,7 +643,7 @@ is now persisted in the clear, which every comparable tool does and is a stated 
 oversight.
 
 Storage is bounded by three independent caps, because a response's body is the first payload this
-app's history/log tables have ever actually stored (`filter_history`/`http_variable_history` cap a
+app's history/log tables have ever actually stored (`filter_history`/`api_variable_history` cap a
 *count* at 20; `op_log` adds an age cut on top — none of the three has ever needed a byte bound,
 since none stores anything bigger than a sentence). A **per-entry cap** (256 KiB, applied once to
 the request body and once to the response body) truncates a stored copy independently of
@@ -633,7 +657,7 @@ raw inspector does not change this: its own rendering elides a binary body the i
 marker-only is a settled property now, not a deferred question — the entry keeps every other field,
 including the true `bodyBytes`, so the list still reads "412 KB · binary". A **per-scope count cap**
 (20, the same shape `filter_history`'s/
-`http_variable_history`'s own insert-then-trim SQL already uses) bounds one request's own history.
+`api_variable_history`'s own insert-then-trim SQL already uses) bounds one request's own history.
 And a **global byte budget** (128 MiB, the same order of magnitude as the L2 row cache's own
 `cache.l2BudgetMb` budget, deliberately) bounds the table itself regardless of how many requests
 exist — evicted oldest-first *across every scope*, the property neither of the first two caps can
@@ -678,7 +702,7 @@ bounded by the global byte budget regardless, and is deliberate: a bound call on
 one more thing that can fail silently at the worst moment, during a quit.
 
 Saving a scratch request (**Save as…**) adopts its history onto the newly-created row —
-`ResponseHistoryRepo.Adopt` is one `UPDATE http_response_history SET item_id = ? WHERE item_id IS
+`ResponseHistoryRepo.Adopt` is one `UPDATE api_response_history SET item_id = ? WHERE item_id IS
 NULL AND tab_id = ?`, with `scope_key` following for free since it is generated, not written.
 Without this, ten minutes of iterating on a scratch request before finally saving it would silently
 discard everything sent while iterating — the exact moment the history is most useful. The reverse
@@ -695,19 +719,19 @@ wondering what still consumes it. The same judgement applies to `ui_layout`'s ow
 leaf: P8's `0002_p8_windows.sql` seeds the first `windows` row from it and then leaves the
 now-inert leaf row in place rather than deleting it.
 
-**A gRPC request is a `protocol` on the existing `http_items` row, not a third `kind` (P11).**
+**A gRPC request is a `protocol` on the existing `api_items` row, not a third `kind` (P11).**
 `kind` stays structural — `'folder'` vs. a leaf — and `protocol` says which document shape
 `request_json` holds for a leaf: `'http'` → `model.SavedRequest`, `'grpc'` → the new
 `model.SavedGrpcRequest`. The alternative (a `kind: 'grpc-request'` value) would have meant every
 existing `kind === 'request'` check across the tree/collections/export code re-auditing whether it
 silently also needs to handle a third value; `protocol` instead reads as "which body shape," and
 every one of those checks stays exactly as narrow as it already was. `grpc_call_history` is
-deliberately its **own** table rather than a widened `http_response_history` — the two share almost
+deliberately its **own** table rather than a widened `api_response_history` — the two share almost
 every column name by convention, not by a shared struct or a shared repo, because the *rows*
 genuinely differ (a gRPC call's `code`/`code_name`/`streaming` have no HTTP equivalent, and an HTTP
 response's `status`/`redirects` have no gRPC one) and a nullable-column union of the two would have
 made every existing HTTP-only query and cap computation reason about rows it can never actually see.
-Storage bounds are the **same four shapes** `http_response_history` already established — per-message
+Storage bounds are the **same four shapes** `api_response_history` already established — per-message
 truncation (64 KiB, half HTTP's single-payload cap, since a streamed message is one of many rather
 than the one thing a response is), a 100-stored-message-per-entry elision with a true `message_count`
 kept alongside it (D11's own addition: unlike an HTTP response's one body, a streaming call's
@@ -808,8 +832,9 @@ Browse (below), where `state.levelPath` is the one piece of Browse-specific stat
 of the same identity.
 
 **A tab's mode is a function of its kind; switching modes writes nothing.** P1 introduced a
-second top-level mode alongside Studio (**Http**, still empty as of P1 — no request builder, no
-collections, nothing protocol-specific has landed yet), and the seam is deliberately the smallest
+second top-level mode alongside Studio (**Api** — named Http through P1-P11, renamed by P12 D2
+once a second protocol, gRPC, joined it; still empty as of P1 — no request builder, no
+collections, nothing protocol-specific had landed yet), and the seam is deliberately the smallest
 thing that works: `TAB_KIND_MODE` (`packages/shared/domain/tabs.ts`) is a total, hand-maintained
 map from `TabKind` to `AppMode`, so there is no `mode` column, no migration and no Go change — a
 tab's mode is derived, never stored, the same shape the "page kind, never database type" rule
@@ -825,7 +850,7 @@ unaffected) cannot leak tabs across a window.
 primitive.** `theme/primitives/PanelShell.vue` (P12 D10: moved out of `workbench/panels/`, since
 it is generic chrome with no Studio- or Api-specific knowledge) owns the header geometry, the
 search reveal/toggle and the VS-Code-style type-ahead redirect — the same panel shell both
-`ProjectPanel.vue` (Studio) and `http/CollectionsPanel.vue` (Http) mount into via its
+`ProjectPanel.vue` (Studio) and `api/CollectionsPanel.vue` (Api) mount into via its
 `#title`/`#actions`/`#body`/`#empty` slots, so a second left panel was never added (there are still
 exactly three layout panels).
 Separately, `theme/primitives/TreeHost.vue` is the virtualized-tree mechanics factored out of
@@ -833,14 +858,14 @@ Separately, `theme/primitives/TreeHost.vue` is the virtualized-tree mechanics fa
 (`theme/primitives/stickyBand.ts`), reveal-scroll with band inset — generic over any row shape
 with `depth`/`hasChildren`/`expanded`/`key`. `ProjectTree.vue` still owns every Studio-specific
 behaviour (the connection-driven row model, the five openable-kind dispatch, context menus,
-keyboard shortcuts) unchanged. **P4's `http/CollectionsTree.vue` is that primitive's second
+keyboard shortcuts) unchanged. **P4's `api/CollectionsTree.vue` is that primitive's second
 consumer**, and it landed with no change to `TreeHost.vue`, `VirtualList.vue` or `stickyBand.ts` at
 all — the props, the `#row` slot, `revealKey` and the background-contextmenu emit were exactly what
 a second tree needed, which is the check the factoring was meant to pass. It mounts `TreeHost` over
 its **own** row model, not a shared one: `CollectionRowVm` is four structural members plus seven of
 its own against `TreeRowVm`'s fourteen, because `connectionId`, `color`, `status`, `statusDetail`,
-`groupKind`, `badges`, `loading` and `error` mean nothing here. `http/CollectionRow.vue` is
-likewise its own row rather than a widened `project/TreeRow.vue` — partly because `http/**` may not
+`groupKind`, `badges`, `loading` and `error` mean nothing here. `api/CollectionRow.vue` is
+likewise its own row rather than a widened `project/TreeRow.vue` — partly because `api/**` may not
 import `project/**` at all, and partly because the differences are the point (no connection rail,
 no status dot, no `EngineIcon`; a leading method chip; an inline rename input). The two modes'
 tree *rows* have nothing in common, only how rows are virtualized and pinned.
@@ -865,7 +890,7 @@ when the mode has no active tab, replacing what used to be a nine-branch `v-if`/
 branching on `tab.kind` itself, and no longer imports `project/state/tree` at all. Adding a tab
 kind means one registry entry each in `state/tabKinds.ts` and `workbench/tabViews.ts`, not editing
 a dispatch chain in three files — `'http-request'` (P2) is the first kind to actually exercise
-that promise, and the first Http-mode kind at all: `TAB_KIND_MODE['http-request']` is `'http'`,
+that promise, and the first Api-mode kind at all: `TAB_KIND_MODE['http-request']` is `'api'`,
 every other entry is `'studio'`. It costs a fourth vocabulary Go's `model.RenderableTabKinds` has
 to carry too (no compiler catches a miss there — `tests/unit/go-ts-vocabulary-parity.spec.ts`
 does). Every Studio kind's `path` addresses a real target the tab is a *view* onto; an HTTP
@@ -876,7 +901,7 @@ above). Duplicating an HTTP request tab therefore copies the source's own reques
 than starting fresh, the one kind where "same target, fresh default state" does not apply.
 
 **A saved collection request opens that same `'http-request'` kind — P4 added no tab kind (and no
-op kind).** Its state is sourced from an `http_items` row instead of `defaultHttpRequestTabState()`,
+op kind).** Its state is sourced from an `api_items` row instead of `defaultHttpRequestTabState()`,
 and the binding lives in the state as `itemId`, *not* in `path`, which stays the literal constant
 above. That placement is forced rather than aesthetic: `duplicateTab` copies `path` verbatim while
 `duplicateState` clears `itemId`, so a `collection:<id>/request:<id>` path would leave a duplicated
@@ -905,6 +930,84 @@ underneath a state-widening phase (P3's own body-mode schema, six new fields) ra
 its own migration story. `tabsSave` still writes `tabsState.tabs` straight back, so a parse also
 drops any key no schema recognizes — deliberate, not lossy in a way that matters, since a garbage
 key had no reader to begin with.
+
+**The Api module is three renderer directories, one workspace package, and four Go packages —
+renamed from Http by P12, once gRPC (P11) made "Http" describe less than half of what the module
+does.** D1's rule, applied throughout: a name changes to Api only if the thing it names also serves
+gRPC. `internal/apivars` (renamed from `internal/httpvars`) resolves gRPC targets and metadata, so
+it names the module; `internal/httpclient`/`internal/grpcclient` each run for one protocol only, so
+neither renamed. `frontend/src/api/` (renamed from `frontend/src/http/`) holds the module-level
+half — the collections tree, the six dialogs (mounted through one `<ApiDialogs />` since P12,
+rather than individually by `App.vue`), the module's own stores, `tabs.ts` (the module's twelve
+tab-opener/finder/patcher functions, moved out of `state/tabs.ts` so the shell imports nothing from
+`views/**`) and `reveal.ts` (below). `views/httprequest/` and `views/grpcrequest/` keep their names
+— they are protocol-specific tab views, the same convention every other `views/<kind>/` follows,
+and renaming one of two sibling protocol directories to a module name would have said the HTTP tab
+is *the* Api tab and the gRPC tab is something else. `@kira/api-core` (`packages/api-core/`) is the
+module's ~2,000 lines of pure, DOM-free logic — `{{name}}` substitution, curl parse/generate, raw
+HTTP parse/generate, the dynamic-value catalog, and both protocols' saved-request mappers — a real
+Bun workspace package (`@kira/shared` promoted alongside it) rather than source reached only
+through a path alias, checked by its own standalone `tsgo`/`bun test` runs with no `apps/` on its
+path and no framework import (`biome.json`'s own rules enforce this, not just a convention).
+
+**Every couple that would block splitting Api into a standalone app someday is named, not
+resolved (P12 D17) — this is an audit, not a restructuring.**
+
+| Coupling | Verdict |
+|---|---|
+| `internal/bridge` is one Go package holding both modules' services | Accepted. Already one file per service, and the six Api files import nothing from the thirteen Studio ones — splitting the package would rewrite every bound method's FQN (`mockRuntime.ts`'s `BRIDGE_PKG` plus 106 `FQN_SUFFIX_BY_IPC_KEY` entries) for no compile-time boundary Go's own `internal/` visibility rule doesn't already give |
+| `appcore.Deps` carries Studio's `Connections`/`Tree`/`Router` into Api services, and Api's `ApiVars` into Studio's (`ConnectionsService`) | Accepted, documented. One struct embedded by value into nineteen bound services; a standalone Api app needs only `Deps{DB, Repos, ApiVars, Events}` from it |
+| `internal/storage/{model,repos}` carries both modules' tables and imports `httpclient`/`postman` (`model.ResponseHistorySnapshot` embeds `httpclient.Response` by value; `repos.CollectionsRepo` speaks `postman.Tree`/`postman.Item`) | **The real blocker, named.** Splitting it is a five-constructor, every-repo-test change for zero behaviour delta — worth doing only once a second host genuinely exists. The shape, so it need not be rediscovered: `model/{collections,variables,grpc,responsehistory}.go` and `repos/{collections,variables,response_history,grpc_history}.go` move to an `internal/apistore` package; `repos.Repos` keeps its four Api fields as an embedded `*apistore.Repos`; `postman` imports `apistore` instead of `model`, and `model` stops importing `httpclient` |
+| `adapterhost.Host.RunOp` is the Api module's op scheduler | Accepted **by design**, not neglect — one op log beats a second dead ring on every request tab or a second `useRunState`/ops store, and both `bridge/http.go` and `bridge/grpc.go` pass `ConnectionID: nil` into the same scheduler every DB adapter uses |
+| `ConnectionsService.SecretsStatus` is the Api module's only call into a Studio service (`http/VariablesDialog.vue`'s own OS-keychain check) | Accepted, documented. It reports a *process-wide platform fact*, not a connection fact, and lives on `ConnectionsService` only because Studio's connections needed it first; the honest fix is a `SecretsService` of its own — a new bound method, out of scope for a phase whose row forbids adding one |
+
+**Three duplications P11 (and earlier phases) wrote down as P12's to unpick are unpicked; a fourth,
+proposed, is declined with a reason.**
+
+- **P5 OQ-2 and P9 OQ-4** (a gated-reveal loop hand-copied at three call sites) are closed by
+  `api/reveal.ts`'s `runReveal` — the one four-outcome switch (`revealed | cancelled |
+  confirmation-required | error`) with the recurse-once-on-confirmation shape, shared by
+  `revealVariable`, `revealHistoryEntry` and the *Copy as curl* reveal loop (which calls
+  `revealVariable` rather than ever hand-rolling its own copy). `project/ConnectionDialog.vue`
+  **keeps its own copy on purpose** — sharing it would need a home both `project/**` and `api/**`
+  may import, i.e. a new Studio↔Api shared module created by the very phase whose job is removing
+  couplings between them.
+- **P9 F16** (`curl/generate.ts`'s and `raw/generate.ts`'s byte-for-byte-identical private
+  `goQueryEscape`, kept apart only because the two lived in different directories) is closed now
+  that both are one package's `src/http/` tree: `packages/api-core/src/http/escape.ts` is the one
+  exported copy, imported by both.
+- **F9/F10** (the two protocols' `views/*/history.ts` sharing 100 lines, and their
+  `mergedValuesAndSecrets`/`collectionIdFor` duplicated because `views/grpcrequest/**` may not
+  import `views/httprequest/**`) are closed the same way: `api/state/history.ts`'s
+  `createHistoryStore` factory (HTTP's compare-selection extra rides in a generic `Extra` type
+  parameter; gRPC passes none), and `mergedValuesAndSecrets`/`collectionIdFor` moved into
+  `api/state/{variables,collections}.ts`, which both view directories already imported.
+- **P11 OQ-6** (should the four insert-then-trim capped history tables — `filter_history`,
+  `api_variable_history`, `api_response_history`, `grpc_call_history` — share a Go helper?) is
+  **declined (D18)**. A shared helper would take the table name, scope column, order column and cap
+  as strings and compose SQL per call, which this codebase already rejected once, on index-usage
+  grounds, for a `WHERE` clause; the four bodies also differ in what they trim on (count vs.
+  count+bytes) and whether they run inside an outer transaction. Four applications of a pattern,
+  each written out, is what this repo already chose three times over — a fifth reader is better
+  served by four legible statements than by one parameterised builder.
+
+**An App.vue that used to know eleven of the module's own component/store imports now knows one.**
+`api/ApiDialogs.vue` mounts the module's six dialogs, each still gated by its own store's `open`
+flag exactly as before — a template-only wrapper, not a behaviour change, and the artefact a future
+`packages/api-ui` (still not built — see below) would extend rather than replace.
+
+**`packages/api-ui` does not exist, and the reason is a measurement, not neglect.** The module
+mounts 43 `theme/primitives/*` imports across eleven distinct Vue components, plus `CodiconIcon`,
+`CodeMirrorHost.vue`, `editor/theme`, `beautify`/`format`/`clipboard`, and
+`views/shared/viewOp.ts` — extracting a UI package first needs `packages/ui-kit` (`theme/**` plus
+`primitives.css`/`tokens.css`/`base.css` plus those three utility modules), which **90 of this
+renderer's 287 source files import**. Moving `theme/**` out from under the phase that styles the
+Api module against it next would be exactly backwards. What this phase does instead is make the
+remaining couplings small and lint-fenced (`api/tabs.ts`, `bridge/apiControl.ts`, and `biome.json`'s
+own six rules) so that a later `packages/ui-kit` extraction turns `packages/api-ui` into a move
+rather than an untangling — three injected ports (an `ApiBridge`, a tab port, the three app-wide
+singletons `confirmDialog`/`contextMenu`/`settings`), two of which this phase already isolated as
+files.
 
 **An HTTP request body is one of five modes; there is no GraphQL mode.** `packages/shared/domain/
 http.ts`'s `httpBodyModeSchema` — `'none' | 'raw' | 'code' | 'urlencoded' | 'formdata' | 'file'` —
@@ -975,12 +1078,12 @@ and the `file` body's own path are the one deliberate exception: that path is `o
 send and came from a native picker, so a substituted one would be validated for the first time
 inside the request, failing on a string the user never typed). The engine itself — find `{{`, find
 the next `}}`, trim, look up, else pass through literally, one pass, no re-expansion — is
-implemented **twice**: `apps/kira-studio/frontend/src/http/substitute.ts` and
-`internal/httpvars/resolve.go`. Not a shared library, on purpose — a template engine like Handlebars
+implemented **twice**: `packages/api-core/src/http/substitute.ts` and
+`internal/apivars/resolve.go`. Not a shared library, on purpose — a template engine like Handlebars
 or Mustache HTML-escapes by default, which would corrupt a JSON/XML body carrying a substituted
 `&`/`<`/`"`, and its "render or fail" contract has no seam for the classified per-reference report
 (`resolved | deferred | dynamic | unknown`) the unresolved-reference chip needs. The two
-implementations are pinned to identical behaviour by `internal/httpvars/testdata/substitution.json`,
+implementations are pinned to identical behaviour by `internal/apivars/testdata/substitution.json`,
 one JSON corpus read by both a Go test and a TS unit test — a stronger guard than two independently
 written test suites, and the same technique `tests/unit/go-ts-vocabulary-parity.spec.ts` already
 uses to keep a Go source and a TS source from drifting apart, applied to *behaviour* instead of a
@@ -991,7 +1094,7 @@ vocabulary list.
 `dynamic?: (name: string) => string | null`, consulted only inside the existing `$`-prefixed
 branch — `$` was already a distinct token kind checked before the values lookup even runs, on both
 sides, so P6 adds a resolver behind an existing branch and changes no scanning at all. The send
-path supplies `http/dynamic/catalog.ts`'s `loadDynamicGenerator()`; the live-preview chip that backs
+path supplies `packages/api-core/src/http/dynamic/catalog.ts`'s `loadDynamicGenerator()`; the live-preview chip that backs
 the unresolved-reference count never does, because that chip is a `computed` re-running the whole
 resolution on every keystroke — if it also generated, typing one character into a URL containing
 `{{$guid}}` would mint a fresh UUID the send would then never actually use. A recognised `$name` is
@@ -1005,8 +1108,8 @@ syntax here or in Postman — is left verbatim and classified `dynamic`, exactly
 branch on the Go side still does with it; a send never fails over an unrecognised dynamic reference.
 
 **The vocabulary is 58 names, Postman's own `$name` spellings, and it is finite on purpose.**
-`http/dynamic/catalog.ts`'s `DYNAMIC_NAMES` (an eager `const` tuple, no faker import) maps each name
-to one `@faker-js/faker@10.6.0` call in `http/dynamic/generators.ts` (the lazy half, reached only
+`packages/api-core/src/http/dynamic/catalog.ts`'s `DYNAMIC_NAMES` (an eager `const` tuple, no faker import) maps each name
+to one `@faker-js/faker@10.6.0` call in `packages/api-core/src/http/dynamic/generators.ts` (the lazy half, reached only
 through a dynamic `import()`) — every mapping was verified by execution against the installed
 version rather than guessed, which caught two calls a naive reading would expect that do not exist
 in faker 10 (`internet.color`, `location.streetName`). A name is included only when exactly one
@@ -1027,7 +1130,7 @@ compile error.
 neither a secret (nothing to gate, nothing to decrypt) nor a stored variable (nothing to look up) —
 it is a renderer-only computation over a root `package.json` dependency, so P6 adds no Go file, no
 migration, no bound method, no bindings regeneration and no `packages/shared` change;
-`internal/httpvars/resolve.go` and `internal/httpvars/testdata/substitution.json` are
+`internal/apivars/resolve.go` and `internal/apivars/testdata/substitution.json` are
 byte-identical to what P5 left. `Resolve`'s existing `$` branch (leave verbatim, classify
 `KindDynamic`) is already the correct behaviour for whatever `$name` stage 1 could not generate — a
 typo or an excluded Postman name — the same honest "leave the token literal" treatment P5 chose for
@@ -1043,7 +1146,7 @@ renderer's own store to be substituted, which is the exact bug P14 fixed for con
 recreated one table later. So stage 1 (the renderer, `send()` in `views/httprequest/state.ts`)
 resolves every reference it can see — everything except a name that matches a *secret* entry, which
 it leaves verbatim and classifies `deferred`, never fetching or holding that value at all. Stage 2
-(`internal/httpvars.Service.ResolveRequest`, called from `bridge/http.go`'s `Send`) decrypts only
+(`internal/apivars.Service.ResolveRequest`, called from `bridge/http.go`'s `Send`) decrypts only
 the secrets a request's fields actually reference and finishes the rest. The ordering inside `Send`
 is load-bearing, not stylistic: `op.SetCommand` — which writes the human-readable command into
 `op_log.command`, a **persisted** column the Operations panel renders — is called with the
@@ -1053,7 +1156,7 @@ is exactly the shape a user puts a credential in, so resolving before `SetComman
 plaintext credential into `kira.sqlite` on every send.
 
 **Import/generate a curl command is two directions over the same vocabulary, entirely in the
-renderer, and Go is untouched by P7 too.** `apps/kira-studio/frontend/src/http/curl/` holds both:
+renderer, and Go is untouched by P7 too.** `packages/api-core/src/http/curl/` holds both:
 `tokenize.ts` wraps `shlex@3.0.0` (`split()`/`quote()`) — the one candidate, of everything measured,
 that survives an escaped-newline continuation, a genuinely empty argument, ANSI-C `$'…'` quoting, an
 un-expanded `$VAR` and an untouched `{{token}}` without corrupting any of them, and also solves the
@@ -1077,7 +1180,7 @@ fully-resolved, credential-bearing request — one careless `op.SetCommand` or `
 writing a decrypted credential into `kira.sqlite`, exactly the hazard `SetCommand`'s
 unresolved-URL-first ordering above exists to avoid; the renderer has no op, no persisted column and
 no log sink; the hazard is absent there, not merely mitigated. So P7 adds no Go file, no migration,
-no bound method and no bindings regeneration — `internal/httpvars/`, `internal/httpclient/`,
+no bound method and no bindings regeneration — `internal/apivars/`, `internal/httpclient/`,
 `internal/bridge/` and `internal/postman/` are byte-identical to what P6 left.
 
 **Response headers are shown alphabetised, not in received order — a known property of
@@ -1183,7 +1286,7 @@ request in text form; even masked (below) it would double a snapshot's size for 
 be opened from a stored entry anyway — selecting a past response and switching to Raw shows an
 empty state naming exactly that lifetime, the same one P2 D6 already gave the live response object
 itself, applied here to a strictly larger payload. A rendered request's secrets are masked back to
-`{{name}}` before this even matters: `internal/httpvars.ResolveRequest` (above) already returns
+`{{name}}` before this even matters: `internal/apivars.ResolveRequest` (above) already returns
 which secret names it substituted and their values in the same call; `bridge/http.go` builds a
 `strings.Replacer` from that pair set and applies it to `Wire.Request` only — never
 `Wire.ResponseHead`, which never carried a request secret to begin with. This is the same posture
@@ -1225,10 +1328,10 @@ that stands complete without it.
 
 **The raw *editor* is a third representation of tab state, parsed and generated entirely in
 renderer TypeScript exactly as P7's curl import/generate is, and it is pre-substitution by
-design.** `http/raw/generate.ts` builds a raw HTTP/1.1 text buffer from `HttpRequestTabState` —
+design.** `packages/api-core/src/http/raw/generate.ts` builds a raw HTTP/1.1 text buffer from `HttpRequestTabState` —
 `{{base_url}}`, `{{token}}` and `{{$guid}}` all appear literally, because a post-substitution buffer
 could not be edited at all (applying it would write today's resolved values back into the tab and
-permanently destroy every variable reference). `http/raw/parse.ts` is the inverse, hand-written for
+permanently destroy every variable reference). `packages/api-core/src/http/raw/parse.ts` is the inverse, hand-written for
 the same reason P7 D1 declined every published curl parser: a raw-text parser has to accept
 `{{base_url}}/v2/orders` as a request-target and preserve header name case and row order verbatim,
 which is the opposite of what a conformant HTTP parser does. The dialog (`EditRawRequestDialog.vue`)
