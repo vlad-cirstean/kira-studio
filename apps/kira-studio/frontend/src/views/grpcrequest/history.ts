@@ -37,8 +37,8 @@ export async function deleteGrpcHistoryEntry(tabId: string, id: string): Promise
   await del(tabId, id);
 }
 
-// F23: implemented and bound, wired to nothing (the gRPC response pane has no Clear action) — a
-// protocol-parity gap this phase's row ("no new user-facing behaviour") leaves for P13 (§8 OQ-3).
+// P13 D12: reachable from CallHistoryList.vue's own Clear history button, behind the same
+// confirmDialog gate HTTP's clearHistory uses — P12's own F23 finding, closed here.
 export async function clearGrpcHistory(tabId: string): Promise<void> {
   await clearAll(tabId);
 }

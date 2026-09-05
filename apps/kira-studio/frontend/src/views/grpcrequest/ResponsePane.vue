@@ -7,16 +7,10 @@ import CodeMirrorHost from '../../editor/CodeMirrorHost.vue';
 import { formatBytes } from '../../format';
 import AppButton from '../../theme/primitives/AppButton.vue';
 import EmptyState from '../../theme/primitives/EmptyState.vue';
-import IconButton from '../../theme/primitives/IconButton.vue';
 import MessageStrip from '../../theme/primitives/MessageStrip.vue';
 import SegmentedControl from '../../theme/primitives/SegmentedControl.vue';
-import {
-  backToLatestGrpc,
-  deleteGrpcHistoryEntry,
-  ensureGrpcHistoryLoaded,
-  grpcHistoryRuntime,
-  viewGrpcHistoryEntry,
-} from './history';
+import CallHistoryList from './CallHistoryList.vue';
+import { backToLatestGrpc, ensureGrpcHistoryLoaded, grpcHistoryRuntime } from './history';
 import { runtime } from './state';
 
 // D14: three segments — Messages · Metadata · History — and deliberately no Raw, no Timeline (D14
@@ -177,31 +171,7 @@ const viewingTime = computed(() => {
         Stopped after {{ messages.length }} message{{ messages.length === 1 ? '' : 's' }}.
       </MessageStrip>
 
-      <div v-if="tab.state.responsePane === 'history'" class="history-pane" data-testid="grpc-history-list">
-        <MessageStrip v-if="historyRt?.error" tone="err">{{ historyRt.error }}</MessageStrip>
-        <EmptyState v-else-if="!historyRt?.entries || historyRt.entries.length === 0" icon="history" label="No past calls yet" />
-        <div v-else class="history-rows">
-          <button
-            v-for="entry in historyRt.entries"
-            :key="entry.id"
-            type="button"
-            class="history-row"
-            data-testid="grpc-history-row"
-            @click="viewGrpcHistoryEntry(tab.id, entry.id)"
-          >
-            <span class="p-chip" :class="grpcCodeClass(entry.code)">{{ entry.codeName }}</span>
-            <span class="p-xs mono">{{ entry.method }}</span>
-            <span class="p-xs dim">{{ new Date(entry.calledAt).toLocaleTimeString([], { hour12: false }) }}</span>
-            <span class="p-push" />
-            <IconButton
-              icon="trash"
-              v-tooltip="'Delete'"
-              data-testid="grpc-history-delete"
-              @click.stop="deleteGrpcHistoryEntry(tab.id, entry.id)"
-            />
-          </button>
-        </div>
-      </div>
+      <CallHistoryList v-if="tab.state.responsePane === 'history'" :tab="tab" />
       <div v-else-if="tab.state.responsePane === 'metadata'" class="metadata-groups" data-testid="grpc-response-metadata">
         <div class="metadata-group">
           <div class="metadata-group-title p-xs muted">Header</div>
@@ -310,35 +280,6 @@ const viewingTime = computed(() => {
   margin-bottom: var(--kira-s-1);
 }
 
-
-.history-pane {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-}
-
-.history-rows {
-  display: flex;
-  flex-direction: column;
-}
-
-.history-row {
-  display: flex;
-  align-items: center;
-  gap: var(--kira-s-2);
-  padding: var(--kira-s-2) var(--kira-s-3);
-  background: none;
-  border: none;
-  border-bottom: var(--kira-border-width) solid var(--kira-border);
-  cursor: pointer;
-  font: inherit;
-  color: var(--kira-fg);
-  text-align: left;
-}
-
-.history-row:hover {
-  background: var(--kira-hover);
-}
 
 .history-hint-link {
   margin-top: var(--kira-s-2);
