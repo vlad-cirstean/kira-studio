@@ -1,10 +1,20 @@
 <script setup lang="ts">
+import {
+  bodyBadgeLabel,
+  canEditAsRaw,
+  defaultContentTypeFor,
+  generateRawRequest,
+  httpRequestTitle,
+  isDirty,
+  isDynamicName,
+  parseQuery,
+  splitUrl,
+  toSavedRequest,
+} from '@kira/api-core';
 import { type HttpMethod, httpMethodClass } from '@shared/domain/http';
 import type { HttpRequestTabRecord } from '@shared/domain/tabs';
 import { computed, onMounted, onUnmounted, watch } from 'vue';
-import { isDynamicName } from '../../http/dynamic/catalog';
 import EnvironmentSelect from '../../http/EnvironmentSelect.vue';
-import { canEditAsRaw, generateRawRequest } from '../../http/raw/generate';
 import {
   collectionIdFor,
   openSaveDialog,
@@ -26,14 +36,11 @@ import PanelSplitter from '../../theme/primitives/PanelSplitter.vue';
 import SegmentedControl from '../../theme/primitives/SegmentedControl.vue';
 import TextField from '../../theme/primitives/TextField.vue';
 import ViewChrome from '../../theme/primitives/ViewChrome.vue';
-import { bodyBadgeLabel, defaultContentTypeFor } from './body';
 import QueryParamsTable from './QueryParamsTable.vue';
 import RequestBodyPane from './RequestBodyPane.vue';
 import RequestHeadersTable from './RequestHeadersTable.vue';
 import ResponsePane from './ResponsePane.vue';
-import { isDirty, toSavedRequest } from './saved';
 import { resolveForExport, resolveTabState, runtime, send, stop } from './state';
-import { httpRequestTitle, parseQuery, splitUrl } from './url';
 
 // MainView.vue keys this component by tab.id — same discipline as every other *View.vue.
 const props = defineProps<{ tab: HttpRequestTabRecord }>();
@@ -91,7 +98,7 @@ function onSend(): void {
 // P7 D10: computes the frozen resolution exactly as send() does (resolveForExport — this file's
 // own './state', P6 D7's short-circuit preserved) and hands the store a plain result; the dialog
 // itself never reaches into views/** to get it. defaultContentType is P3 D7's own per-mode table,
-// computed here rather than inside http/curl/ so that module keeps its no-views-import property.
+// computed here rather than inside @kira/api-core's curl/ so that package keeps its no-app-import property.
 async function onCopyAsCurl(): Promise<void> {
   const resolution = await resolveForExport(props.tab.id);
   if (!resolution) return;

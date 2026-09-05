@@ -1,24 +1,16 @@
-import type { HttpBodyWire, HttpHeaderWire } from '@shared/domain/http';
+import type { HttpBodyWire, HttpHeaderWire } from '@kira/shared/domain/http';
 import { quote } from 'shlex';
+import { goQueryEscape } from '../escape';
 
 export interface CurlRequest {
   method: string;
   url: string;
   headers: readonly HttpHeaderWire[];
   body: HttpBodyWire;
-  /** P3 D7's per-mode default, computed by the caller from views/httprequest/body.ts's own
-   *  defaultContentTypeFor — passed in rather than recomputed here, so there is one table and
-   *  http/curl/ keeps its no-views-import property. '' means "this mode sends none". */
+  /** P3 D7's per-mode default, computed by the caller from body.ts's own defaultContentTypeFor —
+   *  passed in rather than recomputed here, so there is one table. '' means "this mode sends
+   *  none". */
   defaultContentType: string;
-}
-
-/** F13/body.go's `url.QueryEscape`, matched byte-for-byte: encodeURIComponent's own leftover set
- *  (`! * ' ( )`) is smaller than Go's unreserved set, so those five are escaped on top of it; a
- *  space becomes '+', matching buildURLEncoded's own both-halves encoding. */
-function goQueryEscape(s: string): string {
-  return encodeURIComponent(s)
-    .replace(/[!*'()]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`)
-    .replace(/%20/g, '+');
 }
 
 function contentTypeIsMultipart(value: string): boolean {

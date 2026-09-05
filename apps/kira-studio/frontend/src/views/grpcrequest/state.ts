@@ -1,3 +1,4 @@
+import { loadDynamicGenerator, type Reference, resolve } from '@kira/api-core';
 import type {
   GrpcCallResultWire,
   GrpcMessageWire,
@@ -6,16 +7,14 @@ import type {
   GrpcSchemaWire,
 } from '@shared/domain/grpc';
 import { control } from '../../bridge/control';
-import { loadDynamicGenerator } from '../../http/dynamic/catalog';
 import { collectionIdFor } from '../../http/state/collections';
 import { activeEnvironmentId, mergedValuesAndSecrets } from '../../http/state/variables';
-import { type Reference, resolve } from '../../http/substitute';
 import { findGrpcRequestTab } from '../../http/tabs';
 import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
 import { classifyLoadError, createRuntimeStore, stopOp } from '../shared/viewOp';
 import { noteGrpcCallRecorded } from './history';
 
-// D9: {{name}} substitution is reused exactly — the same two-token grammar http/substitute.ts's
+// D9: {{name}} substitution is reused exactly — the same two-token grammar @kira/api-core's
 // resolve() already implements, over gRPC's own three substitutable fields (target, metadata,
 // message). Deliberately NOT protoPath/importPaths/caFile (picker-supplied local paths, P5 D7's
 // own rule). P12 D9/F10: mergedValuesAndSecrets/collectionIdFor used to be hand-copied here from

@@ -1,8 +1,8 @@
 <script setup lang="ts">
+import { DYNAMIC_NAMES, loadDynamicGenerator } from '@kira/api-core';
 import { onMounted, reactive } from 'vue';
 import { copyText } from '../clipboard';
 import DialogFrame from '../theme/primitives/DialogFrame.vue';
-import { DYNAMIC_NAMES, loadDynamicGenerator } from './dynamic/catalog';
 import { closeDynamicValuesDialog } from './state/dynamicValues';
 
 // P6 D11: a read-only discovery surface for the 58-name catalogue — nothing here edits, saves, or

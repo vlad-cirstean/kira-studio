@@ -1,11 +1,11 @@
+import type { EditorLanguageId } from '@kira/shared/domain/editor';
 import {
   CONTENT_TYPE_BY_CODE_LANGUAGE,
   type HttpBodyMode,
   type HttpCodeLanguage,
   type HttpHeaderState,
   type HttpRequestTabState,
-} from '@shared/domain/http';
-import type { EditorLanguageId } from '../../editor/languages';
+} from '@kira/shared/domain/http';
 
 // C5/D9: the five body-mode labels, in the builder's own order. `title` is the tooltip F12 leans
 // on instead of widening SegmentedControl for this one caller's label widths.

@@ -1,7 +1,6 @@
+import { parseRawRequest, type RawWarning } from '@kira/api-core';
 import type { HttpBodyMode } from '@shared/domain/http';
 import { reactive } from 'vue';
-import type { RawWarning } from '../raw/parse';
-import { parseRawRequest } from '../raw/parse';
 import { patchHttpRequestTabState } from '../tabs';
 
 // P9 D8: the raw editor's own state — mirrors http/state/curl.ts's importCurlDialogState shape

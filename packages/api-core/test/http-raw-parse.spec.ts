@@ -9,9 +9,9 @@ import {
   defaultHttpRequestTabState,
   type HttpCodeLanguage,
   type HttpRequestTabState,
-} from '@shared/domain/http';
-import { generateRawRequest } from '../../frontend/src/http/raw/generate';
-import { parseRawRequest } from '../../frontend/src/http/raw/parse';
+} from '@kira/shared/domain/http';
+import { generateRawRequest } from '../src/http/raw/generate';
+import { parseRawRequest } from '../src/http/raw/parse';
 
 function state(overrides: Partial<HttpRequestTabState>): HttpRequestTabState {
   return { ...defaultHttpRequestTabState(), ...overrides };

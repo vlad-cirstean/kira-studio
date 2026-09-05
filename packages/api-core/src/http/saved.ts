@@ -1,5 +1,5 @@
-import type { HttpSavedRequest } from '@shared/domain/collections';
-import { HTTP_METHODS, type HttpMethod, type HttpRequestTabState } from '@shared/domain/http';
+import type { HttpSavedRequest } from '@kira/shared/domain/collections';
+import { HTTP_METHODS, type HttpMethod, type HttpRequestTabState } from '@kira/shared/domain/http';
 
 // P4 D15: two views of the same request exist by construction — http_items.request_json (the
 // saved one) and tabs.state_json (the tab's, autosaved on the existing 1 s debounce). P4 does not

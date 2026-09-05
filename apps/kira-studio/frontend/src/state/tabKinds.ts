@@ -1,3 +1,4 @@
+import { httpRequestTitle } from '@kira/api-core';
 import type { ConnectionColor } from '@shared/domain/connection';
 import {
   defaultGrpcRequestTabState,
@@ -51,7 +52,6 @@ import { revealPath } from '../project/state/tree';
 import { dropForTab as dropConsoleResultPagesForTab } from '../views/console/resultPages';
 import { drop as dropDocumentPagesForTab } from '../views/documents/page';
 import { drop as dropGridPagesForTab } from '../views/grid/page';
-import { httpRequestTitle } from '../views/httprequest/url';
 import { drop as dropKeyValuePagesForTab } from '../views/keyvalue/page';
 import { drop as dropStreamPagesForTab } from '../views/stream/page';
 import { connectionRecord } from './connections';

@@ -1,5 +1,5 @@
-import type { HttpSavedGrpcRequest } from '@shared/domain/collections';
-import type { GrpcRequestTabState } from '@shared/domain/grpc';
+import type { HttpSavedGrpcRequest } from '@kira/shared/domain/collections';
+import type { GrpcRequestTabState } from '@kira/shared/domain/grpc';
 
 // P11 D15/D12: two views of the same request exist by construction — http_items.request_json
 // (the saved one) and tabs.state_json (the tab's, autosaved) — mirrors

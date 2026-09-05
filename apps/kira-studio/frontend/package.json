@@ -8,5 +8,8 @@
     "build": "vite build",
     "build:dev": "KIRA_DEBUG_HOOKS=1 vite build --mode development --minify false",
     "build:test": "KIRA_DEBUG_HOOKS=1 vite build"
+  },
+  "dependencies": {
+    "@kira/api-core": "workspace:*"
   }
 }

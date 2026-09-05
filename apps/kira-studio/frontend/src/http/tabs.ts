@@ -1,3 +1,4 @@
+import { fromSavedGrpcRequest, fromSavedRequest } from '@kira/api-core';
 import type { HttpSavedGrpcRequest, HttpSavedRequest } from '@shared/domain/collections';
 import {
   defaultGrpcRequestTabState,
@@ -16,8 +17,6 @@ import {
   type HttpRequestTabRecord,
 } from '@shared/domain/tabs';
 import { activateTab, type OpenTabResult, openTab, patchTabState, tabsState } from '../state/tabs';
-import { fromSavedGrpcRequest } from '../views/grpcrequest/saved';
-import { fromSavedRequest } from '../views/httprequest/saved';
 
 // P12 D9: the module's own tab helpers, moved out of state/tabs.ts (§1.4) — these are the
 // module's own code that happened to be written in a shell file, so this is a cut-and-paste onto

@@ -1,3 +1,10 @@
+import {
+  loadDynamicGenerator,
+  type Reference,
+  type ResolvedRequest,
+  resolve,
+  substituteBody,
+} from '@kira/api-core';
 import type {
   HttpBodyWire,
   HttpMethod,
@@ -6,17 +13,14 @@ import type {
   HttpTimeline,
 } from '@shared/domain/http';
 import { control } from '../../bridge/control';
-import { loadDynamicGenerator } from '../../http/dynamic/catalog';
 import { collectionIdFor } from '../../http/state/collections';
 import { activeEnvironmentId, mergedValuesAndSecrets } from '../../http/state/variables';
-import { type Reference, resolve } from '../../http/substitute';
-import { type ResolvedRequest, substituteBody } from '../../http/substituteRequest';
 import { findHttpRequestTab } from '../../http/tabs';
 import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
 import { classifyLoadError, createRuntimeStore, stopOp } from '../shared/viewOp';
 import { noteSendRecorded } from './history';
 
-export type { ResolvedRequest } from '../../http/substituteRequest';
+export type { ResolvedRequest } from '@kira/api-core';
 
 // The state's own five-mode fields, translated onto the wire union. Only the fields the active
 // mode's own serializer reads are populated — the rest stay at their zero value, since `Body.Mode`

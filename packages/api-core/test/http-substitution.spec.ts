@@ -6,7 +6,7 @@
 import { describe, expect, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { resolve as resolvePath } from 'node:path';
-import { type Reference, resolve } from '../../frontend/src/http/substitute';
+import { type Reference, resolve } from '../src/http/substitute';
 
 interface Case {
   name: string;
@@ -19,7 +19,12 @@ interface Case {
 
 const cases: Case[] = JSON.parse(
   readFileSync(
-    resolvePath(import.meta.dir, '../../internal/httpvars/testdata/substitution.json'),
+    // P12 F15: this file moved (D19) and internal/httpvars renames to internal/apivars at C9 —
+    // touched by two different renames at once, so the path here changes twice across this phase.
+    resolvePath(
+      import.meta.dir,
+      '../../../apps/kira-studio/internal/httpvars/testdata/substitution.json',
+    ),
     'utf8',
   ),
 );

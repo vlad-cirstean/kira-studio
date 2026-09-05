@@ -1,4 +1,11 @@
 <script setup lang="ts">
+import {
+  BODY_MODE_OPTIONS,
+  CODE_LANGUAGE_OPTIONS,
+  contentTypeCaption,
+  editorLanguageForCode,
+  userContentTypeHeader,
+} from '@kira/api-core';
 import type { HttpBodyMode, HttpCodeLanguage } from '@shared/domain/http';
 import type { HttpRequestTabRecord } from '@shared/domain/tabs';
 import { computed, ref } from 'vue';
@@ -9,13 +16,6 @@ import MessageStrip from '../../theme/primitives/MessageStrip.vue';
 import SegmentedControl from '../../theme/primitives/SegmentedControl.vue';
 import { beautifyFor, canBeautify } from '../shared/celleditor/formats';
 import BinaryBodyPicker from './BinaryBodyPicker.vue';
-import {
-  BODY_MODE_OPTIONS,
-  CODE_LANGUAGE_OPTIONS,
-  contentTypeCaption,
-  editorLanguageForCode,
-  userContentTypeHeader,
-} from './body';
 import FormDataTable from './FormDataTable.vue';
 import UrlEncodedTable from './UrlEncodedTable.vue';
 

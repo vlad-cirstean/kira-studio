@@ -1,10 +1,14 @@
+import {
+  applySecretValues,
+  type CurlWarning,
+  type ParsedCurl,
+  parseCurl,
+  type ResolvedRequest,
+  toCurl,
+} from '@kira/api-core';
 import type { HttpCodeLanguage } from '@shared/domain/http';
 import { reactive } from 'vue';
 import { copyText } from '../../clipboard';
-import { toCurl } from '../curl/generate';
-import { type ParsedCurl, parseCurl } from '../curl/parse';
-import type { CurlWarning } from '../curl/tokenize';
-import { applySecretValues, type ResolvedRequest } from '../substituteRequest';
 import { openApiRequestTab, patchHttpRequestTabState } from '../tabs';
 import { cachedVariables, revealedValues, revealVariable } from './variables';
 

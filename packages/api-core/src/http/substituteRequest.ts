@@ -1,4 +1,4 @@
-import type { HttpBodyWire } from '@shared/domain/http';
+import type { HttpBodyWire } from '@kira/shared/domain/http';
 import { type Reference, resolve } from './substitute';
 
 // P7 C4: moved verbatim from views/httprequest/state.ts (P5 D7) — a pure walk over HttpBodyWire is

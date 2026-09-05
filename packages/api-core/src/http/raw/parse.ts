@@ -3,7 +3,7 @@ import {
   type HttpCodeLanguage,
   type HttpHeaderState,
   type HttpRequestTabState,
-} from '@shared/domain/http';
+} from '@kira/shared/domain/http';
 
 // P9 D11: the warning vocabulary — a closed union, mirroring http/curl/tokenize.ts's own
 // CurlWarningKind shape (P7 D4) so the dialog can render either list with the same component.

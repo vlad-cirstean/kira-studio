@@ -52,6 +52,9 @@
     "apps/kira-studio/frontend": {
       "name": "@kira/kira-studio-frontend",
       "version": "0.0.0",
+      "dependencies": {
+        "@kira/api-core": "workspace:*",
+      },
     },
     "packages/api-core": {
       "name": "@kira/api-core",

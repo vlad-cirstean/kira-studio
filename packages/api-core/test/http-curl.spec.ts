@@ -8,12 +8,12 @@
 import { describe, expect, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { resolve as resolvePath } from 'node:path';
-import type { HttpBodyWire, HttpHeaderWire, HttpRequestTabState } from '@shared/domain/http';
-import type { CurlRequest } from '../../frontend/src/http/curl/generate';
-import { toCurl } from '../../frontend/src/http/curl/generate';
-import { parseCurl } from '../../frontend/src/http/curl/parse';
-import type { CurlWarningKind } from '../../frontend/src/http/curl/tokenize';
-import { tokenize } from '../../frontend/src/http/curl/tokenize';
+import type { HttpBodyWire, HttpHeaderWire, HttpRequestTabState } from '@kira/shared/domain/http';
+import type { CurlRequest } from '../src/http/curl/generate';
+import { toCurl } from '../src/http/curl/generate';
+import { parseCurl } from '../src/http/curl/parse';
+import type { CurlWarningKind } from '../src/http/curl/tokenize';
+import { tokenize } from '../src/http/curl/tokenize';
 
 interface TokenizeCase {
   name: string;

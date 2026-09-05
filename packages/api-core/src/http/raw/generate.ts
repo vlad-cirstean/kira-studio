@@ -1,4 +1,5 @@
-import type { HttpRequestTabState } from '@shared/domain/http';
+import type { HttpRequestTabState } from '@kira/shared/domain/http';
+import { goQueryEscape } from '../escape';
 
 // P9 D10: the raw editor is generated for these four modes only — `formdata`/`file` have no text
 // form that can be edited and parsed back (a file part is bytes on disk, not text). The caller
@@ -8,16 +9,6 @@ const RAW_EDITABLE_BODY_MODES = ['none', 'raw', 'code', 'urlencoded'] as const;
 
 export function canEditAsRaw(bodyMode: HttpRequestTabState['bodyMode']): boolean {
   return (RAW_EDITABLE_BODY_MODES as readonly string[]).includes(bodyMode);
-}
-
-/** F13/body.go's `url.QueryEscape`, matched byte-for-byte — the identical helper http/curl/
- *  generate.ts already hand-rolls as its own private `goQueryEscape`, duplicated rather than
- *  shared: P12's module merge (F16) is where http/raw/ and http/curl/ become one directory and
- *  this can be factored into one place. */
-function goQueryEscape(s: string): string {
-  return encodeURIComponent(s)
-    .replace(/[!*'()]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`)
-    .replace(/%20/g, '+');
 }
 
 /** The active mode's own text, pre-substitution — `{{name}}` references are never touched (D9's
@@ -56,8 +47,8 @@ function hasUserContentType(state: HttpRequestTabState): boolean {
  * has no place in a request about to be sent.
  *
  * `defaultContentType` mirrors D7's own precedent (client.go's Content-Type default, and
- * http/curl/generate.ts's own `toCurl` — F16: computed by the caller, a views/ file, via
- * defaultContentTypeFor, since http/** may not import views/**): emitted only when the user set no
+ * curl/generate.ts's own `toCurl` — computed by the caller via body.ts's own defaultContentTypeFor
+ * rather than recomputed here): emitted only when the user set no
  * Content-Type header of their own. Without this, a no-edit round trip through the dialog (D11's
  * own Content-Type → mode table has nothing to map from) would silently apply-and-send a `code`
  * body with `raw`'s text/plain default instead of the mode's real one — a wire-level change, not a

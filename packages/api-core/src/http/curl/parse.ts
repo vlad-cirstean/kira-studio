@@ -6,7 +6,7 @@ import {
   type HttpHeaderState,
   type HttpRequestTabState,
   type HttpUrlEncodedFieldState,
-} from '@shared/domain/http';
+} from '@kira/shared/domain/http';
 import { type CurlFlagId, expandShortCluster, type FlagSpec, lookupFlag } from './flags';
 import { CURL_WARNING_KINDS, type CurlWarning, type CurlWarningKind, tokenize } from './tokenize';
 

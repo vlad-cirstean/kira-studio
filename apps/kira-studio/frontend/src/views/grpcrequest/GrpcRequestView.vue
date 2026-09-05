@@ -1,10 +1,10 @@
 <script setup lang="ts">
+import { isDynamicName, isGrpcDirty, toSavedGrpcRequest } from '@kira/api-core';
 import { grpcRequestTitle } from '@shared/domain/grpc';
 import type { GrpcRequestTabRecord } from '@shared/domain/tabs';
 import { computed, onMounted, onUnmounted, watch } from 'vue';
 import { beautifyJson } from '../../beautify';
 import CodeMirrorHost from '../../editor/CodeMirrorHost.vue';
-import { isDynamicName } from '../../http/dynamic/catalog';
 import EnvironmentSelect from '../../http/EnvironmentSelect.vue';
 import {
   collectionIdFor,
@@ -27,7 +27,6 @@ import ViewChrome from '../../theme/primitives/ViewChrome.vue';
 import MetadataTable from './MetadataTable.vue';
 import ResponsePane from './ResponsePane.vue';
 import SchemaBrowser from './SchemaBrowser.vue';
-import { isGrpcDirty, toSavedGrpcRequest } from './saved';
 import {
   call,
   findMethod,
