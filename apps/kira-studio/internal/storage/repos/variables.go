@@ -41,8 +41,20 @@ func NewVariables(db *sql.DB, cipher Cipher) *VariablesRepo {
 
 // ---- environments (D3) ----
 
+// P18 D18: unlike repos/connections.go:53 (which *drops* a row whose colour it does not
+// recognise), an environment owns variables and a collection's requests reference it — losing one
+// over a cosmetic column is a data-loss bug waiting for a hand-edited database. An unrecognised
+// stored value is coerced to 'none' instead, with the same slog.Warn.
+func coerceEnvironmentColor(id, color string) string {
+	if model.ValidPaletteColor(color) {
+		return color
+	}
+	slog.Warn("repos/variables: environment has unrecognised colour, coercing to none", "id", id, "color", color)
+	return "none"
+}
+
 func (r *VariablesRepo) ListEnvironments() ([]model.Environment, error) {
-	rows, err := r.db.Query(`SELECT id, name, sort_order, is_active, description FROM api_environments ORDER BY sort_order, name`)
+	rows, err := r.db.Query(`SELECT id, name, sort_order, is_active, description, color FROM api_environments ORDER BY sort_order, name`)
 	if err != nil {
 		return nil, fmt.Errorf("repos/variables: list environments: %w", err)
 	}
@@ -54,10 +66,11 @@ func (r *VariablesRepo) ListEnvironments() ([]model.Environment, error) {
 			e        model.Environment
 			isActive int
 		)
-		if err := rows.Scan(&e.ID, &e.Name, &e.SortOrder, &isActive, &e.Description); err != nil {
+		if err := rows.Scan(&e.ID, &e.Name, &e.SortOrder, &isActive, &e.Description, &e.Color); err != nil {
 			return nil, fmt.Errorf("repos/variables: scan environment: %w", err)
 		}
 		e.IsActive = isActive != 0
+		e.Color = coerceEnvironmentColor(e.ID, e.Color)
 		out = append(out, e)
 	}
 	if err := rows.Err(); err != nil {
@@ -66,7 +79,7 @@ func (r *VariablesRepo) ListEnvironments() ([]model.Environment, error) {
 	return out, nil
 }
 
-func (r *VariablesRepo) CreateEnvironment(name, description string) (model.Environment, error) {
+func (r *VariablesRepo) CreateEnvironment(name, description, color string) (model.Environment, error) {
 	if name == "" {
 		return model.Environment{}, fmt.Errorf("repos/variables: name is required")
 	}
@@ -75,26 +88,27 @@ func (r *VariablesRepo) CreateEnvironment(name, description string) (model.Envir
 		return model.Environment{}, fmt.Errorf("repos/variables: next environment order: %w", err)
 	}
 	now := model.NowISO()
-	e := model.Environment{ID: uuid.NewString(), Name: name, SortOrder: order, Description: description}
+	e := model.Environment{ID: uuid.NewString(), Name: name, SortOrder: order, Description: description, Color: color}
 	if _, err := r.db.Exec(
-		`INSERT INTO api_environments (id, name, sort_order, is_active, description, created_at, updated_at)
-		 VALUES (?, ?, ?, 0, ?, ?, ?)`,
-		e.ID, e.Name, e.SortOrder, e.Description, now, now,
+		`INSERT INTO api_environments (id, name, sort_order, is_active, description, color, created_at, updated_at)
+		 VALUES (?, ?, ?, 0, ?, ?, ?, ?)`,
+		e.ID, e.Name, e.SortOrder, e.Description, e.Color, now, now,
 	); err != nil {
 		return model.Environment{}, fmt.Errorf("repos/variables: insert environment: %w", err)
 	}
 	return e, nil
 }
 
-// UpdateEnvironment replaces RenameEnvironment (P17 D14): renaming and describing are one row
-// update, and one IPC call for one blur is worse than one call carrying both fields.
-func (r *VariablesRepo) UpdateEnvironment(id, name, description string) error {
+// UpdateEnvironment replaces RenameEnvironment (P17 D14): renaming, describing and (P18) colouring
+// an environment are one row update — one IPC call for one blur/swatch-click is worse than one
+// call carrying all three fields.
+func (r *VariablesRepo) UpdateEnvironment(id, name, description, color string) error {
 	if id == "" || name == "" {
 		return fmt.Errorf("repos/variables: id and name are required")
 	}
 	res, err := r.db.Exec(
-		`UPDATE api_environments SET name = ?, description = ?, updated_at = ? WHERE id = ?`,
-		name, description, model.NowISO(), id,
+		`UPDATE api_environments SET name = ?, description = ?, color = ?, updated_at = ? WHERE id = ?`,
+		name, description, color, model.NowISO(), id,
 	)
 	if err != nil {
 		return fmt.Errorf("repos/variables: update environment %s: %w", id, err)
@@ -127,14 +141,15 @@ func (r *VariablesRepo) DuplicateEnvironment(id string) (model.Environment, erro
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	var srcName, srcDescription string
-	err = tx.QueryRow(`SELECT name, description FROM api_environments WHERE id = ?`, id).Scan(&srcName, &srcDescription)
+	var srcName, srcDescription, srcColor string
+	err = tx.QueryRow(`SELECT name, description, color FROM api_environments WHERE id = ?`, id).Scan(&srcName, &srcDescription, &srcColor)
 	if errors.Is(err, sql.ErrNoRows) {
 		return model.Environment{}, fmt.Errorf("repos/variables: no environment %s", id)
 	}
 	if err != nil {
 		return model.Environment{}, fmt.Errorf("repos/variables: read environment %s: %w", id, err)
 	}
+	srcColor = coerceEnvironmentColor(id, srcColor)
 
 	var order int
 	if err := tx.QueryRow(`SELECT COALESCE(MAX(sort_order) + 1, 0) FROM api_environments`).Scan(&order); err != nil {
@@ -143,12 +158,13 @@ func (r *VariablesRepo) DuplicateEnvironment(id string) (model.Environment, erro
 
 	now := model.NowISO()
 	newEnv := model.Environment{
-		ID: uuid.NewString(), Name: srcName + " copy", SortOrder: order, IsActive: false, Description: srcDescription,
+		ID: uuid.NewString(), Name: srcName + " copy", SortOrder: order, IsActive: false,
+		Description: srcDescription, Color: srcColor,
 	}
 	if _, err := tx.Exec(
-		`INSERT INTO api_environments (id, name, sort_order, is_active, description, created_at, updated_at)
-		 VALUES (?, ?, ?, 0, ?, ?, ?)`,
-		newEnv.ID, newEnv.Name, newEnv.SortOrder, newEnv.Description, now, now,
+		`INSERT INTO api_environments (id, name, sort_order, is_active, description, color, created_at, updated_at)
+		 VALUES (?, ?, ?, 0, ?, ?, ?, ?)`,
+		newEnv.ID, newEnv.Name, newEnv.SortOrder, newEnv.Description, newEnv.Color, now, now,
 	); err != nil {
 		return model.Environment{}, fmt.Errorf("repos/variables: insert duplicated environment: %w", err)
 	}

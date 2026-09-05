@@ -27,32 +27,41 @@ func (s *VariablesService) ListEnvironments() ([]model.Environment, error) {
 type VariablesCreateEnvironmentArgs struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
+	Color       string `json:"color"`
 }
 
 func (s *VariablesService) CreateEnvironment(args VariablesCreateEnvironmentArgs) (model.Environment, error) {
 	if args.Name == "" {
 		return model.Environment{}, ipcerr.BadRequest("name is required")
 	}
-	env, err := s.Deps.Repos.Variables.CreateEnvironment(args.Name, args.Description)
+	if !model.ValidPaletteColor(args.Color) {
+		return model.Environment{}, ipcerr.BadRequest("invalid color")
+	}
+	env, err := s.Deps.Repos.Variables.CreateEnvironment(args.Name, args.Description, args.Color)
 	if err != nil {
 		return model.Environment{}, ipcerr.Internal(err.Error())
 	}
 	return env, nil
 }
 
-// VariablesUpdateEnvironmentArgs replaces VariablesRenameEnvironmentArgs (P17 D14): renaming and
-// describing an environment are one row update — one IPC call for one blur is worse than one.
+// VariablesUpdateEnvironmentArgs replaces VariablesRenameEnvironmentArgs (P17 D14): renaming,
+// describing and (P18 D19) colouring an environment are one row update — one IPC call for one
+// blur/swatch-click is worse than one call carrying all three fields.
 type VariablesUpdateEnvironmentArgs struct {
 	ID          string `json:"id"`
 	Name        string `json:"name"`
 	Description string `json:"description"`
+	Color       string `json:"color"`
 }
 
 func (s *VariablesService) UpdateEnvironment(args VariablesUpdateEnvironmentArgs) error {
 	if args.ID == "" || args.Name == "" {
 		return ipcerr.BadRequest("id and name are required")
 	}
-	if err := s.Deps.Repos.Variables.UpdateEnvironment(args.ID, args.Name, args.Description); err != nil {
+	if !model.ValidPaletteColor(args.Color) {
+		return ipcerr.BadRequest("invalid color")
+	}
+	if err := s.Deps.Repos.Variables.UpdateEnvironment(args.ID, args.Name, args.Description, args.Color); err != nil {
 		return ipcerr.Internal(err.Error())
 	}
 	return nil

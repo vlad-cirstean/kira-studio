@@ -5,6 +5,7 @@
 // collections.ts), so none of it earns the one Zod-parse boundary that file's own comment explains.
 //
 // P12 D3: Http* → Api* — a variable is resolved for both protocols (Api* names the module).
+import type { PaletteColor } from './color';
 
 export const VARIABLE_SCOPES = ['collection', 'environment'] as const;
 export type VariableScope = (typeof VARIABLE_SCOPES)[number];
@@ -26,13 +27,15 @@ export interface ApiVariable {
 
 // D3: the active environment is app-global, a column on the row itself rather than a layout leaf
 // or a settings key. `description` is P17 D14 — app-local free text, no Postman round-trip
-// question at all (unlike a variable's, F10).
+// question at all (unlike a variable's, F10). `color` is P18 D16/D19 — a user-assigned value from
+// the same palette Studio's connections use (PaletteColor), never derived; 'none' is the default.
 export interface ApiEnvironment {
   id: string;
   name: string;
   sortOrder: number;
   isActive: boolean;
   description: string;
+  color: PaletteColor;
 }
 
 // D13: history is per-entry — an environment has no history of its own, only its entries do.

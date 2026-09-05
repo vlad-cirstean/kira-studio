@@ -42,7 +42,7 @@ func newCollectionFor(t *testing.T, db *sql.DB) string {
 func TestVariablesSortOrderIsDenseAndScopeIndependent(t *testing.T) {
 	r, db := newVariablesRepo(t)
 	collectionID := newCollectionFor(t, db)
-	env, err := r.CreateEnvironment("Staging", "")
+	env, err := r.CreateEnvironment("Staging", "", "none")
 	if err != nil {
 		t.Fatalf("CreateEnvironment: %v", err)
 	}
@@ -381,7 +381,7 @@ func TestSecretsForDuplicateNameResolvesFirstWinsBySortOrder(t *testing.T) {
 func TestSecretsForEnvironmentStillOverridesCollectionDespiteFirstWins(t *testing.T) {
 	r, db := newVariablesRepo(t)
 	collectionID := newCollectionFor(t, db)
-	env, err := r.CreateEnvironment("Staging", "")
+	env, err := r.CreateEnvironment("Staging", "", "none")
 	if err != nil {
 		t.Fatalf("CreateEnvironment: %v", err)
 	}
@@ -407,7 +407,7 @@ func TestSecretsForEnvironmentStillOverridesCollectionDespiteFirstWins(t *testin
 func TestDuplicateEnvironmentCopiesCiphertextVerbatimNoHistoryNeverActive(t *testing.T) {
 	r, db := newVariablesRepo(t)
 
-	env, err := r.CreateEnvironment("Staging", "a description")
+	env, err := r.CreateEnvironment("Staging", "a description", "none")
 	if err != nil {
 		t.Fatalf("CreateEnvironment: %v", err)
 	}
@@ -652,5 +652,100 @@ func TestApplyBulkFullReconcile(t *testing.T) {
 	}
 	if count != 0 {
 		t.Errorf("history rows for the removed variable = %d, want 0 (cascaded)", count)
+	}
+}
+
+// ---- 6. Environment colour (P18 D18/D19): round-trips through create/update/list, a duplicate
+// inherits it, and an unrecognised stored value reads back as 'none' without dropping the row ----
+
+func TestEnvironmentColorRoundTripsThroughCreateUpdateList(t *testing.T) {
+	r, _ := newVariablesRepo(t)
+
+	env, err := r.CreateEnvironment("Staging", "", "blue")
+	if err != nil {
+		t.Fatalf("CreateEnvironment: %v", err)
+	}
+	if env.Color != "blue" {
+		t.Fatalf("CreateEnvironment's own returned Color = %q, want blue", env.Color)
+	}
+
+	envs, err := r.ListEnvironments()
+	if err != nil {
+		t.Fatalf("ListEnvironments: %v", err)
+	}
+	found := false
+	for _, e := range envs {
+		if e.ID == env.ID {
+			found = true
+			if e.Color != "blue" {
+				t.Errorf("ListEnvironments' Color = %q, want blue", e.Color)
+			}
+		}
+	}
+	if !found {
+		t.Fatal("created environment not found in ListEnvironments")
+	}
+
+	if err := r.UpdateEnvironment(env.ID, "Staging", "", "amber"); err != nil {
+		t.Fatalf("UpdateEnvironment: %v", err)
+	}
+	envs, err = r.ListEnvironments()
+	if err != nil {
+		t.Fatalf("ListEnvironments after update: %v", err)
+	}
+	for _, e := range envs {
+		if e.ID == env.ID && e.Color != "amber" {
+			t.Errorf("Color after update = %q, want amber", e.Color)
+		}
+	}
+}
+
+func TestDuplicateEnvironmentInheritsColor(t *testing.T) {
+	r, _ := newVariablesRepo(t)
+
+	env, err := r.CreateEnvironment("Staging", "", "magenta")
+	if err != nil {
+		t.Fatalf("CreateEnvironment: %v", err)
+	}
+	dup, err := r.DuplicateEnvironment(env.ID)
+	if err != nil {
+		t.Fatalf("DuplicateEnvironment: %v", err)
+	}
+	if dup.Color != "magenta" {
+		t.Errorf("dup.Color = %q, want inherited magenta", dup.Color)
+	}
+}
+
+// TestListEnvironmentsCoercesAnUnrecognisedColorWithoutDroppingTheRow is D18's own deliberate
+// divergence from repos/connections.go:53 (which *drops* a connection row whose colour it does
+// not recognise): an environment owns variables, so losing one over a cosmetic column would be a
+// data-loss bug. A hand-edited or legacy row with a bogus colour must still list, with its colour
+// coerced to 'none'.
+func TestListEnvironmentsCoercesAnUnrecognisedColorWithoutDroppingTheRow(t *testing.T) {
+	r, db := newVariablesRepo(t)
+
+	env, err := r.CreateEnvironment("Staging", "", "blue")
+	if err != nil {
+		t.Fatalf("CreateEnvironment: %v", err)
+	}
+	if _, err := db.Exec(`UPDATE api_environments SET color = ? WHERE id = ?`, "not-a-real-color", env.ID); err != nil {
+		t.Fatalf("corrupt color column: %v", err)
+	}
+
+	envs, err := r.ListEnvironments()
+	if err != nil {
+		t.Fatalf("ListEnvironments: %v", err)
+	}
+	found := false
+	for _, e := range envs {
+		if e.ID == env.ID {
+			found = true
+			if e.Color != "none" {
+				t.Errorf("Color = %q, want coerced to none", e.Color)
+			}
+		}
+	}
+	if !found {
+		t.Fatal("the row with an unrecognised color must still be listed, not dropped")
 	}
 }

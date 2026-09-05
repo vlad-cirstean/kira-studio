@@ -9,6 +9,7 @@ import * as VariablesService from '@bindings/variablesservice.js';
 // args/results reference it rather than restating it, so the renderer types against it through
 // vite.config.ts's existing @bindings-internal alias.
 import type * as WailsStorageModels from '@bindings-internal/storage/model/models.js';
+import type { PaletteColor } from '@shared/domain/color';
 import type {
   GrpcCallEvent,
   GrpcCallResultWire,
@@ -191,13 +192,22 @@ export const apiControl = {
   // close to the wire shape).
   variablesListEnvironments: (): Promise<ApiEnvironment[]> =>
     unwrap(VariablesService.ListEnvironments()).then((r) => trust<ApiEnvironment[]>(r ?? [])),
-  variablesCreateEnvironment: (name: string, description = ''): Promise<ApiEnvironment> =>
-    unwrap(VariablesService.CreateEnvironment({ name, description })).then((r) =>
+  variablesCreateEnvironment: (
+    name: string,
+    description = '',
+    color: PaletteColor = 'none',
+  ): Promise<ApiEnvironment> =>
+    unwrap(VariablesService.CreateEnvironment({ name, description, color })).then((r) =>
       trust<ApiEnvironment>(r),
     ),
-  // P17 D14: replaces variablesRenameEnvironment — renaming and describing are one row update.
-  variablesUpdateEnvironment: (id: string, name: string, description: string): Promise<void> =>
-    unwrap(VariablesService.UpdateEnvironment({ id, name, description })),
+  // P17 D14/P18 D19: replaces variablesRenameEnvironment — renaming, describing and colouring an
+  // environment are one row update.
+  variablesUpdateEnvironment: (
+    id: string,
+    name: string,
+    description: string,
+    color: PaletteColor = 'none',
+  ): Promise<void> => unwrap(VariablesService.UpdateEnvironment({ id, name, description, color })),
   variablesDeleteEnvironment: (id: string): Promise<void> =>
     unwrap(VariablesService.DeleteEnvironment({ id })),
   // P17 D17/item 4: a raw-ciphertext duplicate — see repos/variables.go's own DuplicateEnvironment.

@@ -1,3 +1,4 @@
+import type { PaletteColor } from '@shared/domain/color';
 import type {
   ApiEnvironment,
   ApiVariable,
@@ -53,21 +54,26 @@ export async function setActiveEnvironment(id: string): Promise<void> {
   await loadEnvironments();
 }
 
-export async function createEnvironment(name: string, description = ''): Promise<ApiEnvironment> {
-  const env = await control.variablesCreateEnvironment(name, description);
+export async function createEnvironment(
+  name: string,
+  description = '',
+  color: PaletteColor = 'none',
+): Promise<ApiEnvironment> {
+  const env = await control.variablesCreateEnvironment(name, description, color);
   await loadEnvironments();
   return env;
 }
 
-/** P17 D14: replaces renameEnvironment — renaming and describing are one row update. Also
- *  patches any open variable-set tab for this environment (D16), the same rename-follows-tab rule
- *  a collection's own rename already has. */
+/** P17 D14/P18 D19: replaces renameEnvironment — renaming, describing and colouring an
+ *  environment are one row update. Also patches any open variable-set tab for this environment
+ *  (D16), the same rename-follows-tab rule a collection's own rename already has. */
 export async function updateEnvironment(
   id: string,
   name: string,
   description: string,
+  color: PaletteColor = 'none',
 ): Promise<void> {
-  await control.variablesUpdateEnvironment(id, name, description);
+  await control.variablesUpdateEnvironment(id, name, description, color);
   renameVariableSetTabs('environment', id, name);
   await loadEnvironments();
 }
