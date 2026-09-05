@@ -11,9 +11,9 @@ import {
   TRANSFORM_NAMES,
   type TransformName,
 } from '@kira/api-core';
-import { cachedVariables, mergedValuesAndSecrets } from '../../api/state/variables';
 import type { RangeHighlight } from '../../editor/variableHighlight';
 import type { Completion } from '../../theme/primitives/completion';
+import { cachedVariables, mergedValuesAndSecrets } from './variables';
 
 // P15b D4: the Api side supplies the data, in one module, from the call already being made — F5's
 // own finding that mergedValuesAndSecrets is already synchronous, already cached, and already
@@ -22,6 +22,13 @@ import type { Completion } from '../../theme/primitives/completion';
 // (rangeHighlights), the hover panel's lines (hoverAt), and the `{{…}}` completion list
 // (candidates). May import @kira/api-core and api/state/variables.ts; may not import
 // `workbench/**` (biome.json).
+//
+// P18 D11: moved here from views/httprequest/ — biome.json's per-directory noRestrictedImports
+// bans views/grpcrequest/** from reaching into views/httprequest/**, and gRPC needs this module's
+// exports too (F15). api/state/ is the precedent P12 D12 already set for a module both protocol
+// views need: this file imports only @kira/api-core, api/state/variables.ts (a sibling, now) and
+// two type-only imports, none of which are views/**/project/**/workbench/**, so the move is legal
+// in the direction that matters. No re-export shim is left at the old path.
 
 const HOVER_VALUE_MAX_LENGTH = 200;
 

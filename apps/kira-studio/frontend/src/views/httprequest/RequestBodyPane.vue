@@ -10,6 +10,7 @@ import {
 import type { HttpCodeLanguage } from '@shared/domain/http';
 import type { HttpRequestTabRecord } from '@shared/domain/tabs';
 import { computed, ref } from 'vue';
+import type { VariableSupport } from '../../api/state/variableCompletion';
 import { patchHttpRequestTabState } from '../../api/tabs';
 import CodeMirrorHost from '../../editor/CodeMirrorHost.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
@@ -19,7 +20,6 @@ import { beautifyFor, canBeautify } from '../shared/celleditor/formats';
 import BinaryBodyPicker from './BinaryBodyPicker.vue';
 import FormDataTable from './FormDataTable.vue';
 import UrlEncodedTable from './UrlEncodedTable.vue';
-import type { VariableSupport } from './variableCompletion';
 
 // C5/D9: extracted from HttpRequestView.vue's own inline block (P2) — the mode selector, the code-
 // language select, the auto-Content-Type caption and the per-mode editor host all live here now so

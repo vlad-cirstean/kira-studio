@@ -2,6 +2,7 @@
 import type { HttpFormDataFieldState } from '@shared/domain/http';
 import { contentTypeForFilename } from '@shared/domain/object-store';
 import type { HttpRequestTabRecord } from '@shared/domain/tabs';
+import type { VariableSupport } from '../../api/state/variableCompletion';
 import { patchHttpRequestTabState } from '../../api/tabs';
 import { formatBytes } from '../../format';
 import AppButton from '../../theme/primitives/AppButton.vue';
@@ -11,7 +12,6 @@ import IconButton from '../../theme/primitives/IconButton.vue';
 import TextField from '../../theme/primitives/TextField.vue';
 import FieldRowsTable from './FieldRowsTable.vue';
 import { chooseBodyFile } from './files';
-import type { VariableSupport } from './variableCompletion';
 
 // P3 C8/D4/D15: form-data over C6's shared table, with real file fields. D4's whole point: a
 // picked file's bytes never reach here — chooseBodyFile returns only {path, name, size}, and only

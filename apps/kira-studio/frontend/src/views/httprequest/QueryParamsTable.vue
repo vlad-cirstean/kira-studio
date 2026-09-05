@@ -2,9 +2,9 @@
 import { buildQuery, parseQuery, type QueryPair, splitUrl } from '@kira/api-core';
 import type { HttpRequestTabRecord } from '@shared/domain/tabs';
 import { computed } from 'vue';
+import type { VariableSupport } from '../../api/state/variableCompletion';
 import { patchHttpRequestTabState } from '../../api/tabs';
 import FieldRowsTable from './FieldRowsTable.vue';
-import type { VariableSupport } from './variableCompletion';
 
 // D9/D15/C6: a derived two-way editor over the URL, never a stored `params` array (D6) — `pairs`
 // is a pure computed off `tab.state.url`, so typing in the URL field re-renders this table without

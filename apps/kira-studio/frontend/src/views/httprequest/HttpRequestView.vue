@@ -24,6 +24,7 @@ import {
 } from '../../api/state/collections';
 import { openCopyAsCurlDialog } from '../../api/state/curl';
 import { openEditRawDialog } from '../../api/state/raw';
+import { variableSupport } from '../../api/state/variableCompletion';
 import {
   activeEnvironmentId,
   ensureVariablesLoaded,
@@ -45,7 +46,6 @@ import RequestBodyPane from './RequestBodyPane.vue';
 import RequestHeadersTable from './RequestHeadersTable.vue';
 import ResponsePane from './ResponsePane.vue';
 import { resolveForExport, resolveTabState, runtime, send, stop } from './state';
-import { variableSupport } from './variableCompletion';
 
 // MainView.vue keys this component by tab.id — same discipline as every other *View.vue.
 const props = defineProps<{ tab: HttpRequestTabRecord }>();

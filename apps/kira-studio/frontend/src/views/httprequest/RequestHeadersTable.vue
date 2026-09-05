@@ -2,9 +2,9 @@
 import { WELL_KNOWN_REQUEST_HEADERS } from '@kira/api-core';
 import type { HttpHeaderState } from '@shared/domain/http';
 import type { HttpRequestTabRecord } from '@shared/domain/tabs';
+import type { VariableSupport } from '../../api/state/variableCompletion';
 import { patchHttpRequestTabState } from '../../api/tabs';
 import FieldRowsTable from './FieldRowsTable.vue';
-import type { VariableSupport } from './variableCompletion';
 
 // D15/C6: a thin wrapper over FieldRowsTable — headers write `tab.state.headers` directly (D6:
 // the one persisted array with real write-through, unlike Params which is derived from the URL).

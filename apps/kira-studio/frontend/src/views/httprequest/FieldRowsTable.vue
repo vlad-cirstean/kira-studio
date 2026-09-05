@@ -1,12 +1,12 @@
 <script setup lang="ts" generic="T extends { name: string; value: string; enabled?: boolean }">
 import { computed } from 'vue';
+import type { VariableSupport } from '../../api/state/variableCompletion';
 import AutocompleteField from '../../theme/primitives/AutocompleteField.vue';
 import Checkbox from '../../theme/primitives/Checkbox.vue';
 import type { Completion } from '../../theme/primitives/completion';
 import { templateToken, wholeFieldToken } from '../../theme/primitives/completion';
 import IconButton from '../../theme/primitives/IconButton.vue';
 import TextField from '../../theme/primitives/TextField.vue';
-import type { VariableSupport } from './variableCompletion';
 
 // P3 D15/C6: the one row table behind Params, Headers, urlencoded (C7) and form-data (C8) —
 // RequestHeadersTable.vue and QueryParamsTable.vue were the same file twice minus a checkbox
