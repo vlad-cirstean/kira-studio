@@ -32,6 +32,20 @@ export function createHistoryStore<Entry, Snapshot, Extra extends object = Recor
 
   const runtime = reactive({} as Record<string, Runtime>);
 
+  // F8/P21 round 1: load() had no sequencing against noteRecorded()/del()/clearAll() — a load
+  // issued before a send/call completed, but resolving after noteRecorded ran, cleared `stale`
+  // (and wrote the pre-send list) as if it were the freshest answer, leaving the just-recorded
+  // entry permanently missing from the list until the next send or an explicit delete/clear (the
+  // same failure P18 S1/S2 root-caused for the read side). Each tab's own monotonic counter: a
+  // load only commits its result if nothing newer (another load, or a noteRecorded marking stale)
+  // has started since — the same opId-supersession shape the view stores already use elsewhere.
+  const latestSeq = new Map<string, number>();
+  function bumpSeq(tabId: string): number {
+    const next = (latestSeq.get(tabId) ?? 0) + 1;
+    latestSeq.set(tabId, next);
+    return next;
+  }
+
   function ensure(tabId: string): Runtime {
     // D2: always hand back runtime[tabId] — never the freshly-built literal. `runtime` is a deep
     // reactive(); reading the indexed property returns the tracked proxy, but returning the local
@@ -53,6 +67,7 @@ export function createHistoryStore<Entry, Snapshot, Extra extends object = Recor
 
   registerTabRuntimeCleanup((tabId) => {
     delete runtime[tabId];
+    latestSeq.delete(tabId);
   });
 
   function scopeIdsFor(tabId: string): { itemId: string; tabId: string } {
@@ -64,14 +79,20 @@ export function createHistoryStore<Entry, Snapshot, Extra extends object = Recor
    *  a scratch tab's own. */
   async function load(tabId: string): Promise<void> {
     const rt = ensure(tabId);
+    const mySeq = bumpSeq(tabId);
     rt.loading = true;
     rt.error = null;
     try {
       const { itemId, tabId: tid } = scopeIdsFor(tabId);
       const entries = await opts.list(itemId, tid);
       if (!opts.findTab(tabId)) return; // the tab closed while this was in flight
-      rt.entries = entries;
-      rt.stale = false;
+      // Only commit if nothing newer started while this fetch was in flight — otherwise this is
+      // an answer to a question already superseded (a fresher load, or a noteRecorded that this
+      // fetch's own snapshot predates).
+      if (latestSeq.get(tabId) === mySeq) {
+        rt.entries = entries;
+        rt.stale = false;
+      }
     } catch (err) {
       if (!opts.findTab(tabId)) return;
       rt.error = err instanceof Error ? err.message : String(err);
@@ -101,6 +122,9 @@ export function createHistoryStore<Entry, Snapshot, Extra extends object = Recor
       void load(tabId);
     } else {
       rt.stale = true;
+      // Supersede any in-flight load (F8) — one issued before this send/call completed must not
+      // resolve afterward and clear the `stale` flag this line just set.
+      bumpSeq(tabId);
     }
   }
 

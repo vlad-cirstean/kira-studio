@@ -19,14 +19,14 @@ interface FakeSnapshot {
   id: string;
 }
 
-function makeStore() {
+function makeStore(listImpl?: () => Promise<FakeEntry[]>) {
   let listCalls = 0;
   const tabs = new Map<string, { state: { itemId?: string | null; responsePane: string } }>();
 
   const store = createHistoryStore<FakeEntry, FakeSnapshot>({
     list: async (_itemId, _tabId) => {
       listCalls++;
-      return [{ id: 'e1' }];
+      return listImpl ? await listImpl() : [{ id: 'e1' }];
     },
     get: async (id) => ({ id }),
     remove: async () => {},
@@ -44,6 +44,16 @@ function makeStore() {
   }
 
   return { ...store, registerTab, setPane, listCallCount: () => listCalls };
+}
+
+/** A promise plus its own resolve, so a test can control exactly when an in-flight `list()` call
+ *  settles relative to some other event. */
+function deferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((r) => {
+    resolve = r;
+  });
+  return { promise, resolve };
 }
 
 describe('createHistoryStore reactivity and refresh policy (P18 D1/D2/D3)', () => {
@@ -136,5 +146,36 @@ describe('createHistoryStore reactivity and refresh policy (P18 D1/D2/D3)', () =
 
     store.noteRecorded('tab-1');
     expect(store.runtime['tab-1'].viewing).toBeNull();
+  });
+
+  // F8/P21 round 1: a load() issued before a send/call completes, resolving after
+  // noteRecorded ran, used to clear `stale` (and overwrite `entries`) with a list that predates
+  // the recorded send — the exact repro this test drives end to end.
+  test("7. a load() that resolves after a concurrent noteRecorded doesn't clobber the stale flag or the list", async () => {
+    const first = deferred<FakeEntry[]>();
+    let call = 0;
+    const listResults = [first.promise, Promise.resolve([{ id: 'e1' }, { id: 'e-new' }])];
+    const store = makeStore(() => listResults[call++] as Promise<FakeEntry[]>);
+    store.registerTab('tab-1', 'body'); // pane not on History, so noteRecorded only sets stale
+
+    const loadPromise = store.load('tab-1'); // T0: list() call #1 in flight, not yet resolved
+    store.noteRecorded('tab-1'); // T1: a send completes while T0 is still in flight
+    expect(store.runtime['tab-1'].stale).toBe(true);
+
+    first.resolve([{ id: 'stale-e1' }]); // T2: T0's fetch (answering a question from before T1) resolves
+    await loadPromise;
+
+    // T0's own answer must not have been committed — stale must still be true, and entries must
+    // not have been overwritten with the pre-send list.
+    expect(store.runtime['tab-1'].stale).toBe(true);
+    expect(store.runtime['tab-1'].entries).toBeNull();
+
+    // The next real load (e.g. switching to History) fetches and commits normally.
+    store.setPane('tab-1', 'history');
+    store.ensureFresh('tab-1');
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(store.runtime['tab-1'].stale).toBe(false);
+    expect(store.runtime['tab-1'].entries).toEqual([{ id: 'e1' }, { id: 'e-new' }]);
   });
 });
