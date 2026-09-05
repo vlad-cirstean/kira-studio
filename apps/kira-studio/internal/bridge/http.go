@@ -143,10 +143,12 @@ func (s *HttpService) Send(ctx context.Context, args HttpSendArgs) (httpclient.R
 // there is nothing to mask (no secret was actually substituted). A strings.Replacer can only
 // over-mask (a secret value that happens to occur elsewhere is masked too) and never under-mask a
 // surface that carries the secret's own plaintext verbatim — D6's own stated property, which does
-// not by itself cover a surface that carries a *re-encoded* form instead (finding 6: a
-// urlencoded body's rendered wire text is url.QueryEscape's own output, never the plaintext
-// buildURLEncoded started from), so each secret's QueryEscape'd form is registered as an
-// additional pair below, alongside the plaintext one.
+// not by itself cover a surface that carries a *re-encoded* form instead: a urlencoded body's
+// rendered wire text is url.QueryEscape's own output (finding 6, round 1), never the plaintext
+// buildURLEncoded started from, and a secret used in a URL *path* segment is url.PathEscape's own
+// output instead (finding 4, round 2) — PathEscape differs from QueryEscape for several
+// characters (a space becomes %20 via PathEscape, + via QueryEscape). Both re-encoded forms are
+// registered as additional pairs below, alongside the plaintext one.
 func secretReplacer(usedSecrets map[string]string) *strings.Replacer {
 	if len(usedSecrets) == 0 {
 		return nil
@@ -163,6 +165,14 @@ func secretReplacer(usedSecrets map[string]string) *strings.Replacer {
 		// output, wire.go's renderRequestBody) would otherwise carry the secret in cleartext,
 		// just percent-encoded, with the pane still claiming "N secret values shown as {{name}}".
 		if encoded := url.QueryEscape(value); encoded != value {
+			pairs = append(pairs, encoded, placeholder)
+		}
+		// Round-2 review finding 4: a secret used in a URL *path* segment (e.g.
+		// https://api.example.com/{{secret}}/orders) is percent-encoded via url.PathEscape /
+		// EscapedPath(), which differs from QueryEscape for several characters (a space becomes
+		// %20 via PathEscape but + via QueryEscape) — that form isn't covered by the QueryEscape
+		// pair above and leaked in FinalURL, Timeline.Hops[].URL and Wire.Request's request line.
+		if encoded := url.PathEscape(value); encoded != value {
 			pairs = append(pairs, encoded, placeholder)
 		}
 	}

@@ -408,3 +408,63 @@ func TestMaskSecrets_MasksURLEncodedBodyDespiteQueryEscape(t *testing.T) {
 		t.Fatalf("masked wire request does not contain the masked placeholder:\n%s", resp.Wire.Request)
 	}
 }
+
+// TestMaskSecrets_MasksPathEscapedSecret is round-2 review finding 4: round 1 (finding 6) added
+// url.QueryEscape's own form of a secret as a second replacer pair, but a secret used in a URL
+// *path* segment (e.g. https://api.example.com/{{secret}}/orders) is percent-encoded via
+// url.PathEscape/EscapedPath() instead, which differs from QueryEscape for several characters —
+// a space becomes %20 via PathEscape but + via QueryEscape. That form wasn't in the replacer and
+// leaked in FinalURL, Timeline.Hops[].URL and Wire.Request's request line. Driven through a real
+// httpclient.Send with the secret embedded in a path segment, not a hand-built Response, so a
+// future change to how the URL is rendered would still be caught here.
+func TestMaskSecrets_MasksPathEscapedSecret(t *testing.T) {
+	// Contains a space — PathEscape rewrites it to %20, QueryEscape to '+', so this value's
+	// path-escaped form is not already covered by the QueryEscape pair.
+	const secretName = "apiKey"
+	const secretValue = "p@ss word+token"
+	usedSecrets := map[string]string{secretName: secretValue}
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	resp, err := httpclient.Send(context.Background(), httpclient.Request{
+		Method: "GET",
+		URL:    srv.URL + "/" + secretValue + "/orders",
+	})
+	if err != nil {
+		t.Fatalf("Send: %v", err)
+	}
+	if resp.Wire == nil {
+		t.Fatal("resp.Wire is nil — nothing to mask")
+	}
+	// Confirms the fixture actually exercises the bug: the path-escaped form must differ from both
+	// the plaintext and the QueryEscape'd form, and it must be present in the unmasked timeline.
+	pathEscaped := url.PathEscape(secretValue)
+	queryEscaped := url.QueryEscape(secretValue)
+	if pathEscaped == secretValue || pathEscaped == queryEscaped {
+		t.Fatalf("PathEscape(%q) = %q did not distinguish itself from the plaintext/QueryEscape form — this fixture no longer exercises the bug", secretValue, pathEscaped)
+	}
+	if len(resp.Timeline.Hops) == 0 || !strings.Contains(resp.Timeline.Hops[0].URL, pathEscaped) {
+		t.Fatalf("unmasked Timeline.Hops[0].URL does not contain the path-escaped secret %q at all: %+v", pathEscaped, resp.Timeline.Hops)
+	}
+
+	maskSecrets(&resp, usedSecrets)
+
+	assertMasked := func(t *testing.T, label, s string) {
+		t.Helper()
+		if strings.Contains(s, secretValue) {
+			t.Errorf("%s = %q still contains the raw secret", label, s)
+		}
+		if strings.Contains(s, pathEscaped) {
+			t.Errorf("%s = %q still contains the PathEscape'd secret %q", label, s, pathEscaped)
+		}
+		if !strings.Contains(s, "{{apiKey}}") {
+			t.Errorf("%s = %q, want it masked to {{apiKey}}", label, s)
+		}
+	}
+	assertMasked(t, "FinalURL", resp.FinalURL)
+	assertMasked(t, "Timeline.Hops[0].URL", resp.Timeline.Hops[0].URL)
+	assertMasked(t, "Wire.Request", resp.Wire.Request)
+}
