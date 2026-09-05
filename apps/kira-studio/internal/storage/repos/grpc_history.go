@@ -47,6 +47,13 @@ type storedGrpcSnapshot struct {
 	MessagesElided          bool                            `json:"messagesElided"`
 	Header                  []model.SavedGrpcMetaRow        `json:"header"`
 	Trailer                 []model.SavedGrpcMetaRow        `json:"trailer"`
+	// MetadataElided (F9/P21 round 1): Metadata/Header/Trailer cross the control plane uncapped
+	// (up to 64 MiB — twice the gRPC budget), unlike Message/Messages, which are capped above.
+	// A single call carrying enough of them to push the marshaled snapshot past half the global
+	// byte budget on its own would break the sweep's own safety invariant ("no single row can
+	// exceed the budget") and empty the whole table, including the row just inserted. When that
+	// happens, all three are dropped and this is set instead of ever storing the oversized row.
+	MetadataElided bool `json:"metadataElided,omitempty"`
 }
 
 // Record is the whole storage policy (D11), in one transaction: apply the four caps, marshal,
@@ -116,6 +123,22 @@ func (r *GrpcHistoryRepo) Record(rec model.GrpcCallHistoryRecord) error {
 	snapshotJSON, err := json.Marshal(snap)
 	if err != nil {
 		return fmt.Errorf("repos/grpc_history: encode snapshot: %w", err)
+	}
+
+	// F9/P21 round 1: cap the snapshot as a whole, not just field by field — Message and Messages
+	// are already bounded (256 KiB / 100 × 64 KiB, well under half the budget), so a snapshot this
+	// large can only mean Metadata/Header/Trailer (still uncapped) grew unreasonably. Dropping
+	// them and re-marshalling makes the sweep's safety property structural rather than a per-field
+	// audit that has to be redone every time a field is added.
+	if len(snapshotJSON) > grpcHistoryByteBudget/2 {
+		snap.Metadata = nil
+		snap.Header = nil
+		snap.Trailer = nil
+		snap.MetadataElided = true
+		snapshotJSON, err = json.Marshal(snap)
+		if err != nil {
+			return fmt.Errorf("repos/grpc_history: encode snapshot: %w", err)
+		}
 	}
 
 	id := uuid.NewString()

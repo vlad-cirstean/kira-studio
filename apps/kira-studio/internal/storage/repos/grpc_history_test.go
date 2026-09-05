@@ -261,6 +261,41 @@ func TestGrpcHistoryOversizedRequestMessageDoesNotEmptyTable(t *testing.T) {
 	}
 }
 
+// F9/P21 round 1: Metadata crosses the control plane uncapped (up to 64 MiB, twice the gRPC
+// budget) — unlike Message/Messages, which are capped above. A single call carrying enough
+// metadata to push the marshaled snapshot past half the byte budget on its own would otherwise
+// break the sweep's own safety invariant and empty the whole table on insert. Metadata/Header/
+// Trailer are dropped instead, the same structural backstop TestGrpcHistoryOversizedRequestMessage
+// DoesNotEmptyTable proves for the request message.
+func TestGrpcHistoryOversizedMetadataDoesNotEmptyTableAndIsElided(t *testing.T) {
+	r := newGrpcHistoryRepo(t)
+	repos.SetGrpcHistoryByteBudgetForTest(t, 2*1024*1024) // 2 MiB — half of it is the elision threshold
+
+	// 2 MiB of metadata, far past half the 2 MiB budget on its own.
+	bigValue := strings.Repeat("x", 2*1024*1024)
+	rec := grpcRec("", "tab1", 0)
+	rec.Metadata = []model.SavedGrpcMetaRow{{Name: "x-big", Value: bigValue, Enabled: true}}
+	if err := r.Record(rec); err != nil {
+		t.Fatalf("Record: %v", err)
+	}
+
+	entries, err := r.List("tab:tab1")
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("List returned %d entries, want 1 (the just-inserted row must survive the sweep)", len(entries))
+	}
+
+	snap, err := r.Get(entries[0].ID)
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	if len(snap.Metadata) != 0 {
+		t.Fatalf("Metadata = %v, want it dropped once the snapshot needed the whole-row safety net", snap.Metadata)
+	}
+}
+
 // ---- Adopt and SweepOrphans ----
 
 func TestGrpcHistoryAdopt(t *testing.T) {

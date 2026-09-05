@@ -282,6 +282,44 @@ func TestResponseHistoryGlobalByteBudgetEvictsOldestAcrossScopes(t *testing.T) {
 	}
 }
 
+// F9/P21 round 1: capBody only bounds 'raw'/'code' bodies — a urlencoded body's field values have
+// no per-field cap at all. A single request carrying enough of them to push the marshaled
+// snapshot past half the byte budget on its own would otherwise break the sweep's own safety
+// invariant ("no single row can exceed the budget") and empty the whole table on insert, the same
+// hazard TestResponseHistoryGlobalByteBudgetEvictsOldestAcrossScopes guards for the response body.
+func TestResponseHistoryOversizedRequestFieldsDoesNotEmptyTable(t *testing.T) {
+	r, db := newResponseHistoryRepo(t)
+	itemID := newItemFor(t, db)
+	repos.SetHistoryByteBudgetForTest(t, 2*1024*1024) // 2 MiB — half of it is the elision threshold
+
+	record := rec(itemID, "tab1", 200, "ok")
+	record.Body = httpclient.Body{
+		Mode:       "urlencoded",
+		URLEncoded: []httpclient.Field{{Name: "payload", Value: strings.Repeat("x", 2*1024*1024)}},
+	}
+	if err := r.Record(record); err != nil {
+		t.Fatalf("Record: %v", err)
+	}
+
+	entries, err := r.List(itemID)
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("List returned %d entries, want 1 (the just-inserted row must survive the sweep)", len(entries))
+	}
+
+	var snapshotJSON string
+	if err := db.QueryRow(
+		`SELECT snapshot_json FROM api_response_history WHERE id = ?`, entries[0].ID,
+	).Scan(&snapshotJSON); err != nil {
+		t.Fatalf("query snapshot_json: %v", err)
+	}
+	if strings.Contains(snapshotJSON, strings.Repeat("x", 1000)) {
+		t.Fatal("stored snapshot still carries the oversized field value — the whole-row safety net didn't run")
+	}
+}
+
 // ---- 6. Cascade and sweep ----
 
 func TestResponseHistoryCascadeAndSweepOrphans(t *testing.T) {

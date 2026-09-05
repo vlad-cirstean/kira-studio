@@ -43,6 +43,14 @@ type storedSnapshot struct {
 	BodyStored                  bool                         `json:"bodyStored"`
 	BodyStorageTruncated        bool                         `json:"bodyStorageTruncated"`
 	RequestBodyStorageTruncated bool                         `json:"requestBodyStorageTruncated"`
+	// RequestFieldsElided (F9/P21 round 1): capBody only caps 'raw'/'code' bodies — urlencoded and
+	// formdata field values have no per-field cap at all, and only stay safe today because the
+	// control plane's 64 MiB ceiling happens to sit below the 128 MiB history budget, a coincidence
+	// of two unrelated numbers rather than an invariant. If a snapshot still ends up past half the
+	// global byte budget after the per-field caps above, the request's field values are dropped
+	// (Body.Mode/structure kept, values cleared) rather than ever storing an oversized row — the
+	// same structural backstop grpc_history.go's own MetadataElided gives the gRPC table.
+	RequestFieldsElided bool `json:"requestFieldsElided,omitempty"`
 }
 
 // Record is the whole storage policy (D4/D5/D6), in one transaction: resolve the environment
@@ -104,6 +112,22 @@ func (r *ResponseHistoryRepo) Record(rec model.ResponseHistoryRecord) error {
 	snapshotJSON, err := json.Marshal(snap)
 	if err != nil {
 		return fmt.Errorf("repos/response_history: encode snapshot: %w", err)
+	}
+
+	// F9/P21 round 1: cap the snapshot as a whole, not just field by field. capBody only bounds
+	// 'raw'/'code'; a urlencoded/formdata body's field values have no per-field cap at all and
+	// could otherwise push a single row's stored_bytes past the sweep's own safety margin (the
+	// sweep is safe only because no single row can exceed the budget by itself).
+	if len(snapshotJSON) > historyByteBudget/2 {
+		snap.Request.Body.URLEncoded = nil
+		snap.Request.Body.FormData = nil
+		snap.Request.Body.Raw = ""
+		snap.Request.Body.Code = ""
+		snap.RequestFieldsElided = true
+		snapshotJSON, err = json.Marshal(snap)
+		if err != nil {
+			return fmt.Errorf("repos/response_history: encode snapshot: %w", err)
+		}
 	}
 
 	id := uuid.NewString()
