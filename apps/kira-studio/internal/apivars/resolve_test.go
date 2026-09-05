@@ -28,8 +28,9 @@ type corpusCase struct {
 	Secrets  []string          `json:"secrets"`
 	Want     string            `json:"want"`
 	Refs     []struct {
-		Name string `json:"name"`
-		Kind string `json:"kind"`
+		Name     string   `json:"name"`
+		Kind     string   `json:"kind"`
+		Pipeline []string `json:"pipeline"`
 	} `json:"refs"`
 }
 
@@ -63,6 +64,18 @@ func TestResolveAgainstTheSharedCorpus(t *testing.T) {
 				want := c.Refs[i]
 				if string(ref.Name) != want.Name || string(ref.Kind) != want.Kind {
 					t.Errorf("Refs[%d] = {%s %s}, want {%s %s}", i, ref.Name, ref.Kind, want.Name, want.Kind)
+				}
+				// P17 D4: Pipeline is nil (omitted from the JSON) for every case that predates the
+				// pipe grammar — normalize both sides to a same-length comparison so a corpus entry
+				// with no "pipeline" key (unmarshalled as a nil slice) compares equal to Go's own nil.
+				if len(ref.Pipeline) != len(want.Pipeline) {
+					t.Errorf("Refs[%d].Pipeline = %v, want %v", i, ref.Pipeline, want.Pipeline)
+					continue
+				}
+				for j, step := range ref.Pipeline {
+					if step != want.Pipeline[j] {
+						t.Errorf("Refs[%d].Pipeline[%d] = %q, want %q", i, j, step, want.Pipeline[j])
+					}
 				}
 			}
 		})

@@ -21,6 +21,62 @@ const (
 type Reference struct {
 	Name string
 	Kind ReferenceKind
+	// Pipeline is the transform names, left to right — nil for today's references (P17 D4), which
+	// is what keeps the shared corpus (testdata/substitution.json) comparing field-by-field with no
+	// edit for every case that predates the pipe grammar.
+	Pipeline []string
+}
+
+// ParsedReference is ParseReference's answer: the bare reference name and its optional transform
+// pipeline, split out of the already-extracted, already-trimmed text between `{{` and `}}` (P17
+// D3). The TS twin is packages/api-core/src/http/substitute.ts's own parseReference — same rules,
+// pinned by the same corpus.
+type ParsedReference struct {
+	// Name is the bare reference name — what classifyReference, Names, and every downstream
+	// consumer (the reveal loop, the masking replacer) key on. Unchanged from today for a
+	// reference with no pipeline.
+	Name string
+	// Pipeline is the transform names, left to right. Empty for today's references.
+	Pipeline []string
+	// Normalized is the span text `{{name | a | b}}`, one space either side of each `|`,
+	// regardless of how it was typed — D9's masking placeholder, and nothing else.
+	Normalized string
+}
+
+// ParseReference splits inner — the already-extracted, already-trimmed text between `{{` and
+// `}}` — into a bare name and an optional transform pipeline (P17 D3), by the same all-or-nothing
+// rule the TS twin implements:
+//
+//  1. No `|` at all: today's behaviour exactly — {Name: inner, Pipeline: nil}.
+//  2. Otherwise split on `|` and trim each segment. If the first segment is non-empty and every
+//     segment after it is a known transform (IsTransformName), the parse succeeds.
+//  3. Otherwise the whole of inner is the name, exactly as today, pipeline empty — the
+//     backward-compatibility rule: a variable literally named `a|b` keeps resolving, and a
+//     typo'd `{{token | base46}}` becomes an unknown reference named `token | base46` rather than
+//     a half-parsed pipeline.
+func ParseReference(inner string) ParsedReference {
+	if !strings.Contains(inner, "|") {
+		return ParsedReference{Name: inner, Normalized: "{{" + inner + "}}"}
+	}
+	rawSegments := strings.Split(inner, "|")
+	segments := make([]string, len(rawSegments))
+	for i, s := range rawSegments {
+		segments[i] = strings.TrimSpace(s)
+	}
+	name := segments[0]
+	rest := segments[1:]
+	allTransforms := true
+	for _, seg := range rest {
+		if !IsTransformName(seg) {
+			allTransforms = false
+			break
+		}
+	}
+	if name != "" && allTransforms {
+		normalized := "{{" + strings.Join(append([]string{name}, rest...), " | ") + "}}"
+		return ParsedReference{Name: name, Pipeline: rest, Normalized: normalized}
+	}
+	return ParsedReference{Name: inner, Normalized: "{{" + inner + "}}"}
 }
 
 // SubstitutionResult is Resolve's answer: the text with every resolvable reference substituted,
@@ -39,17 +95,18 @@ type SubstitutionResult struct {
 // nothing, and passes through literally. One pass only: a resolved value that itself contains
 // `{{other}}` is never re-expanded.
 func Resolve(text string, values map[string]string, secretNames []string) SubstitutionResult {
-	return resolveWithSanitizer(text, values, secretNames, nil)
+	return resolveWithSanitizer(text, values, secretNames, nil, nil)
 }
 
 // urlUnsafeReplacer is the Go twin of packages/api-core/src/http/substitute.ts's own
 // sanitizeUrlSpan (finding 6, v1.2 P14 round 2) — percent-encodes only the characters that would
 // otherwise break url.Parse's RawQuery or the request line itself (a space is what actually turns
 // a send into a 400; &/#/= are the query string's own structural delimiters), leaving `{{`/`}}`
-// and the reference name's ordinary characters exactly as typed.
+// and the reference name's ordinary characters exactly as typed. P17 D11: `|` joins the set — it
+// is not a legal URL character and a literal `|` in a request line is finding 6's own class.
 var urlUnsafeReplacer = strings.NewReplacer(
 	" ", "%20", "\t", "%09", "\r", "%0D", "\n", "%0A",
-	"&", "%26", "#", "%23", "=", "%3D",
+	"&", "%26", "#", "%23", "=", "%3D", "|", "%7C",
 )
 
 // resolveWithSanitizer is Resolve's real body — sanitize, when non-nil, is applied to a reference
@@ -58,8 +115,14 @@ var urlUnsafeReplacer = strings.NewReplacer(
 // secretNames nil, so a still-missing secret name falls into this same branch) and KindDynamic (Go
 // never generates a `{{$name}}` value itself — P6's generator is JS-only). Deliberately never
 // applied to KindDeferred: a later pass elsewhere still has to find that span by its exact,
-// untouched name.
-func resolveWithSanitizer(text string, values map[string]string, secretNames []string, sanitize func(string) string) SubstitutionResult {
+// untouched name and pipeline.
+//
+// P17 D6/D9: onResolved, when non-nil, is called exactly once per KindResolved reference with the
+// *rendered* text this function actually wrote — the pipeline already applied. It exists so
+// Resolver.text (below) can record what reached the wire without ever putting that text on a
+// Reference, which is reported outward. D8: dynamic's generator is still invoked once per
+// occurrence, at this same point in the walk — the pipeline wraps only its return value.
+func resolveWithSanitizer(text string, values map[string]string, secretNames []string, sanitize func(string) string, onResolved func(ref Reference, rendered string)) SubstitutionResult {
 	secrets := make(map[string]bool, len(secretNames))
 	for _, n := range secretNames {
 		secrets[n] = true
@@ -88,25 +151,53 @@ func resolveWithSanitizer(text string, values map[string]string, secretNames []s
 		}
 		closeAt += open + 2
 		out.WriteString(text[i:open])
-		name := strings.TrimSpace(text[open+2 : closeAt])
+		inner := strings.TrimSpace(text[open+2 : closeAt])
 		span := text[open : closeAt+2]
 		i = closeAt + 2
 
-		switch {
-		case name == "":
+		if inner == "" {
 			out.WriteString(span)
+			continue
+		}
+		parsed := ParseReference(inner)
+		name := parsed.Name
+		pipeline := parsed.Pipeline
+
+		pushRef := func(kind ReferenceKind) Reference {
+			ref := Reference{Name: name, Kind: kind, Pipeline: pipeline}
+			refs = append(refs, ref)
+			return ref
+		}
+
+		switch {
 		case strings.HasPrefix(name, "$"):
-			refs = append(refs, Reference{Name: name, Kind: KindDynamic})
+			// D6 dynamic row: Go never generates a `{{$name}}` value itself (P6's generator is
+			// JS-only) — so a dynamic reference here is always left verbatim, with its own
+			// pipeline untouched, exactly as stage 1's own uncatalogued-generator branch does.
+			pushRef(KindDynamic)
 			out.WriteString(sanitizeOrVerbatim(span))
 		case secrets[name]:
-			refs = append(refs, Reference{Name: name, Kind: KindDeferred})
+			// Never sanitized, never transformed here: stage 2 (Resolver.text below) is the pass
+			// that finds this exact span, decrypts the secret and applies its pipeline.
+			pushRef(KindDeferred)
 			out.WriteString(span)
 		default:
 			if value, ok := values[name]; ok {
-				refs = append(refs, Reference{Name: name, Kind: KindResolved})
-				out.WriteString(value)
+				rendered, applyOk := ApplyPipeline(pipeline, value)
+				if !applyOk {
+					// D5: a transform that cannot be applied leaves the entire span verbatim and
+					// classifies the reference unknown.
+					pushRef(KindUnknown)
+					out.WriteString(sanitizeOrVerbatim(span))
+					break
+				}
+				ref := pushRef(KindResolved)
+				if onResolved != nil {
+					onResolved(ref, rendered)
+				}
+				out.WriteString(rendered)
 			} else {
-				refs = append(refs, Reference{Name: name, Kind: KindUnknown})
+				pushRef(KindUnknown)
 				out.WriteString(sanitizeOrVerbatim(span))
 			}
 		}
@@ -114,9 +205,11 @@ func resolveWithSanitizer(text string, values map[string]string, secretNames []s
 	return SubstitutionResult{Text: out.String(), Refs: refs}
 }
 
-// Names returns every distinct {{name}} reference in text, trimmed, in first-seen order — the
-// same scan with no lookup and no classification. ResolveRequest uses it to decide, before ever
-// querying a secret, whether a field references anything at all.
+// Names returns every distinct {{name}} reference in text, in first-seen order — the same scan
+// with no lookup and no classification. ResolveRequest uses it to decide, before ever querying a
+// secret, whether a field references anything at all. P17 D4: the *bare* name (ParseReference's
+// own) — a pre-send "does this field reference anything" check counts `{{token | base64}}` as
+// referencing `token`.
 func Names(text string) []string {
 	seen := map[string]bool{}
 	out := []string{}
@@ -132,9 +225,13 @@ func Names(text string) []string {
 			break
 		}
 		closeAt += open + 2
-		name := strings.TrimSpace(text[open+2 : closeAt])
+		inner := strings.TrimSpace(text[open+2 : closeAt])
 		i = closeAt + 2
-		if name == "" || seen[name] {
+		if inner == "" {
+			continue
+		}
+		name := ParseReference(inner).Name
+		if seen[name] {
 			continue
 		}
 		seen[name] = true
@@ -217,7 +314,7 @@ func (r *Resolver) URLText(text string) string {
 }
 
 func (r *Resolver) text(text string, sanitize func(string) string) string {
-	result := resolveWithSanitizer(text, r.secretValues, nil, sanitize)
+	result := resolveWithSanitizer(text, r.secretValues, nil, sanitize, nil)
 	for _, ref := range result.Refs {
 		if ref.Kind == KindResolved {
 			r.used[ref.Name] = r.secretValues[ref.Name]
