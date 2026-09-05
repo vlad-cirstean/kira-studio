@@ -658,7 +658,10 @@ onUnmounted(() => {
         <div class="filter-field">
           <AutocompleteField
             v-model="searchText"
-            placeholder="Filter (e.g. { name: 'a' })"
+            prefix="FILTER"
+            :prefix-active="tab.state.search.trim() !== ''"
+            placeholder="{ name: 'a' }"
+            v-tooltip="'Mongo filter document — the query find() runs'"
             data-testid="document-search"
             :candidates="filterCandidates"
             language="mongo"
