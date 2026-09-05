@@ -2,13 +2,16 @@
 
 [![CI](https://github.com/vlad-cirstean/kira-studio/actions/workflows/ci.yml/badge.svg)](https://github.com/vlad-cirstean/kira-studio/actions/workflows/ci.yml)
 
-A visual database client (DataGrip/DBeaver class) for macOS, built on Wails (Go) and Vue 3 — one
-workbench across ten database engines.
+A native macOS workbench combining a visual database client (DataGrip/DBeaver class, ten database
+engines) and an HTTP/gRPC API client (Postman/Insomnia class) — built on Wails (Go) and Vue 3, one
+app you switch between with a mode button.
 
 ## Status
 
-- **Beta — v1 shipped; v1.1 is in development.** Expect bugs and breaking changes between builds. See
-  [Development](#development) and [`docs/PACKAGING.md`](docs/PACKAGING.md) to build from source.
+- **Beta.** The database client (**Studio**) has shipped through its v1.1 chapter; the API client
+  (**Api**) is in active development as the v1.2 chapter. Expect bugs and breaking changes between
+  builds. See [Development](#development) and [`docs/PACKAGING.md`](docs/PACKAGING.md) to build
+  from source.
 - **macOS 14+, Apple Silicon (`arm64`) only. Dark mode only.**
 - The packaged build is **unsigned (ad-hoc)** — code signing and notarization are deferred past
   v1. One consequence: because each new build is unsigned, macOS treats it as a different
@@ -63,7 +66,7 @@ A couple of things worth knowing up front:
 - **Cancellation is real.** Stop forwards a cancel to the server (`pg_cancel_backend`, `KILL
   QUERY`, cursor abort, consumer stop) — it doesn't just hide the result client-side.
 
-## Features
+## Studio features
 
 - **Project panel** — lazy, cached connection tree; per-connection color and live status dot;
   cached-node search; persistent hide/show filters.
@@ -113,6 +116,26 @@ A couple of things worth knowing up front:
   Defaults action. Appearance (font family/size, row density, word wrap, row coloring), Data
   (default page size), Cache (L2 byte budget, hit rate, clear caches), Advanced (op-log retention,
   expensive-query row threshold).
+
+## Api features
+
+- **Request builder** — method, URL, query params, headers, and a body panel (raw text; syntax
+  highlighted JSON/XML/HTML/JS; form-urlencoded; multipart form-data; a binary file) at Postman
+  parity, with a raw request editor and inspector alongside the built form.
+- **Collections** — a SQLite-backed left-panel tree of requests and folders, with real
+  Postman-format import and export.
+- **Environments & variables** — collection- and environment-scoped variables, colour-coded
+  environments (matched everywhere a request shows which one is active), and Faker-backed dynamic
+  values (`{{name}}`/`fake.*` placeholders) with optional value pipes and secret masking in
+  history and logs.
+- **curl import/export** — paste a curl command to populate a request, or generate one back out of
+  any request.
+- **Response history** — the last 30 responses per request are kept, raw body included, with a
+  "only the last 30 are kept" notice once older ones roll off.
+- **Request timeline** — a per-request timing breakdown (DNS, connect, TLS, time-to-first-byte,
+  download).
+- **gRPC support** — unary and streaming calls alongside HTTP, sharing the same collections,
+  environments and variables.
 
 ## Requirements
 
@@ -246,12 +269,13 @@ apps/kira-studio/tests/ipc       per-adapter IPC-boundary suite — real Go back
 apps/kira-studio/tests/e2e-real  Playwright against a real `-tags server` Go binary
 packages/shared      wire protocol + domain types the Go side mirrors as its own source of truth
 packages/db-fixtures shared fixture corpus (fixtures/support code, not a spec suite of its own)
-docs                 architecture, performance, packaging, design system; docs/v1.1 is the live record
+docs                 architecture, performance, packaging, design system; docs/v1.2 is the live record
 scripts/demo-dbs     local fixture databases for manual testing
 ```
 
-See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the full current-state breakdown, and
-[`docs/v1.1/SPEC.md`](docs/v1.1/SPEC.md) for this chapter's own phases (`docs/v1/SPEC.md` is the
+See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the full current-state breakdown,
+[`docs/v1.2/SPEC.md`](docs/v1.2/SPEC.md) for the Api chapter currently in development, and
+[`docs/v1.1/SPEC.md`](docs/v1.1/SPEC.md) for the completed Studio chapter (`docs/v1/SPEC.md` is the
 v1 record — see `docs/v1/README.md`).
 
 ## Documentation
@@ -263,9 +287,11 @@ v1 record — see `docs/v1/README.md`).
   numbers.
 - [`docs/PACKAGING.md`](docs/PACKAGING.md) — macOS build, the Wails bundle layout, verification
   checklist.
-- [`docs/v1.1/`](docs/v1.1/) — the live phasing record (see `docs/v1.1/README.md`):
-  [`SPEC.md`](docs/v1.1/SPEC.md) and [`plans/`](docs/v1.1/plans/), one implementation plan per
-  phase, this chapter's own P1 onward.
+- [`docs/v1.2/`](docs/v1.2/) — the live phasing record for the Api chapter, currently in
+  development: [`SPEC.md`](docs/v1.2/SPEC.md) and [`plans/`](docs/v1.2/plans/), one implementation
+  plan per phase.
+- [`docs/v1.1/`](docs/v1.1/) — the completed Studio chapter's own phasing record (see
+  `docs/v1.1/README.md`): [`SPEC.md`](docs/v1.1/SPEC.md) and [`plans/`](docs/v1.1/plans/).
 - [`docs/v1/`](docs/v1/) — the v1 record, not a living spec (see `docs/v1/README.md`):
   [`SPEC.md`](docs/v1/SPEC.md), the specification v1 was built against, and
   [`plans/`](docs/v1/plans/), one implementation plan per phase, P0 through P58f.
