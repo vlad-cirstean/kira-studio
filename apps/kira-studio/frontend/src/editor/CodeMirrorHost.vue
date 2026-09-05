@@ -10,7 +10,14 @@ import {
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
 import { syntaxHighlighting } from '@codemirror/language';
 import { type Diagnostic, linter } from '@codemirror/lint';
-import { Annotation, Compartment, EditorState, type Extension, Prec } from '@codemirror/state';
+import {
+  Annotation,
+  Compartment,
+  EditorSelection,
+  EditorState,
+  type Extension,
+  Prec,
+} from '@codemirror/state';
 import {
   EditorView,
   type HoverTooltipSource,
@@ -272,6 +279,15 @@ defineExpose({
   // the overlay's *painted* alignment depends on). `null` when the point falls outside any
   // character (matches `EditorView.posAtCoords`'s own contract).
   posAtCoords: (x: number, y: number): number | null => view?.posAtCoords({ x, y }) ?? null,
+  // P16 D11: the one capability the rangeHighlights seam was missing — a find bar paints its
+  // matches through the same seam (editor/findRanges.ts) but still needs to bring the current one
+  // into view. Additive and read-only-safe: it only scrolls, never touches the selection a
+  // read-only host has no cursor UI for anyway.
+  scrollRangeIntoView: (from: number, to: number): void => {
+    view?.dispatch({
+      effects: EditorView.scrollIntoView(EditorSelection.range(from, to), { y: 'center' }),
+    });
+  },
 });
 
 watch(

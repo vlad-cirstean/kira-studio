@@ -140,6 +140,16 @@ export const kiraEditorTheme = EditorView.theme(
       color: 'var(--kira-warn)',
       textDecoration: 'underline wavy var(--kira-warn)',
     },
+    // P16 D11: ResponseFindBar's own matches, painted through the same `rangeHighlights` seam
+    // (editor/findRanges.ts) — the exact match-tint + solid-current-match token pair every other
+    // search surface in the app already uses (DocumentRow, KeyValueView, StreamView,
+    // ConsoleResultGrid, CollectionRow, TreeRow). No new token.
+    '.cm-kira-find-match': {
+      background: 'var(--kira-search-match)',
+    },
+    '.cm-kira-find-match-current': {
+      background: 'var(--kira-search-match-current)',
+    },
   },
   { dark: true },
 );
