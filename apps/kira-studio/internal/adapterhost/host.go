@@ -200,11 +200,19 @@ func (h *Host) RunOp(ctx context.Context, spec OpSpec, fn func(context.Context, 
 func (h *Host) safeRun(ctx context.Context, op *adapters.OpCtx, fn func(context.Context, *adapters.OpCtx) (any, error)) (value any, err error) {
 	defer func() {
 		if r := recover(); r != nil {
-			msg := fmt.Sprintf("internal error: %v", r)
 			if h.deps.Log != nil {
 				h.deps.Log("error", fmt.Sprintf("adapter panic: %v\n%s", r, debug.Stack()))
 			}
-			err = adapters.New(adapters.ErrorCode("E_INTERNAL"), msg, nil)
+			// quoteIdent's own NUL-byte guard (postgres/mysqlfamily/sqlite/clickhouse read.go)
+			// panics with an *adapters.Error carrying a real code (E_QUERY — a user-input problem,
+			// not an internal fault). Unwrapping it here, rather than always folding into
+			// E_INTERNAL, keeps that code intact instead of presenting a query error as an
+			// internal one.
+			if adapterErr, ok := r.(*adapters.Error); ok {
+				err = adapterErr
+				return
+			}
+			err = adapters.New(adapters.ErrorCode("E_INTERNAL"), fmt.Sprintf("internal error: %v", r), nil)
 		}
 	}()
 	return fn(ctx, op)

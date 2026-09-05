@@ -63,6 +63,39 @@ func TestRunOp_RefusesDuplicateOpID(t *testing.T) {
 	wg.Wait()
 }
 
+// P21 round 1 architecture/security finding 11: quoteIdent (postgres/mysqlfamily/sqlite/clickhouse
+// read.go) panics with an *adapters.Error carrying E_QUERY on a NUL byte in an identifier — a
+// user-input problem, not an internal fault. safeRun's recover() used to always fold a panic into
+// a fresh E_INTERNAL, losing that code and presenting the query error as an internal one.
+func TestRunOp_PreservesAnAdaptersErrorCodeAcrossAPanic(t *testing.T) {
+	h := NewHost(adapters.Deps{}, nil)
+	_, _, err := h.RunOp(context.Background(), OpSpec{OpID: "op-panic-typed", Kind: "read"},
+		func(ctx context.Context, op *adapters.OpCtx) (any, error) {
+			panic(adapters.New(adapters.CodeQuery, "identifier contains a NUL byte", nil))
+		})
+	var ae *adapters.Error
+	if !errors.As(err, &ae) || ae.Code != adapters.CodeQuery {
+		t.Fatalf("got %v, want the panicked *adapters.Error's own E_QUERY code preserved", err)
+	}
+	if ae.Message != "identifier contains a NUL byte" {
+		t.Errorf("message = %q, want the original message preserved", ae.Message)
+	}
+}
+
+// An untyped panic (a real internal fault, not adapters' own error type) must still fold into
+// E_INTERNAL — the fix above only special-cases a panicked *adapters.Error.
+func TestRunOp_UntypedPanicStillBecomesInternalError(t *testing.T) {
+	h := NewHost(adapters.Deps{}, nil)
+	_, _, err := h.RunOp(context.Background(), OpSpec{OpID: "op-panic-untyped", Kind: "read"},
+		func(ctx context.Context, op *adapters.OpCtx) (any, error) {
+			panic("boom")
+		})
+	var ae *adapters.Error
+	if !errors.As(err, &ae) || ae.Code != adapters.ErrorCode("E_INTERNAL") {
+		t.Fatalf("got %v, want an E_INTERNAL *adapters.Error", err)
+	}
+}
+
 // CancelOp must stay two-step and in order: the local abort unblocks the running RunOp call
 // immediately (never mind whether the adapter ever answers), and only then is the adapter's own
 // Cancel called — the one that actually kills the server-side work (§5.1: cancellation is always
