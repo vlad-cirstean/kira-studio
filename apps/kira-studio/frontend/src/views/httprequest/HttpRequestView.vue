@@ -29,6 +29,7 @@ import {
   mergedValuesAndSecrets,
 } from '../../api/state/variables';
 import { patchHttpRequestTabState } from '../../api/tabs';
+import VariablesOverviewPanel from '../../api/VariablesOverviewPanel.vue';
 import { registerCommand } from '../../shortcuts/commands';
 import AppButton from '../../theme/primitives/AppButton.vue';
 import AutocompleteField from '../../theme/primitives/AutocompleteField.vue';
@@ -221,6 +222,10 @@ function setRequestPane(pane: 'params' | 'headers' | 'body'): void {
 // tab state: a lens, not a setting (§8 OQ-8's own rule for every filter this phase adds).
 const fieldFilterOpen = ref(false);
 const fieldFilterQuery = ref('');
+
+// P17 D20/item 8: the unified overview panel's own open flag — component-local, same "a lens, not
+// a setting" rule as fieldFilterOpen just above.
+const overviewOpen = ref(false);
 const showFieldFilterToggle = computed(
   () =>
     props.tab.state.requestPane !== 'body' ||
@@ -372,6 +377,22 @@ onUnmounted(() => {
           data-testid="http-field-filter-toggle"
           @click="toggleFieldFilter"
         />
+        <div class="overview-anchor">
+          <IconButton
+            icon="symbol-variable"
+            :active="overviewOpen"
+            aria-label="Variables"
+            v-tooltip="'Variables'"
+            data-testid="http-variables-overview-toggle"
+            @click="overviewOpen = !overviewOpen"
+          />
+          <VariablesOverviewPanel
+            v-if="overviewOpen"
+            :collection-id="collectionId"
+            :environment-id="activeEnvironmentId"
+            @close="overviewOpen = false"
+          />
+        </div>
         <EnvironmentSelect />
       </template>
 
@@ -416,6 +437,11 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
+.overview-anchor {
+  position: relative;
+  display: flex;
+}
+
 .http-request-view {
   height: 100%;
   display: flex;

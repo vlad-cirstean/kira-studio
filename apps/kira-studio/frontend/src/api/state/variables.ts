@@ -299,6 +299,45 @@ export function mergedValuesAndSecrets(
   return { values, secretNames };
 }
 
+// P17 D20/item 8: one row of the read-only overview panel — every stored row from both scopes
+// (not deduplicated into a single resolved value the way mergedValuesAndSecrets is, since the
+// panel's whole point is to make D2's precedence *visible*: a shadowed collection row still
+// appears, dimmed, rather than disappearing the way it would in the merged map above).
+export interface VariableOverviewRow {
+  id: string;
+  name: string;
+  value: string;
+  isSecret: boolean;
+  description: string;
+  scope: VariableScope;
+  /** True for a collection row whose name is also claimed by some environment row — D2's
+   *  precedence means the environment row is the one that actually resolves. An environment row
+   *  is never shadowed; nothing outranks it. */
+  shadowed: boolean;
+}
+
+/** D20: environment rows first (the scope that wins precedence, D2), then collection rows, each
+ *  group in its own `sort_order` (`cachedVariables`'s own order) — read-only, no dedup within a
+ *  scope, since collapsing same-named rows is `mergedValuesAndSecrets`' job, not this list's. */
+export function overviewRows(collectionId: string, environmentId: string): VariableOverviewRow[] {
+  const envRows = cachedVariables('environment', environmentId);
+  const colRows = cachedVariables('collection', collectionId);
+  const envNames = new Set(envRows.map((v) => v.name));
+  const toRow = (v: ApiVariable, scope: VariableScope, shadowed: boolean): VariableOverviewRow => ({
+    id: v.id,
+    name: v.name,
+    value: v.value,
+    isSecret: v.isSecret,
+    description: v.description,
+    scope,
+    shadowed,
+  });
+  return [
+    ...envRows.map((v) => toRow(v, 'environment', false)),
+    ...colRows.map((v) => toRow(v, 'collection', envNames.has(v.name))),
+  ];
+}
+
 // ---- the gated reveal (D5/D8/D9) ----
 
 /** A revealed variable's plaintext, keyed by variable id — transient, cleared on dialog close

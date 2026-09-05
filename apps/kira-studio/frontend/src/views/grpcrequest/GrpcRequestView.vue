@@ -16,6 +16,7 @@ import {
   mergedValuesAndSecrets,
 } from '../../api/state/variables';
 import { patchGrpcRequestTabState } from '../../api/tabs';
+import VariablesOverviewPanel from '../../api/VariablesOverviewPanel.vue';
 import { beautifyJson } from '../../beautify';
 import CodeMirrorHost from '../../editor/CodeMirrorHost.vue';
 import { registerCommand } from '../../shortcuts/commands';
@@ -191,6 +192,9 @@ function toggleFieldFilter(): void {
   if (!fieldFilterOpen.value) fieldFilterQuery.value = '';
 }
 
+// P17 D20/item 8: same component-local flag as HttpRequestView.vue's own.
+const overviewOpen = ref(false);
+
 function onMessageInput(value: string): void {
   patchGrpcRequestTabState(props.tab.id, { message: value });
 }
@@ -319,6 +323,22 @@ onUnmounted(() => {
           data-testid="grpc-field-filter-toggle"
           @click="toggleFieldFilter"
         />
+        <div class="overview-anchor">
+          <IconButton
+            icon="symbol-variable"
+            :active="overviewOpen"
+            aria-label="Variables"
+            v-tooltip="'Variables'"
+            data-testid="grpc-variables-overview-toggle"
+            @click="overviewOpen = !overviewOpen"
+          />
+          <VariablesOverviewPanel
+            v-if="overviewOpen"
+            :collection-id="collectionId"
+            :environment-id="activeEnvironmentId"
+            @close="overviewOpen = false"
+          />
+        </div>
         <EnvironmentSelect />
       </template>
 
@@ -362,6 +382,11 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
+.overview-anchor {
+  position: relative;
+  display: flex;
+}
+
 .grpc-request-view {
   height: 100%;
   display: flex;
