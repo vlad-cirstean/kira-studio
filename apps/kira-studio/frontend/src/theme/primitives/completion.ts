@@ -30,6 +30,39 @@ export function tokenAt(text: string, caret: number): { from: number; to: number
   return { from, to: caret, word: text.slice(from, caret) };
 }
 
+// P15b D3(b): AutocompleteField's pluggable tokenizer — a field holding exactly one identifier
+// (a header name) needs the *whole* field as its token, not tokenAt's word-char run. tokenAt has
+// no `-` in WORD_CHAR_RE, so typing `Content-T` in a header-name cell would tokenize as just `T`
+// (starting after the hyphen) — accepting a suggestion there would produce
+// `Content-Content-Type` (F1's own finding). `caret` is unused: any caret position within the
+// field means "match/replace the whole field", trimmed only for the match itself so accidental
+// leading/trailing whitespace does not stop a candidate from matching.
+export function wholeFieldToken(
+  text: string,
+  _caret: number,
+): { from: number; to: number; word: string } {
+  return { from: 0, to: text.length, word: text.trim() };
+}
+
+// P15b D3(b): the run between the nearest unclosed `{{` at or before the caret and the caret
+// itself — `null` when the caret is not inside a reference, which is what keeps a `{{variable}}`
+// field's popup from opening while typing ordinary text outside any `{{…}}`. "Unclosed" is decided
+// by scanning only the text *before* the caret: a `}}` already typed before the caret means that
+// reference is closed and the caret has moved past it, even if more text (another `{{`) follows on
+// the line.
+export function templateToken(
+  text: string,
+  caret: number,
+): { from: number; to: number; word: string } | null {
+  const before = text.slice(0, caret);
+  const open = before.lastIndexOf('{{');
+  if (open === -1) return null;
+  const closedBeforeCaret = before.indexOf('}}', open + 2) !== -1;
+  if (closedBeforeCaret) return null;
+  const from = open + 2;
+  return { from, to: caret, word: text.slice(from, caret) };
+}
+
 // A wider list is a scrollbar nobody reads — also the cap Ctrl+Space's "list everything" applies.
 export const MAX_VISIBLE = 12;
 

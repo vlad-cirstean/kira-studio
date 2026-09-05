@@ -3,10 +3,15 @@ import type { HttpUrlEncodedFieldState } from '@shared/domain/http';
 import type { HttpRequestTabRecord } from '@shared/domain/tabs';
 import { patchHttpRequestTabState } from '../../api/tabs';
 import FieldRowsTable from './FieldRowsTable.vue';
+import type { VariableSupport } from './variableCompletion';
 
 // C7: over C6's shared table, wired to state.urlEncoded — Go already serializes this mode (C1)
 // and the body caption already knows its Content-Type (C5/D7).
-const props = defineProps<{ tab: HttpRequestTabRecord }>();
+const props = defineProps<{
+  tab: HttpRequestTabRecord;
+  /** P15b D4: HttpRequestView.vue's own variableSupport(...) — forwarded to the value cell. */
+  variables?: VariableSupport;
+}>();
 
 function blankField(): HttpUrlEncodedFieldState {
   return { name: '', value: '', enabled: true };
@@ -26,6 +31,7 @@ function onUpdateRows(urlEncoded: HttpUrlEncodedFieldState[]): void {
     value-placeholder="value"
     testid-prefix="http-urlencoded"
     container-testid="http-urlencoded-table"
+    :value-variable-support="variables"
     @update:rows="onUpdateRows"
   />
 </template>

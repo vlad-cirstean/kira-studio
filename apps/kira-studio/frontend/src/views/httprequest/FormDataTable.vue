@@ -5,15 +5,24 @@ import type { HttpRequestTabRecord } from '@shared/domain/tabs';
 import { patchHttpRequestTabState } from '../../api/tabs';
 import { formatBytes } from '../../format';
 import AppButton from '../../theme/primitives/AppButton.vue';
+import AutocompleteField from '../../theme/primitives/AutocompleteField.vue';
+import { templateToken } from '../../theme/primitives/completion';
 import IconButton from '../../theme/primitives/IconButton.vue';
 import TextField from '../../theme/primitives/TextField.vue';
 import FieldRowsTable from './FieldRowsTable.vue';
 import { chooseBodyFile } from './files';
+import type { VariableSupport } from './variableCompletion';
 
 // P3 C8/D4/D15: form-data over C6's shared table, with real file fields. D4's whole point: a
 // picked file's bytes never reach here — chooseBodyFile returns only {path, name, size}, and only
 // `path` (D8's own `path`/`fileName`/`fileSize` fields) ever lands in state or on the wire.
-const props = defineProps<{ tab: HttpRequestTabRecord }>();
+const props = defineProps<{
+  tab: HttpRequestTabRecord;
+  /** P15b D4: HttpRequestView.vue's own variableSupport(...) — this table overrides FieldRowsTable's
+   *  own `value` slot (a text/file kind switch), so it wires the AutocompleteField itself rather
+   *  than through `valueVariableSupport`. */
+  variables?: VariableSupport;
+}>();
 
 function blankField(): HttpFormDataFieldState {
   return {
@@ -76,9 +85,20 @@ function onClearFile(index: number): void {
     @update:rows="onUpdateRows"
   >
     <template #value="{ row, update }">
-      <div class="field-cell">
+      <div v-if="row.kind === 'text'" class="field-cell">
+        <AutocompleteField
+          v-if="variables"
+          :model-value="row.value"
+          placeholder="value"
+          data-testid="http-formdata-value"
+          :candidates="variables.candidates"
+          :token-at="templateToken"
+          :range-highlights="variables.rangeHighlights"
+          :hover-at="variables.hoverAt"
+          @update:model-value="update"
+        />
         <TextField
-          v-if="row.kind === 'text'"
+          v-else
           :model-value="row.value"
           placeholder="value"
           data-testid="http-formdata-value"

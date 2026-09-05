@@ -31,10 +31,11 @@ import {
 import { patchHttpRequestTabState } from '../../api/tabs';
 import { registerCommand } from '../../shortcuts/commands';
 import AppButton from '../../theme/primitives/AppButton.vue';
+import AutocompleteField from '../../theme/primitives/AutocompleteField.vue';
+import { templateToken } from '../../theme/primitives/completion';
 import IconButton from '../../theme/primitives/IconButton.vue';
 import PanelSplitter from '../../theme/primitives/PanelSplitter.vue';
 import SegmentedControl from '../../theme/primitives/SegmentedControl.vue';
-import TextField from '../../theme/primitives/TextField.vue';
 import ViewChrome from '../../theme/primitives/ViewChrome.vue';
 import QueryParamsTable from './QueryParamsTable.vue';
 import RequestBodyPane from './RequestBodyPane.vue';
@@ -293,10 +294,14 @@ onUnmounted(() => {
           <option v-for="m in METHODS" :key="m" :value="m">{{ m }}</option>
         </select>
         <div class="url-field">
-          <TextField
+          <AutocompleteField
             :model-value="tab.state.url"
             placeholder="https://api.example.com/users"
             data-testid="http-url"
+            :candidates="variables.candidates"
+            :token-at="templateToken"
+            :range-highlights="variables.rangeHighlights"
+            :hover-at="variables.hoverAt"
             @update:model-value="onUrlInput"
             @enter="onSend"
           />
@@ -343,9 +348,9 @@ onUnmounted(() => {
 
       <div class="request-response-split">
         <div class="request-pane" :style="{ flex: `0 0 ${requestPaneHeight}px` }" data-testid="http-request-pane">
-          <QueryParamsTable v-if="tab.state.requestPane === 'params'" :tab="tab" />
-          <RequestHeadersTable v-else-if="tab.state.requestPane === 'headers'" :tab="tab" />
-          <RequestBodyPane v-else :tab="tab" :range-highlights="variables.rangeHighlights" />
+          <QueryParamsTable v-if="tab.state.requestPane === 'params'" :tab="tab" :variables="variables" />
+          <RequestHeadersTable v-else-if="tab.state.requestPane === 'headers'" :tab="tab" :variables="variables" />
+          <RequestBodyPane v-else :tab="tab" :variables="variables" />
         </div>
 
         <PanelSplitter

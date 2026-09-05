@@ -2,8 +2,10 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 import CodeMirrorHost from '../../editor/CodeMirrorHost.vue';
 import type { EditorLanguageId } from '../../editor/languages';
+import type { RangeHighlight } from '../../editor/variableHighlight';
 import type { SqlDialect } from '../../views/shared/sqlIdent';
 import CodiconIcon from '../CodiconIcon.vue';
+import { computeFloatPosition, pointReference } from '../floatingPosition';
 import { wrapSelectionOnType } from '../wrapSelection';
 import { type Completion, MAX_VISIBLE, rankCandidates, tokenAt } from './completion';
 
@@ -46,11 +48,27 @@ const props = withDefaults(
     language?: EditorLanguageId;
     /** Only consulted when `language === 'sql'`, forwarded to CodeMirrorHost unchanged. */
     sqlDialect?: SqlDialect;
+    /** P15b D3(a): forwarded to the overlay CodeMirrorHost verbatim — a field with no *grammar*
+     *  (no `language`) still gets the read-only overlay when it has *ranges* to paint (the URL and
+     *  header/param value fields' `{{variable}}` colouring, item 10). */
+    rangeHighlights?: (doc: string) => readonly RangeHighlight[];
+    /** P15b D3(b): overrides the default word-run tokenizer (`completion.ts`'s own `tokenAt`) —
+     *  `wholeFieldToken` for a field holding exactly one identifier (a header name), `templateToken`
+     *  for `{{variable}}` completion. A `null` result clears the current word and closes the popup,
+     *  so a variable field only suggests while the caret is actually inside `{{…}}`. */
+    tokenAt?: (text: string, caret: number) => { from: number; to: number; word: string } | null;
+    /** P15b D3(c): a pure text-in lookup for the token under the pointer — absent by default, which
+     *  is every call site but the URL/header-value fields (item 10's hover). No hover machinery
+     *  (listener, timer, panel) exists at all when this is absent. */
+    hoverAt?: (text: string, offset: number) => string[] | null;
   }>(),
   { candidates: () => [] },
 );
 
 const highlighted = computed(() => !!props.language && props.language !== 'plain');
+// D3(a): the overlay's own render condition — a grammar (`highlighted`) or ranges to paint, either
+// is reason enough for the read-only CodeMirrorHost to exist behind the real input.
+const showOverlay = computed(() => highlighted.value || !!props.rangeHighlights);
 
 const emit = defineEmits<{
   'update:modelValue': [value: string];
@@ -92,9 +110,13 @@ const filtered = computed(() =>
 
 function recompute(el: HTMLInputElement): void {
   const cursor = el.selectionStart ?? el.value.length;
-  const token = tokenAt(el.value, cursor);
-  wordStart.value = token.from;
-  currentWord.value = token.word;
+  const tokenizer = props.tokenAt ?? tokenAt;
+  const token = tokenizer(el.value, cursor);
+  // D3(b): a null result (templateToken outside any `{{…}}`) clears the word and, via onInput's
+  // own `currentWord.value.length > 0` gate below, closes the popup — a variable field only
+  // suggests while the caret is actually inside a reference.
+  wordStart.value = token?.from ?? cursor;
+  currentWord.value = token?.word ?? '';
   activeIndex.value = 0;
   hasNavigated.value = false;
 }
@@ -117,6 +139,7 @@ function onInput(e: Event): void {
   recompute(el);
   open.value = currentWord.value.length > 0 && filtered.value.length > 0;
   if (open.value) positionList();
+  closeHover();
 }
 
 // Cursor-move-only events (click, arrow-left/right, Home/End with no text change) still need the
@@ -152,6 +175,8 @@ function accept(completion: Completion): void {
 }
 
 function onKeydown(e: KeyboardEvent): void {
+  // D3(c): any keystroke closes the hover panel — the same close set the completion popup uses.
+  closeHover();
   // Item 5: a bracket/quote typed over a selection wraps it (wrapSelection.ts) rather than
   // running through the completion machinery below — onInput's own listener picks up the
   // synthetic 'input' event this dispatches, same as any other edit.
@@ -212,6 +237,78 @@ function onInputScroll(e: Event): void {
   if (scroller) scroller.scrollLeft = (e.target as HTMLInputElement).scrollLeft;
 }
 
+// P15b D3(c): a field-local floating tooltip for the token under the pointer, built on
+// theme/floatingPosition.ts's pointReference — the app's element-anchored tooltip singleton
+// (workbench/state/tooltip.ts) cannot serve this: it hit-tests per *element*, never re-resolving
+// within one input as the pointer crosses from ordinary text onto a `{{ref}}`, and `theme/` may not
+// import `workbench/` regardless. No hover machinery does anything when `hoverAt` is absent — every
+// call site but the URL/header-value fields (item 10) — since `onInputMouseMove` below returns
+// immediately.
+//
+// OQ-1: 400 mirrors workbench/state/tooltip.ts's own TOOLTIP_DELAY_MS (itself already shared with
+// CodeMirrorHost.vue's lint hover delay) — a third copy of the same constant rather than a hoist of
+// that file into `theme/`, which `theme/` cannot import from anyway (F7).
+const HOVER_DELAY_MS = 400;
+
+// Typed as the bare exposed shape (rather than InstanceType<typeof CodeMirrorHost>) so this ref
+// doesn't read as a type-only use of the CodeMirrorHost import — same convention as
+// ConsoleView.vue's own editorHost/ConsoleSavedMenu.vue's promptInput.
+const codeMirrorHostRef = ref<{ posAtCoords: (x: number, y: number) => number | null } | null>(
+  null,
+);
+const hoverPanelRef = ref<HTMLElement | null>(null);
+const hoverLines = ref<string[] | null>(null);
+const hoverStyle = ref<{ left: string; top: string } | null>(null);
+let hoverTimer: ReturnType<typeof setTimeout> | null = null;
+// D3(c)'s "a different token than last time" without needing the token's own span — `hoverAt`'s
+// contract (D3) is text-in/lines-out, no offsets — comparing the lines it returns for the pointer's
+// current offset is exactly that: the same token yields the same lines every time.
+let lastHoverKey: string | null = null;
+
+function closeHover(): void {
+  if (hoverTimer !== null) {
+    clearTimeout(hoverTimer);
+    hoverTimer = null;
+  }
+  hoverLines.value = null;
+  lastHoverKey = null;
+}
+
+async function openHoverAt(x: number, y: number, lines: string[]): Promise<void> {
+  hoverLines.value = lines;
+  await nextTick();
+  const panel = hoverPanelRef.value;
+  if (!panel) return;
+  const { left, top } = await computeFloatPosition(pointReference(x, y), panel, {
+    placement: 'bottom-start',
+  });
+  hoverStyle.value = { left: `${left}px`, top: `${top}px` };
+}
+
+function onInputMouseMove(e: MouseEvent): void {
+  if (!props.hoverAt) return;
+  const host = codeMirrorHostRef.value;
+  const el = inputRef.value;
+  if (!host || !el) return;
+  // CodeMirror's own coordinate hit-testing on the overlay that is already painting the same text
+  // at the same viewport coordinates as this real input — exact, and it does not re-assume the
+  // monospace grid the overlay's *painted* alignment depends on (font-agnostic, D3(c)).
+  const offset = host.posAtCoords(e.clientX, e.clientY);
+  const lines = offset === null ? null : props.hoverAt(props.modelValue, offset);
+  const key = lines ? JSON.stringify(lines) : null;
+  if (key === lastHoverKey) return; // same token (or still no token) as the last move
+  lastHoverKey = key;
+  if (hoverTimer !== null) clearTimeout(hoverTimer);
+  hoverLines.value = null;
+  if (!lines) return;
+  const rect = el.getBoundingClientRect();
+  const x = e.clientX;
+  hoverTimer = setTimeout(() => {
+    hoverTimer = null;
+    void openHoverAt(x, rect.top, lines);
+  }, HOVER_DELAY_MS);
+}
+
 function onBlur(e: FocusEvent): void {
   // A click on a suggestion fires this blur first (mousedown steals focus before the click
   // handler runs) — closing here first would make the click land on nothing. The suggestion
@@ -219,6 +316,7 @@ function onBlur(e: FocusEvent): void {
   // fires for a genuine "left the field" blur.
   open.value = false;
   forceAll.value = false;
+  closeHover();
   emit('blur', e);
 }
 
@@ -227,6 +325,7 @@ function onBlur(e: FocusEvent): void {
 // scroll-listener-driven reposition loop for what is, in every current use, a single-line toolbar
 // input that never itself scrolls.
 function closeOnViewportChange(): void {
+  closeHover();
   if (!open.value) return;
   open.value = false;
   forceAll.value = false;
@@ -255,14 +354,16 @@ onBeforeUnmount(() => {
            surrounding div (not the component itself) is what `overlayRootRef` needs to be an
            actual DOM node `.querySelector` can walk — a `ref` on <CodeMirrorHost> would resolve to
            its exposed `{ focus }` object instead (defineExpose), not its root element. -->
-      <div v-if="highlighted" ref="overlayRootRef" class="highlight-overlay" aria-hidden="true">
+      <div v-if="showOverlay" ref="overlayRootRef" class="highlight-overlay" aria-hidden="true">
         <CodeMirrorHost
+          ref="codeMirrorHostRef"
           :key="language"
           :doc="modelValue"
           :language="language ?? 'plain'"
           :sql-dialect="sqlDialect"
           :read-only="true"
           single-line
+          :range-highlights="rangeHighlights"
         />
       </div>
       <input
@@ -270,7 +371,7 @@ onBeforeUnmount(() => {
         v-bind="$attrs"
         :value="modelValue"
         :placeholder="placeholder"
-        :class="{ 'has-overlay': highlighted }"
+        :class="{ 'has-overlay': showOverlay }"
         autocomplete="off"
         spellcheck="false"
         role="combobox"
@@ -284,6 +385,8 @@ onBeforeUnmount(() => {
         @keydown="onKeydown"
         @blur="onBlur"
         @scroll="onInputScroll"
+        @mousemove="onInputMouseMove"
+        @mouseleave="closeHover"
       />
     </span>
   </span>
@@ -310,6 +413,16 @@ onBeforeUnmount(() => {
       <span v-if="c.detail" class="sugg-detail">{{ c.detail }}</span>
     </li>
   </ul>
+  <div
+    v-if="hoverLines"
+    ref="hoverPanelRef"
+    class="var-hover-panel p-float"
+    role="tooltip"
+    data-testid="autocomplete-hover"
+    :style="hoverStyle ?? undefined"
+  >
+    <div v-for="(line, i) in hoverLines" :key="i" class="hover-line">{{ line }}</div>
+  </div>
 </template>
 
 <style scoped>
@@ -416,5 +529,28 @@ onBeforeUnmount(() => {
   color: var(--kira-fg-muted);
   font-size: var(--kira-t-xs);
   flex-shrink: 0;
+}
+
+/* P15b D3(c): positioned by computeFloatPosition (theme/floatingPosition.ts) via hoverStyle — the
+   same `.p-float` chrome (background/border/radius/shadow) every other floating surface uses. */
+.var-hover-panel {
+  position: fixed;
+  z-index: 200;
+  padding: var(--kira-s-2) var(--kira-s-3);
+  max-width: 360px;
+  font-family: var(--kira-font-family);
+  font-size: var(--kira-t-sm);
+  color: var(--kira-fg);
+  pointer-events: none;
+}
+
+.hover-line {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.hover-line + .hover-line {
+  color: var(--kira-fg-muted);
+  margin-top: var(--kira-s-1);
 }
 </style>

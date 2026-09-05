@@ -12,7 +12,6 @@ import type { HttpRequestTabRecord } from '@shared/domain/tabs';
 import { computed, ref } from 'vue';
 import { patchHttpRequestTabState } from '../../api/tabs';
 import CodeMirrorHost from '../../editor/CodeMirrorHost.vue';
-import type { RangeHighlight } from '../../editor/variableHighlight';
 import IconButton from '../../theme/primitives/IconButton.vue';
 import MessageStrip from '../../theme/primitives/MessageStrip.vue';
 import SegmentedControl from '../../theme/primitives/SegmentedControl.vue';
@@ -20,6 +19,7 @@ import { beautifyFor, canBeautify } from '../shared/celleditor/formats';
 import BinaryBodyPicker from './BinaryBodyPicker.vue';
 import FormDataTable from './FormDataTable.vue';
 import UrlEncodedTable from './UrlEncodedTable.vue';
+import type { VariableSupport } from './variableCompletion';
 
 // C5/D9: extracted from HttpRequestView.vue's own inline block (P2) — the mode selector, the code-
 // language select, the auto-Content-Type caption and the per-mode editor host all live here now so
@@ -28,10 +28,10 @@ import UrlEncodedTable from './UrlEncodedTable.vue';
 // languages.
 const props = defineProps<{
   tab: HttpRequestTabRecord;
-  /** P15b D4: HttpRequestView.vue's own variableSupport(...).rangeHighlights — forwarded verbatim
-   *  to both editable editor hosts below (raw and code/JSON) so a `{{variable}}` reference in the
-   *  body is coloured exactly like the URL/header fields will be (N3). */
-  rangeHighlights?: (doc: string) => readonly RangeHighlight[];
+  /** P15b D4: HttpRequestView.vue's own variableSupport(...) — rangeHighlights colours both
+   *  editable editor hosts below (raw and code/JSON) with `{{variable}}` references exactly like
+   *  the URL/header fields (N3); the rest is forwarded to the urlencoded/form-data value cells. */
+  variables?: VariableSupport;
 }>();
 
 // P15 D6: JSON is a UI-level segment over the same `bodyMode`/`codeLanguage` storage — no schema,
@@ -148,7 +148,7 @@ const caption = computed(() =>
       :doc="tab.state.body"
       language="plain"
       :read-only="false"
-      :range-highlights="rangeHighlights"
+      :range-highlights="variables?.rangeHighlights"
       @update:doc="onRawChange"
     />
     <CodeMirrorHost
@@ -156,11 +156,11 @@ const caption = computed(() =>
       :doc="tab.state.code"
       :language="editorLanguage"
       :read-only="false"
-      :range-highlights="rangeHighlights"
+      :range-highlights="variables?.rangeHighlights"
       @update:doc="onCodeChange"
     />
-    <UrlEncodedTable v-else-if="tab.state.bodyMode === 'urlencoded'" :tab="tab" />
-    <FormDataTable v-else-if="tab.state.bodyMode === 'formdata'" :tab="tab" />
+    <UrlEncodedTable v-else-if="tab.state.bodyMode === 'urlencoded'" :tab="tab" :variables="variables" />
+    <FormDataTable v-else-if="tab.state.bodyMode === 'formdata'" :tab="tab" :variables="variables" />
     <BinaryBodyPicker v-else-if="tab.state.bodyMode === 'file'" :tab="tab" />
   </div>
 </template>

@@ -1,8 +1,11 @@
 <script setup lang="ts" generic="T extends { name: string; value: string; enabled?: boolean }">
 import { computed } from 'vue';
+import AutocompleteField from '../../theme/primitives/AutocompleteField.vue';
 import Checkbox from '../../theme/primitives/Checkbox.vue';
+import { templateToken } from '../../theme/primitives/completion';
 import IconButton from '../../theme/primitives/IconButton.vue';
 import TextField from '../../theme/primitives/TextField.vue';
+import type { VariableSupport } from './variableCompletion';
 
 // P3 D15/C6: the one row table behind Params, Headers, urlencoded (C7) and form-data (C8) —
 // RequestHeadersTable.vue and QueryParamsTable.vue were the same file twice minus a checkbox
@@ -26,6 +29,11 @@ const props = withDefaults(
     /** The outer container's own testid (e.g. `http-headers-table`) — kept at the wrapper's
      *  discretion since the two existing tables pluralize their prefix differently. */
     containerTestid?: string;
+    /** P15b D4: when present, the default value cell renders as an AutocompleteField wired for
+     *  `{{variable}}` colouring/hover/completion instead of a plain TextField — absent for any
+     *  caller that has not been wired (form-data's own slot wires this itself, D4's "form-data
+     *  value cells" too, since it overrides the `value` slot entirely). */
+    valueVariableSupport?: VariableSupport;
   }>(),
   { showEnabled: false, namePlaceholder: 'key', valuePlaceholder: 'value' },
 );
@@ -82,7 +90,19 @@ function removeRow(index: number): void {
         :update="(v: string) => updateField(i, 'value', v)"
       >
         <div class="field-cell">
+          <AutocompleteField
+            v-if="valueVariableSupport"
+            :model-value="row.value"
+            :placeholder="valuePlaceholder"
+            :data-testid="`${testidPrefix}-value`"
+            :candidates="valueVariableSupport.candidates"
+            :token-at="templateToken"
+            :range-highlights="valueVariableSupport.rangeHighlights"
+            :hover-at="valueVariableSupport.hoverAt"
+            @update:model-value="updateField(i, 'value', $event)"
+          />
           <TextField
+            v-else
             :model-value="row.value"
             :placeholder="valuePlaceholder"
             :data-testid="`${testidPrefix}-value`"
