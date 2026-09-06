@@ -44,8 +44,17 @@
      --kira-conn-amber/--kira-conn-orange in chroma, which LAW 07 reserves for connection identity
      (P19 D17 declined that palette for the same reason). No second token: the row offers the
      option, but all three consumers mean the same thing ("this view is narrowed/reordered/
-     selected right now"). slickTheme.css's sort chevron stays excluded, per its own comment. */
+     selected right now"). slickTheme.css's sort chevron stays excluded, per its own comment.
+     P22b D4 (below) is the other half of this swap, not a coincidence: moving this token off
+     #4ec9b0 is what frees that hue back up for --kira-var-resolved. */
   --kira-state-on: #e0a33c;
+  /* P22b D4: "this {{reference}} will produce a value". P15b D2 painted it --kira-syntax-name
+     under a no-new-tokens constraint; --kira-syntax-name is byte-identical to
+     --kira-syntax-property (#9cdcfe), so in a JSON body — the default body mode — a resolved
+     reference was indistinguishable from the keys around it and only a FAILURE (--kira-warn) had
+     a colour. #4ec9b0 is the hue P19 D17 measured as free of every syntax token and every state
+     colour; it is available again now that P22 D9 (above) has moved --kira-state-on to gold. */
+  --kira-var-resolved: #4ec9b0;
 
   /* Layout tokens for the reworked "detached" chrome: rounded, floating panels, thin borders.
      Radius tier system (VS Code Modern UI, docs/design/kira-design-system): sm for interactive
