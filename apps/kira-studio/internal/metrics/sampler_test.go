@@ -153,7 +153,7 @@ func TestCachedPIDs_ResolveOnlyRunsEveryRescanEvery(t *testing.T) {
 	}, 3)
 
 	for i := 1; i <= 7; i++ {
-		pids, err := c.PIDs()
+		pids, _, err := c.PIDs()
 		if err != nil {
 			t.Fatalf("PIDs() call %d: %v", i, err)
 		}
@@ -182,7 +182,7 @@ func TestCachedPIDs_DropsExitedPidBeforeNextRescan(t *testing.T) {
 		return []int32{self, childPID}, nil
 	}, 10) // large enough that the second PIDs() call below stays on the cheap revalidation path
 
-	first, err := c.PIDs()
+	first, _, err := c.PIDs()
 	if err != nil {
 		t.Fatalf("PIDs() (rescan): %v", err)
 	}
@@ -195,7 +195,7 @@ func TestCachedPIDs_DropsExitedPidBeforeNextRescan(t *testing.T) {
 	}
 	exitedPID := childPID
 
-	second, err := c.PIDs()
+	second, _, err := c.PIDs()
 	if err != nil {
 		t.Fatalf("PIDs() (revalidate): %v", err)
 	}
@@ -214,4 +214,75 @@ func containsPID(pids []int32, want int32) bool {
 		}
 	}
 	return false
+}
+
+// P21 round 2 performance finding 10(a): with RescanEvery == 1 (the production value), every
+// single tick used to probe each pid twice — once inside CachedPIDs.PIDs' own rescan (to read
+// createTime), and again inside Sampler.Sample (to read memory/CPU) — even though rescan's own
+// probe already read every field Sample needs. Sample now reuses whatever procSample its own
+// `pids` func hands back for a pid, falling back to `probe` only for a pid missing from that map.
+// This test drives Sampler.Sample directly (bypassing CachedPIDs and any real OS process) with a
+// `pids` func that returns a `fresh` map covering every pid, and asserts `probe` is never called —
+// it fails against the pre-fix Sample (which called probe unconditionally for every pid) and
+// passes once the `fresh` map is checked first.
+func TestSampler_Sample_ReusesFreshProcSamples_NoDoubleProbe(t *testing.T) {
+	freshSamples := map[int32]procSample{
+		1: {cpuSeconds: 1.5, memBytes: 1000, createTime: 100},
+		2: {cpuSeconds: 2.5, memBytes: 2000, createTime: 200},
+	}
+	probeCalls := 0
+	s := &Sampler{
+		pids: func() ([]int32, map[int32]procSample, error) {
+			return []int32{1, 2}, freshSamples, nil
+		},
+		probe: func(pid int32) (procSample, bool) {
+			probeCalls++
+			t.Errorf("probe(%d) called even though pids() already supplied a fresh procSample for it", pid)
+			return procSample{}, false
+		},
+		prevCPU:     map[int32]cpuState{},
+		logicalCPUs: 1,
+	}
+
+	sample, err := s.Sample()
+	if err != nil {
+		t.Fatalf("Sample: %v", err)
+	}
+	if probeCalls != 0 {
+		t.Errorf("probe was called %d time(s), want 0", probeCalls)
+	}
+	if sample.MemoryBytes != 3000 {
+		t.Errorf("MemoryBytes = %d, want 3000 (1000 + 2000, from the fresh samples)", sample.MemoryBytes)
+	}
+	if sample.ProcessCount != 2 {
+		t.Errorf("ProcessCount = %d, want 2", sample.ProcessCount)
+	}
+}
+
+// A pid missing from the fresh map (a revalidate-only tick, which has no fresh data at all — see
+// PIDs' own doc comment) must still fall back to probe.
+func TestSampler_Sample_FallsBackToProbeWhenNoFreshSample(t *testing.T) {
+	probeCalls := 0
+	s := &Sampler{
+		pids: func() ([]int32, map[int32]procSample, error) {
+			return []int32{7}, nil, nil // nil fresh map: the revalidate-tick shape
+		},
+		probe: func(pid int32) (procSample, bool) {
+			probeCalls++
+			return procSample{cpuSeconds: 0.5, memBytes: 500, createTime: 42}, true
+		},
+		prevCPU:     map[int32]cpuState{},
+		logicalCPUs: 1,
+	}
+
+	sample, err := s.Sample()
+	if err != nil {
+		t.Fatalf("Sample: %v", err)
+	}
+	if probeCalls != 1 {
+		t.Errorf("probe was called %d time(s), want 1 (no fresh sample was offered for pid 7)", probeCalls)
+	}
+	if sample.MemoryBytes != 500 {
+		t.Errorf("MemoryBytes = %d, want 500", sample.MemoryBytes)
+	}
 }

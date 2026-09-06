@@ -70,7 +70,13 @@ const cpuSanityThresholdPercent = 110
 // figure, normalized by the machine's own logical core count so it lands in the same 0-100 range
 // regardless of how many cores the process set is spread across (P2 R1).
 type Sampler struct {
-	pids        func() ([]int32, error)
+	// P21 round 2 performance finding 10(a): pids also returns any procSample its own call
+	// already obtained for a subset of the returned pids — CachedPIDs.PIDs's own rescan path
+	// probes every pid to get its createTime anyway, so Sample below reuses that result directly
+	// instead of calling probe a second time for the same pid on the same tick. nil/empty is
+	// always a valid answer (a revalidate-only tick has no fresh probe data to offer; any
+	// pids-only caller can simply return nil), so this is additive, not a stricter contract.
+	pids        func() ([]int32, map[int32]procSample, error)
 	probe       func(pid int32) (procSample, bool)
 	prevCPU     map[int32]cpuState
 	prevAt      time.Time
@@ -81,12 +87,12 @@ type Sampler struct {
 // see Sum below for the bundle-matching implementation this app actually uses. The per-process
 // probe itself is always defaultProbe (platform-selected, see probe_darwin.go/probe_other.go) —
 // there is no production caller that needs a different one, so it is not part of this signature.
-func NewSampler(pids func() ([]int32, error)) *Sampler {
+func NewSampler(pids func() ([]int32, map[int32]procSample, error)) *Sampler {
 	return &Sampler{pids: pids, probe: defaultProbe, prevCPU: map[int32]cpuState{}, logicalCPUs: runtime.NumCPU()}
 }
 
 func (s *Sampler) Sample() (Sample, error) {
-	ids, err := s.pids()
+	ids, fresh, err := s.pids()
 	if err != nil {
 		return Sample{}, err
 	}
@@ -95,7 +101,10 @@ func (s *Sampler) Sample() (Sample, error) {
 	var processCount int
 	cpuNow := make(map[int32]cpuState, len(ids))
 	for _, pid := range ids {
-		ps, ok := s.probe(pid)
+		ps, ok := fresh[pid]
+		if !ok {
+			ps, ok = s.probe(pid)
+		}
 		if !ok {
 			// A failed probe drops this pid from both readings for the tick rather than
 			// contributing a zero: cpuState.time is cumulative, so a zero fed into next tick's
@@ -293,11 +302,21 @@ func NewCachedPIDs(resolve func() ([]int32, error), rescanEvery int) *CachedPIDs
 }
 
 // PIDs is the func a Ticker/Sampler calls each tick.
-func (c *CachedPIDs) PIDs() ([]int32, error) {
+// PIDs is the func a Ticker/Sampler calls each tick — see Sampler.pids' own doc comment for why
+// it also returns a procSample map (P21 round 2 performance finding 10a): on a rescan tick,
+// resolve's own createTime check already probed every pid once, so this hands that same result to
+// Sample rather than making it probe the identical pid a second time in the same tick. A
+// revalidate-only tick (sinceScan != 0) has no fresh probe data of its own to offer — revalidate
+// only confirms createTime, cheaper than a full probe, and does not read memory/CPU — so it
+// returns nil, which Sample already treats as "probe this pid yourself".
+func (c *CachedPIDs) PIDs() ([]int32, map[int32]procSample, error) {
+	var fresh map[int32]procSample
 	if c.sinceScan == 0 {
-		if err := c.rescan(); err != nil {
-			return nil, err
+		samples, err := c.rescan()
+		if err != nil {
+			return nil, nil, err
 		}
+		fresh = samples
 	} else {
 		c.revalidate()
 	}
@@ -307,22 +326,24 @@ func (c *CachedPIDs) PIDs() ([]int32, error) {
 	for pid := range c.createTimes {
 		out = append(out, pid)
 	}
-	return out, nil
+	return out, fresh, nil
 }
 
-func (c *CachedPIDs) rescan() error {
+func (c *CachedPIDs) rescan() (map[int32]procSample, error) {
 	pids, err := c.resolve()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	createTimes := make(map[int32]int64, len(pids))
+	samples := make(map[int32]procSample, len(pids))
 	for _, pid := range pids {
-		if ct, ok := processCreateTime(pid); ok {
-			createTimes[pid] = ct
+		if ps, ok := defaultProbe(pid); ok {
+			createTimes[pid] = ps.createTime
+			samples[pid] = ps
 		}
 	}
 	c.createTimes = createTimes
-	return nil
+	return samples, nil
 }
 
 func (c *CachedPIDs) revalidate() {

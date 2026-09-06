@@ -60,7 +60,7 @@ type Ticker struct {
 
 // NewTicker takes a pid-discovery function, exactly as NewSampler does — the caller decides how
 // the process set is found (AppProcessSet(AnchorNeedles, HelperNeedles), in production).
-func NewTicker(pids func() ([]int32, error), interval time.Duration) *Ticker {
+func NewTicker(pids func() ([]int32, map[int32]procSample, error), interval time.Duration) *Ticker {
 	return &Ticker{
 		sampler:  NewSampler(pids),
 		interval: interval,
