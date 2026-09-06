@@ -15,7 +15,7 @@ import {
 import type { Selection } from '../shared/slick/selection';
 import { applyLoadFailure, beginOp, createRuntimeStore, stopOp } from '../shared/viewOp';
 import { setPage } from './page';
-import { clearPending } from './pendingChanges';
+import { clearPending, registerFullPrimaryKeyAccessor } from './pendingChanges';
 
 // P19 D7: the type itself moved to views/shared/slick/selection.ts (the file that already owns
 // its geometry, and which views/console/ now needs too) — re-exported here so every existing
@@ -71,6 +71,12 @@ export { runtime, setSearchOpen, toggleSearchOpen };
 registerTabRuntimeCleanup((tabId) => {
   delete runtime[tabId];
 });
+
+// P21 round 2 functional finding 2: pendingChanges.ts already imports clearPending from this
+// module, so importing `runtime` back from there would be a cycle — it registers an accessor
+// instead (the same registry-inversion shape as the cleanup above and state/viewCommands.ts's
+// registerTabReload), so buildPlan can tell a partial composite-key projection from a complete one.
+registerFullPrimaryKeyAccessor((tabId) => runtime[tabId]?.meta?.primaryKey ?? null);
 
 /** P43 F5/D7: written by DataToolbar.vue's own catch around commitPending — see actionError's own
  *  doc comment above for why this is a sibling of `error`, not a reuse of it. */

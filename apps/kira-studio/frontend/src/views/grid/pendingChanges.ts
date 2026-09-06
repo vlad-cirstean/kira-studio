@@ -46,11 +46,33 @@ export function clearPending(tabId: string): void {
   delete pendingState[tabId];
 }
 
+// P21 round 2 functional finding 2: state.ts (which already imports clearPending from here, so
+// importing state.ts's own `runtime` back would be a cycle) registers an accessor for a tab's
+// *full* primary-key column list (rt.meta.primaryKey, loaded once per tab via treeDescribe) —
+// the same registry-inversion shape state/viewCommands.ts already uses to avoid the identical
+// project/ <-> views/ cycle. null until state.ts has run (before any tab exists to stage a
+// change against) or while a tab's meta hasn't loaded yet — primaryKeyOf falls back to its old,
+// zero-columns-only check in that case, exactly as before this fix.
+let fullPrimaryKeyOf: ((tabId: string) => string[] | null) | null = null;
+export function registerFullPrimaryKeyAccessor(fn: (tabId: string) => string[] | null): void {
+  fullPrimaryKeyOf = fn;
+}
+
+interface PrimaryKeyResult {
+  key: Record<string, string | null>;
+  // Non-empty when the current projection has *some* but not all of the object's PK columns —
+  // e.g. Hide column applied to one column of a composite key (legitimate, round 1's own bace7a2
+  // revert). AssertKeyIsPrimaryKey on the server refuses a key that isn't exactly the primary
+  // key with an opaque, table-agnostic error; buildPlan below turns this into round 1's own
+  // UnaddressableRowError instead, naming the hidden column(s).
+  missingColumns: string[];
+}
+
 // Row identity for staging (D5): every column in the current page with `isPrimaryKey === true`.
 // `null` means the page has no primary key at all — the caller must not build an update/delete
 // op for this row (the server would reject it with E_UNSUPPORTED anyway; this just avoids
 // sending an op that can never succeed).
-function primaryKeyOf(tabId: string, row: number): Record<string, string | null> | null {
+function primaryKeyOf(tabId: string, row: number): PrimaryKeyResult | null {
   const page = getPage(tabId);
   if (!page) return null;
   const key: Record<string, string | null> = {};
@@ -60,7 +82,10 @@ function primaryKeyOf(tabId: string, row: number): Record<string, string | null>
     const view = cell(tabId, row, col);
     key[descriptor.name] = view.isNull ? null : view.text;
   }
-  return Object.keys(key).length > 0 ? key : null;
+  if (Object.keys(key).length === 0) return null;
+  const fullKey = fullPrimaryKeyOf?.(tabId) ?? null;
+  const missingColumns = fullKey?.filter((name) => !(name in key)) ?? [];
+  return { key, missingColumns };
 }
 
 export function isPendingDelete(tabId: string, row: number): boolean {
@@ -194,6 +219,22 @@ export function discardInsertRow(tabId: string, insertId: string): void {
 // change that cannot be addressed fails loudly, the same way any other commit failure already does.
 class UnaddressableRowError extends Error {}
 
+// P21 round 2 functional finding 2: a *partial* key (some but not all of the object's PK columns
+// missing from the current projection) is exactly as unaddressable as no key at all — a message
+// naming the specific hidden column(s), where known, rather than the generic "it may be hidden"
+// F2/P21 round 1 already covers for the total-loss case.
+function unaddressableMessage(action: 'delete' | 'edit', result: PrimaryKeyResult | null): string {
+  const missing = result?.missingColumns ?? [];
+  if (missing.length > 0) {
+    const plural = missing.length > 1;
+    return (
+      `A staged ${action} is missing the hidden primary-key column${plural ? 's' : ''} ` +
+      `${missing.join(', ')} — show ${plural ? 'them' : 'it'} before ${action === 'delete' ? 'deleting' : 'editing'} this row.`
+    );
+  }
+  return `A staged ${action} has no primary key in the current view (it may be hidden) — reload and try again.`;
+}
+
 // D8: delete, then update, then insert — mirrors the adapter's own execution order so the
 // *Preview command* panel shows exactly what mutate() will run.
 function buildPlan(tabId: string): MutationRowOp[] | null {
@@ -201,22 +242,18 @@ function buildPlan(tabId: string): MutationRowOp[] | null {
   if (!p) return null;
   const ops: MutationRowOp[] = [];
   for (const row of p.deletes) {
-    const key = primaryKeyOf(tabId, row);
-    if (!key) {
-      throw new UnaddressableRowError(
-        'A staged delete has no primary key in the current view (it may be hidden) — reload and try again.',
-      );
+    const result = primaryKeyOf(tabId, row);
+    if (!result || result.missingColumns.length > 0) {
+      throw new UnaddressableRowError(unaddressableMessage('delete', result));
     }
-    ops.push({ kind: 'delete', key });
+    ops.push({ kind: 'delete', key: result.key });
   }
   for (const edit of p.edits.values()) {
-    const key = primaryKeyOf(tabId, edit.row);
-    if (!key) {
-      throw new UnaddressableRowError(
-        'A staged edit has no primary key in the current view (it may be hidden) — reload and try again.',
-      );
+    const result = primaryKeyOf(tabId, edit.row);
+    if (!result || result.missingColumns.length > 0) {
+      throw new UnaddressableRowError(unaddressableMessage('edit', result));
     }
-    ops.push({ kind: 'update', key, changes: edit.changes });
+    ops.push({ kind: 'update', key: result.key, changes: edit.changes });
   }
   for (const insert of p.inserts) {
     ops.push({ kind: 'insert', values: insert.values });
