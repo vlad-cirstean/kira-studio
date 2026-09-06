@@ -102,7 +102,13 @@ test('C1b: real MariaDB (native), end to end, keyset paging over big_rows', asyn
   await orderItemsRow.dblclick();
   await expect(page.locator('[data-testid="data-grid"]')).toBeVisible();
   await expect(page.locator('[data-testid="grid-row"]')).toHaveCount(3, { timeout: 10_000 });
-  const firstIdCell = page.locator('[data-testid="grid-cell"][data-row="0"][data-column="id"]');
+  // P22 Pass B's own DOM shape (tests/ui/support/grid.ts's `gridCellSelector` documents this):
+  // `data-row` is written on the `.slick-row`/`[data-testid="grid-row"]` ancestor, never on the
+  // `.slick-cell` itself, and with `frozenColumn: 0` that row element is cloned once per pane, so
+  // the cell lookup has to be scoped to the right (non-frozen) pane's row to stay unambiguous.
+  const firstIdCell = page.locator(
+    '[data-testid="data-grid"] .grid-canvas-top.grid-canvas-right [data-testid="grid-row"][data-row="0"] [data-testid="grid-cell"][data-column="id"]',
+  );
   await expect(firstIdCell).toHaveText('1');
 
   // Step 9: keyset paging (BuildKeysetPosition) over a real 1,000,000-row table, forward then back

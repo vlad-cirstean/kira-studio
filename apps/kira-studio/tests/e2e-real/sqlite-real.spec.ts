@@ -93,7 +93,13 @@ test('real backend through a plain browser tab: connect, tree, rows', async ({
   // A real DATA_OP page over the bulk WebSocket stream, through bridge/port.ts's decodeFrame.
   await expect(page.locator('[data-testid="data-grid"]')).toBeVisible();
   await expect(page.locator('[data-testid="grid-row"]')).toHaveCount(3, { timeout: 10_000 });
-  const firstIdCell = page.locator('[data-testid="grid-cell"][data-row="0"][data-column="id"]');
+  // P22 Pass B's own DOM shape (tests/ui/support/grid.ts's `gridCellSelector` documents this):
+  // `data-row` is written on the `.slick-row`/`[data-testid="grid-row"]` ancestor, never on the
+  // `.slick-cell` itself, and with `frozenColumn: 0` that row element is cloned once per pane, so
+  // the cell lookup has to be scoped to the right (non-frozen) pane's row to stay unambiguous.
+  const firstIdCell = page.locator(
+    '[data-testid="data-grid"] .grid-canvas-top.grid-canvas-right [data-testid="grid-row"][data-row="0"] [data-testid="grid-cell"][data-column="id"]',
+  );
   await expect(firstIdCell).toHaveText('1');
 
   // P56's own named symptom ("engine connecting" forever) turning `ok` is the single clearest
