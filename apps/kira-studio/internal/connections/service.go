@@ -276,6 +276,19 @@ func (s *Service) Update(id string, in Input) (model.ConnectionSummary, error) {
 		return model.ConnectionSummary{}, err
 	}
 
+	// P21 round 2 architecture/security finding 2: read the stored row before it's overwritten,
+	// so a live connection's destination and ReadOnly flag can be compared against the draft
+	// below. A connected adapter and both cache layers are stamped with the config resolved at
+	// Connect time and never revisit it — editing them here would otherwise silently do nothing
+	// (ReadOnly) or serve the old destination's cached data under the new one's name.
+	existing, err := s.deps.Conns.Get(id)
+	if err != nil {
+		return model.ConnectionSummary{}, wrapErr(err)
+	}
+	if existing == nil {
+		return model.ConnectionSummary{}, ipcerr.Internal(fmt.Sprintf("connection %s not found", id))
+	}
+
 	var uri *string
 	if in.Mode == "uri" {
 		uri = in.URI
@@ -315,10 +328,33 @@ func (s *Service) Update(id string, in Input) (model.ConnectionSummary, error) {
 	if err != nil {
 		return model.ConnectionSummary{}, wrapErr(err)
 	}
-	// P28 §5.5: applies live, but only while actually connected — an edit to a disconnected
-	// connection has nothing running to pace yet, and attemptConnect installs the right value on
-	// the next connect regardless.
-	if s.StateOf(id).Status == "connected" {
+
+	// P21 round 2 architecture/security finding 2: destinationUnchanged is the same denylist Test
+	// already trusts to decide whether the old destination's password may be injected — it is a
+	// deliberate denylist (not host/port/database alone) so a future new field defaults to gated.
+	// ReadOnly is the one field it excludes on purpose (safe to change without re-gating Test's
+	// password injection) that still needs to force a reconnect here: it is captured once into
+	// the adapter at Connect time (postgres/mysqlfamily/sqlite/redis/sqs/kafka each read their own
+	// captured copy), so toggling it on a live connection was otherwise silently inert.
+	if s.StateOf(id).Status == "connected" &&
+		(!destinationUnchanged(in, existing.ConnectionFields) || in.ReadOnly != existing.ReadOnly) {
+		// Disconnect (which already drops the enginecache's pages/counts for this connection,
+		// adapterhost/router.go's own DropConnection) then reconnect — attemptConnect drops the
+		// persisted metadata_cache and emits the invalidation on its own, exactly the sequence
+		// setConnectionReadOnly's frontend precedent runs for the read-only-only case. A failed
+		// reconnect lands the connection in its normal "error" state, which the UI already
+		// renders — never a silent no-op.
+		if _, err := s.Disconnect(id); err != nil {
+			slog.Warn(fmt.Sprintf("disconnect before reconnect failed for %s: %s", id, err), "scope", "connections")
+		}
+		if _, err := s.Connect(id); err != nil {
+			slog.Warn(fmt.Sprintf("reconnect after update failed for %s: %s", id, err), "scope", "connections")
+		}
+	} else if s.StateOf(id).Status == "connected" {
+		// P28 §5.5: applies live, but only while actually connected — an edit to a disconnected
+		// connection has nothing running to pace yet, and attemptConnect installs the right value
+		// on the next connect regardless. Skipped above when a reconnect already happened, since
+		// attemptConnect installs the current throttle itself.
 		s.deps.Backend.SetThrottle(id, fields.ThrottlePerSec)
 	}
 	s.emitListChanged()

@@ -33,6 +33,7 @@ type fakeBackend struct {
 	lastConfig    model.ResolvedConnectionConfig
 	connectN      atomic.Int64
 	testN         atomic.Int64
+	disconnectN   atomic.Int64
 	release       chan struct{}
 	throttleCalls []throttleCall
 }
@@ -67,7 +68,10 @@ func (b *fakeBackend) Test(ctx context.Context, cfg model.ResolvedConnectionConf
 	return "1.0", nil
 }
 
-func (b *fakeBackend) Disconnect(ctx context.Context, connectionID string) error { return nil }
+func (b *fakeBackend) Disconnect(ctx context.Context, connectionID string) error {
+	b.disconnectN.Add(1)
+	return nil
+}
 
 func (b *fakeBackend) SetThrottle(connectionID string, perSec float64) {
 	b.mu.Lock()
@@ -84,6 +88,8 @@ func (b *fakeBackend) throttleCallsSnapshot() []throttleCall {
 func (b *fakeBackend) releaseSlow() { close(b.release) }
 
 func (b *fakeBackend) connectCount() int { return int(b.connectN.Load()) }
+
+func (b *fakeBackend) disconnectCount() int { return int(b.disconnectN.Load()) }
 
 func (b *fakeBackend) testCount() int { return int(b.testN.Load()) }
 
@@ -731,4 +737,110 @@ func TestTestInjectsStoredPasswordAcrossThrottleOnlyEdit(t *testing.T) {
 	if got == nil || *got != "s3cret" {
 		t.Fatalf("Backend.Test saw password %v, want the stored secret", got)
 	}
+}
+
+// TestUpdateReconnectsALiveConnectionOnDestinationOrReadOnlyChange is the P21 round 2
+// architecture/security finding 2 regression: a connected adapter and both cache layers are
+// stamped with the config resolved at Connect time and never revisit it on their own. Before the
+// fix, Update wrote the new row and, at most, pushed the throttle live — a destination change
+// (host/port/database/etc.) left the old adapter connected to the old server, and toggling
+// ReadOnly on a live connection changed nothing an app-level or server-level guard ever reads
+// (both are captured once at Connect). The fix makes Update disconnect and reconnect whenever
+// destinationUnchanged no longer holds, or ReadOnly itself changed — the same "so the engine
+// picks up the new flag" reconnect the toolbar's own setConnectionReadOnly already performs.
+func TestUpdateReconnectsALiveConnectionOnDestinationOrReadOnlyChange(t *testing.T) {
+	t.Run("toggling ReadOnly on a live connection reconnects", func(t *testing.T) {
+		h := newHarness(t)
+		created := mustCreate(t, h.svc, fieldsInput("ro-toggle"))
+		if _, err := h.svc.Connect(created.ID); err != nil {
+			t.Fatalf("Connect: %v", err)
+		}
+		connectsBefore := h.backend.connectCount()
+		disconnectsBefore := h.backend.disconnectCount()
+
+		draft := fieldsInput("ro-toggle")
+		draft.ReadOnly = true
+		if _, err := h.svc.Update(created.ID, draft); err != nil {
+			t.Fatalf("Update: %v", err)
+		}
+
+		if got := h.backend.disconnectCount(); got != disconnectsBefore+1 {
+			t.Errorf("Backend.Disconnect calls = %d, want %d (a reconnect)", got, disconnectsBefore+1)
+		}
+		if got := h.backend.connectCount(); got != connectsBefore+1 {
+			t.Errorf("Backend.Connect calls = %d, want %d (a reconnect)", got, connectsBefore+1)
+		}
+		if !h.backend.lastConnectConfig().ReadOnly {
+			t.Error("reconnect did not carry the new ReadOnly=true through to Backend.Connect")
+		}
+		if got := h.svc.StateOf(created.ID).Status; got != "connected" {
+			t.Errorf("status after reconnect = %q, want connected", got)
+		}
+	})
+
+	t.Run("changing the destination (Host) on a live connection reconnects", func(t *testing.T) {
+		h := newHarness(t)
+		created := mustCreate(t, h.svc, fieldsInput("dest-change"))
+		if _, err := h.svc.Connect(created.ID); err != nil {
+			t.Fatalf("Connect: %v", err)
+		}
+		connectsBefore := h.backend.connectCount()
+		disconnectsBefore := h.backend.disconnectCount()
+
+		draft := fieldsInput("dest-change")
+		draft.Host = strPtr("prod.example.internal")
+		if _, err := h.svc.Update(created.ID, draft); err != nil {
+			t.Fatalf("Update: %v", err)
+		}
+
+		if got := h.backend.disconnectCount(); got != disconnectsBefore+1 {
+			t.Errorf("Backend.Disconnect calls = %d, want %d (a reconnect)", got, disconnectsBefore+1)
+		}
+		if got := h.backend.connectCount(); got != connectsBefore+1 {
+			t.Errorf("Backend.Connect calls = %d, want %d (a reconnect)", got, connectsBefore+1)
+		}
+		gotHost := h.backend.lastConnectConfig().Host
+		if gotHost == nil || *gotHost != "prod.example.internal" {
+			t.Errorf("reconnect config Host = %v, want prod.example.internal", gotHost)
+		}
+	})
+
+	t.Run("a cosmetic-only edit (Color) on a live connection does not reconnect", func(t *testing.T) {
+		h := newHarness(t)
+		created := mustCreate(t, h.svc, fieldsInput("cosmetic-only"))
+		if _, err := h.svc.Connect(created.ID); err != nil {
+			t.Fatalf("Connect: %v", err)
+		}
+		connectsBefore := h.backend.connectCount()
+		disconnectsBefore := h.backend.disconnectCount()
+
+		draft := fieldsInput("cosmetic-only")
+		draft.Color = "red"
+		if _, err := h.svc.Update(created.ID, draft); err != nil {
+			t.Fatalf("Update: %v", err)
+		}
+
+		if got := h.backend.connectCount(); got != connectsBefore {
+			t.Errorf("Backend.Connect calls = %d, want %d (no reconnect for a cosmetic-only edit)", got, connectsBefore)
+		}
+		if got := h.backend.disconnectCount(); got != disconnectsBefore {
+			t.Errorf("Backend.Disconnect calls = %d, want %d (no reconnect for a cosmetic-only edit)", got, disconnectsBefore)
+		}
+	})
+
+	t.Run("changing ReadOnly on a disconnected connection does not attempt a reconnect", func(t *testing.T) {
+		h := newHarness(t)
+		created := mustCreate(t, h.svc, fieldsInput("ro-disconnected"))
+		connectsBefore := h.backend.connectCount()
+
+		draft := fieldsInput("ro-disconnected")
+		draft.ReadOnly = true
+		if _, err := h.svc.Update(created.ID, draft); err != nil {
+			t.Fatalf("Update: %v", err)
+		}
+
+		if got := h.backend.connectCount(); got != connectsBefore {
+			t.Errorf("Backend.Connect calls = %d, want %d (nothing live to reconnect)", got, connectsBefore)
+		}
+	})
 }
