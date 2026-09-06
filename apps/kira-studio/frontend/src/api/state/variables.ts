@@ -12,6 +12,7 @@ import { control } from '../../bridge/control';
 import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
 import { runReveal } from '../reveal';
 import { closeVariableSetTabsForOwner, renameVariableSetTabs } from '../tabs';
+import { createRevealExpiry } from './revealExpiry';
 
 // P5 D3/D11: the environment list and the app-global active selection — read-only at this point
 // (list and switch); editing, secrets, history and reordering land in later commits on this same
@@ -364,23 +365,7 @@ export function overviewRows(collectionId: string, environmentId: string): Varia
  *  let a *different*, later-opened dialog trust it in place of its own re-auth gate). */
 export const revealedValues = reactive<Record<string, string>>({});
 
-// Mirrors internal/localauth.GraceWindow: the reveal gate's own grace is fixed rather than
-// sliding "so a long editing session can't hold one authentication open indefinitely" — a property
-// that used to be undone downstream, because nothing here ever re-masked a revealed value once the
-// grace it came from had actually expired (only a tab *close* cleared it, which may be hours away
-// for a persistent tab). Keep in sync with GraceWindow by hand; there is no shared constant to
-// import across the Go/TS boundary for a time.Duration.
-const REVEAL_GRACE_WINDOW_MS = 5 * 60 * 1000;
-
-const revealExpiryTimers: Record<string, ReturnType<typeof setTimeout>> = {};
-
-function scheduleRevealExpiry(id: string): void {
-  clearTimeout(revealExpiryTimers[id]);
-  revealExpiryTimers[id] = setTimeout(() => {
-    delete revealExpiryTimers[id];
-    delete revealedValues[id];
-  }, REVEAL_GRACE_WINDOW_MS);
-}
+const revealedValuesExpiry = createRevealExpiry(revealedValues);
 
 /** Drops every revealed secret's plaintext from memory — called by every dialog/popover close
  *  path that can populate revealedValues (closeVariablesDialog here, closeCopyAsCurlDialog in
@@ -389,10 +374,7 @@ function scheduleRevealExpiry(id: string): void {
  *  (finding 5) so a delayed callback can't fire against a map a later reveal has since repopulated. */
 export function clearRevealed(): void {
   for (const id of Object.keys(revealedValues)) delete revealedValues[id];
-  for (const id of Object.keys(revealExpiryTimers)) {
-    clearTimeout(revealExpiryTimers[id]);
-    delete revealExpiryTimers[id];
-  }
+  revealedValuesExpiry.clearAll();
 }
 
 /** P12 D13: runs over http/reveal.ts's shared recurse-once switch — the pattern used to be
@@ -412,7 +394,7 @@ export async function revealVariable(
     (confirmed) => control.variablesReveal(id, confirmed),
     (value) => {
       revealedValues[id] = value;
-      scheduleRevealExpiry(id);
+      revealedValuesExpiry.schedule(id);
     },
     onError,
     'Show this variable’s value? It will be displayed in plain text.',
@@ -445,8 +427,16 @@ export const historyMenuState = reactive<HistoryMenuState>({
  *  discipline revealedValues follows, cleared when the popover closes. */
 export const revealedHistoryValues = reactive<Record<string, string>>({});
 
+// Finding 5: this map used to be cleared only by the popover's own close path
+// (openHistoryMenu/closeHistoryMenu below) — nothing re-masked a revealed prior value once the
+// grace it came from had actually expired, so a popover left open (or, per the comment on
+// openHistoryMenu below, torn down without its own @close firing) could hold a decrypted secret
+// history value indefinitely. Same grace, same discipline as revealedValues above.
+const revealedHistoryValuesExpiry = createRevealExpiry(revealedHistoryValues);
+
 function clearRevealedHistory(): void {
   for (const id of Object.keys(revealedHistoryValues)) delete revealedHistoryValues[id];
+  revealedHistoryValuesExpiry.clearAll();
 }
 
 /** Finding 5: VariableRow.vue's popover is `v-if`-gated on `historyMenuState.variableId ===
@@ -486,6 +476,7 @@ export async function revealHistoryEntry(historyId: string): Promise<string | un
     (confirmed) => control.variablesRevealHistory(historyId, confirmed),
     (value) => {
       revealedHistoryValues[historyId] = value;
+      revealedHistoryValuesExpiry.schedule(historyId);
     },
     (message) => {
       if (historyMenuState.tabId) setVariableSetError(historyMenuState.tabId, message);

@@ -10,6 +10,7 @@ import type { HttpCodeLanguage } from '@shared/domain/http';
 import { reactive } from 'vue';
 import { copyText } from '../../clipboard';
 import { openApiRequestTab, patchHttpRequestTabState } from '../tabs';
+import { createRevealExpiry } from './revealExpiry';
 import { cachedVariables, clearRevealed, revealVariable } from './variables';
 
 // P7 D12: the Import-from-curl dialog's own state — mirrors http/state/dynamicValues.ts's shape
@@ -141,6 +142,16 @@ export const copyAsCurlDialogState = reactive<CopyAsCurlDialogState>({
   error: null,
 });
 
+// Finding 5: this dialog's own revealed-secret map used to be dropped only by
+// openCopyAsCurlDialog/closeCopyAsCurlDialog — nothing here re-masked a revealed value once the
+// grace it came from had actually expired, and this is the more serious of the two remaining
+// unbounded maps: currentCurlCommand() renders the *fully substituted* command with the real
+// secret inline, and the dialog can sit open on screen indefinitely, long past the 5-minute
+// localauth grace that authorised the reveal. Dropping an expired entry here automatically
+// re-masks the rendered command, since currentCurlCommand() is already pure over this reactive
+// map.
+const revealedSecretValuesExpiry = createRevealExpiry(copyAsCurlDialogState.revealedSecretValues);
+
 export function openCopyAsCurlDialog(
   method: string,
   resolved: ResolvedRequest,
@@ -161,6 +172,7 @@ export function openCopyAsCurlDialog(
   for (const key of Object.keys(copyAsCurlDialogState.revealedSecretValues)) {
     delete copyAsCurlDialogState.revealedSecretValues[key];
   }
+  revealedSecretValuesExpiry.clearAll();
 }
 
 export function closeCopyAsCurlDialog(): void {
@@ -171,6 +183,7 @@ export function closeCopyAsCurlDialog(): void {
   for (const key of Object.keys(copyAsCurlDialogState.revealedSecretValues)) {
     delete copyAsCurlDialogState.revealedSecretValues[key];
   }
+  revealedSecretValuesExpiry.clearAll();
   // Finding 5: revealSecretValues below calls the *shared* revealVariable (state/variables.ts),
   // which writes into variables.ts's own revealedValues map, not this dialog's own
   // revealedSecretValues — closing only the latter left a stale entry there for
@@ -234,7 +247,10 @@ export async function revealSecretValues(): Promise<void> {
       const value = await revealVariable(id, (message) => {
         copyAsCurlDialogState.error = message;
       });
-      if (value !== undefined) copyAsCurlDialogState.revealedSecretValues[name] = value;
+      if (value !== undefined) {
+        copyAsCurlDialogState.revealedSecretValues[name] = value;
+        revealedSecretValuesExpiry.schedule(name);
+      }
     }
   } finally {
     copyAsCurlDialogState.revealing = false;
