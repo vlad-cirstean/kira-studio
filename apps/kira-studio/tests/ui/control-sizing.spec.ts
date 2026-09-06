@@ -89,7 +89,7 @@ function rootVar(page: Page, name: string): Promise<number> {
 test('every control in the pager toolbar row is one height, equal to --kira-control-h', async ({
   relaunch,
 }) => {
-  const { window: page } = await relaunch({ control: CONTROL });
+  const { window: page } = await relaunch({ control: CONTROL, stream: FIXTURE.port });
   await connectAndOpenGrid(page);
 
   const controlH = await rootVar(page, '--kira-control-h');
@@ -139,7 +139,7 @@ test('the .md control family in SettingsDialog is one height, equal to --kira-co
 test('the role layer changes no rendered control height at the default font size', async ({
   relaunch,
 }) => {
-  const { window: page } = await relaunch({ control: CONTROL });
+  const { window: page } = await relaunch({ control: CONTROL, stream: FIXTURE.port });
   await connectAndOpenGrid(page);
   await page.click('[data-testid="open-settings"]');
   await expect(page.locator('[data-testid="settings-dialog"]')).toBeVisible();
@@ -171,7 +171,7 @@ test('the role layer changes no rendered control height at the default font size
 test('the view-head band and the toolbar beneath it report the same height (F2(c) closed)', async ({
   relaunch,
 }) => {
-  const { window: page } = await relaunch({ control: CONTROL });
+  const { window: page } = await relaunch({ control: CONTROL, stream: FIXTURE.port });
   await connectAndOpenGrid(page);
 
   const barH = await rootVar(page, '--kira-bar-h');
