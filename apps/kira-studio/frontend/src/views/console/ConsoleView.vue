@@ -11,12 +11,12 @@ import { registerCommand } from '../../shortcuts/commands';
 import { connectionRecord } from '../../state/connections';
 import { openContextMenu } from '../../state/contextMenu';
 import {
-  ddlSchemaFor,
-  dismissNoSchemaHint,
-  ensureDdl,
-  isNoSchemaHintDismissed,
-  openSchemaDialog,
-} from '../../state/schemas';
+  cachedRelationsFor,
+  containerPathFor,
+  effectiveSchema,
+  ensureSchemaColumns,
+} from '../../state/schemaColumns';
+import { ddlSchemaFor, ensureDdl } from '../../state/schemas';
 import CodiconIcon from '../../theme/CodiconIcon.vue';
 import AppButton from '../../theme/primitives/AppButton.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
@@ -98,7 +98,9 @@ const language = computed<EditorLanguageId>(() => {
 
 // P18 (v1.1) C5/D5: a SQL console's own DDL document, loaded once per connection and re-parsed
 // only when its text actually changes (state/schemas.ts's own memoisation) — undefined dialect
-// (a non-SQL console) never fires the load at all.
+// (a non-SQL console) never fires the load at all. `documentDdlSchema` is the hand-authored
+// document alone — D4's completion still takes it as a separate, first-priority argument, so it
+// must not be pre-merged with the cache the way `ddlSchema` below is for lint/hover.
 watch(
   () => [props.tab.connectionId, dialect.value] as const,
   ([connectionId, d]) => {
@@ -106,38 +108,55 @@ watch(
   },
   { immediate: true },
 );
-const ddlSchema = computed(() => ddlSchemaFor(props.tab.connectionId ?? '', dialect.value));
+const documentDdlSchema = computed(() => ddlSchemaFor(props.tab.connectionId ?? '', dialect.value));
 
-// P19 D16: without this, D14/D15 are two features nobody can find, which is how the current one
-// ended up reported as broken. `dialect.value` (not `language.value`) gates it to the five SQL
-// kinds only — Mongo/Redis completion never depended on a DDL document to begin with.
-const showNoSchemaHint = computed(
-  () =>
-    dialect.value !== undefined &&
-    ddlSchema.value.tables.length === 0 &&
-    !!props.tab.connectionId &&
-    !isNoSchemaHintDismissed(props.tab.connectionId),
+// P22c D3: this console's own container (the schema/database its path resolves to) — the same
+// container consoleRelationNames (completion.ts) already resolves relation names against.
+const containerPath = computed(() =>
+  props.tab.connectionId ? containerPathFor(props.tab.connectionId, props.tab.path) : null,
 );
-function onSetUpSchema(): void {
-  if (props.tab.connectionId) openSchemaDialog(props.tab.connectionId);
-}
-function onDismissNoSchemaHint(): void {
-  if (props.tab.connectionId) dismissNoSchemaHint(props.tab.connectionId);
-}
+
+// P22c D3/D5: warms this container's cached columns once per (connection, container) — a view's
+// own lifecycle hook, never a CompletionSource, never on a keystroke. Resolves from the Go-side
+// cache with no connection when one is cached (F7); a no-op when already loaded or in flight.
+watch(
+  () => [props.tab.connectionId, containerPath.value] as const,
+  ([connectionId, path]) => {
+    if (connectionId && path) void ensureSchemaColumns(connectionId, path);
+  },
+  { immediate: true },
+);
+
+// P22c D6: the effective schema diagnostics/hover read — the hand-authored document wins
+// wholesale when it has any tables; otherwise the cached columns for this container fill in.
+// Completion (below) reads the raw document and the raw cache separately instead (D4), since
+// schemaCompletionSource wants a namespace and lang-sql's alias resolution needs the tree's own
+// relation names as a distinct fallback layer — but this is the one place lint/hover read, so
+// they can never disagree with completion about what the console knows.
+const ddlSchema = computed(() =>
+  effectiveSchema(props.tab.connectionId ?? '', containerPath.value ?? '', documentDdlSchema.value),
+);
 
 // D21/D22: undefined for any kind with no console at all, which a mounted ConsoleView never
 // actually has (caps.sql gates the tab) — `language.value !== 'plain'` covers that without
-// special-casing kafka/sqs/s3. The SQL branch (D5) is undefined with no DDL document for this
-// connection — lang-sql's own keyword source stays in charge, byte-for-byte today's behaviour.
+// special-casing kafka/sqs/s3. The SQL branch is undefined with no DDL document, no cached
+// columns and no tree relations for this connection — lang-sql's own keyword source stays in
+// charge, byte-for-byte today's behaviour with none of the three (P22c D4).
 const completionSources = computed(() => {
   if (!connectionKind.value || language.value === 'plain') return undefined;
   if (language.value === 'sql') {
+    const connectionId = props.tab.connectionId;
+    const cached =
+      connectionId && containerPath.value
+        ? cachedRelationsFor(connectionId, containerPath.value)
+        : [];
     return consoleCompletionSources(
       connectionKind.value,
-      props.tab.connectionId,
+      connectionId,
       props.tab.path,
-      ddlSchema.value,
-      connectionRecord(props.tab.connectionId)?.database,
+      documentDdlSchema.value,
+      connectionRecord(connectionId)?.database,
+      cached,
     );
   }
   return consoleCompletionSources(connectionKind.value, props.tab.connectionId, props.tab.path);
@@ -633,31 +652,6 @@ const statusLine = computed(() => {
       </template>
 
       <template #strips>
-        <MessageStrip
-          v-if="showNoSchemaHint"
-          tone="note"
-          data-testid="console-no-schema-hint"
-        >
-          <span class="auto-explain-message"
-            >No schema for this connection — table and column completion is off.</span
-          >
-          <button
-            type="button"
-            class="auto-explain-action"
-            data-testid="console-no-schema-hint-setup"
-            @click="onSetUpSchema"
-          >
-            Set one up ▸
-          </button>
-          <button
-            type="button"
-            class="auto-explain-action"
-            data-testid="console-no-schema-hint-dismiss"
-            @click="onDismissNoSchemaHint"
-          >
-            Dismiss
-          </button>
-        </MessageStrip>
         <MessageStrip v-if="rt?.status === 'error' && rt.error" tone="err" data-testid="console-error">
           {{ rt.error.message }}
         </MessageStrip>

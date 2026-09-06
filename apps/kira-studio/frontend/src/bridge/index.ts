@@ -35,7 +35,7 @@ import type { ConnectionDdl } from '@shared/domain/schema';
 import type { SecretStorageStatus } from '@shared/domain/secrets';
 import type { Settings, SettingsPatch } from '@shared/domain/settings';
 import type { TabRecord } from '@shared/domain/tabs';
-import type { ObjectMeta, TreeNode } from '@shared/domain/tree';
+import type { ObjectMeta, RelationColumns, TreeNode } from '@shared/domain/tree';
 import type { TreeVisibility } from '@shared/domain/tree-filter';
 import { type AppMetricsSample, CHANNEL } from '@shared/protocol/events';
 import { apiControl } from './apiControl';
@@ -191,6 +191,26 @@ const studioControl = {
         tabId: tabId ?? null,
       }),
     ).then((r) => trust<{ definition: ObjectDefinition; source: 'cache' | 'server' }>(r)),
+  // P22c D3: SchemaColumns' own bridge call — args reuse Describe/Definition's own four-field
+  // shape (tabId unused: a schema-wide fetch is not tagged to one tab's op-log row).
+  treeSchemaColumns: (
+    connectionId: string,
+    path: string,
+    refresh?: boolean,
+  ): Promise<{ relations: RelationColumns[]; source: 'cache' | 'server' }> =>
+    unwrap<Awaited<ReturnType<typeof TreeService.SchemaColumns>>>(
+      TreeService.SchemaColumns({
+        connectionId,
+        path,
+        refresh: refresh ?? false,
+        tabId: null,
+      }),
+    ).then((r) =>
+      trust<{ relations: RelationColumns[]; source: 'cache' | 'server' }>({
+        ...r,
+        relations: r.relations ?? [],
+      }),
+    ),
   treeInvalidate: (connectionId: string, path?: string): Promise<void> =>
     unwrap(TreeService.Invalidate({ connectionId, path: path ?? null })),
 

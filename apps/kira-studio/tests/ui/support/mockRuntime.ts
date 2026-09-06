@@ -62,6 +62,7 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   treeChildren: 'TreeService.Children',
   treeDescribe: 'TreeService.Describe',
   treeDefinition: 'TreeService.Definition',
+  treeSchemaColumns: 'TreeService.SchemaColumns',
   treeInvalidate: 'TreeService.Invalidate',
   filtersList: 'FiltersService.List',
   filtersReplace: 'FiltersService.Replace',
@@ -211,6 +212,11 @@ const WILDCARD_DEFAULTS: Readonly<Record<string, string>> = Object.freeze({
   [IPC.opsCancel]: 'null',
   [IPC.queriesHistoryRecord]: 'null',
   [IPC.treeDescribe]: JSON.stringify({ meta: EMPTY_OBJECT_META, source: 'server' }),
+  // P22c D3: every SQL console/data-tab fetches its container's cached columns on
+  // mount/activation (state/schemaColumns.ts's ensureSchemaColumns) — a spec with no
+  // treeSchemaColumns snapshot of its own gets "nothing cached for this container yet", the same
+  // reasoning treeDescribe's own wildcard above already carries, not a fixture miss.
+  [IPC.treeSchemaColumns]: JSON.stringify({ relations: [], source: 'server' }),
   // P4 F11: Http's left panel fetches its whole tree on mount, and the call is NOT wrapped in a
   // try/catch — a fixture miss would leave the panel permanently empty rather than degrade. Every
   // spec that switches to Http mode without seeding a collections fixture (mode-switch.spec.ts

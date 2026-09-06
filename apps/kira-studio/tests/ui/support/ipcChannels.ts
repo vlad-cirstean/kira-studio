@@ -48,6 +48,7 @@ export const IPC = {
   treeChildren: 'kira:tree:children',
   treeDescribe: 'kira:tree:describe',
   treeDefinition: 'kira:tree:definition',
+  treeSchemaColumns: 'kira:tree:schemaColumns',
   treeInvalidate: 'kira:tree:invalidate',
   filtersList: 'kira:filters:list',
   filtersReplace: 'kira:filters:replace',

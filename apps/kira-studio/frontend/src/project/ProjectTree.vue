@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { shortcutFor } from '../shortcuts/keys';
 import { connectionsState } from '../state/connections';
 import { openContextMenu, runMenuShortcut } from '../state/contextMenu';
+import { initSchemaColumnsSync } from '../state/schemaColumns';
 import { initSchemaSync } from '../state/schemas';
 import { settingsState } from '../state/settings';
 import {
@@ -57,6 +58,7 @@ const treeHostRef = ref<{ revealKey: (key: string) => Promise<void> } | null>(nu
 onMounted(() => {
   initTreeSync();
   initSchemaSync();
+  initSchemaColumnsSync();
 });
 
 // revealPath() (Step 7b) sets pendingScrollKey once its expansion/selection work is done;
