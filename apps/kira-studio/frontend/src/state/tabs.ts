@@ -118,8 +118,17 @@ function saveIfChanged(): void {
   const snapshot = JSON.stringify(tabsState.tabs);
   if (snapshot === lastSavedSnapshot || snapshot === pendingSnapshot) return;
   pendingSnapshot = snapshot;
+  // P21 round 3 performance finding 9: this used to hand `tabsState.tabs` itself — the live,
+  // deep-`reactive()` tree — to control.tabsSave, which the Wails binding then serialises a
+  // *second* time to cross the bridge: one full walk through Vue's reactivity proxies (this
+  // stringify, purely for the change check above) immediately followed by a second one (Wails'
+  // own JSON encoding of the call argument), of the same data, on every save. `JSON.parse(snapshot)`
+  // turns the snapshot already built above back into a plain, non-reactive object graph — Wails'
+  // own serialisation of *that* walks ordinary property reads with no proxy traps at all, so the
+  // net cost is one reactive walk (this stringify) plus a cheap parse and a cheap plain walk,
+  // instead of two reactive walks of a tab set that can hold a 1 MB pasted script per tab.
   void control
-    .tabsSave(tabsState.tabs)
+    .tabsSave(JSON.parse(snapshot) as TabRecord[])
     .then(
       () => {
         lastSavedSnapshot = snapshot;
