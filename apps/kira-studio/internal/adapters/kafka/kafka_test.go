@@ -598,6 +598,69 @@ func TestKafka_Count_ExactViaWatermarkSubtraction(t *testing.T) {
 	}
 }
 
+// 12b. count: P21 round 2 functional finding 7 — a Count request's own Filter must scope the
+// watermark subtraction exactly the way a Read under the same filter scopes its browse, not sum
+// every partition regardless. Before the fix, Count ignored its Filter entirely (countTopic took
+// no filter argument at all and adapter.go never passed req.Filter through), so a per-partition
+// filtered count here would equal the *unfiltered* total for every partition, and the two
+// partitions' filtered counts would sum to roughly double the real total rather than exactly it.
+// Message keys are distinct per record (testsupport's own seed), so which of the two partitions
+// each message actually landed in is not known ahead of time — this asserts the *structural*
+// property that must hold regardless of that distribution: the two partitions' own filtered counts
+// partition the unfiltered total exactly, and filtering to both explicitly reproduces it.
+func TestKafka_Count_ScopedToPartitionFilter(t *testing.T) {
+	f := testsupport.StartKafka(t)
+	a := connectedAdapter(t, f)
+	ctx := context.Background()
+	path := topicPath(f, testsupport.KafkaOrdersTopic)
+
+	total, err := a.Count(ctx, adapters.CountRequest{Path: path}, adapters.NewOpCtx("op-12c"))
+	if err != nil {
+		t.Fatalf("Count(unfiltered): %v", err)
+	}
+	if total.Value != testsupport.KafkaOrdersMessageCount {
+		t.Fatalf("Count(unfiltered) = %d, want %d", total.Value, testsupport.KafkaOrdersMessageCount)
+	}
+
+	countForPartitions := func(t *testing.T, partitions string) int64 {
+		t.Helper()
+		filter := `{"offset":null,"partitions":` + partitions + `,"timestampMs":null}`
+		got, err := a.Count(ctx, adapters.CountRequest{Path: path, Filter: &filter}, adapters.NewOpCtx("op-12d-"+partitions))
+		if err != nil {
+			t.Fatalf("Count(filter=%s): %v", partitions, err)
+		}
+		if !got.Exact {
+			t.Errorf("Count(filter=%s).Exact = false, want true", partitions)
+		}
+		return got.Value
+	}
+
+	part0 := countForPartitions(t, "[0]")
+	part1 := countForPartitions(t, "[1]")
+	if part0+part1 != total.Value {
+		t.Errorf("Count(partition 0) + Count(partition 1) = %d + %d = %d, want the unfiltered total %d",
+			part0, part1, part0+part1, total.Value)
+	}
+	// A partition filter naming every partition must reproduce the unfiltered total exactly — the
+	// same "any of these partitions is a union, not an intersection" rule freshWindows itself
+	// documents.
+	if both := countForPartitions(t, "[0,1]"); both != total.Value {
+		t.Errorf("Count(partitions=[0,1]) = %d, want the unfiltered total %d", both, total.Value)
+	}
+
+	// An offset filter set past every real offset in a partition clamps to that partition's own
+	// end (freshWindows' own clamp), so a partition scoped to it alone must count to exactly zero
+	// — proving the offset half of the filter is honoured too, not just partition selection.
+	pastEndFilter := `{"offset":"999999999","partitions":[0],"timestampMs":null}`
+	pastEnd, err := a.Count(ctx, adapters.CountRequest{Path: path, Filter: &pastEndFilter}, adapters.NewOpCtx("op-12e"))
+	if err != nil {
+		t.Fatalf("Count(offset filter past end): %v", err)
+	}
+	if pastEnd.Value != 0 {
+		t.Errorf("Count(offset filter past end) = %d, want 0", pastEnd.Value)
+	}
+}
+
 // 13. preview/mutate: update/delete/execute stay unsupported (D13, canUpdate/canDelete false).
 // Only insert (produce) is supported — see test 16 for that path working end to end.
 func TestKafka_UpdateDeleteExecuteStayUnsupported(t *testing.T) {

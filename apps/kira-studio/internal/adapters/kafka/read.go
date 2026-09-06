@@ -438,32 +438,31 @@ func readTopic(ctx context.Context, adm *kadm.Client, baseOpts []kgo.Opt, topic 
 // countTopic is read.ts's countTopic (:323-337): exact via high/low watermark subtraction, summed
 // across every partition. Go's int64 removes the Number(BigInt(high)-BigInt(low)) narrowing the
 // TypeScript had to accept.
-func countTopic(ctx context.Context, adm *kadm.Client, topic string) (adapters.CountResult, error) {
+//
+// P21 round 2 functional finding 7: rawFilter used to be dropped on the floor entirely (the
+// caller always passed nil), so "N total" answered the high/low watermark across *every*
+// partition even when the browse itself (read.ts's own freshWindows, called from readTopic) was
+// scoped to a partition/offset/timestamp filter — the toolbar's own "<n> rows on this page" and
+// "<N> total" then answered two different questions side by side. This now calls the exact same
+// freshWindows the read path uses to open a browse under this filter, and sums each window's own
+// [Next, End) gap — a partition filter narrows which windows exist at all, and an offset/timestamp
+// filter moves Next away from the partition's true start offset, both of which now scope the
+// total identically to what a browse under this filter would actually return.
+func countTopic(ctx context.Context, adm *kadm.Client, topic string, rawFilter *string) (adapters.CountResult, error) {
 	if err := adapters.CheckNotStarted(ctx); err != nil {
 		return adapters.CountResult{}, err
 	}
-	starts, err := adm.ListStartOffsets(ctx, topic)
+	windows, err := freshWindows(ctx, adm, topic, rawFilter)
 	if err != nil {
-		return adapters.CountResult{}, mapError(err)
-	}
-	if err := starts.Error(); err != nil {
-		return adapters.CountResult{}, mapError(err)
-	}
-	ends, err := adm.ListEndOffsets(ctx, topic)
-	if err != nil {
-		return adapters.CountResult{}, mapError(err)
-	}
-	if err := ends.Error(); err != nil {
-		return adapters.CountResult{}, mapError(err)
+		return adapters.CountResult{}, err
 	}
 	if err := adapters.CheckCancelled(ctx); err != nil {
 		return adapters.CountResult{}, err
 	}
 
-	startsByPartition := starts[topic]
 	var total int64
-	for p, hi := range ends[topic] {
-		total += hi.Offset - startsByPartition[p].Offset
+	for _, w := range windows {
+		total += w.End - w.Next
 	}
 	return adapters.CountResult{Value: total, Exact: true}, nil
 }

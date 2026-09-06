@@ -168,7 +168,7 @@ func (a *Adapter) Count(ctx context.Context, req adapters.CountRequest, op *adap
 	if err != nil {
 		return adapters.CountResult{}, err
 	}
-	return countTopic(ctx, adm, topic)
+	return countTopic(ctx, adm, topic, req.Filter)
 }
 
 // Preview is index.ts's preview.

@@ -79,6 +79,27 @@ registerTabRuntimeCleanup((tabId) => {
  *  has no addressable delete). */
 export { setActionError };
 
+// currentStreamFilter is load()'s own filter encoding, factored out so runCount (P21 round 2
+// functional finding 7) can send the *same* filter a browse under this tab is actually scoped to,
+// rather than re-deriving (or, before this fix, simply not deriving) it. Kafka-only in effect;
+// always null for SQS, since StreamView.vue never lets an SQS tab's three filter fields become
+// non-null in the first place — encodeKafkaStreamFilter itself would still collapse them to null
+// even if it did.
+function currentStreamFilter(tab: NonNullable<ReturnType<typeof findStreamTab>>): string | null {
+  // P31 D14/F17: Date.parse returns NaN for junk, and isEmptyKafkaStreamFilter's own `!== null`
+  // check doesn't catch it — a NaN would silently ride through encodeKafkaStreamFilter (JSON.
+  // stringify turns it into `null` on the wire, so the engine reads "no timestamp filter" while
+  // the field looks applied). StreamView.vue validates before ever calling load(), but this guard
+  // makes the wire payload honest regardless of caller.
+  const parsedTimestampMs =
+    tab.state.timestampFilter === null ? null : Date.parse(tab.state.timestampFilter);
+  return encodeKafkaStreamFilter({
+    offset: tab.state.offsetFilter,
+    partitions: tab.state.partitions,
+    timestampMs: Number.isNaN(parsedTimestampMs) ? null : parsedTimestampMs,
+  });
+}
+
 export async function load(tabId: string, cursor?: PageCursor): Promise<void> {
   const tab = findStreamTab(tabId);
   if (!tab?.connectionId) return;
@@ -87,21 +108,7 @@ export async function load(tabId: string, cursor?: PageCursor): Promise<void> {
   const opId = beginOp(rt);
   rt.polled = true;
 
-  // Kafka-only (item 2); always null for SQS, since StreamView.vue never lets an SQS tab's three
-  // filter fields become non-null in the first place — encodeKafkaStreamFilter itself would still
-  // collapse them to null even if it did.
-  // P31 D14/F17: Date.parse returns NaN for junk, and isEmptyKafkaStreamFilter's own `!== null`
-  // check doesn't catch it — a NaN would silently ride through encodeKafkaStreamFilter (JSON.
-  // stringify turns it into `null` on the wire, so the engine reads "no timestamp filter" while
-  // the field looks applied). StreamView.vue validates before ever calling load(), but this guard
-  // makes the wire payload honest regardless of caller.
-  const parsedTimestampMs =
-    tab.state.timestampFilter === null ? null : Date.parse(tab.state.timestampFilter);
-  const filter = encodeKafkaStreamFilter({
-    offset: tab.state.offsetFilter,
-    partitions: tab.state.partitions,
-    timestampMs: Number.isNaN(parsedTimestampMs) ? null : parsedTimestampMs,
-  });
+  const filter = currentStreamFilter(tab);
 
   try {
     const response = await data.read({
@@ -173,7 +180,13 @@ export async function runCount(tabId: string): Promise<void> {
       tabId,
       connectionId: tab.connectionId,
       path: tab.path,
-      filter: null,
+      // P21 round 2 functional finding 7: this used to hard-code `filter: null`, so the Σ
+      // readout answered a different question than the rows beside it — the high-low watermark
+      // summed across *every* partition, printed next to a page that load() had already scoped
+      // to the selected partition/offset/timestamp filter. Sending the same encoded filter here
+      // scopes the count identically (kafka/count.go's countTopic now shares load's own
+      // freshWindows, so "N total" and the browse agree on what they are counting).
+      filter: currentStreamFilter(tab),
       // D18: a Σ click on an already-fresh count stays an L3 hit; only a stale one bypasses it.
       refresh: rt.count?.stale === true,
     });
@@ -247,6 +260,14 @@ export async function applyStreamFilter(tabId: string, filter: StreamFilterInput
   if (!tab?.connectionId) return;
   const rt = ensureRuntime(tabId);
   rt.nextToken = null;
+  // P21 round 2 functional finding 7: now that runCount sends this same filter, a count taken
+  // under the *previous* filter answers a different question than the browse this narrows to —
+  // grid/state.ts's own setFilter clears rather than stales its count for the identical reason
+  // ("an answer to the previous WHERE is an answer to a different question, not a drifted answer
+  // to this one"). Cleared, not staled, so the toolbar returns to "no total" rather than showing a
+  // wrong one under a `stale` label that would still be visible until the next Σ click.
+  rt.count = null;
+  rt.countOpId = null;
   patchStreamTabState(tabId, {
     offsetFilter: filter.offset,
     partitions: filter.partitions,
