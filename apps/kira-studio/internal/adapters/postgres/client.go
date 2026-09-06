@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"sync"
 	"time"
 
@@ -81,6 +82,20 @@ func buildConfig(cfg model.ResolvedConnectionConfig, database string, log func(l
 			connConfig.TLSConfig = &tls.Config{InsecureSkipVerify: true} //nolint:gosec // matches client.ts's own rejectUnauthorized:false for these two modes
 		case "verify-full":
 			connConfig.TLSConfig = &tls.Config{ServerName: connConfig.Host}
+		// P21 round 2 architecture/security finding 7: pgx.ParseConfig already resolves
+		// verify-ca correctly from a URI's own ?sslmode= (libpq's "verify the CA chain but not
+		// the hostname" — the standard case for an internal CA or an IP-addressed host), but this
+		// Options-driven override then re-read the same value and hit the default branch,
+		// overriding a config pgx had already gotten right with a hard "unknown sslmode" refusal.
+		// InsecureSkipVerify plus a VerifyPeerCertificate that chains against the system roots
+		// without checking the hostname is the standard Go recipe for "verify-CA-not-host".
+		case "verify-ca":
+			connConfig.TLSConfig = &tls.Config{
+				InsecureSkipVerify: true, //nolint:gosec // hostname check is intentionally skipped; chain verification still runs below
+				VerifyPeerCertificate: func(certs [][]byte, _ [][]*x509.Certificate) error {
+					return verifyChainSkipHostname(certs, nil) // nil roots = the system trust store
+				},
+			}
 		default:
 			// An unrecognized sslmode must fail loudly rather than silently fall back to a
 			// plaintext connection — a typo here would otherwise send credentials and data
@@ -100,6 +115,30 @@ func buildConfig(cfg model.ResolvedConnectionConfig, database string, log func(l
 type connEntry struct {
 	conn *pgx.Conn
 	mu   sync.Mutex
+}
+
+// verifyChainSkipHostname is sslmode=verify-ca's certificate check, split out of buildConfig so
+// it can be tested against a controlled root pool rather than only the live system trust store
+// (which a test can't add a throwaway CA to). roots == nil means "the system trust store", the
+// same as x509.VerifyOptions' own zero value and what production always passes.
+func verifyChainSkipHostname(rawCerts [][]byte, roots *x509.CertPool) error {
+	chain := make([]*x509.Certificate, 0, len(rawCerts))
+	for _, raw := range rawCerts {
+		cert, err := x509.ParseCertificate(raw)
+		if err != nil {
+			return err
+		}
+		chain = append(chain, cert)
+	}
+	if len(chain) == 0 {
+		return adapters.New(adapters.CodeConnect, "postgres: server presented no certificate", nil)
+	}
+	opts := x509.VerifyOptions{Roots: roots, Intermediates: x509.NewCertPool()}
+	for _, cert := range chain[1:] {
+		opts.Intermediates.AddCert(cert)
+	}
+	_, err := chain[0].Verify(opts)
+	return err
 }
 
 // ConnSet is client.ts's ClientSet — misleadingly-named "Pool" avoided on purpose (D14): one

@@ -405,6 +405,28 @@ even with no `sslmode` option set, matching the standard meaning of that scheme;
 is dropped with a `warn` log rather than forwarded to the driver (go-sql-driver's `Params` field is
 executed as a literal `SET <k> = <v>` statement at connect time, not a bag of DSN options).
 
+**P21 round 2** closed the one place this vocabulary had actually drifted from its own stated
+rules, without unifying the six independent switches into one shared helper (left for a later
+round — see `docs/v1.2/SPEC.md`'s P21 row). Kafka's own `default:` branch used to reject
+`verify-none`/`insecure` outright, even though the paragraph above already documented it as Kafka's
+own escape hatch alongside Redis and MongoDB — a broker with a self-signed or internal-CA
+certificate (the case the escape hatch exists for) could not be connected to at all; it now accepts
+both, matching Redis's own case exactly (`kgo.DialTLSConfig` with `InsecureSkipVerify` set from the
+same two values). ClickHouse's `resolveTarget` used to reject `prefer`, the one value every other
+engine accepts — it now maps to `https`, the same as `require`/`verify-full` (ClickHouse has no
+plaintext-with-opportunistic-upgrade transport, so `prefer` cannot mean anything else here).
+Postgres's own libpq-convention branch used to reject `verify-ca` (verify the certificate chain
+against the system trust store, skip the hostname check) even in URI mode, where `pgx.ParseConfig`
+had already resolved it correctly before this app's own `Options`-driven override re-read the same
+value and refused it — it now maps to `InsecureSkipVerify: true` plus a `VerifyPeerCertificate`
+that chains against the system roots without checking the name, the standard Go recipe for that
+mode. `allow` (libpq's "prefer plaintext, retry with TLS only if the server demands it") is left
+unimplemented: this app's TLS config is resolved once, unconditionally, before any connection
+attempt, with no retry-on-refusal path for any mode — approximating `allow` under that model would
+mean picking one of "always plaintext" or "always TLS" and calling it `allow`, which is not what
+the value means in any real libpq client; giving it real opportunistic-retry semantics is a
+connection-flow change out of scope for this pass.
+
 ## Storage
 
 `~/.kira-studio/` (dir `0700`), containing `kira.db` (`0600`) and `logs/`.

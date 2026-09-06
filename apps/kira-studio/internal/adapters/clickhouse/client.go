@@ -100,7 +100,14 @@ func resolveTarget(cfg model.ResolvedConnectionConfig, log func(level, message s
 	scheme := "http"
 	if sslmode, ok := cfg.Options["sslmode"].(string); ok && sslmode != "" && sslmode != "disable" {
 		switch sslmode {
-		case "require", "verify-full":
+		// P21 round 2 architecture/security finding 3: `prefer` is a valid, documented value for
+		// every other engine (postgres/mysqlfamily/redis/mongo/kafka) — ClickHouse rejecting it
+		// was the one adapter out of step, and since Options only ever comes from a connection
+		// string's own query parameters (there is no fields-mode sslmode UI), a user carrying one
+		// connection-string style across engines hit this immediately. ClickHouse has no
+		// plaintext-with-opportunistic-upgrade transport, so `prefer` means the same as `require`
+		// here, same as it already does for postgres/mysqlfamily.
+		case "require", "prefer", "verify-full":
 			scheme = "https"
 		default:
 			// An unrecognized sslmode must fail loudly rather than silently fall back to a

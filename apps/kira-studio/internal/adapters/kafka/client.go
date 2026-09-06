@@ -25,6 +25,32 @@ const connectTimeout = 10 * time.Second // client.ts's CONNECT_TIMEOUT_MS
 // alone proves nothing about broker reachability") -> kadm.NewClient. opts is returned alongside
 // so read.go can build the ephemeral per-browse client from the same seed/security options
 // (P58e E5) without duplicating the resolution logic.
+// resolveTLSOpt is connect's sslmode handling, split out so the vocabulary can be unit-tested
+// without a real broker (connect itself dials via Client.Ping). Ports byte-identically to the
+// original inline switch (P58e E16): every non-'disable' mode verifies by default — deliberately
+// unlike libpq's own `require` (no verification) — with verify-none/insecure as the explicit
+// opt-out (P21 round 2 architecture/security finding 3: docs/ARCHITECTURE.md's own "sslmode
+// semantics per engine (P21 round 1)" section already documented this escape hatch for Kafka;
+// round 1 added it to redis/mongo but missed kafka, leaving a broker with a self-signed or
+// internal-CA certificate — the case the escape hatch exists for — unable to connect at all).
+func resolveTLSOpt(cfg model.ResolvedConnectionConfig) (ssl bool, skipVerify bool, err error) {
+	sslmode, ok := cfg.Options["sslmode"].(string)
+	if !ok || sslmode == "" || sslmode == "disable" {
+		return false, false, nil
+	}
+	switch sslmode {
+	case "require", "prefer", "verify-full":
+		return true, false, nil
+	case "verify-none", "insecure":
+		return true, true, nil
+	default:
+		// An unrecognized sslmode must fail loudly rather than silently fall back to a plaintext
+		// connection — a typo here would otherwise send credentials and data unencrypted while
+		// the user believes TLS is configured.
+		return false, false, adapters.New(adapters.CodeConnect, `kafka: unknown sslmode "`+sslmode+`"`, nil)
+	}
+}
+
 func connect(ctx context.Context, cfg model.ResolvedConnectionConfig, log func(level, message string)) (*kgo.Client, *kadm.Client, []kgo.Opt, error) {
 	var host string
 	var port int
@@ -67,21 +93,9 @@ func connect(ctx context.Context, cfg model.ResolvedConnectionConfig, log func(l
 		}
 	}
 
-	// The sslmode handling ports byte-identically (P58e E16): every non-'disable' mode
-	// (require/prefer/verify-full) verifies — deliberately unlike libpq's own `require` (no
-	// verification), and a driver swap is the wrong commit to smuggle a security-relevant
-	// behaviour change into.
-	ssl := false
-	if sslmode, ok := cfg.Options["sslmode"].(string); ok && sslmode != "" && sslmode != "disable" {
-		switch sslmode {
-		case "require", "prefer", "verify-full":
-			ssl = true
-		default:
-			// An unrecognized sslmode must fail loudly rather than silently fall back to a
-			// plaintext connection — a typo here would otherwise send credentials and data
-			// unencrypted while the user believes TLS is configured.
-			return nil, nil, nil, adapters.New(adapters.CodeConnect, `kafka: unknown sslmode "`+sslmode+`"`, nil)
-		}
+	ssl, skipVerify, err := resolveTLSOpt(cfg)
+	if err != nil {
+		return nil, nil, nil, err
 	}
 
 	opts := []kgo.Opt{
@@ -97,7 +111,7 @@ func connect(ctx context.Context, cfg model.ResolvedConnectionConfig, log func(l
 		kgo.DisableIdempotentWrite(),
 	}
 	if ssl {
-		opts = append(opts, kgo.DialTLSConfig(&tls.Config{}))
+		opts = append(opts, kgo.DialTLSConfig(&tls.Config{InsecureSkipVerify: skipVerify})) //nolint:gosec // explicit opt-out via verify-none/insecure, not the default
 	}
 	// P25 §1.4: SASL/PLAIN was configured only when username *and* password were both non-empty —
 	// with only one of the pair present, the whole mechanism was silently dropped and the client
