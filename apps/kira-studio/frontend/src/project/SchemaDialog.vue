@@ -4,11 +4,8 @@ import CodeMirrorHost from '../editor/CodeMirrorHost.vue';
 import { connectionRecord } from '../state/connections';
 import {
   closeSchemaDialog,
-  connectionRelationsFromTree,
   ddlParseSummary,
   ensureDdl,
-  type FillProgress,
-  fillDdlFromConnection,
   saveDdl,
   schemaDialectFor,
   schemaDialogState,
@@ -22,6 +19,13 @@ import DialogFrame from '../theme/primitives/DialogFrame.vue';
 // exactly rather than inventing a second one. schemaDialectFor/ddlParseSummary (state/schemas.ts)
 // are this file's one dispatch point into the SQL surface — SPEC §11 forbids project/ importing
 // views/ directly, the same rule state/viewCommands.ts exists to satisfy for other callers.
+//
+// P22c D7: P19 D15's "Fill from connection" button is gone — the schema metadata it staged at N
+// round trips (one treeDefinition call per relation) is now served automatically, with no manual
+// step, by the console/data-tab's own schema-aware completion (state/schemaColumns.ts). This
+// document is now a deliberate override for what that cache cannot serve: a schema that doesn't
+// exist yet, an engine with no SchemaColumns capability, or a connection this app cannot
+// introspect. The dialog, saveDdl/ensureDdl and the connection-row menu entry are unchanged.
 
 const draft = ref('');
 const saving = ref(false);
@@ -79,47 +83,6 @@ function onDocChange(text: string): void {
   }, 400);
 }
 
-// P19 D15: "the honest reading of v1.1's constraint" — the user still supplies the DDL (presses
-// the button, sees the text, presses Save), the app just stops making them run pg_dump in a
-// terminal and paste the output. Stages into `draft` like any other edit; never saves on its own.
-const filling = ref(false);
-const fillProgress = ref<FillProgress | null>(null);
-let fillCancelled = false;
-
-const canFillFromConnection = computed(
-  () => !!connectionId.value && connectionRelationsFromTree(connectionId.value).length > 0,
-);
-
-async function onFillFromConnection(): Promise<void> {
-  const id = connectionId.value;
-  if (!id) return;
-  const relations = connectionRelationsFromTree(id);
-  if (relations.length === 0) return;
-  filling.value = true;
-  fillCancelled = false;
-  fillProgress.value = { done: 0, total: relations.length };
-  try {
-    const text = await fillDdlFromConnection(
-      id,
-      relations,
-      (progress) => {
-        fillProgress.value = progress;
-      },
-      () => fillCancelled,
-    );
-    if (schemaDialogState.connectionId !== id) return; // the dialog moved on while this ran
-    draft.value = text;
-    debouncedDraft.value = text;
-  } finally {
-    filling.value = false;
-    fillProgress.value = null;
-  }
-}
-
-function onCancelFill(): void {
-  fillCancelled = true;
-}
-
 // P12 round 1 finding #14: SettingsDialog.vue's own pattern (a saveError ref plus a footer strip)
 // mirrored exactly — this file's own header comment already claimed to reuse P17's staging shape,
 // but had no catch at all: a rejected schemaSet became an unhandled promise rejection from a
@@ -158,8 +121,9 @@ async function onSave(): Promise<void> {
 
     <div class="p-dialog-body schema-dialog-body">
       <span class="help">
-        Paste this connection's own schema — table and column definitions the SQL console
-        completes, checks and hovers against. Nothing here ever reads from the connection itself.
+        Table and column completion for this connection normally fills in on its own from the
+        connection's own cached schema metadata — no setup needed. Paste a schema here only to
+        override that: a schema that doesn't exist yet, or a connection this app can't introspect.
       </span>
       <div class="editor-wrap">
         <CodeMirrorHost
@@ -185,40 +149,10 @@ async function onSave(): Promise<void> {
       <span v-if="saveError" class="field-error" data-testid="schema-save-error">{{
         saveError
       }}</span>
-      <span v-else-if="filling" class="help" data-testid="schema-fill-progress">
-        Fetching {{ (fillProgress?.done ?? 0) + 1 }} of {{ fillProgress?.total ?? 0 }}…
-      </span>
       <span v-else class="help">Applies to <span class="mono">{{ connectionName }}</span> only</span>
       <span class="p-dialog-actions p-push">
-        <AppButton
-          v-if="filling"
-          kind="dialog"
-          data-testid="schema-fill-cancel"
-          @click="onCancelFill"
-        >
-          Cancel fetching
-        </AppButton>
-        <AppButton
-          v-else
-          kind="dialog"
-          :disabled="!canFillFromConnection"
-          v-tooltip="
-            canFillFromConnection
-              ? 'Fetch every table/view already visible in the project tree and stage their real definitions here'
-              : 'Expand this connection in the project tree first — nothing is fetched that isn\'t already there'
-          "
-          data-testid="schema-fill-from-connection"
-          @click="onFillFromConnection"
-        >
-          Fill from connection
-        </AppButton>
-        <AppButton kind="dialog" :disabled="filling" @click="closeSchemaDialog">Cancel</AppButton>
-        <AppButton
-          kind="dialog"
-          variant="primary"
-          :disabled="saving || filling"
-          @click="onSave"
-        >
+        <AppButton kind="dialog" :disabled="saving" @click="closeSchemaDialog">Cancel</AppButton>
+        <AppButton kind="dialog" variant="primary" :disabled="saving" @click="onSave">
           Save schema
         </AppButton>
       </span>
