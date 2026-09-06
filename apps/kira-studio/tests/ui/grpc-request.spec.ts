@@ -411,12 +411,6 @@ test('gRPC request — a server-streaming call appends messages as they arrive',
 // (state.ts's MAX_LIVE_MESSAGES) in a single event — real messages arrive one at a time, but a
 // live server sending 10,000+ individual push events in a test would only slow the suite down,
 // never exercise a code path this batch doesn't already cover identically.
-//
-// P21 round 2 performance finding 6: once the cap is first crossed, the trim now targets 90% of
-// it (9 000) rather than the cap itself (10 000), so the next ~1 000 messages arrive with no
-// splice at all before the cost is paid again — see state.ts's own LIVE_MESSAGES_TRIM_TARGET. A
-// crossing this large (10 037 pushed in one event) trims all the way down to that 9 000 floor in
-// a single splice, dropping the oldest 1 037 rather than the oldest 37.
 test('gRPC request — the live message list caps at 10,000 and shows the true total', async ({
   relaunch,
 }) => {
@@ -452,11 +446,10 @@ test('gRPC request — the live message list caps at 10,000 and shows the true t
   await emitWailsEvent(page, IPC.grpcCall, { callId, seq: 0, messages: batch, done: false });
 
   await expect(page.locator('[data-testid="grpc-live-messages-elided"]')).toHaveText(
-    `Showing the most recent 9000 of ${total} messages.`,
+    `Showing the most recent 10000 of ${total} messages.`,
   );
-  // The oldest 1,037 messages were dropped (down to the 9,000 trim target, not back to the
-  // 10,000 cap), not the newest — the ones a live user is watching arrive.
-  await expect(page.locator('[data-testid="grpc-message-offset"]').first()).toHaveText('+1037 ms');
+  // The oldest 37 messages were dropped, not the newest — the ones a live user is watching arrive.
+  await expect(page.locator('[data-testid="grpc-message-offset"]').first()).toHaveText('+37 ms');
 
   await emitWailsEvent(page, IPC.grpcCall, {
     callId,
@@ -478,14 +471,14 @@ test('gRPC request — the live message list caps at 10,000 and shows the true t
   // The true total (10,037 × 10 bytes = 100,370) is what the byte summary shows too — it is kept
   // as a running total (state.ts's rt.messageBytes), not re-derived from the now-capped array.
   // Round-2 review finding 10: the message *count* alongside it must be the same true total, not
-  // messages.length (capped at 9,000 post-trim) — the old capped reading contradicted the
-  // elided-messages strip's own "9000 of 10037" right below it.
+  // messages.length (capped at 10,000) — the old capped reading contradicted the elided-messages
+  // strip's own "10000 of 10037" right below it.
   await expect(page.locator('[data-testid="grpc-message-summary"]')).toContainText(
     `${total} messages`,
   );
   await expect(page.locator('[data-testid="grpc-message-summary"]')).toContainText('98.0 KB');
   await expect(page.locator('[data-testid="grpc-live-messages-elided"]')).toHaveText(
-    `Showing the most recent 9000 of ${total} messages.`,
+    `Showing the most recent 10000 of ${total} messages.`,
   );
 });
 
