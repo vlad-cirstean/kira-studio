@@ -1,6 +1,6 @@
 import type { MutationRowOp } from '@shared/domain/mutations';
 import type { MutateResponse } from '@shared/protocol/data-ops';
-import { reactive } from 'vue';
+import { reactive, toRaw } from 'vue';
 import { data } from '../../bridge/data';
 import { cell, getPage } from './page';
 
@@ -35,6 +35,21 @@ function ensure(tabId: string): TabPending {
 
 export function pendingFor(tabId: string): TabPending | undefined {
   return pendingState[tabId];
+}
+
+// P21 round 3 performance finding 10: SlickGridHost.vue's own header states the rule — "Vue must
+// not see the grid" — because the cell extractor runs *during* SlickGrid's own synchronous render,
+// not Vue's. Reading pending state through pendingFor() breaks that rule in the one place that
+// runs per cell: pendingState[tabId] is itself a reactive proxy, its `edits` a reactive-wrapped
+// Map, so `pendingFor(tabId)?.edits.get(row)?.changes[column]` was up to four proxy traps (record,
+// TabPending, the Map collection handler's own toRaw-and-rewrap, then `changes`) for information
+// that cannot change mid-render. toRaw returns the same underlying object reactive() wraps —
+// nothing here is cloned, so this stays live as of whenever the caller took the snapshot; callers
+// that read it many times per render (dataSource.ts's cell extractor) should snapshot once via
+// this function rather than calling pendingFor() itself inside a per-cell hot loop.
+export function rawPendingFor(tabId: string): TabPending | undefined {
+  const p = pendingState[tabId];
+  return p ? toRaw(p) : undefined;
 }
 
 export function hasPending(tabId: string): boolean {

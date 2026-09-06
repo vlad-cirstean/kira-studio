@@ -2,7 +2,7 @@ import type { TabularPage } from '@shared/protocol/page';
 import { pageColumnIndexFor } from '../../shared/page/columns';
 import type { RowHandle } from '../../shared/slick/dataSource';
 import { type CellView, cell } from '../page';
-import { pendingFor, stagedValue } from '../pendingChanges';
+import { rawPendingFor } from '../pendingChanges';
 
 // P30 §3 prerequisite: the generic display-position/`CustomDataView` core that used to live in
 // this one file moved to `views/shared/slick/dataSource.ts` (SPEC §11 — `views/console/*` may not
@@ -31,12 +31,21 @@ export function createDisplayValueExtractor(
   for (let i = 0; i < columnOrder.length; i++) {
     fieldToPageCol.set(columnOrder[i], pageColumnIndexFor(page, columnOrder, i));
   }
+  // P21 round 3 performance finding 10: snapshotted once per extractor build, not read via
+  // pendingFor()/stagedValue() inside the returned per-cell closure — SlickGridHost.vue already
+  // rebuilds dataSource.setState (and therefore this extractor) on every staging change (the paste
+  // path, plus every stageEdit/stageInsert/stageDelete call site), so a snapshot taken at build
+  // time can never go stale for the render it serves. With no staged edits the pre-fix code's own
+  // optional chain already short-circuited to one trap; once the user has staged even a single
+  // edit, every other cell in the same render paid up to four proxy traps for information that
+  // cannot change mid-render — this removes all of them.
+  const pending = rawPendingFor(tabId);
   return (item, field) => {
     if (item.insertId !== undefined) {
-      const value = pendingFor(tabId)?.inserts.find((i) => i.id === item.insertId)?.values[field];
+      const value = pending?.inserts.find((i) => i.id === item.insertId)?.values[field];
       return { text: value ?? '', isNull: value === null || value === undefined, truncated: false };
     }
-    const staged = stagedValue(tabId, item.row, field);
+    const staged = pending?.edits.get(item.row)?.changes[field];
     if (staged !== undefined) {
       return { text: staged ?? '', isNull: staged === null, truncated: false };
     }
@@ -62,7 +71,7 @@ export function pendingRowClasses(
   pageRowCount: number,
 ): string | undefined {
   if (row >= pageRowCount) return 'kira-row-inserted';
-  const p = pendingFor(tabId);
+  const p = rawPendingFor(tabId);
   if (!p) return undefined;
   if (p.deletes.has(row)) return 'kira-row-deleted pending-delete';
   if (p.edits.has(row)) return 'kira-row-dirty';
