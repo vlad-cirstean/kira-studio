@@ -31,6 +31,9 @@ func resolveFilePath(cfg model.ResolvedConnectionConfig) (string, error) {
 		if path == "" {
 			return "", adapters.New(adapters.CodeConnect, "could not parse the connection URI", nil)
 		}
+		if err := rejectDSNMetacharacters(path); err != nil {
+			return "", err
+		}
 		return path, nil
 	}
 	path := ""
@@ -40,7 +43,27 @@ func resolveFilePath(cfg model.ResolvedConnectionConfig) (string, error) {
 	if path == "" {
 		return "", adapters.New(adapters.CodeConnect, "no database file path was given", nil)
 	}
+	if err := rejectDSNMetacharacters(path); err != nil {
+		return "", err
+	}
 	return path, nil
+}
+
+// rejectDSNMetacharacters is P21 round 3 architecture/security finding 11: buildDSN below builds
+// the SQLite URI filename by plain string concatenation ("file:" + path + "?" + query), and
+// SQLite's own URI parser splits on the *first* `?` (and treats `#` as starting a fragment) — so a
+// path containing either character silently truncates the filename and lets the remainder be read
+// as query parameters, which is exactly where `mode=ro`/`_query_only=1` (this adapter's entire
+// read-only enforcement) live. A `database` value of `/data/x.db?mode=rwc&_query_only=0` would
+// defeat the read-only toggle quietly, with the UI still showing the connection as read-only, and
+// assertFileExists (which stats the real, un-truncated path) would not catch it either. Rejecting
+// outright — rather than percent-encoding the path — keeps the read-only guarantee an explicit
+// refusal rather than a best-effort escape.
+func rejectDSNMetacharacters(path string) error {
+	if strings.ContainsAny(path, "?#") {
+		return adapters.New(adapters.CodeConnect, "the database file path must not contain \"?\" or \"#\"", nil)
+	}
+	return nil
 }
 
 // assertFileExists is client.ts's assertFileExists — D8: Kira never creates a database. A plain
