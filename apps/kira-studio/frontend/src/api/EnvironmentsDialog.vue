@@ -209,19 +209,26 @@ function close(): void {
           data-testid="environment-active"
           @change="onSetActive(env.id)"
         />
-        <TextField
-          v-model="nameDrafts[env.id]"
-          class="name-field"
-          data-testid="environment-name"
-          @blur="onFieldBlur(env.id)"
-        />
-        <TextField
-          v-model="descriptionDrafts[env.id]"
-          class="description-field"
-          placeholder="description"
-          data-testid="environment-description"
-          @blur="onFieldBlur(env.id)"
-        />
+        <!-- P22b D9 (remainder): a bare TextField with a `flex:1` class of its own sizes to its
+             content, not the row's available space — `class` falls through onto TextField's
+             inner <input> (inheritAttrs:false), never onto the outer .p-input box that actually
+             participates in this row's flex layout. GrpcRequestView.vue's own wrapper +
+             :deep(.p-input) idiom, applied here. -->
+        <div class="name-field">
+          <TextField
+            v-model="nameDrafts[env.id]"
+            data-testid="environment-name"
+            @blur="onFieldBlur(env.id)"
+          />
+        </div>
+        <div class="description-field">
+          <TextField
+            v-model="descriptionDrafts[env.id]"
+            placeholder="description"
+            data-testid="environment-description"
+            @blur="onFieldBlur(env.id)"
+          />
+        </div>
         <AppButton
           data-testid="environment-edit-variables"
           @click="onEditVariables(env.id, env.name)"
@@ -284,14 +291,14 @@ function close(): void {
   color: var(--kira-fg-subtle);
 }
 
-.name-field {
-  flex: 1;
-  min-width: 0;
-}
-
+.name-field,
 .description-field {
   flex: 1;
   min-width: 0;
+}
+.name-field :deep(.p-input),
+.description-field :deep(.p-input) {
+  width: 100%;
 }
 
 </style>

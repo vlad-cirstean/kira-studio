@@ -381,13 +381,19 @@ function onBulkClose(): void {
       target-testid="variable-set-target"
       :env-color="scope === 'environment' ? (owningEnvironment?.color ?? 'none') : undefined"
     >
-      <template #toolbar-2>
+      <!-- P22b D9 (remainder): ViewChrome's own standard bands, rather than the hand-spaced single
+           #toolbar-2 row this view used to build both controls into on its own — the search box
+           in #toolbar (the band every other view's own filter/search control lives in), the
+           .env-text toggle in #toolbar-end (every other view's own trailing action group). -->
+      <template #toolbar>
         <PanelSearchBox
           v-if="!bulkMode"
           v-model="filterQuery"
           placeholder="Filter by name"
           testid="variables-filter"
         />
+      </template>
+      <template #toolbar-end>
         <IconButton
           v-if="ownerExists"
           icon="code"
@@ -426,18 +432,25 @@ function onBulkClose(): void {
         </MessageStrip>
 
         <div v-if="scope === 'environment' && owningEnvironment" class="env-fields">
-          <TextField
-            v-model="envNameDraft"
-            placeholder="name"
-            data-testid="environment-name"
-            @blur="onEnvFieldBlur"
-          />
-          <TextField
-            v-model="envDescriptionDraft"
-            placeholder="description"
-            data-testid="environment-description"
-            @blur="onEnvFieldBlur"
-          />
+          <!-- P22b D9 (remainder): GrpcRequestView.vue's own inheritAttrs:false idiom — a bare
+               TextField sizes to its own content, not the flex row's available space, without this
+               wrapper + :deep(.p-input) width:100% pair. -->
+          <div class="env-field">
+            <TextField
+              v-model="envNameDraft"
+              placeholder="name"
+              data-testid="environment-name"
+              @blur="onEnvFieldBlur"
+            />
+          </div>
+          <div class="env-field">
+            <TextField
+              v-model="envDescriptionDraft"
+              placeholder="description"
+              data-testid="environment-description"
+              @blur="onEnvFieldBlur"
+            />
+          </div>
           <ColorPicker
             :model-value="owningEnvironment.color"
             label="Environment color"
@@ -506,6 +519,14 @@ function onBulkClose(): void {
   gap: var(--kira-s-2);
   padding: var(--kira-s-2) var(--kira-s-3);
   border-bottom: var(--kira-border-width) solid var(--kira-border);
+}
+
+.env-field {
+  flex: 1;
+  min-width: 0;
+}
+.env-field :deep(.p-input) {
+  width: 100%;
 }
 
 /* P22b D9: mirrors VariableRow.vue's own grid template exactly (handle, name, value,
