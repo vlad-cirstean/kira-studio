@@ -319,16 +319,22 @@ onUnmounted(() => {
           data-testid="grpc-tls-toggle"
           @update:model-value="setTlsMode"
         />
-        <select
-          class="p-select bordered"
-          data-testid="grpc-method-select"
-          :value="selectedMethodValue"
-          :disabled="methodOptions.length === 0"
-          @change="onMethodSelect"
-        >
-          <option value="" disabled>Choose a method…</option>
-          <option v-for="opt in methodOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-        </select>
+        <!-- P22b D10: the same wrapper + :deep(.p-select) idiom .grpc-target-field uses above, for
+             the identical reason — a bare <select> has no width rule of its own, so it shrinks to
+             its widest <option> label. Both fields are flex: 1 in this one toolbar row, so they
+             share the free space evenly and stay responsive at either extreme of window size. -->
+        <div class="grpc-method-field">
+          <select
+            class="p-select bordered"
+            data-testid="grpc-method-select"
+            :value="selectedMethodValue"
+            :disabled="methodOptions.length === 0"
+            @change="onMethodSelect"
+          >
+            <option value="" disabled>Choose a method…</option>
+            <option v-for="opt in methodOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+          </select>
+        </div>
         <AppButton
           icon="play"
           variant="primary"
@@ -448,6 +454,18 @@ onUnmounted(() => {
   min-width: 0;
 }
 .grpc-target-field :deep(.p-input) {
+  width: 100%;
+}
+
+/* P22b D10: the method select's own sibling of .grpc-target-field above — a bare <select> has no
+   width rule of its own and shrinks to its widest <option>. No :deep() needed here (unlike the
+   target field above): the <select> is a plain element in this component's own template, not
+   behind a child component's scoping boundary. */
+.grpc-method-field {
+  flex: 1;
+  min-width: 0;
+}
+.grpc-method-field .p-select {
   width: 100%;
 }
 
