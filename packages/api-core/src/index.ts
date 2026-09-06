@@ -46,7 +46,11 @@ export {
   loadDynamicGenerator,
 } from './http/dynamic/catalog';
 export { goQueryEscape, goQueryEscapeLiteral } from './http/escape';
-export { type HeaderCompletion, WELL_KNOWN_REQUEST_HEADERS } from './http/headers';
+export {
+  type HeaderCompletion,
+  headerValueCompletions,
+  WELL_KNOWN_REQUEST_HEADERS,
+} from './http/headers';
 export {
   canEditAsRaw,
   generateRawRequest,

@@ -104,3 +104,70 @@ export const WELL_KNOWN_REQUEST_HEADERS: readonly HeaderCompletion[] = [
   header('Idempotency-Key', 'proxy/tracing'),
   header('Link', 'proxy/tracing'),
 ] as const;
+
+function value(label: string): HeaderCompletion {
+  return { label, icon: 'symbol-value' };
+}
+
+function prefix(label: string): HeaderCompletion {
+  // `insert` is the label itself (already ends with the trailing space) and caretOffsetFromEnd
+  // defaults to 0, so acceptance lands the caret right after the space — ready for a
+  // {{variable}} completion to take over for the credential itself.
+  return { label, insert: label, icon: 'symbol-value' };
+}
+
+const CONTENT_TYPES: readonly HeaderCompletion[] = [
+  value('application/json'),
+  value('application/x-www-form-urlencoded'),
+  value('multipart/form-data'),
+  value('text/plain'),
+  value('text/html'),
+  value('application/xml'),
+  value('text/xml'),
+  value('application/octet-stream'),
+  value('application/graphql-response+json'),
+  value('text/csv'),
+  value('application/pdf'),
+];
+
+/** P22b D2: the value vocabulary, keyed by the header's own canonical name (lookup case-folds, so
+ *  a user's `content-type` matches). Two entry kinds, distinguished by `insert`:
+ *   - a complete value (`application/json`) — accepting it replaces the field;
+ *   - a prefix (`Bearer `, with caretOffsetFromEnd 0) — accepting it leaves the caret after the
+ *     space so the {{variable}} source takes over for the credential itself.
+ *  `Completion`-shaped (HeaderCompletion), for the same api-core-may-not-import-apps reason
+ *  WELL_KNOWN_REQUEST_HEADERS is. */
+export function headerValueCompletions(name: string): readonly HeaderCompletion[] {
+  switch (name.trim().toLowerCase()) {
+    case 'content-type':
+      return CONTENT_TYPES;
+    case 'accept':
+      return [...CONTENT_TYPES, value('*/*'), value('application/json, text/plain, */*')];
+    case 'accept-encoding':
+      return [value('gzip, deflate, br'), value('gzip'), value('identity')];
+    case 'accept-language':
+      return [value('en-US,en;q=0.9'), value('*')];
+    case 'cache-control':
+      return [value('no-cache'), value('no-store'), value('max-age=0'), value('must-revalidate')];
+    case 'connection':
+      return [value('keep-alive'), value('close')];
+    case 'content-encoding':
+      return [value('gzip'), value('deflate'), value('br')];
+    case 'transfer-encoding':
+      return [value('chunked')];
+    case 'x-requested-with':
+      return [value('XMLHttpRequest')];
+    case 'authorization':
+      return [
+        prefix('Bearer '),
+        prefix('Basic '),
+        prefix('Digest '),
+        prefix('Token '),
+        prefix('ApiKey '),
+      ];
+    case 'prefer':
+      return [value('return=representation'), value('return=minimal')];
+    default:
+      return [];
+  }
+}
