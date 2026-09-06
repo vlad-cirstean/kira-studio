@@ -81,6 +81,9 @@
   --kira-tabbar-h: var(--kira-bar-h);
   --kira-toolbar-h: var(--kira-bar-h);
   --kira-statusbar-h: 26px;
+  /* P22 D1: the one bar --kira-bar-h's own family missed — .p-view-head was still a literal 28px,
+     one bar shorter than the 34px .p-toolbar directly beneath it in every view (F2(c)). */
+  --kira-viewhead-h: var(--kira-bar-h);
   --kira-titlebar-inset-left: 78px;
   --kira-shadow: 0 2px 8px rgb(0 0 0 / 0.32);
   --kira-shadow-dialog: 0 8px 28px rgb(0 0 0 / 0.45);
@@ -95,10 +98,15 @@
      primitives.css instead of each component inventing its own. --kira-t-md tracks
      the user's Appearance font-size setting; the other three steps are fixed
      offsets from it so the scale never falls out of sync with that setting. */
-  --kira-t-xs: 10px;
-  --kira-t-sm: 11px;
+  /* P22 D1: the three fixed steps become real offsets from --kira-font-size (F2(d) — they were
+     literals, so the comment above was false for them; only --kira-t-md moved with Appearance). At
+     the 12px default every value below is unchanged. --kira-t-xl stays a literal: it sizes
+     empty-state headings, not controls, and deriving it would grow a heading by the same absolute
+     amount as body copy — the wrong ratio for a heading. */
+  --kira-t-xs: calc(var(--kira-font-size) - 2px); /* 10px at the 12px default */
+  --kira-t-sm: calc(var(--kira-font-size) - 1px); /* 11px */
   --kira-t-md: var(--kira-font-size);
-  --kira-t-lg: 13px;
+  --kira-t-lg: calc(var(--kira-font-size) + 1px); /* 13px */
   --kira-t-xl: 20px;
 
   --kira-s-1: 2px;
@@ -113,6 +121,21 @@
   --kira-h-md: 26px;
   --kira-h-lg: 30px;
   --kira-icon-box: 16px;
+
+  /* P22 D1: the *control* half of the role layer --kira-bar-h (above) is the *bar* half of. The
+     --kira-h-* scale is the vocabulary of sizes that exist; these name which size each family of
+     controls uses, so "make every form control one step taller" is one edit here rather than
+     re-picking a step in a dozen rules (this file's own scale comment above already claimed this
+     property; it was true of the steps and not of the roles). Every alias resolves to exactly what
+     its consumers used before this commit — this commit changes no rendered control height. */
+  --kira-control-h: var(
+    --kira-h-sm
+  ); /* toolbar density: input, select, segmented, button, icon button, row */
+  --kira-control-h-lg: var(
+    --kira-h-md
+  ); /* dialog density: .md variants, dialog button, tab, panel head, table head */
+  --kira-control-h-sm: var(--kira-h-xs); /* chip / badge / count / status density */
+  --kira-control-inline-h: 14px; /* drawn inside a control or a bar: checkbox box, toolbar separator, tab rail */
 
   /* §8.12 connection color palette — softened to oklch(0.72 0.09 h): one lightness
      and one chroma for all eleven hues plus a near-neutral grey, so no connection

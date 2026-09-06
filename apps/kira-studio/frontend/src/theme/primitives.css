@@ -33,8 +33,8 @@
 
 /* ---------- P1 icon button ---------- */
 .p-iconbtn {
-  height: var(--kira-h-sm);
-  width: var(--kira-h-sm);
+  height: var(--kira-control-h);
+  width: var(--kira-control-h);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -68,7 +68,7 @@
 
 /* ---------- P2 text button ---------- */
 .p-btn {
-  height: var(--kira-h-sm);
+  height: var(--kira-control-h);
   display: inline-flex;
   align-items: center;
   gap: var(--kira-s-2);
@@ -100,7 +100,7 @@
 
 /* ---------- P3 dialog button (h-md, the only bordered button) ---------- */
 .p-dlgbtn {
-  height: var(--kira-h-md);
+  height: var(--kira-control-h-lg);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -126,7 +126,7 @@
 
 /* ---------- P4 input ---------- */
 .p-input {
-  height: var(--kira-h-sm);
+  height: var(--kira-control-h);
   display: inline-flex;
   align-items: center;
   gap: var(--kira-s-2);
@@ -144,7 +144,7 @@
   font-size: var(--kira-t-sm);
 }
 .p-input.md {
-  height: var(--kira-h-md);
+  height: var(--kira-control-h-lg);
 }
 .p-input.ui {
   font-family: -apple-system, "SF Pro Text", system-ui, "Segoe UI", sans-serif;
@@ -273,16 +273,16 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 14px;
-  height: 14px;
+  width: var(--kira-control-inline-h);
+  height: var(--kira-control-inline-h);
   margin-top: var(--kira-s-1);
   flex-shrink: 0;
 }
 .p-check input[type="checkbox"] {
   appearance: none;
   margin: 0;
-  width: 14px;
-  height: 14px;
+  width: var(--kira-control-inline-h);
+  height: var(--kira-control-inline-h);
   border-radius: 3px;
   border: var(--kira-border-width) solid var(--kira-border-strong);
   background: var(--kira-bg-input);
@@ -371,7 +371,7 @@
    (a bare, unstyled native control) rather than this file's previous appearance:none + manual-SVG
    approach — acceptable since, again, the Chromium version here is pinned, not guessed at. */
 .p-select {
-  height: var(--kira-h-sm);
+  height: var(--kira-control-h);
   display: inline-flex;
   align-items: center;
   gap: var(--kira-s-2);
@@ -419,7 +419,7 @@
   padding-right: calc(var(--kira-s-2) + 14px);
 }
 .p-select.md {
-  height: var(--kira-h-md);
+  height: var(--kira-control-h-lg);
 }
 .p-select:focus-visible {
   border-color: var(--kira-focus);
@@ -439,14 +439,14 @@
 /* ---------- P6 segmented ---------- */
 .p-seg {
   display: inline-flex;
-  height: var(--kira-h-sm);
+  height: var(--kira-control-h);
   border: var(--kira-border-width) solid var(--kira-border-strong);
   border-radius: var(--kira-radius-sm);
   overflow: hidden;
   flex-shrink: 0;
 }
 .p-seg.md {
-  height: var(--kira-h-md);
+  height: var(--kira-control-h-lg);
 }
 .p-seg > * {
   display: flex;
@@ -470,7 +470,7 @@
 
 /* ---------- P7 tab ---------- */
 .p-tab {
-  height: var(--kira-h-md);
+  height: var(--kira-control-h-lg);
   display: inline-flex;
   align-items: center;
   gap: var(--kira-s-2);
@@ -491,7 +491,7 @@
 
 /* ---------- P8 row ---------- */
 .p-row {
-  height: var(--kira-h-sm);
+  height: var(--kira-control-h);
   display: flex;
   align-items: center;
   gap: var(--kira-s-2);
@@ -511,7 +511,7 @@
 
 /* ---------- P9 badge / count / chip ---------- */
 .p-badge {
-  height: var(--kira-h-xs);
+  height: var(--kira-control-h-sm);
   display: inline-flex;
   align-items: center;
   padding: 0 var(--kira-s-3);
@@ -524,8 +524,8 @@
   white-space: nowrap;
 }
 .p-count {
-  min-width: var(--kira-h-xs);
-  height: var(--kira-h-xs);
+  min-width: var(--kira-control-h-sm);
+  height: var(--kira-control-h-sm);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -538,7 +538,7 @@
   flex-shrink: 0;
 }
 .p-chip {
-  height: var(--kira-h-xs);
+  height: var(--kira-control-h-sm);
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -606,7 +606,7 @@
 
 /* ---------- P10 status-bar item ---------- */
 .p-status {
-  height: var(--kira-h-xs);
+  height: var(--kira-control-h-sm);
   display: inline-flex;
   align-items: center;
   gap: var(--kira-s-2);
@@ -635,7 +635,7 @@
   overflow: hidden;
 }
 .p-menu-label {
-  height: var(--kira-h-xs);
+  height: var(--kira-control-h-sm);
   display: flex;
   align-items: center;
   padding: 0 var(--kira-s-3);
@@ -661,7 +661,7 @@
   min-height: 0;
 }
 .p-panel-head {
-  height: var(--kira-h-md);
+  height: var(--kira-control-h-lg);
   flex-shrink: 0;
   display: flex;
   align-items: center;
@@ -695,7 +695,7 @@
 }
 .p-toolbar .sep {
   width: var(--kira-border-width);
-  height: 14px;
+  height: var(--kira-control-inline-h);
   background: var(--kira-border-strong);
   margin: 0 var(--kira-s-1);
   flex-shrink: 0;
@@ -724,7 +724,7 @@
 }
 .p-tab-rail {
   width: 2px;
-  height: 14px;
+  height: var(--kira-control-inline-h);
   border-radius: 1px;
   flex-shrink: 0;
   background: var(--kira-rail, transparent);
@@ -740,7 +740,10 @@
 
 /* ---------- view header — every non-grid view opens with this ---------- */
 .p-view-head {
-  height: 28px;
+  /* P22 D1: was a literal 28px, one bar shorter than .p-toolbar's 34px directly beneath it in
+     every view — fb7476e's own bar-role family (tokens.css) missed this one bar (F2(c)). The one
+     deliberate rendered height change in this commit. */
+  height: var(--kira-viewhead-h);
   flex-shrink: 0;
   display: flex;
   align-items: center;
@@ -834,7 +837,7 @@
 
 /* ---------- tabular body shared by grid / kv / stream / console ---------- */
 .p-thead {
-  height: var(--kira-h-md);
+  height: var(--kira-control-h-lg);
   flex-shrink: 0;
   display: flex;
   background: var(--kira-bg-elevated);
@@ -926,6 +929,8 @@
   gap: var(--kira-s-4);
   color: var(--kira-fg-subtle);
 }
+/* P22 D1: stays a literal — an empty-state illustration glyph, not a control, so the role scale
+   does not reach it. */
 .p-empty .big {
   width: 24px;
   height: 24px;
