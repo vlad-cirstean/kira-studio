@@ -45,6 +45,15 @@ func (s *TreeService) Definition(args TreeDescribeArgs) (tree.DefinitionResult, 
 	return s.Deps.Tree.Definition(args.ConnectionID, args.Path, args.Refresh, args.TabID)
 }
 
+// SchemaColumns is P22c D3 — Args reuses TreeDescribeArgs (TabID unused: a schema-wide fetch is
+// not tagged to one tab's op-log row).
+func (s *TreeService) SchemaColumns(args TreeDescribeArgs) (tree.SchemaColumnsResult, error) {
+	if args.ConnectionID == "" {
+		return tree.SchemaColumnsResult{}, ipcerr.BadRequest("connectionId is required")
+	}
+	return s.Deps.Tree.SchemaColumns(args.ConnectionID, args.Path, args.Refresh)
+}
+
 // TreeInvalidateArgs's Path nil drops the whole connection; non-nil drops one node.
 type TreeInvalidateArgs struct {
 	ConnectionID string  `json:"connectionId"`

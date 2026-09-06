@@ -216,6 +216,40 @@ func (r *Router) Definition(ctx context.Context, connectionID string, path model
 	return value.(model.ObjectDefinition), nil
 }
 
+// SchemaColumns is P22c D1/D2's schema-wide sibling of Describe.
+func (r *Router) SchemaColumns(ctx context.Context, connectionID string, path model.NodePath) ([]model.RelationColumns, error) {
+	adapter, err := requireLiveAdapter(connectionID)
+	if err != nil {
+		return nil, err
+	}
+	id := connectionID
+	_, value, err := r.host.RunOp(ctx, OpSpec{ConnectionID: &id, Kind: "schemaColumns"},
+		func(ctx context.Context, op *adapters.OpCtx) (any, error) {
+			relations, err := adapter.SchemaColumns(ctx, path, op)
+			if err != nil {
+				return nil, err
+			}
+			total := 0
+			for i := range relations {
+				// Same nil-slice-over-the-wire hazard Describe/Definition already guard against.
+				if relations[i].Columns == nil {
+					relations[i].Columns = []model.ColumnMeta{}
+				}
+				total += len(relations[i].Columns)
+			}
+			op.SetRows(total)
+			return relations, nil
+		})
+	if err != nil {
+		return nil, err
+	}
+	relations := value.([]model.RelationColumns)
+	if relations == nil {
+		relations = []model.RelationColumns{}
+	}
+	return relations, nil
+}
+
 // ---- bridge.Canceller ----
 
 // Cancel asks the in-process scheduler — the only place an op can be running now that P58f's
