@@ -30,6 +30,7 @@ export function toSavedRequest(state: HttpRequestTabState): HttpSavedRequest {
     urlEncoded: state.urlEncoded.map((f) => ({ ...f })),
     formData: state.formData.map((f) => ({ ...f })),
     binaryFile: state.binaryFile ? { ...state.binaryFile } : null,
+    paramDescriptions: { ...state.paramDescriptions },
   };
 }
 
@@ -48,6 +49,7 @@ export function fromSavedRequest(saved: HttpSavedRequest): Partial<HttpRequestTa
     urlEncoded: saved.urlEncoded.map((f) => ({ ...f })),
     formData: saved.formData.map((f) => ({ ...f })),
     binaryFile: saved.binaryFile ? { ...saved.binaryFile } : null,
+    paramDescriptions: { ...saved.paramDescriptions },
   };
 }
 
@@ -93,11 +95,20 @@ function sameRequest(a: HttpSavedRequest, b: HttpSavedRequest): boolean {
   if (!sameRows(a.headers, b.headers, sameNameValue)) return false;
   if (!sameRows(a.urlEncoded, b.urlEncoded, sameNameValue)) return false;
   if (!sameRows(a.formData, b.formData, sameFormField)) return false;
-  return sameBinaryFile(a.binaryFile, b.binaryFile);
+  if (!sameBinaryFile(a.binaryFile, b.binaryFile)) return false;
+  return sameStringMap(a.paramDescriptions, b.paramDescriptions);
 }
 
 function sameRows<T>(a: readonly T[], b: readonly T[], eq: (x: T, y: T) => boolean): boolean {
   return a.length === b.length && a.every((row, i) => eq(row, b[i]));
+}
+
+// P22b D7: paramDescriptions' own comparison — key order is exactly the "not guaranteed across
+// two objects built by different code paths" case this file's own top comment already names.
+function sameStringMap(a: Record<string, string>, b: Record<string, string>): boolean {
+  const aKeys = Object.keys(a);
+  if (aKeys.length !== Object.keys(b).length) return false;
+  return aKeys.every((k) => a[k] === b[k]);
 }
 
 function sameNameValue(

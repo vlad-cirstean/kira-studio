@@ -103,6 +103,22 @@ export function buildQuery(pairs: readonly QueryPair[]): string {
     .join('&');
 }
 
+/** P22b D7: rebuilds the query params' own description side-car map fresh from the rows just
+ *  written, rather than patching one key in place — a rename moves the description with the row
+ *  it belongs to (same row object, new name) and a deleted/renamed-away param's old key is never
+ *  carried forward, pruning the orphan for free. A duplicate name (`?a=1&a=2`) shares one
+ *  description, by construction: whichever row for that name appears last in `rows` wins (the
+ *  side-car cannot tell two same-named rows apart — a real, documented limitation, not a bug). */
+export function reconcileParamDescriptions(
+  rows: readonly { name: string; description?: string }[],
+): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const row of rows) {
+    if (row.name && row.description) out[row.name] = row.description;
+  }
+  return out;
+}
+
 function withScheme(base: string): string {
   return /^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(base) ? base : `https://${base}`;
 }

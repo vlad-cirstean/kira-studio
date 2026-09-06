@@ -110,11 +110,15 @@ func buildRequest(origin json.RawMessage, saved model.SavedRequest) json.RawMess
 	// writing it unconditionally removes a comparison.
 	out["method"] = mustRaw(saved.Method)
 
-	if ImportURL(members["url"]) != saved.URL {
+	// P22b D7: a param description can change with the URL string untouched, so the origin `url`
+	// member has to be rebuilt on either change, not just the raw string comparison alone.
+	urlChanged := ImportURL(members["url"]) != saved.URL
+	descriptionsChanged := !paramDescriptionsEqual(ImportParamDescriptions(members["url"]), saved.ParamDescriptions)
+	if urlChanged || descriptionsChanged {
 		if saved.URL == "" {
 			delete(out, "url")
 		} else {
-			out["url"] = mustRaw(Build(saved.URL))
+			out["url"] = mustRaw(BuildWithDescriptions(saved.URL, saved.ParamDescriptions))
 		}
 	}
 
@@ -204,7 +208,10 @@ func ShedOrigin(origin map[string]json.RawMessage, saved model.SavedRequest) map
 		return out
 	}
 	request := cloneOrigin(members)
-	if ImportURL(request["url"]) != saved.URL {
+	// P22b D7: a param description can change with the URL string untouched (see buildRequest's
+	// own comment above) — the origin url member must be shed on either change.
+	if ImportURL(request["url"]) != saved.URL ||
+		!paramDescriptionsEqual(ImportParamDescriptions(request["url"]), saved.ParamDescriptions) {
 		delete(request, "url")
 	}
 	if !headersEqual(importHeaders(request["header"]), saved.Headers) {
@@ -225,7 +232,22 @@ func ShedOrigin(origin map[string]json.RawMessage, saved model.SavedRequest) map
 
 func requestEqual(a, b model.SavedRequest) bool {
 	return a.Method == b.Method && a.URL == b.URL &&
-		headersEqual(a.Headers, b.Headers) && bodyEqual(bodyOf(a), bodyOf(b))
+		headersEqual(a.Headers, b.Headers) && bodyEqual(bodyOf(a), bodyOf(b)) &&
+		paramDescriptionsEqual(a.ParamDescriptions, b.ParamDescriptions)
+}
+
+// P22b D7: a query param's own description can change independently of the URL string itself, so
+// this needs its own comparison rather than folding into requestEqual's plain field checks above.
+func paramDescriptionsEqual(a, b map[string]string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for k, v := range a {
+		if b[k] != v {
+			return false
+		}
+	}
+	return true
 }
 
 func headersEqual(a, b []model.SavedHeader) bool {

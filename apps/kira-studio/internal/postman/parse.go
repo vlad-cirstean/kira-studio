@@ -219,7 +219,7 @@ func defaultRequestName(url string) string {
 // importRequest handles F2's first row: `request` is oneOf [object, string], and the schema's own
 // note says a string "is assumed to be the request URL and the method is assumed to be 'GET'".
 func importRequest(raw json.RawMessage, rep *Report) model.SavedRequest {
-	out := model.SavedRequest{Method: "GET", Headers: []model.SavedHeader{}}
+	out := model.SavedRequest{Method: "GET", Headers: []model.SavedHeader{}, ParamDescriptions: map[string]string{}}
 	defaultBody().applyTo(&out)
 
 	if url, ok := decodeString(raw); ok {
@@ -239,6 +239,9 @@ func importRequest(raw json.RawMessage, rep *Report) model.SavedRequest {
 		}
 	}
 	out.URL = ImportURL(obj["url"])
+	// P22b D7: a query param's own description, the one place it can arrive from Postman
+	// (url.query, not this app's own storage — F10 has no params array).
+	out.ParamDescriptions = ImportParamDescriptions(obj["url"])
 	out.Headers = importHeaders(obj["header"])
 	importBody(obj["body"], rep).applyTo(&out)
 	return out

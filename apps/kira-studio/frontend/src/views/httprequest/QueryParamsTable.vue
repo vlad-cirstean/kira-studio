@@ -1,5 +1,11 @@
 <script setup lang="ts">
-import { buildQuery, parseQuery, type QueryPair, splitUrl } from '@kira/api-core';
+import {
+  buildQuery,
+  parseQuery,
+  type QueryPair,
+  reconcileParamDescriptions,
+  splitUrl,
+} from '@kira/api-core';
 import type { HttpRequestTabRecord } from '@shared/domain/tabs';
 import { computed } from 'vue';
 import type { VariableSupport } from '../../api/state/variableCompletion';
@@ -16,19 +22,37 @@ const props = defineProps<{
   variables?: VariableSupport;
   /** P16 D13: HttpRequestView.vue's own #toolbar-2 filter box, forwarded to FieldRowsTable. */
   filterQuery?: string;
+  /** P22b D7: HttpRequestView.vue's own persisted description-column toggle, forwarded to
+   *  FieldRowsTable. */
+  showDescriptions?: boolean;
 }>();
 
-const pairs = computed<QueryPair[]>(() => parseQuery(splitUrl(props.tab.state.url).query));
-
-function blankParam(): QueryPair {
-  return { name: '', value: '' };
+// P22b D7: a query param row has nowhere of its own to carry a description (F10 — there is no
+// `params` array; the URL is the single source of truth for the query string, D9). `description`
+// is annotation merged in from the tab's own side-car map, keyed by name — never input to
+// buildQuery below, so the two can never disagree about what is actually sent.
+interface ParamRow extends QueryPair {
+  description: string;
 }
 
-function onUpdateRows(next: QueryPair[]): void {
+const pairs = computed<ParamRow[]>(() =>
+  parseQuery(splitUrl(props.tab.state.url).query).map((p) => ({
+    ...p,
+    description: props.tab.state.paramDescriptions[p.name] ?? '',
+  })),
+);
+
+function blankParam(): ParamRow {
+  return { name: '', value: '', description: '' };
+}
+
+function onUpdateRows(next: ParamRow[]): void {
   const { base, hash } = splitUrl(props.tab.state.url);
-  const query = buildQuery(next.filter((p) => p.name !== '' || p.value !== ''));
+  const realRows = next.filter((p) => p.name !== '' || p.value !== '');
+  const query = buildQuery(realRows);
   const url = base + (query ? `?${query}` : '') + (hash ? `#${hash}` : '');
-  patchHttpRequestTabState(props.tab.id, { url });
+  const paramDescriptions = reconcileParamDescriptions(realRows);
+  patchHttpRequestTabState(props.tab.id, { url, paramDescriptions });
 }
 </script>
 
@@ -42,6 +66,7 @@ function onUpdateRows(next: QueryPair[]): void {
     container-testid="http-params-table"
     :value-variable-support="variables"
     :filter-query="filterQuery"
+    :show-descriptions="showDescriptions"
     @update:rows="onUpdateRows"
   />
 </template>

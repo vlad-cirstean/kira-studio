@@ -76,6 +76,11 @@ type SavedRequest struct {
 	URLEncoded   []SavedField     `json:"urlEncoded"`
 	FormData     []SavedFormField `json:"formData"`
 	BinaryFile   *SavedFile       `json:"binaryFile"`
+	// ParamDescriptions is P22b D7 — a query param's own description, keyed by name. A side-car
+	// map rather than a row on a `params` array: there is no such array (the URL is the single
+	// source of truth for the query string), so this is annotation only, never input to what
+	// actually gets sent.
+	ParamDescriptions map[string]string `json:"paramDescriptions"`
 }
 
 // SavedHeader is one header row. `enabled` has no wire counterpart — it exists so the builder can

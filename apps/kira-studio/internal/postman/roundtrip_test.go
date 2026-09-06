@@ -209,9 +209,23 @@ func TestEveryOneOfParsesAndSurvives(t *testing.T) {
 	})
 
 	t.Run("a path-variable segment contributes its value, a disabled query param does not", func(t *testing.T) {
-		got := tree.Items[itemIndex(t, tree, "path variable segment")].Request.URL
-		if got != "https://api.example.com:8443/users/:id/orders?limit=10#section" {
-			t.Fatalf("got %q", got)
+		req := tree.Items[itemIndex(t, tree, "path variable segment")].Request
+		if req.URL != "https://api.example.com:8443/users/:id/orders?limit=10#section" {
+			t.Fatalf("got %q", req.URL)
+		}
+		// P22b D7/F10: a query param's own description arrives from Postman's own url.query — the
+		// one place it can, since this app has no params row of its own. "limit"'s survives;
+		// "cursor" is disabled (dropped from the URL entirely, D9) and never a description key.
+		wantDescriptions := map[string]string{"limit": "how many"}
+		if !reflect.DeepEqual(req.ParamDescriptions, wantDescriptions) {
+			t.Fatalf("ParamDescriptions = %#v, want %#v", req.ParamDescriptions, wantDescriptions)
+		}
+		// Untouched, so the whole url object — description included — is re-emitted verbatim.
+		if !reflect.DeepEqual(
+			requestOf(t, outItems["path variable segment"])["url"],
+			requestOf(t, inItems["path variable segment"])["url"],
+		) {
+			t.Fatal("an untouched url object was rewritten")
 		}
 	})
 
@@ -428,6 +442,33 @@ func TestAnEditedBodyExportsCanonicallyAndShedsItsOrigin(t *testing.T) {
 			t.Fatal("an untouched url was shed too")
 		}
 	})
+}
+
+// TestAnEditedParamDescriptionExportsAndShedsItsOrigin is P22b D7's own edge case: a param
+// description can change with the URL string itself untouched, which is exactly the case
+// requestEqual/ShedOrigin's plain string comparisons would miss without their own
+// paramDescriptionsEqual check.
+func TestAnEditedParamDescriptionExportsAndShedsItsOrigin(t *testing.T) {
+	tree := parseFile(t, "oneofs.json")
+	idx := itemIndex(t, tree, "path variable segment")
+
+	tree.Items[idx].Request.ParamDescriptions = map[string]string{"limit": "how many, edited"}
+	tree.Items[idx].Origin = postman.ShedOrigin(tree.Items[idx].Origin, tree.Items[idx].Request)
+
+	out := requestOf(t, items(exported(t, tree))["path variable segment"])
+	query := out["url"].(map[string]any)["query"].([]any)
+	limit := query[0].(map[string]any)
+	if limit["key"] != "limit" || limit["description"] != "how many, edited" {
+		t.Fatalf("exported query = %#v", query)
+	}
+
+	var request map[string]json.RawMessage
+	if err := json.Unmarshal(tree.Items[idx].Origin["request"], &request); err != nil {
+		t.Fatalf("origin request: %v", err)
+	}
+	if _, ok := request["url"]; ok {
+		t.Fatal("the stale url (with its old description) is still in origin")
+	}
 }
 
 // TestExportStripsLocalFilePathsToTheirBaseName is P21 round 3 architecture/security finding 9:

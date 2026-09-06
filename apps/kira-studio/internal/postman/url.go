@@ -145,6 +145,63 @@ func isAllDigits(s string) bool {
 	return len(s) > 0
 }
 
+// ImportParamDescriptions extracts a query param's own description (P22b D7) from Postman's
+// url.query array — the one place a per-param description can arrive, since this app has no
+// native params row of its own (F10). raw is the same `url` member ImportURL reads; a bare
+// string (no query array at all) yields an empty, non-nil map.
+func ImportParamDescriptions(raw json.RawMessage) map[string]string {
+	out := map[string]string{}
+	obj := decodeObject(raw)
+	if obj == nil {
+		return out
+	}
+	for _, entry := range decodeArray(obj["query"]) {
+		row := decodeObject(entry)
+		if row == nil {
+			continue
+		}
+		key, _ := decodeScalarString(row["key"])
+		if key == "" {
+			continue
+		}
+		if d := decodeDescription(row["description"]); d != "" {
+			out[key] = d
+		}
+	}
+	return out
+}
+
+// BuildWithDescriptions is Build plus each query param's own description (P22b D7), attached to
+// the matching `query` entry when one exists — a separate entry point rather than widening
+// Build's own signature, since every existing caller (this package's own tests included) calls
+// Build with exactly the one argument Import(Build(s)) == s already depends on.
+func BuildWithDescriptions(raw string, descriptions map[string]string) map[string]json.RawMessage {
+	out := Build(raw)
+	if len(descriptions) == 0 {
+		return out
+	}
+	queryRaw, ok := out["query"]
+	if !ok {
+		return out
+	}
+	var entries []map[string]any
+	if err := json.Unmarshal(queryRaw, &entries); err != nil {
+		return out
+	}
+	changed := false
+	for _, e := range entries {
+		key, _ := e["key"].(string)
+		if d, ok := descriptions[key]; ok && d != "" {
+			e["description"] = d
+			changed = true
+		}
+	}
+	if changed {
+		out["query"] = mustRaw(entries)
+	}
+	return out
+}
+
 // ImportURL turns Postman's `url` member — a string or an object (F2) — back into this app's raw
 // URL string. An object's own `raw` wins when it is present and non-empty, which is the common
 // case and which preserves `:pathVariable` segments and `{{baseUrl}}` references exactly as typed.

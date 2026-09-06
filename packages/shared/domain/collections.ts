@@ -42,6 +42,17 @@ export const httpSavedRequestSchema = /*#__PURE__*/ z.object({
   urlEncoded: /*#__PURE__*/ z.array(httpUrlEncodedFieldSchema).default([]),
   formData: /*#__PURE__*/ z.array(httpFormDataFieldSchema).default([]),
   binaryFile: httpBinaryFileSchema,
+  // P22b D7: a query param's own description, keyed by name — see httpRequestTabStateShape's own
+  // comment (domain/http.ts) for why this is a side-car map rather than a `params` array. A plain
+  // `.default({})` is not enough here, unlike every other field's `.default()` on this schema:
+  // this member is brand new, so *every* row saved before this phase omits the Go struct field
+  // entirely, and Go's own JSON encoder (no `omitempty` tag, matching this file's siblings) writes
+  // an absent/nil map as the literal `null` rather than dropping the key — and Zod's `.default()`
+  // only ever fires for `undefined`, never `null` (confirmed against this repo's own zod version).
+  // The preprocess step normalizes both to `{}` before the record schema ever sees them.
+  paramDescriptions: /*#__PURE__*/ z
+    .preprocess((v) => v ?? {}, z.record(z.string(), z.string()))
+    .default({}),
 });
 export type HttpSavedRequest = z.infer<typeof httpSavedRequestSchema>;
 

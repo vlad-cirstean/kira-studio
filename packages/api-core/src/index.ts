@@ -87,6 +87,7 @@ export {
   httpRequestTitle,
   parseQuery,
   type QueryPair,
+  reconcileParamDescriptions,
   type SplitUrl,
   splitUrl,
 } from './http/url';

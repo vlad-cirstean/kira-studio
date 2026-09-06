@@ -39,6 +39,9 @@ const props = defineProps<{
   /** P16 D13: HttpRequestView.vue's own #toolbar-2 filter box, forwarded to whichever body mode
    *  is a row table (urlencoded, form-data) — a no-op for the raw/code/binary modes below. */
   filterQuery?: string;
+  /** P22b D7: HttpRequestView.vue's own persisted description-column toggle, forwarded the same
+   *  way — a no-op for the raw/code/binary modes below. */
+  showDescriptions?: boolean;
 }>();
 
 // P15 D6: JSON is a UI-level segment over the same `bodyMode`/`codeLanguage` storage — no schema,
@@ -179,12 +182,14 @@ const caption = computed(() =>
       :tab="tab"
       :variables="variables"
       :filter-query="filterQuery"
+      :show-descriptions="showDescriptions"
     />
     <FormDataTable
       v-else-if="tab.state.bodyMode === 'formdata'"
       :tab="tab"
       :variables="variables"
       :filter-query="filterQuery"
+      :show-descriptions="showDescriptions"
     />
     <BinaryBodyPicker v-else-if="tab.state.bodyMode === 'file'" :tab="tab" />
   </div>

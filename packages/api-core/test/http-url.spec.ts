@@ -8,7 +8,7 @@
 import { describe, expect, test } from 'bun:test';
 import { goQueryEscape } from '../src/http/escape';
 import { splitTemplateSpans } from '../src/http/substitute';
-import { buildQuery, parseQuery } from '../src/http/url';
+import { buildQuery, parseQuery, reconcileParamDescriptions } from '../src/http/url';
 
 describe('http/substitute.ts splitTemplateSpans', () => {
   test('splits literal text around a {{name}} reference', () => {
@@ -117,5 +117,48 @@ describe('http/escape.ts goQueryEscape leaves a {{variable}} reference untouched
 
   test('a plain value with no reference escapes exactly as before', () => {
     expect(goQueryEscape('a b(c)')).toBe('a+b%28c%29');
+  });
+});
+
+// P22b D7: boundary arithmetic over a side-car map's own keys — a query param has no row of its
+// own to carry a description (no `params` array, D9), so this is the one place the "rename moves
+// it, delete prunes it, a duplicate shares one" rules the row asks for actually live.
+describe('http/url.ts reconcileParamDescriptions (P22b D7)', () => {
+  test('a plain row keeps its description', () => {
+    expect(reconcileParamDescriptions([{ name: 'limit', description: 'how many' }])).toEqual({
+      limit: 'how many',
+    });
+  });
+
+  test('renaming a param moves its description with it (same row, new name)', () => {
+    // The row itself carries the new name and its own unchanged description — reconcile is only
+    // ever handed the *current* rows, so there is nothing to "move" beyond keying off row.name.
+    expect(reconcileParamDescriptions([{ name: 'max', description: 'how many' }])).toEqual({
+      max: 'how many',
+    });
+  });
+
+  test('a param no longer present prunes its old key — nothing carries it forward', () => {
+    expect(
+      reconcileParamDescriptions([
+        { name: 'limit', description: 'how many' },
+        { name: 'cursor', description: '' },
+      ]),
+    ).toEqual({ limit: 'how many' });
+  });
+
+  test('a duplicate name shares one description — the last row for that name wins (OQ-2)', () => {
+    expect(
+      reconcileParamDescriptions([
+        { name: 'a', description: 'first' },
+        { name: 'a', description: 'second' },
+      ]),
+    ).toEqual({ a: 'second' });
+  });
+
+  test('a nameless or description-less row contributes nothing', () => {
+    expect(
+      reconcileParamDescriptions([{ name: '', description: 'orphaned' }, { name: 'x' }]),
+    ).toEqual({});
   });
 });

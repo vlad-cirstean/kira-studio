@@ -204,6 +204,15 @@ function toggleFieldFilter(): void {
   if (!fieldFilterOpen.value) fieldFilterQuery.value = '';
 }
 
+// P22b D7: HttpRequestView.vue's own persisted description-column toggle, mirrored here —
+// fieldDescriptions is a tab-state field (unlike fieldFilterOpen above), so it survives a tab
+// restore (OQ-1).
+function toggleFieldDescriptions(): void {
+  patchGrpcRequestTabState(props.tab.id, {
+    fieldDescriptions: !props.tab.state.fieldDescriptions,
+  });
+}
+
 // P17 D20/item 8: same component-local flag as HttpRequestView.vue's own.
 const overviewOpen = ref(false);
 
@@ -354,6 +363,14 @@ onUnmounted(() => {
           data-testid="grpc-field-filter-toggle"
           @click="toggleFieldFilter"
         />
+        <IconButton
+          v-if="tab.state.requestPane === 'metadata'"
+          icon="note"
+          :active="tab.state.fieldDescriptions"
+          v-tooltip="tab.state.fieldDescriptions ? 'Hide descriptions' : 'Show descriptions'"
+          data-testid="grpc-field-descriptions-toggle"
+          @click="toggleFieldDescriptions"
+        />
         <div class="overview-anchor">
           <IconButton
             icon="symbol-variable"
@@ -395,7 +412,12 @@ onUnmounted(() => {
               placeholder="Filter"
               testid="grpc-field-filter"
             />
-            <MetadataTable :tab="tab" :filter-query="fieldFilterQuery" :variables="variables" />
+            <MetadataTable
+              :tab="tab"
+              :filter-query="fieldFilterQuery"
+              :variables="variables"
+              :show-descriptions="tab.state.fieldDescriptions"
+            />
           </template>
           <SchemaBrowser v-else :tab="tab" />
         </div>

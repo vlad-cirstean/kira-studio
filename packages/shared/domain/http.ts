@@ -312,6 +312,18 @@ const httpRequestTabStateShape = /*#__PURE__*/ z.object({
   urlEncoded: /*#__PURE__*/ z.array(httpUrlEncodedFieldSchema).default([]),
   formData: /*#__PURE__*/ z.array(httpFormDataFieldSchema).default([]),
   binaryFile: httpBinaryFileSchema,
+  // P22b D7: a query param has nowhere to store a description on its own row — there is no
+  // `params` array (the comment above this shape explains why one is never added), so a
+  // description is annotation over the URL's own query string, keyed by param name, never input to
+  // buildQuery. A duplicate param name (`?a=1&a=2`) shares one description — a real, named
+  // limitation (OQ-2) rather than a second array that could disagree with the URL about what is
+  // sent.
+  paramDescriptions: /*#__PURE__*/ z.record(z.string(), z.string()).default({}),
+  // P22b D7: FieldRowsTable's own description-column toggle, persisted per tab rather than
+  // runtime-only (OQ-1: a user who wants it always visible should not have to re-open it every
+  // time the tab restores) — shared by every one of this tab's row tables (headers, params,
+  // urlencoded, form-data), which is why it is one flag, not four.
+  fieldDescriptions: z.boolean().default(false),
   // P4 D14: a saved request's identity and its name, both `.default()`ed like every other field
   // so a tab saved before P4 restores unchanged. `itemId` is the api_items row this tab is bound
   // to (null = a scratch request that has never been saved); it lives here rather than in the

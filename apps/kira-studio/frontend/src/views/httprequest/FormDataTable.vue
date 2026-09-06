@@ -24,6 +24,9 @@ const props = defineProps<{
   variables?: VariableSupport;
   /** P16 D13: HttpRequestView.vue's own #toolbar-2 filter box, forwarded to FieldRowsTable. */
   filterQuery?: string;
+  /** P22b D7: HttpRequestView.vue's own persisted description-column toggle, forwarded to
+   *  FieldRowsTable. */
+  showDescriptions?: boolean;
 }>();
 
 function blankField(): HttpFormDataFieldState {
@@ -86,6 +89,7 @@ function onClearFile(index: number): void {
     testid-prefix="http-formdata"
     container-testid="http-formdata-table"
     :filter-query="filterQuery"
+    :show-descriptions="showDescriptions"
     @update:rows="onUpdateRows"
   >
     <template #value="{ row, update }">

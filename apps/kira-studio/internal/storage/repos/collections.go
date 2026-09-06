@@ -187,6 +187,14 @@ func decodeSavedRequest(itemID, body string) (model.SavedRequest, error) {
 		slog.Warn("collection request failed validation", "scope", "storage/collections", "id", itemID, "err", err)
 		return model.SavedRequest{}, fmt.Errorf("repos/collections: item %s: %w", itemID, err)
 	}
+	// P22b D7: ParamDescriptions is brand new — every row saved before this phase has no such key
+	// at all, so json.Unmarshal leaves the field nil, which re-marshals as JSON `null` rather than
+	// an absent key (no `omitempty` tag, matching this struct's other map/slice fields). Normalized
+	// here rather than relying on the frontend's own Zod default, which only ever fires for
+	// `undefined`, never `null`.
+	if req.ParamDescriptions == nil {
+		req.ParamDescriptions = map[string]string{}
+	}
 	return req, nil
 }
 
@@ -233,7 +241,10 @@ func (r *CollectionsRepo) CreateItem(collectionID string, parentID *string, kind
 	}
 	requestJSON := ""
 	if kind == model.CollectionItemRequest {
-		req := model.SavedRequest{Method: "GET", Headers: []model.SavedHeader{}, BodyMode: "none", CodeLanguage: "json"}
+		req := model.SavedRequest{
+			Method: "GET", Headers: []model.SavedHeader{}, BodyMode: "none", CodeLanguage: "json",
+			ParamDescriptions: map[string]string{},
+		}
 		if request != nil {
 			req = *request
 		}

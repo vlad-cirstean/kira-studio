@@ -238,6 +238,15 @@ function toggleFieldFilter(): void {
   if (!fieldFilterOpen.value) fieldFilterQuery.value = '';
 }
 
+// P22b D7: unlike fieldFilterOpen above, this is persisted per tab (httpRequestTabStateShape's
+// own fieldDescriptions) rather than a component-local lens — OQ-1's own resolution: a user who
+// wants the description column always visible should not have to reopen it on every tab restore.
+// One flag shared by every row table this tab renders (Params, Headers, and — through
+// RequestBodyPane — urlencoded/form-data), matching the single toggle the row asks for.
+function toggleFieldDescriptions(): void {
+  patchHttpRequestTabState(props.tab.id, { fieldDescriptions: !props.tab.state.fieldDescriptions });
+}
+
 // D6: 0 means "the default half" — PanelSplitter itself needs a real pixel size.
 const DEFAULT_REQUEST_PANE_HEIGHT = 260;
 const requestPaneHeight = computed(
@@ -381,6 +390,14 @@ onUnmounted(() => {
           data-testid="http-field-filter-toggle"
           @click="toggleFieldFilter"
         />
+        <IconButton
+          v-if="showFieldFilterToggle"
+          icon="note"
+          :active="tab.state.fieldDescriptions"
+          v-tooltip="tab.state.fieldDescriptions ? 'Hide descriptions' : 'Show descriptions'"
+          data-testid="http-field-descriptions-toggle"
+          @click="toggleFieldDescriptions"
+        />
         <div class="overview-anchor">
           <IconButton
             icon="symbol-variable"
@@ -413,14 +430,22 @@ onUnmounted(() => {
             :tab="tab"
             :variables="variables"
             :filter-query="fieldFilterQuery"
+            :show-descriptions="tab.state.fieldDescriptions"
           />
           <RequestHeadersTable
             v-else-if="tab.state.requestPane === 'headers'"
             :tab="tab"
             :variables="variables"
             :filter-query="fieldFilterQuery"
+            :show-descriptions="tab.state.fieldDescriptions"
           />
-          <RequestBodyPane v-else :tab="tab" :variables="variables" :filter-query="fieldFilterQuery" />
+          <RequestBodyPane
+            v-else
+            :tab="tab"
+            :variables="variables"
+            :filter-query="fieldFilterQuery"
+            :show-descriptions="tab.state.fieldDescriptions"
+          />
         </div>
 
         <PanelSplitter
