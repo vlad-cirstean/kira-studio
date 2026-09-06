@@ -218,6 +218,114 @@ func (r *ConnectionsRepo) Update(connID string, f model.ConnectionFields, update
 	return *updated, nil
 }
 
+// InsertWithSecret is Insert plus the row's password column, written in the very same INSERT
+// statement — P21 round 3 finding 4: connections.Service.Create used to Insert the row and then
+// Secrets.Set the password as two separate statements, so a Secrets.Set failure (SQLite busy/IO, a
+// keychain item that vanished between the cipher probe and the write — anything other than "cipher
+// unavailable", which is pre-validated by the caller before either write) left a passwordless
+// connection row committed and visible in the list, with the caller told the create had failed.
+// secretEnc is the already-encrypted ciphertext (or nil for "no password"); this method never
+// touches the cipher itself, mirroring SecretsRepo's own "one file touches connections.password"
+// discipline as closely as a single combined statement allows.
+func (r *ConnectionsRepo) InsertWithSecret(connID string, f model.ConnectionFields, createdAt string, secretEnc *string) (model.ConnectionSummary, error) {
+	optionsJSON, err := json.Marshal(f.Options)
+	if err != nil {
+		return model.ConnectionSummary{}, fmt.Errorf("repos/connections: encode options: %w", err)
+	}
+
+	tx, err := r.DB.Begin()
+	if err != nil {
+		return model.ConnectionSummary{}, fmt.Errorf("repos/connections: begin: %w", err)
+	}
+	defer tx.Rollback() //nolint:errcheck
+
+	var sortOrder int
+	if err := tx.QueryRow(`SELECT COALESCE(MAX(sort_order), -1) + 1 FROM connections`).Scan(&sortOrder); err != nil {
+		return model.ConnectionSummary{}, fmt.Errorf("repos/connections: next sort order: %w", err)
+	}
+	if _, err := tx.Exec(`
+		INSERT INTO connections (
+			id, name, kind, color, mode, read_only, host, port, database, username, uri,
+			options_json, preconnect, preconnect_sidecar, auto_explain, throttle_per_sec,
+			created_at, updated_at, sort_order, password
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`,
+		connID, f.Name, f.Kind, f.Color, f.Mode, boolToInt(f.ReadOnly), f.Host, f.Port, f.Database,
+		f.Username, f.URI, string(optionsJSON), f.Preconnect, boolToInt(f.PreconnectSidecar),
+		boolToInt(f.AutoExplain), f.ThrottlePerSec, createdAt, createdAt, sortOrder, secretEnc,
+	); err != nil {
+		return model.ConnectionSummary{}, fmt.Errorf("repos/connections: insert %s: %w", connID, err)
+	}
+	if err := tx.Commit(); err != nil {
+		return model.ConnectionSummary{}, fmt.Errorf("repos/connections: commit: %w", err)
+	}
+
+	created, err := r.Get(connID)
+	if err != nil {
+		return model.ConnectionSummary{}, err
+	}
+	if created == nil {
+		return model.ConnectionSummary{}, fmt.Errorf("repos/connections: row %s not readable after insert", connID)
+	}
+	return *created, nil
+}
+
+// UpdateWithSecret is Update plus, in the same UPDATE statement, the row's password column —
+// P21 round 3 finding 4: connections.Service.Update used to Secrets.Set the password and then
+// Conns.Update the rest of the row as two separate statements (in that order, specifically so a
+// cipher failure leaves the row untouched) — but a Conns.Update failure *after* a successful
+// Secrets.Set left the new password stored against the old host/port/database, exactly the
+// "old destination's password on a new destination" state round 2's destinationUnchanged gating
+// exists to prevent, just reached by a different path. hasSecret distinguishes "leave the stored
+// password exactly as it is" (false — the three-state Input.Password contract's nil case) from
+// "set it to secretEnc, which may itself be nil to clear it" (true).
+func (r *ConnectionsRepo) UpdateWithSecret(connID string, f model.ConnectionFields, updatedAt string, hasSecret bool, secretEnc *string) (model.ConnectionSummary, error) {
+	optionsJSON, err := json.Marshal(f.Options)
+	if err != nil {
+		return model.ConnectionSummary{}, fmt.Errorf("repos/connections: encode options: %w", err)
+	}
+
+	var execErr error
+	if hasSecret {
+		_, execErr = r.DB.Exec(`
+			UPDATE connections
+			   SET name = ?, kind = ?, color = ?, mode = ?, read_only = ?, host = ?, port = ?,
+			       database = ?, username = ?, uri = ?, options_json = ?, preconnect = ?,
+			       preconnect_sidecar = ?, auto_explain = ?, throttle_per_sec = ?, updated_at = ?,
+			       password = ?
+			 WHERE id = ?
+		`,
+			f.Name, f.Kind, f.Color, f.Mode, boolToInt(f.ReadOnly), f.Host, f.Port, f.Database,
+			f.Username, f.URI, string(optionsJSON), f.Preconnect, boolToInt(f.PreconnectSidecar),
+			boolToInt(f.AutoExplain), f.ThrottlePerSec, updatedAt, secretEnc, connID,
+		)
+	} else {
+		_, execErr = r.DB.Exec(`
+			UPDATE connections
+			   SET name = ?, kind = ?, color = ?, mode = ?, read_only = ?, host = ?, port = ?,
+			       database = ?, username = ?, uri = ?, options_json = ?, preconnect = ?,
+			       preconnect_sidecar = ?, auto_explain = ?, throttle_per_sec = ?, updated_at = ?
+			 WHERE id = ?
+		`,
+			f.Name, f.Kind, f.Color, f.Mode, boolToInt(f.ReadOnly), f.Host, f.Port, f.Database,
+			f.Username, f.URI, string(optionsJSON), f.Preconnect, boolToInt(f.PreconnectSidecar),
+			boolToInt(f.AutoExplain), f.ThrottlePerSec, updatedAt, connID,
+		)
+	}
+	if execErr != nil {
+		return model.ConnectionSummary{}, fmt.Errorf("repos/connections: update %s: %w", connID, execErr)
+	}
+
+	updated, err := r.Get(connID)
+	if err != nil {
+		return model.ConnectionSummary{}, err
+	}
+	if updated == nil {
+		return model.ConnectionSummary{}, fmt.Errorf("repos/connections: row %s not found after update", connID)
+	}
+	return *updated, nil
+}
+
 // Delete relies on the schema's ON DELETE CASCADE (connections.go's referencing tables:
 // saved_queries, metadata_cache, connection_tree_filters, filter_history, and op_log's
 // ON DELETE SET NULL) — no manual cleanup needed here.

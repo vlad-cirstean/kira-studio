@@ -3,6 +3,7 @@ package connections_test
 import (
 	"context"
 	"errors"
+	"math"
 	"os"
 	"strings"
 	"sync"
@@ -476,6 +477,50 @@ func TestUpdateWritesSecretBeforeRow(t *testing.T) {
 	}
 	if row == nil || row.Name != "original-name" {
 		t.Errorf("row = %+v, want Name unchanged at original-name", row)
+	}
+}
+
+// TestUpdateDoesNotLeaveANewPasswordStoredAgainstOldFields is P21 round 3 finding 4:
+// connections.Service.Update used to write the new password (Secrets.Set) *before* writing the
+// rest of the row (Conns.Update) — reasoning only about the "cipher unavailable" failure, which
+// that ordering does correctly abort before touching anything. But Conns.Update can fail for a
+// reason that has nothing to do with the cipher: its json.Marshal(f.Options) can itself refuse a
+// value (NaN, which Input.Validate never inspects Options for — Go callers, and a future
+// programmatic caller, can construct one even though the IPC/JSON boundary cannot). Under the old
+// ordering, that failure happened *after* the new password had already been committed, leaving it
+// stored against the connection's old host/port/database — exactly the "old destination's password
+// on a new destination" state destinationUnchanged elsewhere in this file exists to prevent, just
+// reached by a different path. UpdateWithSecret's single combined statement computes and validates
+// everything (including the json.Marshal) before issuing any write, so this failure now aborts with
+// nothing changed at all.
+func TestUpdateDoesNotLeaveANewPasswordStoredAgainstOldFields(t *testing.T) {
+	h := newHarness(t)
+	created := mustCreate(t, h.svc, fieldsInput("original-name"))
+	if err := h.secrets.Set(created.ID, strPtr("original-secret")); err != nil {
+		t.Fatalf("seed original secret: %v", err)
+	}
+
+	in := fieldsInput("changed-name")
+	in.Password = strPtr("new-secret")
+	in.Options = map[string]any{"bad": math.NaN()}
+	if _, err := h.svc.Update(created.ID, in); err == nil {
+		t.Fatalf("Update with an unmarshalable Options value: want an error")
+	}
+
+	row, err := h.repos.Connections.Get(created.ID)
+	if err != nil {
+		t.Fatalf("Connections.Get: %v", err)
+	}
+	if row == nil || row.Name != "original-name" {
+		t.Errorf("row = %+v, want Name unchanged at \"original-name\"", row)
+	}
+
+	stored, err := h.secrets.Get(created.ID)
+	if err != nil {
+		t.Fatalf("Secrets.Get: %v", err)
+	}
+	if stored == nil || *stored != "original-secret" {
+		t.Errorf("stored secret = %v, want unchanged \"original-secret\" — a failed update must not leave the new password stored against the old row", stored)
 	}
 }
 

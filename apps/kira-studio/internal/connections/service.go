@@ -249,22 +249,25 @@ func (s *Service) Create(in Input) (model.ConnectionSummary, error) {
 		}
 	}
 
-	// P25 D6: validate the secret can be encrypted before writing anything — a failure here
-	// (cipher unavailable) leaves no row behind at all.
+	// P25 D6: encrypt the secret before writing anything — a failure here (cipher unavailable)
+	// leaves no row behind at all. P21 round 3 finding 4: the row and its password are now written
+	// by the same INSERT statement (InsertWithSecret) rather than as two separate writes, so a
+	// failure that used to land *between* them — leaving a passwordless connection row committed
+	// while the caller was told the create had failed — can no longer happen.
+	var storedSecret *string
 	if password != nil {
-		if _, err := s.deps.Cipher.Encrypt(*password); err != nil {
+		encrypted, err := s.deps.Cipher.Encrypt(*password)
+		if err != nil {
 			return model.ConnectionSummary{}, err
 		}
+		storedSecret = &encrypted
 	}
 
 	fields := in.ConnectionFields
 	fields.URI = uri
 	id := uuid.NewString()
-	created, err := s.deps.Conns.Insert(id, fields, model.NowISO())
+	created, err := s.deps.Conns.InsertWithSecret(id, fields, model.NowISO(), storedSecret)
 	if err != nil {
-		return model.ConnectionSummary{}, wrapErr(err)
-	}
-	if err := s.deps.Secrets.Set(id, password); err != nil {
 		return model.ConnectionSummary{}, wrapErr(err)
 	}
 	s.emitListChanged()
@@ -309,22 +312,28 @@ func (s *Service) Update(id string, in Input) (model.ConnectionSummary, error) {
 		}
 	}
 
-	// P25 D6: the row already exists, so — unlike Create — the secret can be written first; a
-	// failure here (cipher unavailable) means Update never runs, leaving every other field
-	// exactly as it was rather than a half-applied edit.
-	if password != nil {
-		var toStore *string
-		if *password != "" {
-			toStore = password
-		}
-		if err := s.deps.Secrets.Set(id, toStore); err != nil {
+	// P25 D6: encrypt before writing anything — a failure here (cipher unavailable) means Update
+	// never runs, leaving every other field exactly as it was rather than a half-applied edit.
+	// P21 round 3 finding 4: the row and its password are now written by the same UPDATE statement
+	// (UpdateWithSecret) rather than as two separate writes in opposite orders — writing the secret
+	// first and the rest of the row second (the old order) meant a Conns.Update failure left the
+	// *new* password stored against the *old* host/port/database, the same "old destination's
+	// password on a new destination" state destinationUnchanged below exists to prevent, just
+	// reached by a different path. hasSecret carries the three-state Input.Password contract
+	// through to the single combined statement: false leaves the stored password untouched.
+	hasSecret := password != nil
+	var storedSecret *string
+	if hasSecret && *password != "" {
+		encrypted, err := s.deps.Cipher.Encrypt(*password)
+		if err != nil {
 			return model.ConnectionSummary{}, wrapErr(err)
 		}
+		storedSecret = &encrypted
 	}
 
 	fields := in.ConnectionFields
 	fields.URI = uri
-	updated, err := s.deps.Conns.Update(id, fields, model.NowISO())
+	updated, err := s.deps.Conns.UpdateWithSecret(id, fields, model.NowISO(), hasSecret, storedSecret)
 	if err != nil {
 		return model.ConnectionSummary{}, wrapErr(err)
 	}
