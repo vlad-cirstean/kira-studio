@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { grpcCodeClass } from '@shared/domain/grpc';
+import { grpcCodeClass, grpcCodeHint } from '@shared/domain/grpc';
 import {
   GRPC_HISTORY_PER_SCOPE_LIMIT,
   type GrpcCallHistoryEntry,
@@ -83,7 +83,12 @@ async function onClear(): Promise<void> {
         data-testid="grpc-history-row"
         @click="onRowClick(entry.id)"
       >
-        <span class="p-chip" :class="grpcCodeClass(entry.code)">{{ entry.codeName }}</span>
+        <span
+          class="p-chip"
+          :class="grpcCodeClass(entry.code)"
+          v-tooltip="grpcCodeHint(entry.code)"
+          >{{ entry.codeName }}</span
+        >
         <span class="p-xs mono">{{ entry.method }}</span>
         <span v-tooltip="entry.calledAt" class="p-xs dim">{{ formatRelative(entry.calledAt) }}</span>
         <span class="p-push" />

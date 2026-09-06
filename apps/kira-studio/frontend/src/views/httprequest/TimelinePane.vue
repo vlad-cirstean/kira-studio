@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { HttpTimelineHop } from '@shared/domain/http';
-import { statusClass } from '@shared/domain/http';
+import { statusClass, statusHint } from '@shared/domain/http';
 import type { HttpRequestTabRecord } from '@shared/domain/tabs';
 import { computed } from 'vue';
 import EmptyState from '../../theme/primitives/EmptyState.vue';
@@ -235,7 +235,12 @@ function hopNotes(hop: HttpTimelineHop): HopNote[] {
             <span>{{ hop.method }}</span>
             <span class="hop-url">{{ hop.url }}</span>
             <span>→</span>
-            <span v-if="hop.status > 0" class="p-chip" :class="statusClass(hop.status)">
+            <span
+              v-if="hop.status > 0"
+              class="p-chip"
+              :class="statusClass(hop.status)"
+              v-tooltip="statusHint(hop.status)"
+            >
               {{ hop.status }} {{ hop.statusText }}
             </span>
             <span v-else class="p-chip err" data-testid="http-timeline-hop-failed-chip">

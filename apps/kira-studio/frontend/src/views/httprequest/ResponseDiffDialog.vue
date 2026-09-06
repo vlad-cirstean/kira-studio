@@ -3,7 +3,7 @@ import { syntaxHighlighting } from '@codemirror/language';
 import type { MergeView as MergeViewType } from '@codemirror/merge';
 import { EditorState } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
-import { statusClass } from '@shared/domain/http';
+import { statusClass, statusHint } from '@shared/domain/http';
 import type { ResponseHistorySnapshot } from '@shared/domain/response-history';
 import { computed, nextTick, onUnmounted, ref, watch } from 'vue';
 import { type BeautifyResult, beautifyJson, beautifyXml } from '../../beautify';
@@ -214,7 +214,12 @@ onUnmounted(() => {
             formatRelative(snapA.entry.sentAt)
           }}</span>
           <div class="diff-summary-col">
-            <span class="p-chip" :class="statusClass(snapA.entry.status)" data-testid="http-diff-status-a">
+            <span
+              class="p-chip"
+              :class="statusClass(snapA.entry.status)"
+              v-tooltip="statusHint(snapA.entry.status)"
+              data-testid="http-diff-status-a"
+            >
               {{ snapA.entry.status }} {{ snapA.entry.statusText }}
             </span>
             <span class="p-xs dim">{{ snapA.entry.elapsedMs }} ms</span>
@@ -227,7 +232,12 @@ onUnmounted(() => {
             formatRelative(snapB.entry.sentAt)
           }}</span>
           <div class="diff-summary-col">
-            <span class="p-chip" :class="statusClass(snapB.entry.status)" data-testid="http-diff-status-b">
+            <span
+              class="p-chip"
+              :class="statusClass(snapB.entry.status)"
+              v-tooltip="statusHint(snapB.entry.status)"
+              data-testid="http-diff-status-b"
+            >
               {{ snapB.entry.status }} {{ snapB.entry.statusText }}
             </span>
             <span class="p-xs dim">{{ snapB.entry.elapsedMs }} ms</span>

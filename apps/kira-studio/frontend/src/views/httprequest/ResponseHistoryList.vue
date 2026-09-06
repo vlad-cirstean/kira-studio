@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { httpMethodToken, statusClass } from '@shared/domain/http';
+import { httpMethodToken, statusClass, statusHint } from '@shared/domain/http';
 import {
   HISTORY_PER_SCOPE_LIMIT,
   type ResponseHistoryEntry,
@@ -168,7 +168,12 @@ async function onClear(): Promise<void> {
           <div class="history-row-line">
             <span v-tooltip="entry.sentAt" class="p-xs dim history-time">{{ formatRelative(entry.sentAt) }}</span>
             <span class="p-chip p-method" :class="httpMethodToken(entry.method)">{{ entry.method }}</span>
-            <span class="p-chip" :class="statusClass(entry.status)">{{ entry.status }} {{ entry.statusText }}</span>
+            <span
+              class="p-chip"
+              :class="statusClass(entry.status)"
+              v-tooltip="statusHint(entry.status)"
+              >{{ entry.status }} {{ entry.statusText }}</span
+            >
             <span class="p-xs dim">{{ entry.elapsedMs }} ms</span>
             <span class="p-xs dim">{{ formatBytes(entry.bodyBytes) }}</span>
             <span v-if="entry.environment" class="p-xs dim">{{ entry.environment }}</span>
