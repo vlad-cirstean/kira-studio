@@ -13,6 +13,32 @@ import (
 // historyLimit mirrors filter-history.ts's HISTORY_LIMIT.
 const historyLimit = 20
 
+// P23 D4: filter_history was capped per (connection_id, path) but had no bound on the number of
+// paths a connection accumulates — every table/collection a person has ever filtered, on a
+// connection they have never deleted, with no liveness oracle to sweep a dropped one (F6). Not a
+// new number: metadata_cache's own 200-paths-per-connection cap (F7, the adjacent "how many
+// distinct paths is one connection's tree worth caching" question this app already answered) times
+// historyLimit's 20 rows per path. Eviction is by used_at across the whole connection, so a path
+// filtered once years ago falls off before one still in regular use.
+const historyPerConnectionLimit = 200 * historyLimit
+
+// maxFilterTextBytes caps where_text and the encoded order_by_json — a filter predicate is a line
+// a person typed into a filter box, not a pasted document; 4 KiB is ~4,000 characters, past every
+// Mongo filter document this app's own tests use. Truncated silently, with no flag: unlike
+// op_log's command (which Re-run replays blind), a history entry only ever populates the filter
+// box for the user to see and edit before it is applied (bridge/queries.go's HistoryList feeds a
+// picker, not an executor) — a truncated entry is visibly truncated at the moment it matters.
+const maxFilterTextBytes = 4 * 1024
+
+// capFilterText applies maxFilterTextBytes to a value that may be absent — nil stays nil.
+func capFilterText(s *string) *string {
+	if s == nil || len(*s) <= maxFilterTextBytes {
+		return s
+	}
+	truncated := (*s)[:maxFilterTextBytes]
+	return &truncated
+}
+
 type FilterHistoryRepo struct {
 	DB *sql.DB
 }
@@ -36,6 +62,10 @@ func (r *FilterHistoryRepo) Record(connectionID, path string, where *string, ord
 		s := string(encoded)
 		orderByJSON = &s
 	}
+	// D4's per-row cap, applied before the dedupe delete/insert so both compare (and store)
+	// exactly what will be kept.
+	where = capFilterText(where)
+	orderByJSON = capFilterText(orderByJSON)
 
 	tx, err := r.DB.Begin()
 	if err != nil {
@@ -70,6 +100,23 @@ func (r *FilterHistoryRepo) Record(connectionID, path string, where *string, ord
 		   )
 	`, connectionID, path, connectionID, path, historyLimit); err != nil {
 		return fmt.Errorf("repos/filter_history: cap: %w", err)
+	}
+
+	// D4: the bound a per-path cap alone cannot give — across every path a connection has ever
+	// been filtered on, keeping the historyPerConnectionLimit most recently used rows regardless
+	// of which path they belong to, so a path filtered once long ago falls off before one still in
+	// regular use.
+	if _, err := tx.Exec(`
+		DELETE FROM filter_history
+		 WHERE connection_id = ?
+		   AND id NOT IN (
+		     SELECT id FROM filter_history
+		      WHERE connection_id = ?
+		      ORDER BY used_at DESC, rowid DESC
+		      LIMIT ?
+		   )
+	`, connectionID, connectionID, historyPerConnectionLimit); err != nil {
+		return fmt.Errorf("repos/filter_history: cap connection: %w", err)
 	}
 
 	if err := tx.Commit(); err != nil {
