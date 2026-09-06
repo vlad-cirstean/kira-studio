@@ -522,15 +522,19 @@ settings(key, value)                                   -- fonts, sizes, budgets,
 connections(id, name, kind, color, mode, read_only, host, port, database, username, password,
             uri, options_json, preconnect, preconnect_sidecar, auto_explain, throttle_per_sec,
             created_at, updated_at, sort_order)
-connection_filters(id, connection_id, node_kind, pattern, is_regex, action)  -- hide/show rules
+connection_tree_filters(connection_id, scope, value)    -- hide/show rules; a set, no id/ordering
+                                                       -- (P28 D12) — no per-row size cap: a person
+                                                       -- picks these from the tree, doesn't type them
 connection_ddl(connection_id, ddl, updated_at)          -- pasted DDL for the SQL language service
 saved_queries(id, connection_id, path, name, kind, body, pinned, created_at, used_at)
                                                        -- saved filters/queries per table + console
 filter_history(id, connection_id, path, where_text, order_by_json, used_at)
-                                                       -- history list of past filters/sorts
+                                                       -- history list of past filters/sorts; capped
+                                                       -- 20/path, 4,000/connection, 4 KiB/row (P23)
 metadata_cache(connection_id, path, kind, payload_json, fetched_at, etag)
 op_log(id, connection_id, tab_id, started_at, duration_ms, kind, status, rows,
-       command, error)                                  -- rotated, capped
+       command, error, stored_bytes, command_truncated)  -- rotated, capped (P23: stored_bytes/
+                                                       -- command_truncated added by migration 15)
 ui_layout(key, value)                                   -- panel sizes, visibility (app-wide)
 windows(key, order, bounds_json)                        -- one row per workbench (P8)
 tabs(id, connection_id, path, kind, state_json, order, active, window_key)  -- session restore,
@@ -811,6 +815,85 @@ deny `s3:ListAllMyBuckets` outright).
 SQLite connections reuse the same columns again, the same way: `database` holds the **absolute
 file path** on disk, and `host`/`port`/`username`/`password` are all unused — there is no server
 and no credential, only a file Kira opens.
+
+**Every table in `kira.db`, and the file itself, is growth-bounded (P23).** An audit of all
+nineteen tables against the SPEC row's "make sure nothing accumulates without any limit" found
+seventeen already bounded — most by a deliberate cap an earlier phase added, the rest because the
+table simply cannot grow from machinery (a closed key set, one row per user-created object, one row
+per live window). Two were genuinely unbounded, in the same way: a *count* cap existed, a *byte*
+cap did not, and the column that can hold arbitrary user text had no ceiling at all.
+
+| Table | Grows with | Bound |
+|---|---|---|
+| `schema_version` | nothing | one row |
+| `settings`, `ui_layout` | nothing | closed key set; every writer is a hand-listed leaf |
+| `connections`, `connection_ddl`, `connection_tree_filters`, `saved_queries` | user action | user action; all cascade on connection delete |
+| `api_collections`, `api_items`, `api_environments`, `api_variables` | user action / import | user action; import capped at 64 MiB upstream |
+| `tabs` | open tabs | rewritten per window per save; cascades on window close |
+| `windows` | live windows | one row per live window (+1 for session restore) |
+| `metadata_cache` | browsing | 4 MiB/row, 200 rows/connection, dropped whole on every reconnect |
+| `api_variable_history` | value edits | 20 per variable |
+| `filter_history` | filter/sort use | 20 per path, **4,000 per connection**, **4 KiB per row** |
+| `api_response_history` | sends | 256 KiB/body, 30/scope, 128 MiB table, orphan sweep at launch |
+| `grpc_call_history` | calls | 64 KiB/msg, 100 msgs/entry, 30/scope, 32 MiB table, orphan sweep |
+| `op_log` | every DB operation | 30 days, 20,000 rows, **64 KiB command + 8 KiB error**, **32 MiB table** |
+| the file itself | — | **`auto_vacuum=INCREMENTAL` on new databases + a startup `incremental_vacuum` above 16 MiB of freelist** |
+| `kira.db-wal` | one transaction | **`journal_size_limit` = 4 MiB** |
+| `logs/` | one file per day | 30 days by mtime (`logging.Sweep`) |
+
+**The standard a new table has to meet, stated once so it does not have to be re-derived each
+time**: if a table's rows are written by *machinery* rather than by a person, it needs a count
+bound **and** a byte bound; if its rows are written by a person, a cascade to whatever they created
+is enough. `op_log` was the one table that did not meet it.
+
+**`op_log` gained the two byte bounds it was missing (D1-D3).** `command`/`error` are plain `TEXT`
+with nothing on the path to them truncating — a batch console execute (`joinSemicolons`) or a batch
+mutate writes the whole pasted script into one row, permanently, on every re-run: a 5 MB migration
+script re-run twenty times is 100 MB of `op_log`, with the existing 20,000-row cap never firing and
+the retention cut only firing 30 days later. `OpsRepo.Finish` now truncates `command` to **64 KiB**
+(`grpc_history.go`'s own per-message cap — an op-log command is one label among as many as 20,000,
+worth less than a stored gRPC message a user opens and reads) and `error` to **8 KiB**
+(`httpclient/timeline.go`'s per-hop-header cap), and `Prune` gained a third pass — a **32 MiB**
+table-wide sweep (a quarter of `api_response_history`'s 128 MiB, the same reasoning
+`grpc_call_history`'s own budget already uses), oldest-first, gated behind an indexed
+`SUM(stored_bytes)` the same way the other two history tables' own sweeps are. `command`'s
+truncation is **flagged** (`command_truncated`), not silent, because the Operations panel's Re-run
+replays `command` verbatim: silently running the first 64 KiB of a script as though it were the
+whole thing would be worse than not offering Re-run at all, so a truncated row disables it instead.
+`error`'s truncation is silent — nothing in the app acts on `error`, only renders and searches it.
+
+**`filter_history` gained a per-connection bound, not only a per-path one (D4).** The existing cap
+(20 rows per `(connection_id, path)`) had no ceiling on how many *paths* a connection accumulates —
+every table or collection ever filtered, on a connection that is never deleted, with no liveness
+oracle to sweep a path dropped on the server. `historyPerConnectionLimit` (**4,000**) is not a new
+number: `metadata_cache`'s own 200-paths-per-connection cap times `filter_history`'s existing
+20-rows-per-path limit — "as many distinct objects as this app already thinks one connection's tree
+is worth caching." Eviction is by `used_at` across the whole connection, so a path filtered once
+long ago falls off before one still in regular use. `where_text`/`order_by_json` also gained a
+**4 KiB** per-row cap, truncated silently: selecting a history entry only ever populates the filter
+box for the user to see and edit before it applies, never executes it blind.
+
+**The file itself was a permanent high-water mark (D5, D6).** Every cap in this app — the ones
+above included — deletes rows, but a deleted row's pages went on SQLite's freelist and were only
+ever reused by later inserts, never returned to the filesystem: `kira.db` ran with the default
+`auto_vacuum=NONE` and was never vacuumed, so a database that once held 128 MiB of response history
+stayed that size forever, even after *Clear* emptied every scope. `db.go`'s `buildDSN` now sets
+`_auto_vacuum=INCREMENTAL` — measured to take on a brand-new database and to be inert on an
+existing one, so it needs no version gate and converts nothing already on disk (`PRAGMA
+auto_vacuum`/`journal_mode` lock the setting in at the first table or the first journal-mode
+change). `INCREMENTAL` rather than `FULL`: `FULL` reorganises pages on every commit, a cost this
+single-writer, commits-on-every-debounced-save store would pay constantly for a benefit wanted only
+occasionally; `INCREMENTAL` puts freed pages on the freelist and leaves the reclaim decision to
+`repos.Maintenance.Reclaim`, run once at startup, which runs `PRAGMA incremental_vacuum` only once
+the freelist exceeds **16 MiB** (half `op_log`'s own new table budget) — an ordinary launch, with a
+small freelist, does nothing. **Converting an existing `kira.db` is deliberately out of scope**:
+there is no installed base yet, so the only databases this can touch are developers' own; a
+developer who wants theirs converted runs one `VACUUM` by hand after setting the pragma. Separately,
+`buildDSN` also sets `journal_size_limit(4194304)`, so `kira.db-wal` truncates back down to 4 MiB
+after a commit instead of keeping a session's largest transaction as its high-water mark until the
+database is cleanly closed — 4 MiB is derived, not chosen: SQLite's default WAL auto-checkpoint
+interval (1,000 pages at the 4 KiB default page size) is exactly the size the WAL is expected to
+reach between two ordinary checkpoints, so this never truncates a WAL doing its normal job.
 
 ## Caching
 
