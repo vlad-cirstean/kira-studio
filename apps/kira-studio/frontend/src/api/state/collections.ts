@@ -348,14 +348,48 @@ export async function renameRow(row: CollectionRowVm, name: string): Promise<voi
   await loadCollections();
 }
 
+/** P21 round 2 functional finding 4: Go's own delete genuinely cascades (repos/collections.go's
+ *  own comment: "the cascade is genuine") — deleting a folder or a collection removes every
+ *  descendant `api_items` row, not just the row itself. This walks the *pre-delete*
+ *  `collectionsState.items`/`childrenIndex` snapshot (still valid — nothing has re-listed yet) to
+ *  find every item id that the delete about to happen will also remove, so the caller can purge
+ *  all of them from the renderer's own request caches, not just `row.id`. A request row's own
+ *  subtree is itself. */
+function subtreeItemIds(row: CollectionRowVm): string[] {
+  if (row.kind === 'request') return [row.id];
+  if (row.kind === 'collection') {
+    return collectionsState.items
+      .filter((item) => item.collectionId === row.id)
+      .map((item) => item.id);
+  }
+  // row.kind === 'folder': walk down from the folder itself, collecting every descendant
+  // (folders and requests alike — a nested folder's own requests are still cascade-deleted).
+  const ids: string[] = [row.id];
+  const stack: string[] = [row.id];
+  while (stack.length > 0) {
+    const parentId = stack.pop() as string;
+    for (const child of childrenOf(row.collectionId, parentId)) {
+      ids.push(child.id);
+      if (child.kind === 'folder') stack.push(child.id);
+    }
+  }
+  return ids;
+}
+
 export async function deleteRow(row: CollectionRowVm): Promise<void> {
   const target = row.kind === 'collection' ? 'collection' : 'item';
+  const orphaned = subtreeItemIds(row);
   await control.collectionsDelete(row.id, target);
   // Deleting a request does **not** close its open tabs (D14's orphan rule): a tab is an editing
   // surface with its own persisted state, and silently closing one because a tree row went away
-  // would lose work. Its cached saved request goes, though, so the tab reads as unsaved.
-  delete collectionsState.requests[row.id];
-  delete collectionsState.grpcRequests[row.id];
+  // would lose work. Its cached saved request goes, though, so the tab reads as unsaved — and
+  // (finding 4) so does every *descendant* request's cache entry a folder/collection delete just
+  // cascaded away, so `savedRequestFor` correctly reports null for all of them instead of a stale
+  // entry that `onSave` would fail against with no visible error.
+  for (const id of orphaned) {
+    delete collectionsState.requests[id];
+    delete collectionsState.grpcRequests[id];
+  }
   // P17 D16: unlike a request tab, a variable-set tab has no state of its own worth preserving
   // once its owner (the collection) is gone — deleting it closes any open tab for it.
   if (row.kind === 'collection') closeVariableSetTabsForOwner('collection', row.id);
