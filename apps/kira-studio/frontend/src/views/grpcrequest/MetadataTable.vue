@@ -46,6 +46,8 @@ const props = defineProps<{
   /** P18 D10: GrpcRequestView.vue's own variableSupport(...) — forwarded to the value cell, the
    *  highest-value one of the three surfaces (an Authorization bearer is the canonical case). */
   variables?: VariableSupport;
+  /** P22b D6/D7: FieldRowsTable.vue's own showDescriptions prop, mirrored here — off by default. */
+  showDescriptions?: boolean;
 }>();
 
 // P22b D2: the same composition FieldRowsTable.vue's own rowValueCandidates does — a bare
@@ -68,7 +70,7 @@ function rowValueCandidates(row: GrpcMetadataState) {
 }
 
 function blankRow(): GrpcMetadataState {
-  return { name: '', value: '', enabled: true };
+  return { name: '', value: '', enabled: true, description: '' };
 }
 
 // P16 D13/F11: `index` is the row's real position in `tab.state.metadata` — its write-through
@@ -91,7 +93,7 @@ const displayRows = computed<DisplayEntry[]>(() => {
   return [...filtered, { row: blankRow(), index: props.tab.state.metadata.length }];
 });
 
-function updateField(index: number, field: 'name' | 'value', value: string): void {
+function updateField(index: number, field: 'name' | 'value' | 'description', value: string): void {
   const next = [...props.tab.state.metadata];
   if (index === next.length) next.push(blankRow());
   next[index] = { ...next[index], [field]: value };
@@ -181,6 +183,7 @@ function onContainerKeydown(e: KeyboardEvent): void {
       v-for="entry in displayRows"
       :key="entry.index"
       class="metadata-row"
+      :style="{ gridTemplateColumns: showDescriptions ? 'auto 1.2fr 2fr 1.5fr auto' : 'auto 1.2fr 2fr auto' }"
       data-testid="grpc-metadata-row"
     >
       <Checkbox
@@ -219,6 +222,15 @@ function onContainerKeydown(e: KeyboardEvent): void {
           @update:model-value="updateField(entry.index, 'value', $event)"
         />
       </div>
+      <!-- P22b D6: FieldRowsTable.vue's own description cell, mirrored here (F18). -->
+      <div v-if="showDescriptions" class="metadata-cell">
+        <TextField
+          :model-value="entry.row.description ?? ''"
+          placeholder="description"
+          data-testid="grpc-metadata-description"
+          @update:model-value="updateField(entry.index, 'description', $event)"
+        />
+      </div>
       <IconButton
         icon="close"
         :disabled="entry.index >= tab.state.metadata.length"
@@ -244,10 +256,11 @@ function onContainerKeydown(e: KeyboardEvent): void {
 }
 
 /* P22b D9 (FieldRowsTable.vue's own sibling — F18's literal copy): a grid, not independent flex
-   items, so name/value cells line up across rows regardless of what an individual row renders. */
+   items, so name/value cells line up across rows regardless of what an individual row renders.
+   grid-template-columns itself is set inline (above) since it depends on showDescriptions, which
+   — like showEnabled in FieldRowsTable.vue — is fixed per table instance, never per row. */
 .metadata-row {
   display: grid;
-  grid-template-columns: auto 1.2fr 2fr auto;
   align-items: center;
   gap: var(--kira-s-2);
 }

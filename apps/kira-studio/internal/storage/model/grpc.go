@@ -21,15 +21,18 @@ type SavedGrpcRequest struct {
 	Metadata       []SavedGrpcMetaRow `json:"metadata"`
 }
 
-// SavedGrpcMetaRow is one metadata row — the same three fields as SavedHeader (name/value/enabled)
-// with the same "enabled is builder-state-only" rule (P2 D6), deliberately not the same *type*:
-// gRPC lowercases keys and has its own validity rule, and sharing a type across two protocols to
-// save a few lines is the coupling P12 would then have to unpick (domain/grpc.ts's own comment,
-// mirrored here).
+// SavedGrpcMetaRow is one metadata row — the same four fields as SavedHeader (name/value/enabled/
+// description) with the same "enabled is builder-state-only" rule (P2 D6), deliberately not the
+// same *type*: gRPC lowercases keys and has its own validity rule, and sharing a type across two
+// protocols to save a few lines is the coupling P12 would then have to unpick (domain/grpc.ts's
+// own comment, mirrored here). Description (P22b D6) is meaningless on this type's other use — a
+// call history record's captured Header/Trailer/Metadata snapshot, which is server data, never a
+// user-authored row — and is simply left empty there.
 type SavedGrpcMetaRow struct {
-	Name    string `json:"name"`
-	Value   string `json:"value"`
-	Enabled bool   `json:"enabled"`
+	Name        string `json:"name"`
+	Value       string `json:"value"`
+	Enabled     bool   `json:"enabled"`
+	Description string `json:"description"`
 }
 
 var grpcTLSModes = map[string]bool{"plaintext": true, "tls": true}

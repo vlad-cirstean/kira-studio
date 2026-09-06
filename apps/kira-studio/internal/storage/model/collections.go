@@ -80,17 +80,21 @@ type SavedRequest struct {
 
 // SavedHeader is one header row. `enabled` has no wire counterpart — it exists so the builder can
 // keep an unchecked row instead of deleting it, which is the whole point of the checkbox.
+// Description is P22b D6 — app-local free text, no wire counterpart, the same shape
+// model/variables.go's own Description field already carries.
 type SavedHeader struct {
-	Name    string `json:"name"`
-	Value   string `json:"value"`
-	Enabled bool   `json:"enabled"`
+	Name        string `json:"name"`
+	Value       string `json:"value"`
+	Enabled     bool   `json:"enabled"`
+	Description string `json:"description"`
 }
 
 // SavedField is one urlencoded row.
 type SavedField struct {
-	Name    string `json:"name"`
-	Value   string `json:"value"`
-	Enabled bool   `json:"enabled"`
+	Name        string `json:"name"`
+	Value       string `json:"value"`
+	Enabled     bool   `json:"enabled"`
+	Description string `json:"description"`
 }
 
 // SavedFormField is one form-data row. Kind == "file" means Path is a local path (never bytes)
@@ -105,6 +109,7 @@ type SavedFormField struct {
 	FileSize    int64  `json:"fileSize"`
 	ContentType string `json:"contentType"`
 	Enabled     bool   `json:"enabled"`
+	Description string `json:"description"`
 }
 
 // SavedFile is the binary (Postman `file`) body's one chosen file — path only, never bytes.

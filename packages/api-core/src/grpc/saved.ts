@@ -75,6 +75,8 @@ function sameGrpcRequest(a: GrpcSavedRequest, b: GrpcSavedRequest): boolean {
     (m, i) =>
       m.name === b.metadata[i].name &&
       m.value === b.metadata[i].value &&
-      m.enabled === b.metadata[i].enabled,
+      m.enabled === b.metadata[i].enabled &&
+      // P22b D6: a description-only edit must mark the tab dirty like any other field edit.
+      m.description === b.metadata[i].description,
   );
 }

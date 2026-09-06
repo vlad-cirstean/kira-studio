@@ -91,6 +91,7 @@ function toUrlEncodedRows(pieces: readonly RawDataPiece[]): HttpUrlEncodedFieldS
         name: isDataUrlencode ? (kv?.name ?? '') : decodeQueryComponent(kv?.name ?? ''),
         value: isDataUrlencode ? (kv?.value ?? '') : decodeQueryComponent(kv?.value ?? ''),
         enabled: true,
+        description: '',
       });
     }
   }
@@ -150,7 +151,7 @@ export function parseCurl(text: string): ParsedCurl | { error: string } {
   let sawFormFlag = false;
 
   function pushHeader(name: string, value: string): void {
-    headerRows.push({ name, value, enabled: true });
+    headerRows.push({ name, value, enabled: true, description: '' });
   }
 
   function handleHeaderFlag(raw: string): void {
@@ -191,6 +192,7 @@ export function parseCurl(text: string): ParsedCurl | { error: string } {
         fileSize: 0,
         contentType: '',
         enabled: true,
+        description: '',
       });
       return;
     }
@@ -209,6 +211,7 @@ export function parseCurl(text: string): ParsedCurl | { error: string } {
         fileSize: 0,
         contentType: '',
         enabled: true,
+        description: '',
       });
       return;
     }
@@ -247,6 +250,7 @@ export function parseCurl(text: string): ParsedCurl | { error: string } {
         fileSize: 0,
         contentType,
         enabled: true,
+        description: '',
       });
     } else if (content.startsWith('<')) {
       warnings.push({
@@ -264,6 +268,7 @@ export function parseCurl(text: string): ParsedCurl | { error: string } {
         fileSize: 0,
         contentType,
         enabled: true,
+        description: '',
       });
     }
     if (hasFilenameOverride) {

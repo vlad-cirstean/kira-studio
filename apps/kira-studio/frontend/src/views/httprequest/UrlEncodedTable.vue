@@ -16,7 +16,7 @@ const props = defineProps<{
 }>();
 
 function blankField(): HttpUrlEncodedFieldState {
-  return { name: '', value: '', enabled: true };
+  return { name: '', value: '', enabled: true, description: '' };
 }
 
 function onUpdateRows(urlEncoded: HttpUrlEncodedFieldState[]): void {

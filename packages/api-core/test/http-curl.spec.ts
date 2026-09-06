@@ -409,7 +409,9 @@ describe('parseCurl(toCurl(x)) round-trips every mode (P7 D17)', () => {
     expect('error' in result).toBe(false);
     if ('error' in result) return;
     expect(result.state.bodyMode).toBe('urlencoded');
-    expect(result.state.urlEncoded).toEqual([{ name: 'q', value: 'a&b=c+d e%f', enabled: true }]);
+    expect(result.state.urlEncoded).toEqual([
+      { name: 'q', value: 'a&b=c+d e%f', enabled: true, description: '' },
+    ]);
   });
 
   // Finding 5 (v1.2 P14 round 2): toCurl joins a multi-row urlencoded body into exactly one
@@ -436,9 +438,9 @@ describe('parseCurl(toCurl(x)) round-trips every mode (P7 D17)', () => {
     if ('error' in result) return;
     expect(result.state.bodyMode).toBe('urlencoded');
     expect(result.state.urlEncoded).toEqual([
-      { name: 'username', value: 'alice', enabled: true },
-      { name: 'password', value: 'hunter2', enabled: true },
-      { name: 'remember', value: '1', enabled: true },
+      { name: 'username', value: 'alice', enabled: true, description: '' },
+      { name: 'password', value: 'hunter2', enabled: true, description: '' },
+      { name: 'remember', value: '1', enabled: true, description: '' },
     ]);
   });
 
@@ -470,6 +472,7 @@ describe('parseCurl(toCurl(x)) round-trips every mode (P7 D17)', () => {
         fileSize: 0,
         contentType: '',
         enabled: true,
+        description: '',
       },
       {
         name: 'note',
@@ -480,6 +483,7 @@ describe('parseCurl(toCurl(x)) round-trips every mode (P7 D17)', () => {
         fileSize: 0,
         contentType: '',
         enabled: true,
+        description: '',
       },
       // P21 round 2 architecture/security finding 1: a re-parsed curl command never carries a
       // live path — toCurl(x) is plain text once generated, indistinguishable from a pasted
@@ -494,6 +498,7 @@ describe('parseCurl(toCurl(x)) round-trips every mode (P7 D17)', () => {
         fileSize: 0,
         contentType: 'text/csv',
         enabled: true,
+        description: '',
       },
     ]);
   });
@@ -534,6 +539,7 @@ describe('parseCurl(toCurl(x)) round-trips every mode (P7 D17)', () => {
         fileSize: 0,
         contentType: 'application/json',
         enabled: true,
+        description: '',
       },
     ]);
   });

@@ -29,13 +29,13 @@ describe('http/raw/parse.ts — parseRawRequest (P9 D10/D11)', () => {
       method: 'POST',
       url: 'https://{{base_url}}/v2/orders',
       headers: [
-        { name: 'X-Trace', value: '{{$guid}}', enabled: true },
-        { name: 'Authorization', value: 'Bearer {{token}}', enabled: true },
-        { name: 'x-trace', value: 'second-row', enabled: true },
+        { name: 'X-Trace', value: '{{$guid}}', enabled: true, description: '' },
+        { name: 'Authorization', value: 'Bearer {{token}}', enabled: true, description: '' },
+        { name: 'x-trace', value: 'second-row', enabled: true, description: '' },
         // A user-set Content-Type means generateRawRequest's own default-injection never fires
         // (D7's precedence) — this case is about header case/order preservation, kept separate
         // from the Content-Type → mode mapping the dedicated cases below cover.
-        { name: 'Content-Type', value: 'application/json', enabled: true },
+        { name: 'Content-Type', value: 'application/json', enabled: true, description: '' },
       ],
       bodyMode: 'code',
       code: '{"id": "{{token}}"}',
@@ -57,10 +57,10 @@ describe('http/raw/parse.ts — parseRawRequest (P9 D10/D11)', () => {
     // Case and order preserved exactly — 'X-Trace' and 'x-trace' stay two distinct rows, in the
     // order they were typed, never merged.
     expect(result.state.headers).toEqual([
-      { name: 'X-Trace', value: '{{$guid}}', enabled: true },
-      { name: 'Authorization', value: 'Bearer {{token}}', enabled: true },
-      { name: 'x-trace', value: 'second-row', enabled: true },
-      { name: 'Content-Type', value: 'application/json', enabled: true },
+      { name: 'X-Trace', value: '{{$guid}}', enabled: true, description: '' },
+      { name: 'Authorization', value: 'Bearer {{token}}', enabled: true, description: '' },
+      { name: 'x-trace', value: 'second-row', enabled: true, description: '' },
+      { name: 'Content-Type', value: 'application/json', enabled: true, description: '' },
     ]);
   });
 
@@ -151,7 +151,9 @@ describe('http/raw/parse.ts — parseRawRequest (P9 D10/D11)', () => {
     const result = parseRawRequest(text, ORIGIN);
     expect('error' in result).toBe(false);
     if ('error' in result) return;
-    expect(result.state.headers).toEqual([{ name: 'X-Real', value: 'yes', enabled: true }]);
+    expect(result.state.headers).toEqual([
+      { name: 'X-Real', value: 'yes', enabled: true, description: '' },
+    ]);
     expect(result.warnings.map((w) => w.kind)).toEqual(['content-length-dropped']);
   });
 
@@ -161,7 +163,7 @@ describe('http/raw/parse.ts — parseRawRequest (P9 D10/D11)', () => {
     expect('error' in result).toBe(false);
     if ('error' in result) return;
     expect(result.state.headers).toEqual([
-      { name: 'Transfer-Encoding', value: 'chunked', enabled: true },
+      { name: 'Transfer-Encoding', value: 'chunked', enabled: true, description: '' },
     ]);
     expect(result.warnings.map((w) => w.kind)).toEqual(['chunked-transfer-encoding']);
   });

@@ -36,6 +36,7 @@ function blankField(): HttpFormDataFieldState {
     fileSize: 0,
     contentType: '',
     enabled: true,
+    description: '',
   };
 }
 

@@ -184,6 +184,10 @@ export const httpHeaderSchema = /*#__PURE__*/ z.object({
   name: z.string(),
   value: z.string(),
   enabled: z.boolean().default(true),
+  // P22b D6: app-local free text, no wire counterpart — P17 D14's own description field, copied
+  // onto every row-shaped configurable field. `.default('')` so a tab saved before this phase
+  // restores unchanged.
+  description: z.string().default(''),
 });
 export type HttpHeaderState = z.infer<typeof httpHeaderSchema>;
 
@@ -236,6 +240,8 @@ export const httpUrlEncodedFieldSchema = /*#__PURE__*/ z.object({
   name: z.string(),
   value: z.string(),
   enabled: z.boolean().default(true),
+  // P22b D6: see httpHeaderSchema's own comment.
+  description: z.string().default(''),
 });
 export type HttpUrlEncodedFieldState = z.infer<typeof httpUrlEncodedFieldSchema>;
 
@@ -252,6 +258,8 @@ export const httpFormDataFieldSchema = /*#__PURE__*/ z.object({
   fileSize: z.number().default(0),
   contentType: z.string().default(''),
   enabled: z.boolean().default(true),
+  // P22b D6: see httpHeaderSchema's own comment.
+  description: z.string().default(''),
 });
 export type HttpFormDataFieldState = z.infer<typeof httpFormDataFieldSchema>;
 

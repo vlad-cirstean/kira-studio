@@ -274,7 +274,10 @@ func importHeaders(raw json.RawMessage) []model.SavedHeader {
 		// example) — a valueless header row imports as an empty value, not a dropped row.
 		value, _ := decodeScalarString(row["value"])
 		disabled, _ := decodeBool(row["disabled"])
-		out = append(out, model.SavedHeader{Name: name, Value: value, Enabled: !disabled})
+		// P22b D6: the same decodeDescription() Variable import already uses — a header's own
+		// `description` is oneOf [string, Description-object], never round-tripped verbatim.
+		description := decodeDescription(row["description"])
+		out = append(out, model.SavedHeader{Name: name, Value: value, Enabled: !disabled, Description: description})
 	}
 	return out
 }

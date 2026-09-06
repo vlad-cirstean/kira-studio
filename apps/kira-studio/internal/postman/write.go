@@ -174,6 +174,10 @@ func buildHeaders(headers []model.SavedHeader) json.RawMessage {
 		if !h.Enabled {
 			row["disabled"] = true
 		}
+		// P22b D6: buildVariables' own rule above — a plain string, only when non-empty.
+		if h.Description != "" {
+			row["description"] = h.Description
+		}
 		rows = append(rows, row)
 	}
 	return mustRaw(rows)

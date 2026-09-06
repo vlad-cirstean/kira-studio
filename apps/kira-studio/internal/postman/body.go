@@ -139,7 +139,8 @@ func importURLEncoded(raw json.RawMessage) []model.SavedField {
 		key, _ := decodeScalarString(row["key"])
 		value, _ := decodeScalarString(row["value"])
 		disabled, _ := decodeBool(row["disabled"])
-		out = append(out, model.SavedField{Name: key, Value: value, Enabled: !disabled})
+		description := decodeDescription(row["description"])
+		out = append(out, model.SavedField{Name: key, Value: value, Enabled: !disabled, Description: description})
 	}
 	return out
 }
@@ -154,12 +155,14 @@ func importFormData(raw json.RawMessage, rep *Report) []model.SavedFormField {
 		key, _ := decodeScalarString(row["key"])
 		contentType, _ := decodeScalarString(row["contentType"])
 		disabled, _ := decodeBool(row["disabled"])
+		description := decodeDescription(row["description"])
 		kind, _ := decodeString(row["type"])
 		if kind != "file" {
 			// `type` is optional in the schema's anyOf; absent means text.
 			value, _ := decodeScalarString(row["value"])
 			out = append(out, model.SavedFormField{
 				Name: key, Kind: "text", Value: value, ContentType: contentType, Enabled: !disabled,
+				Description: description,
 			})
 			continue
 		}
@@ -184,7 +187,7 @@ func importFormData(raw json.RawMessage, rep *Report) []model.SavedFormField {
 			}
 			out = append(out, model.SavedFormField{
 				Name: key, Kind: "file", Path: "", FileName: baseName(path),
-				ContentType: contentType, Enabled: !disabled,
+				ContentType: contentType, Enabled: !disabled, Description: description,
 			})
 		}
 	}
@@ -323,6 +326,9 @@ func buildBody(b savedBody) json.RawMessage {
 			if !f.Enabled {
 				row["disabled"] = true
 			}
+			if f.Description != "" {
+				row["description"] = f.Description
+			}
 			rows = append(rows, row)
 		}
 		return mustRaw(map[string]any{"mode": "urlencoded", "urlencoded": rows})
@@ -350,6 +356,9 @@ func buildBody(b savedBody) json.RawMessage {
 			}
 			if !f.Enabled {
 				row["disabled"] = true
+			}
+			if f.Description != "" {
+				row["description"] = f.Description
 			}
 			rows = append(rows, row)
 		}

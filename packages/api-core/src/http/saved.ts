@@ -101,10 +101,18 @@ function sameRows<T>(a: readonly T[], b: readonly T[], eq: (x: T, y: T) => boole
 }
 
 function sameNameValue(
-  a: { name: string; value: string; enabled: boolean },
-  b: { name: string; value: string; enabled: boolean },
+  a: { name: string; value: string; enabled: boolean; description: string },
+  b: { name: string; value: string; enabled: boolean; description: string },
 ): boolean {
-  return a.name === b.name && a.value === b.value && a.enabled === b.enabled;
+  return (
+    a.name === b.name &&
+    a.value === b.value &&
+    a.enabled === b.enabled &&
+    // P22b D6: a description-only edit must mark the tab dirty like any other field edit — it is
+    // saved (toSavedRequest above copies it verbatim), so leaving it out here would make Save
+    // silently drop a description the user just typed until some other field also changed.
+    a.description === b.description
+  );
 }
 
 function sameFormField(
@@ -117,7 +125,8 @@ function sameFormField(
     a.value === b.value &&
     a.path === b.path &&
     a.contentType === b.contentType &&
-    a.enabled === b.enabled
+    a.enabled === b.enabled &&
+    a.description === b.description
   );
 }
 

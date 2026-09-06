@@ -17,7 +17,7 @@ const props = defineProps<{
 }>();
 
 function blankHeader(): HttpHeaderState {
-  return { name: '', value: '', enabled: true };
+  return { name: '', value: '', enabled: true, description: '' };
 }
 
 function onUpdateRows(headers: HttpHeaderState[]): void {

@@ -56,8 +56,18 @@
         "method": "POST",
         "url": "https://api.example.com/v1/orders",
         "headers": [
-          { "name": "Authorization", "value": "Bearer abc.def", "enabled": true },
-          { "name": "Content-Type", "value": "application/json", "enabled": true }
+          {
+            "name": "Authorization",
+            "value": "Bearer abc.def",
+            "enabled": true,
+            "description": ""
+          },
+          {
+            "name": "Content-Type",
+            "value": "application/json",
+            "enabled": true,
+            "description": ""
+          }
         ],
         "bodyMode": "code",
         "code": "{\"id\":1}"
@@ -71,7 +81,12 @@
         "method": "POST",
         "url": "https://x.test/a",
         "headers": [
-          { "name": "Content-Type", "value": "application/x-www-form-urlencoded", "enabled": true }
+          {
+            "name": "Content-Type",
+            "value": "application/x-www-form-urlencoded",
+            "enabled": true,
+            "description": ""
+          }
         ],
         "bodyMode": "raw",
         "body": "{\"a\":1}"
@@ -84,7 +99,14 @@
       "want": {
         "method": "POST",
         "url": "https://x.test/a",
-        "headers": [{ "name": "content-type", "value": "application/json", "enabled": true }],
+        "headers": [
+          {
+            "name": "content-type",
+            "value": "application/json",
+            "enabled": true,
+            "description": ""
+          }
+        ],
         "bodyMode": "code",
         "code": "{\"a\":1}"
       },
@@ -98,8 +120,8 @@
         "url": "https://x.test/a",
         "bodyMode": "urlencoded",
         "urlEncoded": [
-          { "name": "a", "value": "1", "enabled": true },
-          { "name": "b", "value": "2", "enabled": true }
+          { "name": "a", "value": "1", "enabled": true, "description": "" },
+          { "name": "b", "value": "2", "enabled": true, "description": "" }
         ]
       },
       "warnings": []
@@ -112,9 +134,9 @@
         "url": "https://x.test/a",
         "bodyMode": "urlencoded",
         "urlEncoded": [
-          { "name": "username", "value": "alice", "enabled": true },
-          { "name": "password", "value": "hunter2", "enabled": true },
-          { "name": "remember", "value": "1", "enabled": true }
+          { "name": "username", "value": "alice", "enabled": true, "description": "" },
+          { "name": "password", "value": "hunter2", "enabled": true, "description": "" },
+          { "name": "remember", "value": "1", "enabled": true, "description": "" }
         ]
       },
       "warnings": []
@@ -126,8 +148,13 @@
         "method": "POST",
         "url": "https://x.test/a",
         "headers": [
-          { "name": "Content-Type", "value": "application/json", "enabled": true },
-          { "name": "Accept", "value": "application/json", "enabled": true }
+          {
+            "name": "Content-Type",
+            "value": "application/json",
+            "enabled": true,
+            "description": ""
+          },
+          { "name": "Accept", "value": "application/json", "enabled": true, "description": "" }
         ],
         "bodyMode": "code",
         "code": "{\"a\":1}"
@@ -150,7 +177,8 @@
             "fileName": "",
             "fileSize": 0,
             "contentType": "",
-            "enabled": true
+            "enabled": true,
+            "description": ""
           },
           {
             "name": "file",
@@ -160,7 +188,8 @@
             "fileName": "report.csv",
             "fileSize": 0,
             "contentType": "text/csv",
-            "enabled": true
+            "enabled": true,
+            "description": ""
           }
         ]
       },
@@ -182,7 +211,8 @@
             "fileName": "id_rsa",
             "fileSize": 0,
             "contentType": "",
-            "enabled": true
+            "enabled": true,
+            "description": ""
           }
         ]
       },
@@ -214,7 +244,8 @@
             "fileName": "",
             "fileSize": 0,
             "contentType": "",
-            "enabled": true
+            "enabled": true,
+            "description": ""
           }
         ]
       },
@@ -269,7 +300,7 @@
         "method": "POST",
         "url": "https://x.test/a",
         "bodyMode": "urlencoded",
-        "urlEncoded": [{ "name": "a", "value": "hello world", "enabled": true }]
+        "urlEncoded": [{ "name": "a", "value": "hello world", "enabled": true, "description": "" }]
       },
       "warnings": []
     },
@@ -280,7 +311,7 @@
         "method": "POST",
         "url": "https://api.test/x",
         "bodyMode": "urlencoded",
-        "urlEncoded": [{ "name": "q", "value": "a+b", "enabled": true }]
+        "urlEncoded": [{ "name": "q", "value": "a+b", "enabled": true, "description": "" }]
       },
       "warnings": []
     },
@@ -291,7 +322,7 @@
         "method": "POST",
         "url": "https://api.test/x",
         "bodyMode": "urlencoded",
-        "urlEncoded": [{ "name": "p", "value": "%2Fx%2Fy", "enabled": true }]
+        "urlEncoded": [{ "name": "p", "value": "%2Fx%2Fy", "enabled": true, "description": "" }]
       },
       "warnings": []
     },
@@ -333,7 +364,14 @@
       "want": {
         "method": "GET",
         "url": "https://x.test/a",
-        "headers": [{ "name": "Authorization", "value": "Basic YWxpY2U6czNjcjN0", "enabled": true }]
+        "headers": [
+          {
+            "name": "Authorization",
+            "value": "Basic YWxpY2U6czNjcjN0",
+            "enabled": true,
+            "description": ""
+          }
+        ]
       },
       "warnings": ["credential-in-command"]
     },
@@ -343,7 +381,14 @@
       "want": {
         "method": "GET",
         "url": "https://x.test/a",
-        "headers": [{ "name": "Authorization", "value": "Bearer sometoken123", "enabled": true }]
+        "headers": [
+          {
+            "name": "Authorization",
+            "value": "Bearer sometoken123",
+            "enabled": true,
+            "description": ""
+          }
+        ]
       },
       "warnings": ["credential-in-command"]
     },
@@ -353,7 +398,9 @@
       "want": {
         "method": "GET",
         "url": "https://x.test/a",
-        "headers": [{ "name": "User-Agent", "value": "MyAgent/1.0", "enabled": true }]
+        "headers": [
+          { "name": "User-Agent", "value": "MyAgent/1.0", "enabled": true, "description": "" }
+        ]
       },
       "warnings": []
     },
@@ -363,7 +410,9 @@
       "want": {
         "method": "GET",
         "url": "https://x.test/a",
-        "headers": [{ "name": "Referer", "value": "https://ref.example", "enabled": true }]
+        "headers": [
+          { "name": "Referer", "value": "https://ref.example", "enabled": true, "description": "" }
+        ]
       },
       "warnings": []
     },
@@ -373,7 +422,9 @@
       "want": {
         "method": "GET",
         "url": "https://x.test/a",
-        "headers": [{ "name": "Cookie", "value": "session=abc123", "enabled": true }]
+        "headers": [
+          { "name": "Cookie", "value": "session=abc123", "enabled": true, "description": "" }
+        ]
       },
       "warnings": []
     },
@@ -446,7 +497,7 @@
       "want": {
         "method": "GET",
         "url": "https://x.test/a",
-        "headers": [{ "name": "X-Empty", "value": "", "enabled": true }]
+        "headers": [{ "name": "X-Empty", "value": "", "enabled": true, "description": "" }]
       },
       "warnings": []
     },

@@ -152,7 +152,7 @@ export function parseRawRequest(
         detail: `'${line}' was kept, but this app never sends a chunked body — it always computes an exact Content-Length instead.`,
       });
     }
-    headers.push({ name, value, enabled: true });
+    headers.push({ name, value, enabled: true, description: '' });
   }
 
   const body = bodyStartLine < lines.length ? lines.slice(bodyStartLine).join('\n') : '';

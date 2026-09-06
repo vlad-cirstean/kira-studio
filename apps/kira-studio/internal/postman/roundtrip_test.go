@@ -316,7 +316,9 @@ func TestImportTranslatesEveryBodyMode(t *testing.T) {
 	t.Run("urlencoded keeps its disabled row", func(t *testing.T) {
 		got := req("urlencoded").URLEncoded
 		want := []model.SavedField{
-			{Name: "grant_type", Value: "password", Enabled: true},
+			// P22b D6: the testdata's own grant_type row carries a Postman `description` —
+			// importURLEncoded now decodes it rather than silently dropping it.
+			{Name: "grant_type", Value: "password", Enabled: true, Description: "the oauth grant"},
 			{Name: "scope", Value: "read", Enabled: false},
 		}
 		if !reflect.DeepEqual(got, want) {
@@ -330,7 +332,8 @@ func TestImportTranslatesEveryBodyMode(t *testing.T) {
 		// re-picks the file themselves.
 		got := req("formdata").FormData
 		want := []model.SavedFormField{
-			{Name: "caption", Kind: "text", Value: "a text row", Enabled: true},
+			// P22b D6: the testdata's own caption row carries a Postman `description`.
+			{Name: "caption", Kind: "text", Value: "a text row", Enabled: true, Description: "the caption"},
 			{Name: "notype", Kind: "text", Value: "type is absent, so text", Enabled: true},
 			{Name: "single", Kind: "file", FileName: "report.csv", ContentType: "text/csv", Enabled: true},
 			{Name: "many", Kind: "file", FileName: "a.png", Enabled: true},

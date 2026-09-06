@@ -1,4 +1,8 @@
-<script setup lang="ts" generic="T extends { name: string; value: string; enabled?: boolean }">
+<script
+  setup
+  lang="ts"
+  generic="T extends { name: string; value: string; enabled?: boolean; description?: string }"
+>
 import { computed } from 'vue';
 import type { VariableSupport } from '../../api/state/variableCompletion';
 import AutocompleteField from '../../theme/primitives/AutocompleteField.vue';
@@ -49,21 +53,32 @@ const props = withDefaults(
      *  A plain case-insensitive substring test over name-or-value (both are user-authored request
      *  content, never a secret's plaintext — §5). */
     filterQuery?: string;
+    /** P22b D6/D7: renders the description column — off by default (OQ-1: a fourth
+     *  AutocompleteField-width column in an already-tight row is unusable for the majority of rows
+     *  that have no description). Driven by a per-tab toggle at the call site. */
+    showDescriptions?: boolean;
   }>(),
-  { showEnabled: false, namePlaceholder: 'key', valuePlaceholder: 'value' },
+  {
+    showEnabled: false,
+    namePlaceholder: 'key',
+    valuePlaceholder: 'value',
+    showDescriptions: false,
+  },
 );
 
 const emit = defineEmits<{ 'update:rows': [rows: T[]] }>();
 
 // P22b D9: a CSS grid, not independent flex items — F13's own finding was that adjacent rows'
 // columns never lined up (each field carried its own `flex` value, so a secret/file row with an
-// extra affordance shifted its neighbours). `showEnabled` is fixed per table instance (never
-// varies row to row), so the column count below is a property of the *table*, not the row —
-// unlike the trailing slot (FormDataTable's kind/file controls), which genuinely does vary row to
-// row and is wrapped in its own single grid cell below for exactly that reason.
-const gridTemplateColumns = computed(() =>
-  props.showEnabled ? 'auto 1.2fr 2fr auto auto' : '1.2fr 2fr auto auto',
-);
+// extra affordance shifted its neighbours). `showEnabled`/`showDescriptions` are fixed per table
+// instance (never vary row to row), so the column count below is a property of the *table*, not
+// the row — unlike the trailing slot (FormDataTable's kind/file controls), which genuinely does
+// vary row to row and is wrapped in its own single grid cell below for exactly that reason.
+const gridTemplateColumns = computed(() => {
+  const checkbox = props.showEnabled ? 'auto ' : '';
+  const description = props.showDescriptions ? '1.5fr ' : '';
+  return `${checkbox}1.2fr 2fr ${description}auto auto`;
+});
 
 // P16 D13/F11: `index` is the row's position in `props.rows` — i.e. its real write-through index
 // — carried alongside the row through filtering, never the position in `displayRows` (which a
@@ -109,7 +124,7 @@ function rowValueCandidates(
   };
 }
 
-function updateField(index: number, field: 'name' | 'value', value: string): void {
+function updateField(index: number, field: 'name' | 'value' | 'description', value: string): void {
   const next = [...props.rows];
   if (index === next.length) next.push(props.blankRow());
   next[index] = { ...next[index], [field]: value };
@@ -271,6 +286,17 @@ function onContainerKeydown(e: KeyboardEvent): void {
           />
         </div>
       </slot>
+      <!-- P22b D6: plain prose about the field, not a value — no autocomplete, no {{variable}}
+           colouring. Behind showDescriptions (D7) so a table with no descriptions in it does not
+           pay a fourth AutocompleteField-width column for nothing. -->
+      <div v-if="showDescriptions" class="field-cell">
+        <TextField
+          :model-value="entry.row.description ?? ''"
+          placeholder="description"
+          :data-testid="`${testidPrefix}-description`"
+          @update:model-value="updateField(entry.index, 'description', $event)"
+        />
+      </div>
       <!-- P22b D9: wrapped in its own single grid cell — FormDataTable's own trailing content
            (kind select, plus a conditional Choose-file button/caption/remove) varies row to row,
            unlike showEnabled above, so it needs one stable cell to vary *inside* rather than

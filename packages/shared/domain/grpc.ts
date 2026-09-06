@@ -163,6 +163,9 @@ export const grpcMetadataSchema = /*#__PURE__*/ z.object({
   name: z.string(),
   value: z.string(),
   enabled: z.boolean().default(true),
+  // P22b D6: app-local free text, no wire counterpart — domain/http.ts's httpHeaderSchema own
+  // comment, copied here for the same reason this schema already borrows its other three fields.
+  description: z.string().default(''),
 });
 export type GrpcMetadataState = z.infer<typeof grpcMetadataSchema>;
 
