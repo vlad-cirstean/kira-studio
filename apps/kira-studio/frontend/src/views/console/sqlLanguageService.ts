@@ -1,8 +1,9 @@
 import type { CompletionSource } from '@codemirror/autocomplete';
 import { keywordCompletionSource, schemaCompletionSource } from '@codemirror/lang-sql';
+import type { RelationColumns } from '@shared/domain/tree';
 import { dialectObjectFor } from '../../editor/languages';
 import type { SqlDialect } from '../shared/sqlIdent';
-import { type DdlSchema, defaultSchemaFor, toSqlNamespace } from './ddl';
+import { type DdlSchema, defaultSchemaFor, namespaceFromCached, toSqlNamespace } from './ddl';
 
 // P18 (v1.1) D1 — why this is a "language service", not a language server.
 //
@@ -37,22 +38,26 @@ function relationCompletionSource(relations: readonly string[]): CompletionSourc
   };
 }
 
-/** D14: two layers, not all-or-nothing. A DDL document (`schema`) still wins when one exists —
- *  today's schemaCompletionSource + keyword pair, now with the relation source ranked after them
- *  so a document's own real column-aware completions are never shadowed by a bare table name.
- *  With no document, `relations` (consoleRelationNames — completion.ts's own tree-cache read,
- *  mirroring mongoCompletionSource's identical technique for collections) still gets table names,
- *  paired with an explicit keyword source the same reason D5/F3 already gives (`override`
- *  replaces language-data sources wholesale). Both empty is exactly today's `undefined` — this is
- *  deliberate, not a gap to patch by having the language service query the database itself: the
- *  SPEC row forbids schema introspection over a real connection, and both this file's diagnostics
- *  and hover providers read the exact same `DdlSchema`/tree cache, so completion never disagrees
- *  with them about what the console knows. */
+/** P19 D14, widened by P22c D4: layered, not all-or-nothing. A DDL document (`schema`) still wins
+ *  wholesale when one has any tables — today's schemaCompletionSource + keyword pair, now with the
+ *  relation source ranked after them so a document's own real column-aware completions are never
+ *  shadowed by a bare table name. With no document, `cached` (P22c: the metadata cache's own
+ *  columns for this console's container, state/schemaColumns.ts's cachedRelationsFor) fills in the
+ *  identical schema-aware completion — table names, `table.` column completion, alias resolution —
+ *  with no manual step. Only once BOTH are empty does `relations` (consoleRelationNames —
+ *  completion.ts's own tree-cache read, mirroring mongoCompletionSource's identical technique for
+ *  collections) fall back to table names alone, paired with an explicit keyword source the same
+ *  reason D5/F3 already gives (`override` replaces language-data sources wholesale). All three
+ *  empty is exactly today's `undefined` — deliberate, not a gap to patch by having the language
+ *  service query the database itself: D5 keeps the "no introspection from the language layer"
+ *  rule, and this file's diagnostics/hover providers read the same effective schema (D6), so
+ *  completion never disagrees with them about what the console knows. */
 export function sqlCompletionSources(
   dialect: SqlDialect,
   schema: DdlSchema,
   database: string | null | undefined,
   relations: readonly string[] = [],
+  cached: readonly RelationColumns[] = [],
 ): readonly CompletionSource[] | undefined {
   const dialectObject = dialectObjectFor(dialect);
   if (!dialectObject) return undefined;
@@ -69,6 +74,12 @@ export function sqlCompletionSources(
       // than implicit.
       keywordCompletionSource(dialectObject, true),
       relationCompletionSource(relations),
+    ];
+  }
+  if (cached.length > 0) {
+    return [
+      schemaCompletionSource({ dialect: dialectObject, schema: namespaceFromCached(cached) }),
+      keywordCompletionSource(dialectObject, true),
     ];
   }
   if (relations.length > 0) {

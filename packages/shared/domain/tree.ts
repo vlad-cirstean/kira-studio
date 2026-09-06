@@ -139,3 +139,16 @@ export const objectMetaSchema = /*#__PURE__*/ z.object({
   comment: z.string().nullable(),
 });
 export type ObjectMeta = z.infer<typeof objectMetaSchema>;
+
+// P22c D1: SchemaColumns' own element — one relation's columns, reusing columnMetaSchema verbatim
+// (never a second, parallel column shape) so a completion source built from this can never
+// disagree with Describe about the same column's type. Deliberately smaller than ObjectMeta: no
+// primaryKey/foreignKeys/referencedBy/indexes/rowEstimate/object-level comment — SchemaColumns
+// exists to spell a column name and its type across a whole container in one round trip, not to
+// fetch a schema's entire constraint graph.
+export const relationColumnsSchema = /*#__PURE__*/ z.object({
+  name: z.string(),
+  kind: nodeKindSchema,
+  columns: /*#__PURE__*/ z.array(columnMetaSchema),
+});
+export type RelationColumns = z.infer<typeof relationColumnsSchema>;

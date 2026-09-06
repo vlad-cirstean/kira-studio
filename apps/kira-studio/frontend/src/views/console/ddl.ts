@@ -1,5 +1,6 @@
 import type { Completion } from '@codemirror/autocomplete';
 import type { SQLDialect, SQLNamespace } from '@codemirror/lang-sql';
+import type { RelationColumns } from '@shared/domain/tree';
 import type { SqlDialect } from '../shared/sqlIdent';
 import {
   childrenOf,
@@ -384,6 +385,26 @@ export function toSqlNamespace(schema: DdlSchema): SQLNamespace {
       ns[table.schema] = schemaNs;
     }
     ns[table.name] = columns;
+  }
+  return ns;
+}
+
+/** P22c D4: RelationColumns[] (the metadata cache's own supply, F5) -> lang-sql's namespace
+ *  object, the exact shape toSqlNamespace already produces from a parsed DdlSchema — so
+ *  schemaCompletionSource cannot tell which supply it got, and alias resolution / `table.`
+ *  completion / qualified paths all work identically. Unqualified only: a schema-wide fetch is
+ *  scoped to one container already, so there is no second schema/database level to nest under the
+ *  way a DDL document's own `table.schema` can produce. */
+export function namespaceFromCached(relations: readonly RelationColumns[]): SQLNamespace {
+  const ns: Record<string, SQLNamespace> = {};
+  for (const rc of relations) {
+    ns[rc.name] = rc.columns.map((col) => ({
+      label: col.name,
+      type: 'property',
+      detail: col.dataType,
+      // D10's own precedent: primary-key columns sort first.
+      boost: col.isPrimaryKey ? 1 : 0,
+    }));
   }
   return ns;
 }
