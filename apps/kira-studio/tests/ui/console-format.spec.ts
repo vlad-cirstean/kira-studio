@@ -322,7 +322,48 @@ test('Query console — pressing Format twice shows "Already formatted" the seco
   await page.click('[data-testid="console-format"]');
   const note = view.locator('[data-testid="console-format-note"]');
   await expect(note).toBeVisible();
-  await expect(note).toContainText('Already formatted');
+  // P22b D13: reworded to name the reason (indentation-only, ClickHouse's own identifier
+  // hazard) rather than assert a bare null result.
+  await expect(note).toContainText(
+    'Already formatted — indentation only; keywords keep the case you typed',
+  );
+});
+
+// P22b D12: splitSqlStatements' pushIfNonEmpty slices up to, not through, a statement's own ';'
+// — a plain join(';\n\n') used to delete the document's LAST semicolon on every Format press.
+// F18's own reported symptom: a user writes `select * from t;`, presses Format, and watches
+// their semicolon disappear.
+test("Query console — Format keeps the document's last semicolon (P22b D12)", async ({
+  relaunch,
+}) => {
+  const CONNECTION_ID = 'conn-console-format-semicolon';
+  const CONNECTION_SUMMARY = postgresConnectionSummary(
+    CONNECTION_ID,
+    'Format Semicolon DB',
+    'magenta',
+  );
+  const FIXTURE = orderItemsFixture(CONNECTION_ID);
+
+  const CONTROL: ControlSnapshot[] = [
+    { channel: IPC.connectionsList, response: [] },
+    {
+      channel: IPC.connectionsCreate,
+      args: postgresCreateArgs('Format Semicolon DB', 'magenta'),
+      response: CONNECTION_SUMMARY,
+    },
+    ...FIXTURE.control,
+  ];
+
+  const { window: page } = await relaunch({ control: CONTROL });
+  await connectAndExpandPostgres(page, 'Format Semicolon DB', 'magenta');
+  await openConsoleFromMenu(page, ORDER_ITEMS_PATH);
+  const view = page.locator('[data-testid="console-view"]');
+  await expect(view).toBeVisible();
+
+  await typeInto(view, page, 'select 1;');
+  await page.click('[data-testid="console-format"]');
+  const text = await consoleText(view);
+  expect(text.trim().endsWith(';')).toBe(true);
 });
 
 test('Query console — Format reformats a Mongo aggregate pipeline', async ({ relaunch }) => {

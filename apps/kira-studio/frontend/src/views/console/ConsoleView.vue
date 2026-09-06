@@ -404,7 +404,12 @@ function onFormat(): void {
         // F19's other silent no-op: keywordCase: 'preserve' (P13 D4) means Format only ever
         // touches whitespace — pressing it on an already-indented document changes nothing, and
         // without this nothing distinguished "already formatted" from "the button is dead".
-        formatNote.value = 'Already formatted.';
+        // P22b D13: reworded to name the reason rather than assert a bare null result — once D12
+        // fixed the semicolon-deletion bug, this note is the whole remaining substance of "Format
+        // looks broken" (F19): the difference between "the button is dead" and "the button ran
+        // and there was nothing to change".
+        formatNote.value =
+          'Already formatted — indentation only; keywords keep the case you typed (ClickHouse identifiers).';
       }
     });
   })();
