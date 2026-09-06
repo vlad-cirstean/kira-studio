@@ -120,15 +120,30 @@ func BuildConfig(cfg model.ResolvedConnectionConfig, database string, profile Pr
 	}
 
 	if sslmode, ok := options["sslmode"].(string); ok && sslmode != "" && sslmode != "disable" {
-		tlsName := "kira-" + cfg.ID
 		switch sslmode {
 		case "require", "prefer":
+			// P21 round 2 architecture/security finding 8: this used to register under
+			// "kira-"+cfg.ID — a fresh entry in go-sql-driver's process-global TLS config
+			// registry (mysql.RegisterTLSConfig) for every connection id, never deregistered on
+			// disconnect or delete, so entries accumulated for the process's whole lifetime keyed
+			// by ids that might no longer exist. The tls.Config for "require"/"prefer" is
+			// identical for every connection that uses it (InsecureSkipVerify, nothing
+			// host-specific), so registering it once under one fixed, shared name makes every
+			// such BuildConfig call idempotent instead of leaking a new entry per connection.
+			const tlsName = "kira-mysql-insecure-skip-verify"
 			if err := mysql.RegisterTLSConfig(tlsName, &tls.Config{InsecureSkipVerify: true}); err != nil { //nolint:gosec // matches client.ts's own rejectUnauthorized:false for these two modes
 				return nil, err
 			}
 			mc.TLSConfig = tlsName
 		case "verify-full":
-			if err := mysql.RegisterTLSConfig(tlsName, &tls.Config{ServerName: parseHost(mc.Addr)}); err != nil {
+			// Same reasoning, keyed on the effective ServerName instead of the connection id:
+			// every connection to the same host reuses one registration, so the registry's size
+			// is bounded by the number of distinct hosts this process has ever connected to
+			// (typically small and stable), not by how many connection records the user has
+			// created and deleted over the app's lifetime.
+			serverName := parseHost(mc.Addr)
+			tlsName := "kira-mysql-verify-full:" + serverName
+			if err := mysql.RegisterTLSConfig(tlsName, &tls.Config{ServerName: serverName}); err != nil {
 				return nil, err
 			}
 			mc.TLSConfig = tlsName

@@ -68,6 +68,51 @@ func TestBuildConfig_URISslmodeStillAppliesTLS(t *testing.T) {
 	}
 }
 
+// TestBuildConfig_TLSConfigNameStableAcrossConnectionIDs is the regression test for P21 round 2
+// architecture/security finding 8's registry-leak half: BuildConfig used to register the driver's
+// process-global TLS config under "kira-"+cfg.ID, so every distinct connection id minted its own
+// entry — never deregistered on disconnect or delete — that accumulated for the life of the
+// process. Two connections with different ids but the same effective TLS settings (same host,
+// same sslmode) must now register under the *same* name, proving the registration is keyed on the
+// settings rather than the id and is therefore idempotent instead of unbounded.
+func TestBuildConfig_TLSConfigNameStableAcrossConnectionIDs(t *testing.T) {
+	cfgA := model.ResolvedConnectionConfig{ID: "conn-aaaa", Mode: "uri", URI: ptr("mysql://u:p@same-host:3306/db?sslmode=verify-full")}
+	cfgB := model.ResolvedConnectionConfig{ID: "conn-bbbb", Mode: "uri", URI: ptr("mysql://u:p@same-host:3306/db?sslmode=verify-full")}
+
+	mcA, err := mysqlfamily.BuildConfig(cfgA, "", noopProfile(), func(string, string) {})
+	if err != nil {
+		t.Fatalf("BuildConfig(cfgA): %v", err)
+	}
+	mcB, err := mysqlfamily.BuildConfig(cfgB, "", noopProfile(), func(string, string) {})
+	if err != nil {
+		t.Fatalf("BuildConfig(cfgB): %v", err)
+	}
+
+	if mcA.TLSConfig != mcB.TLSConfig {
+		t.Fatalf("two connections to the same host under sslmode=verify-full registered different TLS config names (%q vs %q) — the registry leaks one entry per connection id", mcA.TLSConfig, mcB.TLSConfig)
+	}
+	if strings.Contains(mcA.TLSConfig, "conn-aaaa") || strings.Contains(mcA.TLSConfig, "conn-bbbb") {
+		t.Fatalf("TLS config name %q still derives from the connection id", mcA.TLSConfig)
+	}
+
+	// Same check for require/prefer's fixed, shared name.
+	reqA := model.ResolvedConnectionConfig{ID: "conn-cccc", Mode: "uri", URI: ptr("mysql://u:p@host-a:3306/db?sslmode=require")}
+	reqB := model.ResolvedConnectionConfig{ID: "conn-dddd", Mode: "uri", URI: ptr("mysql://u:p@host-b:3306/db?sslmode=require")}
+	mcReqA, err := mysqlfamily.BuildConfig(reqA, "", noopProfile(), func(string, string) {})
+	if err != nil {
+		t.Fatalf("BuildConfig(reqA): %v", err)
+	}
+	mcReqB, err := mysqlfamily.BuildConfig(reqB, "", noopProfile(), func(string, string) {})
+	if err != nil {
+		t.Fatalf("BuildConfig(reqB): %v", err)
+	}
+	if mcReqA.TLSConfig != mcReqB.TLSConfig {
+		t.Fatalf("two require-mode connections (different ids and different hosts, same settings shape) registered different TLS config names (%q vs %q)", mcReqA.TLSConfig, mcReqB.TLSConfig)
+	}
+}
+
+func ptr(s string) *string { return &s }
+
 // TestBuildConfig_URIUnknownSslmodeStillRejected preserves the existing "fail loudly on a typo"
 // behaviour for the one option this adapter does understand.
 func TestBuildConfig_URIUnknownSslmodeStillRejected(t *testing.T) {
