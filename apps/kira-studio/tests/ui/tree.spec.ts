@@ -259,6 +259,38 @@ test('project tree — expansion, caching, disconnect/reconnect, search, filters
   await page.click('[data-testid="menu-item-refresh"]');
   await expect.poll(() => opsCount(control.log())).toBe(opsBeforeCollapse + 1);
 
+  // P24 D7: that refresh routes through treeInvalidate first — the schema's WHOLE row (all four
+  // kinds: children/describe/definition/columns), not loadChildren's own refresh:true, which
+  // only ever rewrote 'children' and left the other three kinds sharing that row untouched (F8).
+  // treeInvalidate is void and outside opsCount()'s own op-channel set (control.log() records it
+  // regardless, since every intercepted call is logged before any snapshot/wildcard lookup runs).
+  const invalidateOnRefresh = control.log().filter((e) => e.channel === IPC.treeInvalidate);
+  expect(invalidateOnRefresh.at(-1)?.args).toEqual({ connectionId: CONNECTION_ID, path: APP_PATH });
+
+  // P24 D8/F10: refreshing a TABLE (a tree leaf, P19 D5) no longer calls Children on it — every
+  // adapter answers a leaf's Children with an empty list nobody renders, so the old refresh flow
+  // both wasted a real round trip AND wrote junk `{"children":[]}` into the same row describe/
+  // definition live on. Right-click wide_table's own Refresh and assert the op delta contains no
+  // `children` call at all — fails on main, which routed every row's Refresh through the same
+  // loadChildren(…, true) regardless of what kind of node it targeted.
+  const opsBeforeLeafRefresh = opsCount(control.log());
+  const invalidateBeforeLeafRefresh = invalidateOnRefresh.length;
+  await openRowMenu(page, WIDE_TABLE_PATH);
+  await page.click('[data-testid="menu-item-refresh"]');
+  // A leaf has no twisty spinner to poll (P19 D5: wide_table's own `.twisty` is `invisible`, and
+  // refreshObject never touches `treeState.loading` for it either way) — wait out the mocked
+  // round trip with a fixed settle window instead, long enough for either the fixed behaviour
+  // (one treeInvalidate call, nothing else) or the pre-fix one (treeInvalidate AND a treeChildren
+  // call) to fully land against a local mock whose every response is effectively instant.
+  await page.waitForTimeout(300);
+  const invalidateAfterLeafRefresh = control.log().filter((e) => e.channel === IPC.treeInvalidate);
+  expect(invalidateAfterLeafRefresh).toHaveLength(invalidateBeforeLeafRefresh + 1);
+  expect(invalidateAfterLeafRefresh.at(-1)?.args).toEqual({
+    connectionId: CONNECTION_ID,
+    path: WIDE_TABLE_PATH,
+  });
+  expect(opsCount(control.log())).toBe(opsBeforeLeafRefresh);
+
   // --- context menus: exact item id list per kind (§9b) ------------------------------------
   await openRowMenu(page, '');
   expect(await menuItemIds(page)).toEqual([
