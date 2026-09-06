@@ -97,28 +97,30 @@ function viewTimeline(): void {
   setResponsePane('timeline');
 }
 
-// Round-2 review finding 8: beautifyJson/beautifyXml run the exact same parse scanJson/scanXml
-// would (both are `tryParseJson`/`tryParseXml` themselves, D10) — computed here once and reused by
-// both prettyFormat (the `ok` flag) and bodyText below (the `text` output), instead of parsing the
-// same body twice per render to answer a boolean and then again for the real output. The `<…>`
-// bracket check mirrors celleditor/detect.ts's own detectXml gate: an XML parse alone accepts
-// plain text with no tags at all (a valid, tag-less node list), so without it every plain-text
-// response would misreport as XML; xmlResult is skipped entirely once JSON already matched.
-const jsonResult = computed(() => {
+// P21 round 2 performance finding 7: the previous shape (a round-2-review-finding-8 fix) cached
+// jsonResult/xmlResult as their own computed()s so prettyFormat and bodyText below would share one
+// parse instead of two — but a Vue computed retains whatever its arrow function *returns*, and
+// beautifyJson/beautifyXml's return value is `{ text, ok, reason? }`: the full pretty-printed
+// string, not just the boolean prettyFormat actually needed. Reading jsonResult.value.ok (from
+// prettyFormat, on every render of the toolbar toggle) was therefore enough to keep the *entire*
+// pretty-printed body — ~1.3x the raw body's own size, un-budgeted, on top of the raw body itself
+// — retained for as long as `response` stayed the current one, including while Raw view is
+// selected or a different pane entirely is showing. prettyFormat now only ever returns 'json' |
+// 'xml' | null, so the large `.text` string beautifyJson/beautifyXml also compute is discarded the
+// instant this computed's own function returns; bodyText below re-parses to get `.text` only when
+// pretty view is the one actually being rendered, at the cost of a second parse in that case
+// (bytewise no worse than the parse this file already ran per render before finding 8's own
+// caching existed) in exchange for never retaining the pretty text outside that view.
+const prettyFormat = computed<'json' | 'xml' | null>(() => {
   const body = response.value?.body;
-  return body === undefined ? null : beautifyJson(body, 'indented');
-});
-const xmlResult = computed(() => {
-  const body = response.value?.body;
-  if (body === undefined || jsonResult.value?.ok) return null;
+  if (body === undefined) return null;
+  if (beautifyJson(body, 'indented').ok) return 'json';
+  // The `<…>` bracket check mirrors celleditor/detect.ts's own detectXml gate: an XML parse alone
+  // accepts plain text with no tags at all (a valid, tag-less node list), so without it every
+  // plain-text response would misreport as XML.
   const t = body.trim();
   if (t.length === 0 || t[0] !== '<' || t[t.length - 1] !== '>') return null;
-  return beautifyXml(body, 'indented');
-});
-const prettyFormat = computed<'json' | 'xml' | null>(() => {
-  if (jsonResult.value?.ok) return 'json';
-  if (xmlResult.value?.ok) return 'xml';
-  return null;
+  return beautifyXml(body, 'indented').ok ? 'xml' : null;
 });
 
 const RESPONSE_VIEW_OPTIONS = [
@@ -146,12 +148,17 @@ const redirectCaption = computed(() => {
 // depending on prettyFormat, Raw renders the bytes exactly as received. Neither ever mutates
 // response.body itself (it is read-only runtime state, D6), so switching back to Raw always shows
 // what the server actually sent.
+//
+// Finding 7 (continued): this re-parses rather than reading a cached jsonResult/xmlResult, and
+// deliberately so — this computed only ever runs (and only ever retains its own return value, the
+// pretty string) while pretty view is the one actually selected, which is exactly the lifetime the
+// pretty text should be retained for.
 const bodyText = computed(() => {
   const r = response.value;
   if (!r) return '';
   if (props.tab.state.responseView === 'pretty') {
-    if (prettyFormat.value === 'json') return jsonResult.value?.text ?? r.body;
-    if (prettyFormat.value === 'xml') return xmlResult.value?.text ?? r.body;
+    if (prettyFormat.value === 'json') return beautifyJson(r.body, 'indented').text;
+    if (prettyFormat.value === 'xml') return beautifyXml(r.body, 'indented').text;
   }
   return r.body;
 });
