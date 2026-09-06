@@ -20,9 +20,13 @@ const { data } = await import('../../frontend/src/bridge/data');
 const { openBrowseTab, openKeyValueTab, openDataTab, findKeyValueTab, findDataTab } = await import(
   '../../frontend/src/state/tabs'
 );
-const { load: loadBrowse, runtime: browseRuntime } = await import(
-  '../../frontend/src/views/browse/state'
-);
+const {
+  load: loadBrowse,
+  descend: descendBrowse,
+  setFilter: setBrowseFilter,
+  selectRow: selectBrowseRow,
+  runtime: browseRuntime,
+} = await import('../../frontend/src/views/browse/state');
 const {
   load: loadKeyValue,
   goNext: keyValueGoNext,
@@ -120,6 +124,50 @@ describe('views/browse/state.ts — load() supersession guard (P44 F47, P43 D39)
 
     first.resolve({ nodes: [], truncated: false });
     await Promise.all([pending, second]);
+  });
+
+  // P21 round 3 functional finding 14: setLevel used to patch levelPath and call load() without
+  // ever touching `filter`/`selected` — both carried over from whatever level the tab was
+  // previously showing.
+  test("4. descending into a level clears the previous level's filter and selection", async () => {
+    const { id } = openBrowseTab('conn4', 'bucket:four', { newTab: true });
+    // biome-ignore lint/suspicious/noExplicitAny: a minimal fake, not the real TreeChildrenResult
+    (control as any).treeChildren = async () => ({ nodes: [{ name: 'child' }], truncated: false });
+    await loadBrowse(id); // establishes the runtime record setFilter/selectRow write through
+
+    setBrowseFilter(id, 'invoices');
+    selectBrowseRow(id, 'bucket:four/some-other-row');
+    expect(browseRuntime[id]?.filter).toBe('invoices');
+    expect(browseRuntime[id]?.selected).toBe('bucket:four/some-other-row');
+
+    await descendBrowse(id, 'bucket:four/invoices');
+
+    expect(browseRuntime[id]?.filter).toBe('');
+    expect(browseRuntime[id]?.selected).toBeNull();
+  });
+
+  // P21 round 3 functional finding 14: a failed descend used to leave `nodes` holding the
+  // *previous* level's listing while `levelPath` had already advanced — a stale listing rendered
+  // under a breadcrumb that no longer matches it, which a row action (Delete) could act on by
+  // mistake.
+  test("5. a failed descend does not leave the previous level's nodes rendered under the new breadcrumb", async () => {
+    const { id } = openBrowseTab('conn5', 'bucket:five', { newTab: true });
+    // biome-ignore lint/suspicious/noExplicitAny: a minimal fake, not the real TreeChildrenResult
+    (control as any).treeChildren = async () => ({
+      nodes: [{ name: 'bucket-five-child' }],
+      truncated: false,
+    });
+    await loadBrowse(id);
+    expect(browseRuntime[id]?.nodes.map((n) => n.name)).toEqual(['bucket-five-child']);
+
+    // biome-ignore lint/suspicious/noExplicitAny: a minimal fake, not the real TreeChildrenResult
+    (control as any).treeChildren = async () => {
+      throw new Error('E_QUERY: token expired');
+    };
+    await descendBrowse(id, 'bucket:five/sub');
+
+    expect(browseRuntime[id]?.status).toBe('error');
+    expect(browseRuntime[id]?.nodes).toEqual([]);
   });
 });
 

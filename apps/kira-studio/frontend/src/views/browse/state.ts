@@ -91,6 +91,11 @@ export async function load(tabId: string, opts?: { refresh?: boolean }): Promise
     }
     rt.status = 'error';
     rt.error = { code: failure.code, message: failure.message };
+    // P21 round 3 functional finding 14: levelPath has already advanced (setLevel patches it
+    // before calling load) — leaving the *previous* level's nodes in place here attributes a
+    // listing to the wrong level under the new breadcrumb, and a row action (Delete, say) run
+    // against it would target a node under the old level while the header says otherwise.
+    rt.nodes = [];
   }
 }
 
@@ -103,6 +108,14 @@ export async function reload(tabId: string): Promise<void> {
 async function setLevel(tabId: string, level: string): Promise<void> {
   const tab = findBrowseTab(tabId);
   if (!tab) return;
+  // P21 round 3 functional finding 14: a level change used to keep the previous level's own
+  // `filter`/`selected` — descending into a container while a substring filter was active carried
+  // that now-meaningless filter into the new level's listing (silently hiding most or all of its
+  // children, with the filter box's leftover text the only clue), and `selected` could go on
+  // pointing at a path that belongs to a different level entirely.
+  const rt = ensureRuntime(tabId);
+  rt.filter = '';
+  rt.selected = null;
   patchBrowseTabState(tabId, { levelPath: level === tab.path ? '' : level });
   await load(tabId);
 }
