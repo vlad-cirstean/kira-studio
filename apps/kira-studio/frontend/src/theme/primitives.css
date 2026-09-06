@@ -153,7 +153,7 @@
 .p-input.is-focus {
   border-color: var(--kira-focus);
   outline: var(--kira-border-width) solid var(--kira-focus);
-  outline-offset: -2px;
+  outline-offset: -1px;
 }
 /* P24 D36: was an inline :style — the one place in the app a colour could never be themed,
    overridden, or seen in the stylesheet. */
@@ -424,7 +424,7 @@
 .p-select:focus-visible {
   border-color: var(--kira-focus);
   outline: var(--kira-border-width) solid var(--kira-focus);
-  outline-offset: -2px;
+  outline-offset: -1px;
 }
 .p-select:disabled {
   color: var(--kira-fg-disabled);

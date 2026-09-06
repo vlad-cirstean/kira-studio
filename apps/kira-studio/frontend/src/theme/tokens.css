@@ -74,7 +74,7 @@
      fix). Do not change this again without a real screenshot (or better, a real measurement)
      confirming it first — a plausible-sounding "standard" figure, and a plausible-sounding "exact"
      compensation, have both been wrong here. */
-  --kira-titlebar-h: 38px;
+  --kira-titlebar-h: 32px;
   --kira-titlebar-inset-left: 78px;
   --kira-shadow: 0 2px 8px rgb(0 0 0 / 0.32);
   --kira-shadow-dialog: 0 8px 28px rgb(0 0 0 / 0.45);
