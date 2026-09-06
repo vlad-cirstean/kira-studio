@@ -1,5 +1,5 @@
 import type { OpRecord } from '@shared/domain/ops';
-import { computed, reactive } from 'vue';
+import { computed, markRaw, reactive } from 'vue';
 import { control } from '../bridge/control';
 
 const MAX_RECORDS = 500;
@@ -14,14 +14,22 @@ export const opsState = reactive({
 let unsubscribe: (() => void) | null = null;
 
 export async function hydrateOps(): Promise<void> {
-  opsState.records = await control.opsRecent(HYDRATE_LIMIT);
+  // P21 round 3 performance finding 13: every op emits op:start then op:end, and each used to run
+  // an O(500) findIndex scan of this deep-reactive array — pure bookkeeping, but each comparison
+  // was a proxy trap, since a plain object read out of a reactive array/state is wrapped in its
+  // own nested reactive proxy the moment it's accessed. markRaw (the same argument round 2 used
+  // for the gRPC message buffer) marks these immutable wire records so Vue never wraps them: every
+  // `.id`/`.status` read anywhere they're accessed (this findIndex, visibleOps/runningCount's own
+  // filters) becomes a plain property read instead of a trap.
+  opsState.records = (await control.opsRecent(HYDRATE_LIMIT)).map((r) => markRaw(r));
   unsubscribe?.();
   unsubscribe = control.onOpUpdate((record) => {
-    const idx = opsState.records.findIndex((r) => r.id === record.id);
+    const raw = markRaw(record);
+    const idx = opsState.records.findIndex((r) => r.id === raw.id);
     if (idx >= 0) {
-      opsState.records[idx] = record; // a 'running' row replaced by its finished self
+      opsState.records[idx] = raw; // a 'running' row replaced by its finished self
     } else {
-      opsState.records.unshift(record);
+      opsState.records.unshift(raw);
       if (opsState.records.length > MAX_RECORDS) opsState.records.length = MAX_RECORDS;
     }
   });
