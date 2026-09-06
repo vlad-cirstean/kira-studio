@@ -105,7 +105,18 @@ function startSearch(autoScroll = true): void {
         // at the same match as `soFar` grows underneath it.
         const previousIndex = props.api.searchState[props.tabId]?.index ?? -1;
         const index = rowsScanned === 0 ? -1 : previousIndex;
-        props.api.searchState[props.tabId] = { matches: [...soFar], index, pending: true, found };
+        // P21 round 2 performance finding 8: this used to spread `soFar` into a fresh array
+        // (`[...soFar]`) on every single progress tick — a full copy of the growing, up to
+        // MAX_SCAN_MATCHES-entry match array once per animation frame of the scan, for a value
+        // scan.ts's own runChunkedScan already documents as "the scanner never mutates a
+        // published array in place other than appending" (only ever grows via .push, never
+        // reassigned or spliced mid-scan) and that every consumer here already treats as
+        // read-only (matchedRows/createMatchIndex only ever iterate or index into it). Publishing
+        // `soFar` by reference is therefore exactly as safe as the copy was, at O(1) instead of
+        // O(matches) per tick. `soFar`'s own `readonly M[]` type (scan.ts) is the caller-facing
+        // half of that same read-only contract; this cast is the other half, matching what
+        // searchState's own field type already assumes every writer honors.
+        props.api.searchState[props.tabId] = { matches: soFar as M[], index, pending: true, found };
       },
     );
   } catch (err) {

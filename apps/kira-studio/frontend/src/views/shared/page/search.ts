@@ -111,18 +111,41 @@ export function createMatchIndex<C>(
   has(row: number, col: C): boolean;
   isCurrent(row: number, col: C): boolean;
 } | null> {
+  // P21 round 2 performance finding 8: byRow used to rebuild from scratch on *every* call —
+  // including a bare Next/Prev, which only moves `index` by one (SearchToolbar.vue's
+  // goNext/goPrev replace the whole entry with `{ ...e, index }`, so this computed's own tracked
+  // dependency — `state[tabId()]`'s reference — changes even though `entry.matches` itself is the
+  // *same* array both times, spread-copied by reference, not cloned). Vue's computed caching can
+  // only invalidate at the granularity of "did any dependency I read change", not "did this one
+  // field change" — reactive() has no visibility into a plain object's own nested fields once
+  // `searchState` is only shallowReactive (P2 R1's own reasoning for that choice) — so this adds
+  // its own manual memo keyed on `entry.matches`' identity: pressing Next/Prev rebuilds nothing
+  // (byRow is reused as-is), and only a genuinely new match array (a fresh scan tick or a
+  // completed scan) pays the O(matches) rebuild.
+  let lastMatches: { row: number; col: C }[] | null = null;
+  let lastByRow: Map<number, Set<C>> | null = null;
+
   return computed(() => {
     const entry = state[tabId()];
     if (!entry) return null;
-    const byRow = new Map<number, Set<C>>();
-    for (const m of entry.matches) {
-      let cols = byRow.get(m.row);
-      if (!cols) {
-        cols = new Set<C>();
-        byRow.set(m.row, cols);
+
+    let byRow: Map<number, Set<C>>;
+    if (entry.matches === lastMatches && lastByRow) {
+      byRow = lastByRow;
+    } else {
+      byRow = new Map<number, Set<C>>();
+      for (const m of entry.matches) {
+        let cols = byRow.get(m.row);
+        if (!cols) {
+          cols = new Set<C>();
+          byRow.set(m.row, cols);
+        }
+        cols.add(m.col);
       }
-      cols.add(m.col);
+      lastMatches = entry.matches;
+      lastByRow = byRow;
     }
+
     const current = entry.index >= 0 ? entry.matches[entry.index] : undefined;
     return {
       has: (row: number, col: C) => byRow.get(row)?.has(col) ?? false,

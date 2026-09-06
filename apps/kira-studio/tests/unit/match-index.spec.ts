@@ -1,6 +1,20 @@
 import { describe, expect, test } from 'bun:test';
-import { effect, isShallow } from 'vue';
+import { effect, isShallow, shallowReactive } from 'vue';
 import { createMatchIndex, createPageSearch } from '../../frontend/src/views/shared/page/search';
+
+// countingMatches wraps a real array in a Proxy that counts how many times it is actually
+// iterated (createMatchIndex's own `for (const m of entry.matches)`) — the only way to observe
+// "was byRow rebuilt" from outside the module without exposing internals just for a test.
+function countingMatches<T>(items: T[]): { array: T[]; iterations: () => number } {
+  let count = 0;
+  const proxy = new Proxy(items, {
+    get(target, prop, receiver) {
+      if (prop === Symbol.iterator) count++;
+      return Reflect.get(target, prop, receiver);
+    },
+  });
+  return { array: proxy, iterations: () => count };
+}
 
 // P2 R1 regression: two related fixes to shared/page/search.ts (and SearchToolbar.vue's own
 // goNext/goPrev, which this file can't reach directly since it's a .vue SFC — covered by their own
@@ -106,5 +120,39 @@ describe('createMatchIndex (P2 R1: Map-based, no string-key allocation)', () => 
     const state: Record<string, { matches: { row: number; col: number }[]; index: number }> = {};
     const index = createMatchIndex(state, () => 'missing');
     expect(index.value).toBeNull();
+  });
+
+  // P21 round 2 performance finding 8: byRow used to rebuild from scratch on every access,
+  // including a bare Next/Prev — SearchToolbar.vue's goNext/goPrev replace the whole entry with
+  // `{ ...e, index }`, the same array reference for `matches`, only `index` genuinely different.
+  // This fails against the pre-fix createMatchIndex (each access below re-iterates `matches`, so
+  // `iterations()` would read 2 by the end) and passes once byRow is memoized on `entry.matches`'
+  // own identity.
+  test('7. a Next/Prev-shaped update (same matches array, only index changes) does not rebuild byRow', () => {
+    const matches = countingMatches([
+      { row: 0, col: 0 },
+      { row: 1, col: 0 },
+    ]);
+    const state = shallowReactive<
+      Record<string, { matches: { row: number; col: number }[]; index: number }>
+    >({
+      tab1: { matches: matches.array, index: 0 },
+    });
+    const index = createMatchIndex(state, () => 'tab1');
+
+    expect(index.value?.has(0, 0)).toBe(true); // forces the first build
+    expect(matches.iterations()).toBe(1);
+
+    // The exact shape goNext/goPrev use: spread the previous entry, override only index.
+    state.tab1 = { ...state.tab1, index: 1 };
+    expect(index.value?.isCurrent(1, 0)).toBe(true); // would force a rebuild pre-fix
+    expect(matches.iterations()).toBe(1); // still 1 — no rebuild for an index-only change
+
+    // A genuinely new matches array (a fresh scan tick, or a completed scan) must still rebuild.
+    const matches2 = countingMatches([{ row: 2, col: 0 }]);
+    state.tab1 = { matches: matches2.array, index: 0 };
+    expect(index.value?.has(2, 0)).toBe(true);
+    expect(matches2.iterations()).toBe(1);
+    expect(index.value?.has(0, 0)).toBe(false); // the old match array's own row is gone
   });
 });

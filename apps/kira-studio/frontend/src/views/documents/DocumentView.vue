@@ -402,15 +402,33 @@ function onVisibleRange(range: { start: number; end: number }): void {
 // matched substring wrapped in <mark> inside a preview line built with search.ts's own
 // previewLineFor, so the highlighted offsets can never disagree with what the scanner matched
 // against. Keyed by row (search.ts's Match has no column, unlike the grid/keyvalue's).
+// P21 round 2 performance finding 8: this used to rebuild `byRow` from scratch on every access —
+// including a bare Next/Prev, which only moves `index` (SearchToolbar.vue's goNext/goPrev replace
+// the whole entry with `{ ...e, index }`; `entry.matches` is the same array reference both times,
+// spread-copied not cloned). Same manual memo as search.ts's own createMatchIndex, keyed on
+// `entry.matches`' identity, for the same reason: Vue's computed can only invalidate at "did
+// `state[tabId]`'s reference change", not "did this one field of it change", once searchState is
+// shallowReactive (P2 R1's own choice).
+let lastMatches: { row: number; start: number; end: number }[] | null = null;
+let lastByRow: Map<number, Array<{ start: number; end: number }>> | null = null;
 const docMatchIndex = computed(() => {
   const entry = docSearchState[props.tab.id];
   if (!entry) return null;
-  const byRow = new Map<number, Array<{ start: number; end: number }>>();
-  for (const m of entry.matches) {
-    const list = byRow.get(m.row);
-    if (list) list.push(m);
-    else byRow.set(m.row, [m]);
+
+  let byRow: Map<number, Array<{ start: number; end: number }>>;
+  if (entry.matches === lastMatches && lastByRow) {
+    byRow = lastByRow;
+  } else {
+    byRow = new Map<number, Array<{ start: number; end: number }>>();
+    for (const m of entry.matches) {
+      const list = byRow.get(m.row);
+      if (list) list.push(m);
+      else byRow.set(m.row, [m]);
+    }
+    lastMatches = entry.matches;
+    lastByRow = byRow;
   }
+
   return { byRow, current: entry.index >= 0 ? entry.matches[entry.index] : undefined };
 });
 function isSearchMatch(row: number): boolean {
