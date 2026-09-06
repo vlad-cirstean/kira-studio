@@ -1,8 +1,8 @@
 // P22c D3: the renderer-side store for a container's cached columns — filled on a view's own
-// lifecycle hook (a console opening, a table's data tab loading), never from a CompletionSource,
-// never on a keystroke (D5: the language layer never fetches). Lives in state/, not views/, for
-// the same reason state/schemas.ts does: three different view kinds read it, and views/<kind>/*
-// may not import another views/<kind>/* (biome.json).
+// lifecycle hook (ConsoleView.vue's own onMounted is the only caller today, F11), never from a
+// CompletionSource, never on a keystroke (D5: the language layer never fetches). Lives in state/,
+// not views/, for the same reason state/schemas.ts does: three different view kinds read it, and
+// views/<kind>/* may not import another views/<kind>/* (biome.json).
 import {
   type ColumnMeta,
   decodePath,
@@ -121,6 +121,23 @@ export function effectiveSchema(
   return ddlSchemaFromCached(cached);
 }
 
+/** Drops this connection's cached columns — every container (containerPath omitted) or just one
+ *  (P24 D10). Shared by the reconnect-invalidation sync below and project/state/tree.ts's three
+ *  explicit-refresh actions (refresh/refreshConnection/refreshObject), so an explicit Refresh
+ *  clears the console's own copy of 'columns' the same way a reconnect already does (F11: before
+ *  this, only a reconnect ever reached this store — a tree Refresh dropped the Go-side cache but
+ *  left completion/diagnostics/hover offering the previous column set until the next reconnect). */
+export function dropSchemaColumns(connectionId: string, containerPath?: string): void {
+  if (containerPath !== undefined) {
+    delete schemaColumnsState.byContainer[rowKey(connectionId, containerPath)];
+    return;
+  }
+  const prefix = rowKey(connectionId, '');
+  for (const key of Object.keys(schemaColumnsState.byContainer)) {
+    if (key.startsWith(prefix)) delete schemaColumnsState.byContainer[key];
+  }
+}
+
 let unsubscribeInvalidated: (() => void) | null = null;
 
 /** Rides the same broadcast project/state/tree.ts already listens to for metadata invalidation
@@ -128,9 +145,6 @@ let unsubscribeInvalidated: (() => void) | null = null;
 export function initSchemaColumnsSync(): void {
   unsubscribeInvalidated?.();
   unsubscribeInvalidated = control.onConnectionMetadataInvalidated((connectionId) => {
-    const prefix = rowKey(connectionId, '');
-    for (const key of Object.keys(schemaColumnsState.byContainer)) {
-      if (key.startsWith(prefix)) delete schemaColumnsState.byContainer[key];
-    }
+    dropSchemaColumns(connectionId);
   });
 }

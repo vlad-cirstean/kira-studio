@@ -5,6 +5,8 @@ import { EMPTY_VISIBILITY, type TreeVisibility } from '@shared/domain/tree-filte
 import { computed, reactive, ref, shallowReactive, watch } from 'vue';
 import { control } from '../../bridge/control';
 import { connectConnection, connectionRecord, connectionsState } from '../../state/connections';
+import { dropSchemaColumns } from '../../state/schemaColumns';
+import { reloadTabsForTarget } from '../../state/viewCommands';
 import { isVisible, toSets, type VisibilitySets } from '../filter';
 import { isLeafKind, labelForGroup, partitionChildren } from '../grouping';
 
@@ -179,9 +181,27 @@ export function toggleGroup(connectionId: string, path: string): void {
   else treeState.expanded.add(k);
 }
 
+// refresh means "drop this row's whole cached entry, then read again" (P24 D7) — a container's
+// Refresh, a connection root's Refresh, and a group's own Refresh (which targets its *parent*
+// path, P19 D2). treeInvalidate drops all four kinds sharing the row (F8: a plain refresh:true
+// only ever replaced 'children', leaving describe/definition/columns for the same path stale);
+// dropSchemaColumns clears the console-facing copy of 'columns' (F11); loadChildren's own
+// refresh:false is now a guaranteed miss, since the row was just dropped.
 export async function refresh(connectionId: string, path: string): Promise<void> {
   treeState.expanded.add(rowKey(connectionId, path));
-  await loadChildren(connectionId, path, true);
+  await control.treeInvalidate(connectionId, path);
+  dropSchemaColumns(connectionId, path);
+  await loadChildren(connectionId, path, false);
+}
+
+// A connection row's own Refresh, and *Refresh all* (via refreshAllConnections below): drops
+// every row for the whole connection (P24 D7's `path` omitted), then re-reads exactly the
+// expanded set — the same lazy, per-path re-fetch a reconnect's invalidation push already
+// produces, so this and a reconnect never disagree about what "refreshed" means.
+export async function refreshConnection(connectionId: string): Promise<void> {
+  await control.treeInvalidate(connectionId);
+  dropSchemaColumns(connectionId);
+  await refreshExpanded(connectionId);
 }
 
 // D11's handler: re-fetches every currently-expanded path for the reconnected connection,
@@ -189,6 +209,12 @@ export async function refresh(connectionId: string, path: string): Promise<void>
 // expanded group's synthetic '#'-path is skipped (P19 D2/D4): it has no adapter path of its own,
 // and its members are already covered by re-fetching its real parent — issuing a `treeChildren`
 // call for it would decode as a bogus node name and error for nothing.
+//
+// P24 D9: passes refresh:false, not true — every row this walks is already either freshly
+// invalidated (refreshConnection, just above) or stale under the new connection epoch
+// (tree.Service's own freshness rule, reached via the reconnect push), so refresh:false already
+// reaches the server; refresh:true on top would force a re-fetch of a path a *sibling window* may
+// have already refreshed under the same epoch, which the epoch rule says is unnecessary.
 export async function refreshExpanded(connectionId: string): Promise<void> {
   const prefix = `${connectionId}|`;
   const paths = [...treeState.expanded]
@@ -197,8 +223,18 @@ export async function refreshExpanded(connectionId: string): Promise<void> {
     .filter((path) => !path.includes('#'))
     .sort((a, b) => a.split('/').length - b.split('/').length);
   for (const path of paths) {
-    await loadChildren(connectionId, path, true);
+    await loadChildren(connectionId, path, false);
   }
+}
+
+// A leaf's own Refresh (a relation, a Mongo collection — P24 D8): drops the object's whole row
+// (describe/definition/the junk `children` a leaf never has) and reloads any open tab on it,
+// rather than calling Children on a path every adapter answers with an empty list for (F10). No
+// tree call for the leaf itself — the next data/definition tab open re-runs describe/definition,
+// and no op-log row is written for work that would only ever return [].
+export async function refreshObject(connectionId: string, path: string): Promise<void> {
+  await control.treeInvalidate(connectionId, path);
+  reloadTabsForTarget(connectionId, path, '');
 }
 
 export function collapseAll(): void {
@@ -241,7 +277,7 @@ export async function revealPath(connectionId: string, path: string): Promise<vo
 
 export async function refreshAllConnections(): Promise<void> {
   for (const conn of connectionsState.records) {
-    await refreshExpanded(conn.id);
+    await refreshConnection(conn.id);
   }
 }
 
