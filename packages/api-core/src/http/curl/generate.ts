@@ -80,9 +80,22 @@ export function toCurl(req: CurlRequest): string {
         if (f.kind === 'file') {
           const typeSuffix = f.contentType ? `;type=${f.contentType}` : '';
           flagUnits.push(['-F', `${f.name}=@${f.path}${typeSuffix}`]);
+        } else if (f.contentType && !/^[@<]/.test(f.value)) {
+          // P21 round 2 functional finding 5: internal/httpclient's own formPartHeader sets a
+          // per-part Content-Type for a text row whenever the row carries one (body.go), but this
+          // generator used to emit every text row as --form-string unconditionally, which has no
+          // syntax for a per-part type at all — the generated command was silently not equivalent
+          // to what Send actually puts on the wire, and a round trip through Import curl (which
+          // *does* parse `;type=`, parse.ts) lost the field. -F does support `;type=`, so a text
+          // row with a content type now uses it, mirroring the file branch above — guarded on the
+          // value's own first character, since F10's "-F misreads a leading '@'/'<'" hazard
+          // applies here too and --form-string remains the only safe spelling for that case (at
+          // the cost of the type, same as before, in that narrow combination).
+          flagUnits.push(['-F', `${f.name}=${f.value};type=${f.contentType}`]);
         } else {
           // F10: -F refuses (or misreads) a value beginning with '@' or '<' — --form-string never
-          // gives either any special meaning, so it is emitted for every text row, unconditionally.
+          // gives either any special meaning, so it is emitted for every text row with no content
+          // type (or one that starts with '@'/'<', which cannot safely use -F either way).
           flagUnits.push(['--form-string', `${f.name}=${f.value}`]);
         }
       }

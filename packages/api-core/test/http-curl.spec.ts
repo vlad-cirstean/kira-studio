@@ -177,6 +177,53 @@ describe('http/curl/generate.ts — toCurl (P7 D13-D16)', () => {
     expect(command).not.toContain("-F 'note");
   });
 
+  // P21 round 2 functional finding 5: internal/httpclient's formPartHeader sets a per-part
+  // Content-Type for a *text* form-data row whenever the row carries one, but toCurl used to emit
+  // every text row as --form-string unconditionally — which has no `;type=` syntax at all — so the
+  // generated command silently stopped being equivalent to what Send actually sends. This fails
+  // against the pre-fix generator (no 'type=' anywhere in the command) and passes once a text
+  // row's own Content-Type is emitted via -F, mirroring the file row's own already-correct case
+  // just below.
+  test('a formdata text row with its own Content-Type uses -F with ;type=, not --form-string (finding 5)', () => {
+    const command = toCurl(
+      req({
+        method: 'POST',
+        body: {
+          ...EMPTY_BODY,
+          mode: 'formdata',
+          formData: [
+            {
+              name: 'metadata',
+              kind: 'text',
+              value: '{"a":1}',
+              path: '',
+              contentType: 'application/json',
+            },
+          ],
+        },
+      }),
+    );
+    expect(command).toContain('-F \'metadata={"a":1};type=application/json\'');
+    expect(command).not.toContain('--form-string');
+  });
+
+  test('a formdata text row with a Content-Type but a leading @ still falls back to --form-string (F10 takes precedence)', () => {
+    const command = toCurl(
+      req({
+        method: 'POST',
+        body: {
+          ...EMPTY_BODY,
+          mode: 'formdata',
+          formData: [
+            { name: 'note', kind: 'text', value: '@notafile', path: '', contentType: 'text/plain' },
+          ],
+        },
+      }),
+    );
+    expect(command).toContain('--form-string');
+    expect(command).not.toContain("-F 'note");
+  });
+
   test('a formdata file row uses -F, with a stated Content-Type appended (F10)', () => {
     const command = toCurl(
       req({
@@ -407,6 +454,46 @@ describe('parseCurl(toCurl(x)) round-trips every mode (P7 D17)', () => {
         fileName: 'r.csv',
         fileSize: 0,
         contentType: 'text/csv',
+        enabled: true,
+      },
+    ]);
+  });
+
+  // P21 round 2 functional finding 5: before the fix, a text row's own Content-Type never reached
+  // toCurl's output at all, so this round trip would come back with contentType: '' — silently
+  // losing the field. Now that toCurl emits it via -F's own `;type=`, and parse.ts already reads
+  // that syntax (finding 5's own note: "the import half *does* read `;type=`"), the value survives
+  // the whole Copy-as-curl -> Import-curl round trip.
+  test('formdata — a text row with its own Content-Type survives the round trip (finding 5)', () => {
+    const result = roundTrip(
+      req({
+        method: 'POST',
+        body: {
+          ...EMPTY_BODY,
+          mode: 'formdata',
+          formData: [
+            {
+              name: 'metadata',
+              kind: 'text',
+              value: '{"a":1}',
+              path: '',
+              contentType: 'application/json',
+            },
+          ],
+        },
+      }),
+    );
+    expect('error' in result).toBe(false);
+    if ('error' in result) return;
+    expect(result.state.formData).toEqual([
+      {
+        name: 'metadata',
+        kind: 'text',
+        value: '{"a":1}',
+        path: '',
+        fileName: '',
+        fileSize: 0,
+        contentType: 'application/json',
         enabled: true,
       },
     ]);
