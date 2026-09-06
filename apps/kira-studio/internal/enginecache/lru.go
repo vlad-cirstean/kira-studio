@@ -124,6 +124,29 @@ func itoa(n int) string {
 	return string(buf[i:])
 }
 
+// Update mutates an existing entry's value (and byte size, if it changed) in place, without
+// touching its own internal `at` timestamp or its position in the LRU eviction order — unlike Set,
+// which always stamps `at: time.Now()` and moves the entry to the newest end (P21 round 3 finding
+// 16). Those are the right semantics for a fetch that genuinely refreshes an entry's data, but
+// wrong for a purely local field flip that carries no new recency information of its own:
+// countStore.markTargetStale used to round-trip a stale bool flip through Set, which silently
+// promoted the flipped entry to most-recently-used — an entry merely being marked stale (no real
+// activity on it) jumped ahead of every other L3 entry actually competing for the byte budget, so
+// an unrelated target's entry became more likely to be evicted in its place. Returns false (no-op)
+// if key isn't present.
+func (l *ByteLru[V]) Update(key string, value V, bytes int) bool {
+	el, ok := l.items[key]
+	if !ok {
+		return false
+	}
+	entry := el.Value.(*lruEntry[V])
+	l.total += bytes - entry.bytes
+	entry.value = value
+	entry.bytes = bytes
+	l.evictToBudget()
+	return true
+}
+
 // Delete mirrors ByteLru.delete.
 func (l *ByteLru[V]) Delete(key string) bool {
 	el, ok := l.items[key]

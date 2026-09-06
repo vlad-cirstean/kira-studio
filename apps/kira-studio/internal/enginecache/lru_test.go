@@ -1,6 +1,9 @@
 package enginecache
 
-import "testing"
+import (
+	"testing"
+	"time"
+)
 
 // Ported 1:1 from tests/unit/engine-cache.spec.ts's "ByteLru" describe block.
 
@@ -71,6 +74,61 @@ func TestByteLru_DeleteWhere(t *testing.T) {
 	}
 	if v, ok := lru.Get("b"); !ok || v != "b" {
 		t.Errorf("'b' = %q, %v, want \"b\", true", v, ok)
+	}
+}
+
+// P21 round 3 functional finding 16: countStore.markTargetStale used to round-trip a stale flip
+// through Set — Set's own "touch" semantics (stamp `at: time.Now()`, move to the newest end) are
+// right for a fetch that genuinely refreshes an entry, but wrong for this purely local field flip,
+// which carries no new recency information at all. Update exists precisely to mutate a value in
+// place without either side effect.
+func TestByteLru_UpdateDoesNotTouchPositionOrTimestamp(t *testing.T) {
+	lru := NewByteLru[string](100, nil)
+	meta := EntryMeta{ConnectionID: "c", Path: "p"}
+	lru.Set("a", "a", 40, meta)
+	time.Sleep(2 * time.Millisecond) // a real, observable clock difference from 'a' to 'b'
+	lru.Set("b", "b", 40, meta)
+
+	before := lru.Entries() // oldest first
+	if before[0].Key != "a" {
+		t.Fatalf("expected 'a' to be oldest before Update, entries = %+v", before)
+	}
+	originalAt := before[0].At
+
+	if !lru.Update("a", "a-updated", 40) {
+		t.Fatal("Update: want true for an existing key")
+	}
+
+	after := lru.Entries()
+	if after[0].Key != "a" {
+		t.Errorf("'a' moved in LRU order after Update — want it to stay oldest, got order %+v", after)
+	}
+	if after[0].Value != "a-updated" {
+		t.Errorf("value = %q, want %q", after[0].Value, "a-updated")
+	}
+	if !after[0].At.Equal(originalAt) {
+		t.Errorf("At = %v, want unchanged %v — Update must not stamp a new timestamp", after[0].At, originalAt)
+	}
+
+	// Confirm the position claim behaviorally, not just via Entries(): overflowing the budget
+	// must still evict 'a' first (still the oldest) — Set's own touch semantics would have
+	// promoted 'a' to newest, and 'b' would be evicted instead.
+	lru.Set("c", "c", 40, meta)
+	if _, ok := lru.Get("a"); ok {
+		t.Error("'a' should have been evicted as the oldest entry — Update must not have promoted it")
+	}
+	if v, ok := lru.Get("b"); !ok || v != "b" {
+		t.Errorf("'b' = %q, %v, want \"b\", true", v, ok)
+	}
+}
+
+func TestByteLru_UpdateOnMissingKeyIsNoop(t *testing.T) {
+	lru := NewByteLru[string](100, nil)
+	if lru.Update("missing", "x", 10) {
+		t.Error("Update on a missing key: want false")
+	}
+	if lru.Size() != 0 || lru.Bytes() != 0 {
+		t.Errorf("size=%d bytes=%d, want 0, 0", lru.Size(), lru.Bytes())
 	}
 }
 

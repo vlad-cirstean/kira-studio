@@ -93,7 +93,7 @@ func (s *countStore) markTargetStale(connectionID, path string) int {
 		}
 		next := e.Value
 		next.stale = true
-		s.lru.Set(e.Key, next, countEntryBytes, e.Meta)
+		s.lru.Update(e.Key, next, countEntryBytes)
 		marked++
 	}
 	return marked

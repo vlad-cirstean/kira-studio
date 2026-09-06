@@ -73,6 +73,48 @@ func TestCache_InvalidateAfterMutation_DropsPagesButOnlyStalesCounts(t *testing.
 	}
 }
 
+// P21 round 3 functional finding 16: InvalidateAfterMutation -> markTargetStale used to flip the
+// stale bool by round-tripping the entry through ByteLru.Set, which always moves the touched entry
+// to the newest end of the LRU eviction order — a stale-flip carries no new recency information of
+// its own, so this silently promoted whatever was merely being marked stale ahead of every other
+// L3 entry actually competing for the 2048-entry/256 KiB budget on real activity. (The finding as
+// originally written also described this as resetting the stored count's own 30-minute
+// countDropAfter clock; verified against this codebase that claim does not hold — that clock reads
+// storedCount's own `at` field, set once in put() and left untouched by the stale-flip either way,
+// a separate field from ByteLru's internal recency timestamp. The LRU-promotion effect below is
+// the real, verified part of the finding.) Direct coverage of the underlying mechanism —
+// ByteLru.Update leaving both position and its own internal timestamp untouched — lives in
+// lru_test.go's TestByteLru_UpdateDoesNotTouchPositionOrTimestamp.
+func TestCache_InvalidateAfterMutation_DoesNotPromoteAStaleFlipInEvictionOrder(t *testing.T) {
+	const connID, staleTarget = "conn", "database:kira_test/schema:app/table:stale_me"
+	c := NewCache(DefaultPageBudgetBytes, nil)
+
+	// Fill L3 to exactly its 2048-entry budget: staleTarget first (so it starts as the oldest —
+	// the first one due for eviction), then 2047 more to fill the rest.
+	c.StoreCount(connID, staleTarget, nil, 1, true)
+	for i := 0; i < 2047; i++ {
+		filter := filterFor(i)
+		c.StoreCount("other-conn", "database:kira_test/schema:app/table:filler", &filter, 2, true)
+	}
+	if got := c.Stats().L3Entries; got != 2048 {
+		t.Fatalf("L3Entries = %d, want 2048 before invalidate", got)
+	}
+
+	// A local mutation against staleTarget marks it stale — no genuine new activity on it.
+	c.InvalidateAfterMutation(connID, staleTarget)
+
+	// One more entry pushes L3 one over budget: the pre-fix Set-based flip would have promoted
+	// staleTarget to the newest end, evicting one of the "other-conn" fillers instead — leaving
+	// staleTarget's own now-stale total sitting in cache indefinitely at every other target's
+	// expense. Fixed, staleTarget is still the oldest and is what gets evicted.
+	filter := filterFor(9999)
+	c.StoreCount("other-conn", "database:kira_test/schema:app/table:filler", &filter, 2, true)
+
+	if _, ok := c.Count(connID, staleTarget, nil); ok {
+		t.Error("staleTarget should have been evicted as the oldest entry — marking it stale must not have promoted it")
+	}
+}
+
 func filterFor(i int) string {
 	return "(1=1) OR (0=" + itoa(i) + ")"
 }
