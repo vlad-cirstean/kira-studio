@@ -298,8 +298,14 @@ onUnmounted(() => {
         >
           {{ unresolvedRefs.length }} unresolved
         </span>
-        <!-- P15 D7 (OQ-2): the first control ever placed in a view head — LAW 09's "the head names
-             the target" holds everywhere else. Same testid/disabled/tooltip, only the slot moved. -->
+      </template>
+
+      <!-- P22b D3: Save moves to the slot ViewHeader already reserves for exactly this — #badges
+           renders before the push and shifts position whenever the dirty mark or unresolved chip
+           changes width. P15 D7 (OQ-2)'s own "first control ever placed in a view head" comment
+           now lives here, since the control moved. Same testid/disabled/tooltip, only the slot
+           moved. -->
+      <template #head-trailing>
         <AppButton
           icon="save"
           data-testid="http-save"

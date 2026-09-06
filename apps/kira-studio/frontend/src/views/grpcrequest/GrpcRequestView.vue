@@ -262,9 +262,13 @@ onUnmounted(() => {
         >
           {{ unresolvedRefs.length }} unresolved
         </span>
-        <!-- P18 D14 (P15 D7's gRPC sibling): the first control HTTP's own head ever placed there —
-             this is its second instance, not a new precedent (LAW 09's own "the head names the
-             target" exception). Same testid/disabled/tooltip, only the slot moved. -->
+      </template>
+
+      <!-- P22b D3 (HttpRequestView.vue's own sibling): Save moves to the slot ViewHeader already
+           reserves for exactly this — #badges renders before the push and shifts position
+           whenever the dirty mark or unresolved chip changes width. Same testid/disabled/tooltip,
+           only the slot moved. -->
+      <template #head-trailing>
         <AppButton
           icon="save"
           data-testid="grpc-save"
