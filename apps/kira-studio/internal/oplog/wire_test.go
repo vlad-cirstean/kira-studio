@@ -206,3 +206,54 @@ func TestShutdownReconcilesInFlight(t *testing.T) {
 		t.Errorf("op4 (already finished before shutdown) status = %q, want untouched ok", row.Status)
 	}
 }
+
+// TestStopWaitsForConsumerBeforeReturning is P21 round 3 finding 3: Stop() must not return until
+// the consumer goroutine has actually run finishInFlight, because main.go's teardown calls
+// repositories.Close()/db.Close() immediately after Stop() — if Stop only unsubscribed (closing
+// the channel) without waiting for consume to drain, finishInFlight's writes would race the very
+// next statements in teardown, and "app exited" rows for still-running ops would be lost (or hit
+// "sql: statement is closed") depending on which side of the race won. Unlike
+// TestShutdownReconcilesInFlight (which uses a generous waitUntil grace period that would hide
+// exactly this race), this test asserts the reconciled state is already correct the instant Stop()
+// returns — no polling.
+func TestStopWaitsForConsumerBeforeReturning(t *testing.T) {
+	h := newHarness(t, 30)
+	h.wiring.Start()
+
+	startedAt := model.NowISO()
+	for _, id := range []string{"op1", "op2", "op3"} {
+		h.src.ch <- oplog.Event{Topic: oplog.EventOpStart, Payload: opStartPayload(id, nil, nil, "read", startedAt)}
+	}
+	// No synchronisation before Stop other than a short, bounded wait for the Append writes to
+	// land — Stop's own job is to wait out whatever is still in flight beyond that.
+	for _, id := range []string{"op1", "op2", "op3"} {
+		waitUntil(t, time.Second, func() bool { return rowExists(t, h.ops, id) })
+	}
+
+	h.wiring.Stop()
+
+	// Immediately after Stop returns — simulating main.go's teardown, which closes the repo and
+	// the database right after oplogWiring.Stop() — every still-running op must already be
+	// reconciled. A pre-fix Stop (unsubscribe only, no wait) fails this non-deterministically but
+	// reliably enough to catch in one run: the consumer has not yet had a chance to run
+	// finishInFlight when Stop returns.
+	for _, id := range []string{"op1", "op2", "op3"} {
+		row := fetchOp(t, h.ops, id)
+		if row.Status != "error" {
+			t.Fatalf("%s.Status immediately after Stop() = %q, want \"error\" (finishInFlight must have already run)", id, row.Status)
+		}
+		if row.Error == nil || *row.Error != "app exited" {
+			t.Errorf("%s.Error = %v, want \"app exited\"", id, row.Error)
+		}
+	}
+
+	// Mirrors main.go's teardown ordering: closing the repo/db right after Stop() must not race a
+	// still-running finishInFlight write. If Stop returned early, this Close could interleave with
+	// finishInFlight's tx.Exec calls (the storage layer runs on a single *sql.DB with
+	// MaxOpenConns(1), so the two would be strictly ordered by the driver — but a premature Close
+	// would still surface as "sql: statement is closed" in finishInFlight's own Warn log, which
+	// TestShutdownReconcilesInFlight's grace period would never observe in time).
+	if err := h.ops.DB.Close(); err != nil {
+		t.Fatalf("close ops db: %v", err)
+	}
+}

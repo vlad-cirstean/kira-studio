@@ -68,10 +68,16 @@ type Wiring struct {
 
 	updates     notify.Emitter[model.OpRecord]
 	unsubscribe func()
+	done        chan struct{}
 }
 
+// stopWait bounds how long Stop blocks for consume to drain and run finishInFlight before giving
+// up — a wedged consumer (P21 round 3 finding 3) must not hang app quit forever, but the ordinary
+// case (a handful of finishInFlight writes) finishes in microseconds.
+const stopWait = 2 * time.Second
+
 func New(src EventSource, ops *repos.OpsRepo, retentionDays int) *Wiring {
-	return &Wiring{src: src, ops: ops, retentionDays: retentionDays}
+	return &Wiring{src: src, ops: ops, retentionDays: retentionDays, done: make(chan struct{})}
 }
 
 // OnUpdate registers fn for every op-log row lifecycle event (running, then its terminal state).
@@ -89,12 +95,28 @@ func (w *Wiring) Start() {
 	go w.consume(events)
 }
 
-// Stop ends the consumer goroutine early (main's before-quit; a test's own cleanup). Idempotent
-// only in the sense that the event source's own unsubscribe already tolerates a second call —
-// Wiring itself is only ever Stopped once in practice.
+// Stop ends the consumer goroutine (main's before-quit; a test's own cleanup) and — P21 round 3
+// finding 3 — waits for it to actually finish before returning, up to stopWait. Without this,
+// unsubscribe only closes the event channel; consume still has to drain, exit its range loop and
+// run finishInFlight (one repos.OpsRepo.Finish write per still-running op), and nothing previously
+// synchronised that with the caller. main.go's teardown calls repositories.Close()/db.Close()
+// immediately after Stop(), so a race here meant "app exited" rows for in-flight ops were either
+// never written (permanent phantom "running" rows in the Operations panel) or attempted against an
+// already-closed statement/database, depending on the race's outcome. Bounded rather than
+// unconditional so a wedged consumer (should the OpsRepo call itself somehow block) cannot hang
+// quit forever — Ticker.Stop's shape is the same idea without the timeout, which it can afford
+// because it has no I/O in its stop path.
+//
+// Idempotent only in the sense that the event source's own unsubscribe already tolerates a second
+// call — Wiring itself is only ever Stopped once in practice.
 func (w *Wiring) Stop() {
 	if w.unsubscribe != nil {
 		w.unsubscribe()
+	}
+	select {
+	case <-w.done:
+	case <-time.After(stopWait):
+		slog.Warn("consumer did not finish within stopWait; shutdown finish for any still-running ops may race", "scope", "oplog")
 	}
 }
 
@@ -109,6 +131,8 @@ func (w *Wiring) prune() {
 // unsubscribe (main's before-quit) causes that in production — at which point finishInFlight
 // reconciles whatever never reached a terminal state (P58f D9).
 func (w *Wiring) consume(events <-chan Event) {
+	defer close(w.done)
+
 	inFlight := map[string]inFlightOp{}
 	completedSincePrune := 0
 
