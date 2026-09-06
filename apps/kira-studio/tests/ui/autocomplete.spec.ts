@@ -547,6 +547,79 @@ test('autocomplete — console shows SQL keywords on a resolved dialect (MariaDB
   expect(consoleErrors).toEqual([]);
 });
 
+// P22 D8/F13/F14: one specification, expressed twice — AutocompleteField.vue's plain-field popup
+// (primitives.css's `.p-completion*`) and CodeMirror's own tooltip (editor/theme.ts's mirror of
+// the same values). Opens both in one run and asserts the metrics that make them read as one
+// component: same container padding/border-radius/max-width/background, same row padding/radius.
+test('autocomplete — the plain-field popup and the console popup share one visual spec (D8)', async ({
+  relaunch,
+  consoleErrors,
+}) => {
+  const CONNECTION_ID = 'conn-ac-mariadb-3';
+  const CONNECTION_SUMMARY = mariadbConnectionSummary(CONNECTION_ID, 'MariaDB', 'amber');
+  const FIXTURE = orderItemsFixture(CONNECTION_ID);
+  const CONTROL: ControlSnapshot[] = [
+    { channel: IPC.connectionsList, response: [] },
+    {
+      channel: IPC.connectionsCreate,
+      args: mariadbCreateArgs('MariaDB'),
+      response: CONNECTION_SUMMARY,
+    },
+    ...FIXTURE.control,
+  ];
+  const { window: page } = await relaunch({ control: CONTROL, stream: FIXTURE.port });
+
+  await connectMariadb(page, 'MariaDB', 'amber');
+  await (await findRow(page, `${MARIADB_DB_PATH}/table:order_items`)).dblclick();
+  await expect(page.locator('[data-testid="data-grid"]')).toBeVisible();
+  await expect(page.locator('[data-testid="grid-row"]').first()).toBeVisible({ timeout: 15_000 });
+
+  const readChrome = (el: Element) => {
+    const s = getComputedStyle(el);
+    return { borderRadius: s.borderRadius, backgroundColor: s.backgroundColor };
+  };
+  const readSizing = (el: Element) => {
+    const s = getComputedStyle(el);
+    return { padding: s.padding, maxWidth: s.maxWidth };
+  };
+  const readRow = (el: Element) => {
+    const s = getComputedStyle(el);
+    return { padding: s.padding, borderRadius: s.borderRadius };
+  };
+
+  const whereInput = page.locator('[data-testid="filter-where-input"]');
+  await whereInput.click();
+  await whereInput.pressSequentially('quan');
+  const plainPopup = page.locator('.autocomplete-suggestions');
+  await expect(plainPopup).toBeVisible({ timeout: 5_000 });
+  const plainRow = plainPopup.locator('li').first();
+  // Read now, into plain values — opening the console next moves focus off this field, which
+  // closes this popup (onBlur), so it can't stay open alongside the second one.
+  const plainChrome = await plainPopup.evaluate(readChrome);
+  const plainSizing = await plainPopup.evaluate(readSizing);
+  const plainRowMetrics = await plainRow.evaluate(readRow);
+
+  await openConsoleFromMenu(page, MARIADB_DB_PATH);
+  const sqlConsole = page.locator('[data-testid="console-view"]');
+  await expect(sqlConsole).toBeVisible();
+  await sqlConsole.locator('.cm-content').click();
+  await page.keyboard.type('SEL');
+  const cmPopup = page.locator('.cm-tooltip.cm-tooltip-autocomplete');
+  await expect(cmPopup).toBeVisible({ timeout: 5_000 });
+  // CodeMirror splits chrome (the outer tooltip div: background/border/radius/shadow) from
+  // padding/sizing (the inner `ul`, where its own scroll/size-cap logic already lives) — the
+  // plain popup is one element doing both jobs, so each half of the comparison reads off
+  // whichever side of that split actually carries the property.
+  const cmList = cmPopup.locator('> ul');
+  const cmRow = cmList.locator('li').first();
+
+  expect(await cmPopup.evaluate(readChrome)).toEqual(plainChrome);
+  expect(await cmList.evaluate(readSizing)).toEqual(plainSizing);
+  expect(await cmRow.evaluate(readRow)).toEqual(plainRowMetrics);
+
+  expect(consoleErrors).toEqual([]);
+});
+
 // P31 item 14/D36: ArrowUp/ArrowDown used to be shadowed by CodeMirror's defaultKeymap (bound
 // earlier in the extension array), so the completion popup never saw them — Prec.highest on the
 // completion keymap fixes that without depending on array order.
