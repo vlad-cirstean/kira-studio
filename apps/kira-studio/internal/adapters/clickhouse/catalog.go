@@ -3,6 +3,7 @@ package clickhouse
 import (
 	"context"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -80,19 +81,25 @@ func listTablesAndViews(ctx context.Context, h *Handle, queryID string, op *adap
 	if err != nil {
 		return nil, err
 	}
+	// P21 round 3 performance finding 7: this used to be a hand-rolled insertion sort over an
+	// index slice, justified only by "sort.SliceStable would need the `sort` import" — a premise
+	// that was already wrong (sqlite/catalog.go imports `sort` for exactly this). The cost was
+	// real: lessTable below allocates two strings.ToLower copies per comparison, and the rank
+	// split (every view moves behind every table that follows it) makes insertion sort O(n²) in
+	// the ordinary interleaved case — thousands of tables/views is seconds of CPU and hundreds of
+	// MB of garbage on a plain tree-node expand. sort.SliceStable is O(n log n), and precomputing
+	// each row's lowercased name once removes the allocation from the comparator entirely.
+	lowerNames := make([]string, len(tables))
+	for i, row := range tables {
+		lowerNames[i] = strings.ToLower(row.Name)
+	}
 	sortIdx := make([]int, len(tables))
 	for i := range sortIdx {
 		sortIdx[i] = i
 	}
-	// sort.SliceStable would need the "sort" import; a tiny insertion sort keeps this file's
-	// import list matching the other adapters' own catalog.go (no unused sort import for one call).
-	for i := 1; i < len(sortIdx); i++ {
-		j := i
-		for j > 0 && lessTable(tables[sortIdx[j]], tables[sortIdx[j-1]]) {
-			sortIdx[j], sortIdx[j-1] = sortIdx[j-1], sortIdx[j]
-			j--
-		}
-	}
+	sort.SliceStable(sortIdx, func(i, j int) bool {
+		return lessTableIdx(tables, lowerNames, sortIdx[i], sortIdx[j])
+	})
 
 	nodes := make([]model.TreeNode, len(tables))
 	for i, idx := range sortIdx {
@@ -117,14 +124,18 @@ func listTablesAndViews(ctx context.Context, h *Handle, queryID string, op *adap
 	return nodes, nil
 }
 
-func lessTable(a, b systemTableRow) bool {
-	rank := func(t systemTableRow) int {
-		if kindForEngine(t.Engine) == "table" {
-			return 0
-		}
-		return 1
+func tableRank(t systemTableRow) int {
+	if kindForEngine(t.Engine) == "table" {
+		return 0
 	}
-	ra, rb := rank(a), rank(b)
+	return 1
+}
+
+// lessTableIdx is lessTable's own rule (tables before views/matviews, then a case-insensitive name
+// compare), rewritten to compare by index against a lowercased-name slice computed once up front
+// (P21 round 3 performance finding 7) rather than allocating two strings.ToLower copies per call.
+func lessTableIdx(tables []systemTableRow, lowerNames []string, i, j int) bool {
+	ra, rb := tableRank(tables[i]), tableRank(tables[j])
 	if ra != rb {
 		return ra < rb
 	}
@@ -132,7 +143,7 @@ func lessTable(a, b systemTableRow) bool {
 	// plain-ASCII table names) is case-insensitive — plain byte comparison would instead sort every
 	// uppercase-leading name before every lowercase one (a P58f-port-time finding, caught by fixture
 	// regeneration reordering "Order Items" ahead of "big_rows" instead of next to "order_items").
-	return strings.ToLower(a.Name) < strings.ToLower(b.Name)
+	return lowerNames[i] < lowerNames[j]
 }
 
 type systemColumnRow struct {
