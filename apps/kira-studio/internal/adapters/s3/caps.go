@@ -22,9 +22,10 @@ var caps = adapters.Caps{
 	Definition: false,
 	// Describe throws E_UNSUPPORTED (adapter.go). Definition is already false above, so this is a
 	// coincidence of two unrelated flags, not something Describe:false relies on.
-	Describe:     false,
-	Projection:   false,
-	ServerFilter: false,
+	Describe:      false,
+	SchemaColumns: false,
+	Projection:    false,
+	ServerFilter:  false,
 	// countObject (read.go) answers a single object's own field count via HeadObject, which is
 	// always exact — the same per-item-exact resolution redis/caps.go makes for its own per-key
 	// counts, not the bucket-wide "how many keys total" question ListObjectsV2 would need to

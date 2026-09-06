@@ -162,6 +162,18 @@ func TestS3_Caps(t *testing.T) {
 	if !c.Cancel || !c.FileTransfer {
 		t.Errorf("Cancel/FileTransfer = %v/%v, want true/true", c.Cancel, c.FileTransfer)
 	}
+	if c.SchemaColumns {
+		t.Error("SchemaColumns = true, want false (an S3 object has no column-shaped schema)")
+	}
+}
+
+// P22c §4.1: the non-SQL kinds report the capability false and the method is not implemented.
+func TestS3_SchemaColumns_Unsupported(t *testing.T) {
+	a := newAdapter(t)
+	_, err := a.SchemaColumns(context.Background(), model.NodePath{}, adapters.NewOpCtx("op-schema-columns"))
+	if code, _ := adapters.CodeOf(err); code != adapters.CodeUnsupported {
+		t.Fatalf("got %v, want E_UNSUPPORTED", err)
+	}
 }
 
 // 4. tree enumeration: root is a flat bucket list.

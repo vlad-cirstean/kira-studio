@@ -169,6 +169,73 @@ func TestSqlite(t *testing.T) {
 		}
 	})
 
+	// P22c §4.1: SchemaColumns is Describe's schema-wide sibling — every relation in one container
+	// together with its columns, in one query, never one per relation.
+	t.Run("SchemaColumns: relations with their columns, byte-identical to Describe", func(t *testing.T) {
+		a := connectedAdapter(t, cfg)
+		ctx := context.Background()
+
+		relations, err := a.SchemaColumns(ctx, nodePath(cfg.ID, seg("database", "main")), adapters.NewOpCtx("op-schema-columns-1"))
+		if err != nil {
+			t.Fatalf("SchemaColumns: %v", err)
+		}
+		byName := make(map[string]model.RelationColumns, len(relations))
+		for _, rc := range relations {
+			byName[rc.Name] = rc
+		}
+		orders, ok := byName["orders"]
+		if !ok || orders.Kind != "table" {
+			t.Fatalf("relations = %v, want to find orders as a table", relations)
+		}
+		orderItems, ok := byName["order_items"]
+		if !ok || orderItems.Kind != "table" {
+			t.Fatalf("relations = %v, want to find order_items as a table", relations)
+		}
+		summary, ok := byName["order_summary"]
+		if !ok || summary.Kind != "view" {
+			t.Fatalf("relations = %v, want to find order_summary as a view", relations)
+		}
+		if len(orderItems.Columns) == 0 {
+			t.Fatal("order_items has no columns")
+		}
+		// SQLite's own Position is table_xinfo's 0-based `cid`, not a 1-based ordinal (listColumns'
+		// own convention, unchanged here).
+		for i, col := range orderItems.Columns {
+			if col.Position != i {
+				t.Errorf("order_items.Columns[%d].Position = %d, want cid %d", i, col.Position, i)
+			}
+		}
+
+		// Every column's DataType (and IsPrimaryKey) must be byte-identical to what Describe
+		// reports for the same column — the property D6's shared supply depends on.
+		meta, err := a.Describe(ctx, nodePath(cfg.ID, seg("database", "main"), seg("table", "order_items")), adapters.NewOpCtx("op-schema-columns-2"))
+		if err != nil {
+			t.Fatalf("Describe: %v", err)
+		}
+		describeByName := make(map[string]model.ColumnMeta, len(meta.Columns))
+		for _, c := range meta.Columns {
+			describeByName[c.Name] = c
+		}
+		for _, c := range orderItems.Columns {
+			want, ok := describeByName[c.Name]
+			if !ok {
+				t.Errorf("SchemaColumns column %q not found in Describe's own column list", c.Name)
+				continue
+			}
+			if c.DataType != want.DataType {
+				t.Errorf("column %q: SchemaColumns DataType = %q, Describe DataType = %q", c.Name, c.DataType, want.DataType)
+			}
+			if c.IsPrimaryKey != want.IsPrimaryKey {
+				t.Errorf("column %q: SchemaColumns IsPrimaryKey = %v, Describe IsPrimaryKey = %v", c.Name, c.IsPrimaryKey, want.IsPrimaryKey)
+			}
+		}
+
+		// A view's own columns are still reported — no adapter should special-case it away.
+		if len(summary.Columns) == 0 {
+			t.Error("order_summary (a view) has no columns")
+		}
+	})
+
 	t.Run("row estimate: big_rows has one, wide_table (never ANALYZEd) has none", func(t *testing.T) {
 		a := connectedAdapter(t, cfg)
 		objects, err := a.Children(context.Background(), nodePath(cfg.ID, seg("database", "main")), adapters.NewOpCtx("op-7"))

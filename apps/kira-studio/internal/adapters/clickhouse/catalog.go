@@ -186,6 +186,52 @@ func toColumnMeta(row systemColumnRow) model.ColumnMeta {
 	}
 }
 
+// listSchemaColumns is P22c D1's SchemaColumns, F9's schema-wide widening: relevantTables' own
+// table/view/matview listing (already excludes system engines, kindForEngine) joined against one
+// schema-wide system.columns query, rather than one listColumnsRaw call per relation.
+// IsPrimaryKey is always false, mirroring toColumnMeta's own D18/D23 rule — a MergeTree PRIMARY
+// KEY is a sparse index, not a uniqueness constraint.
+func listSchemaColumns(ctx context.Context, h *Handle, tablesQueryID, columnsQueryID string, op *adapters.OpCtx, track TrackQuery, schema string) ([]model.RelationColumns, error) {
+	tables, err := relevantTables(ctx, h, tablesQueryID, op, track, schema)
+	if err != nil {
+		return nil, err
+	}
+	byName := make(map[string]*model.RelationColumns, len(tables))
+	order := make([]string, 0, len(tables))
+	for _, t := range tables {
+		byName[t.Name] = &model.RelationColumns{Name: t.Name, Kind: kindForEngine(t.Engine), Columns: []model.ColumnMeta{}}
+		order = append(order, t.Name)
+	}
+
+	type schemaColumnRow struct {
+		Table string `json:"table"`
+		systemColumnRow
+	}
+	rows, err := RunCatalogQuery[schemaColumnRow](ctx, h, columnsQueryID,
+		`SELECT table, name, type, position, default_kind, default_expression, comment
+	 FROM system.columns
+	 WHERE database = {db:String}
+	 ORDER BY table, position`, op, track, map[string]string{"db": schema})
+	if err != nil {
+		return nil, err
+	}
+	for _, row := range rows {
+		rc, ok := byName[row.Table]
+		if !ok {
+			// A shadow/.inner table system.columns still lists (e.g. a materialized view's own
+			// backing table) that relevantTables' own is_temporary/engine filter excluded — not a
+			// relation this container's tree shows, so its columns are skipped, not surfaced.
+			continue
+		}
+		rc.Columns = append(rc.Columns, toColumnMeta(row.systemColumnRow))
+	}
+	out := make([]model.RelationColumns, len(order))
+	for i, name := range order {
+		out[i] = *byName[name]
+	}
+	return out, nil
+}
+
 // splitTopLevelCommas is catalog.ts's own — parenthesis-aware split for a key expression such as
 // "toYYYYMM(d), id".
 func splitTopLevelCommas(expr string) []string {

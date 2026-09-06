@@ -243,6 +243,60 @@ func listColumns(ctx context.Context, exec queryExec, schema, table string) ([]m
 	return columns, err
 }
 
+// listSchemaColumns is P22c D1's SchemaColumns, F9's schema-wide widening of listColumns above:
+// the same join, minus the relname filter, plus one LEFT JOIN against pg_index to fold in
+// IsPrimaryKey (cheap — a single index lookup, not the full listIndexes/listForeignKeys graph
+// Describe pays for) so a completion source built from this can say "not null, pk" without a
+// second per-relation round trip. Every column here is byte-identical to what listColumns/Describe
+// reports for the same column (P22c §4.1's own conformance requirement).
+func listSchemaColumns(ctx context.Context, exec queryExec, schema string) ([]model.RelationColumns, error) {
+	byName := map[string]*model.RelationColumns{}
+	var order []string
+	err := exec(ctx, `SELECT c.relname AS table_name, c.relkind,
+	        a.attname AS name, a.attnum AS position,
+	        format_type(a.atttypid, a.atttypmod) AS data_type,
+	        NOT a.attnotnull AS nullable,
+	        pg_get_expr(d.adbin, d.adrelid) AS default_expr,
+	        col_description(a.attrelid, a.attnum) AS comment,
+	        (ix.indexrelid IS NOT NULL) AS is_primary_key
+	 FROM pg_class c
+	 JOIN pg_namespace n ON n.oid = c.relnamespace
+	 JOIN pg_attribute a ON a.attrelid = c.oid AND a.attnum > 0 AND NOT a.attisdropped
+	 LEFT JOIN pg_attrdef d ON d.adrelid = a.attrelid AND d.adnum = a.attnum
+	 LEFT JOIN pg_index ix ON ix.indrelid = c.oid AND ix.indisprimary AND a.attnum = ANY(ix.indkey)
+	 WHERE n.nspname = $1 AND c.relkind = ANY('{r,p,v,m}')
+	 ORDER BY c.relname, a.attnum`, []any{schema}, func(rows pgx.Rows) error {
+		var tableName, relkind string
+		var col model.ColumnMeta
+		var position int32
+		if err := rows.Scan(&tableName, &relkind, &col.Name, &position, &col.DataType, &col.Nullable,
+			&col.DefaultExpr, &col.Comment, &col.IsPrimaryKey); err != nil {
+			return err
+		}
+		col.Position = int(position)
+		rc, ok := byName[tableName]
+		if !ok {
+			kind, ok2 := relkindToNodeKind[relkind]
+			if !ok2 {
+				kind = "table"
+			}
+			rc = &model.RelationColumns{Name: tableName, Kind: kind, Columns: []model.ColumnMeta{}}
+			byName[tableName] = rc
+			order = append(order, tableName)
+		}
+		rc.Columns = append(rc.Columns, col)
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	out := make([]model.RelationColumns, len(order))
+	for i, name := range order {
+		out[i] = *byName[name]
+	}
+	return out, nil
+}
+
 // listIndexes is catalog.ts's listIndexes.
 func listIndexes(ctx context.Context, exec queryExec, relOID string) ([]model.IndexMeta, error) {
 	var indexes []model.IndexMeta

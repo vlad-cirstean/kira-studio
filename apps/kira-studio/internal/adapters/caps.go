@@ -20,26 +20,30 @@ const (
 // have none, which capsSchema.parse (positive-int) rejects on the TypeScript side while the two
 // coexist.
 type Caps struct {
-	Tabular         bool               `json:"tabular"`
-	Documents       bool               `json:"documents"`
-	KeyValue        bool               `json:"keyValue"`
-	Stream          bool               `json:"stream"`
-	KeyBrowser      bool               `json:"keyBrowser"`
-	DefaultPageKind page.PageKind      `json:"defaultPageKind"`
-	SQL             bool               `json:"sql"`
-	Definition      bool               `json:"definition"`
-	Describe        bool               `json:"describe"`
-	Projection      bool               `json:"projection"`
-	ServerFilter    bool               `json:"serverFilter"`
-	ExactCount      bool               `json:"exactCount"`
-	Pagination      PaginationStrategy `json:"pagination"`
-	ForeignKeys     bool               `json:"foreignKeys"`
-	CanInsert       bool               `json:"canInsert"`
-	CanUpdate       bool               `json:"canUpdate"`
-	CanDelete       bool               `json:"canDelete"`
-	Writable        bool               `json:"writable"`
-	Transactions    bool               `json:"transactions"`
-	Cancel          bool               `json:"cancel"`
-	FileTransfer    bool               `json:"fileTransfer"`
-	MaxPageSize     *int               `json:"maxPageSize,omitempty"`
+	Tabular         bool          `json:"tabular"`
+	Documents       bool          `json:"documents"`
+	KeyValue        bool          `json:"keyValue"`
+	Stream          bool          `json:"stream"`
+	KeyBrowser      bool          `json:"keyBrowser"`
+	DefaultPageKind page.PageKind `json:"defaultPageKind"`
+	SQL             bool          `json:"sql"`
+	Definition      bool          `json:"definition"`
+	Describe        bool          `json:"describe"`
+	// SchemaColumns: the adapter implements SchemaColumns() — P22c D1. true for the five SQL
+	// kinds (postgres/mariadb/mysql/sqlite/clickhouse); false for mongo (no field-level schema at
+	// all, F11) and every non-SQL kind.
+	SchemaColumns bool               `json:"schemaColumns"`
+	Projection    bool               `json:"projection"`
+	ServerFilter  bool               `json:"serverFilter"`
+	ExactCount    bool               `json:"exactCount"`
+	Pagination    PaginationStrategy `json:"pagination"`
+	ForeignKeys   bool               `json:"foreignKeys"`
+	CanInsert     bool               `json:"canInsert"`
+	CanUpdate     bool               `json:"canUpdate"`
+	CanDelete     bool               `json:"canDelete"`
+	Writable      bool               `json:"writable"`
+	Transactions  bool               `json:"transactions"`
+	Cancel        bool               `json:"cancel"`
+	FileTransfer  bool               `json:"fileTransfer"`
+	MaxPageSize   *int               `json:"maxPageSize,omitempty"`
 }

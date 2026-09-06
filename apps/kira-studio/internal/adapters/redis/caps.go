@@ -18,10 +18,11 @@ var caps = adapters.Caps{
 	SQL:             true,
 	// P23 D10: stays false permanently — a key's type/TTL/memory usage are already on every
 	// KeyValuePage.
-	Definition:   false,
-	Describe:     false,
-	Projection:   false,
-	ServerFilter: false,
+	Definition:    false,
+	Describe:      false,
+	SchemaColumns: false,
+	Projection:    false,
+	ServerFilter:  false,
 	// Per-key counts use O(1) exact type-length commands (HLEN/SCARD/ZCARD/LLEN/XLEN, or 1 for a
 	// string).
 	ExactCount:  true,

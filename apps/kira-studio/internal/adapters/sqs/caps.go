@@ -20,12 +20,13 @@ var caps = adapters.Caps{
 	// no automatic message read.
 	Definition: true,
 	// Describe throws E_UNSUPPORTED (adapter.go) — a queue has no column/PK/FK metadata.
-	Describe:     false,
-	Projection:   false,
-	ServerFilter: false,
-	ExactCount:   false, // ApproximateNumberOfMessages only
-	Pagination:   adapters.PaginationBatch,
-	ForeignKeys:  false,
+	Describe:      false,
+	SchemaColumns: false,
+	Projection:    false,
+	ServerFilter:  false,
+	ExactCount:    false, // ApproximateNumberOfMessages only
+	Pagination:    adapters.PaginationBatch,
+	ForeignKeys:   false,
 	// mutate.go's SendMessage/DeleteMessage land both CanInsert and CanDelete here. Unlike Kafka,
 	// SQS's DeleteMessage is a real per-item operation (removes it from the queue via its receipt
 	// handle, kept adapter-local — see mutate.go's own comment). There is still no CanUpdate — a

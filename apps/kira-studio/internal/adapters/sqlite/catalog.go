@@ -262,6 +262,70 @@ func listColumns(exec QueryExecutor, table string) ([]model.ColumnMeta, []tableX
 	return columns, raw, nil
 }
 
+// listSchemaColumns is P22c D1's SchemaColumns, F9's schema-wide widening of listColumns above:
+// relevantTables' own table/view listing (already excludes shadow/sqlite_-prefixed tables, F17/
+// F24), then one pragma_table_xinfo(m.name) join across every one of those tables at once instead
+// of a per-relation call. IsPrimaryKey comes straight off table_xinfo's own `pk` ordinal, the same
+// as listColumns above — byte-identical to what Describe reports for the same column (P22c §4.1).
+func listSchemaColumns(exec QueryExecutor, schema string) ([]model.RelationColumns, error) {
+	tables, err := relevantTables(exec, schema)
+	if err != nil {
+		return nil, err
+	}
+	if len(tables) == 0 {
+		return []model.RelationColumns{}, nil
+	}
+	byName := make(map[string]*model.RelationColumns, len(tables))
+	order := make([]string, 0, len(tables))
+	placeholders := make([]string, len(tables))
+	args := make([]any, len(tables))
+	for i, t := range tables {
+		kind := "table"
+		if t.typ == "view" {
+			kind = "view"
+		}
+		byName[t.name] = &model.RelationColumns{Name: t.name, Kind: kind, Columns: []model.ColumnMeta{}}
+		order = append(order, t.name)
+		placeholders[i] = "?"
+		args[i] = t.name
+	}
+	query := `SELECT m.name AS table_name, p.cid, p.name, p.type, p."notnull", p.dflt_value, p.pk, p.hidden
+	 FROM sqlite_master m, pragma_table_xinfo(m.name) p
+	 WHERE m.name IN (` + strings.Join(placeholders, ",") + `)
+	 ORDER BY m.name, p.cid`
+	err = exec(query, args, func(r *sql.Rows) error {
+		var tableName string
+		var row tableXInfoRow
+		if err := r.Scan(&tableName, &row.cid, &row.name, &row.typ, &row.notnull, &row.dflt, &row.pk, &row.hidden); err != nil {
+			return err
+		}
+		if row.hidden == 1 {
+			return nil
+		}
+		rc, ok := byName[tableName]
+		if !ok {
+			return nil
+		}
+		var def *string
+		if row.dflt.Valid {
+			def = &row.dflt.String
+		}
+		rc.Columns = append(rc.Columns, model.ColumnMeta{
+			Name: row.name, Position: row.cid, DataType: row.typ, Nullable: row.notnull == 0,
+			DefaultExpr: def, IsPrimaryKey: row.pk > 0,
+		})
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	out := make([]model.RelationColumns, len(order))
+	for i, name := range order {
+		out[i] = *byName[name]
+	}
+	return out, nil
+}
+
 // primaryKeyFromColumns is catalog.ts's own — the `pk` ordinal is 1-based and always present on
 // table_xinfo, unlike the other SQL adapters: a single-column INTEGER PRIMARY KEY (the rowid alias)
 // has no backing index at all, so this is read directly rather than derived from listIndexes.

@@ -194,6 +194,15 @@ func (a *Adapter) Describe(ctx context.Context, path model.NodePath, op *adapter
 	}, nil
 }
 
+// SchemaColumns — caps.SchemaColumns is false (P22c F11/D8); unreachable while that flag gates
+// every caller. A Mongo collection has no declared field set — adapter.go:191's own Describe
+// already reports Columns: []model.ColumnMeta{} for the identical reason. Mongo's completion
+// mechanism is a different one entirely: sampled from loaded documents (P22c D8), never cached
+// here.
+func (a *Adapter) SchemaColumns(ctx context.Context, path model.NodePath, op *adapters.OpCtx) ([]model.RelationColumns, error) {
+	return nil, adapters.Unsupported("mongodb", "schemaColumns")
+}
+
 // Definition is index.ts's definition.
 func (a *Adapter) Definition(ctx context.Context, path model.NodePath, op *adapters.OpCtx) (model.ObjectDefinition, error) {
 	databaseSegment, objectSegment, err := requireTwoSegmentObjectPath(path.Segments, "definition")

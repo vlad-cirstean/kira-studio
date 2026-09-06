@@ -42,7 +42,7 @@ export const controlSnapshots: ControlSnapshot[] = [
     response: {
       connectionId: 'test-clickhouse',
       status: 'connected',
-      serverVersion: 'ClickHouse 26.3.26.3',
+      serverVersion: 'ClickHouse 26.3.32.14',
       error: null,
       since: 0,
       caps: {
@@ -55,6 +55,7 @@ export const controlSnapshots: ControlSnapshot[] = [
         sql: true,
         definition: true,
         describe: true,
+        schemaColumns: true,
         projection: true,
         serverFilter: true,
         exactCount: true,

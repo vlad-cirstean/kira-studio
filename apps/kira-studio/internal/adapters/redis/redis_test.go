@@ -10,6 +10,7 @@ package redis_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"regexp"
@@ -797,5 +798,18 @@ func TestRedis_Caps(t *testing.T) {
 	}
 	if c.Definition || c.Describe {
 		t.Error("Definition/Describe = true, want both false")
+	}
+	if c.SchemaColumns {
+		t.Error("SchemaColumns = true, want false (a redis key has no field-level schema)")
+	}
+}
+
+// P22c §4.1: the non-SQL kinds report the capability false and the method is not implemented.
+func TestRedis_SchemaColumns_Unsupported(t *testing.T) {
+	a := newAdapter(t)
+	_, err := a.SchemaColumns(context.Background(), model.NodePath{}, adapters.NewOpCtx("op-schema-columns"))
+	var ae *adapters.Error
+	if !errors.As(err, &ae) || ae.Code != adapters.CodeUnsupported {
+		t.Fatalf("got %v, want E_UNSUPPORTED", err)
 	}
 }

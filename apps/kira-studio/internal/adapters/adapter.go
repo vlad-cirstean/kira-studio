@@ -43,6 +43,17 @@ type Adapter interface {
 	// Describe returns columns, PK, FK, inbound FK, and indexes for one object. Feeds the L1 cache.
 	Describe(ctx context.Context, path model.NodePath, op *OpCtx) (model.ObjectMeta, error)
 
+	// SchemaColumns returns every relation in one container (a database or schema node) together
+	// with its columns, in ONE round trip — Describe's schema-wide sibling, backing schema-aware
+	// SQL completion/diagnostics/hover over a whole container without a per-relation Describe loop
+	// (P22c D1). Returns the same ColumnMeta values Describe does for the same column, never a
+	// second, parallel column shape. Indexes, foreign keys, referencedBy, row estimates and
+	// object-level comments are deliberately absent — fetching a schema's entire constraint graph
+	// to spell a column name is the cost this method exists to avoid; Describe stays the
+	// per-object, full-fidelity call. Gated by Caps().SchemaColumns; a kind that reports it false
+	// returns adapters.Unsupported, unreachable while that flag gates every caller.
+	SchemaColumns(ctx context.Context, path model.NodePath, op *OpCtx) ([]model.RelationColumns, error)
+
 	// Definition returns the object's definition: executable statements for a SQL engine, a JSON
 	// document for Mongo. Gated by Caps().Definition.
 	Definition(ctx context.Context, path model.NodePath, op *OpCtx) (model.ObjectDefinition, error)

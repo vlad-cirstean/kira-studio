@@ -168,6 +168,76 @@ func TestClickHouse(t *testing.T) {
 		}
 	})
 
+	// P22c §4.1: SchemaColumns is Describe's schema-wide sibling — every relation in one database
+	// together with its columns, in one round trip, byte-identical to what Describe reports.
+	t.Run("SchemaColumns: relations with their columns, byte-identical to Describe", func(t *testing.T) {
+		a := connectedAdapter(t, cfg)
+		ctx := context.Background()
+
+		if !a.Caps().SchemaColumns {
+			t.Error("Caps().SchemaColumns = false, want true")
+		}
+		relations, err := a.SchemaColumns(ctx, nodePath(cfg.ID, seg("database", "kira_test")), adapters.NewOpCtx("op-schema-columns-1"))
+		if err != nil {
+			t.Fatalf("SchemaColumns: %v", err)
+		}
+		byName := make(map[string]model.RelationColumns, len(relations))
+		for _, rc := range relations {
+			byName[rc.Name] = rc
+		}
+		orderItems, ok := byName["order_items"]
+		if !ok || orderItems.Kind != "table" {
+			t.Fatalf("relations = %v, want to find order_items as a table", relations)
+		}
+		summary, ok := byName["order_summary"]
+		if !ok || summary.Kind != "view" {
+			t.Fatalf("relations = %v, want to find order_summary as a view", relations)
+		}
+		summaryMv, ok := byName["order_summary_mv"]
+		if !ok || summaryMv.Kind != "matview" {
+			t.Fatalf("relations = %v, want to find order_summary_mv as a matview", relations)
+		}
+		if len(summary.Columns) == 0 {
+			t.Error("order_summary (a view) has no columns")
+		}
+		for _, c := range orderItems.Columns {
+			// D18/D23: IsPrimaryKey is always false — a MergeTree PRIMARY KEY is a sparse index,
+			// not a uniqueness constraint, exactly like toColumnMeta's own per-object rule.
+			if c.IsPrimaryKey {
+				t.Errorf("column %q: IsPrimaryKey = true, want false (D18/D23)", c.Name)
+			}
+		}
+
+		meta, err := a.Describe(ctx, nodePath(cfg.ID, seg("database", "kira_test"), seg("table", "order_items")), adapters.NewOpCtx("op-schema-columns-2"))
+		if err != nil {
+			t.Fatalf("Describe: %v", err)
+		}
+		describeByName := make(map[string]model.ColumnMeta, len(meta.Columns))
+		for _, c := range meta.Columns {
+			describeByName[c.Name] = c
+		}
+		for _, c := range orderItems.Columns {
+			want, ok := describeByName[c.Name]
+			if !ok {
+				t.Errorf("SchemaColumns column %q not found in Describe's own column list", c.Name)
+				continue
+			}
+			if c.DataType != want.DataType {
+				t.Errorf("column %q: SchemaColumns DataType = %q, Describe DataType = %q", c.Name, c.DataType, want.DataType)
+			}
+		}
+
+		// An empty container ("default" — nothing is ever created there by the seed) returns an
+		// empty slice, not an error.
+		empty, err := a.SchemaColumns(ctx, nodePath(cfg.ID, seg("database", "default")), adapters.NewOpCtx("op-schema-columns-3"))
+		if err != nil {
+			t.Fatalf("SchemaColumns(default): %v", err)
+		}
+		if len(empty) != 0 {
+			t.Errorf("SchemaColumns(default) = %v, want an empty slice", empty)
+		}
+	})
+
 	t.Run("row estimate on big_rows", func(t *testing.T) {
 		a := connectedAdapter(t, cfg)
 		objects, err := a.Children(context.Background(), nodePath(cfg.ID, seg("database", "kira_test")), adapters.NewOpCtx("op-6"))

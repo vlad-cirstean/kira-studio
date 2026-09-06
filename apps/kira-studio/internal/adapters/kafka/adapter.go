@@ -117,6 +117,12 @@ func (a *Adapter) Describe(ctx context.Context, path model.NodePath, op *adapter
 	return model.ObjectMeta{}, adapters.Unsupported("kafka", "describe")
 }
 
+// SchemaColumns — caps.SchemaColumns is false; unreachable. A topic/consumer group has no
+// column/PK/FK metadata.
+func (a *Adapter) SchemaColumns(ctx context.Context, path model.NodePath, op *adapters.OpCtx) ([]model.RelationColumns, error) {
+	return nil, adapters.Unsupported("kafka", "schemaColumns")
+}
+
 // Definition is index.ts's definition.
 func (a *Adapter) Definition(ctx context.Context, path model.NodePath, op *adapters.OpCtx) (model.ObjectDefinition, error) {
 	adm, err := a.requireAdmin()

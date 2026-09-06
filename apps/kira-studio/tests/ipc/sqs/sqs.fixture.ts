@@ -57,6 +57,7 @@ export const controlSnapshots: ControlSnapshot[] = [
         sql: false,
         definition: true,
         describe: false,
+        schemaColumns: false,
         projection: false,
         serverFilter: false,
         exactCount: false,

@@ -128,6 +128,18 @@ func TestSqs_Caps(t *testing.T) {
 	if c.FileTransfer {
 		t.Error("FileTransfer = true, want false")
 	}
+	if c.SchemaColumns {
+		t.Error("SchemaColumns = true, want false (a queue has no column/PK/FK metadata)")
+	}
+}
+
+// P22c §4.1: the non-SQL kinds report the capability false and the method is not implemented.
+func TestSqs_SchemaColumns_Unsupported(t *testing.T) {
+	a := newAdapter(t)
+	_, err := a.SchemaColumns(context.Background(), model.NodePath{}, adapters.NewOpCtx("op-schema-columns"))
+	if code, _ := adapters.CodeOf(err); code != adapters.CodeUnsupported {
+		t.Fatalf("got %v, want E_UNSUPPORTED", err)
+	}
 }
 
 // 4. tree enumeration: root is a flat queue list.

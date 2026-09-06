@@ -216,6 +216,23 @@ func (a *Adapter) Describe(ctx context.Context, path model.NodePath, op *adapter
 	}, nil
 }
 
+// SchemaColumns is P22c D1's schema-wide sibling of Describe: every relation in the database
+// together with its columns, in one round trip (well, two — relevantTables plus one schema-wide
+// system.columns query — still orders of magnitude cheaper than a listColumnsRaw call per table).
+func (a *Adapter) SchemaColumns(ctx context.Context, path model.NodePath, op *adapters.OpCtx) ([]model.RelationColumns, error) {
+	if len(path.Segments) != 1 || path.Segments[0].Kind != "database" {
+		return nil, adapters.New(adapters.CodeNotFound, "schemaColumns requires a database path, got: "+model.EncodePath(path.Segments), nil)
+	}
+	databaseSegment := path.Segments[0]
+	handle, err := a.requireHandle()
+	if err != nil {
+		return nil, err
+	}
+	seq := a.newOpSeq(op.OpID)
+	track := a.trackerFor(op.OpID)
+	return listSchemaColumns(ctx, handle, seq.next(a), seq.next(a), op, track, databaseSegment.Name)
+}
+
 // Definition is index.ts's definition.
 func (a *Adapter) Definition(ctx context.Context, path model.NodePath, op *adapters.OpCtx) (model.ObjectDefinition, error) {
 	databaseSegment, objectSegment, err := requireRelationPath(path.Segments, "definition")

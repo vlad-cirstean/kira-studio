@@ -256,6 +256,22 @@ func (a *Adapter) Describe(ctx context.Context, path model.NodePath, op *adapter
 	}, nil
 }
 
+// SchemaColumns is P22c D1's schema-wide sibling of Describe: every relation in the database
+// together with its columns, in one round trip.
+func (a *Adapter) SchemaColumns(ctx context.Context, path model.NodePath, op *adapters.OpCtx) ([]model.RelationColumns, error) {
+	if len(path.Segments) != 1 || path.Segments[0].Kind != "database" {
+		return nil, adapters.New(adapters.CodeNotFound, "schemaColumns requires a database path, got depth "+strconv.Itoa(len(path.Segments)), nil)
+	}
+	databaseSegment := path.Segments[0]
+	entry, release, err := a.requireEntry(ctx, databaseSegment.Name)
+	if err != nil {
+		return nil, err
+	}
+	defer release()
+	exec := execFor(entry.Conn, entry.ThreadID, op, a.trackerFor(op.OpID))
+	return listSchemaColumns(ctx, exec, databaseSegment.Name)
+}
+
 var definitionSupportedKinds = map[string]bool{"table": true, "view": true}
 
 // Definition is index.ts's definition.

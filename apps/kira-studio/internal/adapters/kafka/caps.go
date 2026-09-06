@@ -22,12 +22,13 @@ var caps = adapters.Caps{
 	Definition: true,
 	// Describe throws E_UNSUPPORTED (adapter.go) — a stream has no column/PK/FK metadata. Gates
 	// the definition view's separate describe() load so it's never issued (P31 D2).
-	Describe:     false,
-	Projection:   false,
-	ServerFilter: false,
-	ExactCount:   true, // ListStartOffsets/ListEndOffsets: high - low, summed across partitions
-	Pagination:   adapters.PaginationOffsetWindow,
-	ForeignKeys:  false,
+	Describe:      false,
+	SchemaColumns: false,
+	Projection:    false,
+	ServerFilter:  false,
+	ExactCount:    true, // ListStartOffsets/ListEndOffsets: high - low, summed across partitions
+	Pagination:    adapters.PaginationOffsetWindow,
+	ForeignKeys:   false,
 	// produce.go's ProduceSync lands canInsert here. A topic's log is immutable, so Kafka never
 	// gets canUpdate or canDelete — there is no per-message update or delete in the Kafka API,
 	// only retention/compaction at the topic level — these two stay false permanently, not "not

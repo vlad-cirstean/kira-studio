@@ -84,6 +84,36 @@ type ObjectMeta struct {
 	Comment       *string          `json:"comment"`
 }
 
+// RelationColumns is SchemaColumns' own element — P22c D1. One relation's columns, reusing
+// ColumnMeta verbatim (never a second, parallel column shape) so a completion source built from
+// this can never disagree with Describe about the same column's type. Deliberately smaller than
+// ObjectMeta: no PrimaryKey/ForeignKeys/ReferencedBy/Indexes/RowEstimate/object-level Comment —
+// SchemaColumns exists to spell a column name and its type across a whole container in one round
+// trip, not to fetch a schema's entire constraint graph (P22c OQ-2).
+type RelationColumns struct {
+	Name    string       `json:"name"`
+	Kind    string       `json:"kind"` // "table" | "view" | "matview"
+	Columns []ColumnMeta `json:"columns"`
+}
+
+var relationColumnsKinds = map[string]bool{"table": true, "view": true, "matview": true}
+
+// ValidateRelationColumns mirrors ValidateObjectMeta's discipline for the metadata_cache's
+// "columns" payload kind (P22c D2): every relation's Kind must be one that actually has columns,
+// and Name/Columns must be well-formed. A nil Columns list normalizes to [] first, the same
+// json.Unmarshal-leaves-an-absent-array-nil reason ValidateObjectMeta already documents.
+func ValidateRelationColumns(rels []RelationColumns) bool {
+	for i := range rels {
+		if rels[i].Columns == nil {
+			rels[i].Columns = []ColumnMeta{}
+		}
+		if rels[i].Name == "" || !relationColumnsKinds[rels[i].Kind] {
+			return false
+		}
+	}
+	return true
+}
+
 // EncodePath mirrors tree.ts:33-35's encodePath: 'schema:public/table:order%2Fitems' — the
 // connection id is not part of the string (D6).
 func EncodePath(segments []PathSegment) string {

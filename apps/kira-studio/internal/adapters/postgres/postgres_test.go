@@ -344,6 +344,82 @@ func TestPostgres_Describe(t *testing.T) {
 	}
 }
 
+// P22c §4.1: SchemaColumns is Describe's schema-wide sibling — every relation in one container
+// together with its columns, in one round trip, byte-identical to what Describe reports.
+func TestPostgres_SchemaColumns(t *testing.T) {
+	fixture := testsupport.StartPostgres(t)
+	a := connectedAdapter(t, fixture)
+	ctx := context.Background()
+
+	relations, err := a.SchemaColumns(ctx, nodePath(fixture, seg("database", "kira_test"), seg("schema", "app")), adapters.NewOpCtx("op-schema-columns-1"))
+	if err != nil {
+		t.Fatalf("SchemaColumns: %v", err)
+	}
+	byName := make(map[string]model.RelationColumns, len(relations))
+	for _, rc := range relations {
+		byName[rc.Name] = rc
+	}
+	orderItems, ok := byName["order_items"]
+	if !ok || orderItems.Kind != "table" {
+		t.Fatalf("relations = %v, want to find order_items as a table", relations)
+	}
+	summary, ok := byName["order_summary"]
+	if !ok || summary.Kind != "view" {
+		t.Fatalf("relations = %v, want to find order_summary as a view", relations)
+	}
+	if len(summary.Columns) == 0 {
+		t.Error("order_summary (a view) has no columns")
+	}
+	for i, col := range orderItems.Columns {
+		if col.Position != i+1 {
+			t.Errorf("order_items.Columns[%d].Position = %d, want ordinal %d", i, col.Position, i+1)
+		}
+	}
+	var sawPK bool
+	for _, col := range orderItems.Columns {
+		if col.IsPrimaryKey {
+			sawPK = true
+		}
+	}
+	if !sawPK {
+		t.Error("order_items has no column reported as a primary key")
+	}
+
+	// Every column's DataType/IsPrimaryKey must be byte-identical to what Describe reports for the
+	// same column — the property D6's shared supply depends on.
+	meta, err := a.Describe(ctx, nodePath(fixture, seg("database", "kira_test"), seg("schema", "app"), seg("table", "order_items")), adapters.NewOpCtx("op-schema-columns-2"))
+	if err != nil {
+		t.Fatalf("Describe: %v", err)
+	}
+	describeByName := make(map[string]model.ColumnMeta, len(meta.Columns))
+	for _, c := range meta.Columns {
+		describeByName[c.Name] = c
+	}
+	for _, c := range orderItems.Columns {
+		want, ok := describeByName[c.Name]
+		if !ok {
+			t.Errorf("SchemaColumns column %q not found in Describe's own column list", c.Name)
+			continue
+		}
+		if c.DataType != want.DataType {
+			t.Errorf("column %q: SchemaColumns DataType = %q, Describe DataType = %q", c.Name, c.DataType, want.DataType)
+		}
+		if c.IsPrimaryKey != want.IsPrimaryKey {
+			t.Errorf("column %q: SchemaColumns IsPrimaryKey = %v, Describe IsPrimaryKey = %v", c.Name, c.IsPrimaryKey, want.IsPrimaryKey)
+		}
+	}
+
+	// An empty container (public — nothing is ever created there by the seed) returns an empty
+	// slice, not an error.
+	empty, err := a.SchemaColumns(ctx, nodePath(fixture, seg("database", "kira_test"), seg("schema", "public")), adapters.NewOpCtx("op-schema-columns-3"))
+	if err != nil {
+		t.Fatalf("SchemaColumns(public): %v", err)
+	}
+	if len(empty) != 0 {
+		t.Errorf("SchemaColumns(public) = %v, want an empty slice", empty)
+	}
+}
+
 // 6. row estimate: never-analysed relations surface rowEstimate: nil, never the raw -1.
 func TestPostgres_RowEstimateNeverAnalysed(t *testing.T) {
 	fixture := testsupport.StartPostgres(t)
@@ -436,6 +512,9 @@ func TestPostgres_CapHonesty(t *testing.T) {
 	}
 	if c.FileTransfer {
 		t.Error("expected FileTransfer false")
+	}
+	if !c.SchemaColumns {
+		t.Error("expected SchemaColumns true")
 	}
 }
 

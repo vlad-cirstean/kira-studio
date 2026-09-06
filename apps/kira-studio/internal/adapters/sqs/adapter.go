@@ -123,6 +123,11 @@ func (a *Adapter) Describe(ctx context.Context, path model.NodePath, op *adapter
 	return model.ObjectMeta{}, adapters.Unsupported("sqs", "describe")
 }
 
+// SchemaColumns — caps.SchemaColumns is false; unreachable. A queue has no column/PK/FK metadata.
+func (a *Adapter) SchemaColumns(ctx context.Context, path model.NodePath, op *adapters.OpCtx) ([]model.RelationColumns, error) {
+	return nil, adapters.Unsupported("sqs", "schemaColumns")
+}
+
 func (a *Adapter) resolveQueueTarget(path model.NodePath) (string, error) {
 	if len(path.Segments) == 0 || path.Segments[0].Kind != "queue" {
 		return "", adapters.New(adapters.CodeNotFound, "read requires a queue path, got: "+model.EncodePath(path.Segments), nil)

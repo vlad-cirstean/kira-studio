@@ -38,6 +38,10 @@ export interface Caps {
   // (P31 D2). false for kafka/sqs/redis/s3 — a stream or a key has no column/PK/FK metadata to
   // describe, so definition() alone (gated by `definition` above) is the whole story for them.
   describe: boolean;
+  /** P22c D1: the adapter implements SchemaColumns() — every relation in one container together
+   *  with its columns, in one round trip. true for the five SQL kinds; false for mongo (no
+   *  field-level schema at all, its own D8 mechanism instead) and every non-SQL kind. */
+  schemaColumns: boolean;
 
   // ---- read pushdown
   projection: boolean; // can fetch a column subset server-side
@@ -90,6 +94,7 @@ export const capsSchema = /*#__PURE__*/ z.object({
   sql: z.boolean(),
   definition: z.boolean(),
   describe: z.boolean(),
+  schemaColumns: z.boolean(),
   projection: z.boolean(),
   serverFilter: z.boolean(),
   exactCount: z.boolean(),

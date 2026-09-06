@@ -958,6 +958,20 @@ func TestMongo_Caps(t *testing.T) {
 	if !c.Cancel {
 		t.Error("Cancel = false, want true")
 	}
+	if c.SchemaColumns {
+		t.Error("SchemaColumns = true, want false (a Mongo collection has no field-level schema, F11)")
+	}
+}
+
+// P22c §4.1/D8: Mongo has no field-level schema — SchemaColumns is unreachable, and its own D8
+// mechanism (field names sampled from loaded documents) is a different one entirely.
+func TestMongo_SchemaColumns_Unsupported(t *testing.T) {
+	a := newAdapter(t)
+	_, err := a.SchemaColumns(context.Background(), model.NodePath{}, adapters.NewOpCtx("op-schema-columns"))
+	code, _ := adapters.CodeOf(err)
+	if code != adapters.CodeUnsupported {
+		t.Errorf("code = %v, want E_UNSUPPORTED", code)
+	}
 }
 
 // an already-cancelled context rejects before running anything (Adapter rule 2)

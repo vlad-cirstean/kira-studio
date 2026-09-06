@@ -138,6 +138,12 @@ func (a *Adapter) Definition(ctx context.Context, path model.NodePath, op *adapt
 	return model.ObjectDefinition{}, adapters.Unsupported("redis", "definition")
 }
 
+// SchemaColumns — caps.SchemaColumns is false; unreachable. A redis key has no field-level schema
+// to complete.
+func (a *Adapter) SchemaColumns(ctx context.Context, path model.NodePath, op *adapters.OpCtx) ([]model.RelationColumns, error) {
+	return nil, adapters.Unsupported("redis", "schemaColumns")
+}
+
 func (a *Adapter) resolveKeyTarget(path model.NodePath) (dbIndex int, key string, err error) {
 	segments := path.Segments
 	if len(segments) < 2 || segments[0].Kind != "database" || segments[len(segments)-1].Kind != "key" {

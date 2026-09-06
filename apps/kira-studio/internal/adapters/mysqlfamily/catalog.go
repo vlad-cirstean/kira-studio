@@ -172,6 +172,60 @@ func listColumns(ctx context.Context, exec queryExec, database, table string) ([
 	return columns, err
 }
 
+// listSchemaColumns is P22c D1's SchemaColumns, F9's schema-wide widening of listColumns above:
+// the same information_schema.COLUMNS join, minus the TABLE_NAME filter, plus COLUMN_KEY (already
+// on the same row — no second query) so IsPrimaryKey is populated without listIndexes' own
+// per-relation round trip. Views (COLUMN_KEY is always '' for them) are included; sequences and
+// routines have no columns and are excluded by the JOIN itself. Every column here is
+// byte-identical to what listColumns/Describe reports for the same column (P22c §4.1).
+func listSchemaColumns(ctx context.Context, exec queryExec, database string) ([]model.RelationColumns, error) {
+	byName := map[string]*model.RelationColumns{}
+	var order []string
+	err := exec(ctx, `SELECT t.TABLE_NAME AS table_name, t.TABLE_TYPE AS table_type,
+	        c.COLUMN_NAME AS name, c.ORDINAL_POSITION AS position, c.COLUMN_TYPE AS data_type,
+	        c.IS_NULLABLE AS is_nullable, c.COLUMN_DEFAULT AS default_expr, c.COLUMN_COMMENT AS comment,
+	        c.COLUMN_KEY AS column_key
+	 FROM information_schema.TABLES t
+	 JOIN information_schema.COLUMNS c ON c.TABLE_SCHEMA = t.TABLE_SCHEMA AND c.TABLE_NAME = t.TABLE_NAME
+	 WHERE t.TABLE_SCHEMA = ?
+	 ORDER BY t.TABLE_NAME, c.ORDINAL_POSITION`, []any{database}, func(rows *sql.Rows) error {
+		var tableName, tableType, isNullable, columnKey string
+		var col model.ColumnMeta
+		var position int64
+		var comment *string
+		if err := rows.Scan(&tableName, &tableType, &col.Name, &position, &col.DataType,
+			&isNullable, &col.DefaultExpr, &comment, &columnKey); err != nil {
+			return err
+		}
+		col.Position = int(position)
+		col.Nullable = isNullable == "YES"
+		if comment != nil && *comment != "" {
+			col.Comment = comment
+		}
+		col.IsPrimaryKey = columnKey == "PRI"
+		rc, ok := byName[tableName]
+		if !ok {
+			kind, ok2 := tableTypeToNodeKind[tableType]
+			if !ok2 {
+				kind = "table"
+			}
+			rc = &model.RelationColumns{Name: tableName, Kind: kind, Columns: []model.ColumnMeta{}}
+			byName[tableName] = rc
+			order = append(order, tableName)
+		}
+		rc.Columns = append(rc.Columns, col)
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	out := make([]model.RelationColumns, len(order))
+	for i, name := range order {
+		out[i] = *byName[name]
+	}
+	return out, nil
+}
+
 // listIndexes is catalog.ts's listIndexes.
 func listIndexes(ctx context.Context, exec queryExec, database, table string) ([]model.IndexMeta, error) {
 	type row struct {

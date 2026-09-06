@@ -18,6 +18,7 @@ var caps = adapters.Caps{
 	SQL:             true,
 	Definition:      true,
 	Describe:        true,
+	SchemaColumns:   false,
 	Projection:      true,
 	ServerFilter:    true,
 	ExactCount:      false,
