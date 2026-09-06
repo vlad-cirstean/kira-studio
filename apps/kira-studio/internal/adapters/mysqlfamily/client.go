@@ -160,6 +160,22 @@ func splitHostPort(addr string) (host, port string, err error) {
 	return addr[:idx], addr[idx+1:], nil
 }
 
+// connEntry pairs one database's pinned *sql.Conn with the mutex that serializes every use of it
+// (P21 round 2 performance finding 3, mirroring postgres/client.go's own connEntry): a *sql.Conn
+// is not safe for concurrent use by multiple goroutines any more than a *pgx.Conn is, but nothing
+// above this package serializes ops against the same Adapter — adapterhost dispatches each inbound
+// frame on its own goroutine (bounded only by the session's own in-flight cap), so two Reads on two
+// tabs, or a Read racing a console Execute, can and do reach the same pinned connection
+// concurrently without this lock, which go-sql-driver on a single-conn *sql.DB (SetMaxOpenConns(1))
+// surfaces as a busy-buffer/bad-connection error rather than silently corrupting anything — still a
+// real, user-visible failure with no cause the error message names.
+type connEntry struct {
+	db       *sql.DB
+	conn     *sql.Conn
+	threadID uint32
+	mu       sync.Mutex
+}
+
 // ConnSet is client.ts's ConnectionSet (B5, mirrors postgres/client.go's ConnSet): one *sql.DB per
 // (connection, database), each bounded to a single open connection (SetMaxOpenConns(1)) so a
 // pinned *sql.Conn — never a pool — is what every query in this package actually runs against.
@@ -170,41 +186,36 @@ type ConnSet struct {
 	log     LogFunc
 
 	mu    sync.Mutex
-	dbs   map[string]*sql.DB
-	conns map[string]*sql.Conn
-	tids  map[string]uint32
+	conns map[string]*connEntry
 	lru   []string
 }
 
 // NewConnSet constructs a ConnSet for cfg.
 func NewConnSet(cfg model.ResolvedConnectionConfig, profile Profile, log LogFunc) *ConnSet {
-	return &ConnSet{
-		cfg: cfg, profile: profile, log: log,
-		dbs: make(map[string]*sql.DB), conns: make(map[string]*sql.Conn), tids: make(map[string]uint32),
-	}
+	return &ConnSet{cfg: cfg, profile: profile, log: log, conns: make(map[string]*connEntry)}
 }
 
-// Entry is one pinned connection plus its own server-assigned thread id, cached at Get time (the
-// Go-only addition query.ts's own RunningQuery gets for free from the driver's own conn.threadId).
+// Entry is one pinned connection plus its own server-assigned thread id, cached at Acquire time
+// (the Go-only addition query.ts's own RunningQuery gets for free from the driver's own
+// conn.threadId).
 type Entry struct {
 	Conn     *sql.Conn
 	ThreadID uint32
 }
 
-// Get returns the pinned connection for database (empty string means the primary), opening one if
-// none exists yet and evicting the least-recently-used non-primary entry first if the set is full.
-func (s *ConnSet) Get(ctx context.Context, database string) (Entry, error) {
+// get returns the entry for database (empty string means the primary), opening one if none exists
+// yet and evicting the least-recently-used non-primary entry first if the set is full.
+func (s *ConnSet) get(ctx context.Context, database string) (*connEntry, error) {
 	key := database
 	if key == "" {
 		key = primaryKey
 	}
 
 	s.mu.Lock()
-	if conn, ok := s.conns[key]; ok {
+	if existing, ok := s.conns[key]; ok {
 		s.touchLocked(key)
-		entry := Entry{Conn: conn, ThreadID: s.tids[key]}
 		s.mu.Unlock()
-		return entry, nil
+		return existing, nil
 	}
 	if len(s.conns) >= maxConns {
 		s.evictLRULocked(ctx)
@@ -213,11 +224,11 @@ func (s *ConnSet) Get(ctx context.Context, database string) (Entry, error) {
 
 	mc, err := BuildConfig(s.cfg, database, s.profile, s.log)
 	if err != nil {
-		return Entry{}, err
+		return nil, err
 	}
 	connector, err := mysql.NewConnector(mc)
 	if err != nil {
-		return Entry{}, mapError(err)
+		return nil, mapError(err)
 	}
 	db := sql.OpenDB(connector)
 	db.SetMaxOpenConns(1)
@@ -225,13 +236,13 @@ func (s *ConnSet) Get(ctx context.Context, database string) (Entry, error) {
 	conn, err := db.Conn(ctx)
 	if err != nil {
 		_ = db.Close()
-		return Entry{}, mapError(err)
+		return nil, mapError(err)
 	}
 	var threadID uint32
 	if err := conn.QueryRowContext(ctx, "SELECT CONNECTION_ID()").Scan(&threadID); err != nil {
 		_ = conn.Close()
 		_ = db.Close()
-		return Entry{}, mapError(err)
+		return nil, mapError(err)
 	}
 
 	// A read-only connection is enforced by the server itself, not just Mutate's own app-level
@@ -242,22 +253,37 @@ func (s *ConnSet) Get(ctx context.Context, database string) (Entry, error) {
 		if _, err := conn.ExecContext(ctx, "SET SESSION TRANSACTION READ ONLY"); err != nil {
 			_ = conn.Close()
 			_ = db.Close()
-			return Entry{}, mapError(err)
+			return nil, mapError(err)
 		}
 	}
 
+	entry := &connEntry{db: db, conn: conn, threadID: threadID}
 	s.mu.Lock()
-	s.dbs[key] = db
-	s.conns[key] = conn
-	s.tids[key] = threadID
+	s.conns[key] = entry
 	s.touchLocked(key)
 	s.mu.Unlock()
-	return Entry{Conn: conn, ThreadID: threadID}, nil
+	return entry, nil
 }
 
-// Primary returns the primary (no explicit database override) connection.
-func (s *ConnSet) Primary(ctx context.Context) (Entry, error) {
-	return s.Get(ctx, "")
+// Acquire returns database's connection (empty string means the primary) together with a release
+// func that must be called exactly once, however the caller's own use of it ends — it holds the
+// per-connection lock connEntry's own doc comment describes, for the caller's own entire op, not
+// just one statement: a Mutate's several sequential statements or a console Execute's "run all"
+// must keep any concurrent op off this same conn for its whole duration, not just between
+// individual statements, or a racing Read could execute between two of them (P21 round 2
+// performance finding 3, mirroring postgres/client.go's own Acquire and its identical reasoning).
+func (s *ConnSet) Acquire(ctx context.Context, database string) (Entry, func(), error) {
+	entry, err := s.get(ctx, database)
+	if err != nil {
+		return Entry{}, nil, err
+	}
+	entry.mu.Lock()
+	return Entry{Conn: entry.conn, ThreadID: entry.threadID}, entry.mu.Unlock, nil
+}
+
+// Primary acquires the primary (no explicit database override) connection.
+func (s *ConnSet) Primary(ctx context.Context) (Entry, func(), error) {
+	return s.Acquire(ctx, "")
 }
 
 func (s *ConnSet) touchLocked(key string) {
@@ -270,7 +296,8 @@ func (s *ConnSet) touchLocked(key string) {
 	s.lru = append(s.lru, key)
 }
 
-// evictLRULocked evicts the least-recently-used non-primary entry to make room.
+// evictLRULocked evicts the least-recently-used non-primary entry to make room, taking the
+// victim's own lock first (P21 round 2 performance finding 3 — see connEntry's own comment).
 func (s *ConnSet) evictLRULocked(ctx context.Context) {
 	var victimKey string
 	for _, k := range s.lru {
@@ -282,45 +309,38 @@ func (s *ConnSet) evictLRULocked(ctx context.Context) {
 	if victimKey == "" {
 		return
 	}
-	conn, db := s.conns[victimKey], s.dbs[victimKey]
+	victim := s.conns[victimKey]
 	delete(s.conns, victimKey)
-	delete(s.dbs, victimKey)
-	delete(s.tids, victimKey)
 	for i, k := range s.lru {
 		if k == victimKey {
 			s.lru = append(s.lru[:i], s.lru[i+1:]...)
 			break
 		}
 	}
-	if conn != nil {
-		_ = conn.Close()
-	}
-	if db != nil {
-		_ = db.Close()
+	if victim != nil {
+		victim.mu.Lock()
+		defer victim.mu.Unlock()
+		_ = victim.conn.Close()
+		_ = victim.db.Close()
 	}
 }
 
-// CloseAll closes every open connection.
+// CloseAll closes every open connection, taking each one's own lock first (P21 round 2 performance
+// finding 3 — see evictLRULocked's own comment).
 func (s *ConnSet) CloseAll(ctx context.Context) {
 	s.mu.Lock()
-	conns := make([]*sql.Conn, 0, len(s.conns))
-	for _, c := range s.conns {
-		conns = append(conns, c)
+	all := make([]*connEntry, 0, len(s.conns))
+	for _, e := range s.conns {
+		all = append(all, e)
 	}
-	dbs := make([]*sql.DB, 0, len(s.dbs))
-	for _, d := range s.dbs {
-		dbs = append(dbs, d)
-	}
-	s.conns = make(map[string]*sql.Conn)
-	s.dbs = make(map[string]*sql.DB)
-	s.tids = make(map[string]uint32)
+	s.conns = make(map[string]*connEntry)
 	s.lru = nil
 	s.mu.Unlock()
 
-	for _, c := range conns {
-		_ = c.Close()
-	}
-	for _, d := range dbs {
-		_ = d.Close()
+	for _, e := range all {
+		e.mu.Lock()
+		_ = e.conn.Close()
+		_ = e.db.Close()
+		e.mu.Unlock()
 	}
 }

@@ -54,7 +54,7 @@ func (a *Adapter) Connect(ctx context.Context, cfg model.ResolvedConnectionConfi
 	a.connSet = connSet
 	a.cfg = &cfg
 
-	entry, err := connSet.Primary(ctx)
+	entry, release, err := connSet.Primary(ctx)
 	if err != nil {
 		_ = a.Disconnect(context.Background())
 		return adapters.ConnectInfo{}, err
@@ -77,13 +77,19 @@ func (a *Adapter) Connect(ctx context.Context, cfg model.ResolvedConnectionConfi
 			return rows.Scan(&serverVersion, &database, &charset)
 		})
 	if err != nil {
+		// release() must run before Disconnect: Disconnect->ConnSet.CloseAll takes this same
+		// entry's lock, and sync.Mutex isn't reentrant — calling Disconnect while still holding
+		// the lock this call frame acquired above deadlocks the goroutine permanently.
+		release()
 		_ = a.Disconnect(context.Background())
 		return adapters.ConnectInfo{}, err
 	}
 	if !found {
+		release()
 		_ = a.Disconnect(context.Background())
 		return adapters.ConnectInfo{}, adapters.New(adapters.CodeConnect, "connect probe returned no rows", nil)
 	}
+	release()
 
 	a.primaryDatabase = database.String
 	a.readOnly = cfg.ReadOnly
@@ -114,12 +120,15 @@ func (a *Adapter) Disconnect(ctx context.Context) error {
 	return nil
 }
 
-func (a *Adapter) requireEntry(ctx context.Context, database string) (Entry, error) {
+// requireEntry returns database's pinned connection together with a release func that must be
+// called exactly once — it holds the per-connection lock connEntry's own doc comment describes,
+// for as long as the caller keeps entry (P21 round 2 performance finding 3).
+func (a *Adapter) requireEntry(ctx context.Context, database string) (Entry, func(), error) {
 	connSet, err := adapters.RequireConnected(a.connSet)
 	if err != nil {
-		return Entry{}, err
+		return Entry{}, nil, err
 	}
-	return connSet.Get(ctx, database)
+	return connSet.Acquire(ctx, database)
 }
 
 // Children is index.ts's children.
@@ -127,10 +136,11 @@ func (a *Adapter) Children(ctx context.Context, path model.NodePath, op *adapter
 	segments := path.Segments
 
 	if len(segments) == 0 {
-		entry, err := a.requireEntry(ctx, "")
+		entry, release, err := a.requireEntry(ctx, "")
 		if err != nil {
 			return adapters.TreeChildren{}, err
 		}
+		defer release()
 		nodes, err := listDatabases(ctx, execFor(entry.Conn, entry.ThreadID, op, a.trackerFor(op.OpID)), a.primaryDatabase)
 		if err != nil {
 			return adapters.TreeChildren{}, err
@@ -142,10 +152,11 @@ func (a *Adapter) Children(ctx context.Context, path model.NodePath, op *adapter
 	if databaseSegment.Kind != "database" {
 		return adapters.TreeChildren{}, adapters.New(adapters.CodeNotFound, "unexpected root path segment kind: "+databaseSegment.Kind, nil)
 	}
-	entry, err := a.requireEntry(ctx, databaseSegment.Name)
+	entry, release, err := a.requireEntry(ctx, databaseSegment.Name)
 	if err != nil {
 		return adapters.TreeChildren{}, err
 	}
+	defer release()
 	exec := execFor(entry.Conn, entry.ThreadID, op, a.trackerFor(op.OpID))
 
 	if len(segments) == 1 {
@@ -183,10 +194,11 @@ func (a *Adapter) Describe(ctx context.Context, path model.NodePath, op *adapter
 	if err != nil {
 		return model.ObjectMeta{}, err
 	}
-	entry, err := a.requireEntry(ctx, databaseSegment.Name)
+	entry, release, err := a.requireEntry(ctx, databaseSegment.Name)
 	if err != nil {
 		return model.ObjectMeta{}, err
 	}
+	defer release()
 	exec := execFor(entry.Conn, entry.ThreadID, op, a.trackerFor(op.OpID))
 
 	rawColumns, err := listColumns(ctx, exec, databaseSegment.Name, objectSegment.Name)
@@ -255,10 +267,11 @@ func (a *Adapter) Definition(ctx context.Context, path model.NodePath, op *adapt
 	if !definitionSupportedKinds[objectSegment.Kind] {
 		return model.ObjectDefinition{}, adapters.Unsupported(a.Kind(), "definition for "+objectSegment.Kind)
 	}
-	entry, err := a.requireEntry(ctx, databaseSegment.Name)
+	entry, release, err := a.requireEntry(ctx, databaseSegment.Name)
 	if err != nil {
 		return model.ObjectDefinition{}, err
 	}
+	defer release()
 	exec := execFor(entry.Conn, entry.ThreadID, op, a.trackerFor(op.OpID))
 	return buildDefinition(ctx, exec, path.Segments, databaseSegment.Name, objectSegment.Kind, objectSegment.Name)
 }
@@ -278,10 +291,11 @@ func (a *Adapter) Read(ctx context.Context, req adapters.ReadRequest, op *adapte
 	if err != nil {
 		return nil, err
 	}
-	entry, err := a.requireEntry(ctx, databaseSegment.Name)
+	entry, release, err := a.requireEntry(ctx, databaseSegment.Name)
 	if err != nil {
 		return nil, err
 	}
+	defer release()
 	target, err := getReadTarget(ctx, execFor(entry.Conn, entry.ThreadID, op, a.trackerFor(op.OpID)), databaseSegment.Name, objectSegment.Name)
 	if err != nil {
 		return nil, err
@@ -297,10 +311,11 @@ func (a *Adapter) Count(ctx context.Context, req adapters.CountRequest, op *adap
 	if err != nil {
 		return adapters.CountResult{}, err
 	}
-	entry, err := a.requireEntry(ctx, databaseSegment.Name)
+	entry, release, err := a.requireEntry(ctx, databaseSegment.Name)
 	if err != nil {
 		return adapters.CountResult{}, err
 	}
+	defer release()
 	target := QualifiedName{Database: databaseSegment.Name, Table: objectSegment.Name}
 	return countRows(ctx, entry.Conn, entry.ThreadID, op, a.trackerFor(op.OpID), target, req.Filter)
 }
@@ -313,10 +328,11 @@ func (a *Adapter) Mutate(ctx context.Context, plan model.MutationPlan, op *adapt
 	if len(plan.Path.Segments) == 0 || plan.Path.Segments[0].Kind != "database" {
 		return model.MutationResult{}, adapters.New(adapters.CodeNotFound, "unexpected root path segment kind", nil)
 	}
-	entry, err := a.requireEntry(ctx, plan.Path.Segments[0].Name)
+	entry, release, err := a.requireEntry(ctx, plan.Path.Segments[0].Name)
 	if err != nil {
 		return model.MutationResult{}, err
 	}
+	defer release()
 	return mutate(ctx, entry.Conn, entry.ThreadID, op, a.trackerFor(op.OpID), a.readOnly, plan)
 }
 
@@ -326,10 +342,11 @@ func (a *Adapter) Execute(ctx context.Context, req model.ConsoleRequest, op *ada
 	if len(req.Path.Segments) > 0 && req.Path.Segments[0].Kind == "database" {
 		database = req.Path.Segments[0].Name
 	}
-	entry, err := a.requireEntry(ctx, database)
+	entry, release, err := a.requireEntry(ctx, database)
 	if err != nil {
 		return nil, err
 	}
+	defer release()
 	return execute(ctx, entry.Conn, entry.ThreadID, op, a.trackerFor(op.OpID), a.readOnly, req.Statements)
 }
 
