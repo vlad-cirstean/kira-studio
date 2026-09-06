@@ -97,9 +97,11 @@ function opSqlDialect(record: OpRecord) {
 // D10: Re-run reopens the exact command text through a fresh console tab and runs it
 // immediately — the one execution path built for arbitrary, operator-supervised statement
 // replay, rather than blindly re-invoking whatever op kind (read/count/mutate/execute)
-// produced the row.
+// produced the row. P23 D1(c): commandTruncated means record.command is only a 64 KiB prefix of
+// what actually ran, so re-running it would silently execute part of a script as though it were
+// the whole thing — refused here too, not only via the disabled context-menu item below.
 function onRerun(record: OpRecord): void {
-  if (!record.connectionId || !record.command) return;
+  if (!record.connectionId || !record.command || record.commandTruncated) return;
   const statements = splitSqlStatements(record.command, {
     backslashEscapes: backslashEscapesFor(opSqlDialect(record)),
     dollarQuoting: dollarQuotingFor(opSqlDialect(record)),
@@ -141,7 +143,9 @@ function onRowContextMenu(record: OpRecord, event: MouseEvent): void {
       id: 're-run',
       label: 'Re-run',
       icon: 'play',
-      disabled: !record.command || !canSql,
+      // P23 D1(c): a truncated command is only a 64 KiB prefix of what actually ran — Copy
+      // command stays enabled (copying a prefix is honest and useful), but Re-run must not.
+      disabled: !record.command || !canSql || record.commandTruncated,
       run: () => onRerun(record),
     },
     {
@@ -246,7 +250,11 @@ function onRowContextMenu(record: OpRecord, event: MouseEvent): void {
             </div>
             <div v-else-if="item.kind === 'detail-command'" class="ops-detail-row ops-detail-cm">
               <CodeMirrorHost
-                :doc="`command: ${item.record.command}`"
+                :doc="
+                  item.record.commandTruncated
+                    ? `command (truncated at 64 KiB — cannot Re-run): ${item.record.command}`
+                    : `command: ${item.record.command}`
+                "
                 :language="item.record.kind === 'http' ? 'plain' : 'sql'"
                 :sql-dialect="opSqlDialect(item.record)"
                 :read-only="true"
