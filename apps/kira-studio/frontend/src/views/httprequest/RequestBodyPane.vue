@@ -10,7 +10,11 @@ import {
 import type { HttpCodeLanguage } from '@shared/domain/http';
 import type { HttpRequestTabRecord } from '@shared/domain/tabs';
 import { computed, ref } from 'vue';
-import type { VariableSupport } from '../../api/state/variableCompletion';
+import {
+  type VariableSupport,
+  variableCompletionSource,
+  variableHoverSource,
+} from '../../api/state/variableCompletion';
 import { patchHttpRequestTabState } from '../../api/tabs';
 import CodeMirrorHost from '../../editor/CodeMirrorHost.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
@@ -152,6 +156,9 @@ const caption = computed(() =>
       language="plain"
       :read-only="false"
       :range-highlights="variables?.rangeHighlights"
+      :hover-source="variables && variableHoverSource(variables.hoverAt)"
+      :autocomplete="!!variables"
+      :completion-sources="variables && [variableCompletionSource(variables.candidates)]"
       auto-close-brackets
       @update:doc="onRawChange"
     />
@@ -161,6 +168,9 @@ const caption = computed(() =>
       :language="editorLanguage"
       :read-only="false"
       :range-highlights="variables?.rangeHighlights"
+      :hover-source="variables && variableHoverSource(variables.hoverAt)"
+      :autocomplete="!!variables"
+      :completion-sources="variables && [variableCompletionSource(variables.candidates)]"
       auto-close-brackets
       @update:doc="onCodeChange"
     />

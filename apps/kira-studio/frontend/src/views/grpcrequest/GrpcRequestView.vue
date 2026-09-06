@@ -10,7 +10,11 @@ import {
   savedGrpcRequestFor,
   saveGrpcRequest,
 } from '../../api/state/collections';
-import { variableSupport } from '../../api/state/variableCompletion';
+import {
+  variableCompletionSource,
+  variableHoverSource,
+  variableSupport,
+} from '../../api/state/variableCompletion';
 import {
   activeEnvironmentColor,
   activeEnvironmentId,
@@ -377,6 +381,9 @@ onUnmounted(() => {
             language="json"
             :read-only="false"
             :range-highlights="variables.rangeHighlights"
+            :hover-source="variableHoverSource(variables.hoverAt)"
+            autocomplete
+            :completion-sources="[variableCompletionSource(variables.candidates)]"
             auto-close-brackets
             data-testid="grpc-message-editor"
             @update:doc="onMessageInput"

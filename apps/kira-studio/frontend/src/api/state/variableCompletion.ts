@@ -1,3 +1,5 @@
+import type { CompletionSource } from '@codemirror/autocomplete';
+import type { HoverTooltipSource } from '@codemirror/view';
 import {
   applyPipeline,
   classifyReference,
@@ -11,8 +13,9 @@ import {
   TRANSFORM_NAMES,
   type TransformName,
 } from '@kira/api-core';
+import { buildHoverSource } from '../../editor/hover';
 import type { RangeHighlight } from '../../editor/variableHighlight';
-import type { Completion } from '../../theme/primitives/completion';
+import { type Completion, templateToken } from '../../theme/primitives/completion';
 import { cachedVariables, mergedValuesAndSecrets } from './variables';
 
 // P15b D4: the Api side supplies the data, in one module, from the call already being made — F5's
@@ -218,5 +221,67 @@ export function variableSupport(collectionId: string, environmentId: string): Va
     rangeHighlights,
     hoverAt,
     candidates,
+  };
+}
+
+// P22b D5: the request body editors (RequestBodyPane.vue's raw/code hosts, GrpcRequestView.vue's
+// message editor) are the single largest place a user writes {{variables}}, and until now they
+// only got rangeHighlights (colouring) — hovering showed nothing, typing `{{` offered nothing.
+// These two adapters give CodeMirrorHost's hoverSource/completionSources seams the same
+// VariableSupport data the plain AutocompleteField fields already use, so the behaviour matches
+// exactly rather than being reimplemented.
+
+// buildHoverSource (editor/hover.ts) already owns the .cm-kira-hover/.cm-kira-hover-line DOM the
+// SQL console's own hover uses — reused rather than duplicated. Its `tree` parameter is SQL-
+// specific and unused here; hoverAt only needs the doc text and the pointer offset.
+export function variableHoverSource(hoverAt: VariableSupport['hoverAt']): HoverTooltipSource {
+  return buildHoverSource((doc, pos) => {
+    const lines = hoverAt(doc, pos);
+    // hoverAt has no notion of the reference's own span (F5/AutocompleteField.vue's own hover
+    // panel gets away with the same simplification, its own comment: "without needing the
+    // token's own span") — a point tooltip at `pos` re-triggers as the mouse moves, which is
+    // harmless since the same lines come back for any offset still inside the reference.
+    return lines ? { from: pos, to: pos, lines } : null;
+  });
+}
+
+// CodeMirror's own icon classes (editor/theme.ts's `.cm-completionIcon-*`) cover exactly the five
+// icons this app's own Completion.icon values use for a variable/transform candidate.
+function completionType(icon: string | undefined): string | undefined {
+  switch (icon) {
+    case 'symbol-variable':
+      return 'variable';
+    case 'symbol-method':
+      return 'method';
+    default:
+      return undefined;
+  }
+}
+
+// P22b D5/OQ-6: fires only inside an unclosed `{{…}}` (templateToken's own null elsewhere is what
+// keeps this from popping up over ordinary body text) — the same tokenizer rule
+// AutocompleteField's own `{{variable}}` fields already use. Checked against
+// @codemirror/lang-json's own source (OQ-6 asks whether this fights the JSON language's own
+// completions): jsonLanguage's languageData carries no `autocomplete` entry at all, so there is no
+// JSON completion source to re-add here — the array is this source alone for every `code`
+// language, not just JSON, and for `raw`.
+export function variableCompletionSource(
+  candidates: VariableSupport['candidates'],
+): CompletionSource {
+  return (context) => {
+    const text = context.state.doc.toString();
+    const token = templateToken(text, context.pos);
+    if (!token) return null;
+    const list = candidates({ text, from: token.from, word: token.word });
+    if (list.length === 0) return null;
+    return {
+      from: token.from,
+      options: list.map((c) => ({
+        label: c.label,
+        apply: c.insert ?? c.label,
+        detail: c.detail,
+        type: completionType(c.icon),
+      })),
+    };
   };
 }
