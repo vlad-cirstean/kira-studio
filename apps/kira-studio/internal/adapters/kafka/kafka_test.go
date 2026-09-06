@@ -1060,3 +1060,72 @@ func TestKafka_Read_TransactionCommitMarkerGapStillTerminates(t *testing.T) {
 		t.Error("NextToken != nil, want nil")
 	}
 }
+
+// TestKafka_Read_ExactlyPageCappedGapEventuallyTerminates is P21 round 3 functional finding 3: the
+// preceding test's page size (10) is larger than the topic's one real record, so the very first
+// round already delivers with room to spare (collected < req.PageSize) — advanceWindows' own clamp
+// fires immediately in that same, uncapped round. This test instead sets PageSize to exactly the
+// real record count, so the delivering round is *exactly* capped (collected == req.PageSize) and
+// advanceWindows deliberately skips clamping it (a capped round proves nothing on its own — see
+// advanceWindows' own doc comment). The next page's request must then poll the transaction commit
+// marker's now-unreachable offset with nothing left to deliver, exhausting maxEmptyPolls with no
+// round ever reporting a fresh watermark — exactly the gap advanceWindows' per-round clamp cannot
+// close by itself, which readTopic's own exhaustedByEmptyPolls fallback exists to close.
+// Pre-fix, `next` would advance to the following poll's request only until the two topic offsets
+// were consumed once, and `hasMore`/`nextToken` would latch true forever afterward: every further
+// Next click return a 0-row page after a ~2s stall (maxEmptyPolls rounds at pollTimeout each).
+func TestKafka_Read_ExactlyPageCappedGapEventuallyTerminates(t *testing.T) {
+	f := testsupport.StartKafka(t)
+	ctx := context.Background()
+
+	const gapTopic = "exactly-capped-gap-topic"
+	testsupport.CreateTopic(t, f, gapTopic)
+
+	txClient, err := kgo.NewClient(
+		kgo.SeedBrokers(fmt.Sprintf("%s:%d", *f.Config.Host, *f.Config.Port)),
+		kgo.TransactionalID("kira-test-exactly-capped-gap-txn"),
+	)
+	if err != nil {
+		t.Fatalf("NewClient: %v", err)
+	}
+	defer txClient.Close()
+
+	if err := txClient.BeginTransaction(); err != nil {
+		t.Fatalf("BeginTransaction: %v", err)
+	}
+	rec := &kgo.Record{Topic: gapTopic, Key: []byte("gap-key"), Value: []byte(`{"seq":0}`)}
+	if err := txClient.ProduceSync(ctx, rec).FirstErr(); err != nil {
+		t.Fatalf("ProduceSync: %v", err)
+	}
+	if err := txClient.EndTransaction(ctx, kgo.TryCommit); err != nil {
+		t.Fatalf("EndTransaction: %v", err)
+	}
+
+	a := connectedAdapter(t, f)
+	var lastPage page.StreamPage
+	cursor := model.PageCursor{Mode: "offset", Offset: 0}
+	// PageSize 1 == the topic's one real record, so the first delivering round is exactly capped.
+	// Bounded at 4 rounds (comfortably above the 1-2 actually needed) so a regression that never
+	// terminates fails this test instead of hanging the whole suite.
+	for guard := 0; guard < 4; guard++ {
+		req := adapters.ReadRequest{Path: topicPath(f, gapTopic), PageSize: 1, Cursor: cursor}
+		p, err := a.Read(ctx, req, adapters.NewOpCtx(fmt.Sprintf("op-cap-gap-%d", guard)))
+		if err != nil {
+			t.Fatalf("Read: %v", err)
+		}
+		lastPage = p.(page.StreamPage)
+		if !lastPage.Position.HasMore {
+			break
+		}
+		if lastPage.Position.NextToken == nil {
+			t.Fatal("expected a nextToken on a truncated page")
+		}
+		cursor = model.PageCursor{Mode: "after", Token: *lastPage.Position.NextToken}
+	}
+	if lastPage.Position.HasMore {
+		t.Error("HasMore = true, want false — the exhausted gap must eventually clamp even though no round ever reported a fresh watermark for it")
+	}
+	if lastPage.Position.NextToken != nil {
+		t.Error("NextToken != nil, want nil")
+	}
+}

@@ -354,6 +354,21 @@ func readTopic(ctx context.Context, adm *kadm.Client, baseOpts []kgo.Opt, topic 
 	builder := page.NewStreamPageBuilder(nil)
 	collected := 0
 	emptyPolls := 0
+	// P21 round 3 functional finding 3: set when the loop below ends because maxEmptyPolls
+	// consecutive rounds against the *remaining* windows' own offsets came back with nothing —
+	// never because the page filled or every window's own touched watermark already cleared it.
+	// advanceWindows' own clamp only fires on a round whose fetches.EachPartition actually
+	// reported a watermark, which a round that failed with context.DeadlineExceeded (the "genuinely
+	// nothing to report" case just below) never does — fetches carries no per-partition metadata
+	// at all when PollRecords returns with only a context error, so `touched` stays empty for that
+	// round and advanceWindows(windows, touched, false) clamps nothing. A partition whose last data
+	// offset is a transaction commit marker, a compacted offset, or one aged out by retention hits
+	// exactly this: every subsequent poll times out with nothing to report, `hasMore` latches true
+	// forever, and the caller sees Next stay enabled with each click returning a 0-row page after a
+	// ~2s stall. Once polling has genuinely been retried maxEmptyPolls times against these exact
+	// offsets with nothing to show for it, the remaining [Next, End) gap is exhausted regardless of
+	// whether any round ever reported a fresh watermark.
+	exhaustedByEmptyPolls := false
 
 	for collected < req.PageSize && !allDone() {
 		if err := adapters.CheckCancelled(ctx); err != nil {
@@ -380,6 +395,7 @@ func readTopic(ctx context.Context, adm *kadm.Client, baseOpts []kgo.Opt, topic 
 				// than failing the op.
 				emptyPolls++
 				if emptyPolls >= maxEmptyPolls {
+					exhaustedByEmptyPolls = true
 					break
 				}
 				continue
@@ -417,12 +433,28 @@ func readTopic(ctx context.Context, adm *kadm.Client, baseOpts []kgo.Opt, topic 
 		advanceWindows(windows, touched, collected >= req.PageSize)
 
 		if fetches.NumRecords() == 0 && emptyPolls >= maxEmptyPolls {
+			exhaustedByEmptyPolls = true
 			break
 		}
 	}
 
 	if err := adapters.CheckCancelled(ctx); err != nil {
 		return page.StreamPage{}, err
+	}
+
+	// P21 round 3 functional finding 3: advanceWindows' own per-round clamp never fires for a
+	// window whose remaining gap is entirely non-data offsets *and* every round against it failed
+	// outright (DeadlineExceeded, no watermark reported) rather than succeeding empty — see the
+	// exhaustedByEmptyPolls comment above. Having now genuinely retried maxEmptyPolls times against
+	// these exact offsets with nothing delivered, every window still short of its frozen End is
+	// exhausted; clamping here (rather than leaving hasMore latched true) is what stops Next from
+	// returning an empty page forever.
+	if exhaustedByEmptyPolls {
+		for i := range windows {
+			if windows[i].Next < windows[i].End {
+				windows[i].Next = windows[i].End
+			}
+		}
 	}
 
 	hasMore := false
