@@ -189,5 +189,13 @@ export async function formatConsoleText(kind: ConnectionKind, text: string): Pro
   if (failures.length === statements.length) {
     return { text, ok: false, reason: failures[0]?.reason, failures };
   }
-  return { text: out.join(';\n\n'), ok: true, failures };
+  // P22b D12: splitSqlStatements' own pushIfNonEmpty slices up to, not through, each statement's
+  // terminator (sql-split.ts) — so `stmt.text` never carries its own ';'. A plain join(';\n\n')
+  // therefore emits N-1 semicolons for N statements, silently deleting the document's last one on
+  // every press: a regression against P13's whole-document formatDialect call, which preserved
+  // every ';' it was given. The terminator is now a property of the SOURCE, not of the join: a
+  // document that ended in ';' still does, one that did not still does not.
+  const endedWithTerminator = /;\s*$/.test(text);
+  const joined = out.join(';\n\n');
+  return { text: endedWithTerminator ? `${joined};` : joined, ok: true, failures };
 }

@@ -142,3 +142,46 @@ describe('formatConsoleText — mongodb', () => {
     expect(result.failures.map((f) => f.index)).toEqual([0, 1]);
   });
 });
+
+// P22b D12: splitSqlStatements' pushIfNonEmpty slices up to, not through, a statement's own ';'
+// (sql-split.ts), so a plain join(';\n\n') emitted N-1 semicolons for N statements — silently
+// deleting the document's LAST one on every press, a regression against P13's whole-document
+// formatDialect call. None of the cases above happen to end their input in ';', which is exactly
+// why the regression went unnoticed; these are the ones that would have caught it.
+describe("formatConsoleText — D12 preserves the document's own trailing terminator", () => {
+  test('a document ending in ";" still does', async () => {
+    const result = await formatConsoleText('sqlite', 'select 1;');
+    expect(result.ok).toBe(true);
+    expect(result.text.endsWith(';')).toBe(true);
+  });
+
+  test('a document NOT ending in ";" still does not', async () => {
+    const result = await formatConsoleText('sqlite', 'select 1');
+    expect(result.ok).toBe(true);
+    expect(result.text.endsWith(';')).toBe(false);
+  });
+
+  test('a multi-statement document keeps every internal ";" and its own trailing one', async () => {
+    const result = await formatConsoleText('sqlite', 'select 1; select 2;');
+    expect(result.ok).toBe(true);
+    // Two statements means exactly two ';' — one between them, one at the end — never one fewer.
+    expect(result.text.match(/;/g)).toHaveLength(2);
+    expect(result.text.endsWith(';')).toBe(true);
+  });
+
+  test('the mongo branch (which also goes through splitSqlStatements, F20) keeps a trailing ";" too', async () => {
+    const result = await formatConsoleText('mongodb', 'db.c.find({a:1});');
+    expect(result.ok).toBe(true);
+    expect(result.text).toBe('db.c.find({\n  "a": 1\n});');
+  });
+
+  test('a document where every statement fails is returned byte-identical, terminator included', async () => {
+    // D12's own note: the all-failed branch already returns `text` untouched (the original
+    // string, terminator and all) — correct by construction, not by this fix. Pinned here anyway
+    // so a future refactor of that branch can't silently drop it.
+    const input = 'db.c.frobnicate({x:1});';
+    const result = await formatConsoleText('mongodb', input);
+    expect(result.ok).toBe(false);
+    expect(result.text).toBe(input);
+  });
+});
