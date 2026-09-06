@@ -113,7 +113,25 @@ func computeOrderBySql(sort *model.SortSpec, target ReadTarget) (string, error) 
 		}
 		return adapters.BuildOrderBy(terms, quoteIdent), nil
 	}
-	return strings.TrimSpace(target.SortingKey), nil
+	if key := strings.TrimSpace(target.SortingKey); key != "" {
+		return key, nil
+	}
+	// P21 round 3 functional finding 15: SortingKey is "" for an `ORDER BY tuple()` MergeTree
+	// table and for Log/TinyLog/Memory/Merge engines. readPage still pages with LIMIT/OFFSET
+	// regardless, so with no ORDER BY at all two pages of the same request are two independent
+	// unordered scans — with multiple parts and more than one reading thread, rows can repeat
+	// across pages or never appear at all, even though caps.Pagination advertises "offset"
+	// unconditionally. Ordering by every column is deterministic enough for the ordinary case (no
+	// adapter here promises anything stronger for a table with no real key) and needs no virtual
+	// column a non-MergeTree engine wouldn't have (`_part`/`_part_offset` only exist on MergeTree).
+	if len(target.Columns) == 0 {
+		return "", nil
+	}
+	fallbackTerms := make([]adapters.OrderTerm, len(target.Columns))
+	for i, c := range target.Columns {
+		fallbackTerms[i] = adapters.OrderTerm{Column: c.Name, Direction: "asc"}
+	}
+	return adapters.BuildOrderBy(fallbackTerms, quoteIdent), nil
 }
 
 const noKeysetMessage = "keyset pagination is unavailable for ClickHouse: a MergeTree PRIMARY KEY is a sparse index, " +
