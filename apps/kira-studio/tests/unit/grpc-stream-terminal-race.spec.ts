@@ -11,6 +11,7 @@ import './support/window';
 
 import { afterEach, describe, expect, test } from 'bun:test';
 import type { GrpcCallEvent, GrpcCallResultWire, GrpcSchemaWire } from '@shared/domain/grpc';
+import { isReactive } from 'vue';
 
 const { control } = await import('../../frontend/src/bridge/control');
 const { openGrpcRequestTab, patchGrpcRequestTabState } = await import(
@@ -157,5 +158,74 @@ describe("a server-streaming call's terminal event race (F5)", () => {
 
     // The return path's own supersession guard bails out — the event already finalized this call.
     expect(runtime[id]?.messages).toHaveLength(1);
+  });
+});
+
+// P21 round 2 performance finding 6: rt.messages is a deep-reactive array (createRuntimeStore's
+// own reactive()), and every arriving message used to be pushed straight in with no markRaw,
+// letting Vue wrap each one in its own per-field reactive Proxy on top of the array's own
+// reactivity — wasted work for an immutable wire value this view never mutates in place.
+describe('live-stream message buffer (P21 round 2 performance finding 6)', () => {
+  test('an arriving message is not itself made reactive', async () => {
+    const id = setUpStreamingTab();
+    const grpcCallDeferred = deferred<GrpcCallResultWire>();
+    // biome-ignore lint/suspicious/noExplicitAny: a minimal fake, not the real grpcCall
+    (control as any).grpcCall = () => grpcCallDeferred.promise;
+    const callPromise = call(id);
+    await Promise.resolve();
+    await Promise.resolve();
+    const opId = runtime[id]?.opId as string;
+
+    capturedCallback?.({
+      callId: opId,
+      seq: 0,
+      messages: [{ seq: 0, json: '{"n":0}', wireBytes: 10, offsetMs: 1 }],
+      done: false,
+    });
+
+    // This fails against the pre-fix handler, which pushed event.messages straight into the
+    // reactive array with no markRaw — reactive()'s own array getter wraps every plain-object
+    // element it returns, so the pushed message would come back as a reactive Proxy.
+    expect(isReactive(runtime[id]?.messages[0])).toBe(false);
+
+    grpcCallDeferred.resolve(terminalResult());
+    await callPromise;
+  });
+
+  // 10_000 (MAX_LIVE_MESSAGES) and 9_000 (its own 90% trim target) are state.ts's own private
+  // constants — restated here as literals rather than imported, since the fix's contract is
+  // exactly "trims to below the cap, not back to it".
+  test('crossing the cap trims to 90% of it, not back to the cap itself (amortized splice)', async () => {
+    const id = setUpStreamingTab();
+    const grpcCallDeferred = deferred<GrpcCallResultWire>();
+    // biome-ignore lint/suspicious/noExplicitAny: a minimal fake, not the real grpcCall
+    (control as any).grpcCall = () => grpcCallDeferred.promise;
+    const callPromise = call(id);
+    await Promise.resolve();
+    await Promise.resolve();
+    const opId = runtime[id]?.opId as string;
+
+    let seq = 0;
+    function pushBatch(n: number): void {
+      const messages = Array.from({ length: n }, () => ({
+        seq: seq++,
+        json: '{}',
+        wireBytes: 1,
+        offsetMs: 0,
+      }));
+      capturedCallback?.({ callId: opId, seq: 0, messages, done: false });
+    }
+
+    for (let i = 0; i < 156; i++) pushBatch(64); // 156 * 64 = 9 984
+    pushBatch(16); // exactly 10 000 — right at the cap, no trim triggered yet
+    expect(runtime[id]?.messages.length).toBe(10_000);
+
+    pushBatch(1); // crosses the cap: this is the splice this test pins
+    // Pre-fix, this would be 10_000 (trimmed back to exactly the cap on every batch past it).
+    expect(runtime[id]?.messages.length).toBe(9_000);
+    expect(runtime[id]?.trueMessageCount).toBe(10_001);
+
+    grpcCallDeferred.resolve(terminalResult());
+    await callPromise;
   });
 });

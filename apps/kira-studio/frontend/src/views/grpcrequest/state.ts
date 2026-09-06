@@ -6,6 +6,7 @@ import type {
   GrpcRequestTabState,
   GrpcSchemaWire,
 } from '@shared/domain/grpc';
+import { markRaw } from 'vue';
 import { collectionIdFor } from '../../api/state/collections';
 import { activeEnvironmentId, mergedValuesAndSecrets } from '../../api/state/variables';
 import { findGrpcRequestTab } from '../../api/tabs';
@@ -59,6 +60,15 @@ export function resolveGrpcTabState(
 // The oldest messages are dropped once this is exceeded; trueMessageCount (below) keeps the real
 // total so D17's "showing the most recent 10,000 of N" sentence can still name it.
 const MAX_LIVE_MESSAGES = 10_000;
+// P21 round 2 performance finding 6: once the cap is first reached, trimming back to exactly
+// MAX_LIVE_MESSAGES on every arriving batch means every subsequent batch (<= 64 messages) pays a
+// splice over the full 10 000-element array — on a Proxy-wrapped reactive array, that's 10 000
+// proxied element moves plus a full-array dependency trigger, per batch. Trimming down to 90% of
+// the cap instead means the next ~1 000 messages arrive with no splice at all before the cost is
+// paid again — the same amortization a ring buffer's own head-index trick buys, without changing
+// rt.messages' own plain-array-of-messages shape (every existing reader — ResponsePane.vue's row
+// virtualization, seq-keyed lookups — keeps working unchanged).
+const LIVE_MESSAGES_TRIM_TARGET = Math.floor(MAX_LIVE_MESSAGES * 0.9);
 
 // D6: the response is runtime-only, never persisted.
 export interface GrpcRequestViewRuntime {
@@ -225,11 +235,16 @@ function ensureGrpcCallSubscription(): void {
     for (const tabId of Object.keys(runtime)) {
       const rt = runtime[tabId];
       if (!rt || rt.lastCallId !== event.callId) continue;
-      rt.messages.push(...event.messages);
+      // P21 round 2 performance finding 6: markRaw on each incoming message before it ever
+      // touches the reactive rt.messages array — a GrpcMessageWire is an immutable wire value
+      // (this view never mutates a field of one in place), so nothing here needs Vue to wrap it
+      // in its own per-field reactive Proxy. Without this, every pushed message was itself
+      // deep-proxied on the way in, on top of the array's own reactivity.
+      rt.messages.push(...event.messages.map((m) => markRaw(m)));
       rt.trueMessageCount += event.messages.length;
       for (const m of event.messages) rt.messageBytes += m.wireBytes;
       if (rt.messages.length > MAX_LIVE_MESSAGES) {
-        rt.messages.splice(0, rt.messages.length - MAX_LIVE_MESSAGES);
+        rt.messages.splice(0, rt.messages.length - LIVE_MESSAGES_TRIM_TARGET);
       }
       if (event.done) {
         rt.opId = null;
