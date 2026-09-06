@@ -40,6 +40,11 @@ const props = withDefaults(
      *  `Content-T` would tokenize as just `T` and accepting a suggestion would produce
      *  `Content-Content-Type`). Absent for every caller but the headers table. */
     nameCandidates?: readonly Completion[];
+    /** P22b D2: the value cell's own vocabulary as a function of this row's name — composed with,
+     *  not replacing, valueVariableSupport.candidates (a header value is very often
+     *  `Bearer {{token}}`, which needs both lists live at once). Absent for every caller but the
+     *  headers table. */
+    valueCandidatesFor?: (rowName: string) => readonly Completion[];
     /** P16 D13: the toolbar's own filter box text, forwarded down — absent/empty shows every row.
      *  A plain case-insensitive substring test over name-or-value (both are user-authored request
      *  content, never a secret's plaintext — §5). */
@@ -70,6 +75,29 @@ const displayRows = computed<DisplayEntry[]>(() => {
     : withIndex;
   return [...filtered, { row: props.blankRow(), index: props.rows.length }];
 });
+
+// P22b D2: composes with templateToken rather than replacing it — a bare position (outside any
+// `{{…}}`) still needs to offer valueCandidatesFor's own vocabulary (`Bearer `, `application/
+// json`, …), which templateToken alone would never surface (it returns null there, closing the
+// popup). templateToken's own `from` is at least 2 inside a reference (it starts after a `{{`);
+// wholeFieldToken's is always 0 — so `from > 0` below is an exact, cheap "are we inside a
+// reference" test with no extra state.
+function headerValueToken(
+  text: string,
+  caret: number,
+): { from: number; to: number; word: string } | null {
+  return templateToken(text, caret) ?? wholeFieldToken(text, caret);
+}
+
+function rowValueCandidates(
+  row: T,
+): (ctx: { text: string; from: number; word: string }) => readonly Completion[] {
+  return (ctx) => {
+    const variableCandidates = props.valueVariableSupport?.candidates(ctx) ?? [];
+    if (ctx.from > 0) return variableCandidates; // inside {{…}} — the reference source owns this
+    return [...(props.valueCandidatesFor?.(row.name) ?? []), ...variableCandidates];
+  };
+}
 
 function updateField(index: number, field: 'name' | 'value', value: string): void {
   const next = [...props.rows];
@@ -217,8 +245,8 @@ function onContainerKeydown(e: KeyboardEvent): void {
             :model-value="entry.row.value"
             :placeholder="valuePlaceholder"
             :data-testid="`${testidPrefix}-value`"
-            :candidates="valueVariableSupport.candidates"
-            :token-at="templateToken"
+            :candidates="valueCandidatesFor ? rowValueCandidates(entry.row) : valueVariableSupport.candidates"
+            :token-at="valueCandidatesFor ? headerValueToken : templateToken"
             :range-highlights="valueVariableSupport.rangeHighlights"
             :hover-at="valueVariableSupport.hoverAt"
             @update:model-value="updateField(entry.index, 'value', $event)"

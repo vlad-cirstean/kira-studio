@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { WELL_KNOWN_REQUEST_HEADERS } from '@kira/api-core';
+import { headerValueCompletions, WELL_KNOWN_REQUEST_HEADERS } from '@kira/api-core';
 import type { HttpHeaderState } from '@shared/domain/http';
 import type { HttpRequestTabRecord } from '@shared/domain/tabs';
 import type { VariableSupport } from '../../api/state/variableCompletion';
@@ -35,6 +35,7 @@ function onUpdateRows(headers: HttpHeaderState[]): void {
     testid-prefix="http-header"
     container-testid="http-headers-table"
     :name-candidates="WELL_KNOWN_REQUEST_HEADERS"
+    :value-candidates-for="headerValueCompletions"
     :value-variable-support="variables"
     :filter-query="filterQuery"
     @update:rows="onUpdateRows"

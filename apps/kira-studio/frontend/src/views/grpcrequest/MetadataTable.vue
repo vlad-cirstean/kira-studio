@@ -7,9 +7,32 @@ import type { VariableSupport } from '../../api/state/variableCompletion';
 import { patchGrpcRequestTabState } from '../../api/tabs';
 import AutocompleteField from '../../theme/primitives/AutocompleteField.vue';
 import Checkbox from '../../theme/primitives/Checkbox.vue';
-import { templateToken, wholeFieldToken } from '../../theme/primitives/completion';
+import { type Completion, templateToken, wholeFieldToken } from '../../theme/primitives/completion';
 import IconButton from '../../theme/primitives/IconButton.vue';
 import TextField from '../../theme/primitives/TextField.vue';
+
+// P22b D2: this table's own value vocabulary — genuinely different from
+// packages/api-core/src/http/headers.ts's headerValueCompletions (gRPC metadata keys are
+// lowercase by wire rule), covering the two metadata keys with a real value vocabulary.
+function metadataValueCompletions(name: string): readonly Completion[] {
+  switch (name.trim().toLowerCase()) {
+    case 'authorization':
+      return [
+        { label: 'Bearer ', insert: 'Bearer ', icon: 'symbol-value' },
+        { label: 'Basic ', insert: 'Basic ', icon: 'symbol-value' },
+        { label: 'Digest ', insert: 'Digest ', icon: 'symbol-value' },
+        { label: 'Token ', insert: 'Token ', icon: 'symbol-value' },
+        { label: 'ApiKey ', insert: 'ApiKey ', icon: 'symbol-value' },
+      ];
+    case 'grpc-accept-encoding':
+      return [
+        { label: 'identity', icon: 'symbol-value' },
+        { label: 'gzip', icon: 'symbol-value' },
+      ];
+    default:
+      return [];
+  }
+}
 
 // F18: this package's own copy of views/httprequest/FieldRowsTable.vue's row-plus-trailing-blank
 // shape — views/grpcrequest/** may not import views/httprequest/** (biome.json), and the shape is
@@ -24,6 +47,25 @@ const props = defineProps<{
    *  highest-value one of the three surfaces (an Authorization bearer is the canonical case). */
   variables?: VariableSupport;
 }>();
+
+// P22b D2: the same composition FieldRowsTable.vue's own rowValueCandidates does — a bare
+// position offers this row's own vocabulary plus the {{variable}} list, a caret inside an
+// unclosed {{…}} offers the variable list alone. See that file's own comment for why `from > 0`
+// is an exact test for "inside a reference".
+function headerValueToken(
+  text: string,
+  caret: number,
+): { from: number; to: number; word: string } | null {
+  return templateToken(text, caret) ?? wholeFieldToken(text, caret);
+}
+
+function rowValueCandidates(row: GrpcMetadataState) {
+  return (ctx: { text: string; from: number; word: string }): readonly Completion[] => {
+    const variableCandidates = props.variables?.candidates(ctx) ?? [];
+    if (ctx.from > 0) return variableCandidates;
+    return [...metadataValueCompletions(row.name), ...variableCandidates];
+  };
+}
 
 function blankRow(): GrpcMetadataState {
   return { name: '', value: '', enabled: true };
@@ -163,8 +205,8 @@ function onContainerKeydown(e: KeyboardEvent): void {
           :model-value="entry.row.value"
           placeholder="value"
           data-testid="grpc-metadata-value"
-          :candidates="variables.candidates"
-          :token-at="templateToken"
+          :candidates="rowValueCandidates(entry.row)"
+          :token-at="headerValueToken"
           :range-highlights="variables.rangeHighlights"
           :hover-at="variables.hoverAt"
           @update:model-value="updateField(entry.index, 'value', $event)"
