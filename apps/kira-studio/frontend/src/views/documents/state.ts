@@ -311,12 +311,21 @@ export function toggleExpanded(tabId: string, id: string): void {
 // D2/D32: *Expand all* clears the map outright rather than writing one `true` per row — the
 // default is already expanded, so a 10 000-row page writes an empty object to `state_json`
 // instead of 10 000 keys. *Collapse all* is unchanged: it still needs one `false` per row.
+//
+// P21 round 3 functional finding 13: the collapse branch used to *replace* `state.expanded`
+// wholesale with a fresh map containing only `ids` (the currently rendered page) — discarding
+// every `false` entry for a document on any other page. Since an absent key means expanded,
+// paging away and back re-expanded everything collapsed there, and the map is persisted tab
+// state, so this survived a restart as the wrong value. Merging keeps every other page's own
+// collapsed entries intact; the `value === true` branch above is unaffected — clearing the whole
+// map genuinely does mean "everything, everywhere, expanded".
 export function setAllExpanded(tabId: string, ids: string[], value: boolean): void {
   if (value) {
     patchDocumentTabState(tabId, { expanded: {} });
     return;
   }
-  const expanded: Record<string, boolean> = {};
+  const tab = findDocumentTab(tabId);
+  const expanded: Record<string, boolean> = { ...tab?.state.expanded };
   for (const id of ids) expanded[id] = false;
   patchDocumentTabState(tabId, { expanded });
 }
