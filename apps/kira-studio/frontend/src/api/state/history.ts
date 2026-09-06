@@ -82,6 +82,10 @@ export function createHistoryStore<Entry, Snapshot, Extra extends object = Recor
     const mySeq = bumpSeq(tabId);
     rt.loading = true;
     rt.error = null;
+    // P21 round 3 functional finding 4: set below only on the "superseded while in flight, so a
+    // retry now owns `loading`" branch — this call's own `finally` must not clear `loading` out
+    // from under that retry.
+    let retried = false;
     try {
       const { itemId, tabId: tid } = scopeIdsFor(tabId);
       const entries = await opts.list(itemId, tid);
@@ -92,12 +96,22 @@ export function createHistoryStore<Entry, Snapshot, Extra extends object = Recor
       if (latestSeq.get(tabId) === mySeq) {
         rt.entries = entries;
         rt.stale = false;
+      } else {
+        // F8's own retry-side hole: a load superseded by noteRecorded's `stale = true` branch
+        // (which only bumps the sequence counter — it never itself starts a new load) used to be
+        // silently discarded here, leaving `stale` set with nothing left to ever clear it. The
+        // just-sent response then never appeared in History until the user sent again or deleted/
+        // cleared an entry. Retrying converges: either nothing supersedes the retry and it commits
+        // normally, or it is itself superseded and retries again, until sends/calls stop arriving
+        // faster than a fetch can complete.
+        retried = true;
+        void load(tabId);
       }
     } catch (err) {
       if (!opts.findTab(tabId)) return;
       rt.error = err instanceof Error ? err.message : String(err);
     } finally {
-      if (opts.findTab(tabId)) rt.loading = false;
+      if (opts.findTab(tabId) && !retried) rt.loading = false;
     }
   }
 

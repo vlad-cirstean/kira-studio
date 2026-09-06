@@ -178,4 +178,42 @@ describe('createHistoryStore reactivity and refresh policy (P18 D1/D2/D3)', () =
     expect(store.runtime['tab-1'].stale).toBe(false);
     expect(store.runtime['tab-1'].entries).toEqual([{ id: 'e1' }, { id: 'e-new' }]);
   });
+
+  // P21 round 3 functional finding 4: F8 (round 1) fixed the *commit* side — a superseded load
+  // must not overwrite `stale`/`entries` (test 7, above). It left the *retry* side open: nothing
+  // ever re-fetched on the superseded load's behalf, so if nothing else was in flight to clear
+  // `stale`, it latched true forever and the just-recorded entry never appeared in History until
+  // the user sent again or deleted/cleared an entry. This is the exact repro: an in-flight load
+  // (from the pane already being on History) is superseded by a send while the pane is elsewhere,
+  // and `ensureFresh`'s own `!loading` gate blocks it from doing anything when the pane comes back
+  // — the superseded load resolving is the *only* thing left that can ever fetch fresh data.
+  test('8. a load superseded by a stale-only noteRecorded (no concurrent load in flight) retries itself, rather than latching stale forever', async () => {
+    const first = deferred<FakeEntry[]>();
+    let call = 0;
+    const listResults = [first.promise, Promise.resolve([{ id: 'e1' }, { id: 'e-new' }])];
+    const store = makeStore(() => listResults[call++] as Promise<FakeEntry[]>);
+    store.registerTab('tab-1', 'history'); // the pane is already showing History
+
+    const loadPromise = store.load('tab-1'); // seq 1: in flight against a "slow backend"
+    expect(store.runtime['tab-1'].loading).toBe(true);
+
+    store.setPane('tab-1', 'body'); // the user switches away
+    store.noteRecorded('tab-1'); // a send completes: stale = true, seq bumped to 2 — no new load
+    expect(store.runtime['tab-1'].stale).toBe(true);
+
+    store.setPane('tab-1', 'history'); // the user switches back
+    store.ensureFresh('tab-1'); // blocked by `loading` (seq 1 hasn't resolved yet) — must do nothing
+    expect(store.listCallCount()).toBe(1);
+
+    first.resolve([{ id: 'stale-e1' }]); // seq 1's answer to a question that predates the send
+    await loadPromise;
+    // Not committed (F8's own rule) — but must not leave `stale` stuck with nothing left to ever
+    // clear it: this call must have retried itself instead of silently discarding.
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(store.runtime['tab-1'].stale).toBe(false);
+    expect(store.runtime['tab-1'].entries).toEqual([{ id: 'e1' }, { id: 'e-new' }]);
+    expect(store.runtime['tab-1'].loading).toBe(false);
+  });
 });
