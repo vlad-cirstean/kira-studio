@@ -390,6 +390,22 @@ test('cell editor — autodetect, beautify, override, NULL/empty/truncated, read
     .poll(() => page.locator('.cell-splitter').evaluate((el) => getComputedStyle(el).boxShadow))
     .not.toBe('none');
 
+  // --- scenario 1b: search (item U, D14) — the cell's own value, often a large JSON blob,
+  // through ResponsePane.vue's own find bar over the encoded pane's own doc -----------------
+  await page.click('[data-testid="cell-editor-search-toggle"]');
+  const findBar = panel.locator('[data-testid="http-find-bar"]');
+  await expect(findBar).toBeVisible();
+  await page.fill('[data-testid="http-find-input"]', 'tags');
+  await expect(panel.locator('[data-testid="http-find-count"]')).toContainText('1 of 1');
+  await expect(
+    page.locator('[data-testid="cell-editor-encoded"] .cm-kira-find-match-current'),
+  ).toHaveCount(1);
+  await page.keyboard.press('Escape');
+  await expect(findBar).toHaveCount(0);
+  await expect(page.locator('[data-testid="cell-editor-search-toggle"]')).not.toHaveClass(
+    /is-active/,
+  );
+
   // --- scenario 2: every format, read out of the fixture's own `kind` column -------------
   for (let row = 0; row < 13; row++) {
     const kind = await kindOf(page, row);

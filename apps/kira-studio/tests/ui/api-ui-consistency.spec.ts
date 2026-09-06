@@ -378,6 +378,92 @@ test('hovering a resolved reference shows its value; hovering a secret never doe
   await expect(hover).not.toContainText('api_key');
 });
 
+// P22b D4/D5: the request body editors are the single largest place a user writes {{variables}}
+// (F6) — until now they only got rangeHighlights (colouring), and a resolved reference read as
+// exactly the same colour as the JSON keys around it (`--kira-syntax-property`, byte-identical to
+// the old `--kira-var-resolved` alias). This guards the fix end to end: a colour of its own, a
+// hover, and completion, all inside the JSON body — not just the URL field the tests above cover.
+test('the request body: a resolved {{variable}} has a colour of its own, hovers, and completes', async ({
+  relaunch,
+}) => {
+  const CONTROL: ControlSnapshot[] = [
+    {
+      channel: IPC.tabsList,
+      response: [
+        httpRequestTab('tab-1', 0, true, {
+          bodyMode: 'code',
+          codeLanguage: 'json',
+          code: '{\n  "base": "{{base_url}}",\n  "missing": "{{not_defined}}"\n}',
+        }),
+      ],
+    },
+    ...p15bVariableControl(),
+  ];
+  const { window: page } = await relaunch({ control: CONTROL });
+
+  const body = page.locator('[data-testid="http-request-pane"] .cm-content');
+  await expect(body).toBeVisible();
+
+  const resolvedSpan = body.locator('.cm-kira-var');
+  const unknownSpan = body.locator('.cm-kira-var-unknown');
+  await expect(resolvedSpan).toHaveCount(1);
+  await expect(unknownSpan).toHaveCount(1);
+
+  // --kira-var-resolved (#4ec9b0) vs --kira-warn (#cca700) vs --kira-syntax-property (#9cdcfe,
+  // what the "base"/"missing" JSON keys beside them are painted in) — three distinct colours, not
+  // the two the resolved reference used to share with its own JSON key. kiraHighlightStyle
+  // (editor/theme.ts) generates opaque per-rule class names rather than semantic ones (the same
+  // reason http-request-body.spec.ts's own hasTokenColor() walks every descendant by colour
+  // instead of a class selector), so the key's colour is found the same way here.
+  const [resolvedColor, unknownColor, keyColor] = await Promise.all([
+    resolvedSpan.evaluate((el) => getComputedStyle(el).color),
+    unknownSpan.evaluate((el) => getComputedStyle(el).color),
+    body.evaluate((el) => {
+      for (const node of el.querySelectorAll('span')) {
+        if (
+          node.classList.contains('cm-kira-var') ||
+          node.classList.contains('cm-kira-var-unknown')
+        ) {
+          continue;
+        }
+        if (node.textContent?.includes('base') || node.textContent?.includes('missing')) {
+          return getComputedStyle(node).color;
+        }
+      }
+      return '';
+    }),
+  ]);
+  expect(resolvedColor).toBe('rgb(78, 201, 176)');
+  expect(unknownColor).toBe('rgb(204, 167, 0)');
+  expect(keyColor).not.toBe('');
+  expect(resolvedColor).not.toBe(keyColor);
+
+  // Hovering the resolved reference shows its value — through CodeMirror's own native hover
+  // tooltip (editor/hover.ts's buildHoverSource, `.cm-kira-hover`), not AutocompleteField's own
+  // overlay panel (`autocomplete-hover`): the body editor is a real editable host, wired directly
+  // via CodeMirrorHost's hoverSource prop, not the URL field's read-only-overlay-behind-an-input
+  // trick.
+  const resolvedBox = await resolvedSpan.boundingBox();
+  if (!resolvedBox) throw new Error('resolved reference span has no box');
+  await page.mouse.move(
+    resolvedBox.x + resolvedBox.width / 2,
+    resolvedBox.y + resolvedBox.height / 2,
+  );
+  const hover = page.locator('.cm-kira-hover');
+  await expect(hover).toBeVisible();
+  await expect(hover).toContainText('api.example.com');
+
+  // Typing {{ inside the body offers names — CodeMirror's own completion popup, since the body
+  // editor is a real editable host, not an AutocompleteField overlay.
+  await body.click();
+  await page.keyboard.press('End');
+  await page.keyboard.press('End');
+  await page.keyboard.type('"x": "{{base');
+  const tooltip = page.locator('.cm-tooltip-autocomplete');
+  await expect(tooltip).toBeVisible({ timeout: 5_000 });
+  await expect(tooltip).toContainText('base_url');
+});
+
 test('a header-name cell suggests Content-Type, and typing Content-T then accepting does not duplicate it', async ({
   relaunch,
 }) => {
@@ -1272,4 +1358,94 @@ test('an environment’s colour reaches the request view’s toolbar cap and hea
   await page.click('[data-testid="api-environment-option"][data-value="env-b"]');
 
   await expect(headDot).toHaveClass(/none/);
+});
+
+// P22b D9: one row grid, three consumers (F13) — VariableSetView's rows used to be independent
+// flex items with their own per-field `flex` value, so a secret row's extra reveal affordance
+// shifted its neighbours out of alignment. This guards the fix directly: three consecutive rows,
+// one of them a secret (the row shape D9's own finding calls out), share left edges column by
+// column.
+test('a variable-set view: name/value/description cells of three consecutive rows share left edges (D9)', async ({
+  relaunch,
+}) => {
+  const VARS = [
+    {
+      id: 'var-1',
+      scope: 'collection',
+      ownerId: 'col-1',
+      name: 'a',
+      value: '1',
+      isSecret: false,
+      sortOrder: 0,
+    },
+    {
+      id: 'var-2',
+      scope: 'collection',
+      ownerId: 'col-1',
+      name: 'b',
+      value: '',
+      isSecret: true,
+      sortOrder: 1,
+    },
+    {
+      id: 'var-3',
+      scope: 'collection',
+      ownerId: 'col-1',
+      name: 'c',
+      value: '3',
+      isSecret: false,
+      sortOrder: 2,
+    },
+  ];
+  const VARIABLE_SET_TAB = {
+    id: 'tab-vs-1',
+    connectionId: null,
+    path: 'variables:collection:col-1',
+    kind: 'variable-set',
+    order: 0,
+    active: true,
+    state: { scope: 'collection', ownerId: 'col-1', name: 'Orders API' },
+  };
+  const CONTROL: ControlSnapshot[] = [
+    { channel: IPC.tabsList, response: [VARIABLE_SET_TAB] },
+    {
+      channel: IPC.collectionsList,
+      response: {
+        collections: [
+          {
+            id: 'col-1',
+            name: 'Orders API',
+            sortOrder: 0,
+            createdAt: '2026-01-01T00:00:00.000Z',
+            updatedAt: '2026-01-01T00:00:00.000Z',
+          },
+        ],
+        items: [],
+      },
+    },
+    { channel: IPC.variablesListEnvironments, response: [] },
+    { channel: IPC.variablesList, args: { scope: 'collection', ownerId: 'col-1' }, response: VARS },
+  ];
+  const { window: page } = await relaunch({ control: CONTROL });
+
+  const view = page.locator('[data-testid="variables-dialog"][data-scope="collection"]');
+  await expect(view).toBeVisible();
+  const rows = view.locator('[data-testid="variable-row"]');
+  await expect(rows).toHaveCount(4); // three real rows plus the trailing blank draft row
+
+  async function cellX(rowIndex: number, cellClass: string): Promise<number> {
+    const box = await rows.nth(rowIndex).locator(cellClass).boundingBox();
+    if (!box) throw new Error(`row ${rowIndex} ${cellClass} has no box`);
+    return box.x;
+  }
+
+  for (const cellClass of ['.name-cell', '.value-cell', '.description-cell']) {
+    const [x0, x1, x2] = await Promise.all([
+      cellX(0, cellClass),
+      cellX(1, cellClass),
+      cellX(2, cellClass),
+    ]);
+    expect(x1).toBe(x0);
+    expect(x2).toBe(x0);
+  }
 });

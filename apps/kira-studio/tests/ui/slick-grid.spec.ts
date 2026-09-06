@@ -1282,6 +1282,44 @@ test('P22 Pass B C9 — the pacing invariant holds with N staged insert rows on 
   expect(after.p95).toBeLessThan(before.p95 * 3 + 5);
 });
 
+// P22b D17: the inserts.length watcher invalidated and rendered the touched range but never
+// scrolled to it — on a page taller than the viewport, "Add a row" staged an insert nobody could
+// see (F25). One line, `grid.scrollRowIntoView`, guarded on growth (a discard shrinks the count
+// and must not scroll, the same D16 rule this suite's http/grpc/variable-set siblings each get).
+test('P22b D17 — a staged insert row scrolls into view, and a discard does not scroll', async ({
+  relaunch,
+}) => {
+  const { window: page } = await relaunch({ control: CONTROL, stream: PORT });
+  await connectAndOpenSpikeGrid(page);
+  const viewport = rightViewport(page);
+
+  await viewport.evaluate((el) => {
+    el.scrollTop = 0;
+  });
+  await page.waitForTimeout(50);
+  await expect(page.locator('[data-testid="grid-row-insert"]')).toHaveCount(0);
+
+  await page.click('[data-testid="toolbar-add-row"]');
+  await expect(page.locator('[data-testid="grid-row-insert"]')).toHaveCount(1);
+  // Staged past the loaded page — the viewport must have moved to bring it on screen, not stayed
+  // pinned at the top where it was before the click.
+  await expect.poll(() => viewport.evaluate((el) => el.scrollTop)).toBeGreaterThan(0);
+  await expect(page.locator('[data-testid="grid-row-insert"]')).toBeVisible();
+
+  // The growth guard: discarding the insert (a shrink) must not scroll anywhere on its own.
+  // Scrolled back to the top first — away from the boundary the insert itself sits at, so a plain
+  // browser reflow (the scrollable area shrinking by one row when its very last row is removed)
+  // can't be mistaken for the watcher firing scrollRowIntoView on a shrink, which is the actual
+  // thing this guard exists to prevent.
+  await viewport.evaluate((el) => {
+    el.scrollTop = 0;
+  });
+  await page.waitForTimeout(50);
+  await page.click('[data-testid="toolbar-discard-changes"]');
+  await expect(page.locator('[data-testid="grid-row-insert"]')).toHaveCount(0);
+  await expect(viewport.evaluate((el) => el.scrollTop)).resolves.toBe(0);
+});
+
 // P22 Pass B, C11/§9.2 T9 — the single host-owned nav button's own DOM invariant: exactly one
 // `[data-testid="cell-nav-button"]` in the whole document at any time (never one-per-cell the way
 // the incumbent's own pure-CSS-hover button was), it sits within the left 24px of whichever cell

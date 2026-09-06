@@ -356,12 +356,20 @@ async function onRemove(id: string): Promise<void> {
 // P22b D16: FieldRowsTable.vue's own trailing-blank-row watcher, restated for this view's own
 // shape — the scroller is `.p-dialog-body.list` (not `.field-rows-table`), the row class is
 // `.variable-row` (not `.field-row`), and the watched count is `allRealRows` (this view's own
-// real-row list) rather than a `rows` prop.
+// real-row list) rather than a `rows` prop. One real difference from FieldRowsTable's own copy:
+// `allRealRows` starts at 0 and is populated *asynchronously* by loadVariableSetRows (a tab's
+// rows prop, by contrast, is already the real count the moment this component mounts) — so the
+// watcher's very first invocation is that initial load resolving, not a user adding a row, and
+// must not scroll a freshly opened set straight to its own bottom. `hasLoadedOnce` distinguishes
+// the two: false for that first invocation only, true for every real add after it.
 const listRef = ref<HTMLElement | null>(null);
+let hasLoadedOnce = false;
 watch(
   () => allRealRows.value.length,
   (next, prev) => {
-    if (next <= prev) return;
+    const isInitialLoad = !hasLoadedOnce;
+    hasLoadedOnce = true;
+    if (isInitialLoad || next <= prev) return;
     void nextTick(() => {
       listRef.value
         ?.querySelector('.variable-row:last-child')

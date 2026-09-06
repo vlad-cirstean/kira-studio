@@ -487,3 +487,100 @@ test('history restores a prior value', async ({ relaunch }) => {
     'v2',
   );
 });
+
+// ---- 6. D16: the trailing draft row scrolls into view when it appears ----
+
+test('a new variable row scrolls into view when it appears (D16)', async ({ relaunch }) => {
+  const VARS = Array.from({ length: 30 }, (_, i) => ({
+    id: `var-${i}`,
+    name: `v${i}`,
+    value: `val${i}`,
+    isSecret: false,
+    sortOrder: i,
+  }));
+  const NEW_ROW = { id: 'var-new', name: 'vNew', value: '', isSecret: false, sortOrder: 30 };
+  const CONTROL: ControlSnapshot[] = [
+    { channel: IPC.collectionsList, response: TREE },
+    {
+      channel: IPC.variablesList,
+      args: { scope: 'collection', ownerId: 'col-1' },
+      response: VARS,
+    },
+    {
+      channel: IPC.variablesUpsert,
+      args: {
+        scope: 'collection',
+        ownerId: 'col-1',
+        id: '',
+        name: 'vNew',
+        value: '',
+        isSecret: false,
+        description: '',
+      },
+      response: NEW_ROW,
+    },
+    {
+      channel: IPC.variablesList,
+      args: { scope: 'collection', ownerId: 'col-1' },
+      response: [...VARS, NEW_ROW],
+    },
+  ];
+  const { window: page } = await relaunch({ control: CONTROL });
+  await openVariablesDialog(page);
+
+  const list = page.locator('.p-dialog-body.list');
+  const rows = page.locator('[data-testid="variable-row"]');
+  await expect(rows).toHaveCount(31); // 30 real rows plus the trailing draft
+
+  const trailing = rows.last();
+  // commitDraft only fires on blur (VariableSetView.vue's own onBlur) — .fill() alone leaves the
+  // draft staged but never calls variablesUpsert.
+  await trailing.locator('[data-testid="variable-name"]').fill('vNew');
+  await trailing.locator('[data-testid="variable-name"]').blur();
+  await expect(rows).toHaveCount(32);
+
+  const newTrailing = rows.last();
+  const listBox = await list.boundingBox();
+  const rowBox = await newTrailing.boundingBox();
+  if (!listBox || !rowBox) throw new Error('list/row has no box');
+  expect(rowBox.y).toBeGreaterThanOrEqual(listBox.y);
+  expect(rowBox.y + rowBox.height).toBeLessThanOrEqual(listBox.y + listBox.height + 1);
+});
+
+// The growth guard (D16's own reasoning — see http-request.spec.ts's identical test).
+test('deleting a variable row does not scroll (D16 guard)', async ({ relaunch }) => {
+  const VARS = Array.from({ length: 30 }, (_, i) => ({
+    id: `var-${i}`,
+    name: `v${i}`,
+    value: `val${i}`,
+    isSecret: false,
+    sortOrder: i,
+  }));
+  const CONTROL: ControlSnapshot[] = [
+    { channel: IPC.collectionsList, response: TREE },
+    {
+      channel: IPC.variablesList,
+      args: { scope: 'collection', ownerId: 'col-1' },
+      response: VARS,
+    },
+    { channel: IPC.variablesDelete, args: { id: 'var-20' }, response: undefined },
+    {
+      channel: IPC.variablesList,
+      args: { scope: 'collection', ownerId: 'col-1' },
+      response: VARS.filter((v) => v.id !== 'var-20'),
+    },
+  ];
+  const { window: page } = await relaunch({ control: CONTROL });
+  await openVariablesDialog(page);
+
+  const list = page.locator('.p-dialog-body.list');
+  await expect(list.evaluate((el) => el.scrollTop)).resolves.toBe(0);
+
+  const rows = page.locator('[data-testid="variable-row"]');
+  await rows
+    .nth(20)
+    .locator('[data-testid="variable-remove"]')
+    .evaluate((el: HTMLElement) => el.click());
+  await expect(rows).toHaveCount(30);
+  await expect(list.evaluate((el) => el.scrollTop)).resolves.toBe(0);
+});

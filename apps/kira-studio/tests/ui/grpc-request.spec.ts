@@ -179,6 +179,26 @@ test('gRPC request — open a tab and browse a schema', async ({ relaunch }) => 
   );
 });
 
+// P22b D10: the method select had no width rule of its own, so it shrank to its widest <option>
+// label — a fraction of the address field beside it for a service with short method names. Both
+// fields are flex: 1 in the same toolbar row now, so their rendered widths should track closely.
+test('gRPC request — the method select is as wide as the address field beside it (D10)', async ({
+  relaunch,
+}) => {
+  const CONTROL: ControlSnapshot[] = [{ channel: IPC.grpcDescribe, response: TWO_SERVICE_SCHEMA }];
+  const { window: page } = await relaunch({ control: CONTROL });
+
+  await openHttpModeAndNewGrpcRequest(page);
+  await page.fill('[data-testid="grpc-target"]', 'demo.example.com:443');
+
+  const target = page.locator('[data-testid="grpc-target"]');
+  const methodSelect = page.locator('[data-testid="grpc-method-select"]');
+  const targetBox = await target.boundingBox();
+  const methodBox = await methodSelect.boundingBox();
+  if (!targetBox || !methodBox) throw new Error('target/method select has no box');
+  expect(Math.abs(methodBox.width - targetBox.width) / targetBox.width).toBeLessThan(0.1);
+});
+
 // Finding 13: GrpcRequestView.vue's own watcher used to call loadSchema immediately on every
 // keystroke of the target field, with no debounce — a fast typist fired one Describe round trip
 // per character. Typing character-by-character (page.keyboard.type, unlike page.fill's single
@@ -278,6 +298,21 @@ test('gRPC request — a unary call renders its status, message and metadata', a
   await expect(metadata).toContainText('content-type');
   await expect(metadata).toContainText('application/grpc');
   await expect(metadata).toContainText('grpc-status');
+
+  // P22b D14: the response pane gets HTTP's own find-in-body (P16 D11) — until now the gRPC
+  // sibling had none. Scoped to the selected message's own JSON, through the same
+  // editor/findRanges.ts rangeHighlights seam.
+  await page.click('[data-testid="grpc-response-pane-messages"]');
+  await page.click('[data-testid="grpc-find-toggle"]');
+  const findBar = page.locator('[data-testid="http-find-bar"]');
+  await expect(findBar).toBeVisible();
+  await page.fill('[data-testid="http-find-input"]', 'Ada');
+  await expect(page.locator('[data-testid="http-find-count"]')).toContainText('1 of 1');
+  await expect(messageBody.locator('.cm-kira-find-match-current')).toHaveCount(1);
+
+  await page.keyboard.press('Escape');
+  await expect(findBar).toHaveCount(0);
+  await expect(page.locator('[data-testid="grpc-find-toggle"]')).not.toHaveClass(/is-active/);
 });
 
 test('gRPC request — a non-OK status is a result, not an error', async ({ relaunch }) => {
@@ -593,6 +628,7 @@ test('gRPC request — a request in a collection opens the grpc-request tab kind
     metadata: [],
   };
 
+  const SAVED_ITEM = { ...CREATED_ITEM, name: 'List items' };
   const CONTROL: ControlSnapshot[] = [
     { channel: IPC.collectionsList, response: TREE_EMPTY },
     { channel: IPC.collectionsCreateGrpcItem, response: CREATED_ITEM },
@@ -604,6 +640,7 @@ test('gRPC request — a request in a collection opens the grpc-request tab kind
     // watch (D4) — seeded so the Schema pane behind the toolbar's method chip has something real
     // to have resolved, though this test asserts only the chip and the tab kind.
     { channel: IPC.grpcDescribe, response: STREAM_SCHEMA },
+    { channel: IPC.collectionsSaveGrpcRequest, response: SAVED_ITEM },
   ];
   const { window: page } = await relaunch({ control: CONTROL });
   await modeTab(page, 'api').click();
@@ -631,6 +668,28 @@ test('gRPC request — a request in a collection opens the grpc-request tab kind
   await expect(page.locator('[data-testid="grpc-method-chip"]')).toContainText(
     'demo.Items/ListItems',
   );
+
+  // P22b D3: the same #head-trailing move HTTP's own Save gets — to the right of the request's
+  // own title, and its left edge does not move when the dirty mark appears beside the title.
+  await expect(page.locator('[data-testid="grpc-dirty"]')).toHaveCount(0);
+  const target = page.locator('[data-testid="grpc-request-target"]');
+  const saveButton = page.locator('[data-testid="grpc-save"]');
+  const targetBoxBefore = await target.boundingBox();
+  const saveBoxBefore = await saveButton.boundingBox();
+  if (!targetBoxBefore || !saveBoxBefore) throw new Error('target/save button has no box');
+  expect(targetBoxBefore.x + targetBoxBefore.width).toBeLessThanOrEqual(saveBoxBefore.x);
+
+  const messageEditor = page.locator('[data-testid="grpc-message-editor"] .cm-content');
+  await messageEditor.click();
+  await page.keyboard.press('End');
+  await page.keyboard.type('0');
+  await expect(page.locator('[data-testid="grpc-dirty"]')).toBeVisible();
+  const saveBoxAfter = await saveButton.boundingBox();
+  if (!saveBoxAfter) throw new Error('save button has no box');
+  expect(saveBoxAfter.x).toBe(saveBoxBefore.x);
+
+  await page.click('[data-testid="grpc-save"]');
+  await expect(page.locator('[data-testid="grpc-dirty"]')).toHaveCount(0);
 });
 
 // P13 D15: the Beautify affordance the already-registered view.format command implied but had
@@ -1030,4 +1089,113 @@ test('the gRPC target field fills the toolbar row (P18 D14)', async ({ relaunch 
   // element); its fixed-width neighbour does not move at all.
   expect(widthAfter - widthBefore).toBeGreaterThan(delta * 0.5);
   expect(Math.abs(tlsAfter - tlsBefore)).toBeLessThanOrEqual(1);
+});
+
+// P22b D14: HTTP's own ResponseHistoryList.vue idiom (P16 D15) — an always-visible filter above
+// the list, matching method, status name and time. The gRPC sibling had none.
+test('gRPC request — the call history has its own filter (D14)', async ({ relaunch }) => {
+  const SAY_HELLO = {
+    id: 'call-1',
+    itemId: null,
+    tabId: 'tab-grpc-1',
+    calledAt: '2026-01-01T00:00:00.000Z',
+    target: 'demo.example.com:443',
+    method: 'demo.Echo/SayHello',
+    streaming: 'unary',
+    environment: '',
+    code: 0,
+    codeName: 'OK',
+    statusMessage: '',
+    elapsedMs: 3,
+    messageCount: 1,
+    messageBytes: 10,
+    storedBytes: 60,
+  };
+  const LIST_ITEMS = {
+    ...SAY_HELLO,
+    id: 'call-2',
+    method: 'demo.Items/ListItems',
+    code: 5,
+    codeName: 'NOT_FOUND',
+  };
+  const scope = { itemId: '', tabId: 'tab-grpc-1' };
+  const CONTROL: ControlSnapshot[] = [
+    { channel: IPC.tabsList, response: [grpcTab({})] },
+    { channel: IPC.grpcHistoryList, args: scope, response: [SAY_HELLO, LIST_ITEMS] },
+  ];
+  const { window: page } = await relaunch({ control: CONTROL });
+
+  await page.click('[data-testid="grpc-response-pane-history"]');
+  const rows = page.locator('[data-testid="grpc-history-row"]');
+  await expect(rows).toHaveCount(2);
+
+  const filter = page.locator('[data-testid="grpc-history-filter"]');
+  await expect(filter).toBeVisible();
+  await filter.fill('ListItems');
+  await expect(rows).toHaveCount(1);
+  await expect(rows.first()).toContainText('ListItems');
+
+  await filter.fill('nothing matches this');
+  await expect(page.locator('[data-testid="grpc-history-filter-empty"]')).toBeVisible();
+
+  await filter.fill('');
+  await expect(rows).toHaveCount(2);
+});
+
+// P22b D16: MetadataTable.vue's own copy of FieldRowsTable.vue's trailing-blank-row watcher (F18's
+// own trade — see MetadataTable.vue's header comment).
+test('gRPC request — a new metadata row scrolls into view when it appears (D16)', async ({
+  relaunch,
+}) => {
+  const metadata = Array.from({ length: 30 }, (_, i) => ({
+    name: `x-meta-${i}`,
+    value: `v${i}`,
+    enabled: true,
+  }));
+  const CONTROL: ControlSnapshot[] = [
+    { channel: IPC.tabsList, response: [grpcTab({ requestPane: 'metadata', metadata })] },
+  ];
+  const { window: page } = await relaunch({ control: CONTROL });
+
+  const table = page.locator('[data-testid="grpc-metadata-table"]');
+  await expect(table).toBeVisible();
+  const rows = table.locator('[data-testid="grpc-metadata-row"]');
+  await expect(rows).toHaveCount(31);
+
+  const trailing = rows.last();
+  await trailing.locator('[data-testid="grpc-metadata-name"]').fill('x-new');
+  await expect(rows).toHaveCount(32);
+
+  const newTrailing = rows.last();
+  const tableBox = await table.boundingBox();
+  const rowBox = await newTrailing.boundingBox();
+  if (!tableBox || !rowBox) throw new Error('table/row has no box');
+  expect(rowBox.y).toBeGreaterThanOrEqual(tableBox.y);
+  expect(rowBox.y + rowBox.height).toBeLessThanOrEqual(tableBox.y + tableBox.height + 1);
+});
+
+// The growth guard (D16's own reasoning — see http-request.spec.ts's identical test for why this
+// is a separate scenario from the one above, scrolled to the top rather than the bottom).
+test('gRPC request — deleting a metadata row does not scroll (D16 guard)', async ({ relaunch }) => {
+  const metadata = Array.from({ length: 30 }, (_, i) => ({
+    name: `x-meta-${i}`,
+    value: `v${i}`,
+    enabled: true,
+  }));
+  const CONTROL: ControlSnapshot[] = [
+    { channel: IPC.tabsList, response: [grpcTab({ requestPane: 'metadata', metadata })] },
+  ];
+  const { window: page } = await relaunch({ control: CONTROL });
+
+  const table = page.locator('[data-testid="grpc-metadata-table"]');
+  await expect(table).toBeVisible();
+  await expect(table.evaluate((el) => el.scrollTop)).resolves.toBe(0);
+
+  const rows = table.locator('[data-testid="grpc-metadata-row"]');
+  await rows
+    .nth(20)
+    .locator('[data-testid="grpc-metadata-remove"]')
+    .evaluate((el: HTMLElement) => el.click());
+  await expect(rows).toHaveCount(30);
+  await expect(table.evaluate((el) => el.scrollTop)).resolves.toBe(0);
 });

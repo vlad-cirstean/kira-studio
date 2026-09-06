@@ -166,6 +166,46 @@ test('Http request — a 404 shows its own hint', async ({ relaunch }) => {
   );
 });
 
+// P22b D2: a header's value cell now completes from a vocabulary keyed by the row's own name —
+// a whole-value entry for Content-Type (replaces the field) and a prefix entry for Authorization
+// (inserts `Bearer ` and leaves the caret after it, so {{variable}} completion can take over for
+// the credential itself).
+test('Http request — a header value completes from its own name', async ({ relaunch }) => {
+  const { window: page } = await relaunch({ control: [] });
+
+  await openHttpModeAndNewRequest(page);
+  await page.click('[data-testid="http-request-pane-headers"]');
+  const rows = page.locator('[data-testid="http-header-row"]');
+  const suggestions = page.locator('.autocomplete-suggestions li');
+
+  const firstRow = rows.first();
+  await firstRow.locator('[data-testid="http-header-name"]').fill('Content-Type');
+  const firstValue = firstRow.locator('[data-testid="http-header-value"]');
+  await firstValue.click();
+  await firstValue.pressSequentially('appl');
+  await expect(suggestions.filter({ hasText: 'application/json' })).toBeVisible({
+    timeout: 5_000,
+  });
+  await suggestions.filter({ hasText: 'application/json' }).click();
+  await expect(firstValue).toHaveValue('application/json');
+
+  const secondRow = rows.nth(1);
+  await secondRow.locator('[data-testid="http-header-name"]').fill('Authorization');
+  const secondValue = secondRow.locator('[data-testid="http-header-value"]');
+  await secondValue.click();
+  await secondValue.pressSequentially('Bea');
+  await expect(suggestions.filter({ hasText: 'Bearer' })).toBeVisible({ timeout: 5_000 });
+  await suggestions.filter({ hasText: 'Bearer' }).click();
+  await expect(secondValue).toHaveValue('Bearer ');
+  // The caret lands right after the inserted space — typing `{{` there opens the {{variable}}
+  // source, not a second round of the Authorization prefix vocabulary. templateToken only opens
+  // once there is a non-empty word inside the reference (api-ui-consistency.spec.ts's own rule).
+  await secondValue.pressSequentially('{{');
+  await expect(secondValue).toHaveValue('Bearer {{}}');
+  await secondValue.pressSequentially('$g');
+  await expect(suggestions.filter({ hasText: '$guid' })).toBeVisible({ timeout: 5_000 });
+});
+
 test('Http request — restore from saved state, no reconnect gate', async ({ relaunch }) => {
   const RESTORED_TAB = {
     id: 'tab-restore-1',
@@ -221,4 +261,192 @@ test('Http request — restore from saved state, no reconnect gate', async ({ re
   await expect(page.locator('[data-testid="http-response-pane"]')).toContainText(
     'Send a request to see the response',
   );
+});
+
+// P22b D6/D7: the description toggle reveals a description cell on every configurable row —
+// headers, params, urlencoded and form-data — off by default (a fourth AutocompleteField-width
+// column is unusable for the majority of rows that have none).
+test('Http request — the description toggle reveals a description cell on every row kind', async ({
+  relaunch,
+}) => {
+  const { window: page } = await relaunch({ control: [] });
+  await openHttpModeAndNewRequest(page);
+
+  await expect(page.locator('[data-testid="http-header-description"]')).toHaveCount(0);
+  await page.click('[data-testid="http-field-descriptions-toggle"]');
+
+  // Params: needs a real row, which only exists once the URL carries a query string (D9's
+  // URL-is-authoritative design — F10's own reason there is no persisted params array at all).
+  await page.fill('[data-testid="http-url"]', 'https://api.example.com/x?limit=10');
+  const paramDescription = page.locator('[data-testid="http-param-description"]').first();
+  await expect(paramDescription).toBeVisible();
+  await paramDescription.fill('page size');
+  await expect(paramDescription).toHaveValue('page size');
+
+  // Headers.
+  await page.click('[data-testid="http-request-pane-headers"]');
+  const headerDescription = page.locator('[data-testid="http-header-description"]').first();
+  await expect(headerDescription).toBeVisible();
+  await headerDescription.fill('bearer token');
+  await expect(headerDescription).toHaveValue('bearer token');
+
+  // Urlencoded body.
+  await page.click('[data-testid="http-request-pane-body"]');
+  await page.click('[data-testid="http-body-mode-urlencoded"]');
+  const urlencodedDescription = page.locator('[data-testid="http-urlencoded-description"]').first();
+  await expect(urlencodedDescription).toBeVisible();
+  await urlencodedDescription.fill('form field');
+  await expect(urlencodedDescription).toHaveValue('form field');
+
+  // Form-data body.
+  await page.click('[data-testid="http-body-mode-formdata"]');
+  const formdataDescription = page.locator('[data-testid="http-formdata-description"]').first();
+  await expect(formdataDescription).toBeVisible();
+  await formdataDescription.fill('upload field');
+  await expect(formdataDescription).toHaveValue('upload field');
+});
+
+// A value typed into a description cell survives a tab reload — asserted the same way this file's
+// own "restore from saved state" test above proves persistence for every other field: a tab
+// restored with the description already in its saved state renders it immediately, with no
+// further interaction.
+test('Http request — a header description survives a tab reload', async ({ relaunch }) => {
+  const RESTORED_TAB = {
+    id: 'tab-restore-desc',
+    connectionId: null,
+    path: 'request',
+    kind: 'http-request',
+    order: 0,
+    active: true,
+    state: {
+      method: 'GET',
+      url: 'https://api.example.com/widgets',
+      headers: [
+        {
+          name: 'Authorization',
+          value: 'Bearer {{token}}',
+          enabled: true,
+          description: 'auth token',
+        },
+      ],
+      bodyMode: 'none',
+      body: '',
+      requestPane: 'headers',
+      responsePane: 'body',
+      responseView: 'pretty',
+      requestPaneHeight: 0,
+      fieldDescriptions: true,
+    },
+  };
+  const CONTROL: ControlSnapshot[] = [{ channel: IPC.tabsList, response: [RESTORED_TAB] }];
+  const { window: page } = await relaunch({ control: CONTROL });
+
+  const headerRow = page.locator('[data-testid="http-header-row"]').first();
+  await expect(headerRow.locator('[data-testid="http-header-description"]')).toHaveValue(
+    'auth token',
+  );
+});
+
+// P22b D16: the trailing blank row IS the add affordance (FieldRowsTable.vue's own displayRows
+// comment), so the row a user needs next is the one that appears BELOW the one they just filled
+// in — off the fold on any table long enough to scroll (F24). Guarded on growth only: deleting a
+// row must never move the scroll position.
+test('Http request — a new header row scrolls into view when it appears (D16)', async ({
+  relaunch,
+}) => {
+  const headers = Array.from({ length: 30 }, (_, i) => ({
+    name: `X-Header-${i}`,
+    value: `v${i}`,
+    enabled: true,
+  }));
+  const RESTORED_TAB = {
+    id: 'tab-scroll-1',
+    connectionId: null,
+    path: 'request',
+    kind: 'http-request',
+    order: 0,
+    active: true,
+    state: {
+      method: 'GET',
+      url: '',
+      headers,
+      bodyMode: 'none',
+      body: '',
+      requestPane: 'headers',
+      responsePane: 'body',
+      responseView: 'pretty',
+      requestPaneHeight: 0,
+    },
+  };
+  const { window: page } = await relaunch({
+    control: [{ channel: IPC.tabsList, response: [RESTORED_TAB] }],
+  });
+
+  const table = page.locator('[data-testid="http-headers-table"]');
+  await expect(table).toBeVisible();
+  const rows = table.locator('[data-testid="http-header-row"]');
+  await expect(rows).toHaveCount(31); // 30 real rows plus the trailing blank
+
+  const trailing = rows.last();
+  await trailing.locator('[data-testid="http-header-name"]').fill('X-New');
+  await expect(rows).toHaveCount(32);
+
+  const newTrailing = rows.last();
+  const tableBox = await table.boundingBox();
+  const rowBox = await newTrailing.boundingBox();
+  if (!tableBox || !rowBox) throw new Error('table/row has no box');
+  // "inside the scroller's client rect": the new row's own box is fully within the container's.
+  expect(rowBox.y).toBeGreaterThanOrEqual(tableBox.y);
+  expect(rowBox.y + rowBox.height).toBeLessThanOrEqual(tableBox.y + tableBox.height + 1);
+});
+
+// The growth guard (D16's own reasoning: "without it, deleting the second row of forty would
+// jump to the fortieth"): removing a row is a shrink, and must never scroll anywhere. Scrolled to
+// the top, removing a row further down the (still off-screen) list must leave the top in view —
+// deliberately not reusing the scroll-into-view test above, whose own scroll-to-bottom state
+// would fold a real browser reflow (removing DOM above the viewport shifts scrollTop on its own)
+// into the same assertion as the watcher's own behaviour.
+test('Http request — deleting a header row does not scroll (D16 guard)', async ({ relaunch }) => {
+  const headers = Array.from({ length: 30 }, (_, i) => ({
+    name: `X-Header-${i}`,
+    value: `v${i}`,
+    enabled: true,
+  }));
+  const RESTORED_TAB = {
+    id: 'tab-scroll-2',
+    connectionId: null,
+    path: 'request',
+    kind: 'http-request',
+    order: 0,
+    active: true,
+    state: {
+      method: 'GET',
+      url: '',
+      headers,
+      bodyMode: 'none',
+      body: '',
+      requestPane: 'headers',
+      responsePane: 'body',
+      responseView: 'pretty',
+      requestPaneHeight: 0,
+    },
+  };
+  const { window: page } = await relaunch({
+    control: [{ channel: IPC.tabsList, response: [RESTORED_TAB] }],
+  });
+
+  const table = page.locator('[data-testid="http-headers-table"]');
+  await expect(table).toBeVisible();
+  await expect(table.evaluate((el) => el.scrollTop)).resolves.toBe(0);
+
+  const rows = table.locator('[data-testid="http-header-row"]');
+  // A plain `.click()` would first scroll the (currently off-screen) target into view — an
+  // artifact of the test driver, not of the app — which is exactly the browser-reflow noise this
+  // test exists to avoid. Dispatching the click via JS clicks the real button with no scroll.
+  await rows
+    .nth(20)
+    .locator('[data-testid="http-header-remove"]')
+    .evaluate((el: HTMLElement) => el.click());
+  await expect(rows).toHaveCount(30);
+  await expect(table.evaluate((el) => el.scrollTop)).resolves.toBe(0);
 });

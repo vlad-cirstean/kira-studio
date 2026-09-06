@@ -118,6 +118,13 @@ test('Http history — browse a request’s past responses', async ({ relaunch }
   await expect(rows.nth(2)).toContainText('200');
   await expect(rows.nth(2)).toContainText('100 ms');
 
+  // P22b D1: a secondary status surface (the history list) now carries the code's meaning too —
+  // not as a bare chip, since a dense list row has no room for a full sentence on its own line.
+  await expect(rows.nth(1).locator('.p-chip').last()).toHaveAttribute(
+    'data-kira-tip',
+    'the server has no resource at this URL',
+  );
+
   await rows.nth(1).click();
 
   const band = page.locator('[data-testid="http-history-band"]');
@@ -128,6 +135,13 @@ test('Http history — browse a request’s past responses', async ({ relaunch }
   const status = page.locator('[data-testid="http-status"]');
   await expect(status).toContainText('404');
   await expect(status).toHaveClass(/err/);
+  // D1's no-regression half (F1): the response pane's own hint stays an inline line, not a
+  // tooltip-only affordance — 37716b1 removed the chip's own tooltip deliberately, and this guards
+  // that it has not silently come back as the *only* place the meaning is shown.
+  await expect(status).not.toHaveAttribute('data-kira-tip');
+  await expect(page.locator('[data-testid="http-status-hint"]')).toContainText(
+    'the server has no resource at this URL',
+  );
 
   const bodyEditor = page.locator('[data-testid="http-response-pane"] .response-body .cm-content');
   await expect(bodyEditor).toBeVisible();

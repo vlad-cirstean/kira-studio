@@ -161,6 +161,10 @@ async function switchToSource(view: import('@playwright/test').Locator) {
   await expect(view.locator('.cm-content')).toBeVisible();
 }
 
+async function switchToStructure(view: import('@playwright/test').Locator) {
+  await view.locator('[data-testid="definition-pane-structure"]').click();
+}
+
 async function connectAndExpand(page: import('@playwright/test').Page, name: string) {
   await page.click('[data-testid="add-connection"]');
   await page.click('[data-testid="connection-kind-postgres"]');
@@ -270,6 +274,27 @@ test('Definition tab — Structure/Source, columns menu, notes, read-only, cache
   await expect(definitionView.locator('[data-testid="definition-pane-source"]')).toHaveClass(/on/);
   await expect(definitionView.locator('.cm-content')).toContainText('CREATE TABLE app.order_items');
   expect(await definitionView.locator('.cm-content span').count()).toBeGreaterThan(0);
+
+  // --- scenario 4b: search (item U, D14) — find-in-document over Source, a plain substring
+  // filter over Structure's own columns/indexes/constraints rows ----------------------------
+  await page.click('[data-testid="definition-search-toggle"]');
+  const findBar = definitionView.locator('[data-testid="http-find-bar"]');
+  await expect(findBar).toBeVisible();
+  await page.fill('[data-testid="http-find-input"]', 'PRIMARY KEY');
+  await expect(definitionView.locator('[data-testid="http-find-count"]')).toContainText('1 of 1');
+  await page.keyboard.press('Escape');
+  await expect(findBar).toHaveCount(0);
+
+  await switchToStructure(definitionView);
+  await page.click('[data-testid="definition-search-toggle"]');
+  const structureFilter = definitionView.locator('[data-testid="definition-structure-filter"]');
+  await expect(structureFilter).toBeVisible();
+  await structureFilter.fill('quantity');
+  await expect(columnsSection).toContainText('quantity');
+  await expect(columnsSection).not.toContainText('order_id');
+  await structureFilter.fill('');
+  await expect(columnsSection).toContainText('order_id');
+  await switchToSource(definitionView);
 
   // --- scenario 5: read-only (Source pane) --------------------------------------------------
   const beforeType = await definitionView.locator('.cm-content').innerText();

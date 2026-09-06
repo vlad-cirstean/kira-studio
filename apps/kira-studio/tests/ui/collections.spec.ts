@@ -172,9 +172,23 @@ test('collections — editing marks the request dirty, and Save clears it', asyn
   await expect(page.locator('[data-testid="http-dirty"]')).toHaveCount(0);
   await expect(page.locator('[data-testid="http-save"]')).toBeDisabled();
 
+  // P22b D3: Save lives in #head-trailing now, to the right of the request's own title, and its
+  // left edge does not move when the dirty mark appears beside the title (F5's own bug — Save
+  // used to sit in #badges, mid-row, and shift position whenever a badge's width changed).
+  const target = page.locator('[data-testid="http-request-target"]');
+  const saveButton = page.locator('[data-testid="http-save"]');
+  const targetBoxBefore = await target.boundingBox();
+  const saveBoxBefore = await saveButton.boundingBox();
+  if (!targetBoxBefore || !saveBoxBefore) throw new Error('target/save button has no box');
+  expect(targetBoxBefore.x + targetBoxBefore.width).toBeLessThanOrEqual(saveBoxBefore.x);
+
   await page.fill('[data-testid="http-url"]', 'https://api.example.com/v2/orders/edited');
   await expect(page.locator('[data-testid="http-dirty"]')).toBeVisible();
   await expect(page.locator('[data-testid="http-save"]')).toBeEnabled();
+
+  const saveBoxAfter = await saveButton.boundingBox();
+  if (!saveBoxAfter) throw new Error('save button has no box');
+  expect(saveBoxAfter.x).toBe(saveBoxBefore.x);
 
   await page.click('[data-testid="http-save"]');
   await expect(page.locator('[data-testid="http-dirty"]')).toHaveCount(0);
@@ -314,4 +328,58 @@ test('collections — search filters the tree, keeps ancestors, and restores the
   await expect(row(page, 'item-folder')).toBeVisible();
   await expect(row(page, 'item-health')).toBeVisible();
   await expect(row(page, 'item-create')).toHaveCount(0);
+});
+
+// P22b D8: F11's own fix — the Environments list moves out of a modal dialog into its own
+// collapsible category in the collections panel, beside the tree it already sits above.
+// EnvironmentsDialog stays (OQ-3, unchanged) — this is a second, additive entry point onto the
+// exact same openVariableSetTab('environment', …) call its own row click already makes.
+const ENVIRONMENTS = [
+  { id: 'env-prod', name: 'Prod', sortOrder: 0, isActive: true, color: 'green' },
+  { id: 'env-staging', name: 'Staging', sortOrder: 1, isActive: false, color: 'amber' },
+];
+
+test('collections — the Environments category expands, lists environments, and opens one as a tab', async ({
+  relaunch,
+}) => {
+  const CONTROL: ControlSnapshot[] = [
+    { channel: IPC.collectionsList, response: TREE },
+    { channel: IPC.variablesListEnvironments, response: ENVIRONMENTS },
+  ];
+  const { window: page } = await relaunch({ control: CONTROL });
+  await openHttpMode(page);
+
+  await expect(row(page, 'col-1')).toBeVisible();
+  const tree = page.locator('.tree-body');
+
+  // Collapsed by default (F11: it was behind a dialog before this, never open by default).
+  await expect(page.locator('[data-testid="environments-category-row"]')).toHaveCount(0);
+
+  // Collapsing/expanding the Environments category is a layout change above the tree, not inside
+  // it — the tree's own scroll position must not move because of it.
+  const scrollBefore = await tree.evaluate((el) => el.scrollTop);
+  await page.click('[data-testid="environments-category-toggle"]');
+  const rows = page.locator('[data-testid="environments-category-row"]');
+  await expect(rows).toHaveCount(2);
+  await expect(tree.evaluate((el) => el.scrollTop)).resolves.toBe(scrollBefore);
+
+  await expect(
+    page.locator('[data-testid="environments-category-row"][data-id="env-prod"]'),
+  ).toContainText('Prod');
+  // The active environment carries its own check mark; the inactive one does not.
+  await expect(
+    page
+      .locator('[data-testid="environments-category-row"][data-id="env-prod"]')
+      .locator('.codicon-check'),
+  ).toHaveCount(1);
+  await expect(
+    page
+      .locator('[data-testid="environments-category-row"][data-id="env-staging"]')
+      .locator('.codicon-check'),
+  ).toHaveCount(0);
+
+  await page.click('[data-testid="environments-category-row"][data-id="env-prod"]');
+  const view = page.locator('[data-testid="variables-dialog"][data-scope="environment"]');
+  await expect(view).toBeVisible();
+  await expect(page.locator('[data-testid="tab"]')).toContainText('Prod');
 });
