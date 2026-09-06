@@ -19,7 +19,7 @@ type WindowsRepo struct {
 // List returns every window record in `order`. Not a hot boot path (read once at startup, per
 // window record), so — unlike SettingsRepo/LayoutRepo/TabsRepo — this has no prepared statement.
 func (r *WindowsRepo) List() ([]model.WindowRecord, error) {
-	rows, err := r.DB.Query(`SELECT key, "order", bounds_json FROM windows ORDER BY "order" ASC`)
+	rows, err := r.DB.Query(`SELECT key, "order", bounds_json, mode FROM windows ORDER BY "order" ASC`)
 	if err != nil {
 		return nil, fmt.Errorf("repos/windows: query: %w", err)
 	}
@@ -31,11 +31,12 @@ func (r *WindowsRepo) List() ([]model.WindowRecord, error) {
 			key        string
 			order      int
 			boundsJSON sql.NullString
+			mode       string
 		)
-		if err := rows.Scan(&key, &order, &boundsJSON); err != nil {
+		if err := rows.Scan(&key, &order, &boundsJSON, &mode); err != nil {
 			return nil, fmt.Errorf("repos/windows: scan: %w", err)
 		}
-		rec := model.WindowRecord{Key: key, Order: order}
+		rec := model.WindowRecord{Key: key, Order: order, Mode: model.NormalizeMode(mode)}
 		if boundsJSON.Valid && boundsJSON.String != "" {
 			var b model.WindowBounds
 			if err := json.Unmarshal([]byte(boundsJSON.String), &b); err == nil {
@@ -130,6 +131,36 @@ func (r *WindowsRepo) EnsureExists(key string) error {
 	}
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("repos/windows: ensure commit: %w", err)
+	}
+	return nil
+}
+
+// GetMode reads one window's stored mode (P22 D12), normalised the same way List does. Used by
+// bridge.WindowsService.Ensure — the one call the renderer already makes before it asks for
+// anything window-scoped, so this is the boot-time seam that carries `mode` to the frontend
+// without a second round trip.
+func (r *WindowsRepo) GetMode(key string) (string, error) {
+	var mode string
+	err := r.DB.QueryRow(`SELECT mode FROM windows WHERE key = ?`, key).Scan(&mode)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", fmt.Errorf("repos/windows: %s: no such window", key)
+	}
+	if err != nil {
+		return "", fmt.Errorf("repos/windows: get mode %s: %w", key, err)
+	}
+	return model.NormalizeMode(mode), nil
+}
+
+// SetMode persists one window's app mode (P22 D12) — the per-window analogue of SetBounds below,
+// written on shutdown/mode-debounce rather than on every mode click (F20's own invariant: a mode
+// switch itself schedules no write).
+func (r *WindowsRepo) SetMode(key string, mode string) error {
+	res, err := r.DB.Exec(`UPDATE windows SET mode = ? WHERE key = ?`, model.NormalizeMode(mode), key)
+	if err != nil {
+		return fmt.Errorf("repos/windows: update mode %s: %w", key, err)
+	}
+	if n, err := res.RowsAffected(); err == nil && n == 0 {
+		return fmt.Errorf("repos/windows: %s: no such window", key)
 	}
 	return nil
 }

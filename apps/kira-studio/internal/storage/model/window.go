@@ -13,10 +13,32 @@ type WindowBounds struct {
 // WindowRecord is one row of the `windows` table (P8 D2/D4) — a durable, shell-minted identity
 // for one workbench. Bounds is nil until the window has been moved or resized at least once
 // (D10: a freshly minted window with no stored rectangle inherits its cascade position instead).
+// Mode (P22 D12) is the app mode (packages/shared/domain/mode.ts's AppMode — "studio" or "api")
+// this window was last closed in; a fresh row (no explicit mode column value on INSERT) reads
+// back the migration's own DEFAULT 'studio'.
 type WindowRecord struct {
 	Key    string        `json:"key"`
 	Order  int           `json:"order"`
 	Bounds *WindowBounds `json:"bounds"`
+	Mode   string        `json:"mode"`
+}
+
+// validWindowModes are the only two values AppMode (packages/shared/domain/mode.ts) can be.
+var validWindowModes = map[string]bool{"studio": true, "api": true}
+
+// DefaultWindowMode is the app's own default mode — the migration's column DEFAULT and this
+// constant deliberately agree, so there is exactly one place the default lives on each side.
+const DefaultWindowMode = "studio"
+
+// NormalizeMode returns mode unchanged if it's one of AppMode's two known values, else
+// DefaultWindowMode — the same drop-and-default posture an unrecognised enum gets elsewhere
+// (ValidateObjectDefinition's own callers) rather than refusing to read or write the row: a
+// hand-edited database or a future removed mode should never make a window fail to open.
+func NormalizeMode(mode string) string {
+	if validWindowModes[mode] {
+		return mode
+	}
+	return DefaultWindowMode
 }
 
 // Validate is the same non-empty-identity envelope TabRecord.Validate enforces (P2 R2's

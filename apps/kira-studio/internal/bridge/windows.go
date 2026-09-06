@@ -21,11 +21,39 @@ type WindowsEnsureArgs struct {
 	WindowKey string `json:"windowKey"`
 }
 
-func (s *WindowsService) Ensure(args WindowsEnsureArgs) error {
+// WindowsEnsureResult carries this window's own persisted mode (P22 D12) back to the boot
+// sequence that already calls Ensure before anything else window-scoped — the seam that hydrates
+// state/mode.ts's modeState.active without a second round trip.
+type WindowsEnsureResult struct {
+	Mode string `json:"mode"`
+}
+
+func (s *WindowsService) Ensure(args WindowsEnsureArgs) (WindowsEnsureResult, error) {
+	if args.WindowKey == "" {
+		return WindowsEnsureResult{}, ipcerr.BadRequest("windowKey is required")
+	}
+	if err := s.Deps.Repos.Windows.EnsureExists(args.WindowKey); err != nil {
+		return WindowsEnsureResult{}, ipcerr.Internal(err.Error())
+	}
+	mode, err := s.Deps.Repos.Windows.GetMode(args.WindowKey)
+	if err != nil {
+		return WindowsEnsureResult{}, ipcerr.Internal(err.Error())
+	}
+	return WindowsEnsureResult{Mode: mode}, nil
+}
+
+type WindowsSetModeArgs struct {
+	WindowKey string `json:"windowKey"`
+	Mode      string `json:"mode"`
+}
+
+// SetMode persists this window's own mode (P22 D12) — called from a debounced writer
+// (state/mode.ts), never synchronously from a mode-tab click (F20's own invariant).
+func (s *WindowsService) SetMode(args WindowsSetModeArgs) error {
 	if args.WindowKey == "" {
 		return ipcerr.BadRequest("windowKey is required")
 	}
-	if err := s.Deps.Repos.Windows.EnsureExists(args.WindowKey); err != nil {
+	if err := s.Deps.Repos.Windows.SetMode(args.WindowKey, args.Mode); err != nil {
 		return ipcerr.Internal(err.Error())
 	}
 	return nil
