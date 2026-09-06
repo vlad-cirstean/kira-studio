@@ -28,8 +28,29 @@ export function splitUrl(text: string): SplitUrl {
 export interface QueryPair {
   name: string;
   value: string;
+  /** P21 round 3 functional finding 11: true when the pair's own text had no `=` at all (a bare
+   *  `?flag`, not `?flag=`). buildQuery uses this to rebuild a bare flag as `flag` rather than
+   *  always appending `=` — without it, any *other* row changing in the same table rewrote the
+   *  whole query string (HttpRequestView.vue does this on every edit) and silently turned a
+   *  valueless flag the user never touched into `flag=`, a different request for any server that
+   *  distinguishes "no value" from "empty value". Optional: a freshly added row (blankParam()) has
+   *  no occasion to be bare, and undefined behaves exactly like false. Once `value` becomes
+   *  non-empty (the user typed one), the pair is no longer bare regardless of this flag — see
+   *  buildQuery below. */
+  bare?: boolean;
 }
 
+// P21 round 3 functional finding 11: `+` used to be asymmetric — left untouched here on decode
+// (deliberately, per this file's own header: a space must round-trip as %20, never silently become
+// `+`), but encoded to `%2B` by encodeQueryComponent below (plain encodeURIComponent's own
+// behaviour). Any *other* row changing in the same Params table rewrites the whole query string
+// (HttpRequestView.vue does this on every edit), so a literal `+` a user typed — `q=hello+world`,
+// the overwhelming majority of form-encoded readers' own space encoding — silently became
+// `q=hello%2Bworld` the moment an unrelated param changed, a different request for any server that
+// treats `+` as a space. Resolved by leaving `+` untouched on *both* sides (this decoder already
+// did; encodeQueryComponent now un-encodes the one sequence encodeURIComponent can produce for it)
+// rather than adopting `+`-means-space, which is exactly what this file's header comment already
+// rejected for the more common %20 case.
 function decodeComponent(s: string): string {
   try {
     return decodeURIComponent(s);
@@ -49,7 +70,7 @@ export function parseQuery(query: string): QueryPair[] {
       const eq = pair.indexOf('=');
       const rawName = eq >= 0 ? pair.slice(0, eq) : pair;
       const rawValue = eq >= 0 ? pair.slice(eq + 1) : '';
-      return { name: decodeComponent(rawName), value: decodeComponent(rawValue) };
+      return { name: decodeComponent(rawName), value: decodeComponent(rawValue), bare: eq < 0 };
     });
 }
 
@@ -57,16 +78,28 @@ export function parseQuery(query: string): QueryPair[] {
  *  '+' instead of '%20' and would silently rewrite what the user typed. Finding 16: a `{{name}}`
  *  reference living inside a name or value is left untouched rather than being encoded into
  *  `%7B%7Bname%7D%7D`, a form neither substitution engine (this package's own `resolve`, nor
- *  internal/apivars/resolve.go) recognises any more. */
+ *  internal/apivars/resolve.go) recognises any more. Finding 11 (round 3): `%2B` is un-encoded
+ *  back to a literal `+` afterward — the only percent sequence encodeURIComponent can produce for
+ *  it, so this is exact and never touches a `+` produced by encoding some other original byte. */
 function encodeQueryComponent(s: string): string {
   return splitTemplateSpans(s)
-    .map((span) => (span.isReference ? span.text : encodeURIComponent(span.text)))
+    .map((span) =>
+      span.isReference ? span.text : encodeURIComponent(span.text).replace(/%2B/g, '+'),
+    )
     .join('');
 }
 
 export function buildQuery(pairs: readonly QueryPair[]): string {
   return pairs
-    .map((p) => `${encodeQueryComponent(p.name)}=${encodeQueryComponent(p.value)}`)
+    .map((p) =>
+      // Finding 11 (round 3): a bare `?flag` (no `=` at all) must rebuild bare — always appending
+      // `=` turned a valueless flag into `flag=` the moment any other row's edit rewrote the query
+      // string, a different request for a server that distinguishes the two. Once the user has
+      // actually typed a value, the pair is no longer bare regardless of how it started.
+      p.bare && p.value === ''
+        ? encodeQueryComponent(p.name)
+        : `${encodeQueryComponent(p.name)}=${encodeQueryComponent(p.value)}`,
+    )
     .join('&');
 }
 

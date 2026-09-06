@@ -63,6 +63,49 @@ describe('http/url.ts buildQuery leaves a {{variable}} reference untouched', () 
   });
 });
 
+// P21 round 3 functional finding 11: parseQuery/buildQuery were not exact inverses in two ways —
+// a literal '+' was left alone on decode but encoded to '%2B' on the way back out, and a valueless
+// `?flag` always rebuilt as `flag=`. Because HttpRequestView.vue rewrites the *whole* query string
+// from the table whenever any row changes, both asymmetries silently rewrote params the user never
+// touched the moment an unrelated row was edited.
+describe('http/url.ts parseQuery/buildQuery are exact inverses (finding 11)', () => {
+  test('a literal + survives a round trip unchanged, not re-encoded to %2B', () => {
+    const pairs = parseQuery('q=hello+world');
+    expect(pairs).toEqual([{ name: 'q', value: 'hello+world', bare: false }]);
+    expect(buildQuery(pairs)).toBe('q=hello+world');
+  });
+
+  test('editing one param leaves an untouched + param exactly as it was', () => {
+    const pairs = parseQuery('q=hello+world&debug');
+    pairs.push({ name: 'page', value: '2' });
+    // Pre-fix: 'q=hello%2Bworld&debug=&page=2' — a different request for any server that treats
+    // '+' as a space in a query, which is the overwhelming majority of form-encoded readers.
+    expect(buildQuery(pairs)).toBe('q=hello+world&debug&page=2');
+  });
+
+  test('a bare flag (?flag, no "=") round-trips bare, not as "flag="', () => {
+    const pairs = parseQuery('debug');
+    expect(pairs).toEqual([{ name: 'debug', value: '', bare: true }]);
+    expect(buildQuery(pairs)).toBe('debug');
+  });
+
+  test('a param that was always "flag=" (an explicit empty value) keeps its "=" — parseQuery still tells the two apart', () => {
+    const pairs = parseQuery('flag=');
+    expect(pairs).toEqual([{ name: 'flag', value: '', bare: false }]);
+    expect(buildQuery(pairs)).toBe('flag=');
+  });
+
+  test('once a bare flag is given a real value, it is no longer bare', () => {
+    const pairs = parseQuery('debug');
+    pairs[0].value = 'true';
+    expect(buildQuery(pairs)).toBe('debug=true');
+  });
+
+  test('a fresh row built with no `bare` field at all defaults to non-bare (an empty value still gets "=")', () => {
+    expect(buildQuery([{ name: 'x', value: '' }])).toBe('x=');
+  });
+});
+
 describe('http/escape.ts goQueryEscape leaves a {{variable}} reference untouched', () => {
   test('a reference-only value is not escaped at all', () => {
     expect(goQueryEscape('{{apiKey}}')).toBe('{{apiKey}}');
