@@ -674,9 +674,9 @@
   letter-spacing: 0.05em;
 }
 
-/* ---------- LAW: a toolbar is 28px, holds only h-sm controls ---------- */
+/* ---------- LAW: a toolbar is --kira-toolbar-h, holds only h-sm controls ---------- */
 .p-toolbar {
-  height: 28px;
+  height: var(--kira-toolbar-h);
   flex-shrink: 0;
   display: flex;
   align-items: center;

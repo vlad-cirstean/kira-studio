@@ -55,12 +55,11 @@
      splitter track width; raising that would thicken every resize bar. */
   --kira-window-inset: 6px;
   --kira-border-width: 1px;
-  --kira-statusbar-h: 22px;
   /* P1 D2/C8: the custom title bar (workbench/TitleBar.vue), on top of `Mac.TitleBarHidden`
      (internal/shell/window.go). --kira-titlebar-inset-left clears the macOS traffic-light cluster
      — a real-Mac measurement this repo's Linux sandbox cannot take (§6.3), so it lands in this one
      token to adjust once rather than a value repeated at every call site.
-     Three same-session attempts at shrinking --kira-titlebar-h below 36px, all reverted:
+     Three same-session attempts at shrinking this below 36px, all reverted:
      `MacTitleBarHiddenInset`'s `UseToolbar: true` layout genuinely needed the fix window.go's own
      comment describes (switching to `MacTitleBarHidden`), but 28px — guessed as "the standard
      macOS title-bar height" — was ALSO wrong even under `MacTitleBarHidden`, reported against the
@@ -73,8 +72,15 @@
      6px back made the bar read as tall again, the exact complaint this whole change was meant to
      fix). Do not change this again without a real screenshot (or better, a real measurement)
      confirming it first — a plausible-sounding "standard" figure, and a plausible-sounding "exact"
-     compensation, have both been wrong here. */
-  --kira-titlebar-h: 32px;
+     compensation, have both been wrong here.
+     Own token below (--kira-titlebar-h), loosely coupled to the other chrome bars via
+     --kira-bar-h — each bar can diverge later by pointing its own token at a literal
+     instead, without touching the others. */
+  --kira-bar-h: 34px;
+  --kira-titlebar-h: var(--kira-bar-h);
+  --kira-tabbar-h: var(--kira-bar-h);
+  --kira-toolbar-h: var(--kira-bar-h);
+  --kira-statusbar-h: var(--kira-bar-h);
   --kira-titlebar-inset-left: 78px;
   --kira-shadow: 0 2px 8px rgb(0 0 0 / 0.32);
   --kira-shadow-dialog: 0 8px 28px rgb(0 0 0 / 0.45);

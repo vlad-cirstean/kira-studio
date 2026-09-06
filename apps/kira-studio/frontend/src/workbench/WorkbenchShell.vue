@@ -131,7 +131,7 @@ const gridStyle = computed(() => ({
      a `margin-bottom` here to "give the tab bar space" read as one lone, mismatched gap against
      that flush rhythm — asymmetric on its own, and still let a centred 26px tab sit only ~1.5px
      above the border line it was meant to clear. 34px centres the tab with ~3-4px on each side. */
-  height: 34px;
+  height: var(--kira-tabbar-h);
   /* `.editor-area` is a column flexbox, so this row is itself a flex item on the vertical axis —
      without `min-height: 0` its default `min-height: auto` lets the tab buttons' own intrinsic
      height push it taller than the `height` above, which is what let individual tabs render past
