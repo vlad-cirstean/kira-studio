@@ -628,24 +628,6 @@ onUnmounted(() => {
 
       <template #toolbar>
         <div class="sep"></div>
-        <!-- Canonical order and shape (DataToolbar.vue is the reference): first/prev/page-jump/
-             next/last, then page-size, then a count/columns-equivalent group, then the
-             add/search group. Mongo supports an arbitrary skip()/limit() offset, so — unlike
-             Redis/Kafka/SQS's cursor-only pagination — a real page-N jump box applies here too. -->
-        <PagerControls
-          :page-index="tab.state.pageIndex"
-          :page-size="tab.state.pageSize"
-          :count="rt?.count?.value ?? null"
-          :has-more="!!rt?.hasMore"
-          testid-prefix="document-"
-          last-tooltip="Count documents first"
-          @first="goFirst(tab.id)"
-          @prev="goPrev(tab.id)"
-          @next="goNext(tab.id)"
-          @last="goLast(tab.id)"
-          @jump="onJump"
-        />
-        <div class="sep"></div>
         <SegmentedControl
           :model-value="tab.state.pageSize"
           :options="PAGE_SIZE_OPTIONS"
@@ -710,6 +692,28 @@ onUnmounted(() => {
             @click="onToggleSearch"
           />
         </div>
+      </template>
+
+      <!-- P22 D4 (F7/OQ-4): moved here from #toolbar so this view agrees with DataView.vue's SQL
+           grid about where the shared pager lives — the toolbar's right-most control, with
+           nothing after it (RunState sits ahead of #toolbar-end, P22 D4) able to reflow it.
+           Canonical control order and shape otherwise unchanged: first/prev/page-jump/next/last.
+           Mongo supports an arbitrary skip()/limit() offset, so — unlike Redis/Kafka/SQS's
+           cursor-only pagination — a real page-N jump box applies here too. -->
+      <template #toolbar-end>
+        <PagerControls
+          :page-index="tab.state.pageIndex"
+          :page-size="tab.state.pageSize"
+          :count="rt?.count?.value ?? null"
+          :has-more="!!rt?.hasMore"
+          testid-prefix="document-"
+          last-tooltip="Count documents first"
+          @first="goFirst(tab.id)"
+          @prev="goPrev(tab.id)"
+          @next="goNext(tab.id)"
+          @last="goLast(tab.id)"
+          @jump="onJump"
+        />
       </template>
 
       <!-- The Mongo dialect of the filter row: one filter box, permanent, never closed — plus a

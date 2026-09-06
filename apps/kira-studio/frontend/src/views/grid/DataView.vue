@@ -82,8 +82,9 @@ const primaryKeyLabel = computed(() => {
 });
 
 // P48 step 14: the pending-changes group moved here from DataToolbar.vue so it can land in
-// ViewChrome's own #toolbar-end slot (after the chrome's automatic push, right before RunState) —
-// a component mounted inside #toolbar cannot also render into a sibling named slot of its parent.
+// ViewChrome's own #toolbar-end slot (after the chrome's automatic push and, since P22 D4,
+// RunState too) — a component mounted inside #toolbar cannot also render into a sibling named
+// slot of its parent.
 const caps = computed(() => {
   const connectionId = props.tab.connectionId;
   return connectionId ? (connectionsState.states[connectionId]?.caps ?? null) : null;
@@ -97,8 +98,8 @@ const pendingCount = computed(() => {
 const previewOpen = ref(false);
 
 // P16 D1: the pager itself, moved here from DataToolbar.vue's #toolbar so it can render last in
-// ViewChrome's #toolbar-end — the toolbar's right-most control, with nothing after it (besides
-// RunState, closed by D2) able to reflow it.
+// ViewChrome's #toolbar-end — the toolbar's right-most control (P22 D4 moved RunState ahead of
+// #toolbar-end, so nothing after the pager can reflow it).
 function onPagerFirst(): void {
   void goFirst(props.tab.id);
 }
@@ -263,8 +264,9 @@ function onCloseSearch(): void {
             @click="onCommit"
           />
         </template>
-        <!-- D1: last in the group — nothing to its right can shift it, and D2 closes the one
-             thing to its right in ViewChrome itself (RunState). -->
+        <!-- D1: last in the group — nothing to its right can shift it; P22 D4 moved RunState
+             ahead of this whole #toolbar-end slot, so there is nothing left of the pager's own
+             group to reflow it either. -->
         <PagerControls
           :page-index="tab.state.pageIndex"
           :page-size="tab.state.pageSize"

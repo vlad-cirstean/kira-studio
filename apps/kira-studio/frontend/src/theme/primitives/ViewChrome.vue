@@ -99,13 +99,14 @@ const runState = useRunState(() => props.tab.id);
     </div>
     <slot name="toolbar" />
     <span class="p-push" />
+    <!-- P22 D4: RunState moves ahead of #toolbar-end so a consumer's own last control (the pager,
+         in every view that hosts one) really is the toolbar's right-most element. LAW 12 still
+         holds: RunState's label reserves its own min-width (P16 D2), so it can reflow neither the
+         push to its left nor #toolbar-end to its right. -->
+    <RunState :status="runState.status" :elapsed-ms="runState.elapsedMs" />
     <div class="group">
       <slot name="toolbar-end" />
     </div>
-    <!-- RunState sits last, after everything else in the toolbar (including toolbar-end): its
-         label's width changes as elapsed time ticks up, and it must never be able to reflow
-         controls to its left (see docs/design/kira-design-system LAW 12). -->
-    <RunState :status="runState.status" :elapsed-ms="runState.elapsedMs" />
   </div>
   <div v-if="$slots['toolbar-2']" class="p-toolbar last" :data-testid="toolbar2Testid">
     <slot name="toolbar-2" />

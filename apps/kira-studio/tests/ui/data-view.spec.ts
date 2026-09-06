@@ -1231,6 +1231,21 @@ test('data view — pagination, count, projection, sort, filter, search, stop, N
   expect(pagerBox.x).toBeGreaterThan(searchToggleBox.x);
   await expect(page.locator('[data-testid="pager-next"]')).toBeEnabled();
 
+  // --- P22 D4: RunState moved ahead of #toolbar-end (F6 — it used to sit between the pager and
+  // the toolbar's own right edge, reserving ~76px unconditionally). The pager's last chevron is
+  // now the toolbar's right-most control, within a few px of the toolbar's own right edge, and
+  // to the right of the run-state ring. ---------------------------------------------------------
+  const pagerLastBox = await page.locator('[data-testid="pager-last"]').boundingBox();
+  const dataToolbarBox = await page.locator('[data-testid="data-toolbar"]').boundingBox();
+  const runStateBox = await page.locator('.p-run-state').first().boundingBox();
+  if (!pagerLastBox || !dataToolbarBox || !runStateBox) {
+    throw new Error('pager-last, data-toolbar or run-state has no bounding box');
+  }
+  expect(
+    dataToolbarBox.x + dataToolbarBox.width - (pagerLastBox.x + pagerLastBox.width),
+  ).toBeLessThanOrEqual(12);
+  expect(pagerLastBox.x).toBeGreaterThan(runStateBox.x);
+
   // --- P16 D2: the run-state label reserves its own width — the LAW-12 assertion, and the only
   // one that can catch the toolbar-reflow regression this phase's own D2 fixes. -----------------
   const runStateLabel = page.locator('.p-run-state .label').first();

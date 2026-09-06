@@ -99,6 +99,18 @@ test('a read-only MongoDB connection disables Add/Edit/Delete on the document vi
     timeout: 15_000,
   });
 
+  // P22 D4 (F7/OQ-4): the pager moved from #toolbar to #toolbar-end so this view agrees with
+  // DataView.vue's SQL grid about where the shared pager lives — the toolbar's right-most
+  // control, within a few px of the toolbar's own right edge.
+  const pagerLastBox = await page.locator('[data-testid="document-pager-last"]').boundingBox();
+  const toolbarBox = await view.locator('.p-toolbar').first().boundingBox();
+  if (!pagerLastBox || !toolbarBox) {
+    throw new Error('document-pager-last or the toolbar has no bounding box');
+  }
+  expect(
+    toolbarBox.x + toolbarBox.width - (pagerLastBox.x + pagerLastBox.width),
+  ).toBeLessThanOrEqual(12);
+
   const addButton = page.locator('[data-testid="document-add"]');
   await expect(addButton).toBeDisabled();
   await assertTooltipShows(page, addButton, 'Connection is read-only');
