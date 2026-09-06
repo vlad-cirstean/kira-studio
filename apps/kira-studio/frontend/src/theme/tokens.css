@@ -34,9 +34,18 @@
      fields that carry this cue paint their own value through a CodeMirror overlay in
      --kira-syntax-keyword (#569cd6) and --kira-syntax-name (#9cdcfe) — within 8 degrees of hue of
      --kira-accent's own #0078d4, so "this filter is on" was indistinguishable from "this is part
-     of the query". #4ec9b0 is ~168 degrees: the one region no syntax token, and no other state
-     colour (--kira-warn/--kira-error/--kira-ok/--kira-info), occupies. */
-  --kira-state-on: #4ec9b0;
+     of the query". P19 D17 picked #4ec9b0 (teal, ~168deg) as the one hue no syntax token and no
+     other state colour occupied.
+     P22 D9 re-picks it as gold/amber at the user's request. #e0a33c (~34deg): 5.94:1 on
+     --kira-bg-input and 7.56:1 on --kira-bg; 44deg clear of --kira-warn (#cca700), which is NOT
+     available for this because it is simultaneously --kira-search-match,
+     --kira-search-match-current and the unresolved-{{variable}} colour, and three of this token's
+     own call sites sit inside or beside a search-highlight surface; and clearly above
+     --kira-conn-amber/--kira-conn-orange in chroma, which LAW 07 reserves for connection identity
+     (P19 D17 declined that palette for the same reason). No second token: the row offers the
+     option, but all three consumers mean the same thing ("this view is narrowed/reordered/
+     selected right now"). slickTheme.css's sort chevron stays excluded, per its own comment. */
+  --kira-state-on: #e0a33c;
 
   /* Layout tokens for the reworked "detached" chrome: rounded, floating panels, thin borders.
      Radius tier system (VS Code Modern UI, docs/design/kira-design-system): sm for interactive
