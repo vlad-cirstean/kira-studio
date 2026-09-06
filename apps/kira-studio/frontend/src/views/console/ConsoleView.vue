@@ -170,13 +170,34 @@ const formatWarning = ref<string | null>(null);
 const formatNote = ref<string | null>(null);
 const canFormat = computed(() => canFormatConsole(connectionKind.value));
 
+// P21 round 2 performance finding 9: statementAtCursorText used to call statementAtCursor
+// directly, which re-splits the *entire* document (a quote/comment/dollar-quote state machine
+// over every character) on every access — and both this and canExplain/explainTooltip below are
+// template-bound, so it re-ran on every render, meaning every character typed *and every bare
+// caret move* triggered a full document split. docs/PERF.md's own "Console keystroke -> completion
+// popup" measurement (43.4ms p50 against a 50ms budget, the least headroom of any interaction in
+// the app) sits on exactly this path. Splitting the document is now its own computed, depending
+// only on the document text and dialect (not cursorPos) — a genuine keystroke still re-splits
+// once, unavoidably, but a caret move alone (arrow keys, a click) no longer does, since Vue's own
+// computed caching skips re-running this one when cursorPos is the only thing that changed.
+const splitStatementsForText = computed(() => {
+  if (dialect.value === undefined) return [];
+  return splitSqlStatements(props.tab.state.text, splitOptionsFor(dialect.value));
+});
+
 // P18 (v1.1) C12/D12: the statement the cursor is currently in, undefined for a non-SQL console —
 // the single source both the Explain button's disabled state and onExplain() itself read, so the
-// two can never disagree about which statement is "current".
+// two can never disagree about which statement is "current". Now a cheap O(statement count) scan
+// over the already-split list above, not a re-split — this is the one that reruns on every caret
+// move, so it must stay cheap regardless of document size.
 const statementAtCursorText = computed<string | undefined>(() => {
   if (dialect.value === undefined) return undefined;
-  return statementAtCursor(props.tab.state.text, cursorPos.value, splitOptionsFor(dialect.value))
-    ?.text;
+  const statements = splitStatementsForText.value;
+  const cursor = cursorPos.value;
+  for (const s of statements) {
+    if (cursor >= s.start && cursor <= s.end) return s.text;
+  }
+  return statements[statements.length - 1]?.text;
 });
 // D12: disabled-with-tooltip, not hidden — Explain applies to this *console*, just not to this
 // statement, which is a state (like the format button's own disabled-on-empty-text), not a
