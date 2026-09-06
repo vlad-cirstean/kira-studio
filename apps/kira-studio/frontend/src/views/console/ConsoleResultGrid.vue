@@ -24,7 +24,7 @@ import { datasetNumber } from '../shared/eventCoords';
 import { createMatchIndex } from '../shared/page/search';
 import { setVisibleRows } from '../shared/page/visibleRows';
 import ConsoleSlickGrid from './ConsoleSlickGrid.vue';
-import { rowAsJsonMenu } from './resultMenu';
+import { mongoDocumentRowMenu, rowAsJsonMenu } from './resultMenu';
 import { documentRow, getPage, keyValueRow, pageVersion, setVisibleWindow } from './resultPages';
 import { type Match, matchedRows, searchState } from './search';
 import { isResultDocExpanded, setAllResultDocsExpanded, toggleResultDocExpanded } from './state';
@@ -254,9 +254,11 @@ function selectKeyValueRowFromEvent(e: MouseEvent): void {
   if (r !== null) selectKeyValueRow(r);
 }
 
-// P19 D6/D11: the document and key-value branches' own row menu — "Copy as JSON" (this row) and
-// "Copy all as JSON" (every row currently displayed, i.e. rowIndices/documentRows — under an
-// active find-filter that's the filtered subset, same rule columnsToTsv's own callers already
+// P19 D6/D11, P22b D11: the document and key-value branches' own row menu — the document branch
+// gets P22b D11's Shell/Canonical/Relaxed submenu pair (mongoDocumentRowMenu); key-value has no
+// shell/EJSON format of its own and keeps the plain "Copy as JSON"/"Copy all as JSON" pair
+// (rowAsJsonMenu). Both cover every row currently displayed (i.e. rowIndices/documentRows — under
+// an active find-filter that's the filtered subset, same rule columnsToTsv's own callers already
 // follow). A copy failure lands here (component-local, P13 D9's strip precedent) since the
 // console has no actionError field the way documents/menu.ts's copyOrReportError writes into.
 const copyError = ref<string | null>(null);
@@ -272,9 +274,9 @@ function onCopyError(message: string): void {
 function onDocumentRowContextMenu(e: MouseEvent, index: number): void {
   e.preventDefault();
   const body = documentRow(props.pageKey, index)?.body ?? '';
-  const allJson = () =>
+  const allBodies = () =>
     documentRows.value.map((v) => documentRow(props.pageKey, v.index)?.body ?? '');
-  openContextMenu(e, rowAsJsonMenu({ json: body, allJson, onError: onCopyError }));
+  openContextMenu(e, mongoDocumentRowMenu({ body, allBodies, onError: onCopyError }));
 }
 
 function onKeyValueRowContextMenu(e: MouseEvent, row: number): void {

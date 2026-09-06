@@ -8,6 +8,7 @@ import {
   rowsToJson,
   rowsToTsv,
 } from '../shared/clipboardFormats';
+import { toRelaxedText, toShellText } from '../shared/document/ejson';
 
 // P19 D9/D10: the console result grid's own menu builders, mirroring views/grid/menu.ts's split
 // (builders in a plain module, the host only opens them) -- item ids follow that file's own
@@ -209,10 +210,11 @@ export interface RowJsonMenuContext {
   onError: (message: string) => void;
 }
 
-// D6/D11: the document and key-value result branches' own row menu -- "Copy as JSON" (this row)
-// and "Copy all as JSON" (every displayed row). Both go through copyOrReportError since a
-// clipboard write here can genuinely be rejected and ContextMenu.vue's own `@click` never awaits
-// `run()` -- documents/menu.ts's copyOrReportError shape, P13 D9's strip precedent.
+// D6: the key-value result branch's own row menu (a Redis pair has no shell/EJSON format of its
+// own -- P22b D11's submenu below is Mongo-only) -- "Copy as JSON" (this row) and "Copy all as
+// JSON" (every displayed row). Both go through copyOrReportError since a clipboard write here can
+// genuinely be rejected and ContextMenu.vue's own `@click` never awaits `run()` --
+// documents/menu.ts's copyOrReportError shape, P13 D9's strip precedent.
 export function rowAsJsonMenu(ctx: RowJsonMenuContext): MenuItem[] {
   return [
     {
@@ -228,6 +230,81 @@ export function rowAsJsonMenu(ctx: RowJsonMenuContext): MenuItem[] {
       label: 'Copy all as JSON',
       icon: 'copy',
       run: () => copyOrReportError(jsonArrayOf(ctx.allJson().map(prettyJson)), ctx.onError),
+    },
+  ];
+}
+
+export interface MongoDocumentRowMenuContext {
+  /** This row's own canonical extended-JSON body, unparsed -- toShellText/toRelaxedText each do
+   *  their own parse. */
+  body: string;
+  /** Every displayed row's own canonical body, in display order -- RowJsonMenuContext.allJson's
+   *  own "what's on screen now, as a thunk" rule, restated here since bodies (not pre-stringified
+   *  JSON) are what the shell/relaxed formats need to encode from. */
+  allBodies: () => readonly string[];
+  onError: (message: string) => void;
+}
+
+// P22b D11: the Mongo document result's own row menu -- two named-format submenus (mirroring
+// resultMenu.ts's own tabularRowMenu Copy row(s) ▸ shape above) rather than documents/menu.ts's
+// old flat "Copy as JSON"/"Copy all as JSON" pair. Leaf ids `copy-as-json`/`copy-all-as-json`
+// preserved so existing specs keep passing on a path change with no assertion change.
+export function mongoDocumentRowMenu(ctx: MongoDocumentRowMenuContext): MenuItem[] {
+  return [
+    {
+      type: 'submenu',
+      id: 'copy-document-submenu',
+      label: 'Copy document',
+      icon: 'copy',
+      items: [
+        {
+          type: 'item',
+          id: 'copy-document',
+          label: 'Shell mode',
+          run: () => copyOrReportError(toShellText(ctx.body), ctx.onError),
+        },
+        {
+          type: 'item',
+          id: 'copy-as-json',
+          label: 'Canonical Extended JSON',
+          run: () => copyOrReportError(prettyJson(ctx.body), ctx.onError),
+        },
+        {
+          type: 'item',
+          id: 'copy-relaxed-json',
+          label: 'Relaxed Extended JSON',
+          run: () => copyOrReportError(toRelaxedText(ctx.body), ctx.onError),
+        },
+      ],
+    },
+    {
+      type: 'submenu',
+      id: 'copy-all-submenu',
+      label: 'Copy all',
+      icon: 'copy',
+      items: [
+        {
+          type: 'item',
+          id: 'copy-all-shell',
+          label: 'Shell mode',
+          // D11's own shape for "all": documents joined by '\n', not a JSON array -- that's what
+          // pasting N mongosh literals back into a shell session actually wants.
+          run: () => copyOrReportError(ctx.allBodies().map(toShellText).join('\n'), ctx.onError),
+        },
+        {
+          type: 'item',
+          id: 'copy-all-as-json',
+          label: 'Canonical Extended JSON',
+          run: () => copyOrReportError(jsonArrayOf(ctx.allBodies().map(prettyJson)), ctx.onError),
+        },
+        {
+          type: 'item',
+          id: 'copy-all-relaxed-json',
+          label: 'Relaxed Extended JSON',
+          run: () =>
+            copyOrReportError(jsonArrayOf(ctx.allBodies().map(toRelaxedText)), ctx.onError),
+        },
+      ],
     },
   ];
 }

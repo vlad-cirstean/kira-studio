@@ -1125,16 +1125,41 @@ test('Query console — a Mongo document result copies as JSON, one row or all d
   await expect(docRows).toHaveCount(3);
 
   // --- one row's own body -------------------------------------------------------------------
+  // P22b D11: Copy document is now a named-format submenu (Shell mode / Canonical Extended
+  // JSON / Relaxed Extended JSON) — open it the same way the SQL grid's own Copy row(s) ▸
+  // submenu is opened a few lines above (hover the parent, wait for the panel).
   await docRows.nth(0).click({ button: 'right' });
   await expect(page.locator('[data-testid="context-menu"]')).toBeVisible();
+  await page.locator('[data-testid="menu-item-copy-document-submenu"]').hover();
+  await expect(page.locator('[data-testid="context-submenu"]')).toBeVisible();
   await page.click('[data-testid="menu-item-copy-as-json"]');
   expect(await lastClipboardWrite(page)).toContain('"name": "alpha"');
+
+  // --- this row, shell mode ------------------------------------------------------------------
+  await docRows.nth(0).click({ button: 'right' });
+  await expect(page.locator('[data-testid="context-menu"]')).toBeVisible();
+  await page.locator('[data-testid="menu-item-copy-document-submenu"]').hover();
+  await expect(page.locator('[data-testid="context-submenu"]')).toBeVisible();
+  await page.click('[data-testid="menu-item-copy-document"]');
+  expect(await lastClipboardWrite(page)).toContain('ObjectId("000000000000000000000000")');
 
   // --- every displayed row -------------------------------------------------------------------
   await docRows.nth(0).click({ button: 'right' });
   await expect(page.locator('[data-testid="context-menu"]')).toBeVisible();
+  await page.locator('[data-testid="menu-item-copy-all-submenu"]').hover();
+  await expect(page.locator('[data-testid="context-submenu"]')).toBeVisible();
   await page.click('[data-testid="menu-item-copy-all-as-json"]');
   expect(JSON.parse(await lastClipboardWrite(page))).toHaveLength(3);
+
+  // --- every displayed row, shell mode (documents joined by a newline, not a JSON array) ------
+  await docRows.nth(0).click({ button: 'right' });
+  await expect(page.locator('[data-testid="context-menu"]')).toBeVisible();
+  await page.locator('[data-testid="menu-item-copy-all-submenu"]').hover();
+  await expect(page.locator('[data-testid="context-submenu"]')).toBeVisible();
+  await page.click('[data-testid="menu-item-copy-all-shell"]');
+  const allShell = await lastClipboardWrite(page);
+  expect(allShell.split('\n')).toHaveLength(3);
+  expect(allShell).toContain('ObjectId("000000000000000000000000")');
 
   // --- narrowed to what the find-filter actually shows ----------------------------------------
   await page.click('[data-testid="console-search"]');
@@ -1147,6 +1172,8 @@ test('Query console — a Mongo document result copies as JSON, one row or all d
 
   await docRows.nth(0).click({ button: 'right' });
   await expect(page.locator('[data-testid="context-menu"]')).toBeVisible();
+  await page.locator('[data-testid="menu-item-copy-all-submenu"]').hover();
+  await expect(page.locator('[data-testid="context-submenu"]')).toBeVisible();
   await page.click('[data-testid="menu-item-copy-all-as-json"]');
   const filtered = JSON.parse(await lastClipboardWrite(page));
   expect(filtered).toHaveLength(1);
