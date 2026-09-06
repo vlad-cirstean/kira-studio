@@ -36,6 +36,8 @@ import {
   openFiltersDialog,
   refresh,
   refreshAllConnections,
+  refreshConnection,
+  refreshObject,
   rowKey,
   type TreeRowVm,
   treeState,
@@ -133,7 +135,7 @@ function connectionMenu(row: TreeRowVm): MenuItem[] {
       id: 'refresh',
       label: 'Refresh',
       icon: 'refresh',
-      run: () => refresh(row.connectionId, ''),
+      run: () => refreshConnection(row.connectionId),
     },
     {
       type: 'item',
@@ -369,7 +371,7 @@ function relationMenu(row: TreeRowVm): MenuItem[] {
       id: 'refresh',
       label: 'Refresh',
       icon: 'refresh',
-      run: () => refresh(row.connectionId, row.path),
+      run: () => refreshObject(row.connectionId, row.path),
     },
     {
       type: 'item',
@@ -453,7 +455,7 @@ function collectionMenu(row: TreeRowVm): MenuItem[] {
       id: 'refresh',
       label: 'Refresh',
       icon: 'refresh',
-      run: () => refresh(row.connectionId, row.path),
+      run: () => refreshObject(row.connectionId, row.path),
     },
     {
       type: 'item',

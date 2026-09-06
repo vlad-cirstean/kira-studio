@@ -170,6 +170,12 @@ const FQN_TO_CHANNEL: Readonly<Record<string, string>> = Object.freeze(
 //     frontend spec asserts on the echo itself.
 //   - `opsCancel`/`queriesHistoryRecord`: fire-and-forget, `opId`/free-form-filter args a spec
 //     never asserts on. Void.
+//   - `treeInvalidate` (P24 D7): `project/state/tree.ts`'s `refresh`/`refreshConnection`/
+//     `refreshObject` all await it before the read that follows — a spec asserts on THAT read
+//     (the `treeChildren`/`treeDescribe` call it produces, or the op count it changes), never on
+//     this call's own echo, so a real backend's void response is the only answer worth mocking.
+//     `path` varies per row (a connection's own Refresh omits it entirely), so no single args
+//     shape could be captured as a normal fixture snapshot even in principle. Void.
 //   - `treeDescribe`: `views/grid/state.ts`'s `loadMeta` calls it once per data tab opened,
 //     purely to feed the projection menu — wrapped in its own `try { … } catch {}` ("a failure
 //     here must not block reading rows", the function's own comment), so a real, uncaptured miss
@@ -211,6 +217,7 @@ const WILDCARD_DEFAULTS: Readonly<Record<string, string>> = Object.freeze({
   [IPC.settingsSet]: JSON.stringify(defaultSettings),
   [IPC.opsCancel]: 'null',
   [IPC.queriesHistoryRecord]: 'null',
+  [IPC.treeInvalidate]: 'null',
   [IPC.treeDescribe]: JSON.stringify({ meta: EMPTY_OBJECT_META, source: 'server' }),
   // P22c D3: every SQL console/data-tab fetches its container's cached columns on
   // mount/activation (state/schemaColumns.ts's ensureSchemaColumns) — a spec with no
