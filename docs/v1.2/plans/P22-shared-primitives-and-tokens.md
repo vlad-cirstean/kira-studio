@@ -1180,30 +1180,36 @@ fixed regardless: no synchronous IPC on a mode click (F20).
 
 ## Checklist
 
-- [ ] T1 `refactor(theme): control height and text size are named roles over the size scale`
-- [ ] T2 `test(theme): every control in a toolbar row is one height`
-- [ ] T2b `fix(grid): the page-number box carries a toolbar control's own weight`
-- [ ] T3 `fix(theme): a disabled primary button's label stays readable`
-- [ ] T4 `fix(views): the run-state ring no longer sits between the pager and the edge`
-- [ ] T5 `test(workbench): a mode tab's icon and label ink share a centre line` (red at `b52fd72`)
-- [ ] T6 `fix(workbench): the mode-tab icon is drawn at its own design size`
-- [ ] T7 `style(api): a method is coloured text, not a coloured fill`
-- [ ] T8a `refactor(theme): the completion popup's chrome is one block`
-- [ ] T8b `style(editor): the editor's completion popup matches every other one`
-- [ ] T9 `style(theme): the applied-filter colour is gold`
-- [ ] T10a `refactor(views): selection edges move to views/shared/slick`
-- [ ] T10b `fix(console): a console selection is outlined like the grid's`
-- [ ] T11 `style(workbench): the metrics tooltip is numbers, not prose`
-- [ ] T12 `feat(storage): a window remembers which module it was in`
-- [ ] T13 `feat(workbench): a window reopens into the module it was closed in`
-- [ ] T14 `fix(theme): a splitter inside a view draws a visible divider`
-- [ ] T15 `test(p22): the specs §4 enumerates`
-- [ ] `wails3 task common:generate:bindings` re-run after T12
-- [ ] `bun run lint` / `typecheck` / `build` clean
-- [ ] `bun run test:unit` green; `bun run test:go` green (new windows-repo and migration cases)
-- [ ] `bun run test:ui` run once at the end; failures fixed as follow-up commits
-- [ ] `docs/ARCHITECTURE.md` metrics note carries D11's dropped sentence
-- [ ] `docs/v1.2/SPEC.md`'s P22 row updated
+- [x] T1 `refactor(theme): control height and text size are named roles over the size scale`
+- [x] T2 `test(theme): every control in a toolbar row is one height`
+- [x] T2b `fix(grid): the page-number box carries a toolbar control's own weight` (one commit with T2)
+- [x] T3 `fix(theme): a disabled primary button's label stays readable`
+- [x] T4 `fix(views): the run-state ring no longer sits between the pager and the edge`
+- [x] T5 `test(workbench): a mode tab's icon and label ink share a centre line` (red at `b52fd72`)
+- [x] T6 `fix(workbench): the mode-tab icon is drawn at its own design size`
+- [x] T7 `style(api): a method is coloured text, not a coloured fill`
+- [x] T8a `refactor(theme): the completion popup's chrome is one block`
+- [x] T8b `style(editor): the editor's completion popup matches every other one`
+- [x] T9 `style(theme): the applied-filter colour is gold`
+- [x] T10a `refactor(views): selection edges move to views/shared/slick`
+- [x] T10b `fix(console): a console selection is outlined like the grid's`
+- [x] T11 `style(workbench): the metrics tooltip is numbers, not prose`
+- [x] T12 `feat(storage): a window remembers which module it was in`
+- [x] T13 `feat(workbench): a window reopens into the module it was closed in`
+- [x] T14 `fix(theme): a splitter inside a view draws a visible divider`
+- [x] T15 `test(p22): the specs §4 enumerates` — no separate commit; each §4.3 case landed inside its
+      own D-item's commit (confirmed present against the real tree: `control-sizing.spec.ts` 1/2/2b,
+      `api-ui-consistency.spec.ts` D3, `data-view.spec.ts`/`document-view-readonly.spec.ts` D4,
+      `mode-switch.spec.ts` D5/D12, `http-request.spec.ts`/`collections.spec.ts` D7,
+      `autocomplete.spec.ts` D8, `console.spec.ts` D10, `http-request.spec.ts`/`grpc-request.spec.ts`/
+      `cell-editor.spec.ts` D13), the same distributed-verification precedent P19's own SPEC note
+      records for its T17
+- [x] `wails3 task common:generate:bindings` re-run after T12
+- [x] `bun run lint` / `typecheck` / `build` clean
+- [x] `bun run test:unit` green; `bun run test:go` green (new windows-repo and migration cases)
+- [x] `bun run test:ui` run once at the end; failures fixed as follow-up commits
+- [x] `docs/ARCHITECTURE.md` metrics note carries D11's dropped sentence
+- [x] `docs/v1.2/SPEC.md`'s P22 row updated
 
 ---
 
