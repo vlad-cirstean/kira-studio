@@ -450,9 +450,13 @@ function onBulkClose(): void {
         </div>
 
         <div class="header-row">
+          <span class="cell"></span>
           <span class="cell">Name</span>
           <span class="cell">Value</span>
           <span class="cell">Description</span>
+          <span class="cell"></span>
+          <span class="cell"></span>
+          <span class="cell"></span>
         </div>
         <VariableRow
           v-for="(row, i) in displayRows"
@@ -504,16 +508,16 @@ function onBulkClose(): void {
   border-bottom: var(--kira-border-width) solid var(--kira-border);
 }
 
+/* P22b D9: mirrors VariableRow.vue's own grid template exactly (handle, name, value,
+   description, secret, history, remove) so the labels sit above their columns; the four
+   non-labelled cells are blank placeholders for the columns that carry no header text. */
 .header-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto 1.2fr 2fr 1.5fr auto auto auto;
   gap: var(--kira-s-2);
   padding: var(--kira-s-2) var(--kira-s-3);
   color: var(--kira-fg-subtle);
   font-size: var(--kira-t-sm);
   border-bottom: var(--kira-border-width) solid var(--kira-border);
-}
-
-.header-row .cell {
-  flex: 1;
 }
 </style>

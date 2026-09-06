@@ -200,8 +200,13 @@ function onKeydown(e: KeyboardEvent): void {
 </template>
 
 <style scoped>
+/* P22b D9: a grid, not independent flex items — F13's own finding was that adjacent rows' name/
+   value/description columns never lined up, since each field carried its own `flex` value and a
+   secret row's reveal button (inside the value cell) shifted its neighbours. Named, fixed-fraction
+   columns: handle, name, value, description, secret toggle, history, remove. */
 .variable-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto 1.2fr 2fr 1.5fr auto auto auto;
   align-items: center;
   gap: var(--kira-s-2);
   padding: var(--kira-s-2) var(--kira-s-3);
@@ -223,11 +228,13 @@ function onKeydown(e: KeyboardEvent): void {
 }
 
 .cell {
-  flex: 1;
   min-width: 0;
   display: flex;
   align-items: center;
   gap: var(--kira-s-2);
+}
+.cell :deep(.p-input) {
+  width: 100%;
 }
 
 .masked-value {

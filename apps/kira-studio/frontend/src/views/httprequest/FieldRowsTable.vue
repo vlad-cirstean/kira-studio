@@ -55,6 +55,16 @@ const props = withDefaults(
 
 const emit = defineEmits<{ 'update:rows': [rows: T[]] }>();
 
+// P22b D9: a CSS grid, not independent flex items — F13's own finding was that adjacent rows'
+// columns never lined up (each field carried its own `flex` value, so a secret/file row with an
+// extra affordance shifted its neighbours). `showEnabled` is fixed per table instance (never
+// varies row to row), so the column count below is a property of the *table*, not the row —
+// unlike the trailing slot (FormDataTable's kind/file controls), which genuinely does vary row to
+// row and is wrapped in its own single grid cell below for exactly that reason.
+const gridTemplateColumns = computed(() =>
+  props.showEnabled ? 'auto 1.2fr 2fr auto auto' : '1.2fr 2fr auto auto',
+);
+
 // P16 D13/F11: `index` is the row's position in `props.rows` — i.e. its real write-through index
 // — carried alongside the row through filtering, never the position in `displayRows` (which a
 // filter can move). The trailing blank row is appended last and unconditionally, at
@@ -205,6 +215,7 @@ function onContainerKeydown(e: KeyboardEvent): void {
       v-for="entry in displayRows"
       :key="entry.index"
       class="field-row"
+      :style="{ gridTemplateColumns }"
       :data-testid="`${testidPrefix}-row`"
     >
       <Checkbox
@@ -260,7 +271,13 @@ function onContainerKeydown(e: KeyboardEvent): void {
           />
         </div>
       </slot>
-      <slot name="trailing" :row="entry.row" :index="entry.index" :is-trailing="entry.index >= rows.length" />
+      <!-- P22b D9: wrapped in its own single grid cell — FormDataTable's own trailing content
+           (kind select, plus a conditional Choose-file button/caption/remove) varies row to row,
+           unlike showEnabled above, so it needs one stable cell to vary *inside* rather than
+           shifting the grid's own column count. -->
+      <div class="field-cell-trailing">
+        <slot name="trailing" :row="entry.row" :index="entry.index" :is-trailing="entry.index >= rows.length" />
+      </div>
       <IconButton
         icon="close"
         :disabled="entry.index >= rows.length"
@@ -286,17 +303,26 @@ function onContainerKeydown(e: KeyboardEvent): void {
   min-height: 0;
 }
 
+/* P22b D9: a grid, not independent flex items — named columns (gridTemplateColumns, above) keep
+   every row's name/value/trailing/remove cells at the same width regardless of what an individual
+   row happens to render inside one of them (F13). */
 .field-row {
-  display: flex;
+  display: grid;
   align-items: center;
   gap: var(--kira-s-2);
 }
 
 .field-cell {
-  flex: 1;
   min-width: 0;
 }
 .field-cell :deep(.p-input) {
   width: 100%;
+}
+
+.field-cell-trailing {
+  display: flex;
+  align-items: center;
+  gap: var(--kira-s-2);
+  min-width: 0;
 }
 </style>

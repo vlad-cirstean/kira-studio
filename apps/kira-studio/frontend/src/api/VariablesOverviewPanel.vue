@@ -167,8 +167,14 @@ function editEnvironmentVariables(): void {
   gap: var(--kira-s-1);
 }
 
+/* P22b D9: VariableRow.vue's own grid template, minus the columns a read-only popover has no use
+   for (handle, secret toggle, history, remove) — name, value, scope, description, in the DOM
+   order below. `description` is the last column specifically because it is the only one of the
+   four that renders conditionally (F13/D9): a missing trailing grid item just leaves its own cell
+   empty rather than shifting `scope` into its place, which an *earlier* optional column would. */
 .overview-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1.2fr 2fr auto 1.5fr;
   align-items: center;
   gap: var(--kira-s-2);
   padding: var(--kira-s-1) var(--kira-s-2);
@@ -182,11 +188,13 @@ function editEnvironmentVariables(): void {
 
 .reference {
   cursor: pointer;
-  flex-shrink: 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .overview-value {
-  flex: 1;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -195,8 +203,7 @@ function editEnvironmentVariables(): void {
 }
 
 .overview-description {
-  flex-shrink: 0;
-  max-width: 100px;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -205,7 +212,7 @@ function editEnvironmentVariables(): void {
 }
 
 .scope-chip {
-  flex-shrink: 0;
+  justify-self: start;
   background: var(--kira-bg-input);
   color: var(--kira-fg-muted);
 }

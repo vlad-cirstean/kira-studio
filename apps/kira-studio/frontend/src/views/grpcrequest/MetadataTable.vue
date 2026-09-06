@@ -243,14 +243,16 @@ function onContainerKeydown(e: KeyboardEvent): void {
   min-height: 0;
 }
 
+/* P22b D9 (FieldRowsTable.vue's own sibling — F18's literal copy): a grid, not independent flex
+   items, so name/value cells line up across rows regardless of what an individual row renders. */
 .metadata-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto 1.2fr 2fr auto;
   align-items: center;
   gap: var(--kira-s-2);
 }
 
 .metadata-cell {
-  flex: 1;
   min-width: 0;
 }
 .metadata-cell :deep(.p-input) {
