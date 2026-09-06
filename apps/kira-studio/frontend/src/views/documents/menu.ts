@@ -2,7 +2,7 @@ import { beautifyJson } from '../../beautify';
 import { copyText } from '../../clipboard';
 import { confirmDialog } from '../../state/confirmDialog';
 import type { MenuItem } from '../../state/contextMenu';
-import { parseIdLabel, toShellText } from '../shared/document/ejson';
+import { parseIdLabel, toRelaxedText, toShellText } from '../shared/document/ejson';
 import { deleteDocument } from './mutations';
 import { setActionError, setAllExpanded, toggleExpanded } from './state';
 
@@ -69,21 +69,37 @@ export function rowMenu(
     },
     { type: 'separator' },
     {
-      type: 'item',
-      id: 'copy-document',
+      // P22b D11: one named-format submenu, mirroring the SQL grid's own `Copy row(s) ▸`
+      // shape (resultMenu.ts's tabularRowMenu) — a user choosing between mongosh syntax and
+      // `{"$oid": …}` has to be told which is which, not read two unlabelled sibling items.
+      // Leaf ids preserved (`copy-document`/`copy-as-json`) so existing specs keep passing.
+      type: 'submenu',
+      id: 'copy-document-submenu',
       label: 'Copy document',
-      // P27 D12: the shell form (ObjectId(...), ISODate(...), ...) — what the tree already shows,
-      // and what saveDocumentEdit/parseDocumentLiteral already accept back.
-      run: () => copyOrReportError(tabId, toShellText(body)),
-    },
-    {
-      type: 'item',
-      id: 'copy-as-json',
-      label: 'Copy as JSON',
-      // P19 D6: canonical extended JSON, not relaxed and not shell — it's what the app already
-      // has in hand (no re-encode) and what mongoimport/mongosh accept, mirroring the console's
-      // own document-result menu (resultMenu.ts).
-      run: () => copyOrReportError(tabId, prettyJson(body)),
+      items: [
+        {
+          type: 'item',
+          id: 'copy-document',
+          label: 'Shell mode',
+          // P27 D12: the shell form (ObjectId(...), ISODate(...), ...) — what the tree already
+          // shows, and what saveDocumentEdit/parseDocumentLiteral already accept back.
+          run: () => copyOrReportError(tabId, toShellText(body)),
+        },
+        {
+          type: 'item',
+          id: 'copy-as-json',
+          label: 'Canonical Extended JSON',
+          // P19 D6: canonical extended JSON, not relaxed and not shell — it's what the app
+          // already has in hand (no re-encode) and what mongoimport/mongosh accept.
+          run: () => copyOrReportError(tabId, prettyJson(body)),
+        },
+        {
+          type: 'item',
+          id: 'copy-relaxed-json',
+          label: 'Relaxed Extended JSON',
+          run: () => copyOrReportError(tabId, toRelaxedText(body)),
+        },
+      ],
     },
     {
       type: 'item',

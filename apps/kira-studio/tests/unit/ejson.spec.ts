@@ -11,6 +11,7 @@ import { describe, expect, test } from 'bun:test';
 import {
   parseDocument,
   parseIdLabel,
+  toRelaxedText,
   toShellText,
 } from '../../frontend/src/views/shared/document/ejson';
 
@@ -179,5 +180,47 @@ describe("parseIdLabel — DocumentPage.ids' own EJSON text", () => {
     });
     expect(parseIdLabel('42')).toEqual({ text: '42', bsonType: 'json' });
     expect(parseIdLabel('not-json-at-all')).toEqual({ text: 'not-json-at-all', bsonType: 'json' });
+  });
+});
+
+// P22b D11: the third copy format — Relaxed Extended JSON only ever changes number/date
+// representation (spec-defined, not this app's own invention); every other wrapper is byte-
+// identical to canonical. Interacting per-type rules over a recursive walk is exactly
+// AGENTS.md's "parser with several interacting rules" bar.
+describe('toRelaxedText — canonical -> Relaxed Extended JSON v2', () => {
+  test('$numberInt/$numberLong/a finite $numberDouble unwrap to a bare JSON number', () => {
+    expect(toRelaxedText('{"a":{"$numberInt":"5"},"b":{"$numberLong":"123"}}')).toBe(
+      '{\n  "a": 5,\n  "b": 123\n}',
+    );
+    expect(toRelaxedText('{"pi":{"$numberDouble":"3.5"}}')).toBe('{\n  "pi": 3.5\n}');
+  });
+
+  test('a non-finite $numberDouble (NaN/Infinity) stays wrapped — no bare-JSON spelling exists', () => {
+    expect(toRelaxedText('{"n":{"$numberDouble":"NaN"}}')).toBe(
+      '{\n  "n": {\n    "$numberDouble": "NaN"\n  }\n}',
+    );
+  });
+
+  test('$date becomes an ISO-8601 string, from either canonical millis form', () => {
+    expect(toRelaxedText('{"d":{"$date":{"$numberLong":"1704067200000"}}}')).toBe(
+      '{\n  "d": {\n    "$date": "2024-01-01T00:00:00.000Z"\n  }\n}',
+    );
+  });
+
+  test('$oid, $numberDecimal, $binary and every other wrapper are unchanged — no relaxed variant', () => {
+    const body = '{"_id":{"$oid":"507f1f77bcf86cd799439011"},"amount":{"$numberDecimal":"19.99"}}';
+    expect(toRelaxedText(body)).toBe(JSON.stringify(JSON.parse(body), null, 2));
+  });
+
+  test('nested objects/arrays recurse — a document is not just its top-level fields', () => {
+    expect(toRelaxedText('{"tags":[{"$numberInt":"1"},{"$numberInt":"2"}]}')).toBe(
+      '{\n  "tags": [\n    1,\n    2\n  ]\n}',
+    );
+  });
+
+  test('invalid JSON falls back to the raw body unchanged, not a throw', () => {
+    const raw = '{not valid json';
+    expect(() => toRelaxedText(raw)).not.toThrow();
+    expect(toRelaxedText(raw)).toBe(raw);
   });
 });

@@ -331,6 +331,52 @@ export function toShellText(body: string): string {
   return shellNodeText(root, 0);
 }
 
+// P22b D11: canonical -> Relaxed Extended JSON v2 — the third copy format the row asks for.
+// Reuses this file's own wrapper-shape helpers (isPlainObject/objectKeys/dateMillis) rather than
+// a new BSON dependency (OQ-5): relaxed mode only ever changes number/date representation —
+// $numberInt/$numberLong/a finite $numberDouble unwrap to a bare JSON number, and $date becomes
+// an ISO-8601 string — every other wrapper ($oid, $numberDecimal, $binary, $timestamp,
+// $regularExpression, $code, $ref/$id, $minKey/$maxKey) is unchanged in both modes per the spec,
+// so it round-trips through the walk untouched.
+function canonicalToRelaxed(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(canonicalToRelaxed);
+  if (!isPlainObject(value)) return value;
+  const keys = objectKeys(value);
+  if (keys.length === 1 && keys[0] === '$numberInt' && typeof value.$numberInt === 'string') {
+    const n = Number(value.$numberInt);
+    if (Number.isFinite(n)) return n;
+  }
+  if (keys.length === 1 && keys[0] === '$numberLong' && typeof value.$numberLong === 'string') {
+    const n = Number(value.$numberLong);
+    if (Number.isFinite(n)) return n;
+  }
+  if (keys.length === 1 && keys[0] === '$numberDouble' && typeof value.$numberDouble === 'string') {
+    const n = Number(value.$numberDouble);
+    // NaN/Infinity have no bare-JSON-number spelling — stays wrapped, same as canonical.
+    if (Number.isFinite(n)) return n;
+    return value;
+  }
+  if (keys.length === 1 && keys[0] === '$date') {
+    const millis = dateMillis(value.$date);
+    if (millis !== null) return { $date: new Date(millis).toISOString() };
+  }
+  const out: Record<string, unknown> = {};
+  for (const k of keys) out[k] = canonicalToRelaxed(value[k]);
+  return out;
+}
+
+/** The document re-serialised as Relaxed Extended JSON — falls back to the raw body unchanged
+ *  when it does not parse as JSON at all (same posture as toShellText above). */
+export function toRelaxedText(body: string): string {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(body);
+  } catch {
+    return body;
+  }
+  return JSON.stringify(canonicalToRelaxed(parsed), null, 2);
+}
+
 // ---------------------------------------------------------------------------------------------
 // Beautify/Minify for the document editor's shell-literal buffer (P27 D29). `beautify.ts`'s own
 // JSON scanner can't reindent this text — a shell constructor call (`ObjectId("…")`) isn't valid

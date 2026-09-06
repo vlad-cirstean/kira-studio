@@ -439,24 +439,44 @@ test('Mongo document row — Copy document / Copy as JSON / Copy _id', async ({
 
   await installClipboardSpy(page);
 
+  // P22b D11: Copy document is now a named-format submenu (Shell mode / Canonical Extended
+  // JSON / Relaxed Extended JSON) rather than two flat sibling items — open it the same way
+  // interaction.spec.ts's own openSubmenu helper does (hover the parent, wait for the panel).
   await firstRow.click({ button: 'right' });
   await expect(page.locator('[data-testid="context-menu"]')).toBeVisible();
+  await page.locator('[data-testid="menu-item-copy-document-submenu"]').hover();
+  await expect(page.locator('[data-testid="context-submenu"]')).toBeVisible();
   await page.click('[data-testid="menu-item-copy-document"]');
   await expect(page.locator('[data-testid="context-menu"]')).toHaveCount(0);
   const copiedDoc = await lastClipboardWrite(page);
   expect(copiedDoc).toContain('ObjectId("000000000000000000000000")');
   expect(copiedDoc).toContain('"name": "widget-0"');
 
-  // P19 D6 (parity half): the same "Copy as JSON" item the console's own document result gained
-  // (resultMenu.ts), copying the canonical extended JSON body — not the shell form above.
+  // P19 D6 (parity half): the same "Canonical Extended JSON" item the console's own document
+  // result gained (resultMenu.ts), copying the canonical extended JSON body — not the shell
+  // form above.
   await firstRow.click({ button: 'right' });
   await expect(page.locator('[data-testid="context-menu"]')).toBeVisible();
+  await page.locator('[data-testid="menu-item-copy-document-submenu"]').hover();
+  await expect(page.locator('[data-testid="context-submenu"]')).toBeVisible();
   await page.click('[data-testid="menu-item-copy-as-json"]');
   await expect(page.locator('[data-testid="context-menu"]')).toHaveCount(0);
   const copiedJson = await lastClipboardWrite(page);
   expect(copiedJson).toContain('"$oid": "000000000000000000000000"');
   expect(copiedJson).toContain('"name": "widget-0"');
   expect(copiedJson).not.toContain('ObjectId(');
+
+  // P22b D11: the third format — Relaxed Extended JSON keeps $oid wrapped (no relaxed variant
+  // for ObjectId) but is otherwise the same document.
+  await firstRow.click({ button: 'right' });
+  await expect(page.locator('[data-testid="context-menu"]')).toBeVisible();
+  await page.locator('[data-testid="menu-item-copy-document-submenu"]').hover();
+  await expect(page.locator('[data-testid="context-submenu"]')).toBeVisible();
+  await page.click('[data-testid="menu-item-copy-relaxed-json"]');
+  await expect(page.locator('[data-testid="context-menu"]')).toHaveCount(0);
+  const copiedRelaxed = await lastClipboardWrite(page);
+  expect(copiedRelaxed).toContain('"$oid": "000000000000000000000000"');
+  expect(copiedRelaxed).toContain('"name": "widget-0"');
 
   await firstRow.click({ button: 'right' });
   await expect(page.locator('[data-testid="context-menu"]')).toBeVisible();
@@ -506,6 +526,8 @@ test('Mongo document row — Copy document surfaces a rejected clipboard write',
 
   await firstRow.click({ button: 'right' });
   await expect(page.locator('[data-testid="context-menu"]')).toBeVisible();
+  await page.locator('[data-testid="menu-item-copy-document-submenu"]').hover();
+  await expect(page.locator('[data-testid="context-submenu"]')).toBeVisible();
   await page.click('[data-testid="menu-item-copy-document"]');
 
   await expect(page.locator('[data-testid="document-action-error"]')).toBeVisible();
