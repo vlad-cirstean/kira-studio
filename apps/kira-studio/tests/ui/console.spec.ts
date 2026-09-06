@@ -980,6 +980,19 @@ test('Query console — a tabular selection copies as TSV/CSV/JSON, rows/columns
   await expect(cellAt(0, 0)).toHaveClass(/kira-cell-selected/);
   await expect(cellAt(1, 1)).toHaveClass(/kira-cell-selected/);
   await expect(cellAt(2, 0)).not.toHaveClass(/kira-cell-selected/);
+
+  // P22 D10 (F17/F18): the same four-sided perimeter the SQL data grid's own selection carries —
+  // ConsoleSlickGrid.vue used to have the fill (kira-cell-selected, above) but not this, since
+  // P19's port dropped the setCellCssStyles computation that draws it.
+  await expect(cellAt(0, 0)).toHaveClass(/sel-t/);
+  await expect(cellAt(0, 0)).toHaveClass(/sel-l/);
+  await expect(cellAt(0, 1)).toHaveClass(/sel-t/);
+  await expect(cellAt(0, 1)).toHaveClass(/sel-r/);
+  await expect(cellAt(1, 0)).toHaveClass(/sel-b/);
+  await expect(cellAt(1, 0)).toHaveClass(/sel-l/);
+  await expect(cellAt(1, 1)).toHaveClass(/sel-b/);
+  await expect(cellAt(1, 1)).toHaveClass(/sel-r/);
+
   await cellAt(0, 0).click({ button: 'right' });
   await expect(page.locator('[data-testid="context-menu"]')).toBeVisible();
   await page.click('[data-testid="menu-item-copy"]');

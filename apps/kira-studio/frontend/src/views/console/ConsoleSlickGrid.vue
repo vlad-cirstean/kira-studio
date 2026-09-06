@@ -14,7 +14,7 @@ import { copyText } from '../../clipboard';
 import { publishSelectedCell } from '../../state/cellSelection';
 import { openContextMenu } from '../../state/contextMenu';
 import { appearanceVersion, settingsState } from '../../state/settings';
-import { type CellClassFlags, cellClass } from '../../theme/cellClass';
+import { classesFrom } from '../../theme/cellClass';
 import { categoryForTypeClass } from '../../theme/icons';
 import { columnsToTsv, type RowSnapshot, rowsToTsv } from '../shared/clipboardFormats';
 import {
@@ -27,7 +27,7 @@ import {
   resetMeasureCtx,
 } from '../shared/page/columns';
 import { setVisibleRows } from '../shared/page/visibleRows';
-import { searchCellLayers } from '../shared/slick/cssLayers';
+import { type EdgeHash, searchCellLayers } from '../shared/slick/cssLayers';
 import {
   createGridDataSource,
   type DisplayRowIndex,
@@ -41,6 +41,7 @@ import {
   type Selection,
   selectionFromRanges,
 } from '../shared/slick/selection';
+import { computeSelEdgeHashes, SEL_EDGE_LAYER_KEYS } from '../shared/slick/selectionEdges';
 import '../shared/slick/slickTheme.css';
 import 'slickgrid/dist/styles/css/slick.grid.css';
 import { tabularCellMenu, tabularColumnMenu, tabularRangeMenu, tabularRowMenu } from './resultMenu';
@@ -296,6 +297,14 @@ function tagRenderedRows(): void {
 // VirtualList's `visible-range` emit, now driven from grid.onRendered/lastRenderedRowBounds the
 // way SlickGridHost.vue's own onGridRendered does — the *rendered* (overscanned) band, not the
 // narrower strictly-visible one, so a row still inside the runway keeps its decode cache alive.
+// P22 D10 (F17/F18) — the perimeter layer's other trigger, beside a selection commit
+// (onSelectedRangesChanged below): a rendered-band change needs the same repaint SlickGridHost.vue's
+// own onGridRendered gives it, or scrolling a committed selection into view would leave the newly
+// rendered rows with the fill but no perimeter. Guarded on the band actually changing, same reason
+// SlickGridHost.vue's own lastCssLayerBand exists — recomputing on every render frame the band
+// hasn't moved would be pure waste.
+let lastSelEdgeBand = { start: 0, end: -1 };
+
 function onGridRendered(): void {
   if (!grid || !dataSource) return;
   const { start, end } = grid.lastRenderedRowBounds;
@@ -307,11 +316,40 @@ function onGridRendered(): void {
   const hi = Math.max(first.row, last.row);
   setVisibleRows(props.tabId, lo, hi + 1);
   setVisibleWindow(props.pageKey, lo, hi + 1);
+
+  if (start !== lastSelEdgeBand.start || end !== lastSelEdgeBand.end) {
+    lastSelEdgeBand = { start, end };
+    refreshSelEdges();
+  }
 }
 
 function fieldAtCol(colIdx: number): string | undefined {
   const c = grid?.getColumns()[colIdx];
   return c ? String(c.field) : undefined;
+}
+
+// P22 D10 (F17/F18): the console had a selection fill (`kira-cell-selected`, `selectedCellCssClass`
+// below) but never the four-sided outline every data-grid selection carries — one computation
+// missing, promoted verbatim from views/grid/SlickGridHost.vue to
+// views/shared/slick/selectionEdges.ts rather than restyled or re-derived here.
+function refreshSelEdges(): void {
+  if (!grid || !dataSource || !page) return;
+  const displayRowCount = matchedRows(props.tabId)?.length ?? page.rowCount;
+  const displayColCount = grid.getColumns().length - 1; // minus the gutter
+  const hashes = computeSelEdgeHashes(
+    currentSelection,
+    grid.lastRenderedRowBounds,
+    (pos) => dataSource?.getItem(pos).row ?? pos,
+    (displayCol) =>
+      page && displayCol >= 0 && displayCol < page.columns.length
+        ? colField(displayCol)
+        : undefined,
+    displayRowCount,
+    displayColCount,
+  );
+  SEL_EDGE_LAYER_KEYS.forEach((key, i) => {
+    grid?.setCellCssStyles(key, hashes[i] as EdgeHash);
+  });
 }
 
 // P19 D8: a real SlickHybridSelectionModel, configured identically to SlickGridHost.vue's own
@@ -353,6 +391,7 @@ function onSelectedRangesChanged(_e: unknown, ranges: SlickRange[]): void {
   pendingSelectionKind = null;
   const posSel = selectionFromRanges(ranges, rowMode, kind);
   currentSelection = posSel ? toPageRowSelection(posSel) : null;
+  refreshSelEdges();
 }
 
 // F15: no `.header-select-zone`, no `onHeaderCellRendered` subscription — a console result has no
@@ -575,10 +614,6 @@ function dataSourceState(): GridDataSourceState {
     inserts: [],
     extractValue: (item, field) => cell(props.pageKey, item.row, colIndexFromField(field)),
   };
-}
-
-function classesFrom(flags: CellClassFlags): string[] {
-  return Object.keys(cellClass(flags));
 }
 
 // §3.5: "the highlight is two keyed setCellCssStyles layers" — every match, and (if any) the
