@@ -27,6 +27,19 @@ export interface SearchHandle<M> {
 
 const CHUNK_ROWS = 2000;
 
+// P21 round 3 performance finding 1: CHUNK_ROWS above budgets by *row count* alone, but the real
+// per-frame cost of a tabular scan is CHUNK_ROWS × columnCount — a wide table (docs/PERF.md's
+// `app.scroll_grid` fixture is 60 columns) did 2 000 × 60 = 120 000 decode+regex pairs inside one
+// requestAnimationFrame callback, five to fifteen times the 8-12 ms frame budget §2.1 gates scroll
+// on. chunkRowsForColumns turns the row budget into a cell budget so a wide page walks fewer rows
+// per frame and a narrow one (keyValueRowScanner's fixed 2-column shape, or a 1-2 column table) is
+// unaffected — Math.min keeps it from ever exceeding the original CHUNK_ROWS.
+const CELL_BUDGET_PER_FRAME = CHUNK_ROWS * 2; // unaffected columnCount<=2, e.g. keyValueRowScanner
+export function chunkRowsForColumns(columnCount: number): number {
+  if (columnCount <= 0) return CHUNK_ROWS;
+  return Math.min(CHUNK_ROWS, Math.max(1, Math.ceil(CELL_BUDGET_PER_FRAME / columnCount)));
+}
+
 // P5 C4/F6: a find's match set had no cap — ~101 B retained per match (F6), 38.8 MB at 400 000
 // matches, 96.2 MB at a million, held until the find is cleared or the tab closes. 50 000 is
 // generous for anything a person actually navigates (Prev/Next through a highlight list) and
@@ -88,10 +101,11 @@ export function runChunkedScan<M>(
   scanRow: (row: number, pattern: RegExp, out: M[]) => void,
   q: SearchQuery,
   onProgress: (found: number, rowsScanned: number, totalRows: number, soFar: readonly M[]) => void,
-  opts?: { priority?: { from: number; to: number }; cap?: number },
+  opts?: { priority?: { from: number; to: number }; cap?: number; chunkRows?: number },
 ): SearchHandle<M> {
   const pattern = compilePattern(q);
   const cap = opts?.cap ?? MAX_SCAN_MATCHES;
+  const chunkRows = opts?.chunkRows ?? CHUNK_ROWS;
   let cancelled = false;
   const matches: M[] = [];
   let found = 0;
@@ -112,7 +126,7 @@ export function runChunkedScan<M>(
           resolve({ matches, found });
           return;
         }
-        const chunkEnd = Math.min(totalRows, row + CHUNK_ROWS);
+        const chunkEnd = Math.min(totalRows, row + chunkRows);
         for (; row < chunkEnd; row++) {
           rowBuf.length = 0;
           scanRow(row, pattern, rowBuf);

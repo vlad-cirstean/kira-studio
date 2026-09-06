@@ -1,5 +1,6 @@
 import { cellText, isNull } from '@shared/protocol/page';
 import {
+  chunkRowsForColumns,
   eachMatch,
   emptyScan,
   keyValueRowScanner,
@@ -52,7 +53,9 @@ export function runSearch(
       tabularRowScanner(page, (row, col, start, end) => ({ row, col, start, end })),
       q,
       onProgress,
-      priority,
+      // P21 round 3 performance finding 1: cell-based chunk budget for the tabular branch only —
+      // the document/keyvalue branches below have no per-row column multiplier to correct for.
+      { ...priority, chunkRows: chunkRowsForColumns(page.columns.length) },
     );
   }
 

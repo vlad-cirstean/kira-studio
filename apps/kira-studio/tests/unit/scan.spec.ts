@@ -12,6 +12,7 @@
 // is needed, only the global requestAnimationFrame it calls by name.
 import { beforeEach, describe, expect, test } from 'bun:test';
 import {
+  chunkRowsForColumns,
   eachMatch,
   runChunkedScan,
   type SearchQuery,
@@ -71,6 +72,37 @@ describe('runChunkedScan — frame semantics (P44 F45)', () => {
     expect(matches).toHaveLength(5000);
     expect(found).toBe(5000);
     expect(matches.map((m) => m.row)).toEqual(Array.from({ length: 5000 }, (_, i) => i));
+  });
+
+  test('2b (P21 round 3 finding 1). chunkRowsForColumns shrinks the per-frame row budget for a wide table', () => {
+    // docs/PERF.md's own wide fixture: 60 columns. 2000 rows/frame × 60 cols is the pre-fix
+    // per-frame cost this exists to cut down; the post-fix budget must land well under it while
+    // never exceeding the original CHUNK_ROWS (a narrow table must not get slower).
+    expect(chunkRowsForColumns(60)).toBeLessThan(200);
+    expect(chunkRowsForColumns(60)).toBeGreaterThan(0);
+    // A 1-2 column page (keyValueRowScanner's own fixed shape, or a narrow table) sees no
+    // reduction at all — the multiplier only bites once columnCount is large enough to matter.
+    expect(chunkRowsForColumns(1)).toBe(2000);
+    expect(chunkRowsForColumns(2)).toBe(2000);
+    // Degenerate input (a page reporting 0 columns) falls back to the original flat budget rather
+    // than dividing by zero.
+    expect(chunkRowsForColumns(0)).toBe(2000);
+  });
+
+  test('2c (P21 round 3 finding 1). opts.chunkRows overrides the per-frame row budget end to end', async () => {
+    const rowsScannedTicks: number[] = [];
+    const handle = runChunkedScan<RowMatch>(
+      250,
+      scanRow,
+      QUERY,
+      (_found, rowsScanned) => rowsScannedTicks.push(rowsScanned),
+      { chunkRows: 100 },
+    );
+    await drain();
+    await handle.done;
+    // 250 rows at 100/frame is three ticks (100, 200, 250), not the default single 2000-row tick
+    // a 250-row page would otherwise finish in.
+    expect(rowsScannedTicks).toEqual([100, 200, 250]);
   });
 
   test('3. a priority window runs in its own first frame, publishing rowsScanned === 0 and only its own matches', async () => {

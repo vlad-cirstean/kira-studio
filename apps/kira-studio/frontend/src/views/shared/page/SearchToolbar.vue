@@ -152,7 +152,24 @@ function startSearch(autoScroll = true): void {
   });
 }
 
-watch([query, matchCase, wholeWord, regex], () => startSearch());
+// P21 round 3 performance finding 1: every keystroke used to cancel and restart the whole
+// (potentially many-frame) scan immediately — `runChunkedScan`'s own per-frame cost is bounded now
+// (chunkRowsForColumns above), but restarting it six times over while typing "orders" is still six
+// full scans thrown away for one that matters. Debounced at the same 150 ms the tree
+// (project/state/tree.ts's SEARCH_DEBOUNCE_MS) and the collections panel
+// (api/state/collections.ts's SEARCH_DEBOUNCE_MS) already use for their own search inputs — the
+// toggles (matchCase/wholeWord/regex) stay immediate, since a checkbox click is a single, deliberate
+// action, not a typing stream.
+const QUERY_DEBOUNCE_MS = 150;
+let queryDebounceTimer: ReturnType<typeof setTimeout> | undefined;
+watch(query, () => {
+  clearTimeout(queryDebounceTimer);
+  queryDebounceTimer = setTimeout(() => startSearch(), QUERY_DEBOUNCE_MS);
+});
+watch([matchCase, wholeWord, regex], () => {
+  clearTimeout(queryDebounceTimer);
+  startSearch();
+});
 
 // P31 D22/D23/F23: paging, Fetch more, a page-size change, Refresh or a WHERE re-run all call
 // setPage and bump pageVersion.n — without this, searchState[tabId].matches keeps pointing at
@@ -184,6 +201,7 @@ function goPrev(): void {
 }
 
 function close(): void {
+  clearTimeout(queryDebounceTimer);
   handle?.cancel();
   handle = null;
   props.api.clearSearchState(props.tabId);
@@ -210,6 +228,7 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
+  clearTimeout(queryDebounceTimer);
   handle?.cancel();
   handle = null;
   props.api.clearSearchState(props.tabId);
