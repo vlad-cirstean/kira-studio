@@ -76,6 +76,17 @@ interface Parsed {
 interface TabRows {
   parseCache: Map<number, Parsed>;
   expandedPaths: Map<number, Set<string>>;
+  // P21 round 3 performance finding 4: `rowHeight`'s answer for an expanded row is a single
+  // integer (the visible-line count) — a few bytes, against a whole DocNode tree in parseCache —
+  // but it used to be derived from parseCache/visibleLines on every call, so `pruneRows` evicting
+  // parseCache outside the visible window (P5 C3/F4's own window pruning) meant every rowHeights
+  // recompute after a scroll re-parsed every expanded document on the page from scratch, just to
+  // answer a question whose answer hadn't changed. `lineCounts` is deliberately NOT touched by
+  // pruneRows below — it survives exactly what parseCache doesn't — and is invalidated only where
+  // the line count can actually change: togglePath (this row's own expansion set changed) and a
+  // full resetRows/dropRows (the whole page, or scope, is gone). `null` caches the "no root, raw
+  // fallback" case so a document that failed to parse doesn't retry parsing it every call either.
+  lineCounts: Map<number, number | null>;
 }
 
 const tabRows = new Map<string, TabRows>();
@@ -86,7 +97,7 @@ export const rowsVersion = reactive({ n: 0 });
 function ensureTabRows(tabId: string): TabRows {
   let entry = tabRows.get(tabId);
   if (!entry) {
-    entry = { parseCache: new Map(), expandedPaths: new Map() };
+    entry = { parseCache: new Map(), expandedPaths: new Map(), lineCounts: new Map() };
     tabRows.set(tabId, entry);
   }
   return entry;
@@ -146,6 +157,9 @@ export function togglePath(tabId: string, row: number, path: string): void {
   const set = expandedPathsFor(tabId, row);
   if (set.has(path)) set.delete(path);
   else set.add(path);
+  // This row's own visible-line count just changed — the one cached answer that must not survive
+  // this call, unlike every other row's on the page (finding 4).
+  ensureTabRows(tabId).lineCounts.delete(row);
   rowsVersion.n++;
 }
 
@@ -177,6 +191,7 @@ export function resetRows(tabId: string): void {
   if (entry) {
     entry.parseCache.clear();
     entry.expandedPaths.clear();
+    entry.lineCounts.clear();
   }
   rowsVersion.n++;
 }
@@ -189,7 +204,10 @@ export function resetRows(tabId: string): void {
  *
  *  `expandedPaths` is pruned too, but only for a row whose set is *empty* — a row the user
  *  actually drilled a nested field into keeps its expansion memory regardless of scroll position,
- *  so expanding a document, scrolling far away and scrolling back still shows it expanded. */
+ *  so expanding a document, scrolling far away and scrolling back still shows it expanded.
+ *  `lineCounts` (finding 4) is never pruned here at all — it is the answer `rowHeight` needs for
+ *  every row on the page, not just the visible window, and costs a few bytes/row against a whole
+ *  `DocNode` tree. */
 export function pruneRows(scope: string, start: number, end: number): void {
   const entry = tabRows.get(scope);
   if (!entry) return;
@@ -263,6 +281,12 @@ const EDITING_H = 220; // the fixed editor panel height (unchanged from the pre-
  * row's id purely to answer "is this the one being edited". Combined with `isExpanded`, a
  * collapsed, unedited, non-preview row — the common case for every row outside the rendered
  * window — returns `HEAD_H` with no `documentRow` and no `parseRow` call at all.
+ *
+ * P21 round 3 performance finding 4: an expanded row's line count is read from `lineCounts` first
+ * — populated the first time this row is asked about after its expansion set last changed, kept
+ * (unlike `parseCache`) across `pruneRows` — so a `rowsVersion` bump from toggling *one* row's
+ * expansion (or from a scroll, which changes nothing about any row's own line count) no longer
+ * re-parses every other expanded document on the page just to answer the same question again.
  */
 export function rowHeight(
   tabId: string,
@@ -273,8 +297,13 @@ export function rowHeight(
 ): number {
   if (row === editingRow) return HEAD_H + EDITING_H;
   if (!isExpanded) return hasSearchPreview ? HEAD_H + LINE_H : HEAD_H;
-  const parsed = parseRow(tabId, row);
-  if (!parsed?.root) return HEAD_H + EDITING_H;
-  const lines = visibleLines(tabId, row).length;
+  const entry = ensureTabRows(tabId);
+  let lines = entry.lineCounts.get(row);
+  if (lines === undefined) {
+    const parsed = parseRow(tabId, row);
+    lines = parsed?.root ? visibleLines(tabId, row).length : null;
+    entry.lineCounts.set(row, lines);
+  }
+  if (lines === null) return HEAD_H + EDITING_H;
   return HEAD_H + lines * LINE_H + BODY_PADDING_V;
 }
