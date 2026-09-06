@@ -657,6 +657,56 @@
   margin: var(--kira-s-2) 0;
 }
 
+/* ---------- P22 D8: completion popup — one specification, expressed twice. AutocompleteField.vue
+   (plain fields) consumes these classes directly; CodeMirror draws its own <ul>/<li> for the
+   console/DDL/cell editors with no seam to hand it a Vue component (F14), so editor/theme.ts
+   mirrors these exact values onto CodeMirror's own `.cm-tooltip-autocomplete` DOM instead of
+   sharing the class. Change one, change the other — editor/theme.ts's own header comment points
+   back here. Hoisted verbatim out of AutocompleteField.vue's old scoped `.autocomplete-suggestions`
+   /`.sugg-*` rules (F13) — no visual change to that popup, only the CodeMirror one gains parity. */
+.p-completion {
+  padding: var(--kira-s-1);
+  min-width: 200px;
+  max-width: min(480px, 90vw);
+  max-height: 240px;
+  overflow-y: auto;
+}
+.p-completion-row {
+  display: flex;
+  align-items: center;
+  gap: var(--kira-s-2);
+  padding: var(--kira-s-2) var(--kira-s-3);
+  border-radius: var(--kira-radius-sm);
+  font-size: var(--kira-t-sm);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.p-completion-row.is-on {
+  background: var(--kira-select);
+  color: var(--kira-fg);
+}
+.p-completion-icon {
+  flex-shrink: 0;
+  color: var(--kira-fg-muted);
+}
+.p-completion-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.p-completion-detail {
+  margin-left: auto;
+  padding-left: var(--kira-s-3);
+  color: var(--kira-fg-muted);
+  font-size: var(--kira-t-xs);
+  flex-shrink: 0;
+}
+/* No plain-popup consumer today (AutocompleteField.vue's own candidates carry no match-highlight
+   concept) — declared here anyway so the one CodeMirror consumer (editor/theme.ts's
+   .cm-completionMatchedText) still reads its colour off this shared spec rather than a literal. */
+.p-completion-match {
+  color: var(--kira-syntax-function);
+}
+
 /* ---------- P12 panel ---------- */
 .p-panel {
   border: var(--kira-border-width) solid var(--kira-border);

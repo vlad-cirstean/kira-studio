@@ -412,7 +412,7 @@ onBeforeUnmount(() => {
   <ul
     v-if="open && filtered.length > 0"
     :id="listId"
-    class="autocomplete-suggestions p-float"
+    class="autocomplete-suggestions p-completion p-float"
     role="listbox"
     :style="listStyle ?? undefined"
     @mousedown.prevent
@@ -423,13 +423,14 @@ onBeforeUnmount(() => {
       :key="c.label"
       role="option"
       :aria-selected="i === activeIndex"
-      :class="{ 'is-active': i === activeIndex }"
+      class="p-completion-row"
+      :class="{ 'is-on': i === activeIndex }"
       @mouseenter="activeIndex = i"
       @mousedown.prevent="accept(c)"
     >
-      <CodiconIcon v-if="c.icon" :name="c.icon" :size="13" class="sugg-icon" />
-      <span class="sugg-label">{{ c.label }}</span>
-      <span v-if="c.detail" class="sugg-detail">{{ c.detail }}</span>
+      <CodiconIcon v-if="c.icon" :name="c.icon" :size="13" class="p-completion-icon" />
+      <span class="p-completion-label">{{ c.label }}</span>
+      <span v-if="c.detail" class="p-completion-detail">{{ c.detail }}</span>
     </li>
   </ul>
   <div
@@ -504,50 +505,15 @@ onBeforeUnmount(() => {
   caret-color: var(--kira-fg);
 }
 
+/* P22 D8: this popup's chrome/row/icon/label/detail rules moved to primitives.css's shared
+   `.p-completion*` classes (F13) — this scoped block keeps only what's specific to *this*
+   popup's own positioning, not the completion spec itself: fixed placement (D3's own comment
+   above `positionList()`) and the plain `<ul>` reset. */
 .autocomplete-suggestions {
   position: fixed;
   z-index: 200;
-  min-width: 200px;
-  max-width: min(480px, 90vw);
-  max-height: 240px;
-  overflow-y: auto;
-  padding: var(--kira-s-1);
   list-style: none;
   margin: 0;
-}
-
-.autocomplete-suggestions li {
-  display: flex;
-  align-items: center;
-  gap: var(--kira-s-2);
-  padding: var(--kira-s-2) var(--kira-s-3);
-  border-radius: var(--kira-radius-sm);
-  font-size: var(--kira-t-sm);
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.autocomplete-suggestions li.is-active {
-  background: var(--kira-select);
-  color: var(--kira-fg);
-}
-
-.sugg-icon {
-  flex-shrink: 0;
-  color: var(--kira-fg-muted);
-}
-
-.sugg-label {
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.sugg-detail {
-  margin-left: auto;
-  padding-left: var(--kira-s-3);
-  color: var(--kira-fg-muted);
-  font-size: var(--kira-t-xs);
-  flex-shrink: 0;
 }
 
 /* P15b D3(c): positioned by computeFloatPosition (theme/floatingPosition.ts) via hoverStyle — the
