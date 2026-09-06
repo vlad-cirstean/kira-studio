@@ -2069,9 +2069,18 @@ watch(
     grid.updateRowCount();
     const base = currentDisplayRows()?.length ?? p?.rowCount ?? 0;
     const end = base + Math.max(count, lastInsertCount) - 1;
+    const lastInsertCountBefore = lastInsertCount;
     lastInsertCount = count;
     for (let pos = base; pos <= end; pos++) grid.invalidateRow(pos);
     grid.render();
+    // P22b D17: the insert is staged at the end of the virtual list, past the loaded page — on
+    // any page taller than the viewport, "Add a row" previously staged a row nobody could see.
+    // Safe on this path specifically, for the reason this watcher's own comment above already
+    // gives: inserts.length can only change from a deliberate user action (a toolbar click, a
+    // menu item), never from a keystroke inside an insert row, so this can never yank the
+    // viewport away from someone who is typing. Guarded on growth only, same as D16's watchers —
+    // a discard shrinks the count and must not scroll.
+    if (count > lastInsertCountBefore) grid.scrollRowIntoView(end);
   },
 );
 
