@@ -1323,6 +1323,23 @@ test('data view — pagination, count, projection, sort, filter, search, stop, N
   await page.press('[data-testid="pager-page-input"]', 'Tab');
   await expect.poll(() => firstGutterNumber(page), { timeout: 15_000 }).toBe('999991');
   await expect.poll(() => lastGutterNumber(page)).toBe('1000000');
+
+  // --- P21 round 3 functional finding 12: a jump past the last known page must clamp to it,
+  // not silently request an offset far beyond the end (page 99 of 3, in the finding's own
+  // scenario), and the box must show the page it actually landed on rather than what was typed.
+  await page.fill('[data-testid="pager-page-input"]', '999999999');
+  await page.press('[data-testid="pager-page-input"]', 'Tab');
+  await expect.poll(() => firstGutterNumber(page), { timeout: 15_000 }).toBe('999991');
+  await expect.poll(() => lastGutterNumber(page)).toBe('1000000');
+  await expect(page.locator('[data-testid="pager-page-input"]')).toHaveValue('100000');
+
+  // A rejected jump (below the 1-page floor) must resync the box to the actual current page
+  // instead of leaving it showing the rejected value forever — the grid itself must not move.
+  await page.fill('[data-testid="pager-page-input"]', '0');
+  await page.press('[data-testid="pager-page-input"]', 'Tab');
+  await expect(page.locator('[data-testid="pager-page-input"]')).toHaveValue('100000');
+  await expect.poll(() => firstGutterNumber(page)).toBe('999991');
+
   await page.click('[data-testid="pager-first"]');
   await expect.poll(() => firstGutterNumber(page)).toBe('1');
 

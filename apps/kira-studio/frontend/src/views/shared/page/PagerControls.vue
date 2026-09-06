@@ -38,9 +38,27 @@ const pageCount = computed(() => {
   return Math.max(1, Math.ceil(props.count / props.pageSize));
 });
 
+// P21 round 3 functional finding 12: a rejected jump (non-numeric, or < 1) used to leave
+// pageInputValue exactly as the user left it forever — the box's own resync only ever runs off
+// `watch(pageDisplay, ...)` above, which fires only when the page actually changes, so a rejected
+// jump (nothing changes) never touched it. And a jump past the last known page was never clamped
+// here at all (state.ts's own goToPage only clamps at 0), so typing e.g. 99 against a 3-page
+// result silently asked for an offset far past the end.
 function onJump(e: Event): void {
   const value = Number((e.target as HTMLInputElement).value);
-  if (Number.isFinite(value) && value >= 1) emit('jump', value - 1);
+  const valid = Number.isFinite(value) && value >= 1;
+  if (!valid) {
+    // Resync to the actual current page rather than leaving the box permanently out of sync with
+    // what the grid is really showing.
+    pageInputValue.value = String(pageDisplay.value);
+    return;
+  }
+  const target = pageCount.value !== null ? Math.min(value, pageCount.value) : value;
+  emit('jump', target - 1);
+  // Reflect a clamp immediately rather than waiting on the parent to round-trip pageIndex back
+  // through the pageDisplay watcher — an unclamped jump doesn't need this, since that watcher
+  // already fires once the new pageIndex prop lands.
+  if (target !== value) pageInputValue.value = String(target);
 }
 </script>
 
