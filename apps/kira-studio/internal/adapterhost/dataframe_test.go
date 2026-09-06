@@ -272,3 +272,34 @@ func TestRespond_OversizedPayloadBecomesErrorResponse(t *testing.T) {
 		t.Fatalf("resp = kind:%v id:%d ok:%v, want a res/9/ok:false frame", resp.Kind(), resp.Id(), resp.Ok())
 	}
 }
+
+// A9/P21 round 1: respond() used to always call encodeResponse (allocating and copying the whole
+// FlatBuffers frame, ~1.06x the page's own byte size per docs/PERF.md §2.8) before ever checking
+// whether the result would be too large to send — for a ReadResponse/ExecuteResponse, the page's
+// own Size() already answers that question. This proves the pre-check actually runs before
+// encoding, not just that an oversized *encoded* frame is rejected (TestRespond_
+// OversizedPayloadBecomesErrorResponse, above, already covers that): a page reporting a huge
+// ByteSize but genuinely empty Chunks/Columns would encode to a tiny frame if encodeResponse ran
+// on it — so the only way this can produce an error response is the pre-check firing on Size()
+// alone.
+func TestRespond_OversizedPageIsRejectedBeforeEncoding(t *testing.T) {
+	r := newTestRouter()
+	conn := newFakeConn()
+	session, detach := r.AttachStream(conn)
+	defer detach()
+
+	hugePage := page.TabularPage{
+		Kind:     page.PageKindTabular,
+		ByteSize: maxResponsePayloadBytes + 1024, // reported size only — no data backs this
+	}
+	r.respond(session, 11, ReadResponse{Page: hugePage, Source: "server"}, nil)
+
+	resp := readSentFrame(t, conn)
+	if resp.Kind() != wire.FrameKindres || resp.Id() != 11 || resp.Ok() {
+		t.Fatalf("resp = kind:%v id:%d ok:%v, want a res/11/ok:false frame", resp.Kind(), resp.Id(), resp.Ok())
+	}
+	errObj := resp.Error(nil)
+	if errObj == nil || string(errObj.Code()) != string(adapters.CodeQuery) {
+		t.Fatalf("resp error = %+v, want code %s", errObj, adapters.CodeQuery)
+	}
+}

@@ -228,6 +228,17 @@ func (r *Router) respond(session *Session, id int, payload any, err error) {
 		r.respondError(session, id, err)
 		return
 	}
+	// A9/P21 round 1: a page's own byte size is already known before encoding (it's exactly what
+	// estimateFrameSize below uses to pre-size the FlatBuffers builder, docs/PERF.md §2.8) — an
+	// oversized page used to be fully built into a frame (~1.06x the page's own size, tens of MB
+	// for a pathological one) purely to be discarded by the post-encode check further down. The
+	// post-encode check stays as the correctness backstop for every payload type this estimate
+	// doesn't cover (or underestimates).
+	if oversizedPagePayload(payload) {
+		r.deps.Log("error", "response frame exceeds the size limit, substituting an error response")
+		r.respondError(session, id, adapters.New(adapters.CodeQuery, "the response was too large to return", nil))
+		return
+	}
 	body, encErr := encodeResponse(id, payload)
 	if encErr != nil {
 		r.deps.Log("error", "failed to encode a response frame: "+encErr.Error())
@@ -240,6 +251,25 @@ func (r *Router) respond(session *Session, id int, payload any, err error) {
 		return
 	}
 	session.enqueueResponse(body)
+}
+
+// oversizedPagePayload answers the size question estimateFrameSize already knows how to compute,
+// before encodePayload ever runs — the same two payload shapes (ReadResponse/ExecuteResponse)
+// that shape already special-cases, since those are the ones whose size the app doesn't have to
+// guess at (page.Page.Size() is measured, not estimated, per docs/PERF.md §2.2).
+func oversizedPagePayload(payload any) bool {
+	switch v := payload.(type) {
+	case ReadResponse:
+		return pageSizeEstimate(v.Page.Size()) > maxResponsePayloadBytes
+	case ExecuteResponse:
+		total := 0
+		for _, p := range v.Pages {
+			total += p.Size()
+		}
+		return pageSizeEstimate(total) > maxResponsePayloadBytes
+	default:
+		return false
+	}
 }
 
 func (r *Router) respondError(session *Session, id int, err error) {
