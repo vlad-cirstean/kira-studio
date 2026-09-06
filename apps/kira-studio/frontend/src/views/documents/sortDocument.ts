@@ -8,9 +8,24 @@ import type { SortSpec } from '@shared/domain/queries';
 // descending — a `db.collection.find().sort(...)` argument, not SQL's `ORDER BY field ASC`) so a
 // Mongo user can type what they already know; sortSpecToText/parseSortText are this box's own
 // serializer/parser and must round-trip each other exactly.
+// P21 round 3 functional finding 5: the bare-key alternative below (SORT_TERM_RE) only matches
+// `[A-Za-z0-9_.$]+` — the same set this function used to emit unconditionally, regardless of what
+// the field name actually was. A field name outside that set (a hyphen, a space, `@`, non-ASCII)
+// round-tripped through its own quoted form exactly once (typed by the user, or produced by this
+// function while it still matched the field), but the very next re-serialisation dropped the
+// quotes — the header comment's own "must round-trip each other exactly" contract, violated by
+// this function alone. JSON.stringify both decides whether quoting is needed by construction (it
+// always quotes) and produces a form parseSortText's own `"([^"]+)"` alternative can read back
+// unless the name itself contains a literal `"` (not supported by the parser's regex either way).
+function formatSortKey(column: string): string {
+  return /^[A-Za-z0-9_.$]+$/.test(column) ? column : JSON.stringify(column);
+}
+
 export function sortSpecToText(sort: SortSpec | null): string {
   if (sort?.kind !== 'structured' || sort.terms.length === 0) return '';
-  const body = sort.terms.map((t) => `${t.column}: ${t.direction === 'desc' ? -1 : 1}`).join(', ');
+  const body = sort.terms
+    .map((t) => `${formatSortKey(t.column)}: ${t.direction === 'desc' ? -1 : 1}`)
+    .join(', ');
   return `{ ${body} }`;
 }
 
