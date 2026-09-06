@@ -235,6 +235,8 @@ test('redis (frontend, mocked IPC) — browse tab: filter and Up', async ({
   // "the rows are here too".
   await expect.poll(() => browseView.locator('[data-testid="browse-row"]').count()).toBe(4);
   const totalRows = await browseView.locator('[data-testid="browse-row"]').count();
+  // P22b D15: the filter is a toggle now (browse-filter-toggle), not an always-visible box.
+  await browseView.locator('[data-testid="browse-filter-toggle"]').click();
   await browseView.locator('[data-testid="browse-filter"]').fill('profile');
   await expect(browseView.locator('[data-testid="browse-row"]')).toHaveCount(1);
   await expect(browseView.locator('[data-testid="browse-count"]')).toContainText(

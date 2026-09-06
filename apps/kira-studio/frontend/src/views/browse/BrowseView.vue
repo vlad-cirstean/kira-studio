@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { BrowseTabRecord } from '@shared/domain/tabs';
 import { decodePath, encodePath, pathTail, type TreeNode } from '@shared/domain/tree';
-import { computed, onMounted } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { connectionRecord, connectionsState } from '../../state/connections';
 import { openContextMenu } from '../../state/contextMenu';
 import { openUploadDialog } from '../../state/objectStore';
@@ -10,8 +10,8 @@ import CodiconIcon from '../../theme/CodiconIcon.vue';
 import { nodeIcon } from '../../theme/icons';
 import IconButton from '../../theme/primitives/IconButton.vue';
 import MessageStrip from '../../theme/primitives/MessageStrip.vue';
+import PanelSearchBox from '../../theme/primitives/PanelSearchBox.vue';
 import ReconnectGate from '../../theme/primitives/ReconnectGate.vue';
-import TextField from '../../theme/primitives/TextField.vue';
 import ViewChrome from '../../theme/primitives/ViewChrome.vue';
 import VirtualList from '../../theme/primitives/VirtualList.vue';
 import { refreshOrReconnect, useConnectionGate } from '../shared/useConnectionGate';
@@ -70,6 +70,17 @@ const filterText = computed({
   get: () => rt.value?.filter ?? '',
   set: (v: string) => setFilter(props.tab.id, v),
 });
+
+// P22b D15: the app's own shared search idiom (HttpRequestView.vue's toggleFieldFilter) replaces
+// this file's own always-visible `.filter-field` — `rt.filter`/`filteredNodes`/`countText` below
+// are untouched, only the affordance moves. Component-local, not tab state: a lens, not a setting,
+// same rule fieldFilterOpen already follows.
+const filterOpen = ref(false);
+function toggleFilter(): void {
+  filterOpen.value = !filterOpen.value;
+  // D13's own rule (restated here): closing must restore every hidden row.
+  if (!filterOpen.value) filterText.value = '';
+}
 
 const filteredNodes = computed<TreeNode[]>(() => {
   const nodes = rt.value?.nodes ?? [];
@@ -166,9 +177,13 @@ onMounted(() => {
           </template>
         </span>
         <div class="sep" />
-        <div class="filter-field">
-          <TextField v-model="filterText" placeholder="Filter" data-testid="browse-filter" />
-        </div>
+        <IconButton
+          icon="search"
+          :active="filterOpen"
+          v-tooltip="'Filter'"
+          data-testid="browse-filter-toggle"
+          @click="toggleFilter"
+        />
         <IconButton
           v-if="canUpload"
           icon="cloud-upload"
@@ -180,6 +195,12 @@ onMounted(() => {
       </template>
 
       <template #strips>
+        <PanelSearchBox
+          v-if="filterOpen"
+          v-model="filterText"
+          placeholder="Filter"
+          testid="browse-filter"
+        />
         <MessageStrip v-if="rt?.status === 'error' && rt.error" tone="err" data-testid="browse-error">
           {{ rt.error.message }}
         </MessageStrip>
@@ -284,15 +305,6 @@ onMounted(() => {
 
 .crumb-sep {
   color: var(--kira-fg-subtle);
-}
-
-.filter-field {
-  width: 200px;
-  flex-shrink: 0;
-}
-
-.filter-field :deep(.p-input) {
-  width: 100%;
 }
 
 .body-panel {
