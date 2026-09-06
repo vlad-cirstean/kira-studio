@@ -733,27 +733,30 @@ body says this, and D7 keeps the dialog copy honest about what the document is n
 
 ## Checklist
 
-- [ ] V1 `feat(adapters): a container's columns are one query, not one per table`
-- [ ] V2 `feat(postgres): list a schema's columns in one round trip`
-- [ ] V3 `feat(mysql,mariadb): list a schema's columns in one round trip`
-- [ ] V4 `feat(clickhouse,sqlite): list a schema's columns in one round trip`
-- [ ] V5 `feat(tree): a container's columns are cached beside its children`
-- [ ] V6 `feat(bridge): TreeService.SchemaColumns`
-- [ ] `wails3 task common:generate:bindings` re-run after V6 (`-names` is load-bearing)
-- [ ] V7 `feat(studio): the console loads its container's columns when it opens`
-- [ ] V8 `feat(console): completion is driven by the cached schema, with no document`
-- [ ] V9 `feat(console): diagnostics and hover read the same cached schema`
-- [ ] V10 `refactor(studio)!: the schema document is an override, not the only supply`
-- [ ] V11 `feat(console): a Mongo console completes the fields its documents have shown`
-- [ ] V12 `test(p22c): the specs §4 enumerates`
-- [ ] V13 `docs: ARCHITECTURE's Caching section records the fourth metadata kind`
-- [ ] `bun run lint` / `typecheck` / `build` clean
-- [ ] `bun run test:go` green, including the new per-adapter conformance cases and the
+- [x] V1 `feat(adapters): a container's columns are one query, not one per table`
+- [x] V2 `feat(postgres): list a schema's columns in one round trip`
+- [x] V3 `feat(mysql,mariadb): list a schema's columns in one round trip`
+- [x] V4 `feat(clickhouse,sqlite): list a schema's columns in one round trip`
+- [x] V5 `feat(tree): a container's columns are cached beside its children`
+- [x] V6 `feat(bridge): TreeService.SchemaColumns`
+- [x] `wails3 task common:generate:bindings` re-run after V6 (`-names` is load-bearing)
+- [x] V7 `feat(studio): the console loads its container's columns when it opens`
+- [x] V8 `feat(console): completion is driven by the cached schema, with no document`
+- [x] V9 `feat(console): diagnostics and hover read the same cached schema`
+- [x] V10 `refactor(studio)!: the schema document is an override, not the only supply`
+- [x] V11 `feat(console): a Mongo console completes the fields its documents have shown`
+- [x] V12 `test(p22c): the specs §4 enumerates`
+- [x] V13 `docs: ARCHITECTURE's Caching section records the fourth metadata kind`
+- [x] V14 `docs(spec): P22 part 3 implemented`
+- [x] `bun run lint` / `typecheck` / `build` clean
+- [x] `bun run test:go` green, including the new per-adapter conformance cases and the
       shared-row cache case
-- [ ] `bun run test:unit` green (`namespaceFromCached`, `effectiveSchema`)
-- [ ] `bun run test:ui` run once at the end; failures fixed as follow-up commits
-- [ ] `tests/e2e-real` §4.5 scenario run once (Postgres + SQLite)
-- [ ] `docs/v1.2/SPEC.md`'s P22 row updated
+- [x] `bun run test:unit` green (`namespaceFromCached`, `effectiveSchema`)
+- [x] `bun run test:ui` run once at the end; failures fixed as follow-up commits (216/220 initial
+      pass; three own-test bugs fixed, one pre-existing `budgets.spec.ts` flake reproduced in
+      isolation and left as-is; 219/220 final)
+- [x] `tests/e2e-real` §4.5 scenario run once (Postgres + SQLite) — plus MariaDB, all real-container
+- [x] `docs/v1.2/SPEC.md`'s P22 row updated
 
 ---
 
