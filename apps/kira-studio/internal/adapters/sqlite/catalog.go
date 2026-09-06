@@ -416,39 +416,97 @@ func listForeignKeys(exec QueryExecutor, schema, table string) ([]model.ForeignK
 	return result, nil
 }
 
-// listReferencedBy is catalog.ts's own — F17/D20: SQLite has no reverse-FK index, so this scans
-// every other relevant table's own foreign_key_list looking for one that points back at `table`.
-// allTables includes `table` itself on purpose: a self-referencing FK must appear here too.
+// referencingFKRow is one row of fetchReferencingForeignKeys — foreignKeyListRow plus which table
+// it came from (src), since a single joined query mixes rows from every table together.
+type referencingFKRow struct {
+	src string
+	foreignKeyListRow
+}
+
+// fetchReferencingForeignKeys is P21 round 3 performance finding 6's fix: one query joining every
+// table's own pragma_foreign_key_list against sqlite_master, filtered to the rows that reference
+// target — supported since SQLite 3.16 (table-valued functions), collapsing what used to be N
+// separate round trips (one per table in the database) into one. The `match` column
+// fetchForeignKeyList also scans is omitted here too — nothing downstream ever read it.
+func fetchReferencingForeignKeys(exec QueryExecutor, target string) ([]referencingFKRow, error) {
+	var rows []referencingFKRow
+	err := exec(`
+		SELECT m.name AS src, f.id, f.seq, f."table", f."from", f."to", f.on_update, f.on_delete
+		  FROM sqlite_master m JOIN pragma_foreign_key_list(m.name) f
+		 WHERE m.type = 'table' AND f."table" = ?
+	`, []any{target}, func(r *sql.Rows) error {
+		var row referencingFKRow
+		if err := r.Scan(&row.src, &row.id, &row.seq, &row.table, &row.from, &row.to, &row.onUpdate, &row.onDelete); err != nil {
+			return err
+		}
+		rows = append(rows, row)
+		return nil
+	})
+	return rows, err
+}
+
+// listReferencedBy is catalog.ts's own — F17/D20: SQLite has no reverse-FK index, so this used to
+// scan every other relevant table's own foreign_key_list, one query per table, looking for one
+// that points back at `table`. Describing one table in a 500-table database was ~501 serialised
+// round trips on the single pinned connection, blocking every other op on it for the duration —
+// and views/grid/state.ts calls this on every data-tab load, so opening twenty tables paid it
+// twenty times over. allTables includes `table` itself on purpose: a self-referencing FK must
+// appear here too — fetchReferencingForeignKeys's own query already scans every table via the
+// join, so allTables here is used only to filter to relevant tables (never a view, which
+// `foreign_key_list` reports as if it had no FKs of its own regardless) and to order the result the
+// same way the old per-table loop did (each source table's own group of FKs, in that table's own
+// position in allTables, first-seen id order within it).
 func listReferencedBy(exec QueryExecutor, schema, table string, allTables []string) ([]model.ForeignKeyMeta, error) {
+	rows, err := fetchReferencingForeignKeys(exec, table)
+	if err != nil {
+		return nil, err
+	}
+
+	tablePos := make(map[string]int, len(allTables))
+	for i, t := range allTables {
+		tablePos[t] = i
+	}
+
+	type groupKey struct {
+		src string
+		id  int
+	}
+	byKey := make(map[groupKey][]foreignKeyListRow)
+	var order []groupKey
+	for _, r := range rows {
+		if _, ok := tablePos[r.src]; !ok {
+			continue // a view or anything else outside allTables' own scope
+		}
+		key := groupKey{src: r.src, id: r.id}
+		if _, ok := byKey[key]; !ok {
+			order = append(order, key)
+		}
+		byKey[key] = append(byKey[key], r.foreignKeyListRow)
+	}
+	// Re-sort by each source table's own position in allTables — the join's row order is not
+	// guaranteed to match it, and callers/tests may depend on the same table-by-table grouping the
+	// old per-table loop produced. Stable, so first-seen id order within one table survives.
+	sort.SliceStable(order, func(i, j int) bool { return tablePos[order[i].src] < tablePos[order[j].src] })
+
 	var result []model.ForeignKeyMeta
-	for _, source := range allTables {
-		rows, err := fetchForeignKeyList(exec, source)
-		if err != nil {
-			return nil, err
+	for _, key := range order {
+		group := append([]foreignKeyListRow{}, byKey[key]...)
+		sort.SliceStable(group, func(a, b int) bool { return group[a].seq < group[b].seq })
+		columns := make([]string, len(group))
+		refColumns := make([]string, len(group))
+		for j, r := range group {
+			columns[j] = r.to
+			refColumns[j] = r.from
 		}
-		var filtered []foreignKeyListRow
-		for _, r := range rows {
-			if r.table == table {
-				filtered = append(filtered, r)
-			}
-		}
-		for _, group := range groupByID(filtered) {
-			columns := make([]string, len(group))
-			refColumns := make([]string, len(group))
-			for j, r := range group {
-				columns[j] = r.to
-				refColumns[j] = r.from
-			}
-			onDelete, onUpdate := group[0].onDelete, group[0].onUpdate
-			result = append(result, model.ForeignKeyMeta{
-				Name:    synthesizeFkName(source, group[0].from),
-				Columns: columns,
-				ReferencedPath: model.EncodePath([]model.PathSegment{
-					{Kind: "database", Name: schema}, {Kind: "table", Name: source},
-				}),
-				ReferencedColumns: refColumns, OnDelete: &onDelete, OnUpdate: &onUpdate,
-			})
-		}
+		onDelete, onUpdate := group[0].onDelete, group[0].onUpdate
+		result = append(result, model.ForeignKeyMeta{
+			Name:    synthesizeFkName(key.src, group[0].from),
+			Columns: columns,
+			ReferencedPath: model.EncodePath([]model.PathSegment{
+				{Kind: "database", Name: schema}, {Kind: "table", Name: key.src},
+			}),
+			ReferencedColumns: refColumns, OnDelete: &onDelete, OnUpdate: &onUpdate,
+		})
 	}
 	return result, nil
 }
