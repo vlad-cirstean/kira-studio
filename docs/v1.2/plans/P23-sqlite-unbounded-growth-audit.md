@@ -794,7 +794,7 @@ phase that adds a table has a standard to meet rather than a precedent to guess 
 | `api_collections`, `api_items`, `api_environments`, `api_variables` | user action / import | user action; import capped at 64 MiB upstream |
 | `tabs` | open tabs | rewritten per window per save; cascades on window close |
 | `windows` | live windows | one row per live window (+1 for session restore) |
-| `metadata_cache` | browsing | 4 MiB/row, 200 rows/connection, dropped whole on every reconnect |
+| `metadata_cache` | browsing | 4 MiB/row, 200 rows/connection — **no longer dropped whole on reconnect** (P24 D6: a connect moves the connection's freshness epoch forward instead, and each row is re-read lazily, once, the first time a user opens that path again) |
 | `api_variable_history` | value edits | 20 per variable |
 | `filter_history` | filter/sort use | 20 per path, **4,000 per connection**, **4 KiB per row** |
 | `api_response_history` | sends | 256 KiB/body, 30/scope, 128 MiB table, orphan sweep at launch |

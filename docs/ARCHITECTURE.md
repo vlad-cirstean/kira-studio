@@ -900,10 +900,22 @@ reach between two ordinary checkpoints, so this never truncates a WAL doing its 
 Three tiers, each with an explicit invalidation story.
 
 **L1 — metadata** (databases, schemas, tables, columns, PK/FK, indexes, object definitions).
-Persisted in `metadata_cache`. Survives restart. **No TTL** — an entry is dropped only when its
-connection is deleted, and the whole connection's metadata is refreshed on **every reconnect**.
-Plus manual *Refresh* from the tree context menu. This is what makes the project panel instant on
-launch and what lets panel search work without touching the database.
+Persisted in `metadata_cache`. Survives restart. **No TTL, and staleness is defined by connection
+epoch, not by a clock (P24).** A cached payload is *fresh* if it was written after the connection
+it belongs to was most recently established, and *stale* otherwise; a stale payload is bypassed and
+re-fetched on its first read, per kind, and is never re-fetched again for the rest of that
+connection session. The epoch is `ConnectionState.Since`; the comparison is against a per-kind
+timestamp stored inside `payload_json` under the reserved key `fetchedAt` (the `fetched_at`
+**column** orders the 200-row eviction and nothing else). While a connection is **not** connected
+there is no epoch, so the cache is served at any age — which is what makes the panel instant on
+launch and lets a SQL console over a cached container offer completion with no live connection
+(P22c F7).
+
+A connect no longer *deletes* the connection's rows (it did through P23); it moves the epoch, so
+the same rows are re-read lazily, once each, only for the paths a user actually opens. An explicit
+*Refresh* still deletes: a node's Refresh drops that node's whole row — all four kinds — and a
+connection's Refresh or *Refresh all* drops every row for that connection, which is what
+`docs/v1/plans/P1-connections-and-tree.md` §6c's eviction table always specified.
 
 **A fourth `kind`, `columns`, shares this same L1 row (P22c).** `metadata_cache`'s unique index is
 `(connection_id, path)`, not `(connection_id, path, kind)` — `children`/`describe`/`definition`
@@ -911,15 +923,16 @@ already merge into one row per path, and `columns` (`SchemaColumns`, every relat
 together with its columns, one round trip) is the fourth kind merged the identical way, keyed on
 the *container* (a database/schema node) rather than a relation. This is deliberate, not
 incidental: writing one row per relation instead would compete with the tree's own `children` rows
-for the same 200-row-per-connection budget on a large schema. `columns` inherits every rule the
-other three kinds already have — no TTL of its own, refreshed on reconnect or an explicit
-`Invalidate`, and (F7's own property, load-bearing for this feature) **readable with no live
-connection at all**, since a cache hit is served before the connection is even checked. It backs
-the SQL console's schema-aware completion/diagnostics/hover (`state/schemaColumns.ts`) automatically
-the moment a console or data tab opens over a cached container — no manual step, and the
-completion layer itself never opens a connection or fetches on its own (v1.1 P18's rule, kept).
-Whether a reconnect *should* refresh more aggressively, or `columns` deserves a rule finer than the
-other three kinds, is `docs/v1.2/SPEC.md`'s P24 row's question, not decided here.
+for the same 200-row-per-connection budget on a large schema. `columns` inherits every rule the other three kinds already have — the same connection-epoch
+freshness rule (not more aggressive, and not less), refreshed on an explicit `Invalidate`, and
+(F7's own property, load-bearing for this feature) **readable with no live connection at all**,
+since a cache hit is served before the connection is even checked. It backs the SQL console's
+schema-aware completion/diagnostics/hover (`state/schemaColumns.ts`) automatically the moment a
+console or data tab opens over a cached container — no manual step, and the completion layer
+itself never opens a connection or fetches on its own (v1.1 P18's rule, kept). Freshness is tracked
+**per kind** inside one shared row (P24 D3): refreshing a container's `children` never freshens its
+`columns` on the same row, and vice versa — the row-level `fetched_at` column could not express
+that on its own, which is exactly why the per-kind `fetchedAt` map exists.
 
 **L2 — result pages.** In-memory LRU in the engine, byte-budgeted (default 64 MB, configurable).
 Key = hash of `{connectionId, path, filter, projection, sort, pageSize, pageToken}`. Never
