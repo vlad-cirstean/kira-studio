@@ -93,9 +93,15 @@ function parseIso8601Shaped(text: string): { date: Date; shape: TimestampShape }
   const { style: offset, minutes: offsetMinutes } = parseOffsetPart(offsetRaw);
   const fractionDigits = frac ? frac.length : 0;
   const ms = frac ? Math.round(Number(`0.${frac}`) * 1000) : 0;
+  // P21 round 3 functional finding 10: Date.UTC (like `new Date(...)`) applies ECMAScript's legacy
+  // two-digit-year rule to its own year argument — a value in 0..99 is silently remapped to
+  // 1900 + year, so a Postgres sentinel like `0001-01-01` built a Date at 1901-01-01 instead. 2000
+  // is a placeholder year (a leap year, so a real Feb 29 still computes the right month/day here)
+  // used only to get the month/day/time arithmetic right; setUTCFullYear below never applies the
+  // two-digit-year remap — it sets the year field literally, whatever the value.
   const utcMs =
     Date.UTC(
-      Number(y),
+      2000,
       monthN - 1,
       dayN,
       dateOnly ? 0 : Number(h),
@@ -105,6 +111,7 @@ function parseIso8601Shaped(text: string): { date: Date; shape: TimestampShape }
     ) -
     offsetMinutes * 60_000;
   const date = new Date(utcMs);
+  date.setUTCFullYear(Number(y));
   if (Number.isNaN(date.getTime())) return null;
   return {
     date,
@@ -150,7 +157,10 @@ export function encodeTimestamp(shape: TimestampShape, date: Date): string {
   // shifted instant via the UTC getters — this is what makes the printed digits correct for
   // whatever zone the original spelled, without touching the runtime's own local timezone.
   const shifted = new Date(date.getTime() + shape.offsetMinutes * 60_000);
-  const y = shifted.getUTCFullYear();
+  // P21 round 3 functional finding 10: un-padded, this emitted "901-01-01" (3 digits) for a real
+  // year 901 instead of ISO-8601's required 4 — parseIso8601Shaped's own ISO_PARTS_RE requires
+  // exactly `\d{4}`, so an unpadded year here would round-trip back through this cell as invalid.
+  const y = pad(shifted.getUTCFullYear(), 4);
   const mo = pad(shifted.getUTCMonth() + 1);
   const d = pad(shifted.getUTCDate());
   if (shape.dateOnly) return `${y}-${mo}-${d}`;
@@ -284,9 +294,14 @@ export function fromEditableText(text: string, zone: 'local' | 'utc'): Date | nu
     return null;
   }
   const ms = frac ? Math.round(Number(`0.${frac}`) * 1000) : 0;
+  // P21 round 3 functional finding 10: same legacy two-digit-year remap as parseIso8601Shaped
+  // above (`new Date(...)`'s multi-argument form applies it too) — build with a leap-year
+  // placeholder, then set the real year via setFullYear/setUTCFullYear, which never remaps.
   const d =
     zone === 'utc'
-      ? new Date(Date.UTC(Number(y), monthN - 1, dayN, hN, miN, sN, ms))
-      : new Date(Number(y), monthN - 1, dayN, hN, miN, sN, ms);
+      ? new Date(Date.UTC(2000, monthN - 1, dayN, hN, miN, sN, ms))
+      : new Date(2000, monthN - 1, dayN, hN, miN, sN, ms);
+  if (zone === 'utc') d.setUTCFullYear(Number(y));
+  else d.setFullYear(Number(y));
   return Number.isNaN(d.getTime()) ? null : d;
 }
