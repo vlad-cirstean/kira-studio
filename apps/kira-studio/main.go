@@ -150,6 +150,12 @@ func main() {
 	if err := repositories.GrpcHistory.SweepOrphans(); err != nil {
 		slog.Warn("sweep orphaned grpc call history", "scope", "startup", "err", err)
 	}
+	// P23 D5(b): return freed pages to the filesystem once the freelist is worth reclaiming — a
+	// no-op on a database opened before this phase (auto_vacuum stays NONE, D5(a) never converts
+	// an existing file) and on one whose freelist is still small.
+	if err := (&repos.Maintenance{DB: db.DB}).Reclaim(); err != nil {
+		slog.Warn("reclaim freed pages", "scope", "startup", "err", err)
+	}
 
 	processSet := metrics.NewCachedPIDs(
 		func() ([]int32, error) { return metrics.AppProcessSet(metrics.AnchorNeedles, metrics.HelperNeedles) },

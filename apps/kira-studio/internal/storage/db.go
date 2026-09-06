@@ -25,14 +25,35 @@ type DB struct {
 	*sql.DB
 }
 
-// buildDSN sets the four startup pragmas through the DSN query string rather than as Exec
-// statements after Open — unlike mattn/go-sqlite3's Go-side options, modernc.org/sqlite takes
-// pragmas this way (see adapters/sqlite/client.go's buildDSN), and doing it here means every
-// connection the pool ever opens carries them, not just the first.
+// buildDSN sets the startup pragmas through the DSN query string rather than as Exec statements
+// after Open — unlike mattn/go-sqlite3's Go-side options, modernc.org/sqlite takes pragmas this
+// way (see adapters/sqlite/client.go's buildDSN), and doing it here means every connection the
+// pool ever opens carries them, not just the first.
+//
+// P23 D5(a)/D6: _auto_vacuum=INCREMENTAL and journal_size_limit are new. Both were measured
+// (P23 F16/F17) against the pinned modernc.org/sqlite driver before being added here:
+//
+//   - _auto_vacuum only takes on a brand-new database (PRAGMA auto_vacuum reads back 2) and is
+//     inert on an existing one (reads back 0, unchanged) — so this needs no version gate and can
+//     never half-convert a database that already exists. INCREMENTAL rather than FULL: FULL
+//     reorganises pages on every commit, a cost paid constantly on a store that commits on every
+//     keystroke-debounced tab save, for a benefit (reclaiming freed pages) wanted only
+//     occasionally. INCREMENTAL puts freed pages on the freelist and leaves the reclaim decision
+//     to repos.Maintenance.Reclaim, run once at startup.
+//   - journal_size_limit(4194304) truncates kira.db-wal back down after a commit, rather than
+//     leaving it at its session high-water mark forever (SQLITE_DEFAULT_JOURNAL_SIZE_LIMIT is -1
+//     in the pinned amalgamation). 4 MiB is not chosen, it is derived: 1,000 pages
+//     (SQLITE_DEFAULT_WAL_AUTOCHECKPOINT) at SQLite's 4 KiB default page size is exactly the size
+//     the WAL is expected to reach between two automatic checkpoints, so this never truncates a
+//     WAL doing its ordinary job. modernc.org/sqlite has no _journal_size_limit shorthand — this
+//     goes through the generic _pragma= list, which F17 measured to apply before _journal_mode and
+//     to read back correctly.
 func buildDSN(path string) string {
 	q := url.Values{}
 	q.Set("_busy_timeout", "5000")
 	q.Set("_foreign_keys", "1")
+	q.Set("_auto_vacuum", "INCREMENTAL")
+	q.Set("_pragma", "journal_size_limit(4194304)")
 	q.Set("_journal_mode", "WAL")
 	q.Set("_synchronous", "NORMAL")
 	return "file:" + path + "?" + q.Encode()
