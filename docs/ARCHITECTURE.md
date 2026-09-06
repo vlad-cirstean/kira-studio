@@ -1854,10 +1854,11 @@ Monitor itself shows both: its per-process **"% CPU" column is an unnormalized p
 (0…100×N, so a process pinning two cores of an 8-core Mac reads 200%), while its **CPU-load pane
 graphs the normalized figure** (0…100, a share of the machine's whole capacity). The status bar
 follows the second convention — matching the CPU-load pane, not the per-process column — because a
-one-number readout in a 4-character slot answers "how much of this Mac is the app using", and its
-tooltip states this explicitly (`StatusBar.vue`) since a user comparing against the per-process
-column will otherwise see a figure up to `logicalCPUs` times smaller and reasonably conclude the
-status bar is wrong.
+one-number readout in a 4-character slot answers "how much of this Mac is the app using". A user
+comparing against the per-process column will otherwise see a figure up to `logicalCPUs` times
+smaller and reasonably conclude the status bar is wrong — P22 D11 trimmed the hover tooltip
+(`StatusBar.vue`) to the numbers alone (cores/memory/process count/interval), so this paragraph,
+not a five-line hover panel, is now where that cross-check is spelled out.
 
 **Neither convention accounts for core frequency or Apple silicon's P/E asymmetry.** A normalized
 percentage is a share of total core-*seconds*, not a share of compute capability: four E cores at

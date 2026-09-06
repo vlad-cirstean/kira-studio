@@ -27,17 +27,17 @@ const memLabel = computed(() => {
   return sample ? formatBytes(sample.memoryBytes) : '';
 });
 
-// States the convention explicitly (normalized, not the per-core-sum Activity Monitor's own
-// per-process "% CPU" column uses) since a user comparing against that column is the exact
-// cross-check "the numbers are not trusted" points at — that column reads up to logicalCPUs times
-// higher for the same load, not because either number is wrong (P7 F6).
+// P22 D11: numbers only. The Activity-Monitor cross-check this used to spell out (P7 F6: this
+// figure is normalized — summed across every process, not the per-process "% CPU" column
+// Activity Monitor shows, which reads up to logicalCPUs times higher for the same load) is still
+// true and still the reason the CPU figure is shaped the way it is — it now lives in this comment
+// and in docs/ARCHITECTURE.md's metrics note, not in a five-line hover panel.
 const metricsTooltip = computed(() => {
   const sample = appMetricsState.sample;
   if (!sample) return undefined;
   return (
-    `${cpuLabel.value} of ${sample.logicalCPUs} CPU cores · ${memLabel.value} memory footprint ` +
-    `across ${sample.processCount} processes · updated every 5s. Activity Monitor's own per-process ` +
-    `"% CPU" column is not normalized and reads up to ${sample.logicalCPUs}x higher for the same load.`
+    `${cpuLabel.value} of ${sample.logicalCPUs} cores · ${memLabel.value} across ` +
+    `${sample.processCount} processes · every 5s`
   );
 });
 
