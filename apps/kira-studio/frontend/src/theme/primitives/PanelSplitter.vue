@@ -6,8 +6,15 @@ const props = withDefaults(
     min: number;
     max: number;
     reverse?: boolean;
+    /** P22 D13: draw a visible hairline down the middle of the track at rest. Off by default:
+     *  WorkbenchShell's two splitters sit in a grid GAP between `.panel-surface` boxes, so the
+     *  boundary is already a groove on the shell's own ground and a second line there would read
+     *  as a double rule. On by default nowhere — a splitter inside a view has no gap band behind
+     *  it (both request views' own `.request-splitter` comments already said exactly this about
+     *  height), so it is the caller who knows which situation it is in. */
+    divider?: boolean;
   }>(),
-  { reverse: false },
+  { reverse: false, divider: false },
 );
 
 const emit = defineEmits<{ resize: [size: number] }>();
@@ -41,7 +48,10 @@ function onPointerUp(e: PointerEvent): void {
 <template>
   <div
     class="splitter"
-    :class="orientation === 'col' ? 'cursor-col-resize' : 'cursor-row-resize'"
+    :class="[
+      orientation === 'col' ? 'cursor-col-resize' : 'cursor-row-resize',
+      { 'has-divider': divider },
+    ]"
     @pointerdown="onPointerDown"
     @pointermove="onPointerMove"
     @pointerup="onPointerUp"
@@ -56,5 +66,20 @@ function onPointerUp(e: PointerEvent): void {
 .splitter:hover,
 .splitter:active {
   background: var(--kira-focus);
+}
+
+/* P22 D13: the line is drawn as a centred inset box-shadow, not a border — a border would change
+   the track's own box size and shift the panes it separates, and the track is a pointer target
+   whose 4px height/width is load-bearing for grabbing it. --kira-border (not --kira-border-strong)
+   is the weight every other in-view boundary uses (.p-toolbar, .p-view-head, .cell-dock). */
+.splitter.has-divider.cursor-row-resize {
+  box-shadow: inset 0 calc(var(--kira-border-width) * -1) 0 0 var(--kira-border);
+}
+.splitter.has-divider.cursor-col-resize {
+  box-shadow: inset calc(var(--kira-border-width) * -1) 0 0 0 var(--kira-border);
+}
+.splitter.has-divider:hover,
+.splitter.has-divider:active {
+  box-shadow: none; /* the --kira-focus fill above takes over whole */
 }
 </style>

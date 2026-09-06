@@ -395,6 +395,7 @@ onUnmounted(() => {
           :size="requestPaneHeight"
           :min="120"
           :max="800"
+          divider
           @resize="onResizeRequestPane"
         />
 
@@ -443,6 +444,8 @@ onUnmounted(() => {
   flex-direction: column;
 }
 
+/* P22 D13 (F22): the request/response boundary used to be 4px of nothing until the pointer
+   crossed it — `divider` (above) draws the line HttpRequestView.vue's own twin comment names. */
 .request-splitter {
   height: var(--kira-s-2);
   flex-shrink: 0;

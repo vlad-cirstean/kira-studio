@@ -423,6 +423,7 @@ onUnmounted(() => {
           :size="requestPaneHeight"
           :min="120"
           :max="800"
+          divider
           @resize="onResizeRequestPane"
         />
 
@@ -476,7 +477,9 @@ onUnmounted(() => {
 
 /* Mirrors views/shared/celleditor/CellEditorDock.vue's own .cell-splitter comment: the workbench
    grid gives a splitter its size from a gap row; inside a view there is no gap band, so the
-   track carries its own explicit height. */
+   track carries its own explicit height. P22 D13 (F22): the request/response boundary used to be
+   4px of nothing until the pointer crossed it — `divider` (above) draws the line this comment
+   never reached. */
 .request-splitter {
   height: var(--kira-s-2);
   flex-shrink: 0;

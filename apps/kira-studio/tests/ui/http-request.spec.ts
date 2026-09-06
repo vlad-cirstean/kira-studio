@@ -47,6 +47,12 @@ test('Http request — send, view a JSON response, and Params-table <-> URL sync
   const view = page.locator('[data-testid="http-request-view"]');
   await expect(view).toBeVisible();
 
+  // P22 D13 (F22): the request/response splitter draws a visible divider at rest — it used to be
+  // 4px of nothing, with no line and no grab affordance until the pointer crossed it.
+  await expect
+    .poll(() => view.locator('.request-splitter').evaluate((el) => getComputedStyle(el).boxShadow))
+    .not.toBe('none');
+
   // Typing in the URL updates the Params table without rewriting the URL (D9).
   await page.fill('[data-testid="http-url"]', 'https://api.example.com/users?limit=10');
   const paramRows = page.locator('[data-testid="http-param-row"]');

@@ -26,6 +26,7 @@ const cell = computed(() => selectedCellFor(props.tabId));
       :size="layoutState.panel.cellEditor.height"
       :min="120"
       :max="480"
+      divider
       @resize="setCellEditorHeight"
     />
     <div
@@ -42,7 +43,9 @@ const cell = computed(() => selectedCellFor(props.tabId));
 <style scoped>
 /* The workbench grid gave the splitter its size (a `--kira-gap` row between two gap-separated
    panels, tokens.css:31-36); inside a view there is no gap band to aim at, so the track carries
-   its own height and the dock's border is the visible boundary (D11). */
+   its own height. P22 D13: `divider` (above) now draws the visible boundary the comment below
+   used to hand off to `.cell-dock`'s own border-top — one mechanism for "a splitter inside a view
+   is visible" instead of two that happened to agree, same rendered line in the same place. */
 .cell-splitter {
   height: var(--kira-s-2);
   flex-shrink: 0;
@@ -53,6 +56,5 @@ const cell = computed(() => selectedCellFor(props.tabId));
   min-height: 0;
   overflow: hidden;
   background: var(--kira-bg);
-  border-top: var(--kira-border-width) solid var(--kira-border);
 }
 </style>

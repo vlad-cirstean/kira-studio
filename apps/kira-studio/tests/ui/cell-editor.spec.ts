@@ -384,6 +384,12 @@ test('cell editor — autodetect, beautify, override, NULL/empty/truncated, read
   await expect(page.locator('[data-testid="cell-editor-target"]')).toContainText('row 1');
   expect(await editorText(page)).toBe(await cellText(page, 0, 'sample'));
 
+  // P22 D13 (F22): the dock's own boundary still renders after .cell-dock's border-top is
+  // removed in favour of PanelSplitter's `divider` prop — one mechanism, same rendered line.
+  await expect
+    .poll(() => page.locator('.cell-splitter').evaluate((el) => getComputedStyle(el).boxShadow))
+    .not.toBe('none');
+
   // --- scenario 2: every format, read out of the fixture's own `kind` column -------------
   for (let row = 0; row < 13; row++) {
     const kind = await kindOf(page, row);

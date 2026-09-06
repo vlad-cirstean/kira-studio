@@ -144,6 +144,12 @@ test('gRPC request — open a tab and browse a schema', async ({ relaunch }) => 
   const view = page.locator('[data-testid="grpc-request-view"]');
   await expect(view).toBeVisible();
 
+  // P22 D13 (F22): the request/response splitter draws a visible divider at rest — it used to be
+  // 4px of nothing, with no line and no grab affordance until the pointer crossed it.
+  await expect
+    .poll(() => view.locator('.request-splitter').evaluate((el) => getComputedStyle(el).boxShadow))
+    .not.toBe('none');
+
   // Right icon (D2: distinct from HTTP's 'globe') and, once a target exists, the right title
   // (grpcRequestTitle's own precedence falls to the target when no name/service/method is set).
   const tab = page.locator('[data-testid="tab"]');
