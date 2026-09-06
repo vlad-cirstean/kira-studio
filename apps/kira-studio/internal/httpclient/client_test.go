@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
+	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -46,6 +48,61 @@ func TestSend_RedirectChain(t *testing.T) {
 	}
 	if resp.Redirects[1].Status != http.StatusFound || resp.Redirects[1].URL != srv.URL+"/mid" {
 		t.Errorf("Redirects[1] = %+v, want {302 %s/mid}", resp.Redirects[1], srv.URL)
+	}
+}
+
+// TestSend_CrossHostRedirectStripsUserHeaders is P21 round 3 finding 5: Go's net/http strips only
+// Authorization/WWW-Authenticate/Cookie/Cookie2 on a cross-host redirect — every other header a
+// saved request carries (X-Api-Key, PRIVATE-TOKEN, X-Amz-Security-Token, …) is copied verbatim to
+// whatever answered the redirect. A same-host redirect must still carry the header (that's the
+// ordinary, intended case httptest already covers via TestSend_RedirectChain) — only the
+// cross-host hop must drop it.
+func TestSend_CrossHostRedirectStripsUserHeaders(t *testing.T) {
+	var finalHeader, sameHostHeader string
+
+	finalSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		finalHeader = r.Header.Get("X-Api-Key")
+		_, _ = w.Write([]byte("final"))
+	}))
+	defer finalSrv.Close()
+	finalPort := finalSrv.Listener.Addr().(*net.TCPAddr).Port
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/cross-host", func(w http.ResponseWriter, r *http.Request) {
+		// "localhost" resolves to the same loopback address as httptest's own 127.0.0.1, but is a
+		// different *hostname* — exactly the case sameRedirectHost must treat as cross-origin.
+		http.Redirect(w, r, fmt.Sprintf("http://localhost:%d/", finalPort), http.StatusFound)
+	})
+	mux.HandleFunc("/same-host", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/same-host-final", http.StatusFound)
+	})
+	mux.HandleFunc("/same-host-final", func(w http.ResponseWriter, r *http.Request) {
+		sameHostHeader = r.Header.Get("X-Api-Key")
+		_, _ = w.Write([]byte("same-host"))
+	})
+	startSrv := httptest.NewServer(mux)
+	defer startSrv.Close()
+
+	if _, err := Send(context.Background(), Request{
+		Method:  "GET",
+		URL:     startSrv.URL + "/cross-host",
+		Headers: []Header{{Name: "X-Api-Key", Value: "sk-secret"}},
+	}); err != nil {
+		t.Fatalf("Send (cross-host): %v", err)
+	}
+	if finalHeader != "" {
+		t.Errorf("X-Api-Key reached the cross-host redirect target: %q, want stripped", finalHeader)
+	}
+
+	if _, err := Send(context.Background(), Request{
+		Method:  "GET",
+		URL:     startSrv.URL + "/same-host",
+		Headers: []Header{{Name: "X-Api-Key", Value: "sk-secret"}},
+	}); err != nil {
+		t.Fatalf("Send (same-host redirect): %v", err)
+	}
+	if sameHostHeader != "sk-secret" {
+		t.Errorf("X-Api-Key across a same-host redirect = %q, want \"sk-secret\" unchanged", sameHostHeader)
 	}
 }
 

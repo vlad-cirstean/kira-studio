@@ -106,6 +106,11 @@ type Response struct {
 	Timeline Timeline `json:"timeline"`
 }
 
+// redirectHeaderNamesCtxKey carries the user-supplied header names through context, sibling to
+// timelineCtxKey, so checkRedirect (which only ever sees *http.Request/[]*http.Request per its
+// stdlib-mandated signature) can strip them on a cross-host hop (P21 round 3 finding 5).
+type redirectHeaderNamesCtxKey struct{}
+
 // checkRedirect is sharedClient's CheckRedirect: net/http sets req.Response to the redirect
 // response before invoking this (net/http/client.go's do()), so the status of each hop is
 // available here even though CheckRedirect's own signature carries only requests. tl is threaded
@@ -115,15 +120,43 @@ func checkRedirect(req *http.Request, via []*http.Request) error {
 	if len(via) >= maxRedirects {
 		return fmt.Errorf("httpclient: stopped after %d redirects", maxRedirects)
 	}
-	tl, _ := req.Context().Value(timelineCtxKey{}).(*timeline)
-	if tl == nil || req.Response == nil {
-		return nil
+	if tl, _ := req.Context().Value(timelineCtxKey{}).(*timeline); tl != nil && req.Response != nil {
+		// F13: the hop's own method, status text and headers are all readable here and nowhere
+		// else; req is the next request about to be issued, so its method/URL address the hop
+		// this call is opening (D9) before a single byte of it has gone out.
+		tl.closeHop(req.Response, req.Method, req.URL.String())
 	}
-	// F13: the hop's own method, status text and headers are all readable here and nowhere else;
-	// req is the next request about to be issued, so its method/URL address the hop this call is
-	// opening (D9) before a single byte of it has gone out.
-	tl.closeHop(req.Response, req.Method, req.URL.String())
+
+	// P21 round 3 finding 5: net/http's redirect machinery copies every header from the previous
+	// hop onto this one by default, stripping only Authorization/WWW-Authenticate/Cookie/Cookie2
+	// when the host changes. A saved request's own custom headers — X-Api-Key, PRIVATE-TOKEN,
+	// X-Amz-Security-Token and the like are at least as common in this app's requests as
+	// Authorization — would otherwise silently follow a redirect to a different host, replaying a
+	// secret to whatever answered the redirect (an open redirect, a compromised CDN, a stale DNS
+	// record). Drop every header the user actually typed the moment a hop crosses hosts; the
+	// transport itself never depends on the caller's own headers being present.
+	if len(via) > 0 && !sameRedirectHost(via[len(via)-1].URL, req.URL) {
+		if names, ok := req.Context().Value(redirectHeaderNamesCtxKey{}).([]string); ok {
+			for _, name := range names {
+				req.Header.Del(name)
+			}
+		}
+	}
 	return nil
+}
+
+// sameRedirectHost mirrors net/http's own shouldCopyHeaderOnRedirect host check
+// (isDomainOrSubdomain): dest is allowed to be the same host as, or a subdomain of, from —
+// anything else counts as a cross-origin hop for header-stripping purposes here. Deliberately
+// stricter than "same registrable domain" (which would need a public suffix list this
+// dependency-free package has no business importing) — a false "cross-origin" only costs a
+// header re-add the transport doesn't need; a false "same-origin" would leak a secret.
+func sameRedirectHost(from, dest *url.URL) bool {
+	fh, dh := strings.ToLower(from.Hostname()), strings.ToLower(dest.Hostname())
+	if fh == "" || dh == "" {
+		return fh == dh
+	}
+	return dh == fh || strings.HasSuffix(dh, "."+fh)
 }
 
 // hasScheme reports whether s already begins with "<scheme>://" — deliberately stricter than
@@ -247,6 +280,18 @@ func Send(ctx context.Context, req Request) (Response, error) {
 	// connection from being recorded as a real one.
 	tl := newTimeline(req.Method, u.String())
 	sendCtx = context.WithValue(sendCtx, timelineCtxKey{}, tl)
+
+	// P21 round 3 finding 5: the user-supplied header names, threaded through context the same
+	// way tl is, so checkRedirect can strip them on a cross-host hop. Host is excluded — it is
+	// never carried in http.Header (F20a assigns it to httpReq.Host directly instead).
+	userHeaderNames := make([]string, 0, len(req.Headers))
+	for _, h := range req.Headers {
+		if strings.EqualFold(h.Name, "Host") {
+			continue
+		}
+		userHeaderNames = append(userHeaderNames, h.Name)
+	}
+	sendCtx = context.WithValue(sendCtx, redirectHeaderNamesCtxKey{}, userHeaderNames)
 
 	// P3 D7: a formdata body's boundary is resolved before buildBody runs, not after — a user-
 	// typed multipart/form-data Content-Type carrying its own boundary parameter must drive the
