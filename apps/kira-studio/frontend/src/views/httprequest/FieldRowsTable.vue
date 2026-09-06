@@ -3,7 +3,7 @@
   lang="ts"
   generic="T extends { name: string; value: string; enabled?: boolean; description?: string }"
 >
-import { computed } from 'vue';
+import { computed, nextTick, ref, watch } from 'vue';
 import type { VariableSupport } from '../../api/state/variableCompletion';
 import AutocompleteField from '../../theme/primitives/AutocompleteField.vue';
 import Checkbox from '../../theme/primitives/Checkbox.vue';
@@ -145,6 +145,24 @@ function removeRow(index: number): void {
   );
 }
 
+// P22b D16: the trailing blank row IS the add affordance (displayRows' own comment above), so the
+// row a user needs next is the one that appears BELOW the one they just filled in — off the fold
+// on any table long enough to scroll (F24). `block: 'nearest'` never moves the viewport when the
+// row is already visible, which is the common case and must stay a no-op. Guarded on growth only —
+// a removal shrinking `rows.length` must leave the viewport alone.
+const containerRef = ref<HTMLElement | null>(null);
+watch(
+  () => props.rows.length,
+  (next, prev) => {
+    if (next <= prev) return;
+    void nextTick(() => {
+      containerRef.value
+        ?.querySelector('.field-row:last-child')
+        ?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    });
+  },
+);
+
 // P15b D6 (item 12): arrow-key navigation across this table's rows, one container-level handler —
 // not a shared `theme/rowKeyNav.ts`-shaped module (OQ-4): `views/grpcrequest/**` may not import
 // `views/httprequest/**` (biome.json), MetadataTable.vue is `views/grpcrequest`'s own literal copy
@@ -225,7 +243,12 @@ function onContainerKeydown(e: KeyboardEvent): void {
 </script>
 
 <template>
-  <div class="field-rows-table" :data-testid="containerTestid" @keydown="onContainerKeydown">
+  <div
+    ref="containerRef"
+    class="field-rows-table"
+    :data-testid="containerTestid"
+    @keydown="onContainerKeydown"
+  >
     <div
       v-for="entry in displayRows"
       :key="entry.index"

@@ -2,7 +2,7 @@
 import { WELL_KNOWN_REQUEST_METADATA } from '@kira/api-core';
 import type { GrpcMetadataState } from '@shared/domain/grpc';
 import type { GrpcRequestTabRecord } from '@shared/domain/tabs';
-import { computed } from 'vue';
+import { computed, nextTick, ref, watch } from 'vue';
 import type { VariableSupport } from '../../api/state/variableCompletion';
 import { patchGrpcRequestTabState } from '../../api/tabs';
 import AutocompleteField from '../../theme/primitives/AutocompleteField.vue';
@@ -113,6 +113,22 @@ function removeRow(index: number): void {
   });
 }
 
+// P22b D16: FieldRowsTable.vue's own copy of this exact watcher (F18's own trade — see this
+// file's header comment) — the trailing blank row is the add affordance, so the row a user needs
+// next is the one appearing BELOW the one they just filled in.
+const containerRef = ref<HTMLElement | null>(null);
+watch(
+  () => props.tab.state.metadata.length,
+  (next, prev) => {
+    if (next <= prev) return;
+    void nextTick(() => {
+      containerRef.value
+        ?.querySelector('.metadata-row:last-child')
+        ?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    });
+  },
+);
+
 // P15b D6 (item 12): arrow-key navigation across this table's rows — a literal copy of
 // views/httprequest/FieldRowsTable.vue's own handler (F18/OQ-4: `views/grpcrequest/**` may not
 // import `views/httprequest/**`, biome.json, and this handler is small enough that duplicating it
@@ -178,7 +194,12 @@ function onContainerKeydown(e: KeyboardEvent): void {
 </script>
 
 <template>
-  <div class="metadata-table" data-testid="grpc-metadata-table" @keydown="onContainerKeydown">
+  <div
+    ref="containerRef"
+    class="metadata-table"
+    data-testid="grpc-metadata-table"
+    @keydown="onContainerKeydown"
+  >
     <div
       v-for="entry in displayRows"
       :key="entry.index"

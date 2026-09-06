@@ -2,7 +2,7 @@
 import type { PaletteColor } from '@shared/domain/color';
 import type { VariableSetTabRecord } from '@shared/domain/tabs';
 import type { ApiVariable } from '@shared/domain/variables';
-import { computed, onMounted, reactive, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue';
 import { connectionsState } from '../state/connections';
 import AppButton from '../theme/primitives/AppButton.vue';
 import ColorPicker from '../theme/primitives/ColorPicker.vue';
@@ -353,6 +353,23 @@ async function onRemove(id: string): Promise<void> {
   await deleteVariable(props.tab.id, scope.value, ownerId.value, id);
 }
 
+// P22b D16: FieldRowsTable.vue's own trailing-blank-row watcher, restated for this view's own
+// shape — the scroller is `.p-dialog-body.list` (not `.field-rows-table`), the row class is
+// `.variable-row` (not `.field-row`), and the watched count is `allRealRows` (this view's own
+// real-row list) rather than a `rows` prop.
+const listRef = ref<HTMLElement | null>(null);
+watch(
+  () => allRealRows.value.length,
+  (next, prev) => {
+    if (next <= prev) return;
+    void nextTick(() => {
+      listRef.value
+        ?.querySelector('.variable-row:last-child')
+        ?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    });
+  },
+);
+
 function onHistoryClickFor(row: ApiVariable): void {
   void openHistoryMenu(props.tab.id, scope.value, ownerId.value, row.id);
 }
@@ -419,7 +436,7 @@ function onBulkClose(): void {
         :rows="rows"
         @close="onBulkClose"
       />
-      <div v-else class="p-dialog-body list">
+      <div v-else ref="listRef" class="p-dialog-body list">
         <MessageStrip v-if="error" tone="err" data-testid="variables-error">
           {{ error }}
         </MessageStrip>
