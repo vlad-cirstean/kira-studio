@@ -14,6 +14,7 @@ import './support/window';
 import { describe, expect, test } from 'bun:test';
 import type { PageCursor } from '@shared/protocol/data-ops';
 import type { KeyValuePage, TextColumnChunk } from '@shared/protocol/page';
+import { isReactive } from 'vue';
 
 const { control } = await import('../../frontend/src/bridge/control');
 const { data } = await import('../../frontend/src/bridge/data');
@@ -168,6 +169,29 @@ describe('views/browse/state.ts — load() supersession guard (P44 F47, P43 D39)
 
     expect(browseRuntime[id]?.status).toBe('error');
     expect(browseRuntime[id]?.nodes).toEqual([]);
+  });
+
+  // P21 round 3 performance finding 8: `runtime` (viewOp.ts's createRuntimeStore) is a deep
+  // reactive() — assigning a plain array to `rt.nodes` used to wrap it, and every TreeNode inside
+  // it, in its own reactivity Proxy the moment BrowseView.vue's filteredNodes read them. A Redis/S3
+  // level can hold up to 200 000 nodes (redis/catalog.go's scanCount x maxScanRounds); nothing here
+  // ever mutates a node in place (`nodes` is always replaced wholesale), so the deep wrap bought
+  // nothing — the same shape project/state/tree.ts's own `children` already moved off deep
+  // reactivity for.
+  test('6. a loaded node list is markRaw — not wrapped in a reactivity Proxy (finding 8)', async () => {
+    const { id } = openBrowseTab('conn6', 'bucket:six', { newTab: true });
+    // biome-ignore lint/suspicious/noExplicitAny: a minimal fake, not the real TreeChildrenResult
+    (control as any).treeChildren = async () => ({
+      nodes: [{ name: 'a' }, { name: 'b' }],
+      truncated: false,
+    });
+    await loadBrowse(id);
+
+    const nodes = browseRuntime[id]?.nodes;
+    expect(nodes).toBeDefined();
+    expect(isReactive(nodes)).toBe(false);
+    expect(isReactive(nodes?.[0])).toBe(false);
+    expect(nodes?.map((n) => n.name)).toEqual(['a', 'b']);
   });
 });
 

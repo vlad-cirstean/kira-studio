@@ -1,4 +1,5 @@
 import { pathParent, type TreeNode } from '@shared/domain/tree';
+import { markRaw } from 'vue';
 import { control } from '../../bridge/control';
 import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
 import { findBrowseTab, patchBrowseTabState, unmarkHydrated } from '../../state/tabs';
@@ -78,7 +79,16 @@ export async function load(tabId: string, opts?: { refresh?: boolean }): Promise
   try {
     const result = await control.treeChildren(tab.connectionId, level, opts?.refresh ?? false);
     if (rt.loadSeq !== seq) return; // superseded by a newer load
-    rt.nodes = result.nodes;
+    // P21 round 3 performance finding 8: `runtime` (viewOp.ts's createRuntimeStore) is a deep
+    // reactive() — necessary for the plain scalar fields every other view's runtime keeps, but a
+    // Redis/S3 level can hold up to 200 000 TreeNodes (redis/catalog.go's own scanCount x
+    // maxScanRounds), and assigning a plain array here would wrap every one of them (and their own
+    // `badges` array) in its own reactivity Proxy the moment filteredNodes reads them — for state
+    // nothing here ever mutates in place (`nodes` is always replaced wholesale, never pushed into).
+    // markRaw is project/state/tree.ts's own precedent for exactly this shape (`children`'s own
+    // comment: "deep-wrapping every one of them in a reactivity Proxy bought nothing no writer ever
+    // used").
+    rt.nodes = markRaw(result.nodes);
     rt.truncated = result.truncated;
     rt.status = 'idle';
   } catch (err) {
