@@ -224,6 +224,45 @@ describe('http/curl/generate.ts — toCurl (P7 D13-D16)', () => {
     expect(command).not.toContain("-F 'note");
   });
 
+  // P21 round 3 functional finding 9: `;` is -F's own parameter separator, and the guard above
+  // only checked the value's *first* character (the F10 `@`/`<` case). A text value containing a
+  // `;` — "Hello; world", say — emitted as `-F 'note=Hello; world;type=text/plain'` sends `note` =
+  // "Hello" (curl reads ` world` as an unrecognised parameter, not part of the value): the
+  // generated command silently stopped being equivalent to what Send actually puts on the wire,
+  // the exact failure class round 2 finding 5 introduced this branch to fix, reopened for a value
+  // containing `;` instead of a leading `@`/`<`. Falls back to --form-string, same tradeoff (the
+  // type is lost) as the leading-`@`/`<` case just above.
+  test('a formdata text row whose value contains a ";" falls back to --form-string, not a broken -F', () => {
+    const command = toCurl(
+      req({
+        method: 'POST',
+        body: {
+          ...EMPTY_BODY,
+          mode: 'formdata',
+          formData: [
+            {
+              name: 'note',
+              kind: 'text',
+              value: 'Hello; world',
+              path: '',
+              contentType: 'text/plain',
+            },
+          ],
+        },
+      }),
+    );
+    expect(command).toContain('--form-string');
+    expect(command).not.toContain("-F 'note");
+
+    // The generated command must round-trip to the exact value Send would have sent — not a
+    // truncated "Hello".
+    const reparsed = parseCurl(command);
+    if ('error' in reparsed) throw new Error(`parseCurl: ${reparsed.error}`);
+    expect(reparsed.state.formData).toEqual([
+      expect.objectContaining({ name: 'note', kind: 'text', value: 'Hello; world' }),
+    ]);
+  });
+
   test('a formdata file row uses -F, with a stated Content-Type appended (F10)', () => {
     const command = toCurl(
       req({

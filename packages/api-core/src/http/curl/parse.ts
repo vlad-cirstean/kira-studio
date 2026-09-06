@@ -76,12 +76,20 @@ function decodeQueryComponent(s: string): string {
 function toUrlEncodedRows(pieces: readonly RawDataPiece[]): HttpUrlEncodedFieldState[] {
   const rows: HttpUrlEncodedFieldState[] = [];
   for (const piece of pieces) {
-    const subPieces = piece.id === 'data-urlencode' ? [piece.text] : piece.text.split('&');
+    // P21 round 3 functional finding 8: a `--data-urlencode` piece's value is literal text *curl
+    // itself* percent-encodes before putting it on the wire (the comment above the `&`-split
+    // already says so) — decodeQueryComponent below used to run on it anyway, so a piece curl
+    // would send byte-for-byte (`q=a+b` -> `q=a%2Bb` on the wire) got decoded into `"a b"` and
+    // re-sent as a *different* value (`q=a%20b`). `--data`/`--data-raw`/`--data-binary` pieces are
+    // the opposite case (already percent-encoded text this app's own toCurl produced) and still
+    // need decoding to avoid double-encoding on re-send (D17's round trip, described above).
+    const isDataUrlencode = piece.id === 'data-urlencode';
+    const subPieces = isDataUrlencode ? [piece.text] : piece.text.split('&');
     for (const sub of subPieces) {
       const kv = parseAsKeyValue(sub);
       rows.push({
-        name: decodeQueryComponent(kv?.name ?? ''),
-        value: decodeQueryComponent(kv?.value ?? ''),
+        name: isDataUrlencode ? (kv?.name ?? '') : decodeQueryComponent(kv?.name ?? ''),
+        value: isDataUrlencode ? (kv?.value ?? '') : decodeQueryComponent(kv?.value ?? ''),
         enabled: true,
       });
     }

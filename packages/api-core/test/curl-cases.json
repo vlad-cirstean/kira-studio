@@ -274,6 +274,28 @@
       "warnings": []
     },
     {
+      "name": "P21 round 3 finding 8: --data-urlencode's literal '+' is not decoded to a space",
+      "command": "curl -X POST https://api.test/x --data-urlencode 'q=a+b'",
+      "want": {
+        "method": "POST",
+        "url": "https://api.test/x",
+        "bodyMode": "urlencoded",
+        "urlEncoded": [{ "name": "q", "value": "a+b", "enabled": true }]
+      },
+      "warnings": []
+    },
+    {
+      "name": "P21 round 3 finding 8: --data-urlencode's literal %-sequence is not percent-decoded",
+      "command": "curl -X POST https://api.test/x --data-urlencode 'p=%2Fx%2Fy'",
+      "want": {
+        "method": "POST",
+        "url": "https://api.test/x",
+        "bodyMode": "urlencoded",
+        "urlEncoded": [{ "name": "p", "value": "%2Fx%2Fy", "enabled": true }]
+      },
+      "warnings": []
+    },
+    {
       "name": "-T uploads a file and infers PUT",
       "command": "curl -T /tmp/upload.csv https://x.test/put",
       "want": {

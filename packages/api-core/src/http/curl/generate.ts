@@ -80,7 +80,7 @@ export function toCurl(req: CurlRequest): string {
         if (f.kind === 'file') {
           const typeSuffix = f.contentType ? `;type=${f.contentType}` : '';
           flagUnits.push(['-F', `${f.name}=@${f.path}${typeSuffix}`]);
-        } else if (f.contentType && !/^[@<]/.test(f.value)) {
+        } else if (f.contentType && !/^[@<]/.test(f.value) && !f.value.includes(';')) {
           // P21 round 2 functional finding 5: internal/httpclient's own formPartHeader sets a
           // per-part Content-Type for a text row whenever the row carries one (body.go), but this
           // generator used to emit every text row as --form-string unconditionally, which has no
@@ -90,7 +90,13 @@ export function toCurl(req: CurlRequest): string {
           // row with a content type now uses it, mirroring the file branch above — guarded on the
           // value's own first character, since F10's "-F misreads a leading '@'/'<'" hazard
           // applies here too and --form-string remains the only safe spelling for that case (at
-          // the cost of the type, same as before, in that narrow combination).
+          // the cost of the type, same as before, in that narrow combination). P21 round 3
+          // functional finding 9: also guarded on the value containing no `;` at all — `;` is
+          // `-F`'s own parameter separator, so `-F 'note=Hello; world;type=text/plain'` sends
+          // `note=Hello` and leaves ` world` to be misread as a malformed parameter, not part of
+          // the value. parse.ts's own importer agrees (it splits `rest` on `;` and keeps only the
+          // first segment), so this is the same class of unsafe-character exclusion as `@`/`<`,
+          // just for a different metacharacter.
           flagUnits.push(['-F', `${f.name}=${f.value};type=${f.contentType}`]);
         } else {
           // F10: -F refuses (or misreads) a value beginning with '@' or '<' — --form-string never
