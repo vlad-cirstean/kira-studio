@@ -56,3 +56,12 @@ export function cellClass(flags: CellClassFlags): Record<string, boolean> {
   }
   return out;
 }
+
+/** {@link cellClass}'s own keys, as a plain array — the shape `setCellCssStyles` (a lone class
+ *  name per keyed layer, never a `:class` object) and a search/pending-edit one-off classname
+ *  lookup both want. Shared by views/grid/SlickGridHost.vue's own search/pending-edit hashes and
+ *  views/shared/slick/selectionEdges.ts's perimeter computation (P22 D10) — one definition rather
+ *  than two identical two-line copies. */
+export function classesFrom(flags: CellClassFlags): string[] {
+  return Object.keys(cellClass(flags));
+}

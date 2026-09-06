@@ -27,7 +27,7 @@ import { connectionRecord, connectionsState } from '../../state/connections';
 import { openContextMenu, runMenuShortcut } from '../../state/contextMenu';
 import { appearanceVersion, settingsState } from '../../state/settings';
 import { findDataTab, patchDataTabState } from '../../state/tabs';
-import { type CellClassFlags, cellClass } from '../../theme/cellClass';
+import { classesFrom } from '../../theme/cellClass';
 import { categoryForTypeClass } from '../../theme/icons';
 import AppButton from '../../theme/primitives/AppButton.vue';
 import EmptyState from '../../theme/primitives/EmptyState.vue';
@@ -52,6 +52,7 @@ import {
 import { setSearchFiltering } from '../shared/page/searchFilter';
 import { type EdgeHash, searchCellLayers } from '../shared/slick/cssLayers';
 import { KiraSlickGrid } from '../shared/slick/kiraSlickGrid';
+import { computeSelEdgeHashes, SEL_EDGE_LAYER_KEYS } from '../shared/slick/selectionEdges';
 import { sqlDialectFor } from '../shared/sqlIdent';
 import { cellMenu, headerMenu, rowMenu } from './menu';
 import {
@@ -705,132 +706,27 @@ function fieldAtDisplayCol(displayCol: number): string | undefined {
   return c ? String(c.field) : undefined;
 }
 
-// One class name per FLAG_CLASS_NAMES entry actually set — `setCellCssStyles`'s own hash value
-// ultimately reaches a single `classList.add(value)` call (SlickGrid's own
-// updateCellCssStylesOnRenderedRows), which throws InvalidCharacterError for a multi-token string
-// (the DOM spec's own "no whitespace in one token" rule) — so a cell needing more than one edge
-// class can never be expressed as one merged string in one layer. Four separate keyed layers
-// below (one per edge) are what keep every hash value a lone token while still letting one cell
-// carry all four edges at once.
-function classesFrom(flags: CellClassFlags): string[] {
-  return Object.keys(cellClass(flags));
-}
-
-const SEL_EDGE_LAYER_KEYS = ['kira-sel-t', 'kira-sel-r', 'kira-sel-b', 'kira-sel-l'] as const;
-
-/** C5/§5 D5 — the selection's own perimeter, O(perimeter ∩ rendered) by construction: only the
- *  two edge columns (c0/c1, or every selected row's own two edge columns for a row selection, or
- *  every selected column's own two edge rows for a column selection) are ever walked per rendered
- *  row — never the interior. A committed selection is at most one rectangle (or, in row/column
- *  mode, a set of full-width/full-height strips), which is what keeps this bounded regardless of
- *  how large the selection itself is (F2's O(area) cost is `kira-cell-selected`'s own — SlickGrid's
- *  built-in layer, gated separately at C6). Page-row space in, translated once per rendered row via
- *  `dataSource.getItem(pos).row` — the same arithmetic `onGridRendered` already uses.
- */
-function computeSelEdgeHashes(
-  selOverride?: Selection | null,
-): [EdgeHash, EdgeHash, EdgeHash, EdgeHash] {
-  const hashes: [EdgeHash, EdgeHash, EdgeHash, EdgeHash] = [{}, {}, {}, {}];
-  if (!grid || !dataSource) return hashes;
-  const sel = selOverride !== undefined ? selOverride : rt()?.selection;
-  if (!sel) return hashes;
-  const { start, end } = grid.lastRenderedRowBounds;
-  if (end < start) return hashes;
-
-  const mark = (pos: number, displayCol: number, flags: CellClassFlags): void => {
-    const field = fieldAtDisplayCol(displayCol);
-    if (!field) return;
-    for (const cls of classesFrom(flags)) {
-      const i = SEL_EDGE_LAYER_KEYS.indexOf(`kira-${cls}` as (typeof SEL_EDGE_LAYER_KEYS)[number]);
-      if (i < 0) continue;
-      const hash = hashes[i] as EdgeHash;
-      hash[pos] ??= {};
-      (hash[pos] as Record<string, string>)[field] = cls;
-    }
-  };
-
-  if (sel.kind === 'cell' || sel.kind === 'range') {
-    const anchorRow = sel.kind === 'range' ? sel.anchorRow : sel.row;
-    const anchorCol = sel.kind === 'range' ? sel.anchorCol : sel.col;
-    const r0 = Math.min(anchorRow, sel.row);
-    const r1 = Math.max(anchorRow, sel.row);
-    const c0 = Math.min(anchorCol, sel.col);
-    const c1 = Math.max(anchorCol, sel.col);
-    for (let pos = start; pos <= end; pos++) {
-      const pageRow = dataSource.getItem(pos).row;
-      if (pageRow < r0 || pageRow > r1) continue;
-      const isTop = pageRow === r0;
-      const isBottom = pageRow === r1;
-      mark(pos, c0, {
-        selEdgeLeft: true,
-        selEdgeRight: c0 === c1,
-        selEdgeTop: isTop,
-        selEdgeBottom: isBottom,
-      });
-      if (c1 !== c0)
-        mark(pos, c1, { selEdgeRight: true, selEdgeTop: isTop, selEdgeBottom: isBottom });
-      // Interior columns of the top/bottom row only — c0/c1 already got their own edge above.
-      if (isTop) for (let c = c0 + 1; c <= c1 - 1; c++) mark(pos, c, { selEdgeTop: true });
-      if (isBottom) for (let c = c0 + 1; c <= c1 - 1; c++) mark(pos, c, { selEdgeBottom: true });
-    }
-  } else if (sel.kind === 'row') {
-    const rows = new Set(sel.rows);
-    const lastCol = grid.getColumns().length - 1 - 1; // minus the gutter, then to a 0-based index
-    for (let pos = start; pos <= end; pos++) {
-      const pageRow = dataSource.getItem(pos).row;
-      if (!rows.has(pageRow)) continue;
-      const isTop = !rows.has(pageRow - 1);
-      const isBottom = !rows.has(pageRow + 1);
-      // Real-interaction fix (a later coordinator round, "row selection only shows a border on
-      // the first cell") — this loop used to mark only the two edge COLUMNS (c=0, c=lastCol)
-      // with selEdgeTop/selEdgeBottom, which is correct for a cell/range rectangle's own top/
-      // bottom edge (only the two boundary columns' cells sit on that edge) but wrong for a row
-      // selection: every column across the full row width sits on the row's own top/bottom
-      // boundary, not just the two ends. Confirmed live: a gutter row-select's fill
-      // (`kira-cell-selected`) already covered every cell correctly, but the perimeter's own
-      // top/bottom box-shadow line only ever appeared on the leftmost and rightmost columns,
-      // leaving a visible gap over every interior column — exactly the "only the first cell"
-      // symptom. Every column now gets selEdgeTop/selEdgeBottom; selEdgeLeft/selEdgeRight stay
-      // exclusive to column 0 / lastCol, same as before.
-      for (let c = 0; c <= lastCol; c++) {
-        mark(pos, c, {
-          selEdgeLeft: c === 0,
-          selEdgeRight: c === lastCol,
-          selEdgeTop: isTop,
-          selEdgeBottom: isBottom,
-        });
-      }
-    }
-  } else if (sel.kind === 'column') {
-    const cols = new Set(sel.cols);
-    // Display row count, not the page's own row count (same fix as onSelectAll/
-    // onHeaderSelectClick's own `displayRowCount`, C12) — `pos` here is already a display
-    // position (RowHandle.pos, from dataSource.getItem below), so comparing it against the
-    // display-row bounds is correct with or without an active filter; comparing the underlying
-    // *page* row against `pageRowCount - 1` was not — under a filter the last row actually
-    // rendered can have a page-row index far short of `pageRowCount - 1` (or the filter can even
-    // exclude the true first/last page row), so the bottom (and top) selection-perimeter line
-    // would fail to draw at all.
-    const displayRowCount = currentDisplayRows()?.length ?? getPage(props.tabId)?.rowCount ?? 0;
-    for (let pos = start; pos <= end; pos++) {
-      const isTop = pos === 0;
-      const isBottom = pos === displayRowCount - 1;
-      for (const c of cols) {
-        mark(pos, c, {
-          selEdgeTop: isTop,
-          selEdgeBottom: isBottom,
-          selEdgeLeft: !cols.has(c - 1),
-          selEdgeRight: !cols.has(c + 1),
-        });
-      }
-    }
-  }
-  return hashes;
-}
-
+// P22 D10: moved to views/shared/slick/selectionEdges.ts, verbatim, so
+// views/console/ConsoleSlickGrid.vue can share it (F17/F18) — see that file's own header comment.
 function refreshSelEdges(selOverride?: Selection | null): void {
-  if (!grid) return;
-  const hashes = computeSelEdgeHashes(selOverride);
+  if (!grid || !dataSource) return;
+  const sel = selOverride !== undefined ? selOverride : (rt()?.selection ?? null);
+  // Display row count, not the page's own row count (same fix as onSelectAll/
+  // onHeaderSelectClick's own `displayRowCount`, C12) — `pos` (a display position) is compared
+  // against the display-row bounds, correct with or without an active filter; comparing the
+  // underlying *page* row against `pageRowCount - 1` was not — under a filter the last row
+  // actually rendered can have a page-row index far short of `pageRowCount - 1` (or the filter
+  // can even exclude the true first/last page row), so the bottom (and top) selection-perimeter
+  // line would fail to draw at all. Only consulted for a 'column' selection's own top/bottom test.
+  const displayRowCount = currentDisplayRows()?.length ?? getPage(props.tabId)?.rowCount ?? 0;
+  const hashes = computeSelEdgeHashes(
+    sel,
+    grid.lastRenderedRowBounds,
+    (pos) => dataSource?.getItem(pos).row ?? pos,
+    fieldAtDisplayCol,
+    displayRowCount,
+    grid.getColumns().length - 1, // minus the gutter
+  );
   SEL_EDGE_LAYER_KEYS.forEach((key, i) => {
     grid?.setCellCssStyles(key, hashes[i] as EdgeHash);
   });
