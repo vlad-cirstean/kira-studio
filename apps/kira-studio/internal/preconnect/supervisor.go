@@ -45,6 +45,12 @@ var (
 	killGrace    = 2 * time.Second
 )
 
+// killSignal is syscall.Kill, indirected through a var (postgres/client.go's pgxConnect-as-a-var
+// is this codebase's own precedent for the pattern) so a test can observe — without needing to
+// actually reach a recycled pid, which isn't reproducible on demand — whether killEntry attempted
+// to signal an entry it should have recognised as already dead (P21 round 3 finding 6).
+var killSignal = syscall.Kill
+
 // outcome is the classified result of cmd.Wait().
 type outcome struct {
 	code   *int
@@ -272,18 +278,41 @@ func (s *Supervisor) StopAll() {
 // killEntry sends SIGTERM to the process group, escalates to SIGKILL after killGrace, waits for
 // the real exit, and removes the entry. Marking killing=true first ensures awaitExit's own exit
 // routing stays silent for this kill.
+//
+// P21 round 3 finding 6: an entry can reach here already dead — awaitExit deliberately leaves a
+// sidecar that exited on its own (before Arm was ever called) sitting in s.entries for Arm to
+// consume, and Arm may never come (a connect that fails after the script settled, a connection
+// removed before arming). e.pid has already been reaped by cmd.Wait() in that case, and on a busy
+// machine a reaped pid can be recycled as the leader of an *unrelated* process group by the time
+// Stop/StopAll reaches it here — signalling -e.pid unconditionally would SIGTERM/SIGKILL whatever
+// that pid now is, not this sidecar. e.exited is closed exactly once cmd.Wait() returns, so
+// checking it first (and re-checking right before the escalation fires, racing the same reap)
+// skips the whole kill/escalate dance for an entry that is already gone.
 func (s *Supervisor) killEntry(connectionID string, e *entry) {
 	e.mu.Lock()
 	e.killing = true
 	e.mu.Unlock()
 
-	_ = syscall.Kill(-e.pid, syscall.SIGTERM)
+	select {
+	case <-e.exited:
+		// Already dead (or dies in the instant before the signal below goes out — an
+		// unavoidable, narrower race a non-atomic check-then-kill can't fully close). ESRCH from
+		// a stale pid is otherwise indistinguishable from "no such process" for an unrelated
+		// pid that never existed, so there is nothing further to signal here.
+	default:
+		_ = killSignal(-e.pid, syscall.SIGTERM)
 
-	escalate := time.AfterFunc(killGrace, func() {
-		_ = syscall.Kill(-e.pid, syscall.SIGKILL)
-	})
-	<-e.exited
-	escalate.Stop()
+		escalate := time.AfterFunc(killGrace, func() {
+			select {
+			case <-e.exited:
+				return // reaped between the SIGTERM above and this timer firing.
+			default:
+			}
+			_ = killSignal(-e.pid, syscall.SIGKILL)
+		})
+		<-e.exited
+		escalate.Stop()
+	}
 
 	s.mu.Lock()
 	if s.entries[connectionID] == e {

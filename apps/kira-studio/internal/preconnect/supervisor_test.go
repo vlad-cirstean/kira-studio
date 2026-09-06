@@ -193,6 +193,45 @@ func TestSelfInflictedKillDoesNotFireOnExit(t *testing.T) {
 	})
 }
 
+// TestStopOnAlreadyDeadEntrySkipsSignalling is P21 round 3 finding 6: an entry whose sidecar died
+// on its own before Arm was ever called (the exact case entryDead/TestDiedBetweenStartAndArm
+// above covers) is deliberately left tracked in s.entries for Arm to consume — but Arm may never
+// come (a connection removed, or a connect that fails, before arming). killEntry used to signal
+// -e.pid unconditionally regardless: harmless against the real, still-around pid in this test, but
+// on a busy machine a reaped pid can be recycled as an unrelated process group's leader, so
+// signalling it would hit whatever that pid now is instead of a no-op. killSignal is swapped for a
+// recorder so this test can assert the *attempt* never happens for an already-dead entry, without
+// needing an actual pid recycling (which isn't something a test can force on demand).
+func TestStopOnAlreadyDeadEntrySkipsSignalling(t *testing.T) {
+	old := killSignal
+	var calls []int
+	killSignal = func(pid int, sig syscall.Signal) error {
+		calls = append(calls, pid)
+		return old(pid, sig)
+	}
+	t.Cleanup(func() { killSignal = old })
+
+	// A script that survives long enough to settle as a sidecar, then exits on its own — the
+	// settle window is 80ms in this package's test init, so "sleep 0.2" reliably settles first.
+	s := New()
+	got, err := s.Start("c1", "sleep 0.2; exit 0")
+	if err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	if got.Kind != KindSidecar {
+		t.Fatalf("Kind = %q, want %q", got.Kind, KindSidecar)
+	}
+	waitUntil(t, 2*time.Second, func() bool { return entryDead(s, "c1") != nil })
+
+	// Arm is never called — exactly the "died between Start and an Arm that never came" case.
+	calls = nil
+	s.Stop("c1")
+
+	if len(calls) != 0 {
+		t.Fatalf("killSignal called %d time(s) for an already-dead entry, want 0: pids %v", len(calls), calls)
+	}
+}
+
 // TestSigtermEscalatesToSigkill covers killEntry's escalation: a script that ignores SIGTERM must
 // still be dead by the time Stop returns, and Stop must block for the real exit.
 func TestSigtermEscalatesToSigkill(t *testing.T) {
