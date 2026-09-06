@@ -99,32 +99,54 @@ function fakerCall(
   dialect: SqlDialect | undefined,
 ): () => string {
   switch (id) {
+    // P21 round 3 functional finding 1: every one of these text generators used to return
+    // faker's raw output with no reference to bounds.maxLength, even though it is already parsed
+    // out of the column's own varchar(n)/char(n)/nvarchar(n)/FixedString(n) declaration and
+    // handed in here. A value even one character over the column's declared length aborted the
+    // whole batch (`value too long for type character varying(n)`) with committedRows = 0 and
+    // nothing in the plan warning it could happen — clamp bounds every case the same way the
+    // three lorem.* generators already were.
     case 'person.fullName':
-      return () => faker.person.fullName();
+      return () => clamp(faker.person.fullName(), bounds.maxLength);
     case 'person.firstName':
-      return () => faker.person.firstName();
+      return () => clamp(faker.person.firstName(), bounds.maxLength);
     case 'person.lastName':
-      return () => faker.person.lastName();
+      return () => clamp(faker.person.lastName(), bounds.maxLength);
     case 'internet.email':
-      return () => faker.internet.email();
+      return () => clamp(faker.internet.email(), bounds.maxLength);
     case 'internet.url':
-      return () => faker.internet.url();
+      return () => clamp(faker.internet.url(), bounds.maxLength);
     case 'phone.number':
-      return () => faker.phone.number();
+      return () => clamp(faker.phone.number(), bounds.maxLength);
     case 'location.city':
-      return () => faker.location.city();
+      return () => clamp(faker.location.city(), bounds.maxLength);
     case 'location.country':
-      return () => faker.location.country();
+      return () => clamp(faker.location.country(), bounds.maxLength);
     case 'location.state':
-      return () => faker.location.state();
+      return () => clamp(faker.location.state(), bounds.maxLength);
     case 'location.zipCode':
-      return () => faker.location.zipCode();
+      return () => clamp(faker.location.zipCode(), bounds.maxLength);
     case 'location.streetAddress':
-      return () => faker.location.streetAddress();
+      return () => clamp(faker.location.streetAddress(), bounds.maxLength);
     case 'company.name':
-      return () => faker.company.name();
+      return () => clamp(faker.company.name(), bounds.maxLength);
     case 'finance.amount':
-      return () => faker.finance.amount({ dec: bounds.scale ?? 2 });
+      // P21 round 3 functional finding 2: finance.amount is offered (and name-heuristic-matched
+      // via price/amount/total/cost/salary) for both text and number columns, but used to ignore
+      // the column's own numeric bounds entirely — faker's default 0..1000 range with 2 decimals
+      // overflows a narrow numeric(p,s) and isn't even syntactically valid for an integer column.
+      // An int/bigint/smallint column (bounds.intRange) gets a real integer via the already
+      // bounds-aware randomIntText instead of a decimal string; a numeric(p,s) column's max is
+      // derived from precision - scale (the digits available before the decimal point), capped so
+      // the float arithmetic behind faker's own `max` option never runs into precision loss for a
+      // very large declared precision.
+      if (bounds.intRange) return () => randomIntText(faker, bounds);
+      if (bounds.precision !== undefined) {
+        const dec = bounds.scale ?? 0;
+        const wholeDigits = Math.max(1, Math.min(bounds.precision - dec, 15));
+        return () => faker.finance.amount({ dec, max: 10 ** wholeDigits - 1 });
+      }
+      return () => clamp(faker.finance.amount({ dec: bounds.scale ?? 2 }), bounds.maxLength);
     case 'date.recent':
       return () => formatTemporal(faker.date.recent(), dataType, dialect);
     case 'date.birthdate':
@@ -138,19 +160,29 @@ function fakerCall(
     case 'lorem.slug':
       return () => clamp(faker.lorem.slug(), bounds.maxLength);
     case 'string.uuid':
-      return () => faker.string.uuid();
+      return () => clamp(faker.string.uuid(), bounds.maxLength);
     case 'datatype.boolean':
       return () => String(faker.datatype.boolean());
     case 'number.int':
       return () => randomIntText(faker, bounds);
     case 'json.object':
       return () =>
-        JSON.stringify({
-          note: faker.lorem.words(3),
-          value: faker.number.int({ min: 0, max: 1000 }),
-        });
-    case 'binary.hex':
-      return () => `0x${faker.string.hexadecimal({ length: 16, casing: 'lower', prefix: '' })}`;
+        clamp(
+          JSON.stringify({
+            note: faker.lorem.words(3),
+            value: faker.number.int({ min: 0, max: 1000 }),
+          }),
+          bounds.maxLength,
+        );
+    case 'binary.hex': {
+      // P21 round 3 functional finding 1: the hex length was a fixed 16 (8 bytes) regardless of
+      // the column's own declared length — derive it from bounds.maxLength (never more than the
+      // previous fixed default) when known, one byte minimum.
+      const hexLength =
+        bounds.maxLength !== undefined ? Math.max(2, Math.min(16, bounds.maxLength * 2)) : 16;
+      return () =>
+        `0x${faker.string.hexadecimal({ length: hexLength, casing: 'lower', prefix: '' })}`;
+    }
   }
 }
 
