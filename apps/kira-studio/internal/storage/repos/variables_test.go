@@ -177,6 +177,62 @@ func TestVariableHistoryRecordsOnChangeDedupedAndTrimmed(t *testing.T) {
 	}
 }
 
+// ---- 2b. flipping a variable from plain to secret purges its pre-secret plaintext history ----
+
+// TestUpsertToSecretPurgesPlaintextHistory is P21 round 3 finding 1 (architecture/security): a
+// variable that was edited a few times while still plain, then flipped to Secret, must not leave
+// its earlier plaintext values sitting in api_variable_history — that table has no reveal gate for
+// a row whose own is_secret is 0, so those rows are exactly as exposed as a plain variable's
+// current value, backups and all, once the variable itself is meant to be protected.
+func TestUpsertToSecretPurgesPlaintextHistory(t *testing.T) {
+	r, db := newVariablesRepo(t)
+	collectionID := newCollectionFor(t, db)
+
+	v, err := r.Upsert(model.VariableScopeCollection, collectionID, "", "token", "sk-live-old", false, "")
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	// A plain edit records "sk-live-old" in history.
+	if _, err := r.Upsert(model.VariableScopeCollection, collectionID, v.ID, "token", "sk-live-mid", false, ""); err != nil {
+		t.Fatalf("plain edit: %v", err)
+	}
+	hist, err := r.History(v.ID)
+	if err != nil {
+		t.Fatalf("History: %v", err)
+	}
+	if len(hist) != 1 || hist[0].Value != "sk-live-old" || hist[0].IsSecret {
+		t.Fatalf("hist before flip = %+v, want one plain entry carrying sk-live-old", hist)
+	}
+
+	// Flip to secret in the same edit that also changes the value: recordHistory would otherwise
+	// stamp *this* transition's row is_secret=0 too (the flag is read from the old row), leaving the
+	// value it replaced ("sk-live-mid") in cleartext right alongside the earlier one.
+	if _, err := r.Upsert(model.VariableScopeCollection, collectionID, v.ID, "token", "sk-live-new", true, ""); err != nil {
+		t.Fatalf("flip to secret: %v", err)
+	}
+
+	hist, err = r.History(v.ID)
+	if err != nil {
+		t.Fatalf("History after flip: %v", err)
+	}
+	if len(hist) != 0 {
+		t.Fatalf("len(hist) after flipping to secret = %d, want 0 (every pre-secret plaintext row purged); got %+v", len(hist), hist)
+	}
+
+	// A subsequent secret-to-secret edit records history the normal, encrypted way and is
+	// unaffected by the purge.
+	if _, err := r.Upsert(model.VariableScopeCollection, collectionID, v.ID, "token", "sk-live-newer", true, ""); err != nil {
+		t.Fatalf("secret edit: %v", err)
+	}
+	hist, err = r.History(v.ID)
+	if err != nil {
+		t.Fatalf("History after secret edit: %v", err)
+	}
+	if len(hist) != 1 || !hist[0].IsSecret || hist[0].Value != "" {
+		t.Fatalf("hist after secret edit = %+v, want one masked secret entry", hist)
+	}
+}
+
 // ---- 3. List never returns a secret's plaintext or ciphertext ----
 
 func TestVariablesListNeverReturnsASecret(t *testing.T) {

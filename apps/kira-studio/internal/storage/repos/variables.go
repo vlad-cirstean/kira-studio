@@ -462,6 +462,22 @@ func (r *VariablesRepo) Upsert(scope model.VariableScope, ownerID, id, name, val
 		return model.Variable{}, fmt.Errorf("repos/variables: update variable %s: %w", id, err)
 	}
 
+	// Finding 1 (P21 round 3, architecture/security): a variable flipped from plain to secret must
+	// not leave its pre-secret plaintext sitting in api_variable_history. recordHistory stamps a
+	// row's is_secret from the flag *at the time that row was written*, so every history row
+	// recorded while this variable was still plain (is_secret = 0) — including, potentially, the one
+	// just inserted above for this very transition — carries the old value in cleartext in its
+	// `value` column, with no reveal gate. Once the variable itself becomes a secret, those rows are
+	// exactly as sensitive as its current value and the app has no story for "the old value of a
+	// secret that was never a secret" (there is nothing meaningful to re-encrypt into — the value was
+	// typed in the clear), so the honest fix is to drop them rather than pretend they were always
+	// protected.
+	if isSecret && !oldSecret {
+		if _, err := tx.Exec(`DELETE FROM api_variable_history WHERE variable_id = ? AND is_secret = 0`, id); err != nil {
+			return model.Variable{}, fmt.Errorf("repos/variables: purge pre-secret history %s: %w", id, err)
+		}
+	}
+
 	resolvedScope, resolvedOwner := model.VariableScopeCollection, ""
 	if collectionID.Valid {
 		resolvedOwner = collectionID.String
