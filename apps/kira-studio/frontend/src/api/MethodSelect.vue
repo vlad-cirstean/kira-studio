@@ -101,10 +101,7 @@ function select(method: HttpMethod): void {
   flex: 1;
 }
 
-/* .p-method's own tinted background beats .p-row:hover's plain one at equal specificity (defined
-   later in the cascade) — brightness is an independent property, so this still gives hover
-   feedback without fighting that rule. */
-.method-menu-item:hover {
-  filter: brightness(1.2);
-}
+/* P22 D7: .p-method no longer paints its own fill (colour only), so this row no longer needs a
+   brightness workaround to fight it — the plain `.p-row:hover { background: var(--kira-hover) }`
+   every other menu row already has now applies here too. */
 </style>

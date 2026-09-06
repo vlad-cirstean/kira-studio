@@ -574,42 +574,40 @@
   color: var(--kira-info);
 }
 
-/* P17 D19: colour only — no layout of its own — so it composes onto either a `.p-chip` (the
-   method chip in HttpRequestView.vue's head, ResponseHistoryList.vue's row, CollectionRow.vue's
-   tree row) or `.p-select.bordered` (MethodSelect.vue's own trigger button, D18) without either
-   consumer duplicating the seven-plus-one colour rule. Tinted background via color-mix, same 16%
-   the four `.p-chip` status variants above use, so a method chip reads at the same weight a
-   status chip does. */
+/* P17 D19 gave these a 16% tint to match `.p-chip`'s four status variants above, so a method
+   chip would read at the same weight a status chip does — colour only — no layout of its own —
+   so it composes onto either a `.p-chip` (the method chip in HttpRequestView.vue's head,
+   ResponseHistoryList.vue's row, CollectionRow.vue's tree row) or `.p-select.bordered`
+   (MethodSelect.vue's own trigger button, D18) without either consumer duplicating the
+   seven-plus-one colour rule.
+   P22 D7: the fill is dropped. The user reports it as the problem on the method *select*, where
+   a tinted pill inside an already-bordered control reads as a second, competing control —
+   coloured text on the control's own neutral ground is the treatment asked for. Applied to all
+   five `.p-method` sites (F12: they are all Api — Studio's tree has no method/kind chip, only an
+   EngineIcon and a `.p-count`) so a method never has two looks in one window.
+   `.p-chip.warn/.err/.ok/.info` above are NOT changed — they are status, not method. */
 .p-method.get {
-  background: color-mix(in srgb, var(--kira-method-get) 16%, transparent);
   color: var(--kira-method-get);
 }
 .p-method.post {
-  background: color-mix(in srgb, var(--kira-method-post) 16%, transparent);
   color: var(--kira-method-post);
 }
 .p-method.put {
-  background: color-mix(in srgb, var(--kira-method-put) 16%, transparent);
   color: var(--kira-method-put);
 }
 .p-method.patch {
-  background: color-mix(in srgb, var(--kira-method-patch) 16%, transparent);
   color: var(--kira-method-patch);
 }
 .p-method.delete {
-  background: color-mix(in srgb, var(--kira-method-delete) 16%, transparent);
   color: var(--kira-method-delete);
 }
 .p-method.head {
-  background: color-mix(in srgb, var(--kira-method-head) 16%, transparent);
   color: var(--kira-method-head);
 }
 .p-method.options {
-  background: color-mix(in srgb, var(--kira-method-options) 16%, transparent);
   color: var(--kira-method-options);
 }
 .p-method.other {
-  background: color-mix(in srgb, var(--kira-method-other) 16%, transparent);
   color: var(--kira-method-other);
 }
 

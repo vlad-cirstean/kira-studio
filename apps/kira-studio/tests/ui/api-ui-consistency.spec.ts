@@ -775,6 +775,34 @@ test('the method select opens an app-drawn menu, and PATCH gets its own colour, 
   expect(putColor).not.toBe(patchColor);
 });
 
+// P22 D7/F11/F12: a method is coloured text on the control's own neutral ground, not a tinted
+// pill — the fill P17 D19 gave `.p-method` (to match `.p-chip`'s status variants) reads as a
+// second, competing control on the already-bordered method select. Colour survives; the fill
+// does not, on every `.p-method` site (the trigger and the head chip both).
+test('a method is coloured text on a neutral ground, not a tinted fill (D7)', async ({
+  relaunch,
+}) => {
+  const { window: page } = await relaunch({
+    control: [
+      { channel: IPC.tabsList, response: [httpRequestTab('tab-1', 0, true, { method: 'POST' })] },
+    ],
+  });
+
+  for (const testid of ['http-method-select', 'http-method-chip']) {
+    const el = page.locator(`[data-testid="${testid}"]`);
+    const { color, backgroundColor } = await el.evaluate((node) => {
+      const style = getComputedStyle(node as HTMLElement);
+      return { color: style.color, backgroundColor: style.backgroundColor };
+    });
+    // A neutral background: fully transparent, or the select's own --kira-bg-input ground
+    // (#313131) — never a color-mix tint of the method colour.
+    expect(['rgba(0, 0, 0, 0)', 'rgb(49, 49, 49)']).toContain(backgroundColor);
+    // The method's own colour still reaches the label — not the muted/neutral foreground a plain
+    // select or chip would otherwise use.
+    expect(color).not.toBe('rgba(0, 0, 0, 0)');
+  }
+});
+
 const P17_TREE = {
   collections: [
     {
