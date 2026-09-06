@@ -772,6 +772,69 @@ test('autocomplete — Mongo console degrades to methods/operators when the data
   expect(consoleErrors).toEqual([]);
 });
 
+// P22c D8: Mongo has no field-level schema (F11) — its own mechanism is a sample of whatever
+// documents a collection's own document view has actually loaded, keyed by
+// (connectionId, database, collection), never cached server-side. Opening the document view on
+// `widgets` (loading its own real page via widgetsFixture's port snapshot) is what fills the
+// sample the console then reads from — no separate round trip of its own.
+test("autocomplete — Mongo console offers a loaded collection's own field names inside a filter literal (D8)", async ({
+  relaunch,
+  consoleErrors,
+}) => {
+  const CONNECTION_ID = 'conn-ac-mongo-fields';
+  const CONNECTION_SUMMARY = mongoConnectionSummary(CONNECTION_ID, 'Mongo', 'green');
+  const FIXTURE = widgetsFixture(CONNECTION_ID);
+  const CONTROL: ControlSnapshot[] = [
+    { channel: IPC.connectionsList, response: [] },
+    {
+      channel: IPC.connectionsCreate,
+      args: mongoCreateArgs('Mongo'),
+      response: CONNECTION_SUMMARY,
+    },
+    ...FIXTURE.control,
+  ];
+  const { window: page } = await relaunch({ control: CONTROL, stream: FIXTURE.port });
+
+  await connectMongo(page, 'Mongo', 'green');
+
+  // Loading widgets' own page (opening its document view) is what fills the sample — the console
+  // itself never fetches anything for this.
+  await (await findRow(page, WIDGETS_PATH)).dblclick();
+  const docView = page.locator('[data-testid="document-view"]');
+  await expect(docView).toBeVisible();
+  await expect(page.locator('[data-testid="document-row"]').first()).toBeVisible({
+    timeout: 15_000,
+  });
+
+  await openConsoleFromMenu(page, MONGO_DB_PATH);
+  const mongoConsole = page.locator('[data-testid="console-view"]');
+  await expect(mongoConsole).toBeVisible();
+  const tooltip = page.locator('.cm-tooltip-autocomplete');
+
+  await mongoConsole.locator('.cm-content').click();
+  await page.keyboard.type('db.widgets.find({n');
+  await expect(tooltip).toBeVisible({ timeout: 5_000 });
+  await expect(tooltip).toContainText('name');
+  // The BSON constructors this position already offered are still there, merged, not replaced —
+  // CodeMirror's own fuzzy filter over the combined list still narrows to what a bare "n" matches
+  // (every Number* constructor starts with N; ObjectId/ISODate/Date have no 'n' at all and are
+  // filtered out here exactly like a genuine sibling word would be).
+  await expect(tooltip).toContainText('NumberLong');
+  await page.keyboard.press('Escape');
+
+  // The honest degradation (D8): a collection nobody has browsed offers nothing but the
+  // constructors, same as today — this connection's sample only ever saw `widgets`.
+  await page.keyboard.press('Control+a');
+  await page.keyboard.press('Backspace');
+  await page.keyboard.type('db.big_widgets.find({n');
+  await expect(tooltip).toBeVisible({ timeout: 5_000 });
+  await expect(tooltip).not.toContainText('name');
+  await expect(tooltip).toContainText('NumberLong');
+  await page.keyboard.press('Escape');
+
+  expect(consoleErrors).toEqual([]);
+});
+
 test('autocomplete — Redis console completes command names on the first token only', async ({
   relaunch,
   consoleErrors,

@@ -4,12 +4,10 @@ import { expect, test } from './fixtures';
 import { IPC } from './support/ipcChannels';
 import {
   APP_PATH,
+  appSchemaColumnsSnapshot,
   DB_PATH,
-  ORDER_ITEMS_PATH,
   orderItemsFixture,
-  POSTGRES_CAPS,
   postgresConnectionSummary,
-  SERVER_VERSION,
 } from './support/postgresFixture';
 import { connectionRow, expandRow, openRowMenu } from './support/tree';
 
@@ -273,12 +271,13 @@ test('SQL console completes tables, columns and aliases once a DDL document exis
   expect(consoleErrors).toEqual([]);
 });
 
-// P19 D14: the language service's own behaviour with an empty schema is exactly what this phase
-// changes — table names now come from the tree's own cache (consoleRelationNames,
-// mongoCollectionNames' identical technique carried to SQL) even with no DDL document, while
-// column completion still needs one (F25: a table/view is a leaf in the tree, its columns moved
-// into the definition view — the tree has relation names only). Keyword completion is untouched.
-test('with no DDL document, table names still complete from the tree; columns do not (D5/D14)', async ({
+// P19 D14: table names come from the tree's own cache (consoleRelationNames, mongoCollectionNames'
+// identical technique carried to SQL) even with no DDL document. P22c D4 widens this: with no
+// document, the metadata cache's own columns for this console's container (state/schemaColumns.ts,
+// filled automatically the moment the console opens — no manual step) now complete columns too,
+// with their types in the completion detail, exactly as a DDL document would have. Keyword
+// completion is untouched.
+test('with no DDL document, table names and columns complete from the cache (D4/D5/D14)', async ({
   relaunch,
   consoleErrors,
 }) => {
@@ -292,10 +291,11 @@ test('with no DDL document, table names still complete from the tree; columns do
       response: CONNECTION_SUMMARY,
     },
     ...orderItemsFixture(CONNECTION_ID).control,
+    appSchemaColumnsSnapshot(CONNECTION_ID),
     // No schemaGet override — mockRuntime's own WILDCARD_DEFAULTS answers it with an empty
     // document, the same "absent until the user writes one" state a brand-new connection has.
   ];
-  const { window: page } = await relaunch({ control: CONTROL });
+  const { window: page, control } = await relaunch({ control: CONTROL });
 
   await connectAndExpandPostgres(page, 'Schema DB', 'green');
   // D14's own supply: the tree's cache of this console's own container — expanding it is what
@@ -306,7 +306,12 @@ test('with no DDL document, table names still complete from the tree; columns do
   await expect(view).toBeVisible();
 
   const tooltip = page.locator('.cm-tooltip-autocomplete');
+  // lang-sql's own schemaCompletionSource returns null for an "empty" (no partial word typed
+  // yet) non-explicit context — the cached-columns branch (P22c D4) now goes through the same
+  // schemaCompletionSource the document branch always did, so this asks for it explicitly, same
+  // as the sibling "…once a DDL document exists" test above.
   await typeInto(view, page, 'select * from ');
+  await page.keyboard.press('Control+Space');
   await expect(tooltip).toBeVisible({ timeout: 5_000 });
   await expect(tooltip).toContainText('order_items');
   await expect(tooltip).toContainText('customers');
@@ -318,10 +323,114 @@ test('with no DDL document, table names still complete from the tree; columns do
   await expect(tooltip).toContainText('SELECT');
   await page.keyboard.press('Escape');
 
-  // No column completion — F25's own "columns aren't in the tree" limitation, D15's own reason
-  // to exist.
+  // P22c D4: column completion now works from the cache — order_items' own columns, with their
+  // declared type in the completion detail, the same as a DDL document would have offered.
   await clearAndType(view, page, 'select * from order_items oi where oi.');
-  await expect(tooltip).toHaveCount(0, { timeout: 3_000 });
+  await expect(tooltip).toBeVisible({ timeout: 5_000 });
+  await expect(tooltip).toContainText('quantity');
+  await expect(tooltip).toContainText('integer');
+  await page.keyboard.press('Escape');
+
+  // P22c D5: one treeSchemaColumns call for this console's container, not one per keystroke —
+  // the language layer never fetches on its own (§4.4 item 3).
+  const schemaColumnsCalls = control
+    .log()
+    .filter((e) => e.channel === IPC.treeSchemaColumns).length;
+  await typeInto(view, page, ' and oi.quantity > 1');
+  expect(control.log().filter((e) => e.channel === IPC.treeSchemaColumns).length).toBe(
+    schemaColumnsCalls,
+  );
+
+  expect(consoleErrors).toEqual([]);
+});
+
+// P22c D6: a column the user never opened (no treeDescribe for order_items in this fixture) still
+// hovers with its real type, and the linter never flags it — completion, diagnostics and hover all
+// read the same effective schema (state/schemaColumns.ts's effectiveSchema), so they cannot
+// disagree about what the console knows.
+test('hovering a column the cache knows about, that the user never opened, shows its type (D6)', async ({
+  relaunch,
+}) => {
+  const CONNECTION_ID = 'conn-sql-schema-cache-hover';
+  const CONNECTION_SUMMARY = postgresConnectionSummary(CONNECTION_ID, 'Schema DB', 'green');
+  const CONTROL: ControlSnapshot[] = [
+    { channel: IPC.connectionsList, response: [] },
+    {
+      channel: IPC.connectionsCreate,
+      args: postgresCreateArgs('Schema DB', 'green'),
+      response: CONNECTION_SUMMARY,
+    },
+    ...orderItemsFixture(CONNECTION_ID).control,
+    appSchemaColumnsSnapshot(CONNECTION_ID),
+  ];
+  const { window: page } = await relaunch({ control: CONTROL });
+
+  await connectAndExpandPostgres(page, 'Schema DB', 'green');
+  await openConsoleFromMenu(page, APP_PATH);
+  const view = page.locator('[data-testid="console-view"]');
+  await expect(view).toBeVisible();
+
+  await typeInto(view, page, 'select quantity from order_items');
+  await hoverWord(page, view, 'quantity');
+  const hover = page.locator('.cm-kira-hover');
+  await expect(hover).toBeVisible({ timeout: 5_000 });
+  await expect(hover).toContainText('integer');
+
+  // The linter agrees — a column the cache knows about is never flagged as unknown.
+  await expect(view.locator('.cm-lintRange-warning')).toHaveCount(0, { timeout: 3_000 });
+});
+
+// P22c D4: the hand-authored document still wins wholesale the moment it declares any table, even
+// when the cache also has an answer for this container — a user who pasted a document
+// deliberately (a read replica they cannot introspect, a schema they are designing before it
+// exists) keeps getting exactly what they get today.
+test('a DDL document still wins over the cache (D4)', async ({ relaunch, consoleErrors }) => {
+  const CONNECTION_ID = 'conn-sql-schema-doc-wins';
+  const CONNECTION_SUMMARY = postgresConnectionSummary(CONNECTION_ID, 'Schema DB', 'green');
+  const DOC_ONLY_DDL = `CREATE TABLE widgets (
+  id integer PRIMARY KEY,
+  label text NOT NULL
+);`;
+  const CONTROL: ControlSnapshot[] = [
+    { channel: IPC.connectionsList, response: [] },
+    {
+      channel: IPC.connectionsCreate,
+      args: postgresCreateArgs('Schema DB', 'green'),
+      response: CONNECTION_SUMMARY,
+    },
+    ...orderItemsFixture(CONNECTION_ID).control,
+    appSchemaColumnsSnapshot(CONNECTION_ID),
+    {
+      channel: IPC.schemaGet,
+      args: { connectionId: CONNECTION_ID },
+      response: {
+        connectionId: CONNECTION_ID,
+        ddl: DOC_ONLY_DDL,
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      },
+    },
+  ];
+  const { window: page } = await relaunch({ control: CONTROL });
+
+  await connectAndExpandPostgres(page, 'Schema DB', 'green');
+  await openConsoleFromMenu(page, APP_PATH);
+  const view = page.locator('[data-testid="console-view"]');
+  await expect(view).toBeVisible();
+
+  const tooltip = page.locator('.cm-tooltip-autocomplete');
+  // widgets (the document's own table, not in the cache's own order_items relation) completes —
+  // proof the document, not the cache, is driving completion. An empty non-explicit context needs
+  // an explicit request the same as the sibling DDL-document test above.
+  await typeInto(view, page, 'select * from ');
+  await page.keyboard.press('Control+Space');
+  await expect(tooltip).toBeVisible({ timeout: 5_000 });
+  await expect(tooltip).toContainText('widgets');
+  await page.keyboard.press('Escape');
+
+  await clearAndType(view, page, 'select * from widgets w where w.');
+  await expect(tooltip).toBeVisible({ timeout: 5_000 });
+  await expect(tooltip).toContainText('label');
+  await page.keyboard.press('Escape');
 
   expect(consoleErrors).toEqual([]);
 });
@@ -401,187 +510,55 @@ test('hovering a known column shows its verbatim declared type (D8)', async ({ r
   await expect(hover).toContainText('numeric(10,2)');
 });
 
-// P19 T14/D15: "Fill from connection" stages TreeService.Definition's real output for every
-// relation the tree already has cached — one call per relation, never a saved write until Save
-// is pressed. A small, purpose-built two-table schema (rather than orderItemsFixture's own ~16
-// relation APP_PATH) so the fixture stays reviewable: one treeDefinition snapshot per table.
-test('the Schema (DDL) dialog fills itself from the connection (D15)', async ({ relaunch }) => {
-  const CONNECTION_ID = 'conn-sql-schema-fill';
-  const CONNECTION_SUMMARY = postgresConnectionSummary(CONNECTION_ID, 'Fill DB', 'blue');
-  const SCHEMA_PATH = 'database:small_db/schema:pub';
-  const T1_PATH = `${SCHEMA_PATH}/table:t1`;
-  const T2_PATH = `${SCHEMA_PATH}/table:t2`;
-
-  const T1_DEFINITION = {
-    path: T1_PATH,
-    kind: 'table' as const,
-    qualifiedName: 'pub.t1',
-    statements: ['CREATE TABLE pub.t1 (\n    id integer NOT NULL\n)'],
-    language: 'sql' as const,
-    origin: 'composed' as const,
-    notes: [],
-    constraints: [],
-    documentSchema: null,
-    sections: [],
-    generatedAt: '2026-01-01T00:00:00.000Z',
-  };
-  const T2_DEFINITION = {
-    ...T1_DEFINITION,
-    path: T2_PATH,
-    qualifiedName: 'pub.t2',
-    statements: ['CREATE TABLE pub.t2 (\n    id integer NOT NULL\n)'],
-  };
-
+// P22c D7: P19 D15's "Fill from connection" button and D16's no-schema hint strip are gone — the
+// schema metadata they staged/explained is now served automatically by the cache, with no manual
+// step, so a strip explaining that completion is "off" would be false the moment D4 lands. The
+// Schema (DDL) dialog itself still opens from the connection row's menu and still saves.
+test('the "Fill from connection" button and the no-schema hint are gone (D7)', async ({
+  relaunch,
+}) => {
+  const CONNECTION_ID = 'conn-sql-schema-no-fill';
+  const CONNECTION_SUMMARY = postgresConnectionSummary(CONNECTION_ID, 'Schema DB', 'green');
   const CONTROL: ControlSnapshot[] = [
     { channel: IPC.connectionsList, response: [] },
     {
       channel: IPC.connectionsCreate,
-      args: postgresCreateArgs('Fill DB', 'blue'),
+      args: postgresCreateArgs('Schema DB', 'green'),
       response: CONNECTION_SUMMARY,
     },
+    ...orderItemsFixture(CONNECTION_ID).control,
+    // No schemaGet/treeSchemaColumns override — an empty document and an empty cache, the same
+    // "absent until something fills it" state a brand-new connection has.
     {
-      channel: IPC.connectionsConnect,
-      args: { id: CONNECTION_ID },
+      channel: IPC.schemaSet,
+      args: { connectionId: CONNECTION_ID, ddl: 'CREATE TABLE t (id integer PRIMARY KEY);' },
       response: {
         connectionId: CONNECTION_ID,
-        status: 'connected',
-        serverVersion: SERVER_VERSION,
-        error: null,
-        since: 1735689600000,
-        caps: POSTGRES_CAPS,
+        ddl: 'CREATE TABLE t (id integer PRIMARY KEY);',
+        updatedAt: '2026-01-01T00:00:00.000Z',
       },
-    },
-    {
-      channel: IPC.treeChildren,
-      args: { connectionId: CONNECTION_ID, path: '', refresh: false },
-      response: {
-        nodes: [
-          { kind: 'database', name: 'small_db', path: 'database:small_db', hasChildren: true },
-        ],
-        source: 'server',
-        truncated: false,
-      },
-    },
-    {
-      channel: IPC.treeChildren,
-      args: { connectionId: CONNECTION_ID, path: 'database:small_db', refresh: false },
-      response: {
-        nodes: [{ kind: 'schema', name: 'pub', path: SCHEMA_PATH, hasChildren: true }],
-        source: 'server',
-        truncated: false,
-      },
-    },
-    {
-      channel: IPC.treeChildren,
-      args: { connectionId: CONNECTION_ID, path: SCHEMA_PATH, refresh: false },
-      response: {
-        nodes: [
-          { kind: 'table', name: 't1', path: T1_PATH, hasChildren: false },
-          { kind: 'table', name: 't2', path: T2_PATH, hasChildren: false },
-        ],
-        source: 'server',
-        truncated: false,
-      },
-    },
-    {
-      channel: IPC.treeDefinition,
-      args: { connectionId: CONNECTION_ID, path: T1_PATH, refresh: false, tabId: null },
-      response: { definition: T1_DEFINITION, source: 'server' },
-    },
-    {
-      channel: IPC.treeDefinition,
-      args: { connectionId: CONNECTION_ID, path: T2_PATH, refresh: false, tabId: null },
-      response: { definition: T2_DEFINITION, source: 'server' },
     },
   ];
+  const { window: page } = await relaunch({ control: CONTROL });
 
-  const { window: page, control } = await relaunch({ control: CONTROL });
-
-  await page.click('[data-testid="add-connection"]');
-  await page.click('[data-testid="connection-kind-postgres"]');
-  await page.fill('[data-testid="connection-name"]', 'Fill DB');
-  await page.fill('[data-testid="connection-host"]', '127.0.0.1');
-  await page.fill('[data-testid="connection-port"]', '5432');
-  await page.fill('[data-testid="connection-database"]', 'kira_test');
-  await page.fill('[data-testid="connection-username"]', 'postgres');
-  await page.click('[data-testid="color-blue"]');
-  await page.click('[data-testid="connection-save"]');
-  await expect(page.locator('[data-testid="connection-dialog"]')).toHaveCount(0);
-  const connRow = connectionRow(page);
-  await expect(connRow).toBeVisible();
-  await openRowMenu(page, '');
-  await page.click('[data-testid="menu-item-connect"]');
-  await expect(connRow.locator('.status-dot')).toHaveAttribute('data-status', 'connected', {
-    timeout: 10_000,
-  });
-  await expandRow(page, '');
-  await expandRow(page, 'database:small_db');
-  await expandRow(page, SCHEMA_PATH); // populates treeState.children for consoleRelationNames/D15
-
-  const fillButton = page.locator('[data-testid="schema-fill-from-connection"]');
+  await connectAndExpandPostgres(page, 'Schema DB', 'green');
+  await openConsoleFromMenu(page, APP_PATH);
+  const view = page.locator('[data-testid="console-view"]');
+  await expect(view).toBeVisible();
+  await expect(view.locator('[data-testid="console-no-schema-hint"]')).toHaveCount(0);
+  await expect(view.locator('[data-testid="console-no-schema-hint-setup"]')).toHaveCount(0);
+  await expect(view.locator('[data-testid="console-no-schema-hint-dismiss"]')).toHaveCount(0);
 
   await openRowMenu(page, '');
   await page.click('[data-testid="menu-item-schema"]');
   const dialog = page.locator('[data-testid="schema-dialog"]');
   await expect(dialog).toBeVisible();
-  const summary = page.locator('[data-testid="schema-parse-summary"]');
+  await expect(page.locator('[data-testid="schema-fill-from-connection"]')).toHaveCount(0);
+  await expect(page.locator('[data-testid="schema-fill-cancel"]')).toHaveCount(0);
 
-  await expect(fillButton).toBeEnabled();
-  await fillButton.click();
-  await expect(fillButton).toBeVisible({ timeout: 5_000 }); // filling finished, button is back
-
-  expect(control.log().filter((e) => e.channel === IPC.treeDefinition)).toHaveLength(2);
-  await expect(dialog.locator('.cm-content')).toContainText('CREATE TABLE pub.t1');
-  await expect(dialog.locator('.cm-content')).toContainText('CREATE TABLE pub.t2');
-  await expect(summary).toContainText('2 tables');
-
-  // Nothing was saved — the user still presses Save themselves.
-  expect(control.log().filter((e) => e.channel === IPC.schemaSet)).toHaveLength(0);
-});
-
-// P19 T14/D16: without this, D14/D15 are two features nobody can find, which is how the current
-// one ended up reported as broken. Dismissal is per connection, not per tab — opening a SECOND
-// console on the same connection keeps it dismissed.
-test('a SQL console with no schema document says so, dismissibly, per connection (D16)', async ({
-  relaunch,
-}) => {
-  const CONNECTION_ID = 'conn-sql-schema-hint';
-  const CONNECTION_SUMMARY = postgresConnectionSummary(CONNECTION_ID, 'Hint DB', 'magenta');
-  const CONTROL: ControlSnapshot[] = [
-    { channel: IPC.connectionsList, response: [] },
-    {
-      channel: IPC.connectionsCreate,
-      args: postgresCreateArgs('Hint DB', 'magenta'),
-      response: CONNECTION_SUMMARY,
-    },
-    ...orderItemsFixture(CONNECTION_ID).control,
-    // No schemaGet override — an empty document, same as "with no DDL document" above.
-  ];
-  const { window: page } = await relaunch({ control: CONTROL });
-
-  await connectAndExpandPostgres(page, 'Hint DB', 'magenta');
-  await openConsoleFromMenu(page, APP_PATH);
-  const view = page.locator('[data-testid="console-view"]');
-  await expect(view).toBeVisible();
-
-  const hint = view.locator('[data-testid="console-no-schema-hint"]');
-  await expect(hint).toBeVisible();
-  await expect(hint).toContainText('table and column completion is off');
-
-  await hint.locator('[data-testid="console-no-schema-hint-setup"]').click();
-  await expect(page.locator('[data-testid="schema-dialog"]')).toBeVisible();
-  await page.click('[data-testid="schema-dialog-close"]');
-
-  await hint.locator('[data-testid="console-no-schema-hint-dismiss"]').click();
-  await expect(hint).toHaveCount(0);
-
-  // A second console on the SAME connection stays dismissed — the preference is per connection.
-  // Only one view is ever mounted at a time (MainView.vue's own single-<component> invariant), so
-  // this checks the new tab is the active one, not that two console-views coexist.
-  await expandRow(page, APP_PATH);
-  await openConsoleFromMenu(page, ORDER_ITEMS_PATH);
-  const activeTab = page.locator('[data-testid="tab"][data-active="true"]');
-  await expect(activeTab).toHaveAttribute('data-tab-kind', 'console');
-  await expect(view).toBeVisible();
-  await expect(view.locator('[data-testid="console-no-schema-hint"]')).toHaveCount(0);
+  // The dialog still saves.
+  await dialog.locator('.cm-content').click();
+  await page.keyboard.type('CREATE TABLE t (id integer PRIMARY KEY);');
+  await page.locator('.dialog-footer button', { hasText: 'Save schema' }).click();
+  await expect(dialog).toHaveCount(0);
 });

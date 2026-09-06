@@ -321,6 +321,59 @@ export function orderItemsFixture(connectionId: string): {
   };
 }
 
+// P22c: order_items' own columns, projected into RelationColumns' shape (ObjectMeta's ColumnMeta
+// reused verbatim, D1), plus a second relation (customers) — a real SchemaColumns fetch always
+// returns the WHOLE container in one round trip (D1/F9), so a fixture with only one relation
+// would understate what the cache actually replaces: once any cache exists for a container, it is
+// the sole source of table names for completion (D4's own precedence — no fallback to the tree's
+// relation names once the cache has an answer), so a spec asserting more than one table name must
+// see more than one relation here.
+export const APP_SCHEMA_COLUMNS_RESPONSE = {
+  relations: [
+    {
+      name: 'order_items',
+      kind: 'table' as const,
+      columns: ORDER_ITEMS_META.columns,
+    },
+    {
+      name: 'customers',
+      kind: 'table' as const,
+      columns: [
+        {
+          name: 'id',
+          position: 1,
+          dataType: 'integer',
+          nullable: false,
+          defaultExpr: null,
+          isPrimaryKey: true,
+          comment: null,
+        },
+        {
+          name: 'name',
+          position: 2,
+          dataType: 'text',
+          nullable: false,
+          defaultExpr: null,
+          isPrimaryKey: false,
+          comment: null,
+        },
+      ],
+    },
+  ],
+  source: 'server' as const,
+};
+
+/** A `treeSchemaColumns` snapshot for `APP_PATH` — the container `orderItemsFixture`'s own
+ *  console/data-tab specs open. Callers add this only when a test wants column completion driven
+ *  by the cache rather than a DDL document. */
+export function appSchemaColumnsSnapshot(connectionId: string): ControlSnapshot {
+  return {
+    channel: IPC.treeSchemaColumns,
+    args: { connectionId, path: APP_PATH, refresh: false },
+    response: APP_SCHEMA_COLUMNS_RESPONSE,
+  };
+}
+
 export const COMPOSITE_PK_PATH = `${APP_PATH}/table:composite_pk`;
 
 export const COMPOSITE_PK_COLUMNS: ColumnDescriptor[] = [

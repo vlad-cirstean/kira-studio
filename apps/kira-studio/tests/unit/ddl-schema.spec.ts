@@ -5,7 +5,13 @@
 
 import { describe, expect, test } from 'bun:test';
 import { MySQL, PostgreSQL, SQLDialect, SQLite } from '@codemirror/lang-sql';
-import { defaultSchemaFor, parseDdl, toSqlNamespace } from '../../frontend/src/views/console/ddl';
+import type { RelationColumns } from '@shared/domain/tree';
+import {
+  defaultSchemaFor,
+  namespaceFromCached,
+  parseDdl,
+  toSqlNamespace,
+} from '../../frontend/src/views/console/ddl';
 
 // Mirrors editor/languages.ts's own ClickHouseDialect exactly — kept independent here rather than
 // imported, since languages.ts pulls in Vue-adjacent editor modules this spec has no reason to load.
@@ -195,6 +201,75 @@ describe('toSqlNamespace — D10: a qualified table is emitted both nested and f
     const schema = parseDdl(PostgreSQL, 'CREATE VIEW active_users AS SELECT * FROM users;');
     const ns = toSqlNamespace(schema) as Record<string, unknown>;
     expect(ns.active_users).toEqual([]);
+  });
+});
+
+// P22c D4/§4.3: namespaceFromCached is the metadata-cache analogue of toSqlNamespace above — a
+// shape transform with the same interacting rules (a view and a table must not cross-contaminate
+// each other's columns; an empty relation list or an empty column list must produce a namespace
+// entry lang-sql can still consume; PK-first ordering) feeding the identical third-party
+// completion engine, which is why it earns the same unit coverage toSqlNamespace already has.
+describe('namespaceFromCached — P22c D4: RelationColumns[] -> lang-sql namespace', () => {
+  function col(overrides: Partial<RelationColumns['columns'][number]> = {}) {
+    return {
+      name: 'id',
+      position: 1,
+      dataType: 'integer',
+      nullable: false,
+      defaultExpr: null,
+      isPrimaryKey: false,
+      comment: null,
+      ...overrides,
+    };
+  }
+
+  test('each relation completes under its own bare name, unqualified', () => {
+    const relations: RelationColumns[] = [
+      { name: 'users', kind: 'table', columns: [col({ name: 'id' }), col({ name: 'email' })] },
+    ];
+    const ns = namespaceFromCached(relations) as Record<string, unknown>;
+    expect(Object.keys(ns)).toEqual(['users']);
+    expect((ns.users as { label: string }[]).map((c) => c.label)).toEqual(['id', 'email']);
+  });
+
+  test('a view and a table with the same column name do not cross-contaminate', () => {
+    const relations: RelationColumns[] = [
+      { name: 'users', kind: 'table', columns: [col({ name: 'id' })] },
+      { name: 'active_users', kind: 'view', columns: [col({ name: 'id', dataType: 'bigint' })] },
+    ];
+    const ns = namespaceFromCached(relations) as Record<
+      string,
+      { label: string; detail?: string }[]
+    >;
+    expect(ns.users?.[0]?.detail).toBe('integer');
+    expect(ns.active_users?.[0]?.detail).toBe('bigint');
+  });
+
+  test('an empty relation list produces an empty namespace', () => {
+    expect(namespaceFromCached([])).toEqual({});
+  });
+
+  test('a relation with no columns still gets a (empty) namespace entry', () => {
+    const relations: RelationColumns[] = [{ name: 'empty_view', kind: 'view', columns: [] }];
+    const ns = namespaceFromCached(relations) as Record<string, unknown[]>;
+    expect(ns.empty_view).toEqual([]);
+  });
+
+  test('a primary-key column sorts first, mirroring toSqlNamespace/D10', () => {
+    const relations: RelationColumns[] = [
+      {
+        name: 'orders',
+        kind: 'table',
+        columns: [col({ name: 'total' }), col({ name: 'id', isPrimaryKey: true })],
+      },
+    ];
+    const ns = namespaceFromCached(relations) as Record<
+      string,
+      { label: string; boost?: number }[]
+    >;
+    const byLabel = Object.fromEntries((ns.orders ?? []).map((c) => [c.label, c.boost ?? 0]));
+    expect(byLabel.id).toBe(1);
+    expect(byLabel.total).toBe(0);
   });
 });
 
