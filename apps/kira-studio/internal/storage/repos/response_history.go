@@ -169,16 +169,29 @@ func (r *ResponseHistoryRepo) Record(rec model.ResponseHistoryRecord) error {
 	// Global byte budget, oldest-first across every scope (F7). The per-entry cap above is what
 	// makes this safe: no single row can exceed the budget, so the row just inserted is never
 	// itself evicted.
-	if _, err := tx.Exec(
-		`DELETE FROM api_response_history WHERE id NOT IN (
-		   SELECT id FROM (
-		     SELECT id, SUM(stored_bytes) OVER (ORDER BY sent_at DESC, rowid DESC
-		                                        ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS running
-		       FROM api_response_history
-		   ) WHERE running <= ?)`,
-		historyByteBudget,
-	); err != nil {
-		return fmt.Errorf("repos/response_history: sweep budget: %w", err)
+	//
+	// A8/P21 round 1: the window-function sweep below is an unindexed full scan plus a running
+	// sum over the entire table — unconditionally, on every single send, even though the caps mean
+	// it can only ever delete something after ~512 maximal (256 KiB) entries have accumulated. A
+	// cheap indexed aggregate first skips the expensive sweep for the overwhelming majority of
+	// sends, where the table is nowhere near the budget; the sweep itself is unchanged, so its
+	// safety argument (the row just inserted is never itself evicted) still holds exactly.
+	var totalBytes int64
+	if err := tx.QueryRow(`SELECT COALESCE(SUM(stored_bytes), 0) FROM api_response_history`).Scan(&totalBytes); err != nil {
+		return fmt.Errorf("repos/response_history: sum stored_bytes: %w", err)
+	}
+	if totalBytes > int64(historyByteBudget) {
+		if _, err := tx.Exec(
+			`DELETE FROM api_response_history WHERE id NOT IN (
+			   SELECT id FROM (
+			     SELECT id, SUM(stored_bytes) OVER (ORDER BY sent_at DESC, rowid DESC
+			                                        ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS running
+			       FROM api_response_history
+			   ) WHERE running <= ?)`,
+			historyByteBudget,
+		); err != nil {
+			return fmt.Errorf("repos/response_history: sweep budget: %w", err)
+		}
 	}
 
 	if err := tx.Commit(); err != nil {

@@ -179,16 +179,29 @@ func (r *GrpcHistoryRepo) Record(rec model.GrpcCallHistoryRecord) error {
 
 	// Global byte budget, oldest-first across every scope — the per-entry caps above are what
 	// make this safe: no single row can exceed the budget by itself.
-	if _, err := tx.Exec(
-		`DELETE FROM grpc_call_history WHERE id NOT IN (
-		   SELECT id FROM (
-		     SELECT id, SUM(stored_bytes) OVER (ORDER BY called_at DESC, rowid DESC
-		                                        ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS running
-		       FROM grpc_call_history
-		   ) WHERE running <= ?)`,
-		grpcHistoryByteBudget,
-	); err != nil {
-		return fmt.Errorf("repos/grpc_history: sweep budget: %w", err)
+	//
+	// A8/P21 round 1: the window-function sweep below is an unindexed full scan plus a running
+	// sum over the entire table — unconditionally, on every completed call, even though the caps
+	// mean it can only ever delete something once the table has accumulated well over 512 maximal
+	// entries. A cheap indexed aggregate first skips the expensive sweep for the overwhelming
+	// majority of calls, where the table is nowhere near the budget; the sweep itself is
+	// unchanged, so its safety argument still holds exactly.
+	var totalBytes int64
+	if err := tx.QueryRow(`SELECT COALESCE(SUM(stored_bytes), 0) FROM grpc_call_history`).Scan(&totalBytes); err != nil {
+		return fmt.Errorf("repos/grpc_history: sum stored_bytes: %w", err)
+	}
+	if totalBytes > int64(grpcHistoryByteBudget) {
+		if _, err := tx.Exec(
+			`DELETE FROM grpc_call_history WHERE id NOT IN (
+			   SELECT id FROM (
+			     SELECT id, SUM(stored_bytes) OVER (ORDER BY called_at DESC, rowid DESC
+			                                        ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS running
+			       FROM grpc_call_history
+			   ) WHERE running <= ?)`,
+			grpcHistoryByteBudget,
+		); err != nil {
+			return fmt.Errorf("repos/grpc_history: sweep budget: %w", err)
+		}
 	}
 
 	if err := tx.Commit(); err != nil {
