@@ -134,7 +134,7 @@ func TestSchemaMismatchDropsRow(t *testing.T) {
 	if result.Source != "server" {
 		t.Errorf("Source = %q, want server (the bad cache row must be treated as a miss)", result.Source)
 	}
-	if got, _ := h.repos.Metadata.Get("c1", path, "children"); string(got) == `[{"kind":"nonsense"}]` {
+	if got, _, _ := h.repos.Metadata.Get("c1", path, "children"); string(got) == `[{"kind":"nonsense"}]` {
 		t.Errorf("bad cache row survived: %s", got)
 	}
 }
@@ -158,7 +158,7 @@ func TestTruncatedRefreshDropsOlderCompleteRow(t *testing.T) {
 	if _, err := h.svc.Children("c1", path, true); err != nil {
 		t.Fatalf("Children (truncated refresh): %v", err)
 	}
-	if got, _ := h.repos.Metadata.Get("c1", path, "children"); got != nil {
+	if got, _, _ := h.repos.Metadata.Get("c1", path, "children"); got != nil {
 		t.Errorf("older complete row survived a truncated refresh: %s", got)
 	}
 
@@ -260,7 +260,7 @@ func TestSchemaColumnsInvalidPayloadDroppedAndRefetched(t *testing.T) {
 	if result.Source != "server" {
 		t.Errorf("Source = %q, want server (an invalid cached payload must be treated as a miss)", result.Source)
 	}
-	if got, _ := h.repos.Metadata.Get("c1", path, "columns"); string(got) == `[{"kind":"nonsense"}]` {
+	if got, _, _ := h.repos.Metadata.Get("c1", path, "columns"); string(got) == `[{"kind":"nonsense"}]` {
 		t.Errorf("bad cache row survived: %s", got)
 	}
 }

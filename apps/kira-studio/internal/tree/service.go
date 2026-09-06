@@ -94,8 +94,10 @@ func (s *Service) requireConnected(connectionID string) error {
 	return ipcerr.Disconnected(name)
 }
 
+// getCached is the whole cache-aside read path's choke point. fetchedAt (the payload's own
+// per-kind write time, P24 D3) is not yet consulted here — that lands in a follow-up commit.
 func (s *Service) getCached(connectionID, path, kind string) (json.RawMessage, bool) {
-	raw, err := s.meta.Get(connectionID, path, kind)
+	raw, _, err := s.meta.Get(connectionID, path, kind)
 	if err != nil || raw == nil {
 		return nil, false
 	}

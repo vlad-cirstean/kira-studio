@@ -21,11 +21,11 @@ func TestMetadataCacheDifferentKindsShareOneRow(t *testing.T) {
 		t.Fatalf("Put describe: %v", err)
 	}
 
-	children, err := r.Get("c1", "db:t", "children")
+	children, _, err := r.Get("c1", "db:t", "children")
 	if err != nil {
 		t.Fatalf("Get children: %v", err)
 	}
-	describe, err := r.Get("c1", "db:t", "describe")
+	describe, _, err := r.Get("c1", "db:t", "describe")
 	if err != nil {
 		t.Fatalf("Get describe: %v", err)
 	}
@@ -69,7 +69,7 @@ func TestMetadataCacheEvictionKeepsNewestAndIsolatesConnections(t *testing.T) {
 		t.Errorf("c1 row count after 205 puts = %d, want 200 (evicted to cap)", c1Count)
 	}
 
-	newest, err := r.Get("c1", "db:t204", "children")
+	newest, _, err := r.Get("c1", "db:t204", "children")
 	if err != nil {
 		t.Fatalf("Get newest: %v", err)
 	}
@@ -77,7 +77,7 @@ func TestMetadataCacheEvictionKeepsNewestAndIsolatesConnections(t *testing.T) {
 		t.Error("newest path (db:t204) was evicted, want it to survive")
 	}
 
-	untouched, err := r.Get("c2", "db:other", "children")
+	untouched, _, err := r.Get("c2", "db:other", "children")
 	if err != nil {
 		t.Fatalf("Get c2: %v", err)
 	}

@@ -40,17 +40,41 @@ func readPayload(q interface {
 	return payload
 }
 
-// Get is JSON.parse'd, NOT further validated here — callers parse through their own domain
-// shape and treat a mismatch as a miss (metadata-cache.ts's own discipline).
-func (r *MetadataCacheRepo) Get(connectionID, path, kind string) (json.RawMessage, error) {
-	payload := readPayload(r.DB, connectionID, path)
-	return payload[kind], nil
+// fetchedAtKey is the reserved payload key holding each kind's own last-write timestamp (P24 D3):
+// { "children": …, "columns": …, "fetchedAt": {"children": "…", "columns": "…"} }. The four kind
+// names are a closed set fixed in internal/tree/service.go, so this can never collide with a
+// payload key.
+const fetchedAtKey = "fetchedAt"
+
+// fetchedAtFor reads kind's own entry out of payload's reserved fetchedAt map — "" when the
+// map or the entry is absent, which is the correct answer for both a pre-P24 row (D2's upgrade
+// path) and a row that has simply never cached this kind.
+func fetchedAtFor(payload map[string]json.RawMessage, kind string) string {
+	raw, ok := payload[fetchedAtKey]
+	if !ok {
+		return ""
+	}
+	var m map[string]string
+	if err := json.Unmarshal(raw, &m); err != nil {
+		return ""
+	}
+	return m[kind]
 }
 
-// Put merges payload into the existing row's {children?, describe?, definition?} object (the
-// unique index is (connection_id, path) — kind is not part of the key, so a 'children' payload
-// and a 'describe' payload for the same path share one row), then runs D20's per-connection
-// eviction — all in one transaction.
+// Get is JSON.parse'd, NOT further validated here — callers parse through their own domain
+// shape and treat a mismatch as a miss (metadata-cache.ts's own discipline). The second return is
+// the payload's own per-kind fetch time (P24 D3) — internal/tree.Service is the sole judge of
+// whether that makes it stale.
+func (r *MetadataCacheRepo) Get(connectionID, path, kind string) (json.RawMessage, string, error) {
+	payload := readPayload(r.DB, connectionID, path)
+	return payload[kind], fetchedAtFor(payload, kind), nil
+}
+
+// Put merges payload into the existing row's {children?, describe?, definition?, columns?} object
+// (the unique index is (connection_id, path) — kind is not part of the key, so a 'children'
+// payload and a 'describe' payload for the same path share one row) and stamps this kind's own
+// entry in the reserved fetchedAt map (P24 D3) — every other kind's payload AND fetch time is left
+// untouched. Then runs D20's per-connection eviction — all in one transaction.
 func (r *MetadataCacheRepo) Put(connectionID, path, kind string, payload json.RawMessage) error {
 	tx, err := r.DB.Begin()
 	if err != nil {
@@ -65,6 +89,18 @@ func (r *MetadataCacheRepo) Put(connectionID, path, kind string, payload json.Ra
 	}
 	merged[kind] = payload
 
+	now := model.NowISO()
+	fetchedAt := map[string]string{}
+	if raw, ok := existing[fetchedAtKey]; ok {
+		_ = json.Unmarshal(raw, &fetchedAt) // best-effort; a corrupt map just resets to {kind: now}
+	}
+	fetchedAt[kind] = now
+	encodedFetchedAt, err := json.Marshal(fetchedAt)
+	if err != nil {
+		return fmt.Errorf("repos/metadata_cache: encode fetchedAt map: %w", err)
+	}
+	merged[fetchedAtKey] = encodedFetchedAt
+
 	encoded, err := json.Marshal(merged)
 	if err != nil {
 		return fmt.Errorf("repos/metadata_cache: encode merged payload: %w", err)
@@ -78,7 +114,7 @@ func (r *MetadataCacheRepo) Put(connectionID, path, kind string, payload json.Ra
 		`INSERT INTO metadata_cache (connection_id, path, kind, payload_json, fetched_at, etag)
 		 VALUES (?, ?, ?, ?, ?, NULL)
 		 ON CONFLICT(connection_id, path) DO UPDATE SET kind = excluded.kind, payload_json = excluded.payload_json, fetched_at = excluded.fetched_at`,
-		connectionID, path, kind, string(encoded), model.NowISO(),
+		connectionID, path, kind, string(encoded), now,
 	); err != nil {
 		return fmt.Errorf("repos/metadata_cache: upsert: %w", err)
 	}
