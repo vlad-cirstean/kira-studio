@@ -5,13 +5,14 @@ import {
   type GrpcCallHistoryEntry,
 } from '@shared/domain/grpc-history';
 import type { GrpcRequestTabRecord } from '@shared/domain/tabs';
-import { computed, onMounted } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { formatRelative } from '../../format';
 import { confirmDialog } from '../../state/confirmDialog';
 import AppButton from '../../theme/primitives/AppButton.vue';
 import EmptyState from '../../theme/primitives/EmptyState.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
 import MessageStrip from '../../theme/primitives/MessageStrip.vue';
+import PanelSearchBox from '../../theme/primitives/PanelSearchBox.vue';
 import {
   clearGrpcHistory,
   deleteGrpcHistoryEntry,
@@ -38,6 +39,22 @@ const atCap = computed(() => entries.value.length >= GRPC_HISTORY_PER_SCOPE_LIMI
 
 onMounted(() => {
   ensureGrpcHistoryFresh(props.tab.id);
+});
+
+// P22b D14: HTTP's own ResponseHistoryList.vue idiom (P16 D15) — an always-visible filter box
+// above the list, not a toggle (a compact history pane, not a big document). Matches method,
+// status name, and time — case-folded substring, the fields already on screen in each row.
+const filterQuery = ref('');
+const isFiltered = computed(() => filterQuery.value.trim() !== '');
+const filteredEntries = computed<GrpcCallHistoryEntry[]>(() => {
+  const q = filterQuery.value.trim().toLowerCase();
+  if (!q) return entries.value;
+  return entries.value.filter(
+    (e) =>
+      e.method.toLowerCase().includes(q) ||
+      e.codeName.toLowerCase().includes(q) ||
+      formatRelative(e.calledAt).toLowerCase().includes(q),
+  );
 });
 
 function onRowClick(id: string): void {
@@ -74,9 +91,23 @@ async function onClear(): Promise<void> {
     <MessageStrip v-if="rt?.error" tone="err">{{ rt.error }}</MessageStrip>
     <EmptyState v-else-if="entries.length === 0" icon="history" label="No past calls yet" />
 
-    <div v-else class="history-rows">
+    <template v-else>
+      <PanelSearchBox
+        v-model="filterQuery"
+        placeholder="Filter history"
+        testid="grpc-history-filter"
+      />
+      <EmptyState
+        v-if="isFiltered && filteredEntries.length === 0"
+        icon="search"
+        label="No matches"
+        data-testid="grpc-history-filter-empty"
+      />
+    </template>
+
+    <div v-if="entries.length > 0 && filteredEntries.length > 0" class="history-rows">
       <div
-        v-for="entry in entries"
+        v-for="entry in filteredEntries"
         :key="entry.id"
         class="history-row"
         :class="{ 'is-viewing': entry.id === viewingId }"

@@ -15,10 +15,13 @@ import IconButton from '../../theme/primitives/IconButton.vue';
 import MessageStrip from '../../theme/primitives/MessageStrip.vue';
 import PanelSearchBox from '../../theme/primitives/PanelSearchBox.vue';
 import SegmentedControl from '../../theme/primitives/SegmentedControl.vue';
+import ResponseFindBar, {
+  type FindBarHost,
+  type FindBarTarget,
+} from '../shared/ResponseFindBar.vue';
 import { backToLatest, ensureHistoryFresh, historyRuntime } from './history';
 import RawExchangePane from './RawExchangePane.vue';
 import ResponseDiffDialog from './ResponseDiffDialog.vue';
-import ResponseFindBar, { type FindBarHost, type FindBarTarget } from './ResponseFindBar.vue';
 import ResponseHistoryList from './ResponseHistoryList.vue';
 import { runtime } from './state';
 import TimelinePane from './TimelinePane.vue';

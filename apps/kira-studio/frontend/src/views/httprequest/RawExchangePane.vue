@@ -9,8 +9,8 @@ import type { RangeHighlight } from '../../editor/variableHighlight';
 import EmptyState from '../../theme/primitives/EmptyState.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
 import MessageStrip from '../../theme/primitives/MessageStrip.vue';
+import type { FindBarHost } from '../shared/ResponseFindBar.vue';
 import { historyRuntime } from './history';
-import type { FindBarHost } from './ResponseFindBar.vue';
 import { runtime } from './state';
 
 // P9 D12/D14/D15: the inspector — the SPEC's own "view the exact bytes sent and received", with

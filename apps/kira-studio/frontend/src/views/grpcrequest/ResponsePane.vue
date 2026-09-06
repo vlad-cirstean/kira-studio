@@ -6,15 +6,23 @@ import {
   grpcCodeHint,
 } from '@shared/domain/grpc';
 import type { GrpcRequestTabRecord } from '@shared/domain/tabs';
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { patchGrpcRequestTabState } from '../../api/tabs';
 import CodeMirrorHost from '../../editor/CodeMirrorHost.vue';
+import { findRanges } from '../../editor/findRanges';
+import type { RangeHighlight } from '../../editor/variableHighlight';
 import { formatBytes } from '../../format';
+import { registerCommand } from '../../shortcuts/commands';
 import AppButton from '../../theme/primitives/AppButton.vue';
 import EmptyState from '../../theme/primitives/EmptyState.vue';
+import IconButton from '../../theme/primitives/IconButton.vue';
 import MessageStrip from '../../theme/primitives/MessageStrip.vue';
 import SegmentedControl from '../../theme/primitives/SegmentedControl.vue';
 import VirtualList from '../../theme/primitives/VirtualList.vue';
+import ResponseFindBar, {
+  type FindBarHost,
+  type FindBarTarget,
+} from '../shared/ResponseFindBar.vue';
 import CallHistoryList from './CallHistoryList.vue';
 import { backToLatestGrpc, ensureGrpcHistoryFresh, grpcHistoryRuntime } from './history';
 import { runtime } from './state';
@@ -159,10 +167,67 @@ function onBackToLatest(): void {
   backToLatestGrpc(props.tab.id);
 }
 
+// P22b D14: find-in-message — HTTP's own ResponsePane.vue find bar (P16 D11), applied to the one
+// surface the row calls out as the real gap: the message list has no search at all. The message
+// list is a VirtualList (only visible rows are ever mounted), so unlike HTTP's single always-
+// mounted body this can only search whichever message is actually expanded and on screen right
+// now — the lowest-seq expanded one, deterministic when more than one is open. A unary call's own
+// auto-expand (above) makes this the common case land exactly right with no extra action.
+const findOpen = ref(false);
+function toggleFind(): void {
+  findOpen.value = !findOpen.value;
+}
+function closeFind(): void {
+  findOpen.value = false;
+}
+
+const targetSeq = computed<number | null>(() => {
+  if (expanded.value.size === 0) return null;
+  return Math.min(...expanded.value);
+});
+const targetMessage = computed(() => messages.value.find((m) => m.seq === targetSeq.value) ?? null);
+
+// Function refs, not a single ref — VirtualList only mounts the rows currently on screen, so the
+// host for `targetSeq` may not exist at all (scrolled out) even while its seq is in `expanded`.
+// `scrollRangeIntoView` on a null host is simply a no-op via optional chaining below, same as
+// HTTP's own bodyHostRef before its first render.
+const messageHosts = new Map<number, FindBarHost>();
+function setMessageHost(seq: number, el: unknown): void {
+  if (el && typeof el === 'object' && 'scrollRangeIntoView' in el) {
+    messageHosts.set(seq, el as FindBarHost);
+  } else {
+    messageHosts.delete(seq);
+  }
+}
+
+const findBarRef = ref<{ query: string; currentGlobal: number } | null>(null);
+const findTargets = computed<readonly FindBarTarget[]>(() => {
+  if (!findOpen.value || !targetMessage.value) return [];
+  const seq = targetMessage.value.seq;
+  return [{ doc: targetMessage.value.json, host: messageHosts.get(seq) ?? null }];
+});
+const messageHighlights = computed<(doc: string) => readonly RangeHighlight[]>(() => {
+  const bar = findBarRef.value;
+  const query = bar?.query ?? '';
+  if (!query || findTargets.value.length === 0) return () => [];
+  const currentGlobal = bar?.currentGlobal ?? -1;
+  return (doc: string) => findRanges(doc, query, currentGlobal);
+});
+
 const viewingTime = computed(() => {
   const iso = viewing.value?.snapshot.entry.calledAt;
   if (!iso) return '';
   return new Date(iso).toLocaleTimeString([], { hour12: false });
+});
+
+let unregisterCommands: Array<() => void> = [];
+onMounted(() => {
+  // D14: mirrors HTTP's own ResponsePane.vue registration — opened from the status row's own
+  // search button, and by view.find, mounted only while this tab is the active one.
+  unregisterCommands = [registerCommand('view.find', toggleFind)];
+});
+onUnmounted(() => {
+  for (const off of unregisterCommands) off();
 });
 </script>
 
@@ -187,6 +252,16 @@ const viewingTime = computed(() => {
         </span>
       </template>
       <span v-else class="p-push" />
+      <!-- P22b D14: HTTP's own ResponsePane.vue idiom — only the Messages pane has a document to
+           search (Metadata is a plain key-value list, History is a row list). -->
+      <IconButton
+        v-if="tab.state.responsePane === 'messages'"
+        icon="search"
+        :active="findOpen"
+        v-tooltip="'Find in message'"
+        data-testid="grpc-find-toggle"
+        @click="toggleFind"
+      />
       <SegmentedControl
         :model-value="tab.state.responsePane"
         :options="RESPONSE_PANE_OPTIONS"
@@ -272,7 +347,13 @@ const viewingTime = computed(() => {
               <span class="p-xs dim">#{{ m.seq }}</span>
             </button>
             <div v-if="expanded.has(m.seq)" class="message-detail">
-              <CodeMirrorHost :doc="m.json" language="json" :read-only="true" />
+              <CodeMirrorHost
+                :ref="(el) => setMessageHost(m.seq, el)"
+                :doc="m.json"
+                language="json"
+                :read-only="true"
+                :range-highlights="m.seq === targetSeq ? messageHighlights : undefined"
+              />
             </div>
           </div>
         </template>
@@ -289,6 +370,14 @@ const viewingTime = computed(() => {
         </button>
       </EmptyState>
     </div>
+
+    <!-- D14: docked below the pane it searches (LAW 03), mirroring HTTP's own ResponsePane.vue. -->
+    <ResponseFindBar
+      v-if="findOpen && tab.state.responsePane === 'messages'"
+      ref="findBarRef"
+      :targets="findTargets"
+      @close="closeFind"
+    />
   </div>
 </template>
 
