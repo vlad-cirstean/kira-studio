@@ -32,6 +32,8 @@ type Backend interface {
 	Children(ctx context.Context, connectionID string, path model.NodePath) (adapters.TreeChildren, error)
 	Describe(ctx context.Context, connectionID string, path model.NodePath, tabID *string) (model.ObjectMeta, error)
 	Definition(ctx context.Context, connectionID string, path model.NodePath, tabID *string) (model.ObjectDefinition, error)
+	// SchemaColumns is P22c D1/D2's schema-wide sibling of Describe.
+	SchemaColumns(ctx context.Context, connectionID string, path model.NodePath) ([]model.RelationColumns, error)
 }
 
 type ChildrenResult struct {
@@ -48,6 +50,12 @@ type DescribeResult struct {
 type DefinitionResult struct {
 	Definition model.ObjectDefinition `json:"definition"`
 	Source     string                 `json:"source"`
+}
+
+// SchemaColumnsResult is P22c D2's cache-aside result for the "columns" kind.
+type SchemaColumnsResult struct {
+	Relations []model.RelationColumns `json:"relations"`
+	Source    string                  `json:"source"`
 }
 
 type Service struct {
@@ -182,6 +190,40 @@ func (s *Service) Definition(connectionID, path string, refresh bool, tabID *str
 		_ = s.meta.Put(connectionID, path, "definition", encoded)
 	}
 	return DefinitionResult{Definition: definition, Source: "server"}, nil
+}
+
+// SchemaColumns is D2's fourth cache kind, "columns" — same cache-aside shape as Children/Describe/
+// Definition, sharing their metadata_cache row per (connectionID, path) rather than adding a new
+// one (F8: the cache's 200-row-per-connection budget is shared by all four kinds, keyed by path —
+// a design that wrote one row per relation would evict the tree's own children on a large schema).
+func (s *Service) SchemaColumns(connectionID, path string, refresh bool) (SchemaColumnsResult, error) {
+	if !refresh {
+		if raw, ok := s.getCached(connectionID, path, "columns"); ok {
+			var rels []model.RelationColumns
+			if err := json.Unmarshal(raw, &rels); err == nil && model.ValidateRelationColumns(rels) {
+				return SchemaColumnsResult{Relations: rels, Source: "cache"}, nil
+			}
+			_ = s.meta.Drop(connectionID, path)
+		}
+	}
+	if err := s.requireConnected(connectionID); err != nil {
+		return SchemaColumnsResult{}, err
+	}
+	nodePath, err := model.DecodePath(connectionID, path)
+	if err != nil {
+		return SchemaColumnsResult{}, ipcerr.Internal(err.Error())
+	}
+	relations, err := s.backend.SchemaColumns(context.Background(), connectionID, nodePath)
+	if err != nil {
+		return SchemaColumnsResult{}, err
+	}
+	if relations == nil {
+		relations = []model.RelationColumns{}
+	}
+	if encoded, err := json.Marshal(relations); err == nil {
+		_ = s.meta.Put(connectionID, path, "columns", encoded)
+	}
+	return SchemaColumnsResult{Relations: relations, Source: "server"}, nil
 }
 
 // Invalidate drops L1 for one node (path non-nil) or the whole connection (path nil). No push of

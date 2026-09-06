@@ -29,7 +29,8 @@ func (f *fakeStates) StateOf(connectionID string) model.ConnectionState {
 // contract. Children answers one leaf node, truncated whenever the requested path's last segment
 // name starts with "trunc-" — the same fixture convention these tests were written against.
 type fakeBackend struct {
-	childrenN atomic.Int64
+	childrenN      atomic.Int64
+	schemaColumnsN atomic.Int64
 }
 
 func (b *fakeBackend) Children(ctx context.Context, connectionID string, path model.NodePath) (adapters.TreeChildren, error) {
@@ -49,6 +50,13 @@ func (b *fakeBackend) Describe(ctx context.Context, connectionID string, path mo
 
 func (b *fakeBackend) Definition(ctx context.Context, connectionID string, path model.NodePath, tabID *string) (model.ObjectDefinition, error) {
 	return model.ObjectDefinition{}, nil
+}
+
+func (b *fakeBackend) SchemaColumns(ctx context.Context, connectionID string, path model.NodePath) ([]model.RelationColumns, error) {
+	b.schemaColumnsN.Add(1)
+	return []model.RelationColumns{
+		{Name: "x", Kind: "table", Columns: []model.ColumnMeta{{Name: "id", Position: 1, DataType: "integer"}}},
+	}, nil
 }
 
 type harness struct {
@@ -96,10 +104,15 @@ func (h *harness) seedConnection(t *testing.T, id, name string) {
 
 func requestCount(t *testing.T, h *harness, op string) int {
 	t.Helper()
-	if op != "adapter:children" {
+	switch op {
+	case "adapter:children":
+		return int(h.backend.childrenN.Load())
+	case "adapter:schemaColumns":
+		return int(h.backend.schemaColumnsN.Load())
+	default:
 		t.Fatalf("requestCount: unsupported op %q", op)
+		return 0
 	}
-	return int(h.backend.childrenN.Load())
 }
 
 // TestSchemaMismatchDropsRow covers the validate-before-serve half of the cache-aside path: a
@@ -156,5 +169,161 @@ func TestTruncatedRefreshDropsOlderCompleteRow(t *testing.T) {
 	}
 	if requestCount(t, h, "adapter:children") != before+1 {
 		t.Errorf("post-drop load did not go to the server")
+	}
+}
+
+// P22c §4.2: SchemaColumns gets the identical cache-aside coverage Children already has above,
+// plus the two properties this design most depends on — a cache hit needs no live connection
+// (F7), and it shares one metadata_cache row with "children" rather than adding a new one (F8).
+
+func TestSchemaColumnsMissThenCacheHit(t *testing.T) {
+	h := newHarness(t)
+	h.seedConnection(t, "c1", "Conn One")
+	path := model.EncodePath([]model.PathSegment{{Kind: "database", Name: "app"}, {Kind: "schema", Name: "s1"}})
+
+	result, err := h.svc.SchemaColumns("c1", path, false)
+	if err != nil {
+		t.Fatalf("SchemaColumns: %v", err)
+	}
+	if result.Source != "server" || len(result.Relations) != 1 {
+		t.Fatalf("first call: got %+v, want one relation from the server", result)
+	}
+	if got := requestCount(t, h, "adapter:schemaColumns"); got != 1 {
+		t.Fatalf("backend calls after first load = %d, want 1", got)
+	}
+
+	result, err = h.svc.SchemaColumns("c1", path, false)
+	if err != nil {
+		t.Fatalf("SchemaColumns (cached): %v", err)
+	}
+	if result.Source != "cache" {
+		t.Errorf("second call: Source = %q, want cache", result.Source)
+	}
+	if got := requestCount(t, h, "adapter:schemaColumns"); got != 1 {
+		t.Errorf("backend calls after cached load = %d, want still 1 (no backend call)", got)
+	}
+}
+
+func TestSchemaColumnsCacheHitNeedsNoConnection(t *testing.T) {
+	h := newHarness(t)
+	h.seedConnection(t, "c1", "Conn One")
+	path := model.EncodePath([]model.PathSegment{{Kind: "database", Name: "app"}})
+
+	if _, err := h.svc.SchemaColumns("c1", path, false); err != nil {
+		t.Fatalf("warm the cache: %v", err)
+	}
+
+	// F7's own property: a cache hit is served before the connection is even checked.
+	h.fake.status["c1"] = "disconnected"
+	result, err := h.svc.SchemaColumns("c1", path, false)
+	if err != nil {
+		t.Fatalf("SchemaColumns while disconnected: %v", err)
+	}
+	if result.Source != "cache" {
+		t.Errorf("Source = %q, want cache (readable with no live connection)", result.Source)
+	}
+}
+
+func TestSchemaColumnsRefreshBypassesCache(t *testing.T) {
+	h := newHarness(t)
+	h.seedConnection(t, "c1", "Conn One")
+	path := model.EncodePath([]model.PathSegment{{Kind: "database", Name: "app"}})
+
+	if _, err := h.svc.SchemaColumns("c1", path, false); err != nil {
+		t.Fatalf("warm the cache: %v", err)
+	}
+	result, err := h.svc.SchemaColumns("c1", path, true)
+	if err != nil {
+		t.Fatalf("SchemaColumns (refresh): %v", err)
+	}
+	if result.Source != "server" {
+		t.Errorf("Source = %q, want server (refresh must bypass the cache)", result.Source)
+	}
+	if got := requestCount(t, h, "adapter:schemaColumns"); got != 2 {
+		t.Errorf("backend calls after refresh = %d, want 2", got)
+	}
+}
+
+func TestSchemaColumnsInvalidPayloadDroppedAndRefetched(t *testing.T) {
+	h := newHarness(t)
+	h.seedConnection(t, "c1", "Conn One")
+	path := model.EncodePath([]model.PathSegment{{Kind: "database", Name: "app"}})
+
+	if err := h.repos.Metadata.Put("c1", path, "columns", json.RawMessage(`[{"kind":"nonsense"}]`)); err != nil {
+		t.Fatalf("seed bad row: %v", err)
+	}
+
+	result, err := h.svc.SchemaColumns("c1", path, false)
+	if err != nil {
+		t.Fatalf("SchemaColumns: %v", err)
+	}
+	if result.Source != "server" {
+		t.Errorf("Source = %q, want server (an invalid cached payload must be treated as a miss)", result.Source)
+	}
+	if got, _ := h.repos.Metadata.Get("c1", path, "columns"); string(got) == `[{"kind":"nonsense"}]` {
+		t.Errorf("bad cache row survived: %s", got)
+	}
+}
+
+func TestSchemaColumnsInvalidateClears(t *testing.T) {
+	h := newHarness(t)
+	h.seedConnection(t, "c1", "Conn One")
+	path := model.EncodePath([]model.PathSegment{{Kind: "database", Name: "app"}})
+
+	if _, err := h.svc.SchemaColumns("c1", path, false); err != nil {
+		t.Fatalf("warm the cache: %v", err)
+	}
+	if err := h.svc.Invalidate("c1", nil); err != nil {
+		t.Fatalf("Invalidate: %v", err)
+	}
+	result, err := h.svc.SchemaColumns("c1", path, false)
+	if err != nil {
+		t.Fatalf("SchemaColumns (post-invalidate): %v", err)
+	}
+	if result.Source != "server" {
+		t.Errorf("Source = %q, want server (Invalidate must have cleared the cache)", result.Source)
+	}
+}
+
+// TestChildrenAndSchemaColumnsShareOneRow proves F8's zero-net-row property: a container's
+// "children" and "columns" payloads are two kinds merged into ONE metadata_cache row (the
+// (connection_id, path) unique index), not two competing rows that would otherwise pressure each
+// other out of the 200-row-per-connection budget.
+func TestChildrenAndSchemaColumnsShareOneRow(t *testing.T) {
+	h := newHarness(t)
+	h.seedConnection(t, "c1", "Conn One")
+	path := model.EncodePath([]model.PathSegment{{Kind: "database", Name: "app"}})
+
+	if _, err := h.svc.Children("c1", path, false); err != nil {
+		t.Fatalf("Children: %v", err)
+	}
+	if _, err := h.svc.SchemaColumns("c1", path, false); err != nil {
+		t.Fatalf("SchemaColumns: %v", err)
+	}
+
+	var rowCount int
+	if err := h.repos.Metadata.DB.QueryRow(
+		`SELECT COUNT(*) FROM metadata_cache WHERE connection_id = ? AND path = ?`, "c1", path,
+	).Scan(&rowCount); err != nil {
+		t.Fatalf("count rows: %v", err)
+	}
+	if rowCount != 1 {
+		t.Fatalf("metadata_cache rows for (c1, %q) = %d, want 1 (children and columns must share one row)", path, rowCount)
+	}
+
+	// Both kinds must still read back correctly out of that one shared row.
+	childrenResult, err := h.svc.Children("c1", path, false)
+	if err != nil {
+		t.Fatalf("Children (after sharing the row): %v", err)
+	}
+	if childrenResult.Source != "cache" {
+		t.Errorf("Children Source = %q, want cache", childrenResult.Source)
+	}
+	columnsResult, err := h.svc.SchemaColumns("c1", path, false)
+	if err != nil {
+		t.Fatalf("SchemaColumns (after sharing the row): %v", err)
+	}
+	if columnsResult.Source != "cache" || len(columnsResult.Relations) != 1 {
+		t.Errorf("SchemaColumns after sharing the row = %+v, want a cached single relation", columnsResult)
 	}
 }
