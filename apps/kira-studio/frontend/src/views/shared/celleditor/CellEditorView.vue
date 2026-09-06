@@ -3,6 +3,7 @@ import { pathTail } from '@shared/domain/tree';
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import CodeMirrorHost from '../../../editor/CodeMirrorHost.vue';
 import type { ConsoleDiagnostic } from '../../../editor/diagnostics';
+import { findRanges } from '../../../editor/findRanges';
 import type { EditorLanguageId } from '../../../editor/languages';
 import { formatBytes } from '../../../format';
 import { cellKey, clearSelectedCellFor, type SelectedCell } from '../../../state/cellSelection';
@@ -14,6 +15,7 @@ import IconButton from '../../../theme/primitives/IconButton.vue';
 import PopoverPanel from '../../../theme/primitives/PopoverPanel.vue';
 import ViewHeader from '../../../theme/primitives/ViewHeader.vue';
 import EditBufferActions from '../EditBufferActions.vue';
+import ResponseFindBar, { type FindBarHost, type FindBarTarget } from '../ResponseFindBar.vue';
 import { sqlDialectFor } from '../sqlIdent';
 import { typeDescription } from '../typeGlossary';
 import { useEditBuffer } from '../useEditBuffer';
@@ -301,6 +303,31 @@ function closePanel(): void {
   clearSelectedCellFor(selectedCell.value.tabId);
 }
 
+// P22b D14: one cell's own value, often a large JSON blob dumped straight from the console (F21),
+// had no way to search it at all. Mirrors ResponsePane.vue's own find bar exactly — one target,
+// the encoded pane's own doc, over the same editor/findRanges.ts seam. The decoded/timestamp
+// translate pane is a re-encoding of the same bytes, not a second document worth its own search.
+const findOpen = ref(false);
+function toggleFind(): void {
+  findOpen.value = !findOpen.value;
+}
+function closeFind(): void {
+  findOpen.value = false;
+}
+const encodedHostRef = ref<FindBarHost | null>(null);
+const findBarRef = ref<{ query: string; currentGlobal: number } | null>(null);
+const findTargets = computed<readonly FindBarTarget[]>(() => {
+  if (!findOpen.value) return [];
+  return [{ doc: doc.value, host: encodedHostRef.value }];
+});
+const docHighlights = computed(() => {
+  const bar = findBarRef.value;
+  const query = bar?.query ?? '';
+  if (!query || findTargets.value.length === 0) return undefined;
+  const currentGlobal = bar?.currentGlobal ?? -1;
+  return (text: string) => findRanges(text, query, currentGlobal);
+});
+
 // P42 D26: validated against the *effective* format, on the live buffer — a value that fails
 // says so right beside the status badge, whether the format was auto-detected or overridden.
 const formatProblem = computed(() =>
@@ -519,6 +546,13 @@ const statusLine = computed(() => {
           {{ readOnlyChipText }}
         </span>
         <IconButton
+          icon="search"
+          :active="findOpen"
+          data-testid="cell-editor-search-toggle"
+          v-tooltip="'Find in value'"
+          @click="toggleFind"
+        />
+        <IconButton
           icon="close"
           data-testid="cell-editor-close"
           v-tooltip="'Close'"
@@ -541,11 +575,13 @@ const statusLine = computed(() => {
     >
       <div class="encoded-pane" data-testid="cell-editor-encoded">
         <CodeMirrorHost
+          ref="encodedHostRef"
           :doc="doc"
           :language="language"
           :sql-dialect="sqlDialect"
           :read-only="!isEditable"
           :lint-source="cellLintSource"
+          :range-highlights="docHighlights"
           @update:doc="onMainDocInput"
         />
       </div>
@@ -590,6 +626,15 @@ const statusLine = computed(() => {
         />
       </template>
     </div>
+
+    <!-- P22b D14: docked below the pane it searches (LAW 03), mirroring ResponsePane.vue's own
+         find bar. -->
+    <ResponseFindBar
+      v-if="findOpen"
+      ref="findBarRef"
+      :targets="findTargets"
+      @close="closeFind"
+    />
   </div>
 </template>
 

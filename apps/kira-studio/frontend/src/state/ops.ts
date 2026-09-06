@@ -1,6 +1,7 @@
 import type { OpRecord } from '@shared/domain/ops';
 import { computed, markRaw, reactive } from 'vue';
 import { control } from '../bridge/control';
+import { connectionRecord } from './connections';
 
 const MAX_RECORDS = 500;
 const HYDRATE_LIMIT = 200;
@@ -47,7 +48,14 @@ export const visibleOps = computed<OpRecord[]>(() => {
     if (opsState.statusFilter === 'running' && record.status !== 'running') return false;
     if (opsState.statusFilter === 'error' && record.status !== 'error') return false;
     if (text) {
-      const haystack = `${record.command ?? ''} ${record.kind} ${record.error ?? ''}`.toLowerCase();
+      // P22b D14: this filter already existed (F21's own grep for icon="search"/PanelSearchBox
+      // missed it — it's an always-visible TextField with icon="filter") and already matched
+      // command/kind/error. The one real gap the row's "op label and its connection name" asks
+      // for was the connection's own name — added here rather than duplicating the box with a
+      // second, toggle-based one.
+      const connName = connectionRecord(record.connectionId)?.name ?? '';
+      const haystack =
+        `${record.command ?? ''} ${record.kind} ${record.error ?? ''} ${connName}`.toLowerCase();
       if (!haystack.includes(text)) return false;
     }
     return true;

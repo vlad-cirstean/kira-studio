@@ -2,18 +2,25 @@
 import { definitionText } from '@shared/domain/definition';
 import type { DefinitionTabRecord } from '@shared/domain/tabs';
 import { decodePath, pathTail } from '@shared/domain/tree';
-import { computed, onMounted, onUnmounted } from 'vue';
+import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { copyText } from '../../clipboard';
 import CodeMirrorHost from '../../editor/CodeMirrorHost.vue';
+import { findRanges } from '../../editor/findRanges';
 import { registerCommand } from '../../shortcuts/commands';
 import { connectionRecord, connectionsState } from '../../state/connections';
 import { openConsoleTab, patchDefinitionTabState } from '../../state/tabs';
 import CodiconIcon from '../../theme/CodiconIcon.vue';
 import AppButton from '../../theme/primitives/AppButton.vue';
+import IconButton from '../../theme/primitives/IconButton.vue';
 import MessageStrip from '../../theme/primitives/MessageStrip.vue';
+import PanelSearchBox from '../../theme/primitives/PanelSearchBox.vue';
 import ReconnectGate from '../../theme/primitives/ReconnectGate.vue';
 import SegmentedControl from '../../theme/primitives/SegmentedControl.vue';
 import ViewChrome from '../../theme/primitives/ViewChrome.vue';
+import ResponseFindBar, {
+  type FindBarHost,
+  type FindBarTarget,
+} from '../shared/ResponseFindBar.vue';
 import { sqlDialectFor } from '../shared/sqlIdent';
 import { refreshOrReconnect, useConnectionGate } from '../shared/useConnectionGate';
 import ColumnsSection from './ColumnsSection.vue';
@@ -52,17 +59,20 @@ function onCopy(): void {
   if (definition.value) copyText(definitionText(definition.value));
 }
 
-let unregisterCommand: (() => void) | null = null;
+let unregisterCommands: Array<() => void> = [];
 
 onMounted(() => {
   if (!needsReconnect.value && !runtime[props.tab.id]) {
     void load(props.tab.id);
   }
-  unregisterCommand = registerCommand('view.refresh', onRefresh);
+  unregisterCommands = [
+    registerCommand('view.refresh', onRefresh),
+    registerCommand('view.find', toggleSearch),
+  ];
 });
 
 onUnmounted(() => {
-  unregisterCommand?.();
+  for (const off of unregisterCommands) off();
 });
 
 const targetTail = computed(() => pathTail(props.tab.path));
@@ -92,6 +102,65 @@ const foreignKeyColumnNames = computed(
 const constraintRows = computed(() =>
   definition.value && meta.value ? buildConstraintRows(definition.value, meta.value) : [],
 );
+
+// P22b D14: F21's own finding — a whole DDL document plus columns/indexes/constraints sections is
+// the single largest searchable document in Studio, and had no search at all. Structure's own
+// search is a plain substring filter over each section's *rows*, applied here (once, over the
+// arrays every section already receives as props) rather than teaching four section components
+// their own filtering — ColumnsSection/IndexesSection/ConstraintsSection stay unchanged.
+const searchOpen = ref(false);
+function toggleSearch(): void {
+  searchOpen.value = !searchOpen.value;
+  // D13's own rule (HttpRequestView.vue's toggleFieldFilter): closing must restore every hidden
+  // row — the find bar's own query lives inside ResponseFindBar and resets for free on unmount.
+  if (!searchOpen.value) structureFilterQuery.value = '';
+}
+function closeSearch(): void {
+  searchOpen.value = false;
+  structureFilterQuery.value = '';
+}
+
+const structureFilterQuery = ref('');
+const structureFilterActive = computed(
+  () => searchOpen.value && pane.value === 'structure' && structureFilterQuery.value.trim() !== '',
+);
+const structureQuery = computed(() => structureFilterQuery.value.trim().toLowerCase());
+const filteredColumns = computed(() => {
+  if (!structureFilterActive.value) return meta.value?.columns ?? [];
+  const q = structureQuery.value;
+  return (meta.value?.columns ?? []).filter((c) => c.name.toLowerCase().includes(q));
+});
+const filteredIndexes = computed(() => {
+  if (!structureFilterActive.value) return meta.value?.indexes ?? [];
+  const q = structureQuery.value;
+  return (meta.value?.indexes ?? []).filter(
+    (i) =>
+      i.name.toLowerCase().includes(q) ||
+      (i.columns ?? []).some((c) => c.toLowerCase().includes(q)),
+  );
+});
+const filteredConstraintRows = computed(() => {
+  if (!structureFilterActive.value) return constraintRows.value;
+  const q = structureQuery.value;
+  return constraintRows.value.filter((r) => r.name.toLowerCase().includes(q));
+});
+
+// Source's own search is the same find-in-document ResponseFindBar every other big document in
+// this app uses (HTTP's ResponsePane.vue, gRPC's own ResponsePane.vue) — one target, the whole
+// DDL/JSON text.
+const docHostRef = ref<FindBarHost | null>(null);
+const findBarRef = ref<{ query: string; currentGlobal: number } | null>(null);
+const findTargets = computed<readonly FindBarTarget[]>(() => {
+  if (!searchOpen.value || pane.value !== 'source') return [];
+  return [{ doc: document.value, host: docHostRef.value }];
+});
+const docHighlights = computed(() => {
+  const bar = findBarRef.value;
+  const query = bar?.query ?? '';
+  if (!query || findTargets.value.length === 0) return undefined;
+  const currentGlobal = bar?.currentGlobal ?? -1;
+  return (doc: string) => findRanges(doc, query, currentGlobal);
+});
 
 const dialect = computed(() => sqlDialectFor(connectionRecord(props.tab.connectionId)?.kind));
 
@@ -165,6 +234,15 @@ const breadcrumb = computed(() => {
             @update:model-value="setPane"
           />
         </div>
+        <!-- P22b D14: the single largest searchable document in Studio (F21) had no search at
+             all — a find-in-document bar for Source, a plain substring filter for Structure. -->
+        <IconButton
+          icon="search"
+          :active="searchOpen"
+          v-tooltip="pane === 'source' ? 'Find in definition' : 'Filter columns/indexes/constraints'"
+          data-testid="definition-search-toggle"
+          @click="toggleSearch"
+        />
       </template>
 
       <template #toolbar-end>
@@ -211,6 +289,12 @@ const breadcrumb = computed(() => {
             <li v-for="(note, i) in definition.notes" :key="i">{{ note }}</li>
           </ul>
         </div>
+        <PanelSearchBox
+          v-if="searchOpen && pane === 'structure'"
+          v-model="structureFilterQuery"
+          placeholder="Filter columns, indexes, constraints"
+          testid="definition-structure-filter"
+        />
       </template>
 
       <!-- Item 4: the reconnect gate used to replace this whole ViewChrome (header, toolbar and
@@ -226,35 +310,47 @@ const breadcrumb = computed(() => {
       <template v-else>
       <div v-if="pane === 'source'" class="editor-body">
         <CodeMirrorHost
+          ref="docHostRef"
           :doc="document"
           :language="definition?.language === 'json' ? 'json' : 'sql'"
           :sql-dialect="dialect"
           :read-only="true"
+          :range-highlights="docHighlights"
         />
       </div>
       <!-- P23 D8: the Structure body no longer hard-requires `meta` — Kafka and SQS have no
            describe() (F7), so a definition can arrive with meta still null. PropertiesSection
            renders regardless; everything below it stays conditional on the data it needs, exactly
-           as before. -->
+           as before. P22b D14: Columns/Indexes/Constraints get the filtered arrays (computed
+           above) instead of meta's own raw ones — filtering lives here, once, not in each
+           section. -->
       <div v-else-if="definition" class="structure-body">
         <PropertiesSection v-for="section in definition.sections" :key="section.title" :section="section" />
         <template v-if="meta">
           <ColumnsSection
             v-if="!isCollection"
-            :columns="meta.columns"
+            :columns="filteredColumns"
             :foreign-key-column-names="foreignKeyColumnNames"
             :connection-id="tab.connectionId ?? ''"
             :table-path="tab.path"
           />
-          <IndexesSection :indexes="meta.indexes" />
+          <IndexesSection :indexes="filteredIndexes" />
           <ConstraintsSection
             v-if="!isCollection"
             :connection-id="tab.connectionId ?? ''"
-            :constraints="constraintRows"
+            :constraints="filteredConstraintRows"
           />
         </template>
         <ValidationSection v-if="isCollection" :document-schema="definition.documentSchema" />
       </div>
+      <!-- P22b D14: docked below the pane it searches (LAW 03), mirroring HTTP's own
+           ResponsePane.vue — only shown over the Source pane's single document. -->
+      <ResponseFindBar
+        v-if="searchOpen && pane === 'source'"
+        ref="findBarRef"
+        :targets="findTargets"
+        @close="closeSearch"
+      />
       <!-- LAW — there is no editor status line: identity moved to the view header above,
            duration to the toolbar's run-state, and this tab has no pending edits to report. -->
       </template>
