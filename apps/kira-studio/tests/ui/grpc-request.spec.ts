@@ -1065,9 +1065,15 @@ test('the gRPC target field fills the toolbar row (P18 D14)', async ({ relaunch 
 
   const target = page.locator('[data-testid="grpc-target"]');
   const widthAt = () => target.evaluate((el) => el.getBoundingClientRect().width);
-  // Fixed-width neighbours (TLS toggle, method select, Call) whose own width must stay put while
-  // the target field grows or shrinks with the window — the exact defect F14 found (a no-op
-  // `style="flex: 1"` on the field itself, which never grew at all).
+  // P22b D10: the method select is now `flex: 1` too, the address field's own sibling in the same
+  // row — so the two now share the window's added width roughly evenly, not "the target absorbs
+  // (almost) all of it" this test originally pinned before D10 gave the method select a width
+  // rule of its own. TLS toggle/Call stay fixed either way — the exact defect F14 found (a no-op
+  // `style="flex: 1"` on the target field itself, which never grew at all).
+  const methodWidthAt = () =>
+    page
+      .locator('[data-testid="grpc-method-select"]')
+      .evaluate((el) => el.getBoundingClientRect().width);
   const tlsWidthAt = () =>
     page
       .locator('[data-testid="grpc-tls-toggle"]')
@@ -1077,17 +1083,24 @@ test('the gRPC target field fills the toolbar row (P18 D14)', async ({ relaunch 
   if (!viewport) throw new Error('no viewport');
 
   const widthBefore = await widthAt();
+  const methodBefore = await methodWidthAt();
   const tlsBefore = await tlsWidthAt();
 
   const delta = 200;
   await page.setViewportSize({ width: viewport.width + delta, height: viewport.height });
 
   const widthAfter = await widthAt();
+  const methodAfter = await methodWidthAt();
   const tlsAfter = await tlsWidthAt();
 
-  // The target field grows by roughly the window's own delta (it is the row's one flexible
-  // element); its fixed-width neighbour does not move at all.
-  expect(widthAfter - widthBefore).toBeGreaterThan(delta * 0.5);
+  // Both flex:1 fields grow; between them they account for roughly the window's own delta, and
+  // neither is left flat (D10's own "they share the free space evenly" claim, not one field
+  // absorbing it all and the other still stuck at its content width).
+  const targetGrowth = widthAfter - widthBefore;
+  const methodGrowth = methodAfter - methodBefore;
+  expect(targetGrowth).toBeGreaterThan(delta * 0.2);
+  expect(methodGrowth).toBeGreaterThan(delta * 0.2);
+  expect(targetGrowth + methodGrowth).toBeGreaterThan(delta * 0.7);
   expect(Math.abs(tlsAfter - tlsBefore)).toBeLessThanOrEqual(1);
 });
 

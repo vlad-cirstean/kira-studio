@@ -8,7 +8,7 @@ import {
   rowsToJson,
   rowsToTsv,
 } from '../shared/clipboardFormats';
-import { toRelaxedText, toShellText } from '../shared/document/ejson';
+import { beautifyShellText, toRelaxedText, toShellText } from '../shared/document/ejson';
 
 // P19 D9/D10: the console result grid's own menu builders, mirroring views/grid/menu.ts's split
 // (builders in a plain module, the host only opens them) -- item ids follow that file's own
@@ -245,6 +245,18 @@ export interface MongoDocumentRowMenuContext {
   onError: (message: string) => void;
 }
 
+// P22b D11 fix: `toShellText` (P27 D12, unwrapped from `beautify.ts`'s own mode concept) always
+// pretty-prints -- its one caller before this was the document editor's own buffer, where an
+// indented literal is exactly what's wanted. "Copy all", one document per line, needs the
+// opposite: `beautifyShellText`'s existing 'compact' mode re-renders shell text without its own
+// newlines, so composing the two here (rather than teaching toShellText a second mode it has
+// exactly one non-editor caller for) gives each document its own single line.
+function compactShellText(body: string): string {
+  const indented = toShellText(body);
+  const compacted = beautifyShellText(indented, 'compact');
+  return compacted.ok ? compacted.text : indented;
+}
+
 // P22b D11: the Mongo document result's own row menu -- two named-format submenus (mirroring
 // resultMenu.ts's own tabularRowMenu Copy row(s) ▸ shape above) rather than documents/menu.ts's
 // old flat "Copy as JSON"/"Copy all as JSON" pair. Leaf ids `copy-as-json`/`copy-all-as-json`
@@ -287,9 +299,12 @@ export function mongoDocumentRowMenu(ctx: MongoDocumentRowMenuContext): MenuItem
           type: 'item',
           id: 'copy-all-shell',
           label: 'Shell mode',
-          // D11's own shape for "all": documents joined by '\n', not a JSON array -- that's what
-          // pasting N mongosh literals back into a shell session actually wants.
-          run: () => copyOrReportError(ctx.allBodies().map(toShellText).join('\n'), ctx.onError),
+          // D11's own shape for "all": documents joined by '\n', one compact literal per line --
+          // not a JSON array, and not each document's own multi-line indented form (which would
+          // make "joined by \n" meaningless) -- that's what pasting N mongosh literals back into
+          // a shell session actually wants.
+          run: () =>
+            copyOrReportError(ctx.allBodies().map(compactShellText).join('\n'), ctx.onError),
         },
         {
           type: 'item',

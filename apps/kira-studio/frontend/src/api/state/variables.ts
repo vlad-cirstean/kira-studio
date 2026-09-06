@@ -53,9 +53,19 @@ async function loadEnvironments(): Promise<void> {
   variablesState.loaded = true;
 }
 
+// P22b D8 regression: CollectionsPanel.vue now calls initVariables() on its own mount, alongside
+// EnvironmentSelect.vue's pre-existing call — both fire in the same tick on a fresh Api-mode
+// mount, before either's own loadEnvironments() await resolves and sets `loaded = true`, so the
+// `if (loaded) return` guard let both through and this fired variablesListEnvironments() twice
+// instead of once. `initInFlight` closes that window: a second caller during the first's own
+// in-flight load reuses its promise instead of starting a second real fetch.
+let initInFlight: Promise<void> | null = null;
+
 export function initVariables(): void {
-  if (variablesState.loaded) return;
-  void loadEnvironments();
+  if (variablesState.loaded || initInFlight) return;
+  initInFlight = loadEnvironments().finally(() => {
+    initInFlight = null;
+  });
 }
 
 /** id: '' selects "No environment" (D3). */
