@@ -192,10 +192,11 @@ describe('live-stream message buffer (P21 round 2 performance finding 6)', () =>
     await callPromise;
   });
 
-  // 10_000 (MAX_LIVE_MESSAGES) and 9_000 (its own 90% trim target) are state.ts's own private
-  // constants — restated here as literals rather than imported, since the fix's contract is
-  // exactly "trims to below the cap, not back to it".
-  test('crossing the cap trims to 90% of it, not back to the cap itself (amortized splice)', async () => {
+  // 10_000 (MAX_LIVE_MESSAGES) is state.ts's own private constant — restated here as a literal
+  // rather than imported. An amortized 90%-of-cap trim target was tried and reverted (it broke
+  // D15/D17's "exactly the most recent 10,000" contract, caught by grpc-request.spec.ts's own
+  // "caps at 10,000" UI test); this pins the reverted, exact-cap behavior instead.
+  test('crossing the cap trims back to exactly the cap', async () => {
     const id = setUpStreamingTab();
     const grpcCallDeferred = deferred<GrpcCallResultWire>();
     // biome-ignore lint/suspicious/noExplicitAny: a minimal fake, not the real grpcCall
@@ -221,8 +222,7 @@ describe('live-stream message buffer (P21 round 2 performance finding 6)', () =>
     expect(runtime[id]?.messages.length).toBe(10_000);
 
     pushBatch(1); // crosses the cap: this is the splice this test pins
-    // Pre-fix, this would be 10_000 (trimmed back to exactly the cap on every batch past it).
-    expect(runtime[id]?.messages.length).toBe(9_000);
+    expect(runtime[id]?.messages.length).toBe(10_000);
     expect(runtime[id]?.trueMessageCount).toBe(10_001);
 
     grpcCallDeferred.resolve(terminalResult());
