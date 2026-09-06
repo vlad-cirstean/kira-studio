@@ -31,16 +31,25 @@ export function createDisplayValueExtractor(
   for (let i = 0; i < columnOrder.length; i++) {
     fieldToPageCol.set(columnOrder[i], pageColumnIndexFor(page, columnOrder, i));
   }
-  // P21 round 3 performance finding 10: snapshotted once per extractor build, not read via
-  // pendingFor()/stagedValue() inside the returned per-cell closure — SlickGridHost.vue already
-  // rebuilds dataSource.setState (and therefore this extractor) on every staging change (the paste
-  // path, plus every stageEdit/stageInsert/stageDelete call site), so a snapshot taken at build
-  // time can never go stale for the render it serves. With no staged edits the pre-fix code's own
-  // optional chain already short-circuited to one trap; once the user has staged even a single
-  // edit, every other cell in the same render paid up to four proxy traps for information that
-  // cannot change mid-render — this removes all of them.
-  const pending = rawPendingFor(tabId);
+  // P21 round 3 performance finding 10, corrected: an earlier version of this fix snapshotted
+  // `pending` once here, at extractor-build time, on the theory that SlickGridHost.vue always
+  // rebuilds `dataSource.setState` (and therefore this extractor) on every staging change. That
+  // theory was wrong and a real regression (caught by tests/ui/mutations.spec.ts,
+  // tests/ui/cell-editor.spec.ts and tests/ui/interaction.spec.ts all failing): SlickGridHost.vue's
+  // own C5/§5 D5 watch (the `pendingFor(tabId)?.edits`/`.deletes` signature) invalidates and
+  // re-renders the touched rows on every stageEdit/stageNull/toggleDelete, but never calls
+  // `dataSource.setState` to rebuild this extractor — its own comment says exactly why: "a
+  // committed edit renders correctly for free" *because* the old closure re-read stagedValue()
+  // live on every cell render. `pendingState[tabId]` is also created lazily (pendingChanges.ts's
+  // own `ensure()`), so an extractor built before a tab's first-ever staged change captured
+  // `pending = undefined` permanently — no later edit could ever appear, since nothing ever
+  // rebuilds this closure to re-observe it. `rawPendingFor` is therefore called *inside* the
+  // returned closure, once per cell as before, but through `toRaw` — this still removes 3 of the
+  // original 4 proxy traps per cell (the Map wrapper, its `.get()` result wrapper, and the
+  // `.changes` field wrapper), leaving only the one unavoidable top-level `pendingState[tabId]`
+  // read that must stay live for correctness.
   return (item, field) => {
+    const pending = rawPendingFor(tabId);
     if (item.insertId !== undefined) {
       const value = pending?.inserts.find((i) => i.id === item.insertId)?.values[field];
       return { text: value ?? '', isNull: value === null || value === undefined, truncated: false };

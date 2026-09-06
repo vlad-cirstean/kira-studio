@@ -3,9 +3,17 @@
 // createDisplayValueExtractor read pending edits/inserts through pendingFor()/stagedValue() inside
 // its per-cell closure — pendingState[tabId] is a reactive proxy, its `edits` a reactive-wrapped
 // Map, so every cell paid up to four proxy traps once the user had staged even one edit.
-// rawPendingFor snapshots the same underlying object via toRaw, taken once per extractor build
-// rather than once per cell (SlickGridHost.vue already rebuilds the extractor on every staging
-// change, so the snapshot can never go stale for the render it serves).
+// rawPendingFor unwraps the same underlying object via toRaw. It is called *inside* the returned
+// per-cell closure (once per cell, as before the fix) rather than once at build time: an earlier
+// version of this fix snapshotted it once at build time on the theory that SlickGridHost.vue
+// always rebuilds the extractor on every staging change, which is false (its own C5/§5 D5 watch
+// invalidates/re-renders the touched rows on a stageEdit/stageNull/toggleDelete without ever
+// rebuilding this extractor — see dataSource.ts's own corrected comment) and was a real regression
+// caught by tests/ui/mutations.spec.ts, tests/ui/cell-editor.spec.ts and
+// tests/ui/interaction.spec.ts. Reading through toRaw still removes 3 of the original 4 proxy traps
+// per cell (the Map wrapper, its `.get()` result wrapper, and the `.changes` field wrapper) — only
+// the one unavoidable top-level `pendingState[tabId]` read stays live, which is what correctness
+// here actually requires.
 //
 // pendingChanges.ts transitively reaches bridge/data.ts -> '/wails/runtime.js' at module scope,
 // hence the dynamic import after ./support/window's mock.module registration — the same pattern
@@ -80,20 +88,33 @@ describe('createDisplayValueExtractor merges staged edits the same way stagedVal
     expect(view).toEqual({ text: '', isNull: true, truncated: false });
   });
 
-  test('an edit staged after the extractor was built is still visible through it (toRaw unwraps, it does not clone)', () => {
-    // rawPendingFor returns `toRaw(pendingState[tabId])` -- the SAME underlying object the
-    // reactive proxy wraps, not a copy of it. `edits` is a Map mutated in place (stageEdit calls
-    // `.set` on the existing Map), so a later stageEdit is a mutation of the very object this
-    // extractor already captured a reference to: it is observed exactly as it would have been
-    // through the old pendingFor()/stagedValue() reactive path. The optimisation removes proxy
-    // traps, not correctness -- this is the test that would catch a snapshot that accidentally
-    // cloned instead of unwrapped.
+  test('an edit staged after the extractor was built is still visible through it (the extractor is never rebuilt)', () => {
+    // The regression this exact case caught: an earlier version of this fix read `pending` once
+    // at build time. Because SlickGridHost.vue's own pending-change watch invalidates/re-renders
+    // touched rows WITHOUT ever rebuilding this extractor (dataSource.ts's own corrected comment
+    // explains why), a build-time snapshot could never observe an edit staged afterward through
+    // the *same* extractor instance — exactly the scenario reused here.
     clearPending(TAB);
     stageEdit(TAB, 1, 'a', 'first');
     const extract = createDisplayValueExtractor(TAB, NO_PAGE, ['a']);
     expect(extract({ row: 1, pos: 1 }, 'a').text).toBe('first');
     stageEdit(TAB, 1, 'a', 'second');
     expect(extract({ row: 1, pos: 1 }, 'a').text).toBe('second');
+  });
+
+  test('the FIRST edit ever staged for a tab is visible through an extractor built before it existed', () => {
+    // The sharpest form of the same regression: pendingChanges.ts's own `ensure()` creates
+    // `pendingState[tabId]` lazily, on a tab's *first* staged change — so an extractor built while
+    // the tab had no pending state at all (the ordinary case: SlickGridHost.vue builds its first
+    // extractor at mount, long before anyone has edited a cell) captured `pending = undefined`
+    // under a build-time snapshot. No later stageEdit could ever be observed through that stale
+    // `undefined`, because nothing rebuilds the extractor to re-derive it. This is the exact
+    // failure tests/ui/mutations.spec.ts's "edit, add, delete, preview, commit..." case hit.
+    clearPending(TAB);
+    const extract = createDisplayValueExtractor(TAB, NO_PAGE, ['name']);
+    expect(extract({ row: 0, pos: 0 }, 'name').text).toBe(''); // nothing staged yet — page fallback
+    stageEdit(TAB, 0, 'name', 'edited via UI');
+    expect(extract({ row: 0, pos: 0 }, 'name').text).toBe('edited via UI');
   });
 });
 
