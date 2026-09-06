@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"os"
 
+	"github.com/google/uuid"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/appcore"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/ipcerr"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/postman"
@@ -329,6 +330,41 @@ type CollectionsExportArgs struct {
 	Path         string `json:"path"`
 }
 
+// writeFileAtomically writes to a sibling `path + ".kira-partial-<uuid>"` temp file via write,
+// then Syncs, Closes and os.Renames it onto path only once write has fully succeeded — mirroring
+// internal/adapters/s3/transfer.go's downloadObject (P21 round 3 finding 7). Extracted out of
+// Export so the atomicity guarantee itself — path is only ever replaced by a complete file, and a
+// failure at any step cleans up the temp file rather than leaving it, or path, half-written — can
+// be exercised directly with an injectable write step, not just through a full DB-backed export.
+func writeFileAtomically(path string, write func(*os.File) error) error {
+	tmpPath := path + ".kira-partial-" + uuid.NewString()
+	f, err := os.Create(tmpPath)
+	if err != nil {
+		return ipcerr.BadRequest(fmt.Sprintf("could not write %s: %s", path, err))
+	}
+	cleanup := func() { _ = os.Remove(tmpPath) }
+
+	if err := write(f); err != nil {
+		_ = f.Close()
+		cleanup()
+		return ipcerr.Internal(err.Error())
+	}
+	if err := f.Sync(); err != nil {
+		_ = f.Close()
+		cleanup()
+		return ipcerr.Internal(fmt.Sprintf("could not finish writing %s: %s", path, err))
+	}
+	if err := f.Close(); err != nil {
+		cleanup()
+		return ipcerr.Internal(fmt.Sprintf("could not finish writing %s: %s", path, err))
+	}
+	if err := os.Rename(tmpPath, path); err != nil {
+		cleanup()
+		return ipcerr.Internal(fmt.Sprintf("could not finish writing %s: %s", path, err))
+	}
+	return nil
+}
+
 // ExportReport is Export's answer — D16: a secret is written valueless, and SecretCount is what
 // lets the renderer say so once, rather than that being a fact only discoverable by opening the
 // file. SkippedGrpc is P11 D12/F22's own addition: Postman Collection v2.1 has no representation
@@ -343,6 +379,15 @@ type ExportReport struct {
 // Export writes the collection at path as Collection v2.1 JSON. The file is written whole rather
 // than streamed: a collection is rows in a local table and the writer needs the tree in memory to
 // rebuild the nested arrays anyway.
+//
+// P21 round 3 finding 7: this used to os.Create(args.Path) directly — truncate-or-create — and
+// stream postman.Write straight into it, so a marshal error, a full disk, or the process dying
+// mid-write left the destination empty or half-written with no cleanup, silently destroying
+// whatever was there before (a re-export is exactly the kind of save people make over last week's
+// file). Now mirrors internal/adapters/s3/transfer.go's downloadObject: write to a sibling
+// *.kira-partial-<uuid> temp file, Sync, Close, then os.Rename onto the destination — the
+// destination is only ever replaced by a complete, fully-flushed file, and every error path
+// unlinks the temp file instead of leaving it behind.
 func (s *CollectionsService) Export(args CollectionsExportArgs) (ExportReport, error) {
 	if args.CollectionID == "" {
 		return ExportReport{}, ipcerr.BadRequest("collectionId is required")
@@ -354,16 +399,9 @@ func (s *CollectionsService) Export(args CollectionsExportArgs) (ExportReport, e
 	if err != nil {
 		return ExportReport{}, ipcerr.Internal(err.Error())
 	}
-	f, err := os.Create(args.Path)
-	if err != nil {
-		return ExportReport{}, ipcerr.BadRequest(fmt.Sprintf("could not write %s: %s", args.Path, err))
-	}
-	if err := postman.Write(f, tree); err != nil {
-		_ = f.Close()
-		return ExportReport{}, ipcerr.Internal(err.Error())
-	}
-	if err := f.Close(); err != nil {
-		return ExportReport{}, ipcerr.Internal(fmt.Sprintf("could not finish writing %s: %s", args.Path, err))
+
+	if err := writeFileAtomically(args.Path, func(f *os.File) error { return postman.Write(f, tree) }); err != nil {
+		return ExportReport{}, err
 	}
 
 	secretCount := 0
