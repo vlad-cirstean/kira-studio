@@ -1,3 +1,4 @@
+import type { Locator, Page } from '@playwright/test';
 import type { ControlSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
 import { IPC } from './support/ipcChannels';
@@ -153,40 +154,122 @@ test('mode switch — two mode tabs, an empty Http mode, and Studio state that s
   await expect(page.locator('[data-testid="project-panel"]')).toContainText('Collections');
 });
 
-// P18 D15/F18: the mode tab's icon used to be an unboxed <i> and its label a bare text node — an
-// anonymous flex item with no element, no class, and no rect a test could measure at all. This is
-// the guard that becomes possible only once both are real, boxed elements: (a) the icon-box and
-// the label share a vertical centre line, and (b) the icon-box -> label gap is the same on both
-// tabs — false before this fix (F18's own measurement: an unboxed icon's ink varies per glyph, so
-// `database`'s own right side bearing (2.4px) differed from `globe`'s (0.8px)).
-test('a mode tab’s icon and label share a centre line, and both tabs measure the same gap (P18 D15)', async ({
+// P18 D15/F18 built the box-level fix (a real .icon-box and a real <span> label, both real flex
+// items with a measurable rect) and a guard that held *by construction*: a fixed-size .icon-box
+// centres each glyph's own advance, not its ink, so the guard could never see the two things a
+// user actually reads — F8/F9 name this as the reason the same complaint came back a third time.
+// P22 D5 replaces both of that guard's assertions with an ink measurement: screenshot the icon
+// and the label, find each one's own painted pixels (differing from its own sampled background)
+// rather than trust the fixed box each sits in, and compare the ink itself.
+async function inkBounds(
+  locator: Locator,
+): Promise<{ top: number; bottom: number; left: number; right: number } | null> {
+  const box = await locator.boundingBox();
+  if (!box) return null;
+  const base64 = (await locator.screenshot()).toString('base64');
+  const rel = await locator.page().evaluate(async (b64) => {
+    const img = new Image();
+    const loaded = new Promise<void>((resolve, reject) => {
+      img.onload = () => resolve();
+      img.onerror = () => reject(new Error('mode-tab ink screenshot failed to decode'));
+    });
+    img.src = `data:image/png;base64,${b64}`;
+    await loaded;
+    const canvas = document.createElement('canvas');
+    canvas.width = img.naturalWidth;
+    canvas.height = img.naturalHeight;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('mode-tab ink measurement: no 2d context');
+    ctx.drawImage(img, 0, 0);
+    const { data, width, height } = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    // The crop's own corner pixel is its background — .icon-box and .mode-label paint no fill of
+    // their own, so this is whatever sits behind them (the tab's own ground either way).
+    const bg = [data[0], data[1], data[2]];
+    const THRESHOLD = 24; // per-channel delta that counts as "ink", tolerant of anti-aliasing
+    let minX = Number.POSITIVE_INFINITY;
+    let maxX = Number.NEGATIVE_INFINITY;
+    let minY = Number.POSITIVE_INFINITY;
+    let maxY = Number.NEGATIVE_INFINITY;
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const i = (y * width + x) * 4;
+        const dr = Math.abs(data[i] - bg[0]);
+        const dg = Math.abs(data[i + 1] - bg[1]);
+        const db = Math.abs(data[i + 2] - bg[2]);
+        if (dr > THRESHOLD || dg > THRESHOLD || db > THRESHOLD) {
+          if (x < minX) minX = x;
+          if (x > maxX) maxX = x;
+          if (y < minY) minY = y;
+          if (y > maxY) maxY = y;
+        }
+      }
+    }
+    if (minX === Number.POSITIVE_INFINITY) return null;
+    return { minX, maxX, minY, maxY, width, height };
+  }, base64);
+  if (!rel) return null;
+  const scaleX = box.width / rel.width;
+  const scaleY = box.height / rel.height;
+  return {
+    left: box.x + rel.minX * scaleX,
+    right: box.x + (rel.maxX + 1) * scaleX,
+    top: box.y + rel.minY * scaleY,
+    bottom: box.y + (rel.maxY + 1) * scaleY,
+  };
+}
+
+async function modeTabInk(
+  page: Page,
+  mode: 'studio' | 'api',
+): Promise<{ iconCentreY: number; labelCentreY: number; iconRightInset: number }> {
+  const tab = modeTab(page, mode);
+  const iconBoxLocator = tab.locator('.icon-box');
+  const iconBox = await iconBoxLocator.boundingBox();
+  const iconInk = await inkBounds(iconBoxLocator);
+  const labelInk = await inkBounds(tab.locator('.mode-label'));
+  if (!iconBox || !iconInk || !labelInk) {
+    throw new Error(`mode tab "${mode}" has no measurable icon/label ink`);
+  }
+  return {
+    iconCentreY: (iconInk.top + iconInk.bottom) / 2,
+    labelCentreY: (labelInk.top + labelInk.bottom) / 2,
+    // The .icon-box's own trailing edge to the glyph's own rightmost ink — how much of the box a
+    // rendered-at-native-size glyph actually fills, the direct, verifiable claim D6(a) makes
+    // ("the codicon's own 16-unit design grid and its 16px slot coincide"). At 13px-in-16px this
+    // always carried (16-13)/2 = 1.5px of pure box slack *in addition to* the glyph's own side
+    // bearing; at 16px only the glyph's own bearing remains.
+    iconRightInset: iconBox.x + iconBox.width - iconInk.right,
+  };
+}
+
+test('a mode tab’s icon renders at its own design size, with its ink lined up against the label (P22 D5/D6)', async ({
   relaunch,
 }) => {
   const { window: page } = await relaunch({ control: [] });
 
-  async function boxesFor(mode: 'studio' | 'api') {
-    const tab = modeTab(page, mode);
-    const iconBox = await tab.locator('.icon-box').boundingBox();
-    const labelBox = await tab.locator('.mode-label').boundingBox();
-    if (!iconBox || !labelBox) {
-      throw new Error(`mode tab "${mode}" is missing a measurable .icon-box/.mode-label`);
-    }
-    return { iconBox, labelBox };
+  const studio = await modeTabInk(page, 'studio');
+  const api = await modeTabInk(page, 'api');
+
+  // (a) F9(a)/D6(a): both icons render close to filling their own 16px box — measured, not
+  // merely inferred from the font's stated design grid. Before D6 (a 13px glyph in a 16px box)
+  // this sandbox's own headless-Chromium render measures a 4px inset on "database" alone, purely
+  // from the box/glyph size mismatch, on top of whatever the glyph's own side bearing adds; at
+  // native size that mismatch is gone and only the glyph's own (smaller) bearing remains.
+  for (const { iconRightInset } of [studio, api]) {
+    expect(iconRightInset).toBeLessThanOrEqual(3.5);
   }
 
-  const studio = await boxesFor('studio');
-  const api = await boxesFor('api');
-
-  // (a) icon and label are vertically centred on the same line, on both tabs.
-  for (const { iconBox, labelBox } of [studio, api]) {
-    const iconCentre = iconBox.y + iconBox.height / 2;
-    const labelCentre = labelBox.y + labelBox.height / 2;
-    expect(Math.abs(iconCentre - labelCentre)).toBeLessThanOrEqual(1);
+  // (b) the icon's ink and the label's ink are vertically centred on the same line, on both tabs
+  // — not merely the fixed boxes they sit in (F8's own point: a box-level guard can't see this).
+  // A generous tolerance: F9(b)'s own residual is sub-pixel on the two words this app actually
+  // renders ("Studio" has no descender, "Api" does — a real, permanent, per-word difference in
+  // ink extent that a shared line-height can't and shouldn't erase).
+  for (const { iconCentreY, labelCentreY } of [studio, api]) {
+    expect(Math.abs(iconCentreY - labelCentreY)).toBeLessThanOrEqual(1.5);
   }
 
-  // (b) the icon-box -> label gap is the same on both tabs — glyph-independent, since a
-  // fixed-size .icon-box centres each glyph's *advance*, not its ink.
-  const studioGap = studio.labelBox.x - (studio.iconBox.x + studio.iconBox.width);
-  const apiGap = api.labelBox.x - (api.iconBox.x + api.iconBox.width);
-  expect(Math.abs(studioGap - apiGap)).toBeLessThanOrEqual(0.5);
+  // F9(a)'s own point stands even after (a): "database" and "globe" are drawn with genuinely
+  // different side bearings at any shared box size, so their icon-to-label gaps are not expected
+  // to match pixel-for-pixel without normalizing the icon vocabulary itself (OQ-3, inline SVG) —
+  // that residual is deliberately not asserted here as a "must match" quantity.
 });
