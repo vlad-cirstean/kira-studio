@@ -395,11 +395,15 @@ describe('parseCurl(toCurl(x)) round-trips every mode (P7 D17)', () => {
         contentType: '',
         enabled: true,
       },
+      // P21 round 2 architecture/security finding 1: a re-parsed curl command never carries a
+      // live path — toCurl(x) is plain text once generated, indistinguishable from a pasted
+      // command an attacker wrote, so re-importing it never trusts an `@path` any more than
+      // Postman's own import does. Path is unresolved; only the display name survives.
       {
         name: 'file',
         kind: 'file',
         value: '',
-        path: '/tmp/r.csv',
+        path: '',
         fileName: 'r.csv',
         fileSize: 0,
         contentType: 'text/csv',
@@ -415,6 +419,8 @@ describe('parseCurl(toCurl(x)) round-trips every mode (P7 D17)', () => {
     expect('error' in result).toBe(false);
     if ('error' in result) return;
     expect(result.state.bodyMode).toBe('file');
-    expect(result.state.binaryFile).toEqual({ path: '/tmp/blob.bin', name: 'blob.bin', size: 0 });
+    // Same reasoning as the formdata file row above: a re-parsed curl command never carries a
+    // live path forward.
+    expect(result.state.binaryFile).toEqual({ path: '', name: 'blob.bin', size: 0 });
   });
 });

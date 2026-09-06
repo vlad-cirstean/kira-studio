@@ -17,6 +17,7 @@ export const CURL_WARNING_KINDS = [
   'multiple-urls',
   'header-malformed',
   'data-file-inline',
+  'unresolved-file',
   'form-file-content',
   'form-filename',
   'implied-content-type',

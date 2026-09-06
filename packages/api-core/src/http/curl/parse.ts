@@ -219,12 +219,22 @@ export function parseCurl(text: string): ParsedCurl | { error: string } {
     }
 
     if (content.startsWith('@')) {
+      // P21 round 2 architecture/security finding 1: the sibling of round 1's Postman fix
+      // (internal/postman/body.go's own WarnUnresolvedFile) — a pasted curl command is
+      // attacker-controlled input exactly like an imported collection, so `path` is left
+      // unresolved/empty rather than carried straight into a live, sendable field. Send's own
+      // "no file chosen for form-data field" refusal then does the rest until the user re-picks
+      // the file themselves through FilesService.ChooseOpen. The name is kept only for display.
       const path = content.slice(1);
+      warnings.push({
+        kind: 'unresolved-file',
+        detail: `-F '${name}=@${path}' names a local file — this app cannot read files here, so it must be re-chosen before sending.`,
+      });
       formFields.push({
         name,
         kind: 'file',
         value: '',
-        path,
+        path: '',
         fileName: basename(path),
         fileSize: 0,
         contentType,
@@ -458,9 +468,16 @@ export function parseCurl(text: string): ParsedCurl | { error: string } {
     // overridden on the real wire).
     bodyMode = 'formdata';
   } else if (onlyBinaryFile) {
+    // P21 round 2 architecture/security finding 1: same fix as the -F @path branch above — the
+    // path is attacker-controlled text from the pasted command, not something this app resolved,
+    // so it is never carried into a live, sendable field.
     const path = rawDataPieces[0].text.slice(1);
     bodyMode = 'file';
-    binaryFile = { path, name: basename(path), size: 0 };
+    binaryFile = { path: '', name: basename(path), size: 0 };
+    warnings.push({
+      kind: 'unresolved-file',
+      detail: `--data-binary '@${path}' names a local file — this app cannot read files here, so it must be re-chosen before sending.`,
+    });
   } else if (rawDataPieces.length > 0) {
     const literalPieces: RawDataPiece[] = [];
     for (const piece of rawDataPieces) {
@@ -528,8 +545,14 @@ export function parseCurl(text: string): ParsedCurl | { error: string } {
       }
     }
   } else if (uploadFilePath !== undefined) {
+    // P21 round 2 architecture/security finding 1: same fix as above — -T/--upload-file's path
+    // comes from the pasted command text, not a file this app resolved itself.
     bodyMode = 'file';
-    binaryFile = { path: uploadFilePath, name: basename(uploadFilePath), size: 0 };
+    binaryFile = { path: '', name: basename(uploadFilePath), size: 0 };
+    warnings.push({
+      kind: 'unresolved-file',
+      detail: `-T '${uploadFilePath}' names a local file — this app cannot read files here, so it must be re-chosen before sending.`,
+    });
   }
 
   return {
