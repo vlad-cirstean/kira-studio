@@ -427,6 +427,50 @@ func TestAnEditedBodyExportsCanonicallyAndShedsItsOrigin(t *testing.T) {
 	})
 }
 
+// TestExportStripsLocalFilePathsToTheirBaseName is P21 round 3 architecture/security finding 9:
+// buildBody (the "the body actually changed" branch) used to write a formdata file row's or a
+// file-mode body's real absolute local Path straight into `src` — the exact opposite of import's
+// own rule, applied a few lines above in this same file, that src is never trustworthy and Path
+// stays empty on the way in. An export is a share artefact; the absolute path discloses the OS
+// username, directory layout and often a client or project name to whoever receives the file, and
+// is useless to them besides (their own re-import strips it back down to the basename anyway).
+func TestExportStripsLocalFilePathsToTheirBaseName(t *testing.T) {
+	tree := parseFile(t, "bodies.json")
+
+	const sensitivePath = "/Users/jane.doe/Documents/clients/acme-migration/payload.json"
+	formIdx := itemIndex(t, tree, "formdata")
+	tree.Items[formIdx].Request.FormData = []model.SavedFormField{
+		{Name: "upload", Kind: "file", Path: sensitivePath, FileName: "payload.json", Enabled: true},
+	}
+	tree.Items[formIdx].Origin = postman.ShedOrigin(tree.Items[formIdx].Origin, tree.Items[formIdx].Request)
+
+	const sensitiveBinaryPath = "/Users/jane.doe/Documents/clients/acme-migration/payload.bin"
+	fileIdx := itemIndex(t, tree, "file with src")
+	tree.Items[fileIdx].Request.BinaryFile = &model.SavedFile{Path: sensitiveBinaryPath, Name: "payload.bin"}
+	tree.Items[fileIdx].Origin = postman.ShedOrigin(tree.Items[fileIdx].Origin, tree.Items[fileIdx].Request)
+
+	outItems := items(exported(t, tree))
+
+	formBody := requestOf(t, outItems["formdata"])["body"].(map[string]any)
+	rows, ok := formBody["formdata"].([]any)
+	if !ok || len(rows) == 0 {
+		t.Fatalf("formdata body: %#v", formBody)
+	}
+	row := rows[0].(map[string]any)
+	if src, _ := row["src"].(string); src != "payload.json" {
+		t.Fatalf("formdata file src = %q, want basename-only %q — got the real local path leaked into the export", src, "payload.json")
+	}
+
+	fileBody := requestOf(t, outItems["file with src"])["body"].(map[string]any)
+	fileObj, ok := fileBody["file"].(map[string]any)
+	if !ok {
+		t.Fatalf("file-mode body: %#v", fileBody)
+	}
+	if src, _ := fileObj["src"].(string); src != "payload.bin" {
+		t.Fatalf("file-mode src = %q, want basename-only %q — got the real local path leaked into the export", src, "payload.bin")
+	}
+}
+
 // ---- 5. The unchanged-⇒-verbatim rule holds per member ----
 
 func TestTheVerbatimRuleIsPerMember(t *testing.T) {

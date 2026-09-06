@@ -332,7 +332,15 @@ func buildBody(b savedBody) json.RawMessage {
 			row := map[string]any{"key": f.Name}
 			if f.Kind == "file" {
 				row["type"] = "file"
-				row["src"] = f.Path
+				// P21 round 3 finding 9: f.Path is a real absolute local filesystem path this app
+				// resolved (FilesService.ChooseOpen) — export is a share artefact, and writing it
+				// out verbatim disclosed the OS username, directory layout and often a client or
+				// project name to whoever received the file. Import already refuses to trust a
+				// collection's own src as a path for exactly the symmetric reason (body.go's
+				// importFormdataBody above); baseName here is the same treatment on the way out —
+				// and it is also all the recipient's own re-import can use anyway (it strips the
+				// path down to the name regardless of what export sent).
+				row["src"] = baseName(f.Path)
 			} else {
 				row["type"] = "text"
 				row["value"] = f.Value
@@ -350,9 +358,10 @@ func buildBody(b savedBody) json.RawMessage {
 		if b.BinaryFile == nil || b.BinaryFile.Path == "" {
 			return mustRaw(map[string]any{"mode": "file", "file": map[string]any{"src": nil}})
 		}
+		// P21 round 3 finding 9: same reasoning as the formdata file rows above — baseName only.
 		return mustRaw(map[string]any{
 			"mode": "file",
-			"file": map[string]any{"src": b.BinaryFile.Path},
+			"file": map[string]any{"src": baseName(b.BinaryFile.Path)},
 		})
 	}
 	return nil
