@@ -100,12 +100,39 @@ let saveTimer: ReturnType<typeof setTimeout> | null = null;
 // (e.g. a scroll-offset patch that set a field to the value it already had) skips the IPC and
 // the write entirely, not just the debounce.
 let lastSavedSnapshot: string | null = null;
+// The snapshot of an in-flight (not yet resolved) tabsSave call, if any — kept separate from
+// lastSavedSnapshot (which now only ever reflects a write that actually succeeded) so a second
+// saveIfChanged call landing on the identical snapshot while the first is still in flight does not
+// fire a redundant duplicate write.
+let pendingSnapshot: string | null = null;
 
+// P21 round 2 functional finding ("smaller, real, but narrow"): lastSavedSnapshot used to be
+// assigned *before* awaiting control.tabsSave, so a rejected write (the FK case
+// onConnectionsChanged above exists to prevent, or any transient failure) was still recorded as
+// "already persisted" — the next saveIfChanged call, even for the identical snapshot, would then
+// see snapshot === lastSavedSnapshot and skip the retry entirely, silently dropping the save for
+// good. Assigning only after tabsSave actually resolves means a failed write leaves
+// lastSavedSnapshot at its last real success, so the next state change (even one that lands on the
+// same snapshot the failed save had) is not short-circuited away.
 function saveIfChanged(): void {
   const snapshot = JSON.stringify(tabsState.tabs);
-  if (snapshot === lastSavedSnapshot) return;
-  lastSavedSnapshot = snapshot;
-  void control.tabsSave(tabsState.tabs);
+  if (snapshot === lastSavedSnapshot || snapshot === pendingSnapshot) return;
+  pendingSnapshot = snapshot;
+  void control
+    .tabsSave(tabsState.tabs)
+    .then(
+      () => {
+        lastSavedSnapshot = snapshot;
+      },
+      // Left uncaught beyond this: lastSavedSnapshot simply isn't advanced, so the next
+      // saveIfChanged call (triggered by whatever state change comes next) retries rather than
+      // rejecting the renderer with an unhandled promise rejection over a write it will get another
+      // chance at.
+      () => {},
+    )
+    .finally(() => {
+      if (pendingSnapshot === snapshot) pendingSnapshot = null;
+    });
 }
 
 function saveNow(): void {
