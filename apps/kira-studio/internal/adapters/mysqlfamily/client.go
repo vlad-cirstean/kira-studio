@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"database/sql"
+	"net"
 	"net/url"
 	"strconv"
 	"strings"
@@ -144,20 +145,21 @@ func BuildConfig(cfg model.ResolvedConnectionConfig, database string, profile Pr
 	return mc, nil
 }
 
+// parseHost extracts the bare host from a "host:port" address for use as a TLS ServerName.
+// P21 round 2 architecture/security finding 8: a hand-rolled strings.LastIndex split used to be
+// used here instead of the standard library's net.SplitHostPort — for a URI-mode IPv6 address
+// (net/url.Parse's own Host field, e.g. "[::1]:3306"), that returned ServerName = "[::1]",
+// brackets included, which cannot match any certificate (a real server's certificate names the
+// bare address, "::1", never the bracketed literal). net.SplitHostPort strips the brackets
+// correctly, matching how every other Go TLS ServerName in this codebase is derived.
 func parseHost(addr string) string {
-	host, _, err := splitHostPort(addr)
+	host, _, err := net.SplitHostPort(addr)
 	if err != nil {
+		// A port-less address (net.SplitHostPort's own "missing port in address") is passed
+		// through unchanged, matching this function's original tolerant behaviour.
 		return addr
 	}
 	return host
-}
-
-func splitHostPort(addr string) (host, port string, err error) {
-	idx := strings.LastIndex(addr, ":")
-	if idx < 0 {
-		return addr, "", nil
-	}
-	return addr[:idx], addr[idx+1:], nil
 }
 
 // connEntry pairs one database's pinned *sql.Conn with the mutex that serializes every use of it

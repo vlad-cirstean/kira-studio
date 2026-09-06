@@ -56,3 +56,28 @@ func TestGroupForeignKeys_SameNameSameSchemaCompositeKeyStillMerges(t *testing.T
 		t.Errorf("Columns = %v, want %v", got[0].Columns, want)
 	}
 }
+
+// P21 round 2 architecture/security finding 8: parseHost used to split "host:port" with a
+// hand-rolled strings.LastIndex — for a URI-mode IPv6 address (net/url.Parse's own Host field,
+// e.g. "[::1]:3306"), that returned "[::1]", brackets included, which cannot match any
+// certificate's real hostname ("::1"). net.SplitHostPort strips the brackets correctly.
+func TestParseHost(t *testing.T) {
+	cases := []struct {
+		name string
+		addr string
+		want string
+	}{
+		{"ipv4 with port", "127.0.0.1:3306", "127.0.0.1"},
+		{"hostname with port", "db.example.com:3306", "db.example.com"},
+		{"ipv6 with port, brackets stripped", "[::1]:3306", "::1"},
+		{"ipv6 loopback, brackets stripped", "[2001:db8::1]:3306", "2001:db8::1"},
+		{"no port at all is passed through unchanged", "db.example.com", "db.example.com"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := parseHost(tc.addr); got != tc.want {
+				t.Errorf("parseHost(%q) = %q, want %q", tc.addr, got, tc.want)
+			}
+		})
+	}
+}
