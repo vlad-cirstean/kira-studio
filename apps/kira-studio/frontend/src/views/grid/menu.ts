@@ -396,10 +396,6 @@ export interface HeaderMenuContext {
   currentSort: 'asc' | 'desc' | null;
   currentProjection: string[] | null;
   allColumnNames: string[];
-  // F2/P21 round 1: ColumnsMenu.vue locks a primary-key column's checkbox ("PK columns can't be
-  // hidden — a row can't be identified/edited without it"); Hide column had no equivalent guard at
-  // all, a second, unlocked way to drop a PK column out of the projection.
-  isPrimaryKeyColumn: boolean;
   columnValues: () => string[]; // the loaded page's values only (§8.5's own scope boundary)
 }
 
@@ -438,13 +434,14 @@ export function headerMenu(ctx: HeaderMenuContext): MenuItem[] {
       type: 'item',
       id: 'hide-column',
       label: 'Hide column',
-      // F2/P21 round 1: a primary-key column can't be hidden from here either, matching
-      // ColumnsMenu.vue's own checkbox lock.
-      disabled: ctx.isPrimaryKeyColumn,
       // D8: reuses the same setProjection() ColumnsMenu.vue calls — no second, competing
-      // "which columns are shown" mechanism.
+      // "which columns are shown" mechanism. F1/P21 round 1 note: this deliberately does not lock
+      // out every primary-key column the way ColumnsMenu.vue's own checkbox does — hiding one
+      // column of a *composite* key while the others stay visible is legitimate, tested behaviour
+      // (interaction.spec.ts's own composite-PK coverage), and the real bug (walking the
+      // projection down to zero columns) is closed below by falling back to null instead, not by
+      // forbidding every PK column outright.
       run: () => {
-        if (ctx.isPrimaryKeyColumn) return;
         void setProjection(
           ctx.tabId,
           nextProjectionAfterHidingColumn(

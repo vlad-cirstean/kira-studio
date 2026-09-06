@@ -1570,8 +1570,6 @@ function onHeaderContextMenuHandler(displayCol: number, e: MouseEvent): void {
       currentSort: currentSortTerms().find((t) => t.column === name)?.direction ?? null,
       currentProjection: tab()?.state.projection ?? null,
       allColumnNames: getPage(props.tabId)?.columns.map((c) => c.name) ?? [],
-      isPrimaryKeyColumn:
-        getPage(props.tabId)?.columns.find((c) => c.name === name)?.isPrimaryKey ?? false,
       columnValues: () => columnValuesFor(displayCol),
     }),
   );
