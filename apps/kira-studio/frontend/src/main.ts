@@ -12,6 +12,7 @@ import { hydrateOps } from './state/ops';
 import { hydrateTabs } from './state/tabs';
 import './theme/base.css';
 import { hydrateLayout } from './state/layout';
+import { hydrateMode } from './state/mode';
 import { hydrateSettings } from './state/settings';
 import { planCount as consolePlanCount } from './views/console/explainResults';
 import {
@@ -279,8 +280,9 @@ async function bootstrap(): Promise<void> {
   initAppMetrics();
   // Must complete before anything window-scoped below (hydrateTabs, in particular) — P8 D2:
   // always a no-op on the native shell, the only registration a `-tags server` browser tab ever
-  // gets otherwise.
-  await control.windowsEnsure();
+  // gets otherwise. P22 D12: also this window's own persisted mode — set once before the first
+  // render, the same way hydrateLayout/hydrateSettings below hydrate their own state.
+  hydrateMode(await control.windowsEnsure());
   await Promise.all([
     hydrateLayout(),
     hydrateSettings(),

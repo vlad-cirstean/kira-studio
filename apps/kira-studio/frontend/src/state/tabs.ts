@@ -36,7 +36,7 @@ import { clearPending } from '../views/grid/pendingChanges';
 import { clearSelectedCellFor } from './cellSelection';
 import { connectionsState } from './connections';
 import { consoleDefaultFor } from './consoleDefaults';
-import { modeState } from './mode';
+import { modeState, setMode } from './mode';
 import { settingsState } from './settings';
 import { TAB_KINDS } from './tabKinds';
 import { cleanupTabRuntime } from './tabRuntime';
@@ -228,11 +228,12 @@ export async function hydrateTabs(): Promise<void> {
     const active = modeTabs.find((t) => t.active) ?? modeTabs[0];
     tabsState.activeIdByMode[mode] = active?.id ?? null;
   }
-  // The boot mode is whichever tab was active app-wide before this phase ever shipped a second
-  // mode — there is at most one such tab in a pre-P1 session, so this is unambiguous today and
-  // stays correct once P2 gives Http its own kinds (D5, §8 OQ-2).
-  const bootTab = tabs.find((t) => t.active) ?? tabs[0];
-  modeState.active = bootTab ? TAB_KIND_MODE[bootTab.kind] : 'studio';
+  // P22 D12: the boot mode used to be derived here, from whichever tab was active app-wide
+  // before mode ever had its own persistence ("there is at most one such tab in a pre-P1
+  // session, so this is unambiguous" — its own comment already flagged this as a stand-in,
+  // §8 OQ-2). main.ts's bootstrap now calls hydrateMode() with the window's own stored mode
+  // before this function ever runs, which is the real signal that heuristic was standing in
+  // for — this function no longer touches modeState at all.
   // hydrated stays empty — every restored tab shows Reconnect & load, and restoring never
   // connects anything (§8.4).
 }
@@ -240,13 +241,16 @@ export async function hydrateTabs(): Promise<void> {
 // Deactivates every other tab of `mode` and marks `id` active, in both the per-tab flag and
 // tabsState.activeIdByMode — the one thing every activation path (open, duplicate, activateTab)
 // shares. Also brings that mode forward (D5: "activating a tab from anywhere brings its mode
-// forward"), which is a no-op when the caller is already in that mode.
+// forward"), which is a no-op when the caller is already in that mode. Goes through setMode
+// (P22 D12), not a direct modeState.active write — so a mode change reached this way (e.g.
+// double-clicking a tree row while in the other mode) is eventually persisted exactly like a
+// mode-tab click is, not silently dropped.
 function setActiveTabId(id: string, mode: AppMode): void {
   for (const t of tabsState.tabs) {
     if (TAB_KIND_MODE[t.kind] === mode) t.active = t.id === id;
   }
   tabsState.activeIdByMode[mode] = id;
-  modeState.active = mode;
+  setMode(mode);
 }
 
 // Result of an open*Tab call: `reused` tells the caller whether an existing tab was activated

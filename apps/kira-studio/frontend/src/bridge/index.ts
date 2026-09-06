@@ -20,6 +20,7 @@ import type {
 } from '@shared/domain/connection';
 import type { ObjectDefinition } from '@shared/domain/definition';
 import type { Layout, LayoutPatch } from '@shared/domain/layout';
+import type { AppMode } from '@shared/domain/mode';
 import type { OpRecord } from '@shared/domain/ops';
 import type {
   ConsoleBody,
@@ -213,7 +214,14 @@ const studioControl = {
   // created it before this page's URL ever loaded, D2), and the only thing that ever does on a
   // `-tags server` build, which has no shell managing window creation at all. bootstrap() in
   // main.ts awaits this before hydrateTabs() (or anything else window-scoped) runs.
-  windowsEnsure: (): Promise<void> => unwrap(WindowsService.Ensure({ windowKey })),
+  // P22 D12: also returns this window's own persisted mode — the boot-time seam
+  // state/mode.ts's hydrateMode reads, rather than a second round trip.
+  windowsEnsure: (): Promise<AppMode> =>
+    unwrap(WindowsService.Ensure({ windowKey })).then((r) =>
+      trust<AppMode>(trust<WailsModels.WindowsEnsureResult>(r).mode),
+    ),
+  windowsSetMode: (mode: AppMode): Promise<void> =>
+    unwrap(WindowsService.SetMode({ windowKey, mode })),
 
   // Both scoped to this page's own workbench (P8 D2/F6) — windowKey is read once, synchronously,
   // at module load (state/window.ts), before hydrateTabs() ever calls tabsList().

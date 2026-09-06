@@ -56,6 +56,7 @@ export const IPC = {
   httpSend: 'kira:http:send',
 
   windowsEnsure: 'kira:windows:ensure',
+  windowsSetMode: 'kira:windows:set-mode',
 
   tabsList: 'kira:tabs:list',
   tabsSave: 'kira:tabs:save',

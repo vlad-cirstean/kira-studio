@@ -154,6 +154,48 @@ test('mode switch — two mode tabs, an empty Http mode, and Studio state that s
   await expect(page.locator('[data-testid="project-panel"]')).toContainText('Collections');
 });
 
+// P22 D12/F20/F21: a window remembers which module it was closed in and reopens into it. This
+// tier's own relaunch() mocks both wire protocols from scratch each call (fixtures.ts's own header
+// comment) — there is nothing to persist to, so a real write-then-reboot round trip cannot be
+// proven here. What can: (a) boot honours whatever mode windowsEnsure's own snapshot answers with
+// (the hydration half — real cross-process persistence is Go's own windows_test.go/migration
+// coverage), and (b) switching mode eventually reaches windowsSetMode, debounced rather than
+// synchronous (F20's own invariant — the mode click itself schedules no tabsSave, still proven
+// unchanged by the existing case above).
+test('a window boots into whatever mode windowsEnsure answers with (P22 D12)', async ({
+  relaunch,
+}) => {
+  const { window: page } = await relaunch({
+    control: [{ channel: IPC.windowsEnsure, response: { mode: 'api' } }],
+  });
+
+  await expect(modeTab(page, 'api')).toHaveClass(/is-active/);
+  await expect(modeTab(page, 'studio')).not.toHaveClass(/is-active/);
+  await expect(page.locator('[data-testid="api-start"]')).toBeVisible();
+});
+
+test('switching mode reaches windowsSetMode eventually, never synchronously (P22 D12/F20)', async ({
+  relaunch,
+}) => {
+  const { window: page, control } = await relaunch({ control: [] });
+
+  const setModeCalls = () => control.log().filter((e) => e.channel === IPC.windowsSetMode);
+
+  await modeTab(page, 'api').click();
+  // Nothing yet — the click itself must not fire a synchronous IPC (F20's own invariant).
+  expect(setModeCalls()).toHaveLength(0);
+
+  await expect.poll(() => setModeCalls().length).toBe(1);
+  expect(setModeCalls()[0]?.args).toMatchObject({ mode: 'api' });
+
+  // Switching again before the first write's debounce would have fired collapses to the latest
+  // value, the same coalescing behaviour state/layout.ts's own patchLayout has.
+  await modeTab(page, 'studio').click();
+  await modeTab(page, 'api').click();
+  await expect.poll(() => setModeCalls().length).toBe(2);
+  expect(setModeCalls()[1]?.args).toMatchObject({ mode: 'api' });
+});
+
 // P18 D15/F18 built the box-level fix (a real .icon-box and a real <span> label, both real flex
 // items with a measurable rect) and a guard that held *by construction*: a fixed-size .icon-box
 // centres each glyph's own advance, not its ink, so the guard could never see the two things a

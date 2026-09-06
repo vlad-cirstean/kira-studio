@@ -4,6 +4,7 @@ import { resolve } from 'node:path';
 import type { Page, Route } from '@playwright/test';
 import { defaultLayout } from '@shared/domain/layout';
 import { defaultSettings } from '@shared/domain/settings';
+import { TAB_KIND_MODE, type TabKind } from '@shared/domain/tabs';
 import type { ControlSnapshot } from '../../ipc/support/types';
 import { IPC } from './ipcChannels';
 
@@ -68,6 +69,7 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   opsCancel: 'OpsService.Cancel',
   httpSend: 'HttpService.Send',
   windowsEnsure: 'WindowsService.Ensure',
+  windowsSetMode: 'WindowsService.SetMode',
   tabsList: 'TabsService.List',
   tabsSave: 'TabsService.Save',
   queriesList: 'QueriesService.List',
@@ -152,10 +154,12 @@ const FQN_TO_CHANNEL: Readonly<Record<string, string>> = Object.freeze(
 //   - `filtersList`: `project/state/tree.ts` calls it once for every connection the instant it
 //     reaches `connected` (tree.ts:118) — "no filters yet" for a connection never seen before,
 //     `EMPTY_VISIBILITY` (`shared/domain/tree-filter.ts`) made explicit.
-//   - `windowsEnsure` (P8): `main.ts`'s `bootstrap()` awaits this once, before hydrateTabs() or
-//     anything else window-scoped runs — always a no-op on the real native shell (the window's own
-//     `windows` row already exists by the time its URL loads), so there is nothing meaningful to
-//     snapshot. Void.
+//   - `windowsEnsure` (P8, mode added P22 D12): `main.ts`'s `bootstrap()` awaits this once, before
+//     hydrateTabs() or anything else window-scoped runs — always a no-op (bar the mode read) on the
+//     real native shell (the window's own `windows` row already exists by the time its URL loads),
+//     so there is nothing meaningful to snapshot beyond the app's own default mode.
+//   - `windowsSetMode` (P22 D12): the debounced mode-persistence writer — fire-and-forget, a spec
+//     never asserts on its own echo. Void.
 //   - `tabsSave`: `state/tabs.ts` debounce-persists on every tab mutation (typing in a console
 //     tab, opening/closing a tab, …) with a tab array keyed by a fresh UUID every test run —
 //     never a value any committed fixture could match on args, so it cannot be captured even in
@@ -196,7 +200,11 @@ const WILDCARD_DEFAULTS: Readonly<Record<string, string>> = Object.freeze({
   // "absent until the user writes one" empty document D2 gives a fresh connection, not a fixture
   // miss. connectionId is echoed as '' here since the frontend only reads `.ddl` off this call.
   [IPC.schemaGet]: JSON.stringify({ connectionId: '', ddl: '', updatedAt: '' }),
-  [IPC.windowsEnsure]: 'null',
+  // P22 D12: the boot-time mode read added to this same call — 'studio' is the app's own default
+  // (state/mode.ts's defaultMode / the migration's own column DEFAULT), the correct answer for
+  // any spec that doesn't seed its own windowsEnsure snapshot.
+  [IPC.windowsEnsure]: JSON.stringify({ mode: 'studio' }),
+  [IPC.windowsSetMode]: 'null',
   [IPC.tabsSave]: 'null',
   [IPC.layoutSet]: JSON.stringify(defaultLayout),
   [IPC.settingsSet]: JSON.stringify(defaultSettings),
@@ -332,6 +340,24 @@ export async function installControlMocks(
   }
   const cursors = new Map<string, number>();
 
+  // P22 D12: the mode a fresh boot answers windowsEnsure with, when a spec provides no explicit
+  // snapshot for it — read the (mode-independent) tabsList snapshot the spec *did* configure, so
+  // a spec restoring an Api-mode tab as active boots displaying it, the same way it always did
+  // before mode became its own persisted column. Only ever consults the first tabsList snapshot
+  // (a spec keying tabsList by args to answer differently per window is not a shape any spec
+  // uses today) and only its args-less/single form — args-matched multi-snapshot tabsList specs
+  // fall back to 'studio', same as providing no tabsList snapshot at all.
+  function inferredBootMode(): string {
+    const tabsSnaps = byChannel.get(IPC.tabsList);
+    const tabs = (tabsSnaps?.length === 1 ? tabsSnaps[0].response : undefined) as
+      | { kind?: string; active?: boolean }[]
+      | undefined;
+    if (!tabs || tabs.length === 0) return 'studio';
+    const bootTab = tabs.find((t) => t.active) ?? tabs[0];
+    const kind = bootTab?.kind;
+    return kind && kind in TAB_KIND_MODE ? TAB_KIND_MODE[kind as TabKind] : 'studio';
+  }
+
   await page.route('**/wails/**', async (route) => {
     const request = route.request();
     const url = new URL(request.url());
@@ -413,6 +439,22 @@ export async function installControlMocks(
     }
     const snap = list.length === 1 ? list[0] : findSnapWithRefreshFallback(callArgs);
     if (!snap) {
+      // P22 D12: a spec with no windowsEnsure snapshot of its own gets a mode inferred from
+      // whatever tabsList snapshot it *does* provide, rather than the flat 'studio' default —
+      // the real backend's own persisted mode and "which tab is active at boot" agree in every
+      // realistic case (D12's own mechanism keeps them in sync), and the overwhelming majority
+      // of specs restoring an Api-mode tab as active are asserting on that tab's own content,
+      // not on mode persistence itself. A spec that genuinely wants to test the persisted-mode
+      // seam provides its own explicit windowsEnsure snapshot, which always wins (see `snap`
+      // above) regardless of this inference.
+      if (channel === IPC.windowsEnsure) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ mode: inferredBootMode() }),
+        });
+        return;
+      }
       const wildcard = WILDCARD_DEFAULTS[channel];
       if (wildcard !== undefined) {
         await route.fulfill({ status: 200, contentType: 'application/json', body: wildcard });
