@@ -397,7 +397,11 @@ function buildNodeRow(
     error: treeState.errors[k],
     matched: query ? selfMatches : undefined,
   });
-  if (rowExpanded) out.push(...childOut);
+  // A10/P21 round 1: Array.prototype.push(...arr) spreads into the argument list — engines cap
+  // that in the ~65k-125k range and throw RangeError past it. searchResult accumulates across
+  // every connection and expanded level, so this is a hard failure on a large enough expansion,
+  // not a slow path.
+  if (rowExpanded) for (const r of childOut) out.push(r);
   return selfMatches || descendantMatch;
 }
 
@@ -447,7 +451,7 @@ function buildRows(
       expanded: rowExpanded,
       loading: false,
     });
-    if (rowExpanded) out.push(...childOut);
+    if (rowExpanded) for (const r of childOut) out.push(r);
     anyMatch = anyMatch || anyChildMatch;
   }
   return anyMatch;
@@ -522,7 +526,7 @@ const searchResult = computed(() => {
       status,
       statusDetail: status === 'error' ? (state?.error ?? null) : (state?.serverVersion ?? null),
     });
-    if (rowExpanded) rows.push(...childOut);
+    if (rowExpanded) for (const r of childOut) rows.push(r);
   }
 
   return { rows, incomplete: query ? stats.incomplete : false };
