@@ -13,8 +13,29 @@ export interface RowSnapshot {
   truncated?: ReadonlySet<string>;
 }
 
+// P21 round 3 finding 10 (architecture/security): a cell is untrusted database content — the same
+// reason SlickGridHost.vue explicitly disables enableHtmlRendering — but every text clipboard
+// format below used to hand it straight to a spreadsheet. A value whose first character is one of
+// `= + - @` TAB CR is evaluated as a formula the moment it's pasted into Excel/LibreOffice/Sheets
+// (CWE-1236); prefixing it with a single quote is the standard mitigation. Applied before any
+// other quoting/escaping below, so it survives a format's own quote-doubling untouched.
+function neutralizeFormulaPrefix(value: string): string {
+  return /^[=+\-@\t\r]/.test(value) ? `'${value}` : value;
+}
+
+// P21 round 3 finding 7 (functional): TSV has no native quoting, but real spreadsheet clipboard
+// TSV does — a field carrying an embedded tab, quote or newline is wrapped in double quotes with
+// `"` doubled, exactly CSV's own rule (csvField below). Without this, a `text` column holding an
+// embedded tab or newline shifted every subsequent column (tab) or split one row into two
+// (newline) on paste back into this app's own grid — copy→paste corrupted the very data it copied.
+function tsvField(value: string): string {
+  const guarded = neutralizeFormulaPrefix(value);
+  if (/["\t\n\r]/.test(guarded)) return `"${guarded.replace(/"/g, '""')}"`;
+  return guarded;
+}
+
 export function rowsToTsv(rows: RowSnapshot[]): string {
-  return rows.map((r) => r.columns.map((c) => r.values[c] ?? '').join('\t')).join('\n');
+  return rows.map((r) => r.columns.map((c) => tsvField(r.values[c] ?? '')).join('\t')).join('\n');
 }
 
 interface CellText {
@@ -40,7 +61,7 @@ export function columnsToTsv(
       cols
         .map((c) => {
           const dc = cellAt(r, c);
-          return dc.isNull ? '' : dc.text;
+          return dc.isNull ? '' : tsvField(dc.text);
         })
         .join('\t'),
     );
@@ -49,8 +70,9 @@ export function columnsToTsv(
 }
 
 function csvField(value: string): string {
-  if (/[",\n\r]/.test(value)) return `"${value.replace(/"/g, '""')}"`;
-  return value;
+  const guarded = neutralizeFormulaPrefix(value);
+  if (/[",\n\r]/.test(guarded)) return `"${guarded.replace(/"/g, '""')}"`;
+  return guarded;
 }
 
 export function rowsToCsv(rows: RowSnapshot[]): string {
@@ -108,12 +130,23 @@ export function rowsToInsert(
 export function parseDelimited(text: string): string[][] {
   const normalized = text.replace(/\r\n/g, '\n');
   if (normalized.includes('\t')) {
-    return normalized.split('\n').map((line) => line.split('\t'));
+    return parseDelimitedText(normalized, '\t');
   }
   return parseCsv(normalized);
 }
 
 function parseCsv(text: string): string[][] {
+  return parseDelimitedText(text, ',');
+}
+
+// parseDelimitedText is the shared quoted-field-aware state machine behind both parseCsv and the
+// TSV branch of parseDelimited — P21 round 3 finding 6 (functional): the TSV branch used to be a
+// bare `split('\n').map(line => line.split('\t'))`, so it had neither the CSV branch's trailing-
+// empty-row guard (every clipboard source puts a trailing newline on the clipboard, which produced
+// a bogus extra row that silently blanked or inserted the row below whatever was pasted) nor any
+// quote-awareness for reading back a value tsvField above wraps in quotes (an embedded tab or
+// newline).
+function parseDelimitedText(text: string, delimiter: string): string[][] {
   const rows: string[][] = [];
   let row: string[] = [];
   let field = '';
@@ -143,7 +176,7 @@ function parseCsv(text: string): string[][] {
       i++;
       continue;
     }
-    if (c === ',') {
+    if (c === delimiter) {
       row.push(field);
       field = '';
       i++;
