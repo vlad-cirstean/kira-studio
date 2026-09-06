@@ -8,6 +8,7 @@ package tree
 import (
 	"context"
 	"encoding/json"
+	"time"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/ipcerr"
@@ -94,11 +95,35 @@ func (s *Service) requireConnected(connectionID string) error {
 	return ipcerr.Disconnected(name)
 }
 
-// getCached is the whole cache-aside read path's choke point. fetchedAt (the payload's own
-// per-kind write time, P24 D3) is not yet consulted here — that lands in a follow-up commit.
+// freshnessFloor is the timestamp a cached payload must be at or after to count as fresh: the
+// moment this connection was most recently established (P24 D1/D2). The second result is false
+// while the connection is not connected, which means no floor applies at all — every cached
+// payload is servable regardless of age (D5): this is what makes the tree instant on launch and
+// what lets a SQL console over a cached container offer completion with no live connection
+// (P22c F7).
+func (s *Service) freshnessFloor(connectionID string) (string, bool) {
+	st := s.states.StateOf(connectionID)
+	if st.Status != "connected" {
+		return "", false
+	}
+	return model.FormatISO(time.UnixMilli(st.Since)), true
+}
+
+// getCached is the whole cache-aside read path's choke point, and P24's staleness rule lives here
+// (D4): a payload written before the current connection's Since is stale and BYPASSED, never
+// dropped — D5 needs it left on disk for a disconnected read, and a failed re-fetch must not lose
+// what is already cached (that half is still the caller's job, same as before this phase).
+// fetchedAt compares against the floor as a plain string — both are model.FormatISO's fixed-width,
+// UTC, three-fractional-digit format, which sorts lexicographically the same as chronologically
+// (F12). A payload with no recorded fetchedAt (a pre-P24 row) compares as "", less than every real
+// timestamp, so it reads as stale under any floor and is otherwise unaffected — exactly D2's
+// upgrade behaviour.
 func (s *Service) getCached(connectionID, path, kind string) (json.RawMessage, bool) {
-	raw, _, err := s.meta.Get(connectionID, path, kind)
+	raw, fetchedAt, err := s.meta.Get(connectionID, path, kind)
 	if err != nil || raw == nil {
+		return nil, false
+	}
+	if floor, ok := s.freshnessFloor(connectionID); ok && fetchedAt < floor {
 		return nil, false
 	}
 	return raw, true

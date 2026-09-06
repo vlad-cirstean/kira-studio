@@ -3,9 +3,11 @@ package tree_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage"
@@ -15,12 +17,20 @@ import (
 )
 
 // fakeStates is a Connected whose state a test sets directly, instead of driving a real connect.
+// since (P24) lets a test place a connect epoch on either side of a cached write — zero for a
+// connection a test never sets it on, which is the correct default (a floor of the Unix epoch,
+// leaving every real payload fresh) for every pre-P24 case in this file that never touches it.
 type fakeStates struct {
 	status map[string]string
+	since  map[string]int64
 }
 
 func (f *fakeStates) StateOf(connectionID string) model.ConnectionState {
-	return model.ConnectionState{ConnectionID: connectionID, Status: f.status[connectionID]}
+	return model.ConnectionState{
+		ConnectionID: connectionID,
+		Status:       f.status[connectionID],
+		Since:        f.since[connectionID],
+	}
 }
 
 // fakeBackend replaces the real adapterhost.Router (via a real Node engine fixture) these tests
@@ -31,10 +41,16 @@ func (f *fakeStates) StateOf(connectionID string) model.ConnectionState {
 type fakeBackend struct {
 	childrenN      atomic.Int64
 	schemaColumnsN atomic.Int64
+	// childrenErr, when set, makes the next Children call fail instead of answering — used by
+	// TestStalePayloadIsNotDropped to prove a failed re-fetch never destroys the stale cache row.
+	childrenErr error
 }
 
 func (b *fakeBackend) Children(ctx context.Context, connectionID string, path model.NodePath) (adapters.TreeChildren, error) {
 	b.childrenN.Add(1)
+	if b.childrenErr != nil {
+		return adapters.TreeChildren{}, b.childrenErr
+	}
 	nodes := []model.TreeNode{{Kind: "table", Name: "x", Path: "table:x", HasChildren: false}}
 	last := path.Segments[len(path.Segments)-1]
 	if strings.HasPrefix(last.Name, "trunc-") {
@@ -81,7 +97,7 @@ func newHarness(t *testing.T) *harness {
 	}
 	t.Cleanup(func() { _ = r.Close() })
 
-	fake := &fakeStates{status: map[string]string{}}
+	fake := &fakeStates{status: map[string]string{}, since: map[string]int64{}}
 	backend := &fakeBackend{}
 	svc := tree.New(r.Connections, r.Metadata, backend, fake)
 	return &harness{svc: svc, repos: r, backend: backend, fake: fake}
@@ -100,6 +116,18 @@ func (h *harness) seedConnection(t *testing.T, id, name string) {
 		t.Fatalf("seed connection: %v", err)
 	}
 	h.fake.status[id] = "connected"
+}
+
+// advanceSince marks id's connection as (re-)established right now — real wall-clock time, so
+// P24's freshness floor for it becomes "now": anything already cached is stale, and anything the
+// service writes from this point on is fresh. A 5ms sleep first guarantees a real, strictly-later
+// timestamp string even though jsISOFormat's precision is only milliseconds — otherwise a payload
+// written moments earlier in the same test could share the exact same millisecond and compare
+// equal (fresh, not stale), making the staleness assertion that follows flaky.
+func (h *harness) advanceSince(t *testing.T, id string) {
+	t.Helper()
+	time.Sleep(5 * time.Millisecond)
+	h.fake.since[id] = time.Now().UnixMilli()
 }
 
 func requestCount(t *testing.T, h *harness, op string) int {
@@ -325,5 +353,383 @@ func TestChildrenAndSchemaColumnsShareOneRow(t *testing.T) {
 	}
 	if columnsResult.Source != "cache" || len(columnsResult.Relations) != 1 {
 		t.Errorf("SchemaColumns after sharing the row = %+v, want a cached single relation", columnsResult)
+	}
+}
+
+// P24 §4.2: the staleness rules, and how they interact. seedConnection's default Since (0, the
+// Unix epoch) is left untouched by every test above this line — under D2 that is a floor no real
+// payload can ever be older than, which is exactly why every "cache hit" assertion already in this
+// file keeps passing unmodified. The tests below are the ones that actually move Since.
+
+// TestFreshCacheHitIsServedWhileConnected pins behaviour 2 (P24 §0.1): navigating a live
+// connection never re-fetches what it already has, regardless of the freshness rule this phase
+// adds — the payload is written after the connection's (zero, default) epoch, so it stays fresh
+// for the rest of the session.
+func TestFreshCacheHitIsServedWhileConnected(t *testing.T) {
+	h := newHarness(t)
+	h.seedConnection(t, "c1", "Conn One")
+	path := model.EncodePath([]model.PathSegment{{Kind: "database", Name: "app"}})
+
+	result, err := h.svc.Children("c1", path, false)
+	if err != nil {
+		t.Fatalf("Children (miss): %v", err)
+	}
+	if result.Source != "server" {
+		t.Fatalf("first call: Source = %q, want server", result.Source)
+	}
+	if got := requestCount(t, h, "adapter:children"); got != 1 {
+		t.Fatalf("backend calls after first load = %d, want 1", got)
+	}
+
+	result, err = h.svc.Children("c1", path, false)
+	if err != nil {
+		t.Fatalf("Children (cached): %v", err)
+	}
+	if result.Source != "cache" {
+		t.Errorf("second call: Source = %q, want cache", result.Source)
+	}
+	if got := requestCount(t, h, "adapter:children"); got != 1 {
+		t.Errorf("backend calls after cached load = %d, want still 1 (no backend call)", got)
+	}
+}
+
+// TestPayloadOlderThanTheConnectionIsRefetched is P24's core rule: a payload written before the
+// connection's current epoch is stale and must be re-fetched. Fails on main, which has no
+// staleness concept at all (F2/F3) — a cache hit there wins at any age.
+func TestPayloadOlderThanTheConnectionIsRefetched(t *testing.T) {
+	h := newHarness(t)
+	h.seedConnection(t, "c1", "Conn One")
+	path := model.EncodePath([]model.PathSegment{{Kind: "database", Name: "app"}})
+
+	if _, err := h.svc.Children("c1", path, false); err != nil {
+		t.Fatalf("seed payload: %v", err)
+	}
+	before := requestCount(t, h, "adapter:children")
+
+	h.advanceSince(t, "c1") // the connection is (re-)established after the payload above was written
+
+	result, err := h.svc.Children("c1", path, false)
+	if err != nil {
+		t.Fatalf("Children: %v", err)
+	}
+	if result.Source != "server" {
+		t.Errorf("Source = %q, want server (a payload older than the connection's epoch must be stale)", result.Source)
+	}
+	if got := requestCount(t, h, "adapter:children"); got != before+1 {
+		t.Errorf("backend calls = %d, want %d", got, before+1)
+	}
+}
+
+// TestRefetchRewritesFreshnessAndTheNextReadHits proves the re-fetch triggered by staleness
+// happens once per path per connection session, not on every read: the payload it writes carries
+// a real "now" fetchedAt, which is always at or after the epoch that made the old one stale.
+func TestRefetchRewritesFreshnessAndTheNextReadHits(t *testing.T) {
+	h := newHarness(t)
+	h.seedConnection(t, "c1", "Conn One")
+	path := model.EncodePath([]model.PathSegment{{Kind: "database", Name: "app"}})
+
+	if _, err := h.svc.Children("c1", path, false); err != nil {
+		t.Fatalf("seed payload: %v", err)
+	}
+	h.advanceSince(t, "c1")
+	before := requestCount(t, h, "adapter:children")
+
+	result, err := h.svc.Children("c1", path, false)
+	if err != nil {
+		t.Fatalf("Children (stale, re-fetches): %v", err)
+	}
+	if result.Source != "server" {
+		t.Fatalf("first post-epoch call: Source = %q, want server", result.Source)
+	}
+	if got := requestCount(t, h, "adapter:children"); got != before+1 {
+		t.Fatalf("backend calls after re-fetch = %d, want %d", got, before+1)
+	}
+
+	result, err = h.svc.Children("c1", path, false)
+	if err != nil {
+		t.Fatalf("Children (should be fresh now): %v", err)
+	}
+	if result.Source != "cache" {
+		t.Errorf("second post-epoch call: Source = %q, want cache", result.Source)
+	}
+	if got := requestCount(t, h, "adapter:children"); got != before+1 {
+		t.Errorf("backend calls after second read = %d, want still %d (no second re-fetch)", got, before+1)
+	}
+}
+
+// TestStalePayloadIsStillServedWhileDisconnected is D5: no connection means no floor, so a payload
+// staler than any live connection's epoch is still served — the property that makes the tree
+// instant on launch and lets completion work over a cached container with nothing connected.
+func TestStalePayloadIsStillServedWhileDisconnected(t *testing.T) {
+	h := newHarness(t)
+	h.seedConnection(t, "c1", "Conn One")
+	path := model.EncodePath([]model.PathSegment{{Kind: "database", Name: "app"}})
+
+	if _, err := h.svc.Children("c1", path, false); err != nil {
+		t.Fatalf("seed payload: %v", err)
+	}
+	h.advanceSince(t, "c1") // would make it stale if anything were still connected
+
+	h.fake.status["c1"] = "disconnected"
+	before := requestCount(t, h, "adapter:children")
+	result, err := h.svc.Children("c1", path, false)
+	if err != nil {
+		t.Fatalf("Children while disconnected: %v", err)
+	}
+	if result.Source != "cache" {
+		t.Errorf("Source = %q, want cache (no floor applies while disconnected)", result.Source)
+	}
+	if got := requestCount(t, h, "adapter:children"); got != before {
+		t.Errorf("backend was called while disconnected: %d new call(s)", got-before)
+	}
+}
+
+// TestStalePayloadIsNotDropped: a stale payload is bypassed, never deleted (D2/G3's own
+// discipline) — a failing re-fetch must leave the cache exactly as it was, or a transient backend
+// error would permanently destroy metadata a later, successful retry could have served from.
+func TestStalePayloadIsNotDropped(t *testing.T) {
+	h := newHarness(t)
+	h.seedConnection(t, "c1", "Conn One")
+	path := model.EncodePath([]model.PathSegment{{Kind: "database", Name: "app"}})
+
+	if _, err := h.svc.Children("c1", path, false); err != nil {
+		t.Fatalf("seed payload: %v", err)
+	}
+	h.advanceSince(t, "c1")
+
+	h.backend.childrenErr = errors.New("boom")
+	if _, err := h.svc.Children("c1", path, false); err == nil {
+		t.Fatal("Children: want an error from the failing backend, got nil")
+	}
+	h.backend.childrenErr = nil
+
+	got, _, err := h.repos.Metadata.Get("c1", path, "children")
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	if got == nil {
+		t.Error("stale payload was dropped after a failing re-fetch, want it to survive on disk")
+	}
+}
+
+// TestRefreshingOneKindDoesNotFreshenAnother is F13's hazard, and the single most important case
+// in this file: it fails against a row-level fetched_at implementation (re-fetching 'children'
+// would stamp the whole row, wrongly freshening 'columns' too) and passes against D3's per-kind
+// fetchedAt map.
+func TestRefreshingOneKindDoesNotFreshenAnother(t *testing.T) {
+	h := newHarness(t)
+	h.seedConnection(t, "c1", "Conn One")
+	path := model.EncodePath([]model.PathSegment{{Kind: "database", Name: "app"}})
+
+	if _, err := h.svc.Children("c1", path, false); err != nil {
+		t.Fatalf("seed children: %v", err)
+	}
+	if _, err := h.svc.SchemaColumns("c1", path, false); err != nil {
+		t.Fatalf("seed columns: %v", err)
+	}
+	h.advanceSince(t, "c1") // both kinds are now stale, sharing one row
+
+	childrenBefore := requestCount(t, h, "adapter:children")
+	columnsBefore := requestCount(t, h, "adapter:schemaColumns")
+
+	result, err := h.svc.Children("c1", path, false)
+	if err != nil {
+		t.Fatalf("Children: %v", err)
+	}
+	if result.Source != "server" {
+		t.Fatalf("children Source = %q, want server", result.Source)
+	}
+	if got := requestCount(t, h, "adapter:children"); got != childrenBefore+1 {
+		t.Fatalf("children backend calls = %d, want %d", got, childrenBefore+1)
+	}
+
+	// columns must STILL read as stale — a row-level fetched_at would have been stamped by the
+	// children write above (same row) and wrongly made this look freshly fetched too.
+	colResult, err := h.svc.SchemaColumns("c1", path, false)
+	if err != nil {
+		t.Fatalf("SchemaColumns: %v", err)
+	}
+	if colResult.Source != "server" {
+		t.Errorf("columns Source = %q, want server (a row-level fetchedAt would wrongly freshen this)", colResult.Source)
+	}
+	if got := requestCount(t, h, "adapter:schemaColumns"); got != columnsBefore+1 {
+		t.Errorf("columns backend calls = %d, want %d", got, columnsBefore+1)
+	}
+}
+
+// TestPreP24RowIsStaleWhenConnectedAndServedWhenNot is D2's upgrade path: a row written before
+// this phase (no fetchedAt key at all) compares as "", less than any real epoch — stale the moment
+// a connection is live, but still servable with none.
+func TestPreP24RowIsStaleWhenConnectedAndServedWhenNot(t *testing.T) {
+	h := newHarness(t)
+	h.seedConnection(t, "c1", "Conn One")
+	path := model.EncodePath([]model.PathSegment{{Kind: "database", Name: "app"}})
+
+	legacyChildren := `[{"kind":"table","name":"x","path":"table:x","hasChildren":false}]`
+	if _, err := h.repos.Metadata.DB.Exec(
+		`INSERT INTO metadata_cache (connection_id, path, kind, payload_json, fetched_at, etag)
+		 VALUES (?, ?, 'children', ?, ?, NULL)`,
+		"c1", path, `{"children":`+legacyChildren+`}`, model.NowISO(),
+	); err != nil {
+		t.Fatalf("seed legacy row: %v", err)
+	}
+
+	// Disconnected: served regardless of the missing fetchedAt (D5 — no floor at all).
+	h.fake.status["c1"] = "disconnected"
+	before := requestCount(t, h, "adapter:children")
+	result, err := h.svc.Children("c1", path, false)
+	if err != nil {
+		t.Fatalf("Children while disconnected: %v", err)
+	}
+	if result.Source != "cache" {
+		t.Errorf("Source = %q, want cache while disconnected", result.Source)
+	}
+	if got := requestCount(t, h, "adapter:children"); got != before {
+		t.Errorf("backend was called while disconnected: %d new call(s)", got-before)
+	}
+
+	// Reconnected: the same still-legacy row (the disconnected read above wrote nothing) is stale
+	// against any real epoch.
+	h.fake.status["c1"] = "connected"
+	h.fake.since["c1"] = time.Now().UnixMilli()
+	result, err = h.svc.Children("c1", path, false)
+	if err != nil {
+		t.Fatalf("Children while connected: %v", err)
+	}
+	if result.Source != "server" {
+		t.Errorf("Source = %q, want server (a pre-P24 row must be stale once connected)", result.Source)
+	}
+	if got := requestCount(t, h, "adapter:children"); got != before+1 {
+		t.Errorf("backend calls = %d, want %d", got, before+1)
+	}
+}
+
+// TestInvalidateDropsEveryKindOnTheRow is F8's gap from the Go side: Invalidate on one path drops
+// all four kinds sharing that row, not just whichever kind a caller happened to touch.
+func TestInvalidateDropsEveryKindOnTheRow(t *testing.T) {
+	h := newHarness(t)
+	h.seedConnection(t, "c1", "Conn One")
+	path := model.EncodePath([]model.PathSegment{{Kind: "database", Name: "app"}})
+
+	if _, err := h.svc.Children("c1", path, false); err != nil {
+		t.Fatalf("seed children: %v", err)
+	}
+	if _, err := h.svc.Describe("c1", path, false, nil); err != nil {
+		t.Fatalf("seed describe: %v", err)
+	}
+	if _, err := h.svc.Definition("c1", path, false, nil); err != nil {
+		t.Fatalf("seed definition: %v", err)
+	}
+	if _, err := h.svc.SchemaColumns("c1", path, false); err != nil {
+		t.Fatalf("seed columns: %v", err)
+	}
+
+	if err := h.svc.Invalidate("c1", &path); err != nil {
+		t.Fatalf("Invalidate: %v", err)
+	}
+
+	childrenResult, err := h.svc.Children("c1", path, false)
+	if err != nil {
+		t.Fatalf("Children (post-invalidate): %v", err)
+	}
+	if childrenResult.Source != "server" {
+		t.Errorf("children Source = %q, want server after Invalidate", childrenResult.Source)
+	}
+	describeResult, err := h.svc.Describe("c1", path, false, nil)
+	if err != nil {
+		t.Fatalf("Describe (post-invalidate): %v", err)
+	}
+	if describeResult.Source != "server" {
+		t.Errorf("describe Source = %q, want server after Invalidate", describeResult.Source)
+	}
+	definitionResult, err := h.svc.Definition("c1", path, false, nil)
+	if err != nil {
+		t.Fatalf("Definition (post-invalidate): %v", err)
+	}
+	if definitionResult.Source != "server" {
+		t.Errorf("definition Source = %q, want server after Invalidate", definitionResult.Source)
+	}
+	columnsResult, err := h.svc.SchemaColumns("c1", path, false)
+	if err != nil {
+		t.Fatalf("SchemaColumns (post-invalidate): %v", err)
+	}
+	if columnsResult.Source != "server" {
+		t.Errorf("columns Source = %q, want server after Invalidate", columnsResult.Source)
+	}
+}
+
+// TestInvalidateConnectionDropsEveryPath is F9's gap: Invalidate with path == nil drops every row
+// for that connection, and leaves every other connection's rows alone.
+func TestInvalidateConnectionDropsEveryPath(t *testing.T) {
+	h := newHarness(t)
+	h.seedConnection(t, "c1", "Conn One")
+	h.seedConnection(t, "c2", "Conn Two")
+	path1 := model.EncodePath([]model.PathSegment{{Kind: "database", Name: "app"}})
+	path2 := model.EncodePath([]model.PathSegment{{Kind: "database", Name: "other"}})
+
+	if _, err := h.svc.Children("c1", path1, false); err != nil {
+		t.Fatalf("seed c1/path1: %v", err)
+	}
+	if _, err := h.svc.Children("c1", path2, false); err != nil {
+		t.Fatalf("seed c1/path2: %v", err)
+	}
+	if _, err := h.svc.Children("c2", path1, false); err != nil {
+		t.Fatalf("seed c2/path1: %v", err)
+	}
+
+	if err := h.svc.Invalidate("c1", nil); err != nil {
+		t.Fatalf("Invalidate: %v", err)
+	}
+
+	r1, err := h.svc.Children("c1", path1, false)
+	if err != nil {
+		t.Fatalf("Children c1/path1 (post-invalidate): %v", err)
+	}
+	if r1.Source != "server" {
+		t.Errorf("c1/path1 Source = %q, want server after connection-wide Invalidate", r1.Source)
+	}
+	r2, err := h.svc.Children("c1", path2, false)
+	if err != nil {
+		t.Fatalf("Children c1/path2 (post-invalidate): %v", err)
+	}
+	if r2.Source != "server" {
+		t.Errorf("c1/path2 Source = %q, want server after connection-wide Invalidate", r2.Source)
+	}
+
+	before := requestCount(t, h, "adapter:children")
+	r3, err := h.svc.Children("c2", path1, false)
+	if err != nil {
+		t.Fatalf("Children c2/path1 (should be untouched): %v", err)
+	}
+	if r3.Source != "cache" {
+		t.Errorf("c2/path1 Source = %q, want cache — c1's Invalidate must not touch c2", r3.Source)
+	}
+	if got := requestCount(t, h, "adapter:children"); got != before {
+		t.Errorf("c2's cache was invalidated by c1's connection-wide Invalidate")
+	}
+}
+
+// TestExplicitRefreshBeatsAFreshPayload: behaviour 3 must not be defeated by the new freshness
+// rule — a payload written after the connection's epoch (fresh by D1) still re-fetches when the
+// caller explicitly asks for refresh:true.
+func TestExplicitRefreshBeatsAFreshPayload(t *testing.T) {
+	h := newHarness(t)
+	h.seedConnection(t, "c1", "Conn One")
+	path := model.EncodePath([]model.PathSegment{{Kind: "database", Name: "app"}})
+
+	if _, err := h.svc.Children("c1", path, false); err != nil {
+		t.Fatalf("seed payload: %v", err)
+	}
+	before := requestCount(t, h, "adapter:children")
+
+	result, err := h.svc.Children("c1", path, true)
+	if err != nil {
+		t.Fatalf("Children (refresh): %v", err)
+	}
+	if result.Source != "server" {
+		t.Errorf("Source = %q, want server (refresh must bypass the cache even for a fresh payload)", result.Source)
+	}
+	if got := requestCount(t, h, "adapter:children"); got != before+1 {
+		t.Errorf("backend calls = %d, want %d", got, before+1)
 	}
 }
