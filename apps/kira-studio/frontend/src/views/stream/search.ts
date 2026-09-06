@@ -1,7 +1,8 @@
+import { cellText, isNull, type StreamPage } from '@shared/protocol/page';
 import { reactive } from 'vue';
 import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
 import { isSearchFiltering } from '../shared/page/searchFilter';
-import { getPage, streamRow } from './page';
+import { getPage } from './page';
 
 // Item 5's precedent (grid/search.ts): filters purely client-side against the already-fetched
 // page, never a fresh server call — `getPage`'s rowCount is the only thing this ever iterates.
@@ -27,6 +28,34 @@ export function clearSearchState(tabId: string): void {
 // mirrors grid/search.ts's own registration.
 registerTabRuntimeCleanup(clearSearchState);
 
+// P21 round 2 performance finding 1: rowMatches used to be `streamRow(tabId, row)` — every field
+// read that way, page.ts's own comment explains, goes through store.cachedView/store.cached (the
+// same memoizing decode/view cache the grid/documents/console hosts use), so the very first
+// search keystroke on a page permanently decoded and cached *every* row, undoing the visible-
+// window pruning that otherwise only re-runs on a scroll event (setVisibleWindow). This reads
+// straight off the page's own chunks with a plain TextDecoder instead, the same way scan.ts's own
+// tabularRowScanner/keyValueRowScanner do for every other paged view's search — nothing here is
+// retained past this one call.
+//
+// Each column is checked (and case-folded) independently rather than concatenated into one
+// haystack string first: a hit in an early, typically-short column (key/headers) skips decoding
+// and lowering the row's own body at all, and a miss allocates only that one column's own
+// lowercase copy rather than the whole row's five fields joined together.
+function rowMatches(page: StreamPage, row: number, needle: string, decoder: TextDecoder): boolean {
+  if (!isNull(page.keys, row) && cellText(page.keys, row, decoder).toLowerCase().includes(needle)) {
+    return true;
+  }
+  if (cellText(page.headers, row, decoder).toLowerCase().includes(needle)) return true;
+  if (cellText(page.attrs, row, decoder).toLowerCase().includes(needle)) return true;
+  if (
+    !isNull(page.timestamps, row) &&
+    cellText(page.timestamps, row, decoder).toLowerCase().includes(needle)
+  ) {
+    return true;
+  }
+  return cellText(page.bodies, row, decoder).toLowerCase().includes(needle);
+}
+
 export function runSearch(tabId: string, query: string): void {
   if (query === '') {
     clearSearchState(tabId);
@@ -36,11 +65,9 @@ export function runSearch(tabId: string, query: string): void {
   const needle = query.toLowerCase();
   const matches: number[] = [];
   if (page) {
+    const decoder = new TextDecoder();
     for (let row = 0; row < page.rowCount; row++) {
-      const r = streamRow(tabId, row);
-      if (!r) continue;
-      const haystack = `${r.key ?? ''}\n${r.headers}\n${r.attrs}\n${r.timestamp ?? ''}\n${r.body}`;
-      if (haystack.toLowerCase().includes(needle)) matches.push(row);
+      if (rowMatches(page, row, needle, decoder)) matches.push(row);
     }
   }
   searchState[tabId] = { query, matches, index: matches.length > 0 ? 0 : -1 };
