@@ -64,6 +64,50 @@ func TestMaskGrpcError_NoOpWithNothingUsed(t *testing.T) {
 	}
 }
 
+// TestMaskGrpcResult_MasksStatusMessageAndMetadata is maskGrpcError's own success-path sibling
+// (P21 round 2 architecture/security finding 4 / functional finding 8): a *successful* call's
+// StatusMessage/Header/Trailer must be masked exactly as an error's own fields are — this test
+// fails against the pre-fix code, which called no masker at all on the success path, so a
+// substituted secret echoed back by the server (a gateway reflecting a header, a status message
+// quoting the credential it rejected on an otherwise-OK transport) reached both the renderer and
+// grpc_call_history.snapshot_json unmasked.
+func TestMaskGrpcResult_MasksStatusMessageAndMetadata(t *testing.T) {
+	const secret = "sk_live_super_secret_token"
+	const masked = "{{apiToken}}"
+	used := []apivars.UsedSecret{{Name: "apiToken", Rendered: secret, Placeholder: "{{apiToken}}"}}
+
+	result := grpcclient.CallResult{
+		StatusMessage: "accepted token " + secret,
+		Header:        []grpcclient.MetaPair{{Name: "x-echo", Value: "saw " + secret}},
+		Trailer:       []grpcclient.MetaPair{{Name: "x-detail", Value: "used " + secret}},
+	}
+
+	maskGrpcResult(&result, used)
+
+	assertMasked := func(t *testing.T, label, s string) {
+		t.Helper()
+		if strings.Contains(s, secret) {
+			t.Errorf("%s = %q still contains the raw secret", label, s)
+		}
+		if !strings.Contains(s, masked) {
+			t.Errorf("%s = %q, want it to contain %q", label, s, masked)
+		}
+	}
+	assertMasked(t, "StatusMessage", result.StatusMessage)
+	assertMasked(t, "Header[0].Value", result.Header[0].Value)
+	assertMasked(t, "Trailer[0].Value", result.Trailer[0].Value)
+}
+
+// TestMaskGrpcResult_NoOpWithNothingUsed mirrors TestMaskGrpcError_NoOpWithNothingUsed for the
+// success-path masker.
+func TestMaskGrpcResult_NoOpWithNothingUsed(t *testing.T) {
+	result := grpcclient.CallResult{StatusMessage: "plain, nothing resolved"}
+	maskGrpcResult(&result, nil)
+	if result.StatusMessage != "plain, nothing resolved" {
+		t.Errorf("StatusMessage = %q, want unchanged", result.StatusMessage)
+	}
+}
+
 // TestGrpcHasAnyReference is the short-circuit's own small table — the same "is there anything to
 // resolve at all" gate apivars' own referencedFields walk exists for.
 func TestGrpcHasAnyReference(t *testing.T) {

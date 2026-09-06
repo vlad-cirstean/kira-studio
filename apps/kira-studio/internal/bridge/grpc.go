@@ -240,6 +240,15 @@ func (s *GrpcService) Call(ctx context.Context, args GrpcCallArgs) (grpcclient.C
 				result, callErr = grpcclient.Unary(runCtx, callReq)
 				if callErr != nil {
 					maskGrpcError(callErr, used)
+				} else {
+					// P21 round 2 architecture/security finding 4/functional finding 8: a
+					// *successful* call's own Header/Trailer/StatusMessage can echo a
+					// substituted secret (a gateway reflecting x-request-id, an echo service, a
+					// status message quoting the credential it rejected on a transport-level-OK
+					// call) exactly as an error's can — maskGrpcError already covers the error
+					// path, so the success path must mask before either the renderer or
+					// recordGrpcHistory (which persists to kira.db) ever sees it.
+					maskGrpcResult(&result, used)
 				}
 			}
 			if callErr != nil {
@@ -437,6 +446,11 @@ func (s *GrpcService) runServerStream(ctx context.Context, args GrpcCallArgs, re
 		}
 		return grpcclient.CallResult{}, err
 	}
+	// Same reasoning as Call's own unary success branch: a successful stream's terminal
+	// Header/Trailer/StatusMessage must be masked before coalescer.finish emits it over the D8
+	// push channel — after finish returns is too late, the same "too-late-to-mask-afterwards"
+	// problem finding 4 of round 1 already identified for the error case.
+	maskGrpcResult(&result, used)
 	coalescer.finish(&result, nil)
 	return result, nil
 }
@@ -466,6 +480,27 @@ func maskGrpcError(err error, used []apivars.UsedSecret) {
 		for i := range gerr.Partial.Trailer {
 			gerr.Partial.Trailer[i].Value = replacer.Replace(gerr.Partial.Trailer[i].Value)
 		}
+	}
+}
+
+// maskGrpcResult is maskGrpcError's own success-path sibling (P21 round 2 architecture/security
+// finding 4 / functional finding 8): a *grpcclient.CallResult's StatusMessage/Header/Trailer come
+// straight from the server on a call that returned no error, and can echo a substituted secret
+// exactly as an error's own fields can (a gateway reflecting a metadata value, a status message
+// quoting the credential it rejected on an otherwise-OK transport). bridge/http.go's own
+// maskSecrets already does this for HTTP's successful response; gRPC's success path had no
+// equivalent. A no-op when nothing was substituted, same as maskGrpcError.
+func maskGrpcResult(result *grpcclient.CallResult, used []apivars.UsedSecret) {
+	replacer := secretReplacer(used)
+	if replacer == nil {
+		return
+	}
+	result.StatusMessage = replacer.Replace(result.StatusMessage)
+	for i := range result.Header {
+		result.Header[i].Value = replacer.Replace(result.Header[i].Value)
+	}
+	for i := range result.Trailer {
+		result.Trailer[i].Value = replacer.Replace(result.Trailer[i].Value)
 	}
 }
 
