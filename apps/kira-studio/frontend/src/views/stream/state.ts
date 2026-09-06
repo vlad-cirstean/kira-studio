@@ -7,8 +7,16 @@ import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
 import { findStreamTab, patchStreamTabState } from '../../state/tabs';
 import { registerTabReload } from '../../state/viewCommands';
 import { applyLoadFailure, beginOp, createRuntimeStore, stopOp } from '../shared/viewOp';
-import { setPage } from './page';
+import { drop, setPage } from './page';
 import { recordStreamFilterUse } from './streamFilterHistory';
+
+// D10/D12: SQS's 'batch' pagination must never be re-read except on an explicit Poll press —
+// every read is a real ReceiveMessage against the live queue. StreamView.vue's own isBatch
+// computed reads this same field off caps; mirrored here (rather than imported) because state.ts
+// has no dependency on the view layer.
+function isBatchPagination(connectionId: string): boolean {
+  return connectionsState.states[connectionId]?.caps?.pagination === 'batch';
+}
 
 // Mirrors views/keyvalue/state.ts's KeyValueViewRuntime shape, minus pageIndex (StreamTabState
 // is deliberately empty, §tabs.ts — offsetWindow is always token-driven, batch has no position
@@ -133,6 +141,23 @@ export async function reload(tabId: string): Promise<void> {
   const tab = findStreamTab(tabId);
   if (!tab?.connectionId) return;
   await data.invalidate(tab.connectionId, tab.path);
+  // P21 round 2 functional finding 1: reload() is reached from three paths that are not the
+  // explicit Poll button — a Send/Delete-message mutation's own reload-self, that same
+  // mutation's fan-out to sibling tabs on the same queue (reloadTabsForTarget), and a
+  // project-tree double-click on an already-open tab (ProjectTree.vue's `reused` branch). None
+  // of those is the user asking to poll, so for a batch (SQS) tab this must behave like a
+  // no-op read rather than a real ReceiveMessage: drop the now-invalidated page and return the
+  // tab to its "click Poll" placeholder instead of loading a fresh one.
+  if (isBatchPagination(tab.connectionId)) {
+    const rt = ensureRuntime(tabId);
+    drop(tabId);
+    rt.polled = false;
+    rt.rowCount = 0;
+    rt.hasMore = false;
+    rt.nextToken = null;
+    rt.selectedRow = null;
+    return;
+  }
   await load(tabId);
 }
 
