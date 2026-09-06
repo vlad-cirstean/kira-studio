@@ -27,7 +27,12 @@ function onClick(mode: AppMode): void {
         :data-mode="mode"
         @click="onClick(mode)"
       >
-        <span class="icon-box"><CodiconIcon :name="MODES[mode].icon" :size="13" /></span>
+        <!-- P22 D6: was :size="13" — the codicon glyph set is drawn on a 16-unit grid, so at 13px
+             the advance leaves 1.5px of slack per side and each glyph's own ink sits unevenly
+             within it (F9(a): database's right side bearing is 2.4px, globe's 0.8px, measured by
+             P18 F18). Rendering at the icon's own 16px design size (--kira-icon-box) makes the
+             glyph fill its box, closing that slack. Mode-tab-local, not app-wide (OQ-3/F10). -->
+        <span class="icon-box"><CodiconIcon :name="MODES[mode].icon" :size="16" /></span>
         <span class="mode-label">{{ MODES[mode].label }}</span>
       </button>
     </div>
@@ -141,9 +146,24 @@ function onClick(mode: AppMode): void {
    A 16px flex-centred icon-box centres the advance, not the ink, making the slot glyph-independent
    — the whole point of the law — and gives a test an actual element+rect to measure (an anonymous
    flex item has neither). line-height: 1 keeps the label's own box ink-tight rather than inheriting
-   Tailwind preflight's 1.5, so both flex items are ink-tight boxes centred on one axis. */
+   Tailwind preflight's 1.5, so both flex items are ink-tight boxes centred on one axis.
+   P22 D6(F9(b)): line-height: 1 made the label's own box exactly --kira-t-sm tall with the font
+   box centred inside it, and the icon's line box (13px, pre-D6) was centred in .icon-box's own
+   16px — two different fonts, each centred by their own metrics inside a differently-sized box,
+   with nothing making the two share one line. Both now share --kira-control-inline-h (14px) as
+   their line-height, so the two flex items are centred on the same line box instead of each on
+   its own font's ascent/descent. */
+.mode-tab .icon-box,
 .mode-tab .mode-label {
-  line-height: 1;
+  line-height: var(--kira-control-inline-h);
+}
+/* A residual sub-pixel optical offset a shared line-height can't absorb (e.g. a future codicon
+   version's own vertical metrics) would be nudged here — 0 today (D5's own ink measurement, once
+   green, found nothing left to correct). Kept as a single documented token rather than a magic
+   transform so a future re-measurement has an obvious place to land, and so it is a clean thing
+   to delete outright if OQ-3's inline-SVG icon vocabulary ever replaces codicons. */
+.mode-tab .icon-box {
+  transform: translateY(var(--kira-icon-optical-y, 0px));
 }
 /* primitives.css's own .p-tab has no :hover rule at all — TabStrip.vue (its other consumer)
    declares one locally in its own scoped style, and Vue's scoped CSS never leaks across
