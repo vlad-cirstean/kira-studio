@@ -348,11 +348,11 @@ func (s *Service) Update(id string, in Input) (model.ConnectionSummary, error) {
 	if s.StateOf(id).Status == "connected" &&
 		(!destinationUnchanged(in, existing.ConnectionFields) || in.ReadOnly != existing.ReadOnly) {
 		// Disconnect (which already drops the enginecache's pages/counts for this connection,
-		// adapterhost/router.go's own DropConnection) then reconnect — attemptConnect drops the
-		// persisted metadata_cache and emits the invalidation on its own, exactly the sequence
-		// setConnectionReadOnly's frontend precedent runs for the read-only-only case. A failed
-		// reconnect lands the connection in its normal "error" state, which the UI already
-		// renders — never a silent no-op.
+		// adapterhost/router.go's own DropConnection) then reconnect — attemptConnect moves the
+		// connection's metadata_cache epoch forward (P24 D6) and emits the invalidation on its own,
+		// exactly the sequence setConnectionReadOnly's frontend precedent runs for the read-only-
+		// only case. A failed reconnect lands the connection in its normal "error" state, which the
+		// UI already renders — never a silent no-op.
 		if _, err := s.Disconnect(id); err != nil {
 			slog.Warn(fmt.Sprintf("disconnect before reconnect failed for %s: %s", id, err), "scope", "connections")
 		}
@@ -594,8 +594,11 @@ func (s *Service) doConnect(id string) (model.ConnectionState, error) {
 }
 
 // attemptConnect is doConnect's try block: resolve, optionally start the pre-connect script, call
-// the engine, optionally arm the sidecar, and on success drop the cached metadata and push an
-// invalidation.
+// the engine, optionally arm the sidecar, and on success push a metadata invalidation (P24 D6: the
+// connection's own metadata_cache rows are no longer deleted here — the new epoch this state's
+// Since carries is what internal/tree.Service's freshness rule treats every existing row as stale
+// against, so each path re-fetches lazily, once, the first time a user actually opens it, rather
+// than every row being deleted upfront and re-read whether or not anything ever asks for it again).
 func (s *Service) attemptConnect(id string) (model.ConnectionState, error) {
 	r, err := resolve(s.deps.Conns, s.deps.Secrets, id)
 	if err != nil {
@@ -635,8 +638,9 @@ func (s *Service) attemptConnect(id string) (model.ConnectionState, error) {
 		Since: nowMillis(), Caps: result.Caps,
 	}
 	s.emitState(state)
-	// D11 (Step 6a numbering): the whole connection's metadata is refreshed on every reconnect.
-	_ = s.deps.Metadata.DropConnection(id)
+	// D11 (Step 6a numbering): the renderer's own in-memory copies (the tree's expanded set,
+	// schemaColumnsState) drop on this push regardless — only the persisted L1 rows survive now
+	// (P24 D6), so a path the user re-opens this session reads through to a fresh server answer.
 	s.metadataInvalidated.Emit(id)
 	return state, nil
 }

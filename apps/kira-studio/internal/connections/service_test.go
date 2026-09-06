@@ -2,6 +2,7 @@ package connections_test
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"math"
 	"os"
@@ -888,4 +889,44 @@ func TestUpdateReconnectsALiveConnectionOnDestinationOrReadOnlyChange(t *testing
 			t.Errorf("Backend.Connect calls = %d, want %d (nothing live to reconnect)", got, connectsBefore)
 		}
 	})
+}
+
+// TestConnectKeepsMetadataCacheAndEmitsInvalidation is P24 D6's own regression guard: a successful
+// connect must no longer delete the connection's metadata_cache rows (F4/F5's actual bug — a
+// delete guarantees a miss on every path for the rest of the session, which is the "refetched all
+// the time" the user actually reported) while still emitting metadataInvalidated, so the
+// renderer's own in-memory copies (the tree's expanded set, schemaColumnsState) drop and re-read
+// through internal/tree.Service's own freshness rule (P24 G3) rather than serving something
+// genuinely stale. Fails on main: attemptConnect's DropConnection call empties the table before
+// this assertion could ever see a row.
+func TestConnectKeepsMetadataCacheAndEmitsInvalidation(t *testing.T) {
+	h := newHarness(t)
+	created := mustCreate(t, h.svc, fieldsInput("keeps-metadata"))
+
+	path := model.EncodePath([]model.PathSegment{{Kind: "database", Name: "app"}})
+	if err := h.repos.Metadata.Put(created.ID, path, "children", json.RawMessage(`["x"]`)); err != nil {
+		t.Fatalf("seed metadata_cache row: %v", err)
+	}
+
+	var invalidated []string
+	unsubscribe := h.svc.OnMetadataInvalidated(func(connectionID string) {
+		invalidated = append(invalidated, connectionID)
+	})
+	defer unsubscribe()
+
+	if _, err := h.svc.Connect(created.ID); err != nil {
+		t.Fatalf("Connect: %v", err)
+	}
+
+	got, _, err := h.repos.Metadata.Get(created.ID, path, "children")
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	if got == nil {
+		t.Error("metadata_cache row was deleted by Connect — want it kept (P24 D6)")
+	}
+
+	if len(invalidated) != 1 || invalidated[0] != created.ID {
+		t.Errorf("metadataInvalidated emissions = %v, want exactly [%s]", invalidated, created.ID)
+	}
 }
