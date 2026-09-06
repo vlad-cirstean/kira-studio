@@ -513,14 +513,13 @@ function onRowContextMenu(e: MouseEvent, row: number): void {
   e.preventDefault();
   const entry = rowAt(row);
   if (!entry) return;
-  const ids = idsOf(rows.value);
   openContextMenu(
     e,
     rowMenu(
       props.tab.id,
       entry.view.id,
       entry.body,
-      ids,
+      () => idsOf(rows.value),
       () => startEdit(row, entry.view.id, entry.body),
       editGate.value,
     ),
@@ -547,7 +546,9 @@ function onRefresh(): void {
 }
 
 function onExpandAll(): void {
-  setAllExpanded(props.tab.id, idsOf(rows.value), true);
+  // P21 round 2 performance finding 2: setAllExpanded's own `true` branch never reads `ids` — no
+  // reason to pay for a whole-page idsOf(rows.value) decode just to hand it an argument it drops.
+  setAllExpanded(props.tab.id, [], true);
 }
 
 function onCollapseAll(): void {

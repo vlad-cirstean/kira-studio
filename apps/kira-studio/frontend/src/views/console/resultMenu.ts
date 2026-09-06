@@ -201,8 +201,11 @@ export interface RowJsonMenuContext {
    *  already run through JSON.stringify). */
   json: string;
   /** Every displayed row's JSON text, in display order -- "all" means what's on screen right now
-   *  (an active find-filter's own subset), never every row the server could return. */
-  allJson: readonly string[];
+   *  (an active find-filter's own subset), never every row the server could return. P21 round 2
+   *  performance finding 2: a thunk, not an already-built array -- building the menu (right-click)
+   *  must never pay for a whole-page decode only "Copy all as JSON" will ever need, the exact
+   *  eager-snapshot cost views/grid/menu.ts's own snapshotsThunk (P21 round 1) already avoids. */
+  allJson: () => readonly string[];
   onError: (message: string) => void;
 }
 
@@ -224,7 +227,7 @@ export function rowAsJsonMenu(ctx: RowJsonMenuContext): MenuItem[] {
       id: 'copy-all-as-json',
       label: 'Copy all as JSON',
       icon: 'copy',
-      run: () => copyOrReportError(jsonArrayOf(ctx.allJson.map(prettyJson)), ctx.onError),
+      run: () => copyOrReportError(jsonArrayOf(ctx.allJson().map(prettyJson)), ctx.onError),
     },
   ];
 }

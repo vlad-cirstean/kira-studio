@@ -33,7 +33,12 @@ export function rowMenu(
   tabId: string,
   id: string,
   body: string,
-  allIds: string[],
+  // P21 round 2 performance finding 2: a thunk, not an already-decoded array — right-click used
+  // to decode every row's `_id` (idsOf, a full page walk through the page store's cached/
+  // cachedView) up front regardless of whether Expand/Collapse all is ever picked, undoing the
+  // visible-window pruning in one click. setAllExpanded's own `true` branch doesn't even read its
+  // ids argument, so Expand all now costs nothing at all.
+  allIds: () => string[],
   onEdit: () => void,
   // Edit is shown but disabled — with a label saying why — rather than omitted, mirroring
   // keyvalue/menu.ts's own `editable`/label pair: a row's own Edit icon and this menu entry must
@@ -45,13 +50,15 @@ export function rowMenu(
       type: 'item',
       id: 'expand-all',
       label: 'Expand all',
-      run: () => setAllExpanded(tabId, allIds, true),
+      // setAllExpanded's own `true` branch never reads its ids argument — no reason to force
+      // allIds()'s whole-page decode just to hand it a value it drops.
+      run: () => setAllExpanded(tabId, [], true),
     },
     {
       type: 'item',
       id: 'collapse-all',
       label: 'Collapse all',
-      run: () => setAllExpanded(tabId, allIds, false),
+      run: () => setAllExpanded(tabId, allIds(), false),
     },
     { type: 'separator' },
     {

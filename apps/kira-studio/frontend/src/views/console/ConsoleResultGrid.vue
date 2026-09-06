@@ -264,10 +264,16 @@ function onCopyError(message: string): void {
   copyError.value = message;
 }
 
+// P21 round 2 performance finding 2: allJson used to be a materialized array, built eagerly at
+// right-click time -- a whole-page decode (plus, for the key-value branch, a full
+// JSON.stringify(..., null, 2) per row) on a click that should cost ~0 ms, and one that re-
+// populates the decode/view caches for every row, undoing the visible-window pruning until the
+// next scroll. Both are thunks now, invoked only inside "Copy all as JSON"'s own run().
 function onDocumentRowContextMenu(e: MouseEvent, index: number): void {
   e.preventDefault();
   const body = documentRow(props.pageKey, index)?.body ?? '';
-  const allJson = documentRows.value.map((v) => documentRow(props.pageKey, v.index)?.body ?? '');
+  const allJson = () =>
+    documentRows.value.map((v) => documentRow(props.pageKey, v.index)?.body ?? '');
   openContextMenu(e, rowAsJsonMenu({ json: body, allJson, onError: onCopyError }));
 }
 
@@ -275,10 +281,11 @@ function onKeyValueRowContextMenu(e: MouseEvent, row: number): void {
   e.preventDefault();
   const kv = kvRowAt(row);
   const json = JSON.stringify({ [kv.field]: kv.value }, null, 2);
-  const allJson = rowIndices.value.map((r) => {
-    const entry = kvRowAt(r);
-    return JSON.stringify({ [entry.field]: entry.value }, null, 2);
-  });
+  const allJson = () =>
+    rowIndices.value.map((r) => {
+      const entry = kvRowAt(r);
+      return JSON.stringify({ [entry.field]: entry.value }, null, 2);
+    });
   openContextMenu(e, rowAsJsonMenu({ json, allJson, onError: onCopyError }));
 }
 
