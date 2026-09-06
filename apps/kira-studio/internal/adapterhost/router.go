@@ -27,8 +27,10 @@ type Router struct {
 	cache      *enginecache.Cache
 }
 
-// NewRouter constructs a Router.
+// NewRouter constructs a Router. deps.Log is normalised (withDefaultLog, P21 round 3 finding 8)
+// before either Router or Host stores its own copy, so both always see a callable Log.
 func NewRouter(deps adapters.Deps, cache *enginecache.Cache) *Router {
+	deps = withDefaultLog(deps)
 	host := NewHost(deps, cache)
 	return &Router{deps: deps, host: host, dispatcher: NewDispatcher(host, cache), cache: cache}
 }

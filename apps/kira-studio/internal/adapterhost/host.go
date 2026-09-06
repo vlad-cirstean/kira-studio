@@ -87,8 +87,26 @@ type Host struct {
 
 // NewHost constructs a Host. cache is used by the native Connect/Disconnect handlers
 // (disconnecting releases the connection's cached pages, §2.2 — see router.go).
+//
+// P21 round 3 finding 8: deps.Log is a bare func field with no constructor enforcing it
+// (adapters.Deps has none), and this package treated it as optional in some call sites
+// (`if h.deps.Log != nil`, dataframe.go's panic recovery) and mandatory in others
+// (dataframe.go's response-path logging) — latent in production (main.go always sets one) but a
+// nil-func panic waiting for a test harness or a future caller that doesn't. Normalised once here,
+// the same way enginecache.NewCache substitutes a no-op for a nil log, so every ad-hoc nil check
+// downstream can be — and has been — dropped.
 func NewHost(deps adapters.Deps, cache *enginecache.Cache) *Host {
+	deps = withDefaultLog(deps)
 	return &Host{deps: deps, cache: cache, running: make(map[string]runningOp), throttles: newThrottleRegistry()}
+}
+
+// withDefaultLog substitutes a no-op for a nil deps.Log, so nothing downstream needs to nil-check
+// it again.
+func withDefaultLog(deps adapters.Deps) adapters.Deps {
+	if deps.Log == nil {
+		deps.Log = func(string, string) {}
+	}
+	return deps
 }
 
 // SetThrottle installs (perSec > 0) or clears (perSec <= 0) connectionID's command rate limit —
@@ -200,9 +218,7 @@ func (h *Host) RunOp(ctx context.Context, spec OpSpec, fn func(context.Context, 
 func (h *Host) safeRun(ctx context.Context, op *adapters.OpCtx, fn func(context.Context, *adapters.OpCtx) (any, error)) (value any, err error) {
 	defer func() {
 		if r := recover(); r != nil {
-			if h.deps.Log != nil {
-				h.deps.Log("error", fmt.Sprintf("adapter panic: %v\n%s", r, debug.Stack()))
-			}
+			h.deps.Log("error", fmt.Sprintf("adapter panic: %v\n%s", r, debug.Stack()))
 			// quoteIdent's own NUL-byte guard (postgres/mysqlfamily/sqlite/clickhouse read.go)
 			// panics with an *adapters.Error carrying a real code (E_QUERY — a user-input problem,
 			// not an internal fault). Unwrapping it here, rather than always folding into

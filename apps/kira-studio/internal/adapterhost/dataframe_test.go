@@ -273,6 +273,29 @@ func TestRespond_OversizedPayloadBecomesErrorResponse(t *testing.T) {
 	}
 }
 
+// TestRespond_OversizedPayloadDoesNotPanicWithNilLog is P21 round 3 finding 8: adapters.Deps.Log
+// is a bare func field with no constructor enforcing it, and this package used to nil-check it in
+// some call sites (safeRun's panic recovery) but not others (respond's own error-path logging,
+// right here) — production always supplies one (main.go), so this was latent, but exactly the kind
+// of inconsistency that turns a caller like this test — adapters.Deps{} with no Log, the same
+// style host_test.go/throttle_test.go/data_test.go already use throughout this package — into a
+// nil-func panic on the oversized-response path, the path least likely to ever be exercised by
+// hand. NewRouter now normalises a nil Log to a no-op, so this must not panic.
+func TestRespond_OversizedPayloadDoesNotPanicWithNilLog(t *testing.T) {
+	r := NewRouter(adapters.Deps{}, enginecache.NewCache(enginecache.DefaultPageBudgetBytes, nil))
+	conn := newFakeConn()
+	session, detach := r.AttachStream(conn)
+	defer detach()
+
+	huge := strings.Repeat("a", maxResponsePayloadBytes+1024)
+	r.respond(session, 9, PreviewResponse{Statements: []string{huge}}, nil)
+
+	resp := readSentFrame(t, conn)
+	if resp.Kind() != wire.FrameKindres || resp.Id() != 9 || resp.Ok() {
+		t.Fatalf("resp = kind:%v id:%d ok:%v, want a res/9/ok:false frame", resp.Kind(), resp.Id(), resp.Ok())
+	}
+}
+
 // A9/P21 round 1: respond() used to always call encodeResponse (allocating and copying the whole
 // FlatBuffers frame, ~1.06x the page's own byte size per docs/PERF.md §2.8) before ever checking
 // whether the result would be too large to send — for a ReadResponse/ExecuteResponse, the page's

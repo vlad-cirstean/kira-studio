@@ -69,9 +69,7 @@ func (r *Router) HandleDataFrame(session *Session, frame []byte) {
 	// that actually covers every op dispatched from a frame, known-request-id included.
 	defer func() {
 		if rec := recover(); rec != nil {
-			if r.deps.Log != nil {
-				r.deps.Log("error", fmt.Sprintf("data frame panic: %v\n%s", rec, debug.Stack()))
-			}
+			r.deps.Log("error", fmt.Sprintf("data frame panic: %v\n%s", rec, debug.Stack()))
 			r.respondError(session, probe.ID, adapters.New(adapters.ErrorCode("E_INTERNAL"), fmt.Sprintf("internal error: %v", rec), nil))
 		}
 	}()
