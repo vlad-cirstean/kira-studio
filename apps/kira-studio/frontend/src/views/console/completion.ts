@@ -1,8 +1,14 @@
 import { type CompletionSource, snippet } from '@codemirror/autocomplete';
 import type { ConnectionKind } from '@shared/domain/connection';
 import { MONGO_CONSOLE_METHODS } from '@shared/domain/console';
-import { decodePath, encodePath, type PathSegment } from '@shared/domain/tree';
+import {
+  decodePath,
+  encodePath,
+  type PathSegment,
+  type RelationColumns,
+} from '@shared/domain/tree';
 import { rowKey, treeState } from '../../project/state/tree';
+import { mongoFieldNamesFor } from '../shared/mongoFieldSample';
 import {
   MONGO_QUERY_OPERATORS,
   MONGO_VALUE_CONSTRUCTORS,
@@ -70,9 +76,30 @@ export function consoleRelationNames(connectionId: string, path: string): string
     .map((n) => n.name);
 }
 
-// D21: three contextual positions, each independent of the others — offering a method the engine
+// P22c D8: the last db.<collection>.<method>( call before the cursor — the field-name position
+// below (a filter/projection literal) is scoped to whatever collection that call addresses, the
+// same "look at the text before" technique every other position in this function already uses.
+// A heuristic, not a parse: good enough for the one-statement-per-console shape this grammar
+// already assumes everywhere else (mongo/console.ts's own db.<collection>.<method>(<args>) rule).
+const DB_METHOD_CALL_RE = /\bdb\.([A-Za-z_$][\w$]*)\.[A-Za-z_$][\w$]*\(/g;
+
+function enclosingCollectionPath(path: string, before: string): string | null {
+  const segment = databaseSegment(path);
+  if (!segment) return null;
+  DB_METHOD_CALL_RE.lastIndex = 0;
+  let last: RegExpExecArray | null = null;
+  for (let m = DB_METHOD_CALL_RE.exec(before); m; m = DB_METHOD_CALL_RE.exec(before)) last = m;
+  if (!last) return null;
+  return `${segment}/collection:${encodeURIComponent(last[1] as string)}`;
+}
+
+// D21: four contextual positions, each independent of the others — offering a method the engine
 // will reject would be worse than offering nothing, so this stays exactly as narrow as
-// mongo/console.ts's own grammar (db.<collection>.<method>(<args>)).
+// mongo/console.ts's own grammar (db.<collection>.<method>(<args>)). D8 adds the fourth: a bare
+// identifier inside a filter/projection literal offers field names sampled from whatever documents
+// that collection's own document tabs have loaded (views/shared/mongoFieldSample.ts) — a sample,
+// not a schema (F11: a Mongo collection has none), merged with the BSON-constructor list this
+// position already offered rather than replacing it.
 function mongoCompletionSource(connectionId: string, path: string): CompletionSource {
   return (context) => {
     // Deliberately not gated on "word non-empty or explicit" the way a generic word-completion
@@ -99,16 +126,23 @@ function mongoCompletionSource(connectionId: string, path: string): CompletionSo
         options: MONGO_QUERY_OPERATORS.map((label) => ({ label, type: 'keyword' })),
       };
     }
-    // P27 D17: the six BSON constructors — offered wherever a bare word starts, same as any other
-    // identifier completion; CodeMirror's own default matching narrows the list as more is typed.
+    // P27 D17 + P22c D8: the six BSON constructors — offered wherever a bare word starts, same as
+    // any other identifier completion — plus, when this word sits inside a recognisable
+    // db.<collection>.<method>(…) call, that collection's own sampled field names ahead of them.
+    // CodeMirror's own default matching narrows the combined list as more is typed.
     if (/^[A-Za-z]/.test(word.text)) {
+      const collectionPath = enclosingCollectionPath(path, before);
+      const fields = collectionPath ? mongoFieldNamesFor(connectionId, collectionPath) : [];
       return {
         from: word.from,
-        options: MONGO_VALUE_CONSTRUCTORS.map((c) => ({
-          label: c.name,
-          apply: snippet(toSnippetTemplate(c)),
-          type: 'function',
-        })),
+        options: [
+          ...fields.map((label) => ({ label, type: 'property' })),
+          ...MONGO_VALUE_CONSTRUCTORS.map((c) => ({
+            label: c.name,
+            apply: snippet(toSnippetTemplate(c)),
+            type: 'function',
+          })),
+        ],
       };
     }
     return null;
@@ -175,16 +209,19 @@ function redisCompletionSource(): CompletionSource {
   };
 }
 
-/** For the five SQL kinds: undefined with no DDL document for this connection (D5, lang-sql's own
- *  language-data keyword source stays in charge — the console's `autocomplete` prop is what gates
- *  SQL completion generally); P18 (v1.1)'s schema+keyword pair (sqlLanguageService.ts) once one
- *  exists. */
+/** For the five SQL kinds: undefined with no DDL document AND no cached columns for this
+ *  connection (D5, lang-sql's own language-data keyword source stays in charge — the console's
+ *  `autocomplete` prop is what gates SQL completion generally); P18 (v1.1)'s schema+keyword pair
+ *  (sqlLanguageService.ts) once either exists. `cached` (P22c D4) is the metadata cache's own
+ *  columns for this console's container — a plain value already in memory (state/schemaColumns.ts,
+ *  filled by the view's own lifecycle hook), never fetched from here. */
 export function consoleCompletionSources(
   kind: ConnectionKind,
   connectionId: string | null,
   path: string,
   schema?: DdlSchema,
   database?: string | null,
+  cached?: readonly RelationColumns[],
 ): readonly CompletionSource[] | undefined {
   if (kind === 'mongodb' && connectionId) return [mongoCompletionSource(connectionId, path)];
   if (kind === 'redis') return [redisCompletionSource()];
@@ -194,5 +231,11 @@ export function consoleCompletionSources(
   // exists, but a connection with none still gets table-name completion from the tree's own
   // cache (relations), the same technique mongoCompletionSource already uses for collections.
   const relations = connectionId ? consoleRelationNames(connectionId, path) : [];
-  return sqlCompletionSources(dialect, schema ?? EMPTY_DDL_SCHEMA, database, relations);
+  return sqlCompletionSources(
+    dialect,
+    schema ?? EMPTY_DDL_SCHEMA,
+    database,
+    relations,
+    cached ?? [],
+  );
 }

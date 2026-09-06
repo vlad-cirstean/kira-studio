@@ -39,7 +39,7 @@ export function documentRow(tabId: string, row: number): DocumentRow | null {
 }
 
 // The projection picker's candidate list (ProjectionMenu.vue), the filter/sort autocomplete
-// (filterCompletion.ts) and the toolbar's Fields tooltip (DocumentView.vue) all need "every
+// (views/shared/mongoFieldSample.ts) and the toolbar's Fields tooltip (DocumentView.vue) all need "every
 // top-level field name seen on the loaded page" — a document collection has no catalog to read a
 // field list from (§0 note: "Documents' 'columns' are dynamic per-document fields"), so this is
 // the closest equivalent, shared so those call sites can't drift on how they read a body's field

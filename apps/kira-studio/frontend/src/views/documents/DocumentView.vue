@@ -34,6 +34,11 @@ import {
 } from '../shared/document/rows';
 import EditBufferActions from '../shared/EditBufferActions.vue';
 import FilterHistoryMenu from '../shared/FilterHistoryMenu.vue';
+import {
+  mongoFilterCandidates,
+  mongoSortCandidates,
+  registerMongoFieldSample,
+} from '../shared/mongoFieldSample';
 import PagerControls from '../shared/page/PagerControls.vue';
 import SearchToolbar from '../shared/page/SearchToolbar.vue';
 import { setSearchFiltering } from '../shared/page/searchFilter';
@@ -42,7 +47,6 @@ import { setVisibleRows } from '../shared/page/visibleRows';
 import { ancestorPathPrefix } from '../shared/targetPath';
 import { refreshOrReconnect, useConnectionGate } from '../shared/useConnectionGate';
 import { useEditBuffer } from '../shared/useEditBuffer';
-import { mongoFilterCandidates, mongoSortCandidates } from './filterCompletion';
 import { rowMenu } from './menu';
 import { deleteDocument, saveDocumentEdit, saveNewDocument } from './mutations';
 import ProjectionMenu from './ProjectionMenu.vue';
@@ -194,18 +198,35 @@ function onSearchEscape(): void {
   (document.activeElement as HTMLElement | null)?.blur();
 }
 
-// P18 D9/D13: candidate lists computed here (not inside filterCompletion.ts, which is plain and
+// P18 D9/D13: candidate lists computed here (not inside mongoFieldSample.ts, which is plain and
 // Vue-unaware) so `void pageVersion.n` — fieldNamesOnPage's own non-reactive-Map dependency,
 // same line projectionCountLabel below already carries — is what drives the recompute. Without
 // it the candidate list would freeze at whatever the first loaded page happened to contain.
+// `_id` is prepended here (not inside fieldNamesOnPage, which deliberately excludes it for the
+// projection picker) — it is always returned regardless of projection, so it is the single
+// most-filtered Mongo field.
 const filterCandidates = computed(() => {
   void pageVersion.n;
-  return mongoFilterCandidates(props.tab.id);
+  return mongoFilterCandidates(['_id', ...fieldNamesOnPage(props.tab.id)]);
 });
 const sortCandidates = computed(() => {
   void pageVersion.n;
-  return mongoSortCandidates(props.tab.id);
+  return mongoSortCandidates(['_id', ...fieldNamesOnPage(props.tab.id)]);
 });
+
+// P22c D8: pushes this tab's own loaded field names into the shared, connection-scoped sample the
+// Mongo console reads from (views/shared/mongoFieldSample.ts) — a push, not a pull, so the
+// language layer never fetches (D5). `props.tab.path` is the collection's own tree path, the same
+// key a console opened on that collection resolves via mongoCompletionSource's own
+// enclosingCollectionPath.
+watch(
+  () => [pageVersion.n, props.tab.connectionId, props.tab.path] as const,
+  ([, connectionId, path]) => {
+    if (!connectionId) return;
+    registerMongoFieldSample(connectionId, path, fieldNamesOnPage(props.tab.id));
+  },
+  { immediate: true },
+);
 
 const sortText = ref('');
 

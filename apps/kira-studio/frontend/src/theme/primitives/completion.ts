@@ -3,7 +3,7 @@
 
 /** One suggestion. `insert` defaults to `label` — they differ when the label is the
  *  human-readable name and the insertion needs quoting (grid/filterCompletion.ts) or a trailing
- *  token (documents/filterCompletion.ts's `field: `). */
+ *  token (views/shared/mongoFieldSample.ts's `field: `). */
 export interface Completion {
   label: string;
   insert?: string;
