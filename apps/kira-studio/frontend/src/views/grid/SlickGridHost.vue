@@ -1029,12 +1029,22 @@ function navEntryAt(pos: number, cellIdx: number): CellNavEntry | null {
 // A useful side effect, not the primary motivation: this also structurally removes the whole
 // class of hover-driven append/remove flicker the old single-button design had (item 4, this same
 // coordinator round) — there is no more DOM node being moved on hover at all.
+// A6/P21 round 1: `onGridRendered` fires once per render() — once per scroll frame during a fling,
+// plus every self-scheduled chase render — so the `:not([data-kira-nav-placed])` selector (mirrors
+// `tagRenderedRows`' own `data-kira-row-tagged` marker, right above) is what makes a sub-row scroll
+// (nothing new mounted) match zero elements. The previous idempotency check (`cellEl.querySelector
+// ('.cell-nav-btn')`) was correct but still paid for a full `querySelectorAll` over the grid
+// subtree, plus one `querySelector` per matched cell, on every frame regardless of whether
+// anything new had mounted — a constant per-frame DOM sweep on the exact path
+// docs/PERF.md §2.1a/§2.1c have spent three phases chasing.
 function placeNavButtonsForRenderedCells(): void {
   const root = rootRef.value;
   if (!root) return;
-  const cells = root.querySelectorAll<HTMLElement>('.grid-canvas-right .slick-cell.has-nav');
+  const cells = root.querySelectorAll<HTMLElement>(
+    '.grid-canvas-right .slick-cell.has-nav:not([data-kira-nav-placed])',
+  );
   for (const cellEl of cells) {
-    if (cellEl.querySelector('.cell-nav-btn')) continue;
+    cellEl.dataset.kiraNavPlaced = '1';
     const isFk = cellEl.classList.contains('fk');
     const btn = document.createElement('button');
     btn.type = 'button';

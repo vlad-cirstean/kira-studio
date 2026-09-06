@@ -197,6 +197,18 @@ export class KiraSlickGrid extends SlickGrid<RowHandle, Column<any>> {
    *  alongside `chaseHandle`/`chaseWanted` above, same reasoning. */
   private declare chaseSeenSeq: number;
 
+  /** A7/P21 round 1 — `getRenderedRange`'s own average-column-width divisor, below, used to be an
+   *  O(cols) `reduce` on *every* render call; cached here and only recomputed when the columns
+   *  array itself is a new reference (`setColumns`) or `onColumnsResized` fires (a resize drag
+   *  mutates each `Column.width` in place, so the array reference alone doesn't change — the
+   *  event is the only signal). `declare`d for the same reason `chaseHandle`/`chaseWanted` are:
+   *  `getRenderedRange` can run *during* `super()` (via `init()` -> `resizeCanvas()` -> `render()`,
+   *  this file's own documented call path), so a plain initializer would clobber a write made
+   *  before it runs. */
+  private declare avgColumnWidthCache: number;
+  private declare avgColumnWidthColumns: unknown;
+  private declare avgColumnWidthDirty: boolean;
+
   // Finding 5 — forwards to `SlickGrid`'s own constructor unchanged (this class has no constructor
   // params of its own), then nullish-defaults the three `declare`d fields above: `??=` rather than
   // `=` so a write `getRenderedRange`/`scheduleChase` already made *during* `super()` survives —
@@ -207,6 +219,15 @@ export class KiraSlickGrid extends SlickGrid<RowHandle, Column<any>> {
     this.chaseHandle ??= 0;
     this.chaseWanted ??= false;
     this.chaseSeenSeq ??= -1;
+    this.avgColumnWidthCache ??= 1;
+    this.avgColumnWidthColumns ??= null;
+    this.avgColumnWidthDirty ??= true;
+    // A7: a resize drag mutates each Column.width in place (slick.grid.ts's own `c.width = ...`),
+    // so the columns array reference never changes — this event is the only signal a cached
+    // average needs recomputing.
+    this.onColumnsResized.subscribe(() => {
+      this.avgColumnWidthDirty = true;
+    });
   }
 
   /** P22 iter2-pacing D1 — the fix itself. A catch-up render is gated on scroll *quiescence*, not
@@ -508,9 +529,13 @@ export class KiraSlickGrid extends SlickGrid<RowHandle, Column<any>> {
     // does not apply here at all. One frame stale by construction (like the app's own precedent):
     // it's set for the *next* call, from *this* call's own leftPx/rightPx.
     const columns = this.getColumns() ?? [];
-    const totalWidth = columns.reduce((sum, c) => sum + (c.width ?? 0), 0) || 1;
-    const avgWidth = totalWidth / Math.max(1, columns.length);
-    this.mountedColumnCount = Math.max(1, Math.ceil((rightPx - leftPx) / avgWidth));
+    if (this.avgColumnWidthDirty || this.avgColumnWidthColumns !== columns) {
+      const totalWidth = columns.reduce((sum, c) => sum + (c.width ?? 0), 0) || 1;
+      this.avgColumnWidthCache = totalWidth / Math.max(1, columns.length);
+      this.avgColumnWidthColumns = columns;
+      this.avgColumnWidthDirty = false;
+    }
+    this.mountedColumnCount = Math.max(1, Math.ceil((rightPx - leftPx) / this.avgColumnWidthCache));
     return { top: start, bottom: end, leftPx, rightPx };
   }
 
