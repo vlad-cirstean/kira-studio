@@ -12,10 +12,26 @@ import (
 // hardCapRows mirrors ops.ts's HARD_CAP_ROWS.
 const hardCapRows = 20_000
 
+// P23 D1: op_log already had a count bound (hardCapRows) and an age bound (the retention cut
+// below) — these two close the gap, mirroring api_response_history/grpc_call_history's own shape
+// (F2) rather than inventing a fifth.
+const (
+	// maxOpCommandBytes is grpc_history.go's maxGrpcMessageBytes verbatim (D1(a)): an op-log
+	// command is one label among as many as hardCapRows, worth less than a stored gRPC message a
+	// user opens and reads. It is also the largest cap that keeps the table under roughly twice
+	// its budget between two prunes (pruneEveryOps * (maxOpCommandBytes + maxOpErrorBytes) ≈ one
+	// budget of overshoot on top of one budget).
+	maxOpCommandBytes = 64 * 1024
+	// maxOpErrorBytes is httpclient/timeline.go's maxHopHeaderBytes (D1(b)) — this app's existing
+	// answer for "a block of machine-generated text worth keeping in full". Truncation here is
+	// silent, with no flag: nothing in the app acts on error (F5), only renders and searches it.
+	maxOpErrorBytes = 8 * 1024
+)
+
 const (
 	opsInsertSQL = `INSERT INTO op_log (id, connection_id, tab_id, started_at, duration_ms, kind, status, rows, command, error)
 		 VALUES (?, ?, ?, ?, NULL, ?, 'running', NULL, NULL, NULL)`
-	opsUpdateSQL = `UPDATE op_log SET status = ?, duration_ms = ?, rows = ?, command = ?, error = ? WHERE id = ?`
+	opsUpdateSQL = `UPDATE op_log SET status = ?, duration_ms = ?, rows = ?, command = ?, error = ?, stored_bytes = ?, command_truncated = ? WHERE id = ?`
 )
 
 type OpsRepo struct {
@@ -28,7 +44,8 @@ type OpsRepo struct {
 	update *sql.Stmt
 }
 
-// Append inserts a new running op row (ops.ts's appendOp).
+// Append inserts a new running op row (ops.ts's appendOp). stored_bytes/command_truncated take
+// their column defaults (0) — a running op has no command or error yet.
 func (r *OpsRepo) Append(op model.OpAppend) error {
 	var err error
 	if r.insert != nil {
@@ -42,18 +59,38 @@ func (r *OpsRepo) Append(op model.OpAppend) error {
 	return nil
 }
 
-// Finish records a running op's terminal state (ops.ts's finishOp).
-func (r *OpsRepo) Finish(opID string, patch model.OpFinish) error {
-	var err error
+// Finish records a running op's terminal state (ops.ts's finishOp), applying D1(a)/(b)'s per-row
+// caps first. patch is a pointer so it is truncated in place: the caller (oplog.Wiring) builds its
+// live-update record from the same patch it just passed in, rather than from the pre-truncation
+// event payload, so a push and a subsequent reload never disagree about what was actually stored.
+// The returned bool is D1(c)'s command_truncated flag.
+func (r *OpsRepo) Finish(opID string, patch *model.OpFinish) (commandTruncated bool, err error) {
+	if patch.Command != nil && len(*patch.Command) > maxOpCommandBytes {
+		truncated := (*patch.Command)[:maxOpCommandBytes]
+		patch.Command = &truncated
+		commandTruncated = true
+	}
+	if patch.Error != nil && len(*patch.Error) > maxOpErrorBytes {
+		truncated := (*patch.Error)[:maxOpErrorBytes]
+		patch.Error = &truncated
+	}
+	storedBytes := 0
+	if patch.Command != nil {
+		storedBytes += len(*patch.Command)
+	}
+	if patch.Error != nil {
+		storedBytes += len(*patch.Error)
+	}
+
 	if r.update != nil {
-		_, err = r.update.Exec(patch.Status, patch.DurationMs, patch.Rows, patch.Command, patch.Error, opID)
+		_, err = r.update.Exec(patch.Status, patch.DurationMs, patch.Rows, patch.Command, patch.Error, storedBytes, boolToInt(commandTruncated), opID)
 	} else {
-		_, err = r.DB.Exec(opsUpdateSQL, patch.Status, patch.DurationMs, patch.Rows, patch.Command, patch.Error, opID)
+		_, err = r.DB.Exec(opsUpdateSQL, patch.Status, patch.DurationMs, patch.Rows, patch.Command, patch.Error, storedBytes, boolToInt(commandTruncated), opID)
 	}
 	if err != nil {
-		return fmt.Errorf("repos/ops: finish %s: %w", opID, err)
+		return false, fmt.Errorf("repos/ops: finish %s: %w", opID, err)
 	}
-	return nil
+	return commandTruncated, nil
 }
 
 // Recent mirrors ops.ts's recentOps. There is no 'ddl'->'definition' coercion here (P52 §4.3 /
@@ -61,7 +98,7 @@ func (r *OpsRepo) Finish(opID string, patch model.OpFinish) error {
 // one) — an unrecognised kind or status is simply dropped, logged, like any other bad row.
 func (r *OpsRepo) Recent(limit int) ([]model.OpRecord, error) {
 	rows, err := r.DB.Query(`
-		SELECT id, connection_id, tab_id, started_at, duration_ms, kind, status, rows, command, error
+		SELECT id, connection_id, tab_id, started_at, duration_ms, kind, status, rows, command, error, command_truncated
 		  FROM op_log
 		 ORDER BY started_at DESC, rowid DESC
 		 LIMIT ?
@@ -78,8 +115,9 @@ func (r *OpsRepo) Recent(limit int) ([]model.OpRecord, error) {
 			connectionID, tabID sql.NullString
 			durationMs, opRows  sql.NullInt64
 			command, opErr      sql.NullString
+			commandTruncated    int
 		)
-		if err := rows.Scan(&o.ID, &connectionID, &tabID, &o.StartedAt, &durationMs, &o.Kind, &o.Status, &opRows, &command, &opErr); err != nil {
+		if err := rows.Scan(&o.ID, &connectionID, &tabID, &o.StartedAt, &durationMs, &o.Kind, &o.Status, &opRows, &command, &opErr, &commandTruncated); err != nil {
 			return nil, fmt.Errorf("repos/ops: scan: %w", err)
 		}
 		if !model.ValidOpKind(o.Kind) {
@@ -110,6 +148,7 @@ func (r *OpsRepo) Recent(limit int) ([]model.OpRecord, error) {
 		if opErr.Valid {
 			o.Error = &opErr.String
 		}
+		o.CommandTruncated = commandTruncated != 0
 		out = append(out, o)
 	}
 	if err := rows.Err(); err != nil {

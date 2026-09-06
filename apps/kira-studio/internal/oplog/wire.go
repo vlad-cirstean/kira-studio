@@ -188,9 +188,15 @@ func (w *Wiring) handleOpEnd(payload json.RawMessage, inFlight map[string]inFlig
 		return completedSincePrune
 	}
 
-	if err := w.ops.Finish(evt.OpID, model.OpFinish{
+	patch := model.OpFinish{
 		Status: evt.Status, DurationMs: evt.DurationMs, Rows: evt.Rows, Command: evt.Command, Error: evt.Error,
-	}); err != nil {
+	}
+	// P23 D1(c): Finish truncates patch.Command/patch.Error in place, so the record built below
+	// (and pushed live to the renderer) reflects exactly what was stored, never the
+	// pre-truncation event payload — a live update must not disagree with a subsequent Recent()
+	// reload about whether Re-run should be disabled.
+	commandTruncated, err := w.ops.Finish(evt.OpID, &patch)
+	if err != nil {
 		slog.Warn("finish failed", "scope", "oplog", "opId", evt.OpID, "err", err)
 		return completedSincePrune
 	}
@@ -200,7 +206,7 @@ func (w *Wiring) handleOpEnd(payload json.RawMessage, inFlight map[string]inFlig
 	delete(inFlight, evt.OpID)
 	record := model.OpRecord{
 		ID: evt.OpID, DurationMs: &evt.DurationMs, Status: evt.Status, Rows: evt.Rows,
-		Command: evt.Command, Error: evt.Error,
+		Command: patch.Command, Error: patch.Error, CommandTruncated: commandTruncated,
 	}
 	if ok {
 		record.ConnectionID, record.TabID, record.StartedAt, record.Kind = started.connectionID, started.tabID, started.startedAt, started.kind
@@ -236,9 +242,8 @@ func (w *Wiring) finishInFlight(inFlight map[string]inFlightOp, message string) 
 			}
 		}
 
-		if err := w.ops.Finish(opID, model.OpFinish{
-			Status: "error", DurationMs: durationMs, Rows: nil, Command: nil, Error: &message,
-		}); err != nil {
+		patch := model.OpFinish{Status: "error", DurationMs: durationMs, Rows: nil, Command: nil, Error: &message}
+		if _, err := w.ops.Finish(opID, &patch); err != nil {
 			slog.Warn("shutdown finish failed", "scope", "oplog", "opId", opID, "err", err)
 		}
 	}

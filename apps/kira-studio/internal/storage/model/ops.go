@@ -12,6 +12,9 @@ type OpRecord struct {
 	Rows         *int    `json:"rows"`
 	Command      *string `json:"command"`
 	Error        *string `json:"error"`
+	// CommandTruncated (P23 D1(c)): Command was truncated to maxOpCommandBytes at storage time, so
+	// it is no longer the whole script that ran — Re-run must refuse rather than replay a prefix.
+	CommandTruncated bool `json:"commandTruncated"`
 }
 
 // OpAppend is ops.ts's AppendOpInput.

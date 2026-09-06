@@ -38,5 +38,10 @@ export const opRecordSchema = /*#__PURE__*/ z.object({
   rows: z.number().nullable(),
   command: z.string().nullable(),
   error: z.string().nullable(),
+  // P23 D1(c): set when command was truncated at storage time (op_log's own 64 KiB per-row cap)
+  // — no longer the whole script that ran, so Re-run must refuse rather than replay a prefix.
+  // Optional: a record built before this field existed (or a hand-written test fixture) has no
+  // opinion, which OperationsPanel.vue treats as "not truncated" via plain falsy access.
+  commandTruncated: z.boolean().optional(),
 });
 export type OpRecord = z.infer<typeof opRecordSchema>;
