@@ -497,7 +497,19 @@ const DEFAULT_COLUMN_WIDTHS: Record<string, number> = {
   attrs: 140,
 };
 
+// P21 round 2 performance finding 10(c): onResizeMove used to call patchStreamTabState on every
+// single pointermove — patchStreamTabState's own skipUnchanged: false means every one of those
+// calls allocates a fresh columnWidths object (`{...columnWidths, [col]: width}` is a new object
+// reference every time regardless of whether the rounded width actually differs, so skipUnchanged
+// wouldn't have helped even if it were true here — patchChanged compares by Object.is per key),
+// mutates the reactive tab state (re-rendering the header on every pixel of drag), and re-arms the
+// 1s debounced save, which serializes *every* tab via JSON.stringify(tabsState.tabs). A resize
+// drag now drives this local ref instead — the visual still tracks the pointer via widthFor's own
+// check below — and only writes to tab state once, on pointerup, with the final width.
+const liveResizeWidth = ref<{ column: string; width: number } | null>(null);
+
 function widthFor(column: string): number {
+  if (liveResizeWidth.value?.column === column) return liveResizeWidth.value.width;
   return props.tab.state.columnWidths[column] ?? DEFAULT_COLUMN_WIDTHS[column] ?? 96;
 }
 
@@ -511,12 +523,19 @@ function onResizeStart(e: PointerEvent, column: string): void {
 function onResizeMove(e: PointerEvent): void {
   if (!resizing) return;
   const width = Math.max(40, resizing.startWidth + (e.clientX - resizing.startX));
-  patchStreamTabState(props.tab.id, {
-    columnWidths: { ...props.tab.state.columnWidths, [resizing.column]: width },
-  });
+  liveResizeWidth.value = { column: resizing.column, width };
 }
 function onResizeEnd(e: PointerEvent): void {
+  if (resizing && liveResizeWidth.value) {
+    patchStreamTabState(props.tab.id, {
+      columnWidths: {
+        ...props.tab.state.columnWidths,
+        [resizing.column]: liveResizeWidth.value.width,
+      },
+    });
+  }
   resizing = null;
+  liveResizeWidth.value = null;
   (e.currentTarget as HTMLElement).releasePointerCapture?.(e.pointerId);
 }
 
