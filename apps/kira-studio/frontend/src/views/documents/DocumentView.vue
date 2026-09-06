@@ -106,6 +106,28 @@ const caps = computed(() => {
   return connectionId ? (connectionsState.states[connectionId]?.caps ?? null) : null;
 });
 
+// P21 round 2 functional finding 3: Caps is a static per-adapter literal (internal/adapters/*/
+// caps.go) that never narrows for a connection's own read-only flag — grid/keyvalue/browse's own
+// write gates already combine the two (KeyValueView.vue's own canUpdate/canDelete/canInsert);
+// this view read caps alone, so Add/Edit/Delete stayed enabled on a read-only MongoDB connection
+// and only failed server-side with a raw E_UNSUPPORTED.
+const connRecord = computed(() => connectionRecord(props.tab.connectionId));
+const canInsert = computed(() => !!caps.value?.canInsert && !connRecord.value?.readOnly);
+const canDelete = computed(() => !!caps.value?.canDelete && !connRecord.value?.readOnly);
+// "Connection is read-only" only actually explains the disabled state when the connection's own
+// readOnly toggle is the reason — an adapter that structurally can't write at all would show the
+// same tooltip on a control that toggle could never turn back on. Mirrors KeyValueView.vue's own
+// writeDisabledReason exactly.
+function writeDisabledReason(capFlag: boolean | undefined): string {
+  return capFlag === false ? 'Connection does not support this action' : 'Connection is read-only';
+}
+const insertTitle = computed(() =>
+  canInsert.value ? 'Add a document' : writeDisabledReason(caps.value?.canInsert),
+);
+const deleteTitle = computed(() =>
+  canDelete.value ? 'Delete' : writeDisabledReason(caps.value?.canDelete),
+);
+
 const targetTail = computed(() => pathTail(props.tab.path));
 
 // Task: mutate.ts's update op is a whole-document replaceOne({_id}, body) — when a projection is
@@ -116,6 +138,9 @@ const targetTail = computed(() => pathTail(props.tab.path));
 const editGate = computed<{ editable: boolean; label: string }>(() => {
   if (!caps.value?.canUpdate) {
     return { editable: false, label: 'Connection does not support update' };
+  }
+  if (connRecord.value?.readOnly) {
+    return { editable: false, label: 'Connection is read-only' };
   }
   if (props.tab.state.projection !== null) {
     return {
@@ -654,8 +679,8 @@ onUnmounted(() => {
           <IconButton
             icon="add"
             data-testid="document-add"
-            :disabled="!caps?.canInsert"
-            v-tooltip="caps?.canInsert ? 'Add a document' : 'Connection does not support insert'"
+            :disabled="!canInsert"
+            v-tooltip="insertTitle"
             @click="onAddDocument"
           />
           <IconButton
@@ -845,8 +870,8 @@ onUnmounted(() => {
                   <IconButton
                     icon="trash"
                     data-testid="document-delete"
-                    :disabled="!caps?.canDelete"
-                    v-tooltip="caps?.canDelete ? 'Delete' : 'Connection does not support delete'"
+                    :disabled="!canDelete"
+                    v-tooltip="deleteTitle"
                     @click.stop="onDeleteRow(rowAt(item)!.view.id)"
                   />
                 </div>

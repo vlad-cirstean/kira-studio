@@ -88,8 +88,13 @@ const isBatch = computed(() => caps.value?.pagination === 'batch');
 // text below, is the one thing the doc carves out as fine). isKafka survives only as wording/data
 // selection now; isSqs had no remaining use once the v-ifs below read canInsert/canDelete instead.
 const isKafka = computed(() => connRecord.value?.kind === 'kafka');
-const canInsert = computed(() => caps.value?.canInsert ?? false);
-const canDelete = computed(() => caps.value?.canDelete ?? false);
+// P21 round 2 functional finding 3: Caps is a static per-adapter literal that never narrows for
+// a connection's own read-only flag — this view read it alone, so Produce/Send/Delete-message
+// stayed fully live (not greyed — these are v-ifs, not :disabled) on a read-only Kafka/SQS
+// connection and only failed server-side with a raw E_UNSUPPORTED. Mirrors KeyValueView.vue's
+// own canInsert/canDelete, which already combine the two.
+const canInsert = computed(() => (caps.value?.canInsert ?? false) && !connRecord.value?.readOnly);
+const canDelete = computed(() => (caps.value?.canDelete ?? false) && !connRecord.value?.readOnly);
 
 // D10/D12: a batch tab (SQS) never auto-loads on reconnect — only an explicit Poll does,
 // since every poll consumes from the queue rather than merely browsing it.
