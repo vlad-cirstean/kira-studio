@@ -258,14 +258,23 @@ func (s *GrpcService) Call(ctx context.Context, args GrpcCallArgs) (grpcclient.C
 				var gerr *grpcclient.Error
 				if errors.As(callErr, &gerr) && gerr.Partial != nil {
 					op.SetCommand(fmt.Sprintf("%s → %s → %s", unresolvedMethod, args.Target, gerr.Partial.CodeName))
-					s.recordGrpcHistory(args, *gerr.Partial)
+					// Finding 6: a streaming call already recorded this row from inside
+					// runServerStream, before its own terminal event went out — recording again
+					// here would insert the row twice.
+					if !args.Streaming {
+						s.recordGrpcHistory(args, *gerr.Partial)
+					}
 				}
 				return nil, callErr
 			}
 
 			op.SetCommand(fmt.Sprintf("%s → %s → %s", unresolvedMethod, args.Target, result.CodeName))
 
-			s.recordGrpcHistory(args, result)
+			// Finding 6: same as above — a streaming call's own recordGrpcHistory already ran
+			// inside runServerStream before its terminal event was emitted.
+			if !args.Streaming {
+				s.recordGrpcHistory(args, result)
+			}
 
 			return result, nil
 		})
@@ -279,12 +288,19 @@ func (s *GrpcService) Call(ctx context.Context, args GrpcCallArgs) (grpcclient.C
 // recordGrpcHistory is P8 D2's rule verbatim, applied to gRPC: recorded from args (stage 1 —
 // the target/method/metadata/message as the user typed them, a secret still spelled {{name}}),
 // never from the resolved values — best-effort, exactly as bridge/http.go's own Record call is: a
-// failed insert logs and the call still returns its result. Only a completed call reaches here
-// (Call's own RunOp closure only calls this once grpcclient.Unary/ServerStream has already
-// returned successfully); a cancelled or failed stream's partial state is recorded separately by
-// runServerStream's own caller once C9's UI needs it — D11 states a cancellation that received
-// messages is still a completed call, which is why streaming.go's coalescer's `finish` always
-// carries the true partial count for that path too.
+// failed insert logs and the call still returns its result. Only a completed call is ever recorded
+// — D11 states a cancellation that received messages is still a completed call, which is why
+// streaming.go's coalescer's `finish` always carries the true partial count for that path too.
+//
+// P21 round 2 functional finding 6: a unary call is recorded here, from Call's own RunOp closure,
+// once grpcclient.Unary has returned — the renderer can only learn the outcome by awaiting Call's
+// own promise, so by construction it never observes a state where the call finished but its
+// history row does not exist yet. A *streaming* call is recorded from inside runServerStream
+// instead, before its own terminal event goes out over the D8 push channel: the renderer there is
+// woken by that event rather than by Call's return, so recording after runServerStream returns
+// (i.e. from here) would leave the same window open recordGrpcHistory's very existence is meant to
+// close. Call itself skips recording for a streaming call (`if !args.Streaming`) precisely because
+// runServerStream already did it.
 func (s *GrpcService) recordGrpcHistory(args GrpcCallArgs, result grpcclient.CallResult) {
 	streaming := model.GrpcStreamingUnary
 	if args.Streaming {
@@ -417,6 +433,12 @@ func (c *grpcCoalescer) flushLocked(done bool, status *grpcclient.CallResult, er
 	})
 }
 
+// serverStreamFn — grpcclient.ServerStream, the exact function runServerStream calls — is a
+// package-level var rather than a direct call so a test can swap in a fake that returns a
+// controlled CallResult/error with no real network round trip (httpclient/wire.go's own
+// wireProxyFunc is this codebase's existing precedent for the same seam-by-var shape).
+var serverStreamFn = grpcclient.ServerStream
+
 // runServerStream is D8's own call: one op stays open for the life of the stream (P2 F12: a
 // long-held bound call does not block the control plane), pushing every message through the
 // coalescer above, and returning the terminal CallResult so a caller that misses every event still
@@ -429,15 +451,32 @@ func (c *grpcCoalescer) flushLocked(done bool, status *grpcclient.CallResult, er
 // *grpcclient.Error the coalescer is about to emit. The Partial handed to EmitTo is a copy, taken
 // after masking, so nothing downstream (Call's own recordGrpcHistory read of the same error) can
 // alias the struct the coalescer has already queued for emission.
+//
+// P21 round 2 functional finding 6: for the same reason, recordGrpcHistory itself must run
+// *before* coalescer.finish, not after this function returns back into Call. For a unary call the
+// renderer only learns the outcome by awaiting Call's own promise, so bridge/http.go's own
+// ordering (Record inside the send closure, before the send resolves) is automatically preserved.
+// A *streaming* call's renderer is instead woken by the terminal event finish emits — if that
+// event goes out before the row exists in grpc_call_history, a History pane already open for this
+// tab can react to the event, immediately re-list, and be answered before the insert lands: the
+// finished call's own row is then simply missing from the list (and the pane's staleness flag
+// incorrectly cleared) until some unrelated later call, delete or clear happens to trigger another
+// refresh. Recording here, before finish, closes that window the same way http.go's ordering
+// already does for its one code path. Call itself no longer records for a streaming call (see its
+// own `if !args.Streaming` guards) — recording twice would double-insert the row.
 func (s *GrpcService) runServerStream(ctx context.Context, args GrpcCallArgs, req grpcclient.CallRequest, used []apivars.UsedSecret) (grpcclient.CallResult, error) {
 	coalescer := newGrpcCoalescer(s.Deps.Events, args.WindowKey, args.OpID)
 
-	result, err := grpcclient.ServerStream(ctx, req, coalescer.push)
+	result, err := serverStreamFn(ctx, req, coalescer.push)
 	if err != nil {
 		maskGrpcError(err, used)
 		var gerr *grpcclient.Error
 		if errors.As(err, &gerr) && gerr.Partial != nil {
 			partial := *gerr.Partial
+			// D11: a cancellation or failure that received messages is still a completed call —
+			// recorded here, before the terminal event that could race a History pane's own
+			// refetch of this same row.
+			s.recordGrpcHistory(args, partial)
 			coalescer.finish(&partial, &GrpcCallEventErr{Code: gerr.Code, Message: gerr.Message})
 		} else if errors.As(err, &gerr) {
 			coalescer.finish(nil, &GrpcCallEventErr{Code: gerr.Code, Message: gerr.Message})
@@ -451,6 +490,7 @@ func (s *GrpcService) runServerStream(ctx context.Context, args GrpcCallArgs, re
 	// push channel — after finish returns is too late, the same "too-late-to-mask-afterwards"
 	// problem finding 4 of round 1 already identified for the error case.
 	maskGrpcResult(&result, used)
+	s.recordGrpcHistory(args, result)
 	coalescer.finish(&result, nil)
 	return result, nil
 }

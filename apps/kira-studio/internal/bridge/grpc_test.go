@@ -389,3 +389,82 @@ func TestRunServerStream_MasksDialTargetSecretBeforeEmittingErrorEvent(t *testin
 		t.Fatalf("emitted terminal event Error.Message = %q, want it masked to {{host}}", terminal.Error.Message)
 	}
 }
+
+// raceCheckEmitter is fakeEmitter's own sibling for finding 6: its EmitTo runs synchronously on
+// the same goroutine coalescer.finish calls it from (flushLocked's own EmitTo call, under
+// c.mu) — exactly mirroring the renderer's own D8 wake-up, which is likewise driven directly off
+// this event with no delay of its own. On the terminal (Done) event it snapshots whether
+// GrpcHistory already has a row for this tab, the same query a History pane's own immediate
+// re-list (noteRecorded -> load) would run the instant it is woken by this same event.
+type raceCheckEmitter struct {
+	history *repos.GrpcHistoryRepo
+	tabID   string
+
+	mu                sync.Mutex
+	sawRecordedAtDone bool
+	doneSeen          bool
+}
+
+func (r *raceCheckEmitter) Emit(name string, data any) {}
+func (r *raceCheckEmitter) EmitTo(windowKey string, name string, data any) {
+	evt, ok := data.(GrpcCallEvent)
+	if !ok || !evt.Done {
+		return
+	}
+	entries, _ := r.history.List("tab:" + r.tabID)
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.doneSeen = true
+	r.sawRecordedAtDone = len(entries) > 0
+}
+func (r *raceCheckEmitter) EmitFocused(name string, data any) {}
+
+// TestRunServerStream_RecordsHistoryBeforeEmittingTerminalEvent is P21 round 2 functional finding
+// 6: a server-streaming call's renderer is woken by runServerStream's own terminal event (D8's
+// push channel), not by Call's return value the way a unary call's renderer is — so if the row is
+// recorded only after that event goes out (the old code: Call's own recordGrpcHistory ran only
+// after runServerStream had already returned), a History pane already open for this tab can
+// immediately re-list in reaction to the event and be answered before the insert lands, dropping
+// the just-finished call from the list until some unrelated later refresh. This swaps in a fake
+// serverStreamFn (no real network round trip needed — the ordering bug is entirely on the Go side)
+// and an emitter that checks, synchronously and at the moment the terminal event fires, whether
+// the row already exists. It fails against the pre-fix ordering and passes once recordGrpcHistory
+// runs before coalescer.finish inside runServerStream itself.
+func TestRunServerStream_RecordsHistoryBeforeEmittingTerminalEvent(t *testing.T) {
+	svc, _, _, _ := newGrpcServiceForTest(t)
+
+	old := serverStreamFn
+	t.Cleanup(func() { serverStreamFn = old })
+	serverStreamFn = func(ctx context.Context, req grpcclient.CallRequest, onMessage func(grpcclient.Message)) (grpcclient.CallResult, error) {
+		onMessage(grpcclient.Message{Seq: 0, JSON: `{"text":"hi"}`})
+		return grpcclient.CallResult{Code: 0, CodeName: "OK", MessageCount: 1}, nil
+	}
+
+	emitter := &raceCheckEmitter{history: svc.Deps.Repos.GrpcHistory, tabID: "tab1"}
+	svc.Deps.Events = emitter
+
+	args := GrpcCallArgs{
+		OpID: "op1", TabID: "tab1", WindowKey: "win-1", Streaming: true,
+		DescriptorMode: "reflection", Target: "api.example.com:443",
+		Service: "kira.probe.v1.Echo", Method: "ServerStream",
+	}
+	req := grpcclient.CallRequest{FullMethod: "/kira.probe.v1.Echo/ServerStream"}
+
+	if _, err := svc.runServerStream(context.Background(), args, req, nil); err != nil {
+		t.Fatalf("runServerStream: %v", err)
+	}
+
+	emitter.mu.Lock()
+	defer emitter.mu.Unlock()
+	if !emitter.doneSeen {
+		t.Fatal("no terminal (done) event was emitted")
+	}
+	if !emitter.sawRecordedAtDone {
+		t.Fatal("the terminal event fired before grpc_call_history had a row for this call — a History pane woken by this event can be answered before the insert lands")
+	}
+
+	entries, err := svc.Deps.Repos.GrpcHistory.List("tab:tab1")
+	if err != nil || len(entries) != 1 {
+		t.Fatalf("List(tab:tab1) after the call = %d entries, err %v, want 1", len(entries), err)
+	}
+}
