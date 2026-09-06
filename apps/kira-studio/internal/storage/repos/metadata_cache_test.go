@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"testing"
+
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 )
 
 // TestMetadataCacheDifferentKindsShareOneRow pins Put's merge semantics: the unique index is
@@ -83,5 +85,100 @@ func TestMetadataCacheEvictionKeepsNewestAndIsolatesConnections(t *testing.T) {
 	}
 	if string(untouched) != `["untouched"]` {
 		t.Errorf("c2's row was affected by c1's eviction: %s", untouched)
+	}
+}
+
+// TestMetadataCachePerKindFetchedAtIsIndependent pins P24 D3/F13's hazard directly at the repo
+// layer: a row-level fetched_at cannot express "this kind's payload is old, that kind's is new."
+// A 'children' payload written long ago and a 'columns' payload written just now, sharing one row,
+// must keep two independent fetchedAt entries — writing one must never move the other's.
+func TestMetadataCachePerKindFetchedAtIsIndependent(t *testing.T) {
+	r := newMetadataCacheRepo(t)
+	seedConnection(t, r.DB, "c1")
+
+	// Seed 'children' directly with an old fetchedAt, simulating a payload written minutes ago —
+	// Put() itself always stamps "now", so a real time gap can only be constructed this way.
+	oldFetchedAt := "2020-01-01T00:00:00.000Z"
+	oldPayload := fmt.Sprintf(`{"children":["a"],"fetchedAt":{"children":%q}}`, oldFetchedAt)
+	if _, err := r.DB.Exec(
+		`INSERT INTO metadata_cache (connection_id, path, kind, payload_json, fetched_at, etag)
+		 VALUES ('c1', 'db:t', 'children', ?, ?, NULL)`,
+		oldPayload, oldFetchedAt,
+	); err != nil {
+		t.Fatalf("seed old children row: %v", err)
+	}
+
+	if err := r.Put("c1", "db:t", "columns", json.RawMessage(`[{"name":"x"}]`)); err != nil {
+		t.Fatalf("Put columns: %v", err)
+	}
+
+	children, childrenAt, err := r.Get("c1", "db:t", "children")
+	if err != nil {
+		t.Fatalf("Get children: %v", err)
+	}
+	if string(children) != `["a"]` {
+		t.Errorf("children payload = %s, want unchanged by the columns write", children)
+	}
+	if childrenAt != oldFetchedAt {
+		t.Errorf("children fetchedAt = %q, want unchanged old value %q (writing columns must not move it)", childrenAt, oldFetchedAt)
+	}
+
+	columns, columnsAt, err := r.Get("c1", "db:t", "columns")
+	if err != nil {
+		t.Fatalf("Get columns: %v", err)
+	}
+	if string(columns) != `[{"name":"x"}]` {
+		t.Errorf("columns payload = %s, want the just-written value", columns)
+	}
+	if columnsAt == "" || columnsAt == oldFetchedAt {
+		t.Errorf("columns fetchedAt = %q, want a fresh timestamp distinct from children's", columnsAt)
+	}
+
+	// Now write 'children' again — its own fetchedAt must move, but 'columns' must stay exactly
+	// where it was, proving the independence holds in both directions.
+	if err := r.Put("c1", "db:t", "children", json.RawMessage(`["b"]`)); err != nil {
+		t.Fatalf("Put children again: %v", err)
+	}
+	_, childrenAt2, err := r.Get("c1", "db:t", "children")
+	if err != nil {
+		t.Fatalf("Get children (after rewrite): %v", err)
+	}
+	if childrenAt2 == oldFetchedAt {
+		t.Errorf("children fetchedAt did not move after Put, still %q", childrenAt2)
+	}
+	_, columnsAt2, err := r.Get("c1", "db:t", "columns")
+	if err != nil {
+		t.Fatalf("Get columns (after children rewrite): %v", err)
+	}
+	if columnsAt2 != columnsAt {
+		t.Errorf("columns fetchedAt moved from %q to %q after writing an unrelated kind", columnsAt, columnsAt2)
+	}
+}
+
+// TestMetadataCacheLegacyRowFetchedAtIsEmpty covers D2's upgrade path: a row written before P24
+// (payload_json with no reserved fetchedAt key at all) must read back with fetchedAt == "" rather
+// than erroring — the empty string is what internal/tree.Service's freshness comparison treats as
+// older than any real timestamp.
+func TestMetadataCacheLegacyRowFetchedAtIsEmpty(t *testing.T) {
+	r := newMetadataCacheRepo(t)
+	seedConnection(t, r.DB, "c1")
+
+	if _, err := r.DB.Exec(
+		`INSERT INTO metadata_cache (connection_id, path, kind, payload_json, fetched_at, etag)
+		 VALUES ('c1', 'db:legacy', 'children', '{"children":["a"]}', ?, NULL)`,
+		model.NowISO(),
+	); err != nil {
+		t.Fatalf("seed legacy row: %v", err)
+	}
+
+	payload, fetchedAt, err := r.Get("c1", "db:legacy", "children")
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	if string(payload) != `["a"]` {
+		t.Errorf("payload = %s, want the legacy row's own value", payload)
+	}
+	if fetchedAt != "" {
+		t.Errorf("fetchedAt = %q, want \"\" for a pre-P24 row with no fetchedAt key", fetchedAt)
 	}
 }
