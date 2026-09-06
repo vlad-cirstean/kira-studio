@@ -97,6 +97,15 @@
   color: var(--kira-fg-disabled);
   cursor: default;
 }
+/* P22 D3: was `color: var(--kira-fg-disabled)` alone, which on a .primary button left #6e6e6e on
+   the accent fill — 1.13:1, an invisible label (F5). .p-dlgbtn's own :disabled has always used
+   opacity for exactly this reason; this brings .p-btn onto the same rule, which dims the fill and
+   the label together and can never invert a contrast ratio whatever the tone. */
+.p-btn.primary:disabled,
+.p-btn.primary.is-disabled {
+  color: var(--kira-accent-fg);
+  opacity: 0.45;
+}
 
 /* ---------- P3 dialog button (h-md, the only bordered button) ---------- */
 .p-dlgbtn {

@@ -48,6 +48,15 @@ withDefaults(
   color: var(--kira-accent-fg);
 }
 
+/* P22 D3: same fix as .p-btn.primary:disabled (primitives.css) — a disabled primary icon button
+   dims the fill and the label together via opacity, never keeps a full-strength accent fill with
+   an unreadable label on top of it. */
+.p-iconbtn.is-primary:disabled,
+.p-iconbtn.is-primary.is-disabled {
+  color: var(--kira-accent-fg);
+  opacity: 0.45;
+}
+
 .corner-count {
   position: absolute;
   /* Anchored to the button's own right edge, vertically centred rather than pinned to the top —

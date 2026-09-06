@@ -139,6 +139,30 @@ test('gRPC history Clear tracks whether there is anything to clear (D12)', async
   await expect(withEntries.window.locator('[data-testid="grpc-history-clear"]')).toBeEnabled();
 });
 
+// P22 D3/F5: a freshly opened gRPC tab has neither a service nor a method, so Call is disabled
+// from the moment the tab opens — the one place the app-wide disabled-primary-button defect
+// (every `.p-btn.primary`/`.p-iconbtn.is-primary`, not a gRPC-specific bug) was actually visible
+// to a user. Asserted as "the disabled primary path uses opacity", not as a contrast number
+// computed in the test.
+test('a disabled Call button dims via opacity, not an unreadable label on a full-strength fill (D3)', async ({
+  relaunch,
+}) => {
+  const { window: page } = await relaunch({
+    control: [{ channel: IPC.tabsList, response: [grpcTab({})] }],
+  });
+
+  const call = page.locator('[data-testid="grpc-call"]');
+  await expect(call).toBeDisabled();
+  const { color, opacity } = await call.evaluate((el) => {
+    const style = getComputedStyle(el as HTMLElement);
+    return { color: style.color, opacity: style.opacity };
+  });
+  // rgb(110, 110, 110) is --kira-fg-disabled — the pre-D3 defect kept this on the full accent
+  // fill. Post-D3 the label stays --kira-accent-fg and the whole control dims via opacity.
+  expect(color).not.toBe('rgb(110, 110, 110)');
+  expect(Number.parseFloat(opacity)).toBeLessThan(1);
+});
+
 // P15 §4: four cases guarding this phase's own end-to-end behaviour, not the restyles themselves —
 // the response pane's chrome present from tab-open (D1), JSON as a top-level body segment (D6),
 // and the tab-strip badge (D8).
