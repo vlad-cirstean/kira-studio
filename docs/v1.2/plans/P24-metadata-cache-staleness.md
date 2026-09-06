@@ -682,18 +682,24 @@ reloads what is on screen; a user who wants the listing re-read refreshes the co
 
 ## Checklist
 
-- [ ] G1 `Get` returns the payload's own fetch time; `Put` maintains the per-kind `fetchedAt` map
-- [ ] G2 repo tests: per-kind map, legacy row, eviction unchanged
-- [ ] G3 `freshnessFloor` + `getCached` comparison; stale is bypassed, never dropped
-- [ ] G4 `attemptConnect` stops deleting; emit stays
-- [ ] F1 `refresh` / `refreshConnection` / `refreshObject`; `refreshExpanded` drops `refresh: true`
-- [ ] F2 `menus.ts` routes each Refresh to the right action; no `children` call on a leaf
-- [ ] F3 `dropSchemaColumns`, wired into the three refresh actions; header comment corrected
-- [ ] G5 `internal/tree` staleness suite (§4.2), including the per-kind hazard case
-- [ ] `internal/connections` case: connect keeps the rows, still emits (§4.3)
-- [ ] V1 `tests/ui/tree.spec.ts` scenarios (§4.4); `definition.spec.ts:149` still green
-- [ ] V2 `docs/ARCHITECTURE.md` Caching section (§5); P23's inventory line amended (§0.3)
-- [ ] `bun run lint` / `typecheck` / `build`; `go build` / `go vet` / `bun run test:go`;
+- [x] G1 `Get` returns the payload's own fetch time; `Put` maintains the per-kind `fetchedAt` map
+- [x] G2 repo tests: per-kind map, legacy row, eviction unchanged
+- [x] G3 `freshnessFloor` + `getCached` comparison; stale is bypassed, never dropped
+- [x] G4 `attemptConnect` stops deleting; emit stays
+- [x] F1 `refresh` / `refreshConnection` / `refreshObject`; `refreshExpanded` drops `refresh: true`
+- [x] F2 `menus.ts` routes each Refresh to the right action; no `children` call on a leaf
+- [x] F3 `dropSchemaColumns`, wired into the three refresh actions; header comment corrected
+- [x] G5 `internal/tree` staleness suite (§4.2), including the per-kind hazard case (landed in the
+      same commit as G3, ahead of the plan's own commit-sequence position, since the harness change
+      the suite needs is one and the same)
+- [x] `internal/connections` case: connect keeps the rows, still emits (§4.3)
+- [x] V1 `tests/ui/tree.spec.ts` scenarios (§4.4 — container-refresh and leaf-refresh, both
+      confirmed against `control.log()`'s `treeInvalidate` entries rather than `opsCount()`, the
+      more precise instrument for a void call outside its op-channel set; `definition.spec.ts:149`
+      still green)
+- [x] V2 `docs/ARCHITECTURE.md` Caching section (§5); P23's inventory line amended (§0.3);
+      `docs/v1.2/SPEC.md`'s own P24 row given an Implemented summary
+- [x] `bun run lint` / `typecheck` / `build`; `go build` / `go vet` / `bun run test:go`;
       `bun run test:unit`; `bun run test:ui`; `tests/e2e-real/{sqlite,postgres}` green
 
 ---
