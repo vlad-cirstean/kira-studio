@@ -183,9 +183,15 @@ func (r *GrpcHistoryRepo) Record(rec model.GrpcCallHistoryRecord) error {
 	// A8/P21 round 1: the window-function sweep below is an unindexed full scan plus a running
 	// sum over the entire table — unconditionally, on every completed call, even though the caps
 	// mean it can only ever delete something once the table has accumulated well over 512 maximal
-	// entries. A cheap indexed aggregate first skips the expensive sweep for the overwhelming
-	// majority of calls, where the table is nowhere near the budget; the sweep itself is
-	// unchanged, so its safety argument still holds exactly.
+	// entries. An indexed aggregate first skips the expensive sweep for the overwhelming majority
+	// of calls, where the table is nowhere near the budget; the sweep itself is unchanged, so its
+	// safety argument still holds exactly.
+	//
+	// P21 round 3 performance finding 11: this comment originally claimed the SUM below was
+	// already a "cheap indexed aggregate" — it wasn't; there was no index on stored_bytes, so
+	// SQLite full-scanned the table's own b-tree on every completed call regardless. Migration
+	// 0013_p21r3_history_bytes_index.sql adds grpc_call_history_bytes, a covering index over
+	// exactly this column, making the SUM an index-only scan and making this comment true.
 	var totalBytes int64
 	if err := tx.QueryRow(`SELECT COALESCE(SUM(stored_bytes), 0) FROM grpc_call_history`).Scan(&totalBytes); err != nil {
 		return fmt.Errorf("repos/grpc_history: sum stored_bytes: %w", err)
