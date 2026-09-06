@@ -71,6 +71,21 @@ func New() *Cipher {
 func (c *Cipher) Status() Status { return c.status }
 
 // Encrypt satisfies repos.Cipher.
+//
+// P21 round 2 architecture/security finding 10 (recorded as a decision, not fixed): Seal is
+// called with no additional authenticated data, so a kira:v2: blob decrypts identically wherever
+// it is stored — nothing here binds a ciphertext to the row (or even the table) it lives in. An
+// attacker who can write ~/.kira-studio/kira.db but cannot read the Keychain item could in
+// principle move a connections.password ciphertext into an api_variables.secret_value row and get
+// the user to decrypt it through the variables Reveal gate, which a user is more likely to satisfy
+// casually than a production database credential reveal. This is deliberately left as-is rather
+// than closed: SecretStore.copy() (repos: ConnectionsRepo.Duplicate,
+// VariablesRepo.DuplicateEnvironment) copies raw ciphertext columns by design — see
+// docs/ARCHITECTURE.md — and any AAD binding narrower than a shared per-kind scope (e.g. binding
+// to a row id) would break that duplication path outright. Closing this properly means binding to
+// a *scope* string ("connection" vs "variable" vs "variable-history") passed in by every caller,
+// which touches every Encrypt/Decrypt call site in internal/connections and internal/apivars and
+// is a real but separate change from this pass's bug fixes.
 func (c *Cipher) Encrypt(plain string) (string, error) {
 	if !c.status.Available {
 		return "", ipcerr.SecretStore(*c.status.Reason)
