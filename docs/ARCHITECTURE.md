@@ -822,6 +822,22 @@ connection is deleted, and the whole connection's metadata is refreshed on **eve
 Plus manual *Refresh* from the tree context menu. This is what makes the project panel instant on
 launch and what lets panel search work without touching the database.
 
+**A fourth `kind`, `columns`, shares this same L1 row (P22c).** `metadata_cache`'s unique index is
+`(connection_id, path)`, not `(connection_id, path, kind)` — `children`/`describe`/`definition`
+already merge into one row per path, and `columns` (`SchemaColumns`, every relation in a container
+together with its columns, one round trip) is the fourth kind merged the identical way, keyed on
+the *container* (a database/schema node) rather than a relation. This is deliberate, not
+incidental: writing one row per relation instead would compete with the tree's own `children` rows
+for the same 200-row-per-connection budget on a large schema. `columns` inherits every rule the
+other three kinds already have — no TTL of its own, refreshed on reconnect or an explicit
+`Invalidate`, and (F7's own property, load-bearing for this feature) **readable with no live
+connection at all**, since a cache hit is served before the connection is even checked. It backs
+the SQL console's schema-aware completion/diagnostics/hover (`state/schemaColumns.ts`) automatically
+the moment a console or data tab opens over a cached container — no manual step, and the
+completion layer itself never opens a connection or fetches on its own (v1.1 P18's rule, kept).
+Whether a reconnect *should* refresh more aggressively, or `columns` deserves a rule finer than the
+other three kinds, is `docs/v1.2/SPEC.md`'s P24 row's question, not decided here.
+
 **L2 — result pages.** In-memory LRU in the engine, byte-budgeted (default 64 MB, configurable).
 Key = hash of `{connectionId, path, filter, projection, sort, pageSize, pageToken}`. Never
 persisted. Invalidated by: manual refresh, any local mutation on the same target, disconnect.
