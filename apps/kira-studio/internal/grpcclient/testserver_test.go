@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/connectivity"
+	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/reflection"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/reflect/protoreflect"
@@ -188,7 +190,37 @@ func startEchoServer(t *testing.T, protoSource string, impl *echoImpl, withRefle
 	}
 	go func() { _ = s.Serve(lis) }()
 	t.Cleanup(s.Stop)
-	return echoServer{addr: lis.Addr().String()}
+	addr := lis.Addr().String()
+	waitEchoServerReady(t, addr)
+	return echoServer{addr: addr}
+}
+
+// waitEchoServerReady blocks until the server behind addr actually answers, instead of returning
+// the instant net.Listen succeeds. net.Listen binds the socket immediately, so a client's TCP
+// connect can succeed into the kernel backlog before the s.Serve goroutine above has even been
+// scheduled — the client then sends its HTTP/2 preface into a connection nobody is reading yet and
+// sees EOF instead of a real response (the flake this fixes: descriptors_test.go's own
+// NoReflection case). Dialing here and waiting for connectivity.Ready closes that window.
+func waitEchoServerReady(t *testing.T, addr string) {
+	t.Helper()
+	conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		t.Fatalf("dial %s: %v", addr, err)
+	}
+	defer conn.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	conn.Connect()
+	for {
+		state := conn.GetState()
+		if state == connectivity.Ready {
+			return
+		}
+		if !conn.WaitForStateChange(ctx, state) {
+			t.Fatalf("echo test server at %s never became ready (stuck in %s)", addr, state)
+		}
+	}
 }
 
 func registerGlobalForReflection(t *testing.T, fd protoreflect.FileDescriptor) {
