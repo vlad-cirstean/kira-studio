@@ -78,9 +78,9 @@ func (w *fakeWatcher) Fire(sig gitclient.Signal) { w.sig <- sig }
 
 // newFakeWatcherFactory returns a Registry.newWatcher func and a counter of how many watchers it
 // constructed — the identity proof registry_test.go needs without a production Len()/accessor.
-func newFakeWatcherFactory() (func(gitclient.RepoSummary) (watcher, error), *int32) {
+func newFakeWatcherFactory() (func(gitclient.RepoSummary) (Watcher, error), *int32) {
 	var count int32
-	factory := func(gitclient.RepoSummary) (watcher, error) {
+	factory := func(gitclient.RepoSummary) (Watcher, error) {
 		atomic.AddInt32(&count, 1)
 		return newFakeWatcher(), nil
 	}
@@ -90,7 +90,7 @@ func newFakeWatcherFactory() (func(gitclient.RepoSummary) (watcher, error), *int
 func newTestRegistry() *Registry {
 	reg := NewRegistry(identifyRunner{})
 	factory, _ := newFakeWatcherFactory()
-	reg.newWatcher = factory
+	reg.NewWatcher = factory
 	return reg
 }
 
@@ -191,7 +191,7 @@ func TestRegistry_ReacquireInsideLingerWindowReusesEntryAndCancelsTimer(t *testi
 func TestRegistry_ExpiryTearsDownAndLaterAcquireBuildsNewEntry(t *testing.T) {
 	reg := newTestRegistry()
 	factory, count := newFakeWatcherFactory()
-	reg.newWatcher = factory
+	reg.NewWatcher = factory
 	reg.LingerFor = 20 * time.Millisecond
 
 	e1, release, err := reg.Acquire(context.Background(), "/usr/bin/git", "/repo")

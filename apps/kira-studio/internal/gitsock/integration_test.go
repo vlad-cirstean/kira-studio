@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -42,13 +43,14 @@ func (lookPathLocator) Locate(configuredPath string) (path string, probed []stri
 // duplicated here because a real end-to-end test has to speak the wire as an actual client would,
 // not call into the server's internals.
 type wireFrame struct {
-	T      string          `json:"t"`
-	ID     int             `json:"id,omitempty"`
-	Method string          `json:"method,omitempty"`
-	Params json.RawMessage `json:"params,omitempty"`
-	OK     *bool           `json:"ok,omitempty"`
-	Result json.RawMessage `json:"result,omitempty"`
-	Error  *wireErr        `json:"error,omitempty"`
+	T       string          `json:"t"`
+	ID      int             `json:"id,omitempty"`
+	Method  string          `json:"method,omitempty"`
+	Params  json.RawMessage `json:"params,omitempty"`
+	OK      *bool           `json:"ok,omitempty"`
+	Result  json.RawMessage `json:"result,omitempty"`
+	Error   *wireErr        `json:"error,omitempty"`
+	Payload json.RawMessage `json:"payload,omitempty"` // evt frames only (repo.changed, D20).
 }
 
 type wireErr struct {
@@ -159,7 +161,40 @@ func (c *testClient) request(method string, params any) wireFrame {
 	return respEnv.Body
 }
 
-func newIntegrationServer(t *testing.T) (server *Server, sockPath string, clientsRepo *repos.GitClientsRepo) {
+// repoChangedPayload is repo.changed's wire payload (D20).
+type repoChangedPayload struct {
+	RepoID string `json:"repoId"`
+	Kind   string `json:"kind"`
+}
+
+// recvEvent reads one frame and requires it to be an 'evt' frame for method, decoding its payload
+// — used only at points in a test where no request() is outstanding on the same client, so there
+// is no risk of an event interleaving with a response this test is also waiting on.
+func (c *testClient) recvEvent(method string) repoChangedPayload {
+	c.t.Helper()
+	raw, err := readFrame(c.r)
+	if err != nil {
+		c.t.Fatalf("read event: %v", err)
+	}
+	var env wireEnvelope
+	if err := json.Unmarshal(raw, &env); err != nil {
+		c.t.Fatalf("unmarshal event: %v\n%s", err, raw)
+	}
+	if env.Body.T != "evt" || env.Body.Method != method {
+		c.t.Fatalf("frame = %+v, want an evt frame for %s", env.Body, method)
+	}
+	var payload repoChangedPayload
+	if err := json.Unmarshal(env.Body.Payload, &payload); err != nil {
+		c.t.Fatalf("unmarshal payload: %v\n%s", err, env.Body.Payload)
+	}
+	return payload
+}
+
+// newIntegrationServer is the full-blown harness §8.1(c)'s own tests build on. registry is
+// returned too (not just server/sockPath/clientsRepo) so a test can shorten LingerFor or inject a
+// counting NewWatcher before any repo.open runs — gitsession.Registry's own exported seam (§3.9),
+// needing no production-only accessor.
+func newIntegrationServer(t *testing.T) (server *Server, sockPath string, clientsRepo *repos.GitClientsRepo, registry *gitsession.Registry) {
 	t.Helper()
 	kiraHome := t.TempDir()
 	t.Setenv("KIRA_HOME", kiraHome)
@@ -196,7 +231,7 @@ func newIntegrationServer(t *testing.T) (server *Server, sockPath string, client
 	}
 	t.Cleanup(func() { _ = server.Close() })
 
-	return server, filepath.Join(kiraHome, "git.sock"), repositories.GitClients
+	return server, filepath.Join(kiraHome, "git.sock"), repositories.GitClients, gitRegistry
 }
 
 func initFixtureRepo(t *testing.T) string {
@@ -247,7 +282,7 @@ func TestIntegration_FullPairingAndRPCLifecycle(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not on PATH")
 	}
-	server, sockPath, clientsRepo := newIntegrationServer(t)
+	server, sockPath, clientsRepo, _ := newIntegrationServer(t)
 	repoDir := initFixtureRepo(t)
 
 	// --- 1. hello with no token -> pairingRequired; approve -> paired -> ready.
@@ -396,5 +431,145 @@ func TestIntegration_FullPairingAndRPCLifecycle(t *testing.T) {
 	}
 	if got := server.Broker().Deny(resp5.RequestID); got != PairingActionResolved {
 		t.Fatalf("deny client-2: got %v", got)
+	}
+}
+
+// pairAndReady dials a fresh client and drives it through a fresh pairing to "ready" — the same
+// flow TestIntegration_FullPairingAndRPCLifecycle drives inline, factored out here since the two
+// tests below each need it more than once.
+func pairAndReady(t *testing.T, server *Server, sockPath, clientID string) *testClient {
+	t.Helper()
+	c := dialTestClient(t, sockPath)
+	errCh := make(chan error, 1)
+	go approveHead(server, errCh)
+	kind, _ := c.hello(clientID, "integration test", nil)
+	if err := <-errCh; err != nil {
+		t.Fatalf("approveHead: %v", err)
+	}
+	if kind != "ready" {
+		t.Fatalf("hello outcome for %s: got %q", clientID, kind)
+	}
+	return c
+}
+
+func runGitIn(t *testing.T, dir string, args ...string) {
+	t.Helper()
+	cmd := exec.Command("git", args...)
+	cmd.Dir = dir
+	cmd.Env = append(os.Environ(),
+		"GIT_AUTHOR_NAME=Test", "GIT_AUTHOR_EMAIL=test@example.com",
+		"GIT_COMMITTER_NAME=Test", "GIT_COMMITTER_EMAIL=test@example.com",
+	)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("git %v: %v\n%s", args, err, out)
+	}
+}
+
+func openRepoOK(t *testing.T, c *testClient, repoDir string) gitrpc.RepoOpenResult {
+	t.Helper()
+	resp := c.request("repo.open", gitrpc.RepoOpenParams{Path: repoDir})
+	if resp.T != "res" || resp.OK == nil || !*resp.OK {
+		t.Fatalf("repo.open: got %+v", resp)
+	}
+	var result gitrpc.RepoOpenResult
+	if err := json.Unmarshal(resp.Result, &result); err != nil {
+		t.Fatalf("unmarshal repo.open result: %v", err)
+	}
+	if result.Kind != "ok" || result.Repo == nil {
+		t.Fatalf("repo.open kind: got %+v", result)
+	}
+	return result
+}
+
+// TestIntegration_RepoChangedReachesEveryHolder is the phase's real proof (§8.1(c)): repo.changed
+// reaches EVERY connection holding a repository, not just the one that triggered it, with the
+// contract's exact payload.
+func TestIntegration_RepoChangedReachesEveryHolder(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not on PATH")
+	}
+	server, sockPath, _, _ := newIntegrationServer(t)
+	repoDir := initFixtureRepo(t)
+
+	clientA := pairAndReady(t, server, sockPath, "client-a")
+	clientB := pairAndReady(t, server, sockPath, "client-b")
+
+	resultA := openRepoOK(t, clientA, repoDir)
+	resultB := openRepoOK(t, clientB, repoDir)
+	repoID := resultA.Repo.RepoID
+	if resultB.Repo.RepoID != repoID {
+		t.Fatalf("client B got a different repoId: %s vs %s", resultB.Repo.RepoID, repoID)
+	}
+
+	runGitIn(t, repoDir, "commit", "--allow-empty", "-q", "-m", "second")
+	for _, c := range []*testClient{clientA, clientB} {
+		ev := c.recvEvent("repo.changed")
+		if ev.RepoID != repoID || ev.Kind != "refsChanged" {
+			t.Fatalf("event = %+v, want {%s refsChanged}", ev, repoID)
+		}
+	}
+
+	if err := os.WriteFile(filepath.Join(repoDir, "new-file.txt"), []byte("x"), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	runGitIn(t, repoDir, "add", "new-file.txt")
+	for _, c := range []*testClient{clientA, clientB} {
+		ev := c.recvEvent("repo.changed")
+		if ev.RepoID != repoID || ev.Kind != "worktreeChanged" {
+			t.Fatalf("event = %+v, want {%s worktreeChanged}", ev, repoID)
+		}
+	}
+}
+
+// TestIntegration_RefcountAndDisconnectTeardown proves F7's bug fixed (a repo.close from one
+// connection must not evict the repo for another), and D12/D19's refcount+linger+disconnect
+// teardown chain end to end. Watcher construction is counted (registry.NewWatcher, §3.9's own
+// "no production accessor that exists only for a test" seam) rather than reaching into the
+// registry's own state from a different package.
+func TestIntegration_RefcountAndDisconnectTeardown(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not on PATH")
+	}
+	server, sockPath, _, registry := newIntegrationServer(t)
+	registry.LingerFor = 50 * time.Millisecond
+	var watcherConstructions int32
+	realNewWatcher := registry.NewWatcher
+	registry.NewWatcher = func(s gitclient.RepoSummary) (gitsession.Watcher, error) {
+		atomic.AddInt32(&watcherConstructions, 1)
+		return realNewWatcher(s)
+	}
+	repoDir := initFixtureRepo(t)
+
+	clientA := pairAndReady(t, server, sockPath, "client-a")
+	clientB := pairAndReady(t, server, sockPath, "client-b")
+
+	resultA := openRepoOK(t, clientA, repoDir)
+	_ = openRepoOK(t, clientB, repoDir)
+	repoID := resultA.Repo.RepoID
+	if got := atomic.LoadInt32(&watcherConstructions); got != 1 {
+		t.Fatalf("watcher constructions after two opens of the same repo = %d, want 1", got)
+	}
+
+	closeResp := clientA.request("repo.close", gitrpc.RepoCloseParams{RepoID: repoID})
+	if closeResp.T != "res" || closeResp.OK == nil || !*closeResp.OK {
+		t.Fatalf("client A repo.close: %+v", closeResp)
+	}
+
+	// F7, provably fixed: A's repo.close must not have evicted the repo for B.
+	runGitIn(t, repoDir, "commit", "--allow-empty", "-q", "-m", "second")
+	ev := clientB.recvEvent("repo.changed")
+	if ev.RepoID != repoID || ev.Kind != "refsChanged" {
+		t.Fatalf("client B event = %+v, want {%s refsChanged}", ev, repoID)
+	}
+
+	// Disconnect B from the test side — its own deferred gconn.Close() (D19) must release its ref
+	// too, taking refcount to zero and arming the (deliberately short) linger timer.
+	_ = clientB.nc.Close()
+	time.Sleep(500 * time.Millisecond) // comfortably past disconnect-detection + LingerFor(50ms).
+
+	clientC := pairAndReady(t, server, sockPath, "client-c")
+	_ = openRepoOK(t, clientC, repoDir)
+	if got := atomic.LoadInt32(&watcherConstructions); got != 2 {
+		t.Fatalf("watcher constructions after expiry+re-open = %d, want 2 (a fresh RepoEntry, not the torn-down one reused)", got)
 	}
 }

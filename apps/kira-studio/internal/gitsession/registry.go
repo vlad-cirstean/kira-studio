@@ -31,11 +31,12 @@ type slot struct {
 // (F7): the same repository opened from two connections now stays alive until both release it.
 type Registry struct {
 	runner gitclient.Runner
-	// newWatcher is the watcher construction seam (D12/§3.5): defaulted to gitclient.NewRepoWatcher,
-	// overridable so registry_test.go/conn_test.go/subscriber_test.go need no filesystem or real
-	// git — the real watcher is proven in gitclient/watcher_test.go and end to end in gitsock's
-	// integration tests.
-	newWatcher func(gitclient.RepoSummary) (watcher, error)
+	// NewWatcher is the watcher construction seam (D12/§3.5): defaulted to gitclient.NewRepoWatcher,
+	// overridable so registry_test.go/conn_test.go/subscriber_test.go, and gitsock's own
+	// integration test across the package boundary, need no filesystem or real git — the real
+	// watcher is proven in gitclient/watcher_test.go and end to end in gitsock's integration tests.
+	// Exported so a test can inject a counting fake without a production-only accessor (§3.9).
+	NewWatcher func(gitclient.RepoSummary) (Watcher, error)
 	// LingerFor is the refcount-zero grace period (D12), a field rather than a constant so tests
 	// can shrink it to a few milliseconds. Zero means "use defaultLingerFor" — set by NewRegistry.
 	LingerFor time.Duration
@@ -49,7 +50,7 @@ type Registry struct {
 func NewRegistry(runner gitclient.Runner) *Registry {
 	return &Registry{
 		runner:     runner,
-		newWatcher: func(s gitclient.RepoSummary) (watcher, error) { return gitclient.NewRepoWatcher(s) },
+		NewWatcher: func(s gitclient.RepoSummary) (Watcher, error) { return gitclient.NewRepoWatcher(s) },
 		LingerFor:  defaultLingerFor,
 		entries:    make(map[string]*slot),
 	}
@@ -78,7 +79,7 @@ func (reg *Registry) Acquire(ctx context.Context, gitPath, path string) (*RepoEn
 		return sl.entry, reg.releaseFunc(summary.RepoID), nil
 	}
 
-	w, err := reg.newWatcher(summary)
+	w, err := reg.NewWatcher(summary)
 	if err != nil {
 		return nil, nil, err
 	}

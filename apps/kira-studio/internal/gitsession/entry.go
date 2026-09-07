@@ -6,10 +6,12 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitclient"
 )
 
-// watcher is the minimal seam RepoEntry needs from a repo watcher — gitclient.RepoWatcher
-// satisfies it structurally. Declared here (not imported as a concrete type) so registry_test.go
-// can drive refcount/linger logic against a fake with no filesystem and no real git (§3.5).
-type watcher interface {
+// Watcher is the minimal seam RepoEntry needs from a repo watcher — gitclient.RepoWatcher
+// satisfies it structurally. Declared here (not imported as a concrete type) and exported so both
+// registry_test.go (same package) and gitsock's own integration test (a different package,
+// injecting a counting fake through Registry.NewWatcher) can drive refcount/linger logic with no
+// filesystem and no real git (§3.5/§3.9).
+type Watcher interface {
 	Signals() <-chan gitclient.Signal
 	Close() error
 }
@@ -31,7 +33,7 @@ type RepoEntry struct {
 	Summary gitclient.RepoSummary
 	Repo    *gitclient.Repo
 
-	watcher watcher
+	watcher Watcher
 
 	mu   sync.Mutex
 	subs map[ConnID]*subscriber
@@ -39,7 +41,7 @@ type RepoEntry struct {
 	done chan struct{}
 }
 
-func newRepoEntry(summary gitclient.RepoSummary, repo *gitclient.Repo, w watcher) *RepoEntry {
+func newRepoEntry(summary gitclient.RepoSummary, repo *gitclient.Repo, w Watcher) *RepoEntry {
 	e := &RepoEntry{
 		Summary: summary,
 		Repo:    repo,
