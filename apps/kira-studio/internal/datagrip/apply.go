@@ -91,10 +91,16 @@ func applyOne(ds DataSource, projectDir string, cfg SecurityConfig, secretsAvail
 
 	if password == nil {
 		switch {
+		// Checked before ds.HasLocal below, and before any lookup: when this app's own secret
+		// storage is unavailable, the final block below discards the password regardless of where
+		// it came from, so a Keychain lookup here would only fire a real macOS authorization panel
+		// (lookupPasswordFn -> readKeychainPassword) for a result nobody will ever see.
+		case !secretsAvailable:
+			row.Error = ReasonSecretStorageUnavailable
 		case ds.HasLocal && (ds.SecretStorage == "memory" || ds.SecretStorage == "forget"):
 			row.Error = ReasonPasswordNotSaved
 		default:
-			pw, un, lookupErr := lookupPassword(ds, cfg)
+			pw, un, lookupErr := lookupPasswordFn(ds, cfg)
 			if lookupErr == nil {
 				password = &pw
 				passwordImported = true
@@ -138,6 +144,11 @@ func applyOne(ds DataSource, projectDir string, cfg SecurityConfig, secretsAvail
 	row.PasswordImported = passwordImported
 	return row
 }
+
+// lookupPasswordFn is lookupPassword through an indirection tests can swap out (t.Cleanup-restored)
+// to spy on or count calls — applyOne's only route to a real Keychain prompt, and the seam the
+// review finding's "never invoked when secretsAvailable is false" regression test hangs off.
+var lookupPasswordFn = lookupPassword
 
 // lookupPassword is D4's (now single-backend) credential fetch for one data source, run once, at
 // Apply time (D9). cfg.Provider is checked directly rather than through LookupOrder, because

@@ -196,3 +196,37 @@ func TestApplySecretsUnavailableImportsEveryRowWithNoPassword(t *testing.T) {
 		t.Errorf("PasswordImported = true, want false")
 	}
 }
+
+// TestApplySecretsUnavailableNeverLooksUpPassword is the review finding: the Keychain lookup (a
+// real macOS authorization panel per row) must never run for a row whose password would only be
+// discarded afterward by the secretsAvailable check — checking secretsAvailable first, before
+// attempting the lookup at all, must skip lookupPasswordFn entirely rather than call it and throw
+// the result away.
+func TestApplySecretsUnavailableNeverLooksUpPassword(t *testing.T) {
+	uuid := "cccccccc-0000-0000-0000-000000000002"
+	shared := sharedSourceXML(uuid, "s", "postgresql", "jdbc:postgresql://host:5432/db", false)
+	// master_key: a real saved password DataGrip claims to hold, so the only thing that could ever
+	// suppress the lookup is secretsAvailable=false below — not an upstream memory/forget skip.
+	local := `<?xml version="1.0" encoding="UTF-8"?><project version="4"><component name="dataSourceStorageLocal" created-in="DB-243.22562.220"><data-source name="s" uuid="` + uuid + `"><secret-storage>master_key</secret-storage><user-name>u</user-name></data-source></component></project>`
+	dir := writeSyntheticProject(t, shared, local)
+
+	calls := 0
+	original := lookupPasswordFn
+	lookupPasswordFn = func(ds DataSource, cfg SecurityConfig) (string, string, error) {
+		calls++
+		return original(ds, cfg)
+	}
+	t.Cleanup(func() { lookupPasswordFn = original })
+
+	creator := &recordingCreator{}
+	report, err := Apply(dir, []string{uuid}, false, creator)
+	if err != nil {
+		t.Fatalf("Apply: %v", err)
+	}
+	if calls != 0 {
+		t.Errorf("lookupPasswordFn was called %d time(s), want 0 — secretsAvailable=false must skip the Keychain lookup entirely", calls)
+	}
+	if len(report.Rows) != 1 || report.Rows[0].Error != ReasonSecretStorageUnavailable {
+		t.Fatalf("report = %+v, want one row with Error %q", report.Rows, ReasonSecretStorageUnavailable)
+	}
+}
