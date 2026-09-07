@@ -14,6 +14,7 @@ import (
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitclient"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitrpc"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitsession"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/repos"
 )
@@ -158,7 +159,7 @@ func (c *testClient) request(method string, params any) wireFrame {
 	return respEnv.Body
 }
 
-func newIntegrationServer(t *testing.T) (*Server, string, *repos.GitClientsRepo) {
+func newIntegrationServer(t *testing.T) (server *Server, sockPath string, clientsRepo *repos.GitClientsRepo) {
 	t.Helper()
 	kiraHome := t.TempDir()
 	t.Setenv("KIRA_HOME", kiraHome)
@@ -175,17 +176,18 @@ func newIntegrationServer(t *testing.T) (*Server, string, *repos.GitClientsRepo)
 	}
 	t.Cleanup(func() { _ = repositories.Close() })
 
-	gitCli := &gitclient.Client{
-		Runner:    gitclient.NewExecRunner(),
-		Discovery: gitclient.NewDiscovery(lookPathLocator{}, gitclient.NewExecRunner(), gitclient.NewRealClock()),
-		Registry:  gitclient.NewRegistry(gitclient.NewExecRunner()),
-	}
+	gitRunner := gitclient.NewExecRunner()
+	gitDiscovery := gitclient.NewDiscovery(lookPathLocator{}, gitRunner, gitclient.NewRealClock())
+	gitRegistry := gitsession.NewRegistry(gitRunner)
 
-	server := New(Deps{
-		SocketPath:    filepath.Join(kiraHome, "git.sock"),
-		LockPath:      filepath.Join(kiraHome, "git.sock.lock"),
-		Clients:       repositories.GitClients,
-		Handlers:      gitrpc.New(gitrpc.Deps{Client: gitCli, ServerVersion: "test-version"}),
+	server = New(Deps{
+		SocketPath: filepath.Join(kiraHome, "git.sock"),
+		LockPath:   filepath.Join(kiraHome, "git.sock.lock"),
+		Clients:    repositories.GitClients,
+		Registry:   gitRegistry,
+		Router: gitrpc.New(gitrpc.Deps{
+			Discovery: gitDiscovery, Runner: gitRunner, Registry: gitRegistry, ServerVersion: "test-version",
+		}),
 		ServerVersion: "test-version",
 		Now:           time.Now,
 	})
@@ -291,7 +293,7 @@ func TestIntegration_FullPairingAndRPCLifecycle(t *testing.T) {
 	if openResp.T != "res" || openResp.OK == nil || !*openResp.OK {
 		t.Fatalf("repo.open: got %+v", openResp)
 	}
-	var openResult gitclient.RepoOpenResult
+	var openResult gitrpc.RepoOpenResult
 	if err := json.Unmarshal(openResp.Result, &openResult); err != nil {
 		t.Fatalf("unmarshal repo.open result: %v", err)
 	}
@@ -360,12 +362,19 @@ func TestIntegration_FullPairingAndRPCLifecycle(t *testing.T) {
 
 	// --- 7. a second Server.Start() against the same KIRA_HOME does not listen, does not error,
 	// and does not disturb the first one's socket.
+	secondRunner := gitclient.NewExecRunner()
+	secondRegistry := gitsession.NewRegistry(secondRunner)
 	second := New(Deps{
 		SocketPath: sockPath,
 		LockPath:   filepath.Join(filepath.Dir(sockPath), "git.sock.lock"),
 		Clients:    clientsRepo,
-		Handlers:   gitrpc.New(gitrpc.Deps{Client: &gitclient.Client{}, ServerVersion: "second"}),
-		Now:        time.Now,
+		Registry:   secondRegistry,
+		Router: gitrpc.New(gitrpc.Deps{
+			Discovery: gitclient.NewDiscovery(lookPathLocator{}, secondRunner, gitclient.NewRealClock()),
+			Runner:    secondRunner, Registry: secondRegistry, ServerVersion: "second",
+		}),
+		ServerVersion: "second",
+		Now:           time.Now,
 	})
 	if err := second.Start(); err != nil {
 		t.Fatalf("second Start: %v", err)

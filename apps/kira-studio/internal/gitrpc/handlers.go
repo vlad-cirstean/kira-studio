@@ -3,59 +3,75 @@ package gitrpc
 import (
 	"context"
 	"encoding/json"
+	"strings"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitclient"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitsession"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/ipcerr"
 )
 
-// Deps is everything gitrpc needs; nothing more reaches it (D10/D11).
+// Deps is everything a Router needs; nothing more reaches it (D10/D11 from G1, unchanged in shape
+// — only the fields differ, D18).
 type Deps struct {
-	Client        *gitclient.Client
+	Discovery     *gitclient.Discovery
+	Runner        gitclient.Runner
+	Registry      *gitsession.Registry
 	ServerVersion string
 }
 
 // Handlers is gitrpc's own two-function method table — deliberately not rpcstream.Handlers: gitrpc
 // must not import internal/bridge/rpcstream (a domain package must stay under the layering line,
-// §3.4), so gitsock is the one that adapts these two functions onto rpcstream.Handlers.
+// SPEC §7), so gitsock is the one that adapts these two functions onto rpcstream.Handlers.
 type Handlers struct {
 	Request func(ctx context.Context, method string, params json.RawMessage) (any, error)
 	Stream  func(ctx context.Context, method string, params json.RawMessage) error
 }
 
-// New builds D12's three-arm method table plus its uniform default. There is no per-method test:
-// each arm is a thin, already-tested dispatch (AGENTS.md's "thin pass-through wrapper" exclusion)
-// — the behaviour that matters is proven end-to-end (§8.1), not restated in a unit test.
-func New(deps Deps) Handlers {
+// Router builds a per-connection Handlers over one shared Deps — the piece D18 adds: every method
+// that touches a repository now needs to know which connection is asking, so it can route through
+// that connection's own gitsession.Conn (its holds, its Emit) rather than a single global registry
+// (F7).
+type Router struct{ deps Deps }
+
+// New constructs a Router over deps.
+func New(deps Deps) *Router { return &Router{deps: deps} }
+
+// ForConn returns the two-function Handlers gitsock hands to one connection's rpcstream.Session —
+// c is closed over by repo.open/repo.close, exactly the shape the wire contract itself does not
+// change at all (D18): params, results and CONTRACT_VERSION are untouched, only what repo.close
+// means does (evict globally -> release this connection's hold).
+func (r *Router) ForConn(c *gitsession.Conn) Handlers {
 	return Handlers{
 		Request: func(ctx context.Context, method string, params json.RawMessage) (any, error) {
 			switch method {
 			case "app.init":
-				return handleAppInit(ctx, deps), nil
+				return r.handleAppInit(ctx), nil
 			case "repo.open":
-				return handleRepoOpen(ctx, deps, params)
+				return r.handleRepoOpen(ctx, c, params)
 			case "repo.close":
-				return handleRepoClose(deps, params)
+				return handleRepoClose(c, params)
 			default:
 				return nil, ipcerr.New("E_UNKNOWN_METHOD", "gitrpc: unknown method "+method)
 			}
 		},
 		Stream: func(ctx context.Context, method string, params json.RawMessage) error {
-			// G1 registers no stream handler (D12) — rpcstream's own Handlers.Stream signature
-			// cannot emit a chunk yet regardless (F3), so there is nothing this could serve.
+			// G2 registers no stream handler — rpcstream's own Handlers.Stream signature cannot
+			// emit a chunk yet regardless (G1 §11/G2 plan §9), so there is nothing this could
+			// serve. G3 widens Stream and this default goes away.
 			return ipcerr.New("E_UNKNOWN_METHOD", "gitrpc: unknown method "+method)
 		},
 	}
 }
 
-func handleAppInit(ctx context.Context, deps Deps) AppInitResult {
+func (r *Router) handleAppInit(ctx context.Context) AppInitResult {
 	return AppInitResult{
 		ContractVersion: ContractVersion,
-		ServerVersion:   deps.ServerVersion,
-		Git:             deps.Client.Status(ctx, ""),
+		ServerVersion:   r.deps.ServerVersion,
+		Git:             r.deps.Discovery.Status(ctx, ""),
 	}
 }
 
-func handleRepoOpen(ctx context.Context, deps Deps, params json.RawMessage) (any, error) {
+func (r *Router) handleRepoOpen(ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
 	var p RepoOpenParams
 	if err := json.Unmarshal(params, &p); err != nil {
 		return nil, ipcerr.BadRequest("gitrpc: repo.open: invalid params")
@@ -63,10 +79,23 @@ func handleRepoOpen(ctx context.Context, deps Deps, params json.RawMessage) (any
 	if p.Path == "" {
 		return nil, ipcerr.BadRequest("gitrpc: repo.open: path is required")
 	}
-	return deps.Client.OpenRepo(ctx, "", p.Path)
+
+	status := r.deps.Discovery.Status(ctx, "")
+	if status.Kind != "ok" {
+		return RepoOpenResult{Kind: "gitUnavailable", Git: &status}, nil
+	}
+
+	summary, err := c.Open(ctx, r.deps.Registry, status.Path, p.Path)
+	if err != nil {
+		if kind, ok := gitclient.KindOf(err); ok && kind == gitclient.KindNotARepository {
+			return RepoOpenResult{Kind: "notARepository", Path: p.Path}, nil
+		}
+		return nil, mapGitError(err)
+	}
+	return RepoOpenResult{Kind: "ok", Repo: &summary}, nil
 }
 
-func handleRepoClose(deps Deps, params json.RawMessage) (any, error) {
+func handleRepoClose(c *gitsession.Conn, params json.RawMessage) (any, error) {
 	var p RepoCloseParams
 	if err := json.Unmarshal(params, &p); err != nil {
 		return nil, ipcerr.BadRequest("gitrpc: repo.close: invalid params")
@@ -74,6 +103,38 @@ func handleRepoClose(deps Deps, params json.RawMessage) (any, error) {
 	if p.RepoID == "" {
 		return nil, ipcerr.BadRequest("gitrpc: repo.close: repoId is required")
 	}
-	deps.Client.CloseRepo(p.RepoID)
+	c.CloseRepo(p.RepoID) // idempotent either way (D15) — repo.close always answers {}.
 	return struct{}{}, nil
+}
+
+// mapGitError turns gitclient's closed error vocabulary into ipcerr codes so the classification
+// survives the wire (D6, resolving F6). rpcstream folds anything that is not an *ipcerr.Error into
+// E_INTERNAL (bridge/rpcstream/frame.go), which is the whole reason this exists — a git failure
+// must cross as E_GIT_<KIND>, never as an anonymous internal error.
+func mapGitError(err error) error {
+	kind, ok := gitclient.KindOf(err)
+	if !ok {
+		return err
+	}
+	return ipcerr.New("E_GIT_"+camelToSnake(string(kind)), err.Error())
+}
+
+// camelToSnake converts gitclient's camelCase ErrorKind values ("notARepository") into
+// SCREAMING_SNAKE_CASE ("NOT_A_REPOSITORY") for the E_GIT_<KIND> wire code.
+func camelToSnake(s string) string {
+	var b strings.Builder
+	for i, r := range s {
+		switch {
+		case r >= 'A' && r <= 'Z':
+			if i > 0 {
+				b.WriteByte('_')
+			}
+			b.WriteRune(r)
+		case r >= 'a' && r <= 'z':
+			b.WriteRune(r - ('a' - 'A'))
+		default:
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
 }

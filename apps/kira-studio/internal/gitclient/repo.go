@@ -143,62 +143,6 @@ func (r *Repo) run(ctx context.Context, spec Spec) (Result, error) {
 	return res, nil
 }
 
-// Registry is the per-app set of currently-open repositories, keyed by RepoID (repo.go's own
-// choice: the absolute git-dir, unique per worktree even when several linked worktrees share one
-// commonDir).
-type Registry struct {
-	runner Runner
-
-	mu    sync.Mutex
-	repos map[string]*Repo
-}
-
-// NewRegistry constructs an empty Registry over the given Runner.
-func NewRegistry(runner Runner) *Registry {
-	return &Registry{runner: runner, repos: make(map[string]*Repo)}
-}
-
-// Open resolves path's repository identity via `rev-parse` and registers it, reusing an existing
-// entry if this path's repoId is already open (repeated repo.open on the same worktree is a
-// read, not a second registration). gitPath is the already-discovered, floor-checked git binary
-// — callers resolve GitStatus first (D4) and never reach here below "ok".
-func (reg *Registry) Open(ctx context.Context, gitPath, path string) (*Repo, error) {
-	summary, err := Identify(ctx, reg.runner, gitPath, path)
-	if err != nil {
-		return nil, err
-	}
-
-	reg.mu.Lock()
-	defer reg.mu.Unlock()
-	if existing, ok := reg.repos[summary.RepoID]; ok {
-		return existing, nil
-	}
-	repo := NewRepo(summary, reg.runner, gitPath)
-	reg.repos[summary.RepoID] = repo
-	return repo, nil
-}
-
-// Get returns the already-open Repo for repoId, if any.
-func (reg *Registry) Get(repoID string) (*Repo, bool) {
-	reg.mu.Lock()
-	defer reg.mu.Unlock()
-	r, ok := reg.repos[repoID]
-	return r, ok
-}
-
-// Close discards repoId's entry. No process, handle or lock needs releasing (every git spawn
-// already ran to completion before returning) — this only stops Get from finding it again.
-// Reports whether an entry was actually present.
-func (reg *Registry) Close(repoID string) bool {
-	reg.mu.Lock()
-	defer reg.mu.Unlock()
-	if _, ok := reg.repos[repoID]; !ok {
-		return false
-	}
-	delete(reg.repos, repoID)
-	return true
-}
-
 // Identify runs the handful of `rev-parse` queries that make up a RepoSummary — line-based
 // output only (§0.2: this is not a porcelain parser; every value here is a single trimmed line
 // from a query whose shape `rev-parse` fixes).

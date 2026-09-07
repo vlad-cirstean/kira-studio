@@ -10,18 +10,22 @@ import (
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/bridge/rpcstream"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitrpc"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitsession"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/notify"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 )
 
 // Deps is everything Server needs to listen and serve. SocketPath/LockPath are the two files under
 // ${KIRA_HOME} (F5's already-0700 directory); Now is injected so the pairing broker's deadlines are
-// testable without a real clock (main.go passes time.Now).
+// testable without a real clock (main.go passes time.Now). Router replaces the single shared
+// Handlers value (D18/D19): every connection now gets its own Handlers, built from its own
+// gitsession.Conn, so repo.close only ever releases that connection's own hold (F7).
 type Deps struct {
 	SocketPath    string
 	LockPath      string
 	Clients       TrustStore
-	Handlers      gitrpc.Handlers
+	Router        *gitrpc.Router
+	Registry      *gitsession.Registry
 	ServerVersion string
 	Now           func() time.Time
 }
@@ -154,14 +158,16 @@ func (s *Server) acceptLoop() {
 	}
 }
 
-// handleConn runs the handshake (§3.1.1) and, once it reaches "ready", hands the connection to a
-// rpcstream.Session for the rest of its life. The connection is registered under its client id for
-// D18's Revoke only after the handshake accepts it — a connection still mid-pairing has no
-// identity to revoke yet.
+// handleConn runs the handshake (§3.1.1) and, once it reaches "ready", mints a gitsession.Conn for
+// this connection (its ID is the handshake's own sessionId, no longer thrown away — D19) and hands
+// it to a rpcstream.Session for the rest of its life. The connection is registered under its client
+// id for D18's Revoke only after the handshake accepts it — a connection still mid-pairing has no
+// identity to revoke yet. gconn.Close() releases every repo ref this connection took, whether it
+// disconnected cleanly or was revoked — SPEC §6's disconnect teardown.
 func (s *Server) handleConn(nc net.Conn) {
 	defer nc.Close()
 	c := newConn(nc)
-	clientID, ok := runHandshake(c, handshakeDeps{
+	clientID, sessionID, ok := runHandshake(c, handshakeDeps{
 		Clients:        s.deps.Clients,
 		Broker:         s.broker,
 		ServerVersion:  s.deps.ServerVersion,
@@ -175,11 +181,20 @@ func (s *Server) handleConn(nc net.Conn) {
 	s.addConn(clientID, nc)
 	defer s.removeConn(clientID, nc)
 
-	rpcstream.NewSession(c, rpcstream.Handlers{
+	// gconn.Emit is filled in once sess exists (below) — ForConn's closures capture gconn itself,
+	// not a snapshot of its Emit field, so this ordering is safe: nothing calls Emit before Serve
+	// starts dispatching requests.
+	gconn := gitsession.NewConn(gitsession.ConnID(sessionID), clientID, nil)
+	defer gconn.Close()
+
+	handlers := s.deps.Router.ForConn(gconn)
+	sess := rpcstream.NewSession(c, rpcstream.Handlers{
 		ContractVersion: gitrpc.ContractVersion,
-		Request:         s.deps.Handlers.Request,
-		Stream:          s.deps.Handlers.Stream,
-	}).Serve()
+		Request:         handlers.Request,
+		Stream:          handlers.Stream,
+	})
+	gconn.Emit = sess.Emit
+	sess.Serve()
 }
 
 func (s *Server) addConn(clientID string, nc net.Conn) {
@@ -252,6 +267,12 @@ func (s *Server) Close() error {
 		err = ln.Close()
 	}
 	s.wg.Wait()
+	// Every handleConn goroutine has now returned and released its own refs (deferred
+	// gconn.Close() above) — this stops every remaining watcher outright rather than waiting out
+	// their linger windows (D12 step 5), for a real shutdown.
+	if s.deps.Registry != nil {
+		s.deps.Registry.Close()
+	}
 	if lockFile != nil {
 		_ = lockFile.Close()
 	}

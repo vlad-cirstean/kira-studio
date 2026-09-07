@@ -21,15 +21,16 @@ import (
 	_ "github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters/s3"
 	_ "github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters/sqlite"
 	_ "github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters/sqs"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/apivars"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/appcore"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/bridge"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/buildinfo"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/config"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/connections"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/enginecache"
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/apivars"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitclient"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitrpc"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitsession"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitsock"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/localauth"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/logging"
@@ -95,12 +96,19 @@ func main() {
 
 	// G1 §3.7: the git socket listener. Start's error is logged, never fatal (D5) — the app must
 	// boot even when the git socket could not, e.g. a second instance already serving it.
-	gitCli := gitclient.NewClient(gitclient.NewExecRunner(), gitclient.NewRealClock())
+	// G2 D18/D19: repository lifecycle moves to a refcounted gitsession.Registry, shared across
+	// every connection, with gitrpc rebuilt as a per-connection Router over it.
+	gitRunner := gitclient.NewExecRunner()
+	gitDiscovery := gitclient.NewDiscovery(gitclient.NewPlatformLocator(), gitRunner, gitclient.NewRealClock())
+	gitRegistry := gitsession.NewRegistry(gitRunner)
 	gitSock := gitsock.New(gitsock.Deps{
-		SocketPath:    filepath.Join(config.KiraHome(), "git.sock"),
-		LockPath:      filepath.Join(config.KiraHome(), "git.sock.lock"),
-		Clients:       repositories.GitClients,
-		Handlers:      gitrpc.New(gitrpc.Deps{Client: gitCli, ServerVersion: buildinfo.Version}),
+		SocketPath: filepath.Join(config.KiraHome(), "git.sock"),
+		LockPath:   filepath.Join(config.KiraHome(), "git.sock.lock"),
+		Clients:    repositories.GitClients,
+		Registry:   gitRegistry,
+		Router: gitrpc.New(gitrpc.Deps{
+			Discovery: gitDiscovery, Runner: gitRunner, Registry: gitRegistry, ServerVersion: buildinfo.Version,
+		}),
 		ServerVersion: buildinfo.Version,
 		Now:           time.Now,
 	})

@@ -191,45 +191,8 @@ func TestRepo_ReadAndWriteAreMutuallyExclusive(t *testing.T) {
 	}
 }
 
-// --- Registry.Open / Close ---------------------------------------------------------------------
-
-func TestRegistry_OpenReusesSameRepoID(t *testing.T) {
-	dir := initFixtureRepo(t)
-	reg := NewRegistry(NewExecRunner())
-	gitPath := requireRealGit(t)
-
-	r1, err := reg.Open(context.Background(), gitPath, dir)
-	if err != nil {
-		t.Fatalf("Open: %v", err)
-	}
-	r2, err := reg.Open(context.Background(), gitPath, dir)
-	if err != nil {
-		t.Fatalf("Open (again): %v", err)
-	}
-	if r1 != r2 {
-		t.Fatal("Open on the same path twice returned two different *Repo instances")
-	}
-}
-
-func TestRegistry_CloseThenGet(t *testing.T) {
-	dir := initFixtureRepo(t)
-	reg := NewRegistry(NewExecRunner())
-	gitPath := requireRealGit(t)
-
-	r, err := reg.Open(context.Background(), gitPath, dir)
-	if err != nil {
-		t.Fatalf("Open: %v", err)
-	}
-	if !reg.Close(r.Summary.RepoID) {
-		t.Fatal("Close on an open repoId reported false")
-	}
-	if reg.Close(r.Summary.RepoID) {
-		t.Fatal("Close on an already-closed repoId reported true")
-	}
-	if _, ok := reg.Get(r.Summary.RepoID); ok {
-		t.Fatal("Get found a repo after Close")
-	}
-}
+// Registry's own tests moved to gitsession/registry_test.go, rewritten around Acquire (D18) —
+// gitclient.Registry no longer exists; refcounted lifecycle is gitsession's job now.
 
 // --- Identify() against a real repository --------------------------------------------------
 // Skipped when no git is on PATH — this package's own binary discovery is exercised elsewhere
@@ -395,65 +358,6 @@ func TestIdentify_NotARepository(t *testing.T) {
 	}
 }
 
-// --- Client.OpenRepo / Status --------------------------------------------------------------
-
-func TestClient_OpenRepo_GitUnavailableShortCircuits(t *testing.T) {
-	c := &Client{
-		Runner:    &fakeRunner{},
-		Discovery: NewDiscovery(fakeLocator{found: false, probed: []string{"a"}}, &fakeRunner{}, &fakeClock{}),
-		Registry:  NewRegistry(&fakeRunner{}),
-	}
-	result, err := c.OpenRepo(context.Background(), "", "/some/path")
-	if err != nil {
-		t.Fatalf("OpenRepo: %v", err)
-	}
-	if result.Kind != "gitUnavailable" || result.Git == nil || result.Git.Kind != "notFound" {
-		t.Fatalf("result = %+v, want gitUnavailable/notFound", result)
-	}
-}
-
-// clientOverRealGit builds a Client whose Discovery reports the test machine's real git as "ok"
-// directly (bypassing NewPlatformLocator's darwin-only strategy, D3) — this file's job is proving
-// Client.OpenRepo's own orchestration against a real repository on whatever OS the test runs on,
-// not re-proving D3's platform selection (discovery_test.go already covers that end to end).
-func clientOverRealGit(t *testing.T) *Client {
-	t.Helper()
-	gitPath := requireRealGit(t)
-	runner := NewExecRunner()
-	return &Client{
-		Runner:    runner,
-		Discovery: NewDiscovery(fakeLocator{found: true, path: gitPath}, runner, NewRealClock()),
-		Registry:  NewRegistry(runner),
-	}
-}
-
-func TestClient_OpenRepo_RealRepoEndToEnd(t *testing.T) {
-	dir := initFixtureRepo(t)
-	c := clientOverRealGit(t)
-
-	result, err := c.OpenRepo(context.Background(), "", dir)
-	if err != nil {
-		t.Fatalf("OpenRepo: %v", err)
-	}
-	if result.Kind != "ok" || result.Repo == nil {
-		t.Fatalf("result = %+v, want ok with a repo", result)
-	}
-	if result.Repo.Head.Kind != "branch" {
-		t.Errorf("Head.Kind = %q, want branch", result.Repo.Head.Kind)
-	}
-
-	if !c.CloseRepo(result.Repo.RepoID) {
-		t.Fatal("CloseRepo reported false for a just-opened repo")
-	}
-}
-
-func TestClient_OpenRepo_NotARepository(t *testing.T) {
-	c := clientOverRealGit(t)
-	result, err := c.OpenRepo(context.Background(), "", t.TempDir())
-	if err != nil {
-		t.Fatalf("OpenRepo: %v", err)
-	}
-	if result.Kind != "notARepository" {
-		t.Fatalf("result.Kind = %q, want notARepository", result.Kind)
-	}
-}
+// Client.OpenRepo/CloseRepo no longer exist (D18): repo lifecycle is gitrpc+gitsession's job now.
+// The equivalent behaviour (gitUnavailable short-circuit, ok, notARepository) is proven end to end
+// over the real socket in gitsock's integration tests.

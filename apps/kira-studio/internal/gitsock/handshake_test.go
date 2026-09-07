@@ -95,7 +95,7 @@ func TestHandshake_Row1_MalformedFrame_ClosesSilently(t *testing.T) {
 
 	done := make(chan bool, 1)
 	go func() {
-		_, ok := runHandshake(newConn(server), deps)
+		_, _, ok := runHandshake(newConn(server), deps)
 		done <- ok
 	}()
 	if err := writeFrame(client, []byte("not json")); err != nil {
@@ -113,7 +113,7 @@ func TestHandshake_Row1_EmptyClientID_ClosesSilently(t *testing.T) {
 
 	done := make(chan bool, 1)
 	go func() {
-		_, ok := runHandshake(newConn(server), deps)
+		_, _, ok := runHandshake(newConn(server), deps)
 		done <- ok
 	}()
 	clientSend(t, client, helloFrame{Kind: "hello", Protocol: gitrpc.Protocol, ContractVersion: gitrpc.ContractVersion})
@@ -129,7 +129,7 @@ func TestHandshake_Row2_ProtocolMismatch(t *testing.T) {
 
 	done := make(chan bool, 1)
 	go func() {
-		_, ok := runHandshake(newConn(server), deps)
+		_, _, ok := runHandshake(newConn(server), deps)
 		done <- ok
 	}()
 	clientSend(t, client, helloFrame{
@@ -152,7 +152,7 @@ func TestHandshake_Row3_ContractVersionMismatch(t *testing.T) {
 
 	done := make(chan bool, 1)
 	go func() {
-		_, ok := runHandshake(newConn(server), deps)
+		_, _, ok := runHandshake(newConn(server), deps)
 		done <- ok
 	}()
 	clientSend(t, client, helloFrame{
@@ -183,7 +183,7 @@ func TestHandshake_Row4_ValidToken_Ready(t *testing.T) {
 
 	done := make(chan bool, 1)
 	go func() {
-		_, ok := runHandshake(newConn(server), deps)
+		_, _, ok := runHandshake(newConn(server), deps)
 		done <- ok
 	}()
 	clientSend(t, client, helloFrame{
@@ -210,7 +210,7 @@ func TestHandshake_Row5_TokenRejected_NoRow(t *testing.T) {
 
 	done := make(chan bool, 1)
 	go func() {
-		_, ok := runHandshake(newConn(server), deps)
+		_, _, ok := runHandshake(newConn(server), deps)
 		done <- ok
 	}()
 	bogus := "not-a-real-token"
@@ -245,7 +245,7 @@ func TestHandshake_Row5_TokenRejected_RevokedRow(t *testing.T) {
 
 	done := make(chan bool, 1)
 	go func() {
-		_, ok := runHandshake(newConn(server), deps)
+		_, _, ok := runHandshake(newConn(server), deps)
 		done <- ok
 	}()
 	clientSend(t, client, helloFrame{
@@ -280,7 +280,7 @@ func TestHandshake_Row6_NoTokenInCooldown_DeniedImmediately(t *testing.T) {
 	deps := testHandshakeDeps(newFakeTrustStore(), broker, clock.Now)
 	done := make(chan bool, 1)
 	go func() {
-		_, ok := runHandshake(newConn(server), deps)
+		_, _, ok := runHandshake(newConn(server), deps)
 		done <- ok
 	}()
 	clientSend(t, client, helloFrame{
@@ -305,7 +305,7 @@ func TestHandshake_Row7_PairingApproved_Ready(t *testing.T) {
 
 	done := make(chan bool, 1)
 	go func() {
-		_, ok := runHandshake(newConn(server), deps)
+		_, _, ok := runHandshake(newConn(server), deps)
 		done <- ok
 	}()
 	clientSend(t, client, helloFrame{
@@ -346,7 +346,7 @@ func TestHandshake_Row7_PairingDenied(t *testing.T) {
 
 	done := make(chan bool, 1)
 	go func() {
-		_, ok := runHandshake(newConn(server), deps)
+		_, _, ok := runHandshake(newConn(server), deps)
 		done <- ok
 	}()
 	clientSend(t, client, helloFrame{
@@ -378,7 +378,7 @@ func TestHandshake_Row7_PairingTimeout(t *testing.T) {
 
 	done := make(chan bool, 1)
 	go func() {
-		_, ok := runHandshake(newConn(server), deps)
+		_, _, ok := runHandshake(newConn(server), deps)
 		done <- ok
 	}()
 	clientSend(t, client, helloFrame{
