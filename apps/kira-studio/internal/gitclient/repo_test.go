@@ -19,7 +19,7 @@ import (
 // cancellation, races") is exactly what this section is for.
 
 func newTestRepo() *Repo {
-	return newRepo(RepoSummary{RepoID: "test"}, &fakeRunner{}, "/usr/bin/git")
+	return NewRepo(RepoSummary{RepoID: "test"}, &fakeRunner{}, "/usr/bin/git")
 }
 
 func TestRepo_WriteSerialises(t *testing.T) {
@@ -231,7 +231,7 @@ func TestRegistry_CloseThenGet(t *testing.T) {
 	}
 }
 
-// --- identify() against a real repository --------------------------------------------------
+// --- Identify() against a real repository --------------------------------------------------
 // Skipped when no git is on PATH — this package's own binary discovery is exercised elsewhere
 // (discovery_test.go, entirely faked); this is the one place a real `git init`-produced repo
 // proves rev-parse's own output is read correctly.
@@ -279,7 +279,7 @@ func TestIdentify_OrdinaryRepoOnBranch(t *testing.T) {
 	dir := initFixtureRepo(t)
 	gitPath := requireRealGit(t)
 
-	summary, err := identify(context.Background(), NewExecRunner(), gitPath, dir)
+	summary, err := Identify(context.Background(), NewExecRunner(), gitPath, dir)
 	if err != nil {
 		t.Fatalf("identify: %v", err)
 	}
@@ -315,7 +315,7 @@ func TestIdentify_UnbornBranch(t *testing.T) {
 	dir := t.TempDir()
 	runGit(t, dir, "init", "-q", "-b", "main")
 
-	summary, err := identify(context.Background(), NewExecRunner(), gitPath, dir)
+	summary, err := Identify(context.Background(), NewExecRunner(), gitPath, dir)
 	if err != nil {
 		t.Fatalf("identify: %v", err)
 	}
@@ -330,7 +330,7 @@ func TestIdentify_DetachedHead(t *testing.T) {
 	sha := strings.TrimSpace(runGit(t, dir, "rev-parse", "HEAD"))
 	runGit(t, dir, "checkout", "-q", "--detach", sha)
 
-	summary, err := identify(context.Background(), NewExecRunner(), gitPath, dir)
+	summary, err := Identify(context.Background(), NewExecRunner(), gitPath, dir)
 	if err != nil {
 		t.Fatalf("identify: %v", err)
 	}
@@ -344,7 +344,7 @@ func TestIdentify_BareRepo(t *testing.T) {
 	dir := t.TempDir()
 	runGit(t, dir, "init", "-q", "--bare", "-b", "main")
 
-	summary, err := identify(context.Background(), NewExecRunner(), gitPath, dir)
+	summary, err := Identify(context.Background(), NewExecRunner(), gitPath, dir)
 	if err != nil {
 		t.Fatalf("identify: %v", err)
 	}
@@ -365,7 +365,7 @@ func TestIdentify_LinkedWorktree(t *testing.T) {
 	wtDir := filepath.Join(t.TempDir(), "linked")
 	runGit(t, dir, "worktree", "add", "-q", "-b", "feature", wtDir)
 
-	summary, err := identify(context.Background(), NewExecRunner(), gitPath, wtDir)
+	summary, err := Identify(context.Background(), NewExecRunner(), gitPath, wtDir)
 	if err != nil {
 		t.Fatalf("identify: %v", err)
 	}
@@ -388,7 +388,7 @@ func TestIdentify_NotARepository(t *testing.T) {
 	gitPath := requireRealGit(t)
 	dir := t.TempDir() // not initialised as a repo at all.
 
-	_, err := identify(context.Background(), NewExecRunner(), gitPath, dir)
+	_, err := Identify(context.Background(), NewExecRunner(), gitPath, dir)
 	kind, ok := KindOf(err)
 	if !ok || kind != KindNotARepository {
 		t.Fatalf("KindOf(err) = (%v, %v), want (%v, true)", kind, ok, KindNotARepository)

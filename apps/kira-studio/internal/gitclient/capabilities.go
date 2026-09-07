@@ -8,7 +8,7 @@ import (
 
 // Capabilities are per-repo facts a later phase's operations branch on — none of P1's own scope
 // reads these yet (§0.2: no operation exists here to gate), but they are cheap filesystem/config
-// facts, not a porcelain parse, so they belong beside identify() rather than invented per-phase.
+// facts, not a porcelain parse, so they belong beside Identify() rather than invented per-phase.
 type Capabilities struct {
 	// CommitGraph reports whether git's own commit-graph file exists — P2's paged `git log` can
 	// use `--no-walk` tricks aside, a present commit-graph is what makes a large repo's history

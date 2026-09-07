@@ -1,0 +1,110 @@
+package gitsession
+
+import (
+	"sync"
+
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitclient"
+)
+
+// watcher is the minimal seam RepoEntry needs from a repo watcher — gitclient.RepoWatcher
+// satisfies it structurally. Declared here (not imported as a concrete type) so registry_test.go
+// can drive refcount/linger logic against a fake with no filesystem and no real git (§3.5).
+type watcher interface {
+	Signals() <-chan gitclient.Signal
+	Close() error
+}
+
+// Event is repo.changed's payload, SPEC §6/D20's shape verbatim — crossed as-is by
+// (*rpcstream.Session).Emit's own json.Marshal.
+type Event struct {
+	RepoID string `json:"repoId"`
+	Kind   string `json:"kind"` // "refsChanged" | "worktreeChanged"
+}
+
+// RepoEntry is one repository's SHARED state — everything true of the repository rather than of
+// one viewer (SPEC §6's split rule). G2 gives it exactly what it can use: the identity, the
+// reader/writer gate (unchanged from gitclient, now shared across connections instead of within
+// one), the watcher, and the subscriber fan-out. G3-G9 add the caches, cat-file session, head,
+// stash shapes, undo slot and active remote op SPEC §6 also lists (D13) — no placeholders for any
+// of that here.
+type RepoEntry struct {
+	Summary gitclient.RepoSummary
+	Repo    *gitclient.Repo
+
+	watcher watcher
+
+	mu   sync.Mutex
+	subs map[ConnID]*subscriber
+
+	done chan struct{}
+}
+
+func newRepoEntry(summary gitclient.RepoSummary, repo *gitclient.Repo, w watcher) *RepoEntry {
+	e := &RepoEntry{
+		Summary: summary,
+		Repo:    repo,
+		watcher: w,
+		subs:    make(map[ConnID]*subscriber),
+		done:    make(chan struct{}),
+	}
+	go e.pump()
+	return e
+}
+
+// pump is the entry's watcher-draining goroutine: one signal in, fanned out to every current
+// subscriber. It exits when the watcher's Signals channel closes (teardown calls watcher.Close,
+// which is what closes it).
+func (e *RepoEntry) pump() {
+	defer close(e.done)
+	for sig := range e.watcher.Signals() {
+		e.note(sig)
+	}
+}
+
+func (e *RepoEntry) note(sig gitclient.Signal) {
+	e.mu.Lock()
+	subs := make([]*subscriber, 0, len(e.subs))
+	for _, s := range e.subs {
+		subs = append(subs, s)
+	}
+	e.mu.Unlock()
+	for _, s := range subs {
+		s.note(sig)
+	}
+}
+
+// Subscribe registers deliver for every future signal on this entry, wrapped in D14's coalescing
+// subscriber so a slow deliver can never stall another subscriber or the watcher itself. The
+// returned func unsubscribes and stops the subscriber's own goroutine; safe to call once.
+func (e *RepoEntry) Subscribe(id ConnID, deliver func(Event)) func() {
+	s := newSubscriber(e.Summary.RepoID, deliver)
+	e.mu.Lock()
+	e.subs[id] = s
+	e.mu.Unlock()
+
+	var once sync.Once
+	return func() {
+		once.Do(func() {
+			e.mu.Lock()
+			delete(e.subs, id)
+			e.mu.Unlock()
+			s.close()
+		})
+	}
+}
+
+// teardown stops the watcher, waits for pump to drain, and stops every remaining subscriber —
+// called by Registry once refcount and linger both say the entry is really done. Not idempotent on
+// its own; Registry only ever calls it once per entry (guarded by deleting it from the map first).
+func (e *RepoEntry) teardown() {
+	_ = e.watcher.Close()
+	<-e.done
+
+	e.mu.Lock()
+	subs := e.subs
+	e.subs = nil
+	e.mu.Unlock()
+	for _, s := range subs {
+		s.close()
+	}
+}

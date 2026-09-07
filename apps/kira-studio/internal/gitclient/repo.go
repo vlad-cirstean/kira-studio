@@ -58,7 +58,7 @@ type Repo struct {
 	waitCh  chan struct{}
 }
 
-func newRepo(summary RepoSummary, runner Runner, gitPath string) *Repo {
+func NewRepo(summary RepoSummary, runner Runner, gitPath string) *Repo {
 	return &Repo{
 		Summary: summary,
 		runner:  runner,
@@ -133,7 +133,7 @@ func (r *Repo) Read(ctx context.Context, fn func(ctx context.Context) error) err
 	return fn(ctx)
 }
 
-// run is repo.go's own one convenience over Runner.Run + Classify, used by identity() below and
+// run is repo.go's own one convenience over Runner.Run + Classify, used by Identify() below and
 // available to any later phase's Repo-scoped command.
 func (r *Repo) run(ctx context.Context, spec Spec) (Result, error) {
 	res, err := Run(ctx, r.runner, r.gitPath, spec)
@@ -163,7 +163,7 @@ func NewRegistry(runner Runner) *Registry {
 // read, not a second registration). gitPath is the already-discovered, floor-checked git binary
 // — callers resolve GitStatus first (D4) and never reach here below "ok".
 func (reg *Registry) Open(ctx context.Context, gitPath, path string) (*Repo, error) {
-	summary, err := identify(ctx, reg.runner, gitPath, path)
+	summary, err := Identify(ctx, reg.runner, gitPath, path)
 	if err != nil {
 		return nil, err
 	}
@@ -173,7 +173,7 @@ func (reg *Registry) Open(ctx context.Context, gitPath, path string) (*Repo, err
 	if existing, ok := reg.repos[summary.RepoID]; ok {
 		return existing, nil
 	}
-	repo := newRepo(summary, reg.runner, gitPath)
+	repo := NewRepo(summary, reg.runner, gitPath)
 	reg.repos[summary.RepoID] = repo
 	return repo, nil
 }
@@ -199,10 +199,10 @@ func (reg *Registry) Close(repoID string) bool {
 	return true
 }
 
-// identify runs the handful of `rev-parse` queries that make up a RepoSummary — line-based
+// Identify runs the handful of `rev-parse` queries that make up a RepoSummary — line-based
 // output only (§0.2: this is not a porcelain parser; every value here is a single trimmed line
 // from a query whose shape `rev-parse` fixes).
-func identify(ctx context.Context, runner Runner, gitPath, path string) (RepoSummary, error) {
+func Identify(ctx context.Context, runner Runner, gitPath, path string) (RepoSummary, error) {
 	isBare, err := revParseBool(ctx, runner, gitPath, path, "--is-bare-repository")
 	if err != nil {
 		return RepoSummary{}, err

@@ -10,7 +10,7 @@ import (
 func TestProbeCapabilities_OrdinaryRepo(t *testing.T) {
 	dir := initFixtureRepo(t)
 	gitPath := requireRealGit(t)
-	summary, err := identify(context.Background(), NewExecRunner(), gitPath, dir)
+	summary, err := Identify(context.Background(), NewExecRunner(), gitPath, dir)
 	if err != nil {
 		t.Fatalf("identify: %v", err)
 	}
@@ -35,7 +35,7 @@ func TestProbeCapabilities_CommitGraphPresent(t *testing.T) {
 	gitPath := requireRealGit(t)
 	runGit(t, dir, "commit-graph", "write", "--reachable")
 
-	summary, err := identify(context.Background(), NewExecRunner(), gitPath, dir)
+	summary, err := Identify(context.Background(), NewExecRunner(), gitPath, dir)
 	if err != nil {
 		t.Fatalf("identify: %v", err)
 	}
@@ -53,7 +53,7 @@ func TestProbeCapabilities_SparseCheckoutEnabled(t *testing.T) {
 	gitPath := requireRealGit(t)
 	runGit(t, dir, "config", "core.sparseCheckout", "true")
 
-	summary, err := identify(context.Background(), NewExecRunner(), gitPath, dir)
+	summary, err := Identify(context.Background(), NewExecRunner(), gitPath, dir)
 	if err != nil {
 		t.Fatalf("identify: %v", err)
 	}

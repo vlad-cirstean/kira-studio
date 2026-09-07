@@ -97,7 +97,7 @@ func newWatcherFixture(t *testing.T) (dir string, summary RepoSummary, w *RepoWa
 	t.Helper()
 	dir = initFixtureRepo(t)
 	gitPath := requireRealGit(t)
-	summary, err := identify(context.Background(), NewExecRunner(), gitPath, dir)
+	summary, err := Identify(context.Background(), NewExecRunner(), gitPath, dir)
 	if err != nil {
 		t.Fatalf("identify: %v", err)
 	}
