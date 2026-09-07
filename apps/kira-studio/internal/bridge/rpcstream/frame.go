@@ -1,6 +1,7 @@
 package rpcstream
 
 import (
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 
@@ -41,6 +42,41 @@ type envelope struct {
 }
 
 func boolPtr(b bool) *bool { return &b }
+
+// blobFrameDiscriminant is a blob frame body's first byte (G3 plan D4) — 0x00 can never begin a
+// JSON control frame (whose first byte is always '{'), so a peer that has never opened a stream
+// never needs to know this byte exists at all: the handshake, app.init, repo.open, repo.close and
+// repo.changed are byte-identical to what G1/G2 shipped.
+const blobFrameDiscriminant = 0x00
+
+// encodeBody marshals env as one frame's body. blob == nil produces a plain JSON body, unchanged
+// from G1/G2. blob != nil produces D4's own layout instead:
+//
+//	0x00 | uint32BE headerLen | headerJSON | blob…to the end of the frame
+//
+// Exactly one blob per frame, and it is the rest of the frame — the outer length-prefixed framing
+// (gitsock/frame.go, unchanged by this package) already bounds it, so no second length is
+// written. Where the blob belongs *inside* the JSON payload is the payload's own business, not
+// this function's: rpcstream never inspects env's contents at all, and a caller (gitrpc) marks
+// the position with its own marker (commitsBlob's `{"$blob":true}`) that only socketChannel.ts's
+// reader needs to recognise.
+func encodeBody(env envelope, blob []byte) ([]byte, error) {
+	headerJSON, err := json.Marshal(env)
+	if err != nil {
+		return nil, err
+	}
+	if blob == nil {
+		return headerJSON, nil
+	}
+	out := make([]byte, 0, 1+4+len(headerJSON)+len(blob))
+	out = append(out, blobFrameDiscriminant)
+	var lenBuf [4]byte
+	binary.BigEndian.PutUint32(lenBuf[:], uint32(len(headerJSON)))
+	out = append(out, lenBuf[:]...)
+	out = append(out, headerJSON...)
+	out = append(out, blob...)
+	return out, nil
+}
 
 // wireErrorFrom maps a Go error into the wire shape — *ipcerr.Error (what every bound service in
 // this repo already returns on failure) carries its Code/Message straight across; anything else

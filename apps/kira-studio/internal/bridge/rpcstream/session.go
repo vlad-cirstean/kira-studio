@@ -13,6 +13,8 @@ import (
 	"context"
 	"encoding/json"
 	"sync"
+
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/ipcerr"
 )
 
 // Conn is the whole of what this protocol needs from one renderer connection. Declared here rather
@@ -30,7 +32,17 @@ type Conn interface {
 type Handlers struct {
 	ContractVersion int
 	Request         func(ctx context.Context, method string, params json.RawMessage) (any, error)
-	Stream          func(ctx context.Context, method string, params json.RawMessage) error
+	// Stream serves one `open`ed stream, calling emit for each chunk it produces. emit acquires a
+	// credit before it does anything else (the transcription of rpc.ts's own emit — the credit
+	// gate's first real caller, G1 §11/G3 D5), encodes payload as the chunk's own JSON body, and
+	// queues it with blob (nil for a JSON-only chunk) as D4's own out-of-band bytes. An oversize
+	// encoded body is refused with an error rather than silently dropped (F21/D5) — the caller
+	// should let that error end the stream with a real `end` frame, not swallow it.
+	Stream func(ctx context.Context, method string, params json.RawMessage, emit func(payload any, blob []byte) error) error
+	// MaxFrameBytes caps how large one encoded frame body (JSON header plus blob) may be before
+	// emit refuses it — set by gitsock from its own frame cap. Zero means unbounded, which is what
+	// session_test.go's existing fixtures get.
+	MaxFrameBytes int
 }
 
 // Session is one connection's whole server-side state: the one writer goroutine every frame goes
@@ -82,7 +94,7 @@ func (s *Session) writeLoop() {
 }
 
 func (s *Session) send(f frame) {
-	b, err := json.Marshal(envelope{Version: s.h.ContractVersion, Body: f})
+	b, err := encodeBody(envelope{Version: s.h.ContractVersion, Body: f}, nil)
 	if err != nil {
 		return // every frame value this package ever constructs is JSON-safe by construction.
 	}
@@ -90,6 +102,24 @@ func (s *Session) send(f frame) {
 	case s.sendCh <- b:
 	case <-s.done:
 	}
+}
+
+// sendChunk encodes f with blob as D4's own out-of-band-blob body (or a plain JSON one, when blob
+// is nil) and queues it — refusing (rather than silently truncating, F21) a body that would
+// exceed h.MaxFrameBytes.
+func (s *Session) sendChunk(f frame, blob []byte) error {
+	b, err := encodeBody(envelope{Version: s.h.ContractVersion, Body: f}, blob)
+	if err != nil {
+		return err
+	}
+	if s.h.MaxFrameBytes > 0 && len(b) > s.h.MaxFrameBytes {
+		return ipcerr.New("E_FRAME_TOO_LARGE", "rpcstream: encoded chunk exceeds the frame size cap")
+	}
+	select {
+	case s.sendCh <- b:
+	case <-s.done:
+	}
+	return nil
 }
 
 // Emit sends an 'evt' frame — the Go half of rpc.ts's RpcServer.emit. Its production caller is
@@ -141,15 +171,29 @@ func (s *Session) handleRequest(id int, method string, params json.RawMessage) {
 	s.send(frame{T: "res", ID: id, OK: boolPtr(true), Result: resultBytes})
 }
 
-func (s *Session) handleOpen(id int, method string, params json.RawMessage) {
-	ctx, cancel := context.WithCancel(context.Background())
-	gate := newCreditGate()
-	s.mu.Lock()
-	s.activeWork[id] = cancel
-	s.creditGates[id] = gate
-	s.mu.Unlock()
+// handleOpen runs one stream's handler. ctx/gate are registered by handleRaw synchronously,
+// before this is ever dispatched onto its own goroutine — a client that sends 'credit'
+// immediately after 'open' (every real client does, rpc.ts's own stream() posts both back to
+// back) must always find the gate already there; registering it from inside this goroutine would
+// race the very next frame handleRaw's own receive loop processes.
+func (s *Session) handleOpen(ctx context.Context, cancel context.CancelFunc, gate *creditGate, id int, method string, params json.RawMessage) {
+	seq := 0
+	emit := func(payload any, blob []byte) error {
+		if err := gate.acquire(ctx); err != nil {
+			return err
+		}
+		payloadJSON, err := json.Marshal(payload)
+		if err != nil {
+			return err
+		}
+		if err := s.sendChunk(frame{T: "chunk", ID: id, Seq: seq, Chunk: payloadJSON}, blob); err != nil {
+			return err
+		}
+		seq++
+		return nil
+	}
 
-	streamErr := s.h.Stream(ctx, method, params)
+	streamErr := s.h.Stream(ctx, method, params, emit)
 
 	cancel()
 	s.mu.Lock()
@@ -203,7 +247,13 @@ func (s *Session) handleRaw(raw []byte) {
 	case "req":
 		go s.handleRequest(env.Body.ID, env.Body.Method, env.Body.Params)
 	case "open":
-		go s.handleOpen(env.Body.ID, env.Body.Method, env.Body.Params)
+		ctx, cancel := context.WithCancel(context.Background())
+		gate := newCreditGate()
+		s.mu.Lock()
+		s.activeWork[env.Body.ID] = cancel
+		s.creditGates[env.Body.ID] = gate
+		s.mu.Unlock()
+		go s.handleOpen(ctx, cancel, gate, env.Body.ID, env.Body.Method, env.Body.Params)
 	case "credit":
 		s.handleCredit(env.Body.ID, env.Body.N)
 	case "cancel":
