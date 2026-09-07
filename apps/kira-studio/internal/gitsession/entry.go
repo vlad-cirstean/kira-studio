@@ -2,12 +2,20 @@ package gitsession
 
 import (
 	"context"
+	"errors"
 	"sync"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitclient"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitclient/catfile"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitpreflight"
 )
+
+// ErrRepoTornDown is returned by whatever still reaches a RepoEntry after its own teardown() ran
+// (F2/F3) — Registry.Close() tears entries down regardless of refcount (D14), so a request still
+// in flight at process shutdown can observe this instead of a nil-map panic or a double-close.
+// gitrpc's default mapGitError arm maps it to E_INTERNAL like any other unrecognised error; the
+// response is delivered nowhere anyway, since the socket is already closing.
+var ErrRepoTornDown = errors.New("gitsession: repository entry has been torn down")
 
 // Watcher is the minimal seam RepoEntry needs from a repo watcher — gitclient.RepoWatcher
 // satisfies it structurally. Declared here (not imported as a concrete type) and exported so both
@@ -38,8 +46,11 @@ type RepoEntry struct {
 
 	watcher Watcher
 
-	mu   sync.Mutex
-	subs map[ConnID]*subscriber
+	mu       sync.Mutex
+	subs     map[ConnID]*subscriber
+	tornDown bool // set once, under mu, by teardown() (D4) — makes Subscribe/CatFile/teardown itself
+	// safe against a concurrent subscribe or a second teardown call (F2/F3), guarded by the SAME
+	// mu that already serialises subs.
 
 	catfileMu sync.Mutex
 	catfile   *catfile.Session
@@ -135,10 +146,17 @@ func (e *RepoEntry) note(sig gitclient.Signal) {
 
 // Subscribe registers deliver for every future signal on this entry, wrapped in D14's coalescing
 // subscriber so a slow deliver can never stall another subscriber or the watcher itself. The
-// returned func unsubscribes and stops the subscriber's own goroutine; safe to call once.
+// returned func unsubscribes and stops the subscriber's own goroutine; safe to call once. Returns
+// a no-op unsubscribe, constructing no subscriber, when this entry has already been torn down
+// (F2a: teardown may run concurrently with Open racing Registry.Close during app quit) — the
+// caller (Conn.Open) then holds a ref on a dead entry for a moment and releases it normally.
 func (e *RepoEntry) Subscribe(id ConnID, deliver func(Event)) func() {
-	s := newSubscriber(e.Summary.RepoID, deliver)
 	e.mu.Lock()
+	if e.tornDown {
+		e.mu.Unlock()
+		return func() {}
+	}
+	s := newSubscriber(e.Summary.RepoID, deliver)
 	e.subs[id] = s
 	e.mu.Unlock()
 
@@ -146,9 +164,17 @@ func (e *RepoEntry) Subscribe(id ConnID, deliver func(Event)) func() {
 	return func() {
 		once.Do(func() {
 			e.mu.Lock()
-			delete(e.subs, id)
+			_, present := e.subs[id]
+			if present {
+				delete(e.subs, id)
+			}
 			e.mu.Unlock()
-			s.close()
+			// Close only the subscriber this call actually removed from the map — teardown (F2b)
+			// may have already deleted it and closed it itself, and closing an already-closed
+			// subscriber's channel a second time is the double-close this guard exists to avoid.
+			if present {
+				s.close()
+			}
 		})
 	}
 }
@@ -195,7 +221,17 @@ func (e *RepoEntry) setHead(h gitclient.HeadState) {
 // commit.fileDiff/blob reads); it exists now so RepoEntry's own teardown has somewhere real to
 // tear down, per SPEC §6 putting the cat-file session in the shared (per-repo, not per-connection)
 // box.
+// CatFile returns nil once this entry has been torn down (F3) — a lazy, unguarded construction
+// here is exactly what let auto-fetch (and any other reader racing teardown) start a fresh
+// `cat-file --batch` pair nothing would ever close. Callers treat nil as ErrRepoTornDown.
 func (e *RepoEntry) CatFile() *catfile.Session {
+	e.mu.Lock()
+	tornDown := e.tornDown
+	e.mu.Unlock()
+	if tornDown {
+		return nil
+	}
+
 	e.catfileMu.Lock()
 	defer e.catfileMu.Unlock()
 	if e.catfile == nil {
@@ -210,21 +246,44 @@ func (e *RepoEntry) CatFile() *catfile.Session {
 	return e.catfile
 }
 
+// closeCatFile closes and forgets the memoised cat-file session, if one exists — called by
+// teardown, and by Registry.release at refcount zero (D13a): the pair is pure cost during the
+// linger window (two OS processes for a session nobody is using) and restarts lazily on the next
+// use, exactly as it already does on first use.
+func (e *RepoEntry) closeCatFile() {
+	e.catfileMu.Lock()
+	defer e.catfileMu.Unlock()
+	if e.catfile != nil {
+		e.catfile.Close()
+		e.catfile = nil
+	}
+}
+
 // teardown stops the watcher, waits for pump to drain, stops every remaining subscriber, and
 // closes the cat-file session if one was ever started — called by Registry once refcount and
-// linger both say the entry is really done. Not idempotent on its own; Registry only ever calls it
-// once per entry (guarded by deleting it from the map first).
+// linger both say the entry is really done, or unconditionally by Registry.Close() at shutdown
+// (D14) regardless of refcount. Idempotent (D4): Registry.Close no longer needs to be the only
+// caller, since a concurrent Subscribe/CatFile now sees tornDown rather than racing the map/session
+// this function clears.
 func (e *RepoEntry) teardown() {
+	e.mu.Lock()
+	if e.tornDown {
+		e.mu.Unlock()
+		return
+	}
+	e.tornDown = true
+	subs := e.subs
+	e.subs = make(map[ConnID]*subscriber) // never nil (F2a) — a Subscribe losing this race must
+	// find a real, writable-looking map rather than panic; it is refused by the tornDown check
+	// above before it would ever write into it.
+	e.mu.Unlock()
+
 	e.stopAutoFetch()
 	e.remoteOp.forceCancel()
 	_ = e.watcher.Close()
 	<-e.done
 
-	e.catfileMu.Lock()
-	if e.catfile != nil {
-		e.catfile.Close()
-	}
-	e.catfileMu.Unlock()
+	e.closeCatFile()
 
 	e.detail.dropAll()
 	e.diff.clear()
@@ -232,10 +291,6 @@ func (e *RepoEntry) teardown() {
 	e.rangeCount.drop()
 	e.undo.Set(nil)
 
-	e.mu.Lock()
-	subs := e.subs
-	e.subs = nil
-	e.mu.Unlock()
 	for _, s := range subs {
 		s.close()
 	}

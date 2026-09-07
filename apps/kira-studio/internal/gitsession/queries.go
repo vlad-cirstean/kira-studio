@@ -350,7 +350,11 @@ func (e *RepoEntry) resolveParsedBody(parsed porcelain.ParsedBody) (porcelain.Fi
 // error, for a missing object: the all-zero oid a new or deleted binary file's pre/post image
 // carries is exactly this case, and the wire's own oldBytes/newBytes are `undefined` for it.
 func (e *RepoEntry) blobSizeOrNil(oid string) (*int64, error) {
-	info, err := e.CatFile().Check(oid)
+	session := e.CatFile()
+	if session == nil {
+		return nil, ErrRepoTornDown
+	}
+	info, err := session.Check(oid)
 	if err != nil {
 		if errors.Is(err, catfile.ErrMissing) {
 			return nil, nil
@@ -388,13 +392,17 @@ func looksBinary(content []byte) bool {
 // read-only text document (D3's own doc comment).
 func (e *RepoEntry) Blob(ctx context.Context, rev, path string) (BlobResult, error) {
 	full := rev + ":" + path
+	session := e.CatFile()
+	if session == nil {
+		return BlobResult{}, ErrRepoTornDown
+	}
 	var info catfile.ObjectInfo
 	var content []byte
 	var err error
 	if strings.ContainsRune(path, '\n') {
-		info, content, err = e.CatFile().ReadOneShot(ctx, full)
+		info, content, err = session.ReadOneShot(ctx, full)
 	} else {
-		info, content, err = e.CatFile().Read(full)
+		info, content, err = session.Read(full)
 	}
 	if err != nil {
 		if errors.Is(err, catfile.ErrMissing) {

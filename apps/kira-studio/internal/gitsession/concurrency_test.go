@@ -104,3 +104,71 @@ func TestConcurrent_OpenRacingCloseNeverLeaksAHold(t *testing.T) {
 		t.Fatalf("leaked holds/refs in %d Open/Close races: %d (want 0) — F1", n, leaks)
 	}
 }
+
+// TestConcurrent_SubscribeRacingTeardown is F2(a)'s own probe: 200 iterations of a real Subscribe
+// racing a real Registry.Close (which tears entries down regardless of refcount, D14) — reachable
+// whenever a repo.open/repo.close is still in flight when the app quits. On the pre-fix tree this
+// panics with "assignment to entry in nil map" the moment Subscribe's own critical section runs
+// after teardown has already nilled e.subs.
+func TestConcurrent_SubscribeRacingTeardown(t *testing.T) {
+	const n = 200
+	for i := 0; i < n; i++ {
+		reg := newTestRegistry()
+		entry, _, err := reg.Acquire(context.Background(), "/usr/bin/git", "/repo")
+		if err != nil {
+			t.Fatalf("Acquire: %v", err)
+		}
+
+		var wg sync.WaitGroup
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+			unsub := entry.Subscribe(ConnID("c"), func(Event) {})
+			unsub()
+		}()
+		go func() {
+			defer wg.Done()
+			reg.Close()
+		}()
+		wg.Wait()
+	}
+}
+
+// TestConcurrent_UnsubscribeAfterTeardown is F2(b)'s own probe: a Subscribe that completes BEFORE
+// teardown, whose unsubscribe is then called AFTER teardown already closed every subscriber it
+// found. On the pre-fix tree this panics with "close of closed channel" — teardown's own close and
+// this unsubscribe's close both fire on the same subscriber.
+func TestConcurrent_UnsubscribeAfterTeardown(t *testing.T) {
+	const n = 200
+	for i := 0; i < n; i++ {
+		reg := newTestRegistry()
+		entry, _, err := reg.Acquire(context.Background(), "/usr/bin/git", "/repo")
+		if err != nil {
+			t.Fatalf("Acquire: %v", err)
+		}
+		unsub := entry.Subscribe(ConnID("c"), func(Event) {})
+		reg.Close() // tears the entry down immediately, closing the subscriber above itself.
+		unsub()     // must be a safe no-op, not a double close.
+	}
+}
+
+// TestConcurrent_CatFileAfterTeardownIsRefused is F3's own probe: CatFile() after teardown must
+// return nil (never a live, unmemoised session nothing will ever close) so its callers can refuse
+// with ErrRepoTornDown instead of leaking a `cat-file --batch` pair. On the pre-fix tree this
+// returns a fresh, live session every time.
+func TestConcurrent_CatFileAfterTeardownIsRefused(t *testing.T) {
+	reg := newTestRegistry()
+	entry, _, err := reg.Acquire(context.Background(), "/usr/bin/git", "/repo")
+	if err != nil {
+		t.Fatalf("Acquire: %v", err)
+	}
+	reg.Close()
+
+	if s := entry.CatFile(); s != nil {
+		t.Fatal("CatFile() after teardown returned a live session, want nil (F3)")
+	}
+	// A second call must not construct anything either.
+	if s := entry.CatFile(); s != nil {
+		t.Fatal("a second CatFile() after teardown returned a live session, want nil")
+	}
+}

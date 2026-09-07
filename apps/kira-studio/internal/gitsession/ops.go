@@ -403,7 +403,11 @@ func (e *RepoEntry) UndoRun(ctx context.Context, id string) (OpResult, error) {
 		return e.undoRunFailure(ctx, "NotFound", "This undo is no longer available.")
 	}
 
-	if _, err := e.CatFile().Check(record.RecoverySha + "^{commit}"); err != nil {
+	session := e.CatFile()
+	if session == nil {
+		return OpResult{}, ErrRepoTornDown
+	}
+	if _, err := session.Check(record.RecoverySha + "^{commit}"); err != nil {
 		if errors.Is(err, catfile.ErrMissing) {
 			short := record.RecoverySha
 			if len(short) > 7 {
