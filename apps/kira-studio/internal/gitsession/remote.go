@@ -530,6 +530,10 @@ func (e *RepoEntry) runPullOp(roCtx, spawnCtx context.Context, conn *Conn, deps 
 	writeErr := e.Repo.Write(roCtx, func(wctx context.Context) error {
 		res, rerr := gitclient.Run(wctx, e.Repo.Runner(), e.Repo.GitPath(), gitclient.Spec{
 			Dir: repoWorkingDir(e.Summary), Args: integrateArgv, ReadOnly: false,
+			// G8 D6 (F6): this is a local write (merge/rebase), not the fetch above — a signing
+			// passphrase prompt or a merge driver here would otherwise hang Repo.Write, blocking
+			// every read in every window sharing this repository (G7 F8).
+			Setsid: true,
 		})
 		if rerr != nil {
 			return rerr

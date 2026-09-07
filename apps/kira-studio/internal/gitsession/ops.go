@@ -291,6 +291,11 @@ func (e *RepoEntry) runWriteArgv(ctx context.Context, argv []string) (*OpError, 
 	err := e.Repo.Write(ctx, func(ctx context.Context) error {
 		res, rerr := gitclient.Run(ctx, e.Repo.Runner(), e.Repo.GitPath(), gitclient.Spec{
 			Dir: repoWorkingDir(e.Summary), Args: argv, ReadOnly: false,
+			// G8 D6: a write can invoke an interactive helper (a gpg pinentry for commit.gpgsign, a
+			// custom merge driver writing to a tty) just as a remote op can — GIT_TERMINAL_PROMPT=0
+			// governs git's own prompts, not theirs, so Setsid keeps this spawn off any controlling
+			// terminal exactly as G7 D6 already does for remote ops.
+			Setsid: true,
 		})
 		if ctx.Err() != nil || rerr != nil {
 			return gitclient.Classify(ctx, argv, res, rerr)

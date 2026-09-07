@@ -48,12 +48,17 @@ type Spec struct {
 	// called after Wait returns. A panic in it would take the drain goroutine down, so gitops' own
 	// progress pump is written not to panic; nothing else is defended here.
 	OnStderr func([]byte)
-	// Setsid opts one spawn into a new session (G7 D6, narrowed to remote ops only per the
-	// orchestrator's own scoping call): the child loses any controlling terminal, which closes the
-	// one remaining no-hang gap `GIT_TERMINAL_PROMPT=0` does not (ssh reads a passphrase straight
-	// from /dev/tty when one exists, consulting SSH_ASKPASS only when it does not). False (the
-	// default) keeps every already-shipped spawn on Setpgid exactly as before — this field is set
-	// only by gitsession's remote-op executor and gitsession's auto-fetch tick, never by G2-G6 code.
+	// Setsid opts one spawn into a new session: the child loses any controlling terminal, which
+	// closes the one remaining no-hang gap `GIT_TERMINAL_PROMPT=0` does not — ssh reads a
+	// passphrase straight from /dev/tty when one exists (consulting SSH_ASKPASS only when it does
+	// not), and so does gpg's pinentry for a commit-signing passphrase, or a custom merge driver
+	// writing to a tty. G7 D6 opted in every remote-op spawn; G8 D6 extends this to every LOCAL
+	// WRITE spawn too (op.run's ten kinds, undo.run's replays, pull's integrate phase) — a write can
+	// invoke exactly the same interactive helpers a remote op can, and a hang there blocks
+	// Repo.Write, which blocks every read in every window sharing the repository (G7 F8), the worst
+	// blocking outcome in the whole concurrency model. Every READ spawn (log, diff, status,
+	// cat-file, rev-parse, for-each-ref) stays on Setpgid — a read cannot trigger an interactive
+	// prompt, so it is safe by construction and untouched since G2.
 	Setsid bool
 }
 
@@ -223,10 +228,10 @@ func (execRunner) Start(ctx context.Context, gitPath string, spec Spec) (Process
 	cmd.Dir = spec.Dir
 	cmd.Env = buildEnv(os.Environ(), spec.Env)
 	// D3: every git child gets its own process group, so a group signal reaches whatever it
-	// forked (git fetch/push spawn ssh, git-remote-https, credential helpers). G7 D6 (narrowed to
-	// remote-op spawns only, per the orchestrator's own scoping call): Setsid additionally detaches
-	// the child from any controlling terminal — pgid == pid either way, so killGroup(-pid, …) is
-	// unaffected by which one a spawn asked for.
+	// forked (git fetch/push spawn ssh, git-remote-https, credential helpers). Setsid (G7 D6 for
+	// remote ops, G8 D6 for local writes too) additionally detaches the child from any controlling
+	// terminal — pgid == pid either way, so killGroup(-pid, …) is unaffected by which one a spawn
+	// asked for.
 	if spec.Setsid {
 		cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
 	} else {
