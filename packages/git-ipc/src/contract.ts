@@ -912,7 +912,16 @@ export type Contract = {
      * list the first call returned.
      */
     'review.resolveBase': {
-      params: { repoId: string; branch: string; base?: string };
+      params: {
+        repoId: string;
+        branch: string;
+        base?: string;
+        /** G6: `kiraVersion.review.baseCandidates`, injected by the extension from the window's
+         *  own coerced settings snapshot — SPEC's "can travel with the request and differ per
+         *  window harmlessly". Absent for a raw socket client, which gets the server's own
+         *  `["main", "master"]` default. */
+        baseCandidates?: readonly string[];
+      };
       result: BaseResolution;
     };
     /**

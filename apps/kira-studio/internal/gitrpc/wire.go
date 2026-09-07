@@ -42,8 +42,9 @@ type RepoOpenResult struct {
 // graph.* (D14) — @kira/git-ipc's own CommitRange/graph.* request and stream shapes.
 // ---------------------------------------------------------------------------------------
 
-// CommitRangeParams is CommitRange's wire shape — carried only so a `range` request can be
-// recognised and refused (D14: a ranged walk is G6's, not half-served here).
+// CommitRangeParams is CommitRange's wire shape — @kira/git-ipc's own CommitRange, the
+// <base>..<branch> a graph.* call's `range` selects (G6 D2: the SAME WalkSpec.Range every scoped
+// walk already carries, not a second shape).
 type CommitRangeParams struct {
 	Base   string `json:"base"`
 	Branch string `json:"branch"`
@@ -207,4 +208,22 @@ type UndoPeekResult struct {
 type UndoRunParams struct {
 	RepoID string `json:"repoId"`
 	ID     string `json:"id"`
+}
+
+// ---------------------------------------------------------------------------------------
+// P7 (G6) — branch review (D1, D18). review.resolveBase's own result is gitreview.BaseResolution
+// (D5's own precedent applied again — no second, gitrpc-owned copy of a shape gitreview already
+// produces JSON-tagged). CONTRACT_VERSION moves 14 -> 15 for this phase: review.resolveBase gains
+// one optional param.
+// ---------------------------------------------------------------------------------------
+
+// ReviewResolveBaseParams is review.resolveBase's own request.
+type ReviewResolveBaseParams struct {
+	RepoID string  `json:"repoId"`
+	Branch string  `json:"branch"`
+	Base   *string `json:"base,omitempty"`
+	// BaseCandidates (D1): optional, injected by the extension from kiraVersion.review.
+	// baseCandidates. Absent for every raw socket client — the server defaults it
+	// (gitreview.DefaultBaseCandidates).
+	BaseCandidates []string `json:"baseCandidates,omitempty"`
 }

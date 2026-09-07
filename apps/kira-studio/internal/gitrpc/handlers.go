@@ -80,6 +80,8 @@ func (r *Router) ForConn(c *gitsession.Conn) Handlers {
 				return r.handleUndoPeek(ctx, c, params)
 			case "undo.run":
 				return r.handleUndoRun(ctx, c, params)
+			case "review.resolveBase":
+				return r.handleReviewResolveBase(ctx, c, params)
 			default:
 				return nil, ipcerr.New("E_UNKNOWN_METHOD", "gitrpc: unknown method "+method)
 			}

@@ -16,13 +16,6 @@ import (
 // wire chunk carries.
 const ChunkRows = 500
 
-// rangeRefusal is D14's own honest answer for the three graph.* methods that accept a `range`:
-// the ranged/review walk is G6's, not half-served here — the same posture G1 D12 took for a
-// single default arm.
-func rangeRefusal(method string) error {
-	return ipcerr.BadRequest("gitrpc: " + method + ": ranged walks are not served by this build")
-}
-
 // walkSpecFrom resolves D6's optional scope/pageSize into a porcelain.WalkSpec and a concrete
 // page size — "all" and logsession.DefaultPageSize are the server's own defaults, reached by
 // every raw socket client (no settings snapshot to inject from).
@@ -30,11 +23,30 @@ func walkSpecFrom(scope string, pageSize *int) (porcelain.WalkSpec, int) {
 	if scope == "" {
 		scope = "all"
 	}
-	size := logsession.DefaultPageSize
+	return porcelain.WalkSpec{Scope: scope}, pageSizeFrom(pageSize)
+}
+
+func pageSizeFrom(pageSize *int) int {
 	if pageSize != nil && *pageSize > 0 {
-		size = *pageSize
+		return *pageSize
 	}
-	return porcelain.WalkSpec{Scope: scope}, size
+	return logsession.DefaultPageSize
+}
+
+// rangedWalkSpecFrom validates rng's base/branch (D8/F6: `merge-base` takes its revisions as
+// separate argv tokens, so a leading "-" is refused rather than trusted to git's own argument
+// parser) and returns the ranged WalkSpec (D2). Scope is left empty and IncludeStash false,
+// deliberately: RevSetArgs never reads Scope for a ranged walk and matchesSpec compares it, so
+// filling it from the extension's injected graph.scope would churn a review walk that ignores
+// scope entirely; a stash is not one of a branch's own commits either.
+func rangedWalkSpecFrom(rng *CommitRangeParams) (porcelain.WalkSpec, error) {
+	if err := validRefArg("range.base", rng.Base); err != nil {
+		return porcelain.WalkSpec{}, err
+	}
+	if err := validRefArg("range.branch", rng.Branch); err != nil {
+		return porcelain.WalkSpec{}, err
+	}
+	return porcelain.WalkSpec{Range: &porcelain.RangeSpec{Base: rng.Base, Branch: rng.Branch}}, nil
 }
 
 // mapConnError turns gitsession's own closed error vocabulary into an ipcerr — today just
@@ -55,13 +67,27 @@ func (r *Router) handleGraphStatus(ctx context.Context, c *gitsession.Conn, para
 	if p.RepoID == "" {
 		return nil, ipcerr.BadRequest("gitrpc: graph.status: repoId is required")
 	}
+
+	// D10: `range` present -> the review walk's own counters, never the graph's.
 	if p.Range != nil {
-		return nil, rangeRefusal("graph.status")
+		if _, err := rangedWalkSpecFrom(p.Range); err != nil {
+			return nil, err
+		}
+		w, ok := c.ReviewWalkFor(p.RepoID)
+		if !ok {
+			// The same zero-value answer G3 D14 gives for an unopened graph walk.
+			return GraphStatusResult{}, nil
+		}
+		loaded, remaining, exhausted, err := w.Status(ctx)
+		if err != nil {
+			return nil, mapGitError(err)
+		}
+		return GraphStatusResult{Loaded: loaded, Remaining: remaining, Exhausted: exhausted}, nil
 	}
 
 	w, ok := c.WalkFor(p.RepoID)
 	if !ok {
-		// upstream's own answer for an unopened range/walk (repoService.ts:1005-1017).
+		// upstream's own answer for an unopened walk (repoService.ts:1005-1017).
 		return GraphStatusResult{}, nil
 	}
 	loaded, remaining, exhausted, err := w.Status(ctx)
@@ -79,16 +105,18 @@ func (r *Router) handleGraphLoadMore(ctx context.Context, c *gitsession.Conn, pa
 	if p.RepoID == "" {
 		return nil, ipcerr.BadRequest("gitrpc: graph.loadMore: repoId is required")
 	}
-	if p.Range != nil {
-		return nil, rangeRefusal("graph.loadMore")
-	}
 
-	spec, pageSize := walkSpecFrom(p.Scope, p.PageSize)
 	status := r.deps.Discovery.Status(ctx, "")
 	if status.Kind != "ok" {
 		return nil, ipcerr.New("E_GIT_UNAVAILABLE", "gitrpc: git is unavailable: "+status.Kind)
 	}
-	w, err := c.Walk(p.RepoID, status.Path, spec, pageSize, nil)
+
+	// D10: `range` present -> pages the review walk, never the graph's.
+	spec, pageSize, precomputedTotal, err := resolveWalkRequest(c, p.RepoID, p.Range, p.Scope, p.PageSize)
+	if err != nil {
+		return nil, err
+	}
+	w, err := c.Walk(p.RepoID, status.Path, spec, pageSize, precomputedTotal)
 	if err != nil {
 		return nil, mapConnError(err)
 	}
@@ -113,6 +141,7 @@ func (r *Router) handleGraphRefresh(_ context.Context, c *gitsession.Conn, param
 		return nil, ipcerr.BadRequest("gitrpc: graph.refresh: repoId is required")
 	}
 
+	// graph.refresh has no `range` — the review view has no refresh affordance (D10).
 	w, ok := c.WalkFor(p.RepoID)
 	if !ok {
 		return GraphRefreshResult{Restarted: false}, nil
@@ -121,9 +150,32 @@ func (r *Router) handleGraphRefresh(_ context.Context, c *gitsession.Conn, param
 	return GraphRefreshResult{Restarted: true}, nil
 }
 
+// resolveWalkRequest is graph.loadMore/graph.stream's shared range-vs-scope resolution: with a
+// `range`, it validates the two ref fields (D8) and peeks the per-repo range-count slot (D9, a
+// non-blocking best-effort optimisation — a miss passes nil and logsession runs its own count);
+// without one, it resolves D6's scope/pageSize as before.
+func resolveWalkRequest(c *gitsession.Conn, repoID string, rng *CommitRangeParams, scope string, pageSize *int) (porcelain.WalkSpec, int, *int, error) {
+	if rng == nil {
+		spec, size := walkSpecFrom(scope, pageSize)
+		return spec, size, nil, nil
+	}
+	spec, err := rangedWalkSpecFrom(rng)
+	if err != nil {
+		return porcelain.WalkSpec{}, 0, nil, err
+	}
+	var precomputedTotal *int
+	if entry, ok := c.Entry(repoID); ok {
+		precomputedTotal = entry.TakeRangeCount(rng.Base, rng.Branch)
+	}
+	return spec, pageSizeFrom(pageSize), precomputedTotal, nil
+}
+
 // handleGraphStream serves graph.stream: upstream's streamGraph, via gitsession.Walk.Stream
 // (D14) — every emitted StreamChunk is packed to a FlatBuffer (gitstore.EncodeChunkFrame) and
-// handed to rpcstream's emit as the chunk envelope's out-of-band blob (D4/D5).
+// handed to rpcstream's emit as the chunk envelope's out-of-band blob (D4/D5). `range` present
+// (D10) streams the review walk instead of the graph's; resumeThroughRow is never read on the
+// ranged path (D11) — a ranged walk has no persisted cache to resume from, only whatever this
+// walk's own store already holds, which Stream replays regardless.
 func (r *Router) handleGraphStream(ctx context.Context, c *gitsession.Conn, params json.RawMessage, emit func(payload any, blob []byte) error) error {
 	var p GraphStreamParams
 	if err := json.Unmarshal(params, &p); err != nil {
@@ -132,21 +184,25 @@ func (r *Router) handleGraphStream(ctx context.Context, c *gitsession.Conn, para
 	if p.RepoID == "" {
 		return ipcerr.BadRequest("gitrpc: graph.stream: repoId is required")
 	}
-	if p.Range != nil {
-		return rangeRefusal("graph.stream")
-	}
 
-	spec, pageSize := walkSpecFrom(p.Scope, p.PageSize)
+	spec, pageSize, precomputedTotal, err := resolveWalkRequest(c, p.RepoID, p.Range, p.Scope, p.PageSize)
+	if err != nil {
+		return err
+	}
 	status := r.deps.Discovery.Status(ctx, "")
 	if status.Kind != "ok" {
 		return ipcerr.New("E_GIT_UNAVAILABLE", "gitrpc: git is unavailable: "+status.Kind)
 	}
-	w, err := c.Walk(p.RepoID, status.Path, spec, pageSize, nil)
+	w, err := c.Walk(p.RepoID, status.Path, spec, pageSize, precomputedTotal)
 	if err != nil {
 		return mapConnError(err)
 	}
 
-	return w.Stream(ctx, p.ResumeThroughRow, ChunkRows, func(chunk gitsession.StreamChunk) error {
+	resumeThroughRow := p.ResumeThroughRow
+	if p.Range != nil {
+		resumeThroughRow = nil
+	}
+	return w.Stream(ctx, resumeThroughRow, ChunkRows, func(chunk gitsession.StreamChunk) error {
 		blob := gitstore.EncodeChunkFrame(chunk.Packed)
 		payload := graphChunk{
 			RepoID: p.RepoID, Seq: chunk.Seq, From: chunk.From, To: chunk.To,

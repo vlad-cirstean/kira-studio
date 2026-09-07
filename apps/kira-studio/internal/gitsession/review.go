@@ -47,11 +47,17 @@ func (s *reviewRangeCountSlot) drop() {
 	s.valid = false
 }
 
-func (e *RepoEntry) rememberRangeCount(base, branch string, n int) {
+// RememberRangeCount records n as the range-count slot's own value for base..branch (D9) — written
+// on a "ready" outcome.
+func (e *RepoEntry) RememberRangeCount(base, branch string, n int) {
 	e.rangeCount.remember(base, branch, n)
 }
 
-func (e *RepoEntry) takeRangeCount(base, branch string) *int {
+// TakeRangeCount is a non-blocking peek at the range-count slot (D9) — nil on a miss (an empty
+// slot, or one for a different range), which the caller (gitrpc's ranged graph.* handlers) treats
+// as a correct fallback, never an error: logsession runs its own rev-list --count when this
+// misses.
+func (e *RepoEntry) TakeRangeCount(base, branch string) *int {
 	return e.rangeCount.take(base, branch)
 }
 
@@ -200,7 +206,7 @@ func (e *RepoEntry) ResolveReviewBase(ctx context.Context, branch string, base *
 		}, nil
 	}
 
-	e.rememberRangeCount(*resolvedBase, branch, count)
+	e.RememberRangeCount(*resolvedBase, branch, count)
 	n := count
 	return gitreview.BaseResolution{
 		Branch: branch, Base: resolvedBase, Reason: reason,
