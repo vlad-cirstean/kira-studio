@@ -37,7 +37,7 @@ further along than `feature-v1-3`'s own docs assumed.** Its `docs/SPEC.md` §10 
 | P11 Search | Done | G10 |
 | P15 IPC wire-format fix | Done | informs §4.2, not ported literally |
 | P16 FlatBuffers for `graph.stream` | Done | informs §4.2 — this app already has its own FlatBuffers data plane (§4.2) |
-| P12 GitHub PR links | Not done upstream | G12 — upstream's own design (`docs/SPEC.md` §6.7/D31/D32 there) ported as-is |
+| P12 GitHub PR links | Not done upstream | G12 — upstream's own REST-lookup/cache/badge design (`docs/SPEC.md` §6.7/D31/D32 there) ported, auth mechanism redesigned around `gh` CLI (§3.5) since VS Code's built-in provider isn't available to this chapter |
 | P13 Ship (`.vsix`, marketplace) | Not done upstream | G14 — DMG bundling replaces marketplace/OpenVSX publishing for v1.3 |
 | P14 Worktree support | Not designed upstream | G13 — not designed upstream either; designed at G13's own planning pass, same as upstream deferred it |
 
@@ -67,6 +67,7 @@ not a continuation of `feature-v1-3`'s narrower P1-only scope.
 | `gitclient` | Spawn discipline (env hygiene, `-c core.quotepath=false`, `--no-optional-locks`, graceful `WaitDelay` kill), streaming reads, discovery (macOS-only, CLT-shim gate, 2.38 floor, 30s cache), capability probe, typed error classification, per-repo reader/writer gate | `feature-v1-3` reused near-verbatim for `discovery.go`/`errors.go`/`capabilities.go`/`clock.go`/`settings.go`/the gate in `repo.go`. **`runner.go` is rewritten, not reused** — it buffers to `[]byte`; the paged `git log` design (upstream §5.1.1) needs a `Start()` returning a live pipe, not a `Wait()`-then-drain call |
 | `gitclient/porcelain` | `log`/`for-each-ref`/`status --porcelain=v2`/`diff-tree`/`diff`/`stash list`/`merge-tree`/`cat-file --batch` framing, NUL/`%x1f` record splitting | New. Port of `packages/git/src/parse/*`; upstream's ~43 recorded-byte fixture files become a Go golden corpus, same pattern as `internal/postman`'s round-trip tests |
 | `gitclient/catfile`, `gitclient/logsession` | The two persistent processes: `cat-file --batch` per repo, and the pausable/resumable paged walk | New. Port of `catFile.ts`/`logSession.ts` |
+| `ghclient` | (G12) `gh` CLI discovery/spawn discipline mirroring `gitclient/discovery.go`'s `Locator`/probe/TTL-cache shape, `GhStatus` classification, `gh api` calls for PR lookup | New — no upstream provenance; upstream used VS Code's built-in GitHub auth provider (§3.5) |
 | `gitstore` | Column-wise commit store, sha table, string interner, `PackedCommitChunk` builder | New. Server half of `packages/core/src/store/*` |
 | `gitpreflight` | `classifyCheckout`/`StashPop`/`Reset`/`Revert`/`CherryPick`/`Push`/`Pull`/`StashBranch`/`InProgress`, protected-branch glob matcher, undo slot | New. Port of `packages/core/src/preflight/*` + `model/operation.ts` + `model/protectedBranch.ts` + `undo/slot.ts`. Computed server-side, crossed as data — not duplicated client-side |
 | `gitops` | `branch`/`checkout`/`tag`/`revert`/`reset`/`cherryPick`/`stash`/`fetch`/`push`/`pull`/conflict handling + stderr progress parsing | New. Port of `packages/git/src/ops/*` + `progress.ts` |
@@ -140,6 +141,44 @@ the extension installs separately, so **a mismatch is a hard stop, not a degrade
 extension shows a blocking panel naming both versions and that both need to be on the same release
 (reusing the shape of the existing 2.38-git-floor blocked-state panel). `CONTRACT_VERSION` is the
 sole compatibility authority, exactly as upstream's own D46 established for its FlatBuffers work.
+
+### 3.5 GitHub auth (G12) — the local `gh` CLI, not a built-in provider
+
+Upstream's own G12/P12 design used VS Code's built-in GitHub authentication provider
+(`vscode.authentication.getSession('github', …)`) — unavailable to this chapter, decided
+2026-09-07. Replaced with the same pattern [Orca](https://www.onorca.dev) (an AI development
+environment with its own GitHub review integration) uses: **delegate entirely to the `gh` CLI
+already on the user's machine, own no credentials of any kind.**
+
+- **No OAuth flow inside Kira Studio.** Nothing here ever holds a GitHub token, prompts for one,
+  or talks to GitHub's OAuth endpoints directly — `gh` already solved that, and re-solving it here
+  would be a second, worse implementation of the same problem, storing a second copy of the same
+  secret this app has no business holding.
+- **Runs on the Kira Studio backend, not the extension** — a new `internal/ghclient` package,
+  sibling to `gitclient` and following its exact discovery/spawn shape (§ `gitclient/discovery.go`):
+  a `Locator` finds `gh` on `PATH` (no macOS Command-Line-Tools-shim trap here — `gh` has no
+  built-in-shim equivalent to route around), a probe runs `gh auth status` under the same kind of
+  bounded timeout `gitclient.Discovery` already uses for `git --version`, cached with the same kind
+  of short TTL. GitHub-facing calls (PR lookup) shell through `gh api …`, never a hand-rolled HTTP
+  client with a bearer token lifted out of `gh`'s own keychain entry — matching Orca's own choice to
+  run real requests through `gh api` rather than read `gh`'s stored credential out from under it.
+  Same os/exec discipline as every other spawn in this chapter: argv-only, no shell, `Setpgid` +
+  group-kill on cancellation, hygiene env, one classified-error vocabulary.
+- **A `GhStatus` union, the same discriminated shape `GitStatus` (§ `gitclient/discovery.go`)
+  already established**: `"ok"` (`gh` found, `gh auth status` succeeds), `"notFound"` (`gh` isn't on
+  `PATH` — "GitHub CLI is unavailable", install `gh` and reconnect), `"unauthenticated"` (`gh` found
+  but not logged in, or its token has expired/lost scope — "GitHub authentication is unavailable",
+  run `gh auth login`), `"forbidden"` (a `gh api` call comes back 403 — insufficient scope or org SSO
+  not authorized, name the fix rather than the raw HTTP status). None of these block git itself —
+  they only blank the PR badge and disable `branch.resolvePr`, per `kiraVersion.github.enabled`'s
+  existing fail-open design.
+- **What this changes vs. what it doesn't**: only the auth/transport-to-GitHub mechanism. The REST
+  lookup shape, the per-branch cache invalidated by the watcher, `branch.resolvePr`'s wire contract,
+  and the badge UI (`packages/git-ui`, untouched per this chapter's own rule) are still ported from
+  upstream's D31/D32 as designed — `gh api` is a drop-in replacement for the HTTP client's request
+  shape, not a redesign of what gets requested or how the result is cached and rendered.
+- G12's own Opus planning pass owns the concrete `ghclient` API and the exact `gh api` calls/fields
+  used; this section fixes the mechanism and its failure states, not the full implementation.
 
 ### 4.2 Wire format — reusing this app's existing FlatBuffers data plane
 
@@ -276,7 +315,7 @@ P12 package split may also want), not a boundary violation.
 | **G9** | Reset (3 modes) + cherry-pick, undo slot completed | G8 | P10 |
 | **G10** | Search: Go tail scan + client matcher, regex-dialect reconciliation (§8) | G3, G5 | P11 |
 | **G11** | Multi-client hardening: two-windows/two-repos matrix, disconnect teardown, revoke-while-connected, stale-socket recovery, perf re-baseline against the new transport | all | new |
-| **G12** | GitHub PR links: GitHub-remote detection from `origin`, the `GitHubAuth` port over VS Code's built-in GitHub authentication provider, REST PR lookup, a per-branch cache invalidated by the watcher, `branch.resolvePr`, the `#123` badge on branch-picker rows and message-column ref badges (opened via the extension's own `ExternalOpener`), `kiraVersion.github.enabled`, and PR number/title matching added to search's ref scope — upstream's own design (never built there), ported as designed rather than redesigned. Session requested on first use only, never at activation | G4, G5, G10 | P12 |
+| **G12** | GitHub PR links: GitHub-remote detection from `origin`, auth via the local `gh` CLI on the Kira Studio backend (§3.5 — replaces upstream's VS Code-built-in-provider design, which this chapter can no longer use), REST PR lookup through `gh api`, a per-branch cache invalidated by the watcher, `branch.resolvePr`, the `#123` badge on branch-picker rows and message-column ref badges (opened via the extension's own `ExternalOpener`), `kiraVersion.github.enabled`, and PR number/title matching added to search's ref scope. Auth mechanism redesigned around this chapter's own headless/backend shape (D31/D32's REST-lookup and cache design still ported as upstream wrote them); requested on first use only, never at activation | G4, G5, G10 | P12 |
 | **G13** | Worktree support: `git worktree` create/list/switch/remove, building on G5's linked-worktree detection, plus a user-configurable "prepare script" run after creating a worktree with visible progress feedback. *Not designed upstream either* — full design (RPC shape, pre-flight interaction, prepare-script sandboxing) happens at this phase's own Opus planning pass, not assumed here, same placeholder-then-design approach upstream itself used | G5 | P14 |
 | **G14** | Ship the extension: `vsce package` step producing a real `.vsix`, DMG bundling (`scripts/sign-bundle.sh`/`package` script copies it into the app bundle at a known runtime path), an *Install VS Code Integration* button in the *Connected editors* pane (G1) that shells out to `code --install-extension <path>` — argv-only, no shell, matching every other spawn in this chapter — with a "reveal in Finder" fallback when the `code` CLI isn't on `PATH`; plus the rest of upstream's P13 that isn't packaging mechanics: an SCM title-bar button and status-bar item that open the existing webview (entry points, not a redesign of it), and a command-palette audit wiring a command for every mutating operation introduced across G5–G13. Deliberately last of all: it packages and surfaces what every other phase, including G12/G13, builds | all | P13 (Ship), superseding it — DMG bundling instead of Marketplace/OpenVSX |
 
