@@ -77,7 +77,7 @@ export default defineConfig({
       testDir: './tests/ipc',
       testMatch: '**/*.frontend.spec.ts',
       fullyParallel: true,
-      workers: '50%',
+      workers: '100%',
     },
     // P57-e2e-revisit.md §6/§8: a real Go backend (`go build -tags server`), a real embedded
     // engine and a real database adapter, reached over plain HTTP/WebSocket by a plain Chromium
