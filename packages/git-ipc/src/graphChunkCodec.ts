@@ -1,29 +1,30 @@
 /**
- * P16 W5 — `toWire`/`fromWire` for `graph.stream`'s `PackedCommitChunk`, the one payload this
- * phase moves onto FlatBuffers (D45). Lives in its own file rather than inside `codec.ts`:
- * `codec.ts` owns *buffer encodings* (D34/D35), this owns *one payload's schema* — different
- * concerns, different reasons to change.
+ * G3 plan (docs/v1.3/plans/G3-history-pipeline-and-wire-format.md) D1/D2 — `toWire`/`fromWire` for
+ * `graph.stream`'s `PackedCommitChunk`, retargeted at the `"KIG1"` `gitwire` schema's `Frame`/
+ * `Payload` root (D1's wrapper, matching `packages/shared/protocol/wire.fbs`'s own shape) — the
+ * chapter's own schema, not upstream's migrated `"KVGC"` `graphChunk.fbs`, which is deleted with
+ * this file's rewrite (it never ran, F3).
  *
- * The four compile-time/runtime drift guards this file carries (P16 plan, "What the drift check
- * actually protects today"):
+ * The four compile-time/runtime drift guards this file carries (unchanged in kind from the
+ * migrated version):
  *  1. `toWire`'s exhaustive destructure + `Record<string, never>` guard — a field added to
  *     `PackedCommitChunk` and never written here fails `tsc`.
  *  2. `fromWire`'s annotated return type — a field never read back fails `tsc`.
  *  3. `ACCESSOR_BRIDGE` — every `keyof PackedCommitChunk` must also be an accessor on the
  *     generated table class; a contract field with no schema counterpart fails `tsc`.
  *  4. The `never`-defaulted `switch` on `DecorationRef.kind` in both directions.
- * What none of these can catch — a field written to the wrong slot — is `wireConformance.test.ts`'s
- * job (W9's no-defaults structural test).
  */
 import * as flatbuffers from 'flatbuffers';
 import type { DecorationRef, PackedCommitChunk } from './contract.ts';
 import {
   DecorationRef as GeneratedDecorationRef,
+  Frame as GeneratedFrame,
   PackedCommitChunk as GeneratedPackedCommitChunk,
+  Payload as GeneratedPayload,
   RowDecorations as GeneratedRowDecorations,
-} from './generated/graphChunk.ts';
+} from './generated/gitwire.ts';
 
-const FILE_IDENTIFIER = 'KVGC';
+const FILE_IDENTIFIER = 'KIG1';
 
 // ---------------------------------------------------------------------------------------
 // Drift guard 3 — every field PackedCommitChunk declares must have a same-named accessor on
@@ -74,10 +75,10 @@ function addDecorationRef(builder: flatbuffers.Builder, ref: DecorationRef): num
       break;
     case 'head':
       break;
-    // P9: no new wire field for `index` — the FlatBuffers schema has no numeric slot for a
-    // stash decoration and adding one means a schema/codegen change this phase does not need;
-    // the `name` string slot is otherwise unused for "stash" (and always was), so the index
-    // travels there as its decimal string form instead.
+    // No wire field for `index` — the schema has no numeric slot for a stash decoration; the
+    // `name` string slot is otherwise unused for "stash", so the index travels there as its
+    // decimal string form instead (gitstore/encode.go's Go encoder carries the identical
+    // convention).
     case 'stash':
       nameOffset = builder.createString(String(ref.index));
       break;
@@ -91,8 +92,9 @@ function addDecorationRef(builder: flatbuffers.Builder, ref: DecorationRef): num
   return GeneratedDecorationRef.createDecorationRef(builder, kindOffset, nameOffset, isHead);
 }
 
-/** Builds one `PackedCommitChunk` FlatBuffer, finished with the `"KVGC"` identifier, and returns
- *  exactly-sized bytes (`asUint8Array()`'s own buffer may be larger than the message it holds). */
+/** Builds one `gitwire.Frame` FlatBuffer wrapping chunk as its `PackedCommitChunk` payload,
+ *  finished with the `"KIG1"` identifier, and returns exactly-sized bytes (`asUint8Array()`'s own
+ *  buffer may be larger than the message it holds). */
 export function toWire(chunk: PackedCommitChunk): ArrayBuffer {
   const {
     from,
@@ -139,18 +141,16 @@ export function toWire(chunk: PackedCommitChunk): ArrayBuffer {
   );
 
   // Every column vector is created unconditionally, even at zero length, so a chunk's empty
-  // columns (emptyPackedChunk(), a single root commit's empty parentShas) round-trip as
-  // zero-length vectors rather than an absent field reading back as FlatBuffers' scalar/vector
-  // default (rpc.test.ts's emptyPackedChunk() depends on this).
+  // columns (a single root commit's empty parentShas) round-trip as zero-length vectors rather
+  // than an absent field reading back as FlatBuffers' scalar/vector default.
   //
   // These seven `[ubyte]` columns use `builder.createByteVector()` — the `flatbuffers` runtime's
   // own bulk method (one `TypedArray.set()` copy) — rather than the generated
   // `create<Field>Vector()` wrappers flatc emits for byte columns, which loop `addInt8()` once per
   // element. Both produce byte-identical wire output (a `[ubyte]` vector is just length + raw
-  // bytes, regardless of which builder call wrote it); this is a sender-side perf fix only (P16
-  // W11 follow-up), not a wire-format change. String/offset vectors (dictionary, decorations,
-  // refs) still use their generated per-element builders below — `createByteVector` only applies
-  // to raw byte vectors.
+  // bytes, regardless of which builder call wrote it); this is a sender-side perf fix only, not a
+  // wire-format change. String/offset vectors (dictionary, decorations, refs) still use their
+  // generated per-element builders above — `createByteVector` only applies to raw byte vectors.
   const shasVector = builder.createByteVector(new Uint8Array(shas));
   const parentOffsetsVector = builder.createByteVector(new Uint8Array(parentOffsets));
   const parentShasVector = builder.createByteVector(new Uint8Array(parentShas));
@@ -173,8 +173,13 @@ export function toWire(chunk: PackedCommitChunk): ArrayBuffer {
   GeneratedPackedCommitChunk.addDictionaryBase(builder, dictionaryBase);
   GeneratedPackedCommitChunk.addDictionary(builder, dictionaryVector);
   GeneratedPackedCommitChunk.addDecorations(builder, decorationsVector);
-  const offset = GeneratedPackedCommitChunk.endPackedCommitChunk(builder);
-  GeneratedPackedCommitChunk.finishPackedCommitChunkBuffer(builder, offset);
+  const chunkOffset = GeneratedPackedCommitChunk.endPackedCommitChunk(builder);
+
+  GeneratedFrame.startFrame(builder);
+  GeneratedFrame.addPayloadType(builder, GeneratedPayload.PackedCommitChunk);
+  GeneratedFrame.addPayload(builder, chunkOffset);
+  const frameOffset = GeneratedFrame.endFrame(builder);
+  GeneratedFrame.finishFrameBuffer(builder, frameOffset);
 
   const bytes = builder.asUint8Array();
   // A fresh, exactly-sized ArrayBuffer — `asUint8Array()`'s own backing buffer is the builder's
@@ -232,17 +237,26 @@ function readDecorationRef(ref: GeneratedDecorationRef): DecorationRef {
   }
 }
 
-/** Reads one `PackedCommitChunk` back out of a FlatBuffer built by `toWire`. Every property is
- *  written explicitly (drift guard 2): a field added to `PackedCommitChunk` and never read here
- *  is a missing-property `tsc` error on this function's return type. */
+/** Reads one `PackedCommitChunk` back out of a `gitwire.Frame` FlatBuffer built by `toWire`.
+ *  Every property is written explicitly (drift guard 2): a field added to `PackedCommitChunk` and
+ *  never read here is a missing-property `tsc` error on this function's return type. */
 export function fromWire(buffer: ArrayBuffer): PackedCommitChunk {
   const byteBuffer = new flatbuffers.ByteBuffer(new Uint8Array(buffer));
-  if (!GeneratedPackedCommitChunk.bufferHasIdentifier(byteBuffer)) {
+  if (!GeneratedFrame.bufferHasIdentifier(byteBuffer)) {
     throw new Error(
       `graphChunkCodec.fromWire: buffer is missing the '${FILE_IDENTIFIER}' file identifier`,
     );
   }
-  const table = GeneratedPackedCommitChunk.getRootAsPackedCommitChunk(byteBuffer);
+  const frame = GeneratedFrame.getRootAsFrame(byteBuffer);
+  if (frame.payloadType() !== GeneratedPayload.PackedCommitChunk) {
+    throw new Error(
+      `graphChunkCodec.fromWire: frame payload type ${frame.payloadType()} is not PackedCommitChunk`,
+    );
+  }
+  const table = frame.payload(new GeneratedPackedCommitChunk());
+  if (!table) {
+    throw new Error('graphChunkCodec.fromWire: frame has no payload table');
+  }
 
   const decorations: Array<readonly [number, readonly DecorationRef[]]> = [];
   for (let i = 0; i < table.decorationsLength(); i++) {

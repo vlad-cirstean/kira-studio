@@ -1,0 +1,52 @@
+// packages/git-ipc/schema/gitwire.fbs
+//
+// The git module's bulk data plane (SPEC §4.2). Go: internal/gitwire (generated) +
+// internal/gitstore/encode.go (the encoder). TypeScript: packages/git-ipc/src/generated/ +
+// graphChunkCodec.ts. Regenerate both with scripts/generate-wire.sh.
+//
+// Control frames stay JSON text — this schema covers response/stream payloads only, the same
+// split packages/shared/protocol/wire.fbs states for the studio data plane.
+//
+// Named gitwire.fbs, not gitWire.fbs: flatc's TypeScript generator names its entry-point file
+// after the schema FILENAME and its namespace barrel after the namespace, so a name that differs
+// from `namespace gitwire` only in case emits two files that collide on a case-insensitive
+// filesystem (G3 plan F6). wire.fbs carries the same note for the same reason.
+//
+// Append-only: never renumber, never reorder, never delete a field — retire with (deprecated).
+// CONTRACT_VERSION, not this file, is the compatibility authority (upstream D46).
+
+namespace gitwire;
+
+table DecorationRef {
+  kind:string (required);   // branch | remoteBranch | tag | head | stash
+  name:string;               // absent for "head"; the decimal index for "stash"
+  is_head:bool;               // meaningful only for "branch"
+}
+
+table RowDecorations {
+  row:uint32;                // chunk-relative
+  refs:[DecorationRef] (required);
+}
+
+table PackedCommitChunk {
+  from:uint32;
+  to:uint32;
+  sha_width_bytes:uint8;
+  shas:[ubyte] (required);
+  parent_offsets:[ubyte] (required);    // little-endian uint32, (to-from)+1 entries
+  parent_shas:[ubyte] (required);
+  identity_ids:[ubyte] (required);      // little-endian uint32, 4 per row
+  times:[ubyte] (required);             // little-endian uint32, 2 per row
+  subject_bytes:[ubyte] (required);
+  subject_offsets:[ubyte] (required);   // little-endian uint32, (to-from)+1 entries
+  dictionary_base:uint32;
+  dictionary:[string] (required);
+  decorations:[RowDecorations] (required);
+}
+
+union Payload { PackedCommitChunk }
+
+table Frame { payload:Payload; }
+
+root_type Frame;
+file_identifier "KIG1";

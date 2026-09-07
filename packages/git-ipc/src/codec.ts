@@ -271,7 +271,7 @@ export function encodeStreamPayload(method: StreamKey, chunk: unknown): unknown 
     case 'graph.stream': {
       const envelope = chunk as GraphStreamEnvelope<PackedCommitChunk>;
       const wrapped: FlatBufferStreamPayload = {
-        $fb: 'graphChunk/1',
+        $fb: 'gitwire/1',
         d: graphChunkToWire(envelope.commits),
       };
       return { ...envelope, commits: wrapped };
@@ -298,7 +298,7 @@ export function decodeStreamPayload(method: StreamKey, payload: unknown): unknow
           "codec.decodeStreamPayload: 'graph.stream' chunk's 'commits' is missing its '$fb' FlatBuffers tag",
         );
       }
-      if (wrapped.$fb !== 'graphChunk/1') {
+      if (wrapped.$fb !== 'gitwire/1') {
         throw new Error(
           `codec.decodeStreamPayload: unrecognised '$fb' tag '${wrapped.$fb}' for 'graph.stream'`,
         );

@@ -13,6 +13,7 @@ SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 . "$SCRIPT_DIR/lib.sh"
 
 SCHEMA="$ROOT_DIR/packages/shared/protocol/wire.fbs"
+GIT_SCHEMA="$ROOT_DIR/packages/git-ipc/schema/gitwire.fbs"
 
 FLATC_VERSION=25.9.23
 TOOLS_DIR="$ROOT_DIR/.tools/flatc-$FLATC_VERSION"
@@ -102,5 +103,8 @@ echo "generate-wire: using $FLATC (version $ACTUAL_VERSION)"
 # exist in 25.9.23 at all. Both are simply dropped below; see the C1 commit message.
 "$FLATC" --go -o "$ROOT_DIR/apps/kira-studio/internal/page" "$SCHEMA"
 "$FLATC" --ts -o "$ROOT_DIR/packages/shared/protocol" "$SCHEMA"
+
+"$FLATC" --go -o "$ROOT_DIR/apps/kira-studio/internal"        "$GIT_SCHEMA"
+"$FLATC" --ts -o "$ROOT_DIR/packages/git-ipc/src/generated"   "$GIT_SCHEMA"
 
 echo "generate-wire: done"
