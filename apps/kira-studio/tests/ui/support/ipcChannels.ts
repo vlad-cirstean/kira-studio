@@ -122,6 +122,12 @@ export const IPC = {
   collectionsSaveGrpcRequest: 'kira:collections:saveGrpcRequest',
   collectionsCreateGrpcItem: 'kira:collections:createGrpcItem',
 
+  gitClientsList: 'kira:git:clients:list',
+  gitClientsRevoke: 'kira:git:clients:revoke',
+  gitPairingPending: 'kira:git:pairing:pending',
+  gitPairingApprove: 'kira:git:pairing:approve',
+  gitPairingDeny: 'kira:git:pairing:deny',
+
   connectionState: 'kira:connection:state',
   connectionMetadataInvalidated: 'kira:connection:metadataInvalidated',
   connectionsChanged: 'kira:connections:changed',
@@ -129,4 +135,6 @@ export const IPC = {
   schemaChanged: 'kira:schema:changed',
   opUpdate: 'kira:op:update',
   appMetrics: 'kira:app:metrics',
+  gitPairing: 'kira:git:pairing',
+  gitClientsChanged: 'kira:git:clients',
 } as const;

@@ -127,6 +127,12 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   collectionsGetGrpcRequest: 'CollectionsService.GetGrpcRequest',
   collectionsSaveGrpcRequest: 'CollectionsService.SaveGrpcRequest',
   collectionsCreateGrpcItem: 'CollectionsService.CreateGrpcItem',
+
+  gitClientsList: 'GitClientsService.List',
+  gitClientsRevoke: 'GitClientsService.Revoke',
+  gitPairingPending: 'GitClientsService.PendingPairing',
+  gitPairingApprove: 'GitClientsService.Approve',
+  gitPairingDeny: 'GitClientsService.Deny',
 };
 
 /** ipc.ts's legacy channel string (what every `ControlSnapshot.channel` and fixture is keyed by,
@@ -246,6 +252,13 @@ const WILDCARD_DEFAULTS: Readonly<Record<string, string>> = Object.freeze({
   // (C4), so "no history yet for a request never seen before" is the right default rather than a
   // fixture miss.
   [IPC.historyList]: '[]',
+  // G1: main.ts's bootstrap() awaits hydrateGitClients() alongside every other hydrate* call,
+  // unconditionally, on every boot — no committed fixture will ever snapshot these (nothing in
+  // tests/ui/ exercises pairing), so "no editors paired, nothing pending" is the same "correct
+  // empty answer for a spec with no fixture of its own" every other unawaited-by-a-spec boot call
+  // above already gets, not a fixture miss.
+  [IPC.gitClientsList]: '[]',
+  [IPC.gitPairingPending]: JSON.stringify({ pending: null, queued: 0 }),
 });
 
 interface CallRequestBody {
