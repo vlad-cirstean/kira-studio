@@ -34,33 +34,3 @@ to imply endorsement by, or affiliation with, those trademark holders.
 Amazon SQS and Amazon S3 are not available in Simple Icons (Amazon does not publish per-service
 icon marks under a redistributable license there); their icons in Kira Studio are original,
 hand-drawn glyphs, not reproductions of Amazon's trademarks.
-
-## gokeepasslib
-
-Kira Studio's DataGrip connection importer (P25) reads a `c.kdbx` KeePass 3.1 database via
-[`github.com/tobischo/gokeepasslib/v3`](https://github.com/tobischo/gokeepasslib), Copyright (c)
-2024 Tobias Schoknecht, licensed under the MIT License:
-
-```
-The MIT License (MIT)
-
-Copyright (c) 2024 Tobias Schoknecht
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
-associated documentation files (the "Software"), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute,
-sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or
-substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT
-NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
-DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT
-OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-```
-
-The full text is reproduced in the module's own `LICENSE.md`
-(`$(go env GOPATH)/pkg/mod/github.com/tobischo/gokeepasslib/v3@<version>/LICENSE.md`).

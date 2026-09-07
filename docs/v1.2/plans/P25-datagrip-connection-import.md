@@ -14,6 +14,26 @@
 > itself), or — where JetBrains does not document the thing — to real files and to independent
 > third-party implementations that agree with each other. §1.10 states plainly what is **not**
 > confirmed, and D12 turns each of those into a loud, specific refusal instead of a guess.
+>
+> **Correction (scope-correction follow-up, landed on top of this phase after it shipped):** D1's
+> scope and D4's lookup order below describe a **KEEPASS/file-based fallback that no longer
+> exists.** §0.1's user quote is Keychain-only ("*the passwords are decrypted using the keychain
+> key for datagrip*"); this plan's own §0.2 read the user's next sentence ("*the keys are stored as
+> Intelij platform db and the db uuid*") as also describing `PasswordSafe`'s separate `KEEPASS`
+> file backend (`c.kdbx`/`c.pwd`) and built support for it alongside the Keychain path the user
+> actually asked for. The user corrected this directly after the phase shipped: only the Keychain
+> path was ever wanted. `kdbx.go`, `mainkey.go`, their tests, the `testdata/passwordsafe/` fixtures
+> and generator, and the `github.com/tobischo/gokeepasslib/v3` dependency are all deleted;
+> `internal/datagrip` now tries exactly one backend (the macOS Keychain), and a project whose
+> `security.xml` says `PROVIDER=KEEPASS` gets a named `credential-store-unsupported` refusal
+> instead of a KDBX read attempt. **F1-F6, F9-F11 and §1.10 below are unaffected and still
+> accurate** (the project-file formats, the credential-key naming, the config-directory discovery,
+> and the Keychain query are all unchanged); **F7 and F8 (the `c.pwd`/`c.kdbx` formats) remain
+> here as accurate research with no bearing on what is actually built** — they describe real
+> formats this app deliberately no longer reads, kept for the historical record rather than scrubbed.
+> D1, D4, and the commit table (§3) are corrected in place below with a pointer to this note rather
+> than rewritten, so a reader comparing this plan against the tree isn't left wondering why
+> `kdbx.go`/`mainkey.go` are cited but absent.
 
 ---
 
@@ -525,6 +545,12 @@ all**, or the user pays the prompt cost twice for one import. D9.
 
 ### D1 — Scope: macOS Keychain **and** the `c.kdbx`/`c.pwd` file store; Linux Secret Service and Windows are refused by name (F5, §0.3)
 
+> **Corrected by the keychain-only follow-up (see the note at the top of this plan).** The
+> `KEEPASS` rows below are no longer this phase's scope — the file-based store was removed per
+> explicit user correction. The only backend `internal/datagrip` tries now is the macOS Keychain;
+> every other row in the table below is a refusal, including `KEEPASS` itself (as
+> `credential-store-unsupported`, not "not found").
+
 | Platform | DataGrip backend | This phase |
 |---|---|---|
 | macOS | `KEYCHAIN` (default) | **Supported** — `go-keychain`, already a dependency (F10) |
@@ -571,13 +597,22 @@ supplies the real `*connections.Service`.
 
 ### D4 — Credential lookup order: **Keychain first, KDBX second** (F5, F9)
 
+> **Corrected by the keychain-only follow-up (see the note at the top of this plan).** There is no
+> second backend to fall back to any more. `security.xml`'s `PROVIDER` is still read, but only to
+> tell "no backend applies because DataGrip explicitly used the file store" (`KEEPASS`) — a real,
+> readable-by-DataGrip store this app now declines to read, reported as
+> `credential-store-unsupported` — apart from "no backend applies because DataGrip itself never
+> saved a password" (`MEMORY_ONLY`/`DO_NOT_STORE`), reported as `password-not-saved`. Every other
+> value (`KEYCHAIN`, absent, or unparseable) tries the Keychain and nothing else.
+
 `security.xml`'s `PROVIDER` is read and *believed* when it is present and parses. When it is
 absent, unparseable, or says `KEYCHAIN`: try the OS keychain, then fall back to `c.kdbx` if the
 files exist. When it says `KEEPASS`: try `c.kdbx` only. When it says `MEMORY_ONLY` (or the
 deprecated `DO_NOT_STORE`): skip the lookup and report *"DataGrip is configured not to save
 passwords"*. This mirrors the ordering `TablePro` arrived at independently (*"only the 'In KeePass'
 mode writes the encrypted `c.kdbx`, so the Keychain is tried first and the KDBX is a fallback"*)
-while still honouring an explicit setting when there is one.
+while still honouring an explicit setting when there is one. **(Superseded — see the correction
+note above this section.)**
 
 ### D5 — The IDE config directory is discovered, ranked, and named in every error (F2, F6)
 
@@ -759,6 +794,11 @@ one UI spec in §4.4).
 Fourteen commits. G1-G9 are Go and each is independently green; B1 is the bridge + wiring +
 bindings; F1-F2 are frontend; V1-V2 are verification and docs. Order matters in one place: the
 credential-store commits (G5-G8) must land before the importer (G9) that calls them.
+
+> **Corrected by the keychain-only follow-up (see the note at the top of this plan).** G5
+> (`mainkey.go`), G6 (`kdbx.go` + the `gokeepasslib` dependency), and G8's fixture generator
+> (`testdata/passwordsafe/`) are all reverted by that follow-up's own commit(s) — kept below as the
+> historical record of what G1-G9 originally built, not as a description of the current tree.
 
 | # | Commit | Contents |
 |---|---|---|

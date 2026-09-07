@@ -50,16 +50,16 @@ func TestReadSecurityXMLProviderMemoryOnly(t *testing.T) {
 	}
 }
 
-// TestReadSecurityXMLMissingOrUnparseable is D5.4: a missing/garbage security.xml is "try both
-// stores", never an error.
+// TestReadSecurityXMLMissingOrUnparseable is D5.4: a missing/garbage security.xml means "try the
+// keychain", never an error.
 func TestReadSecurityXMLMissingOrUnparseable(t *testing.T) {
 	dir := t.TempDir()
 	cfg := ReadSecurityXML(dir)
 	if cfg.Provider != "" {
 		t.Errorf("Provider = %q, want empty for a missing file", cfg.Provider)
 	}
-	if order := LookupOrder(cfg.Provider); len(order) != 2 {
-		t.Errorf("LookupOrder(\"\") = %v, want [keychain kdbx]", order)
+	if order := LookupOrder(cfg.Provider); len(order) != 1 || order[0] != "keychain" {
+		t.Errorf("LookupOrder(\"\") = %v, want [keychain]", order)
 	}
 
 	mustMkdir(t, filepath.Join(dir, "options"))
@@ -108,16 +108,15 @@ func productsOf(cs []ConfigCandidate) []string {
 	return out
 }
 
-// TestCredentialStoreNotFoundListsSearchedDirs is case 22: the not-found message names every
-// directory actually searched.
-func TestCredentialStoreNotFoundListsSearchedDirs(t *testing.T) {
-	root := t.TempDir()
-	mustMkdir(t, filepath.Join(root, "NotAnIDE"))
-	mustMkdir(t, filepath.Join(root, "AlsoNotAnIDE"))
-
-	msg := describeSearchedDirs(root)
-	if !strings.Contains(msg, "NotAnIDE") || !strings.Contains(msg, "AlsoNotAnIDE") {
-		t.Errorf("describeSearchedDirs = %q, want it to name both subdirectories", msg)
+// TestOutlookForKeepassConfiguredIsStoreUnsupported is this follow-up's own regression case: a
+// KEEPASS-configured provider must classify as OutlookStoreUnsupported, not OutlookNotSaved —
+// DataGrip did save a password here, this app just can't read that store any more now that the
+// file-based fallback is gone.
+func TestOutlookForKeepassConfiguredIsStoreUnsupported(t *testing.T) {
+	ds := DataSource{UUID: "eeeeeeee-0000-0000-0000-000000000001", HasLocal: true, SecretStorage: "master_key"}
+	fields := ResolvedFields{Kind: "postgres"}
+	if got := outlookFor(ds, fields, SecurityConfig{Provider: "KEEPASS"}); got != OutlookStoreUnsupported {
+		t.Errorf("outlookFor(KEEPASS) = %q, want %q", got, OutlookStoreUnsupported)
 	}
 }
 

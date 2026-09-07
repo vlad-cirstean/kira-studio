@@ -1,7 +1,5 @@
 package datagrip
 
-import "os"
-
 // PasswordOutlook is D9's four-value classification a Scan can make with file reads alone, before
 // any credential store is actually opened.
 type PasswordOutlook string
@@ -52,10 +50,10 @@ type Preview struct {
 }
 
 // Scan parses projectDir's two data-source files, maps engines and fields, locates the IntelliJ
-// Platform config directory, and reads security.xml — all file reads, no keychain and no KDBX
-// decrypt (D9). configDirs (possibly empty) are exported alongside Preview by ScanResult, so Apply
-// can be given the exact same candidate list rather than re-discovering it (a second enumeration
-// could observe a different filesystem state, however unlikely, between the two calls).
+// Platform config directory, and reads security.xml — all file reads, no keychain touched (D9).
+// The config-directory lookup exists only to read security.xml's PROVIDER, which lets a
+// KEEPASS-configured project (D1 follow-up: the file-based PasswordSafe store this app used to
+// also read is gone) get OutlookStoreUnsupported instead of a misleading OutlookWillAttempt.
 func Scan(projectDir string) (*Preview, error) {
 	project, err := ParseProject(projectDir)
 	if err != nil {
@@ -70,7 +68,7 @@ func Scan(projectDir string) (*Preview, error) {
 
 	preview := &Preview{ProjectDir: projectDir, Rows: []PreviewRow{}}
 	for _, ds := range project.DataSources {
-		preview.Rows = append(preview.Rows, previewRowFor(ds, projectDir, candidates, cfg))
+		preview.Rows = append(preview.Rows, previewRowFor(ds, projectDir, cfg))
 	}
 	return preview, nil
 }
@@ -84,7 +82,7 @@ func discoverCandidates(createdIn string) []ConfigCandidate {
 	return candidates
 }
 
-func previewRowFor(ds DataSource, projectDir string, candidates []ConfigCandidate, cfg SecurityConfig) PreviewRow {
+func previewRowFor(ds DataSource, projectDir string, cfg SecurityConfig) PreviewRow {
 	name, truncated := truncateName(ds.Name)
 	row := PreviewRow{UUID: ds.UUID, Name: name, Warnings: []string{}}
 	if truncated {
@@ -107,12 +105,15 @@ func previewRowFor(ds DataSource, projectDir string, candidates []ConfigCandidat
 	row.Port = fields.Port
 	row.Database = fields.Database
 	row.Username = fields.Username
-	row.PasswordOutlook = outlookFor(ds, fields, candidates, cfg)
+	row.PasswordOutlook = outlookFor(ds, fields, cfg)
 	return row
 }
 
-// outlookFor is D9's classification — file reads and in-memory facts only.
-func outlookFor(ds DataSource, fields ResolvedFields, candidates []ConfigCandidate, cfg SecurityConfig) PasswordOutlook {
+// outlookFor is D9's classification — file reads and in-memory facts only. cfg.Provider ==
+// "KEEPASS" is checked ahead of LookupOrder for the same reason lookupPassword checks it directly
+// (apply.go): it is a real, readable-by-DataGrip store this app does not support, which is a
+// different outlook than "DataGrip never saved a password" (OutlookNotSaved).
+func outlookFor(ds DataSource, fields ResolvedFields, cfg SecurityConfig) PasswordOutlook {
 	if fields.FromURL {
 		return OutlookFromURL
 	}
@@ -122,25 +123,17 @@ func outlookFor(ds DataSource, fields ResolvedFields, candidates []ConfigCandida
 	if cfg.Provider == "MEMORY_ONLY" || cfg.Provider == "DO_NOT_STORE" {
 		return OutlookNotSaved
 	}
+	if cfg.Provider == "KEEPASS" {
+		return OutlookStoreUnsupported
+	}
 
 	order := LookupOrder(cfg.Provider)
 	if len(order) == 0 {
 		return OutlookNotSaved
 	}
 	for _, backend := range order {
-		switch backend {
-		case "keychain":
-			if keychainSupported {
-				return OutlookWillAttempt
-			}
-		case "kdbx":
-			if len(candidates) == 0 {
-				continue
-			}
-			kdbxPath, _ := kdbxPathFor(candidates[0], cfg)
-			if _, err := os.Stat(kdbxPath); err == nil {
-				return OutlookWillAttempt
-			}
+		if backend == "keychain" && keychainSupported {
+			return OutlookWillAttempt
 		}
 	}
 	return OutlookStoreUnsupported

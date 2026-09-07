@@ -1,9 +1,10 @@
 // Package datagrip imports connections (and their saved passwords) from a JetBrains DataGrip
 // project directory: parsing .idea/dataSources.xml and dataSources.local.xml, locating the
-// IntelliJ Platform PasswordSafe credential store, and decrypting a data source's password from
-// either the macOS Keychain or a c.kdbx/c.pwd KeePass fallback. See
-// docs/v1.2/plans/P25-datagrip-connection-import.md for the research and decisions this package
-// implements — every format claim below is cited there, not re-derived here.
+// IntelliJ Platform PasswordSafe credential store, and reading a data source's password from the
+// macOS Keychain — the only backend this package supports, per an explicit user correction after
+// P25 shipped (docs/v1.2/plans/P25-datagrip-connection-import.md's correction note). See that plan
+// for the research and decisions this package implements — every format claim below is cited
+// there, not re-derived here.
 package datagrip
 
 // D11's closed enum of skip/refusal reasons and report warnings — rendered by the UI, counted in

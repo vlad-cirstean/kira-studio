@@ -895,51 +895,43 @@ database is cleanly closed — 4 MiB is derived, not chosen: SQLite's default WA
 interval (1,000 pages at the 4 KiB default page size) is exactly the size the WAL is expected to
 reach between two ordinary checkpoints, so this never truncates a WAL doing its normal job.
 
-**DataGrip connection import (P25).** `internal/datagrip` reads a JetBrains DataGrip project
-folder and imports its connections — never its own secret store, never a parallel one:
+**DataGrip connection import (P25, reduced to Keychain-only by an explicit user correction after
+P25 shipped).** `internal/datagrip` reads a JetBrains DataGrip project folder and imports its
+connections — never its own secret store, never a parallel one:
 `internal/connections.Service.Create` is the only write path, exactly as if the user had typed the
 connection in by hand.
 
-*The formats, briefly (full citations in `docs/v1.2/plans/P25-datagrip-connection-import.md`).* A
-project's `.idea/dataSources.xml` (shared: name, uuid, driver, JDBC URL) and
-`dataSources.local.xml` (per-user: username, `<secret-storage>`, detected DBMS) never contain a
-password (the one documented exception: a `<configured-by-url>` source's JDBC URL can carry
-`user:password@` in its own userinfo). The real password lives in the IntelliJ Platform
-`PasswordSafe`, keyed by `generateServiceName("DB", uuid)` — literally `IntelliJ Platform DB —
-<uuid>`, U+2014 EM DASH — under one of three backends: the OS keychain (`KEYCHAIN`, the default off
-Windows), a KeePass 3.1 file `c.kdbx` (`KEEPASS`), or nothing at all (`MEMORY_ONLY`/`forget`).
-`c.kdbx` is unlocked by a main key stored alongside it in `c.pwd` — itself AES-CBC-PKCS5-encrypted
-under a hardcoded, publicly-known 16-byte key (`EncryptionSupport.kt`'s `"Proxy Config Sec"`), over
-a 4-byte-big-endian-IV-length ‖ IV ‖ ciphertext envelope — which is why no password of the user's
-own is ever needed to read it.
+*The formats, briefly (full citations, and the correction note, in
+`docs/v1.2/plans/P25-datagrip-connection-import.md`).* A project's `.idea/dataSources.xml` (shared:
+name, uuid, driver, JDBC URL) and `dataSources.local.xml` (per-user: username, `<secret-storage>`,
+detected DBMS) never contain a password (the one documented exception: a `<configured-by-url>`
+source's JDBC URL can carry `user:password@` in its own userinfo). The real password lives in the
+IntelliJ Platform `PasswordSafe`, keyed by `generateServiceName("DB", uuid)` — literally
+`IntelliJ Platform DB — <uuid>`, U+2014 EM DASH — which this app reads from exactly one of
+`PasswordSafe`'s backends: the OS keychain (`KEYCHAIN`, the default off Windows).
 
-**Supported: macOS Keychain and `c.kdbx`/`c.pwd`, Linux `c.kdbx`/`c.pwd`.** Refused by name, never
-guessed: Linux's *default* backend (freedesktop Secret Service) needs `libsecret` over cgo, which
-this repo's Go is deliberately free of; Windows is refused outright (the app does not ship there,
-and its main-key encryption is DPAPI, unreachable from a non-Windows build); a `PGP_KEY`-encrypted
-`c.pwd` and a `c.kdbx` that fails to decode or has no `IntelliJ Platform` group are refused by name
-rather than retried or downgraded to "not found". **This is a stated, versioned claim, not an
-unqualified "DataGrip import"**: the formats above are read out of `intellij-community`'s `master`
-(2024-2026 lineage) — `pdb.pwd`'s continued support as a legacy fallback shows years of stability,
-but a future format change is a new, explicit refusal to add, not a silent wrong password.
+**Supported: macOS Keychain only.** The user's original request was Keychain-only; a plan-writing
+pass initially misread the user's own description of the credential store's internals as also
+describing `PasswordSafe`'s file-based `KEEPASS` backend (`c.kdbx`/`c.pwd`) and built support for
+both, which the user then corrected — that file-based path is removed. Refused by name, never
+guessed: Linux (the *default* backend there, freedesktop Secret Service, needs `libsecret` over
+cgo, which this repo's Go is deliberately free of), Windows (the app does not ship there), and a
+project whose `security.xml` reads `PROVIDER=KEEPASS` (a real store this app deliberately does not
+read — reported as `credential-store-unsupported`, not conflated with "DataGrip never saved a
+password") all get a named refusal rather than a guess or a silent miss.
 
 **The scan step never touches a credential store (`internal/datagrip.Scan`).** It parses both XML
 files, maps each data source's engine (DataGrip's own detected DBMS, then the `<driver-ref>`
 family, then the JDBC URL scheme — first hit wins) and fields, and classifies each row's password
-outlook from file reads alone. Only `Apply` — run once, at the user's explicit confirmation —
-actually opens a keychain or a KDBX file, because a macOS Keychain query raises a real
-authorization panel per item the first time this app asks for it; scanning first and fetching once
-at apply time is what keeps an eight-connection import from costing eight avoidable prompts. The
-decrypted password exists only inside `Apply`'s own call stack — never in the preview, the import
-report, a log line, or a bridge payload — and `bridge.DataGripService` sends only the project path
-across the bridge either way, the same convention `CollectionsService.Import` already established.
-
-`github.com/tobischo/gokeepasslib/v3` (MIT) does the actual KDBX 3.1 parsing and AES-KDF/Salsa20
-work; the ~150 lines of IntelliJ-specific glue around it (the main-key decrypt, config-directory
-discovery, the keychain query) have no library to reach for — the only complete prior
-implementation found is AGPL-3.0 Swift, unusable as a dependency here, so it is hand-rolled and
-tested against a fixture generator (`internal/datagrip/testdata/gen`, `KIRA_DATAGRIP_FIXTURES=write`)
-rather than a real DataGrip capture, since DataGrip cannot be installed in a headless sandbox.
+outlook from file reads alone — including reading `security.xml`'s `PROVIDER` so a
+`KEEPASS`-configured row is flagged unsupported in the preview, before any keychain is ever opened.
+Only `Apply` — run once, at the user's explicit confirmation — actually queries the keychain,
+because a macOS Keychain query raises a real authorization panel per item the first time this app
+asks for it; scanning first and fetching once at apply time is what keeps an eight-connection
+import from costing eight avoidable prompts. The decrypted password exists only inside `Apply`'s
+own call stack — never in the preview, the import report, a log line, or a bridge payload — and
+`bridge.DataGripService` sends only the project path across the bridge either way, the same
+convention `CollectionsService.Import` already established.
 
 ## Caching
 

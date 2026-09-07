@@ -2,9 +2,6 @@ package datagrip
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
-	"strings"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 )
@@ -56,6 +53,9 @@ func Apply(projectDir string, selectedUUIDs []string, secretsAvailable bool, cre
 		selected[id] = true
 	}
 
+	// security.xml's PROVIDER is still read here (never for a lookup this package no longer makes,
+	// only so a KEEPASS-configured project gets ReasonCredentialStoreUnsupported instead of a bare
+	// "not found" — see lookupPassword).
 	candidates := discoverCandidates(project.CreatedIn)
 	var cfg SecurityConfig
 	if len(candidates) > 0 {
@@ -67,12 +67,12 @@ func Apply(projectDir string, selectedUUIDs []string, secretsAvailable bool, cre
 		if !selected[ds.UUID] {
 			continue
 		}
-		report.Rows = append(report.Rows, applyOne(ds, projectDir, candidates, cfg, secretsAvailable, creator))
+		report.Rows = append(report.Rows, applyOne(ds, projectDir, cfg, secretsAvailable, creator))
 	}
 	return report, nil
 }
 
-func applyOne(ds DataSource, projectDir string, candidates []ConfigCandidate, cfg SecurityConfig, secretsAvailable bool, creator Creator) ReportRow {
+func applyOne(ds DataSource, projectDir string, cfg SecurityConfig, secretsAvailable bool, creator Creator) ReportRow {
 	name, _ := truncateName(ds.Name)
 	row := ReportRow{UUID: ds.UUID, Name: name}
 
@@ -93,7 +93,7 @@ func applyOne(ds DataSource, projectDir string, candidates []ConfigCandidate, cf
 		case ds.HasLocal && (ds.SecretStorage == "memory" || ds.SecretStorage == "forget"):
 			row.Error = ReasonPasswordNotSaved
 		default:
-			pw, un, lookupErr := lookupPassword(ds, candidates, cfg)
+			pw, un, lookupErr := lookupPassword(ds, cfg)
 			if lookupErr == nil {
 				password = &pw
 				passwordImported = true
@@ -138,12 +138,20 @@ func applyOne(ds DataSource, projectDir string, candidates []ConfigCandidate, cf
 	return row
 }
 
-// lookupPassword is D4's ordered credential-store fetch for one data source, run once, at Apply
-// time (D9). When every backend in the order fails, a ReasonCredentialStoreUnsupported refusal is
-// preferred over a later "not found" — it is the more actionable answer (D1's own remedy text),
-// and a store this platform/configuration cannot read at all is a more honest report than "no
-// entry", which implies the store was actually checked.
-func lookupPassword(ds DataSource, candidates []ConfigCandidate, cfg SecurityConfig) (password, username string, err error) {
+// lookupPassword is D4's (now single-backend) credential fetch for one data source, run once, at
+// Apply time (D9). cfg.Provider is checked directly rather than through LookupOrder, because
+// KEEPASS and MEMORY_ONLY/DO_NOT_STORE both resolve to "no backend to try" but need different
+// refusals: KEEPASS means a real store exists that this app cannot read (D1: file-based
+// PasswordSafe was scoped out after the keychain-only correction below), while MEMORY_ONLY/
+// DO_NOT_STORE means DataGrip itself never saved anything.
+func lookupPassword(ds DataSource, cfg SecurityConfig) (password, username string, err error) {
+	if cfg.Provider == "KEEPASS" {
+		return "", "", &RefusalError{
+			Code: ReasonCredentialStoreUnsupported,
+			Message: "DataGrip is configured to use its own local password store instead of the system " +
+				"keychain, which Kira Studio does not support",
+		}
+	}
 	order := LookupOrder(cfg.Provider)
 	if len(order) == 0 {
 		return "", "", &RefusalError{
@@ -151,65 +159,5 @@ func lookupPassword(ds DataSource, candidates []ConfigCandidate, cfg SecurityCon
 			Message: "DataGrip is configured not to save passwords",
 		}
 	}
-
-	var unsupportedErr, lastErr error
-	for _, backend := range order {
-		var pw, un string
-		var berr error
-		switch backend {
-		case "keychain":
-			pw, un, berr = readKeychainPassword(ds.UUID)
-		case "kdbx":
-			pw, un, berr = lookupKDBX(ds, candidates, cfg)
-		}
-		if berr == nil {
-			return pw, un, nil
-		}
-		if re, ok := berr.(*RefusalError); ok && re.Code == ReasonCredentialStoreUnsupported && unsupportedErr == nil {
-			unsupportedErr = berr
-		}
-		lastErr = berr
-	}
-	if unsupportedErr != nil {
-		return "", "", unsupportedErr
-	}
-	return "", "", lastErr
-}
-
-func lookupKDBX(ds DataSource, candidates []ConfigCandidate, cfg SecurityConfig) (string, string, error) {
-	if len(candidates) == 0 {
-		root, _ := jetBrainsConfigRoot()
-		return "", "", &RefusalError{
-			Code:    ReasonCredentialStoreNotFound,
-			Message: fmt.Sprintf("no IntelliJ Platform config directory was found; searched %s", describeSearchedDirs(root)),
-		}
-	}
-	kdbxPath, mainKeyDir := kdbxPathFor(candidates[0], cfg)
-	mainKey, err := ReadMainKey(mainKeyDir)
-	if err != nil {
-		return "", "", err
-	}
-	return readKDBXPassword(kdbxPath, mainKey, serviceNameForDataSource(ds.UUID))
-}
-
-// describeSearchedDirs is D5.4's "the failure message lists the directories actually searched" —
-// the single most useful thing a credential-store-not-found error can say.
-func describeSearchedDirs(root string) string {
-	if root == "" {
-		return "(the home directory could not be resolved)"
-	}
-	entries, err := os.ReadDir(root)
-	if err != nil {
-		return fmt.Sprintf("%s (does not exist)", root)
-	}
-	var names []string
-	for _, e := range entries {
-		if e.IsDir() {
-			names = append(names, filepath.Join(root, e.Name()))
-		}
-	}
-	if len(names) == 0 {
-		return fmt.Sprintf("%s (no subdirectories)", root)
-	}
-	return strings.Join(names, ", ")
+	return readKeychainPassword(ds.UUID)
 }

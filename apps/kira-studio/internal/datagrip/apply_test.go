@@ -140,6 +140,27 @@ func TestApplyPartialFailureLeavesOtherRowsCreated(t *testing.T) {
 	}
 }
 
+// TestLookupPasswordKeepassConfiguredIsUnsupported is this follow-up's own regression case: a
+// project whose security.xml says PROVIDER=KEEPASS now has no backend left to try (the file-based
+// PasswordSafe store was removed per explicit user correction — see this phase's plan doc), and
+// must get a named ReasonCredentialStoreUnsupported refusal rather than being silently folded into
+// ReasonPasswordNotSaved (which would misreport a real, readable-by-DataGrip store as "no
+// password saved") or a bare miss.
+func TestLookupPasswordKeepassConfiguredIsUnsupported(t *testing.T) {
+	ds := DataSource{UUID: "dddddddd-0000-0000-0000-000000000001"}
+	_, _, err := lookupPassword(ds, SecurityConfig{Provider: "KEEPASS"})
+	if err == nil {
+		t.Fatalf("expected an error")
+	}
+	re, ok := err.(*RefusalError)
+	if !ok {
+		t.Fatalf("error is not a *RefusalError: %v", err)
+	}
+	if re.Code != ReasonCredentialStoreUnsupported {
+		t.Errorf("Code = %q, want %q", re.Code, ReasonCredentialStoreUnsupported)
+	}
+}
+
 // TestApplySecretsUnavailableImportsEveryRowWithNoPassword is case 25: with
 // secrets.Status.Available == false, every Input.Password is nil and every row carries
 // secret-storage-unavailable — but every row still creates.

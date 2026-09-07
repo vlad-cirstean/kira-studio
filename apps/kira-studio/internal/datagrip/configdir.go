@@ -99,10 +99,12 @@ func looksLikeIDEConfigDir(dir string) bool {
 }
 
 // SecurityConfig is security.xml's PasswordSafe component (F5) — Provider is "" when the file is
-// missing or unparseable, which D5.4/D4 treat as "try both stores" rather than an error.
+// missing or unparseable, which D5.4/D4 treat as "try the keychain" rather than an error. keepassDb
+// (the file-store's own relocation option) is intentionally not carried here any more — this
+// package no longer reads a file-based store at all (see this follow-up's docs note), only
+// Provider itself, to tell a KEEPASS-configured project apart from one this app can actually help.
 type SecurityConfig struct {
-	Provider  string
-	KeepassDb string
+	Provider string
 }
 
 type xmlSecurityDoc struct {
@@ -133,36 +135,27 @@ func ReadSecurityXML(configDir string) SecurityConfig {
 			continue
 		}
 		for _, o := range c.Options {
-			switch o.Name {
-			case "PROVIDER":
+			if o.Name == "PROVIDER" {
 				cfg.Provider = o.Value
-			case "keepassDb":
-				cfg.KeepassDb = o.Value
 			}
 		}
 	}
 	return cfg
 }
 
-// LookupOrder is D4: Keychain first, KDBX second, honouring an explicit provider when there is
-// one. provider is SecurityConfig.Provider ("" for absent/unparseable, treated the same as
-// "KEYCHAIN" per D4's own wording).
+// LookupOrder is D4, reduced by this follow-up (see docs/v1.2/plans/P25-datagrip-connection-import.md's
+// correction note): the file-based PasswordSafe store (KEEPASS) was removed per explicit user
+// correction, so "keychain" is the only backend this package ever tries. A KEEPASS-configured
+// project is handled separately by its callers (apply.go's lookupPassword, scan.go's outlookFor),
+// which check cfg.Provider directly so they can report ReasonCredentialStoreUnsupported /
+// OutlookStoreUnsupported rather than conflating it with "DataGrip never saved a password"
+// (MEMORY_ONLY/DO_NOT_STORE, which is what an empty return here means). provider is
+// SecurityConfig.Provider ("" for absent/unparseable, treated the same as "KEYCHAIN").
 func LookupOrder(provider string) []string {
 	switch provider {
-	case "KEEPASS":
-		return []string{"kdbx"}
-	case "MEMORY_ONLY", "DO_NOT_STORE":
+	case "KEEPASS", "MEMORY_ONLY", "DO_NOT_STORE":
 		return nil
-	default: // "KEYCHAIN", "", or anything unrecognised — D4: try both, Keychain first.
-		return []string{"keychain", "kdbx"}
+	default: // "KEYCHAIN", "", or anything unrecognised.
+		return []string{"keychain"}
 	}
-}
-
-// kdbxPathFor resolves the c.kdbx/c.pwd pair for a candidate directory — security.xml's
-// keepassDb can relocate c.kdbx anywhere, with c.pwd looked for beside it (F6).
-func kdbxPathFor(candidate ConfigCandidate, cfg SecurityConfig) (kdbxPath, mainKeyDir string) {
-	if cfg.KeepassDb != "" {
-		return cfg.KeepassDb, filepath.Dir(cfg.KeepassDb)
-	}
-	return filepath.Join(candidate.Dir, "c.kdbx"), candidate.Dir
 }
