@@ -106,10 +106,24 @@
   --kira-shadow: 0 2px 8px rgb(0 0 0 / 0.32);
   --kira-shadow-dialog: 0 8px 28px rgb(0 0 0 / 0.45);
 
-  /* Appearance tokens: defaults here, overwritten at runtime from `settings` (Step 6). */
+  /* Appearance tokens: defaults here, overwritten at runtime from `settings` (Step 6).
+     --kira-font-family is the *channel* the Appearance "Data font" control writes; the two roles
+     below are what stylesheets reference. (P26) */
   --kira-font-family: Menlo, monospace;
   --kira-font-size: 12px;
   --kira-row-height: 28px; /* comfortable; compact = 22px */
+
+  /* P26: two font roles over the one channel above, restoring the design system's own
+     --font-ui / --font-mono pair (docs/design/kira-design-system/parts/_style.css:29-30) that the
+     port to this file collapsed into one token. LAW 08 decides which a surface gets: "Mono is for
+     data. If a string came out of a database — a value, an identifier, a query, a duration — it is
+     mono. If the app wrote it, it is UI."
+     --kira-font-data is user-customizable (it is --kira-font-family); --kira-font-ui is FIXED and
+     has no Settings control by design — see docs/v1.2/plans/P26-interface-font-split.md D3. */
+  --kira-font-data: var(--kira-font-family);
+  --kira-font-ui:
+    -apple-system, BlinkMacSystemFont, "Segoe WPC", "Segoe UI", system-ui, "Ubuntu", "Droid Sans",
+    sans-serif;
 
   /* P16 design system (docs/design/kira-design-system): one type scale, one space
      scale, one control-height scale, shared verbatim by every primitive in
