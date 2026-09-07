@@ -19,13 +19,14 @@ func SwitchArgs(branch string, discard bool) []string {
 }
 
 // SwitchDetachArgs builds `git switch --detach <target>` — a tag, a raw sha, or an explicitly
-// detached remote-tracking checkout. --no-guess has no effect on --detach but costs nothing to
-// keep for a uniform argv shape.
+// detached remote-tracking checkout. --no-guess has no effect on --detach (there is nothing to
+// guess a branch name from) but costs nothing to keep, so every `switch` invocation this package
+// builds carries it uniformly (§7.3's own exit criterion).
 func SwitchDetachArgs(target string, discard bool) []string {
 	if discard {
-		return []string{"switch", "--discard-changes", "--detach", target}
+		return []string{"switch", "--no-guess", "--discard-changes", "--detach", target}
 	}
-	return []string{"switch", "--detach", target}
+	return []string{"switch", "--no-guess", "--detach", target}
 }
 
 // SwitchCreateTrackingArgs builds `git switch -c <branch> <upstream>` — the executor's route for
