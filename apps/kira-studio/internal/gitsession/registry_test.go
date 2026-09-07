@@ -20,6 +20,7 @@ import (
 type fakeProcess struct{ stdout []byte }
 
 func (p *fakeProcess) Stdout() io.ReadCloser { return io.NopCloser(bytes.NewReader(p.stdout)) }
+func (p *fakeProcess) Stdin() io.WriteCloser { return nil }
 func (p *fakeProcess) Wait() (gitclient.Result, error) {
 	return gitclient.Result{ExitCode: 0}, nil
 }

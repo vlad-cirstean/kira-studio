@@ -49,6 +49,7 @@ type fakeProcess struct {
 }
 
 func (p *fakeProcess) Stdout() io.ReadCloser { return io.NopCloser(bytes.NewReader(p.result.Stdout)) }
+func (p *fakeProcess) Stdin() io.WriteCloser { return nil }
 func (p *fakeProcess) Wait() (Result, error) {
 	return Result{Stderr: p.result.Stderr, ExitCode: p.result.ExitCode}, nil
 }

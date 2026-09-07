@@ -33,6 +33,11 @@ type Spec struct {
 	// write's lock. Never set for a command that itself writes (a future phase's checkout/reset/
 	// stash), which needs the lock.
 	ReadOnly bool
+	// Stdin requests a writable stdin pipe on the returned Process (G2 §10's handed-forward seam;
+	// G3's gitclient/catfile is its first caller — a persistent `cat-file --batch[-check]` process
+	// is driven by writing one revision per line). False (the default) leaves stdin closed, exactly
+	// as every G1/G2 spawn already behaves.
+	Stdin bool
 }
 
 // Result is the raw outcome of one Spec — no interpretation of Stdout/Stderr's bytes at all
@@ -131,6 +136,10 @@ type Process interface {
 	// signal that whole group, is not delayed forever by a grandchild that outlives the direct
 	// child.
 	Stdout() io.ReadCloser
+	// Stdin is the child's stdin pipe — nil unless Spec.Stdin was set. Closing it (or the caller's
+	// own Close) is what lets a persistent process (git's own read loop) notice EOF and exit
+	// cleanly; a caller that never sets Spec.Stdin never needs to look at this at all.
+	Stdin() io.WriteCloser
 	// Wait blocks until the child has exited and its stderr has been fully drained, then reports
 	// the outcome. Result.Stdout is always nil: the caller owns that pipe. Calling Wait without
 	// having read Stdout to EOF can block until the child's own write blocks and the context or
@@ -219,12 +228,19 @@ func (execRunner) Start(ctx context.Context, gitPath string, spec Spec) (Process
 	if err != nil {
 		return nil, err
 	}
+	var stdin io.WriteCloser
+	if spec.Stdin {
+		stdin, err = cmd.StdinPipe()
+		if err != nil {
+			return nil, err
+		}
+	}
 
 	if err := cmd.Start(); err != nil {
 		return nil, err
 	}
 
-	p := &execProcess{cmd: cmd, stdout: stdout, stderr: &boundedWriter{max: maxStderrBytes}, stderrDone: make(chan struct{})}
+	p := &execProcess{cmd: cmd, stdout: stdout, stdin: stdin, stderr: &boundedWriter{max: maxStderrBytes}, stderrDone: make(chan struct{})}
 	go p.drainStderr(stderrPipe)
 	return p, nil
 }
@@ -260,6 +276,7 @@ func (w *boundedWriter) Write(p []byte) (int, error) {
 type execProcess struct {
 	cmd    *exec.Cmd
 	stdout io.ReadCloser
+	stdin  io.WriteCloser
 	stderr *boundedWriter
 
 	stderrDone chan struct{}
@@ -272,6 +289,7 @@ type execProcess struct {
 }
 
 func (p *execProcess) Stdout() io.ReadCloser { return p.stdout }
+func (p *execProcess) Stdin() io.WriteCloser { return p.stdin }
 
 func (p *execProcess) drainStderr(r io.Reader) {
 	_, _ = io.Copy(p.stderr, r)
@@ -307,6 +325,9 @@ func (p *execProcess) Close() error {
 		// Closing Stdout first unblocks a concurrent reader immediately, independent of how long
 		// the kill below takes to land.
 		_ = p.stdout.Close()
+		if p.stdin != nil {
+			_ = p.stdin.Close()
+		}
 		if p.cmd.Process != nil {
 			_ = killGroup(p.cmd.Process.Pid, syscall.SIGTERM)
 			escalate := time.AfterFunc(gracefulStopDelay, func() {
