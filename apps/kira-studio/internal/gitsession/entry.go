@@ -221,6 +221,23 @@ func (e *RepoEntry) setHead(h gitclient.HeadState) {
 // commit.fileDiff/blob reads); it exists now so RepoEntry's own teardown has somewhere real to
 // tear down, per SPEC §6 putting the cat-file session in the shared (per-repo, not per-connection)
 // box.
+// invalidateAfterWrite drops exactly what a completed local write can have invalidated, without
+// waiting for the watcher's own debounced signal (F5/D7): the same four drops note() makes on
+// refsChanged. It is a second line of defence for OUR OWN writes, for the case a watch was lost
+// (fsnotify's Add can fail with EMFILE, G2 D10 logs-and-skips; ErrEventOverflow is documented) — the
+// watcher remains the ONLY thing that notices a write made outside this app, and the only thing
+// that fans repo.changed out to subscribers. This emits no event (a second emitter would double
+// every event a client sees) and marks no Walk stale (a Walk is per-connection; reaching from an
+// entry into every connection's walks would invert the dependency the subscriber already owns).
+func (e *RepoEntry) invalidateAfterWrite() {
+	e.detail.dropAll()
+	e.refs.drop()
+	e.rangeCount.drop()
+	e.headMu.Lock()
+	e.headStale = true
+	e.headMu.Unlock()
+}
+
 // CatFile returns nil once this entry has been torn down (F3) — a lazy, unguarded construction
 // here is exactly what let auto-fetch (and any other reader racing teardown) start a fresh
 // `cat-file --batch` pair nothing would ever close. Callers treat nil as ErrRepoTornDown.

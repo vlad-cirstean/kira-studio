@@ -330,6 +330,12 @@ func (e *RepoEntry) RunRemote(ctx context.Context, conn *Conn, params RemoteOpPa
 		}
 	}
 
+	// D7: from here on every remaining path spawns at least one real git process that can touch
+	// refs (fetch/push/pull all can) — drop the shared caches synchronously on every exit below,
+	// success, a classified failure or a genuine spawn error alike, rather than waiting for the
+	// watcher's own debounced signal to notice our own write.
+	defer e.invalidateAfterWrite()
+
 	progressEmit := func(p gitops.Progress) {
 		if conn == nil || conn.Emit == nil {
 			return

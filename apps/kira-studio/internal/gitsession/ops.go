@@ -344,6 +344,12 @@ func (e *RepoEntry) RunOp(ctx context.Context, conn ConnID, connLabel string, op
 		return OpResult{OK: false, Error: prep.earlyError, Undo: nil, Head: head, InProgress: inProgress}, nil
 	}
 
+	// D7: drops the shared caches synchronously once a write has actually been attempted, on EVERY
+	// exit path below (success, a classified failure, a genuine spawn error) — a half-applied write
+	// invalidates just as much as a whole one, and the watcher's own debounced signal must not be
+	// the only thing that ever notices our own write.
+	defer e.invalidateAfterWrite()
+
 	var opErr *OpError
 	for _, argv := range prep.argvList {
 		oe, werr := e.runWriteArgv(ctx, argv)
