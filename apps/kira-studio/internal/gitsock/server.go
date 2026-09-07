@@ -10,6 +10,8 @@ import (
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/bridge/rpcstream"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitrpc"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/notify"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 )
 
 // Deps is everything Server needs to listen and serve. SocketPath/LockPath are the two files under
@@ -37,6 +39,8 @@ type Server struct {
 	closeCh   chan struct{}
 	conns     map[string][]net.Conn // clientID -> its live connections
 
+	clientsChanged notify.Emitter[[]model.GitClient]
+
 	wg sync.WaitGroup
 }
 
@@ -50,6 +54,29 @@ func New(deps Deps) *Server {
 // Broker exposes the pairing broker to bridge.GitClientsService (§3.6) — Approve/Deny/Pending/
 // Subscribe all live on it.
 func (s *Server) Broker() *Broker { return s.broker }
+
+// OnPairingChanged and OnClientsChanged are bridge/events.go's Sources.Git seam (§3.6) — Server
+// is the one thing main.go wires as Sources.Git, so both live here rather than splitting the
+// subscription across Server and Broker.
+func (s *Server) OnPairingChanged(fn func(PairingSnapshot)) (unsubscribe func()) {
+	return s.broker.Subscribe(fn)
+}
+
+func (s *Server) OnClientsChanged(fn func([]model.GitClient)) (unsubscribe func()) {
+	return s.clientsChanged.Subscribe(fn)
+}
+
+// notifyClientsChanged re-reads the trust store and fans it out — called after every write
+// (a fresh pairing, a revoke) rather than patching the in-memory list, since G1's volumes make a
+// full re-read cheap and it can never drift from what's actually stored.
+func (s *Server) notifyClientsChanged() {
+	clients, err := s.deps.Clients.List()
+	if err != nil {
+		slog.Warn("gitsock: list clients for change notification", "scope", "gitsock", "err", err)
+		return
+	}
+	s.clientsChanged.Emit(clients)
+}
 
 // Start performs D5's five-step sequence. A failure to acquire the lock, or any other startup
 // error, is returned but never fatal to the caller (main.go logs and continues booting) — the app
@@ -135,10 +162,11 @@ func (s *Server) handleConn(nc net.Conn) {
 	defer nc.Close()
 	c := newConn(nc)
 	clientID, ok := runHandshake(c, handshakeDeps{
-		Clients:       s.deps.Clients,
-		Broker:        s.broker,
-		ServerVersion: s.deps.ServerVersion,
-		Now:           s.deps.Now,
+		Clients:        s.deps.Clients,
+		Broker:         s.broker,
+		ServerVersion:  s.deps.ServerVersion,
+		Now:            s.deps.Now,
+		ClientsChanged: s.notifyClientsChanged,
 	})
 	if !ok {
 		return
@@ -192,6 +220,7 @@ func (s *Server) Revoke(clientID string) error {
 	for _, nc := range live {
 		_ = nc.Close()
 	}
+	s.notifyClientsChanged()
 	return nil
 }
 

@@ -2,6 +2,7 @@ package bridge
 
 import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/appcore"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitsock"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/metrics"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 )
@@ -39,6 +40,10 @@ const (
 	// (the RunOp closure calling grpcclient.ServerStream), not a startup-wired long-lived source,
 	// so it needs no Sources entry and no Attach subscription.
 	ChannelGrpcCall = "kira:grpc:call"
+	// ChannelGitPairing and ChannelGitClientsChanged are G1's own two push channels (SPEC §3.3,
+	// D19) — the pairing prompt's live queue snapshot, and the Connected editors pane's list.
+	ChannelGitPairing        = "kira:git:pairing"
+	ChannelGitClientsChanged = "kira:git:clients"
 )
 
 // ChannelEngineState is declared for completeness and deliberately never emitted: nothing in
@@ -60,6 +65,10 @@ type Sources struct {
 	}
 	Metrics interface {
 		OnSample(func(metrics.Sample)) func()
+	}
+	Git interface {
+		OnPairingChanged(func(gitsock.PairingSnapshot)) func()
+		OnClientsChanged(func([]model.GitClient)) func()
 	}
 }
 
@@ -92,6 +101,12 @@ func (ev *Events) Attach(s Sources) (detach func()) {
 	unsubMetrics := s.Metrics.OnSample(func(sample metrics.Sample) {
 		ev.emit.Emit(ChannelAppMetrics, sample)
 	})
+	unsubGitPairing := s.Git.OnPairingChanged(func(snap gitsock.PairingSnapshot) {
+		ev.emit.Emit(ChannelGitPairing, toWireSnapshot(snap))
+	})
+	unsubGitClients := s.Git.OnClientsChanged(func(clients []model.GitClient) {
+		ev.emit.Emit(ChannelGitClientsChanged, clients)
+	})
 
 	return func() {
 		unsubState()
@@ -99,6 +114,8 @@ func (ev *Events) Attach(s Sources) (detach func()) {
 		unsubList()
 		unsubOplog()
 		unsubMetrics()
+		unsubGitPairing()
+		unsubGitClients()
 	}
 }
 

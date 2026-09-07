@@ -55,6 +55,9 @@ type handshakeDeps struct {
 	Broker        *Broker
 	ServerVersion string
 	Now           func() time.Time
+	// ClientsChanged notifies the Connected editors pane after a write to the trust store
+	// (a fresh pairing). Optional so handshake_test.go's fakes needn't supply it.
+	ClientsChanged func()
 }
 
 // runHandshake implements §3.1.1's decision table, first match wins. ok=true means the connection
@@ -147,6 +150,9 @@ func finishPairing(c *conn, deps handshakeDeps, clientID, label string) (string,
 		slog.Warn("gitsock: insert paired client", "scope", "gitsock", "client", clientID, "err", err)
 		sendHandshake(c, handshakeResponse{Kind: "pairingDenied", Reason: "denied"})
 		return "", false
+	}
+	if deps.ClientsChanged != nil {
+		deps.ClientsChanged()
 	}
 	if err := sendHandshake(c, handshakeResponse{Kind: "paired", Token: plain}); err != nil {
 		return "", false

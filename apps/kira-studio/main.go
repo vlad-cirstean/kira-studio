@@ -4,6 +4,7 @@ import (
 	"embed"
 	"log"
 	"log/slog"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -27,6 +28,9 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/connections"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/enginecache"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/apivars"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitclient"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitrpc"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitsock"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/localauth"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/logging"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/metrics"
@@ -88,6 +92,21 @@ func main() {
 	// P5: the same "needs a Cipher, constructed separately from repos.New's aggregate" shape as
 	// secretsRepo just above.
 	repositories.Variables = repos.NewVariables(db.DB, cipher)
+
+	// G1 §3.7: the git socket listener. Start's error is logged, never fatal (D5) — the app must
+	// boot even when the git socket could not, e.g. a second instance already serving it.
+	gitCli := gitclient.NewClient(gitclient.NewExecRunner(), gitclient.NewRealClock())
+	gitSock := gitsock.New(gitsock.Deps{
+		SocketPath:    filepath.Join(config.KiraHome(), "git.sock"),
+		LockPath:      filepath.Join(config.KiraHome(), "git.sock.lock"),
+		Clients:       repositories.GitClients,
+		Handlers:      gitrpc.New(gitrpc.Deps{Client: gitCli, ServerVersion: buildinfo.Version}),
+		ServerVersion: buildinfo.Version,
+		Now:           time.Now,
+	})
+	if err := gitSock.Start(); err != nil {
+		slog.Warn("git socket listener", "scope", "startup", "err", err)
+	}
 	// P5 D8: the SAME authorizer instance connections.New below is given — that is what makes the
 	// reveal grace genuinely shared between a connection-password reveal and a variable reveal.
 	apiVarsSvc := apivars.New(repositories.Variables, cipher, authorizer)
@@ -173,7 +192,7 @@ func main() {
 	dialogs, attachDialogs := shell.NewDeferredDialogs()
 
 	events := bridge.NewEvents(emitter)
-	eventsDetach := events.Attach(bridge.Sources{Connections: connectionsSvc, Oplog: oplogWiring, Metrics: metricsTicker})
+	eventsDetach := events.Attach(bridge.Sources{Connections: connectionsSvc, Oplog: oplogWiring, Metrics: metricsTicker, Git: gitSock})
 
 	// windows holds every currently open window's shell.Attach cleanup, keyed by that window's own
 	// identity (P8 C2, replacing the single detachWindow/mainWindow pair that only ever worked
@@ -196,6 +215,9 @@ func main() {
 		eventsDetach()
 		oplogWiring.Stop()
 		connectionsSvc.Shutdown()
+		if err := gitSock.Close(); err != nil {
+			slog.Warn("close git socket", "scope", "shutdown", "err", err)
+		}
 		if err := repositories.Close(); err != nil {
 			slog.Warn("close repos", "scope", "shutdown", "err", err)
 		}
@@ -233,6 +255,7 @@ func main() {
 			application.NewService(&bridge.ResponseHistoryService{Deps: deps}),
 			application.NewService(&bridge.GrpcHistoryService{Deps: deps}),
 			application.NewService(&bridge.DataGripService{Deps: deps}),
+			application.NewService(&bridge.GitClientsService{Deps: deps, Sock: gitSock, Broker: gitSock.Broker()}),
 			application.NewService(&bridge.LifecycleService{Flusher: quitter, WindowFlusher: closeFlush}),
 		},
 		Assets: application.AssetOptions{
