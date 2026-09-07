@@ -33,13 +33,13 @@ type Handlers struct {
 	Stream          func(ctx context.Context, method string, params json.RawMessage) error
 }
 
-// session is one renderer connection's whole server-side state: the one writer goroutine every
-// frame goes through (StreamConn.Send is not documented safe for concurrent callers, and this
-// session dispatches each inbound req/open onto its own goroutine — bridge/stream.go's own
-// engine-stream precedent, "router gives this session its own single writer", is the same
-// discipline applied here), plus the active-work/credit-gate bookkeeping every cancel/credit frame
-// needs to reach.
-type session struct {
+// Session is one connection's whole server-side state: the one writer goroutine every frame goes
+// through (Conn.Send is not documented safe for concurrent callers, and a session dispatches each
+// inbound req/open onto its own goroutine — bridge/stream.go's own engine-stream precedent,
+// "router gives this session its own single writer", is the same discipline applied here), plus
+// the active-work/credit-gate bookkeeping every cancel/credit frame needs to reach, and Emit — the
+// production handle gitsession's subscriber fan-out (G2 plan D17) calls to deliver repo.changed.
+type Session struct {
 	h    Handlers
 	conn Conn
 
@@ -52,8 +52,11 @@ type session struct {
 	creditGates map[int]*creditGate
 }
 
-func newSession(conn Conn, h Handlers) *session {
-	s := &session{
+// NewSession constructs a Session over conn — Serve (below) is what actually runs it; a caller
+// that only needs the handle to Emit from elsewhere while Serve loops in its own goroutine is
+// exactly gitsock's own use (D19).
+func NewSession(conn Conn, h Handlers) *Session {
+	s := &Session{
 		h:           h,
 		conn:        conn,
 		sendCh:      make(chan []byte, 16),
@@ -65,7 +68,7 @@ func newSession(conn Conn, h Handlers) *session {
 	return s
 }
 
-func (s *session) writeLoop() {
+func (s *Session) writeLoop() {
 	for {
 		select {
 		case b := <-s.sendCh:
@@ -78,7 +81,7 @@ func (s *session) writeLoop() {
 	}
 }
 
-func (s *session) send(f frame) {
+func (s *Session) send(f frame) {
 	b, err := json.Marshal(envelope{Version: s.h.ContractVersion, Body: f})
 	if err != nil {
 		return // every frame value this package ever constructs is JSON-safe by construction.
@@ -89,12 +92,10 @@ func (s *session) send(f frame) {
 	}
 }
 
-// Emit sends an 'evt' frame — the Go half of rpc.ts's RpcServer.emit, available to a future
-// phase's Watcher-driven repo.changed/settings.changed. P1 wires no production caller of this yet
-// (§0.2: watching-into-events is P2's own row); it exists, correctly, for gitstream_test.go to
-// prove the event side of the frame protocol crosses at all — the "an event crossing" §7 exit
-// criterion names, and the honest way to prove it without inventing a P2 feature early.
-func (s *session) Emit(method string, payload any) {
+// Emit sends an 'evt' frame — the Go half of rpc.ts's RpcServer.emit. Its production caller is
+// gitsession's subscriber fan-out (G2 plan D14/D17), reached through gitsock's Conn.Emit closure
+// (D19); session_test.go's own TestSession_Emit_EventCrosses is what first proved the wire shape.
+func (s *Session) Emit(method string, payload any) {
 	b, err := json.Marshal(payload)
 	if err != nil {
 		return
@@ -106,7 +107,7 @@ func (s *session) Emit(method string, payload any) {
 // mirrors rpc.ts's own `if (activeWork.delete(id))` idiom: a completion that loses the race
 // against an incoming 'cancel' frame (which deletes the same entry first) must send nothing, since
 // the client already resolved locally the moment it sent 'cancel' and is not waiting on a reply.
-func (s *session) removeActiveWork(id int) bool {
+func (s *Session) removeActiveWork(id int) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if _, ok := s.activeWork[id]; !ok {
@@ -116,7 +117,7 @@ func (s *session) removeActiveWork(id int) bool {
 	return true
 }
 
-func (s *session) handleRequest(id int, method string, params json.RawMessage) {
+func (s *Session) handleRequest(id int, method string, params json.RawMessage) {
 	ctx, cancel := context.WithCancel(context.Background())
 	s.mu.Lock()
 	s.activeWork[id] = cancel
@@ -140,7 +141,7 @@ func (s *session) handleRequest(id int, method string, params json.RawMessage) {
 	s.send(frame{T: "res", ID: id, OK: boolPtr(true), Result: resultBytes})
 }
 
-func (s *session) handleOpen(id int, method string, params json.RawMessage) {
+func (s *Session) handleOpen(id int, method string, params json.RawMessage) {
 	ctx, cancel := context.WithCancel(context.Background())
 	gate := newCreditGate()
 	s.mu.Lock()
@@ -165,7 +166,7 @@ func (s *session) handleOpen(id int, method string, params json.RawMessage) {
 	s.send(frame{T: "end", ID: id})
 }
 
-func (s *session) handleCredit(id, n int) {
+func (s *Session) handleCredit(id, n int) {
 	s.mu.Lock()
 	gate := s.creditGates[id]
 	s.mu.Unlock()
@@ -174,7 +175,7 @@ func (s *session) handleCredit(id, n int) {
 	}
 }
 
-func (s *session) handleCancel(id int) {
+func (s *Session) handleCancel(id int) {
 	s.mu.Lock()
 	cancel, ok := s.activeWork[id]
 	if ok {
@@ -187,7 +188,7 @@ func (s *session) handleCancel(id int) {
 	}
 }
 
-func (s *session) handleRaw(raw []byte) {
+func (s *Session) handleRaw(raw []byte) {
 	var env envelope
 	if err := json.Unmarshal(raw, &env); err != nil {
 		return // a corrupt or truncated frame has no reliably extractable id — dropped, the same
@@ -214,7 +215,7 @@ func (s *session) handleRaw(raw []byte) {
 	}
 }
 
-func (s *session) close() {
+func (s *Session) close() {
 	s.mu.Lock()
 	for _, cancel := range s.activeWork {
 		cancel()
@@ -225,12 +226,14 @@ func (s *session) close() {
 	s.stop.Do(func() { close(s.done) })
 }
 
-// Serve runs for the life of one connection and returns when the peer's side closes.
-func Serve(conn Conn, h Handlers) {
-	s := newSession(conn, h)
+// Serve runs for the life of one connection and returns when the peer's side closes, closing the
+// session on return. Call NewSession first and keep the handle to Emit from elsewhere (gitsock
+// does exactly this, D19) — Serve itself takes no arguments precisely so there is one Session, not
+// a second copy constructed internally that Emit could never reach.
+func (s *Session) Serve() {
 	defer s.close()
 	for {
-		raw, err := conn.Receive()
+		raw, err := s.conn.Receive()
 		if err != nil {
 			return
 		}

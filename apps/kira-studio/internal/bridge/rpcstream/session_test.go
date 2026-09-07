@@ -40,16 +40,15 @@ func (p *internalPipeSession) Receive() ([]byte, error) {
 	}
 }
 
-// TestSession_Emit_EventCrosses is §7's own exit-criterion proof for the event half of the frame
-// protocol: gitclient's Watcher has no production wiring into repo.changed yet (P2's row, §0.2), so
-// this is the honest place to prove 'evt' frames cross correctly — directly, since nothing in P1's
-// own production path calls Emit yet for a bridge_test-level (black-box) test to observe.
+// TestSession_Emit_EventCrosses proves the event half of the frame protocol directly, against a
+// bare Conn — gitsession's own subscriber_test.go/conn_test.go prove Emit is actually reached in
+// production, but not the wire shape 'evt' crosses as, which is this package's own job to prove.
 func TestSession_Emit_EventCrosses(t *testing.T) {
 	conn := newInternalPipeSession()
 	// Emit never touches h — a zero-value Request/Stream pair (never invoked in this test) plus
 	// a contract version is enough to construct a session to Emit through.
 	const contractVersion = 3
-	session := newSession(conn, Handlers{ContractVersion: contractVersion})
+	session := NewSession(conn, Handlers{ContractVersion: contractVersion})
 	defer session.close()
 
 	type payload struct {

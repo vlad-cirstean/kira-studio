@@ -154,8 +154,8 @@ func (s *Server) acceptLoop() {
 	}
 }
 
-// handleConn runs the handshake (§3.1.1) and, once it reaches "ready", hands the connection to
-// rpcstream.Serve for the rest of its life. The connection is registered under its client id for
+// handleConn runs the handshake (§3.1.1) and, once it reaches "ready", hands the connection to a
+// rpcstream.Session for the rest of its life. The connection is registered under its client id for
 // D18's Revoke only after the handshake accepts it — a connection still mid-pairing has no
 // identity to revoke yet.
 func (s *Server) handleConn(nc net.Conn) {
@@ -175,11 +175,11 @@ func (s *Server) handleConn(nc net.Conn) {
 	s.addConn(clientID, nc)
 	defer s.removeConn(clientID, nc)
 
-	rpcstream.Serve(c, rpcstream.Handlers{
+	rpcstream.NewSession(c, rpcstream.Handlers{
 		ContractVersion: gitrpc.ContractVersion,
 		Request:         s.deps.Handlers.Request,
 		Stream:          s.deps.Handlers.Stream,
-	})
+	}).Serve()
 }
 
 func (s *Server) addConn(clientID string, nc net.Conn) {
