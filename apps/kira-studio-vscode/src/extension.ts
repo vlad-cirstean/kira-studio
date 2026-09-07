@@ -9,15 +9,23 @@
  * `notifySettingsChanged` calls that used to push into those providers are gone with them,
  * returning in G3.
  */
-import { coerceSettings, SETTINGS, type SettingKey } from '@kira/git-core';
+import {
+  coerceSettings,
+  SETTINGS,
+  type SettingKey,
+  type VirtualDocumentSource,
+} from '@kira/git-core';
 import type { GitStatus } from '@kira/git-ipc';
 import * as vscode from 'vscode';
 import { ConnectionManager } from './connection.ts';
 import { KiraGraphViewProvider } from './panelView.ts';
+import { VsCodeClipboard } from './ports/clipboard.ts';
 import { VsCodeDialogs } from './ports/dialogs.ts';
+import { VsCodeEditorIntegration } from './ports/editorIntegration.ts';
 import { VsCodeLogger } from './ports/logger.ts';
 import { VsCodeWorkspaceRoots } from './ports/workspaceRoots.ts';
 import { createProxyHandlers } from './proxyHandlers.ts';
+import { parseVirtualKey } from './virtualKey.ts';
 
 // D11: the server contract's own app.init is the webview contract's AppInitResult minus host/
 // settings/capabilities (SPEC §5 item 3 assigns those to the extension, which has no webview to
@@ -59,12 +67,33 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const logger = new VsCodeLogger(outputChannel, () => currentSettings['kiraVersion.log.level']);
   const dialogs = new VsCodeDialogs();
   const roots = new VsCodeWorkspaceRoots();
+  const clipboard = new VsCodeClipboard();
+  const editor = new VsCodeEditorIntegration();
 
   const appVersion = String(
     (context.extension.packageJSON as { version?: unknown }).version ?? '0.0.0',
   );
   const manager = new ConnectionManager(context, logger.child('connection'), appVersion);
   connection = manager;
+
+  // G4 D14: registered once, at activation, disposed with the extension. `key` is opaque to VS
+  // Code (virtualKey.ts's own `${repoId}\0${rev}\0${path}` format) — `found` resolves to the
+  // content, everything else (missing/binary/tooLarge, an unparseable key, a request that fails
+  // because the connection dropped) resolves to `undefined`, which the port already turns into an
+  // empty document rather than throwing into VS Code's own provider machinery.
+  const virtualDocumentSource: VirtualDocumentSource = {
+    provide: async (key) => {
+      const parsed = parseVirtualKey(key);
+      if (!parsed) return undefined;
+      try {
+        const result = await manager.request('file.read', parsed);
+        return result.kind === 'found' ? result.content : undefined;
+      } catch {
+        return undefined;
+      }
+    },
+  };
+  context.subscriptions.push(editor.registerVirtualDocuments(virtualDocumentSource));
 
   // D17/D18: the graph webview view is registered as this phase's own first step -- the graph
   // renders end to end from here on, with refs.list/status.get/undo.peek/stash.list rejecting
@@ -74,6 +103,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     settings: () => currentSettings,
     roots,
     dialogs,
+    clipboard,
+    editor,
+    logger,
   });
   const graphProvider = new KiraGraphViewProvider({ extensionUri: context.extensionUri, handlers });
 
