@@ -34,6 +34,13 @@ type Walk struct {
 	spec     porcelain.WalkSpec
 	pageSize int // the underlying log session's own page size — fixed at construction (D6)
 
+	// precomputedTotal is G6 D9's own seam: a rev-list --count already known for this exact range
+	// (from RepoEntry's own range-count slot), threaded into the next resetLocked's
+	// logsession.Options and then consumed (nilled) — only the walk's first open (or the open right
+	// after a reset) benefits; a later reset recounts rather than reusing a stale number. nil for
+	// every graph walk (G3 never sets it).
+	precomputedTotal *int
+
 	mu    sync.Mutex // serialises every operation on this walk, including Stream's own emit
 	log   *logsession.Session
 	store *gitstore.Store
@@ -51,8 +58,8 @@ type Walk struct {
 	staleRefresh atomic.Bool
 }
 
-func newWalk(entry *RepoEntry, gitPath string, spec porcelain.WalkSpec, pageSize int) *Walk {
-	w := &Walk{entry: entry, gitPath: gitPath, spec: spec, pageSize: pageSize}
+func newWalk(entry *RepoEntry, gitPath string, spec porcelain.WalkSpec, pageSize int, precomputedTotal *int) *Walk {
+	w := &Walk{entry: entry, gitPath: gitPath, spec: spec, pageSize: pageSize, precomputedTotal: precomputedTotal}
 	w.resetLocked()
 	return w
 }
@@ -103,7 +110,10 @@ func (w *Walk) resetLocked() {
 		GitPath: w.gitPath,
 		Dir:     walkDir(w.entry.Summary),
 		Read:    w.entry.Repo.Read,
-	}, logsession.Options{Walk: w.spec, PageSize: w.pageSize})
+	}, logsession.Options{Walk: w.spec, PageSize: w.pageSize, PrecomputedTotal: w.precomputedTotal})
+	// Consumed: only THIS open uses a count computed before whatever reset triggered it (D9) — a
+	// later reset (refs moved) recounts rather than reusing a now-stale number.
+	w.precomputedTotal = nil
 	w.staleRefs.Store(false)
 	w.staleRefresh.Store(false)
 }

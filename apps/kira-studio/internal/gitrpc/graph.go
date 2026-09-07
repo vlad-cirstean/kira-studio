@@ -88,7 +88,7 @@ func (r *Router) handleGraphLoadMore(ctx context.Context, c *gitsession.Conn, pa
 	if status.Kind != "ok" {
 		return nil, ipcerr.New("E_GIT_UNAVAILABLE", "gitrpc: git is unavailable: "+status.Kind)
 	}
-	w, err := c.Walk(p.RepoID, status.Path, spec, pageSize)
+	w, err := c.Walk(p.RepoID, status.Path, spec, pageSize, nil)
 	if err != nil {
 		return nil, mapConnError(err)
 	}
@@ -141,7 +141,7 @@ func (r *Router) handleGraphStream(ctx context.Context, c *gitsession.Conn, para
 	if status.Kind != "ok" {
 		return ipcerr.New("E_GIT_UNAVAILABLE", "gitrpc: git is unavailable: "+status.Kind)
 	}
-	w, err := c.Walk(p.RepoID, status.Path, spec, pageSize)
+	w, err := c.Walk(p.RepoID, status.Path, spec, pageSize, nil)
 	if err != nil {
 		return mapConnError(err)
 	}

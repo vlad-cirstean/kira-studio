@@ -25,6 +25,16 @@ type hold struct {
 	unsubscribe func()
 }
 
+// walkPair is SPEC §6's per-(connection, repository) walk box, read literally: "log session,
+// commit store, dictionary marks, scroll/paging state, the active review-range walk if any". Two
+// slots, never a map keyed by range — §6.8 is explicit that the review view holds exactly one
+// review session, and reviewing another branch replaces its contents rather than opening a second
+// view (D3).
+type walkPair struct {
+	graph  *Walk
+	review *Walk
+}
+
 // Conn is one connection's private session state — SPEC §6's Conn box, minus Walk (G6). Emit is
 // supplied by gitsock so this package never imports bridge or rpcstream (SPEC §7's layering rule);
 // it is called from a subscriber's own goroutine (D14), never from the watcher's.
@@ -38,15 +48,15 @@ type Conn struct {
 	Emit        func(method string, payload any)
 
 	mu    sync.Mutex
-	held  map[string]*hold // RepoID -> hold
-	walks map[string]*Walk // RepoID -> Walk (D13), created lazily
+	held  map[string]*hold     // RepoID -> hold
+	walks map[string]*walkPair // RepoID -> walkPair (D3), allocated lazily by whichever walk is created first
 }
 
 // NewConn constructs a Conn with an empty hold set.
 func NewConn(id ConnID, clientID, clientLabel string, emit func(method string, payload any)) *Conn {
 	return &Conn{
 		ID: id, ClientID: clientID, ClientLabel: clientLabel, Emit: emit,
-		held: make(map[string]*hold), walks: make(map[string]*Walk),
+		held: make(map[string]*hold), walks: make(map[string]*walkPair),
 	}
 }
 
@@ -70,10 +80,12 @@ func (c *Conn) Open(ctx context.Context, reg *Registry, gitPath, path string) (g
 	unsubscribe := entry.Subscribe(c.ID, func(ev Event) {
 		// Mark before emitting (D13): a client that reacts to repo.changed by re-opening its
 		// stream must never be able to observe a walk that has not yet been told refs moved.
+		// Marks BOTH the graph and review walk (D5) — a deliberate departure from upstream, whose
+		// review walk dies on hide and so never needs this: ours persists across hide/show, and
+		// without this the client's own "the comparison has changed" banner would replay a stale
+		// store instead of re-walking.
 		if ev.Kind == string(gitclient.SignalRefsChanged) {
-			if w, ok := c.WalkFor(ev.RepoID); ok {
-				w.MarkStale()
-			}
+			c.markWalksStale(ev.RepoID)
 		}
 		if c.Emit != nil {
 			c.Emit("repo.changed", ev)
@@ -124,14 +136,14 @@ func (c *Conn) CloseRepo(repoID string) bool {
 	if ok {
 		delete(c.held, repoID)
 	}
-	w, hasWalk := c.walks[repoID]
+	pair, hasWalk := c.walks[repoID]
 	if hasWalk {
 		delete(c.walks, repoID)
 	}
 	c.mu.Unlock()
 
 	if hasWalk {
-		w.dispose()
+		disposePair(pair)
 	}
 	if !ok {
 		return false
@@ -142,18 +154,18 @@ func (c *Conn) CloseRepo(repoID string) bool {
 }
 
 // Close releases every hold this connection has — gitsock's own disconnect teardown (SPEC §6:
-// "release its RepoEntry refcounts"). Every walk is disposed first (D13), same ordering as
-// CloseRepo.
+// "release its RepoEntry refcounts"). Every walk (both slots of every pair) is disposed first
+// (D13), same ordering as CloseRepo.
 func (c *Conn) Close() {
 	c.mu.Lock()
 	holds := c.held
 	c.held = make(map[string]*hold)
 	walks := c.walks
-	c.walks = make(map[string]*Walk)
+	c.walks = make(map[string]*walkPair)
 	c.mu.Unlock()
 
-	for _, w := range walks {
-		w.dispose()
+	for _, pair := range walks {
+		disposePair(pair)
 	}
 	for _, h := range holds {
 		h.unsubscribe()
@@ -161,15 +173,34 @@ func (c *Conn) Close() {
 	}
 }
 
+// disposePair disposes both slots of pair, whichever are non-nil.
+func disposePair(pair *walkPair) {
+	if pair.graph != nil {
+		pair.graph.dispose()
+	}
+	if pair.review != nil {
+		pair.review.dispose()
+	}
+}
+
 // Walk returns this connection's Walk for repoID — created lazily on first call, rebuilt (the old
-// one disposed) whenever spec no longer matches what it was built with (a scope change, D13's own
-// #ensureReviewWalk shape). Errors with ErrRepoNotHeld if this connection has not opened repoID.
+// one disposed) whenever spec no longer matches what it was built with (a scope or range change,
+// D13/D3's own #ensureReviewWalk shape). Errors with ErrRepoNotHeld if this connection has not
+// opened repoID.
 //
-// pageSize (D6's own graph.pageSize) only takes effect on first construction — the underlying log
-// session's own page size is fixed at Open time and a later call with a different value does not
-// rebuild an otherwise-matching walk (rebuild is scope's own axis, D13); it is not part of
-// matchesSpec.
-func (c *Conn) Walk(repoID string, gitPath string, spec porcelain.WalkSpec, pageSize int) (*Walk, error) {
+// spec.Range == nil selects the graph slot; spec.Range != nil selects the review slot (D3) — both
+// slots live in one walkPair per repoID, so a ranged request can never disturb the graph's own
+// walk and vice versa. Reviewing a second branch replaces the first review walk; there is never
+// more than one per (connection, repository).
+//
+// pageSize (D6's own graph.pageSize) only takes effect on first construction of a given slot — the
+// underlying log session's own page size is fixed at Open time and a later call with a different
+// value does not rebuild an otherwise-matching walk; it is not part of matchesSpec.
+//
+// precomputedTotal (D9) is threaded into a freshly-built walk only — an already-matching walk
+// reused here keeps whatever total it already has (a peeked count is a hint for the walk's own
+// FIRST open, never a value that overwrites a walk already under way).
+func (c *Conn) Walk(repoID string, gitPath string, spec porcelain.WalkSpec, pageSize int, precomputedTotal *int) (*Walk, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -178,23 +209,67 @@ func (c *Conn) Walk(repoID string, gitPath string, spec porcelain.WalkSpec, page
 		return nil, ErrRepoNotHeld
 	}
 
-	if w, ok := c.walks[repoID]; ok {
-		if w.matchesSpec(spec) {
-			return w, nil
-		}
-		w.dispose()
-		delete(c.walks, repoID)
+	pair, ok := c.walks[repoID]
+	if !ok {
+		pair = &walkPair{}
+		c.walks[repoID] = pair
 	}
 
-	w := newWalk(h.entry, gitPath, spec, pageSize)
-	c.walks[repoID] = w
+	slot := &pair.graph
+	if spec.Range != nil {
+		slot = &pair.review
+	}
+
+	if *slot != nil {
+		if (*slot).matchesSpec(spec) {
+			return *slot, nil
+		}
+		(*slot).dispose()
+		*slot = nil
+	}
+
+	w := newWalk(h.entry, gitPath, spec, pageSize, precomputedTotal)
+	*slot = w
 	return w, nil
 }
 
-// WalkFor returns this connection's existing Walk for repoID, if any, without creating one.
+// WalkFor returns this connection's existing GRAPH walk for repoID, if any, without creating one.
 func (c *Conn) WalkFor(repoID string) (*Walk, bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	w, ok := c.walks[repoID]
-	return w, ok
+	pair, ok := c.walks[repoID]
+	if !ok || pair.graph == nil {
+		return nil, false
+	}
+	return pair.graph, true
+}
+
+// ReviewWalkFor returns this connection's existing REVIEW (ranged) walk for repoID, if any,
+// without creating one.
+func (c *Conn) ReviewWalkFor(repoID string) (*Walk, bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	pair, ok := c.walks[repoID]
+	if !ok || pair.review == nil {
+		return nil, false
+	}
+	return pair.review, true
+}
+
+// markWalksStale marks BOTH slots of repoID's walk pair stale (D5) — called by Open's own
+// subscriber on refsChanged, in place of reaching into a single walk. Never takes a walk's own mu
+// (MarkStale's own doc): the subscriber's goroutine must not block behind a page read.
+func (c *Conn) markWalksStale(repoID string) {
+	c.mu.Lock()
+	pair, ok := c.walks[repoID]
+	c.mu.Unlock()
+	if !ok {
+		return
+	}
+	if pair.graph != nil {
+		pair.graph.MarkStale()
+	}
+	if pair.review != nil {
+		pair.review.MarkStale()
+	}
 }

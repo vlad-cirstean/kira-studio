@@ -2,9 +2,13 @@ package gitsession
 
 import (
 	"context"
+	"os/exec"
+	"strings"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitclient/porcelain"
 )
 
 func TestConn_OpenTwiceSamePathOneRefOneHold(t *testing.T) {
@@ -148,5 +152,119 @@ func TestConn_ConcurrentOpenSameRepoTakesOneRef(t *testing.T) {
 	c.mu.Unlock()
 	if holds != 1 {
 		t.Fatalf("Conn.held has %d entries after concurrent Opens, want 1", holds)
+	}
+}
+
+// revListShas returns `git rev-list --reverse HEAD`'s own shas, oldest first — used to build a
+// real <base>..<branch> range against a real repository.
+func revListShas(t *testing.T, dir string) []string {
+	t.Helper()
+	cmd := exec.Command("git", "rev-list", "--reverse", "HEAD")
+	cmd.Dir = dir
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("git rev-list: %v\n%s", err, out)
+	}
+	return strings.Fields(string(out))
+}
+
+// TestConn_ReviewWalkDoesNotDisturbTheGraphWalk is D3's whole correctness claim: build both walks
+// on one Conn against one repository, page and stream each, and assert the graph's store row
+// count, nextSeq (observed via Status/Stream chunk seq) and log session are untouched across the
+// review walk's whole life, including its replacement by a second range.
+func TestConn_ReviewWalkDoesNotDisturbTheGraphWalk(t *testing.T) {
+	skipWithoutGitWalk(t)
+	repoDir := initWalkRepo(t, 6)
+	shas := revListShas(t, repoDir)
+	if len(shas) != 6 {
+		t.Fatalf("got %d commits, want 6", len(shas))
+	}
+	conn, _, repoID := newWalkTestConn(t, repoDir)
+	defer conn.Close()
+
+	// Build and fully page the graph walk first.
+	graphWalk, err := conn.Walk(repoID, "git", porcelain.WalkSpec{Scope: "all"}, 0, nil)
+	if err != nil {
+		t.Fatalf("graph Walk: %v", err)
+	}
+	if _, err := graphWalk.ReadPage(context.Background(), 1); err != nil {
+		t.Fatalf("graph ReadPage: %v", err)
+	}
+	loaded, _, exhausted, err := graphWalk.Status(context.Background())
+	if err != nil {
+		t.Fatalf("graph Status: %v", err)
+	}
+	if loaded != 6 || !exhausted {
+		t.Fatalf("graph walk after ReadPage: loaded=%d exhausted=%v, want loaded=6 exhausted=true", loaded, exhausted)
+	}
+
+	assertGraphUnchanged := func(when string) {
+		t.Helper()
+		w, ok := conn.WalkFor(repoID)
+		if !ok {
+			t.Fatalf("%s: WalkFor reports no graph walk", when)
+		}
+		if w != graphWalk {
+			t.Fatalf("%s: WalkFor returned a different *Walk than the one built before any review walk existed", when)
+		}
+		l, _, e, err := w.Status(context.Background())
+		if err != nil {
+			t.Fatalf("%s: graph Status: %v", when, err)
+		}
+		if l != 6 || !e {
+			t.Fatalf("%s: graph walk = {loaded:%d exhausted:%v}, want {6 true} -- disturbed by the review walk", when, l, e)
+		}
+	}
+
+	// Open a review walk (shas[0]..main), stream and page it.
+	reviewSpec := porcelain.WalkSpec{Range: &porcelain.RangeSpec{Base: shas[0], Branch: "main"}}
+	reviewWalk, err := conn.Walk(repoID, "git", reviewSpec, 0, nil)
+	if err != nil {
+		t.Fatalf("review Walk: %v", err)
+	}
+	if reviewWalk == graphWalk {
+		t.Fatal("review Walk returned the SAME *Walk as the graph walk -- the two slots collided")
+	}
+	if err := reviewWalk.Stream(context.Background(), nil, 500, func(StreamChunk) error { return nil }); err != nil {
+		t.Fatalf("review Stream: %v", err)
+	}
+	reviewLoaded, _, reviewExhausted, err := reviewWalk.Status(context.Background())
+	if err != nil {
+		t.Fatalf("review Status: %v", err)
+	}
+	if reviewLoaded != 5 || !reviewExhausted {
+		// shas[0]..main is 5 commits (every commit but the range's own base).
+		t.Fatalf("review walk = {loaded:%d exhausted:%v}, want {5 true}", reviewLoaded, reviewExhausted)
+	}
+	assertGraphUnchanged("after the review walk's own stream")
+
+	if got, ok := conn.ReviewWalkFor(repoID); !ok || got != reviewWalk {
+		t.Fatal("ReviewWalkFor does not return the review walk just built")
+	}
+
+	// Replace the review walk with a second range -- must not touch the graph, and must not reuse
+	// the first review walk (there is never more than one per (connection, repository)).
+	secondSpec := porcelain.WalkSpec{Range: &porcelain.RangeSpec{Base: shas[1], Branch: "main"}}
+	secondReviewWalk, err := conn.Walk(repoID, "git", secondSpec, 0, nil)
+	if err != nil {
+		t.Fatalf("second review Walk: %v", err)
+	}
+	if secondReviewWalk == reviewWalk {
+		t.Fatal("a review Walk with a different range returned the SAME *Walk -- the incumbent was not replaced")
+	}
+	if err := secondReviewWalk.Stream(context.Background(), nil, 500, func(StreamChunk) error { return nil }); err != nil {
+		t.Fatalf("second review Stream: %v", err)
+	}
+	secondLoaded, _, secondExhausted, err := secondReviewWalk.Status(context.Background())
+	if err != nil {
+		t.Fatalf("second review Status: %v", err)
+	}
+	if secondLoaded != 4 || !secondExhausted {
+		t.Fatalf("second review walk = {loaded:%d exhausted:%v}, want {4 true}", secondLoaded, secondExhausted)
+	}
+	assertGraphUnchanged("after replacing the review walk with a second range")
+
+	if got, ok := conn.ReviewWalkFor(repoID); !ok || got != secondReviewWalk {
+		t.Fatal("ReviewWalkFor does not return the SECOND review walk after replacement")
 	}
 }
