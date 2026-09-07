@@ -4,7 +4,7 @@
 > one where this backend stops being a reader. Everything through G4 queried git and rendered the
 > answer; `gitclient.Repo.Write` — the exclusive write gate G2 built — has never had a single
 > production caller. G5 gives it ten, and in doing so establishes the shape every later mutating
-> phase (G7 remote ops, G8 stash, G9 reset/cherry-pick) copies: **pre-flight → confirm → execute →
+> phase (G7 remote ops, G12 stash, G13 reset/cherry-pick) copies: **pre-flight → confirm → execute →
 > reconcile**, with pre-flight as pure Go functions computed server-side and crossed as data, and
 > execution as one queued spawn behind one typed error vocabulary. It covers upstream's P6 in full
 > minus the two operations that are pushes (F13).
@@ -53,7 +53,7 @@ against the code they produced.
 | `editor.resolveConflict` is wired client-side and its banner is gated on `status.get` | `proxyHandlers.ts:212-221`; `App.vue:931-935` renders `<ConflictBanner :ops="opsState">`, and `ConflictBanner` reads `ops.statusSummary.value?.inProgress` |
 | The server rejects all seven with `E_UNKNOWN_METHOD` today | `gitrpc/handlers.go:48-71` — nine cases, then `default:` |
 | `porcelain` has no ref, status or merge-tree parser; G3's `RefSnapshotArgs` is deliberately narrow and self-contained | `ls gitclient/porcelain` → `diff.go difftree.go log.go records.go refsnapshot.go show.go`; `refsnapshot.go`'s own doc ("deliberately smaller than refs.list's own for-each-ref query"); G3 D9 |
-| `RepoEntry` has no head, no refs cache, no undo slot — and `entry.go` says so by name | `entry.go:33-49`; `:30-32`: "Still to come: head, stash shapes, undo slot and active remote op (G5-G9) — no placeholders for any of that here" |
+| `RepoEntry` has no head, no refs cache, no undo slot — and `entry.go` says so by name | `entry.go:33-49`; `:30-32`: "Still to come: head, stash shapes, undo slot and active remote op (G5-G13) — no placeholders for any of that here" |
 | `RepoSummary.Head` is resolved once at `Identify` and never refreshed | `gitclient/repo.go:183`, `:200-210`; nothing writes `Summary` after `newRepoEntry` |
 | `Repo.Write` exists, is correct, and has never been called | `repo.go:89-115`; its own comment: "No operation in P1 actually calls this yet … it exists now so a later phase's first real write has nowhere else to go"; `grep -rn "\.Write(ctx" internal/git*` → only `repo_test.go` |
 | `rpcstream` cancels a request's ctx on a `cancel` frame **and** on session teardown | `session.go:174-181` (`handleRequest` registers `cancel` in `activeWork`), `:293` (`for _, cancel := range s.activeWork`) |
@@ -135,11 +135,11 @@ The implementer should extend these, not re-derive them.
 
 Everything in §9's table, but the ones most likely to be mistaken for G5 work:
 
-- **`stash.list`.** Still rejecting on every repo open — the last of G3 F16's four. G8's.
+- **`stash.list`.** Still rejecting on every repo open — the last of G3 F16's four. G12's.
 - **Tag push and remote tag delete** (`op.run`'s `tagPush`/`tagDeleteRemote`). Upstream's P6
   shipped them; this chapter cannot, because a push needs G7's askpass broker and credential relay
   (F13/D5). They answer `E_UNKNOWN_METHOD` naming the kind — not a stub, not a silent no-op.
-- **Reset, cherry-pick and their pre-flights, stash and its pre-flights, remote ops.** G9/G8/G7.
+- **Reset, cherry-pick and their pre-flights, stash and its pre-flights, remote ops.** G13/G12/G7.
   `gitpreflight` and `gitops` are created here with only what G5 reads; every later phase extends
   the same two packages (D3/D4).
 - **The protected-branch glob matcher.** SPEC's `gitpreflight` row names it, but its only consumer
@@ -212,7 +212,7 @@ G3 F16 recorded four requests the webview fires on every repo open that no serve
 | `refsState.setRepoId` (`state/refs.ts:71-83`) | `refs.list` | **G5** |
 | `opsState.setRepoId` (`state/ops.ts:233-245`) | `status.get` | **G5** |
 | the same | `undo.peek` | **G5** |
-| `stashState.setRepoId` (`state/stash.ts:74-89`) | `stash.list` | G8 |
+| `stashState.setRepoId` (`state/stash.ts:74-89`) | `stash.list` | G12 |
 
 The second of those is what makes G4's own hand-off land. `App.vue:931-935` renders
 `<ConflictBanner :ops="opsState" :resolve-conflict-enabled="…capabilities.resolveConflict"
@@ -251,7 +251,7 @@ full parser the snapshot keeps its own query rather than acquiring a dependency 
 
 `entry.go:33-49` is `Summary`, `Repo`, `watcher`, `subs`, `catfile`, `detail`, `diff`, `done`.
 `:30-32` names exactly what is missing and assigns it: "Still to come: head, stash shapes, undo
-slot and active remote op (G5-G9)".
+slot and active remote op (G5-G13)".
 
 `Summary.Head` comes from `Identify` at open (`repo.go:183`) and nothing ever writes it again. A
 second connection opening an already-open repository is handed that same frozen value
@@ -275,10 +275,10 @@ What G5's own methods actually read:
 | `ClassifyInProgress` | `status.get`, both pre-flights, `op.run`'s read-back | **G5** |
 | `ClassifyCheckout` | `preflight.checkout` | **G5** |
 | `ClassifyRevert` | `preflight.revert` | **G5** |
-| the undo slot | `op.run`, `undo.peek`, `undo.run` | **G5** (completed G9 — SPEC's own G9 row) |
+| the undo slot | `op.run`, `undo.peek`, `undo.run` | **G5** (completed G13 — SPEC's own G13 row) |
 | `ClassifyPush`/`ClassifyPull` + the protected-branch matcher | `remote.pushPreflight`/`remote.pullPreflight` | G7 |
-| `ClassifyStashPop`/`ClassifyStashBranch` | `preflight.stashPop`/`preflight.stashBranch` | G8 |
-| `ClassifyReset`/`ClassifyCherryPick` | `preflight.reset`/`preflight.cherryPick` | G9 |
+| `ClassifyStashPop`/`ClassifyStashBranch` | `preflight.stashPop`/`preflight.stashBranch` | G12 |
+| `ClassifyReset`/`ClassifyCherryPick` | `preflight.reset`/`preflight.cherryPick` | G13 |
 
 The protected-branch matcher is the clearest case: `grep -rn matchProtectedBranch packages/` finds
 exactly one non-test call site, `preflight/push.ts:24`. Porting it in G5 would produce a Go
@@ -327,7 +327,7 @@ caveats. Both files' own comments say the label "doubles as the mode carrier wit
 field", and both name `RepoService`'s capture sites as the only producers.
 
 Two consequences for G5. First, the labels this phase produces must be **byte-identical to
-upstream's** (`Deleted branch <name>`, `Deleted tag <name>`), or G8's and G9's own detectors will
+upstream's** (`Deleted branch <name>`, `Deleted tag <name>`), or G12's and G13's own detectors will
 be looking for prefixes that the Go server never emits. Second, SPEC §6's required attribution
 ("*so a second window sees "Undo reset of `main` (window: repo-review)"*") must be a **suffix**:
 both patterns are start-anchored, so anything appended is safe and anything prepended breaks two
@@ -335,7 +335,7 @@ future phases.
 
 ### F10 — `git-core`'s `preflight`/`undo` trim: only four symbols are actually live client-side
 
-G1 D14 deferred SPEC §5's "`git-core` **drops** `preflight/*` and `undo/*`" to G5/G9 and named an
+G1 D14 deferred SPEC §5's "`git-core` **drops** `preflight/*` and `undo/*`" to G5/G13 and named an
 exact deletion list — 17 preflight files, 2 undo files, three `index.ts` ranges, "minus whatever G5
 decides to relocate". Re-checked against the tree:
 
@@ -347,8 +347,8 @@ decides to relocate". Re-checked against the tree:
 | `classifyTagCreate` | `preflight/tag.ts` | **no** — `tagDialogModel.ts`'s own comment calls itself "an adaptation of `core`'s `classifyTagCreate` over the wire's `RefRow` rather than a `RefRecord`" |
 | `classifyCheckout` | `preflight/checkout.ts` | **no** |
 | `classifyRevert` | `preflight/revert.ts` | **no** |
-| `classifyCherryPick`, `classifyPush`, `buildPullPreflight`/`resolvePullStrategy`, `classifyStashPop`/`classifyStashBranch` | four files | **no** — but their server counterparts are G7/G8/G9's, not G5's |
-| `UndoSlot`, `UNDO_POLICY` | `undo/slot.ts` | **no** — SPEC's G9 row and G1 D14 both assign this deletion to G9 |
+| `classifyCherryPick`, `classifyPush`, `buildPullPreflight`/`resolvePullStrategy`, `classifyStashPop`/`classifyStashBranch` | four files | **no** — but their server counterparts are G7/G12/G13's, not G5's |
+| `UndoSlot`, `UNDO_POLICY` | `undo/slot.ts` | **no** — SPEC's G13 row and G1 D14 both assign this deletion to G13 |
 
 Two things G1 D14 could not have known without this check: `validateRefName` lives *inside*
 `preflight/tag.ts`, so that file cannot be deleted at all; and nothing in `git-core` imports
@@ -516,7 +516,7 @@ So `packages/git-ipc/schema/`, `src/generated/`, `graphChunkCodec.ts`, `codec.ts
 `internal/gitwire` are untouched, and `Payload` stays a one-member union. G4 D1's own hand-forward
 stands unchanged.
 
-### D3 — `gitpreflight` is created with exactly what G5 reads; G7/G8/G9 extend the same package
+### D3 — `gitpreflight` is created with exactly what G5 reads; G7/G12/G13 extend the same package
 
 Resolving F6, and answering the "how much of a shared package do we build now" tension G2 and G3
 each hit and resolved the same way (G3 D8: "Each lands with the RPC that reads it").
@@ -568,8 +568,8 @@ internal/gitops/
   errors.go     ClassifyOpError
 ```
 
-Not here: `fetch`/`push`/`pull` and the stderr **progress parser** (G7), `stash` (G8), `reset` and
-`cherryPick` (G9). Every one of those is a file this package gains later, beside these, with no
+Not here: `fetch`/`push`/`pull` and the stderr **progress parser** (G7), `stash` (G12), `reset` and
+`cherryPick` (G13). Every one of those is a file this package gains later, beside these, with no
 change to what G5 wrote.
 
 `conflict.go` is the one file that is not an argv builder — it reads the `.git` state files off
@@ -595,8 +595,8 @@ Resolving F13, and the one place this phase's coverage of upstream's P6 is delib
 | `revert` | ✅ | |
 | `opContinue` / `opAbort` / `opSkip` | ✅ | the banner's escape hatches, for **whatever** operation the repository is in — merge, rebase, cherry-pick, bisect included |
 | `tagPush` / `tagDeleteRemote` | ❌ | pushes; need G7's askpass broker and credential relay (F13) |
-| `stashPush` / `stashApply` / `stashPop` / `stashDrop` / `stashBranch` | ❌ | G8 |
-| `reset` / `cherryPick` | ❌ | G9 |
+| `stashPush` / `stashApply` / `stashPop` / `stashDrop` / `stashBranch` | ❌ | G12 |
+| `reset` / `cherryPick` | ❌ | G13 |
 
 An unserved kind is answered with `ipcerr.New("E_UNKNOWN_METHOD", "gitrpc: op.run: <kind> is not served yet")`
 — the same code the router already returns for a method it does not serve, reaching the UI as an
@@ -646,7 +646,7 @@ the only thing standing where `tsc` stood upstream, so it is worth the exception
 `AGENTS.md`'s test bar — and it is named in D18 as such.
 
 The reasons themselves are ported verbatim from `undo/slot.ts:35-61` for the ten served kinds, so
-G8/G9 inherit strings the UI already renders.
+G12/G13 inherit strings the UI already renders.
 
 ### D7 — The undo slot: one per repo, on `RepoEntry`, attributed at read time by suffix
 
@@ -822,7 +822,7 @@ fields something reads:
 
 The `2` record's extra NUL chunk **must** be consumed even though only `originalPath` is read from
 it: skipping it misframes every following record. The modes and object ids porcelain-v2 carries in
-`1`/`2`/`u` records are not parsed, because nothing in G5, G8 or G9 reads them — upstream models
+`1`/`2`/`u` records are not parsed, because nothing in G5, G12 or G13 reads them — upstream models
 them in `core/src/model/conflict.ts` for a three-way conflict view its own §9 defers to v2, and
 this chapter defers it too. An unrecognised marker is an error, not a skipped line.
 
@@ -848,9 +848,9 @@ Two parameters are ported *with their upstream values* rather than dropped:
 - **`targetTreePaths` is always `nil`.** Upstream's own comment explains why and this phase does not
   re-derive it: for a plain checkout every path in `T = diff --name-only HEAD <target>` is one the
   target either changes or adds, so "in `T`" and "in the target tree" coincide for an untracked
-  path. Keeping the parameter is what lets the test matrix state the distinction and what lets G8's
+  path. Keeping the parameter is what lets the test matrix state the distinction and what lets G12's
   stash-pop caller supply a genuinely different `T` without changing the signature.
-- **`stashAvailable` is `false` until G8.** `routes` already gates `"stashAndCarry"` on it, so G8's
+- **`stashAvailable` is `false` until G12.** `routes` already gates `"stashAndCarry"` on it, so G12's
   whole change is flipping one call site — upstream's own P9 W9 did exactly that.
 
 The `worktreeConflict` blocker is the fifth §7.5 does not enumerate (F15), and the two refusals it
@@ -861,7 +861,7 @@ pre-empts are probe P8's.
 of G5's two gated operations has that hole — probe P5 shows git refusing `switch` during a revert
 with `fatal: cannot switch branch while reverting`, and revert refuses itself the same way — so
 adding a re-check here would be defending against a case git already defends. `canRunOp` stays
-client-side only (F10) and G9 adds the Go re-check when it adds the operations that need one.
+client-side only (F10) and G13 adds the Go re-check when it adds the operations that need one.
 
 ### D13 — `ClassifyRevert`: `merge-tree --merge-base`, prediction scoped to `shas[0]`, parent lookups sequential
 
@@ -919,8 +919,8 @@ Every pattern is verbatim from a real failure observed in this container:
 
 Not in the table: every `AuthFailed`/`NonFastForward`/`LeaseViolation`/`RemoteRefUpdated`/
 `NetworkFailed`/`RemoteNotFound`/`RemoteRefMissing`/`HookRejected`/`ProtectedBranch`/`Cancelled`
-(G7), `StashConflict`/`StashIndexConflict`/`StashUntrackedCollision` (G8),
-`EmptyCherryPick`/`ConfirmationRequired` (G9). Each lands with the operation that produces it,
+(G7), `StashConflict`/`StashIndexConflict`/`StashUntrackedCollision` (G12),
+`EmptyCherryPick`/`ConfirmationRequired` (G13). Each lands with the operation that produces it,
 prepended or appended to the same ordered table.
 
 **A classified operation failure is never an RPC error.** `op.run` is the one request where a git
@@ -976,9 +976,9 @@ Nothing else in `git-core` changes; `preflight/types.ts` stays whole (the other 
 and the exported *types* have their own `index.ts` block that is untouched).
 
 **Not deleted, with the phase that owns each**: `preflight/cherryPick.ts` and `preflight/reset.ts`
-(G9 — and `reset.ts`'s `classifyReset` has a live UI caller, `state/ops.ts:490`, so G9 must decide
+(G13 — and `reset.ts`'s `classifyReset` has a live UI caller, `state/ops.ts:490`, so G13 must decide
 whether the client-side re-derivation survives), `preflight/push.ts` and `preflight/pull.ts` (G7),
-`preflight/stashPop.ts` (G8), `undo/slot.ts` (G9, per SPEC's own G9 row and G1 D14).
+`preflight/stashPop.ts` (G12), `undo/slot.ts` (G13, per SPEC's own G13 row and G1 D14).
 
 **`preflight/tag.ts` is never deleted**: `validateRefName` lives in it and has four live UI callers
 (F10). `classifyTagCreate` shares the file and has none — but deleting one export from a file four
@@ -1373,7 +1373,7 @@ Three things are structurally out of reach in this container:
    Code. §7.1(f) proves every byte underneath them and nothing about them.
 2. **Real discovery.** `NewPlatformLocator` returns `unsupportedLocator` on non-darwin (G2 F18), so
    nothing in this container ever reaches the real `repo.open` path a human uses.
-3. **Perf.** G3 D22's harness measures this container; G11 re-measures.
+3. **Perf.** G3 D22's harness measures this container; G8 re-measures.
 
 **The macOS script, run once on real hardware before G5 is called done:**
 
@@ -1387,7 +1387,7 @@ Three things are structurally out of reach in this container:
    version-aware sort git does and JS does not), annotated tags showing their tagger and subject and
    lightweight ones showing **no** annotation at all.
 5. **Checkout, all five verdicts**: a clean switch; a `cleanCarry` switch announcing what carried;
-   a `blockedByTracked` dialog offering **Discard** and Cancel (and *not* stash — G8's route, and
+   a `blockedByTracked` dialog offering **Discard** and Cancel (and *not* stash — G12's route, and
    `routes` must not contain it); a `blockedByUntracked` dialog offering **neither** (probe P7:
    `--discard-changes` cannot clear it); and a branch checked out in a `git worktree add`'d
    worktree refusing with the worktree's path named, not with "commit or stash your changes".
@@ -1412,7 +1412,7 @@ Three things are structurally out of reach in this container:
     `.git/worktrees/<name>/`, which G2's watcher already covers — this step is what proves it).
 11. Confirm what is *expected to still be broken*, so it is not mistaken for a regression: the
     stash list is still empty and the webview console still carries an unhandled rejection for
-    `stash.list` (G8); "Push tag" and "Delete on remote" fail with an error naming the operation
+    `stash.list` (G12); "Push tag" and "Delete on remote" fail with an error naming the operation
     (D5, G7); the review sidebar view is still unregistered (G6). The three rejections G3 D17
     listed for G5 — `refs.list`, `status.get`, `undo.peek` — are **gone**.
 12. **Two windows, one repository**: check out a branch in window A and confirm window B's toolbar,
@@ -1480,14 +1480,14 @@ call, and G3 — comparable in size to this — carried it through successfully.
 
 | Not in G5 | Owner |
 |---|---|
-| `stash.list`, `stash.show`, `preflight.stashPop`, `preflight.stashBranch`, `gitops/stash.go`, `ClassifyStashPop`/`ClassifyStashBranch`, and flipping `stashAvailable` to `true` | G8 |
-| `preflight.reset`, `preflight.cherryPick`, `gitops/{reset,cherryPick}.go`, `ClassifyReset`/`ClassifyCherryPick`, the `EmptyCherryPick`/`ConfirmationRequired` error rows, deleting `undo/slot.ts` | G9 |
+| `stash.list`, `stash.show`, `preflight.stashPop`, `preflight.stashBranch`, `gitops/stash.go`, `ClassifyStashPop`/`ClassifyStashBranch`, and flipping `stashAvailable` to `true` | G12 |
+| `preflight.reset`, `preflight.cherryPick`, `gitops/{reset,cherryPick}.go`, `ClassifyReset`/`ClassifyCherryPick`, the `EmptyCherryPick`/`ConfirmationRequired` error rows, deleting `undo/slot.ts` | G13 |
 | `remote.*`, `gitops/{fetch,push,pull}.go` + the stderr progress parser, the askpass broker, the credential relay, the protected-branch matcher, `op.run`'s `tagPush`/`tagDeleteRemote` | G7 |
 | `review.open`, `review.resolveBase`, the ranged walk, the review view | G6 |
-| `search.run` and the RE2-vs-`RegExp` reconciliation | G10 |
-| Command-palette commands for any operation this phase introduces | G16 (SPEC's own G16 row: "a command-palette audit wiring a command for every mutating operation introduced across G5–G15") |
-| PR badges on branch rows | G12 |
-| `git worktree` create/list/switch/remove | G13 |
+| `search.run` and the RE2-vs-`RegExp` reconciliation | G14 |
+| Command-palette commands for any operation this phase introduces | G9 (SPEC's own G9 row: "a command-palette audit wiring a command for every mutating operation introduced across G5–G11") |
+| PR badges on branch rows | G15 |
+| `git worktree` create/list/switch/remove | G16 |
 | Rebase — starting, continuing or skipping one | out of scope for v1.3 (SPEC's v1 posture: report and refuse to interfere) |
 | Any conflict-resolution UI of our own: three-way view, accept-ours/theirs, marker editing | out of scope; the host's own SCM surface is the answer (G4 D11's `resolveConflict`) |
 | Signed tags (`-s`) and tag signature verification | unassigned upstream, unassigned here |
@@ -1497,12 +1497,12 @@ call, and G3 — comparable in size to this — carried it through successfully.
 
 ## 10. Handed forward
 
-- **`stash.list` is the last of G3 F16's four rejections still open.** **G8**. After G5 the webview
+- **`stash.list` is the last of G3 F16's four rejections still open.** **G12**. After G5 the webview
   console carries exactly one unhandled rejection on repo open instead of four.
 - **`op.run`'s nine unserved kinds** (D5). **G7** takes `tagPush`/`tagDeleteRemote` (and should
   revisit whether they belong in `op.run` at all once `remote.run` exists — upstream's own D51 put
   every other push behind `remote.run` precisely because a push is killable, streaming and
-  progress-reporting); **G8** the five stash kinds; **G9** `reset` and `cherryPick`. Each is one
+  progress-reporting); **G12** the five stash kinds; **G13** `reset` and `cherryPick`. Each is one
   entry in the same `opTable`.
 - **Local operations are deliberately uncancellable and carry no deadline** (D8). SPEC §6 says so
   for the disconnect case; this plan extends it to `cancel` frames for the same reason (shared
@@ -1513,12 +1513,12 @@ call, and G3 — comparable in size to this — carried it through successfully.
   later moves `OpRequest`'s decoding to codegen should take the opportunity to make it structural
   again.
 - **`git-core`'s trim is two files short of SPEC §5's end state after G5** (D17). **G7** owns
-  `preflight/{push,pull}.ts`, **G8** owns `preflight/stashPop.ts`, **G9** owns
-  `preflight/{reset,cherryPick}.ts` and `undo/slot.ts` — and G9 additionally has to decide whether
+  `preflight/{push,pull}.ts`, **G12** owns `preflight/stashPop.ts`, **G13** owns
+  `preflight/{reset,cherryPick}.ts` and `undo/slot.ts` — and G13 additionally has to decide whether
   `classifyReset`'s live client-side caller (`state/ops.ts:490`'s no-round-trip mode preview)
   survives the move. `preflight/tag.ts` never goes: `validateRefName` lives in it (F10/F17).
 - **The read pool is four, and `preflight.checkout` takes two of it while `preflight.revert` takes
-  one per selected commit** (F18/D13). **G11**'s multi-client matrix is where a real answer to "is
+  one per selected commit** (F18/D13). **G8**'s multi-client matrix is where a real answer to "is
   four the right number under two windows scrolling and reverting" comes from.
 - **`InProgressOperation` is computed from files, `status.get` from a spawn, and the two are joined
   in one place** (`statusAndInProgress`). Every later phase that needs either must go through that

@@ -32,14 +32,14 @@ further along than `feature-v1-3`'s own docs assumed.** Its `docs/SPEC.md` §10 
 | P6 Refs & checkout | Done | G5 |
 | P7 Branch review | Done | G6 |
 | P8 Remote ops | Done | G7 |
-| P9 Stash | Done | G8 |
-| P10 Reset | Done | G9 |
-| P11 Search | Done | G10 |
+| P9 Stash | Done | G12 |
+| P10 Reset | Done | G13 |
+| P11 Search | Done | G14 |
 | P15 IPC wire-format fix | Done | informs §4.2, not ported literally |
 | P16 FlatBuffers for `graph.stream` | Done | informs §4.2 — this app already has its own FlatBuffers data plane (§4.2) |
-| P12 GitHub PR links | Not done upstream | G12 — upstream's own REST-lookup/cache/badge design (`docs/SPEC.md` §6.7/D31/D32 there) ported, auth mechanism redesigned around `gh` CLI (§3.5) since VS Code's built-in provider isn't available to this chapter |
-| P13 Ship (`.vsix`, marketplace) | Not done upstream | G16 — DMG bundling replaces marketplace/OpenVSX publishing for v1.3 |
-| P14 Worktree support | Not designed upstream | G13 — not designed upstream either; designed at G13's own planning pass, same as upstream deferred it |
+| P12 GitHub PR links | Not done upstream | G15 — upstream's own REST-lookup/cache/badge design (`docs/SPEC.md` §6.7/D31/D32 there) ported, auth mechanism redesigned around `gh` CLI (§3.5) since VS Code's built-in provider isn't available to this chapter |
+| P13 Ship (`.vsix`, marketplace) | Not done upstream | G9 — DMG bundling replaces marketplace/OpenVSX publishing for v1.3 |
+| P14 Worktree support | Not designed upstream | G16 — not designed upstream either; designed at G16's own planning pass, same as upstream deferred it |
 
 So this chapter is a full port of everything upstream has actually built (P1–P11, P15/P16's lessons),
 not a continuation of `feature-v1-3`'s narrower P1-only scope.
@@ -67,7 +67,7 @@ not a continuation of `feature-v1-3`'s narrower P1-only scope.
 | `gitclient` | Spawn discipline (env hygiene, `-c core.quotepath=false`, `--no-optional-locks`, graceful `WaitDelay` kill), streaming reads, discovery (macOS-only, CLT-shim gate, 2.38 floor, 30s cache), capability probe, typed error classification, per-repo reader/writer gate | `feature-v1-3` reused near-verbatim for `discovery.go`/`errors.go`/`capabilities.go`/`clock.go`/`settings.go`/the gate in `repo.go`. **`runner.go` is rewritten, not reused** — it buffers to `[]byte`; the paged `git log` design (upstream §5.1.1) needs a `Start()` returning a live pipe, not a `Wait()`-then-drain call |
 | `gitclient/porcelain` | `log`/`for-each-ref`/`status --porcelain=v2`/`diff-tree`/`diff`/`stash list`/`merge-tree`/`cat-file --batch` framing, NUL/`%x1f` record splitting | New. Port of `packages/git/src/parse/*`; upstream's ~43 recorded-byte fixture files become a Go golden corpus, same pattern as `internal/postman`'s round-trip tests |
 | `gitclient/catfile`, `gitclient/logsession` | The two persistent processes: `cat-file --batch` per repo, and the pausable/resumable paged walk | New. Port of `catFile.ts`/`logSession.ts` |
-| `ghclient` | (G12) `gh` CLI discovery/spawn discipline mirroring `gitclient/discovery.go`'s `Locator`/probe/TTL-cache shape, `GhStatus` classification, `gh api` calls for PR lookup | New — no upstream provenance; upstream used VS Code's built-in GitHub auth provider (§3.5) |
+| `ghclient` | (G15) `gh` CLI discovery/spawn discipline mirroring `gitclient/discovery.go`'s `Locator`/probe/TTL-cache shape, `GhStatus` classification, `gh api` calls for PR lookup | New — no upstream provenance; upstream used VS Code's built-in GitHub auth provider (§3.5) |
 | `gitstore` | Column-wise commit store, sha table, string interner, `PackedCommitChunk` builder | New. Server half of `packages/core/src/store/*` |
 | `gitpreflight` | `classifyCheckout`/`StashPop`/`Reset`/`Revert`/`CherryPick`/`Push`/`Pull`/`StashBranch`/`InProgress`, protected-branch glob matcher, undo slot | New. Port of `packages/core/src/preflight/*` + `model/operation.ts` + `model/protectedBranch.ts` + `undo/slot.ts`. Computed server-side, crossed as data — not duplicated client-side |
 | `gitops` | `branch`/`checkout`/`tag`/`revert`/`reset`/`cherryPick`/`stash`/`fetch`/`push`/`pull`/conflict handling + stderr progress parsing | New. Port of `packages/git/src/ops/*` + `progress.ts` |
@@ -77,7 +77,7 @@ not a continuation of `feature-v1-3`'s narrower P1-only scope.
 | `gitrpc` | Method table, contract version constant, wire types | Port of `rpcHandlers.ts`, minus the seven host-capability methods the extension now answers locally (§5) |
 | `gitsock` | Unix listener, framing, handshake, pairing broker, stale-socket recovery | New (§3) |
 | `gitwire` | Generated FlatBuffers code for the git data plane | New, generated — see §4.2 |
-| `gitreview` | (G14/G15) `review.db` (own SQLite file), compressed blob storage, fast/slow-path diff selection, partial-review range state, TTL/PR-close reaper, the flat AI-comment list | New — no upstream provenance, "Review state" below |
+| `gitreview` | (G10/G11) `review.db` (own SQLite file), compressed blob storage, fast/slow-path diff selection, partial-review range state, TTL/PR-close reaper, the flat AI-comment list | New — no upstream provenance, "Review state" below |
 | `bridge/rpcstream` | Correlated-RPC-with-credits state machine (`Conn`, `Handlers`, `Serve`) | `feature-v1-3` reused **verbatim** — its `Conn{Send([]byte) error; Receive() ([]byte, error)}` interface already abstracts the channel; a `net.Conn` adapter is the only new code |
 | `bridge/gitclients.go` | Bound Wails service for Kira Studio's own *Connected editors* pane | New, small |
 
@@ -143,9 +143,9 @@ extension shows a blocking panel naming both versions and that both need to be o
 (reusing the shape of the existing 2.38-git-floor blocked-state panel). `CONTRACT_VERSION` is the
 sole compatibility authority, exactly as upstream's own D46 established for its FlatBuffers work.
 
-### 3.5 GitHub auth (G12) — the local `gh` CLI, not a built-in provider
+### 3.5 GitHub auth (G15) — the local `gh` CLI, not a built-in provider
 
-Upstream's own G12/P12 design used VS Code's built-in GitHub authentication provider
+Upstream's own G15/P12 design used VS Code's built-in GitHub authentication provider
 (`vscode.authentication.getSession('github', …)`) — unavailable to this chapter, decided
 2026-09-07. Replaced with the same pattern [Orca](https://www.onorca.dev) (an AI development
 environment with its own GitHub review integration) uses: **delegate entirely to the `gh` CLI
@@ -178,7 +178,7 @@ already on the user's machine, own no credentials of any kind.**
   and the badge UI (`packages/git-ui`, untouched per this chapter's own rule) are still ported from
   upstream's D31/D32 as designed — `gh api` is a drop-in replacement for the HTTP client's request
   shape, not a redesign of what gets requested or how the result is cached and rendered.
-- G12's own Opus planning pass owns the concrete `ghclient` API and the exact `gh api` calls/fields
+- G15's own Opus planning pass owns the concrete `ghclient` API and the exact `gh api` calls/fields
   used; this section fixes the mechanism and its failure states, not the full implementation.
 
 ### 4.2 Wire format — reusing this app's existing FlatBuffers data plane
@@ -288,7 +288,7 @@ untouched):
    mid-prompt, the broker fails the credential request non-zero — never hangs.
 
 **Bundled in the DMG.** The `.vsix` ships alongside the app rather than through the VS Code
-Marketplace for v1.3 (G16).
+Marketplace for v1.3 (G9).
 
 ## Module boundary
 
@@ -312,25 +312,32 @@ P12 package split may also want), not a boundary violation.
 | **G5** | Refs/tags/branches, checkout + the Go pre-flight engine, revert, linked-worktree detection, in-progress banner, undo slot | G4 | P6 |
 | **G6** | Branch review: base resolver, ranged walk as a per-connection `Walk` | G4, G5 | P7 |
 | **G7** | Remote ops: fetch/push/decomposed pull/force-with-lease/protected branches/askpass broker + credential relay/auto-fetch | G5 | P8 |
-| **G8** | Stash + `merge-tree` pop prediction, wired into G5's blocked-checkout resolution | G5 | P9 |
-| **G9** | Reset (3 modes) + cherry-pick, undo slot completed | G8 | P10 |
-| **G10** | Search: Go tail scan + client matcher, regex-dialect reconciliation (§8) | G3, G5 | P11 |
-| **G11** | Multi-client hardening: two-windows/two-repos matrix, disconnect teardown, revoke-while-connected, stale-socket recovery, perf re-baseline against the new transport | all | new |
-| **G12** | GitHub PR links: GitHub-remote detection from `origin`, auth via the local `gh` CLI on the Kira Studio backend (§3.5 — replaces upstream's VS Code-built-in-provider design, which this chapter can no longer use), REST PR lookup through `gh api`, a per-branch cache invalidated by the watcher, `branch.resolvePr`, the `#123` badge on branch-picker rows and message-column ref badges (opened via the extension's own `ExternalOpener`), `kiraVersion.github.enabled`, and PR number/title matching added to search's ref scope. Auth mechanism redesigned around this chapter's own headless/backend shape (D31/D32's REST-lookup and cache design still ported as upstream wrote them); requested on first use only, never at activation | G4, G5, G10 | P12 |
-| **G13** | Worktree support: `git worktree` create/list/switch/remove, building on G5's linked-worktree detection, plus a user-configurable "prepare script" run after creating a worktree with visible progress feedback. *Not designed upstream either* — full design (RPC shape, pre-flight interaction, prepare-script sandboxing) happens at this phase's own Opus planning pass, not assumed here, same placeholder-then-design approach upstream itself used | G5 | P14 |
-| **G14** | Incremental review ("Review state" below): per-file "last reviewed" state as a compressed blob snapshot, not just a commit sha — a rewritten history (rebase/squash/amend) can't be diffed by sha alone. Fast path (last-reviewed commit still an ancestor of HEAD) uses an ordinary `git diff`; slow path (history rewritten) diffs the stored blob against current content directly. Partial/range-level reviewed-vs-unreviewed marking within a file, not just a whole-file toggle. Own SQLite file (`review.db`), TTL-purged (14 days idle) and purged eagerly when the linked PR closes (G12) | G4, G6, G12 | new |
-| **G15** | Inline AI review comments ("Review state" below): flat file+line/range annotations on top of G14's review session, no threading. A centralized list ordered by file then line, formatted as plain text to copy into an AI chat — deliberately just a copy-paste workflow for now, not a live integration. A clear-all action resets a session's comments | G14 | new |
-| **G16** | Ship the extension: `vsce package` step producing a real `.vsix`, DMG bundling (`scripts/sign-bundle.sh`/`package` script copies it into the app bundle at a known runtime path), an *Install VS Code Integration* button in the *Connected editors* pane (G1) that shells out to `code --install-extension <path>` — argv-only, no shell, matching every other spawn in this chapter — with a "reveal in Finder" fallback when the `code` CLI isn't on `PATH`; plus the rest of upstream's P13 that isn't packaging mechanics: an SCM title-bar button and status-bar item that open the existing webview (entry points, not a redesign of it), and a command-palette audit wiring a command for every mutating operation introduced across G5–G15. Deliberately last of all: it packages and surfaces what every other phase builds | all | P13 (Ship), superseding it — DMG bundling instead of Marketplace/OpenVSX |
+| **G8** | Multi-client hardening: two-windows/two-repos matrix, disconnect teardown, revoke-while-connected, stale-socket recovery, perf re-baseline against the new transport | G1–G7 | new |
+| **G9** | Ship the extension: `vsce package` step producing a real `.vsix`, DMG bundling (`scripts/sign-bundle.sh`/`package` script copies it into the app bundle at a known runtime path), an *Install VS Code Integration* button in the *Connected editors* pane (G1) that shells out to `code --install-extension <path>` — argv-only, no shell, matching every other spawn in this chapter — with a "reveal in Finder" fallback when the `code` CLI isn't on `PATH`; plus the rest of upstream's P13 that isn't packaging mechanics: an SCM title-bar button and status-bar item that open the existing webview (entry points, not a redesign of it), and a command-palette audit wiring a command for every mutating operation that exists by this point (checkout/revert/branch/tag from G5, fetch/push/pull from G7). Moved up from dead-last (decided 2026-09-07) specifically so the extension is installable and testable sooner, right after hardening rather than after all sixteen phases — G10 onward are now *post-ship* follow-ups, each responsible for registering its own palette command when it lands, since this one audit doesn't happen again | G1–G8 | P13 (Ship), superseding it — DMG bundling instead of Marketplace/OpenVSX |
+| **G10** | Incremental review ("Review state" below): per-file "last reviewed" state as a compressed blob snapshot, not just a commit sha — a rewritten history (rebase/squash/amend) can't be diffed by sha alone. Fast path (last-reviewed commit still an ancestor of HEAD) uses an ordinary `git diff`; slow path (history rewritten) diffs the stored blob against current content directly. Partial/range-level reviewed-vs-unreviewed marking within a file, not just a whole-file toggle. Own SQLite file (`review.db`), TTL-purged (14 days idle) — the PR-closed eager purge is G15's own small addition once `branch.resolvePr` exists, not built here | G4, G6 | new |
+| **G11** | Inline AI review comments ("Review state" below): flat file+line/range annotations on top of G10's review session, no threading. A centralized list ordered by file then line, formatted as plain text to copy into an AI chat — deliberately just a copy-paste workflow for now, not a live integration. A clear-all action resets a session's comments | G10 | new |
+| **G12** | Stash + `merge-tree` pop prediction, wired into G5's blocked-checkout resolution | G5 | P9 |
+| **G13** | Reset (3 modes) + cherry-pick, undo slot completed | G12 | P10 |
+| **G14** | Search: Go tail scan + client matcher, regex-dialect reconciliation (§8) | G3, G5 | P11 |
+| **G15** | GitHub PR links: GitHub-remote detection from `origin`, auth via the local `gh` CLI on the Kira Studio backend (§3.5 — replaces upstream's VS Code-built-in-provider design, which this chapter can no longer use), REST PR lookup through `gh api`, a per-branch cache invalidated by the watcher, `branch.resolvePr`, the `#123` badge on branch-picker rows and message-column ref badges (opened via the extension's own `ExternalOpener`), `kiraVersion.github.enabled`, PR number/title matching added to search's ref scope, and — since `branch.resolvePr` now exists — wiring G10's eager PR-closed purge into its reaper. Auth mechanism redesigned around this chapter's own headless/backend shape (D31/D32's REST-lookup and cache design still ported as upstream wrote them); requested on first use only, never at activation | G4, G5, G10, G14 | P12 |
+| **G16** | Worktree support: `git worktree` create/list/switch/remove, building on G5's linked-worktree detection, plus a user-configurable "prepare script" run after creating a worktree with visible progress feedback. *Not designed upstream either* — full design (RPC shape, pre-flight interaction, prepare-script sandboxing) happens at this phase's own Opus planning pass, not assumed here, same placeholder-then-design approach upstream itself used | G5 | P14 |
 
 Each phase gets its own Opus-authored plan under `docs/v1.3/plans/` before implementation starts,
-per `AGENTS.md` — none is written as part of this chapter spec.
+per `AGENTS.md` — none is written as part of this chapter spec. **Reordered 2026-09-07**: Ship
+(originally last, dead-last dependency on "all" fifteen other phases) moved to G9, right after
+hardening, so the packaged, installable extension exists much sooner — G8's own position is
+otherwise unchanged (still the phase that stress-tests everything built up to it), and G10–G16 are
+now explicitly *post-ship* iterations rather than pre-ship gates. One real consequence, not papered
+over: G10 (incremental review) originally assumed G15 (PR links) existed first, for the eager
+PR-closed purge — under the new order G15 comes after G10, so that dependency is now the other way
+around (§ "Review state" below).
 
-## Review state (G14/G15)
+## Review state (G10/G11)
 
 Neither phase has an upstream equivalent — both are new, Kira-Studio-specific features, requested
-2026-09-07, deliberately sequenced after the core port (G1–G11) and after G12 (PR-closed detection
-needs `branch.resolvePr`) but before G16 (Ship), so the `.vsix` that gets packaged actually carries
-them.
+2026-09-07, sequenced right after Ship (G9) rather than at the very end — the first installable
+`.vsix` (G9) does **not** carry either feature; they and everything after them are follow-up
+`.vsix` rebuilds using G9's already-built packaging pipeline, not a reason to hold Ship back.
 
 **Why a blob snapshot, not just a commit sha.** The trivial case — nothing folded since last review
 — is a `git diff <lastReviewedSha> HEAD -- <file>`, no storage needed beyond the sha. The case that
@@ -344,7 +351,7 @@ current content directly, independent of whether git's own history still contain
 - **Slow path**: the stored blob is written to a temp file, current content resolved via `cat-file`,
   and the two are diffed with `git diff --no-index` — reusing `gitclient`'s existing spawn discipline
   (argv-only, no shell) rather than a hand-rolled Go diff algorithm. Precise temp-file lifecycle and
-  concurrency (two review sessions in different `Conn`s touching the same repo) is G14's own planning
+  concurrency (two review sessions in different `Conn`s touching the same repo) is G10's own planning
   concern, not fixed here.
 - **Storage**: a second SQLite file, `review.db` under `${KIRA_HOME}`, not a table in `kira.db` — its
   lifecycle is nothing like the rest of the app's data (bulk blob content, TTL/PR-close purges that
@@ -354,14 +361,17 @@ current content directly, independent of whether git's own history still contain
 - **Session scope**: keyed by `(repo, branch)`, joining G6's base-resolver/ranged-walk concept of a
   branch review rather than inventing a second one.
 - **Lifecycle**: TTL 14 days idle (returning after that window starts clean, by design, not an
-  error case) and eager purge when G12's `branch.resolvePr` reports the linked PR closed/merged.
-  Exact reaper shape (background sweep vs. lazy check-on-access, mirroring G2's `Registry` linger
-  pattern either way) is G14's own design.
+  error case) is G10's own mechanism, built without `branch.resolvePr` since G15 (PR links) doesn't
+  exist yet at this point in the new order — TTL alone is a complete, correct lifecycle on its own,
+  just a less eager one. Eager purge on PR closed/merged is G15's own small addition once
+  `branch.resolvePr` exists, wired into G10's reaper rather than duplicating it. Exact reaper shape
+  (background sweep vs. lazy check-on-access, mirroring G2's `Registry` linger pattern either way)
+  is G10's own design, with a seam G15 can hook rather than rebuild.
 - **Partial review**: the requirement is fixed here, the mechanism is not — mark all, some, or none
   of a file's changed lines reviewed, independently re-toggleable, and that state has to degrade
   sensibly as the diff itself changes (new commits land, the fast/slow path swaps mid-session). Left
-  to G14's own planning pass, the same way G13 defers its own range/session design.
-- **AI comments (G15)**: intentionally the simplest possible shape — a flat table of
+  to G10's own planning pass, the same way G16 defers its own range/session design.
+- **AI comments (G11)**: intentionally the simplest possible shape — a flat table of
   `(session, file, line range, text, created_at)`, rendered as an ordered plain-text list for the
   user to paste into an AI conversation by hand. No AI API call, no response ingestion, no threading
   in v1.3 — but the backend shape is a real structured list precisely so a later phase can wire it to
@@ -370,9 +380,9 @@ current content directly, independent of whether git's own history still contain
 
 ## Out of scope for v1.3
 
-- Marketplace/OpenVSX publishing itself (upstream's literal P13) — G16's DMG bundling is this
+- Marketplace/OpenVSX publishing itself (upstream's literal P13) — G9's DMG bundling is this
   chapter's answer instead. P12 (GitHub PR links) and P14 (worktree support) are no longer
-  unowned: they're G12 and G13, added 2026-09-07 specifically so upstream's incomplete phases
+  unowned: they're G15 and G16, added 2026-09-07 specifically so upstream's incomplete phases
   don't ship unfinished here too.
 - Any embedded git UI inside Kira Studio's own Wails frontend — deliberately deferred, but the
   session/transport layer (§6, `rpcstream`) is built so that work is additive later, not a rework.
@@ -381,11 +391,11 @@ current content directly, independent of whether git's own history still contain
 
 ## Known open items
 
-- **RE2 vs. JS `RegExp` in search (G10).** Upstream's whole-word matching compiles to `\b…\b` or,
+- **RE2 vs. JS `RegExp` in search (G14).** Upstream's whole-word matching compiles to `\b…\b` or,
   at a punctuation edge, a lookbehind/lookahead form Go's RE2 cannot express at all. The server-side
   tail scan and the client-side scan must agree exactly or a hit's presence depends on which page
   happens to be loaded. Needs a byte-boundary post-check implementation in `gitsearch` rather than
-  a direct pattern port — flagged here so G10's own plan doesn't rediscover it from scratch.
+  a direct pattern port — flagged here so G14's own plan doesn't rediscover it from scratch.
 - **Perf budgets need re-measurement, not re-derivation.** Upstream's ≤300ms first-paint and
   similar budgets were measured over in-process `postMessage`; a Unix socket plus FlatBuffers
-  framing changes the cost profile in ways worth confirming empirically in G3 and G11, not assuming.
+  framing changes the cost profile in ways worth confirming empirically in G3 and G8, not assuming.
