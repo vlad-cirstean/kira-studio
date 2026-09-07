@@ -139,6 +139,27 @@ func TestDiscovery_UnusableOnSpawnFailure(t *testing.T) {
 	}
 }
 
+// TestDiscovery_VersionProbeTimesOut proves D5 without a real 5s sleep: probe's own
+// context.WithTimeout(ctx, versionProbeTimeout) inherits the sooner of the two deadlines, so a
+// caller ctx with a short timeout of its own makes the fake's blocked Start observe Done() (and
+// DeadlineExceeded) almost immediately, well under versionProbeTimeout itself.
+func TestDiscovery_VersionProbeTimesOut(t *testing.T) {
+	runner := &fakeRunner{blockOnCtx: true}
+	d := NewDiscovery(fakeLocator{found: true, path: "/usr/bin/git"}, runner, &fakeClock{})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
+	defer cancel()
+
+	start := time.Now()
+	status := d.Status(ctx, "")
+	if elapsed := time.Since(start); elapsed >= versionProbeTimeout {
+		t.Fatalf("Status took %v, want well under versionProbeTimeout (%v)", elapsed, versionProbeTimeout)
+	}
+	if status.Kind != "unusable" || status.Reason == "" {
+		t.Fatalf("status = %+v, want unusable with a reason", status)
+	}
+}
+
 func TestDiscovery_UnusableOnUnparseableVersion(t *testing.T) {
 	runner := &fakeRunner{result: Result{ExitCode: 0, Stdout: []byte("garbage\n")}}
 	d := NewDiscovery(fakeLocator{found: true, path: "/usr/bin/git"}, runner, &fakeClock{})

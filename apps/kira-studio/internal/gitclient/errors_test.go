@@ -38,8 +38,34 @@ func TestClassify_UnknownFallsThrough(t *testing.T) {
 	if kind != KindUnknown {
 		t.Fatalf("KindOf = %v, want %v", kind, KindUnknown)
 	}
-	if err.Error() != "fatal: something this package has never seen" {
-		t.Fatalf("Error() = %q, want the trimmed stderr", err.Error())
+	want := "git status failed (unknown): fatal: something this package has never seen"
+	if err.Error() != want {
+		t.Fatalf("Error() = %q, want %q", err.Error(), want)
+	}
+}
+
+// TestError_SummaryIsFirstNonEmptyStderrLine proves the whole stderr wall never crosses (D6) — a
+// multi-line stderr summarises to its first non-empty line; Stderr itself keeps everything.
+func TestError_SummaryIsFirstNonEmptyStderrLine(t *testing.T) {
+	res := Result{ExitCode: 1, Stderr: []byte("\nerror: hook declined\nremote: see https://example\n")}
+	err := Classify(context.Background(), []string{"push"}, res, nil).(*Error)
+	want := "git push failed (unknown): error: hook declined"
+	if err.Error() != want {
+		t.Fatalf("Error() = %q, want %q", err.Error(), want)
+	}
+	if err.Stderr != "error: hook declined\nremote: see https://example" {
+		t.Fatalf("Stderr = %q, want the full trimmed stderr preserved on the struct", err.Stderr)
+	}
+}
+
+// TestError_SummaryFallsBackToExitCodeWhenStderrEmpty covers D6's other named case: a nonzero exit
+// with no stderr at all still produces a useful one-liner.
+func TestError_SummaryFallsBackToExitCodeWhenStderrEmpty(t *testing.T) {
+	res := Result{ExitCode: 2}
+	err := Classify(context.Background(), []string{"merge-tree"}, res, nil).(*Error)
+	want := "git merge-tree failed (unknown): exited 2"
+	if err.Error() != want {
+		t.Fatalf("Error() = %q, want %q", err.Error(), want)
 	}
 }
 

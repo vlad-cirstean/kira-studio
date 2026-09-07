@@ -3,6 +3,7 @@ package gitclient
 import (
 	"context"
 	"errors"
+	"strconv"
 	"strings"
 )
 
@@ -38,14 +39,24 @@ type Error struct {
 	Cause    error
 }
 
+// Error returns a one-line summary — the argv, the classified kind, and the first non-empty line
+// of stderr (or the exit code, when stderr is empty) — never the whole of stderr, which stays on
+// the struct for a caller that wants it in full (D6: "raw stderr never crosses" the wire, matching
+// upstream's own errors.ts contract).
 func (e *Error) Error() string {
-	if e.Stderr != "" {
-		return strings.TrimSpace(e.Stderr)
+	return "git " + strings.Join(e.Command, " ") + " failed (" + string(e.Kind) + "): " + e.summary()
+}
+
+func (e *Error) summary() string {
+	for _, line := range strings.Split(e.Stderr, "\n") {
+		if trimmed := strings.TrimSpace(line); trimmed != "" {
+			return trimmed
+		}
 	}
 	if e.Cause != nil {
 		return e.Cause.Error()
 	}
-	return string(e.Kind)
+	return "exited " + strconv.Itoa(e.ExitCode)
 }
 
 func (e *Error) Unwrap() error { return e.Cause }

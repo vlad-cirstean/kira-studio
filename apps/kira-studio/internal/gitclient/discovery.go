@@ -2,6 +2,7 @@ package gitclient
 
 import (
 	"context"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -238,13 +239,24 @@ func (d *Discovery) Status(ctx context.Context, configuredPath string) GitStatus
 	return status
 }
 
+// versionProbeTimeout bounds the --version probe (G2 plan D5): the caller's own ctx has no
+// deadline of its own (an rpcstream request context is undeadlined), so without this a wedged
+// binary — the exact macOS Command Line Tools trap darwinLocator's own gate exists to route
+// around — would hang app.init for as long as the extension is willing to wait.
+const versionProbeTimeout = 5 * time.Second
+
 func (d *Discovery) probe(ctx context.Context, configuredPath string) GitStatus {
 	path, probed, found := d.locator.Locate(configuredPath)
 	if !found {
 		return GitStatus{Kind: "notFound", Probed: probed}
 	}
 
-	res, err := Run(ctx, d.runner, path, Spec{Args: []string{"--version"}, ReadOnly: true})
+	probeCtx, cancel := context.WithTimeout(ctx, versionProbeTimeout)
+	defer cancel()
+	res, err := Run(probeCtx, d.runner, path, Spec{Args: []string{"--version"}, ReadOnly: true})
+	if errors.Is(probeCtx.Err(), context.DeadlineExceeded) {
+		return GitStatus{Kind: "unusable", Path: path, Reason: "git --version did not respond within 5s"}
+	}
 	if err != nil {
 		return GitStatus{Kind: "unusable", Path: path, Reason: err.Error()}
 	}
