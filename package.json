@@ -19,7 +19,7 @@
     "build:test": "cd apps/kira-studio/frontend && bun run build:test",
     "lint": "biome check . && sh scripts/check-tokens.sh",
     "format": "biome check --write .",
-    "typecheck": "bun run typecheck:tests && bun run typecheck:web && bun run typecheck:unit && bun run typecheck:api-core",
+    "typecheck": "sh -c 'bun run typecheck:tests & p1=$!; bun run typecheck:web & p2=$!; bun run typecheck:unit & p3=$!; bun run typecheck:api-core & p4=$!; fail=0; wait $p1 || fail=1; wait $p2 || fail=1; wait $p3 || fail=1; wait $p4 || fail=1; exit $fail'",
     "typecheck:tests": "tsgo --noEmit -p apps/kira-studio/tsconfig.tests.json",
     "typecheck:web": "vue-tsc --noEmit -p apps/kira-studio/frontend/tsconfig.json",
     "typecheck:unit": "tsgo --noEmit -p apps/kira-studio/tests/unit/tsconfig.json",
