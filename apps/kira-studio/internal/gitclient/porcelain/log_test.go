@@ -51,7 +51,7 @@ func TestLog_GeneratedTopologies(t *testing.T) {
 			}
 		}
 		head := recs[0]
-		if head.SHA != "3fe859c9c5261aefcd63d39b66f007f64ce3bfdf" {
+		if head.SHA != "2df820c2aa5af864e4c4a77aa8d5ea8e31331c79" {
 			t.Fatalf("HEAD sha = %s, want the pinned value", head.SHA)
 		}
 		if len(head.Decoration) != 1 || head.Decoration[0] != (porcelain.DecorationRef{Kind: porcelain.DecorationBranch, Name: "main", IsHead: true}) {

@@ -6,11 +6,12 @@
 package porcelain
 
 // CommitIdentity is a commit's author or committer identity — structurally matching
-// @kira/git-ipc's own CommitIdentity (contract.ts).
+// @kira/git-ipc's own CommitIdentity (contract.ts). JSON tags (G4, D5): unused by G3's own
+// FlatBuffers packing, load-bearing once commit.detail crosses this struct as plain JSON.
 type CommitIdentity struct {
-	Name      string
-	Email     string
-	Timestamp int64 // unix seconds
+	Name      string `json:"name"`
+	Email     string `json:"email"`
+	Timestamp int64  `json:"timestamp"` // unix seconds
 }
 
 // DecorationRefKind is DecorationRef's own discriminant, mirroring @kira/git-ipc's union verbatim.
@@ -26,12 +27,13 @@ const (
 
 // DecorationRef is one ref pointing at a commit, classified from `%D`'s output — structurally
 // matching @kira/git-ipc's own DecorationRef union: Name is meaningless for "head", IsHead is
-// meaningful only for "branch", Index only for "stash".
+// meaningful only for "branch", Index only for "stash". JSON tags (G4, D5): unused by G3's own
+// FlatBuffers packing, load-bearing once commit.detail crosses this struct as plain JSON.
 type DecorationRef struct {
-	Kind   DecorationRefKind
-	Name   string
-	IsHead bool
-	Index  int
+	Kind   DecorationRefKind `json:"kind"`
+	Name   string            `json:"name,omitempty"`
+	IsHead bool              `json:"isHead"`
+	Index  int               `json:"index"`
 }
 
 // CommitRecord is one parsed `git log` record — the Go shape the paged walk, the store and the
