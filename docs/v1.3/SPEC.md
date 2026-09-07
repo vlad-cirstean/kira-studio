@@ -247,9 +247,15 @@ viewer's session* is private (`Walk`). This is the one real structural departure
 - **Undo slot: one per repo**, not per connection, with the *originating client* attributed in its
   label (so a second window sees "Undo reset of `main` (window: repo-review)" rather than an
   anonymous or misattributed action).
-- **Credential prompts**: shown in Kira Studio's own window, never the VS Code window that started
-  the remote operation — consistent with Kira Studio being the one trust/approval authority for
-  everything credential- and pairing-related in this design.
+- **Credential prompts** (git askpass — SSH passphrase, HTTPS token/password; not the pairing
+  approval prompt above, which stays in Kira Studio): shown in **the VS Code connection that owns
+  the in-flight remote op**, via a native input box, in context with the push/fetch/pull that
+  triggered it (G7 §5 item 4's relay design; confirmed 2026-09-07 after this section briefly said
+  the opposite — resolved in favor of VS Code, since the prompt is rare, always the direct result of
+  an action the user just took in that window, and upstream's own `CredentialPrompt` client-side
+  port already exists for exactly this, unused until G7). Kira Studio remains the one trust/approval
+  authority for *pairing* — a fundamentally different question ("should this window ever talk to me
+  at all") from "what's the password for this one push."
 
 ## Settings ownership
 
