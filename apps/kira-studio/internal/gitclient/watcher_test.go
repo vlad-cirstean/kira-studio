@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"testing"
 	"time"
@@ -190,4 +191,67 @@ func TestRepoWatcher_Close_StopsSignals(t *testing.T) {
 	if err := w.Close(); err != nil {
 		t.Fatalf("second Close: %v", err)
 	}
+}
+
+// TestRepoWatcher_SymlinkedRepoStillClassifies guards D7/F9: a repository opened through a
+// symlinked ancestor must still classify. `git rev-parse --absolute-git-dir`/`--git-common-dir`
+// do not resolve symlinks (F9), so without NewRepoWatcher resolving CommonDir/GitDir once up
+// front, a real macOS FSEvents backend — which always reports realpaths — would prefix-match
+// nothing and this would hang forever.
+//
+// This is a partial guard, not a reproduction of that failure: fsnotify (this platform's backend)
+// echoes back whatever path it was told to watch, unresolved or not, so it cannot by itself
+// exhibit F9's mismatch the way FSEvents does. What it does prove is that resolveOrKeep runs,
+// that it does not desync the backend's watch roots from classify's comparison target, and that a
+// repository whose CommonDir/GitDir contain a symlink component still works end to end. §7.3 step
+// 1 is what exercises the real macOS failure mode.
+func TestRepoWatcher_SymlinkedRepoStillClassifies(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("no symlink semantics to exercise on Windows-like platforms")
+	}
+	realDir := initFixtureRepo(t)
+	link := filepath.Join(t.TempDir(), "link")
+	if err := os.Symlink(filepath.Dir(realDir), link); err != nil {
+		t.Fatalf("symlink: %v", err)
+	}
+	symlinkedRoot := filepath.Join(link, filepath.Base(realDir))
+
+	gitPath := requireRealGit(t)
+	summary, err := Identify(context.Background(), NewExecRunner(), gitPath, symlinkedRoot)
+	if err != nil {
+		t.Fatalf("identify through symlink: %v", err)
+	}
+
+	w, err := NewRepoWatcher(summary)
+	if err != nil {
+		t.Fatalf("NewRepoWatcher: %v", err)
+	}
+	t.Cleanup(func() { _ = w.Close() })
+
+	runGit(t, symlinkedRoot, "commit", "--allow-empty", "-q", "-m", "through symlink")
+	awaitSignal(t, w.Signals(), SignalRefsChanged)
+}
+
+// fakeBackend is an in-package backend implementation for driving RepoWatcher's own logic (the
+// debounce and the Rescan rule, D6) with no filesystem and no real git.
+type fakeBackend struct {
+	events chan rawEvent
+}
+
+func (b *fakeBackend) Events() <-chan rawEvent { return b.events }
+func (b *fakeBackend) Close() error            { return nil }
+
+// TestRepoWatcher_RescanRaisesBothSignals is the first automated coverage of the overflow/dropped-
+// events rule (D9/G2 D10) — real fsnotify overflow and real FSEvents drop flags are not producible
+// on demand, but the rule itself lives above the backend seam, so exercising it through a fake
+// backend covers both real backends at once.
+func TestRepoWatcher_RescanRaisesBothSignals(t *testing.T) {
+	fake := &fakeBackend{events: make(chan rawEvent, 1)}
+	w := newRepoWatcherWith(RepoSummary{CommonDir: "/repo/.git", GitDir: "/repo/.git"}, fake)
+	t.Cleanup(func() { _ = w.Close() })
+
+	fake.events <- rawEvent{Rescan: true}
+
+	awaitSignal(t, w.Signals(), SignalRefsChanged)
+	awaitSignal(t, w.Signals(), SignalWorktreeChanged)
 }

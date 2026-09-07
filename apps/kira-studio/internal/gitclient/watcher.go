@@ -1,16 +1,11 @@
 package gitclient
 
 import (
-	"errors"
-	"io/fs"
 	"log/slog"
-	"os"
 	"path/filepath"
 	"strings"
 	"sync"
 	"time"
-
-	"github.com/fsnotify/fsnotify"
 )
 
 // Signal is one coalesced, debounced repository-change notification (SPEC §6's repo.changed
@@ -76,28 +71,32 @@ func classify(summary RepoSummary, path string) (Signal, bool) {
 	return "", false
 }
 
-// addRefsTree walks root (commonDir/refs) and Adds every directory found to fsw — the walk this
-// plan must do itself (F9): fsnotify has no recursive watch, so this is what stands in for one. A
-// missing root (a repository mid-init) is not an error, matching D10; an Add failure on any one
-// directory is logged and skipped rather than aborting the rest.
-func addRefsTree(fsw *fsnotify.Watcher, root string) {
-	_ = filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
-		if err != nil || !d.IsDir() {
-			return nil //nolint:nilerr // one bad entry (including a missing root) must not abort the walk.
-		}
-		if addErr := fsw.Add(path); addErr != nil {
-			slog.Warn("gitclient: watch refs directory", "scope", "watcher", "dir", path, "err", addErr)
-		}
-		return nil
-	})
+// rawEvent is one filesystem notification, stripped of every backend-specific concept (G9 D6).
+// Path is meaningless when Rescan is set. Both backends deliver Path already agreeing with
+// classify's comparison target: resolved once, in NewRepoWatcher, against a watcher-local copy of
+// the summary (D7) — necessary because FSEvents itself always reports realpaths (F9).
+type rawEvent struct {
+	Path   string
+	Rescan bool
 }
 
+// backend is the OS event source, and the only part of the watcher's job that differs by
+// platform (G9 D6). Events is closed once the backend stops on its own (after Close, or if the
+// underlying source ends); Close stops the backend and is idempotent.
+type backend interface {
+	Events() <-chan rawEvent
+	Close() error
+}
+
+// newBackend is implemented once per platform: watcher_fsevents_darwin.go (darwin && cgo) and
+// watcher_fsnotify.go (!darwin || !cgo). commonDir and gitDir are already symlink-resolved (D7).
+// watcherBackend, a const naming which one is active, is declared alongside each implementation.
+
 // RepoWatcher watches one repository's .git directories and reports debounced, coalesced signals.
-// Directories only, never individual files (D10, matching fsnotify's own recommendation). Closing
-// it stops its goroutine and closes Signals.
+// Closing it stops its goroutine and closes Signals.
 type RepoWatcher struct {
-	summary RepoSummary
-	fsw     *fsnotify.Watcher
+	summary RepoSummary // watcher-local: CommonDir/GitDir are resolved (D7); RepoID is not.
+	src     backend
 
 	out  chan Signal
 	stop chan struct{}
@@ -106,49 +105,71 @@ type RepoWatcher struct {
 	closeOnce sync.Once
 }
 
-// NewRepoWatcher starts watching summary's repository: commonDir and, for a linked worktree,
-// gitDir too (D9's table) — plus commonDir/refs and everything under it, enumerated now and
-// extended as new directories appear (D10).
+// resolveOrKeep resolves path to its realpath, falling back to path unchanged if it does not
+// exist yet (a repository mid-init) or cannot be resolved for any other reason — matching what
+// the fsnotify backend already tolerated before this phase.
+func resolveOrKeep(path string) string {
+	resolved, err := filepath.EvalSymlinks(path)
+	if err != nil {
+		return path
+	}
+	return resolved
+}
+
+// NewRepoWatcher starts watching summary's repository.
+//
+// FSEvents reports realpaths, always (F9): on macOS /tmp and /var are symlinks into /private, so
+// an unresolved commonDir would never prefix-match an event path and the watcher would silently
+// classify nothing, forever. Resolving once here — into a copy local to the watcher — is what
+// makes the backend's watch roots and classify's comparisons agree by construction, on every
+// platform (D7). The resolved copy never escapes this file: summary.RepoID and every wire/cache
+// value elsewhere keep using the original, unresolved paths.
 func NewRepoWatcher(summary RepoSummary) (*RepoWatcher, error) {
-	fsw, err := fsnotify.NewWatcher()
+	resolved := summary
+	resolved.CommonDir = resolveOrKeep(summary.CommonDir)
+	resolved.GitDir = resolveOrKeep(summary.GitDir)
+
+	src, err := newBackend(resolved.CommonDir, resolved.GitDir)
 	if err != nil {
 		return nil, err
 	}
+	return newRepoWatcherWith(resolved, src), nil
+}
 
+// newRepoWatcherWith is the shared constructor: NewRepoWatcher calls it with a real backend over
+// a resolved summary, and watcher_test.go calls it directly with a fake backend to drive the
+// debounce/Rescan rule (which lives here, above the seam, D6) without a filesystem or real git.
+func newRepoWatcherWith(summary RepoSummary, src backend) *RepoWatcher {
 	w := &RepoWatcher{
 		summary: summary,
-		fsw:     fsw,
+		src:     src,
 		out:     make(chan Signal, 2), // at most one of each kind pending per debounce firing.
 		stop:    make(chan struct{}),
 		done:    make(chan struct{}),
 	}
 
-	watchDirs := []string{summary.CommonDir}
-	if summary.IsLinkedWorktree {
-		watchDirs = append(watchDirs, summary.GitDir)
+	watchedPaths := []string{summary.CommonDir}
+	if summary.GitDir != summary.CommonDir {
+		watchedPaths = append(watchedPaths, summary.GitDir)
 	}
-	for _, dir := range watchDirs {
-		if addErr := fsw.Add(dir); addErr != nil {
-			slog.Warn("gitclient: watch directory", "scope", "watcher", "dir", dir, "err", addErr)
-		}
-	}
-	addRefsTree(fsw, filepath.Join(summary.CommonDir, "refs"))
+	slog.Info("gitclient: repo watcher started", "scope", "watcher",
+		"backend", watcherBackend, "paths", watchedPaths)
 
 	go w.run()
-	return w, nil
+	return w
 }
 
 // Signals is the debounced, coalesced output — at most one refsChanged and one worktreeChanged per
 // debounce firing (D11), closed once the watcher stops.
 func (w *RepoWatcher) Signals() <-chan Signal { return w.out }
 
-// Close stops the watcher goroutine and the underlying fsnotify watcher. Idempotent.
+// Close stops the watcher goroutine and the underlying backend. Idempotent.
 func (w *RepoWatcher) Close() error {
 	w.closeOnce.Do(func() {
 		close(w.stop)
 		<-w.done
 	})
-	return w.fsw.Close()
+	return w.src.Close()
 }
 
 func (w *RepoWatcher) emit(sig Signal) {
@@ -158,23 +179,11 @@ func (w *RepoWatcher) emit(sig Signal) {
 	}
 }
 
-// maybeWatchNewRefsDir extends the watch when a burst under commonDir/refs materialises a new
-// directory in one go (a clone/fetch can create refs/remotes/origin/ and children faster than this
-// watcher can react to each level individually) — D10's "on Create, add it and walk it".
-func (w *RepoWatcher) maybeWatchNewRefsDir(path string) {
-	refsRoot := filepath.Join(filepath.Clean(w.summary.CommonDir), "refs")
-	clean := filepath.Clean(path)
-	if clean != refsRoot && !strings.HasPrefix(clean, refsRoot+string(filepath.Separator)) {
-		return
-	}
-	if info, err := os.Stat(path); err == nil && info.IsDir() {
-		addRefsTree(w.fsw, path)
-	}
-}
-
 // run is the watcher's single goroutine (D11): it owns the two pending flags and the leading-
-// window debounce timer, and is the only place that reads fsw.Events/Errors or writes pendingRefs/
-// pendingWorktree, so neither needs a lock.
+// window debounce timer, and is the only place that reads w.src.Events() or writes pendingRefs/
+// pendingWorktree, so neither needs a lock. Rescan means "something changed and we don't know
+// what" — coalesced overflow/dropped events on either backend (D9) — and raises both signals,
+// exactly as the fsnotify-only version of this file always did for ErrEventOverflow.
 func (w *RepoWatcher) run() {
 	defer close(w.done)
 	defer close(w.out)
@@ -202,30 +211,21 @@ func (w *RepoWatcher) run() {
 
 	for {
 		select {
-		case ev, ok := <-w.fsw.Events:
+		case ev, ok := <-w.src.Events():
 			if !ok {
 				return
 			}
-			w.maybeWatchNewRefsDir(ev.Name)
-			switch sig, matched := classify(w.summary, ev.Name); {
-			case matched && sig == SignalRefsChanged:
-				pendingRefs = true
-			case matched && sig == SignalWorktreeChanged:
-				pendingWorktree = true
+			if ev.Rescan {
+				pendingRefs, pendingWorktree = true, true
+			} else {
+				switch sig, matched := classify(w.summary, ev.Path); {
+				case matched && sig == SignalRefsChanged:
+					pendingRefs = true
+				case matched && sig == SignalWorktreeChanged:
+					pendingWorktree = true
+				}
 			}
 			armIfNeeded()
-
-		case werr, ok := <-w.fsw.Errors:
-			if !ok {
-				return
-			}
-			if errors.Is(werr, fsnotify.ErrEventOverflow) {
-				// Something changed, we don't know what — raise both signals (D10).
-				pendingRefs, pendingWorktree = true, true
-				armIfNeeded()
-			} else {
-				slog.Warn("gitclient: watcher error", "scope", "watcher", "err", werr)
-			}
 
 		case <-timerC:
 			fire()
