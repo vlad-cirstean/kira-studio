@@ -98,6 +98,40 @@ type ParsedBody struct {
 	EmptyReason string
 }
 
+// FileDiffBodyKind mirrors @kira/git-ipc's own FileDiffBody discriminant verbatim — including
+// "tooLarge", which ParseFileDiffBody itself never produces (D2b's own domain cap is applied by
+// gitsession, over the raw patch bytes this package never sees the size limit of).
+type FileDiffBodyKind string
+
+const (
+	BodyText       FileDiffBodyKind = "text"
+	BodyBinary     FileDiffBodyKind = "binary"
+	BodyLFSPointer FileDiffBodyKind = "lfsPointer"
+	BodyTooLarge   FileDiffBodyKind = "tooLarge"
+	BodyEmpty      FileDiffBodyKind = "empty"
+)
+
+// FileDiffBody mirrors @kira/git-ipc's own FileDiffBody union (D5): one Go struct with a Kind
+// discriminant and omitempty on every arm's own fields — the UI switches on kind and reads only
+// that arm. gitsession.RepoEntry.FileDiff is what actually produces one (the binary arm's byte
+// counts come from a cat-file round trip this package has no business doing, and the tooLarge arm
+// is a cap this package never enforces) — ParseFileDiffBody itself returns the narrower ParsedBody.
+type FileDiffBody struct {
+	Kind FileDiffBodyKind `json:"kind"`
+
+	Hunks []DiffHunk `json:"hunks,omitempty"` // text
+
+	OldBytes *int64 `json:"oldBytes,omitempty"` // binary
+	NewBytes *int64 `json:"newBytes,omitempty"` // binary
+
+	OID   string `json:"oid,omitempty"`   // lfsPointer
+	Bytes int64  `json:"bytes,omitempty"` // lfsPointer, tooLarge
+
+	LimitBytes int64 `json:"limitBytes,omitempty"` // tooLarge
+
+	Reason string `json:"reason,omitempty"` // empty: "modeChangeOnly" | "identical"
+}
+
 var indexLineRe = regexp.MustCompile(`^index ([0-9a-f]+)\.\.([0-9a-f]+)(?: \d+)?$`)
 var hunkHeaderRe = regexp.MustCompile(`^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@ ?(.*)$`)
 

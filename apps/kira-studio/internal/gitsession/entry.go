@@ -25,11 +25,11 @@ type Event struct {
 }
 
 // RepoEntry is one repository's SHARED state — everything true of the repository rather than of
-// one viewer (SPEC §6's split rule). G2 gives it exactly what it can use: the identity, the
-// reader/writer gate (unchanged from gitclient, now shared across connections instead of within
-// one), the watcher, and the subscriber fan-out. G3-G9 add the caches, cat-file session, head,
-// stash shapes, undo slot and active remote op SPEC §6 also lists (D13) — no placeholders for any
-// of that here.
+// one viewer (SPEC §6's split rule). G2 gave it the identity, the reader/writer gate (unchanged
+// from gitclient, now shared across connections instead of within one), the watcher, and the
+// subscriber fan-out. G4 adds the two caches SPEC §6 also lists (D7): the cat-file session,
+// dropped-on-refsChanged detail cache, and never-invalidated diff cache. Still to come: head,
+// stash shapes, undo slot and active remote op (G5-G9) — no placeholders for any of that here.
 type RepoEntry struct {
 	Summary gitclient.RepoSummary
 	Repo    *gitclient.Repo
@@ -42,6 +42,9 @@ type RepoEntry struct {
 	catfileMu sync.Mutex
 	catfile   *catfile.Session
 
+	detail *detailCache
+	diff   *diffCache
+
 	done chan struct{}
 }
 
@@ -51,6 +54,8 @@ func newRepoEntry(summary gitclient.RepoSummary, repo *gitclient.Repo, w Watcher
 		Repo:    repo,
 		watcher: w,
 		subs:    make(map[ConnID]*subscriber),
+		detail:  newDetailCache(),
+		diff:    newDiffCache(diffCacheCapBytes),
 		done:    make(chan struct{}),
 	}
 	go e.pump()
@@ -68,6 +73,12 @@ func (e *RepoEntry) pump() {
 }
 
 func (e *RepoEntry) note(sig gitclient.Signal) {
+	// D7: dropped before the fan-out, exactly the ordering G3 D13 established for marking a Walk
+	// stale — a client that reacts to repo.changed by re-requesting a detail must never be served
+	// the pre-change decoration.
+	if sig == gitclient.SignalRefsChanged {
+		e.detail.dropAll()
+	}
 	e.mu.Lock()
 	subs := make([]*subscriber, 0, len(e.subs))
 	for _, s := range e.subs {
@@ -133,6 +144,9 @@ func (e *RepoEntry) teardown() {
 		e.catfile.Close()
 	}
 	e.catfileMu.Unlock()
+
+	e.detail.dropAll()
+	e.diff.clear()
 
 	e.mu.Lock()
 	subs := e.subs

@@ -98,6 +98,15 @@ func (c *Conn) alreadyHeld(repoID string) (*RepoEntry, bool) {
 	return h.entry, true
 }
 
+// Entry returns the RepoEntry this connection holds for repoID — the seam every per-repo request
+// that is not a graph.* walk needs (D18/F7): a commit's detail, a file's patch and a blob's bytes
+// are facts about the repository (SPEC §6's split rule), not about one viewer's walk. Reports
+// false under the same condition ErrRepoNotHeld names — repo.open must precede this call, exactly
+// as it must for every other per-repo request.
+func (c *Conn) Entry(repoID string) (*RepoEntry, bool) {
+	return c.alreadyHeld(repoID)
+}
+
 // CloseRepo releases this connection's hold on repoID, if any, reporting whether one was present —
 // the RPC ignores the bool and answers {} either way, preserving repo.close's idempotency. Any
 // walk over repoID is disposed (its git log process killed) before the ref is released (D13), so
