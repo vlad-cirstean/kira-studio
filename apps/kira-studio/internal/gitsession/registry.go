@@ -104,10 +104,13 @@ func (reg *Registry) releaseFunc(repoID string) func() {
 	}
 }
 
-// release drops one ref; at zero it arms the linger timer rather than tearing down immediately
-// (D12 step 3) — the watcher keeps running through the window, which is the point: a reload that
-// reopens within seconds reuses the entry, and a future phase's caches on it stay valid rather than
-// silently stale.
+// release drops one ref; at zero it closes the entry's cat-file session (D13a) and arms the linger
+// timer rather than tearing down immediately (D12 step 3) — the watcher and every cache keep
+// running through the window, which is the point: a reload that reopens within seconds reuses the
+// entry and its caches stay valid rather than silently stale. The cat-file pair is different: it
+// holds two OS processes for a session nobody is using, its answers are content-addressed so
+// restarting it costs nothing, and CatFile() already restarts it lazily on the next use exactly as
+// it does on first use — so closing it here is pure savings with no correctness cost.
 func (reg *Registry) release(repoID string) {
 	reg.mu.Lock()
 	defer reg.mu.Unlock()
@@ -120,6 +123,7 @@ func (reg *Registry) release(repoID string) {
 	if sl.refs > 0 {
 		return
 	}
+	sl.entry.closeCatFile()
 	lingerFor := reg.LingerFor
 	if lingerFor <= 0 {
 		lingerFor = defaultLingerFor

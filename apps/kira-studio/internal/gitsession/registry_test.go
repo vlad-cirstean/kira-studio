@@ -252,6 +252,52 @@ func TestRegistry_ReleaseTwiceIsANoOp(t *testing.T) {
 	}
 }
 
+// TestRegistry_ReleaseToZeroClosesCatFileButKeepsWatcherAndCaches is D13(a)'s own proof: the
+// cat-file pair is pure cost during the linger window (two OS processes for a session nobody is
+// using) and is closed at refcount zero, while the watcher — and everything else the linger window
+// exists to keep valid — stays alive. A re-acquire inside the window reuses the same entry and
+// restarts cat-file lazily, exactly as it already does on first use.
+func TestRegistry_ReleaseToZeroClosesCatFileButKeepsWatcherAndCaches(t *testing.T) {
+	reg := newTestRegistry()
+	reg.LingerFor = time.Hour
+
+	entry, release, err := reg.Acquire(context.Background(), "/usr/bin/git", "/repo")
+	if err != nil {
+		t.Fatalf("Acquire: %v", err)
+	}
+	if entry.CatFile() == nil {
+		t.Fatal("CatFile() returned nil before release")
+	}
+
+	release()
+
+	entry.catfileMu.Lock()
+	stillOpen := entry.catfile != nil
+	entry.catfileMu.Unlock()
+	if stillOpen {
+		t.Fatal("cat-file session still open during the linger window, want closed (D13a)")
+	}
+
+	w := entry.watcher.(*fakeWatcher)
+	select {
+	case <-w.closed:
+		t.Fatal("watcher closed at refcount zero, want it alive through the linger window")
+	default:
+	}
+
+	entry2, release2, err := reg.Acquire(context.Background(), "/usr/bin/git", "/repo")
+	if err != nil {
+		t.Fatalf("re-Acquire inside linger: %v", err)
+	}
+	defer release2()
+	if entry2 != entry {
+		t.Fatal("re-acquire inside the linger window built a new entry")
+	}
+	if entry2.CatFile() == nil {
+		t.Fatal("CatFile() after re-acquire returned nil — the pair must restart lazily")
+	}
+}
+
 func TestRegistry_CloseTearsDownEverythingImmediately(t *testing.T) {
 	reg := newTestRegistry()
 	reg.LingerFor = time.Hour
