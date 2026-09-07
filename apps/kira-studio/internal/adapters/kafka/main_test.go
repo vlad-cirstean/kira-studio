@@ -11,8 +11,8 @@ import (
 // down once, after every test has run — never from an individual test's t.Cleanup, which Go's
 // testing package would run the instant the registering test function itself returns (P58b B15).
 func TestMain(m *testing.M) {
+	testsupport.Prewarm("kafka", "kafkasasl")
 	code := m.Run()
-	testsupport.StopKafka()
-	testsupport.StopKafkaSasl()
+	testsupport.StopConcurrently(testsupport.StopKafka, testsupport.StopKafkaSasl)
 	os.Exit(code)
 }

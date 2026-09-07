@@ -30,9 +30,9 @@ import (
 )
 
 func TestMain(m *testing.M) {
+	testsupport.Prewarm("mariadb", "mysql")
 	code := m.Run()
-	testsupport.StopMariadb()
-	testsupport.StopMysql()
+	testsupport.StopConcurrently(testsupport.StopMariadb, testsupport.StopMysql)
 	os.Exit(code)
 }
 

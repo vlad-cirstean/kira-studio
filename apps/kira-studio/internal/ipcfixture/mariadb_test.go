@@ -16,13 +16,12 @@ import (
 )
 
 func TestMain(m *testing.M) {
+	testsupport.Prewarm("mariadb", "mysql", "clickhouse", "redis", "sqs", "kafka")
 	code := m.Run()
-	testsupport.StopMariadb()
-	testsupport.StopMysql()
-	testsupport.StopClickHouse()
-	testsupport.StopRedis()
-	testsupport.StopSqs()
-	testsupport.StopKafka()
+	testsupport.StopConcurrently(
+		testsupport.StopMariadb, testsupport.StopMysql, testsupport.StopClickHouse,
+		testsupport.StopRedis, testsupport.StopSqs, testsupport.StopKafka,
+	)
 	os.Exit(code)
 }
 
