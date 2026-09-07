@@ -122,3 +122,95 @@ func TestClassifyOpError_WorktreeDeleteNotNotFullyMerged(t *testing.T) {
 		t.Fatalf("got %q, want WorktreeConflict (not NotFullyMerged)", kind)
 	}
 }
+
+// G7 D14/F18: the eight remote rows, each pinned to a probe-observed message, plus D24's own three
+// ordering assertions naming the exact row each would otherwise be swallowed by.
+
+func TestClassifyOpError_HookRejected(t *testing.T) {
+	// The non-porcelain stderr shape (probe P7's own note: "the same probe run WITHOUT
+	// --porcelain puts ' ! [rejected] …' on stderr") — with --porcelain, ClassifyRemoteError's
+	// own porcelainReason check (below) is what actually fires for a real push; this row is the
+	// stderr-only fallback the table still names.
+	stderr := " ! [rejected]        main -> main (pre-receive hook declined)"
+	if kind, _ := gitops.ClassifyOpError(stderr, 1); kind != "HookRejected" {
+		t.Fatalf("got %q, want HookRejected", kind)
+	}
+}
+
+func TestClassifyOpError_LeaseViolation(t *testing.T) {
+	stderr := " ! [rejected]        main -> main (stale info)"
+	kind, _ := gitops.ClassifyOpError(stderr, 1)
+	if kind != "LeaseViolation" {
+		t.Fatalf("got %q, want LeaseViolation — not NonFastForward (the ordering assertion)", kind)
+	}
+}
+
+func TestClassifyOpError_RemoteRefUpdated(t *testing.T) {
+	stderr := " ! [rejected]        main -> main (remote ref updated since checkout)"
+	if kind, _ := gitops.ClassifyOpError(stderr, 1); kind != "RemoteRefUpdated" {
+		t.Fatalf("got %q, want RemoteRefUpdated", kind)
+	}
+}
+
+func TestClassifyOpError_NonFastForward(t *testing.T) {
+	// Probe P5's own no-porcelain form.
+	stderr := " ! [rejected]        main -> main (fetch first)"
+	if kind, _ := gitops.ClassifyOpError(stderr, 1); kind != "NonFastForward" {
+		t.Fatalf("got %q, want NonFastForward", kind)
+	}
+}
+
+func TestClassifyOpError_AuthFailed(t *testing.T) {
+	for _, stderr := range []string{
+		"fatal: could not read Username for 'https://example.com': terminal prompts disabled",
+		"error: unable to read askpass response from '/tmp/kira-askpass-x/shim'",
+		"fatal: Authentication failed for 'https://example.com/repo.git/'",
+	} {
+		if kind, _ := gitops.ClassifyOpError(stderr, 128); kind != "AuthFailed" {
+			t.Fatalf("%q -> %q, want AuthFailed", stderr, kind)
+		}
+	}
+}
+
+func TestClassifyOpError_NetworkFailed(t *testing.T) {
+	for _, stderr := range []string{
+		"fatal: unable to access 'https://example.com/repo.git/': Could not resolve host: example.com",
+		"ssh: connect to host example.com port 22: Connection refused",
+	} {
+		if kind, _ := gitops.ClassifyOpError(stderr, 128); kind != "NetworkFailed" {
+			t.Fatalf("%q -> %q, want NetworkFailed", stderr, kind)
+		}
+	}
+}
+
+func TestClassifyOpError_RemoteNotFound(t *testing.T) {
+	// The GitHub shape of RemoteNotFound — must not be swallowed by the local "not found" row.
+	stderr := "remote: Repository not found.\nfatal: repository 'https://github.com/x/y.git/' not found"
+	kind, _ := gitops.ClassifyOpError(stderr, 128)
+	if kind != "RemoteNotFound" {
+		t.Fatalf("got %q, want RemoteNotFound — not NotFound (the ordering assertion)", kind)
+	}
+}
+
+func TestClassifyOpError_RemoteRefMissing(t *testing.T) {
+	// Probe P8.
+	stderr := "error: unable to delete 'fx': remote ref does not exist"
+	if kind, _ := gitops.ClassifyOpError(stderr, 1); kind != "RemoteRefMissing" {
+		t.Fatalf("got %q, want RemoteRefMissing", kind)
+	}
+}
+
+func TestClassifyRemoteError_PorcelainReasonWinsOverStderr(t *testing.T) {
+	kind, _ := gitops.ClassifyRemoteError("pre-receive hook declined", "error: failed to push some refs", 1)
+	if kind != "HookRejected" {
+		t.Fatalf("got %q, want HookRejected", kind)
+	}
+}
+
+func TestClassifyRemoteError_EmptyPorcelainFallsThroughToStderr(t *testing.T) {
+	// Probe P8: fetch and an empty porcelain block both carry "" for porcelainReason.
+	kind, _ := gitops.ClassifyRemoteError("", "error: unable to delete 'fx': remote ref does not exist", 1)
+	if kind != "RemoteRefMissing" {
+		t.Fatalf("got %q, want RemoteRefMissing", kind)
+	}
+}
