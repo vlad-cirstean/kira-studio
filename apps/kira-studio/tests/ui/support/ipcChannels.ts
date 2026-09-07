@@ -32,6 +32,10 @@ export const IPC = {
 
   filesChooseSave: 'kira:files:chooseSave',
   filesChooseOpen: 'kira:files:chooseOpen',
+  filesChooseFolder: 'kira:files:chooseFolder',
+
+  datagripScan: 'kira:datagrip:scan',
+  datagripImport: 'kira:datagrip:import',
 
   connectionsList: 'kira:connections:list',
   connectionsCreate: 'kira:connections:create',
