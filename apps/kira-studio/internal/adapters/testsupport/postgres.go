@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"sync"
 	"testing"
 	"time"
 
@@ -28,11 +29,21 @@ const DockerUnavailableMessage = "Docker daemon unreachable — see AGENTS.md's 
 
 const dockerProbeTimeout = 5 * time.Second
 
-// IsDockerAvailable is docker.ts's isDockerAvailable.
+var (
+	dockerProbeOnce   sync.Once
+	dockerProbeResult bool
+)
+
+// IsDockerAvailable is docker.ts's isDockerAvailable. Memoized per test binary (sync.Once): the
+// daemon does not appear or disappear mid-run, and this is called from every Start<Kind> plus
+// Prewarm — 144 call sites across the suite before this change, each a 60ms `docker info` shell-out.
 func IsDockerAvailable() bool {
-	ctx, cancel := context.WithTimeout(context.Background(), dockerProbeTimeout)
-	defer cancel()
-	return exec.CommandContext(ctx, "docker", "info").Run() == nil
+	dockerProbeOnce.Do(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), dockerProbeTimeout)
+		defer cancel()
+		dockerProbeResult = exec.CommandContext(ctx, "docker", "info").Run() == nil
+	})
+	return dockerProbeResult
 }
 
 // PgFixture is postgres.ts's PgFixture.
