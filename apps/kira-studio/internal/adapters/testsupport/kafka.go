@@ -71,6 +71,35 @@ func StopKafka() {
 	})
 }
 
+const (
+	kafkaReadyPollInterval = 250 * time.Millisecond
+	kafkaReadyTimeout      = 60 * time.Second
+)
+
+// waitKafkaBrokerReady polls a real request until the broker actually serves it. The module's own
+// log-based readiness hook (tckafka.Run's PostStarts wait strategy) fires on a log line the broker
+// writes before its advertised listener is actually accepting client traffic — under load, the
+// window between the two is wide enough that the first real request (seedKafka's CreateTopics) can
+// land mid-ApiVersions negotiation and see the connection closed. client.Ping issues a real
+// Metadata request through the same negotiation path a production caller would use, so it fails
+// exactly the way that first request would, until the broker is genuinely ready.
+func waitKafkaBrokerReady(ctx context.Context, client *kgo.Client) error {
+	deadline := time.Now().Add(kafkaReadyTimeout)
+	var lastErr error
+	for {
+		pingCtx, cancel := context.WithTimeout(ctx, kafkaReadyPollInterval)
+		lastErr = client.Ping(pingCtx)
+		cancel()
+		if lastErr == nil {
+			return nil
+		}
+		if time.Now().After(deadline) {
+			return fmt.Errorf("kafka broker not ready after %s: %w", kafkaReadyTimeout, lastErr)
+		}
+		time.Sleep(kafkaReadyPollInterval)
+	}
+}
+
 func startKafka() (*KafkaFixture, error) {
 	// The module's own readiness wait (a log-regex match inside a PostStarts hook, kafka.go's own
 	// Run) takes no configurable timeout option — it is bounded only by the ctx passed to Run
@@ -111,6 +140,12 @@ func startKafka() (*KafkaFixture, error) {
 		return nil, err
 	}
 	admin := kadm.NewClient(client)
+
+	if err := waitKafkaBrokerReady(ctx, client); err != nil {
+		client.Close()
+		_ = c.Terminate(ctx)
+		return nil, err
+	}
 
 	if err := seedKafka(ctx, admin, client); err != nil {
 		client.Close()
