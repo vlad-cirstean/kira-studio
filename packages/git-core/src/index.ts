@@ -71,8 +71,6 @@ export type {
   UndoSlotSnapshot,
 } from './model/operation.ts';
 export { canRunOp, classifyInProgress, describeInProgress } from './model/operation.ts';
-export type { ProtectedBranchProblem, ProtectedMatch } from './model/protectedBranch.ts';
-export { matchProtectedBranch } from './model/protectedBranch.ts';
 export type { RefKind, RefRecord, RefTrack, TagAnnotation } from './model/ref.ts';
 export type {
   PullStrategy,
@@ -126,9 +124,6 @@ export type { Storage, StorageScope } from './ports/storage.ts';
 export type { Theme, ThemeKind } from './ports/theme.ts';
 export type { RepoCandidate, WorkspaceRoots } from './ports/workspaceRoots.ts';
 export { classifyCherryPick } from './preflight/cherryPick.ts';
-export type { PullConfigValues } from './preflight/pull.ts';
-export { buildPullPreflight, resolvePullStrategy } from './preflight/pull.ts';
-export { classifyPush } from './preflight/push.ts';
 export { classifyReset } from './preflight/reset.ts';
 export { classifyStashBranch, classifyStashPop } from './preflight/stashPop.ts';
 export { classifyTagCreate, validateRefName } from './preflight/tag.ts';

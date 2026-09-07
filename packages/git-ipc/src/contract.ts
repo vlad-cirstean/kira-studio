@@ -40,10 +40,7 @@ export interface SettingsSnapshot {
   readonly 'kiraVersion.log.level': 'off' | 'error' | 'warn' | 'info' | 'debug';
   /** P7 W7/D43: Branch review's own candidate base branches (§6.8). */
   readonly 'kiraVersion.review.baseCandidates': readonly string[];
-  /** P8 W4/W5: minutes between automatic background fetches, 0 = off. */
-  readonly 'kiraVersion.fetch.autoInterval': number;
   readonly 'kiraVersion.pull.strategy': 'auto' | 'ff-only' | 'merge' | 'rebase';
-  readonly 'kiraVersion.protectedBranches': readonly string[];
   /** P9 W6: the Stash dialog's "include untracked files" checkbox default. */
   readonly 'kiraVersion.stash.includeUntracked': boolean;
   /** P9 W6: whether stash entries appear as nodes in the commit graph (OQ5 default: true). */
@@ -497,7 +494,10 @@ export interface PushPreflight {
 
 /** `remote.run`'s params — one request key for all five `RemoteOpKind`s (D51). `confirmToken`
  *  is present only for a protected-branch force-push/delete: the typed branch name, checked
- *  server-side against `kiraVersion.protectedBranches` (D52) — never trusted from the UI alone. */
+ *  server-side against Kira Studio's own server-owned `protectedBranches` setting (G7 D16/D17,
+ *  superseding D52's `kiraVersion.protectedBranches` — moved out of VS Code's settings because
+ *  two windows disagreeing about it is a safety issue, not a preference) — never trusted from the
+ *  UI alone. */
 export interface RemoteOpParams {
   readonly repoId: string;
   readonly kind: RemoteOpKind;

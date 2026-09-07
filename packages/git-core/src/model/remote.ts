@@ -72,8 +72,9 @@ export interface RemoteOpRequest {
    *  other kind. */
   readonly plainForce: boolean | undefined;
   /** `forcePush`/`deleteRemoteBranch` against a protected branch only: the typed branch name,
-   *  checked server-side against `kiraVersion.protectedBranches` (D52) — never trusted from the
-   *  UI alone. `undefined` for every other kind, and for an unprotected branch. */
+   *  checked server-side against Kira Studio's own server-owned `protectedBranches` setting (G7
+   *  D16/D17, superseding D52's `kiraVersion.protectedBranches`) — never trusted from the UI
+   *  alone. `undefined` for every other kind, and for an unprotected branch. */
   readonly confirmToken: string | undefined;
 }
 
