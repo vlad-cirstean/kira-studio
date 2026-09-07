@@ -3,6 +3,7 @@ import { pathTail } from '@shared/domain/tree';
 import { computed } from 'vue';
 import { formatRelative } from '../../format';
 import { connectionRecord, connectionsState, openCreateDialog } from '../../state/connections';
+import { pickAndScanDataGripProject } from '../../state/datagripImport';
 import {
   openDataTab,
   openDocumentTab,
@@ -59,10 +60,21 @@ function openRecent(entry: RecentTableEntry): void {
       <div class="start-sub muted">
         Kira Studio needs somewhere to connect before it can show you anything.
       </div>
-      <button type="button" class="p-dlgbtn primary" @click="openCreateDialog">
-        <span class="icon-box"><CodiconIcon name="add" :size="13" /></span>
-        New connection
-      </button>
+      <span class="first-run-actions">
+        <button type="button" class="p-dlgbtn primary" @click="openCreateDialog">
+          <span class="icon-box"><CodiconIcon name="add" :size="13" /></span>
+          New connection
+        </button>
+        <button
+          type="button"
+          class="p-dlgbtn"
+          data-testid="first-run-import-datagrip"
+          @click="pickAndScanDataGripProject"
+        >
+          <span class="icon-box"><CodiconIcon name="cloud-download" :size="13" /></span>
+          Import from DataGrip
+        </button>
+      </span>
     </div>
   </div>
 
@@ -112,6 +124,11 @@ function openRecent(entry: RecentTableEntry): void {
 .start-inner {
   width: 560px;
   max-width: 100%;
+}
+
+.first-run-actions {
+  display: flex;
+  gap: var(--kira-s-3);
 }
 
 .start-inner.first-run {
