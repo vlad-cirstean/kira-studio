@@ -193,3 +193,30 @@ func TestGoToTarget_PathEscapingRootIsRefused(t *testing.T) {
 		t.Fatalf("err = %v, want ErrPathEscapesRoot", err)
 	}
 }
+
+// TestGoToTarget_BareRepoAlwaysTakesTheHistoricalBranch proves a bare repository (Root == "",
+// F11's own case) never reaches the on-disk check at all — it has no checkout, so the object
+// database alone decides, and no host method may join(repoId, path) against a bare repo's own
+// RepoID (which is the git dir, not a worktree root, G3 D7).
+func TestGoToTarget_BareRepoAlwaysTakesTheHistoricalBranch(t *testing.T) {
+	skipWithoutGitQueries(t)
+	srcDir, rev := initGoToTargetRepo(t)
+
+	bareDir := t.TempDir() + "/bare.git"
+	runGitQ(t, "", "clone", "-q", "--bare", srcDir, bareDir)
+	e := newQueriesTestEntry(t, bareDir)
+	if !e.Summary.IsBare || e.Summary.Root != "" {
+		t.Fatalf("summary = %+v, want a bare repo with an empty Root", e.Summary)
+	}
+
+	got, err := e.GoToTarget(context.Background(), rev, "live.txt")
+	if err != nil {
+		t.Fatalf("GoToTarget: %v", err)
+	}
+	if got.Kind != "historical" || got.Rev != rev || got.Path != "live.txt" {
+		t.Fatalf("got = %+v, want historical (a bare repo has no checkout to be live on)", got)
+	}
+	if got.AbsPath != "" {
+		t.Fatalf("absPath = %q, want empty — a bare repo must never join(repoId, path)", got.AbsPath)
+	}
+}
