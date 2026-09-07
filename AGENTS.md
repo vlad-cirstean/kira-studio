@@ -238,9 +238,12 @@ See `docs/ARCHITECTURE.md`'s Storage section for the cipher, the key and the env
   `$(go env GOPATH)/pkg/mod/github.com/wailsapp/wails/v3@<version>/` instead of the docs site** — it
   is the real source for the exact pinned version.
 - **`go test ./apps/kira-studio/internal/...` / `go build ./apps/kira-studio/internal/...` need
-  nothing but the Go toolchain** — the product's own Go code is entirely cgo-free
-  (`modernc.org/sqlite` for both the sqlite adapter and the app's own storage). Only the
-  `apps/kira-studio` `main` package imports Wails and needs the GTK/WebKit headers, so prefer
+  nothing but the Go toolchain** — every cgo call this app makes (a handful of darwin-only files in
+  `internal/secrets`, `internal/metrics`, `internal/localauth`, and any package that later follows
+  the same pattern) is behind a `darwin && cgo` build tag with a real, working `!darwin || !cgo`
+  companion, invisible to a Linux build; `modernc.org/sqlite` (the sqlite adapter and the app's own
+  storage) is cgo-free on every platform. Only the `apps/kira-studio` `main` package imports Wails
+  and needs the GTK/WebKit headers, so prefer
   `./apps/kira-studio/internal/...` for a fast loop.
 - **Regenerate bindings via `wails3 task common:generate:bindings`** (or `scripts/setup.sh`, which
   calls it) — never a hand-typed `wails3 generate bindings` flag list, which has already drifted

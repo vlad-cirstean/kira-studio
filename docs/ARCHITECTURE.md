@@ -47,9 +47,13 @@ M9.3** (checkpoint C2): `jackc/pgx/v5` (postgres), `go-sql-driver/mysql` (mariad
 (clickhouse, no driver dependency at all), `go.mongodb.org/mongo-driver/v2` (mongodb),
 `redis/go-redis/v9` (redis), `aws-sdk-go-v2/service/{sqs,s3}` (sqs/s3, sharing a small `awscfg`
 config-and-error-mapping package), `github.com/twmb/franz-go` + `franz-go/pkg/kadm` (kafka). **The
-whole product binary is cgo-free for its own code** — only Wails' own macOS bindings still need
-`CGO_ENABLED=1` — a materially better outcome than the parent plan's own D8 predicted, and one
-nothing had claimed until now. **The Node engine child is gone as of P58f M10**: checkpoint C2
+database/adapter surface itself is cgo-free** — a materially better outcome than the parent plan's
+own D8 predicted, and one nothing had claimed until now — though this no longer describes the whole
+binary: a handful of darwin-only files elsewhere in the app (`internal/secrets`, `internal/metrics`,
+`internal/localauth`) use cgo for real OS integrations, each behind a `darwin && cgo` build tag with
+a working non-cgo companion, invisible outside a real darwin+cgo build — so `CGO_ENABLED=1` is
+needed for more than just Wails' own macOS bindings, just never for a Linux dev/test loop. **The
+Node engine child is gone as of P58f M10**: checkpoint C2
 (P58e M9.3) had already brought it to answering no connection traffic for any kind; P58f deleted the
 process itself, its build/vendoring machinery, and everything that supervised it.
 
