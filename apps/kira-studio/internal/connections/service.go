@@ -380,14 +380,14 @@ func (s *Service) Duplicate(id string) (model.ConnectionSummary, error) {
 	}
 	newID := uuid.NewString()
 	fields := existing.ConnectionFields
-	fields.Name = fields.Name + " copy"
-	created, err := s.deps.Conns.Insert(newID, fields, model.NowISO())
+	fields.Name = duplicateName(fields.Name)
+	// P25 D11 (a raw column copy, not decrypt-then-re-encrypt — the plaintext is never used, so
+	// there is no reason for this path to need the OS key at all) plus the review finding's own
+	// atomicity fix: the new row and its copied password column are now written by the very same
+	// INSERT statement (InsertDuplicateWithSecret, P21 round 3 finding 4's precedent), never as two
+	// separate writes — a crash between them can no longer leave a passwordless duplicate behind.
+	created, err := s.deps.Conns.InsertDuplicateWithSecret(id, newID, fields, model.NowISO())
 	if err != nil {
-		return model.ConnectionSummary{}, wrapErr(err)
-	}
-	// P25 D11: a raw column copy, not decrypt-then-re-encrypt — the plaintext is never used, so
-	// there is no reason for this path to need the OS key at all.
-	if err := s.deps.Secrets.Copy(id, newID); err != nil {
 		return model.ConnectionSummary{}, wrapErr(err)
 	}
 	s.emitListChanged()

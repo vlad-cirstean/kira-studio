@@ -58,19 +58,6 @@ func (r *SecretsRepo) Set(connectionID string, secret *string) error {
 	return nil
 }
 
-// Copy copies the stored column value verbatim — no decrypt, no re-encrypt (P25 D11). It must
-// never touch the cipher.
-func (r *SecretsRepo) Copy(fromConnectionID, toConnectionID string) error {
-	var stored sql.NullString
-	if err := r.db.QueryRow(`SELECT password FROM connections WHERE id = ?`, fromConnectionID).Scan(&stored); err != nil {
-		return fmt.Errorf("repos/secrets: copy read %s: %w", fromConnectionID, err)
-	}
-	if _, err := r.db.Exec(`UPDATE connections SET password = ? WHERE id = ?`, stored, toConnectionID); err != nil {
-		return fmt.Errorf("repos/secrets: copy write %s: %w", toConnectionID, err)
-	}
-	return nil
-}
-
 func (r *SecretsRepo) Delete(connectionID string) error {
 	if _, err := r.db.Exec(`UPDATE connections SET password = NULL WHERE id = ?`, connectionID); err != nil {
 		return fmt.Errorf("repos/secrets: delete %s: %w", connectionID, err)

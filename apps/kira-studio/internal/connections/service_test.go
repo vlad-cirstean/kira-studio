@@ -11,6 +11,7 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/connections"
@@ -928,5 +929,78 @@ func TestConnectKeepsMetadataCacheAndEmitsInvalidation(t *testing.T) {
 
 	if len(invalidated) != 1 || invalidated[0] != created.ID {
 		t.Errorf("metadataInvalidated emissions = %v, want exactly [%s]", invalidated, created.ID)
+	}
+}
+
+// TestDuplicateCapsGeneratedNameAtMaxLength is the review finding: Duplicate used to append " copy"
+// with no length cap at all — a 118-character name plus " copy" (5 more) is 123 characters, over
+// connectionInputSchema's own 120-character cap that a hand-typed name of that length would have
+// been rejected for at Create time.
+func TestDuplicateCapsGeneratedNameAtMaxLength(t *testing.T) {
+	h := newHarness(t)
+	longName := strings.Repeat("a", 118)
+	created := mustCreate(t, h.svc, fieldsInput(longName))
+
+	dup, err := h.svc.Duplicate(created.ID)
+	if err != nil {
+		t.Fatalf("Duplicate: %v", err)
+	}
+	if len(dup.Name) > 120 {
+		t.Errorf("Duplicate name is %d bytes (%q), want at most 120", len(dup.Name), dup.Name)
+	}
+	if !strings.HasSuffix(dup.Name, " copy") {
+		t.Errorf("Duplicate name = %q, want it to still end in \" copy\"", dup.Name)
+	}
+	if !utf8.ValidString(dup.Name) {
+		t.Errorf("Duplicate name %q is not valid UTF-8", dup.Name)
+	}
+
+	// A short name is untouched apart from the suffix — the cap only bites when it would actually
+	// be exceeded.
+	short := mustCreate(t, h.svc, fieldsInput("short-name"))
+	dupShort, err := h.svc.Duplicate(short.ID)
+	if err != nil {
+		t.Fatalf("Duplicate: %v", err)
+	}
+	if dupShort.Name != "short-name copy" {
+		t.Errorf("Duplicate name = %q, want %q", dupShort.Name, "short-name copy")
+	}
+}
+
+// TestDuplicateCopiesThePasswordAtomically is the review finding's other half: Duplicate used to
+// Conns.Insert the row and Secrets.Copy the password as two separate statements with no
+// transaction, so a crash between them left a passwordless duplicate. InsertDuplicateWithSecret
+// copies the password in the very same INSERT statement the row itself is written by — this
+// confirms the happy path actually commits both together against a real database (a crash injected
+// between two statements that no longer exist has nothing left to inject between).
+func TestDuplicateCopiesThePasswordAtomically(t *testing.T) {
+	h := newHarness(t)
+	in := fieldsInput("with-a-password")
+	in.Password = strPtr("s3cret")
+	created := mustCreate(t, h.svc, in)
+
+	dup, err := h.svc.Duplicate(created.ID)
+	if err != nil {
+		t.Fatalf("Duplicate: %v", err)
+	}
+	if dup.ID == created.ID {
+		t.Fatalf("Duplicate returned the same ID as the original")
+	}
+
+	got, err := h.secrets.Get(dup.ID)
+	if err != nil {
+		t.Fatalf("Secrets.Get(duplicate): %v", err)
+	}
+	if got == nil || *got != "s3cret" {
+		t.Errorf("duplicate's stored password = %v, want %q", got, "s3cret")
+	}
+
+	// The original's own password must be untouched by the copy.
+	original, err := h.secrets.Get(created.ID)
+	if err != nil {
+		t.Fatalf("Secrets.Get(original): %v", err)
+	}
+	if original == nil || *original != "s3cret" {
+		t.Errorf("original's stored password = %v, want unchanged %q", original, "s3cret")
 	}
 }

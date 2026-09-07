@@ -3,10 +3,17 @@ package connections
 import (
 	"math"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/ipcerr"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 )
+
+// maxNameLength is connectionInputSchema's own name cap — the single source Validate and
+// Service.Duplicate's generated "<name> copy" both read, so the two can never drift apart (review
+// finding: Duplicate used to append " copy" with no cap at all, which Validate would then have
+// rejected outright for any name already close to the limit).
+const maxNameLength = 120
 
 // ThrottlePerSecRange mirrors packages/shared/domain/connection.ts's CONNECTION_THROTTLE_RANGE —
 // 0 (unlimited) or 0.01-1000 commands/sec.
@@ -33,7 +40,7 @@ type Input struct {
 // shape (P52 §4.2: "an explicit guard at the top of the method, returning E_BAD_REQUEST").
 func (in Input) Validate() error {
 	name := strings.TrimSpace(in.Name)
-	if name == "" || len(name) > 120 {
+	if name == "" || len(name) > maxNameLength {
 		return ipcerr.BadRequest("name must be 1-120 characters")
 	}
 	if !model.ValidConnectionKind(in.Kind) {
@@ -89,4 +96,30 @@ func (in Input) Validate() error {
 	}
 
 	return nil
+}
+
+// copySuffix is Service.Duplicate's own generated-name suffix.
+const copySuffix = " copy"
+
+// duplicateName is Service.Duplicate's name generator: name + copySuffix, capped at
+// maxNameLength — the base name is truncated (never the suffix, so the result always reads as a
+// copy) at a rune boundary so it is never invalid UTF-8. Review finding: Duplicate used to append
+// copySuffix with no cap at all, which Validate would then reject outright for any name already
+// within copySuffix's own length of the limit — Duplicate itself never calls Validate (an
+// already-stored name is by definition valid input; a rejection here would be a duplicate that
+// silently never happens), so the cap has to be applied at generation time instead.
+func duplicateName(name string) string {
+	full := name + copySuffix
+	if len(full) <= maxNameLength {
+		return full
+	}
+	maxBase := maxNameLength - len(copySuffix)
+	if maxBase < 0 {
+		maxBase = 0
+	}
+	cut := maxBase
+	for cut > 0 && !utf8.RuneStart(name[cut]) {
+		cut--
+	}
+	return name[:cut] + copySuffix
 }

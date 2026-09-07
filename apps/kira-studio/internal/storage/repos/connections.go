@@ -270,6 +270,57 @@ func (r *ConnectionsRepo) InsertWithSecret(connID string, f model.ConnectionFiel
 	return *created, nil
 }
 
+// InsertDuplicateWithSecret is InsertWithSecret's own twin for connections.Service.Duplicate,
+// closing the review finding's gap the same way P21 round 3 finding 4 closed it for Create/Update:
+// the new row and its copied password column are written by the very same INSERT statement — the
+// password is copied by a scalar subquery reading fromConnectionID's own column directly, never
+// read into Go and never touching the cipher (mirrors SecretsRepo.Copy's own "no decrypt, no
+// re-encrypt" contract, P25 D11), so a crash between "insert the row" and "copy the secret" can no
+// longer leave a passwordless duplicate behind the way two separate statements could.
+func (r *ConnectionsRepo) InsertDuplicateWithSecret(fromConnectionID, toConnectionID string, f model.ConnectionFields, createdAt string) (model.ConnectionSummary, error) {
+	optionsJSON, err := json.Marshal(f.Options)
+	if err != nil {
+		return model.ConnectionSummary{}, fmt.Errorf("repos/connections: encode options: %w", err)
+	}
+
+	tx, err := r.DB.Begin()
+	if err != nil {
+		return model.ConnectionSummary{}, fmt.Errorf("repos/connections: begin: %w", err)
+	}
+	defer tx.Rollback() //nolint:errcheck
+
+	var sortOrder int
+	if err := tx.QueryRow(`SELECT COALESCE(MAX(sort_order), -1) + 1 FROM connections`).Scan(&sortOrder); err != nil {
+		return model.ConnectionSummary{}, fmt.Errorf("repos/connections: next sort order: %w", err)
+	}
+	if _, err := tx.Exec(`
+		INSERT INTO connections (
+			id, name, kind, color, mode, read_only, host, port, database, username, uri,
+			options_json, preconnect, preconnect_sidecar, auto_explain, throttle_per_sec,
+			created_at, updated_at, sort_order, password
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+			(SELECT password FROM connections WHERE id = ?))
+	`,
+		toConnectionID, f.Name, f.Kind, f.Color, f.Mode, boolToInt(f.ReadOnly), f.Host, f.Port, f.Database,
+		f.Username, f.URI, string(optionsJSON), f.Preconnect, boolToInt(f.PreconnectSidecar),
+		boolToInt(f.AutoExplain), f.ThrottlePerSec, createdAt, createdAt, sortOrder, fromConnectionID,
+	); err != nil {
+		return model.ConnectionSummary{}, fmt.Errorf("repos/connections: insert duplicate %s: %w", toConnectionID, err)
+	}
+	if err := tx.Commit(); err != nil {
+		return model.ConnectionSummary{}, fmt.Errorf("repos/connections: commit: %w", err)
+	}
+
+	created, err := r.Get(toConnectionID)
+	if err != nil {
+		return model.ConnectionSummary{}, err
+	}
+	if created == nil {
+		return model.ConnectionSummary{}, fmt.Errorf("repos/connections: row %s not readable after insert", toConnectionID)
+	}
+	return *created, nil
+}
+
 // UpdateWithSecret is Update plus, in the same UPDATE statement, the row's password column —
 // P21 round 3 finding 4: connections.Service.Update used to Secrets.Set the password and then
 // Conns.Update the rest of the row as two separate statements (in that order, specifically so a
