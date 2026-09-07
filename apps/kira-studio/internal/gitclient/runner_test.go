@@ -18,11 +18,22 @@ import (
 
 func TestBuildEnv_AppendsHygieneOntoBase(t *testing.T) {
 	base := []string{"PATH=/usr/bin", "HOME=/home/kira"}
-	got := buildEnv(base)
+	got := buildEnv(base, nil)
 
 	want := append(slices.Clone(base), "GIT_TERMINAL_PROMPT=0", "GIT_OPTIONAL_LOCKS=0", "GIT_PAGER=cat", "GIT_EDITOR=true", "LC_ALL=C")
 	if !slices.Equal(got, want) {
-		t.Fatalf("buildEnv(%v) = %v, want %v", base, got, want)
+		t.Fatalf("buildEnv(%v, nil) = %v, want %v", base, got, want)
+	}
+}
+
+// TestBuildEnv_ExtraWinsOverHygieneOnDuplicateKey is G7 D5's own guarantee — Spec.Env's only
+// caller (the askpass broker) relies on GIT_ASKPASS overriding nothing hygieneEnv sets today, but
+// the ordering itself (extra last, so it would win on any future collision) is worth pinning.
+func TestBuildEnv_ExtraWinsOverHygieneOnDuplicateKey(t *testing.T) {
+	got := buildEnv([]string{"PATH=/usr/bin"}, []string{"GIT_EDITOR=nano"})
+	want := []string{"PATH=/usr/bin", "GIT_TERMINAL_PROMPT=0", "GIT_OPTIONAL_LOCKS=0", "GIT_PAGER=cat", "GIT_EDITOR=true", "LC_ALL=C", "GIT_EDITOR=nano"}
+	if !slices.Equal(got, want) {
+		t.Fatalf("buildEnv with extra = %v, want %v", got, want)
 	}
 }
 

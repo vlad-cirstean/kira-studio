@@ -63,6 +63,14 @@ type Repo struct {
 // what Repo was already constructed with.
 func (r *Repo) Runner() Runner { return r.runner }
 
+// Writing reports whether this repo is currently inside a Write call — G7 D11/D23's own auto-fetch
+// guardrail ("never while another op holds the write queue"), the one caller outside this file.
+func (r *Repo) Writing() bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.writing
+}
+
 // GitPath returns the resolved git binary path this repo spawns.
 func (r *Repo) GitPath() string { return r.gitPath }
 

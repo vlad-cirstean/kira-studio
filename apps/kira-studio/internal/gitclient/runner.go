@@ -38,6 +38,23 @@ type Spec struct {
 	// is driven by writing one revision per line). False (the default) leaves stdin closed, exactly
 	// as every G1/G2 spawn already behaves.
 	Stdin bool
+	// Env is appended AFTER hygieneEnv (G7 D5), so a spec's own entry wins on a duplicate key — the
+	// askpass broker's only caller: GIT_ASKPASS/SSH_ASKPASS, SSH_ASKPASS_REQUIRE and the broker's
+	// own session/op tokens. Every other caller leaves this nil and is byte-for-byte unaffected.
+	Env []string
+	// OnStderr is called with each stderr chunk as it arrives, from the drain goroutine, BEFORE the
+	// chunk is appended to the bounded buffer Wait() reports (G7 D5) — one read, two consumers,
+	// never a second reader that could disagree with the buffer classification depends on. Never
+	// called after Wait returns. A panic in it would take the drain goroutine down, so gitops' own
+	// progress pump is written not to panic; nothing else is defended here.
+	OnStderr func([]byte)
+	// Setsid opts one spawn into a new session (G7 D6, narrowed to remote ops only per the
+	// orchestrator's own scoping call): the child loses any controlling terminal, which closes the
+	// one remaining no-hang gap `GIT_TERMINAL_PROMPT=0` does not (ssh reads a passphrase straight
+	// from /dev/tty when one exists, consulting SSH_ASKPASS only when it does not). False (the
+	// default) keeps every already-shipped spawn on Setpgid exactly as before — this field is set
+	// only by gitsession's remote-op executor and gitsession's auto-fetch tick, never by G2-G6 code.
+	Setsid bool
 }
 
 // Result is the raw outcome of one Spec — no interpretation of Stdout/Stderr's bytes at all
@@ -106,11 +123,14 @@ var hygieneEnv = []string{
 
 // buildEnv returns the process environment for one spawn — os.Environ() (real inherited
 // environment) is not read directly by tests, which pass their own base instead (see
-// runner_test.go), keeping this pure and independent of the machine it runs on.
-func buildEnv(base []string) []string {
-	env := make([]string, 0, len(base)+len(hygieneEnv))
+// runner_test.go), keeping this pure and independent of the machine it runs on. extra (G7 D5) is
+// appended last, so a spec's own entry wins over hygieneEnv on a duplicate key — the askpass
+// broker's own GIT_ASKPASS/SSH_ASKPASS/tokens are the one caller today.
+func buildEnv(base []string, extra []string) []string {
+	env := make([]string, 0, len(base)+len(hygieneEnv)+len(extra))
 	env = append(env, base...)
 	env = append(env, hygieneEnv...)
+	env = append(env, extra...)
 	return env
 }
 
@@ -201,10 +221,17 @@ func NewExecRunner() Runner { return execRunner{} }
 func (execRunner) Start(ctx context.Context, gitPath string, spec Spec) (Process, error) {
 	cmd := exec.CommandContext(ctx, gitPath, buildArgv(spec)...)
 	cmd.Dir = spec.Dir
-	cmd.Env = buildEnv(os.Environ())
+	cmd.Env = buildEnv(os.Environ(), spec.Env)
 	// D3: every git child gets its own process group, so a group signal reaches whatever it
-	// forked (git fetch/push spawn ssh, git-remote-https, credential helpers).
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	// forked (git fetch/push spawn ssh, git-remote-https, credential helpers). G7 D6 (narrowed to
+	// remote-op spawns only, per the orchestrator's own scoping call): Setsid additionally detaches
+	// the child from any controlling terminal — pgid == pid either way, so killGroup(-pid, …) is
+	// unaffected by which one a spawn asked for.
+	if spec.Setsid {
+		cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
+	} else {
+		cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	}
 	// Replaces exec.CommandContext's default Cancel (an immediate, ungraceful Process.Kill()) with
 	// a group SIGTERM, escalating to a group SIGKILL after gracefulStopDelay if the group hasn't
 	// exited by then. This — not cmd.WaitDelay's own escalation, which reaches only the direct
@@ -240,7 +267,11 @@ func (execRunner) Start(ctx context.Context, gitPath string, spec Spec) (Process
 		return nil, err
 	}
 
-	p := &execProcess{cmd: cmd, stdout: stdout, stdin: stdin, stderr: &boundedWriter{max: maxStderrBytes}, stderrDone: make(chan struct{})}
+	p := &execProcess{
+		cmd: cmd, stdout: stdout, stdin: stdin,
+		stderr: &boundedWriter{max: maxStderrBytes}, stderrDone: make(chan struct{}),
+		onStderr: spec.OnStderr,
+	}
 	go p.drainStderr(stderrPipe)
 	return p, nil
 }
@@ -278,6 +309,9 @@ type execProcess struct {
 	stdout io.ReadCloser
 	stdin  io.WriteCloser
 	stderr *boundedWriter
+	// onStderr is G7 D5's tee — nil for every caller before this phase (fetch/push/pull's progress
+	// pump is the first).
+	onStderr func([]byte)
 
 	stderrDone chan struct{}
 
@@ -291,8 +325,24 @@ type execProcess struct {
 func (p *execProcess) Stdout() io.ReadCloser { return p.stdout }
 func (p *execProcess) Stdin() io.WriteCloser { return p.stdin }
 
+// drainStderr reads r in fixed chunks rather than io.Copy so onStderr sees each chunk exactly once,
+// before it is appended to the bounded buffer (G7 D5) — the tee and the buffer can never disagree
+// about what stderr contained, because they are fed from the same read.
 func (p *execProcess) drainStderr(r io.Reader) {
-	_, _ = io.Copy(p.stderr, r)
+	buf := make([]byte, 32*1024)
+	for {
+		n, err := r.Read(buf)
+		if n > 0 {
+			chunk := buf[:n]
+			if p.onStderr != nil {
+				p.onStderr(chunk)
+			}
+			_, _ = p.stderr.Write(chunk)
+		}
+		if err != nil {
+			break
+		}
+	}
 	close(p.stderrDone)
 }
 
