@@ -4,6 +4,7 @@ import (
 	"sync"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitclient"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitclient/catfile"
 )
 
 // Watcher is the minimal seam RepoEntry needs from a repo watcher — gitclient.RepoWatcher
@@ -37,6 +38,9 @@ type RepoEntry struct {
 
 	mu   sync.Mutex
 	subs map[ConnID]*subscriber
+
+	catfileMu sync.Mutex
+	catfile   *catfile.Session
 
 	done chan struct{}
 }
@@ -95,12 +99,40 @@ func (e *RepoEntry) Subscribe(id ConnID, deliver func(Event)) func() {
 	}
 }
 
-// teardown stops the watcher, waits for pump to drain, and stops every remaining subscriber —
-// called by Registry once refcount and linger both say the entry is really done. Not idempotent on
-// its own; Registry only ever calls it once per entry (guarded by deleting it from the map first).
+// CatFile returns this entry's cat-file batch session (D11), starting it lazily on first use — a
+// connection that never reads a blob or a commit's metadata never spawns the two extra
+// `cat-file` processes. No production caller reaches this in G3 (its first is G4's commit.detail/
+// commit.fileDiff/blob reads); it exists now so RepoEntry's own teardown has somewhere real to
+// tear down, per SPEC §6 putting the cat-file session in the shared (per-repo, not per-connection)
+// box.
+func (e *RepoEntry) CatFile() *catfile.Session {
+	e.catfileMu.Lock()
+	defer e.catfileMu.Unlock()
+	if e.catfile == nil {
+		dir := e.Summary.Root
+		if e.Summary.IsBare {
+			dir = e.Summary.GitDir
+		}
+		e.catfile = catfile.NewSession(catfile.Deps{
+			Runner: e.Repo.Runner(), GitPath: e.Repo.GitPath(), Dir: dir,
+		}, 0)
+	}
+	return e.catfile
+}
+
+// teardown stops the watcher, waits for pump to drain, stops every remaining subscriber, and
+// closes the cat-file session if one was ever started — called by Registry once refcount and
+// linger both say the entry is really done. Not idempotent on its own; Registry only ever calls it
+// once per entry (guarded by deleting it from the map first).
 func (e *RepoEntry) teardown() {
 	_ = e.watcher.Close()
 	<-e.done
+
+	e.catfileMu.Lock()
+	if e.catfile != nil {
+		e.catfile.Close()
+	}
+	e.catfileMu.Unlock()
 
 	e.mu.Lock()
 	subs := e.subs

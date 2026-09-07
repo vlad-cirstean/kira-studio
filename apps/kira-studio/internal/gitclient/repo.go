@@ -58,6 +58,14 @@ type Repo struct {
 	waitCh  chan struct{}
 }
 
+// Runner returns this repo's own spawn seam — G3's logsession/catfile need it directly (their
+// long-lived processes are spawned outside Read/Write's gate, D10 dec 2), rather than duplicating
+// what Repo was already constructed with.
+func (r *Repo) Runner() Runner { return r.runner }
+
+// GitPath returns the resolved git binary path this repo spawns.
+func (r *Repo) GitPath() string { return r.gitPath }
+
 func NewRepo(summary RepoSummary, runner Runner, gitPath string) *Repo {
 	return &Repo{
 		Summary: summary,
