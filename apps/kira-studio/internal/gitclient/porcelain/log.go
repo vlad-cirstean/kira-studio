@@ -22,6 +22,13 @@ func logBaseArgs() []string {
 	return []string{"log", "--decorate=full", "--topo-order", "-z", "--format=" + LogFormat}
 }
 
+// RangeToken builds a RangeSpec's own two-dot `<base>..<branch>` token — the range walk's and
+// CountRangeArgs' shared construction site (D7b/upstream's own W2), so no call site can drift to
+// three-dot.
+func RangeToken(r RangeSpec) string {
+	return r.Base + ".." + r.Branch
+}
+
 // RevSetArgs returns the argv fragment selecting spec's rev set — shared by the paged walk, the
 // remaining-count query (`rev-list --count`) and, in G10, the tail scan, so all three agree on
 // exactly the same commits in exactly the same order (D8/D21). G3 always passes
@@ -31,7 +38,7 @@ func RevSetArgs(spec WalkSpec) []string {
 	var args []string
 	switch {
 	case spec.Range != nil:
-		args = append(args, spec.Range.Base+".."+spec.Range.Branch)
+		args = append(args, RangeToken(*spec.Range))
 	case spec.Scope == "head":
 		args = append(args, "HEAD")
 	default: // "all", or unset -- "all" is the server's own default scope (D14).
