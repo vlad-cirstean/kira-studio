@@ -37,9 +37,9 @@ further along than `feature-v1-3`'s own docs assumed.** Its `docs/SPEC.md` §10 
 | P11 Search | Done | G10 |
 | P15 IPC wire-format fix | Done | informs §4.2, not ported literally |
 | P16 FlatBuffers for `graph.stream` | Done | informs §4.2 — this app already has its own FlatBuffers data plane (§4.2) |
-| P12 GitHub PR links | Not done upstream | out of scope |
-| P13 Ship (`.vsix`, marketplace) | Not done upstream | G12 — DMG bundling replaces marketplace publishing for v1.3 |
-| P14 Worktree support | Not designed upstream | out of scope |
+| P12 GitHub PR links | Not done upstream | G12 — upstream's own design (`docs/SPEC.md` §6.7/D31/D32 there) ported as-is |
+| P13 Ship (`.vsix`, marketplace) | Not done upstream | G14 — DMG bundling replaces marketplace/OpenVSX publishing for v1.3 |
+| P14 Worktree support | Not designed upstream | G13 — not designed upstream either; designed at G13's own planning pass, same as upstream deferred it |
 
 So this chapter is a full port of everything upstream has actually built (P1–P11, P15/P16's lessons),
 not a continuation of `feature-v1-3`'s narrower P1-only scope.
@@ -248,7 +248,7 @@ untouched):
    mid-prompt, the broker fails the credential request non-zero — never hangs.
 
 **Bundled in the DMG.** The `.vsix` ships alongside the app rather than through the VS Code
-Marketplace for v1.3 (G12) — upstream's own P13 (Ship) is explicitly out of scope here.
+Marketplace for v1.3 (G14).
 
 ## Module boundary
 
@@ -276,16 +276,19 @@ P12 package split may also want), not a boundary violation.
 | **G9** | Reset (3 modes) + cherry-pick, undo slot completed | G8 | P10 |
 | **G10** | Search: Go tail scan + client matcher, regex-dialect reconciliation (§8) | G3, G5 | P11 |
 | **G11** | Multi-client hardening: two-windows/two-repos matrix, disconnect teardown, revoke-while-connected, stale-socket recovery, perf re-baseline against the new transport | all | new |
-| **G12** | Ship the extension: `vsce package` step producing a real `.vsix`, DMG bundling (`scripts/sign-bundle.sh`/`package` script copies it into the app bundle at a known runtime path), and an *Install VS Code Integration* button in the *Connected editors* pane (G1) that shells out to `code --install-extension <path>` — argv-only, no shell, matching every other spawn in this chapter — with a "reveal in Finder" fallback when the `code` CLI isn't on `PATH`. Decided 2026-09-07, deliberately last: it packages what G1–G11 build, and doing it earlier would mean re-touching it every time the extension bundle changes shape | G1, packaging scripts | P13 (Ship), superseding it — DMG bundling instead of Marketplace |
+| **G12** | GitHub PR links: GitHub-remote detection from `origin`, the `GitHubAuth` port over VS Code's built-in GitHub authentication provider, REST PR lookup, a per-branch cache invalidated by the watcher, `branch.resolvePr`, the `#123` badge on branch-picker rows and message-column ref badges (opened via the extension's own `ExternalOpener`), `kiraVersion.github.enabled`, and PR number/title matching added to search's ref scope — upstream's own design (never built there), ported as designed rather than redesigned. Session requested on first use only, never at activation | G4, G5, G10 | P12 |
+| **G13** | Worktree support: `git worktree` create/list/switch/remove, building on G5's linked-worktree detection, plus a user-configurable "prepare script" run after creating a worktree with visible progress feedback. *Not designed upstream either* — full design (RPC shape, pre-flight interaction, prepare-script sandboxing) happens at this phase's own Opus planning pass, not assumed here, same placeholder-then-design approach upstream itself used | G5 | P14 |
+| **G14** | Ship the extension: `vsce package` step producing a real `.vsix`, DMG bundling (`scripts/sign-bundle.sh`/`package` script copies it into the app bundle at a known runtime path), an *Install VS Code Integration* button in the *Connected editors* pane (G1) that shells out to `code --install-extension <path>` — argv-only, no shell, matching every other spawn in this chapter — with a "reveal in Finder" fallback when the `code` CLI isn't on `PATH`; plus the rest of upstream's P13 that isn't packaging mechanics: an SCM title-bar button and status-bar item that open the existing webview (entry points, not a redesign of it), and a command-palette audit wiring a command for every mutating operation introduced across G5–G13. Deliberately last of all: it packages and surfaces what every other phase, including G12/G13, builds | all | P13 (Ship), superseding it — DMG bundling instead of Marketplace/OpenVSX |
 
 Each phase gets its own Opus-authored plan under `docs/v1.3/plans/` before implementation starts,
 per `AGENTS.md` — none is written as part of this chapter spec.
 
 ## Out of scope for v1.3
 
-- Upstream P12 (GitHub PR links), P14 (worktree support, not yet designed upstream either).
-  P13 (Marketplace/OpenVSX publishing) is out of scope too, but its DMG-bundling replacement is
-  in scope as G12 — not unowned the way P12/P14 are.
+- Marketplace/OpenVSX publishing itself (upstream's literal P13) — G14's DMG bundling is this
+  chapter's answer instead. P12 (GitHub PR links) and P14 (worktree support) are no longer
+  unowned: they're G12 and G13, added 2026-09-07 specifically so upstream's incomplete phases
+  don't ship unfinished here too.
 - Any embedded git UI inside Kira Studio's own Wails frontend — deliberately deferred, but the
   session/transport layer (§6, `rpcstream`) is built so that work is additive later, not a rework.
 - Redesigning the extension's UI around native VS Code surfaces (tree views, quickpicks in place of
