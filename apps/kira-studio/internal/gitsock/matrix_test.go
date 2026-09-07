@@ -218,11 +218,12 @@ func TestMatrix_M1_StreamStalledOnCreditsBlocksOnlyItsOwnConnection(t *testing.T
 
 // sleepyGitShim writes a `git` stand-in that ignores its argv and just sleeps -- a real, genuinely
 // running child so the remote-op slot's own claim/cancel has something real to hold and kill.
-func sleepyGitShim(t *testing.T) string {
+func sleepyGitShim(t *testing.T, seconds int) string {
 	t.Helper()
 	shimDir := t.TempDir()
 	path := filepath.Join(shimDir, "git-sleepy")
-	if err := os.WriteFile(path, []byte("#!/bin/sh\nsleep 30\n"), 0o755); err != nil {
+	script := fmt.Sprintf("#!/bin/sh\nsleep %d\n", seconds)
+	if err := os.WriteFile(path, []byte(script), 0o755); err != nil {
 		t.Fatalf("write sleepy git shim: %v", err)
 	}
 	return path
@@ -236,7 +237,7 @@ func TestMatrix_M2_SimultaneousRemoteRunsAdmitExactlyOne(t *testing.T) {
 
 	started := make(chan struct{})
 	var once sync.Once
-	sleepyGit := sleepyGitShim(t)
+	sleepyGit := sleepyGitShim(t, 30)
 	realRunner := gitclient.NewExecRunner()
 	blockingRunner := runnerFunc(func(ctx context.Context, gitPath string, spec gitclient.Spec) (gitclient.Process, error) {
 		if argvContains(spec.Args, "fetch") {
@@ -358,7 +359,7 @@ func TestMatrix_M2_LocalOpAndRemoteOpAreNotMutuallyExclusive(t *testing.T) {
 
 	started := make(chan struct{})
 	var once sync.Once
-	sleepyGit := sleepyGitShim(t)
+	sleepyGit := sleepyGitShim(t, 30)
 	realRunner := gitclient.NewExecRunner()
 	blockingRunner := runnerFunc(func(ctx context.Context, gitPath string, spec gitclient.Spec) (gitclient.Process, error) {
 		if argvContains(spec.Args, "fetch") {
@@ -636,12 +637,15 @@ func TestMatrix_M4_DisconnectDuringARemoteOp(t *testing.T) {
 	f := buildRemoteFixture(t)
 	started := make(chan struct{})
 	var once sync.Once
-	sleepyGit := sleepyGitShim(t)
+	// A short (not 30s) shim: this test proves the fetch survives disconnect and frees the slot
+	// once it actually ends ON ITS OWN (G7 D19) -- it never cancels, unlike the sibling tests that
+	// use sleepyGitShim's default 30s specifically so a deliberate cancel has time to land.
+	briefSleepyGit := sleepyGitShim(t, 1)
 	realRunner := gitclient.NewExecRunner()
 	blockingRunner := runnerFunc(func(ctx context.Context, gitPath string, spec gitclient.Spec) (gitclient.Process, error) {
 		if argvContains(spec.Args, "fetch") {
 			once.Do(func() { close(started) })
-			return realRunner.Start(ctx, sleepyGit, spec)
+			return realRunner.Start(ctx, briefSleepyGit, spec)
 		}
 		return realRunner.Start(ctx, gitPath, spec)
 	})
@@ -667,25 +671,30 @@ func TestMatrix_M4_DisconnectDuringARemoteOp(t *testing.T) {
 		RepoID: repoID, RemoteOpParams: gitsession.RemoteOpParams{Kind: "fetch", Remote: "origin"},
 	}).Result)
 	if busy.OK || busy.Error == nil || busy.Error.Kind != "OperationInProgress" {
-		t.Fatalf("B's remote.run right after A's disconnect = %+v, want OperationInProgress (the fetch must survive the disconnect)", busy)
+		t.Fatalf("B's remote.run right after A's disconnect = %+v, want OperationInProgress (the fetch must survive the disconnect, G7 D19)", busy)
 	}
 
-	cancelResp := unmarshalResult[gitrpc.RemoteCancelResult](t, requestIgnoringEvents(t, clientB, "remote.cancel", gitrpc.RemoteCancelParams{RepoID: repoID}).Result)
-	if !cancelResp.Cancelled {
-		t.Fatal("cancelling the disconnected connection's still-running fetch reported false")
-	}
-
+	// The fetch is NOT killed by A's disconnect (no cancel is ever sent here) -- it keeps running
+	// and the slot frees only once it actually ends on its own. Each poll that finds the slot still
+	// busy costs nothing (no spawn attempted); the poll that finally wins runs its own real
+	// (shimmed) fetch and returns once THAT completes, so this converges quickly rather than idling
+	// for a fixed guess.
 	deadline := time.Now().Add(10 * time.Second)
-	for time.Now().Before(deadline) {
+	for {
+		if time.Now().After(deadline) {
+			t.Fatal("the shared slot never freed up after A's disconnected fetch should have ended on its own")
+		}
 		result := unmarshalResult[gitsession.RemoteOpResult](t, requestIgnoringEvents(t, clientB, "remote.run", gitrpc.RemoteRunParams{
 			RepoID: repoID, RemoteOpParams: gitsession.RemoteOpParams{Kind: "fetch", Remote: "origin"},
 		}).Result)
-		if result.Error == nil || result.Error.Kind != "OperationInProgress" {
-			return
+		if result.Error == nil {
+			return // B's own fetch actually ran and succeeded -- the slot is confirmed free.
+		}
+		if result.Error.Kind != "OperationInProgress" {
+			t.Fatalf("B's remote.run = %+v, want either success or OperationInProgress", result)
 		}
 		time.Sleep(20 * time.Millisecond)
 	}
-	t.Fatal("the shared slot never freed up after cancelling the disconnected connection's fetch")
 }
 
 // TestMatrix_M4_DisconnectDuringACredentialPrompt adds the half G7's own disconnect-mid-prompt test

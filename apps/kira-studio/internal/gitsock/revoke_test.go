@@ -163,12 +163,14 @@ func TestRevoke_WhileARemoteOpIsRunning(t *testing.T) {
 	f := buildRemoteFixture(t)
 	started := make(chan struct{})
 	var once sync.Once
-	sleepyGit := sleepyGitShim(t)
+	// A short (not 30s) shim: D8 clause 4 says this op is NEVER killed, by revoke or otherwise --
+	// this test proves that by letting it run to its own natural end, never by cancelling it.
+	briefSleepyGit := sleepyGitShim(t, 1)
 	realRunner := gitclient.NewExecRunner()
 	blockingRunner := runnerFunc(func(ctx context.Context, gitPath string, spec gitclient.Spec) (gitclient.Process, error) {
 		if argvContains(spec.Args, "fetch") {
 			once.Do(func() { close(started) })
-			return realRunner.Start(ctx, sleepyGit, spec)
+			return realRunner.Start(ctx, briefSleepyGit, spec)
 		}
 		return realRunner.Start(ctx, gitPath, spec)
 	})
@@ -199,22 +201,25 @@ func TestRevoke_WhileARemoteOpIsRunning(t *testing.T) {
 		t.Fatalf("B's remote.run right after A's revoke = %+v, want OperationInProgress (the fetch must survive revoke, D8 clause 4)", busy)
 	}
 
-	cancelResp := unmarshalResult[gitrpc.RemoteCancelResult](t, requestIgnoringEvents(t, clientB, "remote.cancel", gitrpc.RemoteCancelParams{RepoID: repoID}).Result)
-	if !cancelResp.Cancelled {
-		t.Fatal("cancelling the revoked connection's still-running fetch reported false")
-	}
-
+	// No cancel is ever sent -- D8 clause 4 says this op is not killed, by revoke or by anything
+	// else here. Poll until it ends on its own; the poll that finally wins runs its own real
+	// (shimmed) fetch and returns once THAT completes.
 	deadline := time.Now().Add(10 * time.Second)
-	for time.Now().Before(deadline) {
+	for {
+		if time.Now().After(deadline) {
+			t.Fatal("the shared slot never freed up after the revoked connection's fetch should have ended on its own")
+		}
 		result := unmarshalResult[gitsession.RemoteOpResult](t, requestIgnoringEvents(t, clientB, "remote.run", gitrpc.RemoteRunParams{
 			RepoID: repoID, RemoteOpParams: gitsession.RemoteOpParams{Kind: "fetch", Remote: "origin"},
 		}).Result)
-		if result.Error == nil || result.Error.Kind != "OperationInProgress" {
-			return
+		if result.Error == nil {
+			return // B's own fetch actually ran and succeeded -- the slot is confirmed free.
+		}
+		if result.Error.Kind != "OperationInProgress" {
+			t.Fatalf("B's remote.run = %+v, want either success or OperationInProgress", result)
 		}
 		time.Sleep(20 * time.Millisecond)
 	}
-	t.Fatal("the shared slot never freed up after cancelling the revoked connection's fetch")
 }
 
 // TestRevoke_WhileACredentialPromptIsPending revokes a connection with a credential.request
