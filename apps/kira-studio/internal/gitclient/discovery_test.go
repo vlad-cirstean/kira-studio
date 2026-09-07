@@ -49,8 +49,10 @@ type fakeProcess struct {
 }
 
 func (p *fakeProcess) Stdout() io.ReadCloser { return io.NopCloser(bytes.NewReader(p.result.Stdout)) }
-func (p *fakeProcess) Wait() (Result, error) { return Result{Stderr: p.result.Stderr, ExitCode: p.result.ExitCode}, nil }
-func (p *fakeProcess) Close() error          { return nil }
+func (p *fakeProcess) Wait() (Result, error) {
+	return Result{Stderr: p.result.Stderr, ExitCode: p.result.ExitCode}, nil
+}
+func (p *fakeProcess) Close() error { return nil }
 
 type fakeClock struct{ now time.Time }
 
