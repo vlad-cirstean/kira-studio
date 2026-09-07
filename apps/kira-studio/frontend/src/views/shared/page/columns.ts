@@ -44,7 +44,7 @@ function getMeasureCtx(sizeToken = '--kira-font-size'): CanvasRenderingContext2D
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('2D canvas context is unavailable — cannot measure column widths');
   const root = getComputedStyle(document.documentElement);
-  const family = root.getPropertyValue('--kira-font-family').trim() || 'monospace';
+  const family = root.getPropertyValue('--kira-font-data').trim() || 'monospace';
   const size = root.getPropertyValue(sizeToken).trim() || '12px';
   ctx.font = `${size} ${family}`;
   measureCtxBySize.set(sizeToken, ctx);

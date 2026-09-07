@@ -178,7 +178,7 @@ async function onSave(): Promise<void> {
 }
 
 .mono {
-  font-family: var(--kira-font-family);
+  font-family: var(--kira-font-data);
 }
 
 .editor-wrap {

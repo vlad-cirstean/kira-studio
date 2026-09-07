@@ -131,7 +131,7 @@ function close(): void {
 }
 
 .reference {
-  font-family: var(--kira-font-family);
+  font-family: var(--kira-font-data);
   color: var(--kira-fg);
   flex-shrink: 0;
 }

@@ -12,7 +12,7 @@ export const kiraEditorTheme = EditorView.theme(
       height: '100%',
     },
     '.cm-scroller': {
-      fontFamily: 'var(--kira-font-family)',
+      fontFamily: 'var(--kira-font-data)',
       fontSize: 'var(--kira-font-size)',
       lineHeight: '1.5',
       overflow: 'auto',
@@ -66,7 +66,7 @@ export const kiraEditorTheme = EditorView.theme(
     // where they actually take effect, rather than on the div its properties are conceptually
     // listed against in primitives.css's own comment.
     '.cm-tooltip.cm-tooltip-autocomplete > ul': {
-      fontFamily: 'var(--kira-font-family)',
+      fontFamily: 'var(--kira-font-data)',
       fontSize: 'var(--kira-t-sm)',
       padding: 'var(--kira-s-1)',
       minWidth: '200px',
@@ -138,7 +138,7 @@ export const kiraEditorTheme = EditorView.theme(
       border: 'var(--kira-border-width) solid var(--kira-border-strong)',
       borderRadius: 'var(--kira-radius)',
       boxShadow: 'var(--kira-shadow-dialog)',
-      fontFamily: 'var(--kira-font-family)',
+      fontFamily: 'var(--kira-font-data)',
       fontSize: 'var(--kira-t-sm)',
       overflow: 'hidden',
     },
@@ -159,7 +159,7 @@ export const kiraEditorTheme = EditorView.theme(
       border: 'var(--kira-border-width) solid var(--kira-border-strong)',
       borderRadius: 'var(--kira-radius)',
       boxShadow: 'var(--kira-shadow-dialog)',
-      fontFamily: 'var(--kira-font-family)',
+      fontFamily: 'var(--kira-font-data)',
       fontSize: 'var(--kira-t-sm)',
       color: 'var(--kira-fg)',
       padding: '6px 8px',

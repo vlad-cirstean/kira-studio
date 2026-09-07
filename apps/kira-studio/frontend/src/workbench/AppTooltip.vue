@@ -123,7 +123,7 @@ onUnmounted(() => window.removeEventListener('resize', onResize));
   border-radius: var(--kira-radius-sm);
   background: var(--kira-bg-input);
   color: var(--kira-fg);
-  font-family: var(--kira-font-family);
+  font-family: var(--kira-font-data);
   font-size: var(--kira-t-sm);
   font-weight: 600;
   flex-shrink: 0;

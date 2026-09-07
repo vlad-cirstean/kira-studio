@@ -144,7 +144,7 @@ onUnmounted(() => {
   white-space: pre-wrap;
   word-break: break-word;
   color: var(--kira-error);
-  font-family: var(--kira-font-family);
+  font-family: var(--kira-font-data);
 }
 
 /* Footer is the same 28px band used everywhere a toolbar sits at the edge of a

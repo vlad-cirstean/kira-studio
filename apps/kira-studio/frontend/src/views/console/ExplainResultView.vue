@@ -267,7 +267,7 @@ const rawLanguage = computed(() =>
 }
 
 .plan-label {
-  font-family: var(--kira-font-family);
+  font-family: var(--kira-font-data);
 }
 
 .muted {

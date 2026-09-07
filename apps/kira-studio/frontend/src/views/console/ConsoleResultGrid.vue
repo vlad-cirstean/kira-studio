@@ -405,7 +405,7 @@ function onKeyValueRowContextMenuFromEvent(e: MouseEvent): void {
 .console-result-grid {
   height: 100%;
   min-height: 0;
-  font-family: var(--kira-font-family);
+  font-family: var(--kira-font-data);
   font-size: var(--kira-t-md);
   /* P19 D6: the copy-error strip is an always-possible sibling above whichever one of
      no-rows/ConsoleSlickGrid/VirtualList is the actual body — a plain block stack would let that
@@ -491,7 +491,7 @@ function onKeyValueRowContextMenuFromEvent(e: MouseEvent): void {
   padding: var(--kira-s-2) var(--kira-s-4);
   white-space: pre-wrap;
   word-break: break-word;
-  font-family: var(--kira-font-family);
+  font-family: var(--kira-font-data);
 }
 
 .kv-field {

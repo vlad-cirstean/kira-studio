@@ -351,7 +351,7 @@ function onCloseSearch(): void {
 }
 
 .error-strip {
-  font-family: var(--kira-font-family);
+  font-family: var(--kira-font-data);
   white-space: pre-wrap;
 }
 

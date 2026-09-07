@@ -5,7 +5,7 @@
    named LAWs — see that file for the rationale behind each measurement. */
 
 .mono {
-  font-family: var(--kira-font-family);
+  font-family: var(--kira-font-data);
 }
 .muted {
   color: var(--kira-fg-muted);
@@ -149,7 +149,7 @@
   border: var(--kira-border-width) solid var(--kira-border-strong);
   background: var(--kira-bg-input);
   color: var(--kira-fg);
-  font-family: var(--kira-font-family);
+  font-family: var(--kira-font-data);
   font-size: var(--kira-t-sm);
 }
 .p-input.md {
@@ -262,7 +262,7 @@
   border-radius: var(--kira-radius);
   background: var(--kira-bg-input);
   color: var(--kira-fg);
-  font-family: var(--kira-font-family);
+  font-family: var(--kira-font-data);
   font-size: var(--kira-t-sm);
   /* P16 D7: 4px vertical, 8px horizontal — matches .p-input's own gutter (its multiline sibling
      was tighter still, by another 2px). */
@@ -527,7 +527,7 @@
   border-radius: var(--kira-radius-sm);
   background: var(--kira-bg-input);
   color: var(--kira-fg-muted);
-  font-family: var(--kira-font-family);
+  font-family: var(--kira-font-data);
   font-size: var(--kira-t-xs);
   flex-shrink: 0;
   white-space: nowrap;
@@ -542,7 +542,7 @@
   border-radius: var(--kira-radius-pill);
   background: var(--kira-badge);
   color: #f0f0f0;
-  font-family: var(--kira-font-family);
+  font-family: var(--kira-font-data);
   font-size: var(--kira-t-xs);
   flex-shrink: 0;
 }
@@ -827,7 +827,7 @@
   display: flex;
   align-items: center;
   gap: var(--kira-s-2);
-  font-family: var(--kira-font-family);
+  font-family: var(--kira-font-data);
   font-size: var(--kira-t-xs);
   color: var(--kira-fg-subtle);
 }
@@ -918,7 +918,7 @@
 }
 .p-th .key {
   color: var(--kira-warn);
-  font-family: var(--kira-font-family);
+  font-family: var(--kira-font-data);
   font-size: var(--kira-t-xs);
 }
 .p-td {
@@ -927,7 +927,7 @@
   padding: 0 var(--kira-s-4);
   border-right: var(--kira-border-width) solid var(--kira-border);
   border-bottom: var(--kira-border-width) solid var(--kira-border);
-  font-family: var(--kira-font-family);
+  font-family: var(--kira-font-data);
   font-size: var(--kira-t-md);
   color: var(--kira-fg);
   overflow: hidden;

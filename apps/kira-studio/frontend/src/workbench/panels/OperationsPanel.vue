@@ -366,7 +366,7 @@ function onRowContextMenu(record: OpRecord, event: MouseEvent): void {
 }
 
 .mono {
-  font-family: var(--kira-font-family);
+  font-family: var(--kira-font-data);
 }
 
 .error-text {

@@ -13,7 +13,7 @@
   height: 100%;
   position: relative;
   font-size: var(--kira-t-md);
-  font-family: var(--kira-font-family);
+  font-family: var(--kira-font-data);
   color: var(--kira-fg);
 }
 

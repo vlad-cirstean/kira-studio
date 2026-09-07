@@ -1043,7 +1043,7 @@ onUnmounted(() => {
    head and whatever's left for the body, never restates the number itself. */
 .doc-preview-match {
   padding: 0 var(--kira-s-4) var(--kira-s-2);
-  font-family: var(--kira-font-family);
+  font-family: var(--kira-font-data);
   font-size: var(--kira-t-sm);
   color: var(--kira-fg-muted);
   overflow: hidden;

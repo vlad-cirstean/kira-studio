@@ -1039,7 +1039,7 @@ onUnmounted(() => {
 
 /* body column: monospace and slightly muted, matching the mockup's `.msg-body` */
 .msg-body {
-  font-family: var(--kira-font-family);
+  font-family: var(--kira-font-data);
   font-size: var(--kira-t-sm);
   color: var(--kira-fg-muted);
 }

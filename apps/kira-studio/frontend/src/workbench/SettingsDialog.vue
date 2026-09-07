@@ -761,7 +761,7 @@ async function onSave(): Promise<void> {
 }
 
 .mono {
-  font-family: var(--kira-font-family);
+  font-family: var(--kira-font-data);
 }
 
 .muted-note {
@@ -798,7 +798,7 @@ async function onSave(): Promise<void> {
   display: flex;
   align-items: center;
   padding: 0 var(--kira-s-4);
-  font-family: var(--kira-font-family);
+  font-family: var(--kira-font-data);
   font-size: var(--kira-t-md);
   color: var(--kira-fg);
   border-right: var(--kira-border-width) solid var(--kira-border);

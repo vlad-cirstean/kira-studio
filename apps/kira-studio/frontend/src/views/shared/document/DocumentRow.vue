@@ -120,7 +120,7 @@ defineEmits<{ toggle: []; select: [] }>();
 
 .doc-id {
   flex-shrink: 0;
-  font-family: var(--kira-font-family);
+  font-family: var(--kira-font-data);
   font-size: var(--kira-t-md);
   color: var(--kira-fg);
   max-width: 220px;

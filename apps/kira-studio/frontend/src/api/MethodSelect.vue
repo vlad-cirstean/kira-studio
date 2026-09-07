@@ -81,7 +81,7 @@ function select(method: HttpMethod): void {
    (unaffected by the element swap); the chevron is drawn explicitly since a <button> has no
    ::picker-icon of its own to rely on. */
 .method-select {
-  font-family: var(--kira-font-family);
+  font-family: var(--kira-font-data);
   font-weight: 600;
 }
 

@@ -76,7 +76,7 @@ const TOKEN_CLASS: Record<'string' | 'number' | 'keyword' | 'bson', string> = {
 <style scoped>
 .document-tree {
   padding: var(--kira-s-2) 0;
-  font-family: var(--kira-font-family);
+  font-family: var(--kira-font-data);
   font-size: var(--kira-t-sm);
   /* P43 iter3 D42: chrome-less horizontal scrolling, TabStrip.vue's/ConsoleView.vue's own idiom —
      the same three declarations, occupying zero vertical space, so rowHeight()'s exact LINE_H

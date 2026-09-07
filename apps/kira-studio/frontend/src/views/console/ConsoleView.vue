@@ -818,7 +818,7 @@ const statusLine = computed(() => {
    pre-wrap so a long adapter error still wraps instead of scrolling. */
 .p-strip.err {
   white-space: pre-wrap;
-  font-family: var(--kira-font-family);
+  font-family: var(--kira-font-data);
 }
 
 .auto-explain-message {

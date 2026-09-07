@@ -367,7 +367,7 @@ const breadcrumb = computed(() => {
 }
 
 .err-message {
-  font-family: var(--kira-font-family);
+  font-family: var(--kira-font-data);
   white-space: pre-wrap;
 }
 

@@ -483,7 +483,7 @@ onBeforeUnmount(() => {
 }
 
 .highlight-overlay :deep(.cm-scroller) {
-  font-family: var(--kira-font-family) !important;
+  font-family: var(--kira-font-data) !important;
   font-size: var(--kira-t-sm) !important;
   line-height: normal !important;
   background: transparent !important;
@@ -523,7 +523,7 @@ onBeforeUnmount(() => {
   z-index: 200;
   padding: var(--kira-s-2) var(--kira-s-3);
   max-width: 360px;
-  font-family: var(--kira-font-family);
+  font-family: var(--kira-font-data);
   font-size: var(--kira-t-sm);
   color: var(--kira-fg);
   pointer-events: none;
