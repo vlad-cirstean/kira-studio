@@ -85,10 +85,19 @@ func (w *Wiring) OnUpdate(fn func(model.OpRecord)) (unsubscribe func()) {
 	return w.updates.Subscribe(fn)
 }
 
-// Start prunes once (oplog.ts:28) and then consumes events on one goroutine until Stop is called
-// or the event source's channel closes on its own (adapterhost.Host's, once app teardown
-// unsubscribes every subscriber — P54 §4.2, P58f D9).
+// Start reconciles whatever op_log left 'running' after a hard kill (review finding: consume's own
+// finishInFlight only runs on an orderly channel close, never after SIGKILL/OOM/a panic), prunes
+// once (oplog.ts:28), and then consumes events on one goroutine until Stop is called or the event
+// source's channel closes on its own (adapterhost.Host's, once app teardown unsubscribes every
+// subscriber — P54 §4.2, P58f D9). Reconciliation runs first, before anything else in this app
+// touches op_log, so a restart after a crash never hydrates the Operations panel with a phantom
+// still-running op.
 func (w *Wiring) Start() {
+	if n, err := w.ops.ReconcileInterrupted(); err != nil {
+		slog.Warn("reconcile interrupted ops failed", "scope", "oplog", "err", err)
+	} else if n > 0 {
+		slog.Info("reconciled op_log rows left running by an unclean exit", "scope", "oplog", "count", n)
+	}
 	w.prune()
 	events, unsubscribe := w.src.Subscribe()
 	w.unsubscribe = unsubscribe

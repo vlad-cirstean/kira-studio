@@ -270,3 +270,58 @@ func TestOpsPruneHardCapRowsStillWorks(t *testing.T) {
 		t.Fatalf("op-20000 (the newest seeded row) did not survive the hard cap: %v", err)
 	}
 }
+
+// TestReconcileInterruptedFlipsRunningRowsToError is the review finding: a hard kill (SIGKILL, OOM,
+// a panic outside Host.safeRun) skips oplog.Wiring's own finishInFlight entirely — it only runs on
+// an orderly channel close — leaving 'running' op_log rows that would otherwise persist forever.
+// ReconcileInterrupted, called at the next startup, must flip every one of them to 'error' with a
+// clear message, and must leave an already-terminal row alone.
+func TestReconcileInterruptedFlipsRunningRowsToError(t *testing.T) {
+	ops := newOpsRepo(t)
+
+	// A genuinely still-'running' row — Append is the real path that leaves one in that state.
+	if err := ops.Append(model.OpAppend{ID: "op-running", Kind: "read", StartedAt: model.NowISO()}); err != nil {
+		t.Fatalf("Append: %v", err)
+	}
+	// A second one, to confirm the UPDATE is not somehow limited to a single row.
+	if err := ops.Append(model.OpAppend{ID: "op-running-2", Kind: "read", StartedAt: model.NowISO()}); err != nil {
+		t.Fatalf("Append: %v", err)
+	}
+	// An already-finished row must be left alone.
+	appendAndFinish(t, ops, "op-already-done", model.NowISO(), model.OpFinish{Status: "ok", DurationMs: 5})
+
+	n, err := ops.ReconcileInterrupted()
+	if err != nil {
+		t.Fatalf("ReconcileInterrupted: %v", err)
+	}
+	if n != 2 {
+		t.Errorf("ReconcileInterrupted returned %d, want 2", n)
+	}
+
+	for _, id := range []string{"op-running", "op-running-2"} {
+		rec := recordFor(t, ops, id)
+		if rec.Status != "error" {
+			t.Errorf("%s: Status = %q, want %q", id, rec.Status, "error")
+		}
+		if rec.Error == nil || *rec.Error != repos.InterruptedOpError {
+			t.Errorf("%s: Error = %v, want %q", id, rec.Error, repos.InterruptedOpError)
+		}
+	}
+
+	done := recordFor(t, ops, "op-already-done")
+	if done.Status != "ok" {
+		t.Errorf("op-already-done: Status = %q, want unchanged %q", done.Status, "ok")
+	}
+	if done.Error != nil {
+		t.Errorf("op-already-done: Error = %v, want unchanged nil", done.Error)
+	}
+
+	// Calling it again with nothing left running must be a true no-op.
+	n2, err := ops.ReconcileInterrupted()
+	if err != nil {
+		t.Fatalf("ReconcileInterrupted (second call): %v", err)
+	}
+	if n2 != 0 {
+		t.Errorf("ReconcileInterrupted (second call) returned %d, want 0", n2)
+	}
+}

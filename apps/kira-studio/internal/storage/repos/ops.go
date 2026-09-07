@@ -41,6 +41,11 @@ const (
 	opsUpdateSQL = `UPDATE op_log SET status = ?, duration_ms = ?, rows = ?, command = ?, error = ?, stored_bytes = ?, command_truncated = ? WHERE id = ?`
 )
 
+// InterruptedOpError is the message a still-'running' op_log row gets stamped with by
+// ReconcileInterrupted below — oplog.Wiring's own finishInFlight ("app exited") counterpart for
+// the crash case that never runs an orderly Stop() at all.
+const InterruptedOpError = "interrupted (app did not exit cleanly)"
+
 type OpsRepo struct {
 	DB *sql.DB
 
@@ -64,6 +69,30 @@ func (r *OpsRepo) Append(op model.OpAppend) error {
 		return fmt.Errorf("repos/ops: append %s: %w", op.ID, err)
 	}
 	return nil
+}
+
+// ReconcileInterrupted flips every still-'running' op_log row to 'error' — oplog.Wiring's own
+// in-flight-op finishing (finishInFlight) only runs on an orderly channel close (Stop(), app
+// teardown), per its own doc comment; a hard kill (SIGKILL, OOM, a panic outside Host.safeRun)
+// skips it entirely, which otherwise leaves 'running' rows behind forever (or until Prune's
+// retention/byte-budget sweep happens to evict them) — long enough for the Operations panel to
+// hydrate them as still running on the very next launch. Called once at startup, before anything
+// else touches op_log (main.go, ahead of oplog.Wiring.Start's own prune): a real op can only ever
+// reach 'running' through Append, called from oplog.Wiring.consume, which does not start running
+// until Start subscribes — so nothing genuinely in flight can race this UPDATE.
+func (r *OpsRepo) ReconcileInterrupted() (n int64, err error) {
+	res, err := r.DB.Exec(
+		`UPDATE op_log SET status = 'error', error = ?, stored_bytes = stored_bytes + ? WHERE status = 'running'`,
+		InterruptedOpError, len(InterruptedOpError),
+	)
+	if err != nil {
+		return 0, fmt.Errorf("repos/ops: reconcile interrupted: %w", err)
+	}
+	n, err = res.RowsAffected()
+	if err != nil {
+		return 0, fmt.Errorf("repos/ops: reconcile interrupted rows affected: %w", err)
+	}
+	return n, nil
 }
 
 // Finish records a running op's terminal state (ops.ts's finishOp), applying D1(a)/(b)'s per-row

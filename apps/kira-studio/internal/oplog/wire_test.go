@@ -141,6 +141,27 @@ func (c *updateCollector) count() int {
 // TestPruneRunsAtStartAndEvery500 pins the prune cadence's counter arithmetic: once at Start, then
 // on exactly the 500th completed op and not again until the 1000th. An off-by-one here either
 // prunes on every op (a full table scan per query) or never prunes at all after startup.
+// TestStartReconcilesInterruptedRunningRows is the review finding: consume's own finishInFlight
+// (TestShutdownReconcilesInFlight, below) only ever runs on an orderly channel close — a hard kill
+// (SIGKILL, OOM, a panic outside Host.safeRun) skips it entirely, leaving a 'running' row seeded by
+// a *previous* process's Append with nothing in this process's own in-flight map to reconcile it.
+// Start must flip that leftover row to 'error' via OpsRepo.ReconcileInterrupted before it ever
+// subscribes, so the very next launch after a crash never hydrates the Operations panel with a
+// phantom still-running op.
+func TestStartReconcilesInterruptedRunningRows(t *testing.T) {
+	h := newHarness(t, 30)
+	seedRawOp(t, h.ops, "left-running-by-a-crash", model.NowISO())
+
+	h.wiring.Start()
+	t.Cleanup(h.wiring.Stop)
+
+	waitUntil(t, time.Second, func() bool { return fetchOp(t, h.ops, "left-running-by-a-crash").Status == "error" })
+	row := fetchOp(t, h.ops, "left-running-by-a-crash")
+	if row.Error == nil || *row.Error != repos.InterruptedOpError {
+		t.Errorf("Error = %v, want %q", row.Error, repos.InterruptedOpError)
+	}
+}
+
 func TestPruneRunsAtStartAndEvery500(t *testing.T) {
 	h := newHarness(t, 1)
 	staleAt := model.FormatISO(time.Now().Add(-48 * time.Hour))
