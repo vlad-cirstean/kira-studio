@@ -216,6 +216,11 @@ func (c *Conn) Open(ctx context.Context, reg *Registry, gitPath, path string) (g
 	}
 	c.held[repoID] = &hold{entry: entry, release: release, unsubscribe: unsubscribe}
 	c.mu.Unlock()
+	// Arms auto-fetch for the off→on direction (F4/D5): newRepoEntry only ever sees the interval
+	// AT construction time, so a repository already open when the setting flips on would otherwise
+	// never get a timer. ensureAutoFetch is a no-op whenever one is already running or the entry is
+	// disabled, so N windows opening this repository arm exactly one.
+	entry.ensureAutoFetch()
 	return entry.Summary, nil
 }
 

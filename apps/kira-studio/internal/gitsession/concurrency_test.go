@@ -172,3 +172,72 @@ func TestConcurrent_CatFileAfterTeardownIsRefused(t *testing.T) {
 		t.Fatal("a second CatFile() after teardown returned a live session, want nil")
 	}
 }
+
+// TestConcurrent_AutoFetchArmsOnOpen is F4's own probe: a repository opened while the auto-fetch
+// interval reads as 0 gets no timer at construction (correct); the off→on direction is what G7's
+// startAutoFetch-only-from-newRepoEntry wiring never handled — on the pre-fix tree no LATER Open,
+// however many windows, ever arms one. A second Open (already armed) must arm no second timer, and
+// an entry `disabled` by a real fetch failure must never be resurrected by an Open.
+func TestConcurrent_AutoFetchArmsOnOpen(t *testing.T) {
+	reg := newTestRegistry()
+	reg.LingerFor = time.Hour
+	minutes := 0
+	reg.Settings = func() ([]string, int) { return nil, minutes }
+
+	c1 := NewConn("c1", "client-1", "label-1", func(string, any) {})
+	if _, err := c1.Open(context.Background(), reg, "/usr/bin/git", "/repo"); err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+
+	reg.mu.Lock()
+	entry := reg.entries["/repo"].entry
+	reg.mu.Unlock()
+	defer reg.Close()
+
+	entry.autoFetch.mu.Lock()
+	armedAtConstruction := entry.autoFetch.timer != nil
+	entry.autoFetch.mu.Unlock()
+	if armedAtConstruction {
+		t.Fatal("timer armed at construction despite a 0 interval")
+	}
+
+	// The setting flips on; a SECOND connection's Open must arm the timer this repository never
+	// got (F4 — the off->on direction newRepoEntry-only arming never handles).
+	minutes = 5
+	c2 := NewConn("c2", "client-2", "label-2", func(string, any) {})
+	if _, err := c2.Open(context.Background(), reg, "/usr/bin/git", "/repo"); err != nil {
+		t.Fatalf("Open (2nd conn): %v", err)
+	}
+	entry.autoFetch.mu.Lock()
+	timer1 := entry.autoFetch.timer
+	entry.autoFetch.mu.Unlock()
+	if timer1 == nil {
+		t.Fatal("no timer armed after Open with a non-zero interval (F4)")
+	}
+
+	// A THIRD Open must not replace the already-armed timer with a second one.
+	c3 := NewConn("c3", "client-3", "label-3", func(string, any) {})
+	if _, err := c3.Open(context.Background(), reg, "/usr/bin/git", "/repo"); err != nil {
+		t.Fatalf("Open (3rd conn): %v", err)
+	}
+	entry.autoFetch.mu.Lock()
+	timer2 := entry.autoFetch.timer
+	entry.autoFetch.mu.Unlock()
+	if timer1 != timer2 {
+		t.Fatal("a second Open on an already-armed entry armed a NEW timer")
+	}
+
+	// A `disabled` entry (a real fetch failure already killed its timer, G7 D23) must never be
+	// resurrected by a later Open.
+	entry.disableAutoFetch()
+	c4 := NewConn("c4", "client-4", "label-4", func(string, any) {})
+	if _, err := c4.Open(context.Background(), reg, "/usr/bin/git", "/repo"); err != nil {
+		t.Fatalf("Open (4th conn): %v", err)
+	}
+	entry.autoFetch.mu.Lock()
+	timer3, disabled := entry.autoFetch.timer, entry.autoFetch.disabled
+	entry.autoFetch.mu.Unlock()
+	if timer3 != nil || !disabled {
+		t.Fatal("Open resurrected a disabled auto-fetch entry")
+	}
+}

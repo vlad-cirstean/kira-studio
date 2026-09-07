@@ -32,6 +32,20 @@ func (e *RepoEntry) startAutoFetch(minutes int) {
 	e.autoFetch.timer = time.AfterFunc(time.Duration(minutes)*time.Minute, e.autoFetchTick)
 }
 
+// ensureAutoFetch re-reads this entry's current settings and arms the timer if the interval is now
+// non-zero (F4/D5) — called from Conn.Open on the path that stores a new hold, not only from
+// newRepoEntry. startAutoFetch already no-ops when a timer is already running or the entry is
+// `disabled` (a fetch that failed once stays off for the entry's life, G7 D23), so N windows
+// opening the same repository arm exactly one timer, and this can never resurrect one G7 killed.
+// Fixes the off→on direction, which newRepoEntry-only arming never could: a repository opened
+// while auto-fetch read as 0 never got a timer, and no later settings change could ever start one.
+func (e *RepoEntry) ensureAutoFetch() {
+	_, minutes := e.settings()
+	if minutes > 0 {
+		e.startAutoFetch(minutes)
+	}
+}
+
 // stopAutoFetch is teardown's own call — permanent, the entry is going away.
 func (e *RepoEntry) stopAutoFetch() {
 	e.autoFetch.mu.Lock()
