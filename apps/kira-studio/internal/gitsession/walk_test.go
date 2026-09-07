@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sync"
+	"sync/atomic"
 	"testing"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitclient"
@@ -28,6 +29,7 @@ func initWalkRepo(t *testing.T, n int) string {
 		cmd.Env = append(os.Environ(),
 			"GIT_AUTHOR_NAME=Test", "GIT_AUTHOR_EMAIL=test@example.com",
 			"GIT_COMMITTER_NAME=Test", "GIT_COMMITTER_EMAIL=test@example.com",
+			"GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_SYSTEM=/dev/null",
 		)
 		if out, err := cmd.CombinedOutput(); err != nil {
 			t.Fatalf("git %v: %v\n%s", args, err, out)
@@ -49,7 +51,25 @@ func initWalkRepo(t *testing.T, n int) string {
 // registry.Close via t.Cleanup) and the RepoID conn.Walk expects.
 func newWalkTestConn(t *testing.T, repoDir string) (*Conn, *Registry, string) {
 	t.Helper()
-	runner := gitclient.NewExecRunner()
+	return newWalkTestConnWithRunner(t, gitclient.NewExecRunner(), repoDir)
+}
+
+// countingRunner wraps a real Runner, counting `git log` spawns — D12's own proof needs to know
+// whether a re-open spawned a second one.
+type countingRunner struct {
+	gitclient.Runner
+	logSpawns *int32
+}
+
+func (r countingRunner) Start(ctx context.Context, gitPath string, spec gitclient.Spec) (gitclient.Process, error) {
+	if len(spec.Args) > 0 && spec.Args[0] == "log" {
+		atomic.AddInt32(r.logSpawns, 1)
+	}
+	return r.Runner.Start(ctx, gitPath, spec)
+}
+
+func newWalkTestConnWithRunner(t *testing.T, runner gitclient.Runner, repoDir string) (*Conn, *Registry, string) {
+	t.Helper()
 	registry := NewRegistry(runner)
 	t.Cleanup(registry.Close)
 	conn := NewConn(ConnID("test-conn"), "test-client", "test-client-label", nil)
@@ -210,6 +230,70 @@ func TestWalk_ResumeThroughRowPastStoreClamps(t *testing.T) {
 	}
 	if len(chunks) == 0 || chunks[0].From != 0 {
 		t.Fatalf("chunks = %+v, want a first chunk From:0", chunks)
+	}
+}
+
+// TestWalk_ReopenDoesNotReadAnUnrequestedPage is D12's own proof: a graph.loadMore round trip
+// (an explicit ReadPage) followed by the client's own stream re-open must read exactly one page in
+// total, not two.
+func TestWalk_ReopenDoesNotReadAnUnrequestedPage(t *testing.T) {
+	skipWithoutGitWalk(t)
+	repoDir := initWalkRepo(t, 10)
+	var logSpawns int32
+	runner := countingRunner{Runner: gitclient.NewExecRunner(), logSpawns: &logSpawns}
+	conn, _, repoID := newWalkTestConnWithRunner(t, runner, repoDir)
+	defer conn.Close()
+
+	w, err := conn.Walk(repoID, "git", porcelain.WalkSpec{Scope: "all"}, 3)
+	if err != nil {
+		t.Fatalf("Walk: %v", err)
+	}
+
+	// The walk's very first stream is allowed to read exactly one page (nothing cached yet).
+	if err := w.Stream(context.Background(), nil, 500, func(StreamChunk) error { return nil }); err != nil {
+		t.Fatalf("first Stream: %v", err)
+	}
+	loaded, _, exhausted, err := w.Status(context.Background())
+	if err != nil {
+		t.Fatalf("Status: %v", err)
+	}
+	if loaded != 3 || exhausted {
+		t.Fatalf("after first Stream: loaded=%d exhausted=%v, want loaded=3 exhausted=false", loaded, exhausted)
+	}
+
+	// A graph.loadMore click: an explicit ReadPage.
+	if _, err := w.ReadPage(context.Background(), 1); err != nil {
+		t.Fatalf("ReadPage: %v", err)
+	}
+	loaded, _, _, err = w.Status(context.Background())
+	if err != nil {
+		t.Fatalf("Status: %v", err)
+	}
+	if loaded != 6 {
+		t.Fatalf("after loadMore: loaded=%d, want 6", loaded)
+	}
+
+	// The client's own stream re-open, immediately after: must replay the store, never read a
+	// further page.
+	var gotChunks []StreamChunk
+	resume := loaded
+	if err := w.Stream(context.Background(), &resume, 500, func(c StreamChunk) error {
+		gotChunks = append(gotChunks, c)
+		return nil
+	}); err != nil {
+		t.Fatalf("second Stream (re-open): %v", err)
+	}
+	for _, c := range gotChunks {
+		if c.Source != "cache" {
+			t.Fatalf("re-open chunk source = %q, want cache -- a re-open must never read an unrequested page", c.Source)
+		}
+	}
+	loaded, _, _, err = w.Status(context.Background())
+	if err != nil {
+		t.Fatalf("Status: %v", err)
+	}
+	if loaded != 6 {
+		t.Fatalf("after re-open: loaded=%d, want 6 unchanged -- a re-open read an extra page it was not asked for", loaded)
 	}
 }
 

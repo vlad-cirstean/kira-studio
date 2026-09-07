@@ -256,9 +256,13 @@ func (w *Walk) Stream(ctx context.Context, resumeThroughRow *int, chunkRows int,
 		return nil
 	}
 
-	// Only the first stream for a repo reads from git; every later page is an explicit loadMore
-	// (upstream's own rule) — but this Walk cannot tell "first" from "later" except by there
-	// being nothing left cached, which is exactly the condition reached here.
+	// Upstream's own guard (repoService.ts:1080-1084) and §5.1.1's rule: a page is read here only
+	// on the very first stream for this walk — cachedThrough == 0, nothing cached at all. Every
+	// later page is an explicit loadMore; without this a re-open of a non-exhausted walk would
+	// silently read a page the caller did not ask for, on top of whatever it already had cached.
+	if cachedThrough > 0 {
+		return nil
+	}
 	if _, exhausted, err := w.readPageLocked(ctx); err != nil {
 		return err
 	} else if newTotal := w.store.RowCount(); cursor < newTotal {
