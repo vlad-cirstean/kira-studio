@@ -250,6 +250,35 @@ func captureRaw(t *testing.T, dir string, args []string) []byte {
 	return res.Stdout
 }
 
+// captureRawAllowExit is captureRaw for a command whose non-zero exit is an ordinary outcome
+// (D14/D15) — merge-tree's own exit 1 (conflicts predicted) chief among them.
+func captureRawAllowExit(t *testing.T, dir string, args []string, okExits ...int) []byte {
+	t.Helper()
+	runner := gitclient.NewExecRunner()
+	res, err := gitclient.Run(context.Background(), runner, "git", gitclient.Spec{Dir: dir, Args: args, ReadOnly: true})
+	if err != nil {
+		t.Fatalf("git %v: %v", args, err)
+	}
+	for _, ok := range okExits {
+		if res.ExitCode == ok {
+			return res.Stdout
+		}
+	}
+	t.Fatalf("git %v: exit %d not in %v: %s", args, res.ExitCode, okExits, res.Stderr)
+	return nil
+}
+
+// runAllowingFailure runs a git command that is EXPECTED to exit non-zero (a merge that
+// conflicts) — b.git itself Fatals on any non-zero exit, so this is the one escape hatch the
+// status/unmerged.bin fixture needs.
+func (b *repoBuilder) runAllowingFailure(args ...string) {
+	b.t.Helper()
+	cmd := exec.Command("git", args...)
+	cmd.Dir = b.dir
+	cmd.Env = fixtureEnv()
+	_, _ = cmd.CombinedOutput()
+}
+
 func strPtr(s string) *string { return &s }
 
 // captureNumstat/captureNameStatus/captureFileDiff/captureShowBodyAndSignature run the real,
@@ -545,6 +574,123 @@ func TestFixtures_Regenerate(t *testing.T) {
 		b := newRepoBuilder(t)
 		sha := b.commit("a.txt", "a\n", "Subject line\n\nSigned-off-by: Carol <carol@example.com>")
 		writeFixture(t, "show/bodyIsAllTrailers.bin", captureShowBodyAndSignature(t, b.dir, sha))
+	}
+
+	// --- refs/heads.bin: a branch ahead of its upstream, one whose upstream is [gone], a plain
+	// local branch with no upstream at all, a remote-tracking branch, and one checked out in a
+	// linked worktree (D19). ---
+	{
+		b := newRepoBuilder(t)
+		// %(upstream) needs a real remote.<name>.fetch refspec to map a merge ref onto a
+		// remote-tracking one — a fake, never-dialled URL is enough (nothing here ever fetches).
+		b.git("remote", "add", "origin", "https://example.invalid/repo.git")
+		base := b.commit("base.txt", "base\n", "base commit")
+		b.updateRef("refs/remotes/origin/main", base)
+		b.git("config", "branch.main.remote", "origin")
+		b.git("config", "branch.main.merge", "refs/heads/main")
+		// "main" now ahead of origin/main by one.
+		b.commit("ahead.txt", "ahead\n", "ahead of origin/main")
+
+		// gone: the upstream ref no longer exists, though the branch config still names it.
+		b.branch("gonebranch")
+		b.updateRef("refs/remotes/origin/gonebranch", base)
+		b.git("config", "branch.gonebranch.remote", "origin")
+		b.git("config", "branch.gonebranch.merge", "refs/heads/gonebranch")
+		b.git("update-ref", "-d", "refs/remotes/origin/gonebranch")
+
+		// checked out in a linked worktree — no upstream at all (the empty-track case).
+		b.branch("feature2")
+		wtDir := filepath.Join(t.TempDir(), "wt")
+		b.git("worktree", "add", "-q", wtDir, "feature2")
+
+		writeFixture(t, "refs/heads.bin", captureRaw(t, b.dir, porcelain.HeadsRefsArgs()))
+	}
+
+	// --- refs/tags.bin: a lightweight tag (whose %(contents:subject) borrows the pointed-at
+	// commit's subject and must be discarded) and an annotated one with a multi-line body, in the
+	// %00+\n framing (D19). ---
+	{
+		b := newRepoBuilder(t)
+		base := b.commit("base.txt", "base\n", "a commit with its own subject")
+		b.tag("v-light", base)
+		b.git("tag", "-a", "-m", "Annotated subject\n\nBody line one.\nBody line two.", "v-ann", base)
+		writeFixture(t, "refs/tags.bin", captureRaw(t, b.dir, porcelain.TagRefsArgs()))
+	}
+
+	// --- status/clean.bin: nothing dirty at all. ---
+	{
+		b := newRepoBuilder(t)
+		b.commit("a.txt", "a\n", "initial")
+		writeFixture(t, "status/clean.bin", captureRaw(t, b.dir, porcelain.StatusArgs()))
+	}
+
+	// --- status/mixed.bin: a staged add, an unstaged modify and an untracked file together —
+	// exercising every '1'/'?' marker and branch.ab absence (no upstream) at once. ---
+	{
+		b := newRepoBuilder(t)
+		b.commit("a.txt", "a\n", "initial")
+		b.writeFile("a.txt", "a\nmodified\n")
+		b.writeFile("staged.txt", "new\n")
+		b.add("staged.txt")
+		b.writeFile("untracked.txt", "x\n")
+		writeFixture(t, "status/mixed.bin", captureRaw(t, b.dir, porcelain.StatusArgs()))
+	}
+
+	// --- status/renamed.bin: a staged rename, the '2' record's own two-NUL-chunk framing. ---
+	{
+		b := newRepoBuilder(t)
+		b.commit("old.txt", "line one\nline two\nline three\n", "initial")
+		b.mv("old.txt", "renamed.txt")
+		writeFixture(t, "status/renamed.bin", captureRaw(t, b.dir, porcelain.StatusArgs()))
+	}
+
+	// --- status/unmerged.bin: a real merge conflict, the 'u' record. ---
+	{
+		b := newRepoBuilder(t)
+		b.commit("f.txt", "line1\nline2\nline3\n", "base")
+		b.branch("conflict-side")
+		b.checkout("conflict-side")
+		b.commit("f.txt", "line1\nSIDE\nline3\n", "side change")
+		b.checkout("main")
+		b.commit("f.txt", "line1\nMAIN\nline3\n", "main change")
+		b.runAllowingFailure("-c", "commit.gpgsign=false", "merge", "-q", "--no-ff", "conflict-side")
+		writeFixture(t, "status/unmerged.bin", captureRaw(t, b.dir, porcelain.StatusArgs()))
+	}
+
+	// --- status/unborn.bin: a fresh repo with zero commits — probe P11's "(initial)". ---
+	{
+		dir := t.TempDir()
+		initCmd := exec.Command("git", "init", "-q", "-b", "main")
+		initCmd.Dir = dir
+		initCmd.Env = fixtureEnv()
+		if out, err := initCmd.CombinedOutput(); err != nil {
+			t.Fatalf("git init: %v\n%s", err, out)
+		}
+		writeFixture(t, "status/unborn.bin", captureRaw(t, dir, porcelain.StatusArgs()))
+	}
+
+	// --- mergeTree/clean.bin: two branches touching disjoint files — no conflict. ---
+	{
+		b := newRepoBuilder(t)
+		base := b.commit("f.txt", "line1\nline2\nline3\n", "base")
+		b.branch("mt-a")
+		b.checkout("mt-a")
+		a := b.commit("f.txt", "line1 A\nline2\nline3\n", "a change")
+		b.checkout("main")
+		head := b.commit("g.txt", "new file\n", "unrelated main change")
+		writeFixture(t, "mergeTree/clean.bin", captureRawAllowExit(t, b.dir, porcelain.MergeTreeArgs(head, a, base), 0, 1))
+	}
+
+	// --- mergeTree/conflict.bin: the same line changed on both sides of the same base. ---
+	{
+		b := newRepoBuilder(t)
+		base := b.commit("f.txt", "line1\nline2\nline3\n", "base")
+		b.branch("mt-b")
+		b.checkout("mt-b")
+		other := b.commit("f.txt", "line1\nCHANGED-B\nline3\n", "b change")
+		b.checkout("main")
+		head := b.commit("f.txt", "line1\nCHANGED-MAIN\nline3\n", "main change")
+		writeFixture(t, "mergeTree/conflict.bin", captureRawAllowExit(t, b.dir, porcelain.MergeTreeArgs(head, other, base), 0, 1))
 	}
 
 	t.Log("golden corpus regenerated under testdata/ — run `bunx biome check --write` is not needed (Go-only); re-run tests without KIRA_GIT_FIXTURES to verify")
