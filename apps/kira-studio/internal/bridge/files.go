@@ -42,12 +42,20 @@ type FilesChooseOpenResult struct {
 type SaveFileRequest struct{ Directory, Filename string }
 type OpenFileRequest struct{ Title, FilterName, FilterPattern string }
 
+// OpenDirectoryRequest is P25 D13's folder picker — a "no filters" version of OpenFileRequest,
+// its own type since a filter makes no sense for a directory chooser.
+type OpenDirectoryRequest struct{ Title string }
+
 // Dialogs is the native-dialog seam. internal/shell implements it over app.Dialog with the main
-// window attached for modality; files_test.go implements it with a recorder. Both methods return
+// window attached for modality; files_test.go implements it with a recorder. Every method returns
 // "" for a cancelled dialog, which is the only cancel signal Wails gives (P56 §1.2).
 type Dialogs interface {
 	SaveFile(req SaveFileRequest) (string, error)
 	OpenFile(req OpenFileRequest) (string, error)
+	// OpenDirectory is P25 D13: the same OpenFile panel with CanChooseFiles(false)/
+	// CanChooseDirectories(true) (Wails v3 beta.16's OpenFileDialogStruct already supports this —
+	// no new native mechanism).
+	OpenDirectory(req OpenDirectoryRequest) (string, error)
 }
 
 type FilesService struct {
@@ -97,6 +105,31 @@ func (s *FilesService) ChooseOpen(args FilesChooseOpenArgs) (FilesChooseOpenResu
 		Canceled: false,
 		File:     &ChosenFile{Path: path, Name: filepath.Base(path), Size: info.Size()},
 	}, nil
+}
+
+// FilesChooseFolderArgs / FilesChooseFolderResult are P25 D13's folder picker — ChooseOpen's own
+// "" means cancelled" convention (Path == nil, Canceled == true), the same shape ChooseSave uses.
+type FilesChooseFolderArgs struct {
+	Title string `json:"title,omitempty"`
+}
+type FilesChooseFolderResult struct {
+	Canceled bool    `json:"canceled"`
+	Path     *string `json:"path"`
+}
+
+// ChooseFolder is P25 D13's picker for a DataGrip project directory. It also accepts a directly
+// typed path (the dialog UI itself validates that path the same way, so this method stays a thin
+// wrapper with no directory-shape validation of its own — Scan's own error is what a bad path
+// surfaces as).
+func (s *FilesService) ChooseFolder(args FilesChooseFolderArgs) (FilesChooseFolderResult, error) {
+	path, err := s.Dialogs.OpenDirectory(OpenDirectoryRequest{Title: args.Title})
+	if err != nil {
+		return FilesChooseFolderResult{}, ipcerr.Internal(err.Error())
+	}
+	if path == "" {
+		return FilesChooseFolderResult{Canceled: true}, nil
+	}
+	return FilesChooseFolderResult{Canceled: false, Path: &path}, nil
 }
 
 // wailsFilter collapses Electron's per-group filter list into the single extension set Wails'

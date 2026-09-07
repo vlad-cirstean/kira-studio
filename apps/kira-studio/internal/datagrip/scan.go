@@ -20,33 +20,35 @@ const (
 	OutlookStoreUnsupported PasswordOutlook = "store-unsupported"
 )
 
-// PreviewRow is one line of D10's review dialog.
+// PreviewRow is one line of D10's review dialog. JSON tags: this struct crosses the bridge
+// verbatim as DataGripService.Scan's return value (no separate bridge-side mirror type — the same
+// way connections.Service.List returns model.ConnectionSummary directly).
 type PreviewRow struct {
-	UUID       string
-	Name       string
-	Importable bool
+	UUID       string `json:"uuid"`
+	Name       string `json:"name"`
+	Importable bool   `json:"importable"`
 
 	// Populated only when Importable.
-	Kind            string
-	Host            *string
-	Port            *int
-	Database        *string
-	Username        *string
-	PasswordOutlook PasswordOutlook
+	Kind            string          `json:"kind,omitempty"`
+	Host            *string         `json:"host,omitempty"`
+	Port            *int            `json:"port,omitempty"`
+	Database        *string         `json:"database,omitempty"`
+	Username        *string         `json:"username,omitempty"`
+	PasswordOutlook PasswordOutlook `json:"passwordOutlook,omitempty"`
 
 	// Populated only when !Importable — one of D11's four "no row at all" reasons.
-	SkipReason string
-	SkipDetail string
+	SkipReason string `json:"skipReason,omitempty"`
+	SkipDetail string `json:"skipDetail,omitempty"`
 
 	// Warnings that do not block import (name-truncated, ssh-tunnel-dropped).
-	Warnings []string
+	Warnings []string `json:"warnings"`
 }
 
 // Preview is one Scan's answer — D9: file reads only, no credential store touched (F11: touching
 // the macOS Keychain here would double the authorization panels a real import shows).
 type Preview struct {
-	ProjectDir string
-	Rows       []PreviewRow
+	ProjectDir string       `json:"projectDir"`
+	Rows       []PreviewRow `json:"rows"`
 }
 
 // Scan parses projectDir's two data-source files, maps engines and fields, locates the IntelliJ
@@ -84,7 +86,7 @@ func discoverCandidates(createdIn string) []ConfigCandidate {
 
 func previewRowFor(ds DataSource, projectDir string, candidates []ConfigCandidate, cfg SecurityConfig) PreviewRow {
 	name, truncated := truncateName(ds.Name)
-	row := PreviewRow{UUID: ds.UUID, Name: name}
+	row := PreviewRow{UUID: ds.UUID, Name: name, Warnings: []string{}}
 	if truncated {
 		row.Warnings = append(row.Warnings, WarnNameTruncated)
 	}

@@ -16,6 +16,10 @@ type recordingDialogs struct {
 	openReq bridge.OpenFileRequest
 	openRes string
 	openErr error
+
+	openDirReq bridge.OpenDirectoryRequest
+	openDirRes string
+	openDirErr error
 }
 
 func (d *recordingDialogs) SaveFile(req bridge.SaveFileRequest) (string, error) {
@@ -26,6 +30,11 @@ func (d *recordingDialogs) SaveFile(req bridge.SaveFileRequest) (string, error) 
 func (d *recordingDialogs) OpenFile(req bridge.OpenFileRequest) (string, error) {
 	d.openReq = req
 	return d.openRes, d.openErr
+}
+
+func (d *recordingDialogs) OpenDirectory(req bridge.OpenDirectoryRequest) (string, error) {
+	d.openDirReq = req
+	return d.openDirRes, d.openDirErr
 }
 
 // TestWailsFilterTranslation covers the Electron->Wails filter collapse, whose rules do not

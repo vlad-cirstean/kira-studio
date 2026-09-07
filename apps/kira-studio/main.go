@@ -232,6 +232,7 @@ func main() {
 			application.NewService(&bridge.VariablesService{Deps: deps}),
 			application.NewService(&bridge.ResponseHistoryService{Deps: deps}),
 			application.NewService(&bridge.GrpcHistoryService{Deps: deps}),
+			application.NewService(&bridge.DataGripService{Deps: deps}),
 			application.NewService(&bridge.LifecycleService{Flusher: quitter, WindowFlusher: closeFlush}),
 		},
 		Assets: application.AssetOptions{

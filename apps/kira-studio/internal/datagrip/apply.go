@@ -25,18 +25,19 @@ type Creator interface {
 }
 
 // ReportRow is one row of D9's Report — Error is a D11 reason code on a password-only failure, or
-// a Creator error's message when the row's Create call itself failed.
+// a Creator error's message when the row's Create call itself failed. JSON tags: this struct
+// crosses the bridge verbatim as DataGripService.Import's return value.
 type ReportRow struct {
-	UUID             string
-	Name             string
-	Created          bool
-	PasswordImported bool
-	Error            string
+	UUID             string `json:"uuid"`
+	Name             string `json:"name"`
+	Created          bool   `json:"created"`
+	PasswordImported bool   `json:"passwordImported"`
+	Error            string `json:"error,omitempty"`
 }
 
 // Report is what Apply answers with (D9). It never carries a password.
 type Report struct {
-	Rows []ReportRow
+	Rows []ReportRow `json:"rows"`
 }
 
 // Apply is D9's second step. It re-parses the project (Scan's own Preview is never trusted as
