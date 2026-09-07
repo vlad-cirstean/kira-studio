@@ -6,9 +6,13 @@
  *
  * G1 migration note: see panelView.ts's own note — `service: RepoService` (and with it
  * `setUiVisible`/`endReview`/the `repo.changed` forward) is gone; `handlers` is supplied by the
- * constructor. G3 restores the review-session lifecycle once a real connection exists to end.
+ * constructor. G6 forwards `repo.changed` (`notifyRepoChanged` below) but does NOT restore
+ * `endReview`'s own lifecycle: there is no `review.end` on the wire (D6) — the server invalidates
+ * the ranged walk on `refsChanged` instead (D5), which is what makes `notifyRepoChanged` load-
+ * bearing here at all (F11): `ReviewSessionState`'s background re-resolve and its "the comparison
+ * has changed" banner are the sole consumer of this event in the review webview.
  */
-import type { RpcServer, ServerHandlers, SettingsSnapshot } from '@kira/git-ipc';
+import type { EventPayload, RpcServer, ServerHandlers, SettingsSnapshot } from '@kira/git-ipc';
 import { createRpcServer } from '@kira/git-ipc';
 import * as vscode from 'vscode';
 import type { ReviewTarget } from './html.ts';
@@ -85,5 +89,14 @@ export class KiraReviewViewProvider implements vscode.WebviewViewProvider {
    *  — a no-op when no webview is currently resolved (view collapsed or never opened). */
   notifySettingsChanged(settings: SettingsSnapshot): void {
     this.#server?.emit('settings.changed', { settings });
+  }
+
+  /** Forwarded from `ConnectionManager.on('repo.changed', ...)` by `extension.ts` (G6/D15,
+   *  resolving F11) — a three-line copy of `panelView.ts`'s own `notifyRepoChanged`. Without this,
+   *  `ReviewSessionState`'s background re-resolve and its "the comparison has changed" banner can
+   *  never fire: `repo.changed` is their sole trigger. A no-op when no webview is currently
+   *  resolved. */
+  notifyRepoChanged(payload: EventPayload<'repo.changed'>): void {
+    this.#server?.emit('repo.changed', payload);
   }
 }

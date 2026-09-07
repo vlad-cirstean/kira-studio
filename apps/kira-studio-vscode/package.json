@@ -69,6 +69,11 @@
         "command": "kiraVersion.focusGraph",
         "title": "Focus Graph",
         "category": "Kira Version"
+      },
+      {
+        "command": "kiraVersion.reviewBranch",
+        "title": "Review Branch Changes",
+        "category": "Kira Version"
       }
     ],
     "configuration": {

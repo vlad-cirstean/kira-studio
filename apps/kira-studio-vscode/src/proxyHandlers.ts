@@ -12,9 +12,12 @@
  * own already-migrated ports, `app.init`'s four capabilities flip to `true`, and `repo.open`/
  * `repo.close` grow a side effect — maintaining the `repoId -> root` map `editor.resolveConflict`
  * needs (D13, resolving F11: `RepoID` is only the worktree root for a non-bare repo, so a host
- * method may never `join(repoId, path)` directly). `review.open` is still forwarded and still
- * answers `E_UNKNOWN_METHOD` — the seventh host-capability method, and G6's, not this phase's
- * (D11: wiring it now would reveal a sidebar view that is not registered until G6).
+ * method may never `join(repoId, path)` directly).
+ *
+ * G6 (D13/D14) closes the last gap: `review.open` stops forwarding and reveals the review sidebar
+ * locally — the seventh and last host-capability method — and `repo.list` reports a real
+ * `activeRepoId` (the most recently opened repository on this extension host), the review view's
+ * own first consumer.
  */
 import { basename, join } from 'node:path';
 import type {
@@ -54,10 +57,15 @@ export interface CreateProxyHandlersDeps {
   readonly clipboard: Clipboard;
   readonly editor: EditorIntegration;
   readonly logger: Logger;
+  // G6/D15: reveals the review sidebar, optionally targeting repoId/branch — `review.open`'s own
+  // implementation. Supplied as a plain function rather than a provider instance so this file
+  // never imports vscode.WebviewViewProvider; extension.ts breaks the construction cycle (the
+  // provider needs `handlers`, `handlers` needs this function) with a `let` binding.
+  readonly revealReview: (repoId: string, branch: string) => void;
 }
 
 export function createProxyHandlers(deps: CreateProxyHandlersDeps): ServerHandlers {
-  const { connection, settings, roots, dialogs, clipboard, editor, logger } = deps;
+  const { connection, settings, roots, dialogs, clipboard, editor, logger, revealReview } = deps;
 
   function forward<K extends RequestKey>(method: K): RequestHandler<K> {
     return (params, ctx) => connection.request(method, params, ctx.signal);
@@ -68,6 +76,12 @@ export function createProxyHandlers(deps: CreateProxyHandlersDeps): ServerHandle
   // entry. editor.resolveConflict is this phase's one consumer — editor.goToFile needs no entry,
   // since file.goToTarget already returns absPath from the side that knows it.
   const repoRoots = new Map<string, string>();
+
+  // G6 D14: the most recently successfully opened repository on this extension host — a fact
+  // about this window, not about the backend, so it stays entirely extension-side. repo.list's
+  // own first real consumer is the review view (ReviewView.vue): with no panel-supplied target
+  // and no active repo id, the palette entry point can only render "no repository".
+  let activeRepoId: string | null = null;
 
   const requests: ServerHandlers['requests'] = {
     'app.init': async () => {
@@ -89,9 +103,7 @@ export function createProxyHandlers(deps: CreateProxyHandlersDeps): ServerHandle
     },
     'repo.list': async () => {
       const candidates = await roots.list();
-      // No persisted "last active repo" surface exists yet (rehydration is App.vue's own
-      // persisted-state path, D7) — the picker always starts with nothing pre-selected.
-      return { candidates, activeRepoId: null };
+      return { candidates, activeRepoId };
     },
     'repo.pick': async () => {
       const path = await dialogs.pickFolder({ title: 'Open Repository' });
@@ -101,11 +113,15 @@ export function createProxyHandlers(deps: CreateProxyHandlersDeps): ServerHandle
       const result = await connection.request('repo.open', params, ctx.signal);
       if (result.kind === 'ok') {
         repoRoots.set(result.repo.repoId, result.repo.root);
+        activeRepoId = result.repo.repoId;
       }
       return result;
     },
     'repo.close': async (params, ctx) => {
       repoRoots.delete(params.repoId);
+      if (activeRepoId === params.repoId) {
+        activeRepoId = null;
+      }
       return connection.request('repo.close', params, ctx.signal);
     },
     'graph.status': forward('graph.status'),
@@ -220,8 +236,23 @@ export function createProxyHandlers(deps: CreateProxyHandlersDeps): ServerHandle
       await editor.resolveConflict({ path: join(root, path) });
       return {};
     },
-    'review.resolveBase': forward('review.resolveBase'),
-    'review.open': forward('review.open'), // G6: still forwarded, still E_UNKNOWN_METHOD (D11).
+    // D1: baseCandidates is injected from the window's own coerced settings snapshot, exactly as
+    // graph.loadMore/graph.stream inject scope/pageSize below.
+    'review.resolveBase': (params, ctx) => {
+      const snap = settings();
+      return connection.request(
+        'review.resolveBase',
+        { ...params, baseCandidates: snap['kiraVersion.review.baseCandidates'] },
+        ctx.signal,
+      );
+    },
+    // D13: the seventh and last host-capability method — a host action (reveal a VS Code view),
+    // answered locally rather than forwarded. The server has no review.open case and answers
+    // E_UNKNOWN_METHOD for anything that reaches it there.
+    'review.open': async ({ repoId, branch }) => {
+      revealReview(repoId, branch);
+      return {};
+    },
     'remote.pullPreflight': forward('remote.pullPreflight'),
     'remote.pushPreflight': forward('remote.pushPreflight'),
     'remote.run': forward('remote.run'),

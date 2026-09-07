@@ -1,13 +1,13 @@
 /**
- * `activate`/`deactivate` (G1 §5.4). G1's whole job: dial the socket, handshake, and prove
- * `app.init`/`repo.open` round-trip for real. No webview view is registered yet (D13) — that is
- * G3's first step, once there is a graph to draw.
+ * `activate`/`deactivate` (G1 §5.4, G3 D17/D18, G6 D15). G1's whole job was dialing the socket,
+ * handshaking, and proving `app.init`/`repo.open` round-trip for real, with no webview view
+ * registered. G3 registered the graph view. G6 registers the second and last view this chapter
+ * defines — the branch-review sidebar — closing SPEC §5's "both webview views are registered"
+ * hand-off: `apps/kira-studio-vscode` registers no further views after this phase.
  *
  * Upstream's `activate()` built an in-process `RepoService` and two webview providers; neither
- * exists here. `coerceSettings`/`readRawSettings` and the `onDidChangeConfiguration` re-coercion
- * are kept — the extension still owns settings (SPEC §5 item 3) — but the two
- * `notifySettingsChanged` calls that used to push into those providers are gone with them,
- * returning in G3.
+ * exists here in that shape. `coerceSettings`/`readRawSettings` and the `onDidChangeConfiguration`
+ * re-coercion are kept — the extension still owns settings (SPEC §5 item 3).
  */
 import {
   coerceSettings,
@@ -25,6 +25,7 @@ import { VsCodeEditorIntegration } from './ports/editorIntegration.ts';
 import { VsCodeLogger } from './ports/logger.ts';
 import { VsCodeWorkspaceRoots } from './ports/workspaceRoots.ts';
 import { createProxyHandlers } from './proxyHandlers.ts';
+import { KiraReviewViewProvider } from './reviewView.ts';
 import { parseVirtualKey } from './virtualKey.ts';
 
 // D11: the server contract's own app.init is the webview contract's AppInitResult minus host/
@@ -44,6 +45,10 @@ const OPEN_REPO_COMMAND = 'kiraVersion.openRepository';
 // graph view to focus.
 const FOCUS_GRAPH_COMMAND = 'kiraVersion.focusGraph';
 const GRAPH_VIEW_ID = 'kiraVersion.graph';
+// G6/D15: the review view's own palette entry point (§6.8's third required entry point) and view
+// id — reveal with no target, and let the view ask (upstream's own OQ2 resolution).
+const REVIEW_BRANCH_COMMAND = 'kiraVersion.reviewBranch';
+const REVIEW_VIEW_ID = 'kiraVersion.review';
 const SETTING_KEYS = Object.keys(SETTINGS) as readonly SettingKey[];
 
 function readRawSettings(config: vscode.WorkspaceConfiguration): Record<string, unknown> {
@@ -98,6 +103,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   // D17/D18: the graph webview view is registered as this phase's own first step -- the graph
   // renders end to end from here on, with refs.list/status.get/undo.peek/stash.list rejecting
   // E_UNKNOWN_METHOD on every repo open until G5/G8 close them (documented, not a regression).
+  //
+  // G6/D15: `createProxyHandlers` needs `revealReview`, and `revealReview` needs the review
+  // provider, which needs `handlers` — the smallest honest break in that cycle is a `let` binding
+  // assigned on the next line, read only inside the closure (never before it is set: `review.open`
+  // cannot be dispatched before `activate` returns).
+  let reviewProvider: KiraReviewViewProvider;
   const handlers = createProxyHandlers({
     connection: manager,
     settings: () => currentSettings,
@@ -106,13 +117,21 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     clipboard,
     editor,
     logger,
+    revealReview: (repoId, branch) => reviewProvider.reviewBranch(repoId, branch),
   });
   const graphProvider = new KiraGraphViewProvider({ extensionUri: context.extensionUri, handlers });
+  reviewProvider = new KiraReviewViewProvider({ extensionUri: context.extensionUri, handlers });
 
   context.subscriptions.push(
     { dispose: () => manager.dispose() },
     vscode.window.registerWebviewViewProvider(GRAPH_VIEW_ID, graphProvider),
-    { dispose: manager.on('repo.changed', (payload) => graphProvider.notifyRepoChanged(payload)) },
+    vscode.window.registerWebviewViewProvider(REVIEW_VIEW_ID, reviewProvider),
+    {
+      dispose: manager.on('repo.changed', (payload) => {
+        graphProvider.notifyRepoChanged(payload);
+        reviewProvider.notifyRepoChanged(payload);
+      }),
+    },
     manager.onStateChange((state) => {
       logger.log('info', 'connection state', state);
       // §5.4 point 4: this phase's own exit criterion, executing in the real extension — the
@@ -143,11 +162,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         logger.log('warn', 'invalid setting, using default', problem);
       }
       graphProvider.notifySettingsChanged(currentSettings);
+      reviewProvider.notifySettingsChanged(currentSettings);
     }),
     vscode.commands.registerCommand(STATUS_COMMAND, () => showConnectionStatus(manager)),
     vscode.commands.registerCommand(OPEN_REPO_COMMAND, () => openRepository(manager, dialogs)),
     vscode.commands.registerCommand(FOCUS_GRAPH_COMMAND, () => {
       void vscode.commands.executeCommand(`${GRAPH_VIEW_ID}.focus`);
+    }),
+    vscode.commands.registerCommand(REVIEW_BRANCH_COMMAND, () => {
+      reviewProvider.reviewBranch(undefined, undefined);
     }),
   );
 }
