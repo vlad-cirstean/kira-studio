@@ -66,19 +66,19 @@ type TagAnnotation struct {
 // are omitted, never present-and-null). ObjectType is parsed but never crosses the wire (json:"-")
 // — its one consumer is the tag-delete undo capture, which needs it to choose the replay sha.
 type RefRow struct {
-	Refname        string         `json:"refname"`
-	Kind           string         `json:"kind"` // "branch" | "remoteBranch" | "tag"
-	ShortName      string         `json:"shortName"`
-	ObjectID       string         `json:"objectId"`
-	PeeledObjectID *string        `json:"peeledObjectId,omitempty"`
-	Upstream       *string        `json:"upstream,omitempty"`
+	Refname        string  `json:"refname"`
+	Kind           string  `json:"kind"` // "branch" | "remoteBranch" | "tag"
+	ShortName      string  `json:"shortName"`
+	ObjectID       string  `json:"objectId"`
+	PeeledObjectID *string `json:"peeledObjectId,omitempty"`
+	Upstream       *string `json:"upstream,omitempty"`
 	// Track is RefTrack{...}, the string "gone", or nil (omitted) — a three-way union Go has no
 	// direct equivalent for; `any` reproduces the wire shape byte-identically at the cost of a
 	// caller-visible type switch, which this field's one caller (refs.list's handler) already does.
-	Track         any    `json:"track,omitempty"`
-	CommitterDate int64  `json:"committerDate"`
-	IsHead        bool   `json:"isHead"`
-	CheckedOutIn  *string `json:"checkedOutIn,omitempty"`
+	Track         any            `json:"track,omitempty"`
+	CommitterDate int64          `json:"committerDate"`
+	IsHead        bool           `json:"isHead"`
+	CheckedOutIn  *string        `json:"checkedOutIn,omitempty"`
 	Annotation    *TagAnnotation `json:"annotation,omitempty"`
 
 	ObjectType string `json:"-"`
