@@ -31,6 +31,11 @@ var packagesExemptFromBridgeCheck = map[string]bool{
 	"internal/bridge":     true,
 	"internal/ipcfixture": true,
 	"internal/shell":      true,
+	// internal/bridge/rpcstream is itself part of the transport layer (SPEC §7's one deliberate
+	// exception — module-agnostic RPC infra git and studio/api already share), not a domain
+	// package sitting under it; every package here trivially "depends on" its own path, so a
+	// bridge subpackage would otherwise always fail this check against itself.
+	"internal/bridge/rpcstream": true,
 }
 
 // TestDomainPackagesDoNotImportBridge used to walk a hand-maintained slice of "the domain
