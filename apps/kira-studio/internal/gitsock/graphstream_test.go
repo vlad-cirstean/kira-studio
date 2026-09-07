@@ -425,6 +425,38 @@ func TestIntegration_CreditsApplyBackpressure(t *testing.T) {
 	}
 }
 
+// TestIntegration_GraphRangeIsRefused proves D14's own honest answer: a `range` parameter is
+// refused on all three graph.* methods that accept one, over the real socket -- the ranged/review
+// walk is G6's, not half-served here.
+func TestIntegration_GraphRangeIsRefused(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not on PATH")
+	}
+	server, sockPath, _, _ := newIntegrationServer(t)
+	repoDir, _ := initFixtureRepoWithCommits(t, 2)
+	client := pairAndReady(t, server, sockPath, "range-client")
+	result := openRepoOK(t, client, repoDir)
+	repoID := result.Repo.RepoID
+	rng := map[string]any{"base": "main", "branch": "feature"}
+
+	statusResp := client.request("graph.status", map[string]any{"repoId": repoID, "range": rng})
+	if statusResp.T != "res" || statusResp.OK == nil || *statusResp.OK {
+		t.Fatalf("graph.status with a range: got %+v, want a refused (not-ok) response", statusResp)
+	}
+
+	loadMoreResp := client.request("graph.loadMore", map[string]any{"repoId": repoID, "range": rng})
+	if loadMoreResp.T != "res" || loadMoreResp.OK == nil || *loadMoreResp.OK {
+		t.Fatalf("graph.loadMore with a range: got %+v, want a refused (not-ok) response", loadMoreResp)
+	}
+
+	id := client.openStream("graph.stream", map[string]any{"repoId": repoID, "range": rng})
+	client.sendCredit(id, 10)
+	f := client.readStreamFrame()
+	if f.Body.T != "end" || f.Body.Error == nil {
+		t.Fatalf("graph.stream with a range: got %+v, want an 'end' frame carrying an error", f.Body)
+	}
+}
+
 // TestFixtures_CaptureGraphChunkFrame is D16's own regenerator — the golden fixture proving the
 // Go encoder and the TypeScript decoder (socketChannel.test.ts) agree, byte for byte.
 func TestFixtures_CaptureGraphChunkFrame(t *testing.T) {
