@@ -26,6 +26,7 @@ type Repos struct {
 	Variables       *VariablesRepo
 	ResponseHistory *ResponseHistoryRepo
 	GrpcHistory     *GrpcHistoryRepo
+	GitClients      *GitClientsRepo
 
 	stmts []*sql.Stmt // every prepared statement below, for Close.
 }
@@ -69,6 +70,7 @@ func New(db *sql.DB) (*Repos, error) {
 		Collections:     &CollectionsRepo{DB: db},
 		ResponseHistory: &ResponseHistoryRepo{DB: db},
 		GrpcHistory:     &GrpcHistoryRepo{DB: db},
+		GitClients:      &GitClientsRepo{DB: db},
 		stmts:           []*sql.Stmt{settingsSelectAll, layoutSelectAll, tabsSelectAll, opsInsert, opsUpdate},
 	}, nil
 }
