@@ -602,7 +602,9 @@ test('autocomplete — the plain-field popup and the console popup share one vis
   };
   const readSizing = (el: Element) => {
     const s = getComputedStyle(el);
-    return { padding: s.padding, maxWidth: s.maxWidth };
+    // fontFamily (P26 D9): .p-completion used to inherit this from `body` by coincidence; now
+    // both popups name --kira-font-data explicitly, so this is an assertion instead of a fluke.
+    return { padding: s.padding, maxWidth: s.maxWidth, fontFamily: s.fontFamily };
   };
   const readRow = (el: Element) => {
     const s = getComputedStyle(el);
