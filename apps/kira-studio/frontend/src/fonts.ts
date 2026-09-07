@@ -60,8 +60,10 @@ export interface FontChoice {
 
 // P28 §1.2: 15 named monospace stacks, macOS-first — system faces, Apple's own developer face,
 // and widely-installed developer fonts. Every stack ends in `monospace` (or `Menlo, monospace`)
-// deliberately, since --kira-font-family also drives `body` (theme/base.css), so an unresolved
-// stack must still land on a monospace face rather than the browser's proportional default.
+// deliberately: --kira-font-family drives --kira-font-data (P26), which every grid, document/
+// key-value view and CodeMirror editor renders through, so an unresolved stack must still land on
+// a monospace face there rather than the browser's proportional default. `body` moved to the
+// fixed, non-customizable --kira-font-ui in P26 and is no longer affected by this choice at all.
 export const FONT_CHOICES: readonly FontChoice[] = [
   { label: 'System monospace', stack: 'ui-monospace, Menlo, monospace' },
   { label: 'Menlo', stack: 'Menlo, monospace' },

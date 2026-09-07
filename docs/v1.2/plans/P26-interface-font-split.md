@@ -827,16 +827,17 @@ a later chapter superseding an earlier one.
 
 ## Checklist
 
-- [ ] T1 `refactor(theme): the font family is two named roles over one Appearance channel`
-- [ ] T2 `refactor(theme): every data surface names the data font`
-- [ ] T3 `feat(theme): the interface renders in VS Code's own UI font`
-- [ ] T4 `test(theme): the two completion popups render in the same font`
-- [ ] T5 `test(theme): chrome and data render in different families`
-- [ ] `bun run lint` / `typecheck` / `build` clean after every commit
-- [ ] `bun run test:ui` run once at the end; `mode-switch.spec.ts` (D10) and `control-sizing.spec.ts`
-      explicitly among them; failures fixed as follow-up commits
-- [ ] `fonts.ts:62-64`'s `body` comment corrected (D7)
-- [ ] `docs/v1.2/SPEC.md`'s P26 row updated
+- [x] T1 `refactor(theme): the font family is two named roles over one Appearance channel`
+- [x] T2 `refactor(theme): every data surface names the data font`
+- [x] T3 `feat(theme): the interface renders in VS Code's own UI font`
+- [x] T4 `test(theme): the two completion popups render in the same font`
+- [x] T5 `test(theme): chrome and data render in different families`
+- [x] `bun run lint` / `typecheck` / `build` clean after every commit
+- [x] `bun run test:ui` run once at the end; `mode-switch.spec.ts` (D10) and `control-sizing.spec.ts`
+      explicitly among them; failures fixed as follow-up commits — `mode-switch.spec.ts` passed
+      unchanged after T3, so `--kira-icon-optical-y` was never declared
+- [x] `fonts.ts:62-64`'s `body` comment corrected (D7)
+- [x] `docs/v1.2/SPEC.md`'s P26 row updated
 
 ---
 
