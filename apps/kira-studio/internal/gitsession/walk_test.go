@@ -66,7 +66,7 @@ func TestWalk_StreamAndLoadMoreRaceProduceConsistentStore(t *testing.T) {
 	conn, _, repoID := newWalkTestConn(t, repoDir)
 	defer conn.Close()
 
-	w, err := conn.Walk(repoID, "git", porcelain.WalkSpec{Scope: "all"})
+	w, err := conn.Walk(repoID, "git", porcelain.WalkSpec{Scope: "all"}, 0)
 	if err != nil {
 		t.Fatalf("Walk: %v", err)
 	}
@@ -108,7 +108,7 @@ func TestWalk_RefsChangedResetsToRowZero(t *testing.T) {
 	conn, _, repoID := newWalkTestConn(t, repoDir)
 	defer conn.Close()
 
-	w, err := conn.Walk(repoID, "git", porcelain.WalkSpec{Scope: "all"})
+	w, err := conn.Walk(repoID, "git", porcelain.WalkSpec{Scope: "all"}, 0)
 	if err != nil {
 		t.Fatalf("Walk: %v", err)
 	}
@@ -146,7 +146,7 @@ func TestWalk_MarklessRowReplaysFromZeroWithBaseZero(t *testing.T) {
 	conn, _, repoID := newWalkTestConn(t, repoDir)
 	defer conn.Close()
 
-	w, err := conn.Walk(repoID, "git", porcelain.WalkSpec{Scope: "all"})
+	w, err := conn.Walk(repoID, "git", porcelain.WalkSpec{Scope: "all"}, 0)
 	if err != nil {
 		t.Fatalf("Walk: %v", err)
 	}
@@ -185,7 +185,7 @@ func TestWalk_ResumeThroughRowPastStoreClamps(t *testing.T) {
 	conn, _, repoID := newWalkTestConn(t, repoDir)
 	defer conn.Close()
 
-	w, err := conn.Walk(repoID, "git", porcelain.WalkSpec{Scope: "all"})
+	w, err := conn.Walk(repoID, "git", porcelain.WalkSpec{Scope: "all"}, 0)
 	if err != nil {
 		t.Fatalf("Walk: %v", err)
 	}
@@ -218,7 +218,7 @@ func TestWalk_DisposingConnDoesNotBlockAFreshOpenOfTheSameRepo(t *testing.T) {
 	repoDir := initWalkRepo(t, 3)
 	conn, registry, repoID := newWalkTestConn(t, repoDir)
 
-	w, err := conn.Walk(repoID, "git", porcelain.WalkSpec{Scope: "all"})
+	w, err := conn.Walk(repoID, "git", porcelain.WalkSpec{Scope: "all"}, 0)
 	if err != nil {
 		t.Fatalf("Walk: %v", err)
 	}

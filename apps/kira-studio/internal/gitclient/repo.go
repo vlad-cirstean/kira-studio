@@ -185,8 +185,20 @@ func Identify(ctx context.Context, runner Runner, gitPath, path string) (RepoSum
 		return RepoSummary{}, err
 	}
 
+	// D7: RepoID is the worktree root for a non-bare repo, the git dir for a bare one. `repo.open`
+	// is fed a repoId straight back as a path on rehydration (App.vue's own persisted-state path,
+	// and the KIRA_REPO dev seed) — Identify(root) works, Identify(gitDir) does not
+	// ("fatal: this operation must be run in a work tree"). A bare repo has no root at all
+	// (Root == ""), so it keeps keying on gitDir — collapsing every bare repo onto one key is
+	// exactly what G2's own choice of gitDir was protecting against, and staying on gitDir here
+	// preserves that.
+	repoID := gitDir
+	if !isBare {
+		repoID = root
+	}
+
 	return RepoSummary{
-		RepoID: gitDir,
+		RepoID: repoID,
 		Root:   root, GitDir: gitDir, CommonDir: commonDir,
 		IsBare: isBare,
 		// A linked worktree's own git-dir lives under <commonDir>/worktrees/<name>, distinct from

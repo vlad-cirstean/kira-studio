@@ -24,7 +24,9 @@ type Deps struct {
 // SPEC §7), so gitsock is the one that adapts these two functions onto rpcstream.Handlers.
 type Handlers struct {
 	Request func(ctx context.Context, method string, params json.RawMessage) (any, error)
-	Stream  func(ctx context.Context, method string, params json.RawMessage) error
+	// Stream mirrors rpcstream.Handlers.Stream structurally (D5) — gitrpc still does not import
+	// internal/bridge/rpcstream (SPEC §7's layering rule); gitsock is what adapts the two.
+	Stream func(ctx context.Context, method string, params json.RawMessage, emit func(payload any, blob []byte) error) error
 }
 
 // Router builds a per-connection Handlers over one shared Deps — the piece D18 adds: every method
@@ -50,15 +52,23 @@ func (r *Router) ForConn(c *gitsession.Conn) Handlers {
 				return r.handleRepoOpen(ctx, c, params)
 			case "repo.close":
 				return handleRepoClose(c, params)
+			case "graph.status":
+				return r.handleGraphStatus(ctx, c, params)
+			case "graph.loadMore":
+				return r.handleGraphLoadMore(ctx, c, params)
+			case "graph.refresh":
+				return r.handleGraphRefresh(ctx, c, params)
 			default:
 				return nil, ipcerr.New("E_UNKNOWN_METHOD", "gitrpc: unknown method "+method)
 			}
 		},
-		Stream: func(ctx context.Context, method string, params json.RawMessage) error {
-			// G2 registers no stream handler — rpcstream's own Handlers.Stream signature cannot
-			// emit a chunk yet regardless (G1 §11/G2 plan §9), so there is nothing this could
-			// serve. G3 widens Stream and this default goes away.
-			return ipcerr.New("E_UNKNOWN_METHOD", "gitrpc: unknown method "+method)
+		Stream: func(ctx context.Context, method string, params json.RawMessage, emit func(payload any, blob []byte) error) error {
+			switch method {
+			case "graph.stream":
+				return r.handleGraphStream(ctx, c, params, emit)
+			default:
+				return ipcerr.New("E_UNKNOWN_METHOD", "gitrpc: unknown method "+method)
+			}
 		},
 	}
 }

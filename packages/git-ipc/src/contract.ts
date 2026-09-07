@@ -886,8 +886,18 @@ export type Contract = {
       result: { loaded: number; remaining: number; exhausted: boolean };
     };
     'graph.loadMore': {
-      /** `range` present ⇒ pages the review walk instead of the panel's own (P7 W5). */
-      params: { repoId: string; pages?: number; range?: CommitRange };
+      /** `range` present ⇒ pages the review walk instead of the panel's own (P7 W5).
+       *  `scope`/`pageSize` (G3 D6): optional, injected by the extension from the window's own
+       *  `kiraVersion.graph.*` settings — SPEC's "can travel with the request and differ per
+       *  window harmlessly". A raw socket client that omits them gets the server's own defaults
+       *  ("all", 5000). */
+      params: {
+        repoId: string;
+        pages?: number;
+        range?: CommitRange;
+        scope?: 'all' | 'head';
+        pageSize?: number;
+      };
       result: { started: boolean };
     };
     'graph.refresh': {
@@ -1109,6 +1119,9 @@ export type Contract = {
         /** Present ⇒ walk `<base>..<branch>` instead of the repo's `graph.scope` rev set,
          *  against this repo's own separate review walk. Chunk shape is byte-for-byte the same. */
         range?: CommitRange;
+        /** G3 D6 — see graph.loadMore's own note; the same optional, extension-injected pair. */
+        scope?: 'all' | 'head';
+        pageSize?: number;
       };
       chunk: {
         readonly repoId: string;

@@ -1,8 +1,6 @@
 package gitsock
 
 import (
-	"context"
-	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net"
@@ -193,12 +191,8 @@ func (s *Server) handleConn(nc net.Conn) {
 	sess := rpcstream.NewSession(c, rpcstream.Handlers{
 		ContractVersion: gitrpc.ContractVersion,
 		Request:         handlers.Request,
-		// gitrpc.Handlers.Stream doesn't emit yet (its own Stream is a hardcoded
-		// E_UNKNOWN_METHOD, C8 widens it to match) -- adapted here rather than left
-		// uncompilable between C6 (this widening) and C8 (gitrpc's own).
-		Stream: func(ctx context.Context, method string, params json.RawMessage, _ func(payload any, blob []byte) error) error {
-			return handlers.Stream(ctx, method, params)
-		},
+		Stream:          handlers.Stream,
+		MaxFrameBytes:   maxFrameBytes,
 	})
 	gconn.Emit = sess.Emit
 	sess.Serve()

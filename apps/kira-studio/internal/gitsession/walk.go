@@ -29,9 +29,10 @@ type StreamChunk struct {
 // cached privately for one connection — two windows scrolled to different depths in the same
 // repository is precisely the case a single per-repo session (upstream's own shape) never had.
 type Walk struct {
-	entry   *RepoEntry
-	gitPath string
-	spec    porcelain.WalkSpec
+	entry    *RepoEntry
+	gitPath  string
+	spec     porcelain.WalkSpec
+	pageSize int // the underlying log session's own page size — fixed at construction (D6)
 
 	mu    sync.Mutex // serialises every operation on this walk, including Stream's own emit
 	log   *logsession.Session
@@ -50,8 +51,8 @@ type Walk struct {
 	staleRefresh atomic.Bool
 }
 
-func newWalk(entry *RepoEntry, gitPath string, spec porcelain.WalkSpec) *Walk {
-	w := &Walk{entry: entry, gitPath: gitPath, spec: spec}
+func newWalk(entry *RepoEntry, gitPath string, spec porcelain.WalkSpec, pageSize int) *Walk {
+	w := &Walk{entry: entry, gitPath: gitPath, spec: spec, pageSize: pageSize}
 	w.resetLocked()
 	return w
 }
@@ -102,7 +103,7 @@ func (w *Walk) resetLocked() {
 		GitPath: w.gitPath,
 		Dir:     walkDir(w.entry.Summary),
 		Read:    w.entry.Repo.Read,
-	}, logsession.Options{Walk: w.spec})
+	}, logsession.Options{Walk: w.spec, PageSize: w.pageSize})
 	w.staleRefs.Store(false)
 	w.staleRefresh.Store(false)
 }

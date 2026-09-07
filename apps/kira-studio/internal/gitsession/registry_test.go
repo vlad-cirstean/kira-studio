@@ -133,7 +133,7 @@ func TestRegistry_OneReleaseKeepsEntryAliveWhileSecondHolds(t *testing.T) {
 	time.Sleep(20 * time.Millisecond)
 
 	reg.mu.Lock()
-	_, stillPresent := reg.entries["/repo/.git"]
+	_, stillPresent := reg.entries["/repo"]
 	reg.mu.Unlock()
 	if !stillPresent {
 		t.Fatal("entry torn down while a second connection still holds it")
@@ -152,7 +152,7 @@ func TestRegistry_ReleaseToZeroArmsLingerNotImmediateTeardown(t *testing.T) {
 	release()
 
 	reg.mu.Lock()
-	sl, ok := reg.entries["/repo/.git"]
+	sl, ok := reg.entries["/repo"]
 	reg.mu.Unlock()
 	if !ok {
 		t.Fatal("entry removed immediately at refcount zero, want it lingering")
@@ -180,7 +180,7 @@ func TestRegistry_ReacquireInsideLingerWindowReusesEntryAndCancelsTimer(t *testi
 		t.Fatal("re-acquire inside the linger window built a new *RepoEntry instead of reusing it")
 	}
 	reg.mu.Lock()
-	sl := reg.entries["/repo/.git"]
+	sl := reg.entries["/repo"]
 	timerCancelled := sl.lingerTimer == nil
 	reg.mu.Unlock()
 	if !timerCancelled {
@@ -207,7 +207,7 @@ func TestRegistry_ExpiryTearsDownAndLaterAcquireBuildsNewEntry(t *testing.T) {
 	deadline := time.After(2 * time.Second)
 	for {
 		reg.mu.Lock()
-		_, present := reg.entries["/repo/.git"]
+		_, present := reg.entries["/repo"]
 		reg.mu.Unlock()
 		if !present {
 			break
@@ -244,7 +244,7 @@ func TestRegistry_ReleaseTwiceIsANoOp(t *testing.T) {
 	release() // must not decrement refs a second time, or panic.
 
 	reg.mu.Lock()
-	sl := reg.entries["/repo/.git"]
+	sl := reg.entries["/repo"]
 	refs := sl.refs
 	reg.mu.Unlock()
 	if refs != 0 {

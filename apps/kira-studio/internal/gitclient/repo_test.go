@@ -268,8 +268,8 @@ func TestIdentify_OrdinaryRepoOnBranch(t *testing.T) {
 	if summary.Head.Kind != "branch" || summary.Head.Name != "main" {
 		t.Errorf("Head = %+v, want {branch main}", summary.Head)
 	}
-	if summary.RepoID != summary.GitDir {
-		t.Errorf("RepoID = %q, want it to equal GitDir", summary.RepoID)
+	if summary.RepoID != summary.Root {
+		t.Errorf("RepoID = %q, want it to equal Root for a non-bare repo (D7)", summary.RepoID)
 	}
 }
 
@@ -320,6 +320,9 @@ func TestIdentify_BareRepo(t *testing.T) {
 	if summary.IsLinkedWorktree {
 		t.Error("IsLinkedWorktree = true, want false for a bare repo")
 	}
+	if summary.RepoID != summary.GitDir {
+		t.Errorf("RepoID = %q, want it to equal GitDir for a bare repo (D7 — no Root to key on)", summary.RepoID)
+	}
 }
 
 func TestIdentify_LinkedWorktree(t *testing.T) {
@@ -344,6 +347,16 @@ func TestIdentify_LinkedWorktree(t *testing.T) {
 	}
 	if summary.CommonDir != filepath.Join(mainRealDir, ".git") {
 		t.Errorf("CommonDir = %q, want the main worktree's .git", summary.CommonDir)
+	}
+	if summary.RepoID != summary.Root {
+		t.Errorf("RepoID = %q, want it to equal Root (D7)", summary.RepoID)
+	}
+	mainSummary, err := Identify(context.Background(), NewExecRunner(), gitPath, dir)
+	if err != nil {
+		t.Fatalf("identify main worktree: %v", err)
+	}
+	if summary.RepoID == mainSummary.RepoID {
+		t.Error("linked worktree's RepoID collides with the main worktree's — must stay unique per worktree")
 	}
 }
 

@@ -64,7 +64,7 @@ func (c *Conn) Open(ctx context.Context, reg *Registry, gitPath, path string) (g
 		// Mark before emitting (D13): a client that reacts to repo.changed by re-opening its
 		// stream must never be able to observe a walk that has not yet been told refs moved.
 		if ev.Kind == string(gitclient.SignalRefsChanged) {
-			if w, ok := c.walkFor(ev.RepoID); ok {
+			if w, ok := c.WalkFor(ev.RepoID); ok {
 				w.MarkStale()
 			}
 		}
@@ -148,7 +148,12 @@ func (c *Conn) Close() {
 // Walk returns this connection's Walk for repoID — created lazily on first call, rebuilt (the old
 // one disposed) whenever spec no longer matches what it was built with (a scope change, D13's own
 // #ensureReviewWalk shape). Errors with ErrRepoNotHeld if this connection has not opened repoID.
-func (c *Conn) Walk(repoID string, gitPath string, spec porcelain.WalkSpec) (*Walk, error) {
+//
+// pageSize (D6's own graph.pageSize) only takes effect on first construction — the underlying log
+// session's own page size is fixed at Open time and a later call with a different value does not
+// rebuild an otherwise-matching walk (rebuild is scope's own axis, D13); it is not part of
+// matchesSpec.
+func (c *Conn) Walk(repoID string, gitPath string, spec porcelain.WalkSpec, pageSize int) (*Walk, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -165,13 +170,13 @@ func (c *Conn) Walk(repoID string, gitPath string, spec porcelain.WalkSpec) (*Wa
 		delete(c.walks, repoID)
 	}
 
-	w := newWalk(h.entry, gitPath, spec)
+	w := newWalk(h.entry, gitPath, spec, pageSize)
 	c.walks[repoID] = w
 	return w, nil
 }
 
-// walkFor returns this connection's existing Walk for repoID, if any, without creating one.
-func (c *Conn) walkFor(repoID string) (*Walk, bool) {
+// WalkFor returns this connection's existing Walk for repoID, if any, without creating one.
+func (c *Conn) WalkFor(repoID string) (*Walk, bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	w, ok := c.walks[repoID]
