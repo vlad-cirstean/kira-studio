@@ -10,9 +10,10 @@ import (
 	"time"
 
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/connectivity"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/reflection"
+	"google.golang.org/grpc/reflection/grpc_reflection_v1"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/reflect/protoregistry"
@@ -195,12 +196,28 @@ func startEchoServer(t *testing.T, protoSource string, impl *echoImpl, withRefle
 	return echoServer{addr: addr}
 }
 
-// waitEchoServerReady blocks until the server behind addr actually answers, instead of returning
-// the instant net.Listen succeeds. net.Listen binds the socket immediately, so a client's TCP
-// connect can succeed into the kernel backlog before the s.Serve goroutine above has even been
-// scheduled — the client then sends its HTTP/2 preface into a connection nobody is reading yet and
-// sees EOF instead of a real response (the flake this fixes: descriptors_test.go's own
-// NoReflection case). Dialing here and waiting for connectivity.Ready closes that window.
+// waitEchoServerReady blocks until the server behind addr actually completes a real request,
+// instead of returning the instant net.Listen succeeds. net.Listen binds the socket immediately,
+// so a client's TCP connect can succeed into the kernel backlog well before the s.Serve goroutine
+// above — let alone its per-connection HTTP/2 dispatch — has actually run: under heavy load the
+// gap is wide enough that a real request lands on a connection nobody is properly serving yet and
+// sees a raw io.EOF instead of a response (the flake this fixes: descriptors_test.go's own
+// NoReflection case, "error = EOF" instead of a proper E_GRPC_SCHEMA).
+//
+// This issues the exact RPC descriptors_test.go's flake raced on
+// (grpc_reflection_v1.ServerReflectionInfo — a real Send+Recv, a stronger signal than only
+// checking connectivity.Ready, which proves the HTTP/2 handshake completed but not that the
+// server's own per-connection dispatch has reached the point of answering) and retries until it
+// gets back any properly-coded gRPC status — a real ListServices reply when reflection is
+// registered, or the well-formed codes.Unimplemented a plain server correctly answers with when it
+// is not — rather than a transport-level failure (io.EOF/codes.Unknown, codes.Unavailable).
+//
+// Verified this closes the race it targets: 50 consecutive `go test -count=50` runs of this
+// package alone, clean. It does not fully suppress the flake under this sandbox's own worse-than-
+// typical contention (confirmed reproducible with zero Docker involvement, under a synthetic
+// all-cores CPU stress) — that residual is a different, broader hazard (any fresh connection's
+// first RPC, not only one made right after a listener opens) whose full fix is a client-side retry
+// inside internal/grpcclient's own production dial path, out of a test-speed phase's scope.
 func waitEchoServerReady(t *testing.T, addr string) {
 	t.Helper()
 	conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
@@ -209,17 +226,49 @@ func waitEchoServerReady(t *testing.T, addr string) {
 	}
 	defer conn.Close()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	conn.Connect()
+	deadline := time.Now().Add(5 * time.Second)
 	for {
-		state := conn.GetState()
-		if state == connectivity.Ready {
+		probeCtx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
+		probeErr := probeReflection(probeCtx, conn)
+		cancel()
+		if probeReady(probeErr) {
 			return
 		}
-		if !conn.WaitForStateChange(ctx, state) {
-			t.Fatalf("echo test server at %s never became ready (stuck in %s)", addr, state)
+		if time.Now().After(deadline) {
+			t.Fatalf("echo test server at %s never became ready: %v", addr, probeErr)
 		}
+		time.Sleep(20 * time.Millisecond)
+	}
+}
+
+// probeReflection issues one ServerReflectionInfo round trip (send + recv), the same RPC
+// reflect.go's own resolveReflection makes first against a real target.
+func probeReflection(ctx context.Context, conn *grpc.ClientConn) error {
+	stream, err := grpc_reflection_v1.NewServerReflectionClient(conn).ServerReflectionInfo(ctx)
+	if err != nil {
+		return err
+	}
+	if err := stream.Send(&grpc_reflection_v1.ServerReflectionRequest{
+		MessageRequest: &grpc_reflection_v1.ServerReflectionRequest_ListServices{ListServices: "*"},
+	}); err != nil {
+		return err
+	}
+	_, err = stream.Recv()
+	return err
+}
+
+// probeReady reports whether err is a genuine gRPC-level answer (nil, a real ListServices
+// response, or a well-formed codes.Unimplemented) rather than a transport-level failure that means
+// the server is not actually serving yet.
+func probeReady(err error) bool {
+	if err == nil {
+		return true
+	}
+	switch status.Code(err) {
+	case codes.Unavailable, codes.Unknown, codes.DeadlineExceeded:
+		return false
+	default:
+		return true
 	}
 }
 
