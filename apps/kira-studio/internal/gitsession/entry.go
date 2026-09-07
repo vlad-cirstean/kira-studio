@@ -58,6 +58,10 @@ type RepoEntry struct {
 	// this file's own cache pattern.
 	undo *gitpreflight.UndoSlot
 
+	// rangeCount is G6 D9's one-entry range-count slot (review.go) — a fact about the repository,
+	// shared the same way detail/diff/refs are.
+	rangeCount reviewRangeCountSlot
+
 	done chan struct{}
 }
 
@@ -95,6 +99,7 @@ func (e *RepoEntry) note(sig gitclient.Signal) {
 	if sig == gitclient.SignalRefsChanged {
 		e.detail.dropAll()
 		e.refs.drop()
+		e.rangeCount.drop()
 		e.headMu.Lock()
 		e.headStale = true
 		e.headMu.Unlock()
@@ -204,6 +209,7 @@ func (e *RepoEntry) teardown() {
 	e.detail.dropAll()
 	e.diff.clear()
 	e.refs.drop()
+	e.rangeCount.drop()
 	e.undo.Set(nil)
 
 	e.mu.Lock()
