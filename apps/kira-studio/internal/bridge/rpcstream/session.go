@@ -122,6 +122,29 @@ func (s *Session) sendChunk(f frame, blob []byte) error {
 	return nil
 }
 
+// sendResult queues a successful 'res' frame — the response path's own twin of sendChunk's guard
+// (D2a/F8): an oversize encoded body is refused with an error res carrying E_FRAME_TOO_LARGE
+// instead of being silently dropped by writeFrame further down (gitsock/frame.go), which would
+// otherwise leave the client waiting on a response that never arrives, forever. Only the success
+// path needs the check — an error res is always small (a code plus a message).
+func (s *Session) sendResult(id int, resultBytes json.RawMessage) {
+	f := frame{T: "res", ID: id, OK: boolPtr(true), Result: resultBytes}
+	b, err := encodeBody(envelope{Version: s.h.ContractVersion, Body: f}, nil)
+	if err != nil {
+		return // every frame value this package ever constructs is JSON-safe by construction.
+	}
+	if s.h.MaxFrameBytes > 0 && len(b) > s.h.MaxFrameBytes {
+		s.send(frame{T: "res", ID: id, OK: boolPtr(false), Error: &wireError{
+			Code: "E_FRAME_TOO_LARGE", Message: "rpcstream: encoded response exceeds the frame size cap",
+		}})
+		return
+	}
+	select {
+	case s.sendCh <- b:
+	case <-s.done:
+	}
+}
+
 // Emit sends an 'evt' frame — the Go half of rpc.ts's RpcServer.emit. Its production caller is
 // gitsession's subscriber fan-out (G2 plan D14/D17), reached through gitsock's Conn.Emit closure
 // (D19); session_test.go's own TestSession_Emit_EventCrosses is what first proved the wire shape.
@@ -168,7 +191,7 @@ func (s *Session) handleRequest(id int, method string, params json.RawMessage) {
 		s.send(frame{T: "res", ID: id, OK: boolPtr(false), Error: &wireError{Code: "E_INTERNAL", Message: merr.Error()}})
 		return
 	}
-	s.send(frame{T: "res", ID: id, OK: boolPtr(true), Result: resultBytes})
+	s.sendResult(id, resultBytes)
 }
 
 // handleOpen runs one stream's handler. ctx/gate are registered by handleRaw synchronously,

@@ -197,6 +197,47 @@ func TestSession_Stream_EmitsBlobAndJSONChunks(t *testing.T) {
 	}
 }
 
+// TestSession_HandleRequest_OversizeResultAnswersFrameTooLarge is D2a's own proof: a handler
+// whose result encodes larger than MaxFrameBytes must never simply vanish (F8's bug, the response
+// path's own twin of what G3 D5 already fixed for stream chunks) — the client always gets a real
+// 'res' frame, carrying E_FRAME_TOO_LARGE instead of the oversize result.
+func TestSession_HandleRequest_OversizeResultAnswersFrameTooLarge(t *testing.T) {
+	conn := newInternalPipeSession()
+	const contractVersion = 9
+	h := Handlers{
+		ContractVersion: contractVersion,
+		MaxFrameBytes:   64,
+		Request: func(context.Context, string, json.RawMessage) (any, error) {
+			return map[string]string{"blob": string(make([]byte, 200))}, nil
+		},
+	}
+	session := NewSession(conn, h)
+	go session.Serve()
+	defer session.close()
+
+	reqEnv := envelope{Version: contractVersion, Body: frame{T: "req", ID: 1, Method: "commit.fileDiff", Params: json.RawMessage(`{}`)}}
+	reqBytes, err := json.Marshal(reqEnv)
+	if err != nil {
+		t.Fatalf("marshal req: %v", err)
+	}
+	conn.in <- reqBytes
+
+	raw := recvFrame(t, conn)
+	var env envelope
+	if err := json.Unmarshal(raw, &env); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if env.Body.T != "res" || env.Body.ID != 1 {
+		t.Fatalf("body = %+v, want a res frame for id 1", env.Body)
+	}
+	if env.Body.OK == nil || *env.Body.OK {
+		t.Fatalf("OK = %v, want false", env.Body.OK)
+	}
+	if env.Body.Error == nil || env.Body.Error.Code != "E_FRAME_TOO_LARGE" {
+		t.Fatalf("error = %+v, want E_FRAME_TOO_LARGE", env.Body.Error)
+	}
+}
+
 // TestCreditGate_GrantUnblocksAcquire proves the credit gate's own contract in isolation — a
 // waiter blocked on acquire is released by grant, exactly once per unit of credit.
 func TestCreditGate_GrantUnblocksAcquire(t *testing.T) {
