@@ -1,0 +1,44 @@
+{
+  "envelope": {
+    "repoId": "/tmp/TestFixtures_CaptureGraphChunkFrame1681137860/002",
+    "seq": 0,
+    "from": 0,
+    "to": 3,
+    "source": "git",
+    "remaining": 0,
+    "exhausted": true
+  },
+  "commits": {
+    "from": 0,
+    "to": 3,
+    "shaWidthBytes": 20,
+    "shas": [
+      "db72808548f8b8669dc3f2456d60af2aeb0c558a",
+      "5596ae811577476f31fc7eb45c90235bf9de38fb",
+      "da51955f0a85504fc559b319254f428600dad725"
+    ],
+    "parentOffsets": [0, 1, 2, 2],
+    "parentShas": [
+      "5596ae811577476f31fc7eb45c90235bf9de38fb",
+      "da51955f0a85504fc559b319254f428600dad725"
+    ],
+    "identityIds": [0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1],
+    "times": [1788781690, 1788781690, 1788781690, 1788781690, 1788781690, 1788781690],
+    "subjects": ["commit 2", "commit 1", "commit 0"],
+    "subjectOffsets": [0, 8, 16, 24],
+    "dictionaryBase": 0,
+    "dictionary": ["Test", "test@example.com"],
+    "decorations": [
+      {
+        "row": 0,
+        "refs": [
+          {
+            "kind": "branch",
+            "name": "main",
+            "isHead": true
+          }
+        ]
+      }
+    ]
+  }
+}

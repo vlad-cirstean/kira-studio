@@ -2,12 +2,15 @@ import { expect, test } from 'bun:test';
 import * as net from 'node:net';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { decodeStreamPayload } from './codec.ts';
+import type { DecorationRef, StreamChunkOf } from './contract.ts';
 import {
   createSocketChannel,
   FrameTooLargeError,
   MAX_FRAME_BYTES,
   MalformedBlobFrameError,
 } from './socketChannel.ts';
+import { unwrapVersioned } from './validate.ts';
 
 // D1's framing boundary arithmetic, from the TypeScript side — the counterpart of
 // internal/gitsock/frame_test.go. The two implementations must agree byte for byte, and this is
@@ -217,5 +220,168 @@ test('destroys the socket on a frame whose declared length exceeds the cap', asy
 
     const err = await closed;
     expect(err).toBeInstanceOf(FrameTooLargeError);
+  });
+});
+
+// D16 — the cross-language fixture: internal/gitsock's own TestFixtures_CaptureGraphChunkFrame
+// (KIRA_GIT_FIXTURES=write) drives a real graph.stream over a real socket against a real fixture
+// repository and writes the first chunk frame's exact body bytes (graphChunkFrame.bin) plus the
+// decoded values a reader should recover (graphChunkFrame.json). This is the only test that can
+// catch the Go encoder and this file's/graphChunkCodec.ts's decode path disagreeing — a field
+// written to the wrong slot, a big-endian column, a mis-sized header prefix.
+interface GraphChunkFixture {
+  readonly envelope: {
+    readonly repoId: string;
+    readonly seq: number;
+    readonly from: number;
+    readonly to: number;
+    readonly source: 'git' | 'cache';
+    readonly remaining: number;
+    readonly exhausted: boolean;
+  };
+  readonly commits: {
+    readonly from: number;
+    readonly to: number;
+    readonly shaWidthBytes: number;
+    readonly shas: readonly string[];
+    readonly parentOffsets: readonly number[];
+    readonly parentShas: readonly string[];
+    readonly identityIds: readonly number[];
+    readonly times: readonly number[];
+    readonly subjects: readonly string[];
+    readonly subjectOffsets: readonly number[];
+    readonly dictionaryBase: number;
+    readonly dictionary: readonly string[];
+    readonly decorations: ReadonlyArray<{
+      readonly row: number;
+      readonly refs: ReadonlyArray<{
+        readonly kind: string;
+        readonly name?: string;
+        readonly isHead?: boolean;
+      }>;
+    }>;
+  };
+}
+
+function expectedDecorationRef(r: {
+  kind: string;
+  name?: string;
+  isHead?: boolean;
+}): DecorationRef {
+  switch (r.kind) {
+    case 'branch':
+      if (r.name === undefined) throw new Error('branch decoration fixture is missing a name');
+      return { kind: 'branch', name: r.name, isHead: r.isHead ?? false };
+    case 'remoteBranch':
+      if (r.name === undefined) {
+        throw new Error('remoteBranch decoration fixture is missing a name');
+      }
+      return { kind: 'remoteBranch', name: r.name };
+    case 'tag':
+      if (r.name === undefined) throw new Error('tag decoration fixture is missing a name');
+      return { kind: 'tag', name: r.name };
+    case 'head':
+      return { kind: 'head' };
+    case 'stash':
+      if (r.name === undefined) throw new Error('stash decoration fixture is missing an index');
+      return { kind: 'stash', index: Number(r.name) };
+    default:
+      throw new Error(`socketChannel.test.ts: unrecognised decoration kind ${r.kind}`);
+  }
+}
+
+test('D16: decodes the captured Go-encoded graph.stream chunk frame field for field', async () => {
+  const fixtureDir = path.join(import.meta.dir, '..', 'testdata');
+  const raw = new Uint8Array(
+    await Bun.file(path.join(fixtureDir, 'graphChunkFrame.bin')).arrayBuffer(),
+  );
+  const expected = JSON.parse(
+    await Bun.file(path.join(fixtureDir, 'graphChunkFrame.json')).text(),
+  ) as GraphChunkFixture;
+
+  await withConnectedPair(async (client, server) => {
+    const serverChannel = createSocketChannel(server);
+    const received = new Promise<unknown>((resolve) => serverChannel.onMessage(resolve));
+
+    // The captured .bin is the frame *body* (internal/gitsock's own readFrame already stripped
+    // the outer length prefix) — re-add it here, exactly as it crossed the real socket.
+    const body = Buffer.from(raw);
+    const frame = Buffer.allocUnsafe(4 + body.byteLength);
+    frame.writeUInt32BE(body.byteLength, 0);
+    body.copy(frame, 4);
+    client.write(frame);
+
+    const envelope = await received;
+    const frameBody = unwrapVersioned(envelope as { version: number; body: unknown }) as {
+      readonly t: string;
+      readonly id: number;
+      readonly seq: number;
+      readonly chunk: unknown;
+    };
+    expect(frameBody.t).toBe('chunk');
+
+    const chunk = decodeStreamPayload(
+      'graph.stream',
+      frameBody.chunk,
+    ) as StreamChunkOf<'graph.stream'>;
+
+    expect(chunk.repoId).toBe(expected.envelope.repoId);
+    expect(chunk.seq).toBe(expected.envelope.seq);
+    expect(chunk.from).toBe(expected.envelope.from);
+    expect(chunk.to).toBe(expected.envelope.to);
+    expect(chunk.source).toBe(expected.envelope.source);
+    expect(chunk.remaining).toBe(expected.envelope.remaining);
+    expect(chunk.exhausted).toBe(expected.envelope.exhausted);
+
+    const commits = chunk.commits;
+    expect(commits.from).toBe(expected.commits.from);
+    expect(commits.to).toBe(expected.commits.to);
+    expect(commits.shaWidthBytes).toBe(expected.commits.shaWidthBytes);
+
+    const shaWidth = commits.shaWidthBytes;
+    const shasBytes = new Uint8Array(commits.shas);
+    const gotShas: string[] = [];
+    for (let i = 0; i < shasBytes.length; i += shaWidth) {
+      gotShas.push(Buffer.from(shasBytes.slice(i, i + shaWidth)).toString('hex'));
+    }
+    expect(gotShas).toEqual([...expected.commits.shas]);
+
+    expect(Array.from(new Uint32Array(commits.parentOffsets))).toEqual([
+      ...expected.commits.parentOffsets,
+    ]);
+    const parentShasBytes = new Uint8Array(commits.parentShas);
+    const gotParentShas: string[] = [];
+    for (let i = 0; i < parentShasBytes.length; i += shaWidth) {
+      gotParentShas.push(Buffer.from(parentShasBytes.slice(i, i + shaWidth)).toString('hex'));
+    }
+    expect(gotParentShas).toEqual([...expected.commits.parentShas]);
+
+    expect(Array.from(new Uint32Array(commits.identityIds))).toEqual([
+      ...expected.commits.identityIds,
+    ]);
+    expect(Array.from(new Uint32Array(commits.times))).toEqual([...expected.commits.times]);
+    expect(Array.from(new Uint32Array(commits.subjectOffsets))).toEqual([
+      ...expected.commits.subjectOffsets,
+    ]);
+
+    const subjectBytes = new Uint8Array(commits.subjectBytes);
+    const subjectOffsets = Array.from(new Uint32Array(commits.subjectOffsets));
+    const gotSubjects: string[] = [];
+    for (let i = 0; i < subjectOffsets.length - 1; i++) {
+      gotSubjects.push(
+        Buffer.from(subjectBytes.slice(subjectOffsets[i], subjectOffsets[i + 1])).toString('utf8'),
+      );
+    }
+    expect(gotSubjects).toEqual([...expected.commits.subjects]);
+
+    expect(commits.dictionaryBase).toBe(expected.commits.dictionaryBase);
+    expect([...commits.dictionary]).toEqual([...expected.commits.dictionary]);
+
+    const gotDecorations = commits.decorations.map(([row, refs]) => ({ row, refs: [...refs] }));
+    const wantDecorations = expected.commits.decorations.map((d) => ({
+      row: d.row,
+      refs: d.refs.map(expectedDecorationRef),
+    }));
+    expect(gotDecorations).toEqual(wantDecorations);
   });
 });

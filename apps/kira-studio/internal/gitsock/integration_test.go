@@ -2,6 +2,7 @@ package gitsock
 
 import (
 	"bufio"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -51,6 +52,9 @@ type wireFrame struct {
 	Result  json.RawMessage `json:"result,omitempty"`
 	Error   *wireErr        `json:"error,omitempty"`
 	Payload json.RawMessage `json:"payload,omitempty"` // evt frames only (repo.changed, D20).
+	Seq     int             `json:"seq,omitempty"`     // chunk frames only (G3 D5).
+	Chunk   json.RawMessage `json:"chunk,omitempty"`   // chunk frames only.
+	N       int             `json:"n,omitempty"`       // credit frames only.
 }
 
 type wireErr struct {
@@ -161,6 +165,66 @@ func (c *testClient) request(method string, params any) wireFrame {
 	return respEnv.Body
 }
 
+// openStream sends an 'open' frame for method and returns its id — the caller grants credit and
+// reads chunk/end frames itself (streamFrame, below).
+func (c *testClient) openStream(method string, params any) int {
+	c.t.Helper()
+	id := c.next
+	c.next++
+	paramsJSON, err := json.Marshal(params)
+	if err != nil {
+		c.t.Fatalf("marshal params: %v", err)
+	}
+	env := wireEnvelope{Version: gitrpc.ContractVersion, Body: wireFrame{T: "open", ID: id, Method: method, Params: paramsJSON}}
+	c.sendRaw(env)
+	return id
+}
+
+func (c *testClient) sendCredit(id, n int) {
+	c.t.Helper()
+	env := wireEnvelope{Version: gitrpc.ContractVersion, Body: wireFrame{T: "credit", ID: id, N: n}}
+	c.sendRaw(env)
+}
+
+// streamFrame is one decoded chunk/end frame — Blob is non-nil only for a chunk frame that
+// carried D4's out-of-band bytes.
+type streamFrame struct {
+	Body wireFrame
+	Blob []byte
+}
+
+// readStreamFrame reads exactly one frame off the wire, recognising D4's blob-frame body
+// (0x00 | uint32BE headerLen | headerJSON | blob) itself — a real client's own framing, not a
+// helper the server provides.
+func (c *testClient) readStreamFrame() streamFrame {
+	c.t.Helper()
+	raw, err := readFrame(c.r)
+	if err != nil {
+		c.t.Fatalf("read stream frame: %v", err)
+	}
+	if len(raw) > 0 && raw[0] == 0x00 {
+		if len(raw) < 5 {
+			c.t.Fatalf("blob frame too short: %d bytes", len(raw))
+		}
+		headerLen := binary.BigEndian.Uint32(raw[1:5])
+		if 5+int(headerLen) > len(raw) {
+			c.t.Fatalf("blob frame header length %d exceeds frame (%d bytes)", headerLen, len(raw))
+		}
+		header := raw[5 : 5+int(headerLen)]
+		blob := raw[5+int(headerLen):]
+		var env wireEnvelope
+		if err := json.Unmarshal(header, &env); err != nil {
+			c.t.Fatalf("unmarshal blob frame header: %v\n%s", err, header)
+		}
+		return streamFrame{Body: env.Body, Blob: blob}
+	}
+	var env wireEnvelope
+	if err := json.Unmarshal(raw, &env); err != nil {
+		c.t.Fatalf("unmarshal stream frame: %v\n%s", err, raw)
+	}
+	return streamFrame{Body: env.Body}
+}
+
 // repoChangedPayload is repo.changed's wire payload (D20).
 type repoChangedPayload struct {
 	RepoID string `json:"repoId"`
@@ -196,6 +260,13 @@ func (c *testClient) recvEvent(method string) repoChangedPayload {
 // needing no production-only accessor.
 func newIntegrationServer(t *testing.T) (server *Server, sockPath string, clientsRepo *repos.GitClientsRepo, registry *gitsession.Registry) {
 	t.Helper()
+	return newIntegrationServerWithRunner(t, gitclient.NewExecRunner())
+}
+
+// newIntegrationServerWithRunner is newIntegrationServer, over a caller-supplied Runner — the
+// seam TestIntegration_GraphStreamResumesFromCache needs to count `git log` spawns.
+func newIntegrationServerWithRunner(t *testing.T, gitRunner gitclient.Runner) (server *Server, sockPath string, clientsRepo *repos.GitClientsRepo, registry *gitsession.Registry) {
+	t.Helper()
 	kiraHome := t.TempDir()
 	t.Setenv("KIRA_HOME", kiraHome)
 
@@ -211,7 +282,6 @@ func newIntegrationServer(t *testing.T) (server *Server, sockPath string, client
 	}
 	t.Cleanup(func() { _ = repositories.Close() })
 
-	gitRunner := gitclient.NewExecRunner()
 	gitDiscovery := gitclient.NewDiscovery(lookPathLocator{}, gitRunner, gitclient.NewRealClock())
 	gitRegistry := gitsession.NewRegistry(gitRunner)
 
