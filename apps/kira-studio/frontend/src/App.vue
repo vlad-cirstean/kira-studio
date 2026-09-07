@@ -3,10 +3,12 @@ import { onMounted, onUnmounted } from 'vue';
 import ApiDialogs from './api/ApiDialogs.vue';
 import { control } from './bridge/control';
 import ConnectionDialog from './project/ConnectionDialog.vue';
+import DataGripImportDialog from './project/DataGripImportDialog.vue';
 import CommandPalette from './shortcuts/CommandPalette.vue';
 import { runCommand } from './shortcuts/commands';
 import { togglePalette } from './shortcuts/state';
 import { connectionsState, openCreateDialog } from './state/connections';
+import { datagripImportState } from './state/datagripImport';
 import { fakeDataDialogState } from './state/fakeData';
 import { toggleOperationsPanel, toggleProjectPanel } from './state/layout';
 import { activeTab } from './state/mode';
@@ -64,6 +66,7 @@ onUnmounted(() => {
     <WorkbenchShell />
   </div>
   <ConnectionDialog v-if="connectionsState.dialog.open" />
+  <DataGripImportDialog v-if="datagripImportState.open" />
   <ApiDialogs />
   <UploadObjectDialog v-if="uploadDialogState.open" />
   <GenerateDataDialog v-if="fakeDataDialogState.open" />

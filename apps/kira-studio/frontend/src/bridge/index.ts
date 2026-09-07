@@ -1,5 +1,6 @@
 import * as AppService from '@bindings/appservice.js';
 import * as ConnectionsService from '@bindings/connectionsservice.js';
+import * as DataGripService from '@bindings/datagripservice.js';
 import * as EngineService from '@bindings/engineservice.js';
 import * as FilesService from '@bindings/filesservice.js';
 import * as FiltersService from '@bindings/filtersservice.js';
@@ -13,11 +14,13 @@ import * as SettingsService from '@bindings/settingsservice.js';
 import * as TabsService from '@bindings/tabsservice.js';
 import * as TreeService from '@bindings/treeservice.js';
 import * as WindowsService from '@bindings/windowsservice.js';
+import type * as DataGripModels from '@bindings-internal/datagrip/models.js';
 import type {
   ConnectionInput,
   ConnectionState,
   ConnectionSummary,
 } from '@shared/domain/connection';
+import type { DataGripPreview, DataGripReport } from '@shared/domain/datagrip';
 import type { ObjectDefinition } from '@shared/domain/definition';
 import type { Layout, LayoutPatch } from '@shared/domain/layout';
 import type { AppMode } from '@shared/domain/mode';
@@ -93,6 +96,9 @@ const studioControl = {
   filesChooseOpen: (
     args?: WailsModels.FilesChooseOpenArgs,
   ): Promise<WailsModels.FilesChooseOpenResult> => unwrap(FilesService.ChooseOpen(args ?? {})),
+  // P25 D13: the same "" means cancelled" convention as filesChooseOpen/filesChooseSave.
+  filesChooseFolder: (title?: string): Promise<WailsModels.FilesChooseFolderResult> =>
+    unwrap(FilesService.ChooseFolder({ title: title ?? '' })),
 
   connectionsList: (): Promise<ConnectionSummary[]> =>
     unwrap(ConnectionsService.List()).then((r) => trust<ConnectionSummary[]>(r ?? [])),
@@ -149,6 +155,21 @@ const studioControl = {
     on(CHANNEL.connectionMetadataInvalidated, cb),
   onConnectionsChanged: (cb: (records: ConnectionSummary[]) => void): (() => void) =>
     on(CHANNEL.connectionsChanged, cb),
+
+  // P25 D9: only the project path crosses the bridge either way — Scan never touches a
+  // credential store (file reads only), Import fetches and decrypts a password only inside Go,
+  // and neither ever returns one to the renderer.
+  datagripScan: (path: string): Promise<DataGripPreview> =>
+    unwrap<DataGripModels.Preview>(DataGripService.Scan({ path })).then((r) =>
+      trust<DataGripPreview>({
+        ...r,
+        rows: (r.rows ?? []).map((row) => ({ ...row, warnings: row.warnings ?? [] })),
+      }),
+    ),
+  datagripImport: (path: string, selectedUuids: string[]): Promise<DataGripReport> =>
+    unwrap<DataGripModels.Report>(DataGripService.Import({ path, selectedUuids })).then((r) =>
+      trust<DataGripReport>({ ...r, rows: r.rows ?? [] }),
+    ),
 
   treeChildren: (
     connectionId: string,

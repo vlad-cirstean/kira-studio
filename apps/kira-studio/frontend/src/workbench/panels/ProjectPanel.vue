@@ -4,6 +4,7 @@ import ProjectTree from '../../project/ProjectTree.vue';
 import SchemaDialog from '../../project/SchemaDialog.vue';
 import { treeState } from '../../project/state/tree';
 import { connectionsState, openCreateDialog } from '../../state/connections';
+import { pickAndScanDataGripProject } from '../../state/datagripImport';
 import { schemaDialogState } from '../../state/schemas';
 import CodiconIcon from '../../theme/CodiconIcon.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
@@ -20,6 +21,13 @@ import PanelShell from '../../theme/primitives/PanelShell.vue';
       <span>Connections</span>
     </template>
     <template #actions>
+      <IconButton
+        icon="cloud-download"
+        aria-label="Import from DataGrip"
+        v-tooltip="'Import from DataGrip'"
+        data-testid="import-datagrip"
+        @click="pickAndScanDataGripProject"
+      />
       <IconButton
         icon="add"
         aria-label="Add connection"
