@@ -50,8 +50,9 @@ config-and-error-mapping package), `github.com/twmb/franz-go` + `franz-go/pkg/ka
 database/adapter surface itself is cgo-free** — a materially better outcome than the parent plan's
 own D8 predicted, and one nothing had claimed until now — though this no longer describes the whole
 binary: a handful of darwin-only files elsewhere in the app (`internal/secrets`, `internal/metrics`,
-`internal/localauth`) use cgo for real OS integrations, each behind a `darwin && cgo` build tag with
-a working non-cgo companion, invisible outside a real darwin+cgo build — so `CGO_ENABLED=1` is
+`internal/localauth`, and — as of v1.3's G9 — `internal/gitclient`'s FSEvents-backed repo watcher)
+use cgo for real OS integrations, each behind a `darwin && cgo` build tag with a working non-cgo
+companion, invisible outside a real darwin+cgo build — so `CGO_ENABLED=1` is
 needed for more than just Wails' own macOS bindings, just never for a Linux dev/test loop. **The
 Node engine child is gone as of P58f M10**: checkpoint C2
 (P58e M9.3) had already brought it to answering no connection traffic for any kind; P58f deleted the
