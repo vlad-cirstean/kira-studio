@@ -662,7 +662,7 @@ const statusLine = computed(() => {
    <button>, which is why the chevron below is drawn explicitly instead of relying on one. */
 .format-select {
   max-width: 160px;
-  font-family: var(--kira-font-family);
+  font-family: var(--kira-font-ui);
 }
 
 .format-select-label {
@@ -702,7 +702,7 @@ const statusLine = computed(() => {
   border: none;
   background: transparent;
   text-align: left;
-  font-family: var(--kira-font-family);
+  font-family: var(--kira-font-ui);
 }
 
 /* the relocated statusLine (bytes / decoded reading — e.g. a base64/hex byte count / truncation

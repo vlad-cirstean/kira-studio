@@ -656,7 +656,7 @@
   border-radius: 6px;
   background: var(--kira-accent);
   color: var(--kira-accent-fg);
-  font-family: var(--kira-font-family);
+  font-family: var(--kira-font-ui);
   font-style: normal;
   font-weight: 400;
   font-size: var(--kira-t-xs);

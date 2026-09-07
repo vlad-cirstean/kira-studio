@@ -156,7 +156,10 @@
   height: var(--kira-control-h-lg);
 }
 .p-input.ui {
-  font-family: -apple-system, "SF Pro Text", system-ui, "Segoe UI", sans-serif;
+  /* P26: was the app's one hard-coded font stack (the design system's --font-ui, verbatim). Now
+     the same token every other chrome surface resolves through, so the interface font has exactly
+     one definition in the repo. */
+  font-family: var(--kira-font-ui);
 }
 .p-input:focus-within,
 .p-input.is-focus {
@@ -665,6 +668,12 @@
    back here. Hoisted verbatim out of AutocompleteField.vue's old scoped `.autocomplete-suggestions`
    /`.sugg-*` rules (F13) — no visual change to that popup, only the CodeMirror one gains parity. */
 .p-completion {
+  /* P26: explicit, because this block used to get its family from `body` — which was the data
+     font until P26 moved `body` to --kira-font-ui. Completion items are identifiers (tables,
+     columns, SQL keywords, header names), and the CodeMirror popup this one is required to match
+     (editor/theme.ts, P22 D8) names the data font directly. Without this line the two popups
+     would silently diverge the moment `body` changed. */
+  font-family: var(--kira-font-data);
   padding: var(--kira-s-1);
   min-width: 200px;
   max-width: min(480px, 90vw);

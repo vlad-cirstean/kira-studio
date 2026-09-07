@@ -55,7 +55,10 @@ body,
 }
 
 body {
-  font-family: var(--kira-font-family);
+  /* P26: was --kira-font-family (the data font). Chrome — everything with no font-family of its
+     own, which preflight's `font: inherit` extends to every form control too — now renders in the
+     fixed interface font; every genuinely-data surface names --kira-font-data explicitly. */
+  font-family: var(--kira-font-ui);
   font-size: var(--kira-font-size);
   color: var(--kira-fg);
   background: var(--kira-bg-chrome);
