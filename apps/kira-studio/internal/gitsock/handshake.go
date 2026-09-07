@@ -63,16 +63,19 @@ type handshakeDeps struct {
 // runHandshake implements §3.1.1's decision table, first match wins. ok=true means the connection
 // reached "ready" and ownership passes to a rpcstream.Session; sessionID is the same id sent in
 // that "ready" frame, minted once here rather than thrown away (G2 plan D19 — gitsession.Conn's ID
-// is this, not a second, independent id). ok=false means a terminal frame (or nothing, for row 1)
-// has already been sent and the caller closes the connection.
-func runHandshake(c *conn, deps handshakeDeps) (clientID, sessionID string, ok bool) {
+// is this, not a second, independent id). label is the handshake's own clamped client label
+// (G5 F11) — computed here regardless of outcome, but only meaningful when ok is true; threaded
+// into gitsession.NewConn so the undo slot can attribute a record to "this window" (D7). ok=false
+// means a terminal frame (or nothing, for row 1) has already been sent and the caller closes the
+// connection.
+func runHandshake(c *conn, deps handshakeDeps) (clientID, sessionID, label string, ok bool) {
 	raw, err := c.Receive()
 	if err != nil {
-		return "", "", false // row 1: undecodable/EOF — nothing to answer, just close.
+		return "", "", "", false // row 1: undecodable/EOF — nothing to answer, just close.
 	}
 	var hello helloFrame
 	if err := json.Unmarshal(raw, &hello); err != nil || hello.Kind != "hello" || hello.Client.ID == "" {
-		return "", "", false // row 1
+		return "", "", "", false // row 1
 	}
 
 	if hello.Protocol != gitrpc.Protocol {
@@ -80,18 +83,18 @@ func runHandshake(c *conn, deps handshakeDeps) (clientID, sessionID string, ok b
 			Kind: "versionMismatch", Expected: gitrpc.Protocol, Received: hello.Protocol,
 			ServerVersion: deps.ServerVersion,
 		})
-		return "", "", false // row 2
+		return "", "", "", false // row 2
 	}
 	if hello.ContractVersion != gitrpc.ContractVersion {
 		sendHandshake(c, handshakeResponse{
 			Kind: "versionMismatch", Expected: gitrpc.ContractVersion, Received: hello.ContractVersion,
 			ServerVersion: deps.ServerVersion,
 		})
-		return "", "", false // row 3
+		return "", "", "", false // row 3
 	}
 
 	clientID = hello.Client.ID
-	label := clampLabel(hello.Client.Label)
+	label = clampLabel(hello.Client.Label)
 	sessionID = uuid.NewString()
 
 	if hello.Token != nil {
@@ -104,15 +107,15 @@ func runHandshake(c *conn, deps handshakeDeps) (clientID, sessionID string, ok b
 				Kind: "ready", ContractVersion: gitrpc.ContractVersion,
 				ServerVersion: deps.ServerVersion, SessionID: sessionID,
 			})
-			return clientID, sessionID, true // row 4
+			return clientID, sessionID, label, true // row 4
 		}
 		sendHandshake(c, handshakeResponse{Kind: "tokenRejected"})
-		return "", "", false // row 5
+		return "", "", "", false // row 5
 	}
 
 	if deps.Broker.InCooldown(clientID) {
 		sendHandshake(c, handshakeResponse{Kind: "pairingDenied", Reason: "denied"})
-		return "", "", false // row 6
+		return "", "", "", false // row 6
 	}
 
 	// Row 7: pairingRequired, then §3.1.2's own follow-up table.
@@ -127,15 +130,15 @@ func runHandshake(c *conn, deps handshakeDeps) (clientID, sessionID string, ok b
 	case PairingApproved:
 		ok = finishPairing(c, deps, clientID, sessionID, label)
 		if !ok {
-			return "", "", false
+			return "", "", "", false
 		}
-		return clientID, sessionID, true
+		return clientID, sessionID, label, true
 	case PairingDenied:
 		sendHandshake(c, handshakeResponse{Kind: "pairingDenied", Reason: "denied"})
-		return "", "", false
+		return "", "", "", false
 	default: // PairingTimedOut
 		sendHandshake(c, handshakeResponse{Kind: "pairingDenied", Reason: "timeout"})
-		return "", "", false
+		return "", "", "", false
 	}
 }
 

@@ -167,7 +167,7 @@ func (s *Server) acceptLoop() {
 func (s *Server) handleConn(nc net.Conn) {
 	defer nc.Close()
 	c := newConn(nc)
-	clientID, sessionID, ok := runHandshake(c, handshakeDeps{
+	clientID, sessionID, label, ok := runHandshake(c, handshakeDeps{
 		Clients:        s.deps.Clients,
 		Broker:         s.broker,
 		ServerVersion:  s.deps.ServerVersion,
@@ -184,7 +184,7 @@ func (s *Server) handleConn(nc net.Conn) {
 	// gconn.Emit is filled in once sess exists (below) — ForConn's closures capture gconn itself,
 	// not a snapshot of its Emit field, so this ordering is safe: nothing calls Emit before Serve
 	// starts dispatching requests.
-	gconn := gitsession.NewConn(gitsession.ConnID(sessionID), clientID, nil)
+	gconn := gitsession.NewConn(gitsession.ConnID(sessionID), clientID, label, nil)
 	defer gconn.Close()
 
 	handlers := s.deps.Router.ForConn(gconn)

@@ -1,10 +1,12 @@
 package gitsession
 
 import (
+	"context"
 	"sync"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitclient"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitclient/catfile"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitpreflight"
 )
 
 // Watcher is the minimal seam RepoEntry needs from a repo watcher — gitclient.RepoWatcher
@@ -27,9 +29,9 @@ type Event struct {
 // RepoEntry is one repository's SHARED state — everything true of the repository rather than of
 // one viewer (SPEC §6's split rule). G2 gave it the identity, the reader/writer gate (unchanged
 // from gitclient, now shared across connections instead of within one), the watcher, and the
-// subscriber fan-out. G4 adds the two caches SPEC §6 also lists (D7): the cat-file session,
-// dropped-on-refsChanged detail cache, and never-invalidated diff cache. Still to come: head,
-// stash shapes, undo slot and active remote op (G5-G9) — no placeholders for any of that here.
+// subscriber fan-out. G4 added the cat-file session and the two detail/diff caches. G5 adds the
+// live head, the refs cache and the per-repo undo slot (D7/D10/D16) — still to come: stash shapes
+// and active remote op (G7/G12).
 type RepoEntry struct {
 	Summary gitclient.RepoSummary
 	Repo    *gitclient.Repo
@@ -44,6 +46,17 @@ type RepoEntry struct {
 
 	detail *detailCache
 	diff   *diffCache
+	refs   *refsCache
+
+	// headMu guards head/headStale, separate from mu (subs' own lock): every read/status/pre-flight
+	// spawn touches head far more often than it touches the subscriber set.
+	headMu    sync.Mutex
+	head      gitclient.HeadState
+	headStale bool
+
+	// undo is SPEC §6's undo slot — one per repo, not per connection (D7). Its own mutex, following
+	// this file's own cache pattern.
+	undo *gitpreflight.UndoSlot
 
 	done chan struct{}
 }
@@ -56,6 +69,9 @@ func newRepoEntry(summary gitclient.RepoSummary, repo *gitclient.Repo, w Watcher
 		subs:    make(map[ConnID]*subscriber),
 		detail:  newDetailCache(),
 		diff:    newDiffCache(diffCacheCapBytes),
+		refs:    newRefsCache(),
+		head:    summary.Head,
+		undo:    &gitpreflight.UndoSlot{},
 		done:    make(chan struct{}),
 	}
 	go e.pump()
@@ -73,11 +89,15 @@ func (e *RepoEntry) pump() {
 }
 
 func (e *RepoEntry) note(sig gitclient.Signal) {
-	// D7: dropped before the fan-out, exactly the ordering G3 D13 established for marking a Walk
-	// stale — a client that reacts to repo.changed by re-requesting a detail must never be served
-	// the pre-change decoration.
+	// D7/D10/D16: dropped before the fan-out, exactly the ordering G3 D13 established for marking
+	// a Walk stale — a client that reacts to repo.changed by re-requesting a detail, a ref list or
+	// a fresh head must never be served the pre-change decoration.
 	if sig == gitclient.SignalRefsChanged {
 		e.detail.dropAll()
+		e.refs.drop()
+		e.headMu.Lock()
+		e.headStale = true
+		e.headMu.Unlock()
 	}
 	e.mu.Lock()
 	subs := make([]*subscriber, 0, len(e.subs))
@@ -108,6 +128,42 @@ func (e *RepoEntry) Subscribe(id ConnID, deliver func(Event)) func() {
 			s.close()
 		})
 	}
+}
+
+// Head returns the entry's live head, re-resolving through gitclient.ResolveHead first if a
+// refsChanged signal marked it stale (D16) — a lazy refresh, never eager: the extra two spawns
+// this costs only happen when a ref changed AND the next reader is refs.list rather than
+// status.get/RunOp, both of which set the head for free from their own spawn's output (setHead).
+func (e *RepoEntry) Head(ctx context.Context) (gitclient.HeadState, error) {
+	e.headMu.Lock()
+	if !e.headStale {
+		h := e.head
+		e.headMu.Unlock()
+		return h, nil
+	}
+	e.headMu.Unlock()
+
+	var h gitclient.HeadState
+	err := e.Repo.Read(ctx, func(ctx context.Context) error {
+		var rerr error
+		h, rerr = gitclient.ResolveHead(ctx, e.Repo.Runner(), e.Repo.GitPath(), repoWorkingDir(e.Summary))
+		return rerr
+	})
+	if err != nil {
+		return gitclient.HeadState{}, err
+	}
+	e.setHead(h)
+	return h, nil
+}
+
+// setHead writes a freshly-resolved head (from a status --branch header, or ResolveHead above) and
+// clears the stale flag — called by statusAndInProgress and RunOp's own read-back, both of which
+// already have a fresh head for free from their own spawn's output (D16).
+func (e *RepoEntry) setHead(h gitclient.HeadState) {
+	e.headMu.Lock()
+	e.head = h
+	e.headStale = false
+	e.headMu.Unlock()
 }
 
 // CatFile returns this entry's cat-file batch session (D11), starting it lazily on first use — a
@@ -147,6 +203,8 @@ func (e *RepoEntry) teardown() {
 
 	e.detail.dropAll()
 	e.diff.clear()
+	e.refs.drop()
+	e.undo.Set(nil)
 
 	e.mu.Lock()
 	subs := e.subs

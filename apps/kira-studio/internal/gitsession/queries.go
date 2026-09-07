@@ -61,6 +61,33 @@ func (e *RepoEntry) runOne(ctx context.Context, args []string) ([]byte, error) {
 	return out, err
 }
 
+// runAllowingExit is runOne over the same read gate, but classifies through gitclient.Classify
+// only when the resulting ExitCode is outside ok (D14/D15) — used by exactly three G5 callers,
+// each with its own reason at the call site for which exit codes are ordinary outcomes rather
+// than failures: merge-tree (0 or 1 — a conflict prediction is a successful prediction),
+// `config --get-regexp` (0 or 1 — no matching config is the common case), and `rev-parse
+// --verify` during undo capture (0 or 1 — a ref that has already vanished is a nil record, not an
+// error).
+func (e *RepoEntry) runAllowingExit(ctx context.Context, args []string, ok ...int) (gitclient.Result, error) {
+	var res gitclient.Result
+	err := e.Repo.Read(ctx, func(ctx context.Context) error {
+		r, rerr := gitclient.Run(ctx, e.Repo.Runner(), e.Repo.GitPath(), gitclient.Spec{
+			Dir: repoWorkingDir(e.Summary), Args: args, ReadOnly: true,
+		})
+		res = r
+		if rerr != nil {
+			return gitclient.Classify(ctx, args, r, rerr)
+		}
+		for _, code := range ok {
+			if r.ExitCode == code {
+				return nil
+			}
+		}
+		return gitclient.Classify(ctx, args, r, nil)
+	})
+	return res, err
+}
+
 // oneRecord frames raw (a single `-z`-terminated record — every `show -s -z` spawn in this file
 // produces exactly one) through RecordSplitter, same as the log walk's own framing, so a record
 // this package hands to a parser never carries its own trailing NUL.

@@ -37,7 +37,7 @@ func newQueriesTestEntry(t *testing.T, repoDir string) *RepoEntry {
 	runner := gitclient.NewExecRunner()
 	registry := NewRegistry(runner)
 	t.Cleanup(registry.Close)
-	conn := NewConn(ConnID("queries-test-conn"), "test-client", nil)
+	conn := NewConn(ConnID("queries-test-conn"), "test-client", "test-client-label", nil)
 	summary, err := conn.Open(context.Background(), registry, "git", repoDir)
 	if err != nil {
 		t.Fatalf("conn.Open: %v", err)

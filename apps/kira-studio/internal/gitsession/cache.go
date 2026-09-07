@@ -84,6 +84,42 @@ func (c *detailCache) removeFromOrderLocked(key detailCacheKey) {
 	}
 }
 
+// refsCache is refs.list's own single-value cache (D10) — a repository has one ref list, not
+// many, so no LRU is needed here, unlike detailCache/diffCache. Dropped whole on refsChanged,
+// before the fan-out (entry.go's note), the same ordering G4 D7 established for the detail cache.
+// Pre-flight and the write executor never read it (D10/F16): a decision that precedes a write
+// always takes a fresh snapshot.
+type refsCache struct {
+	mu    sync.Mutex
+	value RefsResult
+	valid bool
+}
+
+func newRefsCache() *refsCache { return &refsCache{} }
+
+func (c *refsCache) get() (RefsResult, bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if !c.valid {
+		return RefsResult{}, false
+	}
+	return c.value, true
+}
+
+func (c *refsCache) set(v RefsResult) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.value = v
+	c.valid = true
+}
+
+func (c *refsCache) drop() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.value = RefsResult{}
+	c.valid = false
+}
+
 type diffCacheKey struct {
 	baseSHA string // "" for a root commit — the empty tree has no sha of its own to key on
 	sha     string

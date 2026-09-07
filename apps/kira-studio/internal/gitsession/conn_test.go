@@ -12,7 +12,7 @@ func TestConn_OpenTwiceSamePathOneRefOneHold(t *testing.T) {
 	reg.LingerFor = time.Hour
 
 	var emitted []string
-	c := NewConn("c1", "client-1", func(method string, _ any) { emitted = append(emitted, method) })
+	c := NewConn("c1", "client-1", "label-1", func(method string, _ any) { emitted = append(emitted, method) })
 
 	s1, err := c.Open(context.Background(), reg, "/usr/bin/git", "/repo")
 	if err != nil {
@@ -46,7 +46,7 @@ func TestConn_CloseRepoFullyReleases(t *testing.T) {
 	reg := newTestRegistry()
 	reg.LingerFor = time.Millisecond
 
-	c := NewConn("c1", "client-1", func(string, any) {})
+	c := NewConn("c1", "client-1", "label-1", func(string, any) {})
 	summary, err := c.Open(context.Background(), reg, "/usr/bin/git", "/repo")
 	if err != nil {
 		t.Fatalf("Open: %v", err)
@@ -75,7 +75,7 @@ func TestConn_CloseReleasesEveryHoldAndUnsubscribes(t *testing.T) {
 	reg := newTestRegistry()
 	reg.LingerFor = time.Hour
 
-	c := NewConn("c1", "client-1", func(string, any) {})
+	c := NewConn("c1", "client-1", "label-1", func(string, any) {})
 	sA, err := c.Open(context.Background(), reg, "/usr/bin/git", "/repo-a")
 	if err != nil {
 		t.Fatalf("Open a: %v", err)
@@ -114,7 +114,7 @@ func TestConn_CloseReleasesEveryHoldAndUnsubscribes(t *testing.T) {
 func TestConn_ConcurrentOpenSameRepoTakesOneRef(t *testing.T) {
 	reg := newTestRegistry()
 	reg.LingerFor = time.Hour
-	c := NewConn("c1", "client-1", func(string, any) {})
+	c := NewConn("c1", "client-1", "label-1", func(string, any) {})
 
 	const n = 20
 	var wg sync.WaitGroup

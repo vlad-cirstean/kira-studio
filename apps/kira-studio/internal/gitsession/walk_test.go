@@ -52,7 +52,7 @@ func newWalkTestConn(t *testing.T, repoDir string) (*Conn, *Registry, string) {
 	runner := gitclient.NewExecRunner()
 	registry := NewRegistry(runner)
 	t.Cleanup(registry.Close)
-	conn := NewConn(ConnID("test-conn"), "test-client", nil)
+	conn := NewConn(ConnID("test-conn"), "test-client", "test-client-label", nil)
 	summary, err := conn.Open(context.Background(), registry, "git", repoDir)
 	if err != nil {
 		t.Fatalf("conn.Open: %v", err)
@@ -232,7 +232,7 @@ func TestWalk_DisposingConnDoesNotBlockAFreshOpenOfTheSameRepo(t *testing.T) {
 	// holding the repository.
 	conn.Close()
 
-	conn2 := NewConn(ConnID("test-conn-2"), "test-client-2", nil)
+	conn2 := NewConn(ConnID("test-conn-2"), "test-client-2", "test-client-2-label", nil)
 	defer conn2.Close()
 	if _, err := conn2.Open(context.Background(), registry, "git", repoDir); err != nil {
 		t.Fatalf("second conn.Open after disposing the first: %v", err)

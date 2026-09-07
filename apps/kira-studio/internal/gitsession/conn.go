@@ -31,7 +31,11 @@ type hold struct {
 type Conn struct {
 	ID       ConnID
 	ClientID string
-	Emit     func(method string, payload any)
+	// ClientLabel is the handshake's own clamped label (gitsock's clampLabel) — G5's own addition
+	// (F11), threaded through so the undo slot can attribute a record to "this window" for every
+	// OTHER connection's reader (D7's SnapshotFor).
+	ClientLabel string
+	Emit        func(method string, payload any)
 
 	mu    sync.Mutex
 	held  map[string]*hold // RepoID -> hold
@@ -39,8 +43,11 @@ type Conn struct {
 }
 
 // NewConn constructs a Conn with an empty hold set.
-func NewConn(id ConnID, clientID string, emit func(method string, payload any)) *Conn {
-	return &Conn{ID: id, ClientID: clientID, Emit: emit, held: make(map[string]*hold), walks: make(map[string]*Walk)}
+func NewConn(id ConnID, clientID, clientLabel string, emit func(method string, payload any)) *Conn {
+	return &Conn{
+		ID: id, ClientID: clientID, ClientLabel: clientLabel, Emit: emit,
+		held: make(map[string]*hold), walks: make(map[string]*Walk),
+	}
 }
 
 // Open acquires path's repository and subscribes this connection to it — idempotent per (Conn,
