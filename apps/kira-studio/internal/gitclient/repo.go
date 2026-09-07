@@ -180,7 +180,7 @@ func Identify(ctx context.Context, runner Runner, gitPath, path string) (RepoSum
 		root = filepath.Clean(root)
 	}
 
-	head, err := headState(ctx, runner, gitPath, path)
+	head, err := ResolveHead(ctx, runner, gitPath, path)
 	if err != nil {
 		return RepoSummary{}, err
 	}
@@ -226,10 +226,12 @@ func revParseBool(ctx context.Context, runner Runner, gitPath, dir string, flag 
 	return line == "true", nil
 }
 
-// headState determines HeadState per RepoSummary.Head's own three-way union: a symbolic ref that
-// resolves is a branch, one that does not is an unborn branch (nothing committed yet), and no
-// symbolic ref at all is a detached HEAD at a bare sha.
-func headState(ctx context.Context, runner Runner, gitPath, dir string) (HeadState, error) {
+// ResolveHead determines HeadState per RepoSummary.Head's own three-way union: a symbolic ref
+// that resolves is a branch, one that does not is an unborn branch (nothing committed yet), and no
+// symbolic ref at all is a detached HEAD at a bare sha. Exported (G5 D16) so gitsession.RepoEntry
+// can re-run it after a ref change instead of trusting the value Identify froze at open — Identify
+// itself is unchanged, still the only caller inside this package.
+func ResolveHead(ctx context.Context, runner Runner, gitPath, dir string) (HeadState, error) {
 	symArgs := []string{"symbolic-ref", "--short", "-q", "HEAD"}
 	symRes, symErr := Run(ctx, runner, gitPath, Spec{Dir: dir, Args: symArgs, ReadOnly: true})
 	if symErr != nil {
