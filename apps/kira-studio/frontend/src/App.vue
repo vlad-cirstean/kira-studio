@@ -19,6 +19,7 @@ import AppTooltip from './workbench/AppTooltip.vue';
 import ConfirmDialog from './workbench/ConfirmDialog.vue';
 import ContextMenu from './workbench/ContextMenu.vue';
 import GenerateDataDialog from './workbench/GenerateDataDialog.vue';
+import GitPairingDialog from './workbench/GitPairingDialog.vue';
 import { initEngineState } from './workbench/state/engine';
 import { initTooltips } from './workbench/state/tooltip';
 import TitleBar from './workbench/TitleBar.vue';
@@ -70,6 +71,7 @@ onUnmounted(() => {
   <ApiDialogs />
   <UploadObjectDialog v-if="uploadDialogState.open" />
   <GenerateDataDialog v-if="fakeDataDialogState.open" />
+  <GitPairingDialog />
   <ConfirmDialog />
   <ContextMenu />
   <CommandPalette />

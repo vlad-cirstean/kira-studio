@@ -4,6 +4,7 @@ import * as DataGripService from '@bindings/datagripservice.js';
 import * as EngineService from '@bindings/engineservice.js';
 import * as FilesService from '@bindings/filesservice.js';
 import * as FiltersService from '@bindings/filtersservice.js';
+import * as GitClientsService from '@bindings/gitclientsservice.js';
 import * as LayoutService from '@bindings/layoutservice.js';
 import * as LifecycleService from '@bindings/lifecycleservice.js';
 import type * as WailsModels from '@bindings/models.js';
@@ -22,6 +23,7 @@ import type {
 } from '@shared/domain/connection';
 import type { DataGripPreview, DataGripReport } from '@shared/domain/datagrip';
 import type { ObjectDefinition } from '@shared/domain/definition';
+import type { GitClient, GitPairingActionResult, GitPairingSnapshot } from '@shared/domain/git';
 import type { Layout, LayoutPatch } from '@shared/domain/layout';
 import type { AppMode } from '@shared/domain/mode';
 import type { OpRecord } from '@shared/domain/ops';
@@ -241,6 +243,20 @@ const studioControl = {
     unwrap(FiltersService.Replace({ connectionId, visibility })).then((r) =>
       trust<TreeVisibility>(r),
     ),
+
+  gitClientsList: (): Promise<GitClient[]> =>
+    unwrap(GitClientsService.List()).then((r) => trust<GitClient[]>(r ?? [])),
+  gitClientsRevoke: (id: string): Promise<void> => unwrap(GitClientsService.Revoke({ id })),
+  onGitClientsChanged: (cb: (clients: GitClient[]) => void): (() => void) =>
+    on(CHANNEL.gitClientsChanged, cb),
+  gitPairingPending: (): Promise<GitPairingSnapshot> =>
+    unwrap(GitClientsService.PendingPairing()).then((r) => trust<GitPairingSnapshot>(r)),
+  gitPairingApprove: (id: string): Promise<GitPairingActionResult> =>
+    unwrap(GitClientsService.Approve({ id })).then((r) => trust<GitPairingActionResult>(r)),
+  gitPairingDeny: (id: string): Promise<GitPairingActionResult> =>
+    unwrap(GitClientsService.Deny({ id })).then((r) => trust<GitPairingActionResult>(r)),
+  onGitPairingChanged: (cb: (snap: GitPairingSnapshot) => void): (() => void) =>
+    on(CHANNEL.gitPairing, cb),
 
   opsRecent: (limit: number): Promise<OpRecord[]> =>
     unwrap(OpsService.Recent({ limit })).then((r) => trust<OpRecord[]>(r ?? [])),

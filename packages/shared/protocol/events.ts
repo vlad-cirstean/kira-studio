@@ -29,6 +29,9 @@ export const CHANNEL = {
   // P11 D8: a server-streaming call's coalesced message batches, delivered via EmitTo (one window
   // only) — the one genuinely new push channel this phase adds.
   grpcCall: 'kira:grpc:call',
+  // G1 §3.6/D19: the pairing prompt's live queue snapshot and the Connected editors pane's list.
+  gitPairing: 'kira:git:pairing',
+  gitClientsChanged: 'kira:git:clients',
 } as const;
 
 /** Summed across every process metrics.Sample covers (P56's ticker) — a single app-wide readout

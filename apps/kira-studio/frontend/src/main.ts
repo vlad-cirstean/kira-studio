@@ -8,6 +8,7 @@ import { knownConnectionIds } from './project/state/tree';
 import { initAppMetrics } from './state/appMetrics';
 import { initCacheStats } from './state/cacheStats';
 import { hydrateConnections } from './state/connections';
+import { hydrateGitClients } from './state/gitClients';
 import { hydrateOps } from './state/ops';
 import { hydrateTabs } from './state/tabs';
 import './theme/base.css';
@@ -287,6 +288,7 @@ async function bootstrap(): Promise<void> {
     hydrateLayout(),
     hydrateSettings(),
     hydrateConnections(),
+    hydrateGitClients(),
     hydrateOps(),
     hydrateTabs(),
   ]);

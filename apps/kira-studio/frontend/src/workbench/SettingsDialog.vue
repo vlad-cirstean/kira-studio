@@ -12,8 +12,10 @@ import {
 import { computed, reactive, ref } from 'vue';
 import { data } from '../bridge/data';
 import { FONT_CHOICES, fontStackAvailable, resolveFontFallback } from '../fonts';
-import { formatBytes } from '../format';
+import { formatBytes, formatRelative } from '../format';
 import { cacheStatsState } from '../state/cacheStats';
+import { confirmDialog } from '../state/confirmDialog';
+import { gitClientsState, revokeGitClient } from '../state/gitClients';
 import { patchSettings, settingsState } from '../state/settings';
 import CodiconIcon from '../theme/CodiconIcon.vue';
 import AppButton from '../theme/primitives/AppButton.vue';
@@ -78,9 +80,21 @@ const pendingPatch = computed<SettingsPatch>(() => {
 
 const isDirty = computed(() => Object.keys(pendingPatch.value).length > 0);
 
-const sections = ['Appearance', 'Data', 'Cache', 'Advanced'] as const;
+const sections = ['Appearance', 'Data', 'Cache', 'Connected editors', 'Advanced'] as const;
 type Section = (typeof sections)[number];
 const activeSection = ref<Section>('Appearance');
+
+// D16: this section bypasses draft/pendingPatch entirely — a revoke must take effect immediately,
+// not wait for Save, and gitClientsState is a module-level store, not a settings leaf.
+async function onRevokeGitClient(id: string, label: string): Promise<void> {
+  const ok = await confirmDialog(
+    `Revoke access for "${label || id}"? It will need to be re-approved.`,
+    {
+      danger: true,
+    },
+  );
+  if (ok) await revokeGitClient(id);
+}
 
 const fontFamilyUnavailable = computed(() => !fontStackAvailable(draft.appearance.fontFamily));
 const fontFamilyFallback = computed(() => resolveFontFallback(draft.appearance.fontFamily));
@@ -518,7 +532,38 @@ async function onSave(): Promise<void> {
             </AppButton>
           </template>
 
-          <template v-else>
+          <template v-else-if="activeSection === 'Connected editors'">
+            <p v-if="gitClientsState.clients.length === 0" class="muted-note" data-testid="git-clients-empty">
+              No editors have been paired yet. A VS Code editor pairs by connecting to
+              <span class="mono">~/.kira-studio/git.sock</span>.
+            </p>
+            <ul v-else class="git-clients-list">
+              <li
+                v-for="client in gitClientsState.clients"
+                :key="client.id"
+                class="git-client-row"
+                :data-testid="`git-client-row-${client.id}`"
+              >
+                <div class="git-client-info">
+                  <span class="git-client-label">{{ client.label || client.id }}</span>
+                  <span class="helper-text">
+                    <template v-if="client.revokedAt">Revoked</template>
+                    <template v-else>Last seen {{ formatRelative(client.lastSeenAt) }}</template>
+                  </span>
+                </div>
+                <IconButton
+                  v-if="!client.revokedAt"
+                  icon="trash"
+                  tone="danger"
+                  :data-testid="`git-client-revoke-${client.id}`"
+                  v-tooltip="'Revoke'"
+                  @click="onRevokeGitClient(client.id, client.label)"
+                />
+              </li>
+            </ul>
+          </template>
+
+          <template v-else-if="activeSection === 'Advanced'">
             <label class="field">
               <div class="field-head">
                 <span>Operation log retention (days)</span>
@@ -771,6 +816,40 @@ async function onSave(): Promise<void> {
 
 .action-button {
   align-self: flex-start;
+}
+
+.git-clients-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kira-s-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.git-client-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--kira-s-3);
+  padding: var(--kira-s-2) var(--kira-s-3);
+  border: var(--kira-border-width) solid var(--kira-border);
+  border-radius: var(--kira-radius-sm);
+}
+
+.git-client-info {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kira-s-1);
+  min-width: 0;
+}
+
+.git-client-label {
+  color: var(--kira-fg);
+  font-size: var(--kira-t-sm);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* SettingsDialog.html's row-density preview strip */
