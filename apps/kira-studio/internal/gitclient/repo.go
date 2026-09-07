@@ -136,7 +136,7 @@ func (r *Repo) Read(ctx context.Context, fn func(ctx context.Context) error) err
 // run is repo.go's own one convenience over Runner.Run + Classify, used by identity() below and
 // available to any later phase's Repo-scoped command.
 func (r *Repo) run(ctx context.Context, spec Spec) (Result, error) {
-	res, err := r.runner.Run(ctx, r.gitPath, spec)
+	res, err := Run(ctx, r.runner, r.gitPath, spec)
 	if cerr := Classify(ctx, spec.Args, res, err); cerr != nil {
 		return res, cerr
 	}
@@ -247,7 +247,7 @@ func identify(ctx context.Context, runner Runner, gitPath, path string) (RepoSum
 }
 
 func revParseLine(ctx context.Context, runner Runner, gitPath, dir string, args ...string) (string, error) {
-	res, err := runner.Run(ctx, gitPath, Spec{Dir: dir, Args: append([]string{"rev-parse"}, args...), ReadOnly: true})
+	res, err := Run(ctx, runner, gitPath, Spec{Dir: dir, Args: append([]string{"rev-parse"}, args...), ReadOnly: true})
 	if cerr := Classify(ctx, args, res, err); cerr != nil {
 		return "", cerr
 	}
@@ -267,7 +267,7 @@ func revParseBool(ctx context.Context, runner Runner, gitPath, dir string, flag 
 // symbolic ref at all is a detached HEAD at a bare sha.
 func headState(ctx context.Context, runner Runner, gitPath, dir string) (HeadState, error) {
 	symArgs := []string{"symbolic-ref", "--short", "-q", "HEAD"}
-	symRes, symErr := runner.Run(ctx, gitPath, Spec{Dir: dir, Args: symArgs, ReadOnly: true})
+	symRes, symErr := Run(ctx, runner, gitPath, Spec{Dir: dir, Args: symArgs, ReadOnly: true})
 	if symErr != nil {
 		return HeadState{}, Classify(ctx, symArgs, symRes, symErr)
 	}
@@ -275,7 +275,7 @@ func headState(ctx context.Context, runner Runner, gitPath, dir string) (HeadSta
 	if symRes.ExitCode == 0 {
 		name := strings.TrimSpace(string(symRes.Stdout))
 		verifyArgs := []string{"rev-parse", "-q", "--verify", "HEAD"}
-		verifyRes, verifyErr := runner.Run(ctx, gitPath, Spec{Dir: dir, Args: verifyArgs, ReadOnly: true})
+		verifyRes, verifyErr := Run(ctx, runner, gitPath, Spec{Dir: dir, Args: verifyArgs, ReadOnly: true})
 		if verifyErr != nil {
 			return HeadState{}, Classify(ctx, verifyArgs, verifyRes, verifyErr)
 		}

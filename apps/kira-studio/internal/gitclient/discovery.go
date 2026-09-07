@@ -244,7 +244,7 @@ func (d *Discovery) probe(ctx context.Context, configuredPath string) GitStatus 
 		return GitStatus{Kind: "notFound", Probed: probed}
 	}
 
-	res, err := d.runner.Run(ctx, path, Spec{Args: []string{"--version"}, ReadOnly: true})
+	res, err := Run(ctx, d.runner, path, Spec{Args: []string{"--version"}, ReadOnly: true})
 	if err != nil {
 		return GitStatus{Kind: "unusable", Path: path, Reason: err.Error()}
 	}

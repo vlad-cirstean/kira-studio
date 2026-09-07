@@ -53,7 +53,7 @@ func sparseCheckoutEnabled(ctx context.Context, runner Runner, gitPath string, s
 		dir = summary.CommonDir // a bare repo has no worktree to run in; config is still readable.
 	}
 	args := []string{"config", "--type=bool", "--default=false", "core.sparseCheckout"}
-	res, err := runner.Run(ctx, gitPath, Spec{Dir: dir, Args: args, ReadOnly: true})
+	res, err := Run(ctx, runner, gitPath, Spec{Dir: dir, Args: args, ReadOnly: true})
 	if cerr := Classify(ctx, args, res, err); cerr != nil {
 		return false, cerr
 	}

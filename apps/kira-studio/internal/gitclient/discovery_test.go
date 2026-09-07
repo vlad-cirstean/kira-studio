@@ -1,8 +1,10 @@
 package gitclient
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"io"
 	"os"
 	"testing"
 	"time"
@@ -23,12 +25,32 @@ type fakeRunner struct {
 	result Result
 	err    error
 	calls  int
+	// startCtx, when set, blocks Start until it observes ctx.Done() — the seam
+	// TestDiscovery_VersionProbeTimesOut needs to prove D5's timeout without a real 5s sleep.
+	blockOnCtx bool
 }
 
-func (f *fakeRunner) Run(ctx context.Context, gitPath string, spec Spec) (Result, error) {
+func (f *fakeRunner) Start(ctx context.Context, gitPath string, spec Spec) (Process, error) {
 	f.calls++
-	return f.result, f.err
+	if f.blockOnCtx {
+		<-ctx.Done()
+		return nil, ctx.Err()
+	}
+	if f.err != nil {
+		return nil, f.err
+	}
+	return &fakeProcess{result: f.result}, nil
 }
+
+// fakeProcess is the canned-bytes Process discovery_test.go's fakes construct — Run(ctx, r, ...)
+// drains it exactly like a real execProcess.
+type fakeProcess struct {
+	result Result
+}
+
+func (p *fakeProcess) Stdout() io.ReadCloser { return io.NopCloser(bytes.NewReader(p.result.Stdout)) }
+func (p *fakeProcess) Wait() (Result, error) { return Result{Stderr: p.result.Stderr, ExitCode: p.result.ExitCode}, nil }
+func (p *fakeProcess) Close() error          { return nil }
 
 type fakeClock struct{ now time.Time }
 
