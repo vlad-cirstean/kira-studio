@@ -66,6 +66,20 @@ func (r *Router) ForConn(c *gitsession.Conn) Handlers {
 				return r.handleFileRead(ctx, c, params)
 			case "file.goToTarget":
 				return r.handleFileGoToTarget(ctx, c, params)
+			case "refs.list":
+				return r.handleRefsList(ctx, c, params)
+			case "status.get":
+				return r.handleStatusGet(ctx, c, params)
+			case "preflight.checkout":
+				return r.handlePreflightCheckout(ctx, c, params)
+			case "preflight.revert":
+				return r.handlePreflightRevert(ctx, c, params)
+			case "op.run":
+				return r.handleOpRun(ctx, c, params)
+			case "undo.peek":
+				return r.handleUndoPeek(ctx, c, params)
+			case "undo.run":
+				return r.handleUndoRun(ctx, c, params)
 			default:
 				return nil, ipcerr.New("E_UNKNOWN_METHOD", "gitrpc: unknown method "+method)
 			}
@@ -109,6 +123,15 @@ func (r *Router) handleRepoOpen(ctx context.Context, c *gitsession.Conn, params 
 			return RepoOpenResult{Kind: "notARepository", Path: p.Path}, nil
 		}
 		return nil, mapGitError(err)
+	}
+	// D16: compose the summary with the entry's own LIVE head rather than the value Identify froze
+	// at whichever window opened this repo first — a second window opening an already-open
+	// repository must see HEAD as it stands now, not as it stood at that first open. Best-effort:
+	// a failure here falls back to the frozen value rather than failing repo.open outright.
+	if entry, ok := c.Entry(summary.RepoID); ok {
+		if head, herr := entry.Head(ctx); herr == nil {
+			summary.Head = head
+		}
 	}
 	return RepoOpenResult{Kind: "ok", Repo: &summary}, nil
 }

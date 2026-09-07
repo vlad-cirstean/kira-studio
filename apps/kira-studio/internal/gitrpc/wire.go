@@ -1,6 +1,10 @@
 package gitrpc
 
-import "github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitclient"
+import (
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitclient"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitpreflight"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitsession"
+)
 
 // AppInitResult is the server contract's own app.init — the webview contract's AppInitResult minus
 // host/capabilities/settings, all three of which are properties of the editor, not of Kira Studio
@@ -153,4 +157,54 @@ type graphChunk struct {
 	Remaining int         `json:"remaining"`
 	Exhausted bool        `json:"exhausted"`
 	Commits   commitsBlob `json:"commits"`
+}
+
+// ---------------------------------------------------------------------------------------
+// P6 (G5) — refs, status, pre-flight and operations (D20). Results are gitsession's/
+// gitpreflight's own wire-shaped types (RefsResult, StatusSummary, CheckoutPreflight,
+// RevertPreflight, OpResult, UndoSlotSnapshot) — D5's own precedent applied again: no second,
+// gitrpc-owned copy of a shape those packages already produce JSON-tagged. CONTRACT_VERSION stays
+// 14 (D1): every one of these seven request keys, and every P6 type, has been in contract.ts/
+// validate.ts since G1.
+// ---------------------------------------------------------------------------------------
+
+type RefsListParams struct {
+	RepoID string `json:"repoId"`
+}
+
+type StatusGetParams struct {
+	RepoID string `json:"repoId"`
+}
+
+type PreflightCheckoutParams struct {
+	RepoID string `json:"repoId"`
+	Target string `json:"target"`
+	Mode   string `json:"mode"` // "switch" | "detach"
+}
+
+type PreflightRevertParams struct {
+	RepoID   string   `json:"repoId"`
+	Shas     []string `json:"shas"`
+	Mainline *int     `json:"mainline,omitempty"`
+}
+
+// OpRunParams is op.run's own request — Op is gitsession's own flattened decode of the wire's
+// nineteen-member OpRequest union (D5).
+type OpRunParams struct {
+	RepoID string               `json:"repoId"`
+	Op     gitsession.OpRequest `json:"op"`
+}
+
+type UndoPeekParams struct {
+	RepoID string `json:"repoId"`
+}
+
+// UndoPeekResult mirrors @kira/git-ipc's own undo.peek result — `{slot: UndoSlotSnapshot | null}`.
+type UndoPeekResult struct {
+	Slot *gitpreflight.UndoSlotSnapshot `json:"slot"`
+}
+
+type UndoRunParams struct {
+	RepoID string `json:"repoId"`
+	ID     string `json:"id"`
 }
