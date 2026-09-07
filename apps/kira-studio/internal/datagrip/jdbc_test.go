@@ -231,6 +231,82 @@ func TestConfiguredByURLPassword(t *testing.T) {
 	}
 }
 
+// TestRedactURLCredentials covers redactURLCredentials's own rules directly.
+func TestRedactURLCredentials(t *testing.T) {
+	tests := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{"no at sign", "jdbc:postgresql://host:5432/db", "jdbc:postgresql://host:5432/db"},
+		{"user and password", "jdbc:postgresql://scott:tiger@host:5432/db", "jdbc:postgresql://REDACTED@host:5432/db"},
+		{"bare user, no password", "jdbc:postgresql://scott@host:5432/db", "jdbc:postgresql://REDACTED@host:5432/db"},
+		{"mongodb+srv scheme", "mongodb+srv://scott:tiger@cluster.example/db", "mongodb+srv://REDACTED@cluster.example/db"},
+		{"no scheme at all", "scott:tiger@host:5432/db", "REDACTED@host:5432/db"},
+		{"at sign only in path, not userinfo", "jdbc:sqlite:/db/user@host.sqlite", "jdbc:sqlite:/db/user@host.sqlite"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := redactURLCredentials(tt.in); got != tt.want {
+				t.Errorf("redactURLCredentials(%q) = %q, want %q", tt.in, got, tt.want)
+			}
+		})
+	}
+}
+
+// TestSkipDetailNeverLeaksURLCredentials is the review finding: a JDBC URL's own embedded
+// "user:password@host" userinfo (D7's configured-by-url exception, or any other URL DataGrip wrote
+// credentials into) must never appear verbatim in a skip/error string that crosses the bridge —
+// D9's "a password never crosses the bridge" guarantee applies to skip/error text exactly as much
+// as to a successfully-resolved row's own fields.
+func TestSkipDetailNeverLeaksURLCredentials(t *testing.T) {
+	const secret = "hunter2secret"
+	tests := []struct {
+		name      string
+		driverRef string
+		jdbcURL   string
+	}{
+		{"configured-by-url mongodb+srv is unrepresentable", "mongo", "mongodb+srv://scott:" + secret + "@cluster.example/db"},
+		{"multi-host url with credentials is unrepresentable", "postgresql", "jdbc:postgresql://scott:" + secret + "@host1:5432,host2:5432/db"},
+		{"unsupported engine with no other signal quotes the url", "", "unknownscheme://scott:" + secret + "@host/db"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			uuid := "aaaaaaaa-0000-0000-0000-0000000000f1"
+			dir := writeSyntheticProject(t, sharedSourceXML(uuid, "s", tt.driverRef, tt.jdbcURL, true), "")
+			ds := oneSource(t, dir)
+			_, ok, skipCode, skipDetail := resolveFields(ds, dir)
+			if ok {
+				t.Fatalf("resolveFields(%+v) succeeded, want a skip", ds)
+			}
+			if strings.Contains(skipDetail, secret) {
+				t.Errorf("skipCode=%q skipDetail=%q leaks the URL's password", skipCode, skipDetail)
+			}
+
+			// Full round trip through Scan/Apply — what actually crosses the bridge as
+			// PreviewRow.SkipDetail / ReportRow.Error.
+			preview, err := Scan(dir)
+			if err != nil {
+				t.Fatalf("Scan: %v", err)
+			}
+			for _, row := range preview.Rows {
+				if strings.Contains(row.SkipDetail, secret) {
+					t.Errorf("PreviewRow.SkipDetail leaks the password: %q", row.SkipDetail)
+				}
+			}
+			report, err := Apply(dir, []string{uuid}, true, &recordingCreator{})
+			if err != nil {
+				t.Fatalf("Apply: %v", err)
+			}
+			for _, row := range report.Rows {
+				if strings.Contains(row.Error, secret) {
+					t.Errorf("ReportRow.Error leaks the password: %q", row.Error)
+				}
+			}
+		})
+	}
+}
+
 // TestNameTruncation is case 10: a 400-character name truncates to 120 and is reported.
 func TestNameTruncation(t *testing.T) {
 	longName := strings.Repeat("a", 400)

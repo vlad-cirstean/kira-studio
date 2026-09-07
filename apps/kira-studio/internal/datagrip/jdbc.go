@@ -97,7 +97,11 @@ func mapEngine(ds DataSource) (kind string, ok bool, label string) {
 	case ds.DBMS != "":
 		return "", false, ds.DBMS
 	default:
-		return "", false, ds.JDBCURL
+		// ds.JDBCURL is the one label case that can itself carry a "user:password@host" userinfo
+		// credential (D7's configured-by-url exception embeds the password directly in the URL) —
+		// review finding: this label crosses the bridge verbatim as PreviewRow.SkipDetail/
+		// ReportRow.Error, which must never carry a password (D9's own guarantee).
+		return "", false, redactURLCredentials(ds.JDBCURL)
 	}
 }
 
@@ -164,22 +168,38 @@ func resolveFields(ds DataSource, projectDir string) (fields ResolvedFields, ok 
 	rest := expanded
 	rest = stripAnyJDBCPrefix(rest)
 	if strings.Contains(rest, "mongodb+srv://") {
-		return ResolvedFields{}, false, ReasonUnrepresentableURL, expanded
+		// expanded can itself carry a "user:password@host" userinfo credential (D7's
+		// configured-by-url exception, or any URL DataGrip otherwise embedded one into) — review
+		// finding: this crosses the bridge verbatim as PreviewRow.SkipDetail/ReportRow.Error, which
+		// must never carry a password (D9's own guarantee).
+		return ResolvedFields{}, false, ReasonUnrepresentableURL, redactURLCredentials(expanded)
 	}
 
 	u, err := url.Parse(rest)
 	if err != nil || u.Host == "" {
-		return ResolvedFields{}, false, ReasonUnrepresentableURL, expanded
+		// expanded can itself carry a "user:password@host" userinfo credential (D7's
+		// configured-by-url exception, or any URL DataGrip otherwise embedded one into) — review
+		// finding: this crosses the bridge verbatim as PreviewRow.SkipDetail/ReportRow.Error, which
+		// must never carry a password (D9's own guarantee).
+		return ResolvedFields{}, false, ReasonUnrepresentableURL, redactURLCredentials(expanded)
 	}
 	if strings.Contains(u.Host, ",") {
 		// A comma-separated multi-host URL (Postgres/MongoDB replica-set style) — D7:
 		// canRoundTripToFields only ever represents a single host.
-		return ResolvedFields{}, false, ReasonUnrepresentableURL, expanded
+		// expanded can itself carry a "user:password@host" userinfo credential (D7's
+		// configured-by-url exception, or any URL DataGrip otherwise embedded one into) — review
+		// finding: this crosses the bridge verbatim as PreviewRow.SkipDetail/ReportRow.Error, which
+		// must never carry a password (D9's own guarantee).
+		return ResolvedFields{}, false, ReasonUnrepresentableURL, redactURLCredentials(expanded)
 	}
 
 	host := u.Hostname()
 	if host == "" {
-		return ResolvedFields{}, false, ReasonUnrepresentableURL, expanded
+		// expanded can itself carry a "user:password@host" userinfo credential (D7's
+		// configured-by-url exception, or any URL DataGrip otherwise embedded one into) — review
+		// finding: this crosses the bridge verbatim as PreviewRow.SkipDetail/ReportRow.Error, which
+		// must never carry a password (D9's own guarantee).
+		return ResolvedFields{}, false, ReasonUnrepresentableURL, redactURLCredentials(expanded)
 	}
 	fields.Host = &host
 
@@ -232,6 +252,33 @@ func applyConfiguredByURLPassword(fields *ResolvedFields, ds DataSource, expande
 		fields.Password = &pw
 		fields.FromURL = true
 	}
+}
+
+// redactURLCredentials returns raw with any embedded "user:password@" (or bare "user@") userinfo
+// replaced by a fixed placeholder — the one thing standing between a configured-by-url source's
+// JDBC URL and D9's "a password never crosses the bridge" guarantee once that URL is quoted back
+// in a user-facing skip/error string (PreviewRow.SkipDetail, ReportRow.Error). A real net/url
+// round-trip is deliberately not used here: every caller of this function is on a path where the
+// URL is, by definition, one net/url may not parse cleanly (mongodb+srv, a comma-separated
+// multi-host authority, an unmapped/unsupported scheme) — a plain scan-and-mask over the raw text
+// works uniformly across all of them, parseable or not. Only the last '@' before the first '/', '?'
+// or '#' following it is treated as a userinfo delimiter, so an '@' that is actually part of a
+// path/query is left alone rather than risk mangling something that was never a credential.
+func redactURLCredentials(raw string) string {
+	at := strings.LastIndex(raw, "@")
+	if at == -1 {
+		return raw
+	}
+	schemeEnd := strings.LastIndex(raw[:at], "://")
+	start := 0
+	if schemeEnd != -1 {
+		start = schemeEnd + len("://")
+	}
+	userinfo := raw[start:at]
+	if userinfo == "" || strings.ContainsAny(userinfo, "/?#") {
+		return raw
+	}
+	return raw[:start] + "REDACTED" + raw[at:]
 }
 
 func stripJDBCPrefix(raw, prefix string) string {
