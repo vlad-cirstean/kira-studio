@@ -4,6 +4,7 @@ import (
 	"embed"
 	"log"
 	"log/slog"
+	"os"
 	"path/filepath"
 	"sync"
 	"time"
@@ -28,6 +29,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/config"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/connections"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/enginecache"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitaskpass"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitclient"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitrpc"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitsession"
@@ -65,6 +67,13 @@ var assets embed.FS
 // Quitter to the now-real App -> menu -> engine stream -> reopen handler -> the main window ->
 // app.Run() (P56 §4.11). There is no Node engine child to start any more (P58f M10 Phase 4).
 func main() {
+	// G7 D8: the askpass helper's whole entry point — four lines, unambiguous (a real GUI launch
+	// has no argv), and returns before anything Wails-related runs, so it can never accidentally
+	// start a window. The shim `main.go`'s own broker below writes execs this exact binary this way.
+	if len(os.Args) > 1 && os.Args[1] == "askpass" {
+		os.Exit(gitaskpass.RunHelper(os.Args[2:], os.Environ(), os.Stdout))
+	}
+
 	startedAt := time.Now()
 
 	if err := config.EnsureLayout(); err != nil {
@@ -101,6 +110,24 @@ func main() {
 	gitRunner := gitclient.NewExecRunner()
 	gitDiscovery := gitclient.NewDiscovery(gitclient.NewPlatformLocator(), gitRunner, gitclient.NewRealClock())
 	gitRegistry := gitsession.NewRegistry(gitRunner)
+	// G7 D16: the server-owned settings a remote op reads fresh on every push pre-flight/run and
+	// every auto-fetch tick — never cached, since a stale protected-branch list is a safety bug.
+	gitRegistry.Settings = func() (protectedBranches []string, autoFetchMinutes int) {
+		s, err := repositories.Settings.GetAll()
+		if err != nil {
+			slog.Warn("read git settings", "scope", "git", "err", err)
+			return nil, 0
+		}
+		return s.Git.ProtectedBranches, s.Git.FetchAutoIntervalMinutes
+	}
+	// G7 D8: a broker that fails to start is logged and left nil — every remote op then runs with
+	// no askpass interposition at all, D10's own already-supported "user's own askpass wins" path,
+	// not a new failure mode. It must never be fatal to boot (same posture as the socket below).
+	askpassBroker, err := gitaskpass.New(gitaskpass.Options{})
+	if err != nil {
+		slog.Warn("start askpass broker", "scope", "startup", "err", err)
+		askpassBroker = nil
+	}
 	gitSock := gitsock.New(gitsock.Deps{
 		SocketPath: filepath.Join(config.KiraHome(), "git.sock"),
 		LockPath:   filepath.Join(config.KiraHome(), "git.sock.lock"),
@@ -108,6 +135,7 @@ func main() {
 		Registry:   gitRegistry,
 		Router: gitrpc.New(gitrpc.Deps{
 			Discovery: gitDiscovery, Runner: gitRunner, Registry: gitRegistry, ServerVersion: buildinfo.Version,
+			Askpass: askpassBroker,
 		}),
 		ServerVersion: buildinfo.Version,
 		Now:           time.Now,
@@ -225,6 +253,11 @@ func main() {
 		connectionsSvc.Shutdown()
 		if err := gitSock.Close(); err != nil {
 			slog.Warn("close git socket", "scope", "shutdown", "err", err)
+		}
+		if askpassBroker != nil {
+			if err := askpassBroker.Close(); err != nil {
+				slog.Warn("close askpass broker", "scope", "shutdown", "err", err)
+			}
 		}
 		if err := repositories.Close(); err != nil {
 			slog.Warn("close repos", "scope", "shutdown", "err", err)

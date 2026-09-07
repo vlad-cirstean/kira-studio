@@ -40,6 +40,13 @@ type Registry struct {
 	// LingerFor is the refcount-zero grace period (D12), a field rather than a constant so tests
 	// can shrink it to a few milliseconds. Zero means "use defaultLingerFor" — set by NewRegistry.
 	LingerFor time.Duration
+	// Settings is G7 D16's server-owned settings accessor: the protected-branch pattern list and
+	// the auto-fetch interval, read fresh on every push pre-flight/run and every auto-fetch tick —
+	// never cached, since a stale protected-branch list is a safety bug. A plain func rather than
+	// an interface so this package keeps importing only gitclient and stdlib (main.go supplies the
+	// real one, backed by storage/repos.SettingsRepo; tests set it directly, the same seam
+	// NewWatcher/LingerFor already are). Defaulted to "no protected branches, auto-fetch off".
+	Settings func() (protectedBranches []string, autoFetchMinutes int)
 
 	mu      sync.Mutex
 	entries map[string]*slot
@@ -52,6 +59,7 @@ func NewRegistry(runner gitclient.Runner) *Registry {
 		runner:     runner,
 		NewWatcher: func(s gitclient.RepoSummary) (Watcher, error) { return gitclient.NewRepoWatcher(s) },
 		LingerFor:  defaultLingerFor,
+		Settings:   func() ([]string, int) { return nil, 0 },
 		entries:    make(map[string]*slot),
 	}
 }

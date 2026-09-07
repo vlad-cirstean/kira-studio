@@ -3,13 +3,14 @@ import {
   CACHE_L2_BUDGET_MB_RANGE,
   defaultSettings,
   EXPENSIVE_QUERY_ROWS_RANGE,
+  FETCH_AUTO_INTERVAL_MINUTES_RANGE,
   FONT_SIZE_RANGE,
   OP_LOG_RETENTION_DAYS_RANGE,
   type RowDensity,
   type Settings,
   type SettingsPatch,
 } from '@shared/domain/settings';
-import { computed, reactive, ref } from 'vue';
+import { computed, reactive, ref, watch } from 'vue';
 import { data } from '../bridge/data';
 import { FONT_CHOICES, fontStackAvailable, resolveFontFallback } from '../fonts';
 import { formatBytes, formatRelative } from '../format';
@@ -41,6 +42,7 @@ const cloneSections = (s: Settings): Settings =>
       data: s.data,
       cache: s.cache,
       advanced: s.advanced,
+      git: s.git,
     }),
   );
 
@@ -48,6 +50,17 @@ const cloneSections = (s: Settings): Settings =>
 // compare it against the mutable draft without a readonly/mutable type mismatch.
 const baseline: Settings = Object.freeze(cloneSections(settingsState)) as Settings;
 const draft = reactive<Settings>(cloneSections(settingsState));
+
+// G7 D16: git.protectedBranches is this dialog's first array-valued leaf — cloneSections gives
+// draft/baseline each their own array object even when unedited, so a bare `!==`/`===` (every
+// other leaf here is a primitive) would report it changed/non-default on every open. Compared by
+// value instead; every other leaf still takes the cheap `===` path.
+function valuesEqual(a: unknown, b: unknown): boolean {
+  if (Array.isArray(a) && Array.isArray(b)) {
+    return a.length === b.length && a.every((v, i) => v === b[i]);
+  }
+  return a === b;
+}
 
 // P17 D2: the generic per-leaf diff Save sends. Walking Object.keys(base) rather than a
 // hand-maintained leaf list means a future leaf (P18's, or anything after it) is picked up with
@@ -57,7 +70,7 @@ function diffSection<T extends object>(base: T, current: T): Partial<T> | undefi
   const changed: Partial<T> = {};
   let anyChanged = false;
   for (const key of Object.keys(base) as (keyof T)[]) {
-    if (current[key] !== base[key]) {
+    if (!valuesEqual(current[key], base[key])) {
       changed[key] = current[key];
       anyChanged = true;
     }
@@ -75,6 +88,8 @@ const pendingPatch = computed<SettingsPatch>(() => {
   if (cache) patch.cache = cache;
   const advanced = diffSection(baseline.advanced, draft.advanced);
   if (advanced) patch.advanced = advanced;
+  const git = diffSection(baseline.git, draft.git);
+  if (git) patch.git = git;
   return patch;
 });
 
@@ -155,6 +170,28 @@ function onExpensiveQueryRowsInput(e: Event): void {
   draft.advanced.expensiveQueryRows = Number((e.target as HTMLInputElement).value);
 }
 
+function onFetchAutoIntervalInput(e: Event): void {
+  draft.git.fetchAutoIntervalMinutes = Number((e.target as HTMLInputElement).value);
+}
+
+// G7 D17: `*` matches any run of characters except `/` — the same rule gitpreflight.
+// MatchProtectedBranch enforces server-side; this dialog only edits the pattern list, never
+// evaluates it. A plain ref, not a computed bound straight to draft.git.protectedBranches: parsing
+// on every keystroke and feeding the result back into the textarea's own value would snap away a
+// blank line the instant it's created, fighting the user mid-edit — parsed into the draft by the
+// watcher below instead, one-directionally.
+const protectedBranchesText = ref(draft.git.protectedBranches.join('\n'));
+watch(protectedBranchesText, (v) => {
+  draft.git.protectedBranches = v
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+});
+function resetProtectedBranches(): void {
+  draft.git.protectedBranches = [...defaultSettings.git.protectedBranches];
+  protectedBranchesText.value = draft.git.protectedBranches.join('\n');
+}
+
 // P17 D6: the draft accepts whatever is typed (@input, so the field never fights the user
 // mid-keystroke) — validity is derived here, not enforced at write time, and gates Save below.
 const fontSizeError = computed<string | null>(() => {
@@ -193,12 +230,22 @@ const expensiveQueryRowsError = computed<string | null>(() => {
   return null;
 });
 
+const fetchAutoIntervalError = computed<string | null>(() => {
+  const v = draft.git.fetchAutoIntervalMinutes;
+  if (!Number.isFinite(v)) return 'Enter a number.';
+  if (v < FETCH_AUTO_INTERVAL_MINUTES_RANGE.min || v > FETCH_AUTO_INTERVAL_MINUTES_RANGE.max) {
+    return `${FETCH_AUTO_INTERVAL_MINUTES_RANGE.min}–${FETCH_AUTO_INTERVAL_MINUTES_RANGE.max} minutes`;
+  }
+  return null;
+});
+
 const isValid = computed(
   () =>
     !fontSizeError.value &&
     !cacheBudgetError.value &&
     !opLogRetentionError.value &&
-    !expensiveQueryRowsError.value,
+    !expensiveQueryRowsError.value &&
+    !fetchAutoIntervalError.value,
 );
 
 const hitRateLabel = computed(() => {
@@ -222,7 +269,7 @@ async function onClearCaches(): Promise<void> {
 // P28 §2.2: two generic helpers replace the single all-or-nothing Revert to Defaults — the same
 // discipline P17 D2 applied to diffSection, so a future leaf needs no edit here either.
 function isAtDefault<S extends keyof Settings, K extends keyof Settings[S]>(s: S, k: K): boolean {
-  return draft[s][k] === defaultSettings[s][k];
+  return valuesEqual(draft[s][k], defaultSettings[s][k]);
 }
 function resetLeaf<S extends keyof Settings, K extends keyof Settings[S]>(s: S, k: K): void {
   draft[s][k] = defaultSettings[s][k];
@@ -561,6 +608,69 @@ async function onSave(): Promise<void> {
                 />
               </li>
             </ul>
+
+            <h3 class="section-subhead">Git remote operations</h3>
+            <p class="muted-note">
+              Server-owned: applies to every connected editor immediately, since two windows
+              disagreeing about either is a safety issue, not a preference.
+            </p>
+            <label class="field">
+              <div class="field-head">
+                <span>Protected branch patterns (one per line)</span>
+                <IconButton
+                  icon="discard"
+                  data-testid="settings-reset-git-protectedBranches"
+                  :disabled="isAtDefault('git', 'protectedBranches')"
+                  v-tooltip="'Reset to default'"
+                  @click="resetProtectedBranches"
+                />
+              </div>
+              <textarea
+                v-model="protectedBranchesText"
+                class="p-textarea"
+                rows="4"
+                placeholder="main"
+                data-testid="settings-git-protected-branches"
+              />
+              <span class="helper-text"
+                >Force-pushing or deleting a matching remote branch requires typing its name to
+                confirm. "*" matches any characters except "/". Ordinary pushes are never gated.</span
+              >
+            </label>
+            <label class="field">
+              <div class="field-head">
+                <span>Auto-fetch interval (minutes)</span>
+                <IconButton
+                  icon="discard"
+                  data-testid="settings-reset-git-fetchAutoIntervalMinutes"
+                  :disabled="isAtDefault('git', 'fetchAutoIntervalMinutes')"
+                  v-tooltip="'Reset to default'"
+                  @click="resetLeaf('git', 'fetchAutoIntervalMinutes')"
+                />
+              </div>
+              <TextField
+                type="number"
+                :min="FETCH_AUTO_INTERVAL_MINUTES_RANGE.min"
+                :max="FETCH_AUTO_INTERVAL_MINUTES_RANGE.max"
+                size="md"
+                :invalid="!!fetchAutoIntervalError"
+                data-testid="settings-git-fetch-auto-interval"
+                :model-value="String(draft.git.fetchAutoIntervalMinutes)"
+                @input="onFetchAutoIntervalInput"
+              />
+              <span
+                v-if="fetchAutoIntervalError"
+                class="field-error"
+                data-testid="settings-git-fetch-auto-interval-error"
+              >
+                {{ fetchAutoIntervalError }}
+              </span>
+              <span v-else class="helper-text"
+                >0 disables background fetching. Never prompts for a credential — a remote that
+                needs one simply fails silently and disables the timer until the next explicit
+                fetch.</span
+              >
+            </label>
           </template>
 
           <template v-else-if="activeSection === 'Advanced'">
@@ -812,6 +922,13 @@ async function onSave(): Promise<void> {
 .muted-note {
   color: var(--kira-fg-subtle);
   font-size: var(--kira-t-xs);
+}
+
+.section-subhead {
+  margin: var(--kira-s-3) 0 0;
+  font-size: var(--kira-t-sm);
+  font-weight: 600;
+  color: var(--kira-fg);
 }
 
 .action-button {

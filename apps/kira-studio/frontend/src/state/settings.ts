@@ -34,6 +34,7 @@ function applySettings(settings: Settings): void {
   Object.assign(settingsState.data, settings.data);
   Object.assign(settingsState.cache, settings.cache);
   Object.assign(settingsState.advanced, settings.advanced);
+  Object.assign(settingsState.git, settings.git);
   applyAppearance();
 }
 

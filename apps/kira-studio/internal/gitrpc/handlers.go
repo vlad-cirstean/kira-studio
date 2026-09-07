@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"strings"
 
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitaskpass"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitclient"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitsession"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/ipcerr"
@@ -17,6 +18,9 @@ type Deps struct {
 	Runner        gitclient.Runner
 	Registry      *gitsession.Registry
 	ServerVersion string
+	// Askpass is G7's credential broker — nil when it failed to start (main.go's own D8 posture:
+	// every remote op then runs with no askpass interposition at all, never a fatal boot error).
+	Askpass *gitaskpass.Broker
 }
 
 // Handlers is gitrpc's own two-function method table — deliberately not rpcstream.Handlers: gitrpc

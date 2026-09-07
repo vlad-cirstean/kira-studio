@@ -25,11 +25,21 @@ type AdvancedSettings struct {
 	ExpensiveQueryRows int `json:"expensiveQueryRows"`
 }
 
+// GitSettings mirrors G7 D16's two server-owned git leaves: two windows disagreeing about either
+// is a correctness/safety issue (a force-push confirmation that only one window enforces, an
+// auto-fetch cadence that differs per viewer), so both live here rather than as VS Code settings.
+type GitSettings struct {
+	ProtectedBranches []string `json:"protectedBranches"`
+	// FetchAutoIntervalMinutes is minutes between automatic background fetches; 0 disables it.
+	FetchAutoIntervalMinutes int `json:"fetchAutoIntervalMinutes"`
+}
+
 type Settings struct {
 	Appearance AppearanceSettings `json:"appearance"`
 	Data       DataSettings       `json:"data"`
 	Cache      CacheSettings      `json:"cache"`
 	Advanced   AdvancedSettings   `json:"advanced"`
+	Git        GitSettings        `json:"git"`
 }
 
 // DefaultSettings mirrors packages/shared/domain/settings.ts's defaultSettings verbatim.
@@ -47,6 +57,12 @@ func DefaultSettings() Settings {
 		Advanced: AdvancedSettings{
 			OpLogRetentionDays: 30,
 			ExpensiveQueryRows: 100_000,
+		},
+		// docs/v1.3/plans/G7 D16: the same three-pattern default upstream's own
+		// kiraVersion.protectedBranches carried, before this phase moved it server-side.
+		Git: GitSettings{
+			ProtectedBranches:        []string{"main", "master", "release/*"},
+			FetchAutoIntervalMinutes: 0,
 		},
 	}
 }
@@ -75,11 +91,18 @@ type AdvancedPatch struct {
 	ExpensiveQueryRows *int `json:"expensiveQueryRows,omitempty"`
 }
 
+// GitPatch mirrors GitSettings' own `.partial()` shape (G7 D16).
+type GitPatch struct {
+	ProtectedBranches        *[]string `json:"protectedBranches,omitempty"`
+	FetchAutoIntervalMinutes *int      `json:"fetchAutoIntervalMinutes,omitempty"`
+}
+
 type SettingsPatch struct {
 	Appearance *AppearancePatch `json:"appearance,omitempty"`
 	Data       *DataPatch       `json:"data,omitempty"`
 	Cache      *CachePatch      `json:"cache,omitempty"`
 	Advanced   *AdvancedPatch   `json:"advanced,omitempty"`
+	Git        *GitPatch        `json:"git,omitempty"`
 }
 
 // ValidRowDensity mirrors settings.ts's rowDensitySchema.
@@ -103,9 +126,10 @@ func InRange(lo, hi int) func(int) bool {
 }
 
 var (
-	validL2BudgetMb         = InRange(8, 1024)
-	validOpLogRetentionDays = InRange(1, 365)
-	validExpensiveQueryRows = InRange(1_000, 1_000_000_000)
+	validL2BudgetMb               = InRange(8, 1024)
+	validOpLogRetentionDays       = InRange(1, 365)
+	validExpensiveQueryRows       = InRange(1_000, 1_000_000_000)
+	validFetchAutoIntervalMinutes = InRange(0, 1440)
 )
 
 // Validate checks every leaf the caller actually patched against settings.ts's bounds, naming
@@ -128,6 +152,9 @@ func (p SettingsPatch) Validate() error {
 		if p.Advanced.ExpensiveQueryRows != nil && !validExpensiveQueryRows(*p.Advanced.ExpensiveQueryRows) {
 			return fmt.Errorf("model: advanced.expensiveQueryRows: out of range value %d", *p.Advanced.ExpensiveQueryRows)
 		}
+	}
+	if p.Git != nil && p.Git.FetchAutoIntervalMinutes != nil && !validFetchAutoIntervalMinutes(*p.Git.FetchAutoIntervalMinutes) {
+		return fmt.Errorf("model: git.fetchAutoIntervalMinutes: out of range value %d", *p.Git.FetchAutoIntervalMinutes)
 	}
 	return nil
 }

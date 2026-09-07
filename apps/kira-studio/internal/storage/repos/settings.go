@@ -60,6 +60,8 @@ func (r *SettingsRepo) GetAll() (model.Settings, error) {
 	leafValid(stored, "cache.l2BudgetMb", &result.Cache.L2BudgetMb, model.InRange(8, 1024))
 	leafValid(stored, "advanced.opLogRetentionDays", &result.Advanced.OpLogRetentionDays, model.InRange(1, 365))
 	leafValid(stored, "advanced.expensiveQueryRows", &result.Advanced.ExpensiveQueryRows, model.InRange(1_000, 1_000_000_000))
+	leaf(stored, "git.protectedBranches", &result.Git.ProtectedBranches)
+	leafValid(stored, "git.fetchAutoIntervalMinutes", &result.Git.FetchAutoIntervalMinutes, model.InRange(0, 1440))
 	return result, nil
 }
 
@@ -121,6 +123,18 @@ func (r *SettingsRepo) Set(patch model.SettingsPatch) (model.Settings, error) {
 		}
 		if a.ExpensiveQueryRows != nil {
 			if err := upsertSettingsLeaf(tx, "advanced.expensiveQueryRows", *a.ExpensiveQueryRows); err != nil {
+				return model.Settings{}, err
+			}
+		}
+	}
+	if g := patch.Git; g != nil {
+		if g.ProtectedBranches != nil {
+			if err := upsertSettingsLeaf(tx, "git.protectedBranches", *g.ProtectedBranches); err != nil {
+				return model.Settings{}, err
+			}
+		}
+		if g.FetchAutoIntervalMinutes != nil {
+			if err := upsertSettingsLeaf(tx, "git.fetchAutoIntervalMinutes", *g.FetchAutoIntervalMinutes); err != nil {
 				return model.Settings{}, err
 			}
 		}
