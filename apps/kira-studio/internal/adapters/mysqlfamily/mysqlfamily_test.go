@@ -1046,6 +1046,11 @@ func runFamilySuite(t *testing.T, kind string, cfg model.ResolvedConnectionConfi
 			t.Fatalf("Count: %v", err)
 		}
 
+		// tx_read_only is mariadb's own spelling; transaction_read_only is mysql's (and postgres's).
+		roVarName := "transaction_read_only"
+		if kind == "mariadb" {
+			roVarName = "tx_read_only"
+		}
 		attempts := [][]string{
 			{"SET SESSION TRANSACTION READ WRITE", "DELETE FROM order_items"},
 			{"SET TRANSACTION READ WRITE", "DELETE FROM order_items"},
@@ -1053,6 +1058,11 @@ func runFamilySuite(t *testing.T, kind string, cfg model.ResolvedConnectionConfi
 			// P26 §3.2(5): a DDL statement takes a different server-side path than DELETE — untested
 			// before this.
 			{"CREATE TABLE p26_ro_escape (id INT)"},
+			// Review finding, case 2: the batch's own COMMIT ends the wrapping read-only transaction,
+			// after which SET SESSION took effect immediately for the plain-autocommit write that
+			// followed — confirmed against a real server before the fix that this created the table
+			// on both mariadb (tx_read_only) and mysql (transaction_read_only).
+			{"COMMIT", "SET SESSION " + roVarName + " = OFF", "DELETE FROM order_items"},
 		}
 		for _, statements := range attempts {
 			_, err := a.Execute(context.Background(), model.ConsoleRequest{

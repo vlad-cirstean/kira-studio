@@ -764,6 +764,18 @@ func TestPostgres_ReadOnlyConnectionExecuteCannotEscapeReadOnlyTransaction(t *te
 		// P26 §3.4(3): a DDL statement takes a different server-side path than DELETE — untested
 		// before this.
 		{"CREATE TABLE app.p26_ro_escape (id int)"},
+		// Review finding, case 1: naming the GUC directly (no "READ WRITE" phrase anywhere) —
+		// confirmed against a real server before the fix that this deleted every row.
+		{"SET transaction_read_only = off", "DELETE FROM app.order_items"},
+		// Review finding, case 2: the batch's own COMMIT ends the wrapping read-only transaction,
+		// after which SET SESSION took effect immediately for the plain-autocommit write that
+		// followed — confirmed not to escape on postgres specifically (see errors.go's
+		// endsTransaction doc comment), but rejected unconditionally regardless of engine.
+		{"COMMIT", "SET SESSION transaction_read_only = OFF", "DELETE FROM app.order_items"},
+		// Review finding, case 3: a nested block comment — confirmed against a real server that
+		// `READ /* /* */ x */ WRITE` parses identically to `READ WRITE`, which the old non-nesting
+		// regexp missed.
+		{"SET TRANSACTION READ /* /* */ x */ WRITE", "DELETE FROM app.order_items"},
 	}
 	for _, statements := range attempts {
 		_, err := a.Execute(context.Background(), model.ConsoleRequest{

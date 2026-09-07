@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"regexp"
+	"strings"
 )
 
 // ErrorCode is the Go analogue of errors.ts's AdapterErrorCode — a closed set, verbatim from
@@ -71,30 +72,110 @@ func AssertWritable(readOnly bool) error {
 }
 
 var (
-	sqlLineComment  = regexp.MustCompile(`--[^\n]*`)
-	sqlBlockComment = regexp.MustCompile(`(?s)/\*.*?\*/`)
-	sqlReadWrite    = regexp.MustCompile(`(?i)READ\s+WRITE`)
+	sqlReadWrite = regexp.MustCompile(`(?i)READ\s+WRITE`)
+	// sqlReadOnlyVarOff catches a statement that names any of the three read-only-mode GUCs/session
+	// variables the postgres and mysqlfamily adapters rely on (default_transaction_read_only /
+	// transaction_read_only on postgres and mysql, tx_read_only on mariadb) and assigns it a falsy
+	// value — the non-SQL-standard way to ask for the same escalation "READ WRITE" asks for by
+	// phrase (review finding: `SET transaction_read_only = off` inside the wrapping transaction
+	// confirmed, against a real Postgres server, to flip that transaction writable and let a
+	// following DELETE succeed, with no "READ WRITE" phrase anywhere in the statement for
+	// sqlReadWrite to catch).
+	sqlReadOnlyVarOff = regexp.MustCompile(`(?i)\b(?:default_transaction_read_only|transaction_read_only|tx_read_only)\b\s*(?:=|TO)\s*'?(?:off|false|0)\b`)
 )
 
+// endsTransaction reports whether stmt (already comment-stripped) is a bare statement that ends
+// the current transaction — COMMIT, END (postgres's alias for COMMIT), or ROLLBACK — rather than
+// a statement that merely mentions one of those words. A real read-only console session has no
+// legitimate reason to end its own wrapping transaction mid-batch (postgres/mysqlfamily console.go
+// both wrap the whole Execute() batch in one read-only transaction specifically so no statement in
+// it can run outside that transaction's protection): confirmed against a real server that
+// `COMMIT; SET SESSION tx_read_only = OFF; ...` (mariadb) / `SET SESSION transaction_read_only =
+// OFF` (mysql) does exactly that — the COMMIT ends the wrapper, and the SET then takes effect
+// immediately for the write statement that follows in plain autocommit mode, with neither the
+// COMMIT nor the SET containing "READ WRITE" for sqlReadWrite to catch (postgres itself is not
+// vulnerable to this particular sequence — confirmed empirically that transaction_read_only set
+// outside an explicit transaction does not carry over to the next implicit one there — but nothing
+// about a read-only console session ever legitimately needs its own COMMIT/END/ROLLBACK either, so
+// this is rejected unconditionally rather than only where a bypass happens to have been proven).
+// ROLLBACK TO SAVEPOINT is exempted: it only rewinds to a savepoint, never ends the transaction.
+func endsTransaction(stmt string) bool {
+	trimmed := strings.TrimSuffix(strings.TrimSpace(stmt), ";")
+	fields := strings.Fields(trimmed)
+	if len(fields) == 0 {
+		return false
+	}
+	switch strings.ToUpper(fields[0]) {
+	case "COMMIT", "END":
+		return true
+	case "ROLLBACK":
+		for _, f := range fields[1:] {
+			if strings.EqualFold(f, "TO") {
+				return false
+			}
+		}
+		return true
+	default:
+		return false
+	}
+}
+
+// stripSQLComments replaces every SQL comment — a line comment (`--` to end of line) or a block
+// comment (`/* ... */`) — with a single space, preserving token boundaries the same way real SQL
+// treats a comment as lexical whitespace (confirmed against a real server: `READ/*x*/WRITE` parses
+// identically to `READ WRITE`, so a comment must become a space, never be deleted outright, or the
+// two keywords it separated would glue together and slip past sqlReadWrite's \s+). Block comments
+// nest on both postgres and mysql/mariadb — confirmed against a real Postgres server that `READ
+// /* /* */ x */ WRITE` parses identically to `READ WRITE`, i.e. the outer /* runs all the way to
+// its own matching, correctly-nested */, swallowing the inner comment and the "x" between them —
+// which a single non-nesting regexp pass cannot express, so this scans by rune and tracks depth
+// instead.
+func stripSQLComments(s string) string {
+	r := []rune(s)
+	var out strings.Builder
+	depth := 0
+	for i := 0; i < len(r); {
+		switch {
+		case depth == 0 && r[i] == '-' && i+1 < len(r) && r[i+1] == '-':
+			for i < len(r) && r[i] != '\n' {
+				i++
+			}
+			out.WriteByte(' ')
+		case r[i] == '/' && i+1 < len(r) && r[i+1] == '*':
+			depth++
+			i += 2
+		case depth > 0 && r[i] == '*' && i+1 < len(r) && r[i+1] == '/':
+			depth--
+			i += 2
+			if depth == 0 {
+				out.WriteByte(' ')
+			}
+		case depth > 0:
+			i++
+		default:
+			out.WriteRune(r[i])
+			i++
+		}
+	}
+	return out.String()
+}
+
 // AssertNoTransactionEscalation is a console-Execute-only backstop for postgres/mysqlfamily (P2
-// R2): both enforce a read-only connection by setting a *session default*
-// (default_transaction_read_only / SESSION TRANSACTION READ ONLY) at connect time and wrapping
-// each Execute() batch in an explicit read-only transaction, neither of which a statement inside
-// that same transaction can be trusted not to try to escape — verified against real servers that
-// a bare `SET TRANSACTION READ WRITE` (postgres) mid-transaction actually does flip an
-// already-open read-only transaction to writable, where every other angle tried (SET
-// default_transaction_read_only=off, SET SESSION TRANSACTION READ WRITE, COMMIT;BEGIN;) does not
-// escape the wrapping transaction on either server. "READ WRITE" has no legitimate reason to
-// appear in a read-only console session, so any statement containing it (after stripping SQL
-// comments, since a comment can sit between the two words) is rejected outright rather than run.
-// Comments are replaced with a single space, not deleted outright: confirmed against a real
-// server that `READ/*x*/WRITE` parses identically to `READ WRITE` (a comment is lexical
-// whitespace to the SQL parser), so deleting it outright would collapse the two keywords together
-// and slip past the \s+ in sqlReadWrite below.
+// R2, hardened per a later review round): both enforce a read-only connection by setting a
+// *session default* (default_transaction_read_only / SESSION TRANSACTION READ ONLY) at connect
+// time and wrapping each Execute() batch in an explicit read-only transaction, neither of which a
+// statement inside that same transaction can be trusted not to try to escape. Three angles are
+// rejected outright rather than run, each confirmed against a real server (see stripSQLComments,
+// sqlReadOnlyVarOff and endsTransaction's own doc comments for what was actually tried and what a
+// real server actually did): the SQL-standard `READ WRITE` phrase, naming a read-only GUC/session
+// variable and assigning it a falsy value, and a bare COMMIT/END/ROLLBACK that would end the
+// wrapping transaction itself. This function cannot be made complete against every possible
+// escalation a SQL dialect can express — it is a backstop on top of the real enforcement (the
+// session default plus the wrapping transaction), not a substitute for it.
 func AssertNoTransactionEscalation(statements []string) error {
 	for _, stmt := range statements {
-		stripped := sqlBlockComment.ReplaceAllString(sqlLineComment.ReplaceAllString(stmt, " "), " ")
-		if sqlReadWrite.MatchString(stripped) {
+		stripped := stripSQLComments(stmt)
+		if sqlReadWrite.MatchString(stripped) || sqlReadOnlyVarOff.MatchString(stripped) || endsTransaction(stripped) {
 			return New(CodeUnsupported, "connection is read-only", nil)
 		}
 	}
