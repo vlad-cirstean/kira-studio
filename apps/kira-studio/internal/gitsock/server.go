@@ -7,21 +7,28 @@ import (
 	"os"
 	"sync"
 	"time"
+
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/bridge/rpcstream"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitrpc"
 )
 
 // Deps is everything Server needs to listen and serve. SocketPath/LockPath are the two files under
 // ${KIRA_HOME} (F5's already-0700 directory); Now is injected so the pairing broker's deadlines are
 // testable without a real clock (main.go passes time.Now).
 type Deps struct {
-	SocketPath string
-	LockPath   string
-	Now        func() time.Time
+	SocketPath    string
+	LockPath      string
+	Clients       TrustStore
+	Handlers      gitrpc.Handlers
+	ServerVersion string
+	Now           func() time.Time
 }
 
-// Server owns the listener, the flock and the live-connection registry that backs revocation
-// (D18). Its zero value is not usable; construct with New.
+// Server owns the listener, the flock, the pairing broker and the live-connection registry that
+// backs revocation (D18). Its zero value is not usable; construct with New.
 type Server struct {
-	deps Deps
+	deps   Deps
+	broker *Broker
 
 	mu        sync.Mutex
 	listening bool
@@ -37,8 +44,12 @@ func New(deps Deps) *Server {
 	if deps.Now == nil {
 		deps.Now = time.Now
 	}
-	return &Server{deps: deps, conns: map[string][]net.Conn{}}
+	return &Server{deps: deps, broker: NewBroker(deps.Now), conns: map[string][]net.Conn{}}
 }
+
+// Broker exposes the pairing broker to bridge.GitClientsService (§3.6) — Approve/Deny/Pending/
+// Subscribe all live on it.
+func (s *Server) Broker() *Broker { return s.broker }
 
 // Start performs D5's five-step sequence. A failure to acquire the lock, or any other startup
 // error, is returned but never fatal to the caller (main.go logs and continues booting) — the app
@@ -77,9 +88,28 @@ func (s *Server) Start() error {
 	s.closeCh = make(chan struct{})
 	s.mu.Unlock()
 
-	s.wg.Add(1)
+	s.wg.Add(2)
 	go s.acceptLoop()
+	go s.expireLoop()
 	return nil
+}
+
+// expireLoop is the real-time driver behind Broker.ExpireOverdue (D8): a queued request whose
+// deadline is measured from enqueue can otherwise only be noticed by whoever next calls Approve/
+// Deny, which may be nobody for a lone, unattended request. pairing_test.go drives ExpireOverdue
+// directly against an injected clock instead of this loop.
+func (s *Server) expireLoop() {
+	defer s.wg.Done()
+	t := time.NewTicker(time.Second)
+	defer t.Stop()
+	for {
+		select {
+		case <-t.C:
+			s.broker.ExpireOverdue()
+		case <-s.closeCh:
+			return
+		}
+	}
 }
 
 func (s *Server) acceptLoop() {
@@ -97,10 +127,72 @@ func (s *Server) acceptLoop() {
 	}
 }
 
-// handleConn is filled in once the handshake exists (C5); until then every accepted connection is
-// simply closed, which is a complete and honest intermediate state (§7 C3).
+// handleConn runs the handshake (§3.1.1) and, once it reaches "ready", hands the connection to
+// rpcstream.Serve for the rest of its life. The connection is registered under its client id for
+// D18's Revoke only after the handshake accepts it — a connection still mid-pairing has no
+// identity to revoke yet.
 func (s *Server) handleConn(nc net.Conn) {
-	_ = nc.Close()
+	defer nc.Close()
+	c := newConn(nc)
+	clientID, ok := runHandshake(c, handshakeDeps{
+		Clients:       s.deps.Clients,
+		Broker:        s.broker,
+		ServerVersion: s.deps.ServerVersion,
+		Now:           s.deps.Now,
+	})
+	if !ok {
+		return
+	}
+
+	s.addConn(clientID, nc)
+	defer s.removeConn(clientID, nc)
+
+	rpcstream.Serve(c, rpcstream.Handlers{
+		ContractVersion: gitrpc.ContractVersion,
+		Request:         s.deps.Handlers.Request,
+		Stream:          s.deps.Handlers.Stream,
+	})
+}
+
+func (s *Server) addConn(clientID string, nc net.Conn) {
+	s.mu.Lock()
+	s.conns[clientID] = append(s.conns[clientID], nc)
+	s.mu.Unlock()
+}
+
+func (s *Server) removeConn(clientID string, nc net.Conn) {
+	s.mu.Lock()
+	list := s.conns[clientID]
+	for i, c := range list {
+		if c == nc {
+			list = append(list[:i], list[i+1:]...)
+			break
+		}
+	}
+	if len(list) == 0 {
+		delete(s.conns, clientID)
+	} else {
+		s.conns[clientID] = list
+	}
+	s.mu.Unlock()
+}
+
+// Revoke implements D18's ordering: revoked_at is written first, then every live connection
+// holding clientID is closed. The reverse order leaves a window where a connection that just
+// reconnected on its still-valid token is silently re-admitted before the write lands.
+func (s *Server) Revoke(clientID string) error {
+	now := s.deps.Now().UnixMilli()
+	if err := s.deps.Clients.Revoke(clientID, now); err != nil {
+		return err
+	}
+	s.mu.Lock()
+	live := s.conns[clientID]
+	delete(s.conns, clientID)
+	s.mu.Unlock()
+	for _, nc := range live {
+		_ = nc.Close()
+	}
+	return nil
 }
 
 // Close unlinks the socket (net.UnixListener's default on Close), closes every live connection,

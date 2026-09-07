@@ -36,6 +36,10 @@ var packagesExemptFromBridgeCheck = map[string]bool{
 	// package sitting under it; every package here trivially "depends on" its own path, so a
 	// bridge subpackage would otherwise always fail this check against itself.
 	"internal/bridge/rpcstream": true,
+	// internal/gitsock is the socket-side transport package — the git module's peer of
+	// internal/bridge's Wails-side transport (SPEC §7), not a domain package sitting underneath
+	// it. It needs rpcstream.Conn/Serve, which live under internal/bridge (G1 D4/§3.4).
+	"internal/gitsock": true,
 }
 
 // TestDomainPackagesDoNotImportBridge used to walk a hand-maintained slice of "the domain
