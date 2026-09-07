@@ -253,10 +253,29 @@ export function createProxyHandlers(deps: CreateProxyHandlersDeps): ServerHandle
       revealReview(repoId, branch);
       return {};
     },
-    'remote.pullPreflight': forward('remote.pullPreflight'),
+    // G7 D2: strategySetting is injected from the window's own coerced settings snapshot,
+    // exactly as review.resolveBase injects baseCandidates above.
+    'remote.pullPreflight': (params, ctx) => {
+      const snap = settings();
+      return connection.request(
+        'remote.pullPreflight',
+        { ...params, strategySetting: snap['kiraVersion.pull.strategy'] },
+        ctx.signal,
+      );
+    },
     'remote.pushPreflight': forward('remote.pushPreflight'),
     'remote.run': forward('remote.run'),
     'remote.cancel': forward('remote.cancel'),
+    // G7 D4/§4.2: credential.provide is answered by the extension's own credential relay
+    // (extension.ts), never proxied from the webview — the webview must never be able to answer a
+    // credential prompt. ServerHandlers.requests is total over RequestKey, so this key still needs
+    // an entry; a thrown handler is the way to say "impossible from here" in a total map, the same
+    // shape editor.resolveConflict's own G4 precedent uses for a genuinely unreachable call.
+    'credential.provide': () => {
+      throw new Error(
+        'credential.provide is answered by the extension, never proxied from the webview',
+      );
+    },
     'stash.list': forward('stash.list'),
     'stash.show': forward('stash.show'),
     'preflight.stashPop': forward('preflight.stashPop'),

@@ -227,3 +227,56 @@ type ReviewResolveBaseParams struct {
 	// (gitreview.DefaultBaseCandidates).
 	BaseCandidates []string `json:"baseCandidates,omitempty"`
 }
+
+// ---------------------------------------------------------------------------------------
+// G7 — remote ops and the credential relay (D2). remote.pullPreflight/remote.pushPreflight's own
+// results are gitpreflight's own wire-shaped types (PullPreflight/PushPreflight) — D5's own
+// precedent applied again: no second, gitrpc-owned copy of a shape that package already produces
+// JSON-tagged. CONTRACT_VERSION moves 15 -> 16 for exactly three additions: credential.request,
+// credential.provide, and remote.pullPreflight's own optional strategySetting param.
+// ---------------------------------------------------------------------------------------
+
+// RemotePullPreflightParams is remote.pullPreflight's own request.
+type RemotePullPreflightParams struct {
+	RepoID string `json:"repoId"`
+	Branch string `json:"branch"`
+	// StrategySetting (D2): optional, injected by the extension from kiraVersion.pull.strategy,
+	// exactly as review.resolveBase injects baseCandidates. Absent (or "auto") for every raw
+	// socket client — gitpreflight.ResolvePullStrategy already treats "" as "auto".
+	StrategySetting string `json:"strategySetting,omitempty"`
+}
+
+// RemotePushPreflightParams is remote.pushPreflight's own request.
+type RemotePushPreflightParams struct {
+	RepoID string `json:"repoId"`
+	Branch string `json:"branch"`
+	Remote string `json:"remote"`
+}
+
+// RemoteRunParams is remote.run's own request: RepoID plus gitsession's own flattened operation
+// fields, embedded so JSON decode flattens them back out — remote.run's wire params are flat (no
+// nested object, unlike op.run's own `op` key), the same shape OpRequest is for op.run (D5).
+type RemoteRunParams struct {
+	RepoID string `json:"repoId"`
+	gitsession.RemoteOpParams
+}
+
+// RemoteCancelParams is remote.cancel's own request.
+type RemoteCancelParams struct {
+	RepoID string `json:"repoId"`
+}
+
+// RemoteCancelResult mirrors @kira/git-ipc's own remote.cancel result — `{cancelled: boolean}`,
+// never an error (D19): a cancel racing a just-finished (or never-running, or non-killable) op is
+// an ordinary outcome.
+type RemoteCancelResult struct {
+	Cancelled bool `json:"cancelled"`
+}
+
+// CredentialProvideParams is credential.provide's own request (D2/D4) — Secret is nil for a
+// dismissal, never omitted (the `null`-vs-absent discipline G4 D5 set for this chapter: "dismissed"
+// is a value the wire carries, not an absence the server has to infer).
+type CredentialProvideParams struct {
+	RequestID string  `json:"requestId"`
+	Secret    *string `json:"secret"`
+}

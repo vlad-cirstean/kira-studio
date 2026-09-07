@@ -86,6 +86,16 @@ func (r *Router) ForConn(c *gitsession.Conn) Handlers {
 				return r.handleUndoRun(ctx, c, params)
 			case "review.resolveBase":
 				return r.handleReviewResolveBase(ctx, c, params)
+			case "remote.pullPreflight":
+				return r.handleRemotePullPreflight(ctx, c, params)
+			case "remote.pushPreflight":
+				return r.handleRemotePushPreflight(ctx, c, params)
+			case "remote.run":
+				return r.handleRemoteRun(ctx, c, params)
+			case "remote.cancel":
+				return r.handleRemoteCancel(ctx, c, params)
+			case "credential.provide":
+				return r.handleCredentialProvide(ctx, c, params)
 			default:
 				return nil, ipcerr.New("E_UNKNOWN_METHOD", "gitrpc: unknown method "+method)
 			}

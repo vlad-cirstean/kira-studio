@@ -8,7 +8,9 @@ package gitrpc
 // packages/git-ipc/src/validate.ts:7's CONTRACT_VERSION, kept honest by both sides reading the
 // same upstream source rather than by codegen (a single integer does not justify one). A mismatch
 // in gitsock's handshake is a hard, loud stop, not a silent drop.
-const ContractVersion = 15
+// G7 D2: 15 -> 16, for exactly three additions — credential.request (a new event), credential.
+// provide (a new request), and remote.pullPreflight's own optional strategySetting param.
+const ContractVersion = 16
 
 // Protocol is the handshake envelope's own version (SPEC §3.3's "protocol":1), distinct from
 // ContractVersion — it never changes unless the hello/ready exchange itself is redesigned.

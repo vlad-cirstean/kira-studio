@@ -4,7 +4,7 @@ import type { EventKey, RequestKey, StreamKey } from './contract.ts';
  * Boundary validation. Per §3.5, a contract mismatch must fail loudly rather than
  * half-work — so this throws, it does not degrade.
  */
-export const CONTRACT_VERSION = 15;
+export const CONTRACT_VERSION = 16;
 
 export class ContractVersionMismatchError extends Error {
   readonly received: number;
@@ -84,6 +84,7 @@ const REQUEST_KEY_MAP: Record<RequestKey, true> = {
   'remote.pushPreflight': true,
   'remote.run': true,
   'remote.cancel': true,
+  'credential.provide': true,
   'stash.list': true,
   'stash.show': true,
   'preflight.stashPop': true,
@@ -99,6 +100,7 @@ const EVENT_KEY_MAP: Record<EventKey, true> = {
   'settings.changed': true,
   'review.target': true,
   'remote.progress': true,
+  'credential.request': true,
 };
 const STREAM_KEY_MAP: Record<StreamKey, true> = {
   'graph.stream': true,

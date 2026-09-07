@@ -65,4 +65,12 @@ export class KiraGraphViewProvider implements vscode.WebviewViewProvider {
   notifyRepoChanged(payload: EventPayload<'repo.changed'>): void {
     this.#server?.emit('repo.changed', payload);
   }
+
+  /** G7 D20/§4.2: forwarded from `ConnectionManager.on('remote.progress', ...)` — the GRAPH
+   *  provider only, never the review one (upstream's own W16): the review sidebar renders no
+   *  operation UI at all, so fanning progress into it would be built, encoded and delivered for
+   *  nothing. A no-op when no webview is currently resolved. */
+  notifyRemoteProgress(payload: EventPayload<'remote.progress'>): void {
+    this.#server?.emit('remote.progress', payload);
+  }
 }

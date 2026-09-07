@@ -1074,7 +1074,14 @@ export type Contract = {
       result: Record<string, never>;
     };
     'remote.pullPreflight': {
-      params: { repoId: string; branch: string };
+      params: {
+        repoId: string;
+        branch: string;
+        /** G7 D2: injected by the extension from `kiraVersion.pull.strategy`, exactly as
+         *  `review.resolveBase` injects `baseCandidates`. Absent for every raw socket client —
+         *  the server treats that the same as `"auto"`. */
+        strategySetting?: PullStrategy | 'auto';
+      };
       result: PullPreflight;
     };
     'remote.pushPreflight': {
@@ -1098,6 +1105,19 @@ export type Contract = {
        *  D50) — never an error: a cancel racing a just-finished op is an ordinary outcome, not a
        *  fault. */
       result: { readonly cancelled: boolean };
+    };
+    /** G7 D2/D4: answers exactly one `credential.request` by id — sent by the connection that
+     *  owns the in-flight remote op, never proxied from the webview (`proxyHandlers.ts` throws on
+     *  this key). `secret` is `null` for a dismissal, never omitted — a value the wire carries,
+     *  not an absence the server has to infer (the same discipline G4 D5 set for this chapter).
+     *  Answering twice, or presenting an id this connection never received, is a no-op, never an
+     *  error (D4's own anti-abuse rules). */
+    'credential.provide': {
+      params: {
+        readonly requestId: string;
+        readonly secret: string | null;
+      };
+      result: Record<string, never>;
     };
     // ---- P11: search -----------------------------------------------------------------------
     /** §7.8's git-backed half. One request, one cancellable read — no cancel key, no second walk
@@ -1153,6 +1173,19 @@ export type Contract = {
     'review.target': { repoId: string; branch: string };
     /** Throttled to 100ms (OQ10) — live progress for whichever `remote.run` is in flight. */
     'remote.progress': RemoteProgress;
+    /** G7 D2/D4: one prompt from git's own askpass protocol, sent to the connection that owns the
+     *  in-flight remote op — never Kira Studio's own window (SPEC §5 item 4, §6, confirmed
+     *  2026-09-07). `requestId` is a server-minted, unguessable id; the extension answers exactly
+     *  once with `credential.provide`. Nothing here is ever logged or stored on either side —
+     *  `prompt` can itself contain a username the user just typed (probe P1's second prompt). */
+    'credential.request': {
+      readonly requestId: string;
+      readonly repoId: string;
+      /** git's own text, verbatim: "Password for 'https://alice@github.com': ". */
+      readonly prompt: string;
+      /** `false` only for git's own "Username for …" shape; everything unrecognised is masked. */
+      readonly masked: boolean;
+    };
   };
   streams: {
     'graph.stream': {

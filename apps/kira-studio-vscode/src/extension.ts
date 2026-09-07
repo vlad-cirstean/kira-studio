@@ -20,6 +20,7 @@ import * as vscode from 'vscode';
 import { ConnectionManager } from './connection.ts';
 import { KiraGraphViewProvider } from './panelView.ts';
 import { VsCodeClipboard } from './ports/clipboard.ts';
+import { VsCodeCredentialPrompt } from './ports/credentialPrompt.ts';
 import { VsCodeDialogs } from './ports/dialogs.ts';
 import { VsCodeEditorIntegration } from './ports/editorIntegration.ts';
 import { VsCodeLogger } from './ports/logger.ts';
@@ -74,6 +75,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const roots = new VsCodeWorkspaceRoots();
   const clipboard = new VsCodeClipboard();
   const editor = new VsCodeEditorIntegration();
+  // G7 D4/D21: the migrated, previously-unused credential port — this phase's own relay is its
+  // first (and only) caller.
+  const credentialPrompt = new VsCodeCredentialPrompt();
 
   const appVersion = String(
     (context.extension.packageJSON as { version?: unknown }).version ?? '0.0.0',
@@ -130,6 +134,30 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       dispose: manager.on('repo.changed', (payload) => {
         graphProvider.notifyRepoChanged(payload);
         reviewProvider.notifyRepoChanged(payload);
+      }),
+    },
+    // G7 D4/D21: the credential relay's whole client half — askpass becomes a relay, per SPEC §5
+    // item 4. No try/catch that logs anywhere on this path: the prompt text can itself contain a
+    // credential (a pasted token echoed back in git's own next prompt, probe P1), so a failed
+    // `credential.provide` call (the socket dropped between prompt and answer) is swallowed
+    // silently — the broker's own disconnect bound has already fired by the time this would run.
+    {
+      dispose: manager.on('credential.request', (req) => {
+        void (async () => {
+          const secret = await credentialPrompt.ask({ prompt: req.prompt, masked: req.masked });
+          await manager.request('credential.provide', {
+            requestId: req.requestId,
+            secret: secret ?? null,
+          });
+        })().catch(() => {
+          /* the broker's own bound (dismissal/timeout/disconnect/cancel) already ends the wait */
+        });
+      }),
+    },
+    // G7 D20/§4.2: the graph provider only — the review sidebar renders no operation UI at all.
+    {
+      dispose: manager.on('remote.progress', (payload) => {
+        graphProvider.notifyRemoteProgress(payload);
       }),
     },
     manager.onStateChange((state) => {

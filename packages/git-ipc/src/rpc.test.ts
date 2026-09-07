@@ -148,6 +148,7 @@ function stubHandlers(
       'remote.cancel': notImplemented,
       'remote.pullPreflight': notImplemented,
       'remote.pushPreflight': notImplemented,
+      'credential.provide': notImplemented,
       'stash.list': notImplemented,
       'stash.show': notImplemented,
       'preflight.stashPop': notImplemented,
