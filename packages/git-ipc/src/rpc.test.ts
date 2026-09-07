@@ -153,6 +153,8 @@ function stubHandlers(
       'preflight.stashPop': notImplemented,
       'preflight.stashBranch': notImplemented,
       'search.run': notImplemented,
+      'file.read': notImplemented,
+      'file.goToTarget': notImplemented,
       ...requestOverrides,
     },
     streams: {

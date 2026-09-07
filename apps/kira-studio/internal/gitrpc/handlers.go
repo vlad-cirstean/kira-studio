@@ -58,6 +58,14 @@ func (r *Router) ForConn(c *gitsession.Conn) Handlers {
 				return r.handleGraphLoadMore(ctx, c, params)
 			case "graph.refresh":
 				return r.handleGraphRefresh(ctx, c, params)
+			case "commit.detail":
+				return r.handleCommitDetail(ctx, c, params)
+			case "commit.fileDiff":
+				return r.handleCommitFileDiff(ctx, c, params)
+			case "file.read":
+				return r.handleFileRead(ctx, c, params)
+			case "file.goToTarget":
+				return r.handleFileGoToTarget(ctx, c, params)
 			default:
 				return nil, ipcerr.New("E_UNKNOWN_METHOD", "gitrpc: unknown method "+method)
 			}

@@ -8,7 +8,7 @@ package gitrpc
 // packages/git-ipc/src/validate.ts:7's CONTRACT_VERSION, kept honest by both sides reading the
 // same upstream source rather than by codegen (a single integer does not justify one). A mismatch
 // in gitsock's handshake is a hard, loud stop, not a silent drop.
-const ContractVersion = 13
+const ContractVersion = 14
 
 // Protocol is the handshake envelope's own version (SPEC §3.3's "protocol":1), distinct from
 // ContractVersion — it never changes unless the hello/ready exchange itself is redesigned.

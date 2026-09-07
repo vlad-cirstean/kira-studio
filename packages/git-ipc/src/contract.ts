@@ -1099,6 +1099,42 @@ export type Contract = {
       params: { repoId: string; query: SearchQueryParams; limit?: number };
       result: SearchRunResult;
     };
+    // ---- G4 (v1.3 chapter): server-only methods -------------------------------------------
+    // Neither of these is ever called by the webview — both exist solely for the extension's own
+    // use (the virtual-document source, "Go to file"'s server half), and would otherwise need a
+    // second, untyped request surface on `ConnectionManager` (G4 plan F12) for two methods. Each
+    // still gets a `forward(...)` entry in `proxyHandlers` (`ServerHandlers.requests` is total
+    // over `RequestKey`) even though nothing ever reaches it from that direction.
+    /** The blob at `<rev>:<path>`, for the extension's own virtual-document provider (G4 D14).
+     *  Text only: a binary blob is refused rather than encoded, because the only consumer is a
+     *  read-only text document. */
+    'file.read': {
+      params: { repoId: string; rev: string; path: string };
+      result:
+        | { readonly kind: 'found'; readonly content: string }
+        | { readonly kind: 'missing' }
+        | { readonly kind: 'binary' }
+        | { readonly kind: 'tooLarge'; readonly bytes: number; readonly limitBytes: number };
+    };
+    /** D14a's decision procedure, minus the part only VS Code can do (G4 D4). The extension maps
+     *  `line` through `hunks` with `@kira/git-core`'s `mapLineAcrossDiff` and then reveals; it
+     *  never asks the filesystem or the object database anything itself. */
+    'file.goToTarget': {
+      params: { repoId: string; rev: string; path: string };
+      result:
+        | {
+            readonly kind: 'live';
+            readonly absPath: string;
+            /** `null` ⇒ do not re-map: identical file, a path git cannot see, over the patch
+             *  cap, or a spawn that failed. A refinement declining to fire is never an error. */
+            readonly hunks: readonly DiffHunk[] | null;
+          }
+        | { readonly kind: 'historical'; readonly rev: string; readonly path: string }
+        | {
+            readonly kind: 'unavailable';
+            readonly reason: 'notInRevision' | 'binary' | 'tooLarge';
+          };
+    };
   };
   events: {
     'repo.changed': { repoId: string; kind: 'refsChanged' | 'worktreeChanged' };

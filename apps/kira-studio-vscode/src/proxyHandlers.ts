@@ -113,6 +113,10 @@ export function createProxyHandlers(deps: CreateProxyHandlersDeps): ServerHandle
     'preflight.reset': forward('preflight.reset'),
     'preflight.cherryPick': forward('preflight.cherryPick'),
     'search.run': forward('search.run'),
+    // G4 D3/F12: server-only, never called by the webview — plain forwarders are enough
+    // (ServerHandlers.requests is total over RequestKey, so both need an entry regardless).
+    'file.read': forward('file.read'),
+    'file.goToTarget': forward('file.goToTarget'),
   };
 
   const streams: ServerHandlers['streams'] = {

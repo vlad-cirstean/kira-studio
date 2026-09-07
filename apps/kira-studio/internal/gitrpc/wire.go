@@ -97,6 +97,51 @@ func (commitsBlob) MarshalJSON() ([]byte, error) {
 	return []byte(`{"$fb":"gitwire/1","d":{"$blob":true}}`), nil
 }
 
+// ---------------------------------------------------------------------------------------
+// commit.detail/commit.fileDiff/file.read/file.goToTarget (D3, D6) — @kira/git-ipc's own request
+// shapes. Results are gitsession's own wire-shaped types (porcelain.CommitDetail,
+// gitsession.FileDiffResult/BlobResult/GoToTarget) — D5's own precedent (gitclient.RepoSummary
+// crossing the wire directly) applied again: no second, gitrpc-owned copy of a shape gitsession
+// already produces JSON-tagged.
+// ---------------------------------------------------------------------------------------
+
+// MaxResultBytes is D2(b)'s own cap on commit.fileDiff/file.read's *encoded* result — comfortably
+// under gitsock's 8 MiB frame cap, far above anything a 1 MiB patch (gitsession.MaxPatchBytes)
+// produces in practice (F9: ~2.5 MiB worst realistic case). Not measured against a real budget —
+// there is no decision this number would change.
+const MaxResultBytes = 6 << 20
+
+type CommitDetailParams struct {
+	RepoID      string `json:"repoId"`
+	SHA         string `json:"sha"`
+	ParentIndex *int   `json:"parentIndex,omitempty"`
+}
+
+type CommitFileDiffParams struct {
+	RepoID       string  `json:"repoId"`
+	SHA          string  `json:"sha"`
+	Path         string  `json:"path"`
+	OriginalPath *string `json:"originalPath,omitempty"`
+	ParentIndex  *int    `json:"parentIndex,omitempty"`
+}
+
+// FileReadParams is file.read's own request — a server-only method (D3): never called by the
+// webview, only by the extension's own virtual-document source (D14).
+type FileReadParams struct {
+	RepoID string `json:"repoId"`
+	Rev    string `json:"rev"`
+	Path   string `json:"path"`
+}
+
+// FileGoToTargetParams is file.goToTarget's own request — a server-only method (D3): the
+// extension maps the returned hunks across the drift itself (D4), over @kira/git-core's own
+// already-tested mapLineAcrossDiff.
+type FileGoToTargetParams struct {
+	RepoID string `json:"repoId"`
+	Rev    string `json:"rev"`
+	Path   string `json:"path"`
+}
+
 // graphChunk is graph.stream's chunk envelope — @kira/git-ipc's own StreamChunkOf<'graph.stream'>
 // field for field, with `commits` replaced by the D4 marker above.
 type graphChunk struct {
