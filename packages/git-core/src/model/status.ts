@@ -9,8 +9,9 @@
  * counts, an uncapped dirty-path list, and `head` derived from the branch header rather than a
  * third rev-parse/symbolic-ref spawn (`status --branch` already carries everything
  * `resolveHeadState` in `discovery.ts` would otherwise re-derive). `dirtyPathsFrom` is the
- * sibling fold used for pre-flight (`core/src/preflight/checkout.ts`'s `dirty` input), kept
- * separate because pre-flight needs `tracked`/`untracked` discrimination per path and
+ * sibling fold used for pre-flight (`internal/gitpreflight/checkout.go`'s `dirty` input —
+ * server-side since G5, SPEC §2), kept separate because pre-flight needs `tracked`/`untracked`
+ * discrimination per path and
  * `StatusSummary` needs only a flat display list — two different shapes over the same entries,
  * not one shape serving both badly.
  */
@@ -165,8 +166,9 @@ export function summarizeStatus(
   };
 }
 
-/** The sibling fold `core/src/preflight/checkout.ts`'s `dirty` input needs: every path git
- *  considers not-clean, discriminated tracked/untracked — the split §7.5's two blocker kinds
+/** The sibling fold `internal/gitpreflight/checkout.go`'s `dirty` input needs (server-side since
+ *  G5, SPEC §2): every path git considers not-clean, discriminated tracked/untracked — the split
+ *  §7.5's two blocker kinds
  *  (`blockedByTracked`/`blockedByUntracked`) are built from. An unmerged path counts as tracked:
  *  it has index stages, and `blockedByTracked`'s remedy (discard) is the one that actually
  *  applies to it. */
