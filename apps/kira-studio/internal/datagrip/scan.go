@@ -66,9 +66,12 @@ func Scan(projectDir string) (*Preview, error) {
 		cfg = ReadSecurityXML(candidates[0].Dir)
 	}
 
-	preview := &Preview{ProjectDir: projectDir, Rows: []PreviewRow{}}
+	// project.Dir (not the projectDir parameter): ParseProject already normalized a .idea-direct
+	// pick down to the real project root (D13/datasources.go), and macro expansion below must
+	// resolve against that root, not the .idea folder itself.
+	preview := &Preview{ProjectDir: project.Dir, Rows: []PreviewRow{}}
 	for _, ds := range project.DataSources {
-		preview.Rows = append(preview.Rows, previewRowFor(ds, projectDir, cfg))
+		preview.Rows = append(preview.Rows, previewRowFor(ds, project.Dir, cfg))
 	}
 	return preview, nil
 }

@@ -108,6 +108,27 @@ func TestParseProjectAcceptsIdeaDirDirectly(t *testing.T) {
 	}
 }
 
+// TestParseProjectDirResolvesToParentOfIdea is the review finding: whichever of the project folder
+// or its .idea folder the caller passed in, Project.Dir must always be the project's own root (the
+// .idea folder's parent) — never the .idea folder itself — since jdbc.go's expandMacros resolves
+// $PROJECT_DIR$/$ProjectFileDir$ against it directly.
+func TestParseProjectDirResolvesToParentOfIdea(t *testing.T) {
+	viaRoot, err := ParseProject("testdata/project-six")
+	if err != nil {
+		t.Fatalf("ParseProject(root): %v", err)
+	}
+	viaIdea, err := ParseProject("testdata/project-six/.idea")
+	if err != nil {
+		t.Fatalf("ParseProject(.idea dir): %v", err)
+	}
+	if viaRoot.Dir != "testdata/project-six" {
+		t.Errorf("Dir via project root = %q, want %q", viaRoot.Dir, "testdata/project-six")
+	}
+	if viaIdea.Dir != viaRoot.Dir {
+		t.Errorf("Dir via .idea pick = %q, want it to resolve to the same project root %q", viaIdea.Dir, viaRoot.Dir)
+	}
+}
+
 // TestParseProjectRejectsFolderWithNoIdea is the negative case for D13's validation.
 func TestParseProjectRejectsFolderWithNoIdea(t *testing.T) {
 	if _, err := ParseProject(t.TempDir()); err == nil {

@@ -143,6 +143,32 @@ func TestSQLiteMacroExpansion(t *testing.T) {
 	}
 }
 
+// TestSQLiteMacroExpansionWhenPickingIdeaDirDirectly is the review finding: a $PROJECT_DIR$-relative
+// SQLite path must resolve against the real project root even when the caller/picker pointed at the
+// .idea folder itself (D13) rather than the project folder — never against .idea, which would put
+// the resolved path a level too deep (e.g. "<project>/.idea/db.sqlite" instead of
+// "<project>/db.sqlite").
+func TestSQLiteMacroExpansionWhenPickingIdeaDirDirectly(t *testing.T) {
+	uuid := "aaaaaaaa-0000-0000-0000-00000000000a"
+	dir := writeSyntheticProject(t, sharedSourceXML(uuid, "s", "sqlite.xerial", "jdbc:sqlite:$PROJECT_DIR$/db/app.sqlite", false), "")
+
+	preview, err := Scan(filepath.Join(dir, ".idea"))
+	if err != nil {
+		t.Fatalf("Scan(.idea dir): %v", err)
+	}
+	if len(preview.Rows) != 1 || !preview.Rows[0].Importable || preview.Rows[0].Database == nil {
+		t.Fatalf("Scan(.idea dir) rows = %+v, want one importable row with a database path", preview.Rows)
+	}
+	got := *preview.Rows[0].Database
+	want := filepath.Join(dir, "db", "app.sqlite")
+	if got != want {
+		t.Errorf("Database = %q, want %q", got, want)
+	}
+	if strings.Contains(got, ".idea") {
+		t.Errorf("Database = %q contains .idea — $PROJECT_DIR$ resolved against the .idea folder itself", got)
+	}
+}
+
 // TestPostgresDefaultPort is case 7.
 func TestPostgresDefaultPort(t *testing.T) {
 	uuid := "aaaaaaaa-0000-0000-0000-000000000003"

@@ -144,7 +144,13 @@ func ParseProject(dir string) (*Project, error) {
 		}
 	}
 
-	project := &Project{Dir: dir, CreatedIn: createdIn}
+	// Dir is always ideaDir's own parent, never the raw dir the caller passed in: resolveIdeaDir
+	// above already normalized a .idea-direct pick down to the real .idea folder, so its parent is
+	// always the actual project root regardless of which of the two the caller/picker handed in.
+	// Getting this wrong would make expandMacros (jdbc.go) resolve $PROJECT_DIR$/$ProjectFileDir$
+	// to the .idea folder itself for a .idea-direct pick — e.g. "<project>/.idea/db.sqlite" instead
+	// of "<project>/db.sqlite" for a relative SQLite path.
+	project := &Project{Dir: filepath.Dir(ideaDir), CreatedIn: createdIn}
 	for _, c := range shared.Components {
 		if c.Name != "DataSourceManagerImpl" && c.Name != "dataSourceStorage" {
 			continue

@@ -67,7 +67,8 @@ func Apply(projectDir string, selectedUUIDs []string, secretsAvailable bool, cre
 		if !selected[ds.UUID] {
 			continue
 		}
-		report.Rows = append(report.Rows, applyOne(ds, projectDir, cfg, secretsAvailable, creator))
+		// project.Dir (not the projectDir parameter): see Scan's identical comment in scan.go.
+		report.Rows = append(report.Rows, applyOne(ds, project.Dir, cfg, secretsAvailable, creator))
 	}
 	return report, nil
 }
