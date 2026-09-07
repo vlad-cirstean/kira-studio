@@ -323,7 +323,24 @@ P12 package split may also want), not a boundary violation.
 | **G16** | Worktree support: `git worktree` create/list/switch/remove, building on G5's linked-worktree detection, plus a user-configurable "prepare script" run after creating a worktree with visible progress feedback. *Not designed upstream either* — full design (RPC shape, pre-flight interaction, prepare-script sandboxing) happens at this phase's own Opus planning pass, not assumed here, same placeholder-then-design approach upstream itself used | G5 | P14 |
 
 Each phase gets its own Opus-authored plan under `docs/v1.3/plans/` before implementation starts,
-per `AGENTS.md` — none is written as part of this chapter spec. **Reordered 2026-09-07**: Ship
+per `AGENTS.md` — none is written as part of this chapter spec.
+
+**Full verification scope, 2026-09-07.** `AGENTS.md`'s "expensive suite runs once near the end of
+the phase" already means the *whole* `apps/kira-studio/internal/...` Go tree — including this app's
+pre-existing `studio`/`api` adapter packages (`adapters/sqlite`, `storage/repos`, and similar),
+which take real minutes under `-race` and cannot be touched by any git-chapter change (the layering
+test itself proves that boundary — no `internal/git*` package imports or is imported by an adapter
+package). For this chapter, scope the once-per-phase Go race run to the git packages actually in
+play plus the layering test — `gitclient`, `gitclient/porcelain`, `gitclient/catfile`,
+`gitclient/logsession`, `gitpreflight`, `gitops`, `gitsession`, `gitrpc`, `gitsock`, `gitstore`,
+`gitwire`, `bridge`, `bridge/rpcstream`, and `internal` itself for
+`TestDomainPackagesDoNotImportBridge` — rather than the full tree, on both sides: what a phase's own
+implementing subagent runs, and what the orchestrating session re-verifies independently afterward.
+The full unscoped tree is still worth running occasionally (e.g. once per few phases, or before a
+final merge) as a backstop against an accidental cross-module regression, just not as the default
+per-phase cost.
+
+**Reordered 2026-09-07**: Ship
 (originally last, dead-last dependency on "all" fifteen other phases) moved to G9, right after
 hardening, so the packaged, installable extension exists much sooner — G8's own position is
 otherwise unchanged (still the phase that stress-tests everything built up to it), and G10–G16 are
