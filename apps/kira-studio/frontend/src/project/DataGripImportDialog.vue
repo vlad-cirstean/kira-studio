@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { ConnectionKind } from '@shared/domain/connection';
-import type { DataGripPreviewRow } from '@shared/domain/datagrip';
+import type { DataGripPreviewRow, DataGripReportRow } from '@shared/domain/datagrip';
 import { computed } from 'vue';
 import { connectionsState } from '../state/connections';
 import {
@@ -58,9 +58,44 @@ const SKIP_LABEL: Record<string, (row: DataGripPreviewRow) => string> = {
   'no-jdbc-url': () => 'no usable JDBC URL for this data source',
 };
 
+// Every D11 reason code that can reach ReportRow.Error (either a resolveFields skip, quoted back
+// with its own detail joined by ": " — internal/datagrip/apply.go's applyOne — or a bare
+// password-only refusal code with no detail at all) gets the same plain-English label the preview
+// step already gives it elsewhere in this file, so a row's report reads the same way its preview
+// row did rather than surfacing a bare wire code.
+const REPORT_REASON_LABEL: Record<string, string> = {
+  'unsupported-engine': 'no adapter for this engine',
+  'unrepresentable-url': 'cannot be represented as host/port/database fields',
+  'sqlite-path-not-absolute': 'database path did not resolve to an absolute path',
+  'no-jdbc-url': 'no usable JDBC URL for this data source',
+  'password-not-saved': 'DataGrip did not save a password',
+  'password-not-found': 'no password is stored for this data source',
+  'credential-store-not-found': 'the credential store could not be found',
+  'credential-store-unsupported': 'password store not supported here',
+  'credential-store-locked': 'the credential store is locked',
+  'secret-storage-unavailable': 'passwords cannot be saved on this machine',
+};
+
 const rows = computed(() => datagripImportState.preview?.rows ?? []);
 const checkedCount = computed(() => datagripImportState.selected.size);
 const secretStatus = computed(() => connectionsState.secretStorage);
+const report = computed(() => datagripImportState.report);
+const reportSummary = computed(() => {
+  const r = report.value;
+  if (!r) return '';
+  const created = r.rows.filter((row) => row.created).length;
+  const failed = r.rows.length - created;
+  const passwords = r.rows.filter((row) => row.passwordImported).length;
+  const parts = [
+    `${created} of ${r.rows.length} connection${r.rows.length === 1 ? '' : 's'} created`,
+  ];
+  if (passwords > 0) parts.push(`${passwords} password${passwords === 1 ? '' : 's'} imported`);
+  if (failed > 0) parts.push(`${failed} failed`);
+  return parts.join(' — ');
+});
+const reportTone = computed<'note' | 'warn'>(() =>
+  (report.value?.rows.some((row) => !row.created) ?? false) ? 'warn' : 'note',
+);
 
 function skipLabel(row: DataGripPreviewRow): string {
   const fn = row.skipReason ? SKIP_LABEL[row.skipReason] : undefined;
@@ -74,9 +109,31 @@ function warningLabel(code: string): string {
   return code;
 }
 
+// row.error is either "<code>: <detail>" (a resolveFields skip, D11) or a bare code/message —
+// only the leading segment is ever a known reason code, so an unmapped prefix (a Creator/Validate
+// error such as "name must be 1-120 characters") falls back to the raw text verbatim.
+function reportErrorLabel(row: DataGripReportRow): string {
+  if (!row.error) return '';
+  const sep = row.error.indexOf(': ');
+  const code = sep === -1 ? row.error : row.error.slice(0, sep);
+  const label = REPORT_REASON_LABEL[code];
+  if (!label) return row.error;
+  const detail = sep === -1 ? '' : row.error.slice(sep + 2);
+  return detail ? `${label} (${detail})` : label;
+}
+
+function reportOutcome(row: DataGripReportRow): { label: string; tone: 'ok' | 'warn' | 'err' } {
+  if (!row.created) return { label: `Not created — ${reportErrorLabel(row)}`, tone: 'err' };
+  if (row.passwordImported) return { label: 'Created — password imported', tone: 'ok' };
+  if (row.error) return { label: `Created — ${reportErrorLabel(row)}`, tone: 'warn' };
+  return { label: 'Created', tone: 'ok' };
+}
+
 async function onConfirm(): Promise<void> {
-  const report = await confirmDataGripImport();
-  if (report) closeDataGripImportDialog();
+  // Deliberately no auto-close here (review finding): confirmDataGripImport already stores its
+  // result on datagripImportState.report, which flips the template below into the results view —
+  // the user closes explicitly once they have seen it.
+  await confirmDataGripImport();
 }
 </script>
 
@@ -92,10 +149,10 @@ async function onConfirm(): Promise<void> {
   >
     <template #header>
       <span class="icon-box muted"><CodiconIcon name="database" :size="13" /></span>
-      <span>Import from DataGrip</span>
+      <span>{{ report ? 'Import from DataGrip — results' : 'Import from DataGrip' }}</span>
     </template>
 
-    <div class="p-dialog-body">
+    <div v-if="!report" class="p-dialog-body">
       <MessageStrip
         v-if="secretStatus && !secretStatus.available"
         tone="warn"
@@ -171,22 +228,66 @@ async function onConfirm(): Promise<void> {
       </div>
     </div>
 
-    <template #footer>
-      <span class="help">{{ datagripImportState.projectPath }}</span>
-      <span class="p-dialog-actions p-push">
-        <AppButton kind="dialog" data-testid="datagrip-import-cancel" @click="closeDataGripImportDialog">
-          Cancel
-        </AppButton>
-        <AppButton
-          kind="dialog"
-          variant="primary"
-          data-testid="datagrip-import-confirm"
-          :disabled="checkedCount === 0 || datagripImportState.busy"
-          @click="onConfirm"
+    <!-- Review finding: the report Import returns used to be discarded on close with no display
+         at all — every per-row outcome (created, password imported, or the specific reason it
+         wasn't) is now shown here instead of auto-closing. -->
+    <div v-else class="p-dialog-body">
+      <MessageStrip :tone="reportTone" data-testid="datagrip-report-summary">
+        {{ reportSummary }}
+      </MessageStrip>
+
+      <div class="row-list" data-testid="datagrip-report-rows">
+        <div
+          v-for="row in report.rows"
+          :key="row.uuid"
+          class="ds-row"
+          :data-testid="`datagrip-report-row-${row.uuid}`"
         >
-          Import {{ checkedCount }} connection{{ checkedCount === 1 ? '' : 's' }}
-        </AppButton>
-      </span>
+          <span class="engine-mark" :style="{ color: row.created ? 'var(--kira-ok)' : 'var(--kira-error)' }">
+            <CodiconIcon :name="row.created ? 'check' : 'error'" :size="15" />
+          </span>
+          <span class="ds-name">{{ row.name }}</span>
+          <span
+            class="p-chip p-push"
+            :class="reportOutcome(row).tone"
+            data-testid="datagrip-report-row-outcome"
+          >
+            {{ reportOutcome(row).label }}
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <template #footer>
+      <template v-if="!report">
+        <span class="help">{{ datagripImportState.projectPath }}</span>
+        <span class="p-dialog-actions p-push">
+          <AppButton kind="dialog" data-testid="datagrip-import-cancel" @click="closeDataGripImportDialog">
+            Cancel
+          </AppButton>
+          <AppButton
+            kind="dialog"
+            variant="primary"
+            data-testid="datagrip-import-confirm"
+            :disabled="checkedCount === 0 || datagripImportState.busy"
+            @click="onConfirm"
+          >
+            Import {{ checkedCount }} connection{{ checkedCount === 1 ? '' : 's' }}
+          </AppButton>
+        </span>
+      </template>
+      <template v-else>
+        <span class="p-dialog-actions p-push">
+          <AppButton
+            kind="dialog"
+            variant="primary"
+            data-testid="datagrip-import-report-close"
+            @click="closeDataGripImportDialog"
+          >
+            Close
+          </AppButton>
+        </span>
+      </template>
     </template>
   </DialogFrame>
 </template>

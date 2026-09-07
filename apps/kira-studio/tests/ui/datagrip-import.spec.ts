@@ -147,6 +147,69 @@ test('datagrip import — the preview lists every row, greys the unsupported one
   expect(args.path).toBe(PROJECT_DIR);
   expect([...args.selectedUuids].sort()).toEqual(['uuid-not-saved', 'uuid-pg']);
 
+  // Review finding: the dialog must show the report, not auto-close — every row's outcome from
+  // the Import call is rendered right here rather than discarded.
+  await expect(dialog).toBeVisible();
+  await expect(page.locator('[data-testid="datagrip-import-confirm"]')).toHaveCount(0);
+  await expect(page.locator('[data-testid="datagrip-report-row-uuid-pg"]')).toContainText(
+    'password imported',
+  );
+  await expect(page.locator('[data-testid="datagrip-report-row-uuid-not-saved"]')).toContainText(
+    'Created',
+  );
+
+  await page.click('[data-testid="datagrip-import-report-close"]');
+  await expect(dialog).toHaveCount(0);
+});
+
+test('datagrip import — the report renders every row outcome, including a failure, and closes only on an explicit Close', async ({
+  relaunch,
+}) => {
+  const REPORT_WITH_FAILURE: DataGripReport = {
+    rows: [
+      { uuid: 'uuid-pg', name: 'pg-main', created: true, passwordImported: true },
+      {
+        uuid: 'uuid-not-saved',
+        name: 'ci-db',
+        created: false,
+        passwordImported: false,
+        error: 'name must be 1-120 characters',
+      },
+    ],
+  };
+  const CONTROL: ControlSnapshot[] = [
+    ...baseControl(),
+    { channel: IPC.datagripImport, response: REPORT_WITH_FAILURE },
+  ];
+  const { window: page } = await relaunch({ control: CONTROL });
+
+  await page.click('[data-testid="import-datagrip"]');
+  await page.click('[data-testid="datagrip-import-confirm"]');
+
+  const dialog = page.locator('[data-testid="datagrip-import-dialog"]');
+  await expect(dialog).toBeVisible();
+
+  // The summary counts both the success and the failure.
+  await expect(page.locator('[data-testid="datagrip-report-summary"]')).toContainText('1 of 2');
+  await expect(page.locator('[data-testid="datagrip-report-summary"]')).toContainText('1 failed');
+
+  const okRow = page.locator('[data-testid="datagrip-report-row-uuid-pg"]');
+  await expect(okRow.locator('[data-testid="datagrip-report-row-outcome"]')).toContainText(
+    'password imported',
+  );
+
+  const failedRow = page.locator('[data-testid="datagrip-report-row-uuid-not-saved"]');
+  await expect(failedRow.locator('[data-testid="datagrip-report-row-outcome"]')).toContainText(
+    'Not created',
+  );
+  await expect(failedRow.locator('[data-testid="datagrip-report-row-outcome"]')).toContainText(
+    'name must be 1-120 characters',
+  );
+
+  // Escape/click-outside is still a valid way to dismiss it — only the auto-close on confirm is
+  // gone — but the dialog must never disappear on its own.
+  await expect(dialog).toBeVisible();
+  await page.click('[data-testid="datagrip-import-report-close"]');
   await expect(dialog).toHaveCount(0);
 });
 
