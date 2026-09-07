@@ -311,7 +311,7 @@ func (e *RepoEntry) RunRemote(ctx context.Context, conn *Conn, params RemoteOpPa
 
 	if params.Kind == "forcePush" || params.Kind == "deleteRemoteBranch" {
 		if match := gitpreflight.MatchProtectedBranch(params.Branch, protectedBranches); match != nil && params.ConfirmToken != params.Branch {
-			return e.remoteResultNoSpawn(opCtx, &RemoteOpError{
+			return e.remoteResultNoSpawn(ctx, &RemoteOpError{
 				Kind:    "ProtectedBranch",
 				Message: fmt.Sprintf("%s is protected by %q — type the branch name to confirm", params.Branch, match.Pattern),
 			})
@@ -319,12 +319,12 @@ func (e *RepoEntry) RunRemote(ctx context.Context, conn *Conn, params RemoteOpPa
 	}
 
 	if params.Kind == "forcePush" {
-		currentTip, err := e.readRemoteTip(opCtx, params.Remote, params.Branch)
+		currentTip, err := e.readRemoteTip(ctx, params.Remote, params.Branch)
 		if err != nil {
 			return RemoteOpResult{}, err
 		}
 		if !remoteTipsEqual(currentTip, params.ExpectedRemoteTip) {
-			return e.remoteResultNoSpawn(opCtx, &RemoteOpError{
+			return e.remoteResultNoSpawn(ctx, &RemoteOpError{
 				Kind: "LeaseViolation", Message: "the remote branch moved since this push was reviewed",
 			})
 		}
@@ -341,6 +341,10 @@ func (e *RepoEntry) RunRemote(ctx context.Context, conn *Conn, params RemoteOpPa
 	parser := gitops.NewProgressParser(gitops.Throttle(progressEmit, 100*time.Millisecond, time.Now))
 	onStderr := func(chunk []byte) { parser.Write(chunk) }
 
+	// ctx (never cancelled by remote.cancel — only opCtx, the spawn's own context, is) is what
+	// every "must still happen even after a cancellation" read below uses: the ref-snapshot reads
+	// bracketing a fetch, and the final read-back after this switch. Only the actual git spawn
+	// inside each helper takes opCtx.
 	var updates []gitops.RefUpdate
 	var opErr *RemoteOpError
 	var spawnErr error
@@ -348,11 +352,11 @@ func (e *RepoEntry) RunRemote(ctx context.Context, conn *Conn, params RemoteOpPa
 	switch params.Kind {
 	case "fetch":
 		e.remoteOp.setKillable(true)
-		updates, opErr, spawnErr = e.runFetch(opCtx, conn, deps, params, onStderr)
+		updates, opErr, spawnErr = e.runFetch(ctx, opCtx, conn, deps, params, onStderr)
 	case "push", "forcePush", "deleteRemoteBranch":
 		updates, opErr, spawnErr = e.runPushFamily(opCtx, conn, deps, params, onStderr)
 	case "pull":
-		updates, opErr, spawnErr = e.runPullOp(opCtx, conn, deps, params, onStderr)
+		updates, opErr, spawnErr = e.runPullOp(ctx, opCtx, conn, deps, params, onStderr)
 	default:
 		return RemoteOpResult{}, fmt.Errorf("gitsession: remote.run: unrecognised kind %q", params.Kind)
 	}
@@ -360,11 +364,11 @@ func (e *RepoEntry) RunRemote(ctx context.Context, conn *Conn, params RemoteOpPa
 		return RemoteOpResult{}, spawnErr
 	}
 
-	_, inProgress, serr := e.statusAndInProgress(opCtx)
+	_, inProgress, serr := e.statusAndInProgress(ctx)
 	if serr != nil {
 		return RemoteOpResult{}, serr
 	}
-	head, herr := e.Head(opCtx)
+	head, herr := e.Head(ctx)
 	if herr != nil {
 		return RemoteOpResult{}, herr
 	}
@@ -372,33 +376,36 @@ func (e *RepoEntry) RunRemote(ctx context.Context, conn *Conn, params RemoteOpPa
 	return RemoteOpResult{OK: opErr == nil, Error: opErr, Updates: nonNilUpdates(updates), Head: head, InProgress: inProgress}, nil
 }
 
-// runFetch executes a plain fetch — killable (D19), no gate (D11).
-func (e *RepoEntry) runFetch(ctx context.Context, conn *Conn, deps RemoteDeps, params RemoteOpParams, onStderr func([]byte)) ([]gitops.RefUpdate, *RemoteOpError, error) {
-	before, err := e.refSnapshot(ctx)
+// runFetch executes a plain fetch — killable (D19), no gate (D11). roCtx (never cancelled by
+// remote.cancel) is used for the ref-snapshot reads bracketing the spawn, so "whatever updates had
+// already landed" can still be reported even when spawnCtx was cancelled mid-flight; only the
+// actual git spawn takes spawnCtx.
+func (e *RepoEntry) runFetch(roCtx, spawnCtx context.Context, conn *Conn, deps RemoteDeps, params RemoteOpParams, onStderr func([]byte)) ([]gitops.RefUpdate, *RemoteOpError, error) {
+	before, err := e.refSnapshot(roCtx)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	argv := gitops.FetchArgs(params.Remote, params.Prune, params.PruneTags)
 	var res gitclient.Result
-	if err := e.withAskpass(ctx, conn, deps, func(env []string) error {
-		r, rerr := e.runRemoteSpawn(ctx, argv, env, onStderr)
+	if err := e.withAskpass(spawnCtx, conn, deps, func(env []string) error {
+		r, rerr := e.runRemoteSpawn(spawnCtx, argv, env, onStderr)
 		res = r
 		return rerr
 	}); err != nil {
 		return nil, nil, err
 	}
 
-	after, err := e.refSnapshot(ctx)
+	after, err := e.refSnapshot(roCtx)
 	if err != nil {
 		return nil, nil, err
 	}
-	updates, err := e.diffRefSnapshots(ctx, before, after)
+	updates, err := e.diffRefSnapshots(roCtx, before, after)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	if ctx.Err() != nil {
+	if spawnCtx.Err() != nil {
 		return updates, &RemoteOpError{Kind: "Cancelled", Message: "the fetch was cancelled"}, nil
 	}
 	if res.ExitCode != 0 {
@@ -466,32 +473,32 @@ func (e *RepoEntry) runPushFamily(ctx context.Context, conn *Conn, deps RemoteDe
 // killable — a genuine local write, gated by Repo.Write exactly like G5's own ops, D11). A
 // conflicting merge/rebase lands in G5's own in-progress banner — this adds no detection of its
 // own (D18).
-func (e *RepoEntry) runPullOp(ctx context.Context, conn *Conn, deps RemoteDeps, params RemoteOpParams, onStderr func([]byte)) ([]gitops.RefUpdate, *RemoteOpError, error) {
+func (e *RepoEntry) runPullOp(roCtx, spawnCtx context.Context, conn *Conn, deps RemoteDeps, params RemoteOpParams, onStderr func([]byte)) ([]gitops.RefUpdate, *RemoteOpError, error) {
 	e.remoteOp.setKillable(true)
 
-	before, err := e.refSnapshot(ctx)
+	before, err := e.refSnapshot(roCtx)
 	if err != nil {
 		return nil, nil, err
 	}
 	fetchArgv := gitops.FetchRefspecArgs(params.Remote, params.Branch, params.Prune)
 	var fetchRes gitclient.Result
-	if err := e.withAskpass(ctx, conn, deps, func(env []string) error {
-		r, rerr := e.runRemoteSpawn(ctx, fetchArgv, env, onStderr)
+	if err := e.withAskpass(spawnCtx, conn, deps, func(env []string) error {
+		r, rerr := e.runRemoteSpawn(spawnCtx, fetchArgv, env, onStderr)
 		fetchRes = r
 		return rerr
 	}); err != nil {
 		return nil, nil, err
 	}
-	after, err := e.refSnapshot(ctx)
+	after, err := e.refSnapshot(roCtx)
 	if err != nil {
 		return nil, nil, err
 	}
-	updates, err := e.diffRefSnapshots(ctx, before, after)
+	updates, err := e.diffRefSnapshots(roCtx, before, after)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	if ctx.Err() != nil {
+	if spawnCtx.Err() != nil {
 		return updates, &RemoteOpError{Kind: "Cancelled", Message: "the pull was cancelled"}, nil
 	}
 	if fetchRes.ExitCode != 0 {
@@ -514,7 +521,7 @@ func (e *RepoEntry) runPullOp(ctx context.Context, conn *Conn, deps RemoteDeps, 
 	}
 
 	var opErr *RemoteOpError
-	writeErr := e.Repo.Write(ctx, func(wctx context.Context) error {
+	writeErr := e.Repo.Write(roCtx, func(wctx context.Context) error {
 		res, rerr := gitclient.Run(wctx, e.Repo.Runner(), e.Repo.GitPath(), gitclient.Spec{
 			Dir: repoWorkingDir(e.Summary), Args: integrateArgv, ReadOnly: false,
 		})
@@ -522,7 +529,12 @@ func (e *RepoEntry) runPullOp(ctx context.Context, conn *Conn, deps RemoteDeps, 
 			return rerr
 		}
 		if res.ExitCode != 0 {
-			kind, message := gitops.ClassifyRemoteError("", string(res.Stderr), res.ExitCode)
+			// Probed here, real git 2.43: a merge conflict's own "CONFLICT (content): …" line is
+			// on STDOUT, while a rebase conflict's "could not apply …" is on stderr — combined so
+			// ClassifyOpError's existing Conflict row (ported from G5, stderr-only there because
+			// checkout/revert never put anything actionable on stdout) sees whichever one fired.
+			combined := string(res.Stdout) + "\n" + string(res.Stderr)
+			kind, message := gitops.ClassifyRemoteError("", combined, res.ExitCode)
 			opErr = &RemoteOpError{Kind: kind, Message: message}
 		}
 		return nil

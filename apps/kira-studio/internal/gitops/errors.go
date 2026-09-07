@@ -29,7 +29,10 @@ func ClassifyOpError(stderr string, exitCode int) (kind, message string) {
 	case strings.Contains(lower, "(remote ref updated since checkout)"):
 		return "RemoteRefUpdated", message
 	case strings.Contains(lower, "! [rejected]") || strings.Contains(lower, "non-fast-forward") ||
-		strings.Contains(lower, "fetch first"):
+		strings.Contains(lower, "fetch first") || strings.Contains(lower, "not possible to fast-forward"):
+		// The last pattern is `merge --ff-only`'s own real message against a diverged branch
+		// (probed here, real git 2.43): "fatal: Not possible to fast-forward, aborting." — pull's
+		// own integrate phase, not a push, so it never has a porcelain reason to check first.
 		return "NonFastForward", message
 	case strings.Contains(lower, "terminal prompts disabled") || strings.Contains(lower, "could not read username") ||
 		strings.Contains(lower, "could not read password") || strings.Contains(lower, "authentication failed for") ||

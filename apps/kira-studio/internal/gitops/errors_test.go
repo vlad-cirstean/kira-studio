@@ -153,10 +153,16 @@ func TestClassifyOpError_RemoteRefUpdated(t *testing.T) {
 }
 
 func TestClassifyOpError_NonFastForward(t *testing.T) {
-	// Probe P5's own no-porcelain form.
-	stderr := " ! [rejected]        main -> main (fetch first)"
-	if kind, _ := gitops.ClassifyOpError(stderr, 1); kind != "NonFastForward" {
-		t.Fatalf("got %q, want NonFastForward", kind)
+	// Probe P5's own no-porcelain form, plus `merge --ff-only`'s own real message against a
+	// diverged branch (probed directly in this container, real git 2.43 — pull's own integrate
+	// phase never has a porcelain reason to check first).
+	for _, stderr := range []string{
+		" ! [rejected]        main -> main (fetch first)",
+		"fatal: Not possible to fast-forward, aborting.",
+	} {
+		if kind, _ := gitops.ClassifyOpError(stderr, 1); kind != "NonFastForward" {
+			t.Fatalf("%q -> %q, want NonFastForward", stderr, kind)
+		}
 	}
 }
 

@@ -115,6 +115,22 @@ func TestParsePushPorcelain_HookRejection(t *testing.T) {
 	}
 }
 
+// TestParsePushPorcelain_SetUpstreamAsideIsSkipped is probed directly in this container:
+// `--set-upstream` injects its own human-readable, tab-free aside into the same porcelain block
+// ("branch 'x' set up to track 'origin/x'." — sandwiched between the ref line and "Done"), which
+// must be skipped rather than treated as a malformed ref line.
+func TestParsePushPorcelain_SetUpstreamAsideIsSkipped(t *testing.T) {
+	stdout := "To ../rem.git\n*\trefs/heads/feature:refs/heads/feature\t[new branch]\n" +
+		"branch 'feature' set up to track 'origin/feature'.\nDone\n"
+	got, err := ParsePushPorcelain([]byte(stdout))
+	if err != nil {
+		t.Fatalf("err = %v", err)
+	}
+	if len(got) != 1 || got[0].Flag != '*' {
+		t.Fatalf("got %+v, want exactly the one ref line", got)
+	}
+}
+
 func TestParsePushPorcelain_DeleteSuccess(t *testing.T) {
 	stdout := "To ../rem.git\n-\t:refs/heads/gone\t[deleted]\nDone\n"
 	got, err := ParsePushPorcelain([]byte(stdout))

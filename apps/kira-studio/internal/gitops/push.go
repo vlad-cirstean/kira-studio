@@ -74,9 +74,12 @@ func ParsePushPorcelain(stdout []byte) ([]PushStatus, error) {
 		if line == "" || line == "Done" || strings.HasPrefix(line, "To ") {
 			continue
 		}
-		status, err := parsePushPorcelainLine(line)
-		if err != nil {
-			return nil, err
+		status, ok := parsePushPorcelainLine(line)
+		if !ok {
+			// --set-upstream injects its own human-readable aside into this same block (probed
+			// here: "branch 'x' set up to track 'origin/x'." — no tabs at all, sandwiched between
+			// the ref line and "Done") — not itself a ref outcome, skipped rather than an error.
+			continue
 		}
 		out = append(out, status)
 	}
@@ -86,21 +89,21 @@ func ParsePushPorcelain(stdout []byte) ([]PushStatus, error) {
 	return out, nil
 }
 
-func parsePushPorcelainLine(line string) (PushStatus, error) {
+func parsePushPorcelainLine(line string) (PushStatus, bool) {
 	fields := strings.Split(line, "\t")
 	if len(fields) != 3 || len(fields[0]) != 1 {
-		return PushStatus{}, fmt.Errorf("gitops: malformed push --porcelain line: %q", line)
+		return PushStatus{}, false
 	}
 	refspec := fields[1]
 	srcDst := strings.SplitN(refspec, ":", 2)
 	if len(srcDst) != 2 {
-		return PushStatus{}, fmt.Errorf("gitops: malformed push --porcelain refspec: %q", refspec)
+		return PushStatus{}, false
 	}
 	summary := fields[2]
 	return PushStatus{
 		Flag: fields[0][0], Src: srcDst[0], Dst: srcDst[1], Summary: summary,
 		Reason: extractParenthesised(summary),
-	}, nil
+	}, true
 }
 
 // extractParenthesised returns the text inside a trailing "(...)" in s, or "" when s does not end
