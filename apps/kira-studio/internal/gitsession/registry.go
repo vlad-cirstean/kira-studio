@@ -92,7 +92,7 @@ func (reg *Registry) Acquire(ctx context.Context, gitPath, path string) (*RepoEn
 		return nil, nil, err
 	}
 	repo := gitclient.NewRepo(summary, reg.runner, gitPath)
-	entry := newRepoEntry(summary, repo, w)
+	entry := newRepoEntry(summary, repo, w, reg.Settings)
 	reg.entries[summary.RepoID] = &slot{entry: entry, refs: 1}
 	return entry, reg.releaseFunc(summary.RepoID), nil
 }

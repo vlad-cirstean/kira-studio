@@ -2,9 +2,12 @@ package gitsession
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"sync"
 
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitaskpass"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitclient"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitclient/porcelain"
 )
@@ -50,6 +53,19 @@ type Conn struct {
 	mu    sync.Mutex
 	held  map[string]*hold     // RepoID -> hold
 	walks map[string]*walkPair // RepoID -> walkPair (D3), allocated lazily by whichever walk is created first
+
+	// done is G7 D20/D21's own disconnect signal — closed once, in Close, so a blocked credential
+	// waiter (AskCredential's own select) can observe this connection going away without ever
+	// reaching into rpcstream or gitsock, which this package must stay under (SPEC §7's layering
+	// rule).
+	done chan struct{}
+	// credMu/creds are G7 D4/D21's credential relay: one waiter per in-flight credential.request,
+	// keyed by its own server-minted requestId. "" is never a valid answer (an empty passphrase is
+	// meaningless to git), so a closed/abandoned channel and an explicit dismissal collapse to the
+	// same "not answered" outcome the caller sees.
+	credMu    sync.Mutex
+	creds     map[string]chan string
+	closeOnce sync.Once
 }
 
 // NewConn constructs a Conn with an empty hold set.
@@ -57,7 +73,85 @@ func NewConn(id ConnID, clientID, clientLabel string, emit func(method string, p
 	return &Conn{
 		ID: id, ClientID: clientID, ClientLabel: clientLabel, Emit: emit,
 		held: make(map[string]*hold), walks: make(map[string]*walkPair),
+		done: make(chan struct{}), creds: make(map[string]chan string),
 	}
+}
+
+// Done reports this connection's own disconnect signal (G7 D20) — closed exactly once, by Close.
+func (c *Conn) Done() <-chan struct{} { return c.done }
+
+// credentialRequestPayload mirrors @kira/git-ipc's own 'credential.request' event payload field
+// for field (G7 D2).
+type credentialRequestPayload struct {
+	RequestID string `json:"requestId"`
+	RepoID    string `json:"repoId"`
+	Prompt    string `json:"prompt"`
+	Masked    bool   `json:"masked"`
+}
+
+func newCredentialRequestID() string {
+	buf := make([]byte, 16)
+	_, _ = rand.Read(buf) // crypto/rand.Read never errors on a Reader that never fails to fill.
+	return hex.EncodeToString(buf)
+}
+
+// AskCredential is this connection's own gitaskpass.Prompter implementation (G7 D4/D21): mints an
+// unguessable request id, registers a waiter, emits credential.request, then selects on the
+// answer, ctx (the op's own cancellation) and c.done (this connection dying mid-prompt) — D4's
+// table's three bounds that live on this side; the broker's own timer is the fourth, layered on
+// top of ctx by the broker itself. Every exit path deletes this waiter's own map entry.
+func (c *Conn) AskCredential(ctx context.Context, req gitaskpass.Request) (string, bool) {
+	id := newCredentialRequestID()
+	ch := make(chan string, 1)
+	c.credMu.Lock()
+	c.creds[id] = ch
+	c.credMu.Unlock()
+	defer func() {
+		c.credMu.Lock()
+		delete(c.creds, id)
+		c.credMu.Unlock()
+	}()
+
+	if c.Emit != nil {
+		c.Emit("credential.request", credentialRequestPayload{
+			RequestID: id, RepoID: req.RepoID, Prompt: req.Prompt, Masked: req.Masked,
+		})
+	}
+
+	select {
+	case secret, ok := <-ch:
+		if !ok || secret == "" {
+			return "", false
+		}
+		return secret, true
+	case <-ctx.Done():
+		return "", false
+	case <-c.done:
+		return "", false
+	}
+}
+
+// ProvideCredential resolves requestID's waiter on THIS connection with secret (nil for a
+// dismissal, closing the waiter's channel instead of sending). Anti-abuse (D4): the map entry is
+// deleted under the lock before the channel is touched, so answering twice — or another connection
+// presenting the same id — finds nothing; both report false, never an error (a retry after a
+// dropped response is legitimate).
+func (c *Conn) ProvideCredential(requestID string, secret *string) bool {
+	c.credMu.Lock()
+	ch, ok := c.creds[requestID]
+	if ok {
+		delete(c.creds, requestID)
+	}
+	c.credMu.Unlock()
+	if !ok {
+		return false
+	}
+	if secret == nil {
+		close(ch)
+	} else {
+		ch <- *secret
+	}
+	return true
 }
 
 // Open acquires path's repository and subscribes this connection to it — idempotent per (Conn,
@@ -157,6 +251,8 @@ func (c *Conn) CloseRepo(repoID string) bool {
 // "release its RepoEntry refcounts"). Every walk (both slots of every pair) is disposed first
 // (D13), same ordering as CloseRepo.
 func (c *Conn) Close() {
+	c.closeOnce.Do(func() { close(c.done) })
+
 	c.mu.Lock()
 	holds := c.held
 	c.held = make(map[string]*hold)

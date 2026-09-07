@@ -62,23 +62,41 @@ type RepoEntry struct {
 	// shared the same way detail/diff/refs are.
 	rangeCount reviewRangeCountSlot
 
+	// remoteOp is SPEC §6's own "active remote op (≤1)" box (G7 D9/D11/D20/D21).
+	remoteOp remoteOpSlot
+	// autoFetch is G7 D23's own background-fetch timer — one per repository.
+	autoFetch autoFetchState
+	// askPassMu/askPassChecked/askPassValue cache `git config --get core.askPass` for this entry's
+	// whole life (G7 D10) — read once, lazily, on the first remote op.
+	askPassMu      sync.Mutex
+	askPassChecked bool
+	askPassValue   string
+	// settings is G7 D16's server-owned settings accessor (protected-branch patterns, auto-fetch
+	// minutes) — a plain func, not an interface, so this package keeps importing only gitclient/
+	// gitaskpass/stdlib; threaded in by Registry.Acquire from its own Registry.Settings field.
+	settings func() (protectedBranches []string, autoFetchMinutes int)
+
 	done chan struct{}
 }
 
-func newRepoEntry(summary gitclient.RepoSummary, repo *gitclient.Repo, w Watcher) *RepoEntry {
+func newRepoEntry(summary gitclient.RepoSummary, repo *gitclient.Repo, w Watcher, settings func() ([]string, int)) *RepoEntry {
 	e := &RepoEntry{
-		Summary: summary,
-		Repo:    repo,
-		watcher: w,
-		subs:    make(map[ConnID]*subscriber),
-		detail:  newDetailCache(),
-		diff:    newDiffCache(diffCacheCapBytes),
-		refs:    newRefsCache(),
-		head:    summary.Head,
-		undo:    &gitpreflight.UndoSlot{},
-		done:    make(chan struct{}),
+		Summary:  summary,
+		Repo:     repo,
+		watcher:  w,
+		subs:     make(map[ConnID]*subscriber),
+		detail:   newDetailCache(),
+		diff:     newDiffCache(diffCacheCapBytes),
+		refs:     newRefsCache(),
+		head:     summary.Head,
+		undo:     &gitpreflight.UndoSlot{},
+		settings: settings,
+		done:     make(chan struct{}),
 	}
 	go e.pump()
+	if _, minutes := settings(); minutes > 0 {
+		e.startAutoFetch(minutes)
+	}
 	return e
 }
 
@@ -197,6 +215,8 @@ func (e *RepoEntry) CatFile() *catfile.Session {
 // linger both say the entry is really done. Not idempotent on its own; Registry only ever calls it
 // once per entry (guarded by deleting it from the map first).
 func (e *RepoEntry) teardown() {
+	e.stopAutoFetch()
+	e.remoteOp.forceCancel()
 	_ = e.watcher.Close()
 	<-e.done
 

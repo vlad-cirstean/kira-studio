@@ -50,6 +50,10 @@ type Broker struct {
 	sockPath string
 	token    string
 	timeout  time.Duration
+	// inheritedGitAskpass is captured once, at construction (D10) — os.Getenv read here rather
+	// than per-op, matching upstream's own "the inherited value comes from os.Getenv('GIT_ASKPASS')
+	// at broker construction".
+	inheritedGitAskpass string
 
 	listener net.Listener
 
@@ -119,7 +123,8 @@ func New(opts Options) (*Broker, error) {
 
 	b := &Broker{
 		dir: dir, shimPath: shimPath, sockPath: sockPath, token: token, timeout: timeout,
-		listener: ln, ops: make(map[string]*opEntry),
+		inheritedGitAskpass: os.Getenv("GIT_ASKPASS"),
+		listener:            ln, ops: make(map[string]*opEntry),
 	}
 	b.wg.Add(1)
 	go b.acceptLoop()
@@ -165,6 +170,13 @@ func (b *Broker) Env() []string {
 		"KIRA_ASKPASS_SOCK=" + b.sockPath,
 		"KIRA_ASKPASS_TOKEN=" + b.token,
 	}
+}
+
+// ShouldInterpose reports whether this broker's shim should override coreAskPass for one spawn —
+// D10: never overrides a user's own core.askPass or an inherited GIT_ASKPASS (captured once, at
+// construction, above). The one-argument wrapper callers actually reach for.
+func (b *Broker) ShouldInterpose(coreAskPass string) bool {
+	return ShouldInterpose(coreAskPass, b.inheritedGitAskpass)
 }
 
 // WithOp registers prompter for one op (a fresh, unguessable 16-byte op id), runs fn with the
