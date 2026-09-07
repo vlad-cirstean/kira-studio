@@ -64,6 +64,11 @@
         "command": "kiraVersion.openRepository",
         "title": "Open Repository",
         "category": "Kira Version"
+      },
+      {
+        "command": "kiraVersion.focusGraph",
+        "title": "Focus Graph",
+        "category": "Kira Version"
       }
     ],
     "configuration": {

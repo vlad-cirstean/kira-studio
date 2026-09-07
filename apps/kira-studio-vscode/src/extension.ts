@@ -13,8 +13,11 @@ import { coerceSettings, SETTINGS, type SettingKey } from '@kira/git-core';
 import type { GitStatus } from '@kira/git-ipc';
 import * as vscode from 'vscode';
 import { ConnectionManager } from './connection.ts';
+import { KiraGraphViewProvider } from './panelView.ts';
 import { VsCodeDialogs } from './ports/dialogs.ts';
 import { VsCodeLogger } from './ports/logger.ts';
+import { VsCodeWorkspaceRoots } from './ports/workspaceRoots.ts';
+import { createProxyHandlers } from './proxyHandlers.ts';
 
 // D11: the server contract's own app.init is the webview contract's AppInitResult minus host/
 // settings/capabilities (SPEC §5 item 3 assigns those to the extension, which has no webview to
@@ -29,6 +32,10 @@ interface ServerAppInitResult {
 
 const STATUS_COMMAND = 'kiraVersion.showConnectionStatus';
 const OPEN_REPO_COMMAND = 'kiraVersion.openRepository';
+// G1 §5.4 removed this command saying it "returns in G3" (D13/D17) — it does, once there is a
+// graph view to focus.
+const FOCUS_GRAPH_COMMAND = 'kiraVersion.focusGraph';
+const GRAPH_VIEW_ID = 'kiraVersion.graph';
 const SETTING_KEYS = Object.keys(SETTINGS) as readonly SettingKey[];
 
 function readRawSettings(config: vscode.WorkspaceConfiguration): Record<string, unknown> {
@@ -51,6 +58,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   ).settings;
   const logger = new VsCodeLogger(outputChannel, () => currentSettings['kiraVersion.log.level']);
   const dialogs = new VsCodeDialogs();
+  const roots = new VsCodeWorkspaceRoots();
 
   const appVersion = String(
     (context.extension.packageJSON as { version?: unknown }).version ?? '0.0.0',
@@ -58,8 +66,21 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const manager = new ConnectionManager(context, logger.child('connection'), appVersion);
   connection = manager;
 
+  // D17/D18: the graph webview view is registered as this phase's own first step -- the graph
+  // renders end to end from here on, with refs.list/status.get/undo.peek/stash.list rejecting
+  // E_UNKNOWN_METHOD on every repo open until G5/G8 close them (documented, not a regression).
+  const handlers = createProxyHandlers({
+    connection: manager,
+    settings: () => currentSettings,
+    roots,
+    dialogs,
+  });
+  const graphProvider = new KiraGraphViewProvider({ extensionUri: context.extensionUri, handlers });
+
   context.subscriptions.push(
     { dispose: () => manager.dispose() },
+    vscode.window.registerWebviewViewProvider(GRAPH_VIEW_ID, graphProvider),
+    { dispose: manager.on('repo.changed', (payload) => graphProvider.notifyRepoChanged(payload)) },
     manager.onStateChange((state) => {
       logger.log('info', 'connection state', state);
       // §5.4 point 4: this phase's own exit criterion, executing in the real extension — the
@@ -89,9 +110,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       for (const problem of problems) {
         logger.log('warn', 'invalid setting, using default', problem);
       }
+      graphProvider.notifySettingsChanged(currentSettings);
     }),
     vscode.commands.registerCommand(STATUS_COMMAND, () => showConnectionStatus(manager)),
     vscode.commands.registerCommand(OPEN_REPO_COMMAND, () => openRepository(manager, dialogs)),
+    vscode.commands.registerCommand(FOCUS_GRAPH_COMMAND, () => {
+      void vscode.commands.executeCommand(`${GRAPH_VIEW_ID}.focus`);
+    }),
   );
 }
 

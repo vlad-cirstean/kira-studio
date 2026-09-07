@@ -15,7 +15,17 @@ import * as net from 'node:net';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import type { Logger } from '@kira/git-core';
-import type { ParamsOf, RequestKey, ResultOf, Transport } from '@kira/git-ipc';
+import type {
+  EventKey,
+  EventPayload,
+  ParamsOf,
+  RequestKey,
+  ResultOf,
+  StreamChunkOf,
+  StreamKey,
+  StreamParamsOf,
+  Transport,
+} from '@kira/git-ipc';
 import { CONTRACT_VERSION, createRpcClient } from '@kira/git-ipc';
 import type { SocketChannel } from '@kira/git-ipc/socketChannel';
 import { createSocketChannel } from '@kira/git-ipc/socketChannel';
@@ -87,6 +97,12 @@ export class ConnectionManager implements vscode.Disposable {
   #state: ConnectionState = { kind: 'connecting' };
   #socket: net.Socket | undefined;
   #transport: Transport | undefined;
+  // on()'s subscriptions must survive a reconnect (D19) -- the transport is rebuilt on every
+  // successful handshake (#handleHandshakeFrame's 'ready' case), so this class keeps its own
+  // handler set and re-subscribes each new transport (#attachEventHandlers), rather than letting
+  // a subscription silently go quiet across a drop.
+  #eventHandlers = new Map<EventKey, Set<(payload: unknown) => void>>();
+  #transportEventUnsubs = new Map<(payload: unknown) => void, () => void>();
   #backoffMs = INITIAL_BACKOFF_MS;
   #reconnectTimer: ReturnType<typeof setTimeout> | undefined;
   #stopped = false;
@@ -115,6 +131,52 @@ export class ConnectionManager implements vscode.Disposable {
       return Promise.reject(new Error('connection: not connected to Kira Studio'));
     }
     return this.#transport.request(method, params, signal);
+  }
+
+  /** Mirrors Transport.stream exactly (D19) — rejects the same way request() does when not
+   *  currently connected. */
+  stream<K extends StreamKey>(
+    method: K,
+    params: StreamParamsOf<K>,
+    onChunk: (chunk: StreamChunkOf<K>) => void,
+    signal?: AbortSignal,
+  ): Promise<void> {
+    if (!this.#transport) {
+      return Promise.reject(new Error('connection: not connected to Kira Studio'));
+    }
+    return this.#transport.stream(method, params, onChunk, signal);
+  }
+
+  /** Subscribes handler to method's events for the life of this ConnectionManager, across
+   *  however many reconnects happen in between (D19) — the one piece of real logic here that
+   *  request() does not need. */
+  on<K extends EventKey>(method: K, handler: (payload: EventPayload<K>) => void): () => void {
+    const wrapped = handler as (payload: unknown) => void;
+    let set = this.#eventHandlers.get(method);
+    if (!set) {
+      set = new Set();
+      this.#eventHandlers.set(method, set);
+    }
+    set.add(wrapped);
+    if (this.#transport) {
+      this.#transportEventUnsubs.set(wrapped, this.#transport.on(method, wrapped));
+    }
+    return () => {
+      set?.delete(wrapped);
+      this.#transportEventUnsubs.get(wrapped)?.();
+      this.#transportEventUnsubs.delete(wrapped);
+    };
+  }
+
+  /** Re-attaches every still-registered on() handler to the newly connected transport — called
+   *  once per successful handshake, right after #transport is assigned. */
+  #attachEventHandlers(): void {
+    if (!this.#transport) return;
+    for (const [method, set] of this.#eventHandlers) {
+      for (const handler of set) {
+        this.#transportEventUnsubs.set(handler, this.#transport.on(method, handler));
+      }
+    }
   }
 
   /** Re-arms the loop after a deliberate stop (`denied`/`versionMismatch`, D22) — the only way
@@ -197,6 +259,7 @@ export class ConnectionManager implements vscode.Disposable {
       case 'ready': {
         this.#backoffMs = INITIAL_BACKOFF_MS;
         this.#transport = createRpcClient(channel);
+        this.#attachEventHandlers();
         this.#setState({ kind: 'connected' });
         this.#logger.log('info', 'connected', { sessionId: resp.sessionId });
         return;
@@ -247,6 +310,7 @@ export class ConnectionManager implements vscode.Disposable {
   #onDisconnected(dialToken: number): void {
     if (dialToken !== this.#dialToken) return;
     this.#transport = undefined;
+    this.#transportEventUnsubs.clear(); // the dead transport's own unsubscribes are moot.
     this.#socket = undefined;
     if (this.#stopped) return;
     // `denied`/`versionMismatch` are deliberate stops (D22) — only a `retry()` call issues a
