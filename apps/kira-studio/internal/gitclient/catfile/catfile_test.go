@@ -78,6 +78,43 @@ func TestSession_Check_Missing(t *testing.T) {
 	}
 }
 
+// TestSession_Read_FoundBlob_PathWithSpace is D10's own "guard the existing fix" case (probe P3):
+// a space-containing path resolved through the ordinary batch protocol, proving readHeader's
+// suffix-based " missing" recognition does not also misfire on a *found* line whose echoed input
+// happens to contain a space.
+func TestSession_Read_FoundBlob_PathWithSpace(t *testing.T) {
+	skipWithoutGit(t)
+	dir := t.TempDir()
+	run := func(args ...string) {
+		cmd := exec.Command("git", args...)
+		cmd.Dir = dir
+		cmd.Env = append(os.Environ(),
+			"GIT_AUTHOR_NAME=Test", "GIT_AUTHOR_EMAIL=test@example.com",
+			"GIT_COMMITTER_NAME=Test", "GIT_COMMITTER_EMAIL=test@example.com",
+		)
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+	run("init", "-q", "-b", "main")
+	if err := os.WriteFile(filepath.Join(dir, "my file.txt"), []byte("spaced\n"), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	run("add", "my file.txt")
+	run("commit", "-q", "-m", "add spaced file")
+
+	sess := catfile.NewSession(catfile.Deps{Runner: gitclient.NewExecRunner(), GitPath: "git", Dir: dir}, 0)
+	defer sess.Close()
+
+	info, content, err := sess.Read("HEAD:my file.txt")
+	if err != nil {
+		t.Fatalf("Read: %v", err)
+	}
+	if info.Type != "blob" || string(content) != "spaced\n" {
+		t.Fatalf("info=%+v content=%q", info, content)
+	}
+}
+
 func TestSession_Check_MissingWithSpacesInEchoedInput(t *testing.T) {
 	skipWithoutGit(t)
 	dir := initRepo(t)
@@ -107,6 +144,55 @@ func (r batchOnlyPanicRunner) Start(ctx context.Context, gitPath string, spec gi
 		}
 	}
 	return r.real.Start(ctx, gitPath, spec)
+}
+
+// TestSession_ReadOneShot_NewlinePath is D10's own new case: a path containing a newline cannot be
+// expressed in the batch protocol at all (one request per line), so it must resolve through the
+// one-shot `git show` fallback instead.
+func TestSession_ReadOneShot_NewlinePath(t *testing.T) {
+	skipWithoutGit(t)
+	dir := t.TempDir()
+	run := func(args ...string) {
+		cmd := exec.Command("git", args...)
+		cmd.Dir = dir
+		cmd.Env = append(os.Environ(),
+			"GIT_AUTHOR_NAME=Test", "GIT_AUTHOR_EMAIL=test@example.com",
+			"GIT_COMMITTER_NAME=Test", "GIT_COMMITTER_EMAIL=test@example.com",
+		)
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+	run("init", "-q", "-b", "main")
+	name := "weird\nname.txt"
+	if err := os.WriteFile(filepath.Join(dir, name), []byte("newline path content\n"), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	run("add", "-A")
+	run("commit", "-q", "-m", "add newline-path file")
+
+	sess := catfile.NewSession(catfile.Deps{Runner: gitclient.NewExecRunner(), GitPath: "git", Dir: dir}, 0)
+	defer sess.Close()
+
+	info, content, err := sess.ReadOneShot(context.Background(), "HEAD:"+name)
+	if err != nil {
+		t.Fatalf("ReadOneShot: %v", err)
+	}
+	if info.Type != "blob" || string(content) != "newline path content\n" {
+		t.Fatalf("info=%+v content=%q", info, content)
+	}
+}
+
+func TestSession_ReadOneShot_Missing(t *testing.T) {
+	skipWithoutGit(t)
+	dir := initRepo(t)
+	sess := catfile.NewSession(catfile.Deps{Runner: gitclient.NewExecRunner(), GitPath: "git", Dir: dir}, 0)
+	defer sess.Close()
+
+	_, _, err := sess.ReadOneShot(context.Background(), "HEAD:does\nnot\nexist.txt")
+	if !errors.Is(err, catfile.ErrMissing) {
+		t.Fatalf("got %v, want ErrMissing", err)
+	}
 }
 
 func TestSession_Read_TooLarge_AnsweredFromCheckAlone(t *testing.T) {

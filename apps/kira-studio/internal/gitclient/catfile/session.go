@@ -132,6 +132,10 @@ type Session struct {
 	check        *persistentProcess
 	batch        *persistentProcess
 	cancelSpawn  context.CancelFunc
+
+	runner  gitclient.Runner
+	gitPath string
+	dir     string
 }
 
 // NewSession constructs a Session over deps — nothing is spawned until the first Check/Read.
@@ -152,6 +156,7 @@ func NewSession(deps Deps, maxBlobBytes int64) *Session {
 			args: []string{"cat-file", "--batch"}, spawnCtx: spawnCtx,
 		},
 		cancelSpawn: cancel,
+		runner:      deps.Runner, gitPath: deps.GitPath, dir: deps.Dir,
 	}
 }
 
@@ -205,6 +210,30 @@ func (s *Session) Read(rev string) (ObjectInfo, []byte, error) {
 		return ObjectInfo{}, nil, ErrMissing
 	}
 	return batchInfo, content, nil
+}
+
+// ReadOneShot answers a rev the batch protocol cannot express — a path containing a newline
+// (`cat-file --batch` reads one request per line, so a newline mid-request would be seen as two).
+// It spawns `git show <rev>` once, argv-only (no line framing to break), bounded by the same
+// maxBlobBytes gate as Read — checked only after the full output is read, since there is no
+// `--batch-check`-style size probe for a one-shot spawn; the rarity of a newline-containing path
+// (F5) makes that acceptable. A non-zero exit is reported as ErrMissing, the same answer a batch
+// lookup gives — the overwhelmingly likely cause is a path that does not resolve at rev, and this
+// package draws no finer distinction than the batch protocol already does.
+func (s *Session) ReadOneShot(ctx context.Context, rev string) (ObjectInfo, []byte, error) {
+	res, err := gitclient.Run(ctx, s.runner, s.gitPath, gitclient.Spec{
+		Dir: s.dir, Args: []string{"show", rev}, ReadOnly: true,
+	})
+	if err != nil {
+		return ObjectInfo{}, nil, err
+	}
+	if res.ExitCode != 0 {
+		return ObjectInfo{}, nil, ErrMissing
+	}
+	if int64(len(res.Stdout)) > s.maxBlobBytes {
+		return ObjectInfo{Type: "blob", Size: int64(len(res.Stdout))}, nil, ErrTooLarge
+	}
+	return ObjectInfo{Type: "blob", Size: int64(len(res.Stdout))}, res.Stdout, nil
 }
 
 // Close stops both persistent processes. Idempotent.
