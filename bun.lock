@@ -32,6 +32,7 @@
         "@testcontainers/postgresql": "12.1.0",
         "@types/node": "26.4.1",
         "@types/pg": "8.23.1",
+        "@types/vscode": "1.134.0",
         "@typescript/native-preview": "7.0.0-dev.20260707.2",
         "@vitejs/plugin-vue": "6.0.8",
         "@vscode/codicons": "0.0.46-24",
@@ -47,6 +48,18 @@
         "vite": "8.2.2",
         "vue": "3.5.42",
         "vue-tsc": "3.3.11",
+      },
+    },
+    "apps/kira-studio-vscode": {
+      "name": "kira-studio-vscode",
+      "version": "0.0.0",
+      "dependencies": {
+        "@kira/git-core": "workspace:*",
+        "@kira/git-ipc": "workspace:*",
+        "@kira/git-ui": "workspace:*",
+      },
+      "devDependencies": {
+        "@types/vscode": "1.134.0",
       },
     },
     "apps/kira-studio/frontend": {
@@ -66,6 +79,40 @@
       },
       "devDependencies": {
         "bun-types": "1.4.0",
+      },
+    },
+    "packages/git-core": {
+      "name": "@kira/git-core",
+      "version": "0.0.0",
+      "devDependencies": {
+        "bun-types": "1.4.0",
+      },
+    },
+    "packages/git-ipc": {
+      "name": "@kira/git-ipc",
+      "version": "0.0.0",
+      "dependencies": {
+        "flatbuffers": "25.9.23",
+      },
+      "devDependencies": {
+        "bun-types": "1.4.0",
+      },
+    },
+    "packages/git-ui": {
+      "name": "@kira/git-ui",
+      "version": "0.0.0",
+      "dependencies": {
+        "@kira/git-core": "workspace:*",
+        "@kira/git-ipc": "workspace:*",
+        "@vscode/codicons": "0.0.46-24",
+        "slickgrid": "5.20.0",
+        "vue": "3.5.42",
+      },
+      "devDependencies": {
+        "@vitejs/plugin-vue": "6.0.8",
+        "typescript": "6.0.3",
+        "vite": "8.2.2",
+        "vue-tsc": "3.3.11",
       },
     },
     "packages/shared": {
@@ -153,6 +200,12 @@
     "@js-sdsl/ordered-map": ["@js-sdsl/ordered-map@4.4.2", "", {}, "sha512-iUKgm52T8HOE/makSxjqoWhe95ZJA1/G1sYsGev2JDKUSS14KAgg1LHb+Ba+IPow0xflbnSkOsZcO08C7w1gYw=="],
 
     "@kira/api-core": ["@kira/api-core@workspace:packages/api-core"],
+
+    "@kira/git-core": ["@kira/git-core@workspace:packages/git-core"],
+
+    "@kira/git-ipc": ["@kira/git-ipc@workspace:packages/git-ipc"],
+
+    "@kira/git-ui": ["@kira/git-ui@workspace:packages/git-ui"],
 
     "@kira/kira-studio-frontend": ["@kira/kira-studio-frontend@workspace:apps/kira-studio/frontend"],
 
@@ -277,6 +330,8 @@
     "@types/ssh2": ["@types/ssh2@0.5.52", "", { "dependencies": { "@types/node": "*", "@types/ssh2-streams": "*" } }, "sha512-lbLLlXxdCZOSJMCInKH2+9V/77ET2J6NPQHpFI0kda61Dd1KglJs+fPQBchizmzYSOJBgdTajhPqBO1xxLywvg=="],
 
     "@types/ssh2-streams": ["@types/ssh2-streams@0.1.13", "", { "dependencies": { "@types/node": "*" } }, "sha512-faHyY3brO9oLEA0QlcO8N2wT7R0+1sHWZvQ+y3rMLwdY1ZyS1z0W3t65j9PqT4HmQ6ALzNe7RZlNuCNE0wBSWA=="],
+
+    "@types/vscode": ["@types/vscode@1.134.0", "", {}, "sha512-NDEu0hg4sF7+vvFsADsktqUJ6f80LHSZvVK2Ovo1XiQ0/VHck1O3zst+ZZyVA/uvz6vo6LcuoqU2q48YMqOwWw=="],
 
     "@typescript/native-preview": ["@typescript/native-preview@7.0.0-dev.20260707.2", "", { "optionalDependencies": { "@typescript/native-preview-darwin-arm64": "7.0.0-dev.20260707.2", "@typescript/native-preview-darwin-x64": "7.0.0-dev.20260707.2", "@typescript/native-preview-linux-arm": "7.0.0-dev.20260707.2", "@typescript/native-preview-linux-arm64": "7.0.0-dev.20260707.2", "@typescript/native-preview-linux-x64": "7.0.0-dev.20260707.2", "@typescript/native-preview-win32-arm64": "7.0.0-dev.20260707.2", "@typescript/native-preview-win32-x64": "7.0.0-dev.20260707.2" }, "bin": { "tsgo": "bin/tsgo" } }, "sha512-oUGp+Rep/hqMhPunyinsALUwSlzHINSxitifPiSaeqoKOKD2OlR9NE3TaPqwsl4NlGslsOSUXI1JotWQzpYCPg=="],
 
@@ -477,6 +532,8 @@
     "jackspeak": ["jackspeak@3.4.3", "", { "dependencies": { "@isaacs/cliui": "^8.0.2" }, "optionalDependencies": { "@pkgjs/parseargs": "^0.11.0" } }, "sha512-OGlZQpz2yfahA/Rd1Y8Cd9SIEsqvXkLVoSw/cgwhnhFMDbsQFeZYoJJ7bIZBS9BcamUW96asq/npPWugM+RQBw=="],
 
     "jiti": ["jiti@2.7.0", "", { "bin": { "jiti": "lib/jiti-cli.mjs" } }, "sha512-AC/7JofJvZGrrneWNaEnJeOLUx+JlGt7tNa0wZiRPT4MY1wmfKjt2+6O2p2uz2+skll8OZZmJMNqeke7kKbNgQ=="],
+
+    "kira-studio-vscode": ["kira-studio-vscode@workspace:apps/kira-studio-vscode"],
 
     "lazystream": ["lazystream@1.0.1", "", { "dependencies": { "readable-stream": "^2.0.5" } }, "sha512-b94GiNHQNy6JNTrt5w6zNyffMrNkXZb3KTkCZJb2V1xaEGCk093vkZ2jk3tpaeP33/OiXC+WvK9AxUebnf5nbw=="],
 

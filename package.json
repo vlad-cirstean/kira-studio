@@ -7,8 +7,12 @@
   "private": true,
   "workspaces": [
     "apps/*/frontend",
+    "apps/kira-studio-vscode",
     "packages/shared",
-    "packages/api-core"
+    "packages/api-core",
+    "packages/git-ipc",
+    "packages/git-core",
+    "packages/git-ui"
   ],
   "scripts": {
     "prepare": "git config core.hooksPath .githooks || true",
@@ -17,13 +21,15 @@
     "dev": "PATH=\"$PATH:$(go env GOPATH)/bin\" sh -c 'cd apps/kira-studio && wails3 task dev'",
     "build": "cd apps/kira-studio/frontend && bun run build",
     "build:test": "cd apps/kira-studio/frontend && bun run build:test",
+    "build:vscode": "bun run scripts/build-vscode.ts",
     "lint": "biome check . && sh scripts/check-tokens.sh",
     "format": "biome check --write .",
-    "typecheck": "sh -c 'bun run typecheck:tests & p1=$!; bun run typecheck:web & p2=$!; bun run typecheck:unit & p3=$!; bun run typecheck:api-core & p4=$!; fail=0; wait $p1 || fail=1; wait $p2 || fail=1; wait $p3 || fail=1; wait $p4 || fail=1; exit $fail'",
+    "typecheck": "sh -c 'bun run typecheck:tests & p1=$!; bun run typecheck:web & p2=$!; bun run typecheck:unit & p3=$!; bun run typecheck:api-core & p4=$!; bun run typecheck:git & p5=$!; fail=0; wait $p1 || fail=1; wait $p2 || fail=1; wait $p3 || fail=1; wait $p4 || fail=1; wait $p5 || fail=1; exit $fail'",
     "typecheck:tests": "tsgo --noEmit -p apps/kira-studio/tsconfig.tests.json",
     "typecheck:web": "vue-tsc --noEmit -p apps/kira-studio/frontend/tsconfig.json",
     "typecheck:unit": "tsgo --noEmit -p apps/kira-studio/tests/unit/tsconfig.json",
     "typecheck:api-core": "tsgo --noEmit -p packages/api-core/tsconfig.json",
+    "typecheck:git": "tsgo --noEmit -p packages/git-ipc/tsconfig.json && tsgo --noEmit -p packages/git-core/tsconfig.json && tsgo --noEmit -p apps/kira-studio-vscode/tsconfig.json && vue-tsc --noEmit -p packages/git-ui/tsconfig.json",
     "test:ui": "bun run build:test && playwright test --config=apps/kira-studio/playwright.config.ts --project=ui --project=ui-timing",
     "test:ipc:fe": "bun run build:test && playwright test --config=apps/kira-studio/playwright.config.ts --project=ipc-frontend",
     "test:unit": "bun test apps/kira-studio/tests/unit packages/api-core/test",
@@ -57,6 +63,7 @@
     "@testcontainers/postgresql": "12.1.0",
     "@types/node": "26.4.1",
     "@types/pg": "8.23.1",
+    "@types/vscode": "1.134.0",
     "@typescript/native-preview": "7.0.0-dev.20260707.2",
     "@vitejs/plugin-vue": "6.0.8",
     "@vscode/codicons": "0.0.46-24",

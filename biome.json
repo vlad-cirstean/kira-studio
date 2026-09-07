@@ -15,7 +15,8 @@
       "!docs/design",
       "!.claude",
       "!packages/shared/protocol/wire.ts",
-      "!packages/shared/protocol/wire"
+      "!packages/shared/protocol/wire",
+      "!packages/git-ipc/src/generated"
     ]
   },
   "formatter": {
@@ -235,6 +236,51 @@
                   {
                     "group": ["**/apps/**", "@kira/api-core"],
                     "message": "P12 D16(f): packages/shared is the base layer (shared -> api-core -> app) — it must not import the app or the package built on top of it."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": [
+        "packages/git-ipc/**",
+        "packages/git-core/**",
+        "packages/git-ui/**",
+        "apps/kira-studio-vscode/**"
+      ],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["@kira/shared", "@kira/api-core", "**/apps/kira-studio/**"],
+                    "message": "SPEC §7: the git module is its own package family — it must not import Studio's or Api's code."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["packages/git-ipc/**", "packages/git-core/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["vscode", "vue"],
+                    "message": "G1 §5.2: git-ipc and git-core are pure, host-free logic — no vscode, no Vue."
                   }
                 ]
               }

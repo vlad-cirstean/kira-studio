@@ -1,0 +1,240 @@
+{
+  "name": "kira-studio-vscode",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "main": "./dist/extension.js",
+  "engines": {
+    "vscode": "^1.134.0"
+  },
+  "extensionKind": [
+    "workspace"
+  ],
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@kira/git-core": "workspace:*",
+    "@kira/git-ipc": "workspace:*",
+    "@kira/git-ui": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/vscode": "1.134.0"
+  },
+  "contributes": {
+    "viewsContainers": {
+      "panel": [
+        {
+          "id": "kiraVersion",
+          "title": "Git Graph",
+          "icon": "resources/icon.svg"
+        }
+      ],
+      "activitybar": [
+        {
+          "id": "kiraVersionReview",
+          "title": "Branch Review",
+          "icon": "resources/review-icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "kiraVersion": [
+        {
+          "id": "kiraVersion.graph",
+          "name": "Graph",
+          "type": "webview"
+        }
+      ],
+      "kiraVersionReview": [
+        {
+          "id": "kiraVersion.review",
+          "name": "Branch Review",
+          "type": "webview"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "kiraVersion.showConnectionStatus",
+        "title": "Show Connection Status",
+        "category": "Kira Version"
+      },
+      {
+        "command": "kiraVersion.openRepository",
+        "title": "Open Repository",
+        "category": "Kira Version"
+      }
+    ],
+    "configuration": {
+      "properties": {
+        "kiraVersion.git.path": {
+          "type": "string",
+          "default": "",
+          "description": "Path to the git executable. Empty uses the host's own discovery (VS Code's git.path setting, then PATH) — see §4.2."
+        },
+        "kiraVersion.graph.pageSize": {
+          "type": "number",
+          "default": 5000,
+          "description": "How many commits a single Load more page fetches.",
+          "minimum": 100,
+          "maximum": 50000
+        },
+        "kiraVersion.graph.scope": {
+          "type": "string",
+          "default": "all",
+          "description": "Whether the graph shows every ref (\"all\") or only the current HEAD's ancestry.",
+          "enum": [
+            "all",
+            "head"
+          ]
+        },
+        "kiraVersion.log.level": {
+          "type": "string",
+          "default": "info",
+          "description": "Verbosity of kira-version's own diagnostic log.",
+          "enum": [
+            "off",
+            "error",
+            "warn",
+            "info",
+            "debug"
+          ]
+        },
+        "kiraVersion.review.baseCandidates": {
+          "type": "array",
+          "default": [
+            "main",
+            "master"
+          ],
+          "description": "Branch review (§6.8): candidate base branches to compare against, in order, tried after the branch's own upstream and the repository's detected default branch (origin/HEAD) both fail to resolve.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "kiraVersion.fetch.autoInterval": {
+          "type": "number",
+          "default": 0,
+          "description": "Minutes between automatic background fetches. 0 disables it (the default). Auto-fetch runs only while the window is focused and the panel is visible, never while another operation is running, and disables itself for the session after a failure.",
+          "minimum": 0,
+          "maximum": 1440
+        },
+        "kiraVersion.pull.strategy": {
+          "type": "string",
+          "default": "auto",
+          "description": "How Pull integrates fetched commits. \"auto\" follows your git configuration (branch.<name>.rebase, then pull.rebase, then pull.ff), falling back to fast-forward-only.",
+          "enum": [
+            "auto",
+            "ff-only",
+            "merge",
+            "rebase"
+          ]
+        },
+        "kiraVersion.protectedBranches": {
+          "type": "array",
+          "default": [
+            "main",
+            "master",
+            "release/*"
+          ],
+          "description": "Branches that require typing the branch name to confirm a force-push or a remote-branch deletion. \"*\" matches any characters except \"/\". Ordinary pushes are never gated.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "kiraVersion.stash.includeUntracked": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether the Stash dialog's \"include untracked files\" box starts checked. Untracked files are restored by a checkout, not a merge, so a pop can fail on a name collision even when the merge itself is clean (§7.6)."
+        },
+        "kiraVersion.stash.showInGraph": {
+          "type": "boolean",
+          "default": true,
+          "description": "Whether stash entries appear as nodes in the commit graph. When off, the walk drops refs/stash entirely and stashes are visible only in the stash list."
+        }
+      }
+    },
+    "colors": [
+      {
+        "id": "kiraVersion.graphLane0",
+        "description": "Kira Version: commit graph lane colour 0.",
+        "defaults": {
+          "dark": "#096db3",
+          "light": "#1b99f3",
+          "highContrast": "#0a78c7",
+          "highContrastLight": "#0a78c7"
+        }
+      },
+      {
+        "id": "kiraVersion.graphLane1",
+        "description": "Kira Version: commit graph lane colour 1.",
+        "defaults": {
+          "dark": "#c2380a",
+          "light": "#f56738",
+          "highContrast": "#d53e0b",
+          "highContrastLight": "#d53e0b"
+        }
+      },
+      {
+        "id": "kiraVersion.graphLane2",
+        "description": "Kira Version: commit graph lane colour 2.",
+        "defaults": {
+          "dark": "#3196dd",
+          "light": "#1d72af",
+          "highContrast": "#50a5e2",
+          "highContrastLight": "#155684"
+        }
+      },
+      {
+        "id": "kiraVersion.graphLane3",
+        "description": "Kira Version: commit graph lane colour 3.",
+        "defaults": {
+          "dark": "#e16d47",
+          "light": "#bd461f",
+          "highContrast": "#e58261",
+          "highContrastLight": "#913618"
+        }
+      },
+      {
+        "id": "kiraVersion.graphLane4",
+        "description": "Kira Version: commit graph lane colour 4.",
+        "defaults": {
+          "dark": "#7fb2d7",
+          "light": "#285b80",
+          "highContrast": "#96c0de",
+          "highContrastLight": "#1c4059"
+        }
+      },
+      {
+        "id": "kiraVersion.graphLane5",
+        "description": "Kira Version: commit graph lane colour 5.",
+        "defaults": {
+          "dark": "#da9f8b",
+          "light": "#88422b",
+          "highContrast": "#e2b2a2",
+          "highContrastLight": "#612f1f"
+        }
+      },
+      {
+        "id": "kiraVersion.graphLane6",
+        "description": "Kira Version: commit graph lane colour 6.",
+        "defaults": {
+          "dark": "#aec5d5",
+          "light": "#2f495b",
+          "highContrast": "#c6d6e2",
+          "highContrastLight": "#1d2e39"
+        }
+      },
+      {
+        "id": "kiraVersion.graphLane7",
+        "description": "Kira Version: commit graph lane colour 7.",
+        "defaults": {
+          "dark": "#d9beb5",
+          "light": "#623e32",
+          "highContrast": "#e3d0c9",
+          "highContrastLight": "#3d271f"
+        }
+      }
+    ]
+  }
+}
