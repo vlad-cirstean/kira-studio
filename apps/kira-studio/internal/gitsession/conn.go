@@ -50,9 +50,15 @@ type Conn struct {
 	ClientLabel string
 	Emit        func(method string, payload any)
 
-	mu    sync.Mutex
-	held  map[string]*hold     // RepoID -> hold
-	walks map[string]*walkPair // RepoID -> walkPair (D3), allocated lazily by whichever walk is created first
+	mu     sync.Mutex
+	held   map[string]*hold     // RepoID -> hold
+	walks  map[string]*walkPair // RepoID -> walkPair (D3), allocated lazily by whichever walk is created first
+	closed bool                 // set by Close, inside the same critical section that swaps held/walks (D3) —
+	// rpcstream.Serve returns without joining its own dispatched handler goroutines (session.go's
+	// receive loop), so a repo.open can, and reproducibly does, complete after handleConn's deferred
+	// Close already ran. Open's final critical section checks this and releases rather than stores a
+	// hold on a connection that is already gone (F1) — the hold would otherwise never be released by
+	// anyone: Close already swapped in the maps it stored into.
 
 	// done is G7 D20/D21's own disconnect signal — closed once, in Close, so a blocked credential
 	// waiter (AskCredential's own select) can observe this connection going away without ever
@@ -187,6 +193,18 @@ func (c *Conn) Open(ctx context.Context, reg *Registry, gitPath, path string) (g
 	})
 
 	c.mu.Lock()
+	if c.closed {
+		// This connection's Close already ran (and swapped in the fresh maps below) while this
+		// Open was still identifying the repository or subscribing (F1). The repository really
+		// was identified — the caller gets a correct summary back — but nothing must be stored:
+		// rpcstream's own removeActiveWork already dropped this request's response, so storing a
+		// hold here would leak it forever (SPEC §6's "the result is simply not delivered
+		// anywhere", D3).
+		c.mu.Unlock()
+		unsubscribe()
+		release()
+		return entry.Summary, nil
+	}
 	if existing, ok := c.held[repoID]; ok {
 		// Lost a race against a concurrent Open for the same repo on this connection (two
 		// repo.open requests dispatched on their own goroutines by rpcstream) — clean up the
@@ -254,6 +272,7 @@ func (c *Conn) Close() {
 	c.closeOnce.Do(func() { close(c.done) })
 
 	c.mu.Lock()
+	c.closed = true
 	holds := c.held
 	c.held = make(map[string]*hold)
 	walks := c.walks
@@ -300,6 +319,9 @@ func (c *Conn) Walk(repoID string, gitPath string, spec porcelain.WalkSpec, page
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
+	if c.closed {
+		return nil, ErrRepoNotHeld
+	}
 	h, ok := c.held[repoID]
 	if !ok {
 		return nil, ErrRepoNotHeld
