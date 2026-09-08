@@ -2,6 +2,7 @@ package main
 
 import (
 	"embed"
+	"fmt"
 	"log"
 	"log/slog"
 	"os"
@@ -47,6 +48,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/repos"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/tree"
 	"github.com/wailsapp/wails/v3/pkg/application"
+	"github.com/wailsapp/wails/v3/pkg/services/notifications"
 	// Aliased: main.go's own `events` local var (bridge.NewEvents) would otherwise shadow this
 	// package for the rest of the function, exactly where openWindow's WindowClosing listener
 	// needs it.
@@ -242,6 +244,10 @@ func main() {
 	// the quit one below: at most one window is ever waiting at a time.
 	closeFlush := shell.NewCloseFlushCoordinator()
 
+	// G12 D8: assigned below, once `app` exists — declared here (nil until then) so `teardown`
+	// (which is defined before `app` is) can still close over the real value by reference.
+	var unsubscribePairing func()
+
 	// teardown is today's OnShutdown, minus the ticker Stop (which moves to beforeFlush, run
 	// before the flush wait rather than after it — P56 D3/index.ts:156).
 	beforeFlush := sync.OnceFunc(func() {
@@ -250,6 +256,9 @@ func main() {
 	})
 	teardown := sync.OnceFunc(func() {
 		eventsDetach()
+		if unsubscribePairing != nil {
+			unsubscribePairing()
+		}
 		oplogWiring.Stop()
 		connectionsSvc.Shutdown()
 		if err := gitSock.Close(); err != nil {
@@ -268,6 +277,17 @@ func main() {
 		}
 	})
 	quitter := shell.NewQuitter(events, beforeFlush, teardown, 2*time.Second, windows.Keys)
+
+	// G12 D8: the pairing-request fallback when no Kira Studio window exists to focus. NOT
+	// registered as a Wails service (application.NewService) — a service's ServiceStartup error
+	// is fatal to the whole app (application.go's startup() returns it straight through Run()),
+	// and this one's Startup fails by design outside a packaged, signed .app (checkBundleIdentifier,
+	// notifications_darwin.go) as well as on any Linux desktop with no D-Bus session bus reachable
+	// (confirmed here: registering it made the server binary exit 1 before ever starting). D8's
+	// own text already expects RequestNotificationAuthorization/SendNotification to fail softly
+	// outside a packaged app; the service's *registration* must never be what takes the app down
+	// first. Calling its methods directly, with no Wails service lifecycle, sidesteps that.
+	notifier := notifications.New()
 
 	app := application.New(application.Options{
 		Name: "Kira Studio",
@@ -321,11 +341,43 @@ func main() {
 	// build, mid-startup before any window is focused) so a dialog call still has some live
 	// window to attach to rather than none (F4's second half — the single `mainWindow` var this
 	// replaces always attached to whichever window was created most recently, not the caller).
-	attachDialogs(app, func() application.Window {
+	// G12 D8 reuses this same "which window" resolution for the pairing activator below — the
+	// only other place in the tree that legitimately answers the same question.
+	windowToActOn := func() application.Window {
 		if w := app.Window.Current(); w != nil {
 			return w
 		}
 		return windows.Any()
+	}
+	attachDialogs(app, windowToActOn)
+
+	// G12 D8/F4: brings Kira Studio to the front the moment a pairing request is enqueued —
+	// nothing did this before, so an approval sat invisible until the user already knew to go
+	// looking for it. Lives here, not in internal/gitsock, because it is the only place in the
+	// tree that legitimately imports both gitsock and application (the layering test's own rule).
+	var lastPresentedPairingID string
+	unsubscribePairing = gitSock.OnPairingChanged(func(snap gitsock.PairingSnapshot) {
+		if snap.Pending == nil {
+			lastPresentedPairingID = "" // the edge latch: a future request is a fresh "just arrived".
+			return
+		}
+		// Only the head of the queue *newly arriving* is worth stealing focus for; a snapshot
+		// emitted because the count behind it changed re-presents the same RequestID and is not.
+		if snap.Pending.RequestID == lastPresentedPairingID {
+			return
+		}
+		lastPresentedPairingID = snap.Pending.RequestID
+		req := snap.Pending
+		if w := windowToActOn(); w != nil {
+			// Runs on the broker's own goroutine — never block it on the UI thread.
+			application.InvokeAsync(func() {
+				w.Show()
+				w.Restore()
+				w.Focus()
+			})
+			return
+		}
+		notifyPairingPending(notifier, req)
 	})
 
 	shell.RegisterEngineStream(app, router)
@@ -449,5 +501,37 @@ func main() {
 
 	if err := app.Run(); err != nil {
 		log.Fatal(err)
+	}
+}
+
+// notifyPairingPending is D8's fallback for "no Kira Studio window is open yet" (SPEC §3.3
+// deliberately holds the request rather than spawning one). Two real limits, not bugs: it only
+// works in a packaged, signed .app (notifications.New's darwin impl refuses without a bundle
+// identifier — logged at Debug and otherwise ignored, since a developer running from source has a
+// terminal and a window); and authorization is requested lazily here, on first actual use, never
+// at startup — asking before the app has any reason to notify is exactly what a good macOS app
+// avoids. A denial is terminal for this process and is logged once, via notificationsDenied.
+var notificationsDenied bool
+
+func notifyPairingPending(notifier *notifications.NotificationService, req *gitsock.PairingRequest) {
+	if notificationsDenied {
+		return
+	}
+	granted, err := notifier.RequestNotificationAuthorization()
+	if err != nil {
+		slog.Debug("git pairing: notification authorization unavailable", "scope", "gitsock", "err", err)
+		return
+	}
+	if !granted {
+		notificationsDenied = true
+		slog.Info("git pairing: notification authorization denied; pairing requests will not surface a notification for the rest of this session")
+		return
+	}
+	if err := notifier.SendNotification(notifications.NotificationOptions{
+		ID:    "kira-git-pairing-" + req.RequestID,
+		Title: "Kira Studio",
+		Body:  fmt.Sprintf("%s wants to connect", req.Label),
+	}); err != nil {
+		slog.Debug("git pairing: send notification", "scope", "gitsock", "err", err)
 	}
 }
