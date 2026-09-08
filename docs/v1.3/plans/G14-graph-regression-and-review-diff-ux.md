@@ -32,17 +32,23 @@
 > host's font size). The third suspect — hardcoded `px` font sizes — turns out not to exist in the
 > review sidebar at all; every `px` size there is a glyph metric (F9). (c) Item 3 says the item is
 > "too narrow"; read against the code the actionable complaint is that it *crowds* a narrow bar —
-> §12.2 puts that reading to a human.
+> §12.3 records that reading, and D5 stands on it.
 >
-> **This phase ships one contract change**, flagged rather than smuggled: item 8 ("Open in graph")
-> must name a commit, and `ui.action`'s payload is `{action}` with no room for one.
-> `CONTRACT_VERSION` goes **20 → 21**. That is the third consecutive phase to bump it — §12.1.
+> **This phase ships one contract change**: `CONTRACT_VERSION` goes **20 → 21**, for two reasons
+> that ride the same bump — item 8's `ui.action` target (D10) and item 4's host-owned settings
+> member (D6). Confirmed and settled (§12.1); no further ask.
+>
+> **Revised after review.** Two of §12's three calls came back confirmed as written (the bump, and
+> item 6's six-change fence). The third was **overridden**: D6 no longer hardcodes an 8px indent —
+> it reads and honours VS Code's own `workbench.tree.indent` through the settings snapshot, with
+> 8px surviving only as the fallback for a host that reports nothing. §12.3 records that.
 >
 > **Tiering is named honestly, per G9/G10/G12's precedent.** Item 1 is provable here end to end,
 > against a real repository, in a real browser, and its guard runs in `bun run test:unit`. Items
-> 4–6 are provable as type/lint/grep checks plus a reasoned argument. Items 2, 3, 7 and 8 need a
-> human on a Mac with a real VS Code and a running Kira Studio. §8 says which is which, per item,
-> and never claims more.
+> 4–6 are provable as type/lint/grep/unit checks plus a reasoned argument — item 4's *live*
+> response to a changed `workbench.tree.indent` additionally wants a real VS Code. Items 2, 3, 7
+> and 8 need a human on a Mac with a real VS Code and a running Kira Studio. §8 says which is
+> which, per item, and never claims more.
 
 ---
 
@@ -105,7 +111,7 @@ Eight items, eight fixes, and nothing else.
 | **1** The graph still renders nothing | `App.vue`'s `CommitGrid`/`AppToolbar` are `import type`, so Vue never instantiates either. The data path below them is **healthy at every layer** | F1, F2, F3, F4, F5 | D1, D2, D3 | **1** |
 | **2** Pairing prompt becomes a real system notification | `main.go` focuses the window first and notifies only when no window exists; the notification carries no actions | F6 | D4 | **3** |
 | **3** Status-bar item crowds the bar | Every state renders `$(icon) Kira Version`; the tooltip is a plain string; no `name` | F7 | D5 | **2** / **3** |
-| **4** File-tree indentation too large | `FileTree.vue:382` hardcodes `depth * 16` px — double VS Code's own tree indent | F8 | D6 | **2** |
+| **4** File-tree indentation too large | `FileTree.vue:382` hardcodes `depth * 16` px, ignoring the host's own `workbench.tree.indent` | F8 | D6 | **2** / **3** |
 | **5** Font should follow VS Code | Not the type scale (already does), and not stray `px` sizes (there are none in the sidebar): the font **family** and the control **heights** | F9 | D7 | **2** |
 | **6** Review UI modelled on GitLens | One-line commit rows that truncate in a sidebar, no row actions, no comparison summary | F10 | D8 | **2** / **3** |
 | **7** "Go to file" in the diff toolbar | Nothing contributes to `editor/title`; the capability itself already exists (G4) | F11, F12 | D9 | **3** |
@@ -466,10 +472,12 @@ Item 4. `FileTree.vue:382`:
 :style="{ paddingLeft: `${row.depth * 16}px` }"
 ```
 
-VS Code's own `workbench.tree.indent` default is **8**, and every tree in the workbench (Explorer,
-SCM, Search results) uses it. At 16px a four-level path costs 64px of a ~300px sidebar before the
-filename starts — which is exactly the "wastes horizontal space" in the item. The number is a
-literal in a template binding, not a token, so it cannot be tuned by the sidebar's own scale.
+VS Code's own `workbench.tree.indent` is what every tree in the workbench (Explorer, SCM, Search
+results) indents by; its default is **8**, and it is a setting the user can change. At a hardcoded
+16px a four-level path costs 64px of a ~300px sidebar before the filename starts — exactly the
+"wastes horizontal space" in the item — and a user who has already tuned their editor's tree
+indent sees this one ignore them. The number is a literal in a template binding, not a token and
+not a setting, so nothing can tune it at all.
 
 ### F9 — What does *not* follow the host is the font family and the control heights — not the type scale, and not a stray literal
 
@@ -582,7 +590,8 @@ passed to `App.vue`'s `pendingAction` prop.
 
 Both halves are extension-side only — the Go server neither emits nor parses `ui.action` (G10 D9
 established exactly this situation for that event's own introduction) — but `CONTRACT_VERSION` is
-the sole compatibility authority (SPEC §3.4), so it still moves. §12.1 puts that to a human.
+the sole compatibility authority (SPEC §3.4), so it still moves — once, for this field and D6's
+together (§12.1).
 
 ### F14 — Observed in passing: `stash.list` rejects on every repo open, as an unhandled page-level rejection
 
@@ -794,24 +803,123 @@ puts where.
 - `backgroundColor`, the per-state `command`, and the `kiraVersion.statusBar.enabled` opt-out are
   unchanged from G12 D10.
 
-### D6 — The file tree indents on a token, defaulting to 8px
+### D6 — The file tree honours VS Code's own `workbench.tree.indent`, plumbed through the settings snapshot
 
-Item 4, fixing F8. `FileTree.vue`'s inline literal becomes a token reference:
+Item 4, fixing F8. **Revised after review**: this plan's first pass hardcoded 8px and recorded
+"read the real setting" as a declined option in §12.3. That is **overridden** — the setting is read
+and honoured, not approximated. The 8px stays only as the fallback for a host that reports nothing.
+
+**The key is the host's own key, mirrored into the snapshot rather than duplicated.** No
+`kiraVersion.tree.indent` is invented: a second knob for a number VS Code already owns is exactly
+the approximation being rejected, and a user who changes their tree indent expects every tree to
+follow, not to find a private copy in another extension's settings.
+
+**(a) `packages/git-core/src/settings/schema.ts`** gains one member and one field on `SettingDef`:
+
+```ts
+/** Where a setting's value comes from. "extension" (the default) is a key this extension
+ *  contributes and owns; "host" is a key the *editor* owns, which we only read — it is part of
+ *  SettingsSnapshot so the webview can honour it, and is deliberately absent from
+ *  contributes.configuration, since contributing a core key would be a duplicate declaration of
+ *  someone else's setting. */
+readonly source?: 'extension' | 'host';
+
+'workbench.tree.indent': {
+  key: 'workbench.tree.indent',
+  type: 'number',
+  default: 8,
+  source: 'host',
+  minimum: 0,
+  maximum: 40,
+  description:
+    "VS Code's own tree indentation, read (never contributed) so Kira Version's file trees " +
+    'line up with the Explorer beside them.',
+},
+```
+
+- **`toVsCodeConfiguration()` skips every `source: 'host'` key.** That function is the single
+  source of `contributes.configuration`, so this is what keeps a core key out of our manifest.
+- **`coerceSettings` needs no special case**: it is keyed off `SETTINGS`, so the new member is
+  validated, range-checked and defaulted like every other one. Its "never partly valid" rule means
+  a nonsense value (a string, a negative, 900) falls back to 8 *and* is reported in `problems`,
+  which `extension.ts` already logs — so a future change to VS Code's own bounds degrades to the
+  fallback instead of breaking the sidebar. `minimum: 0`/`maximum: 40` is deliberately wider than
+  the range VS Code's own schema enforces for the key (a small single-digit floor and a low
+  double-digit ceiling in current builds — not re-derived here, because ours is a sanity bound, not
+  a second declaration of theirs, and a core change to it must degrade rather than break us).
+
+**(b) `apps/kira-studio-vscode/src/extension.ts` — the read needs no special case either, but the
+invalidation does.** `readRawSettings` iterates `SETTING_KEYS` calling
+`config.get(key)` on the **root** configuration object, and a fully-qualified dotted key resolves
+there like any other — `vscode.workspace.getConfiguration().get('workbench.tree.indent')` returns
+the *effective* value, with user, workspace, folder and language overrides already applied by VS
+Code. That is precisely "the real setting, honoured". What must change is the early return:
+
+```ts
+if (!event.affectsConfiguration('kiraVersion') &&
+    !event.affectsConfiguration('workbench.tree.indent')) return;
+```
+
+Everything after it — re-coerce, log problems, `notifySettingsChanged` into both providers — is
+unchanged, so a live change to the indent reaches both webviews through the `settings.changed`
+event that already exists. **This is the whole of "settings.changed handling"**: no new event, no
+new plumbing, one clause.
+
+**(c) `packages/git-ipc/src/contract.ts` — `SettingsSnapshot` gains the member**, with a comment
+saying it is host-owned and read-only from our side:
+
+```ts
+/** G14 D6: VS Code's own tree indentation, mirrored so the webview's file trees match the
+ *  Explorer. Read from the host, never contributed by this extension. */
+readonly 'workbench.tree.indent': number;
+```
+
+That is a contract shape change, and it rides **the bump this phase is already making** for D10
+(20 → 21) rather than adding a second one — the same single-bump-per-phase discipline G12 D1 and
+G13 D1 each kept.
+
+**(d) The webview consumes it as a CSS variable, so `FileTree` stays prop-free.**
+`FileTree.vue:382`'s literal becomes
 
 ```html
 :style="{ paddingLeft: `calc(var(--kv-tree-indent) * ${row.depth})` }"
 ```
 
-with `--kv-tree-indent: 8px` defined in `packages/git-ui/src/theme/density.css` — the file that
-already owns row heights and spacing for **both** surfaces, because item 4's complaint applies to
-every tree this UI renders, not only the review sidebar's. 8px is not a taste call: it is
-`workbench.tree.indent`'s own default, so the tree lines up with the Explorer beside it.
+with `--kv-tree-indent: 8px` declared in `packages/git-ui/src/theme/density.css` (the file that
+already owns row heights and spacing for both surfaces) as the **fallback**, and the live value
+bound on each view's own root:
 
-**Not read from `workbench.tree.indent` itself.** It is readable
-(`vscode.workspace.getConfiguration('workbench.tree').get<number>('indent')`) but it is not one of
-`SETTINGS`' keys, so plumbing it would mean a new settings key, a coercion entry, a
-`settings.changed` path and a manifest entry — a contract-shaped change for a number that is 8 for
-essentially everyone. §12.3 records the option rather than taking it.
+- `App.vue` binds `:style="{ '--kv-tree-indent': treeIndent }"` on `.kv-app`, where `treeIndent` is
+  a computed over `settingsState.value?.settings.value['workbench.tree.indent']` rendered as `px` —
+  the exact shape `pageSize`'s own computed already uses two lines away, fallback included.
+- `ReviewView.vue` does the same on its root. It has no `SettingsState` today, so it constructs one
+  in `bootstrap()` from `init.settings` (which it already awaits) and disposes it on unmount —
+  three lines, and it is what makes the sidebar honour a *live* change rather than only the value
+  at boot.
+
+A CSS variable rather than a prop because `FileTree` is mounted from four places (the graph's
+detail pane, each expanded review row, the Files pane) and none of them should have to thread a
+number through; inheritance is what a custom property is for. The declaration in `density.css` also
+means the fallback is real for any host that never sets it — a harness, a test, a future editor.
+
+**Go: no change, and the reason is worth stating.** The server's `app.init` result carries no
+settings at all (SPEC §5 item 3 assigns settings to the extension; `gitrpc/wire.go`'s own comment
+says so), and `internal/gitclient/settings.go`'s `SettingsSnapshot`/`DefaultSettings` are an unused
+legacy stub — `grep -rn "gitclient\.SettingsSnapshot\|gitclient\.DefaultSettings" apps/kira-studio
+--include=*.go` returns **nothing at all** (run here; grepping the bare names instead also matches
+`internal/storage/model/settings.go`'s own unrelated `DefaultSettings`, which is the studio app's
+settings, not this one's). Adding a member to a struct with no callers would mirror a fact nothing
+reads. §8.4 makes "no new field in `gitclient/settings.go`" a checklist line so this is a decision
+rather than an omission.
+
+**Rejected: a `kiraVersion.tree.indent` of our own** (with, say, `0` meaning "follow the host").
+It is a second knob for a number the editor already owns, it makes "why doesn't my indent apply?"
+a support question, and the coordinator's own correction is that the real setting should be
+honoured — not that a similar one should exist.
+
+**Rejected: reading the setting in the extension and pre-multiplying it** (sending a resolved
+`paddingLeft` per row, or a per-depth pixel table). The snapshot is the mechanism this codebase
+already has for "a host fact the webview needs"; anything else is a second one.
 
 ### D7 — The review sidebar's font family follows VS Code, and its control heights follow the host's font size
 
@@ -891,8 +999,8 @@ declines rather than forgets):
   modules are untouched. This is a template-and-CSS change plus one new hover-actions row.
 - **No graph-panel restyle**, per §0.3.
 
-§12.2 puts the scope of this item to a human before it starts, since "modelled on GitLens" is the
-one instruction in this phase that could absorb an unbounded amount of work.
+§12.2 records this fence as confirmed: "modelled on GitLens" is the one instruction in this phase
+that could absorb an unbounded amount of work, and six changes is the whole of it.
 
 ### D9 — `kiraVersion.goToFileFromDiff`, contributed to `editor/title` left of the change-navigation arrows, over G4's existing mapping
 
@@ -914,8 +1022,8 @@ Item 7, using F11 and F12.
 sit in the same group at default order), matching GitLens's own placement for its "Open File"
 button, which is what item 7 asks for.
 
-**Handler**, in a new `apps/kira-studio-vscode/src/diffToolbar.ts` (both commands live there; it is
-the only new file this phase adds):
+**Handler**, in a new `apps/kira-studio-vscode/src/diffToolbar.ts` (both commands live there; it
+and D11's guard test are the only new files this phase adds):
 
 1. Resolve the diff being acted on from
    `vscode.window.tabGroups.activeTabGroup.activeTab?.input`. When that is a
@@ -1006,7 +1114,8 @@ change, plus a round trip and a race with the panel's own boot.
 | **7, 8** | `commands.test.ts`'s existing cross-checks pick up both new commands automatically | Not a new test — the table-vs-manifest check is total in both directions, so a command in one and not the other already fails |
 | **2** | none | A Wails/macOS notification path this container cannot exercise; a test would assert that a fake was called (G12 D17's own reasoning for D8) |
 | **3** | none | A switch over five states writing strings onto a `StatusBarItem` |
-| **4, 5** | none | One template binding and six `calc()`s. §8.4's "identical at 13px" is a `grep`, and it is a better guard than a test would be |
+| **4** | two assertions added to `schema.test.ts` (§4.6b) | Not a new test — one `expect` on `defaultSettings()` and one on `toVsCodeConfiguration()`, in the suite that already covers both. The second is load-bearing: it is the only thing stopping a `workbench.*` key from being contributed into our own manifest, which VS Code would treat as a duplicate declaration of a core setting |
+| **5** | none | Six `calc()`s. §8.4's "identical at 13px" is arithmetic anyone can read, and a better guard than a test |
 | **6** | none | Template and CSS. `vue-tsc` is the existing guard; `packages/git-ui` has no mounting harness, and building one for a restyle is disproportionate (§11 keeps the question open) |
 
 ---
@@ -1024,23 +1133,27 @@ added beside the subscription and routes `approve`/`deny`/default onto
 `gitSock.Broker().Approve`/`Deny`/window activation. `notificationsDenied`'s once-per-session
 behaviour and the lazy authorization request are unchanged.
 
-### 3.2 `apps/kira-studio/internal/gitrpc/contract.go` — edited (D10)
+### 3.2 `apps/kira-studio/internal/gitrpc/contract.go` — edited (D6, D10)
 
 `ContractVersion` 20 → 21, with the same shape of comment G10 D9 / G12 D1 / G13 D1 left: what moved
-(one new `UiActionKind` member and `ui.action`'s optional `target`), and that the Go server neither
-emits nor parses the event — the constant moves because it is the sole compatibility authority.
+— `SettingsSnapshot`'s host-owned `'workbench.tree.indent'` member (D6) and one new `UiActionKind`
+member with `ui.action`'s optional `target` (D10) — and that the Go server emits and parses
+neither, the constant moving because it is the sole compatibility authority. **One bump, both
+reasons**, landed in C5 (§7).
 
-**No other Go file changes.** §8.4 checks it.
+**No other Go file changes** — including `internal/gitclient/settings.go`, whose `SettingsSnapshot`
+is an unused legacy stub that D6 deliberately does not extend (D6's own "Go: no change" note).
+§8.4 checks both.
 
 ---
 
 ## 4. The TypeScript side, file by file
 
-### 4.1 `packages/git-ui/src/App.vue` — edited (D1, D3, D10)
+### 4.1 `packages/git-ui/src/App.vue` — edited (D1, D3, D6, D10)
 
 Two value imports with their `biome-ignore` lines; the `bootError` banner rendered inside the
-`repoState` branch as well as outside it; `runUiAction`'s `revealCommit` case and the
-`pendingUiAction` prop rename.
+`repoState` branch as well as outside it; the `--kv-tree-indent` style binding on `.kv-app`; and
+`runUiAction`'s `revealCommit` case with the `pendingUiAction` prop rename.
 
 ### 4.2 `packages/git-ui/src/components/AppToolbar.vue` — edited (D1)
 
@@ -1066,28 +1179,45 @@ import, name the file and line, and say in one sentence why it is a bug.
 
 ### 4.6 `packages/git-ui/src/theme/density.css` — edited (D6)
 
-One new token: `--kv-tree-indent: 8px`, beside the row heights it belongs with.
+One new token: `--kv-tree-indent: 8px`, beside the row heights it belongs with — the **fallback**
+each view's root overrides from the host's own setting (D6d).
+
+### 4.6a `packages/git-core/src/settings/schema.ts` — edited (D6)
+
+`SettingDef.source?: 'extension' | 'host'`, the `'workbench.tree.indent'` member, and
+`toVsCodeConfiguration()` skipping host-sourced keys so a core setting is never contributed by this
+extension's manifest.
+
+### 4.6b `packages/git-core/src/settings/schema.test.ts` — edited (D6, D11)
+
+Two assertions on the existing suite, not a new test: the snapshot's default carries
+`'workbench.tree.indent': 8`, and `toVsCodeConfiguration().properties` **does not** contain it.
+The second is the one that matters — it is what keeps a `workbench.*` key out of
+`contributes.configuration`, and it is a one-line `expect` on a function the file already
+exercises.
 
 ### 4.7 `packages/git-ui/src/components/FileTree.vue` — edited (D6, D8)
 
-The indent binding moves onto the token; the review-scoped row anatomy (status letter cell, dimmed
-directory, `+N −M`) lands behind the existing per-instance props, leaving `DetailPane`'s instance
-untouched.
+The indent binding moves onto `--kv-tree-indent` (inherited, never a prop — D6d); the
+review-scoped row anatomy (status letter cell, dimmed directory, `+N −M`) lands behind the existing
+per-instance props, leaving `DetailPane`'s instance untouched.
 
 ### 4.8 `packages/git-ui/src/components/review/ReviewCommitRow.vue` — edited (D8)
 
 The two-line row and the hover/focus action group. Its `font-size: 12px` is the chevron *glyph*
 (paired with `width: 12px`) and stays — F9(3).
 
-### 4.9 `packages/git-ui/src/components/review/ReviewView.vue` — edited (D8)
+### 4.9 `packages/git-ui/src/components/review/ReviewView.vue` — edited (D6, D8)
 
-The comparison summary node replacing the header strip, and the three count badges on the pane
-toggle.
+Its own `SettingsState` (constructed in `bootstrap()` from the `init.settings` it already awaits,
+disposed on unmount) and the `--kv-tree-indent` binding on its root; then the comparison summary
+node replacing the header strip, and the three count badges on the pane toggle.
 
-### 4.10 `packages/git-ipc/src/contract.ts` and `validate.ts` — edited (D10)
+### 4.10 `packages/git-ipc/src/contract.ts` and `validate.ts` — edited (D6, D10)
 
-`UiActionKind`'s `'revealCommit'`, `ui.action`'s optional `target`, and `CONTRACT_VERSION` 20 → 21
-with the file's own comment convention.
+`SettingsSnapshot`'s `'workbench.tree.indent'` member (D6c), `UiActionKind`'s `'revealCommit'`,
+`ui.action`'s optional `target`, and `CONTRACT_VERSION` 20 → 21 — **one bump, both reasons named**
+in the comment convention the file already uses.
 
 ### 4.11 `apps/kira-studio-vscode/src/diffToolbar.ts` — new (D9, D10)
 
@@ -1103,10 +1233,12 @@ Nothing else in this file changes.
 
 Two `OTHER_COMMANDS` entries.
 
-### 4.14 `apps/kira-studio-vscode/src/extension.ts` — edited (D5, D9, D10)
+### 4.14 `apps/kira-studio-vscode/src/extension.ts` — edited (D5, D6, D9, D10)
 
-`updateStatusBar`'s new text/tooltip/name/accessibility shape, and two `otherCommandHandlers`
-entries routing into §4.11.
+`updateStatusBar`'s new text/tooltip/name/accessibility shape; `onDidChangeConfiguration`'s early
+return widened to `workbench.tree.indent` (D6b — `readRawSettings` itself needs no change, since a
+fully-qualified key resolves off the root configuration); and two `otherCommandHandlers` entries
+routing into §4.11.
 
 ### 4.15 `apps/kira-studio-vscode/src/panelView.ts` — edited (D10)
 
@@ -1163,15 +1295,22 @@ looked at in a real window, and item 6's redesign cannot be judged at all.
 | **C2** | `fix(git-ui): a boot failure after the repository opens is visible` | D3 (§4.1) |
 | **C3** | `feat: a pairing request is a system notification with Approve and Deny` | D4 (§3.1) |
 | **C4** | `fix(vscode): the status-bar item stops spending the bar on its own name` | D5 (§4.15) |
-| **C5** | `fix(git-ui): tree indentation follows the workbench's own 8px step` | D6 (§4.6, §4.7) |
+| **C5** | `fix(git-ui): file trees honour VS Code's own workbench.tree.indent` | D6 (§4.1, §4.6, §4.6a, §4.6b, §4.7, §4.9's settings half, §4.10's snapshot half, §4.14's config half) |
 | **C6** | `fix(git-ui): the review sidebar's font and control heights follow VS Code` | D7 (§4.5) |
 | **C7** | `feat(git-ui): a GitLens-shaped branch review sidebar` | D8 (§4.7–§4.9) |
 | **C8** | `feat(vscode): Go to file from the review diff's toolbar` | D9 (§4.11–§4.14, §4.17) |
 | **C9** | `feat(ipc)!: Open in graph from the diff toolbar — CONTRACT_VERSION 21` | D10 (§3.2, §4.1, §4.10, §4.11, §4.14–§4.18) |
 
 C8 before C9 because C8 creates `diffToolbar.ts` and the menu contribution C9 extends, and because
-C8 needs no contract change — keeping the bump isolated to one commit that can be reverted on its
-own.
+C8 needs no contract change.
+
+**One wrinkle the bump creates, and the honest way through it:** C5 adds a `SettingsSnapshot`
+member and C9 adds `ui.action`'s target, and both are the same 20 → 21 bump. Move
+`CONTRACT_VERSION` **in C5**, the earlier of the two, with a comment naming *both* reasons, and
+have C9 add its own field under a constant that has already moved. The alternative — bumping twice,
+or landing C5's field under version 20 — would either put two versions in one phase or ship a
+snapshot member the version number does not account for. C9 keeps the `!` in its subject because it
+is the commit that completes the breaking change; C5 names the bump in its body.
 
 ---
 
@@ -1187,7 +1326,9 @@ own.
 3. `bun run typecheck` (all five projects) green.
 4. `bun run lint` green.
 5. `bun run test:unit` green, **including D11's new guard, which must fail on the pre-fix tree** —
-   verify by re-adding one `import type` and watching it fail before committing.
+   verify by re-adding one `import type` and watching it fail before committing — and including
+   `schema.test.ts`'s two new assertions (D6): the default snapshot carries
+   `'workbench.tree.indent': 8`, and `toVsCodeConfiguration()` does **not** expose it.
 6. **`bun run format` is run and changes nothing in the four files D1 touched.** This is the
    property F4 says is otherwise silently lost, and it is one command.
 7. `bun run build:vscode` produces both bundles and passes its own checks;
@@ -1211,8 +1352,13 @@ own.
 - **D5 (status bar).** Provable: the state table typechecks against `ConnectionState`'s five
   members and `vscode.StatusBarItem`'s API. Not provable: how much narrower the item actually
   renders.
-- **D6 (indent).** Provable: `vue-tsc`, and that no `* 16` literal survives in `FileTree.vue`.
-  Not provable: how it looks beside the Explorer.
+- **D6 (indent).** Provable, and mostly mechanically: `vue-tsc`; that no `* 16` literal survives
+  in `FileTree.vue`; that `'workbench.tree.indent'` is in `SETTINGS`, in `SettingsSnapshot` and
+  **not** in `package.json#contributes.configuration` (a `grep`, plus `schema.test.ts`'s own
+  assertion); and that `coerceSettings` falls back to 8 for a nonsense value (the existing suite's
+  own pattern). Not provable here: that VS Code actually reports the effective value through
+  `getConfiguration().get('workbench.tree.indent')` and re-fires `onDidChangeConfiguration` for it
+  — both are documented API behaviour, and §8.3 step 5 is where they are confirmed.
 - **D7 (font/heights).** Provable, and mechanically: `kira-structure.css` still contains **no
   colour**; and **every `calc()` in (b) evaluates to today's literal at `--kv-font-size: 13px`** —
   six arithmetic checks anyone can do by reading, listed in §8.4.
@@ -1237,7 +1383,11 @@ In order, because several steps depend on the one before:
 4. **Item 3:** confirm the status-bar item is icon-only when connected and idle, that hovering
    shows the Markdown detail, and that quitting Kira Studio switches it to a visible error state.
 5. **Item 4:** a deep path in the review sidebar's file tree lines up with the Explorer's own
-   indentation.
+   indentation at the default. Then **change `workbench.tree.indent`** (to 4, and to 20) with the
+   sidebar open and confirm both trees — the review sidebar's and the graph detail pane's — follow
+   **live**, without a reload, and that the Explorer and Kira's trees still agree. Set it to
+   something invalid (a string) and confirm the tree falls back to 8 with a warning in the *Kira
+   Version* output channel rather than breaking.
 6. **Item 5:** set `editor.fontFamily`/the workbench font and font size to something distinctive;
    confirm the review sidebar follows both, and that at the default size nothing moved.
 7. **Item 6:** the review sidebar reads as GitLens — two-line commit rows, hover actions, the
@@ -1262,7 +1412,9 @@ In order, because several steps depend on the one before:
       `packages/git-ipc/schema/**` or `packages/git-ipc/src/generated/**` (D2 — F2 proved them
       healthy).
 - [ ] No `internal/git*` file imports `internal/bridge` or `wails`; the layering test is green.
-- [ ] `CONTRACT_VERSION` is **21** in all three hand-maintained places and nowhere is it 20.
+- [ ] `CONTRACT_VERSION` is **21** in all three hand-maintained places, nowhere is it 20, and it
+      moved **once** — its comment names both reasons (D6's snapshot member, D10's `ui.action`
+      target).
 - [ ] `packages/git-ui/src/theme/kira-structure.css` still contains **no colour**:
       `grep -nE "#[0-9a-fA-F]{3,8}|rgb\(|oklch\(|(^|[^-])(color|background|border-color):"` finds
       nothing.
@@ -1270,7 +1422,14 @@ In order, because several steps depend on the one before:
       values they replace.
 - [ ] `grep -rnE "font-size: *[0-9]+px" packages/git-ui/src` returns **the same seven lines it
       returns today** — D7(c) changes none of them, and a new one would be a regression.
-- [ ] `FileTree.vue` contains no `* 16` indent literal.
+- [ ] `FileTree.vue` contains no `* 16` indent literal, and reads `--kv-tree-indent`.
+- [ ] `'workbench.tree.indent'` is in `SETTINGS` (with `source: 'host'`) and in
+      `SettingsSnapshot`, and **is not** in `package.json#contributes.configuration`:
+      `grep -n "workbench.tree.indent" apps/kira-studio-vscode/package.json` finds nothing.
+- [ ] `toVsCodeConfiguration()` emits no `source: 'host'` key; `schema.test.ts` asserts it.
+- [ ] `extension.ts`'s `onDidChangeConfiguration` early return covers `workbench.tree.indent`.
+- [ ] `internal/gitclient/settings.go` is **unchanged** — D6 deliberately does not extend an
+      unused stub.
 - [ ] Both new commands appear in `commands.ts`'s `OTHER_COMMANDS` **and**
       `package.json#contributes.commands`; `commands.test.ts` is green.
 - [ ] Both `editor/title` entries carry `when: "isInDiffEditor && resourceScheme == kira-version"`.
@@ -1298,7 +1457,6 @@ before C7, which restyles the rows they retune).
 | Range/hunk-level "mark reviewed" | Its own phase; G13 D20's "G14" is today's **G15** | G15 |
 | Restyling the graph panel | Item 6 says "the branch review UI" | D8's per-instance scoping |
 | Avatars in the review sidebar | No avatar source, no network, no cache | D8 |
-| Reading `workbench.tree.indent` from VS Code | A settings-contract change for a number that is 8 for everyone | §12.3 |
 | A general webview logging/diagnostics layer | Item 1 is root-caused; D3 closes the one real gap | §0.3 |
 | `stash.list`'s unhandled rejection | Real, observed (F14), and G16's | §11 |
 | A mounted-component test harness for `packages/git-ui` | Probe D shows it is buildable and useful; building it as a permanent tier is its own decision | §11 |
@@ -1329,53 +1487,62 @@ before C7, which restyles the rows they retune).
 
 ---
 
-## 12. Three calls that want a human eye
+## 12. Three calls, all now settled
 
-### 12.1 `CONTRACT_VERSION` 20 → 21, for one optional field on an extension-only event (D10)
+All three were put to a human before implementation. Two came back confirmed as written; one was
+overridden and changed this plan. Recorded here in the form the answer left them, so the
+implementing agent reads decisions rather than open questions — **there is nothing outstanding in
+this section.**
 
-**The call:** item 8 needs to tell the graph webview *which commit* to reveal, and `ui.action`'s
-payload has no room for one (F13). This plan adds an optional `target` and one `UiActionKind`
-member, and bumps the contract because `CONTRACT_VERSION` is the sole compatibility authority
-(SPEC §3.4).
+### 12.1 `CONTRACT_VERSION` 20 → 21 — **confirmed, and the last time this is asked**
 
-**Why it is flagged rather than just done:** a bump makes every already-installed `.vsix` refuse to
-talk to a newer Kira Studio and vice versa, and this is the **third consecutive phase** to bump
-(G12 18→19, G13 19→20, now 20→21). The precedent is exact and established — G10 D9's `ui.action`
-itself never crosses the socket and bumped anyway — but three releases in a row that force a paired
-upgrade is a pattern worth someone deciding about rather than inheriting.
+**The call was:** item 8 needs to tell the graph webview *which commit* to reveal and `ui.action`'s
+payload has no room for one (F13); D6's revision then added a second field to the same version
+(D6c). One bump, two reasons, and it is the third consecutive phase to bump — G12 18→19, G13
+19→20, now 20→21 — which forces a paired extension/app upgrade every release.
 
-**The alternative, and why this plan declines it:** ship item 7 (Go to file, no contract change) and
-defer item 8 to whenever the contract next moves for a better reason. That leaves half of a two-
-button toolbar, and the second button is the one that makes the first one's context obvious.
+**Resolved: ship it as planned.** And a standing instruction that outlives this phase: **a plain
+`CONTRACT_VERSION` bump is not a §12-style question in future phases either.** Make the bump, name
+what moved in the constant's own comment (the convention G10 D9 set and every phase since has
+kept), and move on. This section should not carry one again.
 
-### 12.2 How much of GitLens is in scope for item 6 (D8)
+### 12.2 Item 6's GitLens fence — **confirmed as written**
 
-**The call:** "modelled on GitLens" is the one instruction in this phase with no natural boundary.
-D8 fixes the boundary at six changes — two-line commit rows, hover row actions, a comparison
-summary node, count badges, file-row anatomy, and the tighter rhythm — all of them template and CSS
-over data already on the wire, with no new RPC, no new pane and no state change.
+**The call was:** "modelled on GitLens" has no natural boundary, so D8 fixes one at six changes —
+two-line commit rows, hover row actions, a comparison summary node, count badges, file-row anatomy,
+and the tighter rhythm — all template and CSS over data already on the wire, with no new RPC, no
+new pane and no state change; and explicitly *not* avatars, a graph column in the review list, an
+inline hover diff preview, or a comparison picker beyond the existing `BaseSelector`.
 
-**What is deliberately outside it, and each could reasonably be argued back in:** avatars (no
-source, no network); a graph column in the review list (that is the graph panel's job, and the
-review walk draws no lanes by design — G6/D41); an inline file-diff preview on hover; and a
-GitLens-style "Compare with…" picker beyond the existing `BaseSelector`.
+**Resolved: confirmed, no change.** The six-change fence is the scope. An implementer who finds
+themselves adding a seventh has left the phase, and the four exclusions above stay excluded.
 
-**The risk of getting this wrong in either direction is real**: too little and the item is unmet;
-too much and a defect batch has grown a redesign it cannot verify in this container (§8.2 is honest
-that "does it read as GitLens" is a human's judgment). A human should confirm the six-change fence
-before C7 starts.
+### 12.3 The file-tree indent — **overridden: read the real setting, do not approximate it**
 
-### 12.3 Item 3's "too narrow", and item 4's 8px (D5, D6)
+**The call was:** D6 originally hardcoded `--kv-tree-indent: 8px`, matching
+`workbench.tree.indent`'s default, and declined to read the setting itself on the grounds that
+plumbing it costs a `SETTINGS` key, a coercion entry, a `settings.changed` path and a manifest
+entry — "a contract-shaped change for a number that is 8 for essentially everyone".
 
-**Recorded rather than answered**, because both are small and both are taste.
+**Resolved: rejected. The real `workbench.tree.indent` is read and honoured.** A user who has
+already tuned their editor's tree indent expects every tree to follow, and an approximation that
+silently ignores them is the defect item 4 is about, one level up. **D6 is rewritten accordingly**
+— the host's own key is mirrored into `SettingsSnapshot` (never contributed into our manifest),
+`coerceSettings` validates it like any other, `onDidChangeConfiguration` picks up live changes
+through the `settings.changed` event that already exists, and both webview roots bind it as
+`--kv-tree-indent`. The 8px survives **only** as `density.css`'s fallback for a host that reports
+nothing.
 
-- SPEC's item 3 says the status-bar item is "too narrow". Read against the code, the item is not
-  narrow — it renders a constant twelve-character name in every state — so this plan takes the
-  actionable reading: it *crowds a narrow bar*, and D5 shrinks it to an icon plus a state word only
-  when there is one. If the complaint was the opposite (the item is truncated by other extensions
-  and needs to be wider or repositioned), D5 is the wrong fix and the right one is
-  `StatusBarAlignment`/priority, not text.
-- D6 hardcodes 8px rather than reading `workbench.tree.indent`. That is right for essentially every
-  user and wrong for the one who changed it. Plumbing the real setting is a new `SETTINGS` key and
-  its whole coercion/`settings.changed` path — a contract-shaped change for a number — and this
-  plan declines it. Worth a nod, not a debate.
+Three consequences the revision accepts on purpose, each argued in D6 rather than assumed: one more
+`SettingsSnapshot` member (riding this phase's existing bump, §12.1, not a second one); a small
+extension to the settings schema (`SettingDef.source`, so a host-owned key is never emitted into
+`contributes.configuration`); and one more assertion in `schema.test.ts`, which is the only thing
+that keeps a core setting out of our manifest.
+
+**Still recorded, and still just a reading, not a question:** SPEC's item 3 says the status-bar item
+is "too narrow". Read against the code the item is not narrow — it renders a constant
+twelve-character name in every state — so D5 takes the actionable reading: it *crowds* a narrow
+bar, and shrinks to an icon plus a state word only when there is one. If the complaint was the
+opposite (it is being truncated by other extensions and needs to be wider or repositioned), the
+right fix is `StatusBarAlignment`/priority rather than text, and D5 is the wrong one. D5 stands as
+written; this note is here so a reviewer who knows better can say so in one line.
