@@ -78,6 +78,14 @@ func (r *Router) ForConn(c *gitsession.Conn) Handlers {
 				return r.handlePreflightCheckout(ctx, c, params)
 			case "preflight.revert":
 				return r.handlePreflightRevert(ctx, c, params)
+			case "stash.list":
+				return r.handleStashList(ctx, c, params)
+			case "stash.show":
+				return r.handleStashShow(ctx, c, params)
+			case "preflight.stashPop":
+				return r.handlePreflightStashPop(ctx, c, params)
+			case "preflight.stashBranch":
+				return r.handlePreflightStashBranch(ctx, c, params)
 			case "op.run":
 				return r.handleOpRun(ctx, c, params)
 			case "undo.peek":

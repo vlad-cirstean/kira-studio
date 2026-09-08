@@ -2,6 +2,7 @@ package gitrpc
 
 import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitclient"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitclient/porcelain"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitpreflight"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitreview"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitsession"
@@ -209,6 +210,47 @@ type UndoPeekResult struct {
 type UndoRunParams struct {
 	RepoID string `json:"repoId"`
 	ID     string `json:"id"`
+}
+
+// ---------------------------------------------------------------------------------------
+// G17 — stash. Results are gitsession's/gitpreflight's own wire-shaped types
+// ([]porcelain.StashEntry wrapped in StashListResult, gitsession.StashShowResult,
+// gitpreflight.StashPopPreflight, gitpreflight.StashBranchPreflight) — D5's own precedent applied
+// again: no second, gitrpc-owned copy of a shape those packages already produce JSON-tagged.
+// CONTRACT_VERSION stays 21 (F1): every one of these four request keys, and every stash type, has
+// been in contract.ts/validate.ts since G1.
+// ---------------------------------------------------------------------------------------
+
+type StashListParams struct {
+	RepoID string `json:"repoId"`
+}
+
+// StashListResult mirrors @kira/git-ipc's own `stash.list` result — `{entries: StashEntry[]}`.
+type StashListResult struct {
+	Entries []porcelain.StashEntry `json:"entries"`
+}
+
+type StashShowParams struct {
+	RepoID string `json:"repoId"`
+	SHA    string `json:"sha"`
+}
+
+// PreflightStashPopParams is preflight.stashPop's own request. Index is accepted for wire-shape
+// fidelity with the contract but not otherwise used by the Go orchestration below: PreflightStashPop
+// re-resolves the entry fresh by sha (resolveStashEntry, gitsession/stash.go) and reads its own
+// CURRENT index off that fresh read — more correct than trusting a client-supplied index that may
+// already be stale by the time this request lands, the same race the sha itself guards against.
+type PreflightStashPopParams struct {
+	RepoID    string  `json:"repoId"`
+	SHA       string  `json:"sha"`
+	Index     int     `json:"index"`
+	TargetSHA *string `json:"targetSha,omitempty"`
+}
+
+type PreflightStashBranchParams struct {
+	RepoID string `json:"repoId"`
+	SHA    string `json:"sha"`
+	Branch string `json:"branch"`
 }
 
 // ---------------------------------------------------------------------------------------
