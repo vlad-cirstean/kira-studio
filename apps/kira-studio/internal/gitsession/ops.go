@@ -18,9 +18,9 @@ import (
 // OpRequest is op.run's own request — the Go decode of @kira/git-ipc's own nineteen-member
 // OpRequest union, flattened into one struct (a field absent from the wire JSON for a given kind
 // simply decodes to its zero value, which no served kind's Prepare function ever reads). Only
-// fields the ten kinds G5 serves actually need are declared — the nine unserved kinds' own fields
-// (stash/reset/cherryPick) are never decoded at all, since opTable rejects those kinds before any
-// field is read (D5).
+// fields the fifteen kinds opTable serves actually need are declared — the four still-unserved
+// kinds' own fields (G7's tagPush/tagDeleteRemote, G18's reset/cherryPick) are never decoded here at
+// all, since opTable rejects an unlisted kind before any field is read (D5).
 type OpRequest struct {
 	Kind string `json:"kind"`
 
@@ -43,6 +43,16 @@ type OpRequest struct {
 	Shas     []string `json:"shas,omitempty"` // revert
 	Mainline *int     `json:"mainline,omitempty"`
 	NoCommit bool     `json:"noCommit,omitempty"`
+
+	// G17: the five stash kinds' own fields. Message is reused as-is (already declared above, for
+	// tagCreate — the JSON tag already matches stashPush's own `message: string | undefined`).
+	IncludeUntracked bool     `json:"includeUntracked,omitempty"` // stashPush
+	KeepIndex        bool     `json:"keepIndex,omitempty"`        // stashPush
+	Paths            []string `json:"paths,omitempty"`            // stashPush
+	Sha              string   `json:"sha,omitempty"`              // stashApply/stashPop/stashDrop/stashBranch
+	Index            int      `json:"index,omitempty"`            // stashPop/stashDrop/stashBranch
+	RestoreIndex     bool     `json:"restoreIndex,omitempty"`     // stashApply/stashPop
+	Branch           string   `json:"branch,omitempty"`           // stashBranch
 }
 
 // OpError mirrors @kira/git-ipc's own op.run/undo.run per-op error shape.
@@ -60,10 +70,10 @@ type OpResult struct {
 	InProgress *gitpreflight.InProgressOperation `json:"inProgress"`
 }
 
-// ErrUnservedOpKind is RunOp's answer for an OpRequest.Kind not present in opTable (D5) — nine of
-// OpRequest's nineteen kinds, each owned by a later phase (G7's tagPush/tagDeleteRemote, G12's
-// five stash kinds, G13's reset/cherryPick). gitrpc maps this to E_UNKNOWN_METHOD naming the kind
-// — never a stub, never a silent success.
+// ErrUnservedOpKind is RunOp's answer for an OpRequest.Kind not present in opTable (D5) — four of
+// OpRequest's nineteen kinds, each owned by a later phase (G7's tagPush/tagDeleteRemote, G18's
+// reset/cherryPick). gitrpc maps this to E_UNKNOWN_METHOD naming the kind — never a stub, never a
+// silent success.
 type ErrUnservedOpKind struct{ Kind string }
 
 func (e ErrUnservedOpKind) Error() string {
@@ -86,11 +96,19 @@ type prepared struct {
 type opSpec struct {
 	Undo    gitpreflight.UndoPolicy
 	Prepare func(ctx context.Context, e *RepoEntry, conn ConnID, connLabel string, op OpRequest) (prepared, error)
+	// Reclassify: nil for every kind that does not need it (G17 D6 — ten of fifteen served kinds
+	// today). When set, called AFTER the write loop and AFTER the post-write statusAndInProgress
+	// read RunOp already performs — reusing that read, not adding a second one — with the raw
+	// OpError the stderr-only classification produced (nil on a clean exit) and the fresh
+	// porcelain.StatusResult. Returns the OpError RunOp should actually report; a kind with no
+	// Reclassify keeps the stderr-only result unchanged.
+	Reclassify func(opErr *OpError, status porcelain.StatusResult) *OpError
 }
 
-// opTable serves exactly ten of OpRequest's nineteen kinds (D5) — the other nine answer
-// ErrUnservedOpKind, never a stub. Labels are ported verbatim from undo/slot.ts's own UNDO_POLICY
-// for the ten kinds here; G7/G12/G13 each add one entry beside these with no rework.
+// opTable serves fifteen of OpRequest's nineteen kinds (D5) — the other four answer
+// ErrUnservedOpKind, never a stub. Labels are ported verbatim from undo/slot.ts's own UNDO_POLICY;
+// G17 adds the five stash kinds here (note stashDrop's own Undo: undo/slot.ts marks it undoable,
+// not notUndoable like its four stash siblings — captureStashDropUndo below is why).
 var opTable = map[string]opSpec{
 	"checkout": {
 		Undo:    gitpreflight.UndoPolicy{Kind: gitpreflight.NotUndoable, Reason: "Switch back to the previous ref to undo this."},
@@ -137,6 +155,33 @@ var opTable = map[string]opSpec{
 		Prepare: func(ctx context.Context, e *RepoEntry, _ ConnID, _ string, _ OpRequest) (prepared, error) {
 			return prepareSequencerVerb(ctx, e, "Skip", gitops.SkipArgs)
 		},
+	},
+	"stashPush": {
+		Undo:    gitpreflight.UndoPolicy{Kind: gitpreflight.NotUndoable, Reason: "Pop the stash to undo this."},
+		Prepare: prepareStashPush,
+	},
+	"stashApply": {
+		Undo:       gitpreflight.UndoPolicy{Kind: gitpreflight.NotUndoable, Reason: "The stash is still in the list; discard the applied changes to undo this."},
+		Prepare:    prepareStashApply,
+		Reclassify: reclassifyStashPop,
+	},
+	"stashPop": {
+		Undo:       gitpreflight.UndoPolicy{Kind: gitpreflight.NotUndoable, Reason: "The stash was removed once applied; stash again to undo this."},
+		Prepare:    prepareStashPop,
+		Reclassify: reclassifyStashPop,
+	},
+	// stashDrop: undoable, NOT notUndoable like its four stash siblings — undo/slot.ts's own
+	// UNDO_POLICY names it so, and StashDialog's own runStashDrop announcement ("undo available
+	// until your next operation") already expects a real undo slot. captureStashDropUndo captures
+	// the entry's own sha/message immediately before the drop; the replay is `stash store`, which
+	// re-inserts it at the top of the stack under the same message.
+	"stashDrop": {
+		Undo:    gitpreflight.UndoPolicy{Kind: gitpreflight.Undoable},
+		Prepare: prepareStashDrop,
+	},
+	"stashBranch": {
+		Undo:    gitpreflight.UndoPolicy{Kind: gitpreflight.NotUndoable, Reason: "Delete the branch and stash again to undo this."},
+		Prepare: prepareStashBranch,
 	},
 }
 
@@ -190,6 +235,90 @@ func prepareTagDelete(ctx context.Context, e *RepoEntry, conn ConnID, connLabel 
 
 func prepareRevert(_ context.Context, _ *RepoEntry, _ ConnID, _ string, op OpRequest) (prepared, error) {
 	return prepared{argvList: [][]string{gitops.RevertArgs(op.Shas, op.Mainline, op.NoCommit)}}, nil
+}
+
+func prepareStashPush(_ context.Context, _ *RepoEntry, _ ConnID, _ string, op OpRequest) (prepared, error) {
+	return prepared{argvList: [][]string{gitops.StashPushArgs(op.Message, op.IncludeUntracked, op.KeepIndex, op.Paths)}}, nil
+}
+
+func prepareStashApply(_ context.Context, _ *RepoEntry, _ ConnID, _ string, op OpRequest) (prepared, error) {
+	return prepared{argvList: [][]string{gitops.StashApplyArgs(op.Sha, op.RestoreIndex)}}, nil
+}
+
+// stashPositionMismatch verifies `rev-parse stash@{index} == sha` immediately before a
+// position-addressed write (pop/drop/branch — probe 8: none of the three can address by sha alone),
+// per the contract's own "the service verifies... immediately before writing" convention
+// (contract.ts:603-604). A non-nil *OpError is an early refusal — no write is ever spawned.
+func stashPositionMismatch(ctx context.Context, e *RepoEntry, index int, sha string) (*OpError, error) {
+	res, err := e.runAllowingExit(ctx, gitops.StashRevParseArgs(index), 0, 1)
+	if err != nil {
+		return nil, err
+	}
+	got := strings.TrimSpace(string(res.Stdout))
+	if res.ExitCode != 0 || got != sha {
+		return &OpError{
+			Kind:    "NotFound",
+			Message: fmt.Sprintf("stash@{%d} no longer matches the stash you selected — the list may have changed.", index),
+		}, nil
+	}
+	return nil, nil
+}
+
+func prepareStashPop(ctx context.Context, e *RepoEntry, _ ConnID, _ string, op OpRequest) (prepared, error) {
+	mismatch, err := stashPositionMismatch(ctx, e, op.Index, op.Sha)
+	if err != nil {
+		return prepared{}, err
+	}
+	if mismatch != nil {
+		return prepared{earlyError: mismatch}, nil
+	}
+	return prepared{argvList: [][]string{gitops.StashPopArgs(op.Index, op.RestoreIndex)}}, nil
+}
+
+func prepareStashDrop(ctx context.Context, e *RepoEntry, conn ConnID, connLabel string, op OpRequest) (prepared, error) {
+	mismatch, err := stashPositionMismatch(ctx, e, op.Index, op.Sha)
+	if err != nil {
+		return prepared{}, err
+	}
+	if mismatch != nil {
+		return prepared{earlyError: mismatch}, nil
+	}
+	undo := e.captureStashDropUndo(ctx, conn, connLabel, op.Sha)
+	return prepared{argvList: [][]string{gitops.StashDropArgs(op.Index)}, undo: undo}, nil
+}
+
+func prepareStashBranch(ctx context.Context, e *RepoEntry, _ ConnID, _ string, op OpRequest) (prepared, error) {
+	mismatch, err := stashPositionMismatch(ctx, e, op.Index, op.Sha)
+	if err != nil {
+		return prepared{}, err
+	}
+	if mismatch != nil {
+		return prepared{earlyError: mismatch}, nil
+	}
+	return prepared{argvList: [][]string{gitops.StashBranchArgs(op.Branch, op.Index)}}, nil
+}
+
+// reclassifyStashPop is stashPop's/stashApply's own Reclassify (D6/D7). Probe 5: a conflicting
+// pop/apply writes to stdout and leaves stderr EMPTY — ClassifyOpError's stderr-only path already
+// misclassified this as "Unknown"; the post-write status read-back RunOp already fetches is what
+// tells a real conflict apart from every other non-zero exit here. D7: the "untracked working tree
+// file" stderr pattern is shared with checkout's own blocker, so its generic
+// UntrackedWouldBeOverwritten kind is remapped to the stash-specific StashUntrackedCollision here —
+// the one place with the caller context (stash pop/apply) ClassifyOpError itself does not have.
+func reclassifyStashPop(opErr *OpError, status porcelain.StatusResult) *OpError {
+	if opErr == nil {
+		return nil
+	}
+	if opErr.Kind == "UntrackedWouldBeOverwritten" {
+		return &OpError{Kind: "StashUntrackedCollision", Message: opErr.Message}
+	}
+	if len(gitpreflight.UnmergedPaths(status)) > 0 {
+		// Probe 5: the stash is ALWAYS kept on a conflicting pop/apply — never a second write, never
+		// a drop. The contract's own OpErrorKind doc comment states the message says so.
+		return &OpError{Kind: "StashConflict", Message: "The stash was applied with conflicts and has been kept."}
+	}
+	return opErr // an already-classified error (StashIndexConflict, or anything ClassifyOpError's
+	// generic table caught that is not the untracked remap above) passes through unchanged.
 }
 
 // prepareSequencerVerb is opContinue/opAbort/opSkip's own shared shape: refuse (no write at all)
@@ -281,6 +410,41 @@ func (e *RepoEntry) captureTagDeleteUndo(ctx context.Context, conn ConnID, connL
 	}
 }
 
+// captureStashDropUndo is undo-capture for a stash drop (undo/slot.ts's own UNDO_POLICY marks
+// stashDrop undoable, unlike its four stash siblings): reads the current stash list fresh
+// (never the cache — there is none here) immediately before the drop, to capture the entry's own
+// message (the drop's own OpRequest carries only sha/index, not message). Best-effort — any
+// failure (a race with something else already having dropped it) yields nil rather than aborting
+// the drop itself, same convention captureBranchDeleteUndo/captureTagDeleteUndo already use. The
+// replay is `stash store -m <message> <sha>` — re-inserts the entry at the top of the stack under
+// the same message; it is not guaranteed to land back at the exact same index, the same honest
+// limit branchDelete's/tagDelete's own replay carries (a ref recreated by name/tag, not by
+// position).
+func (e *RepoEntry) captureStashDropUndo(ctx context.Context, conn ConnID, connLabel, sha string) *gitpreflight.UndoRecord {
+	entries, err := e.StashList(ctx)
+	if err != nil {
+		return nil
+	}
+	var message string
+	found := false
+	for _, entry := range entries {
+		if entry.Sha == sha {
+			message = entry.Message
+			found = true
+			break
+		}
+	}
+	if !found {
+		return nil
+	}
+
+	return &gitpreflight.UndoRecord{
+		ID: newUndoID(), Label: "Dropped stash: " + message, RecoverySha: sha,
+		CreatedAt: time.Now().UnixMilli(), Replay: [][]string{gitops.StashStoreArgs(message, sha)},
+		OriginConn: string(conn), OriginLabel: connLabel,
+	}
+}
+
 // runWriteArgv spawns one write argv through the repo's exclusive write gate. A cancelled ctx or a
 // genuine spawn failure comes back as a real Go error (propagated by the caller, never folded into
 // an OpResult); a non-zero exit that the process itself completed is classified through
@@ -366,12 +530,18 @@ func (e *RepoEntry) RunOp(ctx context.Context, conn ConnID, connLabel string, op
 			break
 		}
 	}
-	succeeded := opErr == nil
-
-	_, inProgress, serr := e.statusAndInProgress(ctx)
+	statusResult, inProgress, serr := e.statusAndInProgress(ctx)
 	if serr != nil {
 		return OpResult{}, serr
 	}
+	// D6: reuses the status read RunOp already performs (the line above) — no second spawn — to let
+	// a kind reclassify its own stderr-only result. A nil Reclassify (ten of fifteen kinds today) is
+	// a no-op by construction.
+	if spec.Reclassify != nil {
+		opErr = spec.Reclassify(opErr, statusResult)
+	}
+	succeeded := opErr == nil
+
 	head, herr := e.Head(ctx)
 	if herr != nil {
 		return OpResult{}, herr

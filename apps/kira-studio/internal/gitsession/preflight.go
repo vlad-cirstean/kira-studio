@@ -3,6 +3,9 @@ package gitsession
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
 	"sync"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitclient/porcelain"
@@ -29,8 +32,8 @@ func (e *RepoEntry) rewrittenPaths(ctx context.Context, target string) ([]string
 
 // PreflightCheckout is preflight.checkout's own orchestration (D12): gather the reads in
 // parallel, resolve the wire's bare target against a FRESH ref snapshot (never the cache, D10/
-// F16), call the pure classifier. StashAvailable is false through G8 (D12) — G12's own phase
-// flips it.
+// F16), call the pure classifier. StashAvailable: false through G5-G16 — G17 D8 flips it to true
+// unconditionally, which alone is what turns ClassifyCheckout's own "stashAndCarry" route on.
 func (e *RepoEntry) PreflightCheckout(ctx context.Context, target, mode string) (gitpreflight.CheckoutPreflight, error) {
 	snapshot, err := e.refsSnapshot(ctx)
 	if err != nil {
@@ -61,12 +64,13 @@ func (e *RepoEntry) PreflightCheckout(ctx context.Context, target, mode string) 
 	}
 
 	return gitpreflight.ClassifyCheckout(gitpreflight.ClassifyCheckoutInput{
-		Target:       gitpreflight.CheckoutTarget{Kind: resolved.Kind, Name: resolved.Name},
-		Mode:         mode,
-		Dirty:        gitpreflight.DirtyPaths(statusResult),
-		Rewritten:    rewritten,
-		InProgress:   inProgress,
-		CheckedOutIn: resolved.CheckedOutIn,
+		Target:         gitpreflight.CheckoutTarget{Kind: resolved.Kind, Name: resolved.Name},
+		Mode:           mode,
+		Dirty:          gitpreflight.DirtyPaths(statusResult),
+		Rewritten:      rewritten,
+		InProgress:     inProgress,
+		CheckedOutIn:   resolved.CheckedOutIn,
+		StashAvailable: true,
 	}), nil
 }
 
@@ -221,5 +225,193 @@ func (e *RepoEntry) PreflightRevert(ctx context.Context, shas []string, mainline
 		DirtyPaths: dirtyPaths, InProgress: inProgress,
 		DetachedHead: head.Kind == "detached",
 		Prediction:   prediction,
+	}), nil
+}
+
+// stashPopPrediction runs §7.6's merge-tree pop prediction — ALWAYS with --merge-base=<the stash's
+// own base> (probe 2: omitting it makes a genuinely conflicting pop report clean) — against target.
+// A small, deliberate duplicate of predictRevert's own merge-tree-plus-parse shape above (queries.go
+// is not touched by this phase, §3.14) rather than a shared refactor of an existing function.
+func (e *RepoEntry) stashPopPrediction(ctx context.Context, target, stashSha, baseSha string) gitpreflight.RevertPrediction {
+	res, err := e.runAllowingExit(ctx, porcelain.MergeTreeArgs(target, stashSha, baseSha), 0, 1)
+	if err != nil {
+		return gitpreflight.RevertPrediction{Kind: "unknown", Reason: err.Error()}
+	}
+	pred, err := porcelain.ParseMergeTreeOutput(res.Stdout, res.ExitCode)
+	if err != nil {
+		return gitpreflight.RevertPrediction{Kind: "unknown", Reason: err.Error()}
+	}
+	if pred.Kind == "clean" {
+		return gitpreflight.RevertPrediction{Kind: "clean"}
+	}
+	return gitpreflight.RevertPrediction{Kind: "conflicts", Paths: pred.Paths}
+}
+
+// PreflightStashPop is preflight.stashPop's own orchestration (D3, §7.6): re-resolves the stash
+// entry fresh (resolveStashEntry's own doc comment), gathers stashPaths (stash.show's own numstat),
+// stashUntrackedPaths (an ls-tree over the untracked helper commit, when one exists),
+// dirty/inProgress and D4's own filesystem-stat existingUntrackedPaths, plus the merge-tree
+// prediction against targetSha (defaulting to HEAD — the `stashAndCarry` route's own use of a
+// non-HEAD target, per the contract's own doc comment on preflight.stashPop's targetSha param) —
+// then calls the pure classifier.
+func (e *RepoEntry) PreflightStashPop(ctx context.Context, sha string, targetSha *string) (gitpreflight.StashPopPreflight, error) {
+	entry, err := e.resolveStashEntry(ctx, sha)
+	if err != nil {
+		return gitpreflight.StashPopPreflight{}, err
+	}
+
+	target := ""
+	if targetSha != nil {
+		target = *targetSha
+	} else {
+		raw, herr := e.runOne(ctx, []string{"rev-parse", "HEAD"})
+		if herr != nil {
+			return gitpreflight.StashPopPreflight{}, herr
+		}
+		target = strings.TrimSpace(string(raw))
+	}
+
+	numstatArgs, _ := porcelain.StashShowArgs(entry.BaseSha, entry.Sha)
+
+	var statusResult porcelain.StatusResult
+	var inProgress *gitpreflight.InProgressOperation
+	var stashPaths []string
+	var stashUntrackedPaths []string
+	var errs [3]error
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		statusResult, inProgress, errs[0] = e.statusAndInProgress(ctx)
+	}()
+	go func() {
+		defer wg.Done()
+		raw, rerr := e.runOne(ctx, numstatArgs)
+		if rerr != nil {
+			errs[1] = rerr
+			return
+		}
+		recs, rerr := allRecords(raw)
+		if rerr != nil {
+			errs[1] = rerr
+			return
+		}
+		numstat, perr := porcelain.ParseNumstatRecords(recs)
+		if perr != nil {
+			errs[1] = perr
+			return
+		}
+		stashPaths = make([]string, len(numstat))
+		for i, n := range numstat {
+			stashPaths[i] = n.Path
+		}
+	}()
+	if entry.UntrackedSha != nil {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			raw, rerr := e.runOne(ctx, porcelain.StashUntrackedLsTreeArgs(*entry.UntrackedSha))
+			if rerr != nil {
+				errs[2] = rerr
+				return
+			}
+			recs, rerr := allRecords(raw)
+			if rerr != nil {
+				errs[2] = rerr
+				return
+			}
+			stashUntrackedPaths = make([]string, len(recs))
+			for i, r := range recs {
+				stashUntrackedPaths[i] = string(r)
+			}
+		}()
+	}
+	wg.Wait()
+	for _, spawnErr := range errs {
+		if spawnErr != nil {
+			return gitpreflight.StashPopPreflight{}, spawnErr
+		}
+	}
+
+	// D4: a real filesystem stat per untracked path — never a git spawn (probe 3: an ignored file,
+	// or one status elides, still collides; default `status` output omits ignored paths by design).
+	existingUntrackedPaths := []string{}
+	root := repoWorkingDir(e.Summary)
+	for _, p := range stashUntrackedPaths {
+		if _, statErr := os.Stat(filepath.Join(root, p)); statErr == nil {
+			existingUntrackedPaths = append(existingUntrackedPaths, p)
+		}
+	}
+
+	prediction := e.stashPopPrediction(ctx, target, entry.Sha, entry.BaseSha)
+
+	if stashPaths == nil {
+		stashPaths = []string{}
+	}
+	if stashUntrackedPaths == nil {
+		stashUntrackedPaths = []string{}
+	}
+
+	return gitpreflight.ClassifyStashPop(gitpreflight.ClassifyStashPopInput{
+		Stash: entry, TargetSha: target, Prediction: prediction,
+		StashPaths: stashPaths, StashUntrackedPaths: stashUntrackedPaths,
+		Dirty: gitpreflight.DirtyPaths(statusResult), ExistingUntrackedPaths: existingUntrackedPaths,
+		InProgress: inProgress,
+	}), nil
+}
+
+// PreflightStashBranch is preflight.stashBranch's own orchestration (D3, §7.6): re-resolves the
+// stash entry fresh, then reuses the PreflightCheckout-shaped classification path at the stash's
+// own base as the target (probe 11: "no pop prediction — clean by construction", so this reuses
+// ClassifyCheckout, never ClassifyStashPop), plus the branch-name validation ClassifyStashBranch
+// itself performs.
+func (e *RepoEntry) PreflightStashBranch(ctx context.Context, sha, branch string) (gitpreflight.StashBranchPreflight, error) {
+	entry, err := e.resolveStashEntry(ctx, sha)
+	if err != nil {
+		return gitpreflight.StashBranchPreflight{}, err
+	}
+
+	snapshot, err := e.refsSnapshot(ctx)
+	if err != nil {
+		return gitpreflight.StashBranchPreflight{}, err
+	}
+	existingBranchNames := make(map[string]bool, len(snapshot.Branches))
+	for _, b := range snapshot.Branches {
+		existingBranchNames[b.ShortName] = true
+	}
+
+	var statusResult porcelain.StatusResult
+	var inProgress *gitpreflight.InProgressOperation
+	var rewritten []string
+	var statusErr, rewrittenErr error
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		statusResult, inProgress, statusErr = e.statusAndInProgress(ctx)
+	}()
+	go func() {
+		defer wg.Done()
+		rewritten, rewrittenErr = e.rewrittenPaths(ctx, entry.BaseSha)
+	}()
+	wg.Wait()
+	if statusErr != nil {
+		return gitpreflight.StashBranchPreflight{}, statusErr
+	}
+	if rewrittenErr != nil {
+		return gitpreflight.StashBranchPreflight{}, rewrittenErr
+	}
+
+	checkout := gitpreflight.ClassifyCheckout(gitpreflight.ClassifyCheckoutInput{
+		Target:         gitpreflight.CheckoutTarget{Kind: "sha", Name: entry.BaseSha},
+		Mode:           "switch",
+		Dirty:          gitpreflight.DirtyPaths(statusResult),
+		Rewritten:      rewritten,
+		InProgress:     inProgress,
+		StashAvailable: true,
+	})
+
+	return gitpreflight.ClassifyStashBranch(gitpreflight.ClassifyStashBranchInput{
+		Name: branch, ExistingBranchNames: existingBranchNames, Checkout: checkout,
 	}), nil
 }

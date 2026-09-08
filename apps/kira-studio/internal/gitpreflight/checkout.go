@@ -58,7 +58,7 @@ type ClassifyCheckoutInput struct {
 	// CheckedOutIn: set when the target ref is checked out in a linked worktree that is NOT this
 	// session's own — the absolute path of that worktree (D12/probe P2).
 	CheckedOutIn *string
-	// StashAvailable: false through G5-G8 (D12) — G12's preflightCheckout passes true
+	// StashAvailable: false through G5-G16 (D12) — G17 D8's preflightCheckout passes true
 	// unconditionally, which alone is what turns the "stashAndCarry" route on.
 	StashAvailable bool
 }

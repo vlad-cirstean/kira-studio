@@ -379,8 +379,11 @@ func TestIntegration_CheckoutPreflightAndRun(t *testing.T) {
 	if tracked.Verdict != "blocked" || !hasCheckoutBlocker(tracked.Blockers, "blockedByTracked") {
 		t.Fatalf("blockedByTracked: %+v", tracked)
 	}
-	if len(tracked.Routes) != 1 || tracked.Routes[0] != "discard" {
-		t.Fatalf("routes = %v, want [discard]", tracked.Routes)
+	// G17 D8: StashAvailable is now unconditionally true, so a tracked-only block also offers
+	// "stashAndCarry" alongside "discard" (ClassifyCheckout's own rule — an untracked block still
+	// suppresses both, per the blockedByUntracked case below, which is unaffected by this flip).
+	if len(tracked.Routes) != 2 || tracked.Routes[0] != "discard" || tracked.Routes[1] != "stashAndCarry" {
+		t.Fatalf("routes = %v, want [discard stashAndCarry]", tracked.Routes)
 	}
 	runGitIn(t, f.dir, "checkout", "-q", "--", "conflict.txt")
 
