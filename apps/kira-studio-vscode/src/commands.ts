@@ -36,19 +36,19 @@ export interface PaletteCommand {
 }
 
 /** A kind not yet served by any phase's `opTable`/`RunRemote` switch carries the phase that owns
- *  it instead of a command (D18) — G13 F13's corrected numbering: G15 owns the five stash kinds,
- *  G16 owns reset/cherryPick and tagPush/tagDeleteRemote, since both are push operations that
- *  belong with the reset/cherry-pick sweep rather than the stash one. (Chapter phase insertions
- *  moved these off their original G13/G14 labels, which this phase — the real G13 — now owns
- *  outright; F13 is why the labels moved rather than staying wrong.) Move an entry if a later
- *  phase's own plan takes it differently — this comment, not a fixed assignment, is the source of
- *  truth. */
-export type MutatingEntry = PaletteCommand | { readonly pending: 'G15' | 'G16' };
+ *  it instead of a command (D18) — G16 owns reset/cherryPick and tagPush/tagDeleteRemote, since
+ *  both are push operations that belong with the reset/cherry-pick sweep rather than the stash one.
+ *  (Chapter phase insertions moved these off their original G13/G14 labels, which this phase — the
+ *  real G13 — now owns outright; F13 is why the labels moved rather than staying wrong.) G17 lands
+ *  the five stash kinds' own real commands, so `'G15'` is dropped from this union — it is
+ *  unreachable now that every entry that used it is real. Move an entry if a later phase's own plan
+ *  takes it differently — this comment, not a fixed assignment, is the source of truth. */
+export type MutatingEntry = PaletteCommand | { readonly pending: 'G16' };
 
-/** D17's seventeen served commands plus D18's nine `pending` placeholders — twenty-six entries in
- *  total, one per `MutatingAction` member. See the plan's own D17 table for the "what it reaches"
- *  column; every `PaletteCommand.action` here is dispatched by `packages/git-ui/src/App.vue`'s
- *  `runUiAction`. */
+/** D17's seventeen served commands plus G17's five stash commands plus D18's four remaining
+ *  `pending` placeholders — twenty-six entries in total, one per `MutatingAction` member. See the
+ *  plan's own D17 table for the "what it reaches" column; every `PaletteCommand.action` here is
+ *  dispatched by `packages/git-ui/src/App.vue`'s `runUiAction`. */
 export const MUTATING_COMMANDS: Record<MutatingAction, MutatingEntry> = {
   checkout: { command: 'kiraVersion.checkout', title: 'Checkout…', action: 'openBranchPicker' },
   branchCreate: {
@@ -90,11 +90,35 @@ export const MUTATING_COMMANDS: Record<MutatingAction, MutatingEntry> = {
     action: 'abortOperation',
   },
   opSkip: { command: 'kiraVersion.skipCommit', title: 'Skip Commit', action: 'skipCommit' },
-  stashPush: { pending: 'G15' },
-  stashApply: { pending: 'G15' },
-  stashPop: { pending: 'G15' },
-  stashDrop: { pending: 'G15' },
-  stashBranch: { pending: 'G15' },
+  // G17 D9: stashPush opens the create dialog directly (its own new UiActionKind member,
+  // 'stashChanges'); the other four reuse 'openBranchPicker' — the same surface that already
+  // contains `StashList.vue`'s own row-level Apply/Pop/Drop/Branch actions (F8), so no new UI is
+  // built here, only new palette entry points into what already exists.
+  stashPush: {
+    command: 'kiraVersion.stashChanges',
+    title: 'Stash Changes…',
+    action: 'stashChanges',
+  },
+  stashApply: {
+    command: 'kiraVersion.applyStash',
+    title: 'Apply Stash…',
+    action: 'openBranchPicker',
+  },
+  stashPop: {
+    command: 'kiraVersion.popStash',
+    title: 'Pop Stash…',
+    action: 'openBranchPicker',
+  },
+  stashDrop: {
+    command: 'kiraVersion.dropStash',
+    title: 'Drop Stash…',
+    action: 'openBranchPicker',
+  },
+  stashBranch: {
+    command: 'kiraVersion.createBranchFromStash',
+    title: 'Create Branch from Stash…',
+    action: 'openBranchPicker',
+  },
   reset: { pending: 'G16' },
   cherryPick: { pending: 'G16' },
   fetch: { command: 'kiraVersion.fetch', title: 'Fetch', action: 'fetch' },

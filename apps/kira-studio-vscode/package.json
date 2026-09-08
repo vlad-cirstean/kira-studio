@@ -226,6 +226,31 @@
         "command": "kiraVersion.cancelRemoteOperation",
         "title": "Cancel Remote Operation",
         "category": "Kira Version"
+      },
+      {
+        "command": "kiraVersion.stashChanges",
+        "title": "Stash Changes…",
+        "category": "Kira Version"
+      },
+      {
+        "command": "kiraVersion.applyStash",
+        "title": "Apply Stash…",
+        "category": "Kira Version"
+      },
+      {
+        "command": "kiraVersion.popStash",
+        "title": "Pop Stash…",
+        "category": "Kira Version"
+      },
+      {
+        "command": "kiraVersion.dropStash",
+        "title": "Drop Stash…",
+        "category": "Kira Version"
+      },
+      {
+        "command": "kiraVersion.createBranchFromStash",
+        "title": "Create Branch from Stash…",
+        "category": "Kira Version"
       }
     ],
     "menus": {

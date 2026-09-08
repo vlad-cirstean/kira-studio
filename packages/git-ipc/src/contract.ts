@@ -950,7 +950,14 @@ export type UiActionKind =
   | 'refreshReviewComments'
   /** G14 D10: "Open in graph" from the review diff toolbar — reveals and selects a commit named
    *  by `ui.action`'s optional `target`. Extension -> webview only. */
-  | 'revealCommit';
+  | 'revealCommit'
+  /** G17 D9: the palette's own route to `StashDialog.vue`'s create mode — the same assignment the
+   *  toolbar's own "Stash changes…" button already makes (`App.vue`'s `@stash-changes` handler),
+   *  so this is a second entry point into the same dialog, never a second implementation. The
+   *  other four stash commands (`stashApply`/`stashPop`/`stashDrop`/`stashBranch`) reuse
+   *  `openBranchPicker` instead — no new member for those (`BranchPicker.vue`'s own stash section
+   *  already has row-level Apply/Pop/Drop/Branch actions). */
+  | 'stashChanges';
 
 // ---------------------------------------------------------------------------------------
 // The contract.

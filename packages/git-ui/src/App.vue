@@ -669,6 +669,9 @@ function runUiAction(
     case 'revealCommit':
       if (target) void revealCommitInGraph(target);
       break;
+    case 'stashChanges':
+      stashCreateOpen.value = true;
+      break;
   }
 }
 
