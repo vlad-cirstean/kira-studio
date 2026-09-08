@@ -85,7 +85,17 @@ const emit = defineEmits<{
   blur: [event: FocusEvent];
   /** Fired after a suggestion is inserted, so a caller can re-run its own parser/validator. */
   accept: [completion: Completion];
+  /** P28 D12: the pasted text, plus its own event so a host can `preventDefault()` and handle the
+   *  paste itself. The primitive deliberately learns nothing about what any host does with it —
+   *  the URL field's own host recognises a curl command here, this component does not. Unhandled
+   *  (no listener, or one that does not preventDefault) the paste proceeds exactly as before. */
+  pasteText: [text: string, event: ClipboardEvent];
 }>();
+
+function onPaste(e: ClipboardEvent): void {
+  const text = e.clipboardData?.getData('text') ?? '';
+  if (text !== '') emit('pasteText', text, e);
+}
 
 const listId = `ac-${Math.random().toString(36).slice(2)}`;
 
@@ -399,6 +409,7 @@ onBeforeUnmount(() => {
         :aria-controls="listId"
         :aria-activedescendant="open && filtered[activeIndex] ? `${listId}-${activeIndex}` : undefined"
         @input="onInput"
+        @paste="onPaste"
         @click="onClick"
         @keyup="onKeyup"
         @keydown="onKeydown"

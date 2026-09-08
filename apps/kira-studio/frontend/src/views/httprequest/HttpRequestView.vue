@@ -8,6 +8,7 @@ import {
   isDirty,
   isDynamicName,
   isFakeName,
+  looksLikeCurlCommand,
   parseQuery,
   splitUrl,
   toSavedRequest,
@@ -23,7 +24,7 @@ import {
   savedRequestFor,
   saveRequest,
 } from '../../api/state/collections';
-import { openCopyAsCurlDialog } from '../../api/state/curl';
+import { applyCurlToTab, openCopyAsCurlDialog } from '../../api/state/curl';
 import { openEditRawDialog } from '../../api/state/raw';
 import { variableSupport } from '../../api/state/variableCompletion';
 import {
@@ -69,6 +70,17 @@ function onMethodChange(method: HttpMethod): void {
 
 function onUrlInput(value: string): void {
   patchHttpRequestTabState(props.tab.id, { url: value });
+}
+
+// P28 D12: pasting a curl command into the request bar builds the request from it, reusing P7's
+// own parser (packages/api-core/src/http/curl/parse.ts) rather than adding a second one. Two
+// escape hatches, both deliberate: text that does not look like a command pastes normally, and
+// text that looks like one but that the parser rejects ALSO pastes normally — a paste is never
+// silently swallowed.
+function onUrlPaste(text: string, e: ClipboardEvent): void {
+  if (!looksLikeCurlCommand(text)) return;
+  if (!applyCurlToTab(props.tab.id, text)) return;
+  e.preventDefault();
 }
 
 // P4 D15: dirtiness is a computation over two things already in memory — the tab's own state and
@@ -352,6 +364,7 @@ onUnmounted(() => {
             :range-highlights="variables.rangeHighlights"
             :hover-at="variables.hoverAt"
             @update:model-value="onUrlInput"
+            @paste-text="onUrlPaste"
             @enter="onSend"
           />
         </div>
