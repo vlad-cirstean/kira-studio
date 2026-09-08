@@ -7,7 +7,8 @@
   "types": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts",
-    "./socketChannel": "./src/socketChannel.ts"
+    "./socketChannel": "./src/socketChannel.ts",
+    "./codec": "./src/codec.ts"
   },
   "dependencies": {
     "flatbuffers": "25.9.23"

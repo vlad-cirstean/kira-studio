@@ -47,5 +47,18 @@ export default defineConfig({
         launchOptions: { executablePath },
       },
     },
+    // G19 §4.2: the narrowly-scoped fake-transport tier — D4's message-clamp geometry, D10's
+    // click-bubbling regression, and D11a's back-button case. A second project (not folded into
+    // `webview-layout`) since it drives real interaction over scripted data, not a dead
+    // transport's own pre-connect geometry (that project's own doc comment on why it stops there).
+    {
+      name: 'webview-interaction',
+      testDir: './tests/interaction',
+      fullyParallel: true,
+      use: {
+        browserName: 'chromium',
+        launchOptions: { executablePath },
+      },
+    },
   ],
 });
