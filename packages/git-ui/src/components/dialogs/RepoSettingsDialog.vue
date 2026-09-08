@@ -17,13 +17,16 @@
  * `StashDialog.vue` itself (a settings dialog and a stash workflow share no state).
  *
  * G21 D2: the modal shell is `@kira/kira-ui`'s `KuiDialog` now — this file only supplies its own
- * body/actions content. The three native `<select>`s here stay native for this pass and are
- * converted to `<KuiSelect>` together with `SearchBox.vue`'s own two selects, later in this same
- * phase's native-`<select>` migration step.
+ * body/actions content. Its three native `<select>`s are `<KuiSelect>` now too; each one's
+ * `update:model-value` payload is the primitive's own plain `string`, cast back to the narrower
+ * union `RepoSettingsSnapshot` actually declares (the option `value`s themselves are always one
+ * of that union's own members, so the cast is never a lie, just narrower than `KuiSelect`'s own
+ * generic-string contract can express).
  */
 import { SETTINGS } from '@kira/git-core';
 import type { RepoSettingsPatch, RepoSettingsSnapshot } from '@kira/git-ipc';
-import { KuiButton, KuiDialog } from '@kira/kira-ui';
+import type { KuiSelectOption } from '@kira/kira-ui';
+import { KuiButton, KuiDialog, KuiSelect } from '@kira/kira-ui';
 import { computed, reactive, watch } from 'vue';
 import type { RepoSettingsState } from '../../state/repoSettings.ts';
 
@@ -64,6 +67,38 @@ const baseCandidatesText = computed({
       .filter((line) => line !== '');
   },
 });
+
+const graphScopeOptions: readonly KuiSelectOption[] = [
+  { value: 'all', label: 'All refs' },
+  { value: 'head', label: "Current HEAD's ancestry only" },
+];
+
+const pullStrategyOptions: readonly KuiSelectOption[] = [
+  { value: 'auto', label: 'Auto (follow git configuration)' },
+  { value: 'ff-only', label: 'Fast-forward only' },
+  { value: 'merge', label: 'Merge' },
+  { value: 'rebase', label: 'Rebase' },
+];
+
+const logLevelOptions: readonly KuiSelectOption[] = [
+  { value: 'off', label: 'Off' },
+  { value: 'error', label: 'Error' },
+  { value: 'warn', label: 'Warn' },
+  { value: 'info', label: 'Info' },
+  { value: 'debug', label: 'Debug' },
+];
+
+function onGraphScopeChange(value: string): void {
+  draft['kiraVersion.graph.scope'] = value as RepoSettingsSnapshot['kiraVersion.graph.scope'];
+}
+
+function onPullStrategyChange(value: string): void {
+  draft['kiraVersion.pull.strategy'] = value as RepoSettingsSnapshot['kiraVersion.pull.strategy'];
+}
+
+function onLogLevelChange(value: string): void {
+  draft['kiraVersion.log.level'] = value as RepoSettingsSnapshot['kiraVersion.log.level'];
+}
 
 const logLevelInstanceWide = SETTINGS['kiraVersion.log.level'].instanceWide ?? false;
 
@@ -123,10 +158,11 @@ async function save(): Promise<void> {
       </label>
       <label class="kv-dialog-field">
         Scope
-        <select v-model="draft['kiraVersion.graph.scope']">
-          <option value="all">All refs</option>
-          <option value="head">Current HEAD's ancestry only</option>
-        </select>
+        <KuiSelect
+          :model-value="draft['kiraVersion.graph.scope']"
+          :options="graphScopeOptions"
+          @update:model-value="onGraphScopeChange"
+        />
       </label>
     </section>
 
@@ -154,12 +190,11 @@ async function save(): Promise<void> {
       <h3 class="kv-repo-settings-heading">Pull</h3>
       <label class="kv-dialog-field">
         Strategy
-        <select v-model="draft['kiraVersion.pull.strategy']">
-          <option value="auto">Auto (follow git configuration)</option>
-          <option value="ff-only">Fast-forward only</option>
-          <option value="merge">Merge</option>
-          <option value="rebase">Rebase</option>
-        </select>
+        <KuiSelect
+          :model-value="draft['kiraVersion.pull.strategy']"
+          :options="pullStrategyOptions"
+          @update:model-value="onPullStrategyChange"
+        />
       </label>
     </section>
 
@@ -167,13 +202,11 @@ async function save(): Promise<void> {
       <h3 class="kv-repo-settings-heading">Diagnostics</h3>
       <label class="kv-dialog-field">
         Log level
-        <select v-model="draft['kiraVersion.log.level']">
-          <option value="off">Off</option>
-          <option value="error">Error</option>
-          <option value="warn">Warn</option>
-          <option value="info">Info</option>
-          <option value="debug">Debug</option>
-        </select>
+        <KuiSelect
+          :model-value="draft['kiraVersion.log.level']"
+          :options="logLevelOptions"
+          @update:model-value="onLogLevelChange"
+        />
       </label>
       <p v-if="logLevelInstanceWide" class="kv-dialog-note" data-testid="log-level-instance-wide-note">
         This applies to Kira Version's own diagnostic log for every repository, not just this one.
@@ -230,14 +263,6 @@ async function save(): Promise<void> {
   border: 1px solid var(--kv-panel-border);
   font-family: inherit;
   width: 8em;
-}
-
-.kv-dialog-field select {
-  padding: var(--kv-space-1) var(--kv-space-2);
-  background: var(--kv-panel-bg);
-  color: var(--kv-row-fg);
-  border: 1px solid var(--kv-panel-border);
-  font-family: inherit;
 }
 
 .kv-dialog-note {

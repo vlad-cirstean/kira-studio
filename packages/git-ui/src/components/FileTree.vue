@@ -19,7 +19,7 @@
 import type { CommitStore } from '@kira/git-core';
 import type { FileChange, ReviewFileStatus } from '@kira/git-ipc';
 import type { KuiSegmentedOption } from '@kira/kira-ui';
-import { KuiContextMenu, KuiSearchInput, KuiSegmented } from '@kira/kira-ui';
+import { KuiContextMenu, KuiSearchInput, KuiSegmented, KuiSelect } from '@kira/kira-ui';
 import { computed, nextTick, ref, watch } from 'vue';
 import { ACTION_ICONS } from '../icons/index.ts';
 import type { FileListMode } from '../state/detail.ts';
@@ -319,8 +319,12 @@ const parentOptions = computed<ParentOption[]>(() =>
   }),
 );
 
-function onParentChange(event: Event): void {
-  emit('update:parentIndex', Number((event.target as HTMLSelectElement).value));
+const parentSelectOptions = computed(() =>
+  parentOptions.value.map((option, index) => ({ value: String(index), label: option.label })),
+);
+
+function onParentChange(value: string): void {
+  emit('update:parentIndex', Number(value));
 }
 
 function statusLetter(change: FileChange): string {
@@ -406,12 +410,13 @@ function reviewToggleTitle(path: string): string {
        graph panel. -->
   <div class="kv-file-tree kv-skin-kira" data-testid="file-tree">
     <div v-if="parentOptions.length > 1" class="kv-file-tree-parent">
-      <label for="kv-parent-select">Diffing against</label>
-      <select id="kv-parent-select" :value="parentIndex" @change="onParentChange">
-        <option v-for="(option, index) in parentOptions" :key="option.sha" :value="index">
-          {{ option.label }}
-        </option>
-      </select>
+      <span class="kv-file-tree-parent-label">Diffing against</span>
+      <KuiSelect
+        :model-value="String(parentIndex)"
+        :options="parentSelectOptions"
+        ariaLabel="Diffing against"
+        @update:model-value="onParentChange"
+      />
     </div>
 
     <div v-if="showToolbar !== false" class="kv-file-tree-toolbar">

@@ -42,7 +42,8 @@
  * outside-click listener, rather than routing a third global shortcut through `App.vue`.
  */
 import type { SearchScope } from '@kira/git-core';
-import { computeFloatPosition } from '@kira/kira-ui';
+import type { KuiSelectOption } from '@kira/kira-ui';
+import { computeFloatPosition, KuiSelect } from '@kira/kira-ui';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { ACTION_ICONS } from '../icons/index.ts';
 import type { SearchState } from '../state/search.ts';
@@ -199,8 +200,14 @@ function onKeydown(event: KeyboardEvent): void {
   }
 }
 
-function onScopeChange(event: Event): void {
-  props.search.scope.value = (event.target as HTMLSelectElement).value as SearchScope;
+const scopeOptions: readonly KuiSelectOption[] = [
+  { value: 'both', label: 'Both' },
+  { value: 'commits', label: 'Commits' },
+  { value: 'refs', label: 'Refs' },
+];
+
+function onScopeChange(value: string): void {
+  props.search.scope.value = value as SearchScope;
 }
 
 function onDocumentPointerDown(event: PointerEvent): void {
@@ -303,17 +310,14 @@ defineExpose({ focus: () => inputEl.value?.focus() });
           <span class="codicon codicon-regex" aria-hidden="true"></span>
         </button>
       </div>
-      <select
+      <KuiSelect
         class="kv-search-scope"
-        aria-label="Search scope"
+        ariaLabel="Search scope"
         data-testid="search-scope"
-        :value="search.scope.value"
-        @change="onScopeChange"
-      >
-        <option value="both">Both</option>
-        <option value="commits">Commits</option>
-        <option value="refs">Refs</option>
-      </select>
+        :model-value="search.scope.value"
+        :options="scopeOptions"
+        @update:model-value="onScopeChange"
+      />
       <span v-if="countLabel" class="kv-search-count" data-testid="search-count">{{ countLabel }}</span>
     </div>
     <div
@@ -404,11 +408,6 @@ defineExpose({ focus: () => inputEl.value?.focus() });
 }
 
 .kv-search-scope {
-  height: 18px;
-  background: var(--kv-panel-bg);
-  color: var(--kv-app-fg);
-  border: 1px solid var(--kv-panel-border);
-  font-family: inherit;
   font-size: 0.85em;
 }
 
