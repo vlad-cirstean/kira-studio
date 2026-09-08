@@ -26,7 +26,16 @@ func (r *Router) handleRemotePullPreflight(ctx context.Context, c *gitsession.Co
 	if err != nil {
 		return nil, err
 	}
-	result, err := entry.PullPreflight(ctx, p.Branch, p.StrategySetting)
+	// G18 D6/F14: StrategySetting's own wire shape is unchanged (still optional) — what upgrades
+	// is what "empty" resolves to. A raw socket client omitting it used to fall straight to
+	// gitpreflight.ResolvePullStrategy's own "auto" ladder; it now gets this repo's own stored
+	// kiraVersion.pull.strategy first (itself "auto" until a user changes it in the dialog), which
+	// only changes behaviour for a repo whose setting has actually been edited.
+	strategySetting := p.StrategySetting
+	if strategySetting == "" {
+		strategySetting = entry.RepoSettings().PullStrategy
+	}
+	result, err := entry.PullPreflight(ctx, p.Branch, strategySetting)
 	if err != nil {
 		return nil, mapGitError(err)
 	}

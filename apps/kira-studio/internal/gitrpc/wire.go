@@ -435,3 +435,59 @@ type ReviewCommentExportResult struct {
 	At   string `json:"at"`
 	Text string `json:"text"`
 }
+
+// ---------------------------------------------------------------------------------------
+// G18 — repoSettings.get/set/changed (D3/D4). Wire-tagged with their literal kiraVersion.* dotted
+// keys so RepoSettingsSnapshot is a direct structural copy of @kira/git-ipc's own
+// RepoSettingsSnapshot, needing no translation layer on either side — the same discipline
+// gitclient.GitStatus's own JSON tags already follow for GitStatus.
+// ---------------------------------------------------------------------------------------
+
+// RepoSettingsSnapshot is repoSettings.get/set's own result — the seven settings D1 moved into
+// their own per-repo table. Six are genuinely scoped by repoId; kiraVersion.log.level is not
+// (D14) — its value is shared across every repo this installation opens, a fact
+// storage/repos.GitRepoSettingsRepo resolves entirely on its own, invisibly to this type and every
+// handler using it.
+type RepoSettingsSnapshot struct {
+	GraphPageSize         int      `json:"kiraVersion.graph.pageSize"`
+	GraphScope            string   `json:"kiraVersion.graph.scope"`
+	StashShowInGraph      bool     `json:"kiraVersion.stash.showInGraph"`
+	StashIncludeUntracked bool     `json:"kiraVersion.stash.includeUntracked"`
+	ReviewBaseCandidates  []string `json:"kiraVersion.review.baseCandidates"`
+	PullStrategy          string   `json:"kiraVersion.pull.strategy"`
+	LogLevel              string   `json:"kiraVersion.log.level"`
+}
+
+// RepoSettingsGetParams is repoSettings.get's own request.
+type RepoSettingsGetParams struct {
+	RepoID string `json:"repoId"`
+}
+
+// RepoSettingsPatchWire mirrors RepoSettingsSnapshot's own `.partial()` shape — every leaf
+// optional, present only when the caller means to change it (SettingsPatch/GitRepoSettingsPatch's
+// own discipline, restated at the wire).
+type RepoSettingsPatchWire struct {
+	GraphPageSize         *int      `json:"kiraVersion.graph.pageSize,omitempty"`
+	GraphScope            *string   `json:"kiraVersion.graph.scope,omitempty"`
+	StashShowInGraph      *bool     `json:"kiraVersion.stash.showInGraph,omitempty"`
+	StashIncludeUntracked *bool     `json:"kiraVersion.stash.includeUntracked,omitempty"`
+	ReviewBaseCandidates  *[]string `json:"kiraVersion.review.baseCandidates,omitempty"`
+	PullStrategy          *string   `json:"kiraVersion.pull.strategy,omitempty"`
+	LogLevel              *string   `json:"kiraVersion.log.level,omitempty"`
+}
+
+// RepoSettingsSetParams is repoSettings.set's own request.
+type RepoSettingsSetParams struct {
+	RepoID string                `json:"repoId"`
+	Patch  RepoSettingsPatchWire `json:"patch"`
+}
+
+// RepoSettingsChangedPayload is repoSettings.changed's own event payload (D4/D7) — emitted to
+// every currently connected client, not only the one that made the change, via
+// internal/notify.Emitter[T] (the same mechanism gitsock.Server's own clientsChanged already
+// uses). RepoID names which repo's own write triggered the emit; a viewer decides for itself
+// whether that repoId (or, for the instance-wide LogLevel, any repoId at all) is relevant.
+type RepoSettingsChangedPayload struct {
+	RepoID   string               `json:"repoId"`
+	Settings RepoSettingsSnapshot `json:"settings"`
+}

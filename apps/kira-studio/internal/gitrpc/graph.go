@@ -17,20 +17,39 @@ import (
 const ChunkRows = 500
 
 // walkSpecFrom resolves D6's optional scope/pageSize into a porcelain.WalkSpec and a concrete
-// page size — "all" and logsession.DefaultPageSize are the server's own defaults, reached by
-// every raw socket client (no settings snapshot to inject from).
-func walkSpecFrom(scope string, pageSize *int) (porcelain.WalkSpec, int) {
+// page size. G18 D6 upgrades what "the server's own default" means: entry's own stored
+// kiraVersion.graph.* settings (RepoEntry.RepoSettings, itself falling back to the schema's own
+// "all"/5000 defaults when entry is nil or storage has nothing stored) — reached by every raw
+// socket client that omits scope/pageSize, with zero change to either param's own wire shape.
+func walkSpecFrom(entry *gitsession.RepoEntry, scope string, pageSize *int) (porcelain.WalkSpec, int) {
 	if scope == "" {
-		scope = "all"
+		scope = repoGraphScope(entry)
 	}
-	return porcelain.WalkSpec{Scope: scope}, pageSizeFrom(pageSize)
+	return porcelain.WalkSpec{Scope: scope}, pageSizeFrom(entry, pageSize)
 }
 
-func pageSizeFrom(pageSize *int) int {
+func pageSizeFrom(entry *gitsession.RepoEntry, pageSize *int) int {
 	if pageSize != nil && *pageSize > 0 {
 		return *pageSize
 	}
+	if entry != nil {
+		if stored := entry.RepoSettings().GraphPageSize; stored > 0 {
+			return stored
+		}
+	}
 	return logsession.DefaultPageSize
+}
+
+// repoGraphScope is walkSpecFrom's own scope-side default (D6) — "all" when entry is nil (no
+// repo.open has happened yet — never reached by a well-behaved client, since c.Walk itself
+// requires a held repo) or the repo has never stored a scope of its own.
+func repoGraphScope(entry *gitsession.RepoEntry) string {
+	if entry != nil {
+		if stored := entry.RepoSettings().GraphScope; stored != "" {
+			return stored
+		}
+	}
+	return "all"
 }
 
 // rangedWalkSpecFrom validates rng's base/branch (D8/F6: `merge-base` takes its revisions as
@@ -106,7 +125,7 @@ func (r *Router) handleGraphLoadMore(ctx context.Context, c *gitsession.Conn, pa
 		return nil, ipcerr.BadRequest("gitrpc: graph.loadMore: repoId is required")
 	}
 
-	status := r.deps.Discovery.Status(ctx, "")
+	status := r.deps.Discovery.Status(ctx, gitPathFrom(r.deps.Registry))
 	if status.Kind != "ok" {
 		return nil, ipcerr.New("E_GIT_UNAVAILABLE", "gitrpc: git is unavailable: "+status.Kind)
 	}
@@ -153,10 +172,14 @@ func (r *Router) handleGraphRefresh(_ context.Context, c *gitsession.Conn, param
 // resolveWalkRequest is graph.loadMore/graph.stream's shared range-vs-scope resolution: with a
 // `range`, it validates the two ref fields (D8) and peeks the per-repo range-count slot (D9, a
 // non-blocking best-effort optimisation — a miss passes nil and logsession runs its own count);
-// without one, it resolves D6's scope/pageSize as before.
+// without one, it resolves D6's scope/pageSize as before. entry is looked up once, here, and
+// threaded into both branches — the range branch already needed it for the range-count peek; the
+// non-ranged branch now needs it too, for G18 D6's own per-repo scope/pageSize defaults.
 func resolveWalkRequest(c *gitsession.Conn, repoID string, rng *CommitRangeParams, scope string, pageSize *int) (porcelain.WalkSpec, int, *int, error) {
+	entry, _ := c.Entry(repoID) // nil, ok=false when unheld — c.Walk below rejects that case itself.
+
 	if rng == nil {
-		spec, size := walkSpecFrom(scope, pageSize)
+		spec, size := walkSpecFrom(entry, scope, pageSize)
 		return spec, size, nil, nil
 	}
 	spec, err := rangedWalkSpecFrom(rng)
@@ -164,10 +187,10 @@ func resolveWalkRequest(c *gitsession.Conn, repoID string, rng *CommitRangeParam
 		return porcelain.WalkSpec{}, 0, nil, err
 	}
 	var precomputedTotal *int
-	if entry, ok := c.Entry(repoID); ok {
+	if entry != nil {
 		precomputedTotal = entry.TakeRangeCount(rng.Base, rng.Branch)
 	}
-	return spec, pageSizeFrom(pageSize), precomputedTotal, nil
+	return spec, pageSizeFrom(entry, pageSize), precomputedTotal, nil
 }
 
 // handleGraphStream serves graph.stream: upstream's streamGraph, via gitsession.Walk.Stream
@@ -189,7 +212,7 @@ func (r *Router) handleGraphStream(ctx context.Context, c *gitsession.Conn, para
 	if err != nil {
 		return err
 	}
-	status := r.deps.Discovery.Status(ctx, "")
+	status := r.deps.Discovery.Status(ctx, gitPathFrom(r.deps.Registry))
 	if status.Kind != "ok" {
 		return ipcerr.New("E_GIT_UNAVAILABLE", "gitrpc: git is unavailable: "+status.Kind)
 	}

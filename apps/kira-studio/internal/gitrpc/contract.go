@@ -31,7 +31,11 @@ package gitrpc
 // 'revealCommit' UiActionKind member (D10). This constant moves for the same reason ui.action
 // first did (G10 D9): it is the sole compatibility authority, even though the Go server neither
 // emits nor parses either addition — both are extension<->webview only.
-const ContractVersion = 21
+// G18 D5: 21 -> 22, for two new requests (repoSettings.get/set) and one new event
+// (repoSettings.changed) — seven kiraVersion.* settings move out of contributes.configuration
+// into their own per-repo store (D1/D3/D4); SettingsSnapshot narrows to its one remaining member
+// (workbench.tree.indent) and a new RepoSettingsSnapshot carries the seven moved keys.
+const ContractVersion = 22
 
 // Protocol is the handshake envelope's own version (SPEC §3.3's "protocol":1), distinct from
 // ContractVersion — it never changes unless the hello/ready exchange itself is redesigned.

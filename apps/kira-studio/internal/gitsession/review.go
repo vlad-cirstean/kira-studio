@@ -141,9 +141,15 @@ func (e *RepoEntry) naturalResolution(ctx context.Context, branchRef porcelain.R
 
 // ResolveReviewBase is review.resolveBase's own orchestration (D7c) -- upstream's
 // resolveReviewBase, computed fresh on every call before any row is painted. candidates
-// substitutes gitreview.DefaultBaseCandidates when empty, so the server's own default is stated
-// once and every raw client (every Go integration test included) gets it.
+// substitutes this repo's own stored kiraVersion.review.baseCandidates when empty (G18 D6 —
+// upgraded from the hardcoded gitreview.DefaultBaseCandidates constant, which RepoSettings()
+// itself still falls back to when repoSettingsGet is nil or storage has nothing stored), so every
+// raw client (every Go integration test included) still gets a sane default with zero change to
+// this request's own optional param.
 func (e *RepoEntry) ResolveReviewBase(ctx context.Context, branch string, base *string, candidates []string) (gitreview.BaseResolution, error) {
+	if len(candidates) == 0 {
+		candidates = e.RepoSettings().ReviewBaseCandidates
+	}
 	if len(candidates) == 0 {
 		candidates = gitreview.DefaultBaseCandidates
 	}

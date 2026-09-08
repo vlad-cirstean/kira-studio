@@ -9,6 +9,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitclient"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitsession"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/ipcerr"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/notify"
 )
 
 // Deps is everything a Router needs; nothing more reaches it (D10/D11 from G1, unchanged in shape
@@ -37,7 +38,16 @@ type Handlers struct {
 // that touches a repository now needs to know which connection is asking, so it can route through
 // that connection's own gitsession.Conn (its holds, its Emit) rather than a single global registry
 // (F7).
-type Router struct{ deps Deps }
+type Router struct {
+	deps Deps
+
+	// repoSettingsChanged is G18 D4/D7's own fan-out: every currently connected client gets
+	// repoSettings.set's own result, not only the connection that made the change (§3.18's own
+	// cross-connection regression guard) — the same internal/notify.Emitter[T] mechanism
+	// gitsock.Server's own clientsChanged already uses, one Router-wide instance rather than a new
+	// pub/sub of its own.
+	repoSettingsChanged notify.Emitter[RepoSettingsChangedPayload]
+}
 
 // New constructs a Router over deps.
 func New(deps Deps) *Router { return &Router{deps: deps} }
@@ -46,7 +56,25 @@ func New(deps Deps) *Router { return &Router{deps: deps} }
 // c is closed over by repo.open/repo.close, exactly the shape the wire contract itself does not
 // change at all (D18): params, results and CONTRACT_VERSION are untouched, only what repo.close
 // means does (evict globally -> release this connection's hold).
+//
+// G18 D7: also subscribes c to repoSettingsChanged for the life of the connection — unsubscribed
+// via c.Done() rather than repo.close, since repoSettings.changed is not scoped to any one repo
+// being held open (log.level, in particular, is instance-wide). The nil check mirrors entry.go's
+// own Subscribe callback: c.Emit is not assigned until just after ForConn returns (gitsock's own
+// handleConn), so an event landing in that narrow window is silently dropped rather than panicking
+// on a nil func — never observable in practice, since nothing can call repoSettings.set before
+// this connection's own Handlers exist to dispatch it.
 func (r *Router) ForConn(c *gitsession.Conn) Handlers {
+	unsubscribeRepoSettings := r.repoSettingsChanged.Subscribe(func(payload RepoSettingsChangedPayload) {
+		if c.Emit != nil {
+			c.Emit("repoSettings.changed", payload)
+		}
+	})
+	go func() {
+		<-c.Done()
+		unsubscribeRepoSettings()
+	}()
+
 	return Handlers{
 		Request: func(ctx context.Context, method string, params json.RawMessage) (any, error) {
 			switch method {
@@ -120,6 +148,10 @@ func (r *Router) ForConn(c *gitsession.Conn) Handlers {
 				return r.handleReviewCommentClear(ctx, c, params)
 			case "review.comment.export":
 				return r.handleReviewCommentExport(ctx, c, params)
+			case "repoSettings.get":
+				return r.handleRepoSettingsGet(ctx, c, params)
+			case "repoSettings.set":
+				return r.handleRepoSettingsSet(ctx, c, params)
 			default:
 				return nil, ipcerr.New("E_UNKNOWN_METHOD", "gitrpc: unknown method "+method)
 			}
@@ -139,8 +171,17 @@ func (r *Router) handleAppInit(ctx context.Context) AppInitResult {
 	return AppInitResult{
 		ContractVersion: ContractVersion,
 		ServerVersion:   r.deps.ServerVersion,
-		Git:             r.deps.Discovery.Status(ctx, ""),
+		Git:             r.deps.Discovery.Status(ctx, gitPathFrom(r.deps.Registry)),
 	}
+}
+
+// gitPathFrom is G18 D15's own tiny helper: Registry.Settings' three-value destructure, named so
+// it is not repeated at every Discovery.Status call site across handlers.go/graph.go.
+// protectedBranches/autoFetchMinutes are unused here — Discovery.Status wants only the third
+// value.
+func gitPathFrom(reg *gitsession.Registry) string {
+	_, _, gitPath := reg.Settings()
+	return gitPath
 }
 
 func (r *Router) handleRepoOpen(ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
@@ -152,7 +193,7 @@ func (r *Router) handleRepoOpen(ctx context.Context, c *gitsession.Conn, params 
 		return nil, ipcerr.BadRequest("gitrpc: repo.open: path is required")
 	}
 
-	status := r.deps.Discovery.Status(ctx, "")
+	status := r.deps.Discovery.Status(ctx, gitPathFrom(r.deps.Registry))
 	if status.Kind != "ok" {
 		return RepoOpenResult{Kind: "gitUnavailable", Git: &status}, nil
 	}
