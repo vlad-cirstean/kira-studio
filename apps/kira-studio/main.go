@@ -411,7 +411,11 @@ func main() {
 		win := app.Window.NewWithOptions(shell.Options(shell.Harden(), rec, primaryWorkArea))
 		detach := shell.Attach(win, windowDeps, rec.Key)
 		windows.Add(rec.Key, win, detach)
-		shell.AttachCloseFlush(win, rec.Key, events, closeFlush)
+		// Real-interaction fix (item 8): isLastWindow reads the registry fresh at the moment this
+		// window's own close-flush wait completes (closeflush.go's own doc comment) — this
+		// window is still counted (RemoveAndCount, below, is what removes it, and only once a
+		// real Close() actually goes through), so `== 1` means "I am the only one left".
+		shell.AttachCloseFlush(win, rec.Key, events, closeFlush, func() bool { return windows.Count() == 1 })
 		win.OnWindowEvent(wailsevents.Common.WindowClosing, func(*application.WindowEvent) {
 			// A window that closes mid-quit-handshake without ever acking through the flush
 			// channel is removed from the pending set here rather than being waited out for the

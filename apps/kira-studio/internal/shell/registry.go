@@ -51,6 +51,20 @@ func (r *WindowRegistry) DetachAll() {
 	}
 }
 
+// Count reports how many windows are currently registered — AttachCloseFlush's own real-interaction
+// fix (item 8: the webview-process leak) reads this immediately before deciding how a window's
+// close finishes: 1 means the window asking is the last one, so closing it would otherwise leave
+// the app running (Mac.ApplicationShouldTerminateAfterLastWindowClosed: false, main.go) with no
+// window able to bring its own now-orphaned webview process back — Hide (reused on the next
+// Dock-click/menu reopen) replaces Close there instead of adding to the leak. Read at the same
+// registry snapshot RemoveAndCount already coordinates through the same mutex, so a window closing
+// at the same instant as another can't race this decision either.
+func (r *WindowRegistry) Count() int {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return len(r.entries)
+}
+
 // Any returns one live window, or nil if none is registered — attachDialogs' fallback for when
 // app.Window.Current() can't resolve a key window (F4's second half: a dialog used to always
 // attach to whichever window was created most recently, not the one that asked).

@@ -70,22 +70,71 @@ func (c *CloseFlushCoordinator) Ack(key string) {
 // (webview_window.go:1248-1255), so a hook that unconditionally cancels and then calls Close()
 // loops forever. `flushing` makes the hook one-shot: the first pass (the user's own close, or the
 // Dock/menu Close Window action) cancels and starts the flush wait; the second pass — this
-// goroutine's own win.Close() call once the wait ends — sees flushing already true, does not
-// cancel again, and lets Wails' own internal listener finally destroy the window.
+// goroutine's own win.Close()/win.Hide() call once the wait ends — sees flushing already true,
+// does not cancel again, and (for Close) lets Wails' own internal listener finally destroy the
+// window.
+//
+// Real-interaction fix (item 8 — a webview process outlives its window, and duplicates on
+// reopen): root-caused against the actual Wails v3 beta.16 source (vendored at
+// $GOPATH/pkg/mod/github.com/wailsapp/wails/v3@v3.0.0-beta.16), not guessed —
+//   - webview_window.go's own default WindowClosing *listener* (registered once, in NewWindow,
+//     for every window) is the entire native teardown: markAsDestroyed, impl.close,
+//     Window.Remove. On macOS, impl.close is exactly `[NSWindow close]`
+//     (webview_window_darwin.go's macosWebviewWindow.close) — nothing more.
+//     macosWebviewWindow.destroy() exists but is called from nowhere in the library, and its C
+//     body is byte-identical to close()'s; there is no exported Destroy on *WebviewWindow* at
+//     all. So closing a window never guarantees its WKWebView's own WebContent/GPU/Networking
+//     XPC helper processes (docs/WEBVIEW-SCROLL-MEMORY.md §2.2 names all three) actually exit —
+//     confirmed as a known, unfixable-from-Go limitation of this exact Wails version, not
+//     something this app's own code was doing wrong. This is the "does not actually terminate"
+//     half of the report, and it stays true for a genuine Close() below (a real limitation, not
+//     band-aided over) — what this fix changes is *how often Close() has to happen at all*.
+//   - The "duplicates on reopen" half **was** this app's own bug, and is fully fixable: closing
+//     the *last* window always called Close() (real destroy, permanently orphaning that
+//     process), which empties app.Window.GetAll() — so the next Dock-click/menu reopen
+//     (main.go's reopenWindow, gated on GetAll()==0) minted a **second**, brand-new window and
+//     webview from scratch. Every close/reopen cycle on a single-window app (the common case)
+//     therefore orphaned one more WebContent process forever, an unbounded leak.
+//   - Fix: closing the last window now calls Hide() instead of Close(). Hide() never emits
+//     WindowClosing at all (isDestroyed()/impl.close() are never reached), so the native window
+//     and its webview process stay alive — but Wails' *own* default reopen handler
+//     (events_common_darwin.go's setupCommonEvents, registered automatically for every app, not
+//     something this app has to duplicate) already does exactly the right thing for a hidden
+//     window on the next Dock-click: "for _, window := range app.Window.GetAll() { if
+//     !window.IsVisible() { window.Show() } }" — the same window, the same webview, the same
+//     process, reused. main.go's own AttachReopen only ever needs to mint a genuinely new window
+//     when GetAll() is truly empty (first launch, or after a real Cmd+Q quit-then-relaunch), which
+//     this change does not touch. A window that is not the last one still calls Close() exactly as
+//     before — D5's "delete this window's own row unless it's the one keeping the app alive"
+//     bookkeeping (main.go's WindowClosing listener) is unaffected, and closing one of several
+//     windows is a deliberate "I'm done with this workbench" action, not backgrounding the app,
+//     so reusing it later is not the right behaviour there.
 //
 // Known limitation, not resolved here: if the whole app is quitting at the same moment (Quitter's
 // own broadcast flush, C8) and quitting closes windows individually as part of macOS termination,
 // this hook would hold each of them for up to closeFlushTimeout waiting on an ack the renderer
 // may already be past sending — bounded by the timeout, so a worst-case added delay, not a hang,
 // but the actual interaction is AppKit termination sequencing this sandbox cannot observe
-// (**[needs a Mac]**, P8 §6.3).
-func AttachCloseFlush(win *application.WebviewWindow, key string, emit *bridge.Events, coordinator *CloseFlushCoordinator) {
+// (**[needs a Mac]**, P8 §6.3). Quitting always calls Close() on every window regardless of count
+// (quitter.RequestQuit/App.cleanup, not this hook's own hide/close choice) — Hide is only ever
+// reached from a plain window-close, never from quitting the whole app.
+func AttachCloseFlush(
+	win *application.WebviewWindow,
+	key string,
+	emit *bridge.Events,
+	coordinator *CloseFlushCoordinator,
+	isLastWindow func() bool,
+) {
 	var flushing atomic.Bool
 	win.RegisterHook(wailsevents.Common.WindowClosing, func(event *application.WindowEvent) {
 		if !flushing.CompareAndSwap(false, true) {
 			return
 		}
 		event.Cancel()
+		// Decided now, before the flush wait — RemoveAndCount only runs once this hook lets a
+		// real Close() through (main.go's own WindowClosing listener, the second pass below), so
+		// this window is still counted here regardless of which way the decision goes.
+		last := isLastWindow()
 		ack, done := coordinator.wait(key)
 		emit.SignalTo(key, bridge.ChannelWindowFlushBeforeClose)
 		go func() {
@@ -94,25 +143,26 @@ func AttachCloseFlush(win *application.WebviewWindow, key string, emit *bridge.E
 			case <-time.After(closeFlushTimeout):
 			}
 			done()
-			// P28 D20: drop this window's page before the native close.
-			//
-			// Wails v3 beta.16 offers nothing stronger. Its own WindowClosing *listener* (registered
-			// in webview_window.go's NewWithOptions) is the whole teardown — markAsDestroyed,
-			// impl.close, Window.Remove — and on macOS impl.close is `[NSWindow close]`, nothing
-			// more; macosWebviewWindow.destroy() exists but is called from nowhere in the library
-			// and its C body is byte-identical to close()'s. There is no exported Destroy on
-			// *WebviewWindow* at all. So the WKWebView's own WebContent process can outlive the
-			// window that hosted it, which is what shows up in Activity Monitor — and because
-			// ApplicationShouldTerminateAfterLastWindowClosed is deliberately false (main.go), the
-			// app quitting does not reap it either.
-			//
-			// What this app *can* release is the document. By here the flush ack has arrived or
-			// timed out, so nothing in the page still has work to do; navigating away tears down the
-			// Vue tree, every SlickGrid and CodeMirror instance, the data-plane stream reader and
-			// every timer, so the process is left holding an empty document rather than the whole
-			// app heap. Safe on every platform and on every path into a close, including the quit
-			// handshake. **[needs a Mac]** whether macOS then reaps the process itself, and how
-			// quickly — that is observable only in Activity Monitor against a packaged build.
+			if last {
+				// Real-interaction fix: reused, not destroyed — see this function's own doc
+				// comment. Deliberately does NOT navigate to about:blank first (unlike the Close
+				// path below): the whole point of keeping this window alive is instant resume —
+				// every open tab, the query text mid-edit, scroll position — on the next
+				// Dock-click, which a page unload would throw away for no benefit (nothing here
+				// is actually being reclaimed; the process stays up either way).
+				win.Hide()
+				return
+			}
+			// P28 D20: drop this window's page before the native close — this app's own
+			// mitigation for the leak described above, on the one path (not the last window)
+			// where the process really is being permanently orphaned and there is nothing
+			// stronger available. By here the flush ack has arrived or timed out, so nothing in
+			// the page still has work to do; navigating away tears down the Vue tree, every
+			// SlickGrid and CodeMirror instance, the data-plane stream reader and every timer, so
+			// the process is left holding an empty document rather than the whole app heap. Safe
+			// on every platform and on every path into a close, including the quit handshake.
+			// **[needs a Mac]** whether macOS then reaps the process itself, and how quickly —
+			// that is observable only in Activity Monitor against a packaged build.
 			win.SetURL("about:blank")
 			win.Close()
 		}()
