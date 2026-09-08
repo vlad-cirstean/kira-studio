@@ -33,6 +33,16 @@ const emit = defineEmits<(e: 'selectParentCommit', sha: string) => void>();
 const bodyEl = ref<HTMLParagraphElement | null>(null);
 const decorationEl = ref<HTMLSpanElement | null>(null);
 
+/** G19 D4 (item 4): the message body's own click-to-expand state, scoped to the `'message'`
+ *  section only (the `'details'` instance of this component never reads either ref). Reset to
+ *  collapsed on every new commit — an expansion the user made for one commit's message is not a
+ *  standing preference carried into the next. */
+const bodyExpanded = ref(false);
+/** Whether the collapsed body actually overflows its own 4-line clamp — measured, not assumed,
+ *  so the "Show more" toggle only ever renders when there is truly more to show (§the plan's own
+ *  wording: "rendered only when the content actually overflows"). */
+const bodyOverflows = ref(false);
+
 /** Body lines rendered one `<p>` per blank-line-separated paragraph — `appendLinkifiedText`
  *  handles a paragraph's own line breaks by joining with `\n` inside one paragraph rather than
  *  trying to linkify a single giant string with embedded `<br>`s. */
@@ -55,6 +65,12 @@ function renderBody(): void {
       appendLinkifiedText(container, line);
     });
   }
+  // G19 D4: measured against the *collapsed* clamp (bodyExpanded was reset to false by the watch
+  // below before this ran) — one more tick so the clamp CSS has actually applied before reading
+  // scrollHeight/clientHeight back out.
+  void nextTick(() => {
+    bodyOverflows.value = container.scrollHeight > container.clientHeight;
+  });
 }
 
 function renderDecoration(): void {
@@ -65,7 +81,14 @@ function renderDecoration(): void {
   if (badges) container.appendChild(badges);
 }
 
-watch([() => props.detail, bodyEl], () => void nextTick(renderBody), { immediate: true });
+watch(
+  [() => props.detail, bodyEl],
+  () => {
+    bodyExpanded.value = false;
+    void nextTick(renderBody);
+  },
+  { immediate: true },
+);
 watch([() => props.detail?.decoration, decorationEl], () => void nextTick(renderDecoration), {
   immediate: true,
 });
@@ -178,7 +201,20 @@ function copyMessage(): void {
           <span class="codicon codicon-copy" aria-hidden="true"></span>
         </button>
       </div>
-      <p v-if="bodyParagraphs.length > 0" ref="bodyEl" class="kv-meta-body"></p>
+      <p
+        v-if="bodyParagraphs.length > 0"
+        ref="bodyEl"
+        class="kv-meta-body"
+        :class="{ 'kv-meta-body-expanded': bodyExpanded }"
+      ></p>
+      <button
+        v-if="bodyOverflows"
+        type="button"
+        class="kv-meta-body-toggle"
+        @click="bodyExpanded = !bodyExpanded"
+      >
+        {{ bodyExpanded ? "Show less" : "Show more" }}
+      </button>
       <dl v-if="trailerRows.length > 0" class="kv-meta-trailers">
         <template v-for="(row, index) in trailerRows" :key="index">
           <dt>{{ row.token }}</dt>
@@ -281,8 +317,32 @@ function copyMessage(): void {
   white-space: normal;
 }
 
+/* G19 D4 (item 4): truncated to 4 lines while collapsed — F4 confirmed the body used to render in
+   full with no truncation at all. */
+.kv-meta-body:not(.kv-meta-body-expanded) {
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
 .kv-meta-body a {
   color: var(--kv-focus-border);
+}
+
+.kv-meta-body-toggle {
+  margin-top: var(--kv-space-1);
+  background: transparent;
+  border: none;
+  padding: 0;
+  color: var(--kv-focus-border);
+  font-family: inherit;
+  font-size: inherit;
+  cursor: pointer;
+}
+
+.kv-meta-body-toggle:hover {
+  text-decoration: underline;
 }
 
 .kv-meta-trailers {

@@ -7,7 +7,7 @@ import type { CommitRecord, CommitStore } from '@kira/git-core';
 import type { Formatter } from 'slickgrid';
 import type { EdgeSegment, LayoutStore } from './layoutStore.ts';
 import { nodeKindFor } from './palette.ts';
-import { buildRowSvg, isStashRow, type RowSlice } from './rowSvg.ts';
+import { buildRowSvg, isHeadDecoration, isStashRow, type RowSlice } from './rowSvg.ts';
 
 /**
  * W15's `rowBuildMs` (median + p99, recorded not gated) is defined as "sampled inside the graph
@@ -41,17 +41,22 @@ function readSlice(
       nodeKind: 'commit',
       segments: reusable,
       segmentCount: 0,
+      isHead: false,
     };
   }
+  const decoration = store.decorationAt(row);
   const segmentCount = layout.segmentsInRow(row, reusable);
   return {
     row,
     lane: layout.laneOf(row),
     color: layout.colorOf(row),
     laneCount: layout.laneCount,
-    nodeKind: nodeKindFor(store.parentsOf(row).length, isStashRow(store.decorationAt(row))),
+    nodeKind: nodeKindFor(store.parentsOf(row).length, isStashRow(decoration)),
     segments: reusable,
     segmentCount,
+    // G19 D1: the identical shape F1 found `columns.ts`'s own row-bold indicator already computes
+    // — the single source of truth (`isHeadDecoration`), not a second heuristic.
+    isHead: decoration.some(isHeadDecoration),
   };
 }
 

@@ -17,6 +17,10 @@
 import type { CommitRecord, CommitStore, DecorationRef } from '@kira/git-core';
 import type { Column, CustomDataView, Formatter, ItemMetadata } from 'slickgrid';
 import { graphColumnWidth } from '../graph/geometry.ts';
+// G19 D1: isHeadDecoration is promoted to rowSvg.ts (the graph column's own module), imported
+// from there rather than defined here — mirroring isStashRow's already-established precedent for
+// crossing this exact boundary.
+import { isHeadDecoration } from '../graph/rowSvg.ts';
 import type { ColumnWidths, DateFormat } from '../state/viewState.ts';
 import { formatAbsoluteDate, formatRelativeDate } from './dateFormat.ts';
 import { buildRefBadges } from './refBadges.ts';
@@ -31,10 +35,6 @@ export const MESSAGE_COLUMN_ID = 'message';
 export const AUTHOR_COLUMN_ID = 'author';
 export const DATE_COLUMN_ID = 'date';
 export const SHA_COLUMN_ID = 'sha';
-
-function isHeadDecoration(ref: DecorationRef): boolean {
-  return ref.kind === 'head' || (ref.kind === 'branch' && ref.isHead);
-}
 
 function isStashDecoration(ref: DecorationRef): boolean {
   return ref.kind === 'stash';

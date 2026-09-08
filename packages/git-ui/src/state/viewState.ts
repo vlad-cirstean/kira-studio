@@ -59,7 +59,10 @@ export type DateFormat = 'relative' | 'absolute';
  *  date string, a 7-character short sha) at the density §6.1 targets. Exported so every writer
  *  of a fresh `PersistedViewState` (a first-ever mount, a host's dev-seed hook) uses the same
  *  numbers rather than each inventing its own. */
-export const DEFAULT_COLUMN_WIDTHS: ColumnWidths = { author: 140, date: 120, sha: 80 };
+// G19 D2: date 120 -> 152 — F2 found the absolute date format ("2024-03-14 09:41", 16 chars)
+// silently clipped at 120px with no overflow affordance. Only changes a first-ever mount's seed
+// value; MIN_COLUMN_WIDTH and every already-persisted PersistedViewState are untouched.
+export const DEFAULT_COLUMN_WIDTHS: ColumnWidths = { author: 140, date: 152, sha: 80 };
 export const DEFAULT_DETAIL_WIDTH = 380;
 
 export interface ViewStateStore {

@@ -947,6 +947,13 @@ defineExpose({ scrollToRow, focusGrid });
   overflow: visible;
 }
 
+/* G19 D1: the graph column's own HEAD indicator — an unfilled ring in the same token the
+   existing branch-badge dot already uses (.kv-badge-dot, above), additive to whichever shapes
+   the row's node already draws (stash/merge precedence untouched — rowSvg.ts's planNode). */
+.kv-graph-head-ring {
+  stroke: var(--kv-focus-border);
+}
+
 .kv-cell-message {
   display: flex;
   align-items: center;
@@ -1058,9 +1065,15 @@ defineExpose({ scrollToRow, focusGrid });
   background-color: var(--kv-focus-border);
 }
 
+/* G19 D2: F2 found this cell had no overflow safety net at all — unlike
+   .kv-message-subject/.kv-cell-author (both above), an absolute-format date overflowing the
+   column's own width was silently clipped by the cell's own `overflow: hidden`, not truncated
+   with an affordance. */
 .kv-cell-date {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   cursor: pointer;
 }
 

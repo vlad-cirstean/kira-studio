@@ -50,12 +50,25 @@ export interface RowSlice {
   readonly nodeKind: NodeKind;
   readonly segments: readonly EdgeSegment[];
   readonly segmentCount: number;
+  /** G19 D1: whether this row is HEAD (or a branch `ref.isHead`, detached-HEAD included) —
+   *  `graphColumn.ts`'s `readSlice` computes this the identical way `columns.ts`'s `rowMetadata`
+   *  already does for the row-bold indicator (`isHeadDecoration`, below), never a second
+   *  heuristic. Drives `planNode`'s own HEAD ring; does not affect `nodeKind`. */
+  readonly isHead: boolean;
 }
 
 /** `dataContext.decoration.some(...)` — the single source for "is this row a stash", shared with
  *  `columns.ts`'s `rowMetadata` and `refBadges.ts`'s badge, never a second heuristic. */
 export function isStashRow(decorations: readonly DecorationRef[]): boolean {
   return decorations.some((ref) => ref.kind === 'stash');
+}
+
+/** G19 D1: promoted out of `columns.ts` (F1: it was already the single source of truth for the
+ *  row-bold indicator there) into this shared module, so `graphColumn.ts`'s `readSlice` and
+ *  `columns.ts`'s `rowMetadata` both import the one function rather than each defining their own
+ *  — mirroring `isStashRow`'s own already-established crossing of this exact boundary. */
+export function isHeadDecoration(ref: DecorationRef): boolean {
+  return ref.kind === 'head' || (ref.kind === 'branch' && ref.isHead);
 }
 
 /** Rounds to 2 decimal places and drops a trailing `.00` — keeps a row's `d` attribute short
@@ -152,6 +165,12 @@ export interface NodeShapePlan {
    *  dot at all) and only an inline style reliably wins that cascade. */
   readonly filled: boolean;
   readonly dashed: boolean;
+  /** G19 D1: the HEAD ring — an unfilled ring in `--kv-focus-border` (the same token the existing
+   *  branch-badge dot already uses), drawn in addition to whichever shapes `nodeKind` itself
+   *  already returns (stash/merge precedence untouched). `true` only for this one shape; every
+   *  other `NodeShapePlan` this module produces leaves it `undefined`, which `buildNodeElement`
+   *  treats identically to `false`. */
+  readonly isHeadRing?: boolean;
 }
 
 /** §5.3's fifth decision, the three node shapes: filled circle (ordinary), filled circle plus an
@@ -164,8 +183,14 @@ export function planNode(slice: RowSlice, rowHeight: number): readonly NodeShape
   const cy = rowHeight / 2;
   const color = slice.color;
 
+  // G19 D1: the HEAD ring is additive — appended to whichever shapes this kind already returns,
+  // never replacing them. Built once, appended at every return below.
+  const headRing: NodeShapePlan[] = slice.isHead
+    ? [{ cx, cy, r: GEOMETRY.mergeRadius, color, filled: false, dashed: false, isHeadRing: true }]
+    : [];
+
   if (slice.nodeKind === 'stash') {
-    return [{ cx, cy, r: GEOMETRY.nodeRadius, color, filled: false, dashed: true }];
+    return [{ cx, cy, r: GEOMETRY.nodeRadius, color, filled: false, dashed: true }, ...headRing];
   }
 
   const dot: NodeShapePlan = { cx, cy, r: GEOMETRY.nodeRadius, color, filled: true, dashed: false };
@@ -178,9 +203,9 @@ export function planNode(slice: RowSlice, rowHeight: number): readonly NodeShape
       filled: false,
       dashed: false,
     };
-    return [dot, ring];
+    return [dot, ring, ...headRing];
   }
-  return [dot];
+  return [dot, ...headRing];
 }
 
 function buildPathElement(plan: EdgePathPlan): SVGPathElement {
@@ -197,6 +222,20 @@ function buildPathElement(plan: EdgePathPlan): SVGPathElement {
 
 function buildNodeElement(plan: NodeShapePlan): SVGCircleElement {
   const circle = document.createElementNS(SVG_NS, 'circle');
+  circle.setAttribute('cx', fmt(plan.cx));
+  circle.setAttribute('cy', fmt(plan.cy));
+  circle.setAttribute('r', fmt(plan.r));
+
+  // G19 D1: the HEAD ring is never lane-coloured — `.kv-graph-head-ring` (CommitGrid.vue) paints
+  // it in `--kv-focus-border`, the same token the existing branch-badge dot already uses, so it
+  // never takes `laneClass`/`NODE_CLASS`, both of which are about this row's own lane colour.
+  if (plan.isHeadRing) {
+    circle.setAttribute('class', 'kv-graph-head-ring');
+    circle.setAttribute('stroke-width', String(GEOMETRY.strokeWidth));
+    circle.style.fill = 'none';
+    return circle;
+  }
+
   const classes = [laneClass(plan.color)];
   // Only the ordinary filled dot carries NODE_CLASS (the high-contrast outline rule) — see
   // palette.ts's own doc comment on why a ring must not: `.kv-node`'s stroke-width defaults to
@@ -204,9 +243,6 @@ function buildNodeElement(plan: NodeShapePlan): SVGCircleElement {
   // else.
   if (plan.filled) classes.push(NODE_CLASS);
   circle.setAttribute('class', classes.join(' '));
-  circle.setAttribute('cx', fmt(plan.cx));
-  circle.setAttribute('cy', fmt(plan.cy));
-  circle.setAttribute('r', fmt(plan.r));
   if (!plan.filled) {
     circle.setAttribute('stroke-width', String(GEOMETRY.strokeWidth));
     circle.style.fill = 'none';
