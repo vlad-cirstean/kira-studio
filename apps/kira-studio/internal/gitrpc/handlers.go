@@ -96,6 +96,12 @@ func (r *Router) ForConn(c *gitsession.Conn) Handlers {
 				return r.handleRemoteCancel(ctx, c, params)
 			case "credential.provide":
 				return r.handleCredentialProvide(ctx, c, params)
+			case "review.files":
+				return r.handleReviewFiles(ctx, c, params)
+			case "review.fileDiff":
+				return r.handleReviewFileDiff(ctx, c, params)
+			case "review.mark":
+				return r.handleReviewMark(ctx, c, params)
 			default:
 				return nil, ipcerr.New("E_UNKNOWN_METHOD", "gitrpc: unknown method "+method)
 			}

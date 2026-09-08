@@ -14,7 +14,10 @@ package gitrpc
 // webview. This constant moves only because it is the single compatibility authority (SPEC §3.4):
 // ui.action is a JSON control frame on the extension<->webview channel and never crosses the
 // socket, so the Go server neither emits nor parses it.
-const ContractVersion = 17
+// G11 D1: 17 -> 18, for three new requests (review.files, review.fileDiff, review.mark) and one
+// new UiActionKind member (toggleFileReviewed) — no event, no stream, no change to any existing
+// request's params or result.
+const ContractVersion = 18
 
 // Protocol is the handshake envelope's own version (SPEC §3.3's "protocol":1), distinct from
 // ContractVersion — it never changes unless the hello/ready exchange itself is redesigned.

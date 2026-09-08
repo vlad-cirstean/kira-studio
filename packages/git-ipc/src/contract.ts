@@ -791,6 +791,50 @@ export interface BaseResolution {
 }
 
 // ---------------------------------------------------------------------------------------
+// G11 — incremental review (`docs/v1.3/plans/G11-incremental-review-state-and-review-db.md`).
+// review.db's own per-file "last reviewed" state, the three-tier delta selection, and partial
+// review ranges — all new to v1.3, no upstream equivalent.
+// ---------------------------------------------------------------------------------------
+
+/** 1-based, inclusive, both ends. Always new-side (branch-tip) line numbers on the wire — stored
+ *  ranges live in the snapshot's own coordinates server-side, but are always projected forward
+ *  before crossing here (G11 D10). */
+export interface LineRange {
+  readonly start: number;
+  readonly end: number;
+}
+
+export interface ReviewFileStatus {
+  readonly kind: 'none' | 'partial' | 'full';
+  /** The branch tip's content for this path differs from the snapshot the state was recorded
+   *  against. Always `false` for `'none'`. */
+  readonly changedSinceReview: boolean;
+  readonly reviewedAt: number | undefined; // unix millis
+  readonly reviewedAtSha: string | undefined;
+}
+
+export interface ReviewFileEntry {
+  readonly change: FileChange;
+  readonly review: ReviewFileStatus;
+}
+
+/** Which mechanism answered "what changed since the snapshot" (G11 D7). Reported even in
+ *  `mode: "range"`, because it is also what produced `reviewedRanges`' own projection. */
+export type ReviewDeltaSource =
+  /** Never reviewed — the delta IS the whole range diff. */
+  | 'noSnapshot'
+  /** Blob-oid equality: nothing changed, no diff ran. */
+  | 'unchanged'
+  /** The snapshot commit is still an ancestor; an ordinary git diff ran. */
+  | 'fast'
+  /** History was rewritten; the stored blob was diffed with `diff --no-index`. */
+  | 'slow'
+  /** Reviewed, but no content was stored and the sha no longer resolves. */
+  | 'snapshotUnavailable';
+
+export type ReviewDiffMode = 'range' | 'sinceReview';
+
+// ---------------------------------------------------------------------------------------
 // P11 — search. Structural copy of `packages/core`'s `search/query.ts` (minus `scope`: the
 // tail scan is commits-only, and Refs/Both are resolved entirely client-side against
 // `RefsState`, no RPC), kept honest by `tests/unit/ipc/wireConformance.test.ts`.
@@ -861,7 +905,11 @@ export type UiActionKind =
   | 'push'
   | 'forcePush'
   | 'cancelRemoteOperation'
-  | 'refresh';
+  | 'refresh'
+  /** G11 D17: toggles the file currently open in the review sidebar's Files pane. Not a
+   *  MUTATING_COMMANDS member (it maps to no OpRequest/RemoteOpParams kind) — commands.ts's own
+   *  OTHER_COMMANDS carries it instead. */
+  | 'toggleFileReviewed';
 
 // ---------------------------------------------------------------------------------------
 // The contract.
@@ -957,6 +1005,57 @@ export type Contract = {
     'review.open': {
       params: { repoId: string; branch: string };
       result: Record<string, never>;
+    };
+    /**
+     * G11 D1/D6: the range's file list — the three-dot (merge-base) diff's own file set, each
+     * joined against its stored review record (if any) via blob-oid equality (D7 tier 0) so a
+     * per-file "has this changed since you reviewed it" answer never spawns a diff.
+     */
+    'review.files': {
+      params: { repoId: string; branch: string; base: string };
+      result: {
+        readonly branchTip: string;
+        readonly mergeBase: string;
+        readonly files: readonly ReviewFileEntry[];
+      };
+    };
+    /**
+     * G11 D1/D7/D13: one file's delta since it was last reviewed, plus its projected reviewed
+     * ranges — the delta selection runs in BOTH modes (reviewedRanges needs the projection either
+     * way); `mode` decides only which patch becomes `body`.
+     */
+    'review.fileDiff': {
+      params: {
+        repoId: string;
+        branch: string;
+        base: string;
+        path: string;
+        mode: ReviewDiffMode;
+      };
+      result: {
+        readonly path: string;
+        readonly deltaSource: ReviewDeltaSource;
+        readonly body: FileDiffBody;
+        readonly reviewedRanges: readonly LineRange[];
+        readonly lineCount: number;
+        readonly reviewedAtSha: string | null;
+      };
+    };
+    /**
+     * G11 D1/D5/D10: marks (or unmarks) a file, in whole or in part. No `base` — a write is a fact
+     * about `(repo, branch, path)` only. `ranges` omitted (not merely empty) means the whole file.
+     * Returns the resulting status so the file list updates from the response rather than
+     * re-requesting `review.files` after every checkbox.
+     */
+    'review.mark': {
+      params: {
+        repoId: string;
+        branch: string;
+        path: string;
+        reviewed: boolean;
+        ranges?: readonly LineRange[];
+      };
+      result: { readonly review: ReviewFileStatus };
     };
     'commit.detail': {
       params: { repoId: string; sha: string; parentIndex?: number };
@@ -1210,8 +1309,10 @@ export type Contract = {
       /** `false` only for git's own "Username for …" shape; everything unrecognised is masked. */
       readonly masked: boolean;
     };
-    /** G10: host -> the GRAPH webview only (never the review sidebar, which renders no operation
-     *  UI). One palette command's action, routed to the affordance the toolbar or a context menu
+    /** G10: host -> whichever webview the action targets — the graph panel for every mutating op
+     *  (the review sidebar renders no operation UI), and, since G11 D17, the review sidebar for
+     *  'toggleFileReviewed'. One palette command's action, routed to the affordance the toolbar or
+     *  a context menu
      *  already drives — the palette is an entry point, never a second implementation. */
     'ui.action': { readonly action: UiActionKind };
   };

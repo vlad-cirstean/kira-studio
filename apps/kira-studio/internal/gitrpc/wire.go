@@ -3,6 +3,7 @@ package gitrpc
 import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitclient"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitpreflight"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitreview"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitsession"
 )
 
@@ -279,4 +280,46 @@ type RemoteCancelResult struct {
 type CredentialProvideParams struct {
 	RequestID string  `json:"requestId"`
 	Secret    *string `json:"secret"`
+}
+
+// ---------------------------------------------------------------------------------------
+// G11 — incremental review: review.files/review.fileDiff/review.mark (D1, D13). Results are
+// gitsession's own wire-shaped types (RangeFilesResult, ReviewFileDiffResult, ReviewFileStatus) —
+// D5's own precedent applied again: no second, gitrpc-owned copy of a shape gitsession already
+// produces JSON-tagged. CONTRACT_VERSION moves 17 -> 18 for exactly these three requests plus one
+// new UiActionKind member (toggleFileReviewed, a webview-local control frame the Go server never
+// sees, D1).
+// ---------------------------------------------------------------------------------------
+
+// ReviewFilesParams is review.files' own request — D5's session key: base is needed to compute the
+// range's merge-base, but the session itself is keyed on (repoId, branch) alone (D5).
+type ReviewFilesParams struct {
+	RepoID string `json:"repoId"`
+	Branch string `json:"branch"`
+	Base   string `json:"base"`
+}
+
+// ReviewFileDiffParams is review.fileDiff's own request.
+type ReviewFileDiffParams struct {
+	RepoID string `json:"repoId"`
+	Branch string `json:"branch"`
+	Base   string `json:"base"`
+	Path   string `json:"path"`
+	Mode   string `json:"mode"` // "range" | "sinceReview"
+}
+
+// ReviewMarkParams is review.mark's own request — no base (D5: a write is a fact about
+// (repo, branch, path) only). Ranges omitted (not merely empty) means "the whole file" (D13).
+type ReviewMarkParams struct {
+	RepoID   string                `json:"repoId"`
+	Branch   string                `json:"branch"`
+	Path     string                `json:"path"`
+	Reviewed bool                  `json:"reviewed"`
+	Ranges   []gitreview.LineRange `json:"ranges,omitempty"`
+}
+
+// ReviewMarkResult is review.mark's own result — the resulting status, so the file list updates
+// from the response rather than re-requesting review.files after every checkbox (D13).
+type ReviewMarkResult struct {
+	Review gitsession.ReviewFileStatus `json:"review"`
 }

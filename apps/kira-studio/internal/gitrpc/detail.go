@@ -22,6 +22,12 @@ func mapDetailError(err error) error {
 		return ipcerr.BadRequest("gitrpc: path is not one of this commit's changed files")
 	case errors.Is(err, gitsession.ErrPathEscapesRoot):
 		return ipcerr.BadRequest("gitrpc: path escapes the repository root")
+	case errors.Is(err, gitsession.ErrBranchNotFound):
+		return ipcerr.BadRequest("gitrpc: branch not found")
+	case errors.Is(err, gitsession.ErrUnrelatedHistories):
+		return ipcerr.BadRequest("gitrpc: base and branch share no history")
+	case errors.Is(err, gitsession.ErrRangedMarkOnNonText):
+		return ipcerr.BadRequest("gitrpc: a ranged mark requires a text file")
 	default:
 		return mapGitError(err)
 	}
