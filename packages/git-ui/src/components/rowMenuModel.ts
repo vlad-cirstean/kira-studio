@@ -6,25 +6,20 @@
  */
 import { canRunOp, describeInProgress } from '@kira/git-core';
 import type { DecorationRef, InProgressOperation, OpRequest, RefKind } from '@kira/git-ipc';
+// G19 D3b: MenuItem/MenuSection now live in @kira/kira-ui — the shapes are identical by
+// construction, just re-exported from here so every existing importer of `./rowMenuModel.ts`
+// keeps working unchanged.
+import type { MenuItem, MenuSection } from '@kira/kira-ui';
 
-export interface MenuItem {
-  readonly id: string;
-  readonly label: string;
-  readonly disabled: boolean;
-  /** §7.11: "disabled with the banner's reason as the tooltip" — an accessible description, not
-   *  merely a hover-only `title` (`RowContextMenu.vue` wires this to `aria-describedby`). */
-  readonly disabledReason: string | undefined;
-}
-
-export interface MenuSection {
-  readonly items: readonly MenuItem[];
-}
+export type { MenuItem, MenuSection };
 
 function gatedItem(
   id: string,
   label: string,
   opKind: OpRequest['kind'],
   inProgress: InProgressOperation | null,
+  icon?: string,
+  danger?: boolean,
 ): MenuItem {
   const allowed = canRunOp(inProgress, opKind);
   return {
@@ -32,11 +27,13 @@ function gatedItem(
     label,
     disabled: !allowed,
     disabledReason: allowed || inProgress === null ? undefined : describeInProgress(inProgress),
+    icon,
+    danger,
   };
 }
 
-function plainItem(id: string, label: string): MenuItem {
-  return { id, label, disabled: false, disabledReason: undefined };
+function plainItem(id: string, label: string, icon?: string): MenuItem {
+  return { id, label, disabled: false, disabledReason: undefined, icon };
 }
 
 export interface CommitMenuContext {
@@ -63,17 +60,41 @@ export function buildRowMenu(ctx: CommitMenuContext): MenuSection[] {
       'Checkout this commit (detached HEAD)',
       'checkout',
       ctx.inProgress,
+      'codicon-check',
     ),
-    plainItem('createBranchHere', 'Create branch here…'),
-    plainItem('createTagHere', 'Create tag here…'),
-    gatedItem('revertThisCommit', 'Revert this commit…', 'revert', ctx.inProgress),
-    gatedItem('resetToThisCommit', 'Reset to this commit…', 'reset', ctx.inProgress),
-    gatedItem('cherryPickThisCommit', 'Cherry-pick this commit…', 'cherryPick', ctx.inProgress),
+    plainItem('createBranchHere', 'Create branch here…', 'codicon-git-branch'),
+    plainItem('createTagHere', 'Create tag here…', 'codicon-tag'),
+    gatedItem(
+      'revertThisCommit',
+      'Revert this commit…',
+      'revert',
+      ctx.inProgress,
+      'codicon-history',
+      true,
+    ),
+    gatedItem(
+      'resetToThisCommit',
+      'Reset to this commit…',
+      'reset',
+      ctx.inProgress,
+      'codicon-debug-step-back',
+      true,
+    ),
+    gatedItem(
+      'cherryPickThisCommit',
+      'Cherry-pick this commit…',
+      'cherryPick',
+      ctx.inProgress,
+      'codicon-git-commit',
+    ),
   ];
   const sections: MenuSection[] = [{ items: mutating }];
   if (ctx.clipboardEnabled) {
     sections.push({
-      items: [plainItem('copySha', 'Copy SHA'), plainItem('copyMessage', 'Copy commit message')],
+      items: [
+        plainItem('copySha', 'Copy SHA', 'codicon-copy'),
+        plainItem('copyMessage', 'Copy commit message', 'codicon-copy'),
+      ],
     });
   }
   return sections;
@@ -91,8 +112,25 @@ export function buildRowMenu(ctx: CommitMenuContext): MenuSection[] {
 export function buildReviewRowMenu(clipboardEnabled: boolean): MenuSection[] {
   if (!clipboardEnabled) return [];
   return [
-    { items: [plainItem('copySha', 'Copy SHA'), plainItem('copyMessage', 'Copy commit message')] },
+    {
+      items: [
+        plainItem('copySha', 'Copy SHA', 'codicon-copy'),
+        plainItem('copyMessage', 'Copy commit message', 'codicon-copy'),
+      ],
+    },
   ];
+}
+
+/**
+ * `docs/plans/G19.md` D7: `FileTree.vue`'s new right-click "Copy path" menu, scoped to
+ * `reviewStyled` instances only. One item — deliberately not the two-affordance duplication
+ * `ReviewCommitRow.vue` used to carry (removed by this same decision) — built directly against
+ * `@kira/kira-ui`'s own `MenuItem` type from the start, matching every other menu-building
+ * function in this file.
+ */
+export function buildFileRowMenu(clipboardEnabled: boolean): MenuSection[] {
+  if (!clipboardEnabled) return [];
+  return [{ items: [plainItem('copyPath', 'Copy path', 'codicon-copy')] }];
 }
 
 export interface RefMenuContext {
@@ -118,12 +156,19 @@ export interface RefMenuContext {
 export function buildRefMenu(ctx: RefMenuContext): MenuSection[] {
   if (ctx.kind === 'tag') {
     const items: MenuItem[] = [
-      gatedItem('checkoutRef', 'Checkout', 'checkout', ctx.inProgress),
-      gatedItem('deleteRef', 'Delete tag', 'tagDelete', ctx.inProgress),
+      gatedItem('checkoutRef', 'Checkout', 'checkout', ctx.inProgress, 'codicon-check'),
+      gatedItem('deleteRef', 'Delete tag', 'tagDelete', ctx.inProgress, 'codicon-trash', true),
     ];
     for (const remote of ctx.knownRemotes) {
-      items.push(plainItem(`pushRef:${remote}`, `Push to ${remote}`));
-      items.push(plainItem(`deleteRemoteRef:${remote}`, `Delete on ${remote}`));
+      items.push(plainItem(`pushRef:${remote}`, `Push to ${remote}`, 'codicon-cloud'));
+      items.push({
+        id: `deleteRemoteRef:${remote}`,
+        label: `Delete on ${remote}`,
+        disabled: false,
+        disabledReason: undefined,
+        icon: 'codicon-trash',
+        danger: true,
+      });
     }
     return [{ items }];
   }
@@ -137,16 +182,16 @@ export function buildRefMenu(ctx: RefMenuContext): MenuSection[] {
     return [
       {
         items: [
-          gatedItem('checkoutRef', 'Checkout', 'checkout', ctx.inProgress),
-          plainItem('reviewBranch', 'Review branch changes'),
+          gatedItem('checkoutRef', 'Checkout', 'checkout', ctx.inProgress, 'codicon-check'),
+          plainItem('reviewBranch', 'Review branch changes', 'codicon-diff-multiple'),
         ],
       },
     ];
   }
   const items: MenuItem[] = [
-    gatedItem('checkoutRef', 'Checkout', 'checkout', ctx.inProgress),
-    plainItem('renameRef', 'Rename branch…'),
-    plainItem('reviewBranch', 'Review branch changes'),
+    gatedItem('checkoutRef', 'Checkout', 'checkout', ctx.inProgress, 'codicon-check'),
+    plainItem('renameRef', 'Rename branch…', 'codicon-edit'),
+    plainItem('reviewBranch', 'Review branch changes', 'codicon-diff-multiple'),
   ];
   // git refuses to delete the branch you are currently on — not one of §7.11's gated op kinds
   // (the gate is scoped to what an in-progress *operation* blocks), so this is its own, simpler
@@ -158,8 +203,17 @@ export function buildRefMenu(ctx: RefMenuContext): MenuSection[] {
           label: 'Delete branch',
           disabled: true,
           disabledReason: 'This is the current branch.',
+          icon: 'codicon-trash',
+          danger: true,
         }
-      : gatedItem('deleteRef', 'Delete branch', 'branchDelete', ctx.inProgress),
+      : gatedItem(
+          'deleteRef',
+          'Delete branch',
+          'branchDelete',
+          ctx.inProgress,
+          'codicon-trash',
+          true,
+        ),
   );
   return [{ items }];
 }

@@ -18,6 +18,7 @@
  * that emit to this component's exposed `refresh()`, so both paths share one implementation and
  * one `hasPendingChange` state.
  */
+import { KuiButton } from '@kira/kira-ui';
 import { computed, ref, watch } from 'vue';
 import { ACTION_ICONS } from '../icons/index.ts';
 import type { GraphViewState } from '../state/graphView.ts';
@@ -51,8 +52,8 @@ defineExpose({ refresh: doRefresh });
 </script>
 
 <template>
-  <button
-    type="button"
+  <KuiButton
+    :icon="ACTION_ICONS.refresh"
     class="kv-icon-button kv-refresh-button"
     :class="{ 'kv-refresh-spinning': isRefreshing }"
     :disabled="isBusy"
@@ -60,9 +61,8 @@ defineExpose({ refresh: doRefresh });
     aria-label="Refresh"
     @click="doRefresh"
   >
-    <span class="codicon" :class="ACTION_ICONS.refresh" aria-hidden="true"></span>
     <span v-if="hasPendingChange" class="kv-refresh-dot" aria-hidden="true"></span>
-  </button>
+  </KuiButton>
 </template>
 
 <style>

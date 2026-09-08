@@ -14,6 +14,7 @@
  */
 
 import type { PullStrategy, PullStrategySource } from '@kira/git-ipc';
+import { KuiButton } from '@kira/kira-ui';
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import type { OpsState } from '../state/ops.ts';
 import { describePullStrategySource, PULL_STRATEGY_LABELS } from './pullStrategyModel.ts';
@@ -94,28 +95,25 @@ defineExpose({ run: runDefault });
 
 <template>
   <div ref="rootEl" class="kv-pull-picker">
-    <button
-      type="button"
-      class="kv-toolbar-button kv-pull-picker-main"
+    <KuiButton
+      icon="codicon-repo-pull"
+      class="kv-pull-picker-main"
       :disabled="disabled"
       :title="mainTitle"
       data-testid="pull-button"
       @click="runDefault"
     >
-      <span class="codicon codicon-repo-pull" aria-hidden="true"></span>
-      <span>{{ mainLabel }}</span>
-    </button>
-    <button
-      type="button"
-      class="kv-toolbar-button kv-pull-picker-chevron"
+      {{ mainLabel }}
+    </KuiButton>
+    <KuiButton
+      icon="codicon-chevron-down"
+      class="kv-pull-picker-chevron"
       :disabled="disabled"
       aria-label="Pull strategy options"
       :aria-expanded="isOpen"
       data-testid="pull-strategy-trigger"
       @click="toggle"
-    >
-      <span class="codicon codicon-chevron-down" aria-hidden="true"></span>
-    </button>
+    />
 
     <div v-if="isOpen" class="kv-pull-picker-panel" role="menu" aria-label="Pull strategy">
       <button
@@ -149,34 +147,9 @@ defineExpose({ run: runDefault });
 </template>
 
 <style>
-/* Shared with `AppToolbar.vue`'s own Fetch/Push buttons — a bordered, labelled toolbar button,
-   distinct from `BranchPicker.vue`'s borderless `.kv-icon-button` (a chevron/kebab glyph with no
-   label). Defined in both files (matching the dialogs' own redundant-but-identical convention,
-   e.g. `.kv-modal-backdrop` in every `dialogs/*.vue`) so neither file depends on load order. */
-.kv-toolbar-button {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--kv-space-1);
-  height: 22px;
-  padding: 0 var(--kv-space-2);
-  background: transparent;
-  color: var(--kv-app-fg);
-  border: 1px solid var(--kv-panel-border);
-  border-radius: var(--kv-radius);
-  font-family: inherit;
-  font-size: inherit;
-  cursor: pointer;
-}
-
-.kv-toolbar-button:hover:not(:disabled) {
-  background-color: var(--kv-row-hover-bg);
-}
-
-.kv-toolbar-button:disabled {
-  opacity: 0.6;
-  cursor: default;
-}
-
+/* G19 D3a: the trigger's own look now comes from @kira/kira-ui's KuiButton (matching
+   `AppToolbar.vue`'s own Fetch/Push buttons) — the `.kv-toolbar-button` rule that used to be
+   defined identically in both files is closed at its source, not restyled around. */
 .kv-pull-picker {
   position: relative;
   display: inline-flex;

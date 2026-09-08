@@ -21,6 +21,7 @@
  * known at all: there is nothing to name in the tooltip and no useful default to pick.
  */
 import type { StashEntry } from '@kira/git-ipc';
+import { KuiButton } from '@kira/kira-ui';
 import { computed, ref } from 'vue';
 import type { DetailActions } from '../state/detailActions.ts';
 import type { GraphViewState } from '../state/graphView.ts';
@@ -221,17 +222,15 @@ const stashDisabled = computed(
 
     <template v-if="hasRemote">
       <span class="kv-toolbar-separator" aria-hidden="true"></span>
-      <button
-        type="button"
-        class="kv-toolbar-button"
+      <KuiButton
+        icon="codicon-cloud-download"
         :disabled="fetchDisabled"
         :title="`Fetch ${defaultRemote}`"
         data-testid="fetch-button"
         @click="doFetch"
       >
-        <span class="codicon codicon-cloud-download" aria-hidden="true"></span>
-        <span>Fetch</span>
-      </button>
+        Fetch
+      </KuiButton>
 
       <PullStrategyPicker
         v-if="currentBranch !== undefined"
@@ -243,28 +242,25 @@ const stashDisabled = computed(
       />
 
       <div class="kv-push-group">
-        <button
-          type="button"
-          class="kv-toolbar-button kv-push-main"
+        <KuiButton
+          icon="codicon-repo-push"
+          class="kv-push-main"
           :disabled="pushPullDisabled"
           :title="`Push to ${defaultRemote}`"
           data-testid="push-button"
           @click="doPush"
         >
-          <span class="codicon codicon-repo-push" aria-hidden="true"></span>
-          <span>Push</span>
-        </button>
-        <button
-          type="button"
-          class="kv-toolbar-button kv-push-chevron"
+          Push
+        </KuiButton>
+        <KuiButton
+          icon="codicon-chevron-down"
+          class="kv-push-chevron"
           :disabled="pushPullDisabled"
           aria-label="Push options"
           :aria-expanded="isForcePushMenuOpen"
           data-testid="push-overflow-trigger"
           @click="toggleForcePushMenu"
-        >
-          <span class="codicon codicon-chevron-down" aria-hidden="true"></span>
-        </button>
+        />
         <div v-if="isForcePushMenuOpen" class="kv-push-menu" role="menu" aria-label="Push options">
           <button
             type="button"
@@ -280,17 +276,15 @@ const stashDisabled = computed(
     </template>
 
     <span class="kv-toolbar-separator" aria-hidden="true"></span>
-    <button
-      type="button"
-      class="kv-toolbar-button"
+    <KuiButton
+      icon="codicon-inbox"
       :disabled="stashDisabled"
       title="Stash changes"
       data-testid="stash-changes-button"
       @click="emit('stash-changes')"
     >
-      <span class="codicon codicon-inbox" aria-hidden="true"></span>
-      <span>Stash changes…</span>
-    </button>
+      Stash changes…
+    </KuiButton>
 
     <span class="kv-toolbar-spacer" aria-hidden="true"></span>
 
@@ -353,32 +347,11 @@ const stashDisabled = computed(
   flex: 1;
 }
 
-/* Shared with `PullStrategyPicker.vue`'s own trigger buttons — see that file's own doc comment
-   on why this is defined identically in both places rather than one importing the other's CSS. */
-.kv-toolbar-button {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--kv-space-1);
-  height: 22px;
-  padding: 0 var(--kv-space-2);
-  background: transparent;
-  color: var(--kv-app-fg);
-  border: 1px solid var(--kv-panel-border);
-  border-radius: var(--kv-radius);
-  font-family: inherit;
-  font-size: inherit;
-  cursor: pointer;
-}
-
-.kv-toolbar-button:hover:not(:disabled) {
-  background-color: var(--kv-row-hover-bg);
-}
-
-.kv-toolbar-button:disabled {
-  opacity: 0.6;
-  cursor: default;
-}
-
+/* G19 D3a: the toolbar-button look now comes from @kira/kira-ui's own KuiButton (theme/
+   controls.css's `.kui-button`, via this host's kui-bridge.css) — the duplicated
+   `.kv-toolbar-button` rule that used to live here *and* in `PullStrategyPicker.vue` is closed at
+   its source, not restyled around. `.kv-push-main`/`.kv-push-chevron` below only add the split-
+   button corner radii KuiButton has no opinion about. */
 .kv-push-group {
   position: relative;
   display: inline-flex;

@@ -11,6 +11,7 @@
  * for a reset, per hard part 1's own table) rather than staying the single fixed string this file
  * used to render inline.
  */
+import { KuiButton } from '@kira/kira-ui';
 import { composeUndoTooltip } from '../state/liveAnnouncements.ts';
 import type { OpsState } from '../state/ops.ts';
 
@@ -27,16 +28,15 @@ async function undo(): Promise<void> {
 
 <template>
   <div v-if="ops.undoSlot.value" class="kv-undo">
-    <button
-      type="button"
+    <KuiButton
+      icon="codicon-discard"
       class="kv-undo-button"
       :title="composeUndoTooltip(ops.undoSlot.value.label)"
       :disabled="ops.busy.value"
       @click="undo"
     >
-      <span class="codicon codicon-discard" aria-hidden="true"></span>
-      <span>{{ ops.undoSlot.value.label }}</span>
-    </button>
+      {{ ops.undoSlot.value.label }}
+    </KuiButton>
     <button
       v-if="clipboardEnabled"
       type="button"
