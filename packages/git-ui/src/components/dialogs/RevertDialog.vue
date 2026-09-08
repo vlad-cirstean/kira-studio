@@ -4,17 +4,20 @@
  * the preflight is not a clean, non-merge, single-sha revert (`verdict !== "clean"` or a mainline
  * is required) — see that method's own doc comment — so a plain revert of an ordinary commit
  * never opens it at all.
+ *
+ * G21 D2: the modal shell is `@kira/kira-ui`'s `KuiDialog` now — this file only supplies its own
+ * body/actions content. The W20 accessibility-contrast fix that used to live here as a
+ * `.kv-modal-button--primary` override is no longer needed: `KuiButton`'s own `primary` variant
+ * already carries adequate contrast in `@kira/kira-ui`'s theme.
  */
+import { KuiButton, KuiDialog } from '@kira/kira-ui';
 import { computed, ref, watch } from 'vue';
 import type { OpsState } from '../../state/ops.ts';
-import { useModalFocus } from './modalFocus.ts';
 
 const props = defineProps<{ ops: OpsState }>();
 
 const preflight = computed(() => props.ops.pendingRevert.value);
 const active = computed(() => preflight.value !== undefined);
-const rootEl = ref<HTMLDivElement | null>(null);
-const { onKeydown } = useModalFocus(active, rootEl);
 
 const selectedMainline = ref<number | undefined>(undefined);
 const noCommit = ref(false);
@@ -49,91 +52,92 @@ function confirm(): void {
 </script>
 
 <template>
-  <div v-if="active" class="kv-modal-backdrop">
-    <div
-      ref="rootEl"
-      class="kv-modal"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="kv-revert-dialog-title"
-      @keydown="onKeydown"
-      @keydown.escape="cancel"
-    >
-      <h2 id="kv-revert-dialog-title" class="kv-modal-title">Revert</h2>
+  <KuiDialog :open="active" title="Revert" @close="cancel">
+    <p>
+      Reverting applies the inverse of {{ isMultiSha ? 'each selected commit' : 'this commit' }}
+      as a new commit — the original stays in history, so this is safe on branches you've already
+      pushed.
+    </p>
+
+    <p v-if="preflight?.detachedHead" class="kv-dialog-note">
+      HEAD is detached: the revert commit will not belong to any branch until you create one.
+    </p>
+
+    <template v-if="needsMainline">
       <p>
-        Reverting applies the inverse of {{ isMultiSha ? "each selected commit" : "this commit" }}
-        as a new commit — the original stays in history, so this is safe on branches you've
-        already pushed.
+        This reverts a merge commit — pick which parent's history to treat as the "mainline"
+        (§7.10: git cannot guess this for you):
       </p>
-
-      <p v-if="preflight?.detachedHead" class="kv-modal-note">
-        HEAD is detached: the revert commit will not belong to any branch until you create one.
-      </p>
-
-      <template v-if="needsMainline">
-        <p>
-          This reverts a merge commit — pick which parent's history to treat as the "mainline"
-          (§7.10: git cannot guess this for you):
-        </p>
-        <div
-          v-for="entry in preflight?.mainlineRequired"
-          :key="entry.sha"
-          class="kv-revert-mainline-group"
-        >
-          <p class="kv-revert-mainline-sha"><code>{{ entry.sha.slice(0, 7) }}</code></p>
-          <label v-for="parent in entry.parents" :key="parent.parentNumber" class="kv-revert-parent">
-            <input
-              type="radio"
-              name="kv-revert-mainline"
-              :value="parent.parentNumber"
-              v-model="selectedMainline"
-            />
-            Parent {{ parent.parentNumber }} — <code>{{ parent.sha.slice(0, 7) }}</code>
-            {{ parent.subject }}
-          </label>
-        </div>
-      </template>
-
-      <template v-if="!needsMainline || selectedMainline !== undefined">
-        <div v-if="preflight?.prediction.kind === 'clean'" class="kv-revert-prediction kv-revert-prediction--clean">
-          No conflicts predicted.
-        </div>
-        <div v-else-if="preflight?.prediction.kind === 'conflicts'" class="kv-revert-prediction kv-revert-prediction--conflict">
-          <p>This will likely conflict in:</p>
-          <ul class="kv-modal-file-list">
-            <li v-for="path in preflight.prediction.paths" :key="path"><code>{{ path }}</code></li>
-          </ul>
-          <label class="kv-revert-no-commit">
-            <input type="checkbox" v-model="noCommit" />
-            Stop before committing (<code>--no-commit</code>), so I can resolve first
-          </label>
-        </div>
-        <div v-else-if="preflight?.prediction.kind === 'unknown'" class="kv-revert-prediction">
-          Couldn't predict the outcome: {{ preflight.prediction.reason }}
-        </div>
-
-        <p v-if="isMultiSha" class="kv-modal-note">
-          This prediction covers only the first of the {{ preflight?.shas.length }} selected
-          commits — the rest may conflict differently.
-        </p>
-      </template>
-
-      <div class="kv-modal-actions">
-        <button
-          type="button"
-          class="kv-modal-button kv-modal-button--primary"
-          :disabled="!canConfirm"
-          @click="confirm"
-        >
-          Revert
-        </button>
-        <button type="button" class="kv-modal-button" @click="cancel">Cancel</button>
+      <div
+        v-for="entry in preflight?.mainlineRequired"
+        :key="entry.sha"
+        class="kv-revert-mainline-group"
+      >
+        <p class="kv-revert-mainline-sha"><code>{{ entry.sha.slice(0, 7) }}</code></p>
+        <label v-for="parent in entry.parents" :key="parent.parentNumber" class="kv-revert-parent">
+          <input
+            type="radio"
+            name="kv-revert-mainline"
+            :value="parent.parentNumber"
+            v-model="selectedMainline"
+          />
+          Parent {{ parent.parentNumber }} — <code>{{ parent.sha.slice(0, 7) }}</code>
+          {{ parent.subject }}
+        </label>
       </div>
-    </div>
-  </div>
+    </template>
+
+    <template v-if="!needsMainline || selectedMainline !== undefined">
+      <div
+        v-if="preflight?.prediction.kind === 'clean'"
+        class="kv-revert-prediction kv-revert-prediction--clean"
+      >
+        No conflicts predicted.
+      </div>
+      <div
+        v-else-if="preflight?.prediction.kind === 'conflicts'"
+        class="kv-revert-prediction kv-revert-prediction--conflict"
+      >
+        <p>This will likely conflict in:</p>
+        <ul class="kv-dialog-file-list">
+          <li v-for="path in preflight.prediction.paths" :key="path"><code>{{ path }}</code></li>
+        </ul>
+        <label class="kv-revert-no-commit">
+          <input type="checkbox" v-model="noCommit" />
+          Stop before committing (<code>--no-commit</code>), so I can resolve first
+        </label>
+      </div>
+      <div v-else-if="preflight?.prediction.kind === 'unknown'" class="kv-revert-prediction">
+        Couldn't predict the outcome: {{ preflight.prediction.reason }}
+      </div>
+
+      <p v-if="isMultiSha" class="kv-dialog-note">
+        This prediction covers only the first of the {{ preflight?.shas.length }} selected
+        commits — the rest may conflict differently.
+      </p>
+    </template>
+
+    <template #actions>
+      <KuiButton variant="primary" :disabled="!canConfirm" @click="confirm">Revert</KuiButton>
+      <KuiButton @click="cancel">Cancel</KuiButton>
+    </template>
+  </KuiDialog>
 </template>
 
-<style>
+<style scoped>
+.kv-dialog-note {
+  color: var(--kv-diff-deleted-fg);
+}
+
+.kv-dialog-file-list {
+  max-height: 160px;
+  overflow-y: auto;
+  margin: var(--kv-space-2) 0;
+  padding-left: var(--kv-space-4);
+  font-family: var(--kv-mono-font-family);
+  font-size: 0.9em;
+}
+
 .kv-revert-mainline-group {
   margin: var(--kv-space-2) 0;
   padding: var(--kv-space-2);
@@ -162,29 +166,5 @@ function confirm(): void {
 .kv-revert-no-commit {
   display: block;
   margin-top: var(--kv-space-2);
-}
-
-/* W20: was `background: var(--kv-focus-border); color: var(--kv-app-bg)` — `focusBorder` is a
- * VS Code outline-ring token, not a filled-button one, and pairing it with the editor background
- * as text colour fell to 3.95:1 against vscode-dark's own default focus-border blue (axe's own
- * `color-contrast` scan of `RevertDialog.vue`'s enabled "Revert" button, the one primary button
- * this file's own dialogs ever render enabled rather than disabled at rest). `--kv-button-bg`/
- * `--kv-button-fg` are the tokens this app already uses for exactly this — a real, dedicated
- * filled-button pair (`NoRepositoryPanel.vue`'s own buttons) — reused here rather than inventing
- * a third. */
-.kv-modal-button--primary {
-  background: var(--kv-button-bg);
-  color: var(--kv-button-fg);
-  border-color: var(--kv-button-bg);
-}
-
-.kv-modal-button--primary:hover:not(:disabled) {
-  background: var(--kv-button-hover-bg);
-  border-color: var(--kv-button-hover-bg);
-}
-
-.kv-modal-button--primary:disabled {
-  opacity: 0.5;
-  cursor: default;
 }
 </style>

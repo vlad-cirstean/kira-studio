@@ -16,12 +16,16 @@
  * `popConfirm` in practice, since `previewStashBranch` never opens `ops.pendingStashPop`, but the
  * order still matters if a caller opened `createOpen`/`branchTarget` while a pop confirmation from
  * an unrelated row happened to already be pending).
+ *
+ * G21 D2: the modal shell is `@kira/kira-ui`'s `KuiDialog` now — this file only supplies its own
+ * body/actions content, per mode. `KuiDialog`'s single `open`/`title` pair is driven by `mode`
+ * itself (one title/close-handler/actions-set per mode, chosen the same way the body already was).
  */
 import { validateRefName } from '@kira/git-core';
 import type { StashBranchPreflight, StashEntry } from '@kira/git-ipc';
+import { KuiButton, KuiDialog } from '@kira/kira-ui';
 import { computed, ref, watch } from 'vue';
 import type { OpsState } from '../../state/ops.ts';
-import { useModalFocus } from './modalFocus.ts';
 
 const props = defineProps<{
   ops: OpsState;
@@ -51,8 +55,6 @@ const mode = computed<Mode>(() => {
 });
 
 const active = computed(() => mode.value !== undefined);
-const rootEl = ref<HTMLDivElement | null>(null);
-const { onKeydown } = useModalFocus(active, rootEl);
 
 // ---------------------------------------------------------------------------------------
 // create mode
@@ -172,140 +174,195 @@ function cancelPop(): void {
 function confirmPop(): void {
   props.ops.resolveStashPopDialog(true);
 }
+
+// ---------------------------------------------------------------------------------------
+// mode-dispatched title / close, for the one shared `KuiDialog`
+// ---------------------------------------------------------------------------------------
+
+const title = computed(() => {
+  if (mode.value === 'create') return 'Stash changes';
+  if (mode.value === 'branch') return 'Create branch from stash';
+  if (mode.value === 'popConfirm' && pending.value) {
+    return `${pending.value.verb === 'pop' ? 'Pop' : 'Apply'} stash@{${pending.value.preflight.stashIndex}}`;
+  }
+  return '';
+});
+
+function onClose(): void {
+  if (mode.value === 'create') cancelCreate();
+  else if (mode.value === 'branch') cancelBranch();
+  else if (mode.value === 'popConfirm') cancelPop();
+}
 </script>
 
 <template>
-  <div v-if="active" class="kv-modal-backdrop">
-    <div
-      ref="rootEl"
-      class="kv-modal"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="kv-stash-dialog-title"
-      @keydown="onKeydown"
-      @keydown.escape="mode === 'create' ? cancelCreate() : mode === 'branch' ? cancelBranch() : cancelPop()"
-    >
-      <template v-if="mode === 'create'">
-        <h2 id="kv-stash-dialog-title" class="kv-modal-title">Stash changes</h2>
-        <label class="kv-tag-field">
-          Message (optional)
-          <input type="text" v-model="message" autofocus placeholder="git's own WIP message" />
-        </label>
-        <label class="kv-tag-field kv-tag-field--inline">
-          <input type="checkbox" v-model="includeUntracked" />
-          Include untracked files (<code>-u</code>)
-        </label>
-        <label class="kv-tag-field kv-tag-field--inline">
-          <input type="checkbox" v-model="keepIndex" />
-          Keep staged changes staged (<code>--keep-index</code>)
-        </label>
-        <p v-if="pathspec.length > 0" class="kv-modal-note">
-          Only {{ pathspec.length }} selected file{{ pathspec.length === 1 ? "" : "s" }} will be
-          stashed, not the whole working tree.
+  <KuiDialog :open="active" :title="title" @close="onClose">
+    <template v-if="mode === 'create'">
+      <label class="kv-dialog-field">
+        Message (optional)
+        <input type="text" v-model="message" autofocus placeholder="git's own WIP message" />
+      </label>
+      <label class="kv-dialog-field kv-dialog-field--inline">
+        <input type="checkbox" v-model="includeUntracked" />
+        Include untracked files (<code>-u</code>)
+      </label>
+      <label class="kv-dialog-field kv-dialog-field--inline">
+        <input type="checkbox" v-model="keepIndex" />
+        Keep staged changes staged (<code>--keep-index</code>)
+      </label>
+      <p v-if="pathspec.length > 0" class="kv-dialog-note">
+        Only {{ pathspec.length }} selected file{{ pathspec.length === 1 ? '' : 's' }} will be
+        stashed, not the whole working tree.
+      </p>
+    </template>
+
+    <template v-else-if="mode === 'branch'">
+      <p class="kv-dialog-note">
+        From <code>{{ 'stash@{' + (branchTarget?.index ?? '') + '}' }}</code>:
+        {{ branchTarget?.message }}
+      </p>
+      <label class="kv-dialog-field">
+        Branch name
+        <input type="text" v-model="branchName" autofocus />
+      </label>
+      <p v-if="branchNameLocalError" class="kv-dialog-error">{{ branchNameLocalError }}</p>
+      <p v-else-if="branchPreflight?.name.error" class="kv-dialog-error">
+        {{ branchPreflight.name.error }}
+      </p>
+      <div v-if="branchPreflight?.verdict === 'blocked'" class="kv-stash-prediction">
+        <p>
+          The branch will be created, but switching to it will not be clean — your working tree
+          has changes that would be overwritten. You will stay on your current branch until you
+          resolve that yourself.
         </p>
-        <div class="kv-modal-actions">
-          <button type="button" class="kv-modal-button kv-modal-button--primary" @click="submitCreate">
-            Stash
-          </button>
-          <button type="button" class="kv-modal-button" @click="cancelCreate">Cancel</button>
+      </div>
+    </template>
+
+    <template v-else-if="mode === 'popConfirm' && pending">
+      <template v-for="blocker in pending.preflight.blockers" :key="blocker.kind">
+        <div
+          v-if="blocker.kind === 'untrackedCollision'"
+          class="kv-stash-prediction kv-stash-prediction--conflict"
+        >
+          <p>These untracked files already exist in your working tree and would be overwritten:</p>
+          <ul class="kv-dialog-file-list">
+            <li v-for="path in blocker.paths" :key="path"><code>{{ path }}</code></li>
+          </ul>
+          <p>Remedy: move or remove them yourself, or discard them and try again.</p>
+        </div>
+        <div
+          v-else-if="blocker.kind === 'localChangesWouldBeOverwritten'"
+          class="kv-stash-prediction kv-stash-prediction--conflict"
+        >
+          <p>Your uncommitted changes to these files would be overwritten:</p>
+          <ul class="kv-dialog-file-list">
+            <li v-for="path in blocker.paths" :key="path"><code>{{ path }}</code></li>
+          </ul>
+          <p>Remedy: commit or discard those changes first.</p>
+        </div>
+        <div v-else class="kv-stash-prediction kv-stash-prediction--conflict">
+          <p>An operation is already in progress — finish or abort it first.</p>
         </div>
       </template>
 
-      <template v-else-if="mode === 'branch'">
-        <h2 id="kv-stash-dialog-title" class="kv-modal-title">Create branch from stash</h2>
-        <p class="kv-modal-note">
-          From <code>{{ "stash@{" + (branchTarget?.index ?? "") + "}" }}</code>: {{ branchTarget?.message }}
-        </p>
-        <label class="kv-tag-field">
-          Branch name
-          <input type="text" v-model="branchName" autofocus />
-        </label>
-        <p v-if="branchNameLocalError" class="kv-modal-error">{{ branchNameLocalError }}</p>
-        <p v-else-if="branchPreflight?.name.error" class="kv-modal-error">
-          {{ branchPreflight.name.error }}
-        </p>
-        <div v-if="branchPreflight?.verdict === 'blocked'" class="kv-revert-prediction">
+      <template v-if="pending.preflight.blockers.length === 0">
+        <div
+          v-if="pending.preflight.prediction.kind === 'clean'"
+          class="kv-stash-prediction kv-stash-prediction--clean"
+        >
+          No conflicts predicted.
+        </div>
+        <div
+          v-else-if="pending.preflight.prediction.kind === 'conflicts'"
+          class="kv-stash-prediction kv-stash-prediction--conflict"
+        >
+          <p>This will likely conflict in:</p>
+          <ul class="kv-dialog-file-list">
+            <li v-for="path in pending.preflight.prediction.paths" :key="path">
+              <code>{{ path }}</code>
+            </li>
+          </ul>
           <p>
-            The branch will be created, but switching to it will not be clean — your working tree
-            has changes that would be overwritten. You will stay on your current branch until you
-            resolve that yourself.
+            Your stash stays in the list either way{{
+              pending.verb === 'pop' ? ' if this conflicts' : ''
+            }}
+            — nothing is lost.
           </p>
         </div>
-        <div class="kv-modal-actions">
-          <button
-            type="button"
-            class="kv-modal-button kv-modal-button--primary"
-            :disabled="!canSubmitBranch"
-            @click="submitBranch"
-          >
-            Create branch
-          </button>
-          <button type="button" class="kv-modal-button" @click="cancelBranch">Cancel</button>
+        <div v-else class="kv-stash-prediction">
+          Couldn't predict the outcome: {{ pending.preflight.prediction.reason }}
         </div>
       </template>
+    </template>
 
+    <template #actions>
+      <template v-if="mode === 'create'">
+        <KuiButton variant="primary" @click="submitCreate">Stash</KuiButton>
+        <KuiButton @click="cancelCreate">Cancel</KuiButton>
+      </template>
+      <template v-else-if="mode === 'branch'">
+        <KuiButton variant="primary" :disabled="!canSubmitBranch" @click="submitBranch">
+          Create branch
+        </KuiButton>
+        <KuiButton @click="cancelBranch">Cancel</KuiButton>
+      </template>
       <template v-else-if="mode === 'popConfirm' && pending">
-        <h2 id="kv-stash-dialog-title" class="kv-modal-title">
-          {{ pending.verb === "pop" ? "Pop" : "Apply" }}
-          {{ "stash@{" + pending.preflight.stashIndex + "}" }}
-        </h2>
-
-        <template v-for="blocker in pending.preflight.blockers" :key="blocker.kind">
-          <div v-if="blocker.kind === 'untrackedCollision'" class="kv-revert-prediction kv-revert-prediction--conflict">
-            <p>These untracked files already exist in your working tree and would be overwritten:</p>
-            <ul class="kv-modal-file-list">
-              <li v-for="path in blocker.paths" :key="path"><code>{{ path }}</code></li>
-            </ul>
-            <p>Remedy: move or remove them first, or discard them and try again.</p>
-          </div>
-          <div
-            v-else-if="blocker.kind === 'localChangesWouldBeOverwritten'"
-            class="kv-revert-prediction kv-revert-prediction--conflict"
-          >
-            <p>Your uncommitted changes to these files would be overwritten:</p>
-            <ul class="kv-modal-file-list">
-              <li v-for="path in blocker.paths" :key="path"><code>{{ path }}</code></li>
-            </ul>
-            <p>Remedy: commit or discard those changes first.</p>
-          </div>
-          <div v-else class="kv-revert-prediction kv-revert-prediction--conflict">
-            <p>An operation is already in progress — finish or abort it first.</p>
-          </div>
-        </template>
-
-        <template v-if="pending.preflight.blockers.length === 0">
-          <div v-if="pending.preflight.prediction.kind === 'clean'" class="kv-revert-prediction kv-revert-prediction--clean">
-            No conflicts predicted.
-          </div>
-          <div v-else-if="pending.preflight.prediction.kind === 'conflicts'" class="kv-revert-prediction kv-revert-prediction--conflict">
-            <p>This will likely conflict in:</p>
-            <ul class="kv-modal-file-list">
-              <li v-for="path in pending.preflight.prediction.paths" :key="path"><code>{{ path }}</code></li>
-            </ul>
-            <p>
-              Your stash stays in the list either way{{ pending.verb === "pop" ? " if this conflicts" : "" }}
-              — nothing is lost.
-            </p>
-          </div>
-          <div v-else class="kv-revert-prediction">
-            Couldn't predict the outcome: {{ pending.preflight.prediction.reason }}
-          </div>
-        </template>
-
-        <div class="kv-modal-actions">
-          <button type="button" class="kv-modal-button kv-modal-button--primary" @click="confirmPop">
-            {{ pending.preflight.verdict === "blocked" ? "Force" : "" }}
-            {{ pending.verb === "pop" ? "Pop" : "Apply" }} anyway
-          </button>
-          <button type="button" class="kv-modal-button" @click="cancelPop">Cancel</button>
-        </div>
+        <KuiButton variant="primary" @click="confirmPop">
+          {{ pending.preflight.verdict === 'blocked' ? 'Force ' : '' }}{{
+            pending.verb === 'pop' ? 'Pop' : 'Apply'
+          }}
+          anyway
+        </KuiButton>
+        <KuiButton @click="cancelPop">Cancel</KuiButton>
       </template>
-    </div>
-  </div>
+    </template>
+  </KuiDialog>
 </template>
 
-<!-- No `<style>` block: every class this template uses (`.kv-modal-*`, `.kv-tag-field*`,
-     `.kv-revert-prediction*`) is already declared, unscoped, by `CheckoutDialog.vue`/
-     `TagDialog.vue`/`RevertDialog.vue` — `App.vue` always mounts all of them alongside this file,
-     so redeclaring any of it here would only be duplicate CSS. -->
+<style scoped>
+.kv-dialog-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kv-space-1);
+  margin: var(--kv-space-2) 0;
+}
 
+.kv-dialog-field--inline {
+  flex-direction: row;
+  align-items: center;
+}
+
+.kv-dialog-field input[type='text'] {
+  padding: var(--kv-space-1) var(--kv-space-2);
+  background: var(--kv-panel-bg);
+  color: var(--kv-row-fg);
+  border: 1px solid var(--kv-panel-border);
+  font-family: inherit;
+}
+
+.kv-dialog-note {
+  color: var(--kv-diff-deleted-fg);
+}
+
+.kv-dialog-error {
+  color: var(--kv-diff-deleted-fg);
+  margin: var(--kv-space-1) 0;
+}
+
+.kv-dialog-file-list {
+  max-height: 160px;
+  overflow-y: auto;
+  margin: var(--kv-space-2) 0;
+  padding-left: var(--kv-space-4);
+  font-family: var(--kv-mono-font-family);
+  font-size: 0.9em;
+}
+
+.kv-stash-prediction {
+  margin: var(--kv-space-3) 0;
+}
+
+.kv-stash-prediction--clean {
+  color: var(--kv-diff-added-fg);
+}
+</style>

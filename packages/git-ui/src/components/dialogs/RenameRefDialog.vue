@@ -8,20 +8,19 @@
  * refuses a rename the way it can refuse a checkout or a force-move), extended to a rename with
  * a prefilled name field rather than an empty one, validated with the same `validateRefName`
  * prefilter `BranchDialog.vue`/`TagDialog.vue` already use.
+ *
+ * G21 D2: the modal shell is `@kira/kira-ui`'s `KuiDialog` now — this file only supplies its own
+ * body/actions content.
  */
 import { validateRefName } from '@kira/git-core';
+import { KuiButton, KuiDialog } from '@kira/kira-ui';
 import { computed, ref, watch } from 'vue';
 import type { OpsState } from '../../state/ops.ts';
-import { useModalFocus } from './modalFocus.ts';
 
 const props = defineProps<{ open: boolean; currentName: string; ops: OpsState }>();
 const emit = defineEmits<(e: 'close') => void>();
 
 const name = ref('');
-
-const active = computed(() => props.open);
-const rootEl = ref<HTMLDivElement | null>(null);
-const { onKeydown } = useModalFocus(active, rootEl);
 
 watch(
   () => props.open,
@@ -52,36 +51,44 @@ async function submit(): Promise<void> {
 </script>
 
 <template>
-  <div v-if="open" class="kv-modal-backdrop">
-    <div
-      ref="rootEl"
-      class="kv-modal"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="kv-rename-ref-dialog-title"
-      @keydown="onKeydown"
-      @keydown.escape="cancel"
-    >
-      <h2 id="kv-rename-ref-dialog-title" class="kv-modal-title">Rename branch</h2>
-      <p class="kv-modal-note">Renaming <code>{{ currentName }}</code></p>
+  <KuiDialog :open="open" title="Rename branch" @close="cancel">
+    <p class="kv-dialog-note">Renaming <code>{{ currentName }}</code></p>
 
-      <label class="kv-tag-field">
-        New name
-        <input type="text" v-model="name" autofocus />
-      </label>
-      <p v-if="nameError" class="kv-modal-error">{{ nameError }}</p>
+    <label class="kv-dialog-field">
+      New name
+      <input type="text" v-model="name" autofocus />
+    </label>
+    <p v-if="nameError" class="kv-dialog-error">{{ nameError }}</p>
 
-      <div class="kv-modal-actions">
-        <button
-          type="button"
-          class="kv-modal-button kv-modal-button--primary"
-          :disabled="!canSubmit"
-          @click="submit"
-        >
-          Rename branch
-        </button>
-        <button type="button" class="kv-modal-button" @click="cancel">Cancel</button>
-      </div>
-    </div>
-  </div>
+    <template #actions>
+      <KuiButton variant="primary" :disabled="!canSubmit" @click="submit">Rename branch</KuiButton>
+      <KuiButton @click="cancel">Cancel</KuiButton>
+    </template>
+  </KuiDialog>
 </template>
+
+<style scoped>
+.kv-dialog-note {
+  color: var(--kv-diff-deleted-fg);
+}
+
+.kv-dialog-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kv-space-1);
+  margin: var(--kv-space-2) 0;
+}
+
+.kv-dialog-field input[type='text'] {
+  padding: var(--kv-space-1) var(--kv-space-2);
+  background: var(--kv-panel-bg);
+  color: var(--kv-row-fg);
+  border: 1px solid var(--kv-panel-border);
+  font-family: inherit;
+}
+
+.kv-dialog-error {
+  color: var(--kv-diff-deleted-fg);
+  margin: var(--kv-space-1) 0;
+}
+</style>

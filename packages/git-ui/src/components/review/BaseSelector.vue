@@ -10,11 +10,10 @@
  * mirroring W14's "not offered for tags" rule on the row menu's own entry.
  */
 import type { BaseCandidate, BaseResolution, BaseResolutionReason } from '@kira/git-ipc';
-import { KuiPopoverPanel } from '@kira/kira-ui';
+import { KuiPopoverPanel, useModalFocus } from '@kira/kira-ui';
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { STATE_ICONS } from '../../icons/index.ts';
 import type { RefsState } from '../../state/refs.ts';
-import { useModalFocus } from '../dialogs/modalFocus.ts';
 import { buildRefListSections } from '../refListModel.ts';
 
 const props = defineProps<{

@@ -14,17 +14,20 @@
  *  - Plain `--force` bypasses the lease entirely and is behind its own, separately-worded
  *    confirmation (a `<details>` disclosure, collapsed by default) — needed on top of, not
  *    instead of, the typed branch name when the branch is also protected.
+ *
+ * G21 D2: the modal shell is `@kira/kira-ui`'s `KuiDialog` now — this file only supplies its own
+ * body/actions content. The plain-`--force` confirm button stays inside the `<details>` body
+ * (in the default slot) rather than moving to `<template #actions>`, since it belongs beside its
+ * own disclosure and acknowledgement checkbox, not beside the lease/Cancel pair.
  */
+import { KuiButton, KuiDialog } from '@kira/kira-ui';
 import { computed, ref, watch } from 'vue';
 import type { OpsState } from '../../state/ops.ts';
-import { useModalFocus } from './modalFocus.ts';
 
 const props = defineProps<{ ops: OpsState }>();
 
 const pending = computed(() => props.ops.pendingForcePush.value);
 const active = computed(() => pending.value !== undefined);
-const rootEl = ref<HTMLDivElement | null>(null);
-const { onKeydown } = useModalFocus(active, rootEl);
 
 const typedBranch = ref('');
 const understandPlain = ref(false);
@@ -63,174 +66,92 @@ function confirmPlain(): void {
 </script>
 
 <template>
-  <div v-if="active && pending" class="kv-modal-backdrop">
-    <div
-      ref="rootEl"
-      class="kv-modal"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="kv-force-push-dialog-title"
-      @keydown="onKeydown"
-      @keydown.escape="cancel"
-    >
-      <h2 id="kv-force-push-dialog-title" class="kv-modal-title">
-        Force push {{ pending.branch }} to {{ pending.remote }}?
-      </h2>
+  <KuiDialog
+    v-if="pending"
+    :open="active"
+    :title="`Force push ${pending.branch} to ${pending.remote}?`"
+    @close="cancel"
+  >
+    <p>
+      This will overwrite <code>{{ pending.remote }}/{{ pending.branch }}</code>, currently at
+      <code>{{ shortSha(pending.preflight.remoteTip) }}</code>.
+      <template v-if="pending.preflight.behind > 0">
+        It is {{ pending.preflight.behind }} commit{{ pending.preflight.behind === 1 ? '' : 's' }}
+        ahead of what you last saw.
+      </template>
+    </p>
 
-      <p>
-        This will overwrite <code>{{ pending.remote }}/{{ pending.branch }}</code>, currently at
-        <code>{{ shortSha(pending.preflight.remoteTip) }}</code>.
-        <template v-if="pending.preflight.behind > 0">
-          It is {{ pending.preflight.behind }} commit{{ pending.preflight.behind === 1 ? "" : "s" }}
-          ahead of what you last saw.
-        </template>
-      </p>
+    <p v-if="protectedBy" class="kv-dialog-error">
+      <code>{{ pending.branch }}</code> matches your protected pattern
+      <code>{{ protectedBy }}</code>. Type the branch name to confirm.
+    </p>
+    <label v-if="protectedBy" class="kv-dialog-field">
+      Branch name
+      <input
+        v-model="typedBranch"
+        type="text"
+        autofocus
+        :placeholder="pending.branch"
+        data-testid="force-push-confirm-branch"
+      />
+    </label>
 
-      <p v-if="protectedBy" class="kv-modal-error">
-        <code>{{ pending.branch }}</code> matches your protected pattern
-        <code>{{ protectedBy }}</code>. Type the branch name to confirm.
+    <details class="kv-force-push-plain">
+      <summary>Use plain <code>--force</code> instead</summary>
+      <p class="kv-dialog-error">
+        This skips the lease check entirely — it will overwrite the remote branch even if someone
+        else has pushed to it since the lease's own tip was read, with no protection against
+        discarding their work.
       </p>
-      <label v-if="protectedBy" class="kv-force-push-field">
-        Branch name
-        <input
-          v-model="typedBranch"
-          type="text"
-          autofocus
-          :placeholder="pending.branch"
-          data-testid="force-push-confirm-branch"
-        />
+      <label class="kv-dialog-field kv-dialog-field--inline">
+        <input v-model="understandPlain" type="checkbox" data-testid="force-push-plain-ack" />
+        I understand — overwrite the remote branch without checking for other pushes
       </label>
-
-      <div class="kv-modal-actions">
-        <button
-          type="button"
-          class="kv-modal-button kv-modal-button--primary"
-          :disabled="!canConfirmLease"
-          data-testid="force-push-confirm-lease"
-          @click="confirmLease"
+      <div class="kv-force-push-plain-actions">
+        <KuiButton
+          variant="danger"
+          :disabled="!canConfirmPlain"
+          data-testid="force-push-confirm-plain"
+          @click="confirmPlain"
         >
-          Force push (with lease)
-        </button>
-        <button type="button" class="kv-modal-button" @click="cancel">Cancel</button>
+          Force push (plain --force)
+        </KuiButton>
       </div>
+    </details>
 
-      <details class="kv-force-push-plain">
-        <summary>Use plain <code>--force</code> instead</summary>
-        <p class="kv-modal-error">
-          This skips the lease check entirely — it will overwrite the remote branch even if
-          someone else has pushed to it since the lease's own tip was read, with no protection
-          against discarding their work.
-        </p>
-        <label class="kv-force-push-field kv-force-push-field--inline">
-          <input v-model="understandPlain" type="checkbox" data-testid="force-push-plain-ack" />
-          I understand — overwrite the remote branch without checking for other pushes
-        </label>
-        <div class="kv-modal-actions">
-          <button
-            type="button"
-            class="kv-modal-button kv-modal-button--danger"
-            :disabled="!canConfirmPlain"
-            data-testid="force-push-confirm-plain"
-            @click="confirmPlain"
-          >
-            Force push (plain --force)
-          </button>
-        </div>
-      </details>
-    </div>
-  </div>
+    <template #actions>
+      <KuiButton
+        variant="primary"
+        :disabled="!canConfirmLease"
+        data-testid="force-push-confirm-lease"
+        @click="confirmLease"
+      >
+        Force push (with lease)
+      </KuiButton>
+      <KuiButton @click="cancel">Cancel</KuiButton>
+    </template>
+  </KuiDialog>
 </template>
 
-<style>
-.kv-modal-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 40;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background-color: var(--kv-overlay-bg);
-}
-
-.kv-modal {
-  width: min(480px, 90vw);
-  max-height: 80vh;
-  overflow-y: auto;
-  padding: var(--kv-space-4);
-  background-color: var(--kv-panel-bg);
-  color: var(--kv-app-fg);
-  border: 1px solid var(--kv-panel-border);
-  border-radius: var(--kv-radius);
-  box-shadow: 0 4px 16px var(--kv-widget-shadow);
-}
-
-.kv-modal-title {
-  margin: 0 0 var(--kv-space-3);
-  font-size: 1.05em;
-}
-
-.kv-modal-error {
+<style scoped>
+.kv-dialog-error {
   color: var(--kv-diff-deleted-fg);
   margin: var(--kv-space-1) 0;
 }
 
-.kv-modal-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--kv-space-2);
-  margin-top: var(--kv-space-3);
-}
-
-.kv-modal-button {
-  padding: var(--kv-space-1) var(--kv-space-3);
-  background: transparent;
-  color: var(--kv-app-fg);
-  border: 1px solid var(--kv-panel-border);
-  border-radius: var(--kv-radius);
-  cursor: pointer;
-}
-
-.kv-modal-button:hover:not(:disabled) {
-  background-color: var(--kv-row-hover-bg);
-}
-
-.kv-modal-button:disabled {
-  opacity: 0.6;
-  cursor: default;
-}
-
-/* `--kv-button-bg`/`--kv-button-fg` are the tokens this app already uses for a real, dedicated
-   filled-button pair (`RevertDialog.vue`'s own "Revert" button) — reused here rather than
-   inventing a third. */
-.kv-modal-button--primary {
-  background: var(--kv-button-bg);
-  color: var(--kv-button-fg);
-  border-color: var(--kv-button-bg);
-}
-
-.kv-modal-button--primary:hover:not(:disabled) {
-  background: var(--kv-button-hover-bg);
-  border-color: var(--kv-button-hover-bg);
-}
-
-.kv-modal-button--danger {
-  border-color: var(--kv-diff-deleted-fg);
-  color: var(--kv-diff-deleted-fg);
-}
-
-.kv-force-push-field {
+.kv-dialog-field {
   display: flex;
   flex-direction: column;
   gap: var(--kv-space-1);
   margin: var(--kv-space-2) 0;
 }
 
-.kv-force-push-field--inline {
+.kv-dialog-field--inline {
   flex-direction: row;
   align-items: center;
 }
 
-.kv-force-push-field input[type="text"] {
+.kv-dialog-field input[type='text'] {
   padding: var(--kv-space-1) var(--kv-space-2);
   background: var(--kv-panel-bg);
   color: var(--kv-row-fg);
@@ -247,5 +168,11 @@ function confirmPlain(): void {
 .kv-force-push-plain summary {
   cursor: pointer;
   color: var(--kv-description-fg);
+}
+
+.kv-force-push-plain-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: var(--kv-space-2);
 }
 </style>

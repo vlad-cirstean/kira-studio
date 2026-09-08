@@ -15,12 +15,17 @@
  * whole per-repo settings surface fits in one dialog the same way stash's create/branch/popConfirm
  * three modes do, so this is a second file in that shape, not a fourth mode grafted onto
  * `StashDialog.vue` itself (a settings dialog and a stash workflow share no state).
+ *
+ * G21 D2: the modal shell is `@kira/kira-ui`'s `KuiDialog` now — this file only supplies its own
+ * body/actions content. The three native `<select>`s here stay native for this pass and are
+ * converted to `<KuiSelect>` together with `SearchBox.vue`'s own two selects, later in this same
+ * phase's native-`<select>` migration step.
  */
 import { SETTINGS } from '@kira/git-core';
 import type { RepoSettingsPatch, RepoSettingsSnapshot } from '@kira/git-ipc';
-import { computed, reactive, ref, watch } from 'vue';
+import { KuiButton, KuiDialog } from '@kira/kira-ui';
+import { computed, reactive, watch } from 'vue';
 import type { RepoSettingsState } from '../../state/repoSettings.ts';
-import { useModalFocus } from './modalFocus.ts';
 
 const props = defineProps<{
   open: boolean;
@@ -28,10 +33,6 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<(e: 'close') => void>();
-
-const rootEl = ref<HTMLDivElement | null>(null);
-const active = computed(() => props.open);
-const { onKeydown } = useModalFocus(active, rootEl);
 
 /** `RepoSettingsSnapshot`'s own leaves are `readonly` (a wire type is never a mutation target) —
  *  this dialog's draft needs a genuinely mutable copy of the same shape for `v-model` to write
@@ -107,100 +108,86 @@ async function save(): Promise<void> {
 </script>
 
 <template>
-  <div v-if="active" class="kv-modal-backdrop">
-    <div
-      ref="rootEl"
-      class="kv-modal"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="kv-repo-settings-dialog-title"
-      @keydown="onKeydown"
-      @keydown.escape="close"
-    >
-      <h2 id="kv-repo-settings-dialog-title" class="kv-modal-title">Repository settings</h2>
+  <KuiDialog :open="open" title="Repository settings" @close="close">
+    <section class="kv-repo-settings-section">
+      <h3 class="kv-repo-settings-heading">Graph</h3>
+      <label class="kv-dialog-field">
+        Load more page size
+        <input
+          type="number"
+          v-model.number="draft['kiraVersion.graph.pageSize']"
+          :min="SETTINGS['kiraVersion.graph.pageSize'].minimum"
+          :max="SETTINGS['kiraVersion.graph.pageSize'].maximum"
+          autofocus
+        />
+      </label>
+      <label class="kv-dialog-field">
+        Scope
+        <select v-model="draft['kiraVersion.graph.scope']">
+          <option value="all">All refs</option>
+          <option value="head">Current HEAD's ancestry only</option>
+        </select>
+      </label>
+    </section>
 
-      <section class="kv-repo-settings-section">
-        <h3 class="kv-repo-settings-heading">Graph</h3>
-        <label class="kv-tag-field">
-          Load more page size
-          <input
-            type="number"
-            v-model.number="draft['kiraVersion.graph.pageSize']"
-            :min="SETTINGS['kiraVersion.graph.pageSize'].minimum"
-            :max="SETTINGS['kiraVersion.graph.pageSize'].maximum"
-            autofocus
-          />
-        </label>
-        <label class="kv-tag-field">
-          Scope
-          <select v-model="draft['kiraVersion.graph.scope']">
-            <option value="all">All refs</option>
-            <option value="head">Current HEAD's ancestry only</option>
-          </select>
-        </label>
-      </section>
+    <section class="kv-repo-settings-section">
+      <h3 class="kv-repo-settings-heading">Stash</h3>
+      <label class="kv-dialog-field kv-dialog-field--inline">
+        <input type="checkbox" v-model="draft['kiraVersion.stash.showInGraph']" />
+        Show stash entries as nodes in the commit graph
+      </label>
+      <label class="kv-dialog-field kv-dialog-field--inline">
+        <input type="checkbox" v-model="draft['kiraVersion.stash.includeUntracked']" />
+        "Include untracked files" starts checked in the Stash dialog
+      </label>
+    </section>
 
-      <section class="kv-repo-settings-section">
-        <h3 class="kv-repo-settings-heading">Stash</h3>
-        <label class="kv-tag-field kv-tag-field--inline">
-          <input type="checkbox" v-model="draft['kiraVersion.stash.showInGraph']" />
-          Show stash entries as nodes in the commit graph
-        </label>
-        <label class="kv-tag-field kv-tag-field--inline">
-          <input type="checkbox" v-model="draft['kiraVersion.stash.includeUntracked']" />
-          "Include untracked files" starts checked in the Stash dialog
-        </label>
-      </section>
+    <section class="kv-repo-settings-section">
+      <h3 class="kv-repo-settings-heading">Branch review</h3>
+      <label class="kv-dialog-field">
+        Candidate base branches (one per line, tried in order)
+        <textarea v-model="baseCandidatesText" rows="3"></textarea>
+      </label>
+    </section>
 
-      <section class="kv-repo-settings-section">
-        <h3 class="kv-repo-settings-heading">Branch review</h3>
-        <label class="kv-tag-field">
-          Candidate base branches (one per line, tried in order)
-          <textarea v-model="baseCandidatesText" rows="3"></textarea>
-        </label>
-      </section>
+    <section class="kv-repo-settings-section">
+      <h3 class="kv-repo-settings-heading">Pull</h3>
+      <label class="kv-dialog-field">
+        Strategy
+        <select v-model="draft['kiraVersion.pull.strategy']">
+          <option value="auto">Auto (follow git configuration)</option>
+          <option value="ff-only">Fast-forward only</option>
+          <option value="merge">Merge</option>
+          <option value="rebase">Rebase</option>
+        </select>
+      </label>
+    </section>
 
-      <section class="kv-repo-settings-section">
-        <h3 class="kv-repo-settings-heading">Pull</h3>
-        <label class="kv-tag-field">
-          Strategy
-          <select v-model="draft['kiraVersion.pull.strategy']">
-            <option value="auto">Auto (follow git configuration)</option>
-            <option value="ff-only">Fast-forward only</option>
-            <option value="merge">Merge</option>
-            <option value="rebase">Rebase</option>
-          </select>
-        </label>
-      </section>
+    <section class="kv-repo-settings-section">
+      <h3 class="kv-repo-settings-heading">Diagnostics</h3>
+      <label class="kv-dialog-field">
+        Log level
+        <select v-model="draft['kiraVersion.log.level']">
+          <option value="off">Off</option>
+          <option value="error">Error</option>
+          <option value="warn">Warn</option>
+          <option value="info">Info</option>
+          <option value="debug">Debug</option>
+        </select>
+      </label>
+      <p v-if="logLevelInstanceWide" class="kv-dialog-note" data-testid="log-level-instance-wide-note">
+        This applies to Kira Version's own diagnostic log for every repository, not just this one.
+      </p>
+    </section>
 
-      <section class="kv-repo-settings-section">
-        <h3 class="kv-repo-settings-heading">Diagnostics</h3>
-        <label class="kv-tag-field">
-          Log level
-          <select v-model="draft['kiraVersion.log.level']">
-            <option value="off">Off</option>
-            <option value="error">Error</option>
-            <option value="warn">Warn</option>
-            <option value="info">Info</option>
-            <option value="debug">Debug</option>
-          </select>
-        </label>
-        <p v-if="logLevelInstanceWide" class="kv-modal-note" data-testid="log-level-instance-wide-note">
-          This applies to Kira Version's own diagnostic log for every repository, not just this one.
-        </p>
-      </section>
-
-      <div class="kv-modal-actions">
-        <button type="button" class="kv-modal-button kv-modal-button--primary" @click="save">
-          Save
-        </button>
-        <button type="button" class="kv-modal-button" @click="close">Cancel</button>
-      </div>
-    </div>
-  </div>
+    <template #actions>
+      <KuiButton variant="primary" @click="save">Save</KuiButton>
+      <KuiButton @click="close">Cancel</KuiButton>
+    </template>
+  </KuiDialog>
 </template>
 
-<style>
+<style scoped>
 .kv-repo-settings-section {
   margin: var(--kv-space-3) 0;
 }
@@ -216,10 +203,19 @@ async function save(): Promise<void> {
   color: var(--kv-row-fg);
 }
 
-/* `.kv-tag-field textarea`/`input[type="text"]` are already styled, unscoped, by
-   `TagDialog.vue` (App.vue always mounts it alongside this file) — only `select` and
-   `input[type="number"]` are genuinely new here. */
-.kv-tag-field select {
+.kv-dialog-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kv-space-1);
+  margin: var(--kv-space-2) 0;
+}
+
+.kv-dialog-field--inline {
+  flex-direction: row;
+  align-items: center;
+}
+
+.kv-dialog-field textarea {
   padding: var(--kv-space-1) var(--kv-space-2);
   background: var(--kv-panel-bg);
   color: var(--kv-row-fg);
@@ -227,12 +223,24 @@ async function save(): Promise<void> {
   font-family: inherit;
 }
 
-.kv-tag-field input[type="number"] {
+.kv-dialog-field input[type='number'] {
   padding: var(--kv-space-1) var(--kv-space-2);
   background: var(--kv-panel-bg);
   color: var(--kv-row-fg);
   border: 1px solid var(--kv-panel-border);
   font-family: inherit;
   width: 8em;
+}
+
+.kv-dialog-field select {
+  padding: var(--kv-space-1) var(--kv-space-2);
+  background: var(--kv-panel-bg);
+  color: var(--kv-row-fg);
+  border: 1px solid var(--kv-panel-border);
+  font-family: inherit;
+}
+
+.kv-dialog-note {
+  color: var(--kv-diff-deleted-fg);
 }
 </style>

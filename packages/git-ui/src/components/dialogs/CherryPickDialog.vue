@@ -5,17 +5,18 @@
  * single pick (that method's own doc comment). One addition revert has no need of: the non-
  * blocking `alreadyApplied` advisory (probe 6) — it never sets a blocker or changes `verdict`, so
  * it is rendered as its own note rather than folded into the blocker list below.
+ *
+ * G21 D2: the modal shell is `@kira/kira-ui`'s `KuiDialog` now — this file only supplies its own
+ * body/actions content.
  */
+import { KuiButton, KuiDialog } from '@kira/kira-ui';
 import { computed, ref, watch } from 'vue';
 import type { OpsState } from '../../state/ops.ts';
-import { useModalFocus } from './modalFocus.ts';
 
 const props = defineProps<{ ops: OpsState }>();
 
 const preflight = computed(() => props.ops.pendingCherryPick.value);
 const active = computed(() => preflight.value !== undefined);
-const rootEl = ref<HTMLDivElement | null>(null);
-const { onKeydown } = useModalFocus(active, rootEl);
 
 const selectedMainline = ref<number | undefined>(undefined);
 const noCommit = ref(false);
@@ -69,148 +70,107 @@ function confirm(): void {
 </script>
 
 <template>
-  <div v-if="active" class="kv-modal-backdrop">
-    <div
-      ref="rootEl"
-      class="kv-modal"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="kv-cherry-pick-dialog-title"
-      @keydown="onKeydown"
-      @keydown.escape="cancel"
-    >
-      <h2 id="kv-cherry-pick-dialog-title" class="kv-modal-title">Cherry-pick</h2>
-      <p>
-        Applies this commit's changes here as a new commit — the original stays where it is.
-      </p>
+  <KuiDialog :open="active" title="Cherry-pick" @close="cancel">
+    <p>Applies this commit's changes here as a new commit — the original stays where it is.</p>
 
-      <p v-if="preflight?.detachedHead" class="kv-modal-note">
-        HEAD is detached: the new commit will not belong to any branch until you create one.
-      </p>
+    <p v-if="preflight?.detachedHead" class="kv-dialog-note">
+      HEAD is detached: the new commit will not belong to any branch until you create one.
+    </p>
 
-      <p v-if="preflight?.alreadyApplied" class="kv-modal-note">
-        This change already appears in this branch's history; the pick will probably be empty.
-      </p>
+    <p v-if="preflight?.alreadyApplied" class="kv-dialog-note">
+      This change already appears in this branch's history; the pick will probably be empty.
+    </p>
 
-      <template v-if="hasBlocker">
-        <div v-for="(blocker, i) in blockers" :key="i" class="kv-cherry-pick-blocker">
-          <template v-if="blocker.kind === 'inProgressOperation'">
-            <p>An operation is already in progress. Resolve or abort it first.</p>
-          </template>
-          <template v-else-if="blocker.kind === 'stagedChanges'">
-            <p>Staged changes would be overwritten by this pick — commit or unstage them first:</p>
-            <ul class="kv-modal-file-list">
-              <li v-for="path in blocker.paths" :key="path"><code>{{ path }}</code></li>
-            </ul>
-          </template>
-          <template v-else-if="blocker.kind === 'localChangesWouldBeOverwritten'">
-            <p>These local changes would be overwritten by this pick:</p>
-            <ul class="kv-modal-file-list">
-              <li v-for="path in blocker.paths" :key="path"><code>{{ path }}</code></li>
-            </ul>
-          </template>
-          <template v-else-if="blocker.kind === 'untrackedWouldBeOverwritten'">
-            <p>These untracked files would be overwritten by this pick:</p>
-            <ul class="kv-modal-file-list">
-              <li v-for="path in blocker.paths" :key="path"><code>{{ path }}</code></li>
-            </ul>
-          </template>
-        </div>
-      </template>
-
-      <template v-if="!hasBlocker && needsMainline">
-        <p>
-          This picks a merge commit — pick which parent's history to treat as the "mainline"
-          (probe 8: git cannot guess this for you):
-        </p>
-        <div
-          v-for="entry in preflight?.mainlineRequired"
-          :key="entry.parentNumber"
-          class="kv-cherry-pick-parent"
-        >
-          <label>
-            <input
-              type="radio"
-              name="kv-cherry-pick-mainline"
-              :value="entry.parentNumber"
-              v-model="selectedMainline"
-            />
-            Parent {{ entry.parentNumber }} — <code>{{ entry.sha.slice(0, 7) }}</code>
-            {{ entry.subject }}
-          </label>
-        </div>
-      </template>
-
-      <template v-if="!hasBlocker && (!needsMainline || selectedMainline !== undefined)">
-        <div
-          v-if="preflight?.prediction.kind === 'clean'"
-          class="kv-cherry-pick-prediction kv-cherry-pick-prediction--clean"
-        >
-          No conflicts predicted.
-        </div>
-        <div
-          v-else-if="preflight?.prediction.kind === 'conflicts'"
-          class="kv-cherry-pick-prediction kv-cherry-pick-prediction--conflict"
-        >
-          <p>This will likely conflict in:</p>
-          <ul class="kv-modal-file-list">
-            <li v-for="path in preflight.prediction.paths" :key="path"><code>{{ path }}</code></li>
+    <template v-if="hasBlocker">
+      <div v-for="(blocker, i) in blockers" :key="i" class="kv-cherry-pick-blocker">
+        <template v-if="blocker.kind === 'inProgressOperation'">
+          <p>An operation is already in progress. Resolve or abort it first.</p>
+        </template>
+        <template v-else-if="blocker.kind === 'stagedChanges'">
+          <p>Staged changes would be overwritten by this pick — commit or unstage them first:</p>
+          <ul class="kv-dialog-file-list">
+            <li v-for="path in blocker.paths" :key="path"><code>{{ path }}</code></li>
           </ul>
-          <label class="kv-cherry-pick-no-commit">
-            <input type="checkbox" v-model="noCommit" />
-            Stop before committing (<code>--no-commit</code>), so I can resolve first
-          </label>
-        </div>
-        <div v-else-if="preflight?.prediction.kind === 'unknown'" class="kv-cherry-pick-prediction">
-          Couldn't predict the outcome: {{ preflight.prediction.reason }}
-        </div>
-      </template>
-
-      <div class="kv-modal-actions">
-        <button
-          type="button"
-          class="kv-modal-button kv-modal-button--primary"
-          :disabled="!canConfirm"
-          data-testid="cherry-pick-confirm"
-          @click="confirm"
-        >
-          Cherry-pick
-        </button>
-        <button type="button" class="kv-modal-button" @click="cancel">Cancel</button>
+        </template>
+        <template v-else-if="blocker.kind === 'localChangesWouldBeOverwritten'">
+          <p>These local changes would be overwritten by this pick:</p>
+          <ul class="kv-dialog-file-list">
+            <li v-for="path in blocker.paths" :key="path"><code>{{ path }}</code></li>
+          </ul>
+        </template>
+        <template v-else-if="blocker.kind === 'untrackedWouldBeOverwritten'">
+          <p>These untracked files would be overwritten by this pick:</p>
+          <ul class="kv-dialog-file-list">
+            <li v-for="path in blocker.paths" :key="path"><code>{{ path }}</code></li>
+          </ul>
+        </template>
       </div>
-    </div>
-  </div>
+    </template>
+
+    <template v-if="!hasBlocker && needsMainline">
+      <p>
+        This picks a merge commit — pick which parent's history to treat as the "mainline"
+        (probe 8: git cannot guess this for you):
+      </p>
+      <div
+        v-for="entry in preflight?.mainlineRequired"
+        :key="entry.parentNumber"
+        class="kv-cherry-pick-parent"
+      >
+        <label>
+          <input
+            type="radio"
+            name="kv-cherry-pick-mainline"
+            :value="entry.parentNumber"
+            v-model="selectedMainline"
+          />
+          Parent {{ entry.parentNumber }} — <code>{{ entry.sha.slice(0, 7) }}</code>
+          {{ entry.subject }}
+        </label>
+      </div>
+    </template>
+
+    <template v-if="!hasBlocker && (!needsMainline || selectedMainline !== undefined)">
+      <div
+        v-if="preflight?.prediction.kind === 'clean'"
+        class="kv-cherry-pick-prediction kv-cherry-pick-prediction--clean"
+      >
+        No conflicts predicted.
+      </div>
+      <div
+        v-else-if="preflight?.prediction.kind === 'conflicts'"
+        class="kv-cherry-pick-prediction kv-cherry-pick-prediction--conflict"
+      >
+        <p>This will likely conflict in:</p>
+        <ul class="kv-dialog-file-list">
+          <li v-for="path in preflight.prediction.paths" :key="path"><code>{{ path }}</code></li>
+        </ul>
+        <label class="kv-cherry-pick-no-commit">
+          <input type="checkbox" v-model="noCommit" />
+          Stop before committing (<code>--no-commit</code>), so I can resolve first
+        </label>
+      </div>
+      <div v-else-if="preflight?.prediction.kind === 'unknown'" class="kv-cherry-pick-prediction">
+        Couldn't predict the outcome: {{ preflight.prediction.reason }}
+      </div>
+    </template>
+
+    <template #actions>
+      <KuiButton
+        variant="primary"
+        :disabled="!canConfirm"
+        data-testid="cherry-pick-confirm"
+        @click="confirm"
+      >
+        Cherry-pick
+      </KuiButton>
+      <KuiButton @click="cancel">Cancel</KuiButton>
+    </template>
+  </KuiDialog>
 </template>
 
-<style>
-.kv-modal-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 40;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background-color: var(--kv-overlay-bg);
-}
-
-.kv-modal {
-  width: min(480px, 90vw);
-  max-height: 80vh;
-  overflow-y: auto;
-  padding: var(--kv-space-4);
-  background-color: var(--kv-panel-bg);
-  color: var(--kv-app-fg);
-  border: 1px solid var(--kv-panel-border);
-  border-radius: var(--kv-radius);
-  box-shadow: 0 4px 16px var(--kv-widget-shadow);
-}
-
-.kv-modal-title {
-  margin: 0 0 var(--kv-space-3);
-  font-size: 1.05em;
-}
-
-.kv-modal-file-list {
+<style scoped>
+.kv-dialog-file-list {
   max-height: 160px;
   overflow-y: auto;
   margin: var(--kv-space-2) 0;
@@ -219,44 +179,8 @@ function confirm(): void {
   font-size: 0.9em;
 }
 
-.kv-modal-note {
+.kv-dialog-note {
   color: var(--kv-diff-deleted-fg);
-}
-
-.kv-modal-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--kv-space-2);
-  margin-top: var(--kv-space-3);
-}
-
-.kv-modal-button {
-  padding: var(--kv-space-1) var(--kv-space-3);
-  background: transparent;
-  color: var(--kv-app-fg);
-  border: 1px solid var(--kv-panel-border);
-  border-radius: var(--kv-radius);
-  cursor: pointer;
-}
-
-.kv-modal-button:hover:not(:disabled) {
-  background-color: var(--kv-row-hover-bg);
-}
-
-.kv-modal-button:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
-
-.kv-modal-button--primary {
-  background: var(--kv-button-bg);
-  color: var(--kv-button-fg);
-  border-color: var(--kv-button-bg);
-}
-
-.kv-modal-button--primary:hover:not(:disabled) {
-  background: var(--kv-button-hover-bg);
-  border-color: var(--kv-button-hover-bg);
 }
 
 .kv-cherry-pick-blocker {

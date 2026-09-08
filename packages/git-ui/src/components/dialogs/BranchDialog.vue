@@ -7,21 +7,20 @@
  * name/start-point/checkout-toggle modal `TagDialog.vue` uses for a tag, reusing `core`'s own
  * `validateRefName` prefilter (branch and tag names share the same `check-ref-format --branch`
  * rule, §7.5/§7.9 both cite it).
+ *
+ * G21 D2: the modal shell (backdrop, focus trap, Escape-to-close) is `@kira/kira-ui`'s
+ * `KuiDialog` now — this file only supplies its own body/actions content.
  */
 import { validateRefName } from '@kira/git-core';
+import { KuiButton, KuiDialog } from '@kira/kira-ui';
 import { computed, ref, watch } from 'vue';
 import type { OpsState } from '../../state/ops.ts';
-import { useModalFocus } from './modalFocus.ts';
 
 const props = defineProps<{ open: boolean; startPoint: string; ops: OpsState }>();
 const emit = defineEmits<(e: 'close') => void>();
 
 const name = ref('');
 const checkout = ref(true);
-
-const active = computed(() => props.open);
-const rootEl = ref<HTMLDivElement | null>(null);
-const { onKeydown } = useModalFocus(active, rootEl);
 
 watch(
   () => props.open,
@@ -56,36 +55,55 @@ async function submit(): Promise<void> {
 </script>
 
 <template>
-  <div v-if="open" class="kv-modal-backdrop">
-    <div
-      ref="rootEl"
-      class="kv-modal"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="kv-branch-dialog-title"
-      @keydown="onKeydown"
-      @keydown.escape="cancel"
-    >
-      <h2 id="kv-branch-dialog-title" class="kv-modal-title">Create branch</h2>
-      <p class="kv-modal-note">Starting from <code>{{ startPoint.slice(0, 7) }}</code></p>
+  <KuiDialog :open="open" title="Create branch" @close="cancel">
+    <p class="kv-dialog-note">Starting from <code>{{ startPoint.slice(0, 7) }}</code></p>
 
-      <label class="kv-tag-field">
-        Name
-        <input type="text" v-model="name" autofocus />
-      </label>
-      <p v-if="nameError" class="kv-modal-error">{{ nameError }}</p>
+    <label class="kv-dialog-field">
+      Name
+      <input type="text" v-model="name" autofocus />
+    </label>
+    <p v-if="nameError" class="kv-dialog-error">{{ nameError }}</p>
 
-      <label class="kv-tag-field kv-tag-field--inline">
-        <input type="checkbox" v-model="checkout" />
-        Switch to it
-      </label>
+    <label class="kv-dialog-field kv-dialog-field--inline">
+      <input type="checkbox" v-model="checkout" />
+      Switch to it
+    </label>
 
-      <div class="kv-modal-actions">
-        <button type="button" class="kv-modal-button kv-modal-button--primary" :disabled="!canSubmit" @click="submit">
-          Create branch
-        </button>
-        <button type="button" class="kv-modal-button" @click="cancel">Cancel</button>
-      </div>
-    </div>
-  </div>
+    <template #actions>
+      <KuiButton variant="primary" :disabled="!canSubmit" @click="submit">Create branch</KuiButton>
+      <KuiButton @click="cancel">Cancel</KuiButton>
+    </template>
+  </KuiDialog>
 </template>
+
+<style scoped>
+.kv-dialog-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kv-space-1);
+  margin: var(--kv-space-2) 0;
+}
+
+.kv-dialog-field--inline {
+  flex-direction: row;
+  align-items: center;
+}
+
+.kv-dialog-field input[type='text'],
+.kv-dialog-field textarea {
+  padding: var(--kv-space-1) var(--kv-space-2);
+  background: var(--kv-panel-bg);
+  color: var(--kv-row-fg);
+  border: 1px solid var(--kv-panel-border);
+  font-family: inherit;
+}
+
+.kv-dialog-note {
+  color: var(--kv-diff-deleted-fg);
+}
+
+.kv-dialog-error {
+  color: var(--kv-diff-deleted-fg);
+  margin: var(--kv-space-1) 0;
+}
+</style>
