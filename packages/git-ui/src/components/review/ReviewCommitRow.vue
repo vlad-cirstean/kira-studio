@@ -104,12 +104,6 @@ function onMenuSelect(id: string): void {
   else if (id === 'copyMessage') actions.copy(c.subject, 'commit message');
 }
 
-function copySha(event: MouseEvent): void {
-  event.stopPropagation();
-  const c = commit.value;
-  if (c) props.expansion?.actions.copy(c.sha, 'full SHA');
-}
-
 // G14 D8 row action 1: "Open all changes" — every changed file's own native diff, the same
 // request `FileTree`'s per-file click already makes (`expansion.actions.openInEditor`), looped
 // rather than reimplemented. Needs the commit already expanded (its file list fetched); an
@@ -167,11 +161,18 @@ function onSelectFile(index: number): void {
     :aria-expanded="expanded"
     :tabindex="focused ? 0 : -1"
     :data-testid="`review-row-${sha}`"
-    @click="onRowClick"
     @keydown="onKeydown"
     @contextmenu="onContextMenu"
   >
-    <div class="kv-review-row-header" :class="{ 'kv-review-row-header-focused': focused }">
+    <!-- G19 D10: the click-to-toggle listener moved here, off the whole row (F10's root cause —
+         a click on any file row inside .kv-review-row-body used to bubble straight up and
+         collapse the very commit it was clicked inside, since nothing along the way ever called
+         stopPropagation()). Only the header itself toggles the row now. -->
+    <div
+      class="kv-review-row-header"
+      :class="{ 'kv-review-row-header-focused': focused }"
+      @click="onRowClick"
+    >
       <span
         class="codicon kv-review-row-chevron"
         :class="expanded ? 'codicon-chevron-down' : 'codicon-chevron-right'"
@@ -186,16 +187,10 @@ function onSelectFile(index: number): void {
           <span class="kv-review-row-meta-sep" aria-hidden="true">·</span>
           <span class="kv-review-row-date">{{ dateText }}</span>
           <span class="kv-review-row-meta-sep" aria-hidden="true">·</span>
-          <button
-            v-if="expansion?.actions.capabilities.clipboard"
-            type="button"
-            class="kv-review-row-sha"
-            :title="`Copy full SHA (${sha})`"
-            @click="copySha"
-          >
-            {{ shortSha }}
-          </button>
-          <span v-else class="kv-review-row-sha">{{ shortSha }}</span>
+          <!-- G19 D7: the clickable-sha button and its own "Copy SHA" affordance are gone — the
+               sha renders as plain text; the existing copySha context-menu item (buildReviewRowMenu)
+               already covers this, and F7 found these two affordances genuinely redundant with it. -->
+          <span class="kv-review-row-sha">{{ shortSha }}</span>
         </span>
       </span>
       <!-- G14 D8 row 2: inline icon actions, right-aligned — revealed on hover/focus-within
@@ -210,16 +205,6 @@ function onSelectFile(index: number): void {
           @click="openAllChanges"
         >
           <span class="codicon codicon-diff-multiple" aria-hidden="true"></span>
-        </button>
-        <button
-          v-if="expansion?.actions.capabilities.clipboard"
-          type="button"
-          class="kv-review-row-action"
-          title="Copy SHA"
-          aria-label="Copy SHA"
-          @click="copySha"
-        >
-          <span class="codicon codicon-copy" aria-hidden="true"></span>
         </button>
         <a
           class="kv-review-row-action"

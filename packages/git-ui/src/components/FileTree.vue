@@ -7,6 +7,7 @@
  */
 import type { CommitStore } from '@kira/git-core';
 import type { FileChange, ReviewFileStatus } from '@kira/git-ipc';
+import { KuiContextMenu } from '@kira/kira-ui';
 import { computed, nextTick, ref, watch } from 'vue';
 import { ACTION_ICONS } from '../icons/index.ts';
 import type { FileListMode } from '../state/detail.ts';
@@ -25,6 +26,7 @@ import {
   STATUS_COLOR_CLASS,
   STATUS_LETTERS,
 } from './fileTreeModel.ts';
+import { buildFileRowMenu } from './rowMenuModel.ts';
 
 const props = defineProps<{
   files: readonly FileChange[];
@@ -312,6 +314,25 @@ function copyPath(path: string): void {
   props.actions.copy(path, 'file path');
 }
 
+// G19 D7: a right-click "Copy path" menu, gated to reviewStyled instances only — DetailPane.vue/
+// StashDetailPane.vue (which leave reviewStyled unset) render byte-identically, never gaining
+// this handler or the menu markup below.
+const fileMenuState = ref<{ x: number; y: number; path: string } | undefined>(undefined);
+
+function onRowContextMenu(event: MouseEvent, row: FileTreeRow): void {
+  if (!props.reviewStyled || row.kind !== 'file') return;
+  event.preventDefault();
+  fileMenuState.value = { x: event.clientX, y: event.clientY, path: row.node.change.path };
+}
+
+const fileMenuSections = computed(() => buildFileRowMenu(props.actions.capabilities.clipboard));
+
+function onFileMenuSelect(id: string): void {
+  const path = fileMenuState.value?.path;
+  fileMenuState.value = undefined;
+  if (id === 'copyPath' && path !== undefined) copyPath(path);
+}
+
 /** G14 D8: the directory portion of a flat-mode row's path, for the review sidebar's dimmed-
  *  directory-after-filename anatomy — `''` for a root-level file (nothing to show). Tree mode
  *  never calls this: the nesting itself already says which directory a row is in. */
@@ -405,6 +426,7 @@ function reviewToggleTitle(path: string): string {
         :tabindex="index === focusedRow ? 0 : -1"
         :style="{ paddingLeft: `calc(var(--kv-tree-indent) * ${row.depth})` }"
         @click="onRowClick(index)"
+        @contextmenu="onRowContextMenu($event, row)"
       >
         <template v-if="row.kind === 'directory'">
           <span
@@ -473,8 +495,11 @@ function reviewToggleTitle(path: string): string {
           >
             <span class="codicon" :class="reviewToggleIcon(row.node.change.path)" aria-hidden="true"></span>
           </button>
+          <!-- G19 D7: hidden for reviewStyled instances — the new right-click "Copy path" menu
+               (below) replaces it there; DetailPane.vue/StashDetailPane.vue (reviewStyled unset)
+               keep this button exactly as before. -->
           <button
-            v-if="actions.capabilities.clipboard"
+            v-if="actions.capabilities.clipboard && !reviewStyled"
             type="button"
             class="kv-copy-button kv-file-tree-copy"
             title="Copy file path"
@@ -493,6 +518,16 @@ function reviewToggleTitle(path: string): string {
       >
         Show all {{ rows.length }} files
       </button>
+
+      <KuiContextMenu
+        v-if="fileMenuState"
+        :sections="fileMenuSections"
+        :x="fileMenuState.x"
+        :y="fileMenuState.y"
+        label="File actions"
+        @select="onFileMenuSelect"
+        @close="fileMenuState = undefined"
+      />
     </div>
   </div>
 </template>

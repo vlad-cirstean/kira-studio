@@ -149,6 +149,40 @@ export class ReviewSessionState {
     await this.#resolve(repoId, branch, undefined);
   }
 
+  /** G19 D5 (item 5): the header's swap button — re-targets the session through the two RPCs it
+   *  already has, the same two-round-trip sequence a manual re-pick-then-override would already
+   *  produce. Only meaningful once a `ready` comparison exists (a `null` base has nothing to
+   *  swap in); a no-op otherwise. */
+  async swapBaseAndBranch(): Promise<void> {
+    const repoId = this.repoId.value;
+    const branch = this.branch.value;
+    const resolution = this.resolution.value;
+    if (!repoId || !branch) return;
+    if (resolution?.range.kind !== 'ready' || resolution.base === null) return;
+    const oldBase = resolution.base;
+    await this.setTarget(repoId, oldBase);
+    await this.setBase(branch);
+  }
+
+  /** G19 D11a (item 11): "back to branch selection" — mirrors `setTarget`'s own reset lines, but
+   *  sets `phase.value = 'idle'` and, critically, clears `branch.value` back to `undefined` — the
+   *  one field `setTarget` never touches (F11), and the one flip that makes the template's own
+   *  `v-else-if="!review.branch.value"` true again. `repoId.value` is left as-is: the user is
+   *  still browsing the same repo, just picking a different (or the same) branch to compare. */
+  clearTarget(): void {
+    this.#abortAll();
+    this.#clearExpansions();
+    this.#packed.reset();
+    this.#base = undefined;
+    this.resolution.value = undefined;
+    this.resolveError.value = undefined;
+    this.staleReview.value = false;
+    this.#pendingResolution = undefined;
+    this.pane.value = 'commits';
+    this.phase.value = 'idle';
+    this.branch.value = undefined;
+  }
+
   /** The header picker's override (§6.8): re-resolves **with** an explicit base, exactly the
    *  same request shape a detected base gets, so a user-chosen base is checked (`merge-base`,
    *  `rev-list --count`) rather than trusted blind. */

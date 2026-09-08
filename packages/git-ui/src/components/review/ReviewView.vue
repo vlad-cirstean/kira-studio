@@ -22,7 +22,8 @@
  * 3. The "no branch" state's own branch picker — the user picks one directly, no host round trip.
  */
 import { SETTINGS } from '@kira/git-core';
-import type { HostKind, Transport, UiActionKind } from '@kira/git-ipc';
+import type { HostKind, ReviewSessionSnapshot, Transport, UiActionKind } from '@kira/git-ipc';
+import { KuiButton, KuiTextInput } from '@kira/kira-ui';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue';
 import { BridgeClient } from '../../bridge/client.ts';
 import { ACTION_ICONS } from '../../icons/index.ts';
@@ -105,9 +106,90 @@ async function bootstrap(): Promise<void> {
   const list = await bridge.request('repo.list', {});
   if (list.activeRepoId) {
     repoId.value = list.activeRepoId;
+    await resumeSession(list.activeRepoId);
   } else {
     noActiveRepo.value = true;
   }
+}
+
+/**
+ * G19 D11b: the read half of durable persistence — its own round trip, made once `bootstrap()`
+ * has a real `repoId` in hand (right here, alongside `props.target`/`review.target`'s own
+ * priority, both of which still win unchanged: `props.target` already returned above, and a
+ * `review.target` push that races ahead of this call already set `review.branch.value`, checked
+ * again just before applying so it is never clobbered). No commit/diff data is ever restored —
+ * only identifiers `setTarget`/`setBase` already re-ask fresh; a snapshot the extension host
+ * judges too old (14 days) comes back as `{session: null}`, the same as never having saved one.
+ */
+async function resumeSession(id: string): Promise<void> {
+  if (review.value?.branch.value) return;
+  let loaded: { session: ReviewSessionSnapshot | null };
+  try {
+    loaded = await bridge.request('review.session.load', { repoId: id });
+  } catch {
+    return; // best-effort: a failed resume falls back to the ordinary "no branch" picker
+  }
+  const session = loaded.session;
+  if (!session || review.value?.branch.value) return;
+  await applyTarget(id, session.branch);
+  if (session.baseOverride !== null) await review.value?.setBase(session.baseOverride);
+  review.value?.setPane(session.pane);
+  listMode.value = session.listMode;
+  filter.value = session.filter;
+  reviewFiles.value?.setDiffMode(session.diffMode);
+}
+
+/** G19 D11b: the write half — one `watch()` over the same fields the snapshot lists, coalesced
+ *  with a trivial `queueMicrotask` (this is not a hot path). `persistSession` reads the *current*
+ *  values itself rather than the watcher's own old/new arguments, so several fields changing in
+ *  the same tick (e.g. `setTarget` resetting `pane` while also changing `branch`) still produce
+ *  exactly one save with everything already settled. */
+let sessionSaveScheduled = false;
+function scheduleSessionSave(): void {
+  if (sessionSaveScheduled) return;
+  sessionSaveScheduled = true;
+  queueMicrotask(() => {
+    sessionSaveScheduled = false;
+    void persistSession();
+  });
+}
+
+async function persistSession(): Promise<void> {
+  const id = repoId.value;
+  const r = review.value;
+  if (!id || !r?.branch.value) return;
+  const session: ReviewSessionSnapshot = {
+    branch: r.branch.value,
+    baseOverride:
+      r.resolution.value?.reason === 'override' ? (r.resolution.value.base ?? null) : null,
+    pane: r.pane.value,
+    listMode: listMode.value,
+    filter: filter.value,
+    diffMode: reviewFiles.value?.diffMode.value ?? 'sinceReview',
+  };
+  await bridge.request('review.session.save', { repoId: id, session });
+}
+
+/** G19 D11a (item 11): "back to branch selection" — clears the in-memory target and, since this
+ *  is an explicit "go back", also clears the durable resume point (D11b), so the next cold boot
+ *  never silently jumps back into a comparison the user deliberately left. */
+async function goBackToSelection(): Promise<void> {
+  const id = repoId.value;
+  review.value?.clearTarget();
+  if (id) await bridge.request('review.session.save', { repoId: id, session: null });
+}
+
+/** G19 D5 (item 5): the header's swap button. */
+function onSwapBaseAndBranch(): void {
+  void review.value?.swapBaseAndBranch();
+}
+
+// G19 D6 (item 6): the always-rendered filter input is now revealed by a search-icon button —
+// `filterVisible` gates rendering; the button itself carries an "active" state whenever a filter
+// is applied *or* revealed, so an applied-but-collapsed filter still visibly signals itself.
+const filterVisible = ref(false);
+function toggleFilterVisible(): void {
+  filterVisible.value = !filterVisible.value;
 }
 
 function onUiAction(action: UiActionKind): void {
@@ -272,6 +354,24 @@ onBeforeUnmount(() => {
 // (show-toolbar="false") and receive these as plain props.
 const listMode = ref<FileListMode>('tree');
 const filter = ref('');
+
+// G19 D11b: the write half of durable persistence — one watch() over the same fields the
+// snapshot lists (listMode/filter live here; branch/resolution/pane/diffMode are read fresh
+// inside persistSession itself). A getter-source watch over an array literal fires on every
+// tracked-dependency change regardless of the array's own contents, which is exactly right here:
+// scheduleSessionSave's own debounce is what keeps several fields changing in the same tick
+// (setTarget resetting pane while also changing branch) down to one save, not this watch's job.
+watch(
+  () => [
+    review.value?.branch.value,
+    review.value?.resolution.value,
+    review.value?.pane.value,
+    listMode.value,
+    filter.value,
+    reviewFiles.value?.diffMode.value,
+  ],
+  scheduleSessionSave,
+);
 
 // ---------------------------------------------------------------------------------------
 // The "no branch" state's own branch picker (§6.8 state 1) — `refListModel.ts`'s fold over
@@ -547,21 +647,42 @@ watch(
     </template>
 
     <template v-else>
-      <!-- G14 D8 row 3: a comparison summary node, replacing the old header's single-line
-           branch/base/count strip — GitLens's own "Comparing X with Y" node. First line names
-           both sides (`--kv-font-data`, the base still the interactive BaseSelector trigger);
-           second line, muted, states the comparison as a fact rather than leaving it implicit. -->
+      <!-- G19 D5 (item 5): the two compared sides now stack, one per line, with a swap button
+           between them — replacing the old single-row "branch ↔ base" strip (F5: no stacking, no
+           invert control). G19 D11a (item 11): the back-to-selection button renders here too,
+           whenever a branch is picked — including the error phase, which is exactly the state a
+           resumed session pointing at a deleted branch/base lands in (D11b). -->
       <header class="kv-review-header">
-        <div class="kv-review-summary-line">
-          <span class="codicon codicon-git-branch" aria-hidden="true"></span>
-          <span class="kv-review-branch-name" data-testid="review-branch-name">{{
-            review.branch.value
-          }}</span>
-          <span class="kv-review-summary-arrow" aria-hidden="true">↔</span>
-          <BaseSelector
-            :resolution="review.resolution.value"
-            :refs-state="refsState"
-            @select-base="review.setBase($event)"
+        <div class="kv-review-header-row">
+          <KuiButton
+            :icon="ACTION_ICONS.back"
+            title="Back to branch selection"
+            aria-label="Back to branch selection"
+            data-testid="review-back-button"
+            @click="goBackToSelection"
+          />
+          <div class="kv-review-compare">
+            <div class="kv-review-compare-side">
+              <span class="codicon codicon-git-branch" aria-hidden="true"></span>
+              <span class="kv-review-branch-name" data-testid="review-branch-name">{{
+                review.branch.value
+              }}</span>
+            </div>
+            <div class="kv-review-compare-side">
+              <span class="kv-review-summary-arrow" aria-hidden="true">↔</span>
+              <BaseSelector
+                :resolution="review.resolution.value"
+                :refs-state="refsState"
+                @select-base="review.setBase($event)"
+              />
+            </div>
+          </div>
+          <KuiButton
+            :icon="ACTION_ICONS.swap"
+            title="Swap branch and base"
+            aria-label="Swap branch and base"
+            data-testid="review-swap-button"
+            @click="onSwapBaseAndBranch"
           />
         </div>
         <div v-if="review.phase.value === 'listing'" class="kv-review-summary-meta">
@@ -610,13 +731,27 @@ watch(
             <span class="kv-review-pane-badge">{{ commentsCount }}</span>
           </button>
         </div>
-        <input
-          type="text"
+        <!-- G19 D6 (item 6): the always-rendered filter input is now gated behind a search-icon
+             button — F6 found this the one filter in the app that did not already gate behind
+             opening something (BaseSelector.vue's own filter already does). `active` whenever the
+             input is revealed *or* a filter is already applied-but-collapsed, so an applied filter
+             still visibly signals itself even while hidden. -->
+        <KuiButton
+          :icon="ACTION_ICONS.search"
+          :active="filterVisible || filter.length > 0"
+          title="Filter files"
+          aria-label="Filter files"
+          data-testid="review-filter-toggle"
+          @click="toggleFilterVisible"
+        />
+        <KuiTextInput
+          v-if="filterVisible"
           class="kv-review-toolbar-filter"
           placeholder="Filter files"
           aria-label="Filter files"
-          :value="filter"
-          @input="filter = ($event.target as HTMLInputElement).value"
+          autofocus
+          :model-value="filter"
+          @update:model-value="filter = $event"
         />
         <div class="kv-review-toolbar-mode" role="group" aria-label="File list display">
           <button
@@ -898,7 +1033,24 @@ watch(
   min-width: 0;
 }
 
-.kv-review-summary-line {
+/* G19 D5: the back button, the two stacked compare rows, and the swap button share one flex
+   row — .kv-review-compare grows to fill the middle. */
+.kv-review-header-row {
+  display: flex;
+  align-items: center;
+  gap: var(--kv-s-2);
+  min-width: 0;
+}
+
+.kv-review-compare {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kv-s-1);
+  flex: 1;
+  min-width: 0;
+}
+
+.kv-review-compare-side {
   display: flex;
   align-items: center;
   gap: var(--kv-s-2);
