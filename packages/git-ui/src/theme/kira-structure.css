@@ -1,0 +1,63 @@
+/*
+ * Kira Studio's structural scales (G12 item 9), transcribed from
+ * apps/kira-studio/frontend/src/theme/tokens.css — spacing, type, control heights, radius tiers,
+ * font roles. COLOUR IS DEFINED NOWHERE IN THIS FILE, by design: the review sidebar follows the
+ * user's VS Code theme through vscode-tokens.css exactly as the graph panel does (§12.2 — the
+ * fixed dark skin this plan first proposed was rejected precisely because it broke that). Scoped
+ * to .kv-skin-kira rather than :root so density.css's own (workbench-shaped) scale keeps
+ * governing the graph panel unchanged — the two design languages coexist because they describe
+ * two different surfaces, not because either is wrong.
+ *
+ * D14's own guarantee, mechanically checkable: grep this file for a hex literal, `rgb(`, or a
+ * `color`/`background`/`border-color` property and find nothing (§8.4's checklist item).
+ */
+.kv-skin-kira {
+  --kv-s-1: 2px;
+  --kv-s-2: 4px;
+  --kv-s-3: 6px;
+  --kv-s-4: 8px;
+  --kv-s-5: 12px;
+  --kv-s-6: 16px;
+
+  /* Fixed offsets from the host's own --kv-font-size (vscode-tokens.css), the same derivation
+     Kira Studio's own --kira-t-* uses from --kira-font-size — so this scale tracks the user's VS
+     Code font-size setting exactly as the rest of the review sidebar already does. */
+  --kv-t-xs: calc(var(--kv-font-size) - 2px);
+  --kv-t-sm: calc(var(--kv-font-size) - 1px);
+  --kv-t-md: var(--kv-font-size);
+  --kv-t-lg: calc(var(--kv-font-size) + 1px);
+
+  --kv-h-xs: 18px;
+  --kv-h-sm: 22px;
+  --kv-h-md: 26px;
+  --kv-h-lg: 30px;
+  --kv-icon-box: 16px;
+
+  /* Control-height *roles*, aliased rather than hardcoded per control (Kira's own aliasing) — "one
+     step taller everywhere" is one edit here, not a re-pick in a dozen rules. */
+  --kv-control-h: var(--kv-h-sm); /* toolbar density */
+  --kv-control-h-lg: var(--kv-h-md); /* panel-head density */
+
+  --kv-radius-sm: 4px;
+  --kv-radius-panel: 6px;
+
+  --kv-bar-h: 34px;
+  --kv-border-width: 1px;
+
+  /* LAW 08 (docs/design/kira-design-system): "Mono is for data. If a string came out of a
+     database — a value, an identifier, a query, a duration — it is mono. If the app wrote it, it
+     is UI." --kv-font-data is the existing --kv-mono-font-family (the real VS Code editor font,
+     already used by e.g. .kv-review-row-sha) — NOT --kv-font-family, which in this codebase's own
+     naming is the general VS Code *UI* font (vscode-tokens.css: "var(--vscode-font-family, ...
+     sans-serif)"), the opposite of what LAW 08 means by "data". --kv-font-ui is Kira Studio's own
+     fixed system-sans stack, never user-customizable. */
+  --kv-font-data: var(--kv-mono-font-family);
+  --kv-font-ui:
+    -apple-system, BlinkMacSystemFont, "Segoe WPC", "Segoe UI", system-ui, "Ubuntu", "Droid Sans",
+    sans-serif;
+
+  /* Geometry only — composed with the existing --kv-widget-shadow *colour* at each call site
+     (`box-shadow: var(--kv-shadow) var(--kv-widget-shadow)`), never a shadow with its own colour
+     baked in. */
+  --kv-shadow: 0 2px 8px;
+}

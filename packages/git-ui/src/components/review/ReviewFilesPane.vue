@@ -1,33 +1,40 @@
 <script setup lang="ts">
 /**
  * G11 D16 — the review sidebar's Files pane, and the only new component this phase adds to
- * `packages/git-ui` (which SPEC otherwise freezes). `DetailPane.vue`'s own shape — `DiffView` when
- * a file is open, `FileTree` otherwise — over `ReviewFilesState` instead of `DetailState`: the
- * rebase/squash/amend case SPEC wrote this phase for makes every commit in the Commits tab
- * unfamiliar, so a file-level view of the range is the surface that survives it (F10).
+ * `packages/git-ui` (which SPEC otherwise freezes). `FileTree` over `ReviewFilesState` instead of
+ * `DetailState`: the rebase/squash/amend case SPEC wrote this phase for makes every commit in the
+ * Commits tab unfamiliar, so a file-level view of the range is the surface that survives it (F10).
+ *
+ * G12 D12: selecting a file no longer opens an in-webview `DiffView` — it opens VS Code's native
+ * diff editor (`ReviewFilesState.selectFile`'s own `editor.openRangeDiff` call). This component
+ * keeps the file list on screen throughout and renders only the Since-review/Full-range toggle
+ * and the delta status line as feedback, never a diff body.
  *
  * `FileTree`'s merge-parent picker never renders here (`parents` is always `[]` — a branch review
  * has no single "commit" with parents to pick between); `store` is still required by that
  * component's own props, so `ReviewView.vue` passes its own `PackedStreamState.store` down, unused
- * by anything this pane actually shows.
+ * by anything this pane actually shows. `list-mode`/`filter` are props now (G12 D13) — `ReviewView`
+ * owns one toolbar for both the Commits and Files panes, so this component's own toolbar is
+ * disabled (`show-toolbar="false"`) rather than duplicated.
  */
 import type { CommitStore } from '@kira/git-core';
 import type { ReviewFileStatus } from '@kira/git-ipc';
-import { computed, ref } from 'vue';
-import type { FileDiffResult, FileListMode } from '../../state/detail.ts';
+import { computed } from 'vue';
+import { ACTION_ICONS } from '../../icons/index.ts';
+import type { FileListMode } from '../../state/detail.ts';
 import type { DetailActions } from '../../state/detailActions.ts';
 import type { ReviewFilesState } from '../../state/reviewFiles.ts';
-import DiffView, { type ReviewDiffAdornment } from '../DiffView.vue';
 import FileTree from '../FileTree.vue';
 
 const props = defineProps<{
   reviewFiles: ReviewFilesState;
   store: CommitStore;
   actions: DetailActions;
+  // G12 D13: ReviewView.vue's one panel-level toolbar owns these; this pane's own FileTree
+  // renders no toolbar of its own (show-toolbar="false") and so never emits an update to forward.
+  listMode: FileListMode;
+  filter: string;
 }>();
-
-const listMode = ref<FileListMode>('tree');
-const filter = ref('');
 
 const files = computed(() => props.reviewFiles.files.value.map((entry) => entry.change));
 
@@ -41,36 +48,6 @@ const selectedIndex = computed(() => {
   const path = props.reviewFiles.selectedPath.value;
   if (path === null) return -1;
   return files.value.findIndex((f) => f.path === path);
-});
-
-// "Open in editor"/"Go to file" are both commit-shaped (a single sha to diff against) and have no
-// honest meaning against a branch-review delta, so this pane's own DiffView never offers them —
-// an explicit, always-off override, never a stub: the buttons simply do not render here, the same
-// way DiffView already omits them for a binary/tooLarge body.
-const diffActions = computed<DetailActions>(() => ({
-  ...props.actions,
-  capabilities: { ...props.actions.capabilities, openInEditor: false, goToFile: false },
-}));
-
-const diffForView = computed<FileDiffResult | undefined>(() => {
-  const rf = props.reviewFiles;
-  const index = selectedIndex.value;
-  const change = index >= 0 ? files.value[index] : undefined;
-  if (!change || rf.body.value === undefined) return undefined;
-  return { sha: '', parentIndex: 0, baseSha: null, change, body: rf.body.value };
-});
-
-const reviewAdornment = computed<ReviewDiffAdornment | undefined>(() => {
-  const path = props.reviewFiles.selectedPath.value;
-  if (path === null) return undefined;
-  const rf = props.reviewFiles;
-  return {
-    reviewedRanges: rf.reviewedRanges.value,
-    pending: rf.pending.value,
-    mark: (ranges, reviewed) => {
-      void rf.mark(path, reviewed, ranges);
-    },
-  };
 });
 
 const deltaStatusText = computed(() => {
@@ -107,54 +84,51 @@ function onToggleReviewed(path: string): void {
       Couldn't load the file list — {{ reviewFiles.loadError.value }}
     </p>
 
-    <template v-else-if="reviewFiles.selectedPath.value !== null">
-      <div class="kv-review-files-diff-mode" role="group" aria-label="What to show">
-        <button
-          type="button"
-          :aria-pressed="reviewFiles.diffMode.value === 'sinceReview'"
-          :class="{ 'kv-mode-active': reviewFiles.diffMode.value === 'sinceReview' }"
-          @click="reviewFiles.setDiffMode('sinceReview')"
-        >
-          Since review
-        </button>
-        <button
-          type="button"
-          :aria-pressed="reviewFiles.diffMode.value === 'range'"
-          :class="{ 'kv-mode-active': reviewFiles.diffMode.value === 'range' }"
-          @click="reviewFiles.setDiffMode('range')"
-        >
-          Full range
-        </button>
+    <template v-else>
+      <!-- G12 D12/D16: which two revisions a click opens in VS Code's diff editor — the one real
+           capability removing DiffView would otherwise have lost. -->
+      <div class="kv-review-files-diff-mode">
+        <div class="kv-review-files-diff-toggle" role="group" aria-label="What to compare">
+          <button
+            type="button"
+            :aria-pressed="reviewFiles.diffMode.value === 'sinceReview'"
+            :class="{ 'kv-mode-active': reviewFiles.diffMode.value === 'sinceReview' }"
+            title="Since review"
+            aria-label="Since review"
+            @click="reviewFiles.setDiffMode('sinceReview')"
+          >
+            <span class="codicon" :class="ACTION_ICONS.diffSingle" aria-hidden="true"></span>
+          </button>
+          <button
+            type="button"
+            :aria-pressed="reviewFiles.diffMode.value === 'range'"
+            :class="{ 'kv-mode-active': reviewFiles.diffMode.value === 'range' }"
+            title="Full range"
+            aria-label="Full range"
+            @click="reviewFiles.setDiffMode('range')"
+          >
+            <span class="codicon" :class="ACTION_ICONS.diffMultiple" aria-hidden="true"></span>
+          </button>
+        </div>
         <span v-if="deltaStatusText" class="kv-review-files-delta-status">{{ deltaStatusText }}</span>
       </div>
-      <DiffView
-        class="kv-detail-pane-diff"
-        :diff="diffForView"
-        :diff-error="reviewFiles.diffError.value"
-        :file-index="Math.max(selectedIndex, 0)"
-        :total-files="files.length"
-        :actions="diffActions"
-        :review="reviewAdornment"
-        @select-file="onSelectFileIndex"
-        @back="reviewFiles.showList()"
-      />
-    </template>
+      <p v-if="reviewFiles.diffError.value" class="kv-detail-pane-error">
+        Couldn't open that file in the editor — {{ reviewFiles.diffError.value }}
+      </p>
 
-    <template v-else>
       <FileTree
         class="kv-detail-pane-tree kv-review-files-tree"
         :files="files"
         :selected-file="selectedIndex"
         :list-mode="listMode"
         :filter="filter"
+        :show-toolbar="false"
         :parents="[]"
         :parent-index="0"
         :store="store"
         :actions="actions"
         :review-states="reviewStatesMap"
         @select-file="onSelectFileIndex"
-        @update:list-mode="listMode = $event"
-        @update:filter="filter = $event"
         @toggle-reviewed="onToggleReviewed"
       />
       <p v-if="reviewFiles.loading.value && files.length === 0" class="kv-detail-pane-loading">
@@ -176,20 +150,37 @@ function onToggleReviewed(path: string): void {
   border-top: none;
 }
 
+/* G12 D14/D16: the same .p-seg-shaped segmented group as ReviewView.vue's own toggles. */
 .kv-review-files-diff-mode {
   display: flex;
   align-items: center;
-  gap: var(--kv-space-2);
-  padding: var(--kv-space-1) var(--kv-space-4);
-  border-bottom: 1px solid var(--kv-panel-border);
+  gap: var(--kv-s-3);
+  padding: var(--kv-s-1) var(--kv-s-4);
+  border-bottom: var(--kv-border-width) solid var(--kv-panel-border);
+  font-family: var(--kv-font-ui);
+}
+
+.kv-review-files-diff-toggle {
+  display: inline-flex;
+  height: var(--kv-control-h);
+  border: var(--kv-border-width) solid var(--kv-panel-border);
+  border-radius: var(--kv-radius-sm);
+  overflow: hidden;
 }
 
 .kv-review-files-diff-mode button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--kv-control-h);
   background: transparent;
   color: var(--kv-row-fg);
-  border: 1px solid var(--kv-panel-border);
+  border: none;
   cursor: pointer;
-  padding: 0 var(--kv-space-2);
+}
+
+.kv-review-files-diff-mode button + button {
+  border-left: var(--kv-border-width) solid var(--kv-panel-border);
 }
 
 .kv-review-files-diff-mode button.kv-mode-active {
@@ -200,7 +191,7 @@ function onToggleReviewed(path: string): void {
 .kv-review-files-delta-status {
   margin-left: auto;
   color: var(--kv-description-fg);
-  font-size: 0.85em;
+  font-size: var(--kv-t-sm);
 }
 
 /* `.kv-detail-pane-diff`/`.kv-detail-pane-tree`/`.kv-detail-pane-error`/`.kv-detail-pane-loading`

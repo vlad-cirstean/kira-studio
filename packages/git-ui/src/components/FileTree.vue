@@ -8,6 +8,7 @@
 import type { CommitStore } from '@kira/git-core';
 import type { FileChange, ReviewFileStatus } from '@kira/git-ipc';
 import { computed, nextTick, ref, watch } from 'vue';
+import { ACTION_ICONS } from '../icons/index.ts';
 import type { FileListMode } from '../state/detail.ts';
 import type { DetailActions } from '../state/detailActions.ts';
 import {
@@ -37,6 +38,10 @@ const props = defineProps<{
    *  byte-identically to before this prop existed: no checkbox, no badge, nothing — `DetailPane.vue`
    *  and `StashDetailPane.vue` are provably unaffected. */
   reviewStates?: ReadonlyMap<string, ReviewFileStatus>;
+  /** G12 D13: whether this instance renders its own filter/list-mode toolbar. `false` when a
+   *  panel above it owns one for several trees at once (the review sidebar) — `DetailPane.vue`,
+   *  which mounts exactly one tree, leaves this unset and gets today's behaviour byte for byte. */
+  showToolbar?: boolean; // default true
 }>();
 
 const emit = defineEmits<{
@@ -323,7 +328,7 @@ function reviewToggleTitle(path: string): string {
       </select>
     </div>
 
-    <div class="kv-file-tree-toolbar">
+    <div v-if="showToolbar !== false" class="kv-file-tree-toolbar">
       <input
         type="text"
         class="kv-file-tree-filter"
@@ -337,17 +342,21 @@ function reviewToggleTitle(path: string): string {
           type="button"
           :aria-pressed="listMode === 'tree'"
           :class="{ 'kv-mode-active': listMode === 'tree' }"
+          title="Tree view"
+          aria-label="Tree view"
           @click="emit('update:listMode', 'tree')"
         >
-          Tree
+          <span class="codicon" :class="ACTION_ICONS.listTree" aria-hidden="true"></span>
         </button>
         <button
           type="button"
           :aria-pressed="listMode === 'flat'"
           :class="{ 'kv-mode-active': listMode === 'flat' }"
+          title="Flat view"
+          aria-label="Flat view"
           @click="emit('update:listMode', 'flat')"
         >
-          Flat
+          <span class="codicon" :class="ACTION_ICONS.listFlat" aria-hidden="true"></span>
         </button>
       </div>
     </div>

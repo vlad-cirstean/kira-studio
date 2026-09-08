@@ -1,4 +1,5 @@
 import type {
+  FileChangeKind,
   LineRange,
   ResultOf,
   ReviewDeltaSource,
@@ -10,6 +11,21 @@ import { type ShallowRef, shallowRef } from 'vue';
 import type { BridgeClient } from '../bridge/client.ts';
 
 export type ReviewFileDiffBody = ResultOf<'review.fileDiff'>['body'];
+
+/** editor.openRangeDiff's status is a four-way enum (G12 D1); `copied`/`typeChanged`/`unmerged`
+ *  fold to `modified` because the handler treats them identically — both sides present, `path`
+ *  (and `originalPath` when set) name them. Only `added` (no base side) and `deleted` (no branch
+ *  side) change which side is `{kind: 'empty'}`. */
+function rangeDiffStatus(kind: FileChangeKind): 'added' | 'deleted' | 'modified' | 'renamed' {
+  switch (kind) {
+    case 'added':
+    case 'deleted':
+    case 'renamed':
+      return kind;
+    default:
+      return 'modified';
+  }
+}
 
 /** The (repo, branch, base) triple review.files/review.fileDiff/review.mark need — base only for
  *  the two read methods (G11 D5: review.mark carries no base at all, a write is a fact about
@@ -38,6 +54,9 @@ export class ReviewFilesState {
   readonly deltaSource: ShallowRef<ReviewDeltaSource | undefined> = shallowRef(undefined);
   readonly body: ShallowRef<ReviewFileDiffBody | undefined> = shallowRef(undefined);
   readonly reviewedRanges: ShallowRef<readonly LineRange[]> = shallowRef([]);
+  /** G12 D12: the base editor.openRangeDiff uses in `sinceReview` mode — `null` means "never
+   *  reviewed", the fallback-to-`range` case. */
+  readonly reviewedAtSha: ShallowRef<string | null | undefined> = shallowRef(undefined);
   readonly diffError: ShallowRef<string | undefined> = shallowRef(undefined);
 
   /** A review.mark request in flight — the two header buttons disable themselves while true
@@ -91,11 +110,15 @@ export class ReviewFilesState {
     }
   }
 
-  /** Opens path's diff — a no-op re-selection of the file already open keeps its existing diff. */
+  /** Opens path in VS Code's native diff (G12 D12) — a no-op re-selection of the file already
+   *  open re-opens it anyway, since the editor tab may since have been closed. `#loadDiff` runs
+   *  alongside, independently: it fetches metadata this pane still renders (the delta status
+   *  line, the per-file reviewed marks), never the diff body VS Code now owns. */
   selectFile(path: string): void {
-    if (this.selectedPath.value === path) return;
+    const changed = this.selectedPath.value !== path;
     this.selectedPath.value = path;
-    void this.#loadDiff();
+    if (changed) void this.#loadDiff(); // metadata only re-fetches when the file actually changes.
+    void this.#openInEditor(); // always re-opens: the editor tab may since have been closed.
   }
 
   /** Returns to the file list without discarding which file was selected. */
@@ -106,7 +129,35 @@ export class ReviewFilesState {
   setDiffMode(mode: ReviewDiffMode): void {
     if (this.diffMode.value === mode) return;
     this.diffMode.value = mode;
-    if (this.selectedPath.value !== null) void this.#loadDiff();
+    if (this.selectedPath.value !== null) {
+      void this.#loadDiff();
+      void this.#openInEditor();
+    }
+  }
+
+  /** G12 D12: composes the two revisions `editor.openRangeDiff` needs from data this class
+   *  already holds — `sinceReview` uses the file's own `reviewedAtSha`, falling back to the
+   *  range's `base` when it is `null` (never reviewed). A fire-and-forget host action, not a
+   *  fetch: nothing here is superseded the way `#loadDiff`'s reactive state is. */
+  async #openInEditor(): Promise<void> {
+    const target = this.#target;
+    const path = this.selectedPath.value;
+    if (!target || path === null) return;
+    const entry = this.files.value.find((e) => e.change.path === path);
+    if (!entry) return;
+    const change = entry.change;
+    const base =
+      this.diffMode.value === 'sinceReview' && this.reviewedAtSha.value
+        ? this.reviewedAtSha.value
+        : target.base;
+    await this.#bridge.request('editor.openRangeDiff', {
+      repoId: target.repoId,
+      base,
+      branch: target.branch,
+      path,
+      ...(change.originalPath !== undefined ? { originalPath: change.originalPath } : {}),
+      status: rangeDiffStatus(change.kind),
+    });
   }
 
   async #loadDiff(): Promise<void> {
@@ -130,6 +181,7 @@ export class ReviewFilesState {
       this.deltaSource.value = result.deltaSource;
       this.body.value = result.body;
       this.reviewedRanges.value = result.reviewedRanges;
+      this.reviewedAtSha.value = result.reviewedAtSha;
     } catch (error) {
       if (error instanceof TransportError && error.code === 'cancelled') return;
       if (!stillCurrent()) return;
@@ -143,6 +195,7 @@ export class ReviewFilesState {
     this.deltaSource.value = undefined;
     this.body.value = undefined;
     this.reviewedRanges.value = [];
+    this.reviewedAtSha.value = undefined;
     this.diffError.value = undefined;
   }
 

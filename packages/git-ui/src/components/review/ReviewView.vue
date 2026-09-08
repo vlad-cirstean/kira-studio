@@ -25,14 +25,14 @@ import { SETTINGS } from '@kira/git-core';
 import type { HostKind, Transport, UiActionKind } from '@kira/git-ipc';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue';
 import { BridgeClient } from '../../bridge/client.ts';
+import { ACTION_ICONS } from '../../icons/index.ts';
 import { copyToClipboard } from '../../state/clipboardActions.ts';
+import type { FileListMode } from '../../state/detail.ts';
 import type { Capabilities, DetailActions } from '../../state/detailActions.ts';
 import { RefsState } from '../../state/refs.ts';
 import { ReviewSessionState, type ReviewTarget } from '../../state/review.ts';
 import { ReviewFilesState } from '../../state/reviewFiles.ts';
 import type { ViewStateStore } from '../../state/viewState.ts';
-import DiffView from '../DiffView.vue';
-import { useModalFocus } from '../dialogs/modalFocus.ts';
 import { buildRefListSections } from '../refListModel.ts';
 import BaseSelector from './BaseSelector.vue';
 import ReviewCommitRow from './ReviewCommitRow.vue';
@@ -54,6 +54,9 @@ const capabilities = shallowRef<Capabilities | undefined>(undefined);
 
 const repoId = ref<string | undefined>(undefined);
 const noActiveRepo = ref(false);
+// G12 D6: same treatment as App.vue's own bootError — "Loading…" forever is not an acceptable
+// rendering of a failed bootstrap() (F7).
+const bootError = ref<string | undefined>(undefined);
 
 watch(repoId, (id) => refsState.setRepoId(id));
 
@@ -170,8 +173,19 @@ onMounted(() => {
     performance.mark('kira:first-paint');
     performance.measure('kira:first-paint', undefined, 'kira:first-paint');
   });
-  void bootstrap();
+  void bootstrap().catch((err: unknown) => {
+    bootError.value = err instanceof Error ? err.message : String(err);
+  });
 });
+
+/** Retries a failed bootstrap() (G12 D6) — clears the error panel first so a second failure
+ *  replaces the first rather than appearing to do nothing. */
+function retryBootstrap(): void {
+  bootError.value = undefined;
+  void bootstrap().catch((err: unknown) => {
+    bootError.value = err instanceof Error ? err.message : String(err);
+  });
+}
 
 onBeforeUnmount(() => {
   unsubscribeTarget?.();
@@ -182,6 +196,13 @@ onBeforeUnmount(() => {
   bridge.dispose();
   document.removeEventListener('keydown', onDocumentKeydown);
 });
+
+// G12 D13: one panel-level filter/list-mode toolbar, replacing what used to be a separate
+// FileTree toolbar per expanded row (and a third copy in ReviewFilesPane, G11). Owns the state;
+// ReviewCommitRow/ReviewFilesPane's own FileTree instances render no toolbar of their own
+// (show-toolbar="false") and receive these as plain props.
+const listMode = ref<FileListMode>('tree');
+const filter = ref('');
 
 // ---------------------------------------------------------------------------------------
 // The "no branch" state's own branch picker (§6.8 state 1) — `refListModel.ts`'s fold over
@@ -301,40 +322,11 @@ function toggleRow(sha: string): void {
   review.value?.toggle(sha);
 }
 
-/** The single row (of possibly several expanded at once) currently showing its diff as the
- *  full-height overlay — at most one, since opening a file anywhere replaces whichever overlay
- *  was already showing. */
-const activeDiffSha = computed<string | undefined>(() => {
-  const r = review.value;
-  if (!r) return undefined;
-  for (const sha of r.expandedShas.value) {
-    if (r.expansionFor(sha)?.detail.mode.value === 'diff') return sha;
-  }
-  return undefined;
-});
-
-const activeDiffExpansion = computed(() => {
-  const sha = activeDiffSha.value;
-  return sha ? review.value?.expansionFor(sha) : undefined;
-});
-
-// W17: focus returns to the row's disclosure control when the diff overlay closes —
-// `modalFocus.ts`'s own invoker-capture composable, reused. Whatever had focus the instant the
-// overlay opened (in practice, the file the user clicked to get here, which is still the row's
-// own disclosure element for a keyboard user who reached it via Enter on the row itself) is what
-// gets it back, the same guarantee `RevertDialog.vue`/`CheckoutDialog.vue` already give a
-// dialog's own invoking control.
-const diffOverlayActive = computed(() => activeDiffSha.value !== undefined);
-const diffOverlayEl = ref<HTMLDivElement | null>(null);
-const { onKeydown: onDiffOverlayKeydown } = useModalFocus(diffOverlayActive, diffOverlayEl);
-
+// G12 D12: the diff overlay (and W17's modal-focus wiring for it) is gone — every diff opens in
+// VS Code now, so there is nothing left in the webview for Escape's first stage to close. Only
+// the second stage (collapse the focused row) remains.
 function onDocumentKeydown(event: KeyboardEvent): void {
   if (event.key !== 'Escape') return;
-  const diffSha = activeDiffSha.value;
-  if (diffSha) {
-    review.value?.expansionFor(diffSha)?.detail.showTree();
-    return;
-  }
   const sha = shas.value[focusedRow.value];
   if (sha && review.value?.expandedShas.value.has(sha)) review.value.collapse(sha);
 }
@@ -389,13 +381,20 @@ watch(
 </script>
 
 <template>
-  <div class="kv-review-view" :data-connection-state="connectionState">
+  <div class="kv-review-view kv-skin-kira" :data-connection-state="connectionState">
     <span class="kv-visually-hidden" data-testid="connection-state">{{ connectionState }}</span>
     <div class="kv-visually-hidden" role="status" aria-live="polite" data-testid="live-announcements">
       {{ liveAnnouncement }}
     </div>
 
-    <template v-if="!review">
+    <template v-if="bootError">
+      <div class="kv-review-boot-error" data-testid="boot-error">
+        <p>Kira Studio isn't reachable — {{ bootError }}</p>
+        <button type="button" data-testid="boot-retry" @click="retryBootstrap">Retry</button>
+      </div>
+    </template>
+
+    <template v-else-if="!review">
       <p class="kv-review-loading">Loading…</p>
     </template>
 
@@ -463,35 +462,70 @@ watch(
           :refs-state="refsState"
           @select-base="review.setBase($event)"
         />
-        <div
-          v-if="review.phase.value === 'listing'"
-          class="kv-review-pane-toggle"
-          role="group"
-          aria-label="Review pane"
-        >
-          <button
-            type="button"
-            :aria-pressed="review.pane.value === 'commits'"
-            :class="{ 'kv-mode-active': review.pane.value === 'commits' }"
-            @click="review.setPane('commits')"
-          >
-            Commits
-          </button>
-          <button
-            type="button"
-            :aria-pressed="review.pane.value === 'files'"
-            :class="{ 'kv-mode-active': review.pane.value === 'files' }"
-            @click="review.setPane('files')"
-          >
-            Files
-          </button>
-        </div>
         <span
           v-if="review.phase.value === 'listing' && review.pane.value === 'commits'"
           class="kv-review-commit-count"
           >{{ commitCountLabel }}</span
         >
       </header>
+
+      <!-- G12 D13/D14: one panel-level toolbar, holding the Commits/Files pane toggle, the
+           filter, and the Tree/Flat toggle — replacing what used to be one FileTree toolbar per
+           expanded row plus a third, separately-stateful copy in the Files pane. -->
+      <div v-if="review.phase.value === 'listing'" class="kv-review-toolbar">
+        <div class="kv-review-pane-toggle" role="group" aria-label="Review pane">
+          <button
+            type="button"
+            :aria-pressed="review.pane.value === 'commits'"
+            :class="{ 'kv-mode-active': review.pane.value === 'commits' }"
+            title="Commits"
+            aria-label="Commits"
+            @click="review.setPane('commits')"
+          >
+            <span class="codicon" :class="ACTION_ICONS.commits" aria-hidden="true"></span>
+          </button>
+          <button
+            type="button"
+            :aria-pressed="review.pane.value === 'files'"
+            :class="{ 'kv-mode-active': review.pane.value === 'files' }"
+            title="Files"
+            aria-label="Files"
+            @click="review.setPane('files')"
+          >
+            <span class="codicon" :class="ACTION_ICONS.files" aria-hidden="true"></span>
+          </button>
+        </div>
+        <input
+          type="text"
+          class="kv-review-toolbar-filter"
+          placeholder="Filter files"
+          aria-label="Filter files"
+          :value="filter"
+          @input="filter = ($event.target as HTMLInputElement).value"
+        />
+        <div class="kv-review-toolbar-mode" role="group" aria-label="File list display">
+          <button
+            type="button"
+            :aria-pressed="listMode === 'tree'"
+            :class="{ 'kv-mode-active': listMode === 'tree' }"
+            title="Tree view"
+            aria-label="Tree view"
+            @click="listMode = 'tree'"
+          >
+            <span class="codicon" :class="ACTION_ICONS.listTree" aria-hidden="true"></span>
+          </button>
+          <button
+            type="button"
+            :aria-pressed="listMode === 'flat'"
+            :class="{ 'kv-mode-active': listMode === 'flat' }"
+            title="Flat view"
+            aria-label="Flat view"
+            @click="listMode = 'flat'"
+          >
+            <span class="codicon" :class="ACTION_ICONS.listFlat" aria-hidden="true"></span>
+          </button>
+        </div>
+      </div>
 
       <div class="kv-review-body">
         <p v-if="review.phase.value === 'resolving'" class="kv-review-status">
@@ -531,7 +565,14 @@ watch(
             data-testid="review-stale-banner"
           >
             <span>This comparison has changed.</span>
-            <button type="button" @click="review.acknowledgeStaleReview()">Refresh</button>
+            <button
+              type="button"
+              title="Refresh"
+              aria-label="Refresh"
+              @click="review.acknowledgeStaleReview()"
+            >
+              <span class="codicon" :class="ACTION_ICONS.refresh" aria-hidden="true"></span>
+            </button>
           </div>
 
           <div
@@ -550,6 +591,8 @@ watch(
               :expanded="review.expandedShas.value.has(sha)"
               :expansion="review.expansionFor(sha)"
               :focused="index === focusedRow"
+              :list-mode="listMode"
+              :filter="filter"
               @toggle="toggleRow(sha)"
               @focus-row="focusRow(index)"
             />
@@ -573,27 +616,11 @@ watch(
           :review-files="reviewFiles"
           :store="review.store"
           :actions="filesActions"
+          :list-mode="listMode"
+          :filter="filter"
         />
       </div>
     </template>
-
-    <div
-      v-if="activeDiffExpansion"
-      ref="diffOverlayEl"
-      class="kv-review-diff-overlay"
-      @keydown="onDiffOverlayKeydown"
-    >
-      <DiffView
-        class="kv-review-diff-overlay-view"
-        :diff="activeDiffExpansion.detail.diff.value"
-        :diff-error="activeDiffExpansion.detail.diffError.value"
-        :file-index="activeDiffExpansion.detail.selectedFile.value"
-        :total-files="activeDiffExpansion.detail.detail.value?.files.length ?? 0"
-        :actions="activeDiffExpansion.actions"
-        @select-file="activeDiffExpansion.detail.selectFile($event)"
-        @back="activeDiffExpansion.detail.showTree()"
-      />
-    </div>
   </div>
 </template>
 
@@ -606,7 +633,9 @@ watch(
   position: relative;
   background-color: var(--kv-app-bg);
   color: var(--kv-app-fg);
-  font-family: var(--kv-font-family);
+  /* LAW 08 (G12 D14): UI chrome is --kv-font-ui; a sha/branch/path overrides back to
+     --kv-font-data at its own rule, below. */
+  font-family: var(--kv-font-ui);
   font-size: var(--kv-font-size);
   overflow: hidden;
 }
@@ -626,6 +655,28 @@ watch(
 .kv-review-loading {
   padding: var(--kv-space-4);
   color: var(--kv-description-fg);
+}
+
+.kv-review-boot-error {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kv-space-3);
+  padding: var(--kv-space-4);
+}
+
+.kv-review-boot-error p {
+  margin: 0;
+  color: var(--kv-description-fg);
+}
+
+.kv-review-boot-error button {
+  align-self: flex-start;
+  padding: var(--kv-space-2) var(--kv-space-4);
+  border: 1px solid var(--kv-panel-border);
+  border-radius: var(--kv-radius);
+  background-color: var(--kv-panel-bg);
+  color: var(--kv-row-fg);
+  cursor: pointer;
 }
 
 .kv-review-empty-state,
@@ -694,46 +745,96 @@ watch(
   padding: var(--kv-space-1) var(--kv-space-2);
 }
 
+/* G12 D14: .p-panel-head's geometry — height/gap/padding — for the view head carrying the branch
+   name and base selector. Not its uppercase/letter-spacing treatment: that primitive styles a
+   short section label, and this row's own content is live data (a real branch name), which must
+   never be visually re-cased. */
 .kv-review-header {
   display: flex;
   align-items: center;
-  gap: var(--kv-space-2);
-  padding: var(--kv-space-2) var(--kv-space-3);
-  border-bottom: 1px solid var(--kv-panel-border);
+  gap: var(--kv-s-2);
+  height: var(--kv-control-h-lg);
+  padding: 0 var(--kv-s-3);
+  border-bottom: var(--kv-border-width) solid var(--kv-panel-border);
   flex-shrink: 0;
   min-width: 0;
 }
 
 .kv-review-branch-name {
+  font-family: var(--kv-font-data); /* LAW 08: a branch name is data. */
   font-weight: 600;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.kv-review-pane-toggle {
+/* G12 D13/D14: the new panel toolbar — .p-toolbar's own geometry, holding the Commits/Files
+   toggle, the filter, and the Tree/Flat toggle, all at --kv-control-h. */
+.kv-review-toolbar {
   display: flex;
-  margin-left: auto;
+  align-items: center;
+  gap: var(--kv-s-3);
+  height: var(--kv-bar-h);
+  padding: 0 var(--kv-s-4);
+  border-bottom: var(--kv-border-width) solid var(--kv-panel-border);
   flex-shrink: 0;
 }
 
-.kv-review-pane-toggle button {
-  background: transparent;
+.kv-review-toolbar-filter {
+  flex: 1;
+  min-width: 0;
+  height: var(--kv-control-h);
+  background: var(--kv-panel-bg);
   color: var(--kv-row-fg);
-  border: 1px solid var(--kv-panel-border);
-  cursor: pointer;
-  padding: 0 var(--kv-space-2);
+  border: var(--kv-border-width) solid var(--kv-panel-border);
+  border-radius: var(--kv-radius-sm);
+  padding: 0 var(--kv-s-3);
+  font-family: var(--kv-font-ui);
+  font-size: var(--kv-t-sm);
 }
 
-.kv-review-pane-toggle button.kv-mode-active {
+/* G12 D16: .p-seg's own shape — one bordered container, children with no border of their own
+   except the separator between them. Shared by the Commits/Files toggle and the Tree/Flat
+   toggle (and ReviewFilesPane.vue's own Since-review/Full-range toggle, styled the same way). */
+.kv-review-pane-toggle,
+.kv-review-toolbar-mode {
+  display: inline-flex;
+  height: var(--kv-control-h);
+  border: var(--kv-border-width) solid var(--kv-panel-border);
+  border-radius: var(--kv-radius-sm);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.kv-review-pane-toggle button,
+.kv-review-toolbar-mode button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--kv-control-h);
+  background: transparent;
+  color: var(--kv-row-fg);
+  border: none;
+  cursor: pointer;
+}
+
+.kv-review-pane-toggle button + button,
+.kv-review-toolbar-mode button + button {
+  border-left: var(--kv-border-width) solid var(--kv-panel-border);
+}
+
+.kv-review-pane-toggle button.kv-mode-active,
+.kv-review-toolbar-mode button.kv-mode-active {
   background: var(--kv-row-selected-bg);
   color: var(--kv-row-selected-fg);
 }
 
 .kv-review-commit-count {
+  font-family: var(--kv-font-ui);
   color: var(--kv-description-fg);
-  font-size: 0.85em;
+  font-size: var(--kv-t-sm);
   flex-shrink: 0;
+  margin-left: auto;
 }
 
 .kv-review-body {
@@ -761,11 +862,27 @@ watch(
 .kv-review-stale-banner {
   display: flex;
   align-items: center;
-  gap: var(--kv-space-2);
-  padding: var(--kv-space-2) var(--kv-space-3);
+  gap: var(--kv-s-2);
+  padding: var(--kv-s-2) var(--kv-s-3);
   background: var(--kv-row-hover-bg);
-  border-bottom: 1px solid var(--kv-panel-border);
+  border-bottom: var(--kv-border-width) solid var(--kv-panel-border);
   flex-shrink: 0;
+  font-family: var(--kv-font-ui);
+}
+
+/* G12 D16: the refresh affordance in the stale banner became an icon button — .p-iconbtn's shape. */
+.kv-review-stale-banner button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: var(--kv-control-h);
+  width: var(--kv-control-h);
+  margin-left: auto;
+  border: none;
+  border-radius: var(--kv-radius-sm);
+  background: transparent;
+  color: var(--kv-app-fg);
+  cursor: pointer;
 }
 
 .kv-review-rows {
@@ -778,18 +895,20 @@ watch(
 .kv-review-load-more {
   display: flex;
   justify-content: center;
-  padding: var(--kv-space-2) var(--kv-space-3);
+  padding: var(--kv-s-2) var(--kv-s-3);
   flex-shrink: 0;
 }
 
+/* G12 D16: Load more stays text (its label carries a count) — .p-btn's own geometry, per D14. */
 .kv-review-load-more-button {
-  padding: var(--kv-space-2) var(--kv-space-3);
-  border: 1px solid var(--kv-toolbar-border);
-  border-radius: var(--kv-radius);
+  height: var(--kv-control-h);
+  padding: 0 var(--kv-s-3);
+  border: var(--kv-border-width) solid var(--kv-panel-border);
+  border-radius: var(--kv-radius-sm);
   background: transparent;
   color: var(--kv-app-fg);
-  font-family: inherit;
-  font-size: inherit;
+  font-family: var(--kv-font-ui);
+  font-size: var(--kv-t-sm);
   cursor: pointer;
 }
 
@@ -802,16 +921,26 @@ watch(
   opacity: 0.7;
 }
 
-.kv-review-diff-overlay {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  background-color: var(--kv-app-bg);
-  z-index: 20;
+/*
+ * G12 D14: FileTree.vue is shared with the graph panel's DetailPane, which must stay byte-
+ * identical (D14's own guarantee). So its row geometry is restyled here, from the review side,
+ * under the .kv-skin-kira ancestor — never by editing FileTree.vue's own base rules, which would
+ * apply the new scale to the graph panel too. Colour is untouched; only spacing/height/font-role.
+ */
+.kv-skin-kira .kv-file-tree-row {
+  gap: var(--kv-s-2);
+  min-height: var(--kv-control-h);
+  padding: var(--kv-s-1) var(--kv-s-4);
 }
 
-.kv-review-diff-overlay-view {
-  width: 100%;
-  height: 100%;
+.kv-skin-kira .kv-file-tree-status,
+.kv-skin-kira .kv-file-tree-name {
+  font-family: var(--kv-font-data); /* LAW 08: a file path is data. */
+}
+
+.kv-skin-kira .kv-file-tree-dir-name,
+.kv-skin-kira .kv-file-tree-dir-stats,
+.kv-skin-kira .kv-file-tree-counts {
+  font-family: var(--kv-font-ui);
 }
 </style>

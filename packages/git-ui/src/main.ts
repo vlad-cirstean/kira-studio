@@ -7,6 +7,9 @@ import type { ViewStateStore } from './state/viewState.ts';
 import './icons/codicon.css';
 import './theme/vscode-tokens.css';
 import './theme/density.css';
+// G12 D14: colourless structural tokens, scoped to .kv-skin-kira so the graph panel (AppRoot,
+// which never carries that class) is unaffected — one shared entry, so this loads for both roots.
+import './theme/kira-structure.css';
 
 export interface MountHandle {
   unmount(): void;

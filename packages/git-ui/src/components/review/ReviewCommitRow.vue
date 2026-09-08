@@ -4,14 +4,19 @@
  * subject, short sha (`§6.4`'s "clicking a sha copies it"), author, relative date. Expanded:
  * `FileTree.vue` over this row's own `DetailState` (`ReviewSessionState.expand` fetches
  * `commit.detail` on first expansion and keeps it for the session — this component never fetches
- * anything itself). Opening a file's diff is *not* rendered here — `ReviewView.vue` renders it as
- * a full-height overlay over the whole list (§6.8 step 3), since a per-row diff would be squeezed
- * into whatever height this one row happens to have. `→`/`←`/`Enter` toggle expansion (§6.8 step
- * 2); the row's own context menu is copy-sha/copy-message only (`rowMenuModel.ts`'s
- * `buildReviewRowMenu`, not `buildRowMenu` — this row offers no checkout/branch/tag/revert).
+ * anything itself). `→`/`←`/`Enter` toggle expansion (§6.8 step 2); the row's own context menu is
+ * copy-sha/copy-message only (`rowMenuModel.ts`'s `buildReviewRowMenu`, not `buildRowMenu` — this
+ * row offers no checkout/branch/tag/revert).
+ *
+ * G12 D12: opening a file no longer renders an in-webview diff overlay at all — `FileTree`'s
+ * selection calls `actions.openInEditor` directly (D11 fixed the URI it produces), the same
+ * request `DetailPane.vue`'s own tree already uses. D13: `list-mode`/`filter` are props from
+ * `ReviewView.vue`'s one panel-level toolbar, not this row's own `DetailState` fields — every
+ * row's `FileTree` renders no toolbar of its own (`show-toolbar="false"`).
  */
 import type { CommitStore } from '@kira/git-core';
 import { computed, ref } from 'vue';
+import type { FileListMode } from '../../state/detail.ts';
 import type { ReviewExpansion } from '../../state/review.ts';
 import { formatRelativeDate } from '../dateFormat.ts';
 import FileTree from '../FileTree.vue';
@@ -26,6 +31,10 @@ const props = defineProps<{
   /** Roving-tabindex cursor (§6.8's tree/treeitem pattern, `FileTree.vue`'s own precedent) —
    *  `ReviewView.vue` owns which row is the cursor across the whole list. */
   focused: boolean;
+  /** G12 D13: `ReviewView.vue`'s one panel-level toolbar state, forwarded to this row's own
+   *  `FileTree` (which renders no toolbar of its own). */
+  listMode: FileListMode;
+  filter: string;
 }>();
 
 const emit = defineEmits<{
@@ -94,6 +103,21 @@ function copySha(event: MouseEvent): void {
   const c = commit.value;
   if (c) props.expansion?.actions.copy(c.sha, 'full SHA');
 }
+
+// G12 D12: opens VS Code's native diff directly — no in-webview diff mode to flip into. `sha`'s
+// own parentIndex is this row's current merge-parent selection, exactly what commit.detail was
+// fetched against.
+function onSelectFile(index: number): void {
+  const exp = props.expansion;
+  const file = exp?.detail.detail.value?.files[index];
+  if (!exp || !file) return;
+  void exp.actions.openInEditor({
+    sha: props.sha,
+    path: file.path,
+    originalPath: file.originalPath,
+    parentIndex: exp.detail.parentIndex.value,
+  });
+}
 </script>
 
 <template>
@@ -137,15 +161,14 @@ function copySha(event: MouseEvent): void {
         v-else-if="expansion?.detail.detail.value"
         :files="expansion.detail.detail.value.files"
         :selected-file="expansion.detail.selectedFile.value"
-        :list-mode="expansion.detail.listMode.value"
-        :filter="expansion.detail.filter.value"
+        :list-mode="listMode"
+        :filter="filter"
+        :show-toolbar="false"
         :parents="expansion.detail.detail.value.parents"
         :parent-index="expansion.detail.parentIndex.value"
         :store="store"
         :actions="expansion.actions"
-        @select-file="expansion.detail.selectFile($event)"
-        @update:list-mode="expansion.detail.setListMode($event)"
-        @update:filter="expansion.detail.setFilter($event)"
+        @select-file="onSelectFile"
         @update:parent-index="expansion.detail.setParentIndex($event)"
       />
       <p v-else class="kv-review-row-loading">Loading…</p>
@@ -190,9 +213,11 @@ function copySha(event: MouseEvent): void {
 .kv-review-row-header {
   display: flex;
   align-items: center;
-  gap: var(--kv-space-2);
-  padding: var(--kv-space-2) var(--kv-space-3);
+  gap: var(--kv-s-2);
+  min-height: var(--kv-control-h);
+  padding: var(--kv-s-2) var(--kv-s-3);
   min-width: 0;
+  font-family: var(--kv-font-ui);
 }
 
 .kv-review-row-chevron {

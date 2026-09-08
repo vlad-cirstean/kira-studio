@@ -104,3 +104,25 @@
 .codicon-regex::before {
   content: "\eb38";
 }
+
+/* G12 D16: the review sidebar's Commits/Files toggle, FileTree's Tree/Flat toggle (now
+   panel-level, D13), and the Files pane's Since-review/Full-range toggle. */
+.codicon-files::before {
+  content: "\eaf0";
+}
+
+.codicon-list-tree::before {
+  content: "\eb86";
+}
+
+.codicon-list-flat::before {
+  content: "\eb84";
+}
+
+.codicon-diff::before {
+  content: "\eae1";
+}
+
+.codicon-diff-multiple::before {
+  content: "\ec23";
+}

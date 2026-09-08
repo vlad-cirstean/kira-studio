@@ -6,6 +6,13 @@ export const ACTION_ICONS = {
   chevronRight: 'codicon-chevron-right',
   back: 'codicon-chevron-left',
   renameArrow: 'codicon-arrow-small-right',
+  // G12 D16: the review sidebar's icon-only toggles.
+  commits: 'codicon-git-commit',
+  files: 'codicon-files',
+  listTree: 'codicon-list-tree',
+  listFlat: 'codicon-list-flat',
+  diffSingle: 'codicon-diff',
+  diffMultiple: 'codicon-diff-multiple',
 } as const;
 
 export type IconAction = keyof typeof ACTION_ICONS;
