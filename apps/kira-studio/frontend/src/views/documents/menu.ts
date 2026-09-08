@@ -2,7 +2,7 @@ import { beautifyJson } from '../../beautify';
 import { copyText } from '../../clipboard';
 import { confirmDialog } from '../../state/confirmDialog';
 import type { MenuItem } from '../../state/contextMenu';
-import { parseIdLabel, toRelaxedText, toShellText } from '../shared/document/ejson';
+import { parseIdLabel, toPlainJson, toRelaxedText, toShellText } from '../shared/document/ejson';
 import { deleteDocument } from './mutations';
 import { setActionError, setAllExpanded, toggleExpanded } from './state';
 
@@ -73,10 +73,25 @@ export function rowMenu(
       // shape (resultMenu.ts's tabularRowMenu) — a user choosing between mongosh syntax and
       // `{"$oid": …}` has to be told which is which, not read two unlabelled sibling items.
       // Leaf ids preserved (`copy-document`/`copy-as-json`) so existing specs keep passing.
+      //
+      // Real-interaction fix (reported bug — the normal/default copy button still produced
+      // `$oid`/`$date`-wrapped JSON): Plain JSON is new and listed first — none of the three
+      // existing formats could become it. Canonical Extended JSON must keep every wrapper intact
+      // (interaction.spec.ts/autocomplete.spec.ts lock in that `copy-as-json` round-trips through
+      // mongoimport/mongosh, and still contains `"$oid"`); Relaxed Extended JSON is still Extended
+      // JSON per spec (autocomplete.spec.ts locks in that it keeps `$oid` wrapped too — "no relaxed
+      // variant for ObjectId"); Shell mode is mongosh syntax, not JSON at all. ejson.ts's own
+      // `toPlainJson` strips every `$`-prefixed wrapper down to its plain-JSON equivalent instead.
       type: 'submenu',
       id: 'copy-document-submenu',
       label: 'Copy document',
       items: [
+        {
+          type: 'item',
+          id: 'copy-plain-json',
+          label: 'Plain JSON',
+          run: () => copyOrReportError(tabId, toPlainJson(body)),
+        },
         {
           type: 'item',
           id: 'copy-document',

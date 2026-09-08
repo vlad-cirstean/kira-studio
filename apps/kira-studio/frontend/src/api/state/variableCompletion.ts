@@ -12,7 +12,7 @@ import {
   TRANSFORM_NAMES,
   type TransformName,
 } from '@kira/api-core';
-import { buildHoverSource } from '../../editor/hover';
+import { buildHoverSource, formatHoverValue } from '../../editor/hover';
 import type { RangeHighlight } from '../../editor/variableHighlight';
 import { type Completion, templateToken } from '../../theme/primitives/completion';
 import { cachedVariables, mergedValuesAndSecrets } from './variables';
@@ -93,11 +93,36 @@ function scopeOf(name: string, environmentId: string): 'collection' | 'environme
 
 export interface VariableSupport {
   rangeHighlights: (doc: string) => readonly RangeHighlight[];
-  /** `null` when `offset` is not inside any `{{...}}` reference — closes/never opens the hover. */
+  /** `null` when `offset` is not inside any `{{...}}` reference — closes/never opens the hover.
+   *  AutocompleteField.vue's own separate hover panel (the plain `<input>` fields — URL bar,
+   *  headers, query params) is this function's one remaining direct caller: it renders every line
+   *  in one flat, undifferentiated list, unaffected by hoverInfo's value/caption split below,
+   *  which is scoped to the CodeMirror-native tooltip (editor/hover.ts) the request/message body
+   *  editors use instead. */
   hoverAt: (text: string, offset: number) => string[] | null;
+  /** Real-interaction fix (reported bug — the {{variable}} hover tooltip's value and its
+   *  explanation ran together as one undifferentiated block, and a JSON-shaped value showed as a
+   *  single truncated line): the same lookup as `hoverAt`, but keeping a resolved reference's
+   *  actual value (`value`, pretty-printed with editor/hover.ts's own `formatHoverValue` when it
+   *  parses as JSON) separate from its explanation (`lines` — the caption `variableHoverSource`
+   *  renders underneath it). `value` is `undefined` for every other reference kind (deferred/
+   *  dynamic/unknown never had a value to show, only ever an explanation) — `hoverAt` above is a
+   *  thin wrapper over this (`value` prepended into `lines` when present) rather than a second
+   *  copy of the same per-kind switch, so the two can never drift apart on what a reference means. */
+  hoverInfo: (text: string, offset: number) => HoverInfo | null;
   /** P17 D13(b): a function of the token's own context, not a static array — the list depends on
    *  whether the caret is before or after a `|` inside the reference. */
   candidates: (ctx: { text: string; from: number; word: string }) => Completion[];
+}
+
+export interface HoverInfo {
+  /** The reference's own value, distinct from its explanation — present only for a 'resolved'
+   *  reference with an actual value to show (never for deferred/dynamic/unknown, which have only
+   *  ever had an explanation). */
+  value?: string;
+  /** The explanation — the *entire* tooltip content when `value` is absent, a caption underneath
+   *  it otherwise. */
+  lines: string[];
 }
 
 // P17 D13(b): "after a `|`" is decided the same way templateToken decides "inside an unclosed
@@ -123,7 +148,7 @@ export function variableSupport(collectionId: string, environmentId: string): Va
       }));
   }
 
-  function hoverAt(text: string, offset: number): string[] | null {
+  function hoverInfo(text: string, offset: number): HoverInfo | null {
     const span = splitTemplateSpans(text).find(
       (s) => s.isReference && offset >= s.from && offset < s.to,
     );
@@ -141,19 +166,29 @@ export function variableSupport(collectionId: string, environmentId: string): Va
         // D13(c): the renderer has the plaintext for a non-secret, so showing the piped RESULT is
         // both possible and more useful than showing the input untransformed.
         const shown = pipeline.length > 0 ? (applyPipeline(pipeline, raw) ?? raw) : raw;
+        // Real-interaction fix: pretty-printed first (formatHoverValue re-indents a JSON-shaped
+        // value), *then* length-capped — a value that only exceeds HOVER_VALUE_MAX_LENGTH because
+        // indentation added whitespace would be a strange thing to truncate over.
+        const formatted = formatHoverValue(shown);
         const truncated =
-          shown.length > HOVER_VALUE_MAX_LENGTH
-            ? `${shown.slice(0, HOVER_VALUE_MAX_LENGTH)}…`
-            : shown;
-        return [truncated, `${scopeOf(span.name, environmentId)} variable`, ...chainLine];
+          formatted.length > HOVER_VALUE_MAX_LENGTH
+            ? `${formatted.slice(0, HOVER_VALUE_MAX_LENGTH)}…`
+            : formatted;
+        return {
+          value: truncated,
+          lines: [`${scopeOf(span.name, environmentId)} variable`, ...chainLine],
+        };
       }
       case 'deferred':
         // F5/§0.3: a secret's plaintext never enters the renderer to begin with — there is no
         // value this line could show even if it wanted to, transformed or not (P15b §4's security
         // assertion, extended to a pipeline).
-        return pipeline.length > 0
-          ? [`secret — ${describePipelineVerbs(pipeline)} when the request is sent`]
-          : ['secret — resolved when the request is sent'];
+        return {
+          lines:
+            pipeline.length > 0
+              ? [`secret — ${describePipelineVerbs(pipeline)} when the request is sent`]
+              : ['secret — resolved when the request is sent'],
+        };
       case 'dynamic': {
         // D4's table also wants "the catalogue's own description" as a second line here — the
         // catalogue (api-core's dynamic/catalog.ts) deliberately carries no description strings
@@ -162,17 +197,30 @@ export function variableSupport(collectionId: string, environmentId: string): Va
         // a documented deviation rather than a second, drifting copy of that dialog's samples.
         // D12: catalogued means either spelling.
         const catalogued = isDynamicName(span.name) || isFakeName(span.name);
-        return catalogued
-          ? ['generated fresh on every send', ...chainLine]
-          : ['unknown dynamic value'];
+        return {
+          lines: catalogued
+            ? ['generated fresh on every send', ...chainLine]
+            : ['unknown dynamic value'],
+        };
       }
       case 'unknown':
         // D3 rule 4: a name shaped like a failed pipeline (contains `|` but never parsed as one)
         // gets a second line naming exactly which segment isn't a real transform.
-        return span.name.includes('|')
-          ? ['not defined in this collection or environment', badTransformMessage(span.name)]
-          : ['not defined in this collection or environment'];
+        return {
+          lines: span.name.includes('|')
+            ? ['not defined in this collection or environment', badTransformMessage(span.name)]
+            : ['not defined in this collection or environment'],
+        };
     }
+  }
+
+  // AutocompleteField.vue's own separate hover panel — flattens `value` back onto the front of
+  // `lines` so its output is byte-identical to what this function returned before hoverInfo above
+  // existed (it renders every line the same, undifferentiated way regardless).
+  function hoverAt(text: string, offset: number): string[] | null {
+    const info = hoverInfo(text, offset);
+    if (!info) return null;
+    return info.value !== undefined ? [info.value, ...info.lines] : info.lines;
   }
 
   const varCandidates: Completion[] = [
@@ -217,6 +265,7 @@ export function variableSupport(collectionId: string, environmentId: string): Va
   return {
     rangeHighlights,
     hoverAt,
+    hoverInfo,
     candidates,
   };
 }
@@ -230,15 +279,20 @@ export function variableSupport(collectionId: string, environmentId: string): Va
 
 // buildHoverSource (editor/hover.ts) already owns the .cm-kira-hover/.cm-kira-hover-line DOM the
 // SQL console's own hover uses — reused rather than duplicated. Its `tree` parameter is SQL-
-// specific and unused here; hoverAt only needs the doc text and the pointer offset.
-export function variableHoverSource(hoverAt: VariableSupport['hoverAt']): HoverTooltipSource {
+// specific and unused here; hoverInfo only needs the doc text and the pointer offset.
+//
+// Real-interaction fix (reported bug — the tooltip's value and its explanation ran together):
+// takes `hoverInfo` (not `hoverAt`) so buildHoverSource gets the value/caption split — `value`
+// renders as its own inset block, `lines` as the caption underneath it (hover.ts's own
+// ConsoleHoverInfo.value doc comment).
+export function variableHoverSource(hoverInfo: VariableSupport['hoverInfo']): HoverTooltipSource {
   return buildHoverSource((doc, pos) => {
-    const lines = hoverAt(doc, pos);
-    // hoverAt has no notion of the reference's own span (F5/AutocompleteField.vue's own hover
+    const info = hoverInfo(doc, pos);
+    // hoverInfo has no notion of the reference's own span (F5/AutocompleteField.vue's own hover
     // panel gets away with the same simplification, its own comment: "without needing the
     // token's own span") — a point tooltip at `pos` re-triggers as the mouse moves, which is
-    // harmless since the same lines come back for any offset still inside the reference.
-    return lines ? { from: pos, to: pos, lines } : null;
+    // harmless since the same info comes back for any offset still inside the reference.
+    return info ? { from: pos, to: pos, lines: info.lines, value: info.value } : null;
   });
 }
 

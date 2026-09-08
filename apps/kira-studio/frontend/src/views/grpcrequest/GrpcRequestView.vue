@@ -413,7 +413,7 @@ onUnmounted(() => {
             language="json"
             :read-only="false"
             :range-highlights="variables.rangeHighlights"
-            :hover-source="variableHoverSource(variables.hoverAt)"
+            :hover-source="variableHoverSource(variables.hoverInfo)"
             autocomplete
             :completion-sources="[variableCompletionSource(variables.candidates)]"
             auto-close-brackets

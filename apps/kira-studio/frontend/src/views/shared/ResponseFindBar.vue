@@ -16,9 +16,14 @@ import TextField from '../../theme/primitives/TextField.vue';
 // chrome and the cross-document navigation) — deliberately not @codemirror/search (D11: not a
 // dependency, and its own panel/keymap/styling would need suppressing and re-skinning for a
 // requirement `indexOf` already meets). SearchToolbar.vue's own placement (LAW 03: docks below the
-// pane it searches) and key handling (Enter/Shift+Enter to step, Escape to close) are the
-// precedent this mirrors, at a fraction of that widget's size — no case/word/regex, no chunked
-// scan, no filter mode: a response body is one in-memory string, not a paged result set.
+// toolbar/filter row and above the content it searches, never floating over it and never below
+// the content — real-interaction fix: this comment previously had it backwards, "docks below the
+// pane it searches", which is exactly the "docks at the bottom of the result" placement
+// DataView.vue's own SearchToolbar usage records as rejected for reading "as a bug rather than a
+// search bar"; ResponsePane.vue's own placement of this component is corrected to match) and key
+// handling (Enter/Shift+Enter to step, Escape to close) are the precedent this mirrors, at a
+// fraction of that widget's size — no case/word/regex, no chunked scan, no filter mode: a response
+// body is one in-memory string, not a paged result set.
 
 export interface FindBarHost {
   scrollRangeIntoView(from: number, to: number): void;

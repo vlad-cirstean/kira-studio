@@ -21,7 +21,7 @@ import {
 const { setPage } = await import('../../frontend/src/views/grid/page');
 const { runtime } = await import('../../frontend/src/views/grid/state');
 const { data } = await import('../../frontend/src/bridge/data');
-const { stageEdit, toggleDelete, commitPending, previewPending } = await import(
+const { stageEdit, stageDelete, commitPending, previewPending } = await import(
   '../../frontend/src/views/grid/pendingChanges'
 );
 
@@ -113,7 +113,7 @@ describe('a staged change against a partially-hidden composite primary key fails
       searchOpen: false,
     };
     setPage(tabId, compositeKeyPageWithOneColumnHidden());
-    toggleDelete(tabId, [0]);
+    stageDelete(tabId, [0]);
 
     // Explicitly mocked (never expected to be reached) rather than left to the real bridge,
     // which would otherwise hang against the fake window mock instead of failing fast if this
@@ -148,7 +148,7 @@ describe('a staged change against a partially-hidden composite primary key fails
     const builder = createTabularPageBuilder(columns);
     builder.appendRow(['t1', 'e1']);
     setPage(tabId, builder.finish(unpagedPosition(1)));
-    toggleDelete(tabId, [0]);
+    stageDelete(tabId, [0]);
 
     let mutateCalled = false;
     let sentKey: unknown;

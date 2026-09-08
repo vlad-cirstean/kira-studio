@@ -8,7 +8,12 @@ import {
   rowsToJson,
   rowsToTsv,
 } from '../shared/clipboardFormats';
-import { beautifyShellText, toRelaxedText, toShellText } from '../shared/document/ejson';
+import {
+  beautifyShellText,
+  toPlainJson,
+  toRelaxedText,
+  toShellText,
+} from '../shared/document/ejson';
 
 // P19 D9/D10: the console result grid's own menu builders, mirroring views/grid/menu.ts's split
 // (builders in a plain module, the host only opens them) -- item ids follow that file's own
@@ -261,6 +266,13 @@ function compactShellText(body: string): string {
 // resultMenu.ts's own tabularRowMenu Copy row(s) ▸ shape above) rather than documents/menu.ts's
 // old flat "Copy as JSON"/"Copy all as JSON" pair. Leaf ids `copy-as-json`/`copy-all-as-json`
 // preserved so existing specs keep passing on a path change with no assertion change.
+//
+// Real-interaction fix (reported bug — the normal/default copy button still produced
+// `$oid`/`$date`-wrapped JSON, mirrored from documents/menu.ts's own identical fix): Plain JSON is
+// new and listed first in each submenu — Canonical/Relaxed Extended JSON must both keep `$oid`
+// wrapped (autocomplete.spec.ts locks in Canonical's own mongoimport/mongosh round-trip and
+// Relaxed's "no relaxed variant for ObjectId" per spec), and Shell mode is mongosh syntax, not
+// JSON. ejson.ts's own `toPlainJson` strips every `$`-prefixed wrapper instead.
 export function mongoDocumentRowMenu(ctx: MongoDocumentRowMenuContext): MenuItem[] {
   return [
     {
@@ -269,6 +281,12 @@ export function mongoDocumentRowMenu(ctx: MongoDocumentRowMenuContext): MenuItem
       label: 'Copy document',
       icon: 'copy',
       items: [
+        {
+          type: 'item',
+          id: 'copy-plain-json',
+          label: 'Plain JSON',
+          run: () => copyOrReportError(toPlainJson(ctx.body), ctx.onError),
+        },
         {
           type: 'item',
           id: 'copy-document',
@@ -295,6 +313,12 @@ export function mongoDocumentRowMenu(ctx: MongoDocumentRowMenuContext): MenuItem
       label: 'Copy all',
       icon: 'copy',
       items: [
+        {
+          type: 'item',
+          id: 'copy-all-plain-json',
+          label: 'Plain JSON',
+          run: () => copyOrReportError(jsonArrayOf(ctx.allBodies().map(toPlainJson)), ctx.onError),
+        },
         {
           type: 'item',
           id: 'copy-all-shell',

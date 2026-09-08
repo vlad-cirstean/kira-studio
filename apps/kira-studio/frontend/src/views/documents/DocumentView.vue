@@ -649,6 +649,30 @@ onUnmounted(() => {
 
       <template #toolbar>
         <div class="sep"></div>
+        <!-- Real-interaction fix (reported bug — the pager sits on the right instead of where it
+             made sense before): mirrors DataToolbar.vue's own P28 D7 revert of d2892f49 ("the
+             pager sits at the toolbar's right edge"), which moved the SQL grid's pager back beside
+             the page-size picker it pages through, at the toolbar's reading edge — by user report,
+             navigation belongs there, not alone at the far #toolbar-end. That revert was
+             deliberately NOT applied here at the time (f9ef22de's own commit message: "DocumentView's
+             pager is deliberately left where it is: that commit never touched it and its placement
+             was not reported") — this collection's pager was left in #toolbar-end (P22 D4's earlier
+             move, made to agree with the SQL grid's *then-current* right-edge placement, before D7
+             reverted it there). Now that the same placement is reported here too, this gets the
+             identical fix, same reading-edge position DataToolbar.vue uses. -->
+        <PagerControls
+          :page-index="tab.state.pageIndex"
+          :page-size="tab.state.pageSize"
+          :count="rt?.count?.value ?? null"
+          :has-more="!!rt?.hasMore"
+          testid-prefix="document-"
+          last-tooltip="Count documents first"
+          @first="goFirst(tab.id)"
+          @prev="goPrev(tab.id)"
+          @next="goNext(tab.id)"
+          @last="goLast(tab.id)"
+          @jump="onJump"
+        />
         <SegmentedControl
           :model-value="tab.state.pageSize"
           :options="PAGE_SIZE_OPTIONS"
@@ -713,28 +737,6 @@ onUnmounted(() => {
             @click="onToggleSearch"
           />
         </div>
-      </template>
-
-      <!-- P22 D4 (F7/OQ-4): moved here from #toolbar so this view agrees with DataView.vue's SQL
-           grid about where the shared pager lives — the toolbar's right-most control, with
-           nothing after it (RunState sits ahead of #toolbar-end, P22 D4) able to reflow it.
-           Canonical control order and shape otherwise unchanged: first/prev/page-jump/next/last.
-           Mongo supports an arbitrary skip()/limit() offset, so — unlike Redis/Kafka/SQS's
-           cursor-only pagination — a real page-N jump box applies here too. -->
-      <template #toolbar-end>
-        <PagerControls
-          :page-index="tab.state.pageIndex"
-          :page-size="tab.state.pageSize"
-          :count="rt?.count?.value ?? null"
-          :has-more="!!rt?.hasMore"
-          testid-prefix="document-"
-          last-tooltip="Count documents first"
-          @first="goFirst(tab.id)"
-          @prev="goPrev(tab.id)"
-          @next="goNext(tab.id)"
-          @last="goLast(tab.id)"
-          @jump="onJump"
-        />
       </template>
 
       <!-- The Mongo dialect of the filter row: one filter box, permanent, never closed — plus a

@@ -187,16 +187,21 @@ export function duplicateAsInsert(tabId: string, row: number): string | null {
   return id;
 }
 
-// Toggles delete for each row: already-pending rows are un-marked, others are marked (and any
-// pending edit on them is dropped — moot once the row is gone).
-export function toggleDelete(tabId: string, rows: number[]): void {
+// Real-interaction fix (reported bug — invoking the delete shortcut a second time on an already-
+// deleted row UNDID the deletion): this used to toggle — an already-pending row was un-marked
+// rather than left alone. Every one of its three callers (the right-click menu's "Delete row(s)",
+// the `grid.deleteRows` keyboard shortcut, and DataToolbar.vue's own toolbar button) presents
+// itself as a plain "delete this" action with no toggle affordance (no distinct icon/label for
+// "already deleted, click to undo"), so a repeat invocation — the same shortcut fired twice by
+// habit, or the same selection re-deleted after extending it — silently reversed the user's own
+// most recent action instead of being a no-op. Marking for delete is now idempotent, exactly like
+// stageEdit/stageNull above never toggle either: "Revert row(s)" (discardRowChange) is the one and
+// only way to undo a pending delete, for every pending-change kind this module has.
+export function stageDelete(tabId: string, rows: number[]): void {
   const p = ensure(tabId);
   for (const row of rows) {
-    if (p.deletes.has(row)) p.deletes.delete(row);
-    else {
-      p.deletes.add(row);
-      p.edits.delete(row);
-    }
+    p.deletes.add(row);
+    p.edits.delete(row); // a row marked for delete is not independently editable (mirrors stageEdit)
   }
 }
 

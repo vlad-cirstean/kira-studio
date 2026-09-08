@@ -10,7 +10,9 @@ import { pageSizeOptions } from '../shared/page/sizes';
 import ColumnsMenu from './ColumnsMenu.vue';
 import { canGenerateDataFor } from './fakeData/generate';
 import { getPage, pageVersion } from './page';
-import { addInsertRow, discardInsertRow, pendingFor, toggleDelete } from './pendingChanges';
+import { addInsertRow, discardInsertRow, pendingFor, stageDelete } from './pendingChanges';
+import { matchedRows } from './search';
+import { rowsForSelection } from './slick/rowValues';
 import {
   goFirst,
   goLast,
@@ -54,7 +56,7 @@ const isWritable = computed(
 // addressable row to DELETE (a MergeTree PRIMARY KEY is a sparse index, not a unique key), so
 // isWritable alone is no longer enough to offer this button.
 // P28 D8: also gated on a selection and a primary key. onDeleteRow below opens with
-// `if (!sel) return`, and toggleDelete stages an op that can never resolve without a primary key
+// `if (!sel) return`, and stageDelete stages an op that can never resolve without a primary key
 // — so before this the button was enabled and silently inert in both cases, which is the reported
 // "deleting selected rows doesn't work at all". SlickGridHost's own canDeleteRows() has always
 // required hasPrimaryKey; this is the same predicate, plus the selection the toolbar needs and the
@@ -155,26 +157,26 @@ function onAddRow(): void {
   );
 }
 
-// A selected row/cell/range at or beyond the page's real row count addresses an appended
+// A selected row/cell/range/column at or beyond the page's real row count addresses an appended
 // pending-insert row (DataGrid.vue's synthetic row indices) — deleting one of those discards it
 // outright rather than staging a delete op that could never resolve to a real primary key.
+//
+// Real-interaction fix (§4b/§4d): this used to hand-roll its own row/cell/range switch — a third
+// copy of the same conversion SlickGridHost.vue's onKeydown and onGridContextMenu each used to
+// hand-roll too — and, like both of those, never grew a `column` branch, so this button did
+// nothing for a column selection. Routed through `rowsForSelection` (slick/rowValues.ts) now, the
+// same one every other "act on the current selection" call site uses, so a selection kind newly
+// needs coverage exactly once, not here as well.
 function onDeleteRow(): void {
   const r = runtime[props.tab.id];
   const sel = r?.selection;
   if (!sel) return;
   const p = getPage(props.tab.id);
   const rowCount = p?.rowCount ?? 0;
-
-  let rows: number[];
-  if (sel.kind === 'row') rows = sel.rows;
-  else if (sel.kind === 'cell') rows = [sel.row];
-  else if (sel.kind === 'range') {
-    const [r0, r1] = [sel.anchorRow, sel.row].sort((a, b) => a - b);
-    rows = Array.from({ length: r1 - r0 + 1 }, (_, i) => r0 + i);
-  } else return;
+  const rows = rowsForSelection(sel, matchedRows(props.tab.id), rowCount);
 
   const realRows = rows.filter((row) => row < rowCount);
-  if (realRows.length) toggleDelete(props.tab.id, realRows);
+  if (realRows.length) stageDelete(props.tab.id, realRows);
 
   const inserts = pendingFor(props.tab.id)?.inserts ?? [];
   for (const row of rows.filter((row) => row >= rowCount)) {

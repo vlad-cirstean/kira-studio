@@ -11,6 +11,7 @@ import { describe, expect, test } from 'bun:test';
 import {
   parseDocument,
   parseIdLabel,
+  toPlainJson,
   toRelaxedText,
   toShellText,
 } from '../../frontend/src/views/shared/document/ejson';
@@ -222,5 +223,87 @@ describe('toRelaxedText — canonical -> Relaxed Extended JSON v2', () => {
     const raw = '{not valid json';
     expect(() => toRelaxedText(raw)).not.toThrow();
     expect(toRelaxedText(raw)).toBe(raw);
+  });
+});
+
+// Real-interaction fix (reported bug — the normal/default copy button still produced JSON wrapped
+// in Mongo/BSON type annotations, e.g. `{"$date": …}`/`{"$oid": …}`, not actually plain JSON):
+// unlike toRelaxedText above (which deliberately keeps $oid and every other non-numeric/date
+// wrapper, per the real Extended JSON v2 spec — this file's own "no relaxed variant for ObjectId"
+// case just above), toPlainJson resolves every wrapper down to its plain-JSON equivalent, with no
+// `$`-prefixed key surviving anywhere in the result.
+describe('toPlainJson — every BSON wrapper resolves to a plain JSON value, no $-prefixed keys survive', () => {
+  test('$oid becomes a plain string', () => {
+    expect(toPlainJson('{"_id":{"$oid":"507f1f77bcf86cd799439011"}}')).toBe(
+      '{\n  "_id": "507f1f77bcf86cd799439011"\n}',
+    );
+  });
+
+  test('$date becomes a plain ISO-8601 string, from either canonical millis form', () => {
+    expect(toPlainJson('{"d":{"$date":{"$numberLong":"1704067200000"}}}')).toBe(
+      '{\n  "d": "2024-01-01T00:00:00.000Z"\n}',
+    );
+    expect(toPlainJson('{"d":{"$date":"2024-01-01T00:00:00.000Z"}}')).toBe(
+      '{\n  "d": "2024-01-01T00:00:00.000Z"\n}',
+    );
+  });
+
+  test('$numberInt/$numberLong/$numberDecimal/a finite $numberDouble all become a plain JSON number', () => {
+    expect(
+      toPlainJson(
+        '{"a":{"$numberInt":"5"},"b":{"$numberLong":"123"},"c":{"$numberDecimal":"19.99"},"d":{"$numberDouble":"3.5"}}',
+      ),
+    ).toBe('{\n  "a": 5,\n  "b": 123,\n  "c": 19.99,\n  "d": 3.5\n}');
+  });
+
+  test('a non-finite $numberDouble (NaN/Infinity) falls back to its raw string — still no wrapper object', () => {
+    expect(toPlainJson('{"n":{"$numberDouble":"NaN"}}')).toBe('{\n  "n": "NaN"\n}');
+  });
+
+  test('$regularExpression becomes its bare pattern string', () => {
+    expect(toPlainJson('{"r":{"$regularExpression":{"pattern":"^a+$","options":"i"}}}')).toBe(
+      '{\n  "r": "^a+$"\n}',
+    );
+  });
+
+  test('$code (no $scope) becomes a plain string', () => {
+    expect(toPlainJson('{"f":{"$code":"function(){}"}}')).toBe('{\n  "f": "function(){}"\n}');
+  });
+
+  test('a wrapper with no single-scalar equivalent ($binary) keeps its shape but strips every leading $', () => {
+    expect(toPlainJson('{"b":{"$binary":{"base64":"ZGF0YQ==","subType":"00"}}}')).toBe(
+      '{\n  "b": {\n    "binary": {\n      "base64": "ZGF0YQ==",\n      "subType": "00"\n    }\n  }\n}',
+    );
+  });
+
+  test('the reported case: $oid and $date both wrapped, side by side — neither survives', () => {
+    const body =
+      '{"_id":{"$oid":"507f1f77bcf86cd799439011"},"created":{"$date":{"$numberLong":"1704067200000"}},"name":"widget-0"}';
+    const plain = toPlainJson(body);
+    expect(plain).not.toContain('$oid');
+    expect(plain).not.toContain('$date');
+    expect(JSON.parse(plain)).toEqual({
+      _id: '507f1f77bcf86cd799439011',
+      created: '2024-01-01T00:00:00.000Z',
+      name: 'widget-0',
+    });
+  });
+
+  test('nested objects/arrays recurse — a document is not just its top-level fields', () => {
+    expect(toPlainJson('{"tags":[{"$oid":"507f1f77bcf86cd799439011"},{"$numberInt":"2"}]}')).toBe(
+      '{\n  "tags": [\n    "507f1f77bcf86cd799439011",\n    2\n  ]\n}',
+    );
+  });
+
+  test('a document with no wrapper anywhere is unchanged in shape, just re-indented', () => {
+    expect(toPlainJson('{"a":1,"b":"x","c":null,"d":true}')).toBe(
+      JSON.stringify({ a: 1, b: 'x', c: null, d: true }, null, 2),
+    );
+  });
+
+  test('invalid JSON falls back to the raw body unchanged, not a throw', () => {
+    const raw = '{not valid json';
+    expect(() => toPlainJson(raw)).not.toThrow();
+    expect(toPlainJson(raw)).toBe(raw);
   });
 });

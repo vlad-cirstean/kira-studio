@@ -1135,6 +1135,17 @@ test('Query console — a Mongo document result copies as JSON, one row or all d
   await page.click('[data-testid="menu-item-copy-as-json"]');
   expect(await lastClipboardWrite(page)).toContain('"name": "alpha"');
 
+  // --- this row, Plain JSON (real-interaction fix — the normal/default copy button still
+  // produced $oid/$date-wrapped JSON; the new, listed-first Plain JSON format does not) ---------
+  await docRows.nth(0).click({ button: 'right' });
+  await expect(page.locator('[data-testid="context-menu"]')).toBeVisible();
+  await page.locator('[data-testid="menu-item-copy-document-submenu"]').hover();
+  await expect(page.locator('[data-testid="context-submenu"]')).toBeVisible();
+  await page.click('[data-testid="menu-item-copy-plain-json"]');
+  const copiedPlain = await lastClipboardWrite(page);
+  expect(copiedPlain).not.toContain('$oid');
+  expect(JSON.parse(copiedPlain)).toMatchObject({ name: 'alpha' });
+
   // --- this row, shell mode ------------------------------------------------------------------
   await docRows.nth(0).click({ button: 'right' });
   await expect(page.locator('[data-testid="context-menu"]')).toBeVisible();

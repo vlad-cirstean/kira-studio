@@ -194,7 +194,7 @@ const caption = computed(() =>
       language="plain"
       :read-only="false"
       :range-highlights="bodyHighlights"
-      :hover-source="variables && variableHoverSource(variables.hoverAt)"
+      :hover-source="variables && variableHoverSource(variables.hoverInfo)"
       :autocomplete="!!variables"
       :completion-sources="variables && [variableCompletionSource(variables.candidates)]"
       auto-close-brackets
@@ -207,7 +207,7 @@ const caption = computed(() =>
       :language="editorLanguage"
       :read-only="false"
       :range-highlights="bodyHighlights"
-      :hover-source="variables && variableHoverSource(variables.hoverAt)"
+      :hover-source="variables && variableHoverSource(variables.hoverInfo)"
       :autocomplete="!!variables"
       :completion-sources="variables && [variableCompletionSource(variables.candidates)]"
       auto-close-brackets

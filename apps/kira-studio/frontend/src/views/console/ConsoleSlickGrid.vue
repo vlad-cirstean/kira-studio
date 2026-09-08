@@ -47,6 +47,7 @@ import 'slickgrid/dist/styles/css/slick.grid.css';
 import { tabularCellMenu, tabularColumnMenu, tabularRangeMenu, tabularRowMenu } from './resultMenu';
 import { cell, getPage, setVisibleWindow } from './resultPages';
 import { type Match, matchedRows, searchState } from './search';
+import { consoleColumnWidths, setConsoleColumnWidths } from './state';
 
 // P30 §3 — the console result grid's tabular branch, migrated off @tanstack/vue-virtual onto the
 // same KiraSlickGrid/dataSource.ts/slickTheme.css layer views/grid/SlickGridHost.vue already uses
@@ -149,11 +150,22 @@ function tooltipAttrs(content: ReturnType<typeof columnHeaderTooltip>): Record<s
   };
 }
 
-// §3.4: no persisted column widths — always the measured/default width, reset on every remount
-// (`:key="pageKey"` in ConsoleResultGrid.vue). §3.4: every column gets `sortable: false` (no
-// re-query path). P19 F14/D8: the gutter is now focusable/selectable — `rowSelectColumnIds`
-// (below) needs it to compute a row selection when the active cell lands there; Tab/Left-arrow
-// landing on the gutter is the one side effect (SlickGridHost.vue's own F14 finding, verbatim).
+// Real-interaction fix (reported bug — column widths reset on every subsequent query in the same
+// session): §3.4 used to read "no persisted column widths — always the measured/default width,
+// reset on every remount", by deliberate design — a console result has no tab state the way
+// SlickGridHost.vue's own DataTabState.columnWidths does. That's still true; what changed is where
+// the memory lives. `consoleColumnWidths`/`setConsoleColumnWidths` (state.ts) key it by column
+// *name* on the tab's own runtime record instead — the first time this tab ever measures a given
+// column name (this tab's first query, or any later query whose result introduces a column this
+// tab hasn't shown before), the measured width is committed as that name's sticky width for the
+// rest of the session; every subsequent build (`:key="pageKey"` in ConsoleResultGrid.vue remounts
+// this component on every run) reuses it verbatim, exactly like SlickGridHost.vue's own
+// `buildColumns`'s `storedWidths[name] ?? measured[name]` already does for the SQL data view.
+// A manual resize (onColumnsResized, below) is committed the same way. Every column still gets
+// `sortable: false` (no re-query path). P19 F14/D8: the gutter is now focusable/selectable —
+// `rowSelectColumnIds` (below) needs it to compute a row selection when the active cell lands
+// there; Tab/Left-arrow landing on the gutter is the one side effect (SlickGridHost.vue's own F14
+// finding, verbatim).
 function buildColumns(page: TabularPage): KiraColumn[] {
   const cols: KiraColumn[] = [
     {
@@ -175,7 +187,15 @@ function buildColumns(page: TabularPage): KiraColumn[] {
   // Finding 6 (round 2) — indexed, not name-keyed (`initialWidths` would silently collide on a
   // duplicate column name, e.g. `SELECT 1 AS x, 2 AS x`) — the one remaining name-keyed
   // assumption in an otherwise fully index-addressed console path (colField(i), P30 §3 follow-up).
+  // The session-scoped sticky-width store (below) is the one deliberate exception: it is keyed by
+  // name because that is the identity a *later, different* result set's columns must match against
+  // to inherit a width at all — a duplicate-named result shares one sticky width across its
+  // same-named columns, same tradeoff SlickGridHost.vue's own tab.state.columnWidths already
+  // accepts (it just never sees a duplicate, a real table's columns being unique by construction).
   const measured = initialWidthsByIndex(page);
+  const stored = consoleColumnWidths(props.tabId);
+  const nextStored: Record<string, number> = { ...stored };
+  let storedChanged = false;
   page.columns.forEach((col, i) => {
     const classes = [`tc-${categoryForTypeClass(col.typeClass)}`];
     if (alignmentFor(col) === 'right') classes.push('kira-align-right');
@@ -185,6 +205,15 @@ function buildColumns(page: TabularPage): KiraColumn[] {
     // grid's header furniture is 16px of padding only, which measuredWidths' own CELL_PADDING
     // already covered, so this is provably unchanged for every name short enough to matter.
     const floor = headerAwareMinWidth(col.name, { padding: 16, sortControl: 0, keyBadge: 0 });
+    // This tab's own sticky width for this column name wins over a fresh measurement — the first
+    // time a name is ever seen in this tab (a brand new session, or a query returning a column
+    // this tab hasn't shown before) measures it and commits the result below so every later query
+    // in the same tab finds it here instead of re-measuring.
+    const width = stored[col.name] ?? measured[i] ?? DEFAULT_COLUMN_WIDTH;
+    if (stored[col.name] === undefined) {
+      nextStored[col.name] = width;
+      storedChanged = true;
+    }
     cols.push({
       id: colField(i),
       field: colField(i),
@@ -193,7 +222,7 @@ function buildColumns(page: TabularPage): KiraColumn[] {
       // Math.max clamp), and DEFAULT_COLUMN_WIDTH (96) is above it too — width itself needs no
       // extra clamp here, unlike SlickGridHost.vue's storedWidths path. minWidth still needs to
       // match, so an interactive drag can't undercut what a fresh render already guarantees.
-      width: measured[i] ?? DEFAULT_COLUMN_WIDTH,
+      width,
       minWidth: floor,
       resizable: true,
       sortable: false,
@@ -211,6 +240,7 @@ function buildColumns(page: TabularPage): KiraColumn[] {
       },
     });
   });
+  if (storedChanged) setConsoleColumnWidths(props.tabId, nextStored);
   return cols;
 }
 
@@ -439,6 +469,22 @@ function onSelectedRangesChanged(_e: unknown, ranges: SlickRange[]): void {
   refreshSelEdges();
 }
 
+// Real-interaction fix — mirrors SlickGridHost.vue's own onColumnsResized: SlickGrid drags the
+// handle and persists nothing on its own, so a manual resize is read straight off getColumns() and
+// committed into this tab's session-scoped sticky-width store (state.ts's consoleColumnWidths),
+// the same place buildColumns' own first-measurement commit (above) writes to — a manual resize
+// and an auto-measured width are stored identically, so a later query in the same tab can't tell
+// (and doesn't need to) which one produced the width it's now honouring.
+function onColumnsResized(): void {
+  if (!grid) return;
+  const widths: Record<string, number> = { ...consoleColumnWidths(props.tabId) };
+  for (const col of grid.getColumns()) {
+    if (col.id === GUTTER_FIELD || col.width === undefined) continue;
+    widths[String(col.name)] = col.width;
+  }
+  setConsoleColumnWidths(props.tabId, widths);
+}
+
 // F15: no `.header-select-zone`, no `onHeaderCellRendered` subscription — a console result has no
 // sort at all (every column is `sortable: false`) and no re-query path, so a plain header body
 // click is free to mean "select this column" outright.
@@ -613,20 +659,19 @@ function onGridContextMenu(e: SlickEventData): void {
   );
 }
 
+// Real-interaction fix (reported bug — right-clicking a column header was selecting/highlighting
+// it as a side effect of opening the menu, mirrored from SlickGridHost.vue's own identical fix):
+// tabularColumnMenu()'s items close over `displayCol`/`column` directly and read no live
+// selection, so pushing a column range through the selection model here was never functionally
+// necessary — it only ever painted a highlight and discarded whatever the user had selected.
 function onGridHeaderContextMenu(e: SlickEventData, args: { column: KiraColumn }): void {
-  if (!grid || !selectionModel || !page) return;
+  if (!grid || !page) return;
   if (args.column.id === GUTTER_FIELD) return;
   e.preventDefault();
   const displayCol = colIndexFromField(String(args.column.field));
   if (displayCol < 0) return;
   const column = page.columns[displayCol];
   if (!column) return;
-  const displayRowCount = matchedRows(props.tabId)?.length ?? page.rowCount;
-  const colCount = grid.getColumns().length - 1;
-  pendingSelectionKind = 'column';
-  selectionModel.setSelectedRanges(
-    rangesFromSelection({ kind: 'column', cols: [displayCol] }, displayRowCount, colCount),
-  );
   openContextMenu(
     e as unknown as MouseEvent,
     tabularColumnMenu({
@@ -777,6 +822,7 @@ onMounted(() => {
   eventHandler.subscribe(grid.onHeaderClick, onGridHeaderClick);
   eventHandler.subscribe(grid.onContextMenu, onGridContextMenu);
   eventHandler.subscribe(grid.onHeaderContextMenu, onGridHeaderContextMenu);
+  eventHandler.subscribe(grid.onColumnsResized, onColumnsResized);
   eventHandler.subscribe(grid.onKeyDown, onKeydown);
   eventHandler.subscribe(selectionModel.onSelectedRangesChanged, onSelectedRangesChanged);
   const cellRangeSelector = selectionModel.getCellRangeSelector();

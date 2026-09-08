@@ -15,8 +15,8 @@ import {
   discardRowChange,
   duplicateAsInsert,
   pendingFor,
+  stageDelete,
   stageNull,
-  toggleDelete,
 } from './pendingChanges';
 import { setFilter, setProjection, setSort } from './state';
 
@@ -265,7 +265,7 @@ export function cellMenu(ctx: CellMenuContext): MenuItem[] {
       danger: true,
       disabled: !ctx.canDelete,
       shortcut: 'grid.deleteRows',
-      run: () => toggleDelete(ctx.tabId, [ctx.row]),
+      run: () => stageDelete(ctx.tabId, [ctx.row]),
     },
     {
       type: 'item',
@@ -385,7 +385,7 @@ export function rowMenu(ctx: RowMenuContext): MenuItem[] {
       danger: true,
       disabled: !ctx.canDelete,
       shortcut: 'grid.deleteRows',
-      run: () => toggleDelete(ctx.tabId, ctx.rows),
+      run: () => stageDelete(ctx.tabId, ctx.rows),
     },
   ];
 }

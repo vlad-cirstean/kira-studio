@@ -11,6 +11,18 @@ import { autoUpdate, computeFloatPosition } from '../floatingPosition';
 // Not for workbench/ContextMenu.vue: that menu is anchored to the mouse click point, not to a
 // trigger element — a different reference shape (../floatingPosition.ts's own `pointReference`),
 // even though P23 moved both onto the same underlying computePosition call.
+// Real-interaction fix (reported bug — an app dropdown rendered right-aligned when it should
+// have been left-aligned): this prop's own default used to be 'right' ('bottom-end'), silently
+// contradicting floatingPosition.ts's own documented intent for computeFloatPosition's default
+// placement ("'bottom-start' (below-left of the anchor) — what every call site but the
+// context-menu submenu wants") — dead advice as far as this component went, since every call
+// below always passes an explicit placement, never relying on that default. Of this component's
+// own consumers, 13 already pass `anchor` explicitly (left for a trigger with room to its right,
+// right for one flush against its own toolbar's right edge, `api/EnvironmentSelect.vue`'s own
+// real-interaction fix being the one place that was explicit but backwards) — the 2 that omitted
+// it (KeyValueView.vue's own Add/Edit popovers, triggers with room to their own right, not their
+// left) got 'right' by this stale default, silently opening the wrong way. 'left' now matches
+// what an omitted `anchor` should have meant all along.
 const props = withDefaults(
   defineProps<{
     anchor?: 'left' | 'right';
@@ -18,7 +30,7 @@ const props = withDefaults(
     testId?: string;
     backdropTestId?: string;
   }>(),
-  { anchor: 'right', width: 240 },
+  { anchor: 'left', width: 240 },
 );
 
 const emit = defineEmits<{ close: [] }>();

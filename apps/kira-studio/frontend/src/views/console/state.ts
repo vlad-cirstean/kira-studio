@@ -61,6 +61,22 @@ export interface ConsoleViewRuntime {
   // warning — cleared on the next run and on the next document edit (ConsoleView.vue's own
   // formatError/explainError precedent).
   autoExplain: AutoExplainState | null;
+  // Real-interaction fix (reported bug — column widths reset on every subsequent query in the
+  // same session): ConsoleSlickGrid.vue's own header used to state "no persisted column widths —
+  // always the measured/default width, reset on every remount" as a deliberate §3.4 design
+  // decision, because a console result set has no addressable table/tab state the way
+  // SlickGridHost.vue's own DataTabState.columnWidths does (grid/SlickGridHost.vue's `buildColumns`
+  // already prefers `tab().state.columnWidths` over a fresh measurement, so that surface was
+  // already correct). Every query run replaces `activeKey` with a brand-new `pageKey`
+  // (resultPageKey's own monotonic `seq`), which remounts ConsoleSlickGrid.vue via
+  // ConsoleResultGrid.vue's `:key="pageKey"` and re-measures from scratch — losing both the
+  // first run's auto-sized widths and any manual resize the very next time a statement runs.
+  // Keyed by column name, living on this per-tab runtime record (not per-result) so it survives
+  // every subsequent run in the same still-open tab — the "session" §4.2's own bug report names —
+  // and is discarded only when the runtime itself is (a genuinely new session: the tab closes,
+  // `registerTabRuntimeCleanup` below deletes the whole record). Never touched by `dropResults`
+  // (replace-mode's own per-run reset, D6) — a width choice is not a query result.
+  columnWidths: Record<string, number>;
 }
 
 function defaultRuntime(): ConsoleViewRuntime {
@@ -75,6 +91,7 @@ function defaultRuntime(): ConsoleViewRuntime {
     nextSeq: 0,
     expandedDocIds: new Set(),
     autoExplain: null,
+    columnWidths: {},
   };
 }
 
@@ -85,6 +102,18 @@ export { runtime, setSearchOpen, toggleSearchOpen };
 
 export function isResultDocExpanded(tabId: string, resultKey: string, id: string): boolean {
   return runtime[tabId]?.expandedDocIds.has(`${resultKey}:${id}`) ?? false;
+}
+
+// Real-interaction fix — ConsoleSlickGrid.vue's own onMounted/onColumnsResized read and write
+// through these two rather than reaching into `runtime[tabId]` directly, mirroring
+// grid/SlickGridHost.vue's own `currentWidths()`/`onColumnsResized` pair (tab.state.columnWidths)
+// as closely as a runtime-only, no-tab-state console result can.
+export function consoleColumnWidths(tabId: string): Record<string, number> {
+  return runtime[tabId]?.columnWidths ?? {};
+}
+
+export function setConsoleColumnWidths(tabId: string, widths: Record<string, number>): void {
+  ensureRuntime(tabId).columnWidths = widths;
 }
 
 export function toggleResultDocExpanded(tabId: string, resultKey: string, id: string): void {

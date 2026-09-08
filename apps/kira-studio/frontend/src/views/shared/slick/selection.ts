@@ -24,6 +24,37 @@ export type Selection =
 // `+1`, named once here in both directions.
 const GUTTER_OFFSET = 1;
 
+/** P28 D8, promoted out of SlickGridHost.vue (real-interaction fix, §4a/§4d): does the current
+ *  selection already cover this cell? The gutter menu has always asked this (onGutterContextMenu's
+ *  own `inSelection`); the cell menu itself only started asking after P28 D8's own fix — the
+ *  reported "select several rows, right-click, and they deselect". Exported here (rather than kept
+ *  as a private helper inside the host) so both SlickGridHost.vue's onCellContextMenu (deciding
+ *  whether a right-click replaces the selection or acts on it, D8) and its own unit tests can share
+ *  one copy — the same "pure Selection logic belongs in this file" rule `selectionFromRanges`/
+ *  `rangesFromSelection` above already follow. */
+export function selectionCovers(
+  sel: Selection | null | undefined,
+  row: number,
+  displayCol: number,
+): boolean {
+  if (!sel) return false;
+  switch (sel.kind) {
+    case 'row':
+      return sel.rows.includes(row);
+    case 'column':
+      return sel.cols.includes(displayCol);
+    case 'range':
+      return (
+        row >= sel.anchorRow &&
+        row <= sel.row &&
+        displayCol >= sel.anchorCol &&
+        displayCol <= sel.col
+      );
+    default:
+      return false;
+  }
+}
+
 /**
  * `SlickRange[]` -> `Selection`, per §5 D4:
  * - `pendingKind === 'column'` -> `{ kind: 'column', cols }` — set by the header select-zone

@@ -329,6 +329,26 @@ onUnmounted(() => {
       />
     </div>
 
+    <!-- Real-interaction fix (reported bug — the response search bar sat below/at the bottom of
+         the response content instead of above it): the app's own established placement for a
+         "search this content" bar — the SQL data view's SearchToolbar (DataView.vue's own
+         `#strips` slot, docked "below the filter row, not floating over the grid it searches" —
+         that same file's own comment records "the 'docks at the bottom of the result' placement
+         ... overlapped the last visible row, which read as a bug rather than a search bar" and
+         was rejected for exactly that reason), and the Mongo/documents view's SearchToolbar
+         ("Below the filter/sort row, above the list it searches") — is directly below the toolbar
+         it belongs to and above the content it searches, never below the content. This file's own
+         previous placement (after the response body, right before ResponseDiffDialog) and
+         ResponseFindBar.vue's own comment both cited "LAW 03: docks below the pane it searches" —
+         backwards from what LAW 03 actually establishes everywhere else in this app, corrected
+         here to match. -->
+    <ResponseFindBar
+      v-if="findOpen && (tab.state.responsePane === 'body' || tab.state.responsePane === 'raw')"
+      ref="findBarRef"
+      :targets="findTargets"
+      @close="closeFind"
+    />
+
     <MessageStrip v-if="viewing" tone="note" data-testid="http-history-band">
       Viewing the response from {{ viewingTime }} · {{ viewing?.snapshot.entry.method }}
       {{ viewing?.snapshot.entry.url }}
@@ -423,14 +443,6 @@ onUnmounted(() => {
         </button>
       </EmptyState>
     </div>
-
-    <!-- D11: docked below the pane it searches (LAW 03), not floating over it. -->
-    <ResponseFindBar
-      v-if="findOpen && (tab.state.responsePane === 'body' || tab.state.responsePane === 'raw')"
-      ref="findBarRef"
-      :targets="findTargets"
-      @close="closeFind"
-    />
 
     <ResponseDiffDialog v-if="compareIds" :ids="compareIds" @close="closeCompare" />
   </div>

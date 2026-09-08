@@ -638,6 +638,22 @@ test('the response find bar counts and steps through matches, and Escape clears 
 
   await page.click('[data-testid="http-find-toggle"]');
   await expect(page.locator('[data-testid="http-find-bar"]')).toBeVisible();
+
+  // Real-interaction fix (reported bug — the response search bar sat below/at the bottom of the
+  // response content instead of above it): mirrors data-view.spec.ts's own relative-position
+  // pattern for the SQL grid's SearchToolbar — the find bar sits above the content it searches,
+  // below the toolbar above it, never below the content (ResponsePane.vue's own comment records
+  // why: DataView.vue's SearchToolbar usage already found "docks at the bottom of the result"
+  // "overlapped the last visible row, which read as a bug rather than a search bar").
+  const findBarBox = await page.locator('[data-testid="http-find-bar"]').boundingBox();
+  const toolbarBox = await page.locator('.response-status-row').boundingBox();
+  const bodyBox = await page.locator('.response-body').boundingBox();
+  if (!findBarBox || !toolbarBox || !bodyBox) {
+    throw new Error('http-find-bar, response-status-row or response-body has no bounding box');
+  }
+  expect(findBarBox.y).toBeGreaterThanOrEqual(toolbarBox.y + toolbarBox.height);
+  expect(findBarBox.y).toBeLessThan(bodyBox.y);
+
   await page.fill('[data-testid="http-find-input"]', 'Ada');
   await expect(page.locator('[data-testid="http-find-count"]')).toHaveText('1 of 2');
   await page.click('[data-testid="http-find-next"]');
@@ -1308,6 +1324,18 @@ test('the environment select opens an app-drawn menu carrying each environment�
   await select.click();
   const menu = page.locator('[data-testid="api-environment-menu"]');
   await expect(menu).toBeVisible();
+
+  // Real-interaction fix (reported bug — this dropdown rendered right-aligned): the trigger sits
+  // flush against its own toolbar's right edge (`.p-push`), so the popover's own right edge is
+  // pinned to *this control's* right edge (anchor="right") — not, as it used to be, clamped
+  // against the viewport's right edge by shift() overriding a requested-but-unreachable
+  // `anchor="left"`. Those two coincide at this test's own 1440px viewport width (the trigger
+  // sits only ~15px from the edge), so this asserts the actual mechanism — flush with the
+  // trigger — rather than a coincidence that would silently stop holding at a different width.
+  const selectBox = await select.boundingBox();
+  const menuBox = await menu.boundingBox();
+  if (!selectBox || !menuBox) throw new Error('api-environment-select or its menu has no box');
+  expect(Math.round(menuBox.x + menuBox.width)).toBe(Math.round(selectBox.x + selectBox.width));
 
   const noneRow = page.locator('[data-testid="api-environment-option-none"]');
   await expect(noneRow.locator('.p-conn-dot.none')).toBeVisible();
