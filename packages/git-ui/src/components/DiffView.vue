@@ -282,16 +282,16 @@ function formatBytes(bytes: number): string {
 <template>
   <div class="kv-diff-view" data-testid="diff-view" tabindex="0" @keydown="onKeydown">
     <header class="kv-diff-header">
-      <button type="button" class="kv-diff-back" title="Back to files" @click="goBack">
+      <button type="button" class="kv-diff-back" v-kui-tooltip="'Back to files'" @click="goBack">
         <span class="codicon codicon-chevron-left" aria-hidden="true"></span>
         Files
       </button>
       <span class="kv-diff-position">{{ fileIndex + 1 }} of {{ totalFiles }}</span>
-      <span v-if="diff" class="kv-diff-path" :title="diff.change.path">{{ diff.change.path }}</span>
+      <span v-if="diff" class="kv-diff-path" v-kui-tooltip="diff.change.path">{{ diff.change.path }}</span>
       <div class="kv-diff-nav">
         <button
           type="button"
-          title="Previous file (Alt+Up)"
+          v-kui-tooltip="'Previous file (Alt+Up)'"
           :disabled="fileIndex <= 0"
           @click="moveFile(-1)"
         >
@@ -299,7 +299,7 @@ function formatBytes(bytes: number): string {
         </button>
         <button
           type="button"
-          title="Next file (Alt+Down)"
+          v-kui-tooltip="'Next file (Alt+Down)'"
           :disabled="fileIndex >= totalFiles - 1"
           @click="moveFile(1)"
         >

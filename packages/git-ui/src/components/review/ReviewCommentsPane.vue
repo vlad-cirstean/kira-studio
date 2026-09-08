@@ -76,7 +76,7 @@ function anchorTitle(c: ReviewComment): string | undefined {
         v-if="capabilities.clipboard"
         type="button"
         class="kv-review-comments-icon-button"
-        title="Copy for AI"
+        v-kui-tooltip="'Copy for AI'"
         aria-label="Copy for AI"
         :disabled="reviewComments.comments.value.length === 0"
         @click="reviewComments.copyForAi()"
@@ -87,7 +87,7 @@ function anchorTitle(c: ReviewComment): string | undefined {
         v-if="!reviewComments.confirmingClear.value"
         type="button"
         class="kv-review-comments-icon-button"
-        title="Clear all comments"
+        v-kui-tooltip="'Clear all comments'"
         aria-label="Clear all comments"
         :disabled="reviewComments.comments.value.length === 0 || reviewComments.pending.value"
         @click="reviewComments.confirmClear()"
@@ -124,13 +124,13 @@ function anchorTitle(c: ReviewComment): string | undefined {
               <span
                 v-if="anchorTitle(c)"
                 class="codicon codicon-warning kv-review-comments-warning"
-                :title="anchorTitle(c)"
+                v-kui-tooltip="anchorTitle(c)"
                 :aria-label="anchorTitle(c)"
               ></span>
               <button
                 type="button"
                 class="kv-review-comments-icon-button kv-review-comments-row-delete"
-                title="Delete comment"
+                v-kui-tooltip="'Delete comment'"
                 aria-label="Delete comment"
                 :disabled="reviewComments.pending.value"
                 @click.stop="reviewComments.remove(c.id)"

@@ -1,4 +1,5 @@
 import type { HostKind, Transport, UiActionKind } from '@kira/git-ipc';
+import { vKuiTooltip } from '@kira/kira-ui';
 import { createApp, type App as VueApp } from 'vue';
 import AppRoot from './App.vue';
 import ReviewView from './components/review/ReviewView.vue';
@@ -69,6 +70,8 @@ export function mount(container: Element, opts: MountOptions): MountHandle {
     view === 'review'
       ? createApp(ReviewView, { ...rest, target })
       : createApp(AppRoot, { ...rest, pendingUiAction });
+  // G20 D2: `v-kui-tooltip` — replaces every native `title`/`:title` attribute in this bundle.
+  app.directive('kui-tooltip', vKuiTooltip);
   // G16 D1/D2: the other half of app-shell.css's `.kv-mount-root` rule — the class and the rule
   // are useless apart, and they live in two files because the class must follow whatever
   // container the host hands us, not a naming convention two packages have to agree on.

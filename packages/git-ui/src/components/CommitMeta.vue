@@ -195,7 +195,7 @@ function copyMessage(): void {
           v-if="actions.capabilities.clipboard"
           type="button"
           class="kv-copy-button"
-          title="Copy full message"
+          v-kui-tooltip="'Copy full message'"
           @click="copyMessage"
         >
           <span class="codicon codicon-copy" aria-hidden="true"></span>
@@ -235,7 +235,7 @@ function copyMessage(): void {
             v-if="actions.capabilities.clipboard"
             type="button"
             class="kv-copy-button"
-            title="Copy full SHA"
+            v-kui-tooltip="'Copy full SHA'"
             @click="copyFullSha"
           >
             <span class="codicon codicon-copy" aria-hidden="true"></span>
@@ -248,7 +248,7 @@ function copyMessage(): void {
             v-if="actions.capabilities.clipboard"
             type="button"
             class="kv-copy-button"
-            title="Copy short SHA"
+            v-kui-tooltip="'Copy short SHA'"
             @click="copyShortSha"
           >
             <span class="codicon codicon-copy" aria-hidden="true"></span>
@@ -263,7 +263,7 @@ function copyMessage(): void {
               type="button"
               class="kv-meta-parent"
               :disabled="!parent.loaded"
-              :title="parent.loaded ? '' : 'Not loaded — load more history to reach it'"
+              v-kui-tooltip="parent.loaded ? '' : 'Not loaded — load more history to reach it'"
               @click="emit('selectParentCommit', parent.sha)"
             >
               {{ parent.shortSha }}

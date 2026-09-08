@@ -13,7 +13,8 @@
  */
 import { SETTINGS } from '@kira/git-core';
 import type { HostKind, StashEntry, Transport, UiActionKind } from '@kira/git-ipc';
-import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue';
+import { computeFloatPosition, initTooltips, KuiTooltip, pointReference } from '@kira/kira-ui';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue';
 import { BridgeClient } from './bridge/client.ts';
 // A .vue default export is a *value* — the component object the template instantiates. `import
 // type` erases it, and Vue then renders <CommitGrid> as an unknown element with no grid inside it
@@ -517,6 +518,22 @@ const renameRefDialogState = ref<{ open: boolean; currentName: string }>({
   currentName: '',
 });
 const forceDeleteRefCandidate = ref<{ name: string; x: number; y: number } | undefined>(undefined);
+// G20 D4: real flip/shift positioning for the force-delete popup, which previously bound raw
+// click-point coordinates straight into `left`/`top` with zero clamping (F7) — this is a one-off,
+// single-use popup, so it gets a small watch here rather than a new shared component.
+const forceDeletePanelEl = ref<HTMLElement | null>(null);
+const forceDeletePanelStyle = ref({ left: '-9999px', top: '-9999px' });
+watch(forceDeleteRefCandidate, async (candidate) => {
+  if (!candidate) return;
+  forceDeletePanelStyle.value = { left: '-9999px', top: '-9999px' };
+  await nextTick();
+  const el = forceDeletePanelEl.value;
+  if (!el) return;
+  const { left, top } = await computeFloatPosition(pointReference(candidate.x, candidate.y), el, {
+    placement: 'bottom-start',
+  });
+  forceDeletePanelStyle.value = { left: `${left}px`, top: `${top}px` };
+});
 
 function handleGridRefContextMenu(detail: {
   kind: 'branch' | 'remoteBranch';
@@ -1002,6 +1019,10 @@ const initialScrollRowProp = computed(() =>
 
 const hasSelection = computed(() => selection.row.value >= 0);
 
+// G20 D2: this root's own KuiTooltip instance and listener set — independent of ReviewView.vue's
+// (two separate webview documents cannot share one singleton, G19 F3).
+let stopTooltips: (() => void) | null = null;
+
 onMounted(() => {
   document.addEventListener('keydown', onDocumentKeydown);
   document.addEventListener('pointerdown', onDocumentPointerDown);
@@ -1010,6 +1031,7 @@ onMounted(() => {
     breakpointObserver = new ResizeObserver(scheduleBreakpointUpdate);
     breakpointObserver.observe(rootEl.value);
   }
+  stopTooltips = initTooltips();
 });
 
 onBeforeUnmount(() => {
@@ -1017,6 +1039,7 @@ onBeforeUnmount(() => {
   document.removeEventListener('pointerdown', onDocumentPointerDown);
   breakpointObserver?.disconnect();
   if (breakpointRaf !== 0) cancelAnimationFrame(breakpointRaf);
+  stopTooltips?.();
   unsubscribeUiAction();
   graphView.dispose();
   refsState.dispose();
@@ -1037,6 +1060,9 @@ onBeforeUnmount(() => {
     :data-connection-state="connectionState"
     :style="{ '--kv-tree-indent': treeIndent }"
   >
+    <!-- G20 D2: this root's own tooltip surface — mounted unconditionally, alongside the other
+         always-present elements below. -->
+    <KuiTooltip />
     <!-- Unconditional, present from first paint regardless of which of the four content states
          below is showing (or whether bootstrap() has resolved a repoState at all yet) — the old
          live-data strip carried this testid unconditionally too (inside its own always-rendered
@@ -1243,8 +1269,9 @@ onBeforeUnmount(() => {
         />
         <div
           v-if="forceDeleteRefCandidate"
+          ref="forceDeletePanelEl"
           class="kv-branch-force-delete kv-branch-force-delete--floating"
-          :style="{ left: `${forceDeleteRefCandidate.x}px`, top: `${forceDeleteRefCandidate.y}px` }"
+          :style="forceDeletePanelStyle"
         >
           <span>“{{ forceDeleteRefCandidate.name }}” is not fully merged.</span>
           <button type="button" @click="confirmForceDeleteRef">Force delete</button>
@@ -1377,7 +1404,7 @@ onBeforeUnmount(() => {
    reusing `BranchPicker.vue`'s own `.kv-branch-force-delete` for its colours/spacing. */
 .kv-branch-force-delete--floating {
   position: fixed;
-  z-index: 30;
+  z-index: var(--kui-z-popover, 20);
   border: 1px solid var(--kv-panel-border);
   border-radius: var(--kv-radius);
   box-shadow: 0 2px 8px var(--kv-widget-shadow);

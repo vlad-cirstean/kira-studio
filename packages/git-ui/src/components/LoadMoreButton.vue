@@ -63,7 +63,7 @@ function handleCancel(): void {
       type="button"
       class="kv-load-more-button"
       :disabled="isLoading"
-      title="Alt-click to load everything remaining — this keeps every loaded commit in memory."
+      v-kui-tooltip="'Alt-click to load everything remaining — this keeps every loaded commit in memory.'"
       @click="handlePress"
     >
       {{ buttonLabel }}

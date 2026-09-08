@@ -57,7 +57,7 @@ defineExpose({ refresh: doRefresh });
     class="kv-icon-button kv-refresh-button"
     :class="{ 'kv-refresh-spinning': isRefreshing }"
     :disabled="isBusy"
-    :title="tooltip"
+    v-kui-tooltip="tooltip"
     aria-label="Refresh"
     @click="doRefresh"
   >

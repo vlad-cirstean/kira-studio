@@ -387,7 +387,7 @@ function reviewToggleTitle(path: string): string {
           type="button"
           :aria-pressed="listMode === 'tree'"
           :class="{ 'kv-mode-active': listMode === 'tree' }"
-          title="Tree view"
+          v-kui-tooltip="'Tree view'"
           aria-label="Tree view"
           @click="emit('update:listMode', 'tree')"
         >
@@ -397,7 +397,7 @@ function reviewToggleTitle(path: string): string {
           type="button"
           :aria-pressed="listMode === 'flat'"
           :class="{ 'kv-mode-active': listMode === 'flat' }"
-          title="Flat view"
+          v-kui-tooltip="'Flat view'"
           aria-label="Flat view"
           @click="emit('update:listMode', 'flat')"
         >
@@ -437,10 +437,10 @@ function reviewToggleTitle(path: string): string {
           <span class="kv-file-tree-dir-name">{{ row.node.name }}</span>
           <span class="kv-file-tree-dir-stats">
             {{ row.node.fileCount }} {{ row.node.fileCount === 1 ? "file" : "files" }}
-            <span class="kv-diff-added-fg" :title="`${exactCount(row.node.additions)} additions`"
+            <span class="kv-diff-added-fg" v-kui-tooltip="`${exactCount(row.node.additions)} additions`"
               >+{{ formatChangeCount(row.node.additions) }}</span
             >
-            <span class="kv-diff-deleted-fg" :title="`${exactCount(row.node.deletions)} deletions`"
+            <span class="kv-diff-deleted-fg" v-kui-tooltip="`${exactCount(row.node.deletions)} deletions`"
               >-{{ formatChangeCount(row.node.deletions) }}</span
             >
           </span>
@@ -450,10 +450,10 @@ function reviewToggleTitle(path: string): string {
           <span
             class="kv-file-tree-status kv-file-tree-status-chip"
             :class="statusClass(row.node.change)"
-            :title="fileTitle(row.node.change)"
+            v-kui-tooltip="fileTitle(row.node.change)"
             >{{ statusLetter(row.node.change) }}</span
           >
-          <span class="kv-file-tree-name" :title="fileTitle(row.node.change)">
+          <span class="kv-file-tree-name" v-kui-tooltip="fileTitle(row.node.change)">
             <template v-if="renameDisplay(row.node.change)">
               {{ renameDisplay(row.node.change)?.from }}
               <span class="codicon codicon-arrow-small-right" aria-hidden="true"></span>
@@ -469,19 +469,19 @@ function reviewToggleTitle(path: string): string {
           <span v-if="!row.node.change.isBinary" class="kv-file-tree-counts">
             <span
               class="kv-diff-added-fg"
-              :title="`${exactCount(row.node.change.additions ?? 0)} additions`"
+              v-kui-tooltip="`${exactCount(row.node.change.additions ?? 0)} additions`"
               >+{{ formatChangeCount(row.node.change.additions ?? 0) }}</span
             >
             <span
               class="kv-diff-deleted-fg"
-              :title="`${exactCount(row.node.change.deletions ?? 0)} deletions`"
+              v-kui-tooltip="`${exactCount(row.node.change.deletions ?? 0)} deletions`"
               >-{{ formatChangeCount(row.node.change.deletions ?? 0) }}</span
             >
           </span>
           <span
             v-if="reviewStates && reviewStatusFor(row.node.change.path)?.changedSinceReview"
             class="kv-file-tree-changed-badge"
-            title="Changed since you reviewed it"
+            v-kui-tooltip="'Changed since you reviewed it'"
             aria-hidden="true"
             >●</span
           >
@@ -489,7 +489,7 @@ function reviewToggleTitle(path: string): string {
             v-if="reviewStates"
             type="button"
             class="kv-copy-button kv-file-tree-review-toggle"
-            :title="reviewToggleTitle(row.node.change.path)"
+            v-kui-tooltip="reviewToggleTitle(row.node.change.path)"
             :aria-pressed="reviewStatusFor(row.node.change.path)?.kind === 'full'"
             @click.stop="emit('toggleReviewed', row.node.change.path)"
           >
@@ -502,7 +502,7 @@ function reviewToggleTitle(path: string): string {
             v-if="actions.capabilities.clipboard && !reviewStyled"
             type="button"
             class="kv-copy-button kv-file-tree-copy"
-            title="Copy file path"
+            v-kui-tooltip="'Copy file path'"
             @click.stop="copyPath(row.node.change.path)"
           >
             <span class="codicon codicon-copy" aria-hidden="true"></span>

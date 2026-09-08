@@ -23,7 +23,7 @@
  */
 import { SETTINGS } from '@kira/git-core';
 import type { HostKind, ReviewSessionSnapshot, Transport, UiActionKind } from '@kira/git-ipc';
-import { KuiButton, KuiTextInput } from '@kira/kira-ui';
+import { initTooltips, KuiButton, KuiTextInput, KuiTooltip } from '@kira/kira-ui';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue';
 import { BridgeClient } from '../../bridge/client.ts';
 import { ACTION_ICONS } from '../../icons/index.ts';
@@ -313,6 +313,10 @@ const filesActions = computed<DetailActions | undefined>(() => {
   };
 });
 
+// G20 D2: this root's own KuiTooltip instance and listener set, independent of App.vue's own
+// (two separate webview documents cannot share one singleton, G19 F3).
+let stopTooltips: (() => void) | null = null;
+
 onMounted(() => {
   // Mirrors `App.vue`'s own first-paint mark (§5.1 — W18's review-view perf metric measures from
   // this, not merely from `kira:page-parsed`). Unlike the graph panel there is no lane-layout
@@ -325,6 +329,7 @@ onMounted(() => {
   void bootstrap().catch((err: unknown) => {
     bootError.value = err instanceof Error ? err.message : String(err);
   });
+  stopTooltips = initTooltips();
 });
 
 /** Retries a failed bootstrap() (G12 D6) — clears the error panel first so a second failure
@@ -346,6 +351,7 @@ onBeforeUnmount(() => {
   refsState.dispose();
   bridge.dispose();
   document.removeEventListener('keydown', onDocumentKeydown);
+  stopTooltips?.();
 });
 
 // G12 D13: one panel-level filter/list-mode toolbar, replacing what used to be a separate
@@ -577,6 +583,9 @@ watch(
     :data-connection-state="connectionState"
     :style="{ '--kv-tree-indent': treeIndent }"
   >
+    <!-- G20 D2: this root's own tooltip surface — independent of App.vue's (two separate webview
+         documents). -->
+    <KuiTooltip />
     <span class="kv-visually-hidden" data-testid="connection-state">{{ connectionState }}</span>
     <div class="kv-visually-hidden" role="status" aria-live="polite" data-testid="live-announcements">
       {{ liveAnnouncement }}
@@ -656,7 +665,7 @@ watch(
         <div class="kv-review-header-row">
           <KuiButton
             :icon="ACTION_ICONS.back"
-            title="Back to branch selection"
+            v-kui-tooltip="'Back to branch selection'"
             aria-label="Back to branch selection"
             data-testid="review-back-button"
             @click="goBackToSelection"
@@ -679,7 +688,7 @@ watch(
           </div>
           <KuiButton
             :icon="ACTION_ICONS.swap"
-            title="Swap branch and base"
+            v-kui-tooltip="'Swap branch and base'"
             aria-label="Swap branch and base"
             data-testid="review-swap-button"
             @click="onSwapBaseAndBranch"
@@ -701,7 +710,7 @@ watch(
             type="button"
             :aria-pressed="review.pane.value === 'commits'"
             :class="{ 'kv-mode-active': review.pane.value === 'commits' }"
-            title="Commits"
+            v-kui-tooltip="'Commits'"
             :aria-label="`Commits (${commitsCount})`"
             @click="review.setPane('commits')"
           >
@@ -712,7 +721,7 @@ watch(
             type="button"
             :aria-pressed="review.pane.value === 'files'"
             :class="{ 'kv-mode-active': review.pane.value === 'files' }"
-            title="Files"
+            v-kui-tooltip="'Files'"
             :aria-label="`Files (${filesChangedCount})`"
             @click="review.setPane('files')"
           >
@@ -723,7 +732,7 @@ watch(
             type="button"
             :aria-pressed="review.pane.value === 'comments'"
             :class="{ 'kv-mode-active': review.pane.value === 'comments' }"
-            title="Comments"
+            v-kui-tooltip="'Comments'"
             :aria-label="`Comments (${commentsCount})`"
             @click="review.setPane('comments')"
           >
@@ -739,7 +748,7 @@ watch(
         <KuiButton
           :icon="ACTION_ICONS.search"
           :active="filterVisible || filter.length > 0"
-          title="Filter files"
+          v-kui-tooltip="'Filter files'"
           aria-label="Filter files"
           data-testid="review-filter-toggle"
           @click="toggleFilterVisible"
@@ -758,7 +767,7 @@ watch(
             type="button"
             :aria-pressed="listMode === 'tree'"
             :class="{ 'kv-mode-active': listMode === 'tree' }"
-            title="Tree view"
+            v-kui-tooltip="'Tree view'"
             aria-label="Tree view"
             @click="listMode = 'tree'"
           >
@@ -768,7 +777,7 @@ watch(
             type="button"
             :aria-pressed="listMode === 'flat'"
             :class="{ 'kv-mode-active': listMode === 'flat' }"
-            title="Flat view"
+            v-kui-tooltip="'Flat view'"
             aria-label="Flat view"
             @click="listMode = 'flat'"
           >
@@ -817,7 +826,7 @@ watch(
             <span>This comparison has changed.</span>
             <button
               type="button"
-              title="Refresh"
+              v-kui-tooltip="'Refresh'"
               aria-label="Refresh"
               @click="review.acknowledgeStaleReview()"
             >

@@ -225,7 +225,7 @@ const stashDisabled = computed(
       <KuiButton
         icon="codicon-cloud-download"
         :disabled="fetchDisabled"
-        :title="`Fetch ${defaultRemote}`"
+        v-kui-tooltip="`Fetch ${defaultRemote}`"
         data-testid="fetch-button"
         @click="doFetch"
       >
@@ -246,7 +246,7 @@ const stashDisabled = computed(
           icon="codicon-repo-push"
           class="kv-push-main"
           :disabled="pushPullDisabled"
-          :title="`Push to ${defaultRemote}`"
+          v-kui-tooltip="`Push to ${defaultRemote}`"
           data-testid="push-button"
           @click="doPush"
         >
@@ -279,7 +279,7 @@ const stashDisabled = computed(
     <KuiButton
       icon="codicon-inbox"
       :disabled="stashDisabled"
-      title="Stash changes"
+      v-kui-tooltip="'Stash changes'"
       data-testid="stash-changes-button"
       @click="emit('stash-changes')"
     >
@@ -297,7 +297,7 @@ const stashDisabled = computed(
     <button
       type="button"
       class="kv-icon-button"
-      title="Repository settings"
+      v-kui-tooltip="'Repository settings'"
       aria-label="Repository settings"
       data-testid="repo-settings-button"
       @click="emit('open-repo-settings')"
@@ -312,7 +312,7 @@ const stashDisabled = computed(
         type="button"
         class="kv-icon-button"
         :disabled="!cancellable"
-        :title="cancellable ? 'Cancel' : cancelDisabledReason"
+        v-kui-tooltip="cancellable ? 'Cancel' : cancelDisabledReason"
         data-testid="remote-cancel"
         @click="doCancel"
       >

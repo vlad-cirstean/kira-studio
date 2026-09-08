@@ -93,7 +93,7 @@ function onToggleReviewed(path: string): void {
             type="button"
             :aria-pressed="reviewFiles.diffMode.value === 'sinceReview'"
             :class="{ 'kv-mode-active': reviewFiles.diffMode.value === 'sinceReview' }"
-            title="Since review"
+            v-kui-tooltip="'Since review'"
             aria-label="Since review"
             @click="reviewFiles.setDiffMode('sinceReview')"
           >
@@ -103,7 +103,7 @@ function onToggleReviewed(path: string): void {
             type="button"
             :aria-pressed="reviewFiles.diffMode.value === 'range'"
             :class="{ 'kv-mode-active': reviewFiles.diffMode.value === 'range' }"
-            title="Full range"
+            v-kui-tooltip="'Full range'"
             aria-label="Full range"
             @click="reviewFiles.setDiffMode('range')"
           >

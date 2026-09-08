@@ -95,7 +95,7 @@ async function onRefMenuSelect(id: string): Promise<void> {
         ></span>
         <span class="kv-branch-row-name">{{ row.shortName }}</span>
         <span class="kv-tag-kind">{{ row.annotation ? "annotated" : "lightweight" }}</span>
-        <span v-if="row.annotation" class="kv-tag-subject" :title="row.annotation.subject">
+        <span v-if="row.annotation" class="kv-tag-subject" v-kui-tooltip="row.annotation.subject">
           {{ row.annotation.subject }}
         </span>
         <span class="kv-tag-target">{{ targetCommit(row) }}</span>
@@ -103,7 +103,7 @@ async function onRefMenuSelect(id: string): Promise<void> {
       <button
         type="button"
         class="kv-icon-button"
-        title="More actions"
+        v-kui-tooltip="'More actions'"
         aria-label="More actions"
         @click="openRefMenuFromButton(row, $event)"
         @contextmenu="openRefMenu(row, $event)"

@@ -82,7 +82,7 @@ onBeforeUnmount(() => {
       class="kv-repo-trigger"
       aria-haspopup="listbox"
       :aria-expanded="isOpen"
-      :title="repoState.activeRepo.value?.root ?? 'Open a repository'"
+      v-kui-tooltip="repoState.activeRepo.value?.root ?? 'Open a repository'"
       @click="toggle"
     >
       <span class="codicon" :class="STATE_ICONS.repo" aria-hidden="true"></span>

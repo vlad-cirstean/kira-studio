@@ -51,7 +51,7 @@ const parents = computed(() => (entry.value ? [entry.value.baseSha] : []));
       <div class="kv-stash-detail-header">
         <p class="kv-stash-detail-message">{{ entry.message }}</p>
         <p class="kv-stash-detail-facts">
-          <span :title="formatAbsoluteDate(entry.timestamp)">{{
+          <span v-kui-tooltip="formatAbsoluteDate(entry.timestamp)">{{
             formatRelativeDate(entry.timestamp)
           }}</span>
           <span> · based on <code>{{ entry.baseSha.slice(0, 7) }}</code></span>

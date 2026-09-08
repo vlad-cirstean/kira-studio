@@ -31,7 +31,7 @@ async function undo(): Promise<void> {
     <KuiButton
       icon="codicon-discard"
       class="kv-undo-button"
-      :title="composeUndoTooltip(ops.undoSlot.value.label)"
+      v-kui-tooltip="composeUndoTooltip(ops.undoSlot.value.label)"
       :disabled="ops.busy.value"
       @click="undo"
     >
@@ -41,7 +41,7 @@ async function undo(): Promise<void> {
       v-if="clipboardEnabled"
       type="button"
       class="kv-undo-sha"
-      :title="`Copy recovery SHA ${ops.undoSlot.value.recoverySha}`"
+      v-kui-tooltip="`Copy recovery SHA ${ops.undoSlot.value.recoverySha}`"
       @click="copy(ops.undoSlot.value.recoverySha, 'recovery SHA')"
     >
       {{ ops.undoSlot.value.recoverySha.slice(0, 7) }}

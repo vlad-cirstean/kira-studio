@@ -90,18 +90,18 @@ async function onMenuSelect(id: string): Promise<void> {
       <button type="button" class="kv-branch-row-main" @click="select(entry)">
         <span class="codicon codicon-archive" aria-hidden="true"></span>
         <span class="kv-stash-index">{{ "stash@{" + entry.index + "}" }}</span>
-        <span class="kv-stash-message" :title="entry.message">{{ entry.message }}</span>
-        <span class="kv-stash-base" :title="entry.baseSubject">
+        <span class="kv-stash-message" v-kui-tooltip="entry.message">{{ entry.message }}</span>
+        <span class="kv-stash-base" v-kui-tooltip="entry.baseSubject">
           <code>{{ entry.baseSha.slice(0, 7) }}</code> {{ entry.baseSubject }}
         </span>
-        <span v-if="entry.includedUntracked" class="kv-stash-untracked" title="Includes untracked files">-u</span>
+        <span v-if="entry.includedUntracked" class="kv-stash-untracked" v-kui-tooltip="'Includes untracked files'">-u</span>
         <span class="kv-stash-filecount">{{ entry.fileCount }} file{{ entry.fileCount === 1 ? "" : "s" }}</span>
         <span class="kv-stash-date">{{ formatRelativeDate(entry.timestamp) }}</span>
       </button>
       <button
         type="button"
         class="kv-icon-button"
-        title="More actions"
+        v-kui-tooltip="'More actions'"
         aria-label="More actions"
         @click="openMenuFromButton(entry, $event)"
         @contextmenu="openMenu(entry, $event)"

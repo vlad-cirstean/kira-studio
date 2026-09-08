@@ -99,7 +99,7 @@ defineExpose({ run: runDefault });
       icon="codicon-repo-pull"
       class="kv-pull-picker-main"
       :disabled="disabled"
-      :title="mainTitle"
+      v-kui-tooltip="mainTitle"
       data-testid="pull-button"
       @click="runDefault"
     >

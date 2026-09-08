@@ -200,7 +200,7 @@ function onSelectFile(index: number): void {
         <button
           type="button"
           class="kv-review-row-action"
-          title="Open all changes"
+          v-kui-tooltip="'Open all changes'"
           aria-label="Open all changes"
           @click="openAllChanges"
         >
@@ -208,7 +208,7 @@ function onSelectFile(index: number): void {
         </button>
         <a
           class="kv-review-row-action"
-          title="Open in graph"
+          v-kui-tooltip="'Open in graph'"
           aria-label="Open in graph"
           :href="openInGraphHref"
           @click.stop

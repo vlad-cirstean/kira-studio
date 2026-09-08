@@ -211,7 +211,7 @@ onBeforeUnmount(() => {
       class="kv-branch-trigger"
       aria-haspopup="true"
       :aria-expanded="isOpen"
-      :title="refs.head.value?.kind === 'detached' ? refs.head.value.sha : triggerLabel"
+      v-kui-tooltip="refs.head.value?.kind === 'detached' ? refs.head.value.sha : triggerLabel"
       @click="toggle"
     >
       <span class="codicon codicon-git-branch" aria-hidden="true"></span>
@@ -260,7 +260,7 @@ onBeforeUnmount(() => {
                   >{{ row.isHead ? "●" : "" }}</span
                 >
                 <span class="kv-branch-row-name">{{ row.shortName }}</span>
-                <span v-if="row.checkedOutIn" class="kv-branch-badge" :title="`Checked out in ${row.checkedOutIn}`">
+                <span v-if="row.checkedOutIn" class="kv-branch-badge" v-kui-tooltip="`Checked out in ${row.checkedOutIn}`">
                   worktree
                 </span>
                 <span v-if="formatTrack(row.track)" class="kv-branch-track">{{ formatTrack(row.track) }}</span>
@@ -268,7 +268,7 @@ onBeforeUnmount(() => {
               <button
                 type="button"
                 class="kv-icon-button"
-                title="More actions"
+                v-kui-tooltip="'More actions'"
                 aria-label="More actions"
                 @click="openRefMenuFromButton(row, $event)"
                 @contextmenu="openRefMenu(row, $event)"
@@ -299,7 +299,7 @@ onBeforeUnmount(() => {
             <button
               type="button"
               class="kv-icon-button"
-              title="More actions"
+              v-kui-tooltip="'More actions'"
               aria-label="More actions"
               @click="openRefMenuFromButton(row, $event)"
               @contextmenu="openRefMenu(row, $event)"
