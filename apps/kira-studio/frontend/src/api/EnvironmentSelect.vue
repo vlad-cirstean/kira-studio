@@ -17,6 +17,19 @@ import {
 // the switcher must stay visible with none, and the title bar is shared chrome Api must not grow
 // into.
 //
+// Real-interaction fix (reported bug — the dropdown rendered right-aligned): its own popover used
+// to request `anchor="left"` ('bottom-start', its left edge flush with the trigger's own left
+// edge) despite this trigger sitting flush against its toolbar's own right edge (`.p-push` above)
+// — a 200px popover extending rightward from there almost always has nowhere to go, so
+// PopoverPanel's own shift() middleware silently clamped it back against the *viewport's* right
+// edge instead, not this trigger's. Confirmed empirically (Playwright, a 1440px window): the
+// popover's right edge landed within 4px of the viewport edge, not this trigger's right edge —
+// coincidentally close at that width, but unrelated to the trigger's own position, and only
+// getting less related the wider the window. `anchor="right"` ('bottom-end') is what every other
+// right-edge-toolbar trigger in this app already uses correctly (ColumnsMenu.vue,
+// ProjectionMenu.vue, PreviewCommandPanel.vue) — this was the one outlier, and gets a popover
+// that is actually, reliably anchored to *this* control at every window width, not to the window.
+//
 // P18 D19: app-drawn now, on P17 D18's exact precedent (MethodSelect.vue) and for the identical
 // reason — a native <option>'s per-row colour is `option`-level styling that lands only under
 // `appearance: base-select` and only where the engine implements it, and this control now needs a
@@ -66,7 +79,7 @@ function manage(): void {
     <PopoverPanel
       v-if="open"
       :width="200"
-      anchor="left"
+      anchor="right"
       test-id="api-environment-menu"
       backdrop-test-id="api-environment-menu-backdrop"
       @close="open = false"

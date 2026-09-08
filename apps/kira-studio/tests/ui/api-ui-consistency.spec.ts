@@ -1325,6 +1325,18 @@ test('the environment select opens an app-drawn menu carrying each environment�
   const menu = page.locator('[data-testid="api-environment-menu"]');
   await expect(menu).toBeVisible();
 
+  // Real-interaction fix (reported bug — this dropdown rendered right-aligned): the trigger sits
+  // flush against its own toolbar's right edge (`.p-push`), so the popover's own right edge is
+  // pinned to *this control's* right edge (anchor="right") — not, as it used to be, clamped
+  // against the viewport's right edge by shift() overriding a requested-but-unreachable
+  // `anchor="left"`. Those two coincide at this test's own 1440px viewport width (the trigger
+  // sits only ~15px from the edge), so this asserts the actual mechanism — flush with the
+  // trigger — rather than a coincidence that would silently stop holding at a different width.
+  const selectBox = await select.boundingBox();
+  const menuBox = await menu.boundingBox();
+  if (!selectBox || !menuBox) throw new Error('api-environment-select or its menu has no box');
+  expect(Math.round(menuBox.x + menuBox.width)).toBe(Math.round(selectBox.x + selectBox.width));
+
   const noneRow = page.locator('[data-testid="api-environment-option-none"]');
   await expect(noneRow.locator('.p-conn-dot.none')).toBeVisible();
 

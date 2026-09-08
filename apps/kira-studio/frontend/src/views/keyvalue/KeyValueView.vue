@@ -693,7 +693,11 @@ onUnmounted(() => {
         <div class="sep" />
 
         <!-- Canonical [add, edit/delete, search] group — add leads (DataToolbar.vue's own
-             add-before-delete order), search trails, same as every other view. -->
+             add-before-delete order), search trails, same as every other view. Real-interaction
+             fix: this group sits left-of-center in the toolbar (after the pager/page-size/count
+             groups, before search), with room to its own right, not flush against the toolbar's
+             right edge the way api/EnvironmentSelect.vue's trigger is — PopoverPanel's own
+             default anchor (now 'left') is correct here without an explicit override. -->
         <div class="group">
           <div class="add-anchor">
             <IconButton
