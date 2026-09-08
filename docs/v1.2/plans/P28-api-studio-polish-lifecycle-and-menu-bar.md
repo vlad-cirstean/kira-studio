@@ -1746,7 +1746,37 @@ One `win.SetURL("about:blank")` before the final `win.Close()`.
 `go build ./apps/kira-studio/internal/...` · `go test ./apps/kira-studio/internal/...` ·
 `bun run test:ui` where the environment supports it.
 
-### 5.3 Explicitly unverifiable here
+### 5.3 What the ui tier actually caught (postscript, written after implementation)
+
+Four regressions, all from this batch, none of which lint, typecheck, the unit tier or the build
+could have found. Recorded because each is a trap the next person doing similar work will meet.
+
+1. **`showRunControls` defaulted to `false`, everywhere** (D16a). A type-only `defineProps` compiles
+   `showRunControls?: boolean` to a Boolean prop, and Vue casts an **absent** Boolean prop to
+   `false`, not `undefined` — so `v-if="showRunControls !== false"` removed the Refresh/Stop group
+   from every view that does not pass it, which is all of them but one. `tooltips.spec.ts` and
+   `definition.spec.ts` both timed out waiting on a button that had stopped existing. Fixed with an
+   explicit `withDefaults(..., { showRunControls: true })`.
+2. **`size()` fought `autoUpdate`** (D17a). `PopoverPanel` repositions through `autoUpdate`, whose
+   `ResizeObserver` watches the *floating* element — so writing a max-height on every reposition
+   resized the element, fired the observer, repositioned, and wrote again, unbounded, until the
+   renderer died. `size()`'s `apply` now writes only on change, rounded to whole px so sub-pixel
+   jitter cannot keep the comparison unequal forever.
+3. **Four hand-rolled z-index literals were left off the ladder** (D17c), two of them load-bearing:
+   `ConsoleSavedMenu` and `FilterHistoryMenu` each raise their own prompt scrim at `z-index: 30`, a
+   number picked to clear `PopoverPanel`'s backdrop at 20. Moving that backdrop to 100 put the
+   scrims underneath it, and the popover's full-viewport backdrop then swallowed every click aimed
+   at the prompt's own buttons. This is precisely the drift a ladder exists to prevent, so leaving
+   any literal behind defeated it — `CommandPalette` and `ErrorPopover` joined too.
+4. **Three specs asserted decisions this batch reverses**, and were re-aimed rather than deleted:
+   `data-view.spec.ts`'s pager placement (P16 D1 → D7, including P22 D4's right-edge assertion,
+   which now measures RunState and needed its 12px tolerance widened to 16 because RunState carries
+   its own trailing padding where the pager's last IconButton did not), `collections.spec.ts`'s
+   environments category (P22b D8 → D16d), and `http-history.spec.ts`'s explicit
+   `not.toHaveAttribute('data-kira-tip')` guard, which existed to protect the very decision D1
+   reverses.
+
+### 5.4 Explicitly unverifiable here
 **Item 20's Activity Monitor behaviour.** D20's change is verifiable only as "the Go builds and the
 close path still runs"; the actual process reap is macOS-only, packaged-build-only, and cannot be
 observed from a Linux container. Reported as implemented-and-reasoned, not as confirmed.
