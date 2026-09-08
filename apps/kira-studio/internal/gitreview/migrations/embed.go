@@ -19,14 +19,16 @@ type Migration struct {
 }
 
 // names lists the embedded files in the exact order they must apply, rather than trusting
-// directory listing order — G12 adds {2, "g12_comments", "0002_g12_comments.sql"} here, not a
-// second table.
+// directory listing order — G13 took this slot (the "G12 adds a comment table" reservation this
+// comment used to name predates the chapter's mid-stream phase insertions: G12 shipped no
+// migration at all). A further step is the next phase's to reserve.
 var names = []struct {
 	version int
 	name    string
 	file    string
 }{
 	{1, "g11_review", "0001_g11_review.sql"},
+	{2, "g13_comments", "0002_g13_comments.sql"},
 }
 
 // All returns every migration in ascending version order.
