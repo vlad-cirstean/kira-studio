@@ -634,7 +634,7 @@ async function onSave(): Promise<void> {
                 {{ vsixOutcomeMessage }}
               </p>
               <p
-                v-if="!gitClientsState.vsix.codeAvailable && gitClientsState.vsix.probed.length > 0"
+                v-if="gitClientsState.vsix.bundled && !gitClientsState.vsix.codeAvailable && gitClientsState.vsix.probed.length > 0"
                 class="muted-note"
                 data-testid="git-vsix-probed"
               >
