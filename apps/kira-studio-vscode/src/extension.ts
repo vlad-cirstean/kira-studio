@@ -396,11 +396,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   // G10 D16: created here so it can appear before the panel is ever opened (D3's
   // onStartupFinished); disposed with the extension like every other subscription.
-  const statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 0);
+  const statusItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 0);
   // G14 D5: set once — the item's text no longer carries a name (F7), so this is what makes it
   // identifiable in the status bar's own right-click "manage" menu.
-  statusBarItem.name = 'Kira Version';
-  context.subscriptions.push(statusBarItem);
+  statusItem.name = 'Kira Version';
+  context.subscriptions.push(statusItem);
   // G12 D10: the in-flight-work indicator — debounced 150ms on the rising edge only (a burst of
   // small requests must not flicker the item several times a second), never on the falling edge
   // (work finishing should read as finished immediately).
@@ -412,7 +412,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   // call once it resolves. Cleared whenever the state leaves `connected`, since a reconnect may
   // land on a different Kira Studio process.
   let lastAppInit: { readonly serverVersion: string; readonly contractVersion: number } | undefined;
-  updateStatusBar(statusBarItem, manager.state, isActive, lastAppInit);
+  updateStatusBar(statusItem, manager.state, isActive, lastAppInit);
 
   // G10 D19: every command this extension contributes is registered from commands.ts's own
   // tables — no hand-written second list. Mutating commands all dispatch through the graph
@@ -511,12 +511,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       }
       if (!active) {
         isActive = false;
-        updateStatusBar(statusBarItem, manager.state, isActive, lastAppInit);
+        updateStatusBar(statusItem, manager.state, isActive, lastAppInit);
         return;
       }
       activityDebounce = setTimeout(() => {
         isActive = true;
-        updateStatusBar(statusBarItem, manager.state, isActive, lastAppInit);
+        updateStatusBar(statusItem, manager.state, isActive, lastAppInit);
       }, 150);
     }),
     manager.onStateChange((state) => {
@@ -525,7 +525,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       // G15 D7: "connection state leaves connected" — every tracked decoration/state is dropped
       // rather than left showing a diff over a connection that may reconnect to a different repo.
       reviewMarking.notifyConnectionState(state);
-      updateStatusBar(statusBarItem, state, isActive, lastAppInit);
+      updateStatusBar(statusItem, state, isActive, lastAppInit);
       // §5.4 point 4: this phase's own exit criterion, executing in the real extension — the
       // moment a connection is established, prove app.init round-trips over the real socket.
       // G14 D5: also what the connected/idle tooltip's server/contract version comes from — a
@@ -545,7 +545,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
               serverVersion: result.serverVersion,
               contractVersion: result.contractVersion,
             };
-            updateStatusBar(statusBarItem, manager.state, isActive, lastAppInit);
+            updateStatusBar(statusItem, manager.state, isActive, lastAppInit);
           })
           .catch((err: unknown) => {
             logger.log('error', 'app.init failed', { err: String(err) });
