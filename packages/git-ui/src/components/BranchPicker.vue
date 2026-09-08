@@ -73,6 +73,15 @@ function toggle(): void {
   if (!isOpen.value) close();
 }
 
+// G10 D17: forwarded so App.vue's palette dispatcher can open this panel exactly the way clicking
+// its own trigger does — the picker is the only place the UI names a ref to act on, so every
+// ref-scoped palette command (checkout, delete/rename branch, delete tag, delete remote branch)
+// reaches the same `openBranchPicker` action.
+function open(): void {
+  isOpen.value = true;
+}
+defineExpose({ open });
+
 /** W20: `close()` unmounts the whole panel, including whatever row button the click just
  *  focused — by the time `runCheckout` might open `CheckoutDialog.vue`, that button is gone and
  *  `useModalFocus`'s own invoker capture would land on nothing (the browser's own fallback,

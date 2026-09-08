@@ -28,7 +28,12 @@ import type { RefsState } from '../state/refs.ts';
 import type { RepoState } from '../state/repo.ts';
 import type { SearchState } from '../state/search.ts';
 import type { StashState } from '../state/stash.ts';
+// Plain (not `import type`) imports, unlike RefreshButton below: vue-tsc needs the real import to
+// infer the template's inline @branch-from-stash handler's parameter type from BranchPicker's own
+// emits declaration — a type-only import here breaks that inference (TS7006).
+// biome-ignore lint/style/useImportType: see above
 import BranchPicker from './BranchPicker.vue';
+// biome-ignore lint/style/useImportType: see above
 import PullStrategyPicker from './PullStrategyPicker.vue';
 import type RefreshButton from './RefreshButton.vue';
 import RepoPicker from './RepoPicker.vue';
@@ -68,12 +73,8 @@ function copy(text: string, whatCopied: string): void {
 }
 
 const refreshButtonRef = ref<InstanceType<typeof RefreshButton> | null>(null);
-
-// Forwarded so App.vue can drive the same refresh RefreshButton's own click uses from
-// CommitGrid.vue's "refresh" emit (F5/Ctrl+R while the grid has focus) — one implementation,
-// reached from two inputs, rather than App.vue reimplementing RefreshButton's own idempotency
-// and hasPendingChange bookkeeping a second time.
-defineExpose({ refresh: () => refreshButtonRef.value?.refresh() });
+const branchPickerRef = ref<InstanceType<typeof BranchPicker> | null>(null);
+const pullStrategyPickerRef = ref<InstanceType<typeof PullStrategyPicker> | null>(null);
 
 // ---------------------------------------------------------------------------------------
 // P8 W17: fetch/pull/push
@@ -170,6 +171,20 @@ async function doCancel(): Promise<void> {
   await props.opsState.cancelRemote();
 }
 
+// G10 D17/F15: forwarded so App.vue's palette dispatcher can drive the same affordances a click
+// already does — one implementation, reached from two inputs, exactly like `refresh` above. Each
+// is a one-line delegation to a handler this file already has, or to a nested component's own
+// `defineExpose`.
+defineExpose({
+  refresh: () => refreshButtonRef.value?.refresh(),
+  openBranchPicker: () => branchPickerRef.value?.open(),
+  fetch: doFetch,
+  pull: () => pullStrategyPickerRef.value?.run(),
+  push: doPush,
+  forcePush: doForcePush,
+  cancelRemote: doCancel,
+});
+
 /** §7.6/W14: "enabled from `StatusSummary`'s dirty flag" — `isClean` rather than a `dirtyPaths`
  *  length check, since the summary is the same object every other toolbar gate already reads. */
 const stashDisabled = computed(
@@ -185,6 +200,7 @@ const stashDisabled = computed(
   <div class="kv-toolbar" role="toolbar" aria-label="Kira Version toolbar">
     <RepoPicker :repo-state="repoState" @repo-opened="(repoId) => emit('repo-opened', repoId)" />
     <BranchPicker
+      ref="branchPickerRef"
       :refs="refsState"
       :ops="opsState"
       :stash="stashState"
@@ -209,6 +225,7 @@ const stashDisabled = computed(
 
       <PullStrategyPicker
         v-if="currentBranch !== undefined"
+        ref="pullStrategyPickerRef"
         :ops="opsState"
         :remote="defaultRemote as string"
         :branch="currentBranch"

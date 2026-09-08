@@ -86,6 +86,10 @@ async function runWith(strategy: PullStrategy): Promise<void> {
   close();
   await props.ops.runPull(props.remote, props.branch, strategy);
 }
+
+// G10 D17: forwarded so App.vue's palette dispatcher's `pull` action reaches the same default-
+// strategy path the toolbar's own Pull button click does.
+defineExpose({ run: runDefault });
 </script>
 
 <template>

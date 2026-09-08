@@ -1,4 +1,4 @@
-import type { HostKind, Transport } from '@kira/git-ipc';
+import type { HostKind, Transport, UiActionKind } from '@kira/git-ipc';
 import { createApp, type App as VueApp } from 'vue';
 import AppRoot from './App.vue';
 import ReviewView from './components/review/ReviewView.vue';
@@ -24,6 +24,10 @@ export interface MountOptions {
    *  learns which branch to review" (see `ReviewView.vue`'s own doc comment). `undefined`/`null`
    *  is the "no branch yet" state; ignored entirely for `view: "graph"`. */
   readonly target?: ReviewTarget | null;
+  /** G10 D19: only meaningful when `view === "graph"` — the exact mirror of `target` above, for a
+   *  palette command that fired while the graph webview was cold (`panelView.ts`'s own
+   *  `#pendingAction`/bootstrap-island arm). `undefined`/`null` means no action is pending. */
+  readonly pendingAction?: UiActionKind | null;
 }
 
 /**
@@ -45,11 +49,11 @@ export function mount(container: Element, opts: MountOptions): MountHandle {
   performance.mark('kira:page-parsed');
   performance.measure('kira:page-parsed', undefined, 'kira:page-parsed');
 
-  const { view = 'graph', target, ...rest } = opts;
+  const { view = 'graph', target, pendingAction, ...rest } = opts;
   const app: VueApp =
     view === 'review'
       ? createApp(ReviewView, { ...rest, target })
-      : createApp(AppRoot, { ...rest });
+      : createApp(AppRoot, { ...rest, pendingAction });
   app.mount(container);
   return {
     unmount(): void {

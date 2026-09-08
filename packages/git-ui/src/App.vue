@@ -12,7 +12,7 @@
  * picker's own label, the rendered rows themselves).
  */
 import { SETTINGS } from '@kira/git-core';
-import type { HostKind, StashEntry, Transport } from '@kira/git-ipc';
+import type { HostKind, StashEntry, Transport, UiActionKind } from '@kira/git-ipc';
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue';
 import { BridgeClient } from './bridge/client.ts';
 import type AppToolbar from './components/AppToolbar.vue';
@@ -70,6 +70,9 @@ const props = defineProps<{
   transport: Transport;
   viewState: ViewStateStore;
   host: HostKind;
+  /** G10 D19: a palette command that fired while this webview was cold — see `main.ts`'s own
+   *  `MountOptions.pendingAction` doc comment. `undefined`/`null` means none is pending. */
+  pendingAction?: UiActionKind | null;
 }>();
 
 const bridge = new BridgeClient(props.transport);
@@ -568,6 +571,65 @@ watch(graphView.loading, (state, previous) => {
   }
 });
 
+// ---------------------------------------------------------------------------------------
+// G10 D19: the palette's own dispatcher — a switch over the same affordances the toolbar or a
+// context menu already drives (F16), never a second implementation of an operation. Reached two
+// ways: `bridge.on('ui.action', ...)` below, for a command run while this webview is already
+// live, and `props.pendingAction` at mount (below), for one that fired while it was cold —
+// `panelView.ts`'s own two-arm pattern, mirrored from `review.target`'s.
+// ---------------------------------------------------------------------------------------
+function runUiAction(action: UiActionKind): void {
+  switch (action) {
+    case 'openBranchPicker':
+      toolbarRef.value?.openBranchPicker();
+      break;
+    case 'createBranch':
+      branchDialogState.value = { open: true, startPoint: selection.sha.value ?? 'HEAD' };
+      break;
+    case 'createTag':
+      tagDialogState.value = { open: true, target: selection.sha.value ?? 'HEAD' };
+      break;
+    case 'revertSelected': {
+      const sha = selection.sha.value;
+      if (sha) void opsState.runRevert([sha]);
+      else liveAnnouncement.value = 'Select a commit first.';
+      break;
+    }
+    case 'continueOperation':
+      void opsState.continueOp();
+      break;
+    case 'abortOperation':
+      void opsState.abortOp();
+      break;
+    case 'skipCommit':
+      void opsState.skipOp();
+      break;
+    case 'undo':
+      void opsState.undo();
+      break;
+    case 'fetch':
+      toolbarRef.value?.fetch();
+      break;
+    case 'pull':
+      toolbarRef.value?.pull();
+      break;
+    case 'push':
+      toolbarRef.value?.push();
+      break;
+    case 'forcePush':
+      toolbarRef.value?.forcePush();
+      break;
+    case 'cancelRemoteOperation':
+      toolbarRef.value?.cancelRemote();
+      break;
+    case 'refresh':
+      toolbarRef.value?.refresh();
+      break;
+  }
+}
+
+const unsubscribeUiAction = bridge.on('ui.action', (event) => runUiAction(event.action));
+
 onMounted(() => {
   // requestAnimationFrame so the mark lands after the browser has actually painted this
   // frame, not merely after Vue's synchronous mount work.
@@ -586,7 +648,13 @@ onMounted(() => {
   // applied and the rows it covers re-rendered with their lanes, not merely that the shell
   // mounted. `CommitGrid.vue`'s own `handleChunkLayout` — the one place that event fires — marks
   // it, once, the first time that happens; nothing here needs to know when that is.
-  void bootstrap();
+  void bootstrap().then(() => {
+    // G10 D19: the cold-bootstrap arm — a palette command that fired before this webview had a
+    // live RpcServer (panelView.ts's own #pendingAction). Runs once, after bootstrap() has
+    // resolved a repo/opsState to act against; a later hide/reveal of the same view starts with
+    // no pending action (panelView.ts clears it once consumed), so this never replays.
+    if (props.pendingAction) runUiAction(props.pendingAction);
+  });
 });
 
 // `docs/plans/P11.md` W7: the four search fields below are carried through unchanged by every
@@ -854,6 +922,7 @@ onBeforeUnmount(() => {
   document.removeEventListener('pointerdown', onDocumentPointerDown);
   breakpointObserver?.disconnect();
   if (breakpointRaf !== 0) cancelAnimationFrame(breakpointRaf);
+  unsubscribeUiAction();
   graphView.dispose();
   refsState.dispose();
   opsState.dispose();

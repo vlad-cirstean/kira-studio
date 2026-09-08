@@ -71,6 +71,7 @@ export type {
   StreamKey,
   StreamParamsOf,
   TagAnnotation,
+  UiActionKind,
   UndoSlotSnapshot,
 } from './contract.ts';
 export type {
