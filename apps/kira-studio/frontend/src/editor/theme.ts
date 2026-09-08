@@ -44,6 +44,25 @@ export const kiraEditorTheme = EditorView.theme(
     '.cm-scroller::-webkit-scrollbar-thumb': {
       backgroundColor: 'var(--kira-scrollbar)',
     },
+    // G20 D7: closes F3's "coincidence, not a design" finding — @codemirror/view's own
+    // `.cm-tooltip { zIndex: 500 }` (its baseTheme, EditorView.baseTheme, Prec.lowest) happens to
+    // sit above this app's real --kira-z-* ladder (top rung 400) today, by luck of two unrelated
+    // numbers, not by any stated relationship. An explicit reference to the real token instead, so
+    // the two can never silently diverge if either scale is renumbered later.
+    //
+    // §7 item 3: EditorView.theme() (this extension, default precedence) over a plain global CSS
+    // rule with !important — verified, not assumed, by reading both packages' own source
+    // (state/dist/index.cjs's `flatten()`: extensions are bucketed by precedence, highest first,
+    // then concatenated; view/dist/index.cjs's own tooltip-container mount then does
+    // `this.styleModules.concat(baseTheme$1).reverse()` before calling style-mod's
+    // `StyleModule.mount`, whose own doc comment states "rules from modules later in the array
+    // take precedence of those from earlier modules"). Reversing a [highest…lowest]-ordered array
+    // puts default-precedence modules (this theme) *after* Prec.lowest ones (the tooltip
+    // baseTheme) in the final mounted order — so this rule wins the cascade for real, not by
+    // coincidence, and the !important fallback recorded in G20 §7 item 3 is not needed.
+    '.cm-tooltip': {
+      zIndex: 'var(--kira-z-tooltip)',
+    },
     // P18 D12: every other CodeMirror surface in the app is themed from these tokens — an
     // unthemed, library-default completion popup would be the only piece of un-themed chrome in
     // the editor, and would ignore the Settings font entirely. Reuses primitives.css's own

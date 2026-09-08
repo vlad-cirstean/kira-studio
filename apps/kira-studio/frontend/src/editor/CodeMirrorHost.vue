@@ -25,6 +25,7 @@ import {
   hoverTooltip,
   keymap,
   lineNumbers,
+  tooltips,
 } from '@codemirror/view';
 import { onMounted, onUnmounted, ref, watch } from 'vue';
 import { settingsState } from '../state/settings';
@@ -249,6 +250,16 @@ onMounted(() => {
       autocompleteCompartment.of(resolveAutocomplete()),
       lintCompartment.of(resolveLint()),
       hoverCompartment.of(resolveHover()),
+      // G20 D7: one `tooltips()` facet value governs the whole EditorView's tooltip container,
+      // regardless of which extension produces a given tooltip (hoverTooltip() above, and
+      // @codemirror/lint's own diagnostic-hover, wired independently in resolveLint()) — so this
+      // single line fixes every current and future tooltip this host ever renders. Unconditional,
+      // not compartmentalized: every host needs its tooltips escaping `.cm-host`'s own
+      // `overflow: hidden` (and every ancestor pane's own, e.g. HttpRequestView.vue's
+      // `.request-pane`) identically, not as an opt-in feature. The z-index side of this same bug
+      // (CodeMirror's own baseTheme hardcodes `.cm-tooltip { zIndex: 500 }`, uncoordinated with
+      // this app's real `--kira-z-*` ladder) is closed in `theme.ts`'s own `.cm-tooltip` override.
+      tooltips({ parent: document.body }),
       rangeCompartment.of(resolveRangeHighlights()),
       closeBracketsCompartment.of(resolveAutoCloseBrackets()),
       syntaxHighlighting(kiraHighlightStyle),
