@@ -114,7 +114,9 @@ const trailer = computed(() =>
 // same gate the template already used for that group, named here so the hint computed can share
 // it without duplicating the condition.
 const hasCode = computed(() => !!liveResult.value || !!viewing.value);
-// P18 D13: the code's own meaning, on its own always-visible line — statusHint's exact shape.
+// P28 D1 reverses P18 D13's always-visible line, matching the identical change on the HTTP
+// response pane: the meaning is now the status chip's tooltip. The server's own statusMessage
+// keeps its own line — that is a message from the server, not a restatement of the code.
 const codeHint = computed(() => (hasCode.value ? grpcCodeHint(code.value) : ''));
 
 const RESPONSE_PANE_OPTIONS = [
@@ -242,7 +244,12 @@ onUnmounted(() => {
          opened tab used to show no Messages/Metadata/History switcher at all. -->
     <div class="response-status-row p-toolbar">
       <template v-if="hasCode">
-        <span class="p-chip" :class="grpcCodeClass(code)" data-testid="grpc-status-chip">
+        <span
+          class="p-chip"
+          :class="grpcCodeClass(code)"
+          data-testid="grpc-status-chip"
+          v-tooltip="codeHint"
+        >
           {{ codeName }} ({{ code }})
         </span>
         <span class="p-push" />
@@ -270,10 +277,8 @@ onUnmounted(() => {
       />
     </div>
 
-    <!-- P18 D13 (P15 D2's gRPC sibling): the code's own meaning, always visible, never truncated —
-         the server's own statusMessage moves to its own line right below it, free to wrap instead
-         of being ellipsised inside the toolbar row it used to share. -->
-    <div v-if="codeHint" class="p-sm muted status-hint" data-testid="grpc-status-hint">{{ codeHint }}</div>
+    <!-- P18 D13's other half, kept: the server's own statusMessage is a message, not a
+         restatement of the code, so it stays on its own line free to wrap. -->
     <div v-if="statusMessage" class="p-xs dim status-message" data-testid="grpc-status-message">{{ statusMessage }}</div>
 
     <MessageStrip v-if="viewing" tone="note" data-testid="grpc-history-band">
@@ -391,12 +396,6 @@ onUnmounted(() => {
 
 .response-status-row {
   gap: var(--kira-s-2);
-}
-
-/* P18 D13: no longer the toolbar's own truncatable caption (F13) — free to wrap, like HTTP's own
-   .status-hint (ResponsePane.vue). */
-.status-hint {
-  padding: 0 var(--kira-s-3) var(--kira-s-1);
 }
 
 .status-message {

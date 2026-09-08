@@ -1050,10 +1050,12 @@ test('a non-OK status shows what the code means and what the server said (P18 D1
 
   await page.click('[data-testid="grpc-call"]');
 
-  const hint = page.locator('[data-testid="grpc-status-hint"]');
+  // P28 D1: the code's meaning is the status chip's tooltip now; the server's own
+  // statusMessage keeps its own line, since that is a message rather than a restatement.
+  const chip = page.locator('[data-testid="grpc-status-chip"]');
   const message = page.locator('[data-testid="grpc-status-message"]');
-  await expect(hint).toBeVisible();
-  await expect(hint).toContainText('the server has no such method or resource');
+  await expect(page.locator('[data-testid="grpc-status-hint"]')).toHaveCount(0);
+  await expect(chip).toHaveAttribute('data-kira-tip', /no such method or resource/);
   await expect(message).toBeVisible();
   await expect(message).toHaveText('no user with that id');
 });

@@ -135,9 +135,10 @@ function setResponseView(view: 'pretty' | 'raw'): void {
   patchHttpRequestTabState(props.tab.id, { responseView: view });
 }
 
-// D11: the hint is always shown inline, not tooltip-only — the case that matters (4xx/5xx) is
-// exactly the case where the user should not have to discover a hover. `v-tooltip` still carries
-// the full sentence for when the caption itself is truncated by the row's width.
+// P28 D1 reverses D11's "always shown inline, not tooltip-only": the standing caption under the
+// status row was reported as noise. The hint is now the status chip's tooltip, which is what the
+// four other consumers of `statusHint` in this app (ResponseHistoryList, ResponseDiffDialog,
+// TimelinePane) have always done with it.
 const hint = computed(() => (response.value ? statusHint(response.value.status) : ''));
 
 const redirectCaption = computed(() => {
@@ -273,7 +274,12 @@ onUnmounted(() => {
 
     <div class="response-status-row p-toolbar">
       <template v-if="response">
-        <span class="p-chip" :class="statusClass(response.status)" data-testid="http-status">
+        <span
+          class="p-chip"
+          :class="statusClass(response.status)"
+          data-testid="http-status"
+          v-tooltip="hint"
+        >
           {{ response.status }} {{ response.statusText }}
         </span>
         <span class="p-push" />
@@ -314,8 +320,6 @@ onUnmounted(() => {
         @update:model-value="setResponsePane"
       />
     </div>
-
-    <div v-if="hint" class="p-sm muted status-hint" data-testid="http-status-hint">{{ hint }}</div>
 
     <MessageStrip v-if="viewing" tone="note" data-testid="http-history-band">
       Viewing the response from {{ viewingTime }} · {{ viewing?.snapshot.entry.method }}
@@ -434,10 +438,6 @@ onUnmounted(() => {
 
 .response-status-row {
   gap: var(--kira-s-2);
-}
-
-.status-hint {
-  padding: 0 var(--kira-s-3) var(--kira-s-2);
 }
 
 .redirect-caption {

@@ -161,9 +161,8 @@ test('Http request — a 404 shows its own hint', async ({ relaunch }) => {
   const status = page.locator('[data-testid="http-status"]');
   await expect(status).toContainText('404');
   await expect(status).toHaveClass(/err/);
-  await expect(page.locator('[data-testid="http-status-hint"]')).toContainText(
-    'the server has no resource at this URL',
-  );
+  // P28 D1: the code's meaning is the chip's tooltip now, not a standing caption below the row.
+  await expect(status).toHaveAttribute('data-kira-tip', /no resource at this URL/);
 });
 
 // P22b D2: a header's value cell now completes from a vocabulary keyed by the row's own name —
