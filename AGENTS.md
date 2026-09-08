@@ -102,6 +102,25 @@ and how to run things wherever a session happens to be.
   already resolved. "Known open items" is the one durable exception — keep an item only while
   genuinely open, delete it the moment it's resolved rather than marking it done in place.
 
+## `.github/workflows/` changes can't be pushed from here
+
+The git push credential used in this environment is an OAuth App token without the `workflow`
+scope, so GitHub rejects *any* push — including unrelated commits stacked on top — once a commit
+in it touches a file under `.github/workflows/`. This is enforced by GitHub itself regardless of
+what the diff actually does; there's no way to grant the scope from inside a session.
+
+So: never commit a change to `.github/workflows/*` directly. Instead, write the intended diff as a
+new file under `docs/pending-changes/` (create the directory if it doesn't exist) — the target
+workflow file's path as the filename with `.patch` appended (e.g.
+`docs/pending-changes/.github__workflows__release.yml.patch`), containing a normal `git diff`-style
+patch plus a one-line note of why. Commit and push that `docs/` file like anything else (it isn't
+under `.github/workflows/`, so it doesn't trip the scope check). The user applies the patch to the
+real workflow file themselves, from an environment with proper push credentials, and pushes it —
+at which point the corresponding file under `docs/pending-changes/` is deleted (by whoever applies
+it, in the same commit that applies it). A pending-changes entry that's still there means it hasn't
+been applied yet; don't recreate one that already exists for the same target file, and don't let
+this workaround become an excuse to touch workflow files more often than the task actually needs.
+
 ## Known open items
 
 - **First-launch window-size clamp (P22 D6(a)) still can't apply to the very first window a fresh
