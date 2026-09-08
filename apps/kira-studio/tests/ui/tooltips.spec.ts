@@ -237,3 +237,88 @@ test('tooltips — app-owned surface: delay, disabled controls, popovers, a11y',
 
   expect(consoleErrors).toEqual([]);
 });
+
+// G20 D9/F11: the app-owned tooltip surface has real flip/shift middleware (theme/
+// floatingPosition.ts's computeFloatPosition, confirmed at F2) but, until now, no geometry
+// regression proving either actually fires at a real viewport edge — every existing scenario
+// above asserts *what* the tooltip shows, never *where*. Both cases below drive the real,
+// shipped mechanism (tooltip.ts's own document-level focusin listener, AppTooltip.vue's own
+// computeFloatPosition call) against a synthetic trigger element carrying the exact
+// `data-kira-tip` attribute `v-tooltip` itself writes (tooltip.ts's `TIP_ATTR`) — not a mock of
+// the controller, just a trigger whose position is set directly rather than inferred from the
+// current title bar layout, so these stay correct regardless of how that layout shifts over
+// time. `focus()` rather than a simulated hover — `onFocusIn` opens immediately (no
+// TOOLTIP_DELAY_MS wait), avoiding a real pointermove-timing dependency in a geometry-only
+// assertion (D9's own note).
+async function injectTooltipTrigger(
+  page: Page,
+  style: { top?: string; bottom?: string; left?: string; right?: string },
+): Promise<Locator> {
+  await page.evaluate((s) => {
+    const btn = document.createElement('button');
+    btn.id = 'g20-tooltip-trigger';
+    btn.textContent = 'x';
+    btn.setAttribute('data-kira-tip', 'Geometry test tooltip');
+    Object.assign(btn.style, {
+      position: 'fixed',
+      width: '20px',
+      height: '20px',
+      ...s,
+    });
+    document.body.appendChild(btn);
+  }, style);
+  return page.locator('#g20-tooltip-trigger');
+}
+
+test('tooltips — flips above the trigger when there is no room below', async ({
+  relaunch,
+  consoleErrors,
+}) => {
+  const { window: page } = await relaunch();
+  await page.setViewportSize({ width: 1000, height: 400 });
+
+  // Plenty of room above (380px), almost none below (4px) — the tooltip's natural below-the-
+  // trigger placement cannot fit, so flip() must open it above instead.
+  const trigger = await injectTooltipTrigger(page, { top: '376px', left: '400px' });
+  await trigger.focus();
+  const tip = tooltip(page);
+  await expect(tip).toBeVisible({ timeout: 1_000 });
+  const tipBox = await tip.boundingBox();
+  const triggerBox = await trigger.boundingBox();
+  if (!tipBox || !triggerBox) throw new Error('tooltip or trigger has no box');
+
+  expect(
+    tipBox.y + tipBox.height,
+    'flip: the tooltip renders above the trigger, not merely clamped on-screen below it',
+  ).toBeLessThanOrEqual(triggerBox.y + 1);
+  expect(tipBox.y, 'the flipped tooltip must itself stay on-screen').toBeGreaterThanOrEqual(0);
+
+  expect(consoleErrors).toEqual([]);
+});
+
+test('tooltips — shifts back on-screen near a horizontal viewport edge', async ({
+  relaunch,
+  consoleErrors,
+}) => {
+  const { window: page } = await relaunch();
+  await page.setViewportSize({ width: 400, height: 400 });
+
+  // The tooltip's default placement ('bottom-start') grows rightward from the trigger's own left
+  // edge, up to 320px wide — parking the trigger 4px from the right edge of a 400px-wide
+  // viewport forces real overflow past the right edge without shift().
+  const trigger = await injectTooltipTrigger(page, { top: '200px', right: '4px' });
+  await trigger.focus();
+  const tip = tooltip(page);
+  await expect(tip).toBeVisible({ timeout: 1_000 });
+  const tipBox = await tip.boundingBox();
+  if (!tipBox) throw new Error('tooltip has no box');
+  const viewportWidth = await page.evaluate(() => window.innerWidth);
+
+  expect(tipBox.x, 'shift: the tooltip stays on-screen (left edge)').toBeGreaterThanOrEqual(0);
+  expect(
+    tipBox.x + tipBox.width,
+    'shift: the tooltip stays on-screen (right edge)',
+  ).toBeLessThanOrEqual(viewportWidth);
+
+  expect(consoleErrors).toEqual([]);
+});

@@ -465,6 +465,80 @@ test('the request body: a resolved {{variable}} has a colour of its own, hovers,
   await expect(tooltip).toContainText('base_url');
 });
 
+// G20 D7: the actual originally-reported bug — the request body's {{variable}} hover tooltip
+// stayed nested inside two `overflow: hidden` ancestors (CodeMirrorHost.vue's own `.cm-host`,
+// HttpRequestView.vue's `.request-pane`) with no `tooltips({ parent: document.body })` facet to
+// escape them, and its z-index (@codemirror/view's own hardcoded 500) had no stated relationship
+// to this app's real `--kira-z-*` ladder. Both are checked as direct DOM/CSS facts rather than
+// pixel geometry — a stronger, viewport-independent proof that D7's fix actually landed, not a
+// coincidence of one particular window size happening to leave enough room.
+test('the request body {{variable}} hover escapes the editor pane and adopts the coordinated z-index (G20 D7)', async ({
+  relaunch,
+}) => {
+  const CONTROL: ControlSnapshot[] = [
+    {
+      channel: IPC.tabsList,
+      response: [
+        httpRequestTab('tab-1', 0, true, {
+          bodyMode: 'code',
+          codeLanguage: 'json',
+          code: '{\n  "base": "{{base_url}}"\n}',
+        }),
+      ],
+    },
+    ...p15bVariableControl(),
+  ];
+  const { window: page } = await relaunch({ control: CONTROL });
+
+  const body = page.locator('[data-testid="http-request-pane"] .cm-content');
+  await expect(body).toBeVisible();
+
+  const resolvedSpan = body.locator('.cm-kira-var');
+  await expect(resolvedSpan).toHaveCount(1);
+  const resolvedBox = await resolvedSpan.boundingBox();
+  if (!resolvedBox) throw new Error('resolved reference span has no box');
+  await page.mouse.move(
+    resolvedBox.x + resolvedBox.width / 2,
+    resolvedBox.y + resolvedBox.height / 2,
+  );
+
+  const hover = page.locator('.cm-kira-hover');
+  await expect(hover).toBeVisible();
+
+  // D7's first half: escapes both named clipping ancestors, and is mounted as a direct child of
+  // <body> — exactly what `tooltips({ parent: document.body })` produces, and what the library's
+  // own pre-fix default (the editor's own DOM node) never did.
+  const [escapesRequestPane, escapesCmHost, escapesAppRoot, isInBody] = await Promise.all([
+    hover.evaluate((el) => el.closest('.request-pane') === null),
+    hover.evaluate((el) => el.closest('.cm-host') === null),
+    // main.ts mounts the whole app onto '#app' — escaping it entirely (not merely its two named
+    // ancestors above) is the strongest, wrapper-depth-independent proof that
+    // `tooltips({ parent: document.body })` actually re-parented this tooltip's own container,
+    // rather than merely resolving true by accident of which two specific classes happened to be
+    // checked.
+    hover.evaluate((el) => el.closest('#app') === null),
+    hover.evaluate((el) => document.body.contains(el)),
+  ]);
+  expect(escapesRequestPane, 'must not be a descendant of .request-pane').toBe(true);
+  expect(escapesCmHost, 'must not be a descendant of .cm-host').toBe(true);
+  expect(escapesAppRoot, 'must not be a descendant of #app at all').toBe(true);
+  expect(isInBody, 'the tooltip must still be attached under <body>').toBe(true);
+
+  // D7's second half: the coordinated z-index — theme.ts's own '.cm-tooltip' override replaces
+  // @codemirror/view's hardcoded 500 with a real reference to this app's own top-rung token, so
+  // this must read the *token's* current value, not the library's original literal (asserting
+  // this rather than merely ">= the toolbar's z-index" catches the override silently reverting to
+  // the library's default just as reliably, and ties the two numbers together for real instead of
+  // by coincidence).
+  const [tooltipZIndex, expectedZIndex] = await Promise.all([
+    hover.evaluate((el) => getComputedStyle(el.closest('.cm-tooltip') as Element).zIndex),
+    page.evaluate(() =>
+      getComputedStyle(document.documentElement).getPropertyValue('--kira-z-tooltip').trim(),
+    ),
+  ]);
+  expect(tooltipZIndex).toBe(expectedZIndex);
+});
+
 test('a header-name cell suggests Content-Type, and typing Content-T then accepting does not duplicate it', async ({
   relaunch,
 }) => {
