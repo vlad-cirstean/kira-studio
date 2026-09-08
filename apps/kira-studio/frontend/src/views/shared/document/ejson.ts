@@ -377,6 +377,96 @@ export function toRelaxedText(body: string): string {
   return JSON.stringify(canonicalToRelaxed(parsed), null, 2);
 }
 
+// Real-interaction fix (reported bug — the normal/default copy action still produced JSON wrapped
+// in Mongo/BSON type annotations, e.g. `{"$date": …}`/`{"$oid": …}`, not actually plain JSON):
+// unlike canonicalToRelaxed above, this does not stop at "readable per the Extended JSON v2 spec"
+// — Relaxed Extended JSON is *still* Extended JSON (autocomplete.spec.ts's own coverage locks in
+// that `copy-relaxed-json` keeps `$oid` wrapped, "no relaxed variant for ObjectId" per the real
+// spec; interaction.spec.ts and P19 D6/P22b D11 lock in that `copy-as-json` (Canonical Extended
+// JSON) round-trips through mongoimport/mongosh, which requires every wrapper to survive intact —
+// so neither of those two, nor Shell mode, is the right thing to change). This resolves every
+// wrapper detectWrapper recognises down to its plain-JSON equivalent instead: ObjectId/RegExp/Code
+// become a plain string, Date becomes a plain ISO-8601 string, and every numeric wrapper
+// (Int32/Int64/Decimal128/Double) becomes a plain JSON number — JS's usual floating-point
+// precision then applies beyond Number.MAX_SAFE_INTEGER, the same accepted tradeoff any
+// "export as plain JSON" tool makes; there is no lossless way to spell a 64-bit integer as a JSON
+// number, which is exactly why this is a deliberately distinct, separately-offered format rather
+// than a change to Canonical/Relaxed. Binary/Timestamp/DBRef/MinKey/MaxKey have no single scalar
+// value to collapse into — their wrapper object survives, but every one of its keys has its
+// leading `$` stripped, so the result never carries a `$`-prefixed key anywhere, unlike Canonical/
+// Relaxed which both keep every wrapper verbatim.
+function ejsonToPlain(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(ejsonToPlain);
+  if (!isPlainObject(value)) return value;
+  const keys = objectKeys(value);
+
+  if (keys.length === 1 && keys[0] === '$oid' && typeof value.$oid === 'string') {
+    return value.$oid;
+  }
+  if (keys.length === 1 && keys[0] === '$date') {
+    const millis = dateMillis(value.$date);
+    if (millis !== null) return new Date(millis).toISOString();
+  }
+  if (keys.length === 1 && keys[0] === '$numberInt' && typeof value.$numberInt === 'string') {
+    return Number(value.$numberInt);
+  }
+  if (keys.length === 1 && keys[0] === '$numberLong' && typeof value.$numberLong === 'string') {
+    return Number(value.$numberLong);
+  }
+  if (
+    keys.length === 1 &&
+    keys[0] === '$numberDecimal' &&
+    typeof value.$numberDecimal === 'string'
+  ) {
+    return Number(value.$numberDecimal);
+  }
+  if (keys.length === 1 && keys[0] === '$numberDouble' && typeof value.$numberDouble === 'string') {
+    const n = Number(value.$numberDouble);
+    // Infinity/-Infinity/NaN have no bare-JSON-number spelling — the raw string is still plainer
+    // than the `$numberDouble` wrapper it came out of.
+    return Number.isFinite(n) ? n : value.$numberDouble;
+  }
+  if (
+    keys.length === 1 &&
+    keys[0] === '$regularExpression' &&
+    isPlainObject(value.$regularExpression) &&
+    typeof value.$regularExpression.pattern === 'string'
+  ) {
+    return value.$regularExpression.pattern;
+  }
+  if (
+    (keys.length === 1 || keys.length === 2) &&
+    keys.includes('$code') &&
+    typeof value.$code === 'string' &&
+    keys.every((k) => k === '$code' || k === '$scope')
+  ) {
+    return value.$code;
+  }
+
+  // Binary/Timestamp/DBRef/MinKey/MaxKey, or an ordinary object: recurse into every value, and
+  // strip a leading `$` from every key along the way — the loop, not a length-1 special case,
+  // since this same branch also has to walk an ordinary field-by-field document.
+  const out: Record<string, unknown> = {};
+  for (const k of keys) {
+    const plainKey = k.startsWith('$') ? k.slice(1) : k;
+    out[plainKey] = ejsonToPlain(value[k]);
+  }
+  return out;
+}
+
+/** The document re-serialised as genuinely plain JSON — no `$`-prefixed BSON wrapper anywhere,
+ *  every recognised type resolved to its plain-JSON equivalent. Falls back to the raw body
+ *  unchanged when it does not parse as JSON at all (same posture as toShellText/toRelaxedText). */
+export function toPlainJson(body: string): string {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(body);
+  } catch {
+    return body;
+  }
+  return JSON.stringify(ejsonToPlain(parsed), null, 2);
+}
+
 // ---------------------------------------------------------------------------------------------
 // Beautify/Minify for the document editor's shell-literal buffer (P27 D29). `beautify.ts`'s own
 // JSON scanner can't reindent this text — a shell constructor call (`ObjectId("…")`) isn't valid

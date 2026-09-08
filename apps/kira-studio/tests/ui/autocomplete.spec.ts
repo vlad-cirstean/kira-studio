@@ -452,6 +452,22 @@ test('Mongo document row — Copy document / Copy as JSON / Copy _id', async ({
   expect(copiedDoc).toContain('ObjectId("000000000000000000000000")');
   expect(copiedDoc).toContain('"name": "widget-0"');
 
+  // Real-interaction fix (reported bug — the normal/default copy button still produced JSON
+  // wrapped in Mongo/BSON type annotations): the new, listed-first "Plain JSON" format strips
+  // every $-prefixed wrapper — the ObjectId becomes a bare hex string, not `{"$oid": …}`.
+  await firstRow.click({ button: 'right' });
+  await expect(page.locator('[data-testid="context-menu"]')).toBeVisible();
+  await page.locator('[data-testid="menu-item-copy-document-submenu"]').hover();
+  await expect(page.locator('[data-testid="context-submenu"]')).toBeVisible();
+  await page.click('[data-testid="menu-item-copy-plain-json"]');
+  await expect(page.locator('[data-testid="context-menu"]')).toHaveCount(0);
+  const copiedPlain = await lastClipboardWrite(page);
+  expect(copiedPlain).not.toContain('$oid');
+  expect(JSON.parse(copiedPlain)).toMatchObject({
+    _id: '000000000000000000000000',
+    name: 'widget-0',
+  });
+
   // P19 D6 (parity half): the same "Canonical Extended JSON" item the console's own document
   // result gained (resultMenu.ts), copying the canonical extended JSON body — not the shell
   // form above.
