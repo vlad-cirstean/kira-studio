@@ -133,6 +133,8 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   gitPairingPending: 'GitClientsService.PendingPairing',
   gitPairingApprove: 'GitClientsService.Approve',
   gitPairingDeny: 'GitClientsService.Deny',
+  gitVsixStatus: 'GitClientsService.VsixStatus',
+  gitVsixInstall: 'GitClientsService.InstallVsCodeIntegration',
 };
 
 /** ipc.ts's legacy channel string (what every `ControlSnapshot.channel` and fixture is keyed by,
@@ -259,6 +261,16 @@ const WILDCARD_DEFAULTS: Readonly<Record<string, string>> = Object.freeze({
   // above already gets, not a fixture miss.
   [IPC.gitClientsList]: '[]',
   [IPC.gitPairingPending]: JSON.stringify({ pending: null, queued: 0 }),
+  // G10: hydrateGitClients() now also fetches VsixStatus on every boot — the same
+  // no-committed-fixture-will-ever-snapshot-this reasoning as the two entries above. "not
+  // bundled, code not found" is the honest default for a dev-server run under Playwright, which
+  // is never a packaged .app.
+  [IPC.gitVsixStatus]: JSON.stringify({
+    bundled: false,
+    vsixPath: '',
+    codeAvailable: false,
+    probed: [],
+  }),
 });
 
 interface CallRequestBody {

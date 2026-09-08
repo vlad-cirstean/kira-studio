@@ -16,7 +16,7 @@ import { FONT_CHOICES, fontStackAvailable, resolveFontFallback } from '../fonts'
 import { formatBytes, formatRelative } from '../format';
 import { cacheStatsState } from '../state/cacheStats';
 import { confirmDialog } from '../state/confirmDialog';
-import { gitClientsState, revokeGitClient } from '../state/gitClients';
+import { gitClientsState, installVsCodeIntegration, revokeGitClient } from '../state/gitClients';
 import { patchSettings, settingsState } from '../state/settings';
 import CodiconIcon from '../theme/CodiconIcon.vue';
 import AppButton from '../theme/primitives/AppButton.vue';
@@ -110,6 +110,40 @@ async function onRevokeGitClient(id: string, label: string): Promise<void> {
   );
   if (ok) await revokeGitClient(id);
 }
+
+// G10 D12/D14: the same bypass-draft-entirely posture as onRevokeGitClient above — an install is
+// an action, not a setting. installing starts true only while the click is in flight (the button
+// itself has no separate loading affordance elsewhere in this dialog).
+const vsixInstalling = ref(false);
+async function onInstallVsCodeIntegration(): Promise<void> {
+  vsixInstalling.value = true;
+  try {
+    await installVsCodeIntegration();
+  } finally {
+    vsixInstalling.value = false;
+  }
+}
+
+// D12's own outcome copy, verbatim where it's a fixed string; installFailed/revealFailed weave in
+// the server's own bounded Detail/vsixPath.
+const vsixOutcomeMessage = computed(() => {
+  const result = gitClientsState.vsixInstallResult;
+  if (!result) return null;
+  switch (result.outcome) {
+    case 'installed':
+      return 'Installed into VS Code. Reload the window to activate it.';
+    case 'revealed':
+      return "VS Code's code command isn't available. Revealed the file in Finder — drag it onto VS Code, or run Shell Command: Install 'code' command in PATH.";
+    case 'notBundled':
+      return 'The extension ships inside the packaged app. This build has none.';
+    case 'installFailed':
+      return `VS Code refused the install: ${result.detail}. Reveal the file in Finder and drag it onto VS Code instead.`;
+    case 'revealFailed':
+      return `Couldn't reveal the file automatically. Find it at ${result.vsixPath}.`;
+    default:
+      return null;
+  }
+});
 
 const fontFamilyUnavailable = computed(() => !fontStackAvailable(draft.appearance.fontFamily));
 const fontFamilyFallback = computed(() => resolveFontFallback(draft.appearance.fontFamily));
@@ -580,6 +614,35 @@ async function onSave(): Promise<void> {
           </template>
 
           <template v-else-if="activeSection === 'Connected editors'">
+            <!-- G10 D14: the Install VS Code Integration entry point — advisory-rendered from
+                 VsixStatus, but the click itself always re-resolves through Install. -->
+            <div class="git-vsix-install">
+              <p v-if="!gitClientsState.vsix.bundled" class="muted-note" data-testid="git-vsix-not-bundled">
+                The extension ships inside the packaged app. This build has none.
+              </p>
+              <AppButton
+                v-else
+                kind="dialog"
+                class="action-button"
+                :disabled="vsixInstalling"
+                data-testid="git-vsix-install-button"
+                @click="onInstallVsCodeIntegration"
+              >
+                {{ gitClientsState.vsix.codeAvailable ? 'Install VS Code Integration' : 'Reveal Extension in Finder' }}
+              </AppButton>
+              <p v-if="vsixOutcomeMessage" class="helper-text" data-testid="git-vsix-outcome">
+                {{ vsixOutcomeMessage }}
+              </p>
+              <p
+                v-if="!gitClientsState.vsix.codeAvailable && gitClientsState.vsix.probed.length > 0"
+                class="muted-note"
+                data-testid="git-vsix-probed"
+              >
+                Looked for VS Code's <span class="mono">code</span> command at:
+                <span class="mono">{{ gitClientsState.vsix.probed.join(', ') }}</span>
+              </p>
+            </div>
+
             <p v-if="gitClientsState.clients.length === 0" class="muted-note" data-testid="git-clients-empty">
               No editors have been paired yet. A VS Code editor pairs by connecting to
               <span class="mono">~/.kira-studio/git.sock</span>.
@@ -933,6 +996,16 @@ async function onSave(): Promise<void> {
 
 .action-button {
   align-self: flex-start;
+}
+
+.git-vsix-install {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--kira-s-2);
+  margin-bottom: var(--kira-s-4);
+  padding-bottom: var(--kira-s-4);
+  border-bottom: var(--kira-border-width) solid var(--kira-border);
 }
 
 .git-clients-list {

@@ -127,6 +127,8 @@ export const IPC = {
   gitPairingPending: 'kira:git:pairing:pending',
   gitPairingApprove: 'kira:git:pairing:approve',
   gitPairingDeny: 'kira:git:pairing:deny',
+  gitVsixStatus: 'kira:git:vsix:status',
+  gitVsixInstall: 'kira:git:vsix:install',
 
   connectionState: 'kira:connection:state',
   connectionMetadataInvalidated: 'kira:connection:metadataInvalidated',

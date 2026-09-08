@@ -34,6 +34,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitrpc"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitsession"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitsock"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitvsix"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/localauth"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/logging"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/metrics"
@@ -296,7 +297,7 @@ func main() {
 			application.NewService(&bridge.ResponseHistoryService{Deps: deps}),
 			application.NewService(&bridge.GrpcHistoryService{Deps: deps}),
 			application.NewService(&bridge.DataGripService{Deps: deps}),
-			application.NewService(&bridge.GitClientsService{Deps: deps, Sock: gitSock, Broker: gitSock.Broker()}),
+			application.NewService(&bridge.GitClientsService{Deps: deps, Sock: gitSock, Broker: gitSock.Broker(), Vsix: gitvsix.New(gitvsix.Deps{})}),
 			application.NewService(&bridge.LifecycleService{Flusher: quitter, WindowFlusher: closeFlush}),
 		},
 		Assets: application.AssetOptions{

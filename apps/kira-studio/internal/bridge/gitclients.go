@@ -1,8 +1,11 @@
 package bridge
 
 import (
+	"context"
+
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/appcore"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitsock"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitvsix"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/ipcerr"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 )
@@ -21,13 +24,22 @@ type GitBroker interface {
 	Deny(requestID string) gitsock.PairingActionResult
 }
 
+// GitVsix is G10 D14's own seam over internal/gitvsix — the same "declare the interface where
+// it's consumed" precedent as GitSock/GitBroker above.
+type GitVsix interface {
+	Status() gitvsix.Status
+	Install(ctx context.Context) gitvsix.Result
+}
+
 // GitClientsService is the *Connected editors* pane's whole surface (SPEC §3.3, D19): list/revoke
 // paired clients, and answer/observe the pairing prompt. Approve/Deny never return a Go error —
 // connections.Service.Reveal's own precedent (F7): a pairing decision is a value, not a failure.
+// G10 D14 adds VsixStatus/InstallVsCodeIntegration, the same never-erroring shape.
 type GitClientsService struct {
 	Deps   appcore.Deps
 	Sock   GitSock
 	Broker GitBroker
+	Vsix   GitVsix
 }
 
 func (s *GitClientsService) List() ([]model.GitClient, error) {
@@ -113,4 +125,48 @@ func (s *GitClientsService) Deny(args GitClientsIDArgs) (GitPairingActionResult,
 		return GitPairingActionResult{}, ipcerr.BadRequest("id is required")
 	}
 	return toWireActionResult(s.Broker.Deny(args.ID)), nil
+}
+
+// GitVsixStatus is gitvsix.Status's wire projection (G10 D14) — codeAvailable collapses
+// gitvsix.Status.CodePath's "" convention into a bool, since the pane only ever branches on
+// whether one was found, never on the path itself before a real Install call resolves it fresh.
+type GitVsixStatus struct {
+	Bundled       bool     `json:"bundled"`
+	VsixPath      string   `json:"vsixPath"`
+	CodeAvailable bool     `json:"codeAvailable"`
+	Probed        []string `json:"probed"`
+}
+
+func toWireVsixStatus(s gitvsix.Status) GitVsixStatus {
+	return GitVsixStatus{
+		Bundled:       s.Bundled,
+		VsixPath:      s.VsixPath,
+		CodeAvailable: s.CodePath != "",
+		Probed:        s.Probed,
+	}
+}
+
+// VsixStatus is advisory only (D14): it lets the pane render honestly before a click, but
+// InstallVsCodeIntegration re-resolves everything itself and is the sole authority — a `code`
+// installed after this renders must still work on the next click.
+func (s *GitClientsService) VsixStatus() GitVsixStatus {
+	return toWireVsixStatus(s.Vsix.Status())
+}
+
+// GitVsixInstallResult is gitvsix.Result's wire projection.
+type GitVsixInstallResult struct {
+	Outcome  string   `json:"outcome"`
+	VsixPath string   `json:"vsixPath"`
+	Detail   string   `json:"detail"`
+	Probed   []string `json:"probed"`
+}
+
+func toWireVsixResult(r gitvsix.Result) GitVsixInstallResult {
+	return GitVsixInstallResult{Outcome: r.Outcome, VsixPath: r.VsixPath, Detail: r.Detail, Probed: r.Probed}
+}
+
+// InstallVsCodeIntegration never returns a Go error — gitvsix.Install's own contract (D10),
+// following connections.Service.Reveal/apivars.Reveal's precedent.
+func (s *GitClientsService) InstallVsCodeIntegration(ctx context.Context) GitVsixInstallResult {
+	return toWireVsixResult(s.Vsix.Install(ctx))
 }

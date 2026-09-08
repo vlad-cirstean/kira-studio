@@ -34,3 +34,30 @@ export const gitPairingActionResultSchema = /*#__PURE__*/ z.object({
   result: /*#__PURE__*/ z.enum(['resolved', 'alreadyResolved', 'expired']),
 });
 export type GitPairingActionResult = z.infer<typeof gitPairingActionResultSchema>;
+
+// G10 D14: the Install VS Code Integration button's own domain — gitvsix.Status/Result's wire
+// projections. codeAvailable is advisory only (the pane's pre-click render); InstallVsCodeIntegration
+// re-resolves everything itself and is the sole authority.
+export const gitVsixStatusSchema = /*#__PURE__*/ z.object({
+  bundled: z.boolean(),
+  vsixPath: z.string(),
+  codeAvailable: z.boolean(),
+  probed: z.array(z.string()),
+});
+export type GitVsixStatus = z.infer<typeof gitVsixStatusSchema>;
+
+// "installed" | "revealed" | "notBundled" | "installFailed" | "revealFailed" — gitvsix.Install's
+// own outcome vocabulary (D12): never a rejected call, always one of these five values.
+export const gitVsixInstallResultSchema = /*#__PURE__*/ z.object({
+  outcome: /*#__PURE__*/ z.enum([
+    'installed',
+    'revealed',
+    'notBundled',
+    'installFailed',
+    'revealFailed',
+  ]),
+  vsixPath: z.string(),
+  detail: z.string(),
+  probed: z.array(z.string()),
+});
+export type GitVsixInstallResult = z.infer<typeof gitVsixInstallResultSchema>;

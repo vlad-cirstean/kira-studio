@@ -23,7 +23,13 @@ import type {
 } from '@shared/domain/connection';
 import type { DataGripPreview, DataGripReport } from '@shared/domain/datagrip';
 import type { ObjectDefinition } from '@shared/domain/definition';
-import type { GitClient, GitPairingActionResult, GitPairingSnapshot } from '@shared/domain/git';
+import type {
+  GitClient,
+  GitPairingActionResult,
+  GitPairingSnapshot,
+  GitVsixInstallResult,
+  GitVsixStatus,
+} from '@shared/domain/git';
 import type { Layout, LayoutPatch } from '@shared/domain/layout';
 import type { AppMode } from '@shared/domain/mode';
 import type { OpRecord } from '@shared/domain/ops';
@@ -257,6 +263,12 @@ const studioControl = {
     unwrap(GitClientsService.Deny({ id })).then((r) => trust<GitPairingActionResult>(r)),
   onGitPairingChanged: (cb: (snap: GitPairingSnapshot) => void): (() => void) =>
     on(CHANNEL.gitPairing, cb),
+  gitVsixStatus: (): Promise<GitVsixStatus> =>
+    unwrap(GitClientsService.VsixStatus()).then((r) => trust<GitVsixStatus>(r)),
+  gitVsixInstall: (): Promise<GitVsixInstallResult> =>
+    unwrap(GitClientsService.InstallVsCodeIntegration()).then((r) =>
+      trust<GitVsixInstallResult>(r),
+    ),
 
   opsRecent: (limit: number): Promise<OpRecord[]> =>
     unwrap(OpsService.Recent({ limit })).then((r) => trust<OpRecord[]>(r ?? [])),
