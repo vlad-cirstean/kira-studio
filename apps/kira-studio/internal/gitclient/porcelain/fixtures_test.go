@@ -222,6 +222,30 @@ func (b *repoBuilder) commitSigned(name, content, message string) string {
 	return b.rev("HEAD")
 }
 
+// stashPush runs `git stash push -q <args...>` at a fixed, strictly increasing author/committer
+// date (the stash commit's own %at, StashFormat's last field, needs the same reproducibility fix
+// commit() already applies) and returns the resulting stash commit's own sha (refs/stash, freshly
+// pushed).
+func (b *repoBuilder) stashPush(args ...string) string {
+	b.t.Helper()
+	when := b.commitTime().Format(time.RFC3339)
+	cmd := exec.Command("git", append([]string{"-c", "commit.gpgsign=false", "stash", "push", "-q"}, args...)...)
+	cmd.Dir = b.dir
+	cmd.Env = append(fixtureEnv(), "GIT_AUTHOR_DATE="+when, "GIT_COMMITTER_DATE="+when)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		b.t.Fatalf("git stash push %v: %v\n%s", args, err, out)
+	}
+	return b.rev("refs/stash")
+}
+
+// stashDrop/stashStore: no date-fixing needed — neither mints a new commit object (store only
+// moves/creates the refs/stash ref plus a reflog entry; %at reads the STASH COMMIT's own author
+// time, fixed already at push, never the reflog entry's own timestamp).
+func (b *repoBuilder) stashDrop() { b.git("stash", "drop", "-q") }
+func (b *repoBuilder) stashStore(sha, message string) {
+	b.git("stash", "store", "-q", "-m", message, sha)
+}
+
 func trimNL(s string) string {
 	for len(s) > 0 && (s[len(s)-1] == '\n' || s[len(s)-1] == '\r') {
 		s = s[:len(s)-1]
@@ -303,6 +327,16 @@ func captureFileDiff(t *testing.T, dir string, from *string, to, path string, or
 func captureShowBodyAndSignature(t *testing.T, dir, sha string) []byte {
 	t.Helper()
 	return captureRaw(t, dir, porcelain.ShowBodyAndSignatureArgs(sha))
+}
+
+func captureStashList(t *testing.T, dir string) []byte {
+	t.Helper()
+	return captureRaw(t, dir, porcelain.StashListArgs())
+}
+
+func captureStashBaseSubjects(t *testing.T, dir string, shas []string) []byte {
+	t.Helper()
+	return captureRaw(t, dir, porcelain.StashBaseSubjectArgs(shas))
 }
 
 func writeFixture(t *testing.T, relPath string, data []byte) {
@@ -691,6 +725,53 @@ func TestFixtures_Regenerate(t *testing.T) {
 		b.checkout("main")
 		head := b.commit("f.txt", "line1\nCHANGED-MAIN\nline3\n", "main change")
 		writeFixture(t, "mergeTree/conflict.bin", captureRawAllowExit(t, b.dir, porcelain.MergeTreeArgs(head, other, base), 0, 1))
+	}
+
+	// --- stash/twoEntry: a two-entry stack, one pushed with -u (an untracked file alongside a
+	// tracked change), one without — G17 D3/probe 12's own two-numstat-block-plus-zero-block shape
+	// (a pure-untracked entry would produce zero numstat records at all; this scenario's own
+	// first-pushed entry instead carries one tracked file so the numstat parse path is exercised
+	// too, with the untracked half read separately, never from --numstat). ---
+	{
+		b := newRepoBuilder(t)
+		b.commit("a.txt", "a\n", "base commit")
+		second := b.commit("b.txt", "b\n", "second commit")
+
+		b.writeFile("a.txt", "a\nmodified\n")
+		b.writeFile("u.txt", "untracked\n")
+		b.stashPush("-u", "-m", "first stash")
+
+		b.writeFile("b.txt", "b\nmodified\n")
+		b.stashPush("-m", "second stash")
+
+		// Both entries' own baseSha is `second` (HEAD at push time), not the first commit — each
+		// push happens after both commits have already landed.
+		writeFixture(t, "stash/twoEntry.list.bin", captureStashList(t, b.dir))
+		writeFixture(t, "stash/twoEntry.subjects.bin", captureStashBaseSubjects(t, b.dir, []string{second}))
+	}
+
+	// --- stash/storeRestored: `stash store` re-inserts a dropped stash under an arbitrary message
+	// with neither the "WIP on "/"On " prefix (probe 9 — %gs, not %s, is what survives this; a
+	// message with no prefix at all must still parse, Branch resolving to nil). ---
+	{
+		b := newRepoBuilder(t)
+		b.commit("a.txt", "a\n", "base commit")
+		b.writeFile("a.txt", "a\nmodified\n")
+		sha := b.stashPush("-m", "to be restored")
+		b.stashDrop()
+		b.stashStore(sha, "custom restore message, no WIP/On prefix")
+		writeFixture(t, "stash/storeRestored.bin", captureStashList(t, b.dir))
+	}
+
+	// --- stash/detached: a stash pushed from a detached HEAD — message "On (no branch): …",
+	// confirmed against real git 2.43 — Branch must resolve to nil, not "(no branch)". ---
+	{
+		b := newRepoBuilder(t)
+		base := b.commit("a.txt", "a\n", "base commit")
+		b.checkout(base)
+		b.writeFile("a.txt", "a\nmodified\n")
+		b.stashPush("-m", "detached test")
+		writeFixture(t, "stash/detached.bin", captureStashList(t, b.dir))
 	}
 
 	t.Log("golden corpus regenerated under testdata/ — run `bunx biome check --write` is not needed (Go-only); re-run tests without KIRA_GIT_FIXTURES to verify")
