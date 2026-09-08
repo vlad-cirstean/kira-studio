@@ -10,7 +10,7 @@
  * mirroring W14's "not offered for tags" rule on the row menu's own entry.
  */
 import type { BaseCandidate, BaseResolution, BaseResolutionReason } from '@kira/git-ipc';
-import { KuiPopoverPanel, KuiSearchInput, useModalFocus } from '@kira/kira-ui';
+import { KuiButton, KuiPopoverPanel, KuiSearchInput, useModalFocus } from '@kira/kira-ui';
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { STATE_ICONS } from '../../icons/index.ts';
 import type { RefsState } from '../../state/refs.ts';
@@ -47,7 +47,6 @@ const triggerReason = computed(() => {
 
 const isOpen = ref(false);
 const rootEl = ref<HTMLElement | null>(null);
-const triggerEl = ref<HTMLButtonElement | null>(null);
 const filter = ref('');
 
 // W17: focus returns to the header trigger when the panel closes, whichever way it closed
@@ -112,9 +111,7 @@ onBeforeUnmount(() => {
 
 <template>
   <div ref="rootEl" class="kv-base-selector" @keydown="onModalKeydown" @keydown.escape="close">
-    <button
-      ref="triggerEl"
-      type="button"
+    <KuiButton
       class="kv-base-trigger"
       aria-haspopup="true"
       :aria-expanded="isOpen"
@@ -124,7 +121,7 @@ onBeforeUnmount(() => {
       <span class="kv-base-trigger-label">{{ triggerLabel }}</span>
       <span v-if="triggerReason" class="kv-base-trigger-reason">{{ triggerReason }}</span>
       <span class="codicon" :class="STATE_ICONS.chevronDown" aria-hidden="true"></span>
-    </button>
+    </KuiButton>
 
     <KuiPopoverPanel v-if="isOpen" anchor="left" :width="280" @close="close">
     <div class="kv-base-panel" role="dialog" aria-label="Choose a comparison base">
@@ -137,39 +134,36 @@ onBeforeUnmount(() => {
       <div class="kv-base-panel-scroll">
         <div v-if="suggested.length > 0" class="kv-base-section" aria-label="Suggested">
           <div class="kv-base-section-title">Suggested</div>
-          <button
+          <KuiButton
             v-for="candidate in suggested"
             :key="candidate.ref"
-            type="button"
             class="kv-base-row"
             @click="pick(candidate.ref)"
           >
             <span class="kv-base-row-name">{{ candidate.ref }}</span>
             <span class="kv-base-row-reason">{{ candidateReason(candidate) }}</span>
-          </button>
+          </KuiButton>
         </div>
 
         <div class="kv-base-section" aria-label="All branches">
           <div class="kv-base-section-title">All branches</div>
-          <button
+          <KuiButton
             v-for="row in sections.branches.visible"
             :key="row.refname"
-            type="button"
             class="kv-base-row"
             @click="pick(row.shortName)"
           >
             <span class="kv-base-row-name">{{ row.shortName }}</span>
-          </button>
-          <button
+          </KuiButton>
+          <KuiButton
             v-for="row in sections.remoteBranches.visible"
             :key="row.refname"
-            type="button"
             class="kv-base-row"
+            icon="codicon-cloud"
             @click="pick(row.shortName)"
           >
-            <span class="codicon codicon-cloud" aria-hidden="true"></span>
             <span class="kv-base-row-name">{{ row.shortName }}</span>
-          </button>
+          </KuiButton>
           <div
             v-if="sections.branches.visible.length === 0 && sections.remoteBranches.visible.length === 0"
             class="kv-base-empty"

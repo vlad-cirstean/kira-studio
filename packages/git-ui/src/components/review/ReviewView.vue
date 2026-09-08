@@ -24,7 +24,21 @@
 import { SETTINGS } from '@kira/git-core';
 import type { HostKind, ReviewSessionSnapshot, Transport, UiActionKind } from '@kira/git-ipc';
 import type { KuiSegmentedOption } from '@kira/kira-ui';
-import { initTooltips, KuiButton, KuiSegmented, KuiTextInput, KuiTooltip } from '@kira/kira-ui';
+// `KuiSearchInput` is a plain (not `import type`) import even though this file's own script only
+// ever reads it through `InstanceType<typeof KuiSearchInput>` — that is still a genuine *value*
+// read (`typeof` on an identifier requires the runtime binding in scope), and the template's own
+// `<KuiSearchInput>` tag instantiates it as a component; biome's own static analysis sees neither
+// use and would otherwise "fix" this to `import type`, silently erasing the import (AppToolbar.vue's
+// own `useImportType` biome-ignore precedent, for the same reason).
+// biome-ignore lint/style/useImportType: see above
+import {
+  initTooltips,
+  KuiButton,
+  KuiSearchInput,
+  KuiSegmented,
+  KuiTextInput,
+  KuiTooltip,
+} from '@kira/kira-ui';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue';
 import { BridgeClient } from '../../bridge/client.ts';
 import { ACTION_ICONS } from '../../icons/index.ts';
@@ -392,6 +406,7 @@ watch(
 // rule on the row menu's "Review branch changes" entry).
 // ---------------------------------------------------------------------------------------
 const branchFilter = ref('');
+const branchFilterInputRef = ref<InstanceType<typeof KuiSearchInput> | null>(null);
 const branchSections = computed(() =>
   buildRefListSections(
     {
@@ -401,6 +416,17 @@ const branchSections = computed(() =>
     },
     branchFilter.value,
   ),
+);
+
+// G21 D2: `KuiSearchInput`'s root element is a `<div>`, not the `<input>` a plain `autofocus`
+// attribute used to land on directly — its own `defineExpose`'d `focus()` is the replacement,
+// called once this "no branch" state actually renders (not merely once at this component's own
+// mount, which would fire long before the picker is ever shown).
+watch(
+  () => !bootError.value && !!review.value && !noActiveRepo.value && !review.value.branch.value,
+  (showingPicker) => {
+    if (showingPicker) void nextTick(() => branchFilterInputRef.value?.focus());
+  },
 );
 
 function pickBranch(name: string): void {
@@ -617,7 +643,7 @@ watch(
     <template v-if="bootError">
       <div class="kv-review-boot-error" data-testid="boot-error">
         <p>Kira Studio isn't reachable — {{ bootError }}</p>
-        <button type="button" data-testid="boot-retry" @click="retryBootstrap">Retry</button>
+        <KuiButton data-testid="boot-retry" @click="retryBootstrap">Retry</KuiButton>
       </div>
     </template>
 
@@ -638,41 +664,38 @@ watch(
         <p class="kv-review-picker-copy">
           Pick a branch to compare its commits against a base you choose or one we detect.
         </p>
-        <input
-          type="text"
+        <KuiSearchInput
+          ref="branchFilterInputRef"
           class="kv-review-picker-filter"
-          placeholder="Filter branches"
-          aria-label="Filter branches"
           v-model="branchFilter"
-          autofocus
+          placeholder="Filter branches"
+          ariaLabel="Filter branches"
         />
         <div class="kv-review-picker-scroll">
           <div class="kv-review-picker-section">
             <div class="kv-review-picker-section-title">Branches</div>
-            <button
+            <KuiButton
               v-for="row in branchSections.branches.visible"
               :key="row.refname"
-              type="button"
               class="kv-review-picker-row"
               @click="pickBranch(row.shortName)"
             >
               {{ row.shortName }}
-            </button>
+            </KuiButton>
             <div v-if="branchSections.branches.visible.length === 0" class="kv-review-picker-empty">
               No matching branches
             </div>
           </div>
           <div class="kv-review-picker-section">
             <div class="kv-review-picker-section-title">Remote branches</div>
-            <button
+            <KuiButton
               v-for="row in branchSections.remoteBranches.visible"
               :key="row.refname"
-              type="button"
               class="kv-review-picker-row"
               @click="pickBranch(row.shortName)"
             >
               {{ row.shortName }}
-            </button>
+            </KuiButton>
           </div>
         </div>
       </div>
@@ -800,14 +823,12 @@ watch(
             data-testid="review-stale-banner"
           >
             <span>This comparison has changed.</span>
-            <button
-              type="button"
+            <KuiButton
+              :icon="ACTION_ICONS.refresh"
               v-kui-tooltip="'Refresh'"
               aria-label="Refresh"
               @click="review.acknowledgeStaleReview()"
-            >
-              <span class="codicon" :class="ACTION_ICONS.refresh" aria-hidden="true"></span>
-            </button>
+            />
           </div>
 
           <div
@@ -841,14 +862,13 @@ watch(
             v-if="!review.exhausted.value && (review.isLoadingMore.value || review.remaining.value > 0)"
             class="kv-review-load-more"
           >
-            <button
-              type="button"
+            <KuiButton
               class="kv-review-load-more-button"
               :disabled="review.isLoadingMore.value"
               @click="handleLoadMore"
             >
               {{ loadMoreLabel() }}
-            </button>
+            </KuiButton>
           </div>
         </template>
 

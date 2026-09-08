@@ -37,15 +37,15 @@ async function undo(): Promise<void> {
     >
       {{ ops.undoSlot.value.label }}
     </KuiButton>
-    <button
+    <KuiButton
       v-if="clipboardEnabled"
-      type="button"
+      variant="ghost"
       class="kv-undo-sha"
       v-kui-tooltip="`Copy recovery SHA ${ops.undoSlot.value.recoverySha}`"
       @click="copy(ops.undoSlot.value.recoverySha, 'recovery SHA')"
     >
       {{ ops.undoSlot.value.recoverySha.slice(0, 7) }}
-    </button>
+    </KuiButton>
     <span v-else class="kv-undo-sha">{{ ops.undoSlot.value.recoverySha.slice(0, 7) }}</span>
   </div>
 </template>
@@ -85,8 +85,6 @@ async function undo(): Promise<void> {
   font-family: var(--kv-mono-font-family);
   font-size: 0.85em;
   color: var(--kv-description-fg);
-  background: transparent;
-  border: none;
   cursor: copy;
 }
 </style>

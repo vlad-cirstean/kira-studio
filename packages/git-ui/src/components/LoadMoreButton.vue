@@ -9,6 +9,7 @@
  * Deliberately has no live region of its own: W14 owns "one polite live region" announcing both
  * load-more and refresh outcomes, and a second region here would fight it (plan lines ~1325-6).
  */
+import { KuiButton } from '@kira/kira-ui';
 import { computed } from 'vue';
 import type { GraphViewState } from '../state/graphView.ts';
 
@@ -59,24 +60,22 @@ function handleCancel(): void {
     v-if="!graphView.exhausted.value && (isLoading || graphView.remaining.value > 0)"
     class="kv-load-more"
   >
-    <button
-      type="button"
+    <KuiButton
       class="kv-load-more-button"
       :disabled="isLoading"
       v-kui-tooltip="'Alt-click to load everything remaining — this keeps every loaded commit in memory.'"
       @click="handlePress"
     >
       {{ buttonLabel }}
-    </button>
-    <button
+    </KuiButton>
+    <KuiButton
       v-if="isLoading"
-      type="button"
       class="kv-load-more-cancel"
       aria-label="Cancel loading"
       @click="handleCancel"
     >
       Cancel
-    </button>
+    </KuiButton>
   </div>
 </template>
 

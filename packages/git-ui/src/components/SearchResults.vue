@@ -21,7 +21,7 @@ export const SEARCH_LISTBOX_ID = 'kv-search-listbox';
  * element that actually holds focus throughout — not here; this file only reflects
  * `highlightedId` back as `aria-selected` and forwards a click as `select`.
  */
-import { computeFloatPosition } from "@kira/kira-ui";
+import { computeFloatPosition, KuiButton } from "@kira/kira-ui";
 import { computed, nextTick, onMounted, ref } from "vue";
 import { formatRelativeDate } from "./dateFormat.ts";
 import type { SearchOption, SearchResultsModel } from "./searchResultsModel.ts";
@@ -133,15 +133,14 @@ onMounted(() => void reposition());
     </div>
     <div v-if="model.loadedFooter" class="kv-search-footer">{{ model.loadedFooter }}</div>
     <div v-if="model.tailFooter" class="kv-search-footer">{{ model.tailFooter }}</div>
-    <button
+    <KuiButton
       v-if="showBodySearchAffordance"
-      type="button"
       class="kv-search-body-button"
       data-testid="search-body-button"
       @click="emit('runBodySearch')"
     >
       Search message bodies
-    </button>
+    </KuiButton>
   </div>
 </template>
 
@@ -231,17 +230,6 @@ onMounted(() => void reposition());
 .kv-search-body-button {
   display: block;
   width: 100%;
-  padding: var(--kv-space-1) var(--kv-space-3);
-  background: transparent;
-  color: var(--kv-app-fg);
-  border: none;
   text-align: left;
-  cursor: pointer;
-  font-family: inherit;
-  font-size: inherit;
-}
-
-.kv-search-body-button:hover {
-  background-color: var(--kv-row-hover-bg);
 }
 </style>

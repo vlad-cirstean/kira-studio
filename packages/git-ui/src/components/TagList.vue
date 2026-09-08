@@ -8,6 +8,7 @@
  * this file's own template, not that one's.
  */
 import type { InProgressOperation, RefRow } from '@kira/git-ipc';
+import { KuiButton } from '@kira/kira-ui';
 import { computed, ref } from 'vue';
 import type { OpsState } from '../state/ops.ts';
 import RowContextMenu from './RowContextMenu.vue';
@@ -87,7 +88,7 @@ async function onRefMenuSelect(id: string): Promise<void> {
   <div class="kv-branch-section" aria-label="Tags">
     <div class="kv-branch-section-title">Tags</div>
     <div v-for="row in section.visible" :key="row.refname" class="kv-branch-row">
-      <button type="button" class="kv-branch-row-main" @click="checkout(row)">
+      <KuiButton class="kv-branch-row-main" @click="checkout(row)">
         <span
           class="codicon codicon-tag"
           :class="{ 'kv-tag-lightweight': !row.annotation }"
@@ -99,9 +100,8 @@ async function onRefMenuSelect(id: string): Promise<void> {
           {{ row.annotation.subject }}
         </span>
         <span class="kv-tag-target">{{ targetCommit(row) }}</span>
-      </button>
-      <button
-        type="button"
+      </KuiButton>
+      <KuiButton
         class="kv-icon-button"
         v-kui-tooltip="'More actions'"
         aria-label="More actions"
@@ -109,7 +109,7 @@ async function onRefMenuSelect(id: string): Promise<void> {
         @contextmenu="openRefMenu(row, $event)"
       >
         <span class="codicon codicon-ellipsis" aria-hidden="true"></span>
-      </button>
+      </KuiButton>
     </div>
     <div v-if="section.hiddenCount > 0" class="kv-branch-more">
       {{ section.hiddenCount }} more — refine your filter

@@ -13,6 +13,7 @@
  * out, menu does everything else" split as closely as a non-checkout row can.
  */
 import type { InProgressOperation, StashEntry } from '@kira/git-ipc';
+import { KuiButton } from '@kira/kira-ui';
 import { computed, ref } from 'vue';
 import type { OpsState } from '../state/ops.ts';
 import type { StashState } from '../state/stash.ts';
@@ -87,8 +88,7 @@ async function onMenuSelect(id: string): Promise<void> {
       class="kv-branch-row"
       :class="{ 'kv-stash-row--selected': stash.selectedSha.value === entry.sha }"
     >
-      <button type="button" class="kv-branch-row-main" @click="select(entry)">
-        <span class="codicon codicon-archive" aria-hidden="true"></span>
+      <KuiButton class="kv-branch-row-main" icon="codicon-archive" @click="select(entry)">
         <span class="kv-stash-index">{{ "stash@{" + entry.index + "}" }}</span>
         <span class="kv-stash-message" v-kui-tooltip="entry.message">{{ entry.message }}</span>
         <span class="kv-stash-base" v-kui-tooltip="entry.baseSubject">
@@ -97,9 +97,8 @@ async function onMenuSelect(id: string): Promise<void> {
         <span v-if="entry.includedUntracked" class="kv-stash-untracked" v-kui-tooltip="'Includes untracked files'">-u</span>
         <span class="kv-stash-filecount">{{ entry.fileCount }} file{{ entry.fileCount === 1 ? "" : "s" }}</span>
         <span class="kv-stash-date">{{ formatRelativeDate(entry.timestamp) }}</span>
-      </button>
-      <button
-        type="button"
+      </KuiButton>
+      <KuiButton
         class="kv-icon-button"
         v-kui-tooltip="'More actions'"
         aria-label="More actions"
@@ -107,7 +106,7 @@ async function onMenuSelect(id: string): Promise<void> {
         @contextmenu="openMenu(entry, $event)"
       >
         <span class="codicon codicon-ellipsis" aria-hidden="true"></span>
-      </button>
+      </KuiButton>
     </div>
     <div v-if="section.hiddenCount > 0" class="kv-branch-more">
       {{ section.hiddenCount }} more — apply, pop or drop some to see the rest

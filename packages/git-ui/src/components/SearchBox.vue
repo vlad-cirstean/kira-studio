@@ -43,7 +43,7 @@
  */
 import type { SearchScope } from '@kira/git-core';
 import type { KuiSelectOption } from '@kira/kira-ui';
-import { computeFloatPosition, KuiSelect } from '@kira/kira-ui';
+import { computeFloatPosition, KuiButton, KuiSelect } from '@kira/kira-ui';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { ACTION_ICONS } from '../icons/index.ts';
 import type { SearchState } from '../state/search.ts';
@@ -276,39 +276,36 @@ defineExpose({ focus: () => inputEl.value?.focus() });
         @keydown="onKeydown"
       />
       <div class="kv-search-toggles" role="group" aria-label="Search options">
-        <button
-          type="button"
+        <KuiButton
+          icon="codicon-case-sensitive"
           class="kv-search-toggle"
+          :active="search.caseSensitive.value"
           :aria-pressed="search.caseSensitive.value"
           v-kui-tooltip="'Match case'"
           aria-label="Match case"
           data-testid="search-toggle-case"
           @click="search.caseSensitive.value = !search.caseSensitive.value"
-        >
-          <span class="codicon codicon-case-sensitive" aria-hidden="true"></span>
-        </button>
-        <button
-          type="button"
+        />
+        <KuiButton
+          icon="codicon-whole-word"
           class="kv-search-toggle"
+          :active="search.wholeWord.value"
           :aria-pressed="search.wholeWord.value"
           v-kui-tooltip="'Match whole word'"
           aria-label="Match whole word"
           data-testid="search-toggle-whole-word"
           @click="search.wholeWord.value = !search.wholeWord.value"
-        >
-          <span class="codicon codicon-whole-word" aria-hidden="true"></span>
-        </button>
-        <button
-          type="button"
+        />
+        <KuiButton
+          icon="codicon-regex"
           class="kv-search-toggle"
+          :active="search.regex.value"
           :aria-pressed="search.regex.value"
           v-kui-tooltip="'Use regular expression'"
           aria-label="Use regular expression"
           data-testid="search-toggle-regex"
           @click="search.regex.value = !search.regex.value"
-        >
-          <span class="codicon codicon-regex" aria-hidden="true"></span>
-        </button>
+        />
       </div>
       <KuiSelect
         class="kv-search-scope"
@@ -386,25 +383,9 @@ defineExpose({ focus: () => inputEl.value?.focus() });
 }
 
 .kv-search-toggle {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
   width: 20px;
   height: 18px;
-  background: transparent;
   color: var(--kv-description-fg);
-  border: none;
-  border-radius: var(--kv-radius);
-  cursor: pointer;
-}
-
-.kv-search-toggle:hover {
-  background-color: var(--kv-row-hover-bg);
-}
-
-.kv-search-toggle[aria-pressed="true"] {
-  background-color: var(--kv-row-selected-bg);
-  color: var(--kv-row-selected-fg);
 }
 
 .kv-search-scope {

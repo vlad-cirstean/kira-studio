@@ -6,6 +6,7 @@
  * candidate list and Open Folder… action inline rather than behind another click.
  */
 import type { RepoCandidate } from '@kira/git-ipc';
+import { KuiButton } from '@kira/kira-ui';
 import { onMounted } from 'vue';
 import { STATE_ICONS } from '../icons/index.ts';
 import type { RepoState } from '../state/repo.ts';
@@ -36,15 +37,14 @@ async function openFolder(): Promise<void> {
     <h2 class="kv-no-repo-title">Open a repository</h2>
     <ul v-if="repoState.candidates.value.length > 0" class="kv-no-repo-list">
       <li v-for="candidate in repoState.candidates.value" :key="candidate.path">
-        <button type="button" class="kv-no-repo-candidate" @click="openCandidate(candidate)">
+        <KuiButton class="kv-no-repo-candidate" @click="openCandidate(candidate)">
           {{ candidate.label }}
-        </button>
+        </KuiButton>
       </li>
     </ul>
-    <button type="button" class="kv-no-repo-open-folder" @click="openFolder">
-      <span class="codicon" :class="STATE_ICONS.openFolder" aria-hidden="true"></span>
+    <KuiButton class="kv-no-repo-open-folder" :icon="STATE_ICONS.openFolder" @click="openFolder">
       Open Folder…
-    </button>
+    </KuiButton>
   </div>
 </template>
 

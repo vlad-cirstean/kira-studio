@@ -13,7 +13,13 @@
  */
 import { SETTINGS } from '@kira/git-core';
 import type { HostKind, StashEntry, Transport, UiActionKind } from '@kira/git-ipc';
-import { computeFloatPosition, initTooltips, KuiTooltip, pointReference } from '@kira/kira-ui';
+import {
+  computeFloatPosition,
+  initTooltips,
+  KuiButton,
+  KuiTooltip,
+  pointReference,
+} from '@kira/kira-ui';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue';
 import { BridgeClient } from './bridge/client.ts';
 // A .vue default export is a *value* — the component object the template instantiates. `import
@@ -1074,7 +1080,7 @@ onBeforeUnmount(() => {
          got that far — a blank panel is never an acceptable rendering of a failure. -->
     <div v-if="bootError && !repoState" class="kv-boot-error" data-testid="boot-error">
       <p>Kira Studio isn't reachable — {{ bootError }}</p>
-      <button type="button" data-testid="boot-retry" @click="retryBootstrap">Retry</button>
+      <KuiButton data-testid="boot-retry" @click="retryBootstrap">Retry</KuiButton>
     </div>
     <template v-else-if="repoState">
       <GitBlockedPanel v-if="repoState.git.value.kind !== 'ok'" :status="repoState.git.value" />
@@ -1135,9 +1141,7 @@ onBeforeUnmount(() => {
              stale-comparison banner: one line, a Retry action that also dismisses it. -->
         <div v-if="bootError" class="kv-boot-error-banner" role="status" data-testid="boot-error-banner">
           <span>Kira Studio isn't reachable — {{ bootError }}</span>
-          <button type="button" data-testid="boot-error-banner-retry" @click="retryBootstrap">
-            Retry
-          </button>
+          <KuiButton data-testid="boot-error-banner-retry" @click="retryBootstrap">Retry</KuiButton>
         </div>
         <main class="kv-body">
           <section class="kv-graph-region" data-testid="graph-region" aria-label="Commit graph">
@@ -1256,8 +1260,8 @@ onBeforeUnmount(() => {
           :style="forceDeletePanelStyle"
         >
           <span>“{{ forceDeleteRefCandidate.name }}” is not fully merged.</span>
-          <button type="button" @click="confirmForceDeleteRef">Force delete</button>
-          <button type="button" @click="forceDeleteRefCandidate = undefined">Cancel</button>
+          <KuiButton variant="danger" @click="confirmForceDeleteRef">Force delete</KuiButton>
+          <KuiButton @click="forceDeleteRefCandidate = undefined">Cancel</KuiButton>
         </div>
         <RenameRefDialog
           :open="renameRefDialogState.open"

@@ -268,15 +268,15 @@ const stashDisabled = computed(
           @close="isForcePushMenuOpen = false"
         >
           <div class="kv-push-menu" role="menu" aria-label="Push options">
-            <button
-              type="button"
+            <KuiButton
+              variant="danger"
               class="kv-push-menu-item"
               role="menuitem"
               data-testid="force-push-trigger"
               @click="doForcePush"
             >
               Force push…
-            </button>
+            </KuiButton>
           </div>
         </KuiPopoverPanel>
       </div>
@@ -301,30 +301,26 @@ const stashDisabled = computed(
       @focus-grid="emit('search-focus-grid')"
     />
 
-    <button
-      type="button"
+    <KuiButton
       class="kv-icon-button"
+      icon="codicon-gear"
       v-kui-tooltip="'Repository settings'"
       aria-label="Repository settings"
       data-testid="repo-settings-button"
       @click="emit('open-repo-settings')"
-    >
-      <span class="codicon codicon-gear" aria-hidden="true"></span>
-    </button>
+    />
 
     <div v-if="remoteBusy" class="kv-remote-progress" data-testid="remote-progress">
       <span class="codicon codicon-loading kv-remote-progress-spin" aria-hidden="true"></span>
       <span class="kv-remote-progress-label">{{ progressText }}</span>
-      <button
-        type="button"
+      <KuiButton
         class="kv-icon-button"
+        icon="codicon-close"
         :disabled="!cancellable"
         v-kui-tooltip="cancellable ? 'Cancel' : cancelDisabledReason"
         data-testid="remote-cancel"
         @click="doCancel"
-      >
-        <span class="codicon codicon-close" aria-hidden="true"></span>
-      </button>
+      />
     </div>
 
     <UndoButton :ops="opsState" :clipboard-enabled="actions?.capabilities.clipboard ?? false" :copy="copy" />
@@ -384,19 +380,7 @@ const stashDisabled = computed(
 .kv-push-menu-item {
   display: block;
   width: 100%;
-  padding: var(--kv-space-1) var(--kv-space-2);
-  background: transparent;
-  color: var(--kv-diff-deleted-fg);
-  border: none;
-  border-radius: var(--kv-radius);
-  font-family: inherit;
-  font-size: inherit;
   text-align: left;
-  cursor: pointer;
-}
-
-.kv-push-menu-item:hover {
-  background-color: var(--kv-row-hover-bg);
 }
 
 /* The one in-webview progress affordance for whichever `remote.run` is in flight (P6 judgment

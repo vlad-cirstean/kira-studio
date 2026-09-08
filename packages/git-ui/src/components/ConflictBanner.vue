@@ -20,6 +20,7 @@
  * still announces on appearance (the whole point) without demanding attention indefinitely.
  */
 import { describeInProgress } from '@kira/git-core';
+import { KuiButton } from '@kira/kira-ui';
 import { computed, ref } from 'vue';
 import type { OpsState } from '../state/ops.ts';
 
@@ -93,43 +94,40 @@ const PATH_DISPLAY_CAP = 20;
 
       <span class="kv-conflict-banner-spacer"></span>
 
-      <button
+      <KuiButton
         v-if="resolveConflictEnabled"
-        type="button"
         class="kv-conflict-banner-button"
         :disabled="inProgress.unmergedCount === 0 || busyAction !== undefined"
         @click="onResolve"
       >
         Resolve in VS Code
-      </button>
-      <button
+      </KuiButton>
+      <KuiButton
         v-if="inProgress.canContinue"
-        type="button"
         class="kv-conflict-banner-button"
         :disabled="inProgress.unmergedCount > 0 || busyAction !== undefined"
         :aria-describedby="inProgress.unmergedCount > 0 ? CONTINUE_REASON_ID : undefined"
         @click="onContinue"
       >
         Continue
-      </button>
-      <button
+      </KuiButton>
+      <KuiButton
         v-if="inProgress.canSkip"
-        type="button"
         class="kv-conflict-banner-button"
         :disabled="busyAction !== undefined"
         @click="onSkip"
       >
         Skip
-      </button>
-      <button
+      </KuiButton>
+      <KuiButton
         v-if="inProgress.canAbort"
-        type="button"
-        class="kv-conflict-banner-button kv-conflict-banner-button--danger"
+        variant="danger"
+        class="kv-conflict-banner-button"
         :disabled="busyAction !== undefined"
         @click="onAbort"
       >
         Abort
-      </button>
+      </KuiButton>
     </div>
 
     <p v-if="inProgress.unmergedCount > 0" :id="CONTINUE_REASON_ID" class="kv-conflict-banner-reason">
@@ -209,11 +207,6 @@ const PATH_DISPLAY_CAP = 20;
 .kv-conflict-banner-button:disabled {
   opacity: 0.5;
   cursor: default;
-}
-
-.kv-conflict-banner-button--danger {
-  border-color: var(--kv-diff-deleted-fg);
-  color: var(--kv-diff-deleted-fg);
 }
 
 .kv-conflict-banner-reason {

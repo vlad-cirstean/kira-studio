@@ -204,15 +204,13 @@ function copyMessage(): void {
     <section v-if="section === 'message'" class="kv-meta-message" aria-label="Commit message">
       <div class="kv-meta-message-header">
         <h2 class="kv-meta-subject">{{ detail.subject }}</h2>
-        <button
+        <KuiButton
           v-if="actions.capabilities.clipboard"
-          type="button"
-          class="kv-copy-button"
+          variant="ghost"
+          icon="codicon-copy"
           v-kui-tooltip="'Copy full message'"
           @click="copyMessage"
-        >
-          <span class="codicon codicon-copy" aria-hidden="true"></span>
-        </button>
+        />
       </div>
       <p
         v-if="bodyParagraphs.length > 0"
@@ -220,14 +218,14 @@ function copyMessage(): void {
         class="kv-meta-body"
         :class="{ 'kv-meta-body-expanded': bodyExpanded }"
       ></p>
-      <button
+      <KuiButton
         v-if="bodyOverflows"
-        type="button"
+        variant="ghost"
         class="kv-meta-body-toggle"
         @click="bodyExpanded = !bodyExpanded"
       >
-        {{ bodyExpanded ? "Show less" : "Show more" }}
-      </button>
+        {{ bodyExpanded ? 'Show less' : 'Show more' }}
+      </KuiButton>
       <dl v-if="trailerRows.length > 0" class="kv-meta-trailers">
         <template v-for="(row, index) in trailerRows" :key="index">
           <dt>{{ row.token }}</dt>
@@ -258,17 +256,16 @@ function copyMessage(): void {
         <template v-if="parentRows.length > 0">
           <dt>{{ parentRows.length > 1 ? "Parents" : "Parent" }}</dt>
           <dd class="kv-meta-parents">
-            <button
+            <KuiButton
               v-for="parent in parentRows"
               :key="parent.sha"
-              type="button"
               class="kv-meta-parent"
               :disabled="!parent.loaded"
               v-kui-tooltip="parent.loaded ? '' : 'Not loaded — load more history to reach it'"
               @click="emit('selectParentCommit', parent.sha)"
             >
               {{ parent.shortSha }}
-            </button>
+            </KuiButton>
           </dd>
         </template>
         <template v-if="!committerDiffersFromAuthor">
@@ -400,19 +397,6 @@ function copyMessage(): void {
   padding: 0 var(--kv-space-1);
   font-family: var(--kv-mono-font-family);
   font-size: var(--kv-mono-font-size);
-}
-
-.kv-copy-button {
-  background: transparent;
-  border: none;
-  color: var(--kv-row-fg);
-  cursor: pointer;
-  padding: 0 var(--kv-space-1);
-  opacity: 0.8;
-}
-
-.kv-copy-button:hover {
-  opacity: 1;
 }
 
 .kv-meta-parents {

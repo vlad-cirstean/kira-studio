@@ -15,6 +15,7 @@
  * row's `FileTree` renders no toolbar of its own (`show-toolbar="false"`).
  */
 import type { CommitStore } from '@kira/git-core';
+import { KuiButton } from '@kira/kira-ui';
 import { computed, ref } from 'vue';
 import type { FileListMode } from '../../state/detail.ts';
 import type { ReviewExpansion } from '../../state/review.ts';
@@ -211,15 +212,13 @@ function onOpenFile(index: number, pinned: boolean): void {
            (below) and always present for the roving-tabindex-focused row. GitLens's own
            row-action pattern. -->
       <span class="kv-review-row-actions">
-        <button
-          type="button"
+        <KuiButton
           class="kv-review-row-action"
+          icon="codicon-diff-multiple"
           v-kui-tooltip="'Open all changes'"
           aria-label="Open all changes"
           @click="openAllChanges"
-        >
-          <span class="codicon codicon-diff-multiple" aria-hidden="true"></span>
-        </button>
+        />
         <a
           class="kv-review-row-action"
           v-kui-tooltip="'Open in graph'"

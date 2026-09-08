@@ -11,7 +11,7 @@
  * *and* keyboard reachable) plus a plain right-click, both opening the same menu.
  */
 import type { RefRow, StashEntry } from '@kira/git-ipc';
-import { KuiPopoverPanel, KuiSearchInput } from '@kira/kira-ui';
+import { KuiButton, KuiPopoverPanel, KuiSearchInput } from '@kira/kira-ui';
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { STATE_ICONS } from '../icons/index.ts';
 import type { OpsState } from '../state/ops.ts';
@@ -206,6 +206,10 @@ onBeforeUnmount(() => {
 
 <template>
   <div ref="rootEl" class="kv-branch-picker" @keydown.escape="close">
+    <!-- G21 D2: kept as a raw <button>, not <KuiButton> — `closeForCheckout()`'s own W20 fix below
+         calls real `.focus()` on `triggerEl` before a dialog opens, and a `<script setup>`
+         component's template ref does not forward to its root DOM node without exposing it, which
+         `KuiButton` does not do. -->
     <button
       ref="triggerEl"
       type="button"
@@ -247,12 +251,12 @@ onBeforeUnmount(() => {
                 @keydown.enter="submitRename"
                 @keydown.escape="renaming = undefined"
               />
-              <button type="button" class="kv-icon-button" @click="submitRename">
+              <KuiButton class="kv-icon-button" @click="submitRename">
                 <span class="codicon codicon-check" aria-hidden="true"></span>
-              </button>
+              </KuiButton>
             </template>
             <template v-else>
-              <button type="button" class="kv-branch-row-main" @click="checkoutBranch(row)">
+              <KuiButton class="kv-branch-row-main" @click="checkoutBranch(row)">
                 <span
                   class="kv-branch-current-dot"
                   :role="row.isHead ? 'img' : undefined"
@@ -265,9 +269,8 @@ onBeforeUnmount(() => {
                   worktree
                 </span>
                 <span v-if="formatTrack(row.track)" class="kv-branch-track">{{ formatTrack(row.track) }}</span>
-              </button>
-              <button
-                type="button"
+              </KuiButton>
+              <KuiButton
                 class="kv-icon-button"
                 v-kui-tooltip="'More actions'"
                 aria-label="More actions"
@@ -275,13 +278,13 @@ onBeforeUnmount(() => {
                 @contextmenu="openRefMenu(row, $event)"
               >
                 <span class="codicon codicon-ellipsis" aria-hidden="true"></span>
-              </button>
+              </KuiButton>
             </template>
           </div>
           <div v-if="forceDeleteCandidate" class="kv-branch-force-delete">
             <span>“{{ forceDeleteCandidate }}” is not fully merged.</span>
-            <button type="button" @click="confirmForceDelete">Force delete</button>
-            <button type="button" @click="forceDeleteCandidate = undefined">Cancel</button>
+            <KuiButton variant="danger" @click="confirmForceDelete">Force delete</KuiButton>
+            <KuiButton @click="forceDeleteCandidate = undefined">Cancel</KuiButton>
           </div>
           <div v-if="sections.branches.hiddenCount > 0" class="kv-branch-more">
             {{ sections.branches.hiddenCount }} more — refine your filter
@@ -292,13 +295,11 @@ onBeforeUnmount(() => {
         <div class="kv-branch-section" aria-label="Remote branches">
           <div class="kv-branch-section-title">Remote branches</div>
           <div v-for="row in sections.remoteBranches.visible" :key="row.refname" class="kv-branch-row">
-            <button type="button" class="kv-branch-row-main" @click="checkoutRemote(row)">
-              <span class="codicon codicon-cloud" aria-hidden="true"></span>
+            <KuiButton class="kv-branch-row-main" icon="codicon-cloud" @click="checkoutRemote(row)">
               <span class="kv-branch-row-name">{{ row.shortName }}</span>
               <span class="kv-branch-remote-action">{{ remoteCheckoutLabel(row, refs.branches.value) }}</span>
-            </button>
-            <button
-              type="button"
+            </KuiButton>
+            <KuiButton
               class="kv-icon-button"
               v-kui-tooltip="'More actions'"
               aria-label="More actions"
@@ -306,7 +307,7 @@ onBeforeUnmount(() => {
               @contextmenu="openRefMenu(row, $event)"
             >
               <span class="codicon codicon-ellipsis" aria-hidden="true"></span>
-            </button>
+            </KuiButton>
           </div>
           <div v-if="sections.remoteBranches.hiddenCount > 0" class="kv-branch-more">
             {{ sections.remoteBranches.hiddenCount }} more — refine your filter

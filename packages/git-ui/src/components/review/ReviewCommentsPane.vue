@@ -10,6 +10,7 @@
  * re-sorting.
  */
 import type { LineRange, ReviewComment } from '@kira/git-ipc';
+import { KuiButton } from '@kira/kira-ui';
 import { computed } from 'vue';
 import { ACTION_ICONS } from '../../icons/index.ts';
 import type { Capabilities } from '../../state/detailActions.ts';
@@ -72,33 +73,29 @@ function anchorTitle(c: ReviewComment): string | undefined {
       <span class="kv-review-comments-count" data-testid="review-comments-count">{{
         countLabel
       }}</span>
-      <button
+      <KuiButton
         v-if="capabilities.clipboard"
-        type="button"
         class="kv-review-comments-icon-button"
+        :icon="ACTION_ICONS.copy"
         v-kui-tooltip="'Copy for AI'"
         aria-label="Copy for AI"
         :disabled="reviewComments.comments.value.length === 0"
         @click="reviewComments.copyForAi()"
-      >
-        <span class="codicon" :class="ACTION_ICONS.copy" aria-hidden="true"></span>
-      </button>
-      <button
+      />
+      <KuiButton
         v-if="!reviewComments.confirmingClear.value"
-        type="button"
         class="kv-review-comments-icon-button"
+        :icon="ACTION_ICONS.clearAll"
         v-kui-tooltip="'Clear all comments'"
         aria-label="Clear all comments"
         :disabled="reviewComments.comments.value.length === 0 || reviewComments.pending.value"
         @click="reviewComments.confirmClear()"
-      >
-        <span class="codicon" :class="ACTION_ICONS.clearAll" aria-hidden="true"></span>
-      </button>
+      />
       <div v-else class="kv-review-comments-clear-confirm">
-        <button type="button" @click="reviewComments.clear()">
+        <KuiButton @click="reviewComments.clear()">
           Confirm clear ({{ reviewComments.comments.value.length }})
-        </button>
-        <button type="button" @click="reviewComments.cancelClear()">Cancel</button>
+        </KuiButton>
+        <KuiButton @click="reviewComments.cancelClear()">Cancel</KuiButton>
       </div>
     </div>
 
@@ -127,16 +124,14 @@ function anchorTitle(c: ReviewComment): string | undefined {
                 v-kui-tooltip="anchorTitle(c)"
                 :aria-label="anchorTitle(c)"
               ></span>
-              <button
-                type="button"
+              <KuiButton
                 class="kv-review-comments-icon-button kv-review-comments-row-delete"
+                :icon="ACTION_ICONS.remove"
                 v-kui-tooltip="'Delete comment'"
                 aria-label="Delete comment"
                 :disabled="reviewComments.pending.value"
                 @click.stop="reviewComments.remove(c.id)"
-              >
-                <span class="codicon" :class="ACTION_ICONS.remove" aria-hidden="true"></span>
-              </button>
+              />
             </div>
             <p class="kv-review-comments-body">{{ c.body }}</p>
           </div>

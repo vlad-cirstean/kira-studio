@@ -12,7 +12,7 @@
  * documented decoupling from `GraphViewState` in W5).
  */
 import type { RepoCandidate } from '@kira/git-ipc';
-import { KuiPopoverPanel } from '@kira/kira-ui';
+import { KuiButton, KuiPopoverPanel } from '@kira/kira-ui';
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { STATE_ICONS } from '../icons/index.ts';
 import type { RepoState } from '../state/repo.ts';
@@ -78,18 +78,17 @@ onBeforeUnmount(() => {
 
 <template>
   <div ref="rootEl" class="kv-repo-picker" @keydown.escape="close">
-    <button
-      type="button"
+    <KuiButton
       class="kv-repo-trigger"
+      :icon="STATE_ICONS.repo"
       aria-haspopup="listbox"
       :aria-expanded="isOpen"
       v-kui-tooltip="repoState.activeRepo.value?.root ?? 'Open a repository'"
       @click="toggle"
     >
-      <span class="codicon" :class="STATE_ICONS.repo" aria-hidden="true"></span>
       <span class="kv-repo-trigger-label">{{ triggerLabel }}</span>
       <span class="codicon" :class="STATE_ICONS.chevronDown" aria-hidden="true"></span>
-    </button>
+    </KuiButton>
     <KuiPopoverPanel v-if="isOpen" anchor="left" :width="260" @close="close">
     <ul class="kv-repo-list" role="listbox" aria-label="Repositories">
       <li
@@ -138,28 +137,7 @@ onBeforeUnmount(() => {
 }
 
 .kv-repo-trigger {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--kv-space-2);
-  height: 22px;
-  padding: 0 var(--kv-space-2);
-  border: none;
-  border-radius: var(--kv-radius);
-  background: transparent;
-  color: var(--kv-app-fg);
-  font-family: inherit;
-  font-size: inherit;
   max-width: 220px;
-  cursor: pointer;
-}
-
-.kv-repo-trigger:hover {
-  background-color: var(--kv-row-hover-bg);
-}
-
-.kv-repo-trigger:focus-visible {
-  outline: 1px solid var(--kv-focus-border);
-  outline-offset: -1px;
 }
 
 .kv-repo-trigger-label {

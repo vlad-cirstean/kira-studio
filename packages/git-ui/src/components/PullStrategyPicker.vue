@@ -117,8 +117,7 @@ defineExpose({ run: runDefault });
 
     <KuiPopoverPanel v-if="isOpen" anchor="left" :width="260" @close="close">
     <div class="kv-pull-picker-panel" role="menu" aria-label="Pull strategy">
-      <button
-        type="button"
+      <KuiButton
         class="kv-pull-picker-item"
         role="menuitem"
         data-testid="pull-strategy-default"
@@ -131,18 +130,17 @@ defineExpose({ run: runDefault });
             {{ PULL_STRATEGY_LABELS[preview.strategy] }} — {{ describePullStrategySource(preview.source) }}
           </template>
         </span>
-      </button>
-      <button
+      </KuiButton>
+      <KuiButton
         v-for="strategy in STRATEGIES"
         :key="strategy"
-        type="button"
         class="kv-pull-picker-item"
         role="menuitem"
         :data-testid="`pull-strategy-${strategy}`"
         @click="runWith(strategy)"
       >
         <span class="kv-pull-picker-item-label">{{ PULL_STRATEGY_LABELS[strategy] }}</span>
-      </button>
+      </KuiButton>
     </div>
     </KuiPopoverPanel>
   </div>

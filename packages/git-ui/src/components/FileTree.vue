@@ -19,7 +19,7 @@
 import type { CommitStore } from '@kira/git-core';
 import type { FileChange, ReviewFileStatus } from '@kira/git-ipc';
 import type { KuiSegmentedOption } from '@kira/kira-ui';
-import { KuiContextMenu, KuiSearchInput, KuiSegmented, KuiSelect } from '@kira/kira-ui';
+import { KuiButton, KuiContextMenu, KuiSearchInput, KuiSegmented, KuiSelect } from '@kira/kira-ui';
 import { computed, nextTick, ref, watch } from 'vue';
 import { ACTION_ICONS } from '../icons/index.ts';
 import type { FileListMode } from '../state/detail.ts';
@@ -515,27 +515,22 @@ function reviewToggleTitle(path: string): string {
             aria-hidden="true"
             >●</span
           >
-          <button
+          <KuiButton
             v-if="reviewStates"
-            type="button"
-            class="kv-copy-button kv-file-tree-review-toggle"
+            variant="ghost"
+            class="kv-file-tree-review-toggle"
             v-kui-tooltip="reviewToggleTitle(row.node.change.path)"
             :aria-pressed="reviewStatusFor(row.node.change.path)?.kind === 'full'"
             @click.stop="emit('toggleReviewed', row.node.change.path)"
           >
             <span class="codicon" :class="reviewToggleIcon(row.node.change.path)" aria-hidden="true"></span>
-          </button>
+          </KuiButton>
         </template>
       </div>
 
-      <button
-        v-if="capped.hiddenCount > 0"
-        type="button"
-        class="kv-file-tree-show-all"
-        @click="capLifted = true"
-      >
+      <KuiButton v-if="capped.hiddenCount > 0" class="kv-file-tree-show-all" @click="capLifted = true">
         Show all {{ rows.length }} files
-      </button>
+      </KuiButton>
 
       <KuiContextMenu
         v-if="fileMenuState"
