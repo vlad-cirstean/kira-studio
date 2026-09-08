@@ -11,7 +11,11 @@
  * Implemented fully in P0, ahead of anything that consumes it, because it is easy to get subtly
  * wrong and a later phase would otherwise write it in a hurry while also writing a renderer.
  */
-const TOKEN_NAMES = ['--kv-row-height'] as const;
+// G21 D6b: `--kv-font-size`/`--kv-font-family` join `--kv-row-height` — G14 already made the type
+// scale follow VS Code's own font settings, and CommitGrid.vue's own measured date-column width
+// (`dateFormat.ts`'s `measureAbsoluteDateWidth`) is genuinely font-dependent, not computable from
+// a character count, so a live font change has to reach it through this same change signal.
+const TOKEN_NAMES = ['--kv-row-height', '--kv-font-size', '--kv-font-family'] as const;
 
 export type TokenName = (typeof TOKEN_NAMES)[number];
 export type TokenMap = Readonly<Record<TokenName, string>>;

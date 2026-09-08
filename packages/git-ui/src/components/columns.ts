@@ -34,7 +34,6 @@ export const GRAPH_COLUMN_ID = 'graph';
 export const MESSAGE_COLUMN_ID = 'message';
 export const AUTHOR_COLUMN_ID = 'author';
 export const DATE_COLUMN_ID = 'date';
-export const SHA_COLUMN_ID = 'sha';
 
 function isStashDecoration(ref: DecorationRef): boolean {
   return ref.kind === 'stash';
@@ -48,7 +47,7 @@ function textCell(text: string, className: string): HTMLSpanElement {
 }
 
 /** P11 W13: the subject's own in-place search highlight. `pattern()` is re-read on every render
- *  pass — mirroring `DateFormatterContext`/`ShaCopyContext`'s own accessor convention — so
+ *  pass — mirroring `DateFormatterContext`/`LaneColorContext`'s own accessor convention — so
  *  `CommitGrid.vue` never rebuilds the column model just to reflect a new query; it only calls
  *  `invalidateAllRows()`/`render()` on `search.searchGeneration`, exactly as it already does for
  *  `graphView.generation`. `undefined` means "no query to highlight" (empty box, refs-only scope,
@@ -136,81 +135,32 @@ function dateFormatter(ctx: DateFormatterContext): Formatter<CommitRecord> {
   };
 }
 
-/** P5 W10: lands the copy action P4 shipped `disabled` with a "not available until P5" title.
- *  `enabled()` is re-read on every render pass (mirroring `DateFormatterContext`'s own accessor
- *  pattern) so a capability that is only known once `app.init` resolves — after the grid's first
- *  paint — enables the button on the very next `invalidateAllRows()`/`render()` without a column
- *  rebuild. Disabled rather than absent when the host has no clipboard (§3.3's feature
- *  detection): the button still communicates "this copies the sha", it just cannot act on it —
- *  consistent with `noCapabilities.ts`'s doc comment describing the same button under §6.4. */
-export interface ShaCopyContext {
-  readonly enabled: () => boolean;
-  readonly onCopy: (fullSha: string) => void;
-}
-
-function shaFormatter(ctx: ShaCopyContext): Formatter<CommitRecord> {
-  return (_row, _cell, _value, _columnDef, dataContext) => {
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'kv-cell-sha';
-    // Starts out of the native tab order the instant it exists, never natively-tabbable even for
-    // one render frame — `CommitGrid.vue`'s `applyAccessibility` is what promotes exactly the
-    // currently-tabbable row's own button back to `0`, mirroring the row's roving tabindex. A
-    // button left at its browser default (implicitly focusable, no attribute needed) is reachable
-    // by a *native* `Tab` the instant it lands in the DOM, whether or not `applyAccessibility` has
-    // gotten to it yet — on a `hugeRepo`-sized scenario, where `Tab`-driven `scrollIntoView`
-    // continually reveals fresh rows before that pass catches up, that race turns into every row's
-    // still-default button becoming reachable in turn, one Tab press at a time, never actually
-    // escaping the grid.
-    button.tabIndex = -1;
-    const enabled = ctx.enabled();
-    button.disabled = !enabled;
-    button.title = enabled ? 'Copy full SHA' : 'Copy SHA — not available in this host';
-    const shortSha = dataContext.sha.slice(0, 7);
-    button.textContent = shortSha;
-    if (enabled) {
-      button.addEventListener('click', (event) => {
-        // Stops this click from also reaching SlickGrid's own delegated row-click handler
-        // (`CommitGrid.vue`'s `handleClick`) — copying a sha is not a row selection.
-        event.stopPropagation();
-        ctx.onCopy(dataContext.sha);
-        button.textContent = 'Copied';
-        window.setTimeout(() => {
-          button.textContent = shortSha;
-        }, 1500);
-      });
-    }
-    return button;
-  };
-}
-
 /** The explicit widths `CommitGrid.vue` computes before building columns: `messageWidth` is
  *  whatever remains of the host's own width once every other column is accounted for, the graph
- *  column's width is `graphColumnWidth(laneCount)`, and `author`/`date`/`sha` come from
- *  `viewState`'s persisted `ColumnWidths` (or `DEFAULT_COLUMN_WIDTHS` on first mount). */
+ *  column's width is `graphColumnWidth(laneCount)`, and `author`/`date` come from `viewState`'s
+ *  persisted `ColumnWidths` (or `DEFAULT_COLUMN_WIDTHS` on first mount). */
 export interface ColumnWidthInputs extends ColumnWidths {
   readonly laneCount: number;
   readonly messageWidth: number;
 }
 
-/** Builds the five column definitions in display order. Not user-resizable: `graph` (its width
- *  is derived from `laneCount`, not a user choice — its `graphFormatter` and geometry are W8's
- *  `graphColumn.ts`/`rowSvg.ts`, built once per grid instance and passed in here rather than
- *  built by this stateless module) and `message` (it is "remaining width", recomputed by
- *  `CommitGrid.vue` on every resize rather than dragged). `author`/`date`/`sha` are resizable via
- *  `CommitGrid.vue`'s own drag handles (§6.1: `showColumnHeader: false` costs SlickGrid's built-in
- *  header resize handles, so this repo keeps its own), which write back through
- *  `grid.setColumns(...)` — this function, called again with the new widths, is the single source
- *  of the column model either way. `searchCtx` (W13) and `laneCtx` (G21 D4) are both optional and
- *  default to "no highlight"/"no lane colour" so every pre-existing call site (including
- *  `tests/unit/ui/columns.test.ts`'s four) keeps working unchanged — only `CommitGrid.vue` passes
- *  real ones. `laneCtx` is a new optional *last* parameter, added without disturbing any existing
- *  positional argument. */
+/** Builds the four column definitions in display order (G21 D5: the fifth, `sha`, is gone — the
+ *  details panel's own single click-to-copy SHA, `CommitMeta.vue`, is now the only sha-copy
+ *  affordance). Not user-resizable: `graph` (its width is derived from `laneCount`, not a user
+ *  choice — its `graphFormatter` and geometry are W8's `graphColumn.ts`/`rowSvg.ts`, built once
+ *  per grid instance and passed in here rather than built by this stateless module) and `message`
+ *  (it is "remaining width", recomputed by `CommitGrid.vue` on every resize rather than dragged).
+ *  `author`/`date` are resizable via `CommitGrid.vue`'s own drag handles (§6.1:
+ *  `showColumnHeader: false` costs SlickGrid's built-in header resize handles, so this repo keeps
+ *  its own), which write back through `grid.setColumns(...)` — this function, called again with
+ *  the new widths, is the single source of the column model either way. `searchCtx` (W13) and
+ *  `laneCtx` (G21 D4) are both optional and default to "no highlight"/"no lane colour" so a
+ *  caller that only needs the basic shape keeps working unchanged — only `CommitGrid.vue` passes
+ *  real ones. */
 export function buildColumns(
   widths: ColumnWidthInputs,
   dateCtx: DateFormatterContext,
   graphFormatter: Formatter<CommitRecord>,
-  shaCopyCtx: ShaCopyContext,
   searchCtx: MessageSearchContext = NO_SEARCH_CONTEXT,
   laneCtx: LaneColorContext = NO_LANE_COLOR_CONTEXT,
 ): Column<CommitRecord>[] {
@@ -259,17 +209,6 @@ export function buildColumns(
       focusable: false,
       selectable: false,
       formatter: dateFormatter(dateCtx),
-    },
-    {
-      id: SHA_COLUMN_ID,
-      field: 'sha',
-      name: '',
-      width: widths.sha,
-      resizable: false,
-      sortable: false,
-      focusable: false,
-      selectable: false,
-      formatter: shaFormatter(shaCopyCtx),
     },
   ];
 }

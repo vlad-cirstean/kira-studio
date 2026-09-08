@@ -10,6 +10,7 @@
  * (`columns.ts`'s own doc comment) applies here just as much as it does inside the grid.
  */
 import type { CommitStore } from '@kira/git-core';
+import { KuiButton } from '@kira/kira-ui';
 import { computed, nextTick, ref, watch } from 'vue';
 import type { CommitDetail } from '../state/detail.ts';
 import type { DetailActions } from '../state/detailActions.ts';
@@ -173,12 +174,21 @@ const trailerRows = computed<TrailerRow[]>(() =>
   }),
 );
 
-function copyFullSha(): void {
-  if (props.detail) props.actions.copy(props.detail.sha, 'full SHA');
-}
+/** G21 D5: the details panel's own single SHA row — full SHA copied, short SHA shown, one
+ *  button. `shaCopied` mirrors the flash the deleted `shaFormatter` (`columns.ts`) had on the
+ *  graph column's own SHA button, so the copy interaction is no less discoverable for having
+ *  moved here. */
+const shaCopied = ref(false);
+let shaCopiedTimer: ReturnType<typeof setTimeout> | undefined;
 
-function copyShortSha(): void {
-  if (props.detail) props.actions.copy(shortSha.value, 'short SHA');
+function copyFullSha(): void {
+  if (!props.detail) return;
+  props.actions.copy(props.detail.sha, 'full SHA');
+  shaCopied.value = true;
+  clearTimeout(shaCopiedTimer);
+  shaCopiedTimer = setTimeout(() => {
+    shaCopied.value = false;
+  }, 1500);
 }
 
 function copyMessage(): void {
@@ -233,29 +243,17 @@ function copyMessage(): void {
       <dl class="kv-meta-details-list">
         <dt>SHA</dt>
         <dd class="kv-meta-sha-row">
-          <span class="kv-meta-mono">{{ detail.sha }}</span>
-          <button
+          <KuiButton
             v-if="actions.capabilities.clipboard"
-            type="button"
-            class="kv-copy-button"
-            v-kui-tooltip="'Copy full SHA'"
+            variant="ghost"
+            class="kv-meta-sha"
+            v-kui-tooltip="'Click to copy the full SHA'"
+            aria-label="Copy full SHA"
             @click="copyFullSha"
           >
-            <span class="codicon codicon-copy" aria-hidden="true"></span>
-          </button>
-        </dd>
-        <dt>Short SHA</dt>
-        <dd class="kv-meta-sha-row">
-          <span class="kv-meta-mono">{{ shortSha }}</span>
-          <button
-            v-if="actions.capabilities.clipboard"
-            type="button"
-            class="kv-copy-button"
-            v-kui-tooltip="'Copy short SHA'"
-            @click="copyShortSha"
-          >
-            <span class="codicon codicon-copy" aria-hidden="true"></span>
-          </button>
+            {{ shaCopied ? 'Copied' : shortSha }}
+          </KuiButton>
+          <span v-else class="kv-meta-mono">{{ shortSha }}</span>
         </dd>
         <template v-if="parentRows.length > 0">
           <dt>{{ parentRows.length > 1 ? "Parents" : "Parent" }}</dt>
@@ -393,6 +391,15 @@ function copyMessage(): void {
   display: flex;
   align-items: center;
   gap: var(--kv-space-2);
+}
+
+/* G21 D5: the details panel's single click-to-copy SHA button — a KuiButton ghost variant, sized
+   to its text rather than the fixed control height a toolbar button would want. */
+.kv-meta-sha {
+  height: auto;
+  padding: 0 var(--kv-space-1);
+  font-family: var(--kv-mono-font-family);
+  font-size: var(--kv-mono-font-size);
 }
 
 .kv-copy-button {

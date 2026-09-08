@@ -22,12 +22,20 @@
  * argument as the diff/selected-file omission above, applied to search instead of the detail
  * pane. `SearchScope` is imported from `@kira/git-core`'s `search/query.ts` rather than
  * redefined here, same reasoning as `FileListMode`.
+ *
+ * G21 D5/D6a (version 5): `ColumnWidths` loses `sha` — the graph's own SHA column is gone (D5),
+ * so a persisted width for it is a shape that no longer exists, not an optional leftover to keep
+ * accepting. This is also, deliberately, what makes G19's own date-column-width fix (F6's
+ * "unreachable for every user who ran the app before G19") actually reach the users who reported
+ * it: `parsePersistedViewState`'s own documented policy discards a `version` mismatch whole, so a
+ * v4 blob with the narrower pre-G19 date default is rejected and the panel re-seeds from
+ * `DEFAULT_COLUMN_WIDTHS` — if this bump were dropped, item 6 would still be unfixed.
  */
 import type { SearchScope } from '@kira/git-core';
 import type { FileListMode } from './detail.ts';
 
 export interface PersistedViewState {
-  readonly version: 4;
+  readonly version: 5;
   readonly repoId: string | null;
   readonly loadedRows: number;
   readonly detailOpen: boolean;
@@ -50,19 +58,20 @@ export interface PersistedViewState {
 export interface ColumnWidths {
   readonly author: number;
   readonly date: number;
-  readonly sha: number;
 }
 
 export type DateFormat = 'relative' | 'absolute';
 
 /** W6/W9's own defaults — sized for the columns' typical content (an author name, a relative
- *  date string, a 7-character short sha) at the density §6.1 targets. Exported so every writer
- *  of a fresh `PersistedViewState` (a first-ever mount, a host's dev-seed hook) uses the same
- *  numbers rather than each inventing its own. */
+ *  date string) at the density §6.1 targets. Exported so every writer of a fresh
+ *  `PersistedViewState` (a first-ever mount, a host's dev-seed hook) uses the same numbers rather
+ *  than each inventing its own. */
 // G19 D2: date 120 -> 152 — F2 found the absolute date format ("2024-03-14 09:41", 16 chars)
-// silently clipped at 120px with no overflow affordance. Only changes a first-ever mount's seed
-// value; MIN_COLUMN_WIDTH and every already-persisted PersistedViewState are untouched.
-export const DEFAULT_COLUMN_WIDTHS: ColumnWidths = { author: 140, date: 152, sha: 80 };
+// silently clipped at 120px with no overflow affordance. G21 D5/D6: `sha` is gone (the SHA column
+// itself is deleted); `date`'s own 152 is now only the *floor* CommitGrid.vue's measured seed
+// (`dateFormat.ts`'s `measureAbsoluteDateWidth`) clamps up from — see that component's own
+// `computeDateWidthSeed`.
+export const DEFAULT_COLUMN_WIDTHS: ColumnWidths = { author: 140, date: 152 };
 export const DEFAULT_DETAIL_WIDTH = 380;
 
 export interface ViewStateStore {
@@ -73,18 +82,14 @@ export interface ViewStateStore {
 function isColumnWidthsShape(value: unknown): value is ColumnWidths {
   if (typeof value !== 'object' || value === null) return false;
   const record = value as Record<string, unknown>;
-  return (
-    typeof record.author === 'number' &&
-    typeof record.date === 'number' &&
-    typeof record.sha === 'number'
-  );
+  return typeof record.author === 'number' && typeof record.date === 'number';
 }
 
 function isPersistedViewStateShape(value: unknown): value is PersistedViewState {
   if (typeof value !== 'object' || value === null) return false;
   const record = value as Record<string, unknown>;
   return (
-    record.version === 4 &&
+    record.version === 5 &&
     (typeof record.repoId === 'string' || record.repoId === null) &&
     typeof record.loadedRows === 'number' &&
     typeof record.detailOpen === 'boolean' &&

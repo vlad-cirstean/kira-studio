@@ -24,10 +24,10 @@ import { createGraphFormatter } from '../graph/graphColumn.ts';
 import type { GraphViewState, LayoutRange } from '../state/graphView.ts';
 import type { SearchState } from '../state/search.ts';
 import type { SelectionState } from '../state/selection.ts';
-import type { ColumnWidths, DateFormat } from '../state/viewState.ts';
+import { type ColumnWidths, type DateFormat, DEFAULT_COLUMN_WIDTHS } from '../state/viewState.ts';
 import { rowHeightPx, TokenReader } from '../theme/readTokens.ts';
 import { buildColumns, createCommitDataView, DATE_COLUMN_ID } from './columns.ts';
-import { formatAbsoluteDate, formatRelativeDate } from './dateFormat.ts';
+import { formatAbsoluteDate, formatRelativeDate, measureAbsoluteDateWidth } from './dateFormat.ts';
 import { composeRowLabel } from './rowAccessibility.ts';
 
 const props = defineProps<{
@@ -38,11 +38,6 @@ const props = defineProps<{
   /** A previously persisted scroll target (`viewState.scrollRow`) — applied once, right after
    *  the first paint. Absent on a first-ever mount, where there is nothing to restore. */
   initialScrollRow?: number;
-  /** §3.3's feature detection for the sha column's copy button (P5 W10) — `app.init`'s
-   *  `capabilities.clipboard`, re-read on every render pass rather than captured once, since it
-   *  is not yet known at this component's own first paint (`bootstrap()`'s `await` resolves
-   *  after). */
-  clipboardEnabled: boolean;
   /** P11 W13: the message column's own in-place highlight source — optional so a caller with
    *  nothing to search yet (none, currently; W14 is the first to instantiate a real one from
    *  `App.vue`) gets plain, unhighlighted subjects, mirroring `columns.ts`'s own
@@ -63,14 +58,10 @@ const emit = defineEmits<{
   (e: 'closeDetail'): void;
   /** `F5` or `Ctrl/Cmd+R` while this grid has focus. W10 owns the Refresh action itself. */
   (e: 'refresh'): void;
-  /** The sha column's copy button was clicked (P5 W10) — `App.vue` owns the actual
-   *  `clipboard.write` call and the shared live-region announcement; this component only ever
-   *  reports which sha, exactly as it reports scroll/toggle/close rather than acting on them. */
-  (e: 'copySha', fullSha: string): void;
   /** `docs/plans/P6.md` W14: a right-click, `Shift+F10`, or the Menu key on a row — `App.vue`
    *  owns the actual `RowContextMenu.vue` instance (it is the one place with both `ops` and the
    *  commit store's decorations at hand), so this only ever reports which row and where to open
-   *  it, exactly as `copySha` reports which sha rather than copying it itself. */
+   *  it, exactly as `scroll`/`toggleDetail` report rather than acting on them. */
   (e: 'contextMenu', detail: { row: number; x: number; y: number }): void;
   /** `docs/plans/P7.md` W14: a right-click landed on a ref badge (`refBadges.ts`'s
    *  `data-ref-kind`/`data-ref-name`), not merely the row underneath it — `App.vue` opens the
@@ -93,12 +84,39 @@ const MIN_COLUMN_WIDTH = 40;
 const MAX_COLUMN_WIDTH = 600;
 const MIN_MESSAGE_WIDTH = 120;
 const HANDLE_KEY_STEP = 8;
+// G21 D6b: mirrors `--kv-space-2` (density.css), `.slick-cell`'s own horizontal padding — one
+// side; `measureAbsoluteDateWidth`'s own caller doubles it for both sides of the cell.
+const CELL_PADDING_PX = 4;
 
 const host = ref<HTMLDivElement | null>(null);
+const dateWidthProbe = ref<HTMLSpanElement | null>(null);
 let grid: SlickGrid<CommitRecord> | undefined;
 const tokenReader = new TokenReader();
 
 const widths = ref<ColumnWidths>({ ...props.columnWidths });
+
+/** G21 D6b: the measured pixel width the absolute date format actually needs at the current
+ *  font/zoom — `0` until the probe first resolves (always synchronous in practice; there is no
+ *  SSR here) so a `Math.max(DEFAULT_COLUMN_WIDTHS.date, 0)` read before that never regresses the
+ *  relative-format default. Used both as the first-ever-mount seed (`onMounted` below) and as
+ *  the date column's own minimum drag width (`minWidthFor`), replacing the global
+ *  `MIN_COLUMN_WIDTH` for that one column so it cannot be dragged back into the clipping state
+ *  item 6 is about. */
+const measuredDateWidth = ref(0);
+
+function remeasureDateWidth(): void {
+  const probe = dateWidthProbe.value;
+  if (!probe) return;
+  const font = getComputedStyle(probe).font;
+  measuredDateWidth.value = Math.ceil(measureAbsoluteDateWidth(font) + 2 * CELL_PADDING_PX);
+}
+
+/** Every column but `date` keeps the global floor; `date`'s own measured minimum (once known)
+ *  replaces it, never shrinks below it — `Math.max` covers a `measuredDateWidth` of `0` (not yet
+ *  measured) falling back to the global floor exactly like every other column. */
+function minWidthFor(column: keyof ColumnWidths): number {
+  return column === 'date' ? Math.max(MIN_COLUMN_WIDTH, measuredDateWidth.value) : MIN_COLUMN_WIDTH;
+}
 const dateFormatRef = ref<DateFormat>(props.dateFormat);
 
 // Built once per mounted grid (W8): closes over this instance's own LayoutStore/CommitStore
@@ -109,11 +127,11 @@ const graphFormatter = createGraphFormatter(props.graphView.layout, props.graphV
   rowHeightPx(tokenReader),
 );
 
-// Positions of the three drag handles (message|author, author|date, date|sha), recomputed
-// whenever the widths behind them change — see `updateHandlePositions`.
+// Positions of the two drag handles (message|author, author|date), recomputed whenever the
+// widths behind them change — see `updateHandlePositions`. (G21 D5: a third, date|sha, handle
+// existed here until the sha column itself was deleted.)
 const handleLeftAuthor = ref(0);
 const handleLeftDate = ref(0);
-const handleLeftSha = ref(0);
 
 let unsubscribeLayout: (() => void) | undefined;
 let unsubscribeTokens: (() => void) | undefined;
@@ -149,29 +167,22 @@ let pendingFocusRow: number | null = null;
 // for as long as it remains the one the user is on, closing the race `pendingFocusRow` alone
 // leaves open.
 //
-// P5 W10 adds a second real tab stop inside the row's own subtree, its `kv-cell-sha` button, and
-// `focusedShaButton` remembers which of the row's two focusable elements the user was actually
-// on. Restoring unconditionally to the row div (as this used to) fought the user the moment they
-// tabbed onto that button on a `hugeRepo`-sized scenario: the layout worker's still-arriving
-// chunks recreate row DOM nodes well after the initial mount regardless of what currently holds
-// focus, and always recovering to the row rather than the button they had actually reached
-// turned every such background render into an involuntary step backwards — directly observed as
-// `Tab` from the button never making forward progress, since the very next render bounced focus
-// back to the row before the browser had advanced it anywhere.
+// G21 D5: this used to also track which of a row's *two* focusable elements — the row div or its
+// `kv-cell-sha` copy button (P5 W10) — the user was actually on, since a background render (the
+// layout worker's still-arriving chunks) could recreate the row's DOM node out from under
+// whichever one currently held focus. The sha column and its button are gone; a row's own div is
+// its only focusable element now, so that second piece of state goes with it.
 let focusedRowIndex: number | null = null;
-let focusedShaButton = false;
 
 function handleFocusIn(event: FocusEvent): void {
   const target = event.target;
   if (!(target instanceof HTMLElement)) return;
   const rowAttr = target.closest('.slick-row')?.getAttribute('data-row');
   focusedRowIndex = rowAttr != null ? Number(rowAttr) : null;
-  focusedShaButton = target.classList.contains('kv-cell-sha');
 }
 
 function computeMessageWidth(hostWidth: number, laneCount: number): number {
-  const fixed =
-    graphColumnWidth(laneCount) + widths.value.author + widths.value.date + widths.value.sha;
+  const fixed = graphColumnWidth(laneCount) + widths.value.author + widths.value.date;
   return Math.max(MIN_MESSAGE_WIDTH, hostWidth - fixed);
 }
 
@@ -195,7 +206,6 @@ function currentColumns(): Column<CommitRecord>[] {
     { ...widths.value, laneCount, messageWidth: computeMessageWidth(hostWidth, laneCount) },
     { dateFormat: () => dateFormatRef.value, now: () => Date.now() },
     graphFormatter,
-    { enabled: () => props.clipboardEnabled, onCopy: (fullSha) => emit('copySha', fullSha) },
     { pattern: searchPattern },
     {
       // G21 D4: the row-bold/HEAD-ring and merge-in edge colouring already read this same
@@ -213,7 +223,6 @@ function updateHandlePositions(): void {
   const laneCount = props.graphView.laneCount.value;
   handleLeftAuthor.value = graphColumnWidth(laneCount) + computeMessageWidth(hostWidth, laneCount);
   handleLeftDate.value = handleLeftAuthor.value + widths.value.author;
-  handleLeftSha.value = handleLeftDate.value + widths.value.date;
 }
 
 function rebuildColumns(): void {
@@ -222,7 +231,7 @@ function rebuildColumns(): void {
 }
 
 function setColumnWidth(column: keyof ColumnWidths, next: number): void {
-  const clamped = Math.min(MAX_COLUMN_WIDTH, Math.max(MIN_COLUMN_WIDTH, Math.round(next)));
+  const clamped = Math.min(MAX_COLUMN_WIDTH, Math.max(minWidthFor(column), Math.round(next)));
   if (widths.value[column] === clamped) return;
   widths.value = { ...widths.value, [column]: clamped };
   rebuildColumns();
@@ -487,18 +496,6 @@ function applyAccessibility(range: { startRow: number; endRow: number }): void {
     const isSelected = row === selectedRow;
     rowNode.setAttribute('aria-selected', isSelected ? 'true' : 'false');
     rowNode.tabIndex = row === tabbableRow ? 0 : -1;
-    // P5 W10's sha column button is a real, natively-focusable `<button>` (enabling it is the
-    // whole point — a `disabled` one, per its own doc comment, is never a tab stop at all). Left
-    // alone, that turns virtualized `Tab` navigation into a keyboard trap no bound on `Tab`
-    // presses escapes: reaching an off-screen button scrolls it into view, which SlickGrid
-    // answers by virtualizing in yet more rows below, so a scenario with thousands of loaded
-    // commits never runs out of *new* buttons to reach before the grid's own last DOM sibling.
-    // The fix mirrors the row's own roving tabindex directly above: only the one row that is
-    // itself tabbable ever exposes its sha button to `Tab`; every other row's copy button is
-    // still there, still clickable by mouse, just not a stop `Tab` alone will find — reaching it
-    // needs arrow-key selection first, exactly as reaching that row's own detail does.
-    const shaButton = rowNode.querySelector<HTMLButtonElement>('.kv-cell-sha');
-    if (shaButton) shaButton.tabIndex = row === tabbableRow ? 0 : -1;
 
     const commit = props.graphView.store.commitAt(row);
     const dateText =
@@ -519,9 +516,7 @@ function applyAccessibility(range: { startRow: number; endRow: number }): void {
     // matching "selection scrolls it into view first, focuses second") or it is the row the user
     // was already on (`focusedRowIndex`) and this render just recreated its DOM node out from
     // under it — both cases need a *new* node focused; `focusedRowIndex`'s own doc comment above
-    // explains why a one-shot `pendingFocusRow` check alone is not enough, and why the recovery
-    // case restores the sha button specifically when that, not the row div, is what the user was
-    // last known to be on.
+    // explains why a one-shot `pendingFocusRow` check alone is not enough.
     //
     // `{ preventScroll: true }` is load-bearing, not a micro-optimisation: a freshly re-appended
     // row is added at the *end* of its DOM sibling list (its own doc comment on `handleClick`'s
@@ -543,8 +538,7 @@ function applyAccessibility(range: { startRow: number; endRow: number }): void {
     if (wasPendingFocus) {
       rowNode.focus({ preventScroll: true });
     } else if (row === focusedRowIndex) {
-      const target = focusedShaButton ? (shaButton ?? rowNode) : rowNode;
-      target.focus({ preventScroll: true });
+      rowNode.focus({ preventScroll: true });
     }
   }
 }
@@ -552,6 +546,18 @@ function applyAccessibility(range: { startRow: number; endRow: number }): void {
 onMounted(() => {
   if (!host.value) return;
   tokenReader.watch();
+
+  // G21 D6b: measured before the grid's first column build, so a first-ever mount's seed is
+  // right from the very first paint rather than only after a later rebuild.
+  remeasureDateWidth();
+  if (props.initialScrollRow === undefined) {
+    // `initialScrollRow` is only ever passed when `App.vue` found real persisted state to
+    // restore (its own prop doc comment) — absent means this is a genuine first-ever mount, the
+    // one case D6a/D6b's seed is for. A persisted width (even one that happens to equal
+    // `DEFAULT_COLUMN_WIDTHS.date`, e.g. a user who explicitly chose it) is never overridden.
+    const seeded = Math.max(DEFAULT_COLUMN_WIDTHS.date, measuredDateWidth.value);
+    if (seeded !== widths.value.date) widths.value = { ...widths.value, date: seeded };
+  }
 
   const dataView = createCommitDataView({
     store: props.graphView.store,
@@ -565,7 +571,7 @@ onMounted(() => {
     enableColumnReorder: false, // §6.2: resizable, not reorderable — no SortableJS in the loop
     enableHtmlRendering: false, // formatters return elements; no innerHTML, nothing to sanitize
     showColumnHeader: false, // §6.1 — the workbench list this mirrors has no header row
-    enableTextSelectionOnCells: true, // subjects/authors/shas are meant to be selectable text
+    enableTextSelectionOnCells: true, // subjects/authors are meant to be selectable text
     explicitInitialization: false, // the constructor rendering immediately is what we want here
     minRowBuffer: 3, // render-ahead buffer above/below the viewport, not the whole history
     rowTopOffsetRenderType: 'transform', // matches how --kv-row-height drives row positioning
@@ -643,6 +649,12 @@ onMounted(() => {
   unsubscribeLayout = props.graphView.onChunkLayout(handleChunkLayout);
 
   unsubscribeTokens = tokenReader.onChange(() => {
+    // G21 D6b: a font-size/family change (now tracked alongside row-height, readTokens.ts) can
+    // widen or narrow the absolute date format's own rendered width — re-measure so the date
+    // column's minimum drag width stays honest, even though nothing here forces the column's
+    // *current* width to follow (a user-narrowed relative-format column stays exactly as narrow
+    // as they left it; `.kv-cell-date`'s own ellipsis is the safety net for that case).
+    remeasureDateWidth();
     if (!grid) return;
     grid.setOptions({ rowHeight: rowHeightPx(tokenReader) });
     grid.invalidateAllRows();
@@ -696,21 +708,6 @@ watch(
     grid?.render();
   },
 );
-// Unlike `columnWidths`/`dateFormat` above (captured once — this component is the only writer
-// of either), `clipboardEnabled` genuinely changes *after* this component's own first paint:
-// `App.vue`'s `bootstrap()` only learns the real capability once `bridge.init()`'s `await`
-// resolves, well after this grid has already built its first set of columns with the button
-// disabled. Rebuilding on the flip is what turns that into a live enable rather than one stuck
-// showing "not available" for the rest of the session.
-watch(
-  () => props.clipboardEnabled,
-  () => {
-    rebuildColumns();
-    grid?.invalidateAllRows();
-    grid?.render();
-  },
-);
-
 onBeforeUnmount(() => {
   resizeObserver?.disconnect();
   if (resizeRaf !== 0) cancelAnimationFrame(resizeRaf);
@@ -763,6 +760,10 @@ defineExpose({ scrollToRow, focusGrid });
          its siblings, absolutely positioned over it via `.kv-commit-grid`'s own `position:
          relative` above, not descendants a `new SlickGrid(host.value, ...)` call would delete. -->
     <div ref="host" class="kv-grid-host"></div>
+    <!-- G21 D6b: an off-screen probe carrying .kv-cell-date's own font-affecting rules, purely so
+         `remeasureDateWidth` has a real element to read a computed `font` shorthand from — never
+         shown, never a fifth grid column. -->
+    <span ref="dateWidthProbe" class="kv-cell-date kv-date-width-probe" aria-hidden="true"></span>
     <div
       class="kv-resize-handle"
       role="separator"
@@ -783,27 +784,13 @@ defineExpose({ scrollToRow, focusGrid });
       aria-orientation="vertical"
       aria-label="Resize date column"
       :aria-valuenow="widths.date"
-      :aria-valuemin="MIN_COLUMN_WIDTH"
+      :aria-valuemin="minWidthFor('date')"
       :aria-valuemax="MAX_COLUMN_WIDTH"
       :aria-valuetext="`${widths.date} pixels`"
       tabindex="0"
       :style="{ left: `${handleLeftDate}px` }"
       @mousedown="startDrag('date', $event)"
       @keydown="handleHandleKeydown('date', $event)"
-    ></div>
-    <div
-      class="kv-resize-handle"
-      role="separator"
-      aria-orientation="vertical"
-      aria-label="Resize sha column"
-      :aria-valuenow="widths.sha"
-      :aria-valuemin="MIN_COLUMN_WIDTH"
-      :aria-valuemax="MAX_COLUMN_WIDTH"
-      :aria-valuetext="`${widths.sha} pixels`"
-      tabindex="0"
-      :style="{ left: `${handleLeftSha}px` }"
-      @mousedown="startDrag('sha', $event)"
-      @keydown="handleHandleKeydown('sha', $event)"
     ></div>
   </div>
 </template>
@@ -834,6 +821,16 @@ defineExpose({ scrollToRow, focusGrid });
 .kv-grid-host {
   height: 100%;
   width: 100%;
+}
+
+/* G21 D6b: never painted, never laid out into the visible flow — `remeasureDateWidth`'s only use
+   for this element is `getComputedStyle(…).font`, which needs a connected element to resolve the
+   cascade but nothing about its own box. */
+.kv-date-width-probe {
+  position: absolute;
+  visibility: hidden;
+  pointer-events: none;
+  white-space: nowrap;
 }
 
 /* SlickGrid's own dynamic stylesheet (`createCssRules`, `applyColumnWidths`) only ever writes
@@ -880,26 +877,15 @@ defineExpose({ scrollToRow, focusGrid });
   color: var(--kv-row-selected-fg);
 }
 
-/* `.kv-cell-sha`'s own rule below sets an explicit `color`, which wins over the inherited one
-   above regardless of selection — without this override a selected row's sha button keeps its
-   normal, unselected text colour against the row's now-blue background, an axe-flagged contrast
-   failure in `vscode-light` (P5 W10; `a11y.spec.ts`'s own "known false positive" allowance a few
-   lines up covers the message/author cells this same selection recolour affects, but a real
-   contrast regression on a *third* cell is not that same false positive and must not be masked
-   the same way — fixing the colour is the right answer here, not widening that filter). */
-.kv-commit-grid .slick-row.kv-row-selected .kv-cell-sha {
-  color: var(--kv-row-selected-fg);
-}
-
-/* Same class of bug, a fourth cell: a border-only ref badge (tag/remote/stash/overflow — every
-   `refBadges.ts` kind except `.kv-badge-local`, which already fills its own background and so
-   never depends on the row's) carries its own decoration colour as both `color` and
-   `border-color`, tuned against the row's *un*selected background. A selected row with, say, a
-   green `v1.0.0` tag badge fails contrast for real (P5 W14's own axe scan on the commit-detail
-   pane's populated state, the first scan to select a row carrying this particular badge kind) —
-   caught the same way `.kv-cell-sha` above already was, fixed the same way: the row's own
-   selected-foreground, already verified high-contrast against `--kv-row-selected-bg`, for both
-   properties so the badge's outline stays visible too. */
+/* A border-only ref badge (tag/remote/stash/overflow — every `refBadges.ts` kind except
+   `.kv-badge-local`, which already fills its own background and so never depends on the row's)
+   carries its own decoration colour as both `color` and `border-color`, tuned against the row's
+   *un*selected background. A selected row with, say, a green `v1.0.0` tag badge fails contrast
+   for real (P5 W14's own axe scan on the commit-detail pane's populated state, the first scan to
+   select a row carrying this particular badge kind) — fixed with the row's own selected-
+   foreground, already verified high-contrast against `--kv-row-selected-bg`, for both properties
+   so the badge's outline stays visible too. (G21 D5: the sha column's own copy of this same fix
+   was deleted along with the column itself.) */
 .kv-commit-grid .slick-row.kv-row-selected .kv-badge-remote,
 .kv-commit-grid .slick-row.kv-row-selected .kv-badge-tag,
 .kv-commit-grid .slick-row.kv-row-selected .kv-badge-stash,
@@ -1110,26 +1096,6 @@ defineExpose({ scrollToRow, focusGrid });
   overflow: hidden;
   text-overflow: ellipsis;
   cursor: pointer;
-}
-
-.kv-cell-sha {
-  font-family: var(--kv-mono-font-family);
-  font-size: var(--kv-mono-font-size);
-  background: transparent;
-  border: none;
-  padding: 0;
-  color: var(--kv-row-fg);
-  opacity: 0.75;
-  cursor: not-allowed;
-}
-
-.kv-cell-sha:not(:disabled) {
-  cursor: pointer;
-  opacity: 1;
-}
-
-.kv-cell-sha:not(:disabled):hover {
-  text-decoration: underline;
 }
 
 /* §6.1's own resize handles (showColumnHeader: false costs SlickGrid's built-in header resize

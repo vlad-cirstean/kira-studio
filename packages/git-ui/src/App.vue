@@ -367,10 +367,6 @@ function handleSearchFocusGrid(): void {
   commitGridRef.value?.focusGrid();
 }
 
-function handleCopySha(fullSha: string): void {
-  actions.value?.copy(fullSha, 'full SHA');
-}
-
 // ---------------------------------------------------------------------------------------
 // `docs/plans/P6.md` W14: the per-commit context menu. `CommitGrid.vue` only ever reports which
 // row and where to open it (own doc comment on its `contextMenu` emit) — this is the one place
@@ -756,7 +752,7 @@ function retryBootstrap(): void {
 // their default/persisted value across every other field's write, exactly like `fileListMode`
 // did between P5 W11 (when it was added here) and P5 W12 (when `DetailPane` started driving it).
 let lastPersisted: PersistedViewState = {
-  version: 4,
+  version: 5,
   repoId: null,
   loadedRows: 0,
   detailOpen: true,
@@ -1158,7 +1154,6 @@ onBeforeUnmount(() => {
               :column-widths="columnWidths"
               :date-format="dateFormat"
               :search="searchState"
-              :clipboard-enabled="actions?.capabilities.clipboard ?? false"
               v-bind="initialScrollRowProp"
               @update:column-widths="columnWidths = $event"
               @update:date-format="dateFormat = $event"
@@ -1166,7 +1161,6 @@ onBeforeUnmount(() => {
               @toggle-detail="toggleDetail"
               @close-detail="closeDetail"
               @refresh="triggerRefresh"
-              @copy-sha="handleCopySha"
               @context-menu="handleGridContextMenu"
               @ref-context-menu="handleGridRefContextMenu"
               @stash-context-menu="handleStashContextMenu"

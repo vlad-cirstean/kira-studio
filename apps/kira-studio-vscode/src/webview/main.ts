@@ -122,7 +122,7 @@ if (bootstrap.view === 'review') {
   // state — that would defeat the rehydration this same state exists to prove.
   if (bootstrap.repo && !viewState.read()) {
     viewState.write({
-      version: 4,
+      version: 5,
       repoId: bootstrap.repo,
       loadedRows: 0,
       detailOpen: true,
