@@ -14,7 +14,7 @@
  */
 
 import type { PullStrategy, PullStrategySource } from '@kira/git-ipc';
-import { KuiButton } from '@kira/kira-ui';
+import { KuiButton, KuiPopoverPanel } from '@kira/kira-ui';
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import type { OpsState } from '../state/ops.ts';
 import { describePullStrategySource, PULL_STRATEGY_LABELS } from './pullStrategyModel.ts';
@@ -115,7 +115,8 @@ defineExpose({ run: runDefault });
       @click="toggle"
     />
 
-    <div v-if="isOpen" class="kv-pull-picker-panel" role="menu" aria-label="Pull strategy">
+    <KuiPopoverPanel v-if="isOpen" anchor="left" :width="260" @close="close">
+    <div class="kv-pull-picker-panel" role="menu" aria-label="Pull strategy">
       <button
         type="button"
         class="kv-pull-picker-item"
@@ -143,6 +144,7 @@ defineExpose({ run: runDefault });
         <span class="kv-pull-picker-item-label">{{ PULL_STRATEGY_LABELS[strategy] }}</span>
       </button>
     </div>
+    </KuiPopoverPanel>
   </div>
 </template>
 
@@ -167,18 +169,9 @@ defineExpose({ run: runDefault });
   border-bottom-left-radius: 0;
 }
 
+/* G20 D5: positioning/chrome move onto KuiPopoverPanel's own `.kui-popover`. */
 .kv-pull-picker-panel {
-  position: absolute;
-  top: calc(100% + var(--kv-space-1));
-  left: 0;
-  z-index: 30;
-  min-width: 260px;
   padding: var(--kv-space-1);
-  background-color: var(--kv-panel-bg);
-  color: var(--kv-app-fg);
-  border: 1px solid var(--kv-panel-border);
-  border-radius: var(--kv-radius);
-  box-shadow: 0 4px 16px var(--kv-widget-shadow);
 }
 
 .kv-pull-picker-item {

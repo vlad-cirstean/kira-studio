@@ -12,6 +12,7 @@
  * documented decoupling from `GraphViewState` in W5).
  */
 import type { RepoCandidate } from '@kira/git-ipc';
+import { KuiPopoverPanel } from '@kira/kira-ui';
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { STATE_ICONS } from '../icons/index.ts';
 import type { RepoState } from '../state/repo.ts';
@@ -89,7 +90,8 @@ onBeforeUnmount(() => {
       <span class="kv-repo-trigger-label">{{ triggerLabel }}</span>
       <span class="codicon" :class="STATE_ICONS.chevronDown" aria-hidden="true"></span>
     </button>
-    <ul v-if="isOpen" class="kv-repo-list" role="listbox" aria-label="Repositories">
+    <KuiPopoverPanel v-if="isOpen" anchor="left" :width="260" @close="close">
+    <ul class="kv-repo-list" role="listbox" aria-label="Repositories">
       <li
         v-for="candidate in repoState.candidates.value"
         :key="candidate.path"
@@ -126,6 +128,7 @@ onBeforeUnmount(() => {
         <span class="kv-repo-item-label">Open Folder…</span>
       </li>
     </ul>
+    </KuiPopoverPanel>
   </div>
 </template>
 
@@ -165,21 +168,13 @@ onBeforeUnmount(() => {
   white-space: nowrap;
 }
 
+/* G20 D5: positioning/chrome move onto KuiPopoverPanel's own `.kui-popover`. */
 .kv-repo-list {
-  position: absolute;
-  top: calc(100% + 2px);
-  left: 0;
-  z-index: 10;
-  min-width: 260px;
   max-height: 320px;
   overflow-y: auto;
   margin: 0;
   padding: var(--kv-space-1) 0;
   list-style: none;
-  background-color: var(--kv-panel-bg);
-  border: 1px solid var(--kv-panel-border);
-  border-radius: var(--kv-radius);
-  box-shadow: 0 2px 8px var(--kv-widget-shadow);
 }
 
 .kv-repo-item {

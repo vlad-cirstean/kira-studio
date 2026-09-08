@@ -21,7 +21,8 @@ export const SEARCH_LISTBOX_ID = 'kv-search-listbox';
  * element that actually holds focus throughout — not here; this file only reflects
  * `highlightedId` back as `aria-selected` and forwards a click as `select`.
  */
-import { computed } from "vue";
+import { computeFloatPosition } from "@kira/kira-ui";
+import { computed, nextTick, onMounted, ref } from "vue";
 import { formatRelativeDate } from "./dateFormat.ts";
 import type { SearchOption, SearchResultsModel } from "./searchResultsModel.ts";
 import { fieldLabel } from "./searchResultsModel.ts";
@@ -41,10 +42,37 @@ const emit = defineEmits<{
 }>();
 
 const isEmpty = computed(() => props.model.sections.length === 0);
+
+// G20 D5, deviation: the plan's own file-by-file table calls for wrapping this in
+// `KuiPopoverPanel`, like the other 6 dropdowns — but this one, uniquely among the 7, is an ARIA
+// combobox listbox (see the file's own doc comment): `SearchBox.vue`'s `<input>` must keep real
+// DOM focus the whole time this is open, and its own Escape handling (a two-stage
+// dismiss-then-clear, OQ5) is bound directly to that input, not to a document-level listener.
+// `KuiPopoverPanel`'s own document-level, capture-phase Escape handler would intercept every
+// Escape keystroke before it ever reaches the input's own bubble-phase handler, silently
+// replacing that two-stage behaviour with a plain close — the exact "positioning-coupled
+// interaction logic" §7 item 2 anticipated as a reason to special-case one of the 7 rather than
+// force it through the shared wrapper. Positioned directly via `computeFloatPosition` instead —
+// real flip/shift, no backdrop, no Escape/click-outside handling of its own (both already live in
+// `SearchBox.vue`, untouched) — anchored to this component's own DOM parent (`SearchBox.vue`'s
+// `rootEl`), the same "read the wrapper, no prop needed" trick `KuiPopoverPanel` itself uses.
+const resultsEl = ref<HTMLElement | null>(null);
+const resultsStyle = ref({ left: '-9999px', top: '-9999px' });
+
+async function reposition(): Promise<void> {
+  await nextTick();
+  const el = resultsEl.value;
+  const anchor = el?.parentElement;
+  if (!el || !anchor) return;
+  const { left, top } = await computeFloatPosition(anchor, el, { placement: 'bottom-start' });
+  resultsStyle.value = { left: `${left}px`, top: `${top}px` };
+}
+
+onMounted(() => void reposition());
 </script>
 
 <template>
-  <div class="kv-search-results" data-testid="search-results">
+  <div ref="resultsEl" class="kv-search-results" data-testid="search-results" :style="resultsStyle">
     <!-- ARIA's listbox role only permits `option`/`group` children (`aria-required-children`) —
          the status line, section titles and options live inside this inner listbox div; the
          stale hint, footers and the body-search button are its *siblings*, not its children. -->
@@ -118,11 +146,11 @@ const isEmpty = computed(() => props.model.sections.length === 0);
 </template>
 
 <style>
+/* G20 D5: real flip/shift positioning (see the script's own doc comment for why this is
+   positioned directly rather than through KuiPopoverPanel, unlike the other 6 dropdowns). */
 .kv-search-results {
-  position: absolute;
-  top: calc(100% + 2px);
-  left: 0;
-  z-index: 10;
+  position: fixed;
+  z-index: var(--kui-z-popover, 20);
   width: 420px;
   max-height: 360px;
   overflow-y: auto;

@@ -42,7 +42,8 @@
  * outside-click listener, rather than routing a third global shortcut through `App.vue`.
  */
 import type { SearchScope } from '@kira/git-core';
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computeFloatPosition } from '@kira/kira-ui';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { ACTION_ICONS } from '../icons/index.ts';
 import type { SearchState } from '../state/search.ts';
 import { MIN_TAIL_QUERY_LENGTH } from '../state/search.ts';
@@ -60,6 +61,33 @@ const rootEl = ref<HTMLElement | null>(null);
 const inputEl = ref<HTMLInputElement | null>(null);
 
 const ERROR_ID = 'kv-search-error';
+
+// G20 D5, deviation: the plan's own file-by-file table calls for wrapping `.kv-search-error` in
+// `KuiPopoverPanel` like the other 6 dropdowns — but that component's backdrop is a full-viewport,
+// `position: fixed` click-catcher (by design, for a user-opened menu). This element is a passive
+// inline validation message that appears/disappears as a side effect of typing a regex, never
+// something the user affirmatively "opens" — wrapping it in that backdrop would block every other
+// click in the UI (the graph, the toolbar) for as long as a regex error happens to be showing,
+// a real interaction regression the plan's own read of this file (as one of "7 dropdowns," all
+// assumed click-triggered) did not surface. Positioned directly via `computeFloatPosition`
+// instead — real flip/shift, no backdrop, no Escape/click-outside handling of its own (it was
+// never modal) — mirroring `App.vue`'s own one-off force-delete-popup treatment (D4) rather than
+// `KuiPopoverPanel`.
+const errorEl = ref<HTMLElement | null>(null);
+const errorStyle = ref({ left: '-9999px', top: '-9999px' });
+watch(
+  () => props.search.error.value,
+  async (error) => {
+    if (!error) return;
+    errorStyle.value = { left: '-9999px', top: '-9999px' };
+    await nextTick();
+    const anchor = rootEl.value;
+    const el = errorEl.value;
+    if (!anchor || !el) return;
+    const { left, top } = await computeFloatPosition(anchor, el, { placement: 'bottom-start' });
+    errorStyle.value = { left: `${left}px`, top: `${top}px` };
+  },
+);
 
 /** The inline `n of N` indicator mirrors exactly what `Enter`/`Shift+Enter` step through —
  *  commit matches (judgment call 6) — so it is hidden entirely in `Refs` scope, where there is
@@ -288,7 +316,15 @@ defineExpose({ focus: () => inputEl.value?.focus() });
       </select>
       <span v-if="countLabel" class="kv-search-count" data-testid="search-count">{{ countLabel }}</span>
     </div>
-    <div v-if="search.error.value" :id="ERROR_ID" class="kv-search-error" role="alert" data-testid="search-error">
+    <div
+      v-if="search.error.value"
+      :id="ERROR_ID"
+      ref="errorEl"
+      class="kv-search-error"
+      role="alert"
+      data-testid="search-error"
+      :style="errorStyle"
+    >
       {{ search.error.value }}
     </div>
     <SearchResults
@@ -384,9 +420,9 @@ defineExpose({ focus: () => inputEl.value?.focus() });
 }
 
 .kv-search-error {
-  position: absolute;
-  top: calc(100% + 2px);
-  z-index: 20;
+  position: fixed;
+  z-index: var(--kui-z-popover, 20);
+  max-width: var(--kui-float-max-w, none);
   padding: var(--kv-space-1) var(--kv-space-2);
   background-color: var(--kv-panel-bg);
   color: var(--kv-error-fg);

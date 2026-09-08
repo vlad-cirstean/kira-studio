@@ -21,7 +21,7 @@
  * known at all: there is nothing to name in the tooltip and no useful default to pick.
  */
 import type { StashEntry } from '@kira/git-ipc';
-import { KuiButton } from '@kira/kira-ui';
+import { KuiButton, KuiPopoverPanel } from '@kira/kira-ui';
 import { computed, ref } from 'vue';
 import type { DetailActions } from '../state/detailActions.ts';
 import type { GraphViewState } from '../state/graphView.ts';
@@ -261,17 +261,24 @@ const stashDisabled = computed(
           data-testid="push-overflow-trigger"
           @click="toggleForcePushMenu"
         />
-        <div v-if="isForcePushMenuOpen" class="kv-push-menu" role="menu" aria-label="Push options">
-          <button
-            type="button"
-            class="kv-push-menu-item"
-            role="menuitem"
-            data-testid="force-push-trigger"
-            @click="doForcePush"
-          >
-            Force push…
-          </button>
-        </div>
+        <KuiPopoverPanel
+          v-if="isForcePushMenuOpen"
+          anchor="right"
+          :width="160"
+          @close="isForcePushMenuOpen = false"
+        >
+          <div class="kv-push-menu" role="menu" aria-label="Push options">
+            <button
+              type="button"
+              class="kv-push-menu-item"
+              role="menuitem"
+              data-testid="force-push-trigger"
+              @click="doForcePush"
+            >
+              Force push…
+            </button>
+          </div>
+        </KuiPopoverPanel>
       </div>
     </template>
 
@@ -369,18 +376,9 @@ const stashDisabled = computed(
   border-bottom-left-radius: 0;
 }
 
+/* G20 D5: positioning/chrome move onto KuiPopoverPanel's own `.kui-popover`. */
 .kv-push-menu {
-  position: absolute;
-  top: calc(100% + var(--kv-space-1));
-  right: 0;
-  z-index: 30;
-  min-width: 160px;
   padding: var(--kv-space-1);
-  background-color: var(--kv-panel-bg);
-  color: var(--kv-app-fg);
-  border: 1px solid var(--kv-panel-border);
-  border-radius: var(--kv-radius);
-  box-shadow: 0 4px 16px var(--kv-widget-shadow);
 }
 
 .kv-push-menu-item {

@@ -10,6 +10,7 @@
  * mirroring W14's "not offered for tags" rule on the row menu's own entry.
  */
 import type { BaseCandidate, BaseResolution, BaseResolutionReason } from '@kira/git-ipc';
+import { KuiPopoverPanel } from '@kira/kira-ui';
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { STATE_ICONS } from '../../icons/index.ts';
 import type { RefsState } from '../../state/refs.ts';
@@ -126,7 +127,8 @@ onBeforeUnmount(() => {
       <span class="codicon" :class="STATE_ICONS.chevronDown" aria-hidden="true"></span>
     </button>
 
-    <div v-if="isOpen" class="kv-base-panel" role="dialog" aria-label="Choose a comparison base">
+    <KuiPopoverPanel v-if="isOpen" anchor="left" :width="280" @close="close">
+    <div class="kv-base-panel" role="dialog" aria-label="Choose a comparison base">
       <input
         type="text"
         class="kv-base-filter"
@@ -179,6 +181,7 @@ onBeforeUnmount(() => {
         </div>
       </div>
     </div>
+    </KuiPopoverPanel>
   </div>
 </template>
 
@@ -224,19 +227,12 @@ onBeforeUnmount(() => {
   font-size: 0.85em;
 }
 
+/* G20 D5: positioning/chrome move onto KuiPopoverPanel's own `.kui-popover`. */
 .kv-base-panel {
-  position: absolute;
-  top: calc(100% + 2px);
-  left: 0;
-  z-index: 10;
-  width: min(280px, 90vw);
   max-height: 320px;
   display: flex;
   flex-direction: column;
-  border: 1px solid var(--kv-panel-border);
-  border-radius: var(--kv-radius);
-  background: var(--kv-panel-bg);
-  box-shadow: 0 2px 8px var(--kv-widget-shadow);
+  min-height: 0;
 }
 
 .kv-base-filter {

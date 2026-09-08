@@ -11,6 +11,7 @@
  * *and* keyboard reachable) plus a plain right-click, both opening the same menu.
  */
 import type { RefRow, StashEntry } from '@kira/git-ipc';
+import { KuiPopoverPanel } from '@kira/kira-ui';
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { STATE_ICONS } from '../icons/index.ts';
 import type { OpsState } from '../state/ops.ts';
@@ -219,7 +220,8 @@ onBeforeUnmount(() => {
       <span class="codicon" :class="STATE_ICONS.chevronDown" aria-hidden="true"></span>
     </button>
 
-    <div v-if="isOpen" class="kv-branch-panel" role="dialog" aria-label="Branches and tags">
+    <KuiPopoverPanel v-if="isOpen" anchor="left" :width="320" @close="close">
+    <div class="kv-branch-panel" role="dialog" aria-label="Branches and tags">
       <input
         type="text"
         class="kv-branch-filter"
@@ -331,6 +333,7 @@ onBeforeUnmount(() => {
         />
       </div>
     </div>
+    </KuiPopoverPanel>
 
     <RowContextMenu
       v-if="refMenu"
@@ -380,19 +383,13 @@ onBeforeUnmount(() => {
   white-space: nowrap;
 }
 
+/* G20 D5: positioning (absolute/z-index/width) and chrome (background/border/shadow) move onto
+   KuiPopoverPanel's own `.kui-popover` — this is now just the content's own internal layout. */
 .kv-branch-panel {
-  position: absolute;
-  top: calc(100% + 2px);
-  left: 0;
-  z-index: 10;
-  width: 320px;
   max-height: 420px;
   display: flex;
   flex-direction: column;
-  background-color: var(--kv-panel-bg);
-  border: 1px solid var(--kv-panel-border);
-  border-radius: var(--kv-radius);
-  box-shadow: 0 2px 8px var(--kv-widget-shadow);
+  min-height: 0;
 }
 
 .kv-branch-filter {
@@ -405,6 +402,7 @@ onBeforeUnmount(() => {
 
 .kv-branch-panel-scroll {
   overflow-y: auto;
+  min-height: 0;
 }
 
 .kv-branch-section-title {
