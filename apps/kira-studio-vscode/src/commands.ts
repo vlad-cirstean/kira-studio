@@ -36,12 +36,14 @@ export interface PaletteCommand {
 }
 
 /** A kind not yet served by any phase's `opTable`/`RunRemote` switch carries the phase that owns
- *  it instead of a command (D18) — F9's corrected numbering: G13 owns the five stash kinds, G14
- *  owns reset/cherryPick and (moved here from G7's own "whichever of G12/G13 takes them" note)
- *  tagPush/tagDeleteRemote, since both are push operations that belong with the reset/cherry-pick
- *  sweep rather than the stash one. Move an entry if a later phase's own plan takes it differently
- *  — this comment, not a fixed assignment, is the source of truth. */
-export type MutatingEntry = PaletteCommand | { readonly pending: 'G13' | 'G14' };
+ *  it instead of a command (D18) — G13 F13's corrected numbering: G15 owns the five stash kinds,
+ *  G16 owns reset/cherryPick and tagPush/tagDeleteRemote, since both are push operations that
+ *  belong with the reset/cherry-pick sweep rather than the stash one. (Chapter phase insertions
+ *  moved these off their original G13/G14 labels, which this phase — the real G13 — now owns
+ *  outright; F13 is why the labels moved rather than staying wrong.) Move an entry if a later
+ *  phase's own plan takes it differently — this comment, not a fixed assignment, is the source of
+ *  truth. */
+export type MutatingEntry = PaletteCommand | { readonly pending: 'G15' | 'G16' };
 
 /** D17's seventeen served commands plus D18's nine `pending` placeholders — twenty-six entries in
  *  total, one per `MutatingAction` member. See the plan's own D17 table for the "what it reaches"
@@ -70,8 +72,8 @@ export const MUTATING_COMMANDS: Record<MutatingAction, MutatingEntry> = {
     title: 'Delete Tag…',
     action: 'openBranchPicker',
   },
-  tagPush: { pending: 'G14' },
-  tagDeleteRemote: { pending: 'G14' },
+  tagPush: { pending: 'G16' },
+  tagDeleteRemote: { pending: 'G16' },
   revert: {
     command: 'kiraVersion.revertCommit',
     title: 'Revert Commit…',
@@ -88,13 +90,13 @@ export const MUTATING_COMMANDS: Record<MutatingAction, MutatingEntry> = {
     action: 'abortOperation',
   },
   opSkip: { command: 'kiraVersion.skipCommit', title: 'Skip Commit', action: 'skipCommit' },
-  stashPush: { pending: 'G13' },
-  stashApply: { pending: 'G13' },
-  stashPop: { pending: 'G13' },
-  stashDrop: { pending: 'G13' },
-  stashBranch: { pending: 'G13' },
-  reset: { pending: 'G14' },
-  cherryPick: { pending: 'G14' },
+  stashPush: { pending: 'G15' },
+  stashApply: { pending: 'G15' },
+  stashPop: { pending: 'G15' },
+  stashDrop: { pending: 'G15' },
+  stashBranch: { pending: 'G15' },
+  reset: { pending: 'G16' },
+  cherryPick: { pending: 'G16' },
   fetch: { command: 'kiraVersion.fetch', title: 'Fetch', action: 'fetch' },
   pull: { command: 'kiraVersion.pull', title: 'Pull', action: 'pull' },
   push: { command: 'kiraVersion.push', title: 'Push', action: 'push' },
