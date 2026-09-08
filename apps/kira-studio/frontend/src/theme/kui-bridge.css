@@ -23,4 +23,9 @@
   --kui-space-2: var(--kira-s-2);
   --kui-space-3: var(--kira-s-3);
   --kui-space-4: var(--kira-s-4);
+  /* G20 D6: mapped from this app's own real `--kira-z-*` ladder — inert today, same as every
+     other token above (nothing in this app consumes a `packages/kira-ui` floating surface yet). */
+  --kui-z-popover: var(--kira-z-popover);
+  --kui-z-menu: var(--kira-z-menu);
+  --kui-z-tooltip: var(--kira-z-tooltip);
 }

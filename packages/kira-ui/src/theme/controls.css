@@ -6,6 +6,14 @@
  * `apps/kira-studio/frontend/src/theme/kui-bridge.css`). A host that has not loaded a bridge
  * still renders something reasonable, since every `--kui-*` reference below carries its own
  * fallback.
+ *
+ * G20 D6: the `--kui-z-*` floating-surface ladder — a documented contract, same as the sizing/
+ * color vocabulary above. Each host bridges these onto its own real scale (or, for
+ * `packages/git-ui`, which had no `--kv-z-*` ladder at all, establishes fresh literal values):
+ *
+ *   --kui-z-popover  lowest  — dropdowns (KuiPopoverPanel), the force-delete popup
+ *   --kui-z-menu     above popovers — context menus (KuiContextMenu)
+ *   --kui-z-tooltip  highest — KuiTooltip
  */
 
 .kui-icon-box {
@@ -97,9 +105,14 @@
 
 .kui-menu-root {
   position: fixed;
-  z-index: 30;
+  z-index: var(--kui-z-menu, 30);
   min-width: 220px;
   max-width: 320px;
+  /* G20 D3: `computeFloatPosition`'s `size()` middleware writes this — a menu that fits is
+     unaffected, one taller than the viewport scrolls instead of overflowing off the top/bottom
+     with nothing to scroll it into view. */
+  max-height: var(--kui-float-max-h, none);
+  overflow-y: auto;
   padding: var(--kui-space-1, 2px) 0;
   background-color: var(--kui-bg-panel, canvas);
   color: var(--kui-fg, inherit);
@@ -170,4 +183,45 @@
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border: 0;
+}
+
+/* G20 D2: KuiTooltip.vue's floating element — the top rung of the `--kui-z-*` ladder, since every
+   other floating surface can host a hinted control. */
+.kui-tooltip {
+  position: fixed;
+  z-index: var(--kui-z-tooltip, 40);
+  max-width: 320px;
+  padding: var(--kui-space-2, 4px) var(--kui-space-3, 8px);
+  background-color: var(--kui-bg-panel, canvas);
+  color: var(--kui-fg, inherit);
+  border: 1px solid var(--kui-border, transparent);
+  border-radius: var(--kui-radius, 0);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.36);
+  font-size: inherit;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  /* A tooltip must never be able to eat the click it is describing. */
+  pointer-events: none;
+}
+
+/* G20 D5: KuiPopoverPanel.vue — the full-viewport click-outside-closes backdrop, and the
+   positioned surface inside it. */
+.kui-popover-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--kui-z-popover, 20);
+}
+
+.kui-popover {
+  position: fixed;
+  /* `computeFloatPosition`'s `size()` middleware writes these — a popover taller than the
+     viewport scrolls instead of clipping. */
+  max-height: var(--kui-float-max-h, none);
+  max-width: var(--kui-float-max-w, none);
+  overflow-y: auto;
+  background-color: var(--kui-bg-panel, canvas);
+  color: var(--kui-fg, inherit);
+  border: 1px solid var(--kui-border, transparent);
+  border-radius: var(--kui-radius, 0);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.36);
 }

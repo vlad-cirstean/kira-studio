@@ -21,4 +21,9 @@
   --kui-space-2: var(--kv-space-2);
   --kui-space-3: var(--kv-space-3);
   --kui-space-4: var(--kv-space-4);
+  /* G20 D6: `packages/git-ui` had no `--kv-z-*` ladder to bridge from (ad hoc 10/20/30 literals
+     throughout) — this phase is the one that establishes the values, not merely re-maps them. */
+  --kui-z-popover: 20;
+  --kui-z-menu: 30;
+  --kui-z-tooltip: 40;
 }

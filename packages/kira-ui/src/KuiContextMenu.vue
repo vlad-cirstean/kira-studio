@@ -17,6 +17,7 @@ import {
   flattenItems,
   type MenuSection,
 } from './contextMenuModel.ts';
+import { computeFloatPosition, pointReference } from './floatingPosition.ts';
 
 const props = defineProps<{
   sections: readonly MenuSection[];
@@ -118,25 +119,29 @@ function onDocumentPointerDown(event: PointerEvent): void {
   emit('close');
 }
 
-/** Clamps the panel back on-screen — a right-click near the panel's own right/bottom edge must
- *  not render a menu whose own items are partly off the viewport. */
-const style = ref({ left: `${props.x}px`, top: `${props.y}px` });
+/** G20 D3: positioned via `floatingPosition.ts`'s real `flip`/`shift`/`size` middleware, replacing
+ *  the hand-rolled post-mount clamp G19 relocated here verbatim from `RowContextMenu.vue`. Starts
+ *  off-screen until measured, avoiding the one-frame flash the old `requestAnimationFrame`/
+ *  `Math.min` clamp had (positioning used to happen only after first paint). `flip: true` — a
+ *  deliberate divergence from `apps/kira-studio/frontend`'s own `ContextMenu.vue` (`shift`-only):
+ *  this menu opens *above* the click point when there's no room below, closer to how native OS
+ *  context menus behave. `pointReference`'s zero-size virtual element does not change how `flip()`
+ *  evaluates available space — the middleware reasons about space along the placement's own axis
+ *  relative to the reference point, not about the reference's own size. */
+const style = ref({ left: '-9999px', top: '-9999px' });
 
-onMounted(() => {
+onMounted(async () => {
   invoker = document.activeElement instanceof HTMLElement ? document.activeElement : null;
   document.addEventListener('pointerdown', onDocumentPointerDown, true);
   focusItem(focusedId.value);
-  requestAnimationFrame(() => {
-    const el = menuEl.value;
-    if (!el) return;
-    const rect = el.getBoundingClientRect();
-    const maxLeft = Math.max(0, window.innerWidth - rect.width - 4);
-    const maxTop = Math.max(0, window.innerHeight - rect.height - 4);
-    style.value = {
-      left: `${Math.min(props.x, maxLeft)}px`,
-      top: `${Math.min(props.y, maxTop)}px`,
-    };
-  });
+  const el = menuEl.value;
+  if (el) {
+    const { left, top } = await computeFloatPosition(pointReference(props.x, props.y), el, {
+      flip: true,
+      placement: 'bottom-start',
+    });
+    style.value = { left: `${left}px`, top: `${top}px` };
+  }
 });
 
 onBeforeUnmount(() => {
