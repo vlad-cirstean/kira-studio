@@ -11,7 +11,7 @@ import { computed, reactive } from 'vue';
 import { control } from '../../bridge/control';
 import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
 import { runReveal } from '../reveal';
-import { closeVariableSetTabsForOwner, renameVariableSetTabs } from '../tabs';
+import { closeVariableSetTabsForOwner, openEnvironmentsTab, renameVariableSetTabs } from '../tabs';
 import { createRevealExpiry } from './revealExpiry';
 
 // P5 D3/D11: the environment list and the app-global active selection — read-only at this point
@@ -114,17 +114,16 @@ export async function duplicateEnvironment(id: string): Promise<ApiEnvironment> 
   return env;
 }
 
-// ---- the environments dialog (D3/D11) — create/rename/delete/set-active ----
-
-export const environmentsDialogState = reactive({ open: false });
-
-export function openEnvironmentsDialog(): void {
-  environmentsDialogState.open = true;
+// ---- the environments surface (D3/D11, re-homed to a tab by P28 D16(c)) ----
+//
+// The dialog flag and its open/close pair are gone. `openEnvironments()` is the one entry point
+// every caller uses; it opens (or focuses) the environments tab and refreshes the list, which is
+// exactly what openEnvironmentsDialog did minus the flag. It lives here rather than in api/tabs.ts
+// so that a caller wanting "the environments UI" keeps importing one module, and so the
+// loadEnvironments() refresh cannot be forgotten at a call site.
+export function openEnvironments(): void {
+  openEnvironmentsTab();
   void loadEnvironments();
-}
-
-export function closeEnvironmentsDialog(): void {
-  environmentsDialogState.open = false;
 }
 
 // ---- the variable-set tab (P17 D16) — one scope's variable list, one runtime per open tab ----

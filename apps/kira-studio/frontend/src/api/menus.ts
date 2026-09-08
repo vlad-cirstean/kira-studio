@@ -121,7 +121,7 @@ export function menuForRow(row: CollectionRowVm, actions: CollectionMenuActions)
   if (row.kind === 'collection') {
     // Variables… and Export are both collection-level actions: a collection is the unit of
     // export, and the only scope-owning row this menu ever sees (an environment's own variables
-    // open through EnvironmentsDialog's "Edit variables…" instead, D11).
+    // open through the environments tab's "Edit variables…" instead, D11).
     items.push({
       type: 'item',
       id: 'variables',

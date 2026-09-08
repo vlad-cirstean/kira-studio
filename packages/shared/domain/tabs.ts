@@ -25,6 +25,11 @@ export const tabKindSchema = /*#__PURE__*/ z.enum([
   // variable set and an environment's are the same table over the same rows differing only in
   // `scope` (VariablesRepo itself is one repo for both, not two).
   'variable-set',
+  // P28 D16(c): the fourth kind inside the 'api' mode — the environment *list*, where an
+  // environment is created, renamed, duplicated, deleted and reordered. Distinct from
+  // 'variable-set' rather than folded into it with an empty ownerId: that kind is "the rows of one
+  // owner", this one is "the owners", and one tab of each can be open at the same time.
+  'environments',
 ]);
 export type TabKind = z.infer<typeof tabKindSchema>;
 
@@ -43,6 +48,7 @@ export const RENDERABLE_TAB_KINDS: readonly TabKind[] = [
   'http-request',
   'grpc-request',
   'variable-set',
+  'environments',
 ];
 
 // P1 D5: a tab's mode is a total function of its kind — no mode column, no migration. This lives
@@ -63,6 +69,7 @@ export const TAB_KIND_MODE: Record<TabKind, AppMode> = {
   'http-request': 'api',
   'grpc-request': 'api',
   'variable-set': 'api',
+  environments: 'api',
 };
 
 const pageSizeSchema = /*#__PURE__*/ z.union([
@@ -203,6 +210,14 @@ export const variableSetTabStateSchema = /*#__PURE__*/ z.object({
 });
 export type VariableSetTabState = z.infer<typeof variableSetTabStateSchema>;
 
+// P28 D16(c): the environments tab carries no state of its own — its whole content is
+// api/state/variables.ts's own environment list, which every other Api surface already reads, and
+// its identity is its fixed `path` ('environments'), so openTab's `reuse: true` gives exactly one.
+// An empty object rather than no schema at all, so the record shape stays uniform with every other
+// kind and parseState has something to validate against.
+export const environmentsTabStateSchema = /*#__PURE__*/ z.object({});
+export type EnvironmentsTabState = z.infer<typeof environmentsTabStateSchema>;
+
 const tabRecordBase = {
   id: z.string(),
   connectionId: z.string().nullable(),
@@ -258,6 +273,11 @@ export const tabRecordSchema = /*#__PURE__*/ z.discriminatedUnion('kind', [
     kind: z.literal('variable-set'),
     state: variableSetTabStateSchema,
   }),
+  /*#__PURE__*/ z.object({
+    ...tabRecordBase,
+    kind: z.literal('environments'),
+    state: environmentsTabStateSchema,
+  }),
 ]);
 export type TabRecord = z.infer<typeof tabRecordSchema>;
 export type DataTabRecord = Extract<TabRecord, { kind: 'data' }>;
@@ -270,6 +290,7 @@ export type BrowseTabRecord = Extract<TabRecord, { kind: 'browse' }>;
 export type HttpRequestTabRecord = Extract<TabRecord, { kind: 'http-request' }>;
 export type GrpcRequestTabRecord = Extract<TabRecord, { kind: 'grpc-request' }>;
 export type VariableSetTabRecord = Extract<TabRecord, { kind: 'variable-set' }>;
+export type EnvironmentsTabRecord = Extract<TabRecord, { kind: 'environments' }>;
 
 export function asDataTab(tab: TabRecord | null | undefined): DataTabRecord | null {
   return tab && tab.kind === 'data' ? tab : null;

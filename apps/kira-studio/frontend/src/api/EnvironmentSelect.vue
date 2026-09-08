@@ -6,7 +6,7 @@ import PopoverPanel from '../theme/primitives/PopoverPanel.vue';
 import {
   activeEnvironmentId,
   initVariables,
-  openEnvironmentsDialog,
+  openEnvironments,
   setActiveEnvironment,
   variablesState,
 } from './state/variables';
@@ -42,7 +42,7 @@ function selectEnvironment(id: string): void {
 
 function manage(): void {
   open.value = false;
-  openEnvironmentsDialog();
+  openEnvironments();
 }
 </script>
 

@@ -31,7 +31,7 @@ import {
 } from './state/collections';
 import { openImportCurlDialog } from './state/curl';
 import { openDynamicValuesDialog } from './state/dynamicValues';
-import { openEnvironmentsDialog } from './state/variables';
+import { openEnvironments } from './state/variables';
 import { openCollectionGrpcRequestTab, openCollectionRequestTab, openVariableSetTab } from './tabs';
 
 // P4 D13: a real TreeHost consumer, with **not one line of tree mechanics** of its own —
@@ -92,7 +92,7 @@ const actions: CollectionMenuActions = {
   importCurl: () => openImportCurlDialog(),
   exportCollection: (row) => void exportCollection(row.id, row.name),
   variables: (row) => openVariableSetTab('collection', row.id, row.name),
-  environments: () => openEnvironmentsDialog(),
+  environments: () => openEnvironments(),
   dynamicValues: () => openDynamicValuesDialog(),
 };
 

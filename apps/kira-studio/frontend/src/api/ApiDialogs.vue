@@ -7,19 +7,16 @@
 import CopyAsCurlDialog from './CopyAsCurlDialog.vue';
 import DynamicValuesDialog from './DynamicValuesDialog.vue';
 import EditRawRequestDialog from './EditRawRequestDialog.vue';
-import EnvironmentsDialog from './EnvironmentsDialog.vue';
 import ImportCurlDialog from './ImportCurlDialog.vue';
 import SaveRequestDialog from './SaveRequestDialog.vue';
 import { saveDialogState } from './state/collections';
 import { copyAsCurlDialogState, importCurlDialogState } from './state/curl';
 import { dynamicValuesDialogState } from './state/dynamicValues';
 import { editRawDialogState } from './state/raw';
-import { environmentsDialogState } from './state/variables';
 </script>
 
 <template>
   <SaveRequestDialog v-if="saveDialogState.open" />
-  <EnvironmentsDialog v-if="environmentsDialogState.open" />
   <DynamicValuesDialog v-if="dynamicValuesDialogState.open" />
   <ImportCurlDialog v-if="importCurlDialogState.open" />
   <CopyAsCurlDialog v-if="copyAsCurlDialogState.open" />
