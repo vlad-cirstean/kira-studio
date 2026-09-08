@@ -31,10 +31,12 @@ import type { FileListMode } from '../../state/detail.ts';
 import type { Capabilities, DetailActions } from '../../state/detailActions.ts';
 import { RefsState } from '../../state/refs.ts';
 import { ReviewSessionState, type ReviewTarget } from '../../state/review.ts';
+import { ReviewCommentsState } from '../../state/reviewComments.ts';
 import { ReviewFilesState } from '../../state/reviewFiles.ts';
 import type { ViewStateStore } from '../../state/viewState.ts';
 import { buildRefListSections } from '../refListModel.ts';
 import BaseSelector from './BaseSelector.vue';
+import ReviewCommentsPane from './ReviewCommentsPane.vue';
 import ReviewCommitRow from './ReviewCommitRow.vue';
 import ReviewFilesPane from './ReviewFilesPane.vue';
 
@@ -50,6 +52,7 @@ const connectionState = bridge.connectionState;
 const refsState = new RefsState(bridge);
 const review = shallowRef<ReviewSessionState | undefined>(undefined);
 const reviewFiles = shallowRef<ReviewFilesState | undefined>(undefined);
+const reviewComments = shallowRef<ReviewCommentsState | undefined>(undefined);
 const capabilities = shallowRef<Capabilities | undefined>(undefined);
 
 const repoId = ref<string | undefined>(undefined);
@@ -73,6 +76,7 @@ async function bootstrap(): Promise<void> {
   capabilities.value = init.capabilities;
   review.value = new ReviewSessionState(bridge, init.capabilities);
   reviewFiles.value = new ReviewFilesState(bridge);
+  reviewComments.value = new ReviewCommentsState(bridge);
 
   unsubscribeTarget = bridge.on('review.target', (event) => {
     void applyTarget(event.repoId, event.branch);
@@ -96,16 +100,31 @@ async function bootstrap(): Promise<void> {
 }
 
 function onUiAction(action: UiActionKind): void {
-  if (action !== 'toggleFileReviewed') return;
-  const rf = reviewFiles.value;
-  const path = rf?.selectedPath.value;
-  if (!rf || path === null || path === undefined) {
-    liveAnnouncement.value = 'Open a file in the Files tab first.';
-    return;
+  switch (action) {
+    case 'toggleFileReviewed': {
+      const rf = reviewFiles.value;
+      const path = rf?.selectedPath.value;
+      if (!rf || path === null || path === undefined) {
+        liveAnnouncement.value = 'Open a file in the Files tab first.';
+        return;
+      }
+      const entry = rf.files.value.find((e) => e.change.path === path);
+      const isReviewed = entry ? entry.review.kind !== 'none' : false;
+      void rf.mark(path, !isReviewed);
+      return;
+    }
+    // G13 D19: the palette's own route to the Comments pane's copy-for-AI action.
+    case 'copyReviewComments':
+      void reviewComments.value?.copyForAi();
+      return;
+    // G13 D19: pushed by the extension after an editor-side comment add/delete, so the pane
+    // updates without the user switching away from it.
+    case 'refreshReviewComments':
+      void reviewComments.value?.reload();
+      return;
+    default:
+      return;
   }
-  const entry = rf.files.value.find((e) => e.change.path === path);
-  const isReviewed = entry ? entry.review.kind !== 'none' : false;
-  void rf.mark(path, !isReviewed);
 }
 
 // ---------------------------------------------------------------------------------------
@@ -126,6 +145,37 @@ watch(
     reviewFiles.value?.setTarget(target);
   },
 );
+
+// ---------------------------------------------------------------------------------------
+// The Comments pane's own target (G13 D10) — repoId + branch only, no base: the session key
+// review.comment.* is keyed on has none. setPane/setBase already reset the pane to 'commits', so
+// this never needs its own reset logic beyond ReviewCommentsState.setTarget's own.
+// ---------------------------------------------------------------------------------------
+watch(
+  () => {
+    const r = review.value;
+    if (r?.phase.value !== 'listing') return undefined;
+    const branch = r.branch.value;
+    const id = repoId.value;
+    return id && branch ? { repoId: id, branch } : undefined;
+  },
+  (target) => {
+    reviewComments.value?.setTarget(target);
+  },
+);
+
+// D10's own "on becoming the active pane" — a plain reload against whatever target is already
+// current; setTarget's own initial load (above) already covers the first activation.
+watch(
+  () => review.value?.pane.value,
+  (pane) => {
+    if (pane === 'comments') void reviewComments.value?.reload();
+  },
+);
+
+function onSelectComment(path: string): void {
+  reviewFiles.value?.selectFile(path);
+}
 
 // The Files pane's own actions bundle — "Open in editor"/"Go to file" are wired for real (the
 // same bridge calls createDetailActions makes) but ReviewFilesPane.vue always disables both
@@ -192,6 +242,7 @@ onBeforeUnmount(() => {
   unsubscribeUiAction?.();
   review.value?.dispose();
   reviewFiles.value?.dispose();
+  reviewComments.value?.dispose();
   refsState.dispose();
   bridge.dispose();
   document.removeEventListener('keydown', onDocumentKeydown);
@@ -494,6 +545,16 @@ watch(
           >
             <span class="codicon" :class="ACTION_ICONS.files" aria-hidden="true"></span>
           </button>
+          <button
+            type="button"
+            :aria-pressed="review.pane.value === 'comments'"
+            :class="{ 'kv-mode-active': review.pane.value === 'comments' }"
+            title="Comments"
+            aria-label="Comments"
+            @click="review.setPane('comments')"
+          >
+            <span class="codicon" :class="ACTION_ICONS.comments" aria-hidden="true"></span>
+          </button>
         </div>
         <input
           type="text"
@@ -611,13 +672,28 @@ watch(
         </template>
 
         <ReviewFilesPane
-          v-else-if="review.phase.value === 'listing' && reviewFiles && filesActions"
+          v-else-if="
+            review.phase.value === 'listing' &&
+            review.pane.value === 'files' &&
+            reviewFiles &&
+            filesActions
+          "
           class="kv-review-files-mount"
           :review-files="reviewFiles"
           :store="review.store"
           :actions="filesActions"
           :list-mode="listMode"
           :filter="filter"
+        />
+
+        <ReviewCommentsPane
+          v-else-if="
+            review.phase.value === 'listing' && review.pane.value === 'comments' && reviewComments && capabilities
+          "
+          class="kv-review-comments-mount"
+          :review-comments="reviewComments"
+          :capabilities="capabilities"
+          @select-comment="onSelectComment"
         />
       </div>
     </template>
@@ -844,7 +920,8 @@ watch(
   flex-direction: column;
 }
 
-.kv-review-files-mount {
+.kv-review-files-mount,
+.kv-review-comments-mount {
   flex: 1;
   min-height: 0;
 }

@@ -13,6 +13,10 @@ export const ACTION_ICONS = {
   listFlat: 'codicon-list-flat',
   diffSingle: 'codicon-diff',
   diffMultiple: 'codicon-diff-multiple',
+  // G13 D16: the Comments pane's own toggle icon and its two header actions.
+  comments: 'codicon-comment-discussion',
+  remove: 'codicon-trash',
+  clearAll: 'codicon-clear-all',
 } as const;
 
 export type IconAction = keyof typeof ACTION_ICONS;

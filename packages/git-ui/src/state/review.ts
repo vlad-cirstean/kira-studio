@@ -60,10 +60,10 @@ function resolutionsDiffer(a: BaseResolution, b: BaseResolution): boolean {
   return false;
 }
 
-/** G11 D16: which of the review sidebar's two panes is showing — a segmented control in the
- *  existing header, reset (to 'commits') by setTarget/setBase alongside everything else they
- *  already reset. */
-export type ReviewPane = 'commits' | 'files';
+/** G11 D16, extended G13 D10: which of the review sidebar's three panes is showing — a segmented
+ *  control in the existing header, reset (to 'commits') by setTarget/setBase alongside everything
+ *  else they already reset. */
+export type ReviewPane = 'commits' | 'files' | 'comments';
 
 export class ReviewSessionState {
   readonly phase: ShallowRef<ReviewPhase> = shallowRef('idle');
