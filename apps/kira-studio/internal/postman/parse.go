@@ -224,6 +224,7 @@ func importRequest(raw json.RawMessage, rep *Report) model.SavedRequest {
 
 	if url, ok := decodeString(raw); ok {
 		out.URL = url
+		rewriteRequestAliases(&out)
 		return out
 	}
 	obj := decodeObject(raw)
@@ -244,6 +245,11 @@ func importRequest(raw json.RawMessage, rep *Report) model.SavedRequest {
 	out.ParamDescriptions = ImportParamDescriptions(obj["url"])
 	out.Headers = importHeaders(obj["header"])
 	importBody(obj["body"], rep).applyTo(&out)
+	// P28 D15(c): last, over the fully assembled request — one pass rather than one per importer.
+	// ShedOrigin calls this same function to compare an origin against the saved request, so both
+	// sides of that comparison see the identical rewrite and an untouched import still exports
+	// byte-for-byte from its Origin.
+	rewriteRequestAliases(&out)
 	return out
 }
 

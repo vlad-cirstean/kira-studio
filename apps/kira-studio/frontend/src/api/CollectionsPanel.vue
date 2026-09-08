@@ -18,7 +18,7 @@ import {
 } from './state/collections';
 import { openImportCurlDialog } from './state/curl';
 import { openDynamicValuesDialog } from './state/dynamicValues';
-import { initVariables, openEnvironmentsDialog, variablesState } from './state/variables';
+import { initVariables, openEnvironments, variablesState } from './state/variables';
 import { openApiRequestTab, openVariableSetTab } from './tabs';
 
 // P4 C5: the placeholder is gone — this is a real tree now, mounted through the same PanelShell
@@ -29,19 +29,19 @@ import { openApiRequestTab, openVariableSetTab } from './tabs';
 // D6 removed the empty state's duplicate `new-request-empty`/`new-collection-empty`/
 // `import-collection-empty` actions entirely; tests/ui/api-ui-consistency.spec.ts asserts none of
 // the three exist, not that they are preserved.
-// P22b D8: environments now live in this same panel, and exist independently of collections
-// (F11) — a project with environments but no collections yet must still show them, so the panel
-// is "empty" only when it truly has nothing to show, not just no collections.
-const empty = computed(
-  () => collectionsState.collections.length === 0 && variablesState.environments.length === 0,
-);
+// P28 D16(d): back to "no collections" alone. P22b D8 had widened this to also require no
+// environments, because the environments category lived in this panel and a project with
+// environments but no collections still had something to show; with that category gone, this
+// panel shows collections and nothing else, so an environment must not keep the empty state away.
+const empty = computed(() => collectionsState.collections.length === 0);
 
 // The fetch belongs to the panel rather than the tree: PanelShell renders #body only when it is
 // non-empty, so a tree that loaded itself on mount would never load at all on a fresh install —
 // no collections, no tree, no call, no collections.
 onMounted(initCollections);
-// P22b D8: the environments category needs the same data EnvironmentsDialog.vue already loads —
-// initVariables() is idempotent (state/variables.ts's own guard), so mounting both is safe.
+// The header's Environments action and the active-environment select both read this; initVariables()
+// is idempotent (state/variables.ts's own guard), so mounting it here as well as wherever else
+// needs it is safe.
 onMounted(initVariables);
 
 // P22b D8: runtime-only collapse state for the two categories — a panel section is not a
@@ -49,14 +49,6 @@ onMounted(initVariables);
 // rule). Collections starts expanded (today's only view of the tree); Environments starts
 // collapsed (F11: it was behind a dialog before this, so a user has never had it open by default).
 const collectionsExpanded = ref(true);
-const environmentsExpanded = ref(false);
-
-function onOpenEnvironment(id: string, name: string): void {
-  // D8: the same function the dialog's own row click calls (EnvironmentsDialog.vue) — a second
-  // entry point to identical behaviour, not a reimplementation.
-  openVariableSetTab('environment', id, name);
-}
-
 function onSearch(value: string): void {
   collectionsState.search = value;
 }
@@ -92,7 +84,7 @@ function onVariablesCommand(): void {
 }
 
 function onEnvironments(): void {
-  openEnvironmentsDialog();
+  openEnvironments();
 }
 
 // P6 D11: the palette's own "Dynamic values…" entry — not scoped to any selection, unlike
@@ -145,21 +137,14 @@ onUnmounted(() => {
         data-testid="new-collection"
         @click="onNewCollection"
       />
-      <!-- D11: no op-log row — the panel's own action carries the spinner instead, and Wails
-           handles the call in its own goroutine so nothing else is blocked while it runs. -->
-      <IconButton
-        :icon="collectionsState.busy ? 'loading' : 'cloud-download'"
-        :class="{ spin: collectionsState.busy }"
-        :disabled="collectionsState.busy"
-        aria-label="Import collection"
-        v-tooltip="'Import collection…'"
-        data-testid="import-collection"
-        @click="onImport"
-      />
+      <!-- P28 D18: the Postman import moved to the menu bar (App → Import Postman Collection…)
+           and to the command palette entry it already had. D11's spinner-on-the-action reasoning
+           went with the button; collectionsState.busy still gates re-entry inside
+           importCollection() itself, so a second import cannot start while one is running. -->
       <!-- P5 D3/D11: the environments dialog's own entry point — environments exist
            independently of collections, so this lives in the panel's header, not the tree. -->
       <IconButton
-        icon="settings-gear"
+        icon="server-environment"
         aria-label="Environments"
         v-tooltip="'Environments…'"
         data-testid="api-environments"
@@ -181,47 +166,11 @@ onUnmounted(() => {
           </button>
           <CollectionsTree v-if="collectionsExpanded" class="tree-body" />
         </div>
-        <!-- P22b D8: the environments list, moved out of the gear-icon dialog and into its own
-             collapsible category (F11) — a second entry point onto the same
-             openVariableSetTab('environment', …) the dialog's own row click already uses, and the
-             same api/state/variables.ts data, so the two can never disagree. EnvironmentsDialog
-             stays (OQ-3): it owns create/rename/duplicate/delete/reorder, a management surface
-             this navigation-only category does not attempt. -->
-        <div class="panel-category environments-category" :class="{ collapsed: !environmentsExpanded }">
-          <button
-            type="button"
-            class="panel-category-head"
-            data-testid="environments-category-toggle"
-            @click="environmentsExpanded = !environmentsExpanded"
-          >
-            <CodiconIcon :name="environmentsExpanded ? 'chevron-down' : 'chevron-right'" :size="13" />
-            <span>Environments</span>
-          </button>
-          <div v-if="environmentsExpanded" class="environments-list" data-testid="environments-category-list">
-            <EmptyState
-              v-if="variablesState.environments.length === 0"
-              icon="symbol-variable"
-              label="No environments yet"
-            />
-            <button
-              v-for="env in variablesState.environments"
-              :key="env.id"
-              type="button"
-              class="environment-list-row"
-              data-testid="environments-category-row"
-              :data-id="env.id"
-              @click="onOpenEnvironment(env.id, env.name)"
-            >
-              <span
-                class="p-conn-dot"
-                :class="{ none: env.color === 'none' }"
-                :style="{ '--kira-rail': connColorVar(env.color) }"
-              />
-              <span class="environment-list-name">{{ env.name }}</span>
-              <CodiconIcon v-if="env.isActive" name="check" :size="13" v-tooltip="'Active'" />
-            </button>
-          </div>
-        </div>
+        <!-- P28 D16(d) removes P22b D8's environments category from this panel by user request
+             ("remove the environment list from alongside the collections list entirely"). The
+             environments themselves did not go anywhere: the header's own action opens the
+             environments tab, which lists and manages them, and each row there still opens the
+             same openVariableSetTab('environment', …) this category used to. -->
       </div>
     </template>
     <template #empty>
@@ -279,63 +228,9 @@ onUnmounted(() => {
   min-height: 0;
 }
 
-/* D8's own sizing rule: fixed, never flex-growing, capped at 40% of the panel's own height with
-   its own scroll — a long environment list can never squeeze the collections tree to nothing. */
-.environments-category {
-  flex: 0 0 auto;
-  max-height: 40%;
-  min-height: 0;
-  border-top: var(--kira-border-width) solid var(--kira-border);
-}
-.environments-category.collapsed {
-  max-height: none;
-}
-
-.environments-list {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  padding: var(--kira-s-1) 0;
-}
-
-.environment-list-row {
-  all: unset;
-  display: flex;
-  align-items: center;
-  gap: var(--kira-s-2);
-  width: 100%;
-  box-sizing: border-box;
-  height: var(--kira-control-h);
-  padding: 0 var(--kira-s-3);
-  cursor: pointer;
-  color: var(--kira-fg);
-}
-.environment-list-row:hover {
-  background: var(--kira-hover);
-}
-
-.environment-list-name {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 
 .side-empty-text {
   line-height: 1.5;
 }
 
-.spin {
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
 </style>

@@ -399,10 +399,9 @@ function onBulkClose(): void {
   <div class="variable-set-view" data-testid="variables-dialog" :data-scope="scope">
     <ViewChrome
       :tab="tab"
-      :icon="scope === 'environment' ? 'settings-gear' : 'symbol-variable'"
+      :icon="scope === 'environment' ? 'server-environment' : 'symbol-variable'"
       :name="tab.state.name || 'Variables'"
-      :can-refresh="false"
-      :can-stop="false"
+      :show-run-controls="false"
       target-testid="variable-set-target"
       :env-color="scope === 'environment' ? (owningEnvironment?.color ?? 'none') : undefined"
     >
@@ -460,22 +459,28 @@ function onBulkClose(): void {
           <!-- P22b D9 (remainder): GrpcRequestView.vue's own inheritAttrs:false idiom — a bare
                TextField sizes to its own content, not the flex row's available space, without this
                wrapper + :deep(.p-input) width:100% pair. -->
-          <div class="env-field">
+          <!-- P28 D16(b): real labels. Both fields carried a placeholder and nothing else, so a
+               populated environment showed two unlabelled text boxes — the placeholder is gone the
+               moment either has a value, which is most of the time. Same .cell label convention
+               the variable table's own header row below uses. -->
+          <label class="env-field">
+            <span class="env-field-label p-xs dim">Name</span>
             <TextField
               v-model="envNameDraft"
               placeholder="name"
               data-testid="environment-name"
               @blur="onEnvFieldBlur"
             />
-          </div>
-          <div class="env-field">
+          </label>
+          <label class="env-field">
+            <span class="env-field-label p-xs dim">Description</span>
             <TextField
               v-model="envDescriptionDraft"
               placeholder="description"
               data-testid="environment-description"
               @blur="onEnvFieldBlur"
             />
-          </div>
+          </label>
           <ColorPicker
             :model-value="owningEnvironment.color"
             label="Environment color"
@@ -540,7 +545,9 @@ function onBulkClose(): void {
 
 .env-fields {
   display: flex;
-  align-items: center;
+  /* P28 D16(b): flex-end, not center — each labelled field is now a two-row column, and centering
+     would misalign the inputs against the colour picker and Duplicate button beside them. */
+  align-items: flex-end;
   gap: var(--kira-s-2);
   padding: var(--kira-s-2) var(--kira-s-3);
   border-bottom: var(--kira-border-width) solid var(--kira-border);
@@ -549,6 +556,13 @@ function onBulkClose(): void {
 .env-field {
   flex: 1;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--kira-s-1);
+}
+
+.env-field-label {
+  padding-left: var(--kira-s-1);
 }
 .env-field :deep(.p-input) {
   width: 100%;

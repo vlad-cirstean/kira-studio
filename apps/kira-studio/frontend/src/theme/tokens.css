@@ -98,7 +98,7 @@
   --kira-titlebar-h: var(--kira-bar-h);
   --kira-tabbar-h: var(--kira-bar-h);
   --kira-toolbar-h: var(--kira-bar-h);
-  --kira-statusbar-h: 26px;
+  --kira-statusbar-h: 20px;
   /* P22 D1: the one bar --kira-bar-h's own family missed — .p-view-head was still a literal 28px,
      one bar shorter than the 34px .p-toolbar directly beneath it in every view (F2(c)). */
   --kira-viewhead-h: var(--kira-bar-h);
@@ -219,4 +219,15 @@
   --kira-syntax-punctuation: #cccccc;
   --kira-syntax-meta: #808080;
   --kira-syntax-invalid: #f14c4c;
+  /* P28 D17(c): the floating-surface stacking ladder, as tokens rather than five bare literals
+     spread across PopoverPanel/DialogFrame/ContextMenu/AutocompleteField/AppTooltip. Two orderings
+     changed with the move: a popover now outranks a dialog (one opened from inside a dialog used
+     to paint underneath it), and a context menu outranks the autocomplete popup (the two used to
+     tie at 200, so DOM order decided which won). Rungs are 50 apart so a surface can be inserted
+     between two without renumbering the ladder. */
+  --kira-z-popover: 100;
+  --kira-z-dialog: 200;
+  --kira-z-menu: 300;
+  --kira-z-autocomplete: 350;
+  --kira-z-tooltip: 400;
 }

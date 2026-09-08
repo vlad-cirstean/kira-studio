@@ -43,6 +43,16 @@ func BuildTemplate(appName string, isDev bool) []Section {
 			{Kind: ItemRole, Role: application.About},
 			{Kind: ItemSeparator},
 			{Kind: ItemEmit, Label: "New Connection", Accelerator: Shortcuts["app.newConnection"].Accelerator(), Channel: bridge.ChannelNewConnection},
+			// P28 D18: three actions that were prominent panel buttons for how rarely they are used
+			// — the two imports outright, New Request additionally (its panel + button stays, since
+			// creating a request is frequent and the panel is where the collections are). No
+			// accelerators: none is frequent enough to spend one, and accel.go's Shortcuts map is
+			// deliberately untouched.
+			{Kind: ItemEmit, Label: "New Request", Channel: bridge.ChannelNewRequest},
+			{Kind: ItemSeparator},
+			{Kind: ItemEmit, Label: "Import Postman Collection…", Channel: bridge.ChannelImportPostman},
+			{Kind: ItemEmit, Label: "Import DataGrip Connections…", Channel: bridge.ChannelImportDataGrip},
+			{Kind: ItemSeparator},
 			{Kind: ItemEmit, Label: "Settings…", Accelerator: Shortcuts["app.settings"].Accelerator(), Channel: bridge.ChannelOpenSettings},
 			{Kind: ItemSeparator},
 			{Kind: ItemRole, Role: application.ServicesMenu},

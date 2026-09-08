@@ -5,12 +5,23 @@ import { connectionRecord, connectionsState } from '../../state/connections';
 import { openGenerateDataDialog } from '../../state/fakeData';
 import IconButton from '../../theme/primitives/IconButton.vue';
 import SegmentedControl from '../../theme/primitives/SegmentedControl.vue';
+import PagerControls from '../shared/page/PagerControls.vue';
 import { pageSizeOptions } from '../shared/page/sizes';
 import ColumnsMenu from './ColumnsMenu.vue';
 import { canGenerateDataFor } from './fakeData/generate';
-import { getPage } from './page';
+import { getPage, pageVersion } from './page';
 import { addInsertRow, discardInsertRow, pendingFor, toggleDelete } from './pendingChanges';
-import { runCount, runtime, setPageSize, toggleSearchOpen } from './state';
+import {
+  goFirst,
+  goLast,
+  goNext,
+  goPrev,
+  goToPage,
+  runCount,
+  runtime,
+  setPageSize,
+  toggleSearchOpen,
+} from './state';
 
 // P48 D10: takes `tab` as a prop like every other view's toolbar, rather than reading the
 // nullable, globally-computed activeDataTab — this component only ever renders while its tab is
@@ -30,10 +41,11 @@ const caps = computed(() => {
   return connectionId ? (connectionsState.states[connectionId]?.caps ?? null) : null;
 });
 
-// The 4 mutation buttons (add/delete) are gated on writability alone — never on whether the table
-// has a primary key. A no-PK table still rejects at the per-cell edit level (readOnlyReasonFor)
-// and at the server (assertKeyIsPrimaryKey); gating the toolbar too would just be a second,
-// redundant guard.
+// Add is gated on writability alone — never on whether the table has a primary key. A no-PK table
+// still rejects at the per-cell edit level (readOnlyReasonFor) and at the server
+// (assertKeyIsPrimaryKey); gating that button too would just be a second, redundant guard.
+// Delete is different, and P28 D8 separates the two: it has no per-cell rejection path to fall
+// through to — it stages straight into pendingChanges — so an unactionable click there is silent.
 const isWritable = computed(
   () => !!caps.value?.writable && !connectionRecord(props.tab.connectionId)?.readOnly,
 );
@@ -41,11 +53,33 @@ const isWritable = computed(
 // P36 D26: the − row button's own gate — ClickHouse is writable (canInsert: true) but has no
 // addressable row to DELETE (a MergeTree PRIMARY KEY is a sparse index, not a unique key), so
 // isWritable alone is no longer enough to offer this button.
-const canDeleteRows = computed(() => isWritable.value && !!caps.value?.canDelete);
+// P28 D8: also gated on a selection and a primary key. onDeleteRow below opens with
+// `if (!sel) return`, and toggleDelete stages an op that can never resolve without a primary key
+// — so before this the button was enabled and silently inert in both cases, which is the reported
+// "deleting selected rows doesn't work at all". SlickGridHost's own canDeleteRows() has always
+// required hasPrimaryKey; this is the same predicate, plus the selection the toolbar needs and the
+// grid's own context menu does not (it acts on the row that was right-clicked).
+// `runtime` is a real reactive() map (views/shared/viewOp.ts), so this needs no version read —
+// unlike hasPrimaryKey below, whose getPage() reads a plain Map and depends on pageVersion.n.
+const hasSelection = computed(() => !!runtime[props.tab.id]?.selection);
+const hasPrimaryKey = computed(() => {
+  void pageVersion.n;
+  return getPage(props.tab.id)?.columns.some((c) => c.isPrimaryKey) ?? false;
+});
+const canDeleteRows = computed(
+  () => isWritable.value && !!caps.value?.canDelete && hasPrimaryKey.value && hasSelection.value,
+);
+// P28 D8: a disabled control names the actual condition rather than just going grey —
+// KeyValueView.vue's own standing rule ("the actual number or the actual condition, never a
+// silently-disabled control with no explanation"). Ordered most-fundamental first: a read-only
+// connection or an engine that cannot delete is a property of the connection, a missing primary
+// key a property of the table, and an empty selection the one the user can act on right now.
 const deleteRowTooltip = computed(() => {
   if (canDeleteRows.value) return 'Delete selected row(s)';
   if (!isWritable.value) return 'Connection is read-only';
-  return 'This connection does not support deleting rows';
+  if (!caps.value?.canDelete) return 'This connection does not support deleting rows';
+  if (!hasPrimaryKey.value) return 'This table has no primary key, so a row cannot be addressed';
+  return 'Select one or more rows first';
 });
 
 const canGenerateData = computed(() =>
@@ -57,6 +91,21 @@ const generateDataTooltip = computed(() => {
   return 'This connection does not support generating rows';
 });
 
+function onFirst(): void {
+  void goFirst(props.tab.id);
+}
+function onPrev(): void {
+  void goPrev(props.tab.id);
+}
+function onNext(): void {
+  void goNext(props.tab.id);
+}
+function onLast(): void {
+  void goLast(props.tab.id);
+}
+function onJump(pageIndex: number): void {
+  void goToPage(props.tab.id, pageIndex);
+}
 function onCount(): void {
   void runCount(props.tab.id);
 }
@@ -141,9 +190,27 @@ function onDeleteRow(): void {
        DocumentView.vue) rather than assuming its own hand-rolled equivalent (F1/F3). -->
   <div class="sep" />
 
-  <!-- P16 D1: the pager itself moved to DataView.vue's #toolbar-end (right edge of the toolbar,
-       last); the page-size picker stays here — a setting the user sets once per tab, not
-       navigation used repeatedly. -->
+  <!-- P28 D7 reverts P16 D1 (commit d2892f49, which moved this to DataView.vue's #toolbar-end)
+       by user report: navigation belongs beside the page-size picker it pages through, at the
+       toolbar's reading edge, not alone at the far right. The pager is a jump-to-page input rather
+       than a "row 1-200 of N" readout — D7's cursor/offset paging has no notion of that until the
+       count query has run. Deliberately not applied to DocumentView.vue, whose pager d2892f49
+       never touched and whose placement was not reported. -->
+  <PagerControls
+    :page-index="tab.state.pageIndex"
+    :page-size="tab.state.pageSize"
+    :count="rt?.count?.value ?? null"
+    :has-more="!!rt?.hasMore"
+    testid-prefix=""
+    last-tooltip="Count rows first"
+    :strategy="rt?.lastStrategy"
+    @first="onFirst"
+    @prev="onPrev"
+    @next="onNext"
+    @last="onLast"
+    @jump="onJump"
+  />
+
   <SegmentedControl
     :model-value="tab.state.pageSize"
     :options="PAGE_SIZE_OPTIONS"

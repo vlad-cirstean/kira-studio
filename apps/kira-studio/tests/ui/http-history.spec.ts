@@ -135,13 +135,11 @@ test('Http history — browse a request’s past responses', async ({ relaunch }
   const status = page.locator('[data-testid="http-status"]');
   await expect(status).toContainText('404');
   await expect(status).toHaveClass(/err/);
-  // D1's no-regression half (F1): the response pane's own hint stays an inline line, not a
-  // tooltip-only affordance — 37716b1 removed the chip's own tooltip deliberately, and this guards
-  // that it has not silently come back as the *only* place the meaning is shown.
-  await expect(status).not.toHaveAttribute('data-kira-tip');
-  await expect(page.locator('[data-testid="http-status-hint"]')).toContainText(
-    'the server has no resource at this URL',
-  );
+  // P28 D1 reverses D1/F1's "the hint stays an inline line": the standing caption is gone and the
+  // meaning is the chip's own tooltip, the same way ResponseHistoryList/ResponseDiffDialog/
+  // TimelinePane have always shown it.
+  await expect(status).toHaveAttribute('data-kira-tip', /no resource at this URL/);
+  await expect(page.locator('[data-testid="http-status-hint"]')).toHaveCount(0);
 
   const bodyEditor = page.locator('[data-testid="http-response-pane"] .response-body .cm-content');
   await expect(bodyEditor).toBeVisible();

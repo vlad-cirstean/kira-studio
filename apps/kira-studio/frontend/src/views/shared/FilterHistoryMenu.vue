@@ -232,7 +232,11 @@ async function saveCurrent(): Promise<void> {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 30;
+  /* P28 D17(c): the dialog rung, not a bare 30 tuned against PopoverPanel's own old 20. This
+     prompt is raised from *inside* a popover and must paint above that popover's full-viewport
+     backdrop, or the backdrop swallows every click aimed at these buttons — which is exactly what
+     the ladder change caused until this line joined it (console.spec.ts caught it). */
+  z-index: var(--kira-z-dialog);
 }
 
 .prompt-box {

@@ -340,12 +340,18 @@ async function onItemClick(item: MenuItem): Promise<void> {
    every other floating surface in the app. */
 .context-menu {
   position: fixed;
+  /* P28 D17(a): computeFloatPosition's size() middleware writes these; a menu that fits is
+     unaffected, one taller than the viewport scrolls instead of having its lower rows clipped away
+     by .p-float's own overflow: hidden. */
+  max-height: var(--kira-float-max-h, none);
+  max-width: var(--kira-float-max-w, none);
+  overflow-y: auto;
   min-width: 180px;
   padding: var(--kira-s-2);
   display: flex;
   flex-direction: column;
   gap: 1px;
-  z-index: 200;
+  z-index: var(--kira-z-menu);
 }
 
 /* Rows share the tree/operations-list row primitive (P8) so a menu row and a
@@ -416,7 +422,13 @@ async function onItemClick(item: MenuItem): Promise<void> {
      all) rendered a submenu near the right or bottom edge of the window partly or wholly
      offscreen. */
   position: fixed;
-  z-index: 200;
+  z-index: var(--kira-z-menu);
+  /* P28 D17(a): computeFloatPosition's size() middleware writes these; a menu that fits is
+     unaffected, one taller than the viewport scrolls instead of having its lower rows clipped away
+     by .p-float's own overflow: hidden. */
+  max-height: var(--kira-float-max-h, none);
+  max-width: var(--kira-float-max-w, none);
+  overflow-y: auto;
   min-width: 160px;
   padding: var(--kira-s-2);
   display: flex;

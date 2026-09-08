@@ -18,6 +18,7 @@ export {
   hasRequestBody,
   userContentTypeHeader,
 } from './http/body';
+export { looksLikeCurlCommand } from './http/curl/detect';
 export { type CurlRequest, toCurl } from './http/curl/generate';
 export { type ParsedCurl, parseCurl } from './http/curl/parse';
 export { type CurlWarning, type CurlWarningKind, tokenize } from './http/curl/tokenize';

@@ -1,5 +1,6 @@
 import type { TabKind } from '@shared/domain/tabs';
 import type { Component } from 'vue';
+import EnvironmentsTabView from '../api/EnvironmentsView.vue';
 import VariableSetTabView from '../api/VariableSetView.vue';
 import BrowseTabView from '../views/browse/BrowseView.vue';
 import ConsoleTabView from '../views/console/ConsoleView.vue';
@@ -26,4 +27,5 @@ export const TAB_VIEWS: Record<TabKind, Component> = {
   'http-request': HttpRequestTabView,
   'grpc-request': GrpcRequestTabView,
   'variable-set': VariableSetTabView,
+  environments: EnvironmentsTabView,
 };

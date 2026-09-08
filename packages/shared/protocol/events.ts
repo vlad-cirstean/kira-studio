@@ -5,6 +5,9 @@
 export const CHANNEL = {
   openSettings: 'kira:open-settings',
   newConnection: 'kira:menu:new-connection',
+  newRequest: 'kira:menu:new-request',
+  importPostman: 'kira:menu:import-postman',
+  importDataGrip: 'kira:menu:import-datagrip',
   toggleProjectPanel: 'kira:menu:toggle-project-panel',
   toggleOperationsPanel: 'kira:menu:toggle-operations-panel',
   commandPalette: 'kira:menu:command-palette',

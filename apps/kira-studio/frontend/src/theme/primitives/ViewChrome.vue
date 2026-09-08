@@ -14,34 +14,48 @@ import ViewHeader from './ViewHeader.vue';
 // toolbar slot because "Stop always follows Refresh, disabled when idle" is a chrome-level rule,
 // not a per-view choice — six views implementing it separately is exactly how three of them
 // drifted into showing Stop only while running instead of merely disabling it.
-const props = defineProps<{
-  tab: TabRecord;
-  icon: string;
-  iconColor?: string;
-  path?: string;
-  name: string;
-  canRefresh?: boolean;
-  canStop?: boolean;
-  // Forwarded to ViewHeader — see its own props for what each targets. refreshTestid/stopTestid
-  // cover the two built-in buttons below, which predate this component and had per-view names.
-  targetTestid?: string;
-  nameTestid?: string;
-  refreshTestid?: string;
-  stopTestid?: string;
-  // P48 D8: the grid's own `data-testid="data-toolbar"`/`"filter-toolbar"` (pre-dating this
-  // component) survive on the bands themselves rather than a nested `.p-toolbar` the grid would
-  // otherwise have to keep — nesting `.p-toolbar` inside `.p-toolbar` doubles the band height and
-  // border.
-  toolbarTestid?: string;
-  toolbar2Testid?: string;
-  // P18 D17/D19: an Api view's active environment colour — LAW 07's rail/dot, from a source other
-  // than a connection. Mutually exclusive with `connection` below in practice (an Api tab's
-  // `tab.connectionId` is always empty, F20 #6) but resolved independently rather than assumed:
-  // when provided (even 'none'), it drives the rail/dot instead of `connection`, which is exactly
-  // how the reserved-but-empty slot in Api mode becomes the "a query console's own connection
-  // indicator" analogue the design system's LAW 07 describes.
-  envColor?: PaletteColor;
-}>();
+const props = withDefaults(
+  defineProps<{
+    tab: TabRecord;
+    icon: string;
+    iconColor?: string;
+    path?: string;
+    name: string;
+    canRefresh?: boolean;
+    canStop?: boolean;
+    /** P28 D16(a): whether this view has a Refresh/Stop pair at all. `canRefresh: false` says
+     *  "cannot refresh *right now*" and correctly renders a disabled button; a variables or
+     *  environments tab has no such operation in the first place, and rendering two permanently
+     *  dead buttons for it is not the same statement. Defaults true, so every existing view is
+     *  byte-identical. */
+    showRunControls?: boolean;
+    // Forwarded to ViewHeader — see its own props for what each targets. refreshTestid/stopTestid
+    // cover the two built-in buttons below, which predate this component and had per-view names.
+    targetTestid?: string;
+    nameTestid?: string;
+    refreshTestid?: string;
+    stopTestid?: string;
+    // P48 D8: the grid's own `data-testid="data-toolbar"`/`"filter-toolbar"` (pre-dating this
+    // component) survive on the bands themselves rather than a nested `.p-toolbar` the grid would
+    // otherwise have to keep — nesting `.p-toolbar` inside `.p-toolbar` doubles the band height and
+    // border.
+    toolbarTestid?: string;
+    toolbar2Testid?: string;
+    // P18 D17/D19: an Api view's active environment colour — LAW 07's rail/dot, from a source other
+    // than a connection. Mutually exclusive with `connection` below in practice (an Api tab's
+    // `tab.connectionId` is always empty, F20 #6) but resolved independently rather than assumed:
+    // when provided (even 'none'), it drives the rail/dot instead of `connection`, which is exactly
+    // how the reserved-but-empty slot in Api mode becomes the "a query console's own connection
+    // indicator" analogue the design system's LAW 07 describes.
+    envColor?: PaletteColor;
+  }>(),
+  // P28 D16(a): an EXPLICIT default, not an omitted one. A type-only `defineProps` compiles
+  // `showRunControls?: boolean` to a Boolean prop, and Vue casts an absent Boolean prop to
+  // `false` — so `v-if="showRunControls !== false"` silently removed the Refresh/Stop group from
+  // every view that does not pass it, which is all of them but one. Caught by tooltips.spec.ts
+  // and definition.spec.ts, both of which wait on a button that had stopped existing.
+  { showRunControls: true },
+);
 
 const emit = defineEmits<{ refresh: []; stop: [] }>();
 
@@ -81,7 +95,7 @@ const runState = useRunState(() => props.tab.id);
 
   <div class="p-toolbar-rail" :style="{ '--kira-rail': connColorVar(railColor) }" />
   <div class="p-toolbar" :class="{ last: !$slots['toolbar-2'] }" :data-testid="toolbarTestid">
-    <div class="group">
+    <div v-if="showRunControls" class="group">
       <IconButton icon="refresh" v-tooltip="'Refresh'" :data-testid="refreshTestid" :disabled="canRefresh === false" @click="emit('refresh')" />
       <!-- DataToolbar.vue's hand-rolled Stop already tints itself red only while a cancellable op
            is in flight (`is-live`, keyed off the same boolean that also drives `disabled`) — this

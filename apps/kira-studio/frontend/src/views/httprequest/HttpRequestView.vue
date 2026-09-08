@@ -7,6 +7,8 @@ import {
   httpRequestTitle,
   isDirty,
   isDynamicName,
+  isFakeName,
+  looksLikeCurlCommand,
   parseQuery,
   splitUrl,
   toSavedRequest,
@@ -22,7 +24,7 @@ import {
   savedRequestFor,
   saveRequest,
 } from '../../api/state/collections';
-import { openCopyAsCurlDialog } from '../../api/state/curl';
+import { applyCurlToTab, openCopyAsCurlDialog } from '../../api/state/curl';
 import { openEditRawDialog } from '../../api/state/raw';
 import { variableSupport } from '../../api/state/variableCompletion';
 import {
@@ -33,6 +35,8 @@ import {
 } from '../../api/state/variables';
 import { patchHttpRequestTabState } from '../../api/tabs';
 import VariablesOverviewPanel from '../../api/VariablesOverviewPanel.vue';
+import { DEFAULT_FIND_OPTIONS, type FindOptions, findRanges } from '../../editor/findRanges';
+import type { RangeHighlight } from '../../editor/variableHighlight';
 import { registerCommand } from '../../shortcuts/commands';
 import AppButton from '../../theme/primitives/AppButton.vue';
 import AutocompleteField from '../../theme/primitives/AutocompleteField.vue';
@@ -42,6 +46,10 @@ import PanelSearchBox from '../../theme/primitives/PanelSearchBox.vue';
 import PanelSplitter from '../../theme/primitives/PanelSplitter.vue';
 import SegmentedControl from '../../theme/primitives/SegmentedControl.vue';
 import ViewChrome from '../../theme/primitives/ViewChrome.vue';
+import ResponseFindBar, {
+  type FindBarHost,
+  type FindBarTarget,
+} from '../shared/ResponseFindBar.vue';
 import QueryParamsTable from './QueryParamsTable.vue';
 import RequestBodyPane from './RequestBodyPane.vue';
 import RequestHeadersTable from './RequestHeadersTable.vue';
@@ -66,8 +74,71 @@ function onMethodChange(method: HttpMethod): void {
   patchHttpRequestTabState(props.tab.id, { method });
 }
 
+// P28 D11: the request panel's own half of the find bar. The bar itself is hoisted above the
+// request/response split (template below) and asks which panel it is searching; the response half
+// stays inside ResponsePane, which owns its three documents and their editor hosts. Request scope
+// searches the body editor — the params/headers tables already have their own filter box (P16
+// D13's #toolbar-2 PanelSearchBox), which is a different and better affordance for rows than a
+// match-stepping find is.
+//
+// Component-local, not tab state: a lens over what is on screen, the same rule the response pane's
+// own find bar already follows (P16 D11).
+const requestFindOpen = ref(false);
+const requestBodyRef = ref<{
+  findableDoc: string | null;
+  findHost: FindBarHost | null;
+} | null>(null);
+const requestFindBarRef = ref<{
+  query: string;
+  currentGlobal: number;
+  options: FindOptions;
+} | null>(null);
+
+function toggleRequestFind(): void {
+  requestFindOpen.value = !requestFindOpen.value;
+}
+function closeRequestFind(): void {
+  requestFindOpen.value = false;
+}
+
+/** Empty whenever the body pane is not showing a text editor (params/headers/urlencoded/form-data/
+ *  binary), which is what makes the bar honestly report "0 of 0" there rather than searching a
+ *  document that is not on screen. */
+const requestFindTargets = computed<readonly FindBarTarget[]>(() => {
+  if (!requestFindOpen.value) return [];
+  const doc = requestBodyRef.value?.findableDoc;
+  if (doc === null || doc === undefined) return [];
+  return [{ doc, host: requestBodyRef.value?.findHost ?? null }];
+});
+
+/** Paints exactly the matches the bar counts and steps through. Read synchronously here (not
+ *  inside the returned closure) so this computed's own identity changes when the query, the
+ *  options or the current match does — which is what makes CodeMirrorHost repaint. */
+const requestFindHighlights = computed<((doc: string) => readonly RangeHighlight[]) | undefined>(
+  () => {
+    if (!requestFindOpen.value) return undefined;
+    const bar = requestFindBarRef.value;
+    const query = bar?.query ?? '';
+    if (!query) return undefined;
+    const current = bar?.currentGlobal ?? -1;
+    const options = bar?.options ?? DEFAULT_FIND_OPTIONS;
+    return (doc: string) => findRanges(doc, query, current, options);
+  },
+);
+
 function onUrlInput(value: string): void {
   patchHttpRequestTabState(props.tab.id, { url: value });
+}
+
+// P28 D12: pasting a curl command into the request bar builds the request from it, reusing P7's
+// own parser (packages/api-core/src/http/curl/parse.ts) rather than adding a second one. Two
+// escape hatches, both deliberate: text that does not look like a command pastes normally, and
+// text that looks like one but that the parser rejects ALSO pastes normally — a paste is never
+// silently swallowed.
+function onUrlPaste(text: string, e: ClipboardEvent): void {
+  if (!looksLikeCurlCommand(text)) return;
+  if (!applyCurlToTab(props.tab.id, text)) return;
+  e.preventDefault();
 }
 
 // P4 D15: dirtiness is a computation over two things already in memory — the tab's own state and
@@ -172,7 +243,16 @@ const unresolvedRefs = computed(() => {
   const refs = resolveTabState(props.tab.state, values, secretNames).refs;
   const byName = new Map(
     refs
-      .filter((r) => r.kind === 'unknown' || (r.kind === 'dynamic' && !isDynamicName(r.name)))
+      // P28 D15(a): a catalogued dynamic reference is either spelling. substitute.ts's own
+      // isDynamicReference classifies both `$name` and `fake.*` as 'dynamic', but this filter
+      // only ever consulted isDynamicName ($-prefixed), so all 57 FAKE_NAMES were counted into the
+      // "unresolved" chip as unknown dynamic values. They are generated at send time, not looked
+      // up, and are never missing.
+      .filter(
+        (r) =>
+          r.kind === 'unknown' ||
+          (r.kind === 'dynamic' && !isDynamicName(r.name) && !isFakeName(r.name)),
+      )
       .map((r) => [r.name, r]),
   );
   return [...byName.values()];
@@ -342,6 +422,7 @@ onUnmounted(() => {
             :range-highlights="variables.rangeHighlights"
             :hover-at="variables.hoverAt"
             @update:model-value="onUrlInput"
+            @paste-text="onUrlPaste"
             @enter="onSend"
           />
         </div>
@@ -398,9 +479,17 @@ onUnmounted(() => {
           data-testid="http-field-descriptions-toggle"
           @click="toggleFieldDescriptions"
         />
+        <IconButton
+          icon="search"
+          :active="requestFindOpen"
+          aria-label="Find in request"
+          v-tooltip="'Find in the request body'"
+          data-testid="http-request-find-toggle"
+          @click="toggleRequestFind"
+        />
         <div class="overview-anchor">
           <IconButton
-            icon="symbol-variable"
+            icon="variable-group"
             :active="overviewOpen"
             aria-label="Variables"
             v-tooltip="'Variables'"
@@ -416,6 +505,15 @@ onUnmounted(() => {
         </div>
         <EnvironmentSelect />
       </template>
+
+      <!-- P28 D11: above the request panel it searches, not floating over it — LAW 03, the same
+           placement rule the response pane's own bar and the data views' SearchToolbar follow. -->
+      <ResponseFindBar
+        v-if="requestFindOpen"
+        ref="requestFindBarRef"
+        :targets="requestFindTargets"
+        @close="closeRequestFind"
+      />
 
       <div class="request-response-split">
         <div class="request-pane" :style="{ flex: `0 0 ${requestPaneHeight}px` }" data-testid="http-request-pane">
@@ -441,8 +539,10 @@ onUnmounted(() => {
           />
           <RequestBodyPane
             v-else
+            ref="requestBodyRef"
             :tab="tab"
             :variables="variables"
+            :find-highlights="requestFindHighlights"
             :filter-query="fieldFilterQuery"
             :show-descriptions="tab.state.fieldDescriptions"
           />

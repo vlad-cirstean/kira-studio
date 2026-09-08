@@ -4,7 +4,6 @@ import ProjectTree from '../../project/ProjectTree.vue';
 import SchemaDialog from '../../project/SchemaDialog.vue';
 import { treeState } from '../../project/state/tree';
 import { connectionsState, openCreateDialog } from '../../state/connections';
-import { pickAndScanDataGripProject } from '../../state/datagripImport';
 import { schemaDialogState } from '../../state/schemas';
 import CodiconIcon from '../../theme/CodiconIcon.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
@@ -21,13 +20,10 @@ import PanelShell from '../../theme/primitives/PanelShell.vue';
       <span>Connections</span>
     </template>
     <template #actions>
-      <IconButton
-        icon="cloud-download"
-        aria-label="Import from DataGrip"
-        v-tooltip="'Import from DataGrip'"
-        data-testid="import-datagrip"
-        @click="pickAndScanDataGripProject"
-      />
+      <!-- P28 D18: the DataGrip import moved to the menu bar (App → Import DataGrip
+           Connections…). It is a once-per-machine action and did not earn a permanent slot in a
+           four-button header. StudioStart.vue's own first-run button stays: an empty state is
+           exactly when a menu-bar-only affordance is hardest to find. -->
       <IconButton
         icon="add"
         aria-label="Add connection"

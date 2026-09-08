@@ -1,9 +1,17 @@
 import type { ConnectionSummary } from '@shared/domain/connection';
 import type { DataGripPreview, DataGripReport } from '@shared/domain/datagrip';
 import type { SecretStorageStatus } from '@shared/domain/secrets';
+import { CHANNEL } from '@shared/protocol/events';
 import type { ControlSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
 import { IPC } from './support/ipcChannels';
+import { emitWailsEvent } from './support/mockRuntime';
+
+// P28 D18: the panel button is gone — the DataGrip import is a menu-bar command now
+// (App → Import DataGrip Connections…), so these specs drive the channel the menu item emits.
+async function importFromMenu(page: Parameters<typeof emitWailsEvent>[0]): Promise<void> {
+  await emitWailsEvent(page, CHANNEL.importDataGrip, undefined);
+}
 
 // §4.4.1: one importable Postgres source, one unsupported-engine Oracle source, one
 // password-not-saved source, and one row that matches an already-existing connection
@@ -106,7 +114,7 @@ test('datagrip import — the preview lists every row, greys the unsupported one
   ];
   const { window: page, control } = await relaunch({ control: CONTROL });
 
-  await page.click('[data-testid="import-datagrip"]');
+  await importFromMenu(page);
 
   const dialog = page.locator('[data-testid="datagrip-import-dialog"]');
   await expect(dialog).toBeVisible();
@@ -183,7 +191,7 @@ test('datagrip import — the report renders every row outcome, including a fail
   ];
   const { window: page } = await relaunch({ control: CONTROL });
 
-  await page.click('[data-testid="import-datagrip"]');
+  await importFromMenu(page);
   await page.click('[data-testid="datagrip-import-confirm"]');
 
   const dialog = page.locator('[data-testid="datagrip-import-dialog"]');
@@ -216,7 +224,7 @@ test('datagrip import — the report renders every row outcome, including a fail
 test('datagrip import — cancelling the dialog never calls Import', async ({ relaunch }) => {
   const { window: page, control } = await relaunch({ control: baseControl() });
 
-  await page.click('[data-testid="import-datagrip"]');
+  await importFromMenu(page);
   await expect(page.locator('[data-testid="datagrip-import-dialog"]')).toBeVisible();
 
   await page.click('[data-testid="datagrip-import-cancel"]');
@@ -233,7 +241,7 @@ test('datagrip import — cancelling the folder picker never opens the dialog or
   ];
   const { window: page, control } = await relaunch({ control: CONTROL });
 
-  await page.click('[data-testid="import-datagrip"]');
+  await importFromMenu(page);
   await expect(page.locator('[data-testid="datagrip-import-dialog"]')).toHaveCount(0);
   expect(control.log().filter((e) => e.channel === IPC.datagripScan)).toHaveLength(0);
 });
@@ -253,7 +261,7 @@ test('datagrip import — shows the secret-storage-unavailable banner and still 
   ];
   const { window: page } = await relaunch({ control: CONTROL });
 
-  await page.click('[data-testid="import-datagrip"]');
+  await importFromMenu(page);
   const banner = page.locator('[data-testid="datagrip-secrets-unavailable"]');
   await expect(banner).toBeVisible();
   await expect(banner).toContainText('No system keychain');

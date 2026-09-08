@@ -94,6 +94,26 @@ func AttachCloseFlush(win *application.WebviewWindow, key string, emit *bridge.E
 			case <-time.After(closeFlushTimeout):
 			}
 			done()
+			// P28 D20: drop this window's page before the native close.
+			//
+			// Wails v3 beta.16 offers nothing stronger. Its own WindowClosing *listener* (registered
+			// in webview_window.go's NewWithOptions) is the whole teardown — markAsDestroyed,
+			// impl.close, Window.Remove — and on macOS impl.close is `[NSWindow close]`, nothing
+			// more; macosWebviewWindow.destroy() exists but is called from nowhere in the library
+			// and its C body is byte-identical to close()'s. There is no exported Destroy on
+			// *WebviewWindow* at all. So the WKWebView's own WebContent process can outlive the
+			// window that hosted it, which is what shows up in Activity Monitor — and because
+			// ApplicationShouldTerminateAfterLastWindowClosed is deliberately false (main.go), the
+			// app quitting does not reap it either.
+			//
+			// What this app *can* release is the document. By here the flush ack has arrived or
+			// timed out, so nothing in the page still has work to do; navigating away tears down the
+			// Vue tree, every SlickGrid and CodeMirror instance, the data-plane stream reader and
+			// every timer, so the process is left holding an empty document rather than the whole
+			// app heap. Safe on every platform and on every path into a close, including the quit
+			// handshake. **[needs a Mac]** whether macOS then reaps the process itself, and how
+			// quickly — that is observable only in Activity Monitor against a packaged build.
+			win.SetURL("about:blank")
 			win.Close()
 		}()
 	})

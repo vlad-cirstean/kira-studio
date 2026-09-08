@@ -5,7 +5,7 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { patchHttpRequestTabState } from '../../api/tabs';
 import { beautifyJson, beautifyXml } from '../../beautify';
 import CodeMirrorHost from '../../editor/CodeMirrorHost.vue';
-import { findRanges } from '../../editor/findRanges';
+import { DEFAULT_FIND_OPTIONS, type FindOptions, findRanges } from '../../editor/findRanges';
 import type { RangeHighlight } from '../../editor/variableHighlight';
 import { formatBytes } from '../../format';
 import { registerCommand } from '../../shortcuts/commands';
@@ -135,9 +135,10 @@ function setResponseView(view: 'pretty' | 'raw'): void {
   patchHttpRequestTabState(props.tab.id, { responseView: view });
 }
 
-// D11: the hint is always shown inline, not tooltip-only — the case that matters (4xx/5xx) is
-// exactly the case where the user should not have to discover a hover. `v-tooltip` still carries
-// the full sentence for when the caption itself is truncated by the row's width.
+// P28 D1 reverses D11's "always shown inline, not tooltip-only": the standing caption under the
+// status row was reported as noise. The hint is now the status chip's tooltip, which is what the
+// four other consumers of `statusHint` in this app (ResponseHistoryList, ResponseDiffDialog,
+// TimelinePane) have always done with it.
 const hint = computed(() => (response.value ? statusHint(response.value.status) : ''));
 
 const redirectCaption = computed(() => {
@@ -211,7 +212,13 @@ const rawPaneRef = ref<{
   responseHost: FindBarHost | null;
   getDocs: () => { request: string; response: string };
 } | null>(null);
-const findBarRef = ref<{ query: string; currentGlobal: number } | null>(null);
+// P28 D11: the options object joins the exposed pair — the painted highlight has to use the same three
+// toggles the bar counts and steps through, or the two disagree about what a match even is.
+const findBarRef = ref<{
+  query: string;
+  currentGlobal: number;
+  options: FindOptions;
+} | null>(null);
 
 // D11: one target for the Body pane, two (request wire, response wire) for the Raw pane — the
 // only two panes with a `rangeHighlights` compartment free (F12: the request body's own is taken
@@ -241,13 +248,15 @@ const perTargetHighlighters = computed<((doc: string) => readonly RangeHighlight
   const bar = findBarRef.value;
   const query = bar?.query ?? '';
   const currentGlobal = bar?.currentGlobal ?? -1;
+  const options = bar?.options ?? DEFAULT_FIND_OPTIONS;
   const targets = findTargets.value;
   if (!query) return targets.map(() => () => []);
   let cursor = 0;
   return targets.map((t) => {
     const localCurrent = currentGlobal - cursor;
-    cursor += findRanges(t.doc, query).length;
-    return (doc: string): readonly RangeHighlight[] => findRanges(doc, query, localCurrent);
+    cursor += findRanges(t.doc, query, undefined, options).length;
+    return (doc: string): readonly RangeHighlight[] =>
+      findRanges(doc, query, localCurrent, options);
   });
 });
 const bodyHighlights = computed(() => perTargetHighlighters.value[0]);
@@ -273,7 +282,12 @@ onUnmounted(() => {
 
     <div class="response-status-row p-toolbar">
       <template v-if="response">
-        <span class="p-chip" :class="statusClass(response.status)" data-testid="http-status">
+        <span
+          class="p-chip"
+          :class="statusClass(response.status)"
+          data-testid="http-status"
+          v-tooltip="hint"
+        >
           {{ response.status }} {{ response.statusText }}
         </span>
         <span class="p-push" />
@@ -314,8 +328,6 @@ onUnmounted(() => {
         @update:model-value="setResponsePane"
       />
     </div>
-
-    <div v-if="hint" class="p-sm muted status-hint" data-testid="http-status-hint">{{ hint }}</div>
 
     <MessageStrip v-if="viewing" tone="note" data-testid="http-history-band">
       Viewing the response from {{ viewingTime }} · {{ viewing?.snapshot.entry.method }}
@@ -434,10 +446,6 @@ onUnmounted(() => {
 
 .response-status-row {
   gap: var(--kira-s-2);
-}
-
-.status-hint {
-  padding: 0 var(--kira-s-3) var(--kira-s-2);
 }
 
 .redirect-caption {

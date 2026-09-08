@@ -34,6 +34,8 @@ import {
   defaultStreamTabState,
   definitionTabStateSchema,
   documentTabStateSchema,
+  type EnvironmentsTabState,
+  environmentsTabStateSchema,
   type GrpcRequestTabRecord,
   type HttpRequestTabRecord,
   type KeyValueTabRecord,
@@ -311,5 +313,22 @@ export const TAB_KINDS: { [K in TabKind]: TabKindDef<K> } = {
     // No project-panel reveal for a variable set (mirrors grpc-request's own reasoning).
     menuExtras: () => [],
     parseState: parseStateWith(variableSetTabStateSchema),
+  },
+  // P28 D16(c): the environment list. No state of its own, one fixed `path`, so openTab's
+  // `reuse: true` gives exactly one of these however many times the action is invoked.
+  environments: {
+    mode: TAB_KIND_MODE.environments,
+    title: () => 'Environments',
+    icon: () => 'server-environment',
+    railColor: () => undefined,
+    defaultState: (): EnvironmentsTabState => ({}),
+    // Nothing to vary, so a duplicate is the same tab — which is what makes `reuse: true` correct
+    // rather than a bug, the same reasoning 'variable-set' above records.
+    duplicateState: (): EnvironmentsTabState => ({}),
+    // The environment list lives in api/state/variables.ts and is shared with every other Api
+    // surface — this tab owns none of it, so closing it frees nothing.
+    dropResources: noDrop,
+    menuExtras: () => [],
+    parseState: parseStateWith(environmentsTabStateSchema),
   },
 };

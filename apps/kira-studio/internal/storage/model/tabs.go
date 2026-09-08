@@ -35,6 +35,10 @@ var RenderableTabKinds = map[string]bool{
 	// variable set, opened as a tab. This is the exact vocabulary F8 warns is easy to miss: a row
 	// of this kind is silently dropped on restore if this line is forgotten.
 	"variable-set": true,
+	// P28 D16(c): the fourth kind inside the 'api' mode — the environment list, where an
+	// environment is created/renamed/duplicated/deleted/reordered. Same F8 warning as the line
+	// above: forget this and a row of this kind is silently dropped on restore.
+	"environments": true,
 }
 
 // IsRenderableTabKind reports whether kind is one of the seven renderable tab kinds.

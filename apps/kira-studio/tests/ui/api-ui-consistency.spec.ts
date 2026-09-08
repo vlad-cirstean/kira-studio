@@ -23,10 +23,11 @@ test('collections empty state has no duplicate action buttons (D6)', async ({ re
     '[data-testid="new-collection-empty"], [data-testid="import-collection-empty"], [data-testid="new-request-empty"]',
   );
   await expect(empty).toHaveCount(0);
-  // The header's own three actions are the one copy that remains reachable.
+  // The header's own actions are the one copy that remains reachable. P28 D18 moved the import
+  // out of this header entirely — it is a menu-bar command (and a command-palette entry) now.
   await expect(page.locator('[data-testid="new-request"]')).toBeVisible();
   await expect(page.locator('[data-testid="new-collection"]')).toBeVisible();
-  await expect(page.locator('[data-testid="import-collection"]')).toBeVisible();
+  await expect(page.locator('[data-testid="import-collection"]')).toHaveCount(0);
   // D6/F3: no bordered dialog button anywhere in the panel's own empty-state slot.
   await expect(page.locator('.side-empty .p-dlgbtn')).toHaveCount(0);
 });

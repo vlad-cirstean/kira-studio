@@ -332,12 +332,13 @@ function fieldAtCol(colIdx: number): string | undefined {
 // below) but never the four-sided outline every data-grid selection carries — one computation
 // missing, promoted verbatim from views/grid/SlickGridHost.vue to
 // views/shared/slick/selectionEdges.ts rather than restyled or re-derived here.
-function refreshSelEdges(): void {
+function refreshSelEdges(selOverride?: Selection | null): void {
   if (!grid || !dataSource || !page) return;
+  const sel = selOverride !== undefined ? selOverride : currentSelection;
   const displayRowCount = matchedRows(props.tabId)?.length ?? page.rowCount;
   const displayColCount = grid.getColumns().length - 1; // minus the gutter
   const hashes = computeSelEdgeHashes(
-    currentSelection,
+    sel,
     grid.lastRenderedRowBounds,
     (pos) => dataSource?.getItem(pos).row ?? pos,
     (displayCol) =>
@@ -350,6 +351,50 @@ function refreshSelEdges(): void {
   SEL_EDGE_LAYER_KEYS.forEach((key, i) => {
     grid?.setCellCssStyles(key, hashes[i] as EdgeHash);
   });
+}
+
+// P28 D2: the drag-in-progress twin of the fill SlickGrid draws at commit through
+// `selectedCellCssClass` (grid options below) — written to that same 'kira-cell-selected' layer key
+// so a commit's real write and this preview's writes replace one another cleanly rather than both
+// existing at once. Bounded by the rendered band, exactly like the edge layer.
+//
+// SlickGridHost.vue has had this since its own "D4 (fix)"; this file never did, which is the whole
+// of the reported "selection highlight appears only on mouse-up". SlickHybridSelectionModel's
+// `handleCellRangeSelected` deliberately no-ops for a CELL-mode `onCellRangeSelecting` call (only
+// the drag-END `onCellRangeSelected` reaches `setSelectedRanges`), and `dragToSelect: true` — needed
+// for the gutter's own row-range drag, which has no such early return and so already painted live —
+// zeroes the stock decorator's border, so a cell-range drag painted nothing at all until mouseup.
+function computeCellFillHash(sel: Selection | null): EdgeHash {
+  const hash: EdgeHash = {};
+  if (!grid || !dataSource || !sel) return hash;
+  const { start, end } = grid.lastRenderedRowBounds;
+  if (end < start) return hash;
+  if (sel.kind !== 'cell' && sel.kind !== 'range') return hash;
+  const anchorRow = sel.kind === 'range' ? sel.anchorRow : sel.row;
+  const anchorCol = sel.kind === 'range' ? sel.anchorCol : sel.col;
+  const r0 = Math.min(anchorRow, sel.row);
+  const r1 = Math.max(anchorRow, sel.row);
+  const c0 = Math.min(anchorCol, sel.col);
+  const c1 = Math.max(anchorCol, sel.col);
+  for (let pos = start; pos <= end; pos++) {
+    const pageRow = dataSource.getItem(pos).row;
+    if (pageRow < r0 || pageRow > r1) continue;
+    const row: Record<string, string> = {};
+    for (let c = c0; c <= c1; c++) row[colField(c)] = 'kira-cell-selected';
+    hash[pos] = row;
+  }
+  return hash;
+}
+
+// Deliberately never writes `currentSelection`: a drag passing back over its own anchor cell
+// transiently looks like a completed one-cell selection, and the committed
+// `onSelectedRangesChanged` supersedes every layer this writes the moment the drag actually ends.
+function onCellRangeSelecting(_e: unknown, args: { range: SlickRange }): void {
+  if (!selectionModel || selectionModel.currentSelectionModeIsRow()) return;
+  const posSel = selectionFromRanges([args.range], false, null);
+  const pageSel = posSel ? toPageRowSelection(posSel) : null;
+  refreshSelEdges(pageSel);
+  grid?.setCellCssStyles('kira-cell-selected', computeCellFillHash(pageSel));
 }
 
 // P19 D8: a real SlickHybridSelectionModel, configured identically to SlickGridHost.vue's own
@@ -734,6 +779,10 @@ onMounted(() => {
   eventHandler.subscribe(grid.onHeaderContextMenu, onGridHeaderContextMenu);
   eventHandler.subscribe(grid.onKeyDown, onKeydown);
   eventHandler.subscribe(selectionModel.onSelectedRangesChanged, onSelectedRangesChanged);
+  const cellRangeSelector = selectionModel.getCellRangeSelector();
+  if (cellRangeSelector) {
+    eventHandler.subscribe(cellRangeSelector.onCellRangeSelecting, onCellRangeSelecting);
+  }
 
   viewportEl = grid.getViewports()[1] ?? grid.getViewports()[0] ?? null;
   if (viewportEl) {

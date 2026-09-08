@@ -1,10 +1,16 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
-import { findRanges } from '../../editor/findRanges';
+import { type FindOptions, findQueryIsInvalid, findRanges } from '../../editor/findRanges';
 import CodiconIcon from '../../theme/CodiconIcon.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
 import TextField from '../../theme/primitives/TextField.vue';
 
+// P28 D11: the three option toggles the data views' own SearchToolbar has always had — match
+// case, whole word, regex — which is what the report means by "the standard search toolbar (the
+// same one with more options)". Their semantics come from editor/searchPattern.ts, the same
+// compiler that scanner uses, rather than a second implementation here. The comment below is the
+// original P16 note; its "no case/word/regex" clause is what this supersedes.
+//
 // P16 D11: a find bar over the response body and the raw exchange's two documents, built on
 // P15b's own `rangeHighlights` seam (editor/findRanges.ts is the "find", this file is the toolbar
 // chrome and the cross-document navigation) — deliberately not @codemirror/search (D11: not a
@@ -34,7 +40,23 @@ const query = ref('');
 // 0-based, across every target's matches concatenated in order.
 const currentGlobal = ref(0);
 
-const matchCounts = computed(() => props.targets.map((t) => findRanges(t.doc, query.value).length));
+const matchCase = ref(false);
+const wholeWord = ref(false);
+const regex = ref(false);
+// One object the whole file (and, through defineExpose, the host pane) passes around, so a new
+// option can never be threaded into one call site and forgotten at another.
+const options = computed<FindOptions>(() => ({
+  matchCase: matchCase.value,
+  wholeWord: wholeWord.value,
+  regex: regex.value,
+}));
+// Only ever true with regex on — a half-typed pattern is an ordinary intermediate state while
+// typing, so it marks the input rather than throwing or clearing what is already highlighted.
+const invalid = computed(() => findQueryIsInvalid(query.value, options.value));
+
+const matchCounts = computed(() =>
+  props.targets.map((t) => findRanges(t.doc, query.value, undefined, options.value).length),
+);
 const totalMatches = computed(() => matchCounts.value.reduce((a, b) => a + b, 0));
 const displayIndex = computed(() =>
   totalMatches.value === 0 ? 0 : Math.min(currentGlobal.value, totalMatches.value - 1) + 1,
@@ -44,7 +66,7 @@ const displayIndex = computed(() =>
 // no template access to) can paint the exact matches this bar counts and steps through — each
 // editor's own `rangeHighlights` source reads `query`/`currentGlobal` here, so it recomputes (and
 // so the compartment repaints) exactly when either changes.
-defineExpose({ query, currentGlobal });
+defineExpose({ query, currentGlobal, options });
 
 function scrollToCurrent(): void {
   if (totalMatches.value === 0) return;
@@ -52,7 +74,7 @@ function scrollToCurrent(): void {
   for (let i = 0; i < props.targets.length; i++) {
     const count = matchCounts.value[i] ?? 0;
     if (remaining < count) {
-      const ranges = findRanges(props.targets[i]?.doc ?? '', query.value);
+      const ranges = findRanges(props.targets[i]?.doc ?? '', query.value, undefined, options.value);
       const r = ranges[remaining];
       if (r) props.targets[i]?.host?.scrollRangeIntoView(r.from, r.to);
       return;
@@ -61,7 +83,9 @@ function scrollToCurrent(): void {
   }
 }
 
-watch(query, () => {
+// The options belong here alongside the query: changing one changes the match set, so the cursor
+// has to go back to the first match exactly as it does on a new query.
+watch([query, options], () => {
   currentGlobal.value = 0;
   scrollToCurrent();
 });
@@ -104,7 +128,39 @@ onMounted(() => {
       <CodiconIcon name="search" :size="13" />
     </span>
     <div class="find-input">
-      <TextField ref="findInput" v-model="query" placeholder="Find" data-testid="http-find-input" />
+      <TextField
+        ref="findInput"
+        v-model="query"
+        placeholder="Find"
+        :invalid="invalid"
+        data-testid="http-find-input"
+      />
+    </div>
+    <!-- Three independent toggles (all three can be on at once), not a single-value picker — the
+         same three codicons, tooltips and testid shape SearchToolbar.vue uses for the identical
+         options in the data views. -->
+    <div class="group">
+      <IconButton
+        icon="case-sensitive"
+        :active="matchCase"
+        v-tooltip="'Match case'"
+        data-testid="http-find-match-case"
+        @click="matchCase = !matchCase"
+      />
+      <IconButton
+        icon="whole-word"
+        :active="wholeWord"
+        v-tooltip="'Whole word'"
+        data-testid="http-find-whole-word"
+        @click="wholeWord = !wholeWord"
+      />
+      <IconButton
+        icon="regex"
+        :active="regex"
+        v-tooltip="'Regular expression'"
+        data-testid="http-find-regex"
+        @click="regex = !regex"
+      />
     </div>
     <span class="p-sm muted find-count" data-testid="http-find-count">
       {{ totalMatches === 0 ? '0 of 0' : `${displayIndex} of ${totalMatches}` }}

@@ -17,6 +17,7 @@ import {
 } from '../../api/state/variableCompletion';
 import { patchHttpRequestTabState } from '../../api/tabs';
 import CodeMirrorHost from '../../editor/CodeMirrorHost.vue';
+import type { RangeHighlight } from '../../editor/variableHighlight';
 import IconButton from '../../theme/primitives/IconButton.vue';
 import MessageStrip from '../../theme/primitives/MessageStrip.vue';
 import SegmentedControl from '../../theme/primitives/SegmentedControl.vue';
@@ -42,7 +43,40 @@ const props = defineProps<{
   /** P22b D7: HttpRequestView.vue's own persisted description-column toggle, forwarded the same
    *  way — a no-op for the raw/code/binary modes below. */
   showDescriptions?: boolean;
+  /** P28 D11: the hoisted find bar's own ranges for whichever of the two text editors is showing.
+   *  This pane's `rangeHighlights` compartment was already spoken for by P15b's {{variable}}
+   *  colouring (F12 in the response pane's own comment names that as the reason the find bar could
+   *  never reach the request body), so the two sources are merged below rather than one replacing
+   *  the other. */
+  findHighlights?: (doc: string) => readonly RangeHighlight[];
 }>();
+
+/** P28 D11: variable ranges first, find ranges second — a match's class wins on overlap, which is
+ *  what a user searching for text that happens to sit inside a {{reference}} expects to see.
+ *  rangeHighlightPlugin sorts and validates whatever it is handed, so no ordering guarantee is
+ *  required of this concatenation beyond that intent. Identity changes whenever either source
+ *  does, which is what makes CodeMirrorHost's own watch repaint. */
+const bodyHighlights = computed<((doc: string) => readonly RangeHighlight[]) | undefined>(() => {
+  const vars = props.variables?.rangeHighlights;
+  const find = props.findHighlights;
+  if (!find) return vars;
+  if (!vars) return find;
+  return (doc: string) => [...vars(doc), ...find(doc)];
+});
+
+/** The two editable text buffers this pane can show, in the order the find bar numbers them —
+ *  exactly one is mounted at a time, so this is a one-element list or empty. */
+const findableDoc = computed<string | null>(() => {
+  if (props.tab.state.bodyMode === 'raw') return props.tab.state.body;
+  if (props.tab.state.bodyMode === 'code') return props.tab.state.code;
+  return null;
+});
+// The mounted editor host, so the find bar can scroll a match into view — exactly one of the two
+// is ever mounted, so whichever ref is non-null is the live one.
+const rawHostRef = ref<{ scrollRangeIntoView(from: number, to: number): void } | null>(null);
+const codeHostRef = ref<{ scrollRangeIntoView(from: number, to: number): void } | null>(null);
+const findHost = computed(() => rawHostRef.value ?? codeHostRef.value);
+defineExpose({ findableDoc, findHost });
 
 // P15 D6: JSON is a UI-level segment over the same `bodyMode`/`codeLanguage` storage — no schema,
 // wire or Go change (§5 of the plan spells out why: the entire delta below is presentation).
@@ -156,9 +190,10 @@ const caption = computed(() =>
     <CodeMirrorHost
       v-if="tab.state.bodyMode === 'raw'"
       :doc="tab.state.body"
+      ref="rawHostRef"
       language="plain"
       :read-only="false"
-      :range-highlights="variables?.rangeHighlights"
+      :range-highlights="bodyHighlights"
       :hover-source="variables && variableHoverSource(variables.hoverAt)"
       :autocomplete="!!variables"
       :completion-sources="variables && [variableCompletionSource(variables.candidates)]"
@@ -168,9 +203,10 @@ const caption = computed(() =>
     <CodeMirrorHost
       v-else-if="tab.state.bodyMode === 'code'"
       :doc="tab.state.code"
+      ref="codeHostRef"
       :language="editorLanguage"
       :read-only="false"
-      :range-highlights="variables?.rangeHighlights"
+      :range-highlights="bodyHighlights"
       :hover-source="variables && variableHoverSource(variables.hoverAt)"
       :autocomplete="!!variables"
       :completion-sources="variables && [variableCompletionSource(variables.candidates)]"

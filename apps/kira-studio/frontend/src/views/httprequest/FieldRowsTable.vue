@@ -68,6 +68,10 @@ const props = withDefaults(
 
 const emit = defineEmits<{ 'update:rows': [rows: T[]] }>();
 
+// P28 D10: a frozen module-level constant, not an inline `[]` in the template — a fresh array
+// literal per render would change `candidates`' identity on every patch.
+const EMPTY_CANDIDATES: readonly Completion[] = Object.freeze([]);
+
 // P22b D9: a CSS grid, not independent flex items — F13's own finding was that adjacent rows'
 // columns never lined up (each field carried its own `flex` value, so a secret/file row with an
 // extra affordance shifted its neighbours). `showEnabled`/`showDescriptions` are fixed per table
@@ -264,13 +268,22 @@ function onContainerKeydown(e: KeyboardEvent): void {
         @update:model-value="toggleEnabled(entry.index)"
       />
       <div class="field-cell">
+        <!-- P28 D10: a name is as legal a place for a {{reference}} as a value is
+             (`X-{{tenant}}-Id`), and until now it was the one editable Api surface that painted
+             none and hovered none. The gate widens from `nameCandidates` alone to "either a name
+             vocabulary or variable support", so a params/form-data name — which has no vocabulary
+             — still gets the highlight and the resolved-value hover. `token-at` stays
+             `wholeFieldToken`: completion here still means "the whole field is one header name",
+             which is independent of what `range-highlights`/`hover-at` paint. -->
         <AutocompleteField
-          v-if="nameCandidates"
+          v-if="nameCandidates || valueVariableSupport"
           :model-value="entry.row.name"
           :placeholder="namePlaceholder"
           :data-testid="`${testidPrefix}-name`"
-          :candidates="nameCandidates"
+          :candidates="nameCandidates ?? EMPTY_CANDIDATES"
           :token-at="wholeFieldToken"
+          :range-highlights="valueVariableSupport?.rangeHighlights"
+          :hover-at="valueVariableSupport?.hoverAt"
           @update:model-value="updateField(entry.index, 'name', $event)"
         />
         <TextField

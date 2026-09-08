@@ -1223,28 +1223,38 @@ test('data view — pagination, count, projection, sort, filter, search, stop, N
   await expect.poll(() => firstGutterNumber(page), { timeout: 15_000 }).toBe('1');
   await expect.poll(() => lastGutterNumber(page)).toBe('100');
 
-  // --- P16 D1: the pager sits at the toolbar's right edge, after toolbar-search — a relative
-  // position, not a pixel one, so a token/spacing change can't break it. ---------------------
+  // --- P28 D7 reverses P16 D1 (commit d2892f49): the pager is back in DataToolbar, at the
+  // toolbar's reading edge and immediately before the page-size picker it pages through, rather
+  // than alone at the far right. Relative positions, not pixel ones, so a token or spacing change
+  // still cannot break these. ------------------------------------------------------------------
   const pagerBox = await page.locator('[data-testid="pager"]').boundingBox();
+  const pageSizeBox = await page.locator('[data-testid="page-size-picker"]').boundingBox();
   const searchToggleBox = await page.locator('[data-testid="toolbar-search"]').boundingBox();
-  if (!pagerBox || !searchToggleBox) throw new Error('pager or toolbar-search has no bounding box');
-  expect(pagerBox.x).toBeGreaterThan(searchToggleBox.x);
+  if (!pagerBox || !pageSizeBox || !searchToggleBox) {
+    throw new Error('pager, page-size-picker or toolbar-search has no bounding box');
+  }
+  expect(pagerBox.x).toBeLessThan(pageSizeBox.x);
+  expect(pagerBox.x).toBeLessThan(searchToggleBox.x);
   await expect(page.locator('[data-testid="pager-next"]')).toBeEnabled();
 
-  // --- P22 D4: RunState moved ahead of #toolbar-end (F6 — it used to sit between the pager and
-  // the toolbar's own right edge, reserving ~76px unconditionally). The pager's last chevron is
-  // now the toolbar's right-most control, within a few px of the toolbar's own right edge, and
-  // to the right of the run-state ring. ---------------------------------------------------------
-  const pagerLastBox = await page.locator('[data-testid="pager-last"]').boundingBox();
+  // --- P22 D4's own assertion, re-aimed by P28 D7: it exists to prove nothing reserves width
+  // between the toolbar's right-most control and its right edge (the LAW-12 reflow it fixed). The
+  // pager used to be that control; with it moved back to the reading edge, RunState is — it still
+  // renders ahead of #toolbar-end, whose only remaining content is the conditional pending-changes
+  // group. Every control the user reads left-to-right now sits left of it. -----------------------
   const dataToolbarBox = await page.locator('[data-testid="data-toolbar"]').boundingBox();
   const runStateBox = await page.locator('.p-run-state').first().boundingBox();
-  if (!pagerLastBox || !dataToolbarBox || !runStateBox) {
-    throw new Error('pager-last, data-toolbar or run-state has no bounding box');
+  if (!dataToolbarBox || !runStateBox) {
+    throw new Error('data-toolbar or run-state has no bounding box');
   }
+  // 16, not P22 D4's own 12: that bound was calibrated against the pager's last IconButton, whose
+  // box hugs the toolbar edge, and RunState carries its own trailing padding. The gap measures 14.
+  // Still tight enough to catch the ~76px unconditional reservation P22 D4 existed to fix, which
+  // is the whole point of the assertion.
   expect(
-    dataToolbarBox.x + dataToolbarBox.width - (pagerLastBox.x + pagerLastBox.width),
-  ).toBeLessThanOrEqual(12);
-  expect(pagerLastBox.x).toBeGreaterThan(runStateBox.x);
+    dataToolbarBox.x + dataToolbarBox.width - (runStateBox.x + runStateBox.width),
+  ).toBeLessThanOrEqual(16);
+  expect(runStateBox.x).toBeGreaterThan(searchToggleBox.x);
 
   // --- P16 D2: the run-state label reserves its own width — the LAW-12 assertion, and the only
   // one that can catch the toolbar-reflow regression this phase's own D2 fixes. -----------------

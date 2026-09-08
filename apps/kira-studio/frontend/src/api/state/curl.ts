@@ -104,6 +104,21 @@ export function submitImportCurl(text: string): boolean {
   return true;
 }
 
+/** P28 D12: the paste path's own sibling to submitImportCurl above. Same parser, different target:
+ *  this patches the tab the user pasted into, because that is what they aimed at — a paste into
+ *  *this* request's URL bar is an explicit gesture at *this* request, unlike the dialog, which is
+ *  reached from the panel with no tab in mind and so deliberately opens a fresh one (D12/F14).
+ *
+ *  Returns false on a parse error, which the caller treats as "not a curl command after all" and
+ *  lets the ordinary paste proceed — so a string that survives looksLikeCurlCommand but that
+ *  parseCurl cannot make sense of is never silently swallowed. */
+export function applyCurlToTab(tabId: string, text: string): boolean {
+  const parsed = parseCurl(text);
+  if ('error' in parsed) return false;
+  patchHttpRequestTabState(tabId, parsed.state);
+  return true;
+}
+
 // ---- Copy as curl (D10) — masked by default, one gated reveal, nothing persisted ----
 //
 // The caller (HttpRequestView.vue) computes the frozen resolution itself, exactly as send() does

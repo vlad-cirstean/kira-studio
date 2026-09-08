@@ -575,6 +575,11 @@ export async function saveGrpcRequest(
  *  — Go opens the file (F16: a 10-50 MB collection through the control plane is 20-100 serial
  *  round trips, and above 64 MiB an unattributable refusal). Returns false when cancelled. */
 export async function importCollection(): Promise<boolean> {
+  // P28 D18: a real re-entry guard. Until this, the only thing stopping a second concurrent
+  // import was the panel button disabling itself while `busy` — and that button has moved to the
+  // menu bar, which has no such state. Two overlapping imports would interleave their
+  // loadCollections()/report writes.
+  if (collectionsState.busy) return false;
   const chosen = await control.filesChooseOpen({
     title: 'Import Postman collection',
     filters: [{ name: 'Postman collection', extensions: ['json'] }],

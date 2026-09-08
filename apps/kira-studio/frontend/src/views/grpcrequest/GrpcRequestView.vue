@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { isDynamicName, isGrpcDirty, toSavedGrpcRequest } from '@kira/api-core';
+import { isDynamicName, isFakeName, isGrpcDirty, toSavedGrpcRequest } from '@kira/api-core';
 import { grpcRequestTitle } from '@shared/domain/grpc';
 import type { GrpcRequestTabRecord } from '@shared/domain/tabs';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
@@ -174,7 +174,16 @@ const unresolvedRefs = computed(() => {
   const refs = resolveGrpcTabState(props.tab.state, values, secretNames).refs;
   const byName = new Map(
     refs
-      .filter((r) => r.kind === 'unknown' || (r.kind === 'dynamic' && !isDynamicName(r.name)))
+      // P28 D15(a): a catalogued dynamic reference is either spelling. substitute.ts's own
+      // isDynamicReference classifies both `$name` and `fake.*` as 'dynamic', but this filter
+      // only ever consulted isDynamicName ($-prefixed), so all 57 FAKE_NAMES were counted into the
+      // "unresolved" chip as unknown dynamic values. They are generated at send time, not looked
+      // up, and are never missing.
+      .filter(
+        (r) =>
+          r.kind === 'unknown' ||
+          (r.kind === 'dynamic' && !isDynamicName(r.name) && !isFakeName(r.name)),
+      )
       .map((r) => [r.name, r]),
   );
   return [...byName.values()];
@@ -379,7 +388,7 @@ onUnmounted(() => {
         />
         <div class="overview-anchor">
           <IconButton
-            icon="symbol-variable"
+            icon="variable-group"
             :active="overviewOpen"
             aria-label="Variables"
             v-tooltip="'Variables'"

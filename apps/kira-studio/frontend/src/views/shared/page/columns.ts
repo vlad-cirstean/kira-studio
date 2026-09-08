@@ -9,6 +9,14 @@ import { typeDescription } from '../typeGlossary';
 // short as "id" could persist at a one-character-wide render across a reload (found against the
 // real app: minWidth only ever bounded an interactive drag, never a width read back from storage).
 export const MIN_WIDTH = 64;
+// P28 D5: the floor a freshly *measured* column may not fall below, separate from MIN_WIDTH above.
+// The two were one constant doing two different jobs: MIN_WIDTH is the interactive-resize floor (a
+// deliberate narrow drag must stay possible, and a width read back from storage is a deliberate
+// drag), while this is "how narrow may a column the user never touched be drawn". A column whose
+// values are all short ("id", "qty", a boolean) measured to exactly 64px, of which ~20px is header
+// chrome and 20px is CELL_PADDING — reported as columns rendering very narrow. 96px is the same
+// figure DEFAULT_COLUMN_WIDTH below already uses for "nothing measurable at all".
+export const MIN_INITIAL_WIDTH = 96;
 const MAX_WIDTH = 480;
 const CELL_PADDING = 20; // px, both sides combined plus a little breathing room
 const SAMPLE_ROWS = 50;
@@ -71,9 +79,12 @@ export interface HeaderChrome {
   /** `.slick-header-column`'s own `padding: 0 var(--kira-s-4)`, both sides. */
   padding: number; // 16
   /** The flex gap before `.slick-sort-indicator` (4) + its own `width: 14px`, plus the flex gap
-   *  before the always-present, 0px-at-rest `.slick-sort-indicator-numbered` (4) — 0 when the
-   *  column is not sortable (SlickGrid builds neither div under `m.sortable`). */
-  sortControl: number; // 22 | 0
+   *  before the always-present, 0px-at-rest `.slick-sort-indicator-numbered` — 0 when the
+   *  column is not sortable (SlickGrid builds neither div under `m.sortable`).
+   *  P28 D4: 16, was 22. The control narrowed to 12px and now cancels the flex gap that used to
+   *  sit between it and the numbered badge, so what a sortable header actually spends here is one
+   *  4px gap plus the 12px control. */
+  sortControl: number; // 16 | 0
   /** The flex gap before the PK/FK `.header-key` badge (4) + the badge's own
    *  `margin-left: var(--kira-s-2)` (4) + its rendered content width ("PK"/"FK" at
    *  `--kira-t-xs` in the monospace stack, ~12px) — the gap and the badge's own margin are two
@@ -116,7 +127,8 @@ export function headerAwareMinWidth(name: string, chrome: HeaderChrome): number 
 let widthsCache = new WeakMap<TabularPage, number[]>();
 let namedWidthsCache = new WeakMap<TabularPage, Record<string, number>>();
 
-/** Measures the wider of the header and a sample of the first rows, clamped to [64, 480] px —
+/** Measures the wider of the header and a sample of the first rows, clamped to
+ *  [MIN_INITIAL_WIDTH, MAX_WIDTH] px (P28 D5 — not MIN_WIDTH, which is the resize floor) —
  *  positional, parallel to `page.columns`/`page.chunks`. */
 function measuredWidths(page: TabularPage): number[] {
   const cached = widthsCache.get(page);
@@ -136,7 +148,7 @@ function measuredWidths(page: TabularPage): number[] {
       const width = ctx.measureText(cellText(chunk, r, decoder)).width;
       if (width > max) max = width;
     }
-    widths.push(Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, Math.round(max + CELL_PADDING))));
+    widths.push(Math.min(MAX_WIDTH, Math.max(MIN_INITIAL_WIDTH, Math.round(max + CELL_PADDING))));
   }
   widthsCache.set(page, widths);
   return widths;

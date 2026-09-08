@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { DYNAMIC_NAMES, FAKE_NAMES, loadDynamicGenerator } from '@kira/api-core';
+import { FAKE_NAMES, loadDynamicGenerator } from '@kira/api-core';
 import { computed, onMounted, reactive, ref } from 'vue';
 import { copyText } from '../clipboard';
 import AppButton from '../theme/primitives/AppButton.vue';
@@ -14,18 +14,14 @@ import { closeDynamicValuesDialog } from './state/dynamicValues';
 // a sentence, for one call to a record this dialog is loading anyway).
 const samples = reactive<Record<string, string>>({});
 
-// P17 D12: both vocabularies, `fake.` names first — the namespace this app wants a user to reach
-// for first, with the Postman `$name` spellings listed after and tagged `postman alias` so it is
-// visible, not hidden, that they are two spellings of the same catalogue rather than two
-// catalogues. Neither list is rewritten or migrated (D12) — this dialog only ever reads them.
+// P28 D15(b): one vocabulary. P17 D12 listed the Postman `$name` spellings after the `fake.` ones,
+// tagged `postman alias`; this dialog is the app's own reference sheet for what to type, so it now
+// teaches only the spelling the app offers. The `$name` catalogue is unchanged and still resolves —
+// it is simply no longer taught, and a Postman import rewrites what it can up front.
 interface CatalogueEntry {
   name: string;
-  isAlias: boolean;
 }
-const ALL_ENTRIES: CatalogueEntry[] = [
-  ...FAKE_NAMES.map((name): CatalogueEntry => ({ name, isAlias: false })),
-  ...DYNAMIC_NAMES.map((name): CatalogueEntry => ({ name, isAlias: true })),
-];
+const ALL_ENTRIES: CatalogueEntry[] = FAKE_NAMES.map((name): CatalogueEntry => ({ name }));
 
 // D11: awaits loadDynamicGenerator() on open — a user-initiated action, exactly like *Generate
 // data…*'s own first open, and the same memoised promise a send would use. One sample per name,
@@ -84,7 +80,7 @@ function close(): void {
         v-for="entry in filteredEntries"
         :key="entry.name"
         class="p-row dynamic-values-row"
-        :data-testid="entry.isAlias ? 'dynamic-values-row' : 'dynamic-values-fake-row'"
+        data-testid="dynamic-values-fake-row"
         :data-name="entry.name"
         role="button"
         tabindex="0"
@@ -95,13 +91,6 @@ function close(): void {
         <code class="reference" data-testid="dynamic-values-reference">{{
           reference(entry.name)
         }}</code>
-        <span
-          v-if="entry.isAlias"
-          class="p-chip"
-          style="background: var(--kira-bg-input); color: var(--kira-fg-muted)"
-          data-testid="dynamic-values-alias"
-          >postman alias</span
-        >
         <span class="p-chip info sample" data-testid="dynamic-values-sample">{{
           samples[entry.name] ?? ''
         }}</span>

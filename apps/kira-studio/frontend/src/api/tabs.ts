@@ -162,6 +162,12 @@ export function openVariableSetTab(
   return openTab('variable-set', null, path, () => state, { reuse: true });
 }
 
+/** P28 D16(c): the environment list, as a tab. `reuse: true` over a fixed path, so the action
+ *  focuses the existing tab rather than stacking duplicates. */
+export function openEnvironmentsTab(): OpenTabResult {
+  return openTab('environments', null, 'environments', () => ({}), { reuse: true });
+}
+
 /** Renaming a collection or environment patches every open tab bound to it (D16), the same
  *  `renameApiRequestTabs`/`renameGrpcRequestTabs` shape. */
 export function renameVariableSetTabs(scope: VariableScope, ownerId: string, name: string): void {

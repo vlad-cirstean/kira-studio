@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted } from 'vue';
 import ApiDialogs from './api/ApiDialogs.vue';
+import { importCollection } from './api/state/collections';
+import { openApiRequestTab } from './api/tabs';
 import { control } from './bridge/control';
 import ConnectionDialog from './project/ConnectionDialog.vue';
 import DataGripImportDialog from './project/DataGripImportDialog.vue';
@@ -8,10 +10,10 @@ import CommandPalette from './shortcuts/CommandPalette.vue';
 import { runCommand } from './shortcuts/commands';
 import { togglePalette } from './shortcuts/state';
 import { connectionsState, openCreateDialog } from './state/connections';
-import { datagripImportState } from './state/datagripImport';
+import { datagripImportState, pickAndScanDataGripProject } from './state/datagripImport';
 import { fakeDataDialogState } from './state/fakeData';
 import { toggleOperationsPanel, toggleProjectPanel } from './state/layout';
-import { activeTab } from './state/mode';
+import { activeTab, setMode } from './state/mode';
 import { uploadDialogState } from './state/objectStore';
 import { settingsOpen } from './state/settings';
 import { activateNextTab, activatePrevTab, closeTab } from './state/tabs';
@@ -41,6 +43,20 @@ onMounted(() => {
       settingsOpen.value = true;
     }),
     control.onNewConnection(() => openCreateDialog()),
+    // P28 D18: three menu-bar commands. Subscribed here rather than in the panels that used to
+    // own the buttons, so they work with no panel mounted — which is the point of moving them.
+    control.onNewRequest(() => {
+      setMode('api');
+      openApiRequestTab();
+    }),
+    control.onImportPostman(() => {
+      setMode('api');
+      void importCollection();
+    }),
+    control.onImportDataGrip(() => {
+      setMode('studio');
+      void pickAndScanDataGripProject();
+    }),
     control.onToggleProjectPanel(toggleProjectPanel),
     control.onToggleOperationsPanel(toggleOperationsPanel),
     control.onCommandPalette(togglePalette),

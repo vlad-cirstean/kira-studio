@@ -42,6 +42,7 @@ function close(): void {
 <template>
   <PopoverPanel
     :width="280"
+    anchor="left"
     test-id="variable-history"
     backdrop-test-id="variable-history-backdrop"
     @close="close"
