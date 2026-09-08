@@ -23,3 +23,23 @@ export function parseVirtualKey(key: string): ParsedVirtualKey | undefined {
   if (!repoId || !rev || !path) return undefined;
   return { repoId, rev, path };
 }
+
+/**
+ * G12 D11: `ports/editorIntegration.ts`'s `toUri` used to percent-encode `virtualKey()`'s own
+ * string into the URI's first path segment. `RepoID` is an absolute worktree root (G3 D7), so the
+ * key always starts with `/`, and `vscode-uri`'s `Uri.parse` percent-*decodes* the path before
+ * validating it — `%2F` becomes `//`, which it rejects outright ("path cannot begin with two
+ * slash characters"), throwing on every real repository. base64url's alphabet (`A-Za-z0-9_-`)
+ * survives that decode untouched and can never itself contain a `/`, so the encoded segment can
+ * never collide with the URI's own path separators.
+ *
+ * Defined here rather than in the port so `virtualKey.test.ts` needs no `vscode` import — the
+ * same reason `commands.ts` holds the palette table (its own doc comment).
+ */
+export function encodeKey(key: string): string {
+  return Buffer.from(key, 'utf8').toString('base64url');
+}
+
+export function decodeKey(segment: string): string {
+  return Buffer.from(segment, 'base64url').toString('utf8');
+}

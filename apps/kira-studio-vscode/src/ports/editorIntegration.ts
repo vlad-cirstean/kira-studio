@@ -25,12 +25,13 @@ import type {
   VirtualDocumentSource,
 } from '@kira/git-core';
 import * as vscode from 'vscode';
+import { decodeKey, encodeKey } from '../virtualKey.ts';
 
 const SCHEME = 'kira-version';
-/** The first path segment reserved for the "empty" side of an add/delete diff — never a real
- *  encoded key, since a real key always contains at least one percent-encoded `/` (repoId is an
- *  absolute filesystem path). */
-const EMPTY_SEGMENT = 'empty';
+/** The first path segment reserved for the "empty" side of an add/delete diff. `.` is not in
+ *  base64url's alphabet (G12 D11), so this can never collide with a real encoded key — unlike the
+ *  bare `empty` it replaces, which relied only on a real key always containing a `/`. */
+const EMPTY_SEGMENT = '.empty';
 
 function pathSegments(uri: vscode.Uri): readonly string[] {
   return uri.path.split('/').filter((segment) => segment.length > 0);
@@ -43,9 +44,8 @@ function toUri(ref: DocumentRef): vscode.Uri {
     case 'empty':
       return vscode.Uri.parse(`${SCHEME}:/${EMPTY_SEGMENT}/${encodeURIComponent(ref.label)}`);
     case 'virtual':
-      return vscode.Uri.parse(
-        `${SCHEME}:/${encodeURIComponent(ref.key)}/${encodeURIComponent(ref.label)}`,
-      );
+      // G12 D11: base64url, not percent-encoding — see virtualKey.ts's own doc comment.
+      return vscode.Uri.parse(`${SCHEME}:/${encodeKey(ref.key)}/${encodeURIComponent(ref.label)}`);
   }
 }
 
@@ -64,7 +64,10 @@ export class VsCodeEditorIntegration implements EditorIntegration {
         const segments = pathSegments(uri);
         const first = segments[0];
         if (first === undefined || first === EMPTY_SEGMENT) return '';
-        const content = await this.#source?.provide(decodeURIComponent(first));
+        // A malformed segment (not valid base64url, or a key parseVirtualKey rejects) resolves to
+        // an empty document via #source?.provide returning undefined below — never a thrown
+        // provider (G12 D11).
+        const content = await this.#source?.provide(decodeKey(first));
         return content ?? '';
       },
     };
