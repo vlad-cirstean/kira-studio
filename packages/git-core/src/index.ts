@@ -125,7 +125,6 @@ export type { Theme, ThemeKind } from './ports/theme.ts';
 export type { RepoCandidate, WorkspaceRoots } from './ports/workspaceRoots.ts';
 export { classifyCherryPick } from './preflight/cherryPick.ts';
 export { classifyReset } from './preflight/reset.ts';
-export { classifyStashBranch, classifyStashPop } from './preflight/stashPop.ts';
 export { classifyTagCreate, validateRefName } from './preflight/tag.ts';
 export type {
   CheckoutBlocker,
