@@ -11,7 +11,7 @@
  * *and* keyboard reachable) plus a plain right-click, both opening the same menu.
  */
 import type { RefRow, StashEntry } from '@kira/git-ipc';
-import { KuiPopoverPanel } from '@kira/kira-ui';
+import { KuiPopoverPanel, KuiSearchInput } from '@kira/kira-ui';
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { STATE_ICONS } from '../icons/index.ts';
 import type { OpsState } from '../state/ops.ts';
@@ -222,12 +222,11 @@ onBeforeUnmount(() => {
 
     <KuiPopoverPanel v-if="isOpen" anchor="left" :width="320" @close="close">
     <div class="kv-branch-panel" role="dialog" aria-label="Branches and tags">
-      <input
-        type="text"
+      <KuiSearchInput
         class="kv-branch-filter"
-        placeholder="Filter branches and tags"
-        aria-label="Filter branches and tags"
         v-model="filter"
+        placeholder="Filter branches and tags"
+        ariaLabel="Filter branches and tags"
       />
 
       <div class="kv-branch-panel-scroll">
@@ -394,10 +393,6 @@ onBeforeUnmount(() => {
 
 .kv-branch-filter {
   margin: var(--kv-space-2);
-  padding: var(--kv-space-1) var(--kv-space-2);
-  background: var(--kv-panel-bg);
-  color: var(--kv-row-fg);
-  border: 1px solid var(--kv-panel-border);
 }
 
 .kv-branch-panel-scroll {

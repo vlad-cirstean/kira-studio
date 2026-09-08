@@ -10,7 +10,7 @@
  * mirroring W14's "not offered for tags" rule on the row menu's own entry.
  */
 import type { BaseCandidate, BaseResolution, BaseResolutionReason } from '@kira/git-ipc';
-import { KuiPopoverPanel, useModalFocus } from '@kira/kira-ui';
+import { KuiPopoverPanel, KuiSearchInput, useModalFocus } from '@kira/kira-ui';
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { STATE_ICONS } from '../../icons/index.ts';
 import type { RefsState } from '../../state/refs.ts';
@@ -128,12 +128,11 @@ onBeforeUnmount(() => {
 
     <KuiPopoverPanel v-if="isOpen" anchor="left" :width="280" @close="close">
     <div class="kv-base-panel" role="dialog" aria-label="Choose a comparison base">
-      <input
-        type="text"
+      <KuiSearchInput
         class="kv-base-filter"
-        placeholder="Filter branches"
-        aria-label="Filter branches"
         v-model="filter"
+        placeholder="Filter branches"
+        ariaLabel="Filter branches"
       />
       <div class="kv-base-panel-scroll">
         <div v-if="suggested.length > 0" class="kv-base-section" aria-label="Suggested">
@@ -236,10 +235,6 @@ onBeforeUnmount(() => {
 
 .kv-base-filter {
   margin: var(--kv-space-2);
-  background: var(--kv-app-bg);
-  color: var(--kv-row-fg);
-  border: 1px solid var(--kv-panel-border);
-  padding: var(--kv-space-1) var(--kv-space-2);
 }
 
 .kv-base-panel-scroll {

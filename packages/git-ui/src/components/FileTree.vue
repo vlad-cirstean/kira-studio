@@ -19,7 +19,7 @@
 import type { CommitStore } from '@kira/git-core';
 import type { FileChange, ReviewFileStatus } from '@kira/git-ipc';
 import type { KuiSegmentedOption } from '@kira/kira-ui';
-import { KuiContextMenu, KuiSegmented } from '@kira/kira-ui';
+import { KuiContextMenu, KuiSearchInput, KuiSegmented } from '@kira/kira-ui';
 import { computed, nextTick, ref, watch } from 'vue';
 import { ACTION_ICONS } from '../icons/index.ts';
 import type { FileListMode } from '../state/detail.ts';
@@ -99,8 +99,7 @@ watch(
     filterInput.value = value;
   },
 );
-function onFilterInput(event: Event): void {
-  const value = (event.target as HTMLInputElement).value;
+function onFilterInput(value: string): void {
   filterInput.value = value;
   emit('update:filter', value);
 }
@@ -416,13 +415,12 @@ function reviewToggleTitle(path: string): string {
     </div>
 
     <div v-if="showToolbar !== false" class="kv-file-tree-toolbar">
-      <input
-        type="text"
+      <KuiSearchInput
         class="kv-file-tree-filter"
+        :model-value="filterInput"
         placeholder="Filter files"
-        aria-label="Filter files"
-        :value="filterInput"
-        @input="onFilterInput"
+        ariaLabel="Filter files"
+        @update:model-value="onFilterInput"
       />
       <KuiSegmented
         :options="listModeOptions"
@@ -572,10 +570,6 @@ function reviewToggleTitle(path: string): string {
 .kv-file-tree-filter {
   flex: 1;
   min-width: 0;
-  background: var(--kv-panel-bg);
-  color: var(--kv-row-fg);
-  border: 1px solid var(--kv-panel-border);
-  padding: var(--kv-space-1) var(--kv-space-2);
 }
 
 .kv-file-tree-rows {
