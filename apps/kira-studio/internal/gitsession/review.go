@@ -84,13 +84,12 @@ func (e *RepoEntry) originHead(ctx context.Context) (string, error) {
 
 // sharesHistory is `merge-base <base> <branch>` (D7c step 5, probe P2): exit 0 means the two share
 // history, exit 1 means they do not (BaseResolution's "unrelated" outcome) -- anything else is a
-// classified error, never a silent "unrelated" (upstream's own V6).
+// classified error, never a silent "unrelated" (upstream's own V6). A thin wrapper over G11's own
+// mergeBase (incremental.go, D6) — one helper, two callers, one spawn: mergeBase reads the sha this
+// call used to throw away, and this collapses into mergeBase's own `ok` return.
 func (e *RepoEntry) sharesHistory(ctx context.Context, base, branch string) (bool, error) {
-	res, err := e.runAllowingExit(ctx, porcelain.MergeBaseArgs(base, branch), 0, 1)
-	if err != nil {
-		return false, err
-	}
-	return res.ExitCode == 0, nil
+	_, ok, err := e.mergeBase(ctx, base, branch)
+	return ok, err
 }
 
 // countRange is `rev-list --count <base>..<branch>` (D7c step 6) -- a bad base/branch is exit 128

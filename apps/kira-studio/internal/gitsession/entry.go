@@ -8,6 +8,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitclient"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitclient/catfile"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitpreflight"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitreview"
 )
 
 // ErrRepoTornDown is returned by whatever still reaches a RepoEntry after its own teardown() ran
@@ -87,10 +88,14 @@ type RepoEntry struct {
 	// gitaskpass/stdlib; threaded in by Registry.Acquire from its own Registry.Settings field.
 	settings func() (protectedBranches []string, autoFetchMinutes int)
 
+	// review is G11's own review.db handle (D3/D14) — shared off the Registry, not per-connection
+	// (D12: "I have reviewed X" is a fact about the repository and the person, not the window).
+	review *gitreview.Store
+
 	done chan struct{}
 }
 
-func newRepoEntry(summary gitclient.RepoSummary, repo *gitclient.Repo, w Watcher, settings func() ([]string, int)) *RepoEntry {
+func newRepoEntry(summary gitclient.RepoSummary, repo *gitclient.Repo, w Watcher, settings func() ([]string, int), review *gitreview.Store) *RepoEntry {
 	e := &RepoEntry{
 		Summary:  summary,
 		Repo:     repo,
@@ -102,6 +107,7 @@ func newRepoEntry(summary gitclient.RepoSummary, repo *gitclient.Repo, w Watcher
 		head:     summary.Head,
 		undo:     &gitpreflight.UndoSlot{},
 		settings: settings,
+		review:   review,
 		done:     make(chan struct{}),
 	}
 	go e.pump()

@@ -1,7 +1,9 @@
 // Package gitsession owns SPEC §6's session model: Registry (a refcounted, per-repo set of shared
 // RepoEntry state) and Conn (one accepted connection's private holds and event delivery). It
-// imports gitclient and stdlib only — no bridge, no rpcstream, no gitsock — so it stays a domain
-// package internal/layering_test.go's auto-enumerated check covers without an exemption.
+// imports gitclient, gitpreflight, gitreview and stdlib only — no bridge, no rpcstream, no gitsock
+// — so it stays a domain package internal/layering_test.go's auto-enumerated check covers without
+// an exemption. G11 adds Registry.Review (a *gitreview.Store, D3): the one place this package
+// reaches beyond gitclient's own family, and still nowhere near bridge.
 package gitsession
 
 import (
@@ -10,6 +12,7 @@ import (
 	"time"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitclient"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitreview"
 )
 
 // defaultLingerFor is upstream's HIDDEN_EVICT_MS, applied at refcount zero (D12): the duration and
@@ -48,6 +51,13 @@ type Registry struct {
 	// NewWatcher/LingerFor already are). Defaulted to "no protected branches, auto-fetch off".
 	Settings func() (protectedBranches []string, autoFetchMinutes int)
 
+	// Review is G11 D3's own seam: review.db's whole surface, defaulted below to a Store over
+	// gitreview.DefaultPath(). Construction is free (the file opens lazily, on the first review
+	// request) — an instance that never serves one never creates review.db and never starts its
+	// reaper. Tests override this with a Store under t.TempDir(), the same seam NewWatcher already
+	// is (§0.4's "every review.db a test opens lives under t.TempDir()").
+	Review *gitreview.Store
+
 	mu      sync.Mutex
 	entries map[string]*slot
 }
@@ -60,6 +70,7 @@ func NewRegistry(runner gitclient.Runner) *Registry {
 		NewWatcher: func(s gitclient.RepoSummary) (Watcher, error) { return gitclient.NewRepoWatcher(s) },
 		LingerFor:  defaultLingerFor,
 		Settings:   func() ([]string, int) { return nil, 0 },
+		Review:     gitreview.NewStore(gitreview.DefaultPath()),
 		entries:    make(map[string]*slot),
 	}
 }
@@ -92,7 +103,7 @@ func (reg *Registry) Acquire(ctx context.Context, gitPath, path string) (*RepoEn
 		return nil, nil, err
 	}
 	repo := gitclient.NewRepo(summary, reg.runner, gitPath)
-	entry := newRepoEntry(summary, repo, w, reg.Settings)
+	entry := newRepoEntry(summary, repo, w, reg.Settings, reg.Review)
 	reg.entries[summary.RepoID] = &slot{entry: entry, refs: 1}
 	return entry, reg.releaseFunc(summary.RepoID), nil
 }
@@ -148,7 +159,8 @@ func (reg *Registry) expire(repoID string) {
 }
 
 // Close tears down every entry immediately, linger notwithstanding — for gitsock.Server.Close(), a
-// real shutdown rather than a viewer going away for a moment (D12 step 5).
+// real shutdown rather than a viewer going away for a moment (D12 step 5). Also closes Review
+// (G11 D3) — idempotent and safe even when review.db was never opened.
 func (reg *Registry) Close() {
 	reg.mu.Lock()
 	entries := reg.entries
@@ -160,5 +172,9 @@ func (reg *Registry) Close() {
 			sl.lingerTimer.Stop()
 		}
 		sl.entry.teardown()
+	}
+
+	if reg.Review != nil {
+		_ = reg.Review.Close()
 	}
 }
