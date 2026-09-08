@@ -130,6 +130,7 @@ function stubHandlers(
       'commit.detail': notImplemented,
       'commit.fileDiff': notImplemented,
       'editor.openDiff': notImplemented,
+      'editor.openRangeDiff': notImplemented,
       'editor.goToFile': notImplemented,
       'editor.resolveConflict': notImplemented,
       'clipboard.write': notImplemented,

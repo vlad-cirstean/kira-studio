@@ -84,8 +84,12 @@ export function createProxyHandlers(deps: CreateProxyHandlersDeps): ServerHandle
   let activeRepoId: string | null = null;
 
   const requests: ServerHandlers['requests'] = {
-    'app.init': async () => {
-      const raw = await connection.request('app.init', {});
+    // G12 D6: waits for the socket to actually be up rather than failing fast — a webview panel
+    // opened before Kira Studio's handshake completes (the ordinary case, not an edge case) used
+    // to reject instantly and permanently (F7); now it just takes as long as the connection does.
+    'app.init': async (_params, ctx) => {
+      await connection.whenConnected(ctx.signal);
+      const raw = await connection.request('app.init', {}, ctx.signal);
       const server = raw as unknown as ServerAppInitResult;
       return {
         host: 'vscode',
@@ -174,6 +178,23 @@ export function createProxyHandlers(deps: CreateProxyHandlersDeps): ServerHandle
         right,
         title: `${basename(path)} (${shortSha}^ ↔ ${shortSha})`,
       });
+      return {};
+    },
+    // G12 D1/D12: the review sidebar's own diff request — a base..branch comparison for one path,
+    // not one commit's parent-child pair, so it cannot reuse editor.openDiff's commit.detail
+    // composition. `status` (from review.files, the caller) says which side has no blob rather
+    // than this handler re-deriving it with a second round trip.
+    'editor.openRangeDiff': async ({ repoId, base, branch, path, originalPath, status }) => {
+      const oldPath = originalPath ?? path;
+      const left: DocumentRef =
+        status === 'added'
+          ? { kind: 'empty', label: basename(oldPath) }
+          : { kind: 'virtual', key: virtualKey(repoId, base, oldPath), label: basename(oldPath) };
+      const right: DocumentRef =
+        status === 'deleted'
+          ? { kind: 'empty', label: basename(path) }
+          : { kind: 'virtual', key: virtualKey(repoId, branch, path), label: basename(path) };
+      await editor.openDiff({ left, right, title: `${basename(path)} (${base} ↔ ${branch})` });
       return {};
     },
     // D4/D11: the server resolves the on-disk-vs-object-database decision and (for a live file)

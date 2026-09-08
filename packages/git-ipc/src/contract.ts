@@ -1108,6 +1108,22 @@ export type Contract = {
       };
       result: Record<string, never>;
     };
+    /** G12 D1 — the review sidebar's own diff request: a base..branch comparison for one path,
+     *  which (unlike editor.openDiff) is not one commit's parent-child pair. Answered entirely
+     *  inside the extension, exactly like editor.openDiff — the server never sees this method.
+     *  `status` is carried rather than re-derived because the caller (review.files) already knows
+     *  which side is `{kind: 'empty'}` (an added file has no base-side blob). */
+    'editor.openRangeDiff': {
+      params: {
+        repoId: string;
+        base: string;
+        branch: string;
+        path: string;
+        originalPath?: string;
+        status: 'added' | 'deleted' | 'modified' | 'renamed';
+      };
+      result: Record<string, never>;
+    };
     /**
      * D14a. `line` in is 1-based **in `rev`'s version of `path`** — the UI maps the cursor row
      * to the historical revision (`mapDiffLineToRevision`) and stops there. `line` out, on the

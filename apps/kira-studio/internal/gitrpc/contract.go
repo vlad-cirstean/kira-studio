@@ -17,7 +17,11 @@ package gitrpc
 // G11 D1: 17 -> 18, for three new requests (review.files, review.fileDiff, review.mark) and one
 // new UiActionKind member (toggleFileReviewed) — no event, no stream, no change to any existing
 // request's params or result.
-const ContractVersion = 18
+// G12 D1: 18 -> 19, for one new request, editor.openRangeDiff — the review sidebar's two-revision
+// diff, answered entirely inside the extension. This constant moves for the same reason ui.action
+// did (G10 D9): it is the sole compatibility authority, even though the Go server neither emits
+// nor parses this method.
+const ContractVersion = 19
 
 // Protocol is the handshake envelope's own version (SPEC §3.3's "protocol":1), distinct from
 // ContractVersion — it never changes unless the hello/ready exchange itself is redesigned.

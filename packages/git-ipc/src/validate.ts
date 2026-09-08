@@ -9,7 +9,11 @@ import type { EventKey, RequestKey, StreamKey } from './contract.ts';
 // touches the wire contract; every other change this phase makes is packaging mechanics.
 // G11 D1: 17 -> 18 for three new requests (review.files, review.fileDiff, review.mark) and one new
 // UiActionKind member ('toggleFileReviewed').
-export const CONTRACT_VERSION = 18;
+// G12 D1: 18 -> 19 for one new request, 'editor.openRangeDiff' — a two-revision diff for the
+// review sidebar's Files pane, answered entirely inside the extension (never emitted or parsed by
+// the Go server), the same "extension-answered but the sole compatibility authority still moves"
+// precedent G10 D9 set for 'ui.action'.
+export const CONTRACT_VERSION = 19;
 
 export class ContractVersionMismatchError extends Error {
   readonly received: number;
@@ -73,6 +77,7 @@ const REQUEST_KEY_MAP: Record<RequestKey, true> = {
   'commit.detail': true,
   'commit.fileDiff': true,
   'editor.openDiff': true,
+  'editor.openRangeDiff': true,
   'editor.goToFile': true,
   'clipboard.write': true,
   'refs.list': true,
