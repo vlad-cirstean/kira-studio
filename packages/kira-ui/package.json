@@ -1,0 +1,24 @@
+{
+  "name": "@kira/kira-ui",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./theme/controls.css": "./src/theme/controls.css"
+  },
+  "dependencies": {
+    "vue": "3.5.42"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "6.0.8",
+    "vue-tsc": "3.3.11",
+    "typescript": "6.0.3",
+    "bun-types": "1.4.0"
+  },
+  "scripts": {
+    "check:vue": "vue-tsc --noEmit"
+  }
+}

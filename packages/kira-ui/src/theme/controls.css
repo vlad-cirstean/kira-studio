@@ -1,0 +1,173 @@
+/*
+ * G19 D3: the actual CSS for `packages/kira-ui`'s components, written once against the
+ * `--kui-*` semantic vocabulary this package owns outright. Not one rule below references
+ * `--kv-*` or `--kira-*` directly — every host bridges its own tokens onto this vocabulary in a
+ * small `kui-bridge.css` file of its own (`packages/git-ui/src/theme/kui-bridge.css`,
+ * `apps/kira-studio/frontend/src/theme/kui-bridge.css`). A host that has not loaded a bridge
+ * still renders something reasonable, since every `--kui-*` reference below carries its own
+ * fallback.
+ */
+
+.kui-icon-box {
+  width: var(--kui-control-h, 22px);
+  height: var(--kui-control-h, 22px);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.kui-icon-box .codicon {
+  font-size: 16px;
+}
+
+.kui-button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kui-space-1, 2px);
+  height: var(--kui-control-h, 22px);
+  padding: 0 var(--kui-space-2, 4px);
+  background: transparent;
+  color: var(--kui-fg, inherit);
+  border: 1px solid var(--kui-border, transparent);
+  border-radius: var(--kui-radius, 0);
+  font-family: inherit;
+  font-size: inherit;
+  cursor: pointer;
+}
+
+.kui-button .kui-icon-box {
+  width: 16px;
+  height: 16px;
+}
+
+.kui-button:hover:not(:disabled) {
+  background-color: var(--kui-hover-bg, rgba(128, 128, 128, 0.15));
+}
+
+.kui-button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.kui-button--active {
+  background-color: var(--kui-selected-bg, var(--kui-hover-bg));
+  color: var(--kui-selected-fg, var(--kui-fg));
+}
+
+.kui-button--primary {
+  background-color: var(--kui-selected-bg);
+  color: var(--kui-selected-fg);
+  border-color: var(--kui-focus-border, var(--kui-border));
+}
+
+.kui-button--danger {
+  color: var(--kui-danger-fg, var(--kui-fg));
+}
+
+.kui-button-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 3px;
+  border-radius: 999px;
+  background-color: var(--kui-selected-bg, var(--kui-hover-bg));
+  color: var(--kui-selected-fg, var(--kui-fg));
+  font-size: 0.75em;
+  line-height: 14px;
+}
+
+.kui-text-input {
+  height: var(--kui-control-h, 22px);
+  padding: 0 var(--kui-space-2, 4px);
+  background-color: var(--kui-bg-panel, transparent);
+  color: var(--kui-fg, inherit);
+  border: 1px solid var(--kui-border, transparent);
+  border-radius: var(--kui-radius, 0);
+  font-family: inherit;
+  font-size: inherit;
+}
+
+.kui-text-input:focus-visible {
+  outline: 1px solid var(--kui-focus-border, currentColor);
+  outline-offset: -1px;
+}
+
+.kui-menu-root {
+  position: fixed;
+  z-index: 30;
+  min-width: 220px;
+  max-width: 320px;
+  padding: var(--kui-space-1, 2px) 0;
+  background-color: var(--kui-bg-panel, canvas);
+  color: var(--kui-fg, inherit);
+  border: 1px solid var(--kui-border, transparent);
+  border-radius: var(--kui-radius, 0);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.36);
+}
+
+.kui-menu-item {
+  display: flex;
+  align-items: center;
+  gap: var(--kui-space-2, 4px);
+  padding: var(--kui-space-1, 2px) var(--kui-space-3, 8px);
+  cursor: pointer;
+  color: var(--kui-fg, inherit);
+  white-space: nowrap;
+}
+
+.kui-menu-item .kui-icon-box {
+  width: 16px;
+  height: 16px;
+  color: var(--kui-fg-muted, currentColor);
+}
+
+.kui-menu-item--danger {
+  color: var(--kui-danger-fg, var(--kui-fg));
+}
+
+.kui-menu-item--danger .kui-icon-box {
+  color: var(--kui-danger-fg, currentColor);
+}
+
+.kui-menu-item:hover:not(.kui-menu-item--disabled),
+.kui-menu-item:focus-visible:not(.kui-menu-item--disabled) {
+  background-color: var(--kui-hover-bg, rgba(128, 128, 128, 0.15));
+  outline: none;
+}
+
+.kui-menu-item--disabled {
+  color: var(--kui-fg-muted, currentColor);
+  cursor: default;
+}
+
+.kui-menu-heading {
+  padding: var(--kui-space-1, 2px) var(--kui-space-3, 8px);
+  font-weight: 600;
+  color: var(--kui-fg-muted, currentColor);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  border-bottom: 1px solid var(--kui-border, transparent);
+  margin-bottom: var(--kui-space-1, 2px);
+}
+
+.kui-menu-separator {
+  height: 1px;
+  margin: var(--kui-space-1, 2px) 0;
+  background-color: var(--kui-border, currentColor);
+}
+
+.kui-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

@@ -12,7 +12,8 @@
     "packages/api-core",
     "packages/git-ipc",
     "packages/git-core",
-    "packages/git-ui"
+    "packages/git-ui",
+    "packages/kira-ui"
   ],
   "scripts": {
     "prepare": "git config core.hooksPath .githooks || true",
@@ -30,11 +31,11 @@
     "typecheck:web": "vue-tsc --noEmit -p apps/kira-studio/frontend/tsconfig.json",
     "typecheck:unit": "tsgo --noEmit -p apps/kira-studio/tests/unit/tsconfig.json",
     "typecheck:api-core": "tsgo --noEmit -p packages/api-core/tsconfig.json",
-    "typecheck:git": "tsgo --noEmit -p packages/git-ipc/tsconfig.json && tsgo --noEmit -p packages/git-core/tsconfig.json && tsgo --noEmit -p apps/kira-studio-vscode/tsconfig.json && vue-tsc --noEmit -p packages/git-ui/tsconfig.json",
+    "typecheck:git": "tsgo --noEmit -p packages/git-ipc/tsconfig.json && tsgo --noEmit -p packages/git-core/tsconfig.json && tsgo --noEmit -p apps/kira-studio-vscode/tsconfig.json && vue-tsc --noEmit -p packages/git-ui/tsconfig.json && vue-tsc --noEmit -p packages/kira-ui/tsconfig.json",
     "test:ui": "bun run build:test && playwright test --config=apps/kira-studio/playwright.config.ts --project=ui --project=ui-timing",
     "test:webview": "bun run build:vscode && playwright test --config=apps/kira-studio-vscode/playwright.config.ts",
     "test:ipc:fe": "bun run build:test && playwright test --config=apps/kira-studio/playwright.config.ts --project=ipc-frontend",
-    "test:unit": "bun test apps/kira-studio/tests/unit packages/api-core/test packages/git-ipc/src apps/kira-studio-vscode/src packages/git-ui/src",
+    "test:unit": "bun test apps/kira-studio/tests/unit packages/api-core/test packages/git-ipc/src apps/kira-studio-vscode/src packages/git-ui/src packages/kira-ui/src",
     "test:e2e-real": "bun run build && node node_modules/.bin/playwright test --config=apps/kira-studio/playwright.config.ts --project=e2e-real",
     "prepackage": "bun run setup",
     "package": "PATH=\"$PATH:$(go env GOPATH)/bin\" sh -c 'cd apps/kira-studio && wails3 task darwin:package:dmg && sh ../../scripts/sign-bundle.sh'",
