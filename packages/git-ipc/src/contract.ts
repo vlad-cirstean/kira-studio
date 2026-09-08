@@ -835,6 +835,35 @@ export type ReviewDeltaSource =
 export type ReviewDiffMode = 'range' | 'sinceReview';
 
 // ---------------------------------------------------------------------------------------
+// G13 — inline AI review comments (`docs/v1.3/plans/G13-inline-ai-review-comments.md`). A flat,
+// non-threaded annotation table anchored to the revision the reviewer was reading and projected
+// forward on read (D6/D7) — no upstream equivalent, same as G11.
+// ---------------------------------------------------------------------------------------
+
+/** How a stored comment's line range relates to the revision it was asked about (D7). */
+export type CommentAnchor =
+  /** The file is byte-identical to when the comment was written; the lines are current. */
+  | 'exact'
+  /** The lines moved and were mapped forward through a real diff; the lines are current. */
+  | 'projected'
+  /** The commented lines no longer exist; `range` is as of `anchorSha`. */
+  | 'removed'
+  /** History was rewritten and no mapping exists; `range` is as of `anchorSha`. */
+  | 'stale';
+
+export interface ReviewComment {
+  readonly id: number;
+  readonly path: string;
+  /** In the requested revision's coordinates for `exact`/`projected`, in `anchorSha`'s own for
+   *  `removed`/`stale` — which is what `anchor` is for. */
+  readonly range: LineRange;
+  readonly body: string;
+  readonly anchor: CommentAnchor;
+  readonly anchorSha: string;
+  readonly createdAt: number; // unix millis
+}
+
+// ---------------------------------------------------------------------------------------
 // P11 — search. Structural copy of `packages/core`'s `search/query.ts` (minus `scope`: the
 // tail scan is commits-only, and Refs/Both are resolved entirely client-side against
 // `RefsState`, no RPC), kept honest by `tests/unit/ipc/wireConformance.test.ts`.
@@ -909,7 +938,13 @@ export type UiActionKind =
   /** G11 D17: toggles the file currently open in the review sidebar's Files pane. Not a
    *  MUTATING_COMMANDS member (it maps to no OpRequest/RemoteOpParams kind) — commands.ts's own
    *  OTHER_COMMANDS carries it instead. */
-  | 'toggleFileReviewed';
+  | 'toggleFileReviewed'
+  /** G13 D19: the palette's own route to the Comments pane's copy-for-AI action. */
+  | 'copyReviewComments'
+  /** G13 D19: extension -> the Comments pane, emitted after an editor-side comment add/delete so
+   *  the sidebar's list updates without the user switching panes — the reverse direction needs no
+   *  event, since a webview-side mutation already travels through proxyHandlers.ts. */
+  | 'refreshReviewComments';
 
 // ---------------------------------------------------------------------------------------
 // The contract.
@@ -1057,6 +1092,47 @@ export type Contract = {
       };
       result: { readonly review: ReviewFileStatus };
     };
+    /** G13 D11/D15: anchors a new comment to `at` — the revision the caller says it was reading,
+     *  required with no default (a default of "the tip" is exactly the silent mis-anchor D8
+     *  exists to prevent). Returns the whole comment, id included, so the caller can render its
+     *  thread from the response instead of re-listing. */
+    'review.comment.add': {
+      params: {
+        repoId: string;
+        branch: string;
+        path: string;
+        at: string;
+        range: LineRange;
+        body: string;
+      };
+      result: { readonly comment: ReviewComment };
+    };
+    /** G13 D11: `at` defaults to the branch tip when omitted — the resolved value is echoed back
+     *  so a caller never has to guess which coordinates it is holding. */
+    'review.comment.list': {
+      params: { repoId: string; branch: string; at?: string };
+      result: { readonly at: string; readonly comments: readonly ReviewComment[] };
+    };
+    /** G13 D11: idempotent and scoped — an id from another (repo, branch) session matches
+     *  nothing, and a row already gone (another window deleted it) answers `false` rather than an
+     *  error. */
+    'review.comment.remove': {
+      params: { repoId: string; branch: string; id: number };
+      result: { readonly removed: boolean };
+    };
+    /** G13 D14: removes every comment for this (repo, branch) session and nothing else — never
+     *  `review_file`/`review_range`, never the session row itself. Returns the removed count so
+     *  the pane can announce it. */
+    'review.comment.clear': {
+      params: { repoId: string; branch: string };
+      result: { readonly removed: number };
+    };
+    /** G13 D12: the AI-paste plain text, produced server-side by `gitreview.FormatComments` — `""`
+     *  for a session with no comments. `at` defaults to the branch tip, same as list. */
+    'review.comment.export': {
+      params: { repoId: string; branch: string; at?: string };
+      result: { readonly at: string; readonly text: string };
+    };
     'commit.detail': {
       params: { repoId: string; sha: string; parentIndex?: number };
       result: {
@@ -1108,16 +1184,37 @@ export type Contract = {
       };
       result: Record<string, never>;
     };
-    /** G12 D1 — the review sidebar's own diff request: a base..branch comparison for one path,
-     *  which (unlike editor.openDiff) is not one commit's parent-child pair. Answered entirely
-     *  inside the extension, exactly like editor.openDiff — the server never sees this method.
-     *  `status` is carried rather than re-derived because the caller (review.files) already knows
-     *  which side is `{kind: 'empty'}` (an added file has no base-side blob). */
+    /** G12 D1, reshaped G13 D8 — the review sidebar's own diff request: a two-revision comparison
+     *  for one path, which (unlike editor.openDiff) is not one commit's parent-child pair.
+     *  Answered entirely inside the extension, exactly like editor.openDiff — the server never
+     *  sees this method. `status` is carried rather than re-derived because the caller
+     *  (review.files) already knows which side is `{kind: 'empty'}` (an added file has no
+     *  base-side blob).
+     *
+     *  G13 D8 reshapes this: both sides are now sha-addressed (never a branch name), and `branch`
+     *  is carried so the right-hand document can be marked as that branch's tip — the fourth
+     *  virtual-key field (`virtualKey.ts`) that is what lets G13 anchor a comment exactly, and
+     *  G14 anchor a hunk mark, rather than approximately. This closes three defects at once: a
+     *  branch-addressed document's content used to be cached by VS Code per URI and never
+     *  invalidated (a stale tab could silently mis-anchor a comment against content that had
+     *  since moved); `range` mode's left side used to be `base` even though the file list beside
+     *  it is the three-dot (merge-base) set, so the diff and the file list could disagree about
+     *  what the branch changed. */
     'editor.openRangeDiff': {
       params: {
         repoId: string;
-        base: string;
+        /** The review session's branch — carried so the right-hand document can be marked as
+         *  its tip (G13 D8a), never itself a revision on either side of the diff. */
         branch: string;
+        /** The branch tip's own commit sha: the right-hand document's revision. */
+        branchTip: string;
+        /** The left-hand document's revision — the merge base in `range` mode (G13 F7), the
+         *  file's own `reviewedAtSha` in `sinceReview` mode. Always a commit sha, never a ref
+         *  name. */
+        leftRev: string;
+        /** What to call the left side in the tab title (`main`, `your last review`). Display
+         *  only. */
+        leftLabel: string;
         path: string;
         originalPath?: string;
         status: 'added' | 'deleted' | 'modified' | 'renamed';

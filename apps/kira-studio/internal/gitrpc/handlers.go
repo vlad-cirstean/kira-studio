@@ -102,6 +102,16 @@ func (r *Router) ForConn(c *gitsession.Conn) Handlers {
 				return r.handleReviewFileDiff(ctx, c, params)
 			case "review.mark":
 				return r.handleReviewMark(ctx, c, params)
+			case "review.comment.add":
+				return r.handleReviewCommentAdd(ctx, c, params)
+			case "review.comment.list":
+				return r.handleReviewCommentList(ctx, c, params)
+			case "review.comment.remove":
+				return r.handleReviewCommentRemove(ctx, c, params)
+			case "review.comment.clear":
+				return r.handleReviewCommentClear(ctx, c, params)
+			case "review.comment.export":
+				return r.handleReviewCommentExport(ctx, c, params)
 			default:
 				return nil, ipcerr.New("E_UNKNOWN_METHOD", "gitrpc: unknown method "+method)
 			}

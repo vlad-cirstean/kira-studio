@@ -6,21 +6,39 @@
  * is a sha or ref name, path is a repository-relative path).
  */
 
-export function virtualKey(repoId: string, rev: string, path: string): string {
-  return `${repoId}\0${rev}\0${path}`;
+/** `reviewBranch` (G13 D8a) is present only for the branch-tip side of a review diff — `rev` is
+ *  that branch's own tip sha there, and its presence is what makes the document commentable
+ *  (`reviewComments.ts`'s `commentingRangeProvider`). Absent, the key is unchanged from G4. */
+export function virtualKey(
+  repoId: string,
+  rev: string,
+  path: string,
+  reviewBranch?: string,
+): string {
+  return reviewBranch === undefined
+    ? `${repoId}\0${rev}\0${path}`
+    : `${repoId}\0${rev}\0${path}\0${reviewBranch}`;
 }
 
 export interface ParsedVirtualKey {
   readonly repoId: string;
   readonly rev: string;
   readonly path: string;
+  /** Present only for the branch-tip side of a review diff (G13 D8): this document is `rev`'s
+   *  content for `path`, and `rev` is the tip of `reviewBranch` in the review session that opened
+   *  it. */
+  readonly reviewBranch?: string;
 }
 
 export function parseVirtualKey(key: string): ParsedVirtualKey | undefined {
   const parts = key.split('\0');
-  if (parts.length !== 3) return undefined;
-  const [repoId, rev, path] = parts;
+  if (parts.length !== 3 && parts.length !== 4) return undefined;
+  const [repoId, rev, path, reviewBranch] = parts;
   if (!repoId || !rev || !path) return undefined;
+  if (parts.length === 4) {
+    if (!reviewBranch) return undefined; // an empty fourth part is rejected, not treated as absent
+    return { repoId, rev, path, reviewBranch };
+  }
   return { repoId, rev, path };
 }
 

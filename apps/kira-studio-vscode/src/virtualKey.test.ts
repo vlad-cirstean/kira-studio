@@ -38,3 +38,35 @@ describe('encodeKey/decodeKey', () => {
     });
   }
 });
+
+// G13 D8a: the fourth field is what marks a document as the branch-tip side of a review diff —
+// present only there, and its round trip must not disturb the three-part shape every existing
+// caller (editor.openDiff, editor.goToFile) still relies on.
+describe('the optional fourth field (G13 D8a)', () => {
+  test('a four-part key round-trips with reviewBranch set', () => {
+    const key = virtualKey('/Users/me/code/kira-studio', 'abc1234', 'src/main.ts', 'feature/login');
+    const encoded = encodeKey(key);
+    expect(decodeKey(encoded)).toBe(key);
+    expect(parseVirtualKey(decodeKey(encoded))).toEqual({
+      repoId: '/Users/me/code/kira-studio',
+      rev: 'abc1234',
+      path: 'src/main.ts',
+      reviewBranch: 'feature/login',
+    });
+  });
+
+  test('an empty fourth part is rejected, not treated as absent', () => {
+    const threePart = virtualKey('/Users/me/code/kira-studio', 'abc1234', 'src/main.ts');
+    expect(parseVirtualKey(`${threePart}\0`)).toBeUndefined();
+  });
+
+  test('a five-part key is rejected', () => {
+    const fourPart = virtualKey(
+      '/Users/me/code/kira-studio',
+      'abc1234',
+      'src/main.ts',
+      'feature/login',
+    );
+    expect(parseVirtualKey(`${fourPart}\0extra`)).toBeUndefined();
+  });
+});

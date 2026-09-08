@@ -28,6 +28,10 @@ func mapDetailError(err error) error {
 		return ipcerr.BadRequest("gitrpc: base and branch share no history")
 	case errors.Is(err, gitsession.ErrRangedMarkOnNonText):
 		return ipcerr.BadRequest("gitrpc: a ranged mark requires a text file")
+	case errors.Is(err, gitsession.ErrCommentNotText):
+		return ipcerr.BadRequest("gitrpc: a comment requires a text file")
+	case errors.Is(err, gitsession.ErrCommentRangeOutOfFile):
+		return ipcerr.BadRequest("gitrpc: comment range is past the end of the file")
 	default:
 		return mapGitError(err)
 	}

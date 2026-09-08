@@ -21,7 +21,12 @@ package gitrpc
 // diff, answered entirely inside the extension. This constant moves for the same reason ui.action
 // did (G10 D9): it is the sole compatibility authority, even though the Go server neither emits
 // nor parses this method.
-const ContractVersion = 19
+// G13 D1: 19 -> 20, for five new requests (review.comment.add/list/remove/clear/export),
+// editor.openRangeDiff's params reshaped (D8: both sides sha-addressed, the right-hand document
+// carries the review branch — extension-answered, but this constant is still the sole
+// compatibility authority, same precedent as G10/G12) and two new UiActionKind members
+// (copyReviewComments, refreshReviewComments).
+const ContractVersion = 20
 
 // Protocol is the handshake envelope's own version (SPEC §3.3's "protocol":1), distinct from
 // ContractVersion — it never changes unless the hello/ready exchange itself is redesigned.

@@ -180,21 +180,47 @@ export function createProxyHandlers(deps: CreateProxyHandlersDeps): ServerHandle
       });
       return {};
     },
-    // G12 D1/D12: the review sidebar's own diff request — a base..branch comparison for one path,
-    // not one commit's parent-child pair, so it cannot reuse editor.openDiff's commit.detail
-    // composition. `status` (from review.files, the caller) says which side has no blob rather
-    // than this handler re-deriving it with a second round trip.
-    'editor.openRangeDiff': async ({ repoId, base, branch, path, originalPath, status }) => {
+    // G12 D1/D12, reshaped G13 D8: the review sidebar's own diff request — a two-revision
+    // comparison for one path, not one commit's parent-child pair, so it cannot reuse
+    // editor.openDiff's commit.detail composition. `status` (from review.files, the caller) says
+    // which side has no blob rather than this handler re-deriving it with a second round trip.
+    //
+    // G13 D8: both sides are now sha-addressed (never `branch` itself) — `leftRev` is always a
+    // commit sha (the merge base in `range` mode, `reviewedAtSha` in `sinceReview` mode), and the
+    // right-hand document carries `branch` as its virtual key's fourth field, marking it as that
+    // branch's tip and therefore commentable (`reviewComments.ts`).
+    'editor.openRangeDiff': async ({
+      repoId,
+      branch,
+      branchTip,
+      leftRev,
+      leftLabel,
+      path,
+      originalPath,
+      status,
+    }) => {
       const oldPath = originalPath ?? path;
       const left: DocumentRef =
         status === 'added'
           ? { kind: 'empty', label: basename(oldPath) }
-          : { kind: 'virtual', key: virtualKey(repoId, base, oldPath), label: basename(oldPath) };
+          : {
+              kind: 'virtual',
+              key: virtualKey(repoId, leftRev, oldPath),
+              label: basename(oldPath),
+            };
       const right: DocumentRef =
         status === 'deleted'
           ? { kind: 'empty', label: basename(path) }
-          : { kind: 'virtual', key: virtualKey(repoId, branch, path), label: basename(path) };
-      await editor.openDiff({ left, right, title: `${basename(path)} (${base} ↔ ${branch})` });
+          : {
+              kind: 'virtual',
+              key: virtualKey(repoId, branchTip, path, branch),
+              label: basename(path),
+            };
+      await editor.openDiff({
+        left,
+        right,
+        title: `${basename(path)} (${leftLabel} ↔ ${branch})`,
+      });
       return {};
     },
     // D4/D11: the server resolves the on-disk-vs-object-database decision and (for a live file)
@@ -279,6 +305,13 @@ export function createProxyHandlers(deps: CreateProxyHandlersDeps): ServerHandle
     'review.files': forward('review.files'),
     'review.fileDiff': forward('review.fileDiff'),
     'review.mark': forward('review.mark'),
+    // G13 D9/§4.2: verbatim forwards for now — reviewComments.ts wraps add/remove/clear to also
+    // re-render the affected document's threads once the comment controller exists.
+    'review.comment.add': forward('review.comment.add'),
+    'review.comment.list': forward('review.comment.list'),
+    'review.comment.remove': forward('review.comment.remove'),
+    'review.comment.clear': forward('review.comment.clear'),
+    'review.comment.export': forward('review.comment.export'),
     // G7 D2: strategySetting is injected from the window's own coerced settings snapshot,
     // exactly as review.resolveBase injects baseCandidates above.
     'remote.pullPreflight': (params, ctx) => {

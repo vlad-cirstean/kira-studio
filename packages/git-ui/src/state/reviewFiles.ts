@@ -47,6 +47,11 @@ export class ReviewFilesState {
   readonly files: ShallowRef<readonly ReviewFileEntry[]> = shallowRef([]);
   readonly loading: ShallowRef<boolean> = shallowRef(false);
   readonly loadError: ShallowRef<string | undefined> = shallowRef(undefined);
+  // G13 D8/F15: kept, not discarded — the two shas editor.openRangeDiff's reshaped params need.
+  // `branchTip` is the right-hand revision; `mergeBase` is `range` mode's correct left-hand one
+  // (F7: review.files' own three-dot set, not a two-dot diff against `target.base`).
+  #branchTip: string | undefined;
+  #mergeBase: string | undefined;
 
   /** `null` ⇒ the list is showing; a path ⇒ that file's diff has taken over the pane. */
   readonly selectedPath: ShallowRef<string | null> = shallowRef(null);
@@ -78,6 +83,8 @@ export class ReviewFilesState {
     this.#abortAll();
     this.#target = target;
     this.files.value = [];
+    this.#branchTip = undefined;
+    this.#mergeBase = undefined;
     this.loadError.value = undefined;
     this.selectedPath.value = null;
     this.#clearDiff();
@@ -100,6 +107,8 @@ export class ReviewFilesState {
       );
       if (!stillCurrent()) return;
       this.files.value = result.files;
+      this.#branchTip = result.branchTip;
+      this.#mergeBase = result.mergeBase;
     } catch (error) {
       if (error instanceof TransportError && error.code === 'cancelled') return;
       if (!stillCurrent()) return;
@@ -135,25 +144,30 @@ export class ReviewFilesState {
     }
   }
 
-  /** G12 D12: composes the two revisions `editor.openRangeDiff` needs from data this class
-   *  already holds — `sinceReview` uses the file's own `reviewedAtSha`, falling back to the
-   *  range's `base` when it is `null` (never reviewed). A fire-and-forget host action, not a
-   *  fetch: nothing here is superseded the way `#loadDiff`'s reactive state is. */
+  /** G12 D12, reshaped G13 D8: composes the reshaped `editor.openRangeDiff` params from data this
+   *  class already holds — `sinceReview` uses the file's own `reviewedAtSha`, falling back to
+   *  `#mergeBase` when it is `null` (never reviewed); `range` mode always uses `#mergeBase` (F7:
+   *  the three-dot set `review.files` already returns, not a two-dot diff against `target.base`).
+   *  A fire-and-forget host action, not a fetch: nothing here is superseded the way `#loadDiff`'s
+   *  reactive state is. */
   async #openInEditor(): Promise<void> {
     const target = this.#target;
     const path = this.selectedPath.value;
     if (!target || path === null) return;
+    if (this.#branchTip === undefined || this.#mergeBase === undefined) return;
     const entry = this.files.value.find((e) => e.change.path === path);
     if (!entry) return;
     const change = entry.change;
-    const base =
-      this.diffMode.value === 'sinceReview' && this.reviewedAtSha.value
-        ? this.reviewedAtSha.value
-        : target.base;
+    const sinceReview =
+      this.diffMode.value === 'sinceReview' ? this.reviewedAtSha.value : undefined;
+    const leftRev = sinceReview ?? this.#mergeBase;
+    const leftLabel = sinceReview ? 'your last review' : target.base;
     await this.#bridge.request('editor.openRangeDiff', {
       repoId: target.repoId,
-      base,
       branch: target.branch,
+      branchTip: this.#branchTip,
+      leftRev,
+      leftLabel,
       path,
       ...(change.originalPath !== undefined ? { originalPath: change.originalPath } : {}),
       status: rangeDiffStatus(change.kind),

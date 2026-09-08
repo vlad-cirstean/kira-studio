@@ -323,3 +323,73 @@ type ReviewMarkParams struct {
 type ReviewMarkResult struct {
 	Review gitsession.ReviewFileStatus `json:"review"`
 }
+
+// ---------------------------------------------------------------------------------------
+// G13 — inline AI review comments (D1, D11). review.comment.list's own result is gitsession's own
+// wire-shaped type (gitsession.CommentListResult) — D5's own precedent applied again. Every method
+// runs validRefArg on branch, exactly like every other review.* method.
+// ---------------------------------------------------------------------------------------
+
+// ReviewCommentAddParams is review.comment.add's own request. `at` is required, with no default
+// (D15): it is the revision the caller says it was reading, and there is no safe guess for it.
+type ReviewCommentAddParams struct {
+	RepoID string              `json:"repoId"`
+	Branch string              `json:"branch"`
+	Path   string              `json:"path"`
+	At     string              `json:"at"`
+	Range  gitreview.LineRange `json:"range"`
+	Body   string              `json:"body"`
+}
+
+// ReviewCommentAddResult carries the whole new comment, id included, so the extension can render
+// its thread from the response instead of re-listing (D11).
+type ReviewCommentAddResult struct {
+	Comment gitsession.CommentEntry `json:"comment"`
+}
+
+// ReviewCommentListParams is review.comment.list's own request — `at` optional, defaulting to the
+// branch tip (D11).
+type ReviewCommentListParams struct {
+	RepoID string `json:"repoId"`
+	Branch string `json:"branch"`
+	At     string `json:"at,omitempty"`
+}
+
+// ReviewCommentRemoveParams is review.comment.remove's own request.
+type ReviewCommentRemoveParams struct {
+	RepoID string `json:"repoId"`
+	Branch string `json:"branch"`
+	ID     int64  `json:"id"`
+}
+
+// ReviewCommentRemoveResult is `false`, not an error, for a row already gone (D11) — two windows
+// sharing one session is the designed state, not a client mistake.
+type ReviewCommentRemoveResult struct {
+	Removed bool `json:"removed"`
+}
+
+// ReviewCommentClearParams is review.comment.clear's own request.
+type ReviewCommentClearParams struct {
+	RepoID string `json:"repoId"`
+	Branch string `json:"branch"`
+}
+
+// ReviewCommentClearResult carries the removed count so the pane can announce it (D11).
+type ReviewCommentClearResult struct {
+	Removed int `json:"removed"`
+}
+
+// ReviewCommentExportParams is review.comment.export's own request — `at` optional, same default
+// as list.
+type ReviewCommentExportParams struct {
+	RepoID string `json:"repoId"`
+	Branch string `json:"branch"`
+	At     string `json:"at,omitempty"`
+}
+
+// ReviewCommentExportResult's Text is "" for a session with no comments (D11) — never a header-only
+// placeholder.
+type ReviewCommentExportResult struct {
+	At   string `json:"at"`
+	Text string `json:"text"`
+}

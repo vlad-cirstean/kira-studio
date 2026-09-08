@@ -13,7 +13,10 @@ import type { EventKey, RequestKey, StreamKey } from './contract.ts';
 // review sidebar's Files pane, answered entirely inside the extension (never emitted or parsed by
 // the Go server), the same "extension-answered but the sole compatibility authority still moves"
 // precedent G10 D9 set for 'ui.action'.
-export const CONTRACT_VERSION = 19;
+// G13 D1: 19 -> 20 for five new requests ('review.comment.add/list/remove/clear/export'),
+// 'editor.openRangeDiff's reshaped params (D8), and two new UiActionKind members
+// ('copyReviewComments', 'refreshReviewComments').
+export const CONTRACT_VERSION = 20;
 
 export class ContractVersionMismatchError extends Error {
   readonly received: number;
@@ -93,6 +96,11 @@ const REQUEST_KEY_MAP: Record<RequestKey, true> = {
   'review.files': true,
   'review.fileDiff': true,
   'review.mark': true,
+  'review.comment.add': true,
+  'review.comment.list': true,
+  'review.comment.remove': true,
+  'review.comment.clear': true,
+  'review.comment.export': true,
   'remote.pullPreflight': true,
   'remote.pushPreflight': true,
   'remote.run': true,
