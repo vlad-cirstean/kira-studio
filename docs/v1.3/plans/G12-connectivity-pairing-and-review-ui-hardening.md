@@ -23,10 +23,20 @@
 > identity race. Both corrections are the point of a planning pass, and both are stated as findings
 > with the code cited rather than left for the implementer to rediscover.
 >
-> **This phase does ship one contract change**, and it is flagged rather than smuggled: item 8
-> ("every diff opens in VS Code's native diff view") needs a way to ask for a *two-revision* diff,
-> which no existing method can express — `editor.openDiff` takes one `sha`. `CONTRACT_VERSION` goes
-> **18 → 19** for exactly one new, extension-answered request (D1, §12.1).
+> **This phase does ship one contract change**, flagged rather than smuggled and since **confirmed**:
+> item 8 ("every diff opens in VS Code's native diff view") needs a way to ask for a *two-revision*
+> diff, which no existing method can express — `editor.openDiff` takes one `sha`. `CONTRACT_VERSION`
+> goes **18 → 19** for exactly one new, extension-answered request (D1, §12.1).
+>
+> **Revised after review.** All three of §12's calls have been answered, and two of them changed the
+> plan rather than confirming it. **Item 9's restyle no longer transcribes Kira Studio's palette**:
+> the sidebar takes its *structure* — spacing, layout, panel/toolbar anatomy, control geometry, icon
+> usage, the data/UI font law — while every colour keeps deriving from the user's own VS Code theme,
+> so light, dark and high-contrast all keep working. D14 is re-derived on that basis (§12.2). **And
+> range/hunk-level "mark reviewed" is deferred, not dropped**: G12 ships whole-file marking as an
+> explicit interim state, and §11.1 hands a later phase a concrete direction — gutter decorations in
+> VS Code's native diff editor, modelled on the built-in Git extension's hunk staging, against the
+> `ranges` payload `review.mark` already accepts.
 >
 > **Tiering is named honestly, per G9/G10's own precedent.** Five items are provable here end to end;
 > four are provable only as type/unit checks plus a reasoned argument; two need a human on a Mac
@@ -90,7 +100,7 @@ findings and decisions — the one table to read before anything else:
 | **6** Default to the workspace repo | The webview's boot only opens a *persisted* repoId; `repo.list` candidates are rendered as buttons to click | F8 | D7 | **2** |
 | **7** Visible connection state | The status-bar item hides itself in every state except `connected` | F10 | D10 | **2** |
 | **8** Diff in VS Code only + one toolbar | The review view renders `DiffView` in-webview; `FileTree`'s toolbar is per-row. Routing to VS Code is *blocked* by F9 and needs a two-revision request | F9, F11 | D1, D11, D12, D13 | **1** (F9's fix) / **3** (the result) |
-| **9** Restyle to match Kira Studio | `--kv-*` derives from `--vscode-*`; Kira Studio's palette and primitives are a different, fixed system | F12 | D14 | **2** |
+| **9** Restyle to match Kira Studio | `--kv-*` derives from `--vscode-*`; Kira Studio's structural scales and primitives are a separate system the webview cannot import. Resolved (§12.2): take the *structure*, keep colours theme-derived | F12 | D14 | **2** |
 | **10** App icon + README | The icon is G10's placeholder glyph; there is no README | F13 | D15 | **1** |
 | **11** Broken "open file" + icon-only buttons | `toUri({kind:'virtual'})` throws `UriError` for every real repository | F9 | D11, D16 | **1** (F9's fix) / **3** (the result) |
 
@@ -100,8 +110,9 @@ Everything in §10's table, but the ones most likely to be mistaken for G12 work
 
 - **Any git feature.** Stash (G14), reset/cherry-pick (G15), search (G16), PR links (G17), worktrees
   (G18), stacked branches (G19) are untouched. A defect batch that grows a feature has left the phase.
-- **Restyling the *graph* webview** (item 9 says "the review sidebar"). D14 draws that line and §12.2
-  puts the "should the graph follow?" question to a human rather than answering it by doing it.
+- **Restyling the *graph* webview** (item 9 says "the review sidebar"). D14 draws that line by
+  scoping its structural tokens to the review root, and §12.2 records the settled answer: the graph
+  panel keeps the workbench design language it has today.
 - **Removing `DiffView.vue`.** Item 8 stops the *review* view from rendering it; the graph panel's
   detail pane still does, and that is correct — a commit's diff beside the graph is not the same
   affordance as a review file opened for editing.
@@ -501,10 +512,12 @@ Item 9, stated precisely so D14 is not hand-waving.
   in `apps/kira-studio/frontend/src` only — it does not see `packages/git-ui` at all.
 
 The webview cannot `import` the Wails app's CSS (different bundle, different process, no shared
-origin), so "reuse Kira Studio's components/tokens" can only mean *port the values and the shapes*
-into `packages/git-ui`'s own token layer. That has a real cost, and D14 states it rather than
-discovering it in review: a fixed dark palette in a webview is wrong for a user on a light or
-high-contrast VS Code theme.
+origin), so "reuse Kira Studio's components/tokens" can only mean *port values into*
+`packages/git-ui`'s own token layer. **Which values is the whole question**, and §12.2 settled it:
+porting the *palette* would be wrong for every light and high-contrast user, so D14 ports the
+colourless half — the spacing, type, control-height and radius scales, the panel/toolbar anatomy and
+the font-role law — and leaves colour deriving from `--vscode-*` exactly as it does today. The two
+halves are separable because Kira Studio's own primitives already separate them (D14's first table).
 
 ### F13 — The extension ships G10's placeholder glyph and no README
 
@@ -916,12 +929,28 @@ Item 8's first half, and it deletes code rather than adding a mode.
   already at its budget for, and §11 hands it to G13.
 - **`DiffView.vue` itself is untouched.** The graph panel's detail pane still uses it, correctly.
 
-**What this costs, stated plainly:** the range-level "mark reviewed" gutter affordance (G11 D16's
-`ReviewDiffAdornment`, `ReviewFilesPane.vue:63-74`) lives inside `DiffView` and has no home once the
-diff leaves the webview. **Whole-file** marking survives — it is `FileTree`'s own per-row toggle
-(`FileTree.vue:415-424`) and the `toggleFileReviewed` palette command (`ReviewView.vue:95-106`) —
-but selecting *lines* to mark does not, because the lines are now in VS Code's editor. §12.2 puts
-that to a human rather than silently dropping a feature G11 shipped one phase ago.
+**What this costs in G12, and what is explicitly *not* being given up.** The range-level "mark
+reviewed" gutter affordance (G11 D16's `ReviewDiffAdornment`, `ReviewFilesPane.vue:63-74`) lives
+inside `DiffView` and has no home in this phase once the diff leaves the webview. **Whole-file**
+marking survives untouched — `FileTree`'s own per-row toggle (`FileTree.vue:415-424`) and the
+`toggleFileReviewed` palette command (`ReviewView.vue:95-106`) — and is G12's **interim** state.
+
+**Range-level marking is deferred, not dropped** (resolved, §12.2): a later phase reinstates it
+*inside VS Code's native diff editor*, modelled on the built-in Git extension's own hunk-staging
+gutter. Two properties of this plan make that a UI-only phase rather than a rework, and both are
+why it is safe to ship the interim state:
+
+- **The server side already carries ranges and G12 does not touch it.** `review.mark`'s params are
+  `{repoId, branch, path, reviewed, ranges?: readonly LineRange[]}` (`contract.ts:1050-1059`) —
+  the optional `ranges` is already there — and `review.fileDiff` already returns `reviewedRanges`
+  (`:1039`) projected onto current content by G11's own fast/slow path. **No new RPC, no
+  `CONTRACT_VERSION` bump, and no `internal/gitreview` change** is needed to restore the feature.
+- **This phase's own `review.fileDiff` call is retained precisely because of that** (the bullet
+  above): the pane keeps fetching `deltaSource`/`reviewedRanges`/`lineCount`, so the data a gutter
+  would render is still on the client when the later phase wants it.
+
+§11 carries the concrete direction and its dependencies forward; the design itself belongs to that
+phase's own Opus planning pass, exactly as this chapter already defers G18/G19/G21.
 
 ### D13 — One panel-level toolbar: `FileTree`'s own becomes opt-out, and the review view owns a single instance
 
@@ -949,48 +978,106 @@ edits them moves. So:
 - The toolbar is visible for both panes (Commits and Files), because both are file lists and a
   filter that disappears when you switch tabs is its own bug.
 
-### D14 — The review sidebar adopts Kira Studio's palette through a `--kv-*` skin, scoped to the review document
+### D14 — The review sidebar adopts Kira Studio's *structural* design language; every colour keeps deriving from the user's VS Code theme
 
-Item 9, and F12's cost is priced rather than ignored.
+Item 9. **Re-derived after the fixed-palette skin this plan first proposed was rejected** — the
+sidebar must read as Kira Studio in spacing, layout, panel/toolbar anatomy, control geometry, icon
+usage and composition, while its actual colours keep following whatever theme the user has active in
+VS Code (light, dark or high contrast), through the `--kv-*` → `--vscode-*` derivation F12 describes.
 
-**A new `packages/git-ui/src/theme/kira-tokens.css`**, imported by the review entry only, which
-redefines the *same* `--kv-*` names under one root class:
+**Why the split is clean rather than a compromise: Kira Studio's own stylesheet already makes it.**
+Every primitive separates geometry from colour, declaration by declaration —
+
+| Primitive | Geometry (taken) | Colour (not taken) |
+|---|---|---|
+| `.p-toolbar` (`primitives.css:744-752`) | `height: --kira-toolbar-h`, `gap: --kira-s-3`, `padding: 0 --kira-s-4`, `border-bottom: --kira-border-width` | `--kira-border` |
+| `.p-panel` (`:720-728`) | `border-radius: --kira-radius`, `border-width`, flex column, `min-height: 0` | `--kira-border`, `--kira-bg` |
+| `.p-panel-head` (`:729-741`) | `height: --kira-control-h-lg`, `gap: --kira-s-2`, `padding: 0 --kira-s-3`, `font-size: --kira-t-sm`, `text-transform: uppercase`, `letter-spacing: .05em` | `--kira-fg-muted`, `--kira-border` |
+| `.p-seg` (`:452-469`) | `height: --kira-control-h`, `border-radius: --kira-radius-sm`, `padding: 0 --kira-s-3`, `font-size: --kira-t-sm`, `overflow: hidden` | `--kira-border-strong`, `--kira-fg-muted` |
+| `.p-iconbtn` (`:35-52`) | `height`/`width: --kira-control-h` (a square), `border-radius: --kira-radius-sm` | `--kira-hover`, `--kira-fg`, `--kira-bg-input` |
+| `.p-btn` (`:70-87`) | `height: --kira-control-h`, `gap: --kira-s-2`, `padding: 0 --kira-s-3`, `border-radius: --kira-radius-sm`, `font-size: --kira-t-sm` | same three |
+
+So "reuse Kira Studio's design" is implementable as: **take the left column verbatim, and for the
+right column substitute the `--kv-*` token that already resolves to the user's theme.** No colour
+literal is transcribed, nothing is duplicated that could drift, and the sidebar inherits every
+light/high-contrast correction `vscode-tokens.css` already carries.
+
+**A new `packages/git-ui/src/theme/kira-structure.css`**, containing **only colourless tokens**,
+scoped under one root class so it cannot reach the graph panel by accident:
 
 ```css
-/* The Kira Studio skin (G12 item 9). Values are transcribed from
-   apps/kira-studio/frontend/src/theme/tokens.css — the app's own palette — because a webview
-   cannot import the Wails bundle's CSS. This file, like vscode-tokens.css, is the only other
-   place in packages/git-ui permitted to carry a colour literal. */
-.kv-skin-kira { --kv-app-bg: #1f1f1f; --kv-panel-bg: #202020; … }
+/* Kira Studio's structural scales (G12 item 9), transcribed from
+   apps/kira-studio/frontend/src/theme/tokens.css — spacing, type, control heights, radius tiers,
+   font roles. COLOUR IS DEFINED NOWHERE IN THIS FILE, by design: the review sidebar follows the
+   user's VS Code theme through vscode-tokens.css exactly as the graph panel does. Scoped to
+   .kv-skin-kira rather than :root so density.css's own (workbench-shaped) scale keeps governing
+   the graph panel unchanged. */
+.kv-skin-kira { … }
 ```
 
-- **The `--kv-*` names do not change**, so no component is rewritten to reference a second token
-  vocabulary and `vscode-tokens.css` stays the default. A skin is one class on the root element.
-- **`ReviewView.vue`'s root gets `class="kv-review-view kv-skin-kira"`.** Nothing else does — the
-  graph panel keeps the VS-Code-derived tokens (§12.2 asks whether it should follow).
-- **The shape layer comes with it, not just the colours.** Kira Studio's look is as much its radius
-  tiers, control heights and field/button shapes (`primitives.css`) as its palette. The review
-  view's own controls — the Commits/Files toggle, the base selector, the load-more button, the new
-  panel toolbar, the file rows — are restyled to those shapes. This is a bounded list of five
-  control kinds, not a port of a 1091-line stylesheet.
-- **D12 shrinks what has to be restyled**, which is why these two items belong in one phase: once the
-  review view renders no `DiffView`, the shared surface with the graph panel is `FileTree` alone, and
-  `FileTree`'s row styling is already token-driven, so it inherits the skin for free.
+| Role | Added as | Value, from Kira Studio | Today in `--kv-*` |
+|---|---|---|---|
+| Space scale | `--kv-s-1` … `--kv-s-6` | 2 / 4 / 6 / 8 / 12 / 16 px (`--kira-s-*`) | `--kv-space-1..5` = 2/4/8/12/16 — five steps, no 6px |
+| Type scale | `--kv-t-xs`/`sm`/`md`/`lg` | `calc(--kv-font-size - 2px)` … `+1px` (`--kira-t-*`'s own derivation, so it still tracks the host's font size) | none — one `--kv-font-size` |
+| Control heights | `--kv-h-xs`/`sm`/`md`/`lg`, `--kv-icon-box` | 18 / 22 / 26 / 30 px, 16 px (`--kira-h-*`, `--kira-icon-box`) | none |
+| Control-height *roles* | `--kv-control-h`, `--kv-control-h-lg` | `--kv-h-sm` (toolbar density), `--kv-h-md` (panel-head density) — Kira's own aliasing, kept because it is what makes "one step taller everywhere" a single edit | none |
+| Radius tiers | `--kv-radius-sm`, `--kv-radius-panel` | 4 px, 6 px (`--kira-radius-sm`, `--kira-radius`) | `--kv-radius: 0px` |
+| Bar height | `--kv-bar-h` | 34 px (`--kira-bar-h`) | `--kv-toolbar-height: 35px` |
+| Border width | `--kv-border-width` | 1 px (`--kira-border-width`) | none (literals) |
+| Font roles | `--kv-font-ui`, `--kv-font-data` | Kira's fixed system-sans stack, and `--kv-font-family` respectively | one `--kv-font-family` for everything |
+| Shadow **geometry** | `--kv-shadow` | `0 2px 8px` (`--kira-shadow`'s offsets/blur) composed with the existing `--kv-widget-shadow` **colour** | a colour only |
 
-**The honest cost, and the decision made about it.** A fixed dark palette is wrong for a user on a
-light or high-contrast VS Code theme, and no amount of care changes that — Kira Studio has one theme
-and item 9 asks the sidebar to match it. Two mitigations, both cheap:
+Three things this deliberately does **not** do:
 
-1. Every token in the skin is defined; none falls through to a `--vscode-*` chain. A half-skinned
-   panel that mixes a light theme's foreground with a dark background is strictly worse than either.
-2. `kiraVersion.review.theme` is **not** added. A setting is a way of not deciding, and this phase's
-   own rule (D2) is the shortest honest fix. §12.2 asks the human whether the light-theme case is
-   acceptable before the work starts, which is the right place for that question.
+- **`density.css` is not re-valued.** Changing `--kv-space-3` from 8 px to 6 px globally would
+  restyle the graph panel, which item 9 does not ask for. New names alongside the old ones, scoped
+  to the review root — so the graph panel is byte-identical by construction, not by discipline.
+- **`--kv-radius: 0px` stays exactly as written**, comment included ("the workbench has square
+  corners; we do not invent rounded ones"). That is a real decision for a panel that sits in the
+  VS Code workbench and it still holds there. The review sidebar uses the new tiers instead; the
+  two coexist because they describe two surfaces with two design languages, and §12.2 records that
+  the graph panel keeps the workbench one.
+- **`vscode-tokens.css` is not touched at all** — not its `:root` block, not `body.vscode-light`,
+  not `body.vscode-high-contrast`. This is the checklist item (§8.4) that makes the coordinator's
+  requirement mechanically verifiable rather than a claim.
 
-`scripts/check-tokens.sh` does not cover `packages/git-ui` and is not extended to (its `--kira-*`
-grep would not match a `--kv-*` file); the `AccessorBridge`-style guarantee here is simply that
-`kira-tokens.css` redefines a subset of names `vscode-tokens.css` already declares, which a reviewer
-can check by diffing the two files' property lists.
+**What changes in the review sidebar**, concretely — five control kinds and one page anatomy:
+
+| Surface | Today | Becomes |
+|---|---|---|
+| The header (`ReviewView.vue:456-494`) | one flex row of mixed-height items | a `.p-panel-head`-shaped **view head** (`--kv-control-h-lg`, uppercase `--kv-t-sm` label, `--kv-s-3` padding) carrying the branch name and base selector |
+| The new panel toolbar (D13) | — | a `.p-toolbar`-shaped bar: `--kv-bar-h`, `--kv-s-3` gap, `--kv-s-4` inline padding, one bottom border, holding only `--kv-control-h` controls (Kira's own stated law at `primitives.css:743`) |
+| Commits/Files and Tree/Flat and Since-review/Full-range toggles | ad-hoc bordered buttons | `.p-seg`-shaped segmented groups: one bordered container, `--kv-radius-sm`, `--kv-control-h`, children `--kv-t-sm` |
+| Icon buttons (D16) | text buttons | `.p-iconbtn`-shaped squares: `--kv-control-h` on both axes, `--kv-radius-sm`, `--kv-icon-box` glyph |
+| Load more (`:558-567`) | full-width bordered button | `.p-btn`-shaped: `--kv-control-h`, `--kv-radius-sm`, `--kv-s-3` padding |
+| Rows (commit rows, file rows) | `--kv-space-*` padding | `--kv-s-*` padding on Kira's rhythm, row height `--kv-control-h` |
+
+**Plus Kira Studio's font law, which is structure, not colour.** `docs/design/kira-design-system`'s
+LAW 08, quoted in `tokens.css`'s own comment: *"Mono is for data. If a string came out of a database
+— a value, an identifier, a query, a duration — it is mono. If the app wrote it, it is UI."* The
+review sidebar renders both and currently sets one family for everything
+(`ReviewView.vue:609`). Applied here: a sha, a branch name, a base ref and a file path are
+**data** → `--kv-font-data`; headings, button labels, counts, status lines and empty-state copy are
+**UI** → `--kv-font-ui`. This is the single change that most makes the panel read as Kira Studio, and
+it costs two token references.
+
+**D12 shrinks what has to be restyled**, which is why these two items belong in one phase: once the
+review view renders no `DiffView`, its only surface shared with the graph panel is `FileTree`, whose
+rows are already token-driven — so it picks up the scoped scale from its ancestor and needs no
+component-level fork.
+
+**Rejected: the fixed `--kv-*` colour skin this plan originally proposed.** It would have broken
+every light and high-contrast user, duplicated a palette that then drifts from Kira Studio's real
+one with no guard, and thrown away `vscode-tokens.css`'s own WCAG-verified light-theme block
+(`:147-161`) — three costs for an appearance item. Rejected by the user, and correctly.
+
+**Rejected: a `kiraVersion.review.theme` setting.** Unchanged from this plan's first pass, and now
+moot: with colours theme-derived there is nothing left for such a setting to switch.
+
+`scripts/check-tokens.sh` still does not cover `packages/git-ui` (its `--kira-*` grep matches nothing
+in a `--kv-*` file), and is still not extended to. The guard that matters here is narrower and is a
+checklist item instead: **`kira-structure.css` contains no colour** — no hex literal, no `rgb(`, no
+`color`/`background`/`border-color` property — which is one `grep` and cannot be argued with.
 
 ### D15 — The extension icon becomes Kira Studio's own app icon; the README is short and real
 
@@ -1059,7 +1146,9 @@ clears the bar:**
   proportionate; §11 hands the harness question forward rather than pretending a token test covers it.
 - **D8** (window activation) — a Wails call this container cannot make. A test would assert that a
   fake was called, which is a test of the fake.
-- **D9/D12/D13/D14/D16** — template and CSS changes. `vue-tsc` is the guard that already exists.
+- **D9/D12/D13/D14/D16** — template and CSS changes. `vue-tsc` is the guard that already exists,
+  and D14's own guarantee (no colour in `kira-structure.css`, `vscode-tokens.css` unchanged) is a
+  `grep` and a `git diff`, not something a test would say better.
 - **D10** (status bar) — a switch over five states writing strings onto a `vscode.StatusBarItem`.
   The in-flight counter is two increments and a decrement in a `finally`; if it were subtler it would
   earn one, and if a reviewer thinks it is, that is the signal to simplify it rather than test it.
@@ -1193,8 +1282,9 @@ The `bootError` ref, its panel outside the `v-if="repoState"` gate with a Retry 
 ### 4.12 `packages/git-ui/src/components/review/ReviewView.vue` — edited (D6.3, D12, D13, D14, D16)
 
 The largest single file in the phase: the diff overlay comes out, the panel toolbar goes in, the
-skin class lands on the root, the two toggles become icons, and `bootError` gets the same treatment
-as `App.vue`'s.
+`kv-skin-kira` class lands on the root (D14's structural scale, no colour), the header becomes a
+view head, the two toggles become icon segmented groups, the data/UI font split is applied, and
+`bootError` gets the same treatment as `App.vue`'s.
 
 ### 4.13 `packages/git-ui/src/components/review/ReviewFilesPane.vue` — edited (D12, D13, D16)
 
@@ -1211,9 +1301,11 @@ The `DiffView` branch and the `diffActions` override come out; file selection ca
 The `showToolbar` prop and the two icon buttons. **`DetailPane.vue`'s call site is not edited** —
 the default keeps the graph panel byte-identical.
 
-### 4.16 `packages/git-ui/src/theme/kira-tokens.css` — new (D14)
+### 4.16 `packages/git-ui/src/theme/kira-structure.css` — new (D14)
 
-The skin, plus its import in the review entry.
+Kira Studio's colourless scales under `.kv-skin-kira`, plus its import in the review entry.
+**`vscode-tokens.css` and `density.css` are both untouched** — the new file adds names beside them
+and re-values nothing, which is what keeps the graph panel byte-identical and every theme working.
 
 ### 4.17 `apps/kira-studio/tests/e2e-real/git-pairing-real.spec.ts` — edited (D1)
 
@@ -1266,7 +1358,7 @@ phase worked.
 | **C6** | `feat(git-ui): open the workspace's own repository automatically` | D7 (§4.11's auto-open half) |
 | **C7** | `fix(vscode): base64url the virtual-document key so Uri.parse can carry it` | D11 + its test (§4.6, §4.7) |
 | **C8** | `feat(ipc)!: editor.openRangeDiff, and the review sidebar's diffs move into VS Code — CONTRACT_VERSION 19` | D1, D12 (§4.3, §4.5, §4.12–§4.14, §4.17) |
-| **C9** | `feat(git-ui): one review toolbar, icon buttons, and Kira Studio's own styling` | D13, D14, D16 (§4.12–§4.16) |
+| **C9** | `feat(git-ui): one review toolbar, icon buttons, and Kira Studio's structural design` | D13, D14, D16 (§4.12–§4.16) |
 | **C10** | `feat: foreground on pairing, a real connection indicator, the Connected editors tab, the app icon and a README` | D8, D9, D10, D15 (§3.4, §4.8, §4.9, §5) |
 
 C10 batches four independent, small, non-overlapping changes rather than spending four commits on
@@ -1309,9 +1401,11 @@ provable here is named; what is not is not claimed.
 - **D10 (status bar).** Provable: the state table typechecks against `ConnectionState`'s five
   members and `vscode.StatusBarItem`'s API. Not provable: that the item renders, that the spinner
   animates, or that the error background reads as intended.
-- **D14/D16 (skin, icon buttons).** Provable: `vue-tsc`, and that every `--kv-*` the skin sets is one
-  `vscode-tokens.css` already declares (a mechanical diff of the two files' property lists). Not
-  provable: how it looks.
+- **D14/D16 (structural scale, icon buttons).** Provable, and mechanically: `vue-tsc`; that
+  `kira-structure.css` contains **no colour** (one `grep` for a hex literal, `rgb(`, or a
+  `color`/`background`/`border-color` property); and that `vscode-tokens.css` and `density.css` are
+  byte-identical to before, which is what proves every theme still works. Not provable: how it
+  looks.
 - **D15 (icon).** Provable: the file is 128×128 RGBA and is inside the `.vsix`. Not provable: how it
   renders in the Extensions list.
 
@@ -1338,8 +1432,11 @@ The script, in order, because several steps depend on the one before:
    tab. Confirm **both** open VS Code's native diff editor with real content on both sides — today
    the first throws `UriError` and the second renders in the webview (F9, D12). Confirm one toolbar,
    not one per commit.
-8. **Item 9:** confirm the sidebar reads as Kira Studio, and — the question §12.2 asks — look at it
-   under a **light** VS Code theme before signing it off.
+8. **Item 9:** confirm the sidebar reads as Kira Studio *structurally* — spacing, the view head and
+   toolbar, segmented toggles, icon-square buttons, mono for shas/branches/paths and UI font for
+   chrome. Then switch VS Code to a **light** theme and to a **high-contrast** theme and confirm the
+   sidebar recolours with them and stays legible (§12.2's resolved answer — this is now a
+   verification, not an open question). Confirm the **graph** panel looks unchanged.
 9. **Item 4:** Settings shows *Connected editors* (pairing only) and *Git* (the two settings), and
    Save still works on the latter.
 10. **Item 10:** the Extensions list shows Kira Studio's icon and the README's details page.
@@ -1359,6 +1456,11 @@ The script, in order, because several steps depend on the one before:
       `git-client-row-*`/`git-client-revoke-*`.
 - [ ] The two new tests fail on the pre-fix tree and pass after. (Not a hope: run them at C1/C7
       against a stash of the fix.)
+- [ ] `packages/git-ui/src/theme/kira-structure.css` contains **no colour**: `grep -nE
+      "#[0-9a-fA-F]{3,8}|rgb\\(|oklch\\(|(^|[^-])(color|background|border-color):"` finds nothing.
+- [ ] `packages/git-ui/src/theme/vscode-tokens.css` and `density.css` are **byte-identical** to
+      before this phase — the property that keeps light, dark and high-contrast themes working, and
+      the graph panel unrestyled.
 - [ ] `resources/icon.svg` and `resources/review-icon.svg` are byte-identical to before.
 - [ ] No new dependency in `package.json` or `go.mod`.
 
@@ -1385,13 +1487,13 @@ Everything before that is order-dependent.
 | Not this phase | Why | Where |
 |---|---|---|
 | Any new git feature | This is a defect batch | G14–G19 |
-| Restyling the graph webview | Item 9 says "the review sidebar" | §12.2 asks the human |
+| Restyling the graph webview | Item 9 says "the review sidebar"; D14's tokens are scoped to the review root | §12.2, resolved: it keeps the workbench language |
 | Deleting `DiffView.vue` | The graph's detail pane still needs it | — |
 | Making `review.fileDiff` stop sending a body nothing renders | A wire change on a request D1 is already at budget for | §11, G13 |
-| Range-level "mark reviewed" once the diff leaves the webview | A capability D12 genuinely costs | §12.2 |
+| Range/hunk-level "mark reviewed" in VS Code's diff editor | Real, separable work — deferred to its own phase, **not** dropped | §11.1, §12.2 |
 | A "pairing failed" handshake frame distinct from `pairingDenied` | A protocol change for a path D3 removes the cause of | §12.3 |
 | G8 F7's cross-instance revocation hole | Unrelated; still open | §11 |
-| A light-theme skin, or a `kiraVersion.review.theme` setting | A setting is a way of not deciding (D14) | §12.2 |
+| Any colour change at all — a fixed palette, a skin, or a `kiraVersion.review.theme` setting | §12.2 resolved item 9 as *structure only*; colours keep deriving from the user's VS Code theme | D14, §12.2 |
 | A mounted-Vue test harness for `packages/git-ui` | Disproportionate to what D17 needs it for | §11 |
 | Editing `docs/v1.3/SPEC.md` | A chapter spec is not retro-edited by a phase | — |
 
@@ -1413,13 +1515,56 @@ Everything before that is order-dependent.
 - **`clientLabel` no longer names a workspace** (D4). If a future phase wants "which windows are
   currently connected" in the pane, that is a live-connection projection off `Server.conns`, not a
   column on `git_clients` — one row now legitimately covers N windows.
-- **Range-level review marking** (D12's cost). If §12.2 says it must survive, the shape is a VS Code
-  editor decoration plus a command, not a webview diff — a real piece of work, and G13's natural
-  neighbour.
+- **Range/hunk-level review marking must come back** (D12, resolved in §12.2). It is a phase of its
+  own, not a fold-in here; §11.1 states the direction and its dependencies concretely enough to
+  sequence, and stops short of designing it.
+
+### 11.1 A future phase: range/hunk-level review marking inside VS Code's native diff editor
+
+**Placeholder-then-design, the convention this chapter already uses for G18/G19/G21** — the
+requirement is fixed here, the mechanism is not, and the full design (decoration lifecycle, how a
+selection maps to a `LineRange`, what happens when the diff is re-opened after new commits land)
+belongs to that phase's own Opus planning pass. What is fixed:
+
+**The requirement.** G11 shipped partial, range-level "reviewed" marking inside the webview's own
+diff; G12 moves every diff into VS Code's native diff editor (D12) and leaves whole-file marking as
+the interim. A later phase restores range-level marking *in that native editor*, so a reviewer can
+mark part of a file reviewed without leaving the diff they are reading.
+
+**The model to follow, named:** VS Code's own built-in Git extension's hunk-staging affordance — the
+per-hunk buttons it renders in the gutter of its diff editor ("stage this hunk"). The review
+sidebar's equivalent is "mark this hunk reviewed" / "mark this hunk unreviewed", with already-reviewed
+hunks visibly distinguished. Concretely that means editor **gutter decorations** plus per-hunk
+**CodeLens** (or `editor/title`-scoped) actions attached to the right-hand document of the diff — not
+a webview, and not a new panel.
+
+**Why it is cheap, and why it can only happen after G12:**
+
+- **No wire change.** `review.mark` already accepts `ranges?: readonly LineRange[]`
+  (`contract.ts:1050-1059`) and `review.fileDiff` already returns `reviewedRanges` projected onto
+  current content (`:1039`, G11's fast/slow path). The phase calls the *existing* request with a
+  range payload instead of a whole-file one. No `CONTRACT_VERSION` bump, no `internal/gitreview`
+  change, no `review.db` migration.
+- **It needs a document to decorate**, which is what G12 creates: `editor.openRangeDiff` (D1) and the
+  fixed `kira-version:` virtual-document scheme (D11). A decoration provider keys on that scheme, so
+  the diff has to be opening in VS Code before there is anywhere to hang one.
+- **It is extension-side only**: `apps/kira-studio-vscode/src` (a decoration/CodeLens provider plus
+  two commands and their manifest entries). No Go change, and no `packages/git-ui` change — the
+  sidebar's file list only needs to re-read `review.files` afterwards, which it already does.
+
+**Suggested dependencies for the SPEC phase table** (the coordinator owns the insertion and any
+renumbering; this plan does not touch `docs/v1.3/SPEC.md`):
+
+| Field | Value |
+|---|---|
+| **Depends on** | **G11** (the `review.mark` `ranges` param, `review.fileDiff`'s `reviewedRanges` projection, `review.db`'s partial-review state — all already built) and **G12** (`editor.openRangeDiff`, diffs opening in VS Code's native editor, and the base64url `kira-version:` virtual-document scheme the decorations attach to) |
+| **Covers upstream** | new — no upstream equivalent, same as G11/G13 |
+| **Touches** | `apps/kira-studio-vscode/src` only; no Go, no `packages/git-ui`, no contract change |
+| **Natural position** | after G13 (which is already in `review.*`'s surface for the AI-comment list, so the two share a review-UI context), and before the G22–G24 review rounds so it is covered by them |
 
 ---
 
-## 12. Three calls worth a human eye before implementation starts
+## 12. Three calls that needed a human eye — two answered, one recorded
 
 ### 12.1 `CONTRACT_VERSION` 18 → 19, for one extension-answered request (D1)
 
@@ -1437,19 +1582,40 @@ do only the toolbar half of item 8. That leaves item 8's headline requirement un
 Files pane the one place in the extension that renders a diff itself, which is precisely the
 inconsistency the item was filed about.
 
-### 12.2 Item 9's real cost: a fixed dark skin in a themeable webview, and the range-marking it takes with it (D12, D14)
+**Resolved: confirmed as planned.** The bump goes ahead exactly as written above — 18 → 19 for
+`editor.openRangeDiff`, extension-answered, with the three hand-maintained copies and the two
+totality-checked maps moving together.
 
-**Two questions, one answer needed before C8/C9:**
+### 12.2 Item 9's two questions — **both resolved**, and both changed the plan (D12, D14)
 
-1. **Light and high-contrast VS Code themes.** Kira Studio has one theme; the review sidebar
-   currently follows the user's. After D14 it will not. A user on a light theme gets a dark sidebar
-   in a light window. This plan judges that acceptable because item 9 asks for it explicitly, and
-   declines to soften it with a setting (D2, D14) — but it is a visible, permanent trade and the
-   person who filed item 9 should confirm it with the light-theme case in front of them.
-2. **Range-level "mark reviewed" (G11 D16) has no home once the diff moves to VS Code** (D12's
-   stated cost). Whole-file marking survives; selecting lines to mark does not. Either that is an
-   accepted loss, or it becomes a VS Code editor-decoration feature — which is a real piece of work
-   and belongs in its own phase, not folded into a defect batch.
+Raised as open calls in this plan's first pass; answered before implementation, and recorded here
+rather than silently folded in, because each answer moved a decision rather than confirming one.
+
+1. **Light and high-contrast VS Code themes — the fixed dark skin is REJECTED.** The original D14
+   transcribed Kira Studio's palette into a `--kv-*` skin, which would have left a user on a light
+   or high-contrast theme with a dark sidebar in a light window. **The answer: take Kira Studio's
+   *structural* design — spacing, layout, panel/toolbar anatomy, control geometry, icon usage,
+   composition — and keep every colour deriving from the user's own VS Code theme.** D14 is
+   re-derived accordingly and is a materially different plan, not a softened one: no colour token is
+   added or changed anywhere, `vscode-tokens.css` is byte-identical afterwards, and the new
+   `kira-structure.css` is colour-free by construction (§8.4 makes that a one-`grep` checklist item).
+   The re-derivation is possible at all because Kira Studio's own primitives already separate
+   geometry from colour declaration by declaration — D14's first table is that seam.
+2. **Range-level "mark reviewed" — the "accept the loss" framing is REJECTED.** It must remain
+   possible once diffs move into VS Code's native diff view. **The answer, matching this plan's own
+   assessment that it is real, separable work:** G12 ships whole-file-only marking as an explicit
+   *interim* state (D12), and a later phase restores range/hunk-level marking inside VS Code's
+   native diff editor, modelled on the built-in Git extension's hunk-staging gutter. §11.1 states
+   that direction and its dependency list concretely — and stops there, since the design belongs to
+   that phase's own planning pass, the same placeholder-then-design convention this chapter already
+   uses for G18/G19/G21. D12 now records the two properties that make it a UI-only phase: the
+   `ranges` payload already exists on `review.mark`, and this phase keeps fetching the
+   `reviewedRanges` a gutter would render.
+
+**One consequence worth naming, since it is now settled rather than open:** the *graph* panel keeps
+the workbench design language it has today — square corners, `density.css`'s own scale — and does not
+follow the review sidebar. Item 9 asked for the sidebar, D14 scopes the structural tokens to it by
+class, and `--kv-radius: 0px` and its comment survive untouched.
 
 ### 12.3 `pairingDenied` is what a server-side pairing *failure* looks like (F14)
 
