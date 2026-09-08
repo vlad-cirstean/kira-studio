@@ -47,6 +47,20 @@ export const EDGE_KIND_STRAIGHT: EdgeKind = 0;
 export const EDGE_KIND_BRANCH_OUT: EdgeKind = 1;
 export const EDGE_KIND_MERGE_IN: EdgeKind = 2;
 
+/** G21 D3b: one patch record's field offsets within a `PATCH_STRIDE`-wide slice of
+ *  `LayoutChunk.patches`/`BuiltEdges.patches` — `(globalEdgeIndex, toRow, toLane, kind)`. */
+export const PATCH_STRIDE = 4;
+export const PATCH_EDGE_INDEX = 0;
+export const PATCH_TO_ROW = 1;
+export const PATCH_TO_LANE = 2;
+export const PATCH_KIND = 3;
+/** The sentinel a patch record's `toRow`/`toLane`/`kind` slot carries when *that* field is not
+ *  what this particular record is patching — reuses `UNRESOLVED_ROW`'s own bit pattern rather
+ *  than inventing a second one: `0xffffffff` is never a legitimate resolved row, lane, or kind
+ *  value in any of the three fields, and a patch never sets `toRow` *back* to `UNRESOLVED_ROW`
+ *  (resolution only ever moves forward), so the two meanings never collide. */
+export const PATCH_UNCHANGED = UNRESOLVED_ROW;
+
 export interface LayoutChunk {
   readonly from: number;
   readonly to: number;
@@ -59,9 +73,14 @@ export interface LayoutChunk {
    *  length `(to - from) + 1`. Lets the renderer find the edges touching a visible row window
    *  in O(1) instead of scanning from row 0. */
   readonly edgeIndex: Uint32Array;
-  /** `(edgeIndex, toRow)` pairs correcting an `UNRESOLVED_ROW` target left dangling by an
-   *  *earlier* chunk — the mechanism that lets a Load more fix up the previous page's edges
-   *  without re-laying it out. Empty when this chunk resolved nothing outside itself. */
+  /** `PATCH_STRIDE`-wide `(globalEdgeIndex, toRow, toLane, kind)` records correcting an edge
+   *  that belongs to an *earlier* chunk — the mechanism that lets a Load more fix up the
+   *  previous page's edges without re-laying it out. `toRow`/`toLane`/`kind` each carry
+   *  `PATCH_UNCHANGED` when that particular field is not what this record is patching, so a
+   *  `toRow`-only resolution (a parent page loading) and a `toLane`/`kind`-only convergence
+   *  (G21 D3: a lane discovered to converge into another at its target row) share one record
+   *  shape and one applier loop instead of two. Empty when this chunk patched nothing outside
+   *  itself. */
   readonly patches: Uint32Array;
   /** High-water mark of lanes allocated by the pass — lets a consumer size the graph column
    *  without scanning. */
@@ -91,6 +110,13 @@ export interface LayoutFrontier {
   /** Colour assigned to each currently-open lane, parallel to `openLanes`; meaningless where
    *  the lane is `LANE_EMPTY`. */
   readonly laneColors: readonly number[];
+  /** G21 D3a: the *global* edge index of the edge that last set `openLanes[lane]` to a real row
+   *  (not `LANE_PENDING`), parallel to `openLanes`/`laneColors`; `-1` where the lane holds no
+   *  such edge (empty, or still pending). This is what lets step 2's convergence discovery
+   *  (`lanes.ts`) patch the *edge*, not just the lane bookkeeping, once a second lane turns out
+   *  to expect the same row — see that module's own doc comment for why this can only be decided
+   *  at the shared target row's own processing, never speculatively at edge-creation time. */
+  readonly laneEdge: readonly number[];
   readonly colorState: ColorState;
   /** Every edge emitted so far, across every chunk, is numbered from 0 in one global sequence
    *  — this is the next number to hand out. Global (not per-chunk) numbering is what lets a

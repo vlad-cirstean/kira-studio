@@ -19,6 +19,12 @@ import {
   EDGE_TO_ROW,
   type EdgeKind,
   type LayoutChunk,
+  PATCH_EDGE_INDEX,
+  PATCH_KIND,
+  PATCH_STRIDE,
+  PATCH_TO_LANE,
+  PATCH_TO_ROW,
+  PATCH_UNCHANGED,
   UNRESOLVED_ROW,
 } from '@kira/git-core';
 
@@ -227,18 +233,26 @@ export class LayoutStore {
   // Internals
   // ---------------------------------------------------------------------------------------
 
-  /** Patches name edges an *earlier* chunk left `UNRESOLVED_ROW` that this chunk's own page
-   *  resolved. Writes `EDGE_TO_ROW` directly into the owning chunk's `edges` buffer — legal
-   *  (it is ours, it was transferred to us, nothing else holds a reference) and exactly what
-   *  keeps every later read (the CSR scan, `#longEdges`) automatically current with no separate
-   *  bookkeeping. */
+  /** Patches name edges an *earlier* chunk left dangling that this chunk's own page resolved —
+   *  either a `toRow` an `UNRESOLVED_ROW` parent just resolved to, or (G21 D3) a `toLane`/`kind`
+   *  a lane just discovered to converge into another. Each `PATCH_STRIDE`-wide record carries
+   *  `PATCH_UNCHANGED` in whichever of `toRow`/`toLane`/`kind` it is not setting, so one loop
+   *  applies both kinds of patch without needing to know which it is. Writes directly into the
+   *  owning chunk's `edges` buffer — legal (it is ours, it was transferred to us, nothing else
+   *  holds a reference) and exactly what keeps every later read (the CSR scan, `#longEdges`)
+   *  automatically current with no separate bookkeeping. */
   #applyPatches(chunk: LayoutChunk): void {
-    for (let i = 0; i < chunk.patches.length; i += 2) {
-      const globalEdgeIndex = chunk.patches[i] as number;
-      const toRow = chunk.patches[i + 1] as number;
+    for (let i = 0; i < chunk.patches.length; i += PATCH_STRIDE) {
+      const globalEdgeIndex = chunk.patches[i + PATCH_EDGE_INDEX] as number;
+      const toRow = chunk.patches[i + PATCH_TO_ROW] as number;
+      const toLane = chunk.patches[i + PATCH_TO_LANE] as number;
+      const kind = chunk.patches[i + PATCH_KIND] as number;
       const target = this.#findChunkForGlobalEdgeIndex(globalEdgeIndex);
       const owner = this.#chunks[target.chunkIndex] as LayoutChunk;
-      owner.edges[target.localIndex * EDGE_STRIDE + EDGE_TO_ROW] = toRow;
+      const base = target.localIndex * EDGE_STRIDE;
+      if (toRow !== PATCH_UNCHANGED) owner.edges[base + EDGE_TO_ROW] = toRow;
+      if (toLane !== PATCH_UNCHANGED) owner.edges[base + EDGE_TO_LANE] = toLane;
+      if (kind !== PATCH_UNCHANGED) owner.edges[base + EDGE_KIND] = kind;
     }
   }
 

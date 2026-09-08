@@ -10,10 +10,12 @@ import {
   EDGE_FROM_LANE,
   EDGE_FROM_ROW,
   EDGE_KIND,
+  EDGE_KIND_MERGE_IN,
   EDGE_STRIDE,
   EDGE_TO_LANE,
   EDGE_TO_ROW,
   type EdgeKind,
+  PATCH_UNCHANGED,
   UNRESOLVED_ROW,
 } from './types.ts';
 
@@ -33,7 +35,9 @@ export interface BuiltEdges {
   readonly edges: Uint32Array;
   /** CSR into `edges`: length `rowCount + 1`, indexed by `row - from`. */
   readonly edgeIndex: Uint32Array;
-  /** `(globalEdgeIndex, toRow)` pairs patching an edge that belongs to an earlier chunk. */
+  /** `PATCH_STRIDE`-wide `(globalEdgeIndex, toRow, toLane, kind)` records patching an edge that
+   *  belongs to an earlier chunk — see `LayoutChunk.patches`'s own doc comment for the
+   *  `PATCH_UNCHANGED` sentinel each field carries when this record does not set it. */
   readonly patches: Uint32Array;
   readonly maxEdgeSpan: number;
 }
@@ -46,7 +50,8 @@ export interface BuiltEdges {
 export class EdgeBuffer {
   #edges = new Uint32Array(0) as Uint32Array<ArrayBuffer>;
   #count = 0;
-  #patches: number[] = []; // flat pairs: [globalEdgeIndex, toRow, globalEdgeIndex, toRow, ...]
+  // flat PATCH_STRIDE-wide groups: [globalEdgeIndex, toRow, toLane, kind, globalEdgeIndex, …]
+  #patches: number[] = [];
   #maxEdgeSpan = 0;
   #lastFromRow = -1;
   readonly #startGlobalIndex: number;
@@ -94,8 +99,9 @@ export class EdgeBuffer {
 
   /** Sets a previously-`UNRESOLVED_ROW` target now that the parent has resolved. If
    *  `globalEdgeIndex` belongs to this buffer, the target is patched in place; otherwise it
-   *  belongs to an earlier chunk and a `(globalEdgeIndex, toRow)` pair is recorded instead —
-   *  the mechanism a Load more uses to fix up a previous page's edges without re-laying it out. */
+   *  belongs to an earlier chunk and a `(globalEdgeIndex, toRow, PATCH_UNCHANGED, PATCH_UNCHANGED)`
+   *  record is appended to `#patches` instead — the mechanism a Load more uses to fix up a
+   *  previous page's edges without re-laying it out. */
   patchTarget(globalEdgeIndex: number, toRow: number): void {
     if (globalEdgeIndex >= this.#startGlobalIndex) {
       const localIndex = globalEdgeIndex - this.#startGlobalIndex;
@@ -110,7 +116,31 @@ export class EdgeBuffer {
       if (span > this.#maxEdgeSpan) this.#maxEdgeSpan = span;
       return;
     }
-    this.#patches.push(globalEdgeIndex, toRow);
+    this.#patches.push(globalEdgeIndex, toRow, PATCH_UNCHANGED, PATCH_UNCHANGED);
+  }
+
+  /** G21 D3b: the counterpart `patchTarget` never had — a lane discovered, at its *target* row's
+   *  own processing (`lanes.ts` step 2), to converge into `toLane` rather than run straight or
+   *  branch out. Sets `EDGE_TO_LANE`/`EDGE_KIND := EDGE_KIND_MERGE_IN` on the edge that was
+   *  pointing at this row, in place if it belongs to this buffer, or as a cross-chunk
+   *  `(globalEdgeIndex, PATCH_UNCHANGED, toLane, EDGE_KIND_MERGE_IN)` record otherwise — the
+   *  exact same route `patchTarget`'s own cross-chunk case already travels, so a `toRow`
+   *  resolution and a `toLane` convergence for the same edge (a pending parent that resolves and
+   *  is then discovered to converge, both patched from a *later* chunk) become two independent
+   *  records applied by the same loop, never a special merged case. */
+  patchConvergence(globalEdgeIndex: number, toLane: number): void {
+    if (globalEdgeIndex >= this.#startGlobalIndex) {
+      const localIndex = globalEdgeIndex - this.#startGlobalIndex;
+      assert(
+        localIndex < this.#count,
+        `EdgeBuffer.patchConvergence(${globalEdgeIndex}): not yet appended in this chunk`,
+      );
+      const base = localIndex * EDGE_STRIDE;
+      this.#edges[base + EDGE_TO_LANE] = toLane;
+      this.#edges[base + EDGE_KIND] = EDGE_KIND_MERGE_IN;
+      return;
+    }
+    this.#patches.push(globalEdgeIndex, PATCH_UNCHANGED, toLane, EDGE_KIND_MERGE_IN);
   }
 
   get count(): number {

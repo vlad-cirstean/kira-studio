@@ -31,6 +31,12 @@ export {
   EDGE_TO_ROW,
   LANE_EMPTY,
   LANE_PENDING,
+  PATCH_EDGE_INDEX,
+  PATCH_KIND,
+  PATCH_STRIDE,
+  PATCH_TO_LANE,
+  PATCH_TO_ROW,
+  PATCH_UNCHANGED,
   UNRESOLVED_ROW,
 } from './graph/types.ts';
 export type {

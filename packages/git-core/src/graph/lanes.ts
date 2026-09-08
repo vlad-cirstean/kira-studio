@@ -18,11 +18,16 @@
  * and disagree on `laneOf`/`colorOf`, breaking the page-by-page-equals-one-pass invariant.
  * Steps 1-2 depend only on row order, which is identical either way, so that is where every
  * convergence — a real merge commit's parents, or several unrelated lanes that simply happen
- * to share a distant single-parent ancestor — is resolved. One consequence: `EdgeKind`'s
- * `merge-in` value is not currently emitted by this pass (every edge is `straight`, continuing
- * the claiming commit's own lane, or `branch-out`, a freshly allocated one) — recorded as a
- * deliberate simplification for a future refinement, not a silently dropped case; see this
- * phase's Findings.
+ * to share a distant single-parent ancestor — is resolved.
+ *
+ * G21 D3: step 2 used to only free the converging lane, leaving the edge that had been pointing
+ * at it from that lane still claiming its *old* `toLane` — the renderer then drew that edge's
+ * final stub in the wrong lane, disconnected from the commit it actually converges into. Step 2
+ * now also patches that edge's `toLane`/`kind` (`EDGE_KIND_MERGE_IN`) via `laneEdge`, the global
+ * edge index that last set each lane's `openLanes` entry to a real row — tracked alongside
+ * `openLanes`/`laneColors` for exactly this purpose. This is still decided only at the shared
+ * target row's own processing (never speculatively at edge-creation time), so the paged-equals-
+ * one-pass invariant this module exists to protect is unaffected: see `lanes.test.ts`.
  */
 import { assert } from '../util/assert.ts';
 import { advanceColorState, allocateColor, initialColorState } from './colors.ts';
@@ -38,6 +43,10 @@ import {
   UNRESOLVED_ROW,
 } from './types.ts';
 
+/** `laneEdge`'s own "no edge" sentinel — a lane that is `LANE_EMPTY`/`LANE_PENDING`, or one that
+ *  has simply never been claimed, holds this rather than a stale global edge index. */
+const NO_EDGE = -1;
+
 export interface LaneAssignment {
   readonly laneOf: Uint32Array;
   readonly colorOf: Uint32Array;
@@ -52,6 +61,7 @@ function freshFrontier(): LayoutFrontier {
     laneCount: 0,
     openLanes: [],
     laneColors: [],
+    laneEdge: [],
     colorState: initialColorState(),
     nextGlobalEdgeIndex: 0,
     pendingBySlot: new Map(),
@@ -64,6 +74,7 @@ function freshFrontier(): LayoutFrontier {
 interface MutableState {
   openLanes: number[];
   laneColors: number[];
+  laneEdge: number[];
   colorState: { nextColor: number; paletteSize: number };
   laneCount: number;
   pendingBySlot: Map<number, PendingEdge>;
@@ -74,6 +85,7 @@ function toMutable(frontier: LayoutFrontier | undefined): MutableState {
   return {
     openLanes: [...source.openLanes],
     laneColors: [...source.laneColors],
+    laneEdge: [...source.laneEdge],
     colorState: { ...source.colorState },
     laneCount: source.laneCount,
     pendingBySlot: new Map(source.pendingBySlot),
@@ -111,6 +123,7 @@ function allocateLane(state: MutableState): number {
   state.laneCount++;
   state.openLanes.push(LANE_EMPTY);
   state.laneColors.push(0);
+  state.laneEdge.push(NO_EDGE);
   return lane;
 }
 
@@ -146,6 +159,7 @@ export function assignLanes(
     assert(resolvedRow >= 0, `assignLanes: resolvedParentSlots names slot ${slot} still -1`);
     edgeBuffer.patchTarget(pending.globalEdgeIndex, resolvedRow);
     state.openLanes[pending.lane] = resolvedRow;
+    state.laneEdge[pending.lane] = pending.globalEdgeIndex;
     state.pendingBySlot.delete(slot);
   }
 
@@ -161,11 +175,17 @@ export function assignLanes(
     laneOf[localRow] = claimedLane;
     colorOf[localRow] = state.laneColors[claimedLane] as number;
 
-    // Step 2: every OTHER lane also expecting this row is a sibling child converging here —
-    // its edge was already emitted (kind decided at that edge's own creation time, see the
-    // module doc comment); all that remains is to free the lane for reuse.
+    // Step 2 (G21 D3b): every OTHER lane also expecting this row is a sibling child converging
+    // here. Its edge was already emitted pointing at its *own* lane (kind decided provisionally
+    // at that edge's own creation time — straight or branch-out, see the module doc comment);
+    // now that convergence is actually discovered, patch that edge to bend into the lane that
+    // won the claim instead, and reclassify it EDGE_KIND_MERGE_IN. Then free the lane for reuse.
     for (let lane = 0; lane < state.laneCount; lane++) {
-      if (lane !== claimedLane && state.openLanes[lane] === row) state.openLanes[lane] = LANE_EMPTY;
+      if (lane === claimedLane || state.openLanes[lane] !== row) continue;
+      const edgeIndex = state.laneEdge[lane];
+      if (edgeIndex !== NO_EDGE) edgeBuffer.patchConvergence(edgeIndex, claimedLane);
+      state.openLanes[lane] = LANE_EMPTY;
+      state.laneEdge[lane] = NO_EDGE;
     }
 
     const parentStart = input.parentOffsets[row] as number;
@@ -174,6 +194,7 @@ export function assignLanes(
 
     if (parentCount === 0) {
       state.openLanes[claimedLane] = LANE_EMPTY;
+      state.laneEdge[claimedLane] = NO_EDGE;
       continue;
     }
 
@@ -202,7 +223,7 @@ export function assignLanes(
       state.pendingBySlot.set(parentStart, { lane: claimedLane, globalEdgeIndex: edgeIndex });
     } else {
       state.openLanes[claimedLane] = parent0Row;
-      edgeBuffer.append(
+      const edgeIndex = edgeBuffer.append(
         row,
         parent0Row,
         claimedLane,
@@ -210,6 +231,7 @@ export function assignLanes(
         state.laneColors[claimedLane] as number,
         EDGE_KIND_STRAIGHT,
       );
+      state.laneEdge[claimedLane] = edgeIndex;
     }
 
     // Step 3b: remaining parents (an octopus merge is this loop running further) always
@@ -234,7 +256,15 @@ export function assignLanes(
         state.pendingBySlot.set(slot, { lane: newLane, globalEdgeIndex: edgeIndex });
       } else {
         state.openLanes[newLane] = parentRow;
-        edgeBuffer.append(row, parentRow, claimedLane, newLane, color, EDGE_KIND_BRANCH_OUT);
+        const edgeIndex = edgeBuffer.append(
+          row,
+          parentRow,
+          claimedLane,
+          newLane,
+          color,
+          EDGE_KIND_BRANCH_OUT,
+        );
+        state.laneEdge[newLane] = edgeIndex;
       }
     }
   }
@@ -244,6 +274,7 @@ export function assignLanes(
     laneCount: state.laneCount,
     openLanes: state.openLanes,
     laneColors: state.laneColors,
+    laneEdge: state.laneEdge,
     colorState: state.colorState,
     nextGlobalEdgeIndex: edgeBuffer.nextGlobalIndex,
     pendingBySlot: state.pendingBySlot,
