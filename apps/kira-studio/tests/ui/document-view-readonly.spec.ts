@@ -99,17 +99,17 @@ test('a read-only MongoDB connection disables Add/Edit/Delete on the document vi
     timeout: 15_000,
   });
 
-  // P22 D4 (F7/OQ-4): the pager moved from #toolbar to #toolbar-end so this view agrees with
-  // DataView.vue's SQL grid about where the shared pager lives — the toolbar's right-most
-  // control, within a few px of the toolbar's own right edge.
-  const pagerLastBox = await page.locator('[data-testid="document-pager-last"]').boundingBox();
-  const toolbarBox = await view.locator('.p-toolbar').first().boundingBox();
-  if (!pagerLastBox || !toolbarBox) {
-    throw new Error('document-pager-last or the toolbar has no bounding box');
+  // Real-interaction fix (reported bug — the pager sits on the right instead of where it made
+  // sense before): mirrors DataToolbar.vue's own P28 D7 revert of d2892f49/P22 D4 — the pager sits
+  // at the toolbar's reading edge, immediately before the page-size picker it pages through,
+  // rather than alone at the far #toolbar-end. Relative positions, not pixel ones (data-view.spec.ts's
+  // own pattern), so a token or spacing change still cannot break this.
+  const pagerBox = await page.locator('[data-testid="document-pager"]').boundingBox();
+  const pageSizeBox = await page.locator('[data-testid="document-page-size-picker"]').boundingBox();
+  if (!pagerBox || !pageSizeBox) {
+    throw new Error('document-pager or document-page-size-picker has no bounding box');
   }
-  expect(
-    toolbarBox.x + toolbarBox.width - (pagerLastBox.x + pagerLastBox.width),
-  ).toBeLessThanOrEqual(12);
+  expect(pagerBox.x).toBeLessThan(pageSizeBox.x);
 
   const addButton = page.locator('[data-testid="document-add"]');
   await expect(addButton).toBeDisabled();
