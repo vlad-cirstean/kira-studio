@@ -1,39 +1,57 @@
 # G18 — Per-repo settings: out of `contributes.configuration`, into a dialog on the graph
 
-> **What this phase is.** The eighteenth phase of `docs/v1.3/SPEC.md`'s headless-git chapter, and
-> the first one whose entire job is *relocating* settings that already exist rather than building a
-> new capability from nothing. G17 found `kiraVersion.stash.showInGraph` fully scaffolded
-> server-side (`porcelain.WalkSpec.IncludeStash`, `walk.go`'s cache-key inclusion of it,
-> `graph/stashRows.ts`'s row filter) and completely inert, and deliberately declined to wire it into
-> the graph — that would need new wire surface and its own design. Asked about it, the user's answer
-> reached past that one setting: *"these settings should be accessible from the git graph itself,
-> not in vscode settings... move them all into a proper dialog. Obviously configurable per repo."*
-> This phase is that move: which of `packages/git-core/src/settings/schema.ts`'s nine keys actually
-> qualify (five do, on inspection — not the three SPEC's prose names as examples, and not the two
-> more this phase's own audit finds do *not* belong), a genuinely new per-repo storage layer, the RPC
-> surface it needs, migration for values users already set, and the dialog itself.
+> **Revision note (post-human-eye answers).** This plan was committed once (`522e95ce`) with four
+> open calls at §10. The user has since answered all four; two matched this plan's own
+> recommendation (10.1) or are addressed by a downstream decision (10.3), and two diverged from the
+> recommendation and change this phase's scope and design (10.2, 10.4). This revision incorporates
+> all four answers directly into the plan's body rather than leaving them as a still-open §10 — every
+> section below (§0, §1, §2, §3, §4, §6, §7, §8, §9) reflects the decisions actually taken. §10 itself
+> is kept, marked resolved, recording what was asked and what was decided — the same role G16's own
+> plan would give it if amended post-answer, not a second round of open questions.
 >
-> **The storage question was open when this plan started and is not open now.** The user's own
-> steering, given mid-investigation: these settings go into Kira Studio's **existing main database**
-> — the one `storage.Open`/`repos.New` already open in `main.go`, already holding `git_clients`
-> (G1's own trust store, `internal/storage/migrations/0016_g1_git_clients.sql`) and the server-owned
-> `protectedBranches`/`fetchAutoIntervalMinutes` pair (`internal/storage/repos/settings.go`) — not a
-> new standalone file, and explicitly not `review.db`'s pattern. §2 D3 records why that direction was
-> independently correct before the steering arrived: `review.db`'s whole design (compressed BLOB
-> content, aggressive TTL/PR-close purges) answers a lifecycle these settings do not have, and
-> `kira.db` already carries exactly this kind of small, durable, git-module row — `git_clients` is
-> the live precedent, not a new pattern being invented for this phase.
->
-> **The "server's own default" sentence already sitting in `graph.loadMore`/`graph.stream`/
-> `review.resolveBase`'s own doc comments turns out to be almost the whole design.** All three
-> already declare `scope`/`pageSize`/`baseCandidates` as *optional* params with documented fallback:
-> "a raw socket client that omits them gets the server's own defaults." That sentence was written for
-> a hardcoded constant (`"all"`, `logsession.DefaultPageSize`, `["main", "master"]`). Upgrading what
-> "the server's own default" *means* — from a fixed constant to "the per-repo stored value, falling
-> back to the schema default" — needs **zero change to any of those three request shapes**. The
-> extension simply stops sending the three fields (exactly what "a raw socket client" already does
-> today, an already-tested code path), and three lines change in `gitrpc/graph.go`/`review.go`. See
-> D6.
+> **The short version of what changed**: seven settings move into the per-repo dialog now, not five
+> — `pull.strategy` and `log.level` join the original five. `log.level` is not actually per-repo in
+> any meaningful sense (§1 F1 already said so), so it is stored through the *same* new mechanism
+> under a reserved, non-repo sentinel key rather than a real `repo_id` (D14) — genuinely resolved,
+> not glossed over. `git.path` gets its dead server-side wiring fixed in this phase after all (D15),
+> but *not* by adding it to the new per-repo dialog: it was already correctly classified as
+> server-owned (§10.5's own recommendation stands), and fixing its wiring means finishing that
+> classification — a leaf on the *existing* server-owned `settings` table
+> (`internal/storage/repos/settings.go`, `protectedBranches`'s own sibling), surfaced in Kira
+> Studio's own existing Git settings section, not the new git-ui dialog. It also, as a direct
+> consequence, drops out of `packages/git-core/src/settings/schema.ts` and
+> `contributes.configuration` entirely — the same status `protectedBranches`/`fetchAutoInterval`
+> already have (neither is declared there either). The per-repo dialog therefore ends up showing
+> exactly the seven settings that actually live in its own storage — nothing read-only, nothing left
+> over (D-13-revised, §10.3 resolved).
+
+---
+
+## Original framing (unchanged)
+
+The eighteenth phase of `docs/v1.3/SPEC.md`'s headless-git chapter, and the first one whose entire
+job is *relocating* settings that already exist rather than building a new capability from nothing.
+G17 found `kiraVersion.stash.showInGraph` fully scaffolded server-side
+(`porcelain.WalkSpec.IncludeStash`, `walk.go`'s cache-key inclusion of it, `graph/stashRows.ts`'s row
+filter) and completely inert, and deliberately declined to wire it into the graph — that would need
+new wire surface and its own design. Asked about it, the user's answer reached past that one setting:
+*"these settings should be accessible from the git graph itself, not in vscode settings... move them
+all into a proper dialog. Obviously configurable per repo."* This phase is that move.
+
+**The storage question was open when this plan started and is not open now.** The user's own
+steering: these settings go into Kira Studio's **existing main database** — the one
+`storage.Open`/`repos.New` already open in `main.go`, already holding `git_clients` (G1's own trust
+store) and the server-owned `protectedBranches`/`fetchAutoIntervalMinutes` pair
+(`internal/storage/repos/settings.go`) — not a new standalone file, and explicitly not `review.db`'s
+pattern. §2 D3 records why that direction was independently correct before the steering arrived.
+
+**The "server's own default" sentence already sitting in `graph.loadMore`/`graph.stream`/
+`review.resolveBase`/`remote.pullPreflight`'s own doc comments turns out to be almost the whole
+design.** All four already declare their settings-sourced params optional, with documented fallback:
+"a raw socket client that omits them gets the server's own defaults." Upgrading what "the server's
+own default" *means* — from a fixed constant to "the per-repo (or, for `log.level`, instance-wide)
+stored value, falling back to the schema default" — needs **zero change to any of those four request
+shapes**. See D6.
 
 ---
 
@@ -42,1033 +60,686 @@
 ### 0.1 Baseline
 
 Authored against `claude/feature-v1-3-headless-git` at `8442d866` (G1–G17 planned and, except G17
-itself, implemented; this commit is the SPEC renumbering that inserted this phase's own row and
-shifted G18–G29 to G19–G30). Working tree clean; no other agent running concurrently. Every claim
-below was checked against source read in this container — `packages/git-core/src/settings/
-schema.ts` in full, the settings path through `apps/kira-studio-vscode/src/extension.ts` and
-`proxyHandlers.ts`, `packages/git-ipc/src/contract.ts`'s `SettingsSnapshot` and the three requests
-that already inject settings values, `internal/gitreview` end to end, `internal/storage/repos/
-{settings,gitclients}.go` and their migrations, `internal/gitclient/repo.go`'s `RepoID` derivation,
-`internal/gitsession/{entry,conn,registry,subscriber}.go`, `internal/notify`, and
+itself, implemented); this revision incorporates the user's answers to the original plan's §10,
+recorded at commit `522e95ce`. Working tree clean at the time of the original investigation; no
+other agent running concurrently. Every claim in the original plan was checked against source read
+in this container (schema.ts, the settings path through `extension.ts`/`proxyHandlers.ts`,
+`contract.ts`, `internal/gitreview`, `internal/storage/repos/{settings,gitclients}.go` and their
+migrations, `internal/gitclient/repo.go`'s `RepoID`, `internal/gitsession/*`, `internal/notify`,
 `packages/git-ui/src/{App.vue,components/AppToolbar.vue,components/dialogs/StashDialog.vue,
-state/settings.ts}` — not assumed from SPEC's prose alone.
+state/settings.ts}`); this revision additionally checked `apps/kira-studio/frontend/src/workbench/
+SettingsDialog.vue`'s existing "Git" section (confirms `protectedBranches`/`fetchAutoIntervalMinutes`
+are already edited there — the natural, precedented home for `git.path` once it is genuinely
+server-owned, D15), `packages/shared/domain/settings.ts`'s `gitSettingsSchema` (the TS source
+`storage/model/settings.go`'s own doc comment says it "mirrors... verbatim" — `git.path`'s fix must
+touch this file too), `internal/gitrpc/{handlers.go,graph.go,remote.go,wire.go}`'s exact
+`Discovery.Status(ctx, "")` call sites and `remote.pullPreflight`'s `StrategySetting` plumbing.
 
 ### 0.2 Scope
 
-1. A real, audited move-or-stay call for every one of `schema.ts`'s nine keys (§1 F1, §2 D1) — not
-   just the three SPEC's own G18 row names as candidates.
-2. New per-repo storage in `kira.db` (§2 D3), keyed by `RepoID` (§2 D2 — already this app's own
-   stable per-repo identity, reused from `review.db`'s own `repo_id` column, not invented).
+1. A real, audited move-or-stay call for every one of `schema.ts`'s nine keys (§1 F1, §2 D1) —
+   **revised**: seven move, not five (10.2's answer); `workbench.tree.indent` stays, not a candidate;
+   `git.path` stays server-owned but is fixed and relocated out of `schema.ts` entirely (10.4's
+   answer, D15).
+2. New per-repo storage in `kira.db` (§2 D3), keyed by `RepoID` for six of the seven moved keys, and
+   by a reserved non-repo sentinel key for the seventh (`log.level`, D14 — 10.2's own "resolve the
+   mechanics" instruction).
 3. New RPC surface (`repoSettings.get`/`repoSettings.set`/`repoSettings.changed`), a
-   `CONTRACT_VERSION` bump (§2 D5), and — the one piece that turns out to need *no* wire-shape
-   change at all — upgrading `graph.loadMore`/`graph.stream`/`review.resolveBase`'s existing
-   "server's own default" to mean "this repo's stored value" (§2 D6).
-4. A dialog in `packages/git-ui`, opened from a new toolbar entry point `AppToolbar.vue` has been
-   explicitly reserving since P4 (§1 F8), matching this app's existing modal conventions
-   (`StashDialog.vue`).
-5. Removing the five moved keys from `apps/kira-studio-vscode/package.json`'s
-   `contributes.configuration`, and a one-time, best-effort migration for a value a user already set
-   there (§2 D11) — not a silent data loss, and not a blocking requirement either.
+   `CONTRACT_VERSION` bump (§2 D5), and upgrading `graph.loadMore`/`graph.stream`/
+   `review.resolveBase`/`remote.pullPreflight`'s existing "server's own default" to mean "this
+   repo's (or, for `log.level`, this instance's) stored value" (§2 D6) — no wire-shape change to any
+   of the four.
+4. A dialog in `packages/git-ui`, opened from the toolbar entry point `AppToolbar.vue` has been
+   reserving since P4 (§1 F8), matching this app's existing modal conventions (`StashDialog.vue`),
+   showing exactly the seven settings that moved — nothing read-only, nothing else (10.3's answer,
+   D13-revised).
+5. **New in this revision (10.4's answer, D15)**: fixing `kiriVersion.git.path`'s dead server-side
+   wiring — `Discovery.Status(ctx, "")` is hardcoded everywhere it is called; this phase makes it
+   read a real, configured, server-owned value instead. This is *not* the per-repo dialog's job —
+   it is completing the classification §0.2 item 1 above already assigns `git.path`
+   ("stays" — SPEC-named, server-owned), the same way `protectedBranches`/`fetchAutoIntervalMinutes`
+   already work, in the same existing `settings` table and the same existing Kira Studio settings
+   surface those two use.
+6. Removing the seven moved keys from `apps/kira-studio-vscode/package.json`'s
+   `contributes.configuration`, *and* removing `git.path` from there too (once genuinely
+   server-owned, it has no more business being a VS Code setting than `protectedBranches` does) —
+   plus a one-time, best-effort migration for a value a user already set for any of the eight (§2
+   D11).
 
 ### 0.3 Not in this phase
 
-- **Actually filtering the graph by `stash.showInGraph`.** This phase moves *where the setting is
-  stored and edited*. It does not build `WalkSpec.IncludeStash`/`StashShas` population from a
-  `stash.list` read, and does not call `graph/stashRows.ts`'s filter from anywhere. That is G17 D1's
-  own explicitly-deferred, separately-scoped feature (a real row-filter placement question, server
-  vs. client, that G17's own plan left open) — toggling the setting in the new dialog changes what is
-  *stored*, not what the graph *shows*, exactly as inert after this phase as before it. §10.1 flags
-  this explicitly: it is the single likeliest place a reviewer reads the user's own words ("move
-  them all into a proper dialog") as also meaning "and make them work."
-- **`protectedBranches`/`fetch.autoInterval`/`git.path`** — SPEC's own server-owned trio, untouched.
-  Two of the three (`protectedBranches`, `fetchAutoIntervalMinutes`) are already correctly
-  server-owned in `kira.db` today (G7 D16) — nothing to do. `git.path` is a genuine third case, not
-  identical to the other two, and is discussed at F3/§10.5 — it stays put per SPEC either way.
-- **`log.level`, `pull.strategy`.** Audited and kept where they are — §1 F1/D1 explain why, and
-  §10.2 hands the call to a human, since SPEC's own prose does not name them either way.
-- **`workbench.tree.indent`.** Not a candidate at all — a read-only mirror of a VS Code setting this
-  extension does not own; `source: 'host'` already excludes it from `contributes.configuration` and
-  nothing about this phase changes that.
-- **No new Vue component-rendering test tier.** G16 built exactly one Playwright tier for
-  `packages/git-ui` (pixel geometry against a dead transport) and explicitly declared growing it into
-  a behavior tier "a phase of its own." This phase does not build that phase. §2 D13.
-- **No change to Kira Studio's own Wails `SettingsDialog.vue`** (`apps/kira-studio/frontend`) — a
-  different settings surface, for a different module's settings, untouched.
-- **No `docs/v1.3/SPEC.md` edit.** Same convention G12/G14/G15/G16/G17 all followed.
+- **Actually filtering the graph by `stash.showInGraph`.** Unchanged from the original plan — the
+  user picked this plan's own recommendation at 10.1 ("keep the split"). This phase moves *where the
+  setting is stored and edited*, not what the graph shows. §10.1 (resolved).
+- **`protectedBranches`/`fetch.autoInterval`.** Already correctly server-owned in `kira.db` (G7 D16)
+  — untouched. (`git.path` is no longer in this "untouched" bucket as of this revision — it moves
+  from "SPEC-named but not actually wired" to "wired, this phase," §0.2 item 5.)
+- **No new Vue component-rendering test tier.** G16's own declared non-goal, unchanged.
+- **No change to Kira Studio's own Wails `SettingsDialog.vue` beyond adding one new `git.path` field
+  to its existing "Git" section** (D15) — no redesign of that dialog, no new section, no change to
+  its other five sections (Appearance/Data/Cache/Connected editors/Advanced).
+- **No `docs/v1.3/SPEC.md` edit.** Same convention every prior phase in this chapter followed.
 
-### 0.4 Ground rules
+### 0.4 Ground rules (unchanged)
 
-- **Classify every key, not just the three SPEC names.** §1 F1 is the audit; §2 D1 is the table.
-- **Reuse before inventing.** `RepoID` (§1 F5), `kira.db`'s per-leaf-JSON-row pattern (§1 F6),
-  `internal/notify.Emitter[T]` (§1 F11), and the three requests' own already-optional
-  `scope`/`pageSize`/`baseCandidates` params (§1 F12) are all existing seams this phase reuses rather
-  than re-derives — each decision below names which one it is standing on.
-- **The dialog matches this app's existing modal, not a new visual language.** `StashDialog.vue`'s
-  `.kv-modal-backdrop`/`.kv-modal`/`useModalFocus` are reused verbatim.
+- **Classify every key, not just the three SPEC names.** §1 F1 is the audit; §2 D1 is the table,
+  revised.
+- **Reuse before inventing.** `RepoID`, `kira.db`'s per-leaf-JSON-row pattern, `internal/
+  notify.Emitter[T]`, and the four requests' own already-optional settings-sourced params are all
+  existing seams this phase reuses. `git.path`'s fix reuses `protectedBranches`'s own exact pattern
+  (closure-injected, read fresh, never cached) rather than inventing a new one (D15).
+- **The dialog matches this app's existing modal, not a new visual language.** Unchanged.
+- **A setting that is not genuinely per-repo says so, in the UI, rather than pretending.** New this
+  revision, directly answering the tension 10.2 asked this plan to resolve rather than paper over:
+  `log.level`'s field in the dialog carries a visible note that it applies to this installation, not
+  this repository (D13-revised, D14).
 
 ---
 
-## 1. Findings
+## 1. Findings (unchanged from the original investigation; §1 F1's table is superseded by §2 D1's revised version, kept below for the audit trail)
 
-### F1 — Every key in `schema.ts`, audited against SPEC's own criterion, not against the three named examples
+### F1 — Every key in `schema.ts`, audited against SPEC's own criterion — original table, see D1 for the revised verdicts
 
 SPEC's "Settings ownership" section states the test precisely: server-owned when "two windows
-disagreeing about them is a correctness/safety issue, not a preference." Applied to all nine keys in
-`packages/git-core/src/settings/schema.ts` (`:43-120`), not just the three SPEC's G18 row lists as
-candidates:
+disagreeing about them is a correctness/safety issue, not a preference." The original audit's
+per-key reasoning is unchanged and is restated in D1 below with the user's answers folded in; it is
+not re-derived here a second time.
 
-| Key | Type | Two-window disagreement | Verdict |
-|---|---|---|---|
-| `kiraVersion.git.path` | string | SPEC names it server-owned explicitly | **stays** (as-is; F3 below is a separate, pre-existing gap) |
-| `kiraVersion.graph.pageSize` | number | Harmless — a page-size fetch is purely local rendering | **moves** |
-| `kiraVersion.graph.scope` | enum | Harmless — each window's own graph view | **moves** |
-| `kiraVersion.log.level` | enum | N/A — not repo-scoped at all; a diagnostic-verbosity preference for *this extension instance's* output channel, unrelated to which repo is open | **stays**, §10.2 |
-| `kiraVersion.review.baseCandidates` | stringArray | Harmless per SPEC's test, and arguably a *better* fit for per-repo than the three SPEC names — different repos genuinely use different base-branch conventions (`main` vs. `develop` vs. `trunk`) | **moves** |
-| `kiraVersion.pull.strategy` | enum | Each pull is independently valid regardless of which strategy produced it — no cross-window state corruption, but it is a personal integration-style preference (some people always rebase), not a graph/stash *display* setting, and two people on the same repo routinely want different personal defaults here | **stays**, §10.2 |
-| `kiraVersion.stash.includeUntracked` | boolean | Harmless — a dialog checkbox default | **moves** |
-| `kiraVersion.stash.showInGraph` | boolean | Harmless — the reason this phase exists | **moves** |
-| `workbench.tree.indent` | number, `source: 'host'` | Not ours to move — read-only mirror of VS Code's own setting | **stays**, not a candidate |
+### F2 — F13 (unchanged)
 
-Five keys move: `graph.pageSize`, `graph.scope`, `stash.showInGraph`, `stash.includeUntracked`,
-`review.baseCandidates`. This is SPEC's three named examples plus `stash.includeUntracked` (same
-"stash.\*" P9 origin as `showInGraph`, same display-default shape) and `review.baseCandidates`
-(SPEC's own "and similar" catch-all, and the strongest per-repo case of the whole set on inspection).
-`log.level` and `pull.strategy` are genuine judgment calls, not slam dunks either way — §10.2.
+The settings-flow, `git.path`-dead-server-side, `protectedBranches`/`fetchAutoIntervalMinutes`
+already-correct, `RepoID`-already-exists, `kira.db`-already-houses-this-shape,
+`CONTRACT_VERSION`-always-bumps, `AppToolbar.vue`-has-no-gear-yet, `StashDialog.vue`-modal-
+convention, zero-git-ui-tests, and `internal/notify.Emitter[T]`-already-exists findings from the
+original plan are unchanged in substance and are not repeated verbatim here — see the original
+commit `522e95ce`'s §1 F1–F13 for the full text each decision below still cites by number
+(F3/F5/F6/F7/F8/F9/F10/F11/F12/F13 are all referenced, unchanged, throughout §2).
 
-### F2 — The settings flow end to end, today
+### F14 — `remote.pullPreflight`'s `strategySetting` already follows the identical pattern F12 found for `scope`/`pageSize`/`baseCandidates`
 
-- `schema.ts`'s `SETTINGS` (§ above) is read by `apps/kira-studio-vscode/src/extension.ts`'s
-  `readRawSettings()` (`:74-81`), which iterates every `SETTING_KEYS` member against
-  `vscode.workspace.getConfiguration()` — one flat object, **per VS Code window**, not per repo.
-  `coerceSettings()` (git-core) validates/falls-back; the result is `currentSettings`, closed over by
-  `proxyHandlers.ts`'s handlers.
-- `app.init`'s `settings` field is composed **client-side**, in `proxyHandlers.ts:131-139` —
-  `settings: settings()` — never touched by the Go server, which has no notion of it at all today
-  (confirmed: `gitclient/settings.go`'s `SettingsSnapshot`/`DefaultSettings()` have **zero callers**
-  anywhere in `apps/kira-studio`, F13 below).
-- **Three requests already inject a subset of that snapshot per-call**, exactly matching SPEC's "can
-  travel with the request" sentence, and each one's own doc comment already anticipates a raw client
-  omitting the field: `graph.loadMore`/`graph.stream` (`contract.ts:1001-1013,1444-1456`, D6 there —
-  `scope`/`pageSize`) and `review.resolveBase` (`:1027-1038` — `baseCandidates`), all injected by
-  `proxyHandlers.ts` (`:173-184,315-320,400-410`) from the same `currentSettings()` closure.
-- `packages/git-ui/src/state/settings.ts`'s `SettingsState` holds the `app.init` snapshot and applies
-  `settings.changed` events (`bridge.on('settings.changed', ...)`) — but that event, today, is
-  entirely a **window-scoped** VS Code `onDidChangeConfiguration` echo
-  (`extension.ts:428-453`), not anything server-originated or repo-scoped.
-- `App.vue` reads three leaves off `SettingsState` directly: `pageSize` (`:143-145`, feeds
-  `LoadMoreButton.vue`'s label and `graph.loadMore`'s own request, per G16 F3), `treeIndent`
-  (`:151-153`, host-only, untouched by this phase), and `stashIncludeUntrackedDefault` (`:158-162`,
-  `StashDialog.vue`'s create-mode default).
+`packages/git-ipc/src/contract.ts:1318-1327`: `strategySetting?: PullStrategy | 'auto'`, its own doc
+comment — *"G7 D2: injected by the extension from `kiraVersion.pull.strategy`, exactly as
+`review.resolveBase` injects `baseCandidates`. Absent for every raw socket client — the server treats
+that the same as `'auto'`."* Server-side, `gitrpc/remote.go:29` — `entry.PullPreflight(ctx, p.Branch,
+p.StrategySetting)` — the empty-string default resolves deeper inside `PullPreflight` itself. This is
+the fourth instance of F12's pattern, not a new one, and is why moving `pull.strategy` (10.2's
+answer) costs the same "zero param-shape change, one new lookup" price as the original four keys —
+D6 is extended, not redesigned, to cover it.
 
-### F3 — `kiraVersion.git.path` is already dead server-side, a separate, pre-existing gap this phase does not fix
+### F15 — Kira Studio's own `SettingsDialog.vue` already has a "Git" section, already editing exactly the sibling settings `git.path` needs to join
 
-Every server-side call site that resolves git's location passes a hardcoded empty string:
-`gitrpc/graph.go:109,192`, `gitrpc/handlers.go:134,147` all call `r.deps.Discovery.Status(ctx, "")`.
-`gitclient.Client.Status(ctx, configuredGitPath)` exists and is documented to take "the git.path
-setting," but nothing in this tree ever supplies anything but `""`. So `kiriVersion.git.path`,
-declared client-side in `schema.ts` and carried in `app.init`'s `SettingsSnapshot`, has never actually
-reached the driver that would use it — a different, older kind of orphaned setting than
-`stash.showInGraph`'s (that one is inert because nothing reads it at all; this one is inert because
-what *would* read it is wired to ignore it). SPEC keeps `git.path` server-owned, unchanged, and this
-phase's own scope is the five keys F1 identifies as moving — fixing this is real work (threading a
-configured path from `kira.db`'s settings row, which already has no `git.path` leaf at all, into
-`Discovery.Status`) that this phase does not do. §10.5 flags it as worth a human's attention
-separately, since it is the one member of the "stays" trio that, unlike the other two, is not
-actually functioning as server-owned today either — it simply isn't functioning as anything.
-
-### F4 — `protectedBranches`/`fetchAutoIntervalMinutes` are already correctly positioned; no action needed
-
-`internal/storage/model/settings.go:28-35`'s `GitSettings` (`ProtectedBranches`,
-`FetchAutoIntervalMinutes`) is read by `main.go:118-125`'s `gitRegistry.Settings` closure, itself
-read fresh on every push pre-flight and auto-fetch tick per G7 D16's own doc comment ("never cached,
-since a stale protected-branch list is a safety bug"). This is SPEC's server-owned trio working
-exactly as designed, already in `kira.db`, already validated (`GitPatch.Validate`,
-`storage/repos/settings.go:130-141`). Confirms F1's classification of these two needs no change and
-this phase does not touch `storage/model/settings.go`'s existing `GitSettings`/`GitPatch` at all.
-
-### F5 — `RepoID` already exists, is already this app's per-repo identity, and `review.db` already keys on it
-
-`internal/gitclient/repo.go:196-206` (D7): `RepoID` is the worktree root for a non-bare repo, the git
-dir for a bare one — resolved once per `repo.open`/`Registry.Acquire` and carried on every RPC as
-`repoId` (confirmed: `RepoID string \`json:"repoId"\`` appears on effectively every `*Params` struct
-in `gitrpc/wire.go`). `internal/gitreview/migrations/0001_g11_review.sql`'s own `review_session`
-table already keys `UNIQUE (repo_id, branch)` on exactly this string. **No new identity concept is
-needed anywhere in this phase** — the same `RepoID` that already flows through every request and
-already keys `review.db`'s rows is this phase's own key too. The one caveat, inherited from `RepoID`
-itself rather than introduced here: it is a filesystem path, so moving a repository changes its
-identity and starts it with fresh (default) settings — the same behavior `review.db`'s own sessions
-already have, not a new limitation this phase introduces.
-
-### F6 — `kira.db` already houses exactly this shape of git-module data, twice over — and `review.db`'s own design argues against reusing it here
-
-Two precedents, both already in `kira.db`, both git-module state:
-
-1. **`git_clients`** (`internal/storage/migrations/0016_g1_git_clients.sql`, G1's own trust store) —
-   proof that a git-module table living in the app's main database, accessed from `internal/git*`
-   packages, is already this codebase's own established pattern, not a new one this phase would be
-   inventing. `internal/gitsock/clients.go`'s `TrustStore` interface, satisfied structurally by
-   `*repos.GitClientsRepo` and wired in by `main.go` (not a bridge/adapter-layer boundary — `gitsock`
-   already imports `internal/storage/repos` directly), is the exact injection shape this phase reuses
-   for the new per-repo settings accessor (D3, D8).
-2. **`internal/storage/repos/settings.go`'s `SettingsRepo`** — a `settings(key TEXT, value TEXT)`
-   table, one JSON-valued row per leaf (`"${section}.${key}"`), read via `leaf`/`leafValid` helpers
-   that overlay stored values onto `defaultSettings()`'s own baseline, falling back to the default on
-   any unparseable or invalid stored value (`:164-195`). This is **directly reusable**, unchanged in
-   shape, for a per-repo variant — the only structural addition a per-repo table needs is a `repo_id`
-   column joining the existing `(key, value)` shape into a composite key, and the leaf/leafValid
-   fallback-to-default behavior transfers verbatim (D3, D8).
-
-`review.db` (`internal/gitreview/db.go:15-20`) is real prior art for "a second SQLite file, per SPEC
-its lifecycle — bulk compressed BLOB content, aggressive TTL/PR-close purges wanting to reclaim space
-— is nothing like the rest of the app's data." A settings row is the opposite of that description on
-every axis: tiny, never purged, no reason to want a separate file's own vacuum/compaction posture.
-**Decided** (user steering, not merely this plan's own preference, though this plan reached the same
-conclusion independently before that steering arrived): `kira.db`, not a new file, not `review.db`.
-
-### F7 — CONTRACT_VERSION bumps for every wire-shape addition, without exception, per this project's own six-bump history
-
-`gitrpc/contract.go:11-33`'s own dated comment history bumps for: three additions (G7), one new event
-(G10), three new requests plus one `UiActionKind` member (G11), one new request (G12, even though "the
-Go server neither emits nor parses this method" — the constant is "the sole compatibility authority"
-regardless of which side of the wire actually changed), five new requests plus a reshaped param plus
-two `UiActionKind` members (G13), and **one member added to an existing type**
-(`SettingsSnapshot.'workbench.tree.indent'`, G14) bundled with one optional field plus one enum
-member. There is no precedent anywhere in this history for "a field changed, no bump" — G17's own
-"stays at 21" plan (§7.4 there) held only because it added *zero* wire surface of any kind, a fact
-its own plan proves with a `git diff --stat` check. This phase adds two requests, one event, and
-narrows an existing type (`SettingsSnapshot` loses five members) — a bump is required by this
-project's own established rule, not a judgment call. §2 D5.
-
-### F8 — `AppToolbar.vue` has no settings entry point, and has been explicitly reserving one since P4
-
-The component's own top-of-file doc comment (`:2-10`) states the full intended layout —
-`[repo ▾] [branch ▾] │ ⟳ │ Fetch Pull Push │ Stash ▾ │ Search […] ⚙` — and then says plainly: "this
-toolbar has no settings gear of its own to sit beside (out of scope entirely, no phase implements
-one)." The `⚙` was always part of the intended design, in the exact position (immediately after
-`SearchBox.vue`, before the remote-progress/undo cluster) the template's actual right-hand section
-already occupies (`:290-313`) — this phase is the one that builds it, in the slot already reserved
-for it, not a new design decision about where it goes.
-
-### F9 — The modal convention to match: `StashDialog.vue`
-
-`.kv-modal-backdrop` / `.kv-modal` (`role="dialog" aria-modal="true"`), `useModalFocus(active, rootEl)`
-for focus trapping, `.kv-modal-title`/`.kv-modal-actions`/`.kv-tag-field` for structure, a primary
-button plus a Cancel — all declared unscoped by `CheckoutDialog.vue`/`TagDialog.vue`/
-`RevertDialog.vue` and reused, not redeclared, by every dialog that follows (`StashDialog.vue`'s own
-closing comment: "`App.vue` always mounts all of them alongside this file, so redeclaring any of it
-here would only be duplicate CSS"). The new dialog follows the same rule.
-
-### F10 — `packages/git-ui` has zero tests of any kind, confirmed still true
-
-`find packages/git-ui -name '*.test.ts'` and `-name '*.spec.ts'` both return nothing. This matches
-G16's own finding verbatim and is unchanged by G17 (which touched only `App.vue`'s one `runUiAction`
-case). What *does* exist, and is genuinely testable without a DOM: every piece of client logic this
-app has ever needed tested lives in a plain `state/*.ts` class (`StashState`, `OpsState`, `RefsState`,
-`SettingsState` itself), never in a `.vue` file's own `<script setup>` block. This phase's own new
-client logic (dirty-tracking, per-field validation, patch construction) goes into a plain-`.ts` state
-class for exactly this reason (D13).
-
-### F11 — `internal/notify.Emitter[T]` already exists and is exactly this phase's own live-propagation seam
-
-`internal/notify/notify.go`, a small generic pub-sub ("replacing the Set\<handler\>/on(cb)⇒unsubscribe
-idiom... each hand-roll," already used by `gitsock/pairing.go`, `connections/service.go`,
-`oplog/wire.go`, `metrics/ticker.go`, `preconnect/supervisor.go`): `Subscribe(fn func(T))
-(unsubscribe func())`, `Emit(v T)` snapshotting subscribers under a lock and calling them with the
-lock released (safe against a re-entrant subscribe/unsubscribe/emit). This is a direct fit for "every
-open connection on this repo sees a settings change live" — genuinely simpler than
-`gitsession/subscriber.go`'s own coalescing mechanism, which is purpose-built for high-frequency
-filesystem watcher signals (flag-OR plus a capacity-1 wake channel) that a rare, user-triggered dialog
-Save has no need of. D7 uses it directly rather than extending `subscriber.go`'s watcher-specific
-type.
-
-### F12 — `graph.loadMore`/`graph.stream`/`review.resolveBase` already document the exact fallback this phase needs to redirect, with zero shape change required
-
-Quoted in full because the wording is load-bearing: `graph.loadMore`'s own comment
-(`contract.ts:1002-1006`) — *"`scope`/`pageSize` (G3 D6): optional, injected by the extension from
-the window's own `kiraVersion.graph.*` settings — SPEC's 'can travel with the request and differ per
-window harmlessly'. **A raw socket client that omits them gets the server's own defaults**
-('all', 5000)."* `review.resolveBase`'s comment (`:1032-1035`) says the identical thing for
-`baseCandidates`. Server-side, `gitrpc/graph.go:19-33`'s `walkSpecFrom`/`pageSizeFrom` are exactly
-that fallback — `scope == "" → "all"`, `pageSize == nil → logsession.DefaultPageSize` — already fed a
-`repoID` one call up the stack (`resolveWalkRequest(c, p.RepoID, p.Range, p.Scope, p.PageSize)`,
-`graph.go:115,188`). **The fallback already exists, is already reached by an already-tested code
-path (a raw socket client), and already has `repoID` in scope where it runs.** Upgrading "the
-server's own default" from a hardcoded constant to "this repo's stored value, or the schema default"
-needs no change to any of these three requests' param shapes — the extension simply stops sending the
-three fields, and `walkSpecFrom`/`review.go`'s equivalent gain one lookup each. D6.
-
-### F13 — `internal/gitclient/settings.go` is dead code today, left over from a different design
-
-`SettingsSnapshot`/`DefaultSettings()` there (`git.path`/`graph.pageSize`/`graph.scope`/`log.level`,
-its own comment: "OQ-2 defers real settings-surface integration... until then, app.init always
-answers with these fixed defaults") has **zero callers anywhere in `apps/kira-studio`** — confirmed
-by direct grep. `app.init`'s real settings composition happens client-side in `proxyHandlers.ts`
-(F2), never through this file. It predates that design and was never removed. This phase deletes it
-(D9) rather than repurposing it — the new per-repo model belongs in `internal/storage/model`
-alongside `GitSettings`, matching where the *other* server-owned settings validation already lives,
-not in `gitclient`, which holds no settings-validation code that is not this one dead file.
+`apps/kira-studio/frontend/src/workbench/SettingsDialog.vue:102` — `sections = ['Appearance',
+'Data', 'Cache', 'Connected editors', 'Git', 'Advanced']`; its "Git" template branch (`:680-735`)
+already edits `draft.git.protectedBranches` (a multi-line textarea, `resetProtectedBranches`) and
+`draft.git.fetchAutoIntervalMinutes` (a validated number input, `resetLeaf('git',
+'fetchAutoIntervalMinutes')`). `git.path` is a third leaf of the exact same `GitSettings` struct
+(`internal/storage/model/settings.go:31-35`) — adding a plain text input beside the two that already
+exist there is a small, precedented addition, not a new UI surface (D15).
 
 ---
 
 ## 2. Decisions
 
-### D1 — The move-or-stay table (F1), restated as the decision
+### D1 — The move-or-stay table — **revised** (10.2, 10.4)
 
-**Moves** (new per-repo storage + dialog): `graph.pageSize`, `graph.scope`, `stash.showInGraph`,
-`stash.includeUntracked`, `review.baseCandidates`.
+| Key | Verdict | Storage |
+|---|---|---|
+| `kiraVersion.graph.pageSize` | **moves** | new per-repo table, real `repo_id` |
+| `kiraVersion.graph.scope` | **moves** | new per-repo table, real `repo_id` |
+| `kiraVersion.review.baseCandidates` | **moves** | new per-repo table, real `repo_id` |
+| `kiraVersion.stash.showInGraph` | **moves** | new per-repo table, real `repo_id` |
+| `kiraVersion.stash.includeUntracked` | **moves** | new per-repo table, real `repo_id` |
+| `kiraVersion.pull.strategy` | **moves** (10.2) | new per-repo table, real `repo_id` — a repo's own pull convention is a legitimate per-repo fact, unlike `log.level` below |
+| `kiraVersion.log.level` | **moves** (10.2), but not genuinely per-repo | new per-repo table, **reserved sentinel key**, not `repo_id` — D14 |
+| `kiraVersion.git.path` | **stays server-owned** (unchanged verdict) **and is now fixed** (10.4) | existing singleton `settings` table, `GitSettings`'s third leaf — D15. Removed from `schema.ts`/`contributes.configuration` entirely, matching `protectedBranches`/`fetchAutoIntervalMinutes`'s own status |
+| `workbench.tree.indent` | **stays**, not a candidate | unchanged — read-only VS Code mirror |
 
-**Stays exactly where it is**: `git.path` (SPEC-named, F3's gap is separate), `log.level`,
-`pull.strategy` (both §10.2), `workbench.tree.indent` (not a candidate, `source: 'host'`).
+Seven keys move into the new per-repo dialog and storage. `git.path` is fixed but explicitly does
+**not** join them — §10.4/§10.5 (resolved) explain why relocating it to the per-repo mechanism would
+be wrong even though fixing its wiring is right: it answers "where is the `git` binary," a fact about
+this machine/installation, not about any one repository, and its two trio-siblings already prove the
+correct home for that kind of fact is Kira Studio's own settings, not a per-repo dialog.
+`workbench.tree.indent` was never a candidate and remains outside both surfaces.
 
-This is the one call this plan flags most insistently for override (§10.2/§10.3 both bear on it): a
-reviewer who reads the user's "move them all into a proper dialog" as covering `pull.strategy` too
-(it does share `kiraVersion.*`'s general shape) should say so — the fix is a one-line move from
-`SettingsSnapshot` to `RepoSettingsSnapshot` in contract.ts plus the matching schema.ts `source` tag,
-not a redesign of anything else in this plan.
+### D2 — Per-repo key: `RepoID` (unchanged)
 
-### D2 — Per-repo key: `RepoID`, exactly as `review.db` already uses it
+No new identity mechanism. Applies to six of the seven moved keys; `log.level` uses the reserved
+sentinel instead (D14).
 
-No new identity mechanism (F5). The new table's primary key includes `repo_id TEXT`, populated from
-`gitclient.RepoSummary.RepoID` on every read/write, the same string already on every RPC's `repoId`
-field. A repo moved on disk starts with default settings under its new path — accepted, not solved,
-matching `review.db`'s own already-accepted version of the identical limitation.
+### D3 — Storage: a new table in `kira.db`, shaped like `settings`'s existing per-leaf-row pattern plus `repo_id` (unchanged mechanism; now explicitly the home for the sentinel row too)
 
-### D3 — Storage: a new table in `kira.db`, shaped like `settings`'s existing per-leaf-row pattern plus `repo_id`
+Unchanged from the original plan: `internal/storage/migrations/0017_g18_git_repo_settings.sql`
+creates `git_repo_settings (repo_id TEXT NOT NULL, key TEXT NOT NULL, value TEXT NOT NULL, PRIMARY
+KEY (repo_id, key))`. `internal/storage/model/gitreposettings.go`'s `GitRepoSettings` grows from five
+fields to seven (`PullStrategy string`, `LogLevel string` added). `internal/storage/repos/
+gitreposettings.go`'s `GitRepoSettingsRepo.Get`/`Set` are unchanged in shape — D14 is what makes
+`log.level` resolve to a different `repo_id` value than the one the caller passed, entirely inside
+this repo's own implementation, invisible to every caller above it except the dialog's own label
+(D13-revised).
 
-**Decided** (F6, and per the user's own steering): `kira.db`, not a new file. New migration
-`internal/storage/migrations/0017_g18_git_repo_settings.sql`:
+**`git.path` does not live here.** It lives in the *existing* `settings` table
+(`storage/repos/settings.go`), a `GitSettings`'s third leaf, per D15 — a deliberate, explicit
+non-use of this phase's own new table for the one settings-fix this revision adds, because
+`git.path` was never a per-repo fact to begin with.
 
-```sql
--- G18: per-repo display settings (graph page size/scope, stash dialog defaults, review base
--- candidates) — moved out of VS Code's contributes.configuration into an in-app dialog. One row per
--- (repo, leaf), mirroring the existing `settings` table's own per-leaf-JSON shape (settings.go) —
--- the same "a hand-edited or stale-shape row falls back to its default, never propagates" discipline
--- applies here via the same leaf/leafValid helpers, now scoped by repo_id.
-CREATE TABLE git_repo_settings (
-  repo_id TEXT NOT NULL,
-  key     TEXT NOT NULL,
-  value   TEXT NOT NULL,
-  PRIMARY KEY (repo_id, key)
-);
-```
-
-`internal/storage/model/gitreposettings.go` (new, alongside `settings.go`'s existing
-`GitSettings`/`GitPatch`, not inside `gitclient` — F13):
-
-```go
-// GitRepoSettings mirrors packages/git-core/src/settings/schema.ts's five `source: 'repo'` keys
-// (G18) — the per-repo counterpart to GitSettings' two server-owned leaves above.
-type GitRepoSettings struct {
-	GraphPageSize          int      `json:"graphPageSize"`
-	GraphScope             string   `json:"graphScope"`
-	StashShowInGraph       bool     `json:"stashShowInGraph"`
-	StashIncludeUntracked  bool     `json:"stashIncludeUntracked"`
-	ReviewBaseCandidates   []string `json:"reviewBaseCandidates"`
-}
-
-func DefaultGitRepoSettings() GitRepoSettings {
-	return GitRepoSettings{
-		GraphPageSize: 5000, GraphScope: "all",
-		StashShowInGraph: true, StashIncludeUntracked: false,
-		ReviewBaseCandidates: []string{"main", "master"},
-	}
-}
-```
-
-Values match `schema.ts`'s own defaults exactly (`pageSize: 5000`, `scope: "all"`,
-`showInGraph: true`, `includeUntracked: false`, `baseCandidates: ["main", "master"]`) — the same
-"Go mirrors TS, kept honest by both sides reading the same upstream source" convention `gitclient/
-settings.go`'s own (now-deleted, F13) doc comment already named. `GitRepoSettingsPatch` (all
-pointers, `.omitempty`) and a `Validate()` mirroring `GitPatch.Validate()`'s bounds (`pageSize`
-100–50000, `scope` ∈ {`all`,`head`}, `reviewBaseCandidates` non-empty strings) — same shape as the
-existing `SettingsPatch.Validate()`, one new `case` per leaf.
-
-`internal/storage/repos/gitreposettings.go` (new): `GitRepoSettingsRepo` with `Get(repoID string)
-(model.GitRepoSettings, error)` (never errors on a missing row — returns
-`DefaultGitRepoSettings()`, exactly `SettingsRepo.GetAll()`'s own "unknown key stays at its default"
-behavior, scoped) and `Set(repoID string, patch model.GitRepoSettingsPatch) (model.GitRepoSettings,
-error)` (validates, upserts only the patched leaves in one transaction, returns `Get(repoID)`
-afterward) — a direct, mechanical port of `SettingsRepo.GetAll`/`Set`'s own `leaf`/`leafValid`/
-`upsertSettingsLeaf` helpers, with `WHERE repo_id = ?` added to the read and `repo_id` added to every
-write. **Reset to default** is `DELETE FROM git_repo_settings WHERE repo_id = ? AND key = ?` for one
-leaf (the dialog's per-field reset) or `WHERE repo_id = ?` for all of them (a whole-dialog reset) —
-falls back to `DefaultGitRepoSettings()` automatically via the same "row absent ⇒ default" read path,
-no separate "is this reset" flag needed anywhere.
-
-`internal/storage/repos/repos.go`: `GitRepoSettings *GitRepoSettingsRepo` added to the aggregate,
-constructed the same way `GitClients: &GitClientsRepo{DB: db}` already is (`:73`).
-
-### D4 — RPC surface: two requests, one event, `SettingsSnapshot` narrows, `RepoSettingsSnapshot` is new
-
-`packages/git-ipc/src/contract.ts`:
+### D4 — RPC surface: two requests, one event, `SettingsSnapshot` narrows further, `RepoSettingsSnapshot` grows to seven — **revised**
 
 ```ts
-/** The remaining, window/host-scoped keys (D1) — narrowed from nine to four members this phase
- *  (G18): the five per-repo display keys move to RepoSettingsSnapshot below. */
+/** The one remaining window/host-scoped key after this phase (G18): git.path and the five
+ *  originally-named per-repo keys are gone (git.path is server-owned elsewhere now, D15; the rest
+ *  moved to RepoSettingsSnapshot). pull.strategy and log.level moved too (10.2's answer, D14). */
 export interface SettingsSnapshot {
-  readonly 'kiraVersion.git.path': string;
-  readonly 'kiraVersion.log.level': 'off' | 'error' | 'warn' | 'info' | 'debug';
-  readonly 'kiraVersion.pull.strategy': 'auto' | 'ff-only' | 'merge' | 'rebase';
   readonly 'workbench.tree.indent': number;
 }
 
-/** G18: the five per-repo display settings, server-stored, edited from the new in-app dialog
- *  (packages/git-ui). Fetched by repoSettings.get, mutated by repoSettings.set, and pushed live to
- *  every open connection on this repo via repoSettings.changed. */
+/** G18: the seven per-repo display settings, server-stored, edited from the new in-app dialog.
+ *  Six are genuinely scoped by repoId; kiraVersion.log.level is not (D14) — its value is shared
+ *  across every repo this installation opens, stored under a reserved key rather than repoId, a
+ *  fact the dialog surfaces to the user rather than hiding (D13-revised). Every caller still passes
+ *  a real repoId for every key, log.level included; only this phase's own storage layer treats that
+ *  one key's repoId as informational rather than a partition key. */
 export interface RepoSettingsSnapshot {
   readonly 'kiraVersion.graph.pageSize': number;
   readonly 'kiraVersion.graph.scope': 'all' | 'head';
   readonly 'kiraVersion.stash.showInGraph': boolean;
   readonly 'kiraVersion.stash.includeUntracked': boolean;
   readonly 'kiraVersion.review.baseCandidates': readonly string[];
+  readonly 'kiraVersion.pull.strategy': 'auto' | 'ff-only' | 'merge' | 'rebase';
+  readonly 'kiraVersion.log.level': 'off' | 'error' | 'warn' | 'info' | 'debug';
 }
 ```
 
-New requests: `repoSettings.get: { params: { repoId: string }; result: RepoSettingsSnapshot }` and
-`repoSettings.set: { params: { repoId: string; patch: Partial<RepoSettingsSnapshot> }; result:
-RepoSettingsSnapshot }` (returns the full post-write snapshot, matching `SettingsRepo.Set`'s own
-"validate, write only the patched leaves, return `GetAll()` afterward" shape, D3). New event:
-`repoSettings.changed: { repoId: string; settings: RepoSettingsSnapshot }` (host → webview,
-server-originated — genuinely new; unlike the existing `settings.changed`, this one is *not* an
-extension-composed echo of `onDidChangeConfiguration`, D7).
+`SettingsSnapshot` is down to one member. It is kept as a named type rather than folded directly into
+`app.init`'s result — collapsing it further is an unrelated, cosmetic refactor this phase does not
+need to make, and `app.init`'s own result shape stays otherwise unchanged.
 
-`app.init`'s own result type is untouched except for `SettingsSnapshot`'s narrower shape (D6 explains
-why `proxyHandlers.ts`'s `settings: settings()` composition needs no code change despite the type
-narrowing — TypeScript's structural typing does the work).
+Requests/event unchanged in shape from the original plan (`repoSettings.get`, `repoSettings.set`,
+`repoSettings.changed`), now carrying the seven-member `RepoSettingsSnapshot`.
 
-### D5 — `CONTRACT_VERSION`: 21 → 22
+### D5 — `CONTRACT_VERSION`: 21 → 22 (unchanged reasoning, F7)
 
-Required, not optional (F7). `packages/git-ipc/src/validate.ts:24` and
-`apps/kira-studio/internal/gitrpc/contract.go:34`, with a new dated bump comment following the
-existing six-entry history's own convention: *"G18 D5: 21 -> 22, for `repoSettings.get`/
-`repoSettings.set` (two new requests) and `repoSettings.changed` (one new event); `SettingsSnapshot`
-loses five members (moved to the new `RepoSettingsSnapshot`)."*
+The bump comment's own wording widens slightly to name seven requests' worth of settings rather than
+five, and to note the narrower one-member `SettingsSnapshot`.
 
-### D6 — `graph.loadMore`/`graph.stream`/`review.resolveBase` need **no param-shape change at all**
+### D6 — No param-shape change to `graph.loadMore`/`graph.stream`/`review.resolveBase`/`remote.pullPreflight` — **extended to a fourth request** (F14)
 
-F12 is the whole argument: these three requests already document "optional, a raw client that omits
-it gets the server's own default." This phase changes what that default *is* — repo-stored, not
-constant — not the shape carrying it.
+The original plan's reasoning (F12) extends verbatim to `remote.pullPreflight`'s `strategySetting`
+(F14): already optional, already documented as "a raw client omits it, the server supplies a
+default," already has `repoID` in scope at its own resolution point
+(`gitrpc/remote.go:29`/`PullPreflight`'s own internal default). `proxyHandlers.ts`'s
+`remote.pullPreflight` composition (wherever it injects `strategySetting` from the window's settings
+today) is deleted the same way the other three are, becoming a plain `forward(...)` call.
+`gitrpc/remote.go`'s handler gains the same one-line upgrade `graph.go`/`review.go` already get:
+resolve the repo's stored `pull.strategy` before falling back to `"auto"`, when `p.StrategySetting`
+arrives empty.
 
-- **`proxyHandlers.ts`** (`:173-184, 315-320, 400-410`): the three bespoke compositions that inject
-  `scope`/`pageSize`/`baseCandidates` from `settings()` are **deleted**. All three become plain
-  `forward('graph.loadMore')`/`forward('graph.stream')`/`forward('review.resolveBase')` calls, same
-  as `graph.status`/`graph.refresh` already are — this phase *removes* code from `proxyHandlers.ts`,
-  it does not add any. The extension no longer needs to know these five settings exist at all once
-  the migration (D11) has run.
-- **`gitrpc/graph.go`**: `walkSpecFrom`/`pageSizeFrom` (`:19-33`) gain a `repoID string` parameter
-  (already one call frame away at both existing call sites, `resolveWalkRequest`,
-  `graph.go:115,188`) and, when `scope`/`pageSize` arrive empty, resolve
-  `RepoSettingsGet(repoID)` before falling back to the schema constant — same two-line shape as
-  `walkSpecFrom` already has, one new lookup inserted ahead of the existing hardcoded fallback.
-- **`gitrpc/review.go`**'s `review.resolveBase` handler gains the identical one-line upgrade for
-  `baseCandidates`.
-- **`stash.list`'s own create-dialog default** (`stash.includeUntracked`) has no equivalent
-  request-level injection today — `App.vue` reads it straight off `SettingsState` client-side (F2).
-  Its replacement is the new `RepoSettingsState` (D12) read the same way; no Go RPC handler needs to
-  know this value at all, since it only ever seeds a dialog's initial checkbox state, never a spawn
-  argument (`runStashPush`'s own `includeUntracked` param is always explicitly supplied by the
-  dialog's current checkbox state at submit time, not re-derived server-side).
+**`log.level` has no request-injection precedent to extend** — it was never sent per-request (F1's
+own original finding: it governs the extension's local log output, read once via `logger.child`'s
+closure, not attached to any RPC). It does not need a D6-style upgrade at all; it needs only the
+storage/dialog treatment D14 describes. This is itself part of why 10.2's own tension is real: four
+of the seven moved keys fit D6's "travels with the request" shape naturally; `log.level` fits neither
+that shape nor genuine per-repo storage, which is exactly why D14 gives it special handling instead
+of pretending it fits the other six's mold.
 
-**What this buys**: zero change to two request shapes G3/G6 already built, tested, and shipped
-against; `proxyHandlers.ts` gets smaller, not larger; and the server is now the single source of
-truth for these values instead of a value the extension caches and re-injects on every call — the
-staleness risk of a client-cached copy disagreeing with what `repoSettings.set` just wrote is
-eliminated by construction, not by careful cache invalidation. §10.4 flags the conservative
-alternative (keep injecting, source the injected value from a client-side `repoSettings.get` cache)
-for a reviewer who would rather touch fewer existing files at the cost of exactly that staleness risk.
+### D7 — D9 (unchanged from the original plan)
 
-### D7 — Live propagation: `internal/notify.Emitter[T]`, not `gitsession/subscriber.go`'s coalescing mechanism
+Live propagation via `internal/notify.Emitter[T]` (D7), `main.go` wiring for the six genuinely
+per-repo keys via `RepoSettingsGet`/`RepoSettingsSet` closures (D8, widened to seven fields),
+`internal/gitclient/settings.go` deletion (D9) — all unchanged in mechanism. D8's closures now also
+need no special handling for `log.level` beyond what `GitRepoSettingsRepo` already resolves
+internally (D14) — `main.go`'s own wiring code does not need to know about the sentinel at all,
+which is precisely the point of keeping D14's special case inside the repo layer alone.
 
-F11 is the reasoning. `RepoEntry` (`gitsession/entry.go`) gains one field:
+### D10 — `schema.ts` gains a third `source` value, `'repo'` — **revised**: no new source value for the sentinel, one new optional flag instead
 
-```go
-// settingsChanged fans out G18's repoSettings.set (a rare, user-triggered event) to every
-// connection currently holding this repo open — internal/notify's small generic pub-sub, not
-// subscriber.go's coalescing watcher-signal mechanism (D14/F13 there), which exists for
-// high-frequency fsnotify bursts this event has no shape in common with.
-settingsChanged notify.Emitter[gitrpc.RepoSettingsSnapshot]
-```
+Unchanged: the seven moved keys get `source: 'repo'`; `toVsCodeConfiguration()`'s skip condition
+widens to `def.source !== undefined`; `repoSettingKeys()` helper unchanged.
 
-(The wire type import direction — `gitsession` depending on `gitrpc`'s wire shape — is checked
-against this package's existing dependency direction before landing; if `gitsession` must not import
-`gitrpc`, the emitted value is `storage/model.GitRepoSettings` instead, and `gitrpc`'s handler
-projects it to wire shape on the way out, the same translation `handleStashList`-style handlers
-already do for every other server-side type. Implementer's call, not a design fork — §3 names it.)
-
-A new `RepoEntry.SubscribeSettings(deliver func(...)) (unsubscribe func())` method wraps
-`settingsChanged.Subscribe`. `conn.go:180`'s existing `entry.Subscribe(c.ID, func(ev Event) {...})`
-call, inside `Conn.Open`, gains a sibling call to `entry.SubscribeSettings(func(snap ...) {
-if c.Emit != nil { c.Emit("repoSettings.changed", RepoSettingsChangedEvent{RepoID: repoID, Settings:
-snap}) } })`, and the two unsubscribe funcs are combined into the one closure `Open` already stores
-and calls on teardown. `repoSettings.set`'s own handler, after `GitRepoSettingsRepo.Set` succeeds,
-calls `entry.settingsChanged.Emit(result)`.
-
-**This is real, not "reload to see it."** Two VS Code windows open on the same repo both see a save
-made in either one, live — matching the user's own "configurable per repo" framing (a per-repo
-setting that silently disagreed between two windows on the *same* repo until one was closed and
-reopened would be a strange kind of "per-repo").
-
-### D8 — `main.go` wiring: the same closure-injection shape `gitRegistry.Settings` already uses, widened by one parameter
-
-```go
-gitRegistry.RepoSettingsGet = func(repoID string) (model.GitRepoSettings, error) {
-	return repositories.GitRepoSettings.Get(repoID)
-}
-gitRegistry.RepoSettingsSet = func(repoID string, patch model.GitRepoSettingsPatch) (model.GitRepoSettings, error) {
-	return repositories.GitRepoSettings.Set(repoID, patch)
-}
-```
-
-`gitsession/registry.go` gains the two fields (`RepoSettingsGet`/`RepoSettingsSet` function types),
-defaulted the same way `Settings` is (`:72`, a no-op stub returning `DefaultGitRepoSettings(), nil`)
-so tests that construct a bare `Registry` are unaffected. No interface is introduced (unlike
-`gitsock.TrustStore`) because the accessor is a single `(repoID) (settings, error)` shape, not the
-five-method surface `TrustStore` needs — matching `Settings func() (...)`'s own already-simpler
-precedent over `TrustStore`'s richer one.
-
-### D9 — `internal/gitclient/settings.go` is deleted, not repurposed
-
-F13. The new model lives in `internal/storage/model` (D3), matching where `GitSettings`/`GitPatch`
-already live for the *other* server-owned settings — `gitclient` keeps holding driver/discovery
-code, not settings-validation code, which was never really its concern even before this file
-existed as dead weight.
-
-### D10 — `schema.ts` gains a third `source` value, `'repo'`
+**New this revision**: `SettingDef` gains one more optional field —
 
 ```ts
-/** G14 D6/G18: where a setting's value comes from. 'extension' (default): this extension owns and
- *  contributes it. 'host': the editor owns it, read-only (workbench.tree.indent). 'repo' (G18):
- *  this extension owns it, but it is no longer a VS Code setting at all — server-stored per
- *  repository, edited from the in-app dialog (packages/git-ui), never contributed to
- *  contributes.configuration. */
-readonly source?: 'extension' | 'host' | 'repo';
+/** G18 D14: meaningful only when source === 'repo'. true for exactly one key
+ *  (kiriVersion.log.level) — its stored value is shared across every repository this
+ *  installation opens, not scoped by repoId, even though it lives in the same per-repo storage
+ *  and dialog as the other six 'repo'-sourced keys. The dialog surfaces this to the user (a visible
+ *  note, not a hidden implementation detail) rather than presenting it as if it varied per repo. */
+readonly instanceWide?: boolean;
 ```
 
-The five moved keys (F1) get `source: 'repo'`. `toVsCodeConfiguration()` (`:242-264`)'s skip
-condition widens from `if (def.source === 'host') continue;` to `if (def.source !== undefined)
-continue;` — 'extension' is the only source that should ever be contributed, and it is already the
-default/undefined case, so this is a narrowing of the check to its actual intent rather than a new
-branch. A new exported helper, `repoSettingKeys(): readonly SettingKey[]` (`source === 'repo'`),
-feeds both the dialog (D12) and `RepoSettingsState`'s own default-fallback construction — the "one
-schema, one place" promise D25's own doc comment already made for exactly this situation ("a future
-host's own settings surface would generate from the same schema rather than inventing a second one")
-is what the new dialog *is*.
+`kiriVersion.log.level`'s own `SettingDef` gains `instanceWide: true`. No other key does. This is a
+schema-driven flag, not a hardcoded list in `git-ui` — consistent with D25's "one schema, one place"
+philosophy, the same reason this dialog exists as a second consumer of `schema.ts` at all.
 
-**`coerceSettings`/`defaultSettings`/`Settings` (the TS type) are unchanged** — they still cover all
-nine keys, the one schema D25 promises. Only `toVsCodeConfiguration()` and the new
-`repoSettingKeys()` filter which subset applies where. This means `SettingsSnapshot`'s narrower
-9→4-member shape (D4) does not require any picking/omitting logic anywhere it is constructed:
-`proxyHandlers.ts`'s `settings: settings()` composition keeps returning the full, unpicked
-`Settings` object — TypeScript's structural typing accepts a wider object literal-free value where a
-narrower interface is expected (no excess-property check fires on a variable, only on an object
-literal), so this line needs **zero code change**, only the `SettingsSnapshot` type declaration it is
-checked against narrows.
+**`git.path` is removed from `SETTINGS` entirely** (D15) — it is no longer a `kiraVersion.*`
+extension-contributed setting of any kind once its true source of truth is `kira.db`'s existing
+`settings` table, matching `protectedBranches`/`fetchAutoIntervalMinutes`'s own status (never
+declared in `schema.ts` at all). `toVsCodeConfiguration()` needs no special-casing for this removal
+— deleting the object literal entry is the whole change.
 
-`extension.ts`'s `readRawSettings()` (`:74-81`) changes its iteration set from all `SETTING_KEYS` to
-`hostSettingKeys()` (a new small helper, `SETTING_KEYS.filter(k => SETTINGS[k].source !== 'repo')`)
-— it must **stop** reading the five repo-scoped keys from `vscode.workspace.getConfiguration()` on
-every poll (`onDidChangeConfiguration`'s own handler, `:428-453`), since after migration (D11) that
-value lives server-side and a live VS Code config value (however stale) must never resurrect and
-override it.
+### D11 — Migration: unchanged mechanism, now covers eight keys including `git.path`
 
-The stale `wireConformance.test.ts` reference in `schema.ts`'s own top comment (`:14-17`) — that
-file does not exist anywhere in this repo (confirmed, `find`/`grep` both empty) — is corrected in the
-same commit that touches this file's neighborhood, matching G17 D10's own "drive-by fix where the
-diff already is" convention: the sentence is reworded to name what actually keeps `SettingsSnapshot`
-honest today (nothing automated does, currently — the comment is corrected to say so plainly rather
-than pointing at a file that was never ported, not expanded into building that missing test here).
+The one-time, extension-side, `context.globalState`-tracked, `config.inspect()`-based migration
+(unchanged mechanism from the original plan) now runs over all eight keys that leave
+`contributes.configuration` this phase (the seven moved keys plus `git.path`). `git.path`'s own
+migrated value, if a user had customized it, is written via a `SettingsRepo.Set(model.SettingsPatch{
+Git: &model.GitPatch{GitPath: &value}})`-shaped call — Kira Studio's own existing settings-write
+path, **not** `repoSettings.set` (which has no notion of `git.path` at all after D15) — reachable
+from the extension the same way every other socket call already is (a new small RPC, or, if Kira
+Studio's settings are not otherwise reachable over the git socket today, an explicit note that this
+one migration leg needs its own tiny request; §10.4's own resolution flags this as the one piece of
+D15 that needs a real implementation-time check, not assumed).
 
-### D11 — Migration for values a user already set: one-time, extension-side, best-effort, never edits `settings.json`
+### D12 — `apps/kira-studio-vscode/package.json`: eight keys removed (unchanged mechanism, wider set)
 
-The five keys leave `contributes.configuration` entirely (D12) — `vscode.workspace.getConfiguration()`
-still returns whatever a user has in `settings.json` for an uncontributed key (VS Code does not purge
-it), so the value is not *lost*, only no longer read by the normal per-window polling path (D10
-already stopped that). The migration:
+Regenerated via `scripts/gen-settings.ts` after D10's changes — seven keys move to `source: 'repo'`
+(dropped from `contributes.configuration` by the existing skip-condition widening) and `git.path` is
+deleted from `SETTINGS` outright (D10) — both produce the same net effect on the generated
+`contributes.configuration`, by two different mechanisms, worth keeping distinct in the commit that
+makes the change (a reviewer diffing `package.json` alone cannot tell "moved" from "removed
+entirely," but the `schema.ts` diff makes it unambiguous).
 
-- Runs once per `(repoId)`, on that repo's first `repo.open` after the user's extension upgrades to
-  this version — tracked in `context.globalState` (`migratedRepoSettingsIds: string[]`, VS Code's own
-  small persistent per-installation store, not a new server concept), so it is idempotent and never
-  re-runs once it has.
-- For each of the five keys, `vscode.workspace.getConfiguration().inspect(key)` (not `.get()`) — this
-  distinguishes a value the user actually set (`globalValue`/`workspaceValue`/`workspaceFolderValue`
-  present) from VS Code silently reporting the schema's own inherited default, which must **not** be
-  treated as a deliberate customization worth migrating.
-- Any key with a genuine user override becomes one `repoSettings.set` patch, called **only if**
-  `repoSettings.get` for that repo currently shows the schema default for that leaf (never overwrite
-  a value someone already set through the new dialog with a stale VS Code one) — cheap and correct
-  without needing a new "was this ever customized" wire concept, since the check is "does the stored
-  row already differ from `DefaultGitRepoSettings()`" purely client-side, no new server support
-  needed.
-- The orphaned `settings.json` entry is **left in place**, not programmatically removed. Reaching
-  into every configuration scope (user/workspace/folder/language) to safely `update(key, undefined,
-  target)` a key that may be set in more than one of them is exactly the kind of "get one wrong and
-  it silently fails for someone" mechanical risk G10 D19's own doc comment already warns about for a
-  much smaller change (host-capability methods) — not worth it for a value that, once migrated, is
-  simply inert going forward (it no longer appears in VS Code's Settings UI at all, since it is no
-  longer contributed, so it is not actively confusing on an ongoing basis, only a leftover line in a
-  file the user already owns).
+### D13 — The dialog — **revised**: seven fields, no read-only section, `log.level` visibly marked instance-wide (10.3, resolved)
 
-### D12 — `apps/kira-studio-vscode/package.json`: the five keys are removed, not kept-and-ignored
+**Trigger**: unchanged — the `⚙` icon in `AppToolbar.vue`'s already-reserved slot (F8).
 
-`scripts/gen-settings.ts` (D25's own codegen) already drives `contributes.configuration` from
-`toVsCodeConfiguration()` — D10's own `source`-filter change means re-running that script is the
-entire mechanism; no hand-edit of `package.json`'s settings block is needed or correct (a hand-edit
-would drift from the schema the moment either changes independently again).
+**Component**: `RepoSettingsDialog.vue`, unchanged conventions (F9). Four sections now, not three:
 
-### D13 — The dialog: where it opens from, what it contains, and what does — and does not — get tested
+- **Graph** — `pageSize`, `scope` (unchanged from the original plan).
+- **Stash** — `showInGraph` (still inert per §0.3/§10.1, still honestly labelled as such),
+  `includeUntracked` (unchanged).
+- **Branch review** — `baseCandidates` (unchanged).
+- **Pull** (**new**) — `strategy` (`<select>` over the schema's own `enum`: auto/ff-only/merge/
+  rebase).
+- **Diagnostics** (**new**) — `log.level` (`<select>` over the schema's own `enum`), rendered with a
+  visible inline note driven by `SETTINGS['kiraVersion.log.level'].instanceWide` (D10): *"This
+  applies to Kira Version's own diagnostic log for every repository, not just this one."* This is
+  the resolved form of 10.2's own instruction — not silently treating it as per-repo, not refusing to
+  move it either.
 
-**Trigger**: a new `⚙` icon button in `AppToolbar.vue`, in the slot its own doc comment has reserved
-since P4 (F8) — after `SearchBox.vue`, before the remote-progress/undo cluster — using the existing
-`.kv-icon-button` class already established by the remote-cancel button (`:301-310`) and a
-`codicon-gear` icon, `title="Repository settings"`, `data-testid="repo-settings-button"`.
+**No read-only section for anything else** (10.3, resolved): with `pull.strategy`/`log.level` now
+real, editable entries and `git.path` removed from `schema.ts` entirely (D10/D15),
+`workbench.tree.indent` is the only remaining `kiraVersion`-adjacent setting outside this dialog, and
+it was never a candidate to show here at all (it is not this extension's own setting to present as
+editable, or even as a read-only mirror inside a *repository* settings surface — it is a VS Code
+editor preference, unrelated to any one repo). The dialog shows exactly the seven keys that live in
+its own storage. Nothing else.
 
-**Component**: `packages/git-ui/src/components/dialogs/RepoSettingsDialog.vue`, new, matching
-`StashDialog.vue`'s conventions exactly (F9): `.kv-modal-backdrop`/`.kv-modal`, `useModalFocus`,
-`role="dialog"`. Three sections, each with its own "Reset to default" action per field (not just one
-whole-dialog reset, since a user changing their mind about `pageSize` alone should not also discard a
-customized `baseCandidates`):
+**Data flow**: unchanged shape (`RepoSettingsState`, `packages/git-ui/src/state/repoSettings.ts`),
+now carrying seven fields instead of five; the `instanceWide` flag is read straight off `SETTINGS`
+by the component, not duplicated into the state class.
 
-- **Graph** — `pageSize` (`<input type="number">`, `min`/`max` from `SETTINGS['kiraVersion.graph.
-  pageSize']` directly, live-validated against the same bounds on every keystroke), `scope`
-  (`<select>` populated from the schema's own `enum`).
-- **Stash** — `showInGraph` (checkbox — inert per §0.3/§10.1, labelled plainly as such: "Show stash
-  entries in the graph (not yet implemented — see kira-studio #G18)" is the honest label, not a
-  claim the toggle does something it does not), `includeUntracked` (checkbox).
-- **Branch review** — `baseCandidates` (an ordered list editor: add/remove/reorder text rows, each
-  validated as non-empty; the create-order is significant, per `pull.strategy`'s own doc-comment
-  precedent for why order matters in a stringArray setting).
+**Testing**: unchanged (F10, D13's original) — `RepoSettingsState` gets unit tests, the `.vue`
+template does not, no new Playwright behavior tier.
 
-**Data flow**: a new `packages/git-ui/src/state/repoSettings.ts`, `RepoSettingsState` — plain class,
-same shape as `SettingsState` (F10: this is where the logic lives, testable without a DOM), holding
-the current server snapshot (`shallowRef<RepoSettingsSnapshot>`), a `dirty` patch built as the dialog
-form changes, `save()` (calls `repoSettings.set`, applies the result), `resetField(key)` (calls
-`repoSettings.set` with that one leaf explicitly reset — mechanically: `Set`'s Go-side "only writes
-patched leaves" doesn't have a "delete this leaf" wire shape today, so **reset** is implemented as
-"set the leaf back to `SETTINGS[key].default` explicitly," not a `DELETE`-shaped wire call — simpler
-than adding a second wire verb for what is, from the client's perspective, indistinguishable from any
-other save). Recreated/reset on repo switch exactly like `refsState`/`opsState`/`stashState`
-(`App.vue:245-255`'s existing `watch(() => repoState.value?.activeRepo.value?.repoId, ...)` block
-gains one more `.setRepoId(repoId)` call), and subscribes to `repoSettings.changed` scoped to the
-active repo, applying a remote change to the snapshot **only when the dialog is not itself mid-edit**
-(a local unsaved edit must not be silently clobbered by another window's concurrent save — the same
-"don't stomp an in-progress edit" concern `StashDialog.vue`'s own branch-name preview race guard
-already handles with its `previewToken` pattern, reused here as "an incoming `repoSettings.changed`
-while `dirty` is non-empty is queued, not applied, until the dialog closes or is explicitly
-refreshed").
+### D14 — `log.level`'s storage mechanics: a reserved sentinel row in the *same* new table, not a real `repo_id`, not a second table — **new this revision, resolving 10.2's own flagged tension**
 
-**`App.vue`'s existing `pageSize`/`stashIncludeUntrackedDefault` computeds (`:143-145,158-162`)**
-move from reading `settingsState.value?.settings.value[...]` to reading the new
-`repoSettingsState.value?.settings.value[...]` — a one-line source change each, fallback still the
-schema's own default.
+The user's instruction was "move it into the dialog," not "resolve whether it's really per-repo" —
+that half is this plan's own job, per the coordinator's own framing, and the answer is:
 
-**Testing (D13/F10)**: `RepoSettingsState` gets unit tests (bun test, no DOM) — dirty-tracking,
-save/reset round trips against a mock bridge, the "don't stomp a mid-edit" queueing behavior. The
-`.vue` template itself gets no new automated test, matching G16 D11's own "one-condition render
-guards get none" carve-out, scaled up to "a form whose fields are thin bindings to an already-tested
-state class" — no new Playwright behavior tier is built (G16's own declared non-goal, restated at
-§0.3).
+- `RepoID` (D2, `internal/gitclient/repo.go:196-206`) is always a non-empty absolute path (or, for a
+  bare repo, a non-empty git-dir path) — **it can never be the empty string.** That makes `""` a safe,
+  permanently-collision-free sentinel for "this row is not scoped to any repository," reusable inside
+  `git_repo_settings`'s own existing `(repo_id, key)` primary key with **no schema change** beyond
+  what D3 already adds.
+- `internal/storage/repos/gitreposettings.go`'s `Get`/`Set` gain one small, explicit branch:
+  for the key `"kiraVersion.log.level"` specifically, the `repoID` argument the caller passed is
+  **ignored** and `""` is used in its place for the actual query. Every other key's behavior is
+  unchanged. This is the one place in the whole phase where a caller's `repoId` is knowingly not
+  honored — commented plainly, naming D14, so a future reader does not "fix" it into behaving like
+  the other six.
+- **Every caller above this layer — the RPC handlers, `RepoSettingsState`, the dialog's own request
+  plumbing — is unaffected and untouched by this special case.** `repoSettings.get`/`.set` still take
+  a real `repoId` for every key including `log.level`; the substitution happens once, at the bottom
+  of the storage layer, which is what makes D8's `main.go` wiring able to stay ignorant of it (D7/D9
+  above).
+- **The one place this case is *not* hidden is the dialog's own UI** (D13-revised): a user who opens
+  "Repository settings" for two different repos and sees the *same* log-level value in both, changes
+  it in one, and finds the other changed too, needs to understand why — hence the visible note,
+  driven by `schema.ts`'s new `instanceWide` flag (D10), not a silent surprise.
+- **Alternative considered and rejected**: a second, genuinely global table (or a single extra row in
+  the *existing* `settings` table, alongside `git.path`, D15). Rejected because `log.level` is still,
+  by the user's own instruction, meant to live in the **new dialog** — moving it to the existing
+  `settings`/Kira-Studio-settings surface (as `git.path` gets, D15) would directly contradict "move
+  it into the dialog," which is specifically the git-ui surface, not Kira Studio's own Wails
+  settings. The sentinel-row approach is the one design that honors "lives in the new per-repo table
+  and dialog" literally while still being honest that its value is not actually partitioned by repo.
 
----
+### D15 — `git.path`: fixed, in the *existing* server-owned settings surface — **new this revision, resolving 10.4**
 
-## 3. The Go side, file by file
+**Scope of the fix.** Every place that resolves git's location on disk currently passes a hardcoded
+empty string to `Discovery.Status`:
 
-### 3.1 `internal/storage/migrations/0017_g18_git_repo_settings.sql` — **new** (D3)
+- `internal/gitrpc/handlers.go:134` (`handleAppInit`) and `:147` (`handleRepoOpen`).
+- `internal/gitrpc/graph.go:109,192` (the two `graph.status`/similar call sites the original
+  investigation already found).
 
-The `git_repo_settings` table, exactly as shown in D3.
+**The fix, file by file** (§3 restates this as the file-by-file plan; this decision records the
+shape):
 
-### 3.2 `internal/storage/model/gitreposettings.go` — **new** (D3, D9)
+1. `packages/shared/domain/settings.ts` — `gitSettingsSchema` gains `gitPath: z.string().default('')`
+   (a fourth-ish leaf alongside `protectedBranches`/`fetchAutoIntervalMinutes`); both existing
+   default-literal blocks (`:96-97`, `:130-131`) gain the matching `gitPath: ''` entry.
+2. `internal/storage/model/settings.go` — `GitSettings` gains `GitPath string`; `GitPatch` gains
+   `GitPath *string`; `DefaultSettings()`'s `Git: GitSettings{...}` literal gains `GitPath: ""`. No
+   new validation needed (an empty string is the valid "auto-discover" state, matching
+   `gitclient.Client.Status`'s own existing contract — any non-empty string is passed through
+   unvalidated, exactly as `gitclient.Discovery`'s own probe already tolerates a bad path by falling
+   through its classified-error states, not by pre-validating the string).
+3. `internal/storage/repos/settings.go` — `GetAll()` gains `leaf(stored, "git.path",
+   &result.Git.GitPath)`; `Set()` gains the matching `if g.GitPath != nil { upsertSettingsLeaf(tx,
+   "git.path", *g.GitPath) }` branch — both mechanical additions beside the two existing `git.*`
+   leaves, same file, same pattern.
+4. `internal/gitsession/registry.go` — `Registry.Settings`'s signature widens from `func() (
+   protectedBranches []string, autoFetchMinutes int)` to `func() (protectedBranches []string,
+   autoFetchMinutes int, gitPath string)` — the same single closure, one more return value, not a
+   second accessor. `NewRegistry`'s own stub default widens to match (`nil, 0, ""`).
+5. `main.go:118-125` — the existing `gitRegistry.Settings` closure body gains `return
+   s.Git.ProtectedBranches, s.Git.FetchAutoIntervalMinutes, s.Git.GitPath`.
+6. `internal/gitrpc/handlers.go:134,147` and `internal/gitrpc/graph.go:109,192` — each
+   `r.deps.Discovery.Status(ctx, "")` becomes `r.deps.Discovery.Status(ctx, gitPathFrom(r.deps.
+   Registry))`, a tiny new unexported helper (`_, _, gitPath := reg.Settings(); return gitPath`) so
+   the three-value destructure is not repeated at every call site.
+7. `apps/kira-studio/frontend/src/workbench/SettingsDialog.vue` — one new field in the existing
+   "Git" section (`:680-735`), a plain text input bound to `draft.git.gitPath`, with the same
+   `settings-reset-git-*`/`resetLeaf('git', 'gitPath')` convention `fetchAutoIntervalMinutes` already
+   uses — a description matching `schema.ts`'s own now-deleted copy ("Path to the git executable.
+   Empty uses the host's own discovery").
 
-`GitRepoSettings`, `DefaultGitRepoSettings()`, `GitRepoSettingsPatch` (all-pointer, `.omitempty`),
-`(p GitRepoSettingsPatch) Validate() error` — bounds matching `schema.ts`'s own `minimum`/`maximum`/
-`enum` for each moved key, same error-naming convention as `SettingsPatch.Validate()`.
+**Why this is a fix, not a redesign**: `GitSettings`/`SettingsRepo`/`gitRegistry.Settings`'s own
+closure-injection shape were all built by G7 D16 specifically for "a setting a remote op reads fresh,
+never cached." `git.path` needs exactly that same property (a stale configured path could silently
+keep using an old git binary), and reuses the identical mechanism rather than inventing a fetch/cache
+strategy of its own.
 
-### 3.3 `internal/storage/repos/gitreposettings.go` — **new** (D3)
-
-`GitRepoSettingsRepo{DB *sql.DB}`, `Get(repoID string) (model.GitRepoSettings, error)`,
-`Set(repoID string, patch model.GitRepoSettingsPatch) (model.GitRepoSettings, error)` — direct port
-of `SettingsRepo.GetAll`/`Set`'s `leaf`/`leafValid`/`upsertSettingsLeaf` helper shapes, `repo_id`
-added to every query. `reviewBaseCandidates` (a `[]string`) round-trips through the same
-`json.Marshal`/`Unmarshal` leaf encoding `protectedBranches` already uses in the sibling table.
-
-### 3.4 `internal/storage/repos/repos.go` — edited
-
-`GitRepoSettings *GitRepoSettingsRepo` field added to the aggregate; constructed alongside
-`GitClients` in `repos.New` (`:73`).
-
-### 3.5 `internal/storage/repos/gitreposettings_test.go` — **new** (D11 checklist)
-
-Get-returns-defaults-for-unknown-repo, Set-then-Get round trip per leaf, an invalid patch (out of
-range `pageSize`, unknown `scope` value) rejected with `Validate`'s own error naming the leaf,
-reset-one-leaf (set it back to the schema default explicitly, per D13's own reset mechanism) leaves
-the other leaves untouched, two different `repoID`s never see each other's rows.
-
-### 3.6 `internal/gitclient/settings.go` — **deleted** (D9, F13)
-
-Zero callers confirmed (§1 F13); the replacement lives in `internal/storage/model` (3.2).
-
-### 3.7 `internal/gitsession/registry.go` — edited (D8)
-
-`RepoSettingsGet func(repoID string) (model.GitRepoSettings, error)` and `RepoSettingsSet
-func(repoID string, patch model.GitRepoSettingsPatch) (model.GitRepoSettings, error)` fields, next
-to the existing `Settings` field (`:46-52`); defaulted in `NewRegistry` (`:72`) to a stub returning
-`model.DefaultGitRepoSettings(), nil` — same "tests set it directly, the real one is
-`storage/repos`-backed" seam comment `Settings` already carries.
-
-### 3.8 `internal/gitsession/entry.go` — edited (D7)
-
-`RepoEntry` gains `settingsChanged notify.Emitter[gitrpc.RepoSettingsSnapshot]` (or the
-`storage/model.GitRepoSettings`-typed variant if the dependency direction forbids `gitsession`
-importing `gitrpc` — checked against this package's existing imports before landing, per D7's own
-note) and `SubscribeSettings(deliver func(...)) (unsubscribe func())` wrapping
-`settingsChanged.Subscribe`. No change to `Event`, `Subscribe`, or `subscriber.go` — a fully separate,
-additive seam (F11).
-
-### 3.9 `internal/gitsession/conn.go` — edited (D7)
-
-`Conn.Open` (`:168-210`)'s existing `entry.Subscribe(c.ID, ...)` call gains a sibling
-`entry.SubscribeSettings(...)` call, both unsubscribe funcs combined into the one stored closure
-(same pattern the existing code already uses for combining teardown paths).
-
-### 3.10 `internal/gitrpc/wire.go` — edited (D4)
-
-`RepoSettingsSnapshot` (the wire projection of `model.GitRepoSettings`, field names matching
-`contract.ts`'s dotted keys via `json` tags — e.g. `\`json:"kiraVersion.graph.pageSize"\``, same
-convention the deleted `gitclient/settings.go` used), `RepoSettingsGetParams{RepoID string}`,
-`RepoSettingsSetParams{RepoID string; Patch RepoSettingsPatchWire}`, `RepoSettingsChangedEvent{RepoID
-string; Settings RepoSettingsSnapshot}`.
-
-### 3.11 `internal/gitrpc/settings.go` — **new** (D4, D6)
-
-`handleRepoSettingsGet`, `handleRepoSettingsSet` — thin dispatch matching `handleStashList`'s own
-shape (F- from G17: "decode params, validate required fields, `entryFor`, call one method,
-`mapGitError` on failure"). `handleRepoSettingsSet` additionally calls `entry.settingsChanged.Emit`
-after a successful write (D7).
-
-### 3.12 `internal/gitrpc/handlers.go` — edited
-
-Two new `case` arms in `Router.ForConn`'s `Request` switch: `"repoSettings.get"`,
-`"repoSettings.set"`.
-
-### 3.13 `internal/gitrpc/graph.go` — edited (D6)
-
-`walkSpecFrom`/`pageSizeFrom` (`:19-33`) gain a `repoID string` parameter and consult
-`RepoSettingsGet(repoID)` before falling back to the current hardcoded constants; both call sites
-(`resolveWalkRequest`, `:157,159`) pass `repoID` through (already in scope one frame up).
-
-### 3.14 `internal/gitrpc/review.go` — edited (D6)
-
-`review.resolveBase`'s handler gets the identical one-line upgrade for `baseCandidates`.
-
-### 3.15 `internal/gitrpc/contract.go` — edited (D5)
-
-`ContractVersion` 21 → 22, new dated comment (D5's own wording).
-
-### 3.16 `main.go` — edited (D8)
-
-`gitRegistry.RepoSettingsGet`/`RepoSettingsSet` closures, next to the existing `gitRegistry.Settings`
-assignment (`:118-125`).
-
-### 3.17 `internal/gitsession/*_test.go` — new tests
-
-`TestRepoEntry_SubscribeSettings_DeliversToEveryConnection` (mirrors `subscriber_test.go`'s own
-shape, against the new `notify.Emitter`-backed seam instead), `TestConnOpen_CombinesBothUnsubscribes`
-(a `Close()` after `Open()` leaves neither `subs` map holding a stale entry).
-
-### 3.18 `internal/gitrpc/settings_test.go` — new tests
-
-Missing `repoId` rejected (matching every other handler's own validation convention, F-cited from
-G17), a valid `Set` round-trips through `Get`, an invalid patch's `Validate` error surfaces as the
-RPC error rather than a silent partial write, a second `Conn` subscribed to the same repo receives
-`repoSettings.changed` after the first `Conn`'s `Set` (an integration-shaped test, matching this
-package's existing `graph.go`/`ops.go` test conventions for a multi-step RPC flow).
+**What this removes, as a direct consequence**: `git.path` leaves `packages/git-core/src/settings/
+schema.ts` (D10), `SettingsSnapshot` (D4), and `apps/kira-studio-vscode/package.json`'s
+`contributes.configuration` (D12) — it was never really an extension-owned setting once its correct
+home was established; leaving a dead, unread `kiriVersion.git.path` declaration in `schema.ts`
+*after* wiring the real one in `kira.db` would recreate exactly the "a setting that silently does
+nothing" anti-pattern this whole chapter (G17's own citation of commit `90b85c05`) already argues
+against — the fix is not complete without also removing the orphaned declaration, not just adding
+the real one.
 
 ---
 
-## 4. The TypeScript / Vue side, file by file
+## 3. The Go side, file by file — **revised**: adds D15's `git.path` fix, widens D3's model to seven fields, D14's sentinel branch
 
-### 4.1 `packages/git-core/src/settings/schema.ts` — edited (D10)
+### 3.1 `internal/storage/migrations/0017_g18_git_repo_settings.sql` — new (unchanged from original, D3)
 
-`SettingDef.source` widens to include `'repo'`; the five moved keys tagged; `toVsCodeConfiguration()`
-skip condition widens to `def.source !== undefined`; new `repoSettingKeys()` export; the stale
-`wireConformance.test.ts` doc-comment reference corrected (D10's own closing note).
-`coerceSettings`/`defaultSettings`/`SETTINGS`/`Settings` themselves are unchanged in shape.
+### 3.2 `internal/storage/model/gitreposettings.go` — new, **revised**: seven fields (D3, D14)
 
-### 4.2 `packages/git-ipc/src/contract.ts` — edited (D4)
+`GitRepoSettings` gains `PullStrategy string` and `LogLevel string` (five → seven fields);
+`DefaultGitRepoSettings()` gains `PullStrategy: "auto", LogLevel: "info"` (matching `schema.ts`'s own
+defaults). `Validate()` gains the two matching bounds checks (`pullStrategy` ∈ the four-member enum,
+`logLevel` ∈ the five-member enum).
 
-`SettingsSnapshot` narrows to four members; new `RepoSettingsSnapshot` (five members);
-`'repoSettings.get'`/`'repoSettings.set'` requests; `'repoSettings.changed'` event.
+### 3.3 `internal/storage/repos/gitreposettings.go` — new, **revised**: D14's sentinel branch
 
-### 4.3 `packages/git-ipc/src/validate.ts` — edited (D5)
+`Get`/`Set` gain the one explicit `if key == logLevelSettingKey { repoID = "" }`-shaped substitution,
+commented per D14. A named constant `const logLevelSettingKey = "kiraVersion.log.level"` (or the
+equivalent already-shared key constant, if one exists by implementation time) avoids a magic string
+appearing twice.
 
-`CONTRACT_VERSION` 21 → 22.
+### 3.4 `internal/storage/repos/repos.go` — edited (unchanged from original, D3)
 
-### 4.4 `packages/git-ui/src/state/repoSettings.ts` — **new** (D13)
+### 3.5 `internal/storage/repos/gitreposettings_test.go` — new, **revised**: adds D14's sentinel-collapse test
 
-`RepoSettingsState` — bridge-driven class, `settings: ShallowRef<RepoSettingsSnapshot>`, `dirty:
-ShallowRef<Partial<RepoSettingsSnapshot>>`, `setRepoId(repoId)` (re-fetches via `repoSettings.get`,
-resets `dirty`, re-subscribes `repoSettings.changed` scoped to the new repoId), `save()`,
-`resetField(key)`, the mid-edit queueing behavior from D13's own description.
+All original test cases (§3.5 of the prior revision), plus: `Set(repoA, {logLevel: "debug"})`
+followed by `Get(repoB)` shows `logLevel: "debug"` too (proving the sentinel collapse actually
+happens across two different real repo ids) — the single most important new regression guard this
+revision adds, since a bug here would silently make `log.level` behave as if per-repo when it should
+not, or vice versa.
 
-### 4.5 `packages/git-ui/src/components/dialogs/RepoSettingsDialog.vue` — **new** (D13)
+### 3.6 `internal/gitclient/settings.go` — deleted (unchanged, D9)
 
-The three sections, per-field validation and reset, matching `StashDialog.vue`'s structural and
-visual conventions exactly (no new `<style>` block — reuses `.kv-modal-*`/`.kv-tag-field*`, F9).
+### 3.7 `internal/gitsession/registry.go` — edited, **revised**: `Settings`'s three-value signature (D15)
 
-### 4.6 `packages/git-ui/src/components/AppToolbar.vue` — edited (D13, F8)
+`Settings func() (protectedBranches []string, autoFetchMinutes int, gitPath string)`, plus the
+unchanged `RepoSettingsGet`/`RepoSettingsSet` fields from the original plan (D8), now over the
+seven-field `GitRepoSettings`.
 
-One new `⚙` button in the already-reserved slot; one new emit (`open-repo-settings`) forwarded from
-`App.vue`, matching `stash-changes`'s own emit-and-forward shape.
+### 3.8 `internal/gitsession/entry.go` — edited (unchanged, D7)
 
-### 4.7 `packages/git-ui/src/App.vue` — edited
+### 3.9 `internal/gitsession/conn.go` — edited (unchanged, D7)
 
-- New `repoSettingsState` (mirrors `settingsState`'s own declaration), reset alongside
-  `refsState`/`opsState`/`stashState`/`searchState` in the existing `repoId` watch (`:245-255`).
-- `pageSize`/`stashIncludeUntrackedDefault` computeds (`:143-145,158-162`) re-sourced from
-  `repoSettingsState` instead of `settingsState`.
-- One new dialog-open boolean plus the toolbar's `open-repo-settings` handler, mounting
-  `RepoSettingsDialog.vue` alongside the existing `StashDialog`/`CheckoutDialog`/etc. mounts.
+### 3.10 `internal/gitrpc/wire.go` — edited, **revised**: `RepoSettingsSnapshot` grows to seven fields (D4)
 
-### 4.8 `apps/kira-studio-vscode/src/proxyHandlers.ts` — edited (D6)
+### 3.11 `internal/gitrpc/settings.go` — new (unchanged, D4/D6)
 
-The three bespoke `graph.loadMore`/`graph.stream`/`review.resolveBase` compositions become plain
-`forward(...)` calls — this file gets **smaller**.
+### 3.12 `internal/gitrpc/handlers.go` — edited, **revised**: adds D15's `git.path` fix at the two existing `Discovery.Status(ctx, "")` call sites
 
-### 4.9 `apps/kira-studio-vscode/src/extension.ts` — edited (D10, D11)
+The two new `repoSettings.*` `case` arms (unchanged, D4), plus `:134,147`'s `Discovery.Status`
+calls updated per D15 item 6.
 
-`readRawSettings()`'s iteration narrows to `hostSettingKeys()`. New one-time migration routine
-(D11), run from `activate()` at the point a repo is first opened per window (wherever `repo.open`'s
-own success is already observed — the existing `app.init`/probe-call site, `:410-425`, is the
-natural hook, since that is already where this file learns a repo is live).
+### 3.13 `internal/gitrpc/graph.go` — edited, **revised**: D6's fallback upgrade (unchanged) plus D15's fix at `:109,192`
 
-### 4.10 `apps/kira-studio-vscode/package.json` — edited (D12)
+### 3.14 `internal/gitrpc/remote.go` — edited, **new this revision** (D6/F14)
 
-Regenerated via `scripts/gen-settings.ts` after 4.1's `source` change — the five keys' entries
-disappear from `contributes.configuration`.
+`handlePullPreflight` (or wherever `p.StrategySetting` first reaches `entry.PullPreflight`, `:29`)
+gains the same one-line upgrade: when `p.StrategySetting == ""`, resolve the repo's stored
+`pull.strategy` before falling through to `PullPreflight`'s own existing `"auto"` default.
 
-### 4.11 `packages/git-ui/src/state/settings.ts` — **not edited**
+### 3.15 `internal/gitrpc/contract.go` — edited (unchanged, D5, wording widened per D5's note)
 
-`SettingsState` keeps its existing shape, now over the narrower four-key `SettingsSnapshot` — no
-code change needed, only the type it is generic over shrinks (same structural-typing point as D10's
-closing paragraph).
+### 3.16 `main.go` — edited, **revised**: D8's closures plus D15's widened `Settings` closure body
 
-### 4.12 `packages/git-ui/src/state/repoSettings.test.ts` — **new** (D13, F10)
+### 3.17 `internal/gitsession/*_test.go` — new tests (unchanged, D7)
 
-`RepoSettingsState`'s own unit tests, no DOM: initial fetch on `setRepoId`, `save()`'s dirty-clearing,
-`resetField`'s single-leaf reset, the mid-edit queueing behavior (a `repoSettings.changed` arriving
-while `dirty` is non-empty is held, not applied, until `dirty` clears).
+### 3.18 `internal/gitrpc/settings_test.go` — new tests, **revised**: adds a `log.level` cross-repo case
 
-### 4.13 Not edited
+The original four test cases, plus: two different `Conn`s open on two different repos both receive
+`repoSettings.changed` when `log.level` is set via either one's `repoSettings.set` — proving D7's
+live-propagation mechanism also correctly fans a sentinel-backed change out to *every* open
+connection, not just the ones on the repo the request happened to name.
 
-`packages/git-ui/src/components/dialogs/StashDialog.vue` (reused, not modified — F9),
-`internal/gitreview/**` (F6's own conclusion — wrong lifecycle, not touched), `internal/storage/
-model/settings.go`/`storage/repos/settings.go` (F4 — the *other* server-owned settings are already
-correct, untouched), `apps/kira-studio/frontend/**` (Kira Studio's own Wails settings UI, a
-different module's settings entirely).
+### 3.19 `internal/gitrpc/handlers_test.go` (or wherever `app.init`'s existing tests live) — edited, **new this revision** (D15)
+
+A new/updated test: `app.init`'s `Git` field reflects a configured `git.path` (via a fake `Registry.
+Settings` closure returning a non-empty path) rather than always resolving against `""`.
 
 ---
 
-## 5. Dependencies and tooling
+## 4. The TypeScript / Vue side, file by file — **revised**
 
-Nothing new. `internal/notify` is already a dependency of several existing packages; `kira.db`'s
-migration machinery, `scripts/gen-settings.ts`, and every test convention this phase reuses are all
-already in the tree.
+### 4.1 `packages/git-core/src/settings/schema.ts` — edited, **revised**: seven `source: 'repo'` keys, `instanceWide` flag, `git.path` deleted
+
+`SettingDef` gains `instanceWide?: boolean` (D10); `kiriVersion.pull.strategy`/`log.level` get
+`source: 'repo'` (the latter also `instanceWide: true`); `kiriVersion.git.path`'s entire object
+literal is **removed** from `SETTINGS` (D10/D15). `toVsCodeConfiguration()`'s skip condition
+unchanged from the original plan. `repoSettingKeys()` now returns seven keys.
+
+### 4.2 `packages/git-ipc/src/contract.ts` — edited, **revised**: `SettingsSnapshot` down to one member, `RepoSettingsSnapshot` up to seven
+
+### 4.3 `packages/git-ipc/src/validate.ts` — edited (unchanged, D5)
+
+### 4.4 `packages/git-ui/src/state/repoSettings.ts` — new, **revised**: seven fields, no special-casing needed here (D14's sentinel is invisible above the storage layer)
+
+### 4.5 `packages/git-ui/src/components/dialogs/RepoSettingsDialog.vue` — new, **revised**: five sections (Graph, Stash, Branch review, Pull, Diagnostics), the `instanceWide` note on `log.level` (D13-revised)
+
+### 4.6 `packages/git-ui/src/components/AppToolbar.vue` — edited (unchanged, F8)
+
+### 4.7 `packages/git-ui/src/App.vue` — edited (unchanged shape; `pageSize`/`stashIncludeUntrackedDefault` re-sourced from `repoSettingsState`, unchanged from the original plan)
+
+### 4.8 `apps/kira-studio-vscode/src/proxyHandlers.ts` — edited, **revised**: four `forward(...)` simplifications, not three (adds `remote.pullPreflight`, F14/D6)
+
+### 4.9 `apps/kira-studio-vscode/src/extension.ts` — edited, **revised**: migration now covers eight keys including `git.path` (D11), and `git.path`'s migrated value is written via Kira Studio's own settings-write path, not `repoSettings.set` (D11's own flagged implementation-time check)
+
+### 4.10 `apps/kira-studio-vscode/package.json` — edited, **revised**: eight keys removed, not seven (D12)
+
+### 4.11 `packages/git-ui/src/state/settings.ts` — not edited (unchanged; now generic over a one-member `SettingsSnapshot`)
+
+### 4.12 `packages/git-ui/src/state/repoSettings.test.ts` — new, **revised**: adds a case asserting the dialog-facing state exposes `instanceWide` correctly for `log.level` and for no other key
+
+### 4.13 `apps/kira-studio/frontend/src/workbench/SettingsDialog.vue` — edited, **new this revision** (D15/F15)
+
+One new text input in the existing "Git" section, `draft.git.gitPath`, matching the existing
+`fetchAutoIntervalMinutes` field's reset-button/validation convention (no validation needed beyond
+"is a string," per D15 item 2).
+
+### 4.14 Not edited
+
+Everything the original plan's §4.13 already named, still unedited: `packages/git-core/src/settings/
+schema.test.ts`-equivalents beyond what §4.1 already covers, `internal/gitreview/**`,
+`apps/kira-studio/frontend/**` beyond the one field in §4.13.
 
 ---
 
-## 6. Implementation order
-
-One sequential subagent — the Go side is order-dependent (storage → registry wiring → RPC → the
-`graph.go`/`review.go` fallback upgrade), the TS side depends on the Go side's wire shapes being
-final before `contract.ts` is written, and the Vue side depends on `contract.ts`.
-
-1. **Storage** (D3, §3.1-3.5): migration, `storage/model`, `storage/repos`, their tests. `go test
-   ./apps/kira-studio/internal/storage/...`.
-2. **`gitclient/settings.go` deletion** (D9, §3.6) — confirm zero callers one more time
-   (`grep -r gitclient.SettingsSnapshot`) immediately before deleting, not merely trusting this
-   plan's own earlier grep.
-3. **Registry/entry/conn wiring** (D7, D8, §3.7-3.9), their tests (§3.17). `go test
-   ./apps/kira-studio/internal/gitsession/...`.
-4. **RPC surface** (D4, §3.10-3.12), the `graph.go`/`review.go` fallback upgrade (D6, §3.13-3.14),
-   `ContractVersion` bump (D5, §3.15), `main.go` wiring (§3.16), their tests (§3.18). `go test
-   ./apps/kira-studio/internal/...` (SPEC's own scoped git-package set).
-5. **`schema.ts`** (D10, §4.1) — the `source: 'repo'` tagging, `toVsCodeConfiguration()` widening,
-   `repoSettingKeys()`. `bun run typecheck` inside `packages/git-core`.
-6. **`contract.ts` + `validate.ts`** (D4, D5, §4.2-4.3) — `CONTRACT_VERSION` 22 on both sides now
-   agree (`grep`, both languages).
-7. **`proxyHandlers.ts`/`extension.ts`** (D6, D10, D11, §4.8-4.9) — the three `forward()`
-   simplifications, `readRawSettings()`'s narrowed iteration, the migration routine.
-8. **`repoSettings.ts` state + its tests** (D13, §4.4, §4.12).
-9. **`RepoSettingsDialog.vue` + `AppToolbar.vue` + `App.vue`** (D13, §4.5-4.7).
-10. **`package.json` regeneration** (D12, §4.10) — `bun run gen-settings` (or the equivalent script
-    name; confirm against `package.json`'s own scripts before running), diff-reviewed by hand to
-    confirm exactly five properties disappeared and nothing else moved.
-11. Full check pass: `bun run lint`, `bun run typecheck`, `bun run test:unit`, `bun run build:vscode`,
-    `go test ./apps/kira-studio/internal/...` (SPEC-scoped set), `git diff --stat -- packages/
-    git-ipc` (should show exactly the `SettingsSnapshot`/`RepoSettingsSnapshot`/two-requests/
-    one-event diff, nothing incidental).
-
-Commits land incrementally, Conventional Commits, roughly one per numbered step.
+## 5. Dependencies and tooling (unchanged)
 
 ---
 
-## 7. Exit criteria
+## 6. Implementation order — **revised**: adds a git.path step, folds pull.strategy/log.level into the existing steps
 
-### 7.1 Tier 1 — fully provable in this container
+1. **Storage** (D3, D14, §3.1-3.5): migration, `storage/model` (seven fields), `storage/repos` (the
+   sentinel branch), their tests — including the cross-repo `log.level` collapse test (§3.5).
+2. **`git.path`'s existing-table fix** (D15, §3.16 items 1-3 in file terms —
+   `packages/shared/domain/settings.ts`, `storage/model/settings.go`, `storage/repos/settings.go`)
+   — done alongside step 1 since both touch settings-storage machinery in the same sitting, but
+   commit separately (this is a fix to the *existing* server-owned surface, not part of the new
+   per-repo table, and the commit history should say so plainly).
+3. **`gitclient/settings.go` deletion** (D9, §3.6) — unchanged.
+4. **Registry/entry/conn wiring** (D7, D8, D15 item 4-5, §3.7-3.9) — `Registry.Settings`'s widened
+   three-value signature and `main.go`'s matching update land together, since one cannot compile
+   without the other.
+5. **RPC surface** (D4, §3.10-3.12), the `graph.go`/`review.go`/`remote.go` fallback upgrades (D6,
+   §3.13-3.14), the two `Discovery.Status` call sites' fix (D15, §3.12-3.13), `ContractVersion` bump
+   (D5), `main.go` wiring (§3.16), their tests (§3.17-3.19).
+6. **`schema.ts`** (D10, §4.1) — seven `source: 'repo'` tags, the `instanceWide` flag, `git.path`'s
+   deletion.
+7. **`contract.ts` + `validate.ts`** (D4, D5, §4.2-4.3).
+8. **`proxyHandlers.ts`/`extension.ts`** (D6, D10, D11, §4.8-4.9) — four `forward()` simplifications
+   now, and the widened eight-key migration routine.
+9. **`repoSettings.ts` state + its tests** (D13, §4.4, §4.12).
+10. **`RepoSettingsDialog.vue` + `AppToolbar.vue` + `App.vue`** (D13, §4.5-4.7) — five sections now.
+11. **Kira Studio's own `SettingsDialog.vue`** (D15, §4.13) — the one new `git.path` field.
+12. **`package.json` regeneration** (D12, §4.10) — confirm exactly eight properties disappeared.
+13. Full check pass, unchanged in shape from the original plan's step 11, now also covering the
+    `frontend`/Wails side (`vue-tsc` over `apps/kira-studio/frontend`, already part of this repo's
+    existing `typecheck:web` script per this session's own pre-commit hook output on the original
+    commit).
 
-1. `go test ./apps/kira-studio/internal/...` (SPEC-scoped set) passes, including every new test in
-   §3.5, §3.17, §3.18.
-2. `bun run test:unit` passes, including `repoSettings.test.ts` (§4.12).
-3. `bun run lint`, `bun run typecheck`, `bun run build:vscode` all pass.
-4. `CONTRACT_VERSION`/`ContractVersion` are both `22` (`grep`, both sides).
-5. `apps/kira-studio-vscode/package.json`'s `contributes.configuration` no longer lists the five
-   moved keys (`grep -c` each, expect 0), and still lists the four that stayed (expect 1 each).
-6. A manual RPC smoke test (raw socket client, matching G1's own end-to-end proof pattern):
-   `repoSettings.get` for an unconfigured repo returns the schema defaults; `repoSettings.set` with a
-   `pageSize` patch round-trips through a subsequent `repoSettings.get`; a second connection open on
-   the same repo receives `repoSettings.changed` after the first connection's `set`; `graph.loadMore`
-   sent **without** a `pageSize` param honors the stored value, not the old hardcoded 5000.
-7. `internal/gitclient/settings.go` no longer exists (`ls`, expect a "no such file" result).
+---
 
-### 7.2 Tier 2 — provable here as a reasoned check, not a full proof
+## 7. Exit criteria — **revised**
 
-8. **The migration (D11) is correct by inspection against `config.inspect()`'s documented
-   semantics**, not exercised against a real pre-upgrade `settings.json` in this container (no real
-   VS Code host here to hold one) — the `globalValue`/`workspaceValue` distinction is VS Code API
-   behavior, not this app's own code, so this is trusted the same way this chapter already trusts
-   other VS Code API contracts it cannot execute in a headless container.
-9. **`stash.showInGraph` is no worse than before** — still inert, same default, same (still-absent)
-   effect on the graph — checked by confirming `graph/stashRows.ts` and `WalkSpec.IncludeStash`'s
-   only caller sites are unchanged by this phase's diff.
+### 7.1 Tier 1
 
-### 7.3 Tier 3 — needs a human on a Mac, with VS Code and Kira Studio both running
+1-7. Unchanged in kind from the original plan (Go tests, TS tests, lint/typecheck/build,
+`CONTRACT_VERSION` 22, `contributes.configuration` diffs, the RPC smoke test, `gitclient/settings.go`
+gone) — **item 5 widens**: eight keys are gone from `contributes.configuration` now, not five (the
+seven moved keys plus `git.path`). Since those eight were every `kiraVersion.*` leaf `schema.ts`
+declared, **zero `kiraVersion.*` setting properties remain in `contributes.configuration`'s generated
+output after this phase** — confirmed by `grep -c '"kiraVersion\.' apps/kira-studio-vscode/
+package.json`'s setting-property count (not its command/menu ids, which are unrelated and unaffected)
+dropping to 0. `workbench.tree.indent` was never contributed by this extension in the first place
+(`source: 'host'`), so its absence from `contributes.configuration` is unchanged, not a new effect of
+this phase.
+6. **Widens**: the RPC smoke test also confirms `remote.pullPreflight` sent without `strategySetting`
+   honors the repo's stored value, and confirms `repoSettings.set` for `log.level` on repo A is
+   visible via `repoSettings.get` on repo B.
+8. **New**: `app.init`'s `git` field reflects a configured `git.path` in a test that injects one via
+   a fake `Registry.Settings`, rather than only ever seeing `Discovery.Status(ctx, "")`'s
+   auto-discovery path (§3.19).
 
-10. The dialog opens from the new toolbar gear, shows the repo's actual current values, and Save
-    round-trips visibly (a changed `pageSize` changes `LoadMoreButton.vue`'s own label text on the
-    next load).
-11. Two VS Code windows open on the *same* repo: a save in one dialog is reflected live in the
-    other's own dialog state (or at minimum in `LoadMoreButton.vue`'s label) without either window
-    reloading.
-12. Two VS Code windows on *different* repos: each keeps its own independent settings, confirming
-    the per-repo key (D2) is actually doing per-repo work, not accidentally global.
-13. A real pre-upgrade `settings.json` with a customized `kiraVersion.graph.pageSize` migrates once,
-    correctly, on that repo's first open post-upgrade, and does not re-migrate (and does not clobber
-    a subsequent in-dialog change) on a second window opening the same repo afterward.
+### 7.2-7.3 Unchanged in kind; Tier 3 item 13 widens to also cover a real, pre-upgrade `git.path`
+customization migrating correctly into Kira Studio's own settings (not into `repoSettings`).
 
-### 7.4 The checklist
+### 7.4 The checklist — **revised**
 
-- [ ] Five keys moved, four stayed, `workbench.tree.indent` untouched (D1).
-- [ ] `git_repo_settings` keyed by `(repo_id, key)`, in `kira.db`, not `review.db`, not a new file.
-- [ ] `RepoID` reused as the per-repo key — no new identity concept anywhere in this phase's diff.
+- [ ] Seven keys moved to the per-repo dialog; `git.path` fixed but relocated to the existing
+      server-owned surface, not the per-repo one (D1).
+- [ ] `log.level`'s stored value is identical across every repo (the sentinel actually collapses,
+      §3.5's new test) — and the dialog visibly says so (D13-revised).
+- [ ] `git.path` no longer appears anywhere in `packages/git-core/src/settings/schema.ts` or
+      `contributes.configuration`, and now appears in Kira Studio's own "Git" settings section
+      (F15/D15).
+- [ ] `Discovery.Status` is never called with a hardcoded `""` anywhere in `internal/gitrpc` after
+      this phase — every call site resolves through `Registry.Settings`'s widened closure.
 - [ ] `CONTRACT_VERSION`/`ContractVersion` both 22.
-- [ ] `graph.loadMore`/`graph.stream`/`review.resolveBase`'s own param shapes are byte-identical to
-      before this phase (`git diff` on their `contract.ts` entries shows no change) — only their
-      Go-side default resolution changed.
-- [ ] `proxyHandlers.ts` is smaller after this phase, not larger.
-- [ ] `internal/gitclient/settings.go` deleted.
-- [ ] `repoSettings.changed` actually reaches a second open connection on the same repo (§7.1 item 6).
-- [ ] The five-key removal from `package.json` came from re-running `gen-settings`, not a hand-edit.
+- [ ] `graph.loadMore`/`graph.stream`/`review.resolveBase`/`remote.pullPreflight`'s own param shapes
+      are byte-identical to before this phase.
+- [ ] `proxyHandlers.ts` has four simplified `forward()` calls where bespoke compositions used to be,
+      not three.
 - [ ] `stash.showInGraph`'s actual graph-filtering behavior is exactly as inert after this phase as
-      before it (§0.3).
+      before it (§0.3, unchanged).
 
 ---
 
-## 8. Explicit non-goals for G18
+## 8. Explicit non-goals for G18 — **revised**
 
-- **Actually wiring `stash.showInGraph` into the graph.** G17 D1's own deferred, separately-scoped
-  feature. §0.3, §10.1.
-- **`pull.strategy`/`log.level` moving.** Audited and kept — §10.2.
-- **Fixing `git.path`'s dead server-side wiring** (F3) — a real, separate, pre-existing gap. §10.5.
-- **A new Vue component-rendering test tier.** G16's own declared non-goal, restated here.
-- **Editing a user's `settings.json` programmatically.** D11 — the orphaned legacy value is left in
-  place, not removed.
-- **Any change to Kira Studio's own Wails `SettingsDialog.vue`** or its module's settings.
-
----
-
-## 9. Handed forward
-
-- **If a later phase does wire `stash.showInGraph`'s actual graph filtering** (G17's own §9 already
-  named this as future work), it now reads the setting from `RepoSettingsGet(repoID)` server-side —
-  the same accessor this phase builds — rather than from `app.init`'s `SettingsSnapshot`, which no
-  longer carries it at all after this phase.
-- **`git.path`'s dead server-side wiring** (F3) is a self-contained follow-up: thread a configured
-  path from `kira.db` into `Discovery.Status`, the same shape `gitRegistry.Settings` already
-  threads `protectedBranches`/`fetchAutoIntervalMinutes` — no design work, just wiring, and outside
-  this phase's own stated scope (§10.5).
-- **`RepoSettingsDialog.vue`'s reset-to-default mechanism** (D13 — "set the leaf back to the schema
-  default explicitly," not a wire-level delete) is a deliberate simplification; if a later phase adds
-  a genuine "has this leaf ever been customized" wire concept for some other reason, this dialog's
-  reset action is a natural, cheap thing to upgrade at the same time, not before.
+- **Actually wiring `stash.showInGraph` into the graph.** Unchanged — §10.1 (resolved: keep the
+  split).
+- **A new Vue component-rendering test tier.** Unchanged.
+- **Any redesign of Kira Studio's own `SettingsDialog.vue`** beyond the one new `git.path` field in
+  its existing "Git" section — its other five sections are untouched.
+- **Editing a user's `settings.json` programmatically.** Unchanged — the orphaned legacy value(s)
+  are left in place, not removed, for all eight keys now, not five.
+- **~~`pull.strategy`/`log.level` moving~~ — REMOVED from this list.** Both move now (10.2).
+- **~~Fixing `git.path`'s dead server-side wiring~~ — REMOVED from this list.** It is fixed now
+  (10.4), just not inside the per-repo dialog (D15).
 
 ---
 
-## 10. Calls that want a human eye
+## 9. Handed forward — **revised**
 
-### 10.1 `stash.showInGraph` still does nothing after this phase, and the user's own words could be read either way
+- **If a later phase wires `stash.showInGraph`'s actual graph filtering**, unchanged from the
+  original plan — it now reads from `RepoSettingsGet(repoID)`, same as before.
+- **D14's sentinel pattern is a reusable answer, not a one-off hack**, if a future phase ever finds
+  another "wants to live in the per-repo dialog, isn't actually per-repo" setting — the same
+  `repo_id = ""` convention applies without a schema change, only a new `if key == ...` branch in
+  `GitRepoSettingsRepo` plus an `instanceWide: true` tag in `schema.ts`.
+- **`RepoSettingsDialog.vue`'s reset-to-default mechanism** — unchanged note from the original plan.
+- **`git.path`'s validation** is deliberately absent beyond "is a string" (D15 item 2) — if a later
+  phase wants to validate the path actually resolves to a usable git binary *before* saving (rather
+  than surfacing a discovery failure only on the next `app.init`/`repo.open`), that is a genuine UX
+  improvement this phase does not attempt, matching how `protectedBranches`/`fetchAutoIntervalMinutes`
+  are validated for shape/range only, never for "does this branch pattern actually match anything."
 
-The user asked to "move them all into a proper dialog... configurable per repo" — about *where these
-settings live*, prompted by G17's own question about whether to *also* wire the setting's actual
-effect. This plan treats those as two different questions and answers only the first: the toggle
-moves, its (non-)effect on the graph does not change. A reviewer who reads "configurable per repo"
-as implicitly also meaning "and it should do something" should say so — the fix is G17 D1's own
-already-described override path (a new field on `graph.stream`'s param shape, `IncludeStash`
-population from a `stash.list` read, and a decision on where `stashRows.ts`'s row-filter logic lives,
-server or client), which is real, separately-scoped work this plan does not estimate.
-**Recommendation: keep the split** — a settings-relocation phase and a graph-behavior phase are
-different-shaped work, and G17's own plan already left the graph-behavior question open for good,
-stated reasons (an undecided architecture question, not an oversight) that this phase does not
-resolve just by being adjacent to it.
+---
 
-### 10.2 `pull.strategy` and `log.level`: judgment calls, not settled by SPEC's own prose either way
+## 10. Calls that want a human eye — **all four resolved**
 
-D1 keeps both where they are. `pull.strategy` because it reads as a personal integration-style
-preference (two people on one repo often deliberately differ) rather than a repo-level display
-setting; `log.level` because it isn't repo-scoped at all in any meaningful sense — it governs this
-extension instance's own diagnostic output regardless of which repo triggered it. Neither is named in
-SPEC's own G18 row, and SPEC's "and similar" is genuinely ambiguous over both. **Recommendation:
-leave both as VS Code settings** — but a reviewer who weighs "it says `kiraVersion.*`, it should all
-live in one place" more heavily than the per-key reasoning above should say so; moving either is a
-same-shaped, small addition (one `source` tag, one field relocated between the two snapshot types),
-not a design change to anything else in this plan.
+### 10.1 `stash.showInGraph` split — **resolved: keep the split**
 
-### 10.3 Should the dialog show `git.path`/`log.level`/`pull.strategy` read-only, for discoverability, even though they don't move?
+Asked whether relocating the setting's storage should also mean finally implementing its graph
+effect. **User's answer: this plan's own recommendation** — keep the split. No change. §0.3.
 
-A user opening "repository settings" from the graph and finding only five of the nine
-`kiraVersion.*` keys, with the other four still only reachable through VS Code's own Settings UI,
-might reasonably wonder where the rest went. This plan does not add a read-only "these are edited
-elsewhere" section to the dialog — it would need its own design (a link out to VS Code's settings
-UI? a plain sentence?) and risks making the dialog look unfinished rather than deliberately scoped.
-**Recommendation: leave it out** — the dialog's own title ("Repository settings") already implies a
-narrower scope than "every kiraVersion setting," and a reviewer who wants discoverability can add a
-one-line footer sentence cheaply, without touching anything else here.
+### 10.2 `pull.strategy`/`log.level` — **resolved: both move; `log.level` via a reserved sentinel, not a real `repo_id`**
 
-### 10.4 D6's request-shape-preserving design vs. the more conservative "keep client-side injection" alternative
+Asked whether these two stay VS-Code-owned or join the per-repo dialog. **User's answer: move both.**
+This plan's own follow-up obligation — resolving the semantic mismatch the user's answer did not
+itself settle (`log.level` isn't really a per-repo fact) — is D14: same new table, same dialog, a
+reserved non-repo sentinel key (`repo_id = ""`, permanently collision-free since a real `RepoID` is
+never empty) rather than a real partition, and a visible note in the dialog UI so the non-per-repo
+behavior is legible to the user rather than a silent surprise. `pull.strategy`, unlike `log.level`,
+is treated as genuinely per-repo (a real `repo_id`) — a repo's own rebase-vs-merge convention is a
+legitimate fact about that repo, not an instance-wide preference, so it needed no equivalent special
+case.
 
-D6 removes `proxyHandlers.ts`'s three injection sites entirely, relying on the Go server to resolve
-`scope`/`pageSize`/`baseCandidates` itself from the new per-repo store. The conservative alternative
-— keep the extension injecting these three fields into every `graph.loadMore`/`graph.stream`/
-`review.resolveBase` call, sourcing the injected value from a client-side `repoSettings.get` result
-cached per repoId instead of from VS Code config — touches fewer existing files (no change to
-`gitrpc/graph.go`'s `walkSpecFrom`/`review.go`) at the cost of a real staleness window (the client's
-cached copy can lag one `repoSettings.set` behind the server's own value, however briefly) that D6's
-design eliminates by construction. **Recommendation: D6 as written** — the existing doc comments on
-all three requests already frame "the server's own default" as the intended fallback path, and this
-design is strictly less code, not more, once the dust settles. A reviewer who is uneasy about
-changing `gitrpc/graph.go`'s well-tested fallback logic, however small the diff, should say so; the
-conservative alternative is a contained swap inside `proxyHandlers.ts`/`RepoSettingsState` alone.
+### 10.3 Read-only footer for what doesn't move — **resolved: no footer; `workbench.tree.indent` excluded entirely; the dialog shows exactly the seven settings that moved**
 
-### 10.5 `git.path`'s dead server-side wiring: worth fixing now, while this phase is already touching the settings machinery, or genuinely separate?
+**User's answer**: show what makes sense in the dialog, remove what doesn't (`workbench.tree.indent`
+named explicitly as an example of what to remove) — and for `git.path`, decide based on its
+disposition after 10.4. With `pull.strategy`/`log.level` now real entries (10.2) and `git.path` fixed
+but explicitly kept out of this dialog (10.4/D15 — it is a machine-level fact, not a per-repo one,
+and its two trio-siblings already establish where facts like that belong), the set of "settings that
+don't fit this dialog" collapses to exactly `workbench.tree.indent`, which was never a candidate to
+begin with (it isn't even this extension's own setting). **Decision, confirmed with reasoning rather
+than merely asserted**: no read-only section of any kind. The dialog's own contents are precisely its
+own storage's contents — seven keys, all editable, nothing left over to explain away.
 
-F3: unlike `protectedBranches`/`fetchAutoIntervalMinutes`, which are already correctly server-owned
-and working, `git.path` is declared server-owned by SPEC but is not actually wired to anything —
-every `Discovery.Status` call in this tree passes `""`. This phase's own scope (§0.2/§0.3) is the
-five keys that move, and fixing `git.path`'s wiring is neither a move nor a stay in the sense this
-plan is organized around — it is a pre-existing, unrelated gap this investigation happened to
-surface. **Recommendation: leave it for a separate, small follow-up** — it needs no new storage (a
-`git.path` leaf added to the *existing* `GitSettings`/`settings` table, D3's sibling, not this
-phase's new one) and no new dialog (Kira Studio's own Wails settings surface, or the same in-app
-dialog this phase builds, either would do), but scoping it into G18 would blur "settings that move
-out of VS Code" with "a settings that was never wired to VS Code's stated intent at all," two
-genuinely different fixes that happen to share a file. A reviewer who wants it folded in should say
-so; the fix itself is small once decided.
+### 10.4 `git.path`'s dead wiring — **resolved: fixed in G18, in the existing server-owned surface, not the new per-repo one**
+
+**User's answer**: fix it in G18. This plan's own follow-up obligation — where the fix lives, since
+"fix it" did not by itself say "and put it in the new dialog" — is D15: `git.path` was already
+correctly classified as server-owned in D1 (unchanged verdict, both before and after this revision);
+the only thing that changes is that classification stops being aspirational and starts being real.
+The fix threads a real value from `kira.db`'s *existing* `settings` table through
+`Registry.Settings`'s widened closure into every `Discovery.Status` call site, and surfaces the field
+in Kira Studio's own existing "Git" settings section — the same table, the same closure-injection
+pattern, and the same UI surface `protectedBranches`/`fetchAutoIntervalMinutes` already use, not the
+new per-repo table or the new git-ui dialog this phase otherwise builds. As a direct, not merely
+convenient, consequence: `git.path` is deleted from `packages/git-core/src/settings/schema.ts` and
+`apps/kira-studio-vscode/package.json` entirely (D10/D12) — once it is genuinely server-owned, an
+orphaned client-side declaration of it would itself become the exact "setting that silently does
+nothing" anti-pattern this fix exists to close out.
