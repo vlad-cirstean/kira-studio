@@ -21,6 +21,27 @@ func CountRangeArgs(base, branch string) []string {
 	return []string{"rev-list", "--count", RangeToken(RangeSpec{Base: base, Branch: branch})}
 }
 
+// IsAncestorArgs is `merge-base --is-ancestor <ancestor> <descendant>` — G11 D7's tier-1 gate.
+// Exit 0 means ancestor is an ancestor of descendant (the fast path is exact); exit 1 means it is
+// not (a rewritten history, the common case after amend/rebase/squash — probe P2); exit 128 means
+// ancestor no longer resolves at all (pruned) or descendant does not exist. The caller
+// (gitsession.RepoEntry.mergeBase's sibling) classifies which of those three it got.
+func IsAncestorArgs(ancestor, descendant string) []string {
+	return []string{"merge-base", "--is-ancestor", ancestor, descendant}
+}
+
+// NoIndexDiffArgs is G11 D7/D8's slow path: `diff --no-index` between two temp files holding a
+// stored snapshot and the branch tip's current content. No `-z` (there is no path list to frame,
+// and ParseFileDiffBody splits on LF); no `--no-optional-locks` (buildArgv already places it at
+// git level for every ReadOnly spec — probe P5). Both paths are appended after `--` (D8), so a
+// path that somehow began with `-` could never be read as a flag.
+func NoIndexDiffArgs(oldPath, newPath string) []string {
+	return []string{
+		"diff", "--no-index", "--no-color", "--no-ext-diff", "--no-textconv", "--unified=3",
+		"--", oldPath, newPath,
+	}
+}
+
 // OriginHeadArgs is `symbolic-ref --short refs/remotes/origin/HEAD` — the default-branch probe
 // (D7c step 2). Its exit code alone does not distinguish "no origin" from "origin/HEAD unset"
 // from "dangling" (probe P1); the caller folds all three into "not detected".
