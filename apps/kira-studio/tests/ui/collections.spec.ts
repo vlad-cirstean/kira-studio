@@ -1,7 +1,9 @@
 import type { Locator, Page } from '@playwright/test';
+import { CHANNEL } from '@shared/protocol/events';
 import type { ControlSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
 import { IPC } from './support/ipcChannels';
+import { emitWailsEvent } from './support/mockRuntime';
 
 // P4 §6.3: four tests, one snapshot per channel (mockRuntime.ts: a channel with exactly one
 // snapshot answers args-blind, which is what lets a test assert on a call's args afterwards
@@ -260,7 +262,8 @@ test('collections — import reports what it did, and no file contents cross the
   const { window: page, control } = await relaunch({ control: CONTROL });
   await openHttpMode(page);
 
-  await page.click('[data-testid="import-collection"]');
+  // P28 D18: the panel button moved to the menu bar (App → Import Postman Collection…).
+  await emitWailsEvent(page, CHANNEL.importPostman, undefined);
 
   const strip = page.locator('[data-testid="import-report"]');
   await expect(strip).toBeVisible();

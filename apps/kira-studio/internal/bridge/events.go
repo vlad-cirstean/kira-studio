@@ -13,6 +13,9 @@ import (
 const (
 	ChannelOpenSettings           = "kira:open-settings"
 	ChannelNewConnection          = "kira:menu:new-connection"
+	ChannelNewRequest             = "kira:menu:new-request"
+	ChannelImportPostman          = "kira:menu:import-postman"
+	ChannelImportDataGrip         = "kira:menu:import-datagrip"
 	ChannelToggleProjectPanel     = "kira:menu:toggle-project-panel"
 	ChannelToggleOperationsPanel  = "kira:menu:toggle-operations-panel"
 	ChannelCommandPalette         = "kira:menu:command-palette"

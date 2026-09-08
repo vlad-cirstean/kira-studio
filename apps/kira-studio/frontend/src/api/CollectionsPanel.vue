@@ -145,17 +145,10 @@ onUnmounted(() => {
         data-testid="new-collection"
         @click="onNewCollection"
       />
-      <!-- D11: no op-log row — the panel's own action carries the spinner instead, and Wails
-           handles the call in its own goroutine so nothing else is blocked while it runs. -->
-      <IconButton
-        :icon="collectionsState.busy ? 'loading' : 'cloud-download'"
-        :class="{ spin: collectionsState.busy }"
-        :disabled="collectionsState.busy"
-        aria-label="Import collection"
-        v-tooltip="'Import collection…'"
-        data-testid="import-collection"
-        @click="onImport"
-      />
+      <!-- P28 D18: the Postman import moved to the menu bar (App → Import Postman Collection…)
+           and to the command palette entry it already had. D11's spinner-on-the-action reasoning
+           went with the button; collectionsState.busy still gates re-entry inside
+           importCollection() itself, so a second import cannot start while one is running. -->
       <!-- P5 D3/D11: the environments dialog's own entry point — environments exist
            independently of collections, so this lives in the panel's header, not the tree. -->
       <IconButton
@@ -326,16 +319,4 @@ onUnmounted(() => {
   line-height: 1.5;
 }
 
-.spin {
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
 </style>
