@@ -154,13 +154,21 @@ test('the reference dialog lists 58 names with live samples, regenerated on reop
   };
 
   await openDialog();
-  const rows = page.locator('[data-testid="dynamic-values-row"]');
-  await expect(rows).toHaveCount(58);
+  // P28 D15(b): the dialog teaches one vocabulary now — the 57 `fake.` names. The 58 Postman
+  // `$name` aliases still resolve everywhere they are already stored, they are simply no longer
+  // listed here or offered in autocomplete.
+  const rows = page.locator('[data-testid="dynamic-values-fake-row"]');
+  await expect(rows).toHaveCount(57);
+  await expect(page.locator('[data-testid="dynamic-values-row"]')).toHaveCount(0);
 
-  const emailRow = page.locator('[data-testid="dynamic-values-row"][data-name="$randomEmail"]');
+  const emailRow = page.locator(
+    '[data-testid="dynamic-values-fake-row"][data-name="fake.internet.email"]',
+  );
   await expect(emailRow.locator('[data-testid="dynamic-values-sample"]')).toContainText('@');
 
-  const guidRow = page.locator('[data-testid="dynamic-values-row"][data-name="$guid"]');
+  const guidRow = page.locator(
+    '[data-testid="dynamic-values-fake-row"][data-name="fake.string.uuid"]',
+  );
   const firstSample = await guidRow.locator('[data-testid="dynamic-values-sample"]').innerText();
   expect(firstSample).toMatch(UUID_RE);
 

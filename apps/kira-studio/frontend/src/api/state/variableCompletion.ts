@@ -3,7 +3,6 @@ import type { HoverTooltipSource } from '@codemirror/view';
 import {
   applyPipeline,
   classifyReference,
-  DYNAMIC_NAMES,
   FAKE_NAMES,
   isDynamicName,
   isFakeName,
@@ -184,16 +183,14 @@ export function variableSupport(collectionId: string, environmentId: string): Va
     })),
     ...secretNames.map((name) => ({ label: name, detail: 'secret', icon: 'symbol-variable' })),
   ].sort((a, b) => a.label.localeCompare(b.label));
-  // D12/D13(b): fake. names before $ names — the namespace this app wants a user to reach for
-  // first, with the Postman spellings still offered (tagged accordingly) right after.
+  // P28 D15(b): `fake.` is now the only dynamic vocabulary this app *offers*. D12/D13(b) used to
+  // list the 58 Postman `$name` spellings right after it, tagged 'postman alias'. An already-stored
+  // `{{$randomEmail}}` keeps resolving, keeps painting as a catalogued reference (classFor, above)
+  // and keeps its hover — it simply stops being suggested, and a Postman import now rewrites it to
+  // its `fake.` equivalent up front (api/state/collections.ts).
   const fakeCandidates: Completion[] = FAKE_NAMES.map((name) => ({
     label: name,
     detail: 'dynamic',
-    icon: 'symbol-variable',
-  }));
-  const dynamicCandidates: Completion[] = DYNAMIC_NAMES.map((name) => ({
-    label: name,
-    detail: 'postman alias',
     icon: 'symbol-variable',
   }));
   // D7's table, as a completion detail — a one-line reminder of what each transform does, shown
@@ -211,7 +208,7 @@ export function variableSupport(collectionId: string, environmentId: string): Va
     detail: TRANSFORM_DETAILS[name],
     icon: 'symbol-method',
   }));
-  const nameCandidates = [...varCandidates, ...fakeCandidates, ...dynamicCandidates];
+  const nameCandidates = [...varCandidates, ...fakeCandidates];
 
   function candidates(ctx: { text: string; from: number; word: string }): Completion[] {
     return isAfterPipe(ctx.text, ctx.from) ? transformCandidates : nameCandidates;

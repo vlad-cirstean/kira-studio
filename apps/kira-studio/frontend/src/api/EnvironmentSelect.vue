@@ -66,7 +66,7 @@ function manage(): void {
     <PopoverPanel
       v-if="open"
       :width="200"
-      anchor="right"
+      anchor="left"
       test-id="api-environment-menu"
       backdrop-test-id="api-environment-menu-backdrop"
       @close="open = false"

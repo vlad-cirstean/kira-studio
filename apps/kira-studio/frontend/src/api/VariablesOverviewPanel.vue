@@ -70,7 +70,7 @@ function editEnvironmentVariables(): void {
 </script>
 
 <template>
-  <PopoverPanel :width="360" test-id="variables-overview" backdrop-test-id="variables-overview-backdrop" @close="close">
+  <PopoverPanel :width="360" anchor="left" test-id="variables-overview" backdrop-test-id="variables-overview-backdrop" @close="close">
     <div class="overview-panel">
       <PanelSearchBox v-model="filterQuery" placeholder="Filter by name" testid="variables-overview-filter" />
 

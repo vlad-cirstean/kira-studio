@@ -12,6 +12,7 @@ import {
   CONTENT_TYPE_BY_CODE_LANGUAGE,
   HTTP_BODY_MODES,
 } from '@kira/shared/domain/http';
+import { ALIAS_TO_FAKE } from '../src/http/dynamic/catalog';
 import { TRANSFORM_NAMES } from '../src/http/transforms';
 
 /** Pulls every `"key": true` entry out of a Go `var <name> = map[string]bool{ ... }` literal —
@@ -103,5 +104,21 @@ describe('Go/TS transform vocabulary parity (P17 D7)', () => {
     );
     const goNames = extractGoStringSet(source, 'transformNames');
     expect(goNames).toEqual(new Set(TRANSFORM_NAMES));
+  });
+});
+
+// P28 D15(c): the Postman \`{{$name}}\` -> \`fake.\` mapping now exists twice — as ALIAS_TO_FAKE here
+// (what the app resolves and what the catalogue teaches) and as postman.aliasToFake in Go (what an
+// import rewrites with). Drift is silent in the worst direction: an alias missing from the Go table
+// imports verbatim and then, because this app no longer offers or documents the \`$\` spelling,
+// looks to the user like a reference nothing in the app knows about.
+describe('Go/TS Postman dynamic-alias parity (P28 D15c)', () => {
+  test('postman.aliasToFake (Go) matches ALIAS_TO_FAKE (TS)', () => {
+    const source = readFileSync(
+      resolve(import.meta.dir, '../../../apps/kira-studio/internal/postman/aliases.go'),
+      'utf8',
+    );
+    const goTable = extractGoStringMap(source, 'aliasToFake');
+    expect(goTable).toEqual(ALIAS_TO_FAKE);
   });
 });

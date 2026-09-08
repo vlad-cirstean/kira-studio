@@ -201,8 +201,10 @@ test('Http request — a header value completes from its own name', async ({ rel
   // once there is a non-empty word inside the reference (api-ui-consistency.spec.ts's own rule).
   await secondValue.pressSequentially('{{');
   await expect(secondValue).toHaveValue('Bearer {{}}');
-  await secondValue.pressSequentially('$g');
-  await expect(suggestions.filter({ hasText: '$guid' })).toBeVisible({ timeout: 5_000 });
+  // P28 D15(b): `fake.` is the only dynamic vocabulary offered now — the Postman `$name`
+  // spellings still resolve wherever they are already stored, but are no longer suggested.
+  await secondValue.pressSequentially('fake.string');
+  await expect(suggestions.filter({ hasText: 'fake.string.uuid' })).toBeVisible({ timeout: 5_000 });
 });
 
 test('Http request — restore from saved state, no reconnect gate', async ({ relaunch }) => {
