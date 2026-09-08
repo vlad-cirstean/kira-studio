@@ -27,17 +27,27 @@ export interface DetailActions {
   announce(text: string): void;
   /** "Open in editor" (§6.4/D14a's sibling action) — hands the same two blobs to the host's
    *  native diff. A no-op (never called) when `capabilities.openInEditor` is false; callers gate
-   *  the button on that themselves rather than this method re-checking it. */
+   *  the button on that themselves rather than this method re-checking it.
+   *
+   *  G21 D13: `pinned` is required, not optional — the caller (`FileTree.vue`'s `openFile` emit)
+   *  always knows which of the two this is; no default is applied here, so a call site that
+   *  forgets it is a type error, never a silent pin. G21 D12: `fallbackSha` (optional — only
+   *  `StashDetailPane.vue` ever has one to give) carries `entry.untrackedSha` through to
+   *  `editor.openDiff`'s own retry (F12's untracked-stash-file case). */
   openInEditor(params: {
     sha: string;
     path: string;
     originalPath: string | undefined;
     parentIndex: number;
+    pinned: boolean;
+    fallbackSha?: string;
   }): Promise<void>;
   /** "Go to file" (D14a) — `rev`/`path`/`line` are exactly the algorithm at the top of the plan
    *  already resolved; this method only makes the request and returns the outcome, it does not
-   *  compute `rev`/`line` itself (that stays in `DiffView.vue`, the one place that knows which
-   *  side of the diff the cursor is on). */
+   *  compute `rev`/`line` itself. No caller remains after G21 D12 deleted `DiffView.vue` (the one
+   *  place that knew which side of the diff the cursor was on) — kept, unreachable, rather than
+   *  torn out along with a contract method (`editor.goToFile`) this phase's own plan never asked
+   *  to remove. */
   goToFile(params: { rev: string; path: string; line: number }): Promise<GoToFileOutcome>;
 }
 
@@ -57,7 +67,7 @@ export function createDetailActions(
     announce(text) {
       detailState.announce(text);
     },
-    async openInEditor({ sha, path, originalPath, parentIndex }) {
+    async openInEditor({ sha, path, originalPath, parentIndex, pinned, fallbackSha }) {
       const repo = repoId();
       if (!repo) return;
       await bridge.request('editor.openDiff', {
@@ -66,6 +76,8 @@ export function createDetailActions(
         path,
         ...(originalPath !== undefined ? { originalPath } : {}),
         parentIndex,
+        pinned,
+        ...(fallbackSha !== undefined ? { fallbackSha } : {}),
       });
     },
     async goToFile({ rev, path, line }) {

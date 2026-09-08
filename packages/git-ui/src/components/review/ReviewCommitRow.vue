@@ -118,11 +118,15 @@ function openAllChanges(event: MouseEvent): void {
   }
   const parentIndex = exp.detail.parentIndex.value;
   for (const file of files) {
+    // G21 D13: the bulk call site always pins — item 8's original bug, never regressed. (D8's own
+    // commit replaces this per-file loop with one exp.actions.openAllChanges call, awaited and
+    // error-reporting; kept as a loop for now since D13 lands before D8.)
     void exp.actions.openInEditor({
       sha: props.sha,
       path: file.path,
       originalPath: file.originalPath,
       parentIndex,
+      pinned: true,
     });
   }
 }
@@ -139,8 +143,9 @@ const openInGraphHref = computed(() => {
 
 // G12 D12: opens VS Code's native diff directly — no in-webview diff mode to flip into. `sha`'s
 // own parentIndex is this row's current merge-parent selection, exactly what commit.detail was
-// fetched against.
-function onSelectFile(index: number): void {
+// fetched against. G21 D13: `pinned` comes straight from FileTree's own `openFile` emit — a
+// click (or arrow-key move) is `false`, a double click/`Enter` is `true`.
+function onOpenFile(index: number, pinned: boolean): void {
   const exp = props.expansion;
   const file = exp?.detail.detail.value?.files[index];
   if (!exp || !file) return;
@@ -149,6 +154,7 @@ function onSelectFile(index: number): void {
     path: file.path,
     originalPath: file.originalPath,
     parentIndex: exp.detail.parentIndex.value,
+    pinned,
   });
 }
 </script>
@@ -234,7 +240,7 @@ function onSelectFile(index: number): void {
         :parent-index="expansion.detail.parentIndex.value"
         :store="store"
         :actions="expansion.actions"
-        @select-file="onSelectFile"
+        @open-file="onOpenFile"
         @update:parent-index="expansion.detail.setParentIndex($event)"
       />
       <p v-else class="kv-review-row-loading">Loading…</p>

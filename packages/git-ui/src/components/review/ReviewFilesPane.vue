@@ -66,9 +66,11 @@ const deltaStatusText = computed(() => {
   }
 });
 
-function onSelectFileIndex(index: number): void {
+// G21 D13: pinned comes straight from FileTree's own openFile emit — a click (or arrow-key move)
+// is false, a double click/Enter is true.
+function onOpenFileIndex(index: number, pinned: boolean): void {
   const file = files.value[index];
-  if (file) props.reviewFiles.selectFile(file.path);
+  if (file) props.reviewFiles.selectFile(file.path, { pinned });
 }
 
 function onToggleReviewed(path: string): void {
@@ -129,7 +131,7 @@ function onToggleReviewed(path: string): void {
         :actions="actions"
         :review-states="reviewStatesMap"
         review-styled
-        @select-file="onSelectFileIndex"
+        @open-file="onOpenFileIndex"
         @toggle-reviewed="onToggleReviewed"
       />
       <p v-if="reviewFiles.loading.value && files.length === 0" class="kv-detail-pane-loading">

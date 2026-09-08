@@ -194,6 +194,11 @@ export interface FakeEditorAction {
   readonly left?: DocumentRef;
   readonly right?: DocumentRef;
   readonly title?: string;
+  /** G21 D13: recorded so a test can assert which of the two `pinned` mapped to, exactly as the
+   *  real `VsCodeEditorIntegration` maps it (`{ preview: false }` vs. no fourth argument at all)
+   *  — this fake cannot observe *that* distinction directly (it never calls `vscode.diff`), so it
+   *  records the boolean itself instead. */
+  readonly pinned?: boolean;
   readonly ref?: DocumentRef;
   readonly line?: number;
   readonly path?: string;
@@ -219,7 +224,12 @@ export class FakeEditorIntegration implements EditorIntegration {
     return { dispose: () => (this.#source = undefined) };
   }
 
-  async openDiff(req: { left: DocumentRef; right: DocumentRef; title: string }): Promise<void> {
+  async openDiff(req: {
+    left: DocumentRef;
+    right: DocumentRef;
+    title: string;
+    pinned: boolean;
+  }): Promise<void> {
     this.actions.push({ kind: 'openDiff', ...req });
   }
 

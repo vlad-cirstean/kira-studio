@@ -399,13 +399,14 @@ export class ReviewSessionState {
       announce: (text) => {
         this.announcement.value = text;
       },
-      openInEditor: async ({ sha, path, originalPath, parentIndex }) => {
+      openInEditor: async ({ sha, path, originalPath, parentIndex, pinned }) => {
         await this.#bridge.request('editor.openDiff', {
           repoId,
           sha,
           path,
           ...(originalPath !== undefined ? { originalPath } : {}),
           parentIndex,
+          pinned,
         });
       },
       goToFile: async ({ rev, path, line }) =>

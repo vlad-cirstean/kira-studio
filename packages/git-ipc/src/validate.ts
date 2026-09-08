@@ -33,7 +33,13 @@ import type { EventKey, RequestKey, StreamKey } from './contract.ts';
 // entirely inside the extension against `context.workspaceState` and never reaching the Go
 // backend (the same "extension-answered but the sole compatibility authority still moves"
 // precedent G10 D9/G12 D1/G14 D6/D10 already established). No existing method's shape changes.
-export const CONTRACT_VERSION = 23;
+// G21 D8/D12/D13: 23 -> 24, one bump for three additive changes landing across this phase's own
+// commits (stated here so it is never discovered piecemeal in a diff): one new request,
+// 'editor.openAllChanges' (D8, the "Open all changes" multi-file diff, extension-answered like
+// every 'editor.*' request before it); 'editor.openDiff' gains optional 'pinned' (D13) and
+// 'fallbackSha' (D12, the stash-untracked-file retry); 'editor.openRangeDiff' gains the same
+// optional 'pinned' (D13). No existing method's shape changes — every addition is optional.
+export const CONTRACT_VERSION = 24;
 
 export class ContractVersionMismatchError extends Error {
   readonly received: number;
@@ -98,6 +104,7 @@ const REQUEST_KEY_MAP: Record<RequestKey, true> = {
   'commit.fileDiff': true,
   'editor.openDiff': true,
   'editor.openRangeDiff': true,
+  'editor.openAllChanges': true,
   'editor.goToFile': true,
   'clipboard.write': true,
   'refs.list': true,

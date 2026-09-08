@@ -56,13 +56,25 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
+  /** The file cursor moved (a click, arrow-key nav, or a directory toggle's own side effect) —
+   *  purely a cursor/selection signal now (G21 D13): no caller may infer that anything opened
+   *  from this alone. `DetailPane.vue`/`StashDetailPane.vue` forward it straight into
+   *  `DetailState`/`StashState`'s own `selectFile`, which only moves the highlight. */
   (e: 'selectFile', fileIndex: number): void;
+  /** G21 D13: a file row was opened — a click or arrow-key move (`pinned: false`, navigational:
+   *  VS Code's own preview-tab convention governs, the next such open replaces it) or a double
+   *  click/`Enter` (`pinned: true`, an explicit "keep this" that pins a real, permanent tab).
+   *  Always paired with a `selectFile` for the same `fileIndex` when it originates from
+   *  `selectRow` (a click or arrow-key move); a double click/`Enter` fires this alone, since the
+   *  row is already the selection by the time either can happen. */
+  (e: 'openFile', fileIndex: number, pinned: boolean): void;
   (e: 'update:listMode', mode: FileListMode): void;
   (e: 'update:filter', text: string): void;
   (e: 'update:parentIndex', index: number): void;
   /** G11 D16: the reviewed checkbox's own click — toggles path between fully reviewed and
-   *  unreviewed (the file-level toggle; per-range toggling lives in DiffView.vue's own review
-   *  adornment). Never emitted when reviewStates is absent. */
+   *  unreviewed (the file-level toggle; per-range toggling lives in the native diff editor now,
+   *  G21 D12 — it used to live in DiffView.vue's own review adornment, already unreachable dead
+   *  code by the time this phase deleted the file). Never emitted when reviewStates is absent. */
   (e: 'toggleReviewed', path: string): void;
 }>();
 
@@ -133,9 +145,9 @@ const treeEl = ref<HTMLDivElement | null>(null);
 const focusedRow = ref(0);
 
 /** Keeps the keyboard cursor in step with `selectedFile` however it changed — a mouse click on a
- *  row (handled locally, below), or `DetailState.selectFile` being driven from outside this
- *  component entirely (W9's `Alt+↑`/`Alt+↓` file-to-file navigation while focus is in the diff).
- *  A `selectedFile` the current filter/list-mode has hidden leaves the cursor where it was. */
+ *  row (handled locally, below), or `selectedFile` being driven from outside this component
+ *  entirely (a parent-commit pick, a repo refresh re-resolving a selection). A `selectedFile` the
+ *  current filter/list-mode has hidden leaves the cursor where it was. */
 watch(
   [() => props.selectedFile, capped],
   ([selectedFile]) => {
@@ -163,21 +175,10 @@ function focusRowEl(index: number): void {
 }
 watch(focusedRow, (index) => {
   // Only follow the cursor with *real* focus when the tree already holds it — otherwise a
-  // `selectedFile` sync driven from outside (the `watch` just above, on a fresh mount or an
-  // Alt+←/→ file-to-file move made while focus is in the diff) would steal focus into the tree
-  // uninvited. `focusTree()` below is the one explicit, intentional exception.
+  // `selectedFile` sync driven from outside (the `watch` just above, on a fresh mount or a
+  // parent-commit pick) would steal focus into the tree uninvited.
   if (treeEl.value?.contains(document.activeElement)) focusRowEl(index);
 });
-
-/** Exposed for `DetailPane.vue` to call after `Esc`/the back affordance returns from the diff to
- *  the tree (P5 W14's own "leaving the diff returns focus to the file it was showing, not to the
- *  top of the tree") — the one case where focus must move into a component that, an instant ago,
- *  did not even exist in the DOM, so the reactive `watch` above (which requires the tree to
- *  already contain focus) cannot fire on its own. */
-function focusTree(): void {
-  focusRowEl(focusedRow.value);
-}
-defineExpose({ focusTree });
 
 /** P5 W14: announces §8's render cap once per boundary crossing (a fresh commit whose file count
  *  is over the cap, or the filter narrowing back above it after being below) — not on every
@@ -198,12 +199,20 @@ function rowKey(row: FileTreeRow): string {
   return row.kind === 'directory' ? `dir:${row.node.path}` : `file:${row.node.path}`;
 }
 
+/** G21 D13: every selection change — a click or an arrow-key move alike — also opens the file,
+ *  never pinned (VS Code's own preview-tab convention governs). This is not new behaviour, only
+ *  its mechanism: before D12, moving the cursor here already flipped `DetailState.mode` to
+ *  `'diff'` immediately, showing the (then in-webview) diff — this is that same "select = open a
+ *  preview" behaviour, now expressed as a second emit rather than a mode flip, and now something
+ *  a double click/`Enter` can additionally *pin*. */
 function selectRow(index: number, options: { follow?: boolean } = {}): void {
   const row = capped.value.visible[index];
   if (!row) return;
   focusedRow.value = index;
   if (row.kind === 'directory') return;
-  if (options.follow !== false) emit('selectFile', row.node.fileIndex);
+  if (options.follow === false) return;
+  emit('selectFile', row.node.fileIndex);
+  emit('openFile', row.node.fileIndex, false);
 }
 
 function onRowClick(index: number): void {
@@ -215,6 +224,18 @@ function onRowClick(index: number): void {
     return;
   }
   selectRow(index);
+}
+
+/** G21 D13: the explicit "keep this" gesture — pins a real, permanent tab. Deliberately relies on
+ *  the browser firing `click` first (`selectRow` above, via `onRowClick`): a double click opens
+ *  the preview and then immediately re-opens the same diff pinned, and VS Code converts the
+ *  existing preview tab into a permanent one rather than opening a second — matching VS Code's
+ *  own Explorer, and why no click-delay debounce is introduced here (a debounce would add a
+ *  visible lag to every single click to serve the rarer gesture). */
+function onRowDblClick(index: number): void {
+  const row = capped.value.visible[index];
+  if (!row || row.kind === 'directory') return;
+  emit('openFile', row.node.fileIndex, true);
 }
 
 function onKeydown(event: KeyboardEvent): void {
@@ -257,8 +278,10 @@ function onKeydown(event: KeyboardEvent): void {
       const row = visible[focusedRow.value];
       if (!row) break;
       event.preventDefault();
+      // G21 D13: the keyboard equivalent of a double click — pins, rather than re-emitting the
+      // same navigational open `selectRow` (arrow-key nav) already fired for this row.
       if (row.kind === 'directory') toggleDir(row.node.path);
-      else emit('selectFile', row.node.fileIndex);
+      else emit('openFile', row.node.fileIndex, true);
       break;
     }
     default:
@@ -426,6 +449,7 @@ function reviewToggleTitle(path: string): string {
         :tabindex="index === focusedRow ? 0 : -1"
         :style="{ paddingLeft: `calc(var(--kv-tree-indent) * ${row.depth})` }"
         @click="onRowClick(index)"
+        @dblclick="onRowDblClick(index)"
         @contextmenu="onRowContextMenu($event, row)"
       >
         <template v-if="row.kind === 'directory'">

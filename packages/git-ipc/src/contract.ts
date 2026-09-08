@@ -1244,7 +1244,19 @@ export type Contract = {
         readonly body: FileDiffBody;
       };
     };
-    /** "Open in editor" (§6.4) — hands the same two blobs to the host's native diff. */
+    /** "Open in editor" (§6.4) — hands the same two blobs to the host's native diff.
+     *
+     *  G21 D12/D13: two additive params. `pinned` (optional so a caller that forgets it is a
+     *  type error at the transport-building call site, never a silent default) —
+     *  `ports/editorIntegration.ts`'s `openDiff` maps `true` to `{ preview: false }` (G19 D8's
+     *  own fix, kept, scoped to a caller that wants a real, permanent tab) and `false` to
+     *  omitting the fourth `vscode.diff` argument entirely, so VS Code's own preview-tab
+     *  convention (and a user's `workbench.editor.enablePreview` setting) governs. `fallbackSha`
+     *  (D12) is the stash tree's own need: a stash's `-u` untracked files live only in its third
+     *  parent (`entry.untrackedSha`), which has no `baseSha` of its own — the handler retries the
+     *  whole `commit.detail`-composition against `fallbackSha` when `path` is not among `sha`'s
+     *  own changed files, instead of throwing, mirroring the retry `state/stash.ts` already
+     *  implemented for the now-deleted in-webview diff path. */
     'editor.openDiff': {
       params: {
         repoId: string;
@@ -1252,6 +1264,8 @@ export type Contract = {
         path: string;
         originalPath?: string;
         parentIndex?: number;
+        pinned?: boolean;
+        fallbackSha?: string;
       };
       result: Record<string, never>;
     };
@@ -1289,8 +1303,30 @@ export type Contract = {
         path: string;
         originalPath?: string;
         status: 'added' | 'deleted' | 'modified' | 'renamed';
+        /** G21 D13 — same meaning and same mapping as `editor.openDiff`'s own `pinned`. */
+        pinned?: boolean;
       };
       result: Record<string, never>;
+    };
+    /**
+     * G21 D8a (item 8): "Open all changes" — composes the whole file list from **one**
+     * `commit.detail` (collapsing what used to be N separate `editor.openDiff` round trips, one
+     * per file, into one), reusing the exact `DocumentRef` derivation `editor.openDiff`'s own
+     * handler already performs. Prefers VS Code's built-in multi-file diff editor
+     * (`vscode.changes`, probed once via `getCommands(true)` since it is a built-in command with
+     * no entry in `@types/vscode`) and falls back to a sequenced, error-aware loop over the same
+     * per-file open `editor.openDiff` uses when that command is absent or rejects — see
+     * `ports/editorIntegration.ts`'s own `openAllChanges` doc comment for the full fallback
+     * shape. Always pinned/multi-diff in both branches — this is the bulk call site item 8's
+     * original bug was about, and it is never regressed by D13's own per-file preview/pin split.
+     */
+    'editor.openAllChanges': {
+      params: { repoId: string; sha: string; parentIndex?: number };
+      result: {
+        readonly opened: number;
+        readonly failed: number;
+        readonly mode: 'multiDiff' | 'tabs';
+      };
     };
     /**
      * D14a. `line` in is 1-based **in `rev`'s version of `path`** — the UI maps the cursor row

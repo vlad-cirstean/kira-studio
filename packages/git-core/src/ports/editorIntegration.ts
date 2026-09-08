@@ -38,7 +38,18 @@ export interface EditorIntegration {
   readonly capabilities: EditorCapabilities;
   /** Registered once, at activation. */
   registerVirtualDocuments(source: VirtualDocumentSource): Disposable;
-  openDiff(req: { left: DocumentRef; right: DocumentRef; title: string }): Promise<void>;
+  /** G21 D13: `pinned` is required, not optional — every caller (`proxyHandlers.ts`'s two
+   *  `editor.*` handlers) decides it explicitly rather than a default hiding which behaviour a
+   *  forgotten argument would silently get. `true` opens a real, permanent tab (G19 D8's own
+   *  `{ preview: false }` fix, kept); `false` omits the underlying host option entirely so the
+   *  host's own preview-tab convention (and a user's own preference) governs — see the shipped
+   *  implementation's own doc comment for why that is not the same as passing `{ preview: true }`. */
+  openDiff(req: {
+    left: DocumentRef;
+    right: DocumentRef;
+    title: string;
+    pinned: boolean;
+  }): Promise<void>;
   /** Opens `ref` and puts the cursor on `line` (1-based). */
   reveal(ref: DocumentRef, line: number): Promise<void>;
   /** P6/W10, §7.11's "Resolve in VS Code": reveal the host's own SCM surface and open `path` in

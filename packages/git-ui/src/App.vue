@@ -913,28 +913,22 @@ function toggleDetail(): void {
   detailOpen.value = !detailOpen.value;
 }
 
-/** §6.6's Esc ordering: an open menu, then the search results dropdown, then the diff view (P5
- *  W9), then the detail pane/drawer (P11 W12/W13's spec edit 6, restated with this file's own
- *  share of it). The first two stages never reach here at all — `RowContextMenu.vue`'s and
- *  `SearchBox.vue`'s own `keydown` handlers each call `stopPropagation()` on the `Escape` they
- *  act on (see either component's own doc comment), so this file's document-level listener only
- *  ever sees an `Escape` that both of those already declined. What *is* kept as one handler here
- *  is only this function's own two remaining stages — diff view first, then the detail pane/
- *  drawer — called both by `CommitGrid.vue`'s own `closeDetail` emit (when the grid has focus)
- *  and this file's own document-level listener (when focus is inside the detail pane/drawer
- *  itself, outside the grid's host and so outside its own keydown listener's reach) — "the
- *  ordering lives in one handler in App.vue" (§6.6's own words) for exactly the part of the chain
- *  this file owns. */
+/** §6.6's Esc ordering: an open menu, then the search results dropdown, then the detail pane/
+ *  drawer (P11 W12/W13's spec edit 6, restated with this file's own share of it). The first two
+ *  stages never reach here at all — `RowContextMenu.vue`'s and `SearchBox.vue`'s own `keydown`
+ *  handlers each call `stopPropagation()` on the `Escape` they act on (see either component's own
+ *  doc comment), so this file's document-level listener only ever sees an `Escape` that both of
+ *  those already declined. Called both by `CommitGrid.vue`'s own `closeDetail` emit (when the
+ *  grid has focus) and this file's own document-level listener (when focus is inside the detail
+ *  pane/drawer itself, outside the grid's host and so outside its own keydown listener's reach).
+ *
+ *  G21 D12: the "diff view first" stage this function used to have — `Esc` closing the embedded
+ *  diff and going back to the tree, before a second `Esc` closed the whole pane — is gone along
+ *  with the embedded diff itself. `Esc` now always closes the pane in one step; the native diff
+ *  editor VS Code now owns has its own, unrelated `Esc` handling. */
 const selectionIsStash = computed(() => stashState.selected.value !== undefined);
 
 function closeDetail(): void {
-  if (
-    selectionIsStash.value ? stashState.mode.value === 'diff' : detailState.mode.value === 'diff'
-  ) {
-    if (selectionIsStash.value) stashState.showTree();
-    else detailState.showTree();
-    return;
-  }
   detailOpen.value = false;
 }
 
@@ -1208,13 +1202,7 @@ onBeforeUnmount(() => {
           </aside>
         </main>
 
-        <div
-          v-if="detailOpen && breakpoint === 'overlay'"
-          class="kv-detail-drawer"
-          :class="{
-            'kv-detail-drawer--diff': (selectionIsStash ? stashState.mode.value : detailState.mode.value) === 'diff',
-          }"
-        >
+        <div v-if="detailOpen && breakpoint === 'overlay'" class="kv-detail-drawer">
           <aside class="kv-detail-region" data-testid="detail-region" aria-label="Commit detail">
             <p v-if="!hasSelection" class="kv-detail-empty">Select a commit to see its details.</p>
             <StashDetailPane
@@ -1471,14 +1459,5 @@ onBeforeUnmount(() => {
 .kv-detail-drawer .kv-detail-region {
   width: min(320px, 90vw);
   box-shadow: -2px 0 8px var(--kv-widget-shadow);
-}
-
-/* W9's breakpoint table: at the overlay breakpoint the diff is a *full*-width overlay over the
- * graph, wider than the tree/meta drawer beside it — the docked/overlay difference stays "a
- * class on the wrapper, not a second copy of the subtree" (W11's own words) by widening this one
- * rule rather than `DetailPane.vue` (or anything inside it) needing to know the breakpoint at
- * all. */
-.kv-detail-drawer--diff .kv-detail-region {
-  width: 100vw;
 }
 </style>

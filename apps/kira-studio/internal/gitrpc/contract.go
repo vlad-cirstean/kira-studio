@@ -41,7 +41,14 @@ package gitrpc
 // extension's own context.workspaceState and never reaching this server. This constant moves for
 // the same reason ui.action first did (G10 D9): it is the sole compatibility authority, even
 // though the Go server neither emits nor parses either addition.
-const ContractVersion = 23
+// G21 D8/D12/D13 (2026-09-08): 23 -> 24, one bump for three additive changes landing across that
+// phase's own commits — one new request, editor.openAllChanges (D8, the "Open all changes"
+// multi-file diff), and two optional params, editor.openDiff's pinned/fallbackSha (D13/D12) and
+// editor.openRangeDiff's own pinned (D13). This constant moves for the same reason ui.action
+// first did (G10 D9): it is the sole compatibility authority, even though the Go server neither
+// emits nor parses any of the three — every 'editor.*' request is answered entirely inside the
+// extension, the same precedent editor.openRangeDiff itself set at G12 D1.
+const ContractVersion = 24
 
 // Protocol is the handshake envelope's own version (SPEC §3.3's "protocol":1), distinct from
 // ContractVersion — it never changes unless the hello/ready exchange itself is redesigned.

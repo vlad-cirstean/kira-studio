@@ -122,12 +122,16 @@ export class ReviewFilesState {
   /** Opens path in VS Code's native diff (G12 D12) — a no-op re-selection of the file already
    *  open re-opens it anyway, since the editor tab may since have been closed. `#loadDiff` runs
    *  alongside, independently: it fetches metadata this pane still renders (the delta status
-   *  line, the per-file reviewed marks), never the diff body VS Code now owns. */
-  selectFile(path: string): void {
+   *  line, the per-file reviewed marks), never the diff body VS Code now owns.
+   *
+   *  G21 D13: `opts.pinned` — `false`/omitted for a click or arrow-key move (navigational, the
+   *  default here matches every other "selecting = opening" caller in this file), `true` for a
+   *  double click/`Enter` (`FileTree.vue`'s own `openFile` emit). */
+  selectFile(path: string, opts: { pinned?: boolean } = {}): void {
     const changed = this.selectedPath.value !== path;
     this.selectedPath.value = path;
     if (changed) void this.#loadDiff(); // metadata only re-fetches when the file actually changes.
-    void this.#openInEditor(); // always re-opens: the editor tab may since have been closed.
+    void this.#openInEditor(opts.pinned ?? false); // always re-opens: the tab may since have closed.
   }
 
   /** Returns to the file list without discarding which file was selected. */
@@ -140,7 +144,9 @@ export class ReviewFilesState {
     this.diffMode.value = mode;
     if (this.selectedPath.value !== null) {
       void this.#loadDiff();
-      void this.#openInEditor();
+      // G21 D13: a mode change re-showing the same file is navigational, not a new commitment —
+      // never pinned.
+      void this.#openInEditor(false);
     }
   }
 
@@ -150,7 +156,7 @@ export class ReviewFilesState {
    *  the three-dot set `review.files` already returns, not a two-dot diff against `target.base`).
    *  A fire-and-forget host action, not a fetch: nothing here is superseded the way `#loadDiff`'s
    *  reactive state is. */
-  async #openInEditor(): Promise<void> {
+  async #openInEditor(pinned: boolean): Promise<void> {
     const target = this.#target;
     const path = this.selectedPath.value;
     if (!target || path === null) return;
@@ -171,6 +177,7 @@ export class ReviewFilesState {
       path,
       ...(change.originalPath !== undefined ? { originalPath: change.originalPath } : {}),
       status: rangeDiffStatus(change.kind),
+      pinned,
     });
   }
 

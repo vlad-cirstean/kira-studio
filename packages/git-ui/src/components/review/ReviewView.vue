@@ -294,7 +294,7 @@ const filesActions = computed<DetailActions | undefined>(() => {
     announce(text) {
       liveAnnouncement.value = text;
     },
-    async openInEditor({ sha, path, originalPath, parentIndex }) {
+    async openInEditor({ sha, path, originalPath, parentIndex, pinned }) {
       const repo = repoId.value;
       if (!repo) return;
       await bridge.request('editor.openDiff', {
@@ -303,6 +303,7 @@ const filesActions = computed<DetailActions | undefined>(() => {
         path,
         ...(originalPath !== undefined ? { originalPath } : {}),
         parentIndex,
+        pinned,
       });
     },
     async goToFile({ rev, path, line }) {

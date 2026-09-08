@@ -25,6 +25,7 @@ import type {
   Dialogs,
   DocumentRef,
   EditorIntegration,
+  FileChange,
   Logger,
   WorkspaceRoots,
 } from '@kira/git-core';
@@ -121,6 +122,51 @@ export interface CreateProxyHandlersDeps {
   readonly reviewSessionStore: ReviewSessionStore;
 }
 
+/**
+ * G21 D12/D8: `commit.detail` -> `DocumentRef` derivation for one changed file's two sides,
+ * factored out of `editor.openDiff`'s own handler so it can be shared verbatim by
+ * `editor.openAllChanges` (D8) — the two handlers can never disagree about which side is
+ * `{kind: 'empty'}` for an added/deleted file, or about which sha the right-hand document is
+ * addressed against.
+ */
+function documentRefsFor(
+  repoId: string,
+  sha: string,
+  path: string,
+  change: FileChange,
+  baseSha: string | null,
+): { left: DocumentRef; right: DocumentRef } {
+  const oldPath = change.originalPath ?? path;
+  const left: DocumentRef =
+    change.kind === 'added' || baseSha === null
+      ? { kind: 'empty', label: basename(oldPath) }
+      : { kind: 'virtual', key: virtualKey(repoId, baseSha, oldPath), label: basename(oldPath) };
+  const right: DocumentRef =
+    change.kind === 'deleted'
+      ? { kind: 'empty', label: basename(path) }
+      : { kind: 'virtual', key: virtualKey(repoId, sha, path), label: basename(path) };
+  return { left, right };
+}
+
+/** G21 D12: fetches `sha`'s own `commit.detail` and looks `path` up in its file list — `undefined`
+ *  (not a throw) when `path` is not one of that commit's changed files, so `editor.openDiff`'s own
+ *  handler can try `fallbackSha` next without exception-driven control flow, and so a genuine RPC
+ *  failure (as opposed to "wrong sha") still propagates as a real rejection rather than being
+ *  silently swallowed into a fallback attempt. */
+async function findChangeInDetail(
+  connection: ConnectionManager,
+  repoId: string,
+  sha: string,
+  path: string,
+  parentIndex: number | undefined,
+  signal: AbortSignal,
+): Promise<{ readonly change: FileChange; readonly baseSha: string | null } | undefined> {
+  const detail = await connection.request('commit.detail', { repoId, sha, parentIndex }, signal);
+  const change = detail.files.find((f) => f.path === path);
+  if (!change) return undefined;
+  return { change, baseSha: detail.parents[detail.parentIndex] ?? null };
+}
+
 export function createProxyHandlers(deps: CreateProxyHandlersDeps): ServerHandlers {
   const {
     connection,
@@ -209,37 +255,43 @@ export function createProxyHandlers(deps: CreateProxyHandlersDeps): ServerHandle
     'commit.fileDiff': forward('commit.fileDiff'),
     // D12: composed from commit.detail (server-cached, D7) rather than a separate fileDiff fetch
     // — a whole patch is never re-shipped just to read baseSha/change off it.
-    'editor.openDiff': async ({ repoId, sha, path, parentIndex }, ctx) => {
-      const detail = await connection.request(
-        'commit.detail',
-        { repoId, sha, parentIndex },
-        ctx.signal,
-      );
-      const change = detail.files.find((f) => f.path === path);
-      if (!change) {
+    //
+    // G21 D12: gains `fallbackSha` — the stash tree's own need (F12). A stash's `-u` untracked
+    // files live only in its third parent (`entry.untrackedSha`), which has no `baseSha` of its
+    // own composed against the stash's real `sha`; when `path` is not among `sha`'s own changed
+    // files and a `fallbackSha` was given, the whole composition is retried against it before
+    // giving up — a direct mirror of the retry `state/stash.ts` already implemented for the
+    // now-deleted in-webview diff path (`commit.fileDiff`), moved to the one place that now
+    // needs it. Absent `fallbackSha` throws exactly as this always has.
+    //
+    // G21 D13: `pinned` reaches `editor.openDiff` (the port) unchanged — `undefined`/`false`
+    // both mean "preview" (never a silent pin): only an explicit `true` pins.
+    'editor.openDiff': async ({ repoId, sha, path, parentIndex, pinned, fallbackSha }, ctx) => {
+      let found = await findChangeInDetail(connection, repoId, sha, path, parentIndex, ctx.signal);
+      let effectiveSha = sha;
+      if (!found && fallbackSha !== undefined) {
+        found = await findChangeInDetail(
+          connection,
+          repoId,
+          fallbackSha,
+          path,
+          parentIndex,
+          ctx.signal,
+        );
+        effectiveSha = fallbackSha;
+      }
+      if (!found) {
         throw new Error(`editor.openDiff: ${path} is not one of commit ${sha}'s changed files`);
       }
-      const baseSha = detail.parents[detail.parentIndex] ?? null;
-      const oldPath = change.originalPath ?? path;
+      const { baseSha, change } = found;
+      const { left, right } = documentRefsFor(repoId, effectiveSha, path, change, baseSha);
 
-      const left: DocumentRef =
-        change.kind === 'added' || baseSha === null
-          ? { kind: 'empty', label: basename(oldPath) }
-          : {
-              kind: 'virtual',
-              key: virtualKey(repoId, baseSha, oldPath),
-              label: basename(oldPath),
-            };
-      const right: DocumentRef =
-        change.kind === 'deleted'
-          ? { kind: 'empty', label: basename(path) }
-          : { kind: 'virtual', key: virtualKey(repoId, sha, path), label: basename(path) };
-
-      const shortSha = sha.slice(0, 7);
+      const shortSha = effectiveSha.slice(0, 7);
       await editor.openDiff({
         left,
         right,
         title: `${basename(path)} (${shortSha}^ ↔ ${shortSha})`,
+        pinned: pinned === true,
       });
       return {};
     },
@@ -261,6 +313,7 @@ export function createProxyHandlers(deps: CreateProxyHandlersDeps): ServerHandle
       path,
       originalPath,
       status,
+      pinned,
     }) => {
       const oldPath = originalPath ?? path;
       const left: DocumentRef =
@@ -283,6 +336,7 @@ export function createProxyHandlers(deps: CreateProxyHandlersDeps): ServerHandle
         left,
         right,
         title: `${basename(path)} (${leftLabel} ↔ ${branch})`,
+        pinned: pinned === true,
       });
       // G13 D9: the right-hand document is the only commentable side (status !== 'deleted') — its
       // threads render now rather than waiting for onDidChangeVisibleTextEditors.
@@ -292,6 +346,13 @@ export function createProxyHandlers(deps: CreateProxyHandlersDeps): ServerHandle
         refreshReviewMarking(repoId, branchTip, path, branch);
       }
       return {};
+    },
+    // G21 D8: placeholder — the real vscode.changes-probing/sequenced-fallback implementation
+    // lands in its own commit, after D13 (they share this CONTRACT_VERSION 24 bump and the
+    // DetailActions shape). Typed and reachable now only because the contract type requires every
+    // ServerHandlers key to have an implementation.
+    'editor.openAllChanges': () => {
+      throw new Error('editor.openAllChanges: not implemented yet (lands in G21 D8)');
     },
     // D4/D11: the server resolves the on-disk-vs-object-database decision and (for a live file)
     // the drift hunks; the line arithmetic itself stays here, over @kira/git-core's already-tested

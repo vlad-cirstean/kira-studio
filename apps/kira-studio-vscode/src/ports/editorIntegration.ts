@@ -87,20 +87,42 @@ export class VsCodeEditorIntegration implements EditorIntegration {
     };
   }
 
-  async openDiff(req: { left: DocumentRef; right: DocumentRef; title: string }): Promise<void> {
-    // G19 D8: a real, non-preview tab — F8 root-caused "Open all changes" only ever leaving the
-    // last file's diff open to this one missing options argument. With no fourth argument, VS
-    // Code opens every diff in the same single preview tab, so a sequential loop over every
-    // changed file (ReviewCommitRow.vue's own openAllChanges, which already iterates correctly)
-    // just keeps replacing that one tab. `{ preview: false }` pins each call's own tab, so N
-    // files opened in a loop leave N tabs open, not one.
-    await vscode.commands.executeCommand(
-      'vscode.diff',
-      toUri(req.left),
-      toUri(req.right),
-      req.title,
-      { preview: false } satisfies vscode.TextDocumentShowOptions,
-    );
+  async openDiff(req: {
+    left: DocumentRef;
+    right: DocumentRef;
+    title: string;
+    pinned: boolean;
+  }): Promise<void> {
+    // G19 D8: a real, non-preview tab, for a caller that wants one — F8 root-caused "Open all
+    // changes" only ever leaving the last file's diff open to this one missing options argument.
+    // With no fourth argument, VS Code opens every diff in the same single preview tab, so a
+    // sequential loop over every changed file just keeps replacing that one tab. `{ preview:
+    // false }` pins each call's own tab, so N files opened in a loop leave N tabs open, not one.
+    // Kept, unchanged, for `req.pinned === true` (the bulk "Open all changes" fallback path, D8,
+    // and an explicit double-click/Enter, D13).
+    //
+    // G21 D13: `req.pinned === false` (a single click — navigational) omits the options argument
+    // entirely instead. This is deliberately not `{ preview: true }`: passing that argument at
+    // all would *force* preview mode even for a user who has turned `workbench.editor.
+    // enablePreview` off globally, fighting their own setting. Omitting the argument lets VS
+    // Code's own default *and* that setting govern, which is what "matches VS Code's own
+    // convention" actually means here.
+    if (req.pinned) {
+      await vscode.commands.executeCommand(
+        'vscode.diff',
+        toUri(req.left),
+        toUri(req.right),
+        req.title,
+        { preview: false } satisfies vscode.TextDocumentShowOptions,
+      );
+    } else {
+      await vscode.commands.executeCommand(
+        'vscode.diff',
+        toUri(req.left),
+        toUri(req.right),
+        req.title,
+      );
+    }
   }
 
   async reveal(ref: DocumentRef, line: number): Promise<void> {

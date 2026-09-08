@@ -1,15 +1,14 @@
 <script setup lang="ts">
 /**
- * `docs/plans/P5.md` W11: composes `CommitMeta.vue` (twice — see its own doc comment on why),
- * `FileTree.vue` and `DiffView.vue` over one `DetailState`, replacing both of `App.vue`'s P4
- * placeholder blocks (the docked pane and the overlay drawer share this one component). Owns no
- * `ResizeObserver` and takes no `breakpoint` prop — the one presentation difference the plan's
- * own breakpoint table adds beyond §6.3's existing pane-width handling (the diff's *full*-width
- * overlay at the `< 600` breakpoint, vs. the tree/meta drawer's narrower one) is, per W11's own
- * words, "a class on the wrapper" — `App.vue`'s own drawer `<div>`, driven by `detailState.mode`
- * it already holds — rather than a layout fact threaded down into this component. That keeps this
- * component entirely layout-agnostic, which is if anything a *better* fit for "the component P7
- * will mount in a sidebar" than a breakpoint prop it would have had to ignore there.
+ * `docs/plans/P5.md` W11: composes `CommitMeta.vue` (twice — see its own doc comment on why) and
+ * `FileTree.vue` over one `DetailState`, replacing `App.vue`'s P4 placeholder block.
+ *
+ * G21 D12 (item 12): no longer also composes `DiffView.vue` — the graph panel opens VS Code's own
+ * native diff editor now, exactly like the review panel already did since G12 D12. A file row's
+ * `openFile` emit (D13: a click/arrow-key move previews, a double click/`Enter` pins) is wired
+ * straight to `actions.openInEditor`; `DetailState` no longer owns a `mode`/`diff` to drive, so
+ * this component no longer needs the breakpoint-aware "diff takes over the pane" layout its own
+ * doc comment used to describe, nor the focus-return dance a mode flip used to need.
  *
  * Does not call `detailState.select` itself for a parent-commit pick (`CommitMeta.vue`'s own
  * `selectParentCommit` emit) — that emit only bubbles further up, to `App.vue`, which also owns
@@ -18,16 +17,13 @@
  * match, exactly as a normal row click would, and only `App.vue` can do that.
  */
 import type { CommitStore } from '@kira/git-core';
-import { computed, nextTick, ref, watch } from 'vue';
+import { computed } from 'vue';
 import type { DetailState } from '../state/detail.ts';
 import type { DetailActions } from '../state/detailActions.ts';
 import CommitMeta from './CommitMeta.vue';
-import DiffView from './DiffView.vue';
 // A .vue default export is a *value* — the component object the template instantiates. `import
 // type` erases it, and Vue then renders <FileTree> as an unknown element with nothing inside it
-// (G14 F1/F3). The script's only reference is `InstanceType<typeof …>`, so biome's useImportType
-// cannot tell; the template is the real caller.
-// biome-ignore lint/style/useImportType: the template instantiates this — see above
+// (G14 F1/F3).
 import FileTree from './FileTree.vue';
 
 const props = defineProps<{
@@ -44,21 +40,21 @@ function onSelectParentCommit(sha: string): void {
   emit('selectParentCommit', sha);
 }
 
-/** P5 W14: "leaving the diff returns focus to the file it was showing, not to the top of the
- *  tree" — the tree unmounts entirely while the diff is showing (this component's own `v-if`/
- *  `v-else-if`), so there is no DOM node to hold onto across the transition; this watches
- *  `mode` itself and re-focuses the tree's own cursor row once it is back in the DOM. Both ways
- *  back to `"detail"` (the diff's own back affordance, and `App.vue`'s `closeDetail` on `Esc`)
- *  go through `DetailState.showTree()`, so watching `mode` here covers both without either of
- *  those callers needing to know this component exists. */
-const fileTreeRef = ref<InstanceType<typeof FileTree> | null>(null);
-watch(
-  () => props.detailState.mode.value,
-  (mode, previous) => {
-    if (mode === 'detail' && previous === 'diff')
-      void nextTick(() => fileTreeRef.value?.focusTree());
-  },
-);
+/** G21 D12/D13: the tree's own `openFile` emit — `props.actions.openInEditor({ sha, path,
+ *  originalPath, parentIndex })`, exactly the shape D12's own plan names. `pinned` comes straight
+ *  from the emit: a click/arrow-key move is `false` (navigational), a double click/`Enter` is
+ *  `true`. */
+function onOpenFile(index: number, pinned: boolean): void {
+  const file = detail.value?.files[index];
+  if (!file) return;
+  void props.actions.openInEditor({
+    sha: props.detailState.sha.value ?? '',
+    path: file.path,
+    originalPath: file.originalPath,
+    parentIndex: props.detailState.parentIndex.value,
+    pinned,
+  });
+}
 </script>
 
 <template>
@@ -67,19 +63,7 @@ watch(
       Couldn't load this commit — {{ detailState.error.value }}
     </p>
 
-    <DiffView
-      v-if="detailState.mode.value === 'diff' && detail"
-      class="kv-detail-pane-diff"
-      :diff="detailState.diff.value"
-      :diff-error="detailState.diffError.value"
-      :file-index="detailState.selectedFile.value"
-      :total-files="detail.files.length"
-      :actions="actions"
-      @select-file="detailState.selectFile($event)"
-      @back="detailState.showTree()"
-    />
-
-    <template v-else-if="detail">
+    <template v-if="detail">
       <CommitMeta
         section="message"
         :detail="detail"
@@ -88,7 +72,6 @@ watch(
         @select-parent-commit="onSelectParentCommit"
       />
       <FileTree
-        ref="fileTreeRef"
         class="kv-detail-pane-tree"
         :files="detail.files"
         :selected-file="detailState.selectedFile.value"
@@ -99,6 +82,7 @@ watch(
         :store="store"
         :actions="actions"
         @select-file="detailState.selectFile($event)"
+        @open-file="onOpenFile"
         @update:list-mode="detailState.setListMode($event)"
         @update:filter="detailState.setFilter($event)"
         @update:parent-index="detailState.setParentIndex($event)"
@@ -121,10 +105,6 @@ watch(
   display: flex;
   flex-direction: column;
   min-height: 0;
-  height: 100%;
-}
-
-.kv-detail-pane-diff {
   height: 100%;
 }
 

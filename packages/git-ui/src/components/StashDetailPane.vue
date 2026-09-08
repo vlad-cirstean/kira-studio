@@ -1,17 +1,23 @@
 <script setup lang="ts">
 /**
  * `docs/plans/P9.md` W14 (OQ4): "selecting a stash node or list row loads `stash.show` into the
- * existing `FileTree.vue`/`DiffView.vue` — no stash-specific diff view." Mirrors `DetailPane.vue`'s
- * own composition (tree, then diff-takes-over-the-pane) but keyed off `StashState` rather than
- * `DetailState` — a stash entry has none of `CommitDetail`'s richer shape (body/trailers/
- * signature/multiple parents), so `CommitMeta.vue` is not reused here; this file's own small header
- * says the one thing worth saying about a stash (message, base commit, date, `-u` marker) instead.
+ * existing `FileTree.vue`". Mirrors `DetailPane.vue`'s own composition but keyed off `StashState`
+ * rather than `DetailState` — a stash entry has none of `CommitDetail`'s richer shape (body/
+ * trailers/signature/multiple parents), so `CommitMeta.vue` is not reused here; this file's own
+ * small header says the one thing worth saying about a stash (message, base commit, date, `-u`
+ * marker) instead.
+ *
+ * G21 D12 (item 12): no longer also composes `DiffView.vue` — opens VS Code's own native diff
+ * editor now, exactly like `DetailPane.vue` since the same phase. The one real technical wrinkle
+ * `StashState` used to handle itself (F12): a stash's `-u` untracked files live only in its third
+ * parent (`entry.untrackedSha`), which has no `baseSha` of its own — `editor.openDiff`'s own
+ * `fallbackSha` param (D12) carries that through to the host handler now, which retries the whole
+ * composition against it when `path` is not among the primary sha's changed files.
  */
 import type { CommitStore } from '@kira/git-core';
 import { computed } from 'vue';
 import type { DetailActions } from '../state/detailActions.ts';
 import type { StashState } from '../state/stash.ts';
-import DiffView from './DiffView.vue';
 import { formatAbsoluteDate, formatRelativeDate } from './dateFormat.ts';
 import FileTree from './FileTree.vue';
 
@@ -27,6 +33,23 @@ const files = computed(() => props.stash.changes.value ?? []);
  *  this never shows one (a stash entry is never a merge from the UI's point of view: §7.6 truncates
  *  its parent list to `[baseSha]` in the graph, and the detail pane matches that). */
 const parents = computed(() => (entry.value ? [entry.value.baseSha] : []));
+
+/** G21 D12/D13: mirrors `DetailPane.vue`'s own `onOpenFile` — the one difference is `fallbackSha`,
+ *  carrying `entry.untrackedSha` through so the host can retry an untracked file's composition
+ *  against the stash's own third parent instead of throwing. */
+function onOpenFile(index: number, pinned: boolean): void {
+  const file = files.value[index];
+  const current = entry.value;
+  if (!file || !current) return;
+  void props.actions.openInEditor({
+    sha: current.sha,
+    path: file.path,
+    originalPath: file.originalPath,
+    parentIndex: 0,
+    pinned,
+    ...(current.untrackedSha !== undefined ? { fallbackSha: current.untrackedSha } : {}),
+  });
+}
 </script>
 
 <template>
@@ -35,19 +58,7 @@ const parents = computed(() => (entry.value ? [entry.value.baseSha] : []));
       Couldn't load this stash — {{ stash.error.value }}
     </p>
 
-    <DiffView
-      v-if="stash.mode.value === 'diff' && entry"
-      class="kv-detail-pane-diff"
-      :diff="stash.diff.value"
-      :diff-error="stash.diffError.value"
-      :file-index="stash.selectedFile.value"
-      :total-files="files.length"
-      :actions="actions"
-      @select-file="stash.selectFile($event)"
-      @back="stash.showTree()"
-    />
-
-    <template v-else-if="entry">
+    <template v-if="entry">
       <div class="kv-stash-detail-header">
         <p class="kv-stash-detail-message">{{ entry.message }}</p>
         <p class="kv-stash-detail-facts">
@@ -70,6 +81,7 @@ const parents = computed(() => (entry.value ? [entry.value.baseSha] : []));
         :store="store"
         :actions="actions"
         @select-file="stash.selectFile($event)"
+        @open-file="onOpenFile"
         @update:list-mode="stash.setListMode($event)"
         @update:filter="stash.setFilter($event)"
       />
@@ -110,7 +122,7 @@ const parents = computed(() => (entry.value ? [entry.value.baseSha] : []));
   opacity: 0.8;
 }
 
-/* `.kv-detail-pane-diff`/`.kv-detail-pane-tree`/`.kv-detail-pane-error`/`.kv-detail-pane-loading`
- * used above are `DetailPane.vue`'s own — this file is unscoped CSS, same as that one, and
- * `App.vue` always imports both, so reusing rather than redeclaring them is safe and DRY. */
+/* `.kv-detail-pane-tree`/`.kv-detail-pane-error`/`.kv-detail-pane-loading` used above are
+ * `DetailPane.vue`'s own — this file is unscoped CSS, same as that one, and `App.vue` always
+ * imports both, so reusing rather than redeclaring them is safe and DRY. */
 </style>
