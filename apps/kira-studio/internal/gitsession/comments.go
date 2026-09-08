@@ -195,14 +195,14 @@ func (e *RepoEntry) anchorAll(ctx context.Context, at string, cs []gitreview.Com
 
 // anchorOne is D7's three-tier resolution for one comment, verbatim:
 //
-//	0. blobOID(at, c.Path) == c.AnchorBlobOID — byte-identical content, no diff at all: exact.
-//	1. merge-base --is-ancestor c.AnchorSHA at, exit 0 — an ordinary git diff maps the range
-//	   forward through gitreview.ProjectRanges, unchanged (no new arithmetic, D7/D18): a non-empty
-//	   result is projected (unioned, since a projection can split a range across an insertion), an
-//	   empty one is removed (the lines no longer exist — probe P2's own committed behaviour).
-//	2. exit 1 (unreachable but present, the common rewrite case) or exit 128 (genuinely pruned) —
-//	   both take stale: there is no honest mapping to compute, so the original range and sha are
-//	   reported rather than guessed. Any other exit is the classified error.
+//  0. blobOID(at, c.Path) == c.AnchorBlobOID — byte-identical content, no diff at all: exact.
+//  1. merge-base --is-ancestor c.AnchorSHA at, exit 0 — an ordinary git diff maps the range
+//     forward through gitreview.ProjectRanges, unchanged (no new arithmetic, D7/D18): a non-empty
+//     result is projected (unioned, since a projection can split a range across an insertion), an
+//     empty one is removed (the lines no longer exist — probe P2's own committed behaviour).
+//  2. exit 1 (unreachable but present, the common rewrite case) or exit 128 (genuinely pruned) —
+//     both take stale: there is no honest mapping to compute, so the original range and sha are
+//     reported rather than guessed. Any other exit is the classified error.
 func (e *RepoEntry) anchorOne(
 	ctx context.Context, at string, c gitreview.Comment,
 	lineCounts map[string]int, patches map[string][]porcelain.DiffHunk,
