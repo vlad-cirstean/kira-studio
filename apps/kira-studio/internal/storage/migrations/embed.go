@@ -44,6 +44,7 @@ var names = []struct {
 	{14, "p22_window_mode", "0014_p22_window_mode.sql"},
 	{15, "p23_op_log_bytes", "0015_p23_op_log_bytes.sql"},
 	{16, "g1_git_clients", "0016_g1_git_clients.sql"},
+	{17, "g18_git_repo_settings", "0017_g18_git_repo_settings.sql"},
 }
 
 // All returns every migration in ascending version order.
