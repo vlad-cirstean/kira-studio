@@ -11,9 +11,27 @@
  * tree has no such thing).
  */
 import { type DiffRow, flattenDiffRows, mapDiffLineToRevision } from '@kira/git-core';
+import type { LineRange } from '@kira/git-ipc';
 import { computed, ref, watch } from 'vue';
 import type { FileDiffResult } from '../state/detail.ts';
 import type { DetailActions } from '../state/detailActions.ts';
+
+/**
+ * G11 D16: the review sidebar's Files pane only — carries the file's own reviewed ranges (already
+ * projected to NEW-side line numbers, G11 D10) and the one write action both header buttons and
+ * shift-click range marking drive. Absent (the default, every other caller) renders byte-
+ * identically to before this prop existed: no gutter mark, no selection, no extra buttons —
+ * `DetailPane.vue`/`StashDetailPane.vue` are provably unaffected.
+ */
+export interface ReviewDiffAdornment {
+  readonly reviewedRanges: readonly LineRange[];
+  /** A review.mark request in flight — the two buttons disable themselves rather than let a
+   *  double-click race two writes. */
+  readonly pending: boolean;
+  /** Applies `reviewed` to `ranges` (NEW-side line numbers) — the whole file when `ranges` is
+   *  `undefined` (no shift-click selection is active). */
+  mark(ranges: readonly LineRange[] | undefined, reviewed: boolean): void;
+}
 
 const props = defineProps<{
   diff: FileDiffResult | undefined;
@@ -23,6 +41,7 @@ const props = defineProps<{
   fileIndex: number;
   totalFiles: number;
   actions: DetailActions;
+  review?: ReviewDiffAdornment;
 }>();
 
 const emit = defineEmits<{
@@ -77,11 +96,17 @@ const rows = computed<DiffRow[]>(() => {
  *  changes (a new file, or a re-fetch after `parentIndex` changes) — a row index from the
  *  previous file means nothing against this one's hunks. */
 const focusedRow = ref(0);
+/** G11 D16: the review adornment's own selection anchor — `null` until a shift-click sets it, so
+ *  the two mark buttons can tell "the user selected a range" from "just clicked around" (they
+ *  apply to the whole file only in the latter case). Reset alongside focusedRow whenever the diff
+ *  changes, and whenever review itself goes from present to absent. */
+const selectionAnchor = ref<number | null>(null);
 watch(
   () => props.diff,
   () => {
     const firstLineRow = rows.value.findIndex((row) => row.kind === 'line');
     focusedRow.value = firstLineRow === -1 ? 0 : firstLineRow;
+    selectionAnchor.value = null;
     actionMessage.value = '';
   },
 );
@@ -100,6 +125,67 @@ function lineClass(row: DiffRow): string {
   if (line?.kind === 'add') return 'kv-diff-line-add';
   if (line?.kind === 'del') return 'kv-diff-line-del';
   return '';
+}
+
+// ---------------------------------------------------------------------------------------
+// G11 D16: the review adornment — a gutter mark for already-reviewed new-side rows, shift-click
+// range selection anchored on the existing focusedRow cursor, and the two "Mark reviewed"/
+// "Mark unreviewed" buttons that apply to the selection when there is one, the whole file when
+// there is not.
+// ---------------------------------------------------------------------------------------
+
+function newLineOf(row: DiffRow): number | undefined {
+  if (row.kind !== 'line') return undefined;
+  const body = props.diff?.body;
+  if (body?.kind !== 'text') return undefined;
+  return body.hunks[row.hunkIndex]?.lines[row.lineIndex]?.newLine;
+}
+
+function isRowReviewed(row: DiffRow): boolean {
+  if (!props.review) return false;
+  const newLine = newLineOf(row);
+  if (newLine === undefined) return false;
+  return props.review.reviewedRanges.some((r) => newLine >= r.start && newLine <= r.end);
+}
+
+function onRowClick(index: number, event: MouseEvent): void {
+  if (props.review && event.shiftKey && selectionAnchor.value !== null) {
+    focusedRow.value = index; // extend the existing selection; the anchor stays put
+    return;
+  }
+  focusedRow.value = index;
+  selectionAnchor.value = null; // a plain click always clears any prior selection
+}
+
+const isRowSelected = (index: number): boolean => {
+  if (selectionAnchor.value === null) return false;
+  const lo = Math.min(selectionAnchor.value, focusedRow.value);
+  const hi = Math.max(selectionAnchor.value, focusedRow.value);
+  return index >= lo && index <= hi;
+};
+
+/** The current shift-click selection's own new-side line range — `undefined` when there is none,
+ *  which the two mark buttons read as "apply to the whole file" (D16). */
+const selectionLineRange = computed<LineRange | undefined>(() => {
+  if (selectionAnchor.value === null) return undefined;
+  const lo = Math.min(selectionAnchor.value, focusedRow.value);
+  const hi = Math.max(selectionAnchor.value, focusedRow.value);
+  let start: number | undefined;
+  let end: number | undefined;
+  for (let i = lo; i <= hi; i++) {
+    const row = rows.value[i];
+    if (!row) continue;
+    const newLine = newLineOf(row);
+    if (newLine === undefined) continue; // a pure `del` row has no new-side line to select
+    start ??= newLine;
+    end = newLine;
+  }
+  return start !== undefined && end !== undefined ? { start, end } : undefined;
+});
+
+function markSelectionOrWhole(reviewed: boolean): void {
+  const range = selectionLineRange.value;
+  props.review?.mark(range ? [range] : undefined, reviewed);
 }
 
 /** P5 W14: "each row's accessible name states its kind in words" — read instead of the visual
@@ -226,6 +312,24 @@ function formatBytes(bytes: number): string {
       <button v-if="canGoToFile" type="button" class="kv-diff-action" @click="goToFile">
         Go to file
       </button>
+      <button
+        v-if="review"
+        type="button"
+        class="kv-diff-action"
+        :disabled="review.pending"
+        @click="markSelectionOrWhole(true)"
+      >
+        Mark reviewed
+      </button>
+      <button
+        v-if="review"
+        type="button"
+        class="kv-diff-action"
+        :disabled="review.pending"
+        @click="markSelectionOrWhole(false)"
+      >
+        Mark unreviewed
+      </button>
     </header>
 
     <p v-if="actionMessage" class="kv-diff-action-message" role="status">{{ actionMessage }}</p>
@@ -244,10 +348,17 @@ function formatBytes(bytes: number): string {
           v-for="(row, index) in rows"
           :key="rowKey(row, index)"
           class="kv-diff-row"
-          :class="[lineClass(row), { 'kv-diff-row-focused': index === focusedRow }]"
+          :class="[
+            lineClass(row),
+            {
+              'kv-diff-row-focused': index === focusedRow,
+              'kv-diff-row-selected': isRowSelected(index),
+              'kv-diff-row-reviewed': isRowReviewed(row),
+            },
+          ]"
           role="row"
           :aria-label="rowAccessibleName(row)"
-          @click="focusedRow = index"
+          @click="onRowClick(index, $event)"
         >
           <template v-if="row.kind === 'hunkHeader'">
             <div class="kv-diff-hunk-header" role="cell">
@@ -406,6 +517,17 @@ function formatBytes(bytes: number): string {
 
 .kv-diff-row-focused {
   background-color: var(--kv-line-highlight-bg);
+}
+
+/* G11 D16: the shift-click selection a mark button applies to. */
+.kv-diff-row-selected {
+  box-shadow: inset 2px 0 0 var(--kv-focus-border);
+}
+
+/* G11 D16: already-reviewed new-side lines — a thin left gutter stripe, distinct from the
+ * selection's own inset shadow so the two states read separately when they overlap. */
+.kv-diff-row-reviewed .kv-diff-gutter-new {
+  box-shadow: inset 2px 0 0 var(--kv-diff-added-fg);
 }
 
 .kv-diff-hunk-header {

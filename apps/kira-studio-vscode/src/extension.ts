@@ -171,6 +171,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     },
     'kiraVersion.reviewBranch': () => reviewProvider.reviewBranch(undefined, undefined),
     'kiraVersion.refresh': () => graphProvider.runUiAction('refresh'),
+    // G11 D17: the review webview's own command, not the graph's — toggling a reviewed file only
+    // makes sense in the review sidebar's Files pane.
+    'kiraVersion.toggleFileReviewed': () => reviewProvider.runUiAction('toggleFileReviewed'),
   };
   for (const entry of Object.values(MUTATING_COMMANDS)) {
     if (isPaletteCommand(entry)) {

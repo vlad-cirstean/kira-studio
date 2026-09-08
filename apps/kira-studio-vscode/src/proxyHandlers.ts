@@ -253,6 +253,11 @@ export function createProxyHandlers(deps: CreateProxyHandlersDeps): ServerHandle
       revealReview(repoId, branch);
       return {};
     },
+    // G11 D1/§4.3: forwarded verbatim — none of the three is a host capability, and the seventh
+    // and last of those was closed above (review.open).
+    'review.files': forward('review.files'),
+    'review.fileDiff': forward('review.fileDiff'),
+    'review.mark': forward('review.mark'),
     // G7 D2: strategySetting is injected from the window's own coerced settings snapshot,
     // exactly as review.resolveBase injects baseCandidates above.
     'remote.pullPreflight': (params, ctx) => {

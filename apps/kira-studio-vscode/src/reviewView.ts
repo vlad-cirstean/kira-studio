@@ -12,7 +12,13 @@
  * bearing here at all (F11): `ReviewSessionState`'s background re-resolve and its "the comparison
  * has changed" banner are the sole consumer of this event in the review webview.
  */
-import type { EventPayload, RpcServer, ServerHandlers, SettingsSnapshot } from '@kira/git-ipc';
+import type {
+  EventPayload,
+  RpcServer,
+  ServerHandlers,
+  SettingsSnapshot,
+  UiActionKind,
+} from '@kira/git-ipc';
 import { createRpcServer } from '@kira/git-ipc';
 import * as vscode from 'vscode';
 import type { ReviewTarget } from './html.ts';
@@ -89,6 +95,20 @@ export class KiraReviewViewProvider implements vscode.WebviewViewProvider {
    *  — a no-op when no webview is currently resolved (view collapsed or never opened). */
   notifySettingsChanged(settings: SettingsSnapshot): void {
     this.#server?.emit('settings.changed', { settings });
+  }
+
+  /**
+   * G11 D17: routes one palette command's action into the review webview — `panelView.ts`'s own
+   * proven two-arm pattern, ported: reveal the view either way, then emit `ui.action` to an
+   * already-live server or fall back to `#pendingTarget`-style handling... except the review view
+   * has no `#pendingAction` slot to stash into on a cold reveal (unlike the graph panel), since
+   * this phase's only action needs a file already open in the Files pane — a webview that has not
+   * even booted yet cannot have one, so a cold reveal simply has nothing to toggle and the emit is
+   * silently dropped in that case, exactly as it would be with no live server.
+   */
+  runUiAction(action: UiActionKind): void {
+    void vscode.commands.executeCommand(REVIEW_FOCUS_COMMAND);
+    this.#server?.emit('ui.action', { action });
   }
 
   /** Forwarded from `ConnectionManager.on('repo.changed', ...)` by `extension.ts` (G6/D15,

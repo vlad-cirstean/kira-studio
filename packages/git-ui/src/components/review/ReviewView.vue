@@ -22,17 +22,21 @@
  * 3. The "no branch" state's own branch picker — the user picks one directly, no host round trip.
  */
 import { SETTINGS } from '@kira/git-core';
-import type { HostKind, Transport } from '@kira/git-ipc';
+import type { HostKind, Transport, UiActionKind } from '@kira/git-ipc';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue';
 import { BridgeClient } from '../../bridge/client.ts';
+import { copyToClipboard } from '../../state/clipboardActions.ts';
+import type { Capabilities, DetailActions } from '../../state/detailActions.ts';
 import { RefsState } from '../../state/refs.ts';
 import { ReviewSessionState, type ReviewTarget } from '../../state/review.ts';
+import { ReviewFilesState } from '../../state/reviewFiles.ts';
 import type { ViewStateStore } from '../../state/viewState.ts';
 import DiffView from '../DiffView.vue';
 import { useModalFocus } from '../dialogs/modalFocus.ts';
 import { buildRefListSections } from '../refListModel.ts';
 import BaseSelector from './BaseSelector.vue';
 import ReviewCommitRow from './ReviewCommitRow.vue';
+import ReviewFilesPane from './ReviewFilesPane.vue';
 
 const props = defineProps<{
   transport: Transport;
@@ -45,6 +49,8 @@ const bridge = new BridgeClient(props.transport);
 const connectionState = bridge.connectionState;
 const refsState = new RefsState(bridge);
 const review = shallowRef<ReviewSessionState | undefined>(undefined);
+const reviewFiles = shallowRef<ReviewFilesState | undefined>(undefined);
+const capabilities = shallowRef<Capabilities | undefined>(undefined);
 
 const repoId = ref<string | undefined>(undefined);
 const noActiveRepo = ref(false);
@@ -52,6 +58,7 @@ const noActiveRepo = ref(false);
 watch(repoId, (id) => refsState.setRepoId(id));
 
 let unsubscribeTarget: (() => void) | undefined;
+let unsubscribeUiAction: (() => void) | undefined;
 
 async function applyTarget(nextRepoId: string, branch: string): Promise<void> {
   repoId.value = nextRepoId;
@@ -60,10 +67,17 @@ async function applyTarget(nextRepoId: string, branch: string): Promise<void> {
 
 async function bootstrap(): Promise<void> {
   const init = await bridge.init();
+  capabilities.value = init.capabilities;
   review.value = new ReviewSessionState(bridge, init.capabilities);
+  reviewFiles.value = new ReviewFilesState(bridge);
 
   unsubscribeTarget = bridge.on('review.target', (event) => {
     void applyTarget(event.repoId, event.branch);
+  });
+  // G11 D17: the palette's own route into this already-mounted webview — toggles the file
+  // currently open in the Files pane, or announces there is none to toggle.
+  unsubscribeUiAction = bridge.on('ui.action', (event) => {
+    onUiAction(event.action);
   });
 
   if (props.target) {
@@ -77,6 +91,75 @@ async function bootstrap(): Promise<void> {
     noActiveRepo.value = true;
   }
 }
+
+function onUiAction(action: UiActionKind): void {
+  if (action !== 'toggleFileReviewed') return;
+  const rf = reviewFiles.value;
+  const path = rf?.selectedPath.value;
+  if (!rf || path === null || path === undefined) {
+    liveAnnouncement.value = 'Open a file in the Files tab first.';
+    return;
+  }
+  const entry = rf.files.value.find((e) => e.change.path === path);
+  const isReviewed = entry ? entry.review.kind !== 'none' : false;
+  void rf.mark(path, !isReviewed);
+}
+
+// ---------------------------------------------------------------------------------------
+// The Files pane's own target: kept in step with the review session's resolved (branch, base)
+// rather than owned by ReviewSessionState itself (D16's "state/review.ts — one field: the pane
+// the view is showing" — the file list's own request lifecycle stays here).
+// ---------------------------------------------------------------------------------------
+watch(
+  () => {
+    const r = review.value;
+    if (r?.phase.value !== 'listing') return undefined;
+    const base = r.resolution.value?.base;
+    const branch = r.branch.value;
+    const id = repoId.value;
+    return id && branch && base ? { repoId: id, branch, base } : undefined;
+  },
+  (target) => {
+    reviewFiles.value?.setTarget(target);
+  },
+);
+
+// The Files pane's own actions bundle — "Open in editor"/"Go to file" are wired for real (the
+// same bridge calls createDetailActions makes) but ReviewFilesPane.vue always disables both
+// capabilities for its own DiffView, since neither has an honest meaning against a branch-review
+// delta with no single commit sha; FileTree's own copy-path button is the one thing this bundle
+// really serves here.
+const filesActions = computed<DetailActions | undefined>(() => {
+  const caps = capabilities.value;
+  if (!caps) return undefined;
+  return {
+    capabilities: caps,
+    copy(text, whatCopied) {
+      void copyToClipboard(bridge, text, whatCopied).then((outcome) => {
+        liveAnnouncement.value = outcome.message;
+      });
+    },
+    announce(text) {
+      liveAnnouncement.value = text;
+    },
+    async openInEditor({ sha, path, originalPath, parentIndex }) {
+      const repo = repoId.value;
+      if (!repo) return;
+      await bridge.request('editor.openDiff', {
+        repoId: repo,
+        sha,
+        path,
+        ...(originalPath !== undefined ? { originalPath } : {}),
+        parentIndex,
+      });
+    },
+    async goToFile({ rev, path, line }) {
+      const repo = repoId.value;
+      if (!repo) throw new Error('ReviewView: goToFile called with no active repo');
+      return bridge.request('editor.goToFile', { repoId: repo, rev, path, line });
+    },
+  };
+});
 
 onMounted(() => {
   // Mirrors `App.vue`'s own first-paint mark (§5.1 — W18's review-view perf metric measures from
@@ -92,7 +175,9 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   unsubscribeTarget?.();
+  unsubscribeUiAction?.();
   review.value?.dispose();
+  reviewFiles.value?.dispose();
   refsState.dispose();
   bridge.dispose();
   document.removeEventListener('keydown', onDocumentKeydown);
@@ -378,9 +463,34 @@ watch(
           :refs-state="refsState"
           @select-base="review.setBase($event)"
         />
-        <span v-if="review.phase.value === 'listing'" class="kv-review-commit-count">{{
-          commitCountLabel
-        }}</span>
+        <div
+          v-if="review.phase.value === 'listing'"
+          class="kv-review-pane-toggle"
+          role="group"
+          aria-label="Review pane"
+        >
+          <button
+            type="button"
+            :aria-pressed="review.pane.value === 'commits'"
+            :class="{ 'kv-mode-active': review.pane.value === 'commits' }"
+            @click="review.setPane('commits')"
+          >
+            Commits
+          </button>
+          <button
+            type="button"
+            :aria-pressed="review.pane.value === 'files'"
+            :class="{ 'kv-mode-active': review.pane.value === 'files' }"
+            @click="review.setPane('files')"
+          >
+            Files
+          </button>
+        </div>
+        <span
+          v-if="review.phase.value === 'listing' && review.pane.value === 'commits'"
+          class="kv-review-commit-count"
+          >{{ commitCountLabel }}</span
+        >
       </header>
 
       <div class="kv-review-body">
@@ -413,7 +523,7 @@ watch(
           “{{ review.branch.value }}” adds no commits to “{{ review.resolution.value?.base }}”.
         </p>
 
-        <template v-else-if="review.phase.value === 'listing'">
+        <template v-else-if="review.phase.value === 'listing' && review.pane.value === 'commits'">
           <div
             v-if="review.staleReview.value"
             class="kv-review-stale-banner"
@@ -456,6 +566,14 @@ watch(
             </button>
           </div>
         </template>
+
+        <ReviewFilesPane
+          v-else-if="review.phase.value === 'listing' && reviewFiles && filesActions"
+          class="kv-review-files-mount"
+          :review-files="reviewFiles"
+          :store="review.store"
+          :actions="filesActions"
+        />
       </div>
     </template>
 
@@ -593,8 +711,26 @@ watch(
   white-space: nowrap;
 }
 
-.kv-review-commit-count {
+.kv-review-pane-toggle {
+  display: flex;
   margin-left: auto;
+  flex-shrink: 0;
+}
+
+.kv-review-pane-toggle button {
+  background: transparent;
+  color: var(--kv-row-fg);
+  border: 1px solid var(--kv-panel-border);
+  cursor: pointer;
+  padding: 0 var(--kv-space-2);
+}
+
+.kv-review-pane-toggle button.kv-mode-active {
+  background: var(--kv-row-selected-bg);
+  color: var(--kv-row-selected-fg);
+}
+
+.kv-review-commit-count {
   color: var(--kv-description-fg);
   font-size: 0.85em;
   flex-shrink: 0;
@@ -605,6 +741,11 @@ watch(
   min-height: 0;
   display: flex;
   flex-direction: column;
+}
+
+.kv-review-files-mount {
+  flex: 1;
+  min-height: 0;
 }
 
 .kv-review-status {

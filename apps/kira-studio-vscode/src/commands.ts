@@ -128,6 +128,10 @@ export const OTHER_COMMANDS: readonly OtherCommand[] = [
   { command: 'kiraVersion.focusGraph', title: 'Open Git Graph' },
   { command: 'kiraVersion.reviewBranch', title: 'Review Branch Changes' },
   { command: 'kiraVersion.refresh', title: 'Refresh' },
+  // G11 D17: this phase's own palette command (SPEC's "each responsible for registering its own
+  // palette command when it lands") — routed to the REVIEW webview's own runUiAction, not the
+  // graph's, since toggling a reviewed file only makes sense in the review sidebar's Files pane.
+  { command: 'kiraVersion.toggleFileReviewed', title: 'Toggle File Reviewed' },
 ];
 
 export type OtherCommandId = (typeof OTHER_COMMANDS)[number]['command'];

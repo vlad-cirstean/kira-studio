@@ -94,6 +94,11 @@
         "category": "Kira Version"
       },
       {
+        "command": "kiraVersion.toggleFileReviewed",
+        "title": "Toggle File Reviewed",
+        "category": "Kira Version"
+      },
+      {
         "command": "kiraVersion.checkout",
         "title": "Checkout…",
         "category": "Kira Version"

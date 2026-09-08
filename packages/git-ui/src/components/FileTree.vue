@@ -6,7 +6,7 @@
  * fold; every piece of "what row goes where" is that module's job, not this one's.
  */
 import type { CommitStore } from '@kira/git-core';
-import type { FileChange } from '@kira/git-ipc';
+import type { FileChange, ReviewFileStatus } from '@kira/git-ipc';
 import { computed, nextTick, ref, watch } from 'vue';
 import type { FileListMode } from '../state/detail.ts';
 import type { DetailActions } from '../state/detailActions.ts';
@@ -32,6 +32,11 @@ const props = defineProps<{
   parentIndex: number;
   store: CommitStore;
   actions: DetailActions;
+  /** G11 D16: the review sidebar's Files pane only — a per-path reviewed status, keyed by
+   *  `FileChange.path`. Absent (the default, every other caller of this component) renders
+   *  byte-identically to before this prop existed: no checkbox, no badge, nothing — `DetailPane.vue`
+   *  and `StashDetailPane.vue` are provably unaffected. */
+  reviewStates?: ReadonlyMap<string, ReviewFileStatus>;
 }>();
 
 const emit = defineEmits<{
@@ -39,6 +44,10 @@ const emit = defineEmits<{
   (e: 'update:listMode', mode: FileListMode): void;
   (e: 'update:filter', text: string): void;
   (e: 'update:parentIndex', index: number): void;
+  /** G11 D16: the reviewed checkbox's own click — toggles path between fully reviewed and
+   *  unreviewed (the file-level toggle; per-range toggling lives in DiffView.vue's own review
+   *  adornment). Never emitted when reviewStates is absent. */
+  (e: 'toggleReviewed', path: string): void;
 }>();
 
 const filterInput = ref(props.filter);
@@ -281,6 +290,26 @@ function fileTitle(change: FileChange): string {
 function copyPath(path: string): void {
   props.actions.copy(path, 'file path');
 }
+
+// G11 D16: the reviewed checkbox/badge — every accessor is a no-op-shaped lookup when
+// reviewStates is absent, but the template only ever calls these behind `v-if="reviewStates"`.
+function reviewStatusFor(path: string): ReviewFileStatus | undefined {
+  return props.reviewStates?.get(path);
+}
+function reviewToggleIcon(path: string): string {
+  switch (reviewStatusFor(path)?.kind) {
+    case 'full':
+      return 'codicon-pass-filled';
+    case 'partial':
+      return 'codicon-circle-large-filled';
+    default:
+      return 'codicon-circle-large-outline';
+  }
+}
+function reviewToggleTitle(path: string): string {
+  const kind = reviewStatusFor(path)?.kind ?? 'none';
+  return kind === 'none' ? 'Mark reviewed' : 'Mark unreviewed';
+}
 </script>
 
 <template>
@@ -376,6 +405,23 @@ function copyPath(path: string): void {
             <span class="kv-diff-added-fg">+{{ row.node.change.additions ?? 0 }}</span>
             <span class="kv-diff-deleted-fg">-{{ row.node.change.deletions ?? 0 }}</span>
           </span>
+          <span
+            v-if="reviewStates && reviewStatusFor(row.node.change.path)?.changedSinceReview"
+            class="kv-file-tree-changed-badge"
+            title="Changed since you reviewed it"
+            aria-hidden="true"
+            >●</span
+          >
+          <button
+            v-if="reviewStates"
+            type="button"
+            class="kv-copy-button kv-file-tree-review-toggle"
+            :title="reviewToggleTitle(row.node.change.path)"
+            :aria-pressed="reviewStatusFor(row.node.change.path)?.kind === 'full'"
+            @click.stop="emit('toggleReviewed', row.node.change.path)"
+          >
+            <span class="codicon" :class="reviewToggleIcon(row.node.change.path)" aria-hidden="true"></span>
+          </button>
           <button
             v-if="actions.capabilities.clipboard"
             type="button"
@@ -549,6 +595,20 @@ function copyPath(path: string): void {
 
 .kv-file-tree-copy {
   flex-shrink: 0;
+}
+
+.kv-file-tree-changed-badge {
+  flex-shrink: 0;
+  font-size: 0.5em;
+  color: var(--kv-diff-modified-fg);
+}
+
+.kv-file-tree-review-toggle {
+  flex-shrink: 0;
+}
+
+.kv-file-tree-review-toggle[aria-pressed='true'] {
+  color: var(--kv-diff-added-fg);
 }
 
 .kv-file-tree-show-all {

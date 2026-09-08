@@ -60,11 +60,17 @@ function resolutionsDiffer(a: BaseResolution, b: BaseResolution): boolean {
   return false;
 }
 
+/** G11 D16: which of the review sidebar's two panes is showing — a segmented control in the
+ *  existing header, reset (to 'commits') by setTarget/setBase alongside everything else they
+ *  already reset. */
+export type ReviewPane = 'commits' | 'files';
+
 export class ReviewSessionState {
   readonly phase: ShallowRef<ReviewPhase> = shallowRef('idle');
   readonly repoId: ShallowRef<string | undefined> = shallowRef(undefined);
   readonly branch: ShallowRef<string | undefined> = shallowRef(undefined);
   readonly resolution: ShallowRef<BaseResolution | undefined> = shallowRef(undefined);
+  readonly pane: ShallowRef<ReviewPane> = shallowRef('commits');
   readonly resolveError: ShallowRef<string | undefined> = shallowRef(undefined);
   readonly isLoadingMore: ShallowRef<boolean> = shallowRef(false);
   /** D39: a background re-resolve found the outcome or the count changed. Never applied
@@ -138,6 +144,7 @@ export class ReviewSessionState {
     this.resolveError.value = undefined;
     this.staleReview.value = false;
     this.#pendingResolution = undefined;
+    this.pane.value = 'commits';
     this.phase.value = 'resolving';
     await this.#resolve(repoId, branch, undefined);
   }
@@ -157,8 +164,14 @@ export class ReviewSessionState {
     this.resolveError.value = undefined;
     this.staleReview.value = false;
     this.#pendingResolution = undefined;
+    this.pane.value = 'commits';
     this.phase.value = 'resolving';
     await this.#resolve(repoId, branch, base);
+  }
+
+  /** The Files/Commits segmented control's own setter (D16). */
+  setPane(pane: ReviewPane): void {
+    this.pane.value = pane;
   }
 
   /** §6.8's "Load more" (D42) — pages the review walk, then re-opens the stream exactly as
