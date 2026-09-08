@@ -90,7 +90,7 @@ interface HandshakeFrame {
 }
 
 const PROTOCOL = 1;
-const CONTRACT_VERSION = 16; // Mirrors gitrpc.ContractVersion / @kira/git-ipc's CONTRACT_VERSION.
+const CONTRACT_VERSION = 17; // Mirrors gitrpc.ContractVersion / @kira/git-ipc's CONTRACT_VERSION.
 
 test('pairing, token reuse and revocation over the real socket', async ({ kira, kiraHome }) => {
   const { window: page } = kira;
