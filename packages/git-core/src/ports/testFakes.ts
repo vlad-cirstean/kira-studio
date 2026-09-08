@@ -190,7 +190,7 @@ export class FakeClipboard implements Clipboard {
 }
 
 export interface FakeEditorAction {
-  readonly kind: 'openDiff' | 'reveal' | 'resolveConflict';
+  readonly kind: 'openDiff' | 'openAllChanges' | 'reveal' | 'resolveConflict';
   readonly left?: DocumentRef;
   readonly right?: DocumentRef;
   readonly title?: string;
@@ -202,11 +202,17 @@ export interface FakeEditorAction {
   readonly ref?: DocumentRef;
   readonly line?: number;
   readonly path?: string;
+  /** G21 D8: `openAllChanges`'s own file list, recorded whole rather than flattened into this
+   *  action shape's other fields — a test asserting on it wants the list, not one entry. */
+  readonly files?: readonly { left: DocumentRef; right: DocumentRef; resource: string }[];
 }
 
 export class FakeEditorIntegration implements EditorIntegration {
   capabilities: EditorCapabilities;
   readonly actions: FakeEditorAction[] = [];
+  /** G21 D8: what `openAllChanges` answers with — a test overrides this to model the
+   *  fallback-mode/failed-file cases; defaults to "every file opened, the multi-diff path". */
+  openAllChangesResult: { opened: number; failed: number; mode: 'multiDiff' | 'tabs' } | undefined;
   #source: VirtualDocumentSource | undefined;
 
   constructor(
@@ -231,6 +237,14 @@ export class FakeEditorIntegration implements EditorIntegration {
     pinned: boolean;
   }): Promise<void> {
     this.actions.push({ kind: 'openDiff', ...req });
+  }
+
+  async openAllChanges(req: {
+    title: string;
+    files: readonly { left: DocumentRef; right: DocumentRef; resource: string }[];
+  }): Promise<{ opened: number; failed: number; mode: 'multiDiff' | 'tabs' }> {
+    this.actions.push({ kind: 'openAllChanges', title: req.title, files: req.files });
+    return this.openAllChangesResult ?? { opened: req.files.length, failed: 0, mode: 'multiDiff' };
   }
 
   async reveal(ref: DocumentRef, line: number): Promise<void> {

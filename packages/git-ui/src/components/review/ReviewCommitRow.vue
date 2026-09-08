@@ -104,11 +104,14 @@ function onMenuSelect(id: string): void {
   else if (id === 'copyMessage') actions.copy(c.subject, 'commit message');
 }
 
-// G14 D8 row action 1: "Open all changes" — every changed file's own native diff, the same
-// request `FileTree`'s per-file click already makes (`expansion.actions.openInEditor`), looped
-// rather than reimplemented. Needs the commit already expanded (its file list fetched); an
-// unexpanded row announces why instead of silently doing nothing.
-function openAllChanges(event: MouseEvent): void {
+// G14 D8 row action 1 / G21 D8c: "Open all changes" — one awaited `openAllChanges` call rather
+// than N unawaited `openInEditor` calls. Item 8's own remaining problem (i): the old loop fired
+// every request in the same tick with a bare `void` and no `.catch`, so a run where 1 of 14 opens
+// succeeded and 13 rejected looked, to the user, exactly like "it only shows one file's diff" —
+// no announcement, no error surface, no partial-success reporting. This awaits the single host
+// round trip and announces the real outcome either way. Needs the commit already expanded (its
+// file list fetched); an unexpanded row announces why instead of silently doing nothing.
+async function openAllChanges(event: MouseEvent): Promise<void> {
   event.stopPropagation();
   const exp = props.expansion;
   const files = exp?.detail.detail.value?.files;
@@ -117,17 +120,22 @@ function openAllChanges(event: MouseEvent): void {
     return;
   }
   const parentIndex = exp.detail.parentIndex.value;
-  for (const file of files) {
-    // G21 D13: the bulk call site always pins — item 8's original bug, never regressed. (D8's own
-    // commit replaces this per-file loop with one exp.actions.openAllChanges call, awaited and
-    // error-reporting; kept as a loop for now since D13 lands before D8.)
-    void exp.actions.openInEditor({
+  try {
+    const { opened, failed, mode } = await exp.actions.openAllChanges({
       sha: props.sha,
-      path: file.path,
-      originalPath: file.originalPath,
       parentIndex,
-      pinned: true,
     });
+    exp.actions.announce(
+      failed === 0
+        ? mode === 'multiDiff'
+          ? `Opened all ${opened} changed files`
+          : `Opened ${opened} files`
+        : `Opened ${opened} of ${opened + failed} files — ${failed} couldn't be opened`,
+    );
+  } catch (err) {
+    exp.actions.announce(
+      `Couldn't open the changes — ${err instanceof Error ? err.message : String(err)}`,
+    );
   }
 }
 

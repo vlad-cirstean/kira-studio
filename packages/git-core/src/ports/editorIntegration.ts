@@ -50,6 +50,18 @@ export interface EditorIntegration {
     title: string;
     pinned: boolean;
   }): Promise<void>;
+  /** G21 D8b (item 8): "Open all changes" — prefers the host's own multi-file diff editor, one
+   *  call for every changed file at once, falling back to a sequenced, error-aware loop over
+   *  `openDiff` itself when the host has no such surface (or the call rejects). `resource` is the
+   *  real on-disk path of the file each entry names (even when one side is `{kind: 'empty'}`) —
+   *  what lets a multi-file diff editor group and label entries correctly for an added/deleted
+   *  file, which neither `left` nor `right` alone can always give it. Always pinned in spirit:
+   *  every result this method can produce is a permanent surface, never a preview tab — item 8's
+   *  original bug, and D13 never regresses it. */
+  openAllChanges(req: {
+    title: string;
+    files: readonly { left: DocumentRef; right: DocumentRef; resource: string }[];
+  }): Promise<{ opened: number; failed: number; mode: 'multiDiff' | 'tabs' }>;
   /** Opens `ref` and puts the cursor on `line` (1-based). */
   reveal(ref: DocumentRef, line: number): Promise<void>;
   /** P6/W10, §7.11's "Resolve in VS Code": reveal the host's own SCM surface and open `path` in

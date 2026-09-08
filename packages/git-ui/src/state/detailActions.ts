@@ -42,6 +42,16 @@ export interface DetailActions {
     pinned: boolean;
     fallbackSha?: string;
   }): Promise<void>;
+  /** G21 D8 (item 8): "Open all changes" — the bulk call site, always pinned/multi-diff in spirit
+   *  (never regressed by D13's own per-file preview/pin split). One host round trip composes and
+   *  opens every changed file at once; the outcome is returned (not merely fire-and-forget like
+   *  `openInEditor`) so the caller can announce it — item 8's own remaining problem (i), a run
+   *  where some files silently fail to open, is what makes an awaited, inspectable result matter
+   *  here specifically. */
+  openAllChanges(params: {
+    sha: string;
+    parentIndex: number;
+  }): Promise<{ opened: number; failed: number; mode: 'multiDiff' | 'tabs' }>;
   /** "Go to file" (D14a) — `rev`/`path`/`line` are exactly the algorithm at the top of the plan
    *  already resolved; this method only makes the request and returns the outcome, it does not
    *  compute `rev`/`line` itself. No caller remains after G21 D12 deleted `DiffView.vue` (the one
@@ -79,6 +89,11 @@ export function createDetailActions(
         pinned,
         ...(fallbackSha !== undefined ? { fallbackSha } : {}),
       });
+    },
+    async openAllChanges({ sha, parentIndex }) {
+      const repo = repoId();
+      if (!repo) throw new Error('createDetailActions: openAllChanges called with no active repo');
+      return bridge.request('editor.openAllChanges', { repoId: repo, sha, parentIndex });
     },
     async goToFile({ rev, path, line }) {
       const repo = repoId();

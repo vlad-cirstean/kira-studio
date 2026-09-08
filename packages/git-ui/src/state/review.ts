@@ -409,6 +409,8 @@ export class ReviewSessionState {
           pinned,
         });
       },
+      openAllChanges: async ({ sha, parentIndex }) =>
+        this.#bridge.request('editor.openAllChanges', { repoId, sha, parentIndex }),
       goToFile: async ({ rev, path, line }) =>
         this.#bridge.request('editor.goToFile', { repoId, rev, path, line }),
     };

@@ -306,6 +306,11 @@ const filesActions = computed<DetailActions | undefined>(() => {
         pinned,
       });
     },
+    async openAllChanges({ sha, parentIndex }) {
+      const repo = repoId.value;
+      if (!repo) throw new Error('ReviewView: openAllChanges called with no active repo');
+      return bridge.request('editor.openAllChanges', { repoId: repo, sha, parentIndex });
+    },
     async goToFile({ rev, path, line }) {
       const repo = repoId.value;
       if (!repo) throw new Error('ReviewView: goToFile called with no active repo');

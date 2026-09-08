@@ -347,12 +347,30 @@ export function createProxyHandlers(deps: CreateProxyHandlersDeps): ServerHandle
       }
       return {};
     },
-    // G21 D8: placeholder — the real vscode.changes-probing/sequenced-fallback implementation
-    // lands in its own commit, after D13 (they share this CONTRACT_VERSION 24 bump and the
-    // DetailActions shape). Typed and reachable now only because the contract type requires every
-    // ServerHandlers key to have an implementation.
-    'editor.openAllChanges': () => {
-      throw new Error('editor.openAllChanges: not implemented yet (lands in G21 D8)');
+    // G21 D8a (item 8): composes the whole file list from **one** commit.detail (collapsing what
+    // used to be N separate editor.openDiff round trips into one), reusing documentRefsFor — the
+    // exact DocumentRef derivation editor.openDiff's own handler uses — so the two can never
+    // disagree about which side is `empty` for an added/deleted file. `resource` is the file's
+    // real on-disk path (root joined with its own repo-relative path, mirroring
+    // editor.resolveConflict's own D13 precedent just above) — what lets the host's multi-file
+    // diff editor group/label entries correctly. The actual vscode.changes-probing/sequenced-
+    // fallback choice lives entirely in the port (`ports/editorIntegration.ts`'s own
+    // `openAllChanges`); this handler only composes the request and returns its result verbatim.
+    'editor.openAllChanges': async ({ repoId, sha, parentIndex }, ctx) => {
+      const detail = await connection.request(
+        'commit.detail',
+        { repoId, sha, parentIndex },
+        ctx.signal,
+      );
+      const baseSha = detail.parents[detail.parentIndex] ?? null;
+      const root = repoRoots.get(repoId);
+      const files = detail.files.map((change) => {
+        const { left, right } = documentRefsFor(repoId, sha, change.path, change, baseSha);
+        const resource = root ? join(root, change.path) : change.path;
+        return { left, right, resource };
+      });
+      const shortSha = sha.slice(0, 7);
+      return editor.openAllChanges({ title: `All changes in ${shortSha}`, files });
     },
     // D4/D11: the server resolves the on-disk-vs-object-database decision and (for a live file)
     // the drift hunks; the line arithmetic itself stays here, over @kira/git-core's already-tested

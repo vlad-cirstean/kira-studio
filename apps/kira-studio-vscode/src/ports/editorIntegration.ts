@@ -63,6 +63,11 @@ export class VsCodeEditorIntegration implements EditorIntegration {
     resolveConflict: true,
   };
   #source: VirtualDocumentSource | undefined;
+  /** G21 D8b: `vscode.changes` is a built-in command with no entry in `@types/vscode` (F8) — a
+   *  real capability probe rather than a version assumption, and memoized (`getCommands(true)` is
+   *  not free) since this extension's own lifetime never sees the host gain or lose a built-in
+   *  command. `undefined` until the first `openAllChanges` call resolves it. */
+  #hasMultiDiffCommand: Promise<boolean> | undefined;
 
   registerVirtualDocuments(source: VirtualDocumentSource): Disposable {
     this.#source = source;
@@ -92,6 +97,10 @@ export class VsCodeEditorIntegration implements EditorIntegration {
     right: DocumentRef;
     title: string;
     pinned: boolean;
+    /** G21 D8b: internal-only — `openAllChanges`'s own sequenced fallback sets this on every file
+     *  but the last, so opening N tabs steals focus once, not N times. Not part of the
+     *  `EditorIntegration` port's own public signature; no other caller ever sets it. */
+    preserveFocus?: boolean;
   }): Promise<void> {
     // G19 D8: a real, non-preview tab, for a caller that wants one — F8 root-caused "Open all
     // changes" only ever leaving the last file's diff open to this one missing options argument.
@@ -113,7 +122,10 @@ export class VsCodeEditorIntegration implements EditorIntegration {
         toUri(req.left),
         toUri(req.right),
         req.title,
-        { preview: false } satisfies vscode.TextDocumentShowOptions,
+        {
+          preview: false,
+          ...(req.preserveFocus ? { preserveFocus: true } : {}),
+        } satisfies vscode.TextDocumentShowOptions,
       );
     } else {
       await vscode.commands.executeCommand(
@@ -123,6 +135,56 @@ export class VsCodeEditorIntegration implements EditorIntegration {
         req.title,
       );
     }
+  }
+
+  /** G21 D8b (item 8): probes `vscode.changes` once and prefers it — one call opens every file's
+   *  hunks in the host's own multi-file diff editor, which is what item 8's own wording ("doesn't
+   *  show all files' hunks") actually asks for, not N separate tabs. Falls back to the sequenced,
+   *  error-aware per-file loop this extension already had (via `openDiff`, `pinned: true`) when
+   *  the command is absent or the call itself rejects — strictly better than the old loop either
+   *  way (one `commit.detail` round trip already, `proxyHandlers.ts`'s own composition; here,
+   *  `preserveFocus` on every file but the last so opening N tabs steals focus once). */
+  async openAllChanges(req: {
+    title: string;
+    files: readonly { left: DocumentRef; right: DocumentRef; resource: string }[];
+  }): Promise<{ opened: number; failed: number; mode: 'multiDiff' | 'tabs' }> {
+    if (this.#hasMultiDiffCommand === undefined) {
+      // `vscode.commands.getCommands` returns a `Thenable`, not a real `Promise` — wrapped so
+      // `#hasMultiDiffCommand`'s own type (and every later `await`) is an ordinary `Promise`.
+      this.#hasMultiDiffCommand = Promise.resolve(
+        vscode.commands.getCommands(true).then((commands) => commands.includes('vscode.changes')),
+      );
+    }
+    if (await this.#hasMultiDiffCommand) {
+      try {
+        const resources = req.files.map(
+          (file) => [vscode.Uri.file(file.resource), toUri(file.left), toUri(file.right)] as const,
+        );
+        await vscode.commands.executeCommand('vscode.changes', req.title, resources);
+        return { opened: req.files.length, failed: 0, mode: 'multiDiff' };
+      } catch {
+        // Falls through to the sequenced loop below — an absent or renamed command (or any other
+        // rejection) degrades instead of throwing (F8's own reasoning for probing at all).
+      }
+    }
+
+    let opened = 0;
+    let failed = 0;
+    for (const [index, file] of req.files.entries()) {
+      try {
+        await this.openDiff({
+          left: file.left,
+          right: file.right,
+          title: req.title,
+          pinned: true,
+          preserveFocus: index < req.files.length - 1,
+        });
+        opened++;
+      } catch {
+        failed++;
+      }
+    }
+    return { opened, failed, mode: 'tabs' };
   }
 
   async reveal(ref: DocumentRef, line: number): Promise<void> {

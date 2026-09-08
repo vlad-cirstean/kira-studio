@@ -183,8 +183,14 @@ function fakeConnectionServing(
   } as any as ConnectionManager;
 }
 
+interface RecordedOpenAllChanges {
+  readonly title: string;
+  readonly files: readonly { left: DocumentRef; right: DocumentRef; resource: string }[];
+}
+
 function buildOpenDiffHandlers(connection: ConnectionManager) {
   const recorded: RecordedOpenDiff[] = [];
+  const recordedAllChanges: RecordedOpenAllChanges[] = [];
   const notImplemented = (): never => {
     throw new Error('not implemented in this test');
   };
@@ -203,6 +209,10 @@ function buildOpenDiffHandlers(connection: ConnectionManager) {
       openDiff: async (req: RecordedOpenDiff) => {
         recorded.push(req);
       },
+      openAllChanges: async (req: RecordedOpenAllChanges) => {
+        recordedAllChanges.push(req);
+        return { opened: req.files.length, failed: 0, mode: 'multiDiff' as const };
+      },
       reveal: notImplemented,
       resolveConflict: notImplemented,
       // biome-ignore lint/suspicious/noExplicitAny: structurally satisfies EditorIntegration.
@@ -216,7 +226,7 @@ function buildOpenDiffHandlers(connection: ConnectionManager) {
     notifyReviewMarked: () => {},
     reviewSessionStore: { get: () => undefined, update: async () => {} },
   });
-  return { requests, recorded };
+  return { requests, recorded, recordedAllChanges };
 }
 
 describe('editor.openDiff — G21 D12 fallbackSha / D13 pinned', () => {
@@ -303,5 +313,51 @@ describe('editor.openDiff — G21 D12 fallbackSha / D13 pinned', () => {
         { signal: new AbortController().signal } as any,
       ),
     ).rejects.toThrow(/is not one of commit stashSha's changed files/);
+  });
+});
+
+describe('editor.openAllChanges — G21 D8a', () => {
+  test('composes N resource triples from one commit.detail call and forwards the port result', async () => {
+    const detail = detailFor('sha1', [
+      fileChange('a.ts'),
+      fileChange('b.ts', 'added'),
+      fileChange('c.ts', 'deleted'),
+    ]);
+    let detailRequests = 0;
+    const connection = {
+      request: async (method: string, params: unknown) => {
+        if (method !== 'commit.detail') throw new Error(`unexpected method ${method}`);
+        detailRequests++;
+        const { repoId, sha } = params as { repoId: string; sha: string };
+        if (`${repoId}:${sha}` !== 'r1:sha1') throw new Error('no fixture');
+        return detail;
+      },
+      // biome-ignore lint/suspicious/noExplicitAny: cast to the concrete class for this fake's shape.
+    } as any as ConnectionManager;
+    const { requests, recordedAllChanges } = buildOpenDiffHandlers(connection);
+
+    const result = await requests['editor.openAllChanges'](
+      { repoId: 'r1', sha: 'sha1' },
+      // biome-ignore lint/suspicious/noExplicitAny: only `signal` is read.
+      { signal: new AbortController().signal } as any,
+    );
+
+    // One commit.detail round trip for all three files, not three (D8a's own "collapsing N
+    // round trips into one").
+    expect(detailRequests).toBe(1);
+    expect(recordedAllChanges).toHaveLength(1);
+    const request = recordedAllChanges[0];
+    expect(request?.files).toHaveLength(3);
+    expect(request?.title).toContain('sha1'.slice(0, 7));
+    // No repo root known to this fake (no editor.resolveConflict-style repo.open call was ever
+    // made) — resource falls back to the bare repo-relative path, exactly as the handler's own
+    // `root ? join(root, change.path) : change.path` documents.
+    expect(request?.files.map((f) => f.resource)).toEqual(['a.ts', 'b.ts', 'c.ts']);
+    // An added file has no base side; a deleted file has no head side — the same derivation
+    // editor.openDiff's own handler uses (documentRefsFor), never disagreeing about which side
+    // is `empty`.
+    expect(request?.files[1]?.left).toEqual({ kind: 'empty', label: 'b.ts' });
+    expect(request?.files[2]?.right).toEqual({ kind: 'empty', label: 'c.ts' });
+    expect(result).toEqual({ opened: 3, failed: 0, mode: 'multiDiff' });
   });
 });
