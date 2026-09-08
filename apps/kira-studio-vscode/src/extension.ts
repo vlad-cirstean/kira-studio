@@ -27,6 +27,7 @@ import * as vscode from 'vscode';
 import type { OtherCommandId } from './commands.ts';
 import { isPaletteCommand, MUTATING_COMMANDS, OTHER_COMMANDS } from './commands.ts';
 import { ConnectionManager, type ConnectionState } from './connection.ts';
+import { goToFileFromDiffCommand, openCommitInGraphCommand } from './diffToolbar.ts';
 import { KiraGraphViewProvider } from './panelView.ts';
 import { VsCodeClipboard } from './ports/clipboard.ts';
 import { VsCodeCredentialPrompt } from './ports/credentialPrompt.ts';
@@ -74,14 +75,34 @@ function readRawSettings(config: vscode.WorkspaceConfiguration): Record<string, 
   return raw;
 }
 
+// G14 D5: builds the status-bar tooltip as several labelled lines rather than one run-on
+// sentence — the detail item.text no longer carries (F7) lives here instead, where it can be
+// structured. Markdown line breaks (two trailing spaces) between each entry.
+function markdownTooltip(lines: readonly string[]): vscode.MarkdownString {
+  return new vscode.MarkdownString(lines.join('  \n'));
+}
+
+// The label vscode.MarkdownString's own first line reads as plain text — used for
+// accessibilityInformation below, since an icon-only item needs *some* accessible name.
+function plainTextOf(markdownLine: string): string {
+  return markdownLine.replaceAll('**', '').replaceAll('`', '');
+}
+
 // G12 D10: an entry point genuinely visible in every state, not only the one state (connected)
 // that needs no indicator — F10's fix. `active` is the in-flight-request signal
 // (`ConnectionManager.onActivityChange`), meaningful only while `connected`. `item.hide()`
 // survives for exactly one case: the user turned the item off themselves.
+//
+// G14 D5: the two states that need the user's attention (pairing, an error) keep a word; the
+// three that do not (connecting, connected, loading) are icon-only — everything the text used to
+// spend on "Kira Version" now lives in a structured Markdown tooltip instead (F7). `appInit` is
+// the server/contract version the connected/idle tooltip names — fetched separately (extension.ts's
+// own app.init round-trip), so it is `undefined` for the first render of a fresh `connected` state.
 function updateStatusBar(
   item: vscode.StatusBarItem,
   state: ConnectionState,
   active: boolean,
+  appInit?: { readonly serverVersion: string; readonly contractVersion: number },
 ): void {
   const enabled = vscode.workspace.getConfiguration().get<boolean>(STATUS_BAR_SETTING, true);
   if (!enabled) {
@@ -89,27 +110,36 @@ function updateStatusBar(
     return;
   }
   item.backgroundColor = undefined;
+  let tooltipLines: readonly string[];
   switch (state.kind) {
     case 'connecting': {
-      item.text = '$(sync~spin) Kira Version';
-      item.tooltip = 'Connecting to Kira Studio… ~/.kira-studio/git.sock';
+      item.text = '$(sync~spin)';
+      tooltipLines = ['**Kira Studio**', 'Connecting…', '`~/.kira-studio/git.sock`'];
       item.command = SHOW_CONNECTION_STATUS_COMMAND;
       break;
     }
     case 'pairing': {
-      item.text = '$(key) Kira Version';
-      item.tooltip = 'Waiting for approval in Kira Studio';
+      item.text = '$(key) Approve';
+      tooltipLines = ['**Kira Studio**', "Waiting for approval in Kira Studio's window"];
       item.command = SHOW_CONNECTION_STATUS_COMMAND;
       break;
     }
     case 'connected': {
       if (active) {
-        item.text = '$(sync~spin) Kira Version';
-        item.tooltip = 'Loading…';
+        item.text = '$(sync~spin)';
+        tooltipLines = ['**Kira Studio**', 'Loading…'];
       } else {
+        item.text = '$(git-branch)';
         const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-        item.text = '$(git-branch) Kira Version';
-        item.tooltip = root ? `Kira Version: connected (${root})` : 'Kira Version: connected';
+        const lines = ['**Kira Studio**', 'Connected'];
+        if (root) lines.push(root);
+        if (appInit) {
+          lines.push(
+            `Kira Studio ${appInit.serverVersion}`,
+            `Contract v${appInit.contractVersion}`,
+          );
+        }
+        tooltipLines = lines;
       }
       // `connected` keeps focusing the graph — clicking a working connection should reveal the
       // panel, not explain a status there is nothing wrong with.
@@ -117,23 +147,31 @@ function updateStatusBar(
       break;
     }
     case 'denied': {
-      item.text = '$(error) Kira Version';
-      item.tooltip =
-        state.reason === 'timeout' ? 'Pairing request timed out' : 'Pairing was denied';
+      item.text = '$(error) Kira';
+      tooltipLines = [
+        '**Kira Studio**',
+        state.reason === 'timeout' ? 'Pairing request timed out' : 'Pairing was denied',
+        'Click to retry',
+      ];
       item.command = SHOW_CONNECTION_STATUS_COMMAND;
       item.backgroundColor = new vscode.ThemeColor('statusBarItem.errorBackground');
       break;
     }
     case 'versionMismatch': {
-      item.text = '$(error) Kira Version';
-      item.tooltip =
+      item.text = '$(error) Kira';
+      tooltipLines = [
+        '**Kira Studio**',
         `Version mismatch — extension expects contract ${state.expected}, ` +
-        `Kira Studio (${state.serverVersion}) speaks ${state.received}.`;
+          `Kira Studio (${state.serverVersion}) speaks ${state.received}`,
+        'Both need to be on the same release',
+      ];
       item.command = SHOW_CONNECTION_STATUS_COMMAND;
       item.backgroundColor = new vscode.ThemeColor('statusBarItem.errorBackground');
       break;
     }
   }
+  item.tooltip = markdownTooltip(tooltipLines);
+  item.accessibilityInformation = { label: plainTextOf(tooltipLines[0]) };
   item.show();
 }
 
@@ -214,13 +252,22 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   // G10 D16: created here so it can appear before the panel is ever opened (D3's
   // onStartupFinished); disposed with the extension like every other subscription.
   const statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 0);
+  // G14 D5: set once — the item's text no longer carries a name (F7), so this is what makes it
+  // identifiable in the status bar's own right-click "manage" menu.
+  statusBarItem.name = 'Kira Version';
   context.subscriptions.push(statusBarItem);
   // G12 D10: the in-flight-work indicator — debounced 150ms on the rising edge only (a burst of
   // small requests must not flicker the item several times a second), never on the falling edge
   // (work finishing should read as finished immediately).
   let isActive = false;
   let activityDebounce: ReturnType<typeof setTimeout> | undefined;
-  updateStatusBar(statusBarItem, manager.state, isActive);
+  // G14 D5: the connected/idle tooltip names the server and contract version — data this
+  // extension already fetches (the app.init round-trip a few lines below, previously logged only)
+  // but does not have at the moment `connected` itself first fires, hence a second updateStatusBar
+  // call once it resolves. Cleared whenever the state leaves `connected`, since a reconnect may
+  // land on a different Kira Studio process.
+  let lastAppInit: { readonly serverVersion: string; readonly contractVersion: number } | undefined;
+  updateStatusBar(statusBarItem, manager.state, isActive, lastAppInit);
 
   // G10 D19: every command this extension contributes is registered from commands.ts's own
   // tables — no hand-written second list. Mutating commands all dispatch through the graph
@@ -234,6 +281,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   // drop. Every existing zero-arg handler below is still perfectly assignable to the wider type
   // (JS ignores extra arguments), so this widens what the table CAN express without weakening any
   // individual handler's own, precisely-typed body.
+  // G14 D9/D10: both diff-toolbar commands share one `DiffToolbarDeps` bundle.
+  const diffToolbarDeps = { connection: manager, editor, graphProvider };
   // biome-ignore lint/suspicious/noExplicitAny: see the comment above — two of these ids take a real menu-command argument.
   const otherCommandHandlers: Record<OtherCommandId, (...args: any[]) => unknown> = {
     [SHOW_CONNECTION_STATUS_COMMAND]: () => void showConnectionStatus(manager),
@@ -253,6 +302,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       void reviewComments.submit(reply),
     'kiraVersion.deleteReviewComment': (comment: vscode.Comment) =>
       void reviewComments.deleteComment(comment),
+    'kiraVersion.goToFileFromDiff': goToFileFromDiffCommand(diffToolbarDeps),
+    'kiraVersion.openCommitInGraph': openCommitInGraphCommand(diffToolbarDeps),
   };
   for (const entry of Object.values(MUTATING_COMMANDS)) {
     if (isPaletteCommand(entry)) {
@@ -309,19 +360,23 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       }
       if (!active) {
         isActive = false;
-        updateStatusBar(statusBarItem, manager.state, isActive);
+        updateStatusBar(statusBarItem, manager.state, isActive, lastAppInit);
         return;
       }
       activityDebounce = setTimeout(() => {
         isActive = true;
-        updateStatusBar(statusBarItem, manager.state, isActive);
+        updateStatusBar(statusBarItem, manager.state, isActive, lastAppInit);
       }, 150);
     }),
     manager.onStateChange((state) => {
       logger.log('info', 'connection state', state);
-      updateStatusBar(statusBarItem, state, isActive);
+      if (state.kind !== 'connected') lastAppInit = undefined;
+      updateStatusBar(statusBarItem, state, isActive, lastAppInit);
       // §5.4 point 4: this phase's own exit criterion, executing in the real extension — the
       // moment a connection is established, prove app.init round-trips over the real socket.
+      // G14 D5: also what the connected/idle tooltip's server/contract version comes from — a
+      // second updateStatusBar call once it resolves, since it is not available the instant
+      // `connected` itself fires above.
       if (state.kind === 'connected') {
         manager
           .request('app.init', {})
@@ -332,6 +387,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
               contractVersion: result.contractVersion,
               serverVersion: result.serverVersion,
             });
+            lastAppInit = {
+              serverVersion: result.serverVersion,
+              contractVersion: result.contractVersion,
+            };
+            updateStatusBar(statusBarItem, manager.state, isActive, lastAppInit);
           })
           .catch((err: unknown) => {
             logger.log('error', 'app.init failed', { err: String(err) });
@@ -340,9 +400,20 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     }),
     vscode.workspace.onDidChangeConfiguration((event) => {
       if (event.affectsConfiguration(STATUS_BAR_SETTING)) {
-        updateStatusBar(statusBarItem, manager.state, isActive);
+        updateStatusBar(statusBarItem, manager.state, isActive, lastAppInit);
       }
-      if (!event.affectsConfiguration('kiraVersion')) return;
+      // G14 D6b: 'workbench.tree.indent' is a host-owned key (SETTINGS' source: 'host'), read off
+      // the root configuration object like any other SETTING_KEYS member — readRawSettings itself
+      // needs no special case (a fully-qualified dotted key resolves there like any other, with
+      // VS Code's own user/workspace/folder/language overrides already applied). What must widen
+      // is this early return, so a live change to it still reaches both webviews through the same
+      // settings.changed event below.
+      if (
+        !event.affectsConfiguration('kiraVersion') &&
+        !event.affectsConfiguration('workbench.tree.indent')
+      ) {
+        return;
+      }
       const { settings, problems } = coerceSettings(
         readRawSettings(vscode.workspace.getConfiguration()),
       );

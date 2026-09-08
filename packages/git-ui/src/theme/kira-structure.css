@@ -27,11 +27,15 @@
   --kv-t-md: var(--kv-font-size);
   --kv-t-lg: calc(var(--kv-font-size) + 1px);
 
-  --kv-h-xs: 18px;
-  --kv-h-sm: 22px;
-  --kv-h-md: 26px;
-  --kv-h-lg: 30px;
-  --kv-icon-box: 16px;
+  /* G14 D7: control/bar heights now derive from the host's own --kv-font-size, with offsets
+     chosen so every value below is byte-identical to the fixed px it replaces at the default
+     13px — raise VS Code's font size and these grow with the text they contain instead of
+     clipping it; at the default, nothing visually changes at all. */
+  --kv-h-xs: calc(var(--kv-font-size) + 5px); /* 18px at 13px */
+  --kv-h-sm: calc(var(--kv-font-size) + 9px); /* 22px */
+  --kv-h-md: calc(var(--kv-font-size) + 13px); /* 26px */
+  --kv-h-lg: calc(var(--kv-font-size) + 17px); /* 30px */
+  --kv-icon-box: calc(var(--kv-font-size) + 3px); /* 16px */
 
   /* Control-height *roles*, aliased rather than hardcoded per control (Kira's own aliasing) — "one
      step taller everywhere" is one edit here, not a re-pick in a dozen rules. */
@@ -41,7 +45,7 @@
   --kv-radius-sm: 4px;
   --kv-radius-panel: 6px;
 
-  --kv-bar-h: 34px;
+  --kv-bar-h: calc(var(--kv-font-size) + 21px); /* 34px at 13px — see the height block above */
   --kv-border-width: 1px;
 
   /* LAW 08 (docs/design/kira-design-system): "Mono is for data. If a string came out of a
@@ -49,12 +53,22 @@
      is UI." --kv-font-data is the existing --kv-mono-font-family (the real VS Code editor font,
      already used by e.g. .kv-review-row-sha) — NOT --kv-font-family, which in this codebase's own
      naming is the general VS Code *UI* font (vscode-tokens.css: "var(--vscode-font-family, ...
-     sans-serif)"), the opposite of what LAW 08 means by "data". --kv-font-ui is Kira Studio's own
-     fixed system-sans stack, never user-customizable. */
+     sans-serif)"), the opposite of what LAW 08 means by "data".
+     G14 D7: --kv-font-ui now follows the host's own --vscode-font-family, exactly as colour
+     already follows the user's theme (G12 D14) — Kira Studio's own fixed stack survives only as
+     the fallback for a host that sets no --vscode-font-family. */
   --kv-font-data: var(--kv-mono-font-family);
-  --kv-font-ui:
-    -apple-system, BlinkMacSystemFont, "Segoe WPC", "Segoe UI", system-ui, "Ubuntu", "Droid Sans",
-    sans-serif;
+  --kv-font-ui: var(
+    --vscode-font-family,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe WPC",
+    "Segoe UI",
+    system-ui,
+    "Ubuntu",
+    "Droid Sans",
+    sans-serif
+  );
 
   /* Geometry only — composed with the existing --kv-widget-shadow *colour* at each call site
      (`box-shadow: var(--kv-shadow) var(--kv-widget-shadow)`), never a shadow with its own colour

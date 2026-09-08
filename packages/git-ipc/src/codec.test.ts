@@ -66,6 +66,7 @@ describe('ipc codec', () => {
         'kiraVersion.pull.strategy': 'auto',
         'kiraVersion.stash.includeUntracked': false,
         'kiraVersion.stash.showInGraph': true,
+        'workbench.tree.indent': 8,
       },
       git: { kind: 'ok', path: '/usr/bin/git', version: '2.43.0' },
       capabilities: { openInEditor: true, goToFile: true, clipboard: true, resolveConflict: true },

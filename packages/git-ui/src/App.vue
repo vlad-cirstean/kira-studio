@@ -15,8 +15,14 @@ import { SETTINGS } from '@kira/git-core';
 import type { HostKind, StashEntry, Transport, UiActionKind } from '@kira/git-ipc';
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue';
 import { BridgeClient } from './bridge/client.ts';
-import type AppToolbar from './components/AppToolbar.vue';
-import type CommitGrid from './components/CommitGrid.vue';
+// A .vue default export is a *value* — the component object the template instantiates. `import
+// type` erases it, and Vue then renders <CommitGrid> as an unknown element with no grid inside it
+// (G14 F1). The script's only reference is `InstanceType<typeof …>`, so biome's useImportType
+// cannot tell; the template is the real caller.
+// biome-ignore lint/style/useImportType: the template instantiates this — see above
+import AppToolbar from './components/AppToolbar.vue';
+// biome-ignore lint/style/useImportType: the template instantiates this — see above
+import CommitGrid from './components/CommitGrid.vue';
 import ConflictBanner from './components/ConflictBanner.vue';
 import DetailPane from './components/DetailPane.vue';
 import BranchDialog from './components/dialogs/BranchDialog.vue';
@@ -71,8 +77,11 @@ const props = defineProps<{
   viewState: ViewStateStore;
   host: HostKind;
   /** G10 D19: a palette command that fired while this webview was cold — see `main.ts`'s own
-   *  `MountOptions.pendingAction` doc comment. `undefined`/`null` means none is pending. */
-  pendingAction?: UiActionKind | null;
+   *  `MountOptions.pendingUiAction` doc comment. `undefined`/`null` means none is pending. G14
+   *  D10: renamed from `pendingAction` and grown an optional `target`, mirroring `ui.action`'s own
+   *  shape — this is the extension's own cold-boot document, not the wire, so it is a rename
+   *  rather than a contract change. */
+  pendingUiAction?: { action: UiActionKind; target?: { repoId: string; sha: string } } | null;
 }>();
 
 const bridge = new BridgeClient(props.transport);
@@ -133,6 +142,14 @@ const FALLBACK_PAGE_SIZE = SETTINGS['kiraVersion.graph.pageSize'].default;
 
 const pageSize = computed(
   () => settingsState.value?.settings.value['kiraVersion.graph.pageSize'] ?? FALLBACK_PAGE_SIZE,
+);
+
+/** G14 D6: VS Code's own `workbench.tree.indent`, mirrored into the settings snapshot (host-owned,
+ *  never contributed by this extension) and bound as `--kv-tree-indent` on `.kv-app` below — the
+ *  same "read the schema's own default as the fallback" shape as `pageSize` above. */
+const FALLBACK_TREE_INDENT = SETTINGS['workbench.tree.indent'].default;
+const treeIndent = computed(
+  () => `${settingsState.value?.settings.value['workbench.tree.indent'] ?? FALLBACK_TREE_INDENT}px`,
 );
 
 /** `StashDialog.vue`'s create mode default — same "read the schema's own default as the fallback"
@@ -299,6 +316,22 @@ async function revealAndSelectSha(sha: string): Promise<void> {
   if (row === -1) return; // defensive only — revealSha's own contract: "found" means row >= 0
   selection.select(row);
   commitGridRef.value?.scrollToRow(row);
+}
+
+/** G14 D10: "Open in graph" from the review diff toolbar. Opens the target repo first when it is
+ *  not already the active one — the same repo.open + handleRepoOpened path the repo picker uses
+ *  — then reveals and selects the commit through the existing revealAndSelectSha above (which
+ *  already pages until the sha appears, already announces progress, and already scrolls to it on
+ *  a 'found' outcome). */
+async function revealCommitInGraph(target: { repoId: string; sha: string }): Promise<void> {
+  const repo = repoState.value;
+  if (!repo) return;
+  if (repo.activeRepo.value?.repoId !== target.repoId) {
+    const outcome = await repo.open(target.repoId);
+    if (outcome.kind !== 'ok') return;
+    await handleRepoOpened(outcome.repo.repoId);
+  }
+  await revealAndSelectSha(target.sha);
 }
 
 /** An annotated tag's own commit is `peeledObjectId`, never `objectId` (§7.8: "for an annotated
@@ -580,10 +613,13 @@ watch(graphView.loading, (state, previous) => {
 // G10 D19: the palette's own dispatcher — a switch over the same affordances the toolbar or a
 // context menu already drives (F16), never a second implementation of an operation. Reached two
 // ways: `bridge.on('ui.action', ...)` below, for a command run while this webview is already
-// live, and `props.pendingAction` at mount (below), for one that fired while it was cold —
+// live, and `props.pendingUiAction` at mount (below), for one that fired while it was cold —
 // `panelView.ts`'s own two-arm pattern, mirrored from `review.target`'s.
 // ---------------------------------------------------------------------------------------
-function runUiAction(action: UiActionKind): void {
+function runUiAction(
+  action: UiActionKind,
+  target?: { readonly repoId: string; readonly sha: string },
+): void {
   switch (action) {
     case 'openBranchPicker':
       toolbarRef.value?.openBranchPicker();
@@ -630,10 +666,15 @@ function runUiAction(action: UiActionKind): void {
     case 'refresh':
       toolbarRef.value?.refresh();
       break;
+    case 'revealCommit':
+      if (target) void revealCommitInGraph(target);
+      break;
   }
 }
 
-const unsubscribeUiAction = bridge.on('ui.action', (event) => runUiAction(event.action));
+const unsubscribeUiAction = bridge.on('ui.action', (event) =>
+  runUiAction(event.action, event.target),
+);
 
 onMounted(() => {
   // requestAnimationFrame so the mark lands after the browser has actually painted this
@@ -656,10 +697,12 @@ onMounted(() => {
   void bootstrap()
     .then(() => {
       // G10 D19: the cold-bootstrap arm — a palette command that fired before this webview had a
-      // live RpcServer (panelView.ts's own #pendingAction). Runs once, after bootstrap() has
+      // live RpcServer (panelView.ts's own #pendingUiAction). Runs once, after bootstrap() has
       // resolved a repo/opsState to act against; a later hide/reveal of the same view starts with
       // no pending action (panelView.ts clears it once consumed), so this never replays.
-      if (props.pendingAction) runUiAction(props.pendingAction);
+      if (props.pendingUiAction) {
+        runUiAction(props.pendingUiAction.action, props.pendingUiAction.target);
+      }
     })
     .catch((err: unknown) => {
       bootError.value = err instanceof Error ? err.message : String(err);
@@ -973,7 +1016,12 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div ref="rootEl" class="kv-app" :data-connection-state="connectionState">
+  <div
+    ref="rootEl"
+    class="kv-app"
+    :data-connection-state="connectionState"
+    :style="{ '--kv-tree-indent': treeIndent }"
+  >
     <!-- Unconditional, present from first paint regardless of which of the four content states
          below is showing (or whether bootstrap() has resolved a repoState at all yet) — the old
          live-data strip carried this testid unconditionally too (inside its own always-rendered
@@ -1046,6 +1094,18 @@ onBeforeUnmount(() => {
           :resolve-conflict-enabled="actions?.capabilities.resolveConflict ?? false"
           :resolve-conflict="resolveConflictInEditor"
         />
+        <!-- G14 D3: bootstrap() keeps going after repoState is set — through repo.open, the
+             auto-open candidate loop and openStream — so a rejection from any of those used to set
+             bootError into the full-panel error state above, which this v-else branch never shows.
+             That rendered a chrome-complete panel with no history and no explanation: exactly item
+             1's reported shape, whatever the underlying cause. Same anatomy as ReviewView.vue's
+             stale-comparison banner: one line, a Retry action that also dismisses it. -->
+        <div v-if="bootError" class="kv-boot-error-banner" role="status" data-testid="boot-error-banner">
+          <span>Kira Studio isn't reachable — {{ bootError }}</span>
+          <button type="button" data-testid="boot-error-banner-retry" @click="retryBootstrap">
+            Retry
+          </button>
+        </div>
         <main class="kv-body">
           <section class="kv-graph-region" data-testid="graph-region" aria-label="Commit graph">
             <CommitGrid
@@ -1249,6 +1309,30 @@ onBeforeUnmount(() => {
   padding: var(--kv-space-2) var(--kv-space-4);
   border: 1px solid var(--kv-panel-border);
   border-radius: var(--kv-radius);
+  background-color: var(--kv-panel-bg);
+  color: var(--kv-app-fg);
+  cursor: pointer;
+}
+
+/* G14 D3: the same anatomy as ReviewView.vue's .kv-review-stale-banner — a one-line banner above
+   the body it does not otherwise block. */
+.kv-boot-error-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--kv-s-2);
+  padding: var(--kv-s-2) var(--kv-s-3);
+  background: var(--kv-row-hover-bg);
+  border-bottom: var(--kv-border-width) solid var(--kv-panel-border);
+  flex-shrink: 0;
+  font-family: var(--kv-font-ui);
+  color: var(--kv-error-fg);
+}
+
+.kv-boot-error-banner button {
+  margin-left: auto;
+  padding: var(--kv-space-1) var(--kv-space-3);
+  border: 1px solid var(--kv-panel-border);
+  border-radius: var(--kv-radius-sm);
   background-color: var(--kv-panel-bg);
   color: var(--kv-app-fg);
   cursor: pointer;

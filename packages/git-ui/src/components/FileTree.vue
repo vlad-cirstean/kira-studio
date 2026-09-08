@@ -42,6 +42,13 @@ const props = defineProps<{
    *  panel above it owns one for several trees at once (the review sidebar) — `DetailPane.vue`,
    *  which mounts exactly one tree, leaves this unset and gets today's behaviour byte for byte. */
   showToolbar?: boolean; // default true
+  /** G14 D8: the review sidebar's own GitLens-shaped file-row anatomy — a fixed `--kv-icon-box`
+   *  status cell (rather than an `em`-relative one) and, in flat-list mode, the file's directory
+   *  dimmed after its name. Scoped to the review sidebar's own instances (`ReviewCommitRow.vue`,
+   *  `ReviewFilesPane.vue`) rather than this component globally — `DetailPane.vue`'s tree (which
+   *  G14 D1 restored) leaves this unset and keeps today's appearance byte for byte (§0.3: no graph
+   *  restyle). */
+  reviewStyled?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -296,6 +303,14 @@ function copyPath(path: string): void {
   props.actions.copy(path, 'file path');
 }
 
+/** G14 D8: the directory portion of a flat-mode row's path, for the review sidebar's dimmed-
+ *  directory-after-filename anatomy — `''` for a root-level file (nothing to show). Tree mode
+ *  never calls this: the nesting itself already says which directory a row is in. */
+function dirOf(path: string): string {
+  const slash = path.lastIndexOf('/');
+  return slash === -1 ? '' : path.slice(0, slash);
+}
+
 // G11 D16: the reviewed checkbox/badge — every accessor is a no-op-shaped lookup when
 // reviewStates is absent, but the template only ever calls these behind `v-if="reviewStates"`.
 function reviewStatusFor(path: string): ReviewFileStatus | undefined {
@@ -379,7 +394,7 @@ function reviewToggleTitle(path: string): string {
         :aria-expanded="listMode === 'tree' && row.kind === 'directory' ? row.expanded : undefined"
         :aria-selected="row.kind === 'file' ? row.node.fileIndex === selectedFile : undefined"
         :tabindex="index === focusedRow ? 0 : -1"
-        :style="{ paddingLeft: `${row.depth * 16}px` }"
+        :style="{ paddingLeft: `calc(var(--kv-tree-indent) * ${row.depth})` }"
         @click="onRowClick(index)"
       >
         <template v-if="row.kind === 'directory'">
@@ -398,7 +413,7 @@ function reviewToggleTitle(path: string): string {
         <template v-else>
           <span
             class="kv-file-tree-status"
-            :class="statusClass(row.node.change)"
+            :class="[statusClass(row.node.change), { 'kv-file-tree-status-fixed': reviewStyled }]"
             :title="fileTitle(row.node.change)"
             >{{ statusLetter(row.node.change) }}</span
           >
@@ -410,6 +425,11 @@ function reviewToggleTitle(path: string): string {
             </template>
             <template v-else>{{ row.node.name }}</template>
           </span>
+          <span
+            v-if="reviewStyled && listMode === 'flat' && dirOf(row.node.path)"
+            class="kv-file-tree-file-dir"
+            >{{ dirOf(row.node.path) }}</span
+          >
           <span v-if="!row.node.change.isBinary" class="kv-file-tree-counts">
             <span class="kv-diff-added-fg">+{{ row.node.change.additions ?? 0 }}</span>
             <span class="kv-diff-deleted-fg">-{{ row.node.change.deletions ?? 0 }}</span>
@@ -560,6 +580,17 @@ function reviewToggleTitle(path: string): string {
   flex-shrink: 0;
 }
 
+/* G14 D8: the review sidebar's own fixed-cell status letter (row 5) — GitLens's file-node anatomy
+ * uses a fixed-width glyph cell rather than one sized off the letter's own em, so a run of R/M/D
+ * rows lines up instead of each letter setting its own width. */
+.kv-file-tree-status-fixed {
+  width: var(--kv-icon-box);
+  height: var(--kv-icon-box);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .kv-status-added {
   color: var(--kv-diff-added-fg);
 }
@@ -585,6 +616,15 @@ function reviewToggleTitle(path: string): string {
 .kv-file-tree-name {
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* G14 D8: the review sidebar's own dimmed-directory-after-filename (row 5, flat-list mode only —
+ * tree mode already nests by directory). GitLens's own file-node anatomy. */
+.kv-file-tree-file-dir {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--kv-description-fg);
+  font-size: var(--kv-t-xs, 0.85em);
 }
 
 .kv-file-tree-counts {

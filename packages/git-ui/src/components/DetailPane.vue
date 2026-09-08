@@ -23,7 +23,12 @@ import type { DetailState } from '../state/detail.ts';
 import type { DetailActions } from '../state/detailActions.ts';
 import CommitMeta from './CommitMeta.vue';
 import DiffView from './DiffView.vue';
-import type FileTree from './FileTree.vue';
+// A .vue default export is a *value* — the component object the template instantiates. `import
+// type` erases it, and Vue then renders <FileTree> as an unknown element with nothing inside it
+// (G14 F1/F3). The script's only reference is `InstanceType<typeof …>`, so biome's useImportType
+// cannot tell; the template is the real caller.
+// biome-ignore lint/style/useImportType: the template instantiates this — see above
+import FileTree from './FileTree.vue';
 
 const props = defineProps<{
   detailState: DetailState;

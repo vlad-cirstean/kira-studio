@@ -28,14 +28,19 @@ import type { RefsState } from '../state/refs.ts';
 import type { RepoState } from '../state/repo.ts';
 import type { SearchState } from '../state/search.ts';
 import type { StashState } from '../state/stash.ts';
-// Plain (not `import type`) imports, unlike RefreshButton below: vue-tsc needs the real import to
-// infer the template's inline @branch-from-stash handler's parameter type from BranchPicker's own
-// emits declaration — a type-only import here breaks that inference (TS7006).
+// Plain (not `import type`) imports, for two different reasons. BranchPicker: vue-tsc needs the
+// real import to infer the template's inline @branch-from-stash handler's parameter type from
+// BranchPicker's own emits declaration — a type-only import here breaks that inference (TS7006).
+// PullStrategyPicker and RefreshButton: a .vue default export is a *value* — the component object
+// the template instantiates. `import type` erases it, and Vue then renders the tag as an unknown
+// element with nothing inside it (G14 F1/F3). The script's only reference to RefreshButton is
+// `InstanceType<typeof …>`, so biome's useImportType cannot tell; the template is the real caller.
 // biome-ignore lint/style/useImportType: see above
 import BranchPicker from './BranchPicker.vue';
 // biome-ignore lint/style/useImportType: see above
 import PullStrategyPicker from './PullStrategyPicker.vue';
-import type RefreshButton from './RefreshButton.vue';
+// biome-ignore lint/style/useImportType: the template instantiates this — see above
+import RefreshButton from './RefreshButton.vue';
 import RepoPicker from './RepoPicker.vue';
 import { remoteNamesFrom } from './rowMenuModel.ts';
 import SearchBox from './SearchBox.vue';

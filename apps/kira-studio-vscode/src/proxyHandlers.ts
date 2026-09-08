@@ -28,7 +28,6 @@ import type {
   Logger,
   WorkspaceRoots,
 } from '@kira/git-core';
-import { mapLineAcrossDiff } from '@kira/git-core';
 import type {
   GitStatus,
   RequestHandler,
@@ -37,6 +36,7 @@ import type {
   SettingsSnapshot,
 } from '@kira/git-ipc';
 import type { ConnectionManager } from './connection.ts';
+import { goToFile } from './goToFile.ts';
 import { virtualKey } from './virtualKey.ts';
 
 // D11: the server contract's own app.init is the webview contract's AppInitResult minus host/
@@ -254,30 +254,9 @@ export function createProxyHandlers(deps: CreateProxyHandlersDeps): ServerHandle
     // D4/D11: the server resolves the on-disk-vs-object-database decision and (for a live file)
     // the drift hunks; the line arithmetic itself stays here, over @kira/git-core's already-tested
     // mapLineAcrossDiff — never a second, unproven Go implementation of the same trickiest math.
-    'editor.goToFile': async ({ repoId, rev, path, line }, ctx) => {
-      const target = await connection.request('file.goToTarget', { repoId, rev, path }, ctx.signal);
-      switch (target.kind) {
-        case 'live': {
-          const finalLine =
-            target.hunks !== null ? mapLineAcrossDiff(target.hunks, line, 'old') : line;
-          await editor.reveal({ kind: 'file', path: target.absPath }, finalLine);
-          return { kind: 'liveFile', path, line: finalLine };
-        }
-        case 'historical': {
-          await editor.reveal(
-            {
-              kind: 'virtual',
-              key: virtualKey(repoId, target.rev, target.path),
-              label: basename(target.path),
-            },
-            line,
-          );
-          return { kind: 'virtualBlob', path: target.path, rev: target.rev, line };
-        }
-        case 'unavailable':
-          return target;
-      }
-    },
+    // G14 D9: the body itself now lives in diffToolbar.ts's exported `goToFile`, shared with the
+    // diff editor's own "Go to file" toolbar button — this handler is a one-line call to it.
+    'editor.goToFile': (params, ctx) => goToFile({ connection, editor }, params, ctx.signal),
     'clipboard.write': async ({ text, label }) => {
       try {
         await clipboard.writeText(text);

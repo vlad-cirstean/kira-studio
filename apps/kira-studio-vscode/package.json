@@ -119,6 +119,18 @@
         "category": "Kira Version"
       },
       {
+        "command": "kiraVersion.goToFileFromDiff",
+        "title": "Go to File",
+        "category": "Kira Version",
+        "icon": "$(go-to-file)"
+      },
+      {
+        "command": "kiraVersion.openCommitInGraph",
+        "title": "Open Commit in Graph",
+        "category": "Kira Version",
+        "icon": "$(git-commit)"
+      },
+      {
         "command": "kiraVersion.checkout",
         "title": "Checkout…",
         "category": "Kira Version"
@@ -209,6 +221,18 @@
         {
           "command": "kiraVersion.focusGraph",
           "group": "navigation"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "kiraVersion.goToFileFromDiff",
+          "group": "navigation@-99",
+          "when": "isInDiffEditor && resourceScheme == kira-version"
+        },
+        {
+          "command": "kiraVersion.openCommitInGraph",
+          "group": "navigation@-98",
+          "when": "isInDiffEditor && resourceScheme == kira-version"
         }
       ],
       "comments/commentThread/context": [

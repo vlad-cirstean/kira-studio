@@ -16,7 +16,12 @@ import type { EventKey, RequestKey, StreamKey } from './contract.ts';
 // G13 D1: 19 -> 20 for five new requests ('review.comment.add/list/remove/clear/export'),
 // 'editor.openRangeDiff's reshaped params (D8), and two new UiActionKind members
 // ('copyReviewComments', 'refreshReviewComments').
-export const CONTRACT_VERSION = 20;
+// G14 D6/D10: 20 -> 21, one bump for two reasons landing in the same phase. D6:
+// SettingsSnapshot gains the host-owned 'workbench.tree.indent' member. D10: UiActionKind gains
+// 'revealCommit' and 'ui.action' gains an optional 'target' naming the commit to reveal — both
+// extension-side only (the Go server neither emits nor parses either), the same "the sole
+// compatibility authority still moves" precedent G10 D9/G12 D1 set.
+export const CONTRACT_VERSION = 21;
 
 export class ContractVersionMismatchError extends Error {
   readonly received: number;

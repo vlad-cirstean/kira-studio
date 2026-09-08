@@ -45,6 +45,9 @@ export interface SettingsSnapshot {
   readonly 'kiraVersion.stash.includeUntracked': boolean;
   /** P9 W6: whether stash entries appear as nodes in the commit graph (OQ5 default: true). */
   readonly 'kiraVersion.stash.showInGraph': boolean;
+  /** G14 D6: VS Code's own tree indentation, mirrored so the webview's file trees match the
+   *  Explorer. Read from the host, never contributed by this extension. */
+  readonly 'workbench.tree.indent': number;
 }
 
 export interface RepoSummary {
@@ -944,7 +947,10 @@ export type UiActionKind =
   /** G13 D19: extension -> the Comments pane, emitted after an editor-side comment add/delete so
    *  the sidebar's list updates without the user switching panes — the reverse direction needs no
    *  event, since a webview-side mutation already travels through proxyHandlers.ts. */
-  | 'refreshReviewComments';
+  | 'refreshReviewComments'
+  /** G14 D10: "Open in graph" from the review diff toolbar — reveals and selects a commit named
+   *  by `ui.action`'s optional `target`. Extension -> webview only. */
+  | 'revealCommit';
 
 // ---------------------------------------------------------------------------------------
 // The contract.
@@ -1427,7 +1433,12 @@ export type Contract = {
      *  'toggleFileReviewed'. One palette command's action, routed to the affordance the toolbar or
      *  a context menu
      *  already drives — the palette is an entry point, never a second implementation. */
-    'ui.action': { readonly action: UiActionKind };
+    'ui.action': {
+      readonly action: UiActionKind;
+      /** G14 D10: present only for actions that name a commit ('revealCommit'). Extension ->
+       *  webview only; the Go server neither emits nor parses ui.action. */
+      readonly target?: { readonly repoId: string; readonly sha: string };
+    };
   };
   streams: {
     'graph.stream': {

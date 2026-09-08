@@ -33,6 +33,7 @@ import { RefsState } from '../../state/refs.ts';
 import { ReviewSessionState, type ReviewTarget } from '../../state/review.ts';
 import { ReviewCommentsState } from '../../state/reviewComments.ts';
 import { ReviewFilesState } from '../../state/reviewFiles.ts';
+import { SettingsState } from '../../state/settings.ts';
 import type { ViewStateStore } from '../../state/viewState.ts';
 import { buildRefListSections } from '../refListModel.ts';
 import BaseSelector from './BaseSelector.vue';
@@ -54,6 +55,15 @@ const review = shallowRef<ReviewSessionState | undefined>(undefined);
 const reviewFiles = shallowRef<ReviewFilesState | undefined>(undefined);
 const reviewComments = shallowRef<ReviewCommentsState | undefined>(undefined);
 const capabilities = shallowRef<Capabilities | undefined>(undefined);
+// G14 D6: this view has no SettingsState today (unlike App.vue, which already needs one for
+// pageSize/stash defaults) — constructed here from `init.settings` (bootstrap() already awaits
+// it) purely so the sidebar's file trees can honour a *live* workbench.tree.indent change, not
+// only the value at boot.
+const settingsState = shallowRef<SettingsState | undefined>(undefined);
+const FALLBACK_TREE_INDENT = SETTINGS['workbench.tree.indent'].default;
+const treeIndent = computed(
+  () => `${settingsState.value?.settings.value['workbench.tree.indent'] ?? FALLBACK_TREE_INDENT}px`,
+);
 
 const repoId = ref<string | undefined>(undefined);
 const noActiveRepo = ref(false);
@@ -74,6 +84,7 @@ async function applyTarget(nextRepoId: string, branch: string): Promise<void> {
 async function bootstrap(): Promise<void> {
   const init = await bridge.init();
   capabilities.value = init.capabilities;
+  settingsState.value = new SettingsState(bridge, init.settings);
   review.value = new ReviewSessionState(bridge, init.capabilities);
   reviewFiles.value = new ReviewFilesState(bridge);
   reviewComments.value = new ReviewCommentsState(bridge);
@@ -243,6 +254,7 @@ onBeforeUnmount(() => {
   review.value?.dispose();
   reviewFiles.value?.dispose();
   reviewComments.value?.dispose();
+  settingsState.value?.dispose();
   refsState.dispose();
   bridge.dispose();
   document.removeEventListener('keydown', onDocumentKeydown);
@@ -300,6 +312,28 @@ const commitCountLabel = computed(() => {
   if (resolution?.range.kind !== 'ready') return '';
   const count = resolution.range.commitCount;
   return `${commitCountFormatter.format(count)} ${count === 1 ? 'commit' : 'commits'}`;
+});
+
+// G14 D8 row 3/4: bare counts for the comparison summary node and the pane-toggle badges — the
+// same underlying numbers `commitCountLabel` above already formats into a sentence, plus the
+// Files/Comments panes' own row counts. `0` (not `undefined`) whenever a count is not yet known,
+// so a badge renders "0" rather than blinking in once data arrives — every source here is already
+// on the wire (D8's own "no new data" fence).
+const commitsCount = computed(() => {
+  const resolution = review.value?.resolution.value;
+  return resolution?.range.kind === 'ready' ? resolution.range.commitCount : 0;
+});
+const filesChangedCount = computed(() => reviewFiles.value?.files.value.length ?? 0);
+const commentsCount = computed(() => reviewComments.value?.comments.value.length ?? 0);
+
+/** G14 D8 row 3: the comparison summary's own second line — "N commits · M files changed",
+ *  always shown while the list itself is (never gated on which pane is active, unlike the old
+ *  commit-count-only span this replaces). */
+const comparisonSummaryLabel = computed(() => {
+  const commits = commitCountLabel.value;
+  if (!commits) return '';
+  const files = filesChangedCount.value;
+  return `${commits} · ${commitCountFormatter.format(files)} ${files === 1 ? 'file' : 'files'} changed`;
 });
 
 const FALLBACK_PAGE_SIZE = SETTINGS['kiraVersion.graph.pageSize'].default;
@@ -432,7 +466,11 @@ watch(
 </script>
 
 <template>
-  <div class="kv-review-view kv-skin-kira" :data-connection-state="connectionState">
+  <div
+    class="kv-review-view kv-skin-kira"
+    :data-connection-state="connectionState"
+    :style="{ '--kv-tree-indent': treeIndent }"
+  >
     <span class="kv-visually-hidden" data-testid="connection-state">{{ connectionState }}</span>
     <div class="kv-visually-hidden" role="status" aria-live="polite" data-testid="live-announcements">
       {{ liveAnnouncement }}
@@ -503,57 +541,67 @@ watch(
     </template>
 
     <template v-else>
+      <!-- G14 D8 row 3: a comparison summary node, replacing the old header's single-line
+           branch/base/count strip — GitLens's own "Comparing X with Y" node. First line names
+           both sides (`--kv-font-data`, the base still the interactive BaseSelector trigger);
+           second line, muted, states the comparison as a fact rather than leaving it implicit. -->
       <header class="kv-review-header">
-        <span class="codicon codicon-git-branch" aria-hidden="true"></span>
-        <span class="kv-review-branch-name" data-testid="review-branch-name">{{
-          review.branch.value
-        }}</span>
-        <BaseSelector
-          :resolution="review.resolution.value"
-          :refs-state="refsState"
-          @select-base="review.setBase($event)"
-        />
-        <span
-          v-if="review.phase.value === 'listing' && review.pane.value === 'commits'"
-          class="kv-review-commit-count"
-          >{{ commitCountLabel }}</span
-        >
+        <div class="kv-review-summary-line">
+          <span class="codicon codicon-git-branch" aria-hidden="true"></span>
+          <span class="kv-review-branch-name" data-testid="review-branch-name">{{
+            review.branch.value
+          }}</span>
+          <span class="kv-review-summary-arrow" aria-hidden="true">↔</span>
+          <BaseSelector
+            :resolution="review.resolution.value"
+            :refs-state="refsState"
+            @select-base="review.setBase($event)"
+          />
+        </div>
+        <div v-if="review.phase.value === 'listing'" class="kv-review-summary-meta">
+          {{ comparisonSummaryLabel }}
+        </div>
       </header>
 
       <!-- G12 D13/D14: one panel-level toolbar, holding the Commits/Files pane toggle, the
            filter, and the Tree/Flat toggle — replacing what used to be one FileTree toolbar per
            expanded row plus a third, separately-stateful copy in the Files pane. -->
       <div v-if="review.phase.value === 'listing'" class="kv-review-toolbar">
+        <!-- G14 D8 row 4: each pane button carries a count badge — GitLens's own count-badged
+             section nodes. -->
         <div class="kv-review-pane-toggle" role="group" aria-label="Review pane">
           <button
             type="button"
             :aria-pressed="review.pane.value === 'commits'"
             :class="{ 'kv-mode-active': review.pane.value === 'commits' }"
             title="Commits"
-            aria-label="Commits"
+            :aria-label="`Commits (${commitsCount})`"
             @click="review.setPane('commits')"
           >
             <span class="codicon" :class="ACTION_ICONS.commits" aria-hidden="true"></span>
+            <span class="kv-review-pane-badge">{{ commitsCount }}</span>
           </button>
           <button
             type="button"
             :aria-pressed="review.pane.value === 'files'"
             :class="{ 'kv-mode-active': review.pane.value === 'files' }"
             title="Files"
-            aria-label="Files"
+            :aria-label="`Files (${filesChangedCount})`"
             @click="review.setPane('files')"
           >
             <span class="codicon" :class="ACTION_ICONS.files" aria-hidden="true"></span>
+            <span class="kv-review-pane-badge">{{ filesChangedCount }}</span>
           </button>
           <button
             type="button"
             :aria-pressed="review.pane.value === 'comments'"
             :class="{ 'kv-mode-active': review.pane.value === 'comments' }"
             title="Comments"
-            aria-label="Comments"
+            :aria-label="`Comments (${commentsCount})`"
             @click="review.setPane('comments')"
           >
             <span class="codicon" :class="ACTION_ICONS.comments" aria-hidden="true"></span>
+            <span class="kv-review-pane-badge">{{ commentsCount }}</span>
           </button>
         </div>
         <input
@@ -654,6 +702,7 @@ watch(
               :focused="index === focusedRow"
               :list-mode="listMode"
               :filter="filter"
+              :repo-id="repoId"
               @toggle="toggleRow(sha)"
               @focus-row="focusRow(index)"
             />
@@ -825,20 +874,42 @@ watch(
    name and base selector. Not its uppercase/letter-spacing treatment: that primitive styles a
    short section label, and this row's own content is live data (a real branch name), which must
    never be visually re-cased. */
+/* G14 D8 row 3: the comparison summary node — two lines, replacing the old single-row header's
+ * fixed `--kv-control-h-lg`. */
 .kv-review-header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kv-s-1);
+  padding: var(--kv-s-2) var(--kv-s-3);
+  border-bottom: var(--kv-border-width) solid var(--kv-panel-border);
+  flex-shrink: 0;
+  min-width: 0;
+}
+
+.kv-review-summary-line {
   display: flex;
   align-items: center;
   gap: var(--kv-s-2);
-  height: var(--kv-control-h-lg);
-  padding: 0 var(--kv-s-3);
-  border-bottom: var(--kv-border-width) solid var(--kv-panel-border);
-  flex-shrink: 0;
   min-width: 0;
 }
 
 .kv-review-branch-name {
   font-family: var(--kv-font-data); /* LAW 08: a branch name is data. */
   font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kv-review-summary-arrow {
+  color: var(--kv-description-fg);
+  flex-shrink: 0;
+}
+
+.kv-review-summary-meta {
+  font-family: var(--kv-font-ui);
+  color: var(--kv-description-fg);
+  font-size: var(--kv-t-xs, 0.85em);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -887,11 +958,26 @@ watch(
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: var(--kv-s-1);
   width: var(--kv-control-h);
   background: transparent;
   color: var(--kv-row-fg);
   border: none;
   cursor: pointer;
+}
+
+/* G14 D8 row 4: the pane toggle's own buttons carry a count badge (Commits/Files/Comments), so
+ * they grow to fit it instead of staying icon-only-width. `.kv-review-toolbar-mode` (Tree/Flat)
+ * carries no badge and keeps the shared `width: var(--kv-control-h)` above. */
+.kv-review-pane-toggle button {
+  width: auto;
+  padding: 0 var(--kv-s-2);
+}
+
+.kv-review-pane-badge {
+  font-family: var(--kv-font-ui);
+  font-size: var(--kv-t-xs, 0.85em);
+  color: inherit;
 }
 
 .kv-review-pane-toggle button + button,
@@ -903,14 +989,6 @@ watch(
 .kv-review-toolbar-mode button.kv-mode-active {
   background: var(--kv-row-selected-bg);
   color: var(--kv-row-selected-fg);
-}
-
-.kv-review-commit-count {
-  font-family: var(--kv-font-ui);
-  color: var(--kv-description-fg);
-  font-size: var(--kv-t-sm);
-  flex-shrink: 0;
-  margin-left: auto;
 }
 
 .kv-review-body {

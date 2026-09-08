@@ -145,6 +145,14 @@ export const OTHER_COMMANDS: readonly OtherCommand[] = [
   // because commands.test.ts cross-checks both directions (F12) and otherCommandHandlers is total.
   { command: 'kiraVersion.submitReviewComment', title: 'Submit Review Comment' },
   { command: 'kiraVersion.deleteReviewComment', title: 'Delete Review Comment' },
+  // G14 D9: the review diff editor's own toolbar, item 7 — reuses G4's existing line-mapped
+  // "go to file" capability (`diffToolbar.ts`'s `goToFileFromDiffCommand`). `editor/title`-only in
+  // the manifest (F11), same "declared here so commands.test.ts's cross-check covers it" reason
+  // as the comment-menu-only pair above.
+  { command: 'kiraVersion.goToFileFromDiff', title: 'Go to File' },
+  // G14 D10: the review diff editor's own toolbar, item 8 — reveals and selects a commit in the
+  // graph webview (`diffToolbar.ts`'s `openCommitInGraphCommand`).
+  { command: 'kiraVersion.openCommitInGraph', title: 'Open Commit in Graph' },
 ];
 
 export type OtherCommandId = (typeof OTHER_COMMANDS)[number]['command'];

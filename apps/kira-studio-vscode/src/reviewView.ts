@@ -27,6 +27,13 @@ import { createWebviewChannel } from './transport.ts';
 
 const REVIEW_FOCUS_COMMAND = 'kiraVersion.review.focus';
 
+// G14 D8 row 2 / D10: the review row's own "Open in graph" hover action reaches
+// `kiraVersion.openCommitInGraph` through a `command:` URI — VS Code's own webview escape hatch
+// for invoking an already-contributed command, restricted (the array form, not `true`) to exactly
+// this one command id. Not a bridge request: a command URI never touches the RPC contract, which
+// is what keeps D8's own "no RPC changes" fence true while still making the button real.
+const OPEN_COMMIT_IN_GRAPH_COMMAND = 'kiraVersion.openCommitInGraph';
+
 export interface KiraReviewViewProviderDeps {
   readonly extensionUri: vscode.Uri;
   readonly handlers: ServerHandlers;
@@ -50,6 +57,7 @@ export class KiraReviewViewProvider implements vscode.WebviewViewProvider {
     webviewView.webview.options = {
       enableScripts: true,
       localResourceRoots: [vscode.Uri.joinPath(extensionUri, 'dist', 'ui')],
+      enableCommandUris: [OPEN_COMMIT_IN_GRAPH_COMMAND],
     };
     webviewView.webview.html = renderHtml({
       webview: webviewView.webview,

@@ -85,12 +85,16 @@ export interface RenderHtmlOptions {
   /** Only meaningful when `view === "review"`; ignored (and should be omitted) for the graph. */
   readonly target?: ReviewTarget | null;
   /** G10 D19: only meaningful when `view === "graph"`; ignored (and should be omitted) for the
-   *  review sidebar — see `panelView.ts`'s own `runUiAction` doc comment for the flow this seeds. */
-  readonly pendingAction?: UiActionKind | null;
+   *  review sidebar — see `panelView.ts`'s own `runUiAction` doc comment for the flow this seeds.
+   *  G14 D10: grew an optional `target`, mirroring `ui.action`'s own shape. */
+  readonly pendingUiAction?: {
+    action: UiActionKind;
+    target?: { repoId: string; sha: string };
+  } | null;
 }
 
 export function renderHtml(opts: RenderHtmlOptions): string {
-  const { webview, extensionUri, view, target, pendingAction } = opts;
+  const { webview, extensionUri, view, target, pendingUiAction } = opts;
   const distUi = vscode.Uri.joinPath(extensionUri, 'dist', 'ui');
   const assets = resolveUiAssets(webview, distUi);
   const csNonce = nonce();
@@ -103,7 +107,7 @@ export function renderHtml(opts: RenderHtmlOptions): string {
     repo: process.env.KIRA_REPO ?? null,
     view,
     target: view === 'review' ? (target ?? null) : null,
-    pendingAction: view === 'graph' ? (pendingAction ?? null) : null,
+    pendingUiAction: view === 'graph' ? (pendingUiAction ?? null) : null,
   };
 
   const styleLinks = assets.styleUris

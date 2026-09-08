@@ -26,7 +26,12 @@ package gitrpc
 // carries the review branch — extension-answered, but this constant is still the sole
 // compatibility authority, same precedent as G10/G12) and two new UiActionKind members
 // (copyReviewComments, refreshReviewComments).
-const ContractVersion = 20
+// G14 D6/D10: 20 -> 21, one bump for two reasons landing in the same phase — SettingsSnapshot's
+// host-owned 'workbench.tree.indent' member (D6) and ui.action's optional 'target' plus the new
+// 'revealCommit' UiActionKind member (D10). This constant moves for the same reason ui.action
+// first did (G10 D9): it is the sole compatibility authority, even though the Go server neither
+// emits nor parses either addition — both are extension<->webview only.
+const ContractVersion = 21
 
 // Protocol is the handshake envelope's own version (SPEC §3.3's "protocol":1), distinct from
 // ContractVersion — it never changes unless the hello/ready exchange itself is redesigned.

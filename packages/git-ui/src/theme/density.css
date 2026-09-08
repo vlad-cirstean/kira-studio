@@ -15,4 +15,10 @@
 
   --kv-toolbar-height: 35px;
   --kv-radius: 0px; /* the workbench has square corners; we do not invent rounded ones */
+
+  /* G14 D6: the fallback for a host that reports nothing — VS Code's own default for
+     workbench.tree.indent. Each view's root (App.vue/.kv-app, ReviewView.vue's own root)
+     overrides this from the live settings snapshot; FileTree.vue reads only the variable, never
+     a prop, so every mount point (detail pane, review rows, Files pane) honours it uniformly. */
+  --kv-tree-indent: 8px;
 }

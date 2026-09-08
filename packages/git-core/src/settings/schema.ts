@@ -32,6 +32,12 @@ export interface SettingDef<T> {
   readonly minimum?: number;
   readonly maximum?: number;
   readonly scope?: 'window' | 'resource';
+  /** G14 D6: where a setting's value comes from. `"extension"` (the default, when omitted) is a
+   *  key this extension contributes and owns; `"host"` is a key the *editor* owns, which we only
+   *  read — it is part of `SettingsSnapshot` so the webview can honour it, and is deliberately
+   *  absent from `contributes.configuration` (`toVsCodeConfiguration()` below skips it), since
+   *  contributing a core key would be a duplicate declaration of someone else's setting. */
+  readonly source?: 'extension' | 'host';
 }
 
 export const SETTINGS = {
@@ -99,6 +105,17 @@ export const SETTINGS = {
     description:
       'Whether stash entries appear as nodes in the commit graph. When off, the walk drops ' +
       'refs/stash entirely and stashes are visible only in the stash list.',
+  },
+  'workbench.tree.indent': {
+    key: 'workbench.tree.indent',
+    type: 'number',
+    default: 8,
+    source: 'host',
+    minimum: 0,
+    maximum: 40,
+    description:
+      "VS Code's own tree indentation, read (never contributed) so Kira Version's file trees " +
+      'line up with the Explorer beside them.',
   },
 } as const satisfies Record<string, SettingDef<unknown>>;
 
@@ -219,12 +236,15 @@ export interface VsCodeConfigurationSchema {
   readonly properties: Record<string, unknown>;
 }
 
-/** Drives `scripts/gen-settings.ts`: one JSON Schema property per setting. */
+/** Drives `scripts/gen-settings.ts`: one JSON Schema property per setting. `source: 'host'` keys
+ *  (G14 D6) are skipped — this extension reads them but does not own them, so contributing one
+ *  into `contributes.configuration` would be a duplicate declaration of a core VS Code setting. */
 export function toVsCodeConfiguration(): VsCodeConfigurationSchema {
   const properties: Record<string, unknown> = {};
 
   for (const key of SETTING_KEYS) {
     const def: SettingDef<unknown> = SETTINGS[key];
+    if (def.source === 'host') continue;
 
     const property: Record<string, unknown> = {
       type: def.type === 'enum' ? 'string' : def.type === 'stringArray' ? 'array' : def.type,

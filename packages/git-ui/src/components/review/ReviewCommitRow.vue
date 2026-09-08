@@ -35,6 +35,12 @@ const props = defineProps<{
    *  `FileTree` (which renders no toolbar of its own). */
   listMode: FileListMode;
   filter: string;
+  /** G14 D10: the open repository — needed only for the row's "Open in graph" hover action below,
+   *  which reaches `kiraVersion.openCommitInGraph` through a `command:` URI (VS Code's own webview
+   *  escape hatch for invoking an already-contributed command, gated by `enableCommandUris` on
+   *  this webview's own options) rather than a new bridge request — D8 makes no RPC/contract
+   *  change, and a command URI is not one: it never touches the Contract type. */
+  repoId: string | undefined;
 }>();
 
 const emit = defineEmits<{
@@ -104,6 +110,39 @@ function copySha(event: MouseEvent): void {
   if (c) props.expansion?.actions.copy(c.sha, 'full SHA');
 }
 
+// G14 D8 row action 1: "Open all changes" — every changed file's own native diff, the same
+// request `FileTree`'s per-file click already makes (`expansion.actions.openInEditor`), looped
+// rather than reimplemented. Needs the commit already expanded (its file list fetched); an
+// unexpanded row announces why instead of silently doing nothing.
+function openAllChanges(event: MouseEvent): void {
+  event.stopPropagation();
+  const exp = props.expansion;
+  const files = exp?.detail.detail.value?.files;
+  if (!exp || !files) {
+    exp?.actions.announce('Expand the commit first.');
+    return;
+  }
+  const parentIndex = exp.detail.parentIndex.value;
+  for (const file of files) {
+    void exp.actions.openInEditor({
+      sha: props.sha,
+      path: file.path,
+      originalPath: file.originalPath,
+      parentIndex,
+    });
+  }
+}
+
+// G14 D8 row action 3 / D10: a `command:` URI (see the `repoId` prop's own doc comment above) —
+// `undefined` only while no repo is open yet, in which case the anchor renders `href="#"` and the
+// row's own `commit` guard means this template branch cannot actually be reached without a commit,
+// which in turn cannot exist without a repository already open.
+const openInGraphHref = computed(() => {
+  if (!props.repoId) return '#';
+  const args = [{ repoId: props.repoId, sha: props.sha }];
+  return `command:kiraVersion.openCommitInGraph?${encodeURIComponent(JSON.stringify(args))}`;
+});
+
 // G12 D12: opens VS Code's native diff directly — no in-webview diff mode to flip into. `sha`'s
 // own parentIndex is this row's current merge-parent selection, exactly what commit.detail was
 // fetched against.
@@ -132,25 +171,66 @@ function onSelectFile(index: number): void {
     @keydown="onKeydown"
     @contextmenu="onContextMenu"
   >
-    <div class="kv-review-row-header">
+    <div class="kv-review-row-header" :class="{ 'kv-review-row-header-focused': focused }">
       <span
         class="codicon kv-review-row-chevron"
         :class="expanded ? 'codicon-chevron-down' : 'codicon-chevron-right'"
         aria-hidden="true"
       ></span>
-      <span class="kv-review-row-subject">{{ commit.subject }}</span>
-      <button
-        v-if="expansion?.actions.capabilities.clipboard"
-        type="button"
-        class="kv-review-row-sha"
-        :title="`Copy full SHA (${sha})`"
-        @click="copySha"
-      >
-        {{ shortSha }}
-      </button>
-      <span v-else class="kv-review-row-sha">{{ shortSha }}</span>
-      <span class="kv-review-row-author">{{ commit.author.name }}</span>
-      <span class="kv-review-row-date">{{ dateText }}</span>
+      <!-- G14 D8 row 1: two lines — subject on its own, full-width line; author/date/sha, muted,
+           below it. GitLens's own commit-node anatomy. -->
+      <span class="kv-review-row-lines">
+        <span class="kv-review-row-subject">{{ commit.subject }}</span>
+        <span class="kv-review-row-meta">
+          <span class="kv-review-row-author">{{ commit.author.name }}</span>
+          <span class="kv-review-row-meta-sep" aria-hidden="true">·</span>
+          <span class="kv-review-row-date">{{ dateText }}</span>
+          <span class="kv-review-row-meta-sep" aria-hidden="true">·</span>
+          <button
+            v-if="expansion?.actions.capabilities.clipboard"
+            type="button"
+            class="kv-review-row-sha"
+            :title="`Copy full SHA (${sha})`"
+            @click="copySha"
+          >
+            {{ shortSha }}
+          </button>
+          <span v-else class="kv-review-row-sha">{{ shortSha }}</span>
+        </span>
+      </span>
+      <!-- G14 D8 row 2: inline icon actions, right-aligned — revealed on hover/focus-within
+           (below) and always present for the roving-tabindex-focused row. GitLens's own
+           row-action pattern. -->
+      <span class="kv-review-row-actions">
+        <button
+          type="button"
+          class="kv-review-row-action"
+          title="Open all changes"
+          aria-label="Open all changes"
+          @click="openAllChanges"
+        >
+          <span class="codicon codicon-diff-multiple" aria-hidden="true"></span>
+        </button>
+        <button
+          v-if="expansion?.actions.capabilities.clipboard"
+          type="button"
+          class="kv-review-row-action"
+          title="Copy SHA"
+          aria-label="Copy SHA"
+          @click="copySha"
+        >
+          <span class="codicon codicon-copy" aria-hidden="true"></span>
+        </button>
+        <a
+          class="kv-review-row-action"
+          title="Open in graph"
+          aria-label="Open in graph"
+          :href="openInGraphHref"
+          @click.stop
+        >
+          <span class="codicon codicon-git-commit" aria-hidden="true"></span>
+        </a>
+      </span>
     </div>
 
     <div v-if="expanded" class="kv-review-row-body">
@@ -164,6 +244,7 @@ function onSelectFile(index: number): void {
         :list-mode="listMode"
         :filter="filter"
         :show-toolbar="false"
+        review-styled
         :parents="expansion.detail.detail.value.parents"
         :parent-index="expansion.detail.parentIndex.value"
         :store="store"
@@ -214,7 +295,6 @@ function onSelectFile(index: number): void {
   display: flex;
   align-items: center;
   gap: var(--kv-s-2);
-  min-height: var(--kv-control-h);
   padding: var(--kv-s-2) var(--kv-s-3);
   min-width: 0;
   font-family: var(--kv-font-ui);
@@ -226,17 +306,44 @@ function onSelectFile(index: number): void {
   flex-shrink: 0;
 }
 
-.kv-review-row-subject {
+/* G14 D8 row 1: the two-line stack — subject above, muted author/date/sha below. */
+.kv-review-row-lines {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kv-s-1);
   flex: 1;
   min-width: 0;
+}
+
+.kv-review-row-subject {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+.kv-review-row-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--kv-s-1);
+  color: var(--kv-description-fg);
+  font-size: var(--kv-t-xs, 0.85em);
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.kv-review-row-meta-sep {
+  flex-shrink: 0;
+}
+
+.kv-review-row-author,
+.kv-review-row-date {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .kv-review-row-sha {
   font-family: var(--kv-mono-font-family);
-  color: var(--kv-description-fg);
+  color: inherit;
   flex-shrink: 0;
   background: transparent;
   border: none;
@@ -244,12 +351,40 @@ function onSelectFile(index: number): void {
   padding: 0;
 }
 
-.kv-review-row-author,
-.kv-review-row-date {
-  color: var(--kv-description-fg);
-  font-size: 0.9em;
+/* G14 D8 row 2: hidden until the row is hovered/focus-within, or is the roving-tabindex cursor
+ * (`.kv-review-row-header-focused`, set from the `focused` prop) — GitLens's own row-action
+ * pattern, always visible for the keyboard-focused row so the actions are reachable without a
+ * mouse. */
+.kv-review-row-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--kv-s-1);
   flex-shrink: 0;
-  white-space: nowrap;
+  opacity: 0;
+}
+
+.kv-review-row:hover .kv-review-row-actions,
+.kv-review-row:focus-within .kv-review-row-actions,
+.kv-review-row-header-focused .kv-review-row-actions {
+  opacity: 1;
+}
+
+.kv-review-row-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--kv-icon-box);
+  height: var(--kv-icon-box);
+  border: none;
+  border-radius: var(--kv-radius-sm);
+  background: transparent;
+  color: var(--kv-app-fg);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.kv-review-row-action:hover {
+  background-color: var(--kv-row-selected-bg);
 }
 
 .kv-review-row-body {

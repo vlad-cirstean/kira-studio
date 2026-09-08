@@ -351,23 +351,39 @@ func main() {
 	}
 	attachDialogs(app, windowToActOn)
 
-	// G12 D8/F4: brings Kira Studio to the front the moment a pairing request is enqueued —
-	// nothing did this before, so an approval sat invisible until the user already knew to go
-	// looking for it. Lives here, not in internal/gitsock, because it is the only place in the
-	// tree that legitimately imports both gitsock and application (the layering test's own rule).
+	// G12 D8/F4, revised by G14 D4: brings Kira Studio to the front the moment a pairing request is
+	// enqueued, *and* posts a system notification the user can act on without ever finding that
+	// window — window activation alone is routinely demoted to a bouncing Dock icon and is
+	// invisible under a full-screen space or a second display (F6), so it is now the accompaniment
+	// rather than the sole mechanism. Lives here, not in internal/gitsock, because it is the only
+	// place in the tree that legitimately imports both gitsock and application (the layering
+	// test's own rule).
 	var lastPresentedPairingID string
 	unsubscribePairing = gitSock.OnPairingChanged(func(snap gitsock.PairingSnapshot) {
 		if snap.Pending == nil {
+			// The request that was presented resolved (approved/denied/timed out) without a fresh
+			// one taking its place — withdraw its notification so Notification Centre never keeps
+			// a live Approve/Deny button for something already decided.
+			if lastPresentedPairingID != "" {
+				withdrawPairingNotification(notifier, lastPresentedPairingID)
+			}
 			lastPresentedPairingID = "" // the edge latch: a future request is a fresh "just arrived".
 			return
 		}
-		// Only the head of the queue *newly arriving* is worth stealing focus for; a snapshot
+		// Only the head of the queue *newly arriving* is worth presenting again; a snapshot
 		// emitted because the count behind it changed re-presents the same RequestID and is not.
 		if snap.Pending.RequestID == lastPresentedPairingID {
 			return
 		}
+		if lastPresentedPairingID != "" {
+			withdrawPairingNotification(notifier, lastPresentedPairingID)
+		}
 		lastPresentedPairingID = snap.Pending.RequestID
 		req := snap.Pending
+		// Notify first, always — the user who is not looking at Kira Studio needs this to be
+		// what tells them. Then, if a window exists, bring it forward too: a user who *is*
+		// looking at Kira Studio still gets the in-app dialog in front of them.
+		notifyPairingPending(notifier, req)
 		if w := windowToActOn(); w != nil {
 			// Runs on the broker's own goroutine — never block it on the UI thread.
 			application.InvokeAsync(func() {
@@ -375,9 +391,39 @@ func main() {
 				w.Restore()
 				w.Focus()
 			})
+		}
+	})
+
+	// G14 D4: routes a tapped notification action straight onto the broker — the single authority
+	// over a pairing decision (SPEC §3.3) — without any state of our own. A stale action (already
+	// approved/denied/timed out in the window) is a lookup miss the broker itself already answers
+	// with a non-Resolved PairingActionResult; that is not surfaced as an error here, since nothing
+	// about the trust model changes and the broker already logged it. Tapping the notification's
+	// body (not a button) is never an implicit approve — it only brings the window forward, same
+	// as the fallback above, so the in-app dialog can answer it.
+	notifier.OnNotificationResponse(func(result notifications.NotificationResult) {
+		if result.Error != nil {
+			slog.Debug("git pairing: notification response error", "scope", "gitsock", "err", result.Error)
 			return
 		}
-		notifyPairingPending(notifier, req)
+		requestID, _ := result.Response.UserInfo["requestId"].(string)
+		if requestID == "" {
+			return
+		}
+		switch result.Response.ActionIdentifier {
+		case pairingApproveActionID:
+			gitSock.Broker().Approve(requestID)
+		case pairingDenyActionID:
+			gitSock.Broker().Deny(requestID)
+		case notifications.DefaultActionIdentifier:
+			if w := windowToActOn(); w != nil {
+				application.InvokeAsync(func() {
+					w.Show()
+					w.Restore()
+					w.Focus()
+				})
+			}
+		}
 	})
 
 	shell.RegisterEngineStream(app, router)
@@ -504,14 +550,53 @@ func main() {
 	}
 }
 
-// notifyPairingPending is D8's fallback for "no Kira Studio window is open yet" (SPEC §3.3
-// deliberately holds the request rather than spawning one). Two real limits, not bugs: it only
-// works in a packaged, signed .app (notifications.New's darwin impl refuses without a bundle
-// identifier — logged at Debug and otherwise ignored, since a developer running from source has a
-// terminal and a window); and authorization is requested lazily here, on first actual use, never
-// at startup — asking before the app has any reason to notify is exactly what a good macOS app
-// avoids. A denial is terminal for this process and is logged once, via notificationsDenied.
+// G14 D4: the category ID and the two action identifiers OnNotificationResponse switches on above.
+const (
+	pairingCategoryID      = "kira.git.pairing"
+	pairingApproveActionID = "approve"
+	pairingDenyActionID    = "deny"
+)
+
+// pairingNotificationID is the one ID both notifyPairingPending and withdrawPairingNotification
+// address a request's notification by.
+func pairingNotificationID(requestID string) string {
+	return "kira-git-pairing-" + requestID
+}
+
+// notifyPairingPending is D4's system notification for a pairing request — SPEC §3.3 deliberately
+// holds the request rather than spawning one, and this is now the *first* way the user learns
+// about it (F6), not a fallback for "no window". It carries Approve/Deny actions, routed back onto
+// the broker by OnNotificationResponse above. Two real limits, not bugs: it only works in a
+// packaged, signed .app (notifications.New's darwin impl refuses without a bundle identifier —
+// logged at Debug and otherwise ignored, since a developer running from source has a terminal and
+// a window); and authorization is requested lazily here, on first actual use, never at startup —
+// asking before the app has any reason to notify is exactly what a good macOS app avoids. A denial
+// is terminal for this process and is logged once, via notificationsDenied.
 var notificationsDenied bool
+
+// pairingCategoryRegistered: the category is registered once, lazily, the first time a request
+// needs it — never at startup, same rule as authorization above.
+var pairingCategoryRegistered bool
+
+// notifierCallGuard: everywhere else in this file, an unavailable notifications backend degrades
+// softly because the pinned module reports it as an `error` (checked and logged at Debug above and
+// below). Linux is the one exception, confirmed against the pinned module's own source rather than
+// assumed: `RequestNotificationAuthorization` is a plain stub that always returns `(true, nil)`,
+// with no check that a D-Bus session bus is actually reachable, so an unregistered notifier (G12
+// D8's own deliberate choice, restated by D4 above) can panic on a nil D-Bus connection the moment
+// a real send is attempted — not an error this file's own `if err != nil` handling ever sees. That
+// is a real crash observed in this container (no session bus) — a platform this app does not
+// target, but one its own dev loop and CI still run on, and a git pairing request must never be
+// able to take the whole process down. recover() is what makes every notifier call below degrade
+// exactly as softly as its documented-error siblings already do.
+func notifierCallGuard(fn func() error) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("notifications backend panicked: %v", r)
+		}
+	}()
+	return fn()
+}
 
 func notifyPairingPending(notifier *notifications.NotificationService, req *gitsock.PairingRequest) {
 	if notificationsDenied {
@@ -527,11 +612,45 @@ func notifyPairingPending(notifier *notifications.NotificationService, req *gits
 		slog.Info("git pairing: notification authorization denied; pairing requests will not surface a notification for the rest of this session")
 		return
 	}
-	if err := notifier.SendNotification(notifications.NotificationOptions{
-		ID:    "kira-git-pairing-" + req.RequestID,
-		Title: "Kira Studio",
-		Body:  fmt.Sprintf("%s wants to connect", req.Label),
+	if !pairingCategoryRegistered {
+		pairingCategoryRegistered = true
+		if err := notifierCallGuard(func() error {
+			return notifier.RegisterNotificationCategory(notifications.NotificationCategory{
+				ID: pairingCategoryID,
+				Actions: []notifications.NotificationAction{
+					{ID: pairingApproveActionID, Title: "Approve"},
+					{ID: pairingDenyActionID, Title: "Deny", Destructive: true},
+				},
+			})
+		}); err != nil {
+			slog.Debug("git pairing: register notification category", "scope", "gitsock", "err", err)
+		}
+	}
+	if err := notifierCallGuard(func() error {
+		return notifier.SendNotificationWithActions(notifications.NotificationOptions{
+			ID:         pairingNotificationID(req.RequestID),
+			Title:      "Kira Studio",
+			Subtitle:   req.Label,
+			Body:       "wants to connect to your git backend.",
+			CategoryID: pairingCategoryID,
+			Data:       map[string]any{"requestId": req.RequestID},
+			// TimeSensitive, not Critical: this is what breaks through a Focus mode. Critical
+			// additionally overrides Do Not Disturb *and mute*, needs a special Apple
+			// entitlement, and is for alarms — a pairing prompt is not one.
+			InterruptionLevel: notifications.InterruptionLevelTimeSensitive,
+		})
 	}); err != nil {
 		slog.Debug("git pairing: send notification", "scope", "gitsock", "err", err)
+	}
+}
+
+// withdrawPairingNotification removes a request's delivered notification once it has resolved
+// elsewhere (approved/denied in-window, timed out, or superseded by a new head) — so Notification
+// Centre never keeps a live Approve/Deny button for something already decided.
+func withdrawPairingNotification(notifier *notifications.NotificationService, requestID string) {
+	if err := notifierCallGuard(func() error {
+		return notifier.RemoveDeliveredNotification(pairingNotificationID(requestID))
+	}); err != nil {
+		slog.Debug("git pairing: remove delivered notification", "scope", "gitsock", "err", err)
 	}
 }

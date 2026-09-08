@@ -39,8 +39,13 @@ interface Bootstrap {
    *  review view was revealed with no branch pending. */
   readonly target: ReviewTarget | null;
   /** G10 D19: only meaningful when `view === "graph"` — `null` when no palette command was
-   *  pending at this cold resolve. */
-  readonly pendingAction: UiActionKind | null;
+   *  pending at this cold resolve. G14 D10: grew an optional `target`, mirroring `ui.action`'s own
+   *  shape — this is the extension's own cold-boot document, not the wire, so it is a rename
+   *  rather than a contract change. */
+  readonly pendingUiAction: {
+    action: UiActionKind;
+    target?: { repoId: string; sha: string };
+  } | null;
 }
 
 function readBootstrap(): Bootstrap {
@@ -139,6 +144,6 @@ if (bootstrap.view === 'review') {
     viewState,
     host: bootstrap.host,
     view: 'graph',
-    pendingAction: bootstrap.pendingAction,
+    pendingUiAction: bootstrap.pendingUiAction,
   });
 }

@@ -128,6 +128,7 @@ function onToggleReviewed(path: string): void {
         :store="store"
         :actions="actions"
         :review-states="reviewStatesMap"
+        review-styled
         @select-file="onSelectFileIndex"
         @toggle-reviewed="onToggleReviewed"
       />

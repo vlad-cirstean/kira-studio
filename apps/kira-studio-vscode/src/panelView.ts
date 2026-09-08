@@ -38,8 +38,10 @@ export class KiraGraphViewProvider implements vscode.WebviewViewProvider {
    *  the next `resolveWebviewView`'s bootstrap island, the same one-shot arm `reviewView.ts`'s own
    *  `#pendingTarget` established, except cleared once used rather than left sticky: an action
    *  (continue an operation, revert a commit) must not replay on a later hide/reveal the way a
-   *  review's current target correctly does. */
-  #pendingAction: UiActionKind | null = null;
+   *  review's current target correctly does. G14 D10: grew an optional `target`, mirroring
+   *  `ui.action`'s own shape — this is the extension's own cold-boot document, not the wire. */
+  #pendingUiAction: { action: UiActionKind; target?: { repoId: string; sha: string } } | null =
+    null;
 
   constructor(deps: KiraGraphViewProviderDeps) {
     this.#deps = deps;
@@ -56,9 +58,9 @@ export class KiraGraphViewProvider implements vscode.WebviewViewProvider {
       webview: webviewView.webview,
       extensionUri,
       view: 'graph',
-      pendingAction: this.#pendingAction,
+      pendingUiAction: this.#pendingUiAction,
     });
-    this.#pendingAction = null;
+    this.#pendingUiAction = null;
 
     const channel = createWebviewChannel(webviewView.webview);
     const server = createRpcServer(channel, handlers);
@@ -77,14 +79,16 @@ export class KiraGraphViewProvider implements vscode.WebviewViewProvider {
    *
    * Focuses the view either way (so the user sees the effect land), then either emits `ui.action`
    * to an already-live server, or — the view is currently hidden, so `resolveWebviewView` has not
-   * run yet — stashes it as `#pendingAction` for the bootstrap island the next cold resolve seeds.
+   * run yet — stashes it as `#pendingUiAction` for the bootstrap island the next cold resolve
+   * seeds. `target` is G14 D10's addition, forwarded verbatim into both arms — present only for
+   * actions that name a commit ('revealCommit').
    */
-  runUiAction(action: UiActionKind): void {
-    this.#pendingAction = action;
+  runUiAction(action: UiActionKind, target?: { repoId: string; sha: string }): void {
+    this.#pendingUiAction = { action, target };
     void vscode.commands.executeCommand(GRAPH_FOCUS_COMMAND);
     if (this.#server) {
-      this.#server.emit('ui.action', { action });
-      this.#pendingAction = null;
+      this.#server.emit('ui.action', { action, target });
+      this.#pendingUiAction = null;
     }
   }
 
