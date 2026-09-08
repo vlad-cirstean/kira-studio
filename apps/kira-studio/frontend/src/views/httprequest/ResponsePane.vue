@@ -5,7 +5,7 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { patchHttpRequestTabState } from '../../api/tabs';
 import { beautifyJson, beautifyXml } from '../../beautify';
 import CodeMirrorHost from '../../editor/CodeMirrorHost.vue';
-import { findRanges } from '../../editor/findRanges';
+import { DEFAULT_FIND_OPTIONS, type FindOptions, findRanges } from '../../editor/findRanges';
 import type { RangeHighlight } from '../../editor/variableHighlight';
 import { formatBytes } from '../../format';
 import { registerCommand } from '../../shortcuts/commands';
@@ -212,7 +212,13 @@ const rawPaneRef = ref<{
   responseHost: FindBarHost | null;
   getDocs: () => { request: string; response: string };
 } | null>(null);
-const findBarRef = ref<{ query: string; currentGlobal: number } | null>(null);
+// P28 D11: the options object joins the exposed pair — the painted highlight has to use the same three
+// toggles the bar counts and steps through, or the two disagree about what a match even is.
+const findBarRef = ref<{
+  query: string;
+  currentGlobal: number;
+  options: FindOptions;
+} | null>(null);
 
 // D11: one target for the Body pane, two (request wire, response wire) for the Raw pane — the
 // only two panes with a `rangeHighlights` compartment free (F12: the request body's own is taken
@@ -242,13 +248,15 @@ const perTargetHighlighters = computed<((doc: string) => readonly RangeHighlight
   const bar = findBarRef.value;
   const query = bar?.query ?? '';
   const currentGlobal = bar?.currentGlobal ?? -1;
+  const options = bar?.options ?? DEFAULT_FIND_OPTIONS;
   const targets = findTargets.value;
   if (!query) return targets.map(() => () => []);
   let cursor = 0;
   return targets.map((t) => {
     const localCurrent = currentGlobal - cursor;
-    cursor += findRanges(t.doc, query).length;
-    return (doc: string): readonly RangeHighlight[] => findRanges(doc, query, localCurrent);
+    cursor += findRanges(t.doc, query, undefined, options).length;
+    return (doc: string): readonly RangeHighlight[] =>
+      findRanges(doc, query, localCurrent, options);
   });
 });
 const bodyHighlights = computed(() => perTargetHighlighters.value[0]);

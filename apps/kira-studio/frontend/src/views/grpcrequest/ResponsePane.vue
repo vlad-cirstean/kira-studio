@@ -9,7 +9,7 @@ import type { GrpcRequestTabRecord } from '@shared/domain/tabs';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { patchGrpcRequestTabState } from '../../api/tabs';
 import CodeMirrorHost from '../../editor/CodeMirrorHost.vue';
-import { findRanges } from '../../editor/findRanges';
+import { DEFAULT_FIND_OPTIONS, type FindOptions, findRanges } from '../../editor/findRanges';
 import type { RangeHighlight } from '../../editor/variableHighlight';
 import { formatBytes } from '../../format';
 import { registerCommand } from '../../shortcuts/commands';
@@ -202,7 +202,12 @@ function setMessageHost(seq: number, el: unknown): void {
   }
 }
 
-const findBarRef = ref<{ query: string; currentGlobal: number } | null>(null);
+// P28 D11: the options object joins the exposed pair — see the HTTP pane's own note.
+const findBarRef = ref<{
+  query: string;
+  currentGlobal: number;
+  options: FindOptions;
+} | null>(null);
 const findTargets = computed<readonly FindBarTarget[]>(() => {
   if (!findOpen.value || !targetMessage.value) return [];
   const seq = targetMessage.value.seq;
@@ -213,7 +218,8 @@ const messageHighlights = computed<(doc: string) => readonly RangeHighlight[]>((
   const query = bar?.query ?? '';
   if (!query || findTargets.value.length === 0) return () => [];
   const currentGlobal = bar?.currentGlobal ?? -1;
-  return (doc: string) => findRanges(doc, query, currentGlobal);
+  const options = bar?.options ?? DEFAULT_FIND_OPTIONS;
+  return (doc: string) => findRanges(doc, query, currentGlobal, options);
 });
 
 const viewingTime = computed(() => {

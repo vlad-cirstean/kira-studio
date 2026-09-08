@@ -1,4 +1,5 @@
 import { cellText, isNull, type TabularPage, type TextColumnChunk } from '@shared/protocol/page';
+import { compileSearchPattern } from '../../../editor/searchPattern';
 
 // P39 F10: grid/search.ts, documents/search.ts and keyvalue/search.ts declared the same
 // SearchQuery/SearchHandle/CHUNK_ROWS/escapeRegExp and the same rAF-chunked driver with the same
@@ -47,17 +48,13 @@ export function chunkRowsForColumns(columnCount: number): number {
 // realistic use.
 export const MAX_SCAN_MATCHES = 50_000;
 
-function escapeRegExp(text: string): string {
-  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-/** Throws SyntaxError synchronously for an invalid regex, before any scan starts. Only called from
- *  runChunkedScan below; the SyntaxError still surfaces to a toolbar through runSearch → this. */
+/** P28 D11: the compiler itself moved down to editor/searchPattern.ts, so the request/response
+ *  find bar's own case/word/regex toggles mean exactly what these three mean here rather than
+ *  growing a second, subtly different implementation. This wrapper keeps runChunkedScan's call
+ *  site (and its SearchQuery shape) unchanged. Still throws SyntaxError synchronously for an
+ *  invalid regex, before any scan starts. */
 function compilePattern(q: SearchQuery): RegExp {
-  const flags = q.matchCase ? 'g' : 'gi';
-  return q.regex
-    ? new RegExp(q.text, flags)
-    : new RegExp(q.wholeWord ? `\\b${escapeRegExp(q.text)}\\b` : escapeRegExp(q.text), flags);
+  return compileSearchPattern(q.text, q);
 }
 
 /** Walks every match of `pattern` in `text`, calling `emit(start, end)` for each — the zero-width

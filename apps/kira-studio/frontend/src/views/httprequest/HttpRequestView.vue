@@ -35,6 +35,8 @@ import {
 } from '../../api/state/variables';
 import { patchHttpRequestTabState } from '../../api/tabs';
 import VariablesOverviewPanel from '../../api/VariablesOverviewPanel.vue';
+import { DEFAULT_FIND_OPTIONS, type FindOptions, findRanges } from '../../editor/findRanges';
+import type { RangeHighlight } from '../../editor/variableHighlight';
 import { registerCommand } from '../../shortcuts/commands';
 import AppButton from '../../theme/primitives/AppButton.vue';
 import AutocompleteField from '../../theme/primitives/AutocompleteField.vue';
@@ -44,6 +46,10 @@ import PanelSearchBox from '../../theme/primitives/PanelSearchBox.vue';
 import PanelSplitter from '../../theme/primitives/PanelSplitter.vue';
 import SegmentedControl from '../../theme/primitives/SegmentedControl.vue';
 import ViewChrome from '../../theme/primitives/ViewChrome.vue';
+import ResponseFindBar, {
+  type FindBarHost,
+  type FindBarTarget,
+} from '../shared/ResponseFindBar.vue';
 import QueryParamsTable from './QueryParamsTable.vue';
 import RequestBodyPane from './RequestBodyPane.vue';
 import RequestHeadersTable from './RequestHeadersTable.vue';
@@ -67,6 +73,58 @@ const methodToken = computed(() => httpMethodToken(props.tab.state.method));
 function onMethodChange(method: HttpMethod): void {
   patchHttpRequestTabState(props.tab.id, { method });
 }
+
+// P28 D11: the request panel's own half of the find bar. The bar itself is hoisted above the
+// request/response split (template below) and asks which panel it is searching; the response half
+// stays inside ResponsePane, which owns its three documents and their editor hosts. Request scope
+// searches the body editor — the params/headers tables already have their own filter box (P16
+// D13's #toolbar-2 PanelSearchBox), which is a different and better affordance for rows than a
+// match-stepping find is.
+//
+// Component-local, not tab state: a lens over what is on screen, the same rule the response pane's
+// own find bar already follows (P16 D11).
+const requestFindOpen = ref(false);
+const requestBodyRef = ref<{
+  findableDoc: string | null;
+  findHost: FindBarHost | null;
+} | null>(null);
+const requestFindBarRef = ref<{
+  query: string;
+  currentGlobal: number;
+  options: FindOptions;
+} | null>(null);
+
+function toggleRequestFind(): void {
+  requestFindOpen.value = !requestFindOpen.value;
+}
+function closeRequestFind(): void {
+  requestFindOpen.value = false;
+}
+
+/** Empty whenever the body pane is not showing a text editor (params/headers/urlencoded/form-data/
+ *  binary), which is what makes the bar honestly report "0 of 0" there rather than searching a
+ *  document that is not on screen. */
+const requestFindTargets = computed<readonly FindBarTarget[]>(() => {
+  if (!requestFindOpen.value) return [];
+  const doc = requestBodyRef.value?.findableDoc;
+  if (doc === null || doc === undefined) return [];
+  return [{ doc, host: requestBodyRef.value?.findHost ?? null }];
+});
+
+/** Paints exactly the matches the bar counts and steps through. Read synchronously here (not
+ *  inside the returned closure) so this computed's own identity changes when the query, the
+ *  options or the current match does — which is what makes CodeMirrorHost repaint. */
+const requestFindHighlights = computed<((doc: string) => readonly RangeHighlight[]) | undefined>(
+  () => {
+    if (!requestFindOpen.value) return undefined;
+    const bar = requestFindBarRef.value;
+    const query = bar?.query ?? '';
+    if (!query) return undefined;
+    const current = bar?.currentGlobal ?? -1;
+    const options = bar?.options ?? DEFAULT_FIND_OPTIONS;
+    return (doc: string) => findRanges(doc, query, current, options);
+  },
+);
 
 function onUrlInput(value: string): void {
   patchHttpRequestTabState(props.tab.id, { url: value });
@@ -421,6 +479,14 @@ onUnmounted(() => {
           data-testid="http-field-descriptions-toggle"
           @click="toggleFieldDescriptions"
         />
+        <IconButton
+          icon="search"
+          :active="requestFindOpen"
+          aria-label="Find in request"
+          v-tooltip="'Find in the request body'"
+          data-testid="http-request-find-toggle"
+          @click="toggleRequestFind"
+        />
         <div class="overview-anchor">
           <IconButton
             icon="variable-group"
@@ -439,6 +505,15 @@ onUnmounted(() => {
         </div>
         <EnvironmentSelect />
       </template>
+
+      <!-- P28 D11: above the request panel it searches, not floating over it — LAW 03, the same
+           placement rule the response pane's own bar and the data views' SearchToolbar follow. -->
+      <ResponseFindBar
+        v-if="requestFindOpen"
+        ref="requestFindBarRef"
+        :targets="requestFindTargets"
+        @close="closeRequestFind"
+      />
 
       <div class="request-response-split">
         <div class="request-pane" :style="{ flex: `0 0 ${requestPaneHeight}px` }" data-testid="http-request-pane">
@@ -464,8 +539,10 @@ onUnmounted(() => {
           />
           <RequestBodyPane
             v-else
+            ref="requestBodyRef"
             :tab="tab"
             :variables="variables"
+            :find-highlights="requestFindHighlights"
             :filter-query="fieldFilterQuery"
             :show-descriptions="tab.state.fieldDescriptions"
           />
