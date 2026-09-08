@@ -95,7 +95,11 @@ const pendingPatch = computed<SettingsPatch>(() => {
 
 const isDirty = computed(() => Object.keys(pendingPatch.value).length > 0);
 
-const sections = ['Appearance', 'Data', 'Cache', 'Connected editors', 'Advanced'] as const;
+// G12 D9: 'Connected editors' became pairing-only (every row on it bypasses draft/Save, "a
+// revoke must take effect immediately") and the two server-owned git settings that used to share
+// its template branch moved to their own 'Git' section, so no tab mixes instant actions with
+// settings that apply on Save.
+const sections = ['Appearance', 'Data', 'Cache', 'Connected editors', 'Git', 'Advanced'] as const;
 type Section = (typeof sections)[number];
 const activeSection = ref<Section>('Appearance');
 
@@ -671,7 +675,9 @@ async function onSave(): Promise<void> {
                 />
               </li>
             </ul>
+          </template>
 
+          <template v-else-if="activeSection === 'Git'">
             <h3 class="section-subhead">Git remote operations</h3>
             <p class="muted-note">
               Server-owned: applies to every connected editor immediately, since two windows
