@@ -19,6 +19,7 @@
  * W13's Playwright pass rather than here.
  */
 import type { DecorationRef } from '@kira/git-core';
+import { laneClass } from '../graph/palette.ts';
 import { BADGE_ICONS } from '../icons/index.ts';
 
 /** §6.2: "a row with more than three badges collapses the overflow into a +N badge". */
@@ -148,9 +149,19 @@ export function planBadges(decorations: readonly DecorationRef[]): BadgePlan {
   return { visible, overflow };
 }
 
-function buildBadgeElement(spec: BadgeSpec): HTMLSpanElement {
+/** G21 D4: `laneColor` is the row's own lane colour index (`LayoutStore.colorOf`), threaded in
+ *  from `columns.ts`'s `LaneColorContext` — `undefined` for a row whose layout has not arrived
+ *  yet (`graphColumn.ts`'s own already-established "no layout, no colour" case). Appends the
+ *  same `.kv-lane-N` class `rowSvg.ts`'s graph nodes/edges already use, alongside — never instead
+ *  of — `spec.colorClass`: the badge's shape/icon/label still carry the *kind* signal, the lane
+ *  class only tints border+icon (`CommitGrid.vue`'s own badge CSS), tying the badge back to the
+ *  branch it decorates without becoming a second, conflicting source of colour meaning. */
+function buildBadgeElement(spec: BadgeSpec, laneColor: number | undefined): HTMLSpanElement {
   const badge = document.createElement('span');
-  badge.className = `kv-badge kv-badge-${spec.shape} ${spec.colorClass}${spec.dashed ? ' kv-badge-dashed' : ''}`;
+  const classes = ['kv-badge', `kv-badge-${spec.shape}`, spec.colorClass];
+  if (spec.dashed) classes.push('kv-badge-dashed');
+  if (laneColor !== undefined) classes.push('kv-badge-lane-tinted', laneClass(laneColor));
+  badge.className = classes.join(' ');
   // The full name always lives in `title` (a mouse-hover affordance) independent of whether the
   // ~190px CSS truncation (kv-badge-label) actually clips this particular badge's text.
   badge.title = spec.text;
@@ -202,16 +213,21 @@ function buildOverflowBadge(overflow: OverflowSpec): HTMLSpanElement {
  * Builds the inline badge strip for one row's decorations, or `null` for a row with none — the
  * caller (`columns.ts`'s `messageFormatter`) skips the wrapper element entirely in that case
  * rather than inserting an empty, non-contributing `<span>` into every one of the tens of
- * thousands of ordinary rows a full history walk can produce.
+ * thousands of ordinary rows a full history walk can produce. `laneColor` (G21 D4) is this row's
+ * own lane colour index, or `undefined` for a row with no layout yet — see `buildBadgeElement`'s
+ * own doc comment for what it paints.
  */
-export function buildRefBadges(decorations: readonly DecorationRef[]): HTMLSpanElement | null {
+export function buildRefBadges(
+  decorations: readonly DecorationRef[],
+  laneColor: number | undefined,
+): HTMLSpanElement | null {
   if (decorations.length === 0) return null;
 
   const plan = planBadges(decorations);
   const container = document.createElement('span');
   container.className = 'kv-ref-badges';
 
-  for (const spec of plan.visible) container.appendChild(buildBadgeElement(spec));
+  for (const spec of plan.visible) container.appendChild(buildBadgeElement(spec, laneColor));
   if (plan.overflow !== null) container.appendChild(buildOverflowBadge(plan.overflow));
 
   return container;

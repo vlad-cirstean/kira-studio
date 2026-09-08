@@ -197,6 +197,14 @@ function currentColumns(): Column<CommitRecord>[] {
     graphFormatter,
     { enabled: () => props.clipboardEnabled, onCopy: (fullSha) => emit('copySha', fullSha) },
     { pattern: searchPattern },
+    {
+      // G21 D4: the row-bold/HEAD-ring and merge-in edge colouring already read this same
+      // LayoutStore for this same row — a row past its own `rowCount` (layout not arrived yet)
+      // gets no lane class, matching `graphColumn.ts`'s own already-established "no layout, no
+      // colour" case, never a guessed one.
+      colorOf: (row) =>
+        row < props.graphView.layout.rowCount ? props.graphView.layout.colorOf(row) : undefined,
+    },
   );
 }
 
@@ -1064,6 +1072,33 @@ defineExpose({ scrollToRow, focusGrid });
   border-radius: 50%;
   background-color: var(--kv-focus-border);
 }
+
+/* G21 D4: ties a badge back to the row's own lane, on the border and icon only — never the label
+   or the background, both of which stay `--kv-badge-*` (D4's own rationale: `--kv-graph-lane-N`
+   is tuned for 1.6px SVG strokes on a panel background, not for text contrast, and would fail
+   legibility as a fill/label colour on several lanes in several themes). This is additive to,
+   never a replacement for, `.kv-badge-local`/`-remote`/`-tag`/`-stash` above — the kind colour and
+   shape/glyph distinction (§6.1's "no colour-only meaning") still carry the badge's own meaning
+   regardless of whether a lane colour is known. Eight rules, matching `vscode-tokens.css`'s own
+   generated `.kv-lane-0`.`.kv-lane-7` range (`DEFAULT_PALETTE_SIZE`) — deliberately hand-written
+   here rather than folded into that generated block, since these read `color`/`border-color` for
+   an HTML badge, not the `fill`/`stroke` an SVG graph node needs. */
+.kv-badge-lane-tinted.kv-lane-0 { border-color: var(--kv-graph-lane-0); }
+.kv-badge-lane-tinted.kv-lane-0 .kv-badge-icon { color: var(--kv-graph-lane-0); }
+.kv-badge-lane-tinted.kv-lane-1 { border-color: var(--kv-graph-lane-1); }
+.kv-badge-lane-tinted.kv-lane-1 .kv-badge-icon { color: var(--kv-graph-lane-1); }
+.kv-badge-lane-tinted.kv-lane-2 { border-color: var(--kv-graph-lane-2); }
+.kv-badge-lane-tinted.kv-lane-2 .kv-badge-icon { color: var(--kv-graph-lane-2); }
+.kv-badge-lane-tinted.kv-lane-3 { border-color: var(--kv-graph-lane-3); }
+.kv-badge-lane-tinted.kv-lane-3 .kv-badge-icon { color: var(--kv-graph-lane-3); }
+.kv-badge-lane-tinted.kv-lane-4 { border-color: var(--kv-graph-lane-4); }
+.kv-badge-lane-tinted.kv-lane-4 .kv-badge-icon { color: var(--kv-graph-lane-4); }
+.kv-badge-lane-tinted.kv-lane-5 { border-color: var(--kv-graph-lane-5); }
+.kv-badge-lane-tinted.kv-lane-5 .kv-badge-icon { color: var(--kv-graph-lane-5); }
+.kv-badge-lane-tinted.kv-lane-6 { border-color: var(--kv-graph-lane-6); }
+.kv-badge-lane-tinted.kv-lane-6 .kv-badge-icon { color: var(--kv-graph-lane-6); }
+.kv-badge-lane-tinted.kv-lane-7 { border-color: var(--kv-graph-lane-7); }
+.kv-badge-lane-tinted.kv-lane-7 .kv-badge-icon { color: var(--kv-graph-lane-7); }
 
 /* G19 D2: F2 found this cell had no overflow safety net at all — unlike
    .kv-message-subject/.kv-cell-author (both above), an absolute-format date overflowing the

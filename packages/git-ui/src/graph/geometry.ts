@@ -13,6 +13,14 @@ export const GEOMETRY = {
   gutterPad: 6,
   nodeRadius: 3.4,
   mergeRadius: 4.2,
+  /** G21 D1: the HEAD ring's own radius — `mergeRadius` used to double as this, which made a
+   *  merge-at-HEAD's HEAD ring paint exactly over its merge ring (same centre, same radius,
+   *  HEAD ring appended last) and erase the merge indicator entirely. `5.6` clears the merge
+   *  ring by a full `strokeWidth` and clears the ordinary dot (`nodeRadius` 3.4) by
+   *  `strokeWidth / 2`, while staying inside the lane's own envelope: the visible outer edge is
+   *  `headRingRadius + strokeWidth / 2` = `5.6 + 0.8` = `6.4`, `<=` half the 13px lane width
+   *  (6.5). */
+  headRingRadius: 5.6,
   strokeWidth: 1.6,
   maxLanes: 12,
   overdraw: 0.5,

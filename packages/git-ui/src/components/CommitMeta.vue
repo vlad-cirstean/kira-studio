@@ -77,7 +77,10 @@ function renderDecoration(): void {
   const container = decorationEl.value;
   if (!container) return;
   container.replaceChildren();
-  const badges = buildRefBadges(props.detail?.decoration ?? []);
+  // G21 D4: no lane colour here — this panel has no `LayoutStore` row to read one from (its own
+  // commit need not even be within the loaded graph window), so its badges keep their kind-only
+  // colouring, same as a row whose layout has not arrived yet.
+  const badges = buildRefBadges(props.detail?.decoration ?? [], undefined);
   if (badges) container.appendChild(badges);
 }
 

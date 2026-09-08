@@ -1,5 +1,8 @@
 import { describe, expect, test } from 'bun:test';
-import { isHeadDecoration, planNode, type RowSlice } from './rowSvg.ts';
+import { EDGE_KIND_MERGE_IN, EDGE_KIND_STRAIGHT } from '@kira/git-core';
+import { GEOMETRY } from './geometry.ts';
+import type { EdgeSegment } from './layoutStore.ts';
+import { edgeCommand, isHeadDecoration, laneX, planNode, type RowSlice } from './rowSvg.ts';
 
 function baseSlice(overrides: Partial<RowSlice> = {}): RowSlice {
   return {
@@ -65,5 +68,69 @@ describe('planNode — G19 D1 HEAD ring', () => {
 
   test('a row with no layout yet (lane undefined) draws nothing, HEAD or not', () => {
     expect(planNode(baseSlice({ lane: undefined, isHead: true }), 22)).toHaveLength(0);
+  });
+
+  // G21 D1: F1's own remaining gap — a merge commit at HEAD used to have its HEAD ring painted
+  // at the identical centre and radius as its merge ring (both were `GEOMETRY.mergeRadius`),
+  // erasing the merge indicator. The HEAD ring now uses its own, strictly larger radius.
+  test('a merge commit that is HEAD draws three shapes at three distinct radii', () => {
+    const shapes = planNode(baseSlice({ nodeKind: 'merge', isHead: true }), 22);
+    expect(shapes).toHaveLength(3);
+    const radii = shapes.map((s) => s.r);
+    expect(new Set(radii).size).toBe(3);
+    const ring = shapes.find((s) => s.isHeadRing);
+    const mergeRing = shapes.find((s) => !s.isHeadRing && !s.filled);
+    expect(ring?.r).toBe(GEOMETRY.headRingRadius);
+    expect(mergeRing?.r).toBe(GEOMETRY.mergeRadius);
+    // The real assertion: the head ring must be strictly larger, so it clears the merge ring
+    // instead of painting over it.
+    expect(ring?.r).toBeGreaterThan(mergeRing?.r ?? Number.POSITIVE_INFINITY);
+  });
+});
+
+describe('edgeCommand — G21 D3c EDGE_KIND_MERGE_IN', () => {
+  const rowHeight = 22;
+
+  function mergeInSegment(overrides: Partial<EdgeSegment> = {}): EdgeSegment {
+    return {
+      fromRow: 3,
+      toRow: 5,
+      fromLane: 1,
+      toLane: 0,
+      color: 0,
+      kind: EDGE_KIND_MERGE_IN,
+      ...overrides,
+    };
+  }
+
+  test('its own row (fromRow): a vertical run in fromLane, centre to bottom — no bend yet', () => {
+    const d = edgeCommand(mergeInSegment(), 3, rowHeight);
+    // A vertical run ("V", no curve "C") starting at the row's centre, in fromLane (1) — not
+    // toLane (0), unlike the ordinary straight/branch-out case.
+    expect(d).not.toContain('C');
+    expect(d.startsWith(`M${laneX(1)},${rowHeight / 2}`)).toBe(true);
+  });
+
+  test('a pass-through row: a full-height vertical run, still in fromLane', () => {
+    const d = edgeCommand(mergeInSegment(), 4, rowHeight);
+    expect(d).not.toContain('C');
+    expect(d.startsWith(`M${laneX(1)},${-GEOMETRY.overdraw}`)).toBe(true);
+  });
+
+  test('its target row (toRow): the bend — a curve from fromLane into toLane, top to centre', () => {
+    const d = edgeCommand(mergeInSegment(), 5, rowHeight);
+    expect(d).toContain('C');
+    // Starts at the top of the row in fromLane (mirroring the ordinary case's own start-at-
+    // centre-in-fromLane) and ends at the row's own centre in toLane — the node it converges
+    // into — not the bottom.
+    expect(d.startsWith(`M${laneX(1)},${-GEOMETRY.overdraw}`)).toBe(true);
+    expect(d.endsWith(`${laneX(0)},${rowHeight / 2}`)).toBe(true);
+  });
+
+  test('a straight edge is unaffected by the merge-in branch — unchanged shape', () => {
+    const segment = mergeInSegment({ kind: EDGE_KIND_STRAIGHT, fromLane: 0, toLane: 0 });
+    const d = edgeCommand(segment, 3, rowHeight);
+    expect(d).not.toContain('C'); // same lane, no bend needed either way
+    expect(d.startsWith(`M${laneX(0)},${rowHeight / 2}`)).toBe(true);
   });
 });

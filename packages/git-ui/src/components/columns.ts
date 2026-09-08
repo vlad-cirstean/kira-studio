@@ -60,6 +60,18 @@ export interface MessageSearchContext {
 
 const NO_SEARCH_CONTEXT: MessageSearchContext = { pattern: () => undefined };
 
+/** G21 D4: the message column's own accessor onto the row's lane colour — `columns.ts` itself
+ *  has no `LayoutStore` (this module's own doc comment already explains why the graph column's
+ *  formatter is supplied by the caller for the same reason); mirrors `MessageSearchContext`'s own
+ *  shape exactly, re-read on every render pass rather than captured once. `undefined` for a row
+ *  whose layout has not arrived yet (`graphColumn.ts`'s own already-established case) — the badge
+ *  then renders with no lane tint, never a guessed colour. */
+export interface LaneColorContext {
+  readonly colorOf: (row: number) => number | undefined;
+}
+
+const NO_LANE_COLOR_CONTEXT: LaneColorContext = { colorOf: () => undefined };
+
 /** The message cell is a flex row (`CommitGrid.vue`'s `<style>`): `refBadges.ts`'s badge strip
  *  (only when the row has decorations — most rows do not, and get no wrapper at all) followed by
  *  the subject, which alone gets `text-overflow: ellipsis` — a CSS rule on `.kv-message-subject`,
@@ -67,12 +79,15 @@ const NO_SEARCH_CONTEXT: MessageSearchContext = { pattern: () => undefined };
  *  split by `searchHighlight.ts`'s `splitHighlights` into alternating plain text nodes and
  *  `<span class="kv-search-hit">` elements — `enableHtmlRendering: false` (§5.5) and this building
  *  every node with `textContent` mean no escaping code is introduced and none is needed. */
-function messageFormatter(ctx: MessageSearchContext): Formatter<CommitRecord> {
-  return (_row, _cell, _value, _columnDef, dataContext) => {
+function messageFormatter(
+  ctx: MessageSearchContext,
+  laneCtx: LaneColorContext,
+): Formatter<CommitRecord> {
+  return (row, _cell, _value, _columnDef, dataContext) => {
     const cell = document.createElement('span');
     cell.className = 'kv-cell-message';
 
-    const badges = buildRefBadges(dataContext.decoration);
+    const badges = buildRefBadges(dataContext.decoration, laneCtx.colorOf(row));
     if (badges !== null) cell.appendChild(badges);
 
     const subject = document.createElement('span');
@@ -186,15 +201,18 @@ export interface ColumnWidthInputs extends ColumnWidths {
  *  `CommitGrid.vue`'s own drag handles (§6.1: `showColumnHeader: false` costs SlickGrid's built-in
  *  header resize handles, so this repo keeps its own), which write back through
  *  `grid.setColumns(...)` — this function, called again with the new widths, is the single source
- *  of the column model either way. `searchCtx` (W13) is optional and defaults to "no highlight" so
- *  every pre-existing call site (including `tests/unit/ui/columns.test.ts`'s four) keeps working
- *  unchanged — only `CommitGrid.vue` passes a real one. */
+ *  of the column model either way. `searchCtx` (W13) and `laneCtx` (G21 D4) are both optional and
+ *  default to "no highlight"/"no lane colour" so every pre-existing call site (including
+ *  `tests/unit/ui/columns.test.ts`'s four) keeps working unchanged — only `CommitGrid.vue` passes
+ *  real ones. `laneCtx` is a new optional *last* parameter, added without disturbing any existing
+ *  positional argument. */
 export function buildColumns(
   widths: ColumnWidthInputs,
   dateCtx: DateFormatterContext,
   graphFormatter: Formatter<CommitRecord>,
   shaCopyCtx: ShaCopyContext,
   searchCtx: MessageSearchContext = NO_SEARCH_CONTEXT,
+  laneCtx: LaneColorContext = NO_LANE_COLOR_CONTEXT,
 ): Column<CommitRecord>[] {
   return [
     {
@@ -218,7 +236,7 @@ export function buildColumns(
       sortable: false,
       focusable: false,
       selectable: false,
-      formatter: messageFormatter(searchCtx),
+      formatter: messageFormatter(searchCtx, laneCtx),
     },
     {
       id: AUTHOR_COLUMN_ID,
