@@ -88,6 +88,9 @@ tasks:
     summary: Packages the application into a `.app` bundle
     deps:
       - task: build
+      # G10 D8: packaging is the one path that genuinely needs the extension bundle (F8) — unlike
+      # `bun run build`/`scripts/setup.sh`, which G3 D20 deliberately left it out of.
+      - task: common:build:vsix
     cmds:
       - task: create:app:bundle
 
@@ -95,6 +98,7 @@ tasks:
     summary: Packages darwin universal binary (arm64 + amd64)
     deps:
       - task: build:universal
+      - task: common:build:vsix
     cmds:
       - task: create:app:bundle
 
@@ -159,6 +163,18 @@ tasks:
           echo "create:app:bundle: no PlistBuddy — this is a broken macOS environment (build/package already precondition on Darwin), not a supported one" >&2
           exit 1
         fi
+      # G10 D8: copied BEFORE codesign:adhoc so the ad-hoc signature covers it too (N2's own
+      # --deep --strict verify would otherwise fail). This can't be missing in practice — both
+      # tasks that reach create:app:bundle (package/package:universal) depend on common:build:vsix
+      # — so a missing file here means a future task forgot that dep; fail loudly rather than ship
+      # a .dmg whose Install button reports "not bundled".
+      - |
+        VSIX="{{.BIN_DIR}}/kira-version.vsix"
+        if [ ! -f "$VSIX" ]; then
+          echo "create:app:bundle: $VSIX not found — package/package:universal must depend on common:build:vsix" >&2
+          exit 1
+        fi
+        cp "$VSIX" "{{.BIN_DIR}}/{{.APP_NAME}}.app/Contents/Resources/kira-version.vsix"
       - task: codesign:adhoc
 
   codesign:adhoc:
@@ -180,6 +196,15 @@ tasks:
         fi
       - cp "{{.BIN_DIR}}/{{.APP_NAME}}" "{{.BIN_DIR}}/{{.APP_NAME}}.dev.app/Contents/MacOS"
       - cp "build/darwin/Info.dev.plist" "{{.BIN_DIR}}/{{.APP_NAME}}.dev.app/Contents/Info.plist"
+      # G10 D8/F13: conditional, not a dependency — `darwin:run` does not (and should not) build
+      # the extension itself; this is what makes the Install button exercisable from a dev build
+      # without cutting a real .dmg, whenever a .vsix happens to already exist in bin/ (e.g. from a
+      # prior `bun run package:vscode`/`wails3 task common:build:vsix`).
+      - |
+        VSIX="{{.BIN_DIR}}/kira-version.vsix"
+        if [ -f "$VSIX" ]; then
+          cp "$VSIX" "{{.BIN_DIR}}/{{.APP_NAME}}.dev.app/Contents/Resources/kira-version.vsix"
+        fi
       - codesign --force --deep --sign - "{{.BIN_DIR}}/{{.APP_NAME}}.dev.app"
       - '"{{.BIN_DIR}}/{{.APP_NAME}}.dev.app/Contents/MacOS/{{.APP_NAME}}"'
 

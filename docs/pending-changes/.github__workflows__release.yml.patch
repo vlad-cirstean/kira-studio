@@ -1,0 +1,28 @@
+# Why: the push credential in this environment is an OAuth App token without the `workflow`
+# scope, so GitHub rejects any push that includes a commit touching .github/workflows/* — this
+# hunk was extracted out of commit a506e01a ("build(package): carry the .vsix inside the app
+# bundle") for exactly that reason. It's a real, wanted change (G10 D21): keeps the extension
+# manifest's version in lockstep with build/config.yml's on a tagged release, the way S9 in
+# scripts/verify-packaging.sh already asserts they agree.
+#
+# Apply from the repo root (e.g. `git apply docs/pending-changes/.github__workflows__release.yml.patch`),
+# then delete this file, and commit + push both together yourself.
+
+diff --git a/.github/workflows/release.yml b/.github/workflows/release.yml
+index 5787fba7..38869a95 100644
+--- a/.github/workflows/release.yml
++++ b/.github/workflows/release.yml
+@@ -39,6 +39,14 @@ jobs:
+           test "$(sed -n 's/^  version: *"\([^"]*\)".*/\1/p' "$CONFIG" | head -1)" = "$TAG"
+           echo "app version set to $TAG (from tag $GITHUB_REF_NAME)"
+ 
++          # G10 D21: the extension manifest's own version, kept in lockstep with config.yml's — S9
++          # asserts the two agree. Anchored to the top-level "version" key at two-space indent, the
++          # same idiom as the config.yml rewrite above.
++          VSCODE_PKG=apps/kira-studio-vscode/package.json
++          perl -i -pe 's/^(  "version": )"[^"]*"/$1"'"$TAG"'"/' "$VSCODE_PKG"
++          test "$(sed -n 's/^  "version": *"\([^"]*\)".*/\1/p' "$VSCODE_PKG" | head -1)" = "$TAG"
++          echo "extension version set to $TAG (from tag $GITHUB_REF_NAME)"
++
+       - name: Generate Wails bindings (P20 D7 — routed through scripts/setup.sh)
+         run: sh scripts/setup.sh

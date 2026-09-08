@@ -103,6 +103,22 @@ else
   fail "main.go missing" "$MAIN_GO not found — this check needs updating along with it"
 fi
 
+# --- S9: the extension manifest's version agrees with build/config.yml -------------------------
+# G10 D21: both are "0.0.0" today, so this passes immediately; release.yml's version step writes
+# both files from the same tag, so they stay in agreement after a real release. Static (not an
+# artifact check) so it runs on Linux and in every CI job, not only when a bundle exists.
+VSCODE_PKG="apps/kira-studio-vscode/package.json"
+CONFIG_YML="apps/kira-studio/build/config.yml"
+if [ -f "$VSCODE_PKG" ] && [ -f "$CONFIG_YML" ]; then
+  EXT_VERSION="$(sed -n 's/^  "version": *"\([^"]*\)".*/\1/p' "$VSCODE_PKG" | head -1)"
+  APP_VERSION="$(sed -n 's/^  version: *"\([^"]*\)".*/\1/p' "$CONFIG_YML" | head -1)"
+  if [ "$EXT_VERSION" != "$APP_VERSION" ]; then
+    fail "extension/app version mismatch" "$VSCODE_PKG's version ('$EXT_VERSION') != $CONFIG_YML's info.version ('$APP_VERSION')"
+  fi
+else
+  fail "version files missing" "$VSCODE_PKG or $CONFIG_YML not found — this check needs updating along with it"
+fi
+
 # --- S5: the packaging script cannot publish ---------------------------------------------------
 # A POSIX `sed` read, not `node -p require(...)`: this repository does not declare `node` as a
 # dependency anywhere (P58f deleted the vendored runtime), so a machine that satisfies every
@@ -121,7 +137,7 @@ DMG="apps/kira-studio/bin/Kira Studio.dmg"
 
 # --- Artifact checks (only if the bundle exists) -----------------------------------------------
 if [ ! -d "$APP" ]; then
-  note "skipped A1/A3/A5/N2 — \"$APP\" not present (run 'bun run package' first)"
+  note "skipped A1/A3/A5/A6/N2 — \"$APP\" not present (run 'bun run package' first)"
 else
   # A1: ad-hoc signature (P58f: back to the single-target check — no vendored node binary, no
   # nested executable, left to sign independently before the whole bundle is deep-signed).
@@ -162,6 +178,21 @@ else
     fi
   else
     note "skipped A5 — PlistBuddy not available on this runner"
+  fi
+
+  # A6: the bundled .vsix (G10 D8/D21) — present, non-empty, and a real zip archive ("PK" is a
+  # zip's own magic number), so a truncated or missing copy is caught here rather than the Install
+  # button silently reporting "not bundled" or failing to install a corrupt file.
+  VSIX="$APP/Contents/Resources/kira-version.vsix"
+  if [ ! -f "$VSIX" ]; then
+    fail "vsix not bundled" "\"$VSIX\" not present — create:app:bundle must copy it before codesign:adhoc"
+  else
+    VSIX_SIZE="$(wc -c < "$VSIX" | tr -d ' ')"
+    if [ "$VSIX_SIZE" -eq 0 ]; then
+      fail "vsix empty" "\"$VSIX\" is empty"
+    elif [ "$(dd if="$VSIX" bs=1 count=2 2>/dev/null)" != "PK" ]; then
+      fail "vsix not a zip" "\"$VSIX\" does not start with the zip \"PK\" signature"
+    fi
   fi
 
   # --- N2: the whole bundle verifies deep-signed -------------------------------------------------

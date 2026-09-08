@@ -49,6 +49,9 @@ Expected artifacts (nothing lands in `dist/` or `out/` any more):
 - `apps/kira-studio/bin/Kira Studio.app` — the packaged, ad-hoc-signed bundle the image is built
   from. Still produced, and still what you run locally; it is simply no longer what ships.
 - `apps/kira-studio/bin/Kira Studio` — the bare Go binary the bundle is assembled around.
+- `apps/kira-studio/bin/kira-version.vsix` — the packaged VS Code extension (G10 D7), built by
+  `wails3 task common:build:vsix` (`bun run scripts/package-vscode.ts` under the hood) and copied
+  into the `.app`/`.dmg` below rather than shipped separately.
 
 No `.zip` is produced anywhere any more — the release workflow uploads the `.dmg` (§7).
 
@@ -61,6 +64,9 @@ apps/kira-studio/bin/Kira Studio.app/
                                      CFBundleIdentifier com.kirathecat.kira-studio
     Resources/
       icons.icns                     the only icon the bundle carries; no Assets.car ships (§6)
+      kira-version.vsix              the packaged VS Code extension (G10) — copied here BEFORE
+                                     codesign:adhoc runs, so the ad-hoc signature covers it too;
+                                     located at runtime via os.Executable() + "../Resources"
     MacOS/
       Kira Studio                    the compiled Go binary — the literal filename, space included,
                                      must equal CFBundleExecutable or the bundle neither launches
@@ -70,6 +76,16 @@ apps/kira-studio/bin/Kira Studio.app/
 There is no `runtime/` subtree any more (P58f M10) — the compiled Go binary is the whole app.
 `create:app:bundle` used to assert `runtime/{node,engine}` existed and copy that tree in before
 signing; both the guard and the copy step are gone, since there is nothing left to vendor.
+
+**Installing the extension (G10).** Settings → *Connected editors* has an **Install VS Code
+Integration** button (`internal/gitvsix`): it locates the bundled `.vsix` next to the running
+executable, probes for a `code` CLI (`PATH`, then `/usr/local/bin`, then `/opt/homebrew/bin`, then
+the VS Code `.app` bundle's own `bin/code`, then `~/Applications/...` — mirroring
+`gitclient/discovery.go`'s own probe-order shape, since a Finder-launched app's `PATH` never
+includes `/usr/local/bin`), and either runs `code --install-extension <path> --force` or reveals
+the file in Finder as a fallback. `darwin:run`'s `.dev.app` also gets a conditional copy of the
+`.vsix` (when one already exists in `bin/`), so the button is exercisable from a dev build without
+cutting a real `.dmg`.
 
 **Dev loop:** `bun run dev` (`cd apps/kira-studio && wails3 task dev`) launches a real native window
 with hot reload — the Wails task's own dev-mode config drives the frontend build with a blocking
@@ -247,6 +263,14 @@ human to launch the packaged app and use it.
     volume icon. — **partial**: mount, contents, both icons and `Signature=adhoc` on the image were
     verified from the shell; the drag-onto-Applications gesture and how the window *looks* when
     Finder opens it — background, icon placement — still want a human's eyes.
+12. (G10) Settings → *Connected editors* → **Install VS Code Integration**. With `code` on `PATH`:
+    click it, expect `installed` and VS Code's own "Completed installing extension" under
+    **Kira Version**, publisher `vladcirstean`. Rename `/usr/local/bin/code` aside and relaunch:
+    the button now reads **Reveal Extension in Finder**, clicking it opens Finder with
+    `kira-version.vsix` selected, and the probed-paths line names all five candidates. Restore.
+    With the extension installed from the `.vsix` (not `--extensionDevelopmentPath`), open a git
+    repository and confirm the Git Graph panel renders — the one scenario D6's CJS bundle switch
+    exists to make safe. — *not yet run*
 
 ## 5. Off-macOS: what this environment could actually check
 
@@ -262,10 +286,13 @@ frameworks. On Linux that leaves two doors, and neither was opened here:
   macOS.
 
 Consequently `scripts/verify-packaging.sh` degrades honestly off macOS: with no bundle it prints one
-"skipped A1/A3/A5/N2" note and one "skipped A4/N3" note and passes on the static checks alone, and
-even with a bundle it would skip A1/A3/A5/N2 for want of `codesign`/`PlistBuddy`. **A green
-`verify:packaging` on Linux proves only the static checks (S1/S2/S5/S6/S7/S8), not that any bundle
-is correct.**
+"skipped A1/A3/A5/A6/N2" note and one "skipped A4/N3" note and passes on the static checks alone,
+and even with a bundle it would skip A1/A3/A5/A6/N2 for want of `codesign`/`PlistBuddy`. **A green
+`verify:packaging` on Linux proves only the static checks (S1/S2/S5/S6/S7/S8/S9), not that any
+bundle is correct.** S9 (G10 — the extension manifest's `version` matches `build/config.yml`'s
+`info.version`) is a pure string comparison over two committed files, so it runs — and means
+something — even without a bundle; A6 (the bundled `.vsix` exists, is non-empty and `PK`-prefixed)
+needs the real `.app` and so shares A1/A3/A5/N2's fate here.
 
 What *is* fully verifiable off macOS: everything that feeds the bundle rather than being the bundle —
 the renderer build, typecheck, lint, the Go unit tests, and the static half of `verify:packaging`.
