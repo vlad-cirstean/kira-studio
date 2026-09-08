@@ -55,6 +55,7 @@ interface ServerAppInitResult {
 // G1 §5.4 removed this command saying it "returns in G3" (D13/D17) — it does, once there is a
 // graph view to focus.
 const FOCUS_GRAPH_COMMAND = 'kiraVersion.focusGraph';
+const SHOW_CONNECTION_STATUS_COMMAND = 'kiraVersion.showConnectionStatus';
 const GRAPH_VIEW_ID = 'kiraVersion.graph';
 const REVIEW_VIEW_ID = 'kiraVersion.review';
 const SETTING_KEYS = Object.keys(SETTINGS) as readonly SettingKey[];
@@ -72,18 +73,66 @@ function readRawSettings(config: vscode.WorkspaceConfiguration): Record<string, 
   return raw;
 }
 
-// G10 D16: an entry point with connection state, deliberately no branch/ahead-behind — the
-// extension host holds no head state (repo.changed carries only {repoId, kind}), so rendering that
-// would mean a second, host-side copy of state the webview already owns and renders itself.
-function updateStatusBar(item: vscode.StatusBarItem, state: ConnectionState): void {
+// G12 D10: an entry point genuinely visible in every state, not only the one state (connected)
+// that needs no indicator — F10's fix. `active` is the in-flight-request signal
+// (`ConnectionManager.onActivityChange`), meaningful only while `connected`. `item.hide()`
+// survives for exactly one case: the user turned the item off themselves.
+function updateStatusBar(
+  item: vscode.StatusBarItem,
+  state: ConnectionState,
+  active: boolean,
+): void {
   const enabled = vscode.workspace.getConfiguration().get<boolean>(STATUS_BAR_SETTING, true);
-  if (!enabled || state.kind !== 'connected') {
+  if (!enabled) {
     item.hide();
     return;
   }
-  const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-  item.text = '$(git-branch) Kira Version';
-  item.tooltip = root ? `Kira Version: connected (${root})` : 'Kira Version: connected';
+  item.backgroundColor = undefined;
+  switch (state.kind) {
+    case 'connecting': {
+      item.text = '$(sync~spin) Kira Version';
+      item.tooltip = 'Connecting to Kira Studio… ~/.kira-studio/git.sock';
+      item.command = SHOW_CONNECTION_STATUS_COMMAND;
+      break;
+    }
+    case 'pairing': {
+      item.text = '$(key) Kira Version';
+      item.tooltip = 'Waiting for approval in Kira Studio';
+      item.command = SHOW_CONNECTION_STATUS_COMMAND;
+      break;
+    }
+    case 'connected': {
+      if (active) {
+        item.text = '$(sync~spin) Kira Version';
+        item.tooltip = 'Loading…';
+      } else {
+        const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+        item.text = '$(git-branch) Kira Version';
+        item.tooltip = root ? `Kira Version: connected (${root})` : 'Kira Version: connected';
+      }
+      // `connected` keeps focusing the graph — clicking a working connection should reveal the
+      // panel, not explain a status there is nothing wrong with.
+      item.command = FOCUS_GRAPH_COMMAND;
+      break;
+    }
+    case 'denied': {
+      item.text = '$(error) Kira Version';
+      item.tooltip =
+        state.reason === 'timeout' ? 'Pairing request timed out' : 'Pairing was denied';
+      item.command = SHOW_CONNECTION_STATUS_COMMAND;
+      item.backgroundColor = new vscode.ThemeColor('statusBarItem.errorBackground');
+      break;
+    }
+    case 'versionMismatch': {
+      item.text = '$(error) Kira Version';
+      item.tooltip =
+        `Version mismatch — extension expects contract ${state.expected}, ` +
+        `Kira Studio (${state.serverVersion}) speaks ${state.received}.`;
+      item.command = SHOW_CONNECTION_STATUS_COMMAND;
+      item.backgroundColor = new vscode.ThemeColor('statusBarItem.errorBackground');
+      break;
+    }
+  }
   item.show();
 }
 
@@ -155,16 +204,20 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   // G10 D16: created here so it can appear before the panel is ever opened (D3's
   // onStartupFinished); disposed with the extension like every other subscription.
   const statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 0);
-  statusBarItem.command = FOCUS_GRAPH_COMMAND;
   context.subscriptions.push(statusBarItem);
-  updateStatusBar(statusBarItem, manager.state);
+  // G12 D10: the in-flight-work indicator — debounced 150ms on the rising edge only (a burst of
+  // small requests must not flicker the item several times a second), never on the falling edge
+  // (work finishing should read as finished immediately).
+  let isActive = false;
+  let activityDebounce: ReturnType<typeof setTimeout> | undefined;
+  updateStatusBar(statusBarItem, manager.state, isActive);
 
   // G10 D19: every command this extension contributes is registered from commands.ts's own
   // tables — no hand-written second list. Mutating commands all dispatch through the graph
   // provider's runUiAction; the five non-mutating ids get an explicit handler each, so TypeScript
   // requires one per id and rejects one for an id that does not exist.
   const otherCommandHandlers: Record<OtherCommandId, () => void> = {
-    'kiraVersion.showConnectionStatus': () => void showConnectionStatus(manager),
+    [SHOW_CONNECTION_STATUS_COMMAND]: () => void showConnectionStatus(manager),
     'kiraVersion.openRepository': () => void openRepository(manager, dialogs),
     'kiraVersion.focusGraph': () => {
       void vscode.commands.executeCommand(`${GRAPH_VIEW_ID}.focus`);
@@ -223,9 +276,24 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         graphProvider.notifyRemoteProgress(payload);
       }),
     },
+    manager.onActivityChange((active) => {
+      if (activityDebounce) {
+        clearTimeout(activityDebounce);
+        activityDebounce = undefined;
+      }
+      if (!active) {
+        isActive = false;
+        updateStatusBar(statusBarItem, manager.state, isActive);
+        return;
+      }
+      activityDebounce = setTimeout(() => {
+        isActive = true;
+        updateStatusBar(statusBarItem, manager.state, isActive);
+      }, 150);
+    }),
     manager.onStateChange((state) => {
       logger.log('info', 'connection state', state);
-      updateStatusBar(statusBarItem, state);
+      updateStatusBar(statusBarItem, state, isActive);
       // §5.4 point 4: this phase's own exit criterion, executing in the real extension — the
       // moment a connection is established, prove app.init round-trips over the real socket.
       if (state.kind === 'connected') {
@@ -246,7 +314,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     }),
     vscode.workspace.onDidChangeConfiguration((event) => {
       if (event.affectsConfiguration(STATUS_BAR_SETTING)) {
-        updateStatusBar(statusBarItem, manager.state);
+        updateStatusBar(statusBarItem, manager.state, isActive);
       }
       if (!event.affectsConfiguration('kiraVersion')) return;
       const { settings, problems } = coerceSettings(

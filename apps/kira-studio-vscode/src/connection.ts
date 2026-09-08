@@ -10,7 +10,6 @@
  * to `createRpcClient` once `ready` arrives, exactly the handoff `gitsock`'s Go side makes from its
  * own `runHandshake` into `rpcstream.Serve`.
  */
-import * as crypto from 'node:crypto';
 import * as net from 'node:net';
 import * as os from 'node:os';
 import * as path from 'node:path';
@@ -73,17 +72,23 @@ function socketPath(): string {
   return path.join(home, 'git.sock');
 }
 
-async function getOrCreateClientId(context: vscode.ExtensionContext): Promise<string> {
-  const existing = context.globalState.get<string>(CLIENT_ID_KEY);
-  if (existing) return existing;
-  const id = crypto.randomUUID();
-  await context.globalState.update(CLIENT_ID_KEY, id);
-  return id;
+const CLIENT_ID_PREFIX = 'kira-vscode:';
+
+// G12 D4: identity is per editor *installation*, not per window. A mint-and-store UUID on a
+// globalState miss let two windows opened together each mint their own id (F3(3)) — machineId is
+// stable per installation already, so there is nothing left to race. The legacy read is kept (a
+// pre-D4 install's already-paired row lives under it) but never written again, so the race has no
+// path left to fire.
+async function resolveClientId(context: vscode.ExtensionContext): Promise<string> {
+  const legacy = context.globalState.get<string>(CLIENT_ID_KEY);
+  if (legacy) return legacy;
+  return `${CLIENT_ID_PREFIX}${vscode.env.machineId}`;
 }
 
+// G12 D4: names the editor installation that was trusted, not the workspace a window happened to
+// have open — one row now legitimately covers every window of this installation.
 function clientLabel(): string {
-  const workspace = vscode.workspace.workspaceFolders?.[0]?.name;
-  return workspace ? `${os.hostname()} — ${workspace}` : os.hostname();
+  return `${vscode.env.appName} — ${os.hostname()}`;
 }
 
 export class ConnectionManager implements vscode.Disposable {
@@ -93,6 +98,11 @@ export class ConnectionManager implements vscode.Disposable {
   readonly #appVersion: string;
   readonly #stateEmitter = new vscode.EventEmitter<ConnectionState>();
   readonly onStateChange = this.#stateEmitter.event;
+  // G12 D10: counts in-flight request()/stream() calls so the status bar can show "loading"
+  // without a new wire event — fired only on the 0<->non-0 edge, never per call.
+  readonly #activityEmitter = new vscode.EventEmitter<boolean>();
+  readonly onActivityChange = this.#activityEmitter.event;
+  #inFlight = 0;
 
   #state: ConnectionState = { kind: 'connecting' };
   #socket: net.Socket | undefined;
@@ -114,12 +124,44 @@ export class ConnectionManager implements vscode.Disposable {
     this.#context = context;
     this.#logger = logger;
     this.#appVersion = appVersion;
-    this.#clientId = getOrCreateClientId(context);
+    this.#clientId = resolveClientId(context);
     void this.#dial();
   }
 
   get state(): ConnectionState {
     return this.#state;
+  }
+
+  /** Resolves once the connection reaches "connected"; resolves immediately if it already has.
+   *  Rejects on `denied`/`versionMismatch` — the two terminal states (D22) — since waiting for a
+   *  state this manager will never re-enter without a retry() call is a hang, not patience. Lets
+   *  a caller (app.init, G12 D6) await a socket that simply is not up yet instead of failing
+   *  fast against the ordinary "panel opened before Kira Studio" race. */
+  whenConnected(signal?: AbortSignal): Promise<void> {
+    if (this.#state.kind === 'connected') return Promise.resolve();
+    if (this.#state.kind === 'denied' || this.#state.kind === 'versionMismatch') {
+      return Promise.reject(new Error(`connection: ${this.#state.kind}`));
+    }
+    return new Promise<void>((resolve, reject) => {
+      const cleanup = (): void => {
+        subscription.dispose();
+        signal?.removeEventListener('abort', onAbort);
+      };
+      const subscription = this.onStateChange((state) => {
+        if (state.kind === 'connected') {
+          cleanup();
+          resolve();
+        } else if (state.kind === 'denied' || state.kind === 'versionMismatch') {
+          cleanup();
+          reject(new Error(`connection: ${state.kind}`));
+        }
+      });
+      const onAbort = (): void => {
+        cleanup();
+        reject(new Error('connection: aborted'));
+      };
+      signal?.addEventListener('abort', onAbort);
+    });
   }
 
   request<K extends RequestKey>(
@@ -130,7 +172,8 @@ export class ConnectionManager implements vscode.Disposable {
     if (!this.#transport) {
       return Promise.reject(new Error('connection: not connected to Kira Studio'));
     }
-    return this.#transport.request(method, params, signal);
+    this.#beginActivity();
+    return this.#transport.request(method, params, signal).finally(() => this.#endActivity());
   }
 
   /** Mirrors Transport.stream exactly (D19) — rejects the same way request() does when not
@@ -144,7 +187,20 @@ export class ConnectionManager implements vscode.Disposable {
     if (!this.#transport) {
       return Promise.reject(new Error('connection: not connected to Kira Studio'));
     }
-    return this.#transport.stream(method, params, onChunk, signal);
+    this.#beginActivity();
+    return this.#transport
+      .stream(method, params, onChunk, signal)
+      .finally(() => this.#endActivity());
+  }
+
+  #beginActivity(): void {
+    this.#inFlight++;
+    if (this.#inFlight === 1) this.#activityEmitter.fire(true);
+  }
+
+  #endActivity(): void {
+    this.#inFlight--;
+    if (this.#inFlight === 0) this.#activityEmitter.fire(false);
   }
 
   /** Subscribes handler to method's events for the life of this ConnectionManager, across
@@ -194,6 +250,7 @@ export class ConnectionManager implements vscode.Disposable {
     if (this.#reconnectTimer) clearTimeout(this.#reconnectTimer);
     this.#socket?.destroy();
     this.#stateEmitter.dispose();
+    this.#activityEmitter.dispose();
   }
 
   #setState(state: ConnectionState): void {
@@ -221,7 +278,22 @@ export class ConnectionManager implements vscode.Disposable {
       if (dialToken !== this.#dialToken) return;
       const channel = createSocketChannel(socket);
       channel.onClose(() => this.#onDisconnected(dialToken));
-      this.#awaitOneFrame(dialToken, channel, socket);
+      // G12 D5b: one handler for the whole handshake, not one per frame. The old shape
+      // unsubscribed as its first statement and only resubscribed after `await
+      // secrets.store(...)` on the "paired" branch — a window with no subscriber that a
+      // same-read "ready" frame (F1) fell into and was silently dropped. `unsubscribe` is handed
+      // to the handler so only the "ready" branch ever calls it, right before `createRpcClient`
+      // takes the slot.
+      let unsubscribe: () => void = () => undefined;
+      unsubscribe = channel.onMessage((raw) => {
+        void this.#handleHandshakeFrame(
+          dialToken,
+          channel,
+          socket,
+          unsubscribe,
+          raw as HandshakeResponse,
+        );
+      });
       channel.post({
         kind: 'hello',
         protocol: PROTOCOL,
@@ -237,27 +309,24 @@ export class ConnectionManager implements vscode.Disposable {
     });
   }
 
-  /** Reads exactly one handshake frame — §3.1.1's rows 4-7 each answer with either a terminal
-   *  frame or one more frame to wait for ("paired" precedes "ready"; "pairingRequired" precedes
-   *  the broker's own eventual answer), so the handshake proceeds frame by frame rather than as
-   *  one blocking read. */
-  #awaitOneFrame(dialToken: number, channel: SocketChannel, socket: net.Socket): void {
-    const unsubscribe = channel.onMessage((raw) => {
-      unsubscribe();
-      void this.#handleHandshakeFrame(dialToken, channel, socket, raw as HandshakeResponse);
-    });
-  }
-
+  /** Handles §3.1.1's rows 4-7, whichever frame arrives — "paired" precedes "ready";
+   *  "pairingRequired" precedes the broker's own eventual answer. One handler (installed once, in
+   *  `#dial`) stays subscribed for the whole handshake (G12 D5b) — `unsubscribe` is called
+   *  exactly once, on the "ready" branch, immediately before `createRpcClient` takes the slot in
+   *  the same synchronous statement, so the subscription is never empty while this method awaits
+   *  something (the "paired" branch's `secrets.store`, in particular — F1's own window). */
   async #handleHandshakeFrame(
     dialToken: number,
     channel: SocketChannel,
     socket: net.Socket,
+    unsubscribe: () => void,
     resp: HandshakeResponse,
   ): Promise<void> {
     if (dialToken !== this.#dialToken) return;
     switch (resp.kind) {
       case 'ready': {
         this.#backoffMs = INITIAL_BACKOFF_MS;
+        unsubscribe();
         this.#transport = createRpcClient(channel);
         this.#attachEventHandlers();
         this.#setState({ kind: 'connected' });
@@ -266,12 +335,10 @@ export class ConnectionManager implements vscode.Disposable {
       }
       case 'paired': {
         if (resp.token) await this.#context.secrets.store(TOKEN_SECRET_KEY, resp.token);
-        this.#awaitOneFrame(dialToken, channel, socket);
         return;
       }
       case 'pairingRequired': {
         this.#setState({ kind: 'pairing' });
-        this.#awaitOneFrame(dialToken, channel, socket);
         return;
       }
       case 'tokenRejected': {
