@@ -7,9 +7,21 @@
  * upstream's shared repo-root dist/ — see html.ts's own comment): the webview UI
  * (packages/git-ui/vite.config.ts) and the extension bundle itself.
  *
- * Not wired into scripts/setup.sh or `bun run build` (G1 §5.2): nothing in this phase's own proof
- * loads the bundle (D13 — activate() registers no webview view yet), and setup.sh is on the
- * critical path of every dev/e2e run. G3, the phase that first loads a webview, wires this in.
+ * G10 D6: the extension bundle is CommonJS (`dist/extension.cjs`), not ESM — the first phase whose
+ * artifact is ever loaded from a real installed `.vsix` (every prior phase used
+ * `--extensionDevelopmentPath`), and whether VS Code's `require()`-based extension host accepts an
+ * ESM `main` cannot be settled in this container. CJS is free here (+1 KB, still purity-clean) and
+ * removes the question outright. The webview bundle stays Vite/ESM (loaded by a `<script
+ * type="module">` tag, never `require`d) — untouched by this.
+ *
+ * G10 D7: `buildVsCodeBundles()` is exported so `scripts/package-vscode.ts` can call it directly
+ * (one implementation of "build the extension", not a subprocess) — `main()` runs only when this
+ * file is executed directly.
+ *
+ * G10 D8: wired into the *packaging* graph now (`apps/kira-studio/build/Taskfile.yml`'s
+ * `build:vsix`, reached only from `darwin:package`/`darwin:package:universal`) — still out of `bun
+ * run build` and `scripts/setup.sh`, per G3 D20's own reasoning: neither is on a path that has any
+ * use for a packaged extension.
  */
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
@@ -25,12 +37,12 @@ async function buildUi(): Promise<void> {
 
 async function buildExtension(): Promise<void> {
   const entry = join(VSCODE_APP, 'src', 'extension.ts');
-  const outFile = join(DIST, 'extension.js');
+  const outFile = join(DIST, 'extension.cjs');
 
   const result = await Bun.build({
     entrypoints: [entry],
     target: 'node',
-    format: 'esm',
+    format: 'cjs',
     external: ['vscode'],
   });
   if (!result.success) {
@@ -60,11 +72,11 @@ function checkNoBunReferences(file: string): string[] {
   return violations;
 }
 
-async function main(): Promise<void> {
+export async function buildVsCodeBundles(): Promise<void> {
   await buildUi();
   await buildExtension();
 
-  const violations = checkNoBunReferences(join(DIST, 'extension.js'));
+  const violations = checkNoBunReferences(join(DIST, 'extension.cjs'));
   if (violations.length > 0) {
     console.error('build-vscode: bundle checks failed:\n');
     for (const v of violations) console.error(`  ${v}`);
@@ -74,4 +86,6 @@ async function main(): Promise<void> {
   console.log('build-vscode: both bundles produced, bundle checks passed.');
 }
 
-main();
+if (import.meta.main) {
+  await buildVsCodeBundles();
+}

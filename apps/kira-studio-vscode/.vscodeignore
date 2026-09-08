@@ -1,0 +1,14 @@
+# G10 D4: an exclusion list, not an inclusion list — the only two real savings are src/** (the
+# TypeScript source, fully superseded by dist/extension.cjs) and tsconfig.json. node_modules/**
+# and **/*.map are belt-and-braces (vsce's own --no-dependencies already drops the former, and no
+# sourcemap is emitted today).
+#
+# DELIBERATELY ABSENT: any pattern touching dist/, .vite/, or a leading dot. html.ts reads
+# dist/ui/.vite/manifest.json at RUNTIME to resolve the webview's hashed asset names (F4) — a
+# broader ignore here (e.g. "**/.*" or "**/.vite/**") would package cleanly and then throw the
+# first time any webview view is opened, with no packaging-time signal at all. Do not add one.
+src/**
+tsconfig.json
+.vscodeignore
+node_modules/**
+**/*.map
