@@ -9,7 +9,7 @@
     "allowImportingTsExtensions": true,
     "skipLibCheck": true,
     "lib": ["ESNext", "DOM", "DOM.Iterable"],
-    "types": ["node", "vscode", "vite/client"]
+    "types": ["node", "vscode", "vite/client", "bun-types"]
   },
   "include": ["src/**/*.ts"]
 }
