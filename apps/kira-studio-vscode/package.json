@@ -99,6 +99,26 @@
         "category": "Kira Version"
       },
       {
+        "command": "kiraVersion.addReviewComment",
+        "title": "Add Review Comment",
+        "category": "Kira Version"
+      },
+      {
+        "command": "kiraVersion.copyReviewComments",
+        "title": "Copy Review Comments",
+        "category": "Kira Version"
+      },
+      {
+        "command": "kiraVersion.submitReviewComment",
+        "title": "Submit Review Comment",
+        "category": "Kira Version"
+      },
+      {
+        "command": "kiraVersion.deleteReviewComment",
+        "title": "Delete Review Comment",
+        "category": "Kira Version"
+      },
+      {
         "command": "kiraVersion.checkout",
         "title": "Checkout…",
         "category": "Kira Version"
@@ -189,6 +209,30 @@
         {
           "command": "kiraVersion.focusGraph",
           "group": "navigation"
+        }
+      ],
+      "comments/commentThread/context": [
+        {
+          "command": "kiraVersion.submitReviewComment",
+          "group": "inline",
+          "when": "commentController == kiraVersion.reviewComments"
+        }
+      ],
+      "comments/comment/title": [
+        {
+          "command": "kiraVersion.deleteReviewComment",
+          "group": "inline",
+          "when": "commentController == kiraVersion.reviewComments"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "kiraVersion.submitReviewComment",
+          "when": "false"
+        },
+        {
+          "command": "kiraVersion.deleteReviewComment",
+          "when": "false"
         }
       ]
     },

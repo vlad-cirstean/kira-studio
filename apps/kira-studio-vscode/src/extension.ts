@@ -35,6 +35,7 @@ import { VsCodeEditorIntegration } from './ports/editorIntegration.ts';
 import { VsCodeLogger } from './ports/logger.ts';
 import { VsCodeWorkspaceRoots } from './ports/workspaceRoots.ts';
 import { createProxyHandlers } from './proxyHandlers.ts';
+import { createReviewCommentController } from './reviewComments.ts';
 import { KiraReviewViewProvider } from './reviewView.ts';
 import { parseVirtualKey } from './virtualKey.ts';
 
@@ -186,8 +187,14 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   // G6/D15: `createProxyHandlers` needs `revealReview`, and `revealReview` needs the review
   // provider, which needs `handlers` — the smallest honest break in that cycle is a `let` binding
   // assigned on the next line, read only inside the closure (never before it is set: `review.open`
-  // cannot be dispatched before `activate` returns).
+  // cannot be dispatched before `activate` returns). G13 D9's `reviewComments` controller has no
+  // such cycle (it needs only `manager`, already constructed) but its `onEditorMutated` callback
+  // reaches the same `reviewProvider` binding for the same reason.
   let reviewProvider: KiraReviewViewProvider;
+  const reviewComments = createReviewCommentController(manager, () =>
+    reviewProvider.runUiAction('refreshReviewComments'),
+  );
+  context.subscriptions.push(reviewComments);
   const handlers = createProxyHandlers({
     connection: manager,
     settings: () => currentSettings,
@@ -197,6 +204,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     editor,
     logger,
     revealReview: (repoId, branch) => reviewProvider.reviewBranch(repoId, branch),
+    renderReviewComments: (repoId, branchTip, path, branch) =>
+      reviewComments.renderThreadsForKey(repoId, branchTip, path, branch),
+    notifyCommentsMutated: (repoId, branch) => reviewComments.notifyCommentsMutated(repoId, branch),
   });
   const graphProvider = new KiraGraphViewProvider({ extensionUri: context.extensionUri, handlers });
   reviewProvider = new KiraReviewViewProvider({ extensionUri: context.extensionUri, handlers });
@@ -214,9 +224,18 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   // G10 D19: every command this extension contributes is registered from commands.ts's own
   // tables — no hand-written second list. Mutating commands all dispatch through the graph
-  // provider's runUiAction; the five non-mutating ids get an explicit handler each, so TypeScript
-  // requires one per id and rejects one for an id that does not exist.
-  const otherCommandHandlers: Record<OtherCommandId, () => void> = {
+  // provider's runUiAction; the other ids get an explicit handler each, so TypeScript requires one
+  // per id and rejects one for an id that does not exist.
+  //
+  // G13 D9: the value type is `(...args: any[]) => unknown` rather than `() => void` — two of
+  // these ids (submitReviewComment/deleteReviewComment) are contributed to a comment menu
+  // (`comments/commentThread/context`/`comments/comment/title`), and VS Code invokes THOSE with
+  // the menu's own argument (a `CommentReply`/`Comment`), which a zero-arg handler would silently
+  // drop. Every existing zero-arg handler below is still perfectly assignable to the wider type
+  // (JS ignores extra arguments), so this widens what the table CAN express without weakening any
+  // individual handler's own, precisely-typed body.
+  // biome-ignore lint/suspicious/noExplicitAny: see the comment above — two of these ids take a real menu-command argument.
+  const otherCommandHandlers: Record<OtherCommandId, (...args: any[]) => unknown> = {
     [SHOW_CONNECTION_STATUS_COMMAND]: () => void showConnectionStatus(manager),
     'kiraVersion.openRepository': () => void openRepository(manager, dialogs),
     'kiraVersion.focusGraph': () => {
@@ -227,6 +246,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     // G11 D17: the review webview's own command, not the graph's — toggling a reviewed file only
     // makes sense in the review sidebar's Files pane.
     'kiraVersion.toggleFileReviewed': () => reviewProvider.runUiAction('toggleFileReviewed'),
+    // G13 D19: D9's own controller owns the real logic; this table only routes to it.
+    'kiraVersion.addReviewComment': () => void reviewComments.addAtSelection(),
+    'kiraVersion.copyReviewComments': () => reviewProvider.runUiAction('copyReviewComments'),
+    'kiraVersion.submitReviewComment': (reply: vscode.CommentReply) =>
+      void reviewComments.submit(reply),
+    'kiraVersion.deleteReviewComment': (comment: vscode.Comment) =>
+      void reviewComments.deleteComment(comment),
   };
   for (const entry of Object.values(MUTATING_COMMANDS)) {
     if (isPaletteCommand(entry)) {

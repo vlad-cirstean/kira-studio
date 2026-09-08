@@ -132,6 +132,17 @@ export const OTHER_COMMANDS: readonly OtherCommand[] = [
   // palette command when it lands") — routed to the REVIEW webview's own runUiAction, not the
   // graph's, since toggling a reviewed file only makes sense in the review sidebar's Files pane.
   { command: 'kiraVersion.toggleFileReviewed', title: 'Toggle File Reviewed' },
+  // G13 D19: the palette route into D9's comment controller — the active editor must be a review
+  // branch-side document, or it explains itself rather than doing nothing.
+  { command: 'kiraVersion.addReviewComment', title: 'Add Review Comment' },
+  // G13 D19: the palette's own route to the Comments pane's copy-for-AI action (G11 D17's exact
+  // pattern, `runUiAction('copyReviewComments')`).
+  { command: 'kiraVersion.copyReviewComments', title: 'Copy Review Comments' },
+  // G13 D9/D19: menu-only (comments/commentThread/context, comments/comment/title) — hidden from
+  // the palette (`"when": "false"` in package.json) but still declared here and in the manifest,
+  // because commands.test.ts cross-checks both directions (F12) and otherCommandHandlers is total.
+  { command: 'kiraVersion.submitReviewComment', title: 'Submit Review Comment' },
+  { command: 'kiraVersion.deleteReviewComment', title: 'Delete Review Comment' },
 ];
 
 export type OtherCommandId = (typeof OTHER_COMMANDS)[number]['command'];

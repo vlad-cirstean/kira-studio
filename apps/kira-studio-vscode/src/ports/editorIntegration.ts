@@ -27,7 +27,9 @@ import type {
 import * as vscode from 'vscode';
 import { decodeKey, encodeKey } from '../virtualKey.ts';
 
-const SCHEME = 'kira-version';
+// Exported (G13 D9) so reviewComments.ts's commentingRangeProvider and its own document-uri
+// builder use the exact same scheme literal — never a second copy that could drift.
+export const SCHEME = 'kira-version';
 /** The first path segment reserved for the "empty" side of an add/delete diff. `.` is not in
  *  base64url's alphabet (G12 D11), so this can never collide with a real encoded key — unlike the
  *  bare `empty` it replaces, which relied only on a real key always containing a `/`. */

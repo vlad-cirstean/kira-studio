@@ -62,10 +62,35 @@ export interface CreateProxyHandlersDeps {
   // never imports vscode.WebviewViewProvider; extension.ts breaks the construction cycle (the
   // provider needs `handlers`, `handlers` needs this function) with a `let` binding.
   readonly revealReview: (repoId: string, branch: string) => void;
+  // G13 D9: plain-data callbacks into reviewComments.ts's controller — kept as functions, not a
+  // controller instance, for the same reason revealReview is: this file never imports `vscode`.
+  // Called after editor.openRangeDiff opens the branch-tip side of a diff, so its comment threads
+  // render immediately rather than waiting for onDidChangeVisibleTextEditors.
+  readonly renderReviewComments: (
+    repoId: string,
+    branchTip: string,
+    path: string,
+    branch: string,
+  ) => void;
+  // Called after a webview-side review.comment.add/remove/clear succeeds, so an editor-side thread
+  // never disagrees with a sidebar-side mutation — the reverse direction (editor -> sidebar) needs
+  // a real event (`refreshReviewComments`, D19) since the webview has no socket of its own to watch.
+  readonly notifyCommentsMutated: (repoId: string, branch: string) => void;
 }
 
 export function createProxyHandlers(deps: CreateProxyHandlersDeps): ServerHandlers {
-  const { connection, settings, roots, dialogs, clipboard, editor, logger, revealReview } = deps;
+  const {
+    connection,
+    settings,
+    roots,
+    dialogs,
+    clipboard,
+    editor,
+    logger,
+    revealReview,
+    renderReviewComments,
+    notifyCommentsMutated,
+  } = deps;
 
   function forward<K extends RequestKey>(method: K): RequestHandler<K> {
     return (params, ctx) => connection.request(method, params, ctx.signal);
@@ -221,6 +246,9 @@ export function createProxyHandlers(deps: CreateProxyHandlersDeps): ServerHandle
         right,
         title: `${basename(path)} (${leftLabel} ↔ ${branch})`,
       });
+      // G13 D9: the right-hand document is the only commentable side (status !== 'deleted') — its
+      // threads render now rather than waiting for onDidChangeVisibleTextEditors.
+      if (status !== 'deleted') renderReviewComments(repoId, branchTip, path, branch);
       return {};
     },
     // D4/D11: the server resolves the on-disk-vs-object-database decision and (for a live file)
@@ -305,13 +333,27 @@ export function createProxyHandlers(deps: CreateProxyHandlersDeps): ServerHandle
     'review.files': forward('review.files'),
     'review.fileDiff': forward('review.fileDiff'),
     'review.mark': forward('review.mark'),
-    // G13 D9/§4.2: verbatim forwards for now — reviewComments.ts wraps add/remove/clear to also
-    // re-render the affected document's threads once the comment controller exists.
-    'review.comment.add': forward('review.comment.add'),
     'review.comment.list': forward('review.comment.list'),
-    'review.comment.remove': forward('review.comment.remove'),
-    'review.comment.clear': forward('review.comment.clear'),
     'review.comment.export': forward('review.comment.export'),
+    // G13 D9: a webview-side add/remove/clear also re-renders every currently-tracked document
+    // belonging to (repoId, branch) — the editor's own threads must never disagree with a mutation
+    // the sidebar just made, and the reverse direction (editor -> sidebar) is `refreshReviewComments`
+    // (D19), not this.
+    'review.comment.add': async (params, ctx) => {
+      const result = await connection.request('review.comment.add', params, ctx.signal);
+      notifyCommentsMutated(params.repoId, params.branch);
+      return result;
+    },
+    'review.comment.remove': async (params, ctx) => {
+      const result = await connection.request('review.comment.remove', params, ctx.signal);
+      notifyCommentsMutated(params.repoId, params.branch);
+      return result;
+    },
+    'review.comment.clear': async (params, ctx) => {
+      const result = await connection.request('review.comment.clear', params, ctx.signal);
+      notifyCommentsMutated(params.repoId, params.branch);
+      return result;
+    },
     // G7 D2: strategySetting is injected from the window's own coerced settings snapshot,
     // exactly as review.resolveBase injects baseCandidates above.
     'remote.pullPreflight': (params, ctx) => {
