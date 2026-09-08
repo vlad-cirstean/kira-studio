@@ -1414,9 +1414,41 @@ function onGutterContextMenu(row: number, e: MouseEvent): void {
   );
 }
 
+/** P28 D8: does the current selection already cover this cell? The gutter menu has always asked
+ *  this (onGutterContextMenu's own `inSelection`); the cell menu never did, and that is the
+ *  reported "select several rows, right-click, and they deselect". `setActiveCell` below is not
+ *  cosmetic — SlickHybridSelectionModel.handleActiveCellChange turns *any* active-cell change into
+ *  `setSelectedRanges([one cell])`, wiping whatever was selected, which then leaves the toolbar's
+ *  own copy/delete acting on one cell (or nothing) instead of the rows the user picked. */
+function selectionCovers(
+  sel: Selection | null | undefined,
+  row: number,
+  displayCol: number,
+): boolean {
+  if (!sel) return false;
+  switch (sel.kind) {
+    case 'row':
+      return sel.rows.includes(row);
+    case 'column':
+      return sel.cols.includes(displayCol);
+    case 'range':
+      return (
+        row >= sel.anchorRow &&
+        row <= sel.row &&
+        displayCol >= sel.anchorCol &&
+        displayCol <= sel.col
+      );
+    default:
+      return false;
+  }
+}
+
 function onCellContextMenu(row: number, displayCol: number, e: MouseEvent): void {
   const order = currentOrder();
-  if (grid && dataSource) {
+  // D8: only when the click lands OUTSIDE the current selection — the "replace the selection
+  // first" rule (§5 D7) is about a right-click on something the user has not selected, and was
+  // never meant to discard a selection the click is already inside.
+  if (grid && dataSource && !selectionCovers(rt()?.selection, row, displayCol)) {
     const idx = {
       displayRows: currentDisplayRows(),
       pageRowCount: getPage(props.tabId)?.rowCount ?? 0,

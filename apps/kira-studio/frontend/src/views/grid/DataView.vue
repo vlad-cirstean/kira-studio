@@ -11,7 +11,6 @@ import MessageStrip from '../../theme/primitives/MessageStrip.vue';
 import ReconnectGate from '../../theme/primitives/ReconnectGate.vue';
 import ViewChrome from '../../theme/primitives/ViewChrome.vue';
 import CellEditorDock from '../shared/celleditor/CellEditorDock.vue';
-import PagerControls from '../shared/page/PagerControls.vue';
 import SearchToolbar from '../shared/page/SearchToolbar.vue';
 import { ancestorPathPrefix } from '../shared/targetPath';
 import { refreshOrReconnect, useConnectionGate } from '../shared/useConnectionGate';
@@ -23,11 +22,6 @@ import { commitPending, discardPending, hasPending, pendingFor } from './pending
 import SlickGridHost from './SlickGridHost.vue';
 import { type Match, pageSearchApi } from './search';
 import {
-  goFirst,
-  goLast,
-  goNext,
-  goPrev,
-  goToPage,
   load,
   reload,
   reloadAfterMutation,
@@ -96,25 +90,6 @@ const pendingCount = computed(() => {
   return p.edits.size + p.deletes.size + p.inserts.length;
 });
 const previewOpen = ref(false);
-
-// P16 D1: the pager itself, moved here from DataToolbar.vue's #toolbar so it can render last in
-// ViewChrome's #toolbar-end — the toolbar's right-most control (P22 D4 moved RunState ahead of
-// #toolbar-end, so nothing after the pager can reflow it).
-function onPagerFirst(): void {
-  void goFirst(props.tab.id);
-}
-function onPagerPrev(): void {
-  void goPrev(props.tab.id);
-}
-function onPagerNext(): void {
-  void goNext(props.tab.id);
-}
-function onPagerLast(): void {
-  void goLast(props.tab.id);
-}
-function onPagerJump(pageIndex: number): void {
-  void goToPage(props.tab.id, pageIndex);
-}
 
 // P43 F5/D7: commitPending's own rejection (a constraint violation, a type error, a read-only
 // refusal) used to be an unhandled promise rejection — no try/catch here and no async-aware
@@ -264,23 +239,6 @@ function onCloseSearch(): void {
             @click="onCommit"
           />
         </template>
-        <!-- D1: last in the group — nothing to its right can shift it; P22 D4 moved RunState
-             ahead of this whole #toolbar-end slot, so there is nothing left of the pager's own
-             group to reflow it either. -->
-        <PagerControls
-          :page-index="tab.state.pageIndex"
-          :page-size="tab.state.pageSize"
-          :count="rt?.count?.value ?? null"
-          :has-more="!!rt?.hasMore"
-          testid-prefix=""
-          last-tooltip="Count rows first"
-          :strategy="rt?.lastStrategy"
-          @first="onPagerFirst"
-          @prev="onPagerPrev"
-          @next="onPagerNext"
-          @last="onPagerLast"
-          @jump="onPagerJump"
-        />
       </template>
 
       <template #toolbar-2>
