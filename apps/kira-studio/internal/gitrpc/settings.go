@@ -80,3 +80,22 @@ func (r *Router) handleRepoSettingsSet(_ context.Context, _ *gitsession.Conn, pa
 	r.repoSettingsChanged.Emit(RepoSettingsChangedPayload{RepoID: p.RepoID, Settings: snapshot})
 	return snapshot, nil
 }
+
+// handleSettingsSetGitPath is G18 D11's own migration leg: writes kiraVersion.git.path's migrated
+// value through Kira Studio's own server-owned settings surface (storage/repos.SettingsRepo, via
+// r.deps.SetGitPath) rather than repoSettings.set, since git.path never lived in the per-repo
+// store (D15). Extension-only — proxyHandlers.ts never forwards a webview call here (the same
+// posture credential.provide's own doc comment states for a different reason).
+func (r *Router) handleSettingsSetGitPath(_ context.Context, params json.RawMessage) (any, error) {
+	var p SettingsSetGitPathParams
+	if err := json.Unmarshal(params, &p); err != nil {
+		return nil, ipcerr.BadRequest("gitrpc: settings.setGitPath: invalid params")
+	}
+	if r.deps.SetGitPath == nil {
+		return nil, ipcerr.New("E_INTERNAL", "gitrpc: settings.setGitPath: not wired")
+	}
+	if err := r.deps.SetGitPath(p.GitPath); err != nil {
+		return nil, ipcerr.New("E_INTERNAL", "gitrpc: settings.setGitPath: "+err.Error())
+	}
+	return struct{}{}, nil
+}

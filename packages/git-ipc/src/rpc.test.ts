@@ -167,6 +167,7 @@ function stubHandlers(
       'file.goToTarget': notImplemented,
       'repoSettings.get': notImplemented,
       'repoSettings.set': notImplemented,
+      'settings.setGitPath': notImplemented,
       ...requestOverrides,
     },
     streams: {

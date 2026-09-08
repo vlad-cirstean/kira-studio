@@ -377,6 +377,15 @@ export function createProxyHandlers(deps: CreateProxyHandlersDeps): ServerHandle
     // other repoId-addressed request; the server is the sole owner of this storage.
     'repoSettings.get': forward('repoSettings.get'),
     'repoSettings.set': forward('repoSettings.set'),
+    // G18 D11: the migration's own git.path leg — called only by extension.ts's own one-time
+    // migration routine, never proxied from the webview (ServerHandlers.requests is total over
+    // RequestKey, so this key still needs an entry; a thrown handler is the same "impossible from
+    // here" shape credential.provide's own precedent already uses).
+    'settings.setGitPath': () => {
+      throw new Error(
+        'settings.setGitPath is called by the extension’s own migration routine, never proxied from the webview',
+      );
+    },
   };
 
   const streams: ServerHandlers['streams'] = {

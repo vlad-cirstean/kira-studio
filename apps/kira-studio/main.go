@@ -145,6 +145,13 @@ func main() {
 		Router: gitrpc.New(gitrpc.Deps{
 			Discovery: gitDiscovery, Runner: gitRunner, Registry: gitRegistry, ServerVersion: buildinfo.Version,
 			Askpass: askpassBroker,
+			// G18 D11: the settings.setGitPath migration leg's own write path — the exact
+			// SettingsRepo.Set(SettingsPatch{Git: &GitPatch{GitPath: ...}}) shape D11 names,
+			// reused rather than reinvented.
+			SetGitPath: func(gitPath string) error {
+				_, err := repositories.Settings.Set(model.SettingsPatch{Git: &model.GitPatch{GitPath: &gitPath}})
+				return err
+			},
 		}),
 		ServerVersion: buildinfo.Version,
 		Now:           time.Now,

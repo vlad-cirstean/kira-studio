@@ -207,3 +207,40 @@ func TestRepoSettings_ChangedEventReachesEveryConnection(t *testing.T) {
 		t.Fatalf("connB received %v, want exactly one repoSettings.changed with logLevel=warn (fanned out even though connB never opened repo A)", gotB)
 	}
 }
+
+// TestHandleSettingsSetGitPath is G18 D11's own migration-leg guard: settings.setGitPath must
+// reach Deps.SetGitPath with the exact value the caller sent — the write path
+// storage/repos.SettingsRepo.Set(SettingsPatch{Git: &GitPatch{GitPath: ...}}) itself is proven at
+// the storage layer (storage/repos/settings_test.go-equivalent coverage does not exist for this
+// leaf specifically, so this is the one place the plumbing is exercised end to end at the RPC
+// layer with a fake).
+func TestHandleSettingsSetGitPath(t *testing.T) {
+	var got string
+	var calls int
+	router := New(Deps{SetGitPath: func(gitPath string) error {
+		got = gitPath
+		calls++
+		return nil
+	}})
+
+	result, err := router.handleSettingsSetGitPath(context.Background(), []byte(`{"gitPath":"/opt/git/bin/git"}`))
+	if err != nil {
+		t.Fatalf("settings.setGitPath: %v", err)
+	}
+	if _, ok := result.(struct{}); !ok {
+		t.Fatalf("settings.setGitPath result = %T, want struct{}{}", result)
+	}
+	if calls != 1 || got != "/opt/git/bin/git" {
+		t.Fatalf("SetGitPath called %d time(s) with %q, want once with \"/opt/git/bin/git\"", calls, got)
+	}
+}
+
+// TestHandleSettingsSetGitPath_NotWired proves the nil-Deps.SetGitPath case fails loudly rather
+// than silently doing nothing — a Router constructed without this closure wired (a programming
+// error, never main.go's own real wiring) must never look like a successful migration.
+func TestHandleSettingsSetGitPath_NotWired(t *testing.T) {
+	router := New(Deps{})
+	if _, err := router.handleSettingsSetGitPath(context.Background(), []byte(`{"gitPath":"/usr/bin/git"}`)); err == nil {
+		t.Fatal("settings.setGitPath with no Deps.SetGitPath wired: want an error, got nil")
+	}
+}

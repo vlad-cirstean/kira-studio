@@ -21,9 +21,12 @@ import type { EventKey, RequestKey, StreamKey } from './contract.ts';
 // 'revealCommit' and 'ui.action' gains an optional 'target' naming the commit to reveal — both
 // extension-side only (the Go server neither emits nor parses either), the same "the sole
 // compatibility authority still moves" precedent G10 D9/G12 D1 set.
-// G18 D5: 21 -> 22, for two new requests (repoSettings.get/set) and one new event
-// (repoSettings.changed) — seven kiraVersion.* settings move out of contributes.configuration
-// into their own per-repo store (D1/D3/D4). SettingsSnapshot narrows to its one remaining member
+// G18 D5: 21 -> 22, for three new requests (repoSettings.get/set, settings.setGitPath) and one
+// new event (repoSettings.changed) — seven kiraVersion.* settings move out of
+// contributes.configuration into their own per-repo store (D1/D3/D4); git.path's own dead
+// server-side wiring is fixed in the same phase (D15) and its one-time migration leg needs its
+// own tiny server-only request (D11) since git.path was never part of the per-repo store
+// repoSettings.set writes. SettingsSnapshot narrows to its one remaining member
 // (workbench.tree.indent); the seven moved keys now live in the new RepoSettingsSnapshot.
 export const CONTRACT_VERSION = 22;
 
@@ -126,6 +129,7 @@ const REQUEST_KEY_MAP: Record<RequestKey, true> = {
   'file.goToTarget': true,
   'repoSettings.get': true,
   'repoSettings.set': true,
+  'settings.setGitPath': true,
 };
 const EVENT_KEY_MAP: Record<EventKey, true> = {
   'repo.changed': true,

@@ -491,3 +491,9 @@ type RepoSettingsChangedPayload struct {
 	RepoID   string               `json:"repoId"`
 	Settings RepoSettingsSnapshot `json:"settings"`
 }
+
+// SettingsSetGitPathParams is settings.setGitPath's own request (D11's own migration leg, D15) —
+// extension-only, never called by the webview.
+type SettingsSetGitPathParams struct {
+	GitPath string `json:"gitPath"`
+}

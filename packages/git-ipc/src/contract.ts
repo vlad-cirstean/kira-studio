@@ -1447,6 +1447,17 @@ export type Contract = {
       params: { repoId: string; patch: RepoSettingsPatch };
       result: RepoSettingsSnapshot;
     };
+    /** G18 D11/D15: the one-time settings migration's own `kiraVersion.git.path` leg. That key
+     *  never lived in the per-repo store (D15 — it is server-owned, not a per-repo fact), so its
+     *  migrated value (when a user had customized it before this phase) is written through Kira
+     *  Studio's own server-owned settings surface instead of `repoSettings.set`. Extension-only,
+     *  never called by the webview — the same G4 D14 "server-only method" shape `file.read`/
+     *  `file.goToTarget` above already are (`proxyHandlers.ts` still needs an entry, a thrown
+     *  handler, the same "impossible from here" shape `credential.provide` uses). */
+    'settings.setGitPath': {
+      params: { gitPath: string };
+      result: Record<string, never>;
+    };
   };
   events: {
     'repo.changed': { repoId: string; kind: 'refsChanged' | 'worktreeChanged' };
