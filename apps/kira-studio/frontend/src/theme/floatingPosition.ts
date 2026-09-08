@@ -8,6 +8,7 @@ import {
   type Placement,
   type ReferenceElement,
   shift,
+  size,
 } from '@floating-ui/dom';
 
 export interface FloatOptions {
@@ -26,6 +27,14 @@ export interface FloatOptions {
   padding?: number;
 }
 
+/** P28 D17(a): the CSS custom properties `size()` writes onto the floating element. A consumer
+ *  opts in by reading them (`max-height: var(--kira-float-max-h)`) — nothing changes for a
+ *  surface that ignores them, and a surface that fits is unaffected either way, since these are
+ *  only ever a *maximum*. Custom properties rather than direct `style.maxHeight` writes so a
+ *  consumer keeps control of whether the cap applies to itself or to an inner scroll container. */
+export const FLOAT_MAX_WIDTH_VAR = '--kira-float-max-w';
+export const FLOAT_MAX_HEIGHT_VAR = '--kira-float-max-h';
+
 // P23: this file replaces the previous anchoredPosition.ts (P49 D12's own consolidation of three
 // hand-rolled flip/clamp implementations into one pure-arithmetic function, two named
 // "strategies") and ContextMenu.vue's still-separate hand-rolled clamp (menu) plus its entirely
@@ -42,9 +51,32 @@ export async function computeFloatPosition(
   floatingEl: HTMLElement,
   opts: FloatOptions = {},
 ): Promise<{ left: number; top: number }> {
+  const padding = opts.padding ?? 4;
   const middleware: Middleware[] = [offset(opts.offset ?? 4)];
   if (opts.flip ?? true) middleware.push(flip());
-  middleware.push(shift({ padding: opts.padding ?? 4 }));
+  middleware.push(shift({ padding }));
+  // P28 D17(a): `shift()` slides a floating element back inside the viewport but cannot SHRINK
+  // one — a surface taller than the viewport (a long grid row menu, its own `Copy row(s)` submenu,
+  // the cell editor's format picker) stayed overflowing off the bottom edge, and because every
+  // floating surface here inherits `.p-float`'s `overflow: hidden`, the overflowing rows were
+  // simply unreachable. That is the reported "context menus cut off by the window edge".
+  // Last in the chain, after flip/shift have settled which side the surface is on, and sharing
+  // their padding so the cap and the clamp agree about where the viewport ends.
+  middleware.push(
+    size({
+      padding,
+      apply({ availableWidth, availableHeight, elements }) {
+        elements.floating.style.setProperty(
+          FLOAT_MAX_WIDTH_VAR,
+          `${Math.max(0, availableWidth)}px`,
+        );
+        elements.floating.style.setProperty(
+          FLOAT_MAX_HEIGHT_VAR,
+          `${Math.max(0, availableHeight)}px`,
+        );
+      },
+    }),
+  );
 
   const { x, y } = await computePosition(reference, floatingEl, {
     strategy: 'fixed',

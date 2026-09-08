@@ -144,5 +144,11 @@ onUnmounted(() => {
    positioned ancestor at all. */
 .popover {
   position: fixed;
+  /* P28 D17(a): computeFloatPosition's size() middleware writes these; a menu that fits is
+     unaffected, one taller than the viewport scrolls instead of having its lower rows clipped away
+     by .p-float's own overflow: hidden. */
+  max-height: var(--kira-float-max-h, none);
+  max-width: var(--kira-float-max-w, none);
+  overflow-y: auto;
 }
 </style>
