@@ -130,7 +130,6 @@ function onToggleReviewed(path: string): void {
         :store="store"
         :actions="actions"
         :review-states="reviewStatesMap"
-        review-styled
         @open-file="onOpenFileIndex"
         @toggle-reviewed="onToggleReviewed"
       />

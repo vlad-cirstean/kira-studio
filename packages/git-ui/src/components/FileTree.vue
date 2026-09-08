@@ -4,6 +4,17 @@
  * (in this component's own header, per the plan's own placement decision) the merge parent
  * selector. Rendering itself is the only thing this file adds on top of `fileTreeModel.ts`'s pure
  * fold; every piece of "what row goes where" is that module's job, not this one's.
+ *
+ * G21 D11 (item 11): one component, one anatomy. The review-only-styling prop G14 D8 added so this
+ * file could render *two different anatomies* (a dimmed flat-mode directory suffix, an inline
+ * copy button vs. a right-click "Copy path" menu) depending on caller, in service of a
+ * byte-identity guarantee the graph panel's tree needed while it still embedded a diff — is gone.
+ * Items 9/10/12/13 already changed the graph tree's icons, status glyph, and click/double-click
+ * behaviour; there is no byte-identity guarantee left to protect, so the review anatomy (the row
+ * geometry `ReviewView.vue` used to restyle from outside under `.kv-skin-kira`, and the
+ * dimmed-directory-suffix/context-menu-copy behaviour) is now this component's *only* appearance,
+ * everywhere it mounts — `DetailPane.vue`, `StashDetailPane.vue`, `ReviewFilesPane.vue`,
+ * `ReviewCommitRow.vue` alike.
  */
 import type { CommitStore } from '@kira/git-core';
 import type { FileChange, ReviewFileStatus } from '@kira/git-ipc';
@@ -44,15 +55,12 @@ const props = defineProps<{
   reviewStates?: ReadonlyMap<string, ReviewFileStatus>;
   /** G12 D13: whether this instance renders its own filter/list-mode toolbar. `false` when a
    *  panel above it owns one for several trees at once (the review sidebar) — `DetailPane.vue`,
-   *  which mounts exactly one tree, leaves this unset and gets today's behaviour byte for byte. */
+   *  which mounts exactly one tree, leaves this unset and gets today's behaviour byte for byte.
+   *  A real layout fact, not an anatomy fork (G21 D11's own reasoning): the review panel owns one
+   *  toolbar for two panes, the graph and stash panels each own exactly one tree, so the toolbar
+   *  belongs to whichever owns it — unlike the review-styling prop this file used to also carry,
+   *  this one is not something D11 removes. */
   showToolbar?: boolean; // default true
-  /** G14 D8: the review sidebar's own GitLens-shaped file-row anatomy — a fixed `--kv-icon-box`
-   *  status cell (rather than an `em`-relative one) and, in flat-list mode, the file's directory
-   *  dimmed after its name. Scoped to the review sidebar's own instances (`ReviewCommitRow.vue`,
-   *  `ReviewFilesPane.vue`) rather than this component globally — `DetailPane.vue`'s tree (which
-   *  G14 D1 restored) leaves this unset and keeps today's appearance byte for byte (§0.3: no graph
-   *  restyle). */
-  reviewStyled?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -337,13 +345,12 @@ function copyPath(path: string): void {
   props.actions.copy(path, 'file path');
 }
 
-// G19 D7: a right-click "Copy path" menu, gated to reviewStyled instances only — DetailPane.vue/
-// StashDetailPane.vue (which leave reviewStyled unset) render byte-identically, never gaining
-// this handler or the menu markup below.
+// G19 D7 / G21 D11: a right-click "Copy path" menu — the one copy-path affordance in every tree
+// now (the inline button below it used to gate on is gone).
 const fileMenuState = ref<{ x: number; y: number; path: string } | undefined>(undefined);
 
 function onRowContextMenu(event: MouseEvent, row: FileTreeRow): void {
-  if (!props.reviewStyled || row.kind !== 'file') return;
+  if (row.kind !== 'file') return;
   event.preventDefault();
   fileMenuState.value = { x: event.clientX, y: event.clientY, path: row.node.change.path };
 }
@@ -386,7 +393,13 @@ function reviewToggleTitle(path: string): string {
 </script>
 
 <template>
-  <div class="kv-file-tree" data-testid="file-tree">
+  <!-- G21 D11: `.kv-skin-kira` (kira-structure.css) — colour-free, structural-only tokens
+       (spacing/control-height/font-role), scoped here rather than at :root so the graph panel's
+       own density.css scale still governs everywhere outside this one component. Applying it
+       right on this tree's own root, not up at App.vue/DetailPane.vue, is what makes "one
+       anatomy, everywhere this component mounts" true without restyling anything else in the
+       graph panel. -->
+  <div class="kv-file-tree kv-skin-kira" data-testid="file-tree">
     <div v-if="parentOptions.length > 1" class="kv-file-tree-parent">
       <label for="kv-parent-select">Diffing against</label>
       <select id="kv-parent-select" :value="parentIndex" @change="onParentChange">
@@ -486,7 +499,7 @@ function reviewToggleTitle(path: string): string {
             <template v-else>{{ row.node.name }}</template>
           </span>
           <span
-            v-if="reviewStyled && listMode === 'flat' && dirOf(row.node.path)"
+            v-if="listMode === 'flat' && dirOf(row.node.path)"
             class="kv-file-tree-file-dir"
             >{{ dirOf(row.node.path) }}</span
           >
@@ -518,18 +531,6 @@ function reviewToggleTitle(path: string): string {
             @click.stop="emit('toggleReviewed', row.node.change.path)"
           >
             <span class="codicon" :class="reviewToggleIcon(row.node.change.path)" aria-hidden="true"></span>
-          </button>
-          <!-- G19 D7: hidden for reviewStyled instances — the new right-click "Copy path" menu
-               (below) replaces it there; DetailPane.vue/StashDetailPane.vue (reviewStyled unset)
-               keep this button exactly as before. -->
-          <button
-            v-if="actions.capabilities.clipboard && !reviewStyled"
-            type="button"
-            class="kv-copy-button kv-file-tree-copy"
-            v-kui-tooltip="'Copy file path'"
-            @click.stop="copyPath(row.node.change.path)"
-          >
-            <span class="codicon codicon-copy" aria-hidden="true"></span>
           </button>
         </template>
       </div>
@@ -611,11 +612,17 @@ function reviewToggleTitle(path: string): string {
   outline: none;
 }
 
+/* G21 D11: this row geometry used to be `ReviewView.vue`'s own `.kv-skin-kira` restyle of a
+ * plainer base rule here — the graph panel's tree had to stay byte-identical while it still
+ * embedded a diff (G12 D14's own guarantee). Items 9/10/12/13 already changed that tree's icons,
+ * status glyph, and click behaviour, so there is nothing left for that guarantee to protect: this
+ * is now the one geometry every tree renders, the component's only appearance. */
 .kv-file-tree-row {
   display: flex;
   align-items: center;
-  gap: var(--kv-space-2);
-  padding: var(--kv-space-1) var(--kv-space-4);
+  gap: var(--kv-s-2);
+  min-height: var(--kv-control-h);
+  padding: var(--kv-s-1) var(--kv-s-4);
   cursor: pointer;
   white-space: nowrap;
 }
@@ -640,6 +647,7 @@ function reviewToggleTitle(path: string): string {
 }
 
 .kv-file-tree-dir-name {
+  font-family: var(--kv-font-ui);
   font-weight: 600;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -648,6 +656,7 @@ function reviewToggleTitle(path: string): string {
 .kv-file-tree-dir-stats {
   margin-left: auto;
   color: var(--kv-description-fg);
+  font-family: var(--kv-font-ui);
   font-size: 0.85em;
   display: flex;
   gap: var(--kv-space-2);
@@ -713,6 +722,7 @@ function reviewToggleTitle(path: string): string {
 
 .kv-file-tree-counts {
   margin-left: auto;
+  font-family: var(--kv-font-ui);
   font-size: 0.85em;
   display: flex;
   gap: var(--kv-space-2);
@@ -724,10 +734,6 @@ function reviewToggleTitle(path: string): string {
 }
 .kv-diff-deleted-fg {
   color: var(--kv-diff-deleted-fg);
-}
-
-.kv-file-tree-copy {
-  flex-shrink: 0;
 }
 
 .kv-file-tree-changed-badge {

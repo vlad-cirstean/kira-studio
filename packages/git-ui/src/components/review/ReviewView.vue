@@ -1250,28 +1250,10 @@ watch(
   opacity: 0.7;
 }
 
-/*
- * G12 D14: FileTree.vue is shared with the graph panel's DetailPane, which must stay byte-
- * identical (D14's own guarantee). So its row geometry is restyled here, from the review side,
- * under the .kv-skin-kira ancestor — never by editing FileTree.vue's own base rules, which would
- * apply the new scale to the graph panel too. Colour is untouched; only spacing/height/font-role.
- */
-.kv-skin-kira .kv-file-tree-row {
-  gap: var(--kv-s-2);
-  min-height: var(--kv-control-h);
-  padding: var(--kv-s-1) var(--kv-s-4);
-}
-
-/* G19 D13: narrowed from `.kv-file-tree-status, .kv-file-tree-name` — real usage found the mono
-   editor font wrong for file *names* specifically (F13); LAW 08 itself stands unchanged for the
-   status letter, which is still data in the same sense a diff stat is. */
-.kv-skin-kira .kv-file-tree-status {
-  font-family: var(--kv-font-data); /* LAW 08: a file path is data. */
-}
-
-.kv-skin-kira .kv-file-tree-dir-name,
-.kv-skin-kira .kv-file-tree-dir-stats,
-.kv-skin-kira .kv-file-tree-counts {
-  font-family: var(--kv-font-ui);
-}
+/* G21 D11: FileTree.vue's row geometry, font roles and status-letter mono font used to be
+ * restyled from here, under the .kv-skin-kira ancestor, because the graph panel's tree had to
+ * stay byte-identical while it still embedded a diff (G12 D14's own guarantee). That guarantee no
+ * longer has anything to protect (items 9/10/12/13 already changed the graph tree's own
+ * appearance and behaviour), so this whole block moved into FileTree.vue's own <style> as its one
+ * unconditional appearance instead — see that file's own doc comment. */
 </style>

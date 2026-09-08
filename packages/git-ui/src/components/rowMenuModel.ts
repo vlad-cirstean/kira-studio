@@ -122,11 +122,11 @@ export function buildReviewRowMenu(clipboardEnabled: boolean): MenuSection[] {
 }
 
 /**
- * `docs/plans/G19.md` D7: `FileTree.vue`'s new right-click "Copy path" menu, scoped to
- * `reviewStyled` instances only. One item — deliberately not the two-affordance duplication
- * `ReviewCommitRow.vue` used to carry (removed by this same decision) — built directly against
- * `@kira/kira-ui`'s own `MenuItem` type from the start, matching every other menu-building
- * function in this file.
+ * `docs/plans/G19.md` D7: `FileTree.vue`'s right-click "Copy path" menu — one item, deliberately
+ * not the two-affordance duplication `ReviewCommitRow.vue` used to carry (removed by this same
+ * decision) — built directly against `@kira/kira-ui`'s own `MenuItem` type from the start,
+ * matching every other menu-building function in this file. G21 D11: this is now the one copy-
+ * path affordance in every tree, not only the review-styled ones it started out scoped to.
  */
 export function buildFileRowMenu(clipboardEnabled: boolean): MenuSection[] {
   if (!clipboardEnabled) return [];
