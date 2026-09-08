@@ -60,11 +60,11 @@ func TestRealKeychainRoundTrip(t *testing.T) {
 		t.Fatalf("build GCM: %v", err)
 	}
 	c := &Cipher{status: Status{Available: true, Backend: BackendKeychain}, aead: aead}
-	enc, err := c.Encrypt("hunter2")
+	enc, err := c.Encrypt(ScopeConnection, "hunter2")
 	if err != nil {
 		t.Fatalf("Encrypt: %v", err)
 	}
-	got, err := c.Decrypt(enc)
+	got, err := c.Decrypt(ScopeConnection, enc)
 	if err != nil || got != "hunter2" {
 		t.Errorf("round trip via the real Keychain key = (%q, %v), want (hunter2, nil)", got, err)
 	}

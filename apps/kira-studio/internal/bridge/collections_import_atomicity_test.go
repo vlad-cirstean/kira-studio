@@ -15,6 +15,7 @@ import (
 	"testing"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/appcore"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/secrets"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/repos"
 )
@@ -32,8 +33,8 @@ func writeTempCollection(t *testing.T, content string) string {
 // (repos.Cipher's real implementations return E_SECRET_STORE for the equivalent failure).
 type failingCipher struct{}
 
-func (failingCipher) Encrypt(string) (string, error) { return "", errFailingCipher }
-func (failingCipher) Decrypt(string) (string, error) { return "", errFailingCipher }
+func (failingCipher) Encrypt(secrets.Scope, string) (string, error) { return "", errFailingCipher }
+func (failingCipher) Decrypt(secrets.Scope, string) (string, error) { return "", errFailingCipher }
 
 var errFailingCipher = &cipherUnavailableError{}
 

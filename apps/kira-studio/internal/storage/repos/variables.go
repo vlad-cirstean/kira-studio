@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/postman"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/secrets"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 )
 
@@ -119,8 +120,9 @@ func (r *VariablesRepo) UpdateEnvironment(id, name, description, color string) e
 // DuplicateEnvironment is P17 D17/item 4: a raw-column copy of one environment and its variables —
 // F9's own precedent (connections.Service.Duplicate's "a raw column copy, not decrypt-then-
 // re-encrypt — the plaintext is never used, so there is no reason for this path to need the OS
-// key at all"), applied verbatim here since api_variables.secret_value holds the same kira:v2:
-// envelope connections.password does.
+// key at all"), applied verbatim here since api_variables.secret_value holds the same kira:v3:
+// envelope connections.password does. This is a same-kind copy (variable → variable, ScopeVariable
+// both sides — P29), which is exactly what the scope-bound AAD leaves untouched.
 //
 //  1. A new environment row, name+" copy", description copied, sort_order = MAX+1,
 //     is_active = 0 — the active environment is a single app-global selection (D3); duplicating
@@ -450,7 +452,7 @@ func (r *VariablesRepo) Upsert(scope model.VariableScope, ownerID, id, name, val
 	oldSecret := oldSecretInt != 0
 
 	if changed, oldPlain, oldPlainOK := r.valueChanged(oldValue, oldSecret, oldSecretValue, value); changed && oldPlainOK {
-		if err := r.recordHistory(tx, id, oldPlain, oldSecret, oldSecretValue, now); err != nil {
+		if err := r.recordHistory(tx, id, oldPlain, oldSecret, now); err != nil {
 			return model.Variable{}, err
 		}
 	}
@@ -507,7 +509,7 @@ func (r *VariablesRepo) encryptFor(value string, isSecret bool) (storedValue str
 	if !isSecret {
 		return value, nil, nil
 	}
-	encrypted, err := r.cipher.Encrypt(value)
+	encrypted, err := r.cipher.Encrypt(secrets.ScopeVariable, value)
 	if err != nil {
 		return "", nil, fmt.Errorf("repos/variables: encrypt: %w", err)
 	}
@@ -527,7 +529,7 @@ func (r *VariablesRepo) valueChanged(oldValue string, oldSecret bool, oldSecretV
 	if !oldSecretValue.Valid {
 		return false, "", false
 	}
-	plain, err := r.cipher.Decrypt(oldSecretValue.String)
+	plain, err := r.cipher.Decrypt(secrets.ScopeVariable, oldSecretValue.String)
 	if err != nil {
 		slog.Warn("could not decrypt a variable's prior value while checking for a change", "scope", "storage/variables", "err", err)
 		return false, "", false
@@ -538,14 +540,22 @@ func (r *VariablesRepo) valueChanged(oldValue string, oldSecret bool, oldSecretV
 // recordHistory writes the value being replaced, then trims to variableHistoryLimit — the same
 // "insert, then DELETE … WHERE id NOT IN (SELECT … ORDER BY … LIMIT ?)" shape
 // filter_history.go's Record already uses (D13).
-func (r *VariablesRepo) recordHistory(tx *sql.Tx, variableID, oldPlain string, oldSecret bool, oldSecretValue sql.NullString, now string) error {
+func (r *VariablesRepo) recordHistory(tx *sql.Tx, variableID, oldPlain string, oldSecret bool, now string) error {
 	value := oldPlain
 	var secretValue *string
 	if oldSecret {
 		value = ""
-		if oldSecretValue.Valid {
-			secretValue = &oldSecretValue.String
+		// P29: api_variable_history.secret_value is its own scope, so the value being replaced is
+		// re-sealed under ScopeVariableHistory rather than copied across from api_variables — a
+		// verbatim copy would be a ciphertext sealed for one column sitting in another, which is
+		// exactly what this phase's AAD refuses. Every caller reaches here only through
+		// valueChanged's ok return, so oldPlain is a real, already-decrypted plaintext and this
+		// Encrypt cannot fail for an unavailable cipher.
+		enc, err := r.cipher.Encrypt(secrets.ScopeVariableHistory, oldPlain)
+		if err != nil {
+			return fmt.Errorf("repos/variables: encrypt history value: %w", err)
 		}
+		secretValue = &enc
 	}
 	if _, err := tx.Exec(
 		`INSERT INTO api_variable_history (id, variable_id, value, is_secret, secret_value, recorded_at)
@@ -743,7 +753,7 @@ func (r *VariablesRepo) ApplyBulk(scope model.VariableScope, ownerID string, ent
 					// D22 rule 3: a typed plaintext replaces the secret value; history records the
 					// value it replaced through the existing helper.
 					if changed, oldPlain, ok := r.valueChanged(er.value, true, er.secretValue, entry.Value); changed && ok {
-						if err := r.recordHistory(tx, er.id, oldPlain, true, er.secretValue, now); err != nil {
+						if err := r.recordHistory(tx, er.id, oldPlain, true, now); err != nil {
 							return model.VariableBulkResult{}, err
 						}
 					}
@@ -778,7 +788,7 @@ func (r *VariablesRepo) ApplyBulk(scope model.VariableScope, ownerID string, ent
 			if valueChanged || descriptionChanged {
 				if valueChanged {
 					if changed, oldPlain, ok := r.valueChanged(er.value, false, er.secretValue, entry.Value); changed && ok {
-						if err := r.recordHistory(tx, er.id, oldPlain, false, er.secretValue, now); err != nil {
+						if err := r.recordHistory(tx, er.id, oldPlain, false, now); err != nil {
 							return model.VariableBulkResult{}, err
 						}
 					}
@@ -913,7 +923,7 @@ func (r *VariablesRepo) RevealValue(variableID string) (string, error) {
 	if isSecretInt == 0 || !secretValue.Valid {
 		return "", fmt.Errorf("repos/variables: variable %s is not a secret", variableID)
 	}
-	plain, err := r.cipher.Decrypt(secretValue.String)
+	plain, err := r.cipher.Decrypt(secrets.ScopeVariable, secretValue.String)
 	if err != nil {
 		return "", fmt.Errorf("repos/variables: decrypt %s: %w", variableID, err)
 	}
@@ -937,7 +947,7 @@ func (r *VariablesRepo) RevealHistoryValue(historyID string) (string, error) {
 	if isSecretInt == 0 || !secretValue.Valid {
 		return "", fmt.Errorf("repos/variables: history entry %s is not a secret", historyID)
 	}
-	plain, err := r.cipher.Decrypt(secretValue.String)
+	plain, err := r.cipher.Decrypt(secrets.ScopeVariableHistory, secretValue.String)
 	if err != nil {
 		return "", fmt.Errorf("repos/variables: decrypt history entry %s: %w", historyID, err)
 	}
@@ -989,7 +999,7 @@ func (r *VariablesRepo) mergeSecrets(out map[string]string, column, ownerID stri
 		if !secretValue.Valid || seen[name] {
 			continue
 		}
-		plain, err := r.cipher.Decrypt(secretValue.String)
+		plain, err := r.cipher.Decrypt(secrets.ScopeVariable, secretValue.String)
 		if err != nil {
 			slog.Warn("a secret variable could not be decrypted while resolving a request", "scope", "storage/variables", "name", name, "err", err)
 			continue

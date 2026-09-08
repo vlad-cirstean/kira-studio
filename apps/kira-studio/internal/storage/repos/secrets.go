@@ -3,15 +3,19 @@ package repos
 import (
 	"database/sql"
 	"fmt"
+
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/secrets"
 )
 
-// Cipher is implemented by internal/secrets (P55) — P52 §6's kira:v2: AES-256-GCM envelope. Note
+// Cipher is implemented by internal/secrets (P55) — P52 §6's kira:v3: AES-256-GCM envelope. Note
 // what is absent from this interface versus the TS SecretCipher: no isEnveloped (its only caller,
 // upgradeLegacySecrets, is deleted, not ported — §6.4), and no status (the repo never reads it;
-// the cipher enforces availability inside Encrypt/Decrypt and returns E_SECRET_STORE itself).
+// the cipher enforces availability inside Encrypt/Decrypt and returns E_SECRET_STORE itself). The
+// scope argument (P29) is the kind of column the ciphertext lives in — every reader and writer of
+// one column uses one scope.
 type Cipher interface {
-	Encrypt(plain string) (string, error)
-	Decrypt(stored string) (string, error)
+	Encrypt(scope secrets.Scope, plain string) (string, error)
+	Decrypt(scope secrets.Scope, stored string) (string, error)
 }
 
 // SecretsRepo is the only file in this tree that reads or writes connections.password (P1 D8,
@@ -36,7 +40,7 @@ func (r *SecretsRepo) Get(connectionID string) (*string, error) {
 	if !stored.Valid {
 		return nil, nil
 	}
-	plain, err := r.cipher.Decrypt(stored.String)
+	plain, err := r.cipher.Decrypt(secrets.ScopeConnection, stored.String)
 	if err != nil {
 		return nil, fmt.Errorf("repos/secrets: decrypt %s: %w", connectionID, err)
 	}
@@ -46,7 +50,7 @@ func (r *SecretsRepo) Get(connectionID string) (*string, error) {
 func (r *SecretsRepo) Set(connectionID string, secret *string) error {
 	var stored *string
 	if secret != nil {
-		encrypted, err := r.cipher.Encrypt(*secret)
+		encrypted, err := r.cipher.Encrypt(secrets.ScopeConnection, *secret)
 		if err != nil {
 			return fmt.Errorf("repos/secrets: encrypt %s: %w", connectionID, err)
 		}

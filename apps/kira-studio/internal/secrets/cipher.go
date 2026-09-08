@@ -18,7 +18,14 @@ import (
 // envelopePrefix bumps to kira:v2: (P52 §6.4): the cipher genuinely changes (AES-256-GCM under
 // our own key, vs Chromium safeStorage's AES-128-CBC), so reusing kira:v1: would let a v1 value
 // reach a v2 decrypt and fail confusingly.
-const envelopePrefix = "kira:v2:"
+//
+// P29 bumps it again, to kira:v3:: Encrypt/Decrypt now take a Scope, and that scope becomes
+// AES-GCM's additional authenticated data (P21 round 2 architecture/security finding 10) — a
+// kira:v2: blob would fail to authenticate under the new AAD regardless, so the prefix bump exists
+// to turn that failure into a clear "re-enter it" message instead of a generic tag mismatch. There
+// is no dual-read path: every kira:v2: (and kira:v1:) value is refused, by design — see
+// docs/v1.2/plans/P29-secret-cipher-aad-scope.md §2 D3.
+const envelopePrefix = "kira:v3:"
 
 // insecureKeyMaterial is a hardcoded compile-time constant, deliberately (P52 §6.5): the Linux
 // development fallback has the same threat model and the same honesty as Chromium's
@@ -72,21 +79,29 @@ func (c *Cipher) Status() Status { return c.status }
 
 // Encrypt satisfies repos.Cipher.
 //
-// P21 round 2 architecture/security finding 10 (recorded as a decision, not fixed): Seal is
-// called with no additional authenticated data, so a kira:v2: blob decrypts identically wherever
-// it is stored — nothing here binds a ciphertext to the row (or even the table) it lives in. An
-// attacker who can write ~/.kira-studio/kira.db but cannot read the Keychain item could in
-// principle move a connections.password ciphertext into an api_variables.secret_value row and get
-// the user to decrypt it through the variables Reveal gate, which a user is more likely to satisfy
-// casually than a production database credential reveal. This is deliberately left as-is rather
-// than closed: SecretStore.copy() (repos: ConnectionsRepo.Duplicate,
-// VariablesRepo.DuplicateEnvironment) copies raw ciphertext columns by design — see
-// docs/ARCHITECTURE.md — and any AAD binding narrower than a shared per-kind scope (e.g. binding
-// to a row id) would break that duplication path outright. Closing this properly means binding to
-// a *scope* string ("connection" vs "variable" vs "variable-history") passed in by every caller,
-// which touches every Encrypt/Decrypt call site in internal/connections and internal/apivars and
-// is a real but separate change from this pass's bug fixes.
-func (c *Cipher) Encrypt(plain string) (string, error) {
+// P29 closes P21 round 2 architecture/security finding 10: scope becomes AES-GCM's additional
+// authenticated data (Scope.aad), so a ciphertext sealed for one kind of secret refuses to
+// authenticate anywhere but a column holding that same kind — an attacker who can write
+// ~/.kira-studio/kira.db but cannot read the Keychain item can no longer move a
+// connections.password ciphertext into an api_variables.secret_value row and get the user to
+// decrypt it through the lower-friction variables Reveal gate.
+//
+// The AAD is bound to *kind*, not to a row: ConnectionsRepo.InsertDuplicateWithSecret and
+// VariablesRepo.DuplicateEnvironment both copy a raw ciphertext column into a new row of the same
+// kind (connection → connection, variable → variable) without ever touching the cipher, and that
+// must keep working — a per-row AAD would break it outright (would need a decrypt/re-encrypt on
+// every duplicate, requiring the OS key to be available just to copy a row). VariablesRepo's own
+// recordHistory is the one place that copies *across* kinds (a live api_variables.secret_value
+// blob into api_variable_history.secret_value) — it does not use this raw-copy pattern, and instead
+// re-seals under ScopeVariableHistory using the plaintext it already holds, because that copy is
+// genuinely cross-kind.
+//
+// kira:v2: (and kira:v1:) values are refused with no migration, by explicit decision — see
+// docs/v1.2/plans/P29-secret-cipher-aad-scope.md §2 D3.
+func (c *Cipher) Encrypt(scope Scope, plain string) (string, error) {
+	if !scope.valid() {
+		return "", ipcerr.SecretStore(fmt.Sprintf("internal error: %q is not a known secret scope", scope))
+	}
 	if !c.status.Available {
 		return "", ipcerr.SecretStore(*c.status.Reason)
 	}
@@ -94,16 +109,19 @@ func (c *Cipher) Encrypt(plain string) (string, error) {
 	if _, err := rand.Read(nonce); err != nil {
 		return "", ipcerr.SecretStore(fmt.Sprintf("could not generate a nonce (%s)", err))
 	}
-	sealed := c.aead.Seal(nonce, nonce, []byte(plain), nil)
+	sealed := c.aead.Seal(nonce, nonce, []byte(plain), scope.aad())
 	return envelopePrefix + base64.StdEncoding.EncodeToString(sealed), nil
 }
 
 // Decrypt satisfies repos.Cipher.
-func (c *Cipher) Decrypt(stored string) (string, error) {
+func (c *Cipher) Decrypt(scope Scope, stored string) (string, error) {
+	if !scope.valid() {
+		return "", ipcerr.SecretStore(fmt.Sprintf("internal error: %q is not a known secret scope", scope))
+	}
 	if !strings.HasPrefix(stored, envelopePrefix) {
 		// P52 §6.4 retires the pre-P25 plaintext passthrough: a non-enveloped value is an error
 		// naming the problem, never returned verbatim.
-		return "", ipcerr.SecretStore("The stored credential is not in this app's kira:v2: envelope format and cannot be decrypted — re-enter it to fix this connection.")
+		return "", ipcerr.SecretStore("The stored credential is not in this app's kira:v3: envelope format — values saved by an earlier version of Kira Studio cannot be read and must be entered again.")
 	}
 	if !c.status.Available {
 		return "", ipcerr.SecretStore(*c.status.Reason)
@@ -118,7 +136,7 @@ func (c *Cipher) Decrypt(stored string) (string, error) {
 		return "", decryptFailure(fmt.Errorf("ciphertext too short"))
 	}
 	nonce, sealed := raw[:nonceSize], raw[nonceSize:]
-	plain, err := c.aead.Open(nil, nonce, sealed, nil)
+	plain, err := c.aead.Open(nil, nonce, sealed, scope.aad())
 	if err != nil {
 		return "", decryptFailure(err)
 	}

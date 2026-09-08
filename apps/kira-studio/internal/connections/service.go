@@ -256,7 +256,7 @@ func (s *Service) Create(in Input) (model.ConnectionSummary, error) {
 	// while the caller was told the create had failed — can no longer happen.
 	var storedSecret *string
 	if password != nil {
-		encrypted, err := s.deps.Cipher.Encrypt(*password)
+		encrypted, err := s.deps.Cipher.Encrypt(secrets.ScopeConnection, *password)
 		if err != nil {
 			return model.ConnectionSummary{}, err
 		}
@@ -324,7 +324,7 @@ func (s *Service) Update(id string, in Input) (model.ConnectionSummary, error) {
 	hasSecret := password != nil
 	var storedSecret *string
 	if hasSecret && *password != "" {
-		encrypted, err := s.deps.Cipher.Encrypt(*password)
+		encrypted, err := s.deps.Cipher.Encrypt(secrets.ScopeConnection, *password)
 		if err != nil {
 			return model.ConnectionSummary{}, wrapErr(err)
 		}

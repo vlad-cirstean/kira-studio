@@ -1,5 +1,5 @@
 // Package secrets is the Go analogue of src/main/secret-cipher.ts, resolved per P52 §6: one
-// AES-256-GCM key held in the macOS Keychain (github.com/keybase/go-keychain), a kira:v2:
+// AES-256-GCM key held in the macOS Keychain (github.com/keybase/go-keychain), a kira:v3:
 // envelope in the connections.password column, and the same per-platform
 // SecretStorageStatus probe/reason strings the connection dialog already renders.
 package secrets
