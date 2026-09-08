@@ -740,6 +740,28 @@ async function onSave(): Promise<void> {
                 fetch.</span
               >
             </label>
+            <label class="field">
+              <div class="field-head">
+                <span>Git executable path</span>
+                <IconButton
+                  icon="discard"
+                  data-testid="settings-reset-git-gitPath"
+                  :disabled="isAtDefault('git', 'gitPath')"
+                  v-tooltip="'Reset to default'"
+                  @click="resetLeaf('git', 'gitPath')"
+                />
+              </div>
+              <TextField
+                type="text"
+                size="md"
+                data-testid="settings-git-path"
+                v-model="draft.git.gitPath"
+              />
+              <span class="helper-text"
+                >Empty uses the host's own discovery (PATH). A remote op reads this fresh every
+                time, never cached, so a change here takes effect on the next one.</span
+              >
+            </label>
           </template>
 
           <template v-else-if="activeSection === 'Advanced'">
