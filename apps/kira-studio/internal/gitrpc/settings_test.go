@@ -166,7 +166,7 @@ func TestRepoSettings_ChangedEventReachesEveryConnection(t *testing.T) {
 
 	var gotA, gotB []RepoSettingsChangedPayload
 	handlersA := router.ForConn(connA)
-	router.ForConn(connB) // registers connB's own subscription; its Handlers are unused here.
+	handlersB := router.ForConn(connB)
 	connA.Emit = func(method string, payload any) {
 		if method == "repoSettings.changed" {
 			gotA = append(gotA, payload.(RepoSettingsChangedPayload))
@@ -205,6 +205,28 @@ func TestRepoSettings_ChangedEventReachesEveryConnection(t *testing.T) {
 	}
 	if len(gotB) != 1 || gotB[0].Settings.LogLevel != "warn" {
 		t.Fatalf("connB received %v, want exactly one repoSettings.changed with logLevel=warn (fanned out even though connB never opened repo A)", gotB)
+	}
+
+	// §3.18's own "via EITHER one's repoSettings.set" — the reverse direction, B setting on a
+	// third repo, must fan out to both connections too, not only the direction proven above.
+	gotA, gotB = nil, nil
+	if _, err := handlersB.Request(context.Background(), "repoSettings.set", []byte(`{
+		"repoId": "/repos/c",
+		"patch": {"kiraVersion.log.level": "debug"}
+	}`)); err != nil {
+		t.Fatalf("repoSettings.set via connB: %v", err)
+	}
+	deadline = time.Now().Add(time.Second)
+	for len(gotA) == 0 || len(gotB) == 0 {
+		if time.Now().After(deadline) {
+			break
+		}
+	}
+	if len(gotA) != 1 || gotA[0].Settings.LogLevel != "debug" {
+		t.Fatalf("connA received %v, want exactly one repoSettings.changed with logLevel=debug (reverse direction)", gotA)
+	}
+	if len(gotB) != 1 || gotB[0].Settings.LogLevel != "debug" {
+		t.Fatalf("connB received %v, want exactly one repoSettings.changed with logLevel=debug (reverse direction)", gotB)
 	}
 }
 
