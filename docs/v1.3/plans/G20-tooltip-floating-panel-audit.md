@@ -456,7 +456,7 @@ onMounted(async () => {
   const el = menuEl.value;
   if (el) {
     const { left, top } = await computeFloatPosition(pointReference(props.x, props.y), el, {
-      flip: false,
+      flip: true,
       placement: 'bottom-start',
     });
     style.value = { left: `${left}px`, top: `${top}px` };
@@ -464,15 +464,28 @@ onMounted(async () => {
 });
 ```
 
-`flip: false` — matching `apps/kira-studio/frontend/src/workbench/ContextMenu.vue`'s own,
-already-shipped precedent for its identically point-anchored top-level menu
-(`theme/floatingPosition.ts:21-25`'s own documented reasoning: a point anchor has no "other side"
-to flip to, only edges to stay clear of — `shift` alone keeps the whole menu on screen by sliding
-it up/left as needed). `size()` (already part of D1's middleware chain, always included) caps
-`--kui-float-max-h`, which `.kui-menu-root` (`theme/controls.css`) gains a `max-height: var
-(--kui-float-max-h, none); overflow-y: auto;` rule for — a real improvement over the pre-existing
-clamp, which had no answer at all for a menu taller than the viewport (F6). §7 item 1 flags the
-`flip: false` choice for a human's own judgment.
+**`flip: true` — revised 2026-09-08, per the user's own steering answer to §7 item 1, diverging
+from this plan's original recommendation.** The plan as first drafted proposed `flip: false`,
+matching `apps/kira-studio/frontend/src/workbench/ContextMenu.vue`'s own already-shipped
+precedent for its identically point-anchored top-level menu (`shift`-only, sliding the whole menu
+up/left to stay on screen without ever changing which side of the click point it opens on). The
+user's answer explicitly chose the opposite: **flip to open above the click point when there is no
+room below** — closer to how native OS context menus actually behave, at the accepted cost that
+the menu can appear above instead of below the point that was clicked, which the `shift`-only
+design never does. `pointReference`'s zero-size virtual element does not change how `flip()`
+evaluates available space on each side of `placement: 'bottom-start'` — the middleware reasons
+about space along the placement's own axis relative to the reference point, not about the
+reference's own size, so `flip: true` behaves for a point anchor exactly as it already does for
+every element-anchored consumer of `computeFloatPosition` (`AppTooltip.vue`,
+`PopoverPanel.vue`, `ErrorPopover.vue`). This is now a deliberate **divergence** from
+`ContextMenu.vue`'s own `flip: false` choice in the sibling app, not a port of it — recorded here
+so a later reader does not "fix" `KuiContextMenu` back into consistency with a precedent this
+phase's own human steering explicitly moved away from. `size()` (already part of D1's middleware
+chain, always included) still caps `--kui-float-max-h` regardless of which side the menu ends up
+on, which `.kui-menu-root` (`theme/controls.css`) gains a `max-height: var(--kui-float-max-h,
+none); overflow-y: auto;` rule for — a real improvement over the pre-existing clamp, which had no
+answer at all for a menu taller than the viewport (F6). §7 item 1 is now resolved, not open — see
+its own revised text below.
 
 Every consumer — `App.vue`'s 3 (commit/ref/stash menus), `FileTree.vue`'s new one (G19 D7's
 `buildFileRowMenu`), every `review/*` row menu, `StashList.vue`'s (G17) — inherits this with zero
@@ -604,8 +617,9 @@ only changes this phase makes inside `apps/kira-studio/frontend`.
   element already in the pre-connect DOM — the toolbar's own buttons render with no backend).
 - `apps/kira-studio-vscode/tests/interaction/` gains one new spec exercising `KuiContextMenu` and
   one exercising `KuiPopoverPanel`, both via `fakeReviewHost.ts`'s existing rendered review row
-  (F10) — right-clicking near the bottom of a constrained viewport (proves the menu's own `shift`,
-  D3) and opening a dropdown near a horizontal edge (proves `KuiPopoverPanel`'s `shift`, D5).
+  (F10) — right-clicking near the bottom of a constrained viewport (proves the menu's own `flip`,
+  D3 — revised per §7 item 1's resolved `flip: true` decision) and opening a dropdown near a
+  horizontal edge (proves `KuiPopoverPanel`'s `shift`, D5).
 
 §7 item 4 flags the coverage-depth question (one representative case per mechanism vs. one per call
 site) as a human call.
@@ -720,9 +734,12 @@ the real viewport, matching G16 D10's own stated bar ("the guard must measure pi
    edge of a narrow viewport, asserting the tooltip's own left/right edges stay within `[0,
    viewportWidth]`.
 3. **`KuiContextMenu` near the bottom edge**, via `fakeReviewHost.ts`'s rendered review row,
-   right-clicked near the bottom of a short-viewport interaction-tier page — asserts the menu
-   stays fully on-screen (proving `shift`, since D3 deliberately keeps `flip: false` to match
-   `ContextMenu.vue`'s own precedent — §7 item 1).
+   right-clicked near the bottom of a short-viewport interaction-tier page — asserts **both** that
+   the menu stays fully on-screen *and* that it renders **above** the click point (its own bottom
+   edge `<=` the click's `y`, not merely `<=` viewport height), proving `flip` actually fires
+   rather than merely proving `shift` would have kept it on-screen either way — revised per §7
+   item 1's now-resolved `flip: true` decision (D3), superseding this case's original `shift`-only
+   framing.
 4. **`KuiPopoverPanel` near a horizontal edge**, via one of the migrated dropdowns rendered in a
    narrow interaction-tier viewport, asserting `shift` keeps it on-screen.
 5. **The CodeMirror hover escapes its `overflow: hidden` ancestor and sits above the toolbar** —
@@ -820,16 +837,19 @@ because of this named concurrent risk.
 
 ## 7. Calls that want a human eye
 
-### 1. `KuiContextMenu`'s `flip: false` choice
+### 1. `KuiContextMenu`'s flip behaviour — **Resolved 2026-09-08, per the user's own steering answer, diverging from this plan's original recommendation**
 
-D3 matches `apps/kira-studio/frontend`'s own `ContextMenu.vue` precedent — a point-anchored menu
-relies on `shift` (clamp) alone, never opens on the opposite side of its anchor point. The
-alternative (`flip: true`) would open the menu *above* the click point when there's no room below,
-which is closer to how many native OS context menus behave, at the cost of the menu appearing to
-jump to an unexpected side relative to where the user clicked. **Recommendation: keep `flip:
-false`**, matching the one precedent this repo already has and shipped — but this is a debatable
-UX call, not a proven-correct one, and a reviewer who prefers native-menu-like flip behavior should
-say so before implementation locks it in.
+The plan as first drafted recommended `flip: false`, matching `apps/kira-studio/frontend`'s own
+`ContextMenu.vue` precedent — a point-anchored menu relying on `shift` (clamp) alone, never
+opening on the opposite side of its anchor point. **Answer taken: `flip: true`** — the menu opens
+*above* the click point when there's no room below, closer to how native OS context menus actually
+behave, accepting the cost that the menu can appear to jump to the opposite side of where the user
+clicked rather than always staying pinned below-and-right of it. D3 above is revised accordingly;
+this is now a deliberate, recorded **divergence** from `ContextMenu.vue`'s own `flip: false`
+choice in the sibling app, not an oversight to reconcile later — a later reader should not "fix"
+`KuiContextMenu` back into consistency with that precedent. §4.2 case 3's own assertion is revised
+to prove the flip actually fires (the menu's bottom edge ends up above the click point, not merely
+somewhere on-screen) rather than merely proving `shift` would have kept it on-screen either way.
 
 ### 2. Whether all 7 dropdowns genuinely fit one `KuiPopoverPanel` wrapper
 
