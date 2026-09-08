@@ -33,8 +33,11 @@ export class BridgeClient {
     this.#transport = transport;
   }
 
-  /** Performs the `app.init` handshake exactly once, however many callers ask for it — every
-   *  `state/` module that needs the initial snapshot awaits the same promise. */
+  /** Performs the `app.init` handshake exactly once *per success*, however many callers ask for
+   *  it — every `state/` module that needs the initial snapshot awaits the same promise. A
+   *  rejection clears the memo before rethrowing (G12 D6) so a later call genuinely retries
+   *  rather than replaying the same failure forever — the property a webview opened before Kira
+   *  Studio's socket is up depends on (F7). */
   init(): Promise<ResultOf<'app.init'>> {
     if (!this.#initPromise) {
       this.#initPromise = this.#transport.request('app.init', {}).then(
@@ -44,6 +47,7 @@ export class BridgeClient {
         },
         (error: unknown) => {
           this.connectionState.value = 'error';
+          this.#initPromise = undefined;
           throw error;
         },
       );

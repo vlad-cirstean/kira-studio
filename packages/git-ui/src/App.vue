@@ -107,6 +107,11 @@ const searchState = new SearchState(bridge, refsState, graphView);
 
 const repoState = shallowRef<RepoState | undefined>(undefined);
 const settingsState = shallowRef<SettingsState | undefined>(undefined);
+// G12 D6: a failed bootstrap() used to leave repoState undefined forever — the whole template is
+// v-if="repoState", so that rendered nothing at all (F7). Set in the catch below, outside that
+// v-if, with a Retry that clears it and re-runs bootstrap() — the ordinary case this guards is a
+// panel opened before Kira Studio's socket is even up, not a rare failure.
+const bootError = ref<string | undefined>(undefined);
 
 const detailOpen = ref(true);
 const columnWidths = ref<ColumnWidths>(DEFAULT_COLUMN_WIDTHS);
@@ -648,14 +653,27 @@ onMounted(() => {
   // applied and the rows it covers re-rendered with their lanes, not merely that the shell
   // mounted. `CommitGrid.vue`'s own `handleChunkLayout` — the one place that event fires — marks
   // it, once, the first time that happens; nothing here needs to know when that is.
-  void bootstrap().then(() => {
-    // G10 D19: the cold-bootstrap arm — a palette command that fired before this webview had a
-    // live RpcServer (panelView.ts's own #pendingAction). Runs once, after bootstrap() has
-    // resolved a repo/opsState to act against; a later hide/reveal of the same view starts with
-    // no pending action (panelView.ts clears it once consumed), so this never replays.
-    if (props.pendingAction) runUiAction(props.pendingAction);
-  });
+  void bootstrap()
+    .then(() => {
+      // G10 D19: the cold-bootstrap arm — a palette command that fired before this webview had a
+      // live RpcServer (panelView.ts's own #pendingAction). Runs once, after bootstrap() has
+      // resolved a repo/opsState to act against; a later hide/reveal of the same view starts with
+      // no pending action (panelView.ts clears it once consumed), so this never replays.
+      if (props.pendingAction) runUiAction(props.pendingAction);
+    })
+    .catch((err: unknown) => {
+      bootError.value = err instanceof Error ? err.message : String(err);
+    });
 });
+
+/** Retries a failed bootstrap() (G12 D6) — clears the error panel first so a second failure
+ *  replaces the first rather than appearing to do nothing. */
+function retryBootstrap(): void {
+  bootError.value = undefined;
+  void bootstrap().catch((err: unknown) => {
+    bootError.value = err instanceof Error ? err.message : String(err);
+  });
+}
 
 // `docs/plans/P11.md` W7: the four search fields below are carried through unchanged by every
 // write this file makes (the `watch` callback spreads `...lastPersisted`, and a successful
@@ -695,6 +713,7 @@ async function bootstrap(): Promise<void> {
   );
 
   const persisted = props.viewState.read();
+  let openedFromPersisted = false;
   if (persisted) {
     lastPersisted = persisted;
     detailOpen.value = persisted.detailOpen;
@@ -719,12 +738,31 @@ async function bootstrap(): Promise<void> {
     if (persisted.repoId) {
       const outcome = await repo.open(persisted.repoId);
       if (outcome.kind === 'ok') {
+        openedFromPersisted = true;
         if (persisted.selectedSha) pendingSelectionSha.value = persisted.selectedSha;
         // §5.4: a freshly (re)mounted GraphViewState's own `loadedRows` starts at 0, so the
         // default `resumeThroughRow` asks the host to replay every row it still has cached —
         // that single round trip is the whole of "rehydrates without re-running git".
         await graphView.openStream(outcome.repo.repoId);
       }
+    }
+  }
+
+  // G12 D7/item 6: falls back to the workspace's own repository, multi-root aware, only when
+  // nothing persisted actually opened one — a persisted repo B must win over workspace folder A
+  // (the one ordering this must not get wrong), and NoRepositoryPanel still owns the case where
+  // no candidate is a repository at all. Mirrors extension.ts's own palette-command default
+  // rather than inventing a second policy.
+  if (!openedFromPersisted) {
+    await repo.refreshList();
+    for (const candidate of repo.candidates.value) {
+      const outcome = await repo.open(candidate.path);
+      if (outcome.kind === 'ok') {
+        await handleRepoOpened(outcome.repo.repoId);
+        break;
+      }
+      if (outcome.kind === 'gitUnavailable') break; // git itself is blocked; GitBlockedPanel owns it.
+      // 'notARepository' — a workspace folder that simply is not a repo; try the next one.
     }
   }
 
@@ -953,7 +991,13 @@ onBeforeUnmount(() => {
     >
       {{ liveAnnouncement }}
     </div>
-    <template v-if="repoState">
+    <!-- G12 D6: outside the v-if="repoState" gate below, since bootError means bootstrap() never
+         got that far — a blank panel is never an acceptable rendering of a failure. -->
+    <div v-if="bootError && !repoState" class="kv-boot-error" data-testid="boot-error">
+      <p>Kira Studio isn't reachable — {{ bootError }}</p>
+      <button type="button" data-testid="boot-retry" @click="retryBootstrap">Retry</button>
+    </div>
+    <template v-else-if="repoState">
       <GitBlockedPanel v-if="repoState.git.value.kind !== 'ok'" :status="repoState.git.value" />
 
       <NoRepositoryPanel
@@ -1178,6 +1222,36 @@ onBeforeUnmount(() => {
   font-family: var(--kv-font-family);
   font-size: var(--kv-font-size);
   overflow: hidden;
+}
+
+/* G12 D6: F7's blank-panel failure mode, rendered instead — same layout shape as
+   GitBlockedPanel's own centered state, since both are "nothing else in the UI renders while this
+   holds". */
+.kv-boot-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--kv-space-3);
+  height: 100%;
+  padding: var(--kv-space-5);
+  text-align: center;
+  color: var(--kv-app-fg);
+}
+
+.kv-boot-error p {
+  margin: 0;
+  max-width: 480px;
+  color: var(--kv-description-fg);
+}
+
+.kv-boot-error button {
+  padding: var(--kv-space-2) var(--kv-space-4);
+  border: 1px solid var(--kv-panel-border);
+  border-radius: var(--kv-radius);
+  background-color: var(--kv-panel-bg);
+  color: var(--kv-app-fg);
+  cursor: pointer;
 }
 
 .kv-visually-hidden {
