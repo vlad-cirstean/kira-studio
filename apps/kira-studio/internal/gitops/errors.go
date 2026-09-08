@@ -58,8 +58,19 @@ func ClassifyOpError(stderr string, exitCode int) (kind, message string) {
 	case strings.Contains(lower, "is a merge but no -m option was given"):
 		// Probe P6 — revert produces this exactly as readily as cherry-pick does.
 		return "MainlineRequired", message
+	case strings.Contains(lower, "conflicts in index"):
+		// G17 D7/probe 10: `apply --index`/`pop --index` onto an already-conflicted index —
+		// `error: conflicts in index. Try without --index.` Distinct from StashConflict: git names
+		// its own remedy exactly (retry the same op with restoreIndex: false). Ahead of the
+		// "untracked working tree file" row below, matching this table's own "more specific first"
+		// rule — not that the two patterns could collide, but D7 groups both stash-specific rows
+		// together at the point stash pop/apply's own stderr is classified.
+		return "StashIndexConflict", message
 	case strings.Contains(lower, "untracked working tree file"):
-		// Probe P7: matches both the plural list header and --discard-changes' singular form.
+		// Probe P7: matches both the plural list header and --discard-changes' singular form. G17
+		// D7: for a stash pop/apply specifically, reclassifyStashPop (gitsession/ops.go) remaps this
+		// generic kind to StashUntrackedCollision — the identical stderr, but a stash-specific
+		// remedy story (probe 3) — since this table has no notion of which op kind is asking.
 		return "UntrackedWouldBeOverwritten", message
 	case strings.Contains(lower, "local changes to the following files would be overwritten"):
 		// Probe P7.

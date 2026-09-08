@@ -56,6 +56,15 @@ func TestClassifyOpError_UntrackedWouldBeOverwritten(t *testing.T) {
 	}
 }
 
+// TestClassifyOpError_StashIndexConflict is G17 D7/probe 10's own new row — must be classified
+// distinctly from the generic Conflict/UntrackedWouldBeOverwritten rows above and below it.
+func TestClassifyOpError_StashIndexConflict(t *testing.T) {
+	stderr := "error: conflicts in index. Try without --index."
+	if kind, _ := gitops.ClassifyOpError(stderr, 1); kind != "StashIndexConflict" {
+		t.Fatalf("got %q, want StashIndexConflict", kind)
+	}
+}
+
 func TestClassifyOpError_DirtyWorktree(t *testing.T) {
 	stderr := "error: Your local changes to the following files would be overwritten by checkout:\n\tf.txt"
 	if kind, _ := gitops.ClassifyOpError(stderr, 1); kind != "DirtyWorktree" {
