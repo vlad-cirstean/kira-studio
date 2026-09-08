@@ -187,7 +187,7 @@ func TestConcurrent_AutoFetchArmsOnOpen(t *testing.T) {
 	reg := newTestRegistry()
 	reg.LingerFor = time.Hour
 	minutes := 0
-	reg.Settings = func() ([]string, int) { return nil, minutes }
+	reg.Settings = func() ([]string, int, string) { return nil, minutes, "" }
 
 	c1 := NewConn("c1", "client-1", "label-1", func(string, any) {})
 	if _, err := c1.Open(context.Background(), reg, "/usr/bin/git", "/repo"); err != nil {

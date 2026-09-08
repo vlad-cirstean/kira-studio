@@ -307,7 +307,7 @@ func (e *RepoEntry) RunRemote(ctx context.Context, conn *Conn, params RemoteOpPa
 		cancel()
 	}()
 
-	protectedBranches, _ := e.settings()
+	protectedBranches, _, _ := e.settings()
 
 	if params.Kind == "forcePush" || params.Kind == "deleteRemoteBranch" {
 		if match := gitpreflight.MatchProtectedBranch(params.Branch, protectedBranches); match != nil && params.ConfirmToken != params.Branch {
@@ -576,7 +576,7 @@ func parseAheadBehind(raw []byte) (ahead, behind int, err error) {
 // (F15) — and ahead/behind is read ONLY once that ref is confirmed to exist (rev-list dies on a
 // missing ref, probe P11).
 func (e *RepoEntry) PushPreflight(ctx context.Context, remote, branch string) (gitpreflight.PushPreflight, error) {
-	protectedBranches, _ := e.settings()
+	protectedBranches, _, _ := e.settings()
 
 	tipRes, err := e.runAllowingExit(ctx, gitops.RemoteTipArgs(remote, branch), 0, 1)
 	if err != nil {

@@ -73,7 +73,7 @@ func TestAutoFetch_NeverPromptsAndDisablesAfterAuthFailure(t *testing.T) {
 	reg := NewRegistry(runner)
 	// An arbitrary positive interval — irrelevant here since autoFetchTick is called directly
 	// rather than waiting on the real (one-minute-granularity) timer newRepoEntry also arms.
-	reg.Settings = func() ([]string, int) { return nil, 5 }
+	reg.Settings = func() ([]string, int, string) { return nil, 5, "" }
 
 	entry, release, err := reg.Acquire(context.Background(), gitPath, dir)
 	if err != nil {

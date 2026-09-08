@@ -9,6 +9,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitclient/catfile"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitpreflight"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitreview"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 )
 
 // ErrRepoTornDown is returned by whatever still reaches a RepoEntry after its own teardown() ran
@@ -84,9 +85,16 @@ type RepoEntry struct {
 	askPassChecked bool
 	askPassValue   string
 	// settings is G7 D16's server-owned settings accessor (protected-branch patterns, auto-fetch
-	// minutes) — a plain func, not an interface, so this package keeps importing only gitclient/
-	// gitaskpass/stdlib; threaded in by Registry.Acquire from its own Registry.Settings field.
-	settings func() (protectedBranches []string, autoFetchMinutes int)
+	// minutes, and, since G18 D15, gitPath) — a plain func, not an interface, so this package
+	// keeps importing only gitclient/gitaskpass/stdlib; threaded in by Registry.Acquire from its
+	// own Registry.Settings field.
+	settings func() (protectedBranches []string, autoFetchMinutes int, gitPath string)
+
+	// repoSettingsGet is G18 D8's own per-repo settings accessor (the seven keys D3 moved into
+	// their own table) — threaded in by Registry.Acquire from Registry.RepoSettingsGet, read
+	// through RepoSettings() below rather than directly, so a nil closure or a storage error both
+	// fall back to the schema's own defaults instead of every caller re-deriving that fallback.
+	repoSettingsGet func(repoID string) (model.GitRepoSettings, error)
 
 	// review is G11's own review.db handle (D3/D14) — shared off the Registry, not per-connection
 	// (D12: "I have reviewed X" is a fact about the repository and the person, not the window).
@@ -95,26 +103,43 @@ type RepoEntry struct {
 	done chan struct{}
 }
 
-func newRepoEntry(summary gitclient.RepoSummary, repo *gitclient.Repo, w Watcher, settings func() ([]string, int), review *gitreview.Store) *RepoEntry {
+func newRepoEntry(summary gitclient.RepoSummary, repo *gitclient.Repo, w Watcher, settings func() ([]string, int, string), repoSettingsGet func(string) (model.GitRepoSettings, error), review *gitreview.Store) *RepoEntry {
 	e := &RepoEntry{
-		Summary:  summary,
-		Repo:     repo,
-		watcher:  w,
-		subs:     make(map[ConnID]*subscriber),
-		detail:   newDetailCache(),
-		diff:     newDiffCache(diffCacheCapBytes),
-		refs:     newRefsCache(),
-		head:     summary.Head,
-		undo:     &gitpreflight.UndoSlot{},
-		settings: settings,
-		review:   review,
-		done:     make(chan struct{}),
+		Summary:         summary,
+		Repo:            repo,
+		watcher:         w,
+		subs:            make(map[ConnID]*subscriber),
+		detail:          newDetailCache(),
+		diff:            newDiffCache(diffCacheCapBytes),
+		refs:            newRefsCache(),
+		head:            summary.Head,
+		undo:            &gitpreflight.UndoSlot{},
+		settings:        settings,
+		repoSettingsGet: repoSettingsGet,
+		review:          review,
+		done:            make(chan struct{}),
 	}
 	go e.pump()
-	if _, minutes := settings(); minutes > 0 {
+	if _, minutes, _ := settings(); minutes > 0 {
 		e.startAutoFetch(minutes)
 	}
 	return e
+}
+
+// RepoSettings is G18 D6's own resolution point: entry.go's callers (graph.go/review.go/remote.go)
+// use this instead of a hardcoded constant when a request's own optional field is empty. Falls
+// back to the schema's own defaults (never errors, never panics) when repoSettingsGet is nil (a
+// RepoEntry constructed directly by a test) or the storage read itself fails — the same "fail
+// closed to a known-good value" discipline storage/repos.leaf already applies one layer down.
+func (e *RepoEntry) RepoSettings() model.GitRepoSettings {
+	if e.repoSettingsGet == nil {
+		return model.DefaultGitRepoSettings()
+	}
+	s, err := e.repoSettingsGet(e.Summary.RepoID)
+	if err != nil {
+		return model.DefaultGitRepoSettings()
+	}
+	return s
 }
 
 // pump is the entry's watcher-draining goroutine: one signal in, fanned out to every current

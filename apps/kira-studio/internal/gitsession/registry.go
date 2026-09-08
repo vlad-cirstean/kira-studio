@@ -13,6 +13,7 @@ import (
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitclient"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitreview"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 )
 
 // defaultLingerFor is upstream's HIDDEN_EVICT_MS, applied at refcount zero (D12): the duration and
@@ -49,7 +50,23 @@ type Registry struct {
 	// an interface so this package keeps importing only gitclient and stdlib (main.go supplies the
 	// real one, backed by storage/repos.SettingsRepo; tests set it directly, the same seam
 	// NewWatcher/LingerFor already are). Defaulted to "no protected branches, auto-fetch off".
-	Settings func() (protectedBranches []string, autoFetchMinutes int)
+	//
+	// G18 D15: widened from two return values to three — gitPath is the same closure-injected,
+	// read-fresh-never-cached leaf of the same server-owned settings table, threaded through so
+	// gitrpc's Discovery.Status call sites can resolve a real configured path instead of a
+	// hardcoded "".
+	Settings func() (protectedBranches []string, autoFetchMinutes int, gitPath string)
+
+	// RepoSettingsGet/RepoSettingsSet are G18 D8's own closures: the seven per-repo display
+	// settings (D3), backed by storage/repos.GitRepoSettingsRepo — the same "plain func, not an
+	// interface" seam Settings above already is, for the same reason (this package stays under
+	// gitclient/gitreview/stdlib only). D14's log.level sentinel substitution happens entirely
+	// inside GitRepoSettingsRepo itself — neither this Registry nor anything above it needs to
+	// know the substitution exists. Defaulted to the schema's own defaults, read-only, writing
+	// nowhere — a Registry a test constructs by hand (rather than via NewRegistry) still answers
+	// something sane rather than nil-panicking.
+	RepoSettingsGet func(repoID string) (model.GitRepoSettings, error)
+	RepoSettingsSet func(repoID string, patch model.GitRepoSettingsPatch) (model.GitRepoSettings, error)
 
 	// Review is G11 D3's own seam: review.db's whole surface, defaulted below to a Store over
 	// gitreview.DefaultPath(). Construction is free (the file opens lazily, on the first review
@@ -69,9 +86,15 @@ func NewRegistry(runner gitclient.Runner) *Registry {
 		runner:     runner,
 		NewWatcher: func(s gitclient.RepoSummary) (Watcher, error) { return gitclient.NewRepoWatcher(s) },
 		LingerFor:  defaultLingerFor,
-		Settings:   func() ([]string, int) { return nil, 0 },
-		Review:     gitreview.NewStore(gitreview.DefaultPath()),
-		entries:    make(map[string]*slot),
+		Settings:   func() ([]string, int, string) { return nil, 0, "" },
+		RepoSettingsGet: func(string) (model.GitRepoSettings, error) {
+			return model.DefaultGitRepoSettings(), nil
+		},
+		RepoSettingsSet: func(string, model.GitRepoSettingsPatch) (model.GitRepoSettings, error) {
+			return model.DefaultGitRepoSettings(), nil
+		},
+		Review:  gitreview.NewStore(gitreview.DefaultPath()),
+		entries: make(map[string]*slot),
 	}
 }
 
@@ -103,7 +126,7 @@ func (reg *Registry) Acquire(ctx context.Context, gitPath, path string) (*RepoEn
 		return nil, nil, err
 	}
 	repo := gitclient.NewRepo(summary, reg.runner, gitPath)
-	entry := newRepoEntry(summary, repo, w, reg.Settings, reg.Review)
+	entry := newRepoEntry(summary, repo, w, reg.Settings, reg.RepoSettingsGet, reg.Review)
 	reg.entries[summary.RepoID] = &slot{entry: entry, refs: 1}
 	return entry, reg.releaseFunc(summary.RepoID), nil
 }

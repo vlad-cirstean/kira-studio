@@ -115,14 +115,20 @@ func main() {
 	gitRegistry := gitsession.NewRegistry(gitRunner)
 	// G7 D16: the server-owned settings a remote op reads fresh on every push pre-flight/run and
 	// every auto-fetch tick — never cached, since a stale protected-branch list is a safety bug.
-	gitRegistry.Settings = func() (protectedBranches []string, autoFetchMinutes int) {
+	// G18 D15: gitPath joins the same closure — the third leaf of the same table, read the same
+	// way, threaded into every internal/gitrpc Discovery.Status call site (Registry.Settings).
+	gitRegistry.Settings = func() (protectedBranches []string, autoFetchMinutes int, gitPath string) {
 		s, err := repositories.Settings.GetAll()
 		if err != nil {
 			slog.Warn("read git settings", "scope", "git", "err", err)
-			return nil, 0
+			return nil, 0, ""
 		}
-		return s.Git.ProtectedBranches, s.Git.FetchAutoIntervalMinutes
+		return s.Git.ProtectedBranches, s.Git.FetchAutoIntervalMinutes, s.Git.GitPath
 	}
+	// G18 D8: the seven per-repo display settings (D3), backed by GitRepoSettingsRepo — D14's
+	// log.level sentinel substitution happens entirely inside that repo, invisibly here.
+	gitRegistry.RepoSettingsGet = repositories.GitRepoSettings.Get
+	gitRegistry.RepoSettingsSet = repositories.GitRepoSettings.Set
 	// G7 D8: a broker that fails to start is logged and left nil — every remote op then runs with
 	// no askpass interposition at all, D10's own already-supported "user's own askpass wins" path,
 	// not a new failure mode. It must never be fatal to boot (same posture as the socket below).

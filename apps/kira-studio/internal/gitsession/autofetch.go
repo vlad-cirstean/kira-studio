@@ -40,7 +40,7 @@ func (e *RepoEntry) startAutoFetch(minutes int) {
 // Fixes the off→on direction, which newRepoEntry-only arming never could: a repository opened
 // while auto-fetch read as 0 never got a timer, and no later settings change could ever start one.
 func (e *RepoEntry) ensureAutoFetch() {
-	_, minutes := e.settings()
+	_, minutes, _ := e.settings()
 	if minutes > 0 {
 		e.startAutoFetch(minutes)
 	}
@@ -92,7 +92,7 @@ func (e *RepoEntry) autoFetchTick() {
 		return
 	}
 
-	_, minutes := e.settings()
+	_, minutes, _ := e.settings()
 	if minutes <= 0 {
 		e.disableAutoFetch()
 		return

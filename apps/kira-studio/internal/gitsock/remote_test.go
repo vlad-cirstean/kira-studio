@@ -567,7 +567,7 @@ func TestIntegration_ProtectedBranchNeedsTheTypedName(t *testing.T) {
 	server, sockPath, registry, _ := newRemoteIntegrationServer(t, 5*time.Second)
 	// D16/D17: driven with a server-owned pattern list injected through Registry.Settings —
 	// proving the check does not consult the request at all.
-	registry.Settings = func() ([]string, int) { return []string{"main"}, 0 }
+	registry.Settings = func() ([]string, int, string) { return []string{"main"}, 0, "" }
 	client := pairAndReady(t, server, sockPath, "protected-client")
 	repoID := openRepoOK(t, client, f.workDir).Repo.RepoID
 
