@@ -32,10 +32,15 @@ import { decodeKey, encodeKey } from '../virtualKey.ts';
 export const SCHEME = 'kira-version';
 /** The first path segment reserved for the "empty" side of an add/delete diff. `.` is not in
  *  base64url's alphabet (G12 D11), so this can never collide with a real encoded key — unlike the
- *  bare `empty` it replaces, which relied only on a real key always containing a `/`. */
-const EMPTY_SEGMENT = '.empty';
+ *  bare `empty` it replaces, which relied only on a real key always containing a `/`.
+ *  Exported (G19 D9) so `virtualFileDecoration.ts`'s own `FileDecorationProvider` recognises and
+ *  skips this segment the identical way `provideTextDocumentContent` above already does — never a
+ *  second literal that could drift. */
+export const EMPTY_SEGMENT = '.empty';
 
-function pathSegments(uri: vscode.Uri): readonly string[] {
+/** Exported (G19 D9) so `virtualFileDecoration.ts` recovers a URI's own key segment the identical
+ *  way this file's `provideTextDocumentContent` already does — never a second parsing rule. */
+export function pathSegments(uri: vscode.Uri): readonly string[] {
   return uri.path.split('/').filter((segment) => segment.length > 0);
 }
 
@@ -83,11 +88,18 @@ export class VsCodeEditorIntegration implements EditorIntegration {
   }
 
   async openDiff(req: { left: DocumentRef; right: DocumentRef; title: string }): Promise<void> {
+    // G19 D8: a real, non-preview tab — F8 root-caused "Open all changes" only ever leaving the
+    // last file's diff open to this one missing options argument. With no fourth argument, VS
+    // Code opens every diff in the same single preview tab, so a sequential loop over every
+    // changed file (ReviewCommitRow.vue's own openAllChanges, which already iterates correctly)
+    // just keeps replacing that one tab. `{ preview: false }` pins each call's own tab, so N
+    // files opened in a loop leave N tabs open, not one.
     await vscode.commands.executeCommand(
       'vscode.diff',
       toUri(req.left),
       toUri(req.right),
       req.title,
+      { preview: false } satisfies vscode.TextDocumentShowOptions,
     );
   }
 

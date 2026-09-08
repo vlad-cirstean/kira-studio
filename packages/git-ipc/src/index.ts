@@ -66,6 +66,7 @@ export type {
   ReviewFileEntry,
   ReviewFileStatus,
   ReviewRangeState,
+  ReviewSessionSnapshot,
   SearchMatchField,
   SearchQueryParams,
   SearchRunResult,

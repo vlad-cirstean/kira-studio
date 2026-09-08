@@ -482,7 +482,7 @@ export function createReviewMarkingController(deps: ReviewMarkingDeps): ReviewMa
     if (!state) return;
     if (state.stale) {
       await vscode.window.showInformationMessage(
-        `Kira Version: this diff is from an earlier revision of ${state.anchor.branch} — reopen the file from the Branch Review sidebar to mark it.`,
+        `Kira Version: this diff is from an earlier revision of ${state.anchor.branch} — reopen the file from the Kira Version sidebar to mark it.`,
       );
       return;
     }

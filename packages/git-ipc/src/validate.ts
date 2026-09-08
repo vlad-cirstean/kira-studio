@@ -28,7 +28,12 @@ import type { EventKey, RequestKey, StreamKey } from './contract.ts';
 // own tiny server-only request (D11) since git.path was never part of the per-repo store
 // repoSettings.set writes. SettingsSnapshot narrows to its one remaining member
 // (workbench.tree.indent); the seven moved keys now live in the new RepoSettingsSnapshot.
-export const CONTRACT_VERSION = 22;
+// G19 D11b: 22 -> 23, for two new requests ('review.session.save'/'review.session.load') — the
+// review sidebar's durable "back to branch selection" resume point, additive only, answered
+// entirely inside the extension against `context.workspaceState` and never reaching the Go
+// backend (the same "extension-answered but the sole compatibility authority still moves"
+// precedent G10 D9/G12 D1/G14 D6/D10 already established). No existing method's shape changes.
+export const CONTRACT_VERSION = 23;
 
 export class ContractVersionMismatchError extends Error {
   readonly received: number;
@@ -130,6 +135,8 @@ const REQUEST_KEY_MAP: Record<RequestKey, true> = {
   'repoSettings.get': true,
   'repoSettings.set': true,
   'settings.setGitPath': true,
+  'review.session.save': true,
+  'review.session.load': true,
 };
 const EVENT_KEY_MAP: Record<EventKey, true> = {
   'repo.changed': true,

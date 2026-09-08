@@ -32,6 +32,7 @@ import type {
   GitStatus,
   RequestHandler,
   RequestKey,
+  ReviewSessionSnapshot,
   ServerHandlers,
   SettingsSnapshot,
 } from '@kira/git-ipc';
@@ -48,6 +49,31 @@ interface ServerAppInitResult {
   readonly serverVersion: string;
   readonly git: GitStatus;
 }
+
+/**
+ * G19 D11b: the minimal shape this file needs from `context.workspaceState` — never
+ * `vscode.Memento` itself, keeping this file vscode-free (its own doc comment, above: `revealReview`/
+ * `renderReviewComments`/etc. are all plain-data callbacks for exactly this reason). VS Code's
+ * real `Memento` satisfies this structurally (`get`'s single-argument overload, `update`'s
+ * `Thenable<void>` return already assignable to `PromiseLike<void>`), so `extension.ts` passes
+ * `context.workspaceState` straight through with no adapter — and `proxyHandlers.test.ts` (or its
+ * own addition) can pass an in-memory `Map`-backed stub satisfying only this shape, no real
+ * `vscode` import needed either side.
+ */
+export interface ReviewSessionStore {
+  get<T>(key: string): T | undefined;
+  update(key: string, value: unknown): PromiseLike<void>;
+}
+
+/** G19 D11b: what's actually stored per repoId — the wire's own `ReviewSessionSnapshot` plus the
+ *  one field never sent over the wire, `savedAt` (`Date.now()` at save time), which is what
+ *  `review.session.load`'s own 14-day TTL is measured against. */
+type StoredReviewSession = ReviewSessionSnapshot & { readonly savedAt: number };
+
+const REVIEW_SESSION_KEY = 'kiraVersion.review.session';
+/** Matches G11's own `review.db` idle-purge window — reused for consistency (a "session-level
+ *  resumption" concept), not re-derived from nothing. See the plan's own §2 D11b. */
+const REVIEW_SESSION_TTL_MS = 14 * 24 * 60 * 60 * 1000;
 
 export interface CreateProxyHandlersDeps {
   readonly connection: ConnectionManager;
@@ -90,6 +116,9 @@ export interface CreateProxyHandlersDeps {
   // Called after a webview-side review.mark succeeds, so an editor-side decoration never disagrees
   // with a sidebar-side mark.
   readonly notifyReviewMarked: (repoId: string, branch: string, path: string) => void;
+  // G19 D11b: review.session.save/.load's own durable store — see ReviewSessionStore's own doc
+  // comment for why this is a narrow structural type, not vscode.Memento itself.
+  readonly reviewSessionStore: ReviewSessionStore;
 }
 
 export function createProxyHandlers(deps: CreateProxyHandlersDeps): ServerHandlers {
@@ -106,6 +135,7 @@ export function createProxyHandlers(deps: CreateProxyHandlersDeps): ServerHandle
     notifyCommentsMutated,
     refreshReviewMarking,
     notifyReviewMarked,
+    reviewSessionStore,
   } = deps;
 
   function forward<K extends RequestKey>(method: K): RequestHandler<K> {
@@ -385,6 +415,35 @@ export function createProxyHandlers(deps: CreateProxyHandlersDeps): ServerHandle
       throw new Error(
         'settings.setGitPath is called by the extension’s own migration routine, never proxied from the webview',
       );
+    },
+    // G19 D11b: a pure, local write — never reaches the Go backend, exactly like editor.openDiff
+    // itself never does for its own local concerns. `session: null` clears repoId's own stored
+    // entry (sent by ReviewSessionState.clearTarget(), D11a) so an explicit "go back" never
+    // leaves a stale resume-point the next cold boot would silently jump back into.
+    'review.session.save': async ({ repoId, session }) => {
+      const current =
+        reviewSessionStore.get<Record<string, StoredReviewSession | undefined>>(
+          REVIEW_SESSION_KEY,
+        ) ?? {};
+      await reviewSessionStore.update(REVIEW_SESSION_KEY, {
+        ...current,
+        [repoId]: session === null ? undefined : { ...session, savedAt: Date.now() },
+      });
+      return {};
+    },
+    // G19 D11b: no commit/diff data is ever restored — only the identifiers `setTarget`/`setBase`
+    // already re-ask fresh on every call, so a stale *resolution* can never be served; a snapshot
+    // older than REVIEW_SESSION_TTL_MS is treated as expired (a session-level TTL, matching G11's
+    // own review.db idle-purge number) and answered the same as "never saved".
+    'review.session.load': async ({ repoId }) => {
+      const all =
+        reviewSessionStore.get<Record<string, StoredReviewSession | undefined>>(
+          REVIEW_SESSION_KEY,
+        ) ?? {};
+      const entry = all[repoId];
+      if (!entry || Date.now() - entry.savedAt > REVIEW_SESSION_TTL_MS) return { session: null };
+      const { savedAt: _savedAt, ...session } = entry;
+      return { session };
     },
   };
 

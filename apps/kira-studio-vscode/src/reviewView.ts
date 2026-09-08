@@ -37,6 +37,12 @@ const OPEN_COMMIT_IN_GRAPH_COMMAND = 'kiraVersion.openCommitInGraph';
 export interface KiraReviewViewProviderDeps {
   readonly extensionUri: vscode.Uri;
   readonly handlers: ServerHandlers;
+  // G19 D11b: not read by this class directly (review.session.save/.load's own handler lives in
+  // proxyHandlers.ts, already closed over context.workspaceState there) — threaded here only so
+  // this provider's own deps stay a complete, self-contained bundle, the same shape its
+  // constructor already takes everything else through. A small, mechanical addition, not new
+  // state: extension.ts's own activate() already holds this.
+  readonly context: vscode.ExtensionContext;
 }
 
 export class KiraReviewViewProvider implements vscode.WebviewViewProvider {

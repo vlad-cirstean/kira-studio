@@ -168,6 +168,8 @@ function stubHandlers(
       'repoSettings.get': notImplemented,
       'repoSettings.set': notImplemented,
       'settings.setGitPath': notImplemented,
+      'review.session.save': notImplemented,
+      'review.session.load': notImplemented,
       ...requestOverrides,
     },
     streams: {

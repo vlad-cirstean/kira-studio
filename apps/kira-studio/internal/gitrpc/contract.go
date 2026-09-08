@@ -36,7 +36,12 @@ package gitrpc
 // contributes.configuration into their own per-repo store (D1/D3/D4); SettingsSnapshot narrows to
 // its one remaining member (workbench.tree.indent) and a new RepoSettingsSnapshot carries the
 // seven moved keys.
-const ContractVersion = 22
+// G19 D11b (2026-09-08): 22 -> 23, for two new requests (review.session.save/.load) — the review
+// sidebar's durable "back to branch selection" resume point (F11/D11a/D11b), stored in the
+// extension's own context.workspaceState and never reaching this server. This constant moves for
+// the same reason ui.action first did (G10 D9): it is the sole compatibility authority, even
+// though the Go server neither emits nor parses either addition.
+const ContractVersion = 23
 
 // Protocol is the handshake envelope's own version (SPEC §3.3's "protocol":1), distinct from
 // ContractVersion — it never changes unless the hello/ready exchange itself is redesigned.

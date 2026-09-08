@@ -45,7 +45,7 @@
       "activitybar": [
         {
           "id": "kiraVersionReview",
-          "title": "Branch Review",
+          "title": "Kira Version",
           "icon": "resources/review-icon.svg"
         }
       ]
@@ -61,7 +61,7 @@
       "kiraVersionReview": [
         {
           "id": "kiraVersion.review",
-          "name": "Branch Review",
+          "name": "Kira Version",
           "type": "webview"
         }
       ]

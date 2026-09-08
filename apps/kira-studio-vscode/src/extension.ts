@@ -45,6 +45,7 @@ import {
   markSelectionUnreviewedCommand,
 } from './reviewMarking.ts';
 import { KiraReviewViewProvider } from './reviewView.ts';
+import { KiraVirtualFileDecorationProvider } from './virtualFileDecoration.ts';
 import { parseVirtualKey } from './virtualKey.ts';
 
 // D11: the server contract's own app.init is the webview contract's AppInitResult minus host/
@@ -341,6 +342,14 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   };
   context.subscriptions.push(editor.registerVirtualDocuments(virtualDocumentSource));
 
+  // G19 D9: badges a virtual (historical-revision) document whose path has no live counterpart
+  // on disk — a plain workspace.fs.stat against the recovered {repoId, path}, no new RPC.
+  const virtualFileDecoration = new KiraVirtualFileDecorationProvider();
+  context.subscriptions.push(
+    virtualFileDecoration,
+    vscode.window.registerFileDecorationProvider(virtualFileDecoration),
+  );
+
   // D17/D18: the graph webview view is registered as this phase's own first step -- the graph
   // renders end to end from here on, with refs.list/status.get/undo.peek/stash.list rejecting
   // E_UNKNOWN_METHOD on every repo open until G5/G8 close them (documented, not a regression).
@@ -380,9 +389,16 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     refreshReviewMarking: (repoId, branchTip, path, branch) =>
       reviewMarking.refreshForKey(repoId, branchTip, path, branch),
     notifyReviewMarked: (repoId, branch, path) => reviewMarking.notifyMarked(repoId, branch, path),
+    // G19 D11b: context.workspaceState already satisfies ReviewSessionStore structurally — no
+    // adapter needed.
+    reviewSessionStore: context.workspaceState,
   });
   const graphProvider = new KiraGraphViewProvider({ extensionUri: context.extensionUri, handlers });
-  reviewProvider = new KiraReviewViewProvider({ extensionUri: context.extensionUri, handlers });
+  reviewProvider = new KiraReviewViewProvider({
+    extensionUri: context.extensionUri,
+    handlers,
+    context,
+  });
 
   // G10 D16: created here so it can appear before the panel is ever opened (D3's
   // onStartupFinished); disposed with the extension like every other subscription.

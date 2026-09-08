@@ -23,7 +23,7 @@ versions), rather than a silent failure — update whichever side is behind.
 
 - **Git Graph** — the activity-bar panel showing the commit graph, with branch/tag decorations,
   a detail pane, and diffs that open in VS Code's own native diff editor.
-- **Branch Review** — the second activity-bar view: pick a branch, review its commits or its
+- **Kira Version** — the second activity-bar view: pick a branch, review its commits or its
   changed files against a base, and mark files reviewed.
 - **Range/hunk review marking** — inside a branch review diff, select lines (or use the gutter
   mark's hover) and mark just that selection reviewed or unreviewed from the diff editor's own

@@ -24,6 +24,18 @@ export type HeadState =
   | { readonly kind: 'detached'; readonly sha: string }
   | { readonly kind: 'unborn'; readonly name: string };
 
+/** G19 D11b: the durable review-session snapshot — identifiers only, never commit/diff data (see
+ *  `review.session.save`/`.load`'s own doc comments below for why). Named once, here, and reused
+ *  by both requests rather than repeated inline. */
+export interface ReviewSessionSnapshot {
+  readonly branch: string;
+  readonly baseOverride: string | null;
+  readonly pane: 'commits' | 'files' | 'comments';
+  readonly listMode: 'tree' | 'flat';
+  readonly filter: string;
+  readonly diffMode: 'sinceReview' | 'range';
+}
+
 export type DecorationRef =
   | { readonly kind: 'branch'; readonly name: string; readonly isHead: boolean }
   | { readonly kind: 'remoteBranch'; readonly name: string }
@@ -1163,6 +1175,34 @@ export type Contract = {
     'review.comment.export': {
       params: { repoId: string; branch: string; at?: string };
       result: { readonly at: string; readonly text: string };
+    };
+    /**
+     * G19 D11b: the durable half of "back to branch selection" (F11/D11) — a small, additive
+     * pair, `CONTRACT_VERSION` 23's own one reason to move. Not commit or diff data, only the
+     * identifiers needed to re-ask `setTarget`/`setBase`'s own question fresh on the next resume
+     * (every resume re-runs `review.resolveBase` for real — there is no cached resolution to go
+     * stale). Answered entirely inside the extension against `context.workspaceState`, exactly
+     * like `editor.openDiff` itself never reaching the Go backend for its own local concerns.
+     * `session: null` clears the stored session for `repoId` — sent by `clearTarget()` itself, so
+     * an explicit "go back" never leaves a stale resume-point the next cold boot would silently
+     * jump back into.
+     */
+    'review.session.save': {
+      params: {
+        repoId: string;
+        session: ReviewSessionSnapshot | null;
+      };
+      result: Record<string, never>;
+    };
+    /** G19 D11b: the read half — its own round trip, not carried on the bootstrap island, because
+     *  `resolveWebviewView` runs before the webview has told the extension host which repo it is
+     *  even looking at (a cold reveal's `repoId` is only known once the webview's own `repo.list`
+     *  call resolves) — see `ReviewView.vue`'s own doc comment on `bootstrap()`'s resume path. A
+     *  snapshot older than 14 days (`savedAt`, matching G11's own `review.db` idle-purge number)
+     *  is treated as expired and answered as `{session: null}`. */
+    'review.session.load': {
+      params: { repoId: string };
+      result: { session: ReviewSessionSnapshot | null };
     };
     'commit.detail': {
       params: { repoId: string; sha: string; parentIndex?: number };
