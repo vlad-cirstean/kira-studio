@@ -19,6 +19,7 @@ import (
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitclient"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitwire"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 )
 
 // §3.9's own end-to-end proof of the whole history pipeline over a real socket: graph.stream
@@ -635,4 +636,30 @@ func TestGraphStreamPerf(t *testing.T) {
 		"TestGraphStreamPerf: n=%d chunks=%d firstChunk=%s total=%s meanBytesPerChunk=%d totalBytes=%d",
 		n, chunkCount, firstChunkAt, total, meanBytes, totalBytes,
 	)
+}
+
+// TestIntegration_GraphLoadMoreHonorsRepoStoredPageSize is G18 D6's own regression guard: a
+// graph.loadMore sent with NO pageSize field (the raw-client shape proxyHandlers.ts now sends,
+// D6's own forward() simplification) must resolve this repo's own stored
+// kiraVersion.graph.pageSize rather than falling straight to logsession.DefaultPageSize — proven
+// end to end over the real socket.
+func TestIntegration_GraphLoadMoreHonorsRepoStoredPageSize(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not on PATH")
+	}
+	server, sockPath, _, registry := newIntegrationServer(t)
+	registry.RepoSettingsGet = func(string) (model.GitRepoSettings, error) {
+		s := model.DefaultGitRepoSettings()
+		s.GraphPageSize = 3
+		return s, nil
+	}
+	repoDir, wantShas := initFixtureRepoWithCommits(t, 10)
+	client := pairAndReady(t, server, sockPath, "pagesize-client")
+	repoID := openRepoOK(t, client, repoDir).Repo.RepoID
+
+	requestOK(t, client, "graph.loadMore", map[string]any{"repoId": repoID, "pages": 1})
+	status := graphStatusOK(t, client, repoID)
+	if status.Loaded != 3 || status.Exhausted {
+		t.Fatalf("status after one loadMore page = %+v, want Loaded=3 (this repo's own stored pageSize), not exhausted (%d total commits)", status, len(wantShas))
+	}
 }

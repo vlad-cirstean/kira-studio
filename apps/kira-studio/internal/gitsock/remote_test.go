@@ -19,6 +19,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitrpc"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitsession"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/repos"
 )
 
@@ -921,5 +922,36 @@ func TestIntegration_SecondRemoteOpIsRefusedAndCancelIsHonest(t *testing.T) {
 	}
 	if cancelIdleResult.Cancelled {
 		t.Fatal("cancelling with nothing running must report false")
+	}
+}
+
+// TestIntegration_PullPreflightHonorsRepoStoredStrategy is G18 D6/F14's own regression guard:
+// remote.pullPreflight sent with NO strategySetting (the raw-client shape every proxyHandlers.ts
+// call now uses, D6's own upgrade) must resolve the repo's own stored kiraVersion.pull.strategy
+// rather than falling straight to gitpreflight.ResolvePullStrategy's "auto" ladder — proven end to
+// end over the real socket, not just at the storage or handler-unit layer.
+func TestIntegration_PullPreflightHonorsRepoStoredStrategy(t *testing.T) {
+	f := buildRemoteFixture(t)
+	server, sockPath, registry, _ := newRemoteIntegrationServer(t, 5*time.Second)
+	registry.RepoSettingsGet = func(string) (model.GitRepoSettings, error) {
+		s := model.DefaultGitRepoSettings()
+		s.PullStrategy = "rebase"
+		return s, nil
+	}
+	client := pairAndReady(t, server, sockPath, "pull-preflight-client")
+	repoID := openRepoOK(t, client, f.workDir).Repo.RepoID
+
+	// No strategySetting field at all — exactly what proxyHandlers.ts now sends (D6's own
+	// simplification: a plain forward(), no per-field injection).
+	resp := requestOK(t, client, "remote.pullPreflight", map[string]any{
+		"repoId": repoID,
+		"branch": "main",
+	})
+	var preflight gitpreflight.PullPreflight
+	if err := json.Unmarshal(resp.Result, &preflight); err != nil {
+		t.Fatalf("unmarshal remote.pullPreflight result: %v", err)
+	}
+	if preflight.Strategy != gitpreflight.PullRebase || preflight.Source != gitpreflight.SourceSetting {
+		t.Fatalf("preflight = %+v, want strategy=rebase source=setting (this repo's own stored kiraVersion.pull.strategy)", preflight)
 	}
 }

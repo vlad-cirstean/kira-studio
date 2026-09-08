@@ -14,6 +14,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitclient"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitreview"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitrpc"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 )
 
 // §3.9's own end-to-end proof: the base resolver's four outcomes, its reasons and candidate list,
@@ -337,6 +338,28 @@ func TestIntegration_ResolveBaseHonoursRequestBaseCandidates(t *testing.T) {
 	withRequestCandidates := resolveBaseOK(t, client, repoID, "master", nil, []string{"release"})
 	if withRequestCandidates.Base == nil || *withRequestCandidates.Base != "release" {
 		t.Fatalf("master resolution with baseCandidates=[release] = %+v, want base release", withRequestCandidates)
+	}
+}
+
+// TestIntegration_ResolveBaseHonoursRepoStoredBaseCandidates is G18 D6's own regression guard:
+// review.resolveBase sent with NO baseCandidates field (the raw-client shape proxyHandlers.ts now
+// sends, D6's own forward() simplification) must resolve this repo's own stored
+// kiraVersion.review.baseCandidates rather than falling straight to
+// gitreview.DefaultBaseCandidates.
+func TestIntegration_ResolveBaseHonoursRepoStoredBaseCandidates(t *testing.T) {
+	f := buildReviewFixtureRepo(t)
+	server, sockPath, _, registry := newIntegrationServer(t)
+	registry.RepoSettingsGet = func(string) (model.GitRepoSettings, error) {
+		s := model.DefaultGitRepoSettings()
+		s.ReviewBaseCandidates = []string{"release"}
+		return s, nil
+	}
+	client := pairAndReady(t, server, sockPath, "resolve-repo-candidates")
+	repoID := openRepoOK(t, client, f.dir).Repo.RepoID
+
+	withStoredCandidates := resolveBaseOK(t, client, repoID, "master", nil, nil)
+	if withStoredCandidates.Base == nil || *withStoredCandidates.Base != "release" {
+		t.Fatalf("master resolution with no request-borne candidates = %+v, want base release (this repo's own stored kiraVersion.review.baseCandidates)", withStoredCandidates)
 	}
 }
 
