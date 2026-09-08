@@ -1,0 +1,34 @@
+/*
+ * G16 D1/D2: the document-level height chain and gutter reset that no host has ever provided.
+ *
+ * A VS Code webview document is an iframe document: `html`/`body` default to `height: auto`, and
+ * VS Code's own default stylesheet sets `margin: 0; padding: 0 20px` on `body` and nothing else —
+ * no height on `html` or `body` either. Against that, `App.vue`'s `.kv-app { height: 100% }` and
+ * `ReviewView.vue`'s `.kv-review-view { height: 100% }` both resolve to `auto`, and the whole
+ * panel collapses to its content height (G16 F1). This file is the fix, and it lives here rather
+ * than in the extension host's emitted document (`apps/kira-studio-vscode/src/html.ts`) because
+ * `mount()` (`main.ts`) is a document-owning bootstrap, not a widget factory — it already owns
+ * every stylesheet, both mounted roots, and the page's perf marks; owning the document's box is
+ * the same boundary, stated one property further (G16 D1). A future host that wants to mount this
+ * package into a region of a larger page, rather than own the whole document, needs a different
+ * entry point — not a flag here.
+ *
+ * `overflow: hidden` on `html, body` is a deliberate belt-and-braces choice (G16 D2, §10.2): with
+ * the height chain in place it should never be needed, since `.kv-app`/`.kv-review-view` are
+ * themselves `overflow: hidden`, but it converts any future content overflow from a whole-document
+ * scroll that hides the toolbar into silent clipping, which is the safer failure for an app shell
+ * that owns the viewport and provides its own internal scrollers.
+ */
+html,
+body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+.kv-mount-root {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}

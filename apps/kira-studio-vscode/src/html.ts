@@ -11,40 +11,16 @@
 import { readFileSync } from 'node:fs';
 import { CONTRACT_VERSION, type UiActionKind } from '@kira/git-ipc';
 import * as vscode from 'vscode';
-
-/** Vite's own convention: an entry's manifest key is its input path relative to the build
- *  root. `packages/git-ui/vite.config.ts`'s root is the repo root (a build whose source spans
- *  `packages/git-ui` and `apps/kira-studio-vscode` — see that file's own comment), so the key is
- *  this file's repo-root-relative path. */
-const WEBVIEW_ENTRY = 'apps/kira-studio-vscode/src/webview/main.ts';
-
-interface ViteManifestEntry {
-  readonly file: string;
-  readonly css?: readonly string[];
-  readonly imports?: readonly string[];
-}
-
-type ViteManifest = Readonly<Record<string, ViteManifestEntry>>;
+import {
+  buildWebviewDocument,
+  collectCss,
+  type ViteManifest,
+  WEBVIEW_ENTRY,
+} from './webviewDocument.ts';
 
 interface UiAssets {
   readonly scriptUri: vscode.Uri;
   readonly styleUris: readonly vscode.Uri[];
-}
-
-/** The webview and renderer entries share almost all of `packages/ui`'s own code, so Vite
- *  splits it into a common chunk both entries `imports` rather than duplicating it — which
- *  means the CSS that chunk pulls in (`vscode-tokens.css`, `density.css`, `codicon.css`) shows
- *  up in *that chunk's* `css` array, not the entry's own. Vite's documented manifest-consumer
- *  pattern is exactly this: walk `imports` transitively and collect every `css` array found
- *  along the way. `seen` guards the (currently impossible, but not contractually forbidden)
- *  case of a chunk graph that revisits the same chunk from two import paths. */
-function collectCss(manifest: ViteManifest, key: string, seen: Set<string>): string[] {
-  if (seen.has(key)) return [];
-  seen.add(key);
-  const entry = manifest[key];
-  if (!entry) return [];
-  const fromImports = (entry.imports ?? []).flatMap((imp) => collectCss(manifest, imp, seen));
-  return [...fromImports, ...(entry.css ?? [])];
 }
 
 function resolveUiAssets(webview: vscode.Webview, distUi: vscode.Uri): UiAssets {
@@ -110,38 +86,12 @@ export function renderHtml(opts: RenderHtmlOptions): string {
     pendingUiAction: view === 'graph' ? (pendingUiAction ?? null) : null,
   };
 
-  const styleLinks = assets.styleUris
-    .map((uri) => `<link rel="stylesheet" href="${uri.toString()}">`)
-    .join('\n    ');
-
-  const csp = [
-    "default-src 'none'",
-    `img-src ${webview.cspSource} data:`,
-    `style-src ${webview.cspSource} 'unsafe-inline'`,
-    `font-src ${webview.cspSource}`,
-    `script-src 'nonce-${csNonce}'`,
-    // P4 W4: the layout module worker (`packages/ui/src/graph/layoutClient.ts`) is constructed
-    // via `new Worker(new URL(...), { type: "module" })`; Vite's built module-worker bundling
-    // for that form loads through a `blob:` URL in a webview, not the extension's own origin, so
-    // both sources are needed. V1 confirms this holds on a real webview. The review document
-    // does not need this — it runs no layout worker (§6.8/D41) — but CSP is otherwise identical
-    // between the two views and one `renderHtml` covers both rather than forking the document.
-    ...(view === 'graph' ? [`worker-src ${webview.cspSource} blob:`] : []),
-  ].join('; ');
-
-  return `<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8">
-    <meta http-equiv="Content-Security-Policy" content="${csp}">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kira Version</title>
-    ${styleLinks}
-  </head>
-  <body>
-    <div id="app"></div>
-    <script type="application/json" id="kira-bootstrap">${JSON.stringify(bootstrap)}</script>
-    <script type="module" nonce="${csNonce}" src="${assets.scriptUri.toString()}"></script>
-  </body>
-</html>`;
+  return buildWebviewDocument({
+    scriptUrl: assets.scriptUri.toString(),
+    styleUrls: assets.styleUris.map((uri) => uri.toString()),
+    cspSource: webview.cspSource,
+    view,
+    bootstrap,
+    nonce: csNonce,
+  });
 }

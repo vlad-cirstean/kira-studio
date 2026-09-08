@@ -3,6 +3,7 @@ package logsession_test
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"os"
 	"os/exec"
@@ -160,10 +161,11 @@ func TestSession_ReclaimAndSkipResume(t *testing.T) {
 		t.Fatalf("page 2 (post-reclaim): %v", err)
 	}
 	// Exactly 2 commits remain (4 total, pageSize 2): the page fills at exactly the walk's last
-	// record, so exhaustion is only discovered on the *next* read attempt (there is no way to know
-	// a page was the last without trying to read one more and observing EOF).
-	if outcome2.Exhausted || outcome2.Appended != 2 {
-		t.Fatalf("page 2 (post-reclaim): outcome=%+v, want {Appended:2 Exhausted:false}", outcome2)
+	// record, but G16 D6's one-record lookahead reads one chunk further before returning — that
+	// read observes EOF, so exhaustion is discovered in this same call rather than only on a
+	// further, empty ReadPage.
+	if !outcome2.Exhausted || outcome2.Appended != 2 {
+		t.Fatalf("page 2 (post-reclaim): outcome=%+v, want {Appended:2 Exhausted:true}", outcome2)
 	}
 	if runner.logSpawns() != 2 {
 		t.Fatalf("log spawns after reclaim+resume = %d, want 2 (a fresh --skip respawn)", runner.logSpawns())
@@ -178,6 +180,60 @@ func TestSession_ReclaimAndSkipResume(t *testing.T) {
 				t.Fatalf("record %s repeated across the reclaim boundary", r.SHA)
 			}
 		}
+	}
+}
+
+// TestSession_ExactMultiplePageIsExhaustedImmediately is G16 F5's regression guard: a page that
+// fills exactly at the walk's last record (total commits is an exact multiple of PageSize) must
+// report Exhausted:true in the SAME ReadPage call that delivers that last record, via D6's
+// one-record lookahead — not only on a further, empty ReadPage, which is what the old exhausted
+// field (set only inside the io.EOF branch) produced and what session_test.go used to assert as
+// intended before this phase.
+func TestSession_ExactMultiplePageIsExhaustedImmediately(t *testing.T) {
+	skipWithoutGit(t)
+	const total = 6
+	for _, pageSize := range []int{total, total / 2} {
+		t.Run(fmt.Sprintf("pageSize=%d", pageSize), func(t *testing.T) {
+			dir := initRepoWithCommits(t, total)
+			sess := logsession.Open(
+				logsession.Deps{Runner: gitclient.NewExecRunner(), GitPath: "git", Dir: dir, Read: passthroughRead},
+				logsession.Options{Walk: porcelain.WalkSpec{Scope: "all"}, PageSize: pageSize, IdleReclaim: -1},
+			)
+			defer sess.Close()
+
+			var lastOutcome logsession.Outcome
+			appended := 0
+			for i := 0; i < total+1; i++ {
+				outcome, err := sess.ReadPage(context.Background(), func(porcelain.CommitRecord) {})
+				if err != nil {
+					t.Fatalf("ReadPage: %v", err)
+				}
+				appended += outcome.Appended
+				lastOutcome = outcome
+				if outcome.Exhausted {
+					break
+				}
+			}
+			if appended != total {
+				t.Fatalf("total appended across pages = %d, want %d", appended, total)
+			}
+			if !lastOutcome.Exhausted {
+				t.Fatalf("no ReadPage ever reported Exhausted")
+			}
+			if lastOutcome.Appended == 0 {
+				t.Fatalf("Exhausted was only reported on a trailing empty ReadPage (Appended:0) — want it in the same call that delivers the final page")
+			}
+
+			outcome, err := sess.ReadPage(context.Background(), func(porcelain.CommitRecord) {
+				t.Fatal("sink must not be called once exhausted")
+			})
+			if err != nil {
+				t.Fatalf("ReadPage after exhaustion: %v", err)
+			}
+			if !outcome.Exhausted || outcome.Appended != 0 {
+				t.Fatalf("ReadPage after exhaustion: outcome=%+v, want {Appended:0 Exhausted:true}", outcome)
+			}
+		})
 	}
 }
 

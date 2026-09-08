@@ -4,6 +4,9 @@ import AppRoot from './App.vue';
 import ReviewView from './components/review/ReviewView.vue';
 import type { ReviewTarget } from './state/review.ts';
 import type { ViewStateStore } from './state/viewState.ts';
+// G16 D1/D2: the document-level height chain and gutter reset. Imported first so it is the base
+// every other stylesheet layers onto.
+import './theme/app-shell.css';
 import './icons/codicon.css';
 import './theme/vscode-tokens.css';
 import './theme/density.css';
@@ -62,10 +65,15 @@ export function mount(container: Element, opts: MountOptions): MountHandle {
     view === 'review'
       ? createApp(ReviewView, { ...rest, target })
       : createApp(AppRoot, { ...rest, pendingUiAction });
+  // G16 D1/D2: the other half of app-shell.css's `.kv-mount-root` rule — the class and the rule
+  // are useless apart, and they live in two files because the class must follow whatever
+  // container the host hands us, not a naming convention two packages have to agree on.
+  container.classList.add('kv-mount-root');
   app.mount(container);
   return {
     unmount(): void {
       app.unmount();
+      container.classList.remove('kv-mount-root');
     },
   };
 }

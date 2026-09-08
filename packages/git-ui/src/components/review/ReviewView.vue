@@ -714,7 +714,13 @@ watch(
             />
           </div>
 
-          <div v-if="!review.exhausted.value" class="kv-review-load-more">
+          <!-- G16 D9: `remaining > 0` guards against F7's empty-range hole — an empty branch
+               comparison never emits a chunk, so there is no server-side signal to correct here.
+               Kept visible while loading so the affordance does not vanish mid-load. -->
+          <div
+            v-if="!review.exhausted.value && (review.isLoadingMore.value || review.remaining.value > 0)"
+            class="kv-review-load-more"
+          >
             <button
               type="button"
               class="kv-review-load-more-button"

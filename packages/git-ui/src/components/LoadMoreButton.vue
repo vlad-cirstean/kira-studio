@@ -51,7 +51,14 @@ function handleCancel(): void {
 </script>
 
 <template>
-  <div v-if="!graphView.exhausted.value" class="kv-load-more">
+  <!-- G16 D9: `remaining > 0` guards against F7's zero-chunk hole — a re-stream that emits no
+       chunk leaves no server-side signal to correct, so this is the one place that hole can be
+       closed. Kept visible while a load is in flight (`isLoading`) so Cancel does not vanish
+       mid-load. -->
+  <div
+    v-if="!graphView.exhausted.value && (isLoading || graphView.remaining.value > 0)"
+    class="kv-load-more"
+  >
     <button
       type="button"
       class="kv-load-more-button"

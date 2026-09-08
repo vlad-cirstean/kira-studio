@@ -93,4 +93,15 @@ export class PackedStreamState {
     this.lastChunkSource.value = chunk.source;
     return { from: chunk.commits.from, to: chunk.commits.to };
   }
+
+  /** G16 D7: terminal state from a `graph.status` request, applied after a load's resync
+   *  re-stream — not a chunk, so deliberately not folded into `applyChunk`, which would drag the
+   *  reset-on-`from === 0` logic somewhere it does not belong. This is what closes F7's
+   *  zero-chunk hole: a re-stream that emits nothing (because the client already holds every row
+   *  the host has) never calls `applyChunk` at all, so `exhausted`/`remaining` would otherwise be
+   *  stuck at whatever the last real chunk said. */
+  applyStatus(remaining: number, exhausted: boolean): void {
+    this.remaining.value = remaining;
+    this.exhausted.value = exhausted;
+  }
 }

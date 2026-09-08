@@ -157,9 +157,15 @@ export class GraphViewState {
     this.#loadController = controller;
     try {
       while (!this.exhausted.value && !controller.signal.aborted) {
+        const before = this.loadedRows.value;
         await this.#runLoad('loadingMore', () =>
           this.#bridge.request('graph.loadMore', { repoId, pages: 1 }, controller.signal),
         );
+        // G16 D8: a termination guard independent of the exhaustion signal — a page that
+        // appended no rows means there are no more rows, whatever `exhausted` says. Without
+        // this, a walk whose re-stream never reports exhausted (F4) spins forever, repacking
+        // and re-emitting the whole history every iteration.
+        if (this.loadedRows.value === before) break;
       }
     } finally {
       this.#loadController = undefined;
@@ -195,9 +201,12 @@ export class GraphViewState {
     this.announcement.value = composeRevealSearchHitAnnouncement('loading');
     try {
       while (this.store.rowOfSha(sha) < 0 && !this.exhausted.value && !controller.signal.aborted) {
+        const before = this.loadedRows.value;
         await this.#runLoad('loadingMore', () =>
           this.#bridge.request('graph.loadMore', { repoId, pages: 1 }, controller.signal),
         );
+        // G16 D8: same no-progress termination guard as loadAll() — see its comment.
+        if (this.loadedRows.value === before) break;
       }
     } finally {
       signal.removeEventListener('abort', onExternalAbort);
@@ -244,6 +253,19 @@ export class GraphViewState {
     } finally {
       try {
         await this.openStream(repoId, this.loadedRows.value);
+        // G16 D7: closes F7's zero-chunk hole. A re-stream that emits nothing (the client
+        // already holds every row the host has) never calls #applyChunk, so
+        // exhausted/remaining would otherwise be stuck at whatever the last real chunk said —
+        // which is exactly "Load the last 0". graph.status already exists and answers exactly
+        // this (`{loaded, remaining, exhausted}` off the walk's own cached count), so this needs
+        // no CONTRACT_VERSION bump. A failed status call must not mask the load's own outcome or
+        // leave `loading` stuck, so it is caught and logged rather than rethrown.
+        try {
+          const status = await this.#bridge.request('graph.status', { repoId });
+          this.#packed.applyStatus(status.remaining, status.exhausted);
+        } catch (statusError) {
+          console.error('graphView: graph.status failed after load', statusError);
+        }
       } finally {
         this.loading.value = 'idle';
       }

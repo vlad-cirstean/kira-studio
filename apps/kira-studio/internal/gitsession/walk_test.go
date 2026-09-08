@@ -297,6 +297,63 @@ func TestWalk_ReopenDoesNotReadAnUnrequestedPage(t *testing.T) {
 	}
 }
 
+// TestWalk_StreamReplayReportsExhausted is G16 F4's direct regression guard: a cache-replay
+// re-stream of an already-exhausted walk must end with Exhausted:true, not the hardcoded false
+// emitRange's replay loop used to pass. Every re-stream (a webview hide/reveal, graph.loadMore's
+// own resync, the review sidebar's own always-from-zero replay) goes through exactly this path,
+// and this is the state that produced the reported "Load the last 0" button. Before D5 this test
+// fails on the second Stream call.
+func TestWalk_StreamReplayReportsExhausted(t *testing.T) {
+	skipWithoutGitWalk(t)
+	repoDir := initWalkRepo(t, 5)
+	conn, _, repoID := newWalkTestConn(t, repoDir)
+	defer conn.Close()
+
+	// pageSize >= N: the walk's very first Stream reads everything in one page.
+	w, err := conn.Walk(repoID, "git", porcelain.WalkSpec{Scope: "all"}, 100, nil)
+	if err != nil {
+		t.Fatalf("Walk: %v", err)
+	}
+
+	var first []StreamChunk
+	if err := w.Stream(context.Background(), nil, 500, func(c StreamChunk) error {
+		first = append(first, c)
+		return nil
+	}); err != nil {
+		t.Fatalf("first Stream: %v", err)
+	}
+	if len(first) == 0 {
+		t.Fatalf("first Stream emitted no chunks")
+	}
+	if last := first[len(first)-1]; last.Source != "git" || !last.Exhausted {
+		t.Fatalf("first Stream's last chunk = %+v, want {Source:git Exhausted:true}", last)
+	}
+
+	// Re-stream from row 0: a fresh webview mount, or the review sidebar's own always-from-zero
+	// replay (F4). Every chunk comes from cache -- no git read runs (D12's own guard).
+	resume := 0
+	var second []StreamChunk
+	if err := w.Stream(context.Background(), &resume, 500, func(c StreamChunk) error {
+		second = append(second, c)
+		return nil
+	}); err != nil {
+		t.Fatalf("second Stream (replay): %v", err)
+	}
+	if len(second) == 0 {
+		t.Fatalf("second Stream emitted no chunks")
+	}
+	last := second[len(second)-1]
+	if last.Source != "cache" {
+		t.Fatalf("second Stream's last chunk source = %q, want cache", last.Source)
+	}
+	if !last.Exhausted {
+		t.Fatalf("second Stream's last chunk Exhausted = false, want true -- this is F4's bug: a cache replay must tell the truth about exhaustion")
+	}
+	if last.Remaining != 0 {
+		t.Fatalf("second Stream's last chunk Remaining = %d, want 0", last.Remaining)
+	}
+}
+
 func TestWalk_DisposingConnDoesNotBlockAFreshOpenOfTheSameRepo(t *testing.T) {
 	skipWithoutGitWalk(t)
 	repoDir := initWalkRepo(t, 3)

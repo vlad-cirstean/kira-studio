@@ -86,12 +86,23 @@ type Session struct {
 	// one page needs (the rest queue into pending), so by the time a resume happens the process
 	// may already have produced records loadedCount never counted — resuming at loadedCount would
 	// re-walk and re-queue those same records a second time.
-	readCount    int
-	exhausted    bool
+	readCount int
+	// eof is whether the walk's process has drained — not whether the caller has seen everything
+	// it produced. G16 D6: kept apart from "exhausted" (exhaustedLocked, below) specifically so
+	// EOF can be reached with records still queued in pending; folding the two together is what
+	// let a page filling exactly at the walk's last record report Exhausted too late (F5), and
+	// separately let EOF-with-pending silently drop those records (F6).
+	eof          bool
 	baseSnapshot map[string]string // refname -> object id, captured before the first spawn (D9)
 	reclaimTimer *time.Timer
 	cachedTotal  *int
 }
+
+// exhaustedLocked is what every caller means by "exhausted": the walk's process drained AND every
+// record it produced has been delivered. Keeping the two apart is what makes the one-record
+// lookahead in ReadPage safe — EOF can now be reached with records still queued in pending.
+// Caller holds mu.
+func (s *Session) exhaustedLocked() bool { return s.eof && len(s.pending) == 0 }
 
 // Open constructs a Session. Nothing is spawned until the first ReadPage.
 func Open(deps Deps, opts Options) *Session {
@@ -114,11 +125,15 @@ func (s *Session) ReadPage(ctx context.Context, sink func(porcelain.CommitRecord
 
 	s.disarmReclaimLocked()
 
-	if s.exhausted {
+	if s.exhaustedLocked() {
 		return Outcome{Exhausted: true}, nil
 	}
 
-	if s.proc == nil {
+	// G16 D6: guards against re-spawning after EOF while a lookahead record is still parked in
+	// pending (F6's state) — without !s.eof here, that pending-but-not-yet-exhausted case would
+	// send this call into spawnOrResumeLocked and re-walk the history instead of just draining
+	// the queue below.
+	if s.proc == nil && !s.eof {
 		stale, err := s.spawnOrResumeLocked(ctx)
 		if err != nil {
 			return Outcome{}, err
@@ -138,7 +153,12 @@ func (s *Session) ReadPage(ctx context.Context, sink func(porcelain.CommitRecord
 		s.loadedCount++
 	}
 
-	for appended < pageSize {
+	// G16 D6/F5: the lookahead. A full page keeps reading until either one record parks in
+	// pending (so there is definitely more — exhaustedLocked() below is now false) or EOF is
+	// observed (so there is definitely not). Without this, a page that fills exactly at the
+	// walk's last record exits the loop with pending still empty and eof still false, so
+	// exhaustedLocked() is wrongly false until a further, empty ReadPage.
+	for !s.eof && (appended < pageSize || len(s.pending) == 0) {
 		chunk, readErr := s.readChunkLocked(ctx)
 		if len(chunk) > 0 {
 			recs, splitErr := s.splitter.Push(chunk)
@@ -173,18 +193,18 @@ func (s *Session) ReadPage(ctx context.Context, sink func(porcelain.CommitRecord
 				if cerr := gitclient.Classify(ctx, s.currentArgs, res, nil); cerr != nil {
 					return Outcome{}, cerr
 				}
-				s.exhausted = true
+				s.eof = true
 				break
 			}
 			return Outcome{}, readErr
 		}
 	}
 
-	if !s.exhausted {
+	if !s.eof {
 		s.armReclaimLocked()
 	}
 
-	return Outcome{Appended: appended, Exhausted: s.exhausted}, nil
+	return Outcome{Appended: appended, Exhausted: s.exhaustedLocked()}, nil
 }
 
 // spawnOrResumeLocked starts the walk (readCount == 0) or resumes a reclaimed one (via --skip),
@@ -326,7 +346,7 @@ func (s *Session) LoadedCount() int {
 func (s *Session) Exhausted() bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return s.exhausted
+	return s.exhaustedLocked()
 }
 
 // armReclaimLocked arms the idle-reclaim timer (unless IdleReclaim < 0, "never"). Caller holds mu.
