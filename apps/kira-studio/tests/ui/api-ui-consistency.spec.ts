@@ -638,6 +638,22 @@ test('the response find bar counts and steps through matches, and Escape clears 
 
   await page.click('[data-testid="http-find-toggle"]');
   await expect(page.locator('[data-testid="http-find-bar"]')).toBeVisible();
+
+  // Real-interaction fix (reported bug — the response search bar sat below/at the bottom of the
+  // response content instead of above it): mirrors data-view.spec.ts's own relative-position
+  // pattern for the SQL grid's SearchToolbar — the find bar sits above the content it searches,
+  // below the toolbar above it, never below the content (ResponsePane.vue's own comment records
+  // why: DataView.vue's SearchToolbar usage already found "docks at the bottom of the result"
+  // "overlapped the last visible row, which read as a bug rather than a search bar").
+  const findBarBox = await page.locator('[data-testid="http-find-bar"]').boundingBox();
+  const toolbarBox = await page.locator('.response-status-row').boundingBox();
+  const bodyBox = await page.locator('.response-body').boundingBox();
+  if (!findBarBox || !toolbarBox || !bodyBox) {
+    throw new Error('http-find-bar, response-status-row or response-body has no bounding box');
+  }
+  expect(findBarBox.y).toBeGreaterThanOrEqual(toolbarBox.y + toolbarBox.height);
+  expect(findBarBox.y).toBeLessThan(bodyBox.y);
+
   await page.fill('[data-testid="http-find-input"]', 'Ada');
   await expect(page.locator('[data-testid="http-find-count"]')).toHaveText('1 of 2');
   await page.click('[data-testid="http-find-next"]');
