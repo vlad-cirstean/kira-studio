@@ -162,9 +162,14 @@ function buildBadgeElement(spec: BadgeSpec, laneColor: number | undefined): HTML
   if (spec.dashed) classes.push('kv-badge-dashed');
   if (laneColor !== undefined) classes.push('kv-badge-lane-tinted', laneClass(laneColor));
   badge.className = classes.join(' ');
-  // The full name always lives in `title` (a mouse-hover affordance) independent of whether the
-  // ~190px CSS truncation (kv-badge-label) actually clips this particular badge's text.
-  badge.title = spec.text;
+  // G21 D2: the full name always lives in `@kira/kira-ui`'s own tooltip attribute (a mouse-hover
+  // affordance) independent of whether the ~190px CSS truncation (kv-badge-label) actually clips
+  // this particular badge's text — `data-kui-tip`, not a native `title`, since this file is plain
+  // DOM code outside Vue and so cannot use the `v-kui-tooltip` directive itself; setting the same
+  // attribute the directive writes gets it picked up by the one document-level tooltip controller
+  // `App.vue`/`ReviewView.vue` each already mount. No `aria-label` alongside it: the visible label
+  // span below already gives this badge a real accessible name.
+  badge.setAttribute('data-kui-tip', spec.text);
 
   // `docs/plans/P7.md` W14: the one seam `CommitGrid.vue`'s `handleContextMenu` hit-tests for
   // (`closest("[data-ref-kind]")`) — present only for `branch`/`remoteBranch` (see `BadgeSpec`'s
@@ -204,7 +209,7 @@ function buildBadgeElement(spec: BadgeSpec, laneColor: number | undefined): HTML
 function buildOverflowBadge(overflow: OverflowSpec): HTMLSpanElement {
   const badge = document.createElement('span');
   badge.className = 'kv-badge kv-badge-pill kv-badge-overflow';
-  badge.title = overflow.title;
+  badge.setAttribute('data-kui-tip', overflow.title);
   badge.textContent = `+${overflow.count}`;
   return badge;
 }
