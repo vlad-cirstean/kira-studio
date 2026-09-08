@@ -153,6 +153,12 @@ export const OTHER_COMMANDS: readonly OtherCommand[] = [
   // G14 D10: the review diff editor's own toolbar, item 8 — reveals and selects a commit in the
   // graph webview (`diffToolbar.ts`'s `openCommitInGraphCommand`).
   { command: 'kiraVersion.openCommitInGraph', title: 'Open Commit in Graph' },
+  // G15 D2: range/hunk-level review marking's own two commands — the selection-based toolbar/
+  // context-menu route, and the explicit-target route the gutter hover's command link and the
+  // CodeLens both use (`reviewMarking.ts`'s `markSelectionReviewedCommand`/
+  // `markSelectionUnreviewedCommand`).
+  { command: 'kiraVersion.markSelectionReviewed', title: 'Mark Selection Reviewed' },
+  { command: 'kiraVersion.markSelectionUnreviewed', title: 'Mark Selection Unreviewed' },
 ];
 
 export type OtherCommandId = (typeof OTHER_COMMANDS)[number]['command'];

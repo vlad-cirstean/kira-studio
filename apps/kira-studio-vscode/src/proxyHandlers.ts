@@ -76,6 +76,20 @@ export interface CreateProxyHandlersDeps {
   // never disagrees with a sidebar-side mutation — the reverse direction (editor -> sidebar) needs
   // a real event (`refreshReviewComments`, D19) since the webview has no socket of its own to watch.
   readonly notifyCommentsMutated: (repoId: string, branch: string) => void;
+  // G15 D7/D11: reviewMarking.ts's controller is the vscode-facing layer — this file reaches it
+  // only as these two plain-data callbacks, the same shape renderReviewComments/
+  // notifyCommentsMutated already use, so this file never imports vscode (its own doc comment,
+  // above). Called right after editor.openRangeDiff opens the branch-tip side of a diff, so its
+  // decorations paint immediately rather than waiting for onDidChangeVisibleTextEditors.
+  readonly refreshReviewMarking: (
+    repoId: string,
+    branchTip: string,
+    path: string,
+    branch: string,
+  ) => void;
+  // Called after a webview-side review.mark succeeds, so an editor-side decoration never disagrees
+  // with a sidebar-side mark.
+  readonly notifyReviewMarked: (repoId: string, branch: string, path: string) => void;
 }
 
 export function createProxyHandlers(deps: CreateProxyHandlersDeps): ServerHandlers {
@@ -90,6 +104,8 @@ export function createProxyHandlers(deps: CreateProxyHandlersDeps): ServerHandle
     revealReview,
     renderReviewComments,
     notifyCommentsMutated,
+    refreshReviewMarking,
+    notifyReviewMarked,
   } = deps;
 
   function forward<K extends RequestKey>(method: K): RequestHandler<K> {
@@ -248,7 +264,11 @@ export function createProxyHandlers(deps: CreateProxyHandlersDeps): ServerHandle
       });
       // G13 D9: the right-hand document is the only commentable side (status !== 'deleted') — its
       // threads render now rather than waiting for onDidChangeVisibleTextEditors.
-      if (status !== 'deleted') renderReviewComments(repoId, branchTip, path, branch);
+      // G15 D7: same reason, same seam, for the range-marking decorations.
+      if (status !== 'deleted') {
+        renderReviewComments(repoId, branchTip, path, branch);
+        refreshReviewMarking(repoId, branchTip, path, branch);
+      }
       return {};
     },
     // D4/D11: the server resolves the on-disk-vs-object-database decision and (for a live file)
@@ -311,7 +331,14 @@ export function createProxyHandlers(deps: CreateProxyHandlersDeps): ServerHandle
     // and last of those was closed above (review.open).
     'review.files': forward('review.files'),
     'review.fileDiff': forward('review.fileDiff'),
-    'review.mark': forward('review.mark'),
+    // G15 D7: a webview-side mark (the sidebar's whole-file toggle) also refreshes every editor
+    // decoration tracked for the same (repoId, branch, path) — the exact shape review.comment.add/
+    // remove/clear already have below.
+    'review.mark': async (params, ctx) => {
+      const result = await connection.request('review.mark', params, ctx.signal);
+      notifyReviewMarked(params.repoId, params.branch, params.path);
+      return result;
+    },
     'review.comment.list': forward('review.comment.list'),
     'review.comment.export': forward('review.comment.export'),
     // G13 D9: a webview-side add/remove/clear also re-renders every currently-tracked document

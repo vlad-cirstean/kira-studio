@@ -25,6 +25,12 @@ versions), rather than a silent failure — update whichever side is behind.
   a detail pane, and diffs that open in VS Code's own native diff editor.
 - **Branch Review** — the second activity-bar view: pick a branch, review its commits or its
   changed files against a base, and mark files reviewed.
+- **Range/hunk review marking** — inside a branch review diff, select lines (or use the gutter
+  mark's hover) and mark just that selection reviewed or unreviewed from the diff editor's own
+  toolbar, right-click menu, or the `Kira Version: Mark Selection Reviewed`/`Unreviewed` palette
+  commands. Turn on `"diffEditor.codeLens": true` for an inline "Mark Reviewed"/"Mark Unreviewed"
+  action at each change block too — it is off by default in VS Code itself, so this extension
+  never enables it for you.
 - **`Kira Version:` command palette prefix** — every command this extension contributes, including
   opening a repository and checking connection status.
 - **Status-bar item** — shows the connection state at a glance (connecting, waiting for approval,

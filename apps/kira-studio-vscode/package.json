@@ -131,6 +131,18 @@
         "icon": "$(git-commit)"
       },
       {
+        "command": "kiraVersion.markSelectionReviewed",
+        "title": "Mark Selection Reviewed",
+        "category": "Kira Version",
+        "icon": "$(check)"
+      },
+      {
+        "command": "kiraVersion.markSelectionUnreviewed",
+        "title": "Mark Selection Unreviewed",
+        "category": "Kira Version",
+        "icon": "$(circle-slash)"
+      },
+      {
         "command": "kiraVersion.checkout",
         "title": "Checkout…",
         "category": "Kira Version"
@@ -233,6 +245,28 @@
           "command": "kiraVersion.openCommitInGraph",
           "group": "navigation@-98",
           "when": "isInDiffEditor && resourceScheme == kira-version"
+        },
+        {
+          "command": "kiraVersion.markSelectionReviewed",
+          "group": "navigation@-97",
+          "when": "isInDiffEditor && kiraVersion.inReviewDiff && kiraVersion.reviewSelection != full"
+        },
+        {
+          "command": "kiraVersion.markSelectionUnreviewed",
+          "group": "navigation@-97",
+          "when": "isInDiffEditor && kiraVersion.inReviewDiff && kiraVersion.reviewSelection == full"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "kiraVersion.markSelectionReviewed",
+          "group": "kiraVersion@1",
+          "when": "kiraVersion.inReviewDiff"
+        },
+        {
+          "command": "kiraVersion.markSelectionUnreviewed",
+          "group": "kiraVersion@1",
+          "when": "kiraVersion.inReviewDiff"
         }
       ],
       "comments/commentThread/context": [
@@ -413,6 +447,26 @@
           "light": "#623e32",
           "highContrast": "#e3d0c9",
           "highContrastLight": "#3d271f"
+        }
+      },
+      {
+        "id": "kiraVersion.reviewedLineBackground",
+        "description": "Kira Version: whole-line tint for a range/hunk already marked reviewed, in the modified pane of a branch review diff (G15).",
+        "defaults": {
+          "dark": "rgba(46,160,67,0.15)",
+          "light": "rgba(31,136,61,0.10)",
+          "highContrast": "rgba(46,160,67,0.25)",
+          "highContrastLight": "rgba(31,136,61,0.20)"
+        }
+      },
+      {
+        "id": "kiraVersion.reviewedLineOverviewRuler",
+        "description": "Kira Version: overview ruler mark for a range/hunk already marked reviewed (G15) — the only surface that answers \"how much of this file have I read\" without scrolling.",
+        "defaults": {
+          "dark": "rgba(46,160,67,0.8)",
+          "light": "rgba(31,136,61,0.8)",
+          "highContrast": "rgba(46,160,67,0.9)",
+          "highContrastLight": "rgba(31,136,61,0.9)"
         }
       }
     ]

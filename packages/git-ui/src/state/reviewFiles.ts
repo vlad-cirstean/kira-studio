@@ -242,6 +242,14 @@ export class ReviewFilesState {
     }
   }
 
+  /** G15 D9: re-runs `#loadFiles` against the current target — the review sidebar's own answer to
+   *  an editor-side range mark, which emits no `repo.changed` (it touches `review.db`, not refs)
+   *  and would otherwise leave the file list stale until an unrelated repo change. A no-op with no
+   *  target set. */
+  reload(): void {
+    if (this.#target) void this.#loadFiles();
+  }
+
   dispose(): void {
     this.#abortAll();
   }

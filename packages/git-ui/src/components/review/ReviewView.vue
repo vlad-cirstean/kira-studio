@@ -133,6 +133,12 @@ function onUiAction(action: UiActionKind): void {
     case 'refreshReviewComments':
       void reviewComments.value?.reload();
       return;
+    // G15 D9: pushed by the extension after an editor-side range mark, so the Files pane's
+    // reviewed state doesn't sit stale until an unrelated repo.changed comes along — reuses the
+    // existing 'refresh' UiActionKind rather than adding a new contract member (§11.2).
+    case 'refresh':
+      reviewFiles.value?.reload();
+      return;
     default:
       return;
   }

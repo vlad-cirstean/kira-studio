@@ -37,6 +37,11 @@ import { VsCodeLogger } from './ports/logger.ts';
 import { VsCodeWorkspaceRoots } from './ports/workspaceRoots.ts';
 import { createProxyHandlers } from './proxyHandlers.ts';
 import { createReviewCommentController } from './reviewComments.ts';
+import {
+  createReviewMarkingController,
+  markSelectionReviewedCommand,
+  markSelectionUnreviewedCommand,
+} from './reviewMarking.ts';
 import { KiraReviewViewProvider } from './reviewView.ts';
 import { parseVirtualKey } from './virtualKey.ts';
 
@@ -233,6 +238,16 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     reviewProvider.runUiAction('refreshReviewComments'),
   );
   context.subscriptions.push(reviewComments);
+  // G15 D7/D9: the same let-binding cycle break reviewComments' own onEditorMutated uses —
+  // notifySidebarRefresh reaches D9's reused 'refresh' UiActionKind, keeping the review sidebar's
+  // file list honest after an editor-side mark.
+  const reviewMarking = createReviewMarkingController({
+    connection: manager,
+    settings: () => currentSettings,
+    extensionUri: context.extensionUri,
+    notifySidebarRefresh: () => reviewProvider.runUiAction('refresh'),
+  });
+  context.subscriptions.push(reviewMarking);
   const handlers = createProxyHandlers({
     connection: manager,
     settings: () => currentSettings,
@@ -245,6 +260,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     renderReviewComments: (repoId, branchTip, path, branch) =>
       reviewComments.renderThreadsForKey(repoId, branchTip, path, branch),
     notifyCommentsMutated: (repoId, branch) => reviewComments.notifyCommentsMutated(repoId, branch),
+    refreshReviewMarking: (repoId, branchTip, path, branch) =>
+      reviewMarking.refreshForKey(repoId, branchTip, path, branch),
+    notifyReviewMarked: (repoId, branch, path) => reviewMarking.notifyMarked(repoId, branch, path),
   });
   const graphProvider = new KiraGraphViewProvider({ extensionUri: context.extensionUri, handlers });
   reviewProvider = new KiraReviewViewProvider({ extensionUri: context.extensionUri, handlers });
@@ -304,6 +322,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       void reviewComments.deleteComment(comment),
     'kiraVersion.goToFileFromDiff': goToFileFromDiffCommand(diffToolbarDeps),
     'kiraVersion.openCommitInGraph': openCommitInGraphCommand(diffToolbarDeps),
+    // G15 D2: the two entry points shared by the toolbar, the context menu, the palette, the
+    // gutter hover's command link and the CodeLens (an explicit {uri, ranges} argument bypasses
+    // tab/selection resolution for the last two).
+    'kiraVersion.markSelectionReviewed': markSelectionReviewedCommand(reviewMarking),
+    'kiraVersion.markSelectionUnreviewed': markSelectionUnreviewedCommand(reviewMarking),
   };
   for (const entry of Object.values(MUTATING_COMMANDS)) {
     if (isPaletteCommand(entry)) {
@@ -327,6 +350,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       dispose: manager.on('repo.changed', (payload) => {
         graphProvider.notifyRepoChanged(payload);
         reviewProvider.notifyRepoChanged(payload);
+        reviewMarking.notifyRepoChanged(payload);
       }),
     },
     // G7 D4/D21: the credential relay's whole client half — askpass becomes a relay, per SPEC §5
@@ -371,6 +395,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     manager.onStateChange((state) => {
       logger.log('info', 'connection state', state);
       if (state.kind !== 'connected') lastAppInit = undefined;
+      // G15 D7: "connection state leaves connected" — every tracked decoration/state is dropped
+      // rather than left showing a diff over a connection that may reconnect to a different repo.
+      reviewMarking.notifyConnectionState(state);
       updateStatusBar(statusBarItem, state, isActive, lastAppInit);
       // §5.4 point 4: this phase's own exit criterion, executing in the real extension — the
       // moment a connection is established, prove app.init round-trips over the real socket.
