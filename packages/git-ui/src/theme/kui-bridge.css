@@ -21,9 +21,19 @@
   --kui-space-2: var(--kv-space-2);
   --kui-space-3: var(--kv-space-3);
   --kui-space-4: var(--kv-space-4);
+  --kui-space-5: var(--kv-space-5);
   /* G20 D6: `packages/git-ui` had no `--kv-z-*` ladder to bridge from (ad hoc 10/20/30 literals
-     throughout) — this phase is the one that establishes the values, not merely re-maps them. */
+     throughout) — this phase is the one that establishes the values, not merely re-maps them.
+     G21 D2 adds `--kui-z-modal`, one rung above menus, for KuiDialog's backdrop. */
   --kui-z-popover: 20;
   --kui-z-menu: 30;
-  --kui-z-tooltip: 40;
+  --kui-z-modal: 40;
+  --kui-z-tooltip: 50;
+  /* G21 D2: KuiDialog's backdrop and KuiButton's `primary` variant — the real filled-button
+     triple every dialog's own submit action already used before this phase, not the row-
+     selection colour `--kui-selected-*` maps to. */
+  --kui-overlay-bg: var(--kv-overlay-bg);
+  --kui-button-bg: var(--kv-button-bg);
+  --kui-button-fg: var(--kv-button-fg);
+  --kui-button-hover-bg: var(--kv-button-hover-bg);
 }

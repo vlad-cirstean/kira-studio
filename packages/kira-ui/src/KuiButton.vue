@@ -16,7 +16,10 @@ import KuiIconBox from './KuiIconBox.vue';
 withDefaults(
   defineProps<{
     icon?: string;
-    variant?: 'default' | 'primary' | 'danger';
+    /** G21 D2: `'ghost'` is the transparent, border-less icon-only affordance
+     *  (`.kv-copy-button` and friends) `default | primary | danger` did not cover — no border at
+     *  rest, a hover background only, sized to its icon rather than a full control row. */
+    variant?: 'default' | 'primary' | 'danger' | 'ghost';
     active?: boolean;
     count?: number;
   }>(),

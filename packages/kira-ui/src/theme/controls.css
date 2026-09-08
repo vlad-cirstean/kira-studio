@@ -7,12 +7,14 @@
  * still renders something reasonable, since every `--kui-*` reference below carries its own
  * fallback.
  *
- * G20 D6: the `--kui-z-*` floating-surface ladder — a documented contract, same as the sizing/
- * color vocabulary above. Each host bridges these onto its own real scale (or, for
+ * G20 D6 / G21 D2: the `--kui-z-*` floating-surface ladder — a documented contract, same as the
+ * sizing/color vocabulary above. Each host bridges these onto its own real scale (or, for
  * `packages/git-ui`, which had no `--kv-z-*` ladder at all, establishes fresh literal values):
  *
  *   --kui-z-popover  lowest  — dropdowns (KuiPopoverPanel), the force-delete popup
  *   --kui-z-menu     above popovers — context menus (KuiContextMenu)
+ *   --kui-z-modal    above menus — KuiDialog's backdrop (a dialog must sit above any dropdown or
+ *                    context menu a page underneath it may have left open)
  *   --kui-z-tooltip  highest — KuiTooltip
  */
 
@@ -63,14 +65,37 @@
   color: var(--kui-selected-fg, var(--kui-fg));
 }
 
+/* G21 D2: `--kui-button-bg`/`--kui-button-fg`/`--kui-button-hover-bg` are a real, dedicated
+   filled-button token triple (the eleven dialogs' own "Confirm"/"Create branch"/… submit
+   buttons used `--kv-button-bg` for exactly this reason — a host's actual button colour, not its
+   row-selection colour) — falling back to `--kui-selected-*` for a host that has not bridged
+   them, so this variant still renders reasonably with zero required bridge changes. */
 .kui-button--primary {
-  background-color: var(--kui-selected-bg);
-  color: var(--kui-selected-fg);
-  border-color: var(--kui-focus-border, var(--kui-border));
+  background-color: var(--kui-button-bg, var(--kui-selected-bg));
+  color: var(--kui-button-fg, var(--kui-selected-fg));
+  border-color: var(--kui-button-bg, var(--kui-focus-border, var(--kui-border)));
+}
+
+.kui-button--primary:hover:not(:disabled) {
+  background-color: var(--kui-button-hover-bg, var(--kui-button-bg, var(--kui-selected-bg)));
+  border-color: var(--kui-button-hover-bg, var(--kui-button-bg, var(--kui-focus-border)));
 }
 
 .kui-button--danger {
   color: var(--kui-danger-fg, var(--kui-fg));
+  border-color: var(--kui-danger-fg, var(--kui-border));
+}
+
+/* G21 D2: the transparent, border-less icon-only affordance — no border/background at rest,
+   hover feedback only, `.kv-copy-button` and friends' own shape. */
+.kui-button--ghost {
+  border-color: transparent;
+  padding: 0 var(--kui-space-1, 2px);
+  opacity: 0.8;
+}
+
+.kui-button--ghost:hover:not(:disabled) {
+  opacity: 1;
 }
 
 .kui-button-count {
@@ -224,4 +249,174 @@
   border: 1px solid var(--kui-border, transparent);
   border-radius: var(--kui-radius, 0);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.36);
+}
+
+/* G21 D2: KuiDialog.vue — the modal shell that replaces `packages/git-ui`'s eleven hand-rolled
+   `.kv-modal-backdrop`/`.kv-modal` pairs. */
+.kui-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--kui-z-modal, 50);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--kui-overlay-bg, rgba(0, 0, 0, 0.5));
+}
+
+.kui-modal {
+  display: flex;
+  flex-direction: column;
+  max-height: 85vh;
+  padding: var(--kui-space-4, 16px);
+  background-color: var(--kui-bg-panel, canvas);
+  color: var(--kui-fg, inherit);
+  border: 1px solid var(--kui-border, transparent);
+  border-radius: var(--kui-radius, 0);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.36);
+}
+
+.kui-modal-title {
+  flex-shrink: 0;
+  margin: 0 0 var(--kui-space-3, 8px);
+  font-size: 1.05em;
+}
+
+.kui-modal-body {
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.kui-modal-actions {
+  display: flex;
+  flex-shrink: 0;
+  justify-content: flex-end;
+  gap: var(--kui-space-2, 4px);
+  margin-top: var(--kui-space-4, 16px);
+}
+
+/* G21 D2: KuiSegmented.vue — one implementation of the four hand-rolled icon-toggle groups. */
+.kui-segmented {
+  display: flex;
+  gap: var(--kui-space-1, 2px);
+}
+
+.kui-segmented-button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kui-space-1, 2px);
+  height: var(--kui-control-h, 22px);
+  padding: 0 var(--kui-space-2, 4px);
+  background: transparent;
+  color: var(--kui-fg, inherit);
+  border: 1px solid transparent;
+  border-radius: var(--kui-radius, 0);
+  cursor: pointer;
+}
+
+.kui-segmented-button:hover:not(.kui-segmented-button--active) {
+  background-color: var(--kui-hover-bg, rgba(128, 128, 128, 0.15));
+}
+
+.kui-segmented-button--active {
+  background-color: var(--kui-selected-bg, var(--kui-hover-bg));
+  color: var(--kui-selected-fg, var(--kui-fg));
+}
+
+.kui-segmented-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 3px;
+  border-radius: 999px;
+  background-color: var(--kui-hover-bg, rgba(128, 128, 128, 0.25));
+  font-size: 0.75em;
+  line-height: 14px;
+}
+
+/* G21 D2: KuiSearchInput.vue — KuiTextInput plus a leading search glyph and a trailing clear
+   button. */
+.kui-search-input {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  height: var(--kui-control-h, 22px);
+}
+
+.kui-search-input-icon {
+  position: absolute;
+  left: var(--kui-space-2, 4px);
+  pointer-events: none;
+  font-size: 13px;
+  opacity: 0.7;
+}
+
+.kui-search-input-field {
+  width: 100%;
+  height: 100%;
+  padding: 0 var(--kui-space-5, 20px) 0 var(--kui-space-5, 20px);
+  background-color: var(--kui-bg-panel, transparent);
+  color: var(--kui-fg, inherit);
+  border: 1px solid var(--kui-border, transparent);
+  border-radius: var(--kui-radius, 0);
+  font-family: inherit;
+  font-size: inherit;
+}
+
+.kui-search-input-field:focus-visible {
+  outline: 1px solid var(--kui-focus-border, currentColor);
+  outline-offset: -1px;
+}
+
+.kui-search-input-clear {
+  position: absolute;
+  right: var(--kui-space-1, 2px);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  color: var(--kui-fg-muted, currentColor);
+  cursor: pointer;
+  opacity: 0.7;
+}
+
+.kui-search-input-clear:hover {
+  opacity: 1;
+}
+
+/* G21 D2: KuiSelect.vue — a styled native `<select>`. */
+.kui-select {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.kui-select-field {
+  height: var(--kui-control-h, 22px);
+  padding: 0 var(--kui-space-5, 20px) 0 var(--kui-space-2, 4px);
+  background-color: var(--kui-bg-panel, transparent);
+  color: var(--kui-fg, inherit);
+  border: 1px solid var(--kui-border, transparent);
+  border-radius: var(--kui-radius, 0);
+  font-family: inherit;
+  font-size: inherit;
+  appearance: none;
+}
+
+.kui-select-field:focus-visible {
+  outline: 1px solid var(--kui-focus-border, currentColor);
+  outline-offset: -1px;
+}
+
+.kui-select-chevron {
+  position: absolute;
+  right: var(--kui-space-1, 2px);
+  pointer-events: none;
+  font-size: 13px;
+  opacity: 0.7;
 }
