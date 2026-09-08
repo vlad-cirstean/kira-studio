@@ -170,18 +170,10 @@ export function createProxyHandlers(deps: CreateProxyHandlersDeps): ServerHandle
       return connection.request('repo.close', params, ctx.signal);
     },
     'graph.status': forward('graph.status'),
-    'graph.loadMore': (params, ctx) => {
-      const snap = settings();
-      return connection.request(
-        'graph.loadMore',
-        {
-          ...params,
-          scope: snap['kiraVersion.graph.scope'],
-          pageSize: snap['kiraVersion.graph.pageSize'],
-        },
-        ctx.signal,
-      );
-    },
+    // G18 D6: scope/pageSize are no longer injected here — a raw request omitting them now
+    // resolves this repo's own stored kiraVersion.graph.* settings server-side (the per-repo
+    // dialog's own storage), the exact upgrade D6 describes. Wire shape unchanged.
+    'graph.loadMore': forward('graph.loadMore'),
     'graph.refresh': forward('graph.refresh'),
     'commit.detail': forward('commit.detail'),
     'commit.fileDiff': forward('commit.fileDiff'),
@@ -310,16 +302,9 @@ export function createProxyHandlers(deps: CreateProxyHandlersDeps): ServerHandle
       await editor.resolveConflict({ path: join(root, path) });
       return {};
     },
-    // D1: baseCandidates is injected from the window's own coerced settings snapshot, exactly as
-    // graph.loadMore/graph.stream inject scope/pageSize below.
-    'review.resolveBase': (params, ctx) => {
-      const snap = settings();
-      return connection.request(
-        'review.resolveBase',
-        { ...params, baseCandidates: snap['kiraVersion.review.baseCandidates'] },
-        ctx.signal,
-      );
-    },
+    // G18 D6: baseCandidates is no longer injected here — a raw request omitting it now resolves
+    // this repo's own stored kiraVersion.review.baseCandidates server-side. Wire shape unchanged.
+    'review.resolveBase': forward('review.resolveBase'),
     // D13: the seventh and last host-capability method — a host action (reveal a VS Code view),
     // answered locally rather than forwarded. The server has no review.open case and answers
     // E_UNKNOWN_METHOD for anything that reaches it there.
@@ -360,16 +345,10 @@ export function createProxyHandlers(deps: CreateProxyHandlersDeps): ServerHandle
       notifyCommentsMutated(params.repoId, params.branch);
       return result;
     },
-    // G7 D2: strategySetting is injected from the window's own coerced settings snapshot,
-    // exactly as review.resolveBase injects baseCandidates above.
-    'remote.pullPreflight': (params, ctx) => {
-      const snap = settings();
-      return connection.request(
-        'remote.pullPreflight',
-        { ...params, strategySetting: snap['kiraVersion.pull.strategy'] },
-        ctx.signal,
-      );
-    },
+    // G18 D6/F14: strategySetting is no longer injected here — a raw request omitting it now
+    // resolves this repo's own stored kiraVersion.pull.strategy server-side, the same upgrade D6
+    // already gives graph.loadMore/graph.stream/review.resolveBase. Wire shape unchanged.
+    'remote.pullPreflight': forward('remote.pullPreflight'),
     'remote.pushPreflight': forward('remote.pushPreflight'),
     'remote.run': forward('remote.run'),
     'remote.cancel': forward('remote.cancel'),
@@ -394,22 +373,17 @@ export function createProxyHandlers(deps: CreateProxyHandlersDeps): ServerHandle
     // (ServerHandlers.requests is total over RequestKey, so both need an entry regardless).
     'file.read': forward('file.read'),
     'file.goToTarget': forward('file.goToTarget'),
+    // G18 D4: the per-repo settings dialog's own two requests — plain forwards, same as every
+    // other repoId-addressed request; the server is the sole owner of this storage.
+    'repoSettings.get': forward('repoSettings.get'),
+    'repoSettings.set': forward('repoSettings.set'),
   };
 
   const streams: ServerHandlers['streams'] = {
-    'graph.stream': (params, ctx) => {
-      const snap = settings();
-      return connection.stream(
-        'graph.stream',
-        {
-          ...params,
-          scope: snap['kiraVersion.graph.scope'],
-          pageSize: snap['kiraVersion.graph.pageSize'],
-        },
-        (chunk) => ctx.emit(chunk),
-        ctx.signal,
-      );
-    },
+    // G18 D6: scope/pageSize are no longer injected here — see graph.loadMore's own comment
+    // above; the same upgrade applies to the streaming request.
+    'graph.stream': (params, ctx) =>
+      connection.stream('graph.stream', params, (chunk) => ctx.emit(chunk), ctx.signal),
   };
 
   return { requests, streams };

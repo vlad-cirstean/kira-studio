@@ -51,6 +51,8 @@ export type {
   RemoteProgress,
   RepoCandidate,
   RepoOpenResult,
+  RepoSettingsPatch,
+  RepoSettingsSnapshot,
   RepoSummary,
   RequestKey,
   ResetMode,

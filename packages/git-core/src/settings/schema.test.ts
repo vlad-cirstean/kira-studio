@@ -1,5 +1,12 @@
 import { describe, expect, test } from 'bun:test';
-import { coerceSettings, defaultSettings, SETTINGS, toVsCodeConfiguration } from './schema.ts';
+import type { SettingDef, SettingKey } from './schema.ts';
+import {
+  coerceSettings,
+  defaultSettings,
+  repoSettingKeys,
+  SETTINGS,
+  toVsCodeConfiguration,
+} from './schema.ts';
 
 describe('defaultSettings', () => {
   test('returns every SETTINGS key at its declared default', () => {
@@ -23,18 +30,24 @@ describe('coerceSettings', () => {
     expect(result.problems).toEqual([]);
   });
 
-  test('accepts a valid value for every type: string, ranged number, enum, and stringArray', () => {
+  test('accepts a valid value for every type: ranged number, enum, and stringArray', () => {
     const result = coerceSettings({
-      'kiraVersion.git.path': '/usr/bin/git',
       'kiraVersion.graph.pageSize': 1000,
       'kiraVersion.graph.scope': 'head',
       'kiraVersion.review.baseCandidates': ['trunk', 'develop'],
     });
     expect(result.problems).toEqual([]);
-    expect(result.settings['kiraVersion.git.path']).toBe('/usr/bin/git');
     expect(result.settings['kiraVersion.graph.pageSize']).toBe(1000);
     expect(result.settings['kiraVersion.graph.scope']).toBe('head');
     expect(result.settings['kiraVersion.review.baseCandidates']).toEqual(['trunk', 'develop']);
+  });
+
+  // G18 D10/D15: kiraVersion.git.path is no longer a SETTINGS key at all (it moved to kira.db's
+  // existing server-owned `settings` table) — a raw client that still sends it is treated exactly
+  // like any other stranger, not specially.
+  test('kiraVersion.git.path is an unknown key, not a settable string (G18 D15)', () => {
+    const result = coerceSettings({ 'kiraVersion.git.path': '/usr/bin/git' });
+    expect(result.problems).toEqual([{ key: 'kiraVersion.git.path', reason: 'unknown key' }]);
   });
 
   test('stringArray: a non-array value falls back to the default and is reported', () => {
@@ -119,50 +132,57 @@ describe('coerceSettings', () => {
 });
 
 describe('toVsCodeConfiguration', () => {
-  test('has one property per setting, with description, default and enum intact', () => {
+  // G18 D1/D10/D15: every SETTINGS key now carries a `source` (seven `'repo'`, one `'host'`) —
+  // there is no longer any `'extension'`-sourced key left for this extension to contribute at
+  // all, so the generated `contributes.configuration` has exactly zero properties.
+  test('produces zero properties — every remaining key carries a source (G18)', () => {
     const { properties } = toVsCodeConfiguration();
-
-    const pageSize = properties['kiraVersion.graph.pageSize'] as Record<string, unknown>;
-    expect(pageSize).toEqual({
-      type: 'number',
-      default: 5000,
-      description: SETTINGS['kiraVersion.graph.pageSize'].description,
-      minimum: 100,
-      maximum: 50000,
-    });
-
-    const scope = properties['kiraVersion.graph.scope'] as Record<string, unknown>;
-    expect(scope).toEqual({
-      type: 'string',
-      default: 'all',
-      description: SETTINGS['kiraVersion.graph.scope'].description,
-      enum: ['all', 'head'],
-    });
-
-    const gitPath = properties['kiraVersion.git.path'] as Record<string, unknown>;
-    expect(gitPath).toEqual({
-      type: 'string',
-      default: '',
-      description: SETTINGS['kiraVersion.git.path'].description,
-    });
-
-    const baseCandidates = properties['kiraVersion.review.baseCandidates'] as Record<
-      string,
-      unknown
-    >;
-    expect(baseCandidates).toEqual({
-      type: 'array',
-      items: { type: 'string' },
-      default: ['main', 'master'],
-      description: SETTINGS['kiraVersion.review.baseCandidates'].description,
-    });
+    expect(properties).toEqual({});
   });
 
-  // G14 D6/D11: this is the assertion that actually matters — it is the only thing stopping a
-  // host-owned key (`source: 'host'`) from being contributed into this extension's own manifest,
-  // which VS Code would treat as a duplicate declaration of a core setting.
+  // G14 D6/D11/G18 D10: this is the assertion that actually matters — it is the only thing
+  // stopping a key this extension does not itself own the value of (`source: 'host'` or, since
+  // G18, `source: 'repo'`) from being contributed into this extension's own manifest, which VS
+  // Code would treat as a duplicate declaration of someone else's setting.
   test('does not expose a source: "host" key, e.g. workbench.tree.indent', () => {
     const { properties } = toVsCodeConfiguration();
     expect(properties['workbench.tree.indent']).toBeUndefined();
+  });
+
+  test('does not expose a source: "repo" key, e.g. kiraVersion.graph.pageSize (G18)', () => {
+    const { properties } = toVsCodeConfiguration();
+    expect(properties['kiraVersion.graph.pageSize']).toBeUndefined();
+  });
+});
+
+describe('repoSettingKeys', () => {
+  test('returns exactly the seven source: "repo" keys, G18 D1', () => {
+    const expected: SettingKey[] = [
+      'kiraVersion.graph.pageSize',
+      'kiraVersion.graph.scope',
+      'kiraVersion.log.level',
+      'kiraVersion.pull.strategy',
+      'kiraVersion.review.baseCandidates',
+      'kiraVersion.stash.includeUntracked',
+      'kiraVersion.stash.showInGraph',
+    ];
+    expect([...repoSettingKeys()].sort()).toEqual(expected.sort());
+  });
+
+  test('every returned key actually carries source: "repo"', () => {
+    for (const key of repoSettingKeys()) {
+      const def: SettingDef<unknown> = SETTINGS[key];
+      expect(def.source).toBe('repo');
+    }
+  });
+});
+
+describe('instanceWide (G18 D10/D14)', () => {
+  test('kiraVersion.log.level is the only instanceWide: true key', () => {
+    for (const key of repoSettingKeys()) {
+      const def: SettingDef<unknown> = SETTINGS[key];
+      const expected = key === 'kiraVersion.log.level';
+      expect(Boolean(def.instanceWide)).toBe(expected);
+    }
   });
 });

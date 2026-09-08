@@ -243,7 +243,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   // file list honest after an editor-side mark.
   const reviewMarking = createReviewMarkingController({
     connection: manager,
-    settings: () => currentSettings,
     extensionUri: context.extensionUri,
     notifySidebarRefresh: () => reviewProvider.runUiAction('refresh'),
   });

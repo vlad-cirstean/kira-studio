@@ -17,13 +17,7 @@
  * `reviewRanges.ts` is the pure algebra beneath it, importable and testable with no extension host.
  */
 import { basename } from 'node:path';
-import type {
-  DiffHunk,
-  EventPayload,
-  FileDiffBody,
-  LineRange,
-  SettingsSnapshot,
-} from '@kira/git-ipc';
+import type { DiffHunk, EventPayload, FileDiffBody, LineRange } from '@kira/git-ipc';
 import * as vscode from 'vscode';
 import type { ConnectionManager, ConnectionState } from './connection.ts';
 import { SCHEME } from './ports/editorIntegration.ts';
@@ -45,7 +39,6 @@ const REVIEW_SELECTION_CONTEXT = 'kiraVersion.reviewSelection';
 
 export interface ReviewMarkingDeps {
   readonly connection: ConnectionManager;
-  readonly settings: () => SettingsSnapshot;
   readonly extensionUri: vscode.Uri;
   /** D9: `reviewProvider.runUiAction('refresh')` — the `let`-bound provider, same cycle break
    *  `reviewComments.ts`'s own `onEditorMutated` already uses. */
@@ -181,7 +174,7 @@ function asExplicitTarget(value: unknown): MarkTarget | undefined {
 }
 
 export function createReviewMarkingController(deps: ReviewMarkingDeps): ReviewMarkingController {
-  const { connection, settings, extensionUri, notifySidebarRefresh } = deps;
+  const { connection, extensionUri, notifySidebarRefresh } = deps;
 
   // D3: three decoration types, painted on the modified pane only, disposed with the controller.
   const markReviewedIcon = vscode.Uri.joinPath(extensionUri, 'resources', 'mark-reviewed.svg');
@@ -214,13 +207,11 @@ export function createReviewMarkingController(deps: ReviewMarkingDeps): ReviewMa
     const key = `${repoId}\0${branch}`;
     let cached = baseMemo.get(key);
     if (!cached) {
-      const snap = settings();
+      // G18 D6: baseCandidates is no longer injected here — a raw request (omitting it) now
+      // resolves the repo's own stored kiraVersion.review.baseCandidates server-side, the exact
+      // upgrade D6 describes, so this call needs nothing beyond repoId/branch any more.
       cached = connection
-        .request('review.resolveBase', {
-          repoId,
-          branch,
-          baseCandidates: snap['kiraVersion.review.baseCandidates'],
-        })
+        .request('review.resolveBase', { repoId, branch })
         .then((r) => r.base)
         .catch(() => null);
       baseMemo.set(key, cached);

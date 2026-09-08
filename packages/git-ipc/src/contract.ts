@@ -32,23 +32,41 @@ export type DecorationRef =
   | { readonly kind: 'stash'; readonly index: number };
 
 /** The settings schema's keys and value types (D25, W4) — a structural copy of `core`'s
- *  generated `Settings` type, kept in step by wireConformance.test.ts. */
+ *  generated `Settings` type, kept in step by wireConformance.test.ts.
+ *
+ *  G18: the one remaining window/host-scoped key after this phase — `kiraVersion.git.path` and
+ *  the six originally-named per-repo keys are gone (`git.path` is server-owned elsewhere now,
+ *  D15; the rest moved to `RepoSettingsSnapshot` below). `kiraVersion.pull.strategy` and
+ *  `kiraVersion.log.level` moved too (D14). */
 export interface SettingsSnapshot {
-  readonly 'kiraVersion.git.path': string;
-  readonly 'kiraVersion.graph.pageSize': number;
-  readonly 'kiraVersion.graph.scope': 'all' | 'head';
-  readonly 'kiraVersion.log.level': 'off' | 'error' | 'warn' | 'info' | 'debug';
-  /** P7 W7/D43: Branch review's own candidate base branches (§6.8). */
-  readonly 'kiraVersion.review.baseCandidates': readonly string[];
-  readonly 'kiraVersion.pull.strategy': 'auto' | 'ff-only' | 'merge' | 'rebase';
-  /** P9 W6: the Stash dialog's "include untracked files" checkbox default. */
-  readonly 'kiraVersion.stash.includeUntracked': boolean;
-  /** P9 W6: whether stash entries appear as nodes in the commit graph (OQ5 default: true). */
-  readonly 'kiraVersion.stash.showInGraph': boolean;
   /** G14 D6: VS Code's own tree indentation, mirrored so the webview's file trees match the
    *  Explorer. Read from the host, never contributed by this extension. */
   readonly 'workbench.tree.indent': number;
 }
+
+/** G18 D4: the seven per-repo display settings, server-stored, edited from the new in-app dialog
+ *  (`RepoSettingsDialog.vue`) rather than VS Code's settings.json. Six are genuinely scoped by
+ *  repoId; `kiraVersion.log.level` is not (D14) — its value is shared across every repo this
+ *  installation opens, stored under a reserved key rather than repoId, a fact the dialog surfaces
+ *  to the user (`SettingDef.instanceWide`, `@kira/git-core`) rather than hiding. Every caller
+ *  still passes a real repoId for every key, log.level included; only the server's own storage
+ *  layer treats that one key's repoId as informational rather than a partition key. */
+export interface RepoSettingsSnapshot {
+  readonly 'kiraVersion.graph.pageSize': number;
+  readonly 'kiraVersion.graph.scope': 'all' | 'head';
+  /** P9 W6: whether stash entries appear as nodes in the commit graph (OQ5 default: true). */
+  readonly 'kiraVersion.stash.showInGraph': boolean;
+  /** P9 W6: the Stash dialog's "include untracked files" checkbox default. */
+  readonly 'kiraVersion.stash.includeUntracked': boolean;
+  /** P7 W7/D43: Branch review's own candidate base branches (§6.8). */
+  readonly 'kiraVersion.review.baseCandidates': readonly string[];
+  readonly 'kiraVersion.pull.strategy': 'auto' | 'ff-only' | 'merge' | 'rebase';
+  readonly 'kiraVersion.log.level': 'off' | 'error' | 'warn' | 'info' | 'debug';
+}
+
+/** G18: `RepoSettingsSnapshot`'s own `.partial()` shape — `repoSettings.set`'s request, every leaf
+ *  optional so the dialog patches only the field the user actually changed. */
+export type RepoSettingsPatch = Partial<RepoSettingsSnapshot>;
 
 export interface RepoSummary {
   readonly repoId: string;
@@ -1413,10 +1431,33 @@ export type Contract = {
             readonly reason: 'notInRevision' | 'binary' | 'tooLarge';
           };
     };
+    // ---- G18: the per-repo settings dialog (D4) --------------------------------------------
+    /** Reads repoId's own stored settings — six genuinely per-repo, one (`log.level`) shared
+     *  across every repo this installation opens (D14), transparently to this request's own
+     *  shape: repoId is still required and still named for every key. */
+    'repoSettings.get': {
+      params: { repoId: string };
+      result: RepoSettingsSnapshot;
+    };
+    /** Writes only the leaves the caller actually patched and returns the resulting snapshot —
+     *  the same "patch, don't replace" discipline `RepoSettingsPatch` states at its own type.
+     *  Also triggers `repoSettings.changed` (below) to every connected client, not only this
+     *  one (D7). */
+    'repoSettings.set': {
+      params: { repoId: string; patch: RepoSettingsPatch };
+      result: RepoSettingsSnapshot;
+    };
   };
   events: {
     'repo.changed': { repoId: string; kind: 'refsChanged' | 'worktreeChanged' };
     'settings.changed': { settings: SettingsSnapshot };
+    /** G18 D4/D7: fanned out to every connected client whenever `repoSettings.set` succeeds
+     *  anywhere, not only to the connection that made the change — `log.level`'s own
+     *  instance-wide collapse (D14) means a value change made through repo A's own dialog must
+     *  still be visible on a window that only ever opened repo B. `repoId` names which repo's own
+     *  write triggered the emit; a viewer decides for itself whether that repoId (or, for the
+     *  instance-wide `log.level`, any repoId at all) is relevant to what it is showing. */
+    'repoSettings.changed': { repoId: string; settings: RepoSettingsSnapshot };
     /** Host -> the review webview only: "review this branch instead". Never emitted to the
      *  panel's own server — the two views hold separate `RpcServer`s over separate channels. */
     'review.target': { repoId: string; branch: string };

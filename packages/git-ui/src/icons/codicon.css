@@ -126,3 +126,8 @@
 .codicon-diff-multiple::before {
   content: "\ec23";
 }
+
+/* G18 D13: AppToolbar.vue's own settings gear, opening RepoSettingsDialog.vue. */
+.codicon-gear::before {
+  content: "\eaf8";
+}

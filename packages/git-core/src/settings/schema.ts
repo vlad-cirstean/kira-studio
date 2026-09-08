@@ -32,23 +32,38 @@ export interface SettingDef<T> {
   readonly minimum?: number;
   readonly maximum?: number;
   readonly scope?: 'window' | 'resource';
-  /** G14 D6: where a setting's value comes from. `"extension"` (the default, when omitted) is a
-   *  key this extension contributes and owns; `"host"` is a key the *editor* owns, which we only
-   *  read — it is part of `SettingsSnapshot` so the webview can honour it, and is deliberately
-   *  absent from `contributes.configuration` (`toVsCodeConfiguration()` below skips it), since
-   *  contributing a core key would be a duplicate declaration of someone else's setting. */
-  readonly source?: 'extension' | 'host';
+  /** G14 D6/G18 D10: where a setting's value comes from. `"extension"` (the default, when
+   *  omitted) is a key this extension contributes and owns; `"host"` is a key the *editor* owns,
+   *  which we only read; `"repo"` (G18) is a key stored server-side, per repository, edited from
+   *  the git-ui RepoSettingsDialog rather than VS Code settings.json. Both `"host"` and `"repo"`
+   *  keys are deliberately absent from `contributes.configuration` (`toVsCodeConfiguration()`
+   *  below skips both), since contributing either would be a duplicate declaration of a setting
+   *  this extension does not itself own the value of. */
+  readonly source?: 'extension' | 'host' | 'repo';
+  /** G18 D10/D14: meaningful only when `source === 'repo'`. `true` for exactly one key
+   *  (`kiraVersion.log.level`) — its stored value is shared across every repository this
+   *  installation opens, not scoped by repoId, even though it lives in the same per-repo storage
+   *  and dialog as the other six `'repo'`-sourced keys (a reserved sentinel row, not a schema
+   *  change — storage/repos.GitRepoSettingsRepo's own D14). The dialog surfaces this to the user
+   *  (a visible note, not a hidden implementation detail) rather than presenting it as if its
+   *  value varied per repo. */
+  readonly instanceWide?: boolean;
 }
 
 export const SETTINGS = {
-  'kiraVersion.git.path': {
-    key: 'kiraVersion.git.path',
-    type: 'string',
-    default: '',
-    description:
-      "Path to the git executable. Empty uses the host's own discovery (VS Code's " +
-      'git.path setting, then PATH) — see §4.2.',
-  },
+  // G18 D1/D15: kiraVersion.git.path used to live here — it is server-owned (unchanged verdict)
+  // but its wiring was dead until this phase fixed it (Discovery.Status(ctx, "") hardcoded at
+  // every call site). Its fixed home is kira.db's existing `settings` table, surfaced in Kira
+  // Studio's own "Git" settings section — not this schema, and not the new per-repo dialog either
+  // (it answers "where is the git binary on this machine", not a per-repo fact). Leaving a dead
+  // declaration here after wiring the real one would recreate the exact "a setting that silently
+  // does nothing" anti-pattern this fix exists to close out.
+  //
+  // G18 D1/D10: the seven keys below all moved from VS Code settings.json into a new per-repo
+  // table (storage/repos.GitRepoSettingsRepo), edited from git-ui's own RepoSettingsDialog —
+  // `source: 'repo'` is what drops each out of `contributes.configuration` (toVsCodeConfiguration
+  // below). kiraVersion.log.level is the one exception among the seven: it is not actually a
+  // per-repo fact (`instanceWide: true`, D14) even though it lives in the same table and dialog.
   'kiraVersion.graph.pageSize': {
     key: 'kiraVersion.graph.pageSize',
     type: 'number',
@@ -56,6 +71,7 @@ export const SETTINGS = {
     description: 'How many commits a single Load more page fetches.',
     minimum: 100,
     maximum: 50000,
+    source: 'repo',
   },
   'kiraVersion.graph.scope': {
     key: 'kiraVersion.graph.scope',
@@ -63,6 +79,7 @@ export const SETTINGS = {
     default: 'all',
     description: 'Whether the graph shows every ref ("all") or only the current HEAD\'s ancestry.',
     enum: ['all', 'head'],
+    source: 'repo',
   },
   'kiraVersion.log.level': {
     key: 'kiraVersion.log.level',
@@ -70,6 +87,11 @@ export const SETTINGS = {
     default: 'info',
     description: "Verbosity of kira-version's own diagnostic log.",
     enum: ['off', 'error', 'warn', 'info', 'debug'],
+    source: 'repo',
+    // G18 D14: shared across every repository this installation opens, not scoped by repoId —
+    // the dialog renders a visible note driven by this flag rather than presenting the field as
+    // if it varied per repo.
+    instanceWide: true,
   },
   'kiraVersion.review.baseCandidates': {
     key: 'kiraVersion.review.baseCandidates',
@@ -79,6 +101,7 @@ export const SETTINGS = {
       'Branch review (§6.8): candidate base branches to compare against, in order, tried ' +
       "after the branch's own upstream and the repository's detected default branch " +
       '(origin/HEAD) both fail to resolve.',
+    source: 'repo',
   },
   'kiraVersion.pull.strategy': {
     key: 'kiraVersion.pull.strategy',
@@ -88,6 +111,7 @@ export const SETTINGS = {
     description:
       'How Pull integrates fetched commits. "auto" follows your git configuration ' +
       '(branch.<name>.rebase, then pull.rebase, then pull.ff), falling back to fast-forward-only.',
+    source: 'repo',
   },
   'kiraVersion.stash.includeUntracked': {
     key: 'kiraVersion.stash.includeUntracked',
@@ -97,6 +121,7 @@ export const SETTINGS = {
       'Whether the Stash dialog\'s "include untracked files" box starts checked. Untracked ' +
       'files are restored by a checkout, not a merge, so a pop can fail on a name collision ' +
       'even when the merge itself is clean (§7.6).',
+    source: 'repo',
   },
   'kiraVersion.stash.showInGraph': {
     key: 'kiraVersion.stash.showInGraph',
@@ -105,6 +130,7 @@ export const SETTINGS = {
     description:
       'Whether stash entries appear as nodes in the commit graph. When off, the walk drops ' +
       'refs/stash entirely and stashes are visible only in the stash list.',
+    source: 'repo',
   },
   'workbench.tree.indent': {
     key: 'workbench.tree.indent',
@@ -236,15 +262,17 @@ export interface VsCodeConfigurationSchema {
   readonly properties: Record<string, unknown>;
 }
 
-/** Drives `scripts/gen-settings.ts`: one JSON Schema property per setting. `source: 'host'` keys
- *  (G14 D6) are skipped — this extension reads them but does not own them, so contributing one
- *  into `contributes.configuration` would be a duplicate declaration of a core VS Code setting. */
+/** Drives `scripts/gen-settings.ts`: one JSON Schema property per setting. Any key with a
+ *  `source` (G14 D6's `'host'`, G18 D10's `'repo'`) is skipped — this extension reads or edits
+ *  those values, but VS Code's own settings.json is not where either lives, so contributing one
+ *  into `contributes.configuration` would be a duplicate declaration of a setting owned
+ *  elsewhere (the editor itself, or, since G18, kira.db's own per-repo/server-owned storage). */
 export function toVsCodeConfiguration(): VsCodeConfigurationSchema {
   const properties: Record<string, unknown> = {};
 
   for (const key of SETTING_KEYS) {
     const def: SettingDef<unknown> = SETTINGS[key];
-    if (def.source === 'host') continue;
+    if (def.source !== undefined) continue;
 
     const property: Record<string, unknown> = {
       type: def.type === 'enum' ? 'string' : def.type === 'stringArray' ? 'array' : def.type,
@@ -261,4 +289,13 @@ export function toVsCodeConfiguration(): VsCodeConfigurationSchema {
   }
 
   return { properties };
+}
+
+/** G18 D10: the seven keys `source: 'repo'` marks — exactly the settings
+ * `RepoSettingsDialog.vue`/`RepoSettingsState` show/carry, and the eight keys D11's migration
+ * covers minus `kiraVersion.git.path` (which never lived in this schema — D15). Schema-driven
+ * rather than a hand-maintained list in `git-ui`, the same "one schema, one place" reason this
+ * dialog is schema.ts's second consumer at all. */
+export function repoSettingKeys(): readonly SettingKey[] {
+  return SETTING_KEYS.filter((key) => SETTINGS[key].source === 'repo');
 }

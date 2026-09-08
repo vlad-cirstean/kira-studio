@@ -165,6 +165,8 @@ function stubHandlers(
       'search.run': notImplemented,
       'file.read': notImplemented,
       'file.goToTarget': notImplemented,
+      'repoSettings.get': notImplemented,
+      'repoSettings.set': notImplemented,
       ...requestOverrides,
     },
     streams: {

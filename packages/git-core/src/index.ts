@@ -170,6 +170,7 @@ export type {
 export {
   coerceSettings,
   defaultSettings,
+  repoSettingKeys,
   SETTINGS,
   toVsCodeConfiguration,
 } from './settings/schema.ts';

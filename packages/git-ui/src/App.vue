@@ -31,6 +31,7 @@ import CherryPickDialog from './components/dialogs/CherryPickDialog.vue';
 import ForcePushDialog from './components/dialogs/ForcePushDialog.vue';
 import PullDialog from './components/dialogs/PullDialog.vue';
 import RenameRefDialog from './components/dialogs/RenameRefDialog.vue';
+import RepoSettingsDialog from './components/dialogs/RepoSettingsDialog.vue';
 import ResetDialog from './components/dialogs/ResetDialog.vue';
 import RevertDialog from './components/dialogs/RevertDialog.vue';
 import StashDialog from './components/dialogs/StashDialog.vue';
@@ -59,6 +60,7 @@ import {
 import { OpsState } from './state/ops.ts';
 import { RefsState } from './state/refs.ts';
 import { RepoState } from './state/repo.ts';
+import { RepoSettingsState } from './state/repoSettings.ts';
 import { SearchState } from './state/search.ts';
 import { SelectionState } from './state/selection.ts';
 import { SettingsState } from './state/settings.ts';
@@ -113,6 +115,11 @@ const stashState = new StashState(bridge);
 // `refsState`/`graphView` in directly (both already exist above), matching the plan's own "threads
 // RefsState and GraphViewState into it".
 const searchState = new SearchState(bridge, refsState, graphView);
+// G18 D13: one RepoSettingsState for the life of this component, exactly like `refsState`/
+// `opsState`/`stashState`/`searchState` above — reset via `setRepoId` rather than replaced.
+// `RepoSettingsDialog.vue` reads/writes through this instance; `pageSize`/
+// `stashIncludeUntrackedDefault` below are re-sourced from it instead of `settingsState`.
+const repoSettingsState = new RepoSettingsState(bridge);
 
 const repoState = shallowRef<RepoState | undefined>(undefined);
 const settingsState = shallowRef<SettingsState | undefined>(undefined);
@@ -133,15 +140,14 @@ const scrollRow = ref(0);
  *  nowhere in particular, which is correct: there is no prior position to restore. */
 const initialScrollRow = ref<number | undefined>(undefined);
 
-// `settingsState` is always populated by the time this is actually read in practice
-// (`bootstrap()` sets it synchronously, well before any repo-dependent UI — including this
-// value's only consumer, `LoadMoreButton.vue` — can mount), so this fallback is never really
-// exercised; it just needs to exist for the type. Sourced from the schema's own default rather
-// than a hand-copied literal, so it cannot drift.
+// G18 D13: pageSize used to read off `settingsState` (the VS-Code-owned SettingsSnapshot); the
+// setting itself moved to the new per-repo store (D1), so this now reads `repoSettingsState`
+// instead — `RepoSettingsState`'s own constructor already seeds it with the schema's own default
+// before any repo is open, so the `??` fallback below is defence in depth, not the primary path.
 const FALLBACK_PAGE_SIZE = SETTINGS['kiraVersion.graph.pageSize'].default;
 
 const pageSize = computed(
-  () => settingsState.value?.settings.value['kiraVersion.graph.pageSize'] ?? FALLBACK_PAGE_SIZE,
+  () => repoSettingsState.settings.value['kiraVersion.graph.pageSize'] ?? FALLBACK_PAGE_SIZE,
 );
 
 /** G14 D6: VS Code's own `workbench.tree.indent`, mirrored into the settings snapshot (host-owned,
@@ -153,11 +159,11 @@ const treeIndent = computed(
 );
 
 /** `StashDialog.vue`'s create mode default — same "read the schema's own default as the fallback"
- *  shape as `pageSize` above. */
+ *  shape as `pageSize` above; re-sourced from `repoSettingsState` for the same reason (G18 D13). */
 const FALLBACK_INCLUDE_UNTRACKED = SETTINGS['kiraVersion.stash.includeUntracked'].default;
 const stashIncludeUntrackedDefault = computed(
   () =>
-    settingsState.value?.settings.value['kiraVersion.stash.includeUntracked'] ??
+    repoSettingsState.settings.value['kiraVersion.stash.includeUntracked'] ??
     FALLBACK_INCLUDE_UNTRACKED,
 );
 
@@ -250,6 +256,7 @@ watch(
     opsState.setRepoId(repoId);
     stashState.setRepoId(repoId);
     searchState.setRepoId(repoId);
+    repoSettingsState.setRepoId(repoId);
   },
   { immediate: true },
 );
@@ -489,6 +496,10 @@ function handleBranchFromStash(entry: StashEntry): void {
 }
 
 const stashCreateOpen = ref(false);
+
+// G18 D13: AppToolbar.vue's own settings gear — same "App.vue owns the boolean, the dialog owns
+// nothing of its own" shape stashCreateOpen/tagDialogState above already follow.
+const repoSettingsDialogOpen = ref(false);
 
 // ---------------------------------------------------------------------------------------
 // `docs/plans/P7.md` W14: the ref-badge context menu — a right-click that lands on a
@@ -1012,6 +1023,7 @@ onBeforeUnmount(() => {
   opsState.dispose();
   stashState.dispose();
   searchState.dispose();
+  repoSettingsState.dispose();
   repoState.value?.dispose();
   settingsState.value?.dispose();
   bridge.dispose();
@@ -1072,6 +1084,7 @@ onBeforeUnmount(() => {
           @branch-from-stash="handleBranchFromStash"
           @search-select="handleSearchSelect"
           @search-focus-grid="handleSearchFocusGrid"
+          @open-repo-settings="repoSettingsDialogOpen = true"
         />
         <EmptyRepositoryPanel :branch-name="repoState.activeRepo.value.head.name" />
       </template>
@@ -1091,6 +1104,7 @@ onBeforeUnmount(() => {
           @branch-from-stash="handleBranchFromStash"
           @search-select="handleSearchSelect"
           @search-focus-grid="handleSearchFocusGrid"
+          @open-repo-settings="repoSettingsDialogOpen = true"
         />
         <ConflictBanner
           :ops="opsState"
@@ -1268,6 +1282,11 @@ onBeforeUnmount(() => {
           :branch-target="stashBranchTarget"
           @close-create="stashCreateOpen = false"
           @close-branch="stashBranchTarget = undefined"
+        />
+        <RepoSettingsDialog
+          :open="repoSettingsDialogOpen"
+          :repo-settings-state="repoSettingsState"
+          @close="repoSettingsDialogOpen = false"
         />
       </template>
     </template>

@@ -21,7 +21,11 @@ import type { EventKey, RequestKey, StreamKey } from './contract.ts';
 // 'revealCommit' and 'ui.action' gains an optional 'target' naming the commit to reveal — both
 // extension-side only (the Go server neither emits nor parses either), the same "the sole
 // compatibility authority still moves" precedent G10 D9/G12 D1 set.
-export const CONTRACT_VERSION = 21;
+// G18 D5: 21 -> 22, for two new requests (repoSettings.get/set) and one new event
+// (repoSettings.changed) — seven kiraVersion.* settings move out of contributes.configuration
+// into their own per-repo store (D1/D3/D4). SettingsSnapshot narrows to its one remaining member
+// (workbench.tree.indent); the seven moved keys now live in the new RepoSettingsSnapshot.
+export const CONTRACT_VERSION = 22;
 
 export class ContractVersionMismatchError extends Error {
   readonly received: number;
@@ -120,6 +124,8 @@ const REQUEST_KEY_MAP: Record<RequestKey, true> = {
   'search.run': true,
   'file.read': true,
   'file.goToTarget': true,
+  'repoSettings.get': true,
+  'repoSettings.set': true,
 };
 const EVENT_KEY_MAP: Record<EventKey, true> = {
   'repo.changed': true,
@@ -128,6 +134,7 @@ const EVENT_KEY_MAP: Record<EventKey, true> = {
   'remote.progress': true,
   'credential.request': true,
   'ui.action': true,
+  'repoSettings.changed': true,
 };
 const STREAM_KEY_MAP: Record<StreamKey, true> = {
   'graph.stream': true,

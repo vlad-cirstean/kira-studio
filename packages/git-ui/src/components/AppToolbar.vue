@@ -5,9 +5,10 @@
  * undo affordance, since both need P6's ref list and op executor. `docs/plans/P8.md` W17 adds the
  * fetch/pull/push group itself; `docs/plans/P11.md` W14 adds the fifth, `SearchBox.vue`, after the
  * spacer alongside the remote-progress/undo group — the ascii layout's own right-hand cluster —
- * rather than before it with Stash: this toolbar has no settings gear of its own to sit beside
- * (out of scope entirely, no phase implements one), so the search box is what now occupies that
- * same right-aligned space.
+ * rather than before it with Stash, reserving the trailing `⚙` slot for a settings gear no phase
+ * implemented until now. G18 D13 is that phase: the gear opens `App.vue`'s own
+ * `RepoSettingsDialog.vue`, this toolbar owning no dialog state of its own (`open-repo-settings`
+ * emit), the same shape `stash-changes` already follows.
  *
  * Metrics match the panel title bar's, not an invented toolbar height (§6.1): 35px
  * (`--kv-toolbar-height`), square corners (`--kv-radius: 0`), no shadow.
@@ -71,6 +72,10 @@ const emit = defineEmits<{
   /** Forwarded straight from `SearchBox.vue`'s own `focusGrid` emit (§6.6's two-stage `Escape`,
    *  second stage) — moving real DOM focus onto the grid is `App.vue`'s own `commitGridRef`. */
   (event: 'search-focus-grid'): void;
+  /** G18 D13: the settings gear (`⚙`) this toolbar's own ascii layout has named since §6.2 but no
+   *  phase implemented until now — opens `App.vue`'s own `RepoSettingsDialog.vue`, the same
+   *  "toolbar owns no dialog state itself" shape `stash-changes` above already follows. */
+  (event: 'open-repo-settings'): void;
 }>();
 
 function copy(text: string, whatCopied: string): void {
@@ -294,6 +299,17 @@ const stashDisabled = computed(
       @select="(option) => emit('search-select', option)"
       @focus-grid="emit('search-focus-grid')"
     />
+
+    <button
+      type="button"
+      class="kv-icon-button"
+      title="Repository settings"
+      aria-label="Repository settings"
+      data-testid="repo-settings-button"
+      @click="emit('open-repo-settings')"
+    >
+      <span class="codicon codicon-gear" aria-hidden="true"></span>
+    </button>
 
     <div v-if="remoteBusy" class="kv-remote-progress" data-testid="remote-progress">
       <span class="codicon codicon-loading kv-remote-progress-spin" aria-hidden="true"></span>

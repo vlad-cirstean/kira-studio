@@ -9,4 +9,10 @@ export type {
   SettingValue,
   VsCodeConfigurationSchema,
 } from './schema.ts';
-export { coerceSettings, defaultSettings, SETTINGS, toVsCodeConfiguration } from './schema.ts';
+export {
+  coerceSettings,
+  defaultSettings,
+  repoSettingKeys,
+  SETTINGS,
+  toVsCodeConfiguration,
+} from './schema.ts';
