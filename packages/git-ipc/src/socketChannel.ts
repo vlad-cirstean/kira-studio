@@ -26,7 +26,10 @@
  * (D21): the extension's own connection manager reads the handshake's raw frames directly, then
  * hands this same channel to `createRpcClient` once `ready` arrives (§5.4). Two concurrent
  * `onMessage` subscribers racing to drain one shared byte stream would silently split frames
- * between them; a second `onMessage` call instead atomically replaces the first.
+ * between them; a second `onMessage` call instead atomically replaces the first. A frame that
+ * arrives in the gap between one subscriber unsubscribing and the next subscribing — which
+ * happens whenever a handler does anything asynchronous before resubscribing — is queued rather
+ * than dropped (G12 D5a); see `MAX_PENDING_FRAMES` below.
  */
 import type { Socket } from 'node:net';
 import type { MessageChannelLike } from './rpc.ts';
@@ -58,6 +61,16 @@ export class MalformedBlobFrameError extends Error {
   constructor(reason: string) {
     super(`socketChannel: malformed blob frame: ${reason}`);
     this.name = 'MalformedBlobFrameError';
+  }
+}
+
+/** Thrown (and the socket destroyed) when a frame arrives with no subscriber and the queue that
+ *  holds it for the next one (see `MAX_PENDING_FRAMES` below) is already full — the same
+ *  hard-error posture as `FrameTooLargeError`, never a silent drop. */
+export class PendingFrameOverflowError extends Error {
+  constructor(cap: number) {
+    super(`socketChannel: more than ${cap} frames arrived with no subscriber`);
+    this.name = 'PendingFrameOverflowError';
   }
 }
 
@@ -105,8 +118,29 @@ export function createSocketChannel(socket: Socket): SocketChannel {
   let currentHandler: ((message: unknown) => void) | null = null;
   const closeHandlers = new Set<(err?: Error) => void>();
 
+  // A frame that arrives between two subscribers is queued, never dropped: the read loop below
+  // drains every complete frame present after one read, synchronously (this file's own doc
+  // comment), so a handler that resubscribes across an `await` — connection.ts's handshake does —
+  // would otherwise lose whatever the same read already delivered. Bounded because an unread
+  // queue is a leak, not a feature: past the cap the socket is destroyed, the same hard-error
+  // posture as an oversize frame.
+  const MAX_PENDING_FRAMES = 64;
+  const pendingFrames: unknown[] = [];
+
   function fireClose(err?: Error): void {
     for (const handler of [...closeHandlers]) handler(err);
+  }
+
+  function deliver(message: unknown): void {
+    if (currentHandler) {
+      currentHandler(message);
+      return;
+    }
+    if (pendingFrames.length >= MAX_PENDING_FRAMES) {
+      socket.destroy(new PendingFrameOverflowError(MAX_PENDING_FRAMES));
+      return;
+    }
+    pendingFrames.push(message);
   }
 
   socket.on('data', (chunk: Buffer) => {
@@ -147,13 +181,13 @@ export function createSocketChannel(socket: Socket): SocketChannel {
         ) as ArrayBuffer;
         try {
           const message: unknown = JSON.parse(headerBytes.toString('utf8'));
-          currentHandler?.(substituteBlobRoot(message, blob));
+          deliver(substituteBlobRoot(message, blob));
         } catch (err) {
           socket.destroy(err instanceof Error ? err : new MalformedBlobFrameError(String(err)));
           return;
         }
       } else {
-        currentHandler?.(JSON.parse(body.toString('utf8')));
+        deliver(JSON.parse(body.toString('utf8')));
       }
     }
   });
@@ -176,6 +210,12 @@ export function createSocketChannel(socket: Socket): SocketChannel {
 
     onMessage(handler): () => void {
       currentHandler = handler;
+      // Flush whatever queued up while no one was subscribed, in arrival order, before this call
+      // returns — a resubscribe must never observe a gap in the frame sequence.
+      while (pendingFrames.length > 0 && currentHandler === handler) {
+        const message = pendingFrames.shift();
+        handler(message);
+      }
       return () => {
         if (currentHandler === handler) currentHandler = null;
       };

@@ -96,6 +96,42 @@ test('drains three frames written in one underlying write', async () => {
   });
 });
 
+// G12 D5/D17 — the frame this file's F1 finding is about: connection.ts's handshake unsubscribes
+// itself as its own first statement inside the handler, and only resubscribes later (after an
+// `await`). If a second frame is already sitting in the same read when that happens, it must not
+// be lost.
+test('a frame delivered while unsubscribed is queued for the next subscriber, in order', async () => {
+  await withConnectedPair(async (client, server) => {
+    const serverChannel = createSocketChannel(server);
+    const received: unknown[] = [];
+
+    let unsubscribe: () => void = () => undefined;
+    unsubscribe = serverChannel.onMessage((msg) => {
+      unsubscribe(); // the exact self-unsubscribing shape connection.ts's handshake used.
+      received.push(msg);
+    });
+
+    const frames = [{ n: 1 }, { n: 2 }].map((m) => {
+      const body = Buffer.from(JSON.stringify(m), 'utf8');
+      const frame = Buffer.allocUnsafe(4 + body.byteLength);
+      frame.writeUInt32BE(body.byteLength, 0);
+      body.copy(frame, 4);
+      return frame;
+    });
+    client.write(Buffer.concat(frames));
+
+    // Let the synchronous drain loop run to completion, with no subscriber installed, before a
+    // second one arrives — the exact gap the bug lived in.
+    await new Promise((r) => setTimeout(r, 20));
+    expect(received).toEqual([{ n: 1 }]);
+
+    const second = await new Promise<unknown>((resolve) => serverChannel.onMessage(resolve));
+    received.push(second);
+
+    expect(received).toEqual([{ n: 1 }, { n: 2 }]);
+  });
+});
+
 // buildBlobFrame constructs D4's own wire body — 0x00 | uint32BE headerLen | headerJSON | blob —
 // wrapped in gitsock's outer 4-byte length prefix, exactly as internal/bridge/rpcstream's
 // encodeBody produces it.
