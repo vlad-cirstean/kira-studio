@@ -192,6 +192,11 @@ else
       fail "vsix empty" "\"$VSIX\" is empty"
     elif [ "$(dd if="$VSIX" bs=1 count=2 2>/dev/null)" != "PK" ]; then
       fail "vsix not a zip" "\"$VSIX\" does not start with the zip \"PK\" signature"
+    elif command -v unzip >/dev/null 2>&1 && ! unzip -l "$VSIX" | grep -qi 'extension/readme\.md'; then
+      # G12 D15: the extension's own README ships with no packaging edit (.vscodeignore is an
+      # exclusion list) — this is the one line that proves it actually landed in the archive.
+      # vsce lowercases the entry to extension/readme.md, hence -i rather than a literal case.
+      fail "vsix missing README" "\"$VSIX\" does not contain extension/readme.md"
     fi
   fi
 
