@@ -839,6 +839,30 @@ export type SearchRunResult =
   /** Never thrown (probe 4): a pattern the UI would not send still comes back as data. */
   | { readonly kind: 'invalidPattern'; readonly message: string };
 
+/** G10 D9: the palette's own route into an already-mounted webview. `RpcServer.emit` is the only
+ *  way the extension host can reach a live webview (contract-gated exactly like the socket), so
+ *  every mutating palette command that isn't a fresh host-side implementation of `OpsState`'s own
+ *  logic funnels through this one event — the palette is an entry point, never a second
+ *  implementation. One member per served kind in
+ *  `apps/kira-studio-vscode/src/commands.ts`'s `MUTATING_COMMANDS` table, plus `refresh` for the
+ *  one non-mutating palette addition (F15). A later phase (G13/G14/G15) that serves a currently-
+ *  `pending` kind adds its own member here alongside its own table entry and manifest command. */
+export type UiActionKind =
+  | 'openBranchPicker'
+  | 'createBranch'
+  | 'createTag'
+  | 'revertSelected'
+  | 'continueOperation'
+  | 'abortOperation'
+  | 'skipCommit'
+  | 'undo'
+  | 'fetch'
+  | 'pull'
+  | 'push'
+  | 'forcePush'
+  | 'cancelRemoteOperation'
+  | 'refresh';
+
 // ---------------------------------------------------------------------------------------
 // The contract.
 // ---------------------------------------------------------------------------------------
@@ -1186,6 +1210,10 @@ export type Contract = {
       /** `false` only for git's own "Username for …" shape; everything unrecognised is masked. */
       readonly masked: boolean;
     };
+    /** G10: host -> the GRAPH webview only (never the review sidebar, which renders no operation
+     *  UI). One palette command's action, routed to the affordance the toolbar or a context menu
+     *  already drives — the palette is an entry point, never a second implementation. */
+    'ui.action': { readonly action: UiActionKind };
   };
   streams: {
     'graph.stream': {

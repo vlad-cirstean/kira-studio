@@ -4,7 +4,10 @@ import type { EventKey, RequestKey, StreamKey } from './contract.ts';
  * Boundary validation. Per §3.5, a contract mismatch must fail loudly rather than
  * half-work — so this throws, it does not degrade.
  */
-export const CONTRACT_VERSION = 16;
+// G10 D9: 16 -> 17 for one new event, 'ui.action' — the palette's own route into an already-
+// mounted webview (see contract.ts's own doc comment on UiActionKind). This is the one place G10
+// touches the wire contract; every other change this phase makes is packaging mechanics.
+export const CONTRACT_VERSION = 17;
 
 export class ContractVersionMismatchError extends Error {
   readonly received: number;
@@ -101,6 +104,7 @@ const EVENT_KEY_MAP: Record<EventKey, true> = {
   'review.target': true,
   'remote.progress': true,
   'credential.request': true,
+  'ui.action': true,
 };
 const STREAM_KEY_MAP: Record<StreamKey, true> = {
   'graph.stream': true,
