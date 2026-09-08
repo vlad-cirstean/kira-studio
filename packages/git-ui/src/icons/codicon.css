@@ -188,3 +188,66 @@
 .codicon-trash::before {
   content: "\ea81";
 }
+
+/* G21 D9: fileTreeModel.ts's fileIconFor() real per-extension/per-filename table — the ~14
+   glyphs newly referenced beyond G19 D14's six-category map. Codepoints copied from
+   @vscode/codicons/dist/codicon.css, not invented. */
+.codicon-package::before {
+  content: "\eb29";
+}
+
+.codicon-law::before {
+  content: "\eb12";
+}
+
+.codicon-vm::before {
+  content: "\ea7a";
+}
+
+.codicon-tools::before {
+  content: "\eb6d";
+}
+
+.codicon-source-control::before {
+  content: "\ea68";
+}
+
+.codicon-ruby::before {
+  content: "\eb48";
+}
+
+.codicon-database::before {
+  content: "\eace";
+}
+
+.codicon-terminal-bash::before {
+  content: "\ebca";
+}
+
+.codicon-terminal-powershell::before {
+  content: "\ebc7";
+}
+
+.codicon-terminal-cmd::before {
+  content: "\ebc4";
+}
+
+.codicon-notebook::before {
+  content: "\ebaf";
+}
+
+.codicon-key::before {
+  content: "\eb11";
+}
+
+.codicon-file-text::before {
+  content: "\ec5e";
+}
+
+.codicon-github-action::before {
+  content: "\eaff";
+}
+
+.codicon-beaker::before {
+  content: "\ea79";
+}

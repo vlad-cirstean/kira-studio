@@ -448,7 +448,7 @@ function reviewToggleTitle(path: string): string {
         <template v-else>
           <span class="kv-file-tree-icon codicon" :class="fileIcon(row.node.path)" aria-hidden="true"></span>
           <span
-            class="kv-file-tree-status kv-file-tree-status-chip"
+            class="kv-file-tree-status"
             :class="statusClass(row.node.change)"
             v-kui-tooltip="fileTitle(row.node.change)"
             >{{ statusLetter(row.node.change) }}</span
@@ -639,25 +639,16 @@ function reviewToggleTitle(path: string): string {
   font-size: 14px;
 }
 
+/* G21 D10: item 10's own wording, taken literally — "just a colored letter", not a chip. G19
+ * D14's status-chip class (background/border-radius/fixed 1.3em square/0.75em shrink) is
+ * deleted outright; `min-width: 1ch` is the one thing kept from it, so the letters still line up
+ * into a column and the file names after them align, without reintroducing a box around the
+ * letter. */
 .kv-file-tree-status {
+  min-width: 1ch;
   font-family: var(--kv-mono-font-family);
   font-weight: 700;
   flex-shrink: 0;
-}
-
-/* G19 D14: the status letter, demoted from the row's primary glyph to a small secondary chip
- * (kept, per SPEC's own wording, not removed) now that the file-type icon above owns the
- * leading-glyph role. */
-.kv-file-tree-status-chip {
-  width: 1.3em;
-  height: 1.3em;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 3px;
-  font-size: 0.75em;
-  background-color: var(--kv-badge-bg);
-  color: var(--kv-badge-fg);
 }
 
 .kv-status-added {

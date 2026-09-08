@@ -232,14 +232,63 @@ export function capRows(rows: readonly FileTreeRow[], cap: number = FILE_TREE_RO
 }
 
 /**
- * G19 D14: a coarse extension → codicon category map — exactly the categories `@vscode/codicons`
- * can actually distinguish (F14: `file`, `file-code` — one generic glyph, not per-language —
- * `file-media`, `file-pdf`, `file-zip`, `file-binary`, plus the two named glyphs it ships,
- * `json`/`markdown`), never a per-language icon theme (D14's own non-goal — codicons alone
- * cannot offer one). Falls back to the generic `file` glyph for any extension not in one of these
- * six buckets, and for a path with no extension at all.
+ * G21 D9: a real per-extension/per-filename table, mapped to the most specific codicon that
+ * genuinely exists — replacing G19 D14's own six-category map, which collapsed every `.ts`/
+ * `.go`/`.py`/`.rs`/`.java`/`.c`/`.vue` file onto the identical `codicon-file-code` glyph (F9's
+ * own objection, taken literally). **The ceiling is real, not an oversight**: F9's own measured
+ * survey of `@vscode/codicons/dist/codicon.css` found no per-language file-icon vocabulary in it
+ * at all — that is what a Seti/Material file-icon *theme* is for, and this webview has no API to
+ * read the host's active one. This table goes exactly as far as the named icon set (codicons)
+ * actually goes and says so here rather than leaving it implicit (D9's own non-goal).
+ *
+ * Checked in order: an exact filename match (`package.json` → `codicon-package`, not the `json`
+ * extension's own `codicon-json` — precedence, not a coincidence), a path-shape rule (a
+ * `.github/workflows/` file, a `*.test.*`/`*.spec.*` file), then the extension table; a path
+ * matching none of those falls back to the fully-generic `codicon-file` glyph, same as before.
  */
-const MARKDOWN_EXTENSIONS = new Set(['md', 'markdown']);
+const EXACT_FILENAME_ICONS: Readonly<Record<string, string>> = {
+  'package.json': 'codicon-package',
+  'bun.lock': 'codicon-package',
+  'bun.lockb': 'codicon-package',
+  'package-lock.json': 'codicon-package',
+  'yarn.lock': 'codicon-package',
+  'pnpm-lock.yaml': 'codicon-package',
+  'go.sum': 'codicon-package',
+  'Cargo.lock': 'codicon-package',
+  LICENSE: 'codicon-law',
+  LICENCE: 'codicon-law',
+  COPYING: 'codicon-law',
+  Dockerfile: 'codicon-vm',
+  'docker-compose.yml': 'codicon-vm',
+  'docker-compose.yaml': 'codicon-vm',
+  Makefile: 'codicon-tools',
+  'CMakeLists.txt': 'codicon-tools',
+  '.gitignore': 'codicon-source-control',
+  '.gitattributes': 'codicon-source-control',
+  '.gitmodules': 'codicon-source-control',
+  '.editorconfig': 'codicon-gear',
+  '.npmrc': 'codicon-gear',
+  // A bare `.env` has no extension by `extensionOf`'s own leading-dot rule (the same reason
+  // `.gitignore` needs its own entry above) — the `env` bucket in the extension table below
+  // only ever catches a *named* file ending `.env` (e.g. `settings.env`).
+  '.env': 'codicon-gear',
+  'tsconfig.json': 'codicon-gear',
+  'biome.json': 'codicon-gear',
+};
+
+const JSON_EXTENSIONS = new Set(['json', 'jsonc']);
+const MARKDOWN_EXTENSIONS = new Set(['md', 'mdx', 'markdown']);
+const RUBY_EXTENSIONS = new Set(['rb', 'erb', 'gemspec']);
+const DATABASE_EXTENSIONS = new Set(['sql', 'db', 'sqlite']);
+/** VS Code's own Explorer groups every one of these under a settings/config-shaped glyph — this
+ *  table reuses `codicon-gear`, the same one `EXACT_FILENAME_ICONS` above already gives
+ *  `.editorconfig`/`.npmrc`/`tsconfig.json`/`biome.json`, rather than inventing a second config
+ *  glyph the icon set has no equally-apt candidate for. */
+const CONFIG_EXTENSIONS = new Set(['yml', 'yaml', 'toml', 'ini', 'conf', 'cfg', 'env']);
+const BASH_EXTENSIONS = new Set(['sh', 'bash', 'zsh']);
+const CMD_EXTENSIONS = new Set(['bat', 'cmd']);
+const KEY_EXTENSIONS = new Set(['pem', 'key', 'crt']);
+const TEXT_EXTENSIONS = new Set(['txt', 'rst', 'adoc']);
 const MEDIA_EXTENSIONS = new Set([
   'png',
   'jpg',
@@ -277,8 +326,10 @@ const BINARY_EXTENSIONS = new Set([
   'otf',
   'eot',
 ]);
-/** Not exhaustive by design (D14's non-goal) — wide enough that most tracked source files land on
- *  the one "this is code" glyph rather than falling through to the fully-generic file icon. */
+/** Every genuine source extension this table knows about — none of these has a more specific
+ *  codicon glyph than "this is code" (F9's own ceiling), so they all land on the one shared
+ *  `codicon-file-code` icon; the table above them is what actually gives the *common* file types
+ *  a distinct glyph. */
 const CODE_EXTENSIONS = new Set([
   'js',
   'jsx',
@@ -292,29 +343,26 @@ const CODE_EXTENSIONS = new Set([
   'rs',
   'java',
   'kt',
+  'kts',
   'c',
   'h',
   'cpp',
   'hpp',
   'cc',
   'cs',
-  'rb',
   'php',
-  'sh',
-  'bash',
-  'zsh',
-  'ps1',
-  'sql',
-  'yaml',
-  'yml',
-  'toml',
-  'ini',
+  'scala',
+  'hs',
+  'ex',
+  'exs',
   'css',
   'scss',
   'less',
   'html',
+  'htm',
   'xml',
   'graphql',
+  'gql',
   'proto',
   'swift',
   'm',
@@ -322,6 +370,16 @@ const CODE_EXTENSIONS = new Set([
   'lua',
   'r',
   'pl',
+  'dart',
+  'clj',
+  'cljs',
+  'elm',
+  'erl',
+  'fs',
+  'fsx',
+  'nim',
+  'zig',
+  'jl',
 ]);
 
 function extensionOf(path: string): string {
@@ -330,10 +388,32 @@ function extensionOf(path: string): string {
   return dot <= 0 ? '' : base.slice(dot + 1).toLowerCase();
 }
 
+/** A workflow file lives under a `.github/workflows/` directory at the repo root — a commit's own
+ *  `path` is already repo-root-relative, so this anchors at the start of the string rather than
+ *  searching for the segment anywhere in it. */
+const GITHUB_WORKFLOW_PATH = /^\.github\/workflows\//;
+const TEST_FILE_PATTERN = /\.(test|spec)\.[a-z0-9]+$/i;
+
 export function fileIconFor(path: string): string {
+  const base = baseName(path);
+  const exact = EXACT_FILENAME_ICONS[base];
+  if (exact !== undefined) return exact;
+
+  if (GITHUB_WORKFLOW_PATH.test(path)) return 'codicon-github-action';
+  if (TEST_FILE_PATTERN.test(base)) return 'codicon-beaker';
+
   const ext = extensionOf(path);
-  if (ext === 'json') return 'codicon-json';
+  if (JSON_EXTENSIONS.has(ext)) return 'codicon-json';
   if (MARKDOWN_EXTENSIONS.has(ext)) return 'codicon-markdown';
+  if (RUBY_EXTENSIONS.has(ext)) return 'codicon-ruby';
+  if (DATABASE_EXTENSIONS.has(ext)) return 'codicon-database';
+  if (CONFIG_EXTENSIONS.has(ext)) return 'codicon-gear';
+  if (BASH_EXTENSIONS.has(ext)) return 'codicon-terminal-bash';
+  if (ext === 'ps1') return 'codicon-terminal-powershell';
+  if (CMD_EXTENSIONS.has(ext)) return 'codicon-terminal-cmd';
+  if (ext === 'ipynb') return 'codicon-notebook';
+  if (KEY_EXTENSIONS.has(ext)) return 'codicon-key';
+  if (TEXT_EXTENSIONS.has(ext)) return 'codicon-file-text';
   if (ext === 'pdf') return 'codicon-file-pdf';
   if (MEDIA_EXTENSIONS.has(ext)) return 'codicon-file-media';
   if (ZIP_EXTENSIONS.has(ext)) return 'codicon-file-zip';
