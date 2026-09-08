@@ -171,6 +171,33 @@ export const kiraEditorTheme = EditorView.theme(
       overflow: 'hidden',
       textOverflow: 'ellipsis',
     },
+    // Real-interaction fix (reported bug — the {{variable}} hover tooltip "looks horrible": the
+    // value and its explanation ran together, all in one undifferentiated block): the value gets
+    // its own inset, pre-wrapped block — a pretty-printed JSON value keeps its indentation and
+    // line breaks instead of one truncated run — and the explanation below it (`lines`, rendered
+    // as `.cm-kira-hover-caption` whenever `value` is present) drops to a smaller, muted register
+    // so the two read as distinct parts of the tooltip rather than one undifferentiated stack.
+    // hover.ts's own `.cm-kira-hover-line` (no `value`, sqlHover.ts's own callers) is untouched.
+    '.cm-kira-hover-value': {
+      margin: '0 0 4px 0',
+      padding: '4px 6px',
+      backgroundColor: 'var(--kira-bg-input)',
+      border: 'var(--kira-border-width) solid var(--kira-border)',
+      borderRadius: 'var(--kira-radius-sm)',
+      whiteSpace: 'pre-wrap',
+      wordBreak: 'break-word',
+      maxHeight: '220px',
+      overflow: 'auto',
+      fontFamily: 'var(--kira-font-data)',
+      color: 'var(--kira-fg)',
+    },
+    '.cm-kira-hover-caption': {
+      fontFamily: 'var(--kira-font-ui)',
+      fontSize: 'var(--kira-t-xs)',
+      color: 'var(--kira-fg-muted)',
+      whiteSpace: 'pre-wrap',
+      wordBreak: 'break-word',
+    },
     // P15b D2: `{{variable}}` colouring — painted by the `rangeHighlights` seam
     // (variableHighlight.ts), never by a grammar (F1's own finding: resolved/unresolved is a
     // property of the text *and* the current variable set, not something a StreamLanguage could
