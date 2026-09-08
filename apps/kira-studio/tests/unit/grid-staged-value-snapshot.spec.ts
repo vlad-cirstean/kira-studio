@@ -7,7 +7,7 @@
 // per-cell closure (once per cell, as before the fix) rather than once at build time: an earlier
 // version of this fix snapshotted it once at build time on the theory that SlickGridHost.vue
 // always rebuilds the extractor on every staging change, which is false (its own C5/§5 D5 watch
-// invalidates/re-renders the touched rows on a stageEdit/stageNull/toggleDelete without ever
+// invalidates/re-renders the touched rows on a stageEdit/stageNull/stageDelete without ever
 // rebuilding this extractor — see dataSource.ts's own corrected comment) and was a real regression
 // caught by tests/ui/mutations.spec.ts, tests/ui/cell-editor.spec.ts and
 // tests/ui/interaction.spec.ts. Reading through toRaw still removes 3 of the original 4 proxy traps

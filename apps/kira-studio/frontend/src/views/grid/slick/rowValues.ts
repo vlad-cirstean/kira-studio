@@ -3,6 +3,7 @@ import type { TabularPage } from '@shared/protocol/page';
 import type { MenuItem } from '../../../state/contextMenu';
 import type { RowSnapshot } from '../../shared/clipboardFormats';
 import { pageColumnIndexFor } from '../../shared/page/columns';
+import type { Selection } from '../../shared/slick/selection';
 import type { SqlDialect } from '../../shared/sqlIdent';
 import { type FkNavContext, foreignKeyNavItems, referencedByItems } from '../menu';
 import { cell } from '../page';
@@ -122,6 +123,43 @@ export function pasteTargetRows(
   let next = Math.max(startRow, rowCount);
   while (out.length < count) out.push(next++);
   return out;
+}
+
+/** Real-interaction fix (reported bug family — right-click Copy on a multi-row selection was a
+ *  no-op, Delete did nothing for a column or whole-table selection, and the keyboard shortcut and
+ *  the right-click menu could each reach a different answer for the same selection): the single
+ *  conversion every "act on whatever rows the current selection covers" call site must go through
+ *  — SlickGridHost.vue's own onKeydown (Delete/Duplicate), its onGridContextMenu (right-click,
+ *  routes to rowMenu() the same way the gutter path always has), and DataToolbar.vue's own
+ *  toolbar Delete button. Before this, each of those three hand-rolled its own row/cell/range
+ *  switch, and none of the three ever grew a `column` branch — a `Selection.kind` this file (and
+ *  onCopy, which already handles all four kinds — Finding 3 round 2) has covered since P24 D10,
+ *  just never plumbed through to Delete. One switch, covering every `Selection` kind that exists,
+ *  is the fix: a kind newly needs coverage here exactly once, not in three call sites that can
+ *  silently drift out of sync with each other.
+ *  `displayRows`/`rowCount` mirror `visibleRowsInSpan`'s own contract (real page rows only,
+ *  honouring an active search filter); ascending order, no duplicates. */
+export function rowsForSelection(
+  sel: Selection,
+  displayRows: readonly number[] | null,
+  rowCount: number,
+): number[] {
+  switch (sel.kind) {
+    case 'row':
+      return [...sel.rows].sort((a, b) => a - b);
+    case 'cell':
+      return [sel.row];
+    case 'range':
+      return visibleRowsInSpan(displayRows, sel.anchorRow, sel.row);
+    case 'column':
+      // A column selection spans every currently-displayed row (D7's own header-select-zone
+      // semantics — clicking a header selects the whole column, not a row range within it), so
+      // "the rows this selection covers" is every visible row, same as rowsForColumnOps' own
+      // column-scoped-op rule (P24 D10) already applies to Copy for this exact kind.
+      return rowsForColumnOps(displayRows, rowCount);
+    default:
+      return [];
+  }
 }
 
 /** The loaded page's values only for one column (§8.5's own scope boundary) — the header menu's

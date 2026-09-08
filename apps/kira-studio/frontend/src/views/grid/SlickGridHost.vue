@@ -80,6 +80,7 @@ import {
   type NavColumns,
   navColumnsFor,
   pasteTargetRows,
+  rowsForSelection,
   cellNavEntry as rvCellNavEntry,
   columnValuesFor as rvColumnValuesFor,
   displayCell as rvDisplayCell,
@@ -91,7 +92,11 @@ import '../shared/slick/slickTheme.css';
 import 'slickgrid/dist/styles/css/slick.grid.css';
 import { setVisibleRows } from '../shared/page/visibleRows';
 import * as scrollTrace from '../shared/slick/scrollTrace';
-import { rangesFromSelection, selectionFromRanges } from '../shared/slick/selection';
+import {
+  rangesFromSelection,
+  selectionCovers,
+  selectionFromRanges,
+} from '../shared/slick/selection';
 import { getPage, pageVersion, setVisibleWindow } from './page';
 import { parseTextSortTerms } from './sortTerms';
 import { runtime, type Selection, setSort } from './state';
@@ -1414,46 +1419,49 @@ function onGutterContextMenu(row: number, e: MouseEvent): void {
   );
 }
 
-/** P28 D8: does the current selection already cover this cell? The gutter menu has always asked
- *  this (onGutterContextMenu's own `inSelection`); the cell menu never did, and that is the
- *  reported "select several rows, right-click, and they deselect". `setActiveCell` below is not
- *  cosmetic — SlickHybridSelectionModel.handleActiveCellChange turns *any* active-cell change into
- *  `setSelectedRanges([one cell])`, wiping whatever was selected, which then leaves the toolbar's
- *  own copy/delete acting on one cell (or nothing) instead of the rows the user picked. */
-function selectionCovers(
-  sel: Selection | null | undefined,
-  row: number,
-  displayCol: number,
-): boolean {
-  if (!sel) return false;
-  switch (sel.kind) {
-    case 'row':
-      return sel.rows.includes(row);
-    case 'column':
-      return sel.cols.includes(displayCol);
-    case 'range':
-      return (
-        row >= sel.anchorRow &&
-        row <= sel.row &&
-        displayCol >= sel.anchorCol &&
-        displayCol <= sel.col
-      );
-    default:
-      return false;
-  }
-}
+// `selectionCovers` now lives in shared/slick/selection.ts (real-interaction fix, §4a/§4d) — moved
+// so it can be unit-tested directly and shared verbatim rather than redefined; `setActiveCell`
+// below is not cosmetic — SlickHybridSelectionModel.handleActiveCellChange turns *any* active-cell
+// change into `setSelectedRanges([one cell])`, wiping whatever was selected, which then leaves the
+// toolbar's own copy/delete acting on one cell (or nothing) instead of the rows the user picked.
 
 function onCellContextMenu(row: number, displayCol: number, e: MouseEvent): void {
   const order = currentOrder();
+  const priorSel = rt()?.selection;
+  const covers = selectionCovers(priorSel, row, displayCol);
   // D8: only when the click lands OUTSIDE the current selection — the "replace the selection
   // first" rule (§5 D7) is about a right-click on something the user has not selected, and was
   // never meant to discard a selection the click is already inside.
-  if (grid && dataSource && !selectionCovers(rt()?.selection, row, displayCol)) {
+  if (grid && dataSource && !covers) {
     const idx = {
       displayRows: currentDisplayRows(),
       pageRowCount: getPage(props.tabId)?.rowCount ?? 0,
     };
     grid.setActiveCell(displayPositionOf(idx, row), displayCol + 1, false, false, false);
+  } else if (priorSel && priorSel.kind !== 'cell') {
+    // Real-interaction fix (§4a/§4d — "select multiple rows, right-click Copy does not work",
+    // "all interactions ... should work the same ... for the selected row all the time"): the
+    // click landed *inside* a selection that already covers more than this one cell (a multi-row
+    // 'range' from a cell-to-cell drag, a gutter 'row' selection, or a 'column' selection) — this
+    // must act on that whole selection via the same rowMenu() the gutter's own right-click and the
+    // Delete/Duplicate keyboard shortcuts already build from `rowsForSelection` (the one shared
+    // conversion, slick/rowValues.ts), never the single cell under the pointer. Before this fix,
+    // onCellContextMenu always opened cellMenu() here regardless of what was actually selected, so
+    // right-click Copy on a multi-row range silently copied one cell, and right-click Delete on a
+    // column/whole-table selection deleted (at most) one row.
+    openContextMenu(
+      e,
+      rowMenu({
+        tabId: props.tabId,
+        rows: rowsForSelection(priorSel, currentDisplayRows(), getPage(props.tabId)?.rowCount ?? 0),
+        qualifiedName: qualifiedName(),
+        snapshot: rowSnapshot,
+        canEdit: canEditTable(),
+        canDelete: canDeleteRows(),
+        dialect: currentDialect(),
+      }),
+    );
+    return;
   }
   const dc = displayCell(row, displayCol);
   const name = order[displayCol] ?? '';
@@ -1479,17 +1487,17 @@ function onCellContextMenu(row: number, displayCol: number, e: MouseEvent): void
   );
 }
 
+// Real-interaction fix (reported bug — right-clicking a column header was selecting/highlighting
+// it as a side effect of opening the menu): unlike a body-cell/gutter right-click, which follows
+// the deliberate D3/D8 "replace the selection first" rule, a header right-click has never been
+// specified to do that — headerMenu()'s own items (sort/hide/copy) all close over `displayCol`
+// directly and read no live selection state, so there was never a functional reason for this to
+// push a range through the selection model at all. It used to do so unconditionally on every
+// right-click, wiping out whatever the user had selected (rows, a range, other columns) just to
+// paint a highlight nobody asked for. Right-click here now only opens the menu.
 function onHeaderContextMenuHandler(displayCol: number, e: MouseEvent): void {
   const order = currentOrder();
   const name = order[displayCol] ?? '';
-  const displayRowCount = currentDisplayRows()?.length ?? getPage(props.tabId)?.rowCount ?? 0;
-  const colCount = (grid?.getColumns().length ?? 1) - 1;
-  if (selectionModel) {
-    pendingSelectionKind = 'column';
-    selectionModel.setSelectedRanges(
-      rangesFromSelection({ kind: 'column', cols: [displayCol] }, displayRowCount, colCount),
-    );
-  }
   openContextMenu(
     e,
     headerMenu({
@@ -1674,9 +1682,11 @@ function onKeydown(e: SlickEventData): void {
   // P21 D5: dispatched through rowMenu() itself (the same builder the row/gutter context menu
   // will call, C7) so the printed shortcut and the executed action can't drift, and
   // `disabled: !canEdit` is honoured for free — inert on a read-only table without restating that
-  // guard here.
-  const rowShortcut = shortcutFor(nativeLike, ['grid.duplicateRows', 'grid.deleteRows']);
-  if (rowShortcut && runtimeEntry.selection?.kind === 'row') {
+  // guard here. Duplicate stays row-selection-only (there is no sensible "duplicate this column"
+  // or "duplicate this range" — a row is what gets duplicated, and only a gutter/row selection
+  // names an unambiguous set of them).
+  const duplicateShortcut = shortcutFor(nativeLike, ['grid.duplicateRows']);
+  if (duplicateShortcut && runtimeEntry.selection?.kind === 'row') {
     const { rows } = runtimeEntry.selection;
     const ran = runMenuShortcut(
       rowMenu({
@@ -1688,7 +1698,7 @@ function onKeydown(e: SlickEventData): void {
         canDelete: canDeleteRows(),
         dialect: currentDialect(),
       }),
-      rowShortcut,
+      duplicateShortcut,
     );
     if (ran) {
       e.preventDefault();
@@ -1697,20 +1707,19 @@ function onKeydown(e: SlickEventData): void {
     return;
   }
 
-  // P31 D32/F31: Delete/Cmd+Backspace also fires from a cell or range selection, not just a row
-  // selection (which requires a gutter click) — clicking a cell is the ordinary way a row gets
-  // picked. Duplicate stays row-selection-only. Still dispatched through rowMenu() for the same
-  // reasons as above.
+  // Real-interaction fix (reported bug family, §4d's own "all interactions ... should work the
+  // same ... for the selected row all the time"): Delete/Cmd+Backspace used to only recognise a
+  // 'cell' or 'range' selection here — a 'row' selection was handled by the block above (fine),
+  // but a 'column' selection (click a header) reached neither block, so the shortcut silently did
+  // nothing. `rowsForSelection` (slick/rowValues.ts) is the same conversion onGridContextMenu's
+  // right-click routing now uses (below) — every Selection kind that exists is covered in exactly
+  // one place, so the keyboard shortcut and a right-click Delete on the identical selection can
+  // never again disagree about which rows are acted on.
   const deleteShortcut = shortcutFor(nativeLike, ['grid.deleteRows']);
-  const cellOrRangeSel = runtimeEntry.selection;
-  if (deleteShortcut && (cellOrRangeSel?.kind === 'cell' || cellOrRangeSel?.kind === 'range')) {
-    // Finding 3 (round 2) — only the rows actually visible under the current filter within the
-    // span, same rule the copy branch above now applies: a range used to stage every page row
-    // between its two corners for deletion, hidden ones included.
-    const rows =
-      cellOrRangeSel.kind === 'range'
-        ? visibleRowsInSpan(currentDisplayRows(), cellOrRangeSel.anchorRow, cellOrRangeSel.row)
-        : [cellOrRangeSel.row];
+  const sel = runtimeEntry.selection;
+  if (deleteShortcut && sel) {
+    const rows = rowsForSelection(sel, currentDisplayRows(), getPage(props.tabId)?.rowCount ?? 0);
+    if (rows.length === 0) return;
     const ran = runMenuShortcut(
       rowMenu({
         tabId: props.tabId,
@@ -2253,7 +2262,7 @@ let lastPendingRows = new Set<number>();
 // same watch to `p.deletes` too (§4 item 18's own "the pending-changes watch's invalidateRows
 // set"), since `pendingRowClasses`' rail/strike-through classes need the same re-render a staged
 // edit already gets — one watch, not two, since both `p.edits` and `p.deletes` land on the same
-// row-invalidation need and `toggleDelete` already keeps them mutually exclusive per row.
+// row-invalidation need and `stageDelete` already keeps them mutually exclusive per row.
 // `pendingFor(tabId)?.edits`/`.deletes` are a reactive Map/Set (pendingChanges.ts's own
 // `pendingState`, a Vue `reactive()`), so both track reactively without a reference-identity trap
 // the way the TabPending object itself would be (created once per tab, mutated in place, never

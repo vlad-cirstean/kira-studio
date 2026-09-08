@@ -613,20 +613,19 @@ function onGridContextMenu(e: SlickEventData): void {
   );
 }
 
+// Real-interaction fix (reported bug — right-clicking a column header was selecting/highlighting
+// it as a side effect of opening the menu, mirrored from SlickGridHost.vue's own identical fix):
+// tabularColumnMenu()'s items close over `displayCol`/`column` directly and read no live
+// selection, so pushing a column range through the selection model here was never functionally
+// necessary — it only ever painted a highlight and discarded whatever the user had selected.
 function onGridHeaderContextMenu(e: SlickEventData, args: { column: KiraColumn }): void {
-  if (!grid || !selectionModel || !page) return;
+  if (!grid || !page) return;
   if (args.column.id === GUTTER_FIELD) return;
   e.preventDefault();
   const displayCol = colIndexFromField(String(args.column.field));
   if (displayCol < 0) return;
   const column = page.columns[displayCol];
   if (!column) return;
-  const displayRowCount = matchedRows(props.tabId)?.length ?? page.rowCount;
-  const colCount = grid.getColumns().length - 1;
-  pendingSelectionKind = 'column';
-  selectionModel.setSelectedRanges(
-    rangesFromSelection({ kind: 'column', cols: [displayCol] }, displayRowCount, colCount),
-  );
   openContextMenu(
     e as unknown as MouseEvent,
     tabularColumnMenu({

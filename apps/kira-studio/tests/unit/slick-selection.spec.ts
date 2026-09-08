@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import { SlickRange } from 'slickgrid';
 import {
   rangesFromSelection,
+  selectionCovers,
   selectionFromRanges,
 } from '../../frontend/src/views/shared/slick/selection';
 
@@ -108,5 +109,48 @@ describe('rangesFromSelection (P22 Pass B C4) — Selection -> SlickRange[]', ()
     const ranges = rangesFromSelection(original, 10, 5);
     const roundTripped = selectionFromRanges(ranges, true, null);
     expect(roundTripped).toEqual(original);
+  });
+});
+
+// Real-interaction fix (§4a/§4d) — selectionCovers is what SlickGridHost.vue's onCellContextMenu
+// now uses to decide whether a right-click acts on the whole current selection (rowMenu(), via
+// rowsForSelection) or replaces it with just the clicked cell (cellMenu()). null/undefined and the
+// 'cell' kind (never covers anything but its own exact cell, which onCellContextMenu checks via
+// `priorSel.kind !== 'cell'` rather than calling this at all) are exercised by the call site, not
+// here — these cover the three multi-cell kinds selectionCovers itself branches on.
+describe('selectionCovers (P28 D8, promoted for reuse — §4a/§4d)', () => {
+  test('1. no selection never covers anything', () => {
+    expect(selectionCovers(null, 3, 1)).toBe(false);
+    expect(selectionCovers(undefined, 3, 1)).toBe(false);
+  });
+
+  test('2. a row selection covers every column of a selected row, no others', () => {
+    const sel = { kind: 'row' as const, rows: [2, 5] };
+    expect(selectionCovers(sel, 5, 9)).toBe(true); // any column, row 5 is selected
+    expect(selectionCovers(sel, 3, 0)).toBe(false); // row 3 is not selected
+  });
+
+  test('3. a column selection covers every row of a selected column, no others', () => {
+    const sel = { kind: 'column' as const, cols: [1, 3] };
+    expect(selectionCovers(sel, 100, 3)).toBe(true); // any row, column 3 is selected
+    expect(selectionCovers(sel, 0, 2)).toBe(false); // column 2 is not selected
+  });
+
+  test('4. a range selection covers exactly the rectangle between its two corners, inclusive', () => {
+    const sel = { kind: 'range' as const, anchorRow: 2, anchorCol: 1, row: 5, col: 3 };
+    expect(selectionCovers(sel, 2, 1)).toBe(true); // top-left corner
+    expect(selectionCovers(sel, 5, 3)).toBe(true); // bottom-right corner
+    expect(selectionCovers(sel, 3, 2)).toBe(true); // interior
+    expect(selectionCovers(sel, 1, 2)).toBe(false); // one row above
+    expect(selectionCovers(sel, 3, 4)).toBe(false); // one column right
+  });
+
+  test('5. the reported "select several rows, right-click Copy does not work" case: a right-click cell inside a multi-row range still covers it', () => {
+    // A user drags from (row 1, col 0) to (row 4, col 0) — a 'range' selection spanning several
+    // rows in a single column, the shape a cell-to-cell drag produces (not the gutter's own 'row'
+    // kind). Right-clicking any cell inside it must read as "covered" so onCellContextMenu opens
+    // rowMenu() over the whole span instead of replacing the selection with one cell.
+    const sel = { kind: 'range' as const, anchorRow: 1, anchorCol: 0, row: 4, col: 0 };
+    for (let row = 1; row <= 4; row++) expect(selectionCovers(sel, row, 0)).toBe(true);
   });
 });

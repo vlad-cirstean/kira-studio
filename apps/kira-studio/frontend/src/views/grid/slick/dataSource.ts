@@ -37,7 +37,7 @@ export function createDisplayValueExtractor(
   // theory was wrong and a real regression (caught by tests/ui/mutations.spec.ts,
   // tests/ui/cell-editor.spec.ts and tests/ui/interaction.spec.ts all failing): SlickGridHost.vue's
   // own C5/§5 D5 watch (the `pendingFor(tabId)?.edits`/`.deletes` signature) invalidates and
-  // re-renders the touched rows on every stageEdit/stageNull/toggleDelete, but never calls
+  // re-renders the touched rows on every stageEdit/stageNull/stageDelete, but never calls
   // `dataSource.setState` to rebuild this extractor — its own comment says exactly why: "a
   // committed edit renders correctly for free" *because* the old closure re-read stagedValue()
   // live on every cell render. `pendingState[tabId]` is also created lazily (pendingChanges.ts's
