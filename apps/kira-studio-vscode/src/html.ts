@@ -9,7 +9,7 @@
  * `packages/git-ui/vite.config.ts` writes its own output to this same package's `dist/ui`.
  */
 import { readFileSync } from 'node:fs';
-import { CONTRACT_VERSION } from '@kira/git-ipc';
+import { CONTRACT_VERSION, type UiActionKind } from '@kira/git-ipc';
 import * as vscode from 'vscode';
 
 /** Vite's own convention: an entry's manifest key is its input path relative to the build
@@ -84,10 +84,13 @@ export interface RenderHtmlOptions {
   readonly view: 'graph' | 'review';
   /** Only meaningful when `view === "review"`; ignored (and should be omitted) for the graph. */
   readonly target?: ReviewTarget | null;
+  /** G10 D19: only meaningful when `view === "graph"`; ignored (and should be omitted) for the
+   *  review sidebar — see `panelView.ts`'s own `runUiAction` doc comment for the flow this seeds. */
+  readonly pendingAction?: UiActionKind | null;
 }
 
 export function renderHtml(opts: RenderHtmlOptions): string {
-  const { webview, extensionUri, view, target } = opts;
+  const { webview, extensionUri, view, target, pendingAction } = opts;
   const distUi = vscode.Uri.joinPath(extensionUri, 'dist', 'ui');
   const assets = resolveUiAssets(webview, distUi);
   const csNonce = nonce();
@@ -100,6 +103,7 @@ export function renderHtml(opts: RenderHtmlOptions): string {
     repo: process.env.KIRA_REPO ?? null,
     view,
     target: view === 'review' ? (target ?? null) : null,
+    pendingAction: view === 'graph' ? (pendingAction ?? null) : null,
   };
 
   const styleLinks = assets.styleUris

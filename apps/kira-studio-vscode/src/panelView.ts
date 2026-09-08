@@ -12,11 +12,19 @@
  * end to end from there on; `repo.changed` is forwarded from the connection into this view's own
  * `RpcServer.emit` via `notifyRepoChanged` (D18, replacing G1 §5.5's `service.onChanged` note).
  */
-import type { EventPayload, RpcServer, ServerHandlers, SettingsSnapshot } from '@kira/git-ipc';
+import type {
+  EventPayload,
+  RpcServer,
+  ServerHandlers,
+  SettingsSnapshot,
+  UiActionKind,
+} from '@kira/git-ipc';
 import { createRpcServer } from '@kira/git-ipc';
 import * as vscode from 'vscode';
 import { renderHtml } from './html.ts';
 import { createWebviewChannel } from './transport.ts';
+
+const GRAPH_FOCUS_COMMAND = 'kiraVersion.graph.focus';
 
 export interface KiraGraphViewProviderDeps {
   readonly extensionUri: vscode.Uri;
@@ -26,6 +34,12 @@ export interface KiraGraphViewProviderDeps {
 export class KiraGraphViewProvider implements vscode.WebviewViewProvider {
   readonly #deps: KiraGraphViewProviderDeps;
   #server: RpcServer | undefined;
+  /** G10 D19: a palette command that fired while this view was cold — consumed (and cleared) by
+   *  the next `resolveWebviewView`'s bootstrap island, the same one-shot arm `reviewView.ts`'s own
+   *  `#pendingTarget` established, except cleared once used rather than left sticky: an action
+   *  (continue an operation, revert a commit) must not replay on a later hide/reveal the way a
+   *  review's current target correctly does. */
+  #pendingAction: UiActionKind | null = null;
 
   constructor(deps: KiraGraphViewProviderDeps) {
     this.#deps = deps;
@@ -42,7 +56,9 @@ export class KiraGraphViewProvider implements vscode.WebviewViewProvider {
       webview: webviewView.webview,
       extensionUri,
       view: 'graph',
+      pendingAction: this.#pendingAction,
     });
+    this.#pendingAction = null;
 
     const channel = createWebviewChannel(webviewView.webview);
     const server = createRpcServer(channel, handlers);
@@ -52,6 +68,24 @@ export class KiraGraphViewProvider implements vscode.WebviewViewProvider {
       server.dispose();
       if (this.#server === server) this.#server = undefined;
     });
+  }
+
+  /**
+   * G10 D19: routes one palette command's action into the graph webview — `reviewView.ts`'s own
+   * proven two-arm pattern (F11: the only way the extension host can reach a live webview is a
+   * contract event; a `postMessage` into a document that has not booted yet is dropped).
+   *
+   * Focuses the view either way (so the user sees the effect land), then either emits `ui.action`
+   * to an already-live server, or — the view is currently hidden, so `resolveWebviewView` has not
+   * run yet — stashes it as `#pendingAction` for the bootstrap island the next cold resolve seeds.
+   */
+  runUiAction(action: UiActionKind): void {
+    this.#pendingAction = action;
+    void vscode.commands.executeCommand(GRAPH_FOCUS_COMMAND);
+    if (this.#server) {
+      this.#server.emit('ui.action', { action });
+      this.#pendingAction = null;
+    }
   }
 
   /** Pushed by `extension.ts` after `onDidChangeConfiguration` re-coerces the settings snapshot

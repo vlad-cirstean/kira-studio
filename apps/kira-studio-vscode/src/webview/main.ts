@@ -9,7 +9,7 @@
  * type="module">` tag) and hands it nothing at runtime beyond the DOM — `#kira-bootstrap`'s
  * JSON island is this file's only input, read below.
  */
-import type { MessageChannelLike } from '@kira/git-ipc';
+import type { MessageChannelLike, UiActionKind } from '@kira/git-ipc';
 import { createRpcClient, VSCODE_WEBVIEW_BUFFER_ENCODING } from '@kira/git-ipc';
 import type { ReviewTarget, ViewStateStore } from '@kira/git-ui';
 import {
@@ -38,6 +38,9 @@ interface Bootstrap {
   /** Only meaningful when `view === "review"` (D40's cold-bootstrap arm) — `null` when the
    *  review view was revealed with no branch pending. */
   readonly target: ReviewTarget | null;
+  /** G10 D19: only meaningful when `view === "graph"` — `null` when no palette command was
+   *  pending at this cold resolve. */
+  readonly pendingAction: UiActionKind | null;
 }
 
 function readBootstrap(): Bootstrap {
@@ -136,5 +139,6 @@ if (bootstrap.view === 'review') {
     viewState,
     host: bootstrap.host,
     view: 'graph',
+    pendingAction: bootstrap.pendingAction,
   });
 }

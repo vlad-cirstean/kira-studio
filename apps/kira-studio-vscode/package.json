@@ -79,17 +79,121 @@
       },
       {
         "command": "kiraVersion.focusGraph",
-        "title": "Focus Graph",
-        "category": "Kira Version"
+        "title": "Open Git Graph",
+        "category": "Kira Version",
+        "icon": "$(git-branch)"
       },
       {
         "command": "kiraVersion.reviewBranch",
         "title": "Review Branch Changes",
         "category": "Kira Version"
+      },
+      {
+        "command": "kiraVersion.refresh",
+        "title": "Refresh",
+        "category": "Kira Version"
+      },
+      {
+        "command": "kiraVersion.checkout",
+        "title": "Checkout…",
+        "category": "Kira Version"
+      },
+      {
+        "command": "kiraVersion.createBranch",
+        "title": "Create Branch…",
+        "category": "Kira Version"
+      },
+      {
+        "command": "kiraVersion.deleteBranch",
+        "title": "Delete Branch…",
+        "category": "Kira Version"
+      },
+      {
+        "command": "kiraVersion.renameBranch",
+        "title": "Rename Branch…",
+        "category": "Kira Version"
+      },
+      {
+        "command": "kiraVersion.createTag",
+        "title": "Create Tag…",
+        "category": "Kira Version"
+      },
+      {
+        "command": "kiraVersion.deleteTag",
+        "title": "Delete Tag…",
+        "category": "Kira Version"
+      },
+      {
+        "command": "kiraVersion.deleteRemoteBranch",
+        "title": "Delete Remote Branch…",
+        "category": "Kira Version"
+      },
+      {
+        "command": "kiraVersion.revertCommit",
+        "title": "Revert Commit…",
+        "category": "Kira Version"
+      },
+      {
+        "command": "kiraVersion.continueOperation",
+        "title": "Continue Operation",
+        "category": "Kira Version"
+      },
+      {
+        "command": "kiraVersion.abortOperation",
+        "title": "Abort Operation",
+        "category": "Kira Version"
+      },
+      {
+        "command": "kiraVersion.skipCommit",
+        "title": "Skip Commit",
+        "category": "Kira Version"
+      },
+      {
+        "command": "kiraVersion.undo",
+        "title": "Undo Last Operation",
+        "category": "Kira Version"
+      },
+      {
+        "command": "kiraVersion.fetch",
+        "title": "Fetch",
+        "category": "Kira Version"
+      },
+      {
+        "command": "kiraVersion.pull",
+        "title": "Pull",
+        "category": "Kira Version"
+      },
+      {
+        "command": "kiraVersion.push",
+        "title": "Push",
+        "category": "Kira Version"
+      },
+      {
+        "command": "kiraVersion.forcePush",
+        "title": "Force Push…",
+        "category": "Kira Version"
+      },
+      {
+        "command": "kiraVersion.cancelRemoteOperation",
+        "title": "Cancel Remote Operation",
+        "category": "Kira Version"
       }
     ],
+    "menus": {
+      "scm/title": [
+        {
+          "command": "kiraVersion.focusGraph",
+          "group": "navigation"
+        }
+      ]
+    },
     "configuration": {
       "properties": {
+        "kiraVersion.statusBar.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show a Kira Version status-bar item that opens the git graph."
+        },
         "kiraVersion.git.path": {
           "type": "string",
           "default": "",

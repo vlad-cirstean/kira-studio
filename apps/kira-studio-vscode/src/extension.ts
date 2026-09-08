@@ -8,6 +8,13 @@
  * Upstream's `activate()` built an in-process `RepoService` and two webview providers; neither
  * exists here in that shape. `coerceSettings`/`readRawSettings` and the `onDidChangeConfiguration`
  * re-coercion are kept — the extension still owns settings (SPEC §5 item 3).
+ *
+ * G10 D3/D16/D19: `activationEvents: ["onStartupFinished"]` (the manifest) is what lets the
+ * status-bar item created here appear before a user has ever opened the panel by hand — an item
+ * created in `activate()` cannot show until something has already activated the extension.
+ * `activate()` now also registers every palette command straight from `commands.ts`'s tables (no
+ * hand-written second list to drift from), and the SCM title-bar button is a manifest-only
+ * addition (`contributes.menus.scm/title`) pointing at the pre-existing `kiraVersion.focusGraph`.
  */
 import {
   coerceSettings,
@@ -17,7 +24,9 @@ import {
 } from '@kira/git-core';
 import type { GitStatus } from '@kira/git-ipc';
 import * as vscode from 'vscode';
-import { ConnectionManager } from './connection.ts';
+import type { OtherCommandId } from './commands.ts';
+import { isPaletteCommand, MUTATING_COMMANDS, OTHER_COMMANDS } from './commands.ts';
+import { ConnectionManager, type ConnectionState } from './connection.ts';
 import { KiraGraphViewProvider } from './panelView.ts';
 import { VsCodeClipboard } from './ports/clipboard.ts';
 import { VsCodeCredentialPrompt } from './ports/credentialPrompt.ts';
@@ -40,17 +49,19 @@ interface ServerAppInitResult {
   readonly git: GitStatus;
 }
 
-const STATUS_COMMAND = 'kiraVersion.showConnectionStatus';
-const OPEN_REPO_COMMAND = 'kiraVersion.openRepository';
+// G10 D19: command ids themselves now live in commands.ts's tables (the only place activate()
+// reads them from to register) — STATUS_COMMAND/OPEN_REPO_COMMAND/REVIEW_BRANCH_COMMAND are gone
+// from here for exactly that reason, not merely unused.
 // G1 §5.4 removed this command saying it "returns in G3" (D13/D17) — it does, once there is a
 // graph view to focus.
 const FOCUS_GRAPH_COMMAND = 'kiraVersion.focusGraph';
 const GRAPH_VIEW_ID = 'kiraVersion.graph';
-// G6/D15: the review view's own palette entry point (§6.8's third required entry point) and view
-// id — reveal with no target, and let the view ask (upstream's own OQ2 resolution).
-const REVIEW_BRANCH_COMMAND = 'kiraVersion.reviewBranch';
 const REVIEW_VIEW_ID = 'kiraVersion.review';
 const SETTING_KEYS = Object.keys(SETTINGS) as readonly SettingKey[];
+
+// G10 D16: host-only, deliberately outside SETTINGS/SettingsSnapshot — the webview has no use for
+// it, and putting it there would be a second, gratuitous contract change on top of D9's.
+const STATUS_BAR_SETTING = 'kiraVersion.statusBar.enabled';
 
 function readRawSettings(config: vscode.WorkspaceConfiguration): Record<string, unknown> {
   const raw: Record<string, unknown> = {};
@@ -59,6 +70,21 @@ function readRawSettings(config: vscode.WorkspaceConfiguration): Record<string, 
     if (value !== undefined) raw[key] = value;
   }
   return raw;
+}
+
+// G10 D16: an entry point with connection state, deliberately no branch/ahead-behind — the
+// extension host holds no head state (repo.changed carries only {repoId, kind}), so rendering that
+// would mean a second, host-side copy of state the webview already owns and renders itself.
+function updateStatusBar(item: vscode.StatusBarItem, state: ConnectionState): void {
+  const enabled = vscode.workspace.getConfiguration().get<boolean>(STATUS_BAR_SETTING, true);
+  if (!enabled || state.kind !== 'connected') {
+    item.hide();
+    return;
+  }
+  const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  item.text = '$(git-branch) Kira Version';
+  item.tooltip = root ? `Kira Version: connected (${root})` : 'Kira Version: connected';
+  item.show();
 }
 
 let connection: ConnectionManager | undefined;
@@ -126,6 +152,40 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const graphProvider = new KiraGraphViewProvider({ extensionUri: context.extensionUri, handlers });
   reviewProvider = new KiraReviewViewProvider({ extensionUri: context.extensionUri, handlers });
 
+  // G10 D16: created here so it can appear before the panel is ever opened (D3's
+  // onStartupFinished); disposed with the extension like every other subscription.
+  const statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 0);
+  statusBarItem.command = FOCUS_GRAPH_COMMAND;
+  context.subscriptions.push(statusBarItem);
+  updateStatusBar(statusBarItem, manager.state);
+
+  // G10 D19: every command this extension contributes is registered from commands.ts's own
+  // tables — no hand-written second list. Mutating commands all dispatch through the graph
+  // provider's runUiAction; the five non-mutating ids get an explicit handler each, so TypeScript
+  // requires one per id and rejects one for an id that does not exist.
+  const otherCommandHandlers: Record<OtherCommandId, () => void> = {
+    'kiraVersion.showConnectionStatus': () => void showConnectionStatus(manager),
+    'kiraVersion.openRepository': () => void openRepository(manager, dialogs),
+    'kiraVersion.focusGraph': () => {
+      void vscode.commands.executeCommand(`${GRAPH_VIEW_ID}.focus`);
+    },
+    'kiraVersion.reviewBranch': () => reviewProvider.reviewBranch(undefined, undefined),
+    'kiraVersion.refresh': () => graphProvider.runUiAction('refresh'),
+  };
+  for (const entry of Object.values(MUTATING_COMMANDS)) {
+    if (isPaletteCommand(entry)) {
+      const action = entry.action;
+      context.subscriptions.push(
+        vscode.commands.registerCommand(entry.command, () => graphProvider.runUiAction(action)),
+      );
+    }
+  }
+  for (const { command } of OTHER_COMMANDS) {
+    context.subscriptions.push(
+      vscode.commands.registerCommand(command, otherCommandHandlers[command]),
+    );
+  }
+
   context.subscriptions.push(
     { dispose: () => manager.dispose() },
     vscode.window.registerWebviewViewProvider(GRAPH_VIEW_ID, graphProvider),
@@ -162,6 +222,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     },
     manager.onStateChange((state) => {
       logger.log('info', 'connection state', state);
+      updateStatusBar(statusBarItem, state);
       // §5.4 point 4: this phase's own exit criterion, executing in the real extension — the
       // moment a connection is established, prove app.init round-trips over the real socket.
       if (state.kind === 'connected') {
@@ -181,6 +242,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       }
     }),
     vscode.workspace.onDidChangeConfiguration((event) => {
+      if (event.affectsConfiguration(STATUS_BAR_SETTING)) {
+        updateStatusBar(statusBarItem, manager.state);
+      }
       if (!event.affectsConfiguration('kiraVersion')) return;
       const { settings, problems } = coerceSettings(
         readRawSettings(vscode.workspace.getConfiguration()),
@@ -191,14 +255,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       }
       graphProvider.notifySettingsChanged(currentSettings);
       reviewProvider.notifySettingsChanged(currentSettings);
-    }),
-    vscode.commands.registerCommand(STATUS_COMMAND, () => showConnectionStatus(manager)),
-    vscode.commands.registerCommand(OPEN_REPO_COMMAND, () => openRepository(manager, dialogs)),
-    vscode.commands.registerCommand(FOCUS_GRAPH_COMMAND, () => {
-      void vscode.commands.executeCommand(`${GRAPH_VIEW_ID}.focus`);
-    }),
-    vscode.commands.registerCommand(REVIEW_BRANCH_COMMAND, () => {
-      reviewProvider.reviewBranch(undefined, undefined);
     }),
   );
 }
