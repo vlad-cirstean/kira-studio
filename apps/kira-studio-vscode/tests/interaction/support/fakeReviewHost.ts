@@ -54,13 +54,14 @@ function buildPackedChunk(): PackedCommitChunk {
   };
 }
 
-/** The four scripted responses, each a ready-to-dispatch wire envelope (`{version, body}`) —
+/** The five scripted responses, each a ready-to-dispatch wire envelope (`{version, body}`) —
  *  built once, here, from real contract shapes, never assembled by the in-page script itself. */
 function buildResponses(): {
   appInit: (id: number) => unknown;
   resolveBase: (id: number) => unknown;
   streamChunkThenEnd: (id: number) => readonly [unknown, unknown];
   commitDetail: (id: number) => unknown;
+  openDiffOk: (id: number) => unknown;
 } {
   return {
     appInit: (id) =>
@@ -136,17 +137,28 @@ function buildResponses(): {
           ],
         },
       }),
+    // G21 D14: `editor.openDiff` — answered (trivially, `{}`) rather than left pending, so
+    // `file-tree-open.spec.ts` can await the click/dblclick/Enter gesture it triggers and then
+    // read back every recorded call's own `pinned` argument (`buildFakeHostInitScript`'s own
+    // `window.__openDiffCalls`) — "which options argument was passed" is not observable any other
+    // way (G21 F8's own wording).
+    openDiffOk: (id) => wrap({ t: 'res', id, ok: true, result: {} }),
   };
 }
 
 /**
  * Builds the plain-JS string installed via `page.addInitScript`. Reads each incoming
- * `acquireVsCodeApi().postMessage(...)` call and, for the four methods this fixture scripts,
+ * `acquireVsCodeApi().postMessage(...)` call and, for the methods this fixture scripts,
  * dispatches the matching wire response(s) as a `window` `message` event — exactly the shape
  * `createVsCodeChannel`'s own `onMessage` (`webview/main.ts`) already listens for. Every other
  * method (`refs.list`, `review.files`, `review.comment.list`, `review.session.save`, …) is left
  * unanswered — a pending promise nothing in these two specs' own assertions waits on, matching
  * §4.2's own scope (D10/D11a's DOM assertions never depend on any of them resolving).
+ *
+ * G21 D14: `editor.openDiff` is the exception — every call is both answered (`{}`, so
+ * `openInEditor`'s own `await` resolves) and recorded onto `window.__openDiffCalls`, in arrival
+ * order, so `file-tree-open.spec.ts` can read back exactly which `pinned` value each click/
+ * dblclick/`Enter` gesture actually sent.
  */
 export function buildFakeHostInitScript(): string {
   const responses = buildResponses();
@@ -155,6 +167,7 @@ export function buildFakeHostInitScript(): string {
     resolveBase: responses.resolveBase(0),
     stream: responses.streamChunkThenEnd(0),
     commitDetail: responses.commitDetail(0),
+    openDiffOk: responses.openDiffOk(0),
   };
   // Each fixture above was built against a placeholder id (0); the in-page script below
   // substitutes the *real* request id (assigned by the client's own `nextId` counter) into a
@@ -176,6 +189,8 @@ export function buildFakeHostInitScript(): string {
         window.dispatchEvent(new MessageEvent('message', { data: envelope }));
       }
 
+      window.__openDiffCalls = [];
+
       window.acquireVsCodeApi = () => ({
         postMessage(message) {
           const body = message && message.body;
@@ -190,6 +205,11 @@ export function buildFakeHostInitScript(): string {
           }
           if (body.t === 'req' && body.method === 'commit.detail') {
             dispatch(withId(FIXTURES.commitDetail, body.id));
+            return;
+          }
+          if (body.t === 'req' && body.method === 'editor.openDiff') {
+            window.__openDiffCalls.push(body.params);
+            dispatch(withId(FIXTURES.openDiffOk, body.id));
             return;
           }
           if (body.t === 'open' && body.method === 'graph.stream') {
