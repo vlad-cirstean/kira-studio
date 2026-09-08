@@ -284,6 +284,12 @@ func newIntegrationServerWithRunner(t *testing.T, gitRunner gitclient.Runner) (s
 
 	gitDiscovery := gitclient.NewDiscovery(lookPathLocator{}, gitRunner, gitclient.NewRealClock())
 	gitRegistry := gitsession.NewRegistry(gitRunner)
+	// G18 D8: wired to the real, per-test SQLite database above (main.go's own wiring, restated)
+	// so a test that never overrides these closures itself still exercises the real storage path
+	// for repoSettings.get/set, rather than silently falling back to NewRegistry's own in-memory,
+	// never-persisted defaults.
+	gitRegistry.RepoSettingsGet = repositories.GitRepoSettings.Get
+	gitRegistry.RepoSettingsSet = repositories.GitRepoSettings.Set
 
 	server = New(Deps{
 		SocketPath: filepath.Join(kiraHome, "git.sock"),

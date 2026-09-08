@@ -189,6 +189,9 @@ func newRemoteIntegrationServerWithRunner(t *testing.T, timeout time.Duration, g
 
 	gitDiscovery := gitclient.NewDiscovery(lookPathLocator{}, gitRunner, gitclient.NewRealClock())
 	gitRegistry := gitsession.NewRegistry(gitRunner)
+	// G18 D8: same real-storage wiring newIntegrationServerWithRunner's own copy carries.
+	gitRegistry.RepoSettingsGet = repositories.GitRepoSettings.Get
+	gitRegistry.RepoSettingsSet = repositories.GitRepoSettings.Set
 
 	server = New(Deps{
 		SocketPath: filepath.Join(kiraHome, "git.sock"),
