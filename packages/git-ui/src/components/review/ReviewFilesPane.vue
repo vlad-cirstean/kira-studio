@@ -18,7 +18,9 @@
  * disabled (`show-toolbar="false"`) rather than duplicated.
  */
 import type { CommitStore } from '@kira/git-core';
-import type { ReviewFileStatus } from '@kira/git-ipc';
+import type { ReviewDiffMode, ReviewFileStatus } from '@kira/git-ipc';
+import type { KuiSegmentedOption } from '@kira/kira-ui';
+import { KuiSegmented } from '@kira/kira-ui';
 import { computed } from 'vue';
 import { ACTION_ICONS } from '../../icons/index.ts';
 import type { FileListMode } from '../../state/detail.ts';
@@ -35,6 +37,11 @@ const props = defineProps<{
   listMode: FileListMode;
   filter: string;
 }>();
+
+const diffModeOptions: readonly KuiSegmentedOption[] = [
+  { id: 'sinceReview', icon: ACTION_ICONS.diffSingle, label: 'Since review' },
+  { id: 'range', icon: ACTION_ICONS.diffMultiple, label: 'Full range' },
+];
 
 const files = computed(() => props.reviewFiles.files.value.map((entry) => entry.change));
 
@@ -90,28 +97,12 @@ function onToggleReviewed(path: string): void {
       <!-- G12 D12/D16: which two revisions a click opens in VS Code's diff editor — the one real
            capability removing DiffView would otherwise have lost. -->
       <div class="kv-review-files-diff-mode">
-        <div class="kv-review-files-diff-toggle" role="group" aria-label="What to compare">
-          <button
-            type="button"
-            :aria-pressed="reviewFiles.diffMode.value === 'sinceReview'"
-            :class="{ 'kv-mode-active': reviewFiles.diffMode.value === 'sinceReview' }"
-            v-kui-tooltip="'Since review'"
-            aria-label="Since review"
-            @click="reviewFiles.setDiffMode('sinceReview')"
-          >
-            <span class="codicon" :class="ACTION_ICONS.diffSingle" aria-hidden="true"></span>
-          </button>
-          <button
-            type="button"
-            :aria-pressed="reviewFiles.diffMode.value === 'range'"
-            :class="{ 'kv-mode-active': reviewFiles.diffMode.value === 'range' }"
-            v-kui-tooltip="'Full range'"
-            aria-label="Full range"
-            @click="reviewFiles.setDiffMode('range')"
-          >
-            <span class="codicon" :class="ACTION_ICONS.diffMultiple" aria-hidden="true"></span>
-          </button>
-        </div>
+        <KuiSegmented
+          :options="diffModeOptions"
+          :model-value="reviewFiles.diffMode.value"
+          ariaLabel="What to compare"
+          @update:model-value="(value) => reviewFiles.setDiffMode(value as ReviewDiffMode)"
+        />
         <span v-if="deltaStatusText" class="kv-review-files-delta-status">{{ deltaStatusText }}</span>
       </div>
       <p v-if="reviewFiles.diffError.value" class="kv-detail-pane-error">
@@ -160,34 +151,6 @@ function onToggleReviewed(path: string): void {
   padding: var(--kv-s-1) var(--kv-s-4);
   border-bottom: var(--kv-border-width) solid var(--kv-panel-border);
   font-family: var(--kv-font-ui);
-}
-
-.kv-review-files-diff-toggle {
-  display: inline-flex;
-  height: var(--kv-control-h);
-  border: var(--kv-border-width) solid var(--kv-panel-border);
-  border-radius: var(--kv-radius-sm);
-  overflow: hidden;
-}
-
-.kv-review-files-diff-mode button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: var(--kv-control-h);
-  background: transparent;
-  color: var(--kv-row-fg);
-  border: none;
-  cursor: pointer;
-}
-
-.kv-review-files-diff-mode button + button {
-  border-left: var(--kv-border-width) solid var(--kv-panel-border);
-}
-
-.kv-review-files-diff-mode button.kv-mode-active {
-  background: var(--kv-row-selected-bg);
-  color: var(--kv-row-selected-fg);
 }
 
 .kv-review-files-delta-status {

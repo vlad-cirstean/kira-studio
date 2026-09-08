@@ -18,7 +18,8 @@
  */
 import type { CommitStore } from '@kira/git-core';
 import type { FileChange, ReviewFileStatus } from '@kira/git-ipc';
-import { KuiContextMenu } from '@kira/kira-ui';
+import type { KuiSegmentedOption } from '@kira/kira-ui';
+import { KuiContextMenu, KuiSegmented } from '@kira/kira-ui';
 import { computed, nextTick, ref, watch } from 'vue';
 import { ACTION_ICONS } from '../icons/index.ts';
 import type { FileListMode } from '../state/detail.ts';
@@ -85,6 +86,11 @@ const emit = defineEmits<{
    *  code by the time this phase deleted the file). Never emitted when reviewStates is absent. */
   (e: 'toggleReviewed', path: string): void;
 }>();
+
+const listModeOptions: readonly KuiSegmentedOption[] = [
+  { id: 'tree', icon: ACTION_ICONS.listTree, label: 'Tree view' },
+  { id: 'flat', icon: ACTION_ICONS.listFlat, label: 'Flat view' },
+];
 
 const filterInput = ref(props.filter);
 watch(
@@ -418,28 +424,12 @@ function reviewToggleTitle(path: string): string {
         :value="filterInput"
         @input="onFilterInput"
       />
-      <div class="kv-file-tree-mode" role="group" aria-label="File list display">
-        <button
-          type="button"
-          :aria-pressed="listMode === 'tree'"
-          :class="{ 'kv-mode-active': listMode === 'tree' }"
-          v-kui-tooltip="'Tree view'"
-          aria-label="Tree view"
-          @click="emit('update:listMode', 'tree')"
-        >
-          <span class="codicon" :class="ACTION_ICONS.listTree" aria-hidden="true"></span>
-        </button>
-        <button
-          type="button"
-          :aria-pressed="listMode === 'flat'"
-          :class="{ 'kv-mode-active': listMode === 'flat' }"
-          v-kui-tooltip="'Flat view'"
-          aria-label="Flat view"
-          @click="emit('update:listMode', 'flat')"
-        >
-          <span class="codicon" :class="ACTION_ICONS.listFlat" aria-hidden="true"></span>
-        </button>
-      </div>
+      <KuiSegmented
+        :options="listModeOptions"
+        :model-value="listMode"
+        ariaLabel="File list display"
+        @update:model-value="(value) => emit('update:listMode', value as FileListMode)"
+      />
     </div>
 
     <div
@@ -586,23 +576,6 @@ function reviewToggleTitle(path: string): string {
   color: var(--kv-row-fg);
   border: 1px solid var(--kv-panel-border);
   padding: var(--kv-space-1) var(--kv-space-2);
-}
-
-.kv-file-tree-mode {
-  display: flex;
-}
-
-.kv-file-tree-mode button {
-  background: transparent;
-  color: var(--kv-row-fg);
-  border: 1px solid var(--kv-panel-border);
-  cursor: pointer;
-  padding: 0 var(--kv-space-2);
-}
-
-.kv-file-tree-mode button.kv-mode-active {
-  background: var(--kv-row-selected-bg);
-  color: var(--kv-row-selected-fg);
 }
 
 .kv-file-tree-rows {

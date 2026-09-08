@@ -23,7 +23,8 @@
  */
 import { SETTINGS } from '@kira/git-core';
 import type { HostKind, ReviewSessionSnapshot, Transport, UiActionKind } from '@kira/git-ipc';
-import { initTooltips, KuiButton, KuiTextInput, KuiTooltip } from '@kira/kira-ui';
+import type { KuiSegmentedOption } from '@kira/kira-ui';
+import { initTooltips, KuiButton, KuiSegmented, KuiTextInput, KuiTooltip } from '@kira/kira-ui';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue';
 import { BridgeClient } from '../../bridge/client.ts';
 import { ACTION_ICONS } from '../../icons/index.ts';
@@ -31,7 +32,7 @@ import { copyToClipboard } from '../../state/clipboardActions.ts';
 import type { FileListMode } from '../../state/detail.ts';
 import type { Capabilities, DetailActions } from '../../state/detailActions.ts';
 import { RefsState } from '../../state/refs.ts';
-import { ReviewSessionState, type ReviewTarget } from '../../state/review.ts';
+import { type ReviewPane, ReviewSessionState, type ReviewTarget } from '../../state/review.ts';
 import { ReviewCommentsState } from '../../state/reviewComments.ts';
 import { ReviewFilesState } from '../../state/reviewFiles.ts';
 import { SettingsState } from '../../state/settings.ts';
@@ -444,6 +445,22 @@ const commitsCount = computed(() => {
 const filesChangedCount = computed(() => reviewFiles.value?.files.value.length ?? 0);
 const commentsCount = computed(() => reviewComments.value?.comments.value.length ?? 0);
 
+// G14 D8 row 4: each pane button carries a count badge — GitLens's own count-badged section nodes.
+const panelOptions = computed<readonly KuiSegmentedOption[]>(() => [
+  { id: 'commits', icon: ACTION_ICONS.commits, label: 'Commits', badge: commitsCount.value },
+  { id: 'files', icon: ACTION_ICONS.files, label: 'Files', badge: filesChangedCount.value },
+  { id: 'comments', icon: ACTION_ICONS.comments, label: 'Comments', badge: commentsCount.value },
+]);
+
+const listModeOptions: readonly KuiSegmentedOption[] = [
+  { id: 'tree', icon: ACTION_ICONS.listTree, label: 'Tree view' },
+  { id: 'flat', icon: ACTION_ICONS.listFlat, label: 'Flat view' },
+];
+
+function onPaneChange(pane: string): void {
+  review.value?.setPane(pane as ReviewPane);
+}
+
 /** G14 D8 row 3: the comparison summary's own second line — "N commits · M files changed",
  *  always shown while the list itself is (never gated on which pane is active, unlike the old
  *  commit-count-only span this replaces). */
@@ -709,43 +726,12 @@ watch(
            filter, and the Tree/Flat toggle — replacing what used to be one FileTree toolbar per
            expanded row plus a third, separately-stateful copy in the Files pane. -->
       <div v-if="review.phase.value === 'listing'" class="kv-review-toolbar">
-        <!-- G14 D8 row 4: each pane button carries a count badge — GitLens's own count-badged
-             section nodes. -->
-        <div class="kv-review-pane-toggle" role="group" aria-label="Review pane">
-          <button
-            type="button"
-            :aria-pressed="review.pane.value === 'commits'"
-            :class="{ 'kv-mode-active': review.pane.value === 'commits' }"
-            v-kui-tooltip="'Commits'"
-            :aria-label="`Commits (${commitsCount})`"
-            @click="review.setPane('commits')"
-          >
-            <span class="codicon" :class="ACTION_ICONS.commits" aria-hidden="true"></span>
-            <span class="kv-review-pane-badge">{{ commitsCount }}</span>
-          </button>
-          <button
-            type="button"
-            :aria-pressed="review.pane.value === 'files'"
-            :class="{ 'kv-mode-active': review.pane.value === 'files' }"
-            v-kui-tooltip="'Files'"
-            :aria-label="`Files (${filesChangedCount})`"
-            @click="review.setPane('files')"
-          >
-            <span class="codicon" :class="ACTION_ICONS.files" aria-hidden="true"></span>
-            <span class="kv-review-pane-badge">{{ filesChangedCount }}</span>
-          </button>
-          <button
-            type="button"
-            :aria-pressed="review.pane.value === 'comments'"
-            :class="{ 'kv-mode-active': review.pane.value === 'comments' }"
-            v-kui-tooltip="'Comments'"
-            :aria-label="`Comments (${commentsCount})`"
-            @click="review.setPane('comments')"
-          >
-            <span class="codicon" :class="ACTION_ICONS.comments" aria-hidden="true"></span>
-            <span class="kv-review-pane-badge">{{ commentsCount }}</span>
-          </button>
-        </div>
+        <KuiSegmented
+          :options="panelOptions"
+          :model-value="review.pane.value"
+          ariaLabel="Review pane"
+          @update:model-value="onPaneChange"
+        />
         <!-- G19 D6 (item 6): the always-rendered filter input is now gated behind a search-icon
              button — F6 found this the one filter in the app that did not already gate behind
              opening something (BaseSelector.vue's own filter already does). `active` whenever the
@@ -768,28 +754,12 @@ watch(
           :model-value="filter"
           @update:model-value="filter = $event"
         />
-        <div class="kv-review-toolbar-mode" role="group" aria-label="File list display">
-          <button
-            type="button"
-            :aria-pressed="listMode === 'tree'"
-            :class="{ 'kv-mode-active': listMode === 'tree' }"
-            v-kui-tooltip="'Tree view'"
-            aria-label="Tree view"
-            @click="listMode = 'tree'"
-          >
-            <span class="codicon" :class="ACTION_ICONS.listTree" aria-hidden="true"></span>
-          </button>
-          <button
-            type="button"
-            :aria-pressed="listMode === 'flat'"
-            :class="{ 'kv-mode-active': listMode === 'flat' }"
-            v-kui-tooltip="'Flat view'"
-            aria-label="Flat view"
-            @click="listMode = 'flat'"
-          >
-            <span class="codicon" :class="ACTION_ICONS.listFlat" aria-hidden="true"></span>
-          </button>
-        </div>
+        <KuiSegmented
+          :options="listModeOptions"
+          :model-value="listMode"
+          ariaLabel="File list display"
+          @update:model-value="(value) => (listMode = value as FileListMode)"
+        />
       </div>
 
       <div class="kv-review-body">
@@ -1117,57 +1087,6 @@ watch(
   padding: 0 var(--kv-s-3);
   font-family: var(--kv-font-ui);
   font-size: var(--kv-t-sm);
-}
-
-/* G12 D16: .p-seg's own shape — one bordered container, children with no border of their own
-   except the separator between them. Shared by the Commits/Files toggle and the Tree/Flat
-   toggle (and ReviewFilesPane.vue's own Since-review/Full-range toggle, styled the same way). */
-.kv-review-pane-toggle,
-.kv-review-toolbar-mode {
-  display: inline-flex;
-  height: var(--kv-control-h);
-  border: var(--kv-border-width) solid var(--kv-panel-border);
-  border-radius: var(--kv-radius-sm);
-  overflow: hidden;
-  flex-shrink: 0;
-}
-
-.kv-review-pane-toggle button,
-.kv-review-toolbar-mode button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--kv-s-1);
-  width: var(--kv-control-h);
-  background: transparent;
-  color: var(--kv-row-fg);
-  border: none;
-  cursor: pointer;
-}
-
-/* G14 D8 row 4: the pane toggle's own buttons carry a count badge (Commits/Files/Comments), so
- * they grow to fit it instead of staying icon-only-width. `.kv-review-toolbar-mode` (Tree/Flat)
- * carries no badge and keeps the shared `width: var(--kv-control-h)` above. */
-.kv-review-pane-toggle button {
-  width: auto;
-  padding: 0 var(--kv-s-2);
-}
-
-.kv-review-pane-badge {
-  font-family: var(--kv-font-ui);
-  font-size: var(--kv-t-xs, 0.85em);
-  color: inherit;
-}
-
-.kv-review-pane-toggle button + button,
-.kv-review-toolbar-mode button + button {
-  border-left: var(--kv-border-width) solid var(--kv-panel-border);
-}
-
-.kv-review-pane-toggle button.kv-mode-active,
-.kv-review-toolbar-mode button.kv-mode-active {
-  background: var(--kv-row-selected-bg);
-  color: var(--kv-row-selected-fg);
 }
 
 .kv-review-body {
