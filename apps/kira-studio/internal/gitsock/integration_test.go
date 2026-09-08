@@ -643,3 +643,52 @@ func TestIntegration_RefcountAndDisconnectTeardown(t *testing.T) {
 		t.Fatalf("watcher constructions after expiry+re-open = %d, want 2 (a fresh RepoEntry, not the torn-down one reused)", got)
 	}
 }
+
+// TestIntegration_RevokeThenRepairReachesReady is G12 D3/D17's permanent form of F2's probe: a
+// revoked client id must be able to pair again. Before D3, GitClientsRepo.Insert died on the
+// still-present primary key and finishPairing answered pairingDenied — this asserts "ready"
+// instead, and that the Connected editors list shows exactly one, un-revoked row afterward.
+func TestIntegration_RevokeThenRepairReachesReady(t *testing.T) {
+	server, sockPath, clientsRepo, _ := newIntegrationServer(t)
+
+	_, firstToken := pairFreshWithToken(t, server, sockPath, "repair-1")
+
+	rows, err := clientsRepo.List()
+	if err != nil || len(rows) != 1 {
+		t.Fatalf("client list after first pairing: rows=%+v err=%v, want exactly one row", rows, err)
+	}
+
+	if err := server.Revoke("repair-1"); err != nil {
+		t.Fatalf("revoke: %v", err)
+	}
+
+	// Re-dialing with the now-revoked token must be rejected (SPEC §3.3).
+	revokedDial := dialTestClient(t, sockPath)
+	kind, _ := revokedDial.hello("repair-1", "revoke test", &firstToken)
+	if kind != "tokenRejected" {
+		t.Fatalf("re-dial with the revoked token = %q, want tokenRejected", kind)
+	}
+
+	// Re-dialing with no token prompts again; approving it must reach "ready", not "pairingDenied".
+	repairDial := dialTestClient(t, sockPath)
+	approveErr := make(chan error, 1)
+	go approveHead(server, approveErr)
+	kind, newToken := repairDial.hello("repair-1", "revoke test", nil)
+	if err := <-approveErr; err != nil {
+		t.Fatalf("approveHead: %v", err)
+	}
+	if kind != "ready" {
+		t.Fatalf("re-pair after approval = %q, want ready (a UNIQUE-constraint insert failure regresses to pairingDenied)", kind)
+	}
+	if newToken == "" {
+		t.Fatal("expected a fresh token from the re-pair")
+	}
+
+	rows, err = clientsRepo.List()
+	if err != nil || len(rows) != 1 {
+		t.Fatalf("client list after re-pair: rows=%+v err=%v, want exactly one row", rows, err)
+	}
+	if rows[0].RevokedAt != nil {
+		t.Fatalf("client row still revoked after re-pair: %+v", rows[0])
+	}
+}

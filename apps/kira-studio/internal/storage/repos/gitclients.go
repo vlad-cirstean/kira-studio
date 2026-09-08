@@ -44,16 +44,25 @@ func (r *GitClientsRepo) ByID(id string) (GitClientRow, bool, error) {
 	return rec, true, nil
 }
 
-// Insert adds a newly paired client. Called after the pairing broker's approval and before the
-// wire's "paired" frame is sent (D8's own ordering rule) — a token whose row does not yet exist
-// would leave the extension unable to ever reconnect.
-func (r *GitClientsRepo) Insert(row GitClientRow) error {
+// UpsertOnPair records a newly approved pairing. Called after the pairing broker's approval and
+// before the wire's "paired" frame is sent (D8's own ordering rule) — a token whose row does not
+// yet exist would leave the extension unable to ever reconnect. Upserts rather than inserts
+// because the client id may belong to a previously revoked row (G12 D3): `created_at` is
+// preserved (it means "first paired"), but `token_hash`/`token_salt` are replaced and
+// `revoked_at` is cleared, so a fresh human approval always re-admits the client.
+func (r *GitClientsRepo) UpsertOnPair(row GitClientRow) error {
 	_, err := r.DB.Exec(
-		`INSERT INTO git_clients (`+gitClientColumns+`) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		`INSERT INTO git_clients (`+gitClientColumns+`) VALUES (?, ?, ?, ?, ?, ?, ?)
+		 ON CONFLICT(id) DO UPDATE SET
+		   label = excluded.label,
+		   token_hash = excluded.token_hash,
+		   token_salt = excluded.token_salt,
+		   last_seen_at = excluded.last_seen_at,
+		   revoked_at = NULL`,
 		row.ID, row.Label, row.TokenHash, row.TokenSalt, row.CreatedAt, row.LastSeenAt, row.RevokedAt,
 	)
 	if err != nil {
-		return fmt.Errorf("repos/gitclients: insert %s: %w", row.ID, err)
+		return fmt.Errorf("repos/gitclients: upsert on pair %s: %w", row.ID, err)
 	}
 	return nil
 }

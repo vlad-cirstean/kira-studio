@@ -156,8 +156,9 @@ func finishPairing(c *conn, deps handshakeDeps, clientID, sessionID, label strin
 		ID: clientID, Label: label, TokenHash: hash, TokenSalt: salt,
 		CreatedAt: now, LastSeenAt: now,
 	}
-	if err := deps.Clients.Insert(row); err != nil {
-		slog.Warn("gitsock: insert paired client", "scope", "gitsock", "client", clientID, "err", err)
+	if err := deps.Clients.UpsertOnPair(row); err != nil {
+		// A trust grant the user just approved failed to persist — an error, not a warning (F14).
+		slog.Error("gitsock: upsert paired client", "scope", "gitsock", "client", clientID, "err", err)
 		sendHandshake(c, handshakeResponse{Kind: "pairingDenied", Reason: "denied"})
 		return false
 	}

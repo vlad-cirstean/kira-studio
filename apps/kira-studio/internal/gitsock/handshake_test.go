@@ -31,7 +31,7 @@ func (f *fakeTrustStore) ByID(id string) (repos.GitClientRow, bool, error) {
 	return row, ok, nil
 }
 
-func (f *fakeTrustStore) Insert(row repos.GitClientRow) error {
+func (f *fakeTrustStore) UpsertOnPair(row repos.GitClientRow) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.rows[row.ID] = row
@@ -176,7 +176,7 @@ func TestHandshake_Row4_ValidToken_Ready(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := store.Insert(repos.GitClientRow{ID: "c1", Label: "vscode", TokenHash: hash, TokenSalt: salt}); err != nil {
+	if err := store.UpsertOnPair(repos.GitClientRow{ID: "c1", Label: "vscode", TokenHash: hash, TokenSalt: salt}); err != nil {
 		t.Fatal(err)
 	}
 	deps := testHandshakeDeps(store, NewBroker(time.Now), time.Now)
@@ -235,7 +235,7 @@ func TestHandshake_Row5_TokenRejected_RevokedRow(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := store.Insert(repos.GitClientRow{ID: "c1", TokenHash: hash, TokenSalt: salt}); err != nil {
+	if err := store.UpsertOnPair(repos.GitClientRow{ID: "c1", TokenHash: hash, TokenSalt: salt}); err != nil {
 		t.Fatal(err)
 	}
 	if err := store.Revoke("c1", 1000); err != nil {
