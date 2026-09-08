@@ -1,0 +1,24 @@
+/*
+ * G19 D3: bridges `packages/git-ui`'s own `--kv-*` token layer onto `packages/kira-ui`'s
+ * `--kui-*` semantic vocabulary — the one-time mapping that lets this host consume
+ * `@kira/kira-ui`'s components without them ever referencing `--kv-*` directly. Every
+ * right-hand side below is an existing `--kv-*` token (`theme/vscode-tokens.css`,
+ * `theme/density.css`); no new colour is invented here.
+ */
+:root {
+  --kui-fg: var(--kv-app-fg);
+  --kui-fg-muted: var(--kv-description-fg);
+  --kui-bg-panel: var(--kv-panel-bg);
+  --kui-border: var(--kv-panel-border);
+  --kui-hover-bg: var(--kv-row-hover-bg);
+  --kui-selected-bg: var(--kv-row-selected-bg);
+  --kui-selected-fg: var(--kv-row-selected-fg);
+  --kui-danger-fg: var(--kv-diff-deleted-fg);
+  --kui-focus-border: var(--kv-focus-border);
+  --kui-radius: var(--kv-radius);
+  --kui-control-h: 22px;
+  --kui-space-1: var(--kv-space-1);
+  --kui-space-2: var(--kv-space-2);
+  --kui-space-3: var(--kv-space-3);
+  --kui-space-4: var(--kv-space-4);
+}

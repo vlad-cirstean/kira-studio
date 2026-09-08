@@ -1,6 +1,9 @@
 @import "tailwindcss";
 @import "@vscode/codicons/dist/codicon.css";
 @import "./tokens.css";
+/* G19 D3: bridges --kira-* onto @kira/kira-ui's own --kui-* vocabulary, proving the token-
+   injection contract is satisfiable from this host too — no component here consumes it yet. */
+@import "./kui-bridge.css";
 @import "./primitives.css";
 
 /* Maps the token set into Tailwind v4's CSS-first config, so utilities like

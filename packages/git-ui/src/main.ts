@@ -10,6 +10,10 @@ import './theme/app-shell.css';
 import './icons/codicon.css';
 import './theme/vscode-tokens.css';
 import './theme/density.css';
+// G19 D3: bridges --kv-* onto @kira/kira-ui's own --kui-* vocabulary, plus that package's own
+// component CSS (theme/controls.css) — loaded once, here, for every consumer in this bundle.
+import './theme/kui-bridge.css';
+import '@kira/kira-ui/theme/controls.css';
 // G12 D14: colourless structural tokens, scoped to .kv-skin-kira so the graph panel (AppRoot,
 // which never carries that class) is unaffected — one shared entry, so this loads for both roots.
 import './theme/kira-structure.css';

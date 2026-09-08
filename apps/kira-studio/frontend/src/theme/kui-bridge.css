@@ -1,0 +1,26 @@
+/*
+ * G19 D3: bridges Kira Studio's own `--kira-*` token layer onto `packages/kira-ui`'s `--kui-*`
+ * semantic vocabulary — the other half of the same contract `packages/git-ui`'s own
+ * `theme/kui-bridge.css` proves (that file, from `--kv-*`; this one, from `--kira-*`). Loaded so
+ * the contract is real and satisfiable from both hosts; nothing in this app's own UI imports
+ * `@kira/kira-ui` yet (§8 item 1's own explicit non-goal for this phase) — this file alone stays
+ * inert until something does. Every right-hand side is an existing `--kira-*` token
+ * (`theme/tokens.css`); no new colour is invented here.
+ */
+:root {
+  --kui-fg: var(--kira-fg);
+  --kui-fg-muted: var(--kira-fg-muted);
+  --kui-bg-panel: var(--kira-bg-elevated);
+  --kui-border: var(--kira-border);
+  --kui-hover-bg: var(--kira-hover);
+  --kui-selected-bg: var(--kira-select);
+  --kui-selected-fg: var(--kira-accent-fg);
+  --kui-danger-fg: var(--kira-error);
+  --kui-focus-border: var(--kira-focus);
+  --kui-radius: var(--kira-radius-sm);
+  --kui-control-h: var(--kira-control-h);
+  --kui-space-1: var(--kira-s-1);
+  --kui-space-2: var(--kira-s-2);
+  --kui-space-3: var(--kira-s-3);
+  --kui-space-4: var(--kira-s-4);
+}
