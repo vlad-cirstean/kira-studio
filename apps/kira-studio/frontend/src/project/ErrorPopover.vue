@@ -129,7 +129,10 @@ onUnmounted(() => {
 
 .error-popover {
   position: fixed;
-  z-index: 200;
+  /* P28 D17(c): the menu rung. This was a bare 200 — above the dialog scrim (then 100) and below
+     the tooltip (then 300). Both relationships are preserved by the ladder: 300 sits above
+     --kira-z-dialog and below --kira-z-tooltip. */
+  z-index: var(--kira-z-menu);
   width: 340px;
   max-width: calc(100vw - 8px);
   max-height: 240px;
