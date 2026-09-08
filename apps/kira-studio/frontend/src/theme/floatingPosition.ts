@@ -35,6 +35,11 @@ export interface FloatOptions {
 export const FLOAT_MAX_WIDTH_VAR = '--kira-float-max-w';
 export const FLOAT_MAX_HEIGHT_VAR = '--kira-float-max-h';
 
+function setIfChanged(el: HTMLElement, prop: string, px: number): void {
+  const next = `${Math.max(0, Math.round(px))}px`;
+  if (el.style.getPropertyValue(prop) !== next) el.style.setProperty(prop, next);
+}
+
 // P23: this file replaces the previous anchoredPosition.ts (P49 D12's own consolidation of three
 // hand-rolled flip/clamp implementations into one pure-arithmetic function, two named
 // "strategies") and ContextMenu.vue's still-separate hand-rolled clamp (menu) plus its entirely
@@ -66,14 +71,15 @@ export async function computeFloatPosition(
     size({
       padding,
       apply({ availableWidth, availableHeight, elements }) {
-        elements.floating.style.setProperty(
-          FLOAT_MAX_WIDTH_VAR,
-          `${Math.max(0, availableWidth)}px`,
-        );
-        elements.floating.style.setProperty(
-          FLOAT_MAX_HEIGHT_VAR,
-          `${Math.max(0, availableHeight)}px`,
-        );
+        // Write-only-on-change, and rounded to whole px, because PopoverPanel drives reposition
+        // through `autoUpdate`, whose ResizeObserver watches the *floating* element: an
+        // unconditional write here resizes that element, which fires the observer, which
+        // repositions, which writes again — an unbounded loop that hangs the renderer outright
+        // (it did: definition.spec.ts and tooltips.spec.ts both died with "target page has been
+        // closed" the moment a popover opened). Rounding also absorbs the sub-pixel jitter that
+        // would otherwise keep the comparison unequal forever.
+        setIfChanged(elements.floating, FLOAT_MAX_WIDTH_VAR, availableWidth);
+        setIfChanged(elements.floating, FLOAT_MAX_HEIGHT_VAR, availableHeight);
       },
     }),
   );

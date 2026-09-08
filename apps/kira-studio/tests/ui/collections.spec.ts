@@ -333,16 +333,17 @@ test('collections — search filters the tree, keeps ancestors, and restores the
   await expect(row(page, 'item-create')).toHaveCount(0);
 });
 
-// P22b D8: F11's own fix — the Environments list moves out of a modal dialog into its own
-// collapsible category in the collections panel, beside the tree it already sits above.
-// EnvironmentsDialog stays (OQ-3, unchanged) — this is a second, additive entry point onto the
-// exact same openVariableSetTab('environment', …) call its own row click already makes.
+// P28 D16(d) removes P22b D8's Environments category from the collections panel — the user asked
+// for the environment list to stop sharing the panel with the collections tree. What replaced it as
+// the way in is the panel header's own Environments action, which opens the environments *tab*
+// (D16c) — and each row there still opens the same openVariableSetTab('environment', …) the
+// category's rows used to, which is what the tail of this test still checks.
 const ENVIRONMENTS = [
   { id: 'env-prod', name: 'Prod', sortOrder: 0, isActive: true, color: 'green' },
   { id: 'env-staging', name: 'Staging', sortOrder: 1, isActive: false, color: 'amber' },
 ];
 
-test('collections — the Environments category expands, lists environments, and opens one as a tab', async ({
+test('collections — no environments category in the panel; the header action opens the environments tab, and a row there opens one as a variables tab', async ({
   relaunch,
 }) => {
   const CONTROL: ControlSnapshot[] = [
@@ -353,36 +354,29 @@ test('collections — the Environments category expands, lists environments, and
   await openHttpMode(page);
 
   await expect(row(page, 'col-1')).toBeVisible();
-  const tree = page.locator('.tree-body');
 
-  // Collapsed by default (F11: it was behind a dialog before this, never open by default).
+  // D16(d): gone outright — neither the category's toggle nor any of its rows exists any more.
+  await expect(page.locator('[data-testid="environments-category-toggle"]')).toHaveCount(0);
   await expect(page.locator('[data-testid="environments-category-row"]')).toHaveCount(0);
 
-  // Collapsing/expanding the Environments category is a layout change above the tree, not inside
-  // it — the tree's own scroll position must not move because of it.
-  const scrollBefore = await tree.evaluate((el) => el.scrollTop);
-  await page.click('[data-testid="environments-category-toggle"]');
-  const rows = page.locator('[data-testid="environments-category-row"]');
-  await expect(rows).toHaveCount(2);
-  await expect(tree.evaluate((el) => el.scrollTop)).resolves.toBe(scrollBefore);
+  // D16(c)/(e): the panel header's action — server-environment, not the old settings gear — opens
+  // the environments tab rather than a dialog.
+  await page.click('[data-testid="api-environments"]');
+  const environments = page.locator('[data-testid="environments-dialog"]');
+  await expect(environments).toBeVisible();
+  await expect(page.locator('[data-testid="environment-row"]')).toHaveCount(2);
+  await expect(page.locator('[data-testid="environment-row"][data-id="env-prod"]')).toBeVisible();
 
-  await expect(
-    page.locator('[data-testid="environments-category-row"][data-id="env-prod"]'),
-  ).toContainText('Prod');
-  // The active environment carries its own check mark; the inactive one does not.
-  await expect(
-    page
-      .locator('[data-testid="environments-category-row"][data-id="env-prod"]')
-      .locator('.codicon-check'),
-  ).toHaveCount(1);
-  await expect(
-    page
-      .locator('[data-testid="environments-category-row"][data-id="env-staging"]')
-      .locator('.codicon-check'),
-  ).toHaveCount(0);
-
-  await page.click('[data-testid="environments-category-row"][data-id="env-prod"]');
+  // The same openVariableSetTab('environment', …) the removed category's rows used to make — and,
+  // unlike the dialog this replaced, opening it no longer closes the list behind it.
+  await page
+    .locator('[data-testid="environment-row"][data-id="env-prod"]')
+    .locator('[data-testid="environment-edit-variables"]')
+    .click();
   const view = page.locator('[data-testid="variables-dialog"][data-scope="environment"]');
   await expect(view).toBeVisible();
-  await expect(page.locator('[data-testid="tab"]')).toContainText('Prod');
+  // Two tabs now, and that is the point: the environments tab stays open behind the variables
+  // tab it opened, where the dialog it replaced used to close itself. Assert the ACTIVE one.
+  await expect(page.locator('[data-testid="tab"][data-active="true"]')).toContainText('Prod');
+  await expect(page.locator('[data-testid="tab"][data-tab-kind="environments"]')).toHaveCount(1);
 });
