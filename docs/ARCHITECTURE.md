@@ -445,7 +445,7 @@ irrelevant, and `SecretStore.copy()` stays a raw column copy that never needs th
 
 The key is 32 random bytes held as one generic-password item via `github.com/keybase/go-keychain`
 (service `Kira Studio Secrets`, account `Kira Studio`), and values are sealed with
-**AES-256-GCM** under a `kira:v2:<base64>` envelope. Two item attributes are load-bearing:
+**AES-256-GCM** under a `kira:v3:<base64>` envelope. Two item attributes are load-bearing:
 `kSecAttrAccessibleWhenUnlockedThisDeviceOnly`, so the key is never restorable from a backup onto
 another machine, and non-synchronizable, so it never reaches iCloud Keychain. `secrets/keyring_darwin.go`
 is the only file in the repo that touches the keychain library; `secrets/cipher.go` is the only
@@ -470,6 +470,24 @@ or truncated ciphertext fails to authenticate rather than decrypting to garbage,
 user-facing decrypt-failure message ("may have been written on a different machine or after a
 keychain reset — re-enter it to fix this connection") is already correct for that case and is kept
 verbatim.
+
+A third thing changed with the cipher (P29, closing P21 round 2 architecture/security finding 10):
+`Encrypt`/`Decrypt` now take a `secrets.Scope` — `"connection"`, `"variable"`, or
+`"variable-history"`, one per column that stores a ciphertext — and that scope becomes AES-GCM's
+additional authenticated data. A ciphertext sealed for one column now refuses to authenticate in any
+other, closing the gap where a `connections.password` blob moved into `api_variables.secret_value`
+would previously decrypt exactly as if it belonged there. The scope is bound to *kind*, not to a row,
+because the app's own duplication paths — `ConnectionsRepo.InsertDuplicateWithSecret` and
+`VariablesRepo.DuplicateEnvironment` — copy a raw ciphertext column into a new row of the *same* kind
+without ever touching the cipher, and a row-scoped AAD would break that outright.
+`VariablesRepo.recordHistory` is the one place that copies *across* kinds (a live variable's
+ciphertext into its own history row); rather than keep that as a raw copy, it now re-encrypts under
+`ScopeVariableHistory` using the plaintext it already holds two statements earlier — a raw copy would
+have been a live-variable ciphertext sitting in a history row, exactly the cross-kind movement the
+AAD exists to refuse. The envelope bumped again, `kira:v2:` → `kira:v3:`, and — the same "app has not
+shipped" reasoning the keychain-item rename above already leans on — with **no migration and no
+dual-read path**: every `kira:v2:` (and `kira:v1:`) value is refused on first read after this ships,
+and the user re-enters it once.
 
 The connection dialog's credential note reflects the platform's actual backend rather than a fixed
 warning; the probed `{available, backend, insecureFallback, reason}` status is resolved once at
