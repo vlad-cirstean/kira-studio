@@ -131,3 +131,60 @@
 .codicon-gear::before {
   content: "\eaf8";
 }
+
+/* G19 D5: ReviewView.vue's base/branch swap button. */
+.codicon-arrow-swap::before {
+  content: "\ebcb";
+}
+
+/* G19 D14: fileTreeModel.ts's fileIconFor() category map — the six categories codicons can
+   actually distinguish, plus the fully-generic fallback glyph. Codepoints copied from
+   @vscode/codicons/dist/codicon.css, not invented. */
+.codicon-file::before {
+  content: "\ea7b";
+}
+
+.codicon-file-code::before {
+  content: "\eae9";
+}
+
+.codicon-file-media::before {
+  content: "\eaea";
+}
+
+.codicon-file-pdf::before {
+  content: "\eaeb";
+}
+
+.codicon-file-zip::before {
+  content: "\eaef";
+}
+
+.codicon-file-binary::before {
+  content: "\eae8";
+}
+
+.codicon-json::before {
+  content: "\eb0f";
+}
+
+.codicon-markdown::before {
+  content: "\eb1d";
+}
+
+/* G19 D3b: rowMenuModel.ts's new per-item icons (revert/reset/rename/delete). */
+.codicon-history::before {
+  content: "\ea82";
+}
+
+.codicon-debug-step-back::before {
+  content: "\eb8f";
+}
+
+.codicon-edit::before {
+  content: "\ea73";
+}
+
+.codicon-trash::before {
+  content: "\ea81";
+}

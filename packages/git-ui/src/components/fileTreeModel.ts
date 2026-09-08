@@ -231,6 +231,117 @@ export function capRows(rows: readonly FileTreeRow[], cap: number = FILE_TREE_RO
   return { visible: rows.slice(0, cap), hiddenCount: rows.length - cap };
 }
 
+/**
+ * G19 D14: a coarse extension → codicon category map — exactly the categories `@vscode/codicons`
+ * can actually distinguish (F14: `file`, `file-code` — one generic glyph, not per-language —
+ * `file-media`, `file-pdf`, `file-zip`, `file-binary`, plus the two named glyphs it ships,
+ * `json`/`markdown`), never a per-language icon theme (D14's own non-goal — codicons alone
+ * cannot offer one). Falls back to the generic `file` glyph for any extension not in one of these
+ * six buckets, and for a path with no extension at all.
+ */
+const MARKDOWN_EXTENSIONS = new Set(['md', 'markdown']);
+const MEDIA_EXTENSIONS = new Set([
+  'png',
+  'jpg',
+  'jpeg',
+  'gif',
+  'svg',
+  'webp',
+  'bmp',
+  'ico',
+  'avif',
+  'mp4',
+  'mov',
+  'avi',
+  'webm',
+  'mp3',
+  'wav',
+  'ogg',
+  'flac',
+]);
+const ZIP_EXTENSIONS = new Set(['zip', 'tar', 'gz', 'tgz', 'rar', '7z', 'bz2', 'xz']);
+const BINARY_EXTENSIONS = new Set([
+  'exe',
+  'dll',
+  'so',
+  'dylib',
+  'bin',
+  'class',
+  'o',
+  'a',
+  'wasm',
+  'jar',
+  'woff',
+  'woff2',
+  'ttf',
+  'otf',
+  'eot',
+]);
+/** Not exhaustive by design (D14's non-goal) — wide enough that most tracked source files land on
+ *  the one "this is code" glyph rather than falling through to the fully-generic file icon. */
+const CODE_EXTENSIONS = new Set([
+  'js',
+  'jsx',
+  'ts',
+  'tsx',
+  'mjs',
+  'cjs',
+  'vue',
+  'py',
+  'go',
+  'rs',
+  'java',
+  'kt',
+  'c',
+  'h',
+  'cpp',
+  'hpp',
+  'cc',
+  'cs',
+  'rb',
+  'php',
+  'sh',
+  'bash',
+  'zsh',
+  'ps1',
+  'sql',
+  'yaml',
+  'yml',
+  'toml',
+  'ini',
+  'css',
+  'scss',
+  'less',
+  'html',
+  'xml',
+  'graphql',
+  'proto',
+  'swift',
+  'm',
+  'mm',
+  'lua',
+  'r',
+  'pl',
+]);
+
+function extensionOf(path: string): string {
+  const base = baseName(path);
+  const dot = base.lastIndexOf('.');
+  return dot <= 0 ? '' : base.slice(dot + 1).toLowerCase();
+}
+
+export function fileIconFor(path: string): string {
+  const ext = extensionOf(path);
+  if (ext === 'json') return 'codicon-json';
+  if (MARKDOWN_EXTENSIONS.has(ext)) return 'codicon-markdown';
+  if (ext === 'pdf') return 'codicon-file-pdf';
+  if (MEDIA_EXTENSIONS.has(ext)) return 'codicon-file-media';
+  if (ZIP_EXTENSIONS.has(ext)) return 'codicon-file-zip';
+  if (BINARY_EXTENSIONS.has(ext)) return 'codicon-file-binary';
+  if (CODE_EXTENSIONS.has(ext)) return 'codicon-file-code';
+  return 'codicon-file';
+}
+
 /** `originalPath → path` with the common leading *directory* path truncated (§6.4: "a file
  *  moved within a directory shows `old.ts → new.ts`, not two full paths") — compares directory
  *  segments only, so the filenames themselves are never folded away even when they happen to

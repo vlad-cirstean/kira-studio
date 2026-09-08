@@ -11,12 +11,14 @@ import { computed, nextTick, ref, watch } from 'vue';
 import { ACTION_ICONS } from '../icons/index.ts';
 import type { FileListMode } from '../state/detail.ts';
 import type { DetailActions } from '../state/detailActions.ts';
+import { exactCount, formatChangeCount } from './countFormat.ts';
 import {
   buildFileTree,
   buildFlatList,
   capRows,
   FILE_TREE_ROW_CAP,
   type FileTreeRow,
+  fileIconFor,
   filterFiles,
   flattenTreeRows,
   renameDisplay,
@@ -291,6 +293,13 @@ function statusClass(change: FileChange): string {
   return STATUS_COLOR_CLASS[change.kind];
 }
 
+/** G19 D14: the row's primary leading glyph — a coarse extension-based codicon, replacing the
+ *  status letter in that role; the letter itself is kept, demoted to a small secondary chip
+ *  (SPEC's own wording: kept, not removed). */
+function fileIcon(path: string): string {
+  return fileIconFor(path);
+}
+
 function fileTitle(change: FileChange): string {
   const rename = renameDisplay(change);
   if (rename && change.similarity !== undefined) {
@@ -406,14 +415,19 @@ function reviewToggleTitle(path: string): string {
           <span class="kv-file-tree-dir-name">{{ row.node.name }}</span>
           <span class="kv-file-tree-dir-stats">
             {{ row.node.fileCount }} {{ row.node.fileCount === 1 ? "file" : "files" }}
-            <span class="kv-diff-added-fg">+{{ row.node.additions }}</span>
-            <span class="kv-diff-deleted-fg">-{{ row.node.deletions }}</span>
+            <span class="kv-diff-added-fg" :title="`${exactCount(row.node.additions)} additions`"
+              >+{{ formatChangeCount(row.node.additions) }}</span
+            >
+            <span class="kv-diff-deleted-fg" :title="`${exactCount(row.node.deletions)} deletions`"
+              >-{{ formatChangeCount(row.node.deletions) }}</span
+            >
           </span>
         </template>
         <template v-else>
+          <span class="kv-file-tree-icon codicon" :class="fileIcon(row.node.path)" aria-hidden="true"></span>
           <span
-            class="kv-file-tree-status"
-            :class="[statusClass(row.node.change), { 'kv-file-tree-status-fixed': reviewStyled }]"
+            class="kv-file-tree-status kv-file-tree-status-chip"
+            :class="statusClass(row.node.change)"
             :title="fileTitle(row.node.change)"
             >{{ statusLetter(row.node.change) }}</span
           >
@@ -431,8 +445,16 @@ function reviewToggleTitle(path: string): string {
             >{{ dirOf(row.node.path) }}</span
           >
           <span v-if="!row.node.change.isBinary" class="kv-file-tree-counts">
-            <span class="kv-diff-added-fg">+{{ row.node.change.additions ?? 0 }}</span>
-            <span class="kv-diff-deleted-fg">-{{ row.node.change.deletions ?? 0 }}</span>
+            <span
+              class="kv-diff-added-fg"
+              :title="`${exactCount(row.node.change.additions ?? 0)} additions`"
+              >+{{ formatChangeCount(row.node.change.additions ?? 0) }}</span
+            >
+            <span
+              class="kv-diff-deleted-fg"
+              :title="`${exactCount(row.node.change.deletions ?? 0)} deletions`"
+              >-{{ formatChangeCount(row.node.change.deletions ?? 0) }}</span
+            >
           </span>
           <span
             v-if="reviewStates && reviewStatusFor(row.node.change.path)?.changedSinceReview"
@@ -572,23 +594,35 @@ function reviewToggleTitle(path: string): string {
   gap: var(--kv-space-2);
 }
 
+/* G19 D14: the row's primary leading glyph — a coarse extension-based codicon (`fileIconFor`),
+ * taking over the leading-icon role the status letter used to occupy. */
+.kv-file-tree-icon {
+  flex-shrink: 0;
+  width: 16px;
+  text-align: center;
+  color: var(--kv-description-fg);
+  font-size: 14px;
+}
+
 .kv-file-tree-status {
   font-family: var(--kv-mono-font-family);
   font-weight: 700;
-  width: 1.2em;
-  text-align: center;
   flex-shrink: 0;
 }
 
-/* G14 D8: the review sidebar's own fixed-cell status letter (row 5) — GitLens's file-node anatomy
- * uses a fixed-width glyph cell rather than one sized off the letter's own em, so a run of R/M/D
- * rows lines up instead of each letter setting its own width. */
-.kv-file-tree-status-fixed {
-  width: var(--kv-icon-box);
-  height: var(--kv-icon-box);
+/* G19 D14: the status letter, demoted from the row's primary glyph to a small secondary chip
+ * (kept, per SPEC's own wording, not removed) now that the file-type icon above owns the
+ * leading-glyph role. */
+.kv-file-tree-status-chip {
+  width: 1.3em;
+  height: 1.3em;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  border-radius: 3px;
+  font-size: 0.75em;
+  background-color: var(--kv-badge-bg);
+  color: var(--kv-badge-fg);
 }
 
 .kv-status-added {

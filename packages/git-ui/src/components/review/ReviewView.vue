@@ -1100,8 +1100,10 @@ watch(
   padding: var(--kv-s-1) var(--kv-s-4);
 }
 
-.kv-skin-kira .kv-file-tree-status,
-.kv-skin-kira .kv-file-tree-name {
+/* G19 D13: narrowed from `.kv-file-tree-status, .kv-file-tree-name` — real usage found the mono
+   editor font wrong for file *names* specifically (F13); LAW 08 itself stands unchanged for the
+   status letter, which is still data in the same sense a diff stat is. */
+.kv-skin-kira .kv-file-tree-status {
   font-family: var(--kv-font-data); /* LAW 08: a file path is data. */
 }
 

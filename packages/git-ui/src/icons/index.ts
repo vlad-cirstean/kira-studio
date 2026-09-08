@@ -17,6 +17,8 @@ export const ACTION_ICONS = {
   comments: 'codicon-comment-discussion',
   remove: 'codicon-trash',
   clearAll: 'codicon-clear-all',
+  // G19 D5: the review compare header's base/branch swap button.
+  swap: 'codicon-arrow-swap',
 } as const;
 
 export type IconAction = keyof typeof ACTION_ICONS;
