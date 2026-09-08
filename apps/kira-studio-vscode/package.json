@@ -319,15 +319,6 @@
         }
       ]
     },
-    "configuration": {
-      "properties": {
-        "kiraVersion.statusBar.enabled": {
-          "type": "boolean",
-          "default": true,
-          "description": "Show a Kira Version status-bar item that opens the git graph."
-        }
-      }
-    },
     "colors": [
       {
         "id": "kiraVersion.graphLane0",

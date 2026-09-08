@@ -70,10 +70,6 @@ const GRAPH_VIEW_ID = 'kiraVersion.graph';
 const REVIEW_VIEW_ID = 'kiraVersion.review';
 const SETTING_KEYS = Object.keys(SETTINGS) as readonly SettingKey[];
 
-// G10 D16: host-only, deliberately outside SETTINGS/SettingsSnapshot — the webview has no use for
-// it, and putting it there would be a second, gratuitous contract change on top of D9's.
-const STATUS_BAR_SETTING = 'kiraVersion.statusBar.enabled';
-
 function readRawSettings(config: vscode.WorkspaceConfiguration): Record<string, unknown> {
   const raw: Record<string, unknown> = {};
   for (const key of SETTING_KEYS) {
@@ -210,25 +206,23 @@ function plainTextOf(markdownLine: string): string {
 
 // G12 D10: an entry point genuinely visible in every state, not only the one state (connected)
 // that needs no indicator — F10's fix. `active` is the in-flight-request signal
-// (`ConnectionManager.onActivityChange`), meaningful only while `connected`. `item.hide()`
-// survives for exactly one case: the user turned the item off themselves.
+// (`ConnectionManager.onActivityChange`), meaningful only while `connected`.
 //
 // G14 D5: the two states that need the user's attention (pairing, an error) keep a word; the
 // three that do not (connecting, connected, loading) are icon-only — everything the text used to
 // spend on "Kira Version" now lives in a structured Markdown tooltip instead (F7). `appInit` is
 // the server/contract version the connected/idle tooltip names — fetched separately (extension.ts's
 // own app.init round-trip), so it is `undefined` for the first render of a fresh `connected` state.
+//
+// G21 D7 (item 7): the settings-gated hide/show toggle this used to have (a user could turn the
+// item off themselves) is removed outright, along with the setting itself. The item is now
+// always shown.
 function updateStatusBar(
   item: vscode.StatusBarItem,
   state: ConnectionState,
   active: boolean,
   appInit?: { readonly serverVersion: string; readonly contractVersion: number },
 ): void {
-  const enabled = vscode.workspace.getConfiguration().get<boolean>(STATUS_BAR_SETTING, true);
-  if (!enabled) {
-    item.hide();
-    return;
-  }
   item.backgroundColor = undefined;
   let tooltipLines: readonly string[];
   switch (state.kind) {
@@ -559,9 +553,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       }
     }),
     vscode.workspace.onDidChangeConfiguration((event) => {
-      if (event.affectsConfiguration(STATUS_BAR_SETTING)) {
-        updateStatusBar(statusBarItem, manager.state, isActive, lastAppInit);
-      }
       // G14 D6b: 'workbench.tree.indent' is a host-owned key (SETTINGS' source: 'host'), read off
       // the root configuration object like any other SETTING_KEYS member — readRawSettings itself
       // needs no special case (a fully-qualified dotted key resolves there like any other, with
