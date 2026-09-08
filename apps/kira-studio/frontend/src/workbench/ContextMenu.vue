@@ -345,7 +345,7 @@ async function onItemClick(item: MenuItem): Promise<void> {
   display: flex;
   flex-direction: column;
   gap: 1px;
-  z-index: 200;
+  z-index: var(--kira-z-menu);
 }
 
 /* Rows share the tree/operations-list row primitive (P8) so a menu row and a
@@ -416,7 +416,7 @@ async function onItemClick(item: MenuItem): Promise<void> {
      all) rendered a submenu near the right or bottom edge of the window partly or wholly
      offscreen. */
   position: fixed;
-  z-index: 200;
+  z-index: var(--kira-z-menu);
   min-width: 160px;
   padding: var(--kira-s-2);
   display: flex;

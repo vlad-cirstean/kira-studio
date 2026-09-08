@@ -371,14 +371,24 @@
    numeric column the left placement is strictly better — the button no longer sits where the
    value's last digits are. `.slick-cell` is already `position: absolute` (slick.grid.css), so it
    is a containing block on its own; no `position: relative` needed here.
-   Deliberate redesign, not the original port (item 12, a later coordinator round): "always
-   visible... overlay on top of the cell's text... rather than reserving padding that pushes/
-   truncates the text" — `padding-left` (this rule used to reserve `calc(--kira-s-4 + 18px)` for
-   the button, pushing/truncating the cell's own text to make room for it) is dropped entirely;
-   `.cell-nav-btn`'s own opaque `background` (below, unchanged) is what keeps the icon legible
-   sitting directly on top of the text now, rather than beside it. SlickGridHost.vue's own
+   A later coordinator round (item 12) made the button always visible and dropped the
+   `padding-left` this rule used to reserve, so the button sat directly on top of the cell's text,
+   legible only because of its own opaque `background`. **P28 D6 reverses that half by user
+   request** — reported as "the text and button are stacked on top of each other" — and restores
+   the reservation below. The always-visible, one-real-button-per-cell half of item 12 stays: only
+   the overlay-instead-of-reserve choice is undone. Do not re-drop the padding without a fresh
+   report saying the overlay is wanted back. SlickGridHost.vue's own
    `placeNavButtonsForRenderedCells` is what actually builds one real button per nav-eligible
    rendered cell now (superseding D11b's single hover-moved node) — this file only styles it. */
+/* P28 D6: the reservation, restored. 4px of gutter before the button (matching `.cell-nav-btn`'s
+   own `left`) + its 16px box + 4px of breathing room before the value. On a right-aligned numeric
+   column `.kira-align-right`'s `justify-content: flex-end` already pushes the value to the far
+   edge, so this padding only ever widens the gap there — it never pushes a value under the
+   button. */
+.slick-grid-host .slick-cell.has-nav {
+  padding-left: 24px;
+}
+
 .slick-grid-host .cell-nav-btn {
   position: absolute;
   left: 4px;
@@ -579,7 +589,13 @@
      explicit 1, so this is always the last visual item in the row regardless of DOM position. */
   order: 2;
   margin-left: auto;
-  width: 14px;
+  /* P28 D4: 12px, and a negative right margin that cancels the flex gap between this and the
+     always-present (0px-at-rest) .slick-sort-indicator-numbered after it, so the control sits
+     against the header cell's own padding edge instead of 4px short of it. Right-side chrome
+     falls from 30px (4 gap + 14 + 4 gap + 8 padding) to 20px, of which 12 is the control itself.
+     views/shared/page/columns.ts's HeaderChrome.sortControl carries the matching figure. */
+  width: 12px;
+  margin-right: calc(-1 * var(--kira-s-2));
   height: 13px;
   /* Unchanged from the pre-existing at-rest geometry (0, not --kira-s-2) even though this state
      now always shows a glyph — a narrow header's own click-target layout (cell-editor.spec.ts's
@@ -625,7 +641,8 @@
 }
 .slick-grid-host .slick-sort-indicator-asc,
 .slick-grid-host .slick-sort-indicator-desc {
-  margin-left: var(--kira-s-2);
+  /* P28 D4: no extra margin-left — the sorted state used to reserve 4px the at-rest state does
+     not, so sorting a column visibly shifted its header text left. */
   /* Neutral, not var(--kira-accent) — this control signals its state by which single arrow shows,
      the same way the panel-toggle buttons in the title bar settled on shape/brightness over an
      unrelated brand colour. */
@@ -645,6 +662,9 @@
 .slick-grid-host .slick-sort-indicator-numbered {
   order: 3;
   flex-shrink: 0;
+  /* P28 D4: the indicator above pulls itself over this element's preceding flex gap; at rest
+     this is a zero-width no-op, and :not(:empty) below restores its own 2px when a real
+     multi-column sort number is showing. */
   margin: 0;
   width: 0;
   min-width: 0;

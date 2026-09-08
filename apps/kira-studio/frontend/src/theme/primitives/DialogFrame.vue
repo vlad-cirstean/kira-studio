@@ -108,7 +108,7 @@ onUnmounted(() => document.removeEventListener('keydown', onKeydown));
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 100;
+  z-index: var(--kira-z-dialog);
 }
 
 .dialog {

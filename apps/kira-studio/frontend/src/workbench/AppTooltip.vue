@@ -77,12 +77,12 @@ onUnmounted(() => window.removeEventListener('resize', onResize));
 </template>
 
 <style scoped>
-/* z-index 300: the first free rung above every other floating surface (F10's ladder tops out at
-   200 for the context menu/autocomplete/dialog scrim) — all three can host a hinted control, so
-   anything lower would reproduce the "hint swallowed by an open overlay" bug in a new form. */
+/* The top rung of theme/tokens.css's own floating-surface ladder (P28 D17(c)) — every other
+   floating surface can host a hinted control, so anything lower would reproduce the "hint
+   swallowed by an open overlay" bug in a new form. */
 .app-tooltip {
   position: fixed;
-  z-index: 300;
+  z-index: var(--kira-z-tooltip);
   max-width: 320px;
   padding: var(--kira-s-2) var(--kira-s-3);
   color: var(--kira-fg);

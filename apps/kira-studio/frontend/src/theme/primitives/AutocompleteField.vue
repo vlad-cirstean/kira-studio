@@ -511,7 +511,7 @@ onBeforeUnmount(() => {
    above `positionList()`) and the plain `<ul>` reset. */
 .autocomplete-suggestions {
   position: fixed;
-  z-index: 200;
+  z-index: var(--kira-z-autocomplete);
   list-style: none;
   margin: 0;
 }
@@ -520,7 +520,7 @@ onBeforeUnmount(() => {
    same `.p-float` chrome (background/border/radius/shadow) every other floating surface uses. */
 .var-hover-panel {
   position: fixed;
-  z-index: 200;
+  z-index: var(--kira-z-autocomplete);
   padding: var(--kira-s-2) var(--kira-s-3);
   max-width: 360px;
   font-family: var(--kira-font-data);

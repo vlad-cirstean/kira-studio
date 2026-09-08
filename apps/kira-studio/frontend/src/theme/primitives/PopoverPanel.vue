@@ -136,7 +136,7 @@ onUnmounted(() => {
 .menu-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 20;
+  z-index: var(--kira-z-popover);
 }
 
 /* top/left/right are set inline above, computed from the trigger's own bounding rect — see

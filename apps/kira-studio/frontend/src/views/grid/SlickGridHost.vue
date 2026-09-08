@@ -434,7 +434,7 @@ function buildColumns(
     // only the initial width would leave a drag able to crop the header again.
     const floor = headerAwareMinWidth(name, {
       padding: 16,
-      sortControl: 22,
+      sortControl: 16, // P28 D4 — was 22; see HeaderChrome.sortControl's own comment.
       keyBadge: keyLabelFor(descriptor, name, fkNames) ? 20 : 0,
     });
     cols.push({
