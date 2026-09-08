@@ -62,6 +62,7 @@ func (r *SettingsRepo) GetAll() (model.Settings, error) {
 	leafValid(stored, "advanced.expensiveQueryRows", &result.Advanced.ExpensiveQueryRows, model.InRange(1_000, 1_000_000_000))
 	leaf(stored, "git.protectedBranches", &result.Git.ProtectedBranches)
 	leafValid(stored, "git.fetchAutoIntervalMinutes", &result.Git.FetchAutoIntervalMinutes, model.InRange(0, 1440))
+	leaf(stored, "git.path", &result.Git.GitPath)
 	return result, nil
 }
 
@@ -135,6 +136,11 @@ func (r *SettingsRepo) Set(patch model.SettingsPatch) (model.Settings, error) {
 		}
 		if g.FetchAutoIntervalMinutes != nil {
 			if err := upsertSettingsLeaf(tx, "git.fetchAutoIntervalMinutes", *g.FetchAutoIntervalMinutes); err != nil {
+				return model.Settings{}, err
+			}
+		}
+		if g.GitPath != nil {
+			if err := upsertSettingsLeaf(tx, "git.path", *g.GitPath); err != nil {
 				return model.Settings{}, err
 			}
 		}

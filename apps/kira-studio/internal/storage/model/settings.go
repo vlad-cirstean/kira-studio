@@ -32,6 +32,12 @@ type GitSettings struct {
 	ProtectedBranches []string `json:"protectedBranches"`
 	// FetchAutoIntervalMinutes is minutes between automatic background fetches; 0 disables it.
 	FetchAutoIntervalMinutes int `json:"fetchAutoIntervalMinutes"`
+	// GitPath is G18 D15's fix: this leaf was always classified server-owned but its wiring was
+	// dead (Discovery.Status(ctx, "") hardcoded at every call site) until this phase. Empty means
+	// "auto-discover" — gitclient.Discovery's own existing contract, unvalidated beyond "is a
+	// string" (a bad path is tolerated the same way Discovery's own probe already falls through
+	// its classified-error states rather than pre-validating).
+	GitPath string `json:"gitPath"`
 }
 
 type Settings struct {
@@ -63,6 +69,7 @@ func DefaultSettings() Settings {
 		Git: GitSettings{
 			ProtectedBranches:        []string{"main", "master", "release/*"},
 			FetchAutoIntervalMinutes: 0,
+			GitPath:                  "",
 		},
 	}
 }
@@ -95,6 +102,7 @@ type AdvancedPatch struct {
 type GitPatch struct {
 	ProtectedBranches        *[]string `json:"protectedBranches,omitempty"`
 	FetchAutoIntervalMinutes *int      `json:"fetchAutoIntervalMinutes,omitempty"`
+	GitPath                  *string   `json:"gitPath,omitempty"`
 }
 
 type SettingsPatch struct {

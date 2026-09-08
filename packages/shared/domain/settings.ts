@@ -82,6 +82,11 @@ export const gitSettingsSchema = /*#__PURE__*/ z.object({
     .min(FETCH_AUTO_INTERVAL_MINUTES_RANGE.min)
     .max(FETCH_AUTO_INTERVAL_MINUTES_RANGE.max)
     .default(0),
+  // G18 D15: git.path was already classified server-owned (it answers "where is the git binary
+  // on this machine", not a per-repo or per-window preference) but its wiring was dead until this
+  // phase — a third leaf of this same trio, fixed the same way, not a redesign. Empty means "auto-
+  // discover" (VS Code's own git.path, then PATH) — gitclient.Discovery's own existing contract.
+  gitPath: z.string().default(''),
 });
 export type GitSettings = z.infer<typeof gitSettingsSchema>;
 
@@ -95,6 +100,7 @@ export const settingsSchema = /*#__PURE__*/ z.object({
   git: gitSettingsSchema.default({
     protectedBranches: ['main', 'master', 'release/*'],
     fetchAutoIntervalMinutes: 0,
+    gitPath: '',
   }),
 });
 export type Settings = z.infer<typeof settingsSchema>;
@@ -129,5 +135,6 @@ export const defaultSettings: Settings = {
   git: {
     protectedBranches: ['main', 'master', 'release/*'],
     fetchAutoIntervalMinutes: 0,
+    gitPath: '',
   },
 };
