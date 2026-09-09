@@ -56,8 +56,8 @@ type RangeSpec struct {
 }
 
 // WalkSpec selects one walk's rev set — the single builder RevSetArgs/WalkArgs share across the
-// paged walk, the remaining-count query and (G10) the tail scan, so all three agree on exactly
-// the same commits in exactly the same order (D21).
+// paged walk, the remaining-count query and G23's tail scan (LogScanArgs), so all three agree on
+// exactly the same commits in exactly the same order (D21).
 type WalkSpec struct {
 	// Scope is "all" or "head" (the contract's own graph.scope values); "all" is the default when
 	// empty, matching D14's server-side default.

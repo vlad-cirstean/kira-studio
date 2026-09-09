@@ -30,8 +30,8 @@ func RangeToken(r RangeSpec) string {
 }
 
 // RevSetArgs returns the argv fragment selecting spec's rev set — shared by the paged walk, the
-// remaining-count query (`rev-list --count`) and, in G10, the tail scan, so all three agree on
-// exactly the same commits in exactly the same order (D8/D21). G3 always passes
+// remaining-count query (`rev-list --count`) and G23's tail scan (LogScanArgs), so all three agree
+// on exactly the same commits in exactly the same order (D8/D21). G3 always passes
 // spec.IncludeStash=false (WalkArgs(spec) is then just `["--all"]` or `["HEAD"]`); G8 supplies
 // real stash shas.
 func RevSetArgs(spec WalkSpec) []string {
@@ -67,6 +67,27 @@ func LogSessionSkipArgs(spec WalkSpec, skip int) []string {
 	return append(args, WalkArgs(spec)...)
 }
 
+// ScanFormat is LogFormat plus the raw body, LAST — so SplitLimitedFields' "the final field
+// absorbs every extra delimiter" rule keeps a body containing a stray 0x1f harmless, exactly why
+// %s is last in LogFormat itself (G23 D1).
+const ScanFormat = LogFormat + "%x1f%b"
+
+// ScanFieldCount is ScanFormat's own field count.
+const ScanFieldCount = 11
+
+// LogScanArgs is G23's tail-scan argv: the same log vocabulary and the same WalkArgs(spec) call
+// LogSessionArgs makes, with ScanFormat in place of LogFormat — this is what makes upstream probe
+// 11's ordering property hold: the paging walk and the scan are the same --topo-order walk over
+// the same rev set, so the loaded rows are a PREFIX of the scan's sequence and git-ui's
+// buildCommitHits can concatenate the two halves without sorting anything. --decorate=full is kept
+// even though ParseScanRecord discards %D unparsed (D2) — dropping it would change %D's own
+// *content*, and the whole point of this function is that its argv differs from LogSessionArgs' in
+// exactly one token (the format string).
+func LogScanArgs(spec WalkSpec) []string {
+	args := []string{"log", "--decorate=full", "--topo-order", "-z", "--format=" + ScanFormat}
+	return append(args, WalkArgs(spec)...)
+}
+
 // ParseLogRecord parses one NUL-delimited record (as RecordSplitter returns it) against
 // LogFormat's ten %x1f-separated fields.
 func ParseLogRecord(record []byte) (CommitRecord, error) {
@@ -99,6 +120,54 @@ func ParseLogRecord(record []byte) (CommitRecord, error) {
 		},
 		Decoration: decoration,
 		Subject:    string(fields[9]),
+	}, nil
+}
+
+// ScanRecord is one G23 tail-scan record: every field gitsearch matches on, and nothing else.
+type ScanRecord struct {
+	SHA       string
+	Subject   string
+	Body      string
+	Author    CommitIdentity
+	Committer CommitIdentity
+}
+
+// ParseScanRecord splits ScanFormat's eleven %x1f fields. Deliberately leaner than
+// ParseLogRecord: %P and %D are split off positionally and then DROPPED unparsed, because this
+// backend never walks refs/stash — WalkSpec.IncludeStash is false at every call site in this repo
+// (G17 D1) — so there is nothing to filter and no reason to pay parseDecoration per record over a
+// 100k-commit walk. The field INDICES still track LogFormat exactly (G23 D2).
+func ParseScanRecord(record []byte) (ScanRecord, error) {
+	fields := SplitLimitedFields(record, fieldDelim, ScanFieldCount)
+	if len(fields) != ScanFieldCount {
+		return ScanRecord{}, fmt.Errorf("porcelain: scan record has %d fields, want %d", len(fields), ScanFieldCount)
+	}
+
+	authorTime, err := parseUnixSeconds(fields[4])
+	if err != nil {
+		return ScanRecord{}, fmt.Errorf("porcelain: author time: %w", err)
+	}
+	committerTime, err := parseUnixSeconds(fields[7])
+	if err != nil {
+		return ScanRecord{}, fmt.Errorf("porcelain: committer time: %w", err)
+	}
+
+	// git emits a trailing "\n" before the record's own NUL terminator; trimmed here, exactly
+	// once (upstream probe 11 / parseScanRecord.ts's own contract) — a body with a genuine
+	// trailing blank line keeps every newline but the one git's own format machinery appended.
+	body := string(fields[10])
+	body = strings.TrimSuffix(body, "\n")
+
+	return ScanRecord{
+		SHA:     string(fields[0]),
+		Subject: string(fields[9]),
+		Body:    body,
+		Author: CommitIdentity{
+			Name: string(fields[2]), Email: string(fields[3]), Timestamp: authorTime,
+		},
+		Committer: CommitIdentity{
+			Name: string(fields[5]), Email: string(fields[6]), Timestamp: committerTime,
+		},
 	}, nil
 }
 
