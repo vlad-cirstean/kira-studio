@@ -18,6 +18,7 @@ function defaultRepoSettingsSnapshot(): RepoSettingsSnapshot {
     'kiraVersion.github.enabled': SETTINGS['kiraVersion.github.enabled'].default,
     'kiraVersion.worktree.prepareScript': SETTINGS['kiraVersion.worktree.prepareScript'].default,
     'kiraVersion.worktree.basePath': SETTINGS['kiraVersion.worktree.basePath'].default,
+    'kiraVersion.checkout.autoStash': SETTINGS['kiraVersion.checkout.autoStash'].default,
   };
 }
 

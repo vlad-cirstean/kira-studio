@@ -23,6 +23,12 @@ import type { FileListMode } from './detail.ts';
  */
 export class StashState {
   readonly entries: ShallowRef<readonly StashEntry[]> = shallowRef([]);
+  /** G28 D13: the global bucket's own list, reloaded on the same signal `entries` is (a
+   *  `refs/kira/globalstash/**` write is a ref write like any other, already covered by
+   *  `watcher.ts`'s existing refs-dir coverage, M4). A separate ref rather than folding into
+   *  `entries` — `GlobalStashList.vue` is its own `BranchPicker` section (D13), and `selected`
+   *  below searches both without either list needing to know about the other's own shape. */
+  readonly globalEntries: ShallowRef<readonly StashEntry[]> = shallowRef([]);
   /** `null` selects nothing. Otherwise the sha of the entry whose file list `changes` holds —
    *  kept as a sha, not the `StashEntry` itself, so a stack reshuffle (another pop/drop) that
    *  drops this entry out of `entries` is detectable (`selected` below reads back `undefined`)
@@ -31,8 +37,10 @@ export class StashState {
   readonly changes: ShallowRef<readonly FileChange[] | undefined> = shallowRef(undefined);
   readonly error: ShallowRef<string | undefined> = shallowRef(undefined);
 
-  /** The selected entry itself, or `undefined` once it is no longer in `entries` — `StashList.vue`
-   *  reads this, never re-derives it by scanning `entries` on its own. */
+  /** The selected entry itself, or `undefined` once it is no longer in EITHER list (G28 D13
+   *  widens the search to `globalEntries` too — a selection does not know, or need to know,
+   *  which bucket it came from) — `StashList.vue`/`GlobalStashList.vue`/`StashDetailPane.vue`
+   *  read this, never re-derive it by scanning `entries` on their own. */
   readonly selected: ComputedRef<StashEntry | undefined>;
 
   // -------------------------------------------------------------------------------------
@@ -55,12 +63,17 @@ export class StashState {
     this.#bridge = bridge;
     this.selected = computed(() => {
       const sha = this.selectedSha.value;
-      return sha === null ? undefined : this.entries.value.find((entry) => entry.sha === sha);
+      if (sha === null) return undefined;
+      return (
+        this.entries.value.find((entry) => entry.sha === sha) ??
+        this.globalEntries.value.find((entry) => entry.sha === sha)
+      );
     });
     this.#unsubscribe = bridge.on('repo.changed', (event) => {
       if (this.#repoId !== event.repoId) return;
       if (event.kind !== 'refsChanged') return;
       void this.reload();
+      void this.reloadGlobal();
     });
   }
 
@@ -77,6 +90,7 @@ export class StashState {
     this.changes.value = undefined;
     this.error.value = undefined;
     void this.reload();
+    void this.reloadGlobal();
   }
 
   async reload(): Promise<void> {
@@ -89,9 +103,19 @@ export class StashState {
     this.entries.value = entries;
   }
 
-  /** `StashList.vue`'s row click/Enter, and the graph's own stash-node selection (OQ4) — `null`
-   *  clears the selection without a round trip. Re-selecting the already-selected sha is a no-op,
-   *  matching `DetailState.select`'s sibling convention for a commit row (P4). */
+  /** G28 D13: the global bucket's own reload — same shape as `reload()`, same stale-reply guard. */
+  async reloadGlobal(): Promise<void> {
+    const repoId = this.#repoId;
+    if (repoId === undefined) return;
+    const { entries } = await this.#bridge.request('globalStash.list', { repoId });
+    if (this.#repoId !== repoId) return;
+    this.globalEntries.value = entries;
+  }
+
+  /** `StashList.vue`/`GlobalStashList.vue`'s row click/Enter, and the graph's own stash-node
+   *  selection (OQ4) — `null` clears the selection without a round trip. Re-selecting the
+   *  already-selected sha is a no-op, matching `DetailState.select`'s sibling convention for a
+   *  commit row (P4). */
   select(sha: string | null): void {
     if (sha === this.selectedSha.value) return;
     this.#showController?.abort();
@@ -99,7 +123,16 @@ export class StashState {
     this.changes.value = undefined;
     this.error.value = undefined;
     this.selectedFile.value = -1;
-    if (sha !== null) void this.#requestShow(sha);
+    if (sha !== null) void this.#requestShow(sha, this.#scopeFor(sha));
+  }
+
+  /** G28 D13: which bucket sha belongs to, derived by membership rather than trusting a caller-
+   *  supplied scope — `entries` is checked first (the far more common case), falling back to
+   *  `globalEntries`; `'stack'` when neither list (yet) contains it, matching `stash.show`'s own
+   *  "absent/'' means stack" default (D12) rather than sending an undefined scope. */
+  #scopeFor(sha: string): 'stack' | 'global' {
+    if (this.globalEntries.value.some((entry) => entry.sha === sha)) return 'global';
+    return 'stack';
   }
 
   /** `StashDetailPane.vue`'s tree click/arrow-nav — mirrors `DetailState.selectFile` exactly (P5
@@ -117,13 +150,17 @@ export class StashState {
     this.filter.value = text;
   }
 
-  async #requestShow(sha: string): Promise<void> {
+  async #requestShow(sha: string, scope: 'stack' | 'global'): Promise<void> {
     const repoId = this.#repoId;
     if (repoId === undefined) return;
     const controller = new AbortController();
     this.#showController = controller;
     try {
-      const result = await this.#bridge.request('stash.show', { repoId, sha }, controller.signal);
+      const result = await this.#bridge.request(
+        'stash.show',
+        { repoId, sha, scope },
+        controller.signal,
+      );
       if (this.selectedSha.value !== sha) return;
       this.changes.value = result.changes;
     } catch (error) {
@@ -138,6 +175,7 @@ export class StashState {
   #clear(): void {
     this.#showController?.abort();
     this.entries.value = [];
+    this.globalEntries.value = [];
     this.selectedSha.value = null;
     this.changes.value = undefined;
     this.error.value = undefined;
