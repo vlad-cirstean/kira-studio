@@ -179,6 +179,10 @@ function stubHandlers(
       'worktree.prepare': notImplemented,
       'worktree.cancelPrepare': notImplemented,
       'worktree.openWindow': notImplemented,
+      'stack.list': notImplemented,
+      'preflight.restack': notImplemented,
+      'stack.restack': notImplemented,
+      'stack.cancelRestack': notImplemented,
       ...requestOverrides,
     },
     streams: {

@@ -32,6 +32,11 @@ import {
 const VSCODE_APP_DIR = join(import.meta.dir, '..');
 const OPS_GO = join(VSCODE_APP_DIR, '..', 'kira-studio', 'internal', 'gitsession', 'ops.go');
 const REMOTE_GO = join(VSCODE_APP_DIR, '..', 'kira-studio', 'internal', 'gitsession', 'remote.go');
+// G26 D13/F11: a THIRD Go source — `stack.restack` is served by its own dedicated executor
+// (`RunRestack`), neither an `opTable` kind nor a `RunRemote` switch arm, so neither of the two
+// extractions above can ever discover it. Proven served the same way the other two are: by
+// grepping the Go source itself, not by trusting the TS side's own claim.
+const STACK_GO = join(VSCODE_APP_DIR, '..', 'kira-studio', 'internal', 'gitsession', 'stack.go');
 const PACKAGE_JSON = join(VSCODE_APP_DIR, 'package.json');
 
 interface ManifestCommand {
@@ -95,13 +100,31 @@ function extractRemoteSwitchKinds(remoteGoSource: string): string[] {
   return kinds;
 }
 
+/** G26 D13's own third-source extraction — a plain existence check for `RunRestack`'s own method
+ *  signature in `gitsession/stack.go`, exactly the way `commands.ts`'s own doc comment describes
+ *  it: "a grep for `func (e *RepoEntry) RunRestack(` in `gitsession/stack.go`". */
+function extractsRestackExecutor(stackGoSource: string): boolean {
+  return /func \(e \*RepoEntry\) RunRestack\(/.test(stackGoSource);
+}
+
 const opsGoSource = readFileSync(OPS_GO, 'utf8');
 const remoteGoSource = readFileSync(REMOTE_GO, 'utf8');
+const stackGoSource = readFileSync(STACK_GO, 'utf8');
 const opTableKinds = extractOpTableKinds(opsGoSource);
 const remoteSwitchKinds = extractRemoteSwitchKinds(remoteGoSource);
+const restackServed = extractsRestackExecutor(stackGoSource);
 // 'undo'/'cancel' are unconditionally-served top-level RPC methods (undo.run, remote.cancel) —
 // never conditional the way an opTable/RunRemote entry is, so they are not extracted, just added.
-const servedKinds = new Set<string>([...opTableKinds, ...remoteSwitchKinds, 'undo', 'cancel']);
+// 'restack' is added conditionally on the THIRD source actually finding RunRestack (D13) — never
+// unconditionally, so a Go-side rename or removal of the executor fails this test rather than
+// silently keeping 'restack' served forever.
+const servedKinds = new Set<string>([
+  ...opTableKinds,
+  ...remoteSwitchKinds,
+  'undo',
+  'cancel',
+  ...(restackServed ? ['restack'] : []),
+]);
 
 describe('extraction sanity guard', () => {
   // Without this, a regex that silently stopped matching (a Go source reformat, a renamed
@@ -117,6 +140,13 @@ describe('extraction sanity guard', () => {
     expect(remoteSwitchKinds.length).toBeGreaterThan(0);
     expect(remoteSwitchKinds).toContain('fetch');
     expect(remoteSwitchKinds).toContain('pull');
+  });
+
+  // G26 D13: the third source's own sanity guard — without this, a Go-side rename of RunRestack
+  // would make 'restack' silently drop out of servedKinds and every assertion below pass
+  // vacuously for it, exactly the failure mode this whole file's own doc comment warns about.
+  test('stack.go RunRestack extraction finds the executor', () => {
+    expect(restackServed).toBe(true);
   });
 });
 

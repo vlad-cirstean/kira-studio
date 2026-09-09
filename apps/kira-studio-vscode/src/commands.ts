@@ -24,10 +24,21 @@ export const CATEGORY = 'Kira Version';
 
 /** The full set of "an operation that mutates the repository" kinds this extension could ever
  *  register a palette command for: every `OpRequest`/`RemoteOpParams` kind (`op.run`/`remote.run`
- *  cover nineteen and five respectively), plus `undo` (`undo.run`) and `cancel` (`remote.cancel`)
+ *  cover twenty and five respectively), plus `undo` (`undo.run`) and `cancel` (`remote.cancel`)
  *  — neither of which is itself an `OpRequest`/`RemoteOpParams` kind, but both mutate state exactly
- *  the way the rest of this union does. */
-export type MutatingAction = OpRequest['kind'] | RemoteOpParams['kind'] | 'undo' | 'cancel';
+ *  the way the rest of this union does — and, since G26 D13, `restack`: `stack.restack` is served
+ *  by its own dedicated executor (`gitsession/stack.go`'s `RunRestack`), neither an `opTable` kind
+ *  nor a `RunRemote` switch arm — the first mutating operation in this chapter that is neither, so
+ *  the union names it explicitly rather than leaving it invisible to `commands.test.ts`'s audit
+ *  (F11). `commands.test.ts` is extended with a THIRD Go source (a grep for
+ *  `func (e *RepoEntry) RunRestack(` in `gitsession/stack.go`) precisely because this member has no
+ *  `opTable`/`RunRemote` entry either cross-check could otherwise discover it through. */
+export type MutatingAction =
+  | OpRequest['kind']
+  | RemoteOpParams['kind']
+  | 'undo'
+  | 'cancel'
+  | 'restack';
 
 export interface PaletteCommand {
   readonly command: string;
@@ -44,11 +55,11 @@ export interface PaletteCommand {
  *  here. */
 export type MutatingEntry = PaletteCommand | { readonly pending: 'unassigned' };
 
-/** D17's seventeen served commands plus G17's five stash commands plus G22's reset/cherryPick,
- *  with `tagPush`/`tagDeleteRemote` the only two remaining `pending` placeholders — twenty-six
- *  entries in total, one per `MutatingAction` member. See the plan's own D17 table for the "what
- *  it reaches" column; every `PaletteCommand.action` here is dispatched by
- *  `packages/git-ui/src/App.vue`'s `runUiAction`. */
+/** D17's seventeen served commands plus G17's five stash commands, G22's reset/cherryPick, G25's
+ *  worktreeAdd/worktreeRemove, and G26's stackSet/restack, with `tagPush`/`tagDeleteRemote` the
+ *  only two remaining `pending` placeholders — thirty entries in total, one per `MutatingAction`
+ *  member. See the plan's own D17 table for the "what it reaches" column; every
+ *  `PaletteCommand.action` here is dispatched by `packages/git-ui/src/App.vue`'s `runUiAction`. */
 export const MUTATING_COMMANDS: Record<MutatingAction, MutatingEntry> = {
   checkout: { command: 'kiraVersion.checkout', title: 'Checkout…', action: 'openBranchPicker' },
   branchCreate: {
@@ -162,6 +173,22 @@ export const MUTATING_COMMANDS: Record<MutatingAction, MutatingEntry> = {
     title: 'Cancel Remote Operation',
     action: 'cancelRemoteOperation',
   },
+  // G26 D13: stackSet reuses 'openBranchPicker' — the same surface that already contains the
+  // fifth (stack) section's own row-level "Set stack parent…"/"Remove from stack" actions, the
+  // same convention every other row-addressed mutating kind above already follows. restack opens
+  // StackDialog's own restack mode directly (its own new UiActionKind member, 'restackStack' —
+  // the same "stashPush/worktreeAdd open their own dialog directly" shape those two already
+  // established above).
+  stackSet: {
+    command: 'kiraVersion.setStackParent',
+    title: 'Set Stack Parent…',
+    action: 'openBranchPicker',
+  },
+  restack: {
+    command: 'kiraVersion.restackStack',
+    title: 'Restack this Stack…',
+    action: 'restackStack',
+  },
 };
 
 export interface OtherCommand {
@@ -209,6 +236,13 @@ export const OTHER_COMMANDS: readonly OtherCommand[] = [
   // `markSelectionUnreviewedCommand`).
   { command: 'kiraVersion.markSelectionReviewed', title: 'Mark Selection Reviewed' },
   { command: 'kiraVersion.markSelectionUnreviewed', title: 'Mark Selection Unreviewed' },
+  // G26 D13/§7.3: stack navigation (`alt+up`/`alt+down` in package.json's own keybindings) —
+  // resolves the current branch's parent/child client-side (`stackListModel`) and calls the
+  // existing `opsState.runCheckout`, so neither is a `MutatingAction` member (the same reason
+  // `toggleFileReviewed` above is not one: it maps to no `OpRequest`/`RemoteOpParams` kind of its
+  // own).
+  { command: 'kiraVersion.goToStackParent', title: 'Go to Parent Branch' },
+  { command: 'kiraVersion.goToStackChild', title: 'Go to Child Branch' },
 ];
 
 export type OtherCommandId = (typeof OTHER_COMMANDS)[number]['command'];

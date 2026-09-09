@@ -286,8 +286,10 @@ export interface InProgressOperation {
   /** rebase only: `rebase-merge/head-name`, e.g. `refs/heads/side`. */
   readonly headName: string | undefined;
   readonly conflictedPaths: readonly string[];
-  /** True only where `git <op> --continue` exists AND v1 offers it — false for rebase (§9) and
-   *  bisect. */
+  /** True only where `git <op> --continue` exists AND v1 offers it — false only for bisect
+   *  (nothing to continue) and unmergedOnly (no state file to advance). Rebase was false through
+   *  G25 (§9's "report-only posture", correct only while nothing in the app could START a
+   *  rebase); G26 D12 flips it to true once the stack.restack executor does start one. */
   readonly canContinue: boolean;
   readonly canAbort: boolean;
   /** `.git/sequencer/` present: a multi-commit revert or cherry-pick mid-run, where --abort is
@@ -296,8 +298,9 @@ export interface InProgressOperation {
   /** Continue is *enabled* only when this is 0 (§7.11). Kept separate from
    *  `conflictedPaths.length` so a host that caps the path list cannot accidentally enable it. */
   readonly unmergedCount: number;
-  /** P10 probe 6: true for `cherryPick` and `revert` only — the two sequencer operations git
-   *  gives a `--skip`. */
+  /** P10 probe 6: true for `cherryPick` and `revert` — the two sequencer operations git gives a
+   *  `--skip` — and, since G26 D12, `rebase` too (git's own conflict hint names
+   *  `git rebase --skip` verbatim). */
   readonly canSkip: boolean;
 }
 
@@ -595,6 +598,142 @@ export interface WorktreePrepareResult {
 }
 
 // ---------------------------------------------------------------------------------------
+// G26 — stacked branches: the parent pointer, the restack executor, and stack navigation
+// (D1-D17). No upstream to structurally copy from (SPEC's own row: "not designed at all" before
+// this phase's own planning pass) — these nine types are this phase's own original design.
+// Unlike `preflight/reset.ts`'s own "authoritative Go twin, ported TS copy" split (needed there
+// for `previewResetMode`'s no-round-trip mode-radio recompute), `ClassifyRestack` itself is NOT
+// ported to `@kira/git-core`: nothing in `StackDialog.vue` recomputes a preflight verdict
+// client-side ahead of a round trip, so `gitpreflight.ClassifyRestack` (Go) is the ONLY
+// implementation — `packages/git-ui/src/components/stackListModel.ts` is a pure presentation
+// layer over whatever `stack.list`/`preflight.restack` already returned, never a second
+// classifier.
+// ---------------------------------------------------------------------------------------
+
+export type StackBranchState = 'upToDate' | 'needsRestack' | 'parentMissing';
+
+/** `stack.list`'s own per-branch row (D3) — `depth` carries a fork's own tree shape without a
+ *  recursive wire type; `track`/`checkedOutIn`/`isHead` are reused VERBATIM from `RefRow` (F14),
+ *  never re-derived. */
+export interface StackBranch {
+  readonly name: string;
+  /** The recorded parent — a local branch in this same stack, or the stack's own base. Still
+   *  named here even when it no longer resolves (an orphan's own remedy needs to say what was
+   *  recorded). */
+  readonly parent: string;
+  /** 0 for a branch sitting directly on the stack's base; meaningless (0) for an orphan. */
+  readonly depth: number;
+  readonly tip: string;
+  /** `undefined` ⇒ `state === 'parentMissing'`. */
+  readonly parentTip: string | undefined;
+  /** `branch.<name>.kirastackbase`, when recorded — regardless of whether it still resolves as a
+   *  commit (D14 is where that resolvability actually matters, for `RestackPlanEntry.baseSource`). */
+  readonly recordedBase: string | undefined;
+  /** Commits on the parent this branch does not have — `> 0` ⇒ `needsRestack` (D4), and nothing
+   *  else ever decides staleness. */
+  readonly behind: number;
+  /** This branch's own commits since the merge base with its parent. */
+  readonly ahead: number;
+  readonly state: StackBranchState;
+  readonly checkedOutIn: string | undefined;
+  readonly track: RefTrack | 'gone' | undefined;
+  readonly isHead: boolean;
+}
+
+export interface StackSummary {
+  /** The branch (or remote-tracking branch) every root in this stack sits on — itself never a
+   *  member of `branches` (D1). */
+  readonly base: string;
+  /** `undefined` only when `base` is a remote-tracking branch that has since been pruned. */
+  readonly baseTip: string | undefined;
+  /** Pre-order, bottom-to-top (D3): a parent always precedes every one of its children. A stack
+   *  is a FOREST, not strictly a chain (§10.6) — a parent may have more than one child. */
+  readonly branches: readonly StackBranch[];
+  readonly needsRestack: boolean;
+}
+
+export interface StackListResult {
+  readonly stacks: readonly StackSummary[];
+  /** Branches whose recorded parent no longer resolves to any ref, or that sit in a cycle — never
+   *  silently dropped, always surfaced with a remedy. Always `state: 'parentMissing'`. */
+  readonly orphans: readonly StackBranch[];
+}
+
+/** `preflight.restack`'s own blocker union (D14) — six kinds, in the exact fixed order the Go
+ *  classifier reports them: `inProgressOperation`, `notStacked`, `cycle`, `parentMissing`,
+ *  `checkedOutElsewhere`, `dirtyWorktree`. The first is the dialog's own headline, the same
+ *  convention `CheckoutBlocker`/`CherryPickBlocker` already established. */
+export type RestackBlocker =
+  | { readonly kind: 'inProgressOperation'; readonly operation: InProgressOperation }
+  | { readonly kind: 'notStacked'; readonly branch: string }
+  | { readonly kind: 'cycle'; readonly branches: readonly string[] }
+  | { readonly kind: 'parentMissing'; readonly branch: string; readonly parent: string }
+  | {
+      readonly kind: 'checkedOutElsewhere';
+      readonly branch: string;
+      readonly worktreePath: string;
+    }
+  | { readonly kind: 'dirtyWorktree'; readonly paths: readonly string[] };
+
+export interface RestackPlanEntry {
+  readonly branch: string;
+  readonly parent: string;
+  readonly base: string;
+  /** `'recorded'` when `kirastackbase` still resolves as a commit; `'mergeBase'` otherwise (D14/
+   *  F4 — merge-base is the honest FALLBACK, never the primary source: it is provably wrong the
+   *  moment a parent is amended, probe P6). */
+  readonly baseSource: 'recorded' | 'mergeBase';
+  readonly commits: number;
+  /** `'stale'`: this branch's own `behind > 0`. `'ancestorRestacked'`: it is itself up to date,
+   *  but an ancestor of it in the stack is in the plan (D14's own cascade rule — a branch cannot
+   *  be stale without its ancestors being at least as stale). */
+  readonly reason: 'stale' | 'ancestorRestacked';
+}
+
+export interface RestackPreflight {
+  readonly base: string;
+  /** Always the WHOLE stack (D14) — never "from this branch up": a branch cannot be stale
+   *  without its ancestors being at least as stale, so a partial plan would rebase onto a parent
+   *  that is itself about to move. */
+  readonly plan: readonly RestackPlanEntry[];
+  readonly blockers: readonly RestackBlocker[];
+  readonly verdict: 'clean' | 'noop' | 'blocked';
+  /** Where HEAD is returned to (F5: rebase always moves HEAD, even on a no-op) — a branch name,
+   *  or a short sha for a detached HEAD. */
+  readonly restoresHead: string;
+  /** Branches with an upstream that this restack will make diverge — a force-push-with-lease is
+   *  needed afterwards (F14). This phase never acts on it automatically (§8's own non-goal). */
+  readonly needsForcePush: readonly string[];
+  readonly routes: readonly 'stashFirst'[];
+}
+
+/** `stack.restack`'s own result (D6/D8/D11) — a `Conflict`/dirty-tree/base-write failure pauses
+ *  the restack at `stoppedAt` with NO undo record set (D8: replaying `update-ref`s underneath a
+ *  running `rebase-merge` sequencer would leave it pointing at commits the refs no longer name).
+ *  A cancellation (D9) stops between branches, never mid-rebase, and also sets no undo record. */
+export interface RestackResult {
+  readonly ok: boolean;
+  readonly error: { readonly kind: OpErrorKind; readonly message: string } | undefined;
+  readonly restacked: readonly string[];
+  readonly stoppedAt: string | undefined;
+  readonly remaining: readonly string[];
+  readonly undo: UndoSlotSnapshot | undefined;
+  readonly head: HeadState;
+  readonly inProgress: InProgressOperation | null;
+}
+
+/** `stack.progress`'s own event payload (D6 step 4) — emitted BEFORE each branch's own rebase
+ *  spawn, the same "coalesce, never withhold past a bound" family `remote.progress`/
+ *  `worktree.progress` already established, though a restack's own per-branch granularity needs
+ *  no throttling of its own (there is at most one event per branch, never a stream within one). */
+export interface RestackProgress {
+  readonly repoId: string;
+  readonly branch: string;
+  readonly index: number; // 1-based
+  readonly total: number;
+}
+
+// ---------------------------------------------------------------------------------------
 // P8 — remote-op vocabulary, and pull/push pre-flight (§7.3/§7.4). Structural copies of
 // `@kira/git-core`'s own (B3 — core and ipc both depend on nothing, so neither imports the
 // other); `tests/unit/ipc/wireConformance.test.ts` keeps the two in step.
@@ -818,7 +957,11 @@ export type OpRequest =
       readonly path: string;
       readonly force: boolean;
       readonly confirmToken: string | undefined;
-    };
+    }
+  /** G26 D10: sets or clears a branch's stack parent — always exactly two `git config --local`
+   *  writes (D2), always exit 0. `parent: undefined` removes `branch` from its stack (D2 writes
+   *  `""` to both `kirastack*` keys server-side, never `git config --unset`, per F15/probe P5). */
+  | { readonly kind: 'stackSet'; readonly branch: string; readonly parent: string | undefined };
 
 export type OpErrorKind =
   | 'AuthFailed'
@@ -882,6 +1025,10 @@ export type OpErrorKind =
    *  entirely different remedy: `LockHeld` says wait/retry, `WorktreeLocked` says unlock the
    *  worktree first). */
   | 'WorktreeLocked'
+  /** G26 D5/D10: this phase's own ONE new `OpErrorKind` — produced EXCLUSIVELY by `stackSet`
+   *  (D10's cycle check), never by rebase itself (D5: rebase's own two new stderr patterns both
+   *  map onto the EXISTING `DirtyWorktree`/`NotFound` kinds above). */
+  | 'StackCycle'
   | 'Unknown';
 
 /** `worktree.prepare`'s own error vocabulary (D13) — deliberately NOT `OpErrorKind`: none of
@@ -1224,7 +1371,18 @@ export type UiActionKind =
    *  actions (switch, open in new window, remove) reuse `openBranchPicker` instead, the same
    *  convention the five stash commands already established — `BranchPicker.vue`'s own worktree
    *  section already has row-level actions for all three. */
-  | 'createWorktree';
+  | 'createWorktree'
+  /** G26 D13: the palette's own route to "Restack this stack" — resolves the CURRENT branch's own
+   *  stack client-side (`stackListModel`) and calls the same `runRestack` the row menu's
+   *  "Restack this stack" entry and `StackList.vue`'s own header button already call, never a
+   *  second implementation. */
+  | 'restackStack'
+  /** G26 D13/§7.3's `alt+up`/`alt+down` stack navigation — resolves the current branch's parent
+   *  (`checkoutStackParent`) or child (`checkoutStackChild`) client-side and calls the existing
+   *  `opsState.runCheckout`, exactly the same "resolve a target, call the existing op" shape
+   *  `revertSelected`/`resetSelected`/`cherryPickSelected` already established. */
+  | 'checkoutStackParent'
+  | 'checkoutStackChild';
 
 // ---------------------------------------------------------------------------------------
 // The contract.
@@ -1839,6 +1997,37 @@ export type Contract = {
       params: { repoId: string; path: string; forceNewWindow?: boolean };
       result: Record<string, never>;
     };
+    // ---- G26: stacked branches (D1-D17) -----------------------------------------------------
+    /** D3: one `git config --local --null --get-regexp` spawn, always; one `rev-list
+     *  --left-right --count` spawn per stacked branch beyond that, bounded by
+     *  `MaxStackedBranches` (64) — a repository with no stacked branches costs exactly the first
+     *  spawn and nothing else. Cache-reading (dropped on `refsChanged`/any write, D16). */
+    'stack.list': {
+      params: { repoId: string };
+      result: StackListResult;
+    };
+    /** D14: always FRESH (never `stack.list`'s own cache) — this decision precedes a write, the
+     *  same discipline `preflight.checkout`/`preflight.worktreeAdd` already follow. */
+    'preflight.restack': {
+      params: { repoId: string; branch: string };
+      result: RestackPreflight;
+    };
+    /** D6: a long, cancellable, streaming method modelled exactly on `remote.run` — its own
+     *  dedicated executor (`gitsession.RunRestack`), NOT server via the shared `op.run` table
+     *  (F7: recording each child's new base needs the parent's post-rebase tip, which no static
+     *  argv list can express). Emits `stack.progress` before each branch. */
+    'stack.restack': {
+      params: { repoId: string; branch: string };
+      result: RestackResult;
+    };
+    /** No-op if the run already finished or was never running — the same "never an error, a
+     *  cancel racing a just-finished op is ordinary" shape `remote.cancel`/`worktree.cancelPrepare`
+     *  already use. No palette command serves this directly (D13): cancel is a button on the
+     *  surface that started the work. */
+    'stack.cancelRestack': {
+      params: { repoId: string };
+      result: { readonly cancelled: boolean };
+    };
   };
   events: {
     'repo.changed': { repoId: string; kind: 'refsChanged' | 'worktreeChanged' };
@@ -1859,6 +2048,9 @@ export type Contract = {
      *  whichever `worktree.prepare` is in flight, the same cadence/shape `remote.progress`
      *  already uses. */
     'worktree.progress': WorktreeProgress;
+    /** G26 D6 step 4: one event per planned branch (never a stream within one) for whichever
+     *  `stack.restack` is in flight. */
+    'stack.progress': RestackProgress;
     /** G7 D2/D4: one prompt from git's own askpass protocol, sent to the connection that owns the
      *  in-flight remote op — never Kira Studio's own window (SPEC §5 item 4, §6, confirmed
      *  2026-09-07). `requestId` is a server-minted, unguessable id; the extension answers exactly

@@ -24,8 +24,10 @@ export interface InProgressOperation {
   /** rebase only: `rebase-merge/head-name`'s content, e.g. `refs/heads/side`. */
   readonly headName: string | undefined;
   readonly conflictedPaths: readonly string[];
-  /** True only where `git <op> --continue` exists AND v1 offers it — false for rebase (§9) and
-   *  bisect. Kept independent of `unmergedCount`: the *enablement* is
+  /** True only where `git <op> --continue` exists AND v1 offers it — false only for bisect and
+   *  unmergedOnly. Rebase was false through G25 (§9's "report-only posture"); G26 D12 flips it to
+   *  true once `stack.restack` can start one. Kept independent of `unmergedCount`: the
+   *  *enablement* is
    *  `canContinue && unmergedCount === 0`, which is what lets the banner say "resolve the
    *  remaining N files, then Continue" rather than hiding the button outright. */
   readonly canContinue: boolean;
@@ -36,10 +38,10 @@ export interface InProgressOperation {
   /** Continue is *enabled* only when this is 0 (§7.11). Kept separate from
    *  `conflictedPaths.length` so a host that caps the path list cannot accidentally enable it. */
   readonly unmergedCount: number;
-  /** P10 probe 6: true for `cherryPick` and `revert` only — the two sequencer operations git
-   *  gives a `--skip`. Without this the banner would offer a Continue that cannot succeed on an
-   *  empty pick (`CHERRY_PICK_HEAD` present, zero unmerged paths — Continue refuses, `--skip` is
-   *  git's own named remedy). */
+  /** P10 probe 6: true for `cherryPick` and `revert` — the two sequencer operations git gives a
+   *  `--skip` — and, since G26 D12, `rebase` too. Without this the banner would offer a Continue
+   *  that cannot succeed on an empty pick (`CHERRY_PICK_HEAD` present, zero unmerged paths —
+   *  Continue refuses, `--skip` is git's own named remedy). */
   readonly canSkip: boolean;
 }
 
@@ -82,7 +84,8 @@ function operationOf(
     canAbort: input.canAbort,
     isSequence: input.isSequence,
     unmergedCount: input.unmergedPaths.length,
-    canSkip: kind === 'cherryPick' || kind === 'revert',
+    // G26 D12: rebase joins cherryPick/revert in offering Skip.
+    canSkip: kind === 'cherryPick' || kind === 'revert' || kind === 'rebase',
   };
 }
 
@@ -104,7 +107,8 @@ export function classifyInProgress(input: {
     return operationOf('rebase', {
       otherSha: s.rebaseOnto,
       headName: s.rebaseHeadName,
-      canContinue: false,
+      // G26 D12: true — retires G5's "report-only posture", now that stack.restack can START one.
+      canContinue: true,
       canAbort: true,
       isSequence: s.sequencerDir,
       unmergedPaths,
@@ -277,7 +281,10 @@ export type OpRequest =
       readonly path: string;
       readonly force: boolean;
       readonly confirmToken: string | undefined;
-    };
+    }
+  /** G26 D10: sets or clears a branch's stack parent — always exactly two `git config --local`
+   *  writes, always exit 0 (D2). `parent: undefined` removes `branch` from its stack. */
+  | { readonly kind: 'stackSet'; readonly branch: string; readonly parent: string | undefined };
 
 export type OpErrorKind =
   | 'AuthFailed'
@@ -338,6 +345,10 @@ export type OpErrorKind =
   /** G25 D15, probe M5: `fatal: cannot remove a locked working tree, lock reason: <reason>`.
    *  Kept distinct from `LockHeld` (another process holds index.lock — a different remedy). */
   | 'WorktreeLocked'
+  /** G26 D5/D10: this phase's own one new `OpErrorKind`, produced EXCLUSIVELY by `stackSet`'s
+   *  own cycle check — never by rebase itself (D5: rebase's own two new stderr patterns both map
+   *  onto the EXISTING `DirtyWorktree`/`NotFound` kinds above). */
+  | 'StackCycle'
   | 'Unknown';
 
 export interface UndoSlotSnapshot {

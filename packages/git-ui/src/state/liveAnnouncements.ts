@@ -161,6 +161,9 @@ const OP_ERROR_TEXT: Record<OpErrorKind, string> = {
   /** G25 D15, probe M5: `worktree remove` on a locked worktree. Kept distinct from `LockHeld`'s
    *  own phrase above — this names the remedy (unlock it), not "wait and retry". */
   WorktreeLocked: 'the worktree is locked',
+  /** G26 D5/D10: this phase's own one new `OpErrorKind`, produced exclusively by `stackSet`'s
+   *  own cycle check — never by rebase itself. */
+  StackCycle: 'that would make a branch its own ancestor',
   Unknown: 'an unexpected error occurred',
 };
 

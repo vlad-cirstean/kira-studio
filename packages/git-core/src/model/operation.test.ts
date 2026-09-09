@@ -27,7 +27,10 @@ describe('classifyInProgress — precedence table (§7.11)', () => {
     expect(classifyInProgress({ stateFiles: stateFiles({}), unmergedPaths: [] })).toBeNull();
   });
 
-  test('rebase-merge dir present ⇒ rebase, cannot continue, can abort', () => {
+  // G26 D12 inverts this test (renamed from its G5 original, which asserted "cannot continue" —
+  // that "§9 report-only posture" held only while nothing in the app could START a rebase;
+  // stack.restack now does).
+  test('rebase-merge dir present ⇒ rebase, can continue, can abort, can skip (G26 D12)', () => {
     const op = classifyInProgress({
       stateFiles: stateFiles({
         rebaseMergeDir: true,
@@ -41,21 +44,21 @@ describe('classifyInProgress — precedence table (§7.11)', () => {
       otherSha: 'deadbeef',
       headName: 'refs/heads/side',
       conflictedPaths: ['a.txt'],
-      canContinue: false,
+      canContinue: true,
       canAbort: true,
       isSequence: false,
       unmergedCount: 1,
-      canSkip: false,
+      canSkip: true,
     });
   });
 
-  test('rebase-apply dir present ⇒ rebase (am-based rebase)', () => {
+  test('rebase-apply dir present ⇒ rebase (am-based rebase), can continue (G26 D12)', () => {
     const op = classifyInProgress({
       stateFiles: stateFiles({ rebaseApplyDir: true }),
       unmergedPaths: [],
     });
     expect(op?.kind).toBe('rebase');
-    expect(op?.canContinue).toBe(false);
+    expect(op?.canContinue).toBe(true);
   });
 
   test('MERGE_HEAD present ⇒ merge, can continue and abort', () => {
@@ -248,8 +251,8 @@ describe('canRunOp — the gate (§7.11)', () => {
   });
 });
 
-describe('classifyInProgress — canSkip (P10 probe 6)', () => {
-  test('cherryPick and revert can skip; every other kind cannot', () => {
+describe('classifyInProgress — canSkip (P10 probe 6, G26 D12)', () => {
+  test('cherryPick, revert and rebase can skip; every other kind cannot', () => {
     expect(
       classifyInProgress({
         stateFiles: stateFiles({ cherryPickHead: 'c0ffee' }),
@@ -264,12 +267,14 @@ describe('classifyInProgress — canSkip (P10 probe 6)', () => {
       classifyInProgress({ stateFiles: stateFiles({ mergeHead: 'm' }), unmergedPaths: [] })
         ?.canSkip,
     ).toBe(false);
+    // G26 D12 inverts this line: rebase now offers Skip too (git's own conflict hint names
+    // `git rebase --skip` verbatim).
     expect(
       classifyInProgress({
         stateFiles: stateFiles({ rebaseMergeDir: true }),
         unmergedPaths: [],
       })?.canSkip,
-    ).toBe(false);
+    ).toBe(true);
     expect(
       classifyInProgress({ stateFiles: stateFiles({ bisectLog: true }), unmergedPaths: [] })
         ?.canSkip,

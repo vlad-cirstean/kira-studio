@@ -512,6 +512,13 @@ export function createProxyHandlers(deps: CreateProxyHandlersDeps): ServerHandle
       await windows.openFolder(params.path, { forceNewWindow: params.forceNewWindow ?? true });
       return {};
     },
+    // G26: four plain forwards, answered entirely by the Go server, same as every other
+    // repoId-addressed request. stackSet itself needs no entry here at all — it travels through
+    // the existing 'op.run' forward, already present above.
+    'stack.list': forward('stack.list'),
+    'preflight.restack': forward('preflight.restack'),
+    'stack.restack': forward('stack.restack'),
+    'stack.cancelRestack': forward('stack.cancelRestack'),
     // G4 D3/F12: server-only, never called by the webview — plain forwarders are enough
     // (ServerHandlers.requests is total over RequestKey, so both need an entry regardless).
     'file.read': forward('file.read'),
