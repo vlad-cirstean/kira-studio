@@ -659,11 +659,16 @@ function reviewToggleTitle(path: string): string {
  * D14's status-chip class (background/border-radius/fixed 1.3em square/0.75em shrink) is
  * deleted outright; `min-width: 1ch` is the one thing kept from it, so the letters still line up
  * into a column and the file names after them align, without reintroducing a box around the
- * letter. */
+ * letter. G-UX D6 (item 6): the letter drops from the inherited full body size/weight-700 down to
+ * the tree's own secondary scale — the same `0.85em` tier `.kv-file-tree-counts`/
+ * `-dir-stats`/`-file-dir` already use — so it reads as metadata beside the filename, not as a
+ * heading; `var(--kv-t-xs, 0.85em)` mirrors `.kv-file-tree-file-dir`'s own fallback exactly. */
 .kv-file-tree-status {
   min-width: 1ch;
   font-family: var(--kv-mono-font-family);
-  font-weight: 700;
+  font-size: var(--kv-t-xs, 0.85em);
+  font-weight: 600;
+  line-height: 1;
   flex-shrink: 0;
 }
 
