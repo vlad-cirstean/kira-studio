@@ -119,6 +119,15 @@ export class ConnectionManager implements vscode.Disposable {
   // Every dial gets a fresh token; a callback checks it against the current one before acting,
   // so a superseded (disposed, or replaced by a fresh retry) dial's late socket events are inert.
   #dialToken = 0;
+  // G30 round-1 functional-correctness review, finding #4: `#onDisconnected` used to have no
+  // idempotency guard of its own, but up to three independent listeners can fire it for ONE
+  // socket death — this class's own `socket.once('error', ...)` (registered in `#dial`, and never
+  // removed by a later successful connect) plus `channel.onClose`, which `createSocketChannel`
+  // itself fires from BOTH `socket.on('close', ...)` AND `socket.on('error', ...)`. All three pass
+  // the `dialToken` guard (nothing bumps `#dialToken` until the NEXT `#dial`), so one drop tripled
+  // `#backoffMs`'s own single ×2 step and raced three `#dial()` calls. Tracks the dialToken
+  // `#onDisconnected` has already handled, so the second and third fire are inert no-ops.
+  #disconnectHandledFor: number | undefined = undefined;
 
   constructor(context: vscode.ExtensionContext, logger: Logger, appVersion: string) {
     this.#context = context;
@@ -260,6 +269,13 @@ export class ConnectionManager implements vscode.Disposable {
 
   async #dial(): Promise<void> {
     if (this.#stopped) return;
+    // A previous attempt's socket — still open because its own dialToken is about to go stale,
+    // or because the 3x #onDisconnected bug (finding #4, see #disconnectHandledFor) once let a
+    // second/third #dial() race ahead of this one — must never linger un-destroyed: an
+    // un-destroyed socket whose own 'connect' handler is about to early-return on the token
+    // mismatch check is a leaked client socket (and, on the server side, a blocked handshake
+    // goroutine) for the rest of the process's life.
+    this.#socket?.destroy();
     const dialToken = ++this.#dialToken;
     const clientId = await this.#clientId;
     const storedToken = await this.#context.secrets.get(TOKEN_SECRET_KEY);
@@ -376,6 +392,8 @@ export class ConnectionManager implements vscode.Disposable {
 
   #onDisconnected(dialToken: number): void {
     if (dialToken !== this.#dialToken) return;
+    if (this.#disconnectHandledFor === dialToken) return; // already handled — see finding #4 above.
+    this.#disconnectHandledFor = dialToken;
     this.#transport = undefined;
     this.#transportEventUnsubs.clear(); // the dead transport's own unsubscribes are moot.
     this.#socket = undefined;
