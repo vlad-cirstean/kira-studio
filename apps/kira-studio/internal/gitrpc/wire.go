@@ -522,6 +522,12 @@ type RepoSettingsSnapshot struct {
 	// GithubEnabled is G24 D16's own eighth leaf — genuinely per-repo (unlike LogLevel), default
 	// true.
 	GithubEnabled bool `json:"kiraVersion.github.enabled"`
+	// WorktreePrepareScript/WorktreeBasePath are G25 D10/D16's own ninth and tenth leaves.
+	// Deliberately no eleventh field for the approval sha here (F15/D11) — it is a server-only key
+	// in the same storage table, reachable only through GitRepoSettingsRepo's own dedicated
+	// Get/SetPrepareScriptApproval methods, never through this snapshot's own get/set round-trip.
+	WorktreePrepareScript string `json:"kiraVersion.worktree.prepareScript"`
+	WorktreeBasePath      string `json:"kiraVersion.worktree.basePath"`
 }
 
 // RepoSettingsGetParams is repoSettings.get's own request.
@@ -541,6 +547,8 @@ type RepoSettingsPatchWire struct {
 	PullStrategy          *string   `json:"kiraVersion.pull.strategy,omitempty"`
 	LogLevel              *string   `json:"kiraVersion.log.level,omitempty"`
 	GithubEnabled         *bool     `json:"kiraVersion.github.enabled,omitempty"`
+	WorktreePrepareScript *string   `json:"kiraVersion.worktree.prepareScript,omitempty"`
+	WorktreeBasePath      *string   `json:"kiraVersion.worktree.basePath,omitempty"`
 }
 
 // RepoSettingsSetParams is repoSettings.set's own request.

@@ -27,6 +27,8 @@ func repoSettingsSnapshotFrom(s model.GitRepoSettings) RepoSettingsSnapshot {
 		PullStrategy:          s.PullStrategy,
 		LogLevel:              s.LogLevel,
 		GithubEnabled:         s.GithubEnabled,
+		WorktreePrepareScript: s.WorktreePrepareScript,
+		WorktreeBasePath:      s.WorktreeBasePath,
 	}
 }
 
@@ -42,6 +44,8 @@ func (p RepoSettingsPatchWire) toModel() model.GitRepoSettingsPatch {
 		PullStrategy:          p.PullStrategy,
 		LogLevel:              p.LogLevel,
 		GithubEnabled:         p.GithubEnabled,
+		WorktreePrepareScript: p.WorktreePrepareScript,
+		WorktreeBasePath:      p.WorktreeBasePath,
 	}
 }
 

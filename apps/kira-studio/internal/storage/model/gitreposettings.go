@@ -20,6 +20,17 @@ type GitRepoSettings struct {
 	// badge, no search PR arm, no reaper re-resolve — both commit.resolvePr/branch.resolvePr answer
 	// {kind:'disabled'} outright. Genuinely per-repo (unlike LogLevel), default true.
 	GithubEnabled bool `json:"githubEnabled"`
+	// WorktreePrepareScript is G25 D10's own ninth leaf (kiraVersion.worktree.prepareScript): one
+	// command-line string, never a path, never an argv array. "" means the feature is off — no
+	// spawn, no shell, ever — the only value this leaf is EVER read from is this table; it must
+	// never be sourced from `.git/config`, a tracked file, or any repo-carried convention (D10 —
+	// the single highest-value safety property in the whole feature). Deliberately NOT validated
+	// beyond being a string: it is shell text the user wrote, not a value this app parses.
+	WorktreePrepareScript string `json:"worktreePrepareScript"`
+	// WorktreeBasePath is G25 D10's own tenth leaf (kiraVersion.worktree.basePath) — pure UX, never
+	// a security boundary: it only pre-fills WorktreeDialog's own path field. "" means no
+	// suggestion beyond the dialog's own basename default.
+	WorktreeBasePath string `json:"worktreeBasePath"`
 }
 
 // DefaultGitRepoSettings mirrors packages/git-core/src/settings/schema.ts's own SETTINGS defaults
@@ -34,6 +45,8 @@ func DefaultGitRepoSettings() GitRepoSettings {
 		PullStrategy:          "auto",
 		LogLevel:              "info",
 		GithubEnabled:         true,
+		WorktreePrepareScript: "",
+		WorktreeBasePath:      "",
 	}
 }
 
@@ -49,6 +62,12 @@ type GitRepoSettingsPatch struct {
 	PullStrategy          *string   `json:"pullStrategy,omitempty"`
 	LogLevel              *string   `json:"logLevel,omitempty"`
 	GithubEnabled         *bool     `json:"githubEnabled,omitempty"`
+	// WorktreePrepareScript/WorktreeBasePath: G25 D10's two new leaves. Deliberately NO approval
+	// field anywhere near this struct (F15/D11) — the approval sha is a server-only key, reachable
+	// only through GitRepoSettingsRepo's own dedicated Get/SetPrepareScriptApproval methods, never
+	// through this patch.
+	WorktreePrepareScript *string `json:"worktreePrepareScript,omitempty"`
+	WorktreeBasePath      *string `json:"worktreeBasePath,omitempty"`
 }
 
 // ValidGraphScope mirrors schema.ts's kiraVersion.graph.scope enum.
