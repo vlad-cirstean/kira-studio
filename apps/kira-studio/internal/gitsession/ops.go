@@ -18,8 +18,9 @@ import (
 // OpRequest is op.run's own request — the Go decode of @kira/git-ipc's own nineteen-member
 // OpRequest union, flattened into one struct (a field absent from the wire JSON for a given kind
 // simply decodes to its zero value, which no served kind's Prepare function ever reads). Only
-// fields the fifteen kinds opTable serves actually need are declared — the four still-unserved
-// kinds' own fields (G7's tagPush/tagDeleteRemote, G18's reset/cherryPick) are never decoded here at
+// fields the seventeen kinds opTable serves actually need are declared — two of OpRequest's
+// nineteen kinds (tagPush/tagDeleteRemote) are unserved and unassigned (G22 §9: blocked on
+// RunOp's own write path having no askpass wiring), and their own fields are never decoded here at
 // all, since opTable rejects an unlisted kind before any field is read (D5).
 type OpRequest struct {
 	Kind string `json:"kind"`
@@ -53,6 +54,12 @@ type OpRequest struct {
 	Index            int      `json:"index,omitempty"`            // stashPop/stashDrop/stashBranch
 	RestoreIndex     bool     `json:"restoreIndex,omitempty"`     // stashApply/stashPop
 	Branch           string   `json:"branch,omitempty"`           // stashBranch
+
+	// ConfirmToken is G22's own addition (D8): reset's own typed confirmation, required (and
+	// re-checked host-side by prepareReset) exactly when Mode == "hard" and destroys, recomputed
+	// fresh from a status read immediately before the write, is non-empty. A pointer: the wire's
+	// own `string | undefined` (contract.ts's own OpRequest.reset.confirmToken).
+	ConfirmToken *string `json:"confirmToken,omitempty"` // reset
 }
 
 // OpError mirrors @kira/git-ipc's own op.run/undo.run per-op error shape.
@@ -70,10 +77,9 @@ type OpResult struct {
 	InProgress *gitpreflight.InProgressOperation `json:"inProgress"`
 }
 
-// ErrUnservedOpKind is RunOp's answer for an OpRequest.Kind not present in opTable (D5) — four of
-// OpRequest's nineteen kinds, each owned by a later phase (G7's tagPush/tagDeleteRemote, G18's
-// reset/cherryPick). gitrpc maps this to E_UNKNOWN_METHOD naming the kind — never a stub, never a
-// silent success.
+// ErrUnservedOpKind is RunOp's answer for an OpRequest.Kind not present in opTable (D5) — two of
+// OpRequest's nineteen kinds (tagPush/tagDeleteRemote) are unserved and unassigned — see G22 §9.
+// gitrpc maps this to E_UNKNOWN_METHOD naming the kind — never a stub, never a silent success.
 type ErrUnservedOpKind struct{ Kind string }
 
 func (e ErrUnservedOpKind) Error() string {
@@ -96,19 +102,24 @@ type prepared struct {
 type opSpec struct {
 	Undo    gitpreflight.UndoPolicy
 	Prepare func(ctx context.Context, e *RepoEntry, conn ConnID, connLabel string, op OpRequest) (prepared, error)
-	// Reclassify: nil for every kind that does not need it (G17 D6 — ten of fifteen served kinds
-	// today). When set, called AFTER the write loop and AFTER the post-write statusAndInProgress
-	// read RunOp already performs — reusing that read, not adding a second one — with the raw
-	// OpError the stderr-only classification produced (nil on a clean exit) and the fresh
-	// porcelain.StatusResult. Returns the OpError RunOp should actually report; a kind with no
-	// Reclassify keeps the stderr-only result unchanged.
-	Reclassify func(opErr *OpError, status porcelain.StatusResult) *OpError
+	// Reclassify: nil for every kind that does not need it (fourteen of seventeen served kinds
+	// after G22). When set, called AFTER the write loop and AFTER the post-write
+	// statusAndInProgress read RunOp already performs — reusing that read, not adding a second one
+	// — with the raw OpError the stderr-only classification produced (nil on a clean exit), the
+	// fresh porcelain.StatusResult, and the fresh *gitpreflight.InProgressOperation (nil when
+	// nothing is in progress). G22 widened this by the third parameter: an empty cherry-pick is
+	// distinguishable from every other clean-tree pick failure ONLY by CHERRY_PICK_HEAD still
+	// being set, which lives in the in-progress classification, never in status output. Returns
+	// the OpError RunOp should actually report; a kind with no Reclassify keeps the stderr-only
+	// result unchanged.
+	Reclassify func(opErr *OpError, status porcelain.StatusResult, inProgress *gitpreflight.InProgressOperation) *OpError
 }
 
-// opTable serves fifteen of OpRequest's nineteen kinds (D5) — the other four answer
-// ErrUnservedOpKind, never a stub. Labels are ported verbatim from undo/slot.ts's own UNDO_POLICY;
-// G17 adds the five stash kinds here (note stashDrop's own Undo: undo/slot.ts marks it undoable,
-// not notUndoable like its four stash siblings — captureStashDropUndo below is why).
+// opTable serves seventeen of OpRequest's nineteen kinds (D5) — the other two (tagPush/
+// tagDeleteRemote) answer ErrUnservedOpKind, never a stub. Labels are ported verbatim from
+// undo/slot.ts's own UNDO_POLICY; G17 added the five stash kinds (note stashDrop's own Undo:
+// undo/slot.ts marks it undoable, not notUndoable like its four stash siblings —
+// captureStashDropUndo below is why); G22 adds reset/cherryPick, both undoable (D9).
 var opTable = map[string]opSpec{
 	"checkout": {
 		Undo:    gitpreflight.UndoPolicy{Kind: gitpreflight.NotUndoable, Reason: "Switch back to the previous ref to undo this."},
@@ -182,6 +193,24 @@ var opTable = map[string]opSpec{
 	"stashBranch": {
 		Undo:    gitpreflight.UndoPolicy{Kind: gitpreflight.NotUndoable, Reason: "Delete the branch and stash again to undo this."},
 		Prepare: prepareStashBranch,
+	},
+	// reset: undoable (D9) — the replay is mode-matched (`reset --<mode> <prev>`), captured
+	// BEFORE the write, since the reflog cannot supply the mode a reset used (every reset logs
+	// `reset: moving to <sha>`, soft or hard alike).
+	"reset": {
+		Undo:    gitpreflight.UndoPolicy{Kind: gitpreflight.Undoable},
+		Prepare: prepareReset,
+	},
+	// cherryPick: undoable (D9) via `reset --keep <prev>` — never `--hard`, since a pick is legal
+	// with unrelated dirt already in the tree and `--keep` refuses rather than destroy it.
+	// Withheld entirely for `--no-commit` (that pick moves no ref) and for a conflicting/empty
+	// pick (RunOp's own `succeeded` gate drops it, no per-kind logic needed). Reclassify detects
+	// F6's own EmptyCherryPick, which G17's seam could not: it needs CHERRY_PICK_HEAD, which lives
+	// in the in-progress classification, never in status output.
+	"cherryPick": {
+		Undo:       gitpreflight.UndoPolicy{Kind: gitpreflight.Undoable},
+		Prepare:    prepareCherryPick,
+		Reclassify: reclassifyCherryPick,
 	},
 }
 
@@ -298,6 +327,151 @@ func prepareStashBranch(ctx context.Context, e *RepoEntry, _ ConnID, _ string, o
 	return prepared{argvList: [][]string{gitops.StashBranchArgs(op.Branch, op.Index)}}, nil
 }
 
+// prepareReset is reset's own Prepare (D8/D9). P10 probe 3: git itself only refuses a --soft
+// reset mid-merge — --mixed/--hard succeed and silently delete MERGE_HEAD, abandoning the
+// operation. This host-side gate is the ONLY thing standing between a user and that data loss,
+// re-checked here immediately before the write — a pre-flight is advice, not a lock. The same
+// status read doubles as the FRESH state destroys is recomputed from below (D8's second re-check)
+// and the pre-write HEAD sha the undo record captures (F12).
+func prepareReset(ctx context.Context, e *RepoEntry, conn ConnID, connLabel string, op OpRequest) (prepared, error) {
+	statusResult, inProgress, err := e.statusAndInProgress(ctx)
+	if err != nil {
+		return prepared{}, err
+	}
+	if inProgress != nil {
+		return prepared{earlyError: &OpError{
+			Kind:    "OperationInProgress",
+			Message: gitpreflight.DescribeInProgress(inProgress) + " is in progress — finish or abort it before resetting.",
+		}}, nil
+	}
+
+	// Probe 3's bad-target guard, re-run host-side: a pre-flight's target may have since stopped
+	// resolving (the ref was deleted, or never existed at all for a hand-typed sha).
+	resolved, err := e.resolveCommit(ctx, op.Target)
+	if err != nil {
+		return prepared{}, err
+	}
+	if resolved == nil {
+		return prepared{earlyError: &OpError{
+			Kind:    "NotFound",
+			Message: op.Target + " does not resolve to a commit.",
+		}}, nil
+	}
+
+	// D8's second re-check: the typed confirmation is validated against destroys recomputed FRESH
+	// from the status read above — never the pre-flight's possibly-stale value. A dialog can sit
+	// open arbitrarily long, and the token must gate what would actually be destroyed NOW. Only
+	// membership (any of the three sets non-empty) matters for this check, so no dedup is needed.
+	if op.Mode == "hard" {
+		dirty := gitpreflight.DirtySplit(statusResult)
+		stagedNew := gitpreflight.StagedNewPaths(statusResult)
+		anyDestroyed := len(dirty.Staged) > 0 || len(dirty.Unstaged) > 0 || len(stagedNew) > 0
+		shortSha := resolved.Sha
+		if len(shortSha) > 7 {
+			shortSha = shortSha[:7]
+		}
+		if anyDestroyed && (op.ConfirmToken == nil || *op.ConfirmToken != shortSha) {
+			return prepared{earlyError: &OpError{
+				Kind:    "ConfirmationRequired",
+				Message: "Type the target commit's short sha to confirm — this reset would discard uncommitted work.",
+			}}, nil
+		}
+	}
+
+	// D9/F9: captured BEFORE the write, so the undo's replay can match THIS reset's own mode — the
+	// reflog cannot supply it (every reset logs `reset: moving to <sha>`, soft or hard alike), so
+	// capture-before is the only mechanism, exactly as for branch/tag delete and stash drop.
+	// F12: statusResult.Branch.OID is "" on an unborn HEAD — no undo record is captured then,
+	// which is correct, since there is no commit to return to.
+	var undo *gitpreflight.UndoRecord
+	if statusResult.Branch.OID != "" {
+		labelTarget := resolved.Subject
+		if labelTarget == "" {
+			labelTarget = shortSha7(resolved.Sha)
+		}
+		undo = &gitpreflight.UndoRecord{
+			ID:          newUndoID(),
+			Label:       fmt.Sprintf("Reset (%s) to %s", op.Mode, labelTarget), // F9: byte-identical, guarded by a test.
+			RecoverySha: statusResult.Branch.OID,
+			CreatedAt:   time.Now().UnixMilli(),
+			Replay:      [][]string{gitops.ResetArgs(op.Mode, statusResult.Branch.OID)}, // MODE-MATCHED.
+			OriginConn:  string(conn), OriginLabel: connLabel,
+		}
+	}
+
+	// F14: op.Target passed to the write verbatim, never resolved.Sha — classifyReset's own
+	// contract is that target is echoed unchanged, and the client always passes a full sha anyway.
+	return prepared{argvList: [][]string{gitops.ResetArgs(op.Mode, op.Target)}, undo: undo}, nil
+}
+
+// shortSha7 truncates sha to its first 7 characters — the same convention captureTagDeleteUndo's
+// neighbours and UndoRun already use, extracted here only because prepareReset needs it twice.
+func shortSha7(sha string) string {
+	if len(sha) > 7 {
+		return sha[:7]
+	}
+	return sha
+}
+
+// prepareCherryPick is cherryPick's own Prepare (D8/D9). Same rationale as prepareReset's own
+// re-check just above — probe 3 is reset's own finding, but the gate is the same mechanism and a
+// stale pre-flight is exactly as possible here (git DOES refuse a second cherry-pick mid-sequence,
+// but not every in-progress kind — the host-side gate covers all of them uniformly).
+func prepareCherryPick(ctx context.Context, e *RepoEntry, conn ConnID, connLabel string, op OpRequest) (prepared, error) {
+	statusResult, inProgress, err := e.statusAndInProgress(ctx)
+	if err != nil {
+		return prepared{}, err
+	}
+	if inProgress != nil {
+		return prepared{earlyError: &OpError{
+			Kind:    "OperationInProgress",
+			Message: gitpreflight.DescribeInProgress(inProgress) + " is in progress — finish or abort it before cherry-picking.",
+		}}, nil
+	}
+
+	// D9: withheld entirely (nil) when op.NoCommit is true — that pick moves no ref, so there is
+	// nothing a replay could restore. F12: also withheld on an unborn HEAD (OID == "").
+	var undo *gitpreflight.UndoRecord
+	if !op.NoCommit && statusResult.Branch.OID != "" {
+		undo = &gitpreflight.UndoRecord{
+			ID:          newUndoID(),
+			Label:       "Undo cherry-pick of " + shortSha7(op.Sha),
+			RecoverySha: statusResult.Branch.OID,
+			CreatedAt:   time.Now().UnixMilli(),
+			Replay:      [][]string{gitops.ResetKeepArgs(statusResult.Branch.OID)}, // --keep, never --hard (D9).
+			OriginConn:  string(conn), OriginLabel: connLabel,
+		}
+	}
+
+	return prepared{argvList: [][]string{gitops.CherryPickArgs(op.Sha, op.Mainline, op.NoCommit)}, undo: undo}, nil
+}
+
+// reclassifyCherryPick is cherryPick's own Reclassify (D6/F6). Probe 6: an empty pick exits
+// non-zero, leaves CHERRY_PICK_HEAD set, a clean worktree and ZERO unmerged paths —
+// indistinguishable from a fully-resolved pick by state files alone, and its whole message ("The
+// previous cherry-pick is now empty…") goes to STDOUT, so the stderr-only table could only ever
+// say Unknown. The banner offers both Continue and Skip and names which is which, rather than
+// guessing.
+func reclassifyCherryPick(opErr *OpError, status porcelain.StatusResult, inProgress *gitpreflight.InProgressOperation) *OpError {
+	// Upstream's own guard, kept: a pick that failed for a NAMED reason (MainlineRequired,
+	// Conflict, LockHeld) must never be re-labelled an empty pick just because the tree happens to
+	// be clean.
+	if opErr == nil || opErr.Kind != "Unknown" {
+		return opErr
+	}
+	if inProgress == nil || inProgress.Kind != gitpreflight.InProgressCherryPick {
+		return opErr
+	}
+	if len(gitpreflight.UnmergedPaths(status)) != 0 {
+		return opErr // a genuinely conflicting pick — ClassifyOpError's "could not apply" row
+		// already named it Conflict, or, if git said nothing matchable, Unknown is honest.
+	}
+	return &OpError{
+		Kind:    "EmptyCherryPick",
+		Message: "This change is already present on this branch — Skip it, or Continue to commit it anyway.",
+	}
+}
+
 // reclassifyStashPop is stashPop's/stashApply's own Reclassify (D6/D7). Probe 5: a conflicting
 // pop/apply writes to stdout and leaves stderr EMPTY — ClassifyOpError's stderr-only path already
 // misclassified this as "Unknown"; the post-write status read-back RunOp already fetches is what
@@ -305,7 +479,9 @@ func prepareStashBranch(ctx context.Context, e *RepoEntry, _ ConnID, _ string, o
 // file" stderr pattern is shared with checkout's own blocker, so its generic
 // UntrackedWouldBeOverwritten kind is remapped to the stash-specific StashUntrackedCollision here —
 // the one place with the caller context (stash pop/apply) ClassifyOpError itself does not have.
-func reclassifyStashPop(opErr *OpError, status porcelain.StatusResult) *OpError {
+// The third parameter (G22's own widening, D6) is unused here — an empty cherry-pick is the only
+// kind that needs it.
+func reclassifyStashPop(opErr *OpError, status porcelain.StatusResult, _ *gitpreflight.InProgressOperation) *OpError {
 	if opErr == nil {
 		return nil
 	}
@@ -538,7 +714,7 @@ func (e *RepoEntry) RunOp(ctx context.Context, conn ConnID, connLabel string, op
 	// a kind reclassify its own stderr-only result. A nil Reclassify (ten of fifteen kinds today) is
 	// a no-op by construction.
 	if spec.Reclassify != nil {
-		opErr = spec.Reclassify(opErr, statusResult)
+		opErr = spec.Reclassify(opErr, statusResult, inProgress)
 	}
 	succeeded := opErr == nil
 
