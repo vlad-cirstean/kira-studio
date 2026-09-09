@@ -589,6 +589,73 @@ func TestRunOp_GlobalStashRemove_UndoReplaysExactlyOneUpdateRef(t *testing.T) {
 	}
 }
 
+// TestUndoRun_InvalidatesRefsCache is G30 round-1 functional-correctness review, finding #5:
+// UndoRun had no equivalent of RunOp's own `defer e.invalidateAfterWrite()`, so a real write
+// UndoRun makes (here, branchDelete's own undo — an update-ref recreating the branch) left the
+// shared refs cache stale. Warms the cache to a DEFINITE "branch absent" value after the delete
+// (so this test cannot pass merely because RunOp's own invalidation happened to still be in
+// effect), then asserts the very next Refs() call after UndoRun sees the branch again — with no
+// refsChanged event of any kind involved (this fixture has no live watcher), so the only thing
+// that can make that call see fresh state is UndoRun's own invalidation.
+func TestUndoRun_InvalidatesRefsCache(t *testing.T) {
+	skipWithoutGitQueries(t)
+	dir := t.TempDir()
+	runGitQ(t, dir, "init", "-q", "-b", "main")
+	if err := os.WriteFile(filepath.Join(dir, "f.txt"), []byte("one\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	runGitQ(t, dir, "add", "f.txt")
+	runGitQ(t, dir, "commit", "-q", "-m", "base")
+	runGitQ(t, dir, "branch", "feature")
+
+	entry := newQueriesTestEntry(t, dir)
+	ctx := context.Background()
+
+	hasFeature := func() bool {
+		refs, err := entry.Refs(ctx)
+		if err != nil {
+			t.Fatalf("Refs: %v", err)
+		}
+		for _, b := range refs.Branches {
+			if b.ShortName == "feature" {
+				return true
+			}
+		}
+		return false
+	}
+
+	if !hasFeature() {
+		t.Fatal("feature should exist before any delete")
+	}
+
+	result, err := entry.RunOp(ctx, ConnID("undo-cache-test-conn"), "test", OpRequest{Kind: "branchDelete", Name: "feature"})
+	if err != nil {
+		t.Fatalf("RunOp: %v", err)
+	}
+	if !result.OK || result.Undo == nil {
+		t.Fatalf("RunOp branchDelete = %+v, want ok with an undo record", result)
+	}
+
+	// Re-warms the cache to a DEFINITE "absent" value, post-delete — RunOp's own invalidation
+	// already fired; this read is deliberately AFTER that, so nothing from RunOp's own defer can
+	// carry over into what UndoRun is being tested for.
+	if hasFeature() {
+		t.Fatal("feature should be absent immediately after RunOp branchDelete")
+	}
+
+	undoResult, err := entry.UndoRun(ctx, result.Undo.ID)
+	if err != nil {
+		t.Fatalf("UndoRun: %v", err)
+	}
+	if !undoResult.OK {
+		t.Fatalf("UndoRun = %+v, want ok", undoResult)
+	}
+
+	if !hasFeature() {
+		t.Fatal("Refs() after UndoRun still reports feature absent — the cache was not invalidated")
+	}
+}
+
 // TestRunOp_GlobalStashSave_PromoteExistingStackEntry_PreservesOriginBranch is D10 step 3's own
 // proof: promoting an existing STACK entry into the bucket keeps the source in the stack
 // (copy-never-drop) and preserves its own origin-branch tag under the NEW label, rather than

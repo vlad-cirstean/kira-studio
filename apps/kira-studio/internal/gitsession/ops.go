@@ -1131,6 +1131,24 @@ func (e *RepoEntry) UndoRun(ctx context.Context, id string) (OpResult, error) {
 		return OpResult{}, err
 	}
 
+	// G30 round-1 functional-correctness review, finding #5: RunOp drops the shared caches on
+	// EVERY write it attempts (D7's own defer, above) specifically because "the watcher's own
+	// debounced signal must not be the only thing that ever notices our own write" — UndoRun IS
+	// one of those writes (update-ref, reset --keep, switch, config --local, depending on what is
+	// being undone) and had no equivalent defer, so an undo's own effect stayed invisible in
+	// e.refs/e.detail/e.diff/e.rangeCount/e.stack until the watcher's debounce caught up — or
+	// indefinitely, if the watch itself was lost (entry.go's own documented reason this
+	// second-line-of-defence exists at all).
+	// G30 round-1 functional-correctness review, finding #5: RunOp drops the shared caches on
+	// EVERY write it attempts (D7's own defer, above) specifically because "the watcher's own
+	// debounced signal must not be the only thing that ever notices our own write" — UndoRun IS
+	// one of those writes (update-ref, reset --keep, switch, config --local, depending on what is
+	// being undone) and had no equivalent defer, so an undo's own effect stayed invisible in
+	// e.refs/e.detail/e.diff/e.rangeCount/e.stack until the watcher's debounce caught up — or
+	// indefinitely, if the watch itself was lost (entry.go's own documented reason this
+	// second-line-of-defence exists at all).
+	defer e.invalidateAfterWrite()
+
 	var opErr *OpError
 	for _, argv := range record.Replay {
 		oe, werr := e.runWriteArgv(ctx, argv)
