@@ -41,11 +41,11 @@ func initStashRpcRepo(t *testing.T) string {
 	return dir
 }
 
-// TestContractVersion_Is31 is G-UX D4/D9's own literal exit-criteria assertion (30 -> 31), moved
-// forward from G28's TestContractVersion_Is30 in the same commit that bumps the constant.
-func TestContractVersion_Is31(t *testing.T) {
-	if ContractVersion != 31 {
-		t.Fatalf("ContractVersion = %d, want 31", ContractVersion)
+// TestContractVersion_Is32 is G30 round-1's own literal exit-criteria assertion (31 -> 32), moved
+// forward from G-UX D4/D9's TestContractVersion_Is31 in the same commit that bumps the constant.
+func TestContractVersion_Is32(t *testing.T) {
+	if ContractVersion != 32 {
+		t.Fatalf("ContractVersion = %d, want 32", ContractVersion)
 	}
 }
 

@@ -192,6 +192,10 @@ const OP_ERROR_TEXT: Record<OpErrorKind, string> = {
   /** G28 D10: `globalStashSave` from the current working tree with nothing dirty — this phase's
    *  own one new `OpErrorKind`. */
   NothingToStash: 'there is nothing to save — the working tree is clean',
+  /** G30 round-1 functional-correctness review, finding #2: this round's own one new
+   *  `OpErrorKind`, produced exclusively by a pull whose target branch was checked out away from
+   *  between the fetch and the merge/rebase. */
+  BranchChanged: 'a different branch is checked out now',
   Unknown: 'an unexpected error occurred',
 };
 

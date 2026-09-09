@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -684,6 +685,43 @@ func TestIntegration_PullDecomposesAndAConflictLandsInTheBanner(t *testing.T) {
 	abortResp := opRunOK(t, client2, repoID2, gitsession.OpRequest{Kind: "opAbort"})
 	if !abortResp.OK || abortResp.InProgress != nil {
 		t.Fatalf("opAbort = %+v, want ok with no inProgress left", abortResp)
+	}
+}
+
+// TestIntegration_PullRefusesWhenBranchCheckedOutChanged is G30 round-1 functional-correctness
+// review, finding #2: the pull integrate phase (merge/rebase) used to write onto whatever was
+// checked out at spawn time with no re-check, so a checkout race between the fetch and the write
+// silently merged/rebased the WRONG branch. Simulates the race's end state directly — a different
+// branch checked out than the one `pull` was asked to bring up to date — and asserts the write is
+// refused before any merge/rebase spawns, rather than landing on the wrong branch.
+func TestIntegration_PullRefusesWhenBranchCheckedOutChanged(t *testing.T) {
+	f := buildRemoteFixture(t)
+	f.divergeRemote(t, "remote-only.txt", "remote\n", "remote-only change")
+
+	runRemoteGit(t, f.workDir, "checkout", "-q", "-b", "other-branch")
+
+	server, sockPath, _, _ := newRemoteIntegrationServer(t, 5*time.Second)
+	client := pairAndReady(t, server, sockPath, "pull-race-client")
+	repoID := openRepoOK(t, client, f.workDir).Repo.RepoID
+
+	result := remoteRunOK(t, client, gitrpc.RemoteRunParams{
+		RepoID: repoID,
+		RemoteOpParams: gitsession.RemoteOpParams{
+			Kind: "pull", Remote: "origin", Branch: "main", Strategy: string(gitpreflight.PullFFOnly),
+		},
+	})
+	if result.OK || result.Error == nil || result.Error.Kind != "BranchChanged" {
+		if result.Error != nil {
+			t.Fatalf("pull with 'main' checked out elsewhere: got %+v (error: %+v), want BranchChanged", result, *result.Error)
+		}
+		t.Fatalf("pull with 'main' checked out elsewhere: got %+v, want BranchChanged", result)
+	}
+
+	// The fetch itself is allowed to have happened (remote-tracking refs may have moved) — what
+	// must NOT have happened is any write to the checked-out branch.
+	head := runRemoteGit(t, f.workDir, "rev-parse", "--abbrev-ref", "HEAD")
+	if strings.TrimSpace(head) != "other-branch" {
+		t.Fatalf("HEAD after refused pull = %q, want other-branch (unchanged)", head)
 	}
 }
 

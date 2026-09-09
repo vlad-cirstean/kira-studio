@@ -99,7 +99,11 @@ import type { EventKey, RequestKey, StreamKey } from './contract.ts';
 // repositories, so the native-folder-picker fallback has no wire method left to reach (D4). One
 // new 'UiActionKind' member, 'toggleSearch' -- the palette's route to toggling the graph panel's
 // search row (D9). No new capability, no new setting, no SQL migration.
-export const CONTRACT_VERSION = 31;
+// G30 round-1 code review (2026-09-09): 31 -> 32, one new 'OpErrorKind' member, 'BranchChanged' --
+// remote.run's pull integrate phase now refuses (rather than silently writing to the wrong
+// branch) when HEAD changed out from under it between the fetch and the merge/rebase (finding
+// #2). No new request, no new capability, no SQL migration.
+export const CONTRACT_VERSION = 32;
 
 export class ContractVersionMismatchError extends Error {
   readonly received: number;

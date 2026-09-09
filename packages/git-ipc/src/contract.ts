@@ -1088,6 +1088,13 @@ export type OpErrorKind =
    *  create` answers exit 0 with empty output on a clean tree (probe P4), which becomes this named
    *  refusal rather than a silent no-op write. This phase's own ONE new `OpErrorKind`. */
   | 'NothingToStash'
+  /** G30 round-1 functional-correctness review, finding #2: `remote.run`'s pull integrate phase
+   *  (merge/rebase) re-checks HEAD is still the branch the pull was started for, immediately
+   *  before that write — a fetch can take arbitrary wall-clock time, during which another
+   *  window/terminal can check out a different branch, and without this the merge/rebase would
+   *  silently land on whatever is checked out now instead. This review round's own ONE new
+   *  `OpErrorKind`. */
+  | 'BranchChanged'
   | 'Unknown';
 
 /** `worktree.prepare`'s own error vocabulary (D13) — deliberately NOT `OpErrorKind`: none of

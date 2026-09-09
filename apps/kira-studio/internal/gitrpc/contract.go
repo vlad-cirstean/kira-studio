@@ -111,7 +111,11 @@ package gitrpc
 // UiActionKind member, toggleSearch (D9) -- extension<->webview only, the Go server neither emits
 // nor parses it, the same reason this constant moves for every ui.action-only addition since G10
 // D9. No new capability, no new setting, no SQL migration.
-const ContractVersion = 31
+// G30 round-1 code review (2026-09-09): 31 -> 32, one new OpErrorKind member, BranchChanged --
+// remote.run's pull integrate phase now refuses, rather than silently writing to the wrong
+// branch, when HEAD changed between the fetch and the merge/rebase (finding #2). No new request,
+// no new capability, no SQL migration.
+const ContractVersion = 32
 
 // Protocol is the handshake envelope's own version (SPEC §3.3's "protocol":1), distinct from
 // ContractVersion — it never changes unless the hello/ready exchange itself is redesigned.
