@@ -72,8 +72,10 @@ type StashEntry struct {
 	// (refs/kira/globalstash/<sha>, ParseGlobalStashList) — G28 D17.
 	Scope string `json:"scope"`
 	// Ref is "" for a stack entry (addressed by position, never by ref) and the entry's own
-	// gitops.GlobalStashRef(sha) for a global one — G28 D8/D17.
-	Ref string `json:"ref,omitempty"`
+	// gitops.GlobalStashRef(sha) for a global one — G28 D8/D17. Deliberately no `omitempty`: the
+	// wire's own StashEntry.ref is `string`, always present (never `string | undefined`), so an
+	// empty string must serialize as `"ref":""`, not be omitted from the JSON entirely.
+	Ref string `json:"ref"`
 }
 
 // StashScopeStack and StashScopeGlobal are StashEntry.Scope's two legal values (G28 D17).

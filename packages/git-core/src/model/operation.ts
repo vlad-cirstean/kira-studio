@@ -183,6 +183,10 @@ export type OpRequest =
       /** §7.5's "discard" route: `git switch --discard-changes`. Cannot clear an untracked
        *  block (probe P9) — the UI never offers it for one. */
       readonly discardLocalChanges: boolean;
+      /** G28 D3: prepend a whole-tree `stash push [-u]` tagged with the CURRENT branch, so the
+       *  switch cannot be blocked by a dirty tree. Never popped back (D1). Mutually exclusive
+       *  with `discardLocalChanges`. */
+      readonly autoStash: boolean;
     }
   | {
       readonly kind: 'branchCreate';
@@ -234,12 +238,13 @@ export type OpRequest =
     }
   | { readonly kind: 'stashDrop'; readonly sha: string; readonly index: number }
   /** Addressed by `stash@{index}`: given a raw sha, `stash branch` applies but silently never
-   *  drops (probe 8). */
+   *  drops (probe 8). G28 D12: `scope: 'global'` skips the stack-position verification entirely. */
   | {
       readonly kind: 'stashBranch';
       readonly branch: string;
       readonly sha: string;
       readonly index: number;
+      readonly scope?: 'stack' | 'global';
     }
   | {
       readonly kind: 'reset';
@@ -284,7 +289,13 @@ export type OpRequest =
     }
   /** G26 D10: sets or clears a branch's stack parent — always exactly two `git config --local`
    *  writes, always exit 0 (D2). `parent: undefined` removes `branch` from its stack. */
-  | { readonly kind: 'stackSet'; readonly branch: string; readonly parent: string | undefined };
+  | { readonly kind: 'stackSet'; readonly branch: string; readonly parent: string | undefined }
+  /** G28 D10: saves an entry into the global stash bucket — ALWAYS COPIES, never drops its
+   *  source. `sha: undefined` snapshots the current working tree; otherwise the sha of an
+   *  existing stash-stack or global entry to promote. */
+  | { readonly kind: 'globalStashSave'; readonly label: string; readonly sha: string | undefined }
+  /** G28 D11: removes one entry from the global bucket. */
+  | { readonly kind: 'globalStashRemove'; readonly sha: string };
 
 export type OpErrorKind =
   | 'AuthFailed'
@@ -349,6 +360,9 @@ export type OpErrorKind =
    *  own cycle check — never by rebase itself (D5: rebase's own two new stderr patterns both map
    *  onto the EXISTING `DirtyWorktree`/`NotFound` kinds above). */
   | 'StackCycle'
+  /** G28 D10: `globalStashSave` from the current working tree with nothing dirty — `git stash
+   *  create` answers exit 0 with empty output on a clean tree (probe P4). */
+  | 'NothingToStash'
   | 'Unknown';
 
 export interface UndoSlotSnapshot {

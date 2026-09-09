@@ -17,6 +17,7 @@ import type {
   ResetMode,
   StashEntry,
 } from '@kira/git-ipc';
+import { originLabel, stashLabel } from '../components/stashListModel.ts';
 
 const COUNT_FORMATTER = new Intl.NumberFormat();
 
@@ -80,6 +81,30 @@ export function composeCheckoutAnnouncement(preflight: CheckoutPreflight, target
     return `Checked out ${where} — ${n} local ${n === 1 ? 'change' : 'changes'} carried over`;
   }
   return `Checked out ${where}`;
+}
+
+/** G28 D16: the auto-stash announcement — mandatory, never decoration, since the working tree
+ *  reads as clean on the new branch and this sentence is the only place the user learns where
+ *  their work went. `fileCount` is summed from the blocked-tracked/blocked-untracked blocker
+ *  paths the pre-flight already reported (the exact set the server's own `stash push` swept).
+ *  `fromBranch` is the ORIGIN branch (where the switch started, not the target) — matching D1's
+ *  own tagging: the entry is tagged with the branch it came FROM. */
+export function composeAutoStashAnnouncement(fileCount: number, fromBranch: string): string {
+  const noun = fileCount === 1 ? 'file' : 'files';
+  return (
+    `Stashed ${fileCount} ${noun} from ${fromBranch}` +
+    ` — the stash is tagged ${fromBranch}; apply it back from the stash list.`
+  );
+}
+
+/** G28 D6: the auto-detach announcement — mandatory, the entire safety story for landing a user
+ *  in a detached HEAD they did not directly ask for. Names both the branch and the worktree path
+ *  that already holds it. */
+export function composeAutoDetachAnnouncement(target: string, worktreePath: string): string {
+  return (
+    `${shortTarget(target)} is checked out in ${worktreePath} — HEAD is now detached at its ` +
+    `commit. Create a branch here, or switch to another branch, when you're done.`
+  );
 }
 
 /** §7.10: a `noCommit` revert stages rather than commits, and the toolbar's live region is the
@@ -164,6 +189,9 @@ const OP_ERROR_TEXT: Record<OpErrorKind, string> = {
   /** G26 D5/D10: this phase's own one new `OpErrorKind`, produced exclusively by `stackSet`'s
    *  own cycle check — never by rebase itself. */
   StackCycle: 'that would make a branch its own ancestor',
+  /** G28 D10: `globalStashSave` from the current working tree with nothing dirty — this phase's
+   *  own one new `OpErrorKind`. */
+  NothingToStash: 'there is nothing to save — the working tree is clean',
   Unknown: 'an unexpected error occurred',
 };
 
@@ -250,13 +278,28 @@ export function composeUndoTooltip(label: string): string {
  *  already has in `OP_ERROR_TEXT`) is exactly the "silently rendering the outcome" §7.6 rules
  *  out. With no mismatch, this reads exactly like `composeOpFailureAnnouncement`'s own output for
  *  a failure, or a short "Applied"/"Popped" sentence for a plain, agreeing success. */
+/** G28 D5: `currentBranch` (optional — every pre-G28 call site keeps working with no clause at
+ *  all) adds a `"(from <origin>)"` parenthetical whenever `entry`'s own origin branch differs
+ *  from it — the cross-branch apply's own "you're not where this came from" reminder, on the
+ *  SAME sentence shape every other outcome already uses rather than a second, separate
+ *  announcement. `label` now reads `stashLabel(entry)` (the user's own text, stripped of git's
+ *  own "On &lt;b&gt;: " framing) rather than the position-addressed `stash@{N}` — correct for a
+ *  global entry too, whose `index` is D17's own `-1` sentinel and would otherwise render as
+ *  `stash@{-1}`. */
 export function composeStashAnnouncement(
   verb: 'apply' | 'pop',
   entry: StashEntry,
   result: OpResult,
   mismatch: StashPredictionMismatch | null,
+  currentBranch?: string | null,
 ): string {
-  const label = `stash@{${entry.index}}`;
+  const label = stashLabel(entry);
+  // currentBranch OMITTED (not merely a detached-HEAD `null`) means "the caller does not know" —
+  // every pre-G28 call site, none of which pass this argument at all — so the clause is
+  // suppressed rather than comparing against `undefined` (which would never equal a real branch
+  // name and so would ALWAYS add the clause, breaking every existing announcement's wording).
+  const origin = currentBranch === undefined ? undefined : originLabel(entry, currentBranch);
+  const originClause = origin === undefined ? '' : ` (from ${origin})`;
   const actionLabel = verb === 'apply' ? 'Stash apply' : 'Stash pop';
   if (mismatch) {
     const predictedText = mismatch.predicted === 'clean' ? 'a clean apply' : 'conflicts';
@@ -268,12 +311,12 @@ export function composeStashAnnouncement(
           : 'was refused';
     const keptText = mismatch.stashKept ? ' Your stash was kept.' : '';
     return (
-      `This ${verb} ${actualText}, though the pre-flight predicted ${predictedText} — the tree ` +
-      `changed in between.${keptText}`
+      `This ${verb}${originClause} ${actualText}, though the pre-flight predicted ${predictedText}` +
+      ` — the tree changed in between.${keptText}`
     );
   }
   if (!result.ok) return composeOpFailureAnnouncement(actionLabel, result.error);
-  return verb === 'apply' ? `Applied ${label}` : `Popped ${label}`;
+  return verb === 'apply' ? `Applied ${label}${originClause}` : `Popped ${label}${originClause}`;
 }
 
 /** G26 D8/D11: `stack.restack`'s own live-region text — a full success, a paused conflict

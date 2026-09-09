@@ -90,6 +90,11 @@ export interface RepoSettingsSnapshot {
   /** G25 D10: pure UX — pre-fills `WorktreeDialog`'s own path field. Empty means no suggestion
    *  beyond the dialog's own basename default. Never a security boundary. */
   readonly 'kiraVersion.worktree.basePath': string;
+  /** G28 D16: whether a blocked checkout is automatically re-issued with `autoStash: true` instead
+   *  of opening the old `CheckoutDialog`. Read CLIENT-SIDE ONLY — the server never consults this
+   *  leaf, so a stale or absent value can only ever produce the OLD dialog, never an unexpected
+   *  write (the fail-safe direction). Default true. */
+  readonly 'kiraVersion.checkout.autoStash': boolean;
 }
 
 /** G18: `RepoSettingsSnapshot`'s own `.partial()` shape — `repoSettings.set`'s request, every leaf
@@ -343,9 +348,14 @@ export interface CheckoutPreflight {
   /** "clean" = nothing local at all. "cleanCarry" = §7.5's carry case; still no prompt, but the
    *  confirmation copy differs and the UI announces what carried. */
   readonly verdict: 'clean' | 'cleanCarry' | 'blocked';
-  /** Which routes the UI may offer for a `blockedByTracked` verdict. P6 emits `["discard"]` (or
-   *  `[]` when an untracked block is also present); P9 adds `"stashAndCarry"`. */
-  readonly routes: readonly ('discard' | 'stashAndCarry')[];
+  /** Which routes the UI may offer for a `blocked` verdict. P6 emits `["discard"]` (or `[]` when
+   *  an untracked block is also present); P9 adds `"stashAndCarry"`. G28 D2 adds two more:
+   *  `"autoStash"` (whole-tree `stash push [-u]`, tagged with the CURRENT branch, never popped
+   *  back — offered whenever EITHER dirty-blocker kind is present, unlike the two routes above,
+   *  which the untracked case suppresses) and `"detachHere"` (offered whenever a `worktreeConflict`
+   *  blocker is present for a `switch`-mode request to a branch/remote-branch target — composes
+   *  freely with `"autoStash"` when both blocker kinds are present at once, D6). */
+  readonly routes: readonly ('discard' | 'stashAndCarry' | 'autoStash' | 'detachHere')[];
 }
 
 export interface RevertParentChoice {
@@ -383,6 +393,10 @@ export interface RevertPreflight {
 // ---------------------------------------------------------------------------------------
 
 export interface StashEntry {
+  /** The entry's own `stash@{N}` position — meaningful only for `scope: 'stack'`. `-1` for a
+   *  `scope: 'global'` entry, which has no stack position at all (G28 D17's own sentinel; guarded
+   *  structurally, not by convention — `stashPop`/`stashDrop` are never offered for a global entry,
+   *  and `stashBranch` takes a sha-addressed arm for one instead of ever reading this field). */
   readonly index: number;
   readonly sha: string;
   readonly baseSha: string;
@@ -396,6 +410,16 @@ export interface StashEntry {
   readonly timestamp: number;
   readonly fileCount: number;
   readonly includedUntracked: boolean;
+  /** G28 D17: which bucket this entry lives in — `'stack'` (an ordinary `refs/stash` entry,
+   *  `stash.list`) or `'global'` (`refs/kira/globalstash/<sha>`, `globalStash.list`). Widening this
+   *  one field, rather than a parallel `GlobalStashEntry` interface, is D17's own closing
+   *  argument: a fork would touch `StashDetailPane.vue`, `stash.show`, `preflight.stashPop`,
+   *  `preflight.stashBranch` and every announcement helper for one field's worth of real
+   *  difference. */
+  readonly scope: 'stack' | 'global';
+  /** G28 D8/D17: `''` for a stack entry (addressed by position, never by ref); the entry's own
+   *  `refs/kira/globalstash/<sha>` for a global one. */
+  readonly ref: string;
 }
 
 export type StashPopBlocker =
@@ -543,6 +567,11 @@ export interface WorktreeAddPreflight {
   readonly blockers: readonly WorktreeAddBlocker[];
   readonly notes: readonly WorktreeAddNote[];
   readonly verdict: 'clean' | 'blocked';
+  /** G28 D7: `["detachHere"]` iff `branchCheckedOutElsewhere` is the SOLE blocker — closing G25's
+   *  own hand-forward. Unlike `CheckoutPreflight.routes`' own `"detachHere"`, this one is only ever
+   *  OFFERED (a dialog button), never taken automatically: `worktree add` has no "never blocks"
+   *  promise to keep, and a dialog is already open to ask in. */
+  readonly routes: readonly 'detachHere'[];
 }
 
 /** `preflight.worktreeRemove`'s own blocker union (D8), verbatim. `notAWorktree` is ALSO the
@@ -865,6 +894,11 @@ export type OpRequest =
       /** §7.5's "discard" route: `git switch --discard-changes`. Cannot clear an untracked
        *  block (probe P9) — the UI never offers it for one. */
       readonly discardLocalChanges: boolean;
+      /** G28 D3: prepend a whole-tree `stash push [-u]` tagged with the CURRENT branch, so the
+       *  switch cannot be blocked by a dirty tree. Never popped back (D1) — the entry stays in the
+       *  stash list; cross-branch apply is the deliberate recovery path. Mutually exclusive with
+       *  `discardLocalChanges` — the server refuses both at once rather than guessing. */
+      readonly autoStash: boolean;
     }
   | {
       readonly kind: 'branchCreate';
@@ -916,12 +950,16 @@ export type OpRequest =
     }
   | { readonly kind: 'stashDrop'; readonly sha: string; readonly index: number }
   /** Addressed by `stash@{index}`: given a raw sha, `stash branch` applies but silently never
-   *  drops (probe 8). */
+   *  drops (probe 8). G28 D12: `scope: 'global'` skips the stack-position verification entirely
+   *  (there is no position) and applies by sha instead — `index` is then ignored server-side
+   *  (still present on the wire for shape uniformity; the client sends the entry's own `-1`
+   *  sentinel, D17). */
   | {
       readonly kind: 'stashBranch';
       readonly branch: string;
       readonly sha: string;
       readonly index: number;
+      readonly scope?: 'stack' | 'global';
     }
   | {
       readonly kind: 'reset';
@@ -970,7 +1008,15 @@ export type OpRequest =
   /** G26 D10: sets or clears a branch's stack parent — always exactly two `git config --local`
    *  writes (D2), always exit 0. `parent: undefined` removes `branch` from its stack (D2 writes
    *  `""` to both `kirastack*` keys server-side, never `git config --unset`, per F15/probe P5). */
-  | { readonly kind: 'stackSet'; readonly branch: string; readonly parent: string | undefined };
+  | { readonly kind: 'stackSet'; readonly branch: string; readonly parent: string | undefined }
+  /** G28 D10: saves an entry into the global stash bucket — ALWAYS COPIES, never drops its
+   *  source. `sha: undefined` snapshots the CURRENT working tree (tracked changes only — `git
+   *  stash create` cannot include untracked files, probe P5); otherwise the sha of an existing
+   *  stash-stack OR global entry to promote, resolved across BOTH buckets server-side. */
+  | { readonly kind: 'globalStashSave'; readonly label: string; readonly sha: string | undefined }
+  /** G28 D11: removes one entry from the global bucket — the cleanest undo in the whole table
+   *  (an exact single `update-ref <ref> <sha>` replay). */
+  | { readonly kind: 'globalStashRemove'; readonly sha: string };
 
 export type OpErrorKind =
   | 'AuthFailed'
@@ -1038,6 +1084,10 @@ export type OpErrorKind =
    *  (D10's cycle check), never by rebase itself (D5: rebase's own two new stderr patterns both
    *  map onto the EXISTING `DirtyWorktree`/`NotFound` kinds above). */
   | 'StackCycle'
+  /** G28 D10: `globalStashSave` from the CURRENT WORKING TREE with nothing dirty — `git stash
+   *  create` answers exit 0 with empty output on a clean tree (probe P4), which becomes this named
+   *  refusal rather than a silent no-op write. This phase's own ONE new `OpErrorKind`. */
+  | 'NothingToStash'
   | 'Unknown';
 
 /** `worktree.prepare`'s own error vocabulary (D13) — deliberately NOT `OpErrorKind`: none of
@@ -1391,7 +1441,13 @@ export type UiActionKind =
    *  `opsState.runCheckout`, exactly the same "resolve a target, call the existing op" shape
    *  `revertSelected`/`resetSelected`/`cherryPickSelected` already established. */
   | 'checkoutStackParent'
-  | 'checkoutStackChild';
+  | 'checkoutStackChild'
+  /** G28 D13: the palette's own route into `StashDialog.vue`'s fourth mode, save-to-global-stash —
+   *  the same assignment the global stash section's own "Save to global stash…" header button
+   *  already makes, so this is a second entry point into the same dialog, never a second
+   *  implementation. `globalStashRemove`/`stashBranch`-for-a-global-entry reuse `openBranchPicker`
+   *  instead, the same convention the five ordinary stash commands already established. */
+  | 'saveGlobalStash';
 
 // ---------------------------------------------------------------------------------------
 // The contract.
@@ -1787,20 +1843,43 @@ export type Contract = {
       result: { entries: readonly StashEntry[] };
     };
     /** The stash's own file list for the detail pane — tracked and, with `-u`, untracked, from
-     *  one `stash show --numstat/--name-status -z -u -M -C` pair (probe 12). */
+     *  one `stash show --numstat/--name-status -z -u -M -C` pair (probe 12). `scope` (G28 D17):
+     *  absent or `'stack'` resolves against the ordinary stack (unchanged for every pre-G28
+     *  caller); `'global'` resolves against the bucket instead — the same query either way, since
+     *  a stash commit's own tree diffed against its base means the same thing regardless of which
+     *  bucket the ref lives in. */
     'stash.show': {
-      params: { repoId: string; sha: string };
+      params: { repoId: string; sha: string; scope?: 'stack' | 'global' };
       result: { sha: string; changes: readonly FileChange[] };
     };
     /** `targetSha` omitted ⇒ HEAD. Supplied by the `stashAndCarry` route, which predicts against
-     *  the commit it is about to switch to. */
+     *  the commit it is about to switch to. `scope` (G28 D17): same optional 'stack'/'global' shape
+     *  as `stash.show` — the prediction machinery itself (`stashPopPrediction`,
+     *  `ClassifyStashPop`) is UNCHANGED either way (F2/D12): only which bucket the entry is
+     *  resolved from differs. */
     'preflight.stashPop': {
-      params: { repoId: string; sha: string; index: number; targetSha?: string };
+      params: {
+        repoId: string;
+        sha: string;
+        index: number;
+        targetSha?: string;
+        scope?: 'stack' | 'global';
+      };
       result: StashPopPreflight;
     };
+    /** `scope` (G28 D17): same optional shape. For `scope: 'global'` there is no stack position to
+     *  verify (`ClassifyStashBranch` is unaffected; `op.run`'s own `stashBranch` kind takes a
+     *  sha-addressed arm instead, D12). */
     'preflight.stashBranch': {
-      params: { repoId: string; sha: string; branch: string };
+      params: { repoId: string; sha: string; branch: string; scope?: 'stack' | 'global' };
       result: StashBranchPreflight;
+    };
+    /** G28 D9: the global stash bucket's own listing — `refs/kira/globalstash/<sha>`, one ref per
+     *  entry (D8). Reuses `stash.list`'s own result shape verbatim (D17: zero new wire interfaces —
+     *  the bucket's entries are `StashEntry` rows with `scope: 'global'`, not a parallel type). */
+    'globalStash.list': {
+      params: { repoId: string };
+      result: { entries: readonly StashEntry[] };
     };
     'preflight.reset': {
       params: { repoId: string; target: string; mode: ResetMode };

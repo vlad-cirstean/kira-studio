@@ -80,7 +80,21 @@ import type { EventKey, RequestKey, StreamKey } from './contract.ts';
 // phase touches: the prepare script's own sha256-pinned approval -- a server-only key, reachable
 // only through the Go server's own dedicated storage accessors, never through 'repoSettings.get'/
 // 'set' or any 'OpRequest'/'OpResult' shape (D11/F15).
-export const CONTRACT_VERSION = 29;
+// G28 D17 (2026-09-09): 29 -> 30, for branch-scoped stash -- auto-stash on checkout, cross-branch
+// apply, auto-detach on worktree conflict, and a durable global stash bucket. One new Go-served
+// request ('globalStash.list' -> {entries: StashEntry[]}, reusing the existing result shape
+// verbatim); three requests widen their params with an optional 'scope' ('stack'|'global', absent
+// = 'stack') -- 'stash.show', 'preflight.stashPop', 'preflight.stashBranch'; two new 'OpRequest'
+// kinds ('globalStashSave', 'globalStashRemove'); one new 'OpRequest' field
+// ('checkout.autoStash'); two new 'CheckoutPreflight.routes' members ('autoStash', 'detachHere')
+// and one new 'WorktreeAddPreflight.routes' member ('detachHere') -- all three additive to an
+// EXISTING string-array field, no new wire type; one new 'OpErrorKind' member
+// ('NothingToStash'); one new 'UiActionKind' member ('saveGlobalStash'); one new
+// 'RepoSettingsSnapshot' member ('kiraVersion.checkout.autoStash', read client-side only). 'StashEntry'
+// itself widens by two fields ('scope', 'ref') rather than forking a parallel 'GlobalStashEntry'
+// type -- so, notably, ZERO new wire interfaces. No SQL migration, no watcher change, no new
+// 'ClassifyOpError' stderr row (this phase's own explicit non-goals).
+export const CONTRACT_VERSION = 30;
 
 export class ContractVersionMismatchError extends Error {
   readonly received: number;
@@ -175,6 +189,7 @@ const REQUEST_KEY_MAP: Record<RequestKey, true> = {
   'stash.show': true,
   'preflight.stashPop': true,
   'preflight.stashBranch': true,
+  'globalStash.list': true,
   'preflight.reset': true,
   'preflight.cherryPick': true,
   'search.run': true,

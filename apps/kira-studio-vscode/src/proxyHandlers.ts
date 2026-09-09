@@ -490,6 +490,7 @@ export function createProxyHandlers(deps: CreateProxyHandlersDeps): ServerHandle
     'stash.show': forward('stash.show'),
     'preflight.stashPop': forward('preflight.stashPop'),
     'preflight.stashBranch': forward('preflight.stashBranch'),
+    'globalStash.list': forward('globalStash.list'),
     'preflight.reset': forward('preflight.reset'),
     'preflight.cherryPick': forward('preflight.cherryPick'),
     'search.run': forward('search.run'),

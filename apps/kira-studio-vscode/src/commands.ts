@@ -24,7 +24,7 @@ export const CATEGORY = 'Kira Version';
 
 /** The full set of "an operation that mutates the repository" kinds this extension could ever
  *  register a palette command for: every `OpRequest`/`RemoteOpParams` kind (`op.run`/`remote.run`
- *  cover twenty and five respectively), plus `undo` (`undo.run`) and `cancel` (`remote.cancel`)
+ *  cover twenty-four and five respectively), plus `undo` (`undo.run`) and `cancel` (`remote.cancel`)
  *  — neither of which is itself an `OpRequest`/`RemoteOpParams` kind, but both mutate state exactly
  *  the way the rest of this union does — and, since G26 D13, `restack`: `stack.restack` is served
  *  by its own dedicated executor (`gitsession/stack.go`'s `RunRestack`), neither an `opTable` kind
@@ -56,10 +56,11 @@ export interface PaletteCommand {
 export type MutatingEntry = PaletteCommand | { readonly pending: 'unassigned' };
 
 /** D17's seventeen served commands plus G17's five stash commands, G22's reset/cherryPick, G25's
- *  worktreeAdd/worktreeRemove, and G26's stackSet/restack, with `tagPush`/`tagDeleteRemote` the
- *  only two remaining `pending` placeholders — thirty entries in total, one per `MutatingAction`
- *  member. See the plan's own D17 table for the "what it reaches" column; every
- *  `PaletteCommand.action` here is dispatched by `packages/git-ui/src/App.vue`'s `runUiAction`. */
+ *  worktreeAdd/worktreeRemove, G26's stackSet/restack, and G28's globalStashSave/
+ *  globalStashRemove, with `tagPush`/`tagDeleteRemote` the only two remaining `pending`
+ *  placeholders — thirty-two entries in total, one per `MutatingAction` member. See the plan's own
+ *  D17 table for the "what it reaches" column; every `PaletteCommand.action` here is dispatched by
+ *  `packages/git-ui/src/App.vue`'s `runUiAction`. */
 export const MUTATING_COMMANDS: Record<MutatingAction, MutatingEntry> = {
   checkout: { command: 'kiraVersion.checkout', title: 'Checkout…', action: 'openBranchPicker' },
   branchCreate: {
@@ -188,6 +189,22 @@ export const MUTATING_COMMANDS: Record<MutatingAction, MutatingEntry> = {
     command: 'kiraVersion.restackStack',
     title: 'Restack this Stack…',
     action: 'restackStack',
+  },
+  // G28 D13: globalStashSave opens StashDialog's own fourth mode directly (its own new
+  // UiActionKind member, 'saveGlobalStash' — the same "stashPush/worktreeAdd/restack open their
+  // own dialog directly" shape those three already established above); globalStashRemove reuses
+  // 'openBranchPicker' — the same surface that already contains the sixth (global stash) section's
+  // own row-level Remove action, the same convention every other row-addressed mutating kind above
+  // already follows.
+  globalStashSave: {
+    command: 'kiraVersion.saveGlobalStash',
+    title: 'Save to Global Stash…',
+    action: 'saveGlobalStash',
+  },
+  globalStashRemove: {
+    command: 'kiraVersion.removeGlobalStash',
+    title: 'Remove from Global Stash…',
+    action: 'openBranchPicker',
   },
 };
 

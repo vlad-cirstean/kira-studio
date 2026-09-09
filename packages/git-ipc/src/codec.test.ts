@@ -154,6 +154,8 @@ describe('ipc codec', () => {
           timestamp: 1700000000,
           fileCount: 2,
           includedUntracked: false,
+          scope: 'stack',
+          ref: '',
         },
       ],
     };

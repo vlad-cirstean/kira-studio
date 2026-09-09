@@ -163,6 +163,7 @@ function stubHandlers(
       'stash.show': notImplemented,
       'preflight.stashPop': notImplemented,
       'preflight.stashBranch': notImplemented,
+      'globalStash.list': notImplemented,
       'search.run': notImplemented,
       'file.read': notImplemented,
       'file.goToTarget': notImplemented,
