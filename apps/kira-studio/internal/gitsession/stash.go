@@ -155,6 +155,22 @@ func (e *RepoEntry) resolveStashEntryScoped(ctx context.Context, sha, scope stri
 	return porcelain.StashEntry{}, ErrStashNotFound
 }
 
+// resolveStashEntryAnyScope resolves sha against BOTH buckets — the stack first, then the global
+// bucket — for globalStashSave's own "promote an existing entry" source (D10 step 3): the source
+// sha the caller supplies is not itself scoped on the wire (globalStashSave has no scope field at
+// all, D10), because either an ordinary stack entry OR an already-global one is a legal source to
+// copy from.
+func (e *RepoEntry) resolveStashEntryAnyScope(ctx context.Context, sha string) (porcelain.StashEntry, error) {
+	entry, err := e.resolveStashEntry(ctx, sha)
+	if err == nil {
+		return entry, nil
+	}
+	if !errors.Is(err, ErrStashNotFound) {
+		return porcelain.StashEntry{}, err
+	}
+	return e.resolveStashEntryScoped(ctx, sha, porcelain.StashScopeGlobal)
+}
+
 // StashShowResult is stash.show's own wire result — structurally matches contract.ts's
 // `{sha, changes: FileChange[]}` exactly.
 type StashShowResult struct {

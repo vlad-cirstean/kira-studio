@@ -20,8 +20,8 @@ import (
 // legal values, and every notUndoable entry must carry a real, non-empty reason (never a
 // placeholder — §7.12's "we never present an undo we cannot honour").
 func TestOpTable_EveryEntryStatesAnUndoPolicy(t *testing.T) {
-	if len(opTable) != 20 {
-		t.Fatalf("opTable has %d entries, want exactly 20 (D5, G26 adds stackSet)", len(opTable))
+	if len(opTable) != 22 {
+		t.Fatalf("opTable has %d entries, want exactly 22 (D5, G28 adds globalStashSave/globalStashRemove)", len(opTable))
 	}
 	for kind, spec := range opTable {
 		switch spec.Undo.Kind {
@@ -42,14 +42,19 @@ func TestOpTable_EveryEntryStatesAnUndoPolicy(t *testing.T) {
 	}
 }
 
-// TestOpTable_ServesExactlyTheTwentyNamedKinds locks D5's own list, updated by G26's one new entry
-// (stackSet, D10) — a kind absent here answers ErrUnservedOpKind, never a stub.
-func TestOpTable_ServesExactlyTheTwentyNamedKinds(t *testing.T) {
+// TestOpTable_ServesExactlyTheTwentyTwoNamedKinds locks D5's own list, updated by G28's two new
+// entries (globalStashSave, globalStashRemove, D17) — a kind absent here answers
+// ErrUnservedOpKind, never a stub.
+func TestOpTable_ServesExactlyTheTwentyTwoNamedKinds(t *testing.T) {
 	want := []string{
 		"checkout", "branchCreate", "branchDelete", "branchRename",
 		"tagCreate", "tagDelete", "revert", "opContinue", "opAbort", "opSkip",
 		"stashPush", "stashApply", "stashPop", "stashDrop", "stashBranch",
 		"reset", "cherryPick", "worktreeAdd", "worktreeRemove", "stackSet",
+		"globalStashSave", "globalStashRemove",
+	}
+	if len(want) != 22 {
+		t.Fatalf("test fixture itself lists %d kinds, want 22", len(want))
 	}
 	for _, k := range want {
 		if _, ok := opTable[k]; !ok {
@@ -64,20 +69,20 @@ func TestOpTable_ServesExactlyTheTwentyNamedKinds(t *testing.T) {
 	}
 }
 
-// TestOpTable_UndoableKindsAreExactlyBranchTagDeleteStashDropResetCherryPickAndStackSet locks the
-// six kinds this phase captures a real undo record for — G26 D10 adds stackSet to the five G22
-// already established (branchDelete, tagDelete, stashDrop, reset, cherryPick).
-func TestOpTable_UndoableKindsAreExactlyBranchTagDeleteStashDropResetCherryPickAndStackSet(t *testing.T) {
+// TestOpTable_UndoableKindsAreExactlySevenNamedKinds locks the seven kinds this phase captures a
+// real undo record for — G28 D17 adds globalStashRemove to the six G26 already established
+// (branchDelete, tagDelete, stashDrop, reset, cherryPick, stackSet).
+func TestOpTable_UndoableKindsAreExactlySevenNamedKinds(t *testing.T) {
 	var undoable []string
 	for kind, spec := range opTable {
 		if spec.Undo.Kind == gitpreflight.Undoable {
 			undoable = append(undoable, kind)
 		}
 	}
-	if len(undoable) != 6 {
-		t.Fatalf("undoable kinds = %v, want exactly 6 (branchDelete, tagDelete, stashDrop, reset, cherryPick, stackSet)", undoable)
+	if len(undoable) != 7 {
+		t.Fatalf("undoable kinds = %v, want exactly 7 (branchDelete, tagDelete, stashDrop, reset, cherryPick, stackSet, globalStashRemove)", undoable)
 	}
-	for _, k := range []string{"branchDelete", "tagDelete", "stashDrop", "reset", "cherryPick", "stackSet"} {
+	for _, k := range []string{"branchDelete", "tagDelete", "stashDrop", "reset", "cherryPick", "stackSet", "globalStashRemove"} {
 		if opTable[k].Undo.Kind != gitpreflight.Undoable {
 			t.Fatalf("%s must be undoable", k)
 		}
@@ -383,6 +388,265 @@ func TestRunOp_AutoStash_DoesNotPopBack(t *testing.T) {
 	}
 	if len(gitpreflight.DirtyPaths(statusResult)) != 0 {
 		t.Fatalf("working tree is not clean after the auto-stashed switch: %+v", statusResult)
+	}
+}
+
+// TestPrepareGlobalStashSave_CleanTreeAnswersNothingToStash is §7.1 item 7's own exit criterion:
+// a clean working tree (no source sha given) answers NothingToStash with no write at all.
+func TestPrepareGlobalStashSave_CleanTreeAnswersNothingToStash(t *testing.T) {
+	skipWithoutGitQueries(t)
+	dir := t.TempDir()
+	runGitQ(t, dir, "init", "-q", "-b", "main")
+	if err := os.WriteFile(filepath.Join(dir, "f.txt"), []byte("line1\n"), 0o644); err != nil {
+		t.Fatalf("write f.txt: %v", err)
+	}
+	runGitQ(t, dir, "add", "f.txt")
+	runGitQ(t, dir, "commit", "-q", "-m", "base")
+
+	entry := newQueriesTestEntry(t, dir)
+	ctx := context.Background()
+
+	prep, err := prepareGlobalStashSave(ctx, entry, ConnID("test-conn"), "test-label", OpRequest{
+		Kind: "globalStashSave", Label: "my label",
+	})
+	if err != nil {
+		t.Fatalf("prepareGlobalStashSave: %v", err)
+	}
+	if prep.earlyError == nil || prep.earlyError.Kind != "NothingToStash" {
+		t.Fatalf("earlyError = %+v, want Kind=NothingToStash", prep.earlyError)
+	}
+	if len(prep.argvList) != 0 {
+		t.Fatalf("argvList = %v, want none", prep.argvList)
+	}
+
+	// No ref must have been created.
+	entries, err := entry.GlobalStashList(ctx)
+	if err != nil {
+		t.Fatalf("GlobalStashList: %v", err)
+	}
+	if len(entries) != 0 {
+		t.Fatalf("got %d global entries, want 0 (no write happened)", len(entries))
+	}
+}
+
+// TestPrepareGlobalStashSave_EmptyOrMultilineLabelRefuses proves the label validation runs before
+// any spawn at all.
+func TestPrepareGlobalStashSave_EmptyOrMultilineLabelRefuses(t *testing.T) {
+	skipWithoutGitQueries(t)
+	dir := t.TempDir()
+	runGitQ(t, dir, "init", "-q", "-b", "main")
+	if err := os.WriteFile(filepath.Join(dir, "f.txt"), []byte("line1\n"), 0o644); err != nil {
+		t.Fatalf("write f.txt: %v", err)
+	}
+	runGitQ(t, dir, "add", "f.txt")
+	runGitQ(t, dir, "commit", "-q", "-m", "base")
+	entry := newQueriesTestEntry(t, dir)
+	ctx := context.Background()
+
+	for _, label := range []string{"", "   ", "two\nlines"} {
+		prep, err := prepareGlobalStashSave(ctx, entry, ConnID("test-conn"), "test-label", OpRequest{
+			Kind: "globalStashSave", Label: label,
+		})
+		if err != nil {
+			t.Fatalf("prepareGlobalStashSave(%q): %v", label, err)
+		}
+		if prep.earlyError == nil || prep.earlyError.Kind != "Unknown" {
+			t.Fatalf("label %q: earlyError = %+v, want Kind=Unknown", label, prep.earlyError)
+		}
+		if len(prep.argvList) != 0 {
+			t.Fatalf("label %q: argvList = %v, want none", label, prep.argvList)
+		}
+	}
+}
+
+// TestRunOp_GlobalStashSave_FromWorkingTree_CopiesNeverDrops is D10's own copy-never-move proof:
+// after saving, the working tree is UNCHANGED (still dirty, exact same content) and a new global
+// entry exists with the typed label.
+func TestRunOp_GlobalStashSave_FromWorkingTree_CopiesNeverDrops(t *testing.T) {
+	skipWithoutGitQueries(t)
+	dir := t.TempDir()
+	runGitQ(t, dir, "init", "-q", "-b", "main")
+	if err := os.WriteFile(filepath.Join(dir, "f.txt"), []byte("line1\n"), 0o644); err != nil {
+		t.Fatalf("write f.txt: %v", err)
+	}
+	runGitQ(t, dir, "add", "f.txt")
+	runGitQ(t, dir, "commit", "-q", "-m", "base")
+	dirty := []byte("line1\nWIP\n")
+	if err := os.WriteFile(filepath.Join(dir, "f.txt"), dirty, 0o644); err != nil {
+		t.Fatalf("write f.txt (dirty): %v", err)
+	}
+
+	entry := newQueriesTestEntry(t, dir)
+	ctx := context.Background()
+
+	result, err := entry.RunOp(ctx, ConnID("test-conn"), "test-label", OpRequest{
+		Kind: "globalStashSave", Label: "keep this WIP",
+	})
+	if err != nil {
+		t.Fatalf("RunOp: %v", err)
+	}
+	if !result.OK {
+		t.Fatalf("result.OK = false: %+v", result.Error)
+	}
+
+	// The working tree is byte-identical to before -- COPIED, never dropped.
+	got, err := os.ReadFile(filepath.Join(dir, "f.txt"))
+	if err != nil {
+		t.Fatalf("read f.txt: %v", err)
+	}
+	if string(got) != string(dirty) {
+		t.Fatalf("f.txt = %q after save, want unchanged %q", got, dirty)
+	}
+
+	entries, err := entry.GlobalStashList(ctx)
+	if err != nil {
+		t.Fatalf("GlobalStashList: %v", err)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("got %d global entries, want 1: %+v", len(entries), entries)
+	}
+	if !strings.Contains(entries[0].Message, "keep this WIP") {
+		t.Fatalf("Message = %q, want it to carry the typed label", entries[0].Message)
+	}
+	if entries[0].Index != -1 {
+		t.Fatalf("Index = %d, want -1", entries[0].Index)
+	}
+}
+
+// TestPrepareGlobalStashRemove_AbsentRefAnswersNotFoundWithNoWrite is D11/probe P10's own exit
+// criterion: `update-ref -d` on an absent ref exits 0 silently, so the required existence check
+// must catch this BEFORE any write.
+func TestPrepareGlobalStashRemove_AbsentRefAnswersNotFoundWithNoWrite(t *testing.T) {
+	skipWithoutGitQueries(t)
+	dir := t.TempDir()
+	runGitQ(t, dir, "init", "-q", "-b", "main")
+	if err := os.WriteFile(filepath.Join(dir, "f.txt"), []byte("line1\n"), 0o644); err != nil {
+		t.Fatalf("write f.txt: %v", err)
+	}
+	runGitQ(t, dir, "add", "f.txt")
+	runGitQ(t, dir, "commit", "-q", "-m", "base")
+	entry := newQueriesTestEntry(t, dir)
+	ctx := context.Background()
+
+	prep, err := prepareGlobalStashRemove(ctx, entry, ConnID("test-conn"), "test-label", OpRequest{
+		Kind: "globalStashRemove", Sha: strings.Repeat("a", 40),
+	})
+	if err != nil {
+		t.Fatalf("prepareGlobalStashRemove: %v", err)
+	}
+	if prep.earlyError == nil || prep.earlyError.Kind != "NotFound" {
+		t.Fatalf("earlyError = %+v, want Kind=NotFound", prep.earlyError)
+	}
+	if len(prep.argvList) != 0 {
+		t.Fatalf("argvList = %v, want none", prep.argvList)
+	}
+}
+
+// TestRunOp_GlobalStashRemove_UndoReplaysExactlyOneUpdateRef is D11's own "cleanest undo in the
+// table" proof: removing an entry then undoing it recreates the SAME ref at the SAME object via a
+// single update-ref argv.
+func TestRunOp_GlobalStashRemove_UndoReplaysExactlyOneUpdateRef(t *testing.T) {
+	skipWithoutGitQueries(t)
+	dir, globalSha, _ := initGlobalStashTestRepo(t)
+	entry := newQueriesTestEntry(t, dir)
+	ctx := context.Background()
+
+	result, err := entry.RunOp(ctx, ConnID("test-conn"), "test-label", OpRequest{
+		Kind: "globalStashRemove", Sha: globalSha,
+	})
+	if err != nil {
+		t.Fatalf("RunOp: %v", err)
+	}
+	if !result.OK {
+		t.Fatalf("result.OK = false: %+v", result.Error)
+	}
+	if result.Undo == nil {
+		t.Fatal("Undo = nil, want a real undo slot (globalStashRemove is undoable)")
+	}
+
+	entriesAfterRemove, err := entry.GlobalStashList(ctx)
+	if err != nil {
+		t.Fatalf("GlobalStashList: %v", err)
+	}
+	if len(entriesAfterRemove) != 0 {
+		t.Fatalf("got %d global entries after remove, want 0: %+v", len(entriesAfterRemove), entriesAfterRemove)
+	}
+
+	undoResult, err := entry.UndoRun(ctx, result.Undo.ID)
+	if err != nil {
+		t.Fatalf("UndoRun: %v", err)
+	}
+	if !undoResult.OK {
+		t.Fatalf("undo result.OK = false: %+v", undoResult.Error)
+	}
+
+	entriesAfterUndo, err := entry.GlobalStashList(ctx)
+	if err != nil {
+		t.Fatalf("GlobalStashList (after undo): %v", err)
+	}
+	if len(entriesAfterUndo) != 1 || entriesAfterUndo[0].Sha != globalSha {
+		t.Fatalf("got %+v after undo, want exactly the same entry (%s) back", entriesAfterUndo, globalSha)
+	}
+}
+
+// TestRunOp_GlobalStashSave_PromoteExistingStackEntry_PreservesOriginBranch is D10 step 3's own
+// proof: promoting an existing STACK entry into the bucket keeps the source in the stack
+// (copy-never-drop) and preserves its own origin-branch tag under the NEW label, rather than
+// re-stamping it with whatever branch is checked out now.
+func TestRunOp_GlobalStashSave_PromoteExistingStackEntry_PreservesOriginBranch(t *testing.T) {
+	skipWithoutGitQueries(t)
+	dir := t.TempDir()
+	runGitQ(t, dir, "init", "-q", "-b", "main")
+	if err := os.WriteFile(filepath.Join(dir, "f.txt"), []byte("line1\n"), 0o644); err != nil {
+		t.Fatalf("write f.txt: %v", err)
+	}
+	runGitQ(t, dir, "add", "f.txt")
+	runGitQ(t, dir, "commit", "-q", "-m", "base")
+	runGitQ(t, dir, "checkout", "-q", "-b", "origin-branch")
+	if err := os.WriteFile(filepath.Join(dir, "f.txt"), []byte("line1\nstack change\n"), 0o644); err != nil {
+		t.Fatalf("write f.txt (dirty): %v", err)
+	}
+	runGitQ(t, dir, "stash", "push", "-q", "-m", "the source stash")
+	stackSha := trimTrailingNL(runOutput(t, dir, "rev-parse", "refs/stash"))
+	// Switch to a DIFFERENT branch before promoting — proves the message is NOT re-stamped with
+	// whatever is checked out now.
+	runGitQ(t, dir, "checkout", "-q", "main")
+
+	entry := newQueriesTestEntry(t, dir)
+	ctx := context.Background()
+
+	result, err := entry.RunOp(ctx, ConnID("test-conn"), "test-label", OpRequest{
+		Kind: "globalStashSave", Sha: stackSha, Label: "promoted",
+	})
+	if err != nil {
+		t.Fatalf("RunOp: %v", err)
+	}
+	if !result.OK {
+		t.Fatalf("result.OK = false: %+v", result.Error)
+	}
+
+	// The SOURCE stays in the stack (copy-never-drop, D10).
+	stackEntries, err := entry.StashList(ctx)
+	if err != nil {
+		t.Fatalf("StashList: %v", err)
+	}
+	if len(stackEntries) != 1 || stackEntries[0].Sha != stackSha {
+		t.Fatalf("stack entries = %+v, want the source still present", stackEntries)
+	}
+
+	globalEntries, err := entry.GlobalStashList(ctx)
+	if err != nil {
+		t.Fatalf("GlobalStashList: %v", err)
+	}
+	if len(globalEntries) != 1 {
+		t.Fatalf("got %d global entries, want 1: %+v", len(globalEntries), globalEntries)
+	}
+	promoted := globalEntries[0]
+	if promoted.Branch == nil || *promoted.Branch != "origin-branch" {
+		t.Fatalf("Branch = %v, want \"origin-branch\" (the SOURCE's own origin, not \"main\")", promoted.Branch)
+	}
+	if !strings.Contains(promoted.Message, "promoted") {
+		t.Fatalf("Message = %q, want it to carry the NEW label", promoted.Message)
 	}
 }
 

@@ -15,13 +15,14 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitpreflight"
 )
 
-// OpRequest is op.run's own request — the Go decode of @kira/git-ipc's own twenty-member
-// OpRequest union (G26 D10 adds stackSet), flattened into one struct (a field absent from the
-// wire JSON for a given kind simply decodes to its zero value, which no served kind's Prepare
-// function ever reads). Only fields the eighteen kinds opTable serves actually need are declared
-// — two of OpRequest's twenty kinds (tagPush/tagDeleteRemote) are unserved and unassigned (G22 §9: blocked on
-// RunOp's own write path having no askpass wiring), and their own fields are never decoded here at
-// all, since opTable rejects an unlisted kind before any field is read (D5).
+// OpRequest is op.run's own request — the Go decode of @kira/git-ipc's own twenty-four-member
+// OpRequest union (G28 D17 adds globalStashSave/globalStashRemove), flattened into one struct (a
+// field absent from the wire JSON for a given kind simply decodes to its zero value, which no
+// served kind's Prepare function ever reads). Only fields the twenty-two kinds opTable serves
+// actually need are declared — two of OpRequest's twenty-four kinds (tagPush/tagDeleteRemote) are
+// unserved and unassigned (G22 §9: blocked on RunOp's own write path having no askpass wiring),
+// and their own fields are never decoded here at all, since opTable rejects an unlisted kind
+// before any field is read (D5).
 type OpRequest struct {
 	Kind string `json:"kind"`
 
@@ -80,6 +81,18 @@ type OpRequest struct {
 	// Parent is G26 D10's own stackSet addition — nil means "remove Branch from its stack" (D2
 	// writes "" for both kirastack keys, never `config --unset`, per F15/P5).
 	Parent *string `json:"parent,omitempty"` // stackSet
+
+	// Label is G28 D10's own globalStashSave addition — the new entry's own name. Non-empty,
+	// single-line, validated host-side (a newline would corrupt the reflog-subject-shaped line
+	// every reader of this bucket parses).
+	Label string `json:"label,omitempty"` // globalStashSave
+	// Scope is G28 D17's own addition, threaded through the wire's own widened preflight/stash.show
+	// params (a later step) — "" or "stack" for the ordinary stack, "global" for the bucket. Sha
+	// above is reused as-is for globalStashRemove's own target (D11) and, when non-empty, for
+	// globalStashSave's own "promote an existing entry" source (D10) — the source there is resolved
+	// across BOTH buckets (resolveStashEntryAnyScope), so it deliberately carries no Scope of its
+	// own.
+	Scope string `json:"scope,omitempty"`
 }
 
 // OpError mirrors @kira/git-ipc's own op.run/undo.run per-op error shape.
@@ -98,7 +111,7 @@ type OpResult struct {
 }
 
 // ErrUnservedOpKind is RunOp's answer for an OpRequest.Kind not present in opTable (D5) — two of
-// OpRequest's twenty kinds (tagPush/tagDeleteRemote) are unserved and unassigned — see G22 §9.
+// OpRequest's twenty-four kinds (tagPush/tagDeleteRemote) are unserved and unassigned — see G22 §9.
 // gitrpc maps this to E_UNKNOWN_METHOD naming the kind — never a stub, never a silent success.
 type ErrUnservedOpKind struct{ Kind string }
 
@@ -135,11 +148,13 @@ type opSpec struct {
 	Reclassify func(opErr *OpError, status porcelain.StatusResult, inProgress *gitpreflight.InProgressOperation) *OpError
 }
 
-// opTable serves eighteen of OpRequest's twenty kinds (D5) — the other two (tagPush/
+// opTable serves twenty-two of OpRequest's twenty-four kinds (D5) — the other two (tagPush/
 // tagDeleteRemote) answer ErrUnservedOpKind, never a stub. Labels are ported verbatim from
 // undo/slot.ts's own UNDO_POLICY; G17 added the five stash kinds (note stashDrop's own Undo:
 // undo/slot.ts marks it undoable, not notUndoable like its four stash siblings —
-// captureStashDropUndo below is why); G22 adds reset/cherryPick, both undoable (D9).
+// captureStashDropUndo below is why); G22 adds reset/cherryPick, both undoable (D9); G28 adds
+// globalStashSave (notUndoable — copies, never drops its source, D10) and globalStashRemove
+// (undoable — the cleanest undo in the table, an exact single-argv replay, D11).
 var opTable = map[string]opSpec{
 	// checkout: notUndoable, its reason widened at G28 D3 to name the auto-stash honestly — an
 	// auto-stashed switch leaves a clean tree on the new branch, and the reason text is the one
@@ -262,6 +277,21 @@ var opTable = map[string]opSpec{
 	"stackSet": {
 		Undo:    gitpreflight.UndoPolicy{Kind: gitpreflight.Undoable},
 		Prepare: prepareStackSet,
+	},
+	// globalStashSave: notUndoable (D10) — it always COPIES, never drops its source, so its own
+	// inverse is globalStashRemove, one click away and itself undoable; branchCreate/worktreeAdd's
+	// exact precedent for "the inverse is a different, already-undoable op".
+	"globalStashSave": {
+		Undo:    gitpreflight.UndoPolicy{Kind: gitpreflight.NotUndoable, Reason: "Remove it from the global stash to undo this."},
+		Prepare: prepareGlobalStashSave,
+	},
+	// globalStashRemove: undoable (D11) — the cleanest undo in the whole table: the replay is an
+	// EXACT single `update-ref <ref> <sha>` recreating the same ref at the same object, no
+	// positional ambiguity at all (contrast stashDrop's own `stash store`, which is not guaranteed
+	// to land back at the same stack index).
+	"globalStashRemove": {
+		Undo:    gitpreflight.UndoPolicy{Kind: gitpreflight.Undoable},
+		Prepare: prepareGlobalStashRemove,
 	},
 }
 
@@ -482,7 +512,15 @@ func prepareStashDrop(ctx context.Context, e *RepoEntry, conn ConnID, connLabel 
 	return prepared{argvList: [][]string{gitops.StashDropArgs(op.Index)}, undo: undo}, nil
 }
 
+// prepareStashBranch gains its G28 D12 arm: for op.Scope == "global", there is no stack position
+// to verify at all (a global entry is addressed purely by sha), so this skips
+// stashPositionMismatch entirely and uses StashBranchByShaArgs — probe 8's own "given a raw sha,
+// `stash branch` applies but silently never drops" finding is precisely the desired behaviour for
+// a keep-forever bucket entry.
 func prepareStashBranch(ctx context.Context, e *RepoEntry, _ ConnID, _ string, op OpRequest) (prepared, error) {
+	if op.Scope == porcelain.StashScopeGlobal {
+		return prepared{argvList: [][]string{gitops.StashBranchByShaArgs(op.Branch, op.Sha)}}, nil
+	}
 	mismatch, err := stashPositionMismatch(ctx, e, op.Index, op.Sha)
 	if err != nil {
 		return prepared{}, err
@@ -491,6 +529,125 @@ func prepareStashBranch(ctx context.Context, e *RepoEntry, _ ConnID, _ string, o
 		return prepared{earlyError: mismatch}, nil
 	}
 	return prepared{argvList: [][]string{gitops.StashBranchArgs(op.Branch, op.Index)}}, nil
+}
+
+// prepareGlobalStashSave is globalStashSave's own Prepare (D10), two sources, always COPYING and
+// never dropping either one:
+//
+//  1. Validate label: non-empty after trim, no newline (a newline would corrupt the reflog-
+//     subject-shaped line every reader of this bucket parses).
+//  2. Source = the CURRENT working tree (op.Sha == ""): `git stash create <label>` through runOne
+//     — a read-pool spawn that writes only loose objects and touches no ref, index or worktree
+//     (probe P4), the same latitude stashPopPrediction's own `merge-tree --write-tree` already
+//     takes. Empty output means a clean tree (probe P4) -> NothingToStash, no write.
+//  3. Source = an EXISTING entry (op.Sha != ""): resolved fresh across BOTH buckets
+//     (resolveStashEntryAnyScope) -> NotFound if absent. `commit-tree` over the source's own tree
+//     and parent list under a NEW subject that PRESERVES the source's own origin-branch tag
+//     (probe P23) — never re-stamped with whatever is checked out now.
+//
+// Either way, the one write this function ever prepares is `update-ref <ref> <newSha>` —
+// idempotent (probe P10) — never a second argv, never anything that could drop the source.
+func prepareGlobalStashSave(ctx context.Context, e *RepoEntry, _ ConnID, _ string, op OpRequest) (prepared, error) {
+	label := strings.TrimSpace(op.Label)
+	if label == "" || strings.ContainsAny(op.Label, "\n\r") {
+		return prepared{earlyError: &OpError{
+			Kind:    "Unknown",
+			Message: "Give the entry a label: one line, not empty.",
+		}}, nil
+	}
+
+	var newSha string
+	if op.Sha == "" {
+		raw, err := e.runOne(ctx, gitops.StashCreateArgs(label))
+		if err != nil {
+			return prepared{}, err
+		}
+		sha := strings.TrimSpace(string(raw))
+		if sha == "" {
+			return prepared{earlyError: &OpError{
+				Kind:    "NothingToStash",
+				Message: "There are no local changes to save.",
+			}}, nil
+		}
+		newSha = sha
+	} else {
+		source, err := e.resolveStashEntryAnyScope(ctx, op.Sha)
+		if err != nil {
+			if errors.Is(err, ErrStashNotFound) {
+				return prepared{earlyError: &OpError{
+					Kind:    "NotFound",
+					Message: "That stash entry no longer exists — the list may have changed.",
+				}}, nil
+			}
+			return prepared{}, err
+		}
+		originBranch := "(no branch)"
+		if source.Branch != nil {
+			originBranch = *source.Branch
+		}
+		parents := []string{source.BaseSha, source.IndexSha}
+		if source.UntrackedSha != nil {
+			parents = append(parents, *source.UntrackedSha)
+		}
+		message := "On " + originBranch + ": " + label
+		raw, err := e.runOne(ctx, gitops.CommitTreeArgs(source.Sha+"^{tree}", parents, message))
+		if err != nil {
+			return prepared{}, err
+		}
+		sha := strings.TrimSpace(string(raw))
+		if sha == "" {
+			return prepared{}, fmt.Errorf("gitsession: globalStashSave: commit-tree produced no sha")
+		}
+		newSha = sha
+	}
+
+	return prepared{argvList: [][]string{gitops.GlobalStashSetArgs(newSha)}}, nil
+}
+
+// prepareGlobalStashRemove is globalStashRemove's own Prepare (D11) — the cleanest undo in the
+// whole opTable:
+//
+//  1. A required existence check (GlobalStashRefExistsArgs) BEFORE the write — probe P10:
+//     `update-ref -d` on an absent ref exits 0 SILENTLY, which would otherwise make "remove
+//     nothing" look like a successful removal.
+//  2. The undo record captured before the write: an EXACT `update-ref <ref> <sha>` replay
+//     (GlobalStashSetArgs, the same builder globalStashSave's own write uses — re-creating an
+//     identical ref at an identical object is idempotent, probe P10) — no positional ambiguity at
+//     all, unlike stashDrop's own `stash store` replay.
+//  3. The delete itself uses the expected-old-value form (GlobalStashDeleteArgs), so a concurrent
+//     change to the same ref refuses rather than silently deleting whatever now sits there.
+func prepareGlobalStashRemove(ctx context.Context, e *RepoEntry, conn ConnID, connLabel string, op OpRequest) (prepared, error) {
+	existsRaw, err := e.runOne(ctx, gitops.GlobalStashRefExistsArgs(op.Sha))
+	if err != nil {
+		return prepared{}, err
+	}
+	if strings.TrimSpace(string(existsRaw)) == "" {
+		return prepared{earlyError: &OpError{
+			Kind:    "NotFound",
+			Message: "That global stash entry no longer exists.",
+		}}, nil
+	}
+
+	// Best-effort label lookup for the undo record's own human-readable text — never fatal to the
+	// removal itself; a race that drops the entry between the existence check above and this read
+	// simply falls back to a short-sha label instead.
+	label := shortSha7(op.Sha)
+	if entries, lerr := e.GlobalStashList(ctx); lerr == nil {
+		for _, entry := range entries {
+			if entry.Sha == op.Sha {
+				label = entry.Message
+				break
+			}
+		}
+	}
+
+	undo := &gitpreflight.UndoRecord{
+		ID: newUndoID(), Label: "Removed global stash: " + label, RecoverySha: op.Sha,
+		CreatedAt: time.Now().UnixMilli(), Replay: [][]string{gitops.GlobalStashSetArgs(op.Sha)},
+		OriginConn: string(conn), OriginLabel: connLabel,
+	}
+
+	return prepared{argvList: [][]string{gitops.GlobalStashDeleteArgs(op.Sha)}, undo: undo}, nil
 }
 
 // prepareReset is reset's own Prepare (D8/D9). P10 probe 3: git itself only refuses a --soft
