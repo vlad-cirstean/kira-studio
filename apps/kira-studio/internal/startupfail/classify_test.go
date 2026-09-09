@@ -18,7 +18,7 @@ type localSchemaTooNew struct {
 	found, known int
 }
 
-func (e *localSchemaTooNew) Error() string           { return e.msg }
+func (e *localSchemaTooNew) Error() string            { return e.msg }
 func (e *localSchemaTooNew) SchemaTooNew() (int, int) { return e.found, e.known }
 
 // allSteps enumerates every Step constant step.go declares — classify_test.go's stand-in for the
