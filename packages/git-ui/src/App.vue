@@ -702,6 +702,18 @@ function runUiAction(
     case 'stashChanges':
       stashCreateOpen.value = true;
       break;
+    case 'resetSelected': {
+      const sha = selection.sha.value;
+      if (sha) void opsState.runReset(sha, 'mixed');
+      else liveAnnouncement.value = 'Select a commit first.';
+      break;
+    }
+    case 'cherryPickSelected': {
+      const sha = selection.sha.value;
+      if (sha) void opsState.runCherryPick(sha);
+      else liveAnnouncement.value = 'Select a commit first.';
+      break;
+    }
   }
 }
 

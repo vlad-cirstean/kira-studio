@@ -251,6 +251,16 @@
         "command": "kiraVersion.createBranchFromStash",
         "title": "Create Branch from Stash…",
         "category": "Kira Version"
+      },
+      {
+        "command": "kiraVersion.resetToCommit",
+        "title": "Reset to Commit…",
+        "category": "Kira Version"
+      },
+      {
+        "command": "kiraVersion.cherryPickCommit",
+        "title": "Cherry-pick Commit…",
+        "category": "Kira Version"
       }
     ],
     "menus": {

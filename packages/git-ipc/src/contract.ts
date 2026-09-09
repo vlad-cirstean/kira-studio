@@ -987,7 +987,16 @@ export type UiActionKind =
    *  other four stash commands (`stashApply`/`stashPop`/`stashDrop`/`stashBranch`) reuse
    *  `openBranchPicker` instead — no new member for those (`BranchPicker.vue`'s own stash section
    *  already has row-level Apply/Pop/Drop/Branch actions). */
-  | 'stashChanges';
+  | 'stashChanges'
+  /** G22 D10: the palette's own route into `ResetDialog.vue` — the same assignment the graph row
+   *  menu's own "Reset to This Commit…" entry already makes (`App.vue`'s
+   *  `resetToThisCommit`/`runReset` handler), so this is a second entry point into the same
+   *  dialog, never a second implementation. */
+  | 'resetSelected'
+  /** G22 D10: the palette's own route into `CherryPickDialog.vue` — the same assignment the graph
+   *  row menu's own "Cherry-pick This Commit…" entry already makes (`App.vue`'s
+   *  `cherryPickThisCommit`/`runCherryPick` handler). */
+  | 'cherryPickSelected';
 
 // ---------------------------------------------------------------------------------------
 // The contract.

@@ -35,20 +35,20 @@ export interface PaletteCommand {
   readonly action: UiActionKind;
 }
 
-/** A kind not yet served by any phase's `opTable`/`RunRemote` switch carries the phase that owns
- *  it instead of a command (D18) — G16 owns reset/cherryPick and tagPush/tagDeleteRemote, since
- *  both are push operations that belong with the reset/cherry-pick sweep rather than the stash one.
- *  (Chapter phase insertions moved these off their original G13/G14 labels, which this phase — the
- *  real G13 — now owns outright; F13 is why the labels moved rather than staying wrong.) G17 lands
- *  the five stash kinds' own real commands, so `'G15'` is dropped from this union — it is
- *  unreachable now that every entry that used it is real. Move an entry if a later phase's own plan
- *  takes it differently — this comment, not a fixed assignment, is the source of truth. */
-export type MutatingEntry = PaletteCommand | { readonly pending: 'G16' };
+/** A kind not yet served by any phase's `opTable`/`RunRemote` switch carries `'unassigned'`
+ *  instead of a command (D18/G22 D11) — only `tagPush`/`tagDeleteRemote` remain: both are push
+ *  operations, and `RunOp`'s write path has no askpass wiring yet (G22 §9's own named blocker —
+ *  the recommended fix is moving both to `remote.run`, which already has that wiring). G22 lands
+ *  reset/cherryPick's own real commands, so this union no longer carries a phase label at all —
+ *  the day a kind is actually assigned, its entry becomes a real `PaletteCommand`, not a new label
+ *  here. */
+export type MutatingEntry = PaletteCommand | { readonly pending: 'unassigned' };
 
-/** D17's seventeen served commands plus G17's five stash commands plus D18's four remaining
- *  `pending` placeholders — twenty-six entries in total, one per `MutatingAction` member. See the
- *  plan's own D17 table for the "what it reaches" column; every `PaletteCommand.action` here is
- *  dispatched by `packages/git-ui/src/App.vue`'s `runUiAction`. */
+/** D17's seventeen served commands plus G17's five stash commands plus G22's reset/cherryPick,
+ *  with `tagPush`/`tagDeleteRemote` the only two remaining `pending` placeholders — twenty-six
+ *  entries in total, one per `MutatingAction` member. See the plan's own D17 table for the "what
+ *  it reaches" column; every `PaletteCommand.action` here is dispatched by
+ *  `packages/git-ui/src/App.vue`'s `runUiAction`. */
 export const MUTATING_COMMANDS: Record<MutatingAction, MutatingEntry> = {
   checkout: { command: 'kiraVersion.checkout', title: 'Checkout…', action: 'openBranchPicker' },
   branchCreate: {
@@ -72,8 +72,8 @@ export const MUTATING_COMMANDS: Record<MutatingAction, MutatingEntry> = {
     title: 'Delete Tag…',
     action: 'openBranchPicker',
   },
-  tagPush: { pending: 'G16' },
-  tagDeleteRemote: { pending: 'G16' },
+  tagPush: { pending: 'unassigned' },
+  tagDeleteRemote: { pending: 'unassigned' },
   revert: {
     command: 'kiraVersion.revertCommit',
     title: 'Revert Commit…',
@@ -119,8 +119,19 @@ export const MUTATING_COMMANDS: Record<MutatingAction, MutatingEntry> = {
     title: 'Create Branch from Stash…',
     action: 'openBranchPicker',
   },
-  reset: { pending: 'G16' },
-  cherryPick: { pending: 'G16' },
+  // G22 D11: reset/cherryPick's own real commands, mirroring revert's own shape (a single-commit
+  // op the row menu already offers — 'resetToThisCommit'/'cherryPickThisCommit', App.vue:410-429 —
+  // this is the palette's second entry point into the same two dialogs).
+  reset: {
+    command: 'kiraVersion.resetToCommit',
+    title: 'Reset to Commit…',
+    action: 'resetSelected',
+  },
+  cherryPick: {
+    command: 'kiraVersion.cherryPickCommit',
+    title: 'Cherry-pick Commit…',
+    action: 'cherryPickSelected',
+  },
   fetch: { command: 'kiraVersion.fetch', title: 'Fetch', action: 'fetch' },
   pull: { command: 'kiraVersion.pull', title: 'Pull', action: 'pull' },
   push: { command: 'kiraVersion.push', title: 'Push', action: 'push' },

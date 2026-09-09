@@ -39,7 +39,14 @@ import type { EventKey, RequestKey, StreamKey } from './contract.ts';
 // every 'editor.*' request before it); 'editor.openDiff' gains optional 'pinned' (D13) and
 // 'fallbackSha' (D12, the stash-untracked-file retry); 'editor.openRangeDiff' gains the same
 // optional 'pinned' (D13). No existing method's shape changes — every addition is optional.
-export const CONTRACT_VERSION = 24;
+// G22 D10: 24 -> 25, for two new UiActionKind members ('resetSelected', 'cherryPickSelected'),
+// the palette's own route into ResetDialog.vue/CherryPickDialog.vue, neither of which had one.
+// This is the only wire change this phase makes: every result/param/error shape
+// 'preflight.reset'/'preflight.cherryPick'/'op.run's reset/cherryPick kinds serve already existed
+// at CONTRACT_VERSION 24. Moves for the same reason 'ui.action' first did (G10 D9): this constant
+// is the sole compatibility authority, even though the Go server neither emits nor parses
+// 'ui.action' at all.
+export const CONTRACT_VERSION = 25;
 
 export class ContractVersionMismatchError extends Error {
   readonly received: number;
