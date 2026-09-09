@@ -129,7 +129,6 @@ export type {
 export type { Storage, StorageScope } from './ports/storage.ts';
 export type { Theme, ThemeKind } from './ports/theme.ts';
 export type { RepoCandidate, WorkspaceRoots } from './ports/workspaceRoots.ts';
-export { classifyCherryPick } from './preflight/cherryPick.ts';
 export { classifyReset } from './preflight/reset.ts';
 export { classifyTagCreate, validateRefName } from './preflight/tag.ts';
 export type {
@@ -185,8 +184,6 @@ export { CommitStore, packedTransferList } from './store/commitStore.ts';
 export { StringInterner, SubjectBuffer } from './store/intern.ts';
 export type { ShaTableOptions } from './store/shaTable.ts';
 export { bytesToHex, hexToBytes, ShaTable } from './store/shaTable.ts';
-export type { UndoPolicy, UndoRecord } from './undo/slot.ts';
-export { UNDO_POLICY, UndoSlot } from './undo/slot.ts';
 export { AssertionError, assert, assertDefined, assertNever } from './util/assert.ts';
 export type { RecordSplitterOptions } from './util/nulSplit.ts';
 export {

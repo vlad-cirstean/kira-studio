@@ -5,6 +5,12 @@
  * advisory the dialog surfaces, not a refusal. The only real blockers are an in-progress operation
  * (probe 3: git does not refuse a mid-merge reset on its own, so this classifier is the one place
  * that does) and an unresolved target.
+ *
+ * G22 D3/D12: this is the one classifier in the whole P10 chapter kept alive in TWO languages —
+ * `internal/gitpreflight/reset.go`'s own `ClassifyReset` is the authoritative twin (a direct,
+ * field-for-field port), and this copy exists solely so `packages/git-ui/src/state/ops.ts`'s
+ * `previewResetMode` can recompute the dialog's mode-radio verdict with no round trip. Any change
+ * to the classification rules must land in both.
  */
 import type { InProgressOperation, ResetMode } from '../model/operation.ts';
 import type { ResetPreflight } from './types.ts';
