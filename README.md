@@ -382,7 +382,7 @@ chapter (`docs/v1/SPEC.md` is the v1 record — see `docs/v1/README.md`).
   numbers.
 - [`docs/PACKAGING.md`](docs/PACKAGING.md) — macOS build, the Wails bundle layout, verification
   checklist.
-- [`docs/v1.3/`](docs/v1.3/) — the git chapter's phasing record:
+- [`docs/v1.3/`](docs/v1.3/) — the git chapter's phasing record (see `docs/v1.3/README.md`):
   [`SPEC.md`](docs/v1.3/SPEC.md) and [`plans/`](docs/v1.3/plans/), one implementation plan per
   phase, G1 through G33.
 - [`docs/v1.2/`](docs/v1.2/) — the completed Api chapter's own phasing record (see

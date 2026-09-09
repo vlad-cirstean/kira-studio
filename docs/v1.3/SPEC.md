@@ -343,7 +343,7 @@ P12 package split may also want), not a boundary violation.
 | **G30** | Code review, round 1 of 3 — AGENTS.md's own "Code review" convention applied to the *whole* v1.3 chapter (all of `internal/git*`, `internal/bridge/rpcstream`, the migrated `apps/kira-studio-vscode` extension, `packages/git-*` wiring, every design decision in this file), not one phase: three Opus subagents in parallel, one per dimension (architecture/structure/maintainability/security; functional correctness/business logic; performance/resource efficiency), each reporting findings only. One sequential Sonnet subagent then fixes every finding and commits each one individually — no findings document survives the round once fixed, same as AGENTS.md already specifies. A round that finds nothing real says so rather than manufacture a finding | G1–G29 | new |
 | **G31** | Code review, round 2 of 3 — the exact same three-dimension cycle as G30, run again over the chapter's current state (post-G30 fixes), independently — not verification of G30's specific findings, a fresh look at the whole thing. Independent because a fix landed in G30 can itself introduce something new, and a first pass over 20+ phases' worth of code from that many separate implementing subagents rarely catches everything in one sweep | G30 | new |
 | **G32** | Code review, round 3 of 3 — the same cycle a third time, over the chapter's state after G31's fixes. Once this round finds nothing real across all three dimensions, the chapter's code is considered closed out; if it does find something, fix it the same way as the prior two rounds — round count is fixed at three regardless, per AGENTS.md's "repeat... for as many rounds as asked," not extended on the fly | G31 | new |
-| **G33** | Docs update — the chapter's actual closeout, scoped to the main, durable reference docs a reader actually opens: the root `README.md` (currently silent on the git module entirely — Studio and Api both get a mention, git doesn't) and `docs/ARCHITECTURE.md` (gets the git module described as a real, shipped subsystem — transport, session model, package list — rather than absent or described as a plan). `AGENTS.md` gets any new environment/convention notes the three review rounds produced, same spirit as the verification-scope and `docs/pending-changes/` notes already added mid-chapter. This file's own "Known open items" / "Out of scope" sections get swept for anything G1–G32 actually closed. Explicitly NOT in scope here: `docs/v1.3/plans/G<N>-*.md` — those are per-phase historical records, not living docs, and are left as-is. No new code — this phase's only output is documentation, and it's the true last phase of v1.3, after which the chapter is done | G30, G31, G32 | new |
+| **G33** | Docs update — the chapter's actual closeout, scoped to the main, durable reference docs a reader actually opens: the root `README.md` (currently silent on the git module entirely — Studio and Api both get a mention, git doesn't) and `docs/ARCHITECTURE.md` (gets the git module described as a real, shipped subsystem — transport, session model, package list — rather than absent or described as a plan). `AGENTS.md` gets any new environment/convention notes the three review rounds produced, same spirit as the verification-scope and `docs/pending-changes/` notes already added mid-chapter. This file's own "Known open items" / "Out of scope" sections get swept for anything G1–G32 actually closed. Explicitly NOT in scope here: `docs/v1.3/plans/G<N>-*.md` — those are per-phase historical records, not living docs, and are left as-is. No new code — this phase's only output is documentation, and it's the true last phase of v1.3, after which the chapter is done. **Run out of order, 2026-09-09**: at the user's explicit instruction this phase ran *before* G30-G32 rather than after them, so its `AGENTS.md` pass and its "Known open items" sweep cover G1-G29 only. The review rounds' own contribution to both is a follow-up pass once G30-G32 land — see `docs/v1.3/plans/G33-docs-update.md` §6 | G30, G31, G32 | new |
 
 Each phase gets its own Opus-authored plan under `docs/v1.3/plans/` before implementation starts,
 per `AGENTS.md` — none is written as part of this chapter spec.
@@ -432,22 +432,44 @@ current content directly, independent of whether git's own history still contain
 
 ## Out of scope for v1.3
 
-- Marketplace/OpenVSX publishing itself (upstream's literal P13) — G10's DMG bundling is this
-  chapter's answer instead. P12 (GitHub PR links) and P14 (worktree support) are no longer
-  unowned: they're G24 and G25, added 2026-09-07 specifically so upstream's incomplete phases
-  don't ship unfinished here too.
-- Any embedded git UI inside Kira Studio's own Wails frontend — deliberately deferred, but the
-  session/transport layer (§6, `rpcstream`) is built so that work is additive later, not a rework.
-- Redesigning the extension's UI around native VS Code surfaces (tree views, quickpicks in place of
-  the graph) — considered and explicitly rejected; the existing webview UI ships as-is.
+- **Marketplace/OpenVSX publishing itself** (upstream's literal P13) — G10's DMG bundling is this
+  chapter's answer instead, and it shipped: `bun run package:vscode` builds `kira-version.vsix`,
+  the packaging task copies it into the app bundle before the ad-hoc signature so the signature
+  covers it, and the *Connected editors* pane installs it via `code --install-extension`. Upstream's
+  two unfinished phases are no longer unowned either — P12 (GitHub PR links) shipped as G24 and P14
+  (worktree support) as G25, which is what adding them was for.
+- **Any git mode, tab or panel inside Kira Studio's own Wails frontend** — deliberately deferred,
+  and still absent. What the Wails window *does* have is deliberately not that: a *Connected
+  editors* pane and a *Git* settings section, both present because Kira Studio is the pairing trust
+  authority and the owner of the server-owned settings, not because a git UI crept in. The
+  session/transport layer (`rpcstream`'s `Conn` seam) is built so an embedded UI stays additive
+  later rather than a rework.
+- **Replacing the graph and review panels with native VS Code surfaces** (tree views, quickpicks) —
+  considered and explicitly rejected; both are still webviews. This is narrower than this bullet
+  originally read, and the correction is deliberate rather than cosmetic: the webview UI did **not**
+  ship "exactly as it is". G12 moved every review diff out of the webview into VS Code's own diff
+  editor; G14 added *Go to file* and *Open in graph* to that native diff toolbar; G15 rebuilt
+  range-level review marking as gutter decorations there; and G12/G14/G19/G21 restyled the webviews
+  onto this app's own components, producing `packages/kira-ui`. What stayed out of scope is
+  replacing the panels *themselves* with native surfaces — not using a native surface where it is
+  the better host for one interaction.
 
 ## Known open items
 
-- **RE2 vs. JS `RegExp` in search (G23).** Upstream's whole-word matching compiles to `\b…\b` or,
-  at a punctuation edge, a lookbehind/lookahead form Go's RE2 cannot express at all. The server-side
-  tail scan and the client-side scan must agree exactly or a hit's presence depends on which page
-  happens to be loaded. Needs a byte-boundary post-check implementation in `gitsearch` rather than
-  a direct pattern port — flagged here so G23's own plan doesn't rediscover it from scratch.
-- **Perf budgets need re-measurement, not re-derivation.** Upstream's ≤300ms first-paint and
-  similar budgets were measured over in-process `postMessage`; a Unix socket plus FlatBuffers
-  framing changes the cost profile in ways worth confirming empirically in G3 and G8, not assuming.
+Both items this section carried through the chapter are closed and removed, per `AGENTS.md`'s
+"keep an item only while genuinely open, delete it the moment it's resolved" rule. **RE2 vs. JS
+`RegExp` in search** was closed by G23, with a stronger answer than this section asked for — a
+literal query runs no regex engine at all, a regex query is translated construct by construct with
+whole-word as a consuming rewrite (a post-check, which this item proposed, was found to disagree
+with JS on `foo|foobar`), and what RE2 cannot express is refused as data rather than silently
+mismatched; both matchers are pinned by one shared conformance corpus. **Perf budgets needing
+re-measurement** was closed by G3's and G8's own probes over the real socket and the real
+FlatBuffers framing. Both now live where a durable app fact and a durable measurement belong —
+`docs/ARCHITECTURE.md`'s Git module section and `docs/PERF.md` §2.13 respectively — rather than as
+open questions here.
+
+- **G30-G32's own findings have not been swept into this section yet.** G33 was run *ahead* of the
+  three review rounds by explicit instruction (see `docs/v1.3/plans/G33-docs-update.md`), so its
+  sweep covers what **G1-G29** closed and nothing more. Whatever round 3 leaves genuinely open
+  belongs here, and this section — together with `AGENTS.md`'s own environment/convention notes —
+  gets one further pass once G32 finishes. That pass is the chapter's actual last act.
