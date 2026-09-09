@@ -137,8 +137,8 @@ func (e *RepoEntry) branchTip(ctx context.Context, branch string) (string, error
 }
 
 // blobOID resolves rev:path's current blob oid via the cat-file batch session, "" (not an error)
-// for a path that does not exist there — the natural comparand for tier 0 (F6): '' vs. a record's
-// own '' (ContentAbsent) is "still deleted", "unchanged" with no special case.
+// for a path that does not exist there — the natural comparand for tier 0 (F6): ” vs. a record's
+// own ” (ContentAbsent) is "still deleted", "unchanged" with no special case.
 func (e *RepoEntry) blobOID(rev, path string) (string, error) {
 	session := e.CatFile()
 	if session == nil {
@@ -251,13 +251,13 @@ func (e *RepoEntry) parseAndResolve(raw []byte) (porcelain.ParsedBody, porcelain
 
 // FileDelta is D7's three-tier "what changed since you reviewed" selection, verbatim:
 //
-//	0. blob-oid equality (F6) — exact, no diff at all, and the only tier that answers correctly
-//	   when the snapshot commit has been pruned AND the content is unchanged.
-//	1. merge-base --is-ancestor: the snapshot sha is still reachable, an ordinary git diff is
-//	   exact and the stored blob is never read.
-//	2. diff --no-index against the decompressed stored blob: history was rewritten (exit 1, the
-//	   common amend/rebase/squash case, probe P2) or the sha is genuinely pruned (exit 128) — both
-//	   take the slow path. A non-text snapshot has nothing to diff against: snapshotUnavailable.
+//  0. blob-oid equality (F6) — exact, no diff at all, and the only tier that answers correctly
+//     when the snapshot commit has been pruned AND the content is unchanged.
+//  1. merge-base --is-ancestor: the snapshot sha is still reachable, an ordinary git diff is
+//     exact and the stored blob is never read.
+//  2. diff --no-index against the decompressed stored blob: history was rewritten (exit 1, the
+//     common amend/rebase/squash case, probe P2) or the sha is genuinely pruned (exit 128) — both
+//     take the slow path. A non-text snapshot has nothing to diff against: snapshotUnavailable.
 //
 // Do not collapse this to two tiers — tier 0 is not an optimisation, it is the only tier that
 // answers correctly when the snapshot commit is pruned AND unchanged, and it is what keeps
@@ -575,23 +575,35 @@ func (e *RepoEntry) MarkFile(ctx context.Context, branch, path string, reviewed 
 		}
 	}
 
-	// The whole file, in CURRENT coordinates, when the caller gave no ranges (D10's "given absent
-	// => the whole file"); otherwise the caller's own ranges, clamped/normalized against the
-	// current line count — ProjectRanges with no hunks is exactly that clamp (project.go).
-	given := ranges
-	if given == nil {
-		given = gitreview.Expand(currentLineCount)
+	// D10's "given absent => the whole file" used to materialize as gitreview.Expand(currentLineCount)
+	// and rely on normalizeState's own CountLines(next) == lineCount check to fold that back into
+	// "full". That breaks for any file that snapshots at lineCount 0 — deleted at the branch tip,
+	// binary, too-large, or genuinely empty (G30 round-1 functional-correctness review, finding
+	// #1): Expand(0) is nil, so `next` is empty regardless of `reviewed`, and normalizeState reads
+	// an empty range set as "partial" with no ranges, which reviewFileStatus maps straight back to
+	// "none" — the file can never be marked reviewed. "the whole file" is a state, not a
+	// materialized range, so it is set directly here, independent of whether this file currently
+	// has any lines to materialize a range over.
+	var state string
+	var storedRanges []gitreview.LineRange
+	if ranges == nil {
+		if reviewed {
+			state, storedRanges = "full", nil
+		} else {
+			state, storedRanges = "partial", nil
+		}
 	} else {
-		given = gitreview.ProjectRanges(given, nil, currentLineCount)
+		// A real ranged mark — only reachable for a text file (ErrRangedMarkOnNonText above), so
+		// normalizeState's own lineCount-based "did this cover everything" check is meaningful here.
+		given := gitreview.ProjectRanges(ranges, nil, currentLineCount)
+		var next []gitreview.LineRange
+		if reviewed {
+			next = gitreview.Union(existing, given)
+		} else {
+			next = gitreview.Subtract(existing, given)
+		}
+		state, storedRanges = normalizeState(next, currentLineCount)
 	}
-
-	var next []gitreview.LineRange
-	if reviewed {
-		next = gitreview.Union(existing, given)
-	} else {
-		next = gitreview.Subtract(existing, given)
-	}
-	state, storedRanges := normalizeState(next, currentLineCount)
 
 	rec := gitreview.FileRecord{
 		Path: path, State: state, ReviewedAtSHA: tip, ReviewedAt: time.Now(),
