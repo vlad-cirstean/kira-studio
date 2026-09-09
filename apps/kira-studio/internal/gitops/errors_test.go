@@ -72,6 +72,24 @@ func TestClassifyOpError_DirtyWorktree(t *testing.T) {
 	}
 }
 
+// TestClassifyOpError_WorktreeRemoveDirty is G25 D15/probe M4's own verbatim stderr — the reused
+// DirtyWorktree kind, via a pattern distinct from checkout's own row just above.
+func TestClassifyOpError_WorktreeRemoveDirty(t *testing.T) {
+	stderr := "fatal: '../wt-m4' contains modified or untracked files, use --force to delete it"
+	if kind, _ := gitops.ClassifyOpError(stderr, 128); kind != "DirtyWorktree" {
+		t.Fatalf("got %q, want DirtyWorktree", kind)
+	}
+}
+
+// TestClassifyOpError_WorktreeLocked is G25 D15/probe M5's own verbatim stderr — the one new kind
+// this phase adds.
+func TestClassifyOpError_WorktreeLocked(t *testing.T) {
+	stderr := "fatal: cannot remove a locked working tree, lock reason: testing lock reason\nuse 'remove -f -f' to override or unlock first"
+	if kind, _ := gitops.ClassifyOpError(stderr, 128); kind != "WorktreeLocked" {
+		t.Fatalf("got %q, want WorktreeLocked", kind)
+	}
+}
+
 func TestClassifyOpError_OperationInProgress(t *testing.T) {
 	for _, stderr := range []string{
 		"fatal: cannot switch branch while reverting",

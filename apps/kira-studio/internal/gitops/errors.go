@@ -75,6 +75,18 @@ func ClassifyOpError(stderr string, exitCode int) (kind, message string) {
 	case strings.Contains(lower, "local changes to the following files would be overwritten"):
 		// Probe P7.
 		return "DirtyWorktree", message
+	case strings.Contains(lower, "contains modified or untracked files"):
+		// G25 D15/probe M4: `worktree remove` on a dirty worktree — "fatal: '<path>' contains
+		// modified or untracked files, use --force to delete it". A different stderr shape from the
+		// checkout row just above, but the same reused kind (DirtyWorktree): both name "there is
+		// uncommitted work in the way", and the client already renders one remedy story for it.
+		return "DirtyWorktree", message
+	case strings.Contains(lower, "locked working tree"):
+		// G25 D15/probe M5: `worktree remove` on a locked worktree — "fatal: cannot remove a locked
+		// working tree, lock reason: <reason>". A dedicated kind, not folded into LockHeld (which
+		// means "another git process holds index.lock" — an entirely different remedy: LockHeld says
+		// wait/retry, WorktreeLocked says unlock the worktree first).
+		return "WorktreeLocked", message
 	case strings.Contains(lower, "cannot switch branch while") ||
 		(strings.Contains(lower, "there is no") && strings.Contains(lower, "in progress")):
 		// Probe P5.
