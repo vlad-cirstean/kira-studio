@@ -763,12 +763,15 @@ function retryBootstrap(): void {
   });
 }
 
-// `docs/plans/P11.md` W7: the four search fields below are carried through unchanged by every
-// write this file makes (the `watch` callback spreads `...lastPersisted`, and a successful
-// `viewState.read()` at boot replaces this whole literal with the persisted one) — `App.vue`'s
-// own reactive wiring to `SearchState` is W14's, not W7's; until then these four simply hold
-// their default/persisted value across every other field's write, exactly like `fileListMode`
-// did between P5 W11 (when it was added here) and P5 W12 (when `DetailPane` started driving it).
+// `docs/plans/P11.md` W7 / `docs/plans/G23-search.md` D12/F11: the four search toggles/scope
+// below round-trip through every write this file makes (the `watch` callback spreads
+// `...lastPersisted`, and a successful `viewState.read()` at boot replaces this whole literal
+// with the persisted one), AND are now reactively wired to `searchState` — read into it once
+// persisted state is available (`bootstrap()`'s own `if (persisted)` block) and fed back by the
+// same persistence `watch` every other field goes through, exactly like `fileListMode` and
+// `DetailPane` before it (P5 W11/W12). The query TEXT itself is deliberately never persisted
+// (judgment call 7) — a remembered term silently re-running against a repository that has moved
+// on is the same stale-state argument the diff/selected-file omission already made.
 let lastPersisted: PersistedViewState = {
   version: 5,
   repoId: null,
@@ -810,6 +813,14 @@ async function bootstrap(): Promise<void> {
     detailWidth.value = persisted.detailWidth;
     initialScrollRow.value = persisted.scrollRow;
     detailState.setListMode(persisted.fileListMode);
+    // G23 D12/F11: the four search toggles/scope are carried through unchanged since P11 W7
+    // (this file's own comment above `lastPersisted`'s literal), but nothing read them into
+    // `searchState` until now. The query TEXT itself is deliberately never persisted (judgment
+    // call 7) -- only the widget state, same as `dateFormat`.
+    searchState.caseSensitive.value = persisted.searchCaseSensitive;
+    searchState.wholeWord.value = persisted.searchWholeWord;
+    searchState.regex.value = persisted.searchRegex;
+    searchState.scope.value = persisted.searchScope;
 
     // §6.3's "collapsed by default" below `wide`: a persisted `detailOpen: true` from an earlier,
     // wider session must not reopen the pane/drawer over a mount that starts narrower — without
@@ -865,8 +876,26 @@ async function bootstrap(): Promise<void> {
       dateFormat,
       detailWidth,
       detailState.listMode,
+      searchState.caseSensitive,
+      searchState.wholeWord,
+      searchState.regex,
+      searchState.scope,
     ],
-    ([repoId, loadedRows, isDetailOpen, row, selectedSha, widths, format, dWidth, listMode]) => {
+    ([
+      repoId,
+      loadedRows,
+      isDetailOpen,
+      row,
+      selectedSha,
+      widths,
+      format,
+      dWidth,
+      listMode,
+      searchCaseSensitive,
+      searchWholeWord,
+      searchRegex,
+      searchScope,
+    ]) => {
       lastPersisted = {
         ...lastPersisted,
         repoId,
@@ -878,6 +907,10 @@ async function bootstrap(): Promise<void> {
         dateFormat: format,
         detailWidth: dWidth,
         fileListMode: listMode,
+        searchCaseSensitive,
+        searchWholeWord,
+        searchRegex,
+        searchScope,
       };
       props.viewState.write(lastPersisted);
     },

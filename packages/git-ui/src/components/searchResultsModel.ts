@@ -49,6 +49,11 @@ export interface SearchResultsModel {
    *  a cursor), so this is disclosure, not an invitation to load more — narrowing the query is
    *  the only way to see a hit past the cap. */
   readonly tailFooter: string | undefined;
+  /** G23 D6: set only for `tail?.kind === 'unsupportedPattern'` — the one tail outcome that is
+   *  neither silence nor a smaller `ok`. The loaded-commit half is unaffected and still complete;
+   *  this notice is what tells a user why a `regex`-mode pattern's tail (and therefore any
+   *  body-only match) is missing. */
+  readonly tailNotice: string | undefined;
 }
 
 /** A hit's own field list, rendered as one short label — "matched: body", "matched: sha" — for
@@ -138,11 +143,13 @@ export function buildSearchResultsModel(input: SearchResultsInput): SearchResult
     tail?.kind === 'ok' && tail.truncated
       ? `${tail.total - tail.hits.length} more match${tail.total - tail.hits.length === 1 ? '' : 'es'} in history`
       : undefined;
+  const tailNotice = tail?.kind === 'unsupportedPattern' ? tail.message : undefined;
 
   return {
     sections,
     flatOptions: sections.flatMap((section) => section.options),
     loadedFooter,
     tailFooter,
+    tailNotice,
   };
 }

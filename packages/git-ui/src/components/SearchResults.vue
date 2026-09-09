@@ -133,6 +133,9 @@ onMounted(() => void reposition());
     </div>
     <div v-if="model.loadedFooter" class="kv-search-footer">{{ model.loadedFooter }}</div>
     <div v-if="model.tailFooter" class="kv-search-footer">{{ model.tailFooter }}</div>
+    <div v-if="model.tailNotice" class="kv-search-footer" data-testid="search-tail-notice">
+      {{ model.tailNotice }}
+    </div>
     <KuiButton
       v-if="showBodySearchAffordance"
       class="kv-search-body-button"

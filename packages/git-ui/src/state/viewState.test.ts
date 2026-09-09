@@ -88,6 +88,21 @@ describe('parsePersistedViewState — G21 D5/D6a version 4 -> 5', () => {
     store.setRaw(v4Blob());
     expect(store.read()).toBeNull();
   });
+
+  // G23 D12/F11: the four search toggles/scope round-trip like every other field — a v5 blob
+  // with non-default values for all four survives read() back unchanged.
+  test('a v5 blob with non-default search toggles/scope round-trips exactly', () => {
+    const blob = v5Blob({
+      searchCaseSensitive: true,
+      searchWholeWord: true,
+      searchRegex: true,
+      searchScope: 'refs',
+    });
+    expect(parsePersistedViewState(blob)).toEqual(blob);
+    const store = new InMemoryViewStateStore();
+    store.write(blob);
+    expect(store.read()).toEqual(blob);
+  });
 });
 
 describe('DEFAULT_COLUMN_WIDTHS — G21 D5', () => {

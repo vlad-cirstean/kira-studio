@@ -275,8 +275,14 @@ export class SearchState {
       // (OQ1) does not itself make this inexact — that skip's own premise is "the store already
       // is the whole rev set" — but a tail that ran and was capped or time-boxed does.
       const loadedExact = loaded === undefined || loaded.complete;
+      // G23 D6: an `unsupportedPattern` tail is NOT exact — it is silent about the whole
+      // not-yet-walked tail (and therefore any body-only match), unlike `invalidPattern`, which
+      // the client never sends a request for in the first place (compileQuery already refused
+      // it, so there is nothing the tail could have missed).
       const tailExact =
-        tail === undefined || tail.kind !== 'ok' || (!tail.truncated && tail.complete);
+        tail === undefined ||
+        tail.kind === 'invalidPattern' ||
+        (tail.kind === 'ok' && !tail.truncated && tail.complete);
       return { n, exact: loadedExact && tailExact };
     });
     this.activeHit = computed(() => this.commitHits.value[this.activeIndex.value]);
