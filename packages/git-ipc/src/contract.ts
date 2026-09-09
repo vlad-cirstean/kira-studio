@@ -608,6 +608,15 @@ export interface WorktreePrepareResult {
 // implementation — `packages/git-ui/src/components/stackListModel.ts` is a pure presentation
 // layer over whatever `stack.list`/`preflight.restack` already returned, never a second
 // classifier.
+//
+// These nine types ARE structural copies of `internal/gitpreflight/stack.go`'s wire types
+// (`StackBranch`/`StackSummary`/`RestackPreflight`) and `internal/gitsession/stack.go`'s
+// (`RestackResult`/`RestackProgress`) — kept honest by hand (this repo carries no
+// `wireConformance.test.ts`; see G24's own commit message for why) rather than by the plan's
+// own `apps/kira-studio-vscode/tests/unit/ipc/wireConformance.test.ts` (G26 plan §4.24), which
+// does not exist here for the same reason G24's equivalent copy doesn't: `test:unit`'s own
+// `bun test` invocation (root `package.json`) globs `apps/kira-studio-vscode/src`, never
+// `apps/kira-studio-vscode/tests` — a file there would never run.
 // ---------------------------------------------------------------------------------------
 
 export type StackBranchState = 'upToDate' | 'needsRestack' | 'parentMissing';
