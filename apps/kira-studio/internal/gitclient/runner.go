@@ -89,6 +89,13 @@ const stderrTruncationMarker = "\n…[stderr truncated]"
 // configOverrides are `-c` overrides applied to every spawn, first in argv, ahead of the caller's
 // own subcommand (G2 plan D2):
 //   - core.quotepath=false — non-ASCII paths as UTF-8 bytes, not octal escapes.
+//   - core.precomposeunicode=true — G27 D3: makes git precompose the names it reads from
+//     `readdir` (the only place git's own output can disagree with itself about a repository-
+//     relative path, G27 F3), so `status`'s untracked/ignored entries agree with the index/tree
+//     inside one command's output. This is a restatement of the value git itself writes into
+//     `.git/config` at `init`/`clone` on macOS for essentially every repository (G27 M3), and is
+//     accepted without error by a git built without PRECOMPOSE_UNICODE support (G27 P2), so it is
+//     safe on every platform this app runs on.
 //   - color.ui=false — a user's color.ui=always must not inject ANSI escapes into output this
 //     app parses.
 //   - log.showSignature=false — nor log.showSignature=true inject PGP blocks into `git log`'s
@@ -97,6 +104,7 @@ const stderrTruncationMarker = "\n…[stderr truncated]"
 //     configured (and possibly unset) one.
 var configOverrides = []string{
 	"-c", "core.quotepath=false",
+	"-c", "core.precomposeunicode=true", // G27 D3
 	"-c", "color.ui=false",
 	"-c", "log.showSignature=false",
 	"-c", "i18n.logOutputEncoding=UTF-8",

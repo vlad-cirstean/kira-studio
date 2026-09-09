@@ -41,6 +41,7 @@ func TestBuildArgv_ConfigOverridesThenNoPagerFirst(t *testing.T) {
 	got := buildArgv(Spec{Args: []string{"status"}})
 	want := []string{
 		"-c", "core.quotepath=false",
+		"-c", "core.precomposeunicode=true",
 		"-c", "color.ui=false",
 		"-c", "log.showSignature=false",
 		"-c", "i18n.logOutputEncoding=UTF-8",
@@ -56,6 +57,7 @@ func TestBuildArgv_ReadOnlyAddsNoOptionalLocks(t *testing.T) {
 	got := buildArgv(Spec{Args: []string{"log"}, ReadOnly: true})
 	want := []string{
 		"-c", "core.quotepath=false",
+		"-c", "core.precomposeunicode=true",
 		"-c", "color.ui=false",
 		"-c", "log.showSignature=false",
 		"-c", "i18n.logOutputEncoding=UTF-8",
