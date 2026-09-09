@@ -59,18 +59,41 @@ func realExecutable() (string, error)           { return os.Executable() }
 func realLookPath(name string) (string, error)  { return exec.LookPath(name) }
 func realStat(path string) (os.FileInfo, error) { return os.Stat(path) }
 
+// killGroup signals pid's whole process group (the negative pid targets the group, D3's own
+// convention in gitclient/runner.go/gitprepare/runner.go/ghclient/runner.go) — ESRCH (already
+// gone) is not an error, every other Kill failure is.
+func killGroup(pid int, sig syscall.Signal) error {
+	if err := syscall.Kill(-pid, sig); err != nil && !errors.Is(err, syscall.ESRCH) {
+		return err
+	}
+	return nil
+}
+
 // realRun is D13's argv-only spawn: os/exec never interprets args, so a `.vsix` path containing a
 // space (the app's own executable is literally "Contents/MacOS/Kira Studio", space included) is
 // passed as one argument by construction — no sh, no -c, no string command line, no
 // interpolation. Setpgid (not Setsid) matches gitclient/runner.go's own choice for a short-lived,
 // non-interactive spawn: a group signal reaches a stray grandchild without detaching from the
 // caller's own session.
+//
+// cmd.Cancel overrides exec.CommandContext's own default (an immediate, ungraceful
+// Process.Kill() of the DIRECT CHILD ONLY) with the same group SIGTERM-then-SIGKILL sequence
+// every other spawn in this codebase uses (G30 round-1 architecture/security review, finding #7):
+// without it, a `code --install-extension` that forks something long-lived left the grandchild
+// running and this call blocked on the inherited stderr pipe past spawnTimeout — exactly the F3
+// failure gitclient/runner.go's own doc comment defends against, but this package's copy of the
+// same primitive had drifted to not actually install the override.
 func realRun(ctx context.Context, path string, args []string) error {
 	cmd := exec.CommandContext(ctx, path, args...)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	// Unmodified: `code`/`open` need the user's own HOME/PATH to find their own install, unlike a
 	// git spawn this app has already located and can run against a scrubbed environment.
 	cmd.Env = os.Environ()
+	cmd.Cancel = func() error {
+		_ = killGroup(cmd.Process.Pid, syscall.SIGTERM)
+		time.AfterFunc(gracefulStopDelay, func() { _ = killGroup(cmd.Process.Pid, syscall.SIGKILL) })
+		return nil
+	}
 	cmd.WaitDelay = gracefulStopDelay
 
 	var stderr bytes.Buffer
