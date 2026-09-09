@@ -346,6 +346,10 @@ function copyMessage(): void {
   color: var(--kv-focus-border);
 }
 
+/* Deliberately not a standard control's box: "Show more"/"Show less" reads as an inline link
+   (the same --kv-focus-border blue .kv-meta-body a uses just above), zero-padding and borderless
+   by design rather than left over from before the button system existed — no button variant
+   models a link, and inventing one for this single caller would be speculative generality. */
 .kv-meta-body-toggle {
   margin-top: var(--kv-s-1);
   background: transparent;

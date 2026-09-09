@@ -78,24 +78,14 @@ async function openCandidate(candidate: RepoCandidate): Promise<void> {
   width: 100%;
 }
 
+/* G34: box geometry (padding/border/border-radius) no longer re-declared here — the default
+   `KuiButton` box is this shape now; only the full-width-list-item layout survives. */
 .kv-no-repo-candidate {
   width: 100%;
-  padding: var(--kv-s-2) var(--kv-s-4);
-  border: 1px solid var(--kv-panel-border);
-  border-radius: var(--kv-radius-sm);
-  background: transparent;
-  color: var(--kv-app-fg);
-  font-family: inherit;
-  font-size: inherit;
   text-align: left;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  cursor: pointer;
-}
-
-.kv-no-repo-candidate:hover {
-  background-color: var(--kv-row-hover-bg);
 }
 
 .kv-no-repo-note {

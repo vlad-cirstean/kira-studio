@@ -1152,27 +1152,10 @@ watch(
   flex-shrink: 0;
 }
 
-/* G12 D16: Load more stays text (its label carries a count) — .p-btn's own geometry, per D14. */
-.kv-review-load-more-button {
-  height: var(--kv-control-h);
-  padding: 0 var(--kv-s-3);
-  border: var(--kv-border-width) solid var(--kv-panel-border);
-  border-radius: var(--kv-radius-sm);
-  background: transparent;
-  color: var(--kv-app-fg);
-  font-family: var(--kv-font-ui);
-  font-size: var(--kv-t-sm);
-  cursor: pointer;
-}
-
-.kv-review-load-more-button:hover:not(:disabled) {
-  background-color: var(--kv-row-hover-bg);
-}
-
-.kv-review-load-more-button:disabled {
-  cursor: default;
-  opacity: 0.7;
-}
+/* G12 D16: Load more stays text (its label carries a count) — .p-btn's own geometry, per D14.
+   G34: the box this comment already claimed is now actually true — the local re-declaration
+   (height/padding/border/border-radius, with a border `.kui-button` never draws at rest) is
+   gone, found by the phase's own exit-criteria sweep for this class of leftover. */
 
 /* G21 D11: FileTree.vue's row geometry, font roles and status-letter mono font used to be
  * restyled from here, under the .kv-skin-kira ancestor, because the graph panel's tree had to

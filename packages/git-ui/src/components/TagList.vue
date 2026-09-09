@@ -88,7 +88,7 @@ async function onRefMenuSelect(id: string): Promise<void> {
   <div class="kv-branch-section" aria-label="Tags">
     <div class="kv-branch-section-title">Tags</div>
     <div v-for="row in section.visible" :key="row.refname" class="kv-branch-row">
-      <KuiButton class="kv-branch-row-main" @click="checkout(row)">
+      <KuiButton class="kui-row kv-branch-row-main" @click="checkout(row)">
         <span
           class="codicon codicon-tag"
           :class="{ 'kv-tag-lightweight': !row.annotation }"

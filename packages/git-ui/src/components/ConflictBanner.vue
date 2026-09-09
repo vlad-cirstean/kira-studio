@@ -96,7 +96,6 @@ const PATH_DISPLAY_CAP = 20;
 
       <KuiButton
         v-if="resolveConflictEnabled"
-        class="kv-conflict-banner-button"
         :disabled="inProgress.unmergedCount === 0 || busyAction !== undefined"
         @click="onResolve"
       >
@@ -104,7 +103,6 @@ const PATH_DISPLAY_CAP = 20;
       </KuiButton>
       <KuiButton
         v-if="inProgress.canContinue"
-        class="kv-conflict-banner-button"
         :disabled="inProgress.unmergedCount > 0 || busyAction !== undefined"
         :aria-describedby="inProgress.unmergedCount > 0 ? CONTINUE_REASON_ID : undefined"
         @click="onContinue"
@@ -113,7 +111,6 @@ const PATH_DISPLAY_CAP = 20;
       </KuiButton>
       <KuiButton
         v-if="inProgress.canSkip"
-        class="kv-conflict-banner-button"
         :disabled="busyAction !== undefined"
         @click="onSkip"
       >
@@ -122,7 +119,6 @@ const PATH_DISPLAY_CAP = 20;
       <KuiButton
         v-if="inProgress.canAbort"
         variant="danger"
-        class="kv-conflict-banner-button"
         :disabled="busyAction !== undefined"
         @click="onAbort"
       >
@@ -191,23 +187,9 @@ const PATH_DISPLAY_CAP = 20;
   flex: 1;
 }
 
-.kv-conflict-banner-button {
-  padding: var(--kv-s-1) var(--kv-s-2);
-  background: transparent;
-  color: var(--kv-app-fg);
-  border: 1px solid var(--kv-panel-border);
-  border-radius: var(--kv-radius-sm);
-  cursor: pointer;
-}
-
-.kv-conflict-banner-button:hover:not(:disabled) {
-  background-color: var(--kv-row-hover-bg);
-}
-
-.kv-conflict-banner-button:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
+/* G34: `.kv-conflict-banner-button` is gone — it re-declared a `KuiButton`'s own box (F9's class
+   of defect in the G34 plan, found by its own exit-criteria sweep rather than its file-by-file
+   table); the default `KuiButton` box, `variant="danger"` for Abort, is this shape already. */
 
 .kv-conflict-banner-reason {
   margin: var(--kv-s-1) 0 0;
