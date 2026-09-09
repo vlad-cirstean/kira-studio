@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitops"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitpreflight"
 )
 
@@ -153,6 +154,235 @@ func TestRunOp_StashPopConflict_Reclassifies(t *testing.T) {
 	}
 	if len(after) != 1 || after[0].Sha != stash.Sha {
 		t.Fatalf("stash list after a conflicting pop = %+v, want the same entry still present (kept, per probe 5)", after)
+	}
+}
+
+// initAutoStashRepo builds "main" and "target" diverging on the same tracked line of f.txt, and
+// "target" additionally adds a file ("new.txt") "main" does not have — the tracked and untracked
+// blocker fixtures every auto-stash test below builds on. Returns dir with "main" checked out and
+// nothing dirty yet; each test dirties main's own working tree the way it needs.
+func initAutoStashRepo(t *testing.T) (dir string) {
+	t.Helper()
+	dir = t.TempDir()
+	runGitQ(t, dir, "init", "-q", "-b", "main")
+	if err := os.WriteFile(filepath.Join(dir, "f.txt"), []byte("line1\nline2\n"), 0o644); err != nil {
+		t.Fatalf("write f.txt: %v", err)
+	}
+	runGitQ(t, dir, "add", "f.txt")
+	runGitQ(t, dir, "commit", "-q", "-m", "base")
+	runGitQ(t, dir, "checkout", "-q", "-b", "target")
+	if err := os.WriteFile(filepath.Join(dir, "f.txt"), []byte("line1\nTARGET\n"), 0o644); err != nil {
+		t.Fatalf("write f.txt (target): %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "new.txt"), []byte("target's own file\n"), 0o644); err != nil {
+		t.Fatalf("write new.txt (target): %v", err)
+	}
+	runGitQ(t, dir, "add", "f.txt", "new.txt")
+	runGitQ(t, dir, "commit", "-q", "-m", "target change")
+	runGitQ(t, dir, "checkout", "-q", "main")
+	return dir
+}
+
+// TestPrepareCheckout_AutoStash_DirtyProducesStashThenSwitch is D3's own central proof: a tracked
+// dirty file that the target checkout would rewrite produces EXACTLY [stash push, switch] in that
+// order — the argv sequence that lets RunOp's single e.Repo.Write chain never leave a window where
+// the tree is stashed and the switch never happened (F6).
+func TestPrepareCheckout_AutoStash_DirtyProducesStashThenSwitch(t *testing.T) {
+	skipWithoutGitQueries(t)
+	dir := initAutoStashRepo(t)
+	if err := os.WriteFile(filepath.Join(dir, "f.txt"), []byte("line1\nDIRTY\n"), 0o644); err != nil {
+		t.Fatalf("write f.txt (dirty): %v", err)
+	}
+	entry := newQueriesTestEntry(t, dir)
+	ctx := context.Background()
+
+	prep, err := prepareCheckout(ctx, entry, ConnID("test-conn"), "test-label", OpRequest{
+		Kind: "checkout", Target: "target", Mode: "switch", AutoStash: true,
+	})
+	if err != nil {
+		t.Fatalf("prepareCheckout: %v", err)
+	}
+	if prep.earlyError != nil {
+		t.Fatalf("unexpected earlyError: %+v", prep.earlyError)
+	}
+	if len(prep.argvList) != 2 {
+		t.Fatalf("argvList = %v, want exactly 2 entries", prep.argvList)
+	}
+	if prep.argvList[0][0] != "stash" || prep.argvList[0][1] != "push" {
+		t.Fatalf("argvList[0] = %v, want a stash push argv", prep.argvList[0])
+	}
+	if prep.argvList[1][0] != "switch" {
+		t.Fatalf("argvList[1] = %v, want a switch argv", prep.argvList[1])
+	}
+	// Tracked-only dirt: -u must NOT be present (D3 step 4).
+	for _, a := range prep.argvList[0] {
+		if a == "-u" {
+			t.Fatalf("argvList[0] = %v, must not include -u for a tracked-only dirty tree", prep.argvList[0])
+		}
+	}
+}
+
+// TestPrepareCheckout_AutoStash_CleanTreeOneArgv is D3 step 3's own proof: a clean tree omits the
+// stash argv entirely, rather than spawning `stash push` on nothing (probe P16: that prints "No
+// local changes to save" and creates no entry — a confusing no-op announcement).
+func TestPrepareCheckout_AutoStash_CleanTreeOneArgv(t *testing.T) {
+	skipWithoutGitQueries(t)
+	dir := initAutoStashRepo(t)
+	entry := newQueriesTestEntry(t, dir)
+	ctx := context.Background()
+
+	prep, err := prepareCheckout(ctx, entry, ConnID("test-conn"), "test-label", OpRequest{
+		Kind: "checkout", Target: "target", Mode: "switch", AutoStash: true,
+	})
+	if err != nil {
+		t.Fatalf("prepareCheckout: %v", err)
+	}
+	if prep.earlyError != nil {
+		t.Fatalf("unexpected earlyError: %+v", prep.earlyError)
+	}
+	if len(prep.argvList) != 1 {
+		t.Fatalf("argvList = %v, want exactly 1 entry (no stash argv on a clean tree)", prep.argvList)
+	}
+	if prep.argvList[0][0] != "switch" {
+		t.Fatalf("argvList[0] = %v, want a switch argv", prep.argvList[0])
+	}
+}
+
+// TestPrepareCheckout_AutoStash_UntrackedOnly_IncludesDashU proves D3 step 4's -u derivation: an
+// untracked-only dirty path that the target checkout would create sets includeUntracked, so the
+// stash argv carries -u.
+func TestPrepareCheckout_AutoStash_UntrackedOnly_IncludesDashU(t *testing.T) {
+	skipWithoutGitQueries(t)
+	dir := initAutoStashRepo(t)
+	if err := os.WriteFile(filepath.Join(dir, "new.txt"), []byte("main's own untracked collision\n"), 0o644); err != nil {
+		t.Fatalf("write new.txt: %v", err)
+	}
+	entry := newQueriesTestEntry(t, dir)
+	ctx := context.Background()
+
+	prep, err := prepareCheckout(ctx, entry, ConnID("test-conn"), "test-label", OpRequest{
+		Kind: "checkout", Target: "target", Mode: "switch", AutoStash: true,
+	})
+	if err != nil {
+		t.Fatalf("prepareCheckout: %v", err)
+	}
+	if len(prep.argvList) != 2 {
+		t.Fatalf("argvList = %v, want exactly 2 entries", prep.argvList)
+	}
+	found := false
+	for _, a := range prep.argvList[0] {
+		if a == "-u" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("argvList[0] = %v, want -u present for an untracked-only dirty tree", prep.argvList[0])
+	}
+}
+
+// TestPrepareCheckout_AutoStash_BothFlagsRefusedWithZeroSpawns is D3 step 1's own proof: AutoStash
+// and DiscardLocalChanges together refuse BEFORE any spawn at all — not merely before any WRITE.
+func TestPrepareCheckout_AutoStash_BothFlagsRefusedWithZeroSpawns(t *testing.T) {
+	skipWithoutGitQueries(t)
+	dir := initAutoStashRepo(t)
+	runner := newArgSpawnCountingRunner("stash", "switch", "status", "rev-parse", "diff", "for-each-ref")
+	entry := newStackTestEntryWithRunner(t, runner, dir)
+	ctx := context.Background()
+
+	// Reset counters after Open's own setup spawns -- only prepareCheckout's own spawns matter here.
+	for _, v := range []string{"stash", "switch", "status", "rev-parse", "diff", "for-each-ref"} {
+		runner.counts[v] = new(int32)
+	}
+
+	prep, err := prepareCheckout(ctx, entry, ConnID("test-conn"), "test-label", OpRequest{
+		Kind: "checkout", Target: "target", Mode: "switch", AutoStash: true, DiscardLocalChanges: true,
+	})
+	if err != nil {
+		t.Fatalf("prepareCheckout: %v", err)
+	}
+	if prep.earlyError == nil || prep.earlyError.Kind != "Unknown" {
+		t.Fatalf("earlyError = %+v, want Kind=Unknown", prep.earlyError)
+	}
+	if len(prep.argvList) != 0 {
+		t.Fatalf("argvList = %v, want none", prep.argvList)
+	}
+	for _, v := range []string{"stash", "switch", "status", "rev-parse", "diff", "for-each-ref"} {
+		if got := runner.count(v); got != 0 {
+			t.Fatalf("%s spawn count = %d, want 0 (refused before any spawn)", v, got)
+		}
+	}
+}
+
+// TestPrepareCheckout_AutoStash_InProgressRefusesWithNoArgv is D3 step 2/F15's own proof: an
+// in-progress operation refuses (host-side, re-checked fresh) before any WRITE argv is built —
+// probe P17's own reason: `stash push` mid-conflict fails with EMPTY stderr, which
+// ClassifyOpError could only ever call Unknown.
+func TestPrepareCheckout_AutoStash_InProgressRefusesWithNoArgv(t *testing.T) {
+	skipWithoutGitQueries(t)
+	dir := initMidMergeRepo(t)
+	entry := newQueriesTestEntry(t, dir)
+	ctx := context.Background()
+
+	prep, err := prepareCheckout(ctx, entry, ConnID("test-conn"), "test-label", OpRequest{
+		Kind: "checkout", Target: "other", Mode: "switch", AutoStash: true,
+	})
+	if err != nil {
+		t.Fatalf("prepareCheckout: %v", err)
+	}
+	if prep.earlyError == nil || prep.earlyError.Kind != "OperationInProgress" {
+		t.Fatalf("earlyError = %+v, want Kind=OperationInProgress", prep.earlyError)
+	}
+	if len(prep.argvList) != 0 {
+		t.Fatalf("argvList = %v, want none (no write argv built at all)", prep.argvList)
+	}
+}
+
+// TestRunOp_AutoStash_DoesNotPopBack is D1's own end-to-end proof, the single most important
+// semantic decision in this phase: after an auto-stashed switch, the stash entry is STILL in the
+// list (never popped), tagged with the ORIGIN branch (main), and the working tree is clean on the
+// new branch.
+func TestRunOp_AutoStash_DoesNotPopBack(t *testing.T) {
+	skipWithoutGitQueries(t)
+	dir := initAutoStashRepo(t)
+	if err := os.WriteFile(filepath.Join(dir, "f.txt"), []byte("line1\nDIRTY\n"), 0o644); err != nil {
+		t.Fatalf("write f.txt (dirty): %v", err)
+	}
+	entry := newQueriesTestEntry(t, dir)
+	ctx := context.Background()
+
+	result, err := entry.RunOp(ctx, ConnID("test-conn"), "test-label", OpRequest{
+		Kind: "checkout", Target: "target", Mode: "switch", AutoStash: true,
+	})
+	if err != nil {
+		t.Fatalf("RunOp: %v", err)
+	}
+	if !result.OK {
+		t.Fatalf("result.OK = false, want true: %+v", result.Error)
+	}
+	if result.Head.Kind != "branch" || result.Head.Name != "target" {
+		t.Fatalf("Head = %+v, want branch target", result.Head)
+	}
+
+	entries, err := entry.StashList(ctx)
+	if err != nil {
+		t.Fatalf("StashList: %v", err)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("got %d stash entries, want exactly 1 (never popped back, D1)", len(entries))
+	}
+	if entries[0].Branch == nil || *entries[0].Branch != "main" {
+		t.Fatalf("Branch = %v, want \"main\" (the ORIGIN branch, not the target)", entries[0].Branch)
+	}
+	if !strings.Contains(entries[0].Message, gitops.AutoStashMessagePrefix) {
+		t.Fatalf("Message = %q, want it to carry the auto-stash marker %q", entries[0].Message, gitops.AutoStashMessagePrefix)
+	}
+
+	statusResult, _, err := entry.statusAndInProgress(ctx)
+	if err != nil {
+		t.Fatalf("statusAndInProgress: %v", err)
+	}
+	if len(gitpreflight.DirtyPaths(statusResult)) != 0 {
+		t.Fatalf("working tree is not clean after the auto-stashed switch: %+v", statusResult)
 	}
 }
 

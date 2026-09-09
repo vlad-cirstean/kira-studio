@@ -28,6 +28,11 @@ type OpRequest struct {
 	Target              string `json:"target,omitempty"` // checkout, tagCreate
 	Mode                string `json:"mode,omitempty"`   // checkout: "switch" | "detach"
 	DiscardLocalChanges bool   `json:"discardLocalChanges,omitempty"`
+	// AutoStash is G28 D3's own checkout addition: prepend a whole-tree `stash push [-u]` tagged
+	// with the CURRENT branch, so the switch cannot be blocked by a dirty tree. Never popped back
+	// (D1). Mutually exclusive with DiscardLocalChanges — prepareCheckout refuses both at once
+	// rather than guessing which the caller meant.
+	AutoStash bool `json:"autoStash,omitempty"` // checkout
 
 	Name       string  `json:"name,omitempty"` // branchCreate/branchDelete/tagCreate/tagDelete
 	StartPoint string  `json:"startPoint,omitempty"`
@@ -136,8 +141,16 @@ type opSpec struct {
 // undo/slot.ts marks it undoable, not notUndoable like its four stash siblings —
 // captureStashDropUndo below is why); G22 adds reset/cherryPick, both undoable (D9).
 var opTable = map[string]opSpec{
+	// checkout: notUndoable, its reason widened at G28 D3 to name the auto-stash honestly — an
+	// auto-stashed switch leaves a clean tree on the new branch, and the reason text is the one
+	// place a user re-discovering this op later (via the undo-slot tooltip's own reason fallback)
+	// learns where their work went.
 	"checkout": {
-		Undo:    gitpreflight.UndoPolicy{Kind: gitpreflight.NotUndoable, Reason: "Switch back to the previous ref to undo this."},
+		Undo: gitpreflight.UndoPolicy{
+			Kind: gitpreflight.NotUndoable,
+			Reason: "Switch back to the previous ref to undo this. Auto-stashed changes stay in the stash list, " +
+				"tagged with the branch they came from.",
+		},
 		Prepare: prepareCheckout,
 	},
 	"branchCreate": {
@@ -252,7 +265,22 @@ var opTable = map[string]opSpec{
 	},
 }
 
+// prepareCheckout is checkout's own Prepare, widened at G28 D3 by the auto-stash arm: when
+// op.AutoStash is set, a whole-tree `stash push [-u]` argv is PREPENDED to the switch argv this
+// function already built, so both run in order under RunOp's own single e.Repo.Write chain (F6) —
+// there is no window in which the tree is stashed and the switch never happened. Never pops back
+// (D1) — the entry stays in the stash list, tagged with the CURRENT branch via git's own reflog-
+// subject convention, cross-branch apply (D5) is the deliberate, user-initiated recovery path.
 func prepareCheckout(ctx context.Context, e *RepoEntry, _ ConnID, _ string, op OpRequest) (prepared, error) {
+	// D3 step 1: refuse both at once, no write at all. Guessing which the user meant would be
+	// worse than asking again.
+	if op.AutoStash && op.DiscardLocalChanges {
+		return prepared{earlyError: &OpError{
+			Kind:    "Unknown",
+			Message: "Choose either discarding local changes or stashing them, not both.",
+		}}, nil
+	}
+
 	snapshot, err := e.refsSnapshot(ctx)
 	if err != nil {
 		return prepared{}, err
@@ -260,15 +288,61 @@ func prepareCheckout(ctx context.Context, e *RepoEntry, _ ConnID, _ string, op O
 	resolved := resolveCheckoutTarget(snapshot, op.Target)
 	discard := op.DiscardLocalChanges
 
-	willDetach := op.Mode == "detach" || resolved.Kind == "tag" || resolved.Kind == "sha"
-	if willDetach {
-		return prepared{argvList: [][]string{gitops.SwitchDetachArgs(resolved.Name, discard)}}, nil
-	}
-	if resolved.Kind == "remoteBranch" {
+	var switchArgv []string
+	switch {
+	case op.Mode == "detach" || resolved.Kind == "tag" || resolved.Kind == "sha":
+		switchArgv = gitops.SwitchDetachArgs(resolved.Name, discard)
+	case resolved.Kind == "remoteBranch":
 		branch := localNameForRemoteBranch(resolved.Name)
-		return prepared{argvList: [][]string{gitops.SwitchCreateTrackingArgs(branch, resolved.Name, discard)}}, nil
+		switchArgv = gitops.SwitchCreateTrackingArgs(branch, resolved.Name, discard)
+	default:
+		switchArgv = gitops.SwitchArgs(resolved.Name, discard)
 	}
-	return prepared{argvList: [][]string{gitops.SwitchArgs(resolved.Name, discard)}}, nil
+
+	if !op.AutoStash {
+		return prepared{argvList: [][]string{switchArgv}}, nil
+	}
+
+	// D3 step 2 (F15/probe P17): a host-side in-progress re-check BEFORE any argv is built —
+	// `stash push` during a conflicted merge exits non-zero with EMPTY stderr, which
+	// ClassifyOpError would misclassify as Unknown. A pre-flight is advice, not a lock; a dialog
+	// can sit open arbitrarily long between the pre-flight read and this write.
+	statusResult, inProgress, err := e.statusAndInProgress(ctx)
+	if err != nil {
+		return prepared{}, err
+	}
+	if inProgress != nil {
+		return prepared{earlyError: &OpError{
+			Kind:    "OperationInProgress",
+			Message: gitpreflight.DescribeInProgress(inProgress) + " is in progress — finish or abort it before switching.",
+		}}, nil
+	}
+
+	// D3 step 3: recompute dirtiness from THIS status read, never the client's claim — a stale
+	// pre-flight could otherwise stash a tree that has since gone clean (probe P16: `stash push` on
+	// a clean tree prints "No local changes to save" and creates no entry, which would be a
+	// confusing no-op announcement). Nothing dirty -> omit the stash argv entirely.
+	dirty := gitpreflight.DirtyPaths(statusResult)
+	if len(dirty) == 0 {
+		return prepared{argvList: [][]string{switchArgv}}, nil
+	}
+
+	// D3 step 4: derive -u server-side — the common case (tracked-only dirt) does not sweep
+	// untracked build output; the untracked-blocked case cannot block without it (F5).
+	includeUntracked := false
+	for _, d := range dirty {
+		if !d.Tracked {
+			includeUntracked = true
+			break
+		}
+	}
+
+	// D3 step 5: the message is tagged with the CURRENT branch by git's own reflog-subject
+	// convention ("On <currentBranch>: auto-stash: switching to <target>") — resolved.Name is the
+	// TARGET this switch is headed to, which is what belongs in the message text itself.
+	msg := gitops.AutoStashMessage(resolved.Name)
+	stashArgv := gitops.StashPushArgs(&msg, includeUntracked, false, nil)
+	return prepared{argvList: [][]string{stashArgv, switchArgv}}, nil
 }
 
 func prepareBranchCreate(_ context.Context, _ *RepoEntry, _ ConnID, _ string, op OpRequest) (prepared, error) {
