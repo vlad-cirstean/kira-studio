@@ -124,6 +124,8 @@ func (r *Router) ForConn(c *gitsession.Conn) Handlers {
 				return r.handlePreflightStashPop(ctx, c, params)
 			case "preflight.stashBranch":
 				return r.handlePreflightStashBranch(ctx, c, params)
+			case "globalStash.list":
+				return r.handleGlobalStashList(ctx, c, params)
 			case "op.run":
 				return r.handleOpRun(ctx, c, params)
 			case "undo.peek":

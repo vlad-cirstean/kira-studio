@@ -293,27 +293,41 @@ type StashListResult struct {
 	Entries []porcelain.StashEntry `json:"entries"`
 }
 
+// StashShowParams is stash.show's own request. G28 D17: Scope is optional — absent (or "stack")
+// resolves against the ordinary stack (unchanged wire shape for every pre-G28 caller); "global"
+// resolves against the bucket instead.
 type StashShowParams struct {
 	RepoID string `json:"repoId"`
 	SHA    string `json:"sha"`
+	Scope  string `json:"scope,omitempty"`
 }
 
 // PreflightStashPopParams is preflight.stashPop's own request. Index is accepted for wire-shape
 // fidelity with the contract but not otherwise used by the Go orchestration below: PreflightStashPop
-// re-resolves the entry fresh by sha (resolveStashEntry, gitsession/stash.go) and reads its own
-// CURRENT index off that fresh read — more correct than trusting a client-supplied index that may
-// already be stale by the time this request lands, the same race the sha itself guards against.
+// re-resolves the entry fresh by sha (resolveStashEntryScoped, gitsession/stash.go) and reads its
+// own CURRENT index off that fresh read — more correct than trusting a client-supplied index that
+// may already be stale by the time this request lands, the same race the sha itself guards
+// against. Scope: G28 D17, same optional "stack"/"global" shape as StashShowParams.
 type PreflightStashPopParams struct {
 	RepoID    string  `json:"repoId"`
 	SHA       string  `json:"sha"`
 	Index     int     `json:"index"`
 	TargetSHA *string `json:"targetSha,omitempty"`
+	Scope     string  `json:"scope,omitempty"`
 }
 
+// PreflightStashBranchParams is preflight.stashBranch's own request. Scope: G28 D17.
 type PreflightStashBranchParams struct {
 	RepoID string `json:"repoId"`
 	SHA    string `json:"sha"`
 	Branch string `json:"branch"`
+	Scope  string `json:"scope,omitempty"`
+}
+
+// GlobalStashListParams is globalStash.list's own request (G28 D9/D17) — one new request, the
+// bucket's own listing.
+type GlobalStashListParams struct {
+	RepoID string `json:"repoId"`
 }
 
 // ---------------------------------------------------------------------------------------
@@ -528,6 +542,11 @@ type RepoSettingsSnapshot struct {
 	// Get/SetPrepareScriptApproval methods, never through this snapshot's own get/set round-trip.
 	WorktreePrepareScript string `json:"kiraVersion.worktree.prepareScript"`
 	WorktreeBasePath      string `json:"kiraVersion.worktree.basePath"`
+	// CheckoutAutoStash is G28 D16/D17's own eleventh leaf: read CLIENT-SIDE ONLY (the server never
+	// consults it — the fail-safe direction, D16's own doc comment) to decide whether a blocked
+	// checkout is re-issued with autoStash:true or falls through to the old CheckoutDialog. Default
+	// true.
+	CheckoutAutoStash bool `json:"kiraVersion.checkout.autoStash"`
 }
 
 // RepoSettingsGetParams is repoSettings.get's own request.
@@ -549,6 +568,7 @@ type RepoSettingsPatchWire struct {
 	GithubEnabled         *bool     `json:"kiraVersion.github.enabled,omitempty"`
 	WorktreePrepareScript *string   `json:"kiraVersion.worktree.prepareScript,omitempty"`
 	WorktreeBasePath      *string   `json:"kiraVersion.worktree.basePath,omitempty"`
+	CheckoutAutoStash     *bool     `json:"kiraVersion.checkout.autoStash,omitempty"`
 }
 
 // RepoSettingsSetParams is repoSettings.set's own request.

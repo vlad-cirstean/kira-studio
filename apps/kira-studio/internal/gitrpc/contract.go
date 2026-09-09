@@ -86,7 +86,25 @@ package gitrpc
 // OpErrorKind (StackCycle — produced exclusively by stackSet, never by rebase itself, D5), and three
 // new UiActionKind members (restackStack, checkoutStackParent, checkoutStackChild). No new
 // capability, no new setting, no SQL migration (§8's own explicit non-goals for this phase).
-const ContractVersion = 29
+// G28 D17 (2026-09-09): 29 -> 30, for branch-scoped stash — auto-stash on checkout, cross-branch
+// apply, auto-detach on worktree conflict, and a durable global stash bucket. One new Go-served
+// request (globalStash.list -> {entries: StashEntry[]}, reusing StashListResult verbatim); three
+// requests widen their params with an optional scope ('stack'|'global', absent = 'stack') --
+// stash.show, preflight.stashPop, preflight.stashBranch; two new OpRequest kinds (globalStashSave,
+// globalStashRemove, D10/D11); one new OpRequest field (checkout.autoStash, D3); two new
+// CheckoutPreflight routes (autoStash, detachHere, D2) and one new WorktreeAddPreflight route
+// (detachHere, D7) — both additive to an existing string-array field, no new wire type; one new
+// OpErrorKind (NothingToStash); one new UiActionKind (saveGlobalStash); one new
+// RepoSettingsSnapshot leaf (kiraVersion.checkout.autoStash, boolean, default true, read
+// client-side only, D16). StashEntry itself widens by two fields (scope, ref; index's own doc
+// comment gains the -1 sentinel for a global entry) rather than forking a parallel
+// GlobalStashEntry type (D17's own closing argument) -- so, notably, ZERO new wire interfaces.
+// No SQL migration (kiraVersion.checkout.autoStash lives in the existing key-value
+// git_repo_settings table); no watcher change (refs/kira/** already falls under
+// commonDir/refs/**'s existing first classify rule); no new ClassifyOpError stderr row (every
+// failure this phase can produce is either already classified or refused host-side before git can
+// produce it).
+const ContractVersion = 30
 
 // Protocol is the handshake envelope's own version (SPEC §3.3's "protocol":1), distinct from
 // ContractVersion — it never changes unless the hello/ready exchange itself is redesigned.
