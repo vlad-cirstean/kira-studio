@@ -8,10 +8,11 @@ Docker in Claude Code's own sandbox, how to work around a proxy block, which env
 Linux box needs) belong in `AGENTS.md`, not here.
 
 The tree itself outranks this file — if they disagree, the tree is right and this file needs
-fixing, not the other way around. Where this file and `docs/v1/SPEC.md` disagree, this file is
-authoritative for behavior: SPEC.md is the record of what v1 was *specified* to be, phase by phase
-(§10), kept as originally written rather than corrected to match later reality — see
-`docs/v1/README.md` for what that folder is and isn't.
+fixing, not the other way around. Where this file and any chapter's `SPEC.md` disagree (`docs/v1/`,
+`docs/v1.1/`, `docs/v1.2/`, `docs/v1.3/`), **this file is authoritative for behavior**: each
+`SPEC.md` is the record of what that chapter was *specified* to be, phase by phase, kept as
+originally written rather than corrected to match later reality — see each chapter's own
+`README.md` for what those folders are and aren't.
 
 **Related documents:** [`docs/PERF.md`](PERF.md) (performance budgets and measured results),
 [`docs/PACKAGING.md`](PACKAGING.md) (macOS build and packaging verification),
@@ -40,6 +41,7 @@ authoritative for behavior: SPEC.md is the record of what v1 was *specified* to 
 | Data/console grid rendering (P22 Pass B cutover; P30 §3 extended it) | `slickgrid@5.20.0`'s core engine (MIT, `6pac/SlickGrid`), core `SlickGrid` class only — no `SlickDataView`, no plugin, no `slickgrid-vue` | **the only grid engine** — `views/grid/DataGrid.vue`, `GridRow.vue` and `__kiraGridEngine` are gone (P22 Pass B). `views/grid/SlickGridHost.vue` hosts a data tab (full parity: sort, editor, selection ranges, FK/PK nav, clipboard); `views/console/ConsoleSlickGrid.vue` hosts the query console's tabular results (P30 §3) over the same reusable layer, ~300 lines instead of a second 2000+-line host: `views/shared/slick/kiraSlickGrid.ts` (the tuned scroll/runway/chase mechanism, inherited unmodified), `views/shared/slick/dataSource.ts` (the `CustomDataView` bridge; its data-tab-specific half, `createDisplayValueExtractor`/`pendingRowClasses`, stays in `views/grid/slick/dataSource.ts`, which re-exports the rest), `views/shared/slick/slickTheme.css`, `views/shared/page/columns.ts` and `theme/cellClass.ts`. The console host has no selection-range model, sort, editor, context menu, clipboard, FK nav or persisted column widths — a console result has none of what those exist to serve. `@tanstack/vue-virtual` is no longer a dependency (P30 §3.6 C7) |
 | Outbound HTTP client (P2, body modes P3, request timeline P10) | plain `net/http` (`apps/kira-studio/internal/httpclient/`), **no client/retry/URL-parsing/multipart-builder dependency at all** | the same "no driver dependency" shape the ClickHouse adapter already established (below): one package-level `*http.Client`, a 30s timeout applied via `context.WithTimeout` rather than `Client.Timeout` (so the Stop button and a timeout abort an in-flight body read the same way), redirects followed and every hop recorded up to 10, TLS verification always on, `http.ProxyFromEnvironment`. Reachable only from Go — the webview's own `fetch` is never used (`docs/ARCHITECTURE.md`'s own "Go owns the network" invariant, below). P3 adds every body mode this app's request builder supports — none/raw/code/urlencoded/formdata/file (`internal/httpclient/body.go`) — over the same one dependency-free package: a two-pass `mime/multipart` writer computes an *exact* `Content-Length` from a fixed boundary's deterministic framing before streaming a single byte, so a form-data or binary send is never chunked and never guesses. P10 adds one `net/http/httptrace.ClientTrace`, stdlib, installed once per send: every redirect hop's own DNS/connect/TLS/wait/download phases, bucketed by the same `checkRedirect` that already threads `Response.Redirects` through (below) |
 | Outbound gRPC client (P11) | `google.golang.org/grpc` + `google.golang.org/protobuf` (`dynamicpb`/`protojson`/`protodesc`/`protoregistry`, grpc-go's own reflection client) + `bufbuild/protocompile`, all in `apps/kira-studio/internal/grpcclient/` — **no generated `.pb.go` code, no `protoc`/`buf` build step** | dynamic, schema-at-runtime: a method is discovered via server reflection or a supplied `.proto` (compiled by `protocompile`, the same compiler `buf` uses, with no codegen), then called through `dynamicpb`/`protojson` against a descriptor `grpc.NewClient` never needed ahead of time. Unary and server-streaming only — client- and bidi-streaming are out of scope. The largest single dependency this app has taken, **≈14.2 MB** of binary (measured `linux/amd64`, no flags) — the *same order* as `pgx` + `mongo-driver/v2` + both AWS SDK clients + `franz-go` combined (≈13.5 MB), in a binary that already links ten database adapters. Every descriptor source (a reflection round-trip, a compiled `.proto`) gets its **own** private `*protoregistry.Files` — never `protoregistry.GlobalFiles`, which panics outright on a duplicate file path, a realistic outcome for two users' `.proto` files both declaring the same `package` |
+| Git module transport (v1.3) | A Unix domain socket plus `internal/bridge/rpcstream`'s correlated-RPC-with-credits protocol — JSON control frames, FlatBuffers bulk payloads (`"KIG1"`) | The git module is **headless**: the backend is in this binary, the frontend is a separately-installed VS Code extension (`apps/kira-studio-vscode`) reached over `${KIRA_HOME}/git.sock`. **The transport itself took no new runtime dependency** — `net` and `encoding/json` plus the FlatBuffers runtimes P11 already put in the graph. What the module *did* add: `github.com/fsnotify/fsevents` (the darwin repo watcher, `darwin && cgo`, G9), `golang.org/x/text/unicode/norm` (NFC path normalization, G27), and `@vscode/vsce` as a build-time-only packager. See the Git module section below |
 
 Driver libraries — the best-maintained option per engine, **Go-native for all ten kinds as of P58e
 M9.3** (checkpoint C2): `jackc/pgx/v5` (postgres), `go-sql-driver/mysql` (mariadb/mysql, via a shared
@@ -600,6 +602,25 @@ grpc_call_history(id, item_id, tab_id, scope_key, called_at, target, method, str
                                                        -- row per *completed* call — unary or
                                                        -- streaming, cancelled-with-partial-
                                                        -- messages counts as completed (D11)
+git_clients(id, label, token_hash, token_salt, created_at, last_seen_at, revoked_at)
+                                                       -- G1; the paired VS Code editors' trust
+                                                       -- store. Only sha256(salt||token) is ever
+                                                       -- stored, never the plaintext. Revoke sets
+                                                       -- revoked_at; a re-pair clears it on the
+                                                       -- same row, so rows are never deleted.
+                                                       -- Timestamps are epoch-millisecond
+                                                       -- integers rather than this schema's usual
+                                                       -- ISO TEXT -- a new table with no prior
+                                                       -- rows anywhere to stay consistent with
+git_repo_settings(repo_id, key, value)                  -- G18; per-(repository, leaf) display
+                                                       -- settings, shaped like `settings`' own
+                                                       -- per-leaf-row pattern plus a repo_id
+                                                       -- column -- one row per leaf, never a blob
+                                                       -- per repository. repo_id = '' is the
+                                                       -- reserved "not scoped to any repository"
+                                                       -- sentinel (a real RepoID can never be
+                                                       -- empty), so the one non-per-repo key
+                                                       -- needs no schema change
 ```
 
 Migrations are forward-only numbered SQL files (`apps/kira-studio/internal/storage/migrations/`) applied on
@@ -785,6 +806,31 @@ wondering what still consumes it. The same judgement applies to `ui_layout`'s ow
 leaf: P8's `0002_p8_windows.sql` seeds the first `windows` row from it and then leaves the
 now-inert leaf row in place rather than deleting it.
 
+**A second SQLite file, `review.db`, deliberately not a table in `kira.db` (G11/G13).** The git
+module's incremental-review state lives in its own file under `${KIRA_HOME}`, because its lifecycle
+is nothing like the rest of the app's data: bulk blob content, and TTL purges that want to reclaim
+space aggressively without holding a lock on the main database while they do it. Construction is
+free — the file is neither created nor opened until the first request that actually needs one, so
+an instance that never serves a review request (including a second instance that lost the
+`git.sock.lock` flock) never creates the file and never starts its reaper. Four tables:
+`review_session`, one per `(repo_id, branch)` with `last_used_at` indexed because that is the
+reaper's entire query; `review_file`, one per reviewed path, carrying the reviewed-at sha, git's
+own blob oid, a `content_kind` of `text`/`binary`/`tooLarge`/`absent`, the *uncompressed* length,
+and for text the content itself stored `flate`-compressed as a `BLOB`; `review_range`, 1-based
+inclusive line ranges expressed in the **snapshot's** coordinates rather than the current file's;
+and `review_comment`, the flat file/line AI-comment list, anchored by both a commit sha and that
+path's blob oid at that commit. Sessions are purged after 14 days idle — returning after that
+window starts clean, by design rather than as an error case.
+
+**Why a content snapshot and not just a commit sha.** The trivial case — nothing rewritten since
+the last review — is `git merge-base --is-ancestor <lastReviewedSha> HEAD`; when that succeeds an
+ordinary `git diff` is exact and cheap, and the stored blob is never read at all. The case this
+storage exists for is a rebase, squash or amend: `<lastReviewedSha>` is no longer an ancestor of
+`HEAD`, or has ceased to exist, and git has nothing left to diff against. The slow path writes the
+stored content to a temp file, resolves current content through `cat-file`, and diffs the two with
+`git diff --no-index` — reusing `gitclient`'s own spawn discipline rather than hand-rolling a diff
+algorithm in Go for a case git already answers.
+
 **A gRPC request is a `protocol` on the existing `api_items` row, not a third `kind` (P11).**
 `kind` stays structural — `'folder'` vs. a leaf — and `protocol` says which document shape
 `request_json` holds for a leaf: `'http'` → `model.SavedRequest`, `'grpc'` → the new
@@ -839,8 +885,8 @@ SQLite connections reuse the same columns again, the same way: `database` holds 
 file path** on disk, and `host`/`port`/`username`/`password` are all unused — there is no server
 and no credential, only a file Kira opens.
 
-**Every table in `kira.db`, and the file itself, is growth-bounded (P23).** An audit of all
-nineteen tables against the SPEC row's "make sure nothing accumulates without any limit" found
+**Every table in `kira.db`, and the file itself, is growth-bounded (P23).** An audit of every table
+then existing (nineteen) against the SPEC row's "make sure nothing accumulates without any limit" found
 seventeen already bounded — most by a deliberate cap an earlier phase added, the rest because the
 table simply cannot grow from machinery (a closed key set, one row per user-created object, one row
 per live window). Two were genuinely unbounded, in the same way: a *count* cap existed, a *byte*
@@ -860,6 +906,8 @@ cap did not, and the column that can hold arbitrary user text had no ceiling at 
 | `api_response_history` | sends | 256 KiB/body, 30/scope, 128 MiB table, orphan sweep at launch |
 | `grpc_call_history` | calls | 64 KiB/msg, 100 msgs/entry, 30/scope, 32 MiB table, orphan sweep |
 | `op_log` | every DB operation | 30 days, 20,000 rows, **64 KiB command + 8 KiB error**, **32 MiB table** |
+| `git_clients` | pairings | one row per paired editor identity, ever; written only by an explicit human approval, never by machinery |
+| `git_repo_settings` | user action | a closed key set times the repositories a user has actually opened settings on |
 | the file itself | — | **`auto_vacuum=INCREMENTAL` on new databases + a startup `incremental_vacuum` above 16 MiB of freelist** |
 | `kira.db-wal` | one transaction | **`journal_size_limit` = 4 MiB** |
 | `logs/` | one file per day | 30 days by mtime (`logging.Sweep`) |
@@ -1769,8 +1817,10 @@ should be re-evaluated.
 
 ## Process model
 
-Two processes: the **webview** running the Vue renderer, and the **Go shell** that owns the window,
-all app state, and now every database driver too.
+Two processes for the Studio and Api modules: the **webview** running the Vue renderer, and the
+**Go shell** that owns the window, all app state, and now every database driver too. The git module
+adds a third that this app does not own — a separately-installed VS Code extension host, reached
+over a Unix socket rather than through either of the two planes below (see Git module, above).
 
 ```
 ┌──────────────────────┐
@@ -1938,14 +1988,21 @@ made a real candidate worth re-weighing, and adopted FlatBuffers:
   the measurements are `docs/v1.1/plans/P4-fe-be-data-transfer-protocol.md` (historical) and
   `docs/v1.1/plans/P11-flatbuffers-data-plane.md` (current).
 
-**The Go side is `apps/kira-studio/`.** `apps/kira-studio/main.go` builds the `application.New` options and registers
-fifteen bound services under `apps/kira-studio/internal/bridge/` — `AppService`, `SettingsService`,
-`LayoutService`, `TabsService`, `WindowsService` (P8: a page's own boot-time window registration,
-see Process model's multi-window subsection below), `ConnectionsService`, `TreeService`,
-`EngineService`, `OpsService`, `FiltersService`, `FilesService`, `QueriesService`, `SchemaService`
-(P18: per-connection DDL document store, backing `connection_ddl` and the DDL-driven SQL language
-service described below), `HttpService` (P2: `Send`, the outbound HTTP path — see the op-log
-paragraph below and Stack, above), `LifecycleService`. `EngineService.Status()` has
+**The Go side is `apps/kira-studio/`.** `apps/kira-studio/main.go` builds the `application.New`
+options and registers **twenty-two** bound services under `apps/kira-studio/internal/bridge/`.
+Thirteen are Studio's and the shell's — `AppService`, `SettingsService`, `LayoutService`,
+`TabsService`, `WindowsService` (P8: a page's own boot-time window registration, see Process
+model's multi-window subsection below), `ConnectionsService`, `TreeService`, `EngineService`,
+`OpsService`, `FiltersService`, `FilesService`, `QueriesService`, `SchemaService` (P18: the
+per-connection DDL document store backing `connection_ddl` and the DDL-driven SQL language service
+described below). Seven are the Api module's — `HttpService` (P2: `Send`, the outbound HTTP path —
+see the op-log paragraph below and Stack, above), `GrpcService` (P11), `CollectionsService` and
+`VariablesService` (P4/P5), `ResponseHistoryService` (P8), `GrpcHistoryService` (P11), and
+`DataGripService` (P25's connection import). One is the git module's — `GitClientsService`, the
+*Connected editors* pane's whole surface (list, revoke, install the bundled `.vsix`), and the only
+bound service the headless git module has, since everything else it does crosses its own socket
+rather than the bindings (see Git module, above). `LifecycleService` is the twenty-second.
+`EngineService.Status()` has
 zero renderer callers (the status pill reads the data-plane `ping` above, not this) but stays bound
 rather than deleted, since removing it would mean regenerating bindings and editing `control.ts` for
 no user-visible gain; it now reports unconditionally, since the engine is this process. Behind the
@@ -2053,6 +2110,334 @@ is not what any kind uses today: P11 replaced it with a FlatBuffers frame decode
 array views, landing at +0.01–1.7% over raw buffer bytes with no transient heap copy on decode at all
 (`docs/PERF.md` §2.7).
 
+## Git module (v1.3)
+
+The third top-level module, beside `studio` and `api`, and the one that runs **headless**: the git
+logic lives in this Go binary, and the frontend is a separately-installed VS Code extension
+connecting as an external client. Kira Studio's own Wails window has no git mode, no git tab and no
+git panel. Its only git-facing surfaces are the Settings dialog's *Connected editors* pane
+(pairing, revocation, extension install) and its *Git* section (the two server-owned remote-op
+settings below) — both there because Kira Studio is the trust authority and the owner of those
+settings, not because a git UI crept in.
+
+**Why headless, structurally.** An in-process Wails stream is unreachable from another process, and
+the frontend this module wanted already existed as a VS Code extension. So the module was cut at a
+transport seam instead of a UI one: `rpcstream`'s `Conn{Send([]byte) error; Receive() ([]byte,
+error)}` is the whole of what the protocol needs from a channel, so the same `Handlers` serve a
+Unix socket today and would serve an in-process Wails stream unchanged. An embedded git UI is out
+of scope and stays additive rather than a rework — the same "additive, not a rework" shape the
+`-tags server` build tag already gives the `studio` data plane.
+
+### Transport
+
+**One Unix domain socket at `${KIRA_HOME}/git.sock`** (default `~/.kira-studio/git.sock`), mode
+0600, inside the 0700 directory `config.EnsureLayout` already owns. There is **no discovery or
+announce mechanism**: the extension dials the fixed path, and a connection failure means Kira
+Studio isn't running — that is the entire signal, and there is nothing further to distinguish. This
+app is macOS-only, so a Unix socket is unconditionally viable with no cross-platform fallback.
+
+**Stale-socket recovery is an `flock`, not a liveness probe.** At startup the app takes an
+exclusive lock on `${KIRA_HOME}/git.sock.lock`. Lock acquired: any `git.sock` still on disk is a
+crash leftover — unlink it and listen. Lock already held: another instance is serving, and this one
+does not listen. Either way the app still boots; `main.go` logs the listener's error and never
+`Fatal`s on it. A `SIGKILL`ed instance's flock is released by the kernel, so the next launch
+recovers with no stale-pid file and no manual cleanup, and a leaked askpass directory needs no
+startup sweep because it is inert.
+
+**Pairing is the auth model, and there is no pre-shared token file.** A client's `hello` carries
+its identity and, if it has one, an opaque token; the server answers `ready`, `versionMismatch`,
+`tokenRejected`, or `pairingRequired`. An unrecognised or invalid token raises an approval prompt
+**in Kira Studio's own window** — Kira Studio is the trust authority, not the requesting editor —
+one prompt on screen at a time with concurrent requests queued and counted, a 120 s window per
+request measured from enqueue (a request arriving before any window exists is *held*, not
+auto-denied), and a 60 s cooldown after an explicit denial so a reconnecting extension cannot
+re-prompt in a loop. The approved token is 32 `crypto/rand` bytes; **only `sha256(salt‖token)` is
+stored**, compared with `subtle.ConstantTimeCompare`. The plaintext is never stored and never
+recoverable — not an omission, a consequence: verifying a presented token is the only thing this
+app ever needs to do with one, so a reversible form would be strictly more exposure for no
+capability. The extension keeps its own copy in VS Code's `context.secrets`. Revoking from the
+*Connected editors* pane sets `revoked_at` and closes every live connection holding that id; the
+extension receives `tokenRejected`, clears its stored token, and re-dials with none, producing a
+fresh prompt. A row is never deleted — a re-pair clears `revoked_at` on the same row, so a fresh
+human approval always re-admits.
+
+**Version compatibility is hard lockstep, negotiated in that same handshake.**
+`gitrpc.ContractVersion` and `packages/git-ipc/src/validate.ts`'s `CONTRACT_VERSION` are one number
+(**30** today), asserted equal by tests on both sides, and it is the *sole* compatibility
+authority — not the app version, not a side file. A mismatch is a blocking panel in the extension
+naming both versions, never a degraded mode: this app has no auto-update and the extension installs
+separately, so "run an older method set" has no honest meaning here.
+
+**Two frame shapes over that one socket — the same split the `studio` data plane already uses, not
+a second design.** Control frames (the whole `rpcstream` envelope, every request, and every small
+response) stay **JSON text**. Bulk payloads are **FlatBuffers**:
+`packages/git-ipc/schema/gitwire.fbs`, generated through the same pinned, digest-verified `flatc`
+toolchain and the same Go/npm runtimes `wire.fbs` already uses, with its own file identifier
+**`"KIG1"`** — deliberately distinct from the `studio` plane's `"KIF1"` so the two can never be
+cross-decoded. A frame not carrying `"KIG1"` is a hard error: no dual-format decoder, no
+compatibility shim, the same house rule P11 stated. The schema is deliberately small — one `Frame`
+wrapping a `Payload` union whose only member today is `PackedCommitChunk`: the graph's column-wise
+commit block (sha bytes, CSR parent offsets, an identity/time table, subject bytes plus offsets, a
+delta-numbered string dictionary, and per-row ref decorations). It is append-only — never renumber,
+never reorder, never delete a field; retire with `(deprecated)`. The file is named `gitwire.fbs`
+rather than `gitWire.fbs` because `flatc`'s TypeScript generator names its entry point after the
+filename and its barrel after the namespace, and two names differing only in case collide on a
+case-insensitive filesystem.
+
+**`internal/bridge/rpcstream` is module-agnostic infrastructure, and the one deliberate exception
+to the module-boundary rule.** It is a correlated-RPC-with-credits state machine —
+`req`/`res`/`evt`/`open`/`chunk`/`end`/`credit`/`cancel` in a versioned envelope, a
+delete-before-respond guard against a request racing its own cancellation, and an
+aborted-versus-real-error split on a stream's `end` — transcribed field-for-field from the
+TypeScript `rpc.ts` beside it, so its correctness is checkable by reading the two together rather
+than re-deriving the protocol. It never learns what a method means; that is entirely `Handlers`'
+job, which is what makes reuse by a second module free rather than a fork.
+
+### Session model
+
+A real, load-bearing requirement rather than a hypothetical: **several VS Code windows connect to
+one backend at once**, pointed at the same repository or at different ones. The structure follows
+one rule — *a fact about the repository is shared; a fact about one viewer's session is private* —
+which is the one genuine structural departure from a single-session design that conflates the two.
+
+```
+GitServer (internal/gitsock)
+├─ listener (accept loop over the Unix socket) + flock + pairing broker + trust store
+├─ Registry (internal/gitsession): map[RepoID]*RepoEntry — mutex + refcount
+│    RepoEntry — SHARED by every connection open on that repository
+│      reader/writer gate · git driver · cat-file --batch session · repo watcher
+│      detail / diff / refs / stack caches · live HEAD · undo slot · active remote op (<=1)
+│      subscribers: map[ConnID]chan Event
+└─ Conn (internal/gitsession): one per accepted socket
+     client identity · its own ctx · its own rpcstream session and Handlers
+     walks: map[RepoID]*Walk — PRIVATE per (connection, repository)
+       log session, commit store, dictionary marks, paging state, the active review walk
+```
+
+- **`RepoID` is the absolute git dir**, NFC-normalized (below), so two clients that reached the
+  same repository by different spellings of the same path share one entry rather than racing two.
+- **`Registry.Acquire(ctx, path) (*RepoEntry, release func())`** refcounts. Real teardown — kill
+  the `cat-file` pair, stop the watcher, drop the caches — happens only at zero, and only after a
+  five-minute linger, so closing and immediately reopening a repository costs nothing.
+- **The reader/writer gate is unchanged** from the single-client design; it now serializes across
+  connections instead of within one, which is the whole point of moving it onto the shared entry.
+- **One watcher per repository, fanned out.** It covers `HEAD`, `refs/**`, `packed-refs`, `index`,
+  `FETCH_HEAD`, `MERGE_HEAD`, `rebase-*`, `CHERRY_PICK_HEAD`, `REVERT_HEAD` and `sequencer` plus
+  the worktree, debounced 200 ms, delivered to each subscriber over its own coalescing buffered
+  channel so one slow client cannot stall the watcher for the others. **The darwin backend is
+  FSEvents** (`gitclient/watcher_fsevents_darwin.go`, `darwin && cgo`), with the `fsnotify`
+  implementation kept as the real `!darwin || !cgo` companion a Linux dev/test loop actually runs.
+  The reason is a resource bound, not a preference: `fsnotify`'s kqueue path needs one open file
+  descriptor per watched directory — every directory under `commonDir/refs` — which on a repository
+  with many loose refs is a real cost against `kern.maxfilesperproc`. FSEvents watches a tree
+  recursively through one event stream, which eliminates that cost structurally rather than
+  measuring how close it gets. This is the same choice VS Code (`@parcel/watcher`) and Zed (the
+  `notify` crate) make on macOS.
+- **A client disconnect never kills a write.** `rpcstream.Serve` returning on peer close already
+  cancels every in-flight request and stream for that connection; on top of that, the connection's
+  own log-session processes are killed and its `RepoEntry` refcounts released. A **write** already
+  in flight is instead *detached* from the connection and finishes on its own — its result is
+  simply delivered nowhere. A half-applied checkout because a window closed would be far worse than
+  a result nobody reads.
+- **The undo slot is one per repository**, not per connection, and names the originating client in
+  its own label, so a second window reads "Undo reset of `main` (window: repo-review)" rather than
+  an anonymous or misattributed action.
+- **Credential prompts go to the editor; pairing prompts stay in Kira Studio.** The split is
+  deliberate and the two questions are genuinely different: "what is the password for this one
+  push" is about an action the user just took in that window, while "should this window ever talk
+  to me at all" is a trust decision belonging to the trust authority. `internal/gitaskpass` brokers
+  the first over its own private socket behind a `GIT_ASKPASS` shim, relaying to the connection
+  that owns the in-flight remote op. If that connection dies mid-prompt the broker fails the
+  credential request non-zero rather than hanging, and the wait is bounded regardless — a git
+  process blocked forever on a prompt nobody will answer is the failure this design exists to make
+  impossible.
+
+**Settings ownership follows the same shared/private line, and it is a correctness question rather
+than a preference.** `protectedBranches`, `fetch.autoInterval` and `git.path` are **server-owned**
+— two windows disagreeing about a protected-branch list is a safety bug — and are edited in Kira
+Studio's own Settings dialog (*Git* section), read fresh on every push pre-flight and every
+auto-fetch tick, never cached. Every per-viewer display setting (graph page size and scope, stash
+visibility, and similar) is **per repository**, stored server-side in `git_repo_settings` (Storage,
+above) and edited from a dialog opened in the graph view itself. Neither category lives in VS
+Code's own configuration any more: the extension's manifest contributes **no configuration
+properties at all**.
+
+### Go packages
+
+Every git package is its own `internal/git*` (plus `internal/ghclient` and `internal/startupfail`),
+and no phase merged git code into a shared file where a per-module one would do.
+`internal/layering_test.go`'s `TestDomainPackagesDoNotImportBridge` covers them exactly as it
+covers the Studio and Api domain packages — no `internal/git*` package imports `internal/bridge`,
+and none imports or is imported by an adapter package.
+
+| Package | Owns |
+|---|---|
+| `gitclient` | Spawn discipline (argv-only, no shell, env hygiene, `-c core.quotepath=false`, `--no-optional-locks`, `Setpgid` plus group-kill on cancellation, a graceful `WaitDelay`), a streaming runner returning a live pipe rather than a buffered `[]byte`, discovery (macOS-only, a **git 2.38 floor**, an explicit Xcode Command-Line-Tools-shim gate so the shim is never spawned blind, a short TTL cache), the capability probe, the typed error vocabulary, and the per-repository reader/writer gate |
+| `gitclient/porcelain` | Framing and parsing for `log`, `for-each-ref`, `status --porcelain=v2`, `diff-tree`, `diff`, `stash list`, `merge-tree` and `cat-file --batch` — NUL and `%x1f` record splitting, against a committed golden-byte corpus rather than hand-written expectations |
+| `gitclient/catfile`, `gitclient/logsession` | The two persistent child processes: one `cat-file --batch` pair per repository, and the pausable/resumable paged log walk |
+| `gitpath` | The module's single Unicode-canonicalisation point (below) |
+| `gitstore` | The column-wise commit store, sha table, string interner and `PackedCommitChunk` builder. It only ever appends and packs — a parent's sha is stored directly and never resolved to a row, because resolving is a renderer concern |
+| `gitpreflight` | Hazard classification for checkout, stash pop, reset, revert, cherry-pick, push, pull, stash-branch, restack and worktree add/remove, plus the protected-branch glob matcher and the undo slot. Computed server-side and crossed as data — never duplicated client-side, so the two can't disagree |
+| `gitops` | The write side: branch, checkout, tag, revert, reset, cherry-pick, stash, fetch, push, pull, worktree, stack/restack, conflict handling, and stderr progress parsing |
+| `gitsearch` | The cancellable, time-boxed tail scan and the Go matcher, plus the RE2/`RegExp` dialect reconciliation (below) |
+| `gitreview` | `review.db`'s whole surface: compressed content snapshots, fast/slow-path diff selection, partial-review ranges, the flat AI-comment list, and the TTL reaper (Storage, above) |
+| `gitsession` | `Registry`, `RepoEntry`, `Conn`, `Walk` — the session model above. Imports `gitclient`, `gitpreflight`, `gitreview`, `ghclient` and stdlib only |
+| `gitrpc` | The method table (**46 methods**, `app.init` through `worktree.prepare`), `ContractVersion`, and the wire types |
+| `gitsock` | The Unix listener, length-prefixed framing, the handshake, the pairing broker, the trust store and stale-socket recovery |
+| `gitwire` | Generated FlatBuffers code for the git data plane |
+| `gitaskpass` | The credential broker and its `GIT_ASKPASS` shim, over its own private socket, with a bounded wait |
+| `gitprepare` | The worktree prepare script's execution seam — the one shell exception, below |
+| `gitvsix` | Locating the `.vsix` bundled inside a packaged `Kira Studio.app` and installing it via `code --install-extension`, or revealing it in Finder when `code` isn't on `PATH` |
+| `ghclient` | `gh` CLI discovery and spawn discipline mirroring `gitclient`'s own `Locator`/probe/TTL-cache shape, a `GhStatus` classification, and PR lookup through `gh api` |
+| `startupfail` | Native, pre-window failure alerts for every boot step (below) |
+| `bridge/rpcstream` | The correlated-RPC-with-credits protocol (above) — module-agnostic by design |
+| `bridge/gitclients.go` | `GitClientsService`, the bound Wails service behind the *Connected editors* pane |
+
+**One deliberate exception to argv-only spawning, and exactly one.** Every other spawn in this
+codebase hands a fixed argv straight to `os/exec` with no shell involved. `gitprepare` runs the
+user's own worktree prepare script *through* a shell, and its safety argument rests on a single
+property rather than on sanitisation: **no app-supplied value is ever interpolated into the command
+string.** The command string *is* the user's own typed, explicitly approved (sha256-pinned)
+command. App data — the worktree path, its branch, the repository root — reaches the script only as
+environment variable *values*, so even a maximally adversarial branch name can at worst be a
+word-splittable value, never re-parsed as a command. The package imports nothing beyond the
+standard library and knows nothing about repositories, sessions or approval; `gitsession` owns
+every policy decision and this package owns only the mechanism, which is what lets the whole
+feature be tested without ever spawning a real shell.
+
+**GitHub authentication is delegated entirely to `gh`, and this app holds no GitHub credential of
+any kind.** No OAuth flow, no token prompt, no direct call to GitHub's OAuth endpoints, and no
+reading of `gh`'s own keychain entry out from under it — PR lookups shell through `gh api`, under
+the same spawn discipline as every git call. Re-solving authentication here would be a second,
+worse implementation storing a second copy of a secret this app has no business holding. `GhStatus`
+is a discriminated union mirroring `GitStatus`'s existing shape: `ok`, `notFound` (install `gh`),
+`unauthenticated` (run `gh auth login`), and `forbidden` (a 403 from insufficient scope or
+unauthorized org SSO — named as the fix rather than shown as a raw HTTP status). None of these ever
+blocks git itself; they only blank the PR indicator, matching the fail-open design the feature's
+own enable flag already had.
+
+**Search reconciles Go's RE2 against JavaScript's `RegExp` explicitly rather than approximating
+it**, because the server-side tail scan and the client-side scan of already-loaded rows must agree
+exactly — otherwise a hit's presence depends on which page happens to be loaded, which is a bug the
+user can see and cannot explain. Three tiers, and the module never runs a second, silently
+different engine against the same query text:
+
+1. **Literal mode** runs no regex engine at all. A literal query is always a fixed, escaped needle,
+   so "the wrapped pattern matches" reduces to "some occurrence of the needle has an acceptable
+   word boundary on each side", computed by occurrence enumeration plus a byte-level boundary
+   post-check — byte-exact to JavaScript by construction, not by coincidence.
+2. **Regex mode** translates the rewritable constructs into RE2 (`.`, `\s`/`\S`, `\p`/`\P`,
+   `\uXXXX`/`\u{…}`, `\cA`-`\cZ`, a bare `\0`, an unknown identity escape), and applies whole-word
+   as a **consuming rewrite** rather than a post-check — a post-check disagrees with JavaScript's
+   own backtracking-into-a-different-alternative behaviour on a pattern like `foo|foobar`.
+3. **What RE2 genuinely cannot express** — lookahead, lookbehind, a numbered or named
+   backreference — is **refused as data** (`{kind: "unsupportedPattern"}`), never silently dropped
+   and never approximated.
+
+The Go matcher and `packages/git-core/src/search/` are twins, not duplicates, pinned by one shared
+corpus — `packages/git-core/testdata/searchConformance.json`, read by both languages' suites, so a
+semantic change adds a row there first and never edits one side alone. This is the same technique
+`internal/apivars/testdata/substitution.json` already uses for `{{name}}` substitution, applied to
+a second pair of implementations. **Two divergences are knowingly accepted and recorded rather than
+hidden**: regex-mode case folding is RE2's own `(?i)` rather than ECMA-262's `Canonicalize`, so the
+Kelvin-sign class of difference can in principle disagree in regex mode only (literal mode stays
+exact regardless of case sensitivity); and `\S` *inside* an already-open character class falls back
+to RE2's ASCII-only `\S`, since negating a sub-portion of an open class is not expressible by the
+insertion that the out-of-class form uses.
+
+**Unicode path normalization is provenance-based, and getting the direction wrong breaks git
+outright.** APFS returns filenames from the filesystem in NFD; git stores paths as whatever bytes
+the committer's platform produced, usually NFC. `internal/gitpath` is the module's one
+canonicalisation point — it exists because five otherwise-unrelated packages need the same one-line
+normalization and share no common import that wouldn't invert the layering. The rule is not "is
+this a path?" but "where did these bytes come from, and where are they going?":
+
+- **Tier 1 — absolute and directory paths** (`RepoID`, the root, git dir, common dir, worktree
+  directories, filesystem-event paths, every client-supplied directory parameter) are normalized to
+  **NFC at ingestion, always**. They are only ever map/registry/database keys, comparands, chdir
+  targets or `os.Stat` operands, and filesystem access by path is normalization-insensitive on both
+  APFS and HFS+, so this carries no functional risk at all.
+- **Tier 2 — repository-relative file paths** from porcelain output (`status`, `diff-tree`, `diff`,
+  `stash show`) are **never normalized**. Every one of them is handed back to git as a pathspec or
+  a `<rev>:<path>` operand, where git does a byte comparison against tree and index entries: an NFC
+  spelling of an NFD tree entry produces `fatal: path 'café.txt' does not exist in 'HEAD'`, or a
+  silently empty `git diff --name-only`, which is worse.
+
+`gitpath.NFC` is unguarded on purpose — `norm.NFC.String` already has its own fast path and
+measured faster than an `IsNormalString` guard in front of it — and is byte-transparent for invalid
+UTF-8, so it has no failure mode and returns no error.
+
+**This app's reserved ref namespace is `refs/kira/*`.** The reusable global stash lives at
+`refs/kira/globalstash/<sha>` — a real ref rather than a reflog entry, because git's own stash is a
+single ordered pop-once stack with no room for "keep this and reuse it". Every `refs/kira/` string
+in the codebase is built from one exported constant, and every revision set the graph walks passes
+`--exclude=refs/kira/*` unconditionally, so this app's own bookkeeping never shows up as commits in
+a user's graph.
+
+**Startup failures are surfaced natively, before any window exists.** Every pre-window `log.Fatalf`
+site in `main.go` — `config.EnsureLayout`, `logging.Init`, `storage.Open` (including its refusal to
+run against a `schema_version` newer than the binary knows), `repos.New`, the settings read, and
+window list/create — used to reach only a log file, with no window ever created and nothing shown:
+the app simply failed to launch, silently. `internal/startupfail` renders each as a native OS alert
+through an **argv-only `osascript` spawn**, the same discipline `gitvsix` uses for `code`. Wails'
+own dialog API is structurally unusable at these sites (it dispatches through `globalApplication`
+and `a.impl`, assigned inside `New()` and `Run()` respectively, so both are nil dereferences at
+boot). A cgo `NSAlert` shim was declined for a measured reason rather than a stylistic one: a
+pure-Go package cross-compiles and unit-tests for `darwin/arm64` from this repo's Linux dev
+container, while a cgo one cannot be compiled there at all — and for code whose entire purpose is
+to work on the one path nobody exercises interactively, "verifiable where the code is written" is
+not a nicety. `internal/gitreview`'s own equivalent refusal is deliberately *not* routed here: it
+fires mid-session inside an already-open window, as an RPC-level error, which is a different
+surface with a working answer already.
+
+### The extension and its packages
+
+`apps/kira-studio-vscode` is the whole frontend. It contributes a **Git Graph** webview in the
+panel and a **Kira Version** webview in the activity bar, **46 commands** (every mutating operation
+has one — the command-palette audit that established this happens once, and each later phase
+registers its own), SCM-title / editor-title / editor-context / comment-thread menus, keybindings
+and colors, and — as above — **no configuration properties**. It reaches Go through
+`packages/git-ipc`'s `socketChannel.ts`: `net.connect` plus length-prefixed framing behind the same
+`MessageChannelLike` seam a `webview.postMessage` channel satisfies, which is why swapping the
+transport was a channel change rather than a rewrite. A handful of host-capability calls — dialogs,
+clipboard, "open externally", editor integration, workspace roots, storage, logger, theme, windows,
+credential prompt — are answered **locally** by the extension's own ports rather than round-tripped
+to Go.
+
+| Package | Holds |
+|---|---|
+| `packages/git-ipc` | The shared vocabulary: `contract.ts`, `rpc.ts`, `transport.ts`, `codec.ts`, `validate.ts` (`CONTRACT_VERSION`), `socketChannel.ts`, `schema/gitwire.fbs` with its generated code, and `graphChunkCodec.ts` |
+| `packages/git-core` | Client-side domain logic: the commit store, the lane-layout graph worker, the client half of search, the wire model types, the settings schema, and the port interfaces the extension implements |
+| `packages/git-ui` | The webview UI itself — the graph panel, the review panel, the dialogs, the file tree — Vue, mounted by the extension in both webview roots |
+| `packages/kira-ui` | Host-agnostic Vue components (`KuiButton`, `KuiContextMenu`, `KuiDialog`, `KuiIconBox`, `KuiPopoverPanel`, `KuiSearchInput`, `KuiSegmented`, `KuiSelect`, `KuiTextInput`, `KuiTooltip`) plus the shared Floating-UI positioning, tooltip and modal-focus machinery — shared by the workbench and the git webviews so the two frontends stop diverging component by component |
+
+**Every viewport-anchored floating surface in both frontends goes through Floating UI's
+collision-aware middleware** (`flip`/`shift`/`size`), rendered teleported so no `overflow: hidden`
+ancestor can clip it. The audit that established this is stated per *mechanism*, not per module,
+because a first pass concluded one frontend was clear on the strength of its most common mechanism
+and missed a second: a native `title` attribute, a CodeMirror `hoverTooltip` (whose container
+defaults to the editor's own DOM node unless `parent: document.body` is set explicitly, and which
+carries its own hardcoded `z-index` uncoordinated with this app's `--kira-z-tooltip` token), and
+any bespoke click-point popup are each their own path. A module is not clear because one of its
+mechanisms is.
+
+**A webview panel can instantiate correctly and still be invisible, which is why the guard asserts
+pixels.** A shipped build once rendered the graph with a correct `aria-rowcount` while the panel
+was collapsed to roughly 75 px, because nothing in the emitted document or the bundled CSS ever
+gave `html`/`body`/`#app` a height, so the components' own `height: 100%` resolved to `auto`
+against an ancestor chain with none. `apps/kira-studio-vscode/tests/layout/` asserts **real
+rendered box height** via `getBoundingClientRect()` against the real emitted document and the real
+built bundle. DOM shape is exactly the kind of proxy that passes while the thing it stands for is
+broken, and this tier exists because that happened.
+
+**The extension ships in the DMG, not through a marketplace.** `bun run package:vscode` produces
+`kira-version.vsix`; the packaging task copies it to `Contents/Resources/kira-version.vsix` before
+the ad-hoc signature is applied, so the signature covers it; and the *Connected editors* pane's
+*Install VS Code Integration* button shells out to `code --install-extension <path>` — argv-only,
+matching every other spawn in this module — with a reveal-in-Finder fallback when the `code` CLI
+isn't on `PATH`. The filename carries no version: the version lives inside the manifest, where
+`code` reads it.
+
 ## Renderer security surface
 
 **This section is much shorter than it was, and that is the finding, not an omission.** Most of what
@@ -2126,10 +2511,12 @@ repo's CI runs.
 
 ## Testing
 
-Four suites, under `apps/kira-studio/tests/`: `unit/`, `ipc/`, `ui/`, `e2e-real/`, plus the Go suite
-in `apps/kira-studio/` (`bun run test:go`). `packages/db-fixtures/` is a shared fixture corpus, not
-a suite of its own (see below). `ipc/` is the odd one out among the four — it is two suites in one directory, a Go backend
-half and a Playwright frontend half per adapter, sharing one fixture module by design (P50, below).
+Four suites under `apps/kira-studio/tests/`: `unit/`, `ipc/`, `ui/`, `e2e-real/`; a fifth under
+`apps/kira-studio-vscode/tests/` for the git webviews; plus the Go suite in `apps/kira-studio/`
+(`bun run test:go`). `packages/db-fixtures/` is a shared fixture corpus, not a suite of its own
+(see below). `ipc/` is the odd one out among the first four — it is two suites in one directory, a
+Go backend half and a Playwright frontend half per adapter, sharing one fixture module by design
+(P50, below).
 
 **Isolation from the dev server.** The container-backed and UI suites run against their own
 `KIRA_HOME` and their own Testcontainers-provisioned databases, never the developer's real
@@ -2179,7 +2566,8 @@ on demand against each kind's version extremes: `scripts/db-compat.sh` (`bun run
 runs the identical conformance packages against every supported kind's oldest and newest server
 image, sixteen (kind, min|max) pairs, via `testsupport.ImageFor`'s env-var override, running every
 pair even after an earlier one fails. Its `workflow_dispatch` CI workflow is written and staged, not
-live (`AGENTS.md`'s Known open items). The version floor/ceiling this proves is also surfaced to the
+live — `docs/pending-workflows/test-matrix.yml`, staged rather than committed for the push-scope
+reason `AGENTS.md`'s own `.github/workflows/` section explains. The version floor/ceiling this proves is also surfaced to the
 user: `packages/shared/domain/connection.ts`'s `MIN_SERVER_VERSION` map, rendered per kind by
 `apps/kira-studio/frontend/src/project/ConnectionDialog.vue`.
 
@@ -2274,6 +2662,27 @@ proof that used to kill the Node engine child mid-session and assert every conne
 session** instead: a MariaDB and a Kafka connection are both opened, the page is reloaded, and both
 serve a real read afterward, since there is no child left to kill and the property worth proving now
 is that native adapters coexist cleanly within one process across a reload.
+
+**`apps/kira-studio-vscode/tests/`** (`bun run test:webview`) is the git module's own frontend tier
+— Playwright against the extension's real emitted webview documents and its real built bundle, in
+two projects, with no VS Code, no backend and no container. `layout` asserts **rendered box
+heights** rather than DOM shape, for a specific reason recorded in the Git module section above: a
+build once shipped a graph panel with a correct `aria-rowcount` while the panel was visually
+collapsed to roughly 75 px, and every existing check passed. `interaction` covers the graph
+columns, the file tree, the review panel and the shared Floating-UI geometry.
+
+**The git module's Go coverage needs no container, and one part of it is opt-in.** Every
+`internal/git*` package builds real repositories under `t.TempDir()` against the `git` on `PATH`
+and self-skips without one (the app's own 2.38 floor applies to the tests too, so an older `git`
+skips more than it runs). `gitclient/porcelain` is guarded by a committed **golden-byte corpus** —
+recorded real `git` output, the same pattern `internal/postman`'s round-trip tests use — because a
+porcelain parser is exactly the "several interacting rules" case this repo's own testing bar exists
+for. `gitsearch` is guarded by `packages/git-core/testdata/searchConformance.json`, read by both
+its Go suite and the TypeScript twin's. And the transport's perf probes (`TestGraphStreamPerf`,
+`TestG8PerfBaseline`, in `internal/gitsock/`) run only behind `KIRA_GIT_PERF=1` and **assert
+nothing** — they print one `key=value` line each. That is deliberate: a hard threshold in a suite
+that also runs on real macOS hardware would be flaky in exactly the way "re-measurement, not
+re-derivation" warns against. Their numbers are in `docs/PERF.md` §2.13.
 
 **Parallelism.** `playwright.config.ts` runs three projects, all `fullyParallel`. `ui` being fully
 parallel is a real change from the old `e2e` project's `workers: 1`, and it is earned rather than
