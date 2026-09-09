@@ -113,6 +113,49 @@ func TestPullsForBranch_ArgvGolden(t *testing.T) {
 	}
 }
 
+// G30 round-1 architecture/security review, finding #6: branch reached PullsForBranch's own query
+// value unescaped — "+", "%", "&", "#" are all legal in a real git ref, so an ordinary branch name
+// containing them silently corrupted the query (branch.resolvePr's own doc comment gives
+// "feature/a+b" as the concrete repro: decoded server-side as "feature/a b"). Proves each is now
+// percent-encoded in the argv gh itself receives.
+func TestPullsForBranch_EscapesSpecialCharsInBranchName(t *testing.T) {
+	runner := &recordingRunner{result: Result{ExitCode: 0, Stdout: []byte(`[]`)}}
+	c := testClient(t, runner)
+
+	if _, status := c.PullsForBranch(context.Background(), testRepo, "feature/a+b&c#d"); !status.OK() {
+		t.Fatalf("status = %+v, want ok", status)
+	}
+	want := []string{
+		"api", "--hostname", "github.com", "--method", "GET",
+		"-H", "Accept: application/vnd.github+json",
+		"-H", "X-GitHub-Api-Version: 2022-11-28",
+		"repos/o/r/pulls?head=o:feature%2Fa%2Bb%26c%23d&state=all&sort=updated&direction=desc&per_page=5",
+	}
+	if !reflect.DeepEqual(runner.lastArgs, want) {
+		t.Fatalf("argv = %#v, want %#v", runner.lastArgs, want)
+	}
+}
+
+// Same class of bug, PullsForCommit's own sha: a client-supplied sha containing "?"/"#"/"../"
+// could reshape the request path/query rather than simply 404ing.
+func TestPullsForCommit_EscapesSpecialCharsInSha(t *testing.T) {
+	runner := &recordingRunner{result: Result{ExitCode: 0, Stdout: []byte(`[]`)}}
+	c := testClient(t, runner)
+
+	if _, status := c.PullsForCommit(context.Background(), testRepo, "../etc/passwd?x=1"); !status.OK() {
+		t.Fatalf("status = %+v, want ok", status)
+	}
+	want := []string{
+		"api", "--hostname", "github.com", "--method", "GET",
+		"-H", "Accept: application/vnd.github+json",
+		"-H", "X-GitHub-Api-Version: 2022-11-28",
+		"repos/o/r/commits/..%2Fetc%2Fpasswd%3Fx=1/pulls?per_page=10",
+	}
+	if !reflect.DeepEqual(runner.lastArgs, want) {
+		t.Fatalf("argv = %#v, want %#v", runner.lastArgs, want)
+	}
+}
+
 func TestOpenPulls_ArgvGoldenAndEarlyStop(t *testing.T) {
 	runner := &recordingRunner{result: Result{ExitCode: 0, Stdout: readFixture(t, "open_pulls_page1.json")}}
 	c := testClient(t, runner)
