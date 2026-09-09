@@ -9,6 +9,13 @@
  *
  * One packed commit, timestamped at `dateFormat.ts`'s own `WIDEST_SAMPLE_TIMESTAMP` — so
  * `graph-columns.spec.ts`'s date-cell assertion exercises a real row rather than an empty grid.
+ *
+ * G-UX D10 (item 2): also answers `graph.refresh` (recording every call onto
+ * `window.__graphRefreshCalls`, in arrival order) and `graph.status` — the two requests
+ * `GraphViewState`'s own auto-refresh path makes after a `repo.changed`/`refsChanged` event
+ * (`#runLoad`'s request-then-resync shape) — and exposes `window.__emitRepoChanged(kind, repoId?)`,
+ * which dispatches a real, wire-correct `repo.changed` event frame so `graph-columns.spec.ts` can
+ * drive the auto-refresh path end to end without a real watcher or a real `git` process.
  */
 import type { PackedCommitChunk } from '@kira/git-ipc';
 import { CONTRACT_VERSION } from '@kira/git-ipc';
@@ -18,6 +25,7 @@ export const FAKE_REPO_ROOT = '/fake/repo';
 export const FAKE_REPO_ID = '/fake/repo';
 export const FAKE_SHA = '2222222222222222222222222222222222222222';
 export const FAKE_SUBJECT = 'Add the graph column fixture';
+export const OTHER_REPO_ID = '/fake/other-repo';
 /** `dateFormat.ts`'s own `WIDEST_SAMPLE_TIMESTAMP` (`Date.UTC(2024, 11, 30, 22, 48)`) — kept as a
  *  literal here rather than imported, since that constant is not exported (nothing outside that
  *  module has ever needed the raw timestamp before now) and this fixture lives outside `packages/
@@ -56,6 +64,9 @@ function buildResponses(): {
   repoList: (id: number) => unknown;
   repoOpen: (id: number) => unknown;
   streamChunkThenEnd: (id: number) => readonly [unknown, unknown];
+  graphRefresh: (id: number) => unknown;
+  graphStatus: (id: number) => unknown;
+  repoChanged: (kind: 'refsChanged' | 'worktreeChanged', repoId: string) => unknown;
 } {
   return {
     appInit: (id) =>
@@ -117,6 +128,17 @@ function buildResponses(): {
       });
       return [wrap({ t: 'chunk', id, chunk }), wrap({ t: 'end', id })] as const;
     },
+    // G-UX D10: `GraphViewState.refresh()`'s own `graph.refresh` request — `#runLoad`'s resync
+    // then re-opens `graph.stream` from the current `loadedRows` (already answered generically by
+    // `streamChunkThenEnd` above, reused verbatim: its `from: 0` on an already-1-row store is
+    // `#applyChunk`'s own restart-at-zero *reset* detection, not an error).
+    graphRefresh: (id) => wrap({ t: 'res', id, ok: true, result: { restarted: true } }),
+    // `#runLoad`'s own post-resync `graph.status` call — answered as "nothing more to load",
+    // matching `streamChunkThenEnd`'s `exhausted: true`.
+    graphStatus: (id) =>
+      wrap({ t: 'res', id, ok: true, result: { loaded: 1, remaining: 0, exhausted: true } }),
+    repoChanged: (kind, repoId) =>
+      wrap({ t: 'evt', method: 'repo.changed', payload: { repoId, kind } }),
   };
 }
 
@@ -128,6 +150,11 @@ function buildResponses(): {
  * open/chunk/end. Every other method (`refs.list`, `repoSettings.get`, …) is deliberately left
  * unanswered, matching `fakeReviewHost.ts`'s own documented scope — neither spec built on this
  * fixture asserts on anything that depends on one of them resolving.
+ *
+ * G-UX D10: also answers `graph.refresh`/`graph.status` (recording every `graph.refresh` call
+ * onto `window.__graphRefreshCalls`) and exposes `window.__emitRepoChanged(kind, repoId?)` —
+ * `graph-columns.spec.ts`'s own auto-refresh case dispatches a `repo.changed` event through it and
+ * polls `window.__graphRefreshCalls` rather than driving a real watcher.
  */
 export function buildFakeGraphHostInitScript(): string {
   const responses = buildResponses();
@@ -136,12 +163,18 @@ export function buildFakeGraphHostInitScript(): string {
     repoList: responses.repoList(0),
     repoOpen: responses.repoOpen(0),
     stream: responses.streamChunkThenEnd(0),
+    graphRefresh: responses.graphRefresh(0),
+    graphStatus: responses.graphStatus(0),
+    repoChangedRefs: responses.repoChanged('refsChanged', FAKE_REPO_ID),
+    repoChangedWorktree: responses.repoChanged('worktreeChanged', FAKE_REPO_ID),
+    repoChangedOtherRepo: responses.repoChanged('refsChanged', OTHER_REPO_ID),
   };
   const fixtureJson = JSON.stringify(data);
 
   return `
     (() => {
       const FIXTURES = ${fixtureJson};
+      window.__graphRefreshCalls = [];
 
       function withId(template, id) {
         const clone = JSON.parse(JSON.stringify(template));
@@ -152,6 +185,16 @@ export function buildFakeGraphHostInitScript(): string {
       function dispatch(envelope) {
         window.dispatchEvent(new MessageEvent('message', { data: envelope }));
       }
+
+      window.__emitRepoChanged = (kind, repoId) => {
+        const key =
+          repoId === ${JSON.stringify(OTHER_REPO_ID)}
+            ? 'repoChangedOtherRepo'
+            : kind === 'worktreeChanged'
+              ? 'repoChangedWorktree'
+              : 'repoChangedRefs';
+        dispatch(FIXTURES[key]);
+      };
 
       window.acquireVsCodeApi = () => ({
         postMessage(message) {
@@ -173,6 +216,15 @@ export function buildFakeGraphHostInitScript(): string {
             const [chunkEnvelope, endEnvelope] = FIXTURES.stream;
             dispatch(withId(chunkEnvelope, body.id));
             dispatch(withId(endEnvelope, body.id));
+            return;
+          }
+          if (body.t === 'req' && body.method === 'graph.refresh') {
+            window.__graphRefreshCalls.push({ repoId: body.params && body.params.repoId, at: Date.now() });
+            dispatch(withId(FIXTURES.graphRefresh, body.id));
+            return;
+          }
+          if (body.t === 'req' && body.method === 'graph.status') {
+            dispatch(withId(FIXTURES.graphStatus, body.id));
             return;
           }
           // Every other method is deliberately left unanswered — see this file's own doc comment.

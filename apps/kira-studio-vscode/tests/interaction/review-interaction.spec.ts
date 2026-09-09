@@ -59,6 +59,43 @@ test.describe('review sidebar interaction', () => {
     await expect(page.locator('[data-testid="file-tree"]')).toBeVisible();
   });
 
+  // G-UX D5 (item 5): F6's exact mechanism, reproduced without VS Code — a document-level click
+  // listener (the shape VS Code's own webview link interceptor is registered as, bubble-phase on
+  // the document) must actually OBSERVE the click on the "Open in graph" anchor. The old
+  // `@click.stop` prevented exactly this, so the interceptor never saw the click and the
+  // command: URI was never delivered to the host. The row's own aria-expanded must stay
+  // unchanged — the .kv-review-row-actions guard (not a stopped click) is what keeps this from
+  // also toggling the row.
+  test('Open in graph reaches a document-level listener and does not toggle the row', async ({
+    page,
+  }) => {
+    await bootReview(page);
+
+    const row = page.locator(`[data-testid="review-row-${FAKE_SHA}"]`);
+    await expect(row).toHaveAttribute('aria-expanded', 'false');
+
+    await page.evaluate(() => {
+      (window as unknown as { __openInGraphClicks: number }).__openInGraphClicks = 0;
+      document.addEventListener('click', (event) => {
+        const target = event.target as Element | null;
+        if (target?.closest('a[aria-label="Open in graph"]')) {
+          (window as unknown as { __openInGraphClicks: number }).__openInGraphClicks++;
+        }
+      });
+    });
+
+    await row.locator('a[aria-label="Open in graph"]').click();
+
+    await expect
+      .poll(() =>
+        page.evaluate(
+          () => (window as unknown as { __openInGraphClicks?: number }).__openInGraphClicks ?? 0,
+        ),
+      )
+      .toBe(1);
+    await expect(row).toHaveAttribute('aria-expanded', 'false');
+  });
+
   // D11a (item 11): the corrected, single-step "back to branch selection" — reach the listing
   // phase, click the new back button, and assert the DOM actually returns to the branch-picker
   // screen (ReviewView.vue's own existing data-testid, :503), not merely that

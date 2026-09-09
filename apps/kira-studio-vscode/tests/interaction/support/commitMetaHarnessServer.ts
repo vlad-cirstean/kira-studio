@@ -57,7 +57,11 @@ export async function startCommitMetaHarnessServer(): Promise<HarnessServer> {
           res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
           res.end(
             `<!doctype html><html><head><meta charset="utf-8">` +
-              `<style>body{margin:0;font:14px -apple-system,sans-serif;background:#1e1e1e;color:#ccc;} #app{width:420px;padding:16px;}</style>` +
+              // G-UX D7 (item 7): `#app` carries a real, fixed 480px height (this plan's own §2 D7
+              // 7c worked example) so `DetailPane.vue`'s `.kv-detail-pane { height: 100% }` — and
+              // every percentage `max-height` hung off it — resolves against a concrete number,
+              // not an unconstrained one that would collapse to 0.
+              `<style>body{margin:0;font:14px -apple-system,sans-serif;background:#1e1e1e;color:#ccc;} #app{width:420px;height:480px;}</style>` +
               `<link rel="stylesheet" href="/harness.css">` +
               `</head><body><div id="app"></div>` +
               `<script type="module" src="/harness.js"></script></body></html>`,

@@ -3,6 +3,7 @@ import {
   buildFakeHostInitScript,
   FAKE_BRANCH,
   FAKE_FILE_PATH,
+  FAKE_FILE_PATH_2,
   FAKE_REPO_ID,
   FAKE_SHA,
 } from './support/fakeReviewHost.ts';
@@ -103,5 +104,54 @@ test.describe('file tree open gestures', () => {
     await expect.poll(() => openDiffCalls(page)).toHaveLength(1);
     const calls = await openDiffCalls(page);
     expect(calls[0].pinned).toBe(true);
+  });
+
+  // G-UX D3 (item 3): two files with different extensions get different seti icons — rendered as
+  // a CSS mask (`.kv-file-tree-icon`'s own `mask-image`) with `background-color` driving the
+  // colour, replacing codicons' one shared `codicon-file-code` glyph for every source language.
+  test('two files with different extensions render different seti icons', async ({ page }) => {
+    await openFileRow(page);
+    const row1 = page.locator('[data-testid="file-tree"] .kv-file-tree-row', {
+      hasText: FAKE_FILE_PATH.split('/').pop(),
+    });
+    const row2 = page.locator('[data-testid="file-tree"] .kv-file-tree-row', {
+      hasText: FAKE_FILE_PATH_2.split('/').pop(),
+    });
+    await expect(row2).toBeVisible();
+
+    const [icon1, icon2] = await Promise.all(
+      [row1, row2].map((row) =>
+        row.locator('.kv-file-tree-icon').evaluate((el) => {
+          const style = getComputedStyle(el);
+          return {
+            maskImage: style.maskImage || style.getPropertyValue('-webkit-mask-image'),
+            backgroundColor: style.backgroundColor,
+          };
+        }),
+      ),
+    );
+
+    expect(icon1.maskImage).not.toBe('');
+    expect(icon1.maskImage).not.toBe('none');
+    expect(icon1.maskImage).not.toBe(icon2.maskImage);
+    expect(icon1.backgroundColor).not.toBe(icon2.backgroundColor);
+  });
+
+  // G-UX D6 (item 6): the status letter shrinks to the tree's own secondary scale — strictly
+  // smaller than the row's own (inherited) font size, so it reads as metadata beside the
+  // filename, not as a heading.
+  test('the status letter is smaller than the row', async ({ page }) => {
+    const fileRow = await openFileRow(page);
+
+    const { statusFontSize, rowFontSize } = await fileRow.evaluate((row) => {
+      const status = row.querySelector('.kv-file-tree-status');
+      if (!status) throw new Error('.kv-file-tree-status not found');
+      return {
+        statusFontSize: Number.parseFloat(getComputedStyle(status).fontSize),
+        rowFontSize: Number.parseFloat(getComputedStyle(row).fontSize),
+      };
+    });
+
+    expect(statusFontSize).toBeLessThan(rowFontSize);
   });
 });

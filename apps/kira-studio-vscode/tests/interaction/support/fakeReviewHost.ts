@@ -23,6 +23,14 @@ export const FAKE_BASE = 'main';
 export const FAKE_SHA = '1111111111111111111111111111111111111111';
 export const FAKE_SUBJECT = 'Add the example feature';
 export const FAKE_FILE_PATH = 'src/example.ts';
+// G-UX D3/D6 (items 3/6): a second file, a different extension, sorted AFTER `FAKE_FILE_PATH` in
+// flat view's own path sort (`fileTreeModel.ts`'s `buildFlatList`: 'e' < 'z') — added purely so
+// `file-tree-open.spec.ts` can compare two rows' seti icons/status letters without disturbing
+// `openFileRow()`'s own existing "row index 0 is FAKE_FILE_PATH" assumption every other case here
+// already depends on. `.json`, not `.md`: seti-icons' own `definitions.json` gives `.ts` and
+// `.json` genuinely different colours (blue vs yellow) — `.md` shares `.ts`'s blue, which would
+// make a colour-difference assertion fail for a reason that has nothing to do with this fixture.
+export const FAKE_FILE_PATH_2 = 'src/zz-note.json';
 
 function wrap(body: unknown): unknown {
   return encode({ version: CONTRACT_VERSION, body }, 'base64').payload;
@@ -132,6 +140,15 @@ function buildResponses(): {
               similarity: undefined,
               additions: 3,
               deletions: 1,
+              isBinary: false,
+            },
+            {
+              kind: 'added',
+              path: FAKE_FILE_PATH_2,
+              originalPath: undefined,
+              similarity: undefined,
+              additions: 5,
+              deletions: 0,
               isBinary: false,
             },
           ],

@@ -406,13 +406,21 @@ function reviewToggleTitle(path: string): string {
 </script>
 
 <template>
-  <!-- G21 D11: `.kv-skin-kira` (kira-structure.css) — colour-free, structural-only tokens
-       (spacing/control-height/font-role), scoped here rather than at :root so the graph panel's
-       own density.css scale still governs everywhere outside this one component. Applying it
-       right on this tree's own root, not up at App.vue/DetailPane.vue, is what makes "one
-       anatomy, everywhere this component mounts" true without restyling anything else in the
-       graph panel. -->
   <div class="kv-file-tree kv-skin-kira" data-testid="file-tree">
+    <!-- G21 D11: `.kv-skin-kira` (kira-structure.css) — colour-free, structural-only tokens
+         (spacing/control-height/font-role), scoped here rather than at :root so the graph panel's
+         own density.css scale still governs everywhere outside this one component. Applying it
+         right on this tree's own root, not up at App.vue/DetailPane.vue, is what makes "one
+         anatomy, everywhere this component mounts" true without restyling anything else in the
+         graph panel.
+
+         G-UX D7 (item 7): this comment moved from *before* the root `<div>` to *inside* it (same
+         text, new position) — a comment sitting as the root `<div>`'s own template-level sibling
+         defeats Vue's single-root detection for THIS toolchain (Vue 3.5.42 /
+         @vitejs/plugin-vue 6.0.8: confirmed empirically, not merely suspected), which silently
+         drops every attrs-fallthrough class a caller passes — `DetailPane.vue`'s own
+         `class="kv-detail-pane-tree"` (border-top/bottom, and D7's own new max-height/flex rules)
+         never reached this component's root at all before this move. -->
     <div v-if="parentOptions.length > 1" class="kv-file-tree-parent">
       <span class="kv-file-tree-parent-label">Diffing against</span>
       <KuiSelect
