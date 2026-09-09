@@ -29,8 +29,15 @@ type InProgressOperation struct {
 	// HeadName: rebase only — rebase-merge/head-name's content, e.g. "refs/heads/side".
 	HeadName        *string  `json:"headName,omitempty"`
 	ConflictedPaths []string `json:"conflictedPaths"`
-	// CanContinue is true only where `git <op> --continue` exists AND v1 offers it — false for
-	// rebase (§9's report-only posture) and bisect.
+	// CanContinue is true only where `git <op> --continue` exists AND v1 offers it — false only for
+	// bisect (nothing to continue) and unmergedOnly (no state file to advance). Rebase was false
+	// here through G25 ("§9's report-only posture", correct only while nothing in the app could
+	// START a rebase); G26 D12 flips it to true, since G26's own restack executor does start one,
+	// and a paused restack with no Continue button would be a dead end whose only exit is a
+	// terminal. This is a visible, deliberate change to a shipped surface (§10.4): a rebase begun
+	// OUTSIDE the app (a `git pull --rebase` conflict, or one started in a terminal) now also offers
+	// Continue and Skip — a strict improvement, since both run git's own documented remedies for
+	// exactly that state.
 	CanContinue bool `json:"canContinue"`
 	CanAbort    bool `json:"canAbort"`
 	// IsSequence: .git/sequencer/ present — a multi-commit revert or cherry-pick mid-run, where
@@ -39,8 +46,10 @@ type InProgressOperation struct {
 	// UnmergedCount: Continue is *enabled* only when this is 0 — kept separate from
 	// len(ConflictedPaths) so a host that caps the path list can never accidentally enable it.
 	UnmergedCount int `json:"unmergedCount"`
-	// CanSkip: true for cherryPick and revert only — the two sequencer operations git gives a
-	// --skip (probe P6).
+	// CanSkip: true for cherryPick and revert (the two sequencer operations git gives a --skip,
+	// probe P6) and, since G26 D12, rebase too — probe P10's own hint line names
+	// `git rebase --skip` verbatim, and an already-applied commit inside a stack is exactly when it
+	// is wanted (P15's automatic same-patch drop covers only the patch-identical case).
 	CanSkip bool `json:"canSkip"`
 }
 
@@ -77,7 +86,8 @@ func operationOf(kind InProgressKind, in inProgressInput) *InProgressOperation {
 		Kind: kind, OtherSha: in.otherSha, HeadName: in.headName,
 		ConflictedPaths: paths, CanContinue: in.canContinue, CanAbort: in.canAbort,
 		IsSequence: in.isSequence, UnmergedCount: len(paths),
-		CanSkip: kind == InProgressCherryPick || kind == InProgressRevert,
+		// G26 D12: rebase joins cherryPick/revert in offering Skip.
+		CanSkip: kind == InProgressCherryPick || kind == InProgressRevert || kind == InProgressRebase,
 	}
 }
 
@@ -92,7 +102,8 @@ func ClassifyInProgress(files InProgressStateFiles, unmergedPaths []string) *InP
 	if files.RebaseMergeDir || files.RebaseApplyDir {
 		return operationOf(InProgressRebase, inProgressInput{
 			otherSha: files.RebaseOnto, headName: files.RebaseHeadName,
-			canContinue: false, canAbort: true, isSequence: files.SequencerDir, unmergedPaths: unmergedPaths,
+			// G26 D12: canContinue true — see CanContinue's own doc comment above.
+			canContinue: true, canAbort: true, isSequence: files.SequencerDir, unmergedPaths: unmergedPaths,
 		})
 	}
 	if files.MergeHead != nil {

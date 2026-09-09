@@ -51,9 +51,13 @@ func ReadInProgressStateFiles(gitDir string) gitpreflight.InProgressStateFiles {
 }
 
 // ContinueArgs is the Ordering table's own --continue column: (nil, false) for the two kinds v1
-// never offers it for (rebase — §9's report-only instruction; bisect — nothing to continue) and
-// for unmergedOnly (no state file to advance). The caller (gitsession.RunOp) treats false as
-// "refuse before spawning", matching InProgressOperation.CanContinue.
+// never offers it for — bisect (nothing to continue) and unmergedOnly (no state file to advance).
+// Rebase gained Continue at G26 D12, retiring G5's "§9 report-only posture": that posture was
+// correct only while nothing in the app could START a rebase, and G26's restack executor does.
+// GIT_EDITOR=true is already in hygieneEnv (runner.go) and probe M5/P11 both confirm
+// `rebase --continue` never opens an editor anyway (no -i in play here). The caller
+// (gitsession.RunOp) treats false as "refuse before spawning", matching
+// InProgressOperation.CanContinue.
 func ContinueArgs(kind gitpreflight.InProgressKind) ([]string, bool) {
 	switch kind {
 	case gitpreflight.InProgressMerge:
@@ -62,6 +66,8 @@ func ContinueArgs(kind gitpreflight.InProgressKind) ([]string, bool) {
 		return []string{"cherry-pick", "--continue"}, true
 	case gitpreflight.InProgressRevert:
 		return []string{"revert", "--continue"}, true
+	case gitpreflight.InProgressRebase:
+		return []string{"rebase", "--continue"}, true
 	default:
 		return nil, false
 	}
@@ -87,15 +93,20 @@ func AbortArgs(kind gitpreflight.InProgressKind) ([]string, bool) {
 	}
 }
 
-// SkipArgs is probe P6's own sequencer remedy for an empty pick or revert — (nil, false) for every
-// other kind, since InProgressOperation.CanSkip is the UI's own gate and this is only the second
-// line of defence, not the first.
+// SkipArgs is probe P6's own sequencer remedy for an empty pick or revert, joined at G26 D12 by
+// rebase — probe P10's own hint line names it verbatim ("You can instead skip this commit: run
+// "git rebase --skip""), and an already-applied commit inside a stack (a branch reordered under
+// it, say) is exactly the case P15's automatic same-patch drop does not cover. (nil, false) for
+// every other kind, since InProgressOperation.CanSkip is the UI's own gate and this is only the
+// second line of defence, not the first.
 func SkipArgs(kind gitpreflight.InProgressKind) ([]string, bool) {
 	switch kind {
 	case gitpreflight.InProgressCherryPick:
 		return []string{"cherry-pick", "--skip"}, true
 	case gitpreflight.InProgressRevert:
 		return []string{"revert", "--skip"}, true
+	case gitpreflight.InProgressRebase:
+		return []string{"rebase", "--skip"}, true
 	default:
 		return nil, false
 	}

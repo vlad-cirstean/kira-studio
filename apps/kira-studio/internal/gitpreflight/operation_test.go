@@ -42,21 +42,27 @@ func TestClassifyInProgress_Revert(t *testing.T) {
 	}
 }
 
-func TestClassifyInProgress_Rebase(t *testing.T) {
+// TestClassifyInProgress_RebaseOffersContinueAndSkip_G26 inverts G5's original
+// TestClassifyInProgress_Rebase, which asserted canContinue/canSkip both false under "§9's
+// report-only posture". G26 D12 retires that posture: G26's own restack executor is the first
+// thing in this app that can START a rebase, so a paused restack needs Continue (and Skip, for an
+// already-applied commit) to have any exit besides a terminal. Renamed, not deleted, per plan §6
+// step 3/D12's own instruction.
+func TestClassifyInProgress_RebaseOffersContinueAndSkip_G26(t *testing.T) {
 	op := gitpreflight.ClassifyInProgress(gitpreflight.InProgressStateFiles{
 		RebaseMergeDir: true, RebaseHeadName: strp("refs/heads/side"), RebaseOnto: strp("onto-sha"),
 	}, nil)
 	if op == nil || op.Kind != gitpreflight.InProgressRebase {
 		t.Fatalf("op = %+v", op)
 	}
-	if op.CanContinue {
-		t.Fatal("rebase must never offer Continue (§9's report-only posture)")
+	if !op.CanContinue {
+		t.Fatal("G26 D12: rebase must now offer Continue (retires §9's report-only posture)")
 	}
 	if !op.CanAbort {
 		t.Fatal("rebase should offer Abort")
 	}
-	if op.CanSkip {
-		t.Fatal("rebase should not offer Skip")
+	if !op.CanSkip {
+		t.Fatal("G26 D12: rebase must now offer Skip (probe P10's own hint names it)")
 	}
 	if op.HeadName == nil || *op.HeadName != "refs/heads/side" {
 		t.Fatalf("headName = %v", op.HeadName)
