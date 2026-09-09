@@ -9,8 +9,9 @@ and how to run things wherever a session happens to be.
 - The **main session runs on Sonnet and orchestrates only** — it doesn't implement, edit code, or
   fix findings directly. Its job is spawning the right subagents in order, carrying context between
   them, and tracking progress; the actual writing always happens in a subagent.
-- Each phase (`docs/v1.2/SPEC.md`'s phasing table) gets an Opus-authored plan committed under
-  `docs/v1.2/plans/` before implementation starts — spawn an **Opus subagent** (`Agent` tool,
+- Each phase (the current chapter's `SPEC.md` phasing table — `docs/v1.3/` today) gets an
+  Opus-authored plan committed under that same chapter's `plans/` before implementation starts —
+  spawn an **Opus subagent** (`Agent` tool,
   `model: "opus"`) whose only job is writing that plan. If a phase has no plan there, don't
   implement from the spec directly; get the plan written and committed first.
 - **Once the plan lands, spawn a Sonnet subagent** (`model: "sonnet"`) to implement it. Default to
@@ -30,8 +31,9 @@ and how to run things wherever a session happens to be.
   wait for it before moving on. One phase at a time, in order — never parallelize or batch phases.
 - **Multiple passes/iterations/rounds means repeat the whole loop that many times**, not run it once
   and treat extras as optional. Each pass plans against the *current* tree (on top of everything the
-  previous pass landed, never the pre-phase state) and gets its own file under `docs/v1.2/plans/`
-  (a phase's plan plus `-iter2`/`-iter3` suffixes), so what each round found stays legible. A
+  previous pass landed, never the pre-phase state) and gets its own file under the current
+  chapter's `plans/` (a phase's plan plus `-iter2`/`-iter3` suffixes), so what each round found
+  stays legible. A
   planning pass should re-read the current source rather than trust the previous pass's summary
   prose, and say plainly when a pass finds nothing real rather than manufacture a finding.
 - **"Code review"** (once a phase or batch is otherwise complete, on request) means three **Opus
@@ -43,7 +45,7 @@ and how to run things wherever a session happens to be.
   finding. No findings document survives a round once fixed — each finding is fixed and committed
   one at a time, so the commit log is the durable record; carry forward only a genuinely still-open
   item (see "Known open items"), never a running narrative of what each round found.
-- No per-phase PRs. One feature branch for all of v1.
+- No per-phase PRs. One feature branch per chapter.
 - **Best practices throughout, no shortcuts** — no stubbed error handling, no `TODO: fix later`, no
   skipped validation to make something demo. Scope left out of a phase is left out entirely, not
   half-implemented.
@@ -95,7 +97,7 @@ and how to run things wherever a session happens to be.
   for breaking changes.
 - **Keep this file lean — prune as you go, don't just append.** An app fact belongs in
   `docs/ARCHITECTURE.md`; a phase or review round's discovery belongs in that phase's plan doc under
-  `docs/v1.2/plans/` (never a permanent "findings" section here — the plan doc and commit log are
+  the current chapter's `plans/` (never a permanent "findings" section here — the plan doc and commit log are
   the durable record, not this file). Before adding a bullet, ask whether it's a standing rule for
   how this team works, not a one-off result. When you touch this file, remove what's gone stale too
   — a fixed tool's workaround, a pointer to a deleted file/subsystem, a question a later phase
@@ -238,6 +240,38 @@ See `docs/ARCHITECTURE.md`'s Storage section for the cipher, the key and the env
   weaken it, even if accidentally left set. `apps/kira-studio/tests/ui/secrets.spec.ts`'s "keychain
   available" scenario guards this.
 
+## The git module — running and testing it here (G1-G29)
+
+See `docs/ARCHITECTURE.md`'s Git module section for what it is and why. This section is only about
+running it here.
+
+- **`go test ./apps/kira-studio/internal/git...` needs a real `git` on `PATH` and nothing else** —
+  no Docker, no container, no display, no VS Code. Each test builds its own repository under
+  `t.TempDir()`, and cases that need `git` self-skip without it. The app's own floor is **git
+  2.38** (`merge-tree --write-tree`), so an older `git` skips more than it runs rather than failing
+  informatively.
+- **`KIRA_HOME` scopes the socket, not just the database.** The listener is
+  `${KIRA_HOME}/git.sock` with its flock beside it, so two `KIRA_HOME`s are two fully independent
+  backends and a test never contends with a `bun run dev` session's socket. Anything needing a
+  server builds one over its own temp `KIRA_HOME` — never the fixed path.
+- **The perf probes are opt-in and assert nothing.**
+  `KIRA_GIT_PERF=1 go test -run 'TestGraphStreamPerf|TestG8PerfBaseline' ./apps/kira-studio/internal/gitsock/ -v`
+  prints one `key=value` line per probe. Asserting a threshold was declined deliberately: this
+  container's numbers and a real Mac's are not comparable, so a hard bound would be flaky in
+  exactly the way it's meant to guard against. Record numbers in the commit message and, when they
+  answer a stated budget, in `docs/PERF.md`.
+- **The FSEvents watcher is `darwin && cgo`** (`internal/gitclient/watcher_fsevents_darwin.go`), so
+  a Linux run exercises the `fsnotify` companion instead. Both satisfy the same seam and both are
+  covered by `watcher_test.go`; only the darwin backend's own behaviour needs real hardware.
+- **The extension's own suites need neither VS Code nor `xvfb`.** `bun run test:webview` builds the
+  extension bundle and drives the real emitted webview documents in headless Chromium (a layout
+  project asserting rendered box heights, and an interaction project); `bun run test:unit` covers
+  the extension's and `packages/git-*`'s in-source specs alongside everything else.
+- **The scoped Go race run** for a git-chapter phase is the git packages actually in play plus
+  `internal` itself for the layering test, not the whole tree — `docs/v1.3/SPEC.md`'s own "Full
+  verification scope" note fixes the list and the reason. The unscoped tree stays worth running
+  occasionally as a backstop, just not per phase.
+
 ## Wails v3 / Go — building and testing in this environment (P51, P52, P55)
 
 - **None of this toolchain persists across sessions.** Re-run at the start of any fresh container:
@@ -258,12 +292,22 @@ See `docs/ARCHITECTURE.md`'s Storage section for the cipher, the key and the env
   is the real source for the exact pinned version.
 - **`go test ./apps/kira-studio/internal/...` / `go build ./apps/kira-studio/internal/...` need
   nothing but the Go toolchain** — every cgo call this app makes (a handful of darwin-only files in
-  `internal/secrets`, `internal/metrics`, `internal/localauth`, and any package that later follows
-  the same pattern) is behind a `darwin && cgo` build tag with a real, working `!darwin || !cgo`
-  companion, invisible to a Linux build; `modernc.org/sqlite` (the sqlite adapter and the app's own
-  storage) is cgo-free on every platform. Only the `apps/kira-studio` `main` package imports Wails
-  and needs the GTK/WebKit headers, so prefer
-  `./apps/kira-studio/internal/...` for a fast loop.
+  `internal/secrets`, `internal/metrics`, `internal/localauth`, `internal/gitclient`'s FSEvents
+  repo watcher, and any package that later follows the same pattern) is behind a `darwin && cgo`
+  build tag with a real, working `!darwin || !cgo` companion, invisible to a Linux build;
+  `modernc.org/sqlite` (the sqlite adapter and the app's own storage) is cgo-free on every
+  platform. Only the `apps/kira-studio` `main` package imports Wails and needs the GTK/WebKit
+  headers, so prefer `./apps/kira-studio/internal/...` for a fast loop.
+- **`GOOS=darwin` cross-compiles here only with `CGO_ENABLED=0`.** A pure-Go package builds and
+  vets for `darwin/arm64` from this container (`GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build
+  ./…`, exit 0); a cgo one cannot be built for darwin here at all (`CGO_ENABLED=1 GOOS=darwin`
+  fails inside `runtime/cgo` with `clang: error: unsupported option '-arch'`), while a real macOS
+  build is `CGO_ENABLED=1`. So a `darwin && cgo` file is compiled, vetted and tested by nobody
+  until a human builds on a Mac. Treat that as a **design** constraint, not just a testing gap: for
+  code whose whole purpose is to work on a path nobody exercises interactively, prefer a pure-Go
+  implementation this container can actually build and test —
+  `internal/startupfail` chose an argv-only `osascript` spawn over a cgo `NSAlert` shim for exactly
+  this reason, and it is checkable in CI as a result.
 - **Regenerate bindings via `wails3 task common:generate:bindings`** (or `scripts/setup.sh`, which
   calls it) — never a hand-typed `wails3 generate bindings` flag list, which has already drifted
   from the task's real flags once. `apps/kira-studio/frontend/bindings/**` are real Vite import
