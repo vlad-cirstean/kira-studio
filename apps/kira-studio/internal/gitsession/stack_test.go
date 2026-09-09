@@ -293,6 +293,170 @@ func TestRestackPreflight_DirtyWorktreeBlocks(t *testing.T) {
 
 // TestRestackPreflight_RecordedBaseFallsBackToMergeBase is D14/F4's own honest-degrade case: a
 // branch with NO recorded base at all still gets a plan entry, sourced from merge-base.
+// ---------------------------------------------------------------------------------------
+// stackSet (D10)
+// ---------------------------------------------------------------------------------------
+
+func strPtr(s string) *string { return &s }
+
+func TestRunOp_StackSet_SetsParentAndBase(t *testing.T) {
+	skipWithoutGitStack(t)
+	dir := initUnstackedRepo(t)
+	runGitStack(t, dir, "checkout", "-q", "-b", "feat1")
+	entry := newStackTestEntryWithRunner(t, gitclient.NewExecRunner(), dir)
+	ctx := context.Background()
+
+	result, err := entry.RunOp(ctx, ConnID("stack-test-conn"), "test", OpRequest{
+		Kind: "stackSet", Branch: "feat1", Parent: strPtr("main"),
+	})
+	if err != nil {
+		t.Fatalf("RunOp: %v", err)
+	}
+	if !result.OK {
+		t.Fatalf("result = %+v, want ok", result)
+	}
+	if result.Undo == nil {
+		t.Fatal("stackSet must set an undo record (D10: Undoable)")
+	}
+
+	stacks, err := entry.Stacks(ctx)
+	if err != nil {
+		t.Fatalf("Stacks: %v", err)
+	}
+	if len(stacks.Stacks) != 1 || stacks.Stacks[0].Branches[0].Name != "feat1" {
+		t.Fatalf("stacks = %+v", stacks.Stacks)
+	}
+}
+
+// TestRunOp_StackSet_CycleRefusedNoWrite is §7.1 item 9's own exit criterion: a parent that would
+// create a cycle answers StackCycle and spawns NO git write.
+func TestRunOp_StackSet_CycleRefusedNoWrite(t *testing.T) {
+	skipWithoutGitStack(t)
+	dir := initUnstackedRepo(t)
+	runGitStack(t, dir, "checkout", "-q", "-b", "feat1")
+	runGitStack(t, dir, "checkout", "-q", "-b", "feat2")
+	runGitStack(t, dir, "config", "--local", "branch.feat2.kirastackparent", "feat1")
+	runGitStack(t, dir, "config", "--local", "branch.feat1.kirastackparent", "main")
+
+	runner := newArgSpawnCountingRunner("config")
+	entry := newStackTestEntryWithRunner(t, runner, dir)
+	ctx := context.Background()
+	// feat2 is already a child of feat1; setting feat1's parent to feat2 would close the loop.
+	before := runner.count("config")
+
+	result, err := entry.RunOp(ctx, ConnID("stack-test-conn"), "test", OpRequest{
+		Kind: "stackSet", Branch: "feat1", Parent: strPtr("feat2"),
+	})
+	if err != nil {
+		t.Fatalf("RunOp: %v", err)
+	}
+	if result.OK || result.Error == nil || result.Error.Kind != "StackCycle" {
+		t.Fatalf("result = %+v, want a StackCycle error", result)
+	}
+	// The two reads (refsSnapshot's own config-free spawns aside) already happened before this
+	// point; what matters is that no ADDITIONAL config *write* happened — i.e. the read count did
+	// not grow by the two writes a successful stackSet would have made.
+	after := runner.count("config")
+	if after-before > 1 { // the one read this call itself makes is expected; two more (the writes) must not appear
+		t.Fatalf("config spawns grew by %d across a refused stackSet, want at most the one read", after-before)
+	}
+}
+
+func TestRunOp_StackSet_SelfParentRefused(t *testing.T) {
+	skipWithoutGitStack(t)
+	dir := initUnstackedRepo(t)
+	runGitStack(t, dir, "checkout", "-q", "-b", "feat1")
+	entry := newStackTestEntryWithRunner(t, gitclient.NewExecRunner(), dir)
+	ctx := context.Background()
+
+	result, err := entry.RunOp(ctx, ConnID("stack-test-conn"), "test", OpRequest{
+		Kind: "stackSet", Branch: "feat1", Parent: strPtr("feat1"),
+	})
+	if err != nil {
+		t.Fatalf("RunOp: %v", err)
+	}
+	if result.OK || result.Error == nil || result.Error.Kind != "StackCycle" {
+		t.Fatalf("result = %+v, want StackCycle", result)
+	}
+}
+
+func TestRunOp_StackSet_UnknownParentIsNotFound(t *testing.T) {
+	skipWithoutGitStack(t)
+	dir := initUnstackedRepo(t)
+	runGitStack(t, dir, "checkout", "-q", "-b", "feat1")
+	entry := newStackTestEntryWithRunner(t, gitclient.NewExecRunner(), dir)
+	ctx := context.Background()
+
+	result, err := entry.RunOp(ctx, ConnID("stack-test-conn"), "test", OpRequest{
+		Kind: "stackSet", Branch: "feat1", Parent: strPtr("nosuchbranch"),
+	})
+	if err != nil {
+		t.Fatalf("RunOp: %v", err)
+	}
+	if result.OK || result.Error == nil || result.Error.Kind != "NotFound" {
+		t.Fatalf("result = %+v, want NotFound", result)
+	}
+}
+
+// TestRunOp_StackSet_UndoRestoresPreviousParent proves the undo replay is symmetric (D2/D10): a
+// branch that was NOT stacked before gets its "" values back on undo.
+func TestRunOp_StackSet_UndoRestoresPreviousParent(t *testing.T) {
+	skipWithoutGitStack(t)
+	dir := initUnstackedRepo(t)
+	runGitStack(t, dir, "checkout", "-q", "-b", "feat1")
+	entry := newStackTestEntryWithRunner(t, gitclient.NewExecRunner(), dir)
+	ctx := context.Background()
+
+	result, err := entry.RunOp(ctx, ConnID("stack-test-conn"), "test", OpRequest{
+		Kind: "stackSet", Branch: "feat1", Parent: strPtr("main"),
+	})
+	if err != nil || !result.OK || result.Undo == nil {
+		t.Fatalf("RunOp: result=%+v err=%v", result, err)
+	}
+
+	undoResult, err := entry.UndoRun(ctx, result.Undo.ID)
+	if err != nil {
+		t.Fatalf("UndoRun: %v", err)
+	}
+	if !undoResult.OK {
+		t.Fatalf("undoResult = %+v, want ok", undoResult)
+	}
+
+	stacks, err := entry.Stacks(ctx)
+	if err != nil {
+		t.Fatalf("Stacks: %v", err)
+	}
+	if len(stacks.Stacks) != 0 {
+		t.Fatalf("stacks = %+v, want none (feat1's parent restored to empty)", stacks.Stacks)
+	}
+}
+
+func TestRunOp_StackSet_RemoveFromStack(t *testing.T) {
+	skipWithoutGitStack(t)
+	dir := initUnstackedRepo(t)
+	runGitStack(t, dir, "checkout", "-q", "-b", "feat1")
+	runGitStack(t, dir, "config", "--local", "branch.feat1.kirastackparent", "main")
+	entry := newStackTestEntryWithRunner(t, gitclient.NewExecRunner(), dir)
+	ctx := context.Background()
+
+	result, err := entry.RunOp(ctx, ConnID("stack-test-conn"), "test", OpRequest{
+		Kind: "stackSet", Branch: "feat1", Parent: nil,
+	})
+	if err != nil {
+		t.Fatalf("RunOp: %v", err)
+	}
+	if !result.OK {
+		t.Fatalf("result = %+v, want ok", result)
+	}
+	stacks, err := entry.Stacks(ctx)
+	if err != nil {
+		t.Fatalf("Stacks: %v", err)
+	}
+	if len(stacks.Stacks) != 0 {
+		t.Fatalf("stacks = %+v, want none (feat1 removed from its stack)", stacks.Stacks)
+	}
+}
+
 func TestRestackPreflight_RecordedBaseFallsBackToMergeBase(t *testing.T) {
 	skipWithoutGitStack(t)
 	dir := t.TempDir()

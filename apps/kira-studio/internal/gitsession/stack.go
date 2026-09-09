@@ -9,8 +9,10 @@ package gitsession
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitclient/catfile"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitclient/porcelain"
@@ -248,6 +250,158 @@ func (e *RepoEntry) RestackPreflight(ctx context.Context, branch string) (gitpre
 		InProgress: inProgress, CurrentHead: headRef, DirtyPaths: dirtyPaths,
 		CheckedOutElsewhere: checkedOutElsewhere, BranchBases: branchBases, HasUpstream: hasUpstream,
 	}), nil
+}
+
+// ---------------------------------------------------------------------------------------
+// opTable's stackSet kind (D10)
+// ---------------------------------------------------------------------------------------
+
+// isLocalBranch answers "does name match a local branch in snapshot" — D10 step 2's own "branch
+// must be an existing LOCAL branch" check (a remote-tracking branch or a tag is never itself
+// something stackSet can operate ON, only something a parent can point AT).
+func isLocalBranch(snapshot RefsResult, name string) bool {
+	for _, r := range snapshot.Branches {
+		if r.ShortName == name {
+			return true
+		}
+	}
+	return false
+}
+
+// resolvesAsRef answers "does name match a local branch or a remote-tracking branch in snapshot" —
+// D10 step 3's own "parent, when set, must resolve as a local branch or a remote-tracking branch"
+// check, and D1's own "the parent may name a local branch OR a remote-tracking branch" rule.
+func resolvesAsRef(snapshot RefsResult, name string) bool {
+	if isLocalBranch(snapshot, name) {
+		return true
+	}
+	for _, r := range snapshot.RemoteBranches {
+		if r.ShortName == name {
+			return true
+		}
+	}
+	return false
+}
+
+// ancestorChainFrom walks parent pointers up from start using the CURRENT (pre-write) config table
+// — D10 step 4's own cycle check: "walk parent pointers up from parent; reaching branch ⇒
+// StackCycle". Bounded by gitpreflight.MaxStackedBranches iterations (F3's own stated defence: a
+// pre-existing cycle elsewhere in a hand-edited config cannot spin this walk either).
+func ancestorChainFrom(config map[string]gitpreflight.StackConfigEntry, start string) []string {
+	chain := []string{start}
+	seen := map[string]bool{start: true}
+	current := start
+	for i := 0; i < gitpreflight.MaxStackedBranches; i++ {
+		entry, ok := config[current]
+		if !ok || entry.Parent == "" {
+			return chain
+		}
+		if seen[entry.Parent] {
+			return chain // an unrelated pre-existing cycle — not this check's concern.
+		}
+		seen[entry.Parent] = true
+		chain = append(chain, entry.Parent)
+		current = entry.Parent
+	}
+	return chain
+}
+
+// prepareStackSet is stackSet's own opSpec.Prepare (D10), in the plan's own exact order: fresh
+// refs+config (never the caches — the same rule prepareCheckout's refsSnapshot already follows),
+// branch/parent existence, the cycle check, the join-time merge-base, undo capture, then exactly
+// two `git config --local` writes, always exit 0 (D2).
+func prepareStackSet(ctx context.Context, e *RepoEntry, conn ConnID, connLabel string, op OpRequest) (prepared, error) {
+	snapshot, err := e.refsSnapshot(ctx)
+	if err != nil {
+		return prepared{}, err
+	}
+	config, err := e.rawStackConfig(ctx)
+	if err != nil {
+		return prepared{}, err
+	}
+
+	branch := op.Branch
+	if !isLocalBranch(snapshot, branch) {
+		return prepared{earlyError: &OpError{Kind: "NotFound", Message: fmt.Sprintf("%q is not a local branch.", branch)}}, nil
+	}
+
+	parent := ""
+	if op.Parent != nil {
+		parent = strings.TrimSpace(*op.Parent)
+	}
+
+	if parent != "" {
+		if !resolvesAsRef(snapshot, parent) {
+			return prepared{earlyError: &OpError{Kind: "NotFound", Message: fmt.Sprintf("%q does not resolve to a branch.", parent)}}, nil
+		}
+		if parent == branch {
+			return prepared{earlyError: &OpError{Kind: "StackCycle", Message: "a branch cannot be its own stack parent."}}, nil
+		}
+		chain := ancestorChainFrom(config, parent)
+		for _, name := range chain {
+			if name == branch {
+				return prepared{earlyError: &OpError{
+					Kind:    "StackCycle",
+					Message: fmt.Sprintf("setting %q's parent to %q would make %q its own ancestor.", branch, parent, branch),
+				}}, nil
+			}
+		}
+	}
+
+	newBase := ""
+	if parent != "" {
+		res, merr := e.runAllowingExit(ctx, gitops.MergeBaseArgs(parent, branch), 0, 1)
+		if merr != nil {
+			return prepared{}, merr
+		}
+		if res.ExitCode == 0 {
+			newBase = strings.TrimSpace(string(res.Stdout))
+		}
+	}
+
+	undo := e.captureStackSetUndo(ctx, conn, connLabel, branch, parent, config, snapshot)
+
+	return prepared{
+		argvList: [][]string{
+			gitops.StackConfigSetArgs(gitops.StackParentKey(branch), parent),
+			gitops.StackConfigSetArgs(gitops.StackBaseKey(branch), newBase),
+		},
+		undo: undo,
+	}, nil
+}
+
+// captureStackSetUndo is undo-capture for stackSet (D10): the branch's OWN CURRENT parent/base raw
+// config values (possibly both "", meaning it was not stacked before this write, D2), replayed back
+// as the same two argv writes on undo — always exit 0, symmetric with the write itself. RecoverySha
+// is the branch's own tip (D10: "so UndoRun's existing cat-file existence check has something real
+// to validate") — a stackSet never moves any ref, so the tip before and after is identical, but the
+// check still guards against the branch itself having been deleted in the meantime.
+func (e *RepoEntry) captureStackSetUndo(ctx context.Context, conn ConnID, connLabel, branch, newParent string, config map[string]gitpreflight.StackConfigEntry, snapshot RefsResult) *gitpreflight.UndoRecord {
+	tip := ""
+	for _, r := range snapshot.Branches {
+		if r.ShortName == branch {
+			tip = r.ObjectID
+			break
+		}
+	}
+	if tip == "" {
+		return nil
+	}
+
+	oldEntry := config[branch]
+	label := fmt.Sprintf("Removed %s from its stack", branch)
+	if newParent != "" {
+		label = fmt.Sprintf("Set %s's stack parent to %s", branch, newParent)
+	}
+
+	return &gitpreflight.UndoRecord{
+		ID: newUndoID(), Label: label, RecoverySha: tip, CreatedAt: time.Now().UnixMilli(),
+		Replay: [][]string{
+			gitops.StackConfigSetArgs(gitops.StackParentKey(branch), oldEntry.Parent),
+			gitops.StackConfigSetArgs(gitops.StackBaseKey(branch), oldEntry.Base),
+		},
+		OriginConn: string(conn), OriginLabel: connLabel,
+	}
 }
 
 // dirtyPathStrings flattens gitpreflight.DirtyPaths' own []DirtyPath into the plain path list

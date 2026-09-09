@@ -19,8 +19,8 @@ import (
 // legal values, and every notUndoable entry must carry a real, non-empty reason (never a
 // placeholder — §7.12's "we never present an undo we cannot honour").
 func TestOpTable_EveryEntryStatesAnUndoPolicy(t *testing.T) {
-	if len(opTable) != 19 {
-		t.Fatalf("opTable has %d entries, want exactly 19 (D5, G25 adds worktreeAdd/worktreeRemove)", len(opTable))
+	if len(opTable) != 20 {
+		t.Fatalf("opTable has %d entries, want exactly 20 (D5, G26 adds stackSet)", len(opTable))
 	}
 	for kind, spec := range opTable {
 		switch spec.Undo.Kind {
@@ -41,14 +41,14 @@ func TestOpTable_EveryEntryStatesAnUndoPolicy(t *testing.T) {
 	}
 }
 
-// TestOpTable_ServesExactlyTheNineteenNamedKinds locks D5's own list, updated by G25's two new
-// entries — a kind absent here answers ErrUnservedOpKind, never a stub.
-func TestOpTable_ServesExactlyTheNineteenNamedKinds(t *testing.T) {
+// TestOpTable_ServesExactlyTheTwentyNamedKinds locks D5's own list, updated by G26's one new entry
+// (stackSet, D10) — a kind absent here answers ErrUnservedOpKind, never a stub.
+func TestOpTable_ServesExactlyTheTwentyNamedKinds(t *testing.T) {
 	want := []string{
 		"checkout", "branchCreate", "branchDelete", "branchRename",
 		"tagCreate", "tagDelete", "revert", "opContinue", "opAbort", "opSkip",
 		"stashPush", "stashApply", "stashPop", "stashDrop", "stashBranch",
-		"reset", "cherryPick", "worktreeAdd", "worktreeRemove",
+		"reset", "cherryPick", "worktreeAdd", "worktreeRemove", "stackSet",
 	}
 	for _, k := range want {
 		if _, ok := opTable[k]; !ok {
@@ -63,21 +63,20 @@ func TestOpTable_ServesExactlyTheNineteenNamedKinds(t *testing.T) {
 	}
 }
 
-// TestOpTable_UndoableKindsAreExactlyBranchTagDeleteStashDropResetAndCherryPick locks the five
-// kinds this phase captures a real undo record for — reset and cherryPick join
-// branchDelete/tagDelete/stashDrop at G22 (undo/slot.ts's own UNDO_POLICY marks all five
-// undoable).
-func TestOpTable_UndoableKindsAreExactlyBranchTagDeleteStashDropResetAndCherryPick(t *testing.T) {
+// TestOpTable_UndoableKindsAreExactlyBranchTagDeleteStashDropResetCherryPickAndStackSet locks the
+// six kinds this phase captures a real undo record for — G26 D10 adds stackSet to the five G22
+// already established (branchDelete, tagDelete, stashDrop, reset, cherryPick).
+func TestOpTable_UndoableKindsAreExactlyBranchTagDeleteStashDropResetCherryPickAndStackSet(t *testing.T) {
 	var undoable []string
 	for kind, spec := range opTable {
 		if spec.Undo.Kind == gitpreflight.Undoable {
 			undoable = append(undoable, kind)
 		}
 	}
-	if len(undoable) != 5 {
-		t.Fatalf("undoable kinds = %v, want exactly 5 (branchDelete, tagDelete, stashDrop, reset, cherryPick)", undoable)
+	if len(undoable) != 6 {
+		t.Fatalf("undoable kinds = %v, want exactly 6 (branchDelete, tagDelete, stashDrop, reset, cherryPick, stackSet)", undoable)
 	}
-	for _, k := range []string{"branchDelete", "tagDelete", "stashDrop", "reset", "cherryPick"} {
+	for _, k := range []string{"branchDelete", "tagDelete", "stashDrop", "reset", "cherryPick", "stackSet"} {
 		if opTable[k].Undo.Kind != gitpreflight.Undoable {
 			t.Fatalf("%s must be undoable", k)
 		}

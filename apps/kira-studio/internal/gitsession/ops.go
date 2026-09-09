@@ -15,11 +15,11 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitpreflight"
 )
 
-// OpRequest is op.run's own request — the Go decode of @kira/git-ipc's own nineteen-member
-// OpRequest union, flattened into one struct (a field absent from the wire JSON for a given kind
-// simply decodes to its zero value, which no served kind's Prepare function ever reads). Only
-// fields the seventeen kinds opTable serves actually need are declared — two of OpRequest's
-// nineteen kinds (tagPush/tagDeleteRemote) are unserved and unassigned (G22 §9: blocked on
+// OpRequest is op.run's own request — the Go decode of @kira/git-ipc's own twenty-member
+// OpRequest union (G26 D10 adds stackSet), flattened into one struct (a field absent from the
+// wire JSON for a given kind simply decodes to its zero value, which no served kind's Prepare
+// function ever reads). Only fields the eighteen kinds opTable serves actually need are declared
+// — two of OpRequest's twenty kinds (tagPush/tagDeleteRemote) are unserved and unassigned (G22 §9: blocked on
 // RunOp's own write path having no askpass wiring), and their own fields are never decoded here at
 // all, since opTable rejects an unlisted kind before any field is read (D5).
 type OpRequest struct {
@@ -71,6 +71,10 @@ type OpRequest struct {
 	// though prepareWorktreeRemove never actually trusts that claim, recomputing it fresh from the
 	// server-side preflight verdict instead (D8's own fail-safe-over-fail-open principle).
 	Path string `json:"path,omitempty"` // worktreeAdd, worktreeRemove
+
+	// Parent is G26 D10's own stackSet addition — nil means "remove Branch from its stack" (D2
+	// writes "" for both kirastack keys, never `config --unset`, per F15/P5).
+	Parent *string `json:"parent,omitempty"` // stackSet
 }
 
 // OpError mirrors @kira/git-ipc's own op.run/undo.run per-op error shape.
@@ -89,7 +93,7 @@ type OpResult struct {
 }
 
 // ErrUnservedOpKind is RunOp's answer for an OpRequest.Kind not present in opTable (D5) — two of
-// OpRequest's nineteen kinds (tagPush/tagDeleteRemote) are unserved and unassigned — see G22 §9.
+// OpRequest's twenty kinds (tagPush/tagDeleteRemote) are unserved and unassigned — see G22 §9.
 // gitrpc maps this to E_UNKNOWN_METHOD naming the kind — never a stub, never a silent success.
 type ErrUnservedOpKind struct{ Kind string }
 
@@ -126,7 +130,7 @@ type opSpec struct {
 	Reclassify func(opErr *OpError, status porcelain.StatusResult, inProgress *gitpreflight.InProgressOperation) *OpError
 }
 
-// opTable serves seventeen of OpRequest's nineteen kinds (D5) — the other two (tagPush/
+// opTable serves eighteen of OpRequest's twenty kinds (D5) — the other two (tagPush/
 // tagDeleteRemote) answer ErrUnservedOpKind, never a stub. Labels are ported verbatim from
 // undo/slot.ts's own UNDO_POLICY; G17 added the five stash kinds (note stashDrop's own Undo:
 // undo/slot.ts marks it undoable, not notUndoable like its four stash siblings —
@@ -238,6 +242,13 @@ var opTable = map[string]opSpec{
 	"worktreeRemove": {
 		Undo:    gitpreflight.UndoPolicy{Kind: gitpreflight.NotUndoable, Reason: "Removed worktree files cannot be recovered — there is no undo for this."},
 		Prepare: prepareWorktreeRemove,
+	},
+	// stackSet: undoable (D10) — setting or clearing a branch's stack parent is two `git config
+	// --local` writes (D2: always exactly two, always exit 0), and the undo replay is the same two
+	// writes with the branch's own PRIOR values (captureStackSetUndo, gitsession/stack.go).
+	"stackSet": {
+		Undo:    gitpreflight.UndoPolicy{Kind: gitpreflight.Undoable},
+		Prepare: prepareStackSet,
 	},
 }
 
