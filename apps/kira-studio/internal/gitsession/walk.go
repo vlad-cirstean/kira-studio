@@ -56,6 +56,14 @@ type Walk struct {
 	// page read. ensureFreshLocked (under mu, at the top of every operation) tests-and-clears both.
 	staleRefs    atomic.Bool
 	staleRefresh atomic.Bool
+
+	// searchCancel (G23 D12) cancels this walk's own in-flight search.run scan, if any — the
+	// host-side belt to the client's own abort-on-supersede brace (F8). searchGen distinguishes
+	// "my own scan finished, clear the slot" from "a NEWER scan already installed its own cancel
+	// here, leave it alone" — see (*Walk).Search's own doc comment for why a plain nil-check is
+	// not enough.
+	searchCancel context.CancelFunc
+	searchGen    uint64
 }
 
 func newWalk(entry *RepoEntry, gitPath string, spec porcelain.WalkSpec, pageSize int, precomputedTotal *int) *Walk {
@@ -101,6 +109,13 @@ func (w *Walk) resetLocked() {
 	if w.log != nil {
 		w.log.Close()
 	}
+	// G23 D12: a walk rebuild (refs moved, an explicit graph.refresh) invalidates any scan
+	// already reading the walk's OLD rev set — cancel it rather than let it finish and answer a
+	// question that is no longer being asked.
+	if w.searchCancel != nil {
+		w.searchCancel()
+		w.searchCancel = nil
+	}
 	w.store = gitstore.New()
 	w.marks = map[int]int{0: 0}
 	w.nextSeq = 0
@@ -142,6 +157,21 @@ func (w *Walk) dispose() {
 	if w.log != nil {
 		w.log.Close()
 	}
+	// G23 D12: a disposed walk must not leave an orphaned scan running against a repo ref this
+	// connection is about to release.
+	if w.searchCancel != nil {
+		w.searchCancel()
+		w.searchCancel = nil
+	}
+}
+
+// Spec returns a copy of this walk's own WalkSpec (F14) — gitsession/search.go's own source for
+// the rev set gitsearch.Scan runs against, and probe 11's ordering-identity guarantee that a hit
+// is always a row this same walk can reveal.
+func (w *Walk) Spec() porcelain.WalkSpec {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.spec
 }
 
 // Status is graph.status's own answer.
