@@ -1469,6 +1469,44 @@ the main chunk. **§2.11's figures are confirmed still current**, and its Green 
 — P21 is a docs-only sweep (§0.3 of `docs/v1.1/plans/P21-docs-refresh.md`), not a new measurement
 program.
 
+### 2.13 G3/G8 — the git module's transport, re-measured rather than re-derived
+
+Upstream's ≤300 ms first-paint budget was measured over in-process `postMessage`. v1.3 replaced
+that with a Unix socket plus FlatBuffers framing, so `docs/v1.3/SPEC.md` carried a standing note
+asking for re-measurement, not re-derivation. G3 built the probe (`TestGraphStreamPerf`) and G8
+extended it to nine (`TestG8PerfBaseline`), both in `apps/kira-studio/internal/gitsock/`. Both are
+**opt-in** — `KIRA_GIT_PERF=1`, skipped in `-short`, skipped without `git` on `PATH` — and **assert
+nothing**: each prints one `key=value` line. That is a decision, not an omission: a hard threshold
+in a suite that also runs on real macOS hardware would be flaky in exactly the way
+"re-measurement, not re-derivation" warns against.
+
+**This container (Linux, Go 1.27, git 2.43):**
+
+| Probe | Result |
+|---|---|
+| `graph.stream`, 20 000 commits, one connection | `chunks=10 firstChunk=218ms total=220ms meanBytes/chunk=42167` |
+| Same, two connections on **one** repository | A `firstChunk=230ms total=232ms`; B `233ms`/`235ms`; wall `235ms` |
+| Same, two connections on **two** repositories (8 000 commits) | A `106ms`/`110ms`; B `110ms`/`110ms`; wall `110ms` |
+| `commit.detail` x50 | solo mean `6.05ms`, p95 `7.01ms`; two connections mean `0.097ms`, p95 `0.178ms` (cache-warm) |
+| Large patch / blob | `commit.fileDiff` 282 B encoded in `97ms`; `file.read` 1.48 MB encoded (1.44 MB raw) in `49ms` |
+| Ranged walk, 200 commits — upstream's own ≤300 ms case | `total=9.5ms` |
+| Chunk-size distribution, 20 000 commits | min `42156` / mean `42167` / max `42272` / p99 `42156` bytes |
+| Watcher fan-out latency, 1 / 2 / 8 connections | all `~203-204ms` — the watcher's own 200 ms debounce, not fan-out cost |
+| `inotify` watches, 2 000 loose refs | 4 watches — a Linux proxy only; it does not answer the macOS kqueue fd-cost question, which G9 removed structurally by switching to FSEvents |
+
+**Three things this says beyond the numbers.** First, **the budget holds with margin**: a
+20 000-commit first page lands at 218-235 ms against ≤300 ms, one connection or two, and the ranged
+walk the budget was originally written for is 9.5 ms. Second, **`firstChunk ≈ total`** — all ten
+chunks leave within about 2 ms of each other, because a whole page (`logsession.DefaultPageSize =
+5000`) is read and parsed into the commit store before anything is emitted. First paint is bounded
+by `git log` plus parsing, **not** by the socket and not by FlatBuffers, so further transport
+optimisation would buy nothing and a page-size change is the lever that would. Third, a page is
+~422 KB in 10 chunks of ~42 KB — three orders of magnitude under the 8 MiB frame cap, so frame
+sizing is not a live constraint.
+
+**Not measured on real hardware.** These are container numbers, like every other figure in §2. The
+macOS equivalents belong in §3's manual procedures, which have still not been run.
+
 ## 3. Manual procedures (macOS, packaged build)
 
 Not yet run — no macOS hardware available in this environment. Run these once on macOS 14+ arm64
