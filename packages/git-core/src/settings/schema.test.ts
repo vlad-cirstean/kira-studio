@@ -156,8 +156,9 @@ describe('toVsCodeConfiguration', () => {
 });
 
 describe('repoSettingKeys', () => {
-  test('returns exactly the seven source: "repo" keys, G18 D1', () => {
+  test('returns exactly the eight source: "repo" keys, G18 D1/G24 D16', () => {
     const expected: SettingKey[] = [
+      'kiraVersion.github.enabled',
       'kiraVersion.graph.pageSize',
       'kiraVersion.graph.scope',
       'kiraVersion.log.level',

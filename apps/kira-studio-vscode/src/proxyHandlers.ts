@@ -478,6 +478,10 @@ export function createProxyHandlers(deps: CreateProxyHandlersDeps): ServerHandle
     'preflight.reset': forward('preflight.reset'),
     'preflight.cherryPick': forward('preflight.cherryPick'),
     'search.run': forward('search.run'),
+    // G24 D9: plain forwards, same as every other repoId-addressed request — both are answered
+    // entirely by the Go server.
+    'commit.resolvePr': forward('commit.resolvePr'),
+    'branch.resolvePr': forward('branch.resolvePr'),
     // G4 D3/F12: server-only, never called by the webview — plain forwarders are enough
     // (ServerHandlers.requests is total over RequestKey, so both need an entry regardless).
     'file.read': forward('file.read'),

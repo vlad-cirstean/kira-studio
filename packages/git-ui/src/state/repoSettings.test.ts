@@ -25,6 +25,7 @@ function defaultSnapshot(): RepoSettingsSnapshot {
     'kiraVersion.review.baseCandidates': SETTINGS['kiraVersion.review.baseCandidates'].default,
     'kiraVersion.pull.strategy': SETTINGS['kiraVersion.pull.strategy'].default,
     'kiraVersion.log.level': SETTINGS['kiraVersion.log.level'].default,
+    'kiraVersion.github.enabled': SETTINGS['kiraVersion.github.enabled'].default,
   };
 }
 

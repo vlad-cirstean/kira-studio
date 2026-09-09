@@ -171,6 +171,8 @@ function stubHandlers(
       'settings.setGitPath': notImplemented,
       'review.session.save': notImplemented,
       'review.session.load': notImplemented,
+      'commit.resolvePr': notImplemented,
+      'branch.resolvePr': notImplemented,
       ...requestOverrides,
     },
     streams: {

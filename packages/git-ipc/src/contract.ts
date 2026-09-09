@@ -74,6 +74,11 @@ export interface RepoSettingsSnapshot {
   readonly 'kiraVersion.review.baseCandidates': readonly string[];
   readonly 'kiraVersion.pull.strategy': 'auto' | 'ff-only' | 'merge' | 'rebase';
   readonly 'kiraVersion.log.level': 'off' | 'error' | 'warn' | 'info' | 'debug';
+  /** G24 D16: whether the GitHub PR indicator/badges/search-arm/reaper re-resolve are active for
+   *  this repository at all — genuinely per-repo (unlike log.level), default true. Off means no
+   *  `gh` probe, no spawn, no cache fill: both commit.resolvePr/branch.resolvePr answer
+   *  `{kind:'disabled'}` outright. */
+  readonly 'kiraVersion.github.enabled': boolean;
 }
 
 /** G18: `RepoSettingsSnapshot`'s own `.partial()` shape — `repoSettings.set`'s request, every leaf
@@ -761,6 +766,47 @@ export type GitStatus =
       readonly settingId: string;
     }
   | { readonly kind: 'unusable'; readonly path: string; readonly reason: string };
+
+// ---------------------------------------------------------------------------------------
+// G24: GitHub PR links (D1/D5/D14) — a structural copy of internal/ghclient.Status/PR, kept honest
+// by hand (this repo carries no wireConformance.test.ts — see G24's own commit message for why).
+// ---------------------------------------------------------------------------------------
+
+/** D5's own four-kind actionability union: "ok" ⇒ `gh` is installed, authenticated and answered;
+ *  "notFound" ⇒ `gh` could not be used at all; "unauthenticated" ⇒ `gh` works but GitHub does not
+ *  know who you are; "forbidden" ⇒ `gh` works, GitHub knows who you are, and refused or could not
+ *  answer (rate limit, SSO, scope, a 404, or a 5xx — `reason` carries which). */
+export interface GhStatus {
+  readonly kind: 'ok' | 'notFound' | 'unauthenticated' | 'forbidden';
+  readonly path?: string;
+  readonly version?: string;
+  readonly host?: string;
+  readonly account?: string;
+  readonly reason?: string;
+}
+
+/** One GitHub pull request, trimmed to exactly the fields D4 names as read. `state` is derived
+ *  server-side (D4): GitHub's own REST `state` is only ever "open"/"closed" — "merged" and "draft"
+ *  are computed from `merged_at`/`draft` before this record is ever built. */
+export interface PrRecord {
+  readonly number: number;
+  readonly title: string;
+  readonly url: string;
+  readonly state: 'open' | 'draft' | 'merged' | 'closed';
+  readonly headRef: string;
+  readonly headSha: string;
+  readonly baseRef: string;
+  /** Unix milliseconds. */
+  readonly updatedAt: number;
+}
+
+/** commit.resolvePr / branch.resolvePr's own shared result shape (D14). `"disabled"` covers both
+ *  `kiraVersion.github.enabled === false` and "no GitHub remote at all" — the grid/badge/detail
+ *  pane render nothing for either, so the two need no further distinction on the wire. */
+export type PrLookupResult =
+  | { readonly kind: 'ok'; readonly prs: readonly PrRecord[] }
+  | { readonly kind: 'disabled' }
+  | { readonly kind: 'unavailable'; readonly gh: GhStatus };
 
 export type RepoOpenResult =
   | { readonly kind: 'ok'; readonly repo: RepoSummary }
@@ -1547,6 +1593,21 @@ export type Contract = {
     'settings.setGitPath': {
       params: { gitPath: string };
       result: Record<string, never>;
+    };
+    // ---- G24: GitHub PR links (D9/D14) ------------------------------------------------------
+    /** Per-commit PR lookup, driven by the graph indicator and the detail pane's own selection
+     *  (D9): `PrState.select`'s 300ms-debounced, abort-and-recheck request. Answered entirely by
+     *  the Go server — never proxied to the extension. */
+    'commit.resolvePr': {
+      params: { repoId: string; sha: string };
+      result: PrLookupResult;
+    };
+    /** Per-branch PR lookup (D8), upstream's own branch-tip badge plus the reaper's own eager
+     *  purge trigger — `state=all` server-side, so this is the one lookup that can report a PR
+     *  that has since closed or merged. */
+    'branch.resolvePr': {
+      params: { repoId: string; branch: string };
+      result: PrLookupResult;
     };
   };
   events: {

@@ -53,7 +53,12 @@ import type { EventKey, RequestKey, StreamKey } from './contract.ts';
 // now actually serves 'search.run' for the first time -- this is the phase that ports upstream's
 // P11 tail scan into internal/gitsearch, not merely a contract-shape change for a method the
 // extension already answered on its own.
-export const CONTRACT_VERSION = 26;
+// G24 D14: 26 -> 27, for two new Go-served requests ('commit.resolvePr', 'branch.resolvePr'), four
+// new wire types (GhStatus/PrRecord/PrLookupResult and the state string union it carries), and one
+// new RepoSettingsSnapshot member ('kiraVersion.github.enabled'). Additive only -- SearchMatchField
+// is untouched (F9: the wire's own search-field union is commits-only, the PR fields live entirely
+// in git-core's client-side SearchField instead).
+export const CONTRACT_VERSION = 27;
 
 export class ContractVersionMismatchError extends Error {
   readonly received: number;
@@ -158,6 +163,8 @@ const REQUEST_KEY_MAP: Record<RequestKey, true> = {
   'settings.setGitPath': true,
   'review.session.save': true,
   'review.session.load': true,
+  'commit.resolvePr': true,
+  'branch.resolvePr': true,
 };
 const EVENT_KEY_MAP: Record<EventKey, true> = {
   'repo.changed': true,

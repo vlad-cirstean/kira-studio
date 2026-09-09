@@ -64,6 +64,19 @@ export const SETTINGS = {
   // `source: 'repo'` is what drops each out of `contributes.configuration` (toVsCodeConfiguration
   // below). kiraVersion.log.level is the one exception among the seven: it is not actually a
   // per-repo fact (`instanceWide: true`, D14) even though it lives in the same table and dialog.
+  // G24 D16: whether the GitHub PR indicator/badges/search-arm/reaper re-resolve are active for
+  // this repository at all — genuinely per-repo (unlike log.level), default true. Off means no
+  // `gh` probe, no spawn, no cache fill, no badge: both commit.resolvePr/branch.resolvePr answer
+  // {kind:'disabled'} outright.
+  'kiraVersion.github.enabled': {
+    key: 'kiraVersion.github.enabled',
+    type: 'boolean',
+    default: true,
+    description:
+      'Show pull request status for this repository (requires the GitHub CLI, `gh`, to be ' +
+      'installed and authenticated). Off disables every gh probe, spawn and badge for this repo.',
+    source: 'repo',
+  },
   'kiraVersion.graph.pageSize': {
     key: 'kiraVersion.graph.pageSize',
     type: 'number',
