@@ -4,6 +4,7 @@ import (
 	"sync"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitclient/porcelain"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitpreflight"
 )
 
 // detailCacheCap is upstream's own 64-entry cap (D7).
@@ -117,6 +118,42 @@ func (c *refsCache) drop() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.value = RefsResult{}
+	c.valid = false
+}
+
+// stackCache is stack.list's own single-value cache (G26 D3/D16) — the same "one repository, one
+// value" shape refsCache already established, dropped whole on refsChanged and by
+// invalidateAfterWrite (RunRestack and stackSet both go through the latter). Pre-flight
+// (RestackPreflight) never reads it — the same "a decision that precedes a write always takes a
+// fresh snapshot" rule D10/F16 already state for refsCache.
+type stackCache struct {
+	mu    sync.Mutex
+	value gitpreflight.StackListResult
+	valid bool
+}
+
+func newStackCache() *stackCache { return &stackCache{} }
+
+func (c *stackCache) get() (gitpreflight.StackListResult, bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if !c.valid {
+		return gitpreflight.StackListResult{}, false
+	}
+	return c.value, true
+}
+
+func (c *stackCache) set(v gitpreflight.StackListResult) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.value = v
+	c.valid = true
+}
+
+func (c *stackCache) drop() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.value = gitpreflight.StackListResult{}
 	c.valid = false
 }
 

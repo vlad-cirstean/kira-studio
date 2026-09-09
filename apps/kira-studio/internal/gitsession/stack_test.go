@@ -1,0 +1,324 @@
+package gitsession
+
+import (
+	"context"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"sync/atomic"
+	"testing"
+
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitclient"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitpreflight"
+)
+
+func skipWithoutGitStack(t *testing.T) {
+	t.Helper()
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not on PATH")
+	}
+}
+
+func runGitStack(t *testing.T, dir string, args ...string) {
+	t.Helper()
+	cmd := exec.Command("git", args...)
+	cmd.Dir = dir
+	cmd.Env = append(os.Environ(),
+		"GIT_AUTHOR_NAME=Test", "GIT_AUTHOR_EMAIL=test@example.com",
+		"GIT_COMMITTER_NAME=Test", "GIT_COMMITTER_EMAIL=test@example.com",
+	)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("git %v: %v\n%s", args, err, out)
+	}
+}
+
+func writeFileStack(t *testing.T, dir, name, content string) {
+	t.Helper()
+	if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0o644); err != nil {
+		t.Fatalf("write %s: %v", name, err)
+	}
+}
+
+// argSpawnCountingRunner wraps a real Runner, counting spawns whose argv[0] matches one of the
+// given verbs — used to prove D3's own "one config read and nothing else" cost model.
+type argSpawnCountingRunner struct {
+	gitclient.Runner
+	verbs  map[string]bool
+	counts map[string]*int32
+}
+
+func newArgSpawnCountingRunner(verbs ...string) *argSpawnCountingRunner {
+	r := &argSpawnCountingRunner{Runner: gitclient.NewExecRunner(), verbs: map[string]bool{}, counts: map[string]*int32{}}
+	for _, v := range verbs {
+		r.verbs[v] = true
+		var n int32
+		r.counts[v] = &n
+	}
+	return r
+}
+
+func (r *argSpawnCountingRunner) Start(ctx context.Context, gitPath string, spec gitclient.Spec) (gitclient.Process, error) {
+	if len(spec.Args) > 0 && r.verbs[spec.Args[0]] {
+		atomic.AddInt32(r.counts[spec.Args[0]], 1)
+	}
+	return r.Runner.Start(ctx, gitPath, spec)
+}
+
+func (r *argSpawnCountingRunner) count(verb string) int32 { return atomic.LoadInt32(r.counts[verb]) }
+
+func newStackTestEntryWithRunner(t *testing.T, runner gitclient.Runner, repoDir string) *RepoEntry {
+	t.Helper()
+	registry := NewRegistry(runner)
+	t.Cleanup(registry.Close)
+	conn := NewConn(ConnID("stack-test-conn"), "test-client", "test-client-label", nil)
+	summary, err := conn.Open(context.Background(), registry, "git", repoDir)
+	if err != nil {
+		t.Fatalf("conn.Open: %v", err)
+	}
+	t.Cleanup(conn.Close)
+	entry, ok := conn.Entry(summary.RepoID)
+	if !ok {
+		t.Fatal("conn.Entry: not held after Open")
+	}
+	return entry
+}
+
+func initUnstackedRepo(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	runGitStack(t, dir, "init", "-q", "-b", "main")
+	writeFileStack(t, dir, "f.txt", "line1\n")
+	runGitStack(t, dir, "add", "f.txt")
+	runGitStack(t, dir, "commit", "-q", "-m", "c1")
+	return dir
+}
+
+// TestStacks_UnstackedRepo_OneConfigReadNothingElse is §7.1 item 6's own Go-level proof: a
+// repository with no stacked branches costs exactly one `config` spawn (the --get-regexp read) and
+// zero `rev-list` spawns.
+func TestStacks_UnstackedRepo_OneConfigReadNothingElse(t *testing.T) {
+	skipWithoutGitStack(t)
+	dir := initUnstackedRepo(t)
+	runner := newArgSpawnCountingRunner("config", "rev-list")
+	entry := newStackTestEntryWithRunner(t, runner, dir)
+	ctx := context.Background()
+
+	result, err := entry.Stacks(ctx)
+	if err != nil {
+		t.Fatalf("Stacks: %v", err)
+	}
+	if len(result.Stacks) != 0 || len(result.Orphans) != 0 {
+		t.Fatalf("result = %+v, want empty", result)
+	}
+	if got := runner.count("config"); got != 1 {
+		t.Fatalf("config spawns = %d, want exactly 1", got)
+	}
+	if got := runner.count("rev-list"); got != 0 {
+		t.Fatalf("rev-list spawns = %d, want 0", got)
+	}
+}
+
+// TestStacks_CacheHit proves the second call costs no further config spawn.
+func TestStacks_CacheHit(t *testing.T) {
+	skipWithoutGitStack(t)
+	dir := initUnstackedRepo(t)
+	runner := newArgSpawnCountingRunner("config")
+	entry := newStackTestEntryWithRunner(t, runner, dir)
+	ctx := context.Background()
+
+	if _, err := entry.Stacks(ctx); err != nil {
+		t.Fatalf("Stacks (1st): %v", err)
+	}
+	if _, err := entry.Stacks(ctx); err != nil {
+		t.Fatalf("Stacks (2nd): %v", err)
+	}
+	if got := runner.count("config"); got != 1 {
+		t.Fatalf("config spawns = %d, want exactly 1 (second call must hit the cache)", got)
+	}
+}
+
+// TestStacks_CacheDroppedOnWrite proves invalidateAfterWrite (D16) actually drops the stack cache —
+// a branch create (an ordinary write) must make the next Stacks() re-spawn the config read.
+func TestStacks_CacheDroppedOnWrite(t *testing.T) {
+	skipWithoutGitStack(t)
+	dir := initUnstackedRepo(t)
+	runner := newArgSpawnCountingRunner("config")
+	entry := newStackTestEntryWithRunner(t, runner, dir)
+	ctx := context.Background()
+
+	if _, err := entry.Stacks(ctx); err != nil {
+		t.Fatalf("Stacks (1st): %v", err)
+	}
+	if _, err := entry.RunOp(ctx, ConnID("stack-test-conn"), "test", OpRequest{Kind: "branchCreate", Name: "topic", StartPoint: "main"}); err != nil {
+		t.Fatalf("RunOp branchCreate: %v", err)
+	}
+	if _, err := entry.Stacks(ctx); err != nil {
+		t.Fatalf("Stacks (2nd): %v", err)
+	}
+	if got := runner.count("config"); got != 2 {
+		t.Fatalf("config spawns = %d, want exactly 2 (cache must have been dropped by the write)", got)
+	}
+}
+
+// initLinearStackRepo builds main -> feat1 -> feat2, records feat2's stack parent/base, then
+// advances feat1 by one commit so feat2 is stale.
+func initLinearStackRepo(t *testing.T) (dir, feat1TipBeforeAdvance string) {
+	t.Helper()
+	dir = t.TempDir()
+	runGitStack(t, dir, "init", "-q", "-b", "main")
+	writeFileStack(t, dir, "f.txt", "line1\n")
+	runGitStack(t, dir, "add", "f.txt")
+	runGitStack(t, dir, "commit", "-q", "-m", "c1")
+
+	runGitStack(t, dir, "checkout", "-q", "-b", "feat1")
+	writeFileStack(t, dir, "a.txt", "a\n")
+	runGitStack(t, dir, "add", "a.txt")
+	runGitStack(t, dir, "commit", "-q", "-m", "c2 on feat1")
+
+	runGitStack(t, dir, "checkout", "-q", "-b", "feat2")
+	writeFileStack(t, dir, "b.txt", "b\n")
+	runGitStack(t, dir, "add", "b.txt")
+	runGitStack(t, dir, "commit", "-q", "-m", "c3 on feat2")
+
+	cmd := exec.Command("git", "rev-parse", "feat1")
+	cmd.Dir = dir
+	out, err := cmd.Output()
+	if err != nil {
+		t.Fatalf("rev-parse feat1: %v", err)
+	}
+	feat1Tip := string(out[:len(out)-1])
+
+	runGitStack(t, dir, "config", "--local", "branch.feat2.kirastackparent", "feat1")
+	runGitStack(t, dir, "config", "--local", "branch.feat2.kirastackbase", feat1Tip)
+	runGitStack(t, dir, "config", "--local", "branch.feat1.kirastackparent", "main")
+	runGitStack(t, dir, "config", "--local", "branch.feat1.kirastackbase", "")
+
+	runGitStack(t, dir, "checkout", "-q", "feat1")
+	writeFileStack(t, dir, "c.txt", "c\n")
+	runGitStack(t, dir, "add", "c.txt")
+	runGitStack(t, dir, "commit", "-q", "-m", "c4 on feat1 (advances past feat2's recorded base)")
+	runGitStack(t, dir, "checkout", "-q", "feat2")
+
+	return dir, feat1Tip
+}
+
+func TestStacks_LinearChain_RealRepo(t *testing.T) {
+	skipWithoutGitStack(t)
+	dir, _ := initLinearStackRepo(t)
+	entry := newStackTestEntryWithRunner(t, gitclient.NewExecRunner(), dir)
+	ctx := context.Background()
+
+	result, err := entry.Stacks(ctx)
+	if err != nil {
+		t.Fatalf("Stacks: %v", err)
+	}
+	if len(result.Stacks) != 1 || result.Stacks[0].Base != "main" {
+		t.Fatalf("stacks = %+v", result.Stacks)
+	}
+	branches := result.Stacks[0].Branches
+	if len(branches) != 2 || branches[0].Name != "feat1" || branches[1].Name != "feat2" {
+		t.Fatalf("branches = %+v", branches)
+	}
+	if branches[1].State != gitpreflight.StackNeedsRestack || branches[1].Behind == 0 {
+		t.Fatalf("feat2 = %+v, want needsRestack with behind > 0 (feat1 advanced)", branches[1])
+	}
+	if branches[0].State != gitpreflight.StackUpToDate {
+		t.Fatalf("feat1 = %+v, want upToDate", branches[0])
+	}
+}
+
+func TestRestackPreflight_Clean(t *testing.T) {
+	skipWithoutGitStack(t)
+	dir, _ := initLinearStackRepo(t)
+	entry := newStackTestEntryWithRunner(t, gitclient.NewExecRunner(), dir)
+	ctx := context.Background()
+
+	pf, err := entry.RestackPreflight(ctx, "feat2")
+	if err != nil {
+		t.Fatalf("RestackPreflight: %v", err)
+	}
+	if pf.Verdict != "clean" {
+		t.Fatalf("verdict = %q, want clean: %+v", pf.Verdict, pf)
+	}
+	if len(pf.Plan) != 1 || pf.Plan[0].Branch != "feat2" || pf.Plan[0].BaseSource != "recorded" {
+		t.Fatalf("plan = %+v", pf.Plan)
+	}
+	if pf.RestoresHead != "feat2" {
+		t.Fatalf("restoresHead = %q", pf.RestoresHead)
+	}
+}
+
+func TestRestackPreflight_NotStacked(t *testing.T) {
+	skipWithoutGitStack(t)
+	dir := initUnstackedRepo(t)
+	entry := newStackTestEntryWithRunner(t, gitclient.NewExecRunner(), dir)
+	ctx := context.Background()
+
+	pf, err := entry.RestackPreflight(ctx, "main")
+	if err != nil {
+		t.Fatalf("RestackPreflight: %v", err)
+	}
+	if pf.Verdict != "blocked" || len(pf.Blockers) != 1 || pf.Blockers[0].Kind != "notStacked" {
+		t.Fatalf("pf = %+v", pf)
+	}
+}
+
+func TestRestackPreflight_DirtyWorktreeBlocks(t *testing.T) {
+	skipWithoutGitStack(t)
+	dir, _ := initLinearStackRepo(t)
+	writeFileStack(t, dir, "b.txt", "dirty change\n")
+	entry := newStackTestEntryWithRunner(t, gitclient.NewExecRunner(), dir)
+	ctx := context.Background()
+
+	pf, err := entry.RestackPreflight(ctx, "feat2")
+	if err != nil {
+		t.Fatalf("RestackPreflight: %v", err)
+	}
+	if pf.Verdict != "blocked" {
+		t.Fatalf("verdict = %q, want blocked", pf.Verdict)
+	}
+	found := false
+	for _, b := range pf.Blockers {
+		if b.Kind == "dirtyWorktree" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("blockers = %+v, want a dirtyWorktree blocker", pf.Blockers)
+	}
+	if len(pf.Routes) != 1 || pf.Routes[0] != "stashFirst" {
+		t.Fatalf("routes = %v", pf.Routes)
+	}
+}
+
+// TestRestackPreflight_RecordedBaseFallsBackToMergeBase is D14/F4's own honest-degrade case: a
+// branch with NO recorded base at all still gets a plan entry, sourced from merge-base.
+func TestRestackPreflight_RecordedBaseFallsBackToMergeBase(t *testing.T) {
+	skipWithoutGitStack(t)
+	dir := t.TempDir()
+	runGitStack(t, dir, "init", "-q", "-b", "main")
+	writeFileStack(t, dir, "f.txt", "line1\n")
+	runGitStack(t, dir, "add", "f.txt")
+	runGitStack(t, dir, "commit", "-q", "-m", "c1")
+	runGitStack(t, dir, "checkout", "-q", "-b", "feat1")
+	writeFileStack(t, dir, "a.txt", "a\n")
+	runGitStack(t, dir, "add", "a.txt")
+	runGitStack(t, dir, "commit", "-q", "-m", "c2")
+	// No kirastackbase recorded at all -- only the parent pointer.
+	runGitStack(t, dir, "config", "--local", "branch.feat1.kirastackparent", "main")
+	runGitStack(t, dir, "checkout", "-q", "main")
+	writeFileStack(t, dir, "g.txt", "g\n")
+	runGitStack(t, dir, "add", "g.txt")
+	runGitStack(t, dir, "commit", "-q", "-m", "c3 on main")
+	runGitStack(t, dir, "checkout", "-q", "feat1")
+
+	entry := newStackTestEntryWithRunner(t, gitclient.NewExecRunner(), dir)
+	ctx := context.Background()
+	pf, err := entry.RestackPreflight(ctx, "feat1")
+	if err != nil {
+		t.Fatalf("RestackPreflight: %v", err)
+	}
+	if len(pf.Plan) != 1 || pf.Plan[0].BaseSource != "mergeBase" || pf.Plan[0].Base == "" {
+		t.Fatalf("plan = %+v, want a non-empty mergeBase-sourced base", pf.Plan)
+	}
+}

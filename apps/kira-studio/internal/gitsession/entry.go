@@ -61,6 +61,9 @@ type RepoEntry struct {
 	detail *detailCache
 	diff   *diffCache
 	refs   *refsCache
+	// stack is G26 D3/D16's own stack.list cache — one value per repository, dropped on
+	// refsChanged and by invalidateAfterWrite exactly like refs.
+	stack *stackCache
 
 	// headMu guards head/headStale, separate from mu (subs' own lock): every read/status/pre-flight
 	// spawn touches head far more often than it touches the subscriber set.
@@ -141,6 +144,7 @@ func newRepoEntry(
 		detail:                   newDetailCache(),
 		diff:                     newDiffCache(diffCacheCapBytes),
 		refs:                     newRefsCache(),
+		stack:                    newStackCache(),
 		head:                     summary.Head,
 		undo:                     &gitpreflight.UndoSlot{},
 		settings:                 settings,
@@ -193,6 +197,7 @@ func (e *RepoEntry) note(sig gitclient.Signal) {
 	if sig == gitclient.SignalRefsChanged {
 		e.detail.dropAll()
 		e.refs.drop()
+		e.stack.drop()
 		e.rangeCount.drop()
 		e.headMu.Lock()
 		e.headStale = true
@@ -303,6 +308,7 @@ func (e *RepoEntry) setHead(h gitclient.HeadState) {
 func (e *RepoEntry) invalidateAfterWrite() {
 	e.detail.dropAll()
 	e.refs.drop()
+	e.stack.drop()
 	e.rangeCount.drop()
 	e.headMu.Lock()
 	e.headStale = true
@@ -377,6 +383,7 @@ func (e *RepoEntry) teardown() {
 	e.detail.dropAll()
 	e.diff.clear()
 	e.refs.drop()
+	e.stack.drop()
 	e.rangeCount.drop()
 	e.undo.Set(nil)
 
