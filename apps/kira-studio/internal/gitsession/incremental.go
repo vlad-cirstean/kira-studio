@@ -154,6 +154,35 @@ func (e *RepoEntry) blobOID(rev, path string) (string, error) {
 	return info.OID, nil
 }
 
+// blobOIDs resolves the current blob oid for every path in paths, at rev, in ONE --batch-check
+// round trip rather than one per path (G30 round-1 performance review, finding #5) — RangeFiles'
+// own review-status loop is the one caller that needs many of these at once, and a long-lived
+// branch review with hundreds of previously-reviewed files paid one serialized pipe round trip
+// per file before this. Same "" (not an error) contract as blobOID for a path that does not exist
+// at rev; the returned slice is the same length as paths, in the same order.
+func (e *RepoEntry) blobOIDs(rev string, paths []string) ([]string, error) {
+	if len(paths) == 0 {
+		return nil, nil
+	}
+	session := e.CatFile()
+	if session == nil {
+		return nil, ErrRepoTornDown
+	}
+	revs := make([]string, len(paths))
+	for i, p := range paths {
+		revs[i] = rev + ":" + p
+	}
+	infos, err := session.CheckMany(revs)
+	if err != nil {
+		return nil, err
+	}
+	oids := make([]string, len(paths))
+	for i, info := range infos {
+		oids[i] = info.OID
+	}
+	return oids, nil
+}
+
 // readCurrentContent reads rev:path's content through the cat-file batch session, or the one-shot
 // fallback for a path the batch protocol cannot express (a newline in the path, F5's own rarity
 // note) — mirrors RepoEntry.Blob's own two-path shape.
@@ -437,6 +466,24 @@ func (e *RepoEntry) RangeFiles(ctx context.Context, base, branch string) (RangeF
 		return RangeFilesResult{}, err
 	}
 
+	// G30 round-1 performance review, finding #5: one batched CheckMany round trip for every
+	// changed file that actually has a stored review record, instead of one blobOID round trip
+	// per such file in the loop below.
+	var needsOID []string
+	for _, ch := range changes {
+		if _, hasRecord := records[ch.Path]; hasRecord {
+			needsOID = append(needsOID, ch.Path)
+		}
+	}
+	oids, err := e.blobOIDs(tip, needsOID)
+	if err != nil {
+		return RangeFilesResult{}, err
+	}
+	oidByPath := make(map[string]string, len(needsOID))
+	for i, p := range needsOID {
+		oidByPath[p] = oids[i]
+	}
+
 	entries := make([]ReviewFileEntry, 0, len(changes))
 	for _, ch := range changes {
 		rec, hasRecord := records[ch.Path]
@@ -444,10 +491,7 @@ func (e *RepoEntry) RangeFiles(ctx context.Context, base, branch string) (RangeF
 		if !hasRecord {
 			status = ReviewFileStatus{Kind: "none", ChangedSinceReview: false}
 		} else {
-			currentOID, oerr := e.blobOID(tip, ch.Path)
-			if oerr != nil {
-				return RangeFilesResult{}, oerr
-			}
+			currentOID := oidByPath[ch.Path]
 			status = reviewFileStatus(rec, true, currentOID != rec.BlobOID)
 		}
 		entries = append(entries, ReviewFileEntry{Change: ch, Review: status})

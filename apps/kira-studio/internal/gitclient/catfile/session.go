@@ -12,6 +12,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"strings"
 	"sync"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitclient"
@@ -177,6 +178,43 @@ func (s *Session) Check(rev string) (ObjectInfo, error) {
 		return ObjectInfo{}, ErrMissing
 	}
 	return info, nil
+}
+
+// CheckMany resolves every rev in revs via ONE --batch-check round trip — one write of all of
+// them, then all their header lines read back in the same order — rather than one request() call
+// (one write, one read, under the process's own single-request mutex) per rev (G30 round-1
+// performance review, finding #5): `cat-file --batch-check` is explicitly designed to take many
+// revisions in one write and stream back all the answers, the whole point of a persistent process
+// in the first place. The returned slice is the same length as revs, in the same order; a rev git
+// could not resolve gets a zero ObjectInfo at its own index (Check's own ErrMissing becomes a
+// per-Go-error return for a single rev, but a batch of N cannot fail some and succeed others
+// through one error return, so "missing" is a zero-value slot here instead).
+func (s *Session) CheckMany(revs []string) ([]ObjectInfo, error) {
+	if len(revs) == 0 {
+		return nil, nil
+	}
+	var sb strings.Builder
+	for _, rev := range revs {
+		sb.WriteString(rev)
+		sb.WriteByte('\n')
+	}
+	infos := make([]ObjectInfo, len(revs))
+	err := s.check.request(sb.String(), func(r *bufio.Reader) error {
+		for i := range revs {
+			info, found, rerr := readHeader(r)
+			if rerr != nil {
+				return rerr
+			}
+			if found {
+				infos[i] = info
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return infos, nil
 }
 
 // Read resolves rev and returns its content. Checks the size via --batch-check first (Check) and

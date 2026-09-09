@@ -78,6 +78,80 @@ func TestSession_Check_Missing(t *testing.T) {
 	}
 }
 
+// TestSession_CheckMany_MixOfFoundAndMissing is G30 round-1 performance review, finding #5's own
+// regression guard: CheckMany writes every rev in one request() call and must read back exactly
+// one header per rev, IN ORDER, correctly separating found entries (their own real ObjectInfo)
+// from missing ones (a zero ObjectInfo, matching Check's own "" convention) — not just for an
+// all-found or all-missing batch, but for one that interleaves both, which is where an off-by-one
+// in the response-reading loop would actually surface.
+func TestSession_CheckMany_MixOfFoundAndMissing(t *testing.T) {
+	skipWithoutGit(t)
+	dir := initRepo(t)
+	if err := os.WriteFile(filepath.Join(dir, "second.txt"), []byte("second\n"), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	cmd := exec.Command("git", "add", "second.txt")
+	cmd.Dir = dir
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("git add: %v\n%s", err, out)
+	}
+	cmd = exec.Command("git", "commit", "-q", "-m", "add second.txt")
+	cmd.Dir = dir
+	cmd.Env = append(os.Environ(), "GIT_AUTHOR_NAME=Test", "GIT_AUTHOR_EMAIL=test@example.com",
+		"GIT_COMMITTER_NAME=Test", "GIT_COMMITTER_EMAIL=test@example.com")
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("git commit: %v\n%s", err, out)
+	}
+
+	sess := catfile.NewSession(catfile.Deps{Runner: gitclient.NewExecRunner(), GitPath: "git", Dir: dir}, 0)
+	defer sess.Close()
+
+	infos, err := sess.CheckMany([]string{
+		"HEAD:hello.txt",
+		"HEAD:does-not-exist.txt",
+		"HEAD:second.txt",
+	})
+	if err != nil {
+		t.Fatalf("CheckMany: %v", err)
+	}
+	if len(infos) != 3 {
+		t.Fatalf("len(infos) = %d, want 3", len(infos))
+	}
+	if infos[0].OID == "" || infos[0].Type != "blob" {
+		t.Fatalf("infos[0] (hello.txt) = %+v, want a real found blob", infos[0])
+	}
+	if infos[1].OID != "" {
+		t.Fatalf("infos[1] (missing) = %+v, want a zero ObjectInfo", infos[1])
+	}
+	if infos[2].OID == "" || infos[2].Type != "blob" {
+		t.Fatalf("infos[2] (second.txt) = %+v, want a real found blob", infos[2])
+	}
+	if infos[0].OID == infos[2].OID {
+		t.Fatalf("hello.txt and second.txt resolved to the SAME oid (%s) — the response reader misaligned", infos[0].OID)
+	}
+
+	// The session must still work normally afterward — a misaligned read would leave the process's
+	// own response stream desynced for every subsequent request.
+	single, err := sess.Check("HEAD:hello.txt")
+	if err != nil || single.OID != infos[0].OID {
+		t.Fatalf("Check after CheckMany = %+v, %v; want the same oid as infos[0] with no error", single, err)
+	}
+}
+
+// TestSession_CheckMany_Empty proves the zero-revs edge case is a plain no-op, not a hang waiting
+// on a response that was never requested.
+func TestSession_CheckMany_Empty(t *testing.T) {
+	skipWithoutGit(t)
+	dir := initRepo(t)
+	sess := catfile.NewSession(catfile.Deps{Runner: gitclient.NewExecRunner(), GitPath: "git", Dir: dir}, 0)
+	defer sess.Close()
+
+	infos, err := sess.CheckMany(nil)
+	if err != nil || infos != nil {
+		t.Fatalf("CheckMany(nil) = %+v, %v; want nil, nil", infos, err)
+	}
+}
+
 // TestSession_Read_FoundBlob_PathWithSpace is D10's own "guard the existing fix" case (probe P3):
 // a space-containing path resolved through the ordinary batch protocol, proving readHeader's
 // suffix-based " missing" recognition does not also misfire on a *found* line whose echoed input
