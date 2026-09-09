@@ -68,6 +68,12 @@ func (r *argSpawnCountingRunner) count(verb string) int32 { return atomic.LoadIn
 
 func newStackTestEntryWithRunner(t *testing.T, runner gitclient.Runner, repoDir string) *RepoEntry {
 	t.Helper()
+	_, entry := newStackTestConnAndEntry(t, runner, repoDir)
+	return entry
+}
+
+func newStackTestConnAndEntry(t *testing.T, runner gitclient.Runner, repoDir string) (*Conn, *RepoEntry) {
+	t.Helper()
 	registry := NewRegistry(runner)
 	t.Cleanup(registry.Close)
 	conn := NewConn(ConnID("stack-test-conn"), "test-client", "test-client-label", nil)
@@ -80,7 +86,7 @@ func newStackTestEntryWithRunner(t *testing.T, runner gitclient.Runner, repoDir 
 	if !ok {
 		t.Fatal("conn.Entry: not held after Open")
 	}
-	return entry
+	return conn, entry
 }
 
 func initUnstackedRepo(t *testing.T) string {
@@ -584,6 +590,317 @@ func TestRunOp_BranchDelete_ReparentsChildren(t *testing.T) {
 	}
 	if !found {
 		t.Fatal("feat1 must exist again after undo")
+	}
+}
+
+// ---------------------------------------------------------------------------------------
+// stack.restack (D6/D8/D9/D11)
+// ---------------------------------------------------------------------------------------
+
+// initThreeLevelStack builds main -> feat1 -> feat2 -> feat3, each with its own file so no rebase
+// ever conflicts unless the caller deliberately introduces one, then advances feat1 by one commit
+// (in its own file) so BOTH feat2 (directly stale) and feat3 (ancestorRestacked) need a restack.
+// Leaves feat3 checked out.
+func initThreeLevelStack(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	runGitStack(t, dir, "init", "-q", "-b", "main")
+	writeFileStack(t, dir, "m.txt", "m\n")
+	runGitStack(t, dir, "add", "m.txt")
+	runGitStack(t, dir, "commit", "-q", "-m", "c1")
+
+	runGitStack(t, dir, "checkout", "-q", "-b", "feat1")
+	writeFileStack(t, dir, "a.txt", "a\n")
+	runGitStack(t, dir, "add", "a.txt")
+	runGitStack(t, dir, "commit", "-q", "-m", "c2 feat1")
+
+	runGitStack(t, dir, "checkout", "-q", "-b", "feat2")
+	writeFileStack(t, dir, "b.txt", "b\n")
+	runGitStack(t, dir, "add", "b.txt")
+	runGitStack(t, dir, "commit", "-q", "-m", "c3 feat2")
+
+	runGitStack(t, dir, "checkout", "-q", "-b", "feat3")
+	writeFileStack(t, dir, "c.txt", "c\n")
+	runGitStack(t, dir, "add", "c.txt")
+	runGitStack(t, dir, "commit", "-q", "-m", "c4 feat3")
+
+	for _, pair := range [][2]string{{"feat1", "main"}, {"feat2", "feat1"}, {"feat3", "feat2"}} {
+		child, parent := pair[0], pair[1]
+		cmd := exec.Command("git", "rev-parse", parent)
+		cmd.Dir = dir
+		out, err := cmd.Output()
+		if err != nil {
+			t.Fatalf("rev-parse %s: %v", parent, err)
+		}
+		tip := string(out[:len(out)-1])
+		runGitStack(t, dir, "config", "--local", "branch."+child+".kirastackparent", parent)
+		runGitStack(t, dir, "config", "--local", "branch."+child+".kirastackbase", tip)
+	}
+
+	runGitStack(t, dir, "checkout", "-q", "feat1")
+	writeFileStack(t, dir, "a2.txt", "a2\n")
+	runGitStack(t, dir, "add", "a2.txt")
+	runGitStack(t, dir, "commit", "-q", "-m", "c5 feat1 advances")
+	runGitStack(t, dir, "checkout", "-q", "feat3")
+	return dir
+}
+
+func TestRunRestack_FullSuccess(t *testing.T) {
+	skipWithoutGitStack(t)
+	dir := initThreeLevelStack(t)
+	conn, entry := newStackTestConnAndEntry(t, gitclient.NewExecRunner(), dir)
+	ctx := context.Background()
+
+	result, err := entry.RunRestack(ctx, conn, "feat3")
+	if err != nil {
+		t.Fatalf("RunRestack: %v", err)
+	}
+	if !result.OK {
+		t.Fatalf("result = %+v, want ok", result)
+	}
+	if len(result.Restacked) != 2 || result.Restacked[0] != "feat2" || result.Restacked[1] != "feat3" {
+		t.Fatalf("restacked = %v, want [feat2 feat3]", result.Restacked)
+	}
+	if result.Undo == nil {
+		t.Fatal("a fully successful restack must set an undo record (D8/D11)")
+	}
+	if result.Head.Kind != "branch" || result.Head.Name != "feat3" {
+		t.Fatalf("head = %+v, want restored to feat3 (F5)", result.Head)
+	}
+
+	stacks, err := entry.Stacks(ctx)
+	if err != nil {
+		t.Fatalf("Stacks: %v", err)
+	}
+	if len(stacks.Stacks) != 1 || stacks.Stacks[0].NeedsRestack {
+		t.Fatalf("stacks after restack = %+v, want none stale", stacks.Stacks)
+	}
+}
+
+// TestRunRestack_ConflictStopsLoopSetsNoUndo is §7.1 item 7's own exact exit criterion.
+func TestRunRestack_ConflictStopsLoopSetsNoUndo(t *testing.T) {
+	skipWithoutGitStack(t)
+	dir := t.TempDir()
+	runGitStack(t, dir, "init", "-q", "-b", "main")
+	writeFileStack(t, dir, "shared.txt", "line1\nline2\nline3\n")
+	runGitStack(t, dir, "add", "shared.txt")
+	runGitStack(t, dir, "commit", "-q", "-m", "c1")
+
+	runGitStack(t, dir, "checkout", "-q", "-b", "feat1")
+	writeFileStack(t, dir, "a.txt", "a\n")
+	runGitStack(t, dir, "add", "a.txt")
+	runGitStack(t, dir, "commit", "-q", "-m", "c2 feat1")
+
+	runGitStack(t, dir, "checkout", "-q", "-b", "feat2")
+	writeFileStack(t, dir, "shared.txt", "line1\nline2-feat2\nline3\n")
+	runGitStack(t, dir, "add", "shared.txt")
+	runGitStack(t, dir, "commit", "-q", "-m", "c3 feat2 (will conflict)")
+
+	for _, pair := range [][2]string{{"feat1", "main"}, {"feat2", "feat1"}} {
+		child, parent := pair[0], pair[1]
+		cmd := exec.Command("git", "rev-parse", parent)
+		cmd.Dir = dir
+		out, err := cmd.Output()
+		if err != nil {
+			t.Fatalf("rev-parse %s: %v", parent, err)
+		}
+		tip := string(out[:len(out)-1])
+		runGitStack(t, dir, "config", "--local", "branch."+child+".kirastackparent", parent)
+		runGitStack(t, dir, "config", "--local", "branch."+child+".kirastackbase", tip)
+	}
+
+	// feat1 advances by editing the SAME line feat2 also touched -- guarantees the conflict.
+	runGitStack(t, dir, "checkout", "-q", "feat1")
+	writeFileStack(t, dir, "shared.txt", "line1\nline2-feat1\nline3\n")
+	runGitStack(t, dir, "add", "shared.txt")
+	runGitStack(t, dir, "commit", "-q", "-m", "c4 feat1 advances (conflicting edit)")
+	runGitStack(t, dir, "checkout", "-q", "feat2")
+
+	conn, entry := newStackTestConnAndEntry(t, gitclient.NewExecRunner(), dir)
+	ctx := context.Background()
+
+	before, err := entry.Stacks(ctx)
+	if err != nil {
+		t.Fatalf("Stacks (before): %v", err)
+	}
+	if !before.Stacks[0].NeedsRestack {
+		t.Fatal("fixture setup: expected feat2 to need a restack")
+	}
+
+	result, err := entry.RunRestack(ctx, conn, "feat2")
+	if err != nil {
+		t.Fatalf("RunRestack: %v", err)
+	}
+	if result.OK {
+		t.Fatalf("result = %+v, want a conflict, not ok", result)
+	}
+	if result.Error == nil || result.Error.Kind != "Conflict" {
+		t.Fatalf("result.Error = %+v, want Kind = Conflict", result.Error)
+	}
+	if result.StoppedAt == nil || *result.StoppedAt != "feat2" {
+		t.Fatalf("stoppedAt = %v, want feat2", result.StoppedAt)
+	}
+	if len(result.Restacked) != 0 {
+		t.Fatalf("restacked = %v, want none (feat2 was the only, and only, planned branch)", result.Restacked)
+	}
+	if result.Undo != nil {
+		t.Fatal("D8: a conflicting restack must set NO undo record")
+	}
+	if result.InProgress == nil || result.InProgress.Kind != gitpreflight.InProgressRebase {
+		t.Fatalf("inProgress = %+v, want a rebase in progress (G5's own banner surfaces this)", result.InProgress)
+	}
+
+	// Clean up: abort the paused rebase so later tests in this file are unaffected by leftover
+	// .git/rebase-merge state (this file's own tests each build a fresh t.TempDir, but be tidy).
+	runGitStack(t, dir, "rebase", "--abort")
+}
+
+// TestRunRestack_SecondCallWhileRunningIsRefusedNoSpawn proves the ≤1-per-repository slot (D6/D9):
+// a second stack.restack call while the first is active answers OperationInProgress with no spawn,
+// and leaves the first restack's own eventual result untouched.
+func TestRunRestack_SecondCallWhileRunningIsRefusedNoSpawn(t *testing.T) {
+	skipWithoutGitStack(t)
+	dir := initThreeLevelStack(t)
+	conn, entry := newStackTestConnAndEntry(t, gitclient.NewExecRunner(), dir)
+	ctx := context.Background()
+
+	if !entry.restack.claim(func() {}) {
+		t.Fatal("test setup: claim should succeed on an idle slot")
+	}
+	defer entry.restack.release()
+
+	result, err := entry.RunRestack(ctx, conn, "feat3")
+	if err != nil {
+		t.Fatalf("RunRestack: %v", err)
+	}
+	if result.OK || result.Error == nil || result.Error.Kind != "OperationInProgress" {
+		t.Fatalf("result = %+v, want OperationInProgress", result)
+	}
+}
+
+func TestRunRestack_NotStackedBlocked(t *testing.T) {
+	skipWithoutGitStack(t)
+	dir := initUnstackedRepo(t)
+	conn, entry := newStackTestConnAndEntry(t, gitclient.NewExecRunner(), dir)
+	ctx := context.Background()
+
+	result, err := entry.RunRestack(ctx, conn, "main")
+	if err != nil {
+		t.Fatalf("RunRestack: %v", err)
+	}
+	if result.OK || result.Error == nil || result.Error.Kind != "Unknown" {
+		t.Fatalf("result = %+v, want a blocked (notStacked) refusal", result)
+	}
+}
+
+func TestRunRestack_NoopWhenAlreadyUpToDate(t *testing.T) {
+	skipWithoutGitStack(t)
+	dir := initTwoLevelStack(t)
+	conn, entry := newStackTestConnAndEntry(t, gitclient.NewExecRunner(), dir)
+	ctx := context.Background()
+	runGitStack(t, dir, "checkout", "-q", "feat2")
+
+	result, err := entry.RunRestack(ctx, conn, "feat2")
+	if err != nil {
+		t.Fatalf("RunRestack: %v", err)
+	}
+	if !result.OK || len(result.Restacked) != 0 {
+		t.Fatalf("result = %+v, want a no-op success", result)
+	}
+}
+
+// TestRunRestack_UndoReplayOrder is §7.1 item 8's own exact exit criterion: a fully successful
+// restack's undo replay is switch -> update-ref(s) -> config(s) -> reset --keep, in that order, and
+// replaying it actually restores the pre-restack state.
+func TestRunRestack_UndoReplayOrder(t *testing.T) {
+	skipWithoutGitStack(t)
+	dir := initThreeLevelStack(t)
+	conn, entry := newStackTestConnAndEntry(t, gitclient.NewExecRunner(), dir)
+	ctx := context.Background()
+
+	feat2TipBefore := revParseStack(t, dir, "feat2")
+	feat3TipBefore := revParseStack(t, dir, "feat3")
+
+	result, err := entry.RunRestack(ctx, conn, "feat3")
+	if err != nil || !result.OK || result.Undo == nil {
+		t.Fatalf("RunRestack: result=%+v err=%v", result, err)
+	}
+
+	undoResult, err := entry.UndoRun(ctx, result.Undo.ID)
+	if err != nil {
+		t.Fatalf("UndoRun: %v", err)
+	}
+	if !undoResult.OK {
+		t.Fatalf("undoResult = %+v, want ok", undoResult)
+	}
+
+	if got := revParseStack(t, dir, "feat2"); got != feat2TipBefore {
+		t.Fatalf("feat2 tip after undo = %s, want restored to %s", got, feat2TipBefore)
+	}
+	if got := revParseStack(t, dir, "feat3"); got != feat3TipBefore {
+		t.Fatalf("feat3 tip after undo = %s, want restored to %s", got, feat3TipBefore)
+	}
+	headBranch := currentBranchStack(t, dir)
+	if headBranch != "feat3" {
+		t.Fatalf("HEAD after undo = %s, want feat3 (the switch step ran first)", headBranch)
+	}
+}
+
+func revParseStack(t *testing.T, dir, ref string) string {
+	t.Helper()
+	cmd := exec.Command("git", "rev-parse", ref)
+	cmd.Dir = dir
+	out, err := cmd.Output()
+	if err != nil {
+		t.Fatalf("rev-parse %s: %v", ref, err)
+	}
+	return string(out[:len(out)-1])
+}
+
+func currentBranchStack(t *testing.T, dir string) string {
+	t.Helper()
+	cmd := exec.Command("git", "symbolic-ref", "--short", "HEAD")
+	cmd.Dir = dir
+	out, err := cmd.Output()
+	if err != nil {
+		t.Fatalf("symbolic-ref: %v", err)
+	}
+	return string(out[:len(out)-1])
+}
+
+func TestCancelRestack_IdleReportsFalse(t *testing.T) {
+	var e RepoEntry
+	if e.CancelRestack() {
+		t.Fatal("cancelling an idle restack slot must report false")
+	}
+}
+
+func TestRestackSlot_ClaimReleaseCancel(t *testing.T) {
+	var s restackSlot
+	if !s.claim(func() {}) {
+		t.Fatal("first claim should succeed")
+	}
+	if s.claim(func() {}) {
+		t.Fatal("a second claim while occupied should be refused")
+	}
+	s.release()
+	cancelled := false
+	s.claim(func() { cancelled = true })
+	if !s.tryCancel() {
+		t.Fatal("cancelling an active slot must report true")
+	}
+	if !cancelled {
+		t.Fatal("cancel() must have been called")
+	}
+}
+
+func TestRestackSlot_ForceCancel(t *testing.T) {
+	var s restackSlot
+	cancelled := false
+	s.claim(func() { cancelled = true })
+	s.forceCancel()
+	if !cancelled {
+		t.Fatal("forceCancel must cancel")
 	}
 }
 

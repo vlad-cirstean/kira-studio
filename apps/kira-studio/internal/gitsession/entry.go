@@ -126,6 +126,9 @@ type RepoEntry struct {
 	// prepare is G25 D13's own "≤1 prepare run per repository" box — teardown force-cancels it
 	// exactly like remoteOp.
 	prepare prepareOpSlot
+	// restack is G26 D6/D9's own "≤1 restack run per repository" box — teardown force-cancels it
+	// exactly like remoteOp/prepare.
+	restack restackSlot
 
 	done chan struct{}
 }
@@ -375,6 +378,7 @@ func (e *RepoEntry) teardown() {
 	e.stopAutoFetch()
 	e.remoteOp.forceCancel()
 	e.prepare.forceCancel() // G25 D13/3.12: a prepare run in flight is killed, not left orphaned.
+	e.restack.forceCancel() // G26 D6/D9: a restack in flight is killed, not left orphaned.
 	_ = e.watcher.Close()
 	<-e.done
 
