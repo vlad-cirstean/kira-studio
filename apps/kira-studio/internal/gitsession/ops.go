@@ -58,8 +58,19 @@ type OpRequest struct {
 	// ConfirmToken is G22's own addition (D8): reset's own typed confirmation, required (and
 	// re-checked host-side by prepareReset) exactly when Mode == "hard" and destroys, recomputed
 	// fresh from a status read immediately before the write, is non-empty. A pointer: the wire's
-	// own `string | undefined` (contract.ts's own OpRequest.reset.confirmToken).
-	ConfirmToken *string `json:"confirmToken,omitempty"` // reset
+	// own `string | undefined` (contract.ts's own OpRequest.reset.confirmToken). G25 reuses this
+	// same field for worktreeRemove's own typed confirmation (the worktree's basename, D8) — same
+	// "optional, re-checked host-side against a fresh recompute" shape, different op kind.
+	ConfirmToken *string `json:"confirmToken,omitempty"` // reset, worktreeRemove
+
+	// Path is G25 D2's own addition — worktreeAdd's target path and worktreeRemove's target
+	// worktree, both absolute (the client always resolves against basePath/the repo root before
+	// sending). Mode/Branch/StartPoint/Force above are ALL reused as-is for the two new kinds:
+	// Mode carries worktreeAdd's "existingBranch"|"newBranch"|"detach", Branch its branch name,
+	// StartPoint its explicit commit-ish, and Force worktreeRemove's own client-claimed force —
+	// though prepareWorktreeRemove never actually trusts that claim, recomputing it fresh from the
+	// server-side preflight verdict instead (D8's own fail-safe-over-fail-open principle).
+	Path string `json:"path,omitempty"` // worktreeAdd, worktreeRemove
 }
 
 // OpError mirrors @kira/git-ipc's own op.run/undo.run per-op error shape.
@@ -211,6 +222,22 @@ var opTable = map[string]opSpec{
 		Undo:       gitpreflight.UndoPolicy{Kind: gitpreflight.Undoable},
 		Prepare:    prepareCherryPick,
 		Reclassify: reclassifyCherryPick,
+	},
+	// worktreeAdd: notUndoable (F8/D2) — a created worktree is a fresh directory plus a fresh
+	// branch/detached checkout; "undo" would mean deleting a worktree, which is itself
+	// worktreeRemove's own destructive, typed-confirmation path, never a one-click silent undo.
+	"worktreeAdd": {
+		Undo:    gitpreflight.UndoPolicy{Kind: gitpreflight.NotUndoable, Reason: "Remove the worktree to undo this."},
+		Prepare: prepareWorktreeAdd,
+	},
+	// worktreeRemove: notUndoable (F8) — a removed worktree's own modified/untracked files are not
+	// recoverable by any git argv at all (F8's own doc comment); this is the one kind in the whole
+	// opTable whose "undo" would require restoring deleted files from nowhere, so it is never
+	// offered even the honest "no undo" framing a ref-only op gets — G22 D8's typed-confirmation
+	// pattern (prepareWorktreeRemove) is what stands in for undo here instead.
+	"worktreeRemove": {
+		Undo:    gitpreflight.UndoPolicy{Kind: gitpreflight.NotUndoable, Reason: "Removed worktree files cannot be recovered — there is no undo for this."},
+		Prepare: prepareWorktreeRemove,
 	},
 }
 

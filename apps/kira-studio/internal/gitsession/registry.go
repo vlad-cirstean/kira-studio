@@ -69,6 +69,15 @@ type Registry struct {
 	RepoSettingsGet func(repoID string) (model.GitRepoSettings, error)
 	RepoSettingsSet func(repoID string, patch model.GitRepoSettingsPatch) (model.GitRepoSettings, error)
 
+	// PrepareScriptApprovalGet/PrepareScriptApprovalSet are G25 D11's own server-only accessors
+	// (storage/repos.GitRepoSettingsRepo.{Get,Set}PrepareScriptApproval) — threaded the same way as
+	// RepoSettingsGet/Set above, but never exposed anywhere near RepoSettingsGet/Set's own public
+	// surface (F15). Defaulted to "no approval is ever on file, and no approval can ever be
+	// recorded" — a Registry built by hand (a test) that never overrides these simply always
+	// requires a fresh approval, the fail-safe default for a security-relevant accessor.
+	PrepareScriptApprovalGet func(repoID string) (sha string, ok bool, err error)
+	PrepareScriptApprovalSet func(repoID, sha string) error
+
 	// Review is G11 D3's own seam: review.db's whole surface, defaulted below to a Store over
 	// gitreview.DefaultPath(). Construction is free (the file opens lazily, on the first review
 	// request) — an instance that never serves one never creates review.db and never starts its
@@ -101,7 +110,9 @@ func NewRegistry(runner gitclient.Runner) *Registry {
 		RepoSettingsSet: func(string, model.GitRepoSettingsPatch) (model.GitRepoSettings, error) {
 			return model.DefaultGitRepoSettings(), nil
 		},
-		Review: gitreview.NewStore(gitreview.DefaultPath()),
+		PrepareScriptApprovalGet: func(string) (string, bool, error) { return "", false, nil },
+		PrepareScriptApprovalSet: func(string, string) error { return nil },
+		Review:                   gitreview.NewStore(gitreview.DefaultPath()),
 		Gh: ghclient.NewClient(
 			ghclient.NewDiscovery(ghclient.NewPlatformLocator(), ghclient.NewExecRunner(), ghclient.NewRealClock()),
 			ghclient.NewExecRunner(),
@@ -138,7 +149,10 @@ func (reg *Registry) Acquire(ctx context.Context, gitPath, path string) (*RepoEn
 		return nil, nil, err
 	}
 	repo := gitclient.NewRepo(summary, reg.runner, gitPath)
-	entry := newRepoEntry(summary, repo, w, reg.Settings, reg.RepoSettingsGet, reg.Review, reg.Gh)
+	entry := newRepoEntry(
+		summary, repo, w, reg.Settings, reg.RepoSettingsGet, reg.Review, reg.Gh,
+		reg.IsOpen, reg.PrepareScriptApprovalGet, reg.PrepareScriptApprovalSet,
+	)
 	reg.entries[summary.RepoID] = &slot{entry: entry, refs: 1}
 	return entry, reg.releaseFunc(summary.RepoID), nil
 }
@@ -191,6 +205,25 @@ func (reg *Registry) expire(repoID string) {
 	reg.mu.Unlock()
 
 	sl.entry.teardown()
+}
+
+// IsOpen is G25 F7/D8's own cross-window query — the first query this Registry has ever answered
+// about another connection's state rather than its own caller's: does repoID currently have at
+// least one live connection holding it open (refs > 0)? A LINGERING entry (refcount zero, mid
+// grace-period after every window that had it open has already closed) answers false: nothing is
+// actually showing that repository right now, so a `worktree remove` targeting it would not yank a
+// window out from under anyone — only an entry some connection is genuinely holding open answers
+// true. Used with the TARGET worktree's own repoID (its absolute root path, since a linked
+// worktree is its own RepoEntry with its own RepoID, F6) — the calling connection's own ref lives
+// under ITS OWN repoID, which is a different key whenever the target is a DIFFERENT worktree, so
+// this never confuses "open in another window" with "this is the window asking" (ClassifyWorktree
+// Remove's own currentWorktree blocker already covers that case by comparing paths directly, not
+// through this method).
+func (reg *Registry) IsOpen(repoID string) bool {
+	reg.mu.Lock()
+	defer reg.mu.Unlock()
+	sl, ok := reg.entries[repoID]
+	return ok && sl.refs > 0
 }
 
 // Close tears down every entry immediately, linger notwithstanding — for gitsock.Server.Close(), a

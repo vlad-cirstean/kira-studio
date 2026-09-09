@@ -19,8 +19,8 @@ import (
 // legal values, and every notUndoable entry must carry a real, non-empty reason (never a
 // placeholder — §7.12's "we never present an undo we cannot honour").
 func TestOpTable_EveryEntryStatesAnUndoPolicy(t *testing.T) {
-	if len(opTable) != 17 {
-		t.Fatalf("opTable has %d entries, want exactly 17 (D5, G22 adds reset/cherryPick)", len(opTable))
+	if len(opTable) != 19 {
+		t.Fatalf("opTable has %d entries, want exactly 19 (D5, G25 adds worktreeAdd/worktreeRemove)", len(opTable))
 	}
 	for kind, spec := range opTable {
 		switch spec.Undo.Kind {
@@ -41,14 +41,14 @@ func TestOpTable_EveryEntryStatesAnUndoPolicy(t *testing.T) {
 	}
 }
 
-// TestOpTable_ServesExactlyTheSeventeenNamedKinds locks D5's own list, updated by G22's two new
+// TestOpTable_ServesExactlyTheNineteenNamedKinds locks D5's own list, updated by G25's two new
 // entries — a kind absent here answers ErrUnservedOpKind, never a stub.
-func TestOpTable_ServesExactlyTheSeventeenNamedKinds(t *testing.T) {
+func TestOpTable_ServesExactlyTheNineteenNamedKinds(t *testing.T) {
 	want := []string{
 		"checkout", "branchCreate", "branchDelete", "branchRename",
 		"tagCreate", "tagDelete", "revert", "opContinue", "opAbort", "opSkip",
 		"stashPush", "stashApply", "stashPop", "stashDrop", "stashBranch",
-		"reset", "cherryPick",
+		"reset", "cherryPick", "worktreeAdd", "worktreeRemove",
 	}
 	for _, k := range want {
 		if _, ok := opTable[k]; !ok {

@@ -129,6 +129,10 @@ func main() {
 	// log.level sentinel substitution happens entirely inside that repo, invisibly here.
 	gitRegistry.RepoSettingsGet = repositories.GitRepoSettings.Get
 	gitRegistry.RepoSettingsSet = repositories.GitRepoSettings.Set
+	// G25 D11: the prepare script's own server-only approval accessors — never exposed through
+	// RepoSettingsGet/Set above.
+	gitRegistry.PrepareScriptApprovalGet = repositories.GitRepoSettings.GetPrepareScriptApproval
+	gitRegistry.PrepareScriptApprovalSet = repositories.GitRepoSettings.SetPrepareScriptApproval
 	// G7 D8: a broker that fails to start is logged and left nil — every remote op then runs with
 	// no askpass interposition at all, D10's own already-supported "user's own askpass wins" path,
 	// not a new failure mode. It must never be fatal to boot (same posture as the socket below).
