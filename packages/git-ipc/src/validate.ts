@@ -46,7 +46,14 @@ import type { EventKey, RequestKey, StreamKey } from './contract.ts';
 // at CONTRACT_VERSION 24. Moves for the same reason 'ui.action' first did (G10 D9): this constant
 // is the sole compatibility authority, even though the Go server neither emits nor parses
 // 'ui.action' at all.
-export const CONTRACT_VERSION = 25;
+// G23 D6/D13: 25 -> 26, for one new 'SearchRunResult' member, 'unsupportedPattern' -- a
+// `regex`-mode pattern using lookahead/lookbehind/a backreference, syntax the Go tail scan's RE2
+// engine cannot express at all (docs/v1.3/SPEC.md:446-450's own "a hit's presence must not depend
+// on which page happens to be loaded"). Unlike every earlier bump in this history, the Go server
+// now actually serves 'search.run' for the first time -- this is the phase that ports upstream's
+// P11 tail scan into internal/gitsearch, not merely a contract-shape change for a method the
+// extension already answered on its own.
+export const CONTRACT_VERSION = 26;
 
 export class ContractVersionMismatchError extends Error {
   readonly received: number;

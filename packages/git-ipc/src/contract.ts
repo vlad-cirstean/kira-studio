@@ -943,7 +943,12 @@ export type SearchRunResult =
       readonly complete: boolean;
     }
   /** Never thrown (probe 4): a pattern the UI would not send still comes back as data. */
-  | { readonly kind: 'invalidPattern'; readonly message: string };
+  | { readonly kind: 'invalidPattern'; readonly message: string }
+  /** G23: the pattern is valid JavaScript (the client compiled it before sending) but uses
+   *  syntax the Go tail scan's RE2 engine cannot run — lookahead, lookbehind, or a backreference.
+   *  The loaded-commit half of the search is unaffected and still complete; only the not-yet-
+   *  walked tail (and therefore any body-only match) is missing. */
+  | { readonly kind: 'unsupportedPattern'; readonly message: string };
 
 /** G10 D9: the palette's own route into an already-mounted webview. `RpcServer.emit` is the only
  *  way the extension host can reach a live webview (contract-gated exactly like the socket), so
