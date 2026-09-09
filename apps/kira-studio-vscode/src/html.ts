@@ -8,6 +8,7 @@
  * repo-root `dist/`: this repo's `package.json#main` is `./dist/extension.js` (G1 §5.4), and
  * `packages/git-ui/vite.config.ts` writes its own output to this same package's `dist/ui`.
  */
+import { randomInt } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { CONTRACT_VERSION, type UiActionKind } from '@kira/git-ipc';
 import * as vscode from 'vscode';
@@ -38,10 +39,15 @@ function resolveUiAssets(webview: vscode.Webview, distUi: vscode.Uri): UiAssets 
   };
 }
 
+/** G30 round-1 architecture/security review, finding #3: this CSP `script-src 'nonce-…'` is the
+ *  one thing standing between a maliciously-named branch's webview-bootstrap HTML injection (see
+ *  `buildWebviewDocument`'s own escaping fix) and arbitrary script execution — `Math.random()` is
+ *  not a CSPRNG (it shares one V8 PRNG stream with, among other things, `connection.ts`'s
+ *  reconnect jitter) and a predictable nonce defeats that defence. `randomInt` is Node's CSPRNG. */
 function nonce(): string {
   const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
   let out = '';
-  for (let i = 0; i < 32; i++) out += alphabet[Math.floor(Math.random() * alphabet.length)];
+  for (let i = 0; i < 32; i++) out += alphabet[randomInt(alphabet.length)];
   return out;
 }
 

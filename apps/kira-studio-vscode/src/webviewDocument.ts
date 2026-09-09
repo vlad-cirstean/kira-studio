@@ -76,6 +76,15 @@ export function buildWebviewDocument(opts: WebviewDocumentOptions): string {
     ...(view === 'graph' ? [`worker-src ${cspSource} blob:`] : []),
   ].join('; ');
 
+  // G30 round-1 architecture/security review, finding #3: `bootstrap` carries repository-supplied
+  // strings (a branch name, reachable through `review.open`) into this island, and
+  // `JSON.stringify` does not escape "<" — `git check-ref-format` permits it, so a branch named
+  // e.g. `a</script><script>…` closes this JSON island early and injects arbitrary markup into the
+  // document. Escaping "<" to its JSON-safe `<` unicode escape is the standard fix (the
+  // resulting text is still valid, identical JSON — `<` decodes back to "<"), and is why the
+  // CSP nonce above is a real, load-bearing second line of defence rather than decoration.
+  const bootstrapJson = JSON.stringify(bootstrap).replace(/</g, '\\u003c');
+
   return `<!doctype html>
 <html lang="en">
   <head>
@@ -87,7 +96,7 @@ export function buildWebviewDocument(opts: WebviewDocumentOptions): string {
   </head>
   <body>
     <div id="app"></div>
-    <script type="application/json" id="kira-bootstrap">${JSON.stringify(bootstrap)}</script>
+    <script type="application/json" id="kira-bootstrap">${bootstrapJson}</script>
     <script type="module" nonce="${nonce}" src="${scriptUrl}"></script>
   </body>
 </html>`;
