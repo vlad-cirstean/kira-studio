@@ -24,7 +24,7 @@ import { graphColumnWidth } from '../graph/geometry.ts';
 import { isHeadDecoration } from '../graph/rowSvg.ts';
 import type { ColumnWidths, DateFormat } from '../state/viewState.ts';
 import { formatAbsoluteDate, formatRelativeDate } from './dateFormat.ts';
-import { buildPrBadge, buildRefBadges } from './refBadges.ts';
+import { buildPrBadge, buildRefBadges, type StackBadgeInfo } from './refBadges.ts';
 import { splitHighlights } from './searchHighlight.ts';
 
 /** Every field a column's `field:` must name is a valid dotted path into `CommitRecord`
@@ -85,6 +85,18 @@ export interface PrContext {
 
 const NO_PR_CONTEXT: PrContext = { prsFor: () => undefined };
 
+/** G26 D-4.10/F12: the message column's own accessor onto a branch's stack decoration — a fourth
+ *  instance of `MessageSearchContext`/`LaneColorContext`/`PrContext`'s own convention, re-read on
+ *  every render pass. `CommitGrid.vue`'s own `stack.generation` watcher (F12's fourth instance)
+ *  triggers a re-render on a new `stack.list`, never a column rebuild. `stackInfoFor` returns
+ *  `undefined` for every branch that is not a stack member — `refBadges.ts`'s own "render
+ *  nothing" rule, restated here. */
+export interface StackContext {
+  readonly stackInfoFor: (branchName: string) => StackBadgeInfo | undefined;
+}
+
+const NO_STACK_CONTEXT: StackContext = { stackInfoFor: () => undefined };
+
 /** The message cell is a flex row (`CommitGrid.vue`'s `<style>`): `refBadges.ts`'s badge strip
  *  (only when the row has decorations — most rows do not, and get no wrapper at all) followed by
  *  the subject, which alone gets `text-overflow: ellipsis` — a CSS rule on `.kv-message-subject`,
@@ -96,12 +108,17 @@ function messageFormatter(
   ctx: MessageSearchContext,
   laneCtx: LaneColorContext,
   prCtx: PrContext = NO_PR_CONTEXT,
+  stackCtx: StackContext = NO_STACK_CONTEXT,
 ): Formatter<CommitRecord> {
   return (row, _cell, _value, _columnDef, dataContext) => {
     const cell = document.createElement('span');
     cell.className = 'kv-cell-message';
 
-    const badges = buildRefBadges(dataContext.decoration, laneCtx.colorOf(row));
+    const badges = buildRefBadges(
+      dataContext.decoration,
+      laneCtx.colorOf(row),
+      stackCtx.stackInfoFor,
+    );
     if (badges !== null) cell.appendChild(badges);
 
     // G24 D9: placed after the ref badges, before the subject.
@@ -186,6 +203,7 @@ export function buildColumns(
   searchCtx: MessageSearchContext = NO_SEARCH_CONTEXT,
   laneCtx: LaneColorContext = NO_LANE_COLOR_CONTEXT,
   prCtx: PrContext = NO_PR_CONTEXT,
+  stackCtx: StackContext = NO_STACK_CONTEXT,
 ): Column<CommitRecord>[] {
   return [
     {
@@ -209,7 +227,7 @@ export function buildColumns(
       sortable: false,
       focusable: false,
       selectable: false,
-      formatter: messageFormatter(searchCtx, laneCtx, prCtx),
+      formatter: messageFormatter(searchCtx, laneCtx, prCtx, stackCtx),
     },
     {
       id: AUTHOR_COLUMN_ID,

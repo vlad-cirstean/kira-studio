@@ -41,6 +41,7 @@ import RenameRefDialog from './components/dialogs/RenameRefDialog.vue';
 import RepoSettingsDialog from './components/dialogs/RepoSettingsDialog.vue';
 import ResetDialog from './components/dialogs/ResetDialog.vue';
 import RevertDialog from './components/dialogs/RevertDialog.vue';
+import StackDialog from './components/dialogs/StackDialog.vue';
 import StashDialog from './components/dialogs/StashDialog.vue';
 import TagDialog from './components/dialogs/TagDialog.vue';
 import WorktreeDialog from './components/dialogs/WorktreeDialog.vue';
@@ -58,6 +59,7 @@ import {
 } from './components/rowMenuModel.ts';
 import StashDetailPane from './components/StashDetailPane.vue';
 import type { SearchOption } from './components/searchResultsModel.ts';
+import { childOf, parentOf } from './components/stackListModel.ts';
 import { DetailState } from './state/detail.ts';
 import { createDetailActions, type DetailActions } from './state/detailActions.ts';
 import { GraphViewState } from './state/graphView.ts';
@@ -73,6 +75,7 @@ import { RepoSettingsState } from './state/repoSettings.ts';
 import { SearchState } from './state/search.ts';
 import { SelectionState } from './state/selection.ts';
 import { SettingsState } from './state/settings.ts';
+import { StackState } from './state/stack.ts';
 import { StashState } from './state/stash.ts';
 import {
   type ColumnWidths,
@@ -116,7 +119,16 @@ const actions = shallowRef<DetailActions | undefined>(undefined);
 // `graphView`/`selection`/`detailState` above — `handleRepoOpened`/the active-repo watch below
 // reset them via `setRepoId` rather than replacing either instance.
 const refsState = new RefsState(bridge);
-const opsState = new OpsState(bridge, refsState);
+// G24 D10/D18: one PrState for the life of this component, exactly like refsState above — reset
+// via setRepoId rather than replaced. Constructed early (before opsState/searchState) so it can
+// be threaded into both (matchRef's own pr arm, D11; G26 F13's stack.list-driven warm-up below).
+const prState = new PrState(bridge);
+// G26 D3: one StackState for the life of this component, exactly like prState above — reset via
+// setRepoId rather than replaced. Constructed before opsState so its own runRestack/cancelRestack
+// can be threaded into it (D13/4.16 — OpsState layers busy/announcement over StackState's own
+// execution rather than duplicating it).
+const stackState = new StackState(bridge, prState);
+const opsState = new OpsState(bridge, refsState, stackState);
 // `docs/plans/P9.md` W13: one `StashState` for the life of this component, exactly like
 // `refsState`/`opsState` above — reset via `setRepoId` rather than replaced.
 const stashState = new StashState(bridge);
@@ -127,10 +139,6 @@ const worktreeState = new WorktreeState(bridge);
 // `refsState`/`opsState`/`stashState` above — reset via `setRepoId` rather than replaced. Threads
 // `refsState`/`graphView` in directly (both already exist above), matching the plan's own "threads
 // RefsState and GraphViewState into it".
-// G24 D10/D18: one PrState for the life of this component, exactly like refsState/opsState/
-// stashState/searchState above — reset via setRepoId rather than replaced. Constructed before
-// searchState so it can be threaded into it (matchRef's own pr arm, D11).
-const prState = new PrState(bridge);
 const searchState = new SearchState(bridge, refsState, graphView, prState);
 // G18 D13: one RepoSettingsState for the life of this component, exactly like `refsState`/
 // `opsState`/`stashState`/`searchState` above — reset via `setRepoId` rather than replaced.
@@ -295,6 +303,8 @@ watch(
     searchState.setRepoId(repoId);
     repoSettingsState.setRepoId(repoId);
     prState.setRepoId(repoId);
+    // G26: after prState (StackState.reload calls prState.ensureSnapshot, F13).
+    stackState.setRepoId(repoId);
   },
   { immediate: true },
 );
@@ -540,6 +550,21 @@ const repoSettingsDialogOpen = ref(false);
 // `createWorktree` palette action.
 const worktreeCreateOpen = ref(false);
 
+// G26 D13/4.8: StackDialog.vue's own two-mode target — same "App.vue owns the state, the dialog
+// component owns nothing of its own" shape every other dialog above follows. `undefined` ⇒
+// closed.
+const stackDialogTarget = ref<
+  { readonly mode: 'setParent' | 'restack'; readonly branch: string } | undefined
+>(undefined);
+
+function handleOpenSetStackParentDialog(branch: string): void {
+  stackDialogTarget.value = { mode: 'setParent', branch };
+}
+
+function handleOpenRestackDialog(branch: string): void {
+  stackDialogTarget.value = { mode: 'restack', branch };
+}
+
 /** `WorktreeList.vue`'s own "Switch to this worktree" row action, bubbled through
  *  `BranchPicker.vue`/`AppToolbar.vue` — the same `repo.open` + `handleRepoOpened` path
  *  `revealCommitInGraph` above already uses (F6: each worktree is already its own `RepoEntry`, so
@@ -773,6 +798,30 @@ function runUiAction(
       const sha = selection.sha.value;
       if (sha) void opsState.runCherryPick(sha);
       else liveAnnouncement.value = 'Select a commit first.';
+      break;
+    }
+    // G26 D13: the palette's own route to "Restack this stack" — the CURRENT branch stands in for
+    // "this stack" (D14: scope is always the whole stack regardless of which member triggers it).
+    case 'restackStack': {
+      const branch = refsState.currentBranchName.value;
+      if (branch) stackDialogTarget.value = { mode: 'restack', branch };
+      else liveAnnouncement.value = 'Checkout a branch first.';
+      break;
+    }
+    // G26 D13/§7.3: alt+up/alt+down's own palette equivalents — resolve a target client-side
+    // (`stackListModel`) and call the existing checkout op, never a second implementation.
+    case 'checkoutStackParent':
+    case 'checkoutStackChild': {
+      const branch = refsState.currentBranchName.value;
+      const stackResult = { stacks: stackState.stacks.value, orphans: stackState.orphans.value };
+      const target =
+        branch === undefined
+          ? undefined
+          : action === 'checkoutStackParent'
+            ? parentOf(stackResult, branch)
+            : childOf(stackResult, branch);
+      if (target !== undefined) void opsState.runCheckout(target, 'switch');
+      else liveAnnouncement.value = 'No branch to navigate to.';
       break;
     }
   }
@@ -1148,6 +1197,7 @@ onBeforeUnmount(() => {
   opsState.dispose();
   stashState.dispose();
   worktreeState.dispose();
+  stackState.dispose();
   searchState.dispose();
   repoSettingsState.dispose();
   prState.dispose();
@@ -1208,6 +1258,7 @@ onBeforeUnmount(() => {
           :ops-state="opsState"
           :stash-state="stashState"
           :worktree-state="worktreeState"
+          :stack-state="stackState"
           :open-worktree-window-capability="actions?.capabilities.openWorktreeWindow ?? false"
           :search-state="searchState"
           :actions="actions"
@@ -1218,6 +1269,8 @@ onBeforeUnmount(() => {
           @switch-worktree="handleSwitchWorktree"
           @open-worktree-window="handleOpenWorktreeWindow"
           @create-worktree="worktreeCreateOpen = true"
+          @open-restack-dialog="handleOpenRestackDialog"
+          @open-set-stack-parent-dialog="handleOpenSetStackParentDialog"
           @search-select="handleSearchSelect"
           @search-focus-grid="handleSearchFocusGrid"
           @open-repo-settings="repoSettingsDialogOpen = true"
@@ -1234,6 +1287,7 @@ onBeforeUnmount(() => {
           :ops-state="opsState"
           :stash-state="stashState"
           :worktree-state="worktreeState"
+          :stack-state="stackState"
           :open-worktree-window-capability="actions?.capabilities.openWorktreeWindow ?? false"
           :search-state="searchState"
           :actions="actions"
@@ -1244,6 +1298,8 @@ onBeforeUnmount(() => {
           @switch-worktree="handleSwitchWorktree"
           @open-worktree-window="handleOpenWorktreeWindow"
           @create-worktree="worktreeCreateOpen = true"
+          @open-restack-dialog="handleOpenRestackDialog"
+          @open-set-stack-parent-dialog="handleOpenSetStackParentDialog"
           @search-select="handleSearchSelect"
           @search-focus-grid="handleSearchFocusGrid"
           @open-repo-settings="repoSettingsDialogOpen = true"
@@ -1273,6 +1329,7 @@ onBeforeUnmount(() => {
               :date-format="dateFormat"
               :search="searchState"
               :pr="prState"
+              :stack="stackState"
               v-bind="initialScrollRowProp"
               @update:column-widths="columnWidths = $event"
               @update:date-format="dateFormat = $event"
@@ -1428,6 +1485,13 @@ onBeforeUnmount(() => {
           :prepare-script="worktreePrepareScript"
           :run-prepare-script-capability="actions?.capabilities.runPrepareScript ?? false"
           @close-create="worktreeCreateOpen = false"
+        />
+        <StackDialog
+          :stack="stackState"
+          :ops="opsState"
+          :refs="refsState"
+          :target="stackDialogTarget"
+          @close="stackDialogTarget = undefined"
         />
         <RepoSettingsDialog
           :open="repoSettingsDialogOpen"

@@ -17,6 +17,7 @@ import { STATE_ICONS } from '../icons/index.ts';
 import type { OpsState } from '../state/ops.ts';
 import type { PrState } from '../state/pr.ts';
 import type { RefsState } from '../state/refs.ts';
+import type { StackState } from '../state/stack.ts';
 import type { StashState } from '../state/stash.ts';
 import type { WorktreeState } from '../state/worktrees.ts';
 import RowContextMenu from './RowContextMenu.vue';
@@ -27,7 +28,9 @@ import {
   remoteCheckoutTarget,
 } from './refListModel.ts';
 import { buildRefMenu, remoteNamesFrom } from './rowMenuModel.ts';
+import StackList from './StackList.vue';
 import StashList from './StashList.vue';
+import { childOf, parentOf } from './stackListModel.ts';
 import TagList from './TagList.vue';
 import WorktreeList from './WorktreeList.vue';
 
@@ -36,6 +39,8 @@ const props = defineProps<{
   ops: OpsState;
   stash: StashState;
   worktrees: WorktreeState;
+  /** G26 D3 — see `StackList.vue`'s own doc comment. */
+  stack: StackState;
   /** G25 D6/D14 — see `WorktreeList.vue`'s own doc comment. */
   openWorktreeWindowCapability: boolean;
   /** G24 D9's own branch-tip badge — optional so a caller with nothing to show yet gets a plain,
@@ -71,6 +76,8 @@ const emit = defineEmits<{
   (e: 'switchWorktree', path: string): void;
   (e: 'openWorktreeWindow', path: string): void;
   (e: 'createWorktree'): void;
+  (e: 'openRestackDialog', branch: string): void;
+  (e: 'openSetStackParentDialog', branch: string): void;
 }>();
 
 const isOpen = ref(false);
@@ -165,12 +172,24 @@ function openRefMenuFromButton(row: RefRow, event: MouseEvent): void {
 const refMenuSections = computed(() => {
   const entry = refMenu.value;
   if (!entry) return [];
+  // G26 D-4.14: the stack section is present only for a local branch row — a tag/remoteBranch is
+  // never a stack member (buildRefMenu itself already returns before reading `stack` for those
+  // two kinds, but computing it only for `branch` here keeps `parentOf`/`childOf` from ever
+  // running against a row that could not possibly answer anything).
+  const stackResult = { stacks: props.stack.stacks.value, orphans: props.stack.orphans.value };
   return buildRefMenu({
     kind: entry.row.kind,
     shortName: entry.row.shortName,
     isHead: entry.row.isHead,
     knownRemotes: entry.row.kind === 'tag' ? knownRemotes.value : [],
     inProgress: props.ops.statusSummary.value?.inProgress ?? null,
+    stack:
+      entry.row.kind === 'branch'
+        ? {
+            hasParent: parentOf(stackResult, entry.row.shortName) !== undefined,
+            hasChild: childOf(stackResult, entry.row.shortName) !== undefined,
+          }
+        : undefined,
   });
 });
 
@@ -209,6 +228,40 @@ async function onRefMenuSelect(id: string): Promise<void> {
   }
   if (id.startsWith('deleteRemoteRef:')) {
     await props.ops.tagDeleteRemote(id.slice('deleteRemoteRef:'.length), row.shortName);
+    return;
+  }
+  // G26 D-4.14: the stack section's own five items — 'stackSetParent'/'stackRestack' emit intents
+  // (BranchPicker owns no dialog of its own, mirroring 'createWorktree'); 'stackRemove' is a
+  // direct, undoable write (StackList.vue's own row action makes the identical call); the two
+  // navigation items resolve a target via stackListModel and call the existing checkout op,
+  // exactly the shape 'checkoutStackParent'/'checkoutStackChild' establish for the palette too.
+  const stackResult = { stacks: props.stack.stacks.value, orphans: props.stack.orphans.value };
+  if (id === 'stackSetParent') {
+    emit('openSetStackParentDialog', row.shortName);
+    return;
+  }
+  if (id === 'stackRemove') {
+    await props.ops.runStackSet(row.shortName, undefined);
+    return;
+  }
+  if (id === 'stackRestack') {
+    emit('openRestackDialog', row.shortName);
+    return;
+  }
+  if (id === 'stackGoToParent') {
+    const parent = parentOf(stackResult, row.shortName);
+    if (parent !== undefined) {
+      closeForCheckout();
+      await props.ops.runCheckout(parent, 'switch');
+    }
+    return;
+  }
+  if (id === 'stackGoToChild') {
+    const child = childOf(stackResult, row.shortName);
+    if (child !== undefined) {
+      closeForCheckout();
+      await props.ops.runCheckout(child, 'switch');
+    }
   }
 }
 
@@ -399,6 +452,14 @@ onBeforeUnmount(() => {
           @switch-worktree="(path) => emit('switchWorktree', path)"
           @open-worktree-window="(path) => emit('openWorktreeWindow', path)"
           @create-worktree="emit('createWorktree')"
+        />
+
+        <StackList
+          :stack="stack"
+          :ops="ops"
+          :pr="pr"
+          @open-restack-dialog="(branch) => emit('openRestackDialog', branch)"
+          @open-set-parent-dialog="(branch) => emit('openSetStackParentDialog', branch)"
         />
       </div>
     </div>

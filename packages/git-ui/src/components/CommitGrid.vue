@@ -25,6 +25,7 @@ import type { GraphViewState, LayoutRange } from '../state/graphView.ts';
 import type { PrState } from '../state/pr.ts';
 import type { SearchState } from '../state/search.ts';
 import type { SelectionState } from '../state/selection.ts';
+import type { StackState } from '../state/stack.ts';
 import { type ColumnWidths, type DateFormat, DEFAULT_COLUMN_WIDTHS } from '../state/viewState.ts';
 import { rowHeightPx, TokenReader } from '../theme/readTokens.ts';
 import { buildColumns, createCommitDataView, DATE_COLUMN_ID } from './columns.ts';
@@ -47,6 +48,9 @@ const props = defineProps<{
   /** G24 D9: the graph indicator's own PR source — optional so a caller with nothing to show yet
    *  gets a plain, badge-free message column, mirroring `search`'s own default. */
   pr?: PrState;
+  /** G26 D-4.13: the message column's own stack-decoration source — optional so a caller with no
+   *  stack view mounted gets plain, undecorated branch badges, mirroring `pr`'s own default. */
+  stack?: StackState;
 }>();
 
 const emit = defineEmits<{
@@ -203,6 +207,24 @@ function searchPattern(): RegExp | undefined {
   return compiled.kind === 'ok' ? compiled.pattern : undefined;
 }
 
+/** G26 D-4.13: `columns.ts`'s own `StackContext.stackInfoFor` — a plain scan over the current
+ *  `stack.list` result (never a memoized `Map`: the branch count a stack view realistically holds
+ *  is small, and this only runs for a row that actually carries a branch decoration, F12's own
+ *  "re-read on every render pass" contract, not once per grid render). `undefined` for a branch
+ *  that is not a stack member at all — `refBadges.ts`'s own "render nothing" rule. */
+function stackInfoFor(branchName: string): { stacked: boolean; stale: boolean } | undefined {
+  const stackState = props.stack;
+  if (stackState === undefined) return undefined;
+  for (const summary of stackState.stacks.value) {
+    const row = summary.branches.find((b) => b.name === branchName);
+    if (row !== undefined) return { stacked: true, stale: row.state === 'needsRestack' };
+  }
+  if (stackState.orphans.value.some((o) => o.name === branchName)) {
+    return { stacked: true, stale: true };
+  }
+  return undefined;
+}
+
 function currentColumns(): Column<CommitRecord>[] {
   const hostWidth = host.value?.clientWidth ?? 0;
   const laneCount = props.graphView.laneCount.value;
@@ -225,6 +247,7 @@ function currentColumns(): Column<CommitRecord>[] {
       // accessor only needs to pass `PrState.bySha`'s own map lookup straight through.
       prsFor: (sha) => props.pr?.bySha.value.get(sha),
     },
+    { stackInfoFor },
   );
 }
 
@@ -728,6 +751,15 @@ watch(
     grid?.render();
   },
 );
+// G26 D-4.13: mirrors the `pr.generation` watcher directly above — the fourth instance of the
+// same pattern (F12). A new stack resolution never changes how many rows are loaded either.
+watch(
+  () => props.stack?.generation.value,
+  () => {
+    grid?.invalidateAllRows();
+    grid?.render();
+  },
+);
 onBeforeUnmount(() => {
   resizeObserver?.disconnect();
   if (resizeRaf !== 0) cancelAnimationFrame(resizeRaf);
@@ -1029,6 +1061,16 @@ defineExpose({ scrollToRow, focusGrid });
 }
 
 .kv-badge-dashed {
+  border-style: dashed;
+}
+
+/* G26 D-4.11: a stack member's own outline, and (only alongside it) the stale dashed variant —
+   reuses .kv-badge-dashed's own affordance rather than inventing a second "needs attention"
+   visual language. */
+.kv-badge-branch--stacked {
+  border-color: var(--kv-badge-branch-stacked-border);
+}
+.kv-badge-branch--stale {
   border-style: dashed;
 }
 

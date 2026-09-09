@@ -76,6 +76,23 @@
   --kv-badge-pr-draft-fg: var(--vscode-gitDecoration-ignoredResourceForeground, #8c8c8c);
   --kv-badge-pr-merged-fg: #b180d7;
   --kv-badge-pr-closed-fg: var(--vscode-gitDecoration-deletedResourceForeground, #e2685a);
+  /* G26 D-4.20: a stacked branch's own badge outline (`kv-badge-branch--stacked`) and the stale
+     chip's own fill (`kv-stack-stale`/`kv-badge-branch--stale`) — no workbench colour id names
+     either concept, so both alias the closest existing tone rather than invent a new literal,
+     the same discipline `--kv-badge-pr-*` above already follows: "stacked" borrows the
+     submodule/tree-structure tone (`gitDecoration.submoduleResourceForeground`, the same id
+     `--kv-badge-remote-fg` already uses — a stack is, structurally, a chain of refs, the nearest
+     existing concept), "stale" the modified tone (a stale branch is a modified-relative-to-its-
+     parent one, not a deletion or a conflict). */
+  --kv-badge-branch-stacked-border: var(
+    --vscode-gitDecoration-submoduleResourceForeground,
+    #8db9e2
+  );
+  --kv-stack-stale-bg: var(--vscode-gitDecoration-modifiedResourceForeground, #e2c08d);
+  /* A fixed dark literal, not an alias of --kv-app-fg/--kv-panel-bg: the tan fill above stays
+     roughly the same tone in both theme kinds (neither is overridden below), so a fixed dark
+     text keeps working in both rather than flipping to light text on a light-kind host. */
+  --kv-stack-stale-fg: #1e1e1e;
 
   /* Status / diff colours reuse Git's own decoration tokens (§6.1) */
   --kv-diff-added-fg: var(--vscode-gitDecoration-addedResourceForeground, #81b88b);
@@ -185,6 +202,12 @@ body.vscode-high-contrast-light {
      for this exact panel-background pair. */
   --kv-diff-added-fg: var(--vscode-gitDecoration-addedResourceForeground, #256b3a);
   --kv-diff-deleted-fg: var(--vscode-gitDecoration-deletedResourceForeground, #a1260d);
+  /* G26 D-4.20: shares --kv-badge-remote-fg's own workbench id (submoduleResourceForeground) —
+     the same light-appropriate literal, for a border-only use with no fill of its own. */
+  --kv-badge-branch-stacked-border: var(
+    --vscode-gitDecoration-submoduleResourceForeground,
+    #0e5a99
+  );
 }
 
 /* kv-lane-rules:start (scripts/gen-lane-palette.ts) — do not hand-edit */

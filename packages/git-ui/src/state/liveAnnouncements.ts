@@ -275,3 +275,28 @@ export function composeStashAnnouncement(
   if (!result.ok) return composeOpFailureAnnouncement(actionLabel, result.error);
   return verb === 'apply' ? `Applied ${label}` : `Popped ${label}`;
 }
+
+/** G26 D8/D11: `stack.restack`'s own live-region text — a full success, a paused conflict
+ *  (`stoppedAt` set), and a cancellation (`stoppedAt` undefined but `remaining` non-empty) all read
+ *  differently. `StackList.vue`'s own paused-restack strip renders the same "paused on X" text
+ *  inline, not just the live region — kept as one function so the two can never disagree. */
+export function composeRestackAnnouncement(
+  restacked: readonly string[],
+  stoppedAt: string | undefined,
+  remaining: readonly string[],
+): string {
+  if (stoppedAt !== undefined) {
+    const doneText = restacked.length > 0 ? `${restacked.length} restacked so far — ` : '';
+    return (
+      `Restack paused on ${stoppedAt} — ${doneText}resolve the conflict, then Continue, then ` +
+      `Restack again to finish the remaining ${remaining.length}.`
+    );
+  }
+  if (remaining.length > 0) {
+    return `Restack cancelled after ${restacked.length} — ${remaining.length} branch${remaining.length === 1 ? '' : 'es'} left. Restack again to finish.`;
+  }
+  if (restacked.length === 0) return 'Already up to date — nothing to restack.';
+  return restacked.length === 1
+    ? `Restacked ${restacked[0]}`
+    : `Restacked ${restacked.length} branches`;
+}

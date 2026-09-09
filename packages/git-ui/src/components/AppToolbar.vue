@@ -30,6 +30,7 @@ import type { PrState } from '../state/pr.ts';
 import type { RefsState } from '../state/refs.ts';
 import type { RepoState } from '../state/repo.ts';
 import type { SearchState } from '../state/search.ts';
+import type { StackState } from '../state/stack.ts';
 import type { StashState } from '../state/stash.ts';
 import type { WorktreeState } from '../state/worktrees.ts';
 // Plain (not `import type`) imports, for two different reasons. BranchPicker: vue-tsc needs the
@@ -58,6 +59,8 @@ const props = defineProps<{
   opsState: OpsState;
   stashState: StashState;
   worktreeState: WorktreeState;
+  /** G26 D3 — see `StackList.vue`'s own doc comment. */
+  stackState: StackState;
   /** G25 D6/D14 — see `WorktreeList.vue`'s own doc comment. */
   openWorktreeWindowCapability: boolean;
   searchState: SearchState;
@@ -79,6 +82,11 @@ const emit = defineEmits<{
   (event: 'switch-worktree', path: string): void;
   (event: 'open-worktree-window', path: string): void;
   (event: 'create-worktree'): void;
+  /** G26: forwarded straight from `BranchPicker.vue` -> `StackList.vue`'s own emits — `App.vue`
+   *  owns `StackDialog.vue`'s actual open state, the same "toolbar owns no dialog state itself"
+   *  shape every other dialog-opening emit above already follows. */
+  (event: 'open-restack-dialog', branch: string): void;
+  (event: 'open-set-stack-parent-dialog', branch: string): void;
   /** Forwarded straight from `SearchBox.vue`'s own `select` emit — `App.vue` is where both halves
    *  of §7.8's "selecting a hit reveals and selects it" actually live (`GraphViewState.store`,
    *  `SelectionState`), neither of which this toolbar holds. */
@@ -233,13 +241,25 @@ const stashDisabled = computed(
       :ops="opsState"
       :stash="stashState"
       :worktrees="worktreeState"
+      :stack="stackState"
       :open-worktree-window-capability="openWorktreeWindowCapability"
       :pr="prState"
       @branch-from-stash="(entry) => emit('branch-from-stash', entry)"
       @switch-worktree="(path) => emit('switch-worktree', path)"
       @open-worktree-window="(path) => emit('open-worktree-window', path)"
       @create-worktree="emit('create-worktree')"
+      @open-restack-dialog="(branch) => emit('open-restack-dialog', branch)"
+      @open-set-stack-parent-dialog="(branch) => emit('open-set-stack-parent-dialog', branch)"
     />
+    <span
+      v-if="stackState.restacking.value"
+      class="kv-toolbar-restacking"
+      role="status"
+      aria-live="polite"
+    >
+      <span class="codicon codicon-sync codicon-modifier-spin" aria-hidden="true"></span>
+      Restacking…
+    </span>
     <span class="kv-toolbar-separator" aria-hidden="true"></span>
     <RefreshButton ref="refreshButtonRef" :graph-view="graphView" :repo-state="repoState" />
 
@@ -387,6 +407,18 @@ const stashDisabled = computed(
   align-self: stretch;
   margin: var(--kv-space-2) 0;
   background-color: var(--kv-toolbar-border);
+}
+
+/* G26 D6/D8: mirrors the remote/worktree-prepare progress strips' own shape — a plain, low-key
+   status readout, never a second progress bar (a restack's own per-branch granularity is one
+   `stack.progress` event, not a stream worth a bar of its own, per §9's own "not built" note). */
+.kv-toolbar-restacking {
+  display: flex;
+  align-items: center;
+  gap: var(--kv-space-1);
+  color: var(--kv-description-fg);
+  font-size: 0.9em;
+  white-space: nowrap;
 }
 
 .kv-toolbar-spacer {

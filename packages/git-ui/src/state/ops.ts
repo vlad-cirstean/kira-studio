@@ -17,6 +17,7 @@ import type {
   RemoteProgress,
   ResetMode,
   ResetPreflight,
+  RestackResult,
   RevertPreflight,
   StashBranchPreflight,
   StashEntry,
@@ -35,6 +36,7 @@ import {
   composeCherryPickMismatchAnnouncement,
   composeOpFailureAnnouncement,
   composeResetAnnouncement,
+  composeRestackAnnouncement,
   composeRevertAnnouncement,
   composeStashAnnouncement,
   composeStashPushAnnouncement,
@@ -42,6 +44,7 @@ import {
   type StashPredictionMismatch,
 } from './liveAnnouncements.ts';
 import type { RefsState } from './refs.ts';
+import type { StackState } from './stack.ts';
 
 export type { StashPredictionMismatch } from './liveAnnouncements.ts';
 
@@ -224,6 +227,13 @@ export class OpsState {
 
   readonly #bridge: BridgeClient;
   readonly #refs: RefsState;
+  /** G26 D13/4.16: `runRestack`/`cancelRestack` DELEGATE to this instance's own execution
+   *  (`StackState.runRestack`/`cancelRestack` already hold `restacking`/`progress` reactively,
+   *  mirroring `WorktreeState`'s own "domain class holds the list and the read preview" scope) —
+   *  this class only layers `busy`/`announcement` on top, the same uniform lifecycle every other
+   *  mutating action here gets. Optional so a test can construct `OpsState` without one, mirroring
+   *  `PrState`'s own optional threading through `StackState`/`SearchState`. */
+  readonly #stack: StackState | undefined;
   #repoId: string | undefined;
   #resolveCheckout: ((route: CheckoutRoute | null) => void) | undefined;
   #resolveRevert: ((route: RevertRoute | null) => void) | undefined;
@@ -236,9 +246,10 @@ export class OpsState {
   readonly #unsubscribeProgress: () => void;
   readonly #unsubscribeWorktreeProgress: () => void;
 
-  constructor(bridge: BridgeClient, refs: RefsState) {
+  constructor(bridge: BridgeClient, refs: RefsState, stack?: StackState) {
     this.#bridge = bridge;
     this.#refs = refs;
+    this.#stack = stack;
     // Any change at all (a ref write OR a worktree/index touch) can move `inProgress`,
     // `dirtyPaths` or the upstream ahead/behind counts — unlike `RefsState`, which only cares
     // about `refsChanged`, this refreshes on both event kinds.
@@ -882,6 +893,58 @@ export class OpsState {
     } finally {
       this.activeWorktreePreparePath.value = undefined;
     }
+  }
+
+  // -------------------------------------------------------------------------------------
+  // G26 D10/D13: stackSet is an ordinary #runSimple one-liner (StackDialog's own set-parent mode
+  // has already collected the target branch/parent by the time this is called). runRestack/
+  // cancelRestack delegate to StackState (see #stack's own doc comment above) and layer this
+  // class's own busy/announcement lifecycle on top — the same split runWorktreePrepare would use
+  // if WorktreeState held its own reactive progress, which it does not; StackState does.
+  // -------------------------------------------------------------------------------------
+
+  async runStackSet(branch: string, parent: string | undefined): Promise<OpResult> {
+    return this.#runSimple(
+      { kind: 'stackSet', branch, parent },
+      (ok) =>
+        ok
+          ? parent === undefined
+            ? `Removed ${branch} from its stack`
+            : `Set ${branch}'s stack parent to ${parent}`
+          : undefined,
+      'Set stack parent',
+    );
+  }
+
+  /** `stack.restack`'s own client-facing entry point (D6) — NOT an `op.run` kind (F7/D6's own
+   *  reason), so this bypasses `#runSimple` entirely and delegates the actual execution to
+   *  `StackState.runRestack`, which already holds `restacking`/`progress` reactively. `busy` is
+   *  set for the same duration `#runSimple` would set it, so every other button this app disables
+   *  while `busy` is true (checkout, reset, …) is disabled during a restack too — a restack
+   *  rewrites the very branches those buttons would act on. */
+  async runRestack(branch: string): Promise<RestackResult | undefined> {
+    if (this.#stack === undefined) return undefined;
+    if (this.busy.value) throw new Error('ops: another operation is already running');
+    this.busy.value = true;
+    try {
+      const result = await this.#stack.runRestack(branch);
+      if (result !== undefined) {
+        this.announcement.value = result.ok
+          ? composeRestackAnnouncement(result.restacked, undefined, [])
+          : composeRestackAnnouncement(result.restacked, result.stoppedAt, result.remaining);
+        this.#refs.applyHead(result.head);
+      }
+      return result;
+    } finally {
+      this.busy.value = false;
+    }
+  }
+
+  /** `stack.cancelRestack` — always safe to call, mirroring `cancelRemote`'s/
+   *  `cancelWorktreePrepare`'s own doc comment exactly: `false` (never an error) when there was
+   *  nothing to cancel. */
+  async cancelRestack(): Promise<boolean> {
+    return (await this.#stack?.cancelRestack()) ?? false;
   }
 
   /** `worktree.cancelPrepare` — always safe to call, mirroring `cancelRemote`'s own doc comment

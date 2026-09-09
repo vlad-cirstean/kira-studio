@@ -142,6 +142,18 @@ export interface RefMenuContext {
    *  worded differently depending on whether this is even reachable for this tag. */
   readonly knownRemotes: readonly string[];
   readonly inProgress: InProgressOperation | null;
+  /** G26 D-4.14: this branch's own stack membership — `undefined` when the caller has no stack
+   *  view mounted at all (a tag/remoteBranch row, or a host with no `StackState`), matching
+   *  `buildRowMenu`'s own "absent, not disabled" convention for a capability that simply is not
+   *  there. Meaningless for `kind !== 'branch'` (a tag/remote-tracking ref is never a stack
+   *  member) and ignored for those. */
+  readonly stack?: {
+    /** This branch has a recorded stack parent (D1) — gates "Remove from stack"/"Restack this
+     *  stack"/"Go to parent branch". */
+    readonly hasParent: boolean;
+    /** Some other branch records this one as ITS parent — gates "Go to child branch". */
+    readonly hasChild: boolean;
+  };
 }
 
 /**
@@ -215,7 +227,30 @@ export function buildRefMenu(ctx: RefMenuContext): MenuSection[] {
           true,
         ),
   );
-  return [{ items }];
+  const sections: MenuSection[] = [{ items }];
+  // G26 D-4.14: a second section, present only when the caller actually has a stack view mounted
+  // (`ctx.stack !== undefined`) — never gated on `canRunOp` (stackSet/restack are config/rebase
+  // writes, not one of §7.11's in-progress-blocked kinds), matching "Review branch changes"'
+  // own un-gated posture just above.
+  if (ctx.stack !== undefined) {
+    const stackItems: MenuItem[] = [
+      plainItem(
+        'stackSetParent',
+        ctx.stack.hasParent ? 'Change stack parent…' : 'Set stack parent…',
+        'codicon-list-tree',
+      ),
+    ];
+    if (ctx.stack.hasParent) {
+      stackItems.push(plainItem('stackRemove', 'Remove from stack', 'codicon-close'));
+      stackItems.push(plainItem('stackRestack', 'Restack this stack', 'codicon-sync'));
+      stackItems.push(plainItem('stackGoToParent', 'Go to parent branch', 'codicon-arrow-up'));
+    }
+    if (ctx.stack.hasChild) {
+      stackItems.push(plainItem('stackGoToChild', 'Go to child branch', 'codicon-arrow-down'));
+    }
+    sections.push({ items: stackItems });
+  }
+  return sections;
 }
 
 /**

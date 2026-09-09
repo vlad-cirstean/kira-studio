@@ -134,6 +134,18 @@ export interface BadgePlan {
   readonly overflow: OverflowSpec | null;
 }
 
+/** G26 D-4.11: a branch badge's own stack decoration — `stacked` adds `kv-badge-branch--stacked`,
+ *  `stale` (meaningful only alongside `stacked`) additionally adds `kv-badge-branch--stale` (a
+ *  dashed outline, the existing `dashed` affordance's own visual language, D-4.11's own "reuse,
+ *  don't invent" instruction). No new `DecorationRef` kind (`badgeSpecFor`'s exhaustive switch
+ *  above is untouched) — this is looked up SEPARATELY, by branch name, from `columns.ts`'s own
+ *  `StackContext` (the fourth accessor-context instance, F12), and applied only to `branch`-kind
+ *  badges (a stash/tag/remote-branch/HEAD badge is never a stack member). */
+export interface StackBadgeInfo {
+  readonly stacked: boolean;
+  readonly stale: boolean;
+}
+
 /** The pure "what to render" computation: which badges show, and what the overflow badge (if
  *  any) says — with no DOM touched, so this is what `tests/unit/ui/refBadges.test.ts` exercises
  *  directly. `buildRefBadges` below is a thin DOM-construction layer over this. */
@@ -157,11 +169,20 @@ export function planBadges(decorations: readonly DecorationRef[]): BadgePlan {
  *  of — `spec.colorClass`: the badge's shape/icon/label still carry the *kind* signal, the lane
  *  class only tints border+icon (`CommitGrid.vue`'s own badge CSS), tying the badge back to the
  *  branch it decorates without becoming a second, conflicting source of colour meaning. */
-function buildBadgeElement(spec: BadgeSpec, laneColor: number | undefined): HTMLSpanElement {
+function buildBadgeElement(
+  spec: BadgeSpec,
+  laneColor: number | undefined,
+  stackInfoFor?: (branchName: string) => StackBadgeInfo | undefined,
+): HTMLSpanElement {
   const badge = document.createElement('span');
   const classes = ['kv-badge', `kv-badge-${spec.shape}`, spec.colorClass];
   if (spec.dashed) classes.push('kv-badge-dashed');
   if (laneColor !== undefined) classes.push('kv-badge-lane-tinted', laneClass(laneColor));
+  if (spec.refKind === 'branch' && spec.refName !== undefined) {
+    const stackInfo = stackInfoFor?.(spec.refName);
+    if (stackInfo?.stacked) classes.push('kv-badge-branch--stacked');
+    if (stackInfo?.stale) classes.push('kv-badge-branch--stale');
+  }
   badge.className = classes.join(' ');
   // G21 D2: the full name always lives in `@kira/kira-ui`'s own tooltip attribute (a mouse-hover
   // affordance) independent of whether the ~190px CSS truncation (kv-badge-label) actually clips
@@ -284,6 +305,7 @@ export function buildPrBadge(prs: readonly PrRecord[]): HTMLAnchorElement | null
 export function buildRefBadges(
   decorations: readonly DecorationRef[],
   laneColor: number | undefined,
+  stackInfoFor?: (branchName: string) => StackBadgeInfo | undefined,
 ): HTMLSpanElement | null {
   if (decorations.length === 0) return null;
 
@@ -291,7 +313,9 @@ export function buildRefBadges(
   const container = document.createElement('span');
   container.className = 'kv-ref-badges';
 
-  for (const spec of plan.visible) container.appendChild(buildBadgeElement(spec, laneColor));
+  for (const spec of plan.visible) {
+    container.appendChild(buildBadgeElement(spec, laneColor, stackInfoFor));
+  }
   if (plan.overflow !== null) container.appendChild(buildOverflowBadge(plan.overflow));
 
   return container;
