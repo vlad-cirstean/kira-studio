@@ -191,6 +191,20 @@ type PreflightRevertParams struct {
 	Mainline *int     `json:"mainline,omitempty"`
 }
 
+// PreflightResetParams is preflight.reset's own request (§7.7).
+type PreflightResetParams struct {
+	RepoID string `json:"repoId"`
+	Target string `json:"target"`
+	Mode   string `json:"mode"` // "soft" | "mixed" | "hard"
+}
+
+// PreflightCherryPickParams is preflight.cherryPick's own request (§7.13).
+type PreflightCherryPickParams struct {
+	RepoID   string `json:"repoId"`
+	SHA      string `json:"sha"`
+	Mainline *int   `json:"mainline,omitempty"`
+}
+
 // OpRunParams is op.run's own request — Op is gitsession's own flattened decode of the wire's
 // nineteen-member OpRequest union (D5).
 type OpRunParams struct {

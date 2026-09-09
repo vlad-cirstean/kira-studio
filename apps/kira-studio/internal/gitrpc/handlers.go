@@ -111,6 +111,10 @@ func (r *Router) ForConn(c *gitsession.Conn) Handlers {
 				return r.handlePreflightCheckout(ctx, c, params)
 			case "preflight.revert":
 				return r.handlePreflightRevert(ctx, c, params)
+			case "preflight.reset":
+				return r.handlePreflightReset(ctx, c, params)
+			case "preflight.cherryPick":
+				return r.handlePreflightCherryPick(ctx, c, params)
 			case "stash.list":
 				return r.handleStashList(ctx, c, params)
 			case "stash.show":

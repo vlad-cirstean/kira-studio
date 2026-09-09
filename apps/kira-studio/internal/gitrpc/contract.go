@@ -48,7 +48,13 @@ package gitrpc
 // first did (G10 D9): it is the sole compatibility authority, even though the Go server neither
 // emits nor parses any of the three — every 'editor.*' request is answered entirely inside the
 // extension, the same precedent editor.openRangeDiff itself set at G12 D1.
-const ContractVersion = 24
+// G22 D10 (2026-09-09): 24 -> 25, for two new UiActionKind members (resetSelected,
+// cherryPickSelected) — the palette's own route into ResetDialog.vue/CherryPickDialog.vue, neither
+// of which had one. This is the only wire change this phase makes: every result/param/error shape
+// preflight.reset/preflight.cherryPick/op.run's reset/cherryPick kinds serve already existed at
+// CONTRACT_VERSION 24. This constant moves for the same reason ui.action first did (G10 D9): it is
+// the sole compatibility authority, even though the Go server neither emits nor parses ui.action.
+const ContractVersion = 25
 
 // Protocol is the handshake envelope's own version (SPEC §3.3's "protocol":1), distinct from
 // ContractVersion — it never changes unless the hello/ready exchange itself is redesigned.
