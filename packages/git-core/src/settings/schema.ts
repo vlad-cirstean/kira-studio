@@ -171,6 +171,23 @@ export const SETTINGS = {
       'refs/stash entirely and stashes are visible only in the stash list.',
     source: 'repo',
   },
+  // G28 D16: the one new leaf this phase adds — read CLIENT-SIDE ONLY (the server never consults
+  // it, so a stale or absent value can only ever produce the old CheckoutDialog, never an
+  // unexpected write). One behaviour, one switch: no separate setting for auto-detach (§10.7's own
+  // reasoning) — that route is announced loudly enough on its own that a preference would be
+  // solving a visibility problem with a switch.
+  'kiraVersion.checkout.autoStash': {
+    key: 'kiraVersion.checkout.autoStash',
+    type: 'boolean',
+    default: true,
+    description:
+      'When a branch switch is blocked by uncommitted changes, automatically stash them and ' +
+      'switch anyway instead of asking. The stash is tagged with the branch you switched FROM ' +
+      'and is never popped back automatically — bring it back deliberately from the stash list, ' +
+      'even onto a different branch. Off restores the old dialog (discard / stash and carry / ' +
+      'cancel).',
+    source: 'repo',
+  },
   'workbench.tree.indent': {
     key: 'workbench.tree.indent',
     type: 'number',

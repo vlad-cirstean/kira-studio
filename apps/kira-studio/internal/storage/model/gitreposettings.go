@@ -31,6 +31,11 @@ type GitRepoSettings struct {
 	// a security boundary: it only pre-fills WorktreeDialog's own path field. "" means no
 	// suggestion beyond the dialog's own basename default.
 	WorktreeBasePath string `json:"worktreeBasePath"`
+	// CheckoutAutoStash is G28 D16's own eleventh leaf (kiraVersion.checkout.autoStash) — read
+	// CLIENT-SIDE ONLY (the server never consults it, D16's own fail-safe-direction doc comment):
+	// true means a blocked checkout is re-issued with autoStash:true instead of opening the old
+	// CheckoutDialog. Default true.
+	CheckoutAutoStash bool `json:"checkoutAutoStash"`
 }
 
 // DefaultGitRepoSettings mirrors packages/git-core/src/settings/schema.ts's own SETTINGS defaults
@@ -47,6 +52,7 @@ func DefaultGitRepoSettings() GitRepoSettings {
 		GithubEnabled:         true,
 		WorktreePrepareScript: "",
 		WorktreeBasePath:      "",
+		CheckoutAutoStash:     true,
 	}
 }
 
@@ -68,6 +74,8 @@ type GitRepoSettingsPatch struct {
 	// through this patch.
 	WorktreePrepareScript *string `json:"worktreePrepareScript,omitempty"`
 	WorktreeBasePath      *string `json:"worktreeBasePath,omitempty"`
+	// CheckoutAutoStash: G28 D16's own eleventh leaf.
+	CheckoutAutoStash *bool `json:"checkoutAutoStash,omitempty"`
 }
 
 // ValidGraphScope mirrors schema.ts's kiraVersion.graph.scope enum.

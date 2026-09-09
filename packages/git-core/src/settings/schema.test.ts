@@ -156,8 +156,9 @@ describe('toVsCodeConfiguration', () => {
 });
 
 describe('repoSettingKeys', () => {
-  test('returns exactly the ten source: "repo" keys, G18 D1/G24 D16/G25 D10', () => {
+  test('returns exactly the eleven source: "repo" keys, G18 D1/G24 D16/G25 D10/G28 D16', () => {
     const expected: SettingKey[] = [
+      'kiraVersion.checkout.autoStash',
       'kiraVersion.github.enabled',
       'kiraVersion.graph.pageSize',
       'kiraVersion.graph.scope',

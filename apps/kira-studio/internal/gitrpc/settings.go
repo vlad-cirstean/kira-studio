@@ -30,6 +30,7 @@ func repoSettingsSnapshotFrom(s model.GitRepoSettings) RepoSettingsSnapshot {
 		GithubEnabled:         s.GithubEnabled,
 		WorktreePrepareScript: s.WorktreePrepareScript,
 		WorktreeBasePath:      s.WorktreeBasePath,
+		CheckoutAutoStash:     s.CheckoutAutoStash,
 	}
 }
 
@@ -58,6 +59,7 @@ func (p RepoSettingsPatchWire) toModel() model.GitRepoSettingsPatch {
 		GithubEnabled:         p.GithubEnabled,
 		WorktreePrepareScript: p.WorktreePrepareScript,
 		WorktreeBasePath:      worktreeBasePath,
+		CheckoutAutoStash:     p.CheckoutAutoStash,
 	}
 }
 
