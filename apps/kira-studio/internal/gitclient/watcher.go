@@ -68,6 +68,20 @@ func classify(summary RepoSummary, path string) (Signal, bool) {
 	if refIshNames[base] && (dir == commonDir || dir == gitDir) {
 		return SignalRefsChanged, true
 	}
+
+	// G25 D17/F9: a detached `worktree add`/`remove` writes only under commonDir/worktrees/<name>/
+	// (its own per-worktree HEAD, gitdir file, lock file) — for any worktree OTHER than this
+	// summary's own gitDir, none of the two rules just above ever matches (dir is neither gitDir
+	// nor commonDir), a real, pre-existing G5-era gap this phase makes reachable for the first time
+	// (creating/removing a worktree was not something this app could do before now). Checked LAST,
+	// after the more specific gitDir-scoped rules above, so this summary's OWN worktree files (in
+	// particular its own index, which lives at exactly this same path) keep resolving through the
+	// more specific rule that already names the right signal for them. Treated as refsChanged, not
+	// a new third Signal kind: the same read (refs.list/worktree.list) is what a client re-requests
+	// either way, and G5 never introduced worktreeChanged for anything but the index.
+	if worktreesRoot := filepath.Join(commonDir, "worktrees"); path == worktreesRoot || strings.HasPrefix(path, worktreesRoot+string(filepath.Separator)) {
+		return SignalRefsChanged, true
+	}
 	return "", false
 }
 

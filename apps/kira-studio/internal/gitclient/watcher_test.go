@@ -33,6 +33,13 @@ func TestClassify(t *testing.T) {
 		{"a file inside sequencer, not watched at that depth", "/repo/.git/sequencer/todo", "", false},
 		{"a loose object", "/repo/.git/objects/ab/cdef0123456789", "", false},
 		{"COMMIT_EDITMSG", "/repo/.git/COMMIT_EDITMSG", "", false},
+		// G25 D17/F9: a detached `worktree add`/`remove` from ANOTHER window writes only under
+		// commonDir/worktrees/<name>/ — this repo's own gitDir here is commonDir itself (the main
+		// worktree), so none of the basename/dir-equality rules above ever matched a SIBLING
+		// worktree's own metadata files before this arm existed.
+		{"another worktree's own HEAD (detached add, the G5-era gap)", "/repo/.git/worktrees/other/HEAD", SignalRefsChanged, true},
+		{"another worktree's own gitdir file", "/repo/.git/worktrees/other/gitdir", SignalRefsChanged, true},
+		{"the worktrees root directory itself (a new worktree's own top-level entry)", "/repo/.git/worktrees/other", SignalRefsChanged, true},
 	}
 	for _, c := range cases {
 		t.Run("main/"+c.name, func(t *testing.T) {
@@ -123,6 +130,47 @@ func TestRepoWatcher_AddProducesWorktreeChanged(t *testing.T) {
 	}
 	runGit(t, dir, "add", "new-file.txt")
 	awaitSignal(t, w.Signals(), SignalWorktreeChanged)
+}
+
+// TestRepoWatcher_DetachedWorktreeAddProducesRefsChanged is G25 D17/F9's own end-to-end proof: a
+// `worktree add` run as a SEPARATE process (simulating another window/terminal creating a
+// worktree this watcher's own entry did not initiate) writes only under
+// commonDir/worktrees/<name>/ — a real, pre-existing G5-era blind spot this phase makes reachable
+// for the first time. Exercises the real fsnotify backend end to end, not just classify()'s own
+// pure table.
+func TestRepoWatcher_DetachedWorktreeAddProducesRefsChanged(t *testing.T) {
+	dir, _, w := newWatcherFixture(t)
+	wtDir := t.TempDir()
+	runGit(t, dir, "worktree", "add", "-b", "detached-feature", filepath.Join(wtDir, "wt1"))
+	awaitSignal(t, w.Signals(), SignalRefsChanged)
+}
+
+// TestRepoWatcher_SecondDetachedWorktreeAlsoProducesRefsChanged is the worktree-tree analogue of
+// TestRepoWatcher_NewRefNamespaceSeenOnSecondUpdateToo: the FIRST worktree add creates
+// commonDir/worktrees itself, which this backend was not watching at startup — this proves the
+// reactive maybeWatchWorktreesDir extension actually took effect, by requiring a SECOND, distinct
+// worktree add (a new sibling directory under the now-existing commonDir/worktrees) to be seen
+// too, not just the one that happened to create the parent directory.
+func TestRepoWatcher_SecondDetachedWorktreeAlsoProducesRefsChanged(t *testing.T) {
+	dir, _, w := newWatcherFixture(t)
+	wtDir := t.TempDir()
+	runGit(t, dir, "worktree", "add", "-b", "wt-one", filepath.Join(wtDir, "wt1"))
+	awaitSignal(t, w.Signals(), SignalRefsChanged)
+
+	// Drain any immediately-following coalesced signal before the second add, so the next
+	// awaitSignal genuinely observes a fresh firing (TestRepoWatcher_NewRefNamespaceSeenOnSecondUpdateToo's own convention).
+	drainDeadline := time.After(300 * time.Millisecond)
+drain:
+	for {
+		select {
+		case <-w.Signals():
+		case <-drainDeadline:
+			break drain
+		}
+	}
+
+	runGit(t, dir, "worktree", "add", "-b", "wt-two", filepath.Join(wtDir, "wt2"))
+	awaitSignal(t, w.Signals(), SignalRefsChanged)
 }
 
 // TestRepoWatcher_BurstCoalesces proves D11's coalescing: a burst of N ref-creating commands

@@ -54,6 +54,15 @@ func newBackend(commonDir, gitDir string) (backend, error) {
 		}
 	}
 	addRefsTree(fsw, filepath.Join(commonDir, "refs"))
+	// G25 D17/F9: commonDir/worktrees — a repository that has never had a linked worktree has no
+	// such directory yet, which is not an error (mirrors addRefsTree's own "a missing root is not
+	// an error" for a repository mid-init); maybeWatchWorktreesDir below adds this watch reactively
+	// the first time the directory itself is created by a detached `worktree add`.
+	if info, statErr := os.Stat(filepath.Join(commonDir, "worktrees")); statErr == nil && info.IsDir() {
+		if addErr := fsw.Add(filepath.Join(commonDir, "worktrees")); addErr != nil {
+			slog.Warn("gitclient: watch worktrees directory", "scope", "watcher", "dir", filepath.Join(commonDir, "worktrees"), "err", addErr)
+		}
+	}
 
 	b := &fsnotifyBackend{
 		fsw:  fsw,
@@ -94,6 +103,7 @@ func (b *fsnotifyBackend) run(commonDir string) {
 				return
 			}
 			maybeWatchNewRefsDir(b.fsw, commonDir, ev.Name)
+			maybeWatchWorktreesDir(b.fsw, commonDir, ev.Name)
 			select {
 			case b.out <- rawEvent{Path: ev.Name}:
 			case <-b.stop:
@@ -147,5 +157,26 @@ func maybeWatchNewRefsDir(fsw *fsnotify.Watcher, commonDir, path string) {
 	}
 	if info, err := os.Stat(path); err == nil && info.IsDir() {
 		addRefsTree(fsw, path)
+	}
+}
+
+// maybeWatchWorktreesDir is G25 D17/F9's own two-line addition: the FIRST detached `worktree add`
+// this repository has ever seen creates commonDir/worktrees itself, which this backend was not
+// watching at startup (it did not exist yet) — this extends the watch reactively, exactly once,
+// the moment that directory materialises, so every subsequent worktree's own <name> subdirectory
+// (whose creation/removal is a direct child event of THIS directory, not a deeper one this backend
+// would otherwise need to recurse into) is observed from then on. Unlike addRefsTree this never
+// recurses further than this one directory — a linked worktree's own per-worktree files (HEAD,
+// index, locked) are out of this phase's own watch scope (0.3: lock/unlock/prune are not served),
+// only its own top-level creation/removal under commonDir/worktrees is.
+func maybeWatchWorktreesDir(fsw *fsnotify.Watcher, commonDir, path string) {
+	worktreesRoot := filepath.Join(filepath.Clean(commonDir), "worktrees")
+	if filepath.Clean(path) != worktreesRoot {
+		return
+	}
+	if info, err := os.Stat(path); err == nil && info.IsDir() {
+		if addErr := fsw.Add(path); addErr != nil {
+			slog.Warn("gitclient: watch worktrees directory", "scope", "watcher", "dir", path, "err", addErr)
+		}
 	}
 }
