@@ -217,11 +217,49 @@ describe('matchRef — semantics table, rows 14-15', () => {
   });
 });
 
-describe('matchRef — the pr seam (P12, unused)', () => {
-  test('matchRef ignores an unused pr argument entirely — the seam stays inert for the whole phase', () => {
+describe('matchRef — the pr seam, activated (G24 D11)', () => {
+  test('a bare number query hits prNumber', () => {
+    const compiled = compileOk({ text: '123' });
+    const branch = ref({ shortName: 'feature' });
+    expect(matchRef(branch, compiled, { number: 123, title: 'does not matter' })).toEqual([
+      'prNumber',
+    ]);
+  });
+
+  test('a #-prefixed number query also hits prNumber — the two-form test (upstream §7.8)', () => {
+    const compiled = compileOk({ text: '#123' });
+    const branch = ref({ shortName: 'feature' });
+    expect(matchRef(branch, compiled, { number: 123, title: 'does not matter' })).toEqual([
+      'prNumber',
+    ]);
+  });
+
+  test('a title term hits prTitle', () => {
+    const compiled = compileOk({ text: 'widget' });
+    const branch = ref({ shortName: 'feature' });
+    expect(matchRef(branch, compiled, { number: 1, title: 'Fix the widget' })).toEqual(['prTitle']);
+  });
+
+  test('a query matching both the number and the title hits both fields', () => {
+    const compiled = compileOk({ text: '42' });
+    const branch = ref({ shortName: 'unrelated-name' });
+    expect(matchRef(branch, compiled, { number: 42, title: 'issue 42 follow-up' })).toEqual([
+      'prNumber',
+      'prTitle',
+    ]);
+  });
+
+  test('a non-matching pr still allows refName to hit on its own', () => {
+    const compiled = compileOk({ text: 'feature' });
+    const branch = ref({ shortName: 'feature' });
+    expect(matchRef(branch, compiled, { number: 999, title: 'unrelated' })).toEqual(['refName']);
+  });
+
+  test('pr === undefined is byte-identical to this seam’s pre-G24 behaviour — a strict addition', () => {
     const compiled = compileOk({ text: 'no-such-term-anywhere' });
     const branch = ref({ shortName: 'main' });
-    expect(matchRef(branch, compiled, { number: 42, title: 'does not matter' })).toEqual([]);
+    expect(matchRef(branch, compiled)).toEqual([]);
+    expect(matchRef(branch, compiled, undefined)).toEqual([]);
   });
 });
 

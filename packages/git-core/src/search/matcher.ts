@@ -33,7 +33,11 @@ export type SearchField =
   | 'committerEmail'
   | 'sha'
   | 'refName'
-  | 'tagAnnotation';
+  | 'tagAnnotation'
+  // G24 D11: matchRef's own `pr` arm — a ref's associated PR number/title, client-side only (F9:
+  // the wire's SearchMatchField union is commits-only; these two never cross the wire).
+  | 'prNumber'
+  | 'prTitle';
 
 /** Every field a commit can be searched on. `body` is `""` for a loaded row — the column store
  *  holds no commit body at all (hard part 1); only the streamed git tail (`ScanRecord`) ever
@@ -222,16 +226,18 @@ export function searchLoadedCommits(
 /**
  * `shortName` first (the common case), then an annotated tag's own message — `subject` and
  * `body` — never a lightweight tag's borrowed commit subject (`ref.annotation` is already
- * `undefined` there; see `parse/refs.ts`). `pr` is P12's seam: the hook for matching a ref's
- * decoration against a pull request's number/title (§7.8's own paragraph on the boundary),
- * unused for the whole of this phase and never passed by any P11 caller.
+ * `undefined` there; see `parse/refs.ts`). `pr` is G24's own activation of P12's seam (§7.8's own
+ * paragraph on the boundary): when the branch this ref names has an associated pull request
+ * (`PrState.byBranch`), its number and title are matched too — a `#123`-or-bare-`123` two-form
+ * number test (upstream §7.8 verbatim) and a plain title match. `pr === undefined` (every P11
+ * caller, and a branch with no resolved PR) is byte-identical to this seam's pre-G24 inert
+ * behaviour — a strict addition, never a change to the refName/tagAnnotation arms above it.
  */
 export function matchRef(
   ref: MatchableRef,
   query: Extract<CompiledQuery, { kind: 'ok' }>,
   pr?: { readonly number: number; readonly title: string },
 ): readonly SearchField[] {
-  void pr;
   const hits: SearchField[] = [];
   if (query.pattern.test(ref.shortName)) hits.push('refName');
   const annotation = ref.annotation;
@@ -241,6 +247,11 @@ export function matchRef(
       (annotation.body.length > 0 && query.pattern.test(annotation.body)))
   ) {
     hits.push('tagAnnotation');
+  }
+  if (pr !== undefined) {
+    const n = String(pr.number);
+    if (query.pattern.test(n) || query.pattern.test(`#${n}`)) hits.push('prNumber');
+    if (query.pattern.test(pr.title)) hits.push('prTitle');
   }
   return hits.length === 0 ? NO_FIELDS : hits;
 }

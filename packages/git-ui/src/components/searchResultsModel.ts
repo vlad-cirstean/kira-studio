@@ -71,6 +71,8 @@ const FIELD_LABELS: Readonly<Record<SearchField, string>> = {
   sha: 'sha',
   refName: 'name',
   tagAnnotation: 'tag message',
+  prNumber: 'PR number',
+  prTitle: 'PR title',
 };
 
 export function fieldLabel(fields: readonly SearchField[]): string | undefined {
