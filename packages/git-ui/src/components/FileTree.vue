@@ -131,6 +131,12 @@ function collapseDir(path: string): void {
 
 const indexed = computed(() => filterFiles(props.files, props.filter));
 
+// G30 round-1 performance review, finding #6: `tree` depends only on `indexed` (the files/filter),
+// never on `collapsedDirs` — split out from `rows` so toggling a single twisty re-runs only the
+// cheap flatten below, not buildFileTree's own full O(n log n) fold (a fresh DirBuilder Map per
+// directory, a sort at every level, a fresh node object per file) over every file in the commit.
+const tree = computed(() => buildFileTree(indexed.value));
+
 const rows = computed<FileTreeRow[]>(() => {
   if (props.listMode === 'flat') {
     return buildFlatList(indexed.value).map((node) => ({
@@ -139,7 +145,7 @@ const rows = computed<FileTreeRow[]>(() => {
       depth: 0,
     }));
   }
-  return flattenTreeRows(buildFileTree(indexed.value), isExpanded);
+  return flattenTreeRows(tree.value, isExpanded);
 });
 
 /** §8's cap, lifted for the current commit once "Show all N files" is clicked — not persisted
