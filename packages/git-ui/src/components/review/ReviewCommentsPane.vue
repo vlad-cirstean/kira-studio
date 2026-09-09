@@ -282,7 +282,7 @@ function anchorTitle(c: ReviewComment): string | undefined {
 
 .kv-review-comments-empty {
   margin: 0;
-  padding: var(--kv-space-4);
+  padding: var(--kv-s-5);
   color: var(--kv-description-fg);
 }
 

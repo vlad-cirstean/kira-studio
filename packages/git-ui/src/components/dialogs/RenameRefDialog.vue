@@ -75,12 +75,12 @@ async function submit(): Promise<void> {
 .kv-dialog-field {
   display: flex;
   flex-direction: column;
-  gap: var(--kv-space-1);
-  margin: var(--kv-space-2) 0;
+  gap: var(--kv-s-1);
+  margin: var(--kv-s-2) 0;
 }
 
 .kv-dialog-field input[type='text'] {
-  padding: var(--kv-space-1) var(--kv-space-2);
+  padding: var(--kv-s-1) var(--kv-s-2);
   background: var(--kv-panel-bg);
   color: var(--kv-row-fg);
   border: 1px solid var(--kv-panel-border);
@@ -89,6 +89,6 @@ async function submit(): Promise<void> {
 
 .kv-dialog-error {
   color: var(--kv-diff-deleted-fg);
-  margin: var(--kv-space-1) 0;
+  margin: var(--kv-s-1) 0;
 }
 </style>

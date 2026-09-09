@@ -1647,14 +1647,15 @@ onBeforeUnmount(() => {
 
 /* G-UX D9 (item 9): the graph search row — moved out of the always-rendered toolbar (item 9's own
    correctness fix), toggled by `/`/`Ctrl+F`/`Ctrl+Alt+F`, a sibling between <AppToolbar> and
-   whatever follows it in both template branches. */
+   whatever follows it in both template branches. G34 D13: takes the toolbar's own inset, so the
+   two stacked bars read as one chrome block rather than two differently-padded strips. */
 .kv-search-row {
   display: flex;
   align-items: center;
-  gap: var(--kv-space-2);
-  padding: var(--kv-space-1) var(--kv-space-3);
+  gap: var(--kv-s-2);
+  padding: var(--kv-s-2) var(--kv-s-4);
   background-color: var(--kv-toolbar-bg);
-  border-bottom: 1px solid var(--kv-toolbar-border);
+  border-bottom: var(--kv-border-width) solid var(--kv-toolbar-border);
   flex-shrink: 0;
 }
 
@@ -1666,9 +1667,9 @@ onBeforeUnmount(() => {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: var(--kv-space-3);
+  gap: var(--kv-s-4);
   height: 100%;
-  padding: var(--kv-space-5);
+  padding: var(--kv-s-6);
   text-align: center;
   color: var(--kv-app-fg);
 }
@@ -1680,9 +1681,9 @@ onBeforeUnmount(() => {
 }
 
 .kv-boot-error button {
-  padding: var(--kv-space-2) var(--kv-space-4);
+  padding: var(--kv-s-2) var(--kv-s-5);
   border: 1px solid var(--kv-panel-border);
-  border-radius: var(--kv-radius);
+  border-radius: var(--kv-radius-sm);
   background-color: var(--kv-panel-bg);
   color: var(--kv-app-fg);
   cursor: pointer;
@@ -1704,7 +1705,7 @@ onBeforeUnmount(() => {
 
 .kv-boot-error-banner button {
   margin-left: auto;
-  padding: var(--kv-space-1) var(--kv-space-3);
+  padding: var(--kv-s-1) var(--kv-s-4);
   border: 1px solid var(--kv-panel-border);
   border-radius: var(--kv-radius-sm);
   background-color: var(--kv-panel-bg);
@@ -1731,7 +1732,7 @@ onBeforeUnmount(() => {
   position: fixed;
   z-index: var(--kui-z-popover, 20);
   border: 1px solid var(--kv-panel-border);
-  border-radius: var(--kv-radius);
+  border-radius: var(--kv-radius-sm);
   box-shadow: 0 2px 8px var(--kv-widget-shadow);
 }
 
@@ -1785,7 +1786,7 @@ onBeforeUnmount(() => {
 
 .kv-detail-empty {
   margin: 0;
-  padding: var(--kv-space-4);
+  padding: var(--kv-s-5);
   color: var(--kv-description-fg);
 }
 

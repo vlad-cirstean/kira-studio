@@ -28,9 +28,9 @@ defineProps<{ branchName: string }>();
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: var(--kv-space-3);
+  gap: var(--kv-s-4);
   height: 100%;
-  padding: var(--kv-space-5);
+  padding: var(--kv-s-6);
   text-align: center;
   color: var(--kv-app-fg);
 }

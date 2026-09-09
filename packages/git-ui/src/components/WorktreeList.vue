@@ -199,7 +199,7 @@ async function confirmRemove(): Promise<void> {
 .kv-worktree-row-main {
   display: flex;
   align-items: center;
-  gap: var(--kv-space-1);
+  gap: var(--kv-s-1);
   flex: 1;
   min-width: 0;
 }

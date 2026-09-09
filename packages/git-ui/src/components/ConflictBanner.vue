@@ -154,7 +154,7 @@ const PATH_DISPLAY_CAP = 20;
 <style>
 .kv-conflict-banner {
   flex-shrink: 0;
-  padding: var(--kv-space-2) var(--kv-space-3);
+  padding: var(--kv-s-2) var(--kv-s-4);
   /* W20: not `--kv-overlay-bg` — that token is a translucent modal-backdrop scrim (rgba black at
    * a fixed alpha, meant to sit *behind* an opaque dialog, not to host text of its own); over a
    * light theme's own bright app background it blends to a middling gray that this banner's own
@@ -171,7 +171,7 @@ const PATH_DISPLAY_CAP = 20;
 .kv-conflict-banner-row {
   display: flex;
   align-items: center;
-  gap: var(--kv-space-2);
+  gap: var(--kv-s-2);
 }
 
 .kv-conflict-banner-icon {
@@ -192,11 +192,11 @@ const PATH_DISPLAY_CAP = 20;
 }
 
 .kv-conflict-banner-button {
-  padding: var(--kv-space-1) var(--kv-space-2);
+  padding: var(--kv-s-1) var(--kv-s-2);
   background: transparent;
   color: var(--kv-app-fg);
   border: 1px solid var(--kv-panel-border);
-  border-radius: var(--kv-radius);
+  border-radius: var(--kv-radius-sm);
   cursor: pointer;
 }
 
@@ -210,14 +210,14 @@ const PATH_DISPLAY_CAP = 20;
 }
 
 .kv-conflict-banner-reason {
-  margin: var(--kv-space-1) 0 0;
+  margin: var(--kv-s-1) 0 0;
   font-size: 0.85em;
   color: var(--kv-description-fg);
 }
 
 .kv-conflict-banner-paths {
-  margin: var(--kv-space-1) 0 0;
-  padding-left: var(--kv-space-4);
+  margin: var(--kv-s-1) 0 0;
+  padding-left: var(--kv-s-5);
   max-height: 80px;
   overflow-y: auto;
   font-family: var(--kv-mono-font-family);

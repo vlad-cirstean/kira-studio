@@ -335,7 +335,7 @@ function onOpenFile(index: number, pinned: boolean): void {
   align-items: center;
   gap: var(--kv-s-1);
   color: var(--kv-description-fg);
-  font-size: var(--kv-t-xs, 0.85em);
+  font-size: var(--kv-t-xs);
   white-space: nowrap;
   overflow: hidden;
 }
@@ -407,7 +407,7 @@ function onOpenFile(index: number, pinned: boolean): void {
 .kv-review-row-error,
 .kv-review-row-loading {
   margin: 0;
-  padding: var(--kv-space-3);
+  padding: var(--kv-s-4);
   color: var(--kv-description-fg);
 }
 

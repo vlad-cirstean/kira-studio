@@ -628,7 +628,7 @@ watch(
 
 <template>
   <div
-    class="kv-review-view kv-skin-kira"
+    class="kv-review-view"
     :data-connection-state="connectionState"
     :style="{ '--kv-tree-indent': treeIndent }"
   >
@@ -930,15 +930,15 @@ watch(
 }
 
 .kv-review-loading {
-  padding: var(--kv-space-4);
+  padding: var(--kv-s-5);
   color: var(--kv-description-fg);
 }
 
 .kv-review-boot-error {
   display: flex;
   flex-direction: column;
-  gap: var(--kv-space-3);
-  padding: var(--kv-space-4);
+  gap: var(--kv-s-4);
+  padding: var(--kv-s-5);
 }
 
 .kv-review-boot-error p {
@@ -948,9 +948,9 @@ watch(
 
 .kv-review-boot-error button {
   align-self: flex-start;
-  padding: var(--kv-space-2) var(--kv-space-4);
+  padding: var(--kv-s-2) var(--kv-s-5);
   border: 1px solid var(--kv-panel-border);
-  border-radius: var(--kv-radius);
+  border-radius: var(--kv-radius-sm);
   background-color: var(--kv-panel-bg);
   color: var(--kv-row-fg);
   cursor: pointer;
@@ -960,8 +960,8 @@ watch(
 .kv-review-picker {
   display: flex;
   flex-direction: column;
-  gap: var(--kv-space-2);
-  padding: var(--kv-space-4);
+  gap: var(--kv-s-2);
+  padding: var(--kv-s-5);
   min-height: 0;
 }
 
@@ -984,7 +984,7 @@ watch(
   background: var(--kv-panel-bg);
   color: var(--kv-row-fg);
   border: 1px solid var(--kv-panel-border);
-  padding: var(--kv-space-1) var(--kv-space-2);
+  padding: var(--kv-s-1) var(--kv-s-2);
 }
 
 .kv-review-picker-scroll {
@@ -994,7 +994,7 @@ watch(
 }
 
 .kv-review-picker-section-title {
-  padding: var(--kv-space-2) 0 var(--kv-space-1);
+  padding: var(--kv-s-2) 0 var(--kv-s-1);
   color: var(--kv-description-fg);
   font-size: 0.8em;
   text-transform: uppercase;
@@ -1004,7 +1004,7 @@ watch(
   display: block;
   width: 100%;
   text-align: left;
-  padding: var(--kv-space-1) var(--kv-space-2);
+  padding: var(--kv-s-1) var(--kv-s-2);
   border: none;
   background: transparent;
   color: var(--kv-app-fg);
@@ -1019,7 +1019,7 @@ watch(
 
 .kv-review-picker-empty {
   color: var(--kv-description-fg);
-  padding: var(--kv-space-1) var(--kv-space-2);
+  padding: var(--kv-s-1) var(--kv-s-2);
 }
 
 /* G12 D14: .p-panel-head's geometry — height/gap/padding — for the view head carrying the branch
@@ -1078,7 +1078,7 @@ watch(
 .kv-review-summary-meta {
   font-family: var(--kv-font-ui);
   color: var(--kv-description-fg);
-  font-size: var(--kv-t-xs, 0.85em);
+  font-size: var(--kv-t-xs);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1124,7 +1124,7 @@ watch(
 
 .kv-review-status {
   margin: 0;
-  padding: var(--kv-space-4);
+  padding: var(--kv-s-5);
   color: var(--kv-description-fg);
 }
 
@@ -1199,5 +1199,7 @@ watch(
  * stay byte-identical while it still embedded a diff (G12 D14's own guarantee). That guarantee no
  * longer has anything to protect (items 9/10/12/13 already changed the graph tree's own
  * appearance and behaviour), so this whole block moved into FileTree.vue's own <style> as its one
- * unconditional appearance instead — see that file's own doc comment. */
+ * unconditional appearance instead — see that file's own doc comment. G34 D1: `.kv-skin-kira` no
+ * longer exists at all — `kira-structure.css` is `:root`-scoped now, so there is nothing left to
+ * apply here. */
 </style>

@@ -81,7 +81,7 @@ async function removeFromStack(branch: string): Promise<void> {
         v-for="row in rowsFor(summary.branches)"
         :key="row.name"
         class="kv-branch-row kv-stack-row"
-        :style="{ paddingLeft: `calc(var(--kv-space-2) + ${row.depth} * var(--kv-space-3))` }"
+        :style="{ paddingLeft: `calc(var(--kv-s-2) + ${row.depth} * var(--kv-s-4))` }"
       >
         <div class="kv-branch-row-main kv-stack-row-main">
           <span v-if="row.isHead" class="kv-stack-badge" v-kui-tooltip="'Current branch'">●</span>
@@ -157,14 +157,14 @@ async function removeFromStack(branch: string): Promise<void> {
 
 <style scoped>
 .kv-stack-group {
-  margin-bottom: var(--kv-space-2);
+  margin-bottom: var(--kv-s-2);
 }
 
 .kv-stack-header {
   display: flex;
   align-items: center;
-  gap: var(--kv-space-1);
-  padding: var(--kv-space-1) var(--kv-space-2);
+  gap: var(--kv-s-1);
+  padding: var(--kv-s-1) var(--kv-s-2);
   font-weight: 600;
   color: var(--kv-description-fg);
 }
@@ -184,7 +184,7 @@ async function removeFromStack(branch: string): Promise<void> {
 .kv-stack-row-main {
   display: flex;
   align-items: center;
-  gap: var(--kv-space-1);
+  gap: var(--kv-s-1);
   flex: 1;
   min-width: 0;
 }

@@ -8,12 +8,16 @@
  * (`open-repo-settings` emit), the same shape `stash-changes` already follows.
  *
  * `docs/plans/P11.md` W14 originally added a fifth slot here, `SearchBox.vue`, crammed into this
- * same 35px row. G-UX D9 (item 9) moves it out entirely — a row of its own, below the toolbar,
+ * same row. G-UX D9 (item 9) moves it out entirely — a row of its own, below the toolbar,
  * toggled rather than always rendered (`App.vue` owns it now, alongside `AppToolbar`, not this
  * component).
  *
- * Metrics match the panel title bar's, not an invented toolbar height (§6.1): 35px
- * (`--kv-toolbar-height`), square corners (`--kv-radius: 0`), no shadow.
+ * G34 D13: this bar's own metrics used to be a literal 35px (`--kv-toolbar-height`), argued as
+ * matching the panel title bar's — which does not hold, since that title bar is VS Code chrome
+ * outside this webview's iframe and there is no shared edge to align to. It is now `--kv-bar-h`
+ * (34px at the default font size, growing with it, Kira's own toolbar/tab-bar/title-bar token —
+ * already what the review sidebar's toolbar uses), 4px-rounded controls (Kira's radius tier, not
+ * `--kv-radius: 0`'s square corners), and Kira's own shadow tier where a shadow is drawn at all.
  *
  * There is no `remotes.list` endpoint (P6/P8 both skip it, per `rowMenuModel.ts`'s own
  * `remoteNamesFrom` doc comment) and remote *management* is out of scope entirely (§10's scope
@@ -382,33 +386,42 @@ const stashDisabled = computed(
 </template>
 
 <style>
+/* G34 D13: Kira's own `.p-toolbar` geometry (`--kv-bar-h`, a token that tracks the user's font
+   size, not the 35px literal this used to be — see this file's own header comment). */
 .kv-toolbar {
   display: flex;
   align-items: center;
-  gap: var(--kv-space-2);
-  height: var(--kv-toolbar-height);
-  padding: 0 var(--kv-space-3);
+  gap: var(--kv-s-3);
+  height: var(--kv-bar-h);
+  padding: 0 var(--kv-s-4);
   background-color: var(--kv-toolbar-bg);
-  border-bottom: 1px solid var(--kv-toolbar-border);
+  border-bottom: var(--kv-border-width) solid var(--kv-toolbar-border);
   flex-shrink: 0;
 }
 
+/* G34 D13: Kira's `.p-toolbar .sep` — a short rail centred in the bar, not a stretched one. */
 .kv-toolbar-separator {
-  width: 1px;
-  align-self: stretch;
-  margin: var(--kv-space-2) 0;
-  background-color: var(--kv-toolbar-border);
+  width: var(--kv-border-width);
+  height: var(--kv-control-inline-h);
+  align-self: center;
+  margin: 0 var(--kv-s-1);
+  background-color: var(--kv-border-strong);
+  flex-shrink: 0;
 }
 
 /* G26 D6/D8: mirrors the remote/worktree-prepare progress strips' own shape — a plain, low-key
    status readout, never a second progress bar (a restack's own per-branch granularity is one
-   `stack.progress` event, not a stream worth a bar of its own, per §9's own "not built" note). */
+   `stack.progress` event, not a stream worth a bar of its own, per §9's own "not built" note).
+   G34 D13: adopts Kira's `.p-status` proportions. */
 .kv-toolbar-restacking {
   display: flex;
   align-items: center;
-  gap: var(--kv-space-1);
+  height: var(--kv-control-h-sm);
+  padding: 0 var(--kv-s-3);
+  border-radius: var(--kv-radius-sm);
+  gap: var(--kv-s-2);
   color: var(--kv-description-fg);
-  font-size: 0.9em;
+  font-size: var(--kv-t-sm);
   white-space: nowrap;
 }
 
@@ -432,7 +445,7 @@ const stashDisabled = computed(
 }
 
 .kv-push-chevron {
-  padding: 0 var(--kv-space-1);
+  padding: 0 var(--kv-s-1);
   border-left: none;
   border-top-left-radius: 0;
   border-bottom-left-radius: 0;
@@ -440,7 +453,7 @@ const stashDisabled = computed(
 
 /* G20 D5: positioning/chrome move onto KuiPopoverPanel's own `.kui-popover`. */
 .kv-push-menu {
-  padding: var(--kv-space-1);
+  padding: var(--kv-s-1);
 }
 
 .kv-push-menu-item {
@@ -453,13 +466,16 @@ const stashDisabled = computed(
    call 6's precedent — no `Notifications` port, D54) — a phase label, throttled to ~10/s
    host-side (OQ10), and the one cancel button every remote op shares, D50's table read forward
    into "enabled" vs "disabled-with-reason". */
+/* G34 D13: adopts Kira's `.p-status` proportions, same treatment as `.kv-toolbar-restacking`. */
 .kv-remote-progress {
   display: inline-flex;
   align-items: center;
-  gap: var(--kv-space-2);
-  padding: 0 var(--kv-space-2);
+  height: var(--kv-control-h-sm);
+  padding: 0 var(--kv-s-3);
+  border-radius: var(--kv-radius-sm);
+  gap: var(--kv-s-2);
   color: var(--kv-description-fg);
-  font-size: 0.9em;
+  font-size: var(--kv-t-sm);
 }
 
 .kv-remote-progress-label {

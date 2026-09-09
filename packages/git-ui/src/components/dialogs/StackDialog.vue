@@ -196,12 +196,12 @@ function closeDialog(): void {
 .kv-dialog-field {
   display: flex;
   flex-direction: column;
-  gap: var(--kv-space-1);
-  margin: var(--kv-space-2) 0;
+  gap: var(--kv-s-1);
+  margin: var(--kv-s-2) 0;
 }
 
 .kv-dialog-field select {
-  padding: var(--kv-space-1) var(--kv-space-2);
+  padding: var(--kv-s-1) var(--kv-s-2);
   background: var(--kv-panel-bg);
   color: var(--kv-row-fg);
   border: 1px solid var(--kv-panel-border);
@@ -220,7 +220,7 @@ function closeDialog(): void {
 .kv-stack-progress {
   max-height: 200px;
   overflow-y: auto;
-  padding: var(--kv-space-2);
+  padding: var(--kv-s-2);
   background: var(--kv-panel-bg);
   border: 1px solid var(--kv-panel-border);
   font-size: 0.9em;

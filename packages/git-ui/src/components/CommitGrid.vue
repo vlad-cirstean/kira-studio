@@ -99,7 +99,7 @@ const MIN_COLUMN_WIDTH = 40;
 const MAX_COLUMN_WIDTH = 600;
 const MIN_MESSAGE_WIDTH = 120;
 const HANDLE_KEY_STEP = 8;
-// G21 D6b: mirrors `--kv-space-2` (density.css), `.slick-cell`'s own horizontal padding — one
+// G21 D6b: mirrors `--kv-s-2` (density.css), `.slick-cell`'s own horizontal padding — one
 // side; `measureAbsoluteDateWidth`'s own caller doubles it for both sides of the cell.
 const CELL_PADDING_PX = 4;
 
@@ -1010,7 +1010,7 @@ defineExpose({ scrollToRow, focusGrid, scrollToTopRow, getViewportTop });
 .kv-commit-grid .slick-cell {
   position: absolute;
   border: none;
-  padding: 0 var(--kv-space-2);
+  padding: 0 var(--kv-s-2);
   display: flex;
   align-items: center;
   overflow: hidden;
@@ -1046,7 +1046,7 @@ defineExpose({ scrollToRow, focusGrid, scrollToTopRow, getViewportTop });
 .kv-cell-message {
   display: flex;
   align-items: center;
-  gap: var(--kv-space-2);
+  gap: var(--kv-s-2);
   min-width: 0;
   overflow: hidden;
 }

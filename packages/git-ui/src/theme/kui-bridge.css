@@ -3,25 +3,51 @@
  * `--kui-*` semantic vocabulary — the one-time mapping that lets this host consume
  * `@kira/kira-ui`'s components without them ever referencing `--kv-*` directly. Every
  * right-hand side below is an existing `--kv-*` token (`theme/vscode-tokens.css`,
- * `theme/density.css`); no new colour is invented here.
+ * `theme/kira-structure.css`); no new colour is invented here.
+ *
+ * G34 D3: rewritten against the Kira scale (kira-structure.css, now the app's one scale — see
+ * that file) rather than the retired workbench one. `--kui-control-h` stops being a 22px literal
+ * and becomes `--kv-control-h`, a token that grows with the user's VS Code font-size setting the
+ * same way every control inside it already does. `--kui-radius` moves from 0 (square) to Kira's
+ * 4px interactive tier; floating surfaces (menus/popovers/dialogs) get their own 6px panel tier,
+ * `--kui-radius-float`, since Kira draws those two tiers differently. F13 (see the G34 plan): the
+ * spacing reindex means `--kui-space-5` now means 12px, not 16px — the two gutter declarations in
+ * `controls.css` that actually need a fixed 16px clearance for a glyph pin themselves to
+ * `--kui-space-6` explicitly, so this reindex costs nothing there.
  */
 :root {
   --kui-fg: var(--kv-app-fg);
   --kui-fg-muted: var(--kv-description-fg);
+  --kui-fg-subtle: var(--kv-description-fg);
   --kui-bg-panel: var(--kv-panel-bg);
+  --kui-bg-input: var(--kv-input-bg);
   --kui-border: var(--kv-panel-border);
+  --kui-border-strong: var(--kv-border-strong);
+  --kui-border-width: var(--kv-border-width);
   --kui-hover-bg: var(--kv-row-hover-bg);
+  --kui-active-bg: var(--kv-input-bg);
   --kui-selected-bg: var(--kv-row-selected-bg);
   --kui-selected-fg: var(--kv-row-selected-fg);
   --kui-danger-fg: var(--kv-diff-deleted-fg);
   --kui-focus-border: var(--kv-focus-border);
-  --kui-radius: var(--kv-radius);
-  --kui-control-h: 22px;
-  --kui-space-1: var(--kv-space-1);
-  --kui-space-2: var(--kv-space-2);
-  --kui-space-3: var(--kv-space-3);
-  --kui-space-4: var(--kv-space-4);
-  --kui-space-5: var(--kv-space-5);
+  --kui-radius: var(--kv-radius-sm); /* interactive controls — Kira's sm tier, 4px */
+  --kui-radius-float: var(--kv-radius-panel); /* menus/popovers/dialogs — Kira's panel tier, 6px */
+  --kui-control-h: var(--kv-control-h);
+  --kui-control-h-sm: var(--kv-control-h-sm);
+  --kui-control-inline-h: var(--kv-control-inline-h);
+  --kui-icon-box: var(--kv-icon-box);
+  --kui-icon-size: 13px; /* Kira's own CodiconIcon default */
+  --kui-font-ui: var(--kv-font-ui);
+  --kui-font-size: var(--kv-t-md);
+  --kui-font-size-sm: var(--kv-t-sm);
+  --kui-font-size-xs: var(--kv-t-xs);
+  --kui-space-1: var(--kv-s-1);
+  --kui-space-2: var(--kv-s-2);
+  --kui-space-3: var(--kv-s-3);
+  --kui-space-4: var(--kv-s-4);
+  --kui-space-5: var(--kv-s-5);
+  --kui-space-6: var(--kv-s-6);
+  --kui-shadow-float: var(--kv-shadow-dialog) var(--kv-widget-shadow);
   /* G20 D6: `packages/git-ui` had no `--kv-z-*` ladder to bridge from (ad hoc 10/20/30 literals
      throughout) — this phase is the one that establishes the values, not merely re-maps them.
      G21 D2 adds `--kui-z-modal`, one rung above menus, for KuiDialog's backdrop. */

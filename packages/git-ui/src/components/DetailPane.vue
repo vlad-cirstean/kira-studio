@@ -139,13 +139,13 @@ function onOpenFile(index: number, pinned: boolean): void {
 
 .kv-detail-pane-error {
   margin: 0;
-  padding: var(--kv-space-4);
+  padding: var(--kv-s-5);
   color: var(--kv-error-fg);
 }
 
 .kv-detail-pane-loading {
   margin: 0;
-  padding: var(--kv-space-4);
+  padding: var(--kv-s-5);
   color: var(--kv-description-fg);
 }
 </style>

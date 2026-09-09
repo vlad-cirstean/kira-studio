@@ -161,7 +161,7 @@ defineExpose({ run: runDefault });
 }
 
 .kv-pull-picker-chevron {
-  padding: 0 var(--kv-space-1);
+  padding: 0 var(--kv-s-1);
   border-left: none;
   border-top-left-radius: 0;
   border-bottom-left-radius: 0;
@@ -169,7 +169,7 @@ defineExpose({ run: runDefault });
 
 /* G20 D5: positioning/chrome move onto KuiPopoverPanel's own `.kui-popover`. */
 .kv-pull-picker-panel {
-  padding: var(--kv-space-1);
+  padding: var(--kv-s-1);
 }
 
 .kv-pull-picker-item {
@@ -177,11 +177,11 @@ defineExpose({ run: runDefault });
   flex-direction: column;
   align-items: flex-start;
   width: 100%;
-  padding: var(--kv-space-1) var(--kv-space-2);
+  padding: var(--kv-s-1) var(--kv-s-2);
   background: transparent;
   color: inherit;
   border: none;
-  border-radius: var(--kv-radius);
+  border-radius: var(--kv-radius-sm);
   font-family: inherit;
   font-size: inherit;
   text-align: left;

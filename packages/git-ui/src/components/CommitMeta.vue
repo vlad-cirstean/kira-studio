@@ -307,17 +307,17 @@ function copyMessage(): void {
    alongside the 2-line clamp below and the deleted sha/parent rows, to the pane's own 80% target
    for the file tree (DetailPane.vue's own max-height rules do the actual bounding). */
 .kv-commit-meta {
-  padding: var(--kv-space-3);
+  padding: var(--kv-s-4);
   display: flex;
   flex-direction: column;
-  gap: var(--kv-space-2);
+  gap: var(--kv-s-2);
 }
 
 .kv-meta-message-header {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: var(--kv-space-2);
+  gap: var(--kv-s-2);
 }
 
 .kv-meta-subject {
@@ -327,7 +327,7 @@ function copyMessage(): void {
 }
 
 .kv-meta-body {
-  margin: var(--kv-space-2) 0 0;
+  margin: var(--kv-s-2) 0 0;
   white-space: normal;
 }
 
@@ -347,7 +347,7 @@ function copyMessage(): void {
 }
 
 .kv-meta-body-toggle {
-  margin-top: var(--kv-space-1);
+  margin-top: var(--kv-s-1);
   background: transparent;
   border: none;
   padding: 0;
@@ -365,10 +365,10 @@ function copyMessage(): void {
    then the trailers. Zero space cost while collapsed (the default view): nothing here renders
    until bodyExpanded is true. */
 .kv-meta-expanded {
-  margin-top: var(--kv-space-2);
+  margin-top: var(--kv-s-2);
   display: flex;
   flex-direction: column;
-  gap: var(--kv-space-1);
+  gap: var(--kv-s-1);
 }
 
 .kv-meta-identity {
@@ -382,10 +382,10 @@ function copyMessage(): void {
 }
 
 .kv-meta-trailers {
-  margin: var(--kv-space-2) 0 0;
+  margin: var(--kv-s-2) 0 0;
   display: grid;
   grid-template-columns: max-content 1fr;
-  gap: var(--kv-space-1) var(--kv-space-3);
+  gap: var(--kv-s-1) var(--kv-s-4);
   font-size: 0.92em;
 }
 
@@ -405,7 +405,7 @@ function copyMessage(): void {
   margin: 0;
   display: grid;
   grid-template-columns: max-content 1fr;
-  gap: var(--kv-space-1) var(--kv-space-3);
+  gap: var(--kv-s-1) var(--kv-s-4);
   font-size: 0.92em;
 }
 
@@ -420,13 +420,13 @@ function copyMessage(): void {
 .kv-meta-refs {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--kv-space-1);
+  gap: var(--kv-s-1);
 }
 
 .kv-meta-pr {
   display: flex;
   flex-direction: column;
-  gap: var(--kv-space-1);
+  gap: var(--kv-s-1);
 }
 
 .kv-meta-pr-link {

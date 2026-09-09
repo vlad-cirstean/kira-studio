@@ -185,11 +185,11 @@ onBeforeUnmount(() => {
 .kv-base-trigger {
   display: inline-flex;
   align-items: center;
-  gap: var(--kv-space-2);
+  gap: var(--kv-s-2);
   height: 24px;
-  padding: 0 var(--kv-space-2);
+  padding: 0 var(--kv-s-2);
   border: 1px solid var(--kv-panel-border);
-  border-radius: var(--kv-radius);
+  border-radius: var(--kv-radius-sm);
   background: transparent;
   color: var(--kv-app-fg);
   font-family: inherit;
@@ -228,7 +228,7 @@ onBeforeUnmount(() => {
 }
 
 .kv-base-filter {
-  margin: var(--kv-space-2);
+  margin: var(--kv-s-2);
 }
 
 .kv-base-panel-scroll {
@@ -237,7 +237,7 @@ onBeforeUnmount(() => {
 }
 
 .kv-base-section-title {
-  padding: var(--kv-space-1) var(--kv-space-3);
+  padding: var(--kv-s-1) var(--kv-s-4);
   color: var(--kv-description-fg);
   font-size: 0.8em;
   text-transform: uppercase;
@@ -246,10 +246,10 @@ onBeforeUnmount(() => {
 .kv-base-row {
   display: flex;
   align-items: center;
-  gap: var(--kv-space-2);
+  gap: var(--kv-s-2);
   width: 100%;
   text-align: left;
-  padding: var(--kv-space-1) var(--kv-space-3);
+  padding: var(--kv-s-1) var(--kv-s-4);
   border: none;
   background: transparent;
   color: var(--kv-app-fg);
@@ -280,7 +280,7 @@ onBeforeUnmount(() => {
 }
 
 .kv-base-empty {
-  padding: var(--kv-space-2) var(--kv-space-3);
+  padding: var(--kv-s-2) var(--kv-s-4);
   color: var(--kv-description-fg);
 }
 </style>

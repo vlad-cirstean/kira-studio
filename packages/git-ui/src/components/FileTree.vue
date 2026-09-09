@@ -14,7 +14,9 @@
  * geometry `ReviewView.vue` used to restyle from outside under `.kv-skin-kira`, and the
  * dimmed-directory-suffix/context-menu-copy behaviour) is now this component's *only* appearance,
  * everywhere it mounts — `DetailPane.vue`, `StashDetailPane.vue`, `ReviewFilesPane.vue`,
- * `ReviewCommitRow.vue` alike.
+ * `ReviewCommitRow.vue` alike. G34 D1: `kira-structure.css` moved to `:root`, so the class this
+ * paragraph refers to (`.kv-skin-kira`) no longer exists — the tokens it used to scope now apply
+ * globally, unconditionally, everywhere in the package.
  */
 import type { CommitStore } from '@kira/git-core';
 import type { FileChange, ReviewFileStatus } from '@kira/git-ipc';
@@ -406,13 +408,12 @@ function reviewToggleTitle(path: string): string {
 </script>
 
 <template>
-  <div class="kv-file-tree kv-skin-kira" data-testid="file-tree">
-    <!-- G21 D11: `.kv-skin-kira` (kira-structure.css) — colour-free, structural-only tokens
-         (spacing/control-height/font-role), scoped here rather than at :root so the graph panel's
-         own density.css scale still governs everywhere outside this one component. Applying it
-         right on this tree's own root, not up at App.vue/DetailPane.vue, is what makes "one
-         anatomy, everywhere this component mounts" true without restyling anything else in the
-         graph panel.
+  <div class="kv-file-tree" data-testid="file-tree">
+    <!-- G21 D11 (superseded by G34 D1): this root used to carry `.kv-skin-kira` to scope
+         kira-structure.css's colour-free, structural-only tokens (spacing/control-height/
+         font-role) to this one component while density.css's own scale governed everywhere else.
+         G34 hoisted kira-structure.css to `:root` and retired density.css's competing scale, so
+         those tokens now apply globally and the class is gone — nothing left to scope here.
 
          G-UX D7 (item 7): this comment moved from *before* the root `<div>` to *inside* it (same
          text, new position) — a comment sitting as the root `<div>`'s own template-level sibling
@@ -572,15 +573,15 @@ function reviewToggleTitle(path: string): string {
 .kv-file-tree-parent {
   display: flex;
   flex-direction: column;
-  gap: var(--kv-space-1);
-  padding: 0 var(--kv-space-4) var(--kv-space-3);
+  gap: var(--kv-s-1);
+  padding: 0 var(--kv-s-5) var(--kv-s-4);
   font-size: 0.9em;
 }
 
 .kv-file-tree-toolbar {
   display: flex;
-  gap: var(--kv-space-2);
-  padding: 0 var(--kv-space-4) var(--kv-space-2);
+  gap: var(--kv-s-2);
+  padding: 0 var(--kv-s-5) var(--kv-s-2);
 }
 
 .kv-file-tree-filter {
@@ -642,7 +643,7 @@ function reviewToggleTitle(path: string): string {
   font-family: var(--kv-font-ui);
   font-size: 0.85em;
   display: flex;
-  gap: var(--kv-space-2);
+  gap: var(--kv-s-2);
 }
 
 /* G19 D14: the row's primary leading glyph, taking over the leading-icon role the status letter
@@ -668,13 +669,15 @@ function reviewToggleTitle(path: string): string {
  * deleted outright; `min-width: 1ch` is the one thing kept from it, so the letters still line up
  * into a column and the file names after them align, without reintroducing a box around the
  * letter. G-UX D6 (item 6): the letter drops from the inherited full body size/weight-700 down to
- * the tree's own secondary scale — the same `0.85em` tier `.kv-file-tree-counts`/
- * `-dir-stats`/`-file-dir` already use — so it reads as metadata beside the filename, not as a
- * heading; `var(--kv-t-xs, 0.85em)` mirrors `.kv-file-tree-file-dir`'s own fallback exactly. */
+ * the tree's own secondary scale — the same tier `.kv-file-tree-counts`/`-dir-stats`/`-file-dir`
+ * already use — so it reads as metadata beside the filename, not as a heading. G34: the `0.85em`
+ * fallback this and `.kv-file-tree-file-dir` used to carry is dropped — at the 13px default it
+ * and `--kv-t-xs` (11px vs. 11.05px) are visually identical, and `--kv-t-xs` is now unconditional
+ * (kira-structure.css is `:root`-scoped, so it always resolves). */
 .kv-file-tree-status {
   min-width: 1ch;
   font-family: var(--kv-mono-font-family);
-  font-size: var(--kv-t-xs, 0.85em);
+  font-size: var(--kv-t-xs);
   font-weight: 600;
   line-height: 1;
   flex-shrink: 0;
@@ -713,7 +716,7 @@ function reviewToggleTitle(path: string): string {
   overflow: hidden;
   text-overflow: ellipsis;
   color: var(--kv-description-fg);
-  font-size: var(--kv-t-xs, 0.85em);
+  font-size: var(--kv-t-xs);
 }
 
 .kv-file-tree-counts {
@@ -721,7 +724,7 @@ function reviewToggleTitle(path: string): string {
   font-family: var(--kv-font-ui);
   font-size: 0.85em;
   display: flex;
-  gap: var(--kv-space-2);
+  gap: var(--kv-s-2);
   flex-shrink: 0;
 }
 
@@ -752,7 +755,7 @@ function reviewToggleTitle(path: string): string {
   color: var(--kv-focus-border);
   border: none;
   border-top: 1px solid var(--kv-panel-border);
-  padding: var(--kv-space-2);
+  padding: var(--kv-s-2);
   cursor: pointer;
 }
 </style>

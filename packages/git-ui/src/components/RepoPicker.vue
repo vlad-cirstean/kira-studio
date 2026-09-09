@@ -130,15 +130,15 @@ onBeforeUnmount(() => {
   max-height: 320px;
   overflow-y: auto;
   margin: 0;
-  padding: var(--kv-space-1) 0;
+  padding: var(--kv-s-1) 0;
   list-style: none;
 }
 
 .kv-repo-item {
   display: flex;
   align-items: center;
-  gap: var(--kv-space-2);
-  padding: var(--kv-space-1) var(--kv-space-3);
+  gap: var(--kv-s-2);
+  padding: var(--kv-s-1) var(--kv-s-4);
   cursor: pointer;
 }
 
@@ -155,7 +155,7 @@ onBeforeUnmount(() => {
 }
 
 .kv-repo-empty {
-  padding: var(--kv-space-1) var(--kv-space-3);
+  padding: var(--kv-s-1) var(--kv-s-4);
   color: var(--kv-description-fg);
 }
 </style>

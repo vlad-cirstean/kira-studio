@@ -115,8 +115,8 @@ function stashAndCarry(): void {
 .kv-dialog-file-list {
   max-height: 160px;
   overflow-y: auto;
-  margin: var(--kv-space-2) 0;
-  padding-left: var(--kv-space-4);
+  margin: var(--kv-s-2) 0;
+  padding-left: var(--kv-s-5);
   font-family: var(--kv-mono-font-family);
   font-size: 0.9em;
 }

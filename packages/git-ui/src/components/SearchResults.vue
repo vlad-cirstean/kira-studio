@@ -156,22 +156,22 @@ onMounted(() => void reposition());
   width: 420px;
   max-height: 360px;
   overflow-y: auto;
-  padding: var(--kv-space-1) 0;
+  padding: var(--kv-s-1) 0;
   background-color: var(--kv-panel-bg);
   color: var(--kv-app-fg);
   border: 1px solid var(--kv-panel-border);
-  border-radius: var(--kv-radius);
+  border-radius: var(--kv-radius-sm);
   box-shadow: 0 2px 8px var(--kv-widget-shadow);
 }
 
 .kv-search-status {
-  padding: var(--kv-space-1) var(--kv-space-3);
+  padding: var(--kv-s-1) var(--kv-s-4);
   color: var(--kv-description-fg);
   font-size: 0.85em;
 }
 
 .kv-search-section-title {
-  padding: var(--kv-space-1) var(--kv-space-3);
+  padding: var(--kv-s-1) var(--kv-s-4);
   font-size: 0.85em;
   font-weight: 600;
   color: var(--kv-description-fg);
@@ -184,8 +184,8 @@ onMounted(() => void reposition());
 .kv-search-option {
   display: flex;
   align-items: center;
-  gap: var(--kv-space-2);
-  padding: var(--kv-space-1) var(--kv-space-3);
+  gap: var(--kv-s-2);
+  padding: var(--kv-s-1) var(--kv-s-4);
   cursor: pointer;
   white-space: nowrap;
 }
@@ -214,18 +214,18 @@ onMounted(() => void reposition());
 }
 
 .kv-search-option-field {
-  padding: 0 var(--kv-space-1);
+  padding: 0 var(--kv-s-1);
   color: var(--kv-description-fg);
   font-size: 0.8em;
   border: 1px dashed var(--kv-panel-border);
-  border-radius: var(--kv-radius);
+  border-radius: var(--kv-radius-sm);
 }
 
 .kv-search-more,
 .kv-search-empty,
 .kv-search-hint,
 .kv-search-footer {
-  padding: var(--kv-space-1) var(--kv-space-3);
+  padding: var(--kv-s-1) var(--kv-s-4);
   color: var(--kv-description-fg);
   font-size: 0.85em;
 }

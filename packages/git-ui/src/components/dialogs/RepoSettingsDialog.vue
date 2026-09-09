@@ -287,15 +287,15 @@ async function save(): Promise<void> {
 
 <style scoped>
 .kv-repo-settings-section {
-  margin: var(--kv-space-3) 0;
+  margin: var(--kv-s-4) 0;
 }
 
 .kv-repo-settings-section:first-of-type {
-  margin-top: var(--kv-space-2);
+  margin-top: var(--kv-s-2);
 }
 
 .kv-repo-settings-heading {
-  margin: 0 0 var(--kv-space-1) 0;
+  margin: 0 0 var(--kv-s-1) 0;
   font-size: 0.9em;
   font-weight: 600;
   color: var(--kv-row-fg);
@@ -304,8 +304,8 @@ async function save(): Promise<void> {
 .kv-dialog-field {
   display: flex;
   flex-direction: column;
-  gap: var(--kv-space-1);
-  margin: var(--kv-space-2) 0;
+  gap: var(--kv-s-1);
+  margin: var(--kv-s-2) 0;
 }
 
 .kv-dialog-field--inline {
@@ -314,7 +314,7 @@ async function save(): Promise<void> {
 }
 
 .kv-dialog-field textarea {
-  padding: var(--kv-space-1) var(--kv-space-2);
+  padding: var(--kv-s-1) var(--kv-s-2);
   background: var(--kv-panel-bg);
   color: var(--kv-row-fg);
   border: 1px solid var(--kv-panel-border);
@@ -322,7 +322,7 @@ async function save(): Promise<void> {
 }
 
 .kv-dialog-field input[type='number'] {
-  padding: var(--kv-space-1) var(--kv-space-2);
+  padding: var(--kv-s-1) var(--kv-s-2);
   background: var(--kv-panel-bg);
   color: var(--kv-row-fg);
   border: 1px solid var(--kv-panel-border);

@@ -15,8 +15,7 @@ import './theme/density.css';
 // component CSS (theme/controls.css) — loaded once, here, for every consumer in this bundle.
 import './theme/kui-bridge.css';
 import '@kira/kira-ui/theme/controls.css';
-// G12 D14: colourless structural tokens, scoped to .kv-skin-kira so the graph panel (AppRoot,
-// which never carries that class) is unaffected — one shared entry, so this loads for both roots.
+// G34 D1: colourless structural tokens — hoisted to :root, the app's one scale for both roots.
 import './theme/kira-structure.css';
 
 export interface MountHandle {

@@ -345,7 +345,7 @@ defineExpose({ focus: () => searchInputRef.value?.focus() });
 .kv-search-box {
   display: flex;
   align-items: center;
-  gap: var(--kv-space-2);
+  gap: var(--kv-s-2);
 }
 
 /* Grows to the row's own width instead of a hard 160px — `.kui-search-input`
@@ -373,7 +373,7 @@ defineExpose({ focus: () => searchInputRef.value?.focus() });
 }
 
 .kv-search-count {
-  padding: 0 var(--kv-space-1);
+  padding: 0 var(--kv-s-1);
   color: var(--kv-description-fg);
   font-size: 0.85em;
   white-space: nowrap;
@@ -383,11 +383,11 @@ defineExpose({ focus: () => searchInputRef.value?.focus() });
   position: fixed;
   z-index: var(--kui-z-popover, 20);
   max-width: var(--kui-float-max-w, none);
-  padding: var(--kv-space-1) var(--kv-space-2);
+  padding: var(--kv-s-1) var(--kv-s-2);
   background-color: var(--kv-panel-bg);
   color: var(--kv-error-fg);
   border: 1px solid var(--kv-panel-border);
-  border-radius: var(--kv-radius);
+  border-radius: var(--kv-radius-sm);
   box-shadow: 0 2px 8px var(--kv-widget-shadow);
   font-size: 0.85em;
 }

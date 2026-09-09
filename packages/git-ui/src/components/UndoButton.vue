@@ -54,17 +54,17 @@ async function undo(): Promise<void> {
 .kv-undo {
   display: flex;
   align-items: center;
-  gap: var(--kv-space-1);
+  gap: var(--kv-s-1);
 }
 
 .kv-undo-button {
   display: inline-flex;
   align-items: center;
-  gap: var(--kv-space-2);
+  gap: var(--kv-s-2);
   height: 22px;
-  padding: 0 var(--kv-space-2);
+  padding: 0 var(--kv-s-2);
   border: none;
-  border-radius: var(--kv-radius);
+  border-radius: var(--kv-radius-sm);
   background: transparent;
   color: var(--kv-app-fg);
   font-family: inherit;

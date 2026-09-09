@@ -84,15 +84,15 @@ function handleCancel(): void {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: var(--kv-space-2);
-  padding: var(--kv-space-2) var(--kv-space-3);
+  gap: var(--kv-s-2);
+  padding: var(--kv-s-2) var(--kv-s-4);
   flex-shrink: 0;
 }
 
 .kv-load-more-button {
-  padding: var(--kv-space-2) var(--kv-space-3);
+  padding: var(--kv-s-2) var(--kv-s-4);
   border: 1px solid var(--kv-toolbar-border);
-  border-radius: var(--kv-radius);
+  border-radius: var(--kv-radius-sm);
   background: transparent;
   color: var(--kv-app-fg);
   font-family: inherit;
@@ -116,9 +116,9 @@ function handleCancel(): void {
 }
 
 .kv-load-more-cancel {
-  padding: var(--kv-space-2) var(--kv-space-3);
+  padding: var(--kv-s-2) var(--kv-s-4);
   border: none;
-  border-radius: var(--kv-radius);
+  border-radius: var(--kv-radius-sm);
   background: transparent;
   color: var(--kv-app-fg);
   font-family: inherit;

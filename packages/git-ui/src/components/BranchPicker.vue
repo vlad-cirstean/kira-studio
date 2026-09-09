@@ -504,11 +504,11 @@ onBeforeUnmount(() => {
 .kv-branch-trigger {
   display: inline-flex;
   align-items: center;
-  gap: var(--kv-space-2);
+  gap: var(--kv-s-2);
   height: 22px;
-  padding: 0 var(--kv-space-2);
+  padding: 0 var(--kv-s-2);
   border: none;
-  border-radius: var(--kv-radius);
+  border-radius: var(--kv-radius-sm);
   background: transparent;
   color: var(--kv-app-fg);
   font-family: inherit;
@@ -542,7 +542,7 @@ onBeforeUnmount(() => {
 }
 
 .kv-branch-filter {
-  margin: var(--kv-space-2);
+  margin: var(--kv-s-2);
 }
 
 .kv-branch-panel-scroll {
@@ -551,7 +551,7 @@ onBeforeUnmount(() => {
 }
 
 .kv-branch-section-title {
-  padding: var(--kv-space-1) var(--kv-space-3);
+  padding: var(--kv-s-1) var(--kv-s-4);
   font-size: 0.85em;
   font-weight: 600;
   color: var(--kv-description-fg);
@@ -560,8 +560,8 @@ onBeforeUnmount(() => {
 .kv-branch-row {
   display: flex;
   align-items: center;
-  gap: var(--kv-space-1);
-  padding: 0 var(--kv-space-2);
+  gap: var(--kv-s-1);
+  padding: 0 var(--kv-s-2);
 }
 
 .kv-branch-row--current {
@@ -573,8 +573,8 @@ onBeforeUnmount(() => {
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: var(--kv-space-2);
-  padding: var(--kv-space-1) var(--kv-space-1);
+  gap: var(--kv-s-2);
+  padding: var(--kv-s-1) var(--kv-s-1);
   background: transparent;
   border: none;
   color: inherit;
@@ -602,9 +602,9 @@ onBeforeUnmount(() => {
 
 .kv-branch-badge {
   font-size: 0.8em;
-  padding: 0 var(--kv-space-1);
+  padding: 0 var(--kv-s-1);
   border: 1px dashed var(--kv-panel-border);
-  border-radius: var(--kv-radius);
+  border-radius: var(--kv-radius-sm);
   color: var(--kv-description-fg);
 }
 
@@ -623,7 +623,7 @@ onBeforeUnmount(() => {
   border: none;
   color: var(--kv-app-fg);
   cursor: pointer;
-  padding: var(--kv-space-1);
+  padding: var(--kv-s-1);
 }
 
 .kv-icon-button:hover {
@@ -632,7 +632,7 @@ onBeforeUnmount(() => {
 
 .kv-branch-rename-input {
   flex: 1;
-  padding: var(--kv-space-1);
+  padding: var(--kv-s-1);
   background: var(--kv-panel-bg);
   color: var(--kv-row-fg);
   border: 1px solid var(--kv-focus-border);
@@ -640,7 +640,7 @@ onBeforeUnmount(() => {
 
 .kv-branch-more,
 .kv-branch-empty {
-  padding: var(--kv-space-1) var(--kv-space-3);
+  padding: var(--kv-s-1) var(--kv-s-4);
   color: var(--kv-description-fg);
   font-size: 0.85em;
 }
@@ -648,8 +648,8 @@ onBeforeUnmount(() => {
 .kv-branch-force-delete {
   display: flex;
   align-items: center;
-  gap: var(--kv-space-2);
-  padding: var(--kv-space-2) var(--kv-space-3);
+  gap: var(--kv-s-2);
+  padding: var(--kv-s-2) var(--kv-s-4);
   background: var(--kv-overlay-bg);
   font-size: 0.85em;
 }
