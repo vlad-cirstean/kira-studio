@@ -260,6 +260,11 @@ export const OTHER_COMMANDS: readonly OtherCommand[] = [
   // own).
   { command: 'kiraVersion.goToStackParent', title: 'Go to Parent Branch' },
   { command: 'kiraVersion.goToStackChild', title: 'Go to Child Branch' },
+  // G-UX D9 (item 9): the palette's own route to toggling the graph panel's search row — the
+  // same assignment the in-webview `/`/`Ctrl+F`/`Ctrl+Alt+F` gestures already make. Not a
+  // MutatingAction (maps to no OpRequest/RemoteOpParams kind), same reasoning as
+  // toggleFileReviewed/goToStackParent above.
+  { command: 'kiraVersion.toggleSearch', title: 'Toggle Search' },
 ];
 
 export type OtherCommandId = (typeof OTHER_COMMANDS)[number]['command'];

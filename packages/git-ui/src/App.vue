@@ -57,6 +57,10 @@ import {
   buildStashMenu,
   type MenuSection,
 } from './components/rowMenuModel.ts';
+// The template instantiates this (InstanceType<typeof SearchBox> is the script's only other
+// reference) — see AppToolbar.vue's own note on this exact pattern.
+// biome-ignore lint/style/useImportType: see above
+import SearchBox from './components/SearchBox.vue';
 import StashDetailPane from './components/StashDetailPane.vue';
 import type { SearchOption } from './components/searchResultsModel.ts';
 import { childOf, parentOf } from './components/stackListModel.ts';
@@ -159,6 +163,9 @@ const columnWidths = ref<ColumnWidths>(DEFAULT_COLUMN_WIDTHS);
 const dateFormat = ref<DateFormat>('relative');
 const detailWidth = ref(DEFAULT_DETAIL_WIDTH);
 const scrollRow = ref(0);
+/** G-UX D9: the graph search row's own open/closed state — closed by default, toggled by `/`/
+ *  `Ctrl+F`/`Ctrl+Alt+F` (`toggleSearch` below) and persisted like `detailOpen`. */
+const searchOpen = ref(false);
 /** First-mount-only rehydration target for `CommitGrid.vue`'s own `initialScrollRow` prop (see
  *  that component's doc comment on why it is one-shot) — `undefined` until `bootstrap()` reads a
  *  persisted value, so a first-ever mount (nothing persisted yet) passes nothing and scrolls
@@ -389,7 +396,36 @@ watch(searchState.activeHit, (hit) => {
 });
 
 function handleSearchFocusGrid(): void {
+  // G-UX D9: SearchBox.vue's own Escape stage 2 (clear the query, focus the grid) now also
+  // closes the search row -- focusGrid only ever fires from that one branch (never the
+  // dropdown-dismiss stage), so tying the two together here needs no new emit.
+  searchOpen.value = false;
   commitGridRef.value?.focusGrid();
+}
+
+const searchRowEl = ref<HTMLDivElement | null>(null);
+const searchBoxRef = ref<InstanceType<typeof SearchBox> | null>(null);
+
+/** G-UX D9: opens the search row and focuses it on the next tick (`KuiSearchInput`'s exposed
+ *  `focus()`, forwarded through `SearchBox.vue`'s own identical `defineExpose`) — a tick is
+ *  needed since the row (and the input inside it) do not exist in the DOM until this reactive
+ *  change renders. */
+function openSearch(): void {
+  searchOpen.value = true;
+  void nextTick(() => searchBoxRef.value?.focus());
+}
+
+/** Closing clears the query (`SearchState.clear()`) — a hidden row holding a live query that
+ *  still highlights rows in the grid would be a ghost — and hands focus back to the grid. */
+function closeSearch(): void {
+  searchOpen.value = false;
+  searchState.clear();
+  commitGridRef.value?.focusGrid();
+}
+
+function toggleSearchRow(): void {
+  if (searchOpen.value) closeSearch();
+  else openSearch();
 }
 
 // ---------------------------------------------------------------------------------------
@@ -844,6 +880,11 @@ function runUiAction(
       else liveAnnouncement.value = 'No branch to navigate to.';
       break;
     }
+    // G-UX D9: the palette's own route to toggling the graph search row — the same assignment
+    // the in-webview `/`/`Ctrl+F`/`Ctrl+Alt+F` gestures already make.
+    case 'toggleSearch':
+      toggleSearchRow();
+      break;
   }
 }
 
@@ -903,7 +944,7 @@ function retryBootstrap(): void {
 // (judgment call 7) — a remembered term silently re-running against a repository that has moved
 // on is the same stale-state argument the diff/selected-file omission already made.
 let lastPersisted: PersistedViewState = {
-  version: 5,
+  version: 6,
   repoId: null,
   loadedRows: 0,
   detailOpen: true,
@@ -917,6 +958,7 @@ let lastPersisted: PersistedViewState = {
   searchWholeWord: false,
   searchRegex: false,
   searchScope: 'both',
+  searchOpen: false,
 };
 
 async function bootstrap(): Promise<void> {
@@ -951,6 +993,7 @@ async function bootstrap(): Promise<void> {
     searchState.wholeWord.value = persisted.searchWholeWord;
     searchState.regex.value = persisted.searchRegex;
     searchState.scope.value = persisted.searchScope;
+    searchOpen.value = persisted.searchOpen;
 
     // §6.3's "collapsed by default" below `wide`: a persisted `detailOpen: true` from an earlier,
     // wider session must not reopen the pane/drawer over a mount that starts narrower — without
@@ -1010,6 +1053,7 @@ async function bootstrap(): Promise<void> {
       searchState.wholeWord,
       searchState.regex,
       searchState.scope,
+      searchOpen,
     ],
     ([
       repoId,
@@ -1025,6 +1069,7 @@ async function bootstrap(): Promise<void> {
       searchWholeWord,
       searchRegex,
       searchScope,
+      isSearchOpen,
     ]) => {
       lastPersisted = {
         ...lastPersisted,
@@ -1041,6 +1086,7 @@ async function bootstrap(): Promise<void> {
         searchWholeWord,
         searchRegex,
         searchScope,
+        searchOpen: isSearchOpen,
       };
       props.viewState.write(lastPersisted);
     },
@@ -1120,7 +1166,42 @@ function closeDetail(): void {
   detailOpen.value = false;
 }
 
+/** G-UX D9: `/`/`Ctrl/Cmd+F` (moved up from `SearchBox.vue`, which used to own this listener for
+ *  its own whole lifetime — now that the search row is conditionally mounted, that lifetime is
+ *  exactly when it must NOT fire). See `isEditableTarget`'s own doc comment for the exemption
+ *  `/` needs and `Ctrl/Cmd+F`'s toggle-closed behaviour. */
+function isEditableTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  // The search row itself (its input, toggles, or scope select) is never treated as "some other
+  // editable field to avoid hijacking" — mirrors SearchBox.vue's own original `target ===
+  // inputEl.value` exemption, widened to the whole row now that this handler sits outside it.
+  if (searchRowEl.value?.contains(target)) return false;
+  const tag = target.tagName;
+  return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target.isContentEditable;
+}
+
+function onSearchShortcut(event: KeyboardEvent): boolean {
+  const isFindCombo = (event.key === 'f' || event.key === 'F') && (event.ctrlKey || event.metaKey);
+  if (event.key !== '/' && !isFindCombo) return false;
+  if (event.key === '/' && isEditableTarget(event.target)) return false;
+  // `Ctrl/Cmd+F` while the row is already open AND focus is inside it closes it — mirroring
+  // VS Code's own find-widget second-press-closes gesture. `/` never closes, only opens/focuses.
+  if (
+    isFindCombo &&
+    searchOpen.value &&
+    (searchRowEl.value?.contains(document.activeElement) ?? false)
+  ) {
+    event.preventDefault();
+    closeSearch();
+    return true;
+  }
+  event.preventDefault();
+  openSearch();
+  return true;
+}
+
 function onDocumentKeydown(event: KeyboardEvent): void {
+  if (onSearchShortcut(event)) return;
   if (event.key === 'Escape' && detailOpen.value) closeDetail();
 }
 
@@ -1287,7 +1368,6 @@ onBeforeUnmount(() => {
           :worktree-state="worktreeState"
           :stack-state="stackState"
           :open-worktree-window-capability="actions?.capabilities.openWorktreeWindow ?? false"
-          :search-state="searchState"
           :actions="actions"
           :pr-state="prState"
           @repo-opened="handleRepoOpened"
@@ -1300,10 +1380,16 @@ onBeforeUnmount(() => {
           @create-worktree="worktreeCreateOpen = true"
           @open-restack-dialog="handleOpenRestackDialog"
           @open-set-stack-parent-dialog="handleOpenSetStackParentDialog"
-          @search-select="handleSearchSelect"
-          @search-focus-grid="handleSearchFocusGrid"
           @open-repo-settings="repoSettingsDialogOpen = true"
         />
+        <div v-if="searchOpen" ref="searchRowEl" class="kv-search-row">
+          <SearchBox
+            ref="searchBoxRef"
+            :search="searchState"
+            @select="handleSearchSelect"
+            @focus-grid="handleSearchFocusGrid"
+          />
+        </div>
         <EmptyRepositoryPanel :branch-name="repoState.activeRepo.value.head.name" />
       </template>
 
@@ -1318,7 +1404,6 @@ onBeforeUnmount(() => {
           :worktree-state="worktreeState"
           :stack-state="stackState"
           :open-worktree-window-capability="actions?.capabilities.openWorktreeWindow ?? false"
-          :search-state="searchState"
           :actions="actions"
           :pr-state="prState"
           @repo-opened="handleRepoOpened"
@@ -1331,10 +1416,16 @@ onBeforeUnmount(() => {
           @create-worktree="worktreeCreateOpen = true"
           @open-restack-dialog="handleOpenRestackDialog"
           @open-set-stack-parent-dialog="handleOpenSetStackParentDialog"
-          @search-select="handleSearchSelect"
-          @search-focus-grid="handleSearchFocusGrid"
           @open-repo-settings="repoSettingsDialogOpen = true"
         />
+        <div v-if="searchOpen" ref="searchRowEl" class="kv-search-row">
+          <SearchBox
+            ref="searchBoxRef"
+            :search="searchState"
+            @select="handleSearchSelect"
+            @focus-grid="handleSearchFocusGrid"
+          />
+        </div>
         <ConflictBanner
           :ops="opsState"
           :resolve-conflict-enabled="actions?.capabilities.resolveConflict ?? false"
@@ -1552,6 +1643,19 @@ onBeforeUnmount(() => {
   font-family: var(--kv-font-family);
   font-size: var(--kv-font-size);
   overflow: hidden;
+}
+
+/* G-UX D9 (item 9): the graph search row — moved out of the always-rendered toolbar (item 9's own
+   correctness fix), toggled by `/`/`Ctrl+F`/`Ctrl+Alt+F`, a sibling between <AppToolbar> and
+   whatever follows it in both template branches. */
+.kv-search-row {
+  display: flex;
+  align-items: center;
+  gap: var(--kv-space-2);
+  padding: var(--kv-space-1) var(--kv-space-3);
+  background-color: var(--kv-toolbar-bg);
+  border-bottom: 1px solid var(--kv-toolbar-border);
+  flex-shrink: 0;
 }
 
 /* G12 D6: F7's blank-panel failure mode, rendered instead — same layout shape as

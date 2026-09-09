@@ -30,12 +30,18 @@
  * it: `parsePersistedViewState`'s own documented policy discards a `version` mismatch whole, so a
  * v4 blob with the narrower pre-G19 date default is rejected and the panel re-seeds from
  * `DEFAULT_COLUMN_WIDTHS` — if this bump were dropped, item 6 would still be unfixed.
+ *
+ * G-UX D9 (version 6): adds `searchOpen` — the graph search row's own open/closed state (item 9
+ * moved it out of the always-rendered toolbar into a row toggled by `/`/`Ctrl+F`/the new
+ * `Ctrl+Alt+F` keybinding), so whether it was left open survives a hide/reveal exactly like
+ * `detailOpen` already does. The query text itself is still deliberately not persisted — see this
+ * file's own v4 doc comment above.
  */
 import type { SearchScope } from '@kira/git-core';
 import type { FileListMode } from './detail.ts';
 
 export interface PersistedViewState {
-  readonly version: 5;
+  readonly version: 6;
   readonly repoId: string | null;
   readonly loadedRows: number;
   readonly detailOpen: boolean;
@@ -53,6 +59,8 @@ export interface PersistedViewState {
   readonly searchWholeWord: boolean;
   readonly searchRegex: boolean;
   readonly searchScope: SearchScope;
+  /** G-UX D9: the search row's own open/closed state — see the file doc comment's v6 entry. */
+  readonly searchOpen: boolean;
 }
 
 export interface ColumnWidths {
@@ -89,7 +97,7 @@ function isPersistedViewStateShape(value: unknown): value is PersistedViewState 
   if (typeof value !== 'object' || value === null) return false;
   const record = value as Record<string, unknown>;
   return (
-    record.version === 5 &&
+    record.version === 6 &&
     (typeof record.repoId === 'string' || record.repoId === null) &&
     typeof record.loadedRows === 'number' &&
     typeof record.detailOpen === 'boolean' &&
@@ -104,7 +112,8 @@ function isPersistedViewStateShape(value: unknown): value is PersistedViewState 
     typeof record.searchRegex === 'boolean' &&
     (record.searchScope === 'commits' ||
       record.searchScope === 'refs' ||
-      record.searchScope === 'both')
+      record.searchScope === 'both') &&
+    typeof record.searchOpen === 'boolean'
   );
 }
 

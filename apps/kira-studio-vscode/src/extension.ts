@@ -463,6 +463,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     // tab/selection resolution for the last two).
     'kiraVersion.markSelectionReviewed': markSelectionReviewedCommand(reviewMarking),
     'kiraVersion.markSelectionUnreviewed': markSelectionUnreviewedCommand(reviewMarking),
+    // G-UX D9 (item 9): the palette's own route to toggling the graph panel's search row.
+    'kiraVersion.toggleSearch': () => graphProvider.runUiAction('toggleSearch'),
   };
   for (const entry of Object.values(MUTATING_COMMANDS)) {
     if (isPaletteCommand(entry)) {

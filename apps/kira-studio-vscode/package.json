@@ -301,6 +301,11 @@
         "command": "kiraVersion.removeGlobalStash",
         "title": "Remove from Global Stash…",
         "category": "Kira Version"
+      },
+      {
+        "command": "kiraVersion.toggleSearch",
+        "title": "Toggle Search",
+        "category": "Kira Version"
       }
     ],
     "menus": {
@@ -378,6 +383,12 @@
       {
         "command": "kiraVersion.goToStackChild",
         "key": "alt+down",
+        "when": "focusedView == 'kiraVersion.graph'"
+      },
+      {
+        "command": "kiraVersion.toggleSearch",
+        "key": "ctrl+alt+f",
+        "mac": "cmd+alt+f",
         "when": "focusedView == 'kiraVersion.graph'"
       }
     ],

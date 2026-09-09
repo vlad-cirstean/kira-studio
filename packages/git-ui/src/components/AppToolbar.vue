@@ -1,14 +1,16 @@
 <script setup lang="ts">
 /**
- * §6.2's toolbar: `[repo ▾] [branch ▾] │ ⟳ │ Fetch Pull Push │ Stash ▾ │ Search […] ⚙`. P4 built
- * only the first and third groups; P6 (W13/W17) adds the second — the branch/tag picker — and the
- * undo affordance, since both need P6's ref list and op executor. `docs/plans/P8.md` W17 adds the
- * fetch/pull/push group itself; `docs/plans/P11.md` W14 adds the fifth, `SearchBox.vue`, after the
- * spacer alongside the remote-progress/undo group — the ascii layout's own right-hand cluster —
- * rather than before it with Stash, reserving the trailing `⚙` slot for a settings gear no phase
- * implemented until now. G18 D13 is that phase: the gear opens `App.vue`'s own
- * `RepoSettingsDialog.vue`, this toolbar owning no dialog state of its own (`open-repo-settings`
- * emit), the same shape `stash-changes` already follows.
+ * §6.2's toolbar: `[repo ▾] [branch ▾] │ ⟳ │ Fetch Pull Push │ Stash ▾ │ ⚙`. P4 built only the
+ * first and third groups; P6 (W13/W17) adds the second — the branch/tag picker — and the undo
+ * affordance, since both need P6's ref list and op executor. `docs/plans/P8.md` W17 adds the
+ * fetch/pull/push group itself; the trailing `⚙` is a settings gear (G18 D13): the gear opens
+ * `App.vue`'s own `RepoSettingsDialog.vue`, this toolbar owning no dialog state of its own
+ * (`open-repo-settings` emit), the same shape `stash-changes` already follows.
+ *
+ * `docs/plans/P11.md` W14 originally added a fifth slot here, `SearchBox.vue`, crammed into this
+ * same 35px row. G-UX D9 (item 9) moves it out entirely — a row of its own, below the toolbar,
+ * toggled rather than always rendered (`App.vue` owns it now, alongside `AppToolbar`, not this
+ * component).
  *
  * Metrics match the panel title bar's, not an invented toolbar height (§6.1): 35px
  * (`--kv-toolbar-height`), square corners (`--kv-radius: 0`), no shadow.
@@ -29,7 +31,6 @@ import type { OpsState } from '../state/ops.ts';
 import type { PrState } from '../state/pr.ts';
 import type { RefsState } from '../state/refs.ts';
 import type { RepoState } from '../state/repo.ts';
-import type { SearchState } from '../state/search.ts';
 import type { StackState } from '../state/stack.ts';
 import type { StashState } from '../state/stash.ts';
 import type { WorktreeState } from '../state/worktrees.ts';
@@ -48,8 +49,6 @@ import PullStrategyPicker from './PullStrategyPicker.vue';
 import RefreshButton from './RefreshButton.vue';
 import RepoPicker from './RepoPicker.vue';
 import { remoteNamesFrom } from './rowMenuModel.ts';
-import SearchBox from './SearchBox.vue';
-import type { SearchOption } from './searchResultsModel.ts';
 import UndoButton from './UndoButton.vue';
 
 const props = defineProps<{
@@ -63,7 +62,6 @@ const props = defineProps<{
   stackState: StackState;
   /** G25 D6/D14 — see `WorktreeList.vue`'s own doc comment. */
   openWorktreeWindowCapability: boolean;
-  searchState: SearchState;
   actions: DetailActions | undefined;
   /** G24 D9: `BranchPicker.vue`'s own `#123` branch-tip badge source — optional, mirrors every
    *  other G24 prop threaded through this toolbar's own children. */
@@ -91,13 +89,6 @@ const emit = defineEmits<{
    *  shape every other dialog-opening emit above already follows. */
   (event: 'open-restack-dialog', branch: string): void;
   (event: 'open-set-stack-parent-dialog', branch: string): void;
-  /** Forwarded straight from `SearchBox.vue`'s own `select` emit — `App.vue` is where both halves
-   *  of §7.8's "selecting a hit reveals and selects it" actually live (`GraphViewState.store`,
-   *  `SelectionState`), neither of which this toolbar holds. */
-  (event: 'search-select', option: SearchOption): void;
-  /** Forwarded straight from `SearchBox.vue`'s own `focusGrid` emit (§6.6's two-stage `Escape`,
-   *  second stage) — moving real DOM focus onto the grid is `App.vue`'s own `commitGridRef`. */
-  (event: 'search-focus-grid'): void;
   /** G18 D13: the settings gear (`⚙`) this toolbar's own ascii layout has named since §6.2 but no
    *  phase implemented until now — opens `App.vue`'s own `RepoSettingsDialog.vue`, the same
    *  "toolbar owns no dialog state itself" shape `stash-changes` above already follows. */
@@ -343,12 +334,6 @@ const stashDisabled = computed(
     </KuiButton>
 
     <span class="kv-toolbar-spacer" aria-hidden="true"></span>
-
-    <SearchBox
-      :search="searchState"
-      @select="(option) => emit('search-select', option)"
-      @focus-grid="emit('search-focus-grid')"
-    />
 
     <KuiButton
       class="kv-icon-button"

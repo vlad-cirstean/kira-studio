@@ -1,12 +1,14 @@
 <script setup lang="ts">
 /**
- * `docs/plans/P11.md` W11/W12: §6.2's `Search […]` toolbar slot. One text input, three toggle
- * buttons (case-sensitive / whole-word / regex) as `aria-pressed` icon buttons with VS Code's own
+ * `docs/plans/P11.md` W11/W12: §6.2's search box. One text input, three toggle buttons
+ * (case-sensitive / whole-word / regex) as `aria-pressed` icon buttons with VS Code's own
  * icon-button styling, a Commits/Refs/Both scope `<select>` living *inside* the box (OQ6: §6.2
- * gives the toolbar one slot and §6.3's 600px breakpoint has no room for a second control), the
- * inline `n of N` match count, an inline regex error wired to the input via `aria-describedby`
- * (probe 4) — and, nested inside this same root the way `BranchPicker.vue` nests `TagList.vue`/
- * `StashList.vue` inside its own open panel, `SearchResults.vue`'s grouped dropdown.
+ * gave the toolbar one slot and §6.3's 600px breakpoint had no room for a second control — G-UX
+ * D9/item 9 later moved this whole component out of the toolbar into its own row below it, but
+ * the box's own internal anatomy is unchanged), the inline `n of N` match count, an inline regex
+ * error wired to the input via `aria-describedby` (probe 4) — and, nested inside this same root
+ * the way `BranchPicker.vue` nests `TagList.vue`/`StashList.vue` inside its own open panel,
+ * `SearchResults.vue`'s grouped dropdown.
  *
  * **Why the dropdown lives here, not as an `App.vue`-positioned sibling.** `SearchResults.vue`
  * follows the ARIA combobox pattern (`role="listbox"` + `aria-activedescendant`), which requires
@@ -36,16 +38,28 @@
  * view, then the detail pane" without `App.vue`'s own handler needing to know anything about
  * search at all.
  *
- * **`/` and `Ctrl/Cmd+F`** focus the input from anywhere in the panel (§6.6). This file owns that
- * listener directly — mounted for its own whole lifetime, which is the app's whole lifetime
- * (§6.2's slot is never conditionally rendered) — the same way `BranchPicker.vue` owns its own
- * outside-click listener, rather than routing a third global shortcut through `App.vue`.
+ * **`/` and `Ctrl/Cmd+F`** no longer live here (G-UX D9, item 9): the search row this component
+ * mounts inside is now conditionally rendered (`App.vue`'s `searchOpen`), so a listener mounted
+ * for "this component's own whole lifetime" would only ever fire while the row is already open —
+ * exactly backwards for a shortcut whose whole job is opening it. `App.vue` owns that listener
+ * now, alongside the toggle-closed gesture (`Ctrl/Cmd+F` a second time) and the new
+ * `Ctrl+Alt+F` VS Code keybinding, none of which this component needs to know about.
+ *
+ * G-UX D9: the main query input is `KuiSearchInput` now, not a raw `<input>` — G21's own
+ * "duplication G19 D3a/G21 D2 closed at its source" argument finally reaches this file too, now
+ * that `KuiSearchInput` (`packages/kira-ui`) carries the ARIA/keydown passthrough props a
+ * combobox needs (its own doc comment explains why they had to be added rather than assumed).
  */
 import type { SearchScope } from '@kira/git-core';
 import type { KuiSelectOption } from '@kira/kira-ui';
-import { computeFloatPosition, KuiButton, KuiSelect } from '@kira/kira-ui';
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import { ACTION_ICONS } from '../icons/index.ts';
+// `KuiSearchInput` is a plain (not `import type`) import even though this file's own script only
+// ever reads it through `InstanceType<typeof KuiSearchInput>` (`searchInputRef`) — the template's
+// own `<KuiSearchInput>` tag instantiates it as a component; biome's static analysis sees neither
+// use and would otherwise "fix" this to `import type`, silently erasing the import
+// (`AppToolbar.vue`'s/`review/ReviewView.vue`'s own precedent for this exact pattern).
+// biome-ignore lint/style/useImportType: see above
+import { computeFloatPosition, KuiButton, KuiSearchInput, KuiSelect } from '@kira/kira-ui';
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
 import type { SearchState } from '../state/search.ts';
 import { MIN_TAIL_QUERY_LENGTH } from '../state/search.ts';
 import SearchResults, { SEARCH_LISTBOX_ID } from './SearchResults.vue';
@@ -59,7 +73,7 @@ const emit = defineEmits<{
 }>();
 
 const rootEl = ref<HTMLElement | null>(null);
-const inputEl = ref<HTMLInputElement | null>(null);
+const searchInputRef = ref<InstanceType<typeof KuiSearchInput> | null>(null);
 
 const ERROR_ID = 'kv-search-error';
 
@@ -152,8 +166,8 @@ watch(
   },
 );
 
-function onInput(event: Event): void {
-  props.search.text.value = (event.target as HTMLInputElement).value;
+function onInput(value: string): void {
+  props.search.text.value = value;
 }
 
 function selectOption(option: SearchOption): void {
@@ -221,58 +235,34 @@ watch(dropdownVisible, (visible) => {
   else document.removeEventListener('pointerdown', onDocumentPointerDown);
 });
 
-// ---------------------------------------------------------------------------------------
-// §6.6's `/` and `Ctrl/Cmd+F`
-// ---------------------------------------------------------------------------------------
-function isEditableTarget(target: EventTarget | null): boolean {
-  if (!(target instanceof HTMLElement)) return false;
-  if (target === inputEl.value) return false;
-  const tag = target.tagName;
-  return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target.isContentEditable;
-}
-
-/** `Ctrl/Cmd+F` always wins, even while focus sits in some other text field — it is a
- *  deliberate combo, and `preventDefault` is what suppresses the browser's own find-in-page in
- *  its place. Bare `/` only wins when focus is not already inside some *other* editable control,
- *  so typing a literal `/` in the branch-filter box or a rename input is never hijacked. */
-function onGlobalKeydown(event: KeyboardEvent): void {
-  const isFindCombo = (event.key === 'f' || event.key === 'F') && (event.ctrlKey || event.metaKey);
-  if (event.key !== '/' && !isFindCombo) return;
-  if (event.key === '/' && isEditableTarget(event.target)) return;
-  event.preventDefault();
-  inputEl.value?.focus();
-  inputEl.value?.select();
-}
-
-onMounted(() => document.addEventListener('keydown', onGlobalKeydown));
+// This component is now conditionally mounted (App.vue's own searchOpen row, G-UX D9) — a
+// dropdown-open unmount (closing the row while a query is mid-search) must still drop the
+// listener the watch above added, since there is no more "closing" transition left to fire it.
 onBeforeUnmount(() => {
-  document.removeEventListener('keydown', onGlobalKeydown);
   document.removeEventListener('pointerdown', onDocumentPointerDown);
 });
 
-defineExpose({ focus: () => inputEl.value?.focus() });
+defineExpose({ focus: () => searchInputRef.value?.focus() });
 </script>
 
 <template>
   <div ref="rootEl" class="kv-search-box-root">
     <div class="kv-search-box">
-      <span class="codicon" :class="ACTION_ICONS.search" aria-hidden="true"></span>
-      <input
-        ref="inputEl"
-        type="text"
-        class="kv-search-input"
+      <KuiSearchInput
+        ref="searchInputRef"
+        class="kv-search-field"
+        :model-value="search.text.value"
         placeholder="Search"
-        aria-label="Search"
+        ariaLabel="Search"
         role="combobox"
-        aria-haspopup="listbox"
+        ariaHaspopup="listbox"
         data-testid="search-input"
-        :aria-expanded="dropdownVisible && resultsModel.sections.length > 0"
-        :aria-controls="dropdownVisible ? SEARCH_LISTBOX_ID : undefined"
-        :aria-activedescendant="highlightedOption?.id"
-        :aria-describedby="search.error.value ? ERROR_ID : undefined"
-        :aria-invalid="search.error.value ? 'true' : undefined"
-        :value="search.text.value"
-        @input="onInput"
+        :ariaExpanded="dropdownVisible && resultsModel.sections.length > 0"
+        :ariaControls="dropdownVisible ? SEARCH_LISTBOX_ID : undefined"
+        :ariaActivedescendant="highlightedOption?.id"
+        :ariaDescribedby="search.error.value ? ERROR_ID : undefined"
+        :ariaInvalid="!!search.error.value"
+        @update:model-value="onInput"
         @keydown="onKeydown"
       />
       <div class="kv-search-toggles" role="group" aria-label="Search options">
@@ -345,36 +335,26 @@ defineExpose({ focus: () => inputEl.value?.focus() });
 <style>
 .kv-search-box-root {
   position: relative;
+  flex: 1;
+  min-width: 0;
 }
 
+/* G-UX D9 (item 9): the bespoke pill shell (its own border/background/height) is gone — the row
+   this mounts inside (App.vue's .kv-search-row) supplies the chrome now, and this is just the
+   flex layout for the row's own children. */
 .kv-search-box {
-  position: relative;
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: var(--kv-space-1);
-  height: 22px;
-  padding: 0 var(--kv-space-2);
-  background: var(--kv-panel-bg);
-  color: var(--kv-app-fg);
-  border: 1px solid var(--kv-panel-border);
-  border-radius: var(--kv-radius);
+  gap: var(--kv-space-2);
 }
 
-.kv-search-box:focus-within {
-  border-color: var(--kv-focus-border);
-}
-
-.kv-search-input {
-  width: 160px;
-  background: transparent;
-  color: var(--kv-app-fg);
-  border: none;
-  font-family: inherit;
-  font-size: inherit;
-}
-
-.kv-search-input:focus {
-  outline: none;
+/* Grows to the row's own width instead of a hard 160px — `.kui-search-input`
+   (packages/kira-ui/theme/controls.css) is `inline-flex` with no explicit width of its own, so
+   `flex: 1` here is what makes it fill the remaining row space; `min-width: 0` is the usual flex-
+   item guard against its content's own intrinsic width winning instead. */
+.kv-search-field {
+  flex: 1;
+  min-width: 0;
 }
 
 .kv-search-toggles {
@@ -382,9 +362,9 @@ defineExpose({ focus: () => inputEl.value?.focus() });
   gap: 1px;
 }
 
+/* G-UX D9: the bespoke width:20px/height:18px override is gone — KuiButton's own --kui-control-h
+   sizing now, matching every other icon toggle in the app. */
 .kv-search-toggle {
-  width: 20px;
-  height: 18px;
   color: var(--kv-description-fg);
 }
 
