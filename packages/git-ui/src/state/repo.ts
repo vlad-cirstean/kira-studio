@@ -4,9 +4,10 @@ import type { BridgeClient } from '../bridge/client.ts';
 
 /**
  * `GitStatus`, the candidate list, and the active repo's summary (P3 W9) — the state the
- * live-data strip and (from P4 on) the repo/branch pickers read. Opening and picking are
- * requests, not policy: `pick()` returns whatever `repo.pick` answers and never opens it
- * itself (the UI decides, mirroring W8's own rule on the host side).
+ * live-data strip and (from P4 on) the repo/branch pickers read. Opening is a request, not
+ * policy: `open()` never decides which repo to open itself (the UI decides, mirroring W8's own
+ * rule on the host side). The workspace's own folders are the only source of candidates
+ * (G-UX D4) — there is no folder-picking request on this state.
  */
 export class RepoState {
   readonly git: ShallowRef<GitStatus>;
@@ -40,11 +41,6 @@ export class RepoState {
     if (result.kind === 'ok') this.activeRepo.value = result.repo;
     if (result.kind === 'gitUnavailable') this.git.value = result.git;
     return result;
-  }
-
-  async pick(): Promise<string | null> {
-    const { path } = await this.#bridge.request('repo.pick', {});
-    return path;
   }
 
   async close(): Promise<void> {

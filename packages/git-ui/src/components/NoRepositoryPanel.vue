@@ -3,7 +3,9 @@
  * §6.2's "no repository open" state: "the repo picker, prompted, and nothing else." Distinct
  * from `RepoPicker.vue`'s toolbar dropdown (a small trigger button that opens a popup) — this is
  * the main content area itself when there is nothing else to show, so it renders the same
- * candidate list and Open Folder… action inline rather than behind another click.
+ * candidate list inline rather than behind another click. G-UX D4: the workspace's own folders
+ * are the only source of repositories — when none of them is a Git repository, this panel says so
+ * plainly instead of offering a folder-picking dialog.
  */
 import type { RepoCandidate } from '@kira/git-ipc';
 import { KuiButton } from '@kira/kira-ui';
@@ -22,13 +24,6 @@ async function openCandidate(candidate: RepoCandidate): Promise<void> {
   const result = await props.repoState.open(candidate.path);
   if (result.kind === 'ok') emit('repo-opened', result.repo.repoId);
 }
-
-async function openFolder(): Promise<void> {
-  const path = await props.repoState.pick();
-  if (!path) return;
-  const result = await props.repoState.open(path);
-  if (result.kind === 'ok') emit('repo-opened', result.repo.repoId);
-}
 </script>
 
 <template>
@@ -42,9 +37,10 @@ async function openFolder(): Promise<void> {
         </KuiButton>
       </li>
     </ul>
-    <KuiButton class="kv-no-repo-open-folder" :icon="STATE_ICONS.openFolder" @click="openFolder">
-      Open Folder…
-    </KuiButton>
+    <p v-else class="kv-no-repo-note">
+      Kira Version follows the folders open in this VS Code window. None of them is a Git
+      repository — open one with File → Open Folder.
+    </p>
   </div>
 </template>
 
@@ -102,21 +98,10 @@ async function openFolder(): Promise<void> {
   background-color: var(--kv-row-hover-bg);
 }
 
-.kv-no-repo-open-folder {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--kv-space-2);
-  padding: var(--kv-space-2) var(--kv-space-4);
-  border: none;
-  border-radius: var(--kv-radius);
-  background-color: var(--kv-button-bg);
-  color: var(--kv-button-fg);
-  font-family: inherit;
-  font-size: inherit;
-  cursor: pointer;
-}
-
-.kv-no-repo-open-folder:hover {
-  background-color: var(--kv-button-hover-bg);
+.kv-no-repo-note {
+  max-width: 420px;
+  margin: 0;
+  color: var(--kv-description-fg);
+  text-align: center;
 }
 </style>

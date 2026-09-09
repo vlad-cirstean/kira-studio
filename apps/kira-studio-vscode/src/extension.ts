@@ -34,7 +34,6 @@ import { goToFileFromDiffCommand, openCommitInGraphCommand } from './diffToolbar
 import { KiraGraphViewProvider } from './panelView.ts';
 import { VsCodeClipboard } from './ports/clipboard.ts';
 import { VsCodeCredentialPrompt } from './ports/credentialPrompt.ts';
-import { VsCodeDialogs } from './ports/dialogs.ts';
 import { VsCodeEditorIntegration } from './ports/editorIntegration.ts';
 import { VsCodeLogger } from './ports/logger.ts';
 import { VsCodeWindows } from './ports/windows.ts';
@@ -306,7 +305,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     readRawSettings(vscode.workspace.getConfiguration()),
   ).settings;
   const logger = new VsCodeLogger(outputChannel, () => currentSettings['kiraVersion.log.level']);
-  const dialogs = new VsCodeDialogs();
   const roots = new VsCodeWorkspaceRoots();
   const clipboard = new VsCodeClipboard();
   const editor = new VsCodeEditorIntegration();
@@ -382,7 +380,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     connection: manager,
     settings: () => currentSettings,
     roots,
-    dialogs,
     clipboard,
     editor,
     logger,
@@ -443,7 +440,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   // biome-ignore lint/suspicious/noExplicitAny: see the comment above — two of these ids take a real menu-command argument.
   const otherCommandHandlers: Record<OtherCommandId, (...args: any[]) => unknown> = {
     [SHOW_CONNECTION_STATUS_COMMAND]: () => void showConnectionStatus(manager),
-    'kiraVersion.openRepository': () => void openRepository(manager, dialogs),
+    'kiraVersion.openRepository': () => void openRepository(manager),
     'kiraVersion.focusGraph': () => {
       void vscode.commands.executeCommand(`${GRAPH_VIEW_ID}.focus`);
     },
@@ -637,15 +634,27 @@ async function showConnectionStatus(manager: ConnectionManager): Promise<void> {
   }
 }
 
-async function openRepository(
-  manager: ConnectionManager,
-  dialogs: { pickFolder: (opts: { title: string }) => Promise<string | null> },
-): Promise<void> {
-  // G27 D7: a workspace folder's fsPath is filesystem-sourced — the auto-open path repo.open
-  // receives on every G12-item-6 auto-open.
-  const rawFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-  const folder = rawFolder === undefined ? undefined : nfcPath(rawFolder);
-  const path = folder ?? (await dialogs.pickFolder({ title: 'Open Repository' }));
+async function openRepository(manager: ConnectionManager): Promise<void> {
+  // G-UX D4: the workspace's own folders are the only source of repositories — no native
+  // folder-picker fallback. G27 D7: a workspace folder's fsPath is filesystem-sourced — the
+  // auto-open path repo.open receives on every G12-item-6 auto-open.
+  const folders = vscode.workspace.workspaceFolders ?? [];
+  let path: string | undefined;
+  if (folders.length === 1) {
+    path = nfcPath(folders[0].uri.fsPath);
+  } else if (folders.length > 1) {
+    const picked = await vscode.window.showQuickPick(
+      folders.map((folder) => ({ label: folder.name, description: folder.uri.fsPath, folder })),
+      { title: 'Open Repository', placeHolder: 'Select a workspace folder' },
+    );
+    if (!picked) return;
+    path = nfcPath(picked.folder.uri.fsPath);
+  } else {
+    await vscode.window.showInformationMessage(
+      "Kira Version follows this window's workspace folders — open a folder first (File → Open Folder).",
+    );
+    return;
+  }
   if (!path) return;
 
   try {

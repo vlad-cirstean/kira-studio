@@ -1,11 +1,14 @@
 /**
- * The composition SPEC §5 items 2-4 describe (G3 plan D18): `app.init`/`repo.list`/`repo.pick`
+ * The composition SPEC §5 items 2-4 describe (G3 plan D18): `app.init`/`repo.list`
  * answered locally, `graph.loadMore`/`graph.stream` get D6's `scope`/`pageSize` injected from the
  * current settings snapshot before forwarding, everything else forwards verbatim through
  * `ConnectionManager`. Written now, not in G1 — "a version of it that only forwards would be
  * replaced wholesale by G4" (G1 §5.5) — because G3 is the first phase with enough of the server
- * side (`app.init`'s real `git` status, `repo.list`/`repo.pick`'s own ports, `graph.*`) to make a
+ * side (`app.init`'s real `git` status, `repo.list`'s own ports, `graph.*`) to make a
  * non-trivial composition worth writing once rather than twice.
+ *
+ * G-UX D4: `repo.pick` (a native folder-picker dialog) is removed — the workspace's own folders
+ * are the sole source of repositories.
  *
  * G4 (D11-D14) is the "wholesale replacement" G1 forecast: `clipboard.write`, `editor.openDiff`,
  * `editor.goToFile` and `editor.resolveConflict` stop forwarding and answer from the extension's
@@ -22,7 +25,6 @@
 import { basename, join } from 'node:path';
 import type {
   Clipboard,
-  Dialogs,
   DocumentRef,
   EditorIntegration,
   FileChange,
@@ -81,7 +83,6 @@ export interface CreateProxyHandlersDeps {
   readonly connection: ConnectionManager;
   readonly settings: () => SettingsSnapshot;
   readonly roots: WorkspaceRoots;
-  readonly dialogs: Dialogs;
   readonly clipboard: Clipboard;
   readonly editor: EditorIntegration;
   readonly logger: Logger;
@@ -181,7 +182,6 @@ export function createProxyHandlers(deps: CreateProxyHandlersDeps): ServerHandle
     connection,
     settings,
     roots,
-    dialogs,
     clipboard,
     editor,
     logger,
@@ -240,10 +240,6 @@ export function createProxyHandlers(deps: CreateProxyHandlersDeps): ServerHandle
     'repo.list': async () => {
       const candidates = await roots.list();
       return { candidates, activeRepoId };
-    },
-    'repo.pick': async () => {
-      const path = await dialogs.pickFolder({ title: 'Open Repository' });
-      return { path };
     },
     'repo.open': async (params, ctx) => {
       const result = await connection.request('repo.open', params, ctx.signal);

@@ -36,8 +36,6 @@ function buildHandlers(reviewSessionStore: ReviewSessionStore) {
     // biome-ignore lint/suspicious/noExplicitAny: unused by review.session.*, stubbed minimally.
     roots: {} as any,
     // biome-ignore lint/suspicious/noExplicitAny: unused by review.session.*, stubbed minimally.
-    dialogs: {} as any,
-    // biome-ignore lint/suspicious/noExplicitAny: unused by review.session.*, stubbed minimally.
     clipboard: {} as any,
     // biome-ignore lint/suspicious/noExplicitAny: unused by review.session.*, stubbed minimally.
     editor: {} as any,
@@ -202,8 +200,6 @@ function buildOpenDiffHandlers(connection: ConnectionManager) {
     settings: notImplemented,
     // biome-ignore lint/suspicious/noExplicitAny: unused here, stubbed minimally.
     roots: {} as any,
-    // biome-ignore lint/suspicious/noExplicitAny: unused here, stubbed minimally.
-    dialogs: {} as any,
     // biome-ignore lint/suspicious/noExplicitAny: unused here, stubbed minimally.
     clipboard: {} as any,
     editor: {

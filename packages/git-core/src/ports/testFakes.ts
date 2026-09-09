@@ -7,7 +7,6 @@
 
 import type { Clipboard } from './clipboard.ts';
 import type { CredentialPrompt, CredentialRequest } from './credentialPrompt.ts';
-import type { Dialogs, PickFolderOptions } from './dialogs.ts';
 import type { Disposable } from './disposable.ts';
 import type {
   DocumentRef,
@@ -137,18 +136,6 @@ export class FakeTheme implements Theme {
   setKind(kind: ThemeKind): void {
     this.#kind = kind;
     for (const listener of this.#listeners) listener(kind);
-  }
-}
-
-export class FakeDialogs implements Dialogs {
-  readonly calls: PickFolderOptions[] = [];
-  /** Consumed in order by `pickFolder`; `null` (the default when empty) mirrors a user
-   *  dismissing the dialog. */
-  queuedResults: (string | null)[] = [];
-
-  pickFolder(opts: PickFolderOptions): Promise<string | null> {
-    this.calls.push(opts);
-    return Promise.resolve(this.queuedResults.shift() ?? null);
   }
 }
 

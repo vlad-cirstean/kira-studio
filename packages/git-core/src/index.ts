@@ -110,7 +110,6 @@ export { dirtyPathsFrom, summarizeStatus } from './model/status.ts';
 export { isAnnotated, tagTargetCommit } from './model/tag.ts';
 export type { Clipboard } from './ports/clipboard.ts';
 export type { CredentialPrompt, CredentialRequest } from './ports/credentialPrompt.ts';
-export type { Dialogs, PickFolderOptions } from './ports/dialogs.ts';
 export type { Disposable } from './ports/disposable.ts';
 export type {
   DocumentRef,

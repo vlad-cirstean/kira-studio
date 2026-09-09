@@ -2,9 +2,9 @@
 /**
  * §6.2's repo picker — the toolbar's leftmost item. Closes a real P3 gap: P3's UI could only
  * open a repo already in persisted state, so both host e2e specs had to smuggle a `KIRA_REPO`
- * environment variable in. This calls `repo.list` for candidates and offers **Open Folder…**
- * (`repo.pick` → `repo.open`), styled as a quick-input-style dropdown (§6.1: "Dialogs borrow the
- * quick-input surface").
+ * environment variable in. This calls `repo.list` for candidates (`repo.open` on selection) and
+ * is the *only* way to switch repositories (G-UX D4): the workspace's own folders are the sole
+ * source, so there is no folder-picking affordance here at all.
  *
  * Emits `repo-opened` rather than performing the reset itself: switching repos resets
  * `GraphViewState`, clears selection, and persists the new `repoId`, and W11's `App.vue` is what
@@ -49,14 +49,6 @@ function close(): void {
 async function selectCandidate(candidate: RepoCandidate): Promise<void> {
   close();
   const result = await props.repoState.open(candidate.path);
-  if (result.kind === 'ok') emit('repo-opened', result.repo.repoId);
-}
-
-async function openFolder(): Promise<void> {
-  close();
-  const path = await props.repoState.pick();
-  if (!path) return;
-  const result = await props.repoState.open(path);
   if (result.kind === 'ok') emit('repo-opened', result.repo.repoId);
 }
 
@@ -113,19 +105,6 @@ onBeforeUnmount(() => {
       <li v-if="repoState.candidates.value.length === 0" class="kv-repo-empty" aria-disabled="true">
         No repositories found
       </li>
-      <li class="kv-repo-separator" role="separator"></li>
-      <li
-        role="option"
-        tabindex="0"
-        class="kv-repo-item"
-        aria-selected="false"
-        @click="openFolder"
-        @keydown.enter="openFolder"
-        @keydown.space.prevent="openFolder"
-      >
-        <span class="codicon kv-repo-item-check" :class="STATE_ICONS.openFolder" aria-hidden="true"></span>
-        <span class="kv-repo-item-label">Open Folder…</span>
-      </li>
     </ul>
     </KuiPopoverPanel>
   </div>
@@ -178,11 +157,5 @@ onBeforeUnmount(() => {
 .kv-repo-empty {
   padding: var(--kv-space-1) var(--kv-space-3);
   color: var(--kv-description-fg);
-}
-
-.kv-repo-separator {
-  height: 1px;
-  margin: var(--kv-space-1) 0;
-  background-color: var(--kv-panel-border);
 }
 </style>
