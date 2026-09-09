@@ -40,6 +40,10 @@ func TestClassify(t *testing.T) {
 		{"another worktree's own HEAD (detached add, the G5-era gap)", "/repo/.git/worktrees/other/HEAD", SignalRefsChanged, true},
 		{"another worktree's own gitdir file", "/repo/.git/worktrees/other/gitdir", SignalRefsChanged, true},
 		{"the worktrees root directory itself (a new worktree's own top-level entry)", "/repo/.git/worktrees/other", SignalRefsChanged, true},
+		// G26 D16: a hand-edited .git/config (the one legitimate out-of-app way to change a stack)
+		// must now produce refsChanged, and its own in-flight .lock write must too (F12's stripLockSuffix).
+		{"config", "/repo/.git/config", SignalRefsChanged, true},
+		{"config, in-flight write", "/repo/.git/config.lock", SignalRefsChanged, true},
 	}
 	for _, c := range cases {
 		t.Run("main/"+c.name, func(t *testing.T) {

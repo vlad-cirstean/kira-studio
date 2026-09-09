@@ -36,6 +36,12 @@ var refIshNames = map[string]bool{
 	"REVERT_HEAD":      true,
 	"BISECT_LOG":       true,
 	"sequencer":        true,
+	// G26 D16: a hand-edited .git/config is the one legitimate out-of-app way to change a stack —
+	// D1 deliberately chose a human-readable store precisely so a user CAN edit it directly — and
+	// without this, that edit produces no signal at all until something else touches a ref. Written
+	// rarely enough (--set-upstream-to, remote add, and now this) that a spurious refsChanged costs
+	// one debounced cache drop.
+	"config": true,
 }
 
 // stripLockSuffix undoes git's own write-by-rename discipline (F12): every one of the paths above
