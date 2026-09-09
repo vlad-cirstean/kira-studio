@@ -56,7 +56,7 @@ func (r *Router) handleStashShow(ctx context.Context, c *gitsession.Conn, params
 	if err != nil {
 		return nil, err
 	}
-	result, err := entry.StashShow(ctx, p.SHA)
+	result, err := entry.StashShow(ctx, p.SHA, "") // G28 step 11 wires p.Scope through
 	if err != nil {
 		return nil, mapStashError(err)
 	}
@@ -75,7 +75,7 @@ func (r *Router) handlePreflightStashPop(ctx context.Context, c *gitsession.Conn
 	if err != nil {
 		return nil, err
 	}
-	result, err := entry.PreflightStashPop(ctx, p.SHA, p.TargetSHA)
+	result, err := entry.PreflightStashPop(ctx, p.SHA, p.TargetSHA, "") // G28 step 11 wires p.Scope through
 	if err != nil {
 		return nil, mapStashError(err)
 	}
@@ -94,7 +94,7 @@ func (r *Router) handlePreflightStashBranch(ctx context.Context, c *gitsession.C
 	if err != nil {
 		return nil, err
 	}
-	result, err := entry.PreflightStashBranch(ctx, p.SHA, p.Branch)
+	result, err := entry.PreflightStashBranch(ctx, p.SHA, p.Branch, "") // G28 step 11 wires p.Scope through
 	if err != nil {
 		return nil, mapStashError(err)
 	}

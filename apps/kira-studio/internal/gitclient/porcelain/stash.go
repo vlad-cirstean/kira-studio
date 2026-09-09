@@ -292,6 +292,18 @@ func ParseGlobalStashList(raw []byte, subjects map[string]string, refPrefix stri
 	return entries, nil
 }
 
+// ParseGlobalStashRefShas parses GlobalStashListRefsArgs' own for-each-ref output (one
+// %(objectname) per line, newline-terminated) into the bucket's own sha set (D9). An empty bucket
+// answers exit 0 with empty output (probe P10), which this returns as nil — globalStash.list's own
+// signal to stop after the first spawn and skip the log spawn entirely.
+func ParseGlobalStashRefShas(raw []byte) []string {
+	text := strings.TrimSuffix(string(raw), "\n")
+	if text == "" {
+		return nil
+	}
+	return strings.Split(text, "\n")
+}
+
 // ParseStashBaseSubjects parses StashBaseSubjectArgs' own `%H%x1f%s -z` batch output into a
 // sha -> subject map.
 func ParseStashBaseSubjects(raw []byte) (map[string]string, error) {

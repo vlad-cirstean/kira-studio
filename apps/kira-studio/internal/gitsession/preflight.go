@@ -518,14 +518,17 @@ func (e *RepoEntry) PreflightCherryPick(ctx context.Context, sha string, mainlin
 }
 
 // PreflightStashPop is preflight.stashPop's own orchestration (D3, §7.6): re-resolves the stash
-// entry fresh (resolveStashEntry's own doc comment), gathers stashPaths (stash.show's own numstat),
-// stashUntrackedPaths (an ls-tree over the untracked helper commit, when one exists),
+// entry fresh (resolveStashEntryScoped's own doc comment), gathers stashPaths (stash.show's own
+// numstat), stashUntrackedPaths (an ls-tree over the untracked helper commit, when one exists),
 // dirty/inProgress and D4's own filesystem-stat existingUntrackedPaths, plus the merge-tree
 // prediction against targetSha (defaulting to HEAD — the `stashAndCarry` route's own use of a
 // non-HEAD target, per the contract's own doc comment on preflight.stashPop's targetSha param) —
-// then calls the pure classifier.
-func (e *RepoEntry) PreflightStashPop(ctx context.Context, sha string, targetSha *string) (gitpreflight.StashPopPreflight, error) {
-	entry, err := e.resolveStashEntry(ctx, sha)
+// then calls the pure classifier. G28 D12: scope ("" or "stack" for the ordinary stack, "global"
+// for the bucket) only changes how entry is resolved — everything downstream (ClassifyStashPop,
+// stashPopPrediction, the untracked-collision os.Stat loop) takes a porcelain.StashEntry and does
+// not care where it came from, so this is the ONLY line in this function that changes for G28.
+func (e *RepoEntry) PreflightStashPop(ctx context.Context, sha string, targetSha *string, scope string) (gitpreflight.StashPopPreflight, error) {
+	entry, err := e.resolveStashEntryScoped(ctx, sha, scope)
 	if err != nil {
 		return gitpreflight.StashPopPreflight{}, err
 	}
@@ -634,9 +637,10 @@ func (e *RepoEntry) PreflightStashPop(ctx context.Context, sha string, targetSha
 // stash entry fresh, then reuses the PreflightCheckout-shaped classification path at the stash's
 // own base as the target (probe 11: "no pop prediction — clean by construction", so this reuses
 // ClassifyCheckout, never ClassifyStashPop), plus the branch-name validation ClassifyStashBranch
-// itself performs.
-func (e *RepoEntry) PreflightStashBranch(ctx context.Context, sha, branch string) (gitpreflight.StashBranchPreflight, error) {
-	entry, err := e.resolveStashEntry(ctx, sha)
+// itself performs. G28 D12: scope-aware via resolveStashEntryScoped, same one-line change as
+// PreflightStashPop above.
+func (e *RepoEntry) PreflightStashBranch(ctx context.Context, sha, branch, scope string) (gitpreflight.StashBranchPreflight, error) {
+	entry, err := e.resolveStashEntryScoped(ctx, sha, scope)
 	if err != nil {
 		return gitpreflight.StashBranchPreflight{}, err
 	}
