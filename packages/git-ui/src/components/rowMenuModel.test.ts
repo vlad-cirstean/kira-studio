@@ -1,5 +1,30 @@
 import { describe, expect, test } from 'bun:test';
-import { buildRefMenu, type RefMenuContext } from './rowMenuModel.ts';
+import type { StashEntry } from '@kira/git-ipc';
+import {
+  buildGlobalStashMenu,
+  buildRefMenu,
+  buildStashMenu,
+  type RefMenuContext,
+} from './rowMenuModel.ts';
+
+function stashFixture(overrides: Partial<StashEntry> = {}): StashEntry {
+  return {
+    index: 0,
+    sha: 'a'.repeat(40),
+    baseSha: 'b'.repeat(40),
+    baseSubject: 'base subject',
+    indexSha: 'c'.repeat(40),
+    untrackedSha: undefined,
+    message: 'On main: my label',
+    branch: 'main',
+    timestamp: 1700000000,
+    fileCount: 1,
+    includedUntracked: false,
+    scope: 'stack',
+    ref: '',
+    ...overrides,
+  };
+}
 
 /**
  * G26 D-4.14/4.15: `buildRefMenu`'s own new stack section — present only when the caller supplies
@@ -75,5 +100,61 @@ describe('buildRefMenu — stack section contents', () => {
     for (const item of sections[1]?.items ?? []) {
       expect(item.disabled).toBe(false);
     }
+  });
+});
+
+describe('buildStashMenu — G28 D5 cross-branch behavior', () => {
+  test('Pop is present for a same-branch entry, labelled plain "Apply"', () => {
+    const sections = buildStashMenu(null, stashFixture({ branch: 'main' }), 'main');
+    const ids = sections[0]?.items.map((i) => i.id);
+    expect(ids).toEqual([
+      'stashApply',
+      'stashPop',
+      'stashDrop',
+      'stashBranch',
+      'stashSaveGlobal',
+      'stashShow',
+    ]);
+    expect(sections[0]?.items[0]?.label).toBe('Apply');
+  });
+
+  test('Pop is absent for a cross-branch entry, and Apply is labelled with the origin', () => {
+    const sections = buildStashMenu(null, stashFixture({ branch: 'main' }), 'feature');
+    const ids = sections[0]?.items.map((i) => i.id);
+    expect(ids).toEqual(['stashApply', 'stashDrop', 'stashBranch', 'stashSaveGlobal', 'stashShow']);
+    expect(sections[0]?.items[0]?.label).toBe('Apply here (from main)');
+  });
+
+  test('a detached-HEAD stash (no origin branch) keeps Pop and plain "Apply"', () => {
+    const sections = buildStashMenu(null, stashFixture({ branch: null }), 'feature');
+    const ids = sections[0]?.items.map((i) => i.id);
+    expect(ids).toContain('stashPop');
+    expect(sections[0]?.items[0]?.label).toBe('Apply');
+  });
+});
+
+describe('buildGlobalStashMenu — D12/D13 never contains stashPop or stashDrop', () => {
+  test('offers exactly Apply/Branch/Show/Remove, in that order', () => {
+    const sections = buildGlobalStashMenu(null, stashFixture({ scope: 'global' }), 'feature');
+    const ids = sections[0]?.items.map((i) => i.id);
+    expect(ids).toEqual(['stashApply', 'stashBranch', 'stashShow', 'globalStashRemove']);
+  });
+
+  test('never contains stashPop or stashDrop, regardless of branch', () => {
+    for (const currentBranch of ['main', 'feature', null]) {
+      const sections = buildGlobalStashMenu(null, stashFixture({ scope: 'global' }), currentBranch);
+      const ids = sections[0]?.items.map((i) => i.id) ?? [];
+      expect(ids).not.toContain('stashPop');
+      expect(ids).not.toContain('stashDrop');
+    }
+  });
+
+  test('cross-branch Apply label applies here too', () => {
+    const sections = buildGlobalStashMenu(
+      null,
+      stashFixture({ scope: 'global', branch: 'main' }),
+      'feature',
+    );
+    expect(sections[0]?.items[0]?.label).toBe('Apply here (from main)');
   });
 });

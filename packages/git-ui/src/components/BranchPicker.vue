@@ -20,6 +20,7 @@ import type { RefsState } from '../state/refs.ts';
 import type { StackState } from '../state/stack.ts';
 import type { StashState } from '../state/stash.ts';
 import type { WorktreeState } from '../state/worktrees.ts';
+import GlobalStashList from './GlobalStashList.vue';
 import RowContextMenu from './RowContextMenu.vue';
 import {
   buildRefListSections,
@@ -73,6 +74,13 @@ function prTooltip(shortName: string): string {
  *  comment on why the branch-mode dialog itself is owned by `App.vue`, not here. */
 const emit = defineEmits<{
   (e: 'branchFromStash', entry: StashEntry): void;
+  /** G28 D13: bubbled to `App.vue`, which owns `StashDialog.vue`'s save-to-global-stash mode —
+   *  same "this component has nowhere of its own to render a dialog into" shape
+   *  `branchFromStash` already follows. */
+  (e: 'saveGlobalStash'): void;
+  /** G28 D13: the same save mode, opened with THIS entry pre-selected as its source
+   *  (`StashList.vue`'s own "Save to global stash…" row action). */
+  (e: 'saveEntryToGlobalStash', entry: StashEntry): void;
   (e: 'switchWorktree', path: string): void;
   (e: 'openWorktreeWindow', path: string): void;
   (e: 'createWorktree'): void;
@@ -442,7 +450,18 @@ onBeforeUnmount(() => {
           :stash="stash"
           :ops="ops"
           :in-progress="ops.statusSummary.value?.inProgress ?? null"
+          :current-branch="refs.currentBranchName.value ?? null"
           @branch-from-stash="(entry) => emit('branchFromStash', entry)"
+          @save-entry-to-global-stash="(entry) => emit('saveEntryToGlobalStash', entry)"
+        />
+
+        <GlobalStashList
+          :stash="stash"
+          :ops="ops"
+          :in-progress="ops.statusSummary.value?.inProgress ?? null"
+          :current-branch="refs.currentBranchName.value ?? null"
+          @branch-from-stash="(entry) => emit('branchFromStash', entry)"
+          @save-global-stash="emit('saveGlobalStash')"
         />
 
         <WorktreeList

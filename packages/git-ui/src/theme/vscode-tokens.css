@@ -62,6 +62,16 @@
      pass does not "fix" it into a git-decoration colour that does not exist. */
   --kv-badge-stash-fg: var(--vscode-gitDecoration-ignoredResourceForeground, #8c8c8c);
   --kv-badge-stash-border: var(--vscode-gitDecoration-ignoredResourceForeground, #8c8c8c);
+  /* G28 D5/D13: the origin-branch chip (StashList.vue/GlobalStashList.vue) reuses the same
+     "submodule" tone --kv-badge-remote-fg already borrows for a ref-shaped label that is not a
+     local branch itself, on a self-contained fill (own text colour, not measured against the
+     panel) matching --kv-badge-local-bg's own precedent just above. The "auto" badge (D1's own
+     marker) reuses the muted/ignored tone the stash badge itself already established, same
+     reasoning: an auto-stash is not something the user directly asked for by name. */
+  --kv-stash-origin-bg: var(--vscode-gitDecoration-submoduleResourceForeground, #8db9e2);
+  --kv-stash-origin-fg: var(--vscode-badge-foreground, #ffffff);
+  --kv-stash-auto-bg: var(--vscode-gitDecoration-ignoredResourceForeground, #8c8c8c);
+  --kv-stash-auto-fg: var(--vscode-badge-foreground, #ffffff);
   /* G24 D9: the PR badge's own four state colours. "open"/"draft"/"closed" reuse the closest
      existing workbench colour id for each state (no `gitDecoration.*` id names a pull request
      specifically) — the same "alias rather than invent a new literal" discipline

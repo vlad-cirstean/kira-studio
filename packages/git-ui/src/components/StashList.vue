@@ -21,17 +21,25 @@ import { formatRelativeDate } from './dateFormat.ts';
 import RowContextMenu from './RowContextMenu.vue';
 import { capItems } from './refListModel.ts';
 import { buildStashMenu } from './rowMenuModel.ts';
+import { isAutoStash, originLabel, stashLabel } from './stashListModel.ts';
 
 const props = defineProps<{
   stash: StashState;
   ops: OpsState;
   inProgress: InProgressOperation | null;
+  /** G28 D5: the currently checked-out branch — `undefined`/`null` for a detached HEAD. Drives
+   *  the origin-branch chip and `buildStashMenu`'s own cross-branch Apply label/Pop suppression. */
+  currentBranch?: string | null;
 }>();
 
 /** Bubbled to `BranchPicker.vue` → `App.vue`, which owns `StashDialog.vue`'s branch-mode state —
  *  mirroring `createBranchHere`'s own App.vue-owned dialog state (this component has nowhere of
- *  its own to render a name-entry dialog into). */
-const emit = defineEmits<(e: 'branchFromStash', entry: StashEntry) => void>();
+ *  its own to render a name-entry dialog into). `saveEntryToGlobalStash` (G28 D13) is the same
+ *  shape for the save-mode's own pre-selected source. */
+const emit = defineEmits<{
+  (e: 'branchFromStash', entry: StashEntry): void;
+  (e: 'saveEntryToGlobalStash', entry: StashEntry): void;
+}>();
 
 const section = computed(() => capItems(props.stash.entries.value));
 
@@ -51,7 +59,11 @@ function openMenuFromButton(entry: StashEntry, event: MouseEvent): void {
   stashMenu.value = { entry, x: rect.left, y: rect.bottom };
 }
 
-const stashMenuSections = computed(() => buildStashMenu(props.inProgress));
+const stashMenuSections = computed(() => {
+  const entry = stashMenu.value?.entry;
+  if (!entry) return [];
+  return buildStashMenu(props.inProgress, entry, props.currentBranch ?? null);
+});
 
 async function onMenuSelect(id: string): Promise<void> {
   const entry = stashMenu.value?.entry;
@@ -69,6 +81,9 @@ async function onMenuSelect(id: string): Promise<void> {
       return;
     case 'stashBranch':
       emit('branchFromStash', entry);
+      return;
+    case 'stashSaveGlobal':
+      emit('saveEntryToGlobalStash', entry);
       return;
     case 'stashShow':
       select(entry);
@@ -90,7 +105,14 @@ async function onMenuSelect(id: string): Promise<void> {
     >
       <KuiButton class="kv-branch-row-main" icon="codicon-archive" @click="select(entry)">
         <span class="kv-stash-index">{{ "stash@{" + entry.index + "}" }}</span>
-        <span class="kv-stash-message" v-kui-tooltip="entry.message">{{ entry.message }}</span>
+        <span
+          v-if="originLabel(entry, currentBranch)"
+          class="kv-stash-origin"
+          v-kui-tooltip="'Stashed from ' + originLabel(entry, currentBranch)"
+          >{{ originLabel(entry, currentBranch) }}</span
+        >
+        <span v-if="isAutoStash(entry)" class="kv-stash-auto" v-kui-tooltip="'Created automatically by an auto-stashed checkout'">auto</span>
+        <span class="kv-stash-message" v-kui-tooltip="entry.message">{{ stashLabel(entry) }}</span>
         <span class="kv-stash-base" v-kui-tooltip="entry.baseSubject">
           <code>{{ entry.baseSha.slice(0, 7) }}</code> {{ entry.baseSubject }}
         </span>
@@ -156,6 +178,24 @@ async function onMenuSelect(id: string): Promise<void> {
   font-family: var(--kv-mono-font-family);
   font-size: 0.85em;
   opacity: 0.8;
+}
+
+.kv-stash-origin {
+  white-space: nowrap;
+  font-size: 0.8em;
+  padding: 0 0.4em;
+  border-radius: 3px;
+  background-color: var(--kv-stash-origin-bg);
+  color: var(--kv-stash-origin-fg);
+}
+
+.kv-stash-auto {
+  white-space: nowrap;
+  font-size: 0.8em;
+  padding: 0 0.4em;
+  border-radius: 3px;
+  background-color: var(--kv-stash-auto-bg);
+  color: var(--kv-stash-auto-fg);
 }
 
 .kv-stash-filecount,

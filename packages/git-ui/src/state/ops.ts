@@ -29,8 +29,11 @@ import type {
 } from '@kira/git-ipc';
 import { type ShallowRef, shallowRef } from 'vue';
 import type { BridgeClient } from '../bridge/client.ts';
+import { stashLabel } from '../components/stashListModel.ts';
 import {
   type CherryPickPredictionMismatch,
+  composeAutoDetachAnnouncement,
+  composeAutoStashAnnouncement,
   composeCheckoutAnnouncement,
   composeCherryPickAnnouncement,
   composeCherryPickMismatchAnnouncement,
@@ -44,6 +47,7 @@ import {
   type StashPredictionMismatch,
 } from './liveAnnouncements.ts';
 import type { RefsState } from './refs.ts';
+import type { RepoSettingsState } from './repoSettings.ts';
 import type { StackState } from './stack.ts';
 
 export type { StashPredictionMismatch } from './liveAnnouncements.ts';
@@ -234,6 +238,11 @@ export class OpsState {
    *  mutating action here gets. Optional so a test can construct `OpsState` without one, mirroring
    *  `PrState`'s own optional threading through `StackState`/`SearchState`. */
   readonly #stack: StackState | undefined;
+  /** G28 D16: `kiraVersion.checkout.autoStash`'s own read point — optional, same "a test can
+   *  construct `OpsState` without one" convention `#stack` already establishes; `undefined`
+   *  resolves to the setting's own default (`true`, the fail-safe direction: a stale/absent
+   *  value can only ever produce the OLD dialog, never an unexpected write, D16). */
+  readonly #repoSettings: RepoSettingsState | undefined;
   #repoId: string | undefined;
   #resolveCheckout: ((route: CheckoutRoute | null) => void) | undefined;
   #resolveRevert: ((route: RevertRoute | null) => void) | undefined;
@@ -246,10 +255,16 @@ export class OpsState {
   readonly #unsubscribeProgress: () => void;
   readonly #unsubscribeWorktreeProgress: () => void;
 
-  constructor(bridge: BridgeClient, refs: RefsState, stack?: StackState) {
+  constructor(
+    bridge: BridgeClient,
+    refs: RefsState,
+    stack?: StackState,
+    repoSettings?: RepoSettingsState,
+  ) {
     this.#bridge = bridge;
     this.#refs = refs;
     this.#stack = stack;
+    this.#repoSettings = repoSettings;
     // Any change at all (a ref write OR a worktree/index touch) can move `inProgress`,
     // `dirtyPaths` or the upstream ahead/behind counts — unlike `RefsState`, which only cares
     // about `refsChanged`, this refreshes on both event kinds.
@@ -324,12 +339,88 @@ export class OpsState {
   // checkout
   // -------------------------------------------------------------------------------------
 
+  /** G28 D16's own routing table, checked in this exact order:
+   *
+   *  1. `inProgressOperation` among `blockers` -> fall through to the dialog below; neither new
+   *     route is ever offered by the server for that state (F15), so this branch is really "the
+   *     table below finds neither route and falls through on its own", stated here for clarity.
+   *  2. `routes` has BOTH `'detachHere'` and `'autoStash'` -> re-issue with
+   *     `{ mode: 'detach', autoStash: true }` — both blockers (a worktree conflict AND a dirty
+   *     tree) clear in one composed re-issue (D6's own "the two routes compose client-side" case).
+   *  3. `routes` has `'detachHere'` only -> `{ mode: 'detach', autoStash: false }`.
+   *  4. `routes` has `'autoStash'` (only) AND the `kiraVersion.checkout.autoStash` SETTING is on
+   *     -> `{ mode: <the originally requested mode>, autoStash: true }`.
+   *  5. Otherwise -> the old dialog (discard / stashAndCarry / cancel), completely unchanged.
+   */
+  #resolveAutoCheckoutRoute(
+    preflight: CheckoutPreflight,
+    requestedMode: 'switch' | 'detach',
+  ): { readonly mode: 'switch' | 'detach'; readonly autoStash: boolean } | null {
+    if (preflight.verdict !== 'blocked') return null;
+    if (preflight.blockers.some((b) => b.kind === 'inProgressOperation')) return null;
+    const hasDetachHere = preflight.routes.includes('detachHere');
+    const hasAutoStash = preflight.routes.includes('autoStash');
+    if (hasDetachHere && hasAutoStash) return { mode: 'detach', autoStash: true };
+    if (hasDetachHere) return { mode: 'detach', autoStash: false };
+    const autoStashSetting =
+      this.#repoSettings?.settings.value['kiraVersion.checkout.autoStash'] ?? true;
+    if (hasAutoStash && autoStashSetting) return { mode: requestedMode, autoStash: true };
+    return null;
+  }
+
+  /** The blocked-tracked/blocked-untracked path counts a pre-flight already reported — the exact
+   *  set an auto-stash's own whole-tree `stash push` sweeps (D4: whole-tree, never scoped), so
+   *  this is the same number `composeAutoStashAnnouncement` names, computed once here rather than
+   *  re-derived at the announcement call site. */
+  #blockedPathCount(preflight: CheckoutPreflight): number {
+    let n = 0;
+    for (const b of preflight.blockers) {
+      if (b.kind === 'blockedByTracked' || b.kind === 'blockedByUntracked') n += b.paths.length;
+    }
+    return n;
+  }
+
   async runCheckout(target: string, mode: 'switch' | 'detach'): Promise<void> {
     const repoId = this.#repoId;
     if (repoId === undefined || this.busy.value) return;
     this.busy.value = true;
     try {
       const preflight = await this.#bridge.request('preflight.checkout', { repoId, target, mode });
+      const auto = this.#resolveAutoCheckoutRoute(preflight, mode);
+      if (auto !== null) {
+        // The origin branch — where the switch starts FROM, which is what an auto-stash entry is
+        // tagged with (D1) — read BEFORE the write, from whatever HEAD currently is.
+        const fromBranch = this.#refs.currentBranchName.value;
+        const worktreePath = preflight.blockers.find(
+          (b) => b.kind === 'worktreeConflict',
+        )?.worktreePath;
+        const result = await this.#bridge.request('op.run', {
+          repoId,
+          op: {
+            kind: 'checkout',
+            target,
+            mode: auto.mode,
+            discardLocalChanges: false,
+            autoStash: auto.autoStash,
+          },
+        });
+        this.#applyResult(result);
+        if (!result.ok) {
+          this.announcement.value = composeOpFailureAnnouncement('Checkout', result.error);
+          return;
+        }
+        const parts: string[] = [];
+        if (auto.autoStash && fromBranch !== undefined) {
+          parts.push(composeAutoStashAnnouncement(this.#blockedPathCount(preflight), fromBranch));
+        }
+        if (auto.mode === 'detach' && mode !== 'detach' && worktreePath !== undefined) {
+          parts.push(composeAutoDetachAnnouncement(target, worktreePath));
+        }
+        this.announcement.value =
+          parts.length > 0 ? parts.join(' ') : composeCheckoutAnnouncement(preflight, target);
+        return;
+      }
+
       let discardLocalChanges = false;
       if (preflight.verdict === 'blocked') {
         const route = await this.#confirmCheckout(preflight);
@@ -341,12 +432,21 @@ export class OpsState {
           // §7.5's `stashAndCarry` route (P9) — `discardLocalChanges: false` for the checkout
           // half below; the stash push `#stashAndCarry` runs first is what actually clears the
           // tree. Handled inline (not via a public `runCheckoutStashAndCarry`) so it shares this
-          // call's own `busy` hold rather than needing a second one of its own.
+          // call's own `busy` hold rather than needing a second one of its own. G28: UNTOUCHED
+          // (F2/D5's own grep-mechanised claim) — `autoStash: false` on the checkout half is a new
+          // required field, never a new behavior: this route never auto-stashes, it stash-and-
+          // carries, exactly as it always has.
           await this.#stashAndCarry(
             () =>
               this.#bridge.request('op.run', {
                 repoId,
-                op: { kind: 'checkout', target, mode, discardLocalChanges: false },
+                op: {
+                  kind: 'checkout',
+                  target,
+                  mode,
+                  discardLocalChanges: false,
+                  autoStash: false,
+                },
               }),
             'Checkout',
             () => `Checked out ${target}${mode === 'detach' ? ' (detached)' : ''}`,
@@ -357,7 +457,7 @@ export class OpsState {
       }
       const result = await this.#bridge.request('op.run', {
         repoId,
-        op: { kind: 'checkout', target, mode, discardLocalChanges },
+        op: { kind: 'checkout', target, mode, discardLocalChanges, autoStash: false },
       });
       this.#applyResult(result);
       this.announcement.value = result.ok
@@ -715,10 +815,15 @@ export class OpsState {
     if (repoId === undefined || this.busy.value) return undefined;
     this.busy.value = true;
     try {
+      // G28 D12: entry.scope threads through to the pre-flight so a global entry's own
+      // merge-tree prediction resolves it from the bucket — `op.run`'s own 'stashApply'/'stashPop'
+      // kinds need NO scope at all (`apply`/`pop` already address by sha/stack-position exactly
+      // as they did before this phase, D12's own "zero server plumbing" claim).
       const preflight = await this.#bridge.request('preflight.stashPop', {
         repoId,
         sha: entry.sha,
         index: entry.index,
+        scope: entry.scope,
       });
       if (preflight.verdict !== 'clean') {
         const proceed = await this.#confirmStashPop(verb, preflight);
@@ -734,7 +839,13 @@ export class OpsState {
       const result = await this.#bridge.request('op.run', { repoId, op });
       this.#applyResult(result);
       const mismatch = this.#reconcileStashPop(verb, preflight.prediction, result);
-      this.announcement.value = composeStashAnnouncement(verb, entry, result, mismatch);
+      this.announcement.value = composeStashAnnouncement(
+        verb,
+        entry,
+        result,
+        mismatch,
+        this.#refs.currentBranchName.value ?? null,
+      );
       return result;
     } finally {
       this.busy.value = false;
@@ -809,7 +920,12 @@ export class OpsState {
   ): Promise<StashBranchPreflight | undefined> {
     const repoId = this.#repoId;
     if (repoId === undefined) return undefined;
-    return this.#bridge.request('preflight.stashBranch', { repoId, sha: entry.sha, branch: name });
+    return this.#bridge.request('preflight.stashBranch', {
+      repoId,
+      sha: entry.sha,
+      branch: name,
+      scope: entry.scope,
+    });
   }
 
   /** `stash branch` gets no pop prediction (probe 11: clean by construction) but IS non-atomic on
@@ -817,9 +933,40 @@ export class OpsState {
    *  via `previewStashBranch` and is the confirm step, so this runs directly like `branchCreate`. */
   async runStashBranch(entry: StashEntry, name: string): Promise<OpResult> {
     return this.#runSimple(
-      { kind: 'stashBranch', branch: name, sha: entry.sha, index: entry.index },
-      (ok) => (ok ? `Created branch ${name} from stash@{${entry.index}}` : undefined),
+      { kind: 'stashBranch', branch: name, sha: entry.sha, index: entry.index, scope: entry.scope },
+      (ok) => (ok ? `Created branch ${name} from ${stashLabel(entry)}` : undefined),
       'Create branch from stash',
+    );
+  }
+
+  // -------------------------------------------------------------------------------------
+  // G28: the global stash bucket (D10/D11/D13). Both are `#runSimple` one-liners like every
+  // branch/tag mutation above — `StashDialog.vue`'s own fourth mode has already collected the
+  // label/source by the time `runGlobalStashSave` is called, and `GlobalStashList.vue`'s own row
+  // menu is the confirm step for `runGlobalStashRemove`, the same "no separate pre-flight, the
+  // dialog/menu IS the confirm step" shape `runStashDrop`/`runStashBranch` already follow.
+  // -------------------------------------------------------------------------------------
+
+  /** `sha: undefined` snapshots the CURRENT working tree; otherwise the sha of an existing
+   *  stash-stack or global entry to promote (D10). Always COPIES — never drops the source. */
+  async runGlobalStashSave(label: string, sha: string | undefined): Promise<OpResult> {
+    return this.#runSimple(
+      { kind: 'globalStashSave', label, sha },
+      (ok) => (ok ? `Saved "${label}" to the global stash` : undefined),
+      'Save to global stash',
+    );
+  }
+
+  /** D11: the cleanest undo in the whole table — the entry stays fully recoverable via the
+   *  ordinary undo slot for one more operation, same as every other undoable action here. */
+  async runGlobalStashRemove(entry: StashEntry): Promise<OpResult> {
+    return this.#runSimple(
+      { kind: 'globalStashRemove', sha: entry.sha },
+      (ok) =>
+        ok
+          ? `Removed "${stashLabel(entry)}" from the global stash — undo available until your next operation.`
+          : undefined,
+      'Remove from global stash',
     );
   }
 

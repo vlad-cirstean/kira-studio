@@ -498,7 +498,13 @@ function handleStashContextMenu(detail: { row: number; x: number; y: number }): 
 
 const stashMenuSections = computed<MenuSection[]>(() => {
   if (!stashContextMenuState.value) return [];
-  return buildStashMenu(opsState.statusSummary.value?.inProgress ?? null);
+  const entry = stashEntryForContextMenu();
+  if (!entry) return [];
+  return buildStashMenu(
+    opsState.statusSummary.value?.inProgress ?? null,
+    entry,
+    refsState.currentBranchName.value,
+  );
 });
 
 function stashEntryForContextMenu(): StashEntry | undefined {
@@ -540,6 +546,19 @@ function handleBranchFromStash(entry: StashEntry): void {
 }
 
 const stashCreateOpen = ref(false);
+
+// G28 D13: the global stash section's own header button, the palette's `saveGlobalStash` action,
+// and a STACK row's own "Save to global stash…" action all open the SAME dialog mode —
+// `globalStashSaveOpen` for the first two (no pre-selected source), `globalStashSaveSourceEntry`
+// for the third (opens pre-selected to promote that entry, D10 step 3). Same "App.vue owns the
+// state, the dialog owns nothing of its own" shape `stashCreateOpen`/`stashBranchTarget` already
+// follow.
+const globalStashSaveOpen = ref(false);
+const globalStashSaveSourceEntry = ref<StashEntry | undefined>(undefined);
+
+function handleSaveEntryToGlobalStash(entry: StashEntry): void {
+  globalStashSaveSourceEntry.value = entry;
+}
 
 // G18 D13: AppToolbar.vue's own settings gear — same "App.vue owns the boolean, the dialog owns
 // nothing of its own" shape stashCreateOpen/tagDialogState above already follow.
@@ -784,6 +803,9 @@ function runUiAction(
       break;
     case 'stashChanges':
       stashCreateOpen.value = true;
+      break;
+    case 'saveGlobalStash':
+      globalStashSaveOpen.value = true;
       break;
     case 'createWorktree':
       worktreeCreateOpen.value = true;
@@ -1266,6 +1288,8 @@ onBeforeUnmount(() => {
           @repo-opened="handleRepoOpened"
           @stash-changes="stashCreateOpen = true"
           @branch-from-stash="handleBranchFromStash"
+          @save-global-stash="globalStashSaveOpen = true"
+          @save-entry-to-global-stash="handleSaveEntryToGlobalStash"
           @switch-worktree="handleSwitchWorktree"
           @open-worktree-window="handleOpenWorktreeWindow"
           @create-worktree="worktreeCreateOpen = true"
@@ -1295,6 +1319,8 @@ onBeforeUnmount(() => {
           @repo-opened="handleRepoOpened"
           @stash-changes="stashCreateOpen = true"
           @branch-from-stash="handleBranchFromStash"
+          @save-global-stash="globalStashSaveOpen = true"
+          @save-entry-to-global-stash="handleSaveEntryToGlobalStash"
           @switch-worktree="handleSwitchWorktree"
           @open-worktree-window="handleOpenWorktreeWindow"
           @create-worktree="worktreeCreateOpen = true"
@@ -1473,8 +1499,14 @@ onBeforeUnmount(() => {
           :create-open="stashCreateOpen"
           :include-untracked-default="stashIncludeUntrackedDefault"
           :branch-target="stashBranchTarget"
+          :save-open="globalStashSaveOpen"
+          :save-source-entry="globalStashSaveSourceEntry"
           @close-create="stashCreateOpen = false"
           @close-branch="stashBranchTarget = undefined"
+          @close-save="
+            globalStashSaveOpen = false;
+            globalStashSaveSourceEntry = undefined;
+          "
         />
         <WorktreeDialog
           :worktrees="worktreeState"

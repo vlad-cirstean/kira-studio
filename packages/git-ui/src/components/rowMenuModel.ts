@@ -5,11 +5,18 @@
  * (`buildRowMenu`/`buildRefMenu`) rather than template `v-if` conditionals.
  */
 import { canRunOp, describeInProgress } from '@kira/git-core';
-import type { DecorationRef, InProgressOperation, OpRequest, RefKind } from '@kira/git-ipc';
+import type {
+  DecorationRef,
+  InProgressOperation,
+  OpRequest,
+  RefKind,
+  StashEntry,
+} from '@kira/git-ipc';
 // G19 D3b: MenuItem/MenuSection now live in @kira/kira-ui — the shapes are identical by
 // construction, just re-exported from here so every existing importer of `./rowMenuModel.ts`
 // keeps working unchanged.
 import type { MenuItem, MenuSection } from '@kira/kira-ui';
+import { applyMenuLabel, originLabel } from './stashListModel.ts';
 
 export type { MenuItem, MenuSection };
 
@@ -260,16 +267,65 @@ export function buildRefMenu(ctx: RefMenuContext): MenuSection[] {
  * own comment) and Show (a read, never gated, mirroring `buildRowMenu`'s copy actions). One
  * section — there is no clipboard-conditional second section here, unlike `buildRowMenu`, since a
  * stash row's sha is already visible via `StashList.vue`/the badge's own title, not a menu item.
+ *
+ * G28 D5 widens this by two behaviors, both keyed off `entry`/`currentBranch`: the Apply label
+ * reads `"Apply here (from <origin>)"` for a cross-branch entry (`applyMenuLabel`), and Pop is
+ * OMITTED entirely for one — popping a stash from another branch drops it from the stack on
+ * success, which for the "I'll want this back on `main` later" case is a trap; Apply (which keeps
+ * the entry, probe P1) is the correct verb across a branch boundary, and the menu says so instead
+ * of leaving both and hoping the user picks correctly. G28 D13 also adds "Save to global stash…"
+ * — the row-level entry point `StashDialog.vue`'s fourth mode needs to pre-select THIS entry as
+ * its source (D10 step 3, "promote an existing entry"), never gated (saving never fails the way a
+ * git write can; the source stays untouched either way, D10's own copy-never-drop guarantee).
  */
-export function buildStashMenu(inProgress: InProgressOperation | null): MenuSection[] {
+export function buildStashMenu(
+  inProgress: InProgressOperation | null,
+  entry: StashEntry,
+  currentBranch: string | null | undefined,
+): MenuSection[] {
+  const crossBranch = originLabel(entry, currentBranch) !== undefined;
+  const items: MenuItem[] = [
+    gatedItem('stashApply', applyMenuLabel(entry, currentBranch), 'stashApply', inProgress),
+  ];
+  if (!crossBranch) {
+    items.push(gatedItem('stashPop', 'Pop', 'stashPop', inProgress));
+  }
+  items.push(
+    gatedItem('stashDrop', 'Drop', 'stashDrop', inProgress),
+    gatedItem('stashBranch', 'Create branch from stash…', 'stashBranch', inProgress),
+    plainItem('stashSaveGlobal', 'Save to global stash…'),
+    plainItem('stashShow', 'Show changes'),
+  );
+  return [{ items }];
+}
+
+/**
+ * G28 D12/D13: the global bucket's own row menu — Apply here, Create branch from this…, Show
+ * changes, Remove from global stash. NO Pop, NO Drop: both are position-addressed by necessity
+ * (probe 8) and a global entry has no stack position at all — Apply-plus-Remove is the honest pair
+ * for a keep-forever entry. `stashApply`/`stashBranch` reuse the SAME `OpRequest['kind']` gates
+ * `buildStashMenu` uses (the op kinds themselves are unchanged for a global entry, D12 — only how
+ * the server resolves the source sha differs); `globalStashRemove` is its own gate.
+ */
+export function buildGlobalStashMenu(
+  inProgress: InProgressOperation | null,
+  entry: StashEntry,
+  currentBranch: string | null | undefined,
+): MenuSection[] {
   return [
     {
       items: [
-        gatedItem('stashApply', 'Apply', 'stashApply', inProgress),
-        gatedItem('stashPop', 'Pop', 'stashPop', inProgress),
-        gatedItem('stashDrop', 'Drop', 'stashDrop', inProgress),
-        gatedItem('stashBranch', 'Create branch from stash…', 'stashBranch', inProgress),
+        gatedItem('stashApply', applyMenuLabel(entry, currentBranch), 'stashApply', inProgress),
+        gatedItem('stashBranch', 'Create branch from this…', 'stashBranch', inProgress),
         plainItem('stashShow', 'Show changes'),
+        gatedItem(
+          'globalStashRemove',
+          'Remove from global stash',
+          'globalStashRemove',
+          inProgress,
+          undefined,
+          true,
+        ),
       ],
     },
   ];

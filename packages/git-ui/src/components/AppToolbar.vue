@@ -77,6 +77,10 @@ const emit = defineEmits<{
   (event: 'stash-changes'): void;
   /** Forwarded straight from `BranchPicker.vue`'s own emit — see `StashList.vue`'s doc comment. */
   (event: 'branch-from-stash', entry: StashEntry): void;
+  /** G28 D13: forwarded straight from `BranchPicker.vue`'s own emits — see
+   *  `GlobalStashList.vue`'s/`StashList.vue`'s own doc comments. */
+  (event: 'save-global-stash'): void;
+  (event: 'save-entry-to-global-stash', entry: StashEntry): void;
   /** G25: forwarded straight from `BranchPicker.vue` -> `WorktreeList.vue`'s own emits — see
    *  `WorktreeList.vue`'s own doc comment on why this toolbar does not act on them itself. */
   (event: 'switch-worktree', path: string): void;
@@ -245,6 +249,8 @@ const stashDisabled = computed(
       :open-worktree-window-capability="openWorktreeWindowCapability"
       :pr="prState"
       @branch-from-stash="(entry) => emit('branch-from-stash', entry)"
+      @save-global-stash="emit('save-global-stash')"
+      @save-entry-to-global-stash="(entry) => emit('save-entry-to-global-stash', entry)"
       @switch-worktree="(path) => emit('switch-worktree', path)"
       @open-worktree-window="(path) => emit('open-worktree-window', path)"
       @create-worktree="emit('create-worktree')"

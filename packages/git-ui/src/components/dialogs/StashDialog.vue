@@ -26,6 +26,7 @@ import type { StashBranchPreflight, StashEntry } from '@kira/git-ipc';
 import { KuiButton, KuiDialog } from '@kira/kira-ui';
 import { computed, ref, watch } from 'vue';
 import type { OpsState } from '../../state/ops.ts';
+import { stashLabel } from '../stashListModel.ts';
 
 const props = defineProps<{
   ops: OpsState;
@@ -38,18 +39,29 @@ const props = defineProps<{
   /** Set by `StashList.vue`'s "Create branch from stash…" row action, via `BranchPicker.vue` →
    *  `App.vue`; `undefined` when branch mode is not open. */
   branchTarget: StashEntry | undefined;
+  /** G28 D13: toggled by the global-stash section's own header button and the palette's
+   *  `saveGlobalStash` action, via `App.vue` — opens save mode with NO pre-selected source
+   *  (defaults to "this working tree"). */
+  saveOpen: boolean;
+  /** G28 D13: set by a STACK row's own "Save to global stash…" action — opens save mode
+   *  pre-selected to promote THIS entry (D10 step 3); `undefined` when that row action was not
+   *  the trigger (the header button/palette route sets `saveOpen` instead, leaving this
+   *  `undefined`, and the source radio then defaults to "this working tree"). */
+  saveSourceEntry: StashEntry | undefined;
 }>();
 
 const emit = defineEmits<{
   (e: 'close-create'): void;
   (e: 'close-branch'): void;
+  (e: 'close-save'): void;
 }>();
 
-type Mode = 'create' | 'branch' | 'popConfirm' | undefined;
+type Mode = 'create' | 'branch' | 'save' | 'popConfirm' | undefined;
 
 const mode = computed<Mode>(() => {
   if (props.ops.pendingStashPop.value) return 'popConfirm';
   if (props.branchTarget !== undefined) return 'branch';
+  if (props.saveOpen || props.saveSourceEntry !== undefined) return 'save';
   if (props.createOpen) return 'create';
   return undefined;
 });
@@ -162,6 +174,49 @@ async function submitBranch(): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------------------
+// save mode (G28 D13/D10): two sources, the dialog is the confirm step (no pre-flight endpoint
+// exists for globalStashSave, same reason create mode has none), and the one thing worth showing
+// up front is F14's own limitation — `git stash create` cannot include untracked files, so the
+// working-tree source is spelled out as tracked-only rather than hiding the gap.
+// ---------------------------------------------------------------------------------------
+
+type SaveSource = 'workingTree' | 'entry';
+
+const saveLabel = ref('');
+const saveSource = ref<SaveSource>('workingTree');
+
+watch(
+  () => [props.saveOpen, props.saveSourceEntry] as const,
+  ([isOpen, entry]) => {
+    if (!isOpen && entry === undefined) return;
+    saveLabel.value = '';
+    // Pre-selected to "this stash entry" when opened from a stack row (D13); otherwise "this
+    // working tree" — the radio itself stays changeable either way, this only sets the default.
+    saveSource.value = entry !== undefined ? 'entry' : 'workingTree';
+  },
+);
+
+/** F14: the working-tree source's own tracked-only limitation is spelled out whenever there is
+ *  something it would actually miss, rather than unconditionally — a warning that is always true
+ *  reads as noise. */
+const saveHasUntracked = computed(() => (props.ops.statusSummary.value?.counts.untracked ?? 0) > 0);
+
+const canSubmitSave = computed(
+  () => saveLabel.value.trim() !== '' && !/[\r\n]/.test(saveLabel.value),
+);
+
+function cancelSave(): void {
+  emit('close-save');
+}
+
+async function submitSave(): Promise<void> {
+  if (!canSubmitSave.value) return;
+  const sha = saveSource.value === 'entry' ? props.saveSourceEntry?.sha : undefined;
+  await props.ops.runGlobalStashSave(saveLabel.value.trim(), sha);
+  emit('close-save');
+}
+
+// ---------------------------------------------------------------------------------------
 // popConfirm mode (OQ7: one dialog, verb and one sentence differ)
 // ---------------------------------------------------------------------------------------
 
@@ -182,6 +237,7 @@ function confirmPop(): void {
 const title = computed(() => {
   if (mode.value === 'create') return 'Stash changes';
   if (mode.value === 'branch') return 'Create branch from stash';
+  if (mode.value === 'save') return 'Save to global stash';
   if (mode.value === 'popConfirm' && pending.value) {
     return `${pending.value.verb === 'pop' ? 'Pop' : 'Apply'} stash@{${pending.value.preflight.stashIndex}}`;
   }
@@ -191,6 +247,7 @@ const title = computed(() => {
 function onClose(): void {
   if (mode.value === 'create') cancelCreate();
   else if (mode.value === 'branch') cancelBranch();
+  else if (mode.value === 'save') cancelSave();
   else if (mode.value === 'popConfirm') cancelPop();
 }
 </script>
@@ -236,6 +293,30 @@ function onClose(): void {
           resolve that yourself.
         </p>
       </div>
+    </template>
+
+    <template v-else-if="mode === 'save'">
+      <label class="kv-dialog-field">
+        Label
+        <input type="text" v-model="saveLabel" autofocus />
+      </label>
+      <fieldset class="kv-dialog-field">
+        <legend>Source</legend>
+        <label class="kv-dialog-field--inline">
+          <input type="radio" value="workingTree" v-model="saveSource" />
+          This working tree
+        </label>
+        <p v-if="saveSource === 'workingTree' && saveHasUntracked" class="kv-dialog-note">
+          Untracked files will not be included — <code>git stash create</code> cannot save them.
+          Promote an existing stash entry that already includes them instead if you need to keep
+          those too.
+        </p>
+        <label v-if="saveSourceEntry" class="kv-dialog-field--inline">
+          <input type="radio" value="entry" v-model="saveSource" />
+          This stash entry: {{ stashLabel(saveSourceEntry) }}
+        </label>
+      </fieldset>
+      <p class="kv-dialog-note">The source is copied — it is never removed or dropped.</p>
     </template>
 
     <template v-else-if="mode === 'popConfirm' && pending">
@@ -305,6 +386,10 @@ function onClose(): void {
           Create branch
         </KuiButton>
         <KuiButton @click="cancelBranch">Cancel</KuiButton>
+      </template>
+      <template v-else-if="mode === 'save'">
+        <KuiButton variant="primary" :disabled="!canSubmitSave" @click="submitSave">Save</KuiButton>
+        <KuiButton @click="cancelSave">Cancel</KuiButton>
       </template>
       <template v-else-if="mode === 'popConfirm' && pending">
         <KuiButton variant="primary" @click="confirmPop">

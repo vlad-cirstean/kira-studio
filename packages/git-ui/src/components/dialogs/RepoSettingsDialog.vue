@@ -1,9 +1,12 @@
 <script setup lang="ts">
 /**
  * G18 D13: "Repository settings" — the dialog `AppToolbar.vue`'s own gear (`⚙`, D13) opens.
- * Shows exactly the seven `source: 'repo'` settings `schema.ts` declares (D1/D10), nothing else —
- * no read-only leftover section (10.3, resolved). Five sections: Graph, Stash, Branch review,
- * Pull, Diagnostics.
+ * Each field here is hand-written, not schema-driven (no loop over `repoSettingKeys()`) — a new
+ * `source: 'repo'` leaf needs an explicit field/patch-diff line added here, same as every leaf
+ * already present. `kiraVersion.worktree.prepareScript`/`.basePath` (G25) are the two `'repo'`
+ * leaves this dialog deliberately does NOT surface — they are edited from `WorktreeDialog.vue`
+ * itself instead, where the prepare-script approval flow they gate lives. G28 D16 adds
+ * `kiraVersion.checkout.autoStash`, its own new "Checkout" section.
  *
  * **`kiraVersion.log.level` is not actually per-repo** (D14) — its own field carries a visible
  * note, driven by `SETTINGS['kiraVersion.log.level'].instanceWide` rather than a hardcoded flag
@@ -115,6 +118,9 @@ async function save(): Promise<void> {
   if (draft['kiraVersion.graph.scope'] !== current['kiraVersion.graph.scope']) {
     patch['kiraVersion.graph.scope'] = draft['kiraVersion.graph.scope'];
   }
+  if (draft['kiraVersion.checkout.autoStash'] !== current['kiraVersion.checkout.autoStash']) {
+    patch['kiraVersion.checkout.autoStash'] = draft['kiraVersion.checkout.autoStash'];
+  }
   if (draft['kiraVersion.stash.showInGraph'] !== current['kiraVersion.stash.showInGraph']) {
     patch['kiraVersion.stash.showInGraph'] = draft['kiraVersion.stash.showInGraph'];
   }
@@ -167,6 +173,19 @@ async function save(): Promise<void> {
           @update:model-value="onGraphScopeChange"
         />
       </label>
+    </section>
+
+    <section class="kv-repo-settings-section">
+      <h3 class="kv-repo-settings-heading">Checkout</h3>
+      <label class="kv-dialog-field kv-dialog-field--inline">
+        <input type="checkbox" v-model="draft['kiraVersion.checkout.autoStash']" />
+        Automatically stash local changes that block a branch switch
+      </label>
+      <p class="kv-dialog-note">
+        The stash is tagged with the branch you switched FROM and is never popped back
+        automatically — bring it back deliberately from the stash list, even onto a different
+        branch. Off restores the old dialog (discard / stash and carry / cancel).
+      </p>
     </section>
 
     <section class="kv-repo-settings-section">

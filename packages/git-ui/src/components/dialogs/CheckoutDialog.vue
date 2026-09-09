@@ -13,6 +13,16 @@
  *
  * G21 D2: the modal shell is `@kira/kira-ui`'s `KuiDialog` now — this file only supplies its own
  * body/actions content.
+ *
+ * G28 D16: `OpsState.runCheckout` now resolves a blocked verdict AUTOMATICALLY — no dialog at all
+ * — whenever `preflight.routes` offers `"detachHere"` (always) or `"autoStash"` (when
+ * `kiraVersion.checkout.autoStash` is on), re-issuing the same op with `mode: 'detach'` and/or
+ * `autoStash: true` instead. This dialog now only ever opens for what is LEFT after that: an
+ * `inProgressOperation` blocker (routing is never offered for one), or a blocked verdict with
+ * neither route available (a tracked-only or untracked-only block when `autoStash` itself is off,
+ * or `StashAvailable` were ever false). Its own Discard/Stash-and-carry/Cancel buttons, and the
+ * `#stashAndCarry` route they call into, are completely UNCHANGED — this file simply gets called
+ * less often than before.
  */
 import type { CheckoutPreflight } from '@kira/git-ipc';
 import { KuiButton, KuiDialog } from '@kira/kira-ui';

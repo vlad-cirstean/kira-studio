@@ -151,6 +151,37 @@ async function submitCreate(): Promise<void> {
   worktreeCreated.value = trimmedPath;
 }
 
+/** G28 D7: closes G25 §9's own named hand-forward — OFFERED, never taken automatically (unlike
+ *  checkout's own D6 route): this dialog is already open, so there is a natural place to ask,
+ *  and `worktree add` carries no "never blocks" promise to keep. Re-issues the SAME `worktreeAdd`
+ *  op with `mode: 'detach'` and `startPoint: <that branch>` — no new op kind, no new argv. */
+function detachHereBranch(): string | undefined {
+  const blocker = preflight.value?.blockers.find((b) => b.kind === 'branchCheckedOutElsewhere');
+  return blocker?.kind === 'branchCheckedOutElsewhere' ? blocker.branch : undefined;
+}
+
+const canOfferDetachHere = computed(
+  () => (preflight.value?.routes.includes('detachHere') ?? false) && path.value.trim() !== '',
+);
+
+async function submitCreateDetached(): Promise<void> {
+  const branchName = detachHereBranch();
+  if (!canOfferDetachHere.value || branchName === undefined) return;
+  const trimmedPath = path.value.trim();
+  const result = await props.ops.runWorktreeAdd({
+    path: trimmedPath,
+    mode: 'detach',
+    branch: undefined,
+    startPoint: branchName,
+  });
+  if (!result.ok) return;
+  if (props.prepareScript.trim() === '') {
+    emit('close-create');
+    return;
+  }
+  worktreeCreated.value = trimmedPath;
+}
+
 // ---------------------------------------------------------------------------------------
 // prepare phase (D9-D14)
 // ---------------------------------------------------------------------------------------
@@ -281,6 +312,12 @@ function onClose(): void {
           <template v-else-if="blocker.kind === 'unknownStartPoint'">
             <code>{{ blocker.startPoint }}</code> does not resolve to a commit.
           </template>
+        </p>
+        <p v-if="canOfferDetachHere" class="kv-dialog-note">
+          The new worktree will start with a detached HEAD.
+          <KuiButton @click="submitCreateDetached">
+            Create it detached at that branch's commit
+          </KuiButton>
         </p>
         <p v-for="note in preflight.notes" :key="note.kind" class="kv-dialog-note">
           <template v-if="note.kind === 'pathInsideRepo'">
