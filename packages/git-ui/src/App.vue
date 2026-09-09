@@ -1386,7 +1386,6 @@ onBeforeUnmount(() => {
               :stack="stackState"
               v-bind="initialScrollRowProp"
               @update:column-widths="columnWidths = $event"
-              @update:date-format="dateFormat = $event"
               @scroll="scrollRow = $event"
               @toggle-detail="toggleDetail"
               @open-detail="openDetail"
@@ -1557,7 +1556,9 @@ onBeforeUnmount(() => {
         <RepoSettingsDialog
           :open="repoSettingsDialogOpen"
           :repo-settings-state="repoSettingsState"
+          :date-format="dateFormat"
           @close="repoSettingsDialogOpen = false"
+          @update:date-format="dateFormat = $event"
         />
       </template>
     </template>

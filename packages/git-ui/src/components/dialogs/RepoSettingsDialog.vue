@@ -25,6 +25,14 @@
  * union `RepoSettingsSnapshot` actually declares (the option `value`s themselves are always one
  * of that union's own members, so the cast is never a lie, just narrower than `KuiSelect`'s own
  * generic-string contract can express).
+ *
+ * G-UX D8: the **Display** section's `dateFormat` field is a SECOND kind of exception to "hand-
+ * written from `RepoSettingsSnapshot`" — it does not live in that snapshot at all
+ * (`PersistedViewState` owns it, a view preference, not a repository fact, D8's own rejected
+ * alternative explains why) — so it arrives as a plain prop/emit pair and applies immediately,
+ * never joining `draft`/`save()`'s patch diff. Its own visible scope note is the `log.level`
+ * precedent's shape, restated for a value that lives in the opposite direction (client-only,
+ * not instance-wide).
  */
 import { SETTINGS } from '@kira/git-core';
 import type { RepoSettingsPatch, RepoSettingsSnapshot } from '@kira/git-ipc';
@@ -32,13 +40,27 @@ import type { KuiSelectOption } from '@kira/kira-ui';
 import { KuiButton, KuiDialog, KuiSelect } from '@kira/kira-ui';
 import { computed, reactive, watch } from 'vue';
 import type { RepoSettingsState } from '../../state/repoSettings.ts';
+import type { DateFormat } from '../../state/viewState.ts';
 
 const props = defineProps<{
   open: boolean;
   repoSettingsState: RepoSettingsState;
+  dateFormat: DateFormat;
 }>();
 
-const emit = defineEmits<(e: 'close') => void>();
+const emit = defineEmits<{
+  (e: 'close'): void;
+  (e: 'update:dateFormat', value: DateFormat): void;
+}>();
+
+const dateFormatOptions: readonly KuiSelectOption[] = [
+  { value: 'relative', label: 'Relative (3 days ago)' },
+  { value: 'absolute', label: 'Absolute (2024-12-30 22:48)' },
+];
+
+function onDateFormatChange(value: string): void {
+  emit('update:dateFormat', value as DateFormat);
+}
 
 /** `RepoSettingsSnapshot`'s own leaves are `readonly` (a wire type is never a mutation target) —
  *  this dialog's draft needs a genuinely mutable copy of the same shape for `v-model` to write
@@ -153,6 +175,19 @@ async function save(): Promise<void> {
 
 <template>
   <KuiDialog :open="open" title="Repository settings" @close="close">
+    <section class="kv-repo-settings-section">
+      <h3 class="kv-repo-settings-heading">Display</h3>
+      <label class="kv-dialog-field">
+        Commit date
+        <KuiSelect
+          :model-value="dateFormat"
+          :options="dateFormatOptions"
+          @update:model-value="onDateFormatChange"
+        />
+      </label>
+      <p class="kv-dialog-note">This applies to every repository in this panel, not just this one.</p>
+    </section>
+
     <section class="kv-repo-settings-section">
       <h3 class="kv-repo-settings-heading">Graph</h3>
       <label class="kv-dialog-field">

@@ -28,7 +28,7 @@ import type { SelectionState } from '../state/selection.ts';
 import type { StackState } from '../state/stack.ts';
 import { type ColumnWidths, type DateFormat, DEFAULT_COLUMN_WIDTHS } from '../state/viewState.ts';
 import { rowHeightPx, TokenReader } from '../theme/readTokens.ts';
-import { buildColumns, createCommitDataView, DATE_COLUMN_ID } from './columns.ts';
+import { buildColumns, createCommitDataView } from './columns.ts';
 import { formatAbsoluteDate, formatRelativeDate, measureAbsoluteDateWidth } from './dateFormat.ts';
 import { composeRowLabel } from './rowAccessibility.ts';
 
@@ -60,7 +60,6 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'update:columnWidths', widths: ColumnWidths): void;
-  (e: 'update:dateFormat', format: DateFormat): void;
   /** The top loaded row currently in view — what `viewState.scrollRow` should hold (a row
    *  index, not a pixel offset: it survives a re-walk, a pixel offset does not). */
   (e: 'scroll', row: number): void;
@@ -133,7 +132,6 @@ function remeasureDateWidth(): void {
 function minWidthFor(column: keyof ColumnWidths): number {
   return column === 'date' ? Math.max(MIN_COLUMN_WIDTH, measuredDateWidth.value) : MIN_COLUMN_WIDTH;
 }
-const dateFormatRef = ref<DateFormat>(props.dateFormat);
 
 // Built once per mounted grid (W8): closes over this instance's own LayoutStore/CommitStore
 // (props.graphView is assumed stable for the life of one CommitGrid — a repo switch remounts
@@ -241,7 +239,7 @@ function currentColumns(): Column<CommitRecord>[] {
   const laneCount = props.graphView.laneCount.value;
   return buildColumns(
     { ...widths.value, laneCount, messageWidth: computeMessageWidth(hostWidth, laneCount) },
-    { dateFormat: () => dateFormatRef.value, now: () => Date.now() },
+    { dateFormat: () => props.dateFormat, now: () => Date.now() },
     graphFormatter,
     { pattern: searchPattern },
     {
@@ -312,24 +310,12 @@ function handleHandleKeydown(column: keyof ColumnWidths, event: KeyboardEvent): 
   }
 }
 
-function toggleDateFormat(): void {
-  dateFormatRef.value = dateFormatRef.value === 'relative' ? 'absolute' : 'relative';
-  rebuildColumns();
-  grid?.invalidateAllRows();
-  grid?.render();
-  emit('update:dateFormat', dateFormatRef.value);
-}
-
 /** G-UX D2 (item 1b): a click on an unselected row opens the detail pane on the FIRST click —
  *  clicking the already-selected row still toggles it closed (the only mouse-only way to close
- *  it, agreeing with `Esc` and the narrow-breakpoint drawer). Clicking the date cell specifically
- *  also toggles its relative/absolute format (§6.2) — the two behaviours compose, since a
- *  date-cell click is still a row click. */
-function handleClick(row: number, cell: number): void {
-  const dateColumnIndex =
-    grid?.getColumns().findIndex((column) => column.id === DATE_COLUMN_ID) ?? -1;
-  if (cell === dateColumnIndex) toggleDateFormat();
-
+ *  it, agreeing with `Esc` and the narrow-breakpoint drawer). G-UX D8 (item 8): the date cell no
+ *  longer has any click behaviour of its own — the relative/absolute toggle lives in the Display
+ *  settings section now, so a click anywhere on the row means exactly one thing. */
+function handleClick(row: number): void {
   const wasSelected = props.selection.row.value === row;
   props.selection.select(row);
   pendingFocusRow = row;
@@ -551,7 +537,7 @@ function applyAccessibility(range: { startRow: number; endRow: number }): void {
 
     const commit = props.graphView.store.commitAt(row);
     const dateText =
-      dateFormatRef.value === 'absolute'
+      props.dateFormat === 'absolute'
         ? formatAbsoluteDate(commit.author.timestamp)
         : formatRelativeDate(commit.author.timestamp, Date.now());
     rowNode.setAttribute('aria-label', composeRowLabel(commit, dateText));
@@ -667,7 +653,7 @@ onMounted(() => {
   const initialRange = instance.getRenderedRange();
   applyAccessibility({ startRow: initialRange.top, endRow: initialRange.bottom });
 
-  instance.onClick.subscribe((_event, args) => handleClick(args.row, args.cell));
+  instance.onClick.subscribe((_event, args) => handleClick(args.row));
   instance.onScroll.subscribe(() => {
     if (scrollRaf !== 0) return;
     scrollRaf = requestAnimationFrame(() => {
@@ -784,6 +770,15 @@ watch(
 watch(
   () => props.detailOpen,
   () => rebuildColumns(),
+);
+// G-UX D8 (item 8): the date format is now a Display setting (`RepoSettingsDialog.vue`), not a
+// per-cell toggle — mirrors the `generation`/`searchGeneration`/`pr`/`stack` watchers above.
+watch(
+  () => props.dateFormat,
+  () => {
+    grid?.invalidateAllRows();
+    grid?.render();
+  },
 );
 onBeforeUnmount(() => {
   resizeObserver?.disconnect();
@@ -1234,7 +1229,6 @@ defineExpose({ scrollToRow, focusGrid, scrollToTopRow, getViewportTop });
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  cursor: pointer;
 }
 
 /* §6.1's own resize handles (showColumnHeader: false costs SlickGrid's built-in header resize
