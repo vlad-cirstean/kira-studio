@@ -146,6 +146,24 @@ func TestParseStatus_UnrecognisedMarker(t *testing.T) {
 	}
 }
 
+// TestParseStatus_UntrackedPathStaysDecomposed is G27 D2/D12's tier-2 negative: a status record's
+// Path is repository-relative (probe P7 — handed straight back to git as a pathspec), so it must
+// stay byte-exact even when git's own readdir-sourced bytes are decomposed. This is the test that
+// stops a future contributor from "finishing the job" by normalizing this field too (D12).
+func TestParseStatus_UntrackedPathStaysDecomposed(t *testing.T) {
+	decomposedE := string([]byte{0x65, 0xcc, 0x81}) // "e" + U+0301, decomposed "é"
+	rec := []byte("? caf" + decomposedE + ".txt")
+
+	result, err := porcelain.ParseStatus([][]byte{rec})
+	if err != nil {
+		t.Fatalf("ParseStatus: %v", err)
+	}
+	want := "caf" + decomposedE + ".txt"
+	if len(result.Entries) != 1 || result.Entries[0].Path != want {
+		t.Fatalf("entries = %+v, want Path %q byte-exact (untouched)", result.Entries, want)
+	}
+}
+
 func TestParseStatus_RenamedMissingOriginalPathChunk(t *testing.T) {
 	rec := []byte("2 R. N... 100644 100644 100644 " +
 		"0c2aa38e0600e0d2df09c2f84664d8a14f899879 0c2aa38e0600e0d2df09c2f84664d8a14f899879 R100 renamed.txt")

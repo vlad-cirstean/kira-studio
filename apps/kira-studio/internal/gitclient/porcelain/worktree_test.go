@@ -149,3 +149,24 @@ func TestParseWorktreeList_TruncatedInput(t *testing.T) {
 		t.Fatalf("records=%+v err=%v", records, err)
 	}
 }
+
+// TestParseWorktreeList_PathComposesToNFC is G27 D5c/D12's tier-1 positive: `worktree` is an
+// absolute directory path, so a decomposed spelling in git's own output must come back composed.
+// Byte literals only (D12) -- no test here depends on the host filesystem's own normalization
+// behaviour.
+func TestParseWorktreeList_PathComposesToNFC(t *testing.T) {
+	decomposedE := string([]byte{0x65, 0xcc, 0x81}) // "e" + U+0301, decomposed "é"
+	composedE := string([]byte{0xc3, 0xa9})         // U+00E9, composed "é"
+
+	raw := nul(
+		"worktree /repo/caf"+decomposedE, "HEAD aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "branch refs/heads/main", "",
+	)
+	records, err := porcelain.ParseWorktreeList(raw)
+	if err != nil {
+		t.Fatalf("ParseWorktreeList: %v", err)
+	}
+	want := "/repo/caf" + composedE
+	if len(records) != 1 || records[0].Path != want {
+		t.Fatalf("records[0].Path = %q, want %q (composed)", records[0].Path, want)
+	}
+}

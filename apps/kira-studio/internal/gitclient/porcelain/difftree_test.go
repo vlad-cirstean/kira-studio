@@ -166,3 +166,35 @@ func TestParseNameStatusRecords_UnknownLetter(t *testing.T) {
 		t.Fatal("expected an error for an unrecognised name-status letter")
 	}
 }
+
+// TestParseNumstatRecords_PathStaysDecomposed and TestParseNameStatusRecords_PathStaysDecomposed
+// are G27 D2/D12's tier-2 negatives for diff-tree: Path/OriginalPath are repository-relative
+// (probe P7 — handed straight back to git as a <rev>:<path> operand or a pathspec), so they must
+// stay byte-exact even when git's own tree-sourced bytes are decomposed.
+func TestParseNumstatRecords_PathStaysDecomposed(t *testing.T) {
+	decomposedE := string([]byte{0x65, 0xcc, 0x81}) // "e" + U+0301, decomposed "é"
+	records := [][]byte{[]byte("1\t1\t" + "caf" + decomposedE + ".txt")}
+
+	entries, err := porcelain.ParseNumstatRecords(records)
+	if err != nil {
+		t.Fatalf("ParseNumstatRecords: %v", err)
+	}
+	want := "caf" + decomposedE + ".txt"
+	if len(entries) != 1 || entries[0].Path != want {
+		t.Fatalf("entries = %+v, want Path %q byte-exact (untouched)", entries, want)
+	}
+}
+
+func TestParseNameStatusRecords_PathStaysDecomposed(t *testing.T) {
+	decomposedE := string([]byte{0x65, 0xcc, 0x81}) // "e" + U+0301, decomposed "é"
+	records := [][]byte{[]byte("M"), []byte("caf" + decomposedE + ".txt")}
+
+	entries, err := porcelain.ParseNameStatusRecords(records)
+	if err != nil {
+		t.Fatalf("ParseNameStatusRecords: %v", err)
+	}
+	want := "caf" + decomposedE + ".txt"
+	if len(entries) != 1 || entries[0].Path != want {
+		t.Fatalf("entries = %+v, want Path %q byte-exact (untouched)", entries, want)
+	}
+}

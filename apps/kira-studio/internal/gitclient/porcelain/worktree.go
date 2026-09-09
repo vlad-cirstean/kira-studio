@@ -1,6 +1,10 @@
 package porcelain
 
-import "bytes"
+import (
+	"bytes"
+
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitpath"
+)
 
 // WorktreeListArgs is worktree.list's own spawn (D1): `git worktree list --porcelain -z`
 // unconditionally — probe P2: `-z` shipped in git 2.36.0, below this app's 2.38 floor, so there is
@@ -66,7 +70,10 @@ func ParseWorktreeList(raw []byte) ([]WorktreeRecord, error) {
 		key, value, _ := cutFirstSpace(line)
 		switch key {
 		case "worktree":
-			cur.Path = value
+			// G27 D5c: an absolute worktree directory (D2 tier 1), not a repository-relative file
+			// path -- normalized to NFC so it agrees with Identify's own already-composed Root/
+			// GitDir/CommonDir (D5a) and with gitsession's cross-worktree comparisons (F4).
+			cur.Path = gitpath.NFC(value)
 		case "HEAD":
 			cur.Head = value
 		case "branch":

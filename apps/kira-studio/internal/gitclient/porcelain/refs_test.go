@@ -158,3 +158,27 @@ func TestParseRefRows_NULFramingMalformed(t *testing.T) {
 		t.Fatal("expected an error for a stream missing its trailing \\n after the final NUL")
 	}
 }
+
+// TestParseRefRows_WorktreePathComposesToNFC is G27 D5c/D12's tier-1 positive: %(worktreepath) is
+// an absolute worktree directory, so a decomposed spelling in git's own output must come back
+// composed. A hand-built LF-framed record (RefsFormat's own eleven \x1f-delimited fields), not a
+// testdata fixture (D12 forbids adding a new one this phase has no real macOS output to record).
+func TestParseRefRows_WorktreePathComposesToNFC(t *testing.T) {
+	decomposedE := string([]byte{0x65, 0xcc, 0x81}) // "e" + U+0301, decomposed "é"
+	composedE := string([]byte{0xc3, 0xa9})         // U+00E9, composed "é"
+
+	record := "refs/heads/main\x1f" + strings.Repeat("a", 40) + "\x1fcommit\x1f\x1f\x1f0\x1f*\x1f\x1f" +
+		"/repo/caf" + decomposedE + "\x1f\x1f\n"
+
+	rows, err := porcelain.ParseRefRows([]byte(record), false)
+	if err != nil {
+		t.Fatalf("ParseRefRows: %v", err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("got %d rows, want 1: %+v", len(rows), rows)
+	}
+	want := "/repo/caf" + composedE
+	if rows[0].CheckedOutIn == nil || *rows[0].CheckedOutIn != want {
+		t.Fatalf("CheckedOutIn = %v, want %q (composed)", rows[0].CheckedOutIn, want)
+	}
+}

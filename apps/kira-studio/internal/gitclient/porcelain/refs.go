@@ -6,6 +6,8 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitpath"
 )
 
 // RefsFormat is refs.list's own eleven-field for-each-ref format (D10) — %1f between fields,
@@ -143,7 +145,10 @@ func parseRefRow(record []byte, withSubject bool) (RefRow, error) {
 	committerDate, _ := strconv.ParseInt(string(fields[5]), 10, 64)
 	headMarker := string(fields[6])
 	peeled := string(fields[7])
-	worktreePath := string(fields[8])
+	// G27 D5c: %(worktreepath) is an absolute worktree directory (D2 tier 1), not a repository-
+	// relative file path -- normalized to NFC so it agrees with Identify's own already-composed
+	// Root (D5a) when gitsession's subtractOwnWorktree compares the two (F4).
+	worktreePath := gitpath.NFC(string(fields[8]))
 	taggerName := string(fields[9])
 	taggerDate := string(fields[10])
 	var subject, body string
