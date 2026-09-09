@@ -70,4 +70,10 @@ type WalkSpec struct {
 	// supplies real values.
 	StashShas    []string
 	IncludeStash bool
+	// ExcludeStash: G28 D15 -- when true, RevSetArgs also emits `--exclude=refs/stash` (the
+	// decidable "off" half of kiraVersion.stash.showInGraph, which has shipped inert since G18).
+	// Populated server-side in gitrpc/graph.go from the repo's stored settings -- no wire change.
+	// Deliberately does NOT change anything when false/unset: today's de-facto "on" behaviour
+	// (refs/stash swept into --all like any other ref) is untouched either way.
+	ExcludeStash bool
 }

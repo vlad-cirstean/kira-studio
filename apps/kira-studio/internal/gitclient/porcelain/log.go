@@ -34,6 +34,13 @@ func RangeToken(r RangeSpec) string {
 // on exactly the same commits in exactly the same order (D8/D21). G3 always passes
 // spec.IncludeStash=false (WalkArgs(spec) is then just `["--all"]` or `["HEAD"]`); G8 supplies
 // real stash shas.
+//
+// G28 D15/F12/probe P11: `--all` lists EVERY ref under refs/, this app's own `refs/kira/*`
+// namespace included, so the `--all` arm always excludes it first — `--exclude` must PRECEDE the
+// `--all` it modifies (probe P11), and is a harmless no-op when nothing under that prefix exists
+// yet. `--exclude=refs/stash` is added ADDITIONALLY when spec.ExcludeStash is set (the decidable
+// "off" half of kiraVersion.stash.showInGraph, D15) — never for the `head` scope or a ranged walk,
+// where RevSetArgs does not sweep `--all` at all and an exclusion would be meaningless.
 func RevSetArgs(spec WalkSpec) []string {
 	var args []string
 	switch {
@@ -42,6 +49,10 @@ func RevSetArgs(spec WalkSpec) []string {
 	case spec.Scope == "head":
 		args = append(args, "HEAD")
 	default: // "all", or unset -- "all" is the server's own default scope (D14).
+		args = append(args, "--exclude=refs/kira/*")
+		if spec.ExcludeStash {
+			args = append(args, "--exclude=refs/stash")
+		}
 		args = append(args, "--all")
 	}
 	if spec.IncludeStash {
