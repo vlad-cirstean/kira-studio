@@ -94,7 +94,12 @@ import type { EventKey, RequestKey, StreamKey } from './contract.ts';
 // itself widens by two fields ('scope', 'ref') rather than forking a parallel 'GlobalStashEntry'
 // type -- so, notably, ZERO new wire interfaces. No SQL migration, no watcher change, no new
 // 'ClassifyOpError' stderr row (this phase's own explicit non-goals).
-export const CONTRACT_VERSION = 30;
+// G-UX D4/D9 (2026-09-09): 30 -> 31, for two graph/review UX fixes' wire impact. 'repo.pick' is
+// REMOVED from 'Contract["requests"]' -- the workspace's own folders are now the only source of
+// repositories, so the native-folder-picker fallback has no wire method left to reach (D4). One
+// new 'UiActionKind' member, 'toggleSearch' -- the palette's route to toggling the graph panel's
+// search row (D9). No new capability, no new setting, no SQL migration.
+export const CONTRACT_VERSION = 31;
 
 export class ContractVersionMismatchError extends Error {
   readonly received: number;
@@ -149,7 +154,6 @@ export function unwrapVersioned<T>(envelope: VersionedEnvelope<T>): T {
 const REQUEST_KEY_MAP: Record<RequestKey, true> = {
   'app.init': true,
   'repo.list': true,
-  'repo.pick': true,
   'repo.open': true,
   'repo.close': true,
   'graph.status': true,

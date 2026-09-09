@@ -104,7 +104,14 @@ package gitrpc
 // commonDir/refs/**'s existing first classify rule); no new ClassifyOpError stderr row (every
 // failure this phase can produce is either already classified or refused host-side before git can
 // produce it).
-const ContractVersion = 30
+// G-UX D4/D9 (2026-09-09): 30 -> 31, for two graph/review UX fixes' wire impact. repo.pick is
+// REMOVED -- the workspace's own folders are now the only source of repositories, so the native
+// folder-picker fallback has no wire method left to reach (D4); the Go server never served it
+// (grep -rn "repo.pick" apps/kira-studio/ returned nothing before this bump too). One new
+// UiActionKind member, toggleSearch (D9) -- extension<->webview only, the Go server neither emits
+// nor parses it, the same reason this constant moves for every ui.action-only addition since G10
+// D9. No new capability, no new setting, no SQL migration.
+const ContractVersion = 31
 
 // Protocol is the handshake envelope's own version (SPEC §3.3's "protocol":1), distinct from
 // ContractVersion — it never changes unless the hello/ready exchange itself is redesigned.

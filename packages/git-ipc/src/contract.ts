@@ -1447,7 +1447,12 @@ export type UiActionKind =
    *  already makes, so this is a second entry point into the same dialog, never a second
    *  implementation. `globalStashRemove`/`stashBranch`-for-a-global-entry reuse `openBranchPicker`
    *  instead, the same convention the five ordinary stash commands already established. */
-  | 'saveGlobalStash';
+  | 'saveGlobalStash'
+  /** G-UX D9: the palette's own route to toggling the graph panel's search row — the same
+   *  assignment the in-webview `/`/`Ctrl+F` shortcuts already make. Not a `MUTATING_COMMANDS`
+   *  member (it maps to no OpRequest/RemoteOpParams kind) — `commands.ts`'s own `OTHER_COMMANDS`
+   *  carries it instead, the same shape `toggleFileReviewed` above already established. */
+  | 'toggleSearch';
 
 // ---------------------------------------------------------------------------------------
 // The contract.
@@ -1485,10 +1490,6 @@ export type Contract = {
     'repo.list': {
       params: Record<string, never>;
       result: { candidates: readonly RepoCandidate[]; activeRepoId: string | null };
-    };
-    'repo.pick': {
-      params: Record<string, never>;
-      result: { path: string | null };
     };
     'repo.open': {
       params: { path: string };

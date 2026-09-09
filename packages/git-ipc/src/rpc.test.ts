@@ -121,7 +121,6 @@ function stubHandlers(
     requests: {
       'app.init': notImplemented,
       'repo.list': notImplemented,
-      'repo.pick': notImplemented,
       'repo.open': notImplemented,
       'repo.close': notImplemented,
       'graph.status': notImplemented,
