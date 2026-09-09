@@ -52,6 +52,54 @@ type CommitRangeParams struct {
 	Branch string `json:"branch"`
 }
 
+// ---------------------------------------------------------------------------------------
+// search.run (G23 D13) -- @kira/git-ipc's own SearchQueryParams/SearchRunResult, commits-only
+// (no `scope`: refs/both are resolved entirely client-side, contract.ts:900-903).
+// ---------------------------------------------------------------------------------------
+
+// SearchQueryParams is search.run's own query shape — @kira/git-ipc's SearchQueryParams verbatim.
+type SearchQueryParams struct {
+	Text          string `json:"text"`
+	CaseSensitive bool   `json:"caseSensitive"`
+	WholeWord     bool   `json:"wholeWord"`
+	Regex         bool   `json:"regex"`
+}
+
+// SearchRunParams is search.run's request.
+type SearchRunParams struct {
+	RepoID string            `json:"repoId"`
+	Query  SearchQueryParams `json:"query"`
+	Limit  *int              `json:"limit,omitempty"`
+}
+
+// SearchHit is one matched commit — @kira/git-ipc's own CommitSearchHit.
+type SearchHit struct {
+	SHA         string   `json:"sha"`
+	Subject     string   `json:"subject"`
+	AuthorName  string   `json:"authorName"`
+	AuthorEmail string   `json:"authorEmail"`
+	AuthorTime  int64    `json:"authorTime"`
+	Fields      []string `json:"fields"`
+}
+
+// SearchRunResult is search.run's result — @kira/git-ipc's own three-member SearchRunResult
+// union, flattened onto one struct the way RepoOpenResult already is (Kind selects which fields
+// are meaningful): "ok" | "invalidPattern" | "unsupportedPattern" (D6 — the new member this
+// phase adds, for a `regex`-mode pattern using syntax RE2 cannot express at all).
+type SearchRunResult struct {
+	Kind string `json:"kind"`
+
+	// "ok"
+	Hits      []SearchHit `json:"hits"`
+	Total     int         `json:"total"`
+	Truncated bool        `json:"truncated"`
+	Scanned   int         `json:"scanned"`
+	Complete  bool        `json:"complete"`
+
+	// "invalidPattern" | "unsupportedPattern"
+	Message string `json:"message,omitempty"`
+}
+
 type GraphStatusParams struct {
 	RepoID string             `json:"repoId"`
 	Range  *CommitRangeParams `json:"range,omitempty"`

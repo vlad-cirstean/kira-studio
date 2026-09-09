@@ -54,7 +54,13 @@ package gitrpc
 // preflight.reset/preflight.cherryPick/op.run's reset/cherryPick kinds serve already existed at
 // CONTRACT_VERSION 24. This constant moves for the same reason ui.action first did (G10 D9): it is
 // the sole compatibility authority, even though the Go server neither emits nor parses ui.action.
-const ContractVersion = 25
+// G23 D6/D13 (2026-09-09): 25 -> 26, for one new SearchRunResult member, unsupportedPattern — a
+// `regex`-mode pattern using lookahead/lookbehind/a backreference, syntax the Go tail scan's RE2
+// engine cannot run at all (SPEC's own "a hit's presence must not depend on which page happens to
+// be loaded", docs/v1.3/SPEC.md:446-450). Unlike most of this constant's history, this bump also
+// lands the first real Go implementation of the method it accompanies (search.run) rather than
+// only the wire shape for an extension-answered method.
+const ContractVersion = 26
 
 // Protocol is the handshake envelope's own version (SPEC §3.3's "protocol":1), distinct from
 // ContractVersion — it never changes unless the hello/ready exchange itself is redesigned.
