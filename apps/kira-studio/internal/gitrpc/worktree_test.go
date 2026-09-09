@@ -219,9 +219,10 @@ func TestWorktreeCancelPrepare_NothingRunning_OverDispatch(t *testing.T) {
 	}
 }
 
-// TestContractVersion_Is28 is this phase's own literal exit-criteria assertion.
-func TestContractVersion_Is28(t *testing.T) {
-	if ContractVersion != 28 {
-		t.Fatalf("ContractVersion = %d, want 28", ContractVersion)
+// TestContractVersion_Is29 is G26 D17's own literal exit-criteria assertion (28 -> 29), moved
+// forward from G25's TestContractVersion_Is28 in the same commit that bumps the constant.
+func TestContractVersion_Is29(t *testing.T) {
+	if ContractVersion != 29 {
+		t.Fatalf("ContractVersion = %d, want 29", ContractVersion)
 	}
 }

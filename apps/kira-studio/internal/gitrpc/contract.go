@@ -79,7 +79,14 @@ package gitrpc
 // sha (prepareScriptApprovedSha) — a server-only key, D11/F15, reachable only through
 // storage/repos.GitRepoSettingsRepo's two new dedicated methods, never through repoSettings.get/set
 // or any OpRequest/OpResult shape.
-const ContractVersion = 28
+// G26 D17 (2026-09-09): 28 -> 29, for four new Go-served requests (stack.list, preflight.restack,
+// stack.restack, stack.cancelRestack), one new event (stack.progress), nine new wire types
+// (StackBranchState, StackBranch, StackSummary, StackListResult, RestackBlocker, RestackPlanEntry,
+// RestackPreflight, RestackResult, RestackProgress), one new OpRequest kind (stackSet), one new
+// OpErrorKind (StackCycle — produced exclusively by stackSet, never by rebase itself, D5), and three
+// new UiActionKind members (restackStack, checkoutStackParent, checkoutStackChild). No new
+// capability, no new setting, no SQL migration (§8's own explicit non-goals for this phase).
+const ContractVersion = 29
 
 // Protocol is the handshake envelope's own version (SPEC §3.3's "protocol":1), distinct from
 // ContractVersion — it never changes unless the hello/ready exchange itself is redesigned.

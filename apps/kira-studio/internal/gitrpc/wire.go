@@ -705,3 +705,37 @@ type WorktreeCancelPrepareParams struct {
 type WorktreeCancelPrepareResult struct {
 	Cancelled bool `json:"cancelled"`
 }
+
+// StackListParams is stack.list's own request (G26 D3) — the RESULT is
+// gitsession.RepoEntry.Stacks' own gitpreflight.StackListResult, returned directly with no wrapper,
+// the same "handler returns the gitpreflight/gitsession struct as-is" convention
+// preflight.worktreeAdd/preflight.worktreeRemove already established.
+type StackListParams struct {
+	RepoID string `json:"repoId"`
+}
+
+// PreflightRestackParams is preflight.restack's own request (D14) — the RESULT is
+// gitpreflight.RestackPreflight, returned directly.
+type PreflightRestackParams struct {
+	RepoID string `json:"repoId"`
+	Branch string `json:"branch"`
+}
+
+// StackRestackParams is stack.restack's own request (D6) — the RESULT is
+// gitsession.RestackResult, returned directly.
+type StackRestackParams struct {
+	RepoID string `json:"repoId"`
+	Branch string `json:"branch"`
+}
+
+// StackCancelRestackParams is stack.cancelRestack's own request (D9).
+type StackCancelRestackParams struct {
+	RepoID string `json:"repoId"`
+}
+
+// StackCancelRestackResult mirrors @kira/git-ipc's own stack.cancelRestack result —
+// `{cancelled: boolean}`, never an error (D9/RemoteCancelResult's own precedent): a cancel racing a
+// just-finished or never-running restack is an ordinary outcome, not a fault.
+type StackCancelRestackResult struct {
+	Cancelled bool `json:"cancelled"`
+}
