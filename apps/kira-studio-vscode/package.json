@@ -291,6 +291,16 @@
         "command": "kiraVersion.goToStackChild",
         "title": "Go to Child Branch",
         "category": "Kira Version"
+      },
+      {
+        "command": "kiraVersion.saveGlobalStash",
+        "title": "Save to Global Stash…",
+        "category": "Kira Version"
+      },
+      {
+        "command": "kiraVersion.removeGlobalStash",
+        "title": "Remove from Global Stash…",
+        "category": "Kira Version"
       }
     ],
     "menus": {
