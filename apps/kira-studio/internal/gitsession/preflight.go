@@ -247,6 +247,276 @@ func (e *RepoEntry) stashPopPrediction(ctx context.Context, target, stashSha, ba
 	return gitpreflight.RevertPrediction{Kind: "conflicts", Paths: pred.Paths}
 }
 
+// resolvedCommit is resolveCommit's own return shape — a commit's canonical sha and subject.
+type resolvedCommit struct {
+	Sha     string
+	Subject string
+}
+
+// resolveCommit resolves ref (anything `git show` can resolve — a branch, tag, or bare sha) to its
+// canonical sha and subject, or (nil, nil) when ref does not resolve at all — probe 3's bad-target
+// guard, shared by preflightReset (target existence + display subject) and prepareReset's own
+// re-check host-side immediately before the write. Exit 128 is a resolution failure, never a spawn
+// error to propagate: `show -s` on an unresolvable ref exits non-zero with real stderr, cleanly
+// distinguishable from a genuine spawn failure.
+func (e *RepoEntry) resolveCommit(ctx context.Context, ref string) (*resolvedCommit, error) {
+	res, err := e.runAllowingExit(ctx, porcelain.ShowMetadataArgs(ref), 0, 128)
+	if err != nil {
+		return nil, err
+	}
+	if res.ExitCode == 128 {
+		return nil, nil
+	}
+	rec, err := oneRecord(res.Stdout)
+	if err != nil {
+		return nil, err
+	}
+	parsed, err := porcelain.ParseLogRecord(rec)
+	if err != nil {
+		return nil, err
+	}
+	return &resolvedCommit{Sha: parsed.SHA, Subject: parsed.Subject}, nil
+}
+
+// PreflightReset is preflight.reset's own orchestration (D8/F14): target may be anything `git
+// show` can resolve — a branch, tag, or bare sha — so the first read is resolveCommit, which
+// doubles as probe 3's bad-target guard and the source of the canonical sha leaving/gaining/
+// leavingCommits are all computed against (never the wire's own possibly-abbreviated target
+// string). An unresolved target short-circuits the range reads entirely: there is no commit to
+// diff, count, or confirm against, and ClassifyReset's own unknownTarget blocker is what the
+// dialog renders instead. Target is passed to ClassifyReset verbatim (F14) — never resolved.sha.
+func (e *RepoEntry) PreflightReset(ctx context.Context, target, mode string) (gitpreflight.ResetPreflight, error) {
+	var statusResult porcelain.StatusResult
+	var inProgress *gitpreflight.InProgressOperation
+	var resolved *resolvedCommit
+	var statusErr, resolveErr error
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		statusResult, inProgress, statusErr = e.statusAndInProgress(ctx)
+	}()
+	go func() {
+		defer wg.Done()
+		resolved, resolveErr = e.resolveCommit(ctx, target)
+	}()
+	wg.Wait()
+	if statusErr != nil {
+		return gitpreflight.ResetPreflight{}, statusErr
+	}
+	if resolveErr != nil {
+		return gitpreflight.ResetPreflight{}, resolveErr
+	}
+
+	head := headStateFromStatusBranch(statusResult.Branch)
+	var branch *string
+	if head.Kind == "branch" {
+		name := head.Name
+		branch = &name
+	}
+	dirty := gitpreflight.DirtySplit(statusResult)
+	stagedNew := gitpreflight.StagedNewPaths(statusResult)
+
+	if resolved == nil {
+		return gitpreflight.ClassifyReset(gitpreflight.ClassifyResetInput{
+			Target: target, TargetSubject: "", Mode: mode,
+			CurrentHead: statusResult.Branch.OID, Branch: branch,
+			Leaving: 0, Gaining: 0, LeavingCommits: []gitpreflight.ResetLeavingCommit{}, LeavingTruncated: false,
+			Dirty: dirty, StagedNew: stagedNew, InProgress: inProgress, TargetResolves: false,
+		}), nil
+	}
+
+	// Probe 4: `<target>...HEAD` — right is only-reachable-from-HEAD (what resetting to target
+	// leaves behind), left is only-reachable-from-target (what it would additionally gain on a
+	// diverged target).
+	countRaw, err := e.runOne(ctx, porcelain.LeftRightCountArgs(resolved.Sha, "HEAD"))
+	if err != nil {
+		return gitpreflight.ResetPreflight{}, err
+	}
+	gaining, leaving, err := porcelain.ParseLeftRightCount(countRaw)
+	if err != nil {
+		return gitpreflight.ResetPreflight{}, err
+	}
+
+	leavingCommits := []gitpreflight.ResetLeavingCommit{}
+	leavingTruncated := false
+	if leaving > 0 {
+		subjectsRaw, err := e.runOne(ctx, porcelain.RangeSubjectsArgs(resolved.Sha, "HEAD", porcelain.ResetLeavingCommitsCap))
+		if err != nil {
+			return gitpreflight.ResetPreflight{}, err
+		}
+		commits, truncated, err := porcelain.ParseRangeSubjects(subjectsRaw, porcelain.ResetLeavingCommitsCap)
+		if err != nil {
+			return gitpreflight.ResetPreflight{}, err
+		}
+		for _, c := range commits {
+			leavingCommits = append(leavingCommits, gitpreflight.ResetLeavingCommit{Sha: c.Sha, Subject: c.Subject})
+		}
+		leavingTruncated = truncated
+	}
+
+	return gitpreflight.ClassifyReset(gitpreflight.ClassifyResetInput{
+		Target: target, TargetSubject: resolved.Subject, Mode: mode,
+		CurrentHead: statusResult.Branch.OID, Branch: branch,
+		Leaving: leaving, Gaining: gaining,
+		LeavingCommits: leavingCommits, LeavingTruncated: leavingTruncated,
+		Dirty: dirty, StagedNew: stagedNew, InProgress: inProgress, TargetResolves: true,
+	}), nil
+}
+
+// predictCherryPick runs D2's own merge-tree prediction for sha — the exact INVERSE of
+// predictRevert's own arrangement: HEAD is the base, sha is the other side, --merge-base=<sha>^
+// <mainline> — because a pick applies its diff forwards and a revert backwards. Left to itself git
+// would pick merge-base(HEAD, sha), against which a commit that undoes an earlier one on this same
+// branch reads as no change at all (probe 2) — reporting a genuinely conflicting pick as clean.
+// nil effectiveMainline (a merge with none chosen) predicts nothing: there is no single "other"
+// tree to diff against yet, and mainlineRequired already names why.
+func (e *RepoEntry) predictCherryPick(ctx context.Context, sha string, effectiveMainline *int) gitpreflight.RevertPrediction {
+	if effectiveMainline == nil {
+		return gitpreflight.RevertPrediction{Kind: "unknown", Reason: "Pick a mainline parent first."}
+	}
+	mergeBase := fmt.Sprintf("%s^%d", sha, *effectiveMainline)
+
+	res, err := e.runAllowingExit(ctx, porcelain.MergeTreeArgs("HEAD", sha, mergeBase), 0, 1)
+	if err != nil {
+		return gitpreflight.RevertPrediction{Kind: "unknown", Reason: err.Error()}
+	}
+	pred, err := porcelain.ParseMergeTreeOutput(res.Stdout, res.ExitCode)
+	if err != nil {
+		return gitpreflight.RevertPrediction{Kind: "unknown", Reason: err.Error()}
+	}
+	if pred.Kind == "clean" {
+		return gitpreflight.RevertPrediction{Kind: "clean"}
+	}
+	return gitpreflight.RevertPrediction{Kind: "conflicts", Paths: pred.Paths}
+}
+
+// cherryPickCommitPaths is §7.13's path-scoped blockers' own input: the picked commit's own
+// changed paths split "added" (probe 7E: an untracked file at one of these is refused) from
+// everything else (probe 7C: an unstaged change overlapping one of these is refused) — reuses
+// CommitDetail's own metadata/diff-tree plumbing against whichever parent effectiveMainline names,
+// rather than a third parser for the same two spawns. A renamed/copied path counts as "touched"
+// under both its new and its original name. nil effectiveMainline (a merge with no mainline chosen
+// yet) returns both empty, mirroring predictCherryPick's own reason.
+func (e *RepoEntry) cherryPickCommitPaths(ctx context.Context, sha string, effectiveMainline *int) (gitpreflight.CherryPickCommitPaths, error) {
+	if effectiveMainline == nil {
+		return gitpreflight.CherryPickCommitPaths{Touched: []string{}, Added: []string{}}, nil
+	}
+	detail, err := e.CommitDetail(ctx, sha, *effectiveMainline-1)
+	if err != nil {
+		return gitpreflight.CherryPickCommitPaths{}, err
+	}
+	touched := []string{}
+	added := []string{}
+	for _, f := range detail.Files {
+		if f.Kind == porcelain.FileAdded {
+			added = append(added, f.Path)
+			continue
+		}
+		touched = append(touched, f.Path)
+		if f.OriginalPath != nil {
+			touched = append(touched, *f.OriginalPath)
+		}
+	}
+	return gitpreflight.CherryPickCommitPaths{Touched: touched, Added: added}, nil
+}
+
+// isAncestorOrNot runs `merge-base --is-ancestor a b` — exit 0 yes, exit 1 or 128 (a genuinely
+// unresolvable ref, which cannot reach preflightCherryPick's own alreadyApplied read from a normal
+// graph-row sha, but this read must not itself become a hard failure over one) no.
+func (e *RepoEntry) isAncestorOrNot(ctx context.Context, a, b string) (bool, error) {
+	res, err := e.runAllowingExit(ctx, []string{"merge-base", "--is-ancestor", a, b}, 0, 1, 128)
+	if err != nil {
+		return false, err
+	}
+	return res.ExitCode == 0, nil
+}
+
+// PreflightCherryPick is preflight.cherryPick's own orchestration (§7.13) — PreflightRevert's
+// direct structural sibling. mergeParents reuses the same revertMergeParents lookup (empty unless
+// sha is a merge); alreadyApplied is isAncestor(sha, HEAD) (an advisory note, never a blocker —
+// probe 8); commitPaths and the prediction are only ever computed once a mainline is actually
+// known — with none chosen for a merge commit there is no single parent to diff against, and
+// mainlineRequired already blocks the pick regardless of what either would say.
+func (e *RepoEntry) PreflightCherryPick(ctx context.Context, sha string, mainline *int) (gitpreflight.CherryPickPreflight, error) {
+	var statusResult porcelain.StatusResult
+	var inProgress *gitpreflight.InProgressOperation
+	var mergeParentsBySha map[string][]gitpreflight.RevertParentChoice
+	var alreadyApplied bool
+	var resolved *resolvedCommit
+	var errs [4]error
+	var wg sync.WaitGroup
+	wg.Add(4)
+	go func() {
+		defer wg.Done()
+		statusResult, inProgress, errs[0] = e.statusAndInProgress(ctx)
+	}()
+	go func() {
+		defer wg.Done()
+		mergeParentsBySha, errs[1] = e.revertMergeParents(ctx, []string{sha})
+	}()
+	go func() {
+		defer wg.Done()
+		alreadyApplied, errs[2] = e.isAncestorOrNot(ctx, sha, "HEAD")
+	}()
+	go func() {
+		defer wg.Done()
+		resolved, errs[3] = e.resolveCommit(ctx, sha)
+	}()
+	wg.Wait()
+	for _, spawnErr := range errs {
+		if spawnErr != nil {
+			return gitpreflight.CherryPickPreflight{}, spawnErr
+		}
+	}
+
+	mergeParents := mergeParentsBySha[sha]
+	if mergeParents == nil {
+		mergeParents = []gitpreflight.RevertParentChoice{}
+	}
+	var effectiveMainline *int
+	switch {
+	case mainline != nil:
+		effectiveMainline = mainline
+	case len(mergeParents) == 0:
+		one := 1
+		effectiveMainline = &one
+	default:
+		effectiveMainline = nil
+	}
+
+	var prediction gitpreflight.RevertPrediction
+	var commitPaths gitpreflight.CherryPickCommitPaths
+	var pathsErr error
+	var wg2 sync.WaitGroup
+	wg2.Add(2)
+	go func() {
+		defer wg2.Done()
+		prediction = e.predictCherryPick(ctx, sha, effectiveMainline)
+	}()
+	go func() {
+		defer wg2.Done()
+		commitPaths, pathsErr = e.cherryPickCommitPaths(ctx, sha, effectiveMainline)
+	}()
+	wg2.Wait()
+	if pathsErr != nil {
+		return gitpreflight.CherryPickPreflight{}, pathsErr
+	}
+
+	subject := ""
+	if resolved != nil {
+		subject = resolved.Subject
+	}
+	head := headStateFromStatusBranch(statusResult.Branch)
+
+	return gitpreflight.ClassifyCherryPick(gitpreflight.ClassifyCherryPickInput{
+		Sha: sha, Subject: subject, MergeParents: mergeParents, Mainline: mainline,
+		CommitPaths: commitPaths, Dirty: gitpreflight.DirtySplit(statusResult),
+		Prediction: prediction, AlreadyApplied: alreadyApplied, InProgress: inProgress,
+		DetachedHead: head.Kind == "detached",
+	}), nil
+}
+
 // PreflightStashPop is preflight.stashPop's own orchestration (D3, §7.6): re-resolves the stash
 // entry fresh (resolveStashEntry's own doc comment), gathers stashPaths (stash.show's own numstat),
 // stashUntrackedPaths (an ls-tree over the untracked helper commit, when one exists),
