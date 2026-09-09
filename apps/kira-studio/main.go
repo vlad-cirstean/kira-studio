@@ -3,7 +3,6 @@ package main
 import (
 	"embed"
 	"fmt"
-	"log"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -43,6 +42,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/preconnect"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/secrets"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/shell"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/startupfail"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/repos"
@@ -80,16 +80,16 @@ func main() {
 	startedAt := time.Now()
 
 	if err := config.EnsureLayout(); err != nil {
-		log.Fatalf("kira-studio-shell: ensure layout: %v", err)
+		startupfail.Fatal(startupfail.StepEnsureLayout, err)
 	}
 	if err := logging.Init(); err != nil {
-		log.Fatalf("kira-studio-shell: logging: %v", err)
+		startupfail.Fatal(startupfail.StepLogging, err)
 	}
 	logging.Sweep()
 
 	db, err := storage.Open()
 	if err != nil {
-		log.Fatalf("kira-studio-shell: storage: %v", err)
+		startupfail.Fatal(startupfail.StepStorage, err)
 	}
 
 	cipher := secrets.New()
@@ -99,7 +99,7 @@ func main() {
 
 	repositories, err := repos.New(db.DB)
 	if err != nil {
-		log.Fatalf("kira-studio-shell: storage repos: %v", err)
+		startupfail.Fatal(startupfail.StepRepos, err)
 	}
 	secretsRepo := repos.NewSecrets(db.DB, cipher)
 	// P5: the same "needs a Cipher, constructed separately from repos.New's aggregate" shape as
@@ -178,7 +178,7 @@ func main() {
 	// before any user override exists — the cache budget below needs it.
 	settings, err := deps.Repos.Settings.GetAll()
 	if err != nil {
-		log.Fatalf("kira-studio-shell: read settings: %v", err)
+		startupfail.Fatal(startupfail.StepSettings, err)
 	}
 
 	adapterDeps := adapters.Deps{Log: func(level, message string) {
@@ -553,12 +553,12 @@ func main() {
 	// one.
 	records, err := repositories.Windows.List()
 	if err != nil {
-		log.Fatalf("kira-studio-shell: list windows: %v", err)
+		startupfail.Fatal(startupfail.StepWindowList, err)
 	}
 	if len(records) == 0 {
 		rec := model.WindowRecord{Key: uuid.NewString(), Order: 0}
 		if err := repositories.Windows.Create(rec); err != nil {
-			log.Fatalf("kira-studio-shell: create window: %v", err)
+			startupfail.Fatal(startupfail.StepWindowCreate, err)
 		}
 		records = []model.WindowRecord{rec}
 	}
@@ -567,7 +567,7 @@ func main() {
 	}
 
 	if err := app.Run(); err != nil {
-		log.Fatal(err)
+		startupfail.Fatal(startupfail.StepRun, err)
 	}
 }
 
