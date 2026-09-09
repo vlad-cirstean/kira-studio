@@ -81,6 +81,19 @@ func TestClassifyOpError_WorktreeRemoveDirty(t *testing.T) {
 	}
 }
 
+// TestClassifyOpError_RebaseDirtyWorktree is G26 D5/probe P12's own verbatim stderr — a restack's
+// rebase refuses a dirty tree with these two exact strings, reused DirtyWorktree, not a new kind.
+func TestClassifyOpError_RebaseDirtyWorktree(t *testing.T) {
+	for _, stderr := range []string{
+		"error: cannot rebase: You have unstaged changes.",
+		"error: cannot rebase: Your index contains uncommitted changes.",
+	} {
+		if kind, _ := gitops.ClassifyOpError(stderr, 1); kind != "DirtyWorktree" {
+			t.Fatalf("%q -> %q, want DirtyWorktree", stderr, kind)
+		}
+	}
+}
+
 // TestClassifyOpError_WorktreeLocked is G25 D15/probe M5's own verbatim stderr — the one new kind
 // this phase adds.
 func TestClassifyOpError_WorktreeLocked(t *testing.T) {
@@ -121,6 +134,30 @@ func TestClassifyOpError_NotFound(t *testing.T) {
 		if kind, _ := gitops.ClassifyOpError(stderr, 128); kind != "NotFound" {
 			t.Fatalf("%q -> %q, want NotFound", stderr, kind)
 		}
+	}
+}
+
+// TestClassifyOpError_RebaseNoSuchBranchCommit is G26 D5/probe P14's own verbatim stderr — a
+// restack's rebase with a nonexistent third (branch) argument, reused NotFound, added as its own
+// row rather than widening the existing NotFound pattern list (D5's stated reason: the probe
+// citation sits next to the exact string it came from).
+func TestClassifyOpError_RebaseNoSuchBranchCommit(t *testing.T) {
+	stderr := "fatal: no such branch/commit 'nosuchbranchxyz'"
+	if kind, _ := gitops.ClassifyOpError(stderr, 128); kind != "NotFound" {
+		t.Fatalf("got %q, want NotFound", kind)
+	}
+}
+
+// TestClassifyOpError_RebaseConflictCombinedStream is P10's own finding: a rebase conflict's
+// "CONFLICT (content): ..." is on STDOUT while "error: could not apply ..." is on stderr — the
+// existing Conflict row already matches "could not apply" and "conflict (", but only fires here
+// because the executor combines stdout+stderr before classifying, exactly as runPullOp already
+// does for pull's own rebase strategy.
+func TestClassifyOpError_RebaseConflictCombinedStream(t *testing.T) {
+	combined := "CONFLICT (content): Merge conflict in f.txt\n" +
+		"error: could not apply c8fd25a... c3 on feat2"
+	if kind, _ := gitops.ClassifyOpError(combined, 1); kind != "Conflict" {
+		t.Fatalf("got %q, want Conflict", kind)
 	}
 }
 

@@ -75,6 +75,12 @@ func ClassifyOpError(stderr string, exitCode int) (kind, message string) {
 	case strings.Contains(lower, "local changes to the following files would be overwritten"):
 		// Probe P7.
 		return "DirtyWorktree", message
+	case strings.Contains(lower, "cannot rebase: you have unstaged changes") ||
+		strings.Contains(lower, "cannot rebase: your index contains uncommitted changes"):
+		// G26 D5/probe P12: `git rebase --onto` refuses a dirty tree with exactly these two stderr
+		// strings — reused DirtyWorktree, not a new kind, the same "different stderr shape, same
+		// remedy story" convention this table's other rows already follow.
+		return "DirtyWorktree", message
 	case strings.Contains(lower, "contains modified or untracked files"):
 		// G25 D15/probe M4: `worktree remove` on a dirty worktree — "fatal: '<path>' contains
 		// modified or untracked files, use --force to delete it". A different stderr shape from the
@@ -97,6 +103,13 @@ func ClassifyOpError(stderr string, exitCode int) (kind, message string) {
 	case strings.Contains(lower, "reference is not a tree:") || strings.Contains(lower, "no branch named") ||
 		strings.Contains(lower, "not found") || strings.Contains(lower, "bad object") || strings.Contains(lower, "invalid reference"):
 		// upstream probe P7.
+		return "NotFound", message
+	case strings.Contains(lower, "no such branch/commit"):
+		// G26 D5/probe P14: `git rebase --onto <onto> <base> <branch>` with a nonexistent <branch>
+		// — "fatal: no such branch/commit '<x>'". Its own row rather than widening the existing
+		// NotFound pattern list above, so the probe citation sits next to the exact string it came
+		// from (D5's own stated reason). Reused NotFound, not a new kind — this phase's only new
+		// OpErrorKind is StackCycle, produced exclusively by stackSet.
 		return "NotFound", message
 	case strings.Contains(lower, "index.lock") || strings.Contains(lower, "another git process seems to be running"):
 		return "LockHeld", message
