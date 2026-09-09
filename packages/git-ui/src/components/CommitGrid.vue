@@ -51,6 +51,11 @@ const props = defineProps<{
   /** G26 D-4.13: the message column's own stack-decoration source — optional so a caller with no
    *  stack view mounted gets plain, undecorated branch badges, mirroring `pr`'s own default. */
   stack?: StackState;
+  /** G-UX D1 (item 1a): the detail pane's own open/closed state, mirrored from `App.vue`'s
+   *  `detailOpen` ref. `true` drops `author`/`date` to `compact: true` (`columns.ts`) and reflows
+   *  their width into `message` — everything they show already renders in the pane the click just
+   *  opened, so keeping them is pure duplication that starves the one column that is not. */
+  detailOpen: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -193,7 +198,10 @@ function handleFocusIn(event: FocusEvent): void {
 }
 
 function computeMessageWidth(hostWidth: number, laneCount: number): number {
-  const fixed = graphColumnWidth(laneCount) + widths.value.author + widths.value.date;
+  // G-UX D1: with the detail pane open, `author`/`date` are not rendered at all (`currentColumns`
+  // passes `compact: true`) — the width they would have reserved goes to the subject instead.
+  const reserved = props.detailOpen ? 0 : widths.value.author + widths.value.date;
+  const fixed = graphColumnWidth(laneCount) + reserved;
   return Math.max(MIN_MESSAGE_WIDTH, hostWidth - fixed);
 }
 
@@ -251,10 +259,15 @@ function currentColumns(): Column<CommitRecord>[] {
       prsFor: (sha) => props.pr?.bySha.value.get(sha),
     },
     { stackInfoFor },
+    { compact: props.detailOpen },
   );
 }
 
 function updateHandlePositions(): void {
+  // G-UX D1: no handles are rendered in compact mode (`v-if` below) — a handle for a column that
+  // is not there would be a dead hit target, so this skips the computation entirely rather than
+  // just leaving it unused.
+  if (props.detailOpen) return;
   const hostWidth = host.value?.clientWidth ?? 0;
   const laneCount = props.graphView.laneCount.value;
   handleLeftAuthor.value = graphColumnWidth(laneCount) + computeMessageWidth(hostWidth, laneCount);
@@ -766,6 +779,12 @@ watch(
     grid?.render();
   },
 );
+// G-UX D1: the detail pane opening/closing changes the column model itself (compact vs. full),
+// unlike every watcher above — a full `rebuildColumns()`, not just an invalidate/render.
+watch(
+  () => props.detailOpen,
+  () => rebuildColumns(),
+);
 onBeforeUnmount(() => {
   resizeObserver?.disconnect();
   if (resizeRaf !== 0) cancelAnimationFrame(resizeRaf);
@@ -838,6 +857,7 @@ defineExpose({ scrollToRow, focusGrid, scrollToTopRow, getViewportTop });
          shown, never a fifth grid column. -->
     <span ref="dateWidthProbe" class="kv-cell-date kv-date-width-probe" aria-hidden="true"></span>
     <div
+      v-if="!detailOpen"
       class="kv-resize-handle"
       role="separator"
       aria-orientation="vertical"
@@ -852,6 +872,7 @@ defineExpose({ scrollToRow, focusGrid, scrollToTopRow, getViewportTop });
       @keydown="handleHandleKeydown('author', $event)"
     ></div>
     <div
+      v-if="!detailOpen"
       class="kv-resize-handle"
       role="separator"
       aria-orientation="vertical"

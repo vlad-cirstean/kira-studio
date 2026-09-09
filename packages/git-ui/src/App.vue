@@ -1380,6 +1380,7 @@ onBeforeUnmount(() => {
               :selection="selection"
               :column-widths="columnWidths"
               :date-format="dateFormat"
+              :detail-open="detailOpen"
               :search="searchState"
               :pr="prState"
               :stack="stackState"

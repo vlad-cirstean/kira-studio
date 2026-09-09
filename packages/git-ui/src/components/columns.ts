@@ -183,7 +183,16 @@ export interface ColumnWidthInputs extends ColumnWidths {
   readonly messageWidth: number;
 }
 
-/** Builds the four column definitions in display order (G21 D5: the fifth, `sha`, is gone — the
+/** G-UX D1 (item 1a): when the detail pane is open, `author`/`date` are dropped entirely — every
+ *  fact they show also renders in the pane the click just opened (`CommitMeta.vue`'s Author/
+ *  Committer), so keeping them is pure duplication that starves the one column that is not
+ *  already duplicated: `message`. `CommitGrid.vue` stops subtracting `widths.author + widths.date`
+ *  from `computeMessageWidth` in this mode, so the freed width goes to the subject. */
+export interface BuildColumnsOptions {
+  readonly compact?: boolean;
+}
+
+/** Builds the column definitions in display order (G21 D5: the fifth, `sha`, is gone — the
  *  details panel's own single click-to-copy SHA, `CommitMeta.vue`, is now the only sha-copy
  *  affordance). Not user-resizable: `graph` (its width is derived from `laneCount`, not a user
  *  choice — its `graphFormatter` and geometry are W8's `graphColumn.ts`/`rowSvg.ts`, built once
@@ -195,7 +204,9 @@ export interface ColumnWidthInputs extends ColumnWidths {
  *  the new widths, is the single source of the column model either way. `searchCtx` (W13) and
  *  `laneCtx` (G21 D4) are both optional and default to "no highlight"/"no lane colour" so a
  *  caller that only needs the basic shape keeps working unchanged — only `CommitGrid.vue` passes
- *  real ones. */
+ *  real ones. `options.compact` (D1) returns only `graph`/`message` — `author`/`date` are omitted
+ *  outright, not merely hidden, so there is no resize handle or hit target for a column that is
+ *  not rendered. */
 export function buildColumns(
   widths: ColumnWidthInputs,
   dateCtx: DateFormatterContext,
@@ -204,8 +215,9 @@ export function buildColumns(
   laneCtx: LaneColorContext = NO_LANE_COLOR_CONTEXT,
   prCtx: PrContext = NO_PR_CONTEXT,
   stackCtx: StackContext = NO_STACK_CONTEXT,
+  options: BuildColumnsOptions = {},
 ): Column<CommitRecord>[] {
-  return [
+  const columns: Column<CommitRecord>[] = [
     {
       id: GRAPH_COLUMN_ID,
       field: 'sha',
@@ -229,6 +241,9 @@ export function buildColumns(
       selectable: false,
       formatter: messageFormatter(searchCtx, laneCtx, prCtx, stackCtx),
     },
+  ];
+  if (options.compact) return columns;
+  columns.push(
     {
       id: AUTHOR_COLUMN_ID,
       field: 'author.name',
@@ -251,7 +266,8 @@ export function buildColumns(
       selectable: false,
       formatter: dateFormatter(dateCtx),
     },
-  ];
+  );
+  return columns;
 }
 
 /** `getItemMetadata`'s `cssClasses`: `selected` from `SelectionState` (not SlickGrid's own
