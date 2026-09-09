@@ -176,6 +176,35 @@ func TestRefsChanged_DropsCommitCache(t *testing.T) {
 	}
 }
 
+// --- the eager purge pass is min-gap throttled -----------------------------------------------------
+
+// TestGhState_EagerPurgeAllowed_ThrottlesRapidCalls is G30 round-1 performance review, finding #2:
+// note()'s own refsChanged handler calls drop() (dropping the snapshot) immediately before
+// scheduling eagerResolveClosedBranches, on EVERY refsChanged — an interactive rebase's dozen-plus
+// signals, or a single `git fetch --prune`, used to re-trigger a fresh bulk gh fetch on every one,
+// with nothing anywhere in this path throttling it. eagerPurgeAllowed is the gate
+// eagerResolveClosedBranches now checks first, before any other work.
+func TestGhState_EagerPurgeAllowed_ThrottlesRapidCalls(t *testing.T) {
+	s := newGhState()
+	if !s.eagerPurgeAllowed() {
+		t.Fatal("the first call should always be allowed")
+	}
+	if s.eagerPurgeAllowed() {
+		t.Fatal("a call immediately after the first should be throttled")
+	}
+	if s.eagerPurgeAllowed() {
+		t.Fatal("a third rapid call should also be throttled")
+	}
+
+	// Once eagerPurgeMinGap has genuinely elapsed, the gate opens again.
+	s.mu.Lock()
+	s.lastEagerPurgeAt = time.Now().Add(-eagerPurgeMinGap - time.Millisecond)
+	s.mu.Unlock()
+	if !s.eagerPurgeAllowed() {
+		t.Fatal("a call after the min gap elapsed should be allowed")
+	}
+}
+
 // --- the breaker suppresses spawns for its whole window -------------------------------------------
 
 func TestBreaker_SuppressesFurtherSpawnsAfterRateLimit(t *testing.T) {
