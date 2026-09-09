@@ -59,9 +59,12 @@ const emit = defineEmits<{
   /** The top loaded row currently in view — what `viewState.scrollRow` should hold (a row
    *  index, not a pixel offset: it survives a re-walk, a pixel offset does not). */
   (e: 'scroll', row: number): void;
-  /** A row was clicked twice in a row, or `Enter` was pressed: open the detail pane if it is
-   *  closed, close it if it is open. W10/App.vue own the pane's actual open/closed state. */
+  /** A row already selected was clicked again, or `Enter` was pressed: open the detail pane if
+   *  it is closed, close it if it is open. W10/App.vue own the pane's actual open/closed state. */
   (e: 'toggleDetail'): void;
+  /** G-UX D2: an unselected row's first click — opens the detail pane unconditionally (never
+   *  closes it), so clicking a different row while the pane is already open keeps it open. */
+  (e: 'openDetail'): void;
   /** `Esc`: close the detail pane unconditionally. */
   (e: 'closeDetail'): void;
   /** `F5` or `Ctrl/Cmd+R` while this grid has focus. W10 owns the Refresh action itself. */
@@ -304,9 +307,11 @@ function toggleDateFormat(): void {
   emit('update:dateFormat', dateFormatRef.value);
 }
 
-/** §6.4: "onClick selects the row (and a second click on the selected row toggles the detail
- *  pane closed)". Clicking the date cell specifically also toggles its relative/absolute format
- *  (§6.2) — the two behaviours compose, since a date-cell click is still a row click. */
+/** G-UX D2 (item 1b): a click on an unselected row opens the detail pane on the FIRST click —
+ *  clicking the already-selected row still toggles it closed (the only mouse-only way to close
+ *  it, agreeing with `Esc` and the narrow-breakpoint drawer). Clicking the date cell specifically
+ *  also toggles its relative/absolute format (§6.2) — the two behaviours compose, since a
+ *  date-cell click is still a row click. */
 function handleClick(row: number, cell: number): void {
   const dateColumnIndex =
     grid?.getColumns().findIndex((column) => column.id === DATE_COLUMN_ID) ?? -1;
@@ -316,6 +321,7 @@ function handleClick(row: number, cell: number): void {
   props.selection.select(row);
   pendingFocusRow = row;
   if (wasSelected) emit('toggleDetail');
+  else emit('openDetail');
 }
 
 /** §6.4: "right-click selects the row [first]", then (P6 W14) opens `RowContextMenu.vue` at the
@@ -933,6 +939,12 @@ defineExpose({ scrollToRow, focusGrid, scrollToTopRow, getViewportTop });
   border: 0;
   width: 100%;
   background-color: transparent;
+  /* G-UX D2 (item 1b): every row opens/toggles the detail pane on click — the whole row reads as
+   *  clickable, not only `.kv-cell-date` (whose own `cursor: pointer` this cascades onto too,
+   *  `cursor` being an inherited property; that per-cell rule is removed once item 8 relocates
+   *  the date-format toggle off the cell entirely). `enableTextSelectionOnCells: true` still lets
+   *  a pointer-cursor row be drag-selected for its text. */
+  cursor: pointer;
 }
 
 .kv-commit-grid .slick-row:hover {

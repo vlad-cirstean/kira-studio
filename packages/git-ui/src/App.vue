@@ -1116,6 +1116,13 @@ function toggleDetail(): void {
   detailOpen.value = !detailOpen.value;
 }
 
+/** G-UX D2: a dedicated one-liner for `CommitGrid.vue`'s new `openDetail` emit (an unselected
+ *  row's first click) — never `toggleDetail`, so a click on a *different* row while the pane is
+ *  already open never closes it. */
+function openDetail(): void {
+  detailOpen.value = true;
+}
+
 /** §6.6's Esc ordering: an open menu, then the search results dropdown, then the detail pane/
  *  drawer (P11 W12/W13's spec edit 6, restated with this file's own share of it). The first two
  *  stages never reach here at all — `RowContextMenu.vue`'s and `SearchBox.vue`'s own `keydown`
@@ -1381,6 +1388,7 @@ onBeforeUnmount(() => {
               @update:date-format="dateFormat = $event"
               @scroll="scrollRow = $event"
               @toggle-detail="toggleDetail"
+              @open-detail="openDetail"
               @close-detail="closeDetail"
               @refresh="triggerRefresh"
               @context-menu="handleGridContextMenu"
