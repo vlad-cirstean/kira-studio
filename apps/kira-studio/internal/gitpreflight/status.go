@@ -140,3 +140,48 @@ func UnmergedPaths(result porcelain.StatusResult) []string {
 	}
 	return out
 }
+
+// DirtySplit ports repoService.ts's own dirtySplitFrom — the staged/unstaged/untracked split
+// ClassifyReset and ClassifyCherryPick both need, which DirtyPaths' own tracked/untracked
+// discrimination cannot make. An unmerged path counts as BOTH staged and unstaged — the XY code's
+// two halves can each be non-'.' on a real merge conflict, and there is no case in this phase's
+// scope where either classifier reaches this fold with one outstanding without inProgress already
+// blocking first.
+func DirtySplit(result porcelain.StatusResult) ResetDirty {
+	staged := []string{}
+	unstaged := []string{}
+	untracked := []string{}
+	for _, e := range result.Entries {
+		switch e.Kind {
+		case "ordinary", "renamed":
+			if e.Staged != '.' {
+				staged = append(staged, e.Path)
+			}
+			if e.Unstaged != '.' {
+				unstaged = append(unstaged, e.Path)
+			}
+		case "unmerged":
+			staged = append(staged, e.Path)
+			unstaged = append(unstaged, e.Path)
+		case "untracked":
+			untracked = append(untracked, e.Path)
+		case "ignored":
+		}
+	}
+	return ResetDirty{Staged: staged, Unstaged: unstaged, Untracked: untracked}
+}
+
+// StagedNewPaths ports stagedNewPathsFrom — probe 1's third finding: a staged-but-uncommitted NEW
+// file (status `A.`) reads as "added", not "modified". --hard destroys it exactly as it does a
+// staged edit, but it is neither DirtySplit's `unstaged` (nothing in the worktree differs from the
+// index) nor its `untracked` (the index already has it staged) list, so ClassifyReset's `destroys`
+// needs it as its own third input rather than reading it off either.
+func StagedNewPaths(result porcelain.StatusResult) []string {
+	out := []string{}
+	for _, e := range result.Entries {
+		if e.Kind == "ordinary" && e.Staged == 'A' {
+			out = append(out, e.Path)
+		}
+	}
+	return out
+}
