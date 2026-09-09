@@ -6,6 +6,7 @@ import (
 	"errors"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitclient/porcelain"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitpath"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitsession"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/ipcerr"
 )
@@ -39,9 +40,12 @@ func mapDetailError(err error) error {
 
 // entryFor resolves c's held RepoEntry for repoID, or ErrRepoNotHeld mapped the same way graph.*
 // already maps it (D18) — repo.open must precede every one of these four methods, exactly as it
-// must for every other per-repo request.
+// must for every other per-repo request. G27 D6: repoID is normalized to NFC here, at the layer
+// that owns wire ingestion — Registry.Entry stays a pure map lookup with no opinion about string
+// forms (D6's own rejected alternative), and a persisted pre-G27 client's un-normalized repoId
+// resolves against a post-G27 registry rather than erroring (F6).
 func entryFor(c *gitsession.Conn, repoID string) (*gitsession.RepoEntry, error) {
-	entry, ok := c.Entry(repoID)
+	entry, ok := c.Entry(gitpath.CleanNFC(repoID)) // G27 D6
 	if !ok {
 		return nil, mapConnError(gitsession.ErrRepoNotHeld)
 	}

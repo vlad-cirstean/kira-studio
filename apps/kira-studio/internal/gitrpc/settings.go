@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitpath"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitsession"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/ipcerr"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
@@ -34,7 +35,18 @@ func repoSettingsSnapshotFrom(s model.GitRepoSettings) RepoSettingsSnapshot {
 
 // toModel converts the wire's own dotted-key patch into storage/model's own patch shape — a plain
 // field-for-field rename, since both are already "every leaf optional" (D4's own doc comment).
+//
+// G27 D5d: WorktreeBasePath is a client-supplied directory parameter (D2 tier 1), normalized to
+// NFC when set to a non-empty value — nil (leave unset) and "" (explicitly reset to no override,
+// storage/repos.gitreposettings_test.go's own precedent) both stay exactly as the client sent
+// them; CleanNFC("") would turn a deliberate reset into ".", which is not what an empty patch
+// value means here.
 func (p RepoSettingsPatchWire) toModel() model.GitRepoSettingsPatch {
+	worktreeBasePath := p.WorktreeBasePath
+	if worktreeBasePath != nil && *worktreeBasePath != "" {
+		v := gitpath.CleanNFC(*worktreeBasePath)
+		worktreeBasePath = &v
+	}
 	return model.GitRepoSettingsPatch{
 		GraphPageSize:         p.GraphPageSize,
 		GraphScope:            p.GraphScope,
@@ -45,7 +57,7 @@ func (p RepoSettingsPatchWire) toModel() model.GitRepoSettingsPatch {
 		LogLevel:              p.LogLevel,
 		GithubEnabled:         p.GithubEnabled,
 		WorktreePrepareScript: p.WorktreePrepareScript,
-		WorktreeBasePath:      p.WorktreeBasePath,
+		WorktreeBasePath:      worktreeBasePath,
 	}
 }
 
@@ -99,6 +111,11 @@ func (r *Router) handleSettingsSetGitPath(_ context.Context, params json.RawMess
 	}
 	if r.deps.SetGitPath == nil {
 		return nil, ipcerr.New("E_INTERNAL", "gitrpc: settings.setGitPath: not wired")
+	}
+	// G27 D5d: a client-supplied directory parameter (D2 tier 1) -- normalized when non-empty; ""
+	// (clear the override, fall back to auto-discovery) stays "" rather than becoming ".".
+	if p.GitPath != "" {
+		p.GitPath = gitpath.CleanNFC(p.GitPath)
 	}
 	if err := r.deps.SetGitPath(p.GitPath); err != nil {
 		return nil, ipcerr.New("E_INTERNAL", "gitrpc: settings.setGitPath: "+err.Error())

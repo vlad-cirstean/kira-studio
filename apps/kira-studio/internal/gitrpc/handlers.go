@@ -7,6 +7,7 @@ import (
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitaskpass"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitclient"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitpath"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitsession"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/ipcerr"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/notify"
@@ -227,6 +228,7 @@ func (r *Router) handleRepoOpen(ctx context.Context, c *gitsession.Conn, params 
 	if p.Path == "" {
 		return nil, ipcerr.BadRequest("gitrpc: repo.open: path is required")
 	}
+	p.Path = gitpath.CleanNFC(p.Path) // G27 D5d: a client-supplied directory param (D2 tier 1).
 
 	status := r.deps.Discovery.Status(ctx, gitPathFrom(r.deps.Registry))
 	if status.Kind != "ok" {

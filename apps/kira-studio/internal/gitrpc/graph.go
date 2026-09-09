@@ -7,6 +7,7 @@ import (
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitclient/logsession"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitclient/porcelain"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitpath"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitsession"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitstore"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/ipcerr"
@@ -176,7 +177,7 @@ func (r *Router) handleGraphRefresh(_ context.Context, c *gitsession.Conn, param
 // threaded into both branches — the range branch already needed it for the range-count peek; the
 // non-ranged branch now needs it too, for G18 D6's own per-repo scope/pageSize defaults.
 func resolveWalkRequest(c *gitsession.Conn, repoID string, rng *CommitRangeParams, scope string, pageSize *int) (porcelain.WalkSpec, int, *int, error) {
-	entry, _ := c.Entry(repoID) // nil, ok=false when unheld — c.Walk below rejects that case itself.
+	entry, _ := c.Entry(gitpath.CleanNFC(repoID)) // G27 D6; nil, ok=false when unheld — c.Walk below rejects that case itself.
 
 	if rng == nil {
 		spec, size := walkSpecFrom(entry, scope, pageSize)

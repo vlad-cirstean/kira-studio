@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitpath"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitsession"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/ipcerr"
 )
@@ -47,6 +48,7 @@ func (r *Router) handlePreflightWorktreeAdd(ctx context.Context, c *gitsession.C
 	if p.RepoID == "" || p.Path == "" || (p.Mode != "existingBranch" && p.Mode != "newBranch" && p.Mode != "detach") {
 		return nil, ipcerr.BadRequest("gitrpc: preflight.worktreeAdd: repoId, path and a valid mode are required")
 	}
+	p.Path = gitpath.CleanNFC(p.Path) // G27 D5d: a client-supplied directory param (D2 tier 1).
 	entry, err := entryFor(c, p.RepoID)
 	if err != nil {
 		return nil, err
@@ -68,6 +70,7 @@ func (r *Router) handlePreflightWorktreeRemove(ctx context.Context, c *gitsessio
 	if p.RepoID == "" || p.Path == "" {
 		return nil, ipcerr.BadRequest("gitrpc: preflight.worktreeRemove: repoId and path are required")
 	}
+	p.Path = gitpath.CleanNFC(p.Path) // G27 D5d: a client-supplied directory param (D2 tier 1).
 	entry, err := entryFor(c, p.RepoID)
 	if err != nil {
 		return nil, err
@@ -92,6 +95,7 @@ func (r *Router) handleWorktreePrepare(ctx context.Context, c *gitsession.Conn, 
 	if p.RepoID == "" || p.Path == "" || p.ScriptSha256 == "" {
 		return nil, ipcerr.BadRequest("gitrpc: worktree.prepare: repoId, path and scriptSha256 are required")
 	}
+	p.Path = gitpath.CleanNFC(p.Path) // G27 D5d: a client-supplied directory param (D2 tier 1).
 	entry, err := entryFor(c, p.RepoID)
 	if err != nil {
 		return nil, err
