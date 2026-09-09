@@ -74,6 +74,22 @@ export class PendingFrameOverflowError extends Error {
   }
 }
 
+/** Thrown (and the socket destroyed) when a well-framed, correctly-parsed message's own delivery
+ *  throws — `JSON.parse` on a malformed body, or the subscriber itself (the RPC client's own
+ *  `ContractVersionMismatchError`/`ContractShapeError`/`TransportError`, thrown synchronously from
+ *  inside `handleFrame`). G30 round-1 architecture/security review, finding #8: this used to be
+ *  entirely uncaught for a plain (non-blob) frame — the throw unwound out of the `for(;;)` drain
+ *  loop, stranding every OTHER complete frame already sitting in `recvBuffer` from the same read
+ *  until more bytes arrived, an indefinite hang on an otherwise-idle connection. Destroying here
+ *  matches the blob branch's own existing posture (a header/body it cannot make sense of already
+ *  destroys) rather than leaving the loop to strand the rest of the buffer. */
+export class FrameDeliveryError extends Error {
+  constructor(reason: string) {
+    super(`socketChannel: frame delivery failed: ${reason}`);
+    this.name = 'FrameDeliveryError';
+  }
+}
+
 const BLOB_FRAME_DISCRIMINANT = 0x00;
 const BLOB_HEADER_LEN_OFFSET = 1;
 const BLOB_HEADER_START = 5; // 1 discriminant byte + 4-byte big-endian header length.
@@ -187,7 +203,12 @@ export function createSocketChannel(socket: Socket): SocketChannel {
           return;
         }
       } else {
-        deliver(JSON.parse(body.toString('utf8')));
+        try {
+          deliver(JSON.parse(body.toString('utf8')));
+        } catch (err) {
+          socket.destroy(err instanceof Error ? err : new FrameDeliveryError(String(err)));
+          return;
+        }
       }
     }
   });
