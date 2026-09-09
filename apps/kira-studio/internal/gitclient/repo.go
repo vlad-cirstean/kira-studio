@@ -3,9 +3,10 @@ package gitclient
 import (
 	"context"
 	"errors"
-	"path/filepath"
 	"strings"
 	"sync"
+
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitpath"
 )
 
 // HeadState is the wire shape crossing as RepoSummary.Head — structurally matching @kira/git-ipc's
@@ -176,8 +177,12 @@ func Identify(ctx context.Context, runner Runner, gitPath, path string) (RepoSum
 	if err != nil {
 		return RepoSummary{}, err
 	}
-	gitDir = filepath.Clean(gitDir)
-	commonDir = filepath.Clean(commonDir)
+	// G27 D5a: gitDir/commonDir/root are canonicalized to NFC, not just Cleaned -- they are
+	// absolute directory paths (D2 tier 1), and RepoID (below) derives from root/gitDir, so this
+	// one edit is what keeps two on-disk spellings of the same repository from producing two
+	// RepoEntry's worth of registry keys, watchers, and cat-file processes (F5).
+	gitDir = gitpath.CleanNFC(gitDir)
+	commonDir = gitpath.CleanNFC(commonDir)
 
 	root := ""
 	if !isBare {
@@ -185,7 +190,7 @@ func Identify(ctx context.Context, runner Runner, gitPath, path string) (RepoSum
 		if err != nil {
 			return RepoSummary{}, err
 		}
-		root = filepath.Clean(root)
+		root = gitpath.CleanNFC(root)
 	}
 
 	head, err := ResolveHead(ctx, runner, gitPath, path)
@@ -193,6 +198,10 @@ func Identify(ctx context.Context, runner Runner, gitPath, path string) (RepoSum
 		return RepoSummary{}, err
 	}
 
+	// repoID is normalized for free by the gitpath.CleanNFC calls above -- root and gitDir are
+	// both already NFC by the time this reads them, which is what makes RepoID a stable registry/
+	// DB key across two on-disk spellings of one repository (G27 D5a/F5).
+	//
 	// D7: RepoID is the worktree root for a non-bare repo, the git dir for a bare one. `repo.open`
 	// is fed a repoId straight back as a path on rehydration (App.vue's own persisted-state path,
 	// and the KIRA_REPO dev seed) — Identify(root) works, Identify(gitDir) does not

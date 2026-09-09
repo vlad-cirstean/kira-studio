@@ -374,3 +374,67 @@ func TestIdentify_NotARepository(t *testing.T) {
 // Client.OpenRepo/CloseRepo no longer exist (D18): repo lifecycle is gitrpc+gitsession's job now.
 // The equivalent behaviour (gitUnavailable short-circuit, ok, notARepository) is proven end to end
 // over the real socket in gitsock's integration tests.
+
+// --- G27 D5a: Identify normalizes Root/GitDir/CommonDir (and therefore RepoID) to NFC ----------
+
+// argvScriptedRunner scripts a distinct Result per rev-parse/symbolic-ref invocation, keyed on the
+// joined Args — Identify makes several rev-parse calls in sequence (is-bare-repository, the two
+// absolute-dir queries, show-toplevel, and ResolveHead's own symbolic-ref/rev-parse pair), each
+// needing different scripted output, which the single-Result fakeRunner in discovery_test.go
+// cannot express.
+type argvScriptedRunner struct {
+	byArgs map[string]Result
+}
+
+func (r *argvScriptedRunner) Start(_ context.Context, _ string, spec Spec) (Process, error) {
+	key := strings.Join(spec.Args, " ")
+	res, ok := r.byArgs[key]
+	if !ok {
+		panic("argvScriptedRunner: no scripted result for " + key)
+	}
+	return &fakeProcess{result: res}, nil
+}
+
+func TestIdentify_DecomposedRevParseOutputComposesEverything(t *testing.T) {
+	// The "e" + U+0301 COMBINING ACUTE ACCENT spelling of "é" (P3), used throughout so the fake
+	// rev-parse output looks like what an NFD-producing filesystem would actually hand back.
+	decomposedE := string([]byte{0x65, 0xcc, 0x81})
+	composedE := string([]byte{0xc3, 0xa9})
+
+	decomposedRoot := "/Users/Jos" + decomposedE + "/dev/caf" + decomposedE
+	composedRoot := "/Users/Jos" + composedE + "/dev/caf" + composedE
+	decomposedGitDir := decomposedRoot + "/.git"
+	composedGitDir := composedRoot + "/.git"
+
+	runner := &argvScriptedRunner{byArgs: map[string]Result{
+		"rev-parse --is-bare-repository":                      {Stdout: []byte("false\n")},
+		"rev-parse --path-format=absolute --absolute-git-dir": {Stdout: []byte(decomposedGitDir + "\n")},
+		"rev-parse --path-format=absolute --git-common-dir":   {Stdout: []byte(decomposedGitDir + "\n")},
+		"rev-parse --show-toplevel":                           {Stdout: []byte(decomposedRoot + "\n")},
+		"symbolic-ref --short -q HEAD":                        {Stdout: []byte("main\n"), ExitCode: 0},
+		"rev-parse -q --verify HEAD":                          {Stdout: []byte("deadbeef\n"), ExitCode: 0},
+	}}
+
+	summary, err := Identify(context.Background(), runner, "/usr/bin/git", decomposedRoot)
+	if err != nil {
+		t.Fatalf("Identify: %v", err)
+	}
+	if summary.Root != composedRoot {
+		t.Errorf("Root = %q, want composed %q", summary.Root, composedRoot)
+	}
+	if summary.GitDir != composedGitDir {
+		t.Errorf("GitDir = %q, want composed %q", summary.GitDir, composedGitDir)
+	}
+	if summary.CommonDir != composedGitDir {
+		t.Errorf("CommonDir = %q, want composed %q", summary.CommonDir, composedGitDir)
+	}
+	if summary.RepoID != composedRoot {
+		t.Errorf("RepoID = %q, want composed %q", summary.RepoID, composedRoot)
+	}
+	// GitDir == CommonDir here (a main, non-linked worktree) — IsLinkedWorktree's own
+	// gitDir != commonDir comparison must still land on "not linked" once both are composed the
+	// same way, not "linked" because one composed and the other didn't.
+	if summary.IsLinkedWorktree {
+		t.Error("IsLinkedWorktree = true, want false — GitDir and CommonDir compose to the same string")
+	}
+}
