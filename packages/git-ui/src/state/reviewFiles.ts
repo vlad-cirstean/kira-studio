@@ -164,8 +164,15 @@ export class ReviewFilesState {
     const entry = this.files.value.find((e) => e.change.path === path);
     if (!entry) return;
     const change = entry.change;
+    // G30 round-1 functional-correctness review, finding #3: this used to read the shared
+    // `reviewedAtSha` ref, which #loadDiff (fired concurrently, not awaited — see selectFile)
+    // only populates from ITS OWN response, arriving after this runs. On the very first click
+    // after setTarget, or on the file switch immediately following one, that ref still held
+    // either nothing or the PREVIOUS file's own sha, sending "since review" open requests against
+    // the wrong revision. `entry.review.reviewedAtSha` is this file's own value, already in hand
+    // from the file list — no race, no dependency on #loadDiff's timing.
     const sinceReview =
-      this.diffMode.value === 'sinceReview' ? this.reviewedAtSha.value : undefined;
+      this.diffMode.value === 'sinceReview' ? entry.review.reviewedAtSha : undefined;
     const leftRev = sinceReview ?? this.#mergeBase;
     const leftLabel = sinceReview ? 'your last review' : target.base;
     await this.#bridge.request('editor.openRangeDiff', {
