@@ -56,7 +56,14 @@ const dateText = computed(() =>
   commit.value ? formatRelativeDate(commit.value.committer.timestamp) : '',
 );
 
-function onRowClick(): void {
+/** G-UX D5 (item 5): the row-action cluster (Open all changes, Open in graph) sits inside this
+ *  header; a click on it is not a request to expand the row. Guarded here rather than stopped at
+ *  each action, because one of those actions is a `command:` anchor VS Code's own bubble-phase
+ *  link interceptor must be allowed to see — a `stopPropagation()` on the anchor itself (the old
+ *  shape) prevents that interceptor from ever observing the click, so the command URI is never
+ *  delivered to the host (F6). */
+function onRowClick(event: MouseEvent): void {
+  if ((event.target as Element | null)?.closest('.kv-review-row-actions')) return;
   emit('focus-row');
   emit('toggle');
 }
@@ -112,8 +119,9 @@ function onMenuSelect(id: string): void {
 // no announcement, no error surface, no partial-success reporting. This awaits the single host
 // round trip and announces the real outcome either way. Needs the commit already expanded (its
 // file list fetched); an unexpanded row announces why instead of silently doing nothing.
-async function openAllChanges(event: MouseEvent): Promise<void> {
-  event.stopPropagation();
+async function openAllChanges(): Promise<void> {
+  // G-UX D5: stopPropagation() here is now redundant with (and removed in favour of) onRowClick's
+  // own .kv-review-row-actions guard above -- one rule for the whole action cluster.
   const exp = props.expansion;
   const files = exp?.detail.detail.value?.files;
   if (!exp || !files) {
@@ -219,12 +227,16 @@ function onOpenFile(index: number, pinned: boolean): void {
           aria-label="Open all changes"
           @click="openAllChanges"
         />
+        <!-- G-UX D5 (item 5): no @click.stop -- a stopPropagation() on this anchor's own listener
+             prevents VS Code's bubble-phase link interceptor (registered on the webview document)
+             from ever observing the click, so the command: URI is never delivered to the host
+             (F6). onRowClick's own .kv-review-row-actions guard above is what keeps this click
+             from also toggling the row -- the correct fix reaches up the tree, not down. -->
         <a
           class="kv-review-row-action"
           v-kui-tooltip="'Open in graph'"
           aria-label="Open in graph"
           :href="openInGraphHref"
-          @click.stop
         >
           <span class="codicon codicon-git-commit" aria-hidden="true"></span>
         </a>
