@@ -103,6 +103,10 @@ func TestClassifyCheckout_BothBlockerKindsSuppressRoutes(t *testing.T) {
 	}
 }
 
+// TestClassifyCheckout_StashAvailableAddsRoute is widened at G28 D2: a tracked-only block with
+// StashAvailable now also offers "autoStash" alongside "discard"/"stashAndCarry" — all three
+// routes clear a tracked-only block, and the classifier reports every one that applies rather than
+// picking among them (D16's routing policy is what actually chooses, client-side).
 func TestClassifyCheckout_StashAvailableAddsRoute(t *testing.T) {
 	got := gitpreflight.ClassifyCheckout(gitpreflight.ClassifyCheckoutInput{
 		Target: branchTarget("topic"), Mode: "switch",
@@ -110,7 +114,7 @@ func TestClassifyCheckout_StashAvailableAddsRoute(t *testing.T) {
 		Rewritten:      []string{"conflict.txt"},
 		StashAvailable: true,
 	})
-	if !reflect.DeepEqual(got.Routes, []string{"discard", "stashAndCarry"}) {
+	if !reflect.DeepEqual(got.Routes, []string{"discard", "stashAndCarry", "autoStash"}) {
 		t.Fatalf("routes = %v", got.Routes)
 	}
 	// The false case, asserted alongside so the two states are seen together (D18).
@@ -122,6 +126,125 @@ func TestClassifyCheckout_StashAvailableAddsRoute(t *testing.T) {
 	})
 	if !reflect.DeepEqual(gotFalse.Routes, []string{"discard"}) {
 		t.Fatalf("routes = %v, want only discard", gotFalse.Routes)
+	}
+}
+
+// TestClassifyCheckout_AutoStash_TrackedOnlyUntrackedOnlyAndBoth is G28 D2's own route table
+// (§7.1 item 4): "autoStash" is offered for a tracked-only, an untracked-only, AND a both-kinds
+// dirty block — unlike "discard"/"stashAndCarry", which the untracked case suppresses entirely
+// (probe P9), "stash push -u" (probe P15) is the one argv that clears every dirty-tree blocker, so
+// this route does not share their restriction.
+func TestClassifyCheckout_AutoStash_TrackedOnlyUntrackedOnlyAndBoth(t *testing.T) {
+	trackedOnly := gitpreflight.ClassifyCheckout(gitpreflight.ClassifyCheckoutInput{
+		Target: branchTarget("topic"), Mode: "switch",
+		Dirty: []gitpreflight.DirtyPath{{Path: "t.txt", Tracked: true}}, Rewritten: []string{"t.txt"},
+		StashAvailable: true,
+	})
+	if !containsRoute(trackedOnly.Routes, "autoStash") {
+		t.Fatalf("tracked-only routes = %v, want autoStash present", trackedOnly.Routes)
+	}
+
+	untrackedOnly := gitpreflight.ClassifyCheckout(gitpreflight.ClassifyCheckoutInput{
+		Target: branchTarget("topic"), Mode: "switch",
+		Dirty: []gitpreflight.DirtyPath{{Path: "u.txt", Tracked: false}}, Rewritten: []string{"u.txt"},
+		StashAvailable: true,
+	})
+	if !reflect.DeepEqual(untrackedOnly.Routes, []string{"autoStash"}) {
+		t.Fatalf("untracked-only routes = %v, want exactly [autoStash] (discard/stashAndCarry stay suppressed, probe P9)", untrackedOnly.Routes)
+	}
+
+	both := gitpreflight.ClassifyCheckout(gitpreflight.ClassifyCheckoutInput{
+		Target: branchTarget("topic"), Mode: "switch",
+		Dirty: []gitpreflight.DirtyPath{
+			{Path: "t.txt", Tracked: true}, {Path: "u.txt", Tracked: false},
+		},
+		Rewritten: []string{"t.txt", "u.txt"}, StashAvailable: true,
+	})
+	if !reflect.DeepEqual(both.Routes, []string{"autoStash"}) {
+		t.Fatalf("both-kinds routes = %v, want exactly [autoStash]", both.Routes)
+	}
+}
+
+func containsRoute(routes []string, want string) bool {
+	for _, r := range routes {
+		if r == want {
+			return true
+		}
+	}
+	return false
+}
+
+// TestClassifyCheckout_AutoStash_NeverWithInProgressOrStashUnavailable is G28 D2's own negative
+// case (§7.1 item 4): an in-progress operation, or StashAvailable:false, produce neither new route
+// — even with a dirty block present that would otherwise qualify.
+func TestClassifyCheckout_AutoStash_NeverWithInProgressOrStashUnavailable(t *testing.T) {
+	op := &gitpreflight.InProgressOperation{Kind: gitpreflight.InProgressMerge, ConflictedPaths: []string{}}
+	withInProgress := gitpreflight.ClassifyCheckout(gitpreflight.ClassifyCheckoutInput{
+		Target: branchTarget("topic"), Mode: "switch", InProgress: op,
+		Dirty: []gitpreflight.DirtyPath{{Path: "t.txt", Tracked: true}}, Rewritten: []string{"t.txt"},
+		StashAvailable: true,
+	})
+	if containsRoute(withInProgress.Routes, "autoStash") {
+		t.Fatalf("routes = %v, must not contain autoStash while an operation is in progress (F15)", withInProgress.Routes)
+	}
+
+	withoutStash := gitpreflight.ClassifyCheckout(gitpreflight.ClassifyCheckoutInput{
+		Target: branchTarget("topic"), Mode: "switch",
+		Dirty: []gitpreflight.DirtyPath{{Path: "t.txt", Tracked: true}}, Rewritten: []string{"t.txt"},
+		StashAvailable: false,
+	})
+	if containsRoute(withoutStash.Routes, "autoStash") {
+		t.Fatalf("routes = %v, must not contain autoStash when StashAvailable is false", withoutStash.Routes)
+	}
+}
+
+// TestClassifyCheckout_DetachHere_WorktreeConflictAlone_SwitchToBranch is G28 D6's own positive
+// case: a switch-mode request to a branch target whose sole blocker is a worktree conflict offers
+// "detachHere".
+func TestClassifyCheckout_DetachHere_WorktreeConflictAlone_SwitchToBranch(t *testing.T) {
+	path := "/elsewhere"
+	got := gitpreflight.ClassifyCheckout(gitpreflight.ClassifyCheckoutInput{
+		Target: branchTarget("topic"), Mode: "switch", CheckedOutIn: &path,
+	})
+	if !reflect.DeepEqual(got.Routes, []string{"detachHere"}) {
+		t.Fatalf("routes = %v, want exactly [detachHere]", got.Routes)
+	}
+}
+
+// TestClassifyCheckout_DetachHere_ComposesWithAutoStash is plan §3.8's own "worktree conflict +
+// dirty -> BOTH routes" case: a target simultaneously checked out elsewhere AND dirty-blocked
+// offers both routes — they compose client-side (D16) into one re-issued request, this classifier
+// only reports each is individually available.
+func TestClassifyCheckout_DetachHere_ComposesWithAutoStash(t *testing.T) {
+	path := "/elsewhere"
+	got := gitpreflight.ClassifyCheckout(gitpreflight.ClassifyCheckoutInput{
+		Target: branchTarget("topic"), Mode: "switch", CheckedOutIn: &path,
+		Dirty: []gitpreflight.DirtyPath{{Path: "t.txt", Tracked: true}}, Rewritten: []string{"t.txt"},
+		StashAvailable: true,
+	})
+	if !containsRoute(got.Routes, "detachHere") || !containsRoute(got.Routes, "autoStash") {
+		t.Fatalf("routes = %v, want both detachHere and autoStash present", got.Routes)
+	}
+}
+
+// TestClassifyCheckout_DetachHere_NeverForDetachModeOrNonBranchTarget is G28 D6's own negative
+// cases: an explicit detach-mode request is already the thing detachHere would do (offering it
+// would route to an outcome already asked for), and a tag/sha target already detaches
+// unconditionally — detachHere is meaningless for either.
+func TestClassifyCheckout_DetachHere_NeverForDetachModeOrNonBranchTarget(t *testing.T) {
+	path := "/elsewhere"
+	detachMode := gitpreflight.ClassifyCheckout(gitpreflight.ClassifyCheckoutInput{
+		Target: branchTarget("topic"), Mode: "detach", CheckedOutIn: &path,
+	})
+	if containsRoute(detachMode.Routes, "detachHere") {
+		t.Fatalf("routes = %v, must not contain detachHere under an explicit mode:detach request", detachMode.Routes)
+	}
+
+	shaTarget := gitpreflight.ClassifyCheckout(gitpreflight.ClassifyCheckoutInput{
+		Target: gitpreflight.CheckoutTarget{Kind: "sha", Name: "abc1234"}, Mode: "switch", CheckedOutIn: &path,
+	})
+	if containsRoute(shaTarget.Routes, "detachHere") {
+		t.Fatalf("routes = %v, must not contain detachHere for a sha target", shaTarget.Routes)
 	}
 }
 

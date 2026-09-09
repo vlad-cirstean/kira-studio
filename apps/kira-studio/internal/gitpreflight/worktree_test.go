@@ -35,6 +35,9 @@ func TestClassifyWorktreeAdd_PathExists(t *testing.T) {
 	}
 }
 
+// TestClassifyWorktreeAdd_BranchCheckedOutElsewhere is widened at G28 D7: when
+// branchCheckedOutElsewhere is the SOLE blocker, Routes offers "detachHere" — closing G25 §9's own
+// named hand-forward.
 func TestClassifyWorktreeAdd_BranchCheckedOutElsewhere(t *testing.T) {
 	elsewhere := "/repos/other-wt"
 	got := gitpreflight.ClassifyWorktreeAdd(gitpreflight.ClassifyWorktreeAddInput{
@@ -47,6 +50,52 @@ func TestClassifyWorktreeAdd_BranchCheckedOutElsewhere(t *testing.T) {
 	b := got.Blockers[0]
 	if b.Kind != "branchCheckedOutElsewhere" || b.Branch != "feature" || b.WorktreePath != elsewhere {
 		t.Fatalf("blocker = %+v", b)
+	}
+	if len(got.Routes) != 1 || got.Routes[0] != "detachHere" {
+		t.Fatalf("Routes = %v, want exactly [detachHere] (D7's sole-blocker case)", got.Routes)
+	}
+}
+
+// TestClassifyWorktreeAdd_DetachHere_SuppressedAlongsideAnotherBlocker is D7's own negative case:
+// branchCheckedOutElsewhere alongside ANY other blocker withholds the route — detaching cannot fix
+// an invalid path, an existing path, an existing branch name, or an unresolved start point.
+func TestClassifyWorktreeAdd_DetachHere_SuppressedAlongsideAnotherBlocker(t *testing.T) {
+	elsewhere := "/repos/other-wt"
+	got := gitpreflight.ClassifyWorktreeAdd(gitpreflight.ClassifyWorktreeAddInput{
+		Path: "/repos/wt", Mode: "existingBranch", Branch: "feature",
+		BranchCheckedOutElsewhere: &elsewhere, StartPointResolves: true,
+		PathExists: true,
+	})
+	if len(got.Blockers) != 2 {
+		t.Fatalf("got %+v, want 2 blockers (pathExists, branchCheckedOutElsewhere)", got)
+	}
+	if len(got.Routes) != 0 {
+		t.Fatalf("Routes = %v, want none when branchCheckedOutElsewhere is not the sole blocker", got.Routes)
+	}
+}
+
+// TestClassifyWorktreeAdd_DetachHere_NeverForDetachMode proves detachHere is meaningless (and
+// never offered) for a request already in detach mode — ClassifyWorktreeAddInput's own
+// BranchCheckedOutElsewhere is defined only for existingBranch mode anyway (D4), so this proves the
+// route stays empty rather than depending on that convention alone.
+func TestClassifyWorktreeAdd_DetachHere_NeverForDetachMode(t *testing.T) {
+	got := gitpreflight.ClassifyWorktreeAdd(gitpreflight.ClassifyWorktreeAddInput{
+		Path: "/repos/wt", Mode: "detach", StartPoint: "abc123", StartPointResolves: true,
+	})
+	if len(got.Routes) != 0 {
+		t.Fatalf("Routes = %v, want none for a clean detach-mode request", got.Routes)
+	}
+}
+
+// TestClassifyWorktreeAdd_RoutesNeverNil proves the empty-slice-never-nil convention this package
+// follows elsewhere (Blockers/Notes) also holds for Routes.
+func TestClassifyWorktreeAdd_RoutesNeverNil(t *testing.T) {
+	got := gitpreflight.ClassifyWorktreeAdd(gitpreflight.ClassifyWorktreeAddInput{
+		Path: "/repos/wt", Mode: "newBranch", Branch: "topic", StartPoint: "main",
+		StartPointResolves: true,
+	})
+	if got.Routes == nil {
+		t.Fatal("Routes is nil, want a non-nil empty slice")
 	}
 }
 

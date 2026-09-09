@@ -35,6 +35,12 @@ type WorktreeAddPreflight struct {
 	Blockers []WorktreeAddBlocker `json:"blockers"`
 	Notes    []WorktreeAddNote    `json:"notes"`
 	Verdict  string               `json:"verdict"` // "clean" | "blocked"
+	// Routes is G28 D7's own addition, closing G25 §9's own named hand-forward: "detachHere" is
+	// offered iff branchCheckedOutElsewhere is the SOLE blocker — unlike checkout's own automatic
+	// detach (D6), this one is OFFERED via a dialog button, never taken automatically, since
+	// `worktree add` is an explicit creation act with a dialog already open and carries no "never
+	// blocks" promise to keep. Never nil (an empty slice, this package's own convention elsewhere).
+	Routes []string `json:"routes"`
 }
 
 // ClassifyWorktreeAddInput is ClassifyWorktreeAdd's own input — every fact gathered host-side
@@ -116,9 +122,19 @@ func ClassifyWorktreeAdd(in ClassifyWorktreeAddInput) WorktreeAddPreflight {
 		verdict = "blocked"
 	}
 
+	// G28 D7: offered iff branchCheckedOutElsewhere is the ONLY blocker present — unlike checkout's
+	// own detachHere route (D2/D6), which composes freely with a simultaneous dirty-tree block,
+	// worktree add's own blockers (invalidPath, pathExists, branchExists, unknownStartPoint) name
+	// problems detaching cannot fix at all, so offering the route alongside any of them would be
+	// offering a button that cannot actually succeed.
+	routes := []string{}
+	if len(blockers) == 1 && blockers[0].Kind == "branchCheckedOutElsewhere" {
+		routes = append(routes, "detachHere")
+	}
+
 	return WorktreeAddPreflight{
 		Path: in.Path, Mode: in.Mode, Branch: in.Branch,
-		Blockers: blockers, Notes: notes, Verdict: verdict,
+		Blockers: blockers, Notes: notes, Verdict: verdict, Routes: routes,
 	}
 }
 

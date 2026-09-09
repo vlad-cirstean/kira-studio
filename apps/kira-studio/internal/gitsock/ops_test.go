@@ -382,8 +382,10 @@ func TestIntegration_CheckoutPreflightAndRun(t *testing.T) {
 	// G17 D8: StashAvailable is now unconditionally true, so a tracked-only block also offers
 	// "stashAndCarry" alongside "discard" (ClassifyCheckout's own rule — an untracked block still
 	// suppresses both, per the blockedByUntracked case below, which is unaffected by this flip).
-	if len(tracked.Routes) != 2 || tracked.Routes[0] != "discard" || tracked.Routes[1] != "stashAndCarry" {
-		t.Fatalf("routes = %v, want [discard stashAndCarry]", tracked.Routes)
+	// G28 D2: a tracked-only block ALSO now offers "autoStash" (the one route that clears both
+	// dirty-blocker kinds, F5/probe P15) alongside the other two.
+	if len(tracked.Routes) != 3 || tracked.Routes[0] != "discard" || tracked.Routes[1] != "stashAndCarry" || tracked.Routes[2] != "autoStash" {
+		t.Fatalf("routes = %v, want [discard stashAndCarry autoStash]", tracked.Routes)
 	}
 	runGitIn(t, f.dir, "checkout", "-q", "--", "conflict.txt")
 
@@ -397,8 +399,11 @@ func TestIntegration_CheckoutPreflightAndRun(t *testing.T) {
 	if untracked.Verdict != "blocked" || !hasCheckoutBlocker(untracked.Blockers, "blockedByUntracked") {
 		t.Fatalf("blockedByUntracked: %+v", untracked)
 	}
-	if len(untracked.Routes) != 0 {
-		t.Fatalf("routes = %v, want none (probe P9: discard cannot clear an untracked block)", untracked.Routes)
+	// G28 D2: "discard"/"stashAndCarry" stay suppressed (probe P9), but "autoStash" is now offered
+	// even for an untracked-only block -- `stash push -u` is the one argv proven to clear it
+	// (F5/probe P15).
+	if len(untracked.Routes) != 1 || untracked.Routes[0] != "autoStash" {
+		t.Fatalf("routes = %v, want exactly [autoStash]", untracked.Routes)
 	}
 	if err := os.Remove(filepath.Join(f.dir, "conflict.txt")); err != nil {
 		t.Fatalf("remove: %v", err)
@@ -413,6 +418,11 @@ func TestIntegration_CheckoutPreflightAndRun(t *testing.T) {
 		if b.Kind == "worktreeConflict" && b.Branch != "feature2" {
 			t.Fatalf("worktreeConflict blocker branch = %q, want feature2", b.Branch)
 		}
+	}
+	// G28 D6: a switch to a branch target whose sole blocker is worktreeConflict offers
+	// "detachHere" over the real wire, not just the pure classifier's own unit tests.
+	if len(wc.Routes) != 1 || wc.Routes[0] != "detachHere" {
+		t.Fatalf("routes = %v, want exactly [detachHere]", wc.Routes)
 	}
 
 	// The real switch: op.run performing the checkout, its OWN reply naming the new head — read

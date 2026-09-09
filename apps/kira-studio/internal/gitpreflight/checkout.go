@@ -34,7 +34,11 @@ type CheckoutPreflight struct {
 	Carried         []string          `json:"carried"`
 	Blockers        []CheckoutBlocker `json:"blockers"`
 	Verdict         string            `json:"verdict"` // "clean" | "cleanCarry" | "blocked"
-	Routes          []string          `json:"routes"`  // "discard" | "stashAndCarry"
+	// Routes: "discard" | "stashAndCarry" | "autoStash" | "detachHere" (G28 D2 adds the latter
+	// two). The classifier's own verdict semantics do NOT change when either is present — verdict
+	// stays "blocked", because that is what git itself would do; whether the app routes around the
+	// refusal is policy, and policy lives client-side (D16), not in this pure function.
+	Routes []string `json:"routes"`
 }
 
 // ClassifyCheckoutInput is ClassifyCheckout's own input — a direct port of preflight/checkout.ts's
@@ -119,6 +123,31 @@ func ClassifyCheckout(in ClassifyCheckoutInput) CheckoutPreflight {
 		if in.StashAvailable {
 			routes = append(routes, "stashAndCarry")
 		}
+	}
+	// G28 D2: autoStash is the ONLY route that clears an untracked block too (F5/probe P15: `stash
+	// push -u` is the one argv proven to clear both blocker classes in one write) — so, unlike
+	// "discard"/"stashAndCarry" above, it is offered whenever EITHER dirty blocker is present, not
+	// only the tracked-only case. Withheld when an operation is already in progress (F15/probe P17:
+	// `stash push` mid-conflict fails with empty stderr, which the host-side gate in prepareCheckout
+	// refuses before ever building this argv — the route itself must not be offered for a state
+	// where taking it would only produce an unclassifiable failure).
+	if in.StashAvailable && in.InProgress == nil && (len(trackedBlocked) > 0 || len(untrackedBlocked) > 0) {
+		routes = append(routes, "autoStash")
+	}
+	// G28 D6: offered whenever the worktree-conflict blocker is present, for a switch to a
+	// branch/remote-branch target — a tag or raw-sha target already detaches on its own (Detaches
+	// below), and an explicit detach-mode request is already the thing this route would do, so
+	// offering it there would be a route to an outcome the caller already asked for. Probe P14:
+	// `git switch --detach <branch>` succeeds where a plain switch fails with exit 128 against a
+	// branch checked out in another worktree. Deliberately independent of trackedBlocked/
+	// untrackedBlocked (plan §3.8's own "worktree conflict + dirty -> BOTH routes" case): a target
+	// can be simultaneously checked out elsewhere AND have a dirty tree that would be overwritten,
+	// and the two routes compose client-side (D16) into one re-issued request carrying both
+	// mode:'detach' and autoStash:true — this classifier only needs to report that each is
+	// individually available, not resolve their interaction.
+	if in.CheckedOutIn != nil && in.InProgress == nil && in.Mode == "switch" &&
+		(in.Target.Kind == "branch" || in.Target.Kind == "remoteBranch") {
+		routes = append(routes, "detachHere")
 	}
 
 	// A tag or a raw sha always detaches regardless of the requested mode (git itself refuses a
