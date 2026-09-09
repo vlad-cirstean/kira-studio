@@ -15,6 +15,7 @@
  * so a commit subject containing `<script>` is text by construction.
  */
 import type { CommitRecord, CommitStore, DecorationRef } from '@kira/git-core';
+import type { PrRecord } from '@kira/git-ipc';
 import type { Column, CustomDataView, Formatter, ItemMetadata } from 'slickgrid';
 import { graphColumnWidth } from '../graph/geometry.ts';
 // G19 D1: isHeadDecoration is promoted to rowSvg.ts (the graph column's own module), imported
@@ -23,7 +24,7 @@ import { graphColumnWidth } from '../graph/geometry.ts';
 import { isHeadDecoration } from '../graph/rowSvg.ts';
 import type { ColumnWidths, DateFormat } from '../state/viewState.ts';
 import { formatAbsoluteDate, formatRelativeDate } from './dateFormat.ts';
-import { buildRefBadges } from './refBadges.ts';
+import { buildPrBadge, buildRefBadges } from './refBadges.ts';
 import { splitHighlights } from './searchHighlight.ts';
 
 /** Every field a column's `field:` must name is a valid dotted path into `CommitRecord`
@@ -71,6 +72,19 @@ export interface LaneColorContext {
 
 const NO_LANE_COLOR_CONTEXT: LaneColorContext = { colorOf: () => undefined };
 
+/** G24 D9: the message column's own accessor onto a row's associated PR(s) — a third instance of
+ *  `MessageSearchContext`/`LaneColorContext`'s own convention, re-read on every render pass rather
+ *  than captured once, so `CommitGrid.vue` only ever needs to trigger a re-render (the
+ *  `pr.generation` watcher) on a new resolution, never rebuild the column model. `prsFor` returns
+ *  `undefined` for every "nothing to show" outcome (not-yet-resolved, in-flight, `disabled`,
+ *  `unavailable`, or resolved-with-none) — `PrState.bySha`'s own doc comment on why the grid never
+ *  has to distinguish those five itself. */
+export interface PrContext {
+  readonly prsFor: (sha: string) => readonly PrRecord[] | undefined;
+}
+
+const NO_PR_CONTEXT: PrContext = { prsFor: () => undefined };
+
 /** The message cell is a flex row (`CommitGrid.vue`'s `<style>`): `refBadges.ts`'s badge strip
  *  (only when the row has decorations — most rows do not, and get no wrapper at all) followed by
  *  the subject, which alone gets `text-overflow: ellipsis` — a CSS rule on `.kv-message-subject`,
@@ -81,6 +95,7 @@ const NO_LANE_COLOR_CONTEXT: LaneColorContext = { colorOf: () => undefined };
 function messageFormatter(
   ctx: MessageSearchContext,
   laneCtx: LaneColorContext,
+  prCtx: PrContext = NO_PR_CONTEXT,
 ): Formatter<CommitRecord> {
   return (row, _cell, _value, _columnDef, dataContext) => {
     const cell = document.createElement('span');
@@ -88,6 +103,13 @@ function messageFormatter(
 
     const badges = buildRefBadges(dataContext.decoration, laneCtx.colorOf(row));
     if (badges !== null) cell.appendChild(badges);
+
+    // G24 D9: placed after the ref badges, before the subject.
+    const prs = prCtx.prsFor(dataContext.sha);
+    if (prs !== undefined) {
+      const prBadge = buildPrBadge(prs);
+      if (prBadge !== null) cell.appendChild(prBadge);
+    }
 
     const subject = document.createElement('span');
     subject.className = 'kv-message-subject';
@@ -163,6 +185,7 @@ export function buildColumns(
   graphFormatter: Formatter<CommitRecord>,
   searchCtx: MessageSearchContext = NO_SEARCH_CONTEXT,
   laneCtx: LaneColorContext = NO_LANE_COLOR_CONTEXT,
+  prCtx: PrContext = NO_PR_CONTEXT,
 ): Column<CommitRecord>[] {
   return [
     {
@@ -186,7 +209,7 @@ export function buildColumns(
       sortable: false,
       focusable: false,
       selectable: false,
-      formatter: messageFormatter(searchCtx, laneCtx),
+      formatter: messageFormatter(searchCtx, laneCtx, prCtx),
     },
     {
       id: AUTHOR_COLUMN_ID,

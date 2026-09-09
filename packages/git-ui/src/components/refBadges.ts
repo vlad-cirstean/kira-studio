@@ -19,6 +19,7 @@
  * W13's Playwright pass rather than here.
  */
 import type { DecorationRef } from '@kira/git-core';
+import type { PrRecord } from '@kira/git-ipc';
 import { laneClass } from '../graph/palette.ts';
 import { BADGE_ICONS } from '../icons/index.ts';
 
@@ -211,6 +212,64 @@ function buildOverflowBadge(overflow: OverflowSpec): HTMLSpanElement {
   badge.className = 'kv-badge kv-badge-pill kv-badge-overflow';
   badge.setAttribute('data-kui-tip', overflow.title);
   badge.textContent = `+${overflow.count}`;
+  return badge;
+}
+
+// ---------------------------------------------------------------------------------------
+// G24 D9/D10.8: the per-commit graph indicator — one badge per commit, never one per associated
+// PR. Kept in this file (not a new module) since it is, structurally, a fifth badge kind sharing
+// every one of `buildBadgeElement`'s conventions (a `.kv-badge` pill, an icon, `data-kui-tip`) —
+// it just never goes through `badgeSpecFor`/`DecorationRef`, since a PR is not a ref decoration.
+// ---------------------------------------------------------------------------------------
+
+const PR_STATE_PRECEDENCE: Readonly<Record<PrRecord['state'], number>> = {
+  open: 0,
+  draft: 1,
+  merged: 2,
+  closed: 3,
+};
+
+const PR_STATE_LABEL: Readonly<Record<PrRecord['state'], string>> = {
+  open: 'Open',
+  draft: 'Draft',
+  merged: 'Merged',
+  closed: 'Closed',
+};
+
+/** D9's own precedence rule: `open > draft > merged > closed`, ties broken by most recently
+ *  updated — "which one PR does the graph indicator show when a commit is associated with more
+ *  than one" (§10.8's own recommendation). `undefined` for an empty list, never thrown. */
+export function pickBestPr(prs: readonly PrRecord[]): PrRecord | undefined {
+  if (prs.length === 0) return undefined;
+  return [...prs].sort((a, b) => {
+    const precedence = PR_STATE_PRECEDENCE[a.state] - PR_STATE_PRECEDENCE[b.state];
+    return precedence !== 0 ? precedence : b.updatedAt - a.updatedAt;
+  })[0];
+}
+
+/** Builds the graph indicator's own badge for one commit's associated PR(s), or `null` when there
+ *  is nothing to show — every non-resolved-with-a-PR outcome (not-yet-resolved, in-flight,
+ *  `disabled`, `unavailable`, or resolved-with-none) is exactly this `null` (D9's own "inert,
+ *  never noisy" rule): the caller never has to branch on which of those five it actually got.
+ *  Rendered as a real `<a href>` (F11: no `ExternalOpener` port needed — the webview's own
+ *  external-link handling takes it from there) with the PR's state carried as a CSS class, never
+ *  as text (`kv-badge-pr--<state>`) — width is scarce, and the tooltip already names the state in
+ *  words. */
+export function buildPrBadge(prs: readonly PrRecord[]): HTMLAnchorElement | null {
+  const best = pickBestPr(prs);
+  if (best === undefined) return null;
+
+  const badge = document.createElement('a');
+  badge.className = `kv-badge kv-badge-pill kv-badge-pr kv-badge-pr--${best.state}`;
+  badge.href = best.url;
+  const extra = prs.length > 1 ? ` (+${prs.length - 1} more)` : '';
+  badge.setAttribute('data-kui-tip', `${best.title} — ${PR_STATE_LABEL[best.state]}${extra}`);
+
+  const label = document.createElement('span');
+  label.className = 'kv-badge-label';
+  label.textContent = `#${best.number}`;
+  badge.appendChild(label);
+
   return badge;
 }
 

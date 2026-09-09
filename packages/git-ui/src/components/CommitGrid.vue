@@ -22,6 +22,7 @@ import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { graphColumnWidth } from '../graph/geometry.ts';
 import { createGraphFormatter } from '../graph/graphColumn.ts';
 import type { GraphViewState, LayoutRange } from '../state/graphView.ts';
+import type { PrState } from '../state/pr.ts';
 import type { SearchState } from '../state/search.ts';
 import type { SelectionState } from '../state/selection.ts';
 import { type ColumnWidths, type DateFormat, DEFAULT_COLUMN_WIDTHS } from '../state/viewState.ts';
@@ -43,6 +44,9 @@ const props = defineProps<{
    *  `App.vue`) gets plain, unhighlighted subjects, mirroring `columns.ts`'s own
    *  `MessageSearchContext` default. */
   search?: SearchState;
+  /** G24 D9: the graph indicator's own PR source — optional so a caller with nothing to show yet
+   *  gets a plain, badge-free message column, mirroring `search`'s own default. */
+  pr?: PrState;
 }>();
 
 const emit = defineEmits<{
@@ -214,6 +218,12 @@ function currentColumns(): Column<CommitRecord>[] {
       // colour" case, never a guessed one.
       colorOf: (row) =>
         row < props.graphView.layout.rowCount ? props.graphView.layout.colorOf(row) : undefined,
+    },
+    {
+      // G24 D9: `undefined` (not an empty array) is "nothing resolved yet" vs. "resolved, no PR"
+      // — `columns.ts`'s own `messageFormatter` already treats both as "render nothing", so this
+      // accessor only needs to pass `PrState.bySha`'s own map lookup straight through.
+      prsFor: (sha) => props.pr?.bySha.value.get(sha),
     },
   );
 }
@@ -703,6 +713,16 @@ watch(
 // never changes how many rows are loaded.
 watch(
   () => props.search?.searchGeneration.value,
+  () => {
+    grid?.invalidateAllRows();
+    grid?.render();
+  },
+);
+// G24 D9: mirrors the `search.searchGeneration` watcher directly above — a third instance of the
+// same pattern. A new PR resolution never changes how many rows are loaded, same reasoning as
+// `search.searchGeneration`'s own doc comment.
+watch(
+  () => props.pr?.generation.value,
   () => {
     grid?.invalidateAllRows();
     grid?.render();
