@@ -534,7 +534,7 @@ function reviewToggleTitle(path: string): string {
           >
           <KuiButton
             v-if="reviewStates"
-            variant="ghost"
+            variant="icon"
             class="kv-file-tree-review-toggle"
             v-kui-tooltip="reviewToggleTitle(row.node.change.path)"
             :aria-pressed="reviewStatusFor(row.node.change.path)?.kind === 'full'"

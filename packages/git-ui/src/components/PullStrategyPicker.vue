@@ -14,8 +14,16 @@
  */
 
 import type { PullStrategy, PullStrategySource } from '@kira/git-ipc';
-import { KuiButton, KuiPopoverPanel } from '@kira/kira-ui';
-import { computed, onBeforeUnmount, ref, watch } from 'vue';
+import type { MenuSection } from '@kira/kira-ui';
+// `KuiMenuList` is a plain (not `import type`) import even though this file's own script only
+// ever reads it through `InstanceType<typeof KuiMenuList>` — that is still a genuine *value* read
+// (`typeof` on an identifier requires the runtime binding in scope), and the template's own
+// `<KuiMenuList>` tag instantiates it as a component; biome's own static analysis sees neither use
+// and would otherwise "fix" this to `import type`, silently erasing the import (AppToolbar.vue's
+// own `useImportType` biome-ignore precedent, for the same reason).
+// biome-ignore lint/style/useImportType: see above
+import { KuiButton, KuiMenuList, KuiPopoverPanel } from '@kira/kira-ui';
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
 import type { OpsState } from '../state/ops.ts';
 import { describePullStrategySource, PULL_STRATEGY_LABELS } from './pullStrategyModel.ts';
 
@@ -41,6 +49,45 @@ const mainTitle = computed(() => {
 });
 
 const STRATEGIES: readonly PullStrategy[] = ['ff-only', 'merge', 'rebase'];
+const DEFAULT_ID = 'pull-strategy-default';
+const menuListRef = ref<InstanceType<typeof KuiMenuList> | null>(null);
+
+// G34 D8: driving `<KuiMenuList>` — one section, "Follow your configuration" (the live-resolved
+// preview as its `detail` line) plus the three explicit strategies. Row ids double as their own
+// `data-testid` (KuiMenuList derives one from the other), so `pull-strategy-default`/
+// `pull-strategy-<strategy>` are unchanged from before this adoption.
+const menuSections = computed<MenuSection[]>(() => [
+  {
+    items: [
+      {
+        id: DEFAULT_ID,
+        label: 'Follow your configuration',
+        disabled: false,
+        disabledReason: undefined,
+        detail: previewLoading.value
+          ? 'resolving…'
+          : preview.value
+            ? `${PULL_STRATEGY_LABELS[preview.value.strategy]} — ${describePullStrategySource(preview.value.source)}`
+            : undefined,
+      },
+      ...STRATEGIES.map((strategy) => ({
+        id: `pull-strategy-${strategy}`,
+        label: PULL_STRATEGY_LABELS[strategy],
+        disabled: false,
+        disabledReason: undefined,
+      })),
+    ],
+  },
+]);
+
+function onMenuSelect(id: string): void {
+  if (id === DEFAULT_ID) {
+    void runDefault();
+    return;
+  }
+  const strategy = id.slice('pull-strategy-'.length) as PullStrategy;
+  void runWith(strategy);
+}
 
 function onDocumentClick(event: MouseEvent): void {
   if (rootEl.value && !rootEl.value.contains(event.target as Node)) close();
@@ -58,6 +105,8 @@ async function toggle(): Promise<void> {
   }
   isOpen.value = true;
   document.addEventListener('mousedown', onDocumentClick);
+  await nextTick();
+  menuListRef.value?.focusFirst();
   previewLoading.value = true;
   try {
     const pre = await props.ops.previewPullStrategy(props.branch);
@@ -116,32 +165,13 @@ defineExpose({ run: runDefault });
     />
 
     <KuiPopoverPanel v-if="isOpen" anchor="left" :width="260" @close="close">
-    <div class="kv-pull-picker-panel" role="menu" aria-label="Pull strategy">
-      <KuiButton
-        class="kv-pull-picker-item"
-        role="menuitem"
-        data-testid="pull-strategy-default"
-        @click="runDefault"
-      >
-        <span class="kv-pull-picker-item-label">Follow your configuration</span>
-        <span class="kv-pull-picker-item-detail">
-          <template v-if="previewLoading">resolving…</template>
-          <template v-else-if="preview">
-            {{ PULL_STRATEGY_LABELS[preview.strategy] }} — {{ describePullStrategySource(preview.source) }}
-          </template>
-        </span>
-      </KuiButton>
-      <KuiButton
-        v-for="strategy in STRATEGIES"
-        :key="strategy"
-        class="kv-pull-picker-item"
-        role="menuitem"
-        :data-testid="`pull-strategy-${strategy}`"
-        @click="runWith(strategy)"
-      >
-        <span class="kv-pull-picker-item-label">{{ PULL_STRATEGY_LABELS[strategy] }}</span>
-      </KuiButton>
-    </div>
+      <KuiMenuList
+        ref="menuListRef"
+        :sections="menuSections"
+        label="Pull strategy"
+        @select="onMenuSelect"
+        @close="close"
+      />
     </KuiPopoverPanel>
   </div>
 </template>
@@ -167,33 +197,6 @@ defineExpose({ run: runDefault });
   border-bottom-left-radius: 0;
 }
 
-/* G20 D5: positioning/chrome move onto KuiPopoverPanel's own `.kui-popover`. */
-.kv-pull-picker-panel {
-  padding: var(--kv-s-1);
-}
-
-.kv-pull-picker-item {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  width: 100%;
-  padding: var(--kv-s-1) var(--kv-s-2);
-  background: transparent;
-  color: inherit;
-  border: none;
-  border-radius: var(--kv-radius-sm);
-  font-family: inherit;
-  font-size: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-.kv-pull-picker-item:hover {
-  background-color: var(--kv-row-hover-bg);
-}
-
-.kv-pull-picker-item-detail {
-  color: var(--kv-description-fg);
-  font-size: 0.85em;
-}
+/* G34 D8: `.kv-pull-picker-panel`/`.kv-pull-picker-item*` are gone — the popover now wraps a
+   `<KuiMenuList>`, the same menu a right-click renders, instead of a hand-rolled one. */
 </style>

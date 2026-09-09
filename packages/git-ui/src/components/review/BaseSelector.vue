@@ -137,7 +137,7 @@ onBeforeUnmount(() => {
           <KuiButton
             v-for="candidate in suggested"
             :key="candidate.ref"
-            class="kv-base-row"
+            class="kui-row kv-base-row"
             @click="pick(candidate.ref)"
           >
             <span class="kv-base-row-name">{{ candidate.ref }}</span>
@@ -150,7 +150,7 @@ onBeforeUnmount(() => {
           <KuiButton
             v-for="row in sections.branches.visible"
             :key="row.refname"
-            class="kv-base-row"
+            class="kui-row kv-base-row"
             @click="pick(row.shortName)"
           >
             <span class="kv-base-row-name">{{ row.shortName }}</span>
@@ -158,7 +158,7 @@ onBeforeUnmount(() => {
           <KuiButton
             v-for="row in sections.remoteBranches.visible"
             :key="row.refname"
-            class="kv-base-row"
+            class="kui-row kv-base-row"
             icon="codicon-cloud"
             @click="pick(row.shortName)"
           >
@@ -182,29 +182,10 @@ onBeforeUnmount(() => {
   position: relative;
 }
 
+/* G34 D14: everything but `max-width` is gone — the default `KuiButton` box is now this shape
+   (the old 24px height matched nothing in either scale; the default control height does). */
 .kv-base-trigger {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--kv-s-2);
-  height: 24px;
-  padding: 0 var(--kv-s-2);
-  border: 1px solid var(--kv-panel-border);
-  border-radius: var(--kv-radius-sm);
-  background: transparent;
-  color: var(--kv-app-fg);
-  font-family: inherit;
-  font-size: inherit;
   max-width: 100%;
-  cursor: pointer;
-}
-
-.kv-base-trigger:hover {
-  background-color: var(--kv-row-hover-bg);
-}
-
-.kv-base-trigger:focus-visible {
-  outline: 1px solid var(--kv-focus-border);
-  outline-offset: -1px;
 }
 
 .kv-base-trigger-label {
@@ -243,28 +224,10 @@ onBeforeUnmount(() => {
   text-transform: uppercase;
 }
 
+/* G34 D7: geometry now comes from `.kui-row` (composed in the template) — this class keeps only
+   the full-width stretch a vertical list of these needs. */
 .kv-base-row {
-  display: flex;
-  align-items: center;
-  gap: var(--kv-s-2);
   width: 100%;
-  text-align: left;
-  padding: var(--kv-s-1) var(--kv-s-4);
-  border: none;
-  background: transparent;
-  color: var(--kv-app-fg);
-  font-family: inherit;
-  font-size: inherit;
-  cursor: pointer;
-}
-
-.kv-base-row:hover {
-  background-color: var(--kv-row-hover-bg);
-}
-
-.kv-base-row:focus-visible {
-  outline: 1px solid var(--kv-focus-border);
-  outline-offset: -1px;
 }
 
 .kv-base-row-name {

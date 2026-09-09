@@ -7,6 +7,13 @@
  * still renders something reasonable, since every `--kui-*` reference below carries its own
  * fallback.
  *
+ * G34: re-specified against Kira Studio's own primitives (`apps/kira-studio/frontend/src/theme/
+ * primitives.css`) rather than a workbench-shaped guess — see docs/v1.3/plans/
+ * G34-kira-studio-visual-parity.md D5-D12 for the per-rule reasoning. `--kui-radius` moved from
+ * a 0px workbench default to Kira's own 4px interactive tier; floating surfaces (menus, popovers,
+ * tooltips, the modal) get their own 6px panel tier, `--kui-radius-float`, matching how Kira
+ * itself draws those two differently.
+ *
  * G20 D6 / G21 D2: the `--kui-z-*` floating-surface ladder — a documented contract, same as the
  * sizing/color vocabulary above. Each host bridges these onto its own real scale (or, for
  * `packages/git-ui`, which had no `--kv-z-*` ladder at all, establishes fresh literal values):
@@ -18,9 +25,12 @@
  *   --kui-z-tooltip  highest — KuiTooltip
  */
 
+/* G34 D6: one rule, one constant — a 16px box holding a 13px glyph (Kira's own CodiconIcon
+   default), everywhere. The two size overrides this used to need (`.kui-button .kui-icon-box`,
+   the size half of `.kui-menu-item .kui-icon-box`) are gone: nothing overrides this any more. */
 .kui-icon-box {
-  width: var(--kui-control-h, 22px);
-  height: var(--kui-control-h, 22px);
+  width: var(--kui-icon-box, 16px);
+  height: var(--kui-icon-box, 16px);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -28,31 +38,37 @@
 }
 
 .kui-icon-box .codicon {
-  font-size: 16px;
+  font-size: var(--kui-icon-size, 13px);
 }
 
+/* G34 D5: Kira's own `.p-btn` shape — borderless and muted at rest, brightening on hover, with a
+   transparent 1px border reserved rather than `border: none` so the box does not resize between
+   the default/primary/danger variants, which all draw one. */
 .kui-button {
   display: inline-flex;
   align-items: center;
-  gap: var(--kui-space-1, 2px);
+  gap: var(--kui-space-2, 4px);
   height: var(--kui-control-h, 22px);
-  padding: 0 var(--kui-space-2, 4px);
+  padding: 0 var(--kui-space-3, 6px);
   background: transparent;
-  color: var(--kui-fg, inherit);
-  border: 1px solid var(--kui-border, transparent);
-  border-radius: var(--kui-radius, 0);
+  color: var(--kui-fg-muted, inherit);
+  border: var(--kui-border-width, 1px) solid transparent;
+  border-radius: var(--kui-radius, 4px);
   font-family: inherit;
-  font-size: inherit;
+  font-size: var(--kui-font-size-sm, inherit);
+  text-decoration: none;
   cursor: pointer;
-}
-
-.kui-button .kui-icon-box {
-  width: 16px;
-  height: 16px;
+  flex-shrink: 0;
 }
 
 .kui-button:hover:not(:disabled) {
   background-color: var(--kui-hover-bg, rgba(128, 128, 128, 0.15));
+  color: var(--kui-fg, inherit);
+}
+
+.kui-button:focus-visible {
+  outline: var(--kui-border-width, 1px) solid var(--kui-focus-border, currentColor);
+  outline-offset: -1px;
 }
 
 .kui-button:disabled {
@@ -61,8 +77,18 @@
 }
 
 .kui-button--active {
-  background-color: var(--kui-selected-bg, var(--kui-hover-bg));
-  color: var(--kui-selected-fg, var(--kui-fg));
+  background-color: var(--kui-active-bg, var(--kui-hover-bg));
+  color: var(--kui-fg, inherit);
+}
+
+/* G34 D5: Kira's own icon-only button — a square at the control height, no text, no border. This
+   is the variant that replaced five separate hand-rolled icon-button implementations across
+   `packages/git-ui` (G34 D14) and is why `variant="ghost"` (below, previously) is gone: once
+   `.kui-button` is itself borderless and muted, "ghost" no longer named anything distinct. */
+.kui-button--icon {
+  width: var(--kui-control-h, 22px);
+  padding: 0;
+  justify-content: center;
 }
 
 /* G21 D2: `--kui-button-bg`/`--kui-button-fg`/`--kui-button-hover-bg` are a real, dedicated
@@ -86,18 +112,6 @@
   border-color: var(--kui-danger-fg, var(--kui-border));
 }
 
-/* G21 D2: the transparent, border-less icon-only affordance — no border/background at rest,
-   hover feedback only, `.kv-copy-button` and friends' own shape. */
-.kui-button--ghost {
-  border-color: transparent;
-  padding: 0 var(--kui-space-1, 2px);
-  opacity: 0.8;
-}
-
-.kui-button--ghost:hover:not(:disabled) {
-  opacity: 1;
-}
-
 .kui-button-count {
   display: inline-flex;
   align-items: center;
@@ -112,68 +126,131 @@
   line-height: 14px;
 }
 
+/* G34 D7: Kira's own row primitive (`.p-row`) — one "row inside a floating panel" shape, where
+   seven local implementations across `packages/git-ui` used to each draw their own (F8 in the
+   G34 plan). `min-height`, not a fixed `height`: a genuinely two-line row (a menu item's `detail`
+   line, a branch picker's subtitle) must not be clipped; every single-line consumer still renders
+   at exactly `--kui-control-h` either way. */
+.kui-row {
+  display: flex;
+  align-items: center;
+  gap: var(--kui-space-2, 4px);
+  min-height: var(--kui-control-h, 22px);
+  padding: 0 var(--kui-space-3, 6px);
+  border-radius: var(--kui-radius, 4px);
+  color: var(--kui-fg, inherit);
+  font-size: var(--kui-font-size, inherit);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.kui-row:hover,
+.kui-row:focus-visible {
+  background-color: var(--kui-hover-bg, rgba(128, 128, 128, 0.15));
+  outline: none;
+}
+
+.kui-row--selected {
+  background-color: var(--kui-selected-bg);
+  color: var(--kui-selected-fg);
+}
+
+.kui-row--disabled {
+  color: var(--kui-fg-muted, currentColor);
+  cursor: default;
+}
+
+.kui-row--disabled:hover {
+  background-color: transparent;
+}
+
+.kui-row--danger,
+.kui-row--danger .kui-icon-box {
+  color: var(--kui-danger-fg, var(--kui-fg));
+}
+
+/* Several `packages/git-ui` rows compose `.kui-row` directly onto a `<KuiButton>` (the row was
+   already clickable via `KuiButton` before this phase; F8 in the G34 plan unified their geometry,
+   it didn't swap the element out). `.kui-button`'s own fixed `height` would otherwise win over
+   `.kui-row`'s `min-height` at equal specificity (later rule wins; `.kui-button` is defined
+   first) and clip a row whose content wraps to a second line — this cancels it generically rather
+   than requiring every composing file to repeat the same override. */
+.kui-button.kui-row {
+  height: auto;
+}
+
 .kui-text-input {
   height: var(--kui-control-h, 22px);
-  padding: 0 var(--kui-space-2, 4px);
-  background-color: var(--kui-bg-panel, transparent);
+  padding: 0 var(--kui-space-4, 8px);
+  background-color: var(--kui-bg-input, transparent);
   color: var(--kui-fg, inherit);
-  border: 1px solid var(--kui-border, transparent);
-  border-radius: var(--kui-radius, 0);
+  border: var(--kui-border-width, 1px) solid var(--kui-border-strong, transparent);
+  border-radius: var(--kui-radius, 4px);
   font-family: inherit;
-  font-size: inherit;
+  font-size: var(--kui-font-size-sm, inherit);
+}
+
+.kui-text-input::placeholder {
+  color: var(--kui-fg-muted, currentColor);
 }
 
 .kui-text-input:focus-visible {
-  outline: 1px solid var(--kui-focus-border, currentColor);
+  border-color: var(--kui-focus-border, currentColor);
+  outline: var(--kui-border-width, 1px) solid var(--kui-focus-border, currentColor);
   outline-offset: -1px;
 }
 
+/* G34 D10: Kira's own floating-surface geometry (`.p-float`) — 180px min-width (was 220px),
+   4px padding on all sides with a 1px gap between rows (was `2px 0`, bleeding a hovered row's
+   highlight to the surface's own edge), the panel radius/border/shadow tier. `max-width` stays at
+   320px, wider than Kira's own uncapped menu: this app's longest label ("Checkout this commit
+   (detached HEAD)") would otherwise make the commit menu visibly wider than the file menu, and a
+   menu whose width changes per row is a worse artifact than one ellipsis. */
+/* The positioned "surface" — background/border/radius/shadow/size — used stand-alone by
+   KuiContextMenu.vue (which positions this div itself via `computeFloatPosition`). When a menu is
+   instead composed inside `<KuiPopoverPanel>` (AppToolbar's Push menu, PullStrategyPicker), that
+   component's own `.kui-popover` plays this same role and `.kui-menu-root` is not used at all —
+   `.kui-menu-list` below (KuiMenuList.vue's own root) is what's shared between the two. */
 .kui-menu-root {
   position: fixed;
   z-index: var(--kui-z-menu, 30);
-  min-width: 220px;
+  min-width: 180px;
   max-width: 320px;
   /* G20 D3: `computeFloatPosition`'s `size()` middleware writes this — a menu that fits is
      unaffected, one taller than the viewport scrolls instead of overflowing off the top/bottom
      with nothing to scroll it into view. */
   max-height: var(--kui-float-max-h, none);
   overflow-y: auto;
-  padding: var(--kui-space-1, 2px) 0;
   background-color: var(--kui-bg-panel, canvas);
   color: var(--kui-fg, inherit);
-  border: 1px solid var(--kui-border, transparent);
-  border-radius: var(--kui-radius, 0);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.36);
+  border: var(--kui-border-width, 1px) solid var(--kui-border-strong, transparent);
+  border-radius: var(--kui-radius-float, 6px);
+  box-shadow: var(--kui-shadow-float, 0 8px 28px rgba(0, 0, 0, 0.45));
 }
 
-.kui-menu-item {
+/* G34 D8: the rows/sections themselves — KuiMenuList.vue's own root. Deliberately carries no
+   position/background/border/shadow of its own (that's whichever surface wraps it: `.kui-menu-root`
+   above, or `.kui-popover` when nested inside `<KuiPopoverPanel>`) — only the content-layout
+   properties every consumer of this list needs regardless of what surface it sits in. */
+.kui-menu-list {
   display: flex;
-  align-items: center;
-  gap: var(--kui-space-2, 4px);
-  padding: var(--kui-space-1, 2px) var(--kui-space-3, 8px);
-  cursor: pointer;
-  color: var(--kui-fg, inherit);
-  white-space: nowrap;
+  flex-direction: column;
+  gap: 1px;
+  padding: var(--kui-space-2, 4px);
 }
 
+/* G34 D7/D9: geometry now comes from `.kui-row` (KuiMenuList.vue's template composes
+   `class="kui-row kui-menu-item"`) — this class keeps only what is menu-specific: the
+   danger/disabled modifier aliases (mirroring `.kui-row--danger`/`--disabled` under the names
+   KuiMenuList actually emits) and the icon-box colour, which every row in the menu gets
+   unconditionally (KuiMenuList renders the box for every item, icon or not, so labels align). */
 .kui-menu-item .kui-icon-box {
-  width: 16px;
-  height: 16px;
   color: var(--kui-fg-muted, currentColor);
 }
 
-.kui-menu-item--danger {
-  color: var(--kui-danger-fg, var(--kui-fg));
-}
-
+.kui-menu-item--danger,
 .kui-menu-item--danger .kui-icon-box {
-  color: var(--kui-danger-fg, currentColor);
-}
-
-.kui-menu-item:hover:not(.kui-menu-item--disabled),
-.kui-menu-item:focus-visible:not(.kui-menu-item--disabled) {
-  background-color: var(--kui-hover-bg, rgba(128, 128, 128, 0.15));
-  outline: none;
+  color: var(--kui-danger-fg, var(--kui-fg));
 }
 
 .kui-menu-item--disabled {
@@ -181,21 +258,47 @@
   cursor: default;
 }
 
-.kui-menu-heading {
-  padding: var(--kui-space-1, 2px) var(--kui-space-3, 8px);
-  font-weight: 600;
+.kui-menu-item--disabled:hover {
+  background-color: transparent;
+}
+
+/* The label cell is a column so a `detail` line (below) stacks under the label instead of running
+   inline with it; `min-width: 0` lets a long label still ellipsis-truncate inside a flex row. */
+.kui-menu-item-label {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* A secondary line under a menu item's label — `PullStrategyPicker.vue`'s own "Merge — from
+   pull.rebase in your repository config" is the only producer today. A second LINE rather than
+   Kira's right-aligned `.shortcut` slot: that slot holds key chords, and this app's menus have no
+   per-item shortcuts — right-aligning a sentence in a 260px panel would truncate it away. */
+.kui-menu-item-detail {
+  font-size: var(--kui-font-size-xs, 0.85em);
   color: var(--kui-fg-muted, currentColor);
+}
+
+/* G34 D10: Kira's own `.p-menu-label` — no border, just whitespace, uppercase/tracked/subtle. */
+.kui-menu-heading {
+  display: flex;
+  align-items: center;
+  height: var(--kui-control-h-sm, 18px);
+  padding: 0 var(--kui-space-3, 6px);
+  font-size: var(--kui-font-size-xs, 0.85em);
+  font-weight: 600;
+  color: var(--kui-fg-subtle, var(--kui-fg-muted, currentColor));
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  border-bottom: 1px solid var(--kui-border, transparent);
-  margin-bottom: var(--kui-space-1, 2px);
 }
 
 .kui-menu-separator {
-  height: 1px;
-  margin: var(--kui-space-1, 2px) 0;
-  background-color: var(--kui-border, currentColor);
+  height: var(--kui-border-width, 1px);
+  margin: var(--kui-space-2, 4px) 0;
+  background-color: var(--kui-border-strong, currentColor);
 }
 
 .kui-visually-hidden {
@@ -211,18 +314,19 @@
 }
 
 /* G20 D2: KuiTooltip.vue's floating element — the top rung of the `--kui-z-*` ladder, since every
-   other floating surface can host a hinted control. */
+   other floating surface can host a hinted control. G34 D10: same floating-surface triple as the
+   menu/popover/modal. */
 .kui-tooltip {
   position: fixed;
   z-index: var(--kui-z-tooltip, 40);
   max-width: 320px;
-  padding: var(--kui-space-2, 4px) var(--kui-space-3, 8px);
+  padding: var(--kui-space-2, 4px) var(--kui-space-3, 6px);
   background-color: var(--kui-bg-panel, canvas);
   color: var(--kui-fg, inherit);
-  border: 1px solid var(--kui-border, transparent);
-  border-radius: var(--kui-radius, 0);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.36);
-  font-size: inherit;
+  border: var(--kui-border-width, 1px) solid var(--kui-border-strong, transparent);
+  border-radius: var(--kui-radius-float, 6px);
+  box-shadow: var(--kui-shadow-float, 0 8px 28px rgba(0, 0, 0, 0.45));
+  font-size: var(--kui-font-size-sm, inherit);
   line-height: 1.4;
   white-space: pre-wrap;
   /* A tooltip must never be able to eat the click it is describing. */
@@ -246,9 +350,9 @@
   overflow-y: auto;
   background-color: var(--kui-bg-panel, canvas);
   color: var(--kui-fg, inherit);
-  border: 1px solid var(--kui-border, transparent);
-  border-radius: var(--kui-radius, 0);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.36);
+  border: var(--kui-border-width, 1px) solid var(--kui-border-strong, transparent);
+  border-radius: var(--kui-radius-float, 6px);
+  box-shadow: var(--kui-shadow-float, 0 8px 28px rgba(0, 0, 0, 0.45));
 }
 
 /* G21 D2: KuiDialog.vue — the modal shell that replaces `packages/git-ui`'s eleven hand-rolled
@@ -267,17 +371,17 @@
   display: flex;
   flex-direction: column;
   max-height: 85vh;
-  padding: var(--kui-space-4, 16px);
+  padding: var(--kui-space-5, 16px);
   background-color: var(--kui-bg-panel, canvas);
   color: var(--kui-fg, inherit);
-  border: 1px solid var(--kui-border, transparent);
-  border-radius: var(--kui-radius, 0);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.36);
+  border: var(--kui-border-width, 1px) solid var(--kui-border-strong, transparent);
+  border-radius: var(--kui-radius-float, 6px);
+  box-shadow: var(--kui-shadow-float, 0 8px 28px rgba(0, 0, 0, 0.45));
 }
 
 .kui-modal-title {
   flex-shrink: 0;
-  margin: 0 0 var(--kui-space-3, 8px);
+  margin: 0 0 var(--kui-space-4, 8px);
   font-size: 1.05em;
 }
 
@@ -291,26 +395,36 @@
   flex-shrink: 0;
   justify-content: flex-end;
   gap: var(--kui-space-2, 4px);
-  margin-top: var(--kui-space-4, 16px);
+  margin-top: var(--kui-space-5, 16px);
 }
 
-/* G21 D2: KuiSegmented.vue — one implementation of the four hand-rolled icon-toggle groups. */
+/* G34 D11: Kira's own `.p-seg` — one bordered, `overflow: hidden` pill divided by 1px hairlines,
+   its active child filled — not the previous gapped row of independently-bordered buttons. */
 .kui-segmented {
-  display: flex;
-  gap: var(--kui-space-1, 2px);
+  display: inline-flex;
+  height: var(--kui-control-h, 22px);
+  border: var(--kui-border-width, 1px) solid var(--kui-border-strong, transparent);
+  border-radius: var(--kui-radius, 4px);
+  overflow: hidden;
+  flex-shrink: 0;
 }
 
 .kui-segmented-button {
-  display: inline-flex;
+  display: flex;
   align-items: center;
+  justify-content: center;
   gap: var(--kui-space-1, 2px);
-  height: var(--kui-control-h, 22px);
-  padding: 0 var(--kui-space-2, 4px);
-  background: transparent;
-  color: var(--kui-fg, inherit);
-  border: 1px solid transparent;
-  border-radius: var(--kui-radius, 0);
+  padding: 0 var(--kui-space-3, 6px);
+  border: none;
+  background: none;
+  color: var(--kui-fg-muted, inherit);
+  font-size: var(--kui-font-size-sm, inherit);
   cursor: pointer;
+  white-space: nowrap;
+}
+
+.kui-segmented-button + .kui-segmented-button {
+  border-left: var(--kui-border-width, 1px) solid var(--kui-border-strong, transparent);
 }
 
 .kui-segmented-button:hover:not(.kui-segmented-button--active) {
@@ -318,21 +432,21 @@
 }
 
 .kui-segmented-button--active {
-  background-color: var(--kui-selected-bg, var(--kui-hover-bg));
-  color: var(--kui-selected-fg, var(--kui-fg));
+  background-color: var(--kui-active-bg, var(--kui-hover-bg));
+  color: var(--kui-fg, inherit);
 }
 
 .kui-segmented-badge {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 14px;
-  height: 14px;
+  min-width: var(--kui-control-h-sm, 14px);
+  height: var(--kui-control-h-sm, 14px);
   padding: 0 3px;
   border-radius: 999px;
   background-color: var(--kui-hover-bg, rgba(128, 128, 128, 0.25));
-  font-size: 0.75em;
-  line-height: 14px;
+  font-size: var(--kui-font-size-xs, 0.75em);
+  line-height: var(--kui-control-h-sm, 14px);
 }
 
 /* G21 D2: KuiSearchInput.vue — KuiTextInput plus a leading search glyph and a trailing clear
@@ -348,24 +462,31 @@
   position: absolute;
   left: var(--kui-space-2, 4px);
   pointer-events: none;
-  font-size: 13px;
+  font-size: var(--kui-icon-size, 13px);
   opacity: 0.7;
 }
 
+/* G34 D12/F13: the left/right gutters clear a 13px glyph and stay pinned to `--kui-space-6`
+   (16px) explicitly — the reindexed `--kui-space-5` now means 12px, which would crowd them. */
 .kui-search-input-field {
   width: 100%;
   height: 100%;
-  padding: 0 var(--kui-space-5, 20px) 0 var(--kui-space-5, 20px);
-  background-color: var(--kui-bg-panel, transparent);
+  padding: 0 var(--kui-space-6, 16px) 0 var(--kui-space-6, 16px);
+  background-color: var(--kui-bg-input, transparent);
   color: var(--kui-fg, inherit);
-  border: 1px solid var(--kui-border, transparent);
-  border-radius: var(--kui-radius, 0);
+  border: var(--kui-border-width, 1px) solid var(--kui-border-strong, transparent);
+  border-radius: var(--kui-radius, 4px);
   font-family: inherit;
-  font-size: inherit;
+  font-size: var(--kui-font-size-sm, inherit);
+}
+
+.kui-search-input-field::placeholder {
+  color: var(--kui-fg-muted, currentColor);
 }
 
 .kui-search-input-field:focus-visible {
-  outline: 1px solid var(--kui-focus-border, currentColor);
+  border-color: var(--kui-focus-border, currentColor);
+  outline: var(--kui-border-width, 1px) solid var(--kui-focus-border, currentColor);
   outline-offset: -1px;
 }
 
@@ -396,20 +517,23 @@
   align-items: center;
 }
 
+/* G34 D12/F13: same gutter discipline as `.kui-search-input-field` — the trailing chevron clears
+   `--kui-space-6` (16px), pinned explicitly rather than following the reindexed `--kui-space-5`. */
 .kui-select-field {
   height: var(--kui-control-h, 22px);
-  padding: 0 var(--kui-space-5, 20px) 0 var(--kui-space-2, 4px);
-  background-color: var(--kui-bg-panel, transparent);
+  padding: 0 var(--kui-space-6, 16px) 0 var(--kui-space-4, 8px);
+  background-color: var(--kui-bg-input, transparent);
   color: var(--kui-fg, inherit);
-  border: 1px solid var(--kui-border, transparent);
-  border-radius: var(--kui-radius, 0);
+  border: var(--kui-border-width, 1px) solid var(--kui-border-strong, transparent);
+  border-radius: var(--kui-radius, 4px);
   font-family: inherit;
-  font-size: inherit;
+  font-size: var(--kui-font-size-sm, inherit);
   appearance: none;
 }
 
 .kui-select-field:focus-visible {
-  outline: 1px solid var(--kui-focus-border, currentColor);
+  border-color: var(--kui-focus-border, currentColor);
+  outline: var(--kui-border-width, 1px) solid var(--kui-focus-border, currentColor);
   outline-offset: -1px;
 }
 
@@ -417,6 +541,6 @@
   position: absolute;
   right: var(--kui-space-1, 2px);
   pointer-events: none;
-  font-size: 13px;
+  font-size: var(--kui-icon-size, 13px);
   opacity: 0.7;
 }

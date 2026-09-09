@@ -30,16 +30,18 @@ async function undo(): Promise<void> {
   <div v-if="ops.undoSlot.value" class="kv-undo">
     <KuiButton
       icon="codicon-discard"
-      class="kv-undo-button"
       v-kui-tooltip="composeUndoTooltip(ops.undoSlot.value.label)"
       :disabled="ops.busy.value"
       @click="undo"
     >
       {{ ops.undoSlot.value.label }}
     </KuiButton>
+    <!-- G34 D5: the plan's own icon-only/text split names this call site as icon-only (its `ghost`
+         predates both real classes) — it is not: the slot holds real multi-character sha text, not
+         an icon, so `variant="icon"`'s fixed square width would clip it. Dropped to the plain
+         default, the same call the "Show more"/"Show less" toggle gets for the identical reason. -->
     <KuiButton
       v-if="clipboardEnabled"
-      variant="ghost"
       class="kv-undo-sha"
       v-kui-tooltip="`Copy recovery SHA ${ops.undoSlot.value.recoverySha}`"
       @click="copy(ops.undoSlot.value.recoverySha, 'recovery SHA')"
@@ -57,30 +59,9 @@ async function undo(): Promise<void> {
   gap: var(--kv-s-1);
 }
 
-.kv-undo-button {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--kv-s-2);
-  height: 22px;
-  padding: 0 var(--kv-s-2);
-  border: none;
-  border-radius: var(--kv-radius-sm);
-  background: transparent;
-  color: var(--kv-app-fg);
-  font-family: inherit;
-  font-size: inherit;
-  cursor: pointer;
-}
-
-.kv-undo-button:hover {
-  background-color: var(--kv-row-hover-bg);
-}
-
-.kv-undo-button:disabled {
-  opacity: 0.6;
-  cursor: default;
-}
-
+/* G34 D14: `.kv-undo-button` (this component's first KuiButton, the undo affordance itself) is
+   gone — it re-declared `.kui-button`'s own box byte for byte; the default `KuiButton` is now
+   exactly this shape. */
 .kv-undo-sha {
   font-family: var(--kv-mono-font-family);
   font-size: 0.85em;

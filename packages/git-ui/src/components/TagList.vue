@@ -102,7 +102,7 @@ async function onRefMenuSelect(id: string): Promise<void> {
         <span class="kv-tag-target">{{ targetCommit(row) }}</span>
       </KuiButton>
       <KuiButton
-        class="kv-icon-button"
+        variant="icon"
         v-kui-tooltip="'More actions'"
         aria-label="More actions"
         @click="openRefMenuFromButton(row, $event)"

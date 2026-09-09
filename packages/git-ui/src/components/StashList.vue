@@ -121,7 +121,7 @@ async function onMenuSelect(id: string): Promise<void> {
         <span class="kv-stash-date">{{ formatRelativeDate(entry.timestamp) }}</span>
       </KuiButton>
       <KuiButton
-        class="kv-icon-button"
+        variant="icon"
         v-kui-tooltip="'More actions'"
         aria-label="More actions"
         @click="openMenuFromButton(entry, $event)"

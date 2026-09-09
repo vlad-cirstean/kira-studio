@@ -666,7 +666,6 @@ watch(
         </p>
         <KuiSearchInput
           ref="branchFilterInputRef"
-          class="kv-review-picker-filter"
           v-model="branchFilter"
           placeholder="Filter branches"
           ariaLabel="Filter branches"
@@ -677,7 +676,7 @@ watch(
             <KuiButton
               v-for="row in branchSections.branches.visible"
               :key="row.refname"
-              class="kv-review-picker-row"
+              class="kui-row kv-review-picker-row"
               @click="pickBranch(row.shortName)"
             >
               {{ row.shortName }}
@@ -691,7 +690,7 @@ watch(
             <KuiButton
               v-for="row in branchSections.remoteBranches.visible"
               :key="row.refname"
-              class="kv-review-picker-row"
+              class="kui-row kv-review-picker-row"
               @click="pickBranch(row.shortName)"
             >
               {{ row.shortName }}
@@ -980,12 +979,9 @@ watch(
   color: var(--kv-description-fg);
 }
 
-.kv-review-picker-filter {
-  background: var(--kv-panel-bg);
-  color: var(--kv-row-fg);
-  border: 1px solid var(--kv-panel-border);
-  padding: var(--kv-s-1) var(--kv-s-2);
-}
+/* G34 D14: gone — this class landed on `KuiSearchInput`'s own wrapper `<div>`, not its real
+   `<input>` (attrs fallthrough targets the single root element), so its box-chrome properties
+   never actually painted anything; `.kui-search-input-field`'s own chrome is what always rendered. */
 
 .kv-review-picker-scroll {
   flex: 1;
@@ -1000,21 +996,11 @@ watch(
   text-transform: uppercase;
 }
 
+/* G34 D7: geometry now comes from `.kui-row` (composed in the template) — this class keeps only
+   the full-width stretch a vertical list of these needs. */
 .kv-review-picker-row {
-  display: block;
   width: 100%;
   text-align: left;
-  padding: var(--kv-s-1) var(--kv-s-2);
-  border: none;
-  background: transparent;
-  color: var(--kv-app-fg);
-  font-family: inherit;
-  font-size: inherit;
-  cursor: pointer;
-}
-
-.kv-review-picker-row:hover {
-  background-color: var(--kv-row-hover-bg);
 }
 
 .kv-review-picker-empty {
@@ -1096,17 +1082,11 @@ watch(
   flex-shrink: 0;
 }
 
+/* G34 D14: everything but the growable width is gone — `.kui-text-input`'s own chrome (this is a
+   real `KuiTextInput`, whose class lands on its actual `<input>` root) already matches it. */
 .kv-review-toolbar-filter {
   flex: 1;
   min-width: 0;
-  height: var(--kv-control-h);
-  background: var(--kv-panel-bg);
-  color: var(--kv-row-fg);
-  border: var(--kv-border-width) solid var(--kv-panel-border);
-  border-radius: var(--kv-radius-sm);
-  padding: 0 var(--kv-s-3);
-  font-family: var(--kv-font-ui);
-  font-size: var(--kv-t-sm);
 }
 
 .kv-review-body {

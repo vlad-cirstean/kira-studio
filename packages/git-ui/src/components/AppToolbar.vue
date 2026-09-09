@@ -27,8 +27,16 @@
  * known at all: there is nothing to name in the tooltip and no useful default to pick.
  */
 import type { StashEntry } from '@kira/git-ipc';
-import { KuiButton, KuiPopoverPanel } from '@kira/kira-ui';
-import { computed, ref } from 'vue';
+import type { MenuSection } from '@kira/kira-ui';
+// `KuiMenuList` is a plain (not `import type`) import even though this file's own script only
+// ever reads it through `InstanceType<typeof KuiMenuList>` — that is still a genuine *value* read
+// (`typeof` on an identifier requires the runtime binding in scope), and the template's own
+// `<KuiMenuList>` tag instantiates it as a component; biome's own static analysis sees neither use
+// and would otherwise "fix" this to `import type`, silently erasing the import (this file's own
+// `useImportType` biome-ignore precedent further down, for the same reason).
+// biome-ignore lint/style/useImportType: see above
+import { KuiButton, KuiMenuList, KuiPopoverPanel } from '@kira/kira-ui';
+import { computed, nextTick, ref } from 'vue';
 import type { DetailActions } from '../state/detailActions.ts';
 import type { GraphViewState } from '../state/graphView.ts';
 import type { OpsState } from '../state/ops.ts';
@@ -132,9 +140,33 @@ const pushPullDisabled = computed(
 );
 
 const isForcePushMenuOpen = ref(false);
+const pushMenuListRef = ref<InstanceType<typeof KuiMenuList> | null>(null);
 
-function toggleForcePushMenu(): void {
+async function toggleForcePushMenu(): Promise<void> {
   isForcePushMenuOpen.value = !isForcePushMenuOpen.value;
+  if (!isForcePushMenuOpen.value) return;
+  await nextTick();
+  pushMenuListRef.value?.focusFirst();
+}
+
+// G34 D8: driving `<KuiMenuList>` — today, one item. `danger: true` is the same visual treatment
+// `variant="danger"` gave the hand-rolled `KuiButton` row it replaces.
+const pushMenuSections: readonly MenuSection[] = [
+  {
+    items: [
+      {
+        id: 'force-push-trigger',
+        label: 'Force push…',
+        disabled: false,
+        disabledReason: undefined,
+        danger: true,
+      },
+    ],
+  },
+];
+
+function onPushMenuSelect(id: string): void {
+  if (id === 'force-push-trigger') void doForcePush();
 }
 
 async function doFetch(): Promise<void> {
@@ -311,17 +343,13 @@ const stashDisabled = computed(
           :width="160"
           @close="isForcePushMenuOpen = false"
         >
-          <div class="kv-push-menu" role="menu" aria-label="Push options">
-            <KuiButton
-              variant="danger"
-              class="kv-push-menu-item"
-              role="menuitem"
-              data-testid="force-push-trigger"
-              @click="doForcePush"
-            >
-              Force push…
-            </KuiButton>
-          </div>
+          <KuiMenuList
+            ref="pushMenuListRef"
+            :sections="pushMenuSections"
+            label="Push options"
+            @select="onPushMenuSelect"
+            @close="isForcePushMenuOpen = false"
+          />
         </KuiPopoverPanel>
       </div>
     </template>
@@ -340,7 +368,7 @@ const stashDisabled = computed(
     <span class="kv-toolbar-spacer" aria-hidden="true"></span>
 
     <KuiButton
-      class="kv-icon-button"
+      variant="icon"
       icon="codicon-gear"
       v-kui-tooltip="'Repository settings'"
       aria-label="Repository settings"
@@ -352,7 +380,7 @@ const stashDisabled = computed(
       <span class="codicon codicon-loading kv-remote-progress-spin" aria-hidden="true"></span>
       <span class="kv-remote-progress-label">{{ progressText }}</span>
       <KuiButton
-        class="kv-icon-button"
+        variant="icon"
         icon="codicon-close"
         :disabled="!cancellable"
         v-kui-tooltip="cancellable ? 'Cancel' : cancelDisabledReason"
@@ -373,7 +401,7 @@ const stashDisabled = computed(
       <span class="codicon codicon-loading kv-remote-progress-spin" aria-hidden="true"></span>
       <span class="kv-remote-progress-label">Preparing worktree…</span>
       <KuiButton
-        class="kv-icon-button"
+        variant="icon"
         icon="codicon-close"
         v-kui-tooltip="'Cancel'"
         data-testid="worktree-prepare-cancel"
@@ -451,16 +479,8 @@ const stashDisabled = computed(
   border-bottom-left-radius: 0;
 }
 
-/* G20 D5: positioning/chrome move onto KuiPopoverPanel's own `.kui-popover`. */
-.kv-push-menu {
-  padding: var(--kv-s-1);
-}
-
-.kv-push-menu-item {
-  display: block;
-  width: 100%;
-  text-align: left;
-}
+/* G34 D8: `.kv-push-menu`/`.kv-push-menu-item` are gone — the popover now wraps a
+   `<KuiMenuList>`, the same menu a right-click renders, instead of a hand-rolled one. */
 
 /* The one in-webview progress affordance for whichever `remote.run` is in flight (P6 judgment
    call 6's precedent — no `Notifications` port, D54) — a phase label, throttled to ~10/s

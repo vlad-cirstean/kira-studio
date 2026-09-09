@@ -108,7 +108,7 @@ async function removeFromStack(branch: string): Promise<void> {
           </span>
         </div>
         <KuiButton
-          class="kv-icon-button"
+          variant="icon"
           v-kui-tooltip="'Set stack parent…'"
           aria-label="Set stack parent"
           @click="requestSetParent(row.name)"
@@ -116,7 +116,7 @@ async function removeFromStack(branch: string): Promise<void> {
           <span class="codicon codicon-list-tree" aria-hidden="true"></span>
         </KuiButton>
         <KuiButton
-          class="kv-icon-button"
+          variant="icon"
           v-kui-tooltip="'Remove from stack'"
           aria-label="Remove from stack"
           @click="removeFromStack(row.name)"
@@ -136,7 +136,7 @@ async function removeFromStack(branch: string): Promise<void> {
           <span class="kv-stack-orphan-reason">{{ row.orphanReason }}</span>
         </div>
         <KuiButton
-          class="kv-icon-button"
+          variant="icon"
           v-kui-tooltip="'Set stack parent…'"
           aria-label="Set stack parent"
           @click="requestSetParent(row.name)"

@@ -7,6 +7,7 @@ export { default as KuiButton } from './KuiButton.vue';
 export { default as KuiContextMenu } from './KuiContextMenu.vue';
 export { default as KuiDialog } from './KuiDialog.vue';
 export { default as KuiIconBox } from './KuiIconBox.vue';
+export { default as KuiMenuList } from './KuiMenuList.vue';
 export { default as KuiPopoverPanel } from './KuiPopoverPanel.vue';
 export { default as KuiSearchInput } from './KuiSearchInput.vue';
 export { default as KuiSegmented } from './KuiSegmented.vue';

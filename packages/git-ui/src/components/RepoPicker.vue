@@ -88,7 +88,7 @@ onBeforeUnmount(() => {
         :key="candidate.path"
         role="option"
         tabindex="0"
-        class="kv-repo-item"
+        class="kui-row kv-repo-item"
         :aria-selected="isActive(candidate)"
         @click="selectCandidate(candidate)"
         @keydown.enter="selectCandidate(candidate)"
@@ -102,7 +102,11 @@ onBeforeUnmount(() => {
         ></span>
         <span class="kv-repo-item-label">{{ candidate.label }}</span>
       </li>
-      <li v-if="repoState.candidates.value.length === 0" class="kv-repo-empty" aria-disabled="true">
+      <li
+        v-if="repoState.candidates.value.length === 0"
+        class="kui-row kui-row--disabled kv-repo-empty"
+        aria-disabled="true"
+      >
         No repositories found
       </li>
     </ul>
@@ -125,37 +129,21 @@ onBeforeUnmount(() => {
   white-space: nowrap;
 }
 
-/* G20 D5: positioning/chrome move onto KuiPopoverPanel's own `.kui-popover`. */
+/* G20 D5: positioning/chrome move onto KuiPopoverPanel's own `.kui-popover`. G34 D14: padding
+   moves onto `--kv-s-2`, matching every other list panel's own inset. */
 .kv-repo-list {
   max-height: 320px;
   overflow-y: auto;
   margin: 0;
-  padding: var(--kv-s-1) 0;
+  padding: var(--kv-s-2);
   list-style: none;
 }
 
-.kv-repo-item {
-  display: flex;
-  align-items: center;
-  gap: var(--kv-s-2);
-  padding: var(--kv-s-1) var(--kv-s-4);
-  cursor: pointer;
-}
-
-.kv-repo-item:hover,
-.kv-repo-item:focus-visible {
-  background-color: var(--kv-row-hover-bg);
-  outline: none;
-}
+/* G34 D7: geometry now comes from `.kui-row` (composed in the template). */
 
 .kv-repo-item-label {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.kv-repo-empty {
-  padding: var(--kv-s-1) var(--kv-s-4);
-  color: var(--kv-description-fg);
 }
 </style>

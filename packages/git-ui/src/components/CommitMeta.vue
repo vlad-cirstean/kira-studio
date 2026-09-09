@@ -233,7 +233,7 @@ function copyMessage(): void {
         <h2 class="kv-meta-subject">{{ detail.subject }}</h2>
         <KuiButton
           v-if="actions.capabilities.clipboard"
-          variant="ghost"
+          variant="icon"
           icon="codicon-copy"
           v-kui-tooltip="'Copy full message'"
           @click="copyMessage"
@@ -248,7 +248,7 @@ function copyMessage(): void {
       <!-- G-UX D7 (7a/7b): author/committer and the trailers both live behind this toggle now, so
            it is not gated on `bodyOverflows` any more — there is always at least the author to
            reveal, even for a one-line subject with no body at all. -->
-      <KuiButton variant="ghost" class="kv-meta-body-toggle" @click="bodyExpanded = !bodyExpanded">
+      <KuiButton class="kv-meta-body-toggle" @click="bodyExpanded = !bodyExpanded">
         {{ bodyExpanded ? 'Show less' : 'Show more' }}
       </KuiButton>
       <div v-if="bodyExpanded" class="kv-meta-expanded">
