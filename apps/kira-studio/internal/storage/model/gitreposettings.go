@@ -16,6 +16,10 @@ type GitRepoSettings struct {
 	PullStrategy          string   `json:"pullStrategy"`
 	// LogLevel is instance-wide, not per-repo (D14) — see this struct's own doc comment.
 	LogLevel string `json:"logLevel"`
+	// GithubEnabled is G24 D16's own eighth leaf: off means no gh probe, no spawn, no cache fill, no
+	// badge, no search PR arm, no reaper re-resolve — both commit.resolvePr/branch.resolvePr answer
+	// {kind:'disabled'} outright. Genuinely per-repo (unlike LogLevel), default true.
+	GithubEnabled bool `json:"githubEnabled"`
 }
 
 // DefaultGitRepoSettings mirrors packages/git-core/src/settings/schema.ts's own SETTINGS defaults
@@ -29,6 +33,7 @@ func DefaultGitRepoSettings() GitRepoSettings {
 		ReviewBaseCandidates:  []string{"main", "master"},
 		PullStrategy:          "auto",
 		LogLevel:              "info",
+		GithubEnabled:         true,
 	}
 }
 
@@ -43,6 +48,7 @@ type GitRepoSettingsPatch struct {
 	ReviewBaseCandidates  *[]string `json:"reviewBaseCandidates,omitempty"`
 	PullStrategy          *string   `json:"pullStrategy,omitempty"`
 	LogLevel              *string   `json:"logLevel,omitempty"`
+	GithubEnabled         *bool     `json:"githubEnabled,omitempty"`
 }
 
 // ValidGraphScope mirrors schema.ts's kiraVersion.graph.scope enum.

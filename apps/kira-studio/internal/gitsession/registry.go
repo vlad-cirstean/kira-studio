@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/ghclient"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitclient"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitreview"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
@@ -75,6 +76,13 @@ type Registry struct {
 	// is (§0.4's "every review.db a test opens lives under t.TempDir()").
 	Review *gitreview.Store
 
+	// Gh is G24 D1's own single GitHub surface — shared off the Registry exactly like Review above
+	// (one process-wide *ghclient.Client, never one per repository); each RepoEntry gets its own
+	// *ghState (the caches/breaker), but every entry shares this one Client. Defaulted below to a
+	// real Discovery+Runner pair; tests override it with a Client built over a fake/counting
+	// ghclient.Runner (F13: gh is never actually installed in this container).
+	Gh *ghclient.Client
+
 	mu      sync.Mutex
 	entries map[string]*slot
 }
@@ -93,7 +101,11 @@ func NewRegistry(runner gitclient.Runner) *Registry {
 		RepoSettingsSet: func(string, model.GitRepoSettingsPatch) (model.GitRepoSettings, error) {
 			return model.DefaultGitRepoSettings(), nil
 		},
-		Review:  gitreview.NewStore(gitreview.DefaultPath()),
+		Review: gitreview.NewStore(gitreview.DefaultPath()),
+		Gh: ghclient.NewClient(
+			ghclient.NewDiscovery(ghclient.NewPlatformLocator(), ghclient.NewExecRunner(), ghclient.NewRealClock()),
+			ghclient.NewExecRunner(),
+		),
 		entries: make(map[string]*slot),
 	}
 }
@@ -126,7 +138,7 @@ func (reg *Registry) Acquire(ctx context.Context, gitPath, path string) (*RepoEn
 		return nil, nil, err
 	}
 	repo := gitclient.NewRepo(summary, reg.runner, gitPath)
-	entry := newRepoEntry(summary, repo, w, reg.Settings, reg.RepoSettingsGet, reg.Review)
+	entry := newRepoEntry(summary, repo, w, reg.Settings, reg.RepoSettingsGet, reg.Review, reg.Gh)
 	reg.entries[summary.RepoID] = &slot{entry: entry, refs: 1}
 	return entry, reg.releaseFunc(summary.RepoID), nil
 }

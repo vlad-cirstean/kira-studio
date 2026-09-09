@@ -5,6 +5,7 @@ import (
 	"errors"
 	"sync"
 
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/ghclient"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitclient"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitclient/catfile"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitpreflight"
@@ -100,10 +101,16 @@ type RepoEntry struct {
 	// (D12: "I have reviewed X" is a fact about the repository and the person, not the window).
 	review *gitreview.Store
 
+	// gh is G24 D6's own three-cache-plus-breaker slot (gh.go); ghClient is the process-wide
+	// *ghclient.Client threaded in by Registry.Acquire from Registry.Gh, mirroring review's own
+	// "shared off the Registry" shape — one GitHub surface, not one per repository.
+	gh       *ghState
+	ghClient *ghclient.Client
+
 	done chan struct{}
 }
 
-func newRepoEntry(summary gitclient.RepoSummary, repo *gitclient.Repo, w Watcher, settings func() ([]string, int, string), repoSettingsGet func(string) (model.GitRepoSettings, error), review *gitreview.Store) *RepoEntry {
+func newRepoEntry(summary gitclient.RepoSummary, repo *gitclient.Repo, w Watcher, settings func() ([]string, int, string), repoSettingsGet func(string) (model.GitRepoSettings, error), review *gitreview.Store, ghClient *ghclient.Client) *RepoEntry {
 	e := &RepoEntry{
 		Summary:         summary,
 		Repo:            repo,
@@ -117,6 +124,8 @@ func newRepoEntry(summary gitclient.RepoSummary, repo *gitclient.Repo, w Watcher
 		settings:        settings,
 		repoSettingsGet: repoSettingsGet,
 		review:          review,
+		gh:              newGhState(),
+		ghClient:        ghClient,
 		done:            make(chan struct{}),
 	}
 	go e.pump()
@@ -163,6 +172,12 @@ func (e *RepoEntry) note(sig gitclient.Signal) {
 		e.headMu.Lock()
 		e.headStale = true
 		e.headMu.Unlock()
+		// G24 D6/D8: the snapshot/per-branch/per-commit gh caches and the GitHub-remote detection
+		// are all dropped here too — the breaker is not (D7: "refsChanged does not clear it"). The
+		// bounded, gated eager re-resolve pass (D8) is scheduled AFTER the drop, in its own
+		// goroutine, so it never delays this signal's own fan-out to subscribers.
+		e.gh.drop()
+		go e.eagerResolveClosedBranches()
 	}
 	e.mu.Lock()
 	subs := make([]*subscriber, 0, len(e.subs))

@@ -22,6 +22,14 @@ func NewClient(discovery *Discovery, runner Runner) *Client {
 	return &Client{discovery: discovery, runner: runner}
 }
 
+// Hosts passes through to the underlying Discovery's own Hosts (D15's own "is this a GitHub
+// repository" test: github.com, or a host this Client has ever probed successfully) — kept on
+// Client, not exposed as a separate Discovery accessor, so Client stays the single surface every
+// caller above this package reaches through (§9).
+func (c *Client) Hosts(ctx context.Context) []string {
+	return c.discovery.Hosts(ctx)
+}
+
 // commonArgv builds D4's own common prefix: `gh api --hostname <host> --method GET -H "Accept:
 // application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" <path>` — one place so every
 // one of the three calls in pr.go, and this file's own argv-golden test, share byte-for-byte the

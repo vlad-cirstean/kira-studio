@@ -15,6 +15,13 @@ func RemotesArgs() []string {
 	return []string{"remote"}
 }
 
+// RemoteGetURLArgs builds `git remote get-url <name>` — G24 D15's own one-git-spawn "is this a
+// GitHub repository" check, upstream verbatim. Tolerated through the caller's own
+// runAllowingExit (exit 128 == no such remote, F15's own precedent).
+func RemoteGetURLArgs(name string) []string {
+	return []string{"remote", "get-url", name}
+}
+
 // RemoteTipArgs builds `git rev-parse -q --verify refs/remotes/<remote>/<branch>` — tolerated
 // through the caller's own runAllowingExit (exit 1 == the remote-tracking ref does not exist,
 // F15).

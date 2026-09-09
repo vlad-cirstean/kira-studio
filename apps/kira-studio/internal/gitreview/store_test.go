@@ -19,6 +19,48 @@ func newTestStore(t *testing.T) *Store {
 	return s
 }
 
+// TestStoreBranches is G24 D8/F6's own regression guard: a READ-ONLY listing of every branch with
+// a stored session for a repo, and only that repo — never a second delete path.
+func TestStoreBranches(t *testing.T) {
+	ctx := context.Background()
+	s := newTestStore(t)
+
+	rec := FileRecord{
+		Path: "a.txt", State: "full", ReviewedAtSHA: "sha1",
+		ReviewedAt: time.UnixMilli(1000), BlobOID: "oid1",
+		ContentKind: ContentBinary, ContentBytes: 0, LineCount: 0,
+	}
+	if err := s.Put(ctx, "repo-a", "feature-1", rec, nil); err != nil {
+		t.Fatalf("Put: %v", err)
+	}
+	if err := s.Put(ctx, "repo-a", "feature-2", rec, nil); err != nil {
+		t.Fatalf("Put: %v", err)
+	}
+	if err := s.Put(ctx, "repo-b", "other-repo-branch", rec, nil); err != nil {
+		t.Fatalf("Put: %v", err)
+	}
+
+	branches, err := s.Branches(ctx, "repo-a")
+	if err != nil {
+		t.Fatalf("Branches: %v", err)
+	}
+	got := map[string]bool{}
+	for _, b := range branches {
+		got[b] = true
+	}
+	if len(got) != 2 || !got["feature-1"] || !got["feature-2"] {
+		t.Fatalf("Branches(repo-a) = %v, want exactly [feature-1 feature-2]", branches)
+	}
+
+	none, err := s.Branches(ctx, "repo-nonexistent")
+	if err != nil {
+		t.Fatalf("Branches: %v", err)
+	}
+	if len(none) != 0 {
+		t.Fatalf("Branches(repo-nonexistent) = %v, want empty", none)
+	}
+}
+
 // TestStorePutRecordRoundTrip covers D18's own claim: mark -> read back -> re-mark (replacement,
 // not accumulation).
 func TestStorePutRecordRoundTrip(t *testing.T) {

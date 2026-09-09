@@ -55,6 +55,7 @@ func (r *GitRepoSettingsRepo) Get(repoID string) (model.GitRepoSettings, error) 
 	leaf(stored, "stashIncludeUntracked", &result.StashIncludeUntracked)
 	leaf(stored, "reviewBaseCandidates", &result.ReviewBaseCandidates)
 	leafValid(stored, "pullStrategy", &result.PullStrategy, model.ValidPullStrategy)
+	leaf(stored, "githubEnabled", &result.GithubEnabled)
 
 	sentinelStored, err := r.selectAllFor(sentinelRepoID)
 	if err != nil {
@@ -136,6 +137,11 @@ func (r *GitRepoSettingsRepo) Set(repoID string, patch model.GitRepoSettingsPatc
 	if patch.LogLevel != nil {
 		// D14: resolveRepoID redirects this one write to the sentinel row regardless of repoID.
 		if err := r.upsert(tx, repoID, logLevelSettingKey, *patch.LogLevel); err != nil {
+			return model.GitRepoSettings{}, err
+		}
+	}
+	if patch.GithubEnabled != nil {
+		if err := r.upsert(tx, repoID, "githubEnabled", *patch.GithubEnabled); err != nil {
 			return model.GitRepoSettings{}, err
 		}
 	}

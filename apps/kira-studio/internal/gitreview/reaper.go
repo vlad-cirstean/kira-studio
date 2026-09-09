@@ -71,6 +71,37 @@ func (s *Store) Purge(ctx context.Context, repoID, branch string) error {
 	return nil
 }
 
+// Branches is G24 D8's own READ-ONLY seam: every branch with a stored review_session row for
+// repoID — nothing more. This is the one addition G24's own plan permits here (F6, restating G11's
+// own rule at reaper.go: "a G16 that writes its own delete, or its own lifecycle, has gone wrong")
+// — the eager post-fetch re-resolve pass reads this list to know which branches are even worth
+// re-checking, and then purges through the SAME Purge method above; no new DELETE statement exists
+// anywhere in this file because of this method.
+func (s *Store) Branches(ctx context.Context, repoID string) ([]string, error) {
+	db, err := s.conn()
+	if err != nil {
+		return nil, err
+	}
+	rows, err := db.QueryContext(ctx, `SELECT branch FROM review_session WHERE repo_id = ?`, repoID)
+	if err != nil {
+		return nil, fmt.Errorf("gitreview: query branches: %w", err)
+	}
+	defer rows.Close()
+
+	var branches []string
+	for rows.Next() {
+		var branch string
+		if err := rows.Scan(&branch); err != nil {
+			return nil, fmt.Errorf("gitreview: scan branch: %w", err)
+		}
+		branches = append(branches, branch)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("gitreview: iterate branches: %w", err)
+	}
+	return branches, nil
+}
+
 // startReaperLocked launches the hourly sweep ticker — one goroutine per store, stopped and joined
 // by Close. Not AfterFunc-per-session (D11): there is no per-session object to hang a timer on, and
 // a single ticker over one DELETE is cheaper than N timers regardless. Caller holds openMu (called
