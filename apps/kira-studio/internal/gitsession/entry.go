@@ -117,12 +117,6 @@ type RepoEntry struct {
 	// by an older test never worries about worktree cross-window checks in the first place).
 	isOpen func(repoID string) bool
 
-	// prepareScriptApprovalGet/prepareScriptApprovalSet are G25 D11's own two server-only accessors
-	// (storage/repos.GitRepoSettingsRepo.{Get,Set}PrepareScriptApproval), threaded in the same way —
-	// never exposed through repoSettingsGet/RepoSettings, which is exactly the point (F15).
-	prepareScriptApprovalGet func(repoID string) (sha string, ok bool, err error)
-	prepareScriptApprovalSet func(repoID, sha string) error
-
 	// prepare is G25 D13's own "≤1 prepare run per repository" box — teardown force-cancels it
 	// exactly like remoteOp.
 	prepare prepareOpSlot
@@ -137,28 +131,25 @@ func newRepoEntry(
 	summary gitclient.RepoSummary, repo *gitclient.Repo, w Watcher,
 	settings func() ([]string, int, string), repoSettingsGet func(string) (model.GitRepoSettings, error),
 	review *gitreview.Store, ghClient *ghclient.Client, isOpen func(string) bool,
-	prepareScriptApprovalGet func(string) (string, bool, error), prepareScriptApprovalSet func(string, string) error,
 ) *RepoEntry {
 	e := &RepoEntry{
-		Summary:                  summary,
-		Repo:                     repo,
-		watcher:                  w,
-		subs:                     make(map[ConnID]*subscriber),
-		detail:                   newDetailCache(),
-		diff:                     newDiffCache(diffCacheCapBytes),
-		refs:                     newRefsCache(),
-		stack:                    newStackCache(),
-		head:                     summary.Head,
-		undo:                     &gitpreflight.UndoSlot{},
-		settings:                 settings,
-		repoSettingsGet:          repoSettingsGet,
-		review:                   review,
-		gh:                       newGhState(),
-		ghClient:                 ghClient,
-		isOpen:                   isOpen,
-		prepareScriptApprovalGet: prepareScriptApprovalGet,
-		prepareScriptApprovalSet: prepareScriptApprovalSet,
-		done:                     make(chan struct{}),
+		Summary:         summary,
+		Repo:            repo,
+		watcher:         w,
+		subs:            make(map[ConnID]*subscriber),
+		detail:          newDetailCache(),
+		diff:            newDiffCache(diffCacheCapBytes),
+		refs:            newRefsCache(),
+		stack:           newStackCache(),
+		head:            summary.Head,
+		undo:            &gitpreflight.UndoSlot{},
+		settings:        settings,
+		repoSettingsGet: repoSettingsGet,
+		review:          review,
+		gh:              newGhState(),
+		ghClient:        ghClient,
+		isOpen:          isOpen,
+		done:            make(chan struct{}),
 	}
 	go e.pump()
 	if _, minutes, _ := settings(); minutes > 0 {

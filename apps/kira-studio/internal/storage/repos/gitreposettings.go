@@ -20,13 +20,6 @@ const (
 	worktreeBasePathKey      = "worktreeBasePath"
 )
 
-// prepareScriptApprovedShaKey is G25 D11/F15's own server-only key, stored in this SAME table
-// under the SAME (repo_id, key) shape as every other leaf — but reachable ONLY through
-// GetPrepareScriptApproval/SetPrepareScriptApproval below, never through Get/Set's own
-// model.GitRepoSettings{,Patch} surface. Grep confirms this string appears nowhere in
-// storage/model's GitRepoSettings/GitRepoSettingsPatch or gitrpc's RepoSettingsSnapshot.
-const prepareScriptApprovedShaKey = "prepareScriptApprovedSha"
-
 // sentinelRepoID is D14's reserved, permanently collision-free non-repo key: internal/gitclient/
 // repo.go's RepoID is always a non-empty absolute path (or git-dir path for a bare repo), so ""
 // can never collide with a real one.
@@ -165,14 +158,6 @@ func (r *GitRepoSettingsRepo) Set(repoID string, patch model.GitRepoSettingsPatc
 		if err := r.upsert(tx, repoID, worktreePrepareScriptKey, *patch.WorktreePrepareScript); err != nil {
 			return model.GitRepoSettings{}, err
 		}
-		// D11: editing the script clears its stored approval IN THE SAME TRANSACTION — a stale
-		// approval sha must never survive a script edit, even for the pathological case of a patch
-		// that edits the script back to byte-identical text (a fresh approval is still required;
-		// the whole point of D11 is "re-approve whenever the text last shown differs from what is
-		// about to run", and this Set has no way to know the caller intended anything narrower).
-		if err := r.clearPrepareScriptApproval(tx, repoID); err != nil {
-			return model.GitRepoSettings{}, err
-		}
 	}
 	if patch.WorktreeBasePath != nil {
 		if err := r.upsert(tx, repoID, worktreeBasePathKey, *patch.WorktreeBasePath); err != nil {
@@ -198,67 +183,6 @@ func (r *GitRepoSettingsRepo) upsert(tx *sql.Tx, repoID, key string, value any) 
 		resolved, key, string(encoded),
 	); err != nil {
 		return fmt.Errorf("repos/gitreposettings: upsert %s/%s: %w", resolved, key, err)
-	}
-	return nil
-}
-
-// clearPrepareScriptApproval deletes repoID's own prepareScriptApprovedShaKey row, if any — a
-// plain DELETE, not an upsert to "" (F15's own "absent means unapproved" contract, kept exact:
-// GetPrepareScriptApproval below treats "no row" and "row holds ”" identically, but DELETE is the
-// honest representation of "there is no longer an approval on file", not "there is an approval and
-// it is the empty string").
-func (r *GitRepoSettingsRepo) clearPrepareScriptApproval(tx *sql.Tx, repoID string) error {
-	if _, err := tx.Exec(
-		`DELETE FROM git_repo_settings WHERE repo_id = ? AND key = ?`,
-		repoID, prepareScriptApprovedShaKey,
-	); err != nil {
-		return fmt.Errorf("repos/gitreposettings: clear approval for %s: %w", repoID, err)
-	}
-	return nil
-}
-
-// GetPrepareScriptApproval is G25 D11's own server-only read (F15) — the sha256 last approved for
-// repoID's own prepare script, or ("", false) when none is on file (never written, or cleared by a
-// subsequent script edit, D11's clear-on-change rule). Deliberately NOT part of Get/
-// model.GitRepoSettings: this is the one leaf repoSettings.get must never echo back to a client,
-// since the wire round-trip is exactly what would let a client forge its own approval.
-func (r *GitRepoSettingsRepo) GetPrepareScriptApproval(repoID string) (sha string, ok bool, err error) {
-	var value string
-	err = r.DB.QueryRow(
-		`SELECT value FROM git_repo_settings WHERE repo_id = ? AND key = ?`,
-		repoID, prepareScriptApprovedShaKey,
-	).Scan(&value)
-	if err == sql.ErrNoRows {
-		return "", false, nil
-	}
-	if err != nil {
-		return "", false, fmt.Errorf("repos/gitreposettings: get approval for %s: %w", repoID, err)
-	}
-	var decoded string
-	if jerr := json.Unmarshal([]byte(value), &decoded); jerr != nil {
-		return "", false, fmt.Errorf("repos/gitreposettings: decode approval for %s: %w", repoID, jerr)
-	}
-	return decoded, true, nil
-}
-
-// SetPrepareScriptApproval is G25 D11's own server-only write — called ONLY by worktree.prepare's
-// own handler, and ONLY once it has independently confirmed (host-side, never trusting the
-// client's own claim) that the sha256 it is about to record matches the CURRENTLY STORED script
-// text it just re-hashed. There is no public RPC method that calls this directly with a
-// caller-supplied sha — the approval is always derived from re-hashing what is actually stored,
-// never from a value a client sent, which is what makes self-approval structurally impossible
-// rather than merely unlikely.
-func (r *GitRepoSettingsRepo) SetPrepareScriptApproval(repoID, sha256 string) error {
-	tx, err := r.DB.Begin()
-	if err != nil {
-		return fmt.Errorf("repos/gitreposettings: begin approval write: %w", err)
-	}
-	defer tx.Rollback() //nolint:errcheck
-	if err := r.upsert(tx, repoID, prepareScriptApprovedShaKey, sha256); err != nil {
-		return err
-	}
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("repos/gitreposettings: commit approval write: %w", err)
 	}
 	return nil
 }

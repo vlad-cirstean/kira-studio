@@ -69,15 +69,6 @@ type Registry struct {
 	RepoSettingsGet func(repoID string) (model.GitRepoSettings, error)
 	RepoSettingsSet func(repoID string, patch model.GitRepoSettingsPatch) (model.GitRepoSettings, error)
 
-	// PrepareScriptApprovalGet/PrepareScriptApprovalSet are G25 D11's own server-only accessors
-	// (storage/repos.GitRepoSettingsRepo.{Get,Set}PrepareScriptApproval) — threaded the same way as
-	// RepoSettingsGet/Set above, but never exposed anywhere near RepoSettingsGet/Set's own public
-	// surface (F15). Defaulted to "no approval is ever on file, and no approval can ever be
-	// recorded" — a Registry built by hand (a test) that never overrides these simply always
-	// requires a fresh approval, the fail-safe default for a security-relevant accessor.
-	PrepareScriptApprovalGet func(repoID string) (sha string, ok bool, err error)
-	PrepareScriptApprovalSet func(repoID, sha string) error
-
 	// Review is G11 D3's own seam: review.db's whole surface, defaulted below to a Store over
 	// gitreview.DefaultPath(). Construction is free (the file opens lazily, on the first review
 	// request) — an instance that never serves one never creates review.db and never starts its
@@ -110,9 +101,7 @@ func NewRegistry(runner gitclient.Runner) *Registry {
 		RepoSettingsSet: func(string, model.GitRepoSettingsPatch) (model.GitRepoSettings, error) {
 			return model.DefaultGitRepoSettings(), nil
 		},
-		PrepareScriptApprovalGet: func(string) (string, bool, error) { return "", false, nil },
-		PrepareScriptApprovalSet: func(string, string) error { return nil },
-		Review:                   gitreview.NewStore(gitreview.DefaultPath()),
+		Review: gitreview.NewStore(gitreview.DefaultPath()),
 		Gh: ghclient.NewClient(
 			ghclient.NewDiscovery(ghclient.NewPlatformLocator(), ghclient.NewExecRunner(), ghclient.NewRealClock()),
 			ghclient.NewExecRunner(),
@@ -150,8 +139,7 @@ func (reg *Registry) Acquire(ctx context.Context, gitPath, path string) (*RepoEn
 	}
 	repo := gitclient.NewRepo(summary, reg.runner, gitPath)
 	entry := newRepoEntry(
-		summary, repo, w, reg.Settings, reg.RepoSettingsGet, reg.Review, reg.Gh,
-		reg.IsOpen, reg.PrepareScriptApprovalGet, reg.PrepareScriptApprovalSet,
+		summary, repo, w, reg.Settings, reg.RepoSettingsGet, reg.Review, reg.Gh, reg.IsOpen,
 	)
 	reg.entries[summary.RepoID] = &slot{entry: entry, refs: 1}
 	return entry, reg.releaseFunc(summary.RepoID), nil

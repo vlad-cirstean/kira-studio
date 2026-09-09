@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"os"
 	"path/filepath"
-	"sync"
 	"testing"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitclient"
@@ -61,45 +60,18 @@ func TestPrepareOpSlot_ForceCancel(t *testing.T) {
 
 // --- test fixtures ---------------------------------------------------------------------------
 
-// approvalRecorder is a fake for Registry.PrepareScriptApproval{Get,Set} (D11) — records every Set
-// call so a test can assert whether an approval was (or, critically, was NOT) recorded.
-type approvalRecorder struct {
-	mu       sync.Mutex
-	sha      string
-	ok       bool
-	setCalls []string
-}
-
-func (r *approvalRecorder) get(string) (string, bool, error) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	return r.sha, r.ok, nil
-}
-
-func (r *approvalRecorder) set(_ string, sha string) error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	r.sha, r.ok = sha, true
-	r.setCalls = append(r.setCalls, sha)
-	return nil
-}
-
 // newWorktreeTestEntry opens repoDir exactly like newQueriesTestEntry, but with an overridable
-// per-repo prepare script and a recorder standing in for the real storage-backed approval
-// accessors (D18: gitsession's own tests never spawn a real shell — RunPrepare's own tests below
-// all inject a fake gitprepare.Runner too).
-func newWorktreeTestEntry(t *testing.T, repoDir, script string) (*RepoEntry, *approvalRecorder) {
+// per-repo prepare script (D18: gitsession's own tests never spawn a real shell — RunPrepare's own
+// tests below all inject a fake gitprepare.Runner too).
+func newWorktreeTestEntry(t *testing.T, repoDir, script string) *RepoEntry {
 	t.Helper()
 	runner := gitclient.NewExecRunner()
 	registry := NewRegistry(runner)
-	rec := &approvalRecorder{}
 	registry.RepoSettingsGet = func(string) (model.GitRepoSettings, error) {
 		s := model.DefaultGitRepoSettings()
 		s.WorktreePrepareScript = script
 		return s, nil
 	}
-	registry.PrepareScriptApprovalGet = rec.get
-	registry.PrepareScriptApprovalSet = rec.set
 	t.Cleanup(registry.Close)
 	conn := NewConn(ConnID("worktree-test-conn"), "test-client", "test-client-label", nil)
 	summary, err := conn.Open(context.Background(), registry, "git", repoDir)
@@ -111,7 +83,7 @@ func newWorktreeTestEntry(t *testing.T, repoDir, script string) (*RepoEntry, *ap
 	if !ok {
 		t.Fatal("conn.Entry: not held after Open")
 	}
-	return entry, rec
+	return entry
 }
 
 // initWorktreeTestRepo builds a bare-minimum one-commit repo on branch "main".
@@ -155,7 +127,7 @@ func TestWorktrees_MainAndLinked(t *testing.T) {
 	wtPath := filepath.Join(t.TempDir(), "linked")
 	runGitQ(t, dir, "worktree", "add", "-b", "feature", wtPath)
 
-	entry, _ := newWorktreeTestEntry(t, dir, "")
+	entry := newWorktreeTestEntry(t, dir, "")
 	list, err := entry.Worktrees(context.Background())
 	if err != nil {
 		t.Fatalf("Worktrees: %v", err)
@@ -179,7 +151,7 @@ func TestWorktrees_MainAndLinked(t *testing.T) {
 func TestWorktreeAddPreflight_Clean(t *testing.T) {
 	skipWithoutGitQueries(t)
 	dir := initWorktreeTestRepo(t)
-	entry, _ := newWorktreeTestEntry(t, dir, "")
+	entry := newWorktreeTestEntry(t, dir, "")
 	pf, err := entry.WorktreeAddPreflight(context.Background(), WorktreeAddParams{
 		Path: filepath.Join(t.TempDir(), "wt"), Mode: "newBranch", Branch: "topic", StartPoint: "main",
 	})
@@ -197,7 +169,7 @@ func TestWorktreeAddPreflight_BranchCheckedOutElsewhere(t *testing.T) {
 	wtPath := filepath.Join(t.TempDir(), "linked")
 	runGitQ(t, dir, "worktree", "add", "-b", "feature", wtPath)
 
-	entry, _ := newWorktreeTestEntry(t, dir, "")
+	entry := newWorktreeTestEntry(t, dir, "")
 	pf, err := entry.WorktreeAddPreflight(context.Background(), WorktreeAddParams{
 		Path: filepath.Join(t.TempDir(), "wt2"), Mode: "existingBranch", Branch: "feature",
 	})
@@ -214,7 +186,7 @@ func TestWorktreeAddPreflight_BranchCheckedOutElsewhere(t *testing.T) {
 func TestWorktreeRemovePreflight_MainAndCurrentBlocked(t *testing.T) {
 	skipWithoutGitQueries(t)
 	dir := initWorktreeTestRepo(t)
-	entry, _ := newWorktreeTestEntry(t, dir, "")
+	entry := newWorktreeTestEntry(t, dir, "")
 	pf, err := entry.WorktreeRemovePreflight(context.Background(), dir)
 	if err != nil {
 		t.Fatalf("WorktreeRemovePreflight: %v", err)
@@ -244,7 +216,7 @@ func TestRunOp_WorktreeRemove_DirtyRequiresConfirmation(t *testing.T) {
 		t.Fatalf("write dirty.txt: %v", err)
 	}
 
-	entry, _ := newWorktreeTestEntry(t, dir, "")
+	entry := newWorktreeTestEntry(t, dir, "")
 	ctx := context.Background()
 
 	// No token at all.
@@ -296,7 +268,7 @@ func TestRunOp_WorktreeRemove_DirtyRequiresConfirmation(t *testing.T) {
 func TestRunOp_WorktreeRemove_MainWorktreeBlocked(t *testing.T) {
 	skipWithoutGitQueries(t)
 	dir := initWorktreeTestRepo(t)
-	entry, _ := newWorktreeTestEntry(t, dir, "")
+	entry := newWorktreeTestEntry(t, dir, "")
 	result, err := entry.RunOp(context.Background(), ConnID("c"), "label", OpRequest{Kind: "worktreeRemove", Path: dir})
 	if err != nil {
 		t.Fatalf("RunOp: %v", err)
@@ -309,7 +281,7 @@ func TestRunOp_WorktreeRemove_MainWorktreeBlocked(t *testing.T) {
 func TestRunOp_WorktreeAdd_NewBranch(t *testing.T) {
 	skipWithoutGitQueries(t)
 	dir := initWorktreeTestRepo(t)
-	entry, _ := newWorktreeTestEntry(t, dir, "")
+	entry := newWorktreeTestEntry(t, dir, "")
 	wtPath := filepath.Join(t.TempDir(), "new-wt")
 
 	result, err := entry.RunOp(context.Background(), ConnID("c"), "label", OpRequest{
@@ -336,7 +308,7 @@ func TestRunOp_WorktreeAdd_NewBranch(t *testing.T) {
 func TestRunOp_WorktreeAdd_BlockedNeverSpawns(t *testing.T) {
 	skipWithoutGitQueries(t)
 	dir := initWorktreeTestRepo(t)
-	entry, _ := newWorktreeTestEntry(t, dir, "")
+	entry := newWorktreeTestEntry(t, dir, "")
 	wtPath := filepath.Join(t.TempDir(), "bad-wt")
 
 	result, err := entry.RunOp(context.Background(), ConnID("c"), "label", OpRequest{
@@ -358,7 +330,7 @@ func TestRunOp_WorktreeAdd_BlockedNeverSpawns(t *testing.T) {
 func TestRunPrepare_NotConfigured(t *testing.T) {
 	skipWithoutGitQueries(t)
 	dir := initWorktreeTestRepo(t)
-	entry, _ := newWorktreeTestEntry(t, dir, "")
+	entry := newWorktreeTestEntry(t, dir, "")
 	fake := &fakePrepareRunner{}
 
 	result, err := entry.RunPrepare(context.Background(), nil, dir, "irrelevant", WorktreePrepareDeps{Runner: fake})
@@ -379,7 +351,7 @@ func TestRunPrepare_NotConfigured(t *testing.T) {
 func TestRunPrepare_ScriptChangedNeverSpawns(t *testing.T) {
 	skipWithoutGitQueries(t)
 	dir := initWorktreeTestRepo(t)
-	entry, _ := newWorktreeTestEntry(t, dir, "npm ci")
+	entry := newWorktreeTestEntry(t, dir, "npm ci")
 	fake := &fakePrepareRunner{}
 
 	result, err := entry.RunPrepare(context.Background(), nil, dir, "0000000000000000000000000000000000000000000000000000000000000000", WorktreePrepareDeps{Runner: fake})
@@ -398,7 +370,7 @@ func TestRunPrepare_NotAWorktree(t *testing.T) {
 	skipWithoutGitQueries(t)
 	dir := initWorktreeTestRepo(t)
 	script := "npm ci"
-	entry, _ := newWorktreeTestEntry(t, dir, script)
+	entry := newWorktreeTestEntry(t, dir, script)
 	fake := &fakePrepareRunner{}
 
 	result, err := entry.RunPrepare(context.Background(), nil, filepath.Join(t.TempDir(), "not-a-worktree"), sha256Hex(script), WorktreePrepareDeps{Runner: fake})
@@ -417,7 +389,7 @@ func TestRunPrepare_AlreadyRunning(t *testing.T) {
 	skipWithoutGitQueries(t)
 	dir := initWorktreeTestRepo(t)
 	script := "npm ci"
-	entry, _ := newWorktreeTestEntry(t, dir, script)
+	entry := newWorktreeTestEntry(t, dir, script)
 	fake := &fakePrepareRunner{}
 
 	if !entry.prepare.claim(func() {}) {
@@ -437,17 +409,16 @@ func TestRunPrepare_AlreadyRunning(t *testing.T) {
 	}
 }
 
-// TestRunPrepare_SuccessSetsApprovalAndPassesEnv proves the happy path end to end against the fake
-// runner: the correct shell/env reach Spec, the worktree's own path/branch are threaded through,
-// and a successful digest match records the approval (D11).
-func TestRunPrepare_SuccessSetsApprovalAndPassesEnv(t *testing.T) {
+// TestRunPrepare_SuccessPassesEnv proves the happy path end to end against the fake runner: the
+// correct shell/env reach Spec, and the worktree's own path/branch are threaded through.
+func TestRunPrepare_SuccessPassesEnv(t *testing.T) {
 	skipWithoutGitQueries(t)
 	dir := initWorktreeTestRepo(t)
 	wtPath := filepath.Join(t.TempDir(), "prepared-wt")
 	runGitQ(t, dir, "worktree", "add", "-b", "feature", wtPath)
 
 	script := "npm ci"
-	entry, rec := newWorktreeTestEntry(t, dir, script)
+	entry := newWorktreeTestEntry(t, dir, script)
 	fake := &fakePrepareRunner{result: gitprepare.Result{ExitCode: 0, Output: []gitprepare.Line{{Stream: "stdout", Text: "ok"}}}}
 
 	result, err := entry.RunPrepare(context.Background(), nil, wtPath, sha256Hex(script), WorktreePrepareDeps{
@@ -476,11 +447,5 @@ func TestRunPrepare_SuccessSetsApprovalAndPassesEnv(t *testing.T) {
 	}
 	if len(wantEnv) != 0 {
 		t.Fatalf("missing env entries: %v (full env: %v)", wantEnv, fake.lastSpec.Env)
-	}
-
-	rec.mu.Lock()
-	defer rec.mu.Unlock()
-	if len(rec.setCalls) != 1 || rec.setCalls[0] != sha256Hex(script) {
-		t.Fatalf("approval sets = %v, want exactly one call with %q", rec.setCalls, sha256Hex(script))
 	}
 }
