@@ -36,6 +36,7 @@ import { VsCodeCredentialPrompt } from './ports/credentialPrompt.ts';
 import { VsCodeDialogs } from './ports/dialogs.ts';
 import { VsCodeEditorIntegration } from './ports/editorIntegration.ts';
 import { VsCodeLogger } from './ports/logger.ts';
+import { VsCodeWindows } from './ports/windows.ts';
 import { VsCodeWorkspaceRoots } from './ports/workspaceRoots.ts';
 import { createProxyHandlers } from './proxyHandlers.ts';
 import { createReviewCommentController } from './reviewComments.ts';
@@ -303,6 +304,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const roots = new VsCodeWorkspaceRoots();
   const clipboard = new VsCodeClipboard();
   const editor = new VsCodeEditorIntegration();
+  // G25 D6/D14: the "Open in New Window" port and the workspace-trust probe behind
+  // capabilities.runPrepareScript.
+  const windows = new VsCodeWindows();
   // G7 D4/D21: the migrated, previously-unused credential port — this phase's own relay is its
   // first (and only) caller.
   const credentialPrompt = new VsCodeCredentialPrompt();
@@ -376,6 +380,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     clipboard,
     editor,
     logger,
+    windows,
+    isWorkspaceTrusted: () => vscode.workspace.isTrusted,
     revealReview: (repoId, branch) => reviewProvider.reviewBranch(repoId, branch),
     renderReviewComments: (repoId, branchTip, path, branch) =>
       reviewComments.renderThreadsForKey(repoId, branchTip, path, branch),
@@ -502,6 +508,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     {
       dispose: manager.on('remote.progress', (payload) => {
         graphProvider.notifyRemoteProgress(payload);
+      }),
+    },
+    // G25 D13: the same "graph provider only" forward remote.progress already uses.
+    {
+      dispose: manager.on('worktree.progress', (payload) => {
+        graphProvider.notifyWorktreeProgress(payload);
       }),
     },
     manager.onActivityChange((active) => {

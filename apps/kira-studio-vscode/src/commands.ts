@@ -141,6 +141,21 @@ export const MUTATING_COMMANDS: Record<MutatingAction, MutatingEntry> = {
     title: 'Delete Remote Branch…',
     action: 'openBranchPicker',
   },
+  // G25: worktreeAdd opens WorktreeDialog's create mode directly (its own new UiActionKind
+  // member, 'createWorktree' — the same "stashPush opens its own dialog directly" shape stashPush
+  // already established above); worktreeRemove reuses 'openBranchPicker' — the same surface that
+  // already contains the fourth (worktree) section's own row-level Remove action, the same
+  // convention every other row-addressed mutating kind above already follows.
+  worktreeAdd: {
+    command: 'kiraVersion.createWorktree',
+    title: 'Create Worktree…',
+    action: 'createWorktree',
+  },
+  worktreeRemove: {
+    command: 'kiraVersion.removeWorktree',
+    title: 'Remove Worktree…',
+    action: 'openBranchPicker',
+  },
   undo: { command: 'kiraVersion.undo', title: 'Undo Last Operation', action: 'undo' },
   cancel: {
     command: 'kiraVersion.cancelRemoteOperation',

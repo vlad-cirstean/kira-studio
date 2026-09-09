@@ -79,6 +79,17 @@ export interface RepoSettingsSnapshot {
    *  `gh` probe, no spawn, no cache fill: both commit.resolvePr/branch.resolvePr answer
    *  `{kind:'disabled'}` outright. */
   readonly 'kiraVersion.github.enabled': boolean;
+  /** G25 D10: the worktree prepare script — one command-line string, never a path, never an argv
+   *  array. Empty means the feature is off for this repository: no spawn, no shell, ever. Read
+   *  ONLY from this table (`source: 'repo'`) — never from `.git/config`, a tracked file, or any
+   *  repo-carried convention, which is the single highest-value safety property in the whole
+   *  feature (D10). The sha256-pinned approval this script requires before it can run
+   *  (`prepareScriptApprovedSha`) is deliberately NOT a member here, or anywhere near
+   *  `RepoSettingsPatch` — it is a server-only key `repoSettings.set` cannot write (D11/F15). */
+  readonly 'kiraVersion.worktree.prepareScript': string;
+  /** G25 D10: pure UX — pre-fills `WorktreeDialog`'s own path field. Empty means no suggestion
+   *  beyond the dialog's own basename default. Never a security boundary. */
+  readonly 'kiraVersion.worktree.basePath': string;
 }
 
 /** G18: `RepoSettingsSnapshot`'s own `.partial()` shape — `repoSettings.set`'s request, every leaf
@@ -472,6 +483,118 @@ export interface CherryPickPreflight {
 }
 
 // ---------------------------------------------------------------------------------------
+// G25 — worktree support (D1/D4/D8/D9-D14). No upstream to structurally copy from (this
+// chapter's own SPEC row was a placeholder until this phase) — these are this phase's own
+// original design, ported to `@kira/git-core`'s `preflight/worktree.ts` verbatim so the two sides
+// never drift (the same "authoritative Go twin, ported TS copy" split `preflight/reset.ts`
+// already established).
+// ---------------------------------------------------------------------------------------
+
+/** `worktree.list`'s own per-entry shape (D1) — a direct read of `git worktree list --porcelain
+ *  -z`, crossed with this session's own identity (`isCurrent`) and every other connection's
+ *  (`openElsewhere`, F7). Never cached (D1): the watcher's own `commonDir/worktrees` blind spot
+ *  (D17) is exactly the kind of staleness a cache would make the first thing a user notices. */
+export interface WorktreeEntry {
+  readonly path: string;
+  readonly head: string | null;
+  readonly branch: string | null;
+  readonly isBare: boolean;
+  readonly isDetached: boolean;
+  readonly isMain: boolean;
+  readonly isCurrent: boolean;
+  readonly locked: { readonly reason: string } | null;
+  readonly prunable: { readonly reason: string } | null;
+  readonly openElsewhere: boolean;
+}
+
+/** `preflight.worktreeAdd`'s own blocker union (D4) — five kinds, in the exact order the Go
+ *  classifier reports them: `invalidPath`, `pathExists`, `branchCheckedOutElsewhere`,
+ *  `branchExists`, `unknownStartPoint`. Every applicable blocker is reported at once — an earlier
+ *  one never suppresses a later one. */
+export type WorktreeAddBlocker =
+  | { readonly kind: 'invalidPath'; readonly path: string }
+  | { readonly kind: 'pathExists'; readonly path: string }
+  | {
+      readonly kind: 'branchCheckedOutElsewhere';
+      readonly branch: string;
+      readonly worktreePath: string;
+    }
+  | { readonly kind: 'branchExists'; readonly branch: string }
+  | { readonly kind: 'unknownStartPoint'; readonly startPoint: string };
+
+/** `preflight.worktreeAdd`'s own note union (D4) — informational only, never gates `verdict`.
+ *  `pathInsideRepo` is D4's own named example (git allows nesting a worktree inside the
+ *  repository it belongs to; refusing a legal action would be this app deciding for the user).
+ *  `parentDirectoryMissing`/`detachedHead` are this phase's own reasonable fill-in for the plan's
+ *  "three notes" — flagged here, and in G25's own implementation report, as a genuine ambiguity
+ *  resolved locally rather than a plan requirement. */
+export type WorktreeAddNote =
+  | { readonly kind: 'pathInsideRepo'; readonly path: string }
+  | { readonly kind: 'parentDirectoryMissing'; readonly path: string }
+  | { readonly kind: 'detachedHead'; readonly path: string };
+
+export interface WorktreeAddPreflight {
+  readonly path: string;
+  readonly mode: 'existingBranch' | 'newBranch' | 'detach';
+  readonly branch: string | undefined;
+  readonly blockers: readonly WorktreeAddBlocker[];
+  readonly notes: readonly WorktreeAddNote[];
+  readonly verdict: 'clean' | 'blocked';
+}
+
+/** `preflight.worktreeRemove`'s own blocker union (D8), verbatim. `notAWorktree` is ALSO the
+ *  security check that guarantees the app never runs a destructive command against a
+ *  caller-supplied arbitrary path — checked, and reported, first. `mainWorktree`/`currentWorktree`
+ *  are unconditional (no force route ever unlocks them); `openInAnotherWindow` names its own
+ *  remedy, no force route; `locked` gets no force route either (probe M5: git itself needs a
+ *  second, undelivered `-f` to override a lock — this app never sends it). */
+export type WorktreeRemoveBlocker =
+  | { readonly kind: 'notAWorktree'; readonly path: string }
+  | { readonly kind: 'mainWorktree' }
+  | { readonly kind: 'currentWorktree' }
+  | { readonly kind: 'openInAnotherWindow' }
+  | { readonly kind: 'locked'; readonly reason: string };
+
+export interface WorktreeRemovePreflight {
+  readonly path: string;
+  readonly blockers: readonly WorktreeRemoveBlocker[];
+  readonly requiresTypedConfirmation: boolean;
+  /** The worktree's own basename — set only when `requiresTypedConfirmation` is true. Echoed back
+   *  as `op.run`'s own `confirmToken` field; the server always re-derives and re-checks this fresh
+   *  against a freshly re-read status, never trusting a client-echoed value. */
+  readonly confirmToken: string | undefined;
+  readonly routes: readonly 'force'[];
+  readonly verdict: 'clean' | 'dirty' | 'blocked';
+}
+
+/** `worktree.prepare`'s own streamed output line (D12) — already sanitized (invalid UTF-8
+ *  replaced, control bytes and ANSI escapes stripped) and already capped server-side; never raw. */
+export interface WorktreePrepareLine {
+  readonly stream: 'stdout' | 'stderr';
+  readonly text: string;
+}
+
+/** `worktree.progress`'s own event payload (D13) — throttled to ~100ms, capped at 8 KiB/64 lines
+ *  per batch server-side (D12), the same "coalesce, never withhold past a bound" shape
+ *  `remote.progress` already uses. */
+export interface WorktreeProgress {
+  readonly repoId: string;
+  readonly lines: readonly WorktreePrepareLine[];
+}
+
+export interface WorktreePrepareResult {
+  readonly ok: boolean;
+  readonly error: { readonly kind: WorktreePrepareErrorKind; readonly message: string } | undefined;
+  readonly exitCode: number;
+  readonly timedOut: boolean;
+  readonly cancelled: boolean;
+  /** The FINAL, capped/sanitized transcript (D12) — never the live stream `worktree.progress`
+   *  already delivered piecemeal while the script was running. */
+  readonly output: readonly WorktreePrepareLine[];
+  readonly truncated: boolean;
+}
+
+// ---------------------------------------------------------------------------------------
 // P8 — remote-op vocabulary, and pull/push pre-flight (§7.3/§7.4). Structural copies of
 // `@kira/git-core`'s own (B3 — core and ipc both depend on nothing, so neither imports the
 // other); `tests/unit/ipc/wireConformance.test.ts` keeps the two in step.
@@ -669,7 +792,33 @@ export type OpRequest =
       readonly noCommit: boolean;
     }
   /** §7.11's third sequencer verb, for cherry-pick and revert only (probe 6). */
-  | { readonly kind: 'opSkip' };
+  | { readonly kind: 'opSkip' }
+  /** G25 D2/D3: three explicit creation modes, always with an explicit commit-ish — bare DWIM
+   *  (`worktree add <path>` with no commit-ish, which silently names a branch after the path's own
+   *  basename, probe M8) is never relied on. `branch`/`startPoint` are populated per mode:
+   *  `existingBranch` needs only `branch` (itself the commit-ish); `newBranch` needs both;
+   *  `detach` needs only `startPoint`. Deliberately no `force` — its only real use (forcing a
+   *  branch already checked out elsewhere onto a worktree) enables exactly the hazard
+   *  `branchCheckedOutElsewhere` exists to prevent; a later phase owns the right "auto-detach"
+   *  answer for that. */
+  | {
+      readonly kind: 'worktreeAdd';
+      readonly path: string;
+      readonly mode: 'existingBranch' | 'newBranch' | 'detach';
+      readonly branch: string | undefined;
+      readonly startPoint: string | undefined;
+    }
+  /** G25 D2/D8: `force`/`confirmToken` are BOTH re-derived and re-checked host-side immediately
+   *  before the write, never trusted as the client's own claim (D8's own fail-safe-over-fail-open
+   *  principle for this destructive path) — `force` becomes true only when the server's own fresh
+   *  preflight verdict is `"dirty"`, and `confirmToken` must then equal that same fresh preflight's
+   *  own `confirmToken` (the worktree's basename) exactly. */
+  | {
+      readonly kind: 'worktreeRemove';
+      readonly path: string;
+      readonly force: boolean;
+      readonly confirmToken: string | undefined;
+    };
 
 export type OpErrorKind =
   | 'AuthFailed'
@@ -727,6 +876,27 @@ export type OpErrorKind =
   | 'ConfirmationRequired'
   /** P10, probe 8: `commit <sha> is a merge but no -m option was given.` */
   | 'MainlineRequired'
+  /** G25 D15, probe M5: `fatal: cannot remove a locked working tree, lock reason: <reason>` —
+   *  this phase's own ONE new member here (D16's own budget: exactly one new `OpErrorKind`).
+   *  Kept distinct from `LockHeld` (which means "another git process holds index.lock" — an
+   *  entirely different remedy: `LockHeld` says wait/retry, `WorktreeLocked` says unlock the
+   *  worktree first). */
+  | 'WorktreeLocked'
+  | 'Unknown';
+
+/** `worktree.prepare`'s own error vocabulary (D13) — deliberately NOT `OpErrorKind`: none of
+ *  these four are git failures or shared with any other request, so folding them into the shared
+ *  union would spend D16's "exactly one new `OpErrorKind`" budget on kinds that have nothing to
+ *  do with git at all. `AlreadyRunning`/`NotConfigured`/`ScriptChanged`/`NotAWorktree` are
+ *  synthetic refusals answered BEFORE anything is ever spawned (D13's own documented order);
+ *  `Cancelled`/`Unknown` are reused verbatim from the OTHER two states a run can end in (a
+ *  cancellation, or a non-zero exit/timeout with no more specific story). */
+export type WorktreePrepareErrorKind =
+  | 'AlreadyRunning'
+  | 'NotConfigured'
+  | 'ScriptChanged'
+  | 'NotAWorktree'
+  | 'Cancelled'
   | 'Unknown';
 
 export interface UndoSlotSnapshot {
@@ -1047,7 +1217,14 @@ export type UiActionKind =
   /** G22 D10: the palette's own route into `CherryPickDialog.vue` — the same assignment the graph
    *  row menu's own "Cherry-pick This Commit…" entry already makes (`App.vue`'s
    *  `cherryPickThisCommit`/`runCherryPick` handler). */
-  | 'cherryPickSelected';
+  | 'cherryPickSelected'
+  /** G25: the palette's own route into `WorktreeDialog.vue`'s create mode — the same assignment
+   *  the branch picker's own worktree section "Create Worktree…" button already makes, so this is
+   *  a second entry point into the same dialog, never a second implementation. The other worktree
+   *  actions (switch, open in new window, remove) reuse `openBranchPicker` instead, the same
+   *  convention the five stash commands already established — `BranchPicker.vue`'s own worktree
+   *  section already has row-level actions for all three. */
+  | 'createWorktree';
 
 // ---------------------------------------------------------------------------------------
 // The contract.
@@ -1071,6 +1248,14 @@ export type Contract = {
           /** §7.11's "Resolve in VS Code". `true` under VS Code, `false` in the harness's
            *  default posture (D15: reveal the host's own SCM surface, never our own merge UI). */
           readonly resolveConflict: boolean;
+          /** G25 D6/D14: "Open in New Window" for a worktree — `true` under VS Code
+           *  (`vscode.openFolder`), `false` in the harness (no windowing concept to open a second
+           *  one of). */
+          readonly openWorktreeWindow: boolean;
+          /** G25 D14: gates the prepare script's own "Run" affordance, extension-side, as
+           *  defence in depth — NOT the primary control (D10/D11 are). VS Code:
+           *  `vscode.workspace.isTrusted`; the harness: `true`. */
+          readonly runPrepareScript: boolean;
         };
       };
     };
@@ -1609,6 +1794,51 @@ export type Contract = {
       params: { repoId: string; branch: string };
       result: PrLookupResult;
     };
+    // ---- G25: worktree support (D1/D4/D8/D9-D14) -------------------------------------------
+    /** D1: one spawn (`git worktree list --porcelain -z`), never cached — see `WorktreeEntry`'s
+     *  own doc comment for why. */
+    'worktree.list': {
+      params: { repoId: string };
+      result: { readonly worktrees: readonly WorktreeEntry[] };
+    };
+    'preflight.worktreeAdd': {
+      params: {
+        repoId: string;
+        path: string;
+        mode: 'existingBranch' | 'newBranch' | 'detach';
+        branch?: string;
+        startPoint?: string;
+      };
+      result: WorktreeAddPreflight;
+    };
+    'preflight.worktreeRemove': {
+      params: { repoId: string; path: string };
+      result: WorktreeRemovePreflight;
+    };
+    /** D13: a long, cancellable, streaming method modelled exactly on `remote.run` —
+     *  `scriptSha256` is the client's own belief about which script text it is approving; the
+     *  server ALWAYS re-hashes the currently-stored text and refuses with `ScriptChanged` on any
+     *  mismatch before spawning anything (D11) — never trusts that the approval the client
+     *  believes it holds still matches what is on file. */
+    'worktree.prepare': {
+      params: { repoId: string; path: string; scriptSha256: string };
+      result: WorktreePrepareResult;
+    };
+    /** No-op if the run already finished or was never running — the same "never an error, a
+     *  cancel racing a just-finished op is ordinary" shape `remote.cancel` already uses. */
+    'worktree.cancelPrepare': {
+      params: { repoId: string };
+      result: { readonly cancelled: boolean };
+    };
+    /** D6: "Open in New Window" — answered ENTIRELY inside the extension via
+     *  `vscode.openFolder(uri, { forceNewWindow })`, never reaching the Go server at all (the same
+     *  "editor.*-shaped" precedent `editor.openDiff`/`editor.openRangeDiff` already set). Gated by
+     *  `capabilities.openWorktreeWindow`. `forceNewWindow` defaults to `true` (same-window
+     *  `openFolder` tears down the extension host mid-request, D6). */
+    'worktree.openWindow': {
+      params: { repoId: string; path: string; forceNewWindow?: boolean };
+      result: Record<string, never>;
+    };
   };
   events: {
     'repo.changed': { repoId: string; kind: 'refsChanged' | 'worktreeChanged' };
@@ -1625,6 +1855,10 @@ export type Contract = {
     'review.target': { repoId: string; branch: string };
     /** Throttled to 100ms (OQ10) — live progress for whichever `remote.run` is in flight. */
     'remote.progress': RemoteProgress;
+    /** G25 D12/D13: throttled to ~100ms, capped at 8 KiB/64 lines per batch — live output for
+     *  whichever `worktree.prepare` is in flight, the same cadence/shape `remote.progress`
+     *  already uses. */
+    'worktree.progress': WorktreeProgress;
     /** G7 D2/D4: one prompt from git's own askpass protocol, sent to the connection that owns the
      *  in-flight remote op — never Kira Studio's own window (SPEC §5 item 4, §6, confirmed
      *  2026-09-07). `requestId` is a server-minted, unguessable id; the extension answers exactly

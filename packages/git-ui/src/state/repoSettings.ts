@@ -16,6 +16,8 @@ function defaultRepoSettingsSnapshot(): RepoSettingsSnapshot {
     'kiraVersion.pull.strategy': SETTINGS['kiraVersion.pull.strategy'].default,
     'kiraVersion.log.level': SETTINGS['kiraVersion.log.level'].default,
     'kiraVersion.github.enabled': SETTINGS['kiraVersion.github.enabled'].default,
+    'kiraVersion.worktree.prepareScript': SETTINGS['kiraVersion.worktree.prepareScript'].default,
+    'kiraVersion.worktree.basePath': SETTINGS['kiraVersion.worktree.basePath'].default,
   };
 }
 

@@ -156,7 +156,7 @@ describe('toVsCodeConfiguration', () => {
 });
 
 describe('repoSettingKeys', () => {
-  test('returns exactly the eight source: "repo" keys, G18 D1/G24 D16', () => {
+  test('returns exactly the ten source: "repo" keys, G18 D1/G24 D16/G25 D10', () => {
     const expected: SettingKey[] = [
       'kiraVersion.github.enabled',
       'kiraVersion.graph.pageSize',
@@ -166,6 +166,8 @@ describe('repoSettingKeys', () => {
       'kiraVersion.review.baseCandidates',
       'kiraVersion.stash.includeUntracked',
       'kiraVersion.stash.showInGraph',
+      'kiraVersion.worktree.basePath',
+      'kiraVersion.worktree.prepareScript',
     ];
     expect([...repoSettingKeys()].sort()).toEqual(expected.sort());
   });

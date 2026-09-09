@@ -18,4 +18,5 @@ export type {
 } from './processRunner.ts';
 export type { Storage, StorageScope } from './storage.ts';
 export type { Theme, ThemeKind } from './theme.ts';
+export type { OpenFolderOptions, Windows } from './windows.ts';
 export type { RepoCandidate, WorkspaceRoots } from './workspaceRoots.ts';

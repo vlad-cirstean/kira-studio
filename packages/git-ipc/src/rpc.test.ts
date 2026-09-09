@@ -173,6 +173,12 @@ function stubHandlers(
       'review.session.load': notImplemented,
       'commit.resolvePr': notImplemented,
       'branch.resolvePr': notImplemented,
+      'worktree.list': notImplemented,
+      'preflight.worktreeAdd': notImplemented,
+      'preflight.worktreeRemove': notImplemented,
+      'worktree.prepare': notImplemented,
+      'worktree.cancelPrepare': notImplemented,
+      'worktree.openWindow': notImplemented,
       ...requestOverrides,
     },
     streams: {

@@ -111,4 +111,11 @@ export class KiraGraphViewProvider implements vscode.WebviewViewProvider {
   notifyRemoteProgress(payload: EventPayload<'remote.progress'>): void {
     this.#server?.emit('remote.progress', payload);
   }
+
+  /** G25 D13: forwarded from `ConnectionManager.on('worktree.progress', ...)` — the same shape
+   *  `notifyRemoteProgress` above already uses, the graph provider only (the review sidebar has no
+   *  worktree UI either). A no-op when no webview is currently resolved. */
+  notifyWorktreeProgress(payload: EventPayload<'worktree.progress'>): void {
+    this.#server?.emit('worktree.progress', payload);
+  }
 }

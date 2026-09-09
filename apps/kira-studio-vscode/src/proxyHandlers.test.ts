@@ -43,6 +43,9 @@ function buildHandlers(reviewSessionStore: ReviewSessionStore) {
     editor: {} as any,
     // biome-ignore lint/suspicious/noExplicitAny: unused by review.session.*, stubbed minimally.
     logger: {} as any,
+    // biome-ignore lint/suspicious/noExplicitAny: unused by review.session.*, stubbed minimally.
+    windows: {} as any,
+    isWorkspaceTrusted: () => true,
     revealReview: () => {},
     renderReviewComments: () => {},
     notifyCommentsMutated: () => {},
@@ -219,6 +222,9 @@ function buildOpenDiffHandlers(connection: ConnectionManager) {
     } as any,
     // biome-ignore lint/suspicious/noExplicitAny: unused here, stubbed minimally.
     logger: {} as any,
+    // biome-ignore lint/suspicious/noExplicitAny: unused by review.session.*, stubbed minimally.
+    windows: {} as any,
+    isWorkspaceTrusted: () => true,
     revealReview: () => {},
     renderReviewComments: () => {},
     notifyCommentsMutated: () => {},

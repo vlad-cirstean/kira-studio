@@ -158,6 +158,9 @@ const OP_ERROR_TEXT: Record<OpErrorKind, string> = {
   ConfirmationRequired: 'the typed confirmation was missing or did not match',
   EmptyCherryPick: 'this change is already present on this branch',
   MainlineRequired: 'a merge commit needs a parent chosen first',
+  /** G25 D15, probe M5: `worktree remove` on a locked worktree. Kept distinct from `LockHeld`'s
+   *  own phrase above — this names the remedy (unlock it), not "wait and retry". */
+  WorktreeLocked: 'the worktree is locked',
   Unknown: 'an unexpected error occurred',
 };
 

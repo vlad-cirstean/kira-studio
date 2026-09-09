@@ -261,6 +261,16 @@
         "command": "kiraVersion.cherryPickCommit",
         "title": "Cherry-pick Commit…",
         "category": "Kira Version"
+      },
+      {
+        "command": "kiraVersion.createWorktree",
+        "title": "Create Worktree…",
+        "category": "Kira Version"
+      },
+      {
+        "command": "kiraVersion.removeWorktree",
+        "title": "Remove Worktree…",
+        "category": "Kira Version"
       }
     ],
     "menus": {

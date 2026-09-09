@@ -136,6 +136,32 @@ export const SETTINGS = {
       'even when the merge itself is clean (§7.6).',
     source: 'repo',
   },
+  // G25 D10: the worktree prepare script and its own path pre-fill — two more `source: 'repo'`
+  // leaves, same table, same dialog. The sha256-pinned approval this script requires before it
+  // can run (D11) is DELIBERATELY absent from this schema entirely: it is a server-only key this
+  // extension never reads, writes, or even names — repoSettings.set cannot write it, and no
+  // setting in this file could ever expose it.
+  'kiraVersion.worktree.prepareScript': {
+    key: 'kiraVersion.worktree.prepareScript',
+    type: 'string',
+    default: '',
+    description:
+      'A shell command run automatically after creating a worktree (e.g. "npm ci"). Runs as ' +
+      'your own login shell with your own permissions — treat it exactly like a command you ' +
+      'would type into a terminal yourself. Empty disables the feature entirely: no shell is ' +
+      'ever spawned. The exact script text is always shown before it runs for the first time, ' +
+      'and any edit here requires re-approving it.',
+    source: 'repo',
+  },
+  'kiraVersion.worktree.basePath': {
+    key: 'kiraVersion.worktree.basePath',
+    type: 'string',
+    default: '',
+    description:
+      'Pre-fills the "Create Worktree" dialog\'s path field. Purely a convenience — never a ' +
+      'security boundary, and never validated as an existing directory.',
+    source: 'repo',
+  },
   'kiraVersion.stash.showInGraph': {
     key: 'kiraVersion.stash.showInGraph',
     type: 'boolean',

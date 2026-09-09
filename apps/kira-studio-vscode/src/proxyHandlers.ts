@@ -27,6 +27,7 @@ import type {
   EditorIntegration,
   FileChange,
   Logger,
+  Windows,
   WorkspaceRoots,
 } from '@kira/git-core';
 import type {
@@ -84,6 +85,14 @@ export interface CreateProxyHandlersDeps {
   readonly clipboard: Clipboard;
   readonly editor: EditorIntegration;
   readonly logger: Logger;
+  // G25 D6/D14: the "Open in New Window" port and the workspace-trust probe behind
+  // `runPrepareScript` — both plain, narrow shapes so this file stays vscode-free (this file's own
+  // doc comment, above): `windows` wraps `vscode.commands.executeCommand('vscode.openFolder', ...)`
+  // (`ports/windows.ts`); `isWorkspaceTrusted` wraps `vscode.workspace.isTrusted` — a function,
+  // read fresh on every `app.init`, never cached (trust can change during a session, e.g. the user
+  // clicking "Trust" in the banner).
+  readonly windows: Windows;
+  readonly isWorkspaceTrusted: () => boolean;
   // G6/D15: reveals the review sidebar, optionally targeting repoId/branch — `review.open`'s own
   // implementation. Supplied as a plain function rather than a provider instance so this file
   // never imports vscode.WebviewViewProvider; extension.ts breaks the construction cycle (the
@@ -176,6 +185,8 @@ export function createProxyHandlers(deps: CreateProxyHandlersDeps): ServerHandle
     clipboard,
     editor,
     logger,
+    windows,
+    isWorkspaceTrusted,
     revealReview,
     renderReviewComments,
     notifyCommentsMutated,
@@ -219,6 +230,10 @@ export function createProxyHandlers(deps: CreateProxyHandlersDeps): ServerHandle
           goToFile: true,
           clipboard: true,
           resolveConflict: true,
+          // G25 D14: true under VS Code (vscode.openFolder always exists); isWorkspaceTrusted is
+          // read fresh on every app.init, never cached (trust can change mid-session).
+          openWorktreeWindow: true,
+          runPrepareScript: isWorkspaceTrusted(),
         },
       };
     },
@@ -482,6 +497,21 @@ export function createProxyHandlers(deps: CreateProxyHandlersDeps): ServerHandle
     // entirely by the Go server.
     'commit.resolvePr': forward('commit.resolvePr'),
     'branch.resolvePr': forward('branch.resolvePr'),
+    // G25: five plain forwards, answered entirely by the Go server, same as every other
+    // repoId-addressed request.
+    'worktree.list': forward('worktree.list'),
+    'preflight.worktreeAdd': forward('preflight.worktreeAdd'),
+    'preflight.worktreeRemove': forward('preflight.worktreeRemove'),
+    'worktree.prepare': forward('worktree.prepare'),
+    'worktree.cancelPrepare': forward('worktree.cancelPrepare'),
+    // G25 D6: "Open in New Window" — answered ENTIRELY inside the extension via
+    // `deps.windows.openFolder`, the same "host-capability method" shape editor.resolveConflict
+    // already established, never reaching the Go server at all. forceNewWindow defaults to true
+    // (D6: same-window openFolder tears down the extension host mid-request).
+    'worktree.openWindow': async (params) => {
+      await windows.openFolder(params.path, { forceNewWindow: params.forceNewWindow ?? true });
+      return {};
+    },
     // G4 D3/F12: server-only, never called by the webview — plain forwarders are enough
     // (ServerHandlers.requests is total over RequestKey, so both need an entry regardless).
     'file.read': forward('file.read'),

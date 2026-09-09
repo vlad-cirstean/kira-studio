@@ -58,7 +58,21 @@ import type { EventKey, RequestKey, StreamKey } from './contract.ts';
 // new RepoSettingsSnapshot member ('kiraVersion.github.enabled'). Additive only -- SearchMatchField
 // is untouched (F9: the wire's own search-field union is commits-only, the PR fields live entirely
 // in git-core's client-side SearchField instead).
-export const CONTRACT_VERSION = 27;
+// G25 D16 (2026-09-09): 27 -> 28, for worktree support -- no upstream design existed for this
+// phase at all (this chapter's own SPEC row was a placeholder). Six new requests ('worktree.list',
+// 'preflight.worktreeAdd', 'preflight.worktreeRemove', 'worktree.prepare',
+// 'worktree.cancelPrepare', 'worktree.openWindow' -- the last answered entirely inside the
+// extension, the same "editor.*-shaped" precedent 'editor.openDiff' already set), one new event
+// ('worktree.progress'), two new 'OpRequest' kinds ('worktreeAdd', 'worktreeRemove'), one new
+// 'OpErrorKind' member ('WorktreeLocked' -- 'worktree.prepare's own four synthetic refusals live
+// in a SEPARATE, dedicated 'WorktreePrepareErrorKind' instead, spending none of this budget), two
+// new capabilities ('openWorktreeWindow', 'runPrepareScript'), one new 'UiActionKind' member
+// ('createWorktree'), and two new 'RepoSettingsSnapshot' members ('kiraVersion.worktree.
+// prepareScript', 'kiraVersion.worktree.basePath'). Deliberately absent from every wire type this
+// phase touches: the prepare script's own sha256-pinned approval -- a server-only key, reachable
+// only through the Go server's own dedicated storage accessors, never through 'repoSettings.get'/
+// 'set' or any 'OpRequest'/'OpResult' shape (D11/F15).
+export const CONTRACT_VERSION = 28;
 
 export class ContractVersionMismatchError extends Error {
   readonly received: number;
@@ -165,6 +179,12 @@ const REQUEST_KEY_MAP: Record<RequestKey, true> = {
   'review.session.load': true,
   'commit.resolvePr': true,
   'branch.resolvePr': true,
+  'worktree.list': true,
+  'preflight.worktreeAdd': true,
+  'preflight.worktreeRemove': true,
+  'worktree.prepare': true,
+  'worktree.cancelPrepare': true,
+  'worktree.openWindow': true,
 };
 const EVENT_KEY_MAP: Record<EventKey, true> = {
   'repo.changed': true,
@@ -174,6 +194,7 @@ const EVENT_KEY_MAP: Record<EventKey, true> = {
   'credential.request': true,
   'ui.action': true,
   'repoSettings.changed': true,
+  'worktree.progress': true,
 };
 const STREAM_KEY_MAP: Record<StreamKey, true> = {
   'graph.stream': true,

@@ -259,7 +259,25 @@ export type OpRequest =
   /** §7.13/probe 6: the sequencer's own named remedy for an empty pick or revert — distinct from
    *  `opContinue`, which git refuses outright when `CHERRY_PICK_HEAD`/`REVERT_HEAD` is present but
    *  the change is already applied (`canSkip` is what the banner uses to know this is offered). */
-  | { readonly kind: 'opSkip' };
+  | { readonly kind: 'opSkip' }
+  /** G25 D2/D3: three explicit creation modes, always with an explicit commit-ish — bare DWIM
+   *  (probe M8) is never relied on. Deliberately no `force` (G28 owns the "already checked out
+   *  elsewhere" auto-detach answer). */
+  | {
+      readonly kind: 'worktreeAdd';
+      readonly path: string;
+      readonly mode: 'existingBranch' | 'newBranch' | 'detach';
+      readonly branch: string | undefined;
+      readonly startPoint: string | undefined;
+    }
+  /** G25 D2/D8: `force`/`confirmToken` are both re-derived and re-checked host-side immediately
+   *  before the write, never trusted as the client's own claim. */
+  | {
+      readonly kind: 'worktreeRemove';
+      readonly path: string;
+      readonly force: boolean;
+      readonly confirmToken: string | undefined;
+    };
 
 export type OpErrorKind =
   | 'AuthFailed'
@@ -317,6 +335,9 @@ export type OpErrorKind =
   /** P10 probe 2: cherry-picking/reverting a merge commit without `-m` — git's own
    *  `is a merge but no -m option was given`. */
   | 'MainlineRequired'
+  /** G25 D15, probe M5: `fatal: cannot remove a locked working tree, lock reason: <reason>`.
+   *  Kept distinct from `LockHeld` (another process holds index.lock — a different remedy). */
+  | 'WorktreeLocked'
   | 'Unknown';
 
 export interface UndoSlotSnapshot {

@@ -61,7 +61,14 @@ describe('ipc codec', () => {
         'workbench.tree.indent': 8,
       },
       git: { kind: 'ok', path: '/usr/bin/git', version: '2.43.0' },
-      capabilities: { openInEditor: true, goToFile: true, clipboard: true, resolveConflict: true },
+      capabilities: {
+        openInEditor: true,
+        goToFile: true,
+        clipboard: true,
+        resolveConflict: true,
+        openWorktreeWindow: true,
+        runPrepareScript: true,
+      },
     };
     const encodedParams = encode(params);
     const encodedResult = encode(result);

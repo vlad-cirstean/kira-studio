@@ -128,6 +128,7 @@ export type {
 } from './ports/processRunner.ts';
 export type { Storage, StorageScope } from './ports/storage.ts';
 export type { Theme, ThemeKind } from './ports/theme.ts';
+export type { OpenFolderOptions, Windows } from './ports/windows.ts';
 export type { RepoCandidate, WorkspaceRoots } from './ports/workspaceRoots.ts';
 export { classifyReset } from './preflight/reset.ts';
 export { classifyTagCreate, validateRefName } from './preflight/tag.ts';
