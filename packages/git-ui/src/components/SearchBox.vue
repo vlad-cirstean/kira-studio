@@ -363,22 +363,27 @@ defineExpose({ focus: () => searchInputRef.value?.focus() });
 }
 
 /* G-UX D9: the bespoke width:20px/height:18px override is gone — KuiButton's own --kui-control-h
-   sizing now, matching every other icon toggle in the app. */
+   sizing now, matching every other icon toggle in the app. G34 D15: font-size -> --kv-t-xs, the
+   same secondary-text tier `-count`/`-scope` already used. */
 .kv-search-toggle {
   color: var(--kv-description-fg);
+  font-size: var(--kv-t-xs);
 }
 
 .kv-search-scope {
-  font-size: 0.85em;
+  font-size: var(--kv-t-xs);
 }
 
 .kv-search-count {
   padding: 0 var(--kv-s-1);
   color: var(--kv-description-fg);
-  font-size: 0.85em;
+  font-size: var(--kv-t-xs);
   white-space: nowrap;
 }
 
+/* G34 D15: the floating-surface triple every other menu/popover/tooltip in the app now uses —
+   the panel radius tier (not the interactive-control one), a stronger border, and the real
+   floating-surface shadow instead of a flatter ad hoc one. */
 .kv-search-error {
   position: fixed;
   z-index: var(--kui-z-popover, 20);
@@ -386,9 +391,9 @@ defineExpose({ focus: () => searchInputRef.value?.focus() });
   padding: var(--kv-s-1) var(--kv-s-2);
   background-color: var(--kv-panel-bg);
   color: var(--kv-error-fg);
-  border: 1px solid var(--kv-panel-border);
-  border-radius: var(--kv-radius-sm);
-  box-shadow: 0 2px 8px var(--kv-widget-shadow);
-  font-size: 0.85em;
+  border: var(--kv-border-width) solid var(--kv-border-strong);
+  border-radius: var(--kv-radius-panel);
+  box-shadow: var(--kv-shadow-dialog) var(--kv-widget-shadow);
+  font-size: var(--kv-t-xs);
 }
 </style>

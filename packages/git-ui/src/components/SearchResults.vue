@@ -88,7 +88,7 @@ onMounted(() => void reposition());
           <div
             :id="option.id"
             role="option"
-            class="kv-search-option"
+            class="kui-row kv-search-option"
             :class="{ 'kv-search-option--active': option.id === highlightedId }"
             :aria-selected="option.id === highlightedId"
             @click="emit('select', option)"
@@ -159,9 +159,10 @@ onMounted(() => void reposition());
   padding: var(--kv-s-1) 0;
   background-color: var(--kv-panel-bg);
   color: var(--kv-app-fg);
-  border: 1px solid var(--kv-panel-border);
-  border-radius: var(--kv-radius-sm);
-  box-shadow: 0 2px 8px var(--kv-widget-shadow);
+  /* G34 D15: the floating-surface triple every other menu/popover/tooltip in the app now uses. */
+  border: var(--kv-border-width) solid var(--kv-border-strong);
+  border-radius: var(--kv-radius-panel);
+  box-shadow: var(--kv-shadow-dialog) var(--kv-widget-shadow);
 }
 
 .kv-search-status {

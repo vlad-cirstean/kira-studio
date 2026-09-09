@@ -367,6 +367,10 @@ const fileMenuState = ref<{ x: number; y: number; path: string } | undefined>(un
 function onRowContextMenu(event: MouseEvent, row: FileTreeRow): void {
   if (row.kind !== 'file') return;
   event.preventDefault();
+  // G34 D17: without this, the same `contextmenu` event also reaches `ReviewCommitRow.vue`'s own
+  // handler (a file row here can sit inside an expanded review row) and a second menu — that
+  // row's "Commit actions" menu — opens underneath this one from a single right-click.
+  event.stopPropagation();
   fileMenuState.value = { x: event.clientX, y: event.clientY, path: row.node.change.path };
 }
 
@@ -459,7 +463,7 @@ function reviewToggleTitle(path: string): string {
         v-for="(row, index) in capped.visible"
         :id="rowId(index)"
         :key="rowKey(row)"
-        class="kv-file-tree-row"
+        class="kui-row kv-file-tree-row"
         :class="{ 'kv-row-focused': index === focusedRow, 'kv-row-selected': row.kind === 'file' && row.node.fileIndex === selectedFile }"
         :role="listMode === 'tree' ? 'treeitem' : 'option'"
         :aria-level="listMode === 'tree' ? row.depth + 1 : undefined"
@@ -578,10 +582,11 @@ function reviewToggleTitle(path: string): string {
   font-size: 0.9em;
 }
 
+/* G34 D15: the same horizontal inset every other toolbar in the app now uses. */
 .kv-file-tree-toolbar {
   display: flex;
   gap: var(--kv-s-2);
-  padding: 0 var(--kv-s-5) var(--kv-s-2);
+  padding: 0 var(--kv-s-4) var(--kv-s-2);
 }
 
 .kv-file-tree-filter {
