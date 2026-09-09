@@ -6,6 +6,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitpath"
 )
 
 // Signal is one coalesced, debounced repository-change notification (SPEC §6's repo.changed
@@ -55,10 +57,16 @@ func stripLockSuffix(name string) string {
 // (D9): a path under commonDir/refs is always refsChanged; gitDir's own index is worktreeChanged;
 // only then do the ref-ish basenames (checked in either commonDir or gitDir, so a linked
 // worktree's own MERGE_HEAD/sequencer/rebase-* are covered too) apply.
+//
+// G27 D5b/F2: path is normalized to NFC (not just Cleaned) because it is the one raw, OS-supplied
+// byte string in this whole comparison — commonDir/gitDir arrive already NFC (resolveOrKeep below
+// normalizes them, and Identify normalized summary's originals, D5a). Without this, a repository
+// at a non-ASCII path could see every rule below fall through on a form mismatch and the watcher
+// would go permanently, silently dead (F2) rather than merely misclassifying one path.
 func classify(summary RepoSummary, path string) (Signal, bool) {
-	commonDir := filepath.Clean(summary.CommonDir)
-	gitDir := filepath.Clean(summary.GitDir)
-	path = filepath.Clean(path)
+	commonDir := gitpath.CleanNFC(summary.CommonDir)
+	gitDir := gitpath.CleanNFC(summary.GitDir)
+	path = gitpath.CleanNFC(path)
 
 	if refsRoot := filepath.Join(commonDir, "refs"); path == refsRoot || strings.HasPrefix(path, refsRoot+string(filepath.Separator)) {
 		return SignalRefsChanged, true
@@ -92,9 +100,12 @@ func classify(summary RepoSummary, path string) (Signal, bool) {
 }
 
 // rawEvent is one filesystem notification, stripped of every backend-specific concept (G9 D6).
-// Path is meaningless when Rescan is set. Both backends deliver Path already agreeing with
-// classify's comparison target: resolved once, in NewRepoWatcher, against a watcher-local copy of
-// the summary (D7) — necessary because FSEvents itself always reports realpaths (F9).
+// Path is meaningless when Rescan is set. classify normalizes both sides of every comparison to
+// NFC (G27 D5b/F2), which is what makes Path agree with classify's comparison target regardless
+// of the byte form the backend or the filesystem itself hands back — not, as this comment used to
+// claim, because the two were already guaranteed equal by construction. Path is still resolved
+// once in NewRepoWatcher against a watcher-local copy of the summary (D7) — necessary because
+// FSEvents itself always reports realpaths (F9) — normalization is what covers the rest.
 type rawEvent struct {
 	Path   string
 	Rescan bool
@@ -127,13 +138,16 @@ type RepoWatcher struct {
 
 // resolveOrKeep resolves path to its realpath, falling back to path unchanged if it does not
 // exist yet (a repository mid-init) or cannot be resolved for any other reason — matching what
-// the fsnotify backend already tolerated before this phase.
+// the fsnotify backend already tolerated before this phase. G27 D5b: the result is normalized to
+// NFC on both the success and fallback arms — filepath.EvalSymlinks reads link *targets* from the
+// filesystem, so its output is not guaranteed to inherit Identify's already-NFC form (D5a) the
+// way a value merely copied from summary would.
 func resolveOrKeep(path string) string {
 	resolved, err := filepath.EvalSymlinks(path)
 	if err != nil {
-		return path
+		return gitpath.CleanNFC(path)
 	}
-	return resolved
+	return gitpath.CleanNFC(resolved)
 }
 
 // NewRepoWatcher starts watching summary's repository.

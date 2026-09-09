@@ -77,6 +77,37 @@ func TestClassify(t *testing.T) {
 	}
 }
 
+// TestClassify_NFDEventPathMatchesNFCCommonDir is G27 F2's regression guard: a repository at a
+// non-ASCII path must not silence the watcher forever just because the OS handed back a different
+// byte spelling of the same directory than Identify recorded. Byte literals throughout (D12) — no
+// filesystem involved, so this proves the fix regardless of what this container's own filesystem
+// does with the two forms (P1).
+func TestClassify_NFDEventPathMatchesNFCCommonDir(t *testing.T) {
+	composedE := string([]byte{0xc3, 0xa9})         // U+00E9, composed "é"
+	decomposedE := string([]byte{0x65, 0xcc, 0x81}) // "e" + U+0301, decomposed "é"
+
+	// summary.CommonDir/GitDir are NFC, exactly as Identify (D5a) and resolveOrKeep (D5b) leave
+	// them; the incoming event path is spelled NFD, exactly as FSEvents would report a name an
+	// NFD-producing filesystem returned from readdir.
+	summary := RepoSummary{
+		CommonDir: "/repo/caf" + composedE + "/.git",
+		GitDir:    "/repo/caf" + composedE + "/.git",
+	}
+	eventPath := "/repo/caf" + decomposedE + "/.git/refs/heads/main"
+
+	sig, ok := classify(summary, eventPath)
+	if !ok || sig != SignalRefsChanged {
+		t.Fatalf("classify(NFC CommonDir, NFD event path) = (%q, %v), want (%q, true)", sig, ok, SignalRefsChanged)
+	}
+
+	// The GitDir/index arm too — worktreeChanged, not just refsChanged, must survive the mismatch.
+	eventPath = "/repo/caf" + decomposedE + "/.git/index"
+	sig, ok = classify(summary, eventPath)
+	if !ok || sig != SignalWorktreeChanged {
+		t.Fatalf("classify(NFC GitDir, NFD event path to index) = (%q, %v), want (%q, true)", sig, ok, SignalWorktreeChanged)
+	}
+}
+
 func TestStripLockSuffix(t *testing.T) {
 	if got := stripLockSuffix("main.lock"); got != "main" {
 		t.Errorf("stripLockSuffix(main.lock) = %q, want main", got)
