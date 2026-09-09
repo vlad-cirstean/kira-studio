@@ -19,6 +19,7 @@
 import {
   coerceSettings,
   type Logger,
+  nfcPath,
   repoSettingKeys,
   SETTINGS,
   type SettingKey,
@@ -147,12 +148,15 @@ async function migrateLegacySettings(
   // forward verbatim into the new store.
   const { settings: coerced } = coerceSettings(rawRepoValues);
 
-  const folder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-  if (folder === undefined) {
+  // G27 D7: a workspace folder's fsPath is filesystem-sourced, normalized before it is sent on
+  // (here, as repo.open's own path) or compared against a git-sourced value elsewhere.
+  const rawFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  if (rawFolder === undefined) {
     // No repository to attach the per-repo half to yet — try again next activation rather than
     // silently dropping a value a user genuinely set.
     return;
   }
+  const folder = nfcPath(rawFolder);
 
   try {
     await manager.whenConnected();
@@ -245,7 +249,9 @@ function updateStatusBar(
         tooltipLines = ['**Kira Studio**', 'Loading…'];
       } else {
         item.text = '$(git-branch)';
-        const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+        // G27 D7: a workspace folder's fsPath is filesystem-sourced.
+        const rawRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+        const root = rawRoot === undefined ? undefined : nfcPath(rawRoot);
         const lines = ['**Kira Studio**', 'Connected'];
         if (root) lines.push(root);
         if (appInit) {
@@ -635,7 +641,10 @@ async function openRepository(
   manager: ConnectionManager,
   dialogs: { pickFolder: (opts: { title: string }) => Promise<string | null> },
 ): Promise<void> {
-  const folder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  // G27 D7: a workspace folder's fsPath is filesystem-sourced — the auto-open path repo.open
+  // receives on every G12-item-6 auto-open.
+  const rawFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  const folder = rawFolder === undefined ? undefined : nfcPath(rawFolder);
   const path = folder ?? (await dialogs.pickFolder({ title: 'Open Repository' }));
   if (!path) return;
 
