@@ -139,6 +139,33 @@ describe('RepoSettingsState', () => {
     state.dispose();
   });
 
+  // G24 D16's own settings round trip: default true, set false, the server's own resulting
+  // snapshot is adopted — the same "patch, don't replace" shape every other leaf above already
+  // exercises, applied to the eighth key.
+  test('github.enabled round-trips: default true, set false, adopts the result', async () => {
+    const transport = new FakeTransport();
+    const bridge = new BridgeClient(transport);
+    const state = new RepoSettingsState(bridge);
+    expect(state.settings.value['kiraVersion.github.enabled']).toBe(true);
+
+    transport.onRequest = () => defaultSnapshot();
+    state.setRepoId('/repos/a');
+    await tick();
+    expect(state.settings.value['kiraVersion.github.enabled']).toBe(true);
+
+    transport.onRequest = (method, params) => {
+      expect(method).toBe('repoSettings.set');
+      expect(params).toEqual({
+        repoId: '/repos/a',
+        patch: { 'kiraVersion.github.enabled': false },
+      });
+      return { ...defaultSnapshot(), 'kiraVersion.github.enabled': false };
+    };
+    await state.set({ 'kiraVersion.github.enabled': false });
+    expect(state.settings.value['kiraVersion.github.enabled']).toBe(false);
+    state.dispose();
+  });
+
   // G18 §3.18/§4.12: this is the client-side half of D14's own sentinel collapse — a
   // repoSettings.changed event naming a DIFFERENT repo must still update log.level (the one
   // instance-wide field), while leaving every other field alone (it belongs to that other repo).

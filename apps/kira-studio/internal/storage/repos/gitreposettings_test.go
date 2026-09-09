@@ -23,8 +23,12 @@ func TestGitRepoSettingsRepo_GetUnsetReturnsDefaults(t *testing.T) {
 		got.StashShowInGraph != want.StashShowInGraph ||
 		got.StashIncludeUntracked != want.StashIncludeUntracked ||
 		got.PullStrategy != want.PullStrategy ||
-		got.LogLevel != want.LogLevel {
+		got.LogLevel != want.LogLevel ||
+		got.GithubEnabled != want.GithubEnabled {
 		t.Fatalf("Get() = %+v, want defaults %+v", got, want)
+	}
+	if !got.GithubEnabled {
+		t.Fatal("GithubEnabled default = false, want true (G24 D16)")
 	}
 	if len(got.ReviewBaseCandidates) != len(want.ReviewBaseCandidates) {
 		t.Fatalf("ReviewBaseCandidates = %v, want %v", got.ReviewBaseCandidates, want.ReviewBaseCandidates)
@@ -55,6 +59,33 @@ func TestGitRepoSettingsRepo_SetIsScopedPerRepo(t *testing.T) {
 	}
 	if gotB.GraphPageSize != model.DefaultGitRepoSettings().GraphPageSize {
 		t.Fatalf("Get(b).GraphPageSize = %d, want the default (unscoped by a's write)", gotB.GraphPageSize)
+	}
+}
+
+// TestGitRepoSettingsRepo_GithubEnabledRoundTripsPerRepo is G24 D16's own regression guard: set
+// false, read it back, and confirm a DIFFERENT repo is unaffected — GithubEnabled is genuinely
+// per-repo, unlike LogLevel's own sentinel collapse just above.
+func TestGitRepoSettingsRepo_GithubEnabledRoundTripsPerRepo(t *testing.T) {
+	r := newGitRepoSettingsRepo(t)
+	disabled := false
+	if _, err := r.Set("/repos/a", model.GitRepoSettingsPatch{GithubEnabled: &disabled}); err != nil {
+		t.Fatalf("Set(a): %v", err)
+	}
+
+	gotA, err := r.Get("/repos/a")
+	if err != nil {
+		t.Fatalf("Get(a): %v", err)
+	}
+	if gotA.GithubEnabled {
+		t.Fatal("Get(a).GithubEnabled = true, want false after Set")
+	}
+
+	gotB, err := r.Get("/repos/b")
+	if err != nil {
+		t.Fatalf("Get(b): %v", err)
+	}
+	if !gotB.GithubEnabled {
+		t.Fatal("Get(b).GithubEnabled = false, want the default true (unscoped by a's write)")
 	}
 }
 
