@@ -221,6 +221,77 @@ func ParseStashList(raw []byte, subjects map[string]string) ([]StashEntry, error
 	return parseStashRecords(recs, isStackStashHeader, parseStashIndex, StashScopeStack, subjects)
 }
 
+// GlobalStashFormat is StashFormat with %gd replaced by %H (there is no reflog selector for a
+// namespace ref, probe P13) and %gs replaced by %s (the commit's own subject IS the message here,
+// because stash create / commit-tree wrote it, probes P4/P23). Field count and order are otherwise
+// identical, so parseStashRecords' own record walk is reused verbatim (G28 D9).
+const GlobalStashFormat = "%H%x1f%H%x1f%P%x1f%s%x1f%at"
+
+// GlobalStashLogArgs builds globalStash.list's own second spawn (D9, probe P12): `log --no-walk -m
+// --first-parent -z --numstat -M -C --format=<GlobalStashFormat> <shas...>` — structurally
+// identical to stash list's own header-then-numstat framing, so the shared record walk applies
+// unchanged. Only called when the bucket is non-empty (globalStash.list's own first spawn,
+// gitops.GlobalStashListRefsArgs, already answered at least one sha).
+func GlobalStashLogArgs(shas []string) []string {
+	args := []string{"log", "--no-walk", "-m", "--first-parent", "-z", "--numstat", "-M", "-C", "--format=" + GlobalStashFormat}
+	return append(args, shas...)
+}
+
+// isGlobalStashHeader recognises a global-bucket entry's own header record: its first field (up to
+// the first %x1f delimiter, or the whole record if none is present) is exactly 40 hex bytes —
+// unambiguous against a numstat record, which begins with "\n" or a digit-tab and is never a bare
+// 40-hex-byte string (probe P12/P13).
+func isGlobalStashHeader(rec []byte) bool {
+	first := rec
+	if idx := bytes.IndexByte(rec, fieldDelim); idx >= 0 {
+		first = rec[:idx]
+	}
+	return isHexSha40(first)
+}
+
+// isHexSha40 reports whether b is exactly 40 lowercase-hex bytes — a full sha1, the only shape
+// GlobalStashFormat's own leading %H field ever takes.
+func isHexSha40(b []byte) bool {
+	if len(b) != 40 {
+		return false
+	}
+	for _, c := range b {
+		if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')) {
+			return false
+		}
+	}
+	return true
+}
+
+// globalStashIndex is ParseGlobalStashList's own indexOf: a global entry has no stack position at
+// all, so this is the constant -1 sentinel (G28 D17), never a parse.
+func globalStashIndex(string) (int, error) { return -1, nil }
+
+// ParseGlobalStashList parses GlobalStashLogArgs' own raw -z output into StashEntry rows (G28 D9)
+// — a thin wrapper over the same parseStashRecords walk ParseStashList uses, with
+// isGlobalStashHeader/globalStashIndex/StashScopeGlobal in place of the stack's own three. refPrefix
+// is gitops.GlobalStashRefPrefix, threaded in by the caller (this package does not import gitops —
+// SPEC's own layering rule, porcelain sits below gitops) so every entry's own Ref is built from the
+// single source of truth rather than a second hand-spelled "refs/kira/globalstash/" literal here.
+func ParseGlobalStashList(raw []byte, subjects map[string]string, refPrefix string) ([]StashEntry, error) {
+	splitter := NewRecordSplitter(0)
+	recs, err := splitter.Push(raw)
+	if err != nil {
+		return nil, err
+	}
+	if flushed := splitter.Flush(); flushed != nil {
+		return nil, fmt.Errorf("porcelain: global stash list: unterminated trailing bytes: %q", flushed)
+	}
+	entries, err := parseStashRecords(recs, isGlobalStashHeader, globalStashIndex, StashScopeGlobal, subjects)
+	if err != nil {
+		return nil, err
+	}
+	for i := range entries {
+		entries[i].Ref = refPrefix + entries[i].Sha
+	}
+	return entries, nil
+}
+
 // ParseStashBaseSubjects parses StashBaseSubjectArgs' own `%H%x1f%s -z` batch output into a
 // sha -> subject map.
 func ParseStashBaseSubjects(raw []byte) (map[string]string, error) {

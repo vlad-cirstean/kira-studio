@@ -1,10 +1,15 @@
 package porcelain_test
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitclient/porcelain"
 )
+
+const testGlobalStashRefPrefix = "refs/kira/globalstash/"
+
+func hex(c byte) string { return strings.Repeat(string(c), 40) }
 
 func TestStashListArgs(t *testing.T) {
 	got := porcelain.StashListArgs()
@@ -173,5 +178,140 @@ func TestParseStashList_Detached(t *testing.T) {
 func TestParseStashList_MalformedHeader(t *testing.T) {
 	if _, err := porcelain.ParseStashList([]byte("not-a-header\x00"), nil); err == nil {
 		t.Fatal("expected an error for a record set not starting with a stash@{ header")
+	}
+}
+
+func TestGlobalStashLogArgs(t *testing.T) {
+	got := porcelain.GlobalStashLogArgs([]string{"sha1", "sha2"})
+	want := []string{
+		"log", "--no-walk", "-m", "--first-parent", "-z", "--numstat", "-M", "-C",
+		"--format=" + porcelain.GlobalStashFormat, "sha1", "sha2",
+	}
+	if len(got) != len(want) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("got %v, want %v", got, want)
+		}
+	}
+}
+
+func TestGlobalStashFormat_FieldCountMatchesStashFormat(t *testing.T) {
+	if got, want := strings.Count(porcelain.GlobalStashFormat, "\x1f"), strings.Count(porcelain.StashFormat, "\x1f"); got != want {
+		t.Fatalf("GlobalStashFormat has %d field delimiters, want %d (must match StashFormat's field count so parseStashRecords applies unchanged)", got, want)
+	}
+}
+
+// TestParseGlobalStashList_TwoParent covers a tracked-only global entry (no -u): 2 parents,
+// Scope=global, Index=-1 (D17's sentinel), Ref built from the caller-supplied refPrefix.
+func TestParseGlobalStashList_TwoParent(t *testing.T) {
+	sha := hex('a')
+	base := hex('b')
+	indexSha := hex('c')
+	raw := []byte(sha + "\x1f" + sha + "\x1f" + base + " " + indexSha + "\x1f" + "On main: my label" + "\x1f" + "1690000000\x00" +
+		"\n1\t1\tfile.txt\x00")
+
+	entries, err := porcelain.ParseGlobalStashList(raw, nil, testGlobalStashRefPrefix)
+	if err != nil {
+		t.Fatalf("ParseGlobalStashList: %v", err)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("got %d entries, want 1: %+v", len(entries), entries)
+	}
+	e := entries[0]
+	if e.Index != -1 {
+		t.Fatalf("Index = %d, want -1 (D17 sentinel)", e.Index)
+	}
+	if e.Scope != porcelain.StashScopeGlobal {
+		t.Fatalf("Scope = %q, want %q", e.Scope, porcelain.StashScopeGlobal)
+	}
+	if e.Ref != testGlobalStashRefPrefix+sha {
+		t.Fatalf("Ref = %q, want %q", e.Ref, testGlobalStashRefPrefix+sha)
+	}
+	if e.Sha != sha || e.BaseSha != base || e.IndexSha != indexSha {
+		t.Fatalf("sha/base/index = %q/%q/%q", e.Sha, e.BaseSha, e.IndexSha)
+	}
+	if e.UntrackedSha != nil || e.IncludedUntracked {
+		t.Fatalf("entry pushed without -u must have no untracked half: %+v", e)
+	}
+	if e.Message != "On main: my label" {
+		t.Fatalf("Message = %q", e.Message)
+	}
+	if e.Branch == nil || *e.Branch != "main" {
+		t.Fatalf("Branch = %v, want \"main\"", e.Branch)
+	}
+	if e.FileCount != 1 {
+		t.Fatalf("FileCount = %d, want 1", e.FileCount)
+	}
+}
+
+// TestParseGlobalStashList_ThreeParentUntrackedZeroNumstat covers an untracked-only global entry
+// (-u, no tracked changes at all): 3 parents, IncludedUntracked=true, zero numstat records — the
+// same "zero or more numstat records" framing ParseStashList's own untracked-only case already
+// covers, now proven for the bucket's own header shape too.
+func TestParseGlobalStashList_ThreeParentUntrackedZeroNumstat(t *testing.T) {
+	sha := hex('1')
+	base := hex('2')
+	indexSha := hex('3')
+	untrackedSha := hex('4')
+	raw := []byte(sha + "\x1f" + sha + "\x1f" + base + " " + indexSha + " " + untrackedSha + "\x1f" +
+		"On feature: untracked only" + "\x1f" + "1690000001\x00")
+
+	entries, err := porcelain.ParseGlobalStashList(raw, nil, testGlobalStashRefPrefix)
+	if err != nil {
+		t.Fatalf("ParseGlobalStashList: %v", err)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("got %d entries, want 1: %+v", len(entries), entries)
+	}
+	e := entries[0]
+	if e.UntrackedSha == nil || *e.UntrackedSha != untrackedSha {
+		t.Fatalf("UntrackedSha = %v, want %q", e.UntrackedSha, untrackedSha)
+	}
+	if !e.IncludedUntracked {
+		t.Fatal("IncludedUntracked = false, want true (3 parents)")
+	}
+	if e.FileCount != 0 {
+		t.Fatalf("FileCount = %d, want 0 (no tracked numstat records at all)", e.FileCount)
+	}
+}
+
+// TestParseGlobalStashList_TwoEntryHeaderShapedPathNeverMisdetected proves isGlobalStashHeader's
+// own "unambiguous against a numstat record" claim directly: the first entry's own numstat record
+// names a file whose basename is itself 40 hex characters — a pathological near-miss for "looks
+// like a header" — and it must still be folded into entry one's own numstat, never mistaken for a
+// third entry's header.
+func TestParseGlobalStashList_TwoEntryHeaderShapedPathNeverMisdetected(t *testing.T) {
+	sha1 := hex('a')
+	base := hex('b')
+	indexSha := hex('c')
+	pathologicalPath := hex('d') // a file NAME that happens to be 40 hex characters
+	sha2 := hex('e')
+
+	raw := []byte(
+		sha1 + "\x1f" + sha1 + "\x1f" + base + " " + indexSha + "\x1f" + "On main: one" + "\x1f" + "1690000000\x00" +
+			"\n1\t1\t" + pathologicalPath + "\x00" +
+			sha2 + "\x1f" + sha2 + "\x1f" + base + "\x1f" + "On main: two" + "\x1f" + "1690000001\x00",
+	)
+
+	entries, err := porcelain.ParseGlobalStashList(raw, nil, testGlobalStashRefPrefix)
+	if err != nil {
+		t.Fatalf("ParseGlobalStashList: %v", err)
+	}
+	if len(entries) != 2 {
+		t.Fatalf("got %d entries, want 2 (the pathological numstat path must not be misdetected as a third header): %+v", len(entries), entries)
+	}
+	if entries[0].Sha != sha1 || entries[0].FileCount != 1 {
+		t.Fatalf("entries[0] = %+v, want sha %q with FileCount 1", entries[0], sha1)
+	}
+	if entries[1].Sha != sha2 || entries[1].FileCount != 0 {
+		t.Fatalf("entries[1] = %+v, want sha %q with FileCount 0", entries[1], sha2)
+	}
+}
+
+func TestParseGlobalStashList_MalformedHeaderNot40Hex(t *testing.T) {
+	if _, err := porcelain.ParseGlobalStashList([]byte("not-a-sha\x00"), nil, testGlobalStashRefPrefix); err == nil {
+		t.Fatal("expected an error for a record set not starting with a 40-hex header")
 	}
 }
