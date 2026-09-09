@@ -26,7 +26,18 @@ func walkSpecFrom(entry *gitsession.RepoEntry, scope string, pageSize *int) (por
 	if scope == "" {
 		scope = repoGraphScope(entry)
 	}
-	return porcelain.WalkSpec{Scope: scope}, pageSizeFrom(entry, pageSize)
+	return porcelain.WalkSpec{Scope: scope, ExcludeStash: excludeStashFor(entry)}, pageSizeFrom(entry, pageSize)
+}
+
+// excludeStashFor is G28 D15's own settings-side wiring for the decidable "off" half of
+// kiraVersion.stash.showInGraph (F13: inert since G18) — a server-side read from the repo's own
+// stored settings, so no wire change at all. nil entry (no repo.open has happened yet) reads as
+// false, the setting's own default ("on", today's de-facto behaviour).
+func excludeStashFor(entry *gitsession.RepoEntry) bool {
+	if entry == nil {
+		return false
+	}
+	return !entry.RepoSettings().StashShowInGraph
 }
 
 func pageSizeFrom(entry *gitsession.RepoEntry, pageSize *int) int {
