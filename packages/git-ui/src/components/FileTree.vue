@@ -22,6 +22,7 @@ import type { KuiSegmentedOption } from '@kira/kira-ui';
 import { KuiButton, KuiContextMenu, KuiSearchInput, KuiSegmented, KuiSelect } from '@kira/kira-ui';
 import { computed, nextTick, ref, watch } from 'vue';
 import { ACTION_ICONS } from '../icons/index.ts';
+import { setiIconFor } from '../icons/setiFileIcon.ts';
 import type { FileListMode } from '../state/detail.ts';
 import type { DetailActions } from '../state/detailActions.ts';
 import { exactCount, formatChangeCount } from './countFormat.ts';
@@ -31,7 +32,6 @@ import {
   capRows,
   FILE_TREE_ROW_CAP,
   type FileTreeRow,
-  fileIconFor,
   filterFiles,
   flattenTreeRows,
   renameDisplay,
@@ -335,11 +335,15 @@ function statusClass(change: FileChange): string {
   return STATUS_COLOR_CLASS[change.kind];
 }
 
-/** G19 D14: the row's primary leading glyph — a coarse extension-based codicon, replacing the
- *  status letter in that role; the letter itself is kept, demoted to a small secondary chip
- *  (SPEC's own wording: kept, not removed). */
-function fileIcon(path: string): string {
-  return fileIconFor(path);
+/** G19 D14: the row's primary leading glyph, replacing the status letter in that role; the letter
+ *  itself is kept, demoted to a small secondary chip (SPEC's own wording: kept, not removed).
+ *  G-UX D3 (item 3): a real per-language seti-ui icon now, not one shared codicon glyph, rendered
+ *  as a CSS mask (`.kv-file-tree-icon`'s own `mask-image`) so `background-color` still drives the
+ *  glyph's colour exactly as the codicon it replaces did — see `setiFileIcon.ts`'s own doc
+ *  comment for why a mask rather than inline SVG/`v-html`. */
+function fileIconStyle(path: string): Record<string, string> {
+  const icon = setiIconFor(path);
+  return { maskImage: icon.maskUrl, WebkitMaskImage: icon.maskUrl, backgroundColor: icon.color };
 }
 
 function fileTitle(change: FileChange): string {
@@ -476,7 +480,11 @@ function reviewToggleTitle(path: string): string {
           </span>
         </template>
         <template v-else>
-          <span class="kv-file-tree-icon codicon" :class="fileIcon(row.node.path)" aria-hidden="true"></span>
+          <span
+            class="kv-file-tree-icon"
+            :style="fileIconStyle(row.node.path)"
+            aria-hidden="true"
+          ></span>
           <span
             class="kv-file-tree-status"
             :class="statusClass(row.node.change)"
@@ -629,14 +637,22 @@ function reviewToggleTitle(path: string): string {
   gap: var(--kv-space-2);
 }
 
-/* G19 D14: the row's primary leading glyph — a coarse extension-based codicon (`fileIconFor`),
- * taking over the leading-icon role the status letter used to occupy. */
+/* G19 D14: the row's primary leading glyph, taking over the leading-icon role the status letter
+ * used to occupy. G-UX D3 (item 3): a real seti-ui icon now, rendered as a CSS mask (not inline
+ * SVG/`v-html`) so `background-color` keeps driving its colour exactly as it did for the codicon
+ * this replaces — `setiFileIcon.ts`'s own doc comment explains the mask choice. 16px matches VS
+ * Code's own explorer icon box (G-UX item 6/F7 also flagged the old 14px-in-16px box as slightly
+ * oversized; this box is unchanged, only what fills it). */
 .kv-file-tree-icon {
   flex-shrink: 0;
   width: 16px;
-  text-align: center;
-  color: var(--kv-description-fg);
-  font-size: 14px;
+  height: 16px;
+  mask-size: contain;
+  mask-repeat: no-repeat;
+  mask-position: center;
+  -webkit-mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-position: center;
 }
 
 /* G21 D10: item 10's own wording, taken literally — "just a colored letter", not a chip. G19
