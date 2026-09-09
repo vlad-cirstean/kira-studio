@@ -282,13 +282,67 @@ func prepareBranchCreate(_ context.Context, _ *RepoEntry, _ ConnID, _ string, op
 	return prepared{argvList: argvList}, nil
 }
 
+// prepareBranchDelete is branchDelete's own Prepare, widened at G26 §10.9/D-3.12 to re-parent the
+// deleted branch's own stack children onto ITS OWN parent (possibly "", if the deleted branch was
+// itself not stacked) — "PR 1 merged, delete branch 1, branches 2..n now sit on main" is the single
+// most common stack lifecycle event, and leaving the children pointing at a now-gone branch would
+// make the feature feel broken at exactly the moment it should feel best (§10.9). The undo record
+// is captured FIRST (before either the delete or the re-parent writes), widened by
+// captureBranchDeleteUndo itself to also restore every child's own prior pointer.
 func prepareBranchDelete(ctx context.Context, e *RepoEntry, conn ConnID, connLabel string, op OpRequest) (prepared, error) {
 	undo := e.captureBranchDeleteUndo(ctx, conn, connLabel, op.Name)
-	return prepared{argvList: [][]string{gitops.BranchDeleteArgs(op.Name, op.Force)}, undo: undo}, nil
+
+	argv := [][]string{gitops.BranchDeleteArgs(op.Name, op.Force)}
+
+	config, err := e.rawStackConfig(ctx)
+	if err != nil {
+		return prepared{}, err
+	}
+	children := stackChildrenOf(config, op.Name)
+	if len(children) > 0 {
+		newParent := config[op.Name].Parent
+		snapshot, err := e.refsSnapshot(ctx)
+		if err != nil {
+			return prepared{}, err
+		}
+		newParentResolves := newParent != "" && resolvesAsRef(snapshot, newParent)
+		for _, child := range children {
+			newBase := ""
+			if newParentResolves {
+				res, merr := e.runAllowingExit(ctx, gitops.MergeBaseArgs(newParent, child), 0, 1)
+				if merr != nil {
+					return prepared{}, merr
+				}
+				if res.ExitCode == 0 {
+					newBase = strings.TrimSpace(string(res.Stdout))
+				}
+			}
+			argv = append(argv,
+				gitops.StackConfigSetArgs(gitops.StackParentKey(child), newParent),
+				gitops.StackConfigSetArgs(gitops.StackBaseKey(child), newBase),
+			)
+		}
+	}
+
+	return prepared{argvList: argv, undo: undo}, nil
 }
 
-func prepareBranchRename(_ context.Context, _ *RepoEntry, _ ConnID, _ string, op OpRequest) (prepared, error) {
-	return prepared{argvList: [][]string{gitops.BranchRenameArgs(op.From, op.To)}}, nil
+// prepareBranchRename is branchRename's own Prepare, widened at G26 D1/D-3.12: `git branch -m`
+// already moves the WHOLE branch.<name>.* config section for free (probe P1), which restores the
+// RENAMED branch's own kirastack pointer with zero code here — but nothing in git rewrites another
+// branch's OWN config that merely NAMES the old branch as ITS parent. This fix-up finds every such
+// child (by the fresh stack config, never a cache) and rewrites its kirastackparent value to the
+// new name, appended after the rename itself so a rename failure never leaves a half-applied fix-up.
+func prepareBranchRename(ctx context.Context, e *RepoEntry, _ ConnID, _ string, op OpRequest) (prepared, error) {
+	config, err := e.rawStackConfig(ctx)
+	if err != nil {
+		return prepared{}, err
+	}
+	argv := [][]string{gitops.BranchRenameArgs(op.From, op.To)}
+	for _, child := range stackChildrenOf(config, op.From) {
+		argv = append(argv, gitops.StackConfigSetArgs(gitops.StackParentKey(child), op.To))
+	}
+	return prepared{argvList: argv}, nil
 }
 
 func prepareTagCreate(_ context.Context, _ *RepoEntry, _ ConnID, _ string, op OpRequest) (prepared, error) {
@@ -589,6 +643,20 @@ func (e *RepoEntry) captureBranchDeleteUndo(ctx context.Context, conn ConnID, co
 	for _, line := range configLines {
 		if idx := strings.IndexByte(line, ' '); idx != -1 {
 			replay = append(replay, []string{"config", line[:idx], line[idx+1:]})
+		}
+	}
+
+	// G26 §10.9/D-3.12: prepareBranchDelete re-parents this branch's own stack children onto ITS
+	// parent as part of the SAME delete — so undoing the delete must also restore every child's
+	// prior pointer, not just the deleted branch's own. Best-effort exactly like the read above: a
+	// failure here must not abort capturing the undo for the branch's own restoration.
+	if stackConfig, scErr := e.rawStackConfig(ctx); scErr == nil {
+		for _, child := range stackChildrenOf(stackConfig, name) {
+			oldEntry := stackConfig[child]
+			replay = append(replay,
+				gitops.StackConfigSetArgs(gitops.StackParentKey(child), oldEntry.Parent),
+				gitops.StackConfigSetArgs(gitops.StackBaseKey(child), oldEntry.Base),
+			)
 		}
 	}
 

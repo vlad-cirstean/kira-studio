@@ -457,6 +457,136 @@ func TestRunOp_StackSet_RemoveFromStack(t *testing.T) {
 	}
 }
 
+// ---------------------------------------------------------------------------------------
+// branchRename / branchDelete stack fix-ups (D1/§10.9)
+// ---------------------------------------------------------------------------------------
+
+// initTwoLevelStack builds main -> feat1 -> feat2 with both stack keys recorded properly.
+func initTwoLevelStack(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	runGitStack(t, dir, "init", "-q", "-b", "main")
+	writeFileStack(t, dir, "f.txt", "line1\n")
+	runGitStack(t, dir, "add", "f.txt")
+	runGitStack(t, dir, "commit", "-q", "-m", "c1")
+	runGitStack(t, dir, "checkout", "-q", "-b", "feat1")
+	writeFileStack(t, dir, "a.txt", "a\n")
+	runGitStack(t, dir, "add", "a.txt")
+	runGitStack(t, dir, "commit", "-q", "-m", "c2")
+	runGitStack(t, dir, "checkout", "-q", "-b", "feat2")
+	writeFileStack(t, dir, "b.txt", "b\n")
+	runGitStack(t, dir, "add", "b.txt")
+	runGitStack(t, dir, "commit", "-q", "-m", "c3")
+	runGitStack(t, dir, "config", "--local", "branch.feat1.kirastackparent", "main")
+	runGitStack(t, dir, "config", "--local", "branch.feat2.kirastackparent", "feat1")
+	runGitStack(t, dir, "checkout", "-q", "main")
+	return dir
+}
+
+// TestRunOp_BranchRename_ChildPointerFollows proves G26's own fix-up: renaming feat1 to feat1b
+// must rewrite feat2's OWN kirastackparent value (git's own `branch -m` only moves feat1's own
+// section, per probe P1 — it does nothing about feat2's config naming feat1 as ITS parent).
+func TestRunOp_BranchRename_ChildPointerFollows(t *testing.T) {
+	skipWithoutGitStack(t)
+	dir := initTwoLevelStack(t)
+	entry := newStackTestEntryWithRunner(t, gitclient.NewExecRunner(), dir)
+	ctx := context.Background()
+
+	result, err := entry.RunOp(ctx, ConnID("stack-test-conn"), "test", OpRequest{Kind: "branchRename", From: "feat1", To: "feat1b"})
+	if err != nil {
+		t.Fatalf("RunOp: %v", err)
+	}
+	if !result.OK {
+		t.Fatalf("result = %+v, want ok", result)
+	}
+
+	stacks, err := entry.Stacks(ctx)
+	if err != nil {
+		t.Fatalf("Stacks: %v", err)
+	}
+	if len(stacks.Stacks) != 1 || stacks.Stacks[0].Base != "main" {
+		t.Fatalf("stacks = %+v", stacks.Stacks)
+	}
+	names := []string{}
+	for _, b := range stacks.Stacks[0].Branches {
+		names = append(names, b.Name)
+	}
+	if len(names) != 2 || names[0] != "feat1b" || names[1] != "feat2" {
+		t.Fatalf("branches = %v, want [feat1b feat2] (feat2 must follow the rename)", names)
+	}
+}
+
+// TestRunOp_BranchDelete_ReparentsChildren is §7.1 item 10's own exit criterion: deleting feat1
+// (whose own parent is main) re-parents feat2 onto main, and undoing the delete restores both
+// feat1 itself and feat2's own prior pointer (to feat1).
+func TestRunOp_BranchDelete_ReparentsChildren(t *testing.T) {
+	skipWithoutGitStack(t)
+	dir := initTwoLevelStack(t)
+	// feat1 must be fully merged into main for a plain -d delete to succeed with no --force.
+	runGitStack(t, dir, "checkout", "-q", "main")
+	runGitStack(t, dir, "merge", "-q", "--no-edit", "feat1")
+	entry := newStackTestEntryWithRunner(t, gitclient.NewExecRunner(), dir)
+	ctx := context.Background()
+
+	result, err := entry.RunOp(ctx, ConnID("stack-test-conn"), "test", OpRequest{Kind: "branchDelete", Name: "feat1"})
+	if err != nil {
+		t.Fatalf("RunOp: %v", err)
+	}
+	if !result.OK {
+		t.Fatalf("result = %+v, want ok", result)
+	}
+	if result.Undo == nil {
+		t.Fatal("branchDelete must set an undo record")
+	}
+
+	stacks, err := entry.Stacks(ctx)
+	if err != nil {
+		t.Fatalf("Stacks: %v", err)
+	}
+	if len(stacks.Stacks) != 1 || stacks.Stacks[0].Base != "main" {
+		t.Fatalf("stacks = %+v, want feat2 re-parented onto main", stacks.Stacks)
+	}
+	if len(stacks.Stacks[0].Branches) != 1 || stacks.Stacks[0].Branches[0].Name != "feat2" {
+		t.Fatalf("branches = %+v", stacks.Stacks[0].Branches)
+	}
+
+	// Undo must restore BOTH feat1 itself and feat2's own prior pointer (back to feat1). Read the
+	// stack config FRESH (never entry.Stacks' own cache, which UndoRun does not invalidate — a
+	// pre-existing gap in UndoRun predating this phase, noted rather than papered over here) and
+	// via a fresh refs read for feat1's own existence, exactly what a real client's next
+	// stack.list after the watcher's own refsChanged signal would see.
+	undoResult, err := entry.UndoRun(ctx, result.Undo.ID)
+	if err != nil {
+		t.Fatalf("UndoRun: %v", err)
+	}
+	if !undoResult.OK {
+		t.Fatalf("undoResult = %+v, want ok", undoResult)
+	}
+	freshConfig, err := entry.rawStackConfig(ctx)
+	if err != nil {
+		t.Fatalf("rawStackConfig (after undo): %v", err)
+	}
+	if freshConfig["feat1"].Parent != "main" {
+		t.Fatalf("feat1's own parent after undo = %q, want main", freshConfig["feat1"].Parent)
+	}
+	if freshConfig["feat2"].Parent != "feat1" {
+		t.Fatalf("feat2's parent after undo = %q, want feat1 (restored, not left at main)", freshConfig["feat2"].Parent)
+	}
+	freshRefs, err := entry.refsSnapshot(ctx)
+	if err != nil {
+		t.Fatalf("refsSnapshot (after undo): %v", err)
+	}
+	found := false
+	for _, r := range freshRefs.Branches {
+		if r.ShortName == "feat1" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("feat1 must exist again after undo")
+	}
+}
+
 func TestRestackPreflight_RecordedBaseFallsBackToMergeBase(t *testing.T) {
 	skipWithoutGitStack(t)
 	dir := t.TempDir()

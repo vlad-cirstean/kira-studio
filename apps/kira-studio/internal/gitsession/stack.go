@@ -252,6 +252,21 @@ func (e *RepoEntry) RestackPreflight(ctx context.Context, branch string) (gitpre
 	}), nil
 }
 
+// stackChildrenOf returns the sorted list of branch names whose recorded parent (in config) is
+// exactly name — G26 §10.9/D-3.12's own "who points at the branch about to be renamed/deleted"
+// query, shared by prepareBranchRename's fix-up, prepareBranchDelete's re-parent step, and
+// captureBranchDeleteUndo's own widened capture.
+func stackChildrenOf(config map[string]gitpreflight.StackConfigEntry, name string) []string {
+	out := []string{}
+	for branch, entry := range config {
+		if entry.Parent == name {
+			out = append(out, branch)
+		}
+	}
+	sort.Strings(out)
+	return out
+}
+
 // ---------------------------------------------------------------------------------------
 // opTable's stackSet kind (D10)
 // ---------------------------------------------------------------------------------------
