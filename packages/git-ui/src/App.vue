@@ -323,28 +323,6 @@ watch(graphView.announcement, (text) => {
   liveAnnouncement.value = text;
 });
 
-/**
- * `CommitMeta.vue`'s "select this parent commit" affordance, bubbled up through
- * `DetailPane.vue`'s own `selectParentCommit` emit. Mirrors a normal row click when the parent's
- * row is already loaded (updates `SelectionState` and scrolls the grid to it — the same two
- * calls a real click makes, so the grid's own highlight and the pane agree); when it is not
- * loaded (a parent outside the currently streamed window), there is no row to select or scroll
- * to, so only `detailState.select` runs — the pane still follows the parent commit, `selection`
- * is deliberately left as it was rather than cleared, since clearing it here would race this
- * same call's own `detailState.select` against the `selection.sha` watch above (a clear fires
- * that watch asynchronously, and its `null` would land *after* this function's own direct
- * `select(sha)` call, wiping the very detail this action just asked to show).
- */
-function selectCommitFromDetail(sha: string): void {
-  const row = graphView.store.rowOfSha(sha);
-  if (row !== -1) {
-    selection.select(row);
-    commitGridRef.value?.scrollToRow(row);
-    return;
-  }
-  detailState.select(sha);
-}
-
 // ---------------------------------------------------------------------------------------
 // `docs/plans/P11.md` W14: `SearchBox.vue`'s two emits, forwarded through `AppToolbar.vue`.
 // ---------------------------------------------------------------------------------------
@@ -1434,7 +1412,6 @@ onBeforeUnmount(() => {
               :store="graphView.store"
               :actions="actions"
               :pr="prState"
-              @select-parent-commit="selectCommitFromDetail"
             />
           </aside>
         </main>
@@ -1454,7 +1431,6 @@ onBeforeUnmount(() => {
               :store="graphView.store"
               :actions="actions"
               :pr="prState"
-              @select-parent-commit="selectCommitFromDetail"
             />
           </aside>
         </div>

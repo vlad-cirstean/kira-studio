@@ -10,11 +10,13 @@
  * this component no longer needs the breakpoint-aware "diff takes over the pane" layout its own
  * doc comment used to describe, nor the focus-return dance a mode flip used to need.
  *
- * Does not call `detailState.select` itself for a parent-commit pick (`CommitMeta.vue`'s own
- * `selectParentCommit` emit) — that emit only bubbles further up, to `App.vue`, which also owns
- * `SelectionState` and the grid ref neither this component nor `DetailState` has access to; a
- * parent commit whose row is already loaded needs the grid's own selection/scroll updated to
- * match, exactly as a normal row click would, and only `App.vue` can do that.
+ * G-UX D7 (item 7): the pane is subject + files now — `CommitMeta.vue`'s own `selectParentCommit`
+ * emit (and this component's own forwarding of it) is gone along with the Parent row itself; the
+ * graph's own edges are how you reach a parent. The 80% file-tree proportion (7c) is enforced
+ * here, by layout: `.kv-detail-pane-meta`/`-details` are `flex: 0 0 auto` with a `max-height` cap
+ * (a bounded `%` of the pane's own height, not of the viewport), `.kv-detail-pane-tree` is
+ * `flex: 1 1 auto` and takes the remainder — the caps are what keep a pathological subject or an
+ * expanded description from ever pushing the tree below its share.
  */
 import type { CommitStore } from '@kira/git-core';
 import { computed } from 'vue';
@@ -37,13 +39,7 @@ const props = defineProps<{
   pr?: PrState;
 }>();
 
-const emit = defineEmits<(e: 'selectParentCommit', sha: string) => void>();
-
 const detail = computed(() => props.detailState.detail.value);
-
-function onSelectParentCommit(sha: string): void {
-  emit('selectParentCommit', sha);
-}
 
 /** G21 D12/D13: the tree's own `openFile` emit — `props.actions.openInEditor({ sha, path,
  *  originalPath, parentIndex })`, exactly the shape D12's own plan names. `pinned` comes straight
@@ -71,10 +67,9 @@ function onOpenFile(index: number, pinned: boolean): void {
     <template v-if="detail">
       <CommitMeta
         section="message"
+        class="kv-detail-pane-meta"
         :detail="detail"
-        :store="store"
         :actions="actions"
-        @select-parent-commit="onSelectParentCommit"
       />
       <FileTree
         class="kv-detail-pane-tree"
@@ -94,11 +89,10 @@ function onOpenFile(index: number, pinned: boolean): void {
       />
       <CommitMeta
         section="details"
+        class="kv-detail-pane-details"
         :detail="detail"
-        :store="store"
         :actions="actions"
         :pr-result="pr?.selected.value"
-        @select-parent-commit="onSelectParentCommit"
       />
     </template>
 
@@ -114,7 +108,31 @@ function onOpenFile(index: number, pinned: boolean): void {
   height: 100%;
 }
 
+/* G-UX D7 (7c): the subject/description block — naturally ~3 lines collapsed; hard-bounded so a
+   pathological subject or an expanded description can never push the tree below its own share of
+   the pane. The percentage is of THIS pane's own height (the flex container), not the viewport —
+   `.kv-detail-pane-meta--expanded` (CommitMeta.vue's own `:class` binding, keyed off its internal
+   `bodyExpanded`) widens the cap while "Show more" is open. */
+.kv-detail-pane-meta {
+  flex: 0 0 auto;
+  max-height: 20%;
+  overflow: hidden;
+}
+
+.kv-detail-pane-meta.kv-detail-pane-meta--expanded {
+  max-height: 50%;
+  overflow: auto;
+}
+
+.kv-detail-pane-details {
+  flex: 0 0 auto;
+  max-height: 12%;
+  overflow: auto;
+}
+
 .kv-detail-pane-tree {
+  flex: 1 1 auto;
+  min-height: 0;
   border-top: 1px solid var(--kv-panel-border);
   border-bottom: 1px solid var(--kv-panel-border);
 }

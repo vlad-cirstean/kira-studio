@@ -8,8 +8,13 @@
  * `appendLinkifiedText`/`refBadges.ts`'s `buildRefBadges` rather than a template `v-html` — a
  * commit message is untrusted text and this repo's `enableHtmlRendering: false` discipline
  * (`columns.ts`'s own doc comment) applies here just as much as it does inside the grid.
+ *
+ * G-UX D7 (item 7): subject + files is the pane's whole job now. SHA and Parent(s) are gone
+ * entirely — the row context menu's `copySha` is the sha's only copy path left (G19 D7's own
+ * precedent), and the graph's own edges are how you reach a parent. Author/Committer and the
+ * trailers both moved inside the "Show more" collapsible region, alongside the body, so the
+ * collapsed view is subject + clamped body + toggle and nothing else.
  */
-import type { CommitStore } from '@kira/git-core';
 import type { PrLookupResult } from '@kira/git-ipc';
 import { KuiButton } from '@kira/kira-ui';
 import { computed, nextTick, ref, watch } from 'vue';
@@ -20,7 +25,6 @@ import { buildRefBadges } from './refBadges.ts';
 
 const props = defineProps<{
   detail: CommitDetail | undefined;
-  store: CommitStore;
   actions: DetailActions;
   /** §6.4's "message, then files, then details" ordering means `DetailPane.vue` has to put its
    *  own `<FileTree>` *between* this component's two halves — so it mounts this component twice,
@@ -33,10 +37,6 @@ const props = defineProps<{
   prResult?: PrLookupResult;
 }>();
 
-/** A loaded parent's sha button was clicked — `DetailPane.vue`/`App.vue` own turning this into
- *  an actual selection change (this component only reads `store`, it never writes to it). */
-const emit = defineEmits<(e: 'selectParentCommit', sha: string) => void>();
-
 const bodyEl = ref<HTMLParagraphElement | null>(null);
 const decorationEl = ref<HTMLSpanElement | null>(null);
 
@@ -45,10 +45,6 @@ const decorationEl = ref<HTMLSpanElement | null>(null);
  *  collapsed on every new commit — an expansion the user made for one commit's message is not a
  *  standing preference carried into the next. */
 const bodyExpanded = ref(false);
-/** Whether the collapsed body actually overflows its own 4-line clamp — measured, not assumed,
- *  so the "Show more" toggle only ever renders when there is truly more to show (§the plan's own
- *  wording: "rendered only when the content actually overflows"). */
-const bodyOverflows = ref(false);
 
 /** Body lines rendered one `<p>` per blank-line-separated paragraph — `appendLinkifiedText`
  *  handles a paragraph's own line breaks by joining with `\n` inside one paragraph rather than
@@ -72,12 +68,6 @@ function renderBody(): void {
       appendLinkifiedText(container, line);
     });
   }
-  // G19 D4: measured against the *collapsed* clamp (bodyExpanded was reset to false by the watch
-  // below before this ran) — one more tick so the clamp CSS has actually applied before reading
-  // scrollHeight/clientHeight back out.
-  void nextTick(() => {
-    bodyOverflows.value = container.scrollHeight > container.clientHeight;
-  });
 }
 
 function renderDecoration(): void {
@@ -102,22 +92,6 @@ watch(
 watch([() => props.detail?.decoration, decorationEl], () => void nextTick(renderDecoration), {
   immediate: true,
 });
-
-const shortSha = computed(() => props.detail?.sha.slice(0, 7) ?? '');
-
-interface ParentRow {
-  readonly sha: string;
-  readonly shortSha: string;
-  readonly loaded: boolean;
-}
-
-const parentRows = computed<ParentRow[]>(() =>
-  (props.detail?.parents ?? []).map((sha) => ({
-    sha,
-    shortSha: sha.slice(0, 7),
-    loaded: props.store.rowOfSha(sha) !== -1,
-  })),
-);
 
 /** §6.4: "author and committer with both timestamps when they differ" — read as: show one
  *  identity row when author and committer are the very same identity at the very same moment
@@ -198,6 +172,20 @@ const prDetail = computed<PrDetailView | undefined>(() => {
   };
 });
 
+/** G-UX D7 (7b): the whole `'details'` section renders nothing at all when none of its three
+ *  rows would — the common case (no decoration on this commit, unsigned, GitHub disabled) is now
+ *  an empty pane, not an empty padded box. Reads `detail.decoration.length` directly rather than
+ *  `decorationEl?.childNodes.length` (the individual Refs row's own check, unchanged below): this
+ *  needs a value known synchronously from props on the FIRST render, before `renderDecoration`'s
+ *  own `nextTick` has populated anything — `buildRefBadges` only ever returns `null` for an empty
+ *  decoration array (`refBadges.ts`), so this tracks the DOM outcome closely enough to gate on. */
+const hasDetails = computed(
+  () =>
+    (props.detail?.decoration.length ?? 0) > 0 ||
+    signatureText.value !== undefined ||
+    prDetail.value !== undefined,
+);
+
 const COAUTHOR_TOKENS = new Set(['Co-authored-by', 'Signed-off-by']);
 const IDENTITY_TRAILER = /^(.*)\s<(.+)>$/;
 
@@ -225,23 +213,6 @@ const trailerRows = computed<TrailerRow[]>(() =>
   }),
 );
 
-/** G21 D5: the details panel's own single SHA row — full SHA copied, short SHA shown, one
- *  button. `shaCopied` mirrors the flash the deleted `shaFormatter` (`columns.ts`) had on the
- *  graph column's own SHA button, so the copy interaction is no less discoverable for having
- *  moved here. */
-const shaCopied = ref(false);
-let shaCopiedTimer: ReturnType<typeof setTimeout> | undefined;
-
-function copyFullSha(): void {
-  if (!props.detail) return;
-  props.actions.copy(props.detail.sha, 'full SHA');
-  shaCopied.value = true;
-  clearTimeout(shaCopiedTimer);
-  shaCopiedTimer = setTimeout(() => {
-    shaCopied.value = false;
-  }, 1500);
-}
-
 function copyMessage(): void {
   const detail = props.detail;
   if (!detail) return;
@@ -251,7 +222,12 @@ function copyMessage(): void {
 </script>
 
 <template>
-  <div v-if="detail" class="kv-commit-meta" data-testid="commit-meta">
+  <div
+    v-if="detail"
+    class="kv-commit-meta"
+    :class="{ 'kv-detail-pane-meta--expanded': section === 'message' && bodyExpanded }"
+    data-testid="commit-meta"
+  >
     <section v-if="section === 'message'" class="kv-meta-message" aria-label="Commit message">
       <div class="kv-meta-message-header">
         <h2 class="kv-meta-subject">{{ detail.subject }}</h2>
@@ -269,66 +245,36 @@ function copyMessage(): void {
         class="kv-meta-body"
         :class="{ 'kv-meta-body-expanded': bodyExpanded }"
       ></p>
-      <KuiButton
-        v-if="bodyOverflows"
-        variant="ghost"
-        class="kv-meta-body-toggle"
-        @click="bodyExpanded = !bodyExpanded"
-      >
+      <!-- G-UX D7 (7a/7b): author/committer and the trailers both live behind this toggle now, so
+           it is not gated on `bodyOverflows` any more — there is always at least the author to
+           reveal, even for a one-line subject with no body at all. -->
+      <KuiButton variant="ghost" class="kv-meta-body-toggle" @click="bodyExpanded = !bodyExpanded">
         {{ bodyExpanded ? 'Show less' : 'Show more' }}
       </KuiButton>
-      <dl v-if="trailerRows.length > 0" class="kv-meta-trailers">
-        <template v-for="(row, index) in trailerRows" :key="index">
-          <dt>{{ row.token }}</dt>
-          <dd v-if="row.name !== undefined">
-            {{ row.name }} <span class="kv-meta-trailer-email">&lt;{{ row.email }}&gt;</span>
-          </dd>
-          <dd v-else>{{ row.raw }}</dd>
-        </template>
-      </dl>
+      <div v-if="bodyExpanded" class="kv-meta-expanded">
+        <p class="kv-meta-identity">{{ detail.author.name }} &lt;{{ detail.author.email }}&gt;</p>
+        <p v-if="committerDiffersFromAuthor" class="kv-meta-identity">
+          {{ detail.committer.name }} &lt;{{ detail.committer.email }}&gt;
+          <span class="kv-meta-identity-role">committer</span>
+        </p>
+        <dl v-if="trailerRows.length > 0" class="kv-meta-trailers">
+          <template v-for="(row, index) in trailerRows" :key="index">
+            <dt>{{ row.token }}</dt>
+            <dd v-if="row.name !== undefined">
+              {{ row.name }} <span class="kv-meta-trailer-email">&lt;{{ row.email }}&gt;</span>
+            </dd>
+            <dd v-else>{{ row.raw }}</dd>
+          </template>
+        </dl>
+      </div>
     </section>
 
-    <section v-if="section === 'details'" class="kv-meta-details" aria-label="Commit details">
+    <section
+      v-if="section === 'details' && hasDetails"
+      class="kv-meta-details"
+      aria-label="Commit details"
+    >
       <dl class="kv-meta-details-list">
-        <dt>SHA</dt>
-        <dd class="kv-meta-sha-row">
-          <KuiButton
-            v-if="actions.capabilities.clipboard"
-            variant="ghost"
-            class="kv-meta-sha"
-            v-kui-tooltip="'Click to copy the full SHA'"
-            aria-label="Copy full SHA"
-            @click="copyFullSha"
-          >
-            {{ shaCopied ? 'Copied' : shortSha }}
-          </KuiButton>
-          <span v-else class="kv-meta-mono">{{ shortSha }}</span>
-        </dd>
-        <template v-if="parentRows.length > 0">
-          <dt>{{ parentRows.length > 1 ? "Parents" : "Parent" }}</dt>
-          <dd class="kv-meta-parents">
-            <KuiButton
-              v-for="parent in parentRows"
-              :key="parent.sha"
-              class="kv-meta-parent"
-              :disabled="!parent.loaded"
-              v-kui-tooltip="parent.loaded ? '' : 'Not loaded — load more history to reach it'"
-              @click="emit('selectParentCommit', parent.sha)"
-            >
-              {{ parent.shortSha }}
-            </KuiButton>
-          </dd>
-        </template>
-        <template v-if="!committerDiffersFromAuthor">
-          <dt>Author</dt>
-          <dd>{{ detail.author.name }} &lt;{{ detail.author.email }}&gt;</dd>
-        </template>
-        <template v-else>
-          <dt>Author</dt>
-          <dd>{{ detail.author.name }} &lt;{{ detail.author.email }}&gt;</dd>
-          <dt>Committer</dt>
-          <dd>{{ detail.committer.name }} &lt;{{ detail.committer.email }}&gt;</dd>
-        </template>
         <dt v-if="decorationEl?.childNodes.length">Refs</dt>
         <dd v-show="decorationEl?.childNodes.length" ref="decorationEl" class="kv-meta-refs"></dd>
         <template v-if="signatureText">
@@ -357,11 +303,14 @@ function copyMessage(): void {
 </template>
 
 <style>
+/* G-UX D7 (7c): padding/gap tighten one step (space-4 -> space-3/space-2) — one contributor,
+   alongside the 2-line clamp below and the deleted sha/parent rows, to the pane's own 80% target
+   for the file tree (DetailPane.vue's own max-height rules do the actual bounding). */
 .kv-commit-meta {
-  padding: var(--kv-space-4);
+  padding: var(--kv-space-3);
   display: flex;
   flex-direction: column;
-  gap: var(--kv-space-4);
+  gap: var(--kv-space-2);
 }
 
 .kv-meta-message-header {
@@ -382,11 +331,13 @@ function copyMessage(): void {
   white-space: normal;
 }
 
-/* G19 D4 (item 4): truncated to 4 lines while collapsed — F4 confirmed the body used to render in
-   full with no truncation at all. */
+/* G19 D4 (item 4): truncated while collapsed — F4 confirmed the body used to render in full with
+   no truncation at all. G-UX D7 (7c): tightened from 4 lines to 2 — the largest single
+   contributor to the pane's 80% target after removing the sha/parent rows; "Show more" is one
+   click away for the rest. */
 .kv-meta-body:not(.kv-meta-body-expanded) {
   display: -webkit-box;
-  -webkit-line-clamp: 4;
+  -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
@@ -410,8 +361,28 @@ function copyMessage(): void {
   text-decoration: underline;
 }
 
+/* G-UX D7 (7a/7b): the collapsible region behind "Show more" — author/committer identity lines,
+   then the trailers. Zero space cost while collapsed (the default view): nothing here renders
+   until bodyExpanded is true. */
+.kv-meta-expanded {
+  margin-top: var(--kv-space-2);
+  display: flex;
+  flex-direction: column;
+  gap: var(--kv-space-1);
+}
+
+.kv-meta-identity {
+  margin: 0;
+  font-size: 0.92em;
+  color: var(--kv-description-fg);
+}
+
+.kv-meta-identity-role {
+  font-size: 0.85em;
+}
+
 .kv-meta-trailers {
-  margin: var(--kv-space-3) 0 0;
+  margin: var(--kv-space-2) 0 0;
   display: grid;
   grid-template-columns: max-content 1fr;
   gap: var(--kv-space-1) var(--kv-space-3);
@@ -444,48 +415,6 @@ function copyMessage(): void {
 
 .kv-meta-details-list dd {
   margin: 0;
-}
-
-.kv-meta-mono {
-  font-family: var(--kv-mono-font-family);
-  font-size: var(--kv-mono-font-size);
-}
-
-.kv-meta-sha-row {
-  display: flex;
-  align-items: center;
-  gap: var(--kv-space-2);
-}
-
-/* G21 D5: the details panel's single click-to-copy SHA button — a KuiButton ghost variant, sized
-   to its text rather than the fixed control height a toolbar button would want. */
-.kv-meta-sha {
-  height: auto;
-  padding: 0 var(--kv-space-1);
-  font-family: var(--kv-mono-font-family);
-  font-size: var(--kv-mono-font-size);
-}
-
-.kv-meta-parents {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--kv-space-2);
-}
-
-.kv-meta-parent {
-  font-family: var(--kv-mono-font-family);
-  font-size: var(--kv-mono-font-size);
-  background: transparent;
-  border: 1px solid var(--kv-panel-border);
-  color: var(--kv-row-fg);
-  border-radius: var(--kv-radius);
-  padding: 0 var(--kv-space-2);
-  cursor: pointer;
-}
-
-.kv-meta-parent:disabled {
-  cursor: not-allowed;
-  opacity: 0.6;
 }
 
 .kv-meta-refs {
