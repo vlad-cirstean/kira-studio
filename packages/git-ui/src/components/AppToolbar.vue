@@ -31,6 +31,7 @@ import type { RefsState } from '../state/refs.ts';
 import type { RepoState } from '../state/repo.ts';
 import type { SearchState } from '../state/search.ts';
 import type { StashState } from '../state/stash.ts';
+import type { WorktreeState } from '../state/worktrees.ts';
 // Plain (not `import type`) imports, for two different reasons. BranchPicker: vue-tsc needs the
 // real import to infer the template's inline @branch-from-stash handler's parameter type from
 // BranchPicker's own emits declaration — a type-only import here breaks that inference (TS7006).
@@ -56,6 +57,9 @@ const props = defineProps<{
   refsState: RefsState;
   opsState: OpsState;
   stashState: StashState;
+  worktreeState: WorktreeState;
+  /** G25 D6/D14 — see `WorktreeList.vue`'s own doc comment. */
+  openWorktreeWindowCapability: boolean;
   searchState: SearchState;
   actions: DetailActions | undefined;
   /** G24 D9: `BranchPicker.vue`'s own `#123` branch-tip badge source — optional, mirrors every
@@ -70,6 +74,11 @@ const emit = defineEmits<{
   (event: 'stash-changes'): void;
   /** Forwarded straight from `BranchPicker.vue`'s own emit — see `StashList.vue`'s doc comment. */
   (event: 'branch-from-stash', entry: StashEntry): void;
+  /** G25: forwarded straight from `BranchPicker.vue` -> `WorktreeList.vue`'s own emits — see
+   *  `WorktreeList.vue`'s own doc comment on why this toolbar does not act on them itself. */
+  (event: 'switch-worktree', path: string): void;
+  (event: 'open-worktree-window', path: string): void;
+  (event: 'create-worktree'): void;
   /** Forwarded straight from `SearchBox.vue`'s own `select` emit — `App.vue` is where both halves
    *  of §7.8's "selecting a hit reveals and selects it" actually live (`GraphViewState.store`,
    *  `SelectionState`), neither of which this toolbar holds. */
@@ -186,6 +195,10 @@ async function doCancel(): Promise<void> {
   await props.opsState.cancelRemote();
 }
 
+async function doCancelWorktreePrepare(): Promise<void> {
+  await props.opsState.cancelWorktreePrepare();
+}
+
 // G10 D17/F15: forwarded so App.vue's palette dispatcher can drive the same affordances a click
 // already does — one implementation, reached from two inputs, exactly like `refresh` above. Each
 // is a one-line delegation to a handler this file already has, or to a nested component's own
@@ -219,8 +232,13 @@ const stashDisabled = computed(
       :refs="refsState"
       :ops="opsState"
       :stash="stashState"
+      :worktrees="worktreeState"
+      :open-worktree-window-capability="openWorktreeWindowCapability"
       :pr="prState"
       @branch-from-stash="(entry) => emit('branch-from-stash', entry)"
+      @switch-worktree="(path) => emit('switch-worktree', path)"
+      @open-worktree-window="(path) => emit('open-worktree-window', path)"
+      @create-worktree="emit('create-worktree')"
     />
     <span class="kv-toolbar-separator" aria-hidden="true"></span>
     <RefreshButton ref="refreshButtonRef" :graph-view="graphView" :repo-state="repoState" />
@@ -325,6 +343,26 @@ const stashDisabled = computed(
         v-kui-tooltip="cancellable ? 'Cancel' : cancelDisabledReason"
         data-testid="remote-cancel"
         @click="doCancel"
+      />
+    </div>
+
+    <!-- G25 D13: the same shape kv-remote-progress above uses — visible once the dialog that
+         started a prepare run is dismissed (WorktreeDialog.vue's own doc comment: dismissing
+         never cancels the run), which is exactly when this strip becomes the only visible
+         indicator that one is still going. -->
+    <div
+      v-if="opsState.activeWorktreePreparePath.value !== undefined"
+      class="kv-remote-progress"
+      data-testid="worktree-prepare-progress"
+    >
+      <span class="codicon codicon-loading kv-remote-progress-spin" aria-hidden="true"></span>
+      <span class="kv-remote-progress-label">Preparing worktree…</span>
+      <KuiButton
+        class="kv-icon-button"
+        icon="codicon-close"
+        v-kui-tooltip="'Cancel'"
+        data-testid="worktree-prepare-cancel"
+        @click="doCancelWorktreePrepare"
       />
     </div>
 

@@ -18,6 +18,7 @@ import type { OpsState } from '../state/ops.ts';
 import type { PrState } from '../state/pr.ts';
 import type { RefsState } from '../state/refs.ts';
 import type { StashState } from '../state/stash.ts';
+import type { WorktreeState } from '../state/worktrees.ts';
 import RowContextMenu from './RowContextMenu.vue';
 import {
   buildRefListSections,
@@ -28,11 +29,15 @@ import {
 import { buildRefMenu, remoteNamesFrom } from './rowMenuModel.ts';
 import StashList from './StashList.vue';
 import TagList from './TagList.vue';
+import WorktreeList from './WorktreeList.vue';
 
 const props = defineProps<{
   refs: RefsState;
   ops: OpsState;
   stash: StashState;
+  worktrees: WorktreeState;
+  /** G25 D6/D14 — see `WorktreeList.vue`'s own doc comment. */
+  openWorktreeWindowCapability: boolean;
   /** G24 D9's own branch-tip badge — optional so a caller with nothing to show yet gets a plain,
    *  badge-free picker (mirrors `CommitGrid.vue`'s own `pr` prop). */
   pr?: PrState;
@@ -61,7 +66,12 @@ function prTooltip(shortName: string): string {
 
 /** OQ3: bubbled straight through from `StashList.vue`'s own emit — see that component's own doc
  *  comment on why the branch-mode dialog itself is owned by `App.vue`, not here. */
-const emit = defineEmits<(e: 'branchFromStash', entry: StashEntry) => void>();
+const emit = defineEmits<{
+  (e: 'branchFromStash', entry: StashEntry): void;
+  (e: 'switchWorktree', path: string): void;
+  (e: 'openWorktreeWindow', path: string): void;
+  (e: 'createWorktree'): void;
+}>();
 
 const isOpen = ref(false);
 const rootEl = ref<HTMLElement | null>(null);
@@ -380,6 +390,15 @@ onBeforeUnmount(() => {
           :ops="ops"
           :in-progress="ops.statusSummary.value?.inProgress ?? null"
           @branch-from-stash="(entry) => emit('branchFromStash', entry)"
+        />
+
+        <WorktreeList
+          :worktrees="worktrees"
+          :ops="ops"
+          :open-worktree-window-capability="openWorktreeWindowCapability"
+          @switch-worktree="(path) => emit('switchWorktree', path)"
+          @open-worktree-window="(path) => emit('openWorktreeWindow', path)"
+          @create-worktree="emit('createWorktree')"
         />
       </div>
     </div>

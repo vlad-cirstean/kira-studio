@@ -23,6 +23,8 @@ import type {
   StashPopPreflight,
   StatusSummary,
   UndoSlotSnapshot,
+  WorktreePrepareLine,
+  WorktreePrepareResult,
 } from '@kira/git-ipc';
 import { type ShallowRef, shallowRef } from 'vue';
 import type { BridgeClient } from '../bridge/client.ts';
@@ -201,6 +203,25 @@ export class OpsState {
    *  to take that one route, there being no second one (no pull analogue of "discard"). */
   readonly pendingPull: ShallowRef<PullPreflight | undefined> = shallowRef(undefined);
 
+  // -------------------------------------------------------------------------------------
+  // G25 D13: worktree.prepare's own lifecycle — a sibling to the remote-op fields above, not
+  // folded into `busy`/`activeRemoteOp`: a prepare run holds neither the read nor the write gate
+  // server-side (F3), and this app's own UI must not disable every other action while one is in
+  // flight either. `activeWorktreePreparePath` is the worktree path currently preparing, or
+  // `undefined` — the toolbar's own strip and the dialog's own "preparing" phase both key off this,
+  // not `busy`.
+  // -------------------------------------------------------------------------------------
+
+  readonly activeWorktreePreparePath: ShallowRef<string | undefined> = shallowRef(undefined);
+  /** Every sanitized line seen so far for the run named by `activeWorktreePreparePath` — appended
+   *  as `worktree.progress` batches arrive, then REPLACED wholesale by the final result's own
+   *  `output` once `runWorktreePrepare` resolves (a very fast script can finish before its own
+   *  streamed batches are ever throttled out at all, D12's own ~100ms cadence, so the final,
+   *  authoritative transcript always wins over whatever partial view streamed in). */
+  readonly worktreePrepareOutput: ShallowRef<readonly WorktreePrepareLine[]> = shallowRef([]);
+  readonly worktreePrepareResult: ShallowRef<WorktreePrepareResult | undefined> =
+    shallowRef(undefined);
+
   readonly #bridge: BridgeClient;
   readonly #refs: RefsState;
   #repoId: string | undefined;
@@ -213,6 +234,7 @@ export class OpsState {
   #resolvePull: ((proceed: boolean) => void) | undefined;
   readonly #unsubscribe: () => void;
   readonly #unsubscribeProgress: () => void;
+  readonly #unsubscribeWorktreeProgress: () => void;
 
   constructor(bridge: BridgeClient, refs: RefsState) {
     this.#bridge = bridge;
@@ -228,6 +250,11 @@ export class OpsState {
       if (this.#repoId !== event.repoId) return;
       this.remoteProgress.value = event;
     });
+    this.#unsubscribeWorktreeProgress = bridge.on('worktree.progress', (event) => {
+      if (this.#repoId !== event.repoId) return;
+      if (this.activeWorktreePreparePath.value === undefined) return;
+      this.worktreePrepareOutput.value = [...this.worktreePrepareOutput.value, ...event.lines];
+    });
   }
 
   setRepoId(repoId: string | undefined): void {
@@ -235,6 +262,9 @@ export class OpsState {
     this.activeRemoteOp.value = undefined;
     this.remoteProgress.value = undefined;
     this.pullStrategy.value = undefined;
+    this.activeWorktreePreparePath.value = undefined;
+    this.worktreePrepareOutput.value = [];
+    this.worktreePrepareResult.value = undefined;
     if (repoId === undefined) {
       this.statusSummary.value = undefined;
       this.undoSlot.value = null;
@@ -782,6 +812,87 @@ export class OpsState {
     );
   }
 
+  // -------------------------------------------------------------------------------------
+  // G25: worktree support. runWorktreeAdd/runWorktreeRemove are `#runSimple` one-liners like
+  // every branch/tag mutation above — `WorktreeDialog.vue`'s own create phase and the Remove
+  // confirmation have already collected/confirmed their input by the time either is called.
+  // runWorktreePrepare/cancelWorktreePrepare are the exception: `worktree.prepare` is long,
+  // cancellable and streaming (D13), so it gets the same kind of dedicated lifecycle `#runRemote`
+  // gives remote ops, not `#runSimple`'s single-request shape.
+  // -------------------------------------------------------------------------------------
+
+  async runWorktreeAdd(params: {
+    readonly path: string;
+    readonly mode: 'existingBranch' | 'newBranch' | 'detach';
+    readonly branch: string | undefined;
+    readonly startPoint: string | undefined;
+  }): Promise<OpResult> {
+    return this.#runSimple(
+      { kind: 'worktreeAdd', ...params },
+      (ok) => (ok ? `Created worktree at ${params.path}` : undefined),
+      'Create worktree',
+    );
+  }
+
+  /** `confirmToken` is present only for the dirty route (D8) — WorktreeDialog's own Remove
+   *  confirmation reads it straight off a fresh `preflight.worktreeRemove` call, never typed blind.
+   *  `force` is derived here from whether a token was supplied at all: the server re-derives it
+   *  fresh from its own preflight regardless (D8's fail-safe-over-fail-open principle), so a
+   *  mismatched or stale claim here can only ever be REFUSED, never accepted. */
+  async runWorktreeRemove(path: string, confirmToken?: string): Promise<OpResult> {
+    return this.#runSimple(
+      { kind: 'worktreeRemove', path, force: confirmToken !== undefined, confirmToken },
+      (ok) => (ok ? `Removed worktree at ${path}` : undefined),
+      'Remove worktree',
+    );
+  }
+
+  /**
+   * `worktree.prepare`'s own executor (D9-D14). `scriptSha256` is the hash of the script text the
+   * dialog just showed the user — computed client-side (`WorktreeDialog.vue`'s own
+   * `crypto.subtle.digest`) over the SAME string this class never itself reads or stores, so the
+   * script text passes through this method only as a hash, never as a value logged or held here.
+   * The server independently re-hashes whatever is CURRENTLY stored and refuses with
+   * `ScriptChanged` on any mismatch before spawning anything (D11) — this method surfaces that
+   * refusal exactly like any other `WorktreePrepareResult`, never specially.
+   */
+  async runWorktreePrepare(
+    path: string,
+    scriptSha256: string,
+  ): Promise<WorktreePrepareResult | undefined> {
+    const repoId = this.#repoId;
+    if (repoId === undefined || this.activeWorktreePreparePath.value !== undefined) {
+      return undefined;
+    }
+    this.activeWorktreePreparePath.value = path;
+    this.worktreePrepareOutput.value = [];
+    this.worktreePrepareResult.value = undefined;
+    try {
+      const result = await this.#bridge.request('worktree.prepare', {
+        repoId,
+        path,
+        scriptSha256,
+      });
+      if (this.#repoId !== repoId) return result;
+      // The final, capped/sanitized transcript always wins over whatever partial view streamed
+      // in (this method's own doc comment on worktreePrepareOutput's field).
+      this.worktreePrepareOutput.value = result.output;
+      this.worktreePrepareResult.value = result;
+      return result;
+    } finally {
+      this.activeWorktreePreparePath.value = undefined;
+    }
+  }
+
+  /** `worktree.cancelPrepare` — always safe to call, mirroring `cancelRemote`'s own doc comment
+   *  exactly: `false` (never an error) when there was nothing to cancel. */
+  async cancelWorktreePrepare(): Promise<boolean> {
+    const repoId = this.#repoId;
+    if (repoId === undefined) return false;
+    const { cancelled } = await this.#bridge.request('worktree.cancelPrepare', { repoId });
+    return cancelled;
+  }
+
   /**
    * §7.5/§7.3's `stashAndCarry` route (OQ10: pull ships it in this same phase, W10) — shared
    * between `runCheckout`'s and `runPull`'s own inline calls below (each confirms via its own
@@ -1306,5 +1417,6 @@ export class OpsState {
   dispose(): void {
     this.#unsubscribe();
     this.#unsubscribeProgress();
+    this.#unsubscribeWorktreeProgress();
   }
 }

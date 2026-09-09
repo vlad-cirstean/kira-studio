@@ -43,6 +43,7 @@ import ResetDialog from './components/dialogs/ResetDialog.vue';
 import RevertDialog from './components/dialogs/RevertDialog.vue';
 import StashDialog from './components/dialogs/StashDialog.vue';
 import TagDialog from './components/dialogs/TagDialog.vue';
+import WorktreeDialog from './components/dialogs/WorktreeDialog.vue';
 import EmptyRepositoryPanel from './components/EmptyRepositoryPanel.vue';
 import GitBlockedPanel from './components/GitBlockedPanel.vue';
 import LoadMoreButton from './components/LoadMoreButton.vue';
@@ -81,6 +82,7 @@ import {
   type PersistedViewState,
   type ViewStateStore,
 } from './state/viewState.ts';
+import { WorktreeState } from './state/worktrees.ts';
 
 const props = defineProps<{
   transport: Transport;
@@ -118,6 +120,9 @@ const opsState = new OpsState(bridge, refsState);
 // `docs/plans/P9.md` W13: one `StashState` for the life of this component, exactly like
 // `refsState`/`opsState` above — reset via `setRepoId` rather than replaced.
 const stashState = new StashState(bridge);
+// G25 D1: one `WorktreeState` for the life of this component, exactly like `stashState` above —
+// reset via `setRepoId` rather than replaced.
+const worktreeState = new WorktreeState(bridge);
 // `docs/plans/P11.md` W10/W14: one `SearchState` for the life of this component, exactly like
 // `refsState`/`opsState`/`stashState` above — reset via `setRepoId` rather than replaced. Threads
 // `refsState`/`graphView` in directly (both already exist above), matching the plan's own "threads
@@ -177,6 +182,21 @@ const stashIncludeUntrackedDefault = computed(
   () =>
     repoSettingsState.settings.value['kiraVersion.stash.includeUntracked'] ??
     FALLBACK_INCLUDE_UNTRACKED,
+);
+
+/** `WorktreeDialog.vue`'s own path pre-fill default — same "read the schema's own default as the
+ *  fallback" shape as `stashIncludeUntrackedDefault` above (G25 D10). */
+const FALLBACK_WORKTREE_BASE_PATH = SETTINGS['kiraVersion.worktree.basePath'].default;
+const worktreeBasePathDefault = computed(
+  () =>
+    repoSettingsState.settings.value['kiraVersion.worktree.basePath'] ??
+    FALLBACK_WORKTREE_BASE_PATH,
+);
+const FALLBACK_PREPARE_SCRIPT = SETTINGS['kiraVersion.worktree.prepareScript'].default;
+const worktreePrepareScript = computed(
+  () =>
+    repoSettingsState.settings.value['kiraVersion.worktree.prepareScript'] ??
+    FALLBACK_PREPARE_SCRIPT,
 );
 
 const commitGridRef = ref<InstanceType<typeof CommitGrid> | null>(null);
@@ -271,6 +291,7 @@ watch(
     refsState.setRepoId(repoId);
     opsState.setRepoId(repoId);
     stashState.setRepoId(repoId);
+    worktreeState.setRepoId(repoId);
     searchState.setRepoId(repoId);
     repoSettingsState.setRepoId(repoId);
     prState.setRepoId(repoId);
@@ -514,6 +535,33 @@ const stashCreateOpen = ref(false);
 // nothing of its own" shape stashCreateOpen/tagDialogState above already follow.
 const repoSettingsDialogOpen = ref(false);
 
+// G25: WorktreeDialog.vue's own create-mode toggle — same "App.vue owns the boolean" shape
+// stashCreateOpen already follows, opened by both the toolbar/branch-picker button and the
+// `createWorktree` palette action.
+const worktreeCreateOpen = ref(false);
+
+/** `WorktreeList.vue`'s own "Switch to this worktree" row action, bubbled through
+ *  `BranchPicker.vue`/`AppToolbar.vue` — the same `repo.open` + `handleRepoOpened` path
+ *  `revealCommitInGraph` above already uses (F6: each worktree is already its own `RepoEntry`, so
+ *  "switch" needs no worktree-specific request at all). */
+async function handleSwitchWorktree(path: string): Promise<void> {
+  const repo = repoState.value;
+  if (!repo) return;
+  const outcome = await repo.open(path);
+  if (outcome.kind !== 'ok') return;
+  await handleRepoOpened(outcome.repo.repoId);
+}
+
+/** `WorktreeList.vue`'s own "Open in new window" row action (D6) — the one worktree action that
+ *  needs the extension: `worktree.openWindow` is answered entirely inside it, never reaching the
+ *  Go server (this file's own `bridge` is the only thing here with a `request` method to reach
+ *  it with). */
+async function handleOpenWorktreeWindow(path: string): Promise<void> {
+  const repoId = repoState.value?.activeRepo.value?.repoId;
+  if (repoId === undefined) return;
+  await bridge.request('worktree.openWindow', { repoId, path });
+}
+
 // ---------------------------------------------------------------------------------------
 // `docs/plans/P7.md` W14: the ref-badge context menu — a right-click that lands on a
 // `refBadges.ts` badge (`CommitGrid.vue`'s own hit-test) instead of bare row space opens this,
@@ -711,6 +759,9 @@ function runUiAction(
       break;
     case 'stashChanges':
       stashCreateOpen.value = true;
+      break;
+    case 'createWorktree':
+      worktreeCreateOpen.value = true;
       break;
     case 'resetSelected': {
       const sha = selection.sha.value;
@@ -1096,6 +1147,7 @@ onBeforeUnmount(() => {
   refsState.dispose();
   opsState.dispose();
   stashState.dispose();
+  worktreeState.dispose();
   searchState.dispose();
   repoSettingsState.dispose();
   prState.dispose();
@@ -1155,12 +1207,17 @@ onBeforeUnmount(() => {
           :refs-state="refsState"
           :ops-state="opsState"
           :stash-state="stashState"
+          :worktree-state="worktreeState"
+          :open-worktree-window-capability="actions?.capabilities.openWorktreeWindow ?? false"
           :search-state="searchState"
           :actions="actions"
           :pr-state="prState"
           @repo-opened="handleRepoOpened"
           @stash-changes="stashCreateOpen = true"
           @branch-from-stash="handleBranchFromStash"
+          @switch-worktree="handleSwitchWorktree"
+          @open-worktree-window="handleOpenWorktreeWindow"
+          @create-worktree="worktreeCreateOpen = true"
           @search-select="handleSearchSelect"
           @search-focus-grid="handleSearchFocusGrid"
           @open-repo-settings="repoSettingsDialogOpen = true"
@@ -1176,12 +1233,17 @@ onBeforeUnmount(() => {
           :refs-state="refsState"
           :ops-state="opsState"
           :stash-state="stashState"
+          :worktree-state="worktreeState"
+          :open-worktree-window-capability="actions?.capabilities.openWorktreeWindow ?? false"
           :search-state="searchState"
           :actions="actions"
           :pr-state="prState"
           @repo-opened="handleRepoOpened"
           @stash-changes="stashCreateOpen = true"
           @branch-from-stash="handleBranchFromStash"
+          @switch-worktree="handleSwitchWorktree"
+          @open-worktree-window="handleOpenWorktreeWindow"
+          @create-worktree="worktreeCreateOpen = true"
           @search-select="handleSearchSelect"
           @search-focus-grid="handleSearchFocusGrid"
           @open-repo-settings="repoSettingsDialogOpen = true"
@@ -1356,6 +1418,16 @@ onBeforeUnmount(() => {
           :branch-target="stashBranchTarget"
           @close-create="stashCreateOpen = false"
           @close-branch="stashBranchTarget = undefined"
+        />
+        <WorktreeDialog
+          :worktrees="worktreeState"
+          :ops="opsState"
+          :refs="refsState"
+          :create-open="worktreeCreateOpen"
+          :base-path-default="worktreeBasePathDefault"
+          :prepare-script="worktreePrepareScript"
+          :run-prepare-script-capability="actions?.capabilities.runPrepareScript ?? false"
+          @close-create="worktreeCreateOpen = false"
         />
         <RepoSettingsDialog
           :open="repoSettingsDialogOpen"

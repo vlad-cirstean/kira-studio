@@ -86,6 +86,16 @@ export type {
   TagAnnotation,
   UiActionKind,
   UndoSlotSnapshot,
+  WorktreeAddBlocker,
+  WorktreeAddNote,
+  WorktreeAddPreflight,
+  WorktreeEntry,
+  WorktreePrepareErrorKind,
+  WorktreePrepareLine,
+  WorktreePrepareResult,
+  WorktreeProgress,
+  WorktreeRemoveBlocker,
+  WorktreeRemovePreflight,
 } from './contract.ts';
 export type {
   MessageChannelLike,
