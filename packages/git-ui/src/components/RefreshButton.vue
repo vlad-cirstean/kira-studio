@@ -6,10 +6,11 @@
  * guard. Spins only while `loading === "refreshing"`, not for an unrelated `loadMore`/`loadAll`
  * in flight, so the icon never implies a re-walk that is not happening.
  *
- * The one piece of watcher UI P4 owns (§6.2): a `repo.changed` event with `kind: "refsChanged"`
- * shows a small dot and changes the tooltip, cleared again once a refresh actually runs. P4 does
- * not auto-refresh — pulling the list out from under a mid-scroll user because a background
- * `git fetch` finished is exactly what §6.2 draws the line against.
+ * A `repo.changed` event with `kind: "refsChanged"` shows a small dot and changes the tooltip,
+ * cleared again whenever `loading` leaves `"refreshing"` — manual or automatic. G-UX D10 made the
+ * graph itself auto-refresh on this same signal, so this dot now exists purely as the *backup*
+ * for whatever case genuinely did not auto-refresh, not as the primary mechanism P4 originally
+ * shipped it as.
  *
  * The `F5`/`Ctrl+R` keybinding itself is not attached here: `CommitGrid.vue` (W6) already owns a
  * keydown listener scoped to its own host element and emits a `refresh` event from it, which is
@@ -35,6 +36,16 @@ watch(
   },
 );
 
+// Cleared on ANY completed refresh, not only one `doRefresh` itself triggered — D10's
+// auto-refresh runs through the same `loading === 'refreshing'` state, and once it exists the
+// dot must clear on that too or it becomes permanent noise.
+watch(
+  () => props.graphView.loading.value,
+  (state, previous) => {
+    if (previous === 'refreshing' && state !== 'refreshing') hasPendingChange.value = false;
+  },
+);
+
 const isBusy = computed(() => props.graphView.loading.value !== 'idle');
 const isRefreshing = computed(() => props.graphView.loading.value === 'refreshing');
 
@@ -44,7 +55,6 @@ const tooltip = computed(() =>
 
 async function doRefresh(): Promise<void> {
   if (isBusy.value) return;
-  hasPendingChange.value = false;
   await props.graphView.refresh();
 }
 

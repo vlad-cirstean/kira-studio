@@ -722,10 +722,21 @@ async function resolveConflictInEditor(path: string): Promise<void> {
 // ---------------------------------------------------------------------------------------
 const liveAnnouncement = ref('');
 let loadedRowsBeforeLoad = 0;
+// G-UX D10: captured together, at the moment `loading` *enters* `'refreshing'` — synchronous with
+// `GraphViewState` setting `autoRefreshing` (no `await` between the two), so this is reliable in
+// a way re-reading `graphView.autoRefreshing.value` at the *exit* transition would not be (by
+// then it may already have been reset). Both the viewport restore and the announcement gate below
+// key off this one captured flag rather than the live ref.
+let refreshWasAuto = false;
+let autoRefreshViewportRow: number | undefined;
 
 watch(graphView.loading, (state, previous) => {
   if (state === 'loadingMore' || state === 'refreshing') {
     loadedRowsBeforeLoad = graphView.loadedRows.value;
+    if (state === 'refreshing') {
+      refreshWasAuto = graphView.autoRefreshing.value;
+      autoRefreshViewportRow = refreshWasAuto ? commitGridRef.value?.getViewportTop() : undefined;
+    }
     return;
   }
   if (state !== 'idle') return;
@@ -737,7 +748,16 @@ watch(graphView.loading, (state, previous) => {
       graphView.exhausted.value,
     );
   } else if (previous === 'refreshing') {
-    liveAnnouncement.value = composeRefreshAnnouncement(graphView.loadedRows.value);
+    if (refreshWasAuto) {
+      // A background refresh must neither speak on every commit nor move the user's viewport —
+      // it wins over the selection's own `scrollRowIntoView` (this watcher runs after the
+      // `pendingSelectionSha` re-resolution above, which is what would otherwise re-scroll).
+      if (autoRefreshViewportRow !== undefined) {
+        commitGridRef.value?.scrollToTopRow(autoRefreshViewportRow);
+      }
+    } else {
+      liveAnnouncement.value = composeRefreshAnnouncement(graphView.loadedRows.value);
+    }
   }
 });
 

@@ -1,7 +1,7 @@
 import type { CommitStore } from '@kira/git-core';
 import type { StreamChunkOf } from '@kira/git-ipc';
 import { TransportError } from '@kira/git-ipc';
-import { markRaw, type ShallowRef, shallowRef } from 'vue';
+import { markRaw, type ShallowRef, shallowRef, watch } from 'vue';
 import type { BridgeClient } from '../bridge/client.ts';
 import { createLayoutClient, type LayoutClient } from '../graph/layoutClient.ts';
 import { LayoutStore } from '../graph/layoutStore.ts';
@@ -10,6 +10,15 @@ import { type ChunkSource, PackedStreamState } from './packedStream.ts';
 
 export type { ChunkSource };
 export type LoadingState = 'idle' | 'streaming' | 'loadingMore' | 'refreshing';
+
+/** G-UX item 2: the graph is the last piece of client state that did not follow the
+ *  `repo.changed`/`refsChanged` watcher pipeline every other state class already subscribes to
+ *  (`RefsState`/`StashState`/`WorktreeState`/`StackState`/`PrState`/`SearchState`/`OpsState`/
+ *  `ReviewSessionState`/`ReviewCommentsState` — see this chapter's own ux-fixes plan, F3/D10).
+ *  `RefreshButton.vue`'s pending-change dot stays — as the *backup* for the cases below that
+ *  deliberately do not auto-refresh, not as the primary mechanism any more. */
+const AUTO_REFRESH_COALESCE_MS = 250; // on top of the server's own 200ms leading-window debounce
+const AUTO_REFRESH_MIN_GAP_MS = 1000; // a `git fetch --prune` storm must not re-walk continuously
 
 /** The row range a just-applied chunk gained lane layout for — what `onChunkLayout` hands its
  *  subscribers. Absolute row indices, matching `LayoutChunk`'s own `from`/`to`. */
@@ -59,6 +68,10 @@ export class GraphViewState {
   /** W13's `revealSha` own live-region text — `App.vue` forwards it into the shared region
    *  exactly as it already does for `DetailState.announcement`/`OpsState.announcement`. */
   readonly announcement: ShallowRef<string> = shallowRef('');
+  /** True for exactly the duration of an auto-triggered `refresh()` — `App.vue`'s viewport
+   *  capture/restore and its refresh announcement are both gated on this (D10): a background
+   *  refresh must neither move the user's scroll position nor speak on every commit. */
+  readonly autoRefreshing: ShallowRef<boolean> = shallowRef(false);
 
   readonly #packed: PackedStreamState;
   readonly #bridge: BridgeClient;
@@ -68,6 +81,12 @@ export class GraphViewState {
   #loadController: AbortController | undefined;
   #repoId: string | undefined;
   #layoutSubmitMarked = false;
+
+  readonly #unsubscribeChanged: () => void;
+  readonly #unsubscribeLoading: () => void;
+  #autoRefreshTimer: ReturnType<typeof setTimeout> | undefined;
+  #autoRefreshPending = false;
+  #lastAutoRefreshAt = 0;
 
   constructor(bridge: BridgeClient, layoutClient: LayoutClient = createLayoutClient()) {
     this.#bridge = bridge;
@@ -80,6 +99,21 @@ export class GraphViewState {
     this.lastChunkSource = this.#packed.lastChunkSource;
     this.generation = this.#packed.generation;
     this.layout = markRaw(new LayoutStore());
+
+    this.#unsubscribeChanged = bridge.on('repo.changed', (event) => {
+      // `worktreeChanged` (an index write) cannot change committed history — nothing to refresh.
+      if (event.kind !== 'refsChanged') return;
+      if (event.repoId !== this.#repoId) return;
+      this.#scheduleAutoRefresh();
+    });
+    // Rule: a signal that arrives while a load-shaped operation is running (loadMore/loadAll/
+    // revealSha/a manual refresh) is never dropped — once `loading` returns to idle, whatever
+    // auto-refresh was deferred runs. This is what makes auto-refresh "always", not "usually".
+    this.#unsubscribeLoading = watch(this.loading, (state) => {
+      if (state !== 'idle' || !this.#autoRefreshPending) return;
+      this.#autoRefreshPending = false;
+      this.#scheduleAutoRefresh();
+    });
   }
 
   /**
@@ -292,6 +326,48 @@ export class GraphViewState {
   reset(): void {
     this.#resetLayout();
     this.#packed.reset();
+    this.#cancelAutoRefresh();
+  }
+
+  /** Coalesces arrivals within `AUTO_REFRESH_COALESCE_MS` into one run, and enforces
+   *  `AUTO_REFRESH_MIN_GAP_MS` since the last auto-refresh *completed* — a single delay covers
+   *  both, since whichever bound is larger is the one that matters. A timer already pending
+   *  absorbs further arrivals for free (the same "leading window" shape the server's own watcher
+   *  debounce already uses, F3). */
+  #scheduleAutoRefresh(): void {
+    if (this.#autoRefreshTimer !== undefined) return;
+    const sinceLastRefresh = Date.now() - this.#lastAutoRefreshAt;
+    const delay = Math.max(AUTO_REFRESH_COALESCE_MS, AUTO_REFRESH_MIN_GAP_MS - sinceLastRefresh);
+    this.#autoRefreshTimer = setTimeout(() => {
+      this.#autoRefreshTimer = undefined;
+      void this.#runAutoRefresh();
+    }, delay);
+  }
+
+  async #runAutoRefresh(): Promise<void> {
+    if (this.loading.value !== 'idle') {
+      // Deferred, not dropped — the `loading` watcher above re-schedules the moment it clears.
+      this.#autoRefreshPending = true;
+      return;
+    }
+    this.autoRefreshing.value = true;
+    try {
+      // `graph.refresh` is nominally redundant (the host already marked the walk stale on
+      // `refsChanged`), but `MarkRefresh`/`MarkStale` are not the same guarantee — reusing the
+      // one refresh path is worth the one extra ~1ms request (D10).
+      await this.refresh();
+    } finally {
+      this.autoRefreshing.value = false;
+      this.#lastAutoRefreshAt = Date.now();
+    }
+  }
+
+  #cancelAutoRefresh(): void {
+    if (this.#autoRefreshTimer !== undefined) {
+      clearTimeout(this.#autoRefreshTimer);
+      this.#autoRefreshTimer = undefined;
+    }
+    this.#autoRefreshPending = false;
   }
 
   #resetLayout(): void {
@@ -339,5 +415,8 @@ export class GraphViewState {
     this.#abortController?.abort();
     this.#loadController?.abort();
     this.#layoutClient.dispose();
+    this.#unsubscribeChanged();
+    this.#unsubscribeLoading();
+    this.#cancelAutoRefresh();
   }
 }

@@ -781,6 +781,21 @@ function scrollToRow(row: number): void {
   grid?.scrollRowIntoView(row);
 }
 
+/** G-UX item 2/D10: an auto-refresh's own viewport restore — `App.vue` captures
+ *  `getViewport().top` before a background refresh and calls this with it afterward, so the
+ *  user's scroll position wins over the selection's own `scrollRowIntoView` (the concern
+ *  `RefreshButton.vue` originally raised for why auto-refresh did not exist). Distinct from
+ *  `scrollToRow`, which centers a target row rather than pinning it to the viewport's top. */
+function scrollToTopRow(row: number): void {
+  grid?.scrollRowToTop(row);
+}
+
+/** The row currently pinned at the viewport's top — `App.vue`'s own capture half of the
+ *  auto-refresh viewport restore, paired with `scrollToTopRow` above. */
+function getViewportTop(): number | undefined {
+  return grid?.getViewport().top;
+}
+
 /** `docs/plans/P11.md` W14: `SearchBox.vue`'s second-stage `Escape` (§6.6) asks to move real DOM
  *  focus back onto the grid — the same row `applyAccessibility`'s own roving tabindex already
  *  made the one native tab stop (the selected row, or row 0 with nothing selected yet). Scrolled
@@ -801,7 +816,7 @@ function focusGrid(): void {
   grid.render();
 }
 
-defineExpose({ scrollToRow, focusGrid });
+defineExpose({ scrollToRow, focusGrid, scrollToTopRow, getViewportTop });
 </script>
 
 <template>
