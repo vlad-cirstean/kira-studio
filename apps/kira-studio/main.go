@@ -347,6 +347,27 @@ func main() {
 		},
 		ShouldQuit: quitter.ShouldQuit,
 		OnShutdown: quitter.Shutdown,
+		// G29 D7/F6: catches the two pre-window fatal paths Wails takes itself, without ever
+		// returning to main -- application.New's own transport-start failure, and
+		// webview_window_darwin.go's GetStartURL failure during first-window creation, inside
+		// Run(). handleError (application.go) prefers ErrorHandler over its own logger and calls
+		// it synchronously, before Wails' own os.Exit(1) -- so ReportPlatform's alert has already
+		// run and completed by the time that exit happens, and this handler must never exit
+		// itself. A non-fatal handleError call (e.g. RegisterService after Run) passes a plain
+		// error here, not a *FatalError -- logged by Wails itself already, not alerted a second
+		// time. This is the one place startupfail needs a pkg/application type; the assertion
+		// stays here, in the file that already legitimately imports pkg/application
+		// (internal/shell/app.go's own documented rule), so internal/startupfail imports nothing
+		// from pkg/application at all.
+		ErrorHandler: func(err error) {
+			fatalErr, ok := err.(*application.FatalError)
+			if !ok {
+				return
+			}
+			platformErrorOnce.Do(func() {
+				startupfail.ReportPlatform(fatalErr.Unwrap())
+			})
+		},
 	})
 
 	attachEmitter(app)
@@ -570,6 +591,11 @@ func main() {
 		startupfail.Fatal(startupfail.StepRun, err)
 	}
 }
+
+// platformErrorOnce bounds G29 D7's ErrorHandler to at most one alert per process, independent of
+// internal/startupfail's own per-Reporter alertOnce bound -- both exist because this handler could,
+// in principle, be reached more than once before the process actually exits.
+var platformErrorOnce sync.Once
 
 // G14 D4: the category ID and the two action identifiers OnNotificationResponse switches on above.
 const (
