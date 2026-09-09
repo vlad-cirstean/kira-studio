@@ -186,6 +186,7 @@ export { StringInterner, SubjectBuffer } from './store/intern.ts';
 export type { ShaTableOptions } from './store/shaTable.ts';
 export { bytesToHex, hexToBytes, ShaTable } from './store/shaTable.ts';
 export { AssertionError, assert, assertDefined, assertNever } from './util/assert.ts';
+export { nfcPath } from './util/nfcPath.ts';
 export type { RecordSplitterOptions } from './util/nulSplit.ts';
 export {
   RecordSplitter,
