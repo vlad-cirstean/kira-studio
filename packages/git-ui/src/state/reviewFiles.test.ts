@@ -150,3 +150,58 @@ describe('ReviewFilesState — sinceReview mode opens each file against its own 
     ]);
   });
 });
+
+// G30 round-1 functional-correctness review, finding #6: mark()'s own `finally` only clears
+// `pending` when `this.#target` still identically equals the target that was current when the
+// request started. A setTarget call landing while a mark() is in flight (a base-resolution
+// change, the stale-review banner, Refresh review) swaps that identity, so the guard never
+// matches and `pending` — a pane-wide flag, not a per-target one — stays latched true forever:
+// every review checkbox goes dead until the webview reloads.
+describe('ReviewFilesState — pending never latches across a setTarget while a mark() is in flight', () => {
+  test('setTarget clears pending even when a prior mark() never resolves', async () => {
+    const transport = new FakeTransport();
+    const bridge = new BridgeClient(transport);
+    const state = new ReviewFilesState(bridge);
+
+    let resolveMark: ((v: unknown) => void) | undefined;
+    transport.onRequest = (method) => {
+      if (method === 'review.files') {
+        return { branchTip: 'tip', mergeBase: 'base', files: [] };
+      }
+      if (method === 'review.mark') {
+        return new Promise((resolve) => {
+          resolveMark = resolve;
+        });
+      }
+      throw new Error(`unscripted request: ${method}`);
+    };
+
+    state.setTarget({ repoId: REPO, branch: BRANCH, base: BASE });
+    await tick();
+
+    void state.mark('a.ts', true);
+    await tick();
+    expect(state.pending.value).toBe(true);
+
+    // A base-resolution change (or Refresh review, or the stale-review banner) lands a fresh
+    // target while the mark() above is still hanging — resolveMark is deliberately never called.
+    state.setTarget({ repoId: REPO, branch: BRANCH, base: 'a-different-base' });
+    await tick();
+
+    expect(state.pending.value).toBe(false);
+
+    // And the panel must actually be usable again, not just report pending=false: a fresh mark()
+    // call must reach the transport rather than bouncing off a guard that still thinks one is
+    // already in flight.
+    const markCallsBefore = transport.calls.filter((c) => c.method === 'review.mark').length;
+    void state.mark('b.ts', true);
+    await tick();
+    expect(transport.calls.filter((c) => c.method === 'review.mark').length).toBe(
+      markCallsBefore + 1,
+    );
+
+    resolveMark?.({
+      review: { kind: 'full', changedSinceReview: false, reviewedAt: 0, reviewedAtSha: 's' },
+    });
+  });
+});

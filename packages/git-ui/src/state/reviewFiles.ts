@@ -88,6 +88,15 @@ export class ReviewFilesState {
     this.loadError.value = undefined;
     this.selectedPath.value = null;
     this.#clearDiff();
+    // G30 round-1 functional-correctness review, finding #6: mark()'s own `finally` only clears
+    // `pending` when `this.#target === target` still holds for the SAME target identity that was
+    // current when the request started — a `setTarget` call that lands while a mark() is in
+    // flight (a base-resolution change, the stale-review banner, clicking Refresh review) swaps
+    // that identity, so the guard never matches and `pending` stays latched true forever: every
+    // review checkbox in the panel silently stops responding until the webview reloads. `pending`
+    // is a pane-wide "is a mark in flight" flag, not a per-target one, so a fresh target — which
+    // already discards everything else about the in-flight request above — discards this too.
+    this.pending.value = false;
     if (target) void this.#loadFiles();
   }
 
