@@ -1,0 +1,13 @@
+[
+  {
+    "number": 456,
+    "title": "Add the gizmo",
+    "html_url": "https://github.com/o/r/pull/456",
+    "state": "open",
+    "draft": true,
+    "merged_at": null,
+    "head": { "ref": "add-gizmo", "sha": "def456" },
+    "base": { "ref": "main" },
+    "updated_at": "2026-02-03T04:05:06Z"
+  }
+]

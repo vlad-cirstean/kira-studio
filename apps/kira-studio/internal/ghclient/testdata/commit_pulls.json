@@ -1,0 +1,13 @@
+[
+  {
+    "number": 123,
+    "title": "Fix the widget",
+    "html_url": "https://github.com/o/r/pull/123",
+    "state": "closed",
+    "draft": false,
+    "merged_at": "2026-01-02T03:04:05Z",
+    "head": { "ref": "fix-widget", "sha": "abc123" },
+    "base": { "ref": "main" },
+    "updated_at": "2026-01-02T03:04:05Z"
+  }
+]
