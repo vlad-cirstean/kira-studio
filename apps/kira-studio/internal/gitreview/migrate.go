@@ -70,5 +70,13 @@ func migrate(db *sql.DB) error {
 			return fmt.Errorf("gitreview: commit migration %s: %w", m.Name, err)
 		}
 	}
+
+	// G27 D8: an idempotent Go sweep, not a SQL migration step — it needs no schema_version of its
+	// own precisely because it is idempotent (normalize.go's own doc comment), so it runs
+	// unconditionally here, every lazy-open, after the SQL loop above has brought the schema itself
+	// up to date.
+	if err := normalizeStoredPaths(db); err != nil {
+		return fmt.Errorf("gitreview: normalize stored paths: %w", err)
+	}
 	return nil
 }
