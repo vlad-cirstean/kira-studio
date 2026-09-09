@@ -70,6 +70,18 @@ func onePullJSON(number int, state string, draft bool, headRef string) []byte {
 		`,"head":{"ref":"` + headRef + `","sha":"s"},"base":{"ref":"main"},"updated_at":"2026-01-01T00:00:00Z"}]`)
 }
 
+// threePullsJSON is a bulk open-PR snapshot (the shape ensureSnapshot's own OpenPulls call
+// returns) carrying one open PR each for feature-a/feature-b/feature-c — onePullJSON's own single-
+// entry shape has no multi-branch equivalent.
+func threePullsJSON() []byte {
+	var entries []string
+	for i, ref := range []string{"feature-a", "feature-b", "feature-c"} {
+		one := onePullJSON(i+1, "open", false, ref)
+		entries = append(entries, string(one[1:len(one)-1])) // strip the single entry's own [ ]
+	}
+	return []byte("[" + strings.Join(entries, ",") + "]")
+}
+
 // ghTestFixture wires a Registry with a fake identify+remote runner, a fake watcher, a real
 // gitreview.Store under t.TempDir(), and a countingGhRunner-backed ghclient.Client.
 type ghTestFixture struct {
@@ -270,6 +282,37 @@ func TestResolveBranchPr_NeverPurgesOnOpen(t *testing.T) {
 	}
 	if !hasSession(t, f.review, repoID, "feature") {
 		t.Fatal("an open PR must never purge the branch's review session")
+	}
+}
+
+// G30 round-1 performance review, finding #1: ResolveBranchPr used to read the snapshot cache
+// (snapshotGet) but never called ensureSnapshot, the one thing that actually populates it —
+// ensureSnapshot had zero callers anywhere in the tree. So on a cold cache, resolving N different
+// branches cost N separate `gh api` calls (one full subprocess spawn each) instead of the ONE
+// bulk repo-wide fetch D6 was designed around. This proves the fix: the first resolve pays the
+// one-time Discovery probe plus the one bulk fetch (three gh runner invocations total, matching
+// TestOpenPulls_ArgvGoldenAndEarlyStop's own golden argv — page 1 alone, since three entries is
+// well under per_page); every OTHER branch resolved after that costs ZERO further gh runner
+// invocations, served entirely from the now-warm snapshot.
+func TestResolveBranchPr_ColdCacheCostsOneBulkFetchForManyBranches(t *testing.T) {
+	f := newGhTestFixture(t, "https://github.com/acme/widgets.git")
+	f.ghRunner.apiResult = ghclient.Result{ExitCode: 0, Stdout: threePullsJSON()}
+
+	r1 := f.entry.ResolveBranchPr(context.Background(), "feature-a")
+	if r1.Kind != "ok" || len(r1.PRs) != 1 || r1.PRs[0].Number != 1 {
+		t.Fatalf("first resolve = %+v, want ok with PR #1", r1)
+	}
+	before := f.ghRunner.count()
+
+	for i, branch := range []string{"feature-b", "feature-c"} {
+		r := f.entry.ResolveBranchPr(context.Background(), branch)
+		if r.Kind != "ok" || len(r.PRs) != 1 || r.PRs[0].Number != i+2 {
+			t.Fatalf("ResolveBranchPr(%q) = %+v, want ok with PR #%d", branch, r, i+2)
+		}
+	}
+
+	if after := f.ghRunner.count(); after != before {
+		t.Fatalf("gh runner was invoked %d more times resolving two more branches from an already-warm snapshot, want 0", after-before)
 	}
 }
 

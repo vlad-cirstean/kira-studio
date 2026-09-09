@@ -317,13 +317,27 @@ func (e *RepoEntry) ResolveBranchPr(ctx context.Context, branch string) PrLookup
 		return disabledResult()
 	}
 
-	if snapshot, hit := e.gh.snapshotGet(); hit {
+	// G30 round-1 performance review, finding #1: this used to read the snapshot cache with
+	// snapshotGet alone, which never POPULATES it — ensureSnapshot is the one thing that does,
+	// and had zero callers anywhere in the tree. So on any cold cache (repo open, or every
+	// ghSnapshotTTL expiry) every branch's first resolve fell straight through to its own
+	// per-branch `gh api` spawn, and the client's own "warm every branch at once" fan-out
+	// (pr.ts's ensureSnapshot, called from BranchPicker.vue/search/stack) turned that into one
+	// process + one GitHub REST call PER BRANCH, all concurrent, for a repo that may have hundreds.
+	// Calling ensureSnapshot here means the first resolve after a cold cache pays ONE bulk
+	// OpenPulls call and warms the snapshot for every other branch that has an open PR; only a
+	// genuinely non-GitHub-shaped miss (a since-closed PR, or the breaker/a fetch failure) still
+	// falls through to the per-branch query below, exactly as before.
+	if snapshot, status := e.ensureSnapshot(ctx); status.OK() {
 		for _, pr := range snapshot {
 			if pr.HeadRef == branch {
 				e.maybePurgeClosed(ctx, branch, &pr)
 				return okResult([]ghclient.PR{pr})
 			}
 		}
+		// No OPEN PR for this branch in the snapshot — not yet authoritative for "no PR at all"
+		// (the snapshot is open-PRs-only), so this still falls through to the per-branch
+		// state=all query below, the one call that can report a PR that has since closed.
 	}
 
 	if cached, hit := e.gh.branchCacheGet(branch); hit {
