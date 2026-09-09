@@ -169,6 +169,16 @@ func (r *Router) ForConn(c *gitsession.Conn) Handlers {
 				return r.handleCommitResolvePr(ctx, c, params)
 			case "branch.resolvePr":
 				return r.handleBranchResolvePr(ctx, c, params)
+			case "worktree.list":
+				return r.handleWorktreeList(ctx, c, params)
+			case "preflight.worktreeAdd":
+				return r.handlePreflightWorktreeAdd(ctx, c, params)
+			case "preflight.worktreeRemove":
+				return r.handlePreflightWorktreeRemove(ctx, c, params)
+			case "worktree.prepare":
+				return r.handleWorktreePrepare(ctx, c, params)
+			case "worktree.cancelPrepare":
+				return r.handleWorktreeCancelPrepare(ctx, c, params)
 			default:
 				return nil, ipcerr.New("E_UNKNOWN_METHOD", "gitrpc: unknown method "+method)
 			}

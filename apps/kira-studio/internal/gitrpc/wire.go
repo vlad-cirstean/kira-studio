@@ -649,3 +649,59 @@ type BranchResolvePrParams struct {
 	RepoID string `json:"repoId"`
 	Branch string `json:"branch"`
 }
+
+// ---------------------------------------------------------------------------------------
+// G25 — worktree support (D1-D14). worktree.list/preflight.worktreeAdd/preflight.worktreeRemove's
+// own results are gitsession's/gitpreflight's own wire-shaped types ([]gitsession.WorktreeEntry
+// wrapped in WorktreeListResult, gitpreflight.WorktreeAddPreflight, gitpreflight.
+// WorktreeRemovePreflight) — D5's own precedent applied again: no second, gitrpc-owned copy of a
+// shape those packages already produce JSON-tagged. worktree.prepare's own result is
+// gitsession.WorktreePrepareResult, same precedent. CONTRACT_VERSION moves 27 -> 28 (D16).
+// ---------------------------------------------------------------------------------------
+
+// WorktreeListParams is worktree.list's own request.
+type WorktreeListParams struct {
+	RepoID string `json:"repoId"`
+}
+
+// WorktreeListResult mirrors @kira/git-ipc's own worktree.list result — `{worktrees:
+// WorktreeEntry[]}`.
+type WorktreeListResult struct {
+	Worktrees []gitsession.WorktreeEntry `json:"worktrees"`
+}
+
+// PreflightWorktreeAddParams is preflight.worktreeAdd's own request (D2/D4).
+type PreflightWorktreeAddParams struct {
+	RepoID     string `json:"repoId"`
+	Path       string `json:"path"`
+	Mode       string `json:"mode"` // "existingBranch" | "newBranch" | "detach"
+	Branch     string `json:"branch,omitempty"`
+	StartPoint string `json:"startPoint,omitempty"`
+}
+
+// PreflightWorktreeRemoveParams is preflight.worktreeRemove's own request (D8).
+type PreflightWorktreeRemoveParams struct {
+	RepoID string `json:"repoId"`
+	Path   string `json:"path"`
+}
+
+// WorktreePrepareParams is worktree.prepare's own request (D13) — ScriptSha256 is the client's own
+// belief about which script text it is approving; the server always re-hashes the CURRENTLY STORED
+// text and refuses with ScriptChanged on any mismatch before spawning anything (D11).
+type WorktreePrepareParams struct {
+	RepoID       string `json:"repoId"`
+	Path         string `json:"path"`
+	ScriptSha256 string `json:"scriptSha256"`
+}
+
+// WorktreeCancelPrepareParams is worktree.cancelPrepare's own request.
+type WorktreeCancelPrepareParams struct {
+	RepoID string `json:"repoId"`
+}
+
+// WorktreeCancelPrepareResult mirrors @kira/git-ipc's own worktree.cancelPrepare result —
+// `{cancelled: boolean}`, never an error (D13/RemoteCancelResult's own precedent): a cancel racing
+// a just-finished or never-running prepare is an ordinary outcome, not a fault.
+type WorktreeCancelPrepareResult struct {
+	Cancelled bool `json:"cancelled"`
+}

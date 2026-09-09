@@ -66,7 +66,20 @@ package gitrpc
 // addition is additive; SearchMatchField/CommitSearchHit/internal/gitsearch are untouched (F9 —
 // the wire's own search-field union is commits-only, the PR fields live entirely in git-core's
 // client-side SearchField instead).
-const ContractVersion = 27
+// G25 D16 (2026-09-09): 27 -> 28, for six new requests (worktree.list, preflight.worktreeAdd,
+// preflight.worktreeRemove, worktree.prepare, worktree.cancelPrepare, worktree.openWindow), one new
+// event (worktree.progress), two new OpRequest kinds (worktreeAdd, worktreeRemove), one new
+// OpErrorKind (WorktreeLocked), two new host capabilities (openWorktreeWindow, runPrepareScript),
+// one new UiActionKind, and two new RepoSettingsSnapshot members (kiraVersion.worktree.
+// prepareScript, kiraVersion.worktree.basePath). worktree.openWindow is answered entirely inside
+// the extension (D6) — the same "editor.*-shaped" precedent editor.openDiff/editor.openRangeDiff
+// already set (this constant still moves, for the same reason ui.action first did at G10 D9: it is
+// the sole compatibility authority, even for an addition the Go server neither emits nor parses).
+// Deliberately absent from every wire type this phase touches: the prepare script's own approval
+// sha (prepareScriptApprovedSha) — a server-only key, D11/F15, reachable only through
+// storage/repos.GitRepoSettingsRepo's two new dedicated methods, never through repoSettings.get/set
+// or any OpRequest/OpResult shape.
+const ContractVersion = 28
 
 // Protocol is the handshake envelope's own version (SPEC §3.3's "protocol":1), distinct from
 // ContractVersion — it never changes unless the hello/ready exchange itself is redesigned.
