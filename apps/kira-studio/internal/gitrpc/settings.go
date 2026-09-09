@@ -26,6 +26,7 @@ func repoSettingsSnapshotFrom(s model.GitRepoSettings) RepoSettingsSnapshot {
 		ReviewBaseCandidates:  candidates,
 		PullStrategy:          s.PullStrategy,
 		LogLevel:              s.LogLevel,
+		GithubEnabled:         s.GithubEnabled,
 	}
 }
 
@@ -40,6 +41,7 @@ func (p RepoSettingsPatchWire) toModel() model.GitRepoSettingsPatch {
 		ReviewBaseCandidates:  p.ReviewBaseCandidates,
 		PullStrategy:          p.PullStrategy,
 		LogLevel:              p.LogLevel,
+		GithubEnabled:         p.GithubEnabled,
 	}
 }
 

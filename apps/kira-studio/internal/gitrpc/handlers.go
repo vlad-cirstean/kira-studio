@@ -165,6 +165,10 @@ func (r *Router) ForConn(c *gitsession.Conn) Handlers {
 				return r.handleSettingsSetGitPath(ctx, params)
 			case "search.run":
 				return r.handleSearchRun(ctx, c, params)
+			case "commit.resolvePr":
+				return r.handleCommitResolvePr(ctx, c, params)
+			case "branch.resolvePr":
+				return r.handleBranchResolvePr(ctx, c, params)
 			default:
 				return nil, ipcerr.New("E_UNKNOWN_METHOD", "gitrpc: unknown method "+method)
 			}

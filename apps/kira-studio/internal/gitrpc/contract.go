@@ -60,7 +60,13 @@ package gitrpc
 // be loaded", docs/v1.3/SPEC.md:446-450). Unlike most of this constant's history, this bump also
 // lands the first real Go implementation of the method it accompanies (search.run) rather than
 // only the wire shape for an extension-answered method.
-const ContractVersion = 26
+// G24 D14 (2026-09-09): 26 -> 27, for two new Go-served requests (commit.resolvePr,
+// branch.resolvePr), four new wire types (GhStatus, PrRecord, PrLookupResult, and the state string
+// union it carries) and one new RepoSettingsSnapshot member (kiraVersion.github.enabled). Every
+// addition is additive; SearchMatchField/CommitSearchHit/internal/gitsearch are untouched (F9 —
+// the wire's own search-field union is commits-only, the PR fields live entirely in git-core's
+// client-side SearchField instead).
+const ContractVersion = 27
 
 // Protocol is the handshake envelope's own version (SPEC §3.3's "protocol":1), distinct from
 // ContractVersion — it never changes unless the hello/ready exchange itself is redesigned.

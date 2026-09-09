@@ -1,6 +1,7 @@
 package gitrpc
 
 import (
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/ghclient"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitclient"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitclient/porcelain"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitpreflight"
@@ -518,6 +519,9 @@ type RepoSettingsSnapshot struct {
 	ReviewBaseCandidates  []string `json:"kiraVersion.review.baseCandidates"`
 	PullStrategy          string   `json:"kiraVersion.pull.strategy"`
 	LogLevel              string   `json:"kiraVersion.log.level"`
+	// GithubEnabled is G24 D16's own eighth leaf — genuinely per-repo (unlike LogLevel), default
+	// true.
+	GithubEnabled bool `json:"kiraVersion.github.enabled"`
 }
 
 // RepoSettingsGetParams is repoSettings.get's own request.
@@ -536,6 +540,7 @@ type RepoSettingsPatchWire struct {
 	ReviewBaseCandidates  *[]string `json:"kiraVersion.review.baseCandidates,omitempty"`
 	PullStrategy          *string   `json:"kiraVersion.pull.strategy,omitempty"`
 	LogLevel              *string   `json:"kiraVersion.log.level,omitempty"`
+	GithubEnabled         *bool     `json:"kiraVersion.github.enabled,omitempty"`
 }
 
 // RepoSettingsSetParams is repoSettings.set's own request.
@@ -558,4 +563,81 @@ type RepoSettingsChangedPayload struct {
 // extension-only, never called by the webview.
 type SettingsSetGitPathParams struct {
 	GitPath string `json:"gitPath"`
+}
+
+// ---------------------------------------------------------------------------------------
+// G24 — commit.resolvePr / branch.resolvePr (D9/D14). GhStatus/PrRecord/PrLookupResult are direct
+// structural copies of @kira/git-ipc's own types of the same name, kept honest by hand (this repo
+// carries no wireConformance.test.ts — see this phase's own commit message) the same way
+// gitclient.GitStatus's JSON tags already mirror GitStatus's TS twin.
+// ---------------------------------------------------------------------------------------
+
+// GhStatus mirrors ghclient.Status field for field — this phase's own D5 four-kind actionability
+// union, crossing the wire unchanged.
+type GhStatus struct {
+	Kind    string `json:"kind"`
+	Path    string `json:"path,omitempty"`
+	Version string `json:"version,omitempty"`
+	Host    string `json:"host,omitempty"`
+	Account string `json:"account,omitempty"`
+	Reason  string `json:"reason,omitempty"`
+}
+
+func ghStatusFrom(s ghclient.Status) GhStatus {
+	return GhStatus{Kind: s.Kind, Path: s.Path, Version: s.Version, Host: s.Host, Account: s.Account, Reason: s.Reason}
+}
+
+// PrRecord mirrors ghclient.PR field for field, camelCased at the wire.
+type PrRecord struct {
+	Number    int    `json:"number"`
+	Title     string `json:"title"`
+	URL       string `json:"url"`
+	State     string `json:"state"`
+	HeadRef   string `json:"headRef"`
+	HeadSha   string `json:"headSha"`
+	BaseRef   string `json:"baseRef"`
+	UpdatedAt int64  `json:"updatedAt"`
+}
+
+func prRecordFrom(p ghclient.PR) PrRecord {
+	return PrRecord{
+		Number: p.Number, Title: p.Title, URL: p.URL, State: p.State,
+		HeadRef: p.HeadRef, HeadSha: p.HeadSha, BaseRef: p.BaseRef, UpdatedAt: p.UpdatedAt,
+	}
+}
+
+// PrLookupResult mirrors @kira/git-ipc's own discriminated union (D14) — both commit.resolvePr and
+// branch.resolvePr answer this exact shape.
+type PrLookupResult struct {
+	Kind string     `json:"kind"` // "ok" | "disabled" | "unavailable"
+	PRs  []PrRecord `json:"prs,omitempty"`
+	Gh   *GhStatus  `json:"gh,omitempty"`
+}
+
+func prLookupResultFrom(r gitsession.PrLookupResult) PrLookupResult {
+	out := PrLookupResult{Kind: r.Kind}
+	if r.Kind == "ok" {
+		prs := make([]PrRecord, 0, len(r.PRs))
+		for _, p := range r.PRs {
+			prs = append(prs, prRecordFrom(p))
+		}
+		out.PRs = prs
+	}
+	if r.Gh != nil {
+		gh := ghStatusFrom(*r.Gh)
+		out.Gh = &gh
+	}
+	return out
+}
+
+// CommitResolvePrParams is commit.resolvePr's own request.
+type CommitResolvePrParams struct {
+	RepoID string `json:"repoId"`
+	SHA    string `json:"sha"`
+}
+
+// BranchResolvePrParams is branch.resolvePr's own request.
+type BranchResolvePrParams struct {
+	RepoID string `json:"repoId"`
+	Branch string `json:"branch"`
 }
