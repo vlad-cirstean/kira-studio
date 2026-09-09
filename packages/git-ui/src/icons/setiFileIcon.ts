@@ -50,7 +50,13 @@ const maskUrlCache = new Map<string, string>();
 function maskUrlFor(svg: string): string {
   const cached = maskUrlCache.get(svg);
   if (cached !== undefined) return cached;
-  const url = `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
+  // `seti-icons`' shipped `icons.json` strings have no `xmlns` — harmless for `<img>`/inline SVG,
+  // but a CSS `mask-image` data URL without it renders as fully transparent in Chromium (no error,
+  // no console warning). Inject the namespace onto the root `<svg ...>` tag before building the URL.
+  const namespaced = svg.includes('xmlns=')
+    ? svg
+    : svg.replace('<svg ', '<svg xmlns="http://www.w3.org/2000/svg" ');
+  const url = `url("data:image/svg+xml,${encodeURIComponent(namespaced)}")`;
   maskUrlCache.set(svg, url);
   return url;
 }
