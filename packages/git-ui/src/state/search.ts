@@ -5,6 +5,7 @@ import { TransportError } from '@kira/git-ipc';
 import { type ComputedRef, computed, type ShallowRef, shallowRef, watch } from 'vue';
 import type { BridgeClient } from '../bridge/client.ts';
 import type { GraphViewState } from './graphView.ts';
+import type { PrState } from './pr.ts';
 import type { RefsState } from './refs.ts';
 
 export type SearchRunResult = ResultOf<'search.run'>;
@@ -210,16 +211,21 @@ export class SearchState {
   readonly #bridge: BridgeClient;
   readonly #refs: RefsState;
   readonly #graph: GraphViewState;
+  /** G24 D11: optional so a caller with nothing to match PRs against (every pre-G24 caller, and
+   *  this class's own existing tests) keeps working with `matchRef`'s `pr` arg simply `undefined`
+   *  — byte-identical to this seam's pre-G24 behaviour. */
+  readonly #pr: PrState | undefined;
   #repoId: string | undefined;
   #tailController: AbortController | undefined;
   #tailTimer: ReturnType<typeof setTimeout> | undefined;
   readonly #unsubscribeRefsChanged: () => void;
   readonly #stopWatchers: readonly (() => void)[];
 
-  constructor(bridge: BridgeClient, refs: RefsState, graph: GraphViewState) {
+  constructor(bridge: BridgeClient, refs: RefsState, graph: GraphViewState, pr?: PrState) {
     this.#bridge = bridge;
     this.#refs = refs;
     this.#graph = graph;
+    this.#pr = pr;
 
     this.compiled = computed(() =>
       compileQuery({
@@ -241,7 +247,8 @@ export class SearchState {
       const hits: RefHit[] = [];
       const collect = (rows: readonly RefRow[]): void => {
         for (const row of rows) {
-          const fields = matchRef(row, ok);
+          const pr = this.#pr?.byBranch.value.get(row.shortName);
+          const fields = matchRef(row, ok, pr);
           if (fields.length > 0) hits.push(toRefHit(row, fields));
         }
       };
@@ -284,6 +291,18 @@ export class SearchState {
         tail.kind === 'invalidPattern' ||
         (tail.kind === 'ok' && !tail.truncated && tail.complete);
       return { n, exact: loadedExact && tailExact };
+    });
+    // G24 D7 point 4/D11: entering a scope that can show a ref hit is one of the few user acts
+    // allowed to touch the network at all — warms PrState's own byBranch cache (the server answers
+    // every branch from its already-cached snapshot, D6, so this costs no additional GitHub call)
+    // so the very next keystroke's own synchronous refHits computed already has PR records to
+    // match against (F16's own "adds no process and no network round trip to a keystroke").
+    watch(this.scope, (scope) => {
+      if (scope === 'commits' || this.#pr === undefined) return;
+      const names = [...this.#refs.branches.value, ...this.#refs.remoteBranches.value].map(
+        (r) => r.shortName,
+      );
+      void this.#pr.ensureSnapshot(names);
     });
     this.activeHit = computed(() => this.commitHits.value[this.activeIndex.value]);
     this.tailSkippedByExhaustion = computed(

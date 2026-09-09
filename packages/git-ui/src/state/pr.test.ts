@@ -40,6 +40,12 @@ class FakeTransport implements Transport {
     return () => set?.delete(wrapped);
   }
 
+  emit<K extends EventKey>(method: K, payload: EventPayload<K>): void {
+    for (const handler of this.#handlers.get(method) ?? []) {
+      handler(payload);
+    }
+  }
+
   stream<K extends StreamKey>(
     _method: K,
     _params: StreamParamsOf<K>,
@@ -148,7 +154,7 @@ describe('PrState — stale-response drop', () => {
 });
 
 describe('PrState — refsChanged clears everything', () => {
-  test('onRefsChanged empties bySha/byBranch/selected/status and bumps generation', async () => {
+  test('a repo.changed refsChanged event empties bySha/byBranch/selected/status and bumps generation', async () => {
     const transport = new FakeTransport();
     const bridge = new BridgeClient(transport);
     const pr = new PrState(bridge);
@@ -175,7 +181,7 @@ describe('PrState — refsChanged clears everything', () => {
     expect(pr.selected.value?.kind).toBe('ok');
 
     const genBefore = pr.generation.value;
-    pr.onRefsChanged();
+    transport.emit('repo.changed', { repoId: REPO, kind: 'refsChanged' });
 
     expect(pr.bySha.value.size).toBe(0);
     expect(pr.byBranch.value.size).toBe(0);

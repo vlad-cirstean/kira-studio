@@ -10,6 +10,7 @@
  * (`columns.ts`'s own doc comment) applies here just as much as it does inside the grid.
  */
 import type { CommitStore } from '@kira/git-core';
+import type { PrLookupResult } from '@kira/git-ipc';
 import { KuiButton } from '@kira/kira-ui';
 import { computed, nextTick, ref, watch } from 'vue';
 import type { CommitDetail } from '../state/detail.ts';
@@ -25,6 +26,11 @@ const props = defineProps<{
    *  own `<FileTree>` *between* this component's two halves — so it mounts this component twice,
    *  once per section, rather than this file owning where the tree sits. */
   section: 'message' | 'details';
+  /** G24 D12: the currently selected commit's own PR lookup — `PrState.selected`, threaded in by
+   *  `DetailPane.vue`. The `'message'` instance never reads this (the row only ever renders in
+   *  `'details'`, below). `undefined` covers both "nothing selected yet" and the in-flight/
+   *  debounce window, same as `detail` itself before it resolves. */
+  prResult?: PrLookupResult;
 }>();
 
 /** A loaded parent's sha button was clicked — `DetailPane.vue`/`App.vue` own turning this into
@@ -145,6 +151,51 @@ const signatureText = computed<string | undefined>(() => {
   if (!signature || signature.status === 'N') return undefined;
   const text = SIGNATURE_TEXT[signature.status] ?? signature.status;
   return signature.signer ? `${text} by ${signature.signer}` : text;
+});
+
+/** G24 D12: the one "Pull request" row — resolved with a PR (one line per associated PR),
+ *  resolved with none ("No pull request"), or `unavailable` (`Status.Reason` — the ONLY place in
+ *  the app that ever tells a user to run `gh auth login`, per upstream D32's "inert, never noisy"
+ *  rule applying everywhere else but here). `disabled` renders nothing at all — this computed is
+ *  `undefined` for both `disabled` and "nothing resolved yet", collapsing them into the same
+ *  "no row" template branch below. */
+const PR_STATE_LABEL: Readonly<Record<string, string>> = {
+  open: 'Open',
+  draft: 'Draft',
+  merged: 'Merged',
+  closed: 'Closed',
+};
+
+interface PrDetailView {
+  readonly kind: 'prs' | 'none' | 'unavailable';
+  readonly prs: readonly {
+    readonly number: number;
+    readonly title: string;
+    readonly url: string;
+    readonly stateLabel: string;
+  }[];
+  readonly reason: string | undefined;
+}
+
+const prDetail = computed<PrDetailView | undefined>(() => {
+  const result = props.prResult;
+  if (result === undefined || result.kind === 'disabled') return undefined;
+  if (result.kind === 'unavailable') {
+    return { kind: 'unavailable', prs: [], reason: result.gh.reason ?? 'GitHub did not answer' };
+  }
+  if (result.prs.length === 0) {
+    return { kind: 'none', prs: [], reason: undefined };
+  }
+  return {
+    kind: 'prs',
+    reason: undefined,
+    prs: result.prs.map((pr) => ({
+      number: pr.number,
+      title: pr.title,
+      url: pr.url,
+      stateLabel: PR_STATE_LABEL[pr.state] ?? pr.state,
+    })),
+  };
 });
 
 const COAUTHOR_TOKENS = new Set(['Co-authored-by', 'Signed-off-by']);
@@ -283,6 +334,22 @@ function copyMessage(): void {
         <template v-if="signatureText">
           <dt>Signature</dt>
           <dd>{{ signatureText }}</dd>
+        </template>
+        <template v-if="prDetail">
+          <dt>Pull request</dt>
+          <dd v-if="prDetail.kind === 'prs'" class="kv-meta-pr">
+            <a
+              v-for="pr in prDetail.prs"
+              :key="pr.number"
+              :href="pr.url"
+              class="kv-meta-pr-link"
+              >#{{ pr.number }} {{ pr.title }} — {{ pr.stateLabel }}</a
+            >
+          </dd>
+          <dd v-else-if="prDetail.kind === 'none'">No pull request</dd>
+          <dd v-else class="kv-meta-pr-unavailable" data-testid="pr-unavailable">
+            {{ prDetail.reason }}
+          </dd>
         </template>
       </dl>
     </section>
@@ -425,5 +492,19 @@ function copyMessage(): void {
   display: flex;
   flex-wrap: wrap;
   gap: var(--kv-space-1);
+}
+
+.kv-meta-pr {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kv-space-1);
+}
+
+.kv-meta-pr-link {
+  color: var(--kv-badge-pr-open-fg);
+}
+
+.kv-meta-pr-unavailable {
+  color: var(--kv-description-fg);
 }
 </style>

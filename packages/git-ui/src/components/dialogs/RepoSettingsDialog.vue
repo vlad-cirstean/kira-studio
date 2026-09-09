@@ -135,6 +135,9 @@ async function save(): Promise<void> {
   if (draft['kiraVersion.log.level'] !== current['kiraVersion.log.level']) {
     patch['kiraVersion.log.level'] = draft['kiraVersion.log.level'];
   }
+  if (draft['kiraVersion.github.enabled'] !== current['kiraVersion.github.enabled']) {
+    patch['kiraVersion.github.enabled'] = draft['kiraVersion.github.enabled'];
+  }
   if (Object.keys(patch).length > 0) {
     await props.repoSettingsState.set(patch);
   }
@@ -183,6 +186,14 @@ async function save(): Promise<void> {
       <label class="kv-dialog-field">
         Candidate base branches (one per line, tried in order)
         <textarea v-model="baseCandidatesText" rows="3"></textarea>
+      </label>
+    </section>
+
+    <section class="kv-repo-settings-section">
+      <h3 class="kv-repo-settings-heading">GitHub</h3>
+      <label class="kv-dialog-field kv-dialog-field--inline">
+        <input type="checkbox" v-model="draft['kiraVersion.github.enabled']" />
+        Show pull request status for this repository
       </label>
     </section>
 

@@ -1072,6 +1072,35 @@ defineExpose({ scrollToRow, focusGrid });
   border-color: var(--kv-panel-border);
 }
 
+/* G24 D9: the per-commit/per-branch PR badge — a real <a href>, so it needs its own link reset
+   (no underline, inherits the badge's own colour rather than the browser default blue/visited).
+   State travels as one of these four classes, never as text (§7's "no colour-only meaning" is
+   already satisfied by the "#123" number plus the tooltip naming the state in words). */
+.kv-badge-pr {
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.kv-badge-pr--open {
+  color: var(--kv-badge-pr-open-fg);
+  border-color: var(--kv-badge-pr-open-fg);
+}
+
+.kv-badge-pr--draft {
+  color: var(--kv-badge-pr-draft-fg);
+  border-color: var(--kv-badge-pr-draft-fg);
+}
+
+.kv-badge-pr--merged {
+  color: var(--kv-badge-pr-merged-fg);
+  border-color: var(--kv-badge-pr-merged-fg);
+}
+
+.kv-badge-pr--closed {
+  color: var(--kv-badge-pr-closed-fg);
+  border-color: var(--kv-badge-pr-closed-fg);
+}
+
 .kv-badge-dot {
   width: 5px;
   height: 5px;

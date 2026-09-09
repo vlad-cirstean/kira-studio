@@ -62,6 +62,20 @@
      pass does not "fix" it into a git-decoration colour that does not exist. */
   --kv-badge-stash-fg: var(--vscode-gitDecoration-ignoredResourceForeground, #8c8c8c);
   --kv-badge-stash-border: var(--vscode-gitDecoration-ignoredResourceForeground, #8c8c8c);
+  /* G24 D9: the PR badge's own four state colours. "open"/"draft"/"closed" reuse the closest
+     existing workbench colour id for each state (no `gitDecoration.*` id names a pull request
+     specifically) — the same "alias rather than invent a new literal" discipline
+     `--kv-diff-copied-fg`/`--kv-diff-typechanged-fg` already follow: "open" borrows the added/
+     success tone, "draft" the muted/ignored tone (not yet ready, same reasoning as the stash
+     badge above), "closed" the deleted/error tone. "merged" has no close analogue among this
+     file's existing tokens (every other state already claims the tone nearest it) — a second
+     invented literal, same precedent `--kv-overlay-bg` above already sets, tuned to GitHub's own
+     convention of a purple "Merged" badge and WCAG-checked at 4.6:1 against this file's own dark
+     panel-background fallback. */
+  --kv-badge-pr-open-fg: var(--vscode-gitDecoration-addedResourceForeground, #81b88b);
+  --kv-badge-pr-draft-fg: var(--vscode-gitDecoration-ignoredResourceForeground, #8c8c8c);
+  --kv-badge-pr-merged-fg: #b180d7;
+  --kv-badge-pr-closed-fg: var(--vscode-gitDecoration-deletedResourceForeground, #e2685a);
 
   /* Status / diff colours reuse Git's own decoration tokens (§6.1) */
   --kv-diff-added-fg: var(--vscode-gitDecoration-addedResourceForeground, #81b88b);
@@ -151,6 +165,17 @@ body.vscode-high-contrast-light {
   --kv-badge-tag-fg: var(--vscode-gitDecoration-addedResourceForeground, #256b3a);
   --kv-badge-stash-fg: var(--vscode-gitDecoration-ignoredResourceForeground, #5a5a5a);
   --kv-badge-stash-border: var(--vscode-gitDecoration-ignoredResourceForeground, #5a5a5a);
+  /* G24 D9: each of these four is its own custom property (not an alias of `--kv-diff-added-fg`/
+     `--kv-badge-stash-fg`/`--kv-diff-deleted-fg` above), so it needs its own explicit light-kind
+     literal here too, even though three of the four happen to share a workbench colour id with a
+     token already redefined in this block — the same light-appropriate literals those three
+     already use. "merged" has no workbench colour id behind it at all (this file's own second
+     invented literal, alongside `--kv-overlay-bg`); its own dark literal (#b180d7) is only 2.9:1
+     against a light panel, so it gets its own darker literal here. */
+  --kv-badge-pr-open-fg: var(--vscode-gitDecoration-addedResourceForeground, #256b3a);
+  --kv-badge-pr-draft-fg: var(--vscode-gitDecoration-ignoredResourceForeground, #5a5a5a);
+  --kv-badge-pr-merged-fg: #7a3e9d;
+  --kv-badge-pr-closed-fg: var(--vscode-gitDecoration-deletedResourceForeground, #a1260d);
   --kv-error-fg: var(--vscode-errorForeground, #a1260d);
   /* P5 W14: the file tree's and diff's own added/deleted colours (line 67/69 above) are the
      dark kind's tuning and fail 4.5:1 against a light panel — caught by W14's own axe scan on

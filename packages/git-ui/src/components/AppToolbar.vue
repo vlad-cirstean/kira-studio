@@ -26,6 +26,7 @@ import { computed, ref } from 'vue';
 import type { DetailActions } from '../state/detailActions.ts';
 import type { GraphViewState } from '../state/graphView.ts';
 import type { OpsState } from '../state/ops.ts';
+import type { PrState } from '../state/pr.ts';
 import type { RefsState } from '../state/refs.ts';
 import type { RepoState } from '../state/repo.ts';
 import type { SearchState } from '../state/search.ts';
@@ -57,6 +58,9 @@ const props = defineProps<{
   stashState: StashState;
   searchState: SearchState;
   actions: DetailActions | undefined;
+  /** G24 D9: `BranchPicker.vue`'s own `#123` branch-tip badge source — optional, mirrors every
+   *  other G24 prop threaded through this toolbar's own children. */
+  prState?: PrState;
 }>();
 const emit = defineEmits<{
   (event: 'repo-opened', repoId: string): void;
@@ -215,6 +219,7 @@ const stashDisabled = computed(
       :refs="refsState"
       :ops="opsState"
       :stash="stashState"
+      :pr="prState"
       @branch-from-stash="(entry) => emit('branch-from-stash', entry)"
     />
     <span class="kv-toolbar-separator" aria-hidden="true"></span>

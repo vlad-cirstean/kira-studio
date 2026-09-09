@@ -15,6 +15,7 @@ import { KuiButton, KuiPopoverPanel, KuiSearchInput } from '@kira/kira-ui';
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { STATE_ICONS } from '../icons/index.ts';
 import type { OpsState } from '../state/ops.ts';
+import type { PrState } from '../state/pr.ts';
 import type { RefsState } from '../state/refs.ts';
 import type { StashState } from '../state/stash.ts';
 import RowContextMenu from './RowContextMenu.vue';
@@ -28,7 +29,35 @@ import { buildRefMenu, remoteNamesFrom } from './rowMenuModel.ts';
 import StashList from './StashList.vue';
 import TagList from './TagList.vue';
 
-const props = defineProps<{ refs: RefsState; ops: OpsState; stash: StashState }>();
+const props = defineProps<{
+  refs: RefsState;
+  ops: OpsState;
+  stash: StashState;
+  /** G24 D9's own branch-tip badge — optional so a caller with nothing to show yet gets a plain,
+   *  badge-free picker (mirrors `CommitGrid.vue`'s own `pr` prop). */
+  pr?: PrState;
+}>();
+
+const PR_STATE_LABEL: Readonly<Record<string, string>> = {
+  open: 'Open',
+  draft: 'Draft',
+  merged: 'Merged',
+  closed: 'Closed',
+};
+
+/** The one PR record known for a branch's own short name, or `undefined` — same "render nothing"
+ *  rule every other G24 surface follows. */
+function prFor(
+  shortName: string,
+): { number: number; url: string; title: string; state: string } | undefined {
+  return props.pr?.byBranch.value.get(shortName);
+}
+
+function prTooltip(shortName: string): string {
+  const pr = prFor(shortName);
+  if (!pr) return '';
+  return `${pr.title} — ${PR_STATE_LABEL[pr.state] ?? pr.state}`;
+}
 
 /** OQ3: bubbled straight through from `StashList.vue`'s own emit — see that component's own doc
  *  comment on why the branch-mode dialog itself is owned by `App.vue`, not here. */
@@ -199,6 +228,18 @@ watch(isOpen, (open) => {
   else document.removeEventListener('pointerdown', onDocumentPointerDown);
 });
 
+// G24 D7 point 4: opening the picker is one of the few user acts allowed to touch the network at
+// all — warms every visible branch's own PR record in one go (the server answers each from its
+// already-cached snapshot, D6, at no additional GitHub cost).
+watch(isOpen, (open) => {
+  if (!open || !props.pr) return;
+  const names = [
+    ...props.refs.branches.value.map((r) => r.shortName),
+    ...props.refs.remoteBranches.value.map((r) => r.shortName),
+  ];
+  void props.pr.ensureSnapshot(names);
+});
+
 onBeforeUnmount(() => {
   document.removeEventListener('pointerdown', onDocumentPointerDown);
 });
@@ -265,6 +306,15 @@ onBeforeUnmount(() => {
                   >{{ row.isHead ? "●" : "" }}</span
                 >
                 <span class="kv-branch-row-name">{{ row.shortName }}</span>
+                <a
+                  v-if="prFor(row.shortName)"
+                  :href="prFor(row.shortName)!.url"
+                  class="kv-badge kv-badge-pill kv-badge-pr"
+                  :class="`kv-badge-pr--${prFor(row.shortName)!.state}`"
+                  v-kui-tooltip="prTooltip(row.shortName)"
+                  @click.stop
+                  >#{{ prFor(row.shortName)!.number }}</a
+                >
                 <span v-if="row.checkedOutIn" class="kv-branch-badge" v-kui-tooltip="`Checked out in ${row.checkedOutIn}`">
                   worktree
                 </span>

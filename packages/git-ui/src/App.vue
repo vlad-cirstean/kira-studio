@@ -65,6 +65,7 @@ import {
   composeRefreshAnnouncement,
 } from './state/liveAnnouncements.ts';
 import { OpsState } from './state/ops.ts';
+import { PrState } from './state/pr.ts';
 import { RefsState } from './state/refs.ts';
 import { RepoState } from './state/repo.ts';
 import { RepoSettingsState } from './state/repoSettings.ts';
@@ -121,7 +122,11 @@ const stashState = new StashState(bridge);
 // `refsState`/`opsState`/`stashState` above — reset via `setRepoId` rather than replaced. Threads
 // `refsState`/`graphView` in directly (both already exist above), matching the plan's own "threads
 // RefsState and GraphViewState into it".
-const searchState = new SearchState(bridge, refsState, graphView);
+// G24 D10/D18: one PrState for the life of this component, exactly like refsState/opsState/
+// stashState/searchState above — reset via setRepoId rather than replaced. Constructed before
+// searchState so it can be threaded into it (matchRef's own pr arm, D11).
+const prState = new PrState(bridge);
+const searchState = new SearchState(bridge, refsState, graphView, prState);
 // G18 D13: one RepoSettingsState for the life of this component, exactly like `refsState`/
 // `opsState`/`stashState`/`searchState` above — reset via `setRepoId` rather than replaced.
 // `RepoSettingsDialog.vue` reads/writes through this instance; `pageSize`/
@@ -252,6 +257,10 @@ watch(
       detailState.select(sha);
       stashState.select(null);
     }
+    // G24 D9: PrState.select runs for every selection change, stash entries included — a stash
+    // sha simply resolves to "no PR" (or `disabled`) same as any other commit the server has
+    // never heard of as a PR head; no special-casing needed here.
+    prState.select(sha);
   },
 );
 
@@ -264,6 +273,7 @@ watch(
     stashState.setRepoId(repoId);
     searchState.setRepoId(repoId);
     repoSettingsState.setRepoId(repoId);
+    prState.setRepoId(repoId);
   },
   { immediate: true },
 );
@@ -1088,6 +1098,7 @@ onBeforeUnmount(() => {
   stashState.dispose();
   searchState.dispose();
   repoSettingsState.dispose();
+  prState.dispose();
   repoState.value?.dispose();
   settingsState.value?.dispose();
   bridge.dispose();
@@ -1146,6 +1157,7 @@ onBeforeUnmount(() => {
           :stash-state="stashState"
           :search-state="searchState"
           :actions="actions"
+          :pr-state="prState"
           @repo-opened="handleRepoOpened"
           @stash-changes="stashCreateOpen = true"
           @branch-from-stash="handleBranchFromStash"
@@ -1166,6 +1178,7 @@ onBeforeUnmount(() => {
           :stash-state="stashState"
           :search-state="searchState"
           :actions="actions"
+          :pr-state="prState"
           @repo-opened="handleRepoOpened"
           @stash-changes="stashCreateOpen = true"
           @branch-from-stash="handleBranchFromStash"
@@ -1197,6 +1210,7 @@ onBeforeUnmount(() => {
               :column-widths="columnWidths"
               :date-format="dateFormat"
               :search="searchState"
+              :pr="prState"
               v-bind="initialScrollRowProp"
               @update:column-widths="columnWidths = $event"
               @update:date-format="dateFormat = $event"
@@ -1246,6 +1260,7 @@ onBeforeUnmount(() => {
               :detail-state="detailState"
               :store="graphView.store"
               :actions="actions"
+              :pr="prState"
               @select-parent-commit="selectCommitFromDetail"
             />
           </aside>
@@ -1265,6 +1280,7 @@ onBeforeUnmount(() => {
               :detail-state="detailState"
               :store="graphView.store"
               :actions="actions"
+              :pr="prState"
               @select-parent-commit="selectCommitFromDetail"
             />
           </aside>

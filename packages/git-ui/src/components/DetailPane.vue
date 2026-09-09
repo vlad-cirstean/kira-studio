@@ -20,6 +20,7 @@ import type { CommitStore } from '@kira/git-core';
 import { computed } from 'vue';
 import type { DetailState } from '../state/detail.ts';
 import type { DetailActions } from '../state/detailActions.ts';
+import type { PrState } from '../state/pr.ts';
 import CommitMeta from './CommitMeta.vue';
 // A .vue default export is a *value* — the component object the template instantiates. `import
 // type` erases it, and Vue then renders <FileTree> as an unknown element with nothing inside it
@@ -30,6 +31,10 @@ const props = defineProps<{
   detailState: DetailState;
   store: CommitStore;
   actions: DetailActions;
+  /** G24 D12: optional so a caller with nothing to show yet (mirrors `CommitGrid.vue`'s own `pr`
+   *  prop) gets a detail pane with no "Pull request" row at all — `CommitMeta.vue`'s own
+   *  `prDetail` computed already treats `undefined` the same as `disabled`. */
+  pr?: PrState;
 }>();
 
 const emit = defineEmits<(e: 'selectParentCommit', sha: string) => void>();
@@ -92,6 +97,7 @@ function onOpenFile(index: number, pinned: boolean): void {
         :detail="detail"
         :store="store"
         :actions="actions"
+        :pr-result="pr?.selected.value"
         @select-parent-commit="onSelectParentCommit"
       />
     </template>

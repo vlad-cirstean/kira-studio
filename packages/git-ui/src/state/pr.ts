@@ -67,9 +67,19 @@ export class PrState {
    *  it means arrow-keying through a whole disabled repository's history issues zero requests
    *  rather than one debounced no-op per row. */
   #disabledForRepo = false;
+  readonly #unsubscribe: () => void;
 
   constructor(bridge: BridgeClient) {
     this.#bridge = bridge;
+    // Mirrors RefsState's own three lines (D10): subscribes to repo.changed's refsChanged kind
+    // and clears everything — the server already dropped its own caches for the same signal (D6),
+    // so there is nothing worth eagerly re-fetching here; the next selection/badge render
+    // re-requests lazily, exactly as a first-ever selection would.
+    this.#unsubscribe = bridge.on('repo.changed', (event) => {
+      if (this.#repoId !== event.repoId) return;
+      if (event.kind !== 'refsChanged') return;
+      this.#clear();
+    });
   }
 
   /** Called whenever the active repo changes — mirrors `RefsState`/`DetailState`'s own
@@ -77,15 +87,6 @@ export class PrState {
    *  repository's), and cancels any in-flight/debounced per-commit request. */
   setRepoId(repoId: string | undefined): void {
     this.#repoId = repoId;
-    this.#clear();
-  }
-
-  /** `App.vue`'s own `repo.changed { refsChanged }` handler calls this — mirrors `RefsState`'s own
-   *  reload-on-refsChanged shape, except this class has nothing worth eagerly re-fetching (the
-   *  server already dropped its own caches for the same signal, D6): the client-side caches are
-   *  simply cleared, and the next selection/badge render re-requests lazily, exactly as a
-   *  first-ever selection would. */
-  onRefsChanged(): void {
     this.#clear();
   }
 
@@ -214,5 +215,6 @@ export class PrState {
   dispose(): void {
     this.#selectController?.abort();
     if (this.#selectTimer !== undefined) clearTimeout(this.#selectTimer);
+    this.#unsubscribe();
   }
 }
