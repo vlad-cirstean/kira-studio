@@ -599,6 +599,18 @@ func (e *RepoEntry) runPullOp(roCtx, spawnCtx context.Context, conn *Conn, deps 
 	// Past this point the op is a local write and is never killable again (D19).
 	e.remoteOp.setKillable(false)
 
+	// G32 round-3 functional-correctness review, finding #2: RunOp's own undo slot is invalidated
+	// by every LOCAL write it performs (D6's "the very next operation clears it," SPEC §7.12) — a
+	// pull's merge/rebase step is exactly such a write, but remote.run never went through RunOp and
+	// so never touched the slot at all. Left alone, a reset's undo record survives a subsequent
+	// pull: the record's replay is an absolute ref write (`reset --mixed <origHead>`,
+	// `reset --keep <oldOID>`) that assumes nothing has moved the branch since it was captured —
+	// exactly what this pull is about to do. Cleared unconditionally, before the write is even
+	// attempted: a conflicting merge/rebase is caught by the in-progress banner before any new
+	// destructive op could run anyway, so there is no cost to treating "pull reached its local
+	// write phase" as invalidating, the same way RunOp treats reaching its own write phase.
+	e.undo.Set(nil)
+
 	upstream := "refs/remotes/" + params.Remote + "/" + remoteBranch
 	var integrateArgv []string
 	switch gitpreflight.PullStrategy(params.Strategy) {

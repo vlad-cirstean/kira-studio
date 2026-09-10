@@ -326,3 +326,59 @@ func runGitStackOutput(t *testing.T, dir string, args ...string) string {
 	}
 	return strings.TrimSpace(string(out))
 }
+
+// TestRunRemote_Pull_ClearsUndoSlot is G32 round-3 functional-correctness review finding #2's own
+// regression proof: a reset (or any other Undoable RunOp kind)'s undo record is an absolute ref
+// write that assumes nothing has moved the branch since it was captured. RunRemote never touched
+// the undo slot at all before this fix, so a pull landing after such an op left a stale record in
+// place — clicking Undo would silently move the branch back past whatever the pull just brought in.
+func TestRunRemote_Pull_ClearsUndoSlot(t *testing.T) {
+	remoteDir := t.TempDir()
+	runGitStack(t, remoteDir, "init", "-q", "--bare", "-b", "main")
+
+	dir := t.TempDir()
+	runGitStack(t, dir, "clone", "-q", remoteDir, ".")
+	runGitStack(t, dir, "checkout", "-q", "-b", "main")
+	writeFileStack(t, dir, "f.txt", "line1\n")
+	runGitStack(t, dir, "add", "f.txt")
+	runGitStack(t, dir, "commit", "-q", "-m", "c1")
+	runGitStack(t, dir, "push", "-q", "-u", "origin", "main")
+
+	// A second clone pushes a new commit to the remote -- what runPullOp is about to fetch.
+	otherDir := t.TempDir()
+	runGitStack(t, otherDir, "clone", "-q", remoteDir, ".")
+	writeFileStack(t, otherDir, "g.txt", "line1\n")
+	runGitStack(t, otherDir, "add", "g.txt")
+	runGitStack(t, otherDir, "commit", "-q", "-m", "c2")
+	runGitStack(t, otherDir, "push", "-q", "origin", "main")
+
+	runGitStack(t, dir, "checkout", "-q", "-b", "feat")
+	conn, entry := newStackTestConnAndEntry(t, gitclient.NewExecRunner(), dir)
+	ctx := context.Background()
+
+	// Populate the undo slot with an unrelated Undoable op (stackSet is cheap: no working-tree
+	// mutation needed) -- stands in for "any local write happened before the user then pulls."
+	setResult, err := entry.RunOp(ctx, conn.ID, "test", OpRequest{Kind: "stackSet", Branch: "feat", Parent: strPtr("main")})
+	if err != nil || !setResult.OK || setResult.Undo == nil {
+		t.Fatalf("RunOp(stackSet) = %+v, %v, want an ok result with an undo record", setResult, err)
+	}
+	// Pull requires the pulled branch to be the one actually checked out (FUNC1/G30 finding #2's
+	// own fresh HEAD re-check) -- back to main for that.
+	runGitStack(t, dir, "checkout", "-q", "main")
+	if entry.undo.Peek() == nil {
+		t.Fatal("undo slot must be populated before the pull this test is actually about")
+	}
+
+	result, err := entry.RunRemote(ctx, conn, RemoteOpParams{
+		Kind: "pull", Remote: "origin", Branch: "main", Strategy: "ff",
+	}, RemoteDeps{})
+	if err != nil {
+		t.Fatalf("RunRemote(pull): %v", err)
+	}
+	if !result.OK {
+		t.Fatalf("pull result = %+v, want ok", result)
+	}
+	if entry.undo.Peek() != nil {
+		t.Fatal("pull must clear the undo slot -- its stale reset/etc. record is no longer safe to replay")
+	}
+}
