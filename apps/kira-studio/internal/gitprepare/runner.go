@@ -16,7 +16,12 @@ const PrepareTimeout = 15 * time.Minute
 // gracefulStopDelay is SIGTERM's own grace window before escalating to SIGKILL — mirrors
 // ghclient/runner.go's own constant of the same name and purpose exactly (this package's own
 // precedent for "a spawned non-git binary gets a real chance to clean up, then dies for real").
-const gracefulStopDelay = 2 * time.Second
+//
+// A var, not a const (mirrors internal/preconnect/supervisor.go's own killGrace/settleWindow
+// precedent, P55 §2 D9, and gitclient/runner.go's own identical G31 round-2 fix): runner_test.go
+// lowers it so a regression test proving cmd.Cancel's SIGKILL escalation timer is actually stopped
+// once the process exits cleanly doesn't cost 2s of real wall-clock time.
+var gracefulStopDelay = 2 * time.Second
 
 // Spec is one prepare-script invocation — everything Run needs. Shell/LoginShell/Script are fed
 // straight to BuildArgv; Env is the FULL child environment (BuildEnv's own output, never appended
@@ -55,7 +60,9 @@ func NewOSRunner() Runner { return osRunner{} }
 
 type osRunner struct{}
 
-func killGroup(pid int, sig syscall.Signal) error {
+// A var, not a plain func (internal/preconnect/supervisor.go's own killSignal is this codebase's
+// precedent) so a test can observe whether cmd.Cancel's SIGKILL escalation was actually invoked.
+var killGroup = func(pid int, sig syscall.Signal) error {
 	if err := syscall.Kill(-pid, sig); err != nil && !errors.Is(err, syscall.ESRCH) {
 		return err
 	}
@@ -79,9 +86,16 @@ func (osRunner) Run(ctx context.Context, spec Spec) (Result, error) {
 	cmd.Dir = spec.Dir
 	cmd.Env = spec.Env
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
+	// escalate is read after cmd.Wait() returns, below — G31 round-2 architecture/security review,
+	// finding #11: without stopping it there, a group that exits cleanly on SIGTERM left this timer
+	// armed for the full gracefulStopDelay regardless, and a SIGKILL fired at cmd.Process.Pid's
+	// process group after that delay could — narrowly, but really — land on an unrelated group that
+	// has since reused the same pid. No lock is needed: cmd.Wait is documented to block until any
+	// goroutine running Cancel has finished, which is exactly the happens-before this needs.
+	var escalate *time.Timer
 	cmd.Cancel = func() error {
 		_ = killGroup(cmd.Process.Pid, syscall.SIGTERM)
-		time.AfterFunc(gracefulStopDelay, func() { _ = killGroup(cmd.Process.Pid, syscall.SIGKILL) })
+		escalate = time.AfterFunc(gracefulStopDelay, func() { _ = killGroup(cmd.Process.Pid, syscall.SIGKILL) })
 		return nil
 	}
 	cmd.WaitDelay = gracefulStopDelay
@@ -109,6 +123,9 @@ func (osRunner) Run(ctx context.Context, spec Spec) (Result, error) {
 	}()
 
 	waitErr := cmd.Wait()
+	if escalate != nil {
+		escalate.Stop()
+	}
 	close(tickerDone)
 	collector.flush()
 

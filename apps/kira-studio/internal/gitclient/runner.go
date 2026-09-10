@@ -76,7 +76,13 @@ type Result struct {
 // enough that a Stop button or a window close is never left waiting on a hung child indefinitely.
 // Matches this repo's own precedent (internal/preconnect/supervisor.go's killGrace) and upstream's
 // SIGKILL_GRACE_MS.
-const gracefulStopDelay = 2 * time.Second
+//
+// A var, not a const (mirrors internal/preconnect/supervisor.go's own killGrace/settleWindow
+// precedent, P55 §2 D9): runner_test.go lowers it so a G31 round-2 architecture/security review
+// finding #11 regression test — proving cmd.Cancel's escalation timer is actually stopped once the
+// process exits cleanly, not left armed toward a SIGKILL nothing needs — doesn't cost 2s of real
+// wall-clock time.
+var gracefulStopDelay = 2 * time.Second
 
 // maxStderrBytes/stderrTruncationMarker bound how much of a child's stderr this package retains
 // (G2 plan D4) — stderr is attacker-adjacent (a pre-push hook, a remote's message) and lands in an
@@ -216,7 +222,12 @@ func Run(ctx context.Context, r Runner, gitPath string, spec Spec) (Result, erro
 // what reaches a grandchild (ssh, a credential helper, a hook) the direct child spawned, not just
 // the direct child itself. ESRCH (no such process/group — already gone) is not an error: the
 // intended outcome already holds.
-func killGroup(pid int, sig syscall.Signal) error {
+//
+// A var, not a plain func (internal/preconnect/supervisor.go's own killSignal is this codebase's
+// precedent for the pattern) so a test can observe whether cmd.Cancel's SIGKILL escalation was
+// actually invoked — proving a stopped timer, not merely inferring it from a real pid-reuse
+// scenario, which isn't reproducible on demand.
+var killGroup = func(pid int, sig syscall.Signal) error {
 	if err := syscall.Kill(-pid, sig); err != nil && !errors.Is(err, syscall.ESRCH) {
 		return err
 	}
@@ -251,9 +262,20 @@ func (execRunner) Start(ctx context.Context, gitPath string, spec Spec) (Process
 	// child and never the pipes obtained via *Pipe() below — is what actually unblocks a Stdout
 	// reader parked behind a grandchild that outlived git itself (F3): only a group-wide kill
 	// reaches that grandchild and lets it close its own copy of the pipe.
+	//
+	// escalate is read by execProcess.reap, below, once cmd.Wait has returned — G31 round-2
+	// architecture/security review, finding #11: without stopping it there, a group that exits
+	// cleanly on SIGTERM (the overwhelmingly common case) still left this timer armed for the full
+	// gracefulStopDelay, each one a live goroutine referencing this cmd, and — narrower but
+	// real — a SIGKILL fired at cmd.Process.Pid's process GROUP after that delay could land on an
+	// unrelated group that has since reused the same pid. Reading escalate only after cmd.Wait
+	// returns is safe with no lock: Wait is documented to block until any goroutine running Cancel
+	// has finished, which is exactly the happens-before this needs (execProcess.Close, just below,
+	// already relies on the identical guarantee for its own, separately-armed escalate timer).
+	var escalate *time.Timer
 	cmd.Cancel = func() error {
 		_ = killGroup(cmd.Process.Pid, syscall.SIGTERM)
-		time.AfterFunc(gracefulStopDelay, func() {
+		escalate = time.AfterFunc(gracefulStopDelay, func() {
 			_ = killGroup(cmd.Process.Pid, syscall.SIGKILL)
 		})
 		return nil
@@ -284,6 +306,11 @@ func (execRunner) Start(ctx context.Context, gitPath string, spec Spec) (Process
 		cmd: cmd, stdout: stdout, stdin: stdin,
 		stderr: &boundedWriter{max: maxStderrBytes}, stderrDone: make(chan struct{}),
 		onStderr: spec.OnStderr,
+		stopEscalate: func() {
+			if escalate != nil {
+				escalate.Stop()
+			}
+		},
 	}
 	go p.drainStderr(stderrPipe)
 	return p, nil
@@ -325,6 +352,11 @@ type execProcess struct {
 	// onStderr is G7 D5's tee — nil for every caller before this phase (fetch/push/pull's progress
 	// pump is the first).
 	onStderr func([]byte)
+	// stopEscalate stops cmd.Cancel's own SIGKILL-escalation timer, if one was ever armed (G31
+	// round-2 architecture/security review, finding #11) — called from reap, below, once cmd.Wait
+	// has confirmed the process is actually gone, so a clean SIGTERM exit never leaves that timer
+	// ticking uselessly toward a SIGKILL nothing needs.
+	stopEscalate func()
 
 	stderrDone chan struct{}
 
@@ -365,6 +397,7 @@ func (p *execProcess) reap() {
 	// truncate the message a classified failure needs.
 	<-p.stderrDone
 	err := p.cmd.Wait()
+	p.stopEscalate()
 	if err != nil {
 		var exitErr *exec.ExitError
 		if errors.As(err, &exitErr) {

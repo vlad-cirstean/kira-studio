@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"slices"
 	"strconv"
+	"sync"
+	"syscall"
 	"testing"
 	"time"
 )
@@ -204,6 +206,64 @@ func TestStart_CancellationKillsAndUnblocksReader(t *testing.T) {
 	}
 	if res.ExitCode == 0 {
 		t.Fatalf("ExitCode = 0, want non-zero for a signal-terminated process")
+	}
+}
+
+// TestStart_CancellationStopsEscalationTimerAfterCleanExit is G31 round-2 architecture/security
+// review, finding #11: cmd.Cancel's own SIGKILL-escalation timer (armed on SIGTERM, to fire after
+// gracefulStopDelay) used to never be stopped once the process actually exited — a clean SIGTERM
+// exit (the overwhelmingly common case, exactly what this test's shim does) still left the timer
+// ticking toward a SIGKILL nothing needs, each one a live goroutine referencing this process for
+// the whole gracefulStopDelay window; narrower but real, a SIGKILL later fired at a pid that has
+// since been reused by an unrelated process group would land on the wrong target. gracefulStopDelay
+// and killGroup are both package vars specifically so this test can shrink the window and observe
+// the escalation directly, rather than relying on an on-demand-unreproducible real pid reuse.
+func TestStart_CancellationStopsEscalationTimerAfterCleanExit(t *testing.T) {
+	requireExecGit(t)
+	r := NewExecRunner()
+
+	oldDelay := gracefulStopDelay
+	gracefulStopDelay = 100 * time.Millisecond
+	t.Cleanup(func() { gracefulStopDelay = oldDelay })
+
+	var mu sync.Mutex
+	var sigkillCalls int
+	oldKillGroup := killGroup
+	killGroup = func(pid int, sig syscall.Signal) error {
+		if sig == syscall.SIGKILL {
+			mu.Lock()
+			sigkillCalls++
+			mu.Unlock()
+		}
+		return oldKillGroup(pid, sig)
+	}
+	t.Cleanup(func() { killGroup = oldKillGroup })
+
+	ctx, cancel := context.WithCancel(context.Background())
+	dir := t.TempDir()
+	shim := writeSleepyGitShim(t, dir, 30)
+
+	p, err := r.Start(ctx, shim, Spec{Args: []string{"--version"}})
+	if err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	go func() { _, _ = io.ReadAll(p.Stdout()) }()
+
+	time.Sleep(50 * time.Millisecond) // let the shim actually be sleeping before cancelling.
+	cancel()
+
+	if _, err := p.Wait(); err != nil {
+		t.Fatalf("Wait: %v", err)
+	}
+
+	// The process is confirmed reaped at this point — reap() must already have stopped the
+	// escalation timer armed above. Wait comfortably past gracefulStopDelay and confirm no SIGKILL
+	// was ever attempted against it.
+	time.Sleep(3 * gracefulStopDelay)
+	mu.Lock()
+	defer mu.Unlock()
+	if sigkillCalls != 0 {
+		t.Fatalf("SIGKILL attempted %d time(s) after a clean SIGTERM exit — the escalation timer was not stopped", sigkillCalls)
 	}
 }
 

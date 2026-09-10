@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"sync"
 	"syscall"
 	"testing"
 	"time"
@@ -47,6 +48,67 @@ func TestRealRun_CancelKillsGrandchild(t *testing.T) {
 		time.Sleep(20 * time.Millisecond)
 	}
 	t.Fatalf("grandchild pid %d is still alive — realRun's cancellation did not reach it", grandchildPid)
+}
+
+// TestRealRun_CancellationStopsEscalationTimerAfterCleanExit is G31 round-2 architecture/security
+// review, finding #11: cmd.Cancel's own SIGKILL-escalation timer (armed on SIGTERM, to fire after
+// gracefulStopDelay) used to never be stopped once the process actually exited — a clean SIGTERM
+// exit (the overwhelmingly common case, exactly what this test's script does) still left the timer
+// ticking toward a SIGKILL nothing needs. gracefulStopDelay and killGroup are both package vars
+// specifically so this test can shrink the window and observe the escalation directly, rather than
+// relying on an on-demand-unreproducible real pid reuse.
+func TestRealRun_CancellationStopsEscalationTimerAfterCleanExit(t *testing.T) {
+	if _, err := os.Stat("/bin/sh"); err != nil {
+		t.Skip("/bin/sh not available")
+	}
+
+	oldDelay := gracefulStopDelay
+	gracefulStopDelay = 100 * time.Millisecond
+	t.Cleanup(func() { gracefulStopDelay = oldDelay })
+
+	var mu sync.Mutex
+	var sigkillCalls int
+	oldKillGroup := killGroup
+	killGroup = func(pid int, sig syscall.Signal) error {
+		if sig == syscall.SIGKILL {
+			mu.Lock()
+			sigkillCalls++
+			mu.Unlock()
+		}
+		return oldKillGroup(pid, sig)
+	}
+	t.Cleanup(func() { killGroup = oldKillGroup })
+
+	scriptPath := filepath.Join(t.TempDir(), "spawn.sh")
+	if err := os.WriteFile(scriptPath, []byte("#!/bin/sh\nsleep 30\n"), 0o755); err != nil {
+		t.Fatalf("write script: %v", err)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() {
+		_ = realRun(ctx, scriptPath, nil)
+		close(done)
+	}()
+
+	time.Sleep(50 * time.Millisecond) // let the script actually be sleeping before cancelling.
+	cancel()
+
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("realRun did not return after cancellation")
+	}
+
+	// The process is confirmed reaped at this point — the escalation timer (armed for a mere
+	// 100ms above) must already have been stopped. Wait comfortably past that window and confirm
+	// no SIGKILL was ever attempted.
+	time.Sleep(3 * gracefulStopDelay)
+	mu.Lock()
+	defer mu.Unlock()
+	if sigkillCalls != 0 {
+		t.Fatalf("SIGKILL attempted %d time(s) after a clean SIGTERM exit — the escalation timer was not stopped", sigkillCalls)
+	}
 }
 
 func waitForPidFile(t *testing.T, path string) int {
