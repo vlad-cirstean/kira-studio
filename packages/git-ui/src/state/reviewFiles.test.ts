@@ -205,3 +205,93 @@ describe('ReviewFilesState — pending never latches across a setTarget while a 
     });
   });
 });
+
+// G30 round-1 functional-correctness review, finding #7: mark()'s own request had no catch at
+// all — a rejection propagated straight out of mark() as a rejected promise, and every real
+// caller (ReviewFilesPane.vue's onToggleReviewed, ReviewView.vue's toggleFileReviewed palette
+// action) calls it as `void mark(...)`, discarding that promise. The failure became an unhandled
+// rejection with nothing user-visible: the checkbox just silently reverted on the next render.
+describe('ReviewFilesState — a failed mark() surfaces on markError instead of vanishing', () => {
+  test('a rejected review.mark sets markError and clears pending, without throwing out of mark()', async () => {
+    const transport = new FakeTransport();
+    const bridge = new BridgeClient(transport);
+    const state = new ReviewFilesState(bridge);
+
+    transport.onRequest = (method) => {
+      if (method === 'review.files') {
+        return { branchTip: 'tip', mergeBase: 'base', files: [] };
+      }
+      if (method === 'review.mark') {
+        throw new Error('disk full');
+      }
+      throw new Error(`unscripted request: ${method}`);
+    };
+
+    state.setTarget({ repoId: REPO, branch: BRANCH, base: BASE });
+    await tick();
+    expect(state.markError.value).toBeUndefined();
+
+    // mark() is awaited directly here (not `void`-discarded, as every real caller does) — proves
+    // the promise itself never rejects, only markError is set. A real caller relying on `void`
+    // would otherwise have seen this as an unhandled rejection.
+    await state.mark('a.ts', true);
+
+    expect(state.markError.value).toBe('disk full');
+    expect(state.pending.value).toBe(false);
+  });
+
+  test('a subsequent successful mark() clears a previous markError', async () => {
+    const transport = new FakeTransport();
+    const bridge = new BridgeClient(transport);
+    const state = new ReviewFilesState(bridge);
+
+    let failNext = true;
+    transport.onRequest = (method) => {
+      if (method === 'review.files') {
+        return { branchTip: 'tip', mergeBase: 'base', files: [] };
+      }
+      if (method === 'review.mark') {
+        if (failNext) throw new Error('disk full');
+        return {
+          review: { kind: 'full', changedSinceReview: false, reviewedAt: 0, reviewedAtSha: 's' },
+        };
+      }
+      throw new Error(`unscripted request: ${method}`);
+    };
+
+    state.setTarget({ repoId: REPO, branch: BRANCH, base: BASE });
+    await tick();
+
+    await state.mark('a.ts', true);
+    expect(state.markError.value).toBe('disk full');
+
+    failNext = false;
+    await state.mark('a.ts', true);
+    expect(state.markError.value).toBeUndefined();
+  });
+
+  test('setTarget clears a stale markError from the previous target', async () => {
+    const transport = new FakeTransport();
+    const bridge = new BridgeClient(transport);
+    const state = new ReviewFilesState(bridge);
+
+    transport.onRequest = (method) => {
+      if (method === 'review.files') {
+        return { branchTip: 'tip', mergeBase: 'base', files: [] };
+      }
+      if (method === 'review.mark') {
+        throw new Error('disk full');
+      }
+      throw new Error(`unscripted request: ${method}`);
+    };
+
+    state.setTarget({ repoId: REPO, branch: BRANCH, base: BASE });
+    await tick();
+    await state.mark('a.ts', true);
+    expect(state.markError.value).toBe('disk full');
+
+    state.setTarget({ repoId: REPO, branch: BRANCH, base: 'a-different-base' });
+    await tick();
+    expect(state.markError.value).toBeUndefined();
+  });
+});

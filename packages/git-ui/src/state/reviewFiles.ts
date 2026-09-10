@@ -67,6 +67,13 @@ export class ReviewFilesState {
   /** A review.mark request in flight — the two header buttons disable themselves while true
    *  rather than let a double-click race two writes against the same file. */
   readonly pending: ShallowRef<boolean> = shallowRef(false);
+  // G30 round-1 functional-correctness review, finding #7: mark()'s own request had no catch at
+  // all — a rejection propagated straight out of mark() as a rejected promise, and every caller
+  // (ReviewFilesPane.vue's onToggleReviewed among them) calls it as `void mark(...)`, discarding
+  // that promise outright. The failure became an unhandled rejection with nothing user-visible:
+  // the checkbox just silently reverted to its pre-click state on the next render with no
+  // explanation. Mirrors loadError/diffError's own pattern exactly.
+  readonly markError: ShallowRef<string | undefined> = shallowRef(undefined);
 
   readonly #bridge: BridgeClient;
   #target: ReviewFilesTarget | undefined;
@@ -86,6 +93,7 @@ export class ReviewFilesState {
     this.#branchTip = undefined;
     this.#mergeBase = undefined;
     this.loadError.value = undefined;
+    this.markError.value = undefined;
     this.selectedPath.value = null;
     this.#clearDiff();
     // G30 round-1 functional-correctness review, finding #6: mark()'s own `finally` only clears
@@ -247,6 +255,7 @@ export class ReviewFilesState {
     const target = this.#target;
     if (!target || this.pending.value) return;
     this.pending.value = true;
+    this.markError.value = undefined;
     try {
       const result = await this.#bridge.request('review.mark', {
         repoId: target.repoId,
@@ -260,6 +269,9 @@ export class ReviewFilesState {
         entry.change.path === path ? { ...entry, review: result.review } : entry,
       );
       if (this.selectedPath.value === path) await this.#loadDiff();
+    } catch (error) {
+      if (this.#target !== target) return;
+      this.markError.value = error instanceof Error ? error.message : String(error);
     } finally {
       if (this.#target === target) this.pending.value = false;
     }
