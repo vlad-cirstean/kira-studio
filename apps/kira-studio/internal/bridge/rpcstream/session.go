@@ -170,12 +170,14 @@ func (s *Session) removeActiveWork(id int) bool {
 	return true
 }
 
-func (s *Session) handleRequest(id int, method string, params json.RawMessage) {
-	ctx, cancel := context.WithCancel(context.Background())
-	s.mu.Lock()
-	s.activeWork[id] = cancel
-	s.mu.Unlock()
-
+// handleRequest runs one request's handler. ctx/cancel are registered by handleRaw synchronously,
+// before this is ever dispatched onto its own goroutine — mirrors handleOpen's own reasoning
+// (G30 round-1 architecture review, finding #10): registering activeWork from inside this
+// goroutine would leave a window, between handleRaw dispatching it and the goroutine actually
+// acquiring the lock, where a second 'req' frame for the same id passes handleRaw's own
+// already-in-flight check and both goroutines end up racing to set the same map entry — exactly
+// the silent-response-drop this fix exists to close.
+func (s *Session) handleRequest(ctx context.Context, cancel context.CancelFunc, id int, method string, params json.RawMessage) {
 	result, err := s.h.Request(ctx, method, params)
 	cancel()
 
@@ -268,11 +270,41 @@ func (s *Session) handleRaw(raw []byte) {
 	}
 	switch env.Body.T {
 	case "req":
-		go s.handleRequest(env.Body.ID, env.Body.Method, env.Body.Params)
+		// G30 round-1 architecture review, finding #10: activeWork[id] used to be overwritten
+		// unconditionally, which orphans whichever request held the id first — its own cancel
+		// func becomes unreachable (a 'cancel' frame for it now cancels the second request
+		// instead), and whichever of the two finishes first "wins" removeActiveWork's presence
+		// check, so the other's response is silently dropped and its caller hangs forever
+		// waiting on a reply that will never come. A client reusing an in-flight id is refused
+		// outright instead — the second request never starts, the first's bookkeeping is left
+		// untouched. The check-and-register happens atomically under one lock (mirrors
+		// handleOpen's own already-synchronous registration below) so a second 'req' for the
+		// same id can never slip past the check before the first's registration lands.
+		ctx, cancel := context.WithCancel(context.Background())
+		s.mu.Lock()
+		if _, inFlight := s.activeWork[env.Body.ID]; inFlight {
+			s.mu.Unlock()
+			cancel()
+			s.send(frame{T: "res", ID: env.Body.ID, OK: boolPtr(false), Error: wireErrorFrom(
+				ipcerr.BadRequest("rpcstream: request id is already in flight"),
+			)})
+			return
+		}
+		s.activeWork[env.Body.ID] = cancel
+		s.mu.Unlock()
+		go s.handleRequest(ctx, cancel, env.Body.ID, env.Body.Method, env.Body.Params)
 	case "open":
 		ctx, cancel := context.WithCancel(context.Background())
 		gate := newCreditGate()
 		s.mu.Lock()
+		if _, inFlight := s.activeWork[env.Body.ID]; inFlight {
+			s.mu.Unlock()
+			cancel()
+			s.send(frame{T: "end", ID: env.Body.ID, Error: wireErrorFrom(
+				ipcerr.BadRequest("rpcstream: request id is already in flight"),
+			)})
+			return
+		}
 		s.activeWork[env.Body.ID] = cancel
 		s.creditGates[env.Body.ID] = gate
 		s.mu.Unlock()
