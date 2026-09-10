@@ -1507,6 +1507,44 @@ sizing is not a live constraint.
 **Not measured on real hardware.** These are container numbers, like every other figure in §2. The
 macOS equivalents belong in §3's manual procedures, which have still not been run.
 
+### 2.14 G34 — the visual-parity phase's own CSS delta, measured after the fact
+
+`docs/v1.3/plans/G34-kira-studio-visual-parity.md` §7.1 item 9 made recording the built CSS
+asset's raw/gzip size, before and after the phase, an explicit Tier-1 exit criterion — "F3 predicts
+a delta inside ±3 KB raw; a materially larger one means something was duplicated rather than
+replaced and is worth investigating before merge." None of G34's four commits
+(`0bc989f`/`bfff105`/`e72afe1`/`bf0a1d8`) actually recorded it; G30 round 1's own performance
+review flagged the gap. This entry supplies the measurement the exit criterion asked for, run now
+rather than at the time.
+
+**Method.** `bun run build:vscode` (`scripts/build-vscode.ts`, the same Vite production build G34's
+own exit criterion #4 already exercises) at the commit immediately before G34's first code change
+(`521fcba`, a docs-only plan commit — its parent has no G34 code at all) versus at G34's last commit
+(`bf0a1d8`). Nothing between `bf0a1d8` and the measurement date touches a `.vue` `<style>` block or
+a `packages/kira-ui`/`packages/git-ui` `.css` file (checked via `git log bf0a1d8..HEAD` over both
+extensions), so `bf0a1d8`'s own CSS is byte-identical to what a build at current `HEAD` produces —
+the container this ran in.
+
+| | Raw | Gzip |
+|---|---|---|
+| Before G34 (`521fcba`) | 65,409 B (63.9 KiB) | 9,867 B (9.6 KiB) |
+| After G34 (`bf0a1d8`) | 61,466 B (60.0 KiB) | 9,700 B (9.5 KiB) |
+| Δ | **−3,943 B (−3.85 KiB)** | −167 B (−0.16 KiB) |
+
+**This is a decrease, not an increase** — G34 replaced bespoke, duplicated `.kv-*` button/menu/row
+styling with shared `packages/kira-ui` component classes and a single token scale (D1/D13's own "one
+token scale, not two"), and removing the duplication outweighed whatever the newly-consumed
+`kira-ui` classes added. The raw delta's own magnitude (3.85 KiB) is about 1.3x the plan's ±3 KB
+tolerance band, which technically trips exit criterion #9's own "materially larger… worth
+investigating" clause by absolute size — but a *shrink* of this shape is exactly what removing
+duplicated CSS in favour of shared components predicts, not evidence that anything was duplicated
+rather than replaced (the failure mode #9 was actually watching for). No further investigation
+follows from this number; it is recorded here so the exit criterion is no longer an open item.
+
+**Not measured on real hardware**, like every other figure in this section — the macOS-packaged
+build's own CSS asset was not separately verified, on the standing assumption (§2.13's own note)
+that a container Vite build and a packaged one produce byte-identical CSS output.
+
 ## 3. Manual procedures (macOS, packaged build)
 
 Not yet run — no macOS hardware available in this environment. Run these once on macOS 14+ arm64
