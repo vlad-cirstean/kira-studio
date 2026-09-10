@@ -58,14 +58,6 @@ import type { EventKey, RequestKey, StreamKey } from './contract.ts';
 // new RepoSettingsSnapshot member ('kiraVersion.github.enabled'). Additive only -- SearchMatchField
 // is untouched (F9: the wire's own search-field union is commits-only, the PR fields live entirely
 // in git-core's client-side SearchField instead).
-// G26 D17 (2026-09-09): 28 -> 29, for four new Go-served requests ('stack.list',
-// 'preflight.restack', 'stack.restack', 'stack.cancelRestack'), one new event ('stack.progress'),
-// nine new wire types ('StackBranchState', 'StackBranch', 'StackSummary', 'StackListResult',
-// 'RestackBlocker', 'RestackPlanEntry', 'RestackPreflight', 'RestackResult', 'RestackProgress'),
-// one new 'OpRequest' kind ('stackSet'), one new 'OpErrorKind' member ('StackCycle' -- produced
-// exclusively by 'stackSet's own cycle check, never by rebase itself), and three new
-// 'UiActionKind' members ('restackStack', 'checkoutStackParent', 'checkoutStackChild'). No new
-// capability, no new setting, no SQL migration (this phase's own §8 explicit non-goals).
 // G25 D16 (2026-09-09): 27 -> 28, for worktree support -- no upstream design existed for this
 // phase at all (this chapter's own SPEC row was a placeholder). Six new requests ('worktree.list',
 // 'preflight.worktreeAdd', 'preflight.worktreeRemove', 'worktree.prepare',
@@ -80,6 +72,14 @@ import type { EventKey, RequestKey, StreamKey } from './contract.ts';
 // phase touches: the prepare script's own sha256-pinned approval -- a server-only key, reachable
 // only through the Go server's own dedicated storage accessors, never through 'repoSettings.get'/
 // 'set' or any 'OpRequest'/'OpResult' shape (D11/F15).
+// G26 D17 (2026-09-09): 28 -> 29, for four new Go-served requests ('stack.list',
+// 'preflight.restack', 'stack.restack', 'stack.cancelRestack'), one new event ('stack.progress'),
+// nine new wire types ('StackBranchState', 'StackBranch', 'StackSummary', 'StackListResult',
+// 'RestackBlocker', 'RestackPlanEntry', 'RestackPreflight', 'RestackResult', 'RestackProgress'),
+// one new 'OpRequest' kind ('stackSet'), one new 'OpErrorKind' member ('StackCycle' -- produced
+// exclusively by 'stackSet's own cycle check, never by rebase itself), and three new
+// 'UiActionKind' members ('restackStack', 'checkoutStackParent', 'checkoutStackChild'). No new
+// capability, no new setting, no SQL migration (this phase's own §8 explicit non-goals).
 // G28 D17 (2026-09-09): 29 -> 30, for branch-scoped stash -- auto-stash on checkout, cross-branch
 // apply, auto-detach on worktree conflict, and a durable global stash bucket. One new Go-served
 // request ('globalStash.list' -> {entries: StashEntry[]}, reusing the existing result shape
