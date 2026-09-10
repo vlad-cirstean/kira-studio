@@ -295,3 +295,78 @@ func TestOutputCollector_FlushDeliversPendingUnconditionally(t *testing.T) {
 		t.Fatalf("got %d total lines across %d batches, want 2", total, len(batches))
 	}
 }
+
+// TestOutputCollector_DeliveriesSerializeInFormationOrder is G31 round-2 architecture/security
+// review, finding #9: write/flush/tick all form a batch under mu, release mu, and only then call
+// onBatch — a gap where two batches formed back-to-back under mu (batch1 strictly before batch2,
+// since mu itself serializes formation) could still have their onBatch calls run in the OPPOSITE
+// order if goroutine scheduling let the second caller reach deliver() first. onBatch's own contract
+// is an ordered stream of lines; a caller (gitsession's own conn.Emit, forwarding worktree.progress
+// events) has no way to detect or recover from a later batch's lines arriving before an earlier
+// one's.
+//
+// This exercises reserveDelivery/finishDelivery directly (the exact pair write/flush/tick call)
+// rather than racing two goroutines through write() itself, since the whole point is a
+// deterministic proof of the serialization guarantee, not a scheduling-dependent flake: batch1 is
+// formed and its delivery turn reserved first; its own onBatch call is then held open on a channel
+// so the test can prove batch2 — formed and reserved strictly afterward — cannot complete its own
+// delivery until batch1's is released.
+func TestOutputCollector_DeliveriesSerializeInFormationOrder(t *testing.T) {
+	release := make(chan struct{})
+	blockedOnFirst := make(chan struct{})
+	var mu sync.Mutex
+	var order []string
+	c := newOutputCollector(func(b []Line) {
+		text := b[0].Text
+		if text == "first" {
+			close(blockedOnFirst)
+			<-release
+		}
+		mu.Lock()
+		order = append(order, text)
+		mu.Unlock()
+	})
+	var tick int64
+	c.now = func() time.Time {
+		tick++
+		return time.Unix(0, 0).Add(time.Duration(tick) * time.Second) // always past batchInterval.
+	}
+
+	c.mu.Lock()
+	c.addLineLocked("stdout", "first")
+	batch1 := c.takeBatchIfDueLocked(false)
+	ticket1, reserved1 := c.reserveDelivery(batch1)
+	c.mu.Unlock()
+	if !reserved1 {
+		t.Fatal("expected batch1 to reserve a delivery turn")
+	}
+	go c.finishDelivery(batch1, ticket1, reserved1)
+	<-blockedOnFirst // batch1's onBatch has started (and is now blocked) before batch2 is even formed.
+
+	c.mu.Lock()
+	c.addLineLocked("stdout", "second")
+	batch2 := c.takeBatchIfDueLocked(false)
+	ticket2, reserved2 := c.reserveDelivery(batch2)
+	c.mu.Unlock()
+
+	done2 := make(chan struct{})
+	go func() {
+		c.finishDelivery(batch2, ticket2, reserved2)
+		close(done2)
+	}()
+
+	select {
+	case <-done2:
+		t.Fatal("batch2's delivery completed before batch1's own delivery was released — deliveries are not serialized in formation order")
+	case <-time.After(50 * time.Millisecond):
+	}
+
+	close(release)
+	<-done2
+
+	mu.Lock()
+	defer mu.Unlock()
+	if len(order) != 2 || order[0] != "first" || order[1] != "second" {
+		t.Fatalf("delivery order = %v, want [first second]", order)
+	}
+}
