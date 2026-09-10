@@ -698,3 +698,89 @@ func TestIntegration_RevokeThenRepairReachesReady(t *testing.T) {
 		t.Fatalf("client row still revoked after re-pair: %+v", rows[0])
 	}
 }
+
+// TestServer_Close_ReturnsPromptlyWithAPendingPairingRequest is G32 round-3 architecture/security
+// review finding #1's own regression proof: a pairing request still sitting unanswered — exactly
+// what a pending prompt on screen when the app quits looks like — used to hang Server.Close()
+// forever. Broker.Request blocks on a plain channel receive, not on any I/O a closed net.Conn
+// would unblock, so this specifically exercises the Broker.Shutdown() half of the fix, not just
+// the allConns half (TestServer_Close_ReturnsPromptlyWithASilentConnection covers that one).
+func TestServer_Close_ReturnsPromptlyWithAPendingPairingRequest(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not on PATH")
+	}
+	server, sockPath, _, _ := newIntegrationServer(t)
+
+	// Sends hello directly rather than through testClient.hello (which t.Fatalf's on any read
+	// error): once Close() below tears this connection down mid-handshake, the client sees EOF or
+	// a reset rather than a clean "pairingDenied" frame -- an acceptable, expected shape for "the
+	// server is going away right now," not a protocol bug this test is about.
+	client := dialTestClient(t, sockPath)
+	client.sendRaw(helloFrame{
+		Kind: "hello", Protocol: gitrpc.Protocol, ContractVersion: gitrpc.ContractVersion,
+		Client: helloClient{ID: "pending-client", Label: "pending window", PID: os.Getpid(), AppVersion: "test"},
+		Token:  nil,
+	})
+	helloDone := make(chan struct{})
+	go func() {
+		defer close(helloDone)
+		_, _ = readFrame(client.r)
+		_, _ = readFrame(client.r)
+	}()
+
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) && server.Broker().Pending().Pending == nil {
+		time.Sleep(5 * time.Millisecond)
+	}
+	if server.Broker().Pending().Pending == nil {
+		t.Fatal("pairing request never reached the broker's queue")
+	}
+
+	closeDone := make(chan error, 1)
+	go func() { closeDone <- server.Close() }()
+
+	select {
+	case err := <-closeDone:
+		if err != nil {
+			t.Fatalf("Close: %v", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("Close() did not return within 5s -- hung behind the still-pending pairing request")
+	}
+
+	select {
+	case <-helloDone:
+	case <-time.After(2 * time.Second):
+		t.Fatal("hello()'s own goroutine never unblocked after Close()")
+	}
+}
+
+// TestServer_Close_ReturnsPromptlyWithASilentConnection is the same finding's other scenario: a
+// connection that dials but never sends a single byte (the handshake's own first read blocks
+// forever with no deadline) — the allConns half of the fix, closing it directly, unlike the
+// pairing-broker case above.
+func TestServer_Close_ReturnsPromptlyWithASilentConnection(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not on PATH")
+	}
+	server, sockPath, _, _ := newIntegrationServer(t)
+
+	nc, err := net.Dial("unix", sockPath)
+	if err != nil {
+		t.Fatalf("dial: %v", err)
+	}
+	t.Cleanup(func() { _ = nc.Close() })
+	// Never write anything -- runHandshake's first Receive() blocks indefinitely.
+
+	closeDone := make(chan error, 1)
+	go func() { closeDone <- server.Close() }()
+
+	select {
+	case err := <-closeDone:
+		if err != nil {
+			t.Fatalf("Close: %v", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("Close() did not return within 5s -- hung behind the silent, never-handshaked connection")
+	}
+}

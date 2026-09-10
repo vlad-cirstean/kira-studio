@@ -241,6 +241,30 @@ func (b *Broker) ExpireOverdue() {
 	}
 }
 
+// Shutdown resolves every currently queued pairing request as denied, unblocking any Request()
+// call still waiting on one. Server.Close calls this before its own wg.Wait() (G32 round-3
+// architecture/security review, finding #1): a queued request's Request() call blocks on
+// entry.result, a plain Go channel receive with no other case — unlike a connection blocked on an
+// actual network read, closing its net.Conn does nothing to unblock it, so a pairing prompt still
+// sitting unanswered when the app quits would otherwise hang that connection's handleConn
+// goroutine, and so Close's own wg.Wait(), forever. No cooldown is started (unlike an explicit
+// Deny): this is the server going away, not a decision about the client.
+func (b *Broker) Shutdown() {
+	b.mu.Lock()
+	all := append([]*pendingEntry(nil), b.queue...)
+	b.queue = nil
+	b.byID = map[string]*pendingEntry{}
+	snap := b.snapshotLocked()
+	b.mu.Unlock()
+
+	for _, entry := range all {
+		entry.result <- PairingDenied
+	}
+	if len(all) > 0 {
+		b.emitter.Emit(snap)
+	}
+}
+
 // removeLocked drops entry from both byID and the queue slice. Caller holds b.mu.
 func (b *Broker) removeLocked(entry *pendingEntry) {
 	delete(b.byID, entry.req.RequestID)

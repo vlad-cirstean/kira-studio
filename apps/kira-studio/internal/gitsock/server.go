@@ -41,7 +41,13 @@ type Server struct {
 	listener  net.Listener
 	lockFile  *os.File
 	closeCh   chan struct{}
-	conns     map[string][]net.Conn // clientID -> its live connections
+	conns     map[string][]net.Conn // clientID -> its live connections (post-handshake, for Revoke)
+	// allConns tracks every accepted connection from Accept() itself, independent of handshake
+	// state (G32 round-3 architecture/security review, finding #1): conns is populated only once
+	// runHandshake succeeds, so a connection still mid-handshake was invisible to Close() even
+	// though its goroutine is already counted in wg (acceptLoop's own Add, before the handshake
+	// starts) -- Close could then block on wg.Wait() forever behind a connection it never closed.
+	allConns map[net.Conn]struct{}
 
 	clientsChanged notify.Emitter[[]model.GitClient]
 
@@ -52,7 +58,7 @@ func New(deps Deps) *Server {
 	if deps.Now == nil {
 		deps.Now = time.Now
 	}
-	return &Server{deps: deps, broker: NewBroker(deps.Now), conns: map[string][]net.Conn{}}
+	return &Server{deps: deps, broker: NewBroker(deps.Now), conns: map[string][]net.Conn{}, allConns: map[net.Conn]struct{}{}}
 }
 
 // Broker exposes the pairing broker to bridge.GitClientsService (§3.6) — Approve/Deny/Pending/
@@ -150,12 +156,26 @@ func (s *Server) acceptLoop() {
 		if err != nil {
 			return // listener closed by Close() — normal shutdown.
 		}
+		s.trackConn(nc)
 		s.wg.Add(1)
 		go func() {
 			defer s.wg.Done()
+			defer s.untrackConn(nc)
 			s.handleConn(nc)
 		}()
 	}
+}
+
+func (s *Server) trackConn(nc net.Conn) {
+	s.mu.Lock()
+	s.allConns[nc] = struct{}{}
+	s.mu.Unlock()
+}
+
+func (s *Server) untrackConn(nc net.Conn) {
+	s.mu.Lock()
+	delete(s.allConns, nc)
+	s.mu.Unlock()
 }
 
 // handleConn runs the handshake (§3.1.1) and, once it reaches "ready", mints a gitsession.Conn for
@@ -253,19 +273,37 @@ func (s *Server) Close() error {
 	ln := s.listener
 	lockFile := s.lockFile
 	close(s.closeCh)
+	s.mu.Unlock()
+
+	// Stop accepting before gathering the live-connection snapshot below — narrows (does not fully
+	// eliminate; Accept() can still return successfully a moment before this call lands, same as
+	// any accept-loop shutdown) the window in which a brand new connection could be missed by the
+	// snapshot and left unclosed.
+	var err error
+	if ln != nil {
+		err = ln.Close()
+	}
+
+	// G32 round-3 architecture/security review, finding #1: closing every connection in s.conns —
+	// those already past the handshake (addConn runs only once runHandshake succeeds) — used to
+	// leave a connection still mid-handshake unclosed, even though its goroutine is already counted
+	// in wg (acceptLoop's own Add, before the handshake starts). allConns tracks every accepted
+	// connection independent of handshake state, so shutdown closes all of them, not just the
+	// admitted ones. Closing the net.Conn unblocks a connection blocked on an actual network read
+	// (handshake.go's own hello read, or rpcstream's own); it does nothing for one blocked on
+	// Broker.Request's plain channel receive instead — Shutdown (below) resolves those directly.
+	s.broker.Shutdown()
+
+	s.mu.Lock()
 	var live []net.Conn
-	for _, cs := range s.conns {
-		live = append(live, cs...)
+	for nc := range s.allConns {
+		live = append(live, nc)
 	}
 	s.conns = map[string][]net.Conn{}
 	s.mu.Unlock()
 
 	for _, nc := range live {
 		_ = nc.Close()
-	}
-	var err error
-	if ln != nil {
-		err = ln.Close()
 	}
 	s.wg.Wait()
 	// Every handleConn goroutine has now returned and released its own refs (deferred
