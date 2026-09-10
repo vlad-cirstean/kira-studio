@@ -1135,6 +1135,18 @@ export class OpsState {
   ): Promise<void> {
     const repoId = this.#repoId;
     if (repoId === undefined) return;
+
+    // G31 round-2 functional-correctness review, finding #1 (high): the stash-list snapshot
+    // taken AFTER stashPush is not, by itself, proof that stashPush created anything — an
+    // untracked-only dirty tree makes `git stash push` (no `-u`) print "No local changes to
+    // save" and exit 0 (`pushResult.ok` true) without touching the stack at all. The OLD check
+    // below ("is the post-push list empty?") only caught that when the user had NO stash of
+    // their own; with a pre-existing stash, `entries[0]` after such a no-op push is that
+    // pre-existing, UNRELATED entry, and the code used to run stashPop on it — applying and then
+    // deleting a stash this operation never created. Same before/after entry-count comparison
+    // runStashPush already uses (above) for the identical probe-10 no-op.
+    const beforePush = await this.#bridge.request('stash.list', { repoId });
+
     const pushResult = await this.#bridge.request('op.run', {
       repoId,
       op: {
@@ -1163,9 +1175,12 @@ export class OpsState {
 
     const { entries } = await this.#bridge.request('stash.list', { repoId });
     const top = entries[0];
-    if (top === undefined) {
-      // `stashPush` above was itself a no-op (probe 10) — the worktree really was clean, so
-      // there is nothing left to carry back.
+    if (top === undefined || entries.length <= beforePush.entries.length) {
+      // `stashPush` above was itself a no-op (probe 10) — either the worktree really was clean
+      // (top === undefined), or it was dirty only in a way `stashPush`'s own args don't capture
+      // (untracked-only, no -u — the list is unchanged, and `top` is the caller's own
+      // pre-existing, unrelated entry). Either way nothing THIS operation stashed, so nothing to
+      // carry back or pop.
       this.announcement.value = announceMiddleOk();
       return;
     }
