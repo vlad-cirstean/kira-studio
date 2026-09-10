@@ -35,6 +35,16 @@ func (s *SettingsService) Set(args SettingsSetArgs) (model.Settings, error) {
 	if args.Patch.Cache != nil && args.Patch.Cache.L2BudgetMb != nil {
 		s.Deps.Router.PushCacheConfig(merged)
 	}
+	// G31 round-2 functional-correctness review, finding #8: EnsureAutoFetch's only other caller
+	// is Conn.Open (gitsession's own off→on path) — a repository already open when the user turns
+	// fetch.autoInterval back on from 0 had no way to ever restart auto-fetch without a fresh
+	// repo.open, since pauseAutoFetch (armed the moment the interval reads 0) leaves nothing
+	// scheduled to notice a later settings change on its own. This is the actual write path for
+	// that setting (git.path's own sibling in the same instance-wide GitPatch); repoSettings.set
+	// is a different, per-repo settings surface that never carries it.
+	if args.Patch.Git != nil && args.Patch.Git.FetchAutoIntervalMinutes != nil && s.Deps.GitRegistry != nil {
+		s.Deps.GitRegistry.ReconcileAutoFetch()
+	}
 	s.Deps.Events.Emit(ChannelSettingsChanged, merged)
 	return merged, nil
 }

@@ -32,14 +32,17 @@ func (e *RepoEntry) startAutoFetch(minutes int) {
 	e.autoFetch.timer = time.AfterFunc(time.Duration(minutes)*time.Minute, e.autoFetchTick)
 }
 
-// ensureAutoFetch re-reads this entry's current settings and arms the timer if the interval is now
-// non-zero (F4/D5) — called from Conn.Open on the path that stores a new hold, not only from
-// newRepoEntry. startAutoFetch already no-ops when a timer is already running or the entry is
-// `disabled` (a fetch that failed once stays off for the entry's life, G7 D23), so N windows
-// opening the same repository arm exactly one timer, and this can never resurrect one G7 killed.
-// Fixes the off→on direction, which newRepoEntry-only arming never could: a repository opened
-// while auto-fetch read as 0 never got a timer, and no later settings change could ever start one.
-func (e *RepoEntry) ensureAutoFetch() {
+// EnsureAutoFetch re-reads this entry's current settings and arms the timer if the interval is now
+// non-zero (F4/D5) — called from Conn.Open on the path that stores a new hold, and (G31 round-2
+// functional-correctness review, finding #8) from gitrpc's own repoSettings.set handler, the
+// OTHER off→on path: a user flipping fetch.autoInterval from 0 back to a positive value while the
+// repository is already open, with no repo.open in between to reach this any other way.
+// startAutoFetch already no-ops when a timer is already running or the entry is `disabled` (a
+// fetch that failed once stays off for the entry's life, G7 D23), so calling this redundantly
+// (both an open AND a settings change, or several windows) arms exactly one timer, and this can
+// never resurrect one G7 killed. Exported for gitrpc's own cross-package call; unexported callers
+// within this package (conn.go) use it exactly the same way.
+func (e *RepoEntry) EnsureAutoFetch() {
 	_, minutes, _ := e.settings()
 	if minutes > 0 {
 		e.startAutoFetch(minutes)

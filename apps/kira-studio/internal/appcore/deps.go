@@ -8,6 +8,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapterhost"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/apivars"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/connections"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitsession"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/repos"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/tree"
 )
@@ -42,6 +43,13 @@ type Deps struct {
 	Tree        *tree.Service
 	Router      *adapterhost.Router // PushCacheConfig's Go-side half (bridge/settings.go); A17
 	Events      Emitter
+	// GitRegistry is the git module's own Registry (internal/gitsession) — bridge/settings.go's
+	// SettingsService.Set reads this to call ReconcileAutoFetch after a git.fetchAutoIntervalMinutes
+	// patch (G31 round-2 functional-correctness review, finding #8), the same "push a changed
+	// setting to another subsystem" shape Router.PushCacheConfig already establishes just above.
+	// May be nil in a fixture that never wires the git module — ReconcileAutoFetch is only called
+	// when both this field and the patch field are non-nil.
+	GitRegistry *gitsession.Registry
 	// ApiVars (P12 D3: renamed from HttpVars — it resolves gRPC targets too) is P5 D19 — the
 	// gated variable/history reveal and stage 2 of the two-stage {{name}} substitution
 	// (bridge/http.go's Send calls ResolveRequest directly; every other VariablesService method

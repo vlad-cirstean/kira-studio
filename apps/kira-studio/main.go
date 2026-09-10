@@ -164,10 +164,11 @@ func main() {
 	apiVarsSvc := apivars.New(repositories.Variables, cipher, authorizer)
 
 	deps := appcore.Deps{
-		DB:        db.DB,
-		StartedAt: startedAt.UnixMilli(),
-		Repos:     repositories,
-		ApiVars:   apiVarsSvc,
+		DB:          db.DB,
+		StartedAt:   startedAt.UnixMilli(),
+		Repos:       repositories,
+		ApiVars:     apiVarsSvc,
+		GitRegistry: gitRegistry,
 	}
 
 	// Read from the just-migrated (possibly still-default) settings row, same as production would

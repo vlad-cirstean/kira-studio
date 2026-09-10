@@ -214,6 +214,33 @@ func (reg *Registry) IsOpen(repoID string) bool {
 	return ok && sl.refs > 0
 }
 
+// ReconcileAutoFetch calls EnsureAutoFetch on every entry this Registry currently has constructed
+// — held by at least one connection, or still lingering through its post-refcount-zero grace
+// period (D12 step 3).
+//
+// G31 round-2 functional-correctness review, finding #8: EnsureAutoFetch's only OTHER caller is
+// Conn.Open (D23's own off→on path) — nothing at all calls it when fetch.autoInterval changes for
+// a repository that is already open, since that setting is instance-wide (Registry.Settings,
+// backed by storage/repos.SettingsRepo — a different store from the per-repo RepoSettingsGet/Set
+// pair above) and gets written from Kira Studio's own settings pane
+// (bridge/settings.go's SettingsService.Set), a call this domain package cannot see or be called
+// from directly (it must not import internal/bridge, internal/layering_test.go's own rule) — so
+// the caller is main.go's own composition instead, via this method, mirroring how
+// SettingsService.Set already pushes a changed cache budget to Router.PushCacheConfig. Once a
+// repository's own timer has been cleared by pauseAutoFetch (interval read 0 at some point), this
+// is genuinely the ONLY way it can ever restart without a fresh repo.open.
+func (reg *Registry) ReconcileAutoFetch() {
+	reg.mu.Lock()
+	entries := make([]*RepoEntry, 0, len(reg.entries))
+	for _, sl := range reg.entries {
+		entries = append(entries, sl.entry)
+	}
+	reg.mu.Unlock()
+	for _, e := range entries {
+		e.EnsureAutoFetch()
+	}
+}
+
 // Close tears down every entry immediately, linger notwithstanding — for gitsock.Server.Close(), a
 // real shutdown rather than a viewer going away for a moment (D12 step 5). Also closes Review
 // (G11 D3) — idempotent and safe even when review.db was never opened.
