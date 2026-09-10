@@ -163,6 +163,47 @@ func TestDiscovery_VersionProbeTimesOut(t *testing.T) {
 	}
 }
 
+// TestDiscovery_CancelledCallerContextIsNotCachedAsUnusable proves G31 round-2 architecture/
+// security review finding #1 — a regression from ARCH-10 (c5ea760): a caller cancelling its own
+// ctx (not probe's internal versionProbeTimeout) while the --version probe is in flight must not
+// poison the 30s cache with an "unusable" verdict for every OTHER connection's app.init/repo.open.
+// Without the fix, fakeRunner's blockOnCtx path returning ctx.Err() (context.Canceled) landed in
+// the generic `err != nil` branch, got cached as unusable, and the fresh, uncancelled caller below
+// would be served that poisoned entry instead of triggering its own probe.
+func TestDiscovery_CancelledCallerContextIsNotCachedAsUnusable(t *testing.T) {
+	runner := &fakeRunner{blockOnCtx: true}
+	d := NewDiscovery(fakeLocator{found: true, path: "/usr/bin/git"}, runner, &fakeClock{})
+
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan GitStatus, 1)
+	go func() { done <- d.Status(ctx, "") }()
+	cancel() // caller cancellation, not a timeout — versionProbeTimeout (5s) never elapses.
+
+	var status GitStatus
+	select {
+	case status = <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("Status did not return promptly after its ctx was cancelled")
+	}
+	if status.Kind != "unusable" {
+		t.Fatalf("Kind = %q, want unusable (for THIS caller's own aborted request)", status.Kind)
+	}
+
+	// A fresh, healthy caller with its own uncancelled ctx must get a real probe, not the
+	// cancelled caller's cached leftovers.
+	runner.blockOnCtx = false
+	runner.result = Result{ExitCode: 0, Stdout: []byte("git version 2.42.0\n")}
+	fresh := d.Status(context.Background(), "")
+	if fresh.Kind != "ok" {
+		t.Fatalf("second Status (fresh ctx) = %+v, want kind=ok -- the cancelled caller's "+
+			"result must not have been cached", fresh)
+	}
+	if runner.calls != 2 {
+		t.Fatalf("runner.calls = %d, want 2 (the fresh caller must trigger its own probe, "+
+			"not reuse a cached result)", runner.calls)
+	}
+}
+
 func TestDiscovery_UnusableOnUnparseableVersion(t *testing.T) {
 	runner := &fakeRunner{result: Result{ExitCode: 0, Stdout: []byte("garbage\n")}}
 	d := NewDiscovery(fakeLocator{found: true, path: "/usr/bin/git"}, runner, &fakeClock{})

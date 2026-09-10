@@ -521,9 +521,12 @@ func TestMatrix_M4_DisconnectDuringRepoOpen(t *testing.T) {
 	server, sockPath, _, registry := newIntegrationServer(t)
 	registry.LingerFor = 50 * time.Millisecond
 	var watcherConstructions int32
+	firstConstructed := make(chan struct{})
 	realNewWatcher := registry.NewWatcher
 	registry.NewWatcher = func(s gitclient.RepoSummary) (gitsession.Watcher, error) {
-		atomic.AddInt32(&watcherConstructions, 1)
+		if atomic.AddInt32(&watcherConstructions, 1) == 1 {
+			close(firstConstructed)
+		}
 		return realNewWatcher(s)
 	}
 	repoDir := initFixtureRepo(t)
@@ -536,6 +539,28 @@ func TestMatrix_M4_DisconnectDuringRepoOpen(t *testing.T) {
 		t.Fatalf("marshal: %v", err)
 	}
 	client.sendRaw(wireEnvelope{Version: gitrpc.ContractVersion, Body: wireFrame{T: "req", ID: id, Method: "repo.open", Params: params}})
+
+	// G31 round-2 architecture/security review, finding #1's own downstream effect: ARCH-10
+	// (c5ea760) made a disconnect's ctx cancellation reach an in-flight repo.open reliably and
+	// fast, where it used to usually race and lose. Closing the socket immediately after sendRaw
+	// (this test's original shape) now reliably wins that race BEFORE the repo ever opens --
+	// gitclient.Discovery's own --version probe gets killed first, repo.open returns
+	// gitUnavailable early (correctly, per that finding's own fix -- a caller-cancelled probe
+	// must not be treated as "git is unusable"), and Conn.Open/NewWatcher is never reached at
+	// all. That's arguably better production behavior (no wasted work opening a repo nobody is
+	// listening for anymore) -- but it stopped this test from ever reaching the scenario it
+	// exists to prove: a repo.open that DOES complete gets cleaned up correctly even though its
+	// own connection is already gone (Conn.Open's own `c.closed` race check, conn.go, resolving
+	// the original F1). Waiting for the first watcher construction before disconnecting restores
+	// that scenario deterministically, without weakening "the response is never read" (F1's own
+	// point) -- whichever of Conn.Open's or Conn.Close's own cleanup path actually wins the race
+	// against this goroutine, both release the hold correctly, so the wait only has to guarantee
+	// the repo *opened*, not which teardown path fires.
+	select {
+	case <-firstConstructed:
+	case <-time.After(5 * time.Second):
+		t.Fatal("repo.open never reached NewWatcher construction")
+	}
 	_ = client.nc.Close() // disconnect WITHOUT ever reading repo.open's own response (F1).
 
 	time.Sleep(500 * time.Millisecond) // comfortably past LingerFor(50ms) if the ref was released.

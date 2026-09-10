@@ -230,6 +230,20 @@ func (d *Discovery) Status(ctx context.Context, configuredPath string) GitStatus
 
 	status := d.probe(ctx, configuredPath)
 
+	// G31 round-2 architecture/security review, finding #1 — a regression from ARCH-10 (c5ea760):
+	// that rpcstream fix made an in-flight repo.open's ctx reliably cancel on disconnect where it
+	// used to usually race and lose, which made this bug deterministic rather than latent. A
+	// caller-cancelled ctx kills the --version probe mid-flight, and probe() used to have no way
+	// to tell that apart from "git itself is unusable" — so it got cached process-wide for
+	// discoveryTTL, poisoning every OTHER connection's app.init/repo.open for up to 30s over an
+	// event that says nothing about git at all. Skip the cache write when the CALLER's own ctx
+	// (not probeCtx's own 5s sub-timeout, which is a real "git took too long" signal worth
+	// caching) was cancelled out from under this probe — the next caller, with its own fresh ctx,
+	// deserves a real probe, not this one's leftovers.
+	if errors.Is(ctx.Err(), context.Canceled) {
+		return status
+	}
+
 	d.mu.Lock()
 	d.cached = status
 	d.cachedAt = d.clock.Now()
@@ -256,6 +270,13 @@ func (d *Discovery) probe(ctx context.Context, configuredPath string) GitStatus 
 	res, err := Run(probeCtx, d.runner, path, Spec{Args: []string{"--version"}, ReadOnly: true})
 	if errors.Is(probeCtx.Err(), context.DeadlineExceeded) {
 		return GitStatus{Kind: "unusable", Path: path, Reason: "git --version did not respond within 5s"}
+	}
+	// The caller's own ctx (not probeCtx's 5s sub-timeout above) was cancelled mid-probe — the
+	// killed process's exit code/error below says nothing about whether git itself works, so
+	// don't report it as though it did (Status's own caller-cancelled check is what keeps this
+	// out of the 30s cache; this just keeps the immediate Reason honest for anyone who logs it).
+	if errors.Is(ctx.Err(), context.Canceled) {
+		return GitStatus{Kind: "unusable", Path: path, Reason: "the request was cancelled"}
 	}
 	if err != nil {
 		return GitStatus{Kind: "unusable", Path: path, Reason: err.Error()}
