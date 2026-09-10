@@ -258,6 +258,11 @@ export class ConnectionManager implements vscode.Disposable {
     this.#dialToken++;
     if (this.#reconnectTimer) clearTimeout(this.#reconnectTimer);
     this.#socket?.destroy();
+    // Same reasoning as #onDisconnected's own dispose() call above — a still-connected transport
+    // at the moment the extension itself shuts down must reject its own in-flight requests, not
+    // merely be forgotten.
+    this.#transport?.dispose();
+    this.#transport = undefined;
     this.#stateEmitter.dispose();
     this.#activityEmitter.dispose();
   }
@@ -394,6 +399,15 @@ export class ConnectionManager implements vscode.Disposable {
     if (dialToken !== this.#dialToken) return;
     if (this.#disconnectHandledFor === dialToken) return; // already handled — see finding #4 above.
     this.#disconnectHandledFor = dialToken;
+    // G31 round-2 functional-correctness review, finding #2: this used to drop `#transport` with
+    // no `dispose()` call. `createRpcClient`'s own `dispose()` is the only thing that rejects its
+    // `pendingRequests`/`pendingStreams` — `createSocketChannel`'s `onClose` (which is what got us
+    // here) does nothing to the RPC client layered on top of it. Without this, every `request()`/
+    // `stream()` promise in flight at the moment of a drop hung forever, even across a later
+    // successful reconnect, and — since `request`/`stream` route through `#beginActivity`'s
+    // `finally(() => this.#endActivity())` — `#inFlight` never returned to 0, latching the status
+    // bar's "connecting…" spinner on for the rest of the session.
+    this.#transport?.dispose();
     this.#transport = undefined;
     this.#transportEventUnsubs.clear(); // the dead transport's own unsubscribes are moot.
     this.#socket = undefined;
