@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitaskpass"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitclient"
 )
 
 // --- remoteOpSlot: D24's own ≤1-slot concurrency matrix -----------------------------------------
@@ -223,4 +224,54 @@ func waitFor(t *testing.T, cond func() bool) {
 		time.Sleep(2 * time.Millisecond)
 	}
 	t.Fatal("condition never became true")
+}
+
+// TestResolveUpstreamRemoteBranch is G32 round-3 functional-correctness review finding #1/#3's own
+// regression proof: fetch/pull/push used to assume a branch's remote-side name always matches its
+// local name — real for a first push, false for `git checkout -b feat origin/main` and every fork
+// workflow. %(upstream) doesn't need a reachable remote or an existing remote-tracking ref to
+// resolve (it's computed purely from branch.<name>.{remote,merge} config), so this needs no bare
+// remote repo to exercise the three cases that matter.
+func TestResolveUpstreamRemoteBranch(t *testing.T) {
+	dir := t.TempDir()
+	runGitStack(t, dir, "init", "-q", "-b", "main")
+	writeFileStack(t, dir, "f.txt", "x\n")
+	runGitStack(t, dir, "add", "f.txt")
+	runGitStack(t, dir, "commit", "-q", "-m", "c1")
+	runGitStack(t, dir, "branch", "feat")
+	runGitStack(t, dir, "branch", "untracked")
+	// %(upstream) only resolves once "origin" is a real configured remote (remote.origin.url) --
+	// it need not be reachable, no fetch/network is involved in what this test exercises.
+	runGitStack(t, dir, "remote", "add", "origin", t.TempDir())
+	// feat tracks origin/main -- a differently-named upstream, the exact repro shape.
+	runGitStack(t, dir, "config", "branch.feat.remote", "origin")
+	runGitStack(t, dir, "config", "branch.feat.merge", "refs/heads/main")
+
+	entry := newStackTestEntryWithRunner(t, gitclient.NewExecRunner(), dir)
+	ctx := context.Background()
+
+	if remoteBranch, hasUpstream, err := entry.resolveUpstreamRemoteBranch(ctx, "origin", "feat"); err != nil {
+		t.Fatalf("resolveUpstreamRemoteBranch(origin, feat): %v", err)
+	} else if !hasUpstream || remoteBranch != "main" {
+		t.Fatalf("resolveUpstreamRemoteBranch(origin, feat) = (%q, %v), want (\"main\", true) -- "+
+			"feat tracks origin/main, not origin/feat", remoteBranch, hasUpstream)
+	}
+
+	// No upstream at all: falls back to the branch's own name, the pre-fix same-name behavior --
+	// still correct for the common "never pushed yet" case, which this fix must not disturb.
+	if remoteBranch, hasUpstream, err := entry.resolveUpstreamRemoteBranch(ctx, "origin", "untracked"); err != nil {
+		t.Fatalf("resolveUpstreamRemoteBranch(origin, untracked): %v", err)
+	} else if hasUpstream || remoteBranch != "untracked" {
+		t.Fatalf("resolveUpstreamRemoteBranch(origin, untracked) = (%q, %v), want (\"untracked\", false)",
+			remoteBranch, hasUpstream)
+	}
+
+	// An upstream configured for a DIFFERENT remote than the one asked about is not a match either
+	// -- same fallback, not a cross-remote guess.
+	if remoteBranch, hasUpstream, err := entry.resolveUpstreamRemoteBranch(ctx, "upstream", "feat"); err != nil {
+		t.Fatalf("resolveUpstreamRemoteBranch(upstream, feat): %v", err)
+	} else if hasUpstream || remoteBranch != "feat" {
+		t.Fatalf("resolveUpstreamRemoteBranch(upstream, feat) = (%q, %v), want (\"feat\", false) -- "+
+			"feat's upstream is on origin, not upstream", remoteBranch, hasUpstream)
+	}
 }

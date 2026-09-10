@@ -209,6 +209,45 @@ func remoteTipsEqual(current, expected *string) bool {
 	return *current == *expected
 }
 
+// resolveUpstreamRemoteBranch is fetch/pull/push's own shared upstream lookup (G32 round-3
+// functional-correctness review, finding #1/#3): a branch's already-configured upstream can name
+// ANY branch on the remote, not just one sharing the local branch's own name (`git checkout -b
+// feat origin/main`, or any fork workflow, produces exactly this) — %(upstream) (the SAME
+// for-each-ref field `PullPreflight` already trusts, D10's own precedent) is the one source of
+// truth for "where does this branch's history already live on <remote>," never a same-name guess.
+// Returns the remote-side branch name to fetch from / push to, and whether an upstream configured
+// for THIS remote specifically was found. When it wasn't (no upstream at all, a purely local
+// upstream, or an upstream on a different remote than the one this call is about), `branch` itself
+// is returned unchanged — the pre-existing same-name behavior for every case outside this bug's
+// actual scope (a branch that has genuinely never been pushed still gets the same "try the
+// same-named ref, fail with a real git error if it's not there" behavior it always has).
+func (e *RepoEntry) resolveUpstreamRemoteBranch(ctx context.Context, remote, branch string) (remoteBranch string, hasUpstream bool, err error) {
+	snapshot, err := e.refsSnapshot(ctx)
+	if err != nil {
+		return "", false, err
+	}
+	const remotePrefix = "refs/remotes/"
+	for _, r := range snapshot.Branches {
+		if r.ShortName != branch || r.Upstream == nil {
+			continue
+		}
+		ref := *r.Upstream
+		if !strings.HasPrefix(ref, remotePrefix) {
+			break // a purely local upstream (refs/heads/<other>) is not a fetch/push target
+		}
+		rest := strings.TrimPrefix(ref, remotePrefix)
+		idx := strings.IndexByte(rest, '/')
+		if idx < 0 {
+			break
+		}
+		if upstreamRemote := rest[:idx]; upstreamRemote == remote {
+			return rest[idx+1:], true, nil
+		}
+		break
+	}
+	return branch, false, nil
+}
+
 // refSnapshot is D13's own narrow ref->sha map (porcelain.RefSnapshotArgs, through Repo.Read) —
 // deliberately distinct from refs.go's refsSnapshot, which builds the structured, cached RefsResult
 // wire type: this one exists only to be diffed before/after a fetch.
@@ -482,11 +521,19 @@ func (e *RepoEntry) runPushFamily(ctx context.Context, conn *Conn, deps RemoteDe
 func (e *RepoEntry) runPullOp(roCtx, spawnCtx context.Context, conn *Conn, deps RemoteDeps, params RemoteOpParams, onStderr func([]byte)) ([]gitops.RefUpdate, *RemoteOpError, error) {
 	e.remoteOp.setKillable(true)
 
+	// G32 round-3 functional-correctness review, finding #1: fetch/merge/rebase must target the
+	// branch's OWN upstream-side name (resolveUpstreamRemoteBranch), not assume it shares the local
+	// branch's name — see that helper's own doc comment.
+	remoteBranch, _, uerr := e.resolveUpstreamRemoteBranch(roCtx, params.Remote, params.Branch)
+	if uerr != nil {
+		return nil, nil, uerr
+	}
+
 	before, err := e.refSnapshot(roCtx)
 	if err != nil {
 		return nil, nil, err
 	}
-	fetchArgv := gitops.FetchRefspecArgs(params.Remote, params.Branch, params.Prune)
+	fetchArgv := gitops.FetchRefspecArgs(params.Remote, remoteBranch, params.Prune)
 	var fetchRes gitclient.Result
 	if err := e.withAskpass(spawnCtx, conn, deps, func(env []string) error {
 		r, rerr := e.runRemoteSpawn(spawnCtx, fetchArgv, env, onStderr)
@@ -534,7 +581,7 @@ func (e *RepoEntry) runPullOp(roCtx, spawnCtx context.Context, conn *Conn, deps 
 	// Past this point the op is a local write and is never killable again (D19).
 	e.remoteOp.setKillable(false)
 
-	upstream := "refs/remotes/" + params.Remote + "/" + params.Branch
+	upstream := "refs/remotes/" + params.Remote + "/" + remoteBranch
 	var integrateArgv []string
 	switch gitpreflight.PullStrategy(params.Strategy) {
 	case gitpreflight.PullMerge:
