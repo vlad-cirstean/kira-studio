@@ -15,6 +15,16 @@ const (
 	pairingCooldown = 60 * time.Second
 )
 
+// maxQueueLen bounds Broker.queue. G31 round-2 architecture/security review, finding #10:
+// clientID is entirely client-supplied (handshake.go's own hello.Client.ID, unauthenticated until
+// a pairing decision grants it a token), and Request never limited how many requests could be
+// queued at once — nothing stops a local process from opening many concurrent connections and
+// enqueueing a pairing request on each one, growing the queue (and the goroutines blocked waiting
+// on each entry's own result channel) without bound for up to pairingTimeout before
+// ExpireOverdue reaps them. Beyond this cap, Request denies immediately rather than enqueueing —
+// the same short-circuit shape the cooldown check just above already uses.
+const maxQueueLen = 200
+
 // PairingOutcome is Broker.Request's own vocabulary — never a Go error (F7's precedent: a pairing
 // decision is a value, not a failure).
 type PairingOutcome int
@@ -116,6 +126,10 @@ func (b *Broker) Request(clientID, label string, onEnqueued func(PairingRequest)
 		b.mu.Unlock()
 		return PairingDenied
 	}
+	if len(b.queue) >= maxQueueLen {
+		b.mu.Unlock()
+		return PairingDenied
+	}
 	now := b.now()
 	entry := &pendingEntry{
 		req: PairingRequest{
@@ -168,8 +182,19 @@ func (b *Broker) answer(requestID string, outcome PairingOutcome, cooldownOnDeny
 	}
 	expired := !b.now().Before(entry.req.ExpiresAt)
 	b.removeLocked(entry)
+	var others []*pendingEntry
 	if cooldownOnDeny && !expired {
 		b.cooldown[entry.req.ClientID] = b.now().Add(pairingCooldown)
+		// G31 round-2 architecture/security review, finding #10: an explicit Deny only ever
+		// resolved the ONE entry named by requestID — in practice always the presented head,
+		// since that is the only request a window's dialog ever has a RequestID for. Nothing
+		// stops the SAME clientID from having other requests already queued behind it (opened
+		// from several concurrent connections before the first was ever presented), and those
+		// survived untouched — bypassing the cooldown this denial just started, since the
+		// cooldown only short-circuits a NEW Request() call above, never one already queued.
+		// Denying a client now also resolves every other request already queued from it, as
+		// denied, under the same cooldown just started.
+		others = b.removeAllForClientLocked(entry.req.ClientID)
 	}
 	snap := b.snapshotLocked()
 	b.mu.Unlock()
@@ -178,6 +203,9 @@ func (b *Broker) answer(requestID string, outcome PairingOutcome, cooldownOnDeny
 		entry.result <- PairingTimedOut
 	} else {
 		entry.result <- outcome
+	}
+	for _, other := range others {
+		other.result <- PairingDenied
 	}
 	b.emitter.Emit(snap)
 	if expired {
@@ -222,4 +250,22 @@ func (b *Broker) removeLocked(entry *pendingEntry) {
 			break
 		}
 	}
+}
+
+// removeAllForClientLocked drops every remaining queued entry belonging to clientID from both
+// byID and the queue slice, and returns them so the caller can resolve their result channels
+// outside the lock. Caller holds b.mu.
+func (b *Broker) removeAllForClientLocked(clientID string) []*pendingEntry {
+	var removed []*pendingEntry
+	kept := b.queue[:0]
+	for _, e := range b.queue {
+		if e.req.ClientID == clientID {
+			delete(b.byID, e.req.RequestID)
+			removed = append(removed, e)
+		} else {
+			kept = append(kept, e)
+		}
+	}
+	b.queue = kept
+	return removed
 }

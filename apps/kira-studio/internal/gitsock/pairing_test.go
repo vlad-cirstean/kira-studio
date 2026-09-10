@@ -254,6 +254,109 @@ func TestBroker_DoubleAnswer_ReportsAlreadyResolved(t *testing.T) {
 	}
 }
 
+// TestBroker_QueueBoundedAgainstUnlimitedEnqueue is G31 round-2 architecture/security review,
+// finding #10: clientID is entirely client-supplied and unauthenticated at Request time (handshake
+// row 7), so nothing but maxQueueLen stops a local process from opening far more concurrent
+// connections than any real user could ever triage, each blocking a goroutine on its own result
+// channel for up to pairingTimeout. This proves Request denies immediately — no enqueue, no
+// onEnqueued call, matching the cooldown short-circuit's own contract — once the queue is already
+// at the cap, rather than growing without bound.
+func TestBroker_QueueBoundedAgainstUnlimitedEnqueue(t *testing.T) {
+	clock := newFakeClock()
+	b := NewBroker(clock.Now)
+
+	results := make([]chan PairingOutcome, 0, maxQueueLen)
+	for i := 0; i < maxQueueLen; i++ {
+		enqueued := make(chan PairingRequest, 1)
+		done := make(chan PairingOutcome, 1)
+		id := "client-" + string(rune('a'+i%26)) + string(rune('0'+i/26))
+		go func(id string) {
+			done <- b.Request(id, "label", func(req PairingRequest) { enqueued <- req })
+		}(id)
+		<-enqueued
+		results = append(results, done)
+	}
+	if snap := b.Pending(); snap.Queued != maxQueueLen {
+		t.Fatalf("Queued = %d, want %d (the queue must be full at the cap)", snap.Queued, maxQueueLen)
+	}
+
+	out := b.Request("one-too-many", "label", func(PairingRequest) {
+		t.Fatal("a request beyond maxQueueLen must not be enqueued")
+	})
+	if out != PairingDenied {
+		t.Fatalf("over-cap request outcome: got %v, want PairingDenied", out)
+	}
+	if snap := b.Pending(); snap.Queued != maxQueueLen {
+		t.Fatalf("Queued after the over-cap attempt = %d, want unchanged %d", snap.Queued, maxQueueLen)
+	}
+
+	for _, done := range results {
+		select {
+		case <-done:
+			t.Fatal("an already-queued request resolved on its own — it should still be pending")
+		default:
+		}
+	}
+}
+
+// TestBroker_DenyPurgesEveryOtherQueuedRequestFromTheSameClient is G31 round-2 architecture/
+// security review, finding #10's other half: Deny only ever resolved the ONE entry named by its
+// requestID — the presented head, in practice, since that's the only request a window's dialog
+// ever has a RequestID for. A clientID that opened several concurrent connections before the first
+// was ever presented had its OTHER already-queued requests survive untouched, bypassing the very
+// cooldown the denial just started (the cooldown only short-circuits a NEW Request() call, never
+// one already queued). This proves denying one request from a client also resolves every other
+// request already queued from that SAME client, as denied — while leaving an unrelated client's
+// own queued request untouched.
+func TestBroker_DenyPurgesEveryOtherQueuedRequestFromTheSameClient(t *testing.T) {
+	clock := newFakeClock()
+	b := NewBroker(clock.Now)
+
+	enqueue := func(clientID string) (PairingRequest, chan PairingOutcome) {
+		enqueued := make(chan PairingRequest, 1)
+		done := make(chan PairingOutcome, 1)
+		go func() {
+			done <- b.Request(clientID, "label", func(req PairingRequest) { enqueued <- req })
+		}()
+		return <-enqueued, done
+	}
+
+	reqA1, doneA1 := enqueue("client-a") // presented head.
+	_, doneA2 := enqueue("client-a")     // a second connection from the SAME client, queued behind it.
+	reqB, doneB := enqueue("client-b")   // an unrelated client, queued behind both of A's.
+
+	if snap := b.Pending(); snap.Queued != 3 {
+		t.Fatalf("Queued = %d, want 3", snap.Queued)
+	}
+
+	if got := b.Deny(reqA1.RequestID); got != PairingActionResolved {
+		t.Fatalf("deny reqA1: got %v", got)
+	}
+	if out := recvOrTimeout(t, doneA1); out != PairingDenied {
+		t.Fatalf("reqA1 outcome: got %v", out)
+	}
+	if out := recvOrTimeout(t, doneA2); out != PairingDenied {
+		t.Fatalf("reqA2 outcome: got %v, want PairingDenied — a client's OTHER queued request must be purged when the client is denied", out)
+	}
+	if !b.InCooldown("client-a") {
+		t.Fatal("client-a must be in cooldown after its denial")
+	}
+
+	// client-b's own request must be entirely unaffected: still queued, still pending.
+	select {
+	case out := <-doneB:
+		t.Fatalf("client-b's own request resolved (%v) — it must not be touched by client-a's denial", out)
+	default:
+	}
+	if snap := b.Pending(); snap.Pending == nil || snap.Pending.ClientID != "client-b" || snap.Queued != 1 {
+		t.Fatalf("after purging client-a: got %+v, want head=client-b queued=1", snap)
+	}
+	if got := b.Deny(reqB.RequestID); got != PairingActionResolved {
+		t.Fatalf("deny reqB: got %v", got)
+	}
+	<-doneB
+}
+
 func TestBroker_UnknownRequestID_ReportsAlreadyResolved(t *testing.T) {
 	b := NewBroker(newFakeClock().Now)
 	if got := b.Approve("no-such-id"); got != PairingActionAlreadyResolved {
