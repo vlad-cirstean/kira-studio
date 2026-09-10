@@ -31,14 +31,25 @@ func TestBroker_FIFOOrder_OnlyHeadPresented(t *testing.T) {
 	clock := newFakeClock()
 	b := NewBroker(clock.Now)
 
+	// G31 round-2 functional-correctness review, finding #6: Request now emits on every enqueue,
+	// not only when the new request becomes the head (see that fix's own comment on Request) — a
+	// second/third request queueing behind an already-presented head changes Queued and must be
+	// reported too. This test's own subscriber therefore collapses CONSECUTIVE duplicate head
+	// IDs before asserting order, exactly like main.go's own real subscriber does (deduping on
+	// RequestID) — "only head presented" is a claim about which request is ever the ANSWERABLE
+	// one at a time, not about how many snapshots fire while it stays the head.
 	var mu sync.Mutex
 	var presentedOrder []string
 	unsub := b.Subscribe(func(snap PairingSnapshot) {
 		mu.Lock()
 		defer mu.Unlock()
-		if snap.Pending != nil {
-			presentedOrder = append(presentedOrder, snap.Pending.ClientID)
+		if snap.Pending == nil {
+			return
 		}
+		if n := len(presentedOrder); n > 0 && presentedOrder[n-1] == snap.Pending.ClientID {
+			return
+		}
+		presentedOrder = append(presentedOrder, snap.Pending.ClientID)
 	})
 	defer unsub()
 
@@ -94,6 +105,46 @@ func TestBroker_FIFOOrder_OnlyHeadPresented(t *testing.T) {
 	defer mu.Unlock()
 	if len(presentedOrder) != 3 || presentedOrder[0] != "a" || presentedOrder[1] != "b" || presentedOrder[2] != "c" {
 		t.Fatalf("presented order: got %v, want [a b c]", presentedOrder)
+	}
+}
+
+// TestBroker_QueuedCountChangeIsEmittedEvenBehindAPresentedHead is G31 round-2 functional-
+// correctness review finding #6's own regression coverage: enqueueing a second/third request
+// behind an already-presented head used to change Queued (SPEC §3.3's own "visible count") but
+// never emit at all — Request's own `presented := len(b.queue) == 1` gate meant only the very
+// first request of a queue ever triggered a snapshot. GitPairingDialog.vue's "1 of {{ queued }}
+// waiting" line is fed solely by this emitter, so it stayed stuck reporting 1 no matter how many
+// more requests queued up.
+func TestBroker_QueuedCountChangeIsEmittedEvenBehindAPresentedHead(t *testing.T) {
+	clock := newFakeClock()
+	b := NewBroker(clock.Now)
+
+	var mu sync.Mutex
+	var queuedSeen []int
+	unsub := b.Subscribe(func(snap PairingSnapshot) {
+		mu.Lock()
+		defer mu.Unlock()
+		queuedSeen = append(queuedSeen, snap.Queued)
+	})
+	defer unsub()
+
+	enqueuedA := make(chan PairingRequest, 1)
+	go func() { b.Request("a", "a", func(req PairingRequest) { enqueuedA <- req }) }()
+	<-enqueuedA // a is now the presented head — Queued: 1.
+
+	enqueuedB := make(chan PairingRequest, 1)
+	go func() { b.Request("b", "b", func(req PairingRequest) { enqueuedB <- req }) }()
+	<-enqueuedB // b queues behind a, never presented — Queued must still be reported as 2.
+
+	enqueuedC := make(chan PairingRequest, 1)
+	go func() { b.Request("c", "c", func(req PairingRequest) { enqueuedC <- req }) }()
+	<-enqueuedC // c queues behind a and b — Queued: 3.
+
+	mu.Lock()
+	defer mu.Unlock()
+	if len(queuedSeen) != 3 || queuedSeen[0] != 1 || queuedSeen[1] != 2 || queuedSeen[2] != 3 {
+		t.Fatalf("queued counts seen by the subscriber: got %v, want [1 2 3] — "+
+			"an enqueue behind an already-presented head must still emit its own updated count", queuedSeen)
 	}
 }
 

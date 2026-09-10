@@ -126,16 +126,25 @@ func (b *Broker) Request(clientID, label string, onEnqueued func(PairingRequest)
 	}
 	b.queue = append(b.queue, entry)
 	b.byID[entry.req.RequestID] = entry
-	presented := len(b.queue) == 1
 	snap := b.snapshotLocked()
 	b.mu.Unlock()
 
 	if onEnqueued != nil {
 		onEnqueued(entry.req)
 	}
-	if presented {
-		b.emitter.Emit(snap)
-	}
+	// G31 round-2 functional-correctness review, finding #6: this used to emit only when the new
+	// request became the presented head (`presented := len(b.queue) == 1` at append time) — so
+	// enqueueing a second or third request behind an already-presented head changed
+	// snapshotLocked's own Queued count (SPEC §3.3's "concurrent requests queue with a visible
+	// count") but never told any subscriber. GitPairingDialog.vue's own "1 of {{ queued }}
+	// waiting" line, fed solely by this emitter (bridge/events.go, state/gitClients.ts), stayed
+	// stuck at 1 until the head was approved/denied/expired, no matter how many more requests
+	// queued up behind it. Every enqueue changes Queued by construction (the append above always
+	// succeeds), so every enqueue is worth emitting — main.go's own subscriber already dedupes on
+	// RequestID for exactly this case ("a snapshot emitted because the count behind it changed
+	// re-presents the same RequestID and is not [worth re-presenting]"), so this was already the
+	// assumed contract on the consuming side.
+	b.emitter.Emit(snap)
 	return <-entry.result
 }
 
