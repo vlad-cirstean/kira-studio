@@ -457,6 +457,14 @@ export class CommitStore {
     const subjectRange = this.#subjects.rangeBytes(from, to);
     const subjectBytes = new Uint8Array(subjectRange.bytes.length);
     subjectBytes.set(subjectRange.bytes);
+    // G31 round-2 performance review, finding #2: rangeBytes' own offsets may now be a VIEW into
+    // the live #offsets buffer, not a fresh copy (see its own doc comment) — `.buffer` off a view
+    // is the ENTIRE shared backing buffer, wrong-sized for the wire AND, if this ArrayBuffer is
+    // ever used as a postMessage Transferable, would detach #offsets' own live storage out from
+    // under every future append/read. Same defensive `new` + `.set()` copy subjectBytes already
+    // takes two lines up, for the identical reason.
+    const subjectOffsets = new Uint32Array(subjectRange.offsets.length);
+    subjectOffsets.set(subjectRange.offsets);
 
     return {
       from,
@@ -468,7 +476,7 @@ export class CommitStore {
       identityIds: identityIds.buffer as ArrayBuffer,
       times: times.buffer as ArrayBuffer,
       subjectBytes: subjectBytes.buffer as ArrayBuffer,
-      subjectOffsets: subjectRange.offsets.buffer as ArrayBuffer,
+      subjectOffsets: subjectOffsets.buffer as ArrayBuffer,
       dictionaryBase,
       dictionary: this.#interner.valuesFrom(dictionaryBase),
       decorations,
