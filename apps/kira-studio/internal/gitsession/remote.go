@@ -358,7 +358,15 @@ func (e *RepoEntry) RunRemote(ctx context.Context, conn *Conn, params RemoteOpPa
 	}
 
 	if params.Kind == "forcePush" {
-		currentTip, err := e.readRemoteTip(ctx, params.Remote, params.Branch)
+		// G32 round-3 finding #3's own shape: the lease re-check must compare against the SAME
+		// remote-side ref PushPreflight quoted expectedRemoteTip from, or a differently-named
+		// upstream makes both sides consistently (and wrongly) nil — passing the lease check
+		// trivially right before the push spawns against the wrong destination anyway.
+		remoteBranch, _, uerr := e.resolveUpstreamRemoteBranch(ctx, params.Remote, params.Branch)
+		if uerr != nil {
+			return RemoteOpResult{}, uerr
+		}
+		currentTip, err := e.readRemoteTip(ctx, params.Remote, remoteBranch)
 		if err != nil {
 			return RemoteOpResult{}, err
 		}
@@ -467,10 +475,20 @@ func (e *RepoEntry) runPushFamily(ctx context.Context, conn *Conn, deps RemoteDe
 	var argv []string
 	switch params.Kind {
 	case "push":
-		argv = gitops.PushArgs(params.Remote, params.Branch, params.SetUpstream)
+		remoteBranch, _, err := e.resolveUpstreamRemoteBranch(ctx, params.Remote, params.Branch)
+		if err != nil {
+			return nil, nil, err
+		}
+		argv = gitops.PushArgs(params.Remote, params.Branch, remoteBranch, params.SetUpstream)
 	case "forcePush":
-		argv = gitops.ForcePushArgs(params.Remote, params.Branch, params.PlainForce)
-	default: // "deleteRemoteBranch"
+		remoteBranch, _, err := e.resolveUpstreamRemoteBranch(ctx, params.Remote, params.Branch)
+		if err != nil {
+			return nil, nil, err
+		}
+		argv = gitops.ForcePushArgs(params.Remote, params.Branch, remoteBranch, params.PlainForce)
+	default: // "deleteRemoteBranch": params.Branch already names the remote branch directly (the
+		// UI picks it from the remote-branch list itself, not from a local branch's upstream), so
+		// no resolution applies here.
 		argv = gitops.DeleteRemoteBranchArgs(params.Remote, params.Branch)
 	}
 
@@ -640,11 +658,19 @@ func parseAheadBehind(raw []byte) (ahead, behind int, err error) {
 // own existence/sha stands in for "upstream" here — a branch with no upstream, or one whose
 // remote-tracking ref has been pruned, is the common case wouldSetUpstream exists to describe
 // (F15) — and ahead/behind is read ONLY once that ref is confirmed to exist (rev-list dies on a
-// missing ref, probe P11).
+// missing ref, probe P11). The ref checked is the branch's REAL upstream-side name
+// (resolveUpstreamRemoteBranch, G32 round-3 finding #3), not an assumed same-name one — a branch
+// already tracking a differently-named upstream must never be reported as "would set upstream"
+// just because no same-named ref happens to exist yet.
 func (e *RepoEntry) PushPreflight(ctx context.Context, remote, branch string) (gitpreflight.PushPreflight, error) {
 	protectedBranches, _, _ := e.settings()
 
-	tipRes, err := e.runAllowingExit(ctx, gitops.RemoteTipArgs(remote, branch), 0, 1)
+	remoteBranch, _, uerr := e.resolveUpstreamRemoteBranch(ctx, remote, branch)
+	if uerr != nil {
+		return gitpreflight.PushPreflight{}, uerr
+	}
+
+	tipRes, err := e.runAllowingExit(ctx, gitops.RemoteTipArgs(remote, remoteBranch), 0, 1)
 	if err != nil {
 		return gitpreflight.PushPreflight{}, err
 	}
@@ -654,7 +680,7 @@ func (e *RepoEntry) PushPreflight(ctx context.Context, remote, branch string) (g
 	if tipRes.ExitCode == 0 {
 		tip := strings.TrimSpace(string(tipRes.Stdout))
 		remoteTip = &tip
-		ref := "refs/remotes/" + remote + "/" + branch
+		ref := "refs/remotes/" + remote + "/" + remoteBranch
 		upstream = &ref
 
 		abRaw, abErr := e.runOne(ctx, gitops.AheadBehindArgs("refs/heads/"+branch, ref))

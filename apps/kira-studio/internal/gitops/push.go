@@ -8,16 +8,21 @@ import (
 )
 
 // PushArgs builds `git push --porcelain --progress [--set-upstream] <remote>
-// refs/heads/<b>:refs/heads/<b>` (D12). --porcelain (F10/P5): the exact, tab-separated,
-// locale-independent statement of each ref's outcome and rejection reason, available far below
-// this chapter's 2.38 floor. A fully-qualified refspec on both sides (F14) — so neither
-// push.default nor a same-named tag can redirect what gets pushed.
-func PushArgs(remote, branch string, setUpstream bool) []string {
+// refs/heads/<local>:refs/heads/<remote-side>` (D12). --porcelain (F10/P5): the exact,
+// tab-separated, locale-independent statement of each ref's outcome and rejection reason,
+// available far below this chapter's 2.38 floor. A fully-qualified refspec on both sides (F14) —
+// so neither push.default nor a same-named tag can redirect what gets pushed. `localBranch` and
+// `remoteBranch` are deliberately separate params (G32 round-3 functional-correctness review,
+// finding #3): a branch already tracking a differently-named upstream (`git checkout -b feat
+// origin/main`) must push to THAT branch, never silently create a new same-named one — callers
+// resolve `remoteBranch` via gitsession's own resolveUpstreamRemoteBranch, which falls back to
+// `localBranch` for the ordinary first-push case.
+func PushArgs(remote, localBranch, remoteBranch string, setUpstream bool) []string {
 	argv := []string{"push", "--porcelain", "--progress"}
 	if setUpstream {
 		argv = append(argv, "--set-upstream")
 	}
-	return append(argv, remote, branchRefspec(branch))
+	return append(argv, remote, branchRefspec(localBranch, remoteBranch))
 }
 
 // ForcePushArgs builds the force-push family (D12, upstream D48): bare
@@ -25,15 +30,16 @@ func PushArgs(remote, branch string, setUpstream bool) []string {
 // is not used here because the residual hazard it would close (a lease satisfied by a background
 // auto-fetch between dialog-open and spawn) is instead closed by gitsession re-reading the remote
 // tip immediately before this spawns and comparing it with RemoteOpParams.expectedRemoteTip — or
-// plain --force when plain is true.
-func ForcePushArgs(remote, branch string, plain bool) []string {
+// plain --force when plain is true. `localBranch`/`remoteBranch` split for the same reason as
+// PushArgs above.
+func ForcePushArgs(remote, localBranch, remoteBranch string, plain bool) []string {
 	argv := []string{"push", "--porcelain", "--progress"}
 	if plain {
 		argv = append(argv, "--force")
 	} else {
 		argv = append(argv, "--force-with-lease", "--force-if-includes")
 	}
-	return append(argv, remote, branchRefspec(branch))
+	return append(argv, remote, branchRefspec(localBranch, remoteBranch))
 }
 
 // DeleteRemoteBranchArgs builds `git push --porcelain --progress <remote> --delete
@@ -42,8 +48,8 @@ func DeleteRemoteBranchArgs(remote, branch string) []string {
 	return []string{"push", "--porcelain", "--progress", remote, "--delete", "refs/heads/" + branch}
 }
 
-func branchRefspec(branch string) string {
-	return "refs/heads/" + branch + ":refs/heads/" + branch
+func branchRefspec(localBranch, remoteBranch string) string {
+	return "refs/heads/" + localBranch + ":refs/heads/" + remoteBranch
 }
 
 // PushStatus is one parsed line of --porcelain's own output (D13): `<flag>\t<src>:<dst>\t<summary>`.

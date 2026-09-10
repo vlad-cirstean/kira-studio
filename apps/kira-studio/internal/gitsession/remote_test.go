@@ -2,6 +2,8 @@ package gitsession
 
 import (
 	"context"
+	"os/exec"
+	"strings"
 	"testing"
 	"time"
 
@@ -274,4 +276,53 @@ func TestResolveUpstreamRemoteBranch(t *testing.T) {
 		t.Fatalf("resolveUpstreamRemoteBranch(upstream, feat) = (%q, %v), want (\"feat\", false) -- "+
 			"feat's upstream is on origin, not upstream", remoteBranch, hasUpstream)
 	}
+}
+
+// TestPushPreflight_DifferentlyNamedUpstreamIsNotWouldSetUpstream is G32 round-3
+// functional-correctness review finding #3's own regression proof: before the fix, PushPreflight
+// checked refs/remotes/<remote>/<localBranchName> for existence regardless of the branch's real
+// configured upstream, so a branch already tracking a differently-named remote branch was reported
+// as "would set upstream" (and pushed to a brand-new same-named remote branch, silently rebinding
+// the branch's tracking config) purely because no same-named ref happened to exist yet.
+func TestPushPreflight_DifferentlyNamedUpstreamIsNotWouldSetUpstream(t *testing.T) {
+	dir := t.TempDir()
+	runGitStack(t, dir, "init", "-q", "-b", "main")
+	writeFileStack(t, dir, "f.txt", "x\n")
+	runGitStack(t, dir, "add", "f.txt")
+	runGitStack(t, dir, "commit", "-q", "-m", "c1")
+	runGitStack(t, dir, "branch", "feat")
+	runGitStack(t, dir, "remote", "add", "origin", t.TempDir())
+	// feat tracks origin/main -- a differently-named upstream. Simulate it having already been
+	// fetched once (what a real tracking branch looks like) without needing a reachable remote:
+	// point the remote-tracking ref at feat's own current tip, so ahead/behind reads as 0/0.
+	headSha := runGitStackOutput(t, dir, "rev-parse", "feat")
+	runGitStack(t, dir, "update-ref", "refs/remotes/origin/main", headSha)
+	runGitStack(t, dir, "config", "branch.feat.remote", "origin")
+	runGitStack(t, dir, "config", "branch.feat.merge", "refs/heads/main")
+
+	entry := newStackTestEntryWithRunner(t, gitclient.NewExecRunner(), dir)
+	got, err := entry.PushPreflight(context.Background(), "origin", "feat")
+	if err != nil {
+		t.Fatalf("PushPreflight: %v", err)
+	}
+	if got.WouldSetUpstream {
+		t.Fatal("feat already tracks origin/main -- must not report wouldSetUpstream")
+	}
+	if got.Upstream == nil || *got.Upstream != "refs/remotes/origin/main" {
+		t.Fatalf("Upstream = %v, want refs/remotes/origin/main", got.Upstream)
+	}
+	if got.Ahead != 0 || got.Behind != 0 {
+		t.Fatalf("Ahead/Behind = %d/%d, want 0/0 (feat's tip matches its resolved upstream)", got.Ahead, got.Behind)
+	}
+}
+
+func runGitStackOutput(t *testing.T, dir string, args ...string) string {
+	t.Helper()
+	cmd := exec.Command("git", args...)
+	cmd.Dir = dir
+	out, err := cmd.Output()
+	if err != nil {
+		t.Fatalf("git %v: %v", args, err)
+	}
+	return strings.TrimSpace(string(out))
 }
