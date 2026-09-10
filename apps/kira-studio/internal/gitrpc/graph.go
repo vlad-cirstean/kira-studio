@@ -98,6 +98,13 @@ func (r *Router) handleGraphStatus(ctx context.Context, c *gitsession.Conn, para
 	if p.RepoID == "" {
 		return nil, ipcerr.BadRequest("gitrpc: graph.status: repoId is required")
 	}
+	// G31 round-2 architecture/security review, finding #4: normalized once, here, at wire
+	// ingestion — see this file's own resolveWalkRequest, which already normalized ITS internal
+	// c.Entry lookup but left every c.Walk/WalkFor/ReviewWalkFor call in this file using the raw
+	// p.RepoID. Conn's own maps are keyed by entry.Summary.RepoID (NFC, since Identify normalizes),
+	// so a decomposed repoId for a non-ASCII repository path failed ErrRepoNotHeld here even
+	// though commit.detail/file.read (entryFor, detail.go) already normalize and work fine.
+	p.RepoID = gitpath.CleanNFC(p.RepoID)
 
 	// D10: `range` present -> the review walk's own counters, never the graph's.
 	if p.Range != nil {
@@ -136,6 +143,7 @@ func (r *Router) handleGraphLoadMore(ctx context.Context, c *gitsession.Conn, pa
 	if p.RepoID == "" {
 		return nil, ipcerr.BadRequest("gitrpc: graph.loadMore: repoId is required")
 	}
+	p.RepoID = gitpath.CleanNFC(p.RepoID) // G31 round-2 architecture/security review, finding #4.
 
 	status := r.deps.Discovery.Status(ctx, gitPathFrom(r.deps.Registry))
 	if status.Kind != "ok" {
@@ -171,6 +179,7 @@ func (r *Router) handleGraphRefresh(_ context.Context, c *gitsession.Conn, param
 	if p.RepoID == "" {
 		return nil, ipcerr.BadRequest("gitrpc: graph.refresh: repoId is required")
 	}
+	p.RepoID = gitpath.CleanNFC(p.RepoID) // G31 round-2 architecture/security review, finding #4.
 
 	// graph.refresh has no `range` — the review view has no refresh affordance (D10).
 	w, ok := c.WalkFor(p.RepoID)
@@ -219,6 +228,10 @@ func (r *Router) handleGraphStream(ctx context.Context, c *gitsession.Conn, para
 	if p.RepoID == "" {
 		return ipcerr.BadRequest("gitrpc: graph.stream: repoId is required")
 	}
+	p.RepoID = gitpath.CleanNFC(p.RepoID) // G31 round-2 architecture/security review, finding #4:
+	// also fixes graph.stream's own chunk echo (RepoID: p.RepoID below) carrying the client's raw
+	// spelling while repo.changed events carry the NFC one — a client keying state on repoId used
+	// to see two spellings for one repository.
 
 	spec, pageSize, precomputedTotal, err := resolveWalkRequest(c, p.RepoID, p.Range, p.Scope, p.PageSize)
 	if err != nil {

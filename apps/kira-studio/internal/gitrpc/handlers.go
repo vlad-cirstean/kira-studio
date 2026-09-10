@@ -264,7 +264,12 @@ func handleRepoClose(c *gitsession.Conn, params json.RawMessage) (any, error) {
 	if p.RepoID == "" {
 		return nil, ipcerr.BadRequest("gitrpc: repo.close: repoId is required")
 	}
-	c.CloseRepo(p.RepoID) // idempotent either way (D15) — repo.close always answers {}.
+	// G31 round-2 architecture/security review, finding #4: CloseRepo's own map is keyed by
+	// entry.Summary.RepoID (NFC, since Identify normalizes) — a decomposed repoId for a non-ASCII
+	// repository path used to silently no-op here (CloseRepo already answers {} either way, so
+	// nothing errored), leaking that connection's RepoEntry refcount and its watcher subscription
+	// for the connection's whole life.
+	c.CloseRepo(gitpath.CleanNFC(p.RepoID)) // idempotent either way (D15) — repo.close always answers {}.
 	return struct{}{}, nil
 }
 
