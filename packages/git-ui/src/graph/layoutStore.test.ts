@@ -144,3 +144,51 @@ describe('LayoutStore — long-edge segment collection stays correct after a pat
     }
   });
 });
+
+// G31 round-2 performance review, finding #2: every open lane at a chunk boundary is added to
+// #longEdges as UNRESOLVED_ROW (isLongAtAppendTime's own unconditional rule), and most resolve to
+// a genuinely short span in the very next chunk — but #longEdges used to be a true append-only log,
+// so each such chunk boundary left a permanent entry behind regardless, and #collectLongSegments
+// scans every entry with fromRow <= row on every rendered row. Over many loaded chunks this grows
+// without bound, in direct contradiction of the module doc's own "hundreds, not thousands" claim.
+// This suite proves #longEdges' own size stays bounded by the genuinely-long-or-still-unresolved
+// count, not by how many chunks have ever loaded — the actual quantity the growth claim is about.
+describe('LayoutStore — #longEdges does not grow without bound as pending edges resolve short', () => {
+  test('an edge that resolves short in the very next chunk is demoted out of #longEdges', () => {
+    const store = new LayoutStore();
+    const chunk0 = buildChunk(0, 1, [[0, UNRESOLVED_ROW, 0, 0, 1, 0]]);
+    store.append(chunk0);
+    expect(store.longEdgeCount).toBe(1); // unresolved at append time — long, as designed.
+
+    // Resolves edge0 (global index 0) to toRow=1 — a span of 1, well under LONG_EDGE_ROWS.
+    const chunk1 = buildPatchChunk(1, 2, [[0, 1, PATCH_UNCHANGED, PATCH_UNCHANGED]]);
+    store.append(chunk1);
+    expect(store.longEdgeCount).toBe(0); // demoted — no longer a permanent long-edge entry.
+
+    // Still correctly reported, now via the CSR window instead of the long-edge scan.
+    const out: EdgeSegment[] = [];
+    expect(store.segmentsInRow(1, out)).toBe(1);
+    expect(out[0]?.color).toBe(1);
+  });
+
+  test('loading many chunks whose pending edges each resolve short keeps #longEdges near zero, not O(chunks)', () => {
+    const store = new LayoutStore();
+    const chunkCount = 200;
+    // Chunk c (rows [c, c+1)) opens one new unresolved edge of its own (global edge index c) AND
+    // carries a patch resolving the PREVIOUS chunk's own edge (global index c-1) to toRow=c — a
+    // span of 1, well under LONG_EDGE_ROWS. So by the time loading finishes, every edge but the
+    // very last has been resolved short and demoted.
+    for (let c = 0; c < chunkCount; c++) {
+      const patches: Array<[number, number, number, number]> =
+        c > 0 ? [[c - 1, c, PATCH_UNCHANGED, PATCH_UNCHANGED]] : [];
+      const chunk: LayoutChunk = {
+        ...buildChunk(c, c + 1, [[c, UNRESOLVED_ROW, 0, 0, c, 0]]),
+        patches: new Uint32Array(patches.flat()),
+      };
+      store.append(chunk);
+    }
+    // #longEdges holds only the very last chunk's own still-genuinely-unresolved entry — not one
+    // per chunk ever loaded (the pre-fix behavior this test would catch: longEdgeCount === 200).
+    expect(store.longEdgeCount).toBe(1);
+  });
+});
