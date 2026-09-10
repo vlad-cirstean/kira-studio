@@ -2,13 +2,16 @@ package gitsession
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitclient"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitclient/porcelain"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitreview"
 )
 
@@ -166,6 +169,56 @@ func TestFileDelta_FastAfterANormalEdit(t *testing.T) {
 	}
 	if delta.CurrentLineCount != 4 {
 		t.Fatalf("CurrentLineCount = %d, want 4", delta.CurrentLineCount)
+	}
+}
+
+// TestFileDelta_FastPathTooLargePatch_StillReportsTheRealCurrentLineCount is G31 round-2
+// functional-correctness review, finding #7: when the fast (tier-1) path's own raw patch exceeds
+// MaxPatchBytes, parseAndResolve returns a zero-value ParsedBody (no hunks) — CurrentLineCount
+// used to be computed as `rec.LineCount + sumHunkDelta(nil)`, silently equal to rec.LineCount
+// (the SNAPSHOT's own line count), even though ancestorRes.ExitCode == 0 already proved the file
+// changed. Rewrites a.txt from 3 lines to 9000 DIFFERENT lines (a diff comfortably over the 1 MiB
+// cap) — CurrentLineCount must report 9000, not the stale snapshot's 3.
+func TestFileDelta_FastPathTooLargePatch_StillReportsTheRealCurrentLineCount(t *testing.T) {
+	dir, sha1 := buildFileDeltaFixture(t)
+	entry, store := newIncrementalTestEntry(t, dir)
+	ctx := context.Background()
+
+	content := "line1\nline2\nline3\n"
+	oid1 := blobOIDInc(t, dir, sha1, "a.txt")
+	rec := gitreview.FileRecord{
+		Path: "a.txt", State: "full", ReviewedAtSHA: sha1, ReviewedAt: time.UnixMilli(1000),
+		BlobOID: oid1, ContentKind: gitreview.ContentText, ContentBytes: len(content), LineCount: 3,
+	}
+	if err := store.Put(ctx, entry.Summary.RepoID, "main", rec, []byte(content)); err != nil {
+		t.Fatalf("Put: %v", err)
+	}
+	storedRec, snapshot, found, err := store.Record(ctx, entry.Summary.RepoID, "main", "a.txt")
+	if err != nil || !found {
+		t.Fatalf("Record: found=%v err=%v", found, err)
+	}
+
+	const wantLines = 15000
+	var b strings.Builder
+	for i := 0; i < wantLines; i++ {
+		fmt.Fprintf(&b, "a completely different line number %d with enough padding to push the raw diff comfortably past the one-mebibyte MaxPatchBytes cap regardless of git's own diff header overhead\n", i)
+	}
+	writeIncFile(t, dir, "a.txt", b.String())
+	runInc(t, dir, "add", "a.txt")
+	commitInc(t, dir, "rewrite a.txt entirely")
+
+	delta, err := entry.FileDelta(ctx, "main", "a.txt", storedRec, snapshot, "main")
+	if err != nil {
+		t.Fatalf("FileDelta: %v", err)
+	}
+	if delta.Source != "fast" {
+		t.Fatalf("Source = %q, want fast", delta.Source)
+	}
+	if delta.Body.Kind != porcelain.BodyTooLarge {
+		t.Fatalf("Body.Kind = %q, want %q (this test's own fixture is meant to exceed MaxPatchBytes)", delta.Body.Kind, porcelain.BodyTooLarge)
+	}
+	if delta.CurrentLineCount != wantLines {
+		t.Fatalf("CurrentLineCount = %d, want %d (the file's real current line count, not rec.LineCount=%d)", delta.CurrentLineCount, wantLines, rec.LineCount)
 	}
 }
 

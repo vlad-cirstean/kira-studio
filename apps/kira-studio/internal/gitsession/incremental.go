@@ -394,9 +394,26 @@ func (e *RepoEntry) FileDelta(ctx context.Context, branch, path string, rec gitr
 		if err != nil {
 			return deltaResult{}, err
 		}
+		// G31 round-2 functional-correctness review, finding #7: parseAndResolve's own
+		// MaxPatchBytes gate returns a zero-value ParsedBody (no hunks) for BodyTooLarge, so
+		// `rec.LineCount + sumHunkDelta(nil)` silently equals rec.LineCount — the SNAPSHOT's line
+		// count for a file that ancestorRes.ExitCode == 0 already proved changed. That stale
+		// estimate then overwrote MarkFile's own freshly-measured snapshotLineCount and clamped
+		// ProjectRanges/reviewMarking.ts's own clampRanges to the wrong length, silently
+		// truncating or no-oping a mark past the estimate's own too-short bound. The slow path and
+		// the noSnapshot path both already measure the real count directly; do the same here
+		// instead of estimating from hunks that were never parsed.
+		currentLineCount := rec.LineCount + sumHunkDelta(parsed.Hunks)
+		if body.Kind == porcelain.BodyTooLarge {
+			_, currentContent, cerr := e.readCurrentContent(ctx, tip, path)
+			if cerr != nil {
+				return deltaResult{}, cerr
+			}
+			currentLineCount = countLines(currentContent)
+		}
 		return deltaResult{
 			Source: "fast", Hunks: parsed.Hunks, Body: body, CurrentOID: currentOID,
-			CurrentLineCount: rec.LineCount + sumHunkDelta(parsed.Hunks),
+			CurrentLineCount: currentLineCount,
 		}, nil
 	}
 
