@@ -1,6 +1,7 @@
 package gitsession
 
 import (
+	"container/list"
 	"sync"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitclient/porcelain"
@@ -258,16 +259,31 @@ type diffCacheEntry struct {
 // and **never invalidated**: two tree oids and a path determine a patch forever, which is exactly
 // why this cache carries no drop-on-refsChanged logic at all — that absence is deliberate, not an
 // oversight (D7).
+//
+// G30 round-1 performance review, finding #9: `order` used to be a plain `[]diffCacheKey`, so
+// every touch-on-get and every re-set of an already-cached key did a linear scan
+// (removeFromOrderLocked) to find and splice the key out before re-appending it — O(n) per access
+// against a cache with no entry-count cap at all (only a 4 MiB byte budget, D7's own choice,
+// which a repository with many small-patch files can hold thousands of entries under). `order` is
+// now a `container/list.List` (front = least-recently-used, back = most-recently-used) plus an
+// `elems` index from key to `*list.Element`, giving touch/remove both O(1): `MoveToBack` and
+// `Remove` are pointer operations on the list's own doubly-linked nodes, never a scan.
 type diffCache struct {
 	mu       sync.Mutex
 	capacity int64
 	total    int64
-	order    []diffCacheKey // least-recently-used first
+	order    *list.List // Value: diffCacheKey. Front = least-recently-used, back = most-recently-used.
+	elems    map[diffCacheKey]*list.Element
 	byKey    map[diffCacheKey]diffCacheEntry
 }
 
 func newDiffCache(capacityBytes int64) *diffCache {
-	return &diffCache{capacity: capacityBytes, byKey: make(map[diffCacheKey]diffCacheEntry)}
+	return &diffCache{
+		capacity: capacityBytes,
+		order:    list.New(),
+		elems:    make(map[diffCacheKey]*list.Element),
+		byKey:    make(map[diffCacheKey]diffCacheEntry),
+	}
 }
 
 func (c *diffCache) get(baseSHA, sha, path string) (porcelain.FileDiffBody, int64, bool) {
@@ -291,11 +307,13 @@ func (c *diffCache) set(baseSHA, sha, path string, body porcelain.FileDiffBody, 
 		c.removeFromOrderLocked(key)
 	}
 	c.byKey[key] = diffCacheEntry{body: body, bytes: bytes}
-	c.order = append(c.order, key)
+	c.elems[key] = c.order.PushBack(key)
 	c.total += bytes
-	for c.total > c.capacity && len(c.order) > 0 {
-		oldest := c.order[0]
-		c.order = c.order[1:]
+	for c.total > c.capacity && c.order.Len() > 0 {
+		front := c.order.Front()
+		oldest := front.Value.(diffCacheKey)
+		c.order.Remove(front)
+		delete(c.elems, oldest)
 		c.total -= c.byKey[oldest].bytes
 		delete(c.byKey, oldest)
 	}
@@ -306,21 +324,21 @@ func (c *diffCache) set(baseSHA, sha, path string, body porcelain.FileDiffBody, 
 func (c *diffCache) clear() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.order = nil
+	c.order = list.New()
+	c.elems = make(map[diffCacheKey]*list.Element)
 	c.total = 0
 	c.byKey = make(map[diffCacheKey]diffCacheEntry)
 }
 
 func (c *diffCache) touchLocked(key diffCacheKey) {
-	c.removeFromOrderLocked(key)
-	c.order = append(c.order, key)
+	if elem, ok := c.elems[key]; ok {
+		c.order.MoveToBack(elem)
+	}
 }
 
 func (c *diffCache) removeFromOrderLocked(key diffCacheKey) {
-	for i, k := range c.order {
-		if k == key {
-			c.order = append(c.order[:i], c.order[i+1:]...)
-			return
-		}
+	if elem, ok := c.elems[key]; ok {
+		c.order.Remove(elem)
+		delete(c.elems, key)
 	}
 }
