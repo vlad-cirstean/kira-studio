@@ -66,6 +66,15 @@ export class PrState {
   #selectTimer: ReturnType<typeof setTimeout> | undefined;
   #selectController: AbortController | undefined;
   readonly #branchRequests = new Set<string>();
+  /** G31 round-2 performance review, finding #3: branches whose `branch.resolvePr` answer came
+   *  back `"ok"` with no PR at all. `byBranch` only ever holds an actual `PrRecord`, so a
+   *  no-PR branch never appeared in it — `ensureSnapshot`'s own dedup filter (`!byBranch.has(name)
+   *  && !#branchRequests.has(name)`) then failed both checks forever, and every `BranchPicker.vue`
+   *  open / search-scope change / stack reload re-issued `branch.resolvePr` for every PR-less
+   *  branch, indefinitely. Tracked separately (rather than widening `byBranch`'s value type) so
+   *  every existing `byBranch.value.get(name)` call site keeps meaning "the branch's PR, if any"
+   *  with no signature change. */
+  readonly #noBranchPr = new Set<string>();
   /** Set the first time EITHER lookup answers `"disabled"` for the current repo (github.enabled
    *  off, or no GitHub remote) — every later selection/branch resolve for this same repo then
    *  answers `"disabled"` synchronously, with no request at all, until the repo changes or
@@ -105,6 +114,7 @@ export class PrState {
     }
     this.#sha = null;
     this.#branchRequests.clear();
+    this.#noBranchPr.clear();
     this.#disabledForRepo = false;
     this.bySha.value = new Map();
     this.byBranch.value = new Map();
@@ -190,7 +200,10 @@ export class PrState {
    *  independent of how many branches the repo has. */
   async ensureSnapshot(branchNames: readonly string[]): Promise<void> {
     const toFetch = branchNames.filter(
-      (name) => !this.byBranch.value.has(name) && !this.#branchRequests.has(name),
+      (name) =>
+        !this.byBranch.value.has(name) &&
+        !this.#noBranchPr.has(name) &&
+        !this.#branchRequests.has(name),
     );
     let next = 0;
     const worker = async (): Promise<void> => {
@@ -212,16 +225,25 @@ export class PrState {
     const repoId = this.#repoId;
     if (repoId === undefined) return;
     if (this.#disabledForRepo) return;
-    if (this.byBranch.value.has(branch) || this.#branchRequests.has(branch)) return;
+    if (
+      this.byBranch.value.has(branch) ||
+      this.#noBranchPr.has(branch) ||
+      this.#branchRequests.has(branch)
+    )
+      return;
     this.#branchRequests.add(branch);
     try {
       const result = await this.#bridge.request('branch.resolvePr', { repoId, branch });
       if (this.#repoId !== repoId) return;
       if (result.kind === 'ok') {
-        const next = new Map(this.byBranch.value);
         const first = result.prs[0];
-        if (first !== undefined) next.set(branch, first);
-        this.byBranch.value = next;
+        if (first !== undefined) {
+          const next = new Map(this.byBranch.value);
+          next.set(branch, first);
+          this.byBranch.value = next;
+        } else {
+          this.#noBranchPr.add(branch);
+        }
         this.generation.value++;
       } else if (result.kind === 'unavailable') {
         this.status.value = result.gh;
