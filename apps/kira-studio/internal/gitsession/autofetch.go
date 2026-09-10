@@ -73,6 +73,23 @@ func (e *RepoEntry) disableAutoFetch() {
 	e.autoFetch.mu.Unlock()
 }
 
+// pauseAutoFetch stops the ticking loop for a user-set interval of zero — deliberately NOT the
+// same as disableAutoFetch (G30 round-1 functional-correctness review, finding #8): `disabled` is
+// this entry's permanent, for-its-whole-life kill switch, reserved for a genuine fetch failure
+// (most commonly AuthFailed). Before this fix, autoFetchTick called disableAutoFetch for BOTH
+// cases — so a user turning fetch.autoInterval to 0 tripped the same permanent switch a real
+// failure does, and startAutoFetch's own `e.autoFetch.disabled` guard then refused to ever re-arm
+// again, even after the user set the interval back to a positive value: auto-fetch stayed off
+// forever, silently, for the rest of the entry's life. Clearing only `timer` (never `disabled`)
+// leaves startAutoFetch's other guard (`timer != nil`) false too, so the next ensureAutoFetch call
+// (Conn.Open, the same off→on path D5 already established) arms a fresh timer once the interval
+// reads positive again.
+func (e *RepoEntry) pauseAutoFetch() {
+	e.autoFetch.mu.Lock()
+	e.autoFetch.timer = nil
+	e.autoFetch.mu.Unlock()
+}
+
 // autoFetchTick re-reads the server-owned interval fresh (so a setting change takes effect within
 // one interval, with no need to recreate the entry) and, when nothing else is using the
 // repository, runs one silent fetch through the SAME RunRemote path an explicit fetch takes — with
@@ -94,7 +111,7 @@ func (e *RepoEntry) autoFetchTick() {
 
 	_, minutes, _ := e.settings()
 	if minutes <= 0 {
-		e.disableAutoFetch()
+		e.pauseAutoFetch()
 		return
 	}
 	if e.Repo.Writing() {
