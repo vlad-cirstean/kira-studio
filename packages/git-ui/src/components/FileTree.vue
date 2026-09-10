@@ -504,12 +504,6 @@ function reviewToggleTitle(path: string): string {
             :style="fileIconStyle(row.node.path)"
             aria-hidden="true"
           ></span>
-          <span
-            class="kv-file-tree-status"
-            :class="statusClass(row.node.change)"
-            v-kui-tooltip="fileTitle(row.node.change)"
-            >{{ statusLetter(row.node.change) }}</span
-          >
           <span class="kv-file-tree-name" v-kui-tooltip="fileTitle(row.node.change)">
             <template v-if="renameDisplay(row.node.change)">
               {{ renameDisplay(row.node.change)?.from }}
@@ -522,6 +516,12 @@ function reviewToggleTitle(path: string): string {
             v-if="listMode === 'flat' && dirOf(row.node.path)"
             class="kv-file-tree-file-dir"
             >{{ dirOf(row.node.path) }}</span
+          >
+          <span
+            class="kv-file-tree-status"
+            :class="statusClass(row.node.change)"
+            v-kui-tooltip="fileTitle(row.node.change)"
+            >{{ statusLetter(row.node.change) }}</span
           >
           <span v-if="!row.node.change.isBinary" class="kv-file-tree-counts">
             <span
@@ -677,21 +677,37 @@ function reviewToggleTitle(path: string): string {
 
 /* G21 D10: item 10's own wording, taken literally — "just a colored letter", not a chip. G19
  * D14's status-chip class (background/border-radius/fixed 1.3em square/0.75em shrink) is
- * deleted outright; `min-width: 1ch` is the one thing kept from it, so the letters still line up
- * into a column and the file names after them align, without reintroducing a box around the
- * letter. G-UX D6 (item 6): the letter drops from the inherited full body size/weight-700 down to
- * the tree's own secondary scale — the same tier `.kv-file-tree-counts`/`-dir-stats`/`-file-dir`
- * already use — so it reads as metadata beside the filename, not as a heading. G34: the `0.85em`
- * fallback this and `.kv-file-tree-file-dir` used to carry is dropped — at the 13px default it
- * and `--kv-t-xs` (11px vs. 11.05px) are visually identical, and `--kv-t-xs` is now unconditional
- * (kira-structure.css is `:root`-scoped, so it always resolves). */
+ * deleted outright; `min-width: 1ch` is the one thing kept from it, so the letter still occupies
+ * a consistent width against its neighbour without reintroducing a box around it. G-UX D6
+ * (item 6): the letter drops from the inherited full body size/weight-700 down to the tree's own
+ * secondary scale — the same tier `.kv-file-tree-counts`/`-dir-stats`/`-file-dir` already use —
+ * so it reads as metadata, not a heading. G34: the `0.85em` fallback this and
+ * `.kv-file-tree-file-dir` used to carry is dropped — at the 13px default it and `--kv-t-xs`
+ * (11px vs. 11.05px) are visually identical, and `--kv-t-xs` is now unconditional
+ * (kira-structure.css is `:root`-scoped, so it always resolves). G-UX (item 8): moved from
+ * leading (just after the file icon) to trailing (just before the change counts, on the row's
+ * right edge) — see its own `margin-left: auto`, below. */
 .kv-file-tree-status {
+  /* G-UX (item 8): moved from just after the file icon to just before the change counts, on the
+   * row's right edge — `margin-left: auto` (moved here from `.kv-file-tree-counts`, below) is
+   * what pushes it there; a binary file with no counts span still lands the letter at the right
+   * edge on its own. */
+  margin-left: auto;
   min-width: 1ch;
   font-family: var(--kv-mono-font-family);
   font-size: var(--kv-t-xs);
   font-weight: 600;
   line-height: 1;
   flex-shrink: 0;
+  /* G-UX (item 8): "use stronger colors" — a single 11px letter needs more punch than the
+   * `--kv-diff-*-fg` tokens give it at that size (those are sourced from the ACTIVE VS Code
+   * theme's own `--vscode-gitDecoration-*` colors, tuned for larger surfaces like the diff
+   * gutter, and can read as pale/washed-out this small). A `filter` boosts saturation/contrast on
+   * whichever color the active theme actually supplies, rather than replacing it with a fixed
+   * hex that would stop following the user's theme (and rather than touching the shared
+   * `--kv-diff-*-fg` tokens themselves, which the diff view and change-count numbers still rely
+   * on unchanged). */
+  filter: saturate(1.6) contrast(1.15);
 }
 
 .kv-status-added {
@@ -731,7 +747,6 @@ function reviewToggleTitle(path: string): string {
 }
 
 .kv-file-tree-counts {
-  margin-left: auto;
   font-family: var(--kv-font-ui);
   font-size: 0.85em;
   display: flex;

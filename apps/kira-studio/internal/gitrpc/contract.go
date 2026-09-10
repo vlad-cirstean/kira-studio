@@ -115,7 +115,10 @@ package gitrpc
 // remote.run's pull integrate phase now refuses, rather than silently writing to the wrong
 // branch, when HEAD changed between the fetch and the merge/rebase (finding #2). No new request,
 // no new capability, no SQL migration.
-const ContractVersion = 32
+// G-UX D13 (item 13): 32 -> 33, one new event, connection.changed -- extension<->webview only,
+// the Go server neither emits nor parses it, the same reason this constant moves for every
+// ui.action-only addition since G10 D9. No new request, no new capability, no SQL migration.
+const ContractVersion = 33
 
 // Protocol is the handshake envelope's own version (SPEC §3.3's "protocol":1), distinct from
 // ContractVersion — it never changes unless the hello/ready exchange itself is redesigned.

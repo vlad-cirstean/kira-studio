@@ -87,6 +87,8 @@ export async function startLayoutServer(): Promise<LayoutServer> {
           view,
           target: null,
           pendingUiAction: null,
+          // G-UX (item 13): see tests/interaction/support/server.ts's own copy of this field.
+          connectionState: { kind: 'connected' as const },
         };
         const document = buildWebviewDocument({
           scriptUrl,

@@ -9,7 +9,7 @@
  * type="module">` tag) and hands it nothing at runtime beyond the DOM — `#kira-bootstrap`'s
  * JSON island is this file's only input, read below.
  */
-import type { MessageChannelLike, UiActionKind } from '@kira/git-ipc';
+import type { EventPayload, MessageChannelLike, UiActionKind } from '@kira/git-ipc';
 import { createRpcClient, VSCODE_WEBVIEW_BUFFER_ENCODING } from '@kira/git-ipc';
 import type { ReviewTarget, ViewStateStore } from '@kira/git-ui';
 import {
@@ -46,6 +46,10 @@ interface Bootstrap {
     action: UiActionKind;
     target?: { repoId: string; sha: string };
   } | null;
+  /** G-UX (item 13): the connection state as of the extension host's own `resolveWebviewView` —
+   *  `html.ts`'s own `RenderHtmlOptions.connectionState` doc comment explains why this is seeded
+   *  rather than always waiting on the first live `connection.changed` push. */
+  readonly connectionState: EventPayload<'connection.changed'>['state'];
 }
 
 function readBootstrap(): Bootstrap {
@@ -111,6 +115,7 @@ if (bootstrap.view === 'review') {
     host: bootstrap.host,
     view: 'review',
     target: bootstrap.target,
+    hostConnectionState: bootstrap.connectionState,
   });
 } else {
   const viewState = new VsCodeApiViewStateStore(vscodeApi);
@@ -146,5 +151,6 @@ if (bootstrap.view === 'review') {
     host: bootstrap.host,
     view: 'graph',
     pendingUiAction: bootstrap.pendingUiAction,
+    hostConnectionState: bootstrap.connectionState,
   });
 }

@@ -22,7 +22,13 @@
  * 3. The "no branch" state's own branch picker — the user picks one directly, no host round trip.
  */
 import { SETTINGS } from '@kira/git-core';
-import type { HostKind, ReviewSessionSnapshot, Transport, UiActionKind } from '@kira/git-ipc';
+import type {
+  EventPayload,
+  HostKind,
+  ReviewSessionSnapshot,
+  Transport,
+  UiActionKind,
+} from '@kira/git-ipc';
 import type { KuiSegmentedOption } from '@kira/kira-ui';
 // `KuiSearchInput` is a plain (not `import type`) import even though this file's own script only
 // ever reads it through `InstanceType<typeof KuiSearchInput>` — that is still a genuine *value*
@@ -51,6 +57,7 @@ import { ReviewCommentsState } from '../../state/reviewComments.ts';
 import { ReviewFilesState } from '../../state/reviewFiles.ts';
 import { SettingsState } from '../../state/settings.ts';
 import type { ViewStateStore } from '../../state/viewState.ts';
+import ConnectionBanner from '../ConnectionBanner.vue';
 import { buildRefListSections } from '../refListModel.ts';
 import BaseSelector from './BaseSelector.vue';
 import ReviewCommentsPane from './ReviewCommentsPane.vue';
@@ -62,9 +69,14 @@ const props = defineProps<{
   viewState: ViewStateStore;
   host: HostKind;
   target?: ReviewTarget | null;
+  /** G-UX (item 13): the host's own connection state as of this webview's cold resolve — see
+   *  `App.vue`'s own copy of this doc comment (`main.ts`'s `MountOptions.hostConnectionState`,
+   *  including why this is named `hostConnectionState`, not `connectionState` — the latter
+   *  collides with the differently-scoped local const of that name just below). */
+  hostConnectionState: EventPayload<'connection.changed'>['state'];
 }>();
 
-const bridge = new BridgeClient(props.transport);
+const bridge = new BridgeClient(props.transport, props.hostConnectionState);
 const connectionState = bridge.connectionState;
 const refsState = new RefsState(bridge);
 const review = shallowRef<ReviewSessionState | undefined>(undefined);
@@ -639,6 +651,11 @@ watch(
     <div class="kv-visually-hidden" role="status" aria-live="polite" data-testid="live-announcements">
       {{ liveAnnouncement }}
     </div>
+
+    <!-- G-UX (item 13): unconditional, outside the v-if/v-else-if chain below (`App.vue`'s own
+         copy of this reasoning) — each of those branches fully replaces the panel's own content,
+         which would otherwise hide a live disconnect exactly when it matters most. -->
+    <ConnectionBanner :state="bridge.hostConnection.value" />
 
     <template v-if="bootError">
       <div class="kv-review-boot-error" data-testid="boot-error">

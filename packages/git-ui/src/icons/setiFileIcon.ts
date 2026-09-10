@@ -61,6 +61,22 @@ function maskUrlFor(svg: string): string {
   return url;
 }
 
+/** G-UX (item 10): `seti-icons`' own bundled data (last published years ago) has no `files` entry
+ *  for these — its own `getDetails` (`lib/index.js`) checks `files` (exact name), then walks
+ *  `fileName.slice(fileName.indexOf('.'))` outward through `extensions` (so `go.mod` is tried as
+ *  `.mod`, `.mod`.slice(1) etc — never `.go`, since `.go` is not a SUFFIX of `go.mod`), then
+ *  `partials` (a plain substring match, and nothing in that table matches "go" either) — every one
+ *  of them misses, so `go.mod`/`go.sum`/`go.work`/`go.work.sum` fall all the way through to the
+ *  generic default icon despite being at least as common in a real diff as `.go` source itself.
+ *  Real VS Code's own current Seti icon theme (synced far more recently than this npm package)
+ *  does show the gopher for these. Routed through the same `themed()` lookup a real `.go` file
+ *  uses — not a hand-copied icon key — so a future `seti-icons` update that adds its own entry for
+ *  them is picked up automatically the moment this override is removed. */
+const GO_TOOLING_FILENAMES = new Set(['go.mod', 'go.sum', 'go.work', 'go.work.sum']);
+/** Any filename `seti-icons`' own extension-matching would resolve to the `.go` icon — used only
+ *  to drive `GO_TOOLING_FILENAMES`' lookup through the real `themed()` call above. */
+const GO_EXTENSION_LOOKUP_NAME = 'main.go';
+
 /** `path` may be a full repo-relative path — `seti-icons`' own `getDetails` slices from
  *  `fileName.indexOf('.')`, so handing it a full path would poison extension matching against any
  *  dot elsewhere in the path (a dotted directory segment). The basename is taken here, once, so
@@ -68,6 +84,7 @@ function maskUrlFor(svg: string): string {
  *  its own slicing. `.gitignore`-style dotfiles resolve correctly from a basename too. */
 export function setiIconFor(path: string): SetiFileIcon {
   const basename = path.slice(path.lastIndexOf('/') + 1);
-  const { svg, color } = themed(basename);
+  const lookupName = GO_TOOLING_FILENAMES.has(basename) ? GO_EXTENSION_LOOKUP_NAME : basename;
+  const { svg, color } = themed(lookupName);
   return { maskUrl: maskUrlFor(svg), color };
 }

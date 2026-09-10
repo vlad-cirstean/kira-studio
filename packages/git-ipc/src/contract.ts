@@ -2128,6 +2128,21 @@ export type Contract = {
   events: {
     'repo.changed': { repoId: string; kind: 'refsChanged' | 'worktreeChanged' };
     'settings.changed': { settings: SettingsSnapshot };
+    /** G-UX (item 13): "app is off" pushed into the webviews themselves, not only the extension's
+     *  own status bar (`ConnectionManager.onStateChange`'s only consumer before this). A narrowed
+     *  shape, not a structural copy of the extension's own richer `ConnectionState` union
+     *  (`connection.ts`) — `denied`/`versionMismatch` there carry fields (`reason`, `expected`/
+     *  `received`/`serverVersion`) meaningful only to the status bar's own tooltip composition;
+     *  `detail`, when present, is that same wording already composed server-side
+     *  (`connection.ts`'s own `toWireConnectionState`), so a webview banner never re-implements it.
+     *  Seeded into `html.ts`'s bootstrap island for a panel opened while already disconnected, and
+     *  pushed live by `extension.ts`'s `ConnectionManager.onStateChange` subscriber otherwise. */
+    'connection.changed': {
+      readonly state: {
+        readonly kind: 'connecting' | 'pairing' | 'connected' | 'denied' | 'versionMismatch';
+        readonly detail?: string;
+      };
+    };
     /** G18 D4/D7: fanned out to every connected client whenever `repoSettings.set` succeeds
      *  anywhere, not only to the connection that made the change — `log.level`'s own
      *  instance-wide collapse (D14) means a value change made through repo A's own dialog must

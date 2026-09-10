@@ -198,6 +198,12 @@ export interface NodeShapePlan {
    *  other `NodeShapePlan` this module produces leaves it `undefined`, which `buildNodeElement`
    *  treats identically to `false`. */
   readonly isHeadRing?: boolean;
+  /** G-UX (item 1): the HEAD halo — a soft, filled, low-opacity disc behind the checked-out
+   *  commit's node, additive alongside `isHeadRing` (both are only ever present together, since
+   *  both come from the same `slice.isHead` check in `planNode`). `buildRowSvg` paints every
+   *  `isHeadHalo` shape BEFORE the row's own edges, unlike every other shape here (including
+   *  `isHeadRing`), which paints on top of them — the one place paint order depends on this flag. */
+  readonly isHeadHalo?: boolean;
 }
 
 /** §5.3's fifth decision, the three node shapes: filled circle (ordinary), filled circle plus an
@@ -228,9 +234,30 @@ export function planNode(slice: RowSlice, rowHeight: number): readonly NodeShape
         },
       ]
     : [];
+  // G-UX (item 1): the halo, same additive shape as headRing above and always present alongside
+  // it (both gated on the identical `slice.isHead`) — kept as its own array, not folded into
+  // headRing, so `buildRowSvg` can paint it in a different position (under the row's own edges)
+  // without needing to inspect each shape's flags to decide where it goes.
+  const headHalo: NodeShapePlan[] = slice.isHead
+    ? [
+        {
+          cx,
+          cy,
+          r: GEOMETRY.headHaloRadius,
+          color,
+          filled: true,
+          dashed: false,
+          isHeadHalo: true,
+        },
+      ]
+    : [];
 
   if (slice.nodeKind === 'stash') {
-    return [{ cx, cy, r: GEOMETRY.nodeRadius, color, filled: false, dashed: true }, ...headRing];
+    return [
+      ...headHalo,
+      { cx, cy, r: GEOMETRY.nodeRadius, color, filled: false, dashed: true },
+      ...headRing,
+    ];
   }
 
   const dot: NodeShapePlan = { cx, cy, r: GEOMETRY.nodeRadius, color, filled: true, dashed: false };
@@ -243,9 +270,9 @@ export function planNode(slice: RowSlice, rowHeight: number): readonly NodeShape
       filled: false,
       dashed: false,
     };
-    return [dot, ring, ...headRing];
+    return [...headHalo, dot, ring, ...headRing];
   }
-  return [dot, ...headRing];
+  return [...headHalo, dot, ...headRing];
 }
 
 function buildPathElement(plan: EdgePathPlan): SVGPathElement {
@@ -266,12 +293,19 @@ function buildNodeElement(plan: NodeShapePlan): SVGCircleElement {
   circle.setAttribute('cy', fmt(plan.cy));
   circle.setAttribute('r', fmt(plan.r));
 
+  // G-UX (item 1): the HEAD halo, like the HEAD ring below, is never lane-coloured —
+  // `.kv-graph-head-halo` (CommitGrid.vue) paints it in `--kv-focus-border` at low opacity.
+  if (plan.isHeadHalo) {
+    circle.setAttribute('class', 'kv-graph-head-halo');
+    return circle;
+  }
+
   // G19 D1: the HEAD ring is never lane-coloured — `.kv-graph-head-ring` (CommitGrid.vue) paints
   // it in `--kv-focus-border`, the same token the existing branch-badge dot already uses, so it
   // never takes `laneClass`/`NODE_CLASS`, both of which are about this row's own lane colour.
   if (plan.isHeadRing) {
     circle.setAttribute('class', 'kv-graph-head-ring');
-    circle.setAttribute('stroke-width', String(GEOMETRY.strokeWidth));
+    circle.setAttribute('stroke-width', String(GEOMETRY.headRingStrokeWidth));
     circle.style.fill = 'none';
     return circle;
   }
@@ -307,8 +341,13 @@ export function buildRowSvg(slice: RowSlice, rowHeight: number): SVGSVGElement {
   svg.setAttribute('height', String(rowHeight));
   svg.setAttribute('viewBox', `0 0 ${width} ${rowHeight}`);
 
+  // G-UX (item 1): the HEAD halo paints UNDER the row's own edges (a soft backdrop the edges
+  // still read clearly on top of); every other node shape — including the HEAD ring itself —
+  // paints on top of the edges, as before.
+  const nodes = planNode(slice, rowHeight);
+  for (const plan of nodes) if (plan.isHeadHalo) svg.appendChild(buildNodeElement(plan));
   for (const plan of planEdgePaths(slice, rowHeight)) svg.appendChild(buildPathElement(plan));
-  for (const plan of planNode(slice, rowHeight)) svg.appendChild(buildNodeElement(plan));
+  for (const plan of nodes) if (!plan.isHeadHalo) svg.appendChild(buildNodeElement(plan));
 
   return svg;
 }

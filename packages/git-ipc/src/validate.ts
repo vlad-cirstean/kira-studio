@@ -103,7 +103,11 @@ import type { EventKey, RequestKey, StreamKey } from './contract.ts';
 // remote.run's pull integrate phase now refuses (rather than silently writing to the wrong
 // branch) when HEAD changed out from under it between the fetch and the merge/rebase (finding
 // #2). No new request, no new capability, no SQL migration.
-export const CONTRACT_VERSION = 32;
+// G-UX D13 (item 13): 32 -> 33, one new event, 'connection.changed' -- pushes the connection
+// state that used to reach only the extension's own status bar into both webviews themselves, so
+// a panel that stays open through a drop shows it too. No new request, no new capability, no SQL
+// migration.
+export const CONTRACT_VERSION = 33;
 
 export class ContractVersionMismatchError extends Error {
   readonly received: number;
@@ -224,6 +228,7 @@ const REQUEST_KEY_MAP: Record<RequestKey, true> = {
 const EVENT_KEY_MAP: Record<EventKey, true> = {
   'repo.changed': true,
   'settings.changed': true,
+  'connection.changed': true,
   'review.target': true,
   'remote.progress': true,
   'credential.request': true,

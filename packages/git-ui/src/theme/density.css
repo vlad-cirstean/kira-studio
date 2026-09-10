@@ -8,7 +8,12 @@
  * was a compromise, just a rename with a few genuinely row-density-only tokens left behind.
  */
 :root {
-  --kv-row-height: 22px;
+  /* G-UX (item 2b): raised from 22px so a row's ref-badge strip has its own 16px line above the
+     18px message line (`CommitGrid.vue`'s `.kv-cell-message` grid, `columns.ts`'s own
+     `.kv-message-badges-row` wrapper) — confirmed safe to change uniformly: every consumer
+     (`rowSvg.ts`'s node/edge geometry, `graphColumn.ts`) already reads this token rather than a
+     literal, so nothing needed touching beyond this one value. */
+  --kv-row-height: 36px;
   --kv-row-height-compact: 20px;
   --kv-row-height-comfortable: 26px;
 

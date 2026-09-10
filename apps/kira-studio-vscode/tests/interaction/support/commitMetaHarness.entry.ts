@@ -5,13 +5,12 @@
  * fake RPC — a hand-built `CommitDetail` (message-clamp geometry) is all `DetailPane.vue` needs
  * to render.
  *
- * G-UX D7 (item 7): mounts the real `DetailPane.vue` now, not a bare `CommitMeta.vue` —
- * `commit-meta-clamp.spec.ts`'s new cases need the whole subject/tree/details composition (the
- * trailer-hidden-while-collapsed case reads both the message section's clamp and the details
- * section's absence of SHA/parent markup; the detail-pane-proportion case measures the real
- * `.kv-detail-pane-tree` against `.kv-detail-pane`, D7's own 80% target). `detailState` is a
- * plain object satisfying exactly the shape `DetailPane.vue` reads from `DetailState` — not the
- * real class, which needs a `BridgeClient` this harness has no use for (no request ever fires;
+ * Mounts the real `DetailPane.vue`, not a bare `CommitMeta.vue` — `commit-meta-clamp.spec.ts`'s
+ * cases need the whole subject/tree composition (the collapsed-state case reads the title/facts
+ * row plus the absence of body/identity/trailer/details markup; the detail-pane-proportion case
+ * measures the real `.kv-detail-pane-tree` against `.kv-detail-pane`). `detailState` is a plain
+ * object satisfying exactly the shape `DetailPane.vue` reads from `DetailState` — not the real
+ * class, which needs a `BridgeClient` this harness has no use for (no request ever fires;
  * `detail`/`sha` are set directly, once, before mount).
  */
 import { CommitStore } from '@kira/git-core';
@@ -30,12 +29,9 @@ const LONG_BODY = Array.from({ length: 10 }, (_, i) => `Paragraph ${i + 1}. ${PA
   '\n\n',
 );
 
-// G-UX D7 (item 7): trailers + a distinct author (author !== committer) — commit-meta-clamp.spec.ts's
-// new "trailer-hidden-while-collapsed" case asserts both are absent from the DOM while collapsed
-// and present, inside .kv-meta-expanded, after "Show more". A parent sha is included too, so the
-// "SHA/parent markup is gone entirely" assertion is checking against a fixture that would have
-// shown a Parent row under the pre-D7 shape, not one that never had anything to show in the first
-// place.
+// Trailers + a distinct author (author !== committer) — commit-meta-clamp.spec.ts's
+// "trailer-hidden-while-collapsed" case asserts both are absent from the DOM while collapsed
+// and present, inside .kv-meta-expanded, after "Show more".
 const detail = {
   sha: '2'.repeat(40),
   parents: ['3'.repeat(40)],
@@ -63,10 +59,13 @@ const detail = {
 };
 
 const actions = {
-  capabilities: { openInEditor: false, goToFile: false, clipboard: false, resolveConflict: false },
+  capabilities: { openInEditor: false, goToFile: false, clipboard: true, resolveConflict: false },
   copy(): void {},
   announce(): void {},
   async openInEditor(): Promise<void> {},
+  async openAllChanges(): Promise<{ opened: number; failed: number; mode: 'multiDiff' | 'tabs' }> {
+    return { opened: 0, failed: 0, mode: 'multiDiff' };
+  },
   async goToFile(): Promise<{ line: number }> {
     return { line: 1 };
   },

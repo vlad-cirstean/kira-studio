@@ -78,6 +78,9 @@ const props = defineProps<{
   /** G24 D9: `BranchPicker.vue`'s own `#123` branch-tip badge source — optional, mirrors every
    *  other G24 prop threaded through this toolbar's own children. */
   prState?: PrState;
+  /** Whether `App.vue`'s own search row is currently open — drives the toggle button's `active`
+   *  state, the same `active` = "revealed" convention `ReviewView.vue`'s own filter toggle uses. */
+  searchOpen: boolean;
 }>();
 const emit = defineEmits<{
   (event: 'repo-opened', repoId: string): void;
@@ -105,6 +108,10 @@ const emit = defineEmits<{
    *  phase implemented until now — opens `App.vue`'s own `RepoSettingsDialog.vue`, the same
    *  "toolbar owns no dialog state itself" shape `stash-changes` above already follows. */
   (event: 'open-repo-settings'): void;
+  /** Toggles `App.vue`'s own search row (`toggleSearchRow`) — the toolbar owns no search state of
+   *  its own, the same "emit, don't own" shape every other dialog/panel-toggling emit above
+   *  already follows. */
+  (event: 'toggle-search'): void;
 }>();
 
 function copy(text: string, whatCopied: string): void {
@@ -362,10 +369,20 @@ const stashDisabled = computed(
       data-testid="stash-changes-button"
       @click="emit('stash-changes')"
     >
-      Stash changes…
+      Stash
     </KuiButton>
 
     <span class="kv-toolbar-spacer" aria-hidden="true"></span>
+
+    <KuiButton
+      variant="icon"
+      icon="codicon-search"
+      :active="searchOpen"
+      v-kui-tooltip="'Search'"
+      aria-label="Search"
+      data-testid="search-toggle-button"
+      @click="emit('toggle-search')"
+    />
 
     <KuiButton
       variant="icon"

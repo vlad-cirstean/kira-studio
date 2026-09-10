@@ -70,6 +70,10 @@ const props = defineProps<{ search: SearchState }>();
 const emit = defineEmits<{
   (e: 'focusGrid'): void;
   (e: 'select', option: SearchOption): void;
+  /** The row's own close (X) button — `App.vue` owns `closeSearch()` (close, clear the query, and
+   *  return focus to the grid), the same "emit, don't own" shape this component already follows
+   *  for `focusGrid`. */
+  (e: 'close'): void;
 }>();
 
 const rootEl = ref<HTMLElement | null>(null);
@@ -306,6 +310,15 @@ defineExpose({ focus: () => searchInputRef.value?.focus() });
         @update:model-value="onScopeChange"
       />
       <span v-if="countLabel" class="kv-search-count" data-testid="search-count">{{ countLabel }}</span>
+      <KuiButton
+        variant="icon"
+        icon="codicon-close"
+        class="kv-search-close"
+        v-kui-tooltip="'Close search'"
+        aria-label="Close search"
+        data-testid="search-close-button"
+        @click="emit('close')"
+      />
     </div>
     <div
       v-if="search.error.value"

@@ -9,9 +9,14 @@ import type {
   StreamParamsOf,
   Transport,
 } from '@kira/git-ipc';
-import { shallowRef } from 'vue';
+import { type ShallowRef, shallowRef } from 'vue';
 
 export type ConnectionState = 'connecting' | 'connected' | 'error';
+
+/** G-UX (item 13): the wire's own narrowed shape (`@kira/git-ipc`'s `connection.changed` event) —
+ *  distinct from `ConnectionState` above, which is this class's own cold-boot `app.init`
+ *  success/failure signal, not the host's live socket state. */
+export type HostConnectionState = EventPayload<'connection.changed'>['state'];
 
 /**
  * The real typed client (P3 W9) over the `Transport` W2 provides: `request`/`on`/`stream`
@@ -25,12 +30,29 @@ export type ConnectionState = 'connecting' | 'connected' | 'error';
  */
 export class BridgeClient {
   readonly connectionState = shallowRef<ConnectionState>('connecting');
+  /** G-UX (item 13): the live "is the host's own socket to Kira Studio up" signal — kept
+   *  separately from `connectionState` above rather than folded into it, since that field already
+   *  has its own well-established, narrower meaning three other things key off (`app.init` cold-
+   *  boot success/failure) and this needs a fourth state (`pairing`) that concept never had.
+   *  `undefined` means "never told" — no bootstrap seed (a fresh, e2e-style mount with no host
+   *  behind it at all) and no `connection.changed` event has arrived yet — and a banner reading
+   *  this should render nothing for that value, the same "no data yet, not an error" convention
+   *  `detail.value === undefined` already uses elsewhere in this codebase. Seeded once, at
+   *  construction, from the host's own cold-boot bootstrap island (`main.ts`'s own
+   *  `MountOptions.connectionState`) — a panel opened while already disconnected must show the
+   *  banner immediately, not only on the next live push — then kept current by the event below for
+   *  the rest of this webview's life. */
+  readonly hostConnection: ShallowRef<HostConnectionState | undefined>;
 
   readonly #transport: Transport;
   #initPromise: Promise<ResultOf<'app.init'>> | undefined;
 
-  constructor(transport: Transport) {
+  constructor(transport: Transport, initialHostConnection?: HostConnectionState) {
     this.#transport = transport;
+    this.hostConnection = shallowRef(initialHostConnection);
+    this.#transport.on('connection.changed', (payload) => {
+      this.hostConnection.value = payload.state;
+    });
   }
 
   /** Performs the `app.init` handshake exactly once *per success*, however many callers ask for

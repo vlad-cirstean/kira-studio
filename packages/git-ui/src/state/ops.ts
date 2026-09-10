@@ -11,6 +11,7 @@ import type {
   PullStrategy,
   PullStrategySource,
   PushPreflight,
+  RefRow,
   RemoteOpKind,
   RemoteOpParams,
   RemoteOpResult,
@@ -115,6 +116,26 @@ export interface PullStrategyInfo {
  *  `"blocked"` at all (§7.5: clean and cleanCarry proceed with no prompt). */
 export type CheckoutRoute = { readonly kind: 'discard' } | { readonly kind: 'stashAndCarry' };
 
+/** `PostCheckoutPullDialog.vue`'s own pending state (G-UX item 3) — everything the dialog needs
+ *  to render "This branch is N commits behind `<upstream>` — pull now?" and, on confirm, for
+ *  `resolvePostCheckoutPullDialog`'s caller to run the pull without a second lookup. */
+export interface PostCheckoutPullPrompt {
+  readonly branch: string;
+  readonly remote: string;
+  readonly upstreamShortName: string;
+  readonly behind: number;
+}
+
+/** `RefRow.upstream` is `%(upstream)`'s bare expansion — `refs/remotes/<remote>/<name>` for a
+ *  remote-tracking upstream, or `refs/heads/<name>` for the (unusual, but legal) case of a branch
+ *  tracking another local branch. Only the first has a *remote* to pull from at all — `undefined`
+ *  for the second is deliberate, not a gap: `runPull` has no meaning for a purely local upstream. */
+export function remoteFromUpstreamRef(upstreamRef: string | undefined): string | undefined {
+  if (upstreamRef === undefined) return undefined;
+  const match = /^refs\/remotes\/([^/]+)\//.exec(upstreamRef);
+  return match?.[1];
+}
+
 /** The route a confirmed revert takes: the chosen mainline (present only when the preflight's
  *  `mainlineRequired` was non-empty) and whether to stop short of committing. */
 export interface RevertRoute {
@@ -209,6 +230,11 @@ export class OpsState {
    *  `"stashAndCarry"` (its own doc comment): `resolvePullDialog`'s `boolean` says only whether
    *  to take that one route, there being no second one (no pull analogue of "discard"). */
   readonly pendingPull: ShallowRef<PullPreflight | undefined> = shallowRef(undefined);
+  /** G-UX (item 3): `PostCheckoutPullDialog.vue`'s own pending state — "when checking out a
+   *  branch that advanced, ask if I want to pull it too". Set only after `runCheckout` itself has
+   *  finished (its `busy` hold released) — see `#maybePromptPostCheckoutPull`'s own doc comment. */
+  readonly pendingPostCheckoutPull: ShallowRef<PostCheckoutPullPrompt | undefined> =
+    shallowRef(undefined);
 
   // -------------------------------------------------------------------------------------
   // G25 D13: worktree.prepare's own lifecycle — a sibling to the remote-op fields above, not
@@ -251,6 +277,7 @@ export class OpsState {
   #resolveForcePush: ((route: ForcePushRoute | null) => void) | undefined;
   #resolveStashPop: ((proceed: boolean) => void) | undefined;
   #resolvePull: ((proceed: boolean) => void) | undefined;
+  #resolvePostCheckoutPull: ((proceed: boolean) => void) | undefined;
   readonly #unsubscribe: () => void;
   readonly #unsubscribeProgress: () => void;
   readonly #unsubscribeWorktreeProgress: () => void;
@@ -384,6 +411,18 @@ export class OpsState {
     const repoId = this.#repoId;
     if (repoId === undefined || this.busy.value) return;
     this.busy.value = true;
+    // G-UX (item 3): captured here, before ANY write below, so the post-checkout pull prompt
+    // (run once `busy` is released, at the very bottom of this method) always reads the target
+    // branch's ahead/behind exactly as it stood before the switch — `RefsState.branches`'s own
+    // `track` field is only as fresh as the next `refs.list` reload, which the checkout's own
+    // `repo.changed` event triggers moments later (the same staleness window `RefsState
+    // .applyHead`'s doc comment already names for `head` itself), so there is no reason to read it
+    // again after the write only to land back in that window.
+    const targetTrack = this.#refs.branches.value.find((b) => b.shortName === target)?.track;
+    // Set at each point below where a switch-mode checkout actually lands on `target` as a branch
+    // (never a detach, never a route this method cannot cleanly resolve `result.ok` for — see
+    // `#maybePromptPostCheckoutPull`'s own doc comment on why `stashAndCarry` is out of scope).
+    let landedOnBranch = false;
     try {
       const preflight = await this.#bridge.request('preflight.checkout', { repoId, target, mode });
       const auto = this.#resolveAutoCheckoutRoute(preflight, mode);
@@ -409,6 +448,7 @@ export class OpsState {
           this.announcement.value = composeOpFailureAnnouncement('Checkout', result.error);
           return;
         }
+        landedOnBranch = auto.mode === 'switch';
         const parts: string[] = [];
         if (auto.autoStash && fromBranch !== undefined) {
           parts.push(composeAutoStashAnnouncement(this.#blockedPathCount(preflight), fromBranch));
@@ -463,9 +503,56 @@ export class OpsState {
       this.announcement.value = result.ok
         ? composeCheckoutAnnouncement(preflight, target)
         : composeOpFailureAnnouncement('Checkout', result.error);
+      landedOnBranch = result.ok && mode === 'switch';
     } finally {
       this.busy.value = false;
     }
+    if (landedOnBranch) await this.#maybePromptPostCheckoutPull(target, targetTrack);
+  }
+
+  /** G-UX (item 3): "when checking out a branch that advanced, ask if I want to pull it too" —
+   *  offered only once `runCheckout`'s own `busy` hold has already been released (`runPull` below
+   *  is itself gated on `!busy`, and this method may call it). `targetTrack` is the pre-switch
+   *  snapshot `runCheckout` captured — `'gone'`/`undefined`/`behind <= 0` all mean nothing to ask
+   *  about (no upstream, an already-deleted one, or already caught up). The remote name comes from
+   *  the branch's own `upstream` ref (`refs/remotes/<remote>/<branch>`), not the toolbar's
+   *  `defaultRemote` (the first remote name found at all) — a multi-remote repo could otherwise
+   *  offer to pull from the wrong one. Deliberately does not cover the `stashAndCarry` route above:
+   *  that route's own success is reported by `#stashAndCarry` internally, with no `result.ok` this
+   *  method could key off without a larger, riskier change to a helper `runPull` also shares. */
+  async #maybePromptPostCheckoutPull(
+    target: string,
+    targetTrack: RefRow['track'] | undefined,
+  ): Promise<void> {
+    if (targetTrack === undefined || targetTrack === 'gone' || targetTrack.behind <= 0) return;
+    const upstreamRef = this.#refs.branches.value.find((b) => b.shortName === target)?.upstream;
+    const remote = remoteFromUpstreamRef(upstreamRef);
+    if (remote === undefined || upstreamRef === undefined) return;
+    const proceed = await this.#confirmPostCheckoutPull({
+      branch: target,
+      remote,
+      upstreamShortName: upstreamRef.replace(/^refs\/remotes\//, ''),
+      behind: targetTrack.behind,
+    });
+    if (!proceed) return;
+    await this.runPull(remote, target);
+  }
+
+  #confirmPostCheckoutPull(prompt: PostCheckoutPullPrompt): Promise<boolean> {
+    this.pendingPostCheckoutPull.value = prompt;
+    return new Promise((resolve) => {
+      this.#resolvePostCheckoutPull = resolve;
+    });
+  }
+
+  /** The prompt's own Pull now/Not now buttons call this — `false` for Not now, matching every
+   *  other confirm dialog's own `false`/`null`-for-decline convention as closely as a boolean
+   *  route can. */
+  resolvePostCheckoutPullDialog(proceed: boolean): void {
+    this.pendingPostCheckoutPull.value = undefined;
+    const resolve = this.#resolvePostCheckoutPull;
+    this.#resolvePostCheckoutPull = undefined;
+    resolve?.(proceed);
   }
 
   #confirmCheckout(preflight: CheckoutPreflight): Promise<CheckoutRoute | null> {

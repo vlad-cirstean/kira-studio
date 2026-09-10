@@ -21,6 +21,20 @@ export const GEOMETRY = {
    *  `headRingRadius + strokeWidth / 2` = `5.6 + 0.8` = `6.4`, `<=` half the 13px lane width
    *  (6.5). */
   headRingRadius: 5.6,
+  /** G-UX (item 1): the HEAD ring's own stroke width — thicker than the shared `strokeWidth`
+   *  every edge/merge-ring/stash-ring uses, so the checked-out commit's ring reads as visibly
+   *  heavier rather than blending in as just another thin line. Outer edge stays
+   *  `headRingRadius + headRingStrokeWidth / 2` = `5.6 + 1.0` = `6.6`, ~0.1px past the lane's own
+   *  half-width (6.5) — negligible bleed at this scale, accepted rather than shrinking the ring's
+   *  own radius to compensate (the tight 13px lane envelope leaves no room to both thicken the
+   *  stroke AND keep the ring's inner edge clear of the merge ring's outer edge at 5.0; a small,
+   *  imperceptible edge-of-lane overflow is the better trade than a smaller, less visible ring). */
+  headRingStrokeWidth: 2.0,
+  /** G-UX (item 1): a soft, low-opacity disc behind the checked-out commit's node (painted under
+   *  the row's own edges, `rowSvg.ts`'s `buildRowSvg`) — a halo, not a hard-edged shape, so it is
+   *  allowed to reach closer to the lane's own edge than a stroke could without looking like
+   *  bleed. */
+  headHaloRadius: 6.2,
   strokeWidth: 1.6,
   maxLanes: 12,
   overdraw: 0.5,

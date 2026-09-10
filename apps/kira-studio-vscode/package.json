@@ -38,7 +38,7 @@
       "panel": [
         {
           "id": "kiraVersion",
-          "title": "Git Graph",
+          "title": "Kira",
           "icon": "resources/icon.svg"
         }
       ],
@@ -79,7 +79,7 @@
       },
       {
         "command": "kiraVersion.focusGraph",
-        "title": "Open Git Graph",
+        "title": "Open Kira",
         "category": "Kira Version",
         "icon": "$(git-branch)"
       },
@@ -389,6 +389,12 @@
         "command": "kiraVersion.toggleSearch",
         "key": "ctrl+alt+f",
         "mac": "cmd+alt+f",
+        "when": "focusedView == 'kiraVersion.graph'"
+      },
+      {
+        "command": "kiraVersion.toggleSearch",
+        "key": "ctrl+f",
+        "mac": "cmd+f",
         "when": "focusedView == 'kiraVersion.graph'"
       }
     ],

@@ -90,7 +90,7 @@ export class TokenReader {
 /** The default `--kv-row-height` (`density.css`) — the fallback `rowHeightPx` returns if the
  *  token is unset or unparseable, which only happens outside a real browser (a unit test with no
  *  stylesheet loaded), never in a mounted app. */
-const FALLBACK_ROW_HEIGHT = 22;
+const FALLBACK_ROW_HEIGHT = 36;
 
 /**
  * `--kv-row-height` as an actual pixel number (W6, W8) — the one numeric read every consumer of

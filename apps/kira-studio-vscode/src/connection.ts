@@ -54,6 +54,37 @@ export type ConnectionState =
       readonly serverVersion: string;
     };
 
+/** G-UX (item 13): `connection.changed`'s own narrowed wire shape (`@kira/git-ipc`'s contract) —
+ *  reused by both `resolveWebviewView`'s cold-boot seed (`html.ts`'s bootstrap island, via
+ *  `panelView.ts`/`reviewView.ts` reading `ConnectionManager.state` fresh at that moment) and
+ *  `extension.ts`'s own live push on every `onStateChange` firing, so the two paths can never
+ *  describe the same state two different ways. `detail` mirrors `updateStatusBar`'s own tooltip
+ *  wording for `denied`/`versionMismatch` — the only two states worth explaining beyond their
+ *  kind; `connecting`/`pairing`/`connected` need no further words here (the webview banner that
+ *  reads this composes its own "reconnecting…"/"waiting for approval" text around the bare
+ *  kind). */
+export function toWireConnectionState(state: ConnectionState): {
+  readonly kind: 'connecting' | 'pairing' | 'connected' | 'denied' | 'versionMismatch';
+  readonly detail?: string;
+} {
+  switch (state.kind) {
+    case 'denied':
+      return {
+        kind: 'denied',
+        detail: state.reason === 'timeout' ? 'Pairing request timed out' : 'Pairing was denied',
+      };
+    case 'versionMismatch':
+      return {
+        kind: 'versionMismatch',
+        detail:
+          `Extension expects contract ${state.expected}, ` +
+          `Kira Studio (${state.serverVersion}) speaks ${state.received}`,
+      };
+    default:
+      return { kind: state.kind };
+  }
+}
+
 interface HandshakeResponse {
   readonly kind: string;
   readonly expected?: number;

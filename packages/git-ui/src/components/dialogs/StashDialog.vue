@@ -30,7 +30,7 @@ import { stashLabel } from '../stashListModel.ts';
 
 const props = defineProps<{
   ops: OpsState;
-  /** Toggled by `AppToolbar.vue`'s "Stash changes…" button, via `App.vue`. */
+  /** Toggled by `AppToolbar.vue`'s "Stash" button, via `App.vue`. */
   createOpen: boolean;
   /** `kiraVersion.stash.includeUntracked`'s current value — the create form's own default,
    *  re-read fresh every time the dialog opens (a setting change mid-session should be seen the

@@ -183,6 +183,10 @@ function buildBadgeElement(
     if (stackInfo?.stacked) classes.push('kv-badge-branch--stacked');
     if (stackInfo?.stale) classes.push('kv-badge-branch--stale');
   }
+  // G-UX (item 1): a subtle ring (not a border, which would fight the lane-tint border-color
+  // rules the `kv-badge-lane-tinted` class above can also set) on the current-branch badge itself
+  // — CommitGrid.vue's own `.kv-badge-current` rule.
+  if (spec.isCurrentBranch) classes.push('kv-badge-current');
   badge.className = classes.join(' ');
   // G21 D2: the full name always lives in `@kira/kira-ui`'s own tooltip attribute (a mouse-hover
   // affordance) independent of whether the ~190px CSS truncation (kv-badge-label) actually clips
@@ -214,15 +218,16 @@ function buildBadgeElement(
   badge.appendChild(label);
 
   if (spec.isCurrentBranch) {
-    const dot = document.createElement('span');
-    dot.className = 'kv-badge-dot';
-    // `role="img"` + `aria-label` is what makes a label on a plain, non-interactive `<span>`
-    // reliably reach the accessibility tree — the dot is a second, non-text signal for "this is
-    // the current branch" (§6.1's "no colour/shape-only meaning" also applies to HEAD itself),
-    // read as part of the row rather than as a separate focusable control (§7's own "Done when").
-    dot.setAttribute('role', 'img');
-    dot.setAttribute('aria-label', 'current branch');
-    badge.appendChild(dot);
+    // G-UX (item 1): a check glyph, not a plain dot — the dot was a 5×5px circle, easy to miss
+    // next to the badge's own icon; a recognisable checkmark reads as "current" at a glance
+    // without needing colour to carry the meaning. Still `role="img"` + `aria-label`, the same
+    // "reliably reach the accessibility tree as a second, non-text signal" reasoning the dot it
+    // replaces already established (§6.1/§7's own "no colour/shape-only meaning" still applies).
+    const check = document.createElement('span');
+    check.className = 'codicon codicon-check kv-badge-current-glyph';
+    check.setAttribute('role', 'img');
+    check.setAttribute('aria-label', 'current branch');
+    badge.appendChild(check);
   }
 
   return badge;

@@ -273,6 +273,13 @@ function updateHandlePositions(): void {
 }
 
 function rebuildColumns(): void {
+  // G-UX (item 9): resizeCanvas() BEFORE setColumns() — SlickGrid's own cached canvas width has
+  // to already reflect the host's current size before the new column set (and its `left` offsets)
+  // is written, or the columns are laid out against a stale width. Without this, the detailOpen
+  // watcher below used to call setColumns() alone (stale, pane-open width) and a ResizeObserver
+  // rAF one frame later called resizeCanvas()+rebuildColumns() again (the true, final width) —
+  // two different offsets painted a frame apart read as the columns sliding into place.
+  grid?.resizeCanvas();
   grid?.setColumns(currentColumns());
   updateHandlePositions();
 }
@@ -767,9 +774,14 @@ watch(
 );
 // G-UX D1: the detail pane opening/closing changes the column model itself (compact vs. full),
 // unlike every watcher above — a full `rebuildColumns()`, not just an invalidate/render.
+// G-UX (item 9): `flush: 'post'` — this must run AFTER Vue has applied the pane's own width
+// change to the DOM (App.vue's `detailWidthPx`/the pane unmounting), so `host.clientWidth` (read
+// inside `rebuildColumns()` -> `currentColumns()`/`resizeCanvas()`) already reflects the grid's
+// true final width instead of the pane-open one.
 watch(
   () => props.detailOpen,
   () => rebuildColumns(),
+  { flush: 'post' },
 );
 // G-UX D8 (item 8): the date format is now a Display setting (`RepoSettingsDialog.vue`), not a
 // per-cell toggle — mirrors the `generation`/`searchGeneration`/`pr`/`stack` watchers above.
@@ -963,6 +975,18 @@ defineExpose({ scrollToRow, focusGrid, scrollToTopRow, getViewportTop });
   cursor: pointer;
 }
 
+/* G-UX (item 1): the checked-out row's own subtle background tint + left accent bar — placed
+   BEFORE :hover/.kv-row-selected below (equal specificity throughout this file's own rows,
+   (0,3,0) each; the LAST matching rule wins a tie), so hovering or selecting a HEAD row still
+   shows the hover/selection background on top of this one, not the reverse. font-weight has no
+   such ordering concern (hover/selected never set it), so it stays on this same rule rather than
+   splitting into two. */
+.kv-commit-grid .slick-row.kv-row-head {
+  font-weight: 600;
+  background-color: color-mix(in srgb, var(--kv-focus-border) 9%, transparent);
+  box-shadow: inset 2px 0 0 0 var(--kv-focus-border);
+}
+
 .kv-commit-grid .slick-row:hover {
   background-color: var(--kv-row-hover-bg);
 }
@@ -973,18 +997,26 @@ defineExpose({ scrollToRow, focusGrid, scrollToTopRow, getViewportTop });
 }
 
 /* A border-only ref badge (tag/remote/stash/overflow — every `refBadges.ts` kind except
-   `.kv-badge-local`, which already fills its own background and so never depends on the row's)
-   carries its own decoration colour as both `color` and `border-color`, tuned against the row's
-   *un*selected background. A selected row with, say, a green `v1.0.0` tag badge fails contrast
-   for real (P5 W14's own axe scan on the commit-detail pane's populated state, the first scan to
-   select a row carrying this particular badge kind) — fixed with the row's own selected-
+   `.kv-badge-local`, which used to always fill its own OPAQUE background and so never depend on
+   the row's) carries its own decoration colour as both `color` and `border-color`, tuned against
+   the row's *un*selected background. A selected row with, say, a green `v1.0.0` tag badge fails
+   contrast for real (P5 W14's own axe scan on the commit-detail pane's populated state, the first
+   scan to select a row carrying this particular badge kind) — fixed with the row's own selected-
    foreground, already verified high-contrast against `--kv-row-selected-bg`, for both properties
    so the badge's outline stays visible too. (G21 D5: the sha column's own copy of this same fix
-   was deleted along with the column itself.) */
+   was deleted along with the column itself.)
+
+   G-UX (item 2b): `.kv-badge-local.kv-badge-lane-tinted` joins this list — its own background is
+   a *translucent* lane wash now (the per-lane rules below), not the opaque fill the comment above
+   still describes for the untinted case, so it DOES depend on whatever sits underneath it once a
+   lane is known; scoped to `.kv-badge-lane-tinted` only so a local badge with no lane data yet
+   (rare — the layout worker has not attached a colour to this row) keeps its today-established
+   look, unaffected. */
 .kv-commit-grid .slick-row.kv-row-selected .kv-badge-remote,
 .kv-commit-grid .slick-row.kv-row-selected .kv-badge-tag,
 .kv-commit-grid .slick-row.kv-row-selected .kv-badge-stash,
-.kv-commit-grid .slick-row.kv-row-selected .kv-badge-overflow {
+.kv-commit-grid .slick-row.kv-row-selected .kv-badge-overflow,
+.kv-commit-grid .slick-row.kv-row-selected .kv-badge-local.kv-badge-lane-tinted {
   color: var(--kv-row-selected-fg);
   border-color: var(--kv-row-selected-fg);
 }
@@ -994,10 +1026,6 @@ defineExpose({ scrollToRow, focusGrid, scrollToTopRow, getViewportTop });
 .kv-commit-grid .slick-row:focus-visible {
   outline: 1px solid var(--kv-focus-border);
   outline-offset: -1px;
-}
-
-.kv-commit-grid .slick-row.kv-row-head {
-  font-weight: 600;
 }
 
 /* The stash tip (refs/stash — W7's DecorationRef "stash" kind): italic subject text is the row-
@@ -1037,21 +1065,52 @@ defineExpose({ scrollToRow, focusGrid, scrollToTopRow, getViewportTop });
 }
 
 /* G19 D1: the graph column's own HEAD indicator — an unfilled ring in the same token the
-   existing branch-badge dot already uses (.kv-badge-dot, above), additive to whichever shapes
-   the row's node already draws (stash/merge precedence untouched — rowSvg.ts's planNode). */
+   current-branch badge's own ring/glyph use (.kv-badge-current/.kv-badge-current-glyph, below),
+   additive to whichever shapes the row's node already draws (stash/merge precedence untouched —
+   rowSvg.ts's planNode). */
 .kv-graph-head-ring {
   stroke: var(--kv-focus-border);
 }
 
+/* G-UX (item 1): the soft backdrop disc behind the HEAD ring — rowSvg.ts's buildRowSvg paints
+   this one shape UNDER the row's own edges, everything else (including the ring above) on top. */
+.kv-graph-head-halo {
+  fill: var(--kv-focus-border);
+  fill-opacity: 0.18;
+}
+
+/* G-UX (item 2b): the literal ask — badges above the message, on their own line, rather than
+   fighting it for horizontal space (item 2a's `.kv-ref-badges` `max-width` cap was the quick,
+   low-risk stopgap; this supersedes it). A 2-row CSS Grid, not a flex column: `grid-template-rows`
+   reserves BOTH rows unconditionally, so a commit with no badges (most rows) still puts its
+   subject on row 2 — the same baseline every other row's subject sits on — with nothing rendered
+   in row 1 at all, not an empty placeholder element (`columns.ts`'s own `messageFormatter` skips
+   `.kv-message-badges-row` entirely for an undecorated row; the grid track being empty costs
+   nothing js-side). `16px`/`18px` match `--kv-row-height`'s own `36px` (`density.css`) minus this
+   cell's vertical padding. */
 .kv-cell-message {
+  display: grid;
+  grid-template-rows: 16px 18px;
+  align-items: center;
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* The row-1 strip — ref badges then the PR badge, sharing one flex row and one `overflow: hidden`
+   boundary so a commit with more decorations than fit truncates as a strip rather than spilling
+   into the graph/author column. No `max-width` cap needed any more (item 2a's own reason for one):
+   this row no longer shares its horizontal space with the subject at all. */
+.kv-message-badges-row {
+  grid-row: 1;
   display: flex;
   align-items: center;
-  gap: var(--kv-s-2);
+  gap: 4px;
   min-width: 0;
   overflow: hidden;
 }
 
 .kv-message-subject {
+  grid-row: 2;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1074,8 +1133,9 @@ defineExpose({ scrollToRow, focusGrid, scrollToTopRow, getViewportTop });
 
 /* refBadges.ts's inline badge strip (P4 W7, §6.2): a row with no decorations never gets this
    wrapper at all (buildRefBadges returns null), so this only ever costs layout on rows that
-   have something to show. flex-shrink: 0 keeps badges from squeezing to nothing before the
-   subject's own ellipsis kicks in. */
+   have something to show. Sits inside `.kv-message-badges-row` now (G-UX item 2b), alongside the
+   PR badge — that shared wrapper owns the row's own `overflow: hidden`/width, so this strip
+   itself needs no shrink/max-width logic of its own beyond not collapsing its own badges. */
 .kv-ref-badges {
   display: flex;
   align-items: center;
@@ -1186,23 +1246,32 @@ defineExpose({ scrollToRow, focusGrid, scrollToTopRow, getViewportTop });
   border-color: var(--kv-badge-pr-closed-fg);
 }
 
-.kv-badge-dot {
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background-color: var(--kv-focus-border);
+/* G-UX (item 1): replaces the old 5×5px `.kv-badge-dot` — a checkmark glyph reads as "current"
+   at a glance, where a plain dot next to the badge's own icon was easy to miss. Fixed in
+   `--kv-focus-border`, independent of the badge's own kind colour or any lane tint, so "this is
+   the current branch" stays a single, consistent, always-recognisable signal. */
+.kv-badge-current-glyph {
+  font-size: 9px;
+  color: var(--kv-focus-border);
 }
 
-/* G21 D4: ties a badge back to the row's own lane, on the border and icon only — never the label
-   or the background, both of which stay `--kv-badge-*` (D4's own rationale: `--kv-graph-lane-N`
-   is tuned for 1.6px SVG strokes on a panel background, not for text contrast, and would fail
-   legibility as a fill/label colour on several lanes in several themes). This is additive to,
-   never a replacement for, `.kv-badge-local`/`-remote`/`-tag`/`-stash` above — the kind colour and
-   shape/glyph distinction (§6.1's "no colour-only meaning") still carry the badge's own meaning
-   regardless of whether a lane colour is known. Eight rules, matching `vscode-tokens.css`'s own
-   generated `.kv-lane-0`.`.kv-lane-7` range (`DEFAULT_PALETTE_SIZE`) — deliberately hand-written
-   here rather than folded into that generated block, since these read `color`/`border-color` for
-   an HTML badge, not the `fill`/`stroke` an SVG graph node needs. */
+/* The ring goes on the badge itself, not the glyph — a `box-shadow`, not `border`, so it never
+   fights the lane-tinted `border-color` rules below (`.kv-badge-lane-tinted`). */
+.kv-badge-current {
+  box-shadow: 0 0 0 1px var(--kv-focus-border);
+}
+
+/* G21 D4: ties a badge back to the row's own lane, on the border and icon — for an outline badge
+   (`.kv-badge-remote`/`-tag`/`-stash`, the overflow badge) this is the whole of it, same as
+   always: never the label, which stays `--kv-badge-*` (`--kv-graph-lane-N` is tuned for 1.6px SVG
+   strokes on a panel background, not for text contrast, and would fail legibility as a solid
+   label colour on several lanes in several themes). Additive to, never a replacement for,
+   `.kv-badge-remote`/`-tag`/`-stash` above — the kind colour and shape/glyph distinction (§6.1's
+   "no colour-only meaning") still carry the badge's own meaning regardless of whether a lane
+   colour is known. Eight rules, matching `vscode-tokens.css`'s own generated `.kv-lane-0`.
+   `.kv-lane-7` range (`DEFAULT_PALETTE_SIZE`) — deliberately hand-written here rather than folded
+   into that generated block, since these read `color`/`border-color` for an HTML badge, not the
+   `fill`/`stroke` an SVG graph node needs. */
 .kv-badge-lane-tinted.kv-lane-0 { border-color: var(--kv-graph-lane-0); }
 .kv-badge-lane-tinted.kv-lane-0 .kv-badge-icon { color: var(--kv-graph-lane-0); }
 .kv-badge-lane-tinted.kv-lane-1 { border-color: var(--kv-graph-lane-1); }
@@ -1219,6 +1288,49 @@ defineExpose({ scrollToRow, focusGrid, scrollToTopRow, getViewportTop });
 .kv-badge-lane-tinted.kv-lane-6 .kv-badge-icon { color: var(--kv-graph-lane-6); }
 .kv-badge-lane-tinted.kv-lane-7 { border-color: var(--kv-graph-lane-7); }
 .kv-badge-lane-tinted.kv-lane-7 .kv-badge-icon { color: var(--kv-graph-lane-7); }
+
+/* G-UX (item 2b): the literal ask's "easy to spot" half — a *filled* local badge (unlike the
+   outline kinds above) takes its own background from the lane too, not just its border/icon, so
+   the badge itself reads as "this lane's branch" at a glance. `color-mix(... 22%, transparent)`
+   rather than a solid `--kv-graph-lane-N` fill: several lanes are near-white and would fail text
+   contrast as a solid fill/label colour (the same reason the outline kinds above never tint their
+   label) — a translucent wash lets the row's own background show through, so the badge's own text
+   can stay at the row's ordinary foreground token instead of needing a lane-specific one. Three
+   properties (background/color/border-color), one rule per lane, at `(0,3,0)` specificity —
+   higher than `.kv-badge-local`'s own plain rule above, so this wins whenever a lane is known
+   without needing `!important`. */
+.kv-badge-local.kv-badge-lane-tinted.kv-lane-0 {
+  background-color: color-mix(in srgb, var(--kv-graph-lane-0) 22%, transparent);
+  color: var(--kv-row-fg);
+}
+.kv-badge-local.kv-badge-lane-tinted.kv-lane-1 {
+  background-color: color-mix(in srgb, var(--kv-graph-lane-1) 22%, transparent);
+  color: var(--kv-row-fg);
+}
+.kv-badge-local.kv-badge-lane-tinted.kv-lane-2 {
+  background-color: color-mix(in srgb, var(--kv-graph-lane-2) 22%, transparent);
+  color: var(--kv-row-fg);
+}
+.kv-badge-local.kv-badge-lane-tinted.kv-lane-3 {
+  background-color: color-mix(in srgb, var(--kv-graph-lane-3) 22%, transparent);
+  color: var(--kv-row-fg);
+}
+.kv-badge-local.kv-badge-lane-tinted.kv-lane-4 {
+  background-color: color-mix(in srgb, var(--kv-graph-lane-4) 22%, transparent);
+  color: var(--kv-row-fg);
+}
+.kv-badge-local.kv-badge-lane-tinted.kv-lane-5 {
+  background-color: color-mix(in srgb, var(--kv-graph-lane-5) 22%, transparent);
+  color: var(--kv-row-fg);
+}
+.kv-badge-local.kv-badge-lane-tinted.kv-lane-6 {
+  background-color: color-mix(in srgb, var(--kv-graph-lane-6) 22%, transparent);
+  color: var(--kv-row-fg);
+}
+.kv-badge-local.kv-badge-lane-tinted.kv-lane-7 {
+  background-color: color-mix(in srgb, var(--kv-graph-lane-7) 22%, transparent);
+  color: var(--kv-row-fg);
+}
 
 /* G19 D2: F2 found this cell had no overflow safety net at all — unlike
    .kv-message-subject/.kv-cell-author (both above), an absolute-format date overflowing the

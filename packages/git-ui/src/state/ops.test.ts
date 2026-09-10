@@ -1,10 +1,12 @@
 import { describe, expect, test } from 'bun:test';
 import type {
+  CheckoutPreflight,
   EventKey,
   EventPayload,
   OpResult,
   ParamsOf,
   PullPreflight,
+  RefRow,
   RemoteOpResult,
   RequestKey,
   ResultOf,
@@ -16,7 +18,7 @@ import type {
   Transport,
 } from '@kira/git-ipc';
 import { BridgeClient } from '../bridge/client.ts';
-import { OpsState } from './ops.ts';
+import { OpsState, remoteFromUpstreamRef } from './ops.ts';
 import { RefsState } from './refs.ts';
 
 /** Same fake `Transport` shape `pr.test.ts` already established — request() is scripted per
@@ -168,5 +170,185 @@ describe('OpsState — #stashAndCarry (via runPull) never touches a pre-existing
     );
     expect(stashPopAttempted).toBe(false);
     expect(ops.announcement.value).toBe('Pulled origin/main (merge)');
+  });
+});
+
+describe('remoteFromUpstreamRef', () => {
+  test('extracts the remote name from a remote-tracking upstream', () => {
+    expect(remoteFromUpstreamRef('refs/remotes/origin/feature')).toBe('origin');
+    expect(remoteFromUpstreamRef('refs/remotes/upstream/main')).toBe('upstream');
+  });
+
+  test('undefined for a purely local upstream (no remote to pull from)', () => {
+    expect(remoteFromUpstreamRef('refs/heads/main')).toBeUndefined();
+  });
+
+  test('undefined for no upstream at all', () => {
+    expect(remoteFromUpstreamRef(undefined)).toBeUndefined();
+  });
+});
+
+// G-UX (item 3): "when checking out a branch that advanced, ask if I want to pull it too" —
+// runCheckout's own post-switch confirm step.
+describe('OpsState — post-checkout pull prompt', () => {
+  function branchRow(overrides: Partial<RefRow> = {}): RefRow {
+    return {
+      refname: 'refs/heads/feature',
+      kind: 'branch',
+      shortName: 'feature',
+      objectId: 'sha-feature',
+      peeledObjectId: undefined,
+      upstream: 'refs/remotes/origin/feature',
+      track: { ahead: 0, behind: 3 },
+      committerDate: 0,
+      isHead: false,
+      checkedOutIn: undefined,
+      annotation: undefined,
+      ...overrides,
+    };
+  }
+
+  const CLEAN_CHECKOUT_PREFLIGHT: CheckoutPreflight = {
+    target: { kind: 'branch', name: 'feature' },
+    detaches: false,
+    createsTracking: undefined,
+    carried: [],
+    blockers: [],
+    verdict: 'clean',
+    routes: [],
+  };
+
+  const CHECKOUT_RESULT: OpResult = {
+    ok: true,
+    error: undefined,
+    undo: null,
+    head: { kind: 'branch', name: 'feature' },
+    inProgress: null,
+  };
+
+  function setUp(branches: readonly RefRow[]): {
+    ops: OpsState;
+    refs: RefsState;
+    transport: FakeTransport;
+  } {
+    const transport = new FakeTransport();
+    const bridge = new BridgeClient(transport);
+    const refs = new RefsState(bridge);
+    const ops = new OpsState(bridge, refs);
+    transport.onRequest = (method) => {
+      switch (method) {
+        case 'status.get':
+          return STATUS;
+        case 'undo.peek':
+          return { slot: null };
+        case 'preflight.checkout':
+          return CLEAN_CHECKOUT_PREFLIGHT;
+        case 'op.run':
+          return CHECKOUT_RESULT;
+        default:
+          throw new Error(`unscripted request: ${method}`);
+      }
+    };
+    ops.setRepoId(REPO);
+    refs.branches.value = branches;
+    return { ops, refs, transport };
+  }
+
+  test('prompts, and "Pull now" runs the pull against the branch\'s own upstream remote', async () => {
+    const { ops, transport } = setUp([branchRow()]);
+    // Script the pull half only once the checkout half has run — `remote.pullPreflight`/
+    // `remote.run` are not requests the checkout-only fixture above answers.
+    let pullPreflightRequested = false;
+    const originalOnRequest = transport.onRequest;
+    transport.onRequest = (method, params) => {
+      if (method === 'remote.pullPreflight') {
+        pullPreflightRequested = true;
+        return {
+          strategy: 'merge',
+          source: 'default',
+          upstream: 'origin/feature',
+          ahead: 0,
+          behind: 3,
+          dirty: false,
+          routes: [],
+          blockers: [],
+        } satisfies PullPreflight;
+      }
+      if (method === 'remote.run') {
+        return {
+          ok: true,
+          error: undefined,
+          updates: [],
+          head: { kind: 'branch', name: 'feature' },
+          inProgress: null,
+        } satisfies RemoteOpResult;
+      }
+      return originalOnRequest(method, params);
+    };
+
+    await tick();
+    const runPromise = ops.runCheckout('feature', 'switch');
+    // runCheckout's own post-switch prompt awaits #confirmPostCheckoutPull — resolve it exactly
+    // as PostCheckoutPullDialog.vue's own "Pull now" button would, before awaiting the call's own
+    // completion (it does not resolve until the dialog does).
+    await tick();
+    expect(ops.pendingPostCheckoutPull.value).toEqual({
+      branch: 'feature',
+      remote: 'origin',
+      upstreamShortName: 'origin/feature',
+      behind: 3,
+    });
+
+    ops.resolvePostCheckoutPullDialog(true);
+    await runPromise;
+
+    expect(pullPreflightRequested).toBe(true);
+    const pullCall = transport.calls.find((c) => c.method === 'remote.run');
+    if (pullCall === undefined) throw new Error('expected a remote.run call');
+    const pullParams = pullCall.params as { remote: string; branch: string };
+    expect(pullParams.remote).toBe('origin');
+    expect(pullParams.branch).toBe('feature');
+  });
+
+  test('"Not now" leaves the branch checked out without pulling', async () => {
+    const { ops, transport } = setUp([branchRow()]);
+    await tick();
+    const runPromise = ops.runCheckout('feature', 'switch');
+    await tick();
+
+    expect(ops.pendingPostCheckoutPull.value).toBeDefined();
+    ops.resolvePostCheckoutPullDialog(false);
+    await runPromise;
+
+    expect(ops.pendingPostCheckoutPull.value).toBeUndefined();
+    expect(transport.calls.some((c) => c.method === 'remote.pullPreflight')).toBe(false);
+  });
+
+  test('no prompt when the branch is already up to date', async () => {
+    const { ops } = setUp([branchRow({ track: { ahead: 0, behind: 0 } })]);
+    await tick();
+    await ops.runCheckout('feature', 'switch');
+    expect(ops.pendingPostCheckoutPull.value).toBeUndefined();
+  });
+
+  test('no prompt when the branch has no upstream', async () => {
+    const { ops } = setUp([branchRow({ track: undefined, upstream: undefined })]);
+    await tick();
+    await ops.runCheckout('feature', 'switch');
+    expect(ops.pendingPostCheckoutPull.value).toBeUndefined();
+  });
+
+  test('no prompt when the upstream is gone', async () => {
+    const { ops } = setUp([branchRow({ track: 'gone' })]);
+    await tick();
+    await ops.runCheckout('feature', 'switch');
+    expect(ops.pendingPostCheckoutPull.value).toBeUndefined();
+  });
+
+  test('no prompt on a detach, even to a target behind its own upstream', async () => {
+    const { ops } = setUp([branchRow()]);
+    await tick();
+    await ops.runCheckout('feature', 'detach');
+    expect(ops.pendingPostCheckoutPull.value).toBeUndefined();
   });
 });

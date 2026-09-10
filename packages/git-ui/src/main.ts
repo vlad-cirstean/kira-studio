@@ -1,4 +1,4 @@
-import type { HostKind, Transport, UiActionKind } from '@kira/git-ipc';
+import type { EventPayload, HostKind, Transport, UiActionKind } from '@kira/git-ipc';
 import { vKuiTooltip } from '@kira/kira-ui';
 import { createApp, type App as VueApp } from 'vue';
 import AppRoot from './App.vue';
@@ -43,6 +43,15 @@ export interface MountOptions {
     action: UiActionKind;
     target?: { repoId: string; sha: string };
   } | null;
+  /** G-UX (item 13): the connection state as of the host's own cold resolve — meaningful for
+   *  BOTH views (unlike `target`/`pendingUiAction` above), so it flows through `mount()`'s own
+   *  `...rest` spread into whichever root is mounted, rather than being picked apart per branch.
+   *  `App.vue`/`ReviewView.vue` each construct their own `BridgeClient` seeded with this, then keep
+   *  it live via the `connection.changed` event — see that class's own doc comment. Named
+   *  `hostConnectionState`, not `connectionState`: both root components already have an unrelated
+   *  local of that name (`BridgeClient.connectionState`, the cold-boot `app.init` success/failure
+   *  signal), and a same-named prop would collide with it as a Vue template key. */
+  readonly hostConnectionState: EventPayload<'connection.changed'>['state'];
 }
 
 /**

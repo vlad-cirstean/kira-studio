@@ -10,7 +10,7 @@
  */
 import { randomInt } from 'node:crypto';
 import { readFileSync } from 'node:fs';
-import { CONTRACT_VERSION, type UiActionKind } from '@kira/git-ipc';
+import { CONTRACT_VERSION, type EventPayload, type UiActionKind } from '@kira/git-ipc';
 import * as vscode from 'vscode';
 import {
   buildWebviewDocument,
@@ -73,10 +73,19 @@ export interface RenderHtmlOptions {
     action: UiActionKind;
     target?: { repoId: string; sha: string };
   } | null;
+  /** G-UX (item 13): the connection state as of THIS resolve — both `panelView.ts` and
+   *  `reviewView.ts` read `ConnectionManager.state` fresh (via `connection.ts`'s own
+   *  `toWireConnectionState`) right before calling this, so a panel opened while Kira Studio is
+   *  already unreachable shows the banner immediately instead of only on the next live
+   *  `connection.changed` push (`retainContextWhenHidden` is off — an `emit` sent before this
+   *  webview has booted is simply dropped, the same cold-boot race `pendingUiAction` above already
+   *  has to handle). Required, unlike `target`/`pendingUiAction`: every resolve, of either view,
+   *  has a real connection state to seed. */
+  readonly connectionState: EventPayload<'connection.changed'>['state'];
 }
 
 export function renderHtml(opts: RenderHtmlOptions): string {
-  const { webview, extensionUri, view, target, pendingUiAction } = opts;
+  const { webview, extensionUri, view, target, pendingUiAction, connectionState } = opts;
   const distUi = vscode.Uri.joinPath(extensionUri, 'dist', 'ui');
   const assets = resolveUiAssets(webview, distUi);
   const csNonce = nonce();
@@ -90,6 +99,7 @@ export function renderHtml(opts: RenderHtmlOptions): string {
     view,
     target: view === 'review' ? (target ?? null) : null,
     pendingUiAction: view === 'graph' ? (pendingUiAction ?? null) : null,
+    connectionState,
   };
 
   return buildWebviewDocument({
