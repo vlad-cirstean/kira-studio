@@ -106,15 +106,29 @@ func nonNilRanges(ranges []gitreview.LineRange) []gitreview.LineRange {
 // mergeBase is `merge-base <base> <branch>` (D6) — exit 0 the shared ancestor sha, exit 1
 // "unrelated" (probe P2), anything else a classified error. sharesHistory (review.go) is now a
 // thin wrapper over this: one helper, two callers, one spawn.
+//
+// G30 round-1 performance review, finding #8: this used to spawn `git merge-base` uncached on
+// EVERY call — and RangeFiles (this method's own two production callers, review.files and
+// review.fileDiff) calls it on nearly every request a review session makes, re-deriving the exact
+// same (base, branch) answer over and over for the life of that session. Cached by (base, branch)
+// ref-name pair through e.mergeBases (cache.go), dropped whole on refsChanged/invalidateAfterWrite
+// exactly like refs/stack — an error is never cached (only a genuine exit-0/exit-1 result is a
+// stable, cacheable fact).
 func (e *RepoEntry) mergeBase(ctx context.Context, base, branch string) (string, bool, error) {
+	if v, ok := e.mergeBases.get(base, branch); ok {
+		return v.sha, v.ok, nil
+	}
 	res, err := e.runAllowingExit(ctx, porcelain.MergeBaseArgs(base, branch), 0, 1)
 	if err != nil {
 		return "", false, err
 	}
 	if res.ExitCode != 0 {
+		e.mergeBases.set(base, branch, mergeBaseCacheValue{})
 		return "", false, nil
 	}
-	return trimTrailingNewline(res.Stdout), true, nil
+	sha := trimTrailingNewline(res.Stdout)
+	e.mergeBases.set(base, branch, mergeBaseCacheValue{sha: sha, ok: true})
+	return sha, true, nil
 }
 
 func trimTrailingNewline(b []byte) string {

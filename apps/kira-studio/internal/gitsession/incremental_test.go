@@ -348,3 +348,90 @@ func TestReviewFileDiff_NoSnapshotForAFileWithNoRecord(t *testing.T) {
 		t.Fatalf("Body = %+v, want the whole range diff, not an empty body", result.Body)
 	}
 }
+
+// TestRangeFiles_MergeBaseIsCachedAcrossRequests is G30 round-1 performance review finding #8's
+// own proof: RangeFiles (review.files' own orchestration) used to spawn `git merge-base` uncached
+// on every single call, even for the identical (base, branch) pair a review session's own
+// review.files/review.fileDiff round trips repeat over and over while the session sits open.
+func TestRangeFiles_MergeBaseIsCachedAcrossRequests(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not on PATH")
+	}
+	dir := t.TempDir()
+	runInc(t, dir, "init", "-q", "-b", "main")
+	writeIncFile(t, dir, "a.txt", "line1\n")
+	runInc(t, dir, "add", "a.txt")
+	commitInc(t, dir, "base commit")
+
+	runInc(t, dir, "checkout", "-q", "-b", "feature")
+	writeIncFile(t, dir, "a.txt", "line1\nline2\n")
+	runInc(t, dir, "add", "a.txt")
+	commitInc(t, dir, "feature commit")
+
+	runner := newArgSpawnCountingRunner("merge-base")
+	registry := NewRegistry(runner)
+	store := gitreview.NewStore(filepath.Join(t.TempDir(), "review.db"))
+	registry.Review = store
+	t.Cleanup(registry.Close)
+
+	conn := NewConn(ConnID("merge-base-cache-test-conn"), "test-client", "test-client-label", nil)
+	summary, err := conn.Open(context.Background(), registry, "git", dir)
+	if err != nil {
+		t.Fatalf("conn.Open: %v", err)
+	}
+	t.Cleanup(conn.Close)
+	entry, ok := conn.Entry(summary.RepoID)
+	if !ok {
+		t.Fatal("conn.Entry: not held after Open")
+	}
+
+	ctx := context.Background()
+	first, err := entry.RangeFiles(ctx, "main", "feature")
+	if err != nil {
+		t.Fatalf("RangeFiles (first): %v", err)
+	}
+	if got := runner.count("merge-base"); got != 1 {
+		t.Fatalf("merge-base spawns after the first RangeFiles = %d, want 1", got)
+	}
+
+	second, err := entry.RangeFiles(ctx, "main", "feature")
+	if err != nil {
+		t.Fatalf("RangeFiles (second): %v", err)
+	}
+	if got := runner.count("merge-base"); got != 1 {
+		t.Fatalf("merge-base spawns after a second, identical RangeFiles = %d, want still 1 (cached)", got)
+	}
+	if second.MergeBase != first.MergeBase {
+		t.Fatalf("MergeBase = %q, want %q (the cached value must match the freshly spawned one)", second.MergeBase, first.MergeBase)
+	}
+
+	// A refsChanged signal (a real commit landing on the branch) must invalidate the cache —
+	// the next RangeFiles call re-spawns rather than serving a now-stale merge-base.
+	writeIncFile(t, dir, "a.txt", "line1\nline2\nline3\n")
+	runInc(t, dir, "add", "a.txt")
+	commitInc(t, dir, "second feature commit")
+	waitForRefsChangedInc(t, entry)
+
+	if _, err := entry.RangeFiles(ctx, "main", "feature"); err != nil {
+		t.Fatalf("RangeFiles (after a real ref move): %v", err)
+	}
+	if got := runner.count("merge-base"); got != 2 {
+		t.Fatalf("merge-base spawns after a real ref move = %d, want 2 (the cache must drop on refsChanged)", got)
+	}
+}
+
+// waitForRefsChangedInc polls entry.refs until it reports invalid (dropped by note() on
+// refsChanged) or the timeout expires — the watcher's own signal is asynchronous (fsnotify), so a
+// test proving cache invalidation on a real ref move cannot simply call RangeFiles immediately
+// after the commit above.
+func waitForRefsChangedInc(t *testing.T, entry *RepoEntry) {
+	t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		if _, valid := entry.refs.get(); !valid {
+			return
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	t.Fatal("timed out waiting for the watcher's own refsChanged signal to invalidate refs")
+}

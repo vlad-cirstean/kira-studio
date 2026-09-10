@@ -64,6 +64,11 @@ type RepoEntry struct {
 	// stack is G26 D3/D16's own stack.list cache — one value per repository, dropped on
 	// refsChanged and by invalidateAfterWrite exactly like refs.
 	stack *stackCache
+	// mergeBases is G30 round-1 performance review finding #8's own cache — RangeFiles's two
+	// callers (review.files, review.fileDiff) re-spawned merge-base uncached on every request;
+	// dropped on refsChanged and by invalidateAfterWrite exactly like refs/stack (cache.go's own
+	// doc comment on mergeBaseCache).
+	mergeBases *mergeBaseCache
 
 	// headMu guards head/headStale, separate from mu (subs' own lock): every read/status/pre-flight
 	// spawn touches head far more often than it touches the subscriber set.
@@ -141,6 +146,7 @@ func newRepoEntry(
 		diff:            newDiffCache(diffCacheCapBytes),
 		refs:            newRefsCache(),
 		stack:           newStackCache(),
+		mergeBases:      newMergeBaseCache(),
 		head:            summary.Head,
 		undo:            &gitpreflight.UndoSlot{},
 		settings:        settings,
@@ -192,6 +198,7 @@ func (e *RepoEntry) note(sig gitclient.Signal) {
 		e.detail.dropAll()
 		e.refs.drop()
 		e.stack.drop()
+		e.mergeBases.dropAll()
 		e.rangeCount.drop()
 		e.headMu.Lock()
 		e.headStale = true
@@ -303,6 +310,7 @@ func (e *RepoEntry) invalidateAfterWrite() {
 	e.detail.dropAll()
 	e.refs.drop()
 	e.stack.drop()
+	e.mergeBases.dropAll()
 	e.rangeCount.drop()
 	e.headMu.Lock()
 	e.headStale = true
@@ -379,6 +387,7 @@ func (e *RepoEntry) teardown() {
 	e.diff.clear()
 	e.refs.drop()
 	e.stack.drop()
+	e.mergeBases.dropAll()
 	e.rangeCount.drop()
 	e.undo.Set(nil)
 

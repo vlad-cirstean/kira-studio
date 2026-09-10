@@ -157,6 +157,91 @@ func (c *stackCache) drop() {
 	c.valid = false
 }
 
+// mergeBaseCacheCap mirrors detailCacheCap — a merge-base result is small and roughly fixed-size,
+// the same shape reasoning that constant already documents.
+const mergeBaseCacheCap = 64
+
+type mergeBaseCacheKey struct {
+	base   string
+	branch string
+}
+
+type mergeBaseCacheValue struct {
+	sha string
+	ok  bool // false = merge-base's own exit 1, "unrelated histories" (probe P2) — a real, stable,
+	// cacheable answer, not an error.
+}
+
+// mergeBaseCache caches `git merge-base <base> <branch>`'s own result by (base, branch) REF NAME
+// pair (G30 round-1 performance review, finding #8: every review RPC — review.files,
+// review.fileDiff, RangeFiles's other caller — re-spawned this uncached, once per request, even
+// though the same (base, branch) pair is looked up on nearly every one of them while a review
+// session sits open). base/branch are ref names, not shas, so — the same reasoning detailCache's
+// own dropAll already documents for refs/%D decoration — a ref moving can change what its own
+// merge-base with another ref resolves to, and there is no per-entry way to know which cached
+// pairs a given ref move actually touched: dropped **whole** on refsChanged, capped at
+// mergeBaseCacheCap entries (plain LRU by entry count).
+type mergeBaseCache struct {
+	mu    sync.Mutex
+	order []mergeBaseCacheKey
+	byKey map[mergeBaseCacheKey]mergeBaseCacheValue
+}
+
+func newMergeBaseCache() *mergeBaseCache {
+	return &mergeBaseCache{byKey: make(map[mergeBaseCacheKey]mergeBaseCacheValue)}
+}
+
+func (c *mergeBaseCache) get(base, branch string) (mergeBaseCacheValue, bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	key := mergeBaseCacheKey{base, branch}
+	v, ok := c.byKey[key]
+	if !ok {
+		return mergeBaseCacheValue{}, false
+	}
+	c.touchLocked(key)
+	return v, true
+}
+
+func (c *mergeBaseCache) set(base, branch string, v mergeBaseCacheValue) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	key := mergeBaseCacheKey{base, branch}
+	if _, exists := c.byKey[key]; exists {
+		c.removeFromOrderLocked(key)
+	}
+	c.byKey[key] = v
+	c.order = append(c.order, key)
+	for len(c.order) > mergeBaseCacheCap {
+		oldest := c.order[0]
+		c.order = c.order[1:]
+		delete(c.byKey, oldest)
+	}
+}
+
+// dropAll evicts every entry — called on refsChanged and by invalidateAfterWrite, mirroring
+// detailCache/refsCache/stackCache's own ordering (entry.go's note, before the fan-out).
+func (c *mergeBaseCache) dropAll() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.order = nil
+	c.byKey = make(map[mergeBaseCacheKey]mergeBaseCacheValue)
+}
+
+func (c *mergeBaseCache) touchLocked(key mergeBaseCacheKey) {
+	c.removeFromOrderLocked(key)
+	c.order = append(c.order, key)
+}
+
+func (c *mergeBaseCache) removeFromOrderLocked(key mergeBaseCacheKey) {
+	for i, k := range c.order {
+		if k == key {
+			c.order = append(c.order[:i], c.order[i+1:]...)
+			return
+		}
+	}
+}
+
 type diffCacheKey struct {
 	baseSHA string // "" for a root commit — the empty tree has no sha of its own to key on
 	sha     string
