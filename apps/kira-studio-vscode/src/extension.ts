@@ -521,6 +521,26 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         graphProvider.notifyWorktreeProgress(payload);
       }),
     },
+    // G31 round-2 functional-correctness review, finding #3: RunRestack's own per-branch
+    // stack.progress was never forwarded at all — StackDialog.vue's progress list stayed
+    // permanently empty. Both webviews' App.vue instantiate their own StackState, so both get it,
+    // matching repo.changed's own two-provider forward above.
+    {
+      dispose: manager.on('stack.progress', (payload) => {
+        graphProvider.notifyStackProgress(payload);
+        reviewProvider.notifyStackProgress(payload);
+      }),
+    },
+    // G31 round-2 functional-correctness review, finding #4: repoSettings.changed (G18 D4/D7's
+    // cross-connection settings fan-out — every currently connected client sees a repoSettings.set
+    // written by ANY of them) was never forwarded either, so the graph and review webviews (two
+    // independent RpcServers/connections) never saw each other's settings changes.
+    {
+      dispose: manager.on('repoSettings.changed', (payload) => {
+        graphProvider.notifyRepoSettingsChanged(payload);
+        reviewProvider.notifyRepoSettingsChanged(payload);
+      }),
+    },
     manager.onActivityChange((active) => {
       if (activityDebounce) {
         clearTimeout(activityDebounce);

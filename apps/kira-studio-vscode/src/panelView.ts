@@ -118,4 +118,24 @@ export class KiraGraphViewProvider implements vscode.WebviewViewProvider {
   notifyWorktreeProgress(payload: EventPayload<'worktree.progress'>): void {
     this.#server?.emit('worktree.progress', payload);
   }
+
+  /** G31 round-2 functional-correctness review, finding #3: `gitsession/stack.go`'s `RunRestack`
+   *  emits `stack.progress` per branch, and `StackState` (`packages/git-ui/src/state/stack.ts`)
+   *  subscribes — but nothing here ever forwarded it, so `StackDialog.vue`'s own per-branch
+   *  progress list stayed empty for the whole restack. A no-op when no webview is currently
+   *  resolved, same as every other `notify*` above. */
+  notifyStackProgress(payload: EventPayload<'stack.progress'>): void {
+    this.#server?.emit('stack.progress', payload);
+  }
+
+  /** G31 round-2 functional-correctness review, finding #4: `gitrpc/handlers.go`'s `Router`
+   *  subscribes every connection to `repoSettingsChanged` and emits `repoSettings.changed`
+   *  specifically so every currently-connected client sees a `repoSettings.set` written by
+   *  ANY of them (G18 D4/D7's cross-connection fan-out) — but nothing here ever forwarded it,
+   *  so a setting changed in this panel's own dialog never reached the review panel's
+   *  `RepoSettingsState` (a separate `RpcServer`/connection), and vice versa. A no-op when no
+   *  webview is currently resolved. */
+  notifyRepoSettingsChanged(payload: EventPayload<'repoSettings.changed'>): void {
+    this.#server?.emit('repoSettings.changed', payload);
+  }
 }
