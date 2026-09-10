@@ -83,7 +83,20 @@ export function clampRanges(ranges: readonly LineRange[], lineCount: number): re
 }
 
 /** How much of `target` is covered by `ranges` — the presentation-only question of whether a hunk
- *  or a selection reads as reviewed. Sums overlap length rather than walking line by line. */
+ *  or a selection reads as reviewed. Sums overlap length rather than walking line by line.
+ *
+ *  **`ranges` must already be normalized** (sorted, non-overlapping, non-adjacent — exactly what
+ *  `normalizeRanges` produces). Call `normalizeRanges` yourself first if `ranges` might not be.
+ *
+ *  G31 round-2 performance review, finding #4: this used to call `normalizeRanges(ranges)` on
+ *  every invocation, but its one real caller (`reviewMarking.ts`, both directly and through
+ *  `aggregateCoverage`) always passes `state.reviewedRanges` — wire data whose every server-side
+ *  origin (`gitreview.ProjectRanges`, `Union`, `Subtract`) already ends in `Normalize`, so the
+ *  work was pure repetition: a fresh filter+spread+sort+merge for an array that was already
+ *  sorted and merged. `paint`'s own hunk loop calls this once per hunk against the SAME
+ *  `state.reviewedRanges`, and `updateContextKeys` calls it (via `aggregateCoverage`) on every
+ *  selection change with no debounce — an arrow key inside a reviewed diff used to re-normalize
+ *  the whole reviewed-range list on every keypress for no reason. */
 export function coverage(
   target: LineRange,
   ranges: readonly LineRange[],
@@ -91,7 +104,7 @@ export function coverage(
   if (target.end < target.start) return 'none';
   const targetLength = target.end - target.start + 1;
   let covered = 0;
-  for (const r of normalizeRanges(ranges)) {
+  for (const r of ranges) {
     const start = Math.max(r.start, target.start);
     const end = Math.min(r.end, target.end);
     if (start <= end) covered += end - start + 1;

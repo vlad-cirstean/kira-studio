@@ -83,7 +83,7 @@ async function onMenuSelect(id: string): Promise<void> {
     <div class="kv-branch-section-title kv-global-stash-title">
       <span>Global stash</span>
       <KuiButton
-        class="kv-global-stash-save"
+        variant="icon"
         icon="codicon-add"
         v-kui-tooltip="'Save to global stash…'"
         aria-label="Save to global stash…"
@@ -96,7 +96,7 @@ async function onMenuSelect(id: string): Promise<void> {
       class="kv-branch-row"
       :class="{ 'kv-stash-row--selected': stash.selectedSha.value === entry.sha }"
     >
-      <KuiButton class="kv-branch-row-main" icon="codicon-archive" @click="select(entry)">
+      <KuiButton class="kui-row kv-branch-row-main" icon="codicon-archive" @click="select(entry)">
         <span
           v-if="globalRowModel(entry).origin"
           class="kv-stash-origin"
@@ -110,7 +110,7 @@ async function onMenuSelect(id: string): Promise<void> {
         <span class="kv-stash-date">{{ formatRelativeDate(entry.timestamp) }}</span>
       </KuiButton>
       <KuiButton
-        class="kv-icon-button"
+        variant="icon"
         v-kui-tooltip="'More actions'"
         aria-label="More actions"
         @click="openMenuFromButton(entry, $event)"
@@ -143,7 +143,5 @@ async function onMenuSelect(id: string): Promise<void> {
   justify-content: space-between;
 }
 
-.kv-global-stash-save {
-  padding: 0 0.25em;
-}
+/* G34: `.kv-global-stash-save` is gone — `variant="icon"` is this icon-only button's box now. */
 </style>

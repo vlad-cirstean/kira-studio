@@ -69,15 +69,6 @@ type Registry struct {
 	RepoSettingsGet func(repoID string) (model.GitRepoSettings, error)
 	RepoSettingsSet func(repoID string, patch model.GitRepoSettingsPatch) (model.GitRepoSettings, error)
 
-	// PrepareScriptApprovalGet/PrepareScriptApprovalSet are G25 D11's own server-only accessors
-	// (storage/repos.GitRepoSettingsRepo.{Get,Set}PrepareScriptApproval) — threaded the same way as
-	// RepoSettingsGet/Set above, but never exposed anywhere near RepoSettingsGet/Set's own public
-	// surface (F15). Defaulted to "no approval is ever on file, and no approval can ever be
-	// recorded" — a Registry built by hand (a test) that never overrides these simply always
-	// requires a fresh approval, the fail-safe default for a security-relevant accessor.
-	PrepareScriptApprovalGet func(repoID string) (sha string, ok bool, err error)
-	PrepareScriptApprovalSet func(repoID, sha string) error
-
 	// Review is G11 D3's own seam: review.db's whole surface, defaulted below to a Store over
 	// gitreview.DefaultPath(). Construction is free (the file opens lazily, on the first review
 	// request) — an instance that never serves one never creates review.db and never starts its
@@ -110,9 +101,7 @@ func NewRegistry(runner gitclient.Runner) *Registry {
 		RepoSettingsSet: func(string, model.GitRepoSettingsPatch) (model.GitRepoSettings, error) {
 			return model.DefaultGitRepoSettings(), nil
 		},
-		PrepareScriptApprovalGet: func(string) (string, bool, error) { return "", false, nil },
-		PrepareScriptApprovalSet: func(string, string) error { return nil },
-		Review:                   gitreview.NewStore(gitreview.DefaultPath()),
+		Review: gitreview.NewStore(gitreview.DefaultPath()),
 		Gh: ghclient.NewClient(
 			ghclient.NewDiscovery(ghclient.NewPlatformLocator(), ghclient.NewExecRunner(), ghclient.NewRealClock()),
 			ghclient.NewExecRunner(),
@@ -150,8 +139,7 @@ func (reg *Registry) Acquire(ctx context.Context, gitPath, path string) (*RepoEn
 	}
 	repo := gitclient.NewRepo(summary, reg.runner, gitPath)
 	entry := newRepoEntry(
-		summary, repo, w, reg.Settings, reg.RepoSettingsGet, reg.Review, reg.Gh,
-		reg.IsOpen, reg.PrepareScriptApprovalGet, reg.PrepareScriptApprovalSet,
+		summary, repo, w, reg.Settings, reg.RepoSettingsGet, reg.Review, reg.Gh, reg.IsOpen,
 	)
 	reg.entries[summary.RepoID] = &slot{entry: entry, refs: 1}
 	return entry, reg.releaseFunc(summary.RepoID), nil
@@ -224,6 +212,33 @@ func (reg *Registry) IsOpen(repoID string) bool {
 	defer reg.mu.Unlock()
 	sl, ok := reg.entries[repoID]
 	return ok && sl.refs > 0
+}
+
+// ReconcileAutoFetch calls EnsureAutoFetch on every entry this Registry currently has constructed
+// — held by at least one connection, or still lingering through its post-refcount-zero grace
+// period (D12 step 3).
+//
+// G31 round-2 functional-correctness review, finding #8: EnsureAutoFetch's only OTHER caller is
+// Conn.Open (D23's own off→on path) — nothing at all calls it when fetch.autoInterval changes for
+// a repository that is already open, since that setting is instance-wide (Registry.Settings,
+// backed by storage/repos.SettingsRepo — a different store from the per-repo RepoSettingsGet/Set
+// pair above) and gets written from Kira Studio's own settings pane
+// (bridge/settings.go's SettingsService.Set), a call this domain package cannot see or be called
+// from directly (it must not import internal/bridge, internal/layering_test.go's own rule) — so
+// the caller is main.go's own composition instead, via this method, mirroring how
+// SettingsService.Set already pushes a changed cache budget to Router.PushCacheConfig. Once a
+// repository's own timer has been cleared by pauseAutoFetch (interval read 0 at some point), this
+// is genuinely the ONLY way it can ever restart without a fresh repo.open.
+func (reg *Registry) ReconcileAutoFetch() {
+	reg.mu.Lock()
+	entries := make([]*RepoEntry, 0, len(reg.entries))
+	for _, sl := range reg.entries {
+		entries = append(entries, sl.entry)
+	}
+	reg.mu.Unlock()
+	for _, e := range entries {
+		e.EnsureAutoFetch()
+	}
 }
 
 // Close tears down every entry immediately, linger notwithstanding — for gitsock.Server.Close(), a

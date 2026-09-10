@@ -37,6 +37,9 @@ func (r *Router) handleOpRun(ctx context.Context, c *gitsession.Conn, params jso
 			// method it does not serve at all.
 			return nil, ipcerr.New("E_UNKNOWN_METHOD", "gitrpc: op.run: "+unserved.Kind+" is not served yet")
 		}
+		if errors.Is(err, gitsession.ErrInvalidResetMode) {
+			return nil, ipcerr.BadRequest("gitrpc: op.run: " + err.Error())
+		}
 		return nil, mapGitError(err)
 	}
 	return result, nil

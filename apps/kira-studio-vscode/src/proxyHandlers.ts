@@ -22,7 +22,7 @@
  * `activeRepoId` (the most recently opened repository on this extension host), the review view's
  * own first consumer.
  */
-import { basename, join } from 'node:path';
+import { basename, isAbsolute, join, relative, sep } from 'node:path';
 import type {
   Clipboard,
   DocumentRef,
@@ -412,6 +412,12 @@ export function createProxyHandlers(deps: CreateProxyHandlersDeps): ServerHandle
     // D13: an absolute path over the repo's own root — never repoId, which is only the root for a
     // non-bare repo (F11) — refused with a clear error when the repo is unknown or bare (a bare
     // repo has no checkout and therefore cannot have a conflicted file at all).
+    //
+    // G30 round-1 architecture review, finding #9: `path` is server-supplied over the wire, not a
+    // constant this process picked — a `../../../etc/passwd`-shaped value used to resolve outside
+    // `root` unchecked and open in the editor. Mirrors gitsession's own ErrPathEscapesRoot
+    // containment check (queries.go): join, then verify the relative path back to root is neither
+    // `..` nor `..`-prefixed nor itself absolute (a cross-drive relative() result on Windows).
     'editor.resolveConflict': async ({ repoId, path }) => {
       const root = repoRoots.get(repoId);
       if (!root) {
@@ -419,7 +425,12 @@ export function createProxyHandlers(deps: CreateProxyHandlersDeps): ServerHandle
           `editor.resolveConflict: repo ${repoId} has no known worktree root (not open, or bare)`,
         );
       }
-      await editor.resolveConflict({ path: join(root, path) });
+      const abs = join(root, path);
+      const rel = relative(root, abs);
+      if (rel === '..' || rel.startsWith(`..${sep}`) || isAbsolute(rel)) {
+        throw new Error(`editor.resolveConflict: path escapes the repository root: ${path}`);
+      }
+      await editor.resolveConflict({ path: abs });
       return {};
     },
     // G18 D6: baseCandidates is no longer injected here — a raw request omitting it now resolves

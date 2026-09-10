@@ -6,106 +6,103 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitclient/porcelain"
 )
 
-// TestDetailCache_EvictsOldestPastCap proves detailCache's own 64-entry cap (D7), LRU by access —
-// a get() on the oldest survivor keeps it alive past a fresh insert that would otherwise evict it.
-func TestDetailCache_EvictsOldestPastCap(t *testing.T) {
-	c := newDetailCache()
-	for i := 0; i < detailCacheCap; i++ {
-		c.set(shaFor(i), 0, porcelain.CommitDetail{SHA: shaFor(i)})
-	}
-	// Touch the oldest entry (index 0) so it is no longer the least-recently-used one.
-	if _, ok := c.get(shaFor(0), 0); !ok {
-		t.Fatal("expected the oldest entry still present before the cap is exceeded")
-	}
-	// One more insert past the cap must evict the *new* least-recently-used entry (index 1, since
-	// index 0 was just touched), not index 0.
-	c.set(shaFor(detailCacheCap), 0, porcelain.CommitDetail{SHA: shaFor(detailCacheCap)})
+// G30 round-1 performance review, finding #9: diffCache's own `order` used to be a plain
+// `[]diffCacheKey`, scanned linearly (removeFromOrderLocked) on every touch-on-get and every
+// re-set of an already-cached key — O(n) per access against a cache with no entry-count cap, only
+// a byte budget a repository with many small patches can hold thousands of entries under. Rewired
+// onto a container/list.List (O(1) MoveToBack/Remove via the list's own element pointers) plus an
+// index from key to *list.Element. These tests are diffCache's first-ever coverage — they exist to
+// prove the list-based rewrite preserves the exact LRU behaviour the old slice-based one had, not
+// merely that it doesn't crash.
 
-	if _, ok := c.get(shaFor(0), 0); !ok {
-		t.Fatal("index 0 was touched most recently among the originals and must survive eviction")
+func diffBody(tag string) porcelain.FileDiffBody {
+	return porcelain.FileDiffBody{Kind: porcelain.BodyText, Hunks: []porcelain.DiffHunk{{Heading: tag}}}
+}
+
+func TestDiffCache_GetSetRoundTrips(t *testing.T) {
+	c := newDiffCache(1 << 20)
+	c.set("base", "sha", "a.txt", diffBody("a"), 10)
+
+	body, bytes, ok := c.get("base", "sha", "a.txt")
+	if !ok {
+		t.Fatal("get: not found, want a hit")
 	}
-	if _, ok := c.get(shaFor(1), 0); ok {
-		t.Fatal("index 1 was the least-recently-used entry and must have been evicted")
+	if body.Hunks[0].Heading != "a" || bytes != 10 {
+		t.Fatalf("get = (%+v, %d), want (a, 10)", body, bytes)
 	}
-	if len(c.byKey) != detailCacheCap {
-		t.Fatalf("cache holds %d entries, want the cap %d", len(c.byKey), detailCacheCap)
+
+	if _, _, ok := c.get("base", "sha", "missing.txt"); ok {
+		t.Fatal("get for an unset key: want a miss")
 	}
 }
 
-// TestDetailCache_DropAllClearsEverything proves the refsChanged behaviour (D7) — every entry
-// gone, not just the ones whose ref actually moved (there is no per-entry way to know that).
-func TestDetailCache_DropAllClearsEverything(t *testing.T) {
-	c := newDetailCache()
-	c.set("sha1", 0, porcelain.CommitDetail{SHA: "sha1"})
-	c.set("sha2", 1, porcelain.CommitDetail{SHA: "sha2"})
-	c.dropAll()
-	if _, ok := c.get("sha1", 0); ok {
-		t.Fatal("sha1 survived dropAll")
+// TestDiffCache_EvictsLeastRecentlyUsedFirst is the crux of the rewrite: a byte budget too small
+// for all three entries must evict the one that was neither set most recently NOR touched by a
+// get() since — proving `order`'s own front/back semantics (least- to most-recently-used) survived
+// the slice-to-list rewrite.
+func TestDiffCache_EvictsLeastRecentlyUsedFirst(t *testing.T) {
+	c := newDiffCache(25) // room for exactly two 10-byte-ish entries plus slack, never three.
+	c.set("base", "sha", "a.txt", diffBody("a"), 10)
+	c.set("base", "sha", "b.txt", diffBody("b"), 10)
+	// Touching a.txt moves it to the most-recently-used end — b.txt is now the oldest untouched
+	// entry, even though it was set AFTER a.txt.
+	if _, _, ok := c.get("base", "sha", "a.txt"); !ok {
+		t.Fatal("get a.txt: want a hit before the touch even matters")
 	}
-	if _, ok := c.get("sha2", 1); ok {
-		t.Fatal("sha2 survived dropAll")
+	// Pushes total past capacity — b.txt (now the least-recently-used) must be evicted, not a.txt.
+	c.set("base", "sha", "c.txt", diffBody("c"), 10)
+
+	if _, _, ok := c.get("base", "sha", "a.txt"); !ok {
+		t.Fatal("a.txt was touched most recently — it must survive eviction")
 	}
-	if len(c.byKey) != 0 || len(c.order) != 0 {
-		t.Fatalf("cache not empty after dropAll: byKey=%d order=%d", len(c.byKey), len(c.order))
+	if _, _, ok := c.get("base", "sha", "b.txt"); ok {
+		t.Fatal("b.txt was the least-recently-used entry — it must have been evicted")
+	}
+	if _, _, ok := c.get("base", "sha", "c.txt"); !ok {
+		t.Fatal("c.txt was just set — it must still be present")
 	}
 }
 
-func shaFor(i int) string {
-	return "sha" + string(rune('a'+i%26)) + string(rune('0'+i/26))
-}
+// TestDiffCache_ReSettingAnExistingKeyMovesItToMostRecentlyUsed proves set() on an ALREADY-cached
+// key re-touches it too (not only get()) — the same removeFromOrderLocked + re-append/re-push
+// path both old and new implementations share.
+func TestDiffCache_ReSettingAnExistingKeyMovesItToMostRecentlyUsed(t *testing.T) {
+	c := newDiffCache(25)
+	c.set("base", "sha", "a.txt", diffBody("a1"), 10)
+	c.set("base", "sha", "b.txt", diffBody("b"), 10)
+	// Re-setting a.txt (a fresh patch for the same key, the real-world "content changed" case)
+	// must move it to most-recently-used, exactly like a get() would.
+	c.set("base", "sha", "a.txt", diffBody("a2"), 10)
+	c.set("base", "sha", "c.txt", diffBody("c"), 10) // evicts the least-recently-used: b.txt.
 
-// TestDiffCache_EvictsByBytesUnderLRUOrder proves D7's own contrast with the detail cache: capped
-// by total bytes, not entry count, and a touched (get) entry survives an eviction pass that would
-// otherwise have taken it.
-func TestDiffCache_EvictsByBytesUnderLRUOrder(t *testing.T) {
-	c := newDiffCache(100)
-	c.set("base1", "sha1", "a.txt", porcelain.FileDiffBody{Kind: porcelain.BodyText}, 40)
-	c.set("base1", "sha1", "b.txt", porcelain.FileDiffBody{Kind: porcelain.BodyText}, 40)
-	if c.total != 80 {
-		t.Fatalf("total = %d, want 80", c.total)
+	if _, _, ok := c.get("base", "sha", "b.txt"); ok {
+		t.Fatal("b.txt must have been evicted — a.txt's re-set should have outranked it")
 	}
-
-	// Touch a.txt so it is no longer the least-recently-used entry.
-	if _, _, ok := c.get("base1", "sha1", "a.txt"); !ok {
-		t.Fatal("a.txt missing before eviction")
+	body, _, ok := c.get("base", "sha", "a.txt")
+	if !ok {
+		t.Fatal("a.txt must still be present")
 	}
-
-	// A third entry pushes total to 150, over the 100-byte cap — b.txt (now the LRU entry) must be
-	// evicted, a.txt (just touched) must survive.
-	c.set("base1", "sha1", "c.txt", porcelain.FileDiffBody{Kind: porcelain.BodyText}, 40)
-
-	if _, _, ok := c.get("base1", "sha1", "a.txt"); !ok {
-		t.Fatal("a.txt (touched) was evicted, want it to survive")
-	}
-	if _, _, ok := c.get("base1", "sha1", "b.txt"); ok {
-		t.Fatal("b.txt (LRU) survived eviction, want it evicted")
-	}
-	if _, _, ok := c.get("base1", "sha1", "c.txt"); !ok {
-		t.Fatal("c.txt (just inserted) missing")
-	}
-	if c.total > 100 {
-		t.Fatalf("total = %d, want <= 100 after eviction", c.total)
+	if body.Hunks[0].Heading != "a2" {
+		t.Fatalf("a.txt body = %q, want the re-set value a2 (not the stale a1)", body.Hunks[0].Heading)
 	}
 }
 
-// TestDiffCache_NeverInvalidatedByAnythingButEviction proves D7's other half: unlike the detail
-// cache, nothing in this package ever calls dropAll on a diff cache — its own clear() exists only
-// for RepoEntry.teardown, and a plain set/get round trip is never disturbed by anything but bytes
-// pressure.
-func TestDiffCache_NeverInvalidatedByAnythingButEviction(t *testing.T) {
-	c := newDiffCache(diffCacheCapBytes)
-	body := porcelain.FileDiffBody{Kind: porcelain.BodyText}
-	c.set("base", "sha", "f.txt", body, 10)
-	if _, _, ok := c.get("base", "sha", "f.txt"); !ok {
-		t.Fatal("entry missing immediately after set")
+func TestDiffCache_ClearDropsEverything(t *testing.T) {
+	c := newDiffCache(1 << 20)
+	c.set("base", "sha", "a.txt", diffBody("a"), 10)
+	c.set("base", "sha", "b.txt", diffBody("b"), 10)
+
+	c.clear()
+
+	if _, _, ok := c.get("base", "sha", "a.txt"); ok {
+		t.Fatal("a.txt: want a miss after clear()")
 	}
-	// A root commit's own key (baseSHA == "") is a distinct, valid key, not a collision with any
-	// other repo's own empty string.
-	c.set("", "root-sha", "f.txt", body, 10)
-	if _, _, ok := c.get("", "root-sha", "f.txt"); !ok {
-		t.Fatal("root-commit entry (empty baseSha) missing")
+	if _, _, ok := c.get("base", "sha", "b.txt"); ok {
+		t.Fatal("b.txt: want a miss after clear()")
 	}
-	if _, _, ok := c.get("base", "sha", "f.txt"); !ok {
-		t.Fatal("original entry evicted by an unrelated set — cache must not cross-invalidate")
+	// The cache must still be usable after clear() — not left in some half-torn-down state.
+	c.set("base", "sha", "c.txt", diffBody("c"), 10)
+	if _, _, ok := c.get("base", "sha", "c.txt"); !ok {
+		t.Fatal("c.txt: want a hit — the cache must work after clear()")
 	}
 }

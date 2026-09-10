@@ -64,7 +64,7 @@ defineExpose({ refresh: doRefresh });
 <template>
   <KuiButton
     :icon="ACTION_ICONS.refresh"
-    class="kv-icon-button kv-refresh-button"
+    variant="icon" class="kv-refresh-button"
     :class="{ 'kv-refresh-spinning': isRefreshing }"
     :disabled="isBusy"
     v-kui-tooltip="tooltip"

@@ -104,11 +104,10 @@ test.describe('kira-ui floating primitives — geometry', () => {
     await page.setViewportSize({ width: 1000, height: Math.ceil(clickY + 20) });
 
     await fileRow.click({ button: 'right', position: { x: 10, y: rowBox.height / 2 } });
-    // The file row's own contextmenu handler (FileTree.vue's onRowContextMenu) calls only
-    // preventDefault(), not stopPropagation() — a pre-existing bubbling quirk outside this
-    // phase's own positioning-only scope (not fixed here) that also opens the row's "Commit
-    // actions" menu underneath. Scoped to the one this case actually cares about.
-    const menu = page.getByRole('menu', { name: 'File actions' });
+    // G34 D17: FileTree.vue's own contextmenu handler (onRowContextMenu) now calls
+    // stopPropagation() as well as preventDefault(), so the row's ancestor "Commit actions" menu
+    // never also opens underneath — exactly one menu, no name filter needed to pick it out.
+    const menu = page.getByRole('menu');
     await expect(menu).toBeVisible();
     const menuBox = await menu.boundingBox();
     if (!menuBox) throw new Error('menu has no box');

@@ -8,12 +8,16 @@
  * (`open-repo-settings` emit), the same shape `stash-changes` already follows.
  *
  * `docs/plans/P11.md` W14 originally added a fifth slot here, `SearchBox.vue`, crammed into this
- * same 35px row. G-UX D9 (item 9) moves it out entirely — a row of its own, below the toolbar,
+ * same row. G-UX D9 (item 9) moves it out entirely — a row of its own, below the toolbar,
  * toggled rather than always rendered (`App.vue` owns it now, alongside `AppToolbar`, not this
  * component).
  *
- * Metrics match the panel title bar's, not an invented toolbar height (§6.1): 35px
- * (`--kv-toolbar-height`), square corners (`--kv-radius: 0`), no shadow.
+ * G34 D13: this bar's own metrics used to be a literal 35px (`--kv-toolbar-height`), argued as
+ * matching the panel title bar's — which does not hold, since that title bar is VS Code chrome
+ * outside this webview's iframe and there is no shared edge to align to. It is now `--kv-bar-h`
+ * (34px at the default font size, growing with it, Kira's own toolbar/tab-bar/title-bar token —
+ * already what the review sidebar's toolbar uses), 4px-rounded controls (Kira's radius tier, not
+ * `--kv-radius: 0`'s square corners), and Kira's own shadow tier where a shadow is drawn at all.
  *
  * There is no `remotes.list` endpoint (P6/P8 both skip it, per `rowMenuModel.ts`'s own
  * `remoteNamesFrom` doc comment) and remote *management* is out of scope entirely (§10's scope
@@ -23,8 +27,16 @@
  * known at all: there is nothing to name in the tooltip and no useful default to pick.
  */
 import type { StashEntry } from '@kira/git-ipc';
-import { KuiButton, KuiPopoverPanel } from '@kira/kira-ui';
-import { computed, ref } from 'vue';
+import type { MenuSection } from '@kira/kira-ui';
+// `KuiMenuList` is a plain (not `import type`) import even though this file's own script only
+// ever reads it through `InstanceType<typeof KuiMenuList>` — that is still a genuine *value* read
+// (`typeof` on an identifier requires the runtime binding in scope), and the template's own
+// `<KuiMenuList>` tag instantiates it as a component; biome's own static analysis sees neither use
+// and would otherwise "fix" this to `import type`, silently erasing the import (this file's own
+// `useImportType` biome-ignore precedent further down, for the same reason).
+// biome-ignore lint/style/useImportType: see above
+import { KuiButton, KuiMenuList, KuiPopoverPanel } from '@kira/kira-ui';
+import { computed, nextTick, ref } from 'vue';
 import type { DetailActions } from '../state/detailActions.ts';
 import type { GraphViewState } from '../state/graphView.ts';
 import type { OpsState } from '../state/ops.ts';
@@ -66,6 +78,9 @@ const props = defineProps<{
   /** G24 D9: `BranchPicker.vue`'s own `#123` branch-tip badge source — optional, mirrors every
    *  other G24 prop threaded through this toolbar's own children. */
   prState?: PrState;
+  /** Whether `App.vue`'s own search row is currently open — drives the toggle button's `active`
+   *  state, the same `active` = "revealed" convention `ReviewView.vue`'s own filter toggle uses. */
+  searchOpen: boolean;
 }>();
 const emit = defineEmits<{
   (event: 'repo-opened', repoId: string): void;
@@ -93,6 +108,10 @@ const emit = defineEmits<{
    *  phase implemented until now — opens `App.vue`'s own `RepoSettingsDialog.vue`, the same
    *  "toolbar owns no dialog state itself" shape `stash-changes` above already follows. */
   (event: 'open-repo-settings'): void;
+  /** Toggles `App.vue`'s own search row (`toggleSearchRow`) — the toolbar owns no search state of
+   *  its own, the same "emit, don't own" shape every other dialog/panel-toggling emit above
+   *  already follows. */
+  (event: 'toggle-search'): void;
 }>();
 
 function copy(text: string, whatCopied: string): void {
@@ -128,9 +147,33 @@ const pushPullDisabled = computed(
 );
 
 const isForcePushMenuOpen = ref(false);
+const pushMenuListRef = ref<InstanceType<typeof KuiMenuList> | null>(null);
 
-function toggleForcePushMenu(): void {
+async function toggleForcePushMenu(): Promise<void> {
   isForcePushMenuOpen.value = !isForcePushMenuOpen.value;
+  if (!isForcePushMenuOpen.value) return;
+  await nextTick();
+  pushMenuListRef.value?.focusFirst();
+}
+
+// G34 D8: driving `<KuiMenuList>` — today, one item. `danger: true` is the same visual treatment
+// `variant="danger"` gave the hand-rolled `KuiButton` row it replaces.
+const pushMenuSections: readonly MenuSection[] = [
+  {
+    items: [
+      {
+        id: 'force-push-trigger',
+        label: 'Force push…',
+        disabled: false,
+        disabledReason: undefined,
+        danger: true,
+      },
+    ],
+  },
+];
+
+function onPushMenuSelect(id: string): void {
+  if (id === 'force-push-trigger') void doForcePush();
 }
 
 async function doFetch(): Promise<void> {
@@ -307,17 +350,13 @@ const stashDisabled = computed(
           :width="160"
           @close="isForcePushMenuOpen = false"
         >
-          <div class="kv-push-menu" role="menu" aria-label="Push options">
-            <KuiButton
-              variant="danger"
-              class="kv-push-menu-item"
-              role="menuitem"
-              data-testid="force-push-trigger"
-              @click="doForcePush"
-            >
-              Force push…
-            </KuiButton>
-          </div>
+          <KuiMenuList
+            ref="pushMenuListRef"
+            :sections="pushMenuSections"
+            label="Push options"
+            @select="onPushMenuSelect"
+            @close="isForcePushMenuOpen = false"
+          />
         </KuiPopoverPanel>
       </div>
     </template>
@@ -330,13 +369,23 @@ const stashDisabled = computed(
       data-testid="stash-changes-button"
       @click="emit('stash-changes')"
     >
-      Stash changes…
+      Stash
     </KuiButton>
 
     <span class="kv-toolbar-spacer" aria-hidden="true"></span>
 
     <KuiButton
-      class="kv-icon-button"
+      variant="icon"
+      icon="codicon-search"
+      :active="searchOpen"
+      v-kui-tooltip="'Search'"
+      aria-label="Search"
+      data-testid="search-toggle-button"
+      @click="emit('toggle-search')"
+    />
+
+    <KuiButton
+      variant="icon"
       icon="codicon-gear"
       v-kui-tooltip="'Repository settings'"
       aria-label="Repository settings"
@@ -348,7 +397,7 @@ const stashDisabled = computed(
       <span class="codicon codicon-loading kv-remote-progress-spin" aria-hidden="true"></span>
       <span class="kv-remote-progress-label">{{ progressText }}</span>
       <KuiButton
-        class="kv-icon-button"
+        variant="icon"
         icon="codicon-close"
         :disabled="!cancellable"
         v-kui-tooltip="cancellable ? 'Cancel' : cancelDisabledReason"
@@ -369,7 +418,7 @@ const stashDisabled = computed(
       <span class="codicon codicon-loading kv-remote-progress-spin" aria-hidden="true"></span>
       <span class="kv-remote-progress-label">Preparing worktree…</span>
       <KuiButton
-        class="kv-icon-button"
+        variant="icon"
         icon="codicon-close"
         v-kui-tooltip="'Cancel'"
         data-testid="worktree-prepare-cancel"
@@ -382,33 +431,42 @@ const stashDisabled = computed(
 </template>
 
 <style>
+/* G34 D13: Kira's own `.p-toolbar` geometry (`--kv-bar-h`, a token that tracks the user's font
+   size, not the 35px literal this used to be — see this file's own header comment). */
 .kv-toolbar {
   display: flex;
   align-items: center;
-  gap: var(--kv-space-2);
-  height: var(--kv-toolbar-height);
-  padding: 0 var(--kv-space-3);
+  gap: var(--kv-s-3);
+  height: var(--kv-bar-h);
+  padding: 0 var(--kv-s-4);
   background-color: var(--kv-toolbar-bg);
-  border-bottom: 1px solid var(--kv-toolbar-border);
+  border-bottom: var(--kv-border-width) solid var(--kv-toolbar-border);
   flex-shrink: 0;
 }
 
+/* G34 D13: Kira's `.p-toolbar .sep` — a short rail centred in the bar, not a stretched one. */
 .kv-toolbar-separator {
-  width: 1px;
-  align-self: stretch;
-  margin: var(--kv-space-2) 0;
-  background-color: var(--kv-toolbar-border);
+  width: var(--kv-border-width);
+  height: var(--kv-control-inline-h);
+  align-self: center;
+  margin: 0 var(--kv-s-1);
+  background-color: var(--kv-border-strong);
+  flex-shrink: 0;
 }
 
 /* G26 D6/D8: mirrors the remote/worktree-prepare progress strips' own shape — a plain, low-key
    status readout, never a second progress bar (a restack's own per-branch granularity is one
-   `stack.progress` event, not a stream worth a bar of its own, per §9's own "not built" note). */
+   `stack.progress` event, not a stream worth a bar of its own, per §9's own "not built" note).
+   G34 D13: adopts Kira's `.p-status` proportions. */
 .kv-toolbar-restacking {
   display: flex;
   align-items: center;
-  gap: var(--kv-space-1);
+  height: var(--kv-control-h-sm);
+  padding: 0 var(--kv-s-3);
+  border-radius: var(--kv-radius-sm);
+  gap: var(--kv-s-2);
   color: var(--kv-description-fg);
-  font-size: 0.9em;
+  font-size: var(--kv-t-sm);
   white-space: nowrap;
 }
 
@@ -432,34 +490,29 @@ const stashDisabled = computed(
 }
 
 .kv-push-chevron {
-  padding: 0 var(--kv-space-1);
+  padding: 0 var(--kv-s-1);
   border-left: none;
   border-top-left-radius: 0;
   border-bottom-left-radius: 0;
 }
 
-/* G20 D5: positioning/chrome move onto KuiPopoverPanel's own `.kui-popover`. */
-.kv-push-menu {
-  padding: var(--kv-space-1);
-}
-
-.kv-push-menu-item {
-  display: block;
-  width: 100%;
-  text-align: left;
-}
+/* G34 D8: `.kv-push-menu`/`.kv-push-menu-item` are gone — the popover now wraps a
+   `<KuiMenuList>`, the same menu a right-click renders, instead of a hand-rolled one. */
 
 /* The one in-webview progress affordance for whichever `remote.run` is in flight (P6 judgment
    call 6's precedent — no `Notifications` port, D54) — a phase label, throttled to ~10/s
    host-side (OQ10), and the one cancel button every remote op shares, D50's table read forward
    into "enabled" vs "disabled-with-reason". */
+/* G34 D13: adopts Kira's `.p-status` proportions, same treatment as `.kv-toolbar-restacking`. */
 .kv-remote-progress {
   display: inline-flex;
   align-items: center;
-  gap: var(--kv-space-2);
-  padding: 0 var(--kv-space-2);
+  height: var(--kv-control-h-sm);
+  padding: 0 var(--kv-s-3);
+  border-radius: var(--kv-radius-sm);
+  gap: var(--kv-s-2);
   color: var(--kv-description-fg);
-  font-size: 0.9em;
+  font-size: var(--kv-t-sm);
 }
 
 .kv-remote-progress-label {

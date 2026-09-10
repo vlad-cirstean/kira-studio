@@ -84,50 +84,15 @@ function handleCancel(): void {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: var(--kv-space-2);
-  padding: var(--kv-space-2) var(--kv-space-3);
+  gap: var(--kv-s-2);
+  padding: var(--kv-s-2) var(--kv-s-4);
   flex-shrink: 0;
 }
 
-.kv-load-more-button {
-  padding: var(--kv-space-2) var(--kv-space-3);
-  border: 1px solid var(--kv-toolbar-border);
-  border-radius: var(--kv-radius);
-  background: transparent;
-  color: var(--kv-app-fg);
-  font-family: inherit;
-  font-size: inherit;
-  cursor: pointer;
-}
-
-.kv-load-more-button:hover:not(:disabled) {
-  background-color: var(--kv-row-hover-bg);
-}
-
-.kv-load-more-button:focus-visible,
-.kv-load-more-cancel:focus-visible {
-  outline: 1px solid var(--kv-focus-border);
-  outline-offset: -1px;
-}
-
-.kv-load-more-button:disabled {
-  cursor: default;
-  opacity: 0.7;
-}
-
+/* G34: `.kv-load-more-button`/`.kv-load-more-cancel` no longer re-declare a `KuiButton`'s own
+   box (height/padding/border/border-radius) — the default box is this shape now. Cancel keeps
+   its one genuine distinction, the underline. */
 .kv-load-more-cancel {
-  padding: var(--kv-space-2) var(--kv-space-3);
-  border: none;
-  border-radius: var(--kv-radius);
-  background: transparent;
-  color: var(--kv-app-fg);
-  font-family: inherit;
-  font-size: inherit;
-  cursor: pointer;
   text-decoration: underline;
-}
-
-.kv-load-more-cancel:hover {
-  background-color: var(--kv-row-hover-bg);
 }
 </style>

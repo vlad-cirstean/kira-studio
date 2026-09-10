@@ -180,6 +180,42 @@ describe('coverage', () => {
   test('an empty ranges list is none', () => {
     expect(coverage(target, [])).toBe('none');
   });
+
+  // G31 round-2 performance review, finding #4: coverage() no longer normalizes `ranges` itself
+  // (it used to, on every call — pure repetition, since its one real caller always passes
+  // already-normalized wire data). It still gives the right answer for genuinely normalized
+  // input, sorted or not (order alone never affects the sum-of-overlaps below), and its own doc
+  // comment now states the precondition explicitly: normalize first if `ranges` might not be.
+  test('an already-normalized ranges list still gives the right answer regardless of order', () => {
+    expect(
+      coverage(target, [
+        { start: 5, end: 12 },
+        { start: 18, end: 25 },
+      ]),
+    ).toBe('partial');
+    expect(
+      coverage(target, [
+        { start: 18, end: 25 },
+        { start: 5, end: 12 },
+      ]),
+    ).toBe('partial');
+  });
+
+  // Documents WHY the precondition matters, not a desired behavior: duplicate/overlapping
+  // ranges (what normalizeRanges would have merged away) double-count their overlap, which can
+  // push a genuinely partial coverage over the "full" threshold. state.reviewedRanges (every
+  // real caller's own input) can never be shaped like this — every server-side origin ends in
+  // Normalize — so this is a documentation-as-test guard against the precondition quietly
+  // becoming false, not a case any production code path is expected to hit.
+  test('violating the normalized-input precondition can report "full" for a genuinely partial target', () => {
+    const wideTarget: LineRange = { start: 1, end: 100 };
+    const overlapping: readonly LineRange[] = [
+      { start: 1, end: 60 },
+      { start: 1, end: 60 }, // a duplicate — normalizeRanges would have merged this away.
+    ];
+    expect(coverage(wideTarget, overlapping)).toBe('full'); // wrong: only 60 of 100 lines covered.
+    expect(coverage(wideTarget, normalizeRanges(overlapping))).toBe('partial'); // correct once normalized.
+  });
 });
 
 describe('selectionToRange', () => {

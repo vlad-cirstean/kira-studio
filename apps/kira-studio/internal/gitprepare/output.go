@@ -29,6 +29,16 @@ const (
 	batchInterval = 100 * time.Millisecond
 )
 
+// maxUnterminatedBuf bounds how many bytes of a stream's not-yet-'\n'-terminated tail write will
+// accumulate before giving up on waiting for the newline and flushing what it has as a line of its
+// own. G31 round-2 architecture/security review, finding #8: maxRetainedOutput/maxBatchBytes above
+// only bound the OUTPUT of this buffer — lines already split on '\n' — never this buffer's own
+// unsplit input. A still-running process that simply never emits a '\n' (a runaway loop echoing a
+// huge binary blob, or an ordinary script bug) would otherwise grow streamBuf[stream] for the
+// entire 15-minute spawn timeout with neither cap able to help at all, since neither one has
+// anything to act on until a newline finally shows up.
+const maxUnterminatedBuf = 1 << 20
+
 // Line is one sanitized, already-newline-split output line, tagged by which stream it came from.
 type Line struct {
 	Stream string // "stdout" | "stderr"
@@ -119,6 +129,27 @@ func stripANSI(s string) string {
 // output disciplines, one collector, so a line is sanitized exactly once regardless of which of the
 // two consumers reads it. Safe for concurrent Write calls from independent stdout/stderr pipes
 // (os/exec copies each into its assigned io.Writer from its own goroutine).
+//
+// write/flush/tick all release mu before calling onBatch (deliver must never run while mu is held,
+// since a real onBatch — gitsession's own conn.Emit — can take a while and must not block a
+// concurrent stdout/stderr write from making progress). That gap between "batch formed, mu
+// released" and "onBatch actually called" is exactly where two batches, formed back-to-back under
+// mu (batch A strictly before batch B, since mu itself serializes their formation), could still
+// have their onBatch calls interleave in the OPPOSITE order if goroutine scheduling let caller B
+// reach onBatch first — G31 round-2 architecture/security review, finding #9. onBatch's own
+// contract is an ordered stream of lines; a caller has no way to detect or recover from batch B's
+// lines arriving before batch A's.
+//
+// reserveDelivery/finishDelivery close that gap with a ticket, not a hand-off lock: reserveDelivery
+// hands out the next sequence number while mu is STILL held — an O(1), never-blocks-on-I/O
+// operation, so it can never make mu itself wait on a slow onBatch call the way locking a
+// deliver-order mutex right there would (that was this fix's own first, wrong attempt: it let a
+// batch's delivery-order lock stay held across the actual onBatch call, so a later caller's
+// reserveDelivery — called while THAT caller's own mu critical section was still open — blocked
+// waiting for it, holding mu hostage for everyone). finishDelivery, called only after mu has been
+// released, waits on deliverCond for its own ticket's turn, calls onBatch, then advances the turn
+// and wakes whichever ticket is next — serializing deliveries into formation order without ever
+// coupling mu's own hold time to onBatch's.
 type outputCollector struct {
 	onBatch func([]Line)
 	now     func() time.Time
@@ -131,14 +162,21 @@ type outputCollector struct {
 	pending      []Line
 	pendingBytes int
 	lastFlush    time.Time
+
+	deliverMu    sync.Mutex
+	deliverCond  *sync.Cond
+	nextTicket   uint64
+	deliveredSeq uint64
 }
 
 func newOutputCollector(onBatch func([]Line)) *outputCollector {
-	return &outputCollector{
+	c := &outputCollector{
 		onBatch:   onBatch,
 		now:       time.Now,
 		streamBuf: map[string][]byte{"stdout": nil, "stderr": nil},
 	}
+	c.deliverCond = sync.NewCond(&c.deliverMu)
+	return c
 }
 
 // streamWriter adapts one named stream onto io.Writer for cmd.Stdout/cmd.Stderr.
@@ -166,10 +204,15 @@ func (c *outputCollector) write(stream string, chunk []byte) {
 		c.addLineLocked(stream, sanitizeLine(string(buf[:idx])))
 		buf = buf[idx+1:]
 	}
+	for len(buf) > maxUnterminatedBuf {
+		c.addLineLocked(stream, sanitizeLine(string(buf[:maxUnterminatedBuf])))
+		buf = buf[maxUnterminatedBuf:]
+	}
 	c.streamBuf[stream] = buf
 	batch := c.takeBatchIfDueLocked(false)
+	ticket, reserved := c.reserveDelivery(batch)
 	c.mu.Unlock()
-	c.deliver(batch)
+	c.finishDelivery(batch, ticket, reserved)
 }
 
 // flush is called exactly once, after the process has exited: any unterminated trailing bytes on
@@ -184,8 +227,9 @@ func (c *outputCollector) flush() {
 		}
 	}
 	batch := c.takeBatchIfDueLocked(true)
+	ticket, reserved := c.reserveDelivery(batch)
 	c.mu.Unlock()
-	c.deliver(batch)
+	c.finishDelivery(batch, ticket, reserved)
 }
 
 // tick is the idle-flush path: called periodically while the process runs so a small pending batch
@@ -194,14 +238,50 @@ func (c *outputCollector) flush() {
 func (c *outputCollector) tick() {
 	c.mu.Lock()
 	batch := c.takeBatchIfDueLocked(false)
+	ticket, reserved := c.reserveDelivery(batch)
 	c.mu.Unlock()
-	c.deliver(batch)
+	c.finishDelivery(batch, ticket, reserved)
 }
 
-func (c *outputCollector) deliver(batch []Line) {
-	if len(batch) > 0 && c.onBatch != nil {
+// reserveDelivery must be called while mu is STILL held, immediately before it is released: when
+// batch is non-empty it hands out the next delivery ticket, a plain counter increment under
+// deliverMu — never blocked on I/O, so it can never make mu itself wait on some earlier batch's
+// still-in-flight onBatch call. A batch's relative delivery order is thereby fixed at the exact
+// point in mu's own critical-section ordering that it was formed.
+func (c *outputCollector) reserveDelivery(batch []Line) (ticket uint64, reserved bool) {
+	if len(batch) == 0 {
+		return 0, false
+	}
+	c.deliverMu.Lock()
+	ticket = c.nextTicket
+	c.nextTicket++
+	c.deliverMu.Unlock()
+	return ticket, true
+}
+
+// finishDelivery must be called after mu has been released, with the ticket/reserved values
+// reserveDelivery returned from that same critical section. It waits for every earlier ticket to
+// finish its own onBatch call first, then calls onBatch, then hands the turn to the next ticket —
+// serializing deliveries into formation order without ever holding mu (or blocking any other
+// ticket's reserveDelivery) while onBatch runs.
+func (c *outputCollector) finishDelivery(batch []Line, ticket uint64, reserved bool) {
+	if !reserved {
+		return
+	}
+	c.deliverMu.Lock()
+	for c.deliveredSeq != ticket {
+		c.deliverCond.Wait()
+	}
+	c.deliverMu.Unlock()
+
+	if c.onBatch != nil {
 		c.onBatch(batch)
 	}
+
+	c.deliverMu.Lock()
+	c.deliveredSeq++
+	c.deliverCond.Broadcast()
+	c.deliverMu.Unlock()
 }
 
 func (c *outputCollector) addLineLocked(stream, text string) {

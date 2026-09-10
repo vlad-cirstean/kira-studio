@@ -1,6 +1,9 @@
 package ghclient
 
-import "strings"
+import (
+	"net/url"
+	"strings"
+)
 
 // Repo is one GitHub (or GHES) repository identity — Host distinguishes github.com from a custom
 // GHES hostname (D15), threaded through every `gh api --hostname` call this package makes.
@@ -11,7 +14,16 @@ type Repo struct {
 }
 
 // Path returns "owner/repo", the shape `gh api`'s own REST paths and D4's own calls build against.
-func (r Repo) Path() string { return r.Owner + "/" + r.Name }
+// Owner and Name normally hold nothing that needs escaping (GitHub's own username/repo-name
+// character sets), but both are parsed out of a git remote URL (ParseRemote, below) rather than
+// validated against those character sets — a maliciously crafted remote (e.g. a cloned repo's own
+// .git/config) can put "?", "#", or other URL-special characters into either segment. G31 round-2
+// architecture/security review, finding #6: pr.go's own callers splice this string directly into a
+// `gh api` path that also carries a literal "?"-prefixed query string of its own (state=open&...),
+// so an unescaped Owner/Name segment can inject or override query parameters rather than simply
+// 404ing. url.PathEscape treats each segment as opaque, exactly as pr.go already does for
+// individually-escaped sha/branch values (G30 round-1 finding #6).
+func (r Repo) Path() string { return url.PathEscape(r.Owner) + "/" + url.PathEscape(r.Name) }
 
 // trimGitSuffix strips a trailing ".git" — every documented remote form may or may not carry one.
 func trimGitSuffix(s string) string {
@@ -84,8 +96,13 @@ func parseSSHURLForm(rest string) (Repo, bool) {
 }
 
 // parseSCPForm parses "[user@]host:owner/repo(.git)" — git's own scp-like short form, the one shape
-// with no "://" scheme at all.
+// with no "://" scheme at all. Like parseURLForm/parseSSHURLForm, a query string or fragment is
+// dropped, not parsed — G31 round-2 architecture/security review, finding #6, noted this form was
+// missing the same "?"/"#" stripping its URL-shaped siblings already had, letting either character
+// survive into Repo.Owner/Repo.Name.
 func parseSCPForm(s string) (Repo, bool) {
+	s = strings.SplitN(s, "?", 2)[0]
+	s = strings.SplitN(s, "#", 2)[0]
 	at := strings.LastIndexByte(s, '@')
 	if at >= 0 {
 		s = s[at+1:]

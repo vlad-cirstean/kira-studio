@@ -22,6 +22,9 @@ func (r *Router) handleRemotePullPreflight(ctx context.Context, c *gitsession.Co
 	if p.RepoID == "" || p.Branch == "" {
 		return nil, ipcerr.BadRequest("gitrpc: remote.pullPreflight: repoId and branch are required")
 	}
+	if err := validRefArg("branch", p.Branch); err != nil {
+		return nil, err
+	}
 	entry, err := entryFor(c, p.RepoID)
 	if err != nil {
 		return nil, err
@@ -50,6 +53,12 @@ func (r *Router) handleRemotePushPreflight(ctx context.Context, c *gitsession.Co
 	if p.RepoID == "" || p.Branch == "" || p.Remote == "" {
 		return nil, ipcerr.BadRequest("gitrpc: remote.pushPreflight: repoId, branch and remote are required")
 	}
+	if err := validRefArg("branch", p.Branch); err != nil {
+		return nil, err
+	}
+	if err := validRefArg("remote", p.Remote); err != nil {
+		return nil, err
+	}
 	entry, err := entryFor(c, p.RepoID)
 	if err != nil {
 		return nil, err
@@ -68,6 +77,18 @@ func (r *Router) handleRemoteRun(ctx context.Context, c *gitsession.Conn, params
 	}
 	if p.RepoID == "" || p.Kind == "" || p.Remote == "" {
 		return nil, ipcerr.BadRequest("gitrpc: remote.run: repoId, kind and remote are required")
+	}
+	// D8 (see validRefArg, review.go): remote.run is the one write path that spawns `git
+	// fetch`/`push` with a client-supplied remote name as its own argv token — unguarded, a remote
+	// beginning with "-" is read as an option (e.g. `--upload-pack=<cmd>`) rather than a remote
+	// name, letting a paired client run arbitrary commands via a local-path remote.
+	if err := validRefArg("remote", p.Remote); err != nil {
+		return nil, err
+	}
+	if p.Branch != "" {
+		if err := validRefArg("branch", p.Branch); err != nil {
+			return nil, err
+		}
 	}
 	entry, err := entryFor(c, p.RepoID)
 	if err != nil {

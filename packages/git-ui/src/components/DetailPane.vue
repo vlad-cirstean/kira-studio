@@ -10,13 +10,15 @@
  * this component no longer needs the breakpoint-aware "diff takes over the pane" layout its own
  * doc comment used to describe, nor the focus-return dance a mode flip used to need.
  *
- * G-UX D7 (item 7): the pane is subject + files now — `CommitMeta.vue`'s own `selectParentCommit`
+ * G-UX (items 6/7): the pane is subject + files now — `CommitMeta.vue`'s own `selectParentCommit`
  * emit (and this component's own forwarding of it) is gone along with the Parent row itself; the
- * graph's own edges are how you reach a parent. The 80% file-tree proportion (7c) is enforced
- * here, by layout: `.kv-detail-pane-meta`/`-details` are `flex: 0 0 auto` with a `max-height` cap
- * (a bounded `%` of the pane's own height, not of the viewport), `.kv-detail-pane-tree` is
- * `flex: 1 1 auto` and takes the remainder — the caps are what keep a pathological subject or an
- * expanded description from ever pushing the tree below its share.
+ * graph's own edges are how you reach a parent. `CommitMeta` used to mount twice here (message
+ * above the tree, a second "details" instance for Refs/Signature/PR below it, each with its own
+ * scroll cap) — it is a single instance now, folding all of that behind one "Show more" region, so
+ * nothing renders stranded below the file tree any more. The collapsed-state proportion is
+ * enforced the same way as before: `.kv-detail-pane-meta` is `flex: 0 0 auto` with a `max-height`
+ * cap (a bounded `%` of the pane's own height, not of the viewport), `.kv-detail-pane-tree` is
+ * `flex: 1 1 auto` and takes the remainder.
  */
 import type { CommitStore } from '@kira/git-core';
 import { computed } from 'vue';
@@ -66,10 +68,10 @@ function onOpenFile(index: number, pinned: boolean): void {
 
     <template v-if="detail">
       <CommitMeta
-        section="message"
         class="kv-detail-pane-meta"
         :detail="detail"
         :actions="actions"
+        :pr-result="pr?.selected.value"
       />
       <FileTree
         class="kv-detail-pane-tree"
@@ -86,13 +88,6 @@ function onOpenFile(index: number, pinned: boolean): void {
         @update:list-mode="detailState.setListMode($event)"
         @update:filter="detailState.setFilter($event)"
         @update:parent-index="detailState.setParentIndex($event)"
-      />
-      <CommitMeta
-        section="details"
-        class="kv-detail-pane-details"
-        :detail="detail"
-        :actions="actions"
-        :pr-result="pr?.selected.value"
       />
     </template>
 
@@ -124,12 +119,6 @@ function onOpenFile(index: number, pinned: boolean): void {
   overflow: auto;
 }
 
-.kv-detail-pane-details {
-  flex: 0 0 auto;
-  max-height: 12%;
-  overflow: auto;
-}
-
 .kv-detail-pane-tree {
   flex: 1 1 auto;
   min-height: 0;
@@ -139,13 +128,13 @@ function onOpenFile(index: number, pinned: boolean): void {
 
 .kv-detail-pane-error {
   margin: 0;
-  padding: var(--kv-space-4);
+  padding: var(--kv-s-5);
   color: var(--kv-error-fg);
 }
 
 .kv-detail-pane-loading {
   margin: 0;
-  padding: var(--kv-space-4);
+  padding: var(--kv-s-5);
   color: var(--kv-description-fg);
 }
 </style>

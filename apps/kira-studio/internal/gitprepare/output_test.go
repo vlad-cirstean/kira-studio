@@ -97,6 +97,50 @@ func TestOutputCollector_TrailingUnterminatedLineFlushed(t *testing.T) {
 	}
 }
 
+// TestOutputCollector_UnterminatedStreamBufDoesNotGrowUnbounded is G31 round-2 architecture/
+// security review, finding #8: maxRetainedOutput/maxBatchBytes (proved by the two tests below this
+// one) only bound already-'\n'-split LINES; streamBuf[stream] itself — the raw, not-yet-terminated
+// tail write() accumulates while waiting for the next '\n' — had no bound of its own at all before
+// maxUnterminatedBuf. A single write() call carrying many megabytes with no '\n' anywhere in it (a
+// runaway process echoing a huge blob, or a script bug) used to grow that buffer by the whole
+// chunk's size in one shot, regardless of either cap above. This proves a single such write is
+// instead split into maxUnterminatedBuf-sized lines as it goes (each one still passing through the
+// exact same sanitize+cap pipeline every other line does — TestOutputCollector_RetainedBytesCapped
+// below is what caps its total contribution to the retained transcript), rather than the streaming
+// buffer itself absorbing the whole thing in memory unbounded.
+func TestOutputCollector_UnterminatedStreamBufDoesNotGrowUnbounded(t *testing.T) {
+	c := newOutputCollector(nil)
+	huge := strings.Repeat("x", maxUnterminatedBuf*3+1000) // no '\n' anywhere in it.
+	c.write("stdout", []byte(huge))
+
+	c.mu.Lock()
+	bufLen := len(c.streamBuf["stdout"])
+	c.mu.Unlock()
+	if bufLen > maxUnterminatedBuf {
+		t.Fatalf("streamBuf[stdout] len = %d after one oversized unterminated write, want <= %d (the "+
+			"buffer must flush itself as it goes, not absorb the whole chunk)", bufLen, maxUnterminatedBuf)
+	}
+
+	// maxUnterminatedBuf (1 MiB) is itself well past maxRetainedOutput (256 KiB), so the very first
+	// forced flush already exceeds the retained-transcript budget — Truncated must reflect that,
+	// exactly as an equally oversized but '\n'-terminated line already would.
+	if !c.isTruncated() {
+		t.Fatal("want Truncated true — the forced flush of an oversized unterminated chunk exceeds maxRetainedOutput")
+	}
+
+	// The collector must still work normally afterward — a real '\n'-terminated line right after
+	// the oversized one is decoded cleanly, proving this isn't a stuck or corrupted state. The
+	// leading '\n' terminates whatever unterminated remainder of the oversized write is still
+	// buffered (huge's own length need not be an exact multiple of maxUnterminatedBuf), so
+	// "ordinary line" itself starts clean.
+	c.write("stdout", []byte("\nordinary line\n"))
+	c.flush()
+	lines := c.finalLines()
+	if lines[len(lines)-1].Text != "ordinary line" {
+		t.Fatalf("last line = %q, want %q — the collector must recover cleanly after an oversized flush", lines[len(lines)-1].Text, "ordinary line")
+	}
+}
+
 // TestOutputCollector_RetainedLinesCapped proves maxRetainedLines: more lines than the cap still
 // produce exactly the cap's worth of retained lines, with Truncated set.
 func TestOutputCollector_RetainedLinesCapped(t *testing.T) {
@@ -249,5 +293,80 @@ func TestOutputCollector_FlushDeliversPendingUnconditionally(t *testing.T) {
 	}
 	if total != 2 {
 		t.Fatalf("got %d total lines across %d batches, want 2", total, len(batches))
+	}
+}
+
+// TestOutputCollector_DeliveriesSerializeInFormationOrder is G31 round-2 architecture/security
+// review, finding #9: write/flush/tick all form a batch under mu, release mu, and only then call
+// onBatch — a gap where two batches formed back-to-back under mu (batch1 strictly before batch2,
+// since mu itself serializes formation) could still have their onBatch calls run in the OPPOSITE
+// order if goroutine scheduling let the second caller reach deliver() first. onBatch's own contract
+// is an ordered stream of lines; a caller (gitsession's own conn.Emit, forwarding worktree.progress
+// events) has no way to detect or recover from a later batch's lines arriving before an earlier
+// one's.
+//
+// This exercises reserveDelivery/finishDelivery directly (the exact pair write/flush/tick call)
+// rather than racing two goroutines through write() itself, since the whole point is a
+// deterministic proof of the serialization guarantee, not a scheduling-dependent flake: batch1 is
+// formed and its delivery turn reserved first; its own onBatch call is then held open on a channel
+// so the test can prove batch2 — formed and reserved strictly afterward — cannot complete its own
+// delivery until batch1's is released.
+func TestOutputCollector_DeliveriesSerializeInFormationOrder(t *testing.T) {
+	release := make(chan struct{})
+	blockedOnFirst := make(chan struct{})
+	var mu sync.Mutex
+	var order []string
+	c := newOutputCollector(func(b []Line) {
+		text := b[0].Text
+		if text == "first" {
+			close(blockedOnFirst)
+			<-release
+		}
+		mu.Lock()
+		order = append(order, text)
+		mu.Unlock()
+	})
+	var tick int64
+	c.now = func() time.Time {
+		tick++
+		return time.Unix(0, 0).Add(time.Duration(tick) * time.Second) // always past batchInterval.
+	}
+
+	c.mu.Lock()
+	c.addLineLocked("stdout", "first")
+	batch1 := c.takeBatchIfDueLocked(false)
+	ticket1, reserved1 := c.reserveDelivery(batch1)
+	c.mu.Unlock()
+	if !reserved1 {
+		t.Fatal("expected batch1 to reserve a delivery turn")
+	}
+	go c.finishDelivery(batch1, ticket1, reserved1)
+	<-blockedOnFirst // batch1's onBatch has started (and is now blocked) before batch2 is even formed.
+
+	c.mu.Lock()
+	c.addLineLocked("stdout", "second")
+	batch2 := c.takeBatchIfDueLocked(false)
+	ticket2, reserved2 := c.reserveDelivery(batch2)
+	c.mu.Unlock()
+
+	done2 := make(chan struct{})
+	go func() {
+		c.finishDelivery(batch2, ticket2, reserved2)
+		close(done2)
+	}()
+
+	select {
+	case <-done2:
+		t.Fatal("batch2's delivery completed before batch1's own delivery was released — deliveries are not serialized in formation order")
+	case <-time.After(50 * time.Millisecond):
+	}
+
+	close(release)
+	<-done2
+
+	mu.Lock()
+	defer mu.Unlock()
+	if len(order) != 2 || order[0] != "first" || order[1] != "second" {
+		t.Fatalf("delivery order = %v, want [first second]", order)
 	}
 }

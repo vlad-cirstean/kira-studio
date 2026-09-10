@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -75,6 +76,80 @@ func TestSession_Check_Missing(t *testing.T) {
 	_, err := sess.Check("deadbeefdeadbeefdeadbeefdeadbeefdeadbeef")
 	if !errors.Is(err, catfile.ErrMissing) {
 		t.Fatalf("got %v, want ErrMissing", err)
+	}
+}
+
+// TestSession_CheckMany_MixOfFoundAndMissing is G30 round-1 performance review, finding #5's own
+// regression guard: CheckMany writes every rev in one request() call and must read back exactly
+// one header per rev, IN ORDER, correctly separating found entries (their own real ObjectInfo)
+// from missing ones (a zero ObjectInfo, matching Check's own "" convention) — not just for an
+// all-found or all-missing batch, but for one that interleaves both, which is where an off-by-one
+// in the response-reading loop would actually surface.
+func TestSession_CheckMany_MixOfFoundAndMissing(t *testing.T) {
+	skipWithoutGit(t)
+	dir := initRepo(t)
+	if err := os.WriteFile(filepath.Join(dir, "second.txt"), []byte("second\n"), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	cmd := exec.Command("git", "add", "second.txt")
+	cmd.Dir = dir
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("git add: %v\n%s", err, out)
+	}
+	cmd = exec.Command("git", "commit", "-q", "-m", "add second.txt")
+	cmd.Dir = dir
+	cmd.Env = append(os.Environ(), "GIT_AUTHOR_NAME=Test", "GIT_AUTHOR_EMAIL=test@example.com",
+		"GIT_COMMITTER_NAME=Test", "GIT_COMMITTER_EMAIL=test@example.com")
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("git commit: %v\n%s", err, out)
+	}
+
+	sess := catfile.NewSession(catfile.Deps{Runner: gitclient.NewExecRunner(), GitPath: "git", Dir: dir}, 0)
+	defer sess.Close()
+
+	infos, err := sess.CheckMany([]string{
+		"HEAD:hello.txt",
+		"HEAD:does-not-exist.txt",
+		"HEAD:second.txt",
+	})
+	if err != nil {
+		t.Fatalf("CheckMany: %v", err)
+	}
+	if len(infos) != 3 {
+		t.Fatalf("len(infos) = %d, want 3", len(infos))
+	}
+	if infos[0].OID == "" || infos[0].Type != "blob" {
+		t.Fatalf("infos[0] (hello.txt) = %+v, want a real found blob", infos[0])
+	}
+	if infos[1].OID != "" {
+		t.Fatalf("infos[1] (missing) = %+v, want a zero ObjectInfo", infos[1])
+	}
+	if infos[2].OID == "" || infos[2].Type != "blob" {
+		t.Fatalf("infos[2] (second.txt) = %+v, want a real found blob", infos[2])
+	}
+	if infos[0].OID == infos[2].OID {
+		t.Fatalf("hello.txt and second.txt resolved to the SAME oid (%s) — the response reader misaligned", infos[0].OID)
+	}
+
+	// The session must still work normally afterward — a misaligned read would leave the process's
+	// own response stream desynced for every subsequent request.
+	single, err := sess.Check("HEAD:hello.txt")
+	if err != nil || single.OID != infos[0].OID {
+		t.Fatalf("Check after CheckMany = %+v, %v; want the same oid as infos[0] with no error", single, err)
+	}
+}
+
+// TestSession_CheckMany_Empty proves the zero-revs edge case is a plain no-op, not a hang waiting
+// on a response that was never requested.
+func TestSession_CheckMany_Empty(t *testing.T) {
+	skipWithoutGit(t)
+	dir := initRepo(t)
+	sess := catfile.NewSession(catfile.Deps{Runner: gitclient.NewExecRunner(), GitPath: "git", Dir: dir}, 0)
+	defer sess.Close()
+
+	infos, err := sess.CheckMany(nil)
+	if err != nil || infos != nil {
+		t.Fatalf("CheckMany(nil) = %+v, %v; want nil, nil", infos, err)
 	}
 }
 
@@ -190,6 +265,65 @@ func TestSession_ReadOneShot_Missing(t *testing.T) {
 	defer sess.Close()
 
 	_, _, err := sess.ReadOneShot(context.Background(), "HEAD:does\nnot\nexist.txt")
+	if !errors.Is(err, catfile.ErrMissing) {
+		t.Fatalf("got %v, want ErrMissing", err)
+	}
+}
+
+// TestSession_CheckOneShot_NewlineRev is G31 round-2 architecture/security review finding #2's
+// own regression coverage — Check's counterpart to TestSession_ReadOneShot_NewlinePath above: a
+// newline anywhere in the rev (not just the path half of it) cannot be expressed in the
+// --batch-check protocol either, and must resolve through this one-shot `rev-parse --verify`
+// fallback instead, giving the same OID Check's own batch header line would have.
+func TestSession_CheckOneShot_NewlineRev(t *testing.T) {
+	skipWithoutGit(t)
+	dir := t.TempDir()
+	run := func(args ...string) {
+		cmd := exec.Command("git", args...)
+		cmd.Dir = dir
+		cmd.Env = append(os.Environ(),
+			"GIT_AUTHOR_NAME=Test", "GIT_AUTHOR_EMAIL=test@example.com",
+			"GIT_COMMITTER_NAME=Test", "GIT_COMMITTER_EMAIL=test@example.com",
+		)
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+	run("init", "-q", "-b", "main")
+	name := "weird\nname.txt"
+	if err := os.WriteFile(filepath.Join(dir, name), []byte("newline path content\n"), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	run("add", "-A")
+	run("commit", "-q", "-m", "add newline-path file")
+
+	// Independent oracle for the expected OID: `git hash-object` on the file's own bytes, a
+	// wholly different code path than either Check or CheckOneShot's own rev-parse.
+	hashOut, err := exec.Command("git", "-C", dir, "hash-object", name).Output()
+	if err != nil {
+		t.Fatalf("git hash-object: %v", err)
+	}
+	wantOID := strings.TrimSpace(string(hashOut))
+
+	sess := catfile.NewSession(catfile.Deps{Runner: gitclient.NewExecRunner(), GitPath: "git", Dir: dir}, 0)
+	defer sess.Close()
+
+	info, err := sess.CheckOneShot(context.Background(), "HEAD:"+name)
+	if err != nil {
+		t.Fatalf("CheckOneShot: %v", err)
+	}
+	if info.OID != wantOID {
+		t.Fatalf("CheckOneShot OID = %q, want %q (git hash-object)", info.OID, wantOID)
+	}
+}
+
+func TestSession_CheckOneShot_Missing(t *testing.T) {
+	skipWithoutGit(t)
+	dir := initRepo(t)
+	sess := catfile.NewSession(catfile.Deps{Runner: gitclient.NewExecRunner(), GitPath: "git", Dir: dir}, 0)
+	defer sess.Close()
+
+	_, err := sess.CheckOneShot(context.Background(), "HEAD:does\nnot\nexist.txt")
 	if !errors.Is(err, catfile.ErrMissing) {
 		t.Fatalf("got %v, want ErrMissing", err)
 	}

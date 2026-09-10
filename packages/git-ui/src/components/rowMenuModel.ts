@@ -285,16 +285,28 @@ export function buildStashMenu(
 ): MenuSection[] {
   const crossBranch = originLabel(entry, currentBranch) !== undefined;
   const items: MenuItem[] = [
-    gatedItem('stashApply', applyMenuLabel(entry, currentBranch), 'stashApply', inProgress),
+    gatedItem(
+      'stashApply',
+      applyMenuLabel(entry, currentBranch),
+      'stashApply',
+      inProgress,
+      'codicon-diff-added',
+    ),
   ];
   if (!crossBranch) {
-    items.push(gatedItem('stashPop', 'Pop', 'stashPop', inProgress));
+    items.push(gatedItem('stashPop', 'Pop', 'stashPop', inProgress, 'codicon-export'));
   }
   items.push(
-    gatedItem('stashDrop', 'Drop', 'stashDrop', inProgress),
-    gatedItem('stashBranch', 'Create branch from stash…', 'stashBranch', inProgress),
-    plainItem('stashSaveGlobal', 'Save to global stash…'),
-    plainItem('stashShow', 'Show changes'),
+    gatedItem('stashDrop', 'Drop', 'stashDrop', inProgress, 'codicon-trash', true),
+    gatedItem(
+      'stashBranch',
+      'Create branch from stash…',
+      'stashBranch',
+      inProgress,
+      'codicon-git-branch',
+    ),
+    plainItem('stashSaveGlobal', 'Save to global stash…', 'codicon-archive'),
+    plainItem('stashShow', 'Show changes', 'codicon-eye'),
   );
   return [{ items }];
 }
@@ -315,15 +327,27 @@ export function buildGlobalStashMenu(
   return [
     {
       items: [
-        gatedItem('stashApply', applyMenuLabel(entry, currentBranch), 'stashApply', inProgress),
-        gatedItem('stashBranch', 'Create branch from this…', 'stashBranch', inProgress),
-        plainItem('stashShow', 'Show changes'),
+        gatedItem(
+          'stashApply',
+          applyMenuLabel(entry, currentBranch),
+          'stashApply',
+          inProgress,
+          'codicon-diff-added',
+        ),
+        gatedItem(
+          'stashBranch',
+          'Create branch from this…',
+          'stashBranch',
+          inProgress,
+          'codicon-git-branch',
+        ),
+        plainItem('stashShow', 'Show changes', 'codicon-eye'),
         gatedItem(
           'globalStashRemove',
           'Remove from global stash',
           'globalStashRemove',
           inProgress,
-          undefined,
+          'codicon-trash',
           true,
         ),
       ],

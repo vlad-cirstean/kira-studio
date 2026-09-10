@@ -3,21 +3,28 @@
  * G19 D3b: promoted from `packages/git-ui/src/components/RowContextMenu.vue` — its ARIA `menu`/
  * `menuitem` semantics, full keyboard roving focus, and focus-capture-and-return were already
  * correct there (F3); this is a move to a shared, host-agnostic home, generalised to render an
- * icon-box per row and a `danger` variant, not a rewrite of the interaction logic itself (see
- * `contextMenuModel.ts` for the promoted keyboard-nav helpers).
+ * icon-box per row and a `danger` variant, not a rewrite of the interaction logic itself.
+ *
+ * G34 D8: reduced to point-anchored positioning, the outside-click backdrop, and focus-capture-
+ * and-return, wrapping `KuiMenuList.vue` — which now owns everything about *rendering* a menu
+ * (rows, sections, keyboard nav; see that file). This component's own public API — every prop,
+ * every emit — is unchanged, so `RowContextMenu.vue` and all its consumers need zero edits.
  *
  * Owns no global singleton — each instance is created and destroyed by its caller, exactly as
  * `RowContextMenu.vue` already did. Submenus are explicitly not included (D3's own non-goal) —
  * nothing in `packages/git-ui`'s own menus needs one.
  */
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
-import {
-  enabledNeighbour,
-  firstEnabled,
-  flattenItems,
-  type MenuSection,
-} from './contextMenuModel.ts';
+import { onBeforeUnmount, onMounted, ref } from 'vue';
+import type { MenuSection } from './contextMenuModel.ts';
 import { computeFloatPosition, pointReference } from './floatingPosition.ts';
+// `KuiMenuList` is a plain (not `import type`) import even though this file's own script only
+// ever reads it through `InstanceType<typeof KuiMenuList>` — that is still a genuine *value* read
+// (`typeof` on an identifier requires the runtime binding in scope), and the template's own
+// `<KuiMenuList>` tag instantiates it as a component; biome's own static analysis sees neither use
+// and would otherwise "fix" this to `import type`, silently erasing the import (AppToolbar.vue's
+// own `useImportType` biome-ignore precedent, for the same reason).
+// biome-ignore lint/style/useImportType: see above
+import KuiMenuList from './KuiMenuList.vue';
 
 const props = defineProps<{
   sections: readonly MenuSection[];
@@ -37,82 +44,9 @@ const emit = defineEmits<{
 
 const rootEl = ref<HTMLDivElement | null>(null);
 const menuEl = ref<HTMLDivElement | null>(null);
+const listRef = ref<InstanceType<typeof KuiMenuList> | null>(null);
 
 let invoker: HTMLElement | null = null;
-
-const flatItems = computed(() => flattenItems(props.sections));
-
-function itemId(id: string): string {
-  return `kui-menu-item-${id}`;
-}
-
-const focusedId = ref<string | undefined>(firstEnabled(flatItems.value));
-
-function focusItem(id: string | undefined): void {
-  if (id === undefined) return;
-  focusedId.value = id;
-  menuEl.value?.querySelector<HTMLElement>(`#${itemId(id)}`)?.focus();
-}
-
-function neighbour(direction: 1 | -1): string | undefined {
-  return enabledNeighbour(flatItems.value, focusedId.value, direction);
-}
-
-/** Every key this menu recognises calls `stopPropagation()` — most load-bearingly `Escape`: a
- *  host's own document-level `Escape` handler must never see the same keystroke this menu
- *  already acted on, or one press would close the menu *and* whatever else is listening together
- *  instead of one at a time. */
-function onKeydown(event: KeyboardEvent): void {
-  switch (event.key) {
-    case 'Escape':
-      event.preventDefault();
-      event.stopPropagation();
-      emit('close');
-      break;
-    case 'ArrowDown':
-      event.preventDefault();
-      event.stopPropagation();
-      focusItem(neighbour(1));
-      break;
-    case 'ArrowUp':
-      event.preventDefault();
-      event.stopPropagation();
-      focusItem(neighbour(-1));
-      break;
-    case 'Home':
-      event.preventDefault();
-      event.stopPropagation();
-      focusItem(enabledNeighbour(flatItems.value, undefined, 1));
-      break;
-    case 'End':
-      event.preventDefault();
-      event.stopPropagation();
-      focusItem(enabledNeighbour(flatItems.value, undefined, -1));
-      break;
-    case 'Enter':
-    case ' ':
-      event.preventDefault();
-      event.stopPropagation();
-      activate(focusedId.value);
-      break;
-    case 'Tab':
-      // A menu does not participate in normal tab order — closing it here rather than letting
-      // focus leave to whatever the page's own next tab stop happens to be.
-      event.preventDefault();
-      event.stopPropagation();
-      emit('close');
-      break;
-    default:
-      break;
-  }
-}
-
-function activate(id: string | undefined): void {
-  if (id === undefined) return;
-  const item = flatItems.value.find((entry) => entry.id === id);
-  if (!item || item.disabled) return;
-  emit('select', id);
-}
 
 function onDocumentPointerDown(event: PointerEvent): void {
   if (rootEl.value && event.target instanceof Node && rootEl.value.contains(event.target)) return;
@@ -133,7 +67,7 @@ const style = ref({ left: '-9999px', top: '-9999px' });
 onMounted(async () => {
   invoker = document.activeElement instanceof HTMLElement ? document.activeElement : null;
   document.addEventListener('pointerdown', onDocumentPointerDown, true);
-  focusItem(focusedId.value);
+  listRef.value?.focusFirst();
   const el = menuEl.value;
   if (el) {
     const { left, top } = await computeFloatPosition(pointReference(props.x, props.y), el, {
@@ -152,43 +86,15 @@ onBeforeUnmount(() => {
 
 <template>
   <div ref="rootEl" class="kui-menu-root-wrap">
-    <div
-      ref="menuEl"
-      class="kui-menu-root"
-      role="menu"
-      :aria-label="title ?? label"
-      :style="style"
-      @keydown="onKeydown"
-    >
-      <div v-if="title" class="kui-menu-heading" aria-hidden="true">{{ title }}</div>
-      <template v-for="(section, sectionIndex) in sections" :key="sectionIndex">
-        <div v-if="sectionIndex > 0" class="kui-menu-separator" role="separator"></div>
-        <div
-          v-for="item in section.items"
-          :id="itemId(item.id)"
-          :key="item.id"
-          class="kui-menu-item"
-          :class="{ 'kui-menu-item--disabled': item.disabled, 'kui-menu-item--danger': item.danger }"
-          role="menuitem"
-          :aria-disabled="item.disabled"
-          :aria-describedby="item.disabled && item.disabledReason ? `${itemId(item.id)}-reason` : undefined"
-          :tabindex="focusedId === item.id ? 0 : -1"
-          @click="activate(item.id)"
-          @mouseenter="focusedId = item.id"
-        >
-          <span v-if="item.icon" class="kui-icon-box">
-            <span class="codicon" :class="item.icon" aria-hidden="true"></span>
-          </span>
-          <span>{{ item.label }}</span>
-          <span
-            v-if="item.disabled && item.disabledReason"
-            :id="`${itemId(item.id)}-reason`"
-            class="kui-visually-hidden"
-          >
-            {{ item.disabledReason }}
-          </span>
-        </div>
-      </template>
+    <div ref="menuEl" class="kui-menu-root" :style="style">
+      <KuiMenuList
+        ref="listRef"
+        :sections="sections"
+        :label="label"
+        :title="title"
+        @select="(id) => emit('select', id)"
+        @close="emit('close')"
+      />
     </div>
   </div>
 </template>

@@ -21,7 +21,7 @@ versions), rather than a silent failure — update whichever side is behind.
 
 ## Basic usage
 
-- **Git Graph** — the activity-bar panel showing the commit graph, with branch/tag decorations,
+- **Kira** — the panel showing the commit graph, with branch/tag decorations,
   a detail pane, and diffs that open in VS Code's own native diff editor.
 - **Kira Version** — the second activity-bar view: pick a branch, review its commits or its
   changed files against a base, and mark files reviewed.

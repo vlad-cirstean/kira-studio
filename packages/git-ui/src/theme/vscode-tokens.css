@@ -13,6 +13,14 @@
   --kv-panel-bg: var(--vscode-panel-background, var(--kv-app-bg));
   --kv-panel-border: var(--vscode-panel-border, rgba(128, 128, 128, 0.35));
   --kv-widget-shadow: var(--vscode-widget-shadow, rgba(0, 0, 0, 0.36));
+  /* G34 D4: the three tokens Kira's own `.p-input`/`.p-float` parity needs that this file didn't
+     yet have a real surface for — a text input's own fill (distinct from the panel behind it,
+     which is what made `.kui-text-input` invisible before this phase), its own border, and a
+     "strong" border tier for a floating surface's edge (a menu/popover/dialog needs more contrast
+     against the panel than a hairline row divider does). */
+  --kv-input-bg: var(--vscode-input-background, #313131);
+  --kv-input-border: var(--vscode-input-border, var(--kv-panel-border));
+  --kv-border-strong: var(--vscode-widget-border, var(--kv-panel-border));
 
   /* Toolbar */
   --kv-toolbar-bg: var(--vscode-editorGroupHeader-tabsBackground, var(--kv-panel-bg));
@@ -187,6 +195,7 @@ body.vscode-high-contrast-light {
    --vscode-panel-background's light fallback (#f3f3f3) and pure white. */
 body.vscode-light,
 body.vscode-high-contrast-light {
+  --kv-input-bg: var(--vscode-input-background, #ffffff);
   --kv-description-fg: var(--vscode-descriptionForeground, #606060);
   --kv-badge-remote-fg: var(--vscode-gitDecoration-submoduleResourceForeground, #0e5a99);
   --kv-badge-tag-fg: var(--vscode-gitDecoration-addedResourceForeground, #256b3a);

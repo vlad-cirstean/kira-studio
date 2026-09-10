@@ -537,9 +537,6 @@ type RepoSettingsSnapshot struct {
 	// true.
 	GithubEnabled bool `json:"kiraVersion.github.enabled"`
 	// WorktreePrepareScript/WorktreeBasePath are G25 D10/D16's own ninth and tenth leaves.
-	// Deliberately no eleventh field for the approval sha here (F15/D11) — it is a server-only key
-	// in the same storage table, reachable only through GitRepoSettingsRepo's own dedicated
-	// Get/SetPrepareScriptApproval methods, never through this snapshot's own get/set round-trip.
 	WorktreePrepareScript string `json:"kiraVersion.worktree.prepareScript"`
 	WorktreeBasePath      string `json:"kiraVersion.worktree.basePath"`
 	// CheckoutAutoStash is G28 D16/D17's own eleventh leaf: read CLIENT-SIDE ONLY (the server never

@@ -80,6 +80,50 @@ describe('SubjectBuffer', () => {
     expect(() => buffer.at(-1)).toThrow();
   });
 
+  // G31 round-2 performance review, finding #2: rangeBytes(0, count) used to rebase every
+  // offset — `this.#offsets[i] - this.#offsets[0]` — into a freshly allocated Uint32Array even
+  // though `this.#offsets[0]` is always 0, making the whole rebase loop an identity copy. Proven
+  // here by capacity: growOffsets's own doubling (1, 2, 4, 8, ...) leaves slack between
+  // `#offsets`' own allocated length and `count + 1` once count stops landing exactly on a power
+  // of two — a genuine copy would be exactly `(count + 1) * 4` bytes; a view into the padded
+  // backing buffer is larger.
+  describe('rangeBytes', () => {
+    test('a from=0 range is a view into the live offsets buffer, not a copy', () => {
+      const buffer = new SubjectBuffer();
+      for (const s of ['a', 'bb', 'ccc', 'dddd', 'eeeee']) buffer.append(s);
+      const { offsets } = buffer.rangeBytes(0, buffer.count);
+      expect(offsets.length).toBe(buffer.count + 1);
+      expect(Array.from(offsets)).toEqual([0, 1, 3, 6, 10, 15]);
+      // A fresh, tightly-sized copy would be exactly (count + 1) * 4 = 24 bytes for these 5
+      // appends; growOffsets' own doubling leaves the live buffer at 8 entries (32 bytes) by
+      // then, so a view's reported byteLength is strictly larger.
+      expect(offsets.buffer.byteLength).toBeGreaterThan(
+        (buffer.count + 1) * Uint32Array.BYTES_PER_ELEMENT,
+      );
+    });
+
+    test('a from>0 range is still correctly rebased to start at 0', () => {
+      const buffer = new SubjectBuffer();
+      buffer.append('a'); // 1 byte
+      buffer.append('bb'); // 2 bytes
+      buffer.append('ccc'); // 3 bytes
+      buffer.append('dddd'); // 4 bytes
+      // Full offsets: [0, 1, 3, 6, 10]. Slicing rows [1, 3) ("bb", "ccc") must rebase to [0, 3].
+      const { bytes, offsets } = buffer.rangeBytes(1, 3);
+      expect(Array.from(offsets)).toEqual([0, 2, 5]);
+      expect(new TextDecoder().decode(bytes)).toBe('bbccc');
+    });
+
+    test('a from>0 range starting right after zero-length subjects is still correctly rebased', () => {
+      const buffer = new SubjectBuffer();
+      buffer.append(''); // 0 bytes — offsets[1] === 0, the same value start=0 would have.
+      buffer.append(''); // 0 bytes — offsets[2] === 0.
+      buffer.append('xyz'); // 3 bytes.
+      const { offsets } = buffer.rangeBytes(2, 3);
+      expect(Array.from(offsets)).toEqual([0, 3]);
+    });
+  });
+
   test('byteLength reflects actual allocation and grows across many appends', () => {
     const buffer = new SubjectBuffer();
     for (let i = 0; i < 5000; i++) buffer.append(`commit subject number ${i}`);

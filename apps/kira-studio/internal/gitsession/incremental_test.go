@@ -2,13 +2,16 @@ package gitsession
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitclient"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitclient/porcelain"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitreview"
 )
 
@@ -166,6 +169,56 @@ func TestFileDelta_FastAfterANormalEdit(t *testing.T) {
 	}
 	if delta.CurrentLineCount != 4 {
 		t.Fatalf("CurrentLineCount = %d, want 4", delta.CurrentLineCount)
+	}
+}
+
+// TestFileDelta_FastPathTooLargePatch_StillReportsTheRealCurrentLineCount is G31 round-2
+// functional-correctness review, finding #7: when the fast (tier-1) path's own raw patch exceeds
+// MaxPatchBytes, parseAndResolve returns a zero-value ParsedBody (no hunks) — CurrentLineCount
+// used to be computed as `rec.LineCount + sumHunkDelta(nil)`, silently equal to rec.LineCount
+// (the SNAPSHOT's own line count), even though ancestorRes.ExitCode == 0 already proved the file
+// changed. Rewrites a.txt from 3 lines to 9000 DIFFERENT lines (a diff comfortably over the 1 MiB
+// cap) — CurrentLineCount must report 9000, not the stale snapshot's 3.
+func TestFileDelta_FastPathTooLargePatch_StillReportsTheRealCurrentLineCount(t *testing.T) {
+	dir, sha1 := buildFileDeltaFixture(t)
+	entry, store := newIncrementalTestEntry(t, dir)
+	ctx := context.Background()
+
+	content := "line1\nline2\nline3\n"
+	oid1 := blobOIDInc(t, dir, sha1, "a.txt")
+	rec := gitreview.FileRecord{
+		Path: "a.txt", State: "full", ReviewedAtSHA: sha1, ReviewedAt: time.UnixMilli(1000),
+		BlobOID: oid1, ContentKind: gitreview.ContentText, ContentBytes: len(content), LineCount: 3,
+	}
+	if err := store.Put(ctx, entry.Summary.RepoID, "main", rec, []byte(content)); err != nil {
+		t.Fatalf("Put: %v", err)
+	}
+	storedRec, snapshot, found, err := store.Record(ctx, entry.Summary.RepoID, "main", "a.txt")
+	if err != nil || !found {
+		t.Fatalf("Record: found=%v err=%v", found, err)
+	}
+
+	const wantLines = 15000
+	var b strings.Builder
+	for i := 0; i < wantLines; i++ {
+		fmt.Fprintf(&b, "a completely different line number %d with enough padding to push the raw diff comfortably past the one-mebibyte MaxPatchBytes cap regardless of git's own diff header overhead\n", i)
+	}
+	writeIncFile(t, dir, "a.txt", b.String())
+	runInc(t, dir, "add", "a.txt")
+	commitInc(t, dir, "rewrite a.txt entirely")
+
+	delta, err := entry.FileDelta(ctx, "main", "a.txt", storedRec, snapshot, "main")
+	if err != nil {
+		t.Fatalf("FileDelta: %v", err)
+	}
+	if delta.Source != "fast" {
+		t.Fatalf("Source = %q, want fast", delta.Source)
+	}
+	if delta.Body.Kind != porcelain.BodyTooLarge {
+		t.Fatalf("Body.Kind = %q, want %q (this test's own fixture is meant to exceed MaxPatchBytes)", delta.Body.Kind, porcelain.BodyTooLarge)
+	}
+	if delta.CurrentLineCount != wantLines {
+		t.Fatalf("CurrentLineCount = %d, want %d (the file's real current line count, not rec.LineCount=%d)", delta.CurrentLineCount, wantLines, rec.LineCount)
 	}
 }
 
@@ -347,4 +400,121 @@ func TestReviewFileDiff_NoSnapshotForAFileWithNoRecord(t *testing.T) {
 	if result.Body.Kind != "text" || len(result.Body.Hunks) == 0 {
 		t.Fatalf("Body = %+v, want the whole range diff, not an empty body", result.Body)
 	}
+}
+
+// TestRangeFiles_MergeBaseIsCachedAcrossRequests is G30 round-1 performance review finding #8's
+// own proof: RangeFiles (review.files' own orchestration) used to spawn `git merge-base` uncached
+// on every single call, even for the identical (base, branch) pair a review session's own
+// review.files/review.fileDiff round trips repeat over and over while the session sits open.
+func TestRangeFiles_MergeBaseIsCachedAcrossRequests(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not on PATH")
+	}
+	dir := t.TempDir()
+	runInc(t, dir, "init", "-q", "-b", "main")
+	writeIncFile(t, dir, "a.txt", "line1\n")
+	runInc(t, dir, "add", "a.txt")
+	commitInc(t, dir, "base commit")
+
+	runInc(t, dir, "checkout", "-q", "-b", "feature")
+	writeIncFile(t, dir, "a.txt", "line1\nline2\n")
+	runInc(t, dir, "add", "a.txt")
+	commitInc(t, dir, "feature commit")
+
+	runner := newArgSpawnCountingRunner("merge-base")
+	registry := NewRegistry(runner)
+	store := gitreview.NewStore(filepath.Join(t.TempDir(), "review.db"))
+	registry.Review = store
+	t.Cleanup(registry.Close)
+
+	conn := NewConn(ConnID("merge-base-cache-test-conn"), "test-client", "test-client-label", nil)
+	summary, err := conn.Open(context.Background(), registry, "git", dir)
+	if err != nil {
+		t.Fatalf("conn.Open: %v", err)
+	}
+	t.Cleanup(conn.Close)
+	entry, ok := conn.Entry(summary.RepoID)
+	if !ok {
+		t.Fatal("conn.Entry: not held after Open")
+	}
+
+	ctx := context.Background()
+	first, err := entry.RangeFiles(ctx, "main", "feature")
+	if err != nil {
+		t.Fatalf("RangeFiles (first): %v", err)
+	}
+	if got := runner.count("merge-base"); got != 1 {
+		t.Fatalf("merge-base spawns after the first RangeFiles = %d, want 1", got)
+	}
+
+	second, err := entry.RangeFiles(ctx, "main", "feature")
+	if err != nil {
+		t.Fatalf("RangeFiles (second): %v", err)
+	}
+	if got := runner.count("merge-base"); got != 1 {
+		t.Fatalf("merge-base spawns after a second, identical RangeFiles = %d, want still 1 (cached)", got)
+	}
+	if second.MergeBase != first.MergeBase {
+		t.Fatalf("MergeBase = %q, want %q (the cached value must match the freshly spawned one)", second.MergeBase, first.MergeBase)
+	}
+
+	// A refsChanged signal (a real commit landing on the branch) must invalidate the cache —
+	// the next RangeFiles call re-spawns rather than serving a now-stale merge-base.
+	writeIncFile(t, dir, "a.txt", "line1\nline2\nline3\n")
+	runInc(t, dir, "add", "a.txt")
+	commitInc(t, dir, "second feature commit")
+	waitForRefsChangedInc(t, entry)
+
+	if _, err := entry.RangeFiles(ctx, "main", "feature"); err != nil {
+		t.Fatalf("RangeFiles (after a real ref move): %v", err)
+	}
+	if got := runner.count("merge-base"); got != 2 {
+		t.Fatalf("merge-base spawns after a real ref move = %d, want 2 (the cache must drop on refsChanged)", got)
+	}
+}
+
+// TestMarkFile_StoredBlobOIDMatchesGit is G31 round-2 performance review, finding #5's own
+// regression coverage: MarkFile's own currentOID used to come from a SECOND, separately-spawned
+// blobOID(ctx, tip, path) call, after readSnapshotSource had already resolved (and discarded) the
+// identical rev's OID as part of its own Read. MarkFile now takes currentOID straight off
+// readSnapshotSource's own return (readCurrentContent's own doc comment) — this proves that
+// plumbing is correct, not just "compiles": the stored record's BlobOID must still equal what an
+// independent `git rev-parse <tip>:<path>` reports.
+func TestMarkFile_StoredBlobOIDMatchesGit(t *testing.T) {
+	dir, sha1 := buildFileDeltaFixture(t)
+	entry, store := newIncrementalTestEntry(t, dir)
+	ctx := context.Background()
+
+	rec, err := entry.MarkFile(ctx, "main", "a.txt", true, nil)
+	if err != nil {
+		t.Fatalf("MarkFile: %v", err)
+	}
+	wantOID := blobOIDInc(t, dir, sha1, "a.txt")
+	if rec.BlobOID != wantOID {
+		t.Fatalf("MarkFile's stored BlobOID = %q, want %q (git rev-parse %s:a.txt)", rec.BlobOID, wantOID, sha1)
+	}
+
+	storedRec, _, found, err := store.Record(ctx, entry.Summary.RepoID, "main", "a.txt")
+	if err != nil || !found {
+		t.Fatalf("Record: found=%v err=%v", found, err)
+	}
+	if storedRec.BlobOID != wantOID {
+		t.Fatalf("stored record's own BlobOID = %q, want %q", storedRec.BlobOID, wantOID)
+	}
+}
+
+// waitForRefsChangedInc polls entry.refs until it reports invalid (dropped by note() on
+// refsChanged) or the timeout expires — the watcher's own signal is asynchronous (fsnotify), so a
+// test proving cache invalidation on a real ref move cannot simply call RangeFiles immediately
+// after the commit above.
+func waitForRefsChangedInc(t *testing.T, entry *RepoEntry) {
+	t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		if _, valid := entry.refs.get(); !valid {
+			return
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	t.Fatal("timed out waiting for the watcher's own refsChanged signal to invalidate refs")
 }

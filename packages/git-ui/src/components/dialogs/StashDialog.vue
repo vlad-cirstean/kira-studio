@@ -30,7 +30,7 @@ import { stashLabel } from '../stashListModel.ts';
 
 const props = defineProps<{
   ops: OpsState;
-  /** Toggled by `AppToolbar.vue`'s "Stash changes…" button, via `App.vue`. */
+  /** Toggled by `AppToolbar.vue`'s "Stash" button, via `App.vue`. */
   createOpen: boolean;
   /** `kiraVersion.stash.includeUntracked`'s current value — the create form's own default,
    *  re-read fresh every time the dialog opens (a setting change mid-session should be seen the
@@ -408,8 +408,8 @@ function onClose(): void {
 .kv-dialog-field {
   display: flex;
   flex-direction: column;
-  gap: var(--kv-space-1);
-  margin: var(--kv-space-2) 0;
+  gap: var(--kv-s-1);
+  margin: var(--kv-s-2) 0;
 }
 
 .kv-dialog-field--inline {
@@ -418,7 +418,7 @@ function onClose(): void {
 }
 
 .kv-dialog-field input[type='text'] {
-  padding: var(--kv-space-1) var(--kv-space-2);
+  padding: var(--kv-s-1) var(--kv-s-2);
   background: var(--kv-panel-bg);
   color: var(--kv-row-fg);
   border: 1px solid var(--kv-panel-border);
@@ -431,20 +431,20 @@ function onClose(): void {
 
 .kv-dialog-error {
   color: var(--kv-diff-deleted-fg);
-  margin: var(--kv-space-1) 0;
+  margin: var(--kv-s-1) 0;
 }
 
 .kv-dialog-file-list {
   max-height: 160px;
   overflow-y: auto;
-  margin: var(--kv-space-2) 0;
-  padding-left: var(--kv-space-4);
+  margin: var(--kv-s-2) 0;
+  padding-left: var(--kv-s-5);
   font-family: var(--kv-mono-font-family);
   font-size: 0.9em;
 }
 
 .kv-stash-prediction {
-  margin: var(--kv-space-3) 0;
+  margin: var(--kv-s-4) 0;
 }
 
 .kv-stash-prediction--clean {

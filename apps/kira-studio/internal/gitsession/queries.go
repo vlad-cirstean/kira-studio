@@ -399,7 +399,18 @@ func (e *RepoEntry) Blob(ctx context.Context, rev, path string) (BlobResult, err
 	var info catfile.ObjectInfo
 	var content []byte
 	var err error
-	if strings.ContainsRune(path, '\n') {
+	// G31 round-2 architecture/security review, finding #2: this used to sniff only `path` for a
+	// newline, not `rev` — but `full` (what actually crosses the batch protocol's stdin) is
+	// `rev + ":" + path`, and the persistent cat-file session is one line in, one line out
+	// (catfile/session.go). A newline anywhere in `full` — rev included, and rev is client-
+	// supplied directly via file.read's own FileReadParams.Rev, validRefArg only rejects empty
+	// and a leading "-" — makes git read it as TWO requests while only one response gets
+	// consumed here; the leftover response line then answers the NEXT unrelated caller on this
+	// same, connection-shared session, silently, for the life of the RepoEntry (readHeader still
+	// parses a shifted header fine, so nothing errors and the circuit breaker never trips).
+	// readCurrentContent, blobOID and blobOIDs (incremental.go) have the identical
+	// `full`-vs-`path` gap, fixed the same way.
+	if strings.ContainsRune(full, '\n') {
 		info, content, err = session.ReadOneShot(ctx, full)
 	} else {
 		info, content, err = session.Read(full)

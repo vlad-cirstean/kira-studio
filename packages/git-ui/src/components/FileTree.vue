@@ -14,7 +14,9 @@
  * geometry `ReviewView.vue` used to restyle from outside under `.kv-skin-kira`, and the
  * dimmed-directory-suffix/context-menu-copy behaviour) is now this component's *only* appearance,
  * everywhere it mounts — `DetailPane.vue`, `StashDetailPane.vue`, `ReviewFilesPane.vue`,
- * `ReviewCommitRow.vue` alike.
+ * `ReviewCommitRow.vue` alike. G34 D1: `kira-structure.css` moved to `:root`, so the class this
+ * paragraph refers to (`.kv-skin-kira`) no longer exists — the tokens it used to scope now apply
+ * globally, unconditionally, everywhere in the package.
  */
 import type { CommitStore } from '@kira/git-core';
 import type { FileChange, ReviewFileStatus } from '@kira/git-ipc';
@@ -129,6 +131,12 @@ function collapseDir(path: string): void {
 
 const indexed = computed(() => filterFiles(props.files, props.filter));
 
+// G30 round-1 performance review, finding #6: `tree` depends only on `indexed` (the files/filter),
+// never on `collapsedDirs` — split out from `rows` so toggling a single twisty re-runs only the
+// cheap flatten below, not buildFileTree's own full O(n log n) fold (a fresh DirBuilder Map per
+// directory, a sort at every level, a fresh node object per file) over every file in the commit.
+const tree = computed(() => buildFileTree(indexed.value));
+
 const rows = computed<FileTreeRow[]>(() => {
   if (props.listMode === 'flat') {
     return buildFlatList(indexed.value).map((node) => ({
@@ -137,7 +145,7 @@ const rows = computed<FileTreeRow[]>(() => {
       depth: 0,
     }));
   }
-  return flattenTreeRows(buildFileTree(indexed.value), isExpanded);
+  return flattenTreeRows(tree.value, isExpanded);
 });
 
 /** §8's cap, lifted for the current commit once "Show all N files" is clicked — not persisted
@@ -365,6 +373,10 @@ const fileMenuState = ref<{ x: number; y: number; path: string } | undefined>(un
 function onRowContextMenu(event: MouseEvent, row: FileTreeRow): void {
   if (row.kind !== 'file') return;
   event.preventDefault();
+  // G34 D17: without this, the same `contextmenu` event also reaches `ReviewCommitRow.vue`'s own
+  // handler (a file row here can sit inside an expanded review row) and a second menu — that
+  // row's "Commit actions" menu — opens underneath this one from a single right-click.
+  event.stopPropagation();
   fileMenuState.value = { x: event.clientX, y: event.clientY, path: row.node.change.path };
 }
 
@@ -406,13 +418,12 @@ function reviewToggleTitle(path: string): string {
 </script>
 
 <template>
-  <div class="kv-file-tree kv-skin-kira" data-testid="file-tree">
-    <!-- G21 D11: `.kv-skin-kira` (kira-structure.css) — colour-free, structural-only tokens
-         (spacing/control-height/font-role), scoped here rather than at :root so the graph panel's
-         own density.css scale still governs everywhere outside this one component. Applying it
-         right on this tree's own root, not up at App.vue/DetailPane.vue, is what makes "one
-         anatomy, everywhere this component mounts" true without restyling anything else in the
-         graph panel.
+  <div class="kv-file-tree" data-testid="file-tree">
+    <!-- G21 D11 (superseded by G34 D1): this root used to carry `.kv-skin-kira` to scope
+         kira-structure.css's colour-free, structural-only tokens (spacing/control-height/
+         font-role) to this one component while density.css's own scale governed everywhere else.
+         G34 hoisted kira-structure.css to `:root` and retired density.css's competing scale, so
+         those tokens now apply globally and the class is gone — nothing left to scope here.
 
          G-UX D7 (item 7): this comment moved from *before* the root `<div>` to *inside* it (same
          text, new position) — a comment sitting as the root `<div>`'s own template-level sibling
@@ -458,7 +469,7 @@ function reviewToggleTitle(path: string): string {
         v-for="(row, index) in capped.visible"
         :id="rowId(index)"
         :key="rowKey(row)"
-        class="kv-file-tree-row"
+        class="kui-row kv-file-tree-row"
         :class="{ 'kv-row-focused': index === focusedRow, 'kv-row-selected': row.kind === 'file' && row.node.fileIndex === selectedFile }"
         :role="listMode === 'tree' ? 'treeitem' : 'option'"
         :aria-level="listMode === 'tree' ? row.depth + 1 : undefined"
@@ -493,12 +504,6 @@ function reviewToggleTitle(path: string): string {
             :style="fileIconStyle(row.node.path)"
             aria-hidden="true"
           ></span>
-          <span
-            class="kv-file-tree-status"
-            :class="statusClass(row.node.change)"
-            v-kui-tooltip="fileTitle(row.node.change)"
-            >{{ statusLetter(row.node.change) }}</span
-          >
           <span class="kv-file-tree-name" v-kui-tooltip="fileTitle(row.node.change)">
             <template v-if="renameDisplay(row.node.change)">
               {{ renameDisplay(row.node.change)?.from }}
@@ -511,6 +516,12 @@ function reviewToggleTitle(path: string): string {
             v-if="listMode === 'flat' && dirOf(row.node.path)"
             class="kv-file-tree-file-dir"
             >{{ dirOf(row.node.path) }}</span
+          >
+          <span
+            class="kv-file-tree-status"
+            :class="statusClass(row.node.change)"
+            v-kui-tooltip="fileTitle(row.node.change)"
+            >{{ statusLetter(row.node.change) }}</span
           >
           <span v-if="!row.node.change.isBinary" class="kv-file-tree-counts">
             <span
@@ -533,7 +544,7 @@ function reviewToggleTitle(path: string): string {
           >
           <KuiButton
             v-if="reviewStates"
-            variant="ghost"
+            variant="icon"
             class="kv-file-tree-review-toggle"
             v-kui-tooltip="reviewToggleTitle(row.node.change.path)"
             :aria-pressed="reviewStatusFor(row.node.change.path)?.kind === 'full'"
@@ -572,15 +583,16 @@ function reviewToggleTitle(path: string): string {
 .kv-file-tree-parent {
   display: flex;
   flex-direction: column;
-  gap: var(--kv-space-1);
-  padding: 0 var(--kv-space-4) var(--kv-space-3);
+  gap: var(--kv-s-1);
+  padding: 0 var(--kv-s-5) var(--kv-s-4);
   font-size: 0.9em;
 }
 
+/* G34 D15: the same horizontal inset every other toolbar in the app now uses. */
 .kv-file-tree-toolbar {
   display: flex;
-  gap: var(--kv-space-2);
-  padding: 0 var(--kv-space-4) var(--kv-space-2);
+  gap: var(--kv-s-2);
+  padding: 0 var(--kv-s-4) var(--kv-s-2);
 }
 
 .kv-file-tree-filter {
@@ -642,7 +654,7 @@ function reviewToggleTitle(path: string): string {
   font-family: var(--kv-font-ui);
   font-size: 0.85em;
   display: flex;
-  gap: var(--kv-space-2);
+  gap: var(--kv-s-2);
 }
 
 /* G19 D14: the row's primary leading glyph, taking over the leading-icon role the status letter
@@ -665,19 +677,37 @@ function reviewToggleTitle(path: string): string {
 
 /* G21 D10: item 10's own wording, taken literally — "just a colored letter", not a chip. G19
  * D14's status-chip class (background/border-radius/fixed 1.3em square/0.75em shrink) is
- * deleted outright; `min-width: 1ch` is the one thing kept from it, so the letters still line up
- * into a column and the file names after them align, without reintroducing a box around the
- * letter. G-UX D6 (item 6): the letter drops from the inherited full body size/weight-700 down to
- * the tree's own secondary scale — the same `0.85em` tier `.kv-file-tree-counts`/
- * `-dir-stats`/`-file-dir` already use — so it reads as metadata beside the filename, not as a
- * heading; `var(--kv-t-xs, 0.85em)` mirrors `.kv-file-tree-file-dir`'s own fallback exactly. */
+ * deleted outright; `min-width: 1ch` is the one thing kept from it, so the letter still occupies
+ * a consistent width against its neighbour without reintroducing a box around it. G-UX D6
+ * (item 6): the letter drops from the inherited full body size/weight-700 down to the tree's own
+ * secondary scale — the same tier `.kv-file-tree-counts`/`-dir-stats`/`-file-dir` already use —
+ * so it reads as metadata, not a heading. G34: the `0.85em` fallback this and
+ * `.kv-file-tree-file-dir` used to carry is dropped — at the 13px default it and `--kv-t-xs`
+ * (11px vs. 11.05px) are visually identical, and `--kv-t-xs` is now unconditional
+ * (kira-structure.css is `:root`-scoped, so it always resolves). G-UX (item 8): moved from
+ * leading (just after the file icon) to trailing (just before the change counts, on the row's
+ * right edge) — see its own `margin-left: auto`, below. */
 .kv-file-tree-status {
+  /* G-UX (item 8): moved from just after the file icon to just before the change counts, on the
+   * row's right edge — `margin-left: auto` (moved here from `.kv-file-tree-counts`, below) is
+   * what pushes it there; a binary file with no counts span still lands the letter at the right
+   * edge on its own. */
+  margin-left: auto;
   min-width: 1ch;
   font-family: var(--kv-mono-font-family);
-  font-size: var(--kv-t-xs, 0.85em);
+  font-size: var(--kv-t-xs);
   font-weight: 600;
   line-height: 1;
   flex-shrink: 0;
+  /* G-UX (item 8): "use stronger colors" — a single 11px letter needs more punch than the
+   * `--kv-diff-*-fg` tokens give it at that size (those are sourced from the ACTIVE VS Code
+   * theme's own `--vscode-gitDecoration-*` colors, tuned for larger surfaces like the diff
+   * gutter, and can read as pale/washed-out this small). A `filter` boosts saturation/contrast on
+   * whichever color the active theme actually supplies, rather than replacing it with a fixed
+   * hex that would stop following the user's theme (and rather than touching the shared
+   * `--kv-diff-*-fg` tokens themselves, which the diff view and change-count numbers still rely
+   * on unchanged). */
+  filter: saturate(1.6) contrast(1.15);
 }
 
 .kv-status-added {
@@ -713,15 +743,14 @@ function reviewToggleTitle(path: string): string {
   overflow: hidden;
   text-overflow: ellipsis;
   color: var(--kv-description-fg);
-  font-size: var(--kv-t-xs, 0.85em);
+  font-size: var(--kv-t-xs);
 }
 
 .kv-file-tree-counts {
-  margin-left: auto;
   font-family: var(--kv-font-ui);
   font-size: 0.85em;
   display: flex;
-  gap: var(--kv-space-2);
+  gap: var(--kv-s-2);
   flex-shrink: 0;
 }
 
@@ -752,7 +781,7 @@ function reviewToggleTitle(path: string): string {
   color: var(--kv-focus-border);
   border: none;
   border-top: 1px solid var(--kv-panel-border);
-  padding: var(--kv-space-2);
+  padding: var(--kv-s-2);
   cursor: pointer;
 }
 </style>

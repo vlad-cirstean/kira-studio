@@ -6,6 +6,7 @@ import { decodeStreamPayload } from './codec.ts';
 import type { DecorationRef, StreamChunkOf } from './contract.ts';
 import {
   createSocketChannel,
+  FrameDeliveryError,
   FrameTooLargeError,
   MAX_FRAME_BYTES,
   MalformedBlobFrameError,
@@ -93,6 +94,55 @@ test('drains three frames written in one underlying write', async () => {
 
     await allReceived;
     expect(messages).toEqual([{ n: 1 }, { n: 2 }, { n: 3 }]);
+  });
+});
+
+// G30 round-1 architecture/security review, finding #8: a plain (non-blob) frame's own delivery
+// throwing — JSON.parse on a malformed body, or (as here) the subscriber's own handler throwing,
+// the shape `createRpcClient`'s handleFrame takes on a ContractVersionMismatchError/
+// ContractShapeError/unrecognised frame — used to be entirely uncaught, unwinding out of the
+// drain loop and leaving the socket in an undefined state with no deterministic close. Proves the
+// throw is now caught and the socket destroyed promptly (not hung waiting for more bytes that
+// will never come on an otherwise-idle connection).
+test('a throw from the onMessage handler destroys the socket instead of hanging', async () => {
+  await withConnectedPair(async (client, server) => {
+    const serverChannel = createSocketChannel(server);
+    serverChannel.onMessage(() => {
+      throw new Error('handler boom');
+    });
+    const closed = new Promise<Error | undefined>((resolve) => serverChannel.onClose(resolve));
+
+    const body = Buffer.from(JSON.stringify({ n: 1 }), 'utf8');
+    const frame = Buffer.allocUnsafe(4 + body.byteLength);
+    frame.writeUInt32BE(body.byteLength, 0);
+    body.copy(frame, 4);
+    client.write(frame);
+
+    const err = await closed;
+    expect(err).toBeInstanceOf(Error);
+    expect(err?.message).toBe('handler boom');
+  });
+});
+
+// The same case for a non-Error throw (a plain JSON.parse SyntaxError-shaped value would already
+// be an Error, but a handler could throw anything) — wrapped in FrameDeliveryError rather than
+// passed through raw, matching the blob branch's own MalformedBlobFrameError fallback.
+test('a non-Error throw from the onMessage handler is wrapped in FrameDeliveryError', async () => {
+  await withConnectedPair(async (client, server) => {
+    const serverChannel = createSocketChannel(server);
+    serverChannel.onMessage(() => {
+      throw 'not an Error instance';
+    });
+    const closed = new Promise<Error | undefined>((resolve) => serverChannel.onClose(resolve));
+
+    const body = Buffer.from(JSON.stringify({ n: 1 }), 'utf8');
+    const frame = Buffer.allocUnsafe(4 + body.byteLength);
+    frame.writeUInt32BE(body.byteLength, 0);
+    body.copy(frame, 4);
+    client.write(frame);
+
+    const err = await closed;
+    expect(err).toBeInstanceOf(FrameDeliveryError);
   });
 });
 

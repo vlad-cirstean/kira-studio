@@ -2,6 +2,7 @@ package gitsession
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -230,6 +231,62 @@ func TestStacks_LinearChain_RealRepo(t *testing.T) {
 	}
 	if branches[0].State != gitpreflight.StackUpToDate {
 		t.Fatalf("feat1 = %+v, want upToDate", branches[0])
+	}
+}
+
+// TestStacks_ManySiblingBranches_EachGetsItsOwnCorrectCount is G31 round-2 performance review,
+// finding #6: buildStacksFromSnapshot's own per-candidate rev-list spawns now run concurrently
+// (one goroutine per candidate, writing only its own indexed slot) instead of strictly serially.
+// Five sibling branches off main, each carrying a DISTINCT, distinguishable number of its own
+// commits, is a slot-mixup detector: a wrong index (or a race on the shared behindAhead map) would
+// show up as a branch reporting some OTHER branch's Ahead count, not just as a flaky test.
+func TestStacks_ManySiblingBranches_EachGetsItsOwnCorrectCount(t *testing.T) {
+	skipWithoutGitStack(t)
+	dir := t.TempDir()
+	runGitStack(t, dir, "init", "-q", "-b", "main")
+	writeFileStack(t, dir, "f.txt", "line1\n")
+	runGitStack(t, dir, "add", "f.txt")
+	runGitStack(t, dir, "commit", "-q", "-m", "c1")
+
+	names := []string{"b1", "b2", "b3", "b4", "b5"}
+	wantAhead := map[string]int{"b1": 1, "b2": 2, "b3": 3, "b4": 4, "b5": 5}
+	for _, name := range names {
+		runGitStack(t, dir, "checkout", "-q", "-b", name, "main")
+		for i := 0; i < wantAhead[name]; i++ {
+			writeFileStack(t, dir, name+".txt", fmt.Sprintf("commit %d\n", i))
+			runGitStack(t, dir, "add", name+".txt")
+			runGitStack(t, dir, "commit", "-q", "-m", fmt.Sprintf("%s commit %d", name, i))
+		}
+		runGitStack(t, dir, "config", "--local", "branch."+name+".kirastackparent", "main")
+		runGitStack(t, dir, "config", "--local", "branch."+name+".kirastackbase", "")
+	}
+	runGitStack(t, dir, "checkout", "-q", "main")
+
+	entry := newStackTestEntryWithRunner(t, gitclient.NewExecRunner(), dir)
+	result, err := entry.Stacks(context.Background())
+	if err != nil {
+		t.Fatalf("Stacks: %v", err)
+	}
+	if len(result.Stacks) != 1 || result.Stacks[0].Base != "main" {
+		t.Fatalf("stacks = %+v", result.Stacks)
+	}
+	branches := result.Stacks[0].Branches
+	if len(branches) != len(names) {
+		t.Fatalf("branches = %+v, want %d entries", branches, len(names))
+	}
+	seen := map[string]int{}
+	for _, b := range branches {
+		seen[b.Name] = b.Ahead
+	}
+	for _, name := range names {
+		want := wantAhead[name]
+		got, ok := seen[name]
+		if !ok {
+			t.Fatalf("branch %q missing from result entirely: %+v", name, branches)
+		}
+		if got != want {
+			t.Fatalf("branch %q Ahead = %d, want %d (a slot mixup would report a DIFFERENT branch's count here)", name, got, want)
+		}
 	}
 }
 

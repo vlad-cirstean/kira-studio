@@ -52,7 +52,11 @@ export interface EdgeSegment {
 /** Edges whose span exceeds this many rows — or whose target has not resolved yet, treated as
  *  unboundedly long until a later chunk's patch says otherwise — are indexed separately in
  *  `#longEdges` rather than relied on to be found by a nearby row's CSR scan. Real repositories
- *  have hundreds of these (long-lived branch merges), not thousands. */
+ *  have hundreds of these (long-lived branch merges), not thousands — a bound `#demoteIfNowShort`
+ *  is what actually keeps true under paging: an edge that's merely unresolved *at append time*
+ *  (every open lane at a chunk boundary) is demoted back out the moment its own patch resolves it
+ *  to a genuinely short span, rather than staying a permanent `#longEdges` entry for the rest of
+ *  the store's life. */
 const LONG_EDGE_ROWS = 64;
 
 /** A reference into an owning chunk's own `edges` buffer, not a copy of the segment itself: a
@@ -144,6 +148,14 @@ export class LayoutStore {
 
   get laneCount(): number {
     return this.#laneCount;
+  }
+
+  /** Test-observable count of `#longEdges`' own current size — exposed so
+   *  `#demoteIfNowShort`'s bound ("stays close to the genuinely-long edge count, not the total
+   *  number ever appended") is provable from outside the class, not just inferable from
+   *  `segmentsInRow`'s output. Not read by any renderer. */
+  get longEdgeCount(): number {
+    return this.#longEdges.length;
   }
 
   clear(): void {
@@ -250,10 +262,45 @@ export class LayoutStore {
       const target = this.#findChunkForGlobalEdgeIndex(globalEdgeIndex);
       const owner = this.#chunks[target.chunkIndex] as LayoutChunk;
       const base = target.localIndex * EDGE_STRIDE;
-      if (toRow !== PATCH_UNCHANGED) owner.edges[base + EDGE_TO_ROW] = toRow;
+      if (toRow !== PATCH_UNCHANGED) {
+        owner.edges[base + EDGE_TO_ROW] = toRow;
+        this.#demoteIfNowShort(target.chunkIndex, target.localIndex, toRow);
+      }
       if (toLane !== PATCH_UNCHANGED) owner.edges[base + EDGE_TO_LANE] = toLane;
       if (kind !== PATCH_UNCHANGED) owner.edges[base + EDGE_KIND] = kind;
     }
+  }
+
+  /** G31 round-2 performance review, finding #2: `isLongAtAppendTime` unconditionally classifies
+   *  any still-`UNRESOLVED_ROW` edge as long — every open lane at a chunk boundary, not just a
+   *  genuine long-lived merge — and `#longEdges` is append-only, scanned in full by every future
+   *  row query. Most of those edges resolve in the very next chunk to a genuinely SHORT span, but
+   *  the frozen-at-append-time membership rule (`isLongAtAppendTime`'s own doc comment, to avoid a
+   *  double-reported segment) meant they stayed in `#longEdges` forever regardless, so the module
+   *  doc's own "hundreds, not thousands" bound broke under paging — every chunk boundary added a
+   *  permanent entry.
+   *
+   *  Called the moment a patch resolves an edge's `toRow` (`patchTarget`'s own doc comment: this
+   *  happens at most once per edge, `UNRESOLVED_ROW` → a real row, never patched again). If the
+   *  now-resolved span turns out short, this removes the edge from both `#longEdges` and its
+   *  chunk's own `#longLocalIndices` — un-freezing it, but towards the *same* answer
+   *  `isLongAtAppendTime` would have given had it known the real span up front, so no double
+   *  report results. `#collectShortSegments`' CSR window, `[row - LONG_EDGE_ROWS, row]`, then picks
+   *  it up naturally: a demoted edge's own `toRow` is by definition within
+   *  `fromRow + LONG_EDGE_ROWS`, so every row that could still cover it already falls inside that
+   *  window. Removal via `splice` (not swap-and-pop) preserves `#longEdges`' own
+   *  sorted-by-`fromRow` invariant, which `#longEdgeUpperBound`'s binary search still relies on. */
+  #demoteIfNowShort(chunkIndex: number, localIndex: number, toRow: number): void {
+    const longLocalIndices = this.#longLocalIndices[chunkIndex] as Set<number>;
+    if (!longLocalIndices.has(localIndex)) return; // wasn't long-at-append-time; nothing to do.
+    const index = this.#longEdges.findIndex(
+      (ref) => ref.chunkIndex === chunkIndex && ref.localIndex === localIndex,
+    );
+    assert(index !== -1, 'LayoutStore: long-at-append-time edge missing from #longEdges');
+    const ref = this.#longEdges[index] as LongEdgeRef;
+    if (toRow - ref.fromRow > LONG_EDGE_ROWS) return; // genuinely long — stays classified long.
+    longLocalIndices.delete(localIndex);
+    this.#longEdges.splice(index, 1);
   }
 
   /** Binary search over `#chunkEdgeStart`: the chunk whose own range contains `globalEdgeIndex`. */
@@ -351,18 +398,25 @@ export class LayoutStore {
 
   /** The `#longEdges` scan: binary search to the last entry with `fromRow <= row`, then a
    *  linear filter on `toRow` — the "long edges are hundreds, not thousands" bound from the
-   *  module doc comment is what keeps this cheap. */
+   *  module doc comment is what keeps this cheap.
+   *
+   *  G30 round-1 performance review, finding #3: `readSegment` (a fresh 6-field object) used to
+   *  be allocated for every candidate this scan visits, `coversRow` checked only afterward — so
+   *  an edge that closed thousands of rows ago (still in `[0, upperBound)`, since `#longEdges`
+   *  is append-only and never pruned) paid a full allocation just to be discarded. `fromRow <=
+   *  row` already holds for every entry in that range by construction (`#longEdgeUpperBound`'s
+   *  own binary search), so only `toRow` needs checking — read directly out of the typed array,
+   *  no object built, for every candidate that misses. */
   #collectLongSegments(row: number, out: EdgeSegment[], countIn: number): number {
     let count = countIn;
     const upperBound = this.#longEdgeUpperBound(row);
     for (let i = 0; i < upperBound; i++) {
       const ref = this.#longEdges[i] as LongEdgeRef;
       const chunk = this.#chunks[ref.chunkIndex] as LayoutChunk;
-      const segment = readSegment(chunk, ref.localIndex);
-      if (coversRow(segment, row)) {
-        out[count] = segment;
-        count++;
-      }
+      const toRow = chunk.edges[ref.localIndex * EDGE_STRIDE + EDGE_TO_ROW] as number;
+      if (toRow !== UNRESOLVED_ROW && row > toRow) continue;
+      out[count] = readSegment(chunk, ref.localIndex);
+      count++;
     }
     return count;
   }

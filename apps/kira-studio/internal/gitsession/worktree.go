@@ -481,8 +481,11 @@ func noSpawnPrepareResult(kind, message string) (WorktreePrepareResult, error) {
 //  1. claim the ≤1 prepare slot (else AlreadyRunning, no spawn).
 //  2. resolve the stored script (empty ⇒ NotConfigured, no spawn).
 //  3. re-hash the CURRENTLY STORED text and compare to params.ScriptSha256 (mismatch ⇒
-//     ScriptChanged, no spawn) — this is D11's own "re-checked immediately before the spawn",
-//     never trusting that the approval the client believes it has still matches what is on file.
+//     ScriptChanged, no spawn) — re-checked immediately before the spawn, never trusting that the
+//     script the client believes it is running still matches what is on file (a second window may
+//     have edited it since the client last read it). The human-confirmation gate itself — did
+//     someone actually look at this text before clicking Run — lives entirely client-side, in the
+//     extension's own confirmation dialog; this check is a staleness guard, not that gate.
 //  4. verify path is a real worktree of THIS repository (⇒ NotAWorktree, no spawn) — the same
 //     security property D8's notAWorktree blocker states for remove, restated here for prepare.
 //  5. resolve the shell (D9/D16), build the env (D12/F12) from the worktree's own facts, and spawn
@@ -526,14 +529,6 @@ func (e *RepoEntry) RunPrepare(ctx context.Context, conn *Conn, path, scriptSha2
 	target, isWorktree := findWorktree(records, path)
 	if !isWorktree {
 		return noSpawnPrepareResult("NotAWorktree", "This path is not one of this repository's worktrees.")
-	}
-
-	// D11: this run is proof the user has now seen and approved exactly this script text — recorded
-	// AFTER the digest check above succeeds (never before: a mismatch must never itself become an
-	// approval), best-effort (a storage failure here must not block the run the user already
-	// confirmed by way of the matching digest).
-	if e.prepareScriptApprovalSet != nil {
-		_ = e.prepareScriptApprovalSet(e.Summary.RepoID, currentSha)
 	}
 
 	getenv := deps.Getenv

@@ -1,20 +1,21 @@
 /*
- * Spacing and row-height scale (§6.1): tight vertical rhythm, no decorative padding,
- * 22px default commit row to match the workbench list at default density.
+ * Row-density tokens (G34 D2): a *list row height* is a genuinely different concern from a
+ * *control height* — Kira's own scale (kira-structure.css) deliberately does not express it, so
+ * these four survive here rather than folding into that file. This used to also be the app's
+ * spacing scale (`--kv-space-*`) and hold `--kv-toolbar-height`/`--kv-radius`; G34 retired all
+ * three in favour of kira-structure.css's `--kv-s-*`/`--kv-bar-h`/`--kv-radius-sm` — the workbench
+ * scale and Kira's scale are the same values with one extra step (see that file), so nothing here
+ * was a compromise, just a rename with a few genuinely row-density-only tokens left behind.
  */
 :root {
-  --kv-row-height: 22px;
+  /* G-UX (item 2b): raised from 22px so a row's ref-badge strip has its own 16px line above the
+     18px message line (`CommitGrid.vue`'s `.kv-cell-message` grid, `columns.ts`'s own
+     `.kv-message-badges-row` wrapper) — confirmed safe to change uniformly: every consumer
+     (`rowSvg.ts`'s node/edge geometry, `graphColumn.ts`) already reads this token rather than a
+     literal, so nothing needed touching beyond this one value. */
+  --kv-row-height: 36px;
   --kv-row-height-compact: 20px;
   --kv-row-height-comfortable: 26px;
-
-  --kv-space-1: 2px;
-  --kv-space-2: 4px;
-  --kv-space-3: 8px;
-  --kv-space-4: 12px;
-  --kv-space-5: 16px;
-
-  --kv-toolbar-height: 35px;
-  --kv-radius: 0px; /* the workbench has square corners; we do not invent rounded ones */
 
   /* G14 D6: the fallback for a host that reports nothing — VS Code's own default for
      workbench.tree.indent. Each view's root (App.vue/.kv-app, ReviewView.vue's own root)

@@ -12,6 +12,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"strings"
 	"sync"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitclient"
@@ -179,6 +180,43 @@ func (s *Session) Check(rev string) (ObjectInfo, error) {
 	return info, nil
 }
 
+// CheckMany resolves every rev in revs via ONE --batch-check round trip — one write of all of
+// them, then all their header lines read back in the same order — rather than one request() call
+// (one write, one read, under the process's own single-request mutex) per rev (G30 round-1
+// performance review, finding #5): `cat-file --batch-check` is explicitly designed to take many
+// revisions in one write and stream back all the answers, the whole point of a persistent process
+// in the first place. The returned slice is the same length as revs, in the same order; a rev git
+// could not resolve gets a zero ObjectInfo at its own index (Check's own ErrMissing becomes a
+// per-Go-error return for a single rev, but a batch of N cannot fail some and succeed others
+// through one error return, so "missing" is a zero-value slot here instead).
+func (s *Session) CheckMany(revs []string) ([]ObjectInfo, error) {
+	if len(revs) == 0 {
+		return nil, nil
+	}
+	var sb strings.Builder
+	for _, rev := range revs {
+		sb.WriteString(rev)
+		sb.WriteByte('\n')
+	}
+	infos := make([]ObjectInfo, len(revs))
+	err := s.check.request(sb.String(), func(r *bufio.Reader) error {
+		for i := range revs {
+			info, found, rerr := readHeader(r)
+			if rerr != nil {
+				return rerr
+			}
+			if found {
+				infos[i] = info
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return infos, nil
+}
+
 // Read resolves rev and returns its content. Checks the size via --batch-check first (Check) and
 // answers ErrTooLarge without ever asking --batch for the bytes when it exceeds the session's
 // gate — the size gate this session was built to enforce.
@@ -210,6 +248,27 @@ func (s *Session) Read(rev string) (ObjectInfo, []byte, error) {
 		return ObjectInfo{}, nil, ErrMissing
 	}
 	return batchInfo, content, nil
+}
+
+// CheckOneShot is Check's own counterpart to ReadOneShot — a rev the batch protocol cannot
+// express (a newline anywhere in it: `cat-file --batch-check` reads one request per line, same
+// framing limit ReadOneShot's own doc comment explains). Spawns `git rev-parse --verify <rev>`
+// once, argv-only (no line framing to break): for a `<rev>:<path>` expression this resolves to
+// exactly the same OID `Check`'s own --batch-check header line would have reported, with a
+// non-zero exit standing in for "missing" — the same ErrMissing answer Check gives for an
+// unresolvable rev, drawing no finer distinction than the batch protocol already does (mirrors
+// ReadOneShot's own reasoning verbatim).
+func (s *Session) CheckOneShot(ctx context.Context, rev string) (ObjectInfo, error) {
+	res, err := gitclient.Run(ctx, s.runner, s.gitPath, gitclient.Spec{
+		Dir: s.dir, Args: []string{"rev-parse", "--verify", rev}, ReadOnly: true,
+	})
+	if err != nil {
+		return ObjectInfo{}, err
+	}
+	if res.ExitCode != 0 {
+		return ObjectInfo{}, ErrMissing
+	}
+	return ObjectInfo{OID: strings.TrimSpace(string(res.Stdout))}, nil
 }
 
 // ReadOneShot answers a rev the batch protocol cannot express — a path containing a newline

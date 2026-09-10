@@ -163,6 +163,23 @@ export class SubjectBuffer {
     );
     const start = this.#offsets[from] as number;
     const end = this.#offsets[to] as number;
+    // G31 round-2 performance review, finding #2: `from === 0` (CommitStore's own
+    // subjectBytes()/subjectOffsets(), the whole-loaded-range case every search scan calls) makes
+    // `start === this.#offsets[0] === 0` always — the rebase loop below would then compute
+    // `this.#offsets[i] - 0`, an identity copy, for every one of `to + 1` entries. `shaBytes()`'s
+    // own `ShaTable.rangeView` never copies for exactly this reason (see its own doc comment); a
+    // 200k-row load's `subjectOffsets()` paid an 800KB allocation and fill loop for a value
+    // `this.#offsets.subarray(0, to + 1)` already gives byte-for-byte, on every call — and
+    // `search/matcher.ts`'s `searchLoadedCommits` calls both accessors, so unconditionally, once
+    // per (undebounced) keystroke. (`commitStore.ts`'s own chunk-builder call, the other caller
+    // of this method, defensively copies before ever taking `.buffer` off the result — see its
+    // own comment — so handing back a live view here is safe for every caller.)
+    if (start === 0) {
+      return {
+        bytes: this.#bytes.subarray(start, end),
+        offsets: this.#offsets.subarray(from, to + 1),
+      };
+    }
     const offsets = new Uint32Array(to - from + 1);
     for (let i = 0; i <= to - from; i++) {
       offsets[i] = (this.#offsets[from + i] as number) - start;

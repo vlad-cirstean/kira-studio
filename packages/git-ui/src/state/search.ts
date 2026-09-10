@@ -23,6 +23,18 @@ const LOADED_HIT_LIMIT = 500;
  *  applied when `limit` is omitted; passing it explicitly here would just be the same number
  *  twice, so this request omits `limit` entirely. */
 const TAIL_DEBOUNCE_MS = 200;
+/** G30 round-1 performance review, finding #4: `#runLoadedScan` re-scans the ENTIRE loaded store
+ *  from row 0 every time it runs (`searchLoadedCommits` has no incremental/resume mode), and used
+ *  to be wired to fire on every single `loadedRows` change — the `revealSha` "load page after page
+ *  until the target sha appears" loop (`graphView.ts`) could fire dozens of these full re-scans in
+ *  a tight synchronous burst, each up to `LOADED_SCAN_BUDGET_MS` of main-thread work, on the one
+ *  interaction whose whole point is "jump to this commit". Short enough that an ordinary one-page
+ *  scroll-triggered load still re-scans almost immediately (imperceptible), long enough to coalesce
+ *  a tight loadMore() burst into one scan at the burst's own final row count instead of one per
+ *  page. A genuine query/scope change (`compiled`/`generation`) is NOT debounced — see the split
+ *  watchers below — typing a character must still re-scan synchronously, hard part 4's own budget
+ *  governs that cost, not this one. */
+const LOADED_SCAN_COALESCE_MS = 50;
 /** Hard part 6 / §7.8: below this, a query matches most of a repository, and spawning a ~1 s walk
  *  on the very first keystroke of every search is the wrong trade. Two characters, not one.
  *  Exported so `SearchResults.vue`'s own "search message bodies" affordance can tell a too-short
@@ -218,6 +230,7 @@ export class SearchState {
   #repoId: string | undefined;
   #tailController: AbortController | undefined;
   #tailTimer: ReturnType<typeof setTimeout> | undefined;
+  #loadedScanTimer: ReturnType<typeof setTimeout> | undefined;
   readonly #unsubscribeRefsChanged: () => void;
   readonly #stopWatchers: readonly (() => void)[];
 
@@ -315,12 +328,20 @@ export class SearchState {
       if (this.tail.value !== undefined) this.tailStale.value = true;
     });
 
-    // Per keystroke, synchronous half (hard part 4's own budget, not the debounce below).
-    const stopLoaded = watch(
-      [this.compiled, this.#graph.loadedRows, this.#graph.generation],
-      () => this.#runLoadedScan(),
+    // Per keystroke, synchronous half (hard part 4's own budget, not the debounce below) — a
+    // genuine query change must re-scan immediately, never coalesced. Deliberately the SAME
+    // trigger set the original single watcher used (compiled + generation), minus loadedRows
+    // (split out below) — scope is intentionally NOT a trigger here, unchanged from before this
+    // split.
+    const stopLoadedQuery = watch(
+      [this.compiled, this.#graph.generation],
+      () => this.#runLoadedScanNow(),
       { immediate: true },
     );
+    // G30 round-1 performance review, finding #4: loadedRows changing (a page finishing loading)
+    // is coalesced through LOADED_SCAN_COALESCE_MS — see that constant's own doc comment — rather
+    // than re-running the full from-row-0 scan on every single page.
+    const stopLoadedRows = watch(this.#graph.loadedRows, () => this.#scheduleLoadedScan());
     // Debounced tail (hard part 6): a fresh timer per relevant change, so five keystrokes in
     // 300ms spawn at most one process, not five.
     const stopTail = watch(
@@ -328,7 +349,7 @@ export class SearchState {
       () => this.#scheduleTail(),
       { immediate: true },
     );
-    this.#stopWatchers = [stopLoaded, stopTail];
+    this.#stopWatchers = [stopLoadedQuery, stopLoadedRows, stopTail];
   }
 
   setRepoId(repoId: string | undefined): void {
@@ -384,7 +405,11 @@ export class SearchState {
     return true;
   }
 
-  #runLoadedScan(): void {
+  /** Cancels any pending coalesced scan (see `LOADED_SCAN_COALESCE_MS`) and runs one immediately —
+   *  the query/scope watcher's own handler, and `#scheduleLoadedScan`'s own settled call. */
+  #runLoadedScanNow(): void {
+    if (this.#loadedScanTimer !== undefined) clearTimeout(this.#loadedScanTimer);
+    this.#loadedScanTimer = undefined;
     const compiled = this.compiled.value;
     if (compiled.kind !== 'ok' || this.scope.value === 'refs') {
       this.loaded.value = undefined;
@@ -395,6 +420,19 @@ export class SearchState {
       });
     }
     this.searchGeneration.value++;
+  }
+
+  /** `loadedRows` changed — coalesces a burst of these (see `LOADED_SCAN_COALESCE_MS`'s own doc
+   *  comment) into one `#runLoadedScanNow` call after the burst settles, rather than one full
+   *  from-row-0 re-scan per page. A no-op with no compiled query to run, same as the immediate
+   *  path — no point arming a timer for a scan that would do nothing when it fires. */
+  #scheduleLoadedScan(): void {
+    if (this.compiled.value.kind !== 'ok' || this.scope.value === 'refs') {
+      this.#runLoadedScanNow();
+      return;
+    }
+    if (this.#loadedScanTimer !== undefined) clearTimeout(this.#loadedScanTimer);
+    this.#loadedScanTimer = setTimeout(() => this.#runLoadedScanNow(), LOADED_SCAN_COALESCE_MS);
   }
 
   #scheduleTail(): void {
@@ -457,6 +495,7 @@ export class SearchState {
     this.#unsubscribeRefsChanged();
     for (const stop of this.#stopWatchers) stop();
     if (this.#tailTimer !== undefined) clearTimeout(this.#tailTimer);
+    if (this.#loadedScanTimer !== undefined) clearTimeout(this.#loadedScanTimer);
     this.#tailController?.abort();
   }
 }

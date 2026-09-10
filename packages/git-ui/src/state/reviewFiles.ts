@@ -67,6 +67,13 @@ export class ReviewFilesState {
   /** A review.mark request in flight — the two header buttons disable themselves while true
    *  rather than let a double-click race two writes against the same file. */
   readonly pending: ShallowRef<boolean> = shallowRef(false);
+  // G30 round-1 functional-correctness review, finding #7: mark()'s own request had no catch at
+  // all — a rejection propagated straight out of mark() as a rejected promise, and every caller
+  // (ReviewFilesPane.vue's onToggleReviewed among them) calls it as `void mark(...)`, discarding
+  // that promise outright. The failure became an unhandled rejection with nothing user-visible:
+  // the checkbox just silently reverted to its pre-click state on the next render with no
+  // explanation. Mirrors loadError/diffError's own pattern exactly.
+  readonly markError: ShallowRef<string | undefined> = shallowRef(undefined);
 
   readonly #bridge: BridgeClient;
   #target: ReviewFilesTarget | undefined;
@@ -86,8 +93,18 @@ export class ReviewFilesState {
     this.#branchTip = undefined;
     this.#mergeBase = undefined;
     this.loadError.value = undefined;
+    this.markError.value = undefined;
     this.selectedPath.value = null;
     this.#clearDiff();
+    // G30 round-1 functional-correctness review, finding #6: mark()'s own `finally` only clears
+    // `pending` when `this.#target === target` still holds for the SAME target identity that was
+    // current when the request started — a `setTarget` call that lands while a mark() is in
+    // flight (a base-resolution change, the stale-review banner, clicking Refresh review) swaps
+    // that identity, so the guard never matches and `pending` stays latched true forever: every
+    // review checkbox in the panel silently stops responding until the webview reloads. `pending`
+    // is a pane-wide "is a mark in flight" flag, not a per-target one, so a fresh target — which
+    // already discards everything else about the in-flight request above — discards this too.
+    this.pending.value = false;
     if (target) void this.#loadFiles();
   }
 
@@ -164,8 +181,15 @@ export class ReviewFilesState {
     const entry = this.files.value.find((e) => e.change.path === path);
     if (!entry) return;
     const change = entry.change;
+    // G30 round-1 functional-correctness review, finding #3: this used to read the shared
+    // `reviewedAtSha` ref, which #loadDiff (fired concurrently, not awaited — see selectFile)
+    // only populates from ITS OWN response, arriving after this runs. On the very first click
+    // after setTarget, or on the file switch immediately following one, that ref still held
+    // either nothing or the PREVIOUS file's own sha, sending "since review" open requests against
+    // the wrong revision. `entry.review.reviewedAtSha` is this file's own value, already in hand
+    // from the file list — no race, no dependency on #loadDiff's timing.
     const sinceReview =
-      this.diffMode.value === 'sinceReview' ? this.reviewedAtSha.value : undefined;
+      this.diffMode.value === 'sinceReview' ? entry.review.reviewedAtSha : undefined;
     const leftRev = sinceReview ?? this.#mergeBase;
     const leftLabel = sinceReview ? 'your last review' : target.base;
     await this.#bridge.request('editor.openRangeDiff', {
@@ -231,6 +255,7 @@ export class ReviewFilesState {
     const target = this.#target;
     if (!target || this.pending.value) return;
     this.pending.value = true;
+    this.markError.value = undefined;
     try {
       const result = await this.#bridge.request('review.mark', {
         repoId: target.repoId,
@@ -244,6 +269,9 @@ export class ReviewFilesState {
         entry.change.path === path ? { ...entry, review: result.review } : entry,
       );
       if (this.selectedPath.value === path) await this.#loadDiff();
+    } catch (error) {
+      if (this.#target !== target) return;
+      this.markError.value = error instanceof Error ? error.message : String(error);
     } finally {
       if (this.#target === target) this.pending.value = false;
     }

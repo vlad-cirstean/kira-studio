@@ -12,7 +12,7 @@
  * picker's own label, the rendered rows themselves).
  */
 import { SETTINGS } from '@kira/git-core';
-import type { HostKind, StashEntry, Transport, UiActionKind } from '@kira/git-ipc';
+import type { EventPayload, HostKind, StashEntry, Transport, UiActionKind } from '@kira/git-ipc';
 import {
   computeFloatPosition,
   initTooltips,
@@ -31,11 +31,13 @@ import AppToolbar from './components/AppToolbar.vue';
 // biome-ignore lint/style/useImportType: the template instantiates this — see above
 import CommitGrid from './components/CommitGrid.vue';
 import ConflictBanner from './components/ConflictBanner.vue';
+import ConnectionBanner from './components/ConnectionBanner.vue';
 import DetailPane from './components/DetailPane.vue';
 import BranchDialog from './components/dialogs/BranchDialog.vue';
 import CheckoutDialog from './components/dialogs/CheckoutDialog.vue';
 import CherryPickDialog from './components/dialogs/CherryPickDialog.vue';
 import ForcePushDialog from './components/dialogs/ForcePushDialog.vue';
+import PostCheckoutPullDialog from './components/dialogs/PostCheckoutPullDialog.vue';
 import PullDialog from './components/dialogs/PullDialog.vue';
 import RenameRefDialog from './components/dialogs/RenameRefDialog.vue';
 import RepoSettingsDialog from './components/dialogs/RepoSettingsDialog.vue';
@@ -64,6 +66,7 @@ import SearchBox from './components/SearchBox.vue';
 import StashDetailPane from './components/StashDetailPane.vue';
 import type { SearchOption } from './components/searchResultsModel.ts';
 import { childOf, parentOf } from './components/stackListModel.ts';
+import UncommittedChangesStrip from './components/UncommittedChangesStrip.vue';
 import { DetailState } from './state/detail.ts';
 import { createDetailActions, type DetailActions } from './state/detailActions.ts';
 import { GraphViewState } from './state/graphView.ts';
@@ -101,9 +104,18 @@ const props = defineProps<{
    *  shape — this is the extension's own cold-boot document, not the wire, so it is a rename
    *  rather than a contract change. */
   pendingUiAction?: { action: UiActionKind; target?: { repoId: string; sha: string } } | null;
+  /** G-UX (item 13): the host's own connection state as of this webview's cold resolve — see
+   *  `main.ts`'s own `MountOptions.hostConnectionState` doc comment. Threaded straight into
+   *  `BridgeClient`'s constructor as its seed; this component reads the live value back off
+   *  `bridge.hostConnection`, never this prop directly, past that one call. Named
+   *  `hostConnectionState`, not `connectionState`, to avoid colliding with the local const of that
+   *  name below (`BridgeClient`'s OWN, differently-scoped `connectionState` — cold-boot `app.init`
+   *  success/failure, not the host's live socket state; see that class's own doc comment on why
+   *  the two are kept separate). */
+  hostConnectionState: EventPayload<'connection.changed'>['state'];
 }>();
 
-const bridge = new BridgeClient(props.transport);
+const bridge = new BridgeClient(props.transport, props.hostConnectionState);
 const connectionState = bridge.connectionState;
 const graphView = new GraphViewState(bridge);
 // A fresh CommitStore for the life of this component (graphView is never swapped out from under
@@ -1342,6 +1354,11 @@ onBeforeUnmount(() => {
     >
       {{ liveAnnouncement }}
     </div>
+    <!-- G-UX (item 13): unconditional, above every content state below (including the boot-error
+         branches immediately following) — a live disconnect can happen regardless of which of
+         those the rest of the panel is currently showing, and each of them fully replaces the
+         panel's own content, which would otherwise hide this exactly when it matters most. -->
+    <ConnectionBanner :state="bridge.hostConnection.value" />
     <!-- G12 D6: outside the v-if="repoState" gate below, since bootError means bootstrap() never
          got that far — a blank panel is never an acceptable rendering of a failure. -->
     <div v-if="bootError && !repoState" class="kv-boot-error" data-testid="boot-error">
@@ -1370,6 +1387,7 @@ onBeforeUnmount(() => {
           :open-worktree-window-capability="actions?.capabilities.openWorktreeWindow ?? false"
           :actions="actions"
           :pr-state="prState"
+          :search-open="searchOpen"
           @repo-opened="handleRepoOpened"
           @stash-changes="stashCreateOpen = true"
           @branch-from-stash="handleBranchFromStash"
@@ -1381,6 +1399,7 @@ onBeforeUnmount(() => {
           @open-restack-dialog="handleOpenRestackDialog"
           @open-set-stack-parent-dialog="handleOpenSetStackParentDialog"
           @open-repo-settings="repoSettingsDialogOpen = true"
+          @toggle-search="toggleSearchRow"
         />
         <div v-if="searchOpen" ref="searchRowEl" class="kv-search-row">
           <SearchBox
@@ -1388,6 +1407,7 @@ onBeforeUnmount(() => {
             :search="searchState"
             @select="handleSearchSelect"
             @focus-grid="handleSearchFocusGrid"
+            @close="closeSearch"
           />
         </div>
         <EmptyRepositoryPanel :branch-name="repoState.activeRepo.value.head.name" />
@@ -1406,6 +1426,7 @@ onBeforeUnmount(() => {
           :open-worktree-window-capability="actions?.capabilities.openWorktreeWindow ?? false"
           :actions="actions"
           :pr-state="prState"
+          :search-open="searchOpen"
           @repo-opened="handleRepoOpened"
           @stash-changes="stashCreateOpen = true"
           @branch-from-stash="handleBranchFromStash"
@@ -1417,6 +1438,7 @@ onBeforeUnmount(() => {
           @open-restack-dialog="handleOpenRestackDialog"
           @open-set-stack-parent-dialog="handleOpenSetStackParentDialog"
           @open-repo-settings="repoSettingsDialogOpen = true"
+          @toggle-search="toggleSearchRow"
         />
         <div v-if="searchOpen" ref="searchRowEl" class="kv-search-row">
           <SearchBox
@@ -1424,6 +1446,7 @@ onBeforeUnmount(() => {
             :search="searchState"
             @select="handleSearchSelect"
             @focus-grid="handleSearchFocusGrid"
+            @close="closeSearch"
           />
         </div>
         <ConflictBanner
@@ -1443,6 +1466,7 @@ onBeforeUnmount(() => {
         </div>
         <main class="kv-body">
           <section class="kv-graph-region" data-testid="graph-region" aria-label="Commit graph">
+            <UncommittedChangesStrip :graph-view="graphView" :ops-state="opsState" />
             <CommitGrid
               ref="commitGridRef"
               :graph-view="graphView"
@@ -1589,6 +1613,7 @@ onBeforeUnmount(() => {
         <CherryPickDialog :ops="opsState" />
         <ForcePushDialog :ops="opsState" />
         <PullDialog :ops="opsState" />
+        <PostCheckoutPullDialog :ops="opsState" />
         <StashDialog
           :ops="opsState"
           :create-open="stashCreateOpen"
@@ -1647,14 +1672,15 @@ onBeforeUnmount(() => {
 
 /* G-UX D9 (item 9): the graph search row — moved out of the always-rendered toolbar (item 9's own
    correctness fix), toggled by `/`/`Ctrl+F`/`Ctrl+Alt+F`, a sibling between <AppToolbar> and
-   whatever follows it in both template branches. */
+   whatever follows it in both template branches. G34 D13: takes the toolbar's own inset, so the
+   two stacked bars read as one chrome block rather than two differently-padded strips. */
 .kv-search-row {
   display: flex;
   align-items: center;
-  gap: var(--kv-space-2);
-  padding: var(--kv-space-1) var(--kv-space-3);
+  gap: var(--kv-s-2);
+  padding: var(--kv-s-2) var(--kv-s-4);
   background-color: var(--kv-toolbar-bg);
-  border-bottom: 1px solid var(--kv-toolbar-border);
+  border-bottom: var(--kv-border-width) solid var(--kv-toolbar-border);
   flex-shrink: 0;
 }
 
@@ -1666,9 +1692,9 @@ onBeforeUnmount(() => {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: var(--kv-space-3);
+  gap: var(--kv-s-4);
   height: 100%;
-  padding: var(--kv-space-5);
+  padding: var(--kv-s-6);
   text-align: center;
   color: var(--kv-app-fg);
 }
@@ -1680,9 +1706,9 @@ onBeforeUnmount(() => {
 }
 
 .kv-boot-error button {
-  padding: var(--kv-space-2) var(--kv-space-4);
+  padding: var(--kv-s-2) var(--kv-s-5);
   border: 1px solid var(--kv-panel-border);
-  border-radius: var(--kv-radius);
+  border-radius: var(--kv-radius-sm);
   background-color: var(--kv-panel-bg);
   color: var(--kv-app-fg);
   cursor: pointer;
@@ -1704,7 +1730,7 @@ onBeforeUnmount(() => {
 
 .kv-boot-error-banner button {
   margin-left: auto;
-  padding: var(--kv-space-1) var(--kv-space-3);
+  padding: var(--kv-s-1) var(--kv-s-4);
   border: 1px solid var(--kv-panel-border);
   border-radius: var(--kv-radius-sm);
   background-color: var(--kv-panel-bg);
@@ -1731,7 +1757,7 @@ onBeforeUnmount(() => {
   position: fixed;
   z-index: var(--kui-z-popover, 20);
   border: 1px solid var(--kv-panel-border);
-  border-radius: var(--kv-radius);
+  border-radius: var(--kv-radius-sm);
   box-shadow: 0 2px 8px var(--kv-widget-shadow);
 }
 
@@ -1785,7 +1811,7 @@ onBeforeUnmount(() => {
 
 .kv-detail-empty {
   margin: 0;
-  padding: var(--kv-space-4);
+  padding: var(--kv-s-5);
   color: var(--kv-description-fg);
 }
 

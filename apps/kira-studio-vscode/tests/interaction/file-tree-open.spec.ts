@@ -106,6 +106,42 @@ test.describe('file tree open gestures', () => {
     expect(calls[0].pinned).toBe(true);
   });
 
+  /** A CSS mask-image `url("data:image/svg+xml,...")` string can look entirely valid
+   *  (`getComputedStyle` returns it, it's non-empty, it's not `none`) while still painting nothing:
+   *  Chromium silently renders an un-namespaced SVG data URI as fully transparent instead of erroring
+   *  (the `seti-icons` package's shipped `icons.json` ships every glyph without `xmlns`, see
+   *  `setiFileIcon.ts`'s `maskUrlFor`). So this asserts the mask URL actually rasterizes to visible
+   *  pixels, not just that the CSS property string is present — the CSS-string-only version of this
+   *  test passed even while every icon was invisible on screen. */
+  async function maskUrlPaintsPixels(
+    page: import('@playwright/test').Page,
+    maskImage: string,
+  ): Promise<boolean> {
+    const match = maskImage.match(/url\((["']?)(.*?)\1\)/);
+    if (!match) throw new Error(`could not extract a URL from mask-image: ${maskImage}`);
+    const dataUrl = match[2];
+    return page.evaluate(async (src) => {
+      const img = new Image();
+      const loaded = await new Promise<boolean>((resolve) => {
+        img.addEventListener('load', () => resolve(true));
+        img.addEventListener('error', () => resolve(false));
+        img.src = src;
+      });
+      if (!loaded) return false;
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.max(1, img.naturalWidth || 32);
+      canvas.height = Math.max(1, img.naturalHeight || 32);
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return false;
+      ctx.drawImage(img, 0, 0);
+      const { data } = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      for (let i = 3; i < data.length; i += 4) {
+        if (data[i] > 0) return true;
+      }
+      return false;
+    }, dataUrl);
+  }
+
   // G-UX D3 (item 3): two files with different extensions get different seti icons — rendered as
   // a CSS mask (`.kv-file-tree-icon`'s own `mask-image`) with `background-color` driving the
   // colour, replacing codicons' one shared `codicon-file-code` glyph for every source language.
@@ -135,6 +171,9 @@ test.describe('file tree open gestures', () => {
     expect(icon1.maskImage).not.toBe('none');
     expect(icon1.maskImage).not.toBe(icon2.maskImage);
     expect(icon1.backgroundColor).not.toBe(icon2.backgroundColor);
+
+    expect(await maskUrlPaintsPixels(page, icon1.maskImage)).toBe(true);
+    expect(await maskUrlPaintsPixels(page, icon2.maskImage)).toBe(true);
   });
 
   // G-UX D6 (item 6): the status letter shrinks to the tree's own secondary scale — strictly

@@ -75,6 +75,7 @@ function anchorTitle(c: ReviewComment): string | undefined {
       }}</span>
       <KuiButton
         v-if="capabilities.clipboard"
+        variant="icon"
         class="kv-review-comments-icon-button"
         :icon="ACTION_ICONS.copy"
         v-kui-tooltip="'Copy for AI'"
@@ -84,6 +85,7 @@ function anchorTitle(c: ReviewComment): string | undefined {
       />
       <KuiButton
         v-if="!reviewComments.confirmingClear.value"
+        variant="icon"
         class="kv-review-comments-icon-button"
         :icon="ACTION_ICONS.clearAll"
         v-kui-tooltip="'Clear all comments'"
@@ -125,7 +127,8 @@ function anchorTitle(c: ReviewComment): string | undefined {
                 :aria-label="anchorTitle(c)"
               ></span>
               <KuiButton
-                class="kv-review-comments-icon-button kv-review-comments-row-delete"
+                variant="icon"
+                class="kv-review-comments-row-delete"
                 :icon="ACTION_ICONS.remove"
                 v-kui-tooltip="'Delete comment'"
                 aria-label="Delete comment"
@@ -173,31 +176,14 @@ function anchorTitle(c: ReviewComment): string | undefined {
   font-size: var(--kv-t-sm);
 }
 
+/* G34 D14: `.kui-button--icon`'s own box (kira-ui/theme/controls.css) is now this exact shape —
+   only the header's own "push everything after the count to the right" layout survives. */
 .kv-review-comments-icon-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  height: var(--kv-control-h);
-  width: var(--kv-control-h);
   margin-left: auto;
-  border: none;
-  border-radius: var(--kv-radius-sm);
-  background: transparent;
-  color: var(--kv-app-fg);
-  cursor: pointer;
 }
 
 .kv-review-comments-icon-button + .kv-review-comments-icon-button {
   margin-left: 0;
-}
-
-.kv-review-comments-icon-button:hover:not(:disabled) {
-  background-color: var(--kv-row-hover-bg);
-}
-
-.kv-review-comments-icon-button:disabled {
-  cursor: default;
-  opacity: 0.5;
 }
 
 .kv-review-comments-clear-confirm {
@@ -208,16 +194,8 @@ function anchorTitle(c: ReviewComment): string | undefined {
   font-size: var(--kv-t-sm);
 }
 
-.kv-review-comments-clear-confirm button {
-  height: var(--kv-control-h);
-  padding: 0 var(--kv-s-2);
-  border: var(--kv-border-width) solid var(--kv-panel-border);
-  border-radius: var(--kv-radius-sm);
-  background: transparent;
-  color: var(--kv-app-fg);
-  font-family: var(--kv-font-ui);
-  cursor: pointer;
-}
+/* G34 D14: `.kv-review-comments-clear-confirm button` is gone — both children are already
+   `KuiButton`, whose own default box is this exact shape. */
 
 .kv-review-comments-list {
   flex: 1;
@@ -268,8 +246,6 @@ function anchorTitle(c: ReviewComment): string | undefined {
 
 .kv-review-comments-row-delete {
   margin-left: auto;
-  height: calc(var(--kv-control-h) * 0.8);
-  width: calc(var(--kv-control-h) * 0.8);
 }
 
 .kv-review-comments-body {
@@ -282,7 +258,7 @@ function anchorTitle(c: ReviewComment): string | undefined {
 
 .kv-review-comments-empty {
   margin: 0;
-  padding: var(--kv-space-4);
+  padding: var(--kv-s-5);
   color: var(--kv-description-fg);
 }
 

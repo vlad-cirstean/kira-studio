@@ -127,6 +127,18 @@ func (d *Discovery) Status(ctx context.Context, host string) Status {
 
 	status := d.probe(ctx, host)
 
+	// G31 round-2 architecture/security review, finding #5 (mirror of gitclient's own discovery.go
+	// finding #1, apps/kira-studio/internal/gitclient/discovery.go): a caller-cancelled ctx killed
+	// probe's own spawn mid-flight, which used to be indistinguishable from "gh is genuinely
+	// unavailable/unauthenticated" and got cached under notOKTTL — poisoning every OTHER caller's
+	// Status(host) for up to 30s over an event that says nothing about gh at all. Skip the cache
+	// write when the CALLER's own ctx (not either sub-probe's own versionProbeTimeout/
+	// authProbeTimeout, which are real "gh took too long" signals worth caching) was cancelled out
+	// from under this probe.
+	if errors.Is(ctx.Err(), context.Canceled) {
+		return status
+	}
+
 	d.mu.Lock()
 	d.cache[host] = cacheEntry{status: status, cachedAt: d.clock.Now()}
 	d.mu.Unlock()
@@ -166,6 +178,13 @@ func (d *Discovery) probe(ctx context.Context, host string) Status {
 	if errors.Is(err, context.DeadlineExceeded) {
 		return Status{Kind: KindNotFound, Host: host, Path: path, Reason: "gh --version did not respond within 5s"}
 	}
+	// The caller's own ctx (not versionCtx's own sub-timeout above) was cancelled mid-probe — the
+	// killed process's own error below says nothing about whether gh works, so don't report it as
+	// though it did (Status's own caller-cancelled check is what keeps this out of the cache; this
+	// just keeps the immediate Reason honest for anyone who logs it).
+	if errors.Is(ctx.Err(), context.Canceled) {
+		return Status{Kind: KindNotFound, Host: host, Path: path, Reason: "the request was cancelled"}
+	}
 	if err != nil {
 		return Status{Kind: KindNotFound, Host: host, Path: path, Reason: "gh could not be started: " + err.Error()}
 	}
@@ -182,6 +201,12 @@ func (d *Discovery) probe(ctx context.Context, host string) Status {
 	cancel()
 	if errors.Is(err, context.DeadlineExceeded) {
 		return Status{Kind: KindNotFound, Host: host, Path: path, Reason: "gh auth status did not respond within 10s"}
+	}
+	// Mirrors the version sub-probe's own check above: the caller's ctx (not authCtx's own
+	// sub-timeout) was cancelled mid-probe, so the killed process's error says nothing about
+	// whether gh/auth actually work.
+	if errors.Is(ctx.Err(), context.Canceled) {
+		return Status{Kind: KindNotFound, Host: host, Path: path, Reason: "the request was cancelled"}
 	}
 	if err != nil {
 		return Status{Kind: KindNotFound, Host: host, Path: path, Reason: "gh could not be started: " + err.Error()}

@@ -1,50 +1,50 @@
 <script setup lang="ts">
 /**
- * `docs/plans/P5.md` W7: §6.4 items 1 and 3 — message at the top of the pane, details at the
- * bottom, with `FileTree.vue` (item 2) between them in `DetailPane.vue`'s own template; this
- * component only ever renders its own two pieces.
+ * `docs/plans/P5.md` W7: subject + files is `DetailPane.vue`'s whole job — this component renders
+ * the subject/facts/actions header and, behind one "Show more" toggle, everything else about the
+ * commit (body, author/committer identities, trailers, refs, signature, pull request).
  *
  * Every DOM-touching bit (message linkification, ref badges) is built through `linkify.ts`'s
  * `appendLinkifiedText`/`refBadges.ts`'s `buildRefBadges` rather than a template `v-html` — a
  * commit message is untrusted text and this repo's `enableHtmlRendering: false` discipline
  * (`columns.ts`'s own doc comment) applies here just as much as it does inside the grid.
  *
- * G-UX D7 (item 7): subject + files is the pane's whole job now. SHA and Parent(s) are gone
- * entirely — the row context menu's `copySha` is the sha's only copy path left (G19 D7's own
- * precedent), and the graph's own edges are how you reach a parent. Author/Committer and the
- * trailers both moved inside the "Show more" collapsible region, alongside the body, so the
- * collapsed view is subject + clamped body + toggle and nothing else.
+ * G-UX (items 6/7): `DetailPane.vue` used to mount this component twice — once for the message
+ * (with the body/author/trailers behind "Show more"), once more, physically below the file tree,
+ * for Refs/Signature/Pull request. That second, separately-scrolling instance is gone: this file
+ * now mounts once and folds Refs/Signature/PR into the same "Show more" region as the body and
+ * identities, so there is exactly one expandable region, not two disconnected ones. The collapsed
+ * view is now title + a date/SHA facts row + "Open all changes" — no body preview at all (it used
+ * to show a 2-line clamp before the toggle); "Show more" reveals the rest. The old copy-message
+ * icon button is gone too — SHA/message copy already exist via the row context menu, and the new
+ * facts row's SHA button covers the one copy path this pane itself offers.
  */
 import type { PrLookupResult } from '@kira/git-ipc';
 import { KuiButton } from '@kira/kira-ui';
 import { computed, nextTick, ref, watch } from 'vue';
 import type { CommitDetail } from '../state/detail.ts';
 import type { DetailActions } from '../state/detailActions.ts';
+import { formatAbsoluteDate, formatRelativeDate } from './dateFormat.ts';
 import { appendLinkifiedText } from './linkify.ts';
 import { buildRefBadges } from './refBadges.ts';
 
 const props = defineProps<{
   detail: CommitDetail | undefined;
   actions: DetailActions;
-  /** §6.4's "message, then files, then details" ordering means `DetailPane.vue` has to put its
-   *  own `<FileTree>` *between* this component's two halves — so it mounts this component twice,
-   *  once per section, rather than this file owning where the tree sits. */
-  section: 'message' | 'details';
   /** G24 D12: the currently selected commit's own PR lookup — `PrState.selected`, threaded in by
-   *  `DetailPane.vue`. The `'message'` instance never reads this (the row only ever renders in
-   *  `'details'`, below). `undefined` covers both "nothing selected yet" and the in-flight/
-   *  debounce window, same as `detail` itself before it resolves. */
+   *  `DetailPane.vue`. `undefined` covers both "nothing selected yet" and the in-flight/debounce
+   *  window, same as `detail` itself before it resolves. */
   prResult?: PrLookupResult;
 }>();
 
 const bodyEl = ref<HTMLParagraphElement | null>(null);
 const decorationEl = ref<HTMLSpanElement | null>(null);
 
-/** G19 D4 (item 4): the message body's own click-to-expand state, scoped to the `'message'`
- *  section only (the `'details'` instance of this component never reads either ref). Reset to
- *  collapsed on every new commit — an expansion the user made for one commit's message is not a
- *  standing preference carried into the next. */
-const bodyExpanded = ref(false);
+/** G-UX (items 6/7): the one "Show more" state for the whole pane now — gates the body, the
+ *  identities, the trailers, and Refs/Signature/PR together. Reset to collapsed on every new
+ *  commit — an expansion the user made for one commit is not a standing preference carried into
+ *  the next. */
+const expanded = ref(false);
 
 /** Body lines rendered one `<p>` per blank-line-separated paragraph — `appendLinkifiedText`
  *  handles a paragraph's own line breaks by joining with `\n` inside one paragraph rather than
@@ -81,14 +81,20 @@ function renderDecoration(): void {
   if (badges) container.appendChild(badges);
 }
 
+/** `bodyEl` stays mounted (see the template) whether or not the pane is expanded — only its own
+ *  visibility toggles — precisely so this watch, and the render it drives, never has to re-run
+ *  just because the user clicked "Show more"; it only reacts to an actual commit/body change. */
 watch(
   [() => props.detail, bodyEl],
   () => {
-    bodyExpanded.value = false;
+    expanded.value = false;
     void nextTick(renderBody);
   },
   { immediate: true },
 );
+/** `decorationEl`, unlike `bodyEl`, only exists in the DOM while `expanded` — nothing here sets
+ *  `expanded` itself, so mounting/unmounting it as the toggle flips is safe and simply re-renders
+ *  the badges into place the next time it appears. */
 watch([() => props.detail?.decoration, decorationEl], () => void nextTick(renderDecoration), {
   immediate: true,
 });
@@ -172,13 +178,14 @@ const prDetail = computed<PrDetailView | undefined>(() => {
   };
 });
 
-/** G-UX D7 (7b): the whole `'details'` section renders nothing at all when none of its three
- *  rows would — the common case (no decoration on this commit, unsigned, GitHub disabled) is now
- *  an empty pane, not an empty padded box. Reads `detail.decoration.length` directly rather than
- *  `decorationEl?.childNodes.length` (the individual Refs row's own check, unchanged below): this
- *  needs a value known synchronously from props on the FIRST render, before `renderDecoration`'s
- *  own `nextTick` has populated anything — `buildRefBadges` only ever returns `null` for an empty
- *  decoration array (`refBadges.ts`), so this tracks the DOM outcome closely enough to gate on. */
+/** Whether the Refs/Signature/PR block has anything to show at all — the common case (no
+ *  decoration on this commit, unsigned, GitHub disabled) renders none of it, not an empty padded
+ *  box. Reads `detail.decoration.length` directly rather than `decorationEl?.childNodes.length`
+ *  (the individual Refs row's own check, unchanged below): this needs a value known synchronously
+ *  from props, before `renderDecoration`'s own `nextTick` has populated anything, and before
+ *  `decorationEl` even exists in the DOM (it is only mounted while `expanded`) —
+ *  `buildRefBadges` only ever returns `null` for an empty decoration array (`refBadges.ts`), so
+ *  this tracks the DOM outcome closely enough to gate on. */
 const hasDetails = computed(
   () =>
     (props.detail?.decoration.length ?? 0) > 0 ||
@@ -213,11 +220,40 @@ const trailerRows = computed<TrailerRow[]>(() =>
   }),
 );
 
-function copyMessage(): void {
+const shortSha = computed(() => props.detail?.sha.slice(0, 7) ?? '');
+
+/** G-UX (item 6): the facts row's own copy path — the only sha-copy affordance this pane offers
+ *  now (the old header copy button copied the full *message*, not the sha, and is gone). */
+function copySha(): void {
+  const sha = props.detail?.sha;
+  if (!sha) return;
+  props.actions.copy(sha, 'full SHA');
+}
+
+/** G-UX (item 6): replaces the old copy-message header button — "Open all changes", the exact
+ *  pattern `ReviewCommitRow.vue`'s own row action already uses. Unlike that row, this pane's
+ *  `detail` always already carries the full file list (no lazy per-row fetch to guard against
+ *  here), so there is no "expand first" precondition to check. */
+async function openAllChanges(): Promise<void> {
   const detail = props.detail;
   if (!detail) return;
-  const full = detail.body.trim() === '' ? detail.subject : `${detail.subject}\n\n${detail.body}`;
-  props.actions.copy(full, 'commit message');
+  try {
+    const { opened, failed, mode } = await props.actions.openAllChanges({
+      sha: detail.sha,
+      parentIndex: detail.parentIndex,
+    });
+    props.actions.announce(
+      failed === 0
+        ? mode === 'multiDiff'
+          ? `Opened all ${opened} changed files`
+          : `Opened ${opened} files`
+        : `Opened ${opened} of ${opened + failed} files — ${failed} couldn't be opened`,
+    );
+  } catch (err) {
+    props.actions.announce(
+      `Couldn't open the changes — ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
 }
 </script>
 
@@ -225,56 +261,67 @@ function copyMessage(): void {
   <div
     v-if="detail"
     class="kv-commit-meta"
-    :class="{ 'kv-detail-pane-meta--expanded': section === 'message' && bodyExpanded }"
+    :class="{ 'kv-detail-pane-meta--expanded': expanded }"
     data-testid="commit-meta"
   >
-    <section v-if="section === 'message'" class="kv-meta-message" aria-label="Commit message">
-      <div class="kv-meta-message-header">
-        <h2 class="kv-meta-subject">{{ detail.subject }}</h2>
-        <KuiButton
-          v-if="actions.capabilities.clipboard"
-          variant="ghost"
-          icon="codicon-copy"
-          v-kui-tooltip="'Copy full message'"
-          @click="copyMessage"
-        />
-      </div>
-      <p
-        v-if="bodyParagraphs.length > 0"
-        ref="bodyEl"
-        class="kv-meta-body"
-        :class="{ 'kv-meta-body-expanded': bodyExpanded }"
-      ></p>
-      <!-- G-UX D7 (7a/7b): author/committer and the trailers both live behind this toggle now, so
-           it is not gated on `bodyOverflows` any more — there is always at least the author to
-           reveal, even for a one-line subject with no body at all. -->
-      <KuiButton variant="ghost" class="kv-meta-body-toggle" @click="bodyExpanded = !bodyExpanded">
-        {{ bodyExpanded ? 'Show less' : 'Show more' }}
-      </KuiButton>
-      <div v-if="bodyExpanded" class="kv-meta-expanded">
-        <p class="kv-meta-identity">{{ detail.author.name }} &lt;{{ detail.author.email }}&gt;</p>
-        <p v-if="committerDiffersFromAuthor" class="kv-meta-identity">
-          {{ detail.committer.name }} &lt;{{ detail.committer.email }}&gt;
-          <span class="kv-meta-identity-role">committer</span>
-        </p>
-        <dl v-if="trailerRows.length > 0" class="kv-meta-trailers">
-          <template v-for="(row, index) in trailerRows" :key="index">
-            <dt>{{ row.token }}</dt>
-            <dd v-if="row.name !== undefined">
-              {{ row.name }} <span class="kv-meta-trailer-email">&lt;{{ row.email }}&gt;</span>
-            </dd>
-            <dd v-else>{{ row.raw }}</dd>
-          </template>
-        </dl>
-      </div>
-    </section>
+    <div class="kv-meta-header">
+      <h2 class="kv-meta-subject">{{ detail.subject }}</h2>
+      <KuiButton
+        variant="icon"
+        icon="codicon-diff-multiple"
+        v-kui-tooltip="'Open all changes'"
+        aria-label="Open all changes"
+        data-testid="open-all-changes-button"
+        @click="openAllChanges"
+      />
+    </div>
 
-    <section
-      v-if="section === 'details' && hasDetails"
-      class="kv-meta-details"
-      aria-label="Commit details"
-    >
-      <dl class="kv-meta-details-list">
+    <p class="kv-meta-facts">
+      <span v-kui-tooltip="formatAbsoluteDate(detail.committer.timestamp)">{{
+        formatRelativeDate(detail.committer.timestamp)
+      }}</span>
+      <span class="kv-meta-facts-sep" aria-hidden="true">·</span>
+      <button
+        v-if="actions.capabilities.clipboard"
+        type="button"
+        class="kv-meta-sha"
+        v-kui-tooltip="'Copy full SHA'"
+        aria-label="Copy full SHA"
+        data-testid="commit-meta-sha"
+        @click="copySha"
+      >
+        {{ shortSha }}
+      </button>
+      <code v-else class="kv-meta-sha-static" data-testid="commit-meta-sha">{{ shortSha }}</code>
+    </p>
+
+    <p
+      v-if="bodyParagraphs.length > 0"
+      ref="bodyEl"
+      v-show="expanded"
+      class="kv-meta-body"
+    ></p>
+
+    <KuiButton class="kv-meta-body-toggle" @click="expanded = !expanded">
+      {{ expanded ? 'Show less' : 'Show more' }}
+    </KuiButton>
+
+    <div v-if="expanded" class="kv-meta-expanded">
+      <p class="kv-meta-identity">{{ detail.author.name }} &lt;{{ detail.author.email }}&gt;</p>
+      <p v-if="committerDiffersFromAuthor" class="kv-meta-identity">
+        {{ detail.committer.name }} &lt;{{ detail.committer.email }}&gt;
+        <span class="kv-meta-identity-role">committer</span>
+      </p>
+      <dl v-if="trailerRows.length > 0" class="kv-meta-trailers">
+        <template v-for="(row, index) in trailerRows" :key="index">
+          <dt>{{ row.token }}</dt>
+          <dd v-if="row.name !== undefined">
+            {{ row.name }} <span class="kv-meta-trailer-email">&lt;{{ row.email }}&gt;</span>
+          </dd>
+          <dd v-else>{{ row.raw }}</dd>
+        </template>
+      </dl>
+      <dl v-if="hasDetails" class="kv-meta-details-list">
         <dt v-if="decorationEl?.childNodes.length">Refs</dt>
         <dd v-show="decorationEl?.childNodes.length" ref="decorationEl" class="kv-meta-refs"></dd>
         <template v-if="signatureText">
@@ -298,26 +345,23 @@ function copyMessage(): void {
           </dd>
         </template>
       </dl>
-    </section>
+    </div>
   </div>
 </template>
 
 <style>
-/* G-UX D7 (7c): padding/gap tighten one step (space-4 -> space-3/space-2) — one contributor,
-   alongside the 2-line clamp below and the deleted sha/parent rows, to the pane's own 80% target
-   for the file tree (DetailPane.vue's own max-height rules do the actual bounding). */
 .kv-commit-meta {
-  padding: var(--kv-space-3);
+  padding: var(--kv-s-4);
   display: flex;
   flex-direction: column;
-  gap: var(--kv-space-2);
+  gap: var(--kv-s-2);
 }
 
-.kv-meta-message-header {
+.kv-meta-header {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: var(--kv-space-2);
+  gap: var(--kv-s-2);
 }
 
 .kv-meta-subject {
@@ -326,28 +370,53 @@ function copyMessage(): void {
   font-weight: 600;
 }
 
-.kv-meta-body {
-  margin: var(--kv-space-2) 0 0;
-  white-space: normal;
+/* G-UX (item 6): the date + short-SHA row — visible even while collapsed, alongside the title and
+   the "Open all changes" action. */
+.kv-meta-facts {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--kv-s-1);
+  color: var(--kv-description-fg);
+  font-size: 0.85em;
 }
 
-/* G19 D4 (item 4): truncated while collapsed — F4 confirmed the body used to render in full with
-   no truncation at all. G-UX D7 (7c): tightened from 4 lines to 2 — the largest single
-   contributor to the pane's 80% target after removing the sha/parent rows; "Show more" is one
-   click away for the rest. */
-.kv-meta-body:not(.kv-meta-body-expanded) {
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+.kv-meta-facts-sep {
+  flex-shrink: 0;
+}
+
+.kv-meta-sha {
+  font-family: var(--kv-mono-font-family);
+  color: inherit;
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+.kv-meta-sha:hover {
+  text-decoration: underline;
+}
+
+.kv-meta-sha-static {
+  font-family: var(--kv-mono-font-family);
+}
+
+.kv-meta-body {
+  margin: var(--kv-s-2) 0 0;
+  white-space: normal;
 }
 
 .kv-meta-body a {
   color: var(--kv-focus-border);
 }
 
+/* Deliberately not a standard control's box: "Show more"/"Show less" reads as an inline link
+   (the same --kv-focus-border blue .kv-meta-body a uses just above), zero-padding and borderless
+   by design rather than left over from before the button system existed — no button variant
+   models a link, and inventing one for this single caller would be speculative generality. */
 .kv-meta-body-toggle {
-  margin-top: var(--kv-space-1);
+  margin-top: var(--kv-s-1);
   background: transparent;
   border: none;
   padding: 0;
@@ -361,14 +430,14 @@ function copyMessage(): void {
   text-decoration: underline;
 }
 
-/* G-UX D7 (7a/7b): the collapsible region behind "Show more" — author/committer identity lines,
-   then the trailers. Zero space cost while collapsed (the default view): nothing here renders
-   until bodyExpanded is true. */
+/* G-UX (items 6/7): the collapsible region behind "Show more" — body, author/committer identity,
+   trailers, then Refs/Signature/Pull request, all folded into the one region. Zero space cost
+   while collapsed (the default view): nothing here renders until `expanded` is true. */
 .kv-meta-expanded {
-  margin-top: var(--kv-space-2);
+  margin-top: var(--kv-s-2);
   display: flex;
   flex-direction: column;
-  gap: var(--kv-space-1);
+  gap: var(--kv-s-2);
 }
 
 .kv-meta-identity {
@@ -382,10 +451,10 @@ function copyMessage(): void {
 }
 
 .kv-meta-trailers {
-  margin: var(--kv-space-2) 0 0;
+  margin: 0;
   display: grid;
   grid-template-columns: max-content 1fr;
-  gap: var(--kv-space-1) var(--kv-space-3);
+  gap: var(--kv-s-1) var(--kv-s-4);
   font-size: 0.92em;
 }
 
@@ -405,7 +474,7 @@ function copyMessage(): void {
   margin: 0;
   display: grid;
   grid-template-columns: max-content 1fr;
-  gap: var(--kv-space-1) var(--kv-space-3);
+  gap: var(--kv-s-1) var(--kv-s-4);
   font-size: 0.92em;
 }
 
@@ -420,13 +489,13 @@ function copyMessage(): void {
 .kv-meta-refs {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--kv-space-1);
+  gap: var(--kv-s-1);
 }
 
 .kv-meta-pr {
   display: flex;
   flex-direction: column;
-  gap: var(--kv-space-1);
+  gap: var(--kv-s-1);
 }
 
 .kv-meta-pr-link {

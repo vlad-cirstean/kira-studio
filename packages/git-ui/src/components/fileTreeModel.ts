@@ -199,19 +199,26 @@ export type FileTreeRow =
  *  descendants are simply absent from this list, which is what makes "directory rows are skipped
  *  by arrow nav" true for free in flat mode (no directory rows exist there at all) and correct in
  *  tree mode (collapsing one hides its whole subtree from navigation, not just from view). */
+// G30 round-1 performance review, finding #7: `rows.push(...flattenTreeRows(...))` built a fresh
+// sub-array per directory level and spread it into the parent — O(n·depth) work overall (every
+// row gets re-copied once per ancestor directory it sits under), and `push`'s own argument list is
+// V8's own call-stack-sized array (not the heap), so a single spread past roughly 65k elements
+// throws `RangeError: Maximum call stack size exceeded` outright rather than merely running slow.
+// `rows` is now threaded through as an accumulator every level pushes into directly — one array,
+// one allocation, no spread at any depth.
 export function flattenTreeRows(
   nodes: readonly FileTreeNode[],
   isExpanded: (path: string) => boolean,
   depth = 0,
+  rows: FileTreeRow[] = [],
 ): FileTreeRow[] {
-  const rows: FileTreeRow[] = [];
   for (const node of nodes) {
     if (node.kind === 'file') {
       rows.push({ kind: 'file', node, depth });
     } else {
       const expanded = isExpanded(node.path);
       rows.push({ kind: 'directory', node, depth, expanded });
-      if (expanded) rows.push(...flattenTreeRows(node.children, isExpanded, depth + 1));
+      if (expanded) flattenTreeRows(node.children, isExpanded, depth + 1, rows);
     }
   }
   return rows;

@@ -29,7 +29,7 @@ import type { GitStatus, RepoSettingsPatch } from '@kira/git-ipc';
 import * as vscode from 'vscode';
 import type { OtherCommandId } from './commands.ts';
 import { isPaletteCommand, MUTATING_COMMANDS, OTHER_COMMANDS } from './commands.ts';
-import { ConnectionManager, type ConnectionState } from './connection.ts';
+import { ConnectionManager, type ConnectionState, toWireConnectionState } from './connection.ts';
 import { goToFileFromDiffCommand, openCommitInGraphCommand } from './diffToolbar.ts';
 import { KiraGraphViewProvider } from './panelView.ts';
 import { VsCodeClipboard } from './ports/clipboard.ts';
@@ -396,11 +396,16 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     // adapter needed.
     reviewSessionStore: context.workspaceState,
   });
-  const graphProvider = new KiraGraphViewProvider({ extensionUri: context.extensionUri, handlers });
+  const graphProvider = new KiraGraphViewProvider({
+    extensionUri: context.extensionUri,
+    handlers,
+    connection: manager,
+  });
   reviewProvider = new KiraReviewViewProvider({
     extensionUri: context.extensionUri,
     handlers,
     context,
+    connection: manager,
   });
 
   // G10 D16: created here so it can appear before the panel is ever opened (D3's
@@ -521,6 +526,26 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         graphProvider.notifyWorktreeProgress(payload);
       }),
     },
+    // G31 round-2 functional-correctness review, finding #3: RunRestack's own per-branch
+    // stack.progress was never forwarded at all — StackDialog.vue's progress list stayed
+    // permanently empty. Both webviews' App.vue instantiate their own StackState, so both get it,
+    // matching repo.changed's own two-provider forward above.
+    {
+      dispose: manager.on('stack.progress', (payload) => {
+        graphProvider.notifyStackProgress(payload);
+        reviewProvider.notifyStackProgress(payload);
+      }),
+    },
+    // G31 round-2 functional-correctness review, finding #4: repoSettings.changed (G18 D4/D7's
+    // cross-connection settings fan-out — every currently connected client sees a repoSettings.set
+    // written by ANY of them) was never forwarded either, so the graph and review webviews (two
+    // independent RpcServers/connections) never saw each other's settings changes.
+    {
+      dispose: manager.on('repoSettings.changed', (payload) => {
+        graphProvider.notifyRepoSettingsChanged(payload);
+        reviewProvider.notifyRepoSettingsChanged(payload);
+      }),
+    },
     manager.onActivityChange((active) => {
       if (activityDebounce) {
         clearTimeout(activityDebounce);
@@ -542,6 +567,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       // G15 D7: "connection state leaves connected" — every tracked decoration/state is dropped
       // rather than left showing a diff over a connection that may reconnect to a different repo.
       reviewMarking.notifyConnectionState(state);
+      // G-UX (item 13): pushed into both webviews themselves, not only the status bar below — a
+      // panel that stays open through a drop now shows it too. Mapped once, here, through the
+      // same `toWireConnectionState` `resolveWebviewView`'s own cold-boot seed already uses, so a
+      // live push and a cold-boot seed can never describe the same state two different ways.
+      const wireState = toWireConnectionState(state);
+      graphProvider.notifyConnectionState(wireState);
+      reviewProvider.notifyConnectionState(wireState);
       updateStatusBar(statusItem, state, isActive, lastAppInit);
       // §5.4 point 4: this phase's own exit criterion, executing in the real extension — the
       // moment a connection is established, prove app.init round-trips over the real socket.

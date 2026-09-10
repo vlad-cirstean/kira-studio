@@ -108,6 +108,12 @@ function onToggleReviewed(path: string): void {
       <p v-if="reviewFiles.diffError.value" class="kv-detail-pane-error">
         Couldn't open that file in the editor — {{ reviewFiles.diffError.value }}
       </p>
+      <!-- G30 round-1 functional-correctness review, finding #7: a failed review.mark used to be
+           an unhandled promise rejection with nothing shown here — the checkbox just silently
+           reverted on the next render. Mirrors loadError/diffError's own pattern exactly. -->
+      <p v-if="reviewFiles.markError.value" class="kv-detail-pane-error">
+        Couldn't update that file's review status — {{ reviewFiles.markError.value }}
+      </p>
 
       <FileTree
         class="kv-detail-pane-tree kv-review-files-tree"

@@ -512,6 +512,25 @@ func (e *RepoEntry) runPullOp(roCtx, spawnCtx context.Context, conn *Conn, deps 
 		return updates, &RemoteOpError{Kind: kind, Message: message}, nil
 	}
 
+	// G30 round-1 functional-correctness review, finding #2: unlike forcePush's own re-check above
+	// (step 3, D12) and every other write in this chapter ("a pre-flight is advice, not a lock",
+	// ops.go's own prepareReset doc comment), this integrate phase never re-verified HEAD was still
+	// params.Branch before merging/rebasing INTO WHATEVER IS CHECKED OUT NOW. The fetch above can
+	// take an arbitrary amount of wall-clock time (network, credential prompt) during which another
+	// window/terminal can check out a different branch — the merge/rebase below would then silently
+	// write onto that branch instead, with no error. Re-read fresh, immediately before the write
+	// this gates, same shape as prepareReset's own fresh in-progress re-check.
+	head, herr := e.Head(roCtx)
+	if herr != nil {
+		return updates, nil, herr
+	}
+	if head.Kind != "branch" || head.Name != params.Branch {
+		return updates, &RemoteOpError{
+			Kind:    "BranchChanged",
+			Message: fmt.Sprintf("%s is no longer checked out — the pull was not applied", params.Branch),
+		}, nil
+	}
+
 	// Past this point the op is a local write and is never killable again (D19).
 	e.remoteOp.setKillable(false)
 

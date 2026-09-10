@@ -220,7 +220,7 @@ func (c *Conn) Open(ctx context.Context, reg *Registry, gitPath, path string) (g
 	// AT construction time, so a repository already open when the setting flips on would otherwise
 	// never get a timer. ensureAutoFetch is a no-op whenever one is already running or the entry is
 	// disabled, so N windows opening this repository arm exactly one.
-	entry.ensureAutoFetch()
+	entry.EnsureAutoFetch()
 	return entry.Summary, nil
 }
 

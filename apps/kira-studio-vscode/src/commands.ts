@@ -221,7 +221,7 @@ export interface OtherCommand {
 export const OTHER_COMMANDS: readonly OtherCommand[] = [
   { command: 'kiraVersion.showConnectionStatus', title: 'Show Connection Status' },
   { command: 'kiraVersion.openRepository', title: 'Open Repository' },
-  { command: 'kiraVersion.focusGraph', title: 'Open Git Graph' },
+  { command: 'kiraVersion.focusGraph', title: 'Open Kira' },
   { command: 'kiraVersion.reviewBranch', title: 'Review Branch Changes' },
   { command: 'kiraVersion.refresh', title: 'Refresh' },
   // G11 D17: this phase's own palette command (SPEC's "each responsible for registering its own

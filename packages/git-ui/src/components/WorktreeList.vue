@@ -128,7 +128,7 @@ async function confirmRemove(): Promise<void> {
       </div>
       <KuiButton
         v-if="!entry.isCurrent"
-        class="kv-icon-button"
+        variant="icon"
         v-kui-tooltip="'Switch to this worktree'"
         aria-label="Switch to this worktree"
         @click="switchTo(entry)"
@@ -137,7 +137,7 @@ async function confirmRemove(): Promise<void> {
       </KuiButton>
       <KuiButton
         v-if="openWorktreeWindowCapability"
-        class="kv-icon-button"
+        variant="icon"
         v-kui-tooltip="'Open in new window'"
         aria-label="Open in new window"
         @click="openInNewWindow(entry)"
@@ -146,7 +146,7 @@ async function confirmRemove(): Promise<void> {
       </KuiButton>
       <KuiButton
         v-if="!entry.isMain && !entry.isCurrent"
-        class="kv-icon-button"
+        variant="icon"
         v-kui-tooltip="'Remove worktree'"
         aria-label="Remove worktree"
         @click="requestRemove(entry)"
@@ -199,7 +199,7 @@ async function confirmRemove(): Promise<void> {
 .kv-worktree-row-main {
   display: flex;
   align-items: center;
-  gap: var(--kv-space-1);
+  gap: var(--kv-s-1);
   flex: 1;
   min-width: 0;
 }

@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
+	"syscall"
 	"testing"
 	"time"
 )
@@ -77,5 +79,46 @@ func TestExecRunner_TimeoutKillsProcess(t *testing.T) {
 	}
 	if err == nil {
 		t.Fatal("Run returned nil error for a killed/timed-out process, want a non-nil error")
+	}
+}
+
+// TestExecRunner_CancellationStopsEscalationTimerAfterCleanExit is G31 round-2 architecture/
+// security review, finding #11: cmd.Cancel's own SIGKILL-escalation timer (armed on SIGTERM, to
+// fire after gracefulStopDelay) used to never be stopped once the process actually exited — a
+// clean SIGTERM exit (the overwhelmingly common case, exactly what this test's script does) still
+// left the timer ticking toward a SIGKILL nothing needs. gracefulStopDelay and killGroup are both
+// package vars specifically so this test can shrink the window and observe the escalation
+// directly, rather than relying on an on-demand-unreproducible real pid reuse.
+func TestExecRunner_CancellationStopsEscalationTimerAfterCleanExit(t *testing.T) {
+	script := writeScript(t, "#!/bin/sh\nsleep 30\n")
+
+	oldDelay := gracefulStopDelay
+	gracefulStopDelay = 100 * time.Millisecond
+	t.Cleanup(func() { gracefulStopDelay = oldDelay })
+
+	var mu sync.Mutex
+	var sigkillCalls int
+	oldKillGroup := killGroup
+	killGroup = func(pid int, sig syscall.Signal) error {
+		if sig == syscall.SIGKILL {
+			mu.Lock()
+			sigkillCalls++
+			mu.Unlock()
+		}
+		return oldKillGroup(pid, sig)
+	}
+	t.Cleanup(func() { killGroup = oldKillGroup })
+
+	r := NewExecRunner()
+	_, _ = r.Run(context.Background(), script, Spec{Args: nil, Timeout: 50 * time.Millisecond})
+
+	// Run has already returned, meaning cmd.Run (Start+Wait) confirmed the process reaped — the
+	// escalation timer armed above must already have been stopped. Wait comfortably past that
+	// window and confirm no SIGKILL was ever attempted.
+	time.Sleep(3 * gracefulStopDelay)
+	mu.Lock()
+	defer mu.Unlock()
+	if sigkillCalls != 0 {
+		t.Fatalf("SIGKILL attempted %d time(s) after a clean SIGTERM exit — the escalation timer was not stopped", sigkillCalls)
 	}
 }

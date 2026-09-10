@@ -15,6 +15,12 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitpreflight"
 )
 
+// ErrInvalidResetMode is prepareReset's own validation refusal (G30 round-1 architecture/security
+// review, finding #5) — op.Mode must be "soft", "mixed" or "hard", the same three op.run's own
+// write path was always meant to be reachable with; preflight.reset (gitrpc/reset.go) already
+// validates this, but the write path did not.
+var ErrInvalidResetMode = errors.New("gitsession: reset mode must be soft, mixed, or hard")
+
 // OpRequest is op.run's own request — the Go decode of @kira/git-ipc's own twenty-four-member
 // OpRequest union (G28 D17 adds globalStashSave/globalStashRemove), flattened into one struct (a
 // field absent from the wire JSON for a given kind simply decodes to its zero value, which no
@@ -657,6 +663,19 @@ func prepareGlobalStashRemove(ctx context.Context, e *RepoEntry, conn ConnID, co
 // status read doubles as the FRESH state destroys is recomputed from below (D8's second re-check)
 // and the pre-write HEAD sha the undo record captures (F12).
 func prepareReset(ctx context.Context, e *RepoEntry, conn ConnID, connLabel string, op OpRequest) (prepared, error) {
+	// G30 round-1 architecture/security review, finding #5: unlike preflight.reset (gitrpc/reset.go),
+	// the WRITE path never validated op.Mode — it reached ResetArgs verbatim, building
+	// `reset --<mode> <target>`. ResetArgs' own doc comment already documents "keep" as
+	// deliberately unreachable through this string (reserved for the undo replay's ResetKeepArgs);
+	// with no validation here a client could reach it directly (or any other `git reset` long
+	// option) via mode, and the op.Mode == "hard" confirm-token gate above/below is itself bypassed
+	// by any non-"hard" spelling of hard. Refused before any status/spawn work, same "reject
+	// malformed input before doing anything" posture every other prepare* function in this file
+	// already follows for its own kind-specific fields.
+	if op.Mode != "soft" && op.Mode != "mixed" && op.Mode != "hard" {
+		return prepared{}, ErrInvalidResetMode
+	}
+
 	statusResult, inProgress, err := e.statusAndInProgress(ctx)
 	if err != nil {
 		return prepared{}, err
@@ -1111,6 +1130,16 @@ func (e *RepoEntry) UndoRun(ctx context.Context, id string) (OpResult, error) {
 		}
 		return OpResult{}, err
 	}
+
+	// G30 round-1 functional-correctness review, finding #5: RunOp drops the shared caches on
+	// EVERY write it attempts (D7's own defer, above) specifically because "the watcher's own
+	// debounced signal must not be the only thing that ever notices our own write" — UndoRun IS
+	// one of those writes (update-ref, reset --keep, switch, config --local, depending on what is
+	// being undone) and had no equivalent defer, so an undo's own effect stayed invisible in
+	// e.refs/e.detail/e.diff/e.rangeCount/e.stack until the watcher's debounce caught up — or
+	// indefinitely, if the watch itself was lost (entry.go's own documented reason this
+	// second-line-of-defence exists at all).
+	defer e.invalidateAfterWrite()
 
 	var opErr *OpError
 	for _, argv := range record.Replay {

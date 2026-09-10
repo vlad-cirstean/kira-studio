@@ -21,6 +21,8 @@ import type {
 } from '@kira/git-ipc';
 import { createRpcServer } from '@kira/git-ipc';
 import * as vscode from 'vscode';
+import type { ConnectionManager } from './connection.ts';
+import { toWireConnectionState } from './connection.ts';
 import type { ReviewTarget } from './html.ts';
 import { renderHtml } from './html.ts';
 import { createWebviewChannel } from './transport.ts';
@@ -43,6 +45,9 @@ export interface KiraReviewViewProviderDeps {
   // constructor already takes everything else through. A small, mechanical addition, not new
   // state: extension.ts's own activate() already holds this.
   readonly context: vscode.ExtensionContext;
+  /** G-UX (item 13): the same fresh-snapshot-at-resolve-time seam `panelView.ts`'s own
+   *  `KiraGraphViewProviderDeps.connection` doc comment explains. */
+  readonly connection: ConnectionManager;
 }
 
 export class KiraReviewViewProvider implements vscode.WebviewViewProvider {
@@ -58,7 +63,7 @@ export class KiraReviewViewProvider implements vscode.WebviewViewProvider {
   }
 
   resolveWebviewView(webviewView: vscode.WebviewView): void {
-    const { extensionUri, handlers } = this.#deps;
+    const { extensionUri, handlers, connection } = this.#deps;
 
     webviewView.webview.options = {
       enableScripts: true,
@@ -70,6 +75,7 @@ export class KiraReviewViewProvider implements vscode.WebviewViewProvider {
       extensionUri,
       view: 'review',
       target: this.#pendingTarget,
+      connectionState: toWireConnectionState(connection.state),
     });
 
     const channel = createWebviewChannel(webviewView.webview);
@@ -132,5 +138,30 @@ export class KiraReviewViewProvider implements vscode.WebviewViewProvider {
    *  resolved. */
   notifyRepoChanged(payload: EventPayload<'repo.changed'>): void {
     this.#server?.emit('repo.changed', payload);
+  }
+
+  /** G-UX (item 13): forwarded from `ConnectionManager.onStateChange` by `extension.ts` — see
+   *  `panelView.ts`'s own copy of this method for the full explanation. Forwarded here too since
+   *  the review sidebar is exactly as capable of staying open through a live drop as the graph
+   *  panel is. */
+  notifyConnectionState(state: EventPayload<'connection.changed'>['state']): void {
+    this.#server?.emit('connection.changed', { state });
+  }
+
+  /** G31 round-2 functional-correctness review, finding #4: `repoSettings.changed` (G18 D4/D7's
+   *  cross-connection settings fan-out) was never forwarded to EITHER webview — see
+   *  `panelView.ts`'s own copy of this method for the full explanation. Forwarded here too (not
+   *  just the graph panel) since both webviews mount the same `App.vue`, with its own
+   *  `RepoSettingsState`, over two entirely independent connections. */
+  notifyRepoSettingsChanged(payload: EventPayload<'repoSettings.changed'>): void {
+    this.#server?.emit('repoSettings.changed', payload);
+  }
+
+  /** G31 round-2 functional-correctness review, finding #3: `stack.progress` was never forwarded
+   *  to either webview — see `panelView.ts`'s own copy of this method. Forwarded here too since
+   *  both webviews' `App.vue` instantiate their own `StackState` unconditionally, regardless of
+   *  `view`. */
+  notifyStackProgress(payload: EventPayload<'stack.progress'>): void {
+    this.#server?.emit('stack.progress', payload);
   }
 }

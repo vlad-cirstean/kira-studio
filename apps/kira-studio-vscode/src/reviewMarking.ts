@@ -20,6 +20,7 @@ import { basename } from 'node:path';
 import type { DiffHunk, EventPayload, FileDiffBody, LineRange } from '@kira/git-ipc';
 import * as vscode from 'vscode';
 import type { ConnectionManager, ConnectionState } from './connection.ts';
+import { memoizedSetter } from './memoizedSetter.ts';
 import { SCHEME } from './ports/editorIntegration.ts';
 import { reviewAnchorFor } from './reviewComments.ts';
 import {
@@ -203,6 +204,20 @@ export function createReviewMarkingController(deps: ReviewMarkingDeps): ReviewMa
   const baseMemo = new Map<string, Promise<string | null>>();
   const codeLensEmitter = new vscode.EventEmitter<void>();
 
+  // G30 round-1 performance review, finding #10: updateContextKeys fires on every selection
+  // change (onDidChangeTextEditorSelection — a drag-select or multi-cursor move can fire this many
+  // times a second), and used to call `setContext` unconditionally both times regardless of
+  // whether the value actually changed — each call crosses the extension host's own IPC boundary.
+  // Moving the cursor within an already-fully-reviewed region, for instance, kept re-sending the
+  // same 'full' over and over. memoizedSetter (its own pure, vscode-free module) skips a call
+  // whenever the value is unchanged from the last one actually sent.
+  const setInReviewDiffContext = memoizedSetter<boolean>((value) => {
+    void vscode.commands.executeCommand('setContext', IN_REVIEW_DIFF_CONTEXT, value);
+  });
+  const setReviewSelectionContext = memoizedSetter<string>((value) => {
+    void vscode.commands.executeCommand('setContext', REVIEW_SELECTION_CONTEXT, value);
+  });
+
   function resolveBase(repoId: string, branch: string): Promise<string | null> {
     const key = `${repoId}\0${branch}`;
     let cached = baseMemo.get(key);
@@ -352,9 +367,9 @@ export function createReviewMarkingController(deps: ReviewMarkingDeps): ReviewMa
     const editor = activeModifiedEditor();
     const state = editor ? states.get(editor.document.uri.toString()) : undefined;
     const inReviewDiff = state !== undefined && state.bodyKind === 'text' && !state.stale;
-    void vscode.commands.executeCommand('setContext', IN_REVIEW_DIFF_CONTEXT, inReviewDiff);
+    setInReviewDiffContext(inReviewDiff);
     if (!inReviewDiff || !editor || !state) {
-      void vscode.commands.executeCommand('setContext', REVIEW_SELECTION_CONTEXT, 'empty');
+      setReviewSelectionContext('empty');
       return;
     }
     const ranges = normalizeRanges(
@@ -365,11 +380,7 @@ export function createReviewMarkingController(deps: ReviewMarkingDeps): ReviewMa
         }),
       ),
     );
-    void vscode.commands.executeCommand(
-      'setContext',
-      REVIEW_SELECTION_CONTEXT,
-      aggregateCoverage(ranges, state.reviewedRanges),
-    );
+    setReviewSelectionContext(aggregateCoverage(ranges, state.reviewedRanges));
   }
 
   async function loadAndPaint(uri: vscode.Uri): Promise<void> {
@@ -565,8 +576,11 @@ export function createReviewMarkingController(deps: ReviewMarkingDeps): ReviewMa
     states.clear();
     for (const controller of inFlight.values()) controller.abort();
     inFlight.clear();
-    void vscode.commands.executeCommand('setContext', IN_REVIEW_DIFF_CONTEXT, false);
-    void vscode.commands.executeCommand('setContext', REVIEW_SELECTION_CONTEXT, 'empty');
+    // Routed through the same last-value-tracking setters updateContextKeys uses (not a raw
+    // executeCommand) — otherwise the tracked "last sent" value would go stale here and a later,
+    // genuinely-changed updateContextKeys call could wrongly skip re-sending it after reconnect.
+    setInReviewDiffContext(false);
+    setReviewSelectionContext('empty');
     codeLensEmitter.fire();
   }
 

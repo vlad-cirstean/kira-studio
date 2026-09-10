@@ -11,7 +11,14 @@
  * *and* keyboard reachable) plus a plain right-click, both opening the same menu.
  */
 import type { RefRow, StashEntry } from '@kira/git-ipc';
-import { KuiButton, KuiPopoverPanel, KuiSearchInput } from '@kira/kira-ui';
+// `KuiButton` is a plain (not `import type`) import even though this file's own script only ever
+// reads it through `InstanceType<typeof KuiButton>` (the trigger's own ref type) — that is still a
+// genuine *value* read (`typeof` on an identifier requires the runtime binding in scope), and the
+// template's own `<KuiButton>` tags instantiate it as a component; biome's own static analysis
+// sees neither use and would otherwise "fix" this to `import type`, silently erasing the import
+// (AppToolbar.vue's own `useImportType` biome-ignore precedent, for the same reason).
+// biome-ignore lint/style/useImportType: see above
+import { KuiButton, KuiPopoverPanel, KuiSearchInput, KuiTextInput } from '@kira/kira-ui';
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { STATE_ICONS } from '../icons/index.ts';
 import type { OpsState } from '../state/ops.ts';
@@ -90,7 +97,9 @@ const emit = defineEmits<{
 
 const isOpen = ref(false);
 const rootEl = ref<HTMLElement | null>(null);
-const triggerEl = ref<HTMLButtonElement | null>(null);
+// G34 D5/D14: `KuiButton` now exposes `focus()` (the same escape hatch `KuiSearchInput` already
+// has), so the trigger is a real `KuiButton` instead of the raw `<button>` this used to need.
+const triggerEl = ref<InstanceType<typeof KuiButton> | null>(null);
 const filter = ref('');
 
 const triggerLabel = computed(() => {
@@ -318,13 +327,10 @@ onBeforeUnmount(() => {
 
 <template>
   <div ref="rootEl" class="kv-branch-picker" @keydown.escape="close">
-    <!-- G21 D2: kept as a raw <button>, not <KuiButton> — `closeForCheckout()`'s own W20 fix below
-         calls real `.focus()` on `triggerEl` before a dialog opens, and a `<script setup>`
-         component's template ref does not forward to its root DOM node without exposing it, which
-         `KuiButton` does not do. -->
-    <button
+    <!-- G34 D5/D14: a real `KuiButton` — `closeForCheckout()`'s own W20 fix below calls real
+         `.focus()` on `triggerEl` before a dialog opens, and `KuiButton` now exposes that. -->
+    <KuiButton
       ref="triggerEl"
-      type="button"
       class="kv-branch-trigger"
       aria-haspopup="true"
       :aria-expanded="isOpen"
@@ -334,7 +340,7 @@ onBeforeUnmount(() => {
       <span class="codicon codicon-git-branch" aria-hidden="true"></span>
       <span class="kv-branch-trigger-label">{{ triggerLabel }}</span>
       <span class="codicon" :class="STATE_ICONS.chevronDown" aria-hidden="true"></span>
-    </button>
+    </KuiButton>
 
     <KuiPopoverPanel v-if="isOpen" anchor="left" :width="320" @close="close">
     <div class="kv-branch-panel" role="dialog" aria-label="Branches and tags">
@@ -355,20 +361,20 @@ onBeforeUnmount(() => {
             :class="{ 'kv-branch-row--current': row.isHead }"
           >
             <template v-if="renaming?.name === row.shortName">
-              <input
-                type="text"
+              <KuiTextInput
                 class="kv-branch-rename-input"
                 v-model="renaming.value"
                 autofocus
+                ariaLabel="Rename branch"
                 @keydown.enter="submitRename"
                 @keydown.escape="renaming = undefined"
               />
-              <KuiButton class="kv-icon-button" @click="submitRename">
+              <KuiButton variant="icon" @click="submitRename">
                 <span class="codicon codicon-check" aria-hidden="true"></span>
               </KuiButton>
             </template>
             <template v-else>
-              <KuiButton class="kv-branch-row-main" @click="checkoutBranch(row)">
+              <KuiButton class="kui-row kv-branch-row-main" @click="checkoutBranch(row)">
                 <span
                   class="kv-branch-current-dot"
                   :role="row.isHead ? 'img' : undefined"
@@ -392,7 +398,7 @@ onBeforeUnmount(() => {
                 <span v-if="formatTrack(row.track)" class="kv-branch-track">{{ formatTrack(row.track) }}</span>
               </KuiButton>
               <KuiButton
-                class="kv-icon-button"
+                variant="icon"
                 v-kui-tooltip="'More actions'"
                 aria-label="More actions"
                 @click="openRefMenuFromButton(row, $event)"
@@ -416,12 +422,12 @@ onBeforeUnmount(() => {
         <div class="kv-branch-section" aria-label="Remote branches">
           <div class="kv-branch-section-title">Remote branches</div>
           <div v-for="row in sections.remoteBranches.visible" :key="row.refname" class="kv-branch-row">
-            <KuiButton class="kv-branch-row-main" icon="codicon-cloud" @click="checkoutRemote(row)">
+            <KuiButton class="kui-row kv-branch-row-main" icon="codicon-cloud" @click="checkoutRemote(row)">
               <span class="kv-branch-row-name">{{ row.shortName }}</span>
               <span class="kv-branch-remote-action">{{ remoteCheckoutLabel(row, refs.branches.value) }}</span>
             </KuiButton>
             <KuiButton
-              class="kv-icon-button"
+              variant="icon"
               v-kui-tooltip="'More actions'"
               aria-label="More actions"
               @click="openRefMenuFromButton(row, $event)"
@@ -501,29 +507,10 @@ onBeforeUnmount(() => {
   position: relative;
 }
 
+/* G34 D14: everything but `max-width` is gone — the default `KuiButton` box is now this exact
+   shape (the raw `<button>` this class used to style became a real `KuiButton`, D5). */
 .kv-branch-trigger {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--kv-space-2);
-  height: 22px;
-  padding: 0 var(--kv-space-2);
-  border: none;
-  border-radius: var(--kv-radius);
-  background: transparent;
-  color: var(--kv-app-fg);
-  font-family: inherit;
-  font-size: inherit;
   max-width: 200px;
-  cursor: pointer;
-}
-
-.kv-branch-trigger:hover {
-  background-color: var(--kv-row-hover-bg);
-}
-
-.kv-branch-trigger:focus-visible {
-  outline: 1px solid var(--kv-focus-border);
-  outline-offset: -1px;
 }
 
 .kv-branch-trigger-label {
@@ -542,7 +529,7 @@ onBeforeUnmount(() => {
 }
 
 .kv-branch-filter {
-  margin: var(--kv-space-2);
+  margin: var(--kv-s-2);
 }
 
 .kv-branch-panel-scroll {
@@ -550,41 +537,39 @@ onBeforeUnmount(() => {
   min-height: 0;
 }
 
+/* G34 D14: takes `.kui-menu-heading`'s own treatment (kira-ui/theme/controls.css) — the same
+   section-label look every menu in the app now uses. */
 .kv-branch-section-title {
-  padding: var(--kv-space-1) var(--kv-space-3);
-  font-size: 0.85em;
+  display: flex;
+  align-items: center;
+  height: var(--kv-control-h-sm);
+  padding: 0 var(--kv-s-4);
+  font-size: var(--kv-t-xs);
   font-weight: 600;
   color: var(--kv-description-fg);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
 }
 
 .kv-branch-row {
   display: flex;
   align-items: center;
-  gap: var(--kv-space-1);
-  padding: 0 var(--kv-space-2);
+  gap: var(--kv-s-1);
+  padding: 0 var(--kv-s-2);
 }
 
 .kv-branch-row--current {
   font-weight: 600;
 }
 
+/* G34 D7: geometry now comes from `.kui-row` (composed in the template, `.kui-button.kui-row`'s
+   own `height: auto` override in kira-ui/theme/controls.css cancels `.kui-button`'s fixed height
+   so `.kui-row`'s `min-height` actually governs) — this class keeps only what's specific to this
+   row inside `.kv-branch-row`'s own flex layout. */
 .kv-branch-row-main {
   flex: 1;
   min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: var(--kv-space-2);
-  padding: var(--kv-space-1) var(--kv-space-1);
-  background: transparent;
-  border: none;
-  color: inherit;
-  font: inherit;
   text-align: left;
-  cursor: pointer;
-}
-
-.kv-branch-row-main:hover {
-  background-color: var(--kv-row-hover-bg);
 }
 
 .kv-branch-current-dot {
@@ -602,9 +587,9 @@ onBeforeUnmount(() => {
 
 .kv-branch-badge {
   font-size: 0.8em;
-  padding: 0 var(--kv-space-1);
+  padding: 0 var(--kv-s-1);
   border: 1px dashed var(--kv-panel-border);
-  border-radius: var(--kv-radius);
+  border-radius: var(--kv-radius-sm);
   color: var(--kv-description-fg);
 }
 
@@ -618,29 +603,18 @@ onBeforeUnmount(() => {
   color: var(--kv-description-fg);
 }
 
-.kv-icon-button {
-  background: transparent;
-  border: none;
-  color: var(--kv-app-fg);
-  cursor: pointer;
-  padding: var(--kv-space-1);
-}
+/* G34 D14: `.kv-icon-button` (this component's own global rule, also consumed by seven other
+   components) is gone — `variant="icon"` is now the shared shape every one of those adopts. */
 
-.kv-icon-button:hover {
-  background-color: var(--kv-row-hover-bg);
-}
-
+/* G34 D14: only the growable width survives — `.kui-text-input`'s own chrome (background/border/
+   padding/radius) replaces the rest now that this is a real `KuiTextInput`. */
 .kv-branch-rename-input {
   flex: 1;
-  padding: var(--kv-space-1);
-  background: var(--kv-panel-bg);
-  color: var(--kv-row-fg);
-  border: 1px solid var(--kv-focus-border);
 }
 
 .kv-branch-more,
 .kv-branch-empty {
-  padding: var(--kv-space-1) var(--kv-space-3);
+  padding: var(--kv-s-1) var(--kv-s-4);
   color: var(--kv-description-fg);
   font-size: 0.85em;
 }
@@ -648,8 +622,8 @@ onBeforeUnmount(() => {
 .kv-branch-force-delete {
   display: flex;
   align-items: center;
-  gap: var(--kv-space-2);
-  padding: var(--kv-space-2) var(--kv-space-3);
+  gap: var(--kv-s-2);
+  padding: var(--kv-s-2) var(--kv-s-4);
   background: var(--kv-overlay-bg);
   font-size: 0.85em;
 }

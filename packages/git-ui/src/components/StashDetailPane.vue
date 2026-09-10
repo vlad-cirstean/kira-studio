@@ -100,12 +100,12 @@ function onOpenFile(index: number, pinned: boolean): void {
 }
 
 .kv-stash-detail-header {
-  padding: var(--kv-space-3) var(--kv-space-4);
+  padding: var(--kv-s-4) var(--kv-s-5);
   border-bottom: 1px solid var(--kv-panel-border);
 }
 
 .kv-stash-detail-message {
-  margin: 0 0 var(--kv-space-1);
+  margin: 0 0 var(--kv-s-1);
   font-weight: 600;
   overflow-wrap: break-word;
 }
@@ -117,7 +117,7 @@ function onOpenFile(index: number, pinned: boolean): void {
 }
 
 .kv-stash-detail-untracked {
-  margin-left: var(--kv-space-2);
+  margin-left: var(--kv-s-2);
   font-family: var(--kv-mono-font-family);
   opacity: 0.8;
 }

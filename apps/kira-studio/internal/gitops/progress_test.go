@@ -101,6 +101,34 @@ func TestProgressParser_NoProgressAtAllEmitsNothing(t *testing.T) {
 	}
 }
 
+// TestProgressParser_UnterminatedOversizedLineDoesNotGrowBufUnbounded is G31 round-2
+// architecture/security review, finding #8: before maxBufferedLine, p.buf had no upper bound at
+// all — bytes arriving with neither '\r' nor '\n' anywhere in them just kept appending forever, for
+// as long as the underlying git operation (and whatever is on the other end of its remote) kept
+// running. Feeding a chunk well past the cap with no terminator must not leave p.buf holding onto
+// it, and the parser must still decode a normal line correctly right afterward — proving this isn't
+// a "stuck forever" state, just a dropped oversized one (exactly what an equally oversized but
+// still-terminated line would suffer anyway, since it would never match either regex).
+func TestProgressParser_UnterminatedOversizedLineDoesNotGrowBufUnbounded(t *testing.T) {
+	var got []Progress
+	p := NewProgressParser(func(pr Progress) { got = append(got, pr) })
+
+	huge := make([]byte, maxBufferedLine+1000)
+	for i := range huge {
+		huge[i] = 'x'
+	}
+	p.Write(huge)
+	if len(p.buf) != 0 {
+		t.Fatalf("buf len = %d after an oversized unterminated write, want 0 (dropped, not retained)", len(p.buf))
+	}
+
+	p.Write([]byte("Receiving objects: 50% (5/10)\n"))
+	if len(got) != 1 {
+		t.Fatalf("got %d events, want 1 — the parser must recover cleanly after dropping an oversized line: %+v", len(got), got)
+	}
+	assertProgress(t, got[0], Progress{Phase: "Receiving objects", Percent: intPtr(50), Done: intPtr(5), Total: intPtr(10)})
+}
+
 func TestThrottle_CoalescesPercentageUpdatesButNeverDoneLines(t *testing.T) {
 	now := time.Unix(0, 0)
 	var got []Progress

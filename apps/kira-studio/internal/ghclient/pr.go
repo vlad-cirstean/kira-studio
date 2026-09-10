@@ -3,6 +3,7 @@ package ghclient
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"time"
 )
 
@@ -89,7 +90,12 @@ func toPRs(raw []rawPull) []PR {
 // own noted asymmetry with PullsForBranch, which cannot).
 func (c *Client) PullsForCommit(ctx context.Context, repo Repo, sha string) ([]PR, Status) {
 	var raw []rawPull
-	status := c.get(ctx, repo, fmt.Sprintf("repos/%s/commits/%s/pulls?per_page=10", repo.Path(), sha), &raw)
+	// G30 round-1 architecture/security review, finding #6: sha is client-supplied (only checked
+	// non-empty at gitrpc/gh.go) and reached this path unescaped — `gh api` parses `path` as a
+	// URL before requesting it, so a sha containing "?"/"#"/"../" reshapes the request path/query
+	// rather than 404ing. url.PathEscape keeps this a single path segment regardless of content.
+	path := fmt.Sprintf("repos/%s/commits/%s/pulls?per_page=10", repo.Path(), url.PathEscape(sha))
+	status := c.get(ctx, repo, path, &raw)
 	if !status.OK() {
 		return nil, status
 	}
@@ -102,8 +108,14 @@ func (c *Client) PullsForCommit(ctx context.Context, repo Repo, sha string) ([]P
 // query could ever tell the reaper (F1's own "why two lookups" reasoning).
 func (c *Client) PullsForBranch(ctx context.Context, repo Repo, branch string) ([]PR, Status) {
 	var raw []rawPull
+	// G30 round-1 architecture/security review, finding #6: branch is a real branch name — "+",
+	// "%", "&", "#" are all legal in a ref — and reached this query value unescaped. An ordinary
+	// branch like "feature/a+b" silently corrupted the query (decoded server-side as "feature/a
+	// b"), so branch.resolvePr reported "no PR" for a branch that had one. url.QueryEscape both
+	// halves of the "owner:branch" value; the literal ":" GitHub's own head= syntax needs stays
+	// outside either escaped piece.
 	path := fmt.Sprintf("repos/%s/pulls?head=%s:%s&state=all&sort=updated&direction=desc&per_page=5",
-		repo.Path(), repo.Owner, branch)
+		repo.Path(), url.QueryEscape(repo.Owner), url.QueryEscape(branch))
 	status := c.get(ctx, repo, path, &raw)
 	if !status.OK() {
 		return nil, status

@@ -139,6 +139,11 @@ function buildResponses(): {
       wrap({ t: 'res', id, ok: true, result: { loaded: 1, remaining: 0, exhausted: true } }),
     repoChanged: (kind, repoId) =>
       wrap({ t: 'evt', method: 'repo.changed', payload: { repoId, kind } }),
+    // G-UX (item 13): mirrors `repoChanged` above — `window.__emitConnectionChanged` (below)
+    // dispatches one of these on demand, the same "no reload, no re-mount" live-push path
+    // `panelView.ts`'s own `notifyConnectionState` drives in the real extension.
+    connectionChanged: (state: { kind: string; detail?: string }) =>
+      wrap({ t: 'evt', method: 'connection.changed', payload: { state } }),
   };
 }
 
@@ -168,6 +173,16 @@ export function buildFakeGraphHostInitScript(): string {
     repoChangedRefs: responses.repoChanged('refsChanged', FAKE_REPO_ID),
     repoChangedWorktree: responses.repoChanged('worktreeChanged', FAKE_REPO_ID),
     repoChangedOtherRepo: responses.repoChanged('refsChanged', OTHER_REPO_ID),
+    // G-UX (item 13): every state `window.__emitConnectionChanged`'s own callers below actually
+    // use — not the full five-kind union, since a fixture answers only what its own specs ask
+    // for, same as every other precomputed envelope in this file.
+    connectionChangedConnecting: responses.connectionChanged({ kind: 'connecting' }),
+    connectionChangedPairing: responses.connectionChanged({ kind: 'pairing' }),
+    connectionChangedDenied: responses.connectionChanged({
+      kind: 'denied',
+      detail: 'Pairing was denied',
+    }),
+    connectionChangedConnected: responses.connectionChanged({ kind: 'connected' }),
   };
   const fixtureJson = JSON.stringify(data);
 
@@ -193,6 +208,20 @@ export function buildFakeGraphHostInitScript(): string {
             : kind === 'worktreeChanged'
               ? 'repoChangedWorktree'
               : 'repoChangedRefs';
+        dispatch(FIXTURES[key]);
+      };
+
+      // G-UX (item 13): drives BridgeClient.hostConnection's own live-push path (the
+      // 'connection.changed' subscription) without a reload — 'kind' picks one of the four
+      // precomputed envelopes above.
+      window.__emitConnectionChanged = (kind) => {
+        const key = {
+          connecting: 'connectionChangedConnecting',
+          pairing: 'connectionChangedPairing',
+          denied: 'connectionChangedDenied',
+          connected: 'connectionChangedConnected',
+        }[kind];
+        if (!key) throw new Error('fakeGraphHost: unknown connection.changed kind ' + kind);
         dispatch(FIXTURES[key]);
       };
 

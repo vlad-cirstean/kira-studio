@@ -285,3 +285,65 @@ describe('PrState — ensureSnapshot warms only uncached branches', () => {
     pr.dispose();
   });
 });
+
+// G31 round-2 performance review, finding #3: a branch whose resolvePr answer came back "ok" with
+// no PR at all never landed in byBranch (only a real PrRecord goes in there), so ensureSnapshot's
+// own dedup filter (!byBranch.has(name) && !#branchRequests.has(name)) failed forever and every
+// PR-less branch was re-requested on every ensureSnapshot call, indefinitely.
+describe('PrState — resolveBranch caches a "no PR" answer', () => {
+  test('a branch that resolves to no PR is not re-requested by a later ensureSnapshot', async () => {
+    const transport = new FakeTransport();
+    const bridge = new BridgeClient(transport);
+    const pr = new PrState(bridge);
+    pr.setRepoId(REPO);
+    transport.onRequest = () => ({ kind: 'ok', prs: [] });
+
+    await pr.ensureSnapshot(['no-pr-branch']);
+    expect(transport.calls.filter((c) => c.method === 'branch.resolvePr').length).toBe(1);
+    expect(pr.byBranch.value.has('no-pr-branch')).toBe(false);
+
+    await pr.ensureSnapshot(['no-pr-branch']);
+    await pr.resolveBranch('no-pr-branch');
+    expect(transport.calls.filter((c) => c.method === 'branch.resolvePr').length).toBe(1);
+    pr.dispose();
+  });
+});
+
+// G30 round-1 performance review, finding #1: ensureSnapshot used to Promise.all every branch at
+// once — a repo with hundreds of branches fired hundreds of concurrent branch.resolvePr requests
+// with nothing capping it anywhere in the stack. Proves the worker-pool bound: with 20 branches to
+// warm and every request left hanging, no more than 6 are ever in flight at once.
+describe('PrState — ensureSnapshot bounds its own fan-out', () => {
+  test('never more than 6 branch.resolvePr requests are in flight at once', async () => {
+    const transport = new FakeTransport();
+    const bridge = new BridgeClient(transport);
+    const pr = new PrState(bridge);
+    pr.setRepoId(REPO);
+
+    const resolvers: Array<(v: unknown) => void> = [];
+    transport.onRequest = () =>
+      new Promise((resolve) => {
+        resolvers.push(resolve);
+      });
+
+    const branches = Array.from({ length: 20 }, (_, i) => `branch-${i}`);
+    const done = pr.ensureSnapshot(branches);
+
+    // Draining the whole queue in batches proves the cap holds throughout (not just at the very
+    // first tick) — each resolved worker immediately picks up the next branch, so a broken cap
+    // would show up as a batch bigger than 6 on a later iteration too.
+    let resolvedCount = 0;
+    while (resolvedCount < branches.length) {
+      await tick(10); // let every worker that's going to start this round actually start.
+      expect(resolvers.length).toBeGreaterThan(0);
+      expect(resolvers.length).toBeLessThanOrEqual(6);
+      const batch = resolvers.splice(0, resolvers.length);
+      for (const resolve of batch) resolve({ kind: 'ok', prs: [] });
+      resolvedCount += batch.length;
+    }
+    await done;
+
+    expect(transport.calls.filter((c) => c.method === 'branch.resolvePr').length).toBe(20);
+    pr.dispose();
+  });
+});

@@ -116,6 +116,50 @@ func TestPreflightResetAndRunOpReset_OverDispatch(t *testing.T) {
 	}
 }
 
+// TestRunOpReset_RejectsInvalidMode is G30 round-1 architecture/security review, finding #5:
+// op.run's own write path never validated op.mode the way preflight.reset does, so a mode of
+// "keep" (reserved for the undo replay's own ResetKeepArgs — never a user-selectable mode) or any
+// other non-soft/mixed/hard spelling reached `git reset --<mode>` verbatim. Proves it is now
+// refused before any spawn, with HEAD left untouched.
+func TestRunOpReset_RejectsInvalidMode(t *testing.T) {
+	dir := t.TempDir()
+	resetSmokeGit(t, dir, "init", "-q", "-b", "main")
+	if err := os.WriteFile(filepath.Join(dir, "f.txt"), []byte("one\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	resetSmokeGit(t, dir, "add", "f.txt")
+	resetSmokeGit(t, dir, "commit", "-q", "-m", "base")
+	if err := os.WriteFile(filepath.Join(dir, "f.txt"), []byte("one\ntwo\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	resetSmokeGit(t, dir, "commit", "-aqm", "second")
+	headBefore, err := exec.Command("git", "-C", dir, "rev-parse", "HEAD").Output()
+	if err != nil {
+		t.Fatalf("rev-parse HEAD: %v", err)
+	}
+
+	handlers, repoID := resetSmokeConn(t, dir)
+	ctx := context.Background()
+
+	for _, mode := range []string{"keep", "--soft", ""} {
+		opParams, _ := json.Marshal(map[string]any{
+			"repoId": repoID,
+			"op":     map[string]any{"kind": "reset", "mode": mode, "target": "HEAD~1"},
+		})
+		if _, err := handlers.Request(ctx, "op.run", opParams); err == nil {
+			t.Fatalf("op.run with mode %q: want an error, got nil", mode)
+		}
+	}
+
+	headAfter, err := exec.Command("git", "-C", dir, "rev-parse", "HEAD").Output()
+	if err != nil {
+		t.Fatalf("rev-parse HEAD: %v", err)
+	}
+	if string(headBefore) != string(headAfter) {
+		t.Fatalf("HEAD moved despite every reset being rejected: before=%q after=%q", headBefore, headAfter)
+	}
+}
+
 // TestPreflightCherryPickAndRunOpCherryPick_OverDispatch exercises preflight.cherryPick and op.run
 // (kind cherryPick) through the same real dispatch path, ending in a real EmptyCherryPick — the
 // wire.go PreflightCherryPickParams decode, the handlers.go switch case, and reclassifyCherryPick

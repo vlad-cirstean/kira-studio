@@ -484,7 +484,21 @@ func TestIntegration_BinarySnapshotDegradesHonestly(t *testing.T) {
 	client := pairAndReady(t, server, sockPath, "binary-client")
 	repoID := openRepoOK(t, client, dir).Repo.RepoID
 
-	markFile(t, client, repoID, "feature", "img.bin", true, nil)
+	// G30 round-1 functional-correctness review, finding #1: marking a whole file reviewed used to
+	// materialize "the whole file" as Expand(currentLineCount), which is nil for any file that
+	// snapshots at lineCount 0 — binary included — so the mark silently landed as
+	// state="partial", ranges=nil, which review.files/review.mark's own response both read back as
+	// kind "none": the checkbox flipped back off with no error. Asserting Kind here is this test's
+	// own missing assertion the review called out — it previously marked the file and moved on
+	// without ever checking what state that mark actually produced.
+	status := markFile(t, client, repoID, "feature", "img.bin", true, nil)
+	if status.Kind != "full" {
+		t.Fatalf("review.mark on a binary file: Kind = %q, want full", status.Kind)
+	}
+	filesAfterMark := reviewFiles(t, client, repoID, "feature", "main")
+	if entry, ok := findEntry(filesAfterMark.Files, "img.bin"); !ok || entry.Review.Kind != "full" {
+		t.Fatalf("review.files after marking a binary file reviewed: entry = %+v, want kind full", entry)
+	}
 
 	// Keeps the NUL byte (looksBinary's own sniff) so the rewrite is still classified as binary —
 	// only the trailing byte actually changes.
@@ -508,6 +522,39 @@ func TestIntegration_BinarySnapshotDegradesHonestly(t *testing.T) {
 		Ranges: []gitreview.LineRange{{Start: 1, End: 1}},
 	})
 	assertBadRequest(t, resp, "text")
+}
+
+// TestIntegration_DeletedFileCanBeMarkedReviewed is G30 round-1 functional-correctness review,
+// finding #1's other real-world arm: a branch that deletes a file entirely (common in any review)
+// snapshots that path at lineCount 0 the same way a binary file does — the same "given absent =>
+// whole file" bug applied here too, silently refusing every mark on a deleted file.
+func TestIntegration_DeletedFileCanBeMarkedReviewed(t *testing.T) {
+	dir, _, _ := buildMainFeatureFixture(t)
+	runGitIn(t, dir, "checkout", "-q", "feature")
+	runGitIn(t, dir, "rm", "-q", "a.txt")
+	runGitIn(t, dir, "-c", "commit.gpgsign=false", "commit", "-q", "-m", "delete a.txt")
+
+	server, sockPath, _, _ := newIntegrationServer(t)
+	client := pairAndReady(t, server, sockPath, "deleted-file-client")
+	repoID := openRepoOK(t, client, dir).Repo.RepoID
+
+	status := markFile(t, client, repoID, "feature", "a.txt", true, nil)
+	if status.Kind != "full" {
+		t.Fatalf("review.mark on a deleted file: Kind = %q, want full", status.Kind)
+	}
+
+	files := reviewFiles(t, client, repoID, "feature", "main")
+	entry, ok := findEntry(files.Files, "a.txt")
+	if !ok || entry.Review.Kind != "full" {
+		t.Fatalf("review.files after marking a deleted file reviewed: entry = %+v, want kind full", entry)
+	}
+
+	// Unmarking must clear it back to "none" — the same Expand(0)-was-nil bug would have made
+	// this a no-op too (Subtract(existing, nil) leaves existing untouched).
+	status = markFile(t, client, repoID, "feature", "a.txt", false, nil)
+	if status.Kind != "none" {
+		t.Fatalf("review.mark(reviewed=false) on a deleted file: Kind = %q, want none", status.Kind)
+	}
 }
 
 // TestIntegration_TwoConnectionsShareReviewState is D12's own shared-state claim: a mark on

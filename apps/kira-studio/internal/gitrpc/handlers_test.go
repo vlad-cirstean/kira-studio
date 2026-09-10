@@ -6,6 +6,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -236,5 +239,129 @@ func TestRepoOpen_ComposedIdentifyOutputThenDecomposedRepoIDStillResolves(t *tes
 	}
 	if _, err := handlers.Request(ctx, "worktree.list", listParams); err != nil {
 		t.Fatalf("worktree.list with a decomposed spelling of the RepoID: %v", err)
+	}
+}
+
+// TestRepoClose_DecomposedRepoIDStillClosesTheComposedlyHeldEntry is G31 round-2 architecture/
+// security review, finding #4: handleRepoClose passed p.RepoID straight into c.CloseRepo without
+// entryFor's own gitpath.CleanNFC normalization. c.held is keyed by the COMPOSED spelling
+// (Identify's own D5a normalization at open time), so repo.close with a decomposed repoId used to
+// look up the wrong map key, find nothing, and silently no-op (CloseRepo answers {} either way,
+// so nothing ever errored) — leaking that connection's RepoEntry refcount and watcher
+// subscription for the connection's whole life. Proven by opening under a composed spelling, then
+// closing with a decomposed one, then asserting the connection no longer holds the entry.
+func TestRepoClose_DecomposedRepoIDStillClosesTheComposedlyHeldEntry(t *testing.T) {
+	decomposedE := string([]byte{0x65, 0xcc, 0x81}) // "e" + U+0301, decomposed "é"
+	composedE := string([]byte{0xc3, 0xa9})         // U+00E9, composed "é"
+	composedRoot := "/repo/caf" + composedE
+
+	router, conn, handlers := newHandlersScriptedRouter(scriptedIdentify(composedRoot))
+	t.Cleanup(conn.Close)
+	ctx := context.Background()
+
+	openParams, err := json.Marshal(map[string]string{"path": composedRoot})
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	result, err := router.handleRepoOpen(ctx, conn, openParams)
+	if err != nil {
+		t.Fatalf("handleRepoOpen: %v", err)
+	}
+	opened, ok := result.(RepoOpenResult)
+	if !ok || opened.Kind != "ok" || opened.Repo == nil {
+		t.Fatalf("handleRepoOpen result = %+v, want kind=ok", result)
+	}
+	composedRepoID := opened.Repo.RepoID
+	if !strings.Contains(composedRepoID, composedE) {
+		t.Fatalf("RepoID = %q, want the composed spelling", composedRepoID)
+	}
+	if _, held := conn.Entry(composedRepoID); !held {
+		t.Fatalf("conn does not hold the entry right after opening it")
+	}
+
+	decomposedRepoID := strings.Replace(composedRepoID, composedE, decomposedE, 1)
+	closeParams, err := json.Marshal(map[string]string{"repoId": decomposedRepoID})
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	if _, err := handlers.Request(ctx, "repo.close", closeParams); err != nil {
+		t.Fatalf("repo.close with a decomposed spelling of the RepoID: %v", err)
+	}
+
+	if _, held := conn.Entry(composedRepoID); held {
+		t.Fatal("conn still holds the entry after repo.close with a decomposed repoId spelling — " +
+			"CloseRepo looked up the wrong map key and silently no-opped")
+	}
+}
+
+// TestGraphRefresh_DecomposedRepoIDStillFindsTheComposedlyOpenedWalk is G31 round-2 architecture/
+// security review, finding #4's own coverage for graph.go's own handlers (graph.status/loadMore/
+// refresh/stream): each passed p.RepoID straight into c.WalkFor/ReviewWalkFor/Walk without
+// normalization, even though resolveWalkRequest's OWN internal c.Entry lookup (used by the same
+// handlers) already normalized. Conn's walk map is keyed by the composed spelling Identify itself
+// produces, so a decomposed repoId used to fail to find an already-open walk — graph.status/
+// graph.refresh answered as though no walk was open at all (their own documented "unopened walk"
+// zero-value answer, indistinguishable from a genuine miss), and graph.loadMore/stream opened a
+// SECOND, redundant walk instead of reusing the held one. Uses a real git repo (not the scripted
+// fixture above) so a real graph.loadMore can actually open a walk to look for afterward.
+func TestGraphRefresh_DecomposedRepoIDStillFindsTheComposedlyOpenedWalk(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not on PATH")
+	}
+	decomposedE := string([]byte{0x65, 0xcc, 0x81}) // "e" + U+0301, decomposed "é"
+	composedE := string([]byte{0xc3, 0xa9})         // U+00E9, composed "é"
+	dir := filepath.Join(t.TempDir(), "caf"+composedE)
+	if err := os.Mkdir(dir, 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	activationGit(t, dir, "init", "-q", "-b", "main")
+	if err := os.WriteFile(filepath.Join(dir, "f.txt"), []byte("hello"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	activationGit(t, dir, "add", "f.txt")
+	activationGit(t, dir, "commit", "-q", "-m", "first commit")
+
+	runner := gitclient.NewExecRunner()
+	registry := gitsession.NewRegistry(runner)
+	t.Cleanup(registry.Close)
+	discovery := gitclient.NewDiscovery(alwaysGitLocator{}, runner, gitclient.NewRealClock())
+	router := New(Deps{Discovery: discovery, Runner: runner, Registry: registry, ServerVersion: "test"})
+	conn := gitsession.NewConn(gitsession.ConnID("g31-arch4-conn"), "test-client", "test-label", nil)
+	t.Cleanup(conn.Close)
+	handlers := router.ForConn(conn)
+	ctx := context.Background()
+
+	openParams, _ := json.Marshal(RepoOpenParams{Path: dir})
+	openResultAny, err := handlers.Request(ctx, "repo.open", openParams)
+	if err != nil {
+		t.Fatalf("repo.open: %v", err)
+	}
+	opened, ok := openResultAny.(RepoOpenResult)
+	if !ok || opened.Kind != "ok" || opened.Repo == nil {
+		t.Fatalf("repo.open result = %+v, want ok", openResultAny)
+	}
+	composedRepoID := opened.Repo.RepoID
+	if !strings.Contains(composedRepoID, composedE) {
+		t.Fatalf("RepoID = %q, want the composed spelling", composedRepoID)
+	}
+
+	loadMoreParams, _ := json.Marshal(GraphLoadMoreParams{RepoID: composedRepoID})
+	if _, err := handlers.Request(ctx, "graph.loadMore", loadMoreParams); err != nil {
+		t.Fatalf("graph.loadMore (composed repoId, opening the walk): %v", err)
+	}
+
+	decomposedRepoID := strings.Replace(composedRepoID, composedE, decomposedE, 1)
+	refreshParams, _ := json.Marshal(GraphRefreshParams{RepoID: decomposedRepoID})
+	refreshResultAny, err := handlers.Request(ctx, "graph.refresh", refreshParams)
+	if err != nil {
+		t.Fatalf("graph.refresh (decomposed repoId): %v", err)
+	}
+	refreshed, ok := refreshResultAny.(GraphRefreshResult)
+	if !ok {
+		t.Fatalf("graph.refresh result = %T, want GraphRefreshResult", refreshResultAny)
+	}
+	if !refreshed.Restarted {
+		t.Fatal("graph.refresh with a decomposed repoId spelling reported Restarted=false — " +
+			"it failed to find the walk graph.loadMore opened under the composed spelling")
 	}
 }

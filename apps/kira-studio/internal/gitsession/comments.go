@@ -56,7 +56,10 @@ func toCommentEntries(acs []gitreview.AnchoredComment) []CommentEntry {
 // anchored to `at` (D6). `at` is the revision the caller says it was reading; there is no default
 // (D15's own refusal to guess).
 func (e *RepoEntry) AddComment(ctx context.Context, branch, path, at string, r gitreview.LineRange, body string) (CommentEntry, error) {
-	contentKind, _, lineCount, err := e.readSnapshotSource(ctx, at, path)
+	// G31 round-2 performance review, finding #5 (same fix as MarkFile's): blobOID comes straight
+	// off readSnapshotSource's own return now, not a second blobOID(ctx, at, path) round trip for
+	// the identical rev — valid here since a non-ContentText kind already returns above.
+	contentKind, _, lineCount, blobOID, err := e.readSnapshotSource(ctx, at, path)
 	if err != nil {
 		return CommentEntry{}, err
 	}
@@ -65,11 +68,6 @@ func (e *RepoEntry) AddComment(ctx context.Context, branch, path, at string, r g
 	}
 	if r.End > lineCount {
 		return CommentEntry{}, ErrCommentRangeOutOfFile
-	}
-
-	blobOID, err := e.blobOID(at, path)
-	if err != nil {
-		return CommentEntry{}, err
 	}
 
 	stored, err := e.review.AddComment(ctx, e.Summary.RepoID, branch, gitreview.Comment{
@@ -166,7 +164,7 @@ func (e *RepoEntry) lineCountAt(ctx context.Context, at, path string, cache map[
 	if n, ok := cache[path]; ok {
 		return n, nil
 	}
-	_, _, n, err := e.readSnapshotSource(ctx, at, path)
+	_, _, n, _, err := e.readSnapshotSource(ctx, at, path)
 	if err != nil {
 		return 0, err
 	}
@@ -207,7 +205,7 @@ func (e *RepoEntry) anchorOne(
 	ctx context.Context, at string, c gitreview.Comment,
 	lineCounts map[string]int, patches map[string][]porcelain.DiffHunk,
 ) (gitreview.AnchoredComment, error) {
-	currentOID, err := e.blobOID(at, c.Path)
+	currentOID, err := e.blobOID(ctx, at, c.Path)
 	if err != nil {
 		return gitreview.AnchoredComment{}, err
 	}

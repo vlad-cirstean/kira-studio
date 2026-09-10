@@ -83,8 +83,23 @@ func (e *RepoEntry) buildStacksFromSnapshot(ctx context.Context, config map[stri
 		candidates = candidates[:gitpreflight.MaxStackedBranches]
 	}
 
-	behindAhead := map[string]gitpreflight.LeftRightCount{}
-	for _, name := range candidates {
+	// G31 round-2 performance review, finding #6: up to gitpreflight.MaxStackedBranches (64)
+	// `rev-list --left-right --count` processes used to spawn strictly serially, one full pipe
+	// round trip awaited before the next began — after every ref movement and every local write
+	// (the cache this feeds is dropped by both, entry.go), a stack-using repo paid up to 64
+	// sequential spawns. RangeFiles (incremental.go) already establishes the concurrent shape for
+	// exactly this situation — a small, fixed set of independent spawns under one sync.WaitGroup —
+	// generalized here to N candidates (D3 already bounds N at 64, so no separate concurrency cap
+	// is needed on top of it). Each candidate writes only its own slot, so no lock is needed around
+	// behindAhead's own build below — that map is populated single-threaded, after Wait.
+	type stackDiffSlot struct {
+		name          string
+		behind, ahead int
+		err           error
+	}
+	slots := make([]stackDiffSlot, len(candidates))
+	var wg sync.WaitGroup
+	for i, name := range candidates {
 		parent := config[name].Parent
 		parentTip, ok := baseTips[parent]
 		if !ok {
@@ -94,15 +109,33 @@ func (e *RepoEntry) buildStacksFromSnapshot(ctx context.Context, config map[stri
 		if !ok {
 			continue
 		}
-		raw, err := e.runOne(ctx, porcelain.LeftRightCountArgs(parentTip, childTip.Tip))
-		if err != nil {
-			return gitpreflight.StackListResult{}, err
+		wg.Add(1)
+		go func(i int, name, parentTip, childTip string) {
+			defer wg.Done()
+			raw, err := e.runOne(ctx, porcelain.LeftRightCountArgs(parentTip, childTip))
+			if err != nil {
+				slots[i] = stackDiffSlot{err: err}
+				return
+			}
+			behind, ahead, perr := porcelain.ParseLeftRightCount(raw)
+			if perr != nil {
+				slots[i] = stackDiffSlot{err: perr}
+				return
+			}
+			slots[i] = stackDiffSlot{name: name, behind: behind, ahead: ahead}
+		}(i, name, parentTip, childTip.Tip)
+	}
+	wg.Wait()
+
+	behindAhead := map[string]gitpreflight.LeftRightCount{}
+	for _, slot := range slots {
+		if slot.err != nil {
+			return gitpreflight.StackListResult{}, slot.err
 		}
-		behind, ahead, perr := porcelain.ParseLeftRightCount(raw)
-		if perr != nil {
-			return gitpreflight.StackListResult{}, perr
+		if slot.name == "" {
+			continue // this candidate's own parent/child lookup missed above; nothing to record.
 		}
-		behindAhead[name] = gitpreflight.LeftRightCount{Behind: behind, Ahead: ahead}
+		behindAhead[slot.name] = gitpreflight.LeftRightCount{Behind: slot.behind, Ahead: slot.ahead}
 	}
 
 	return gitpreflight.BuildStacks(gitpreflight.BuildStacksInput{

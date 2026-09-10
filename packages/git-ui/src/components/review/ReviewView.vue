@@ -22,7 +22,13 @@
  * 3. The "no branch" state's own branch picker — the user picks one directly, no host round trip.
  */
 import { SETTINGS } from '@kira/git-core';
-import type { HostKind, ReviewSessionSnapshot, Transport, UiActionKind } from '@kira/git-ipc';
+import type {
+  EventPayload,
+  HostKind,
+  ReviewSessionSnapshot,
+  Transport,
+  UiActionKind,
+} from '@kira/git-ipc';
 import type { KuiSegmentedOption } from '@kira/kira-ui';
 // `KuiSearchInput` is a plain (not `import type`) import even though this file's own script only
 // ever reads it through `InstanceType<typeof KuiSearchInput>` — that is still a genuine *value*
@@ -51,6 +57,7 @@ import { ReviewCommentsState } from '../../state/reviewComments.ts';
 import { ReviewFilesState } from '../../state/reviewFiles.ts';
 import { SettingsState } from '../../state/settings.ts';
 import type { ViewStateStore } from '../../state/viewState.ts';
+import ConnectionBanner from '../ConnectionBanner.vue';
 import { buildRefListSections } from '../refListModel.ts';
 import BaseSelector from './BaseSelector.vue';
 import ReviewCommentsPane from './ReviewCommentsPane.vue';
@@ -62,9 +69,14 @@ const props = defineProps<{
   viewState: ViewStateStore;
   host: HostKind;
   target?: ReviewTarget | null;
+  /** G-UX (item 13): the host's own connection state as of this webview's cold resolve — see
+   *  `App.vue`'s own copy of this doc comment (`main.ts`'s `MountOptions.hostConnectionState`,
+   *  including why this is named `hostConnectionState`, not `connectionState` — the latter
+   *  collides with the differently-scoped local const of that name just below). */
+  hostConnectionState: EventPayload<'connection.changed'>['state'];
 }>();
 
-const bridge = new BridgeClient(props.transport);
+const bridge = new BridgeClient(props.transport, props.hostConnectionState);
 const connectionState = bridge.connectionState;
 const refsState = new RefsState(bridge);
 const review = shallowRef<ReviewSessionState | undefined>(undefined);
@@ -628,7 +640,7 @@ watch(
 
 <template>
   <div
-    class="kv-review-view kv-skin-kira"
+    class="kv-review-view"
     :data-connection-state="connectionState"
     :style="{ '--kv-tree-indent': treeIndent }"
   >
@@ -639,6 +651,11 @@ watch(
     <div class="kv-visually-hidden" role="status" aria-live="polite" data-testid="live-announcements">
       {{ liveAnnouncement }}
     </div>
+
+    <!-- G-UX (item 13): unconditional, outside the v-if/v-else-if chain below (`App.vue`'s own
+         copy of this reasoning) — each of those branches fully replaces the panel's own content,
+         which would otherwise hide a live disconnect exactly when it matters most. -->
+    <ConnectionBanner :state="bridge.hostConnection.value" />
 
     <template v-if="bootError">
       <div class="kv-review-boot-error" data-testid="boot-error">
@@ -666,7 +683,6 @@ watch(
         </p>
         <KuiSearchInput
           ref="branchFilterInputRef"
-          class="kv-review-picker-filter"
           v-model="branchFilter"
           placeholder="Filter branches"
           ariaLabel="Filter branches"
@@ -677,7 +693,7 @@ watch(
             <KuiButton
               v-for="row in branchSections.branches.visible"
               :key="row.refname"
-              class="kv-review-picker-row"
+              class="kui-row kv-review-picker-row"
               @click="pickBranch(row.shortName)"
             >
               {{ row.shortName }}
@@ -691,7 +707,7 @@ watch(
             <KuiButton
               v-for="row in branchSections.remoteBranches.visible"
               :key="row.refname"
-              class="kv-review-picker-row"
+              class="kui-row kv-review-picker-row"
               @click="pickBranch(row.shortName)"
             >
               {{ row.shortName }}
@@ -930,15 +946,15 @@ watch(
 }
 
 .kv-review-loading {
-  padding: var(--kv-space-4);
+  padding: var(--kv-s-5);
   color: var(--kv-description-fg);
 }
 
 .kv-review-boot-error {
   display: flex;
   flex-direction: column;
-  gap: var(--kv-space-3);
-  padding: var(--kv-space-4);
+  gap: var(--kv-s-4);
+  padding: var(--kv-s-5);
 }
 
 .kv-review-boot-error p {
@@ -948,9 +964,9 @@ watch(
 
 .kv-review-boot-error button {
   align-self: flex-start;
-  padding: var(--kv-space-2) var(--kv-space-4);
+  padding: var(--kv-s-2) var(--kv-s-5);
   border: 1px solid var(--kv-panel-border);
-  border-radius: var(--kv-radius);
+  border-radius: var(--kv-radius-sm);
   background-color: var(--kv-panel-bg);
   color: var(--kv-row-fg);
   cursor: pointer;
@@ -960,8 +976,8 @@ watch(
 .kv-review-picker {
   display: flex;
   flex-direction: column;
-  gap: var(--kv-space-2);
-  padding: var(--kv-space-4);
+  gap: var(--kv-s-2);
+  padding: var(--kv-s-5);
   min-height: 0;
 }
 
@@ -980,12 +996,9 @@ watch(
   color: var(--kv-description-fg);
 }
 
-.kv-review-picker-filter {
-  background: var(--kv-panel-bg);
-  color: var(--kv-row-fg);
-  border: 1px solid var(--kv-panel-border);
-  padding: var(--kv-space-1) var(--kv-space-2);
-}
+/* G34 D14: gone — this class landed on `KuiSearchInput`'s own wrapper `<div>`, not its real
+   `<input>` (attrs fallthrough targets the single root element), so its box-chrome properties
+   never actually painted anything; `.kui-search-input-field`'s own chrome is what always rendered. */
 
 .kv-review-picker-scroll {
   flex: 1;
@@ -994,32 +1007,22 @@ watch(
 }
 
 .kv-review-picker-section-title {
-  padding: var(--kv-space-2) 0 var(--kv-space-1);
+  padding: var(--kv-s-2) 0 var(--kv-s-1);
   color: var(--kv-description-fg);
   font-size: 0.8em;
   text-transform: uppercase;
 }
 
+/* G34 D7: geometry now comes from `.kui-row` (composed in the template) — this class keeps only
+   the full-width stretch a vertical list of these needs. */
 .kv-review-picker-row {
-  display: block;
   width: 100%;
   text-align: left;
-  padding: var(--kv-space-1) var(--kv-space-2);
-  border: none;
-  background: transparent;
-  color: var(--kv-app-fg);
-  font-family: inherit;
-  font-size: inherit;
-  cursor: pointer;
-}
-
-.kv-review-picker-row:hover {
-  background-color: var(--kv-row-hover-bg);
 }
 
 .kv-review-picker-empty {
   color: var(--kv-description-fg);
-  padding: var(--kv-space-1) var(--kv-space-2);
+  padding: var(--kv-s-1) var(--kv-s-2);
 }
 
 /* G12 D14: .p-panel-head's geometry — height/gap/padding — for the view head carrying the branch
@@ -1078,7 +1081,7 @@ watch(
 .kv-review-summary-meta {
   font-family: var(--kv-font-ui);
   color: var(--kv-description-fg);
-  font-size: var(--kv-t-xs, 0.85em);
+  font-size: var(--kv-t-xs);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1096,17 +1099,11 @@ watch(
   flex-shrink: 0;
 }
 
+/* G34 D14: everything but the growable width is gone — `.kui-text-input`'s own chrome (this is a
+   real `KuiTextInput`, whose class lands on its actual `<input>` root) already matches it. */
 .kv-review-toolbar-filter {
   flex: 1;
   min-width: 0;
-  height: var(--kv-control-h);
-  background: var(--kv-panel-bg);
-  color: var(--kv-row-fg);
-  border: var(--kv-border-width) solid var(--kv-panel-border);
-  border-radius: var(--kv-radius-sm);
-  padding: 0 var(--kv-s-3);
-  font-family: var(--kv-font-ui);
-  font-size: var(--kv-t-sm);
 }
 
 .kv-review-body {
@@ -1124,7 +1121,7 @@ watch(
 
 .kv-review-status {
   margin: 0;
-  padding: var(--kv-space-4);
+  padding: var(--kv-s-5);
   color: var(--kv-description-fg);
 }
 
@@ -1172,32 +1169,17 @@ watch(
   flex-shrink: 0;
 }
 
-/* G12 D16: Load more stays text (its label carries a count) — .p-btn's own geometry, per D14. */
-.kv-review-load-more-button {
-  height: var(--kv-control-h);
-  padding: 0 var(--kv-s-3);
-  border: var(--kv-border-width) solid var(--kv-panel-border);
-  border-radius: var(--kv-radius-sm);
-  background: transparent;
-  color: var(--kv-app-fg);
-  font-family: var(--kv-font-ui);
-  font-size: var(--kv-t-sm);
-  cursor: pointer;
-}
-
-.kv-review-load-more-button:hover:not(:disabled) {
-  background-color: var(--kv-row-hover-bg);
-}
-
-.kv-review-load-more-button:disabled {
-  cursor: default;
-  opacity: 0.7;
-}
+/* G12 D16: Load more stays text (its label carries a count) — .p-btn's own geometry, per D14.
+   G34: the box this comment already claimed is now actually true — the local re-declaration
+   (height/padding/border/border-radius, with a border `.kui-button` never draws at rest) is
+   gone, found by the phase's own exit-criteria sweep for this class of leftover. */
 
 /* G21 D11: FileTree.vue's row geometry, font roles and status-letter mono font used to be
  * restyled from here, under the .kv-skin-kira ancestor, because the graph panel's tree had to
  * stay byte-identical while it still embedded a diff (G12 D14's own guarantee). That guarantee no
  * longer has anything to protect (items 9/10/12/13 already changed the graph tree's own
  * appearance and behaviour), so this whole block moved into FileTree.vue's own <style> as its one
- * unconditional appearance instead — see that file's own doc comment. */
+ * unconditional appearance instead — see that file's own doc comment. G34 D1: `.kv-skin-kira` no
+ * longer exists at all — `kira-structure.css` is `:root`-scoped now, so there is nothing left to
+ * apply here. */
 </style>

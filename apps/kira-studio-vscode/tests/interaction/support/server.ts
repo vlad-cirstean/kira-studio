@@ -48,6 +48,11 @@ export interface StartInteractionServerOptions {
   /** Seeded into the `/review` document's own bootstrap island as `target` — `null` for the
    *  ordinary "no branch yet" cold boot. */
   readonly reviewTarget?: { repoId: string; branch: string } | null;
+  /** G-UX (item 13): seeded into both documents' own bootstrap island as `connectionState` —
+   *  defaults to `connected` (the ordinary case for every existing spec built on this fixture,
+   *  whose fake host answers every request as if connected). A spec exercising the connection
+   *  banner's own cold-boot seed passes a different value here. */
+  readonly connectionState?: { kind: string; detail?: string };
 }
 
 export async function startInteractionServer(
@@ -64,6 +69,7 @@ export async function startInteractionServer(
   const scriptUrl = `/${entry.file}`;
   const styleUrls = collectCss(manifest, WEBVIEW_ENTRY, new Set()).map((css) => `/${css}`);
   const reviewTarget = options.reviewTarget ?? null;
+  const connectionState = options.connectionState ?? { kind: 'connected' as const };
 
   let origin = '';
   const server: Server = createServer((req, res) => {
@@ -83,6 +89,7 @@ export async function startInteractionServer(
           view,
           target: view === 'review' ? reviewTarget : null,
           pendingUiAction: null,
+          connectionState,
         };
         const document = buildWebviewDocument({
           scriptUrl,

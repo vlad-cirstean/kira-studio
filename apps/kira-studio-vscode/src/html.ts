@@ -8,8 +8,9 @@
  * repo-root `dist/`: this repo's `package.json#main` is `./dist/extension.js` (G1 §5.4), and
  * `packages/git-ui/vite.config.ts` writes its own output to this same package's `dist/ui`.
  */
+import { randomInt } from 'node:crypto';
 import { readFileSync } from 'node:fs';
-import { CONTRACT_VERSION, type UiActionKind } from '@kira/git-ipc';
+import { CONTRACT_VERSION, type EventPayload, type UiActionKind } from '@kira/git-ipc';
 import * as vscode from 'vscode';
 import {
   buildWebviewDocument,
@@ -38,10 +39,15 @@ function resolveUiAssets(webview: vscode.Webview, distUi: vscode.Uri): UiAssets 
   };
 }
 
+/** G30 round-1 architecture/security review, finding #3: this CSP `script-src 'nonce-…'` is the
+ *  one thing standing between a maliciously-named branch's webview-bootstrap HTML injection (see
+ *  `buildWebviewDocument`'s own escaping fix) and arbitrary script execution — `Math.random()` is
+ *  not a CSPRNG (it shares one V8 PRNG stream with, among other things, `connection.ts`'s
+ *  reconnect jitter) and a predictable nonce defeats that defence. `randomInt` is Node's CSPRNG. */
 function nonce(): string {
   const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
   let out = '';
-  for (let i = 0; i < 32; i++) out += alphabet[Math.floor(Math.random() * alphabet.length)];
+  for (let i = 0; i < 32; i++) out += alphabet[randomInt(alphabet.length)];
   return out;
 }
 
@@ -67,10 +73,19 @@ export interface RenderHtmlOptions {
     action: UiActionKind;
     target?: { repoId: string; sha: string };
   } | null;
+  /** G-UX (item 13): the connection state as of THIS resolve — both `panelView.ts` and
+   *  `reviewView.ts` read `ConnectionManager.state` fresh (via `connection.ts`'s own
+   *  `toWireConnectionState`) right before calling this, so a panel opened while Kira Studio is
+   *  already unreachable shows the banner immediately instead of only on the next live
+   *  `connection.changed` push (`retainContextWhenHidden` is off — an `emit` sent before this
+   *  webview has booted is simply dropped, the same cold-boot race `pendingUiAction` above already
+   *  has to handle). Required, unlike `target`/`pendingUiAction`: every resolve, of either view,
+   *  has a real connection state to seed. */
+  readonly connectionState: EventPayload<'connection.changed'>['state'];
 }
 
 export function renderHtml(opts: RenderHtmlOptions): string {
-  const { webview, extensionUri, view, target, pendingUiAction } = opts;
+  const { webview, extensionUri, view, target, pendingUiAction, connectionState } = opts;
   const distUi = vscode.Uri.joinPath(extensionUri, 'dist', 'ui');
   const assets = resolveUiAssets(webview, distUi);
   const csNonce = nonce();
@@ -84,6 +99,7 @@ export function renderHtml(opts: RenderHtmlOptions): string {
     view,
     target: view === 'review' ? (target ?? null) : null,
     pendingUiAction: view === 'graph' ? (pendingUiAction ?? null) : null,
+    connectionState,
   };
 
   return buildWebviewDocument({

@@ -94,9 +94,16 @@ type execRunner struct{}
 // gracefulStopDelay mirrors gitclient/runner.go's own constant of the same name and purpose: on
 // cancellation, the child's process group is sent SIGTERM and given this long to exit before
 // escalating to SIGKILL.
-const gracefulStopDelay = 2 * time.Second
+//
+// A var, not a const (mirrors internal/preconnect/supervisor.go's own killGrace/settleWindow
+// precedent, P55 §2 D9, and gitclient/runner.go's own identical G31 round-2 fix): runner_test.go
+// lowers it so a regression test proving cmd.Cancel's SIGKILL escalation timer is actually stopped
+// once the process exits cleanly doesn't cost 2s of real wall-clock time.
+var gracefulStopDelay = 2 * time.Second
 
-func killGroup(pid int, sig syscall.Signal) error {
+// A var, not a plain func (internal/preconnect/supervisor.go's own killSignal is this codebase's
+// precedent) so a test can observe whether cmd.Cancel's SIGKILL escalation was actually invoked.
+var killGroup = func(pid int, sig syscall.Signal) error {
 	if err := syscall.Kill(-pid, sig); err != nil && !errors.Is(err, syscall.ESRCH) {
 		return err
 	}
@@ -116,9 +123,17 @@ func (execRunner) Run(ctx context.Context, ghPath string, spec Spec) (Result, er
 	// Own process group (F5's own discipline, mirroring gitclient/runner.go:230): a group signal
 	// reaches whatever `gh` itself forks, not just the direct child.
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	// escalate is read after cmd.Run() returns, below — G31 round-2 architecture/security review,
+	// finding #11: without stopping it there, a group that exits cleanly on SIGTERM left this timer
+	// armed for the full gracefulStopDelay regardless, and a SIGKILL fired at cmd.Process.Pid's
+	// process group after that delay could — narrowly, but really — land on an unrelated group that
+	// has since reused the same pid. No lock is needed: cmd.Run (Start+Wait) is documented to block
+	// until any goroutine running Cancel has finished, which is exactly the happens-before this
+	// needs.
+	var escalate *time.Timer
 	cmd.Cancel = func() error {
 		_ = killGroup(cmd.Process.Pid, syscall.SIGTERM)
-		time.AfterFunc(gracefulStopDelay, func() {
+		escalate = time.AfterFunc(gracefulStopDelay, func() {
 			_ = killGroup(cmd.Process.Pid, syscall.SIGKILL)
 		})
 		return nil
@@ -130,6 +145,9 @@ func (execRunner) Run(ctx context.Context, ghPath string, spec Spec) (Result, er
 	cmd.Stderr = &stderr
 
 	runErr := cmd.Run()
+	if escalate != nil {
+		escalate.Stop()
+	}
 
 	// runCtx's own deadline (spec.Timeout) or the caller's outer ctx being cancelled is reported as
 	// a genuine error — never folded into Result.ExitCode — exactly mirroring

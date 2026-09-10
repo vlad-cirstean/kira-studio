@@ -85,6 +85,11 @@ type ghState struct {
 	// deliberately NOT cleared by drop() (refsChanged does not clear it, D7).
 	blockedUntil  time.Time
 	blockedStatus ghclient.Status
+
+	// lastEagerPurgeAt gates eagerPurgeAllowed below (G30 round-1 performance review, finding #2)
+	// — deliberately NOT cleared by drop(): the whole point is to survive the very refsChanged
+	// that triggers the next eager pass, not reset alongside it.
+	lastEagerPurgeAt time.Time
 }
 
 func newGhState() *ghState {
@@ -120,6 +125,29 @@ func (s *ghState) breakerStatus() (ghclient.Status, bool) {
 		return ghclient.Status{}, false
 	}
 	return s.blockedStatus, true
+}
+
+// eagerPurgeMinGap bounds how often eagerResolveClosedBranches may actually do its own work,
+// independent of maxEagerPurgeBranches' own per-pass branch cap (G30 round-1 performance review,
+// finding #2). note()'s own refsChanged handler calls drop() immediately before scheduling this
+// pass, on EVERY refsChanged — an interactive rebase's dozen-plus signals, or a `git fetch
+// --prune`'s own single burst, used to re-trigger a fresh bulk gh fetch on every single one, with
+// no throttle anywhere in this path. Mirrors graphView.ts's own AUTO_REFRESH_MIN_GAP_MS — the
+// client's own auto-refresh already learned this exact lesson for the same reason.
+const eagerPurgeMinGap = 1 * time.Second
+
+// eagerPurgeAllowed reports whether enough time has passed since the last eager pass that actually
+// ran, and — if so — atomically claims this call as the one that runs, so two goroutines racing
+// this check (two refsChanged signals close enough together that both reach here before either
+// finishes) can never both proceed.
+func (s *ghState) eagerPurgeAllowed() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if !s.lastEagerPurgeAt.IsZero() && time.Since(s.lastEagerPurgeAt) < eagerPurgeMinGap {
+		return false
+	}
+	s.lastEagerPurgeAt = time.Now()
+	return true
 }
 
 func (s *ghState) commitCacheGet(sha string) ([]ghclient.PR, bool) {
@@ -317,13 +345,27 @@ func (e *RepoEntry) ResolveBranchPr(ctx context.Context, branch string) PrLookup
 		return disabledResult()
 	}
 
-	if snapshot, hit := e.gh.snapshotGet(); hit {
+	// G30 round-1 performance review, finding #1: this used to read the snapshot cache with
+	// snapshotGet alone, which never POPULATES it — ensureSnapshot is the one thing that does,
+	// and had zero callers anywhere in the tree. So on any cold cache (repo open, or every
+	// ghSnapshotTTL expiry) every branch's first resolve fell straight through to its own
+	// per-branch `gh api` spawn, and the client's own "warm every branch at once" fan-out
+	// (pr.ts's ensureSnapshot, called from BranchPicker.vue/search/stack) turned that into one
+	// process + one GitHub REST call PER BRANCH, all concurrent, for a repo that may have hundreds.
+	// Calling ensureSnapshot here means the first resolve after a cold cache pays ONE bulk
+	// OpenPulls call and warms the snapshot for every other branch that has an open PR; only a
+	// genuinely non-GitHub-shaped miss (a since-closed PR, or the breaker/a fetch failure) still
+	// falls through to the per-branch query below, exactly as before.
+	if snapshot, status := e.ensureSnapshot(ctx); status.OK() {
 		for _, pr := range snapshot {
 			if pr.HeadRef == branch {
 				e.maybePurgeClosed(ctx, branch, &pr)
 				return okResult([]ghclient.PR{pr})
 			}
 		}
+		// No OPEN PR for this branch in the snapshot — not yet authoritative for "no PR at all"
+		// (the snapshot is open-PRs-only), so this still falls through to the per-branch
+		// state=all query below, the one call that can report a PR that has since closed.
 	}
 
 	if cached, hit := e.gh.branchCacheGet(branch); hit {
@@ -372,6 +414,9 @@ const maxEagerPurgeBranches = 8
 // maybePurgeClosed itself already logs on a purge failure — this is a background best-effort pass,
 // not a request with a caller waiting on it.
 func (e *RepoEntry) eagerResolveClosedBranches() {
+	if !e.gh.eagerPurgeAllowed() {
+		return
+	}
 	if !e.githubEnabled() {
 		return
 	}

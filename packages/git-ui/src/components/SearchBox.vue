@@ -70,6 +70,10 @@ const props = defineProps<{ search: SearchState }>();
 const emit = defineEmits<{
   (e: 'focusGrid'): void;
   (e: 'select', option: SearchOption): void;
+  /** The row's own close (X) button — `App.vue` owns `closeSearch()` (close, clear the query, and
+   *  return focus to the grid), the same "emit, don't own" shape this component already follows
+   *  for `focusGrid`. */
+  (e: 'close'): void;
 }>();
 
 const rootEl = ref<HTMLElement | null>(null);
@@ -306,6 +310,15 @@ defineExpose({ focus: () => searchInputRef.value?.focus() });
         @update:model-value="onScopeChange"
       />
       <span v-if="countLabel" class="kv-search-count" data-testid="search-count">{{ countLabel }}</span>
+      <KuiButton
+        variant="icon"
+        icon="codicon-close"
+        class="kv-search-close"
+        v-kui-tooltip="'Close search'"
+        aria-label="Close search"
+        data-testid="search-close-button"
+        @click="emit('close')"
+      />
     </div>
     <div
       v-if="search.error.value"
@@ -345,7 +358,7 @@ defineExpose({ focus: () => searchInputRef.value?.focus() });
 .kv-search-box {
   display: flex;
   align-items: center;
-  gap: var(--kv-space-2);
+  gap: var(--kv-s-2);
 }
 
 /* Grows to the row's own width instead of a hard 160px — `.kui-search-input`
@@ -363,32 +376,37 @@ defineExpose({ focus: () => searchInputRef.value?.focus() });
 }
 
 /* G-UX D9: the bespoke width:20px/height:18px override is gone — KuiButton's own --kui-control-h
-   sizing now, matching every other icon toggle in the app. */
+   sizing now, matching every other icon toggle in the app. G34 D15: font-size -> --kv-t-xs, the
+   same secondary-text tier `-count`/`-scope` already used. */
 .kv-search-toggle {
   color: var(--kv-description-fg);
+  font-size: var(--kv-t-xs);
 }
 
 .kv-search-scope {
-  font-size: 0.85em;
+  font-size: var(--kv-t-xs);
 }
 
 .kv-search-count {
-  padding: 0 var(--kv-space-1);
+  padding: 0 var(--kv-s-1);
   color: var(--kv-description-fg);
-  font-size: 0.85em;
+  font-size: var(--kv-t-xs);
   white-space: nowrap;
 }
 
+/* G34 D15: the floating-surface triple every other menu/popover/tooltip in the app now uses —
+   the panel radius tier (not the interactive-control one), a stronger border, and the real
+   floating-surface shadow instead of a flatter ad hoc one. */
 .kv-search-error {
   position: fixed;
   z-index: var(--kui-z-popover, 20);
   max-width: var(--kui-float-max-w, none);
-  padding: var(--kv-space-1) var(--kv-space-2);
+  padding: var(--kv-s-1) var(--kv-s-2);
   background-color: var(--kv-panel-bg);
   color: var(--kv-error-fg);
-  border: 1px solid var(--kv-panel-border);
-  border-radius: var(--kv-radius);
-  box-shadow: 0 2px 8px var(--kv-widget-shadow);
-  font-size: 0.85em;
+  border: var(--kv-border-width) solid var(--kv-border-strong);
+  border-radius: var(--kv-radius-panel);
+  box-shadow: var(--kv-shadow-dialog) var(--kv-widget-shadow);
+  font-size: var(--kv-t-xs);
 }
 </style>

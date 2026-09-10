@@ -221,7 +221,7 @@ function onOpenFile(index: number, pinned: boolean): void {
            row-action pattern. -->
       <span class="kv-review-row-actions">
         <KuiButton
-          class="kv-review-row-action"
+          variant="icon"
           icon="codicon-diff-multiple"
           v-kui-tooltip="'Open all changes'"
           aria-label="Open all changes"
@@ -231,9 +231,12 @@ function onOpenFile(index: number, pinned: boolean): void {
              prevents VS Code's bubble-phase link interceptor (registered on the webview document)
              from ever observing the click, so the command: URI is never delivered to the host
              (F6). onRowClick's own .kv-review-row-actions guard above is what keeps this click
-             from also toggling the row -- the correct fix reaches up the tree, not down. -->
+             from also toggling the row -- the correct fix reaches up the tree, not down.
+             G34 D15: this must stay a real <a href="command:…"> (VS Code's own link interceptor is
+             what delivers the command URI), so it wears the button classes directly rather than
+             becoming a KuiButton — bespoke in *element* only, never in appearance. -->
         <a
-          class="kv-review-row-action"
+          class="kui-button kui-button--icon"
           v-kui-tooltip="'Open in graph'"
           aria-label="Open in graph"
           :href="openInGraphHref"
@@ -335,7 +338,7 @@ function onOpenFile(index: number, pinned: boolean): void {
   align-items: center;
   gap: var(--kv-s-1);
   color: var(--kv-description-fg);
-  font-size: var(--kv-t-xs, 0.85em);
+  font-size: var(--kv-t-xs);
   white-space: nowrap;
   overflow: hidden;
 }
@@ -378,23 +381,9 @@ function onOpenFile(index: number, pinned: boolean): void {
   opacity: 1;
 }
 
-.kv-review-row-action {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: var(--kv-icon-box);
-  height: var(--kv-icon-box);
-  border: none;
-  border-radius: var(--kv-radius-sm);
-  background: transparent;
-  color: var(--kv-app-fg);
-  text-decoration: none;
-  cursor: pointer;
-}
-
-.kv-review-row-action:hover {
-  background-color: var(--kv-row-selected-bg);
-}
+/* G34 D14: `.kv-review-row-action` is gone — its `:hover` painted the *selection* blue, not a
+   hover tint (F9 in the G34 plan); `.kui-button`/`.kui-button--icon`'s own hover is correct and
+   is what both the KuiButton above and the `<a class="kui-button kui-button--icon">` now get. */
 
 .kv-review-row-body {
   border-top: 1px solid var(--kv-panel-border);
@@ -407,7 +396,7 @@ function onOpenFile(index: number, pinned: boolean): void {
 .kv-review-row-error,
 .kv-review-row-loading {
   margin: 0;
-  padding: var(--kv-space-3);
+  padding: var(--kv-s-4);
   color: var(--kv-description-fg);
 }
 

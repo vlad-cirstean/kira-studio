@@ -68,10 +68,7 @@ type GitRepoSettingsPatch struct {
 	PullStrategy          *string   `json:"pullStrategy,omitempty"`
 	LogLevel              *string   `json:"logLevel,omitempty"`
 	GithubEnabled         *bool     `json:"githubEnabled,omitempty"`
-	// WorktreePrepareScript/WorktreeBasePath: G25 D10's two new leaves. Deliberately NO approval
-	// field anywhere near this struct (F15/D11) — the approval sha is a server-only key, reachable
-	// only through GitRepoSettingsRepo's own dedicated Get/SetPrepareScriptApproval methods, never
-	// through this patch.
+	// WorktreePrepareScript/WorktreeBasePath: G25 D10's two new leaves.
 	WorktreePrepareScript *string `json:"worktreePrepareScript,omitempty"`
 	WorktreeBasePath      *string `json:"worktreeBasePath,omitempty"`
 	// CheckoutAutoStash: G28 D16's own eleventh leaf.

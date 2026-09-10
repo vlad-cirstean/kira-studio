@@ -74,6 +74,9 @@ func (r *Router) handleCommitDetail(ctx context.Context, c *gitsession.Conn, par
 	if p.RepoID == "" || p.SHA == "" {
 		return nil, ipcerr.BadRequest("gitrpc: commit.detail: repoId and sha are required")
 	}
+	if err := validRefArg("sha", p.SHA); err != nil {
+		return nil, err
+	}
 	entry, err := entryFor(c, p.RepoID)
 	if err != nil {
 		return nil, err
@@ -97,6 +100,9 @@ func (r *Router) handleCommitFileDiff(ctx context.Context, c *gitsession.Conn, p
 	}
 	if p.RepoID == "" || p.SHA == "" || p.Path == "" {
 		return nil, ipcerr.BadRequest("gitrpc: commit.fileDiff: repoId, sha and path are required")
+	}
+	if err := validRefArg("sha", p.SHA); err != nil {
+		return nil, err
 	}
 	entry, err := entryFor(c, p.RepoID)
 	if err != nil {
@@ -131,6 +137,11 @@ func (r *Router) handleFileRead(ctx context.Context, c *gitsession.Conn, params 
 	if p.RepoID == "" || p.Rev == "" || p.Path == "" {
 		return nil, ipcerr.BadRequest("gitrpc: file.read: repoId, rev and path are required")
 	}
+	// D8 (see validRefArg, review.go): Rev reaches `git show <rev>:<path>` as a bare argv token
+	// (gitclient/catfile) — unguarded, a rev beginning with "-" would be read as an option.
+	if err := validRefArg("rev", p.Rev); err != nil {
+		return nil, err
+	}
 	entry, err := entryFor(c, p.RepoID)
 	if err != nil {
 		return nil, err
@@ -161,6 +172,12 @@ func (r *Router) handleFileGoToTarget(ctx context.Context, c *gitsession.Conn, p
 	}
 	if p.RepoID == "" || p.Rev == "" || p.Path == "" {
 		return nil, ipcerr.BadRequest("gitrpc: file.goToTarget: repoId, rev and path are required")
+	}
+	// D8 (see validRefArg, review.go): Rev reaches `git diff <rev> -- <path>` as a bare argv token
+	// in an option-consuming position (gitclient/porcelain.WorktreeDiffArgs) — unguarded, a rev of
+	// "--output=<path>" makes `git diff` write to an arbitrary file instead of erroring.
+	if err := validRefArg("rev", p.Rev); err != nil {
+		return nil, err
 	}
 	entry, err := entryFor(c, p.RepoID)
 	if err != nil {

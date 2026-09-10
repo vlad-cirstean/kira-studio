@@ -54,6 +54,37 @@ export type ConnectionState =
       readonly serverVersion: string;
     };
 
+/** G-UX (item 13): `connection.changed`'s own narrowed wire shape (`@kira/git-ipc`'s contract) —
+ *  reused by both `resolveWebviewView`'s cold-boot seed (`html.ts`'s bootstrap island, via
+ *  `panelView.ts`/`reviewView.ts` reading `ConnectionManager.state` fresh at that moment) and
+ *  `extension.ts`'s own live push on every `onStateChange` firing, so the two paths can never
+ *  describe the same state two different ways. `detail` mirrors `updateStatusBar`'s own tooltip
+ *  wording for `denied`/`versionMismatch` — the only two states worth explaining beyond their
+ *  kind; `connecting`/`pairing`/`connected` need no further words here (the webview banner that
+ *  reads this composes its own "reconnecting…"/"waiting for approval" text around the bare
+ *  kind). */
+export function toWireConnectionState(state: ConnectionState): {
+  readonly kind: 'connecting' | 'pairing' | 'connected' | 'denied' | 'versionMismatch';
+  readonly detail?: string;
+} {
+  switch (state.kind) {
+    case 'denied':
+      return {
+        kind: 'denied',
+        detail: state.reason === 'timeout' ? 'Pairing request timed out' : 'Pairing was denied',
+      };
+    case 'versionMismatch':
+      return {
+        kind: 'versionMismatch',
+        detail:
+          `Extension expects contract ${state.expected}, ` +
+          `Kira Studio (${state.serverVersion}) speaks ${state.received}`,
+      };
+    default:
+      return { kind: state.kind };
+  }
+}
+
 interface HandshakeResponse {
   readonly kind: string;
   readonly expected?: number;
@@ -119,6 +150,15 @@ export class ConnectionManager implements vscode.Disposable {
   // Every dial gets a fresh token; a callback checks it against the current one before acting,
   // so a superseded (disposed, or replaced by a fresh retry) dial's late socket events are inert.
   #dialToken = 0;
+  // G30 round-1 functional-correctness review, finding #4: `#onDisconnected` used to have no
+  // idempotency guard of its own, but up to three independent listeners can fire it for ONE
+  // socket death — this class's own `socket.once('error', ...)` (registered in `#dial`, and never
+  // removed by a later successful connect) plus `channel.onClose`, which `createSocketChannel`
+  // itself fires from BOTH `socket.on('close', ...)` AND `socket.on('error', ...)`. All three pass
+  // the `dialToken` guard (nothing bumps `#dialToken` until the NEXT `#dial`), so one drop tripled
+  // `#backoffMs`'s own single ×2 step and raced three `#dial()` calls. Tracks the dialToken
+  // `#onDisconnected` has already handled, so the second and third fire are inert no-ops.
+  #disconnectHandledFor: number | undefined = undefined;
 
   constructor(context: vscode.ExtensionContext, logger: Logger, appVersion: string) {
     this.#context = context;
@@ -249,6 +289,11 @@ export class ConnectionManager implements vscode.Disposable {
     this.#dialToken++;
     if (this.#reconnectTimer) clearTimeout(this.#reconnectTimer);
     this.#socket?.destroy();
+    // Same reasoning as #onDisconnected's own dispose() call above — a still-connected transport
+    // at the moment the extension itself shuts down must reject its own in-flight requests, not
+    // merely be forgotten.
+    this.#transport?.dispose();
+    this.#transport = undefined;
     this.#stateEmitter.dispose();
     this.#activityEmitter.dispose();
   }
@@ -260,6 +305,13 @@ export class ConnectionManager implements vscode.Disposable {
 
   async #dial(): Promise<void> {
     if (this.#stopped) return;
+    // A previous attempt's socket — still open because its own dialToken is about to go stale,
+    // or because the 3x #onDisconnected bug (finding #4, see #disconnectHandledFor) once let a
+    // second/third #dial() race ahead of this one — must never linger un-destroyed: an
+    // un-destroyed socket whose own 'connect' handler is about to early-return on the token
+    // mismatch check is a leaked client socket (and, on the server side, a blocked handshake
+    // goroutine) for the rest of the process's life.
+    this.#socket?.destroy();
     const dialToken = ++this.#dialToken;
     const clientId = await this.#clientId;
     const storedToken = await this.#context.secrets.get(TOKEN_SECRET_KEY);
@@ -376,6 +428,17 @@ export class ConnectionManager implements vscode.Disposable {
 
   #onDisconnected(dialToken: number): void {
     if (dialToken !== this.#dialToken) return;
+    if (this.#disconnectHandledFor === dialToken) return; // already handled — see finding #4 above.
+    this.#disconnectHandledFor = dialToken;
+    // G31 round-2 functional-correctness review, finding #2: this used to drop `#transport` with
+    // no `dispose()` call. `createRpcClient`'s own `dispose()` is the only thing that rejects its
+    // `pendingRequests`/`pendingStreams` — `createSocketChannel`'s `onClose` (which is what got us
+    // here) does nothing to the RPC client layered on top of it. Without this, every `request()`/
+    // `stream()` promise in flight at the moment of a drop hung forever, even across a later
+    // successful reconnect, and — since `request`/`stream` route through `#beginActivity`'s
+    // `finally(() => this.#endActivity())` — `#inFlight` never returned to 0, latching the status
+    // bar's "connecting…" spinner on for the rest of the session.
+    this.#transport?.dispose();
     this.#transport = undefined;
     this.#transportEventUnsubs.clear(); // the dead transport's own unsubscribes are moot.
     this.#socket = undefined;

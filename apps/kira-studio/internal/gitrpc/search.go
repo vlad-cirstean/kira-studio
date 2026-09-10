@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitpath"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitsearch"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitsession"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/ipcerr"
@@ -29,6 +30,7 @@ func (r *Router) handleSearchRun(ctx context.Context, c *gitsession.Conn, params
 	if p.RepoID == "" {
 		return nil, ipcerr.BadRequest("gitrpc: search.run: repoId is required")
 	}
+	p.RepoID = gitpath.CleanNFC(p.RepoID) // G31 round-2 architecture/security review, finding #4.
 
 	// D7's own empty-query short-circuit, taken here too: no reason to open a walk (a side
 	// effect for a client that has never touched the graph) or spawn a process for a query with

@@ -238,6 +238,145 @@ func TestSession_HandleRequest_OversizeResultAnswersFrameTooLarge(t *testing.T) 
 	}
 }
 
+// sendFrame marshals and delivers one client->server frame through conn.in — the test-side half
+// of the same wire the real client uses, mirroring TestSession_HandleRequest_OversizeResultAnswersFrameTooLarge's
+// own inline construction rather than adding a new helper only these two tests would share.
+func sendFrame(t *testing.T, conn *internalPipeSession, version int, f frame) {
+	t.Helper()
+	b, err := json.Marshal(envelope{Version: version, Body: f})
+	if err != nil {
+		t.Fatalf("marshal frame: %v", err)
+	}
+	conn.in <- b
+}
+
+// TestSession_HandleRequest_RejectsReusedInFlightID is G30 round-1 architecture review finding
+// #10's own proof: a 'req' frame reusing an id that is still in flight used to silently overwrite
+// activeWork[id], orphaning the first request's cancel func and dropping whichever of the two
+// responses lost the removeActiveWork race — the caller waiting on it would hang forever. The
+// second 'req' must now be refused immediately, by its own 'res' frame, without ever starting a
+// second handler invocation, and the first request must still complete normally afterward.
+func TestSession_HandleRequest_RejectsReusedInFlightID(t *testing.T) {
+	conn := newInternalPipeSession()
+	const contractVersion = 9
+	release := make(chan struct{})
+	entered := make(chan struct{}, 1)
+	calls := 0
+	h := Handlers{
+		ContractVersion: contractVersion,
+		Request: func(ctx context.Context, method string, params json.RawMessage) (any, error) {
+			calls++
+			entered <- struct{}{}
+			<-release
+			return map[string]string{"ok": "yes"}, nil
+		},
+	}
+	session := NewSession(conn, h)
+	go session.Serve()
+	defer session.close()
+
+	sendFrame(t, conn, contractVersion, frame{T: "req", ID: 1, Method: "commit.fileDiff", Params: json.RawMessage(`{}`)})
+	select {
+	case <-entered:
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for the first request's handler to start")
+	}
+
+	// The id is now in activeWork, still blocked inside the handler — reusing it must be refused
+	// without a second handler invocation ever starting.
+	sendFrame(t, conn, contractVersion, frame{T: "req", ID: 1, Method: "commit.fileDiff", Params: json.RawMessage(`{}`)})
+
+	raw := recvFrame(t, conn)
+	var env envelope
+	if err := json.Unmarshal(raw, &env); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if env.Body.T != "res" || env.Body.ID != 1 {
+		t.Fatalf("body = %+v, want a res frame for id 1", env.Body)
+	}
+	if env.Body.OK == nil || *env.Body.OK {
+		t.Fatalf("OK = %v, want false (the reused id must be refused)", env.Body.OK)
+	}
+	if env.Body.Error == nil || env.Body.Error.Code != "E_BAD_REQUEST" {
+		t.Fatalf("error = %+v, want E_BAD_REQUEST", env.Body.Error)
+	}
+
+	// The first request, still in flight, must complete normally once released — its own
+	// bookkeeping was never touched by the refused duplicate.
+	close(release)
+	raw2 := recvFrame(t, conn)
+	var env2 envelope
+	if err := json.Unmarshal(raw2, &env2); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if env2.Body.T != "res" || env2.Body.ID != 1 {
+		t.Fatalf("body = %+v, want a res frame for id 1", env2.Body)
+	}
+	if env2.Body.OK == nil || !*env2.Body.OK {
+		t.Fatalf("OK = %v, want true (the first request must still succeed)", env2.Body.OK)
+	}
+	if calls != 1 {
+		t.Fatalf("handler invocations = %d, want exactly 1 (the reused id must never start a second)", calls)
+	}
+}
+
+// TestSession_HandleOpen_RejectsReusedInFlightID is the 'open' half of the same finding #10 —
+// a stream 'open' reusing an in-flight id must be refused by an immediate 'end' frame carrying an
+// error, never by silently overwriting the first stream's own registration.
+func TestSession_HandleOpen_RejectsReusedInFlightID(t *testing.T) {
+	conn := newInternalPipeSession()
+	const contractVersion = 9
+	release := make(chan struct{})
+	entered := make(chan struct{}, 1)
+	calls := 0
+	h := Handlers{
+		ContractVersion: contractVersion,
+		Stream: func(ctx context.Context, method string, params json.RawMessage, emit func(payload any, blob []byte) error) error {
+			calls++
+			entered <- struct{}{}
+			<-release
+			return nil
+		},
+	}
+	session := NewSession(conn, h)
+	go session.Serve()
+	defer session.close()
+
+	sendFrame(t, conn, contractVersion, frame{T: "open", ID: 1, Method: "log.stream", Params: json.RawMessage(`{}`)})
+	select {
+	case <-entered:
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for the first stream's handler to start")
+	}
+
+	sendFrame(t, conn, contractVersion, frame{T: "open", ID: 1, Method: "log.stream", Params: json.RawMessage(`{}`)})
+
+	raw := recvFrame(t, conn)
+	var env envelope
+	if err := json.Unmarshal(raw, &env); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if env.Body.T != "end" || env.Body.ID != 1 {
+		t.Fatalf("body = %+v, want an end frame for id 1", env.Body)
+	}
+	if env.Body.Error == nil || env.Body.Error.Code != "E_BAD_REQUEST" {
+		t.Fatalf("error = %+v, want E_BAD_REQUEST", env.Body.Error)
+	}
+
+	close(release)
+	raw2 := recvFrame(t, conn)
+	var env2 envelope
+	if err := json.Unmarshal(raw2, &env2); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if env2.Body.T != "end" || env2.Body.ID != 1 || env2.Body.Error != nil {
+		t.Fatalf("body = %+v, want a clean end frame for id 1", env2.Body)
+	}
+	if calls != 1 {
+		t.Fatalf("handler invocations = %d, want exactly 1 (the reused id must never start a second)", calls)
+	}
+}
+
 // TestCreditGate_GrantUnblocksAcquire proves the credit gate's own contract in isolation — a
 // waiter blocked on acquire is released by grant, exactly once per unit of credit.
 func TestCreditGate_GrantUnblocksAcquire(t *testing.T) {

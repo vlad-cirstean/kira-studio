@@ -103,7 +103,7 @@ async function onMenuSelect(id: string): Promise<void> {
       class="kv-branch-row"
       :class="{ 'kv-stash-row--selected': stash.selectedSha.value === entry.sha }"
     >
-      <KuiButton class="kv-branch-row-main" icon="codicon-archive" @click="select(entry)">
+      <KuiButton class="kui-row kv-branch-row-main" icon="codicon-archive" @click="select(entry)">
         <span class="kv-stash-index">{{ "stash@{" + entry.index + "}" }}</span>
         <span
           v-if="originLabel(entry, currentBranch)"
@@ -121,7 +121,7 @@ async function onMenuSelect(id: string): Promise<void> {
         <span class="kv-stash-date">{{ formatRelativeDate(entry.timestamp) }}</span>
       </KuiButton>
       <KuiButton
-        class="kv-icon-button"
+        variant="icon"
         v-kui-tooltip="'More actions'"
         aria-label="More actions"
         @click="openMenuFromButton(entry, $event)"

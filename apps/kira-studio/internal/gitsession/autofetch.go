@@ -32,14 +32,17 @@ func (e *RepoEntry) startAutoFetch(minutes int) {
 	e.autoFetch.timer = time.AfterFunc(time.Duration(minutes)*time.Minute, e.autoFetchTick)
 }
 
-// ensureAutoFetch re-reads this entry's current settings and arms the timer if the interval is now
-// non-zero (F4/D5) — called from Conn.Open on the path that stores a new hold, not only from
-// newRepoEntry. startAutoFetch already no-ops when a timer is already running or the entry is
-// `disabled` (a fetch that failed once stays off for the entry's life, G7 D23), so N windows
-// opening the same repository arm exactly one timer, and this can never resurrect one G7 killed.
-// Fixes the off→on direction, which newRepoEntry-only arming never could: a repository opened
-// while auto-fetch read as 0 never got a timer, and no later settings change could ever start one.
-func (e *RepoEntry) ensureAutoFetch() {
+// EnsureAutoFetch re-reads this entry's current settings and arms the timer if the interval is now
+// non-zero (F4/D5) — called from Conn.Open on the path that stores a new hold, and (G31 round-2
+// functional-correctness review, finding #8) from gitrpc's own repoSettings.set handler, the
+// OTHER off→on path: a user flipping fetch.autoInterval from 0 back to a positive value while the
+// repository is already open, with no repo.open in between to reach this any other way.
+// startAutoFetch already no-ops when a timer is already running or the entry is `disabled` (a
+// fetch that failed once stays off for the entry's life, G7 D23), so calling this redundantly
+// (both an open AND a settings change, or several windows) arms exactly one timer, and this can
+// never resurrect one G7 killed. Exported for gitrpc's own cross-package call; unexported callers
+// within this package (conn.go) use it exactly the same way.
+func (e *RepoEntry) EnsureAutoFetch() {
 	_, minutes, _ := e.settings()
 	if minutes > 0 {
 		e.startAutoFetch(minutes)
@@ -73,6 +76,23 @@ func (e *RepoEntry) disableAutoFetch() {
 	e.autoFetch.mu.Unlock()
 }
 
+// pauseAutoFetch stops the ticking loop for a user-set interval of zero — deliberately NOT the
+// same as disableAutoFetch (G30 round-1 functional-correctness review, finding #8): `disabled` is
+// this entry's permanent, for-its-whole-life kill switch, reserved for a genuine fetch failure
+// (most commonly AuthFailed). Before this fix, autoFetchTick called disableAutoFetch for BOTH
+// cases — so a user turning fetch.autoInterval to 0 tripped the same permanent switch a real
+// failure does, and startAutoFetch's own `e.autoFetch.disabled` guard then refused to ever re-arm
+// again, even after the user set the interval back to a positive value: auto-fetch stayed off
+// forever, silently, for the rest of the entry's life. Clearing only `timer` (never `disabled`)
+// leaves startAutoFetch's other guard (`timer != nil`) false too, so the next ensureAutoFetch call
+// (Conn.Open, the same off→on path D5 already established) arms a fresh timer once the interval
+// reads positive again.
+func (e *RepoEntry) pauseAutoFetch() {
+	e.autoFetch.mu.Lock()
+	e.autoFetch.timer = nil
+	e.autoFetch.mu.Unlock()
+}
+
 // autoFetchTick re-reads the server-owned interval fresh (so a setting change takes effect within
 // one interval, with no need to recreate the entry) and, when nothing else is using the
 // repository, runs one silent fetch through the SAME RunRemote path an explicit fetch takes — with
@@ -94,7 +114,7 @@ func (e *RepoEntry) autoFetchTick() {
 
 	_, minutes, _ := e.settings()
 	if minutes <= 0 {
-		e.disableAutoFetch()
+		e.pauseAutoFetch()
 		return
 	}
 	if e.Repo.Writing() {

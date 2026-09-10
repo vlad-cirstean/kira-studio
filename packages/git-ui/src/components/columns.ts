@@ -97,13 +97,18 @@ export interface StackContext {
 
 const NO_STACK_CONTEXT: StackContext = { stackInfoFor: () => undefined };
 
-/** The message cell is a flex row (`CommitGrid.vue`'s `<style>`): `refBadges.ts`'s badge strip
- *  (only when the row has decorations — most rows do not, and get no wrapper at all) followed by
- *  the subject, which alone gets `text-overflow: ellipsis` — a CSS rule on `.kv-message-subject`,
- *  not something this formatter computes. When a search pattern is active, the subject's text is
- *  split by `searchHighlight.ts`'s `splitHighlights` into alternating plain text nodes and
- *  `<span class="kv-search-hit">` elements — `enableHtmlRendering: false` (§5.5) and this building
- *  every node with `textContent` mean no escaping code is introduced and none is needed. */
+/** G-UX (item 2b): the message cell is a 2-row CSS grid now (`CommitGrid.vue`'s `<style>`), not a
+ *  single flex row — `refBadges.ts`'s badge strip and `buildPrBadge`'s own badge, when either is
+ *  present, share one `grid-row: 1` wrapper (`.kv-message-badges-row`) above the subject's own
+ *  `grid-row: 2`, rather than sitting inline before it. A row with neither never gets that wrapper
+ *  at all (mirroring `buildRefBadges`'s own "no empty wrapper" rule) — the subject's explicit
+ *  `grid-row: 2` still lands it on the same baseline as every other row regardless, so an
+ *  undecorated commit costs nothing beyond the row's own fixed height. The subject alone gets
+ *  `text-overflow: ellipsis` — a CSS rule on `.kv-message-subject`, not something this formatter
+ *  computes. When a search pattern is active, the subject's text is split by `searchHighlight.ts`'s
+ *  `splitHighlights` into alternating plain text nodes and `<span class="kv-search-hit">` elements
+ *  — `enableHtmlRendering: false` (§5.5) and this building every node with `textContent` mean no
+ *  escaping code is introduced and none is needed. */
 function messageFormatter(
   ctx: MessageSearchContext,
   laneCtx: LaneColorContext,
@@ -119,13 +124,15 @@ function messageFormatter(
       laneCtx.colorOf(row),
       stackCtx.stackInfoFor,
     );
-    if (badges !== null) cell.appendChild(badges);
-
-    // G24 D9: placed after the ref badges, before the subject.
+    // G24 D9: the PR badge shares the same row-1 strip, placed after the ref badges.
     const prs = prCtx.prsFor(dataContext.sha);
-    if (prs !== undefined) {
-      const prBadge = buildPrBadge(prs);
-      if (prBadge !== null) cell.appendChild(prBadge);
+    const prBadge = prs !== undefined ? buildPrBadge(prs) : null;
+    if (badges !== null || prBadge !== null) {
+      const badgesRow = document.createElement('span');
+      badgesRow.className = 'kv-message-badges-row';
+      if (badges !== null) badgesRow.appendChild(badges);
+      if (prBadge !== null) badgesRow.appendChild(prBadge);
+      cell.appendChild(badgesRow);
     }
 
     const subject = document.createElement('span');

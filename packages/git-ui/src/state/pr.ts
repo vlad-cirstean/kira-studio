@@ -7,6 +7,13 @@ import type { BridgeClient } from '../bridge/client.ts';
  *  not forty. */
 const SELECTION_DEBOUNCE_MS = 300;
 
+/** G30 round-1 performance review, finding #1: `ensureSnapshot`'s own worker-pool cap — see that
+ *  method's doc comment. Six, not one and not unbounded: small enough that a repo with hundreds of
+ *  branches never opens more than a handful of requests at once, large enough that warming a
+ *  normal-sized branch list still finishes in one or two batches rather than trickling one at a
+ *  time. */
+const PR_ENSURE_SNAPSHOT_CONCURRENCY = 6;
+
 /**
  * G24 D10: the one client-side owner of every GitHub PR fact this app renders — the graph
  * indicator's per-commit lookup, the branch-tip badges/search's per-branch lookup, and the single
@@ -59,6 +66,15 @@ export class PrState {
   #selectTimer: ReturnType<typeof setTimeout> | undefined;
   #selectController: AbortController | undefined;
   readonly #branchRequests = new Set<string>();
+  /** G31 round-2 performance review, finding #3: branches whose `branch.resolvePr` answer came
+   *  back `"ok"` with no PR at all. `byBranch` only ever holds an actual `PrRecord`, so a
+   *  no-PR branch never appeared in it — `ensureSnapshot`'s own dedup filter (`!byBranch.has(name)
+   *  && !#branchRequests.has(name)`) then failed both checks forever, and every `BranchPicker.vue`
+   *  open / search-scope change / stack reload re-issued `branch.resolvePr` for every PR-less
+   *  branch, indefinitely. Tracked separately (rather than widening `byBranch`'s value type) so
+   *  every existing `byBranch.value.get(name)` call site keeps meaning "the branch's PR, if any"
+   *  with no signature change. */
+  readonly #noBranchPr = new Set<string>();
   /** Set the first time EITHER lookup answers `"disabled"` for the current repo (github.enabled
    *  off, or no GitHub remote) — every later selection/branch resolve for this same repo then
    *  answers `"disabled"` synchronously, with no request at all, until the repo changes or
@@ -98,6 +114,7 @@ export class PrState {
     }
     this.#sha = null;
     this.#branchRequests.clear();
+    this.#noBranchPr.clear();
     this.#disabledForRepo = false;
     this.bySha.value = new Map();
     this.byBranch.value = new Map();
@@ -173,12 +190,31 @@ export class PrState {
   /** Warms `byBranch` for every branch in `branchNames` not already cached — see this class's own
    *  doc comment for why this takes an explicit list rather than D10's literal zero-argument
    *  signature. Safe to call repeatedly (e.g. on every `BranchPicker.vue` open): a branch already
-   *  in `byBranch`, or already in flight, is skipped. */
+   *  in `byBranch`, or already in flight, is skipped.
+   *
+   *  G30 round-1 performance review, finding #1: this used to `Promise.all` every branch at once —
+   *  a repo with hundreds of branches fired hundreds of concurrent `branch.resolvePr` requests,
+   *  with nothing anywhere in the stack capping it. The server side of this same finding (one bulk
+   *  snapshot fetch instead of one GitHub call per branch) already answers "how much this costs
+   *  GitHub"; a small worker pool here bounds "how many requests are ever in flight at once",
+   *  independent of how many branches the repo has. */
   async ensureSnapshot(branchNames: readonly string[]): Promise<void> {
     const toFetch = branchNames.filter(
-      (name) => !this.byBranch.value.has(name) && !this.#branchRequests.has(name),
+      (name) =>
+        !this.byBranch.value.has(name) &&
+        !this.#noBranchPr.has(name) &&
+        !this.#branchRequests.has(name),
     );
-    await Promise.all(toFetch.map((name) => this.resolveBranch(name)));
+    let next = 0;
+    const worker = async (): Promise<void> => {
+      while (next < toFetch.length) {
+        const name = toFetch[next];
+        next += 1;
+        if (name !== undefined) await this.resolveBranch(name);
+      }
+    };
+    const workerCount = Math.min(PR_ENSURE_SNAPSHOT_CONCURRENCY, toFetch.length);
+    await Promise.all(Array.from({ length: workerCount }, worker));
   }
 
   /** Resolves one branch's own PR record — `BranchPicker.vue`'s `#123` badge and search's Refs
@@ -189,16 +225,25 @@ export class PrState {
     const repoId = this.#repoId;
     if (repoId === undefined) return;
     if (this.#disabledForRepo) return;
-    if (this.byBranch.value.has(branch) || this.#branchRequests.has(branch)) return;
+    if (
+      this.byBranch.value.has(branch) ||
+      this.#noBranchPr.has(branch) ||
+      this.#branchRequests.has(branch)
+    )
+      return;
     this.#branchRequests.add(branch);
     try {
       const result = await this.#bridge.request('branch.resolvePr', { repoId, branch });
       if (this.#repoId !== repoId) return;
       if (result.kind === 'ok') {
-        const next = new Map(this.byBranch.value);
         const first = result.prs[0];
-        if (first !== undefined) next.set(branch, first);
-        this.byBranch.value = next;
+        if (first !== undefined) {
+          const next = new Map(this.byBranch.value);
+          next.set(branch, first);
+          this.byBranch.value = next;
+        } else {
+          this.#noBranchPr.add(branch);
+        }
         this.generation.value++;
       } else if (result.kind === 'unavailable') {
         this.status.value = result.gh;

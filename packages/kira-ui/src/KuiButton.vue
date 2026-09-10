@@ -11,24 +11,38 @@
  * default attrs-inheritance — the same reason `AppButton.vue`'s own callers can already pass
  * those straight through without this component repeating each one.
  */
+import { ref } from 'vue';
 import KuiIconBox from './KuiIconBox.vue';
 
 withDefaults(
   defineProps<{
     icon?: string;
-    /** G21 D2: `'ghost'` is the transparent, border-less icon-only affordance
-     *  (`.kv-copy-button` and friends) `default | primary | danger` did not cover — no border at
-     *  rest, a hover background only, sized to its icon rather than a full control row. */
-    variant?: 'default' | 'primary' | 'danger' | 'ghost';
+    /** G34 D5: `'ghost'` retired — once `.kui-button` is itself borderless and muted at rest
+     *  (Kira's own `.p-btn`), "ghost" no longer named anything distinct from the default; it
+     *  differed only by `opacity: 0.8`, a worse way of saying "muted" than a colour token is.
+     *  `'icon'` is its replacement for the icon-only case: Kira's `.p-iconbtn` — a square at the
+     *  control height, no text, no border — and the shape every hand-rolled icon-button
+     *  implementation in `packages/git-ui` collapsed onto (G34 D14). */
+    variant?: 'default' | 'primary' | 'danger' | 'icon';
     active?: boolean;
     count?: number;
   }>(),
   { variant: 'default', active: false },
 );
+
+// G34 D5/D14: a plain DOM ref plus `defineExpose`, the same escape hatch `KuiSearchInput` already
+// exposes for the identical structural problem — a caller cannot otherwise reach the root DOM
+// node of a `<script setup>` component. This is what lets `BranchPicker.vue`'s last raw
+// `<button>` become a real `KuiButton` (its trigger needs `.focus()` to return focus on close).
+const buttonEl = ref<HTMLButtonElement | null>(null);
+defineExpose({
+  focus: () => buttonEl.value?.focus(),
+});
 </script>
 
 <template>
   <button
+    ref="buttonEl"
     type="button"
     class="kui-button"
     :class="[`kui-button--${variant}`, { 'kui-button--active': active }]"

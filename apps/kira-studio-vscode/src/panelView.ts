@@ -21,6 +21,8 @@ import type {
 } from '@kira/git-ipc';
 import { createRpcServer } from '@kira/git-ipc';
 import * as vscode from 'vscode';
+import type { ConnectionManager } from './connection.ts';
+import { toWireConnectionState } from './connection.ts';
 import { renderHtml } from './html.ts';
 import { createWebviewChannel } from './transport.ts';
 
@@ -29,6 +31,11 @@ const GRAPH_FOCUS_COMMAND = 'kiraVersion.graph.focus';
 export interface KiraGraphViewProviderDeps {
   readonly extensionUri: vscode.Uri;
   readonly handlers: ServerHandlers;
+  /** G-UX (item 13): read fresh, synchronously, at the top of every `resolveWebviewView` — the
+   *  cold-boot seed for the connection banner (`html.ts`'s own `connectionState` bootstrap field).
+   *  Not subscribed to here: `extension.ts`'s own `ConnectionManager.onStateChange` handler is what
+   *  pushes live changes via `notifyConnectionState` below; this deps field only needs a snapshot. */
+  readonly connection: ConnectionManager;
 }
 
 export class KiraGraphViewProvider implements vscode.WebviewViewProvider {
@@ -48,7 +55,7 @@ export class KiraGraphViewProvider implements vscode.WebviewViewProvider {
   }
 
   resolveWebviewView(webviewView: vscode.WebviewView): void {
-    const { extensionUri, handlers } = this.#deps;
+    const { extensionUri, handlers, connection } = this.#deps;
 
     webviewView.webview.options = {
       enableScripts: true,
@@ -59,6 +66,7 @@ export class KiraGraphViewProvider implements vscode.WebviewViewProvider {
       extensionUri,
       view: 'graph',
       pendingUiAction: this.#pendingUiAction,
+      connectionState: toWireConnectionState(connection.state),
     });
     this.#pendingUiAction = null;
 
@@ -117,5 +125,32 @@ export class KiraGraphViewProvider implements vscode.WebviewViewProvider {
    *  worktree UI either). A no-op when no webview is currently resolved. */
   notifyWorktreeProgress(payload: EventPayload<'worktree.progress'>): void {
     this.#server?.emit('worktree.progress', payload);
+  }
+
+  /** G31 round-2 functional-correctness review, finding #3: `gitsession/stack.go`'s `RunRestack`
+   *  emits `stack.progress` per branch, and `StackState` (`packages/git-ui/src/state/stack.ts`)
+   *  subscribes — but nothing here ever forwarded it, so `StackDialog.vue`'s own per-branch
+   *  progress list stayed empty for the whole restack. A no-op when no webview is currently
+   *  resolved, same as every other `notify*` above. */
+  notifyStackProgress(payload: EventPayload<'stack.progress'>): void {
+    this.#server?.emit('stack.progress', payload);
+  }
+
+  /** G-UX (item 13): forwarded from `ConnectionManager.onStateChange` by `extension.ts`, already
+   *  mapped through `toWireConnectionState` — a no-op when no webview is currently resolved, same
+   *  as every other `notify*` here. */
+  notifyConnectionState(state: EventPayload<'connection.changed'>['state']): void {
+    this.#server?.emit('connection.changed', { state });
+  }
+
+  /** G31 round-2 functional-correctness review, finding #4: `gitrpc/handlers.go`'s `Router`
+   *  subscribes every connection to `repoSettingsChanged` and emits `repoSettings.changed`
+   *  specifically so every currently-connected client sees a `repoSettings.set` written by
+   *  ANY of them (G18 D4/D7's cross-connection fan-out) — but nothing here ever forwarded it,
+   *  so a setting changed in this panel's own dialog never reached the review panel's
+   *  `RepoSettingsState` (a separate `RpcServer`/connection), and vice versa. A no-op when no
+   *  webview is currently resolved. */
+  notifyRepoSettingsChanged(payload: EventPayload<'repoSettings.changed'>): void {
+    this.#server?.emit('repoSettings.changed', payload);
   }
 }

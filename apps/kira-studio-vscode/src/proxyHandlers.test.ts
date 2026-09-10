@@ -363,3 +363,106 @@ describe('editor.openAllChanges — G21 D8a', () => {
     expect(result).toEqual({ opened: 3, failed: 0, mode: 'multiDiff' });
   });
 });
+
+// G30 round-1 architecture review, finding #9: `path` on editor.resolveConflict is
+// server-supplied over the wire, not a constant this process picked. Before the fix, a
+// `../../../etc/passwd`-shaped path resolved outside the repo root unchecked and reached the
+// editor. Mirrors gitsession's own ErrPathEscapesRoot containment check server-side.
+describe('editor.resolveConflict — path containment', () => {
+  async function buildResolveConflictHandlers() {
+    const resolved: { path: string }[] = [];
+    const notImplemented = (): never => {
+      throw new Error('not implemented in this test');
+    };
+    const connection = {
+      request: async (method: string) => {
+        if (method !== 'repo.open') throw new Error(`unexpected method ${method}`);
+        return {
+          kind: 'ok' as const,
+          repo: {
+            repoId: 'r1',
+            root: '/home/user/repo',
+            gitDir: '/home/user/repo/.git',
+            commonDir: '/home/user/repo/.git',
+            isBare: false,
+            isLinkedWorktree: false,
+            // biome-ignore lint/suspicious/noExplicitAny: unused by this handler.
+            head: {} as any,
+          },
+        };
+      },
+      // biome-ignore lint/suspicious/noExplicitAny: cast to the concrete class for this fake's shape.
+    } as any as ConnectionManager;
+    const { requests } = createProxyHandlers({
+      connection,
+      settings: notImplemented,
+      // biome-ignore lint/suspicious/noExplicitAny: unused here, stubbed minimally.
+      roots: {} as any,
+      // biome-ignore lint/suspicious/noExplicitAny: unused here, stubbed minimally.
+      clipboard: {} as any,
+      editor: {
+        capabilities: { openInEditor: true, goToFile: true, resolveConflict: true },
+        registerVirtualDocuments: () => ({ dispose: () => {} }),
+        openDiff: notImplemented,
+        openAllChanges: notImplemented,
+        reveal: notImplemented,
+        resolveConflict: async (req: { path: string }) => {
+          resolved.push(req);
+        },
+        // biome-ignore lint/suspicious/noExplicitAny: structurally satisfies EditorIntegration.
+      } as any,
+      // biome-ignore lint/suspicious/noExplicitAny: unused here, stubbed minimally.
+      logger: {} as any,
+      // biome-ignore lint/suspicious/noExplicitAny: unused by review.session.*, stubbed minimally.
+      windows: {} as any,
+      isWorkspaceTrusted: () => true,
+      revealReview: () => {},
+      renderReviewComments: () => {},
+      notifyCommentsMutated: () => {},
+      refreshReviewMarking: () => {},
+      notifyReviewMarked: () => {},
+      reviewSessionStore: { get: () => undefined, update: async () => {} },
+    });
+    // biome-ignore lint/suspicious/noExplicitAny: ctx is unused by repo.open.
+    await requests['repo.open']({ path: '/home/user/repo' } as any, {} as any);
+    return { requests, resolved };
+  }
+
+  test('a path inside the repo root reaches the editor unchanged', async () => {
+    const { requests, resolved } = await buildResolveConflictHandlers();
+    await requests['editor.resolveConflict'](
+      { repoId: 'r1', path: 'src/conflict.ts' },
+      // biome-ignore lint/suspicious/noExplicitAny: ctx is unused by this handler.
+      {} as any,
+    );
+    expect(resolved).toEqual([{ path: '/home/user/repo/src/conflict.ts' }]);
+  });
+
+  test('a path escaping the repo root via .. is refused before reaching the editor', async () => {
+    const { requests, resolved } = await buildResolveConflictHandlers();
+    await expect(
+      requests['editor.resolveConflict'](
+        { repoId: 'r1', path: '../../../etc/passwd' },
+        // biome-ignore lint/suspicious/noExplicitAny: ctx is unused by this handler.
+        {} as any,
+      ),
+    ).rejects.toThrow(/escapes the repository root/);
+    expect(resolved).toEqual([]);
+  });
+
+  test('a mixed traversal that only escapes after normalization is refused too', async () => {
+    // join()'s own normalization means a lone leading-slash segment (e.g. `/etc/passwd`) never
+    // actually escapes — join('/home/user/repo', '/etc/passwd') is '/home/user/repo/etc/passwd',
+    // still inside root. The real second vector is a path that stays superficially relative but
+    // walks out via a longer `..` chain once joined and normalized.
+    const { requests, resolved } = await buildResolveConflictHandlers();
+    await expect(
+      requests['editor.resolveConflict'](
+        { repoId: 'r1', path: 'subdir/../../outside.txt' },
+        // biome-ignore lint/suspicious/noExplicitAny: ctx is unused by this handler.
+        {} as any,
+      ),
+    ).rejects.toThrow(/escapes the repository root/);
+    expect(resolved).toEqual([]);
+  });
+});

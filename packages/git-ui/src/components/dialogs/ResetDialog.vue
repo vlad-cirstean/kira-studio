@@ -202,8 +202,8 @@ function confirm(): void {
 .kv-dialog-file-list {
   max-height: 160px;
   overflow-y: auto;
-  margin: var(--kv-space-2) 0;
-  padding-left: var(--kv-space-4);
+  margin: var(--kv-s-2) 0;
+  padding-left: var(--kv-s-5);
   font-family: var(--kv-mono-font-family);
   font-size: 0.9em;
 }
@@ -214,22 +214,22 @@ function confirm(): void {
 }
 
 .kv-reset-mode-picker {
-  margin: var(--kv-space-3) 0;
-  padding: var(--kv-space-2);
+  margin: var(--kv-s-4) 0;
+  padding: var(--kv-s-2);
   border: 1px solid var(--kv-panel-border);
-  border-radius: var(--kv-radius);
+  border-radius: var(--kv-radius-sm);
 }
 
 .kv-reset-mode-picker legend {
-  padding: 0 var(--kv-space-1);
+  padding: 0 var(--kv-s-1);
   color: var(--kv-description-fg);
 }
 
 .kv-reset-mode-option {
   display: flex;
-  gap: var(--kv-space-2);
+  gap: var(--kv-s-2);
   align-items: flex-start;
-  padding: var(--kv-space-2) 0;
+  padding: var(--kv-s-2) 0;
 }
 
 .kv-reset-mode-option input {
@@ -243,18 +243,18 @@ function confirm(): void {
 
 .kv-reset-stash-first {
   display: block;
-  margin: var(--kv-space-2) 0;
+  margin: var(--kv-s-2) 0;
 }
 
 .kv-reset-field {
   display: flex;
   flex-direction: column;
-  gap: var(--kv-space-1);
-  margin: var(--kv-space-2) 0;
+  gap: var(--kv-s-1);
+  margin: var(--kv-s-2) 0;
 }
 
 .kv-reset-field input[type='text'] {
-  padding: var(--kv-space-1) var(--kv-space-2);
+  padding: var(--kv-s-1) var(--kv-s-2);
   background: var(--kv-panel-bg);
   color: var(--kv-row-fg);
   border: 1px solid var(--kv-panel-border);
