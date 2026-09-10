@@ -351,18 +351,25 @@ export class LayoutStore {
 
   /** The `#longEdges` scan: binary search to the last entry with `fromRow <= row`, then a
    *  linear filter on `toRow` — the "long edges are hundreds, not thousands" bound from the
-   *  module doc comment is what keeps this cheap. */
+   *  module doc comment is what keeps this cheap.
+   *
+   *  G30 round-1 performance review, finding #3: `readSegment` (a fresh 6-field object) used to
+   *  be allocated for every candidate this scan visits, `coversRow` checked only afterward — so
+   *  an edge that closed thousands of rows ago (still in `[0, upperBound)`, since `#longEdges`
+   *  is append-only and never pruned) paid a full allocation just to be discarded. `fromRow <=
+   *  row` already holds for every entry in that range by construction (`#longEdgeUpperBound`'s
+   *  own binary search), so only `toRow` needs checking — read directly out of the typed array,
+   *  no object built, for every candidate that misses. */
   #collectLongSegments(row: number, out: EdgeSegment[], countIn: number): number {
     let count = countIn;
     const upperBound = this.#longEdgeUpperBound(row);
     for (let i = 0; i < upperBound; i++) {
       const ref = this.#longEdges[i] as LongEdgeRef;
       const chunk = this.#chunks[ref.chunkIndex] as LayoutChunk;
-      const segment = readSegment(chunk, ref.localIndex);
-      if (coversRow(segment, row)) {
-        out[count] = segment;
-        count++;
-      }
+      const toRow = chunk.edges[ref.localIndex * EDGE_STRIDE + EDGE_TO_ROW] as number;
+      if (toRow !== UNRESOLVED_ROW && row > toRow) continue;
+      out[count] = readSegment(chunk, ref.localIndex);
+      count++;
     }
     return count;
   }
