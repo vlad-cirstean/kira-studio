@@ -29,6 +29,16 @@ const (
 	batchInterval = 100 * time.Millisecond
 )
 
+// maxUnterminatedBuf bounds how many bytes of a stream's not-yet-'\n'-terminated tail write will
+// accumulate before giving up on waiting for the newline and flushing what it has as a line of its
+// own. G31 round-2 architecture/security review, finding #8: maxRetainedOutput/maxBatchBytes above
+// only bound the OUTPUT of this buffer — lines already split on '\n' — never this buffer's own
+// unsplit input. A still-running process that simply never emits a '\n' (a runaway loop echoing a
+// huge binary blob, or an ordinary script bug) would otherwise grow streamBuf[stream] for the
+// entire 15-minute spawn timeout with neither cap able to help at all, since neither one has
+// anything to act on until a newline finally shows up.
+const maxUnterminatedBuf = 1 << 20
+
 // Line is one sanitized, already-newline-split output line, tagged by which stream it came from.
 type Line struct {
 	Stream string // "stdout" | "stderr"
@@ -165,6 +175,10 @@ func (c *outputCollector) write(stream string, chunk []byte) {
 		}
 		c.addLineLocked(stream, sanitizeLine(string(buf[:idx])))
 		buf = buf[idx+1:]
+	}
+	for len(buf) > maxUnterminatedBuf {
+		c.addLineLocked(stream, sanitizeLine(string(buf[:maxUnterminatedBuf])))
+		buf = buf[maxUnterminatedBuf:]
 	}
 	c.streamBuf[stream] = buf
 	batch := c.takeBatchIfDueLocked(false)

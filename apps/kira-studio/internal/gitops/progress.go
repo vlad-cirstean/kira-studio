@@ -38,6 +38,17 @@ func NewProgressParser(emit func(Progress)) *ProgressParser {
 	return &ProgressParser{emit: emit}
 }
 
+// maxBufferedLine bounds how many bytes of an incomplete (no '\r'/'\n' seen yet) line Write will
+// hold onto before giving up on it. G31 round-2 architecture/security review, finding #8: a real
+// git progress line is well under 200 bytes (probe P9's own examples); nothing legitimate ever
+// approaches this. Without a bound, p.buf grew for as long as bytes kept arriving with no line
+// terminator at all — a malicious or simply broken remote's side-band progress channel could hold
+// this app's memory growing for the full life of the fetch/clone/push. Once the cap is hit, the
+// buffered bytes are dropped (the same fate an oversized line would meet anyway — processLine's
+// own regexes never match anything remotely this large) and Write resumes scanning fresh for the
+// next terminator, so a well-formed line right after an oversized one is still decoded normally.
+const maxBufferedLine = 64 << 10
+
 // Write feeds chunk into the decoder. Every complete '\r'- or '\n'-terminated line is processed
 // immediately; an unmatched line is dropped from progress (it still reaches the caller's own
 // stderr buffer untouched, gitclient.Spec.OnStderr's whole point) — not an error, and not treated
@@ -53,6 +64,9 @@ func (p *ProgressParser) Write(chunk []byte) {
 			}
 		}
 		if idx < 0 {
+			if len(p.buf) > maxBufferedLine {
+				p.buf = nil
+			}
 			return
 		}
 		line := string(p.buf[:idx])

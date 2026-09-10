@@ -97,6 +97,50 @@ func TestOutputCollector_TrailingUnterminatedLineFlushed(t *testing.T) {
 	}
 }
 
+// TestOutputCollector_UnterminatedStreamBufDoesNotGrowUnbounded is G31 round-2 architecture/
+// security review, finding #8: maxRetainedOutput/maxBatchBytes (proved by the two tests below this
+// one) only bound already-'\n'-split LINES; streamBuf[stream] itself — the raw, not-yet-terminated
+// tail write() accumulates while waiting for the next '\n' — had no bound of its own at all before
+// maxUnterminatedBuf. A single write() call carrying many megabytes with no '\n' anywhere in it (a
+// runaway process echoing a huge blob, or a script bug) used to grow that buffer by the whole
+// chunk's size in one shot, regardless of either cap above. This proves a single such write is
+// instead split into maxUnterminatedBuf-sized lines as it goes (each one still passing through the
+// exact same sanitize+cap pipeline every other line does — TestOutputCollector_RetainedBytesCapped
+// below is what caps its total contribution to the retained transcript), rather than the streaming
+// buffer itself absorbing the whole thing in memory unbounded.
+func TestOutputCollector_UnterminatedStreamBufDoesNotGrowUnbounded(t *testing.T) {
+	c := newOutputCollector(nil)
+	huge := strings.Repeat("x", maxUnterminatedBuf*3+1000) // no '\n' anywhere in it.
+	c.write("stdout", []byte(huge))
+
+	c.mu.Lock()
+	bufLen := len(c.streamBuf["stdout"])
+	c.mu.Unlock()
+	if bufLen > maxUnterminatedBuf {
+		t.Fatalf("streamBuf[stdout] len = %d after one oversized unterminated write, want <= %d (the "+
+			"buffer must flush itself as it goes, not absorb the whole chunk)", bufLen, maxUnterminatedBuf)
+	}
+
+	// maxUnterminatedBuf (1 MiB) is itself well past maxRetainedOutput (256 KiB), so the very first
+	// forced flush already exceeds the retained-transcript budget — Truncated must reflect that,
+	// exactly as an equally oversized but '\n'-terminated line already would.
+	if !c.isTruncated() {
+		t.Fatal("want Truncated true — the forced flush of an oversized unterminated chunk exceeds maxRetainedOutput")
+	}
+
+	// The collector must still work normally afterward — a real '\n'-terminated line right after
+	// the oversized one is decoded cleanly, proving this isn't a stuck or corrupted state. The
+	// leading '\n' terminates whatever unterminated remainder of the oversized write is still
+	// buffered (huge's own length need not be an exact multiple of maxUnterminatedBuf), so
+	// "ordinary line" itself starts clean.
+	c.write("stdout", []byte("\nordinary line\n"))
+	c.flush()
+	lines := c.finalLines()
+	if lines[len(lines)-1].Text != "ordinary line" {
+		t.Fatalf("last line = %q, want %q — the collector must recover cleanly after an oversized flush", lines[len(lines)-1].Text, "ordinary line")
+	}
+}
+
 // TestOutputCollector_RetainedLinesCapped proves maxRetainedLines: more lines than the cap still
 // produce exactly the cap's worth of retained lines, with Truncated set.
 func TestOutputCollector_RetainedLinesCapped(t *testing.T) {
