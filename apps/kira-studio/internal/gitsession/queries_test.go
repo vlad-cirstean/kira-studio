@@ -103,6 +103,45 @@ func runOutput(t *testing.T, dir string, args ...string) string {
 	return string(out)
 }
 
+// TestBlob_NewlineInRevDoesNotDesyncTheSharedSession is G31 round-2 architecture/security review
+// finding #2: Blob used to sniff only `path` for a newline (the batch protocol's one-line-per-
+// request limit), not `rev` — so a newline embedded in `rev` still reached the shared, persistent
+// cat-file session's normal Read/Check path. Git then read the embedded newline as a SECOND
+// request line, but this code only ever consumes ONE response per call, leaving a leftover
+// response sitting in the session's own buffered reader — silently answering the NEXT, entirely
+// unrelated caller sharing this RepoEntry's session (every connection on the repository, SPEC
+// §6's split rule) with stale, misaligned data. Proven here by an evil rev followed immediately by
+// an ordinary, correct call: the second call must see its own real content, not corruption left
+// behind by the first.
+func TestBlob_NewlineInRevDoesNotDesyncTheSharedSession(t *testing.T) {
+	skipWithoutGitQueries(t)
+	dir := t.TempDir()
+	runGitQ(t, dir, "init", "-q", "-b", "main")
+	if err := os.WriteFile(filepath.Join(dir, "a.txt"), []byte("AAAA\n"), 0o644); err != nil {
+		t.Fatalf("write a.txt: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "b.txt"), []byte("BBBB\n"), 0o644); err != nil {
+		t.Fatalf("write b.txt: %v", err)
+	}
+	runGitQ(t, dir, "add", "a.txt", "b.txt")
+	runGitQ(t, dir, "commit", "-q", "-m", "add a.txt and b.txt")
+	e := newQueriesTestEntry(t, dir)
+	ctx := context.Background()
+
+	// The evil call: an embedded newline in rev. Whatever it resolves to (or fails to) is not
+	// this test's concern — only that it must not corrupt the shared session for what follows.
+	_, _ = e.Blob(ctx, "HEAD\nHEAD", "a.txt")
+
+	got, err := e.Blob(ctx, "HEAD", "b.txt")
+	if err != nil {
+		t.Fatalf("Blob(HEAD, b.txt) after the evil call: %v", err)
+	}
+	if got.Kind != "found" || got.Content != "BBBB\n" {
+		t.Fatalf("Blob(HEAD, b.txt) after the evil call = %+v, want {Kind:found Content:\"BBBB\\n\"} "+
+			"(a mismatch here means the earlier newline-in-rev call desynced the shared cat-file session)", got)
+	}
+}
+
 // TestGoToTarget_LivePresentAndUnchanged proves the "live, no drift" branch: a file on disk,
 // identical to rev's own version, answers hunks=nil (never a rewritten line).
 func TestGoToTarget_LivePresentAndUnchanged(t *testing.T) {

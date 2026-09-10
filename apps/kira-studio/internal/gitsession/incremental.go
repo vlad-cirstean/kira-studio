@@ -153,12 +153,25 @@ func (e *RepoEntry) branchTip(ctx context.Context, branch string) (string, error
 // blobOID resolves rev:path's current blob oid via the cat-file batch session, "" (not an error)
 // for a path that does not exist there — the natural comparand for tier 0 (F6): ” vs. a record's
 // own ” (ContentAbsent) is "still deleted", "unchanged" with no special case.
-func (e *RepoEntry) blobOID(rev, path string) (string, error) {
+//
+// G31 round-2 architecture/security review, finding #2 (queries.go's Blob, the same class of
+// bug): a newline anywhere in `full` (rev included) desyncs the persistent --batch-check
+// session's one-line-in-one-line-out protocol for every later caller sharing it, silently, for
+// the life of the RepoEntry — routed through CheckOneShot instead, the --batch-check counterpart
+// of readCurrentContent's own ReadOneShot fallback below.
+func (e *RepoEntry) blobOID(ctx context.Context, rev, path string) (string, error) {
 	session := e.CatFile()
 	if session == nil {
 		return "", ErrRepoTornDown
 	}
-	info, err := session.Check(rev + ":" + path)
+	full := rev + ":" + path
+	var info catfile.ObjectInfo
+	var err error
+	if strings.ContainsRune(full, '\n') {
+		info, err = session.CheckOneShot(ctx, full)
+	} else {
+		info, err = session.Check(full)
+	}
 	if err != nil {
 		if errors.Is(err, catfile.ErrMissing) {
 			return "", nil
@@ -174,7 +187,7 @@ func (e *RepoEntry) blobOID(rev, path string) (string, error) {
 // branch review with hundreds of previously-reviewed files paid one serialized pipe round trip
 // per file before this. Same "" (not an error) contract as blobOID for a path that does not exist
 // at rev; the returned slice is the same length as paths, in the same order.
-func (e *RepoEntry) blobOIDs(rev string, paths []string) ([]string, error) {
+func (e *RepoEntry) blobOIDs(ctx context.Context, rev string, paths []string) ([]string, error) {
 	if len(paths) == 0 {
 		return nil, nil
 	}
@@ -182,17 +195,39 @@ func (e *RepoEntry) blobOIDs(rev string, paths []string) ([]string, error) {
 	if session == nil {
 		return nil, ErrRepoTornDown
 	}
-	revs := make([]string, len(paths))
-	for i, p := range paths {
-		revs[i] = rev + ":" + p
-	}
-	infos, err := session.CheckMany(revs)
-	if err != nil {
-		return nil, err
-	}
 	oids := make([]string, len(paths))
-	for i, info := range infos {
-		oids[i] = info.OID
+	// G31 round-2 architecture/security review, finding #2 (see blobOID's own doc comment): a
+	// newline anywhere in one path would desync the whole shared --batch-check session for every
+	// index after it in this same CheckMany round trip, not just its own answer. The overwhelming
+	// common case (no newline in any path) still gets one batched round trip (G30 round-1
+	// performance review, finding #5); the rare newline-containing path is pulled out and
+	// resolved on its own via CheckOneShot instead, same "" (not an error) missing contract.
+	var batchRevs []string
+	var batchIndices []int
+	for i, p := range paths {
+		full := rev + ":" + p
+		if strings.ContainsRune(full, '\n') {
+			info, err := session.CheckOneShot(ctx, full)
+			if err != nil {
+				if errors.Is(err, catfile.ErrMissing) {
+					continue // oids[i] stays "" — CheckMany's own zero-value-slot contract.
+				}
+				return nil, err
+			}
+			oids[i] = info.OID
+			continue
+		}
+		batchRevs = append(batchRevs, full)
+		batchIndices = append(batchIndices, i)
+	}
+	if len(batchRevs) > 0 {
+		infos, err := session.CheckMany(batchRevs)
+		if err != nil {
+			return nil, err
+		}
+		for j, info := range infos {
+			oids[batchIndices[j]] = info.OID
+		}
 	}
 	return oids, nil
 }
@@ -206,7 +241,10 @@ func (e *RepoEntry) readCurrentContent(ctx context.Context, rev, path string) ([
 		return nil, ErrRepoTornDown
 	}
 	full := rev + ":" + path
-	if strings.ContainsRune(path, '\n') {
+	// G31 round-2 architecture/security review, finding #2 (see blobOID's own doc comment): a
+	// newline in `rev`, not only `path`, needs the one-shot fallback too — `full` is what
+	// actually crosses the batch protocol's one-line framing.
+	if strings.ContainsRune(full, '\n') {
 		_, content, err := session.ReadOneShot(ctx, full)
 		return content, err
 	}
@@ -306,7 +344,7 @@ func (e *RepoEntry) parseAndResolve(raw []byte) (porcelain.ParsedBody, porcelain
 // answers correctly when the snapshot commit is pruned AND unchanged, and it is what keeps
 // RangeFiles from spawning a diff per file (D7/D18).
 func (e *RepoEntry) FileDelta(ctx context.Context, branch, path string, rec gitreview.FileRecord, snapshot []byte, tip string) (deltaResult, error) {
-	currentOID, err := e.blobOID(tip, path)
+	currentOID, err := e.blobOID(ctx, tip, path)
 	if err != nil {
 		return deltaResult{}, err
 	}
@@ -489,7 +527,7 @@ func (e *RepoEntry) RangeFiles(ctx context.Context, base, branch string) (RangeF
 			needsOID = append(needsOID, ch.Path)
 		}
 	}
-	oids, err := e.blobOIDs(tip, needsOID)
+	oids, err := e.blobOIDs(ctx, tip, needsOID)
 	if err != nil {
 		return RangeFilesResult{}, err
 	}
@@ -610,7 +648,7 @@ func (e *RepoEntry) MarkFile(ctx context.Context, branch, path string, reviewed 
 		return gitreview.FileRecord{}, ErrRangedMarkOnNonText
 	}
 
-	currentOID, err := e.blobOID(tip, path)
+	currentOID, err := e.blobOID(ctx, tip, path)
 	if err != nil {
 		return gitreview.FileRecord{}, err
 	}

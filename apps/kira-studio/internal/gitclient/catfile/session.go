@@ -250,6 +250,27 @@ func (s *Session) Read(rev string) (ObjectInfo, []byte, error) {
 	return batchInfo, content, nil
 }
 
+// CheckOneShot is Check's own counterpart to ReadOneShot — a rev the batch protocol cannot
+// express (a newline anywhere in it: `cat-file --batch-check` reads one request per line, same
+// framing limit ReadOneShot's own doc comment explains). Spawns `git rev-parse --verify <rev>`
+// once, argv-only (no line framing to break): for a `<rev>:<path>` expression this resolves to
+// exactly the same OID `Check`'s own --batch-check header line would have reported, with a
+// non-zero exit standing in for "missing" — the same ErrMissing answer Check gives for an
+// unresolvable rev, drawing no finer distinction than the batch protocol already does (mirrors
+// ReadOneShot's own reasoning verbatim).
+func (s *Session) CheckOneShot(ctx context.Context, rev string) (ObjectInfo, error) {
+	res, err := gitclient.Run(ctx, s.runner, s.gitPath, gitclient.Spec{
+		Dir: s.dir, Args: []string{"rev-parse", "--verify", rev}, ReadOnly: true,
+	})
+	if err != nil {
+		return ObjectInfo{}, err
+	}
+	if res.ExitCode != 0 {
+		return ObjectInfo{}, ErrMissing
+	}
+	return ObjectInfo{OID: strings.TrimSpace(string(res.Stdout))}, nil
+}
+
 // ReadOneShot answers a rev the batch protocol cannot express — a path containing a newline
 // (`cat-file --batch` reads one request per line, so a newline mid-request would be seen as two).
 // It spawns `git show <rev>` once, argv-only (no line framing to break), bounded by the same

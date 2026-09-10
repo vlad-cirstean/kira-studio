@@ -67,7 +67,7 @@ func (e *RepoEntry) AddComment(ctx context.Context, branch, path, at string, r g
 		return CommentEntry{}, ErrCommentRangeOutOfFile
 	}
 
-	blobOID, err := e.blobOID(at, path)
+	blobOID, err := e.blobOID(ctx, at, path)
 	if err != nil {
 		return CommentEntry{}, err
 	}
@@ -207,7 +207,7 @@ func (e *RepoEntry) anchorOne(
 	ctx context.Context, at string, c gitreview.Comment,
 	lineCounts map[string]int, patches map[string][]porcelain.DiffHunk,
 ) (gitreview.AnchoredComment, error) {
-	currentOID, err := e.blobOID(at, c.Path)
+	currentOID, err := e.blobOID(ctx, at, c.Path)
 	if err != nil {
 		return gitreview.AnchoredComment{}, err
 	}

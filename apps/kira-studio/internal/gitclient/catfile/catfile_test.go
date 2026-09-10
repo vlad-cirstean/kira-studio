@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -264,6 +265,65 @@ func TestSession_ReadOneShot_Missing(t *testing.T) {
 	defer sess.Close()
 
 	_, _, err := sess.ReadOneShot(context.Background(), "HEAD:does\nnot\nexist.txt")
+	if !errors.Is(err, catfile.ErrMissing) {
+		t.Fatalf("got %v, want ErrMissing", err)
+	}
+}
+
+// TestSession_CheckOneShot_NewlineRev is G31 round-2 architecture/security review finding #2's
+// own regression coverage — Check's counterpart to TestSession_ReadOneShot_NewlinePath above: a
+// newline anywhere in the rev (not just the path half of it) cannot be expressed in the
+// --batch-check protocol either, and must resolve through this one-shot `rev-parse --verify`
+// fallback instead, giving the same OID Check's own batch header line would have.
+func TestSession_CheckOneShot_NewlineRev(t *testing.T) {
+	skipWithoutGit(t)
+	dir := t.TempDir()
+	run := func(args ...string) {
+		cmd := exec.Command("git", args...)
+		cmd.Dir = dir
+		cmd.Env = append(os.Environ(),
+			"GIT_AUTHOR_NAME=Test", "GIT_AUTHOR_EMAIL=test@example.com",
+			"GIT_COMMITTER_NAME=Test", "GIT_COMMITTER_EMAIL=test@example.com",
+		)
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+	run("init", "-q", "-b", "main")
+	name := "weird\nname.txt"
+	if err := os.WriteFile(filepath.Join(dir, name), []byte("newline path content\n"), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	run("add", "-A")
+	run("commit", "-q", "-m", "add newline-path file")
+
+	// Independent oracle for the expected OID: `git hash-object` on the file's own bytes, a
+	// wholly different code path than either Check or CheckOneShot's own rev-parse.
+	hashOut, err := exec.Command("git", "-C", dir, "hash-object", name).Output()
+	if err != nil {
+		t.Fatalf("git hash-object: %v", err)
+	}
+	wantOID := strings.TrimSpace(string(hashOut))
+
+	sess := catfile.NewSession(catfile.Deps{Runner: gitclient.NewExecRunner(), GitPath: "git", Dir: dir}, 0)
+	defer sess.Close()
+
+	info, err := sess.CheckOneShot(context.Background(), "HEAD:"+name)
+	if err != nil {
+		t.Fatalf("CheckOneShot: %v", err)
+	}
+	if info.OID != wantOID {
+		t.Fatalf("CheckOneShot OID = %q, want %q (git hash-object)", info.OID, wantOID)
+	}
+}
+
+func TestSession_CheckOneShot_Missing(t *testing.T) {
+	skipWithoutGit(t)
+	dir := initRepo(t)
+	sess := catfile.NewSession(catfile.Deps{Runner: gitclient.NewExecRunner(), GitPath: "git", Dir: dir}, 0)
+	defer sess.Close()
+
+	_, err := sess.CheckOneShot(context.Background(), "HEAD:does\nnot\nexist.txt")
 	if !errors.Is(err, catfile.ErrMissing) {
 		t.Fatalf("got %v, want ErrMissing", err)
 	}
