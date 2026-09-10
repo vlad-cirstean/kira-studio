@@ -235,10 +235,19 @@ func (e *RepoEntry) blobOIDs(ctx context.Context, rev string, paths []string) ([
 // readCurrentContent reads rev:path's content through the cat-file batch session, or the one-shot
 // fallback for a path the batch protocol cannot express (a newline in the path, F5's own rarity
 // note) — mirrors RepoEntry.Blob's own two-path shape.
-func (e *RepoEntry) readCurrentContent(ctx context.Context, rev, path string) ([]byte, error) {
+//
+// Also returns the blob's own OID (G31 round-2 performance review, finding #5): Read's own
+// internal Check call already resolves it before fetching content, and MarkFile needs both the
+// content (to classify/count lines) AND the OID (to compare against the stored record) for the
+// exact same rev — discarding it here just to have blobOID re-resolve the identical rev via a
+// second Check round trip a few lines later was a free pipe round trip to remove. ReadOneShot's
+// own ObjectInfo never carries an OID (a one-shot `git show` has none to report), so the rare
+// newline-in-rev path pays its own extra CheckOneShot call instead — still strictly fewer round
+// trips than the two full Read+Check pairs the pre-fix code paid even in the common case.
+func (e *RepoEntry) readCurrentContent(ctx context.Context, rev, path string) (string, []byte, error) {
 	session := e.CatFile()
 	if session == nil {
-		return nil, ErrRepoTornDown
+		return "", nil, ErrRepoTornDown
 	}
 	full := rev + ":" + path
 	// G31 round-2 architecture/security review, finding #2 (see blobOID's own doc comment): a
@@ -246,10 +255,17 @@ func (e *RepoEntry) readCurrentContent(ctx context.Context, rev, path string) ([
 	// actually crosses the batch protocol's one-line framing.
 	if strings.ContainsRune(full, '\n') {
 		_, content, err := session.ReadOneShot(ctx, full)
-		return content, err
+		if err != nil {
+			return "", nil, err
+		}
+		info, err := session.CheckOneShot(ctx, full)
+		if err != nil {
+			return "", nil, err
+		}
+		return info.OID, content, nil
 	}
-	_, content, err := session.Read(full)
-	return content, err
+	info, content, err := session.Read(full)
+	return info.OID, content, err
 }
 
 // countLines counts a text blob's own line count — the number of '\n' bytes, plus one more when
@@ -270,24 +286,30 @@ func countLines(content []byte) int {
 // over the cap (either MaxSnapshotBytes or the cat-file session's own 10 MiB gate), ContentBinary
 // via the NUL sniff, else ContentText with the content and its line count. Only ContentText's
 // content/lineCount are meaningful; every other kind returns (kind, nil, 0, nil).
-func (e *RepoEntry) readSnapshotSource(ctx context.Context, tip, path string) (gitreview.ContentKind, []byte, int, error) {
-	content, err := e.readCurrentContent(ctx, tip, path)
+//
+// Also returns the blob's own OID whenever content was actually read (G31 round-2 performance
+// review, finding #5) — readCurrentContent's own doc comment explains why this piggybacks for
+// free; "" for every kind that never called readCurrentContent's content path.
+func (e *RepoEntry) readSnapshotSource(ctx context.Context, tip, path string) (gitreview.ContentKind, []byte, int, string, error) {
+	oid, content, err := e.readCurrentContent(ctx, tip, path)
 	if err != nil {
 		if errors.Is(err, catfile.ErrMissing) {
-			return gitreview.ContentAbsent, nil, 0, nil
+			return gitreview.ContentAbsent, nil, 0, "", nil
 		}
 		if errors.Is(err, catfile.ErrTooLarge) {
-			return gitreview.ContentTooLarge, nil, 0, nil
+			// Read's own size gate (session.go) still resolves and returns the OID via Check
+			// before skipping the content fetch — oid is valid here, not "".
+			return gitreview.ContentTooLarge, nil, 0, oid, nil
 		}
-		return "", nil, 0, err
+		return "", nil, 0, "", err
 	}
 	if int64(len(content)) > gitreview.MaxSnapshotBytes {
-		return gitreview.ContentTooLarge, nil, 0, nil
+		return gitreview.ContentTooLarge, nil, 0, oid, nil
 	}
 	if looksBinary(content) {
-		return gitreview.ContentBinary, nil, 0, nil
+		return gitreview.ContentBinary, nil, 0, oid, nil
 	}
-	return gitreview.ContentText, content, countLines(content), nil
+	return gitreview.ContentText, content, countLines(content), oid, nil
 }
 
 // sumHunkDelta is the running total D7's tier-1 arithmetic needs: a file's new line count equals
@@ -390,7 +412,7 @@ func (e *RepoEntry) FileDelta(ctx context.Context, branch, path string, rec gitr
 		}, nil
 	}
 
-	currentContent, err := e.readCurrentContent(ctx, tip, path)
+	_, currentContent, err := e.readCurrentContent(ctx, tip, path)
 	if err != nil {
 		if errors.Is(err, catfile.ErrMissing) {
 			currentContent = nil
@@ -585,7 +607,7 @@ func (e *RepoEntry) ReviewFileDiff(ctx context.Context, base, branch, path, mode
 		if err != nil {
 			return ReviewFileDiffResult{}, err
 		}
-		_, _, lineCount, err := e.readSnapshotSource(ctx, tip, path)
+		_, _, lineCount, _, err := e.readSnapshotSource(ctx, tip, path)
 		if err != nil {
 			return ReviewFileDiffResult{}, err
 		}
@@ -640,17 +662,16 @@ func (e *RepoEntry) MarkFile(ctx context.Context, branch, path string, reviewed 
 		return gitreview.FileRecord{}, err
 	}
 
-	contentKind, content, snapshotLineCount, err := e.readSnapshotSource(ctx, tip, path)
+	// G31 round-2 performance review, finding #5: currentOID comes straight off
+	// readSnapshotSource's own return now, instead of a second, separately-spawned blobOID call
+	// for the identical tip:path — readCurrentContent's own doc comment explains why the OID was
+	// already sitting there for free.
+	contentKind, content, snapshotLineCount, currentOID, err := e.readSnapshotSource(ctx, tip, path)
 	if err != nil {
 		return gitreview.FileRecord{}, err
 	}
 	if ranges != nil && contentKind != gitreview.ContentText {
 		return gitreview.FileRecord{}, ErrRangedMarkOnNonText
-	}
-
-	currentOID, err := e.blobOID(ctx, tip, path)
-	if err != nil {
-		return gitreview.FileRecord{}, err
 	}
 
 	existingRec, snapshot, found, err := e.review.Record(ctx, e.Summary.RepoID, branch, path)

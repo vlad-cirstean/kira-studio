@@ -420,6 +420,36 @@ func TestRangeFiles_MergeBaseIsCachedAcrossRequests(t *testing.T) {
 	}
 }
 
+// TestMarkFile_StoredBlobOIDMatchesGit is G31 round-2 performance review, finding #5's own
+// regression coverage: MarkFile's own currentOID used to come from a SECOND, separately-spawned
+// blobOID(ctx, tip, path) call, after readSnapshotSource had already resolved (and discarded) the
+// identical rev's OID as part of its own Read. MarkFile now takes currentOID straight off
+// readSnapshotSource's own return (readCurrentContent's own doc comment) — this proves that
+// plumbing is correct, not just "compiles": the stored record's BlobOID must still equal what an
+// independent `git rev-parse <tip>:<path>` reports.
+func TestMarkFile_StoredBlobOIDMatchesGit(t *testing.T) {
+	dir, sha1 := buildFileDeltaFixture(t)
+	entry, store := newIncrementalTestEntry(t, dir)
+	ctx := context.Background()
+
+	rec, err := entry.MarkFile(ctx, "main", "a.txt", true, nil)
+	if err != nil {
+		t.Fatalf("MarkFile: %v", err)
+	}
+	wantOID := blobOIDInc(t, dir, sha1, "a.txt")
+	if rec.BlobOID != wantOID {
+		t.Fatalf("MarkFile's stored BlobOID = %q, want %q (git rev-parse %s:a.txt)", rec.BlobOID, wantOID, sha1)
+	}
+
+	storedRec, _, found, err := store.Record(ctx, entry.Summary.RepoID, "main", "a.txt")
+	if err != nil || !found {
+		t.Fatalf("Record: found=%v err=%v", found, err)
+	}
+	if storedRec.BlobOID != wantOID {
+		t.Fatalf("stored record's own BlobOID = %q, want %q", storedRec.BlobOID, wantOID)
+	}
+}
+
 // waitForRefsChangedInc polls entry.refs until it reports invalid (dropped by note() on
 // refsChanged) or the timeout expires — the watcher's own signal is asynchronous (fsnotify), so a
 // test proving cache invalidation on a real ref move cannot simply call RangeFiles immediately
