@@ -309,14 +309,23 @@ watch(isOpen, (open) => {
 });
 
 // G24 D7 point 4: opening the picker is one of the few user acts allowed to touch the network at
-// all — warms every visible branch's own PR record in one go (the server answers each from its
-// already-cached snapshot, D6, at no additional GitHub cost).
-watch(isOpen, (open) => {
-  if (!open || !props.pr) return;
-  const names = [
-    ...props.refs.branches.value.map((r) => r.shortName),
-    ...props.refs.remoteBranches.value.map((r) => r.shortName),
+// all — warms every visible branch's own PR record in one go. G32 round-3 performance review,
+// finding #3: "visible" used to mean the repo's FULL branch list, not what `sections` (above)
+// actually renders — `branch.resolvePr` answers a branch WITH an open PR from its already-cached
+// bulk snapshot at no extra cost (D6), but one WITHOUT falls through to its own per-branch `gh
+// api` call, so a repo with hundreds of branches fanned out hundreds of `gh` spawns from one
+// picker open, easily arming GitHub's rate-limit breaker. Scoped to `sections.visible` (each
+// capped at `REF_LIST_SECTION_CAP`) and keyed off that computed itself, not just `isOpen`, so
+// typing a filter that surfaces a branch outside the initial page still gets it warmed.
+const visibleBranchNames = computed<readonly string[]>(() => {
+  if (!isOpen.value) return [];
+  return [
+    ...sections.value.branches.visible.map((r) => r.shortName),
+    ...sections.value.remoteBranches.visible.map((r) => r.shortName),
   ];
+});
+watch(visibleBranchNames, (names) => {
+  if (names.length === 0 || !props.pr) return;
   void props.pr.ensureSnapshot(names);
 });
 

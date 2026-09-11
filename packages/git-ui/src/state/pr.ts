@@ -26,12 +26,16 @@ const PR_ENSURE_SNAPSHOT_CONCURRENCY = 6;
  * names to warm (`readonly string[]`) rather than no arguments at all. D10 lists it as
  * `ensureSnapshot(): Promise<void>`, but this class holds no `RefsState` reference of its own (D10
  * threads only `bridge` into its constructor, exactly like `DetailState`) and so has no other way
- * to know which branches exist to warm. The server-side half of D6's own "one bulk read" snapshot
- * is unaffected: `branch.resolvePr` answers every one of these calls from `RepoEntry`'s own cached
- * open-PR snapshot with zero additional GitHub calls, so calling this once per known branch still
- * costs the server nothing beyond its own already-lazy, already-cached snapshot fetch — only the
- * signature (not the network/caching shape D6 describes) differs from the plan's own literal
- * wording.
+ * to know which branches exist to warm.
+ *
+ * **Cost correction (G32 round-3 performance review, finding #3):** the paragraph this replaces
+ * claimed `branch.resolvePr` answers every branch from `RepoEntry`'s own cached bulk snapshot at
+ * zero extra GitHub cost — true only for a branch the snapshot already lists as having an open PR.
+ * One that doesn't falls through to the server's own per-branch `PullsForBranch` lookup, a real
+ * `gh` spawn and REST call. `ensureSnapshot`'s caller is therefore NOT free to warm "every known
+ * branch" the way this class's own D10 name suggests — every call site is responsible for scoping
+ * `branchNames` to what actually needs it (e.g. `BranchPicker.vue`'s own rendered/capped sections,
+ * not its full branch list), not handed here as a blanket guarantee.
  */
 export class PrState {
   /** Per-commit PR records, populated only on a resolved `"ok"` answer — `columns.ts`'s own
