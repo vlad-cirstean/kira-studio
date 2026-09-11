@@ -1,0 +1,34 @@
+# Why: the push credential in this environment is an OAuth App token without the `workflow`
+# scope, so GitHub rejects any push that includes a commit touching .github/workflows/* — this
+# hunk is v1.4 P6's own CI wiring for the new `visual` project (docs/v1.4/plans/
+# P6-visual-regression.md §7), held out of that phase's own commit for exactly that reason. It's a
+# real, wanted change: adds `bun run test:visual` to the existing `ui` job (same runner, same
+# already-installed WebKit/apt packages — no new job needed) right after the existing
+# `bun run test:ui` step, and widens the existing failure-artifact upload to also capture
+# `test-results/` (where a screenshot mismatch's actual/expected/diff PNGs land, Playwright's own
+# default) alongside the already-uploaded `playwright-report/`.
+#
+# Apply from the repo root (e.g. `git apply docs/pending-changes/.github__workflows__ci.yml.patch`),
+# then delete this file, and commit + push both together yourself.
+
+diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+index 1f7011c..6148622 100644
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -92,11 +92,15 @@ jobs:
+       - run: bun run test:ui
+       - name: IPC frontend tests (v1.4 P1 — previously in no CI job; consumes the fixtures internal/adapters/*'s own suites generate, closing the anti-drift gap)
+         run: bun run test:ipc:fe
++      - name: Visual regression tests (v1.4 P6 — bounded pixel-diff tier, docs/v1.4/plans/P6-visual-regression.md; baselines are only ever captured/updated from this job's own environment, see tests/visual/README.md)
++        run: bun run test:visual
+       - uses: actions/upload-artifact@v7
+         if: failure()
+         with:
+           name: playwright-report
+-          path: playwright-report/
++          path: |
++            playwright-report/
++            test-results/
+           retention-days: 7
+
+   container-tests:

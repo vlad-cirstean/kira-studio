@@ -2637,8 +2637,10 @@ were deleted outright with no analogue: no `webPreferences`, fuse or Chromium-pe
 concept is left to assert, and no `process.uptime()` equivalent — cold start is now a manual procedure
 (`docs/PERF.md` §3).
 
-**`tests/ui/`** (`bun run test:ui`) is its replacement for everything that ported: 72 tests across 25
-spec files driving the **real built `apps/kira-studio/frontend/dist` bundle** — real Vue, real
+**`tests/ui/`** (`bun run test:ui`) is its replacement for everything that ported: 252 tests across
+47 spec files, split across the `ui` and `ui-timing` projects (v1.4 P6 recount — `docs/PERF.md` §5
+records this tier's own measured wall-clock cost, 5m4s) driving the **real built `apps/kira-studio/
+frontend/dist` bundle** — real Vue, real
 `bridge/{control,port}.ts` — over a static HTTP file server, in **real WebKit**, the same engine a
 packaged build actually embeds (WKWebView on macOS, WebKitGTK on Linux). There is no native app
 process and no container: **both wire planes are mocked**, the control plane by
@@ -2673,6 +2675,22 @@ session** instead: a MariaDB and a Kafka connection both open, the page reloads,
 serve a real read afterward, since no child is left to kill and the property worth proving now
 is that native adapters coexist cleanly within one process across a reload.
 
+**`tests/visual/`** (`bun run test:visual`, v1.4 P6) is a bounded pixel-diff tier — five specs, one
+canonical at-rest screenshot each (the workbench shell, the data grid, the SQL console, the
+connection dialog, the Schema (DDL) editor), reusing `tests/ui/`'s own fixtures/mocked wire planes.
+Its own project (not folded into `ui`) mirrors why `ui-timing` is its own project too — a different
+measurement contract earns a different one. Baselines are captured/updated only from the `ui` CI
+job's own `ubuntu-latest` environment, never a local macOS run (WKWebView vs. WebKitGTK glyph
+rendering differs independent of font choice) — see `tests/visual/README.md`. Playwright's own
+`animations: 'disabled'` (its default) freezes this app's several state-gated `infinite` CSS
+animations before capture; a small test-only stylesheet (`tests/visual/support/pin-fonts.css`,
+loaded via `stylePath`, `ui`'s own specs unaffected) collapses `--kira-font-ui`/`--kira-font-data`
+to their trailing generic keyword, removing a multi-hop fontconfig fallback's own run-to-run
+ambiguity on the CI image. `docs/v1.4/plans/P6-visual-regression.md` is the full design record,
+including what's deliberately out of scope (the `apps/kira-studio-vscode` webview tier — no CI job
+runs it at all today, and its VS-Code-theme-following palette is a different baselining problem
+than this app's single hard-coded dark theme).
+
 **`apps/kira-studio-vscode/tests/`** (`bun run test:webview`) is the git module's own frontend tier
 — Playwright against the extension's real emitted webview documents and its real built bundle, in
 two projects, with no VS Code, no backend and no container. `layout` asserts **rendered box
@@ -2694,9 +2712,14 @@ nothing** — they print one `key=value` line each. That is deliberate: a hard t
 that also runs on real macOS hardware would be flaky in exactly the way "re-measurement, not
 re-derivation" warns against. Their numbers are in `docs/PERF.md` §2.13.
 
-**Parallelism.** `playwright.config.ts` runs three projects, all `fullyParallel`. `ui` being fully
-parallel is a real change from the old `e2e` project's `workers: 1`, and it is earned rather than
-inherited: that serialisation existed because concurrent Electron apps contend over wall-clock/RSS
-budgets and Docker containers, and this tier has neither — the same reasoning that already made
-`ipc-frontend` fully parallel. `e2e-real` runs `workers: 2`, safe since a per-test `KIRA_HOME` plus
-`WAILS_SERVER_PORT` gives each instance its own SQLite app storage and its own secrets.
+**Parallelism.** `playwright.config.ts` runs five projects (v1.4 P27 added `ui-timing`, v1.4 P6
+added `visual`): `ui`, `ui-timing`, `ipc-frontend`, `e2e-real` and `visual`, every one but
+`ui-timing` `fullyParallel`. `ui` being fully parallel is a real change from the old `e2e` project's
+`workers: 1`, and it is earned rather than inherited: that serialisation existed because concurrent
+Electron apps contend over wall-clock/RSS budgets and Docker containers, and this tier has neither —
+the same reasoning that already made `ipc-frontend` (and `visual`, which carries no timing
+assertion of its own to protect) fully parallel too. `ui-timing` runs `workers: 1`, serially, after
+`ui` finishes (`dependencies: ['ui']`) — its own real-millisecond wall-clock assertions need the
+rest of the tier's CPU contention out of the way. `e2e-real` runs `workers: 2`, safe since a
+per-test `KIRA_HOME` plus `WAILS_SERVER_PORT` gives each instance its own SQLite app storage and its
+own secrets.

@@ -79,6 +79,32 @@ export default defineConfig({
       fullyParallel: true,
       workers: '100%',
     },
+    // v1.4 P6: a bounded first pixel-diff tier, deliberately its own project rather than folded
+    // into `ui` — the same "a different measurement contract earns its own project" reasoning
+    // `ui-timing` already established, just for a different contract (screenshot comparison, not
+    // wall-clock timing). No `dependencies: ['ui']` edge: unlike `ui-timing`, nothing about a
+    // screenshot comparison degrades under CPU contention, so this runs fully parallel like `ui`
+    // itself. `animations: 'disabled'` is Playwright's own default already, stated explicitly here
+    // so it's not accidentally lost to a future edit — freezes every CSS animation/transition to
+    // its terminal frame before capture (docs/v1.4/plans/P6-visual-regression.md §2(b)'s own
+    // inventory of this app's `infinite` animations). `stylePath` collapses --kira-font-ui/
+    // --kira-font-data to their own trailing generic keyword only for this project — removing the
+    // multi-hop fallback chain's own run-to-run fontconfig ambiguity on the CI image that is this
+    // tier's sole baseline authority (P6 plan §2(a)/(c); never applied to `ui`, whose own
+    // font-roles.spec.ts specifically wants to see the real configured stacks resolve).
+    {
+      name: 'visual',
+      testDir: './tests/visual',
+      use: { browserName: 'webkit' },
+      fullyParallel: true,
+      workers: '100%',
+      expect: {
+        toHaveScreenshot: {
+          animations: 'disabled',
+          stylePath: './tests/visual/support/pin-fonts.css',
+        },
+      },
+    },
     // P57-e2e-revisit.md §6/§8: a real Go backend (`go build -tags server`), a real embedded
     // engine and a real database adapter, reached over plain HTTP/WebSocket by a plain Chromium
     // tab — no mock, no native window. A *wiring* tier, not a UI-fidelity one (D5): `chromium`,

@@ -33,6 +33,8 @@
     "typecheck:api-core": "tsgo --noEmit -p packages/api-core/tsconfig.json",
     "typecheck:git": "tsgo --noEmit -p packages/git-ipc/tsconfig.json && tsgo --noEmit -p packages/git-core/tsconfig.json && tsgo --noEmit -p apps/kira-studio-vscode/tsconfig.json && vue-tsc --noEmit -p packages/git-ui/tsconfig.json && vue-tsc --noEmit -p packages/kira-ui/tsconfig.json",
     "test:ui": "bun run build:test && playwright test --config=apps/kira-studio/playwright.config.ts --project=ui --project=ui-timing",
+    "test:visual": "bun run build:test && playwright test --config=apps/kira-studio/playwright.config.ts --project=visual",
+    "test:visual:update": "bun run build:test && playwright test --config=apps/kira-studio/playwright.config.ts --project=visual --update-snapshots",
     "test:webview": "bun run build:vscode && playwright test --config=apps/kira-studio-vscode/playwright.config.ts",
     "test:ipc:fe": "bun run build:test && playwright test --config=apps/kira-studio/playwright.config.ts --project=ipc-frontend",
     "test:unit": "bun test apps/kira-studio/tests/unit packages/api-core/test packages/git-core/src packages/git-ipc/src apps/kira-studio-vscode/src packages/git-ui/src packages/kira-ui/src",
