@@ -269,7 +269,20 @@ interface GraphStreamEnvelope<TCommits> {
 export function encodeStreamPayload(method: StreamKey, chunk: unknown): unknown {
   switch (method) {
     case 'graph.stream': {
-      const envelope = chunk as GraphStreamEnvelope<PackedCommitChunk>;
+      const envelope = chunk as GraphStreamEnvelope<PackedCommitChunk | FlatBufferStreamPayload>;
+      // G32 round-3 performance review, finding #5: a relay (the extension host) that never
+      // decoded this chunk hands it back here already `$fb`-wrapped — toWire+fromWire round
+      // tripping bytes that are already exactly what goes out would be pure waste. Recognising
+      // the wrapper and returning the chunk unchanged makes this call idempotent for a
+      // pass-through caller, without weakening the loud-failure behavior for an unrecognised tag.
+      if (isFlatBufferStreamPayload(envelope.commits)) {
+        if (envelope.commits.$fb !== 'gitwire/1') {
+          throw new Error(
+            `codec.encodeStreamPayload: unrecognised '$fb' tag '${envelope.commits.$fb}' for 'graph.stream'`,
+          );
+        }
+        return chunk;
+      }
       const wrapped: FlatBufferStreamPayload = {
         $fb: 'gitwire/1',
         d: graphChunkToWire(envelope.commits),

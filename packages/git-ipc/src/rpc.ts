@@ -167,7 +167,20 @@ interface PendingStream {
   done: boolean;
 }
 
-export function createRpcClient(channel: MessageChannelLike): Transport {
+export interface RpcClientOptions {
+  /** G32 round-3 performance review, finding #5: a client that only relays chunks onward (the
+   *  extension host's `graph.stream` proxy, which never reads a field of the chunk) has no use
+   *  for `decodeStreamPayload`'s FlatBuffer materialization — it immediately re-encodes the same
+   *  bytes for its own downstream client. When true, `onChunk` receives the still-wire-shaped
+   *  `frame.chunk` verbatim; the caller is responsible for treating it as opaque. Defaults to
+   *  false so every other client (the webview) is unaffected. */
+  readonly rawStreamChunks?: boolean;
+}
+
+export function createRpcClient(
+  channel: MessageChannelLike,
+  options?: RpcClientOptions,
+): Transport {
   let nextId = 1;
   const pendingRequests = new Map<number, PendingRequest>();
   const pendingStreams = new Map<number, PendingStream>();
@@ -202,7 +215,10 @@ export function createRpcClient(channel: MessageChannelLike): Transport {
         if (!entry || entry.done) return;
         entry.queue = entry.queue.then(async () => {
           if (entry.done) return;
-          await entry.onChunk(decodeStreamPayload(entry.method, frame.chunk));
+          const payload = options?.rawStreamChunks
+            ? frame.chunk
+            : decodeStreamPayload(entry.method, frame.chunk);
+          await entry.onChunk(payload);
           if (entry.done) return;
           post(channel, { t: 'credit', id: frame.id, n: 1 });
         });

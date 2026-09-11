@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import type { BufferEncoding } from './codec.ts';
+import { encodeStreamPayload } from './codec.ts';
 import type { PackedCommitChunk, StreamChunkOf } from './contract.ts';
 import {
   createRpcClient,
@@ -444,6 +445,64 @@ describe('ipc rpc — streams', () => {
     const commits = received[0]?.commits;
     expect(commits?.shas.byteLength).toBe(20);
     expect(new Uint8Array(commits?.shas ?? new ArrayBuffer(0)).every((b) => b === 0x7a)).toBe(true);
+
+    client.dispose();
+    server.dispose();
+  });
+
+  test('rawStreamChunks: true delivers the still-wire-shaped chunk without decoding it (G32-PERF5)', async () => {
+    const [a, b] = createInMemoryChannelPair();
+    const shas = new ArrayBuffer(20);
+    new Uint8Array(shas).fill(0x5c);
+    const handlers = stubHandlers(
+      {},
+      {
+        'graph.stream': async (_params, { emit }) => {
+          await emit({ ...chunkFor(0), commits: { ...emptyPackedChunk(), shas } });
+        },
+      },
+    );
+    const server = createRpcServer(a, handlers);
+    const client = createRpcClient(b, { rawStreamChunks: true });
+
+    const received: unknown[] = [];
+    await client.stream('graph.stream', { repoId: 'r1' }, (chunk) => {
+      received.push(chunk);
+    });
+
+    expect(received).toHaveLength(1);
+    const envelope = received[0] as { commits: { $fb: string; d: ArrayBuffer } };
+    // Still wrapped: decodeStreamPayload was never called, so `commits` is the raw `{$fb, d}`
+    // wire wrapper, not a decoded PackedCommitChunk (which has no `$fb` field at all).
+    expect(envelope.commits.$fb).toBe('gitwire/1');
+    expect(envelope.commits.d).toBeInstanceOf(ArrayBuffer);
+
+    client.dispose();
+    server.dispose();
+  });
+
+  test('a raw chunk handed back to encodeStreamPayload is returned by identity, not rebuilt (G32-PERF5)', async () => {
+    const [a, b] = createInMemoryChannelPair();
+    const handlers = stubHandlers(
+      {},
+      {
+        'graph.stream': async (_params, { emit }) => {
+          await emit(chunkFor(0));
+        },
+      },
+    );
+    const server = createRpcServer(a, handlers);
+    const client = createRpcClient(b, { rawStreamChunks: true });
+
+    let raw: unknown;
+    await client.stream('graph.stream', { repoId: 'r1' }, (chunk) => {
+      raw = chunk;
+    });
+
+    // A relay (the extension host) hands the still-wrapped chunk straight back into its own
+    // outbound encodeStreamPayload call -- this must be a no-op reference return, not a
+    // decode-then-rebuild of bytes that are already exactly correct.
+    expect(encodeStreamPayload('graph.stream', raw)).toBe(raw);
 
     client.dispose();
     server.dispose();

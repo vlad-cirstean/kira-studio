@@ -364,6 +364,69 @@ describe('editor.openAllChanges — G21 D8a', () => {
   });
 });
 
+// G32 round-3 performance review, finding #5: this relay used to hand every inbound
+// `graph.stream` chunk through decodeStreamPayload (a full FlatBuffer materialization) only to
+// hand it straight to `ctx.emit`, which re-encodes it right back (toWire) for the webview's own
+// stream -- a decode+rebuild of bytes nothing in this file ever reads a field of. Proven here by
+// object identity: if the relay ever started decoding/re-encoding, `emitted` would be a
+// different object than `rawChunk`, not just a deep-equal one.
+describe('graph.stream relay — never decodes or rebuilds the chunk it forwards', () => {
+  test('ctx.emit receives the exact object connection.stream produced', async () => {
+    const rawChunk = {
+      repoId: 'r1',
+      seq: 0,
+      from: 0,
+      to: 1,
+      source: 'git',
+      remaining: 0,
+      exhausted: true,
+      commits: { $fb: 'gitwire/1', d: new ArrayBuffer(0) },
+    };
+    const notImplemented = (): never => {
+      throw new Error('not implemented in this test');
+    };
+    const connection = {
+      stream: async (method: string, _params: unknown, onChunk: (chunk: unknown) => void) => {
+        if (method !== 'graph.stream') throw new Error(`unexpected method ${method}`);
+        onChunk(rawChunk);
+      },
+      // biome-ignore lint/suspicious/noExplicitAny: cast to the concrete class for this fake's shape.
+    } as any as ConnectionManager;
+    const { streams } = createProxyHandlers({
+      connection,
+      settings: notImplemented,
+      // biome-ignore lint/suspicious/noExplicitAny: unused here, stubbed minimally.
+      roots: {} as any,
+      // biome-ignore lint/suspicious/noExplicitAny: unused here, stubbed minimally.
+      clipboard: {} as any,
+      // biome-ignore lint/suspicious/noExplicitAny: unused here, stubbed minimally.
+      editor: {} as any,
+      // biome-ignore lint/suspicious/noExplicitAny: unused here, stubbed minimally.
+      logger: {} as any,
+      // biome-ignore lint/suspicious/noExplicitAny: unused here, stubbed minimally.
+      windows: {} as any,
+      isWorkspaceTrusted: () => true,
+      revealReview: () => {},
+      renderReviewComments: () => {},
+      notifyCommentsMutated: () => {},
+      refreshReviewMarking: () => {},
+      notifyReviewMarked: () => {},
+      reviewSessionStore: { get: () => undefined, update: async () => {} },
+    });
+
+    let emitted: unknown;
+    await streams['graph.stream']({ repoId: 'r1' }, {
+      signal: new AbortController().signal,
+      emit: async (chunk: unknown) => {
+        emitted = chunk;
+      },
+      // biome-ignore lint/suspicious/noExplicitAny: `emit`'s declared type is StreamChunkOf<'graph.stream'>; this fake only needs identity.
+    } as any);
+
+    expect(emitted).toBe(rawChunk);
+  });
+});
+
 // G30 round-1 architecture review, finding #9: `path` on editor.resolveConflict is
 // server-supplied over the wire, not a constant this process picked. Before the fix, a
 // `../../../etc/passwd`-shaped path resolved outside the repo root unchecked and reached the

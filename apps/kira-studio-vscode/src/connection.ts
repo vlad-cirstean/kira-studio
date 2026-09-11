@@ -379,7 +379,11 @@ export class ConnectionManager implements vscode.Disposable {
       case 'ready': {
         this.#backoffMs = INITIAL_BACKOFF_MS;
         unsubscribe();
-        this.#transport = createRpcClient(channel);
+        // G32 round-3 performance review, finding #5: this connection's `graph.stream` proxy
+        // (proxyHandlers.ts) never reads a chunk field, only forwards it to the webview's own
+        // client — which decodes it itself. Skipping the decode here avoids a full
+        // FlatBuffer-decode-then-re-encode round trip per chunk for bytes that never change.
+        this.#transport = createRpcClient(channel, { rawStreamChunks: true });
         this.#attachEventHandlers();
         this.#setState({ kind: 'connected' });
         this.#logger.log('info', 'connected', { sessionId: resp.sessionId });
