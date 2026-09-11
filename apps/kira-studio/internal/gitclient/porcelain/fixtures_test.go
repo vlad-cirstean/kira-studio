@@ -774,5 +774,31 @@ func TestFixtures_Regenerate(t *testing.T) {
 		writeFixture(t, "stash/detached.bin", captureStashList(t, b.dir))
 	}
 
+	// --- blame/committed.bin: an ordinary line from a non-root commit — `previous` present, no
+	// `boundary` (P5). ---
+	{
+		b := newRepoBuilder(t)
+		b.commit("f.txt", "line one\n", "first commit")
+		b.commit("f.txt", "line one\nline two\n", "second commit")
+		writeFixture(t, "blame/committed.bin", captureRaw(t, b.dir, porcelain.BlameLineArgs("f.txt", 2)))
+	}
+
+	// --- blame/boundary.bin: a line from the repository's own first commit — `boundary`, no
+	// `previous` (P5, probed against real git 2.43.0). ---
+	{
+		b := newRepoBuilder(t)
+		b.commit("f.txt", "line one\n", "first commit")
+		writeFixture(t, "blame/boundary.bin", captureRaw(t, b.dir, porcelain.BlameLineArgs("f.txt", 1)))
+	}
+
+	// --- blame/uncommitted.bin: an unstaged, on-disk edit — the all-zero sha sentinel, synthetic
+	// "Not Committed Yet" identity (P5, probed verbatim). ---
+	{
+		b := newRepoBuilder(t)
+		b.commit("f.txt", "line one\n", "first commit")
+		b.writeFile("f.txt", "line one edited\n")
+		writeFixture(t, "blame/uncommitted.bin", captureRaw(t, b.dir, porcelain.BlameLineArgs("f.txt", 1)))
+	}
+
 	t.Log("golden corpus regenerated under testdata/ — run `bunx biome check --write` is not needed (Go-only); re-run tests without KIRA_GIT_FIXTURES to verify")
 }

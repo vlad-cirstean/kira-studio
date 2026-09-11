@@ -198,6 +198,15 @@ type FileGoToTargetParams struct {
 	Path   string `json:"path"`
 }
 
+// BlameLineParams is blame.line's own request (P5) — a server-only method: no webview caller
+// exists yet, only the extension's own status-bar widget. line is 1-based. No rev/atSha field —
+// blame.line always blames the working tree, never a historical revision (P5's own plan, §7).
+type BlameLineParams struct {
+	RepoID string `json:"repoId"`
+	Path   string `json:"path"`
+	Line   int    `json:"line"`
+}
+
 // graphChunk is graph.stream's chunk envelope — @kira/git-ipc's own StreamChunkOf<'graph.stream'>
 // field for field, with `commits` replaced by the D4 marker above.
 type graphChunk struct {

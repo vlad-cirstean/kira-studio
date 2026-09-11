@@ -107,7 +107,13 @@ import type { EventKey, RequestKey, StreamKey } from './contract.ts';
 // state that used to reach only the extension's own status bar into both webviews themselves, so
 // a panel that stays open through a drop shows it too. No new request, no new capability, no SQL
 // migration.
-export const CONTRACT_VERSION = 33;
+// P5 (2026-09-11): 33 -> 34, for one new Go-served request, 'blame.line' -- the status-bar blame
+// widget's own one-line-at-a-time query (params: repoId/path/line; result: sha/author/
+// authorTimeSeconds/summary, 'sha' the all-zero sentinel for an uncommitted line). No webview
+// caller exists yet, only the extension's own host-side status bar -- 'proxyHandlers.ts' still
+// gained a plain forward entry since 'ServerHandlers.requests' is total over 'RequestKey'. No new
+// event, no new capability, no new 'UiActionKind' member, no SQL migration.
+export const CONTRACT_VERSION = 34;
 
 export class ContractVersionMismatchError extends Error {
   readonly received: number;
@@ -207,6 +213,7 @@ const REQUEST_KEY_MAP: Record<RequestKey, true> = {
   'search.run': true,
   'file.read': true,
   'file.goToTarget': true,
+  'blame.line': true,
   'repoSettings.get': true,
   'repoSettings.set': true,
   'settings.setGitPath': true,

@@ -1701,6 +1701,21 @@ export type Contract = {
         readonly files: readonly FileChange[];
       };
     };
+    /** P5: the status bar's one-line-at-a-time query — never a whole-file blame (no such request
+     *  exists). Always blames the working tree, never a historical revision (no `atSha` param — no
+     *  caller needs one). `sha` is the all-zero sentinel
+     *  (`'0000000000000000000000000000000000000000'`) for a line whose content isn't in any commit
+     *  yet (an unsaved-but-on-disk edit) — the caller checks this before treating `sha` as a real
+     *  commit to route `revealCommit` at. */
+    'blame.line': {
+      params: { repoId: string; path: string; line: number };
+      result: {
+        readonly sha: string;
+        readonly author: string;
+        readonly authorTimeSeconds: number;
+        readonly summary: string;
+      };
+    };
     'commit.fileDiff': {
       params: {
         repoId: string;

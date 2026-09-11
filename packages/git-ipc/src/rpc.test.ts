@@ -167,6 +167,7 @@ function stubHandlers(
       'search.run': notImplemented,
       'file.read': notImplemented,
       'file.goToTarget': notImplemented,
+      'blame.line': notImplemented,
       'repoSettings.get': notImplemented,
       'repoSettings.set': notImplemented,
       'settings.setGitPath': notImplemented,

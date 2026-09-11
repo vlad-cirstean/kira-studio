@@ -27,6 +27,11 @@ import {
 } from '@kira/git-core';
 import type { GitStatus, RepoSettingsPatch } from '@kira/git-ipc';
 import * as vscode from 'vscode';
+import {
+  type BlameDisplayState,
+  blameStatusText,
+  createBlameWidgetController,
+} from './blameWidget.ts';
 import type { OtherCommandId } from './commands.ts';
 import { isPaletteCommand, MUTATING_COMMANDS, OTHER_COMMANDS } from './commands.ts';
 import { ConnectionManager, type ConnectionState, toWireConnectionState } from './connection.ts';
@@ -226,6 +231,12 @@ function updateStatusBar(
   state: ConnectionState,
   active: boolean,
   appInit?: { readonly serverVersion: string; readonly contractVersion: number },
+  // P5: consulted only inside the `connected && !active` branch below — busy and blame are
+  // mutually exclusive states of the same item by construction (a blame result can't be showing
+  // while a request is in flight), so this adds one more thing the not-busy branch can render
+  // instead of the plain $(git-branch) icon it falls back to when there is nothing more specific
+  // to say, with no new precedence rule invented.
+  blame?: BlameDisplayState,
 ): void {
   item.backgroundColor = undefined;
   let tooltipLines: readonly string[];
@@ -243,9 +254,30 @@ function updateStatusBar(
       break;
     }
     case 'connected': {
+      // `connected` keeps focusing the graph as its default click target — a blame line below is
+      // the one exception, routed to its own commit instead.
+      item.command = FOCUS_GRAPH_COMMAND;
       if (active) {
         item.text = '$(sync~spin)';
         tooltipLines = ['**Kira Studio**', 'Loading…'];
+      } else if (blame?.kind === 'dirty') {
+        item.text = '$(git-branch) Unsaved changes';
+        tooltipLines = ['**Kira Studio**', 'Unsaved changes — blame updates once you save'];
+      } else if (blame?.kind === 'uncommitted') {
+        item.text = '$(git-branch) Uncommitted';
+        tooltipLines = ['**Kira Studio**', 'This line has not been committed yet'];
+      } else if (blame?.kind === 'resolved') {
+        item.text = `$(git-branch) ${blameStatusText(blame)}`;
+        tooltipLines = [
+          '**Kira Studio**',
+          blame.summary,
+          `${blame.author}, ${new Date(blame.authorTimeSeconds * 1000).toLocaleString()}`,
+        ];
+        item.command = {
+          command: 'kiraVersion.openCommitInGraph',
+          title: 'Open Commit in Graph',
+          arguments: [{ repoId: blame.repoId, sha: blame.sha }],
+        };
       } else {
         item.text = '$(git-branch)';
         // G27 D7: a workspace folder's fsPath is filesystem-sourced.
@@ -261,9 +293,6 @@ function updateStatusBar(
         }
         tooltipLines = lines;
       }
-      // `connected` keeps focusing the graph — clicking a working connection should reveal the
-      // panel, not explain a status there is nothing wrong with.
-      item.command = FOCUS_GRAPH_COMMAND;
       break;
     }
     case 'denied': {
@@ -426,7 +455,19 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   // call once it resolves. Cleared whenever the state leaves `connected`, since a reconnect may
   // land on a different Kira Studio process.
   let lastAppInit: { readonly serverVersion: string; readonly contractVersion: number } | undefined;
-  updateStatusBar(statusItem, manager.state, isActive, lastAppInit);
+  // P5: the status-bar blame widget's own controller — active-line tracking, debounce and repoId
+  // resolution live entirely inside it; this file only reads its current state on render.
+  const blameWidget = createBlameWidgetController({ connection: manager });
+  context.subscriptions.push(blameWidget);
+
+  // P5: updateStatusBar is called from five sites (this one, both onActivityChange branches, both
+  // onStateChange call sites below) — wrapping them in one render() closure means the new blame
+  // input threads through all five without widening every call site by hand.
+  function render(): void {
+    updateStatusBar(statusItem, manager.state, isActive, lastAppInit, blameWidget.state());
+  }
+  context.subscriptions.push(blameWidget.onDidChangeState(() => render()));
+  render();
 
   // G10 D19: every command this extension contributes is registered from commands.ts's own
   // tables — no hand-written second list. Mutating commands all dispatch through the graph
@@ -494,6 +535,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         graphProvider.notifyRepoChanged(payload);
         reviewProvider.notifyRepoChanged(payload);
         reviewMarking.notifyRepoChanged(payload);
+        blameWidget.notifyRepoChanged(payload);
       }),
     },
     // G7 D4/D21: the credential relay's whole client half — askpass becomes a relay, per SPEC §5
@@ -553,12 +595,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       }
       if (!active) {
         isActive = false;
-        updateStatusBar(statusItem, manager.state, isActive, lastAppInit);
+        render();
         return;
       }
       activityDebounce = setTimeout(() => {
         isActive = true;
-        updateStatusBar(statusItem, manager.state, isActive, lastAppInit);
+        render();
       }, 150);
     }),
     manager.onStateChange((state) => {
@@ -567,6 +609,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       // G15 D7: "connection state leaves connected" — every tracked decoration/state is dropped
       // rather than left showing a diff over a connection that may reconnect to a different repo.
       reviewMarking.notifyConnectionState(state);
+      // P5: mirrors reviewMarking's own notifyConnectionState — drops the blame widget's memoized
+      // repoId-per-folder map on leaving connected (a reconnect may land on a different Kira
+      // Studio process) and re-resolves against the now-current state.
+      blameWidget.notifyConnectionState(state);
       // G-UX (item 13): pushed into both webviews themselves, not only the status bar below — a
       // panel that stays open through a drop now shows it too. Mapped once, here, through the
       // same `toWireConnectionState` `resolveWebviewView`'s own cold-boot seed already uses, so a
@@ -574,7 +620,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       const wireState = toWireConnectionState(state);
       graphProvider.notifyConnectionState(wireState);
       reviewProvider.notifyConnectionState(wireState);
-      updateStatusBar(statusItem, state, isActive, lastAppInit);
+      render();
       // §5.4 point 4: this phase's own exit criterion, executing in the real extension — the
       // moment a connection is established, prove app.init round-trips over the real socket.
       // G14 D5: also what the connected/idle tooltip's server/contract version comes from — a
@@ -594,7 +640,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
               serverVersion: result.serverVersion,
               contractVersion: result.contractVersion,
             };
-            updateStatusBar(statusItem, manager.state, isActive, lastAppInit);
+            render();
           })
           .catch((err: unknown) => {
             logger.log('error', 'app.init failed', { err: String(err) });

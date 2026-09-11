@@ -469,6 +469,26 @@ func (e *RepoEntry) GoToTarget(ctx context.Context, rev, path string) (GoToTarge
 	return e.historicalOrUnavailable(ctx, rev, path)
 }
 
+// BlameLine is P5's own status-bar query: who last touched path's line in the working tree, right
+// now — never a historical revision (no rev param; §0/§9 of the plan state why), never a cache (no
+// stable key exists for a working-tree answer the way one exists for CommitDetail/FileDiff's
+// immutable tree-oid keys). path is resolved against the repo root and rejected with
+// ErrPathEscapesRoot on escape, the identical check GoToTarget already makes for the same reason (a
+// blame request also resolves a path against a live worktree).
+func (e *RepoEntry) BlameLine(ctx context.Context, path string, line int) (porcelain.BlameLine, error) {
+	root := e.Summary.Root
+	abs := filepath.Join(root, path)
+	rel, err := filepath.Rel(root, abs)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return porcelain.BlameLine{}, ErrPathEscapesRoot
+	}
+	raw, err := e.runOne(ctx, porcelain.BlameLineArgs(rel, line))
+	if err != nil {
+		return porcelain.BlameLine{}, err
+	}
+	return porcelain.ParseBlameLine(raw)
+}
+
 func (e *RepoEntry) historicalOrUnavailable(ctx context.Context, rev, path string) (GoToTarget, error) {
 	blob, err := e.Blob(ctx, rev, path)
 	if err != nil {

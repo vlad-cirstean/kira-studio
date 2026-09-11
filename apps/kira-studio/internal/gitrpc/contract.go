@@ -118,7 +118,13 @@ package gitrpc
 // G-UX D13 (item 13): 32 -> 33, one new event, connection.changed -- extension<->webview only,
 // the Go server neither emits nor parses it, the same reason this constant moves for every
 // ui.action-only addition since G10 D9. No new request, no new capability, no SQL migration.
-const ContractVersion = 33
+// P5 (2026-09-11): 33 -> 34, for one new Go-served request, blame.line -- the status-bar blame
+// widget's own one-line-at-a-time query (internal/gitclient/porcelain's new BlameLineArgs/
+// ParseBlameLine, RepoEntry.BlameLine). No webview caller exists yet, only the extension's own
+// host-side status bar; packages/git-ipc's proxyHandlers.ts still gained a plain forward entry
+// since ServerHandlers['requests'] is total over RequestKey. No new event, no new capability, no
+// new UiActionKind member, no SQL migration.
+const ContractVersion = 34
 
 // Protocol is the handshake envelope's own version (SPEC §3.3's "protocol":1), distinct from
 // ContractVersion — it never changes unless the hello/ready exchange itself is redesigned.

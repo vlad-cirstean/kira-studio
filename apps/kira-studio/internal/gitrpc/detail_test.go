@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitclient"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitclient/porcelain"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitsession"
 )
 
@@ -116,5 +117,54 @@ func TestCommitDetailAndFileDiff_RejectOptionInjectingSHA(t *testing.T) {
 	diffParams, _ := json.Marshal(CommitFileDiffParams{RepoID: repoID, SHA: "--stdin", Path: "f.txt"})
 	if _, err := handlers.Request(context.Background(), "commit.fileDiff", diffParams); err == nil {
 		t.Fatal("commit.fileDiff: expected an error for an option-injecting sha")
+	}
+}
+
+// TestBlameLine_DispatchReachesTheHandler proves "blame.line" reaches handleBlameLine through the
+// real method-string dispatch (handlers.go's switch), not E_UNKNOWN_METHOD, end to end against a
+// real repo.
+func TestBlameLine_DispatchReachesTheHandler(t *testing.T) {
+	dir := t.TempDir()
+	resetSmokeGit(t, dir, "init", "-q", "-b", "main")
+	if err := os.WriteFile(filepath.Join(dir, "f.txt"), []byte("one\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	resetSmokeGit(t, dir, "add", "f.txt")
+	resetSmokeGit(t, dir, "commit", "-q", "-m", "base")
+
+	handlers, repoID := detailSecurityConn(t, dir)
+
+	params, _ := json.Marshal(BlameLineParams{RepoID: repoID, Path: "f.txt", Line: 1})
+	result, err := handlers.Request(context.Background(), "blame.line", params)
+	if err != nil {
+		t.Fatalf("blame.line: %v", err)
+	}
+	line, ok := result.(porcelain.BlameLine)
+	if !ok {
+		t.Fatalf("blame.line: result = %T, want porcelain.BlameLine", result)
+	}
+	if line.Summary != "base" {
+		t.Fatalf("blame.line: Summary = %q, want %q", line.Summary, "base")
+	}
+}
+
+// TestBlameLine_RejectsMissingParams proves the params-validation guard: an empty repoId/path or a
+// non-positive line is E_BAD_REQUEST, never reaching entry.BlameLine at all.
+func TestBlameLine_RejectsMissingParams(t *testing.T) {
+	dir := t.TempDir()
+	resetSmokeGit(t, dir, "init", "-q", "-b", "main")
+	handlers, repoID := detailSecurityConn(t, dir)
+
+	cases := []BlameLineParams{
+		{RepoID: "", Path: "f.txt", Line: 1},
+		{RepoID: repoID, Path: "", Line: 1},
+		{RepoID: repoID, Path: "f.txt", Line: 0},
+		{RepoID: repoID, Path: "f.txt", Line: -1},
+	}
+	for _, p := range cases {
+		params, _ := json.Marshal(p)
+		if _, err := handlers.Request(context.Background(), "blame.line", params); err == nil {
+			t.Fatalf("blame.line(%+v): expected E_BAD_REQUEST, got nil", p)
+		}
 	}
 }

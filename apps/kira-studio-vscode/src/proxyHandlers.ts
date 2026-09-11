@@ -531,6 +531,10 @@ export function createProxyHandlers(deps: CreateProxyHandlersDeps): ServerHandle
     // (ServerHandlers.requests is total over RequestKey, so both need an entry regardless).
     'file.read': forward('file.read'),
     'file.goToTarget': forward('file.goToTarget'),
+    // P5: server-only, never called by the webview — only the extension's own status-bar widget
+    // (blameWidget.ts) calls this. Same "plain forwarder, ServerHandlers.requests is total over
+    // RequestKey" shape as file.read/file.goToTarget just above.
+    'blame.line': forward('blame.line'),
     // G18 D4: the per-repo settings dialog's own two requests — plain forwards, same as every
     // other repoId-addressed request; the server is the sole owner of this storage.
     'repoSettings.get': forward('repoSettings.get'),

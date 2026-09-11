@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitclient"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitclient/porcelain"
 )
 
 func skipWithoutGitQueries(t *testing.T) {
@@ -264,5 +265,64 @@ func TestGoToTarget_BareRepoAlwaysTakesTheHistoricalBranch(t *testing.T) {
 	}
 	if got.AbsPath != "" {
 		t.Fatalf("absPath = %q, want empty — a bare repo must never join(repoId, path)", got.AbsPath)
+	}
+}
+
+// TestBlameLine_Committed proves the end-to-end path against a real repo: base commit's own line 1
+// of live.txt blames to that commit, by the fixture's own committer identity.
+func TestBlameLine_Committed(t *testing.T) {
+	t.Parallel()
+	skipWithoutGitQueries(t)
+	dir, _ := initGoToTargetRepo(t)
+	e := newQueriesTestEntry(t, dir)
+
+	line, err := e.BlameLine(context.Background(), "live.txt", 1)
+	if err != nil {
+		t.Fatalf("BlameLine: %v", err)
+	}
+	if line.SHA == "" || line.SHA == porcelain.UncommittedBlameSHA {
+		t.Fatalf("SHA = %q, want a real committed sha", line.SHA)
+	}
+	if line.Author != "Test" {
+		t.Fatalf("Author = %q, want %q", line.Author, "Test")
+	}
+	if line.Summary != "base commit" {
+		t.Fatalf("Summary = %q, want %q", line.Summary, "base commit")
+	}
+}
+
+// TestBlameLine_UncommittedEdit proves an unstaged on-disk edit blames to the all-zero sentinel, not
+// a stale committed sha.
+func TestBlameLine_UncommittedEdit(t *testing.T) {
+	t.Parallel()
+	skipWithoutGitQueries(t)
+	dir, _ := initGoToTargetRepo(t)
+	e := newQueriesTestEntry(t, dir)
+
+	if err := os.WriteFile(filepath.Join(dir, "live.txt"), []byte("EDITED\n"+lineRange(2, 20)), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	line, err := e.BlameLine(context.Background(), "live.txt", 1)
+	if err != nil {
+		t.Fatalf("BlameLine: %v", err)
+	}
+	if line.SHA != porcelain.UncommittedBlameSHA {
+		t.Fatalf("SHA = %q, want the all-zero uncommitted sentinel", line.SHA)
+	}
+}
+
+// TestBlameLine_PathEscapingRootIsRefused mirrors TestGoToTarget_PathEscapingRootIsRefused — a
+// blame request also resolves a path against a live worktree, the identical risk GoToTarget was
+// written to close.
+func TestBlameLine_PathEscapingRootIsRefused(t *testing.T) {
+	t.Parallel()
+	skipWithoutGitQueries(t)
+	dir, _ := initGoToTargetRepo(t)
+	e := newQueriesTestEntry(t, dir)
+
+	_, err := e.BlameLine(context.Background(), "../../etc/passwd", 1)
+	if err != ErrPathEscapesRoot {
+		t.Fatalf("err = %v, want ErrPathEscapesRoot", err)
 	}
 }

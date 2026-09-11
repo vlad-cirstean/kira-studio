@@ -189,3 +189,26 @@ func (r *Router) handleFileGoToTarget(ctx context.Context, c *gitsession.Conn, p
 	}
 	return result, nil
 }
+
+// handleBlameLine is P5's own handler — no size guard needed (unlike commit.fileDiff/file.read):
+// a BlameLine result is a handful of short fields, nowhere near MaxResultBytes.
+func (r *Router) handleBlameLine(ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
+	var p BlameLineParams
+	if err := json.Unmarshal(params, &p); err != nil {
+		return nil, ipcerr.BadRequest("gitrpc: blame.line: invalid params")
+	}
+	if p.RepoID == "" || p.Path == "" || p.Line < 1 {
+		return nil, ipcerr.BadRequest("gitrpc: blame.line: repoId, path and a 1-based line are required")
+	}
+	entry, err := entryFor(c, p.RepoID)
+	if err != nil {
+		return nil, err
+	}
+	line, err := entry.BlameLine(ctx, p.Path, p.Line)
+	if err != nil {
+		// ErrPathEscapesRoot is already mapped by mapDetailError; everything else (an untracked
+		// path, a line past EOF) falls to mapGitError's default arm.
+		return nil, mapDetailError(err)
+	}
+	return line, nil
+}
