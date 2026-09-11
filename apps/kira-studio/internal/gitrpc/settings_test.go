@@ -2,6 +2,7 @@ package gitrpc
 
 import (
 	"context"
+	"sync"
 	"testing"
 	"time"
 
@@ -152,6 +153,34 @@ func TestRepoSettings_LogLevelCollapsesAcrossRepos(t *testing.T) {
 	}
 }
 
+// changedEventCollector is a mutex-guarded stand-in for the plain slice this test used before G32
+// round-3 architecture/security review, finding #5: ForConn's repoSettings.changed delivery now
+// runs on each connection's own dedicated forwarding goroutine (handlers.go), never synchronously
+// on the repoSettings.set caller's own goroutine — so a plain, unguarded slice appended to from
+// that goroutine and read back from the test's own goroutine would be a genuine data race.
+type changedEventCollector struct {
+	mu  sync.Mutex
+	got []RepoSettingsChangedPayload
+}
+
+func (c *changedEventCollector) record(payload RepoSettingsChangedPayload) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.got = append(c.got, payload)
+}
+
+func (c *changedEventCollector) snapshot() []RepoSettingsChangedPayload {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return append([]RepoSettingsChangedPayload(nil), c.got...)
+}
+
+func (c *changedEventCollector) reset() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.got = nil
+}
+
 // TestRepoSettings_ChangedEventReachesEveryConnection is G18 §3.18's own event-fan-out guard: two
 // different Conns — even ones that have never opened the repo the write happened on — both
 // receive repoSettings.changed, proving D7's live-propagation mechanism fans a sentinel-backed
@@ -164,17 +193,17 @@ func TestRepoSettings_ChangedEventReachesEveryConnection(t *testing.T) {
 	t.Cleanup(connA.Close)
 	t.Cleanup(connB.Close)
 
-	var gotA, gotB []RepoSettingsChangedPayload
+	var gotA, gotB changedEventCollector
 	handlersA := router.ForConn(connA)
 	handlersB := router.ForConn(connB)
 	connA.Emit = func(method string, payload any) {
 		if method == "repoSettings.changed" {
-			gotA = append(gotA, payload.(RepoSettingsChangedPayload))
+			gotA.record(payload.(RepoSettingsChangedPayload))
 		}
 	}
 	connB.Emit = func(method string, payload any) {
 		if method == "repoSettings.changed" {
-			gotB = append(gotB, payload.(RepoSettingsChangedPayload))
+			gotB.record(payload.(RepoSettingsChangedPayload))
 		}
 	}
 
@@ -188,28 +217,29 @@ func TestRepoSettings_ChangedEventReachesEveryConnection(t *testing.T) {
 		t.Fatalf("repoSettings.set via connA: %v", err)
 	}
 
-	// The subscriber callback runs synchronously inside notify.Emitter.Emit (notify.go's own doc
-	// comment: "calls each callback with the lock released", not asynchronously dispatched), so no
-	// polling/sleep is needed here — but a short deadline-bounded check keeps this test honest
-	// against a future implementation that DID make it asynchronous, rather than silently passing
-	// on an empty slice.
+	// G32 round-3 architecture/security review, finding #5: each connection's own delivery now runs
+	// on a dedicated forwarding goroutine, decoupled from repoSettings.set's own caller — never
+	// synchronous the way notify.Emitter.Emit's own subscriber callback still is — so this poll is
+	// no longer merely defensive, it is load-bearing.
 	deadline := time.Now().Add(time.Second)
-	for len(gotA) == 0 || len(gotB) == 0 {
+	for len(gotA.snapshot()) == 0 || len(gotB.snapshot()) == 0 {
 		if time.Now().After(deadline) {
 			break
 		}
 	}
 
-	if len(gotA) != 1 || gotA[0].Settings.LogLevel != "warn" {
-		t.Fatalf("connA received %v, want exactly one repoSettings.changed with logLevel=warn", gotA)
+	a, b := gotA.snapshot(), gotB.snapshot()
+	if len(a) != 1 || a[0].Settings.LogLevel != "warn" {
+		t.Fatalf("connA received %v, want exactly one repoSettings.changed with logLevel=warn", a)
 	}
-	if len(gotB) != 1 || gotB[0].Settings.LogLevel != "warn" {
-		t.Fatalf("connB received %v, want exactly one repoSettings.changed with logLevel=warn (fanned out even though connB never opened repo A)", gotB)
+	if len(b) != 1 || b[0].Settings.LogLevel != "warn" {
+		t.Fatalf("connB received %v, want exactly one repoSettings.changed with logLevel=warn (fanned out even though connB never opened repo A)", b)
 	}
 
 	// §3.18's own "via EITHER one's repoSettings.set" — the reverse direction, B setting on a
 	// third repo, must fan out to both connections too, not only the direction proven above.
-	gotA, gotB = nil, nil
+	gotA.reset()
+	gotB.reset()
 	if _, err := handlersB.Request(context.Background(), "repoSettings.set", []byte(`{
 		"repoId": "/repos/c",
 		"patch": {"kiraVersion.log.level": "debug"}
@@ -217,16 +247,78 @@ func TestRepoSettings_ChangedEventReachesEveryConnection(t *testing.T) {
 		t.Fatalf("repoSettings.set via connB: %v", err)
 	}
 	deadline = time.Now().Add(time.Second)
-	for len(gotA) == 0 || len(gotB) == 0 {
+	for len(gotA.snapshot()) == 0 || len(gotB.snapshot()) == 0 {
 		if time.Now().After(deadline) {
 			break
 		}
 	}
-	if len(gotA) != 1 || gotA[0].Settings.LogLevel != "debug" {
-		t.Fatalf("connA received %v, want exactly one repoSettings.changed with logLevel=debug (reverse direction)", gotA)
+	a, b = gotA.snapshot(), gotB.snapshot()
+	if len(a) != 1 || a[0].Settings.LogLevel != "debug" {
+		t.Fatalf("connA received %v, want exactly one repoSettings.changed with logLevel=debug (reverse direction)", a)
 	}
-	if len(gotB) != 1 || gotB[0].Settings.LogLevel != "debug" {
-		t.Fatalf("connB received %v, want exactly one repoSettings.changed with logLevel=debug (reverse direction)", gotB)
+	if len(b) != 1 || b[0].Settings.LogLevel != "debug" {
+		t.Fatalf("connB received %v, want exactly one repoSettings.changed with logLevel=debug (reverse direction)", b)
+	}
+}
+
+// TestRepoSettings_WedgedConnectionDoesNotBlockOthers is G32 round-3 architecture/security review,
+// finding #5's own regression proof: before the fix, notify.Emitter.Emit called every
+// repoSettings.changed subscriber SEQUENTIALLY on the repoSettings.set caller's own goroutine, and
+// each subscriber's own c.Emit could block indefinitely on a slow-reading or wedged connection's
+// socket. A permanently-blocked connection ("wedged") must never delay repoSettings.set's own RPC
+// response for a DIFFERENT, healthy connection, nor prevent that healthy connection from receiving
+// its own repoSettings.changed delivery.
+func TestRepoSettings_WedgedConnectionDoesNotBlockOthers(t *testing.T) {
+	router, _ := newTestRouter()
+
+	wedged := gitsession.NewConn("conn-wedged", "client-wedged", "label-wedged", nil)
+	other := gitsession.NewConn("conn-other", "client-other", "label-other", nil)
+	t.Cleanup(wedged.Close)
+	t.Cleanup(other.Close)
+
+	router.ForConn(wedged) // subscribes wedged to repoSettings.changed; its Handlers are unused.
+	handlersOther := router.ForConn(other)
+
+	block := make(chan struct{}) // never closed -- simulates a client that never drains its socket.
+	wedged.Emit = func(method string, _ any) {
+		if method == "repoSettings.changed" {
+			<-block
+		}
+	}
+	var gotOther changedEventCollector
+	other.Emit = func(method string, payload any) {
+		if method == "repoSettings.changed" {
+			gotOther.record(payload.(RepoSettingsChangedPayload))
+		}
+	}
+
+	done := make(chan error, 1)
+	go func() {
+		_, err := handlersOther.Request(context.Background(), "repoSettings.set", []byte(`{
+			"repoId": "/repos/a",
+			"patch": {"kiraVersion.log.level": "warn"}
+		}`))
+		done <- err
+	}()
+
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("repoSettings.set: %v", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("repoSettings.set never returned — a wedged OTHER connection blocked the RPC response")
+	}
+
+	deadline := time.Now().Add(time.Second)
+	for len(gotOther.snapshot()) == 0 {
+		if time.Now().After(deadline) {
+			break
+		}
+	}
+	got := gotOther.snapshot()
+	if len(got) != 1 || got[0].Settings.LogLevel != "warn" {
+		t.Fatalf("the healthy connection received %v, want exactly one repoSettings.changed with logLevel=warn", got)
 	}
 }
 

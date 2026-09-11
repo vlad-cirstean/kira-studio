@@ -40,6 +40,12 @@ type Handlers struct {
 	Stream func(ctx context.Context, method string, params json.RawMessage, emit func(payload any, blob []byte) error) error
 }
 
+// repoSettingsQueueCap bounds each connection's own repoSettings.changed mailbox (ForConn, G32
+// round-3 architecture/security review, finding #5) — generous for any realistic burst of
+// concurrent repoSettings.set calls while staying tiny; a full queue drops its oldest entry
+// rather than growing further, since every payload is a full snapshot anyway.
+const repoSettingsQueueCap = 8
+
 // Router builds a per-connection Handlers over one shared Deps — the piece D18 adds: every method
 // that touches a repository now needs to know which connection is asking, so it can route through
 // that connection's own gitsession.Conn (its holds, its Emit) rather than a single global registry
@@ -70,12 +76,52 @@ func New(deps Deps) *Router { return &Router{deps: deps} }
 // handleConn), so an event landing in that narrow window is silently dropped rather than panicking
 // on a nil func — never observable in practice, since nothing can call repoSettings.set before
 // this connection's own Handlers exist to dispatch it.
+//
+// G32 round-3 architecture/security review, finding #5: notify.Emitter.Emit (notify.go) calls
+// every subscriber SEQUENTIALLY, on the calling repoSettings.set request's own goroutine.
+// rpcstream.Session.Emit's own send() blocks on a bounded channel until it either accepts the
+// frame or THAT connection's own s.done fires — a slow-reading or wedged OTHER client used to be
+// able to stall the fan-out entirely, delaying the repoSettings.set RPC response for the client
+// that actually made the change, and every subscriber snapshotted after the wedged one. Each
+// connection now gets its own small, bounded mailbox (repoSettingsQueueCap) plus ONE dedicated
+// forwarding goroutine — never one goroutine per event, which could reorder deliveries against
+// each other — so the subscribe callback itself is a non-blocking channel send: a wedged
+// connection can only ever stall its own forwarding goroutine, never the emitting caller or any
+// other connection. Dropping the oldest queued entry when a connection falls behind is safe
+// because RepoSettingsChangedPayload always carries a FULL snapshot (D4) — the next delivery makes
+// the client current regardless of what was skipped in between.
 func (r *Router) ForConn(c *gitsession.Conn) Handlers {
+	settingsQueue := make(chan RepoSettingsChangedPayload, repoSettingsQueueCap)
 	unsubscribeRepoSettings := r.repoSettingsChanged.Subscribe(func(payload RepoSettingsChangedPayload) {
-		if c.Emit != nil {
-			c.Emit("repoSettings.changed", payload)
+		select {
+		case settingsQueue <- payload:
+		default:
+			// The queue is full — this connection is badly behind. Drop the oldest pending
+			// snapshot and enqueue the newest, non-blockingly either way; both selects have a
+			// default case so a race with the forwarding goroutine draining concurrently can never
+			// make this block.
+			select {
+			case <-settingsQueue:
+			default:
+			}
+			select {
+			case settingsQueue <- payload:
+			default:
+			}
 		}
 	})
+	go func() {
+		for {
+			select {
+			case payload := <-settingsQueue:
+				if c.Emit != nil {
+					c.Emit("repoSettings.changed", payload)
+				}
+			case <-c.Done():
+				return
+			}
+		}
+	}()
 	go func() {
 		<-c.Done()
 		unsubscribeRepoSettings()
