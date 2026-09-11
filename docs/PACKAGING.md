@@ -6,7 +6,7 @@ Kira Studio ships as an unsigned (ad-hoc), local, arm64-only macOS build in v1 �
 
 Packaging is Wails v3's own [Task](https://taskfile.dev)-based pipeline (P57): config lives in
 `apps/kira-studio/build/config.yml`, the task graph in `apps/kira-studio/Taskfile.yml` and `apps/kira-studio/build/darwin/Taskfile.yml`,
-and the entry points in the repo-root `package.json`'s `scripts` plus `scripts/sign-bundle.sh` and
+and entry points in the repo-root `package.json`'s `scripts` plus `scripts/sign-bundle.sh` and
 `scripts/verify-packaging.sh`. There is no `electron-builder.yml`, no asar, and no native-module ABI
 rebuild step — all deleted with Electron in P57 M7. **As of P58f M10, there is no vendored Node
 runtime and no bundled Node engine either** — `scripts/vendor-node.sh` is deleted outright, and
@@ -15,7 +15,7 @@ every database adapter is served in-process by the Go binary itself.
 ## 1. Building locally
 
 Requires macOS arm64, Bun, Go (`go.mod`: 1.27.0), and Xcode command-line tools. Everything else —
-`bun install`, `go mod download`, and the `wails3` CLI at the version `go.mod` pins — installs
+`bun install`, `go mod download`, and `wails3` CLI at the version `go.mod` pins — installs
 itself:
 
 ```sh
@@ -24,7 +24,7 @@ bun run package                 # installs everything first, then wails3 task da
 
 `bun run package` and `bun run dev` both run `bun run setup` first (wired as `prepackage`/`predev`),
 which is `scripts/setup.sh`, the one entry point for everything a fresh clone needs before building.
-It sources `scripts/lib.sh` for the shared `ROOT_DIR`, `require_cmd`, `ensure_gopath_on_path`,
+It sources `scripts/lib.sh` for shared `ROOT_DIR`, `require_cmd`, `ensure_gopath_on_path`,
 `sha256_file` and `pinned_wails_version`/`go_directive` helpers, then:
 
 - runs `bun install` and `go mod download`;
@@ -47,7 +47,7 @@ Expected artifacts (nothing lands in `dist/` or `out/` any more):
 - `apps/kira-studio/bin/Kira Studio.dmg` — **the shipped artifact** (P10): the styled, ad-hoc-signed
   disk image holding the app and an `/Applications` shortcut to drag it onto.
 - `apps/kira-studio/bin/Kira Studio.app` — the packaged, ad-hoc-signed bundle the image is built
-  from. Still produced, and still what you run locally; it is simply no longer what ships.
+  from. Still produced, and still what you run locally; it is no longer what ships.
 - `apps/kira-studio/bin/Kira Studio` — the bare Go binary the bundle is assembled around.
 - `apps/kira-studio/bin/kira-version.vsix` — the packaged VS Code extension (G10 D7), built by
   `wails3 task common:build:vsix` (`bun run scripts/package-vscode.ts` under the hood) and copied
@@ -299,12 +299,12 @@ the renderer build, typecheck, lint, the Go unit tests, and the static half of `
 
 ## 6. Known gaps
 
-- **Closed (P57 M7 → P58e M9 → P58f M10, in that order).** The packaging gap started as "Kafka's
+- **Closed (P57 M7, then P58e M9, then P58f M10, in that order).** The packaging gap started as "Kafka's
   native module was never vendored into the packaged bundle" (P57 M7): `build:engine` marked
   `@confluentinc/kafka-javascript` `--external` and no build step vendored it, so a packaged build's
   Kafka connections would fail at `require()` time. P58e M9 made the gap moot without closing it:
   Kafka went native in Go (`docs/v1/plans/P58e-kafka.md`) and stopped reaching the Node engine child
-  at all, so the dead `require()` path was simply never exercised — `sign-bundle.sh` and
+  at all, so the dead `require()` path was never exercised — `sign-bundle.sh` and
   `verify-packaging.sh` kept probing for the native module and printing a harmless "not present" note.
   P58f M10 closed it for real: the Node engine, `build:engine`, and every check that probed for that
   module are deleted outright, not merely dead-code-kept. There is no native-module packaging
@@ -335,7 +335,7 @@ the renderer build, typecheck, lint, the Go unit tests, and the static half of `
   `CFBundleIconName` resolves against `Assets.car` **before** `CFBundleIconFile` falls back to
   `icons.icns`, so a packaged app showed the old Wails icon while `icons.icns` beside it was right.
   Both the file and the `CFBundleIconName` key are now gone from `darwin/`, which leaves
-  `CFBundleIconFile` → `icons.icns` as the only path and ships the correct icon. Note `wails3 update
+  `icons.icns` as `CFBundleIconFile`'s only path and ships the correct icon. Note `wails3 update
   build-assets` adds that key back on its own whenever an `Assets.car` is present, so the two belong
   together: reintroduce both or neither. `appicon.icon` is kept for whoever regenerates a catalog on
   a machine with Xcode — the cost of going without one is that macOS composes no appearance
@@ -369,8 +369,7 @@ full-coverage run of that same `test:go` needs a runner with Docker, which is wh
 is for. This split predates P58f and is unaffected by it: `packages/db-fixtures/`'s per-engine specs used to be
 the ones needing Docker-on-Linux (Electron-hosted macOS runners have neither Docker nor nested
 virtualization); P58f D1 moved that coverage into `apps/kira-studio/internal/adapters/*/*_test.go`
-(`docs/ARCHITECTURE.md`'s Testing section) without changing which runner needs to be the one that
-actually exercises it.
+(`docs/ARCHITECTURE.md`'s Testing section) without changing which runner exercises it.
 
 **Cutting a release** (`release.yml`, on tags matching `v*.*.*`):
 
@@ -426,7 +425,7 @@ exercise of `release.yml`.*
 **The on-demand DB compatibility suite is not part of either workflow.** `scripts/db-compat.sh`
 (`bun run test:compat`, P16) runs the same per-engine conformance packages against each kind's
 oldest and newest supported server image, sixteen (kind, min|max) pairs — deliberately outside
-`bun run test:go` and outside `ci.yml`, since it is meant to be run occasionally rather than on
+`bun run test:go` and outside `ci.yml`, since it runs occasionally, not on
 every push. It has its own `workflow_dispatch`-only workflow, `.github/workflows/db-compat.yml`,
 which nothing else references — an ordinary CI run is byte-identical to before it existed.
 
