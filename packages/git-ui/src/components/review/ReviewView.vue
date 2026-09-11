@@ -463,6 +463,20 @@ const shas = computed<readonly string[]>(() => {
   return out;
 });
 
+// G32 round-3 performance review, finding #2: `shas` above is every LOADED row (a "Load more"
+// page is up to 5,000, `logsession.DefaultPageSize`) — every other list in this package bounds
+// what it actually MOUNTS (`FILE_TREE_ROW_CAP`, `REF_LIST_SECTION_CAP`), unlike this one, which
+// used to `v-for` over `shas` directly and so mounted one `ReviewCommitRow` (each retaining a
+// full `CommitRecord`, per that component's own doc comment) per loaded row with no cap at all.
+// `renderCap` decouples "how many rows are loaded" from "how many are mounted": the template's
+// own client-side "Show more" button (below the rows) grows it in the same increment with no
+// network round trip, and keyboard End/vertical nav (`focusRow` below) grows it to whatever index
+// is being focused, so nothing becomes reachable-but-unfocusable — only the common case (scrolling
+// linearly from the top of a freshly opened review) is what this actually bounds.
+const REVIEW_ROW_RENDER_CAP = 500;
+const renderCap = ref(REVIEW_ROW_RENDER_CAP);
+const visibleShas = computed<readonly string[]>(() => shas.value.slice(0, renderCap.value));
+
 const commitCountFormatter = new Intl.NumberFormat();
 const commitCountLabel = computed(() => {
   const resolution = review.value?.resolution.value;
@@ -526,6 +540,18 @@ function handleLoadMore(): void {
   void review.value?.loadMore();
 }
 
+/** The client-side "reveal more of what's already loaded" button's own label/handler — see
+ *  `renderCap`'s own doc comment above `shas`. No network round trip; `Math.min` because the
+ *  last reveal can be smaller than a full increment. */
+function revealMoreLabel(): string {
+  const hidden = shas.value.length - renderCap.value;
+  return `Show ${commitCountFormatter.format(Math.min(REVIEW_ROW_RENDER_CAP, hidden))} more`;
+}
+
+function revealMore(): void {
+  renderCap.value += REVIEW_ROW_RENDER_CAP;
+}
+
 // ---------------------------------------------------------------------------------------
 // Row expansion, the roving-tabindex cursor, and the diff overlay — one keydown handler at the
 // root (§6.8 step 3's Esc ordering: the diff first, then the row), rather than three components
@@ -536,6 +562,10 @@ const focusedRow = ref(0);
 
 watch(shas, (list) => {
   if (focusedRow.value >= list.length) focusedRow.value = Math.max(0, list.length - 1);
+  // A genuine reset (setTarget/setBase/acknowledgeStaleReview) always passes through 0 rows
+  // before the next chunk lands — back to the default cap rather than leaving a stale, possibly
+  // much larger, reveal from the PREVIOUS review's own list.
+  if (list.length < renderCap.value) renderCap.value = REVIEW_ROW_RENDER_CAP;
 });
 
 function rowElId(sha: string): string {
@@ -544,6 +574,9 @@ function rowElId(sha: string): string {
 
 function focusRow(index: number): void {
   focusedRow.value = index;
+  // Keyboard nav (End, or arrowing past the current render cap) must never land on a row that
+  // isn't mounted — grow the cap to cover it first, same as the "Show more" button below does.
+  if (index >= renderCap.value) renderCap.value = index + 1;
   const sha = shas.value[index];
   if (!sha) return;
   void nextTick(() => {
@@ -855,7 +888,7 @@ watch(
             @keydown="onRowsKeydown"
           >
             <ReviewCommitRow
-              v-for="(sha, index) in shas"
+              v-for="(sha, index) in visibleShas"
               :id="rowElId(sha)"
               :key="sha"
               :sha="sha"
@@ -871,11 +904,21 @@ watch(
             />
           </div>
 
+          <!-- G32 round-3 performance review, finding #2: reveals more of what is ALREADY
+               loaded (renderCap, above) — no network round trip — before ever offering the real,
+               server-fetching "Load more" below it. Mutually exclusive with that button (v-else-if)
+               so only one affordance shows at a time: reveal the local buffer first, only then ask
+               the server for more. -->
+          <div v-if="shas.length > renderCap" class="kv-review-load-more">
+            <KuiButton class="kv-review-load-more-button" @click="revealMore">
+              {{ revealMoreLabel() }}
+            </KuiButton>
+          </div>
           <!-- G16 D9: `remaining > 0` guards against F7's empty-range hole — an empty branch
                comparison never emits a chunk, so there is no server-side signal to correct here.
                Kept visible while loading so the affordance does not vanish mid-load. -->
           <div
-            v-if="!review.exhausted.value && (review.isLoadingMore.value || review.remaining.value > 0)"
+            v-else-if="!review.exhausted.value && (review.isLoadingMore.value || review.remaining.value > 0)"
             class="kv-review-load-more"
           >
             <KuiButton
