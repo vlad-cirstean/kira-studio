@@ -7,7 +7,7 @@ import {
   closeBracketsKeymap,
   completionKeymap,
 } from '@codemirror/autocomplete';
-import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
+import { defaultKeymap, history, historyKeymap, isolateHistory } from '@codemirror/commands';
 import { syntaxHighlighting } from '@codemirror/language';
 import { type Diagnostic, linter } from '@codemirror/lint';
 import {
@@ -336,14 +336,22 @@ watch(
       view.dispatch({
         changes: { from: 0, to: view.state.doc.length, insert: doc },
         selection: EditorSelection.cursor(pos),
-        annotations: externalSync.of(true),
+        // v1.4 follow-up: without isolateHistory, @codemirror/commands' history() merges this
+        // dispatch into whatever undo group is still open under its own newGroupDelay (500ms) —
+        // so pressing Format shortly after typing (the ordinary case: type, then click the button
+        // right there) put the reformat into the SAME undo group as everything just typed. One
+        // Cmd+Z then wiped the whole query back to empty instead of just undoing the reformat.
+        // isolateHistory.of('full') forces a hard group boundary on both sides of this transaction
+        // regardless of timing, so an external sync (Format, or a saved-query load) is always its
+        // own separate undo step.
+        annotations: [externalSync.of(true), isolateHistory.of('full')],
       });
       return;
     }
     view.dispatch({
       changes: { from: 0, to: view.state.doc.length, insert: doc },
       selection: { anchor: 0 },
-      annotations: externalSync.of(true),
+      annotations: [externalSync.of(true), isolateHistory.of('full')],
     });
     view.scrollDOM.scrollTop = 0;
   },

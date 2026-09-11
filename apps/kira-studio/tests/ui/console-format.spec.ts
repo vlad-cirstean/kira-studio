@@ -479,3 +479,42 @@ test('Query console — Format leaves the caret in the statement it was in, so R
   expect(statements?.[0]).not.toContain('as a');
   expect(statements?.[0]).not.toContain('as c');
 });
+
+// v1.4 follow-up: CodeMirrorHost's external-sync dispatch (used by Format's own setText(), and by
+// loading a saved query) had no isolateHistory annotation, so @codemirror/commands' history()
+// could merge it into whatever undo group was still open under its own newGroupDelay (500ms) — the
+// ordinary case of typing a query then immediately clicking Format, right next to it. One Cmd+Z
+// then wiped the WHOLE query back to empty instead of undoing just the reformat. No artificial
+// delay anywhere in this test — that immediacy is exactly what triggered it.
+test('Query console — Format immediately after typing, then undo, restores the typed text (not empty)', async ({
+  relaunch,
+}) => {
+  const CONNECTION_ID = 'conn-console-format-undo';
+  const CONNECTION_SUMMARY = postgresConnectionSummary(CONNECTION_ID, 'Format Undo DB', 'red');
+  const FIXTURE = orderItemsFixture(CONNECTION_ID);
+
+  const CONTROL: ControlSnapshot[] = [
+    { channel: IPC.connectionsList, response: [] },
+    {
+      channel: IPC.connectionsCreate,
+      args: postgresCreateArgs('Format Undo DB', 'red'),
+      response: CONNECTION_SUMMARY,
+    },
+    ...FIXTURE.control,
+  ];
+
+  const { window: page } = await relaunch({ control: CONTROL });
+  await connectAndExpandPostgres(page, 'Format Undo DB', 'red');
+  await openConsoleFromMenu(page, ORDER_ITEMS_PATH);
+  const view = page.locator('[data-testid="console-view"]');
+  await expect(view).toBeVisible();
+
+  const original = 'SELECT a,b FROM t WHERE a=1 AND b IN (SELECT x FROM y)';
+  await typeInto(view, page, original);
+  await page.click('[data-testid="console-format"]');
+  await expect(view.locator('.cm-line').first()).toHaveText('SELECT');
+
+  await view.locator('.cm-content').click();
+  await page.keyboard.press('ControlOrMeta+z');
+  await expect(view.locator('.cm-content')).toHaveText(original);
+});
