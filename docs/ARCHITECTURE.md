@@ -1,16 +1,16 @@
 # Architecture reference
 
-This file is **authoritative for the app as it stands today**: facts about the app itself —
-driver/dependency choices, protocol-level constraints, capability quirks and the structural reasons
+This file is **authoritative for the app as it stands today**: facts about the app —
+driver/dependency choices, protocol constraints, capability quirks, structural reasons
 behind them — organized by subsystem/engine so a future session can look something up without
-reconstructing it from phase-history prose. Environment-specific operational notes (how to run
-Docker in Claude Code's own sandbox, how to work around a proxy block, which env var a headless
+reconstructing it from phase-history prose. Environment-specific operational notes (running
+Docker in Claude Code's own sandbox, working around a proxy block, which env var a headless
 Linux box needs) belong in `AGENTS.md`, not here.
 
-The tree itself outranks this file — if they disagree, the tree is right and this file needs
+The tree outranks this file — if they disagree, the tree is right and this file needs
 fixing, not the other way around. Where this file and any chapter's `SPEC.md` disagree (`docs/v1/`,
 `docs/v1.1/`, `docs/v1.2/`, `docs/v1.3/`), **this file is authoritative for behavior**: each
-`SPEC.md` is the record of what that chapter was *specified* to be, phase by phase, kept as
+`SPEC.md` records what that chapter was *specified* to be, phase by phase, kept as
 originally written rather than corrected to match later reality — see each chapter's own
 `README.md` for what those folders are and aren't.
 
@@ -49,13 +49,13 @@ M9.3** (checkpoint C2): `jackc/pgx/v5` (postgres), `go-sql-driver/mysql` (mariad
 (clickhouse, no driver dependency at all), `go.mongodb.org/mongo-driver/v2` (mongodb),
 `redis/go-redis/v9` (redis), `aws-sdk-go-v2/service/{sqs,s3}` (sqs/s3, sharing a small `awscfg`
 config-and-error-mapping package), `github.com/twmb/franz-go` + `franz-go/pkg/kadm` (kafka). **The
-database/adapter surface itself is cgo-free** — a materially better outcome than the parent plan's
+database/adapter surface is cgo-free** — a materially better outcome than the parent plan's
 own D8 predicted, and one nothing had claimed until now — though this no longer describes the whole
 binary: a handful of darwin-only files elsewhere in the app (`internal/secrets`, `internal/metrics`,
 `internal/localauth`, and — as of v1.3's G9 — `internal/gitclient`'s FSEvents-backed repo watcher)
 use cgo for real OS integrations, each behind a `darwin && cgo` build tag with a working non-cgo
 companion, invisible outside a real darwin+cgo build — so `CGO_ENABLED=1` is
-needed for more than just Wails' own macOS bindings, just never for a Linux dev/test loop. **The
+needed for more than Wails' own macOS bindings, never for a Linux dev/test loop. **The
 Node engine child is gone as of P58f M10**: checkpoint C2
 (P58e M9.3) had already brought it to answering no connection traffic for any kind; P58f deleted the
 process itself, its build/vendoring machinery, and everything that supervised it.
@@ -68,30 +68,30 @@ auto-update.
 ## Invariants
 
 Rules that follow from the app's two hard non-functional requirements — silky UI and a small RAM
-footprint. The budget numbers themselves (and what's actually measured) live in
+footprint. The budget numbers (and what's measured) live in
 [`docs/PERF.md`](PERF.md) §1, not here — this section is the *rules*, not the numbers.
 
-- The renderer never imports a database driver and never parses a wire protocol.
-- No DOM node per cell for off-screen rows — the grid is virtualized in both axes.
-- No Vue reactivity on row data. Rows live in plain frozen typed structures; the grid reads them
-  imperatively and re-renders on an explicit version counter.
+- Renderer never imports a DB driver, never parses a wire protocol.
+- No DOM node per cell for off-screen rows — grid is virtualized in both axes.
+- No Vue reactivity on row data. Rows live in plain frozen typed structures; grid reads them
+  imperatively, re-renders on an explicit version counter.
 - Long lists (tree, log panel, document view) are virtualized too.
-- Every operation that can exceed ~150 ms shows progress and a working stop button.
+- Every operation exceeding ~150 ms shows progress and a working stop button.
 - Every DB read goes through the cache layer (see Caching, below) — a cache miss is the only thing
   that produces a query.
 - **Bulk data is produced and encoded exactly once, in the process that owns the window (P58 D3).**
   A result page is built in Go by the adapter that read it, held in the Go-side L2 cache as native
-  structures, and serialized a single time when a renderer asks for it (see Process model, below).
-  There is no second process, no intermediate encoding, and no re-decode — Go now parses every
-  data-plane request envelope too, since it is the thing answering them. This replaces both the
+  structures, and serialized once when a renderer asks for it (see Process model, below).
+  No second process, no intermediate encoding, no re-decode — Go now parses every
+  data-plane request envelope too, since it answers them. This replaces both the
   original Electron-era rule ("bulk data skips the main process", describing `MessagePort`) and the
   P58a–P58e interim ("the Go process forwards without looking"), which held only while a
   Node-served kind could still exist beside a Go-native one — P58f M10 deleted that seam along with
   the Node engine child.
-- The renderer loads no remote content, opens no window, and navigates nowhere but its own base
+- Renderer loads no remote content, opens no window, navigates nowhere but its own base
   URL. Under Electron this was enforced by the shell as well as true of the code; under Wails only
-  the second half still holds — the renderer contains no such call, but there is no navigation
-  policy left to stop one (see Renderer security surface, below). The *shell* can open a second
+  the second half still holds — the renderer contains no such call, but no navigation
+  policy is left to stop one (see Renderer security surface, below). The *shell* can open a second
   window — *Window → New Window*, ⇧⌘N (P8) — but only from a Go-side menu command, never from a
   renderer-initiated call: `JavaScriptCanOpenWindowsAutomatically: Disabled` (Renderer security
   surface, below) is unchanged, and the renderer never calls `window.open` or its own equivalent.
@@ -107,11 +107,11 @@ that engine can do — `DefaultPageKind`, `Pagination` strategy, `CanInsert`/`Ca
 `Cancel`, `SQL`, `Definition`, `Describe`, `FileTransfer`, `KeyBrowser` (P41 — true only for
 redis/s3: the top-level container's own key/object space is unbounded and arbitrarily nested, so
 the project tree treats that container as a leaf and the UI reaches it through a dedicated Browse
-tab instead, SPEC.md §8.18) — and the UI reads *only* `Caps`, never a `connection.kind` check, to
+tab instead, SPEC.md §8.18) — UI reads *only* `Caps`, never a `connection.kind` check, to
 decide what to show. `registry.go`'s `loaders` map is `registry.ts`'s successor: a plain constructor
 table, each adapter package registering its own constructor from its own `init()`, not a
 lazy-`import()` map — Go links every adapter into the binary regardless of whether a connection kind
-is ever used, so there is no per-engine baseline-memory story left to preserve (P58a OQ-6).
+is ever used, so no per-engine baseline-memory story is left to preserve (P58a OQ-6).
 
 ### Per-database mapping
 
@@ -133,7 +133,7 @@ is ever used, so there is no per-engine baseline-memory story left to preserve (
 consumers for the visibility timeout. Nothing is fetched on tab open, on refresh, or on a timer.
 SQS's authentication is by **named AWS profile** (static keys accepted only in URI mode).
 
-Cancellation is never "stop showing the result" — it is always forwarded to the server. If a driver
+Cancellation is never "stop showing the result" — always forwarded to the server. If a driver
 cannot cancel, the capability is absent and the stop button says so rather than lying.
 
 Every adapter maps its own driver's returned errors to the closed `ErrorCode` set via
@@ -168,8 +168,8 @@ Full read/write SQL adapters — keyset pagination on the primary key (falling b
 `nativeKinds["postgres"]` is `true`, so a Postgres connection is served in-process by
 `adapterhost.Router`, never by the Node engine child. The Go port keeps the design facts
 above (keyset-on-PK pagination, `pg_cancel_backend` on a side connection using the tracked backend
-pid) exactly; what changed is only which process runs the adapter and how its query context is
-handled — a caller-side op cancellation must never be the same `context.Context` passed to `pgx`'s
+pid) exactly; only which process runs the adapter and how its query context is
+handled changed — a caller-side op cancellation must never be the same `context.Context` passed to `pgx`'s
 own `Query`/`Exec`, since pgx (unlike Node's `pg`) honours context cancellation by racing its own
 cancel request against the adapter's explicit `pg_cancel_backend` call
 (`internal/adapters/postgres/query.go`'s `runWithAbortRace`).
@@ -178,7 +178,7 @@ cancel request against the adapter's explicit `pg_cancel_backend` call
 (`apps/kira-studio/internal/adapters/mysqlfamily/`, `github.com/go-sql-driver/mysql`) —
 `nativeKinds["mariadb"]` and `nativeKinds["mysql"]` are both `true`. The shared-core/thin-profile
 split carries over unchanged from the Node design: `mysqlfamily/` holds one `Adapter`
-implementation, and `mariadb/`/`mysql/` each hold only their own `Profile` (server label,
+implementation; `mariadb/`/`mysql/` each hold only their own `Profile` (server label,
 `ApplyEngineOptions`). Same abort pattern as Postgres but for the opposite reason: where pgx
 honours ctx cancellation and the adapter has to race it against an explicit
 `pg_cancel_backend`, go-sql-driver's `database/sql` path does the opposite — cancelling the
@@ -189,7 +189,7 @@ explicit `KILL QUERY <threadId>` on a side connection instead
 (`internal/adapters/mysqlfamily/query.go`). Two capability losses versus the Node adapter, both
 inherent to `go-sql-driver/mysql` rather than fixable in the port: the query console's "N row(s)
 affected" status text is gone (no `RowsAffected()` on the `QueryContext` path the console's
-multi-statement runner needs; a generic "OK" is shown instead), and `allowPublicKeyRetrieval` has
+multi-statement runner needs; a generic "OK" shows instead), and `allowPublicKeyRetrieval` has
 no equivalent — the driver requests the server's RSA public key unconditionally over plaintext
 when `caching_sha2_password` needs one and TLS is off, with no option to refuse that request.
 
@@ -200,7 +200,7 @@ pure Go and cgo-free — the same driver that also backs the app's own storage, 
 `nativeKinds["sqlite"]` is `true`. `caps.cancel` flips from the Node adapter's honest `false` to
 an equally honest `true`: `node:sqlite` (a Node builtin, no native module, no build step, requiring
 Bun 1.4+/Node 22.5+) had no `sqlite3_interrupt` and its whole API was synchronous, so a running
-statement blocked the event loop and an abort could never be delivered while one ran; the Go port's
+statement blocked the event loop and an abort could never be delivered while one ran. The Go port's
 `modernc.org/sqlite` has a real `sqlite3_interrupt`, reached by cancelling an adapter-owned per-op
 `context.Context` on that op's own dedicated `*sql.Conn` (one connection per op, not a pinned
 shared one — unlike Postgres/MariaDB/MySQL, whose cancellation goes through a side connection
@@ -231,20 +231,20 @@ HTTP client that POSTs the statement text and reads ClickHouse's own
 `JSONCompactStringsEachRowWithNamesAndTypes` wire format line by line (names row, types row, then
 one JSON array of strings — or the `ᴺᵁᴸᴸ` sentinel — per data row). This works because ClickHouse's
 own text-rendering already covers every exotic type (`Decimal128`, `UUID`, `Array`/`Tuple`/`Map`,
-`Enum8`, big `UInt64`/`Int64` values) exactly the way the cell editor needs it, so there is nothing
-a Go-side type system would add. The one cost of skipping a client library: its hidden defaults
+`Enum8`, big `UInt64`/`Int64` values) exactly the way the cell editor needs it, so a Go-side type
+system would add nothing. The one cost of skipping a client library: its hidden defaults
 have to be re-discovered and re-set explicitly. `output_format_json_quote_64bit_integers=1` is one
 such setting — `@clickhouse/client`'s own `.json()` method sets it invisibly on every request;
 without it, a plain `FORMAT JSON` catalog query (`total_rows`, `count()`, `system.columns.position`)
-renders a UInt64/Int64 column as a bare JSON number rather than a quoted string, which is both a
+renders a UInt64/Int64 column as a bare JSON number rather than a quoted string, both a
 precision loss past 2^53 and a decode failure for a Go struct field typed `string`. Every such
-setting travels as a URL query parameter on every request (there is no persistent client-level
-session over stateless HTTP), including `database=<db>` (no per-request database override exists
+setting travels as a URL query parameter on every request (no persistent client-level
+session exists over stateless HTTP), including `database=<db>` (no per-request database override exists
 in ClickHouse's HTTP interface either way, so every statement is fully qualified with
 `` `db`.`table` `` regardless of driver).
 
 `canUpdate`/`canDelete` are permanently `false` (`caps.go`) — a MergeTree `PRIMARY KEY` is a sparse
-index over parts, not a unique row key, so there is no addressable row to target for `UPDATE`/
+index over parts, not a unique row key, so no addressable row exists to target for `UPDATE`/
 `DELETE`. This is a structural fact about the engine, not "not yet implemented." The grid's `− row`
 button and inline cell editing are both disabled for this connection kind for the same reason, with
 a tooltip naming it. Cancellation goes through `KILL QUERY WHERE query_id = '<id>' SYNC` on a
@@ -260,15 +260,15 @@ all ten kinds, plus cancel/settings-save/cache-clear, left `adapterhost.Router.C
 zero — the Node engine child is spawned, idle, and answers no connection traffic at all). franz-go
 replaces the old TypeScript driver's ABI-specific compiled binding (built against V8's C++ API — the
 one engine Bun could never load at any ABI) with a pure-Go client: no compiled binding, no ABI, no
-rebuild step, and no packaged-bundle native-module gap (`docs/PACKAGING.md` §6).
+rebuild step, no packaged-bundle native-module gap (`docs/PACKAGING.md` §6).
 
 The adapter never joins a consumer group for a read-only browse — `kgo.ConsumePartitions` assigns
 partitions directly at explicit start offsets (a construction-time option, so the browse client is
 fresh and ephemeral per read, never the adapter's long-lived admin-and-produce client), never
-`subscribe()`/`kgo.ConsumerGroup`. This is now **structural**, not merely configured: there is no
-group-join call in the browse path at all, where the old driver's `group.id` was a
+`subscribe()`/`kgo.ConsumerGroup`. This is now **structural**, not merely configured: no
+group-join call exists in the browse path at all, where the old driver's `group.id` was a
 required-but-never-joined constant. End-of-log detection is a per-fetch `HighWatermark` comparison
-(captured from the fetch that actually delivered the last record, never a follow-up peek poll) rather
+(captured from the fetch that delivered the last record, never a follow-up peek poll) rather
 than a `partition.eof` event, with a fixed-count empty-poll counter kept as a second, independent
 terminator — the same clamp the old driver needed after a real regression (P43 iter2 F19/D26), now
 without the native event that made it possible before.
@@ -292,8 +292,8 @@ S3 — so the op's own `context.Context` on every `kadm`/`kgo` call is the entir
 detail neither SQL adapter's port prepares a reader for: `kgo.Client.PollRecords` returns a
 `Fetches`, not an error, and a cancelled context surfaces as an injected fake fetch carrying
 `ctx.Err()` (`Fetches.Err()`), so the browse loop checks that explicitly rather than relying on a
-returned error. `canDelete` is permanently `false` — a topic's log is immutable, so there is no
-per-message delete or update at the protocol level, only retention/compaction.
+returned error. `canDelete` is permanently `false` — a topic's log is immutable, so no
+per-message delete or update exists at the protocol level, only retention/compaction.
 
 ### SQS (Go-native as of P58d M8.2)
 
@@ -324,7 +324,7 @@ plain `json.Marshal` of the SDK struct — the latter emits every field (`Binary
 `JSON.stringify(message.MessageAttributes ?? {})` never produced. The profile-resolution error also
 changed observably: a nonexistent named AWS profile now fails **at connect time**
 (`config.LoadDefaultConfig` returns `config.SharedConfigProfileNotExistError` directly) rather than
-at first use, which is a gain the Test button reports sooner.
+at first use — a gain, since the Test button reports it sooner.
 
 ### S3 (Go-native as of P58d M8.3)
 
@@ -409,10 +409,10 @@ native precedent** — `sslmode` is this app's own invented option for them — 
 `disable` and an absent option mean plaintext everywhere. A `rediss://` URI implies `verify-full`
 even with no `sslmode` option set, matching the standard meaning of that scheme; a MySQL/MariaDB
 `mysql://`/`mariadb://` URI's query string is parsed for `sslmode` only — any other query parameter
-is dropped with a `warn` log rather than forwarded to the driver (go-sql-driver's `Params` field is
-executed as a literal `SET <k> = <v>` statement at connect time, not a bag of DSN options).
+drops with a `warn` log rather than forwarding to the driver (go-sql-driver's `Params` field
+executes as a literal `SET <k> = <v>` statement at connect time, not a bag of DSN options).
 
-**P21 round 2** closed the one place this vocabulary had actually drifted from its own stated
+**P21 round 2** closed the one place this vocabulary had drifted from its own stated
 rules, without unifying the six independent switches into one shared helper (left for a later
 round — see `docs/v1.2/SPEC.md`'s P21 row). Kafka's own `default:` branch used to reject
 `verify-none`/`insecure` outright, even though the paragraph above already documented it as Kafka's
@@ -427,8 +427,8 @@ against the system trust store, skip the hostname check) even in URI mode, where
 had already resolved it correctly before this app's own `Options`-driven override re-read the same
 value and refused it — it now maps to `InsecureSkipVerify: true` plus a `VerifyPeerCertificate`
 that chains against the system roots without checking the name, the standard Go recipe for that
-mode. `allow` (libpq's "prefer plaintext, retry with TLS only if the server demands it") is left
-unimplemented: this app's TLS config is resolved once, unconditionally, before any connection
+mode. `allow` (libpq's "prefer plaintext, retry with TLS only if the server demands it") stays
+unimplemented: this app's TLS config resolves once, unconditionally, before any connection
 attempt, with no retry-on-refusal path for any mode — approximating `allow` under that model would
 mean picking one of "always plaintext" or "always TLS" and calling it `allow`, which is not what
 the value means in any real libpq client; giving it real opportunistic-retry semantics is a
@@ -441,7 +441,7 @@ connection-flow change out of scope for this pass.
 Credentials in the `connections` table's `password` column are **encrypted at rest** (P25), now from
 Go rather than through Electron's `safeStorage`. The design `safeStorage` used is kept deliberately,
 because it is the right one: one **single symmetric key** lives in the OS keychain and every value
-is encrypted with it, with the ciphertext in the app's own database — one keychain item means one
+encrypts with it, with the ciphertext in the app's own database — one keychain item means one
 authorization decision rather than a prompt per connection, item-count and item-size limits become
 irrelevant, and `SecretStore.copy()` stays a raw column copy that never needs the OS key at all.
 
@@ -461,7 +461,7 @@ installed base to orphan; the OS looks the item up by service name, not by bundl
 **this is the last time the name can change for free** — once real users exist, a rename needs a
 migration (read the old service name once, re-write under the new one, then stop looking).
 
-Two things changed with the cipher, and both are deliberate. The envelope bumped **`kira:v1:` →
+Two things changed with the cipher, both deliberate. The envelope bumped **`kira:v1:` →
 `kira:v2:`** because the cipher genuinely changed (AES-256-GCM under our own key, against Chromium's
 AES-128-CBC under `safeStorage`'s) — reusing the v1 prefix would hand a v1 value to a v2 decrypt and
 fail confusingly. And the **pre-P25 plaintext passthrough is dropped**: `Decrypt` of a non-enveloped
@@ -470,7 +470,7 @@ value now returns an `E_SECRET_STORE` error naming the problem instead of return
 rows written before P25. AES-GCM's authentication tag is a real gain over the old design: a tampered
 or truncated ciphertext fails to authenticate rather than decrypting to garbage, and the existing
 user-facing decrypt-failure message ("may have been written on a different machine or after a
-keychain reset — re-enter it to fix this connection") is already correct for that case and is kept
+keychain reset — re-enter it to fix this connection") is already correct for that case and stays
 verbatim.
 
 A third thing changed with the cipher (P29, closing P21 round 2 architecture/security finding 10):
@@ -492,7 +492,7 @@ dual-read path**: every `kira:v2:` (and `kira:v1:`) value is refused on first re
 and the user re-enters it once.
 
 The connection dialog's credential note reflects the platform's actual backend rather than a fixed
-warning; the probed `{available, backend, insecureFallback, reason}` status is resolved once at
+warning; the probed `{available, backend, insecureFallback, reason}` status resolves once at
 startup and never changes for the life of the process. Linux — development/CI only, v1 targets macOS
 only — has no real keychain support: behind an explicit `KIRA_INSECURE_SECRETS=1` env var it falls
 back to obfuscation under a hardcoded compile-time key (the same threat model and the same honesty
@@ -500,9 +500,9 @@ as Chromium's `basic_text`, whose backend name is kept); without it, secret stor
 and a write carrying a password is refused rather than silently stored in the clear.
 
 Decrypting a stored credential for **display** — the connection edit dialog's password field —
-is gated separately from every other use of it (P14): pressing *Show password* is what triggers
+is gated separately from every other use of it (P14): pressing *Show password* triggers
 the reveal, not opening the dialog, and the backend (`internal/localauth`) confirms the device
-owner before it will decrypt, via macOS's own `LAContext.evaluatePolicy(.deviceOwnerAuthentication)`
+owner before it decrypts, via macOS's own `LAContext.evaluatePolicy(.deviceOwnerAuthentication)`
 (Touch ID with the account password as its own fallback). A successful confirmation grants a
 5-minute, process-wide, non-persisted grace window, so re-opening the same or a different
 connection's edit dialog shortly after doesn't re-prompt — but each window still requires its own
@@ -725,8 +725,8 @@ answer they were waiting for). What is stored of the request is `args`, not `Res
 output — the identical line `op.SetCommand`'s own unresolved-URL-first ordering already draws
 (above): a secret name is still spelled `{{name}}`, never its decrypted value, so a response-history
 entry carries no new secret exposure a saved request's own `tabs.state_json` didn't already have.
-The one thing that genuinely is new: a **response body** (e.g. a login endpoint's `{"token": …}`)
-is now persisted in the clear, which every comparable tool does and is a stated decision, not an
+The one genuinely new thing: a **response body** (e.g. a login endpoint's `{"token": …}`)
+is now persisted in the clear, which every comparable tool does — a stated decision, not an
 oversight.
 
 Storage is bounded by three independent caps, because a response's body is the first payload this
@@ -747,7 +747,7 @@ including the true `bodyBytes`, so the list still reads "412 KB · binary". A **
 `api_variable_history`'s own insert-then-trim SQL already uses) bounds one request's own history.
 And a **global byte budget** (128 MiB, the same order of magnitude as the L2 row cache's own
 `cache.l2BudgetMb` budget, deliberately) bounds the table itself regardless of how many requests
-exist — evicted oldest-first *across every scope*, the property neither of the first two caps can
+exist — evicted oldest-first *across every scope*, a property neither of the first two caps can
 give on its own, as one `DELETE … WHERE id NOT IN (SELECT … SUM(stored_bytes) OVER (…) …)`
 window-function statement inside `Record`'s own transaction on every insert. The per-entry cap is
 what makes that statement safe: no single row can exceed the budget, so the row just inserted is
@@ -757,8 +757,8 @@ old response is not noise.
 
 **The timeline rides the same object into `kira.db` the rendered exchange is stripped out of —
 deliberately not stripped itself (P10).** `Response.Wire` is nilled before `Record` marshals a
-snapshot (below); `Response.Timeline` is not, because the size argument that justifies stripping
-`Wire` does not transfer here: a no-redirect send's timeline is one envelope plus one hop, on the
+snapshot (below); `Response.Timeline` is not, because the size argument justifying `Wire`'s
+stripping does not transfer here: a no-redirect send's timeline is one envelope plus one hop, on the
 order of half a kilobyte, and even a 10-hop chain against the 8 KiB per-hop header cap (below) tops
 out around 90 KB — a fraction of the 256 KiB per-entry cap, absorbed by the existing byte budget
 with no new cap and no schema change (`stored_bytes` already counts whatever `snapshot_json`
@@ -1013,10 +1013,10 @@ Persisted in `metadata_cache`. Survives restart. **No TTL, and staleness is defi
 epoch, not by a clock (P24).** A cached payload is *fresh* if it was written after the connection
 it belongs to was most recently established, and *stale* otherwise; a stale payload is bypassed and
 re-fetched on its first read, per kind, and is never re-fetched again for the rest of that
-connection session. The epoch is `ConnectionState.Since`; the comparison is against a per-kind
+connection session. The epoch is `ConnectionState.Since`; the comparison runs against a per-kind
 timestamp stored inside `payload_json` under the reserved key `fetchedAt` (the `fetched_at`
 **column** orders the 200-row eviction and nothing else). While a connection is **not** connected
-there is no epoch, so the cache is served at any age — which is what makes the panel instant on
+no epoch exists, so the cache serves at any age — which is what makes the panel instant on
 launch and lets a SQL console over a cached container offer completion with no live connection
 (P22c F7).
 
@@ -1048,13 +1048,13 @@ Key = hash of `{connectionId, path, filter, projection, sort, pageSize, pageToke
 persisted. Invalidated by: manual refresh, any local mutation on the same target, disconnect.
 
 **L3 — counts.** `{connectionId, path, filter} → {count, at}`. TTL 5 min, and immediately marked
-*stale* (shown greyed with a refresh affordance) after any local mutation. Counts are only
-computed on explicit user request — never automatically, because they are the most expensive read
+*stale* (shown greyed with a refresh affordance) after any local mutation. Counts compute only
+on explicit user request — never automatically, since they are the most expensive read
 in the app.
 
-**No speculative fetching.** A page is loaded only in direct response to a user action — Next/
-Previous, a filter/sort/projection change, Refresh, or the Count button. There is no background
-prefetch of the next page and no automatic count-on-open; both existed at one point and were
+**No speculative fetching.** A page loads only in direct response to a user action — Next/
+Previous, a filter/sort/projection change, Refresh, or the Count button. No background
+prefetch of the next page and no automatic count-on-open exist; both existed at one point and were
 removed by user request as unwanted background work rather than kept as an opt-out setting.
 
 **Observability.** The status bar shows cache size; the settings dialog shows hit rate and a
@@ -1066,7 +1066,7 @@ five page stores (`views/shared/page/store.ts`, one per page kind, §"UI archite
 holding one loaded page per open tab, plus `views/shared/document/rows.ts`'s parsed-tree cache for
 document bodies — released on tab close, and now (P5 C3) pruned to the rendered window as a tab
 scrolls, in all five stores rather than the two (grid, console) that had it before. It has **no
-byte budget of any kind**, which is a deliberate consequence of an earlier decision (`docs/PERF.md`
+byte budget of any kind**, a deliberate consequence of an earlier decision (`docs/PERF.md`
 §2.2's lever L-B: evicting a cold tab's page was declined twice, on the stated trade of RAM for the
 ≤ 50 ms cached-tab-switch interaction budget) — not an oversight P5 left unfixed. Ten tabs of large
 pages is real, uncapped renderer memory; `docs/v1.1/plans/P5-ram-usage.md` §8 OQ-2 hands the actual
@@ -1076,16 +1076,16 @@ follow-up (surfacing this figure next to the status bar's own cache size, not ev
 
 Distilled facts about how the workbench is put together — not a restatement of `docs/v1/SPEC.md`
 §8's per-dialog field lists or its mockup-vs-shipped narrative, which stay where they are as the
-phase-by-phase record. This is the structural rules a future session needs to not reinvent.
+phase-by-phase record. These are the structural rules a future session needs to not reinvent.
 
 **A view is chosen by page kind, never by database type.** `Page` is a discriminated union
-(`TabularPage`, `DocumentPage`, `KeyValuePage`, `StreamPage`); the UI reads the page's own `kind`
+(`TabularPage`, `DocumentPage`, `KeyValuePage`, `StreamPage`); UI reads the page's own `kind`
 to decide grid vs. document view vs. key/value view vs. stream view. This is why a Postgres
 `jsonb` column can open in the document view and a Mongo `$group` result can open in the grid —
 the mapping is page-shape → view, not engine → view.
 
 **Tab identity is the tab's `id`, never its `path`.** A tab is `{ id, connectionId, path, kind,
-state }`; the same table/collection/key can be open in any number of tabs at once, each with fully
+state }`; the same table/collection/key can open in any number of tabs at once, each with fully
 independent paging, projection, sort, filter and scroll state. Every tab kind — `data`,
 `definition`, `document`, `keyvalue`, `stream`, `console`, `browse` — follows this rule, including
 Browse (below), where `state.levelPath` is the one piece of Browse-specific state layered on top
@@ -1096,13 +1096,13 @@ second top-level mode alongside Studio (**Api** — named Http through P1-P11, r
 once a second protocol, gRPC, joined it; still empty as of P1 — no request builder, no
 collections, nothing protocol-specific had landed yet), and the seam is deliberately the smallest
 thing that works: `TAB_KIND_MODE` (`packages/shared/domain/tabs.ts`) is a total, hand-maintained
-map from `TabKind` to `AppMode`, so there is no `mode` column, no migration and no Go change — a
+map from `TabKind` to `AppMode`, so no `mode` column, migration or Go change exists — a
 tab's mode is derived, never stored, the same shape the "page kind, never database type" rule
 above already uses. `state/mode.ts`'s `modeState` is a plain selection (`setMode`); `tabsState`
 (`state/tabs.ts`) keeps one active tab **per mode** (`activeIdByMode: Record<AppMode, string |
 null>`, not a single app-wide id), and `activateTab`/`closeTab`/`closeOthers`/`closeToTheRight`/
 `closeAll`/`stepTab` are all scoped to the current mode's own slice of the one shared `tabs` array.
-Switching mode touches no `TabRecord`, schedules no save and issues no IPC — the two modes cannot
+Switching mode touches no `TabRecord`, schedules no save, issues no IPC — the two modes cannot
 drift, cannot double-persist into each other, and (per-window `tabs.window_key` scoping,
 unaffected) cannot leak tabs across a window.
 
@@ -1121,7 +1121,7 @@ behaviour (the connection-driven row model, the five openable-kind dispatch, con
 keyboard shortcuts) unchanged. **P4's `api/CollectionsTree.vue` is that primitive's second
 consumer**, and it landed with no change to `TreeHost.vue`, `VirtualList.vue` or `stickyBand.ts` at
 all — the props, the `#row` slot, `revealKey` and the background-contextmenu emit were exactly what
-a second tree needed, which is the check the factoring was meant to pass. It mounts `TreeHost` over
+a second tree needed, the check the factoring was meant to pass. It mounts `TreeHost` over
 its **own** row model, not a shared one: `CollectionRowVm` is four structural members plus seven of
 its own against `TreeRowVm`'s fourteen, because `connectionId`, `color`, `status`, `statusDetail`,
 `groupKind`, `badges`, `loading` and `error` mean nothing here. `api/CollectionRow.vue` is
@@ -1134,7 +1134,7 @@ The stores differ for a reason worth stating: Studio's tree is lazy because its 
 expanding a node connects a connection and issues an IPC call, which is what its children cache,
 loading set, search debounce and "searching cached nodes only" caveat all exist for. A collections
 tree has none of that, because the whole tree is rows in a local SQLite table listable in one call,
-so its `visibleRows` is a pure `computed` over one array with no cache, no loading set and nothing
+so its `visibleRows` is a pure `computed` over one array with no cache, no loading set, nothing
 to be incomplete about. While a search is active every ancestor of a match renders expanded
 **without mutating the expansion set**, so clearing the search restores exactly the shape the user
 had.
@@ -1156,7 +1156,7 @@ to carry too (no compiler catches a miss there — `tests/unit/go-ts-vocabulary-
 does). Every Studio kind's `path` addresses a real target the tab is a *view* onto; an HTTP
 request has none — its state **is** the request — so its `path` is the literal constant
 `'request'`: non-empty (`model.TabRecord.Validate` requires one), carrying no false uniqueness,
-and never reused for identity (a tab's identity is always its `id`, never its `path`, restated
+never reused for identity (a tab's identity is always its `id`, never its `path`, restated
 above). Duplicating an HTTP request tab therefore copies the source's own request state rather
 than starting fresh, the one kind where "same target, fresh default state" does not apply.
 
@@ -1185,7 +1185,7 @@ restore path ever called `.parse`/`.safeParse` at all (`repos/tabs.go`'s Go side
 envelope — ID/path/kind/object-ness — deliberately leaving per-kind shape "renderer-side"), so a
 tab saved with a field missing restored with that property `undefined` rather than defaulted, and a
 stale enum value restored as-is. Merge-only is the load-bearing property: a successful parse can
-only *add* a missing field's default, never drop or reset one, so this is safe to have landed
+only *add* a missing field's default, never drop or reset one, so it is safe to land
 underneath a state-widening phase (P3's own body-mode schema, six new fields) rather than needing
 its own migration story. `tabsSave` still writes `tabsState.tabs` straight back, so a parse also
 drops any key no schema recognizes — deliberate, not lossy in a way that matters, since a garbage
@@ -1201,7 +1201,7 @@ half — the collections tree, the six dialogs (mounted through one `<ApiDialogs
 rather than individually by `App.vue`), the module's own stores, `tabs.ts` (the module's twelve
 tab-opener/finder/patcher functions, moved out of `state/tabs.ts` so the shell imports nothing from
 `views/**`) and `reveal.ts` (below). `views/httprequest/` and `views/grpcrequest/` keep their names
-— they are protocol-specific tab views, the same convention every other `views/<kind>/` follows,
+— protocol-specific tab views, the same convention every other `views/<kind>/` follows,
 and renaming one of two sibling protocol directories to a module name would have said the HTTP tab
 is *the* Api tab and the gRPC tab is something else. `@kira/api-core` (`packages/api-core/`) is the
 module's ~2,000 lines of pure, DOM-free logic — `{{name}}` substitution, curl parse/generate, raw
@@ -1225,7 +1225,7 @@ resolved (P12 D17) — this is an audit, not a restructuring.**
 `biome.json`'s `noRestrictedImports` enforcing its own module graph; the Go side has the equivalent
 rule but no linter behind it, so `internal/ipcerr` (the one error type every bound method returns,
 shaped for `bridge/rpc.ts`'s own `unwrap()`) used to live at `internal/bridge/ipcerr` — an import
-path that asserted a dependency on the IPC transport layer from three packages *below* it
+path asserting a dependency on the IPC transport layer from three packages *below* it
 (`connections`, `secrets`, `tree`). It moved to `internal/ipcerr`, a sibling of `internal/bridge`
 rather than a child of it; `apps/kira-studio/internal/layering_test.go`'s
 `TestDomainPackagesDoNotImportBridge` runs `go list -deps` against the named domain packages so a
@@ -1272,7 +1272,7 @@ mounts 43 `theme/primitives/*` imports across eleven distinct Vue components, pl
 `views/shared/viewOp.ts` — extracting a UI package first needs `packages/ui-kit` (`theme/**` plus
 `primitives.css`/`tokens.css`/`base.css` plus those three utility modules), which **90 of this
 renderer's 287 source files import**. Moving `theme/**` out from under the phase that styles the
-Api module against it next would be exactly backwards. What this phase does instead is make the
+Api module against it next would be exactly backwards. This phase instead makes the
 remaining couplings small and lint-fenced (`api/tabs.ts`, `bridge/apiControl.ts`, and `biome.json`'s
 own six rules) so that a later `packages/ui-kit` extraction turns `packages/api-ui` into a move
 rather than an untangling — three injected ports (an `ApiBridge`, a tab port, the three app-wide
@@ -1325,7 +1325,7 @@ the exporter silently stop emitting it, with nothing failing anywhere. The build
 request carries none of its own** (`text/plain` for raw, the `code` language's Content-Type,
 `application/x-www-form-urlencoded`, a generated `multipart/form-data; boundary=…`, and explicitly
 *no* header at all for a binary body, matching Postman's own documented behaviour for that one) —
-a hand-set `Content-Type` header always wins, including the one edge case that needs an assist: a
+a hand-set `Content-Type` header always wins, including the one edge case needing an assist: a
 user-typed bare `multipart/form-data` with no boundary gets Go's generated boundary appended,
 since the boundary is unknowable to the user and the header and the body must agree.
 
@@ -1342,7 +1342,7 @@ or a binary body, and Go re-`os.Stat`s and streams it directly from disk. See th
 section below for the control-plane arithmetic this is built against.
 
 **`{{name}}` substitution is two stages, in two languages, pinned by one shared corpus (P5).**
-Collection variables and named environments are resolved wherever a request references them — URL,
+Collection variables and named environments resolve wherever a request references them — URL,
 header name and value, and the active body mode's own text fields (a form-data file row's `path`
 and the `file` body's own path are the one deliberate exception: that path is `os.Stat`-checked at
 send and came from a native picker, so a substituted one would be validated for the first time
@@ -1412,9 +1412,9 @@ persisted column protects (next paragraph) does not apply to a value that was ne
 **Why two stages, not one.** All of it in Go would put the engine somewhere P6's
 `@faker-js/faker`-backed `{{$dynamic}}` values cannot reach (a root `package.json` dependency,
 renderer-only); all of it in the renderer would mean a secret's plaintext has to live in the
-renderer's own store to be substituted, which is the exact bug P14 fixed for connection passwords,
+renderer's own store to be substituted, the exact bug P14 fixed for connection passwords,
 recreated one table later. So stage 1 (the renderer, `send()` in `views/httprequest/state.ts`)
-resolves every reference it can see — everything except a name that matches a *secret* entry, which
+resolves every reference it can see — everything except a name matching a *secret* entry, which
 it leaves verbatim and classifies `deferred`, never fetching or holding that value at all. Stage 2
 (`internal/apivars.Service.ResolveRequest`, called from `bridge/http.go`'s `Send`) decrypts only
 the secrets a request's fields actually reference and finishes the rest. The ordering inside `Send`
@@ -1444,19 +1444,19 @@ emitting exactly the client defaults that change how the *server* interprets the
 mode's own default `Content-Type`) and never the ones that only identify the client (`User-Agent`,
 the request deadline). Neither direction reaches Go: parse produces tab state, which
 `model.TabRecord.State` already treats as an opaque `json.RawMessage` (P3); generate needs the
-renderer's own dynamic-value generator and the reveal gate above, both of which only exist
+renderer's own dynamic-value generator and the reveal gate above, both existing only
 renderer-side. A hypothetical Go-side generator would be a second bound method holding a
 fully-resolved, credential-bearing request — one careless `op.SetCommand` or `slog.Info` away from
 writing a decrypted credential into `kira.db`, exactly the hazard `SetCommand`'s
 unresolved-URL-first ordering above exists to avoid; the renderer has no op, no persisted column and
-no log sink; the hazard is absent there, not merely mitigated. So P7 adds no Go file, no migration,
+no log sink — the hazard is absent there, not merely mitigated. So P7 adds no Go file, no migration,
 no bound method and no bindings regeneration — `internal/apivars/`, `internal/httpclient/`,
-`internal/bridge/` and `internal/postman/` are byte-identical to what P6 left.
+`internal/bridge/` and `internal/postman/` stay byte-identical to what P6 left.
 
-**Response headers are shown alphabetised, not in received order — a known property of
+**Response headers show alphabetised, not in received order — a known property of
 `net/http`, not a bug.** Go's `http.Response.Header` is a `map[string][]string` with
-`textproto.CanonicalMIMEHeaderKey` already applied by the transport; there is no stdlib access to
-the bytes as actually received, so `internal/httpclient` cannot recover either the original casing
+`textproto.CanonicalMIMEHeaderKey` already applied by the transport; no stdlib access exists to
+the bytes as received, so `internal/httpclient` cannot recover either the original casing
 or the original order even if it wanted to. `Response.Headers` is instead a deterministic
 substitute — `[]Header{Name, Value}` sorted by name, one entry per value so a duplicate header
 (e.g. multiple `Set-Cookie`s) still survives — documented on the struct itself. **P9 measured the
@@ -1524,10 +1524,10 @@ resolve, so `dns` alone is nil while `connect` is real; a plain-`http://` URL ha
 ever. `wait` (`WroteRequest` → `GotFirstResponseByte`) is guarded against two real cases: a server
 may answer before the request finishes writing (a `1xx`, or a rejection partway through a large
 upload), so `WroteRequest` either fires *after* the first response byte or never fires at all —
-either way `wait` is left nil rather than reporting a negative or decades-long interval. The five
+either way `wait` stays nil rather than reporting a negative or decades-long interval. The five
 phases are never summed to claim a hop's own total: what is left over — a proxied request's own
 CONNECT-tunnel round trip is the one substantial case, since `ConnectStart`/`Done` there measure the
-dial to the *proxy* and the tunnel's own request/response has no hook at all — is rendered as a
+dial to the *proxy* and the tunnel's own request/response has no hook at all — renders as a
 labelled, unattributed residue instead of padded away. A hop's own response headers are capped at 8
 KiB, truncated visibly (`headersElided`) rather than copying an adversarial server's unbounded
 `MaxResponseHeaderBytes` allowance into `Response` and, via history (above), into `kira.db`.
@@ -1658,8 +1658,8 @@ direction is never a surprise; a binary body on either side withholds only the b
 summary and headers levels still shown and the reason stated inline.
 
 **Session restore never auto-reconnects.** On relaunch, previous tabs reopen but their connections
-are not. A restored tab renders a centred **Reconnect & load** button (`ReconnectGate`) and
-nothing else until it is pressed — the same gate every view kind uses for this state, including
+do not. A restored tab renders a centred **Reconnect & load** button (`ReconnectGate`) and
+nothing else until pressed — the same gate every view kind uses for this state, including
 Browse tabs.
 
 **The write model is staged for SQL tables, immediate everywhere else.** PostgreSQL/MariaDB/
@@ -1668,25 +1668,25 @@ set — nothing reaches the database until *Commit*, and *Preview command* rende
 statements first. ClickHouse tables get add-row only, staged the same way (no addressable row to
 update/delete — a MergeTree `PRIMARY KEY` is a sparse index). MongoDB/Redis/Kafka/SQS/S3 write
 **immediately**, gated per adapter's `canInsert`/`canUpdate`/`canDelete` capability, with no
-staging or preview — there is no pending-change set to opt into for these engines at all.
+staging or preview — no pending-change set exists to opt into for these engines at all.
 **The fake-data generator (P15) is a third, staging-free caller of that same `data.mutate` op** —
 its own per-column recipe plans build `MutationRowOp[]` batches directly, the way
 `views/shared/immediateMutation.ts` already does, rather than going through the pending-change set:
-that store renders one un-virtualized DOM row per staged insert, which is fine for a hand-clicked
+that store renders one un-virtualized DOM row per staged insert, fine for a hand-clicked
 row and wrong for a generator that can be asked for thousands.
 
 **The cell editor is a panel mounted by whichever view owns the tab**, not a global singleton —
 grid, documents, key/value, stream and console each mount their own instance, appearing only while
 their tab has a selected cell and disappearing the instant it doesn't (including across a tab
-switch). A view kind that never shows one (a definition tab) simply never mounts it — there is no
-central registry or visibility flag to keep in sync.
+switch). A view kind that never shows one (a definition tab) simply never mounts it — no
+central registry or visibility flag needs keeping in sync.
 
 **Browse panel: one level per screen, never a recursive tree.** Redis (a db index's key
 namespace) and S3 (a bucket's prefix/object space) are unbounded and arbitrarily nested, so their
 project-tree node is a leaf and a dedicated `browse` tab is the only place either is actually
 navigated, one lazy level at a time over the same `SCAN`/`ListObjectsV2` calls the tree would
 otherwise have made inline. The toolbar's **Up** button and a breadcrumb are the only ways to move
-between levels; there is no expand/collapse and no level is ever rendered nested under another.
+between levels; there is no expand/collapse, and no level ever renders nested under another.
 
 **Find/search and chunked scanning are shared machinery, not four reimplementations.** The grid,
 document, key/value and console-result views all call the same `createPageSearch` factory and the
@@ -1726,7 +1726,7 @@ completion/diagnostics/hover providers (`views/console/sqlLanguageService.ts`,
 DDL document (`connection_ddl`, below) via `@codemirror/lang-sql`'s own per-dialect Lezer parser —
 no schema introspection over a live connection, ever, even though the renderer already has live
 column metadata in reach (`runtime[tabId].meta`, the WHERE/ORDER BY boxes' own completion source).
-With no DDL document, a SQL console is byte-for-byte what it was before this phase.
+With no DDL document, a SQL console stays byte-for-byte what it was before this phase.
 
 **EXPLAIN crosses the wire as an ordinary result page, never a new op.** P18 (v1.1)'s Explain
 button and auto-explain toggle (`connections.auto_explain`, below) both compose a dialect's own
@@ -1759,7 +1759,7 @@ user actually wanted to undo) with a small `IconButton icon="discard"` beside ea
 editable leaves, disabled once the draft already equals that leaf's own default. Two generic
 `isAtDefault`/`resetLeaf` helpers drive all nine — the same discipline `diffSection` already
 applies to the Save-time patch — so a future leaf needs no dedicated handler. A reset still only
-stages the default into the draft; Save is what commits it, unchanged from P17.
+stages the default into the draft; Save commits it, unchanged from P17.
 
 **The op log records one connectionless op kind: `'http'` (P2).** `Host.RunOp`'s `OpSpec.ConnectionID`
 was always `*string`, but P2 is the first phase to give it a real, every-day connectionless caller
@@ -1800,7 +1800,7 @@ currently-connected connection (so tuning a limit while hitting it applies immed
 reconnect needed), and cleared in `Disconnect`.
 
 **Row coloring is a per-column text colour, not a row background.** P9's `appearance.rowColoring`
-setting (default on) does not paint a background, a stripe, a parity rule or a hash — it derives a
+setting (default on) paints no background, stripe, parity rule or hash — it derives a
 text colour from each column's own `typeClass`, decided by exactly one function
 (`DataGrid.vue`'s `colorForColumn`). Turning the setting off removes colour wholesale; with it on,
 string-typed cells get no distinct colour of their own, unlike every other type class.
@@ -1809,7 +1809,7 @@ string-typed cells get no distinct colour of their own, unlike every other type 
 compiled, no-virtual-DOM rendering) was evaluated against this tree in P6
 (`docs/v1.1/plans/P6-vue-vapor-mode.md`) and declined — not because it is new, but because this
 app's hot paths already sit outside the VDOM's per-binding diffing model via the
-no-reactivity-on-row-data invariant above (`:66-67`), so there is no rendering cost left for Vapor
+no-reactivity-on-row-data invariant above (`:66-67`), so no rendering cost is left for Vapor
 to remove; partial adoption would also ship both runtimes for one component, and the one global
 `v-tooltip` directive is an `ObjectDirective`, an interface Vapor's custom directives don't accept.
 A future Vue 3.6 upgrade keeps VDOM mode — see the plan's §6 for the conditions under which this
@@ -1818,8 +1818,8 @@ should be re-evaluated.
 ## Process model
 
 Two processes for the Studio and Api modules: the **webview** running the Vue renderer, and the
-**Go shell** that owns the window, all app state, and now every database driver too. The git module
-adds a third that this app does not own — a separately-installed VS Code extension host, reached
+**Go shell** owning the window, all app state, and now every database driver too. The git module
+adds a third this app does not own — a separately-installed VS Code extension host, reached
 over a Unix socket rather than through either of the two planes below (see Git module, above).
 
 ```
@@ -1850,10 +1850,10 @@ all survive); now every adapter call runs behind a `recover()` at the op boundar
 (`adapterhost.Host.safeRun`), which converts a panic into a failed op (`E_INTERNAL`) for that one
 call instead of taking the whole app down — but a panic *outside* that boundary (a goroutine an
 adapter spawns and never joins, for instance) still can. This does not restore the old isolation;
-it converts "the app disappears" into "one operation failed" for the panics it actually catches.
+it converts "the app disappears" into "one operation failed" for the panics it catches.
 
 **One process for all connections**, same as before: there was never one V8 isolate per connection,
-and there is no per-connection Go process either — the adapter host multiplexes every open
+and no per-connection Go process exists either — the adapter host multiplexes every open
 connection through its own registry and cache regardless of how many are open at once.
 
 **The renderer talks to Go over two planes.** The **control plane** is the Wails-generated
@@ -1867,7 +1867,7 @@ external. Vite's dev server still has to resolve it at transform time, which is 
 `apps/kira-studio/frontend/wails/runtime.js` is for: a file at exactly that path under the Vite root, so the
 rewritten import URL stays `/wails/runtime.js` and `wails3 dev`'s asset server (which answers
 `/wails/*` itself and proxies only the rest to Vite) keeps serving the real bundle. Every call is
-wrapped in one `unwrap()` that normalizes a Go-side error into
+wrapped in one `unwrap()` normalizing a Go-side error into
 the `{message, code}` shape the renderer already branched on.
 
 **The control plane has its own undocumented size behaviour, measured once (P3) rather than
@@ -1882,8 +1882,8 @@ of its own to explain it. This is exactly why the HTTP request body's file modes
 file fields, the binary body) and the pre-existing S3 object upload both cross the wire as a short
 local **path** instead of the file's own bytes: Go opens and streams the file itself
 (`internal/httpclient/body.go`'s `buildFormData`/`buildFile`, mirroring `internal/adapters/s3/
-transfer.go`'s `openUploadBody`), so an upload's size is bounded by the filesystem, not by this
-512 KiB/64 MiB arithmetic, and a multi-GB file is one ~200-byte control call rather than hundreds.
+transfer.go`'s `openUploadBody`), so an upload's size stays bounded by the filesystem, not by this
+512 KiB/64 MiB arithmetic, and a multi-GB file becomes one ~200-byte control call rather than hundreds.
 
 The **data plane** is a single named
 stream, `"engine"`, opened once per page load by `apps/kira-studio/frontend/src/bridge/port.ts` via
@@ -1895,7 +1895,7 @@ wraps Wails' own transport, and which transport that is depends on the build tag
 (what this app ships) has no local listener at all: the frontend holds open `GET
 /wails/stream/poll` (up to 20 s) until the Go side has a frame to deliver, and posts outbound
 frames to `POST /wails/stream/send` — both over the asset server's custom URI scheme, deliberately,
-so that no local TCP port is open for another process on the machine to reach. `WailsSocket` wraps
+so no local TCP port is open for another process on the machine to reach. `WailsSocket` wraps
 that poll/send pair in the same `readyState`/`onmessage`/`send()` shape a `WebSocket` has, which is
 why the frontend code reads as if it were talking to one — but a real, on-the-wire `WebSocket` only
 exists in a `-tags server` build (`apps/kira-studio/tests/e2e-real/` builds with that tag; the
@@ -1906,26 +1906,26 @@ packaged app does not), where the identical application code runs unchanged over
 exactly once, in the process that owns the window — the old Electron-era invariant ("Go never reads
 a data-plane frame") could not survive Go adapters existing at all. `apps/kira-studio/internal/adapterhost/dataframe.go`'s
 `HandleDataFrame` parses just enough of each inbound frame — its `op`, and for a connection-scoped
-op, that connection's `connectionId` — to route it, then answers every op in-process by
+op, that connection's `connectionId` — to route it, then answers every op in-process via
 `adapterhost.Dispatcher`, its response encoded as one FlatBuffers `Frame` — a `"KIF1"`
 file-identified buffer whose `offsets`/`truncated` vectors are `[uint]` so
 `packages/shared/protocol/frame.ts`'s `decodeFrame` reads every chunk's four buffers as zero-copy
-typed-array views over the received bytes, not a base64 decode-and-copy (P11 D4, D5). There is no
-other wire shape any more for a response or event; requests (renderer → Go) still travel as plain
+typed-array views over the received bytes, not a base64 decode-and-copy (P11 D4, D5). No
+other wire shape exists any more for a response or event; requests (renderer → Go) still travel as plain
 JSON text (P11 D3). `ping` is answered locally too — the engine *is* this process now (P58f D11),
 so the status pill's pid is this process's own `os.Getpid()`, not a child's; `cache:stats`/`cache:clear`
-are answered locally as before, merging both caches' counters while reporting the configured budget
+answer locally as before, merging both caches' counters while reporting the configured budget
 once, not doubled (A16).
 
 **One writer, one producer.** `adapterhost.Session` owns a single bounded queue (64 frames / 32 MiB)
 and the one goroutine draining it into the renderer's `Send`, so exactly one goroutine ever calls
-the renderer connection's blocking `Send`. There is only one producer now — the router's own
+the renderer connection's blocking `Send`. Only one producer exists now — the router's own
 locally-produced responses — where P58a–P58e had two (the deleted Node engine's own data frames were
 the other, fanned together by the now-deleted `internal/enginebackend`, P58f D9). A full queue never
 drops a response frame — `enqueueResponse` blocks for room instead (P2 R1 task #51, P2 R2 task #97),
 since a dropped response could never settle its pending request, which has no client-side timeout of
-its own. Only `enqueueLocal`'s unsolicited events (`cache:stats`) drop on a full queue, because the
-next one supersedes it. There is no OS pipe left to push back through, so the old retry-with-backoff
+its own. Only `enqueueLocal`'s unsolicited events (`cache:stats`) drop on a full queue, since the
+next one supersedes it. No OS pipe is left to push back through, so the old retry-with-backoff
 that paused the engine's stdout read loop has no successor and needs none.
 
 **Backpressure is app-level and transport-level, stacked, and which one actually binds differs by
@@ -1940,7 +1940,7 @@ which stalls the queue's own draining and only then, as the queue backs up towar
 frames, does the app-level bound engage and block the producer (`enqueueResponse`). The app's larger
 queue is the shock absorber in front of the smaller transport window, not a tighter gate ahead of
 it. Inbound (renderer → Go) has no app-level queue at all: Wails' own limit (256 frames / 8 MiB)
-answers **429** rather than blocking, deliberately, because the held poll request is this
+answers **429** rather than blocking, deliberately, since the held poll request is this
 transport's scarce resource, not a buffer to grow.
 
 **The FE↔BE protocol decision (P4, superseded on the data plane by P11).** With efficiency and a
@@ -1989,7 +1989,7 @@ made a real candidate worth re-weighing, and adopted FlatBuffers:
   `docs/v1.1/plans/P11-flatbuffers-data-plane.md` (current).
 
 **The Go side is `apps/kira-studio/`.** `apps/kira-studio/main.go` builds the `application.New`
-options and registers **twenty-two** bound services under `apps/kira-studio/internal/bridge/`.
+options, registers **twenty-two** bound services under `apps/kira-studio/internal/bridge/`.
 Thirteen are Studio's and the shell's — `AppService`, `SettingsService`, `LayoutService`,
 `TabsService`, `WindowsService` (P8: a page's own boot-time window registration, see Process
 model's multi-window subsection below), `ConnectionsService`, `TreeService`, `EngineService`,
@@ -2015,7 +2015,7 @@ op-log event type and its two topics, relocated here from the deleted `internal/
 D9), and `internal/metrics/`.
 
 **Multi-window: per window, or app-wide (P8).** The app has always had exactly one window in
-practice — there was no code path to a second one in either the Electron or the Wails shell — but
+practice — no code path led to a second one in either the Electron or the Wails shell — but
 Wails' own window manager (`internal/shell`) supports any number, and P8 is the phase that made a
 second window both reachable (*Window → New Window*, ⇧⌘N) and correct. The line, and why it sits
 where it does:
@@ -2083,12 +2083,12 @@ platform sums RSS, unchanged.
 Monitor itself shows both: its per-process **"% CPU" column is an unnormalized per-core sum**
 (0…100×N, so a process pinning two cores of an 8-core Mac reads 200%), while its **CPU-load pane
 graphs the normalized figure** (0…100, a share of the machine's whole capacity). The status bar
-follows the second convention — matching the CPU-load pane, not the per-process column — because a
+follows the second convention — matching the CPU-load pane, not the per-process column — since a
 one-number readout in a 4-character slot answers "how much of this Mac is the app using". A user
 comparing against the per-process column will otherwise see a figure up to `logicalCPUs` times
 smaller and reasonably conclude the status bar is wrong — P22 D11 trimmed the hover tooltip
 (`StatusBar.vue`) to the numbers alone (cores/memory/process count/interval), so this paragraph,
-not a five-line hover panel, is now where that cross-check is spelled out.
+not a five-line hover panel, now spells out that cross-check.
 
 **Neither convention accounts for core frequency or Apple silicon's P/E asymmetry.** A normalized
 percentage is a share of total core-*seconds*, not a share of compute capability: four E cores at
@@ -2117,7 +2117,7 @@ logic lives in this Go binary, and the frontend is a separately-installed VS Cod
 connecting as an external client. Kira Studio's own Wails window has no git mode, no git tab and no
 git panel. Its only git-facing surfaces are the Settings dialog's *Connected editors* pane
 (pairing, revocation, extension install) and its *Git* section (the two server-owned remote-op
-settings below) — both there because Kira Studio is the trust authority and the owner of those
+settings below) — both there because Kira Studio is the trust authority and owner of those
 settings, not because a git UI crept in.
 
 **Why headless, structurally.** An in-process Wails stream is unreachable from another process, and
@@ -2133,7 +2133,7 @@ of scope and stays additive rather than a rework — the same "additive, not a r
 **One Unix domain socket at `${KIRA_HOME}/git.sock`** (default `~/.kira-studio/git.sock`), mode
 0600, inside the 0700 directory `config.EnsureLayout` already owns. There is **no discovery or
 announce mechanism**: the extension dials the fixed path, and a connection failure means Kira
-Studio isn't running — that is the entire signal, and there is nothing further to distinguish. This
+Studio isn't running — that is the entire signal, with nothing further to distinguish. This
 app is macOS-only, so a Unix socket is unconditionally viable with no cross-platform fallback.
 
 **Stale-socket recovery is an `flock`, not a liveness probe.** At startup the app takes an
@@ -2142,7 +2142,7 @@ crash leftover — unlink it and listen. Lock already held: another instance is 
 does not listen. Either way the app still boots; `main.go` logs the listener's error and never
 `Fatal`s on it. A `SIGKILL`ed instance's flock is released by the kernel, so the next launch
 recovers with no stale-pid file and no manual cleanup, and a leaked askpass directory needs no
-startup sweep because it is inert.
+startup sweep, since it is inert.
 
 **Pairing is the auth model, and there is no pre-shared token file.** A client's `hello` carries
 its identity and, if it has one, an opaque token; the server answers `ready`, `versionMismatch`,
@@ -2154,7 +2154,7 @@ auto-denied), and a 60 s cooldown after an explicit denial so a reconnecting ext
 re-prompt in a loop. The approved token is 32 `crypto/rand` bytes; **only `sha256(salt‖token)` is
 stored**, compared with `subtle.ConstantTimeCompare`. The plaintext is never stored and never
 recoverable — not an omission, a consequence: verifying a presented token is the only thing this
-app ever needs to do with one, so a reversible form would be strictly more exposure for no
+app ever needs to do with one, so a reversible form would mean strictly more exposure for no
 capability. The extension keeps its own copy in VS Code's `context.secrets`. Revoking from the
 *Connected editors* pane sets `revoked_at` and closes every live connection holding that id; the
 extension receives `tokenRejected`, clears its stored token, and re-dials with none, producing a
@@ -2198,7 +2198,7 @@ job, which is what makes reuse by a second module free rather than a fork.
 A real, load-bearing requirement rather than a hypothetical: **several VS Code windows connect to
 one backend at once**, pointed at the same repository or at different ones. The structure follows
 one rule — *a fact about the repository is shared; a fact about one viewer's session is private* —
-which is the one genuine structural departure from a single-session design that conflates the two.
+the one genuine structural departure from a single-session design that conflates the two.
 
 ```
 GitServer (internal/gitsock)
@@ -2254,7 +2254,7 @@ GitServer (internal/gitsock)
 
 **Settings ownership follows the same shared/private line, and it is a correctness question rather
 than a preference.** `protectedBranches`, `fetch.autoInterval` and `git.path` are **server-owned**
-— two windows disagreeing about a protected-branch list is a safety bug — and are edited in Kira
+— two windows disagreeing about a protected-branch list is a safety bug — and edited in Kira
 Studio's own Settings dialog (*Git* section), read fresh on every push pre-flight and every
 auto-fetch tick, never cached. Every per-viewer display setting (graph page size and scope, stash
 visibility, and similar) is **per repository**, stored server-side in `git_repo_settings` (Storage,
@@ -2268,7 +2268,7 @@ Every git package is its own `internal/git*` (plus `internal/ghclient` and `inte
 and no phase merged git code into a shared file where a per-module one would do.
 `internal/layering_test.go`'s `TestDomainPackagesDoNotImportBridge` covers them exactly as it
 covers the Studio and Api domain packages — no `internal/git*` package imports `internal/bridge`,
-and none imports or is imported by an adapter package.
+none imports or is imported by an adapter package.
 
 | Package | Owns |
 |---|---|
@@ -2302,11 +2302,11 @@ command. App data — the worktree path, its branch, the repository root — rea
 environment variable *values*, so even a maximally adversarial branch name can at worst be a
 word-splittable value, never re-parsed as a command. The package imports nothing beyond the
 standard library and knows nothing about repositories, sessions or approval; `gitsession` owns
-every policy decision and this package owns only the mechanism, which is what lets the whole
+every policy decision and this package owns only the mechanism, letting the whole
 feature be tested without ever spawning a real shell.
 
 **GitHub authentication is delegated entirely to `gh`, and this app holds no GitHub credential of
-any kind.** No OAuth flow, no token prompt, no direct call to GitHub's OAuth endpoints, and no
+any kind.** No OAuth flow, no token prompt, no direct call to GitHub's OAuth endpoints, no
 reading of `gh`'s own keychain entry out from under it — PR lookups shell through `gh api`, under
 the same spawn discipline as every git call. Re-solving authentication here would be a second,
 worse implementation storing a second copy of a secret this app has no business holding. `GhStatus`
@@ -2318,7 +2318,7 @@ own enable flag already had.
 
 **Search reconciles Go's RE2 against JavaScript's `RegExp` explicitly rather than approximating
 it**, because the server-side tail scan and the client-side scan of already-loaded rows must agree
-exactly — otherwise a hit's presence depends on which page happens to be loaded, which is a bug the
+exactly — otherwise a hit's presence depends on which page happens to be loaded, a bug the
 user can see and cannot explain. Three tiers, and the module never runs a second, silently
 different engine against the same query text:
 
@@ -2350,7 +2350,7 @@ outright.** APFS returns filenames from the filesystem in NFD; git stores paths 
 the committer's platform produced, usually NFC. `internal/gitpath` is the module's one
 canonicalisation point — it exists because five otherwise-unrelated packages need the same one-line
 normalization and share no common import that wouldn't invert the layering. The rule is not "is
-this a path?" but "where did these bytes come from, and where are they going?":
+this a path?" but "where did these bytes come from, and where do they go?":
 
 - **Tier 1 — absolute and directory paths** (`RepoID`, the root, git dir, common dir, worktree
   directories, filesystem-event paths, every client-supplied directory parameter) are normalized to
@@ -2387,14 +2387,14 @@ pure-Go package cross-compiles and unit-tests for `darwin/arm64` from this repo'
 container, while a cgo one cannot be compiled there at all — and for code whose entire purpose is
 to work on the one path nobody exercises interactively, "verifiable where the code is written" is
 not a nicety. `internal/gitreview`'s own equivalent refusal is deliberately *not* routed here: it
-fires mid-session inside an already-open window, as an RPC-level error, which is a different
+fires mid-session inside an already-open window, as an RPC-level error — a different
 surface with a working answer already.
 
 ### The extension and its packages
 
 `apps/kira-studio-vscode` is the whole frontend. It contributes a **Git Graph** webview in the
 panel and a **Kira Version** webview in the activity bar, **46 commands** (every mutating operation
-has one — the command-palette audit that established this happens once, and each later phase
+has one — the command-palette audit establishing this happens once, and each later phase
 registers its own), SCM-title / editor-title / editor-context / comment-thread menus, keybindings
 and colors, and — as above — **no configuration properties**. It reaches Go through
 `packages/git-ipc`'s `socketChannel.ts`: `net.connect` plus length-prefixed framing behind the same
@@ -2413,7 +2413,7 @@ to Go.
 
 **Every viewport-anchored floating surface in both frontends goes through Floating UI's
 collision-aware middleware** (`flip`/`shift`/`size`), rendered teleported so no `overflow: hidden`
-ancestor can clip it. The audit that established this is stated per *mechanism*, not per module,
+ancestor can clip it. The audit establishing this is stated per *mechanism*, not per module,
 because a first pass concluded one frontend was clear on the strength of its most common mechanism
 and missed a second: a native `title` attribute, a CodeMirror `hoverTooltip` (whose container
 defaults to the editor's own DOM node unless `parent: document.body` is set explicitly, and which
@@ -2428,7 +2428,7 @@ gave `html`/`body`/`#app` a height, so the components' own `height: 100%` resolv
 against an ancestor chain with none. `apps/kira-studio-vscode/tests/layout/` asserts **real
 rendered box height** via `getBoundingClientRect()` against the real emitted document and the real
 built bundle. DOM shape is exactly the kind of proxy that passes while the thing it stands for is
-broken, and this tier exists because that happened.
+broken — this tier exists because that happened.
 
 **The extension ships in the DMG, not through a marketplace.** `bun run package:vscode` produces
 `kira-version.vsix`; the packaging task copies it to `Contents/Resources/kira-version.vsix` before
@@ -2442,12 +2442,12 @@ isn't on `PATH`. The filename carries no version: the version lives inside the m
 
 **This section is much shorter than it was, and that is the finding, not an omission.** Most of what
 P46 hardened were default-on Electron/Chromium capabilities. Under Wails the webview is a native
-WKWebView, not a bundled Chromium, so the majority of those switches have **no subject at all** —
-there is nothing to turn off, because the thing was never on. A smaller number have **no analogue**:
+WKWebView, not a bundled Chromium, so most of those switches have **no subject at all** —
+nothing to turn off, since the thing was never on. A smaller number have **no analogue**:
 Wails exposes no equivalent, and the guarantee is genuinely weaker than it was. Those are listed as
 losses below rather than papered over.
 
-`apps/kira-studio/internal/shell/security.go` is the one module that owns what remains. `Harden()` returns the
+`apps/kira-studio/internal/shell/security.go` is the one module owning what remains. `Harden()` returns the
 posture, and `window.go`'s `Options` is its single caller. It does four things: deny every
 permission except clipboard reads, set `JavaScriptCanOpenWindowsAutomatically` false, leave
 `EnableFileDrop` false, and leave `OpenInspectorOnStartup` false.
@@ -2485,13 +2485,13 @@ Wails half on their own). Re-check after any Wails version bump; P19's posture m
 moving through betas.
 
 **Autofill** is unchanged and still a renderer-side control: `autocomplete="off"` on every
-`TextField.vue`-backed input, because zero `<form>` elements means the engine has no form owner to
-attach autofill heuristics to and the attribute is the actual per-input opt-out.
+`TextField.vue`-backed input, since zero `<form>` elements means the engine has no form owner to
+attach autofill heuristics to, and the attribute is the actual per-input opt-out.
 
 **The clipboard allowlist is an allowlist, not a deny-all, because a deny-all breaks the app.**
 Denying clipboard reads throws at `clipboard.ts`'s `copyText` (38 call sites) and the grid's own
 paste path. This reasoning still governs the `Permissions` map even though that map is inert on
-macOS — it is the correct value, and it is the value that actually applies on Linux.
+macOS — it is the correct value, and the value that actually applies on Linux.
 
 **Deliberately left alone, each a decision rather than an oversight:**
 - **Hardware acceleration** stays on. The grid's scroll budget (see Invariants, above, and
@@ -2502,9 +2502,9 @@ macOS — it is the correct value, and it is the value that actually applies on 
 
 **What actually holds this**, so a revert is never silent: `apps/kira-studio/internal/shell/security_test.go`
 and `menutemplate_test.go` (the posture value and the packaged-vs-dev menu template — the successors
-to the deleted `tests/unit/security.spec.ts`/`menu.spec.ts`, whose subjects moved to Go). There is
-no Wails analogue of the old `tests/e2e/hardening.spec.ts`, and none was written: with the table
-above reduced to "no subject" for most rows, there is nothing left for such a spec to assert that
+to the deleted `tests/unit/security.spec.ts`/`menu.spec.ts`, whose subjects moved to Go). No
+Wails analogue of the old `tests/e2e/hardening.spec.ts` exists, and none was written: with the table
+above reduced to "no subject" for most rows, nothing is left for such a spec to assert that
 the Go test does not already cover. The macOS-only behaviours — WebKit's clipboard gesture
 heuristics, and the absent navigation delegate — have no automated coverage on any platform this
 repo's CI runs.
@@ -2523,7 +2523,7 @@ Go backend half and a Playwright frontend half per adapter, sharing one fixture 
 `~/.kira-studio` or a database a running `bun run dev` session is connected to. Running the tests
 must not disconnect, lock out, or otherwise disturb a `bun run dev` instance already running on the
 same machine. One exception is deliberate (P25 F10): on a real macOS dev machine the app's Keychain
-item is shared with the developer's own login keychain, so a test that saves a connection password
+item is shared with the developer's own login keychain, so a test saving a connection password
 touches the same OS-level encryption key a `bun run dev` session would. This is safe — each test's
 *secrets* stay isolated in its own temp `KIRA_HOME`'s `kira.db`, only the underlying key is
 shared, and no test ever rotates or clears that key.
@@ -2537,7 +2537,7 @@ deleted as low-value rather than ported. The **Go suite was pruned against the s
 same pass. Two specs were deleted because their subject moved rather than disappeared:
 `security.spec.ts` and `menu.spec.ts` are now `apps/kira-studio/internal/shell/security_test.go` and
 `menutemplate_test.go`. A shared runtime stub (`tests/unit/support/wailsRuntime.ts`) registers a fake
-`/wails/runtime.js` and is imported for its side effect by every spec that needs one, rather than
+`/wails/runtime.js` and is imported for its side effect by every spec needing one, rather than
 each spec declaring its own — Bun's module registry is shared across every spec file in one test
 run, so whichever spec's stub loads first wins for the whole run.
 
@@ -2567,7 +2567,7 @@ runs the identical conformance packages against every supported kind's oldest an
 image, sixteen (kind, min|max) pairs, via `testsupport.ImageFor`'s env-var override, running every
 pair even after an earlier one fails. Its `workflow_dispatch` CI workflow is written and staged, not
 live — `docs/pending-workflows/test-matrix.yml`, staged rather than committed for the push-scope
-reason `AGENTS.md`'s own `.github/workflows/` section explains. The version floor/ceiling this proves is also surfaced to the
+reason `AGENTS.md`'s own `.github/workflows/` section explains. The version floor/ceiling this proves also surfaces to the
 user: `packages/shared/domain/connection.ts`'s `MIN_SERVER_VERSION` map, rendered per kind by
 `apps/kira-studio/frontend/src/project/ConnectionDialog.vue`.
 
@@ -2580,8 +2580,8 @@ one assertion per capability a `caps.go` declares. A *complete* suite (each adap
 (`bun run test:matrix`), is the full auth/config permutation matrix per adapter — root vs.
 least-privilege principal, with/without password, with/without the database-equivalent field — with
 every connecting case's own functional consequences (a real read, a real write, a real permission
-refusal) attached via `testsupport.Scenario`/`RunMatrix`'s `Then`. `testsupport.RunScenarios` is the
-same `Scenario` body run outside a matrix table, which is what lets one scenario back both tiers
+refusal) attached via `testsupport.Scenario`/`RunMatrix`'s `Then`. `testsupport.RunScenarios` runs the
+same `Scenario` body outside a matrix table, which is what lets one scenario back both tiers
 instead of being written twice. A permission *refusal* getting the wrong `ErrorCode` — an
 authorization failure read as a wrong password (`E_AUTH`) rather than a query/permission failure — is
 the specific risk the complete suite is built to catch, and four adapters (clickhouse, mongo, redis,
@@ -2610,26 +2610,26 @@ holds only while *something* regenerates: `kafka.frontend.spec.ts`'s Configurati
 went stale for three weeks after the Kafka adapter went native (P58e M9.3) and kept asserting an
 empty section against a fixture nobody had re-captured, until this port's own regeneration surfaced
 and fixed it. Wall-clock and other non-reproducible fields (timestamps, ephemeral ports, randomly generated
-ids, approximate row-count estimates) are frozen to fixed placeholders (`frozen.go`) after being
-validated structurally against the real value, never invented. `tests/ipc/support/types.ts` is the
+ids, approximate row-count estimates) freeze to fixed placeholders (`frozen.go`) after
+structural validation against the real value, never invented. `tests/ipc/support/types.ts` is the
 one TypeScript file the tier keeps outright — the frontend specs' own shared types, with real
 consumers on that side and no Go equivalent needed.
 
 **`tests/e2e/` is gone** — the whole `_electron.launch()` tier, 23 spec files, was retired with the
 Electron shell rather than ported wholesale. Every pure-UI spec has a verified `tests/ui/` port;
-every full-stack-only spec has a named disposition, recorded here because two of them are losses:
+every full-stack-only spec has a named disposition, recorded here since two of them are losses:
 `sqlite.spec.ts`'s and the postgres wiring value was recovered by the new
 `apps/kira-studio/tests/e2e-real/` tier; `s3.spec.ts`'s file-write contract (the engine writes the
 file itself, bytes never transit the shell or the renderer) was recovered by a `packages/db-fixtures/`
 case; **`mongo.spec.ts`'s full-stack anchor value was
-not recovered**, and that is an accepted, documented loss. `hardening.spec.ts` and `startup.spec.ts`
-were deleted outright with no analogue: there is no `webPreferences`, fuse or Chromium-permission
-concept left to assert, and no `process.uptime()` equivalent — cold start is now a manual procedure
+not recovered**, an accepted, documented loss. `hardening.spec.ts` and `startup.spec.ts`
+were deleted outright with no analogue: no `webPreferences`, fuse or Chromium-permission
+concept is left to assert, and no `process.uptime()` equivalent — cold start is now a manual procedure
 (`docs/PERF.md` §3).
 
 **`tests/ui/`** (`bun run test:ui`) is its replacement for everything that ported: 72 tests across 25
 spec files driving the **real built `apps/kira-studio/frontend/dist` bundle** — real Vue, real
-`bridge/{control,port}.ts` — over a static HTTP file server, in **real WebKit**, which is what a
+`bridge/{control,port}.ts` — over a static HTTP file server, in **real WebKit**, the same engine a
 packaged build actually embeds (WKWebView on macOS, WebKitGTK on Linux). There is no native app
 process and no container: **both wire planes are mocked**, the control plane by
 `page.route('**/wails/runtime')` answering from fixtures keyed by a hand-maintained `CHANNEL_TO_FQN`
@@ -2650,17 +2650,17 @@ full-stack proof of P8's `tabs.window_key` isolation ("two windows, one backend:
 its own tabs"), referenced by name in the multi-window subsection below. It builds the Go shell
 with `-tags server` (Wails v3's
 server build mode), which serves both planes over plain HTTP and WebSocket to a plain Chromium tab
-with **no native window at all**: a real Go backend, a real adapter, a real container — there is no
-embedded engine child to speak of any more (P58f M10). That recovers the wiring confidence
+with **no native window at all**: a real Go backend, a real adapter, a real container — no
+embedded engine child exists any more (P58f M10). That recovers the wiring confidence
 `tests/e2e/` used to provide for these engines at a small fraction of the cost. It is not a
 UI-fidelity tier — that is `tests/ui/`'s job, which is why this one uses Chromium rather than
 WebKit. Server mode has no file dialogs (`FilesService.ChooseSave`/`ChooseOpen` answer a real HTTP
-422), so a spec needing one stubs exactly that method through a passthrough route that reuses
+422), so a spec needing one stubs exactly that method through a passthrough route reusing
 `CHANNEL_TO_FQN` rather than re-deriving it. `mariadb-real.spec.ts`'s second test is the coexistence
 proof that used to kill the Node engine child mid-session and assert every connection survived
 (`C2`, retired with the child it needed) — rewritten in P58f M10 to prove **two native kinds in one
-session** instead: a MariaDB and a Kafka connection are both opened, the page is reloaded, and both
-serve a real read afterward, since there is no child left to kill and the property worth proving now
+session** instead: a MariaDB and a Kafka connection both open, the page reloads, and both
+serve a real read afterward, since no child is left to kill and the property worth proving now
 is that native adapters coexist cleanly within one process across a reload.
 
 **`apps/kira-studio-vscode/tests/`** (`bun run test:webview`) is the git module's own frontend tier
@@ -2688,5 +2688,5 @@ re-derivation" warns against. Their numbers are in `docs/PERF.md` §2.13.
 parallel is a real change from the old `e2e` project's `workers: 1`, and it is earned rather than
 inherited: that serialisation existed because concurrent Electron apps contend over wall-clock/RSS
 budgets and Docker containers, and this tier has neither — the same reasoning that already made
-`ipc-frontend` fully parallel. `e2e-real` runs `workers: 2`, safe because a per-test `KIRA_HOME` plus
+`ipc-frontend` fully parallel. `e2e-real` runs `workers: 2`, safe since a per-test `KIRA_HOME` plus
 `WAILS_SERVER_PORT` gives each instance its own SQLite app storage and its own secrets.
