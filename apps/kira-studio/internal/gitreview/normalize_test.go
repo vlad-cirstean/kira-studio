@@ -16,18 +16,21 @@ var (
 	normalizeComposedE   = string([]byte{0xc3, 0xa9})       // U+00E9, composed "é"
 )
 
-// TestNormalizeStoredPaths_RekeysSessionFileRangeAndComment is D8/D12's first case: every one of
-// review_session.repo_id, review_file.path, review_range.path and review_comment.path, stored
-// decomposed (as a pre-G27 build would have written them), comes back composed after one sweep —
-// with review_range's own start/end and review_comment's own body surviving the rekey untouched.
-func TestNormalizeStoredPaths_RekeysSessionFileRangeAndComment(t *testing.T) {
+// TestNormalizeStoredPaths_RekeysRepoIDOnly is G32 round-3 functional-correctness review finding
+// #6's own regression proof: review_session.repo_id (a filesystem DIRECTORY path, which this
+// app's own ingestion sites can legitimately hand it in NFD) is still rekeyed to NFC, but
+// review_file.path/review_range.path/review_comment.path (repository-relative paths sourced from
+// git's own diff output, which echoes committed tree/index bytes verbatim regardless of
+// core.precomposeunicode) are now left exactly as stored — rewriting them used to silently break
+// incremental.go's own live-diff-path join for a genuinely NFD-committed file, making its review
+// state (and every comment on it) disappear on the very next review.db open.
+func TestNormalizeStoredPaths_RekeysRepoIDOnly(t *testing.T) {
 	ctx := context.Background()
 	s := newTestStore(t)
 
 	decomposedRepoID := "/repo/caf" + normalizeDecomposedE
 	composedRepoID := "/repo/caf" + normalizeComposedE
 	decomposedPath := "caf" + normalizeDecomposedE + ".txt"
-	composedPath := "caf" + normalizeComposedE + ".txt"
 
 	rec := FileRecord{
 		Path: decomposedPath, State: "full", ReviewedAtSHA: "sha1", ReviewedAt: time.UnixMilli(1000),
@@ -63,8 +66,9 @@ func TestNormalizeStoredPaths_RekeysSessionFileRangeAndComment(t *testing.T) {
 	if err := db.QueryRow(`SELECT path FROM review_file`).Scan(&filePath); err != nil {
 		t.Fatalf("select review_file.path: %v", err)
 	}
-	if filePath != composedPath {
-		t.Errorf("review_file.path = %q, want composed %q", filePath, composedPath)
+	if filePath != decomposedPath {
+		t.Errorf("review_file.path = %q, want it left decomposed (%q) -- git's own diff output for "+
+			"this file would still report it decomposed too", filePath, decomposedPath)
 	}
 
 	var rangePath string
@@ -72,112 +76,16 @@ func TestNormalizeStoredPaths_RekeysSessionFileRangeAndComment(t *testing.T) {
 	if err := db.QueryRow(`SELECT path, start_line, end_line FROM review_range`).Scan(&rangePath, &start, &end); err != nil {
 		t.Fatalf("select review_range: %v", err)
 	}
-	if rangePath != composedPath || start != 1 || end != 3 {
-		t.Errorf("review_range = (%q, %d, %d), want (%q, 1, 3)", rangePath, start, end, composedPath)
+	if rangePath != decomposedPath || start != 1 || end != 3 {
+		t.Errorf("review_range = (%q, %d, %d), want (%q, 1, 3) -- left decomposed", rangePath, start, end, decomposedPath)
 	}
 
 	var commentPath, commentBody string
 	if err := db.QueryRow(`SELECT path, body FROM review_comment`).Scan(&commentPath, &commentBody); err != nil {
 		t.Fatalf("select review_comment: %v", err)
 	}
-	if commentPath != composedPath || commentBody != "hello" {
-		t.Errorf("review_comment = (%q, %q), want (%q, %q)", commentPath, commentBody, composedPath, "hello")
-	}
-}
-
-// TestNormalizeStoredPaths_FileCollisionLeavesOneNFCRowWithRangesIntact is D8/D12's second case: a
-// stale NFD-keyed review_file row and an already-correct NFC-keyed row for the SAME session exist
-// side by side (exactly what a client upgrading across G27 could have on disk) — after the sweep,
-// exactly one review_file row remains, keyed under the composed path, and review_range rows for
-// that surviving key are intact (UPDATE OR REPLACE's own conflict resolution, normalize.go's doc
-// comment).
-func TestNormalizeStoredPaths_FileCollisionLeavesOneNFCRowWithRangesIntact(t *testing.T) {
-	ctx := context.Background()
-	s := newTestStore(t)
-
-	decomposedPath := "caf" + normalizeDecomposedE + ".txt"
-	composedPath := "caf" + normalizeComposedE + ".txt"
-
-	// The stale NFD row.
-	staleRec := FileRecord{
-		Path: decomposedPath, State: "partial", ReviewedAtSHA: "sha-stale", ReviewedAt: time.UnixMilli(1000),
-		BlobOID: "oid-stale", ContentKind: ContentBinary, Ranges: []LineRange{{Start: 1, End: 2}},
-	}
-	if err := s.Put(ctx, "repo", "main", staleRec, nil); err != nil {
-		t.Fatalf("Put stale: %v", err)
-	}
-	// The already-correct NFC row for the very same logical file.
-	freshRec := FileRecord{
-		Path: composedPath, State: "full", ReviewedAtSHA: "sha-fresh", ReviewedAt: time.UnixMilli(5000),
-		BlobOID: "oid-fresh", ContentKind: ContentBinary, Ranges: []LineRange{{Start: 10, End: 20}},
-	}
-	if err := s.Put(ctx, "repo", "main", freshRec, nil); err != nil {
-		t.Fatalf("Put fresh: %v", err)
-	}
-
-	db, err := s.conn()
-	if err != nil {
-		t.Fatalf("conn: %v", err)
-	}
-
-	var fileCountBefore int
-	if err := db.QueryRow(`SELECT COUNT(*) FROM review_file`).Scan(&fileCountBefore); err != nil {
-		t.Fatalf("count review_file before: %v", err)
-	}
-	if fileCountBefore != 2 {
-		t.Fatalf("review_file has %d rows before the sweep, want 2 (the two colliding spellings)", fileCountBefore)
-	}
-
-	if err := normalizeStoredPaths(db); err != nil {
-		t.Fatalf("normalizeStoredPaths: %v", err)
-	}
-
-	var fileCountAfter int
-	if err := db.QueryRow(`SELECT COUNT(*) FROM review_file`).Scan(&fileCountAfter); err != nil {
-		t.Fatalf("count review_file after: %v", err)
-	}
-	if fileCountAfter != 1 {
-		t.Fatalf("review_file has %d rows after the sweep, want exactly 1 (the collision collapsed)", fileCountAfter)
-	}
-
-	var survivingPath string
-	if err := db.QueryRow(`SELECT path FROM review_file`).Scan(&survivingPath); err != nil {
-		t.Fatalf("select surviving review_file: %v", err)
-	}
-	if survivingPath != composedPath {
-		t.Fatalf("surviving review_file.path = %q, want composed %q", survivingPath, composedPath)
-	}
-
-	// Every review_range row still standing must belong to the surviving composed path — no
-	// dangling range left pointing at a path review_file no longer has a row for (the FK, and this
-	// query, would both notice).
-	rows, err := db.Query(`SELECT path, start_line, end_line FROM review_range ORDER BY start_line`)
-	if err != nil {
-		t.Fatalf("query review_range: %v", err)
-	}
-	defer rows.Close()
-	var got [][3]any
-	for rows.Next() {
-		var path string
-		var start, end int
-		if err := rows.Scan(&path, &start, &end); err != nil {
-			t.Fatalf("scan review_range: %v", err)
-		}
-		if path != composedPath {
-			t.Errorf("review_range row (%q, %d, %d) does not belong to the surviving path %q", path, start, end, composedPath)
-		}
-		got = append(got, [3]any{path, start, end})
-	}
-	if err := rows.Err(); err != nil {
-		t.Fatalf("iterate review_range: %v", err)
-	}
-	// review_file renamed first (normalize.go's own doc comment on why the order is load-bearing):
-	// the stale row's own 1-2 range is what survives, renamed into place. The pre-existing NFC
-	// row's own 10-20 range was a child of the row REPLACE deleted to make room, and goes with it
-	// — the documented, accepted cost of a genuine collision, not a bug in this test.
-	want := [][3]any{{composedPath, 1, 2}}
-	if len(got) != len(want) || got[0] != want[0] {
-		t.Fatalf("review_range rows for %q = %v, want %v (the stale row's own range, renamed into place)", composedPath, got, want)
+	if commentPath != decomposedPath || commentBody != "hello" {
+		t.Errorf("review_comment = (%q, %q), want (%q, %q) -- left decomposed", commentPath, commentBody, decomposedPath, "hello")
 	}
 }
 

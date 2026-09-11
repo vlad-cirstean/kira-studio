@@ -16,29 +16,29 @@ import (
 // on every lazy-open rather than gated behind a schema version.
 const nonASCIIGlob = `*[^ -~]*`
 
-// normalizeStoredPaths re-keys review.db rows written before G27 normalized RepoID (D5a) and the
-// worktree-path fields (D5c) to NFC. Idempotent — a second run against an already-normalized
-// database finds nothing to do (every candidate's gitpath.NFC(x) already equals x) — and
-// self-disabling on an all-ASCII database via nonASCIIGlob above, which is why it needs no schema
-// version of its own and is called unconditionally from migrate() after the SQL migration loop.
+// normalizeStoredPaths re-keys review_session.repo_id (D5a) to NFC — repo_id is an absolute
+// repository DIRECTORY path, which this app's own filesystem-ingestion sites (G27 D5b-d) can
+// legitimately hand it in NFD form (APFS/the fs watcher). Idempotent, self-disabling on an
+// all-ASCII database via nonASCIIGlob above, which is why it needs no schema version of its own
+// and is called unconditionally from migrate() after the SQL migration loop.
 //
-// This is D2's one deliberate crossing of the tier-2 rule: review_file.path, review_range.path and
-// review_comment.path are repository-relative file paths, normally never normalized (P7 — handed
-// back to git as a pathspec would break the lookup). But a STORED review path is never handed to
-// git directly — incremental.go always joins the live diff's own path against these stored rows as
-// a lookup key (store.go's own out[rec.Path]), never the reverse — so normalizing the stored key to
-// match what a post-D3 git will report for the same file is what KEEPS that join working, not what
-// breaks it. The sweep only ever rewrites a stored path when gitpath.NFC(p) != p, i.e. exactly the
-// rows a post-D3/D5 diff would otherwise fail to find a match for.
-//
-// review_file's PRIMARY KEY is (session_id, path) and review_range's is (session_id, path,
-// start_line), with review_range's own FK on (session_id, path) REFERENCES review_file(session_id,
-// path) — renaming that composite key from one side without the other, under review.db's own
-// _foreign_keys=1 (db.go), is rejected immediately regardless of which side goes first. PRAGMA
-// defer_foreign_keys defers that check to COMMIT instead of after each statement, which is exactly
-// what lets this rename both sides of the FK inside one transaction. It applies only to the
-// transaction it is set in and is cleared automatically at COMMIT/ROLLBACK — never a persisted
-// setting, and never touching db.go's own always-on _foreign_keys=1 for every other connection.
+// G32 round-3 functional-correctness review, finding #6: this used to ALSO rewrite
+// review_file.path, review_range.path and review_comment.path (normalizeFileAndRangePaths/
+// normalizeCommentPaths, removed) on the premise that "a stored review path is only ever joined
+// against what a post-D3 git will report for the same file [i.e. always NFC]." Verified false: D3
+// (core.precomposeunicode) only affects how git READS filenames off the filesystem for its own
+// internal comparisons — it does not touch what `git diff-tree`/`show` ECHO for a path already
+// committed to the tree/index, which git returns byte-for-byte exactly as committed, forever. A
+// repo containing a genuinely NFD-committed path (created on Linux, or copied in) reports that
+// path NFD from every git command, this app's own repo_id notwithstanding — so unconditionally
+// rewriting its stored review_file/range/comment rows to NFC, on the very next review.db open
+// after they were written, silently broke incremental.go's own live-diff-path join and made that
+// file's review state (and every comment on it) disappear. There is no way to tell, from inside
+// this DB-only migration, "this stored NFD path is a historical artifact from before some earlier
+// bug fix" apart from "this file's own commit history genuinely used NFD bytes" — the two are
+// indistinguishable without consulting the live repository, which this function structurally has
+// no access to — so the only safe fix is to never guess: these three columns are left exactly as
+// git itself reported them, permanently.
 func normalizeStoredPaths(db *sql.DB) error {
 	tx, err := db.Begin()
 	if err != nil {
@@ -46,17 +46,7 @@ func normalizeStoredPaths(db *sql.DB) error {
 	}
 	defer tx.Rollback() //nolint:errcheck // no-op once Commit has succeeded
 
-	if _, err := tx.Exec(`PRAGMA defer_foreign_keys = ON`); err != nil {
-		return fmt.Errorf("gitreview: normalize: defer_foreign_keys: %w", err)
-	}
-
 	if err := normalizeSessionRepoIDs(tx); err != nil {
-		return err
-	}
-	if err := normalizeFileAndRangePaths(tx); err != nil {
-		return err
-	}
-	if err := normalizeCommentPaths(tx); err != nil {
 		return err
 	}
 
@@ -107,106 +97,4 @@ func normalizeSessionRepoIDs(tx *sql.Tx) error {
 		}
 	}
 	return nil
-}
-
-// filePathKey is one (session_id, path) pair — review_file's own PK minus its non-key columns,
-// and review_range/review_comment's own grouping key.
-type filePathKey struct {
-	sessionID int64
-	path      string
-}
-
-// normalizeFileAndRangePaths re-keys review_file.path and review_range.path together (D8's one
-// deliberate tier-2 crossing, see normalizeStoredPaths' own doc comment).
-//
-// review_file is renamed FIRST, review_range second — and this order is load-bearing, not
-// cosmetic. review_range's own FK carries ON DELETE CASCADE: renaming review_file collides with a
-// pre-existing already-NFC row often enough (D8's own "collision" case) that REPLACE's conflict
-// resolution deletes that pre-existing row, which cascades away ITS OWN, still-decomposed-keyed
-// review_range children too — so doing review_file's rename first, while the stale row's own
-// review_range children are still safely parked under the OLD (still-unrenamed) key, is what keeps
-// them from being caught in that same cascade. Renaming review_range second, once review_file has
-// already landed on the composed key, then simply moves them into place with nothing left to
-// collide with. (defer_foreign_keys, set by the caller, is what makes either order legal for the
-// FK *check* itself — this ordering is about which rows a REPLACE-triggered cascade can still see,
-// not about constraint enforcement timing.)
-func normalizeFileAndRangePaths(tx *sql.Tx) error {
-	keys, err := distinctFilePathKeys(tx, "review_file")
-	if err != nil {
-		return err
-	}
-
-	for _, k := range keys {
-		normalized := gitpath.NFC(k.path)
-		if normalized == k.path {
-			continue
-		}
-		if _, err := tx.Exec(
-			`UPDATE OR REPLACE review_file SET path = ? WHERE session_id = ? AND path = ?`,
-			normalized, k.sessionID, k.path,
-		); err != nil {
-			return fmt.Errorf("gitreview: normalize: rekey review_file path: %w", err)
-		}
-		if _, err := tx.Exec(
-			`UPDATE OR REPLACE review_range SET path = ? WHERE session_id = ? AND path = ?`,
-			normalized, k.sessionID, k.path,
-		); err != nil {
-			return fmt.Errorf("gitreview: normalize: rekey review_range path: %w", err)
-		}
-	}
-	return nil
-}
-
-// normalizeCommentPaths re-keys review_comment.path. Unlike review_file/review_range, path is not
-// part of any PRIMARY KEY or UNIQUE constraint here (review_comment's own identity is its
-// AUTOINCREMENT id, migrations/0002's own schema) — a plain UPDATE, no OR REPLACE, no collision to
-// resolve, and every row sharing (session_id, path) is rewritten by one statement.
-func normalizeCommentPaths(tx *sql.Tx) error {
-	keys, err := distinctFilePathKeys(tx, "review_comment")
-	if err != nil {
-		return err
-	}
-
-	for _, k := range keys {
-		normalized := gitpath.NFC(k.path)
-		if normalized == k.path {
-			continue
-		}
-		if _, err := tx.Exec(
-			`UPDATE review_comment SET path = ? WHERE session_id = ? AND path = ?`,
-			normalized, k.sessionID, k.path,
-		); err != nil {
-			return fmt.Errorf("gitreview: normalize: rekey review_comment path: %w", err)
-		}
-	}
-	return nil
-}
-
-// distinctFilePathKeys reads every distinct (session_id, path) pair from table whose path matches
-// nonASCIIGlob, fully materialised before any write — never an open cursor held across the UPDATEs
-// that follow, both for SQLite locking and so a rewritten row can never be re-visited mid-scan.
-func distinctFilePathKeys(tx *sql.Tx, table string) ([]filePathKey, error) {
-	// table is one of the two literal, package-internal constants this file calls with — never
-	// user input — so string-building the identifier here is not an injection risk.
-	query := fmt.Sprintf(`SELECT DISTINCT session_id, path FROM %s WHERE path GLOB ?`, table)
-	rows, err := tx.Query(query, nonASCIIGlob)
-	if err != nil {
-		return nil, fmt.Errorf("gitreview: normalize: query %s paths: %w", table, err)
-	}
-	var keys []filePathKey
-	for rows.Next() {
-		var k filePathKey
-		if err := rows.Scan(&k.sessionID, &k.path); err != nil {
-			_ = rows.Close()
-			return nil, fmt.Errorf("gitreview: normalize: scan %s path: %w", table, err)
-		}
-		keys = append(keys, k)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("gitreview: normalize: iterate %s paths: %w", table, err)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, fmt.Errorf("gitreview: normalize: close %s paths: %w", table, err)
-	}
-	return keys, nil
 }
