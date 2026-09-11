@@ -36,6 +36,7 @@ func recvRepoSettingsChanged(c *testClient) gitrpc.RepoSettingsChangedPayload {
 // cross-repo sentinel collapse), and repoSettings.changed reaches a connection that only ever
 // opened the OTHER repo (D7's fan-out, D14's instance-wide field together).
 func TestIntegration_RepoSettingsLogLevelCollapsesAcrossRealRepos(t *testing.T) {
+	t.Parallel()
 	server, sockPath, _, _ := newIntegrationServer(t)
 
 	repoADir := initFixtureRepo(t)

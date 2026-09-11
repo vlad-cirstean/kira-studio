@@ -25,6 +25,7 @@ func fieldStrings(fields []Field) []string {
 // TestMatchFields_FieldOrder pins D8's own contract: the returned slice's order is subject, body,
 // authorName, authorEmail, committerName, committerEmail, sha -- exactly matcher.ts's own order.
 func TestMatchFields_FieldOrder(t *testing.T) {
+	t.Parallel()
 	m := mustCompile(t, Query{Text: "x"})
 	f := CommitFields{
 		SHA: "x0000000000000000000000000000000000000",
@@ -40,6 +41,7 @@ func TestMatchFields_FieldOrder(t *testing.T) {
 }
 
 func TestMatchFields_EmptyBodyGuard(t *testing.T) {
+	t.Parallel()
 	m := mustCompile(t, Query{Text: ""})
 	// An empty query text compiles to a matcher that matches nothing -- but the guard under test
 	// here is about a PATTERN that matches the empty string (a regex like "x*"), not an empty
@@ -55,6 +57,7 @@ func TestMatchFields_EmptyBodyGuard(t *testing.T) {
 }
 
 func TestMatchFields_BodyOnlyHit(t *testing.T) {
+	t.Parallel()
 	m := mustCompile(t, Query{Text: "Zebra"})
 	f := CommitFields{Subject: "routine maintenance", Body: "Renames the internal Zebra module."}
 	got := fieldStrings(m.MatchFields(f))
@@ -64,6 +67,7 @@ func TestMatchFields_BodyOnlyHit(t *testing.T) {
 }
 
 func TestMatchFields_ShaPrefix(t *testing.T) {
+	t.Parallel()
 	m := mustCompile(t, Query{Text: "218224"})
 	f := CommitFields{SHA: "218224" + "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", Subject: "sha prefix commit"}
 	got := fieldStrings(m.MatchFields(f))
@@ -73,6 +77,7 @@ func TestMatchFields_ShaPrefix(t *testing.T) {
 }
 
 func TestMatchFields_BelowMinShaPrefixMatchesNothing(t *testing.T) {
+	t.Parallel()
 	m := mustCompile(t, Query{Text: "218"})
 	f := CommitFields{SHA: "218224" + "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", Subject: "sha prefix commit"}
 	if got := m.MatchFields(f); len(got) != 0 {
@@ -81,6 +86,7 @@ func TestMatchFields_BelowMinShaPrefixMatchesNothing(t *testing.T) {
 }
 
 func TestMatchFields_NoMatchReturnsEmpty(t *testing.T) {
+	t.Parallel()
 	m := mustCompile(t, Query{Text: "widget"})
 	got := m.MatchFields(CommitFields{Subject: "unrelated change to build config"})
 	if len(got) != 0 {

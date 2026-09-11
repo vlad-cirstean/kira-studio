@@ -43,6 +43,7 @@ func stashPopBase() gitpreflight.ClassifyStashPopInput {
 }
 
 func TestClassifyStashPop_CleanPredictionNoBlockers(t *testing.T) {
+	t.Parallel()
 	got := gitpreflight.ClassifyStashPop(stashPopBase())
 	if got.Verdict != "clean" {
 		t.Fatalf("verdict = %q, want clean", got.Verdict)
@@ -56,6 +57,7 @@ func TestClassifyStashPop_CleanPredictionNoBlockers(t *testing.T) {
 }
 
 func TestClassifyStashPop_ConflictingPredictionNoBlockers(t *testing.T) {
+	t.Parallel()
 	in := stashPopBase()
 	in.Prediction = stashConflicts
 	got := gitpreflight.ClassifyStashPop(in)
@@ -67,6 +69,7 @@ func TestClassifyStashPop_ConflictingPredictionNoBlockers(t *testing.T) {
 // TestClassifyStashPop_UnknownPredictionIsNeverClean: "unknown never clean — willConflict, stating
 // the reason via the prediction itself".
 func TestClassifyStashPop_UnknownPredictionIsNeverClean(t *testing.T) {
+	t.Parallel()
 	in := stashPopBase()
 	in.Prediction = stashUnknown
 	got := gitpreflight.ClassifyStashPop(in)
@@ -79,6 +82,7 @@ func TestClassifyStashPop_UnknownPredictionIsNeverClean(t *testing.T) {
 }
 
 func TestClassifyStashPop_UntrackedCollisionAlone(t *testing.T) {
+	t.Parallel()
 	in := stashPopBase()
 	in.StashUntrackedPaths = []string{"u.txt", "other.txt"}
 	in.ExistingUntrackedPaths = []string{"u.txt"}
@@ -96,6 +100,7 @@ func TestClassifyStashPop_UntrackedCollisionAlone(t *testing.T) {
 // still only reachable via existingPaths, not `dirty` membership" — deliberately does NOT populate
 // Dirty with the untracked path's collision; the classifier must not silently fall back to it.
 func TestClassifyStashPop_Probe3_DirtyMembershipIsNotSufficient(t *testing.T) {
+	t.Parallel()
 	in := stashPopBase()
 	in.StashUntrackedPaths = []string{"u.txt"}
 	in.ExistingUntrackedPaths = []string{}
@@ -110,6 +115,7 @@ func TestClassifyStashPop_Probe3_DirtyMembershipIsNotSufficient(t *testing.T) {
 }
 
 func TestClassifyStashPop_LocalChangesWouldBeOverwrittenAlone(t *testing.T) {
+	t.Parallel()
 	in := stashPopBase()
 	in.StashPaths = []string{"a.txt", "b.txt"}
 	in.Dirty = []gitpreflight.DirtyPath{{Path: "a.txt", Tracked: true}}
@@ -126,6 +132,7 @@ func TestClassifyStashPop_LocalChangesWouldBeOverwrittenAlone(t *testing.T) {
 // TestClassifyStashPop_UntrackedDirtyOverlapIsNotLocalOverwrite: an untracked dirty path overlapping
 // stashPaths is NOT localChangesWouldBeOverwritten — that blocker is tracked-only.
 func TestClassifyStashPop_UntrackedDirtyOverlapIsNotLocalOverwrite(t *testing.T) {
+	t.Parallel()
 	in := stashPopBase()
 	in.StashPaths = []string{"a.txt"}
 	in.Dirty = []gitpreflight.DirtyPath{{Path: "a.txt", Tracked: false}}
@@ -136,6 +143,7 @@ func TestClassifyStashPop_UntrackedDirtyOverlapIsNotLocalOverwrite(t *testing.T)
 }
 
 func TestClassifyStashPop_BothBlockersOrdered(t *testing.T) {
+	t.Parallel()
 	in := stashPopBase()
 	in.StashPaths = []string{"a.txt"}
 	in.StashUntrackedPaths = []string{"u.txt"}
@@ -152,6 +160,7 @@ func TestClassifyStashPop_BothBlockersOrdered(t *testing.T) {
 }
 
 func TestClassifyStashPop_InProgressOperationAlwaysFirst(t *testing.T) {
+	t.Parallel()
 	inProgress := &gitpreflight.InProgressOperation{
 		Kind: gitpreflight.InProgressMerge, OtherSha: strPtr40("x"),
 		ConflictedPaths: []string{}, CanContinue: true, CanAbort: true, IsSequence: false,
@@ -178,6 +187,7 @@ func strPtr40(c string) *string { s := strings40(c); return &s }
 // TestClassifyStashPop_BlockerAlongsideCleanPrediction: verdict is blocked, but the clean prediction
 // is still reported as-is (never overwritten by the blocked verdict).
 func TestClassifyStashPop_BlockerAlongsideCleanPrediction(t *testing.T) {
+	t.Parallel()
 	in := stashPopBase()
 	in.Prediction = stashClean
 	in.StashPaths = []string{"a.txt"}
@@ -192,6 +202,7 @@ func TestClassifyStashPop_BlockerAlongsideCleanPrediction(t *testing.T) {
 }
 
 func TestClassifyStashPop_PassesThroughShaIndexTarget(t *testing.T) {
+	t.Parallel()
 	in := stashPopBase()
 	got := gitpreflight.ClassifyStashPop(in)
 	if got.StashSha != in.Stash.Sha {
@@ -222,6 +233,7 @@ var blockedCheckout = gitpreflight.CheckoutPreflight{
 }
 
 func TestClassifyStashBranch_ValidNonExistingCleanCheckout(t *testing.T) {
+	t.Parallel()
 	got := gitpreflight.ClassifyStashBranch(gitpreflight.ClassifyStashBranchInput{
 		Name: "recovered", ExistingBranchNames: map[string]bool{}, Checkout: cleanCheckout,
 	})
@@ -236,6 +248,7 @@ func TestClassifyStashBranch_ValidNonExistingCleanCheckout(t *testing.T) {
 // TestClassifyStashBranch_InvalidName — reserved "@{" shorthand — invalidName, checkout passed
 // through untouched.
 func TestClassifyStashBranch_InvalidName(t *testing.T) {
+	t.Parallel()
 	got := gitpreflight.ClassifyStashBranch(gitpreflight.ClassifyStashBranchInput{
 		Name: "bad@{0}", ExistingBranchNames: map[string]bool{}, Checkout: cleanCheckout,
 	})
@@ -253,6 +266,7 @@ func TestClassifyStashBranch_InvalidName(t *testing.T) {
 // TestClassifyStashBranch_AlreadyExisting — invalidName with its own error, distinct from a
 // malformed name.
 func TestClassifyStashBranch_AlreadyExisting(t *testing.T) {
+	t.Parallel()
 	got := gitpreflight.ClassifyStashBranch(gitpreflight.ClassifyStashBranchInput{
 		Name: "topic", ExistingBranchNames: map[string]bool{"topic": true}, Checkout: cleanCheckout,
 	})
@@ -268,6 +282,7 @@ func TestClassifyStashBranch_AlreadyExisting(t *testing.T) {
 // nested checkout preflight ⇒ blocked (non-atomic on failure per OQ6 — no rollback here, that is
 // ops.go's job, not the classifier's).
 func TestClassifyStashBranch_ValidNameBlockedCheckout(t *testing.T) {
+	t.Parallel()
 	got := gitpreflight.ClassifyStashBranch(gitpreflight.ClassifyStashBranchInput{
 		Name: "recovered", ExistingBranchNames: map[string]bool{}, Checkout: blockedCheckout,
 	})
@@ -284,6 +299,7 @@ func TestClassifyStashBranch_ValidNameBlockedCheckout(t *testing.T) {
 // confirms the struct compiles and the classifier never sets one — a compile-time guarantee TS
 // needed a runtime `'prediction' in result` check for.
 func TestClassifyStashBranch_NoPredictionField(t *testing.T) {
+	t.Parallel()
 	got := gitpreflight.ClassifyStashBranch(gitpreflight.ClassifyStashBranchInput{
 		Name: "recovered", ExistingBranchNames: map[string]bool{}, Checkout: cleanCheckout,
 	})

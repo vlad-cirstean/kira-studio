@@ -7,6 +7,7 @@ import (
 )
 
 func TestClassifyWorktreeAdd_Clean(t *testing.T) {
+	t.Parallel()
 	got := gitpreflight.ClassifyWorktreeAdd(gitpreflight.ClassifyWorktreeAddInput{
 		Path: "/repos/wt", Mode: "newBranch", Branch: "topic", StartPoint: "main",
 		StartPointResolves: true,
@@ -17,6 +18,7 @@ func TestClassifyWorktreeAdd_Clean(t *testing.T) {
 }
 
 func TestClassifyWorktreeAdd_InvalidPath(t *testing.T) {
+	t.Parallel()
 	got := gitpreflight.ClassifyWorktreeAdd(gitpreflight.ClassifyWorktreeAddInput{
 		Path: "", Mode: "detach", StartPoint: "abc123", StartPointResolves: true,
 	})
@@ -26,6 +28,7 @@ func TestClassifyWorktreeAdd_InvalidPath(t *testing.T) {
 }
 
 func TestClassifyWorktreeAdd_PathExists(t *testing.T) {
+	t.Parallel()
 	got := gitpreflight.ClassifyWorktreeAdd(gitpreflight.ClassifyWorktreeAddInput{
 		Path: "/repos/wt", Mode: "detach", StartPoint: "abc123",
 		PathExists: true, StartPointResolves: true,
@@ -39,6 +42,7 @@ func TestClassifyWorktreeAdd_PathExists(t *testing.T) {
 // branchCheckedOutElsewhere is the SOLE blocker, Routes offers "detachHere" — closing G25 §9's own
 // named hand-forward.
 func TestClassifyWorktreeAdd_BranchCheckedOutElsewhere(t *testing.T) {
+	t.Parallel()
 	elsewhere := "/repos/other-wt"
 	got := gitpreflight.ClassifyWorktreeAdd(gitpreflight.ClassifyWorktreeAddInput{
 		Path: "/repos/wt", Mode: "existingBranch", Branch: "feature",
@@ -60,6 +64,7 @@ func TestClassifyWorktreeAdd_BranchCheckedOutElsewhere(t *testing.T) {
 // branchCheckedOutElsewhere alongside ANY other blocker withholds the route — detaching cannot fix
 // an invalid path, an existing path, an existing branch name, or an unresolved start point.
 func TestClassifyWorktreeAdd_DetachHere_SuppressedAlongsideAnotherBlocker(t *testing.T) {
+	t.Parallel()
 	elsewhere := "/repos/other-wt"
 	got := gitpreflight.ClassifyWorktreeAdd(gitpreflight.ClassifyWorktreeAddInput{
 		Path: "/repos/wt", Mode: "existingBranch", Branch: "feature",
@@ -79,6 +84,7 @@ func TestClassifyWorktreeAdd_DetachHere_SuppressedAlongsideAnotherBlocker(t *tes
 // BranchCheckedOutElsewhere is defined only for existingBranch mode anyway (D4), so this proves the
 // route stays empty rather than depending on that convention alone.
 func TestClassifyWorktreeAdd_DetachHere_NeverForDetachMode(t *testing.T) {
+	t.Parallel()
 	got := gitpreflight.ClassifyWorktreeAdd(gitpreflight.ClassifyWorktreeAddInput{
 		Path: "/repos/wt", Mode: "detach", StartPoint: "abc123", StartPointResolves: true,
 	})
@@ -90,6 +96,7 @@ func TestClassifyWorktreeAdd_DetachHere_NeverForDetachMode(t *testing.T) {
 // TestClassifyWorktreeAdd_RoutesNeverNil proves the empty-slice-never-nil convention this package
 // follows elsewhere (Blockers/Notes) also holds for Routes.
 func TestClassifyWorktreeAdd_RoutesNeverNil(t *testing.T) {
+	t.Parallel()
 	got := gitpreflight.ClassifyWorktreeAdd(gitpreflight.ClassifyWorktreeAddInput{
 		Path: "/repos/wt", Mode: "newBranch", Branch: "topic", StartPoint: "main",
 		StartPointResolves: true,
@@ -100,6 +107,7 @@ func TestClassifyWorktreeAdd_RoutesNeverNil(t *testing.T) {
 }
 
 func TestClassifyWorktreeAdd_BranchExists(t *testing.T) {
+	t.Parallel()
 	got := gitpreflight.ClassifyWorktreeAdd(gitpreflight.ClassifyWorktreeAddInput{
 		Path: "/repos/wt", Mode: "newBranch", Branch: "main", StartPoint: "HEAD",
 		BranchExists: true, StartPointResolves: true,
@@ -110,6 +118,7 @@ func TestClassifyWorktreeAdd_BranchExists(t *testing.T) {
 }
 
 func TestClassifyWorktreeAdd_UnknownStartPoint(t *testing.T) {
+	t.Parallel()
 	got := gitpreflight.ClassifyWorktreeAdd(gitpreflight.ClassifyWorktreeAddInput{
 		Path: "/repos/wt", Mode: "newBranch", Branch: "topic", StartPoint: "no-such-ref",
 		StartPointResolves: false,
@@ -123,6 +132,7 @@ func TestClassifyWorktreeAdd_UnknownStartPoint(t *testing.T) {
 // (invalidPath, pathExists, branchCheckedOutElsewhere, branchExists, unknownStartPoint) AND that
 // earlier blockers never suppress later ones — every applicable blocker is reported.
 func TestClassifyWorktreeAdd_BlockerOrderAndAccumulation(t *testing.T) {
+	t.Parallel()
 	elsewhere := "/repos/other-wt"
 	got := gitpreflight.ClassifyWorktreeAdd(gitpreflight.ClassifyWorktreeAddInput{
 		Path: "", Mode: "newBranch", Branch: "main", StartPoint: "no-such-ref",
@@ -144,6 +154,7 @@ func TestClassifyWorktreeAdd_BlockerOrderAndAccumulation(t *testing.T) {
 }
 
 func TestClassifyWorktreeAdd_Notes(t *testing.T) {
+	t.Parallel()
 	got := gitpreflight.ClassifyWorktreeAdd(gitpreflight.ClassifyWorktreeAddInput{
 		Path: "/repos/main/nested-wt", Mode: "detach", StartPoint: "abc123",
 		StartPointResolves: true, PathInsideRepo: true, ParentDirMissing: true,
@@ -167,6 +178,7 @@ func TestClassifyWorktreeAdd_Notes(t *testing.T) {
 }
 
 func TestClassifyWorktreeRemove_Clean(t *testing.T) {
+	t.Parallel()
 	got := gitpreflight.ClassifyWorktreeRemove(gitpreflight.ClassifyWorktreeRemoveInput{
 		Path: "/repos/wt", IsWorktree: true,
 	})
@@ -176,6 +188,7 @@ func TestClassifyWorktreeRemove_Clean(t *testing.T) {
 }
 
 func TestClassifyWorktreeRemove_NotAWorktree(t *testing.T) {
+	t.Parallel()
 	got := gitpreflight.ClassifyWorktreeRemove(gitpreflight.ClassifyWorktreeRemoveInput{
 		Path: "/etc/passwd", IsWorktree: false,
 	})
@@ -187,6 +200,7 @@ func TestClassifyWorktreeRemove_NotAWorktree(t *testing.T) {
 // TestClassifyWorktreeRemove_MainAndCurrentUnconditional proves F8/D8: mainWorktree and
 // currentWorktree block even when every other input claims "dirty" — no force route unlocks them.
 func TestClassifyWorktreeRemove_MainAndCurrentUnconditional(t *testing.T) {
+	t.Parallel()
 	got := gitpreflight.ClassifyWorktreeRemove(gitpreflight.ClassifyWorktreeRemoveInput{
 		Path: "/repos/main", IsWorktree: true, IsMainWorktree: true, IsCurrentWorktree: true, Dirty: true,
 	})
@@ -199,6 +213,7 @@ func TestClassifyWorktreeRemove_MainAndCurrentUnconditional(t *testing.T) {
 }
 
 func TestClassifyWorktreeRemove_OpenInAnotherWindow(t *testing.T) {
+	t.Parallel()
 	got := gitpreflight.ClassifyWorktreeRemove(gitpreflight.ClassifyWorktreeRemoveInput{
 		Path: "/repos/wt", IsWorktree: true, OpenInAnotherWindow: true, Dirty: true,
 	})
@@ -208,6 +223,7 @@ func TestClassifyWorktreeRemove_OpenInAnotherWindow(t *testing.T) {
 }
 
 func TestClassifyWorktreeRemove_LockedUnconditional(t *testing.T) {
+	t.Parallel()
 	reason := "testing lock reason"
 	got := gitpreflight.ClassifyWorktreeRemove(gitpreflight.ClassifyWorktreeRemoveInput{
 		Path: "/repos/wt", IsWorktree: true, LockedReason: &reason, Dirty: true,
@@ -224,6 +240,7 @@ func TestClassifyWorktreeRemove_LockedUnconditional(t *testing.T) {
 // worktree gets verdict "dirty", a "force" route, and a typed confirmation token equal to the
 // worktree's own basename — never a caller-supplied value.
 func TestClassifyWorktreeRemove_DirtyRequiresTypedConfirmation(t *testing.T) {
+	t.Parallel()
 	got := gitpreflight.ClassifyWorktreeRemove(gitpreflight.ClassifyWorktreeRemoveInput{
 		Path: "/repos/feature-wt", IsWorktree: true, Dirty: true,
 	})
@@ -242,6 +259,7 @@ func TestClassifyWorktreeRemove_DirtyRequiresTypedConfirmation(t *testing.T) {
 // notAWorktree is reported even when every other field also claims a blocker, and it is always
 // first.
 func TestClassifyWorktreeRemove_NotAWorktreeBeatsEveryOtherBlocker(t *testing.T) {
+	t.Parallel()
 	reason := "x"
 	got := gitpreflight.ClassifyWorktreeRemove(gitpreflight.ClassifyWorktreeRemoveInput{
 		Path: "/etc/passwd", IsWorktree: false, IsMainWorktree: true, IsCurrentWorktree: true,

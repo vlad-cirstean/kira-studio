@@ -28,6 +28,7 @@ func readShowFixture(t *testing.T, relPath string) []byte {
 }
 
 func TestParseShowBodyAndSignature_Trailers(t *testing.T) {
+	t.Parallel()
 	sig, trailers, body, err := porcelain.ParseShowBodyAndSignature(readShowFixture(t, "show/trailers.bin"))
 	if err != nil {
 		t.Fatalf("ParseShowBodyAndSignature: %v", err)
@@ -52,6 +53,7 @@ func TestParseShowBodyAndSignature_Trailers(t *testing.T) {
 // the parsed record — classification stays by exit code, exactly the same %G?="N" shape an
 // unsigned commit produces, and the record still parses cleanly.
 func TestParseShowBodyAndSignature_Signed(t *testing.T) {
+	t.Parallel()
 	sig, trailers, body, err := porcelain.ParseShowBodyAndSignature(readShowFixture(t, "show/signed.bin"))
 	if err != nil {
 		t.Fatalf("ParseShowBodyAndSignature: %v", err)
@@ -68,6 +70,7 @@ func TestParseShowBodyAndSignature_Signed(t *testing.T) {
 }
 
 func TestParseShowBodyAndSignature_EmptyBody(t *testing.T) {
+	t.Parallel()
 	_, trailers, body, err := porcelain.ParseShowBodyAndSignature(readShowFixture(t, "show/emptyBody.bin"))
 	if err != nil {
 		t.Fatalf("ParseShowBodyAndSignature: %v", err)
@@ -81,6 +84,7 @@ func TestParseShowBodyAndSignature_EmptyBody(t *testing.T) {
 // body whose only paragraph is trailer-shaped is removed entirely, leaving an empty body — never a
 // dangling blank line.
 func TestParseShowBodyAndSignature_BodyIsAllTrailers(t *testing.T) {
+	t.Parallel()
 	_, trailers, body, err := porcelain.ParseShowBodyAndSignature(readShowFixture(t, "show/bodyIsAllTrailers.bin"))
 	if err != nil {
 		t.Fatalf("ParseShowBodyAndSignature: %v", err)
@@ -96,6 +100,7 @@ func TestParseShowBodyAndSignature_BodyIsAllTrailers(t *testing.T) {
 // --- SplitTrailerBlock's own paragraph-rule cases (D16), independent of any fixture. ---
 
 func TestSplitTrailerBlock_NoTrailers(t *testing.T) {
+	t.Parallel()
 	body := "Just a body, no trailers, with a colon: not a trailer."
 	if got := porcelain.SplitTrailerBlock(body, nil); got != body {
 		t.Fatalf("got %q, want unchanged (no trailers reported)", got)
@@ -103,6 +108,7 @@ func TestSplitTrailerBlock_NoTrailers(t *testing.T) {
 }
 
 func TestSplitTrailerBlock_LastParagraphColonButNotATrailer(t *testing.T) {
+	t.Parallel()
 	// git reported no trailers even though the body's last paragraph contains a colon line — the
 	// no-trailers short-circuit must leave it alone rather than second-guessing git.
 	body := "Body.\n\nNote: this looks like a trailer but git did not parse it as one."
@@ -112,6 +118,7 @@ func TestSplitTrailerBlock_LastParagraphColonButNotATrailer(t *testing.T) {
 }
 
 func TestSplitTrailerBlock_FoldedContinuation(t *testing.T) {
+	t.Parallel()
 	body := "Body.\n\nSigned-off-by: Alice <alice@example.com>\n  (folded continuation line)"
 	trailers := []porcelain.CommitTrailer{{Token: "Signed-off-by", Value: "Alice <alice@example.com>"}}
 	if got := porcelain.SplitTrailerBlock(body, trailers); got != "Body." {
@@ -120,6 +127,7 @@ func TestSplitTrailerBlock_FoldedContinuation(t *testing.T) {
 }
 
 func TestSplitTrailerBlock_TrailingBlankLines(t *testing.T) {
+	t.Parallel()
 	body := "Body.\n\nSigned-off-by: Alice <alice@example.com>\n\n\n"
 	trailers := []porcelain.CommitTrailer{{Token: "Signed-off-by", Value: "Alice <alice@example.com>"}}
 	if got := porcelain.SplitTrailerBlock(body, trailers); got != "Body." {
@@ -128,6 +136,7 @@ func TestSplitTrailerBlock_TrailingBlankLines(t *testing.T) {
 }
 
 func TestSplitTrailerBlock_BodyIsOnlyTrailers(t *testing.T) {
+	t.Parallel()
 	body := "Signed-off-by: Alice <alice@example.com>"
 	trailers := []porcelain.CommitTrailer{{Token: "Signed-off-by", Value: "Alice <alice@example.com>"}}
 	if got := porcelain.SplitTrailerBlock(body, trailers); got != "" {

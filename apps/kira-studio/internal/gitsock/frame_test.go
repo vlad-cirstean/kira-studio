@@ -10,6 +10,7 @@ import (
 )
 
 func TestFrame_ZeroLengthBody(t *testing.T) {
+	t.Parallel()
 	var buf bytes.Buffer
 	if err := writeFrame(&buf, []byte{}); err != nil {
 		t.Fatalf("write: %v", err)
@@ -24,6 +25,7 @@ func TestFrame_ZeroLengthBody(t *testing.T) {
 }
 
 func TestFrame_OneByteUnderMax(t *testing.T) {
+	t.Parallel()
 	body := make([]byte, maxFrameBytes-1)
 	var buf bytes.Buffer
 	if err := writeFrame(&buf, body); err != nil {
@@ -39,6 +41,7 @@ func TestFrame_OneByteUnderMax(t *testing.T) {
 }
 
 func TestFrame_OneByteOverMax_WriteRefused(t *testing.T) {
+	t.Parallel()
 	body := make([]byte, maxFrameBytes+1)
 	var buf bytes.Buffer
 	if err := writeFrame(&buf, body); err != errFrameTooLarge {
@@ -50,6 +53,7 @@ func TestFrame_OneByteOverMax_WriteRefused(t *testing.T) {
 }
 
 func TestFrame_OneByteOverMax_ReadRefusedBeforeBody(t *testing.T) {
+	t.Parallel()
 	var buf bytes.Buffer
 	var hdr [frameHeaderLen]byte
 	binary.BigEndian.PutUint32(hdr[:], maxFrameBytes+1)
@@ -62,6 +66,7 @@ func TestFrame_OneByteOverMax_ReadRefusedBeforeBody(t *testing.T) {
 }
 
 func TestFrame_TruncatedNeverBlocksForever(t *testing.T) {
+	t.Parallel()
 	// A prefix promising 100 bytes with only 10 ever arriving, then EOF.
 	var buf bytes.Buffer
 	var hdr [frameHeaderLen]byte
@@ -85,6 +90,7 @@ func TestFrame_TruncatedNeverBlocksForever(t *testing.T) {
 }
 
 func TestFrame_TwoFramesInOneWrite(t *testing.T) {
+	t.Parallel()
 	var buf bytes.Buffer
 	if err := writeFrame(&buf, []byte("first")); err != nil {
 		t.Fatal(err)
@@ -121,6 +127,7 @@ func (r *stepReader) Read(p []byte) (int, error) {
 }
 
 func TestFrame_SplitAcrossThreeReads(t *testing.T) {
+	t.Parallel()
 	var buf bytes.Buffer
 	if err := writeFrame(&buf, []byte("hello world")); err != nil {
 		t.Fatal(err)

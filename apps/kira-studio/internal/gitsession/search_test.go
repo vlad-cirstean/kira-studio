@@ -54,6 +54,7 @@ func initSearchRepo(t *testing.T, commits []searchCommitSpec) string {
 // no ReadPage has ever loaded into the store — the whole point of running an independent scan
 // rather than reading the paused logsession.
 func TestWalkSearch_HitInNotYetLoadedTail(t *testing.T) {
+	t.Parallel()
 	skipWithoutGitWalk(t)
 	dir := initSearchRepo(t, []searchCommitSpec{
 		{subject: "base commit"},
@@ -88,6 +89,7 @@ func TestWalkSearch_HitInNotYetLoadedTail(t *testing.T) {
 // a commit's real body regardless of whether the row is already paged into the store — the
 // client-side loaded scan never can (the column store holds no bodies at all).
 func TestWalkSearch_BodyOnlyHitOnAlreadyLoadedRow(t *testing.T) {
+	t.Parallel()
 	skipWithoutGitWalk(t)
 	dir := initSearchRepo(t, []searchCommitSpec{
 		{subject: "routine maintenance", body: "Renames the internal Zebra module."},
@@ -128,6 +130,7 @@ func TestWalkSearch_BodyOnlyHitOnAlreadyLoadedRow(t *testing.T) {
 // racing a real scan's wall-clock duration): a cancel func standing in for "a scan already in
 // flight" must be invoked, and searchGen must advance, on the next Search call.
 func TestWalkSearch_SupersedeCancelsThePreviousScan(t *testing.T) {
+	t.Parallel()
 	skipWithoutGitWalk(t)
 	dir := initSearchRepo(t, []searchCommitSpec{{subject: "one commit"}})
 	conn, _, repoID := newWalkTestConn(t, dir)
@@ -161,6 +164,7 @@ func TestWalkSearch_SupersedeCancelsThePreviousScan(t *testing.T) {
 // TestWalkSearch_ResetCancelsInFlightScan is D12's own resetLocked line: a walk rebuild (refs
 // moved, an explicit graph.refresh) must cancel any scan already reading the walk's old rev set.
 func TestWalkSearch_ResetCancelsInFlightScan(t *testing.T) {
+	t.Parallel()
 	skipWithoutGitWalk(t)
 	dir := initSearchRepo(t, []searchCommitSpec{{subject: "one commit"}})
 	conn, _, repoID := newWalkTestConn(t, dir)
@@ -188,6 +192,7 @@ func TestWalkSearch_ResetCancelsInFlightScan(t *testing.T) {
 // through entry.Repo.Read (the four-slot reader pool), not a direct-spawn bypass — proven here by
 // showing it blocks behind an in-progress Write and resumes once the Write releases.
 func TestWalkSearch_RunsInsideTheReadGate(t *testing.T) {
+	t.Parallel()
 	skipWithoutGitWalk(t)
 	dir := initSearchRepo(t, []searchCommitSpec{{subject: "one commit"}})
 	conn, _, repoID := newWalkTestConn(t, dir)
@@ -239,6 +244,7 @@ func TestWalkSearch_RunsInsideTheReadGate(t *testing.T) {
 // TestWalkSearch_UsesTheWalksOwnRevSet is a light structural check that Search's argv comes from
 // THIS walk's own spec — a review (ranged) walk must never be read by a graph-scoped Search call.
 func TestWalkSearch_UsesTheWalksOwnRevSet(t *testing.T) {
+	t.Parallel()
 	skipWithoutGitWalk(t)
 	dir := initSearchRepo(t, []searchCommitSpec{{subject: fmt.Sprintf("commit %d", 1)}})
 	conn, _, repoID := newWalkTestConn(t, dir)

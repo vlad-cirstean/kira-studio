@@ -64,6 +64,7 @@ func scanDeps(dir string) Deps {
 }
 
 func TestScan_BasicMatch(t *testing.T) {
+	t.Parallel()
 	skipWithoutGitScan(t)
 	dir := initScanRepo(t, 5, func(i int) string {
 		if i == 3 {
@@ -99,6 +100,7 @@ func TestScan_BasicMatch(t *testing.T) {
 }
 
 func TestScan_LimitCapsHitsButKeepsExactTotal(t *testing.T) {
+	t.Parallel()
 	skipWithoutGitScan(t)
 	const n = 50
 	dir := initScanRepo(t, n, func(i int) string {
@@ -138,6 +140,7 @@ func TestScan_LimitCapsHitsButKeepsExactTotal(t *testing.T) {
 // TestScan_BudgetFiresEarly needs > 1024 commits so the deadline check (every 1024 scanned
 // records) actually fires before EOF — built via fast-import so this stays fast.
 func TestScan_BudgetFiresEarly(t *testing.T) {
+	t.Parallel()
 	skipWithoutGitScan(t)
 	const n = 1100
 	dir := initScanRepo(t, n, func(i int) string { return fmt.Sprintf("commit %d", i) })
@@ -165,6 +168,7 @@ func TestScan_BudgetFiresEarly(t *testing.T) {
 }
 
 func TestScan_DefaultsApplyWhenUnset(t *testing.T) {
+	t.Parallel()
 	skipWithoutGitScan(t)
 	dir := initScanRepo(t, 1, func(i int) string { return "sole commit" })
 	m, err := Compile(Query{Text: "sole"})
@@ -190,6 +194,7 @@ func TestScan_DefaultsApplyWhenUnset(t *testing.T) {
 // at all, well within its own timeout, is itself the proof no orphan git process is left running
 // past this call.
 func TestScan_CancelledContextStopsPromptlyAndKillsTheChild(t *testing.T) {
+	t.Parallel()
 	skipWithoutGitScan(t)
 	// Large enough that an uncancelled scan would still be reading when the cancel fires.
 	const n = 5000

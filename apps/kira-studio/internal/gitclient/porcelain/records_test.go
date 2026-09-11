@@ -7,6 +7,7 @@ import (
 )
 
 func TestRecordSplitter_SplitAcrossThreePushes(t *testing.T) {
+	t.Parallel()
 	s := NewRecordSplitter(0)
 	full := []byte("recordAAAA\x00recordB\x00")
 	var got [][]byte
@@ -27,6 +28,7 @@ func TestRecordSplitter_SplitAcrossThreePushes(t *testing.T) {
 }
 
 func TestRecordSplitter_DelimiterAsFirstAndLastByteOfAChunk(t *testing.T) {
+	t.Parallel()
 	s := NewRecordSplitter(0)
 	recs1, err := s.Push([]byte("\x00tail"))
 	if err != nil {
@@ -48,6 +50,7 @@ func TestRecordSplitter_DelimiterAsFirstAndLastByteOfAChunk(t *testing.T) {
 }
 
 func TestRecordSplitter_NoTrailingEmptyRecordAfterFinalNUL(t *testing.T) {
+	t.Parallel()
 	s := NewRecordSplitter(0)
 	recs, err := s.Push([]byte("a\x00b\x00"))
 	if err != nil {
@@ -60,6 +63,7 @@ func TestRecordSplitter_NoTrailingEmptyRecordAfterFinalNUL(t *testing.T) {
 }
 
 func TestRecordSplitter_FlushSurfacesAGenuinePartialRecord(t *testing.T) {
+	t.Parallel()
 	s := NewRecordSplitter(0)
 	if _, err := s.Push([]byte("a\x00partial-tail-no-terminator")); err != nil {
 		t.Fatalf("Push: %v", err)
@@ -74,6 +78,7 @@ func TestRecordSplitter_FlushSurfacesAGenuinePartialRecord(t *testing.T) {
 }
 
 func TestRecordSplitter_RemainderCap(t *testing.T) {
+	t.Parallel()
 	s := NewRecordSplitter(0)
 	huge := bytes.Repeat([]byte("x"), maxRemainderBytes+1)
 	_, err := s.Push(huge)
@@ -83,6 +88,7 @@ func TestRecordSplitter_RemainderCap(t *testing.T) {
 }
 
 func TestSplitLimitedFields_FinalFieldAbsorbsExtraDelimiters(t *testing.T) {
+	t.Parallel()
 	got := SplitLimitedFields([]byte("a\x1fb\x1fc\x1fd\x1fe"), 0x1f, 3)
 	want := [][]byte{[]byte("a"), []byte("b"), []byte("c\x1fd\x1fe")}
 	if !reflect.DeepEqual(got, want) {
@@ -91,6 +97,7 @@ func TestSplitLimitedFields_FinalFieldAbsorbsExtraDelimiters(t *testing.T) {
 }
 
 func TestSplitLimitedFields_TooFewDelimiters(t *testing.T) {
+	t.Parallel()
 	got := SplitLimitedFields([]byte("a\x1fb"), 0x1f, 5)
 	want := [][]byte{[]byte("a"), []byte("b")}
 	if !reflect.DeepEqual(got, want) {

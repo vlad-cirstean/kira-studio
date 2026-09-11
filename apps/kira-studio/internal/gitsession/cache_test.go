@@ -20,6 +20,7 @@ func diffBody(tag string) porcelain.FileDiffBody {
 }
 
 func TestDiffCache_GetSetRoundTrips(t *testing.T) {
+	t.Parallel()
 	c := newDiffCache(1 << 20)
 	c.set("base", "sha", "a.txt", diffBody("a"), 10)
 
@@ -41,6 +42,7 @@ func TestDiffCache_GetSetRoundTrips(t *testing.T) {
 // get() since — proving `order`'s own front/back semantics (least- to most-recently-used) survived
 // the slice-to-list rewrite.
 func TestDiffCache_EvictsLeastRecentlyUsedFirst(t *testing.T) {
+	t.Parallel()
 	c := newDiffCache(25) // room for exactly two 10-byte-ish entries plus slack, never three.
 	c.set("base", "sha", "a.txt", diffBody("a"), 10)
 	c.set("base", "sha", "b.txt", diffBody("b"), 10)
@@ -67,6 +69,7 @@ func TestDiffCache_EvictsLeastRecentlyUsedFirst(t *testing.T) {
 // key re-touches it too (not only get()) — the same removeFromOrderLocked + re-append/re-push
 // path both old and new implementations share.
 func TestDiffCache_ReSettingAnExistingKeyMovesItToMostRecentlyUsed(t *testing.T) {
+	t.Parallel()
 	c := newDiffCache(25)
 	c.set("base", "sha", "a.txt", diffBody("a1"), 10)
 	c.set("base", "sha", "b.txt", diffBody("b"), 10)
@@ -88,6 +91,7 @@ func TestDiffCache_ReSettingAnExistingKeyMovesItToMostRecentlyUsed(t *testing.T)
 }
 
 func TestDiffCache_ClearDropsEverything(t *testing.T) {
+	t.Parallel()
 	c := newDiffCache(1 << 20)
 	c.set("base", "sha", "a.txt", diffBody("a"), 10)
 	c.set("base", "sha", "b.txt", diffBody("b"), 10)

@@ -38,6 +38,7 @@ func addTestComment(t *testing.T, ctx context.Context, entry *RepoEntry, at stri
 // unrelated file changes — blob-oid equality answers "exact" with the stored range unchanged, no
 // diff spawn.
 func TestAnchorOne_ExactAfterUnrelatedCommits(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	dir, sha1, entry := buildCommentFixture(t)
 	added := addTestComment(t, ctx, entry, sha1, gitreview.LineRange{Start: 2, End: 2})
@@ -69,6 +70,7 @@ func TestAnchorOne_ExactAfterUnrelatedCommits(t *testing.T) {
 // above the comment shift its projected range by exactly five, through gitreview.ProjectRanges
 // unchanged (D7/D18 — no new arithmetic).
 func TestAnchorOne_ProjectedWhenLinesShiftAbove(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	dir, sha1, entry := buildCommentFixture(t)
 	addTestComment(t, ctx, entry, sha1, gitreview.LineRange{Start: 2, End: 2})
@@ -94,6 +96,7 @@ func TestAnchorOne_ProjectedWhenLinesShiftAbove(t *testing.T) {
 // deleted outright — ProjectRanges' own nil result (probe P2) is the removed signal, with the
 // stored (pre-deletion) range reported rather than a fabricated new one.
 func TestAnchorOne_RemovedWhenCommentedLinesDeleted(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	dir, sha1, entry := buildCommentFixture(t)
 	addTestComment(t, ctx, entry, sha1, gitreview.LineRange{Start: 2, End: 2})
@@ -119,6 +122,7 @@ func TestAnchorOne_RemovedWhenCommentedLinesDeleted(t *testing.T) {
 // unreachable"): amending the commit — with a.txt itself changing, so tier 0 cannot short-circuit
 // — leaves the old anchor sha present but unreachable from the new tip.
 func TestAnchorOne_StaleAfterAmend(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	dir, sha1, entry := buildCommentFixture(t)
 	addTestComment(t, ctx, entry, sha1, gitreview.LineRange{Start: 2, End: 2})
@@ -147,6 +151,7 @@ func TestAnchorOne_StaleAfterAmend(t *testing.T) {
 // pruned (not merely unreachable) — reflog expiry plus gc leaves merge-base --is-ancestor unable
 // to resolve it at all, and the result is the same honest "stale" as the amend case.
 func TestAnchorOne_StaleAfterPrune(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	dir, sha1, entry := buildCommentFixture(t)
 	addTestComment(t, ctx, entry, sha1, gitreview.LineRange{Start: 2, End: 2})
@@ -171,6 +176,7 @@ func TestAnchorOne_StaleAfterPrune(t *testing.T) {
 // (older) `at` reports exact against THAT revision, not the tip — even while the tip has since
 // changed the very lines the comment is about.
 func TestAnchorOne_ExactAtExplicitOlderRevision(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	dir, sha1, entry := buildCommentFixture(t)
 	addTestComment(t, ctx, entry, sha1, gitreview.LineRange{Start: 2, End: 2})

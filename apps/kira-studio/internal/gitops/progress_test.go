@@ -38,6 +38,7 @@ func intPtrEqual(a, b *int) bool {
 // done." (LF-terminated), then "Counting objects: 100% (1/1)" CR-separated from its own final
 // ", done." line.
 func TestProgressParser_PushTranscript(t *testing.T) {
+	t.Parallel()
 	got := collect(t, []string{
 		"Enumerating objects: 1, done.\n" +
 			"Counting objects: 100% (1/1)\rCounting objects: 100% (1/1), done.\n",
@@ -58,6 +59,7 @@ func TestProgressParser_PushTranscript(t *testing.T) {
 // "remote: "-prefixed and right-padded with spaces, then the "From …"/ref-update block, which is
 // unrecognised and dropped rather than erroring.
 func TestProgressParser_FetchTranscript(t *testing.T) {
+	t.Parallel()
 	got := collect(t, []string{
 		"remote: Enumerating objects: 5, done.        \n" +
 			"remote: Counting objects:  20% (1/5)\rremote: Counting objects: 100% (5/5), done.        \n" +
@@ -75,6 +77,7 @@ func TestProgressParser_FetchTranscript(t *testing.T) {
 // TestProgressParser_ChunkSplitMidPercentage proves the parser survives an os/exec pipe boundary
 // falling in the middle of a percentage line — a real hazard this decoder exists to handle.
 func TestProgressParser_ChunkSplitMidPercentage(t *testing.T) {
+	t.Parallel()
 	got := collect(t, []string{
 		"Receiving objects:  5",
 		"0% (5/10)\r",
@@ -88,6 +91,7 @@ func TestProgressParser_ChunkSplitMidPercentage(t *testing.T) {
 }
 
 func TestProgressParser_UnrecognisedLineIsDroppedNotError(t *testing.T) {
+	t.Parallel()
 	got := collect(t, []string{"hint: some unrelated hint text\n"})
 	if len(got) != 0 {
 		t.Fatalf("got %+v, want no events for an unrecognised line", got)
@@ -95,6 +99,7 @@ func TestProgressParser_UnrecognisedLineIsDroppedNotError(t *testing.T) {
 }
 
 func TestProgressParser_NoProgressAtAllEmitsNothing(t *testing.T) {
+	t.Parallel()
 	got := collect(t, []string{"Everything up-to-date\n"})
 	if len(got) != 0 {
 		t.Fatalf("got %+v, want no events — no progress is not a stall", got)
@@ -110,6 +115,7 @@ func TestProgressParser_NoProgressAtAllEmitsNothing(t *testing.T) {
 // a "stuck forever" state, just a dropped oversized one (exactly what an equally oversized but
 // still-terminated line would suffer anyway, since it would never match either regex).
 func TestProgressParser_UnterminatedOversizedLineDoesNotGrowBufUnbounded(t *testing.T) {
+	t.Parallel()
 	var got []Progress
 	p := NewProgressParser(func(pr Progress) { got = append(got, pr) })
 
@@ -130,6 +136,7 @@ func TestProgressParser_UnterminatedOversizedLineDoesNotGrowBufUnbounded(t *test
 }
 
 func TestThrottle_CoalescesPercentageUpdatesButNeverDoneLines(t *testing.T) {
+	t.Parallel()
 	now := time.Unix(0, 0)
 	var got []Progress
 	throttled := Throttle(func(p Progress) { got = append(got, p) }, 100*time.Millisecond, func() time.Time { return now })

@@ -29,17 +29,34 @@ func KiraHome() string {
 // names this file kira.db throughout; if you find it saying kira.sqlite anywhere, that is the doc
 // drifting, not this file.
 func DbPath() string {
-	return filepath.Join(KiraHome(), "kira.db")
+	return DbPathAt(KiraHome())
+}
+
+// DbPathAt is DbPath against an explicit home dir instead of KiraHome()'s env lookup — lets a
+// caller (storage.OpenAt) resolve a path without going through $KIRA_HOME, so a test can run
+// t.Parallel() without t.Setenv's parallel-test panic (v1.4 P1).
+func DbPathAt(home string) string {
+	return filepath.Join(home, "kira.db")
 }
 
 func LogsDir() string {
-	return filepath.Join(KiraHome(), "logs")
+	return LogsDirAt(KiraHome())
+}
+
+// LogsDirAt is LogsDir against an explicit home dir — see DbPathAt.
+func LogsDirAt(home string) string {
+	return filepath.Join(home, "logs")
 }
 
 // EnsureLayout creates KIRA_HOME and its logs directory with the same permissions the Electron
 // build uses (0700), tightening an existing loose directory too, not only on first create.
 func EnsureLayout() error {
-	for _, dir := range []string{KiraHome(), LogsDir()} {
+	return EnsureLayoutAt(KiraHome())
+}
+
+// EnsureLayoutAt is EnsureLayout against an explicit home dir — see DbPathAt.
+func EnsureLayoutAt(home string) error {
+	for _, dir := range []string{home, LogsDirAt(home)} {
 		if err := os.MkdirAll(dir, 0o700); err != nil {
 			return err
 		}

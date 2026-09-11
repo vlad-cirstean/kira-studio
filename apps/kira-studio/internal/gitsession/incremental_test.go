@@ -98,6 +98,7 @@ func buildFileDeltaFixture(t *testing.T) (dir, sha1 string) {
 // TestFileDelta_UnchangedAfterUnrelatedCommits is D18's tier-0 scenario: a.txt's own content never
 // moves, only an unrelated file changes — blob-oid equality answers "unchanged" with no diff spawn.
 func TestFileDelta_UnchangedAfterUnrelatedCommits(t *testing.T) {
+	t.Parallel()
 	dir, sha1 := buildFileDeltaFixture(t)
 	entry, store := newIncrementalTestEntry(t, dir)
 	ctx := context.Background()
@@ -135,6 +136,7 @@ func TestFileDelta_UnchangedAfterUnrelatedCommits(t *testing.T) {
 // TestFileDelta_FastAfterANormalEdit is D18's tier-1 scenario: an ordinary commit edits the
 // reviewed file, and the snapshot commit is still an ancestor of the branch.
 func TestFileDelta_FastAfterANormalEdit(t *testing.T) {
+	t.Parallel()
 	dir, sha1 := buildFileDeltaFixture(t)
 	entry, store := newIncrementalTestEntry(t, dir)
 	ctx := context.Background()
@@ -180,6 +182,7 @@ func TestFileDelta_FastAfterANormalEdit(t *testing.T) {
 // changed. Rewrites a.txt from 3 lines to 9000 DIFFERENT lines (a diff comfortably over the 1 MiB
 // cap) — CurrentLineCount must report 9000, not the stale snapshot's 3.
 func TestFileDelta_FastPathTooLargePatch_StillReportsTheRealCurrentLineCount(t *testing.T) {
+	t.Parallel()
 	dir, sha1 := buildFileDeltaFixture(t)
 	entry, store := newIncrementalTestEntry(t, dir)
 	ctx := context.Background()
@@ -226,6 +229,7 @@ func TestFileDelta_FastPathTooLargePatch_StillReportsTheRealCurrentLineCount(t *
 // `git commit --amend`, the snapshot commit is unreachable but still present (exit 1, not 128) —
 // the overwhelmingly common rewrite case, and this phase's whole reason to exist.
 func TestFileDelta_SlowAfterAmend(t *testing.T) {
+	t.Parallel()
 	dir, sha1 := buildFileDeltaFixture(t)
 	entry, store := newIncrementalTestEntry(t, dir)
 	ctx := context.Background()
@@ -271,6 +275,7 @@ func TestFileDelta_SlowAfterAmend(t *testing.T) {
 // TestFileDelta_SlowAfterPrune is D18's own "genuinely pruned" scenario: the snapshot commit is
 // not merely unreachable but actually gone (exit 128) — still the slow path, still correct.
 func TestFileDelta_SlowAfterPrune(t *testing.T) {
+	t.Parallel()
 	dir, sha1 := buildFileDeltaFixture(t)
 	entry, store := newIncrementalTestEntry(t, dir)
 	ctx := context.Background()
@@ -319,6 +324,7 @@ func TestFileDelta_SlowAfterPrune(t *testing.T) {
 // binary file's snapshot stores no content at all (D9), so once its sha is rewritten there is
 // nothing left to diff against — reported honestly, never silently as "unchanged" or an error.
 func TestFileDelta_SnapshotUnavailableForRewrittenBinary(t *testing.T) {
+	t.Parallel()
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not on PATH")
 	}
@@ -367,6 +373,7 @@ func TestFileDelta_SnapshotUnavailableForRewrittenBinary(t *testing.T) {
 // record" scenario — decided one level up from FileDelta (which always assumes a record exists),
 // in ReviewFileDiff itself: the delta IS the whole range diff.
 func TestReviewFileDiff_NoSnapshotForAFileWithNoRecord(t *testing.T) {
+	t.Parallel()
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not on PATH")
 	}
@@ -407,6 +414,7 @@ func TestReviewFileDiff_NoSnapshotForAFileWithNoRecord(t *testing.T) {
 // on every single call, even for the identical (base, branch) pair a review session's own
 // review.files/review.fileDiff round trips repeat over and over while the session sits open.
 func TestRangeFiles_MergeBaseIsCachedAcrossRequests(t *testing.T) {
+	t.Parallel()
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not on PATH")
 	}
@@ -481,6 +489,7 @@ func TestRangeFiles_MergeBaseIsCachedAcrossRequests(t *testing.T) {
 // plumbing is correct, not just "compiles": the stored record's BlobOID must still equal what an
 // independent `git rev-parse <tip>:<path>` reports.
 func TestMarkFile_StoredBlobOIDMatchesGit(t *testing.T) {
+	t.Parallel()
 	dir, sha1 := buildFileDeltaFixture(t)
 	entry, store := newIncrementalTestEntry(t, dir)
 	ctx := context.Background()

@@ -51,6 +51,7 @@ func runAutoFetchGit(t *testing.T, dir string, args ...string) {
 }
 
 func TestAutoFetch_NeverPromptsAndDisablesAfterAuthFailure(t *testing.T) {
+	t.Parallel()
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not on PATH")
 	}
@@ -109,6 +110,7 @@ func TestAutoFetch_NeverPromptsAndDisablesAfterAuthFailure(t *testing.T) {
 // forever, silently, since startAutoFetch's own `disabled` guard never distinguished "the user
 // turned this off" from "this entry is broken".
 func TestAutoFetch_ZeroIntervalPausesWithoutPermanentlyDisabling(t *testing.T) {
+	t.Parallel()
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not on PATH")
 	}
@@ -180,6 +182,7 @@ func TestAutoFetch_ZeroIntervalPausesWithoutPermanentlyDisabling(t *testing.T) {
 // such a write, without either package needing to know about a specific repository. This proves
 // it fans out to ALL currently held entries, not just one.
 func TestRegistry_ReconcileAutoFetch_RearmsEveryPausedEntry(t *testing.T) {
+	t.Parallel()
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not on PATH")
 	}

@@ -12,6 +12,7 @@ func branchTarget(name string) gitpreflight.CheckoutTarget {
 }
 
 func TestClassifyCheckout_Clean(t *testing.T) {
+	t.Parallel()
 	got := gitpreflight.ClassifyCheckout(gitpreflight.ClassifyCheckoutInput{
 		Target: branchTarget("topic"), Mode: "switch",
 	})
@@ -29,6 +30,7 @@ func TestClassifyCheckout_Clean(t *testing.T) {
 // TestClassifyCheckout_DirtyDisjointFromTarget proves the set-intersection rule directly: a dirty
 // path the checkout does NOT rewrite carries over rather than blocking — clean carry, no prompt.
 func TestClassifyCheckout_DirtyDisjointFromTarget(t *testing.T) {
+	t.Parallel()
 	got := gitpreflight.ClassifyCheckout(gitpreflight.ClassifyCheckoutInput{
 		Target: branchTarget("topic"), Mode: "switch",
 		Dirty:     []gitpreflight.DirtyPath{{Path: "untouched.txt", Tracked: true}},
@@ -46,6 +48,7 @@ func TestClassifyCheckout_DirtyDisjointFromTarget(t *testing.T) {
 }
 
 func TestClassifyCheckout_BlockedByTracked(t *testing.T) {
+	t.Parallel()
 	got := gitpreflight.ClassifyCheckout(gitpreflight.ClassifyCheckoutInput{
 		Target: branchTarget("topic"), Mode: "switch",
 		Dirty:     []gitpreflight.DirtyPath{{Path: "conflict.txt", Tracked: true}},
@@ -63,6 +66,7 @@ func TestClassifyCheckout_BlockedByTracked(t *testing.T) {
 }
 
 func TestClassifyCheckout_BlockedByUntracked(t *testing.T) {
+	t.Parallel()
 	got := gitpreflight.ClassifyCheckout(gitpreflight.ClassifyCheckoutInput{
 		Target: branchTarget("topic"), Mode: "switch",
 		Dirty:     []gitpreflight.DirtyPath{{Path: "conflict.txt", Tracked: false}},
@@ -83,6 +87,7 @@ func TestClassifyCheckout_BlockedByUntracked(t *testing.T) {
 // TestClassifyCheckout_BothBlockerKindsSuppressRoutes proves an untracked block wins over a
 // tracked one for route purposes even when both are present: no route helps either.
 func TestClassifyCheckout_BothBlockerKindsSuppressRoutes(t *testing.T) {
+	t.Parallel()
 	got := gitpreflight.ClassifyCheckout(gitpreflight.ClassifyCheckoutInput{
 		Target: branchTarget("topic"), Mode: "switch",
 		Dirty: []gitpreflight.DirtyPath{
@@ -108,6 +113,7 @@ func TestClassifyCheckout_BothBlockerKindsSuppressRoutes(t *testing.T) {
 // routes clear a tracked-only block, and the classifier reports every one that applies rather than
 // picking among them (D16's routing policy is what actually chooses, client-side).
 func TestClassifyCheckout_StashAvailableAddsRoute(t *testing.T) {
+	t.Parallel()
 	got := gitpreflight.ClassifyCheckout(gitpreflight.ClassifyCheckoutInput{
 		Target: branchTarget("topic"), Mode: "switch",
 		Dirty:          []gitpreflight.DirtyPath{{Path: "conflict.txt", Tracked: true}},
@@ -135,6 +141,7 @@ func TestClassifyCheckout_StashAvailableAddsRoute(t *testing.T) {
 // (probe P9), "stash push -u" (probe P15) is the one argv that clears every dirty-tree blocker, so
 // this route does not share their restriction.
 func TestClassifyCheckout_AutoStash_TrackedOnlyUntrackedOnlyAndBoth(t *testing.T) {
+	t.Parallel()
 	trackedOnly := gitpreflight.ClassifyCheckout(gitpreflight.ClassifyCheckoutInput{
 		Target: branchTarget("topic"), Mode: "switch",
 		Dirty: []gitpreflight.DirtyPath{{Path: "t.txt", Tracked: true}}, Rewritten: []string{"t.txt"},
@@ -178,6 +185,7 @@ func containsRoute(routes []string, want string) bool {
 // case (§7.1 item 4): an in-progress operation, or StashAvailable:false, produce neither new route
 // — even with a dirty block present that would otherwise qualify.
 func TestClassifyCheckout_AutoStash_NeverWithInProgressOrStashUnavailable(t *testing.T) {
+	t.Parallel()
 	op := &gitpreflight.InProgressOperation{Kind: gitpreflight.InProgressMerge, ConflictedPaths: []string{}}
 	withInProgress := gitpreflight.ClassifyCheckout(gitpreflight.ClassifyCheckoutInput{
 		Target: branchTarget("topic"), Mode: "switch", InProgress: op,
@@ -202,6 +210,7 @@ func TestClassifyCheckout_AutoStash_NeverWithInProgressOrStashUnavailable(t *tes
 // case: a switch-mode request to a branch target whose sole blocker is a worktree conflict offers
 // "detachHere".
 func TestClassifyCheckout_DetachHere_WorktreeConflictAlone_SwitchToBranch(t *testing.T) {
+	t.Parallel()
 	path := "/elsewhere"
 	got := gitpreflight.ClassifyCheckout(gitpreflight.ClassifyCheckoutInput{
 		Target: branchTarget("topic"), Mode: "switch", CheckedOutIn: &path,
@@ -216,6 +225,7 @@ func TestClassifyCheckout_DetachHere_WorktreeConflictAlone_SwitchToBranch(t *tes
 // offers both routes — they compose client-side (D16) into one re-issued request, this classifier
 // only reports each is individually available.
 func TestClassifyCheckout_DetachHere_ComposesWithAutoStash(t *testing.T) {
+	t.Parallel()
 	path := "/elsewhere"
 	got := gitpreflight.ClassifyCheckout(gitpreflight.ClassifyCheckoutInput{
 		Target: branchTarget("topic"), Mode: "switch", CheckedOutIn: &path,
@@ -232,6 +242,7 @@ func TestClassifyCheckout_DetachHere_ComposesWithAutoStash(t *testing.T) {
 // would route to an outcome already asked for), and a tag/sha target already detaches
 // unconditionally — detachHere is meaningless for either.
 func TestClassifyCheckout_DetachHere_NeverForDetachModeOrNonBranchTarget(t *testing.T) {
+	t.Parallel()
 	path := "/elsewhere"
 	detachMode := gitpreflight.ClassifyCheckout(gitpreflight.ClassifyCheckoutInput{
 		Target: branchTarget("topic"), Mode: "detach", CheckedOutIn: &path,
@@ -251,6 +262,7 @@ func TestClassifyCheckout_DetachHere_NeverForDetachModeOrNonBranchTarget(t *test
 // TestClassifyCheckout_NonPathBlockersAloneAndCombined asserts the full blocker order (D18):
 // inProgressOperation, worktreeConflict, blockedByUntracked, blockedByTracked.
 func TestClassifyCheckout_NonPathBlockersOrder(t *testing.T) {
+	t.Parallel()
 	op := &gitpreflight.InProgressOperation{Kind: gitpreflight.InProgressMerge, ConflictedPaths: []string{}}
 	worktreePath := "/some/other/worktree"
 	got := gitpreflight.ClassifyCheckout(gitpreflight.ClassifyCheckoutInput{
@@ -278,6 +290,7 @@ func TestClassifyCheckout_NonPathBlockersOrder(t *testing.T) {
 }
 
 func TestClassifyCheckout_InProgressAlone(t *testing.T) {
+	t.Parallel()
 	op := &gitpreflight.InProgressOperation{Kind: gitpreflight.InProgressRevert, ConflictedPaths: []string{}}
 	got := gitpreflight.ClassifyCheckout(gitpreflight.ClassifyCheckoutInput{
 		Target: branchTarget("topic"), Mode: "switch", InProgress: op,
@@ -288,6 +301,7 @@ func TestClassifyCheckout_InProgressAlone(t *testing.T) {
 }
 
 func TestClassifyCheckout_WorktreeConflictAlone(t *testing.T) {
+	t.Parallel()
 	path := "/elsewhere"
 	got := gitpreflight.ClassifyCheckout(gitpreflight.ClassifyCheckoutInput{
 		Target: branchTarget("topic"), Mode: "switch", CheckedOutIn: &path,
@@ -301,6 +315,7 @@ func TestClassifyCheckout_WorktreeConflictAlone(t *testing.T) {
 }
 
 func TestClassifyCheckout_ShaTargetDetaches(t *testing.T) {
+	t.Parallel()
 	got := gitpreflight.ClassifyCheckout(gitpreflight.ClassifyCheckoutInput{
 		Target: gitpreflight.CheckoutTarget{Kind: "sha", Name: "abc1234"}, Mode: "switch",
 	})
@@ -313,6 +328,7 @@ func TestClassifyCheckout_ShaTargetDetaches(t *testing.T) {
 }
 
 func TestClassifyCheckout_TagTargetDetaches(t *testing.T) {
+	t.Parallel()
 	got := gitpreflight.ClassifyCheckout(gitpreflight.ClassifyCheckoutInput{
 		Target: gitpreflight.CheckoutTarget{Kind: "tag", Name: "v1.0"}, Mode: "switch",
 	})
@@ -325,6 +341,7 @@ func TestClassifyCheckout_TagTargetDetaches(t *testing.T) {
 // switch to a remote-tracking ref with no local counterpart offers a labelled tracking-branch
 // choice rather than detaching or guessing silently.
 func TestClassifyCheckout_RemoteBranchSwitchCreatesTracking(t *testing.T) {
+	t.Parallel()
 	got := gitpreflight.ClassifyCheckout(gitpreflight.ClassifyCheckoutInput{
 		Target: gitpreflight.CheckoutTarget{Kind: "remoteBranch", Name: "origin/topic"}, Mode: "switch",
 	})
@@ -339,6 +356,7 @@ func TestClassifyCheckout_RemoteBranchSwitchCreatesTracking(t *testing.T) {
 // TestClassifyCheckout_RemoteBranchDetachModeSkipsTracking proves an explicit detach never creates
 // a tracking branch even for a remoteBranch target.
 func TestClassifyCheckout_RemoteBranchDetachModeSkipsTracking(t *testing.T) {
+	t.Parallel()
 	got := gitpreflight.ClassifyCheckout(gitpreflight.ClassifyCheckoutInput{
 		Target: gitpreflight.CheckoutTarget{Kind: "remoteBranch", Name: "origin/topic"}, Mode: "detach",
 	})
@@ -351,6 +369,7 @@ func TestClassifyCheckout_RemoteBranchDetachModeSkipsTracking(t *testing.T) {
 }
 
 func TestClassifyCheckout_EmptyRewrittenSet(t *testing.T) {
+	t.Parallel()
 	got := gitpreflight.ClassifyCheckout(gitpreflight.ClassifyCheckoutInput{
 		Target: branchTarget("topic"), Mode: "switch",
 		Dirty: []gitpreflight.DirtyPath{{Path: "a.txt", Tracked: true}},

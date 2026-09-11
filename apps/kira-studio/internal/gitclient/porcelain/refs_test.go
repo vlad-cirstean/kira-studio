@@ -21,6 +21,7 @@ func byRefname(rows []porcelain.RefRow, refname string) *porcelain.RefRow {
 // %(upstream:track) shapes, the trailing-empty-field case (a branch's own %(taggerdate:unix) is
 // empty and last), isHead, and checkedOutIn for a branch checked out in a linked worktree.
 func TestParseRefRows_Heads(t *testing.T) {
+	t.Parallel()
 	rows, err := porcelain.ParseRefRows(readDiffFixture(t, "refs/heads.bin"), false)
 	if err != nil {
 		t.Fatalf("ParseRefRows: %v", err)
@@ -93,6 +94,7 @@ func TestParseRefRows_Heads(t *testing.T) {
 // lightweight tag's borrowed commit subject must be discarded, and an annotated tag's multi-line
 // body must round-trip through the %00+\n framing intact.
 func TestParseRefRows_Tags(t *testing.T) {
+	t.Parallel()
 	rows, err := porcelain.ParseRefRows(readDiffFixture(t, "refs/tags.bin"), true)
 	if err != nil {
 		t.Fatalf("ParseRefRows: %v", err)
@@ -141,6 +143,7 @@ func TestParseRefRows_Tags(t *testing.T) {
 }
 
 func TestParseRefRows_EmptyInput(t *testing.T) {
+	t.Parallel()
 	rows, err := porcelain.ParseRefRows(nil, false)
 	if err != nil || len(rows) != 0 {
 		t.Fatalf("ParseRefRows(nil, false) = %v, %v", rows, err)
@@ -154,6 +157,7 @@ func TestParseRefRows_EmptyInput(t *testing.T) {
 // TestParseRefRows_NULFramingMalformed proves the %00+\n framing invariant is actually checked —
 // a stream whose final split does not leave exactly "\n" is a malformed stream, not a silent skip.
 func TestParseRefRows_NULFramingMalformed(t *testing.T) {
+	t.Parallel()
 	raw := []byte("refs/tags/x\x1fsha\x1fcommit\x1f\x1f\x1f0\x1f \x1f\x1f\x1f\x1f\x1fsubj\x1fbody\x00")
 	if _, err := porcelain.ParseRefRows(raw, true); err == nil {
 		t.Fatal("expected an error for a stream missing its trailing \\n after the final NUL")
@@ -165,6 +169,7 @@ func TestParseRefRows_NULFramingMalformed(t *testing.T) {
 // composed. A hand-built LF-framed record (RefsFormat's own eleven \x1f-delimited fields), not a
 // testdata fixture (D12 forbids adding a new one this phase has no real macOS output to record).
 func TestParseRefRows_WorktreePathComposesToNFC(t *testing.T) {
+	t.Parallel()
 	decomposedE := string([]byte{0x65, 0xcc, 0x81}) // "e" + U+0301, decomposed "é"
 	composedE := string([]byte{0xc3, 0xa9})         // U+00E9, composed "é"
 
@@ -206,6 +211,7 @@ func setupRepoWithRemoteHead(t *testing.T) *repoBuilder {
 }
 
 func TestHeadsRefsArgs_ExcludesRemoteHeadPointer(t *testing.T) {
+	t.Parallel()
 	b := setupRepoWithRemoteHead(t)
 	out := captureRaw(t, b.dir, porcelain.HeadsRefsArgs())
 	if strings.Contains(string(out), "refs/remotes/origin/HEAD") {
@@ -217,6 +223,7 @@ func TestHeadsRefsArgs_ExcludesRemoteHeadPointer(t *testing.T) {
 }
 
 func TestLogSessionArgs_ExcludesRemoteHeadDecoration(t *testing.T) {
+	t.Parallel()
 	b := setupRepoWithRemoteHead(t)
 	out := captureRaw(t, b.dir, porcelain.LogSessionArgs(porcelain.WalkSpec{}))
 	if strings.Contains(string(out), "refs/remotes/origin/HEAD") {

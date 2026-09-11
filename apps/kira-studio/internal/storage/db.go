@@ -63,11 +63,19 @@ func buildDSN(path string) string {
 // permissions the Electron build uses, applies the four startup pragmas, and runs every pending
 // migration.
 func Open() (*DB, error) {
-	if err := config.EnsureLayout(); err != nil {
+	return OpenAt(config.KiraHome())
+}
+
+// OpenAt is Open against an explicit home dir instead of $KIRA_HOME. Exists so a test can pass its
+// own t.TempDir() directly rather than t.Setenv("KIRA_HOME", …) — Go's testing package panics if
+// t.Setenv runs in a test that called t.Parallel() (or whose parent did), so a test wanting both
+// isolation and parallelism needs the dir threaded explicitly (v1.4 P1).
+func OpenAt(home string) (*DB, error) {
+	if err := config.EnsureLayoutAt(home); err != nil {
 		return nil, fmt.Errorf("storage: ensure layout: %w", err)
 	}
 
-	path := config.DbPath()
+	path := config.DbPathAt(home)
 	sqlDB, err := sql.Open("sqlite", buildDSN(path))
 	if err != nil {
 		return nil, fmt.Errorf("storage: open %s: %w", path, err)

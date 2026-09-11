@@ -12,6 +12,7 @@ const testGlobalStashRefPrefix = "refs/kira/globalstash/"
 func hex(c byte) string { return strings.Repeat(string(c), 40) }
 
 func TestStashListArgs(t *testing.T) {
+	t.Parallel()
 	got := porcelain.StashListArgs()
 	want := []string{"stash", "list", "-z", "--numstat", "-M", "-C", "--format=" + porcelain.StashFormat}
 	if len(got) != len(want) {
@@ -25,6 +26,7 @@ func TestStashListArgs(t *testing.T) {
 }
 
 func TestStashShowArgs(t *testing.T) {
+	t.Parallel()
 	numstat, nameStatus := porcelain.StashShowArgs("base123", "stash456")
 	wantNumstat := porcelain.NumstatArgs(strPtr("base123"), "stash456")
 	wantNameStatus := porcelain.NameStatusArgs(strPtr("base123"), "stash456")
@@ -44,6 +46,7 @@ func TestStashShowArgs(t *testing.T) {
 }
 
 func TestStashUntrackedLsTreeArgs(t *testing.T) {
+	t.Parallel()
 	got := porcelain.StashUntrackedLsTreeArgs("abc123")
 	want := []string{"ls-tree", "-r", "--name-only", "-z", "abc123"}
 	if len(got) != len(want) {
@@ -62,6 +65,7 @@ func TestStashUntrackedLsTreeArgs(t *testing.T) {
 // parent split (indexSha always present, untrackedSha iff -u), and baseSubject's own batch-resolved
 // join, all against real git 2.43 output.
 func TestParseStashList_TwoEntry(t *testing.T) {
+	t.Parallel()
 	raw := readDiffFixture(t, "stash/twoEntry.list.bin")
 	subjRaw := readDiffFixture(t, "stash/twoEntry.subjects.bin")
 	subjects, err := porcelain.ParseStashBaseSubjects(subjRaw)
@@ -133,6 +137,7 @@ func TestParseStashList_TwoEntry(t *testing.T) {
 // carries neither the "WIP on "/"On " prefix — Branch must resolve to nil rather than panicking or
 // guessing.
 func TestParseStashList_StoreRestored(t *testing.T) {
+	t.Parallel()
 	raw := readDiffFixture(t, "stash/storeRestored.bin")
 	entries, err := porcelain.ParseStashList(raw, nil)
 	if err != nil {
@@ -158,6 +163,7 @@ func TestParseStashList_StoreRestored(t *testing.T) {
 // "On (no branch): …" (confirmed against real git 2.43) — Branch must resolve to nil, not the
 // literal string "(no branch)".
 func TestParseStashList_Detached(t *testing.T) {
+	t.Parallel()
 	raw := readDiffFixture(t, "stash/detached.bin")
 	entries, err := porcelain.ParseStashList(raw, nil)
 	if err != nil {
@@ -176,12 +182,14 @@ func TestParseStashList_Detached(t *testing.T) {
 }
 
 func TestParseStashList_MalformedHeader(t *testing.T) {
+	t.Parallel()
 	if _, err := porcelain.ParseStashList([]byte("not-a-header\x00"), nil); err == nil {
 		t.Fatal("expected an error for a record set not starting with a stash@{ header")
 	}
 }
 
 func TestGlobalStashLogArgs(t *testing.T) {
+	t.Parallel()
 	got := porcelain.GlobalStashLogArgs([]string{"sha1", "sha2"})
 	want := []string{
 		"log", "--no-walk", "-m", "--first-parent", "-z", "--numstat", "-M", "-C",
@@ -198,6 +206,7 @@ func TestGlobalStashLogArgs(t *testing.T) {
 }
 
 func TestGlobalStashFormat_FieldCountMatchesStashFormat(t *testing.T) {
+	t.Parallel()
 	if got, want := strings.Count(porcelain.GlobalStashFormat, "\x1f"), strings.Count(porcelain.StashFormat, "\x1f"); got != want {
 		t.Fatalf("GlobalStashFormat has %d field delimiters, want %d (must match StashFormat's field count so parseStashRecords applies unchanged)", got, want)
 	}
@@ -206,6 +215,7 @@ func TestGlobalStashFormat_FieldCountMatchesStashFormat(t *testing.T) {
 // TestParseGlobalStashList_TwoParent covers a tracked-only global entry (no -u): 2 parents,
 // Scope=global, Index=-1 (D17's sentinel), Ref built from the caller-supplied refPrefix.
 func TestParseGlobalStashList_TwoParent(t *testing.T) {
+	t.Parallel()
 	sha := hex('a')
 	base := hex('b')
 	indexSha := hex('c')
@@ -251,6 +261,7 @@ func TestParseGlobalStashList_TwoParent(t *testing.T) {
 // same "zero or more numstat records" framing ParseStashList's own untracked-only case already
 // covers, now proven for the bucket's own header shape too.
 func TestParseGlobalStashList_ThreeParentUntrackedZeroNumstat(t *testing.T) {
+	t.Parallel()
 	sha := hex('1')
 	base := hex('2')
 	indexSha := hex('3')
@@ -283,6 +294,7 @@ func TestParseGlobalStashList_ThreeParentUntrackedZeroNumstat(t *testing.T) {
 // like a header" — and it must still be folded into entry one's own numstat, never mistaken for a
 // third entry's header.
 func TestParseGlobalStashList_TwoEntryHeaderShapedPathNeverMisdetected(t *testing.T) {
+	t.Parallel()
 	sha1 := hex('a')
 	base := hex('b')
 	indexSha := hex('c')
@@ -311,6 +323,7 @@ func TestParseGlobalStashList_TwoEntryHeaderShapedPathNeverMisdetected(t *testin
 }
 
 func TestParseGlobalStashList_MalformedHeaderNot40Hex(t *testing.T) {
+	t.Parallel()
 	if _, err := porcelain.ParseGlobalStashList([]byte("not-a-sha\x00"), nil, testGlobalStashRefPrefix); err == nil {
 		t.Fatal("expected an error for a record set not starting with a 40-hex header")
 	}

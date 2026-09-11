@@ -19,6 +19,7 @@ import (
 // Byte literals only (D12): no filesystem involved, so the case holds regardless of what this
 // container's own filesystem does with the two forms (P1).
 func TestSubtractOwnWorktree_NFDWorktreePathMatchesNFCOwnRoot(t *testing.T) {
+	t.Parallel()
 	composedE := string([]byte{0xc3, 0xa9})         // U+00E9, composed "é"
 	decomposedE := string([]byte{0x65, 0xcc, 0x81}) // "e" + U+0301, decomposed "é"
 
@@ -50,6 +51,7 @@ func TestSubtractOwnWorktree_NFDWorktreePathMatchesNFCOwnRoot(t *testing.T) {
 // TestSubtractOwnWorktree_DifferentWorktreeIsKept is the negative twin: a genuinely different
 // worktree's CheckedOutIn must survive even once both sides are NFC.
 func TestSubtractOwnWorktree_DifferentWorktreeIsKept(t *testing.T) {
+	t.Parallel()
 	composedE := string([]byte{0xc3, 0xa9})
 	ownRoot := "/repo/caf" + composedE
 	elsewhere := "/repo-wt/caf" + composedE

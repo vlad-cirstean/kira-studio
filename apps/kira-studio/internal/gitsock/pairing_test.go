@@ -28,6 +28,7 @@ func (c *fakeClock) Advance(d time.Duration) {
 }
 
 func TestBroker_FIFOOrder_OnlyHeadPresented(t *testing.T) {
+	t.Parallel()
 	clock := newFakeClock()
 	b := NewBroker(clock.Now)
 
@@ -116,6 +117,7 @@ func TestBroker_FIFOOrder_OnlyHeadPresented(t *testing.T) {
 // waiting" line is fed solely by this emitter, so it stayed stuck reporting 1 no matter how many
 // more requests queued up.
 func TestBroker_QueuedCountChangeIsEmittedEvenBehindAPresentedHead(t *testing.T) {
+	t.Parallel()
 	clock := newFakeClock()
 	b := NewBroker(clock.Now)
 
@@ -149,6 +151,7 @@ func TestBroker_QueuedCountChangeIsEmittedEvenBehindAPresentedHead(t *testing.T)
 }
 
 func TestBroker_DeadlineMeasuredFromEnqueue_NotPresentation(t *testing.T) {
+	t.Parallel()
 	clock := newFakeClock()
 	b := NewBroker(clock.Now)
 
@@ -201,6 +204,7 @@ func recvOrTimeout(t *testing.T, ch chan PairingOutcome) PairingOutcome {
 }
 
 func TestBroker_DenyOnly_SetsCooldown(t *testing.T) {
+	t.Parallel()
 	clock := newFakeClock()
 	b := NewBroker(clock.Now)
 
@@ -233,6 +237,7 @@ func TestBroker_DenyOnly_SetsCooldown(t *testing.T) {
 }
 
 func TestBroker_DoubleAnswer_ReportsAlreadyResolved(t *testing.T) {
+	t.Parallel()
 	clock := newFakeClock()
 	b := NewBroker(clock.Now)
 
@@ -262,6 +267,7 @@ func TestBroker_DoubleAnswer_ReportsAlreadyResolved(t *testing.T) {
 // onEnqueued call, matching the cooldown short-circuit's own contract — once the queue is already
 // at the cap, rather than growing without bound.
 func TestBroker_QueueBoundedAgainstUnlimitedEnqueue(t *testing.T) {
+	t.Parallel()
 	clock := newFakeClock()
 	b := NewBroker(clock.Now)
 
@@ -309,6 +315,7 @@ func TestBroker_QueueBoundedAgainstUnlimitedEnqueue(t *testing.T) {
 // request already queued from that SAME client, as denied — while leaving an unrelated client's
 // own queued request untouched.
 func TestBroker_DenyPurgesEveryOtherQueuedRequestFromTheSameClient(t *testing.T) {
+	t.Parallel()
 	clock := newFakeClock()
 	b := NewBroker(clock.Now)
 
@@ -358,6 +365,7 @@ func TestBroker_DenyPurgesEveryOtherQueuedRequestFromTheSameClient(t *testing.T)
 }
 
 func TestBroker_UnknownRequestID_ReportsAlreadyResolved(t *testing.T) {
+	t.Parallel()
 	b := NewBroker(newFakeClock().Now)
 	if got := b.Approve("no-such-id"); got != PairingActionAlreadyResolved {
 		t.Fatalf("got %v, want alreadyResolved", got)

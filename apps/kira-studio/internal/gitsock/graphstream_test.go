@@ -221,6 +221,7 @@ func readUint32ColumnLE(raw []byte) []uint32 {
 }
 
 func TestIntegration_GraphStreamRendersAPage(t *testing.T) {
+	t.Parallel()
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not on PATH")
 	}
@@ -281,6 +282,7 @@ func TestIntegration_GraphStreamRendersAPage(t *testing.T) {
 }
 
 func TestIntegration_GraphStreamResumesFromCache(t *testing.T) {
+	t.Parallel()
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not on PATH")
 	}
@@ -343,6 +345,7 @@ func TestIntegration_GraphStreamResumesFromCache(t *testing.T) {
 // non-ranged test above; the wire-level `From`/`Source` on each resumed chunk is what actually
 // proves whether a full or a partial replay happened.
 func TestIntegration_RangedGraphStreamResumesFromCache(t *testing.T) {
+	t.Parallel()
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not on PATH")
 	}
@@ -420,6 +423,7 @@ func rangeStatusOK(t *testing.T, c *testClient, repoID string, rangeParams map[s
 }
 
 func TestIntegration_WalksArePrivatePerConnection(t *testing.T) {
+	t.Parallel()
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not on PATH")
 	}
@@ -478,6 +482,7 @@ func TestIntegration_WalksArePrivatePerConnection(t *testing.T) {
 }
 
 func TestIntegration_CreditsApplyBackpressure(t *testing.T) {
+	t.Parallel()
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not on PATH")
 	}
@@ -522,6 +527,7 @@ func TestIntegration_CreditsApplyBackpressure(t *testing.T) {
 // TestFixtures_CaptureGraphChunkFrame is D16's own regenerator — the golden fixture proving the
 // Go encoder and the TypeScript decoder (socketChannel.test.ts) agree, byte for byte.
 func TestFixtures_CaptureGraphChunkFrame(t *testing.T) {
+	t.Parallel()
 	if os.Getenv("KIRA_GIT_FIXTURES") != "write" {
 		t.Skip("set KIRA_GIT_FIXTURES=write to regenerate the golden corpus")
 	}
@@ -681,6 +687,7 @@ func packedChunkToFixture(table *gitwire.PackedCommitChunk) fixturePackedChunk {
 
 // TestGraphStreamPerf is D22's opt-in probe: numbers recorded, nothing asserted.
 func TestGraphStreamPerf(t *testing.T) {
+	t.Parallel()
 	if testing.Short() {
 		t.Skip("short mode")
 	}
@@ -734,6 +741,7 @@ func TestGraphStreamPerf(t *testing.T) {
 // kiraVersion.graph.pageSize rather than falling straight to logsession.DefaultPageSize — proven
 // end to end over the real socket.
 func TestIntegration_GraphLoadMoreHonorsRepoStoredPageSize(t *testing.T) {
+	t.Parallel()
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not on PATH")
 	}

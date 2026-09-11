@@ -81,6 +81,7 @@ func newWalkTestConnWithRunner(t *testing.T, runner gitclient.Runner, repoDir st
 }
 
 func TestWalk_StreamAndLoadMoreRaceProduceConsistentStore(t *testing.T) {
+	t.Parallel()
 	skipWithoutGitWalk(t)
 	repoDir := initWalkRepo(t, 12)
 	conn, _, repoID := newWalkTestConn(t, repoDir)
@@ -123,6 +124,7 @@ func TestWalk_StreamAndLoadMoreRaceProduceConsistentStore(t *testing.T) {
 }
 
 func TestWalk_RefsChangedResetsToRowZero(t *testing.T) {
+	t.Parallel()
 	skipWithoutGitWalk(t)
 	repoDir := initWalkRepo(t, 3)
 	conn, _, repoID := newWalkTestConn(t, repoDir)
@@ -161,6 +163,7 @@ func TestWalk_RefsChangedResetsToRowZero(t *testing.T) {
 }
 
 func TestWalk_MarklessRowReplaysFromZeroWithBaseZero(t *testing.T) {
+	t.Parallel()
 	skipWithoutGitWalk(t)
 	repoDir := initWalkRepo(t, 5)
 	conn, _, repoID := newWalkTestConn(t, repoDir)
@@ -200,6 +203,7 @@ func TestWalk_MarklessRowReplaysFromZeroWithBaseZero(t *testing.T) {
 }
 
 func TestWalk_ResumeThroughRowPastStoreClamps(t *testing.T) {
+	t.Parallel()
 	skipWithoutGitWalk(t)
 	repoDir := initWalkRepo(t, 5)
 	conn, _, repoID := newWalkTestConn(t, repoDir)
@@ -237,6 +241,7 @@ func TestWalk_ResumeThroughRowPastStoreClamps(t *testing.T) {
 // (an explicit ReadPage) followed by the client's own stream re-open must read exactly one page in
 // total, not two.
 func TestWalk_ReopenDoesNotReadAnUnrequestedPage(t *testing.T) {
+	t.Parallel()
 	skipWithoutGitWalk(t)
 	repoDir := initWalkRepo(t, 10)
 	var logSpawns int32
@@ -304,6 +309,7 @@ func TestWalk_ReopenDoesNotReadAnUnrequestedPage(t *testing.T) {
 // and this is the state that produced the reported "Load the last 0" button. Before D5 this test
 // fails on the second Stream call.
 func TestWalk_StreamReplayReportsExhausted(t *testing.T) {
+	t.Parallel()
 	skipWithoutGitWalk(t)
 	repoDir := initWalkRepo(t, 5)
 	conn, _, repoID := newWalkTestConn(t, repoDir)
@@ -355,6 +361,7 @@ func TestWalk_StreamReplayReportsExhausted(t *testing.T) {
 }
 
 func TestWalk_DisposingConnDoesNotBlockAFreshOpenOfTheSameRepo(t *testing.T) {
+	t.Parallel()
 	skipWithoutGitWalk(t)
 	repoDir := initWalkRepo(t, 3)
 	conn, registry, repoID := newWalkTestConn(t, repoDir)

@@ -6,6 +6,7 @@ import "testing"
 // never panics (exercised through verifyClientToken in handshake_test.go's table; this file
 // covers mint/verifyToken directly).
 func TestToken_MintThenVerify_Succeeds(t *testing.T) {
+	t.Parallel()
 	plain, hash, salt, err := mintToken()
 	if err != nil {
 		t.Fatalf("mint: %v", err)
@@ -16,6 +17,7 @@ func TestToken_MintThenVerify_Succeeds(t *testing.T) {
 }
 
 func TestToken_VerifyAgainstDifferentSalt_Fails(t *testing.T) {
+	t.Parallel()
 	plain, hash, _, err := mintToken()
 	if err != nil {
 		t.Fatalf("mint: %v", err)
@@ -30,6 +32,7 @@ func TestToken_VerifyAgainstDifferentSalt_Fails(t *testing.T) {
 }
 
 func TestToken_VerifyWrongToken_Fails(t *testing.T) {
+	t.Parallel()
 	_, hash, salt, err := mintToken()
 	if err != nil {
 		t.Fatalf("mint: %v", err)
@@ -44,6 +47,7 @@ func TestToken_VerifyWrongToken_Fails(t *testing.T) {
 }
 
 func TestToken_VerifyMalformedPresented_DoesNotPanic(t *testing.T) {
+	t.Parallel()
 	_, hash, salt, err := mintToken()
 	if err != nil {
 		t.Fatalf("mint: %v", err)
@@ -54,6 +58,7 @@ func TestToken_VerifyMalformedPresented_DoesNotPanic(t *testing.T) {
 }
 
 func TestToken_DummyComparison_NeverPanics(t *testing.T) {
+	t.Parallel()
 	// The shape verifyClientToken uses for a missing client id (D6): compare against the fixed
 	// dummy pair so a miss costs the same as a real mismatch.
 	if verifyToken("anything", dummyHash, dummySalt) {

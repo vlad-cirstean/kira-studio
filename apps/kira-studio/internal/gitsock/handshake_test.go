@@ -89,6 +89,7 @@ func clientReceive(t *testing.T, r *bufio.Reader) handshakeResponse {
 }
 
 func TestHandshake_Row1_MalformedFrame_ClosesSilently(t *testing.T) {
+	t.Parallel()
 	client, server := net.Pipe()
 	defer client.Close()
 	deps := testHandshakeDeps(newFakeTrustStore(), NewBroker(time.Now), time.Now)
@@ -107,6 +108,7 @@ func TestHandshake_Row1_MalformedFrame_ClosesSilently(t *testing.T) {
 }
 
 func TestHandshake_Row1_EmptyClientID_ClosesSilently(t *testing.T) {
+	t.Parallel()
 	client, server := net.Pipe()
 	defer client.Close()
 	deps := testHandshakeDeps(newFakeTrustStore(), NewBroker(time.Now), time.Now)
@@ -123,6 +125,7 @@ func TestHandshake_Row1_EmptyClientID_ClosesSilently(t *testing.T) {
 }
 
 func TestHandshake_Row2_ProtocolMismatch(t *testing.T) {
+	t.Parallel()
 	client, server := net.Pipe()
 	defer client.Close()
 	deps := testHandshakeDeps(newFakeTrustStore(), NewBroker(time.Now), time.Now)
@@ -146,6 +149,7 @@ func TestHandshake_Row2_ProtocolMismatch(t *testing.T) {
 }
 
 func TestHandshake_Row3_ContractVersionMismatch(t *testing.T) {
+	t.Parallel()
 	client, server := net.Pipe()
 	defer client.Close()
 	deps := testHandshakeDeps(newFakeTrustStore(), NewBroker(time.Now), time.Now)
@@ -169,6 +173,7 @@ func TestHandshake_Row3_ContractVersionMismatch(t *testing.T) {
 }
 
 func TestHandshake_Row4_ValidToken_Ready(t *testing.T) {
+	t.Parallel()
 	client, server := net.Pipe()
 	defer client.Close()
 	store := newFakeTrustStore()
@@ -204,6 +209,7 @@ func TestHandshake_Row4_ValidToken_Ready(t *testing.T) {
 }
 
 func TestHandshake_Row5_TokenRejected_NoRow(t *testing.T) {
+	t.Parallel()
 	client, server := net.Pipe()
 	defer client.Close()
 	deps := testHandshakeDeps(newFakeTrustStore(), NewBroker(time.Now), time.Now)
@@ -228,6 +234,7 @@ func TestHandshake_Row5_TokenRejected_NoRow(t *testing.T) {
 }
 
 func TestHandshake_Row5_TokenRejected_RevokedRow(t *testing.T) {
+	t.Parallel()
 	client, server := net.Pipe()
 	defer client.Close()
 	store := newFakeTrustStore()
@@ -262,6 +269,7 @@ func TestHandshake_Row5_TokenRejected_RevokedRow(t *testing.T) {
 }
 
 func TestHandshake_Row6_NoTokenInCooldown_DeniedImmediately(t *testing.T) {
+	t.Parallel()
 	client, server := net.Pipe()
 	defer client.Close()
 	clock := newFakeClock()
@@ -297,6 +305,7 @@ func TestHandshake_Row6_NoTokenInCooldown_DeniedImmediately(t *testing.T) {
 }
 
 func TestHandshake_Row7_PairingApproved_Ready(t *testing.T) {
+	t.Parallel()
 	client, server := net.Pipe()
 	defer client.Close()
 	store := newFakeTrustStore()
@@ -339,6 +348,7 @@ func TestHandshake_Row7_PairingApproved_Ready(t *testing.T) {
 }
 
 func TestHandshake_Row7_PairingDenied(t *testing.T) {
+	t.Parallel()
 	client, server := net.Pipe()
 	defer client.Close()
 	broker := NewBroker(time.Now)
@@ -370,6 +380,7 @@ func TestHandshake_Row7_PairingDenied(t *testing.T) {
 }
 
 func TestHandshake_Row7_PairingTimeout(t *testing.T) {
+	t.Parallel()
 	client, server := net.Pipe()
 	defer client.Close()
 	clock := newFakeClock()

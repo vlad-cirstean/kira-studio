@@ -203,6 +203,7 @@ func filePaths(files []porcelain.FileChange) []string {
 }
 
 func TestIntegration_CommitDetailAndFileTree(t *testing.T) {
+	t.Parallel()
 	f := buildDetailFixtureRepo(t)
 	server, sockPath, _, _ := newIntegrationServer(t)
 	client := pairAndReady(t, server, sockPath, "detail-client")
@@ -254,6 +255,7 @@ func TestIntegration_CommitDetailAndFileTree(t *testing.T) {
 }
 
 func TestIntegration_CommitDetailMergeParentSelector(t *testing.T) {
+	t.Parallel()
 	f := buildDetailFixtureRepo(t)
 	server, sockPath, _, _ := newIntegrationServer(t)
 	client := pairAndReady(t, server, sockPath, "merge-client")
@@ -280,6 +282,7 @@ func TestIntegration_CommitDetailMergeParentSelector(t *testing.T) {
 }
 
 func TestIntegration_FileDiffShapes(t *testing.T) {
+	t.Parallel()
 	f := buildDetailFixtureRepo(t)
 	server, sockPath, _, _ := newIntegrationServer(t)
 	client := pairAndReady(t, server, sockPath, "filediff-client")
@@ -324,6 +327,7 @@ func TestIntegration_FileDiffShapes(t *testing.T) {
 }
 
 func TestIntegration_FileReadBranches(t *testing.T) {
+	t.Parallel()
 	f := buildDetailFixtureRepo(t)
 	server, sockPath, _, _ := newIntegrationServer(t)
 	client := pairAndReady(t, server, sockPath, "read-client")
@@ -356,6 +360,7 @@ func TestIntegration_FileReadBranches(t *testing.T) {
 }
 
 func TestIntegration_GoToTargetBranches(t *testing.T) {
+	t.Parallel()
 	f := buildDetailFixtureRepo(t)
 	server, sockPath, _, _ := newIntegrationServer(t)
 	client := pairAndReady(t, server, sockPath, "goto-client")
@@ -396,6 +401,7 @@ func TestIntegration_GoToTargetBranches(t *testing.T) {
 // commit.detail is a cache hit (no new 'show' spawn), and a refsChanged event (a real `git tag`)
 // invalidates it — the next request spawns fresh and reports the new decoration.
 func TestIntegration_DetailCacheDropsOnRefsChanged(t *testing.T) {
+	t.Parallel()
 	f := buildDetailFixtureRepo(t)
 	realRunner := gitclient.NewExecRunner()
 	var showSpawns int32

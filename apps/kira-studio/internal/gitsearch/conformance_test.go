@@ -81,6 +81,7 @@ func toFields(row conformanceRow) CommitFields {
 // TestConformanceCorpus_NonEmpty guards against a silently-empty or unreadable corpus file
 // passing this suite vacuously.
 func TestConformanceCorpus_NonEmpty(t *testing.T) {
+	t.Parallel()
 	corpus := loadCorpus(t)
 	if len(corpus.Rows) == 0 {
 		t.Fatal("searchConformance.json has no rows")
@@ -91,6 +92,7 @@ func TestConformanceCorpus_NonEmpty(t *testing.T) {
 // row in the shared corpus, run through Compile + MatchFields, agrees with the expectation
 // conformance.test.ts asserts against the exact same file on the TypeScript side.
 func TestConformanceCorpus_AgreesWithCompileAndMatchFields(t *testing.T) {
+	t.Parallel()
 	corpus := loadCorpus(t)
 	for _, row := range corpus.Rows {
 		row := row

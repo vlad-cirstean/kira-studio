@@ -11,6 +11,7 @@ import (
 // leak), --null (the key\nvalue\0 framing parsePullConfig-shaped code already knows how to read),
 // --get-regexp with the anchored branch.*.kirastack pattern.
 func TestStackConfigReadArgs(t *testing.T) {
+	t.Parallel()
 	got := gitops.StackConfigReadArgs()
 	want := []string{"config", "--local", "--null", "--get-regexp", `^branch\..*\.kirastack`}
 	if !reflect.DeepEqual(got, want) {
@@ -19,6 +20,7 @@ func TestStackConfigReadArgs(t *testing.T) {
 }
 
 func TestStackParentKeyAndBaseKey(t *testing.T) {
+	t.Parallel()
 	if got, want := gitops.StackParentKey("feat"), "branch.feat.kirastackparent"; got != want {
 		t.Fatalf("StackParentKey = %q, want %q", got, want)
 	}
@@ -35,6 +37,7 @@ func TestStackParentKeyAndBaseKey(t *testing.T) {
 // present on every call, including the empty-string ("not stacked") case — the same argv shape for
 // setting and for clearing, so undo replay never special-cases either direction.
 func TestStackConfigSetArgs_LocalPresent(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name, key, value string
 		want             []string
@@ -53,6 +56,7 @@ func TestStackConfigSetArgs_LocalPresent(t *testing.T) {
 }
 
 func TestMergeBaseArgs(t *testing.T) {
+	t.Parallel()
 	got := gitops.MergeBaseArgs("main", "feat2")
 	want := []string{"merge-base", "main", "feat2"}
 	if !reflect.DeepEqual(got, want) {
@@ -64,6 +68,7 @@ func TestMergeBaseArgs(t *testing.T) {
 // --no-update-refs precede --onto, both are the explicit negative form (D6/D7), and the argument
 // order is onto, upstream, branch.
 func TestRebaseOntoArgs_Golden(t *testing.T) {
+	t.Parallel()
 	got := gitops.RebaseOntoArgs("feat1", "abc123", "feat2")
 	want := []string{"rebase", "--no-autostash", "--no-update-refs", "--onto", "feat1", "abc123", "feat2"}
 	if !reflect.DeepEqual(got, want) {

@@ -104,6 +104,7 @@ func initUnstackedRepo(t *testing.T) string {
 // repository with no stacked branches costs exactly one `config` spawn (the --get-regexp read) and
 // zero `rev-list` spawns.
 func TestStacks_UnstackedRepo_OneConfigReadNothingElse(t *testing.T) {
+	t.Parallel()
 	skipWithoutGitStack(t)
 	dir := initUnstackedRepo(t)
 	runner := newArgSpawnCountingRunner("config", "rev-list")
@@ -127,6 +128,7 @@ func TestStacks_UnstackedRepo_OneConfigReadNothingElse(t *testing.T) {
 
 // TestStacks_CacheHit proves the second call costs no further config spawn.
 func TestStacks_CacheHit(t *testing.T) {
+	t.Parallel()
 	skipWithoutGitStack(t)
 	dir := initUnstackedRepo(t)
 	runner := newArgSpawnCountingRunner("config")
@@ -147,6 +149,7 @@ func TestStacks_CacheHit(t *testing.T) {
 // TestStacks_CacheDroppedOnWrite proves invalidateAfterWrite (D16) actually drops the stack cache —
 // a branch create (an ordinary write) must make the next Stacks() re-spawn the config read.
 func TestStacks_CacheDroppedOnWrite(t *testing.T) {
+	t.Parallel()
 	skipWithoutGitStack(t)
 	dir := initUnstackedRepo(t)
 	runner := newArgSpawnCountingRunner("config")
@@ -210,6 +213,7 @@ func initLinearStackRepo(t *testing.T) (dir, feat1TipBeforeAdvance string) {
 }
 
 func TestStacks_LinearChain_RealRepo(t *testing.T) {
+	t.Parallel()
 	skipWithoutGitStack(t)
 	dir, _ := initLinearStackRepo(t)
 	entry := newStackTestEntryWithRunner(t, gitclient.NewExecRunner(), dir)
@@ -241,6 +245,7 @@ func TestStacks_LinearChain_RealRepo(t *testing.T) {
 // commits, is a slot-mixup detector: a wrong index (or a race on the shared behindAhead map) would
 // show up as a branch reporting some OTHER branch's Ahead count, not just as a flaky test.
 func TestStacks_ManySiblingBranches_EachGetsItsOwnCorrectCount(t *testing.T) {
+	t.Parallel()
 	skipWithoutGitStack(t)
 	dir := t.TempDir()
 	runGitStack(t, dir, "init", "-q", "-b", "main")
@@ -291,6 +296,7 @@ func TestStacks_ManySiblingBranches_EachGetsItsOwnCorrectCount(t *testing.T) {
 }
 
 func TestRestackPreflight_Clean(t *testing.T) {
+	t.Parallel()
 	skipWithoutGitStack(t)
 	dir, _ := initLinearStackRepo(t)
 	entry := newStackTestEntryWithRunner(t, gitclient.NewExecRunner(), dir)
@@ -312,6 +318,7 @@ func TestRestackPreflight_Clean(t *testing.T) {
 }
 
 func TestRestackPreflight_NotStacked(t *testing.T) {
+	t.Parallel()
 	skipWithoutGitStack(t)
 	dir := initUnstackedRepo(t)
 	entry := newStackTestEntryWithRunner(t, gitclient.NewExecRunner(), dir)
@@ -327,6 +334,7 @@ func TestRestackPreflight_NotStacked(t *testing.T) {
 }
 
 func TestRestackPreflight_DirtyWorktreeBlocks(t *testing.T) {
+	t.Parallel()
 	skipWithoutGitStack(t)
 	dir, _ := initLinearStackRepo(t)
 	writeFileStack(t, dir, "b.txt", "dirty change\n")
@@ -363,6 +371,7 @@ func TestRestackPreflight_DirtyWorktreeBlocks(t *testing.T) {
 func strPtr(s string) *string { return &s }
 
 func TestRunOp_StackSet_SetsParentAndBase(t *testing.T) {
+	t.Parallel()
 	skipWithoutGitStack(t)
 	dir := initUnstackedRepo(t)
 	runGitStack(t, dir, "checkout", "-q", "-b", "feat1")
@@ -394,6 +403,7 @@ func TestRunOp_StackSet_SetsParentAndBase(t *testing.T) {
 // TestRunOp_StackSet_CycleRefusedNoWrite is §7.1 item 9's own exit criterion: a parent that would
 // create a cycle answers StackCycle and spawns NO git write.
 func TestRunOp_StackSet_CycleRefusedNoWrite(t *testing.T) {
+	t.Parallel()
 	skipWithoutGitStack(t)
 	dir := initUnstackedRepo(t)
 	runGitStack(t, dir, "checkout", "-q", "-b", "feat1")
@@ -426,6 +436,7 @@ func TestRunOp_StackSet_CycleRefusedNoWrite(t *testing.T) {
 }
 
 func TestRunOp_StackSet_SelfParentRefused(t *testing.T) {
+	t.Parallel()
 	skipWithoutGitStack(t)
 	dir := initUnstackedRepo(t)
 	runGitStack(t, dir, "checkout", "-q", "-b", "feat1")
@@ -444,6 +455,7 @@ func TestRunOp_StackSet_SelfParentRefused(t *testing.T) {
 }
 
 func TestRunOp_StackSet_UnknownParentIsNotFound(t *testing.T) {
+	t.Parallel()
 	skipWithoutGitStack(t)
 	dir := initUnstackedRepo(t)
 	runGitStack(t, dir, "checkout", "-q", "-b", "feat1")
@@ -464,6 +476,7 @@ func TestRunOp_StackSet_UnknownParentIsNotFound(t *testing.T) {
 // TestRunOp_StackSet_UndoRestoresPreviousParent proves the undo replay is symmetric (D2/D10): a
 // branch that was NOT stacked before gets its "" values back on undo.
 func TestRunOp_StackSet_UndoRestoresPreviousParent(t *testing.T) {
+	t.Parallel()
 	skipWithoutGitStack(t)
 	dir := initUnstackedRepo(t)
 	runGitStack(t, dir, "checkout", "-q", "-b", "feat1")
@@ -495,6 +508,7 @@ func TestRunOp_StackSet_UndoRestoresPreviousParent(t *testing.T) {
 }
 
 func TestRunOp_StackSet_RemoveFromStack(t *testing.T) {
+	t.Parallel()
 	skipWithoutGitStack(t)
 	dir := initUnstackedRepo(t)
 	runGitStack(t, dir, "checkout", "-q", "-b", "feat1")
@@ -550,6 +564,7 @@ func initTwoLevelStack(t *testing.T) string {
 // must rewrite feat2's OWN kirastackparent value (git's own `branch -m` only moves feat1's own
 // section, per probe P1 — it does nothing about feat2's config naming feat1 as ITS parent).
 func TestRunOp_BranchRename_ChildPointerFollows(t *testing.T) {
+	t.Parallel()
 	skipWithoutGitStack(t)
 	dir := initTwoLevelStack(t)
 	entry := newStackTestEntryWithRunner(t, gitclient.NewExecRunner(), dir)
@@ -583,6 +598,7 @@ func TestRunOp_BranchRename_ChildPointerFollows(t *testing.T) {
 // (whose own parent is main) re-parents feat2 onto main, and undoing the delete restores both
 // feat1 itself and feat2's own prior pointer (to feat1).
 func TestRunOp_BranchDelete_ReparentsChildren(t *testing.T) {
+	t.Parallel()
 	skipWithoutGitStack(t)
 	dir := initTwoLevelStack(t)
 	// feat1 must be fully merged into main for a plain -d delete to succeed with no --force.
@@ -703,6 +719,7 @@ func initThreeLevelStack(t *testing.T) string {
 }
 
 func TestRunRestack_FullSuccess(t *testing.T) {
+	t.Parallel()
 	skipWithoutGitStack(t)
 	dir := initThreeLevelStack(t)
 	conn, entry := newStackTestConnAndEntry(t, gitclient.NewExecRunner(), dir)
@@ -736,6 +753,7 @@ func TestRunRestack_FullSuccess(t *testing.T) {
 
 // TestRunRestack_ConflictStopsLoopSetsNoUndo is §7.1 item 7's own exact exit criterion.
 func TestRunRestack_ConflictStopsLoopSetsNoUndo(t *testing.T) {
+	t.Parallel()
 	skipWithoutGitStack(t)
 	dir := t.TempDir()
 	runGitStack(t, dir, "init", "-q", "-b", "main")
@@ -816,6 +834,7 @@ func TestRunRestack_ConflictStopsLoopSetsNoUndo(t *testing.T) {
 // a second stack.restack call while the first is active answers OperationInProgress with no spawn,
 // and leaves the first restack's own eventual result untouched.
 func TestRunRestack_SecondCallWhileRunningIsRefusedNoSpawn(t *testing.T) {
+	t.Parallel()
 	skipWithoutGitStack(t)
 	dir := initThreeLevelStack(t)
 	conn, entry := newStackTestConnAndEntry(t, gitclient.NewExecRunner(), dir)
@@ -836,6 +855,7 @@ func TestRunRestack_SecondCallWhileRunningIsRefusedNoSpawn(t *testing.T) {
 }
 
 func TestRunRestack_NotStackedBlocked(t *testing.T) {
+	t.Parallel()
 	skipWithoutGitStack(t)
 	dir := initUnstackedRepo(t)
 	conn, entry := newStackTestConnAndEntry(t, gitclient.NewExecRunner(), dir)
@@ -851,6 +871,7 @@ func TestRunRestack_NotStackedBlocked(t *testing.T) {
 }
 
 func TestRunRestack_NoopWhenAlreadyUpToDate(t *testing.T) {
+	t.Parallel()
 	skipWithoutGitStack(t)
 	dir := initTwoLevelStack(t)
 	conn, entry := newStackTestConnAndEntry(t, gitclient.NewExecRunner(), dir)
@@ -870,6 +891,7 @@ func TestRunRestack_NoopWhenAlreadyUpToDate(t *testing.T) {
 // restack's undo replay is switch -> update-ref(s) -> config(s) -> reset --keep, in that order, and
 // replaying it actually restores the pre-restack state.
 func TestRunRestack_UndoReplayOrder(t *testing.T) {
+	t.Parallel()
 	skipWithoutGitStack(t)
 	dir := initThreeLevelStack(t)
 	conn, entry := newStackTestConnAndEntry(t, gitclient.NewExecRunner(), dir)
@@ -926,6 +948,7 @@ func currentBranchStack(t *testing.T, dir string) string {
 }
 
 func TestCancelRestack_IdleReportsFalse(t *testing.T) {
+	t.Parallel()
 	var e RepoEntry
 	if e.CancelRestack() {
 		t.Fatal("cancelling an idle restack slot must report false")
@@ -933,6 +956,7 @@ func TestCancelRestack_IdleReportsFalse(t *testing.T) {
 }
 
 func TestRestackSlot_ClaimReleaseCancel(t *testing.T) {
+	t.Parallel()
 	var s restackSlot
 	if !s.claim(func() {}) {
 		t.Fatal("first claim should succeed")
@@ -952,6 +976,7 @@ func TestRestackSlot_ClaimReleaseCancel(t *testing.T) {
 }
 
 func TestRestackSlot_ForceCancel(t *testing.T) {
+	t.Parallel()
 	var s restackSlot
 	cancelled := false
 	s.claim(func() { cancelled = true })
@@ -972,6 +997,7 @@ func TestRestackSlot_ForceCancel(t *testing.T) {
 // silently answers the very next, wholly unrelated Check call on this same session, for the life
 // of the RepoEntry (the exact desync shape G31-ARCH2 already fixed for Blob/blobOID/blobOIDs).
 func TestCommitResolves_NewlineRecordedBaseDoesNotDesyncSharedSession(t *testing.T) {
+	t.Parallel()
 	skipWithoutGitStack(t)
 	dir, _ := initLinearStackRepo(t)
 	entry := newStackTestEntryWithRunner(t, gitclient.NewExecRunner(), dir)
@@ -1002,6 +1028,7 @@ func TestCommitResolves_NewlineRecordedBaseDoesNotDesyncSharedSession(t *testing
 }
 
 func TestRestackPreflight_RecordedBaseFallsBackToMergeBase(t *testing.T) {
+	t.Parallel()
 	skipWithoutGitStack(t)
 	dir := t.TempDir()
 	runGitStack(t, dir, "init", "-q", "-b", "main")

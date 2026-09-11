@@ -22,6 +22,7 @@ func nullFraming(records ...[2]string) []byte {
 }
 
 func TestParseStackConfig_Basic(t *testing.T) {
+	t.Parallel()
 	raw := nullFraming(
 		[2]string{"branch.feat2.kirastackparent", "feat1"},
 		[2]string{"branch.feat2.kirastackbase", "abc123"},
@@ -37,6 +38,7 @@ func TestParseStackConfig_Basic(t *testing.T) {
 
 // TestParseStackConfig_DottedBranchName is probe P4's own case: never split on ".".
 func TestParseStackConfig_DottedBranchName(t *testing.T) {
+	t.Parallel()
 	raw := nullFraming([2]string{"branch.feat.x.kirastackparent", "main"})
 	got := gitpreflight.ParseStackConfig(raw)
 	want := map[string]gitpreflight.StackConfigEntry{"feat.x": {Branch: "feat.x", Parent: "main"}}
@@ -49,6 +51,7 @@ func TestParseStackConfig_DottedBranchName(t *testing.T) {
 // never causing the branch to vanish from the map (a residual "kirastackparent=" line for a branch
 // that left its stack, per D2's stated cost).
 func TestParseStackConfig_EmptyValue(t *testing.T) {
+	t.Parallel()
 	raw := nullFraming([2]string{"branch.feat2.kirastackparent", ""})
 	got := gitpreflight.ParseStackConfig(raw)
 	want := map[string]gitpreflight.StackConfigEntry{"feat2": {Branch: "feat2", Parent: ""}}
@@ -58,6 +61,7 @@ func TestParseStackConfig_EmptyValue(t *testing.T) {
 }
 
 func TestParseStackConfig_LowercasedKeys(t *testing.T) {
+	t.Parallel()
 	// Probe P1: git stores/reads back the variable name lowercased regardless of how it was set.
 	raw := nullFraming([2]string{"branch.Feat2.kirastackparent", "feat1"})
 	got := gitpreflight.ParseStackConfig(raw)
@@ -67,6 +71,7 @@ func TestParseStackConfig_LowercasedKeys(t *testing.T) {
 }
 
 func TestParseStackConfig_TruncatedOrMalformedRecordsIgnored(t *testing.T) {
+	t.Parallel()
 	raw := []byte("not-a-key-value-pair\x00branch.feat2.kirastackparent\nfeat1\x00")
 	got := gitpreflight.ParseStackConfig(raw)
 	if len(got) != 1 || got["feat2"].Parent != "feat1" {
@@ -75,6 +80,7 @@ func TestParseStackConfig_TruncatedOrMalformedRecordsIgnored(t *testing.T) {
 }
 
 func TestParseStackConfig_IgnoresUnrelatedBranchConfig(t *testing.T) {
+	t.Parallel()
 	raw := nullFraming(
 		[2]string{"branch.feat2.remote", "origin"},
 		[2]string{"branch.feat2.merge", "refs/heads/feat2"},
@@ -101,6 +107,7 @@ func names(branches []gitpreflight.StackBranch) []string {
 }
 
 func TestBuildStacks_LinearChain(t *testing.T) {
+	t.Parallel()
 	in := gitpreflight.BuildStacksInput{
 		Config: map[string]gitpreflight.StackConfigEntry{
 			"feat1": {Branch: "feat1", Parent: "main"},
@@ -129,6 +136,7 @@ func TestBuildStacks_LinearChain(t *testing.T) {
 }
 
 func TestBuildStacks_Fork(t *testing.T) {
+	t.Parallel()
 	in := gitpreflight.BuildStacksInput{
 		Config: map[string]gitpreflight.StackConfigEntry{
 			"feat1": {Branch: "feat1", Parent: "main"},
@@ -153,6 +161,7 @@ func TestBuildStacks_Fork(t *testing.T) {
 
 // TestBuildStacks_Orphan_DanglingParent: a recorded parent that no longer resolves to any ref.
 func TestBuildStacks_Orphan_DanglingParent(t *testing.T) {
+	t.Parallel()
 	in := gitpreflight.BuildStacksInput{
 		Config: map[string]gitpreflight.StackConfigEntry{
 			"feat2": {Branch: "feat2", Parent: "deleted-branch"},
@@ -173,6 +182,7 @@ func TestBuildStacks_Orphan_DanglingParent(t *testing.T) {
 }
 
 func TestBuildStacks_SelfCycle(t *testing.T) {
+	t.Parallel()
 	in := gitpreflight.BuildStacksInput{
 		Config: map[string]gitpreflight.StackConfigEntry{
 			"feat2": {Branch: "feat2", Parent: "feat2"},
@@ -187,6 +197,7 @@ func TestBuildStacks_SelfCycle(t *testing.T) {
 }
 
 func TestBuildStacks_TwoBranchCycle(t *testing.T) {
+	t.Parallel()
 	in := gitpreflight.BuildStacksInput{
 		Config: map[string]gitpreflight.StackConfigEntry{
 			"a": {Branch: "a", Parent: "b"},
@@ -206,6 +217,7 @@ func TestBuildStacks_TwoBranchCycle(t *testing.T) {
 
 // TestBuildStacks_RemoteBranchBase: the stack sits on origin/main, never itself a stack member.
 func TestBuildStacks_RemoteBranchBase(t *testing.T) {
+	t.Parallel()
 	in := gitpreflight.BuildStacksInput{
 		Config: map[string]gitpreflight.StackConfigEntry{
 			"feat1": {Branch: "feat1", Parent: "origin/main"},
@@ -225,6 +237,7 @@ func TestBuildStacks_RemoteBranchBase(t *testing.T) {
 // TestBuildStacks_BehindAheadDrivesState is D4's own predicate: behind > 0 is needsRestack, and
 // nothing else.
 func TestBuildStacks_BehindAheadDrivesState(t *testing.T) {
+	t.Parallel()
 	in := gitpreflight.BuildStacksInput{
 		Config: map[string]gitpreflight.StackConfigEntry{
 			"feat1": {Branch: "feat1", Parent: "main"},
@@ -246,6 +259,7 @@ func TestBuildStacks_BehindAheadDrivesState(t *testing.T) {
 // TestBuildStacks_BeyondCapZeroedNotDropped: a branch with no BehindAhead entry (beyond the cap) is
 // still listed, with behind/ahead left at zero rather than being dropped.
 func TestBuildStacks_BeyondCapZeroedNotDropped(t *testing.T) {
+	t.Parallel()
 	in := gitpreflight.BuildStacksInput{
 		Config: map[string]gitpreflight.StackConfigEntry{
 			"feat1": {Branch: "feat1", Parent: "main"},
@@ -262,6 +276,7 @@ func TestBuildStacks_BeyondCapZeroedNotDropped(t *testing.T) {
 }
 
 func TestDetectCycleFrom_NoCycle(t *testing.T) {
+	t.Parallel()
 	config := map[string]gitpreflight.StackConfigEntry{
 		"feat1": {Branch: "feat1", Parent: "main"},
 	}
@@ -271,6 +286,7 @@ func TestDetectCycleFrom_NoCycle(t *testing.T) {
 }
 
 func TestDetectCycleFrom_TwoBranchCycle(t *testing.T) {
+	t.Parallel()
 	config := map[string]gitpreflight.StackConfigEntry{
 		"a": {Branch: "a", Parent: "b"},
 		"b": {Branch: "b", Parent: "a"},
@@ -318,6 +334,7 @@ func baseInput() gitpreflight.ClassifyRestackInput {
 }
 
 func TestClassifyRestack_Clean(t *testing.T) {
+	t.Parallel()
 	pf := gitpreflight.ClassifyRestack(baseInput())
 	if pf.Verdict != "clean" {
 		t.Fatalf("verdict = %q, want clean: %+v", pf.Verdict, pf)
@@ -331,6 +348,7 @@ func TestClassifyRestack_Clean(t *testing.T) {
 }
 
 func TestClassifyRestack_Noop(t *testing.T) {
+	t.Parallel()
 	in := baseInput()
 	in.Stacks = chainStacks(0)
 	pf := gitpreflight.ClassifyRestack(in)
@@ -342,6 +360,7 @@ func TestClassifyRestack_Noop(t *testing.T) {
 // TestClassifyRestack_AncestorRestackedCascade: feat1 stale, feat2 up to date on its own — feat2
 // must still be planned because its ancestor moves (D14's cascade rule).
 func TestClassifyRestack_AncestorRestackedCascade(t *testing.T) {
+	t.Parallel()
 	stacks := []gitpreflight.StackSummary{{
 		Base: "main",
 		Branches: []gitpreflight.StackBranch{
@@ -361,6 +380,7 @@ func TestClassifyRestack_AncestorRestackedCascade(t *testing.T) {
 }
 
 func TestClassifyRestack_NotStacked(t *testing.T) {
+	t.Parallel()
 	in := baseInput()
 	in.Target = "unrelated"
 	pf := gitpreflight.ClassifyRestack(in)
@@ -370,6 +390,7 @@ func TestClassifyRestack_NotStacked(t *testing.T) {
 }
 
 func TestClassifyRestack_ParentMissing(t *testing.T) {
+	t.Parallel()
 	in := baseInput()
 	in.Target = "orphaned"
 	in.Orphans = []gitpreflight.StackBranch{{Name: "orphaned", Parent: "gone"}}
@@ -383,6 +404,7 @@ func TestClassifyRestack_ParentMissing(t *testing.T) {
 }
 
 func TestClassifyRestack_Cycle(t *testing.T) {
+	t.Parallel()
 	in := baseInput()
 	in.Target = "a"
 	in.Orphans = []gitpreflight.StackBranch{{Name: "a", Parent: "b"}, {Name: "b", Parent: "a"}}
@@ -397,6 +419,7 @@ func TestClassifyRestack_Cycle(t *testing.T) {
 }
 
 func TestClassifyRestack_CheckedOutElsewhere(t *testing.T) {
+	t.Parallel()
 	in := baseInput()
 	in.CheckedOutElsewhere = map[string]string{"feat2": "/tmp/other-worktree"}
 	pf := gitpreflight.ClassifyRestack(in)
@@ -409,6 +432,7 @@ func TestClassifyRestack_CheckedOutElsewhere(t *testing.T) {
 }
 
 func TestClassifyRestack_DirtyWorktree(t *testing.T) {
+	t.Parallel()
 	in := baseInput()
 	in.DirtyPaths = []string{"f.txt"}
 	pf := gitpreflight.ClassifyRestack(in)
@@ -423,6 +447,7 @@ func TestClassifyRestack_DirtyWorktree(t *testing.T) {
 // TestClassifyRestack_BlockerOrder proves D14's exact fixed order: inProgressOperation first even
 // when a dirtyWorktree also applies.
 func TestClassifyRestack_BlockerOrder(t *testing.T) {
+	t.Parallel()
 	in := baseInput()
 	in.InProgress = &gitpreflight.InProgressOperation{Kind: gitpreflight.InProgressRebase}
 	in.DirtyPaths = []string{"f.txt"}
@@ -433,6 +458,7 @@ func TestClassifyRestack_BlockerOrder(t *testing.T) {
 }
 
 func TestClassifyRestack_RestoresHeadDetached(t *testing.T) {
+	t.Parallel()
 	in := baseInput()
 	in.CurrentHead = gitpreflight.HeadRef{Sha: "0123456789abcdef"}
 	pf := gitpreflight.ClassifyRestack(in)
@@ -442,6 +468,7 @@ func TestClassifyRestack_RestoresHeadDetached(t *testing.T) {
 }
 
 func TestClassifyRestack_NeedsForcePush(t *testing.T) {
+	t.Parallel()
 	in := baseInput()
 	in.HasUpstream = map[string]bool{"feat2": true}
 	pf := gitpreflight.ClassifyRestack(in)

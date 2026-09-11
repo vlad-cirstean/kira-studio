@@ -13,6 +13,7 @@ import (
 // scope (the default/unset case too) always excludes `refs/kira/*`, and `--exclude` precedes the
 // `--all` it modifies.
 func TestRevSetArgs_AllScopeExcludesKiraNamespace(t *testing.T) {
+	t.Parallel()
 	got := porcelain.RevSetArgs(porcelain.WalkSpec{Scope: "all"})
 	want := []string{"--exclude=refs/kira/*", "--all"}
 	if !reflect.DeepEqual(got, want) {
@@ -21,6 +22,7 @@ func TestRevSetArgs_AllScopeExcludesKiraNamespace(t *testing.T) {
 }
 
 func TestRevSetArgs_UnsetScopeBehavesLikeAll(t *testing.T) {
+	t.Parallel()
 	got := porcelain.RevSetArgs(porcelain.WalkSpec{})
 	want := []string{"--exclude=refs/kira/*", "--all"}
 	if !reflect.DeepEqual(got, want) {
@@ -31,6 +33,7 @@ func TestRevSetArgs_UnsetScopeBehavesLikeAll(t *testing.T) {
 // TestRevSetArgs_ExcludeStashAddsExcludeStashBeforeAll proves the three-token order exactly:
 // refs/kira/* exclusion first, refs/stash exclusion second, --all last.
 func TestRevSetArgs_ExcludeStashAddsExcludeStashBeforeAll(t *testing.T) {
+	t.Parallel()
 	got := porcelain.RevSetArgs(porcelain.WalkSpec{Scope: "all", ExcludeStash: true})
 	want := []string{"--exclude=refs/kira/*", "--exclude=refs/stash", "--all"}
 	if !reflect.DeepEqual(got, want) {
@@ -41,6 +44,7 @@ func TestRevSetArgs_ExcludeStashAddsExcludeStashBeforeAll(t *testing.T) {
 // TestRevSetArgs_HeadScopeNeverExcludes proves the `head` scope emits neither exclusion — it never
 // walks `--all` at all, so an exclusion would be meaningless.
 func TestRevSetArgs_HeadScopeNeverExcludes(t *testing.T) {
+	t.Parallel()
 	got := porcelain.RevSetArgs(porcelain.WalkSpec{Scope: "head", ExcludeStash: true})
 	want := []string{"HEAD"}
 	if !reflect.DeepEqual(got, want) {
@@ -51,6 +55,7 @@ func TestRevSetArgs_HeadScopeNeverExcludes(t *testing.T) {
 // TestRevSetArgs_RangeNeverExcludes proves a ranged walk emits neither exclusion either, same
 // reasoning as the head scope.
 func TestRevSetArgs_RangeNeverExcludes(t *testing.T) {
+	t.Parallel()
 	got := porcelain.RevSetArgs(porcelain.WalkSpec{Range: &porcelain.RangeSpec{Base: "main", Branch: "topic"}, ExcludeStash: true})
 	want := []string{"main..topic"}
 	if !reflect.DeepEqual(got, want) {
@@ -61,6 +66,7 @@ func TestRevSetArgs_RangeNeverExcludes(t *testing.T) {
 // TestRevSetArgs_IncludeStashShasAppendAfterExcludes proves G8's own stash-sha injection still
 // lands after the exclude/--all tokens, unaffected by G28's own additions.
 func TestRevSetArgs_IncludeStashShasAppendAfterExcludes(t *testing.T) {
+	t.Parallel()
 	got := porcelain.RevSetArgs(porcelain.WalkSpec{Scope: "all", IncludeStash: true, StashShas: []string{"deadbeef"}})
 	want := []string{"--exclude=refs/kira/*", "--all", "deadbeef"}
 	if !reflect.DeepEqual(got, want) {
@@ -99,6 +105,7 @@ func parseFixture(t *testing.T, relPath string) []porcelain.CommitRecord {
 // decoration classification per deterministic topology, sha-pinned since these fixtures'
 // deterministic identity/dates/content make their shas reproducible across regenerations.
 func TestLog_GeneratedTopologies(t *testing.T) {
+	t.Parallel()
 	t.Run("linear", func(t *testing.T) {
 		recs := parseFixture(t, "log/linear.bin")
 		if len(recs) != 3 {
@@ -183,6 +190,7 @@ func TestLog_GeneratedTopologies(t *testing.T) {
 
 // TestLog_HandAuthoredEdgeCases covers what no generated topology produces on its own (D15).
 func TestLog_HandAuthoredEdgeCases(t *testing.T) {
+	t.Parallel()
 	t.Run("emptySubject", func(t *testing.T) {
 		recs := parseFixture(t, "handAuthored/emptySubject.bin")
 		if len(recs) != 1 || recs[0].Subject != "" {

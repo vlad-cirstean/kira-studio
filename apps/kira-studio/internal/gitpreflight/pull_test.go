@@ -8,6 +8,7 @@ import (
 
 // TestResolvePullStrategy_Ladder is D24's own six-rung matrix, one case per rung in order.
 func TestResolvePullStrategy_Ladder(t *testing.T) {
+	t.Parallel()
 	t.Run("1 explicit wins over everything", func(t *testing.T) {
 		explicit := gitpreflight.PullMerge
 		strategy, source := gitpreflight.ResolvePullStrategy(&explicit, "rebase", gitpreflight.PullConfigValues{
@@ -76,6 +77,7 @@ func TestResolvePullStrategy_Ladder(t *testing.T) {
 // TestResolvePullStrategy_BranchConfigValueMapping pins the value mapping itself: false -> merge,
 // true/interactive/merges -> rebase, anything else -> not a decision this key makes.
 func TestResolvePullStrategy_BranchConfigValueMapping(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		raw  string
 		want gitpreflight.PullStrategy
@@ -99,6 +101,7 @@ func TestResolvePullStrategy_BranchConfigValueMapping(t *testing.T) {
 }
 
 func TestClassifyPull_CleanNoBlockers(t *testing.T) {
+	t.Parallel()
 	got := gitpreflight.ClassifyPull(gitpreflight.ClassifyPullInput{
 		Strategy: gitpreflight.PullFFOnly, Source: gitpreflight.SourceDefault, Dirty: true, Behind: 3,
 	})
@@ -108,6 +111,7 @@ func TestClassifyPull_CleanNoBlockers(t *testing.T) {
 }
 
 func TestClassifyPull_DirtyNonFastForwardBlocks(t *testing.T) {
+	t.Parallel()
 	got := gitpreflight.ClassifyPull(gitpreflight.ClassifyPullInput{
 		Strategy: gitpreflight.PullMerge, Source: gitpreflight.SourceDefault, Dirty: true, Behind: 3,
 	})
@@ -120,6 +124,7 @@ func TestClassifyPull_DirtyNonFastForwardBlocks(t *testing.T) {
 }
 
 func TestClassifyPull_CleanTreeNeverBlocksRegardlessOfStrategy(t *testing.T) {
+	t.Parallel()
 	got := gitpreflight.ClassifyPull(gitpreflight.ClassifyPullInput{
 		Strategy: gitpreflight.PullRebase, Source: gitpreflight.SourceDefault, Dirty: false, Behind: 3, Ahead: 2,
 	})

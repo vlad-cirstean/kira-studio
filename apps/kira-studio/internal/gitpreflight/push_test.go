@@ -7,6 +7,7 @@ import (
 )
 
 func TestMatchProtectedBranch(t *testing.T) {
+	t.Parallel()
 	patterns := []string{"main", "master", "release/*"}
 
 	if m := gitpreflight.MatchProtectedBranch("main", patterns); m == nil || m.Pattern != "main" {
@@ -29,6 +30,7 @@ func TestMatchProtectedBranch(t *testing.T) {
 // TestMatchProtectedBranch_DoubleStarIsLiteral is D17's own "**" handling: not a supported glob,
 // matched literally rather than crossing "/".
 func TestMatchProtectedBranch_DoubleStarIsLiteral(t *testing.T) {
+	t.Parallel()
 	patterns := []string{"release/**"}
 	if m := gitpreflight.MatchProtectedBranch("release/**", patterns); m == nil {
 		t.Fatal("an exact literal match on the pattern itself should still match")
@@ -42,6 +44,7 @@ func TestMatchProtectedBranch_DoubleStarIsLiteral(t *testing.T) {
 // literal "*" is compared like any other character, never accidentally treated as a wildcard on
 // the branch side (only the pattern side has wildcard semantics).
 func TestMatchProtectedBranch_LiteralStarInBranchName(t *testing.T) {
+	t.Parallel()
 	if m := gitpreflight.MatchProtectedBranch("weird*name", []string{"weird*name"}); m == nil {
 		t.Fatal("want a match: the pattern's own \"*\" matches the branch's literal \"*\" as one of the zero-or-more characters it covers")
 	}
@@ -51,6 +54,7 @@ func TestMatchProtectedBranch_LiteralStarInBranchName(t *testing.T) {
 }
 
 func TestClassifyPush(t *testing.T) {
+	t.Parallel()
 	upstream := "refs/remotes/origin/main"
 	tip := "abc123"
 	got := gitpreflight.ClassifyPush(gitpreflight.ClassifyPushInput{
@@ -69,6 +73,7 @@ func TestClassifyPush(t *testing.T) {
 }
 
 func TestClassifyPush_NoUpstreamSetsUpstream(t *testing.T) {
+	t.Parallel()
 	got := gitpreflight.ClassifyPush(gitpreflight.ClassifyPushInput{Branch: "topic", Behind: 0})
 	if !got.WouldSetUpstream {
 		t.Fatal("a nil upstream must set wouldSetUpstream")

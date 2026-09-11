@@ -12,6 +12,7 @@ import (
 )
 
 func TestConn_OpenTwiceSamePathOneRefOneHold(t *testing.T) {
+	t.Parallel()
 	reg := newTestRegistry()
 	reg.LingerFor = time.Hour
 
@@ -47,6 +48,7 @@ func TestConn_OpenTwiceSamePathOneRefOneHold(t *testing.T) {
 }
 
 func TestConn_CloseRepoFullyReleases(t *testing.T) {
+	t.Parallel()
 	reg := newTestRegistry()
 	reg.LingerFor = time.Millisecond
 
@@ -76,6 +78,7 @@ func TestConn_CloseRepoFullyReleases(t *testing.T) {
 }
 
 func TestConn_CloseReleasesEveryHoldAndUnsubscribes(t *testing.T) {
+	t.Parallel()
 	reg := newTestRegistry()
 	reg.LingerFor = time.Hour
 
@@ -116,6 +119,7 @@ func TestConn_CloseReleasesEveryHoldAndUnsubscribes(t *testing.T) {
 // for: rpcstream dispatches every request on its own goroutine, so two repo.open calls for the same
 // path from one connection can race each other.
 func TestConn_ConcurrentOpenSameRepoTakesOneRef(t *testing.T) {
+	t.Parallel()
 	reg := newTestRegistry()
 	reg.LingerFor = time.Hour
 	c := NewConn("c1", "client-1", "label-1", func(string, any) {})
@@ -173,6 +177,7 @@ func revListShas(t *testing.T, dir string) []string {
 // count, nextSeq (observed via Status/Stream chunk seq) and log session are untouched across the
 // review walk's whole life, including its replacement by a second range.
 func TestConn_ReviewWalkDoesNotDisturbTheGraphWalk(t *testing.T) {
+	t.Parallel()
 	skipWithoutGitWalk(t)
 	repoDir := initWalkRepo(t, 6)
 	shas := revListShas(t, repoDir)
@@ -280,6 +285,7 @@ func TestConn_ReviewWalkDoesNotDisturbTheGraphWalk(t *testing.T) {
 // concurrently calls markWalksStale — go test -race is what actually proves this, by flagging the
 // unsynchronized read/write pre-fix and staying silent post-fix.
 func TestConn_MarkWalksStaleRacesSafelyWithWalkRebuild(t *testing.T) {
+	t.Parallel()
 	skipWithoutGitWalk(t)
 	repoDir := initWalkRepo(t, 6)
 	conn, _, repoID := newWalkTestConn(t, repoDir)

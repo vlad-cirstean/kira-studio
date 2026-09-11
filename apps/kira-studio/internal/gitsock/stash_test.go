@@ -70,6 +70,7 @@ func stashListOK(t *testing.T, c *testClient, repoID string) []porcelain.StashEn
 // then branch (also removes it, per real `stash branch stash@{index}` behaviour), push a third time
 // then drop (undoable — G17's own addition to the undo slot) and undo it back.
 func TestIntegration_StashListShowAndCleanOps(t *testing.T) {
+	t.Parallel()
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not on PATH")
 	}
@@ -229,6 +230,7 @@ func TestIntegration_StashListShowAndCleanOps(t *testing.T) {
 // `stash pop`, over the real socket — `{ok: false, error: {kind: "StashConflict", ...}}`, never
 // "Unknown", and the stash entry still present afterward.
 func TestIntegration_StashPopConflictOverTheWire(t *testing.T) {
+	t.Parallel()
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not on PATH")
 	}

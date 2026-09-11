@@ -14,6 +14,7 @@ import (
 // --- remoteOpSlot: D24's own ≤1-slot concurrency matrix -----------------------------------------
 
 func TestRemoteOpSlot_SecondClaimIsRefused(t *testing.T) {
+	t.Parallel()
 	var s remoteOpSlot
 	if !s.claim("fetch", func() {}) {
 		t.Fatal("first claim should succeed")
@@ -28,6 +29,7 @@ func TestRemoteOpSlot_SecondClaimIsRefused(t *testing.T) {
 }
 
 func TestRemoteOpSlot_CancelOnIdleReportsFalse(t *testing.T) {
+	t.Parallel()
 	var s remoteOpSlot
 	if s.tryCancel() {
 		t.Fatal("cancelling an idle slot must report false, never true")
@@ -35,6 +37,7 @@ func TestRemoteOpSlot_CancelOnIdleReportsFalse(t *testing.T) {
 }
 
 func TestRemoteOpSlot_CancelOnNonKillablePhaseReportsFalseAndNeverCancels(t *testing.T) {
+	t.Parallel()
 	var s remoteOpSlot
 	cancelled := false
 	s.claim("push", func() { cancelled = true })
@@ -48,6 +51,7 @@ func TestRemoteOpSlot_CancelOnNonKillablePhaseReportsFalseAndNeverCancels(t *tes
 }
 
 func TestRemoteOpSlot_CancelOnKillablePhaseCancelsAndReportsTrue(t *testing.T) {
+	t.Parallel()
 	var s remoteOpSlot
 	cancelled := false
 	s.claim("fetch", func() { cancelled = true })
@@ -61,6 +65,7 @@ func TestRemoteOpSlot_CancelOnKillablePhaseCancelsAndReportsTrue(t *testing.T) {
 }
 
 func TestRemoteOpSlot_ForceCancelIgnoresKillable(t *testing.T) {
+	t.Parallel()
 	var s remoteOpSlot
 	cancelled := false
 	s.claim("push", func() { cancelled = true })
@@ -73,6 +78,7 @@ func TestRemoteOpSlot_ForceCancelIgnoresKillable(t *testing.T) {
 // --- Conn credential relay: D24's own four exits -------------------------------------------------
 
 func TestConn_AskCredential_Answered(t *testing.T) {
+	t.Parallel()
 	c := NewConn("c1", "client-1", "label-1", func(string, any) {})
 	done := make(chan struct{})
 	var secret string
@@ -105,6 +111,7 @@ func TestConn_AskCredential_Answered(t *testing.T) {
 }
 
 func TestConn_AskCredential_Dismissed(t *testing.T) {
+	t.Parallel()
 	c := NewConn("c1", "client-1", "label-1", func(string, any) {})
 	done := make(chan struct{})
 	var ok bool
@@ -133,6 +140,7 @@ func TestConn_AskCredential_Dismissed(t *testing.T) {
 }
 
 func TestConn_AskCredential_CtxCancelled(t *testing.T) {
+	t.Parallel()
 	c := NewConn("c1", "client-1", "label-1", func(string, any) {})
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan struct{})
@@ -158,6 +166,7 @@ func TestConn_AskCredential_CtxCancelled(t *testing.T) {
 }
 
 func TestConn_AskCredential_ConnClosed(t *testing.T) {
+	t.Parallel()
 	c := NewConn("c1", "client-1", "label-1", func(string, any) {})
 	done := make(chan struct{})
 	var ok bool
@@ -182,6 +191,7 @@ func TestConn_AskCredential_ConnClosed(t *testing.T) {
 }
 
 func TestConn_ProvideCredential_UnknownIDReportsFalse(t *testing.T) {
+	t.Parallel()
 	c := NewConn("c1", "client-1", "label-1", func(string, any) {})
 	if c.ProvideCredential("no-such-id", strPtrLocal("x")) {
 		t.Fatal("an unknown request id must report false")
@@ -189,6 +199,7 @@ func TestConn_ProvideCredential_UnknownIDReportsFalse(t *testing.T) {
 }
 
 func TestConn_ProvideCredential_TwiceIsANoOp(t *testing.T) {
+	t.Parallel()
 	c := NewConn("c1", "client-1", "label-1", func(string, any) {})
 	done := make(chan struct{})
 	go func() {
@@ -235,6 +246,7 @@ func waitFor(t *testing.T, cond func() bool) {
 // resolve (it's computed purely from branch.<name>.{remote,merge} config), so this needs no bare
 // remote repo to exercise the three cases that matter.
 func TestResolveUpstreamRemoteBranch(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	runGitStack(t, dir, "init", "-q", "-b", "main")
 	writeFileStack(t, dir, "f.txt", "x\n")
@@ -285,6 +297,7 @@ func TestResolveUpstreamRemoteBranch(t *testing.T) {
 // as "would set upstream" (and pushed to a brand-new same-named remote branch, silently rebinding
 // the branch's tracking config) purely because no same-named ref happened to exist yet.
 func TestPushPreflight_DifferentlyNamedUpstreamIsNotWouldSetUpstream(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	runGitStack(t, dir, "init", "-q", "-b", "main")
 	writeFileStack(t, dir, "f.txt", "x\n")
@@ -333,6 +346,7 @@ func runGitStackOutput(t *testing.T, dir string, args ...string) string {
 // the undo slot at all before this fix, so a pull landing after such an op left a stale record in
 // place — clicking Undo would silently move the branch back past whatever the pull just brought in.
 func TestRunRemote_Pull_ClearsUndoSlot(t *testing.T) {
+	t.Parallel()
 	remoteDir := t.TempDir()
 	runGitStack(t, remoteDir, "init", "-q", "--bare", "-b", "main")
 

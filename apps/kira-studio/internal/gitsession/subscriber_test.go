@@ -14,6 +14,7 @@ import (
 // since the exact call count depends on scheduling (how many notes land before the first delivery
 // is even picked up), not just on the coalescing logic itself.
 func TestSubscriber_BurstCoalescesFarBelowSignalCount(t *testing.T) {
+	t.Parallel()
 	delivered := make(chan Event, 100)
 	blockFirst := make(chan struct{})
 	var unblocked atomic.Bool
@@ -66,6 +67,7 @@ collect:
 // TestSubscriber_SlowSubscriberDoesNotDelayAnother is the SPEC §6 sentence this design exists for:
 // one subscriber stuck inside deliver must not stall a second, independent subscriber's delivery.
 func TestSubscriber_SlowSubscriberDoesNotDelayAnother(t *testing.T) {
+	t.Parallel()
 	block := make(chan struct{}) // never closed in this test: the slow subscriber stays stuck.
 	slow := newSubscriber("repo-1", func(Event) { <-block })
 	defer slow.close()
@@ -88,6 +90,7 @@ func TestSubscriber_SlowSubscriberDoesNotDelayAnother(t *testing.T) {
 }
 
 func TestSubscriber_CloseStopsFurtherDelivery(t *testing.T) {
+	t.Parallel()
 	var calls int32
 	s := newSubscriber("repo-1", func(Event) { atomic.AddInt32(&calls, 1) })
 	s.note(gitclient.SignalRefsChanged)

@@ -126,6 +126,7 @@ func newGhTestFixture(t *testing.T, remoteURL string) *ghTestFixture {
 // --- cache hit/miss ------------------------------------------------------------------------------
 
 func TestResolveCommitPr_CachesWithinTTL(t *testing.T) {
+	t.Parallel()
 	f := newGhTestFixture(t, "https://github.com/acme/widgets.git")
 	f.ghRunner.apiResult = ghclient.Result{ExitCode: 0, Stdout: onePullJSON(1, "open", false, "feature")}
 
@@ -145,6 +146,7 @@ func TestResolveCommitPr_CachesWithinTTL(t *testing.T) {
 }
 
 func TestResolveCommitPr_DifferentShaMisses(t *testing.T) {
+	t.Parallel()
 	f := newGhTestFixture(t, "https://github.com/acme/widgets.git")
 	f.ghRunner.apiResult = ghclient.Result{ExitCode: 0, Stdout: onePullJSON(1, "open", false, "feature")}
 
@@ -159,6 +161,7 @@ func TestResolveCommitPr_DifferentShaMisses(t *testing.T) {
 // --- drop on refsChanged --------------------------------------------------------------------------
 
 func TestRefsChanged_DropsCommitCache(t *testing.T) {
+	t.Parallel()
 	f := newGhTestFixture(t, "https://github.com/acme/widgets.git")
 	f.ghRunner.apiResult = ghclient.Result{ExitCode: 0, Stdout: onePullJSON(1, "open", false, "feature")}
 
@@ -186,6 +189,7 @@ func TestRefsChanged_DropsCommitCache(t *testing.T) {
 // with nothing anywhere in this path throttling it. eagerPurgeAllowed is the gate
 // eagerResolveClosedBranches now checks first, before any other work.
 func TestGhState_EagerPurgeAllowed_ThrottlesRapidCalls(t *testing.T) {
+	t.Parallel()
 	s := newGhState()
 	if !s.eagerPurgeAllowed() {
 		t.Fatal("the first call should always be allowed")
@@ -209,6 +213,7 @@ func TestGhState_EagerPurgeAllowed_ThrottlesRapidCalls(t *testing.T) {
 // --- the breaker suppresses spawns for its whole window -------------------------------------------
 
 func TestBreaker_SuppressesFurtherSpawnsAfterRateLimit(t *testing.T) {
+	t.Parallel()
 	f := newGhTestFixture(t, "https://github.com/acme/widgets.git")
 	f.ghRunner.apiResult = ghclient.Result{ExitCode: 1, Stderr: []byte("gh: API rate limit exceeded for user ID 1. (HTTP 403)")}
 
@@ -230,6 +235,7 @@ func TestBreaker_SuppressesFurtherSpawnsAfterRateLimit(t *testing.T) {
 }
 
 func TestBreaker_NotClearedByRefsChanged(t *testing.T) {
+	t.Parallel()
 	f := newGhTestFixture(t, "https://github.com/acme/widgets.git")
 	f.ghRunner.apiResult = ghclient.Result{ExitCode: 1, Stderr: []byte("gh: API rate limit exceeded for user ID 1. (HTTP 403)")}
 	f.entry.ResolveCommitPr(context.Background(), "sha1")
@@ -271,6 +277,7 @@ func hasSession(t *testing.T, store *gitreview.Store, repoID, branch string) boo
 }
 
 func TestResolveBranchPr_PurgesOnClosed(t *testing.T) {
+	t.Parallel()
 	f := newGhTestFixture(t, "https://github.com/acme/widgets.git")
 	repoID := f.entry.Summary.RepoID
 	seedReviewSession(t, f.review, repoID, "feature")
@@ -286,6 +293,7 @@ func TestResolveBranchPr_PurgesOnClosed(t *testing.T) {
 }
 
 func TestResolveBranchPr_PurgesOnMerged(t *testing.T) {
+	t.Parallel()
 	f := newGhTestFixture(t, "https://github.com/acme/widgets.git")
 	repoID := f.entry.Summary.RepoID
 	seedReviewSession(t, f.review, repoID, "feature")
@@ -301,6 +309,7 @@ func TestResolveBranchPr_PurgesOnMerged(t *testing.T) {
 }
 
 func TestResolveBranchPr_NeverPurgesOnOpen(t *testing.T) {
+	t.Parallel()
 	f := newGhTestFixture(t, "https://github.com/acme/widgets.git")
 	repoID := f.entry.Summary.RepoID
 	seedReviewSession(t, f.review, repoID, "feature")
@@ -325,6 +334,7 @@ func TestResolveBranchPr_NeverPurgesOnOpen(t *testing.T) {
 // well under per_page); every OTHER branch resolved after that costs ZERO further gh runner
 // invocations, served entirely from the now-warm snapshot.
 func TestResolveBranchPr_ColdCacheCostsOneBulkFetchForManyBranches(t *testing.T) {
+	t.Parallel()
 	f := newGhTestFixture(t, "https://github.com/acme/widgets.git")
 	f.ghRunner.apiResult = ghclient.Result{ExitCode: 0, Stdout: threePullsJSON()}
 
@@ -349,6 +359,7 @@ func TestResolveBranchPr_ColdCacheCostsOneBulkFetchForManyBranches(t *testing.T)
 // --- non-GitHub remote costs exactly zero ----------------------------------------------------------
 
 func TestResolveCommitPr_NonGitHubRemoteNeverSpawns(t *testing.T) {
+	t.Parallel()
 	f := newGhTestFixture(t, "https://gitlab.com/acme/widgets.git")
 	r := f.entry.ResolveCommitPr(context.Background(), "sha1")
 	if r.Kind != "disabled" {
@@ -413,6 +424,7 @@ func (r *singleFlightGhRunner) snapshotCallCount() int {
 // asserts the gh runner's own snapshot endpoint was reached exactly once, with every caller still
 // getting the SAME correct snapshot back.
 func TestEnsureSnapshot_SingleFlightOnColdCache(t *testing.T) {
+	t.Parallel()
 	reg := NewRegistry(githubRemoteRunner{url: "https://github.com/acme/widgets.git"})
 	watcherCh := make(chan *fakeWatcher, 1)
 	reg.NewWatcher = func(gitclient.RepoSummary) (Watcher, error) {

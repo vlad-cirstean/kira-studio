@@ -42,6 +42,7 @@ func pairFreshWithToken(t *testing.T, server *Server, sockPath, clientID string)
 // TestIntegration_FullPairingAndRPCLifecycle, against D8's wording, so this file is self-contained
 // (that existing test is NOT deleted, D15).
 func TestRevoke_WhileIdle(t *testing.T) {
+	t.Parallel()
 	server, sockPath, clientsRepo, _ := newIntegrationServer(t)
 	client, token := pairFreshWithToken(t, server, sockPath, "revoke-idle")
 
@@ -84,6 +85,7 @@ func TestRevoke_WhileIdle(t *testing.T) {
 // -- bounded, not assumed instantaneous (D8 clause 3/F8) -- the walk's own git log process is
 // killed and the ref released, proven by a fresh open building a NEW RepoEntry.
 func TestRevoke_WhileHoldingAGraphWalk(t *testing.T) {
+	t.Parallel()
 	dir, _ := initFixtureRepoWithCommits(t, 3)
 	server, sockPath, _, registry := newIntegrationServer(t)
 	registry.LingerFor = 30 * time.Millisecond
@@ -123,6 +125,7 @@ func TestRevoke_WhileHoldingAGraphWalk(t *testing.T) {
 // TestRevoke_WhileHoldingAReviewSession is the same shape with BOTH walk slots open (D3's own
 // walkPair) -- both must be disposed, not just the graph one.
 func TestRevoke_WhileHoldingAReviewSession(t *testing.T) {
+	t.Parallel()
 	f := buildReviewFixtureRepo(t)
 	server, sockPath, _, registry := newIntegrationServer(t)
 	registry.LingerFor = 30 * time.Millisecond
@@ -271,6 +274,7 @@ func TestRevoke_WhileACredentialPromptIsPending(t *testing.T) {
 // TestRevoke_DoesNotDisturbAnotherClient revokes one of two clients holding the same repository:
 // the other's holds, walk and events are entirely intact, and its OWN token still works.
 func TestRevoke_DoesNotDisturbAnotherClient(t *testing.T) {
+	t.Parallel()
 	dir, _ := initFixtureRepoWithCommits(t, 3)
 	server, sockPath, _, _ := newIntegrationServer(t)
 	clientA, _ := pairFreshWithToken(t, server, sockPath, "revoke-other-a")

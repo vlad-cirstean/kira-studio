@@ -72,6 +72,7 @@ func exportComments(t *testing.T, c *testClient, repoID, branch, at string) gitr
 // TestIntegration_AddThenListRoundTrips is the round trip itself: three comments across two files,
 // every field intact, every anchor "exact" (added and listed at the same revision).
 func TestIntegration_AddThenListRoundTrips(t *testing.T) {
+	t.Parallel()
 	dir, _, featureSha := buildCommentsFixture(t)
 	server, sockPath, _, _ := newIntegrationServer(t)
 	client := pairAndReady(t, server, sockPath, "add-list-client")
@@ -104,6 +105,7 @@ func TestIntegration_AddThenListRoundTrips(t *testing.T) {
 // order, the returned order is (path, start, end, created_at, id), and two comments on identical
 // ranges come back in created_at (then id) order.
 func TestIntegration_CommentsAreOrderedByFileThenLine(t *testing.T) {
+	t.Parallel()
 	dir, _, featureSha := buildCommentsFixture(t)
 	server, sockPath, _, _ := newIntegrationServer(t)
 	client := pairAndReady(t, server, sockPath, "order-client")
@@ -134,6 +136,7 @@ func TestIntegration_CommentsAreOrderedByFileThenLine(t *testing.T) {
 // five lines inserted above a comment shift it forward (projected); the commented line deleted
 // outright reports the stored range unchanged (removed).
 func TestIntegration_CommentAnchorsProjectForward(t *testing.T) {
+	t.Parallel()
 	dir, _, featureSha := buildCommentsFixture(t)
 	server, sockPath, _, _ := newIntegrationServer(t)
 	client := pairAndReady(t, server, sockPath, "project-client")
@@ -181,6 +184,7 @@ func TestIntegration_CommentAnchorsProjectForward(t *testing.T) {
 // anchor commit is amended away (present but unreachable), and the comment survives, marked stale,
 // with its original range and sha.
 func TestIntegration_CommentSurvivesAnAmendAsStale(t *testing.T) {
+	t.Parallel()
 	dir, _, featureSha := buildCommentsFixture(t)
 	server, sockPath, _, _ := newIntegrationServer(t)
 	client := pairAndReady(t, server, sockPath, "amend-client")
@@ -216,6 +220,7 @@ func TestIntegration_CommentSurvivesAnAmendAsStale(t *testing.T) {
 // (older) `at` reports exact against THAT revision — and echoes it back — even while the tip has
 // since changed the very line the comment is about, twice over.
 func TestIntegration_ListAtAnExplicitRevision(t *testing.T) {
+	t.Parallel()
 	dir, _, featureSha := buildCommentsFixture(t)
 	server, sockPath, _, _ := newIntegrationServer(t)
 	client := pairAndReady(t, server, sockPath, "explicit-at-client")
@@ -254,6 +259,7 @@ func TestIntegration_ListAtAnExplicitRevision(t *testing.T) {
 // them exact even though their anchor sha becomes unreachable) and one on b.txt (which the amend
 // DOES touch, going stale) — compared byte for byte against a hand-built literal.
 func TestIntegration_ExportIsExactlyThisText(t *testing.T) {
+	t.Parallel()
 	dir, _, featureSha := buildCommentsFixture(t)
 	server, sockPath, _, _ := newIntegrationServer(t)
 	client := pairAndReady(t, server, sockPath, "export-client")
@@ -293,6 +299,7 @@ func TestIntegration_ExportIsExactlyThisText(t *testing.T) {
 // TestIntegration_ExportIsEmptyWithNoComments is D11's own explicit rule: "" for a session with no
 // comments, never a header-only placeholder.
 func TestIntegration_ExportIsEmptyWithNoComments(t *testing.T) {
+	t.Parallel()
 	dir, _, _ := buildCommentsFixture(t)
 	server, sockPath, _, _ := newIntegrationServer(t)
 	client := pairAndReady(t, server, sockPath, "export-empty-client")
@@ -308,6 +315,7 @@ func TestIntegration_ExportIsEmptyWithNoComments(t *testing.T) {
 // branch) session's own review matches nothing when presented against a different session, and
 // removing the same id twice answers true then false.
 func TestIntegration_RemoveIsScopedAndIdempotent(t *testing.T) {
+	t.Parallel()
 	dir, mainSha, featureSha := buildCommentsFixture(t)
 	runGitIn(t, dir, "checkout", "-q", "-b", "other", mainSha)
 
@@ -338,6 +346,7 @@ func TestIntegration_RemoveIsScopedAndIdempotent(t *testing.T) {
 // review_range (the "full" mark) and the session row itself untouched — a subsequent add reuses
 // the surviving session rather than erroring.
 func TestIntegration_ClearRemovesOnlyComments(t *testing.T) {
+	t.Parallel()
 	dir, _, featureSha := buildCommentsFixture(t)
 	server, sockPath, _, _ := newIntegrationServer(t)
 	client := pairAndReady(t, server, sockPath, "clear-client")
@@ -372,6 +381,7 @@ func TestIntegration_ClearRemovesOnlyComments(t *testing.T) {
 // TestIntegration_CommentRefusals is D15's own validation rules, each an E_BAD_REQUEST naming what
 // was wrong, and none of them reaching a spawn it should not.
 func TestIntegration_CommentRefusals(t *testing.T) {
+	t.Parallel()
 	dir, _, featureSha := buildCommentsFixture(t)
 	if err := os.WriteFile(filepath.Join(dir, "img.bin"), []byte{0x89, 'P', 'N', 'G', 0x00, 0x01}, 0o644); err != nil {
 		t.Fatalf("write img.bin: %v", err)
@@ -429,6 +439,7 @@ func TestIntegration_CommentRefusals(t *testing.T) {
 // added on connection A is visible in connection B's next list, and B's remove of it is visible to
 // A.
 func TestIntegration_TwoConnectionsShareComments(t *testing.T) {
+	t.Parallel()
 	dir, _, featureSha := buildCommentsFixture(t)
 	server, sockPath, _, _ := newIntegrationServer(t)
 	clientA := pairAndReady(t, server, sockPath, "comments-shared-a")
@@ -459,6 +470,7 @@ func TestIntegration_TwoConnectionsShareComments(t *testing.T) {
 // contributor is most likely to break: force-moving an UNRELATED branch fires refsChanged, and
 // every comment is still there afterward.
 func TestIntegration_RefsChangedDoesNotDropComments(t *testing.T) {
+	t.Parallel()
 	dir, _, featureSha := buildCommentsFixture(t)
 	server, sockPath, _, _ := newIntegrationServer(t)
 	client := pairAndReady(t, server, sockPath, "refschanged-comments-client")

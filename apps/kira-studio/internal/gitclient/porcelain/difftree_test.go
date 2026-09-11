@@ -31,6 +31,7 @@ func strPtrEq(p *string, want string) bool { return p != nil && *p == want }
 // is [counts+empty-path, originalPath, path], and the counts are the true +1 -1 of the edit alone
 // — never the +10 -10 a -M-less numstat would report against the whole file.
 func TestParseNumstatRecords_RenameWithEdit(t *testing.T) {
+	t.Parallel()
 	entries, err := porcelain.ParseNumstatRecords(readFixtureRecords(t, "diffTree/renameWithEdit.numstat.bin"))
 	if err != nil {
 		t.Fatalf("ParseNumstatRecords: %v", err)
@@ -51,6 +52,7 @@ func TestParseNumstatRecords_RenameWithEdit(t *testing.T) {
 }
 
 func TestParseNameStatusRecords_RenameWithEdit(t *testing.T) {
+	t.Parallel()
 	entries, err := porcelain.ParseNameStatusRecords(readFixtureRecords(t, "diffTree/renameWithEdit.nameStatus.bin"))
 	if err != nil {
 		t.Fatalf("ParseNameStatusRecords: %v", err)
@@ -72,6 +74,7 @@ func TestParseNameStatusRecords_RenameWithEdit(t *testing.T) {
 // modified in the same commit — the only way -C finds a copy without --find-copies-harder, which
 // FileDiffArgs/NumstatArgs/NameStatusArgs never pass.
 func TestParseRecords_Mixed(t *testing.T) {
+	t.Parallel()
 	numstat, err := porcelain.ParseNumstatRecords(readFixtureRecords(t, "diffTree/mixed.numstat.bin"))
 	if err != nil {
 		t.Fatalf("ParseNumstatRecords: %v", err)
@@ -154,6 +157,7 @@ func TestParseRecords_Mixed(t *testing.T) {
 // TestParseNumstatRecords_TruncatedRename proves an empty-path record with fewer than two
 // following records is an error, not a panic.
 func TestParseNumstatRecords_TruncatedRename(t *testing.T) {
+	t.Parallel()
 	records := [][]byte{[]byte("1\t1\t"), []byte("old.txt")} // missing the final "new.txt" record
 	if _, err := porcelain.ParseNumstatRecords(records); err == nil {
 		t.Fatal("expected an error for a record set ending mid-rename")
@@ -161,6 +165,7 @@ func TestParseNumstatRecords_TruncatedRename(t *testing.T) {
 }
 
 func TestParseNameStatusRecords_UnknownLetter(t *testing.T) {
+	t.Parallel()
 	records := [][]byte{[]byte("Z"), []byte("some.txt")}
 	if _, err := porcelain.ParseNameStatusRecords(records); err == nil {
 		t.Fatal("expected an error for an unrecognised name-status letter")
@@ -172,6 +177,7 @@ func TestParseNameStatusRecords_UnknownLetter(t *testing.T) {
 // (probe P7 — handed straight back to git as a <rev>:<path> operand or a pathspec), so they must
 // stay byte-exact even when git's own tree-sourced bytes are decomposed.
 func TestParseNumstatRecords_PathStaysDecomposed(t *testing.T) {
+	t.Parallel()
 	decomposedE := string([]byte{0x65, 0xcc, 0x81}) // "e" + U+0301, decomposed "é"
 	records := [][]byte{[]byte("1\t1\t" + "caf" + decomposedE + ".txt")}
 
@@ -186,6 +192,7 @@ func TestParseNumstatRecords_PathStaysDecomposed(t *testing.T) {
 }
 
 func TestParseNameStatusRecords_PathStaysDecomposed(t *testing.T) {
+	t.Parallel()
 	decomposedE := string([]byte{0x65, 0xcc, 0x81}) // "e" + U+0301, decomposed "é"
 	records := [][]byte{[]byte("M"), []byte("caf" + decomposedE + ".txt")}
 

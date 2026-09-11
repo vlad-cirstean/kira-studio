@@ -23,6 +23,7 @@ func splitStatusRecords(t *testing.T, raw []byte) [][]byte {
 }
 
 func TestParseStatus_Clean(t *testing.T) {
+	t.Parallel()
 	result, err := porcelain.ParseStatus(splitStatusRecords(t, readDiffFixture(t, "status/clean.bin")))
 	if err != nil {
 		t.Fatalf("ParseStatus: %v", err)
@@ -41,6 +42,7 @@ func TestParseStatus_Clean(t *testing.T) {
 // TestParseStatus_Mixed proves the '1' (ordinary) and '?' (untracked) markers, and that a
 // no-upstream repo leaves HasAheadBehind false rather than zero-valued.
 func TestParseStatus_Mixed(t *testing.T) {
+	t.Parallel()
 	result, err := porcelain.ParseStatus(splitStatusRecords(t, readDiffFixture(t, "status/mixed.bin")))
 	if err != nil {
 		t.Fatalf("ParseStatus: %v", err)
@@ -70,6 +72,7 @@ func TestParseStatus_Mixed(t *testing.T) {
 // TestParseStatus_Renamed proves the '2' record's own two-NUL-chunk framing: originalPath is a
 // SEPARATE following record, and a following record (were there one) would still parse correctly.
 func TestParseStatus_Renamed(t *testing.T) {
+	t.Parallel()
 	result, err := porcelain.ParseStatus(splitStatusRecords(t, readDiffFixture(t, "status/renamed.bin")))
 	if err != nil {
 		t.Fatalf("ParseStatus: %v", err)
@@ -93,6 +96,7 @@ func TestParseStatus_Renamed(t *testing.T) {
 }
 
 func TestParseStatus_Unmerged(t *testing.T) {
+	t.Parallel()
 	result, err := porcelain.ParseStatus(splitStatusRecords(t, readDiffFixture(t, "status/unmerged.bin")))
 	if err != nil {
 		t.Fatalf("ParseStatus: %v", err)
@@ -111,6 +115,7 @@ func TestParseStatus_Unmerged(t *testing.T) {
 
 // TestParseStatus_Unborn proves probe P11: "(initial)" is the unborn signal, not an error.
 func TestParseStatus_Unborn(t *testing.T) {
+	t.Parallel()
 	result, err := porcelain.ParseStatus(splitStatusRecords(t, readDiffFixture(t, "status/unborn.bin")))
 	if err != nil {
 		t.Fatalf("ParseStatus: %v", err)
@@ -129,6 +134,7 @@ func TestParseStatus_Unborn(t *testing.T) {
 // TestParseStatus_PathWithSpace proves the space-limited field split absorbs a path's own spaces
 // into the final field rather than truncating at the first one.
 func TestParseStatus_PathWithSpace(t *testing.T) {
+	t.Parallel()
 	rec := []byte("1 .M N... 100644 100644 100644 " +
 		"78981922613b2afb6025042ff6bd878ac1994e8 78981922613b2afb6025042ff6bd878ac1994e8 a file with spaces.txt")
 	result, err := porcelain.ParseStatus([][]byte{rec})
@@ -141,6 +147,7 @@ func TestParseStatus_PathWithSpace(t *testing.T) {
 }
 
 func TestParseStatus_UnrecognisedMarker(t *testing.T) {
+	t.Parallel()
 	if _, err := porcelain.ParseStatus([][]byte{[]byte("x bogus record")}); err == nil {
 		t.Fatal("expected an error for an unrecognised status marker")
 	}
@@ -151,6 +158,7 @@ func TestParseStatus_UnrecognisedMarker(t *testing.T) {
 // stay byte-exact even when git's own readdir-sourced bytes are decomposed. This is the test that
 // stops a future contributor from "finishing the job" by normalizing this field too (D12).
 func TestParseStatus_UntrackedPathStaysDecomposed(t *testing.T) {
+	t.Parallel()
 	decomposedE := string([]byte{0x65, 0xcc, 0x81}) // "e" + U+0301, decomposed "é"
 	rec := []byte("? caf" + decomposedE + ".txt")
 
@@ -165,6 +173,7 @@ func TestParseStatus_UntrackedPathStaysDecomposed(t *testing.T) {
 }
 
 func TestParseStatus_RenamedMissingOriginalPathChunk(t *testing.T) {
+	t.Parallel()
 	rec := []byte("2 R. N... 100644 100644 100644 " +
 		"0c2aa38e0600e0d2df09c2f84664d8a14f899879 0c2aa38e0600e0d2df09c2f84664d8a14f899879 R100 renamed.txt")
 	if _, err := porcelain.ParseStatus([][]byte{rec}); err == nil {

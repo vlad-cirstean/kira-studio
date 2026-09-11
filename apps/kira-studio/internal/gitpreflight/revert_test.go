@@ -10,6 +10,7 @@ import (
 func intp(n int) *int { return &n }
 
 func TestClassifyRevert_NonMerge(t *testing.T) {
+	t.Parallel()
 	got := gitpreflight.ClassifyRevert(gitpreflight.ClassifyRevertInput{
 		Shas: []string{"c1"}, Prediction: gitpreflight.RevertPrediction{Kind: "clean"},
 	})
@@ -25,6 +26,7 @@ func TestClassifyRevert_NonMerge(t *testing.T) {
 }
 
 func TestClassifyRevert_MergeNoMainlineChosen(t *testing.T) {
+	t.Parallel()
 	parents := []gitpreflight.RevertParentChoice{
 		{ParentNumber: 1, Sha: "p1", Subject: "mainline"},
 		{ParentNumber: 2, Sha: "p2", Subject: "merged-in"},
@@ -49,6 +51,7 @@ func TestClassifyRevert_MergeNoMainlineChosen(t *testing.T) {
 }
 
 func TestClassifyRevert_MainlineAlreadySupplied(t *testing.T) {
+	t.Parallel()
 	parents := []gitpreflight.RevertParentChoice{{ParentNumber: 1, Sha: "p1"}, {ParentNumber: 2, Sha: "p2"}}
 	got := gitpreflight.ClassifyRevert(gitpreflight.ClassifyRevertInput{
 		Shas:         []string{"m1"},
@@ -67,6 +70,7 @@ func TestClassifyRevert_MainlineAlreadySupplied(t *testing.T) {
 // TestClassifyRevert_Octopus proves an octopus merge's own parent set (>2) flows through the same
 // mainline-required path with no special casing.
 func TestClassifyRevert_Octopus(t *testing.T) {
+	t.Parallel()
 	parents := []gitpreflight.RevertParentChoice{
 		{ParentNumber: 1, Sha: "p1"}, {ParentNumber: 2, Sha: "p2"}, {ParentNumber: 3, Sha: "p3"},
 	}
@@ -80,6 +84,7 @@ func TestClassifyRevert_Octopus(t *testing.T) {
 }
 
 func TestClassifyRevert_DirtyTree(t *testing.T) {
+	t.Parallel()
 	got := gitpreflight.ClassifyRevert(gitpreflight.ClassifyRevertInput{
 		Shas: []string{"c1"}, DirtyPaths: []string{"a.txt"},
 		Prediction: gitpreflight.RevertPrediction{Kind: "clean"},
@@ -90,6 +95,7 @@ func TestClassifyRevert_DirtyTree(t *testing.T) {
 }
 
 func TestClassifyRevert_InProgress(t *testing.T) {
+	t.Parallel()
 	op := &gitpreflight.InProgressOperation{Kind: gitpreflight.InProgressMerge, ConflictedPaths: []string{}}
 	got := gitpreflight.ClassifyRevert(gitpreflight.ClassifyRevertInput{
 		Shas: []string{"c1"}, InProgress: op, Prediction: gitpreflight.RevertPrediction{Kind: "clean"},
@@ -100,6 +106,7 @@ func TestClassifyRevert_InProgress(t *testing.T) {
 }
 
 func TestClassifyRevert_DetachedHeadIsNoteNotBlocker(t *testing.T) {
+	t.Parallel()
 	got := gitpreflight.ClassifyRevert(gitpreflight.ClassifyRevertInput{
 		Shas: []string{"c1"}, DetachedHead: true, Prediction: gitpreflight.RevertPrediction{Kind: "clean"},
 	})
@@ -112,6 +119,7 @@ func TestClassifyRevert_DetachedHeadIsNoteNotBlocker(t *testing.T) {
 }
 
 func TestClassifyRevert_WillConflict(t *testing.T) {
+	t.Parallel()
 	got := gitpreflight.ClassifyRevert(gitpreflight.ClassifyRevertInput{
 		Shas: []string{"c1"}, Prediction: gitpreflight.RevertPrediction{Kind: "conflicts", Paths: []string{"f.txt"}},
 	})
@@ -122,6 +130,7 @@ func TestClassifyRevert_WillConflict(t *testing.T) {
 
 // TestClassifyRevert_MultiSha proves predictedFor is always shas[0], regardless of selection size.
 func TestClassifyRevert_MultiSha(t *testing.T) {
+	t.Parallel()
 	got := gitpreflight.ClassifyRevert(gitpreflight.ClassifyRevertInput{
 		Shas: []string{"c1", "c2", "c3"}, Prediction: gitpreflight.RevertPrediction{Kind: "clean"},
 	})
@@ -131,6 +140,7 @@ func TestClassifyRevert_MultiSha(t *testing.T) {
 }
 
 func TestClassifyRevert_NoShas(t *testing.T) {
+	t.Parallel()
 	got := gitpreflight.ClassifyRevert(gitpreflight.ClassifyRevertInput{
 		Prediction: gitpreflight.RevertPrediction{Kind: "unknown", Reason: "no commit selected"},
 	})

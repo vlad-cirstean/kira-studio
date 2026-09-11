@@ -253,6 +253,7 @@ func assertBadRequest(t *testing.T, resp wireFrame, wantFieldSubstring string) {
 }
 
 func TestIntegration_ResolveBaseFourOutcomes(t *testing.T) {
+	t.Parallel()
 	f := buildReviewFixtureRepo(t)
 	askDir := buildAskFixtureRepo(t)
 
@@ -300,6 +301,7 @@ func TestIntegration_ResolveBaseFourOutcomes(t *testing.T) {
 }
 
 func TestIntegration_ResolveBaseReasonsAndCandidates(t *testing.T) {
+	t.Parallel()
 	f := buildReviewFixtureRepo(t)
 	server, sockPath, _, _ := newIntegrationServer(t)
 	client := pairAndReady(t, server, sockPath, "resolve-reasons")
@@ -325,6 +327,7 @@ func TestIntegration_ResolveBaseReasonsAndCandidates(t *testing.T) {
 }
 
 func TestIntegration_ResolveBaseHonoursRequestBaseCandidates(t *testing.T) {
+	t.Parallel()
 	f := buildReviewFixtureRepo(t)
 	server, sockPath, _, _ := newIntegrationServer(t)
 	client := pairAndReady(t, server, sockPath, "resolve-candidates")
@@ -347,6 +350,7 @@ func TestIntegration_ResolveBaseHonoursRequestBaseCandidates(t *testing.T) {
 // kiraVersion.review.baseCandidates rather than falling straight to
 // gitreview.DefaultBaseCandidates.
 func TestIntegration_ResolveBaseHonoursRepoStoredBaseCandidates(t *testing.T) {
+	t.Parallel()
 	f := buildReviewFixtureRepo(t)
 	server, sockPath, _, registry := newIntegrationServer(t)
 	registry.RepoSettingsGet = func(string) (model.GitRepoSettings, error) {
@@ -364,6 +368,7 @@ func TestIntegration_ResolveBaseHonoursRepoStoredBaseCandidates(t *testing.T) {
 }
 
 func TestIntegration_RangedWalkMatchesGitLog(t *testing.T) {
+	t.Parallel()
 	f := buildReviewFixtureRepo(t)
 	server, sockPath, _, _ := newIntegrationServer(t)
 	client := pairAndReady(t, server, sockPath, "ranged-matches-log")
@@ -398,6 +403,7 @@ func TestIntegration_RangedWalkMatchesGitLog(t *testing.T) {
 }
 
 func TestIntegration_RangedWalkDoesNotDisturbTheGraph(t *testing.T) {
+	t.Parallel()
 	f := buildReviewFixtureRepo(t)
 	server, sockPath, _, _ := newIntegrationServer(t)
 	client := pairAndReady(t, server, sockPath, "ranged-vs-graph")
@@ -443,6 +449,7 @@ func TestIntegration_RangedWalkDoesNotDisturbTheGraph(t *testing.T) {
 }
 
 func TestIntegration_RangedLoadMoreAndStatus(t *testing.T) {
+	t.Parallel()
 	f := buildReviewFixtureRepo(t)
 	server, sockPath, _, _ := newIntegrationServer(t)
 	client := pairAndReady(t, server, sockPath, "ranged-loadmore")
@@ -475,6 +482,7 @@ func TestIntegration_RangedLoadMoreAndStatus(t *testing.T) {
 }
 
 func TestIntegration_ReviewWalkResetsAfterRefsChange(t *testing.T) {
+	t.Parallel()
 	f := buildReviewFixtureRepo(t)
 	server, sockPath, _, _ := newIntegrationServer(t)
 	client := pairAndReady(t, server, sockPath, "ranged-reset")
@@ -531,6 +539,7 @@ func TestIntegration_ReviewWalkResetsAfterRefsChange(t *testing.T) {
 }
 
 func TestIntegration_TwoConnectionsReviewIndependently(t *testing.T) {
+	t.Parallel()
 	f := buildReviewFixtureRepo(t)
 	server, sockPath, _, _ := newIntegrationServer(t)
 	clientA := pairAndReady(t, server, sockPath, "review-two-a")
@@ -575,6 +584,7 @@ func TestIntegration_TwoConnectionsReviewIndependently(t *testing.T) {
 }
 
 func TestIntegration_RangedRefusalsAreBadRequests(t *testing.T) {
+	t.Parallel()
 	f := buildReviewFixtureRepo(t)
 	server, sockPath, _, _ := newIntegrationServer(t)
 	client := pairAndReady(t, server, sockPath, "ranged-refusals")

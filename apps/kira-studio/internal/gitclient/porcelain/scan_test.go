@@ -12,6 +12,7 @@ import (
 // string) — anything else would mean the two walks are no longer the same walk over the same rev
 // set, breaking upstream probe 11's ordering-identity property.
 func TestLogScanArgs_DiffersFromLogSessionArgsInExactlyOneToken(t *testing.T) {
+	t.Parallel()
 	spec := porcelain.WalkSpec{Scope: "all"}
 	sessionArgs := porcelain.LogSessionArgs(spec)
 	scanArgs := porcelain.LogScanArgs(spec)
@@ -36,6 +37,7 @@ func TestLogScanArgs_DiffersFromLogSessionArgsInExactlyOneToken(t *testing.T) {
 // argv builders' rev-set tail comes from the exact same WalkArgs(spec) call, never a string-patch
 // of one builder's output onto the other.
 func TestLogScanArgs_UsesSameWalkArgsCallAsLogSessionArgs(t *testing.T) {
+	t.Parallel()
 	spec := porcelain.WalkSpec{Range: &porcelain.RangeSpec{Base: "main", Branch: "feature"}}
 	scanArgs := porcelain.LogScanArgs(spec)
 	want := porcelain.WalkArgs(spec)
@@ -64,6 +66,7 @@ func scanRecordBytes(subject, body string) []byte {
 }
 
 func TestParseScanRecord(t *testing.T) {
+	t.Parallel()
 	t.Run("multi-paragraph body", func(t *testing.T) {
 		rec := scanRecordBytes("subject line", "first paragraph\n\nsecond paragraph\n")
 		got, err := porcelain.ParseScanRecord(rec)
@@ -151,6 +154,7 @@ func TestParseScanRecord(t *testing.T) {
 // literal characters ('%','x','1','f'), so this counts substring occurrences rather than the byte
 // itself.
 func TestScanFormat_FieldCount(t *testing.T) {
+	t.Parallel()
 	got := 0
 	rest := porcelain.ScanFormat
 	for {

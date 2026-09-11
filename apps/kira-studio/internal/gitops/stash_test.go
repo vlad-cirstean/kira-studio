@@ -15,6 +15,7 @@ func strPtr(s string) *string { return &s }
 // (`stash push -- 'x*.txt'` stashed `xy.txt` too) even though no caller in this repo populates
 // paths today.
 func TestStashPushArgs_LiteralPathspec(t *testing.T) {
+	t.Parallel()
 	got := gitops.StashPushArgs(nil, false, false, []string{"a*.txt", "b.txt"})
 	want := []string{"stash", "push", "--", ":(literal)a*.txt", ":(literal)b.txt"}
 	if !reflect.DeepEqual(got, want) {
@@ -23,6 +24,7 @@ func TestStashPushArgs_LiteralPathspec(t *testing.T) {
 }
 
 func TestStashPushArgs_NoPathsNoTrailingDashDash(t *testing.T) {
+	t.Parallel()
 	got := gitops.StashPushArgs(nil, true, false, nil)
 	want := []string{"stash", "push", "-u"}
 	if !reflect.DeepEqual(got, want) {
@@ -31,6 +33,7 @@ func TestStashPushArgs_NoPathsNoTrailingDashDash(t *testing.T) {
 }
 
 func TestStashPushArgs_MessageAndKeepIndex(t *testing.T) {
+	t.Parallel()
 	got := gitops.StashPushArgs(strPtr("my message"), false, true, nil)
 	want := []string{"stash", "push", "-k", "-m", "my message"}
 	if !reflect.DeepEqual(got, want) {
@@ -41,6 +44,7 @@ func TestStashPushArgs_MessageAndKeepIndex(t *testing.T) {
 // TestAutoStashMessage_NoNewline is D3's own guard: the message becomes a single reflog-subject
 // line, so it must never contain one, and must carry the deliberate marker prefix (D1).
 func TestAutoStashMessage_NoNewline(t *testing.T) {
+	t.Parallel()
 	got := gitops.AutoStashMessage("feature/topic")
 	want := "auto-stash: switching to feature/topic"
 	if got != want {
@@ -55,6 +59,7 @@ func TestAutoStashMessage_NoNewline(t *testing.T) {
 }
 
 func TestStashCreateArgs(t *testing.T) {
+	t.Parallel()
 	got := gitops.StashCreateArgs("my label")
 	want := []string{"stash", "create", "my label"}
 	if !reflect.DeepEqual(got, want) {
@@ -63,6 +68,7 @@ func TestStashCreateArgs(t *testing.T) {
 }
 
 func TestStashBranchByShaArgs(t *testing.T) {
+	t.Parallel()
 	got := gitops.StashBranchByShaArgs("newbranch", "abc123")
 	want := []string{"stash", "branch", "newbranch", "abc123"}
 	if !reflect.DeepEqual(got, want) {
@@ -71,6 +77,7 @@ func TestStashBranchByShaArgs(t *testing.T) {
 }
 
 func TestGlobalStashRef(t *testing.T) {
+	t.Parallel()
 	got := gitops.GlobalStashRef("deadbeef")
 	want := "refs/kira/globalstash/deadbeef"
 	if got != want {
@@ -82,6 +89,7 @@ func TestGlobalStashRef(t *testing.T) {
 }
 
 func TestGlobalStashSetArgs(t *testing.T) {
+	t.Parallel()
 	got := gitops.GlobalStashSetArgs("deadbeef")
 	want := []string{"update-ref", "refs/kira/globalstash/deadbeef", "deadbeef"}
 	if !reflect.DeepEqual(got, want) {
@@ -93,6 +101,7 @@ func TestGlobalStashSetArgs(t *testing.T) {
 // expected old value (the sha itself), so a concurrent change to the same ref refuses rather than
 // silently deleting whatever now sits there.
 func TestGlobalStashDeleteArgs_ExpectedOldValue(t *testing.T) {
+	t.Parallel()
 	got := gitops.GlobalStashDeleteArgs("deadbeef")
 	want := []string{"update-ref", "-d", "refs/kira/globalstash/deadbeef", "deadbeef"}
 	if !reflect.DeepEqual(got, want) {
@@ -101,6 +110,7 @@ func TestGlobalStashDeleteArgs_ExpectedOldValue(t *testing.T) {
 }
 
 func TestGlobalStashRefExistsArgs(t *testing.T) {
+	t.Parallel()
 	got := gitops.GlobalStashRefExistsArgs("deadbeef")
 	want := []string{"for-each-ref", "--format=%(objectname)", "refs/kira/globalstash/deadbeef"}
 	if !reflect.DeepEqual(got, want) {
@@ -109,6 +119,7 @@ func TestGlobalStashRefExistsArgs(t *testing.T) {
 }
 
 func TestGlobalStashListRefsArgs(t *testing.T) {
+	t.Parallel()
 	got := gitops.GlobalStashListRefsArgs()
 	want := []string{"for-each-ref", "--format=%(objectname)", "refs/kira/globalstash/"}
 	if !reflect.DeepEqual(got, want) {
@@ -117,6 +128,7 @@ func TestGlobalStashListRefsArgs(t *testing.T) {
 }
 
 func TestCommitTreeArgs(t *testing.T) {
+	t.Parallel()
 	got := gitops.CommitTreeArgs("treeSha", []string{"base", "index", "untracked"}, "On main: my label")
 	want := []string{"commit-tree", "treeSha", "-p", "base", "-p", "index", "-p", "untracked", "-m", "On main: my label"}
 	if !reflect.DeepEqual(got, want) {
@@ -125,6 +137,7 @@ func TestCommitTreeArgs(t *testing.T) {
 }
 
 func TestCommitTreeArgs_SingleParent(t *testing.T) {
+	t.Parallel()
 	got := gitops.CommitTreeArgs("treeSha", []string{"base"}, "On main: label")
 	want := []string{"commit-tree", "treeSha", "-p", "base", "-m", "On main: label"}
 	if !reflect.DeepEqual(got, want) {

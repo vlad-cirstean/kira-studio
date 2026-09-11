@@ -18,6 +18,7 @@ func readDiffFixture(t *testing.T, relPath string) []byte {
 }
 
 func TestParseFileDiffBody_Text(t *testing.T) {
+	t.Parallel()
 	body, err := porcelain.ParseFileDiffBody(readDiffFixture(t, "diff/text.bin"))
 	if err != nil {
 		t.Fatalf("ParseFileDiffBody: %v", err)
@@ -55,6 +56,7 @@ func TestParseFileDiffBody_Text(t *testing.T) {
 // paths in its pathspec, so the patch renders as a rename (similarity/rename headers, a real
 // hunk), never a whole-file add.
 func TestParseFileDiffBody_Rename(t *testing.T) {
+	t.Parallel()
 	body, err := porcelain.ParseFileDiffBody(readDiffFixture(t, "diff/rename.bin"))
 	if err != nil {
 		t.Fatalf("ParseFileDiffBody: %v", err)
@@ -68,6 +70,7 @@ func TestParseFileDiffBody_Rename(t *testing.T) {
 }
 
 func TestParseFileDiffBody_AddedFile(t *testing.T) {
+	t.Parallel()
 	body, err := porcelain.ParseFileDiffBody(readDiffFixture(t, "diff/addedFile.bin"))
 	if err != nil {
 		t.Fatalf("ParseFileDiffBody: %v", err)
@@ -84,6 +87,7 @@ func TestParseFileDiffBody_AddedFile(t *testing.T) {
 }
 
 func TestParseFileDiffBody_DeletedFile(t *testing.T) {
+	t.Parallel()
 	body, err := porcelain.ParseFileDiffBody(readDiffFixture(t, "diff/deletedFile.bin"))
 	if err != nil {
 		t.Fatalf("ParseFileDiffBody: %v", err)
@@ -97,6 +101,7 @@ func TestParseFileDiffBody_DeletedFile(t *testing.T) {
 }
 
 func TestParseFileDiffBody_Binary(t *testing.T) {
+	t.Parallel()
 	body, err := porcelain.ParseFileDiffBody(readDiffFixture(t, "diff/binary.bin"))
 	if err != nil {
 		t.Fatalf("ParseFileDiffBody: %v", err)
@@ -110,6 +115,7 @@ func TestParseFileDiffBody_Binary(t *testing.T) {
 }
 
 func TestParseFileDiffBody_ModeOnly(t *testing.T) {
+	t.Parallel()
 	body, err := porcelain.ParseFileDiffBody(readDiffFixture(t, "diff/modeOnly.bin"))
 	if err != nil {
 		t.Fatalf("ParseFileDiffBody: %v", err)
@@ -123,6 +129,7 @@ func TestParseFileDiffBody_ModeOnly(t *testing.T) {
 // with no content edit at all produces no index line and no hunks, and is "identical" — not
 // "modeChangeOnly", which is reserved for old/new mode lines specifically.
 func TestParseFileDiffBody_PureRenameIsIdentical(t *testing.T) {
+	t.Parallel()
 	raw := []byte("diff --git a/a.txt b/b.txt\nsimilarity index 100%\nrename from a.txt\nrename to b.txt\n")
 	body, err := porcelain.ParseFileDiffBody(raw)
 	if err != nil {
@@ -134,6 +141,7 @@ func TestParseFileDiffBody_PureRenameIsIdentical(t *testing.T) {
 }
 
 func TestParseFileDiffBody_NoNewlineAtEof(t *testing.T) {
+	t.Parallel()
 	body, err := porcelain.ParseFileDiffBody(readDiffFixture(t, "diff/noNewline.bin"))
 	if err != nil {
 		t.Fatalf("ParseFileDiffBody: %v", err)
@@ -155,6 +163,7 @@ func TestParseFileDiffBody_NoNewlineAtEof(t *testing.T) {
 // TestParseFileDiffBody_LFSPointer proves the LFS sniff: a single-hunk, pure-addition new file
 // whose reconstructed content matches the pointer spec is classified lfsPointer, not text.
 func TestParseFileDiffBody_LFSPointer(t *testing.T) {
+	t.Parallel()
 	body, err := porcelain.ParseFileDiffBody(readDiffFixture(t, "diff/lfsPointer.bin"))
 	if err != nil {
 		t.Fatalf("ParseFileDiffBody: %v", err)
@@ -174,6 +183,7 @@ func TestParseFileDiffBody_LFSPointer(t *testing.T) {
 // promises more lines than the body actually supplies before EOF must fail loudly, never
 // half-render (AGENTS.md's "no skipped validation").
 func TestParseFileDiffBody_HunkCountsDisagree(t *testing.T) {
+	t.Parallel()
 	raw := []byte("diff --git a/f.txt b/f.txt\nindex 111..222 100644\n--- a/f.txt\n+++ b/f.txt\n@@ -1,3 +1,3 @@\n line1\n-line2\n")
 	if _, err := porcelain.ParseFileDiffBody(raw); err == nil {
 		t.Fatal("expected an error for a hunk whose counts disagree with its content")
@@ -181,6 +191,7 @@ func TestParseFileDiffBody_HunkCountsDisagree(t *testing.T) {
 }
 
 func TestParseFileDiffBody_Empty(t *testing.T) {
+	t.Parallel()
 	body, err := porcelain.ParseFileDiffBody(nil)
 	if err != nil {
 		t.Fatalf("ParseFileDiffBody(nil): %v", err)
@@ -191,6 +202,7 @@ func TestParseFileDiffBody_Empty(t *testing.T) {
 }
 
 func TestHasDeletedPostImage(t *testing.T) {
+	t.Parallel()
 	if !porcelain.HasDeletedPostImage(readDiffFixture(t, "diff/deletedFile.bin")) {
 		t.Fatal("want true for a real deleted-file diff")
 	}

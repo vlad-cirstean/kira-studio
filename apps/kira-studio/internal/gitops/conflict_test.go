@@ -11,6 +11,7 @@ import (
 // TestContinueArgs_Rebase and TestSkipArgs_Rebase are §7.1 item 5's own exit criterion: G26 D12
 // gives rebase both a Continue and a Skip argv, retiring G5's "report-only posture".
 func TestContinueArgs_Rebase(t *testing.T) {
+	t.Parallel()
 	argv, ok := gitops.ContinueArgs(gitpreflight.InProgressRebase)
 	if !ok {
 		t.Fatal("ContinueArgs(InProgressRebase) ok = false, want true (G26 D12)")
@@ -21,6 +22,7 @@ func TestContinueArgs_Rebase(t *testing.T) {
 }
 
 func TestSkipArgs_Rebase(t *testing.T) {
+	t.Parallel()
 	argv, ok := gitops.SkipArgs(gitpreflight.InProgressRebase)
 	if !ok {
 		t.Fatal("SkipArgs(InProgressRebase) ok = false, want true (G26 D12)")
@@ -32,6 +34,7 @@ func TestSkipArgs_Rebase(t *testing.T) {
 
 // TestAbortArgs_Rebase proves the pre-existing abort arm is untouched by this phase.
 func TestAbortArgs_Rebase(t *testing.T) {
+	t.Parallel()
 	argv, ok := gitops.AbortArgs(gitpreflight.InProgressRebase)
 	if !ok {
 		t.Fatal("AbortArgs(InProgressRebase) ok = false, want true")
@@ -44,6 +47,7 @@ func TestAbortArgs_Rebase(t *testing.T) {
 // TestSkipArgs_BisectStillRefused proves the widening is scoped to exactly the three kinds D12
 // names — bisect (no --skip in git) still answers ok=false.
 func TestSkipArgs_BisectStillRefused(t *testing.T) {
+	t.Parallel()
 	if _, ok := gitops.SkipArgs(gitpreflight.InProgressBisect); ok {
 		t.Fatal("SkipArgs(InProgressBisect) ok = true, want false")
 	}

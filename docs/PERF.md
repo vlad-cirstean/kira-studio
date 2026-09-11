@@ -1670,3 +1670,50 @@ lived in `tests/e2e/leaks.spec.ts` moved to Go with the rest of the L2/L3 cache 
    ported unchanged into `apps/kira-studio/internal/enginecache`. The original browser-driven proof (now
    retired) warmed L2 to a real (non-"—") hit rate, clicked Clear, and asserted the Settings → Cache
    hit rate field read `—` again.
+
+## 5. Test-suite duration (v1.4 P1)
+
+First baseline this doc has ever tracked for suite wall-clock time, not app runtime. Numbers below:
+this container, 4 cores, no Docker (container-backed cases self-skip — see `docs/v1.4/plans/
+P1-test-suite-speed.md` §0/§1 for the full method). CI's own container-tests/ui numbers still need
+a real run to confirm — not re-measured here.
+
+**`go test ./apps/kira-studio/...`, non-container packages**: 50.4s → 35.9s (−29%). Go already runs
+packages concurrently, so wall clock ≈ the slowest package; the win is per-package, not a global
+multiplier.
+
+| Package | Before | After | Change |
+|---|---|---|---|
+| `internal/gitsock` | 35.6s | 23.1s (−35s under 8192 inotify instances; see below) | `t.Parallel()` on everything except `matrix_test.go`/`recovery_test.go`/`perf_test.go` (real `/proc` process-count and goroutine-count assertions, corrupted by a parallel sibling) and the two `revoke_test.go` tests routed through `remote_test.go`'s helper (still `t.Setenv`-blocked on `KIRA_ASKPASS_HELPER_PROCESS`, needed process-wide for real `git` children) |
+| `internal/gitsession` | 17.4s | 6.5s (`-race`) | `t.Parallel()` on everything except `concurrency_test.go` (ordering/timing-sensitive by its own header) — no `t.Setenv` blocker existed here |
+| `gitclient/porcelain`, `gitpreflight`, `gitops`, `gitsearch` | each &lt;1s | unchanged, `-race`-clean | `t.Parallel()` added for correctness headroom; none was ever on the critical path so wall clock doesn't move |
+
+**A real, load-bearing prerequisite, found empirically, not in the original plan**: `gitsock` fully
+parallel hangs — not just slow, a genuine 10-minute timeout with goroutines stuck mid-read — under
+this container's stock `fs.inotify.max_user_instances` (128). Each open repo holds one fsnotify
+watcher, one inotify instance apiece; a 100-plus-test parallel run exhausts the ceiling faster than
+teardown frees it. Raising the limit to 8192 (`sysctl -w fs.inotify.max_user_instances=8192`) made
+the same run pass clean in 59s (`-race`) / 23.1s (plain). macOS (`checks`, kqueue-backed) never hits
+this; Linux CI (`container-tests`) does, so `.github/workflows/ci.yml` now raises the limit there
+before `test:go` runs.
+
+**`internal/preconnect` — planned as a safe win, found unsafe, reverted.** The original research
+pass called it parallel-safe (each test spawns its own child, no shared package state). `-race`
+disagreed: `TestStopOnAlreadyDeadEntrySkipsSignalling`, `TestProcessGroupKillReachesGrandchild`, and
+`TestSelfInflictedKillDoesNotFireOnExit` all raced against each other under `t.Parallel()`, on real
+OS-level process/signal state a static read of the package can't see. Left exactly as it was —
+serial, race-clean.
+
+**`playwright.config.ts`'s `ui-timing` → `ui` dependency — investigated, kept.** The plan called
+this dead serialization. It isn't: the file's own comment records a real, already-fixed regression
+— `ui-timing`'s wall-clock assertions failed their bound under the CPU contention of running
+alongside `ui`'s 244 tests at full parallelism, and running after `ui` finishes is the fix already
+in place for that. Removing the edge would reopen a closed bug for a few seconds saved on 4 tests.
+No change made.
+
+**Not done this pass, deferred** — not because they're wrong, because this environment can't verify
+them: merging `internal/ipcfixture`'s six container starts into the matching adapter suites (no
+Docker here to prove the merged binaries still pass); the `tests/ui/` pruning candidates (no working
+frontend build in this container to run Playwright against — see `apps/kira-studio [setup failed]`,
+`frontend/dist` not built). Both stay open items on `docs/v1.4/plans/P1-test-suite-speed.md`'s own
+phase until a session with Docker/a real build can carry them out.

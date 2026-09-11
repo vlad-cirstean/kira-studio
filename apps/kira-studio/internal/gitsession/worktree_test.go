@@ -16,6 +16,7 @@ import (
 // --- prepareOpSlot: D13's own ≤1-slot concurrency matrix, mirroring remoteOpSlot's own tests ------
 
 func TestPrepareOpSlot_SecondClaimIsRefused(t *testing.T) {
+	t.Parallel()
 	var s prepareOpSlot
 	if !s.claim(func() {}) {
 		t.Fatal("first claim should succeed")
@@ -30,6 +31,7 @@ func TestPrepareOpSlot_SecondClaimIsRefused(t *testing.T) {
 }
 
 func TestPrepareOpSlot_CancelOnIdleReportsFalse(t *testing.T) {
+	t.Parallel()
 	var s prepareOpSlot
 	if s.tryCancel() {
 		t.Fatal("cancelling an idle slot must report false, never true")
@@ -37,6 +39,7 @@ func TestPrepareOpSlot_CancelOnIdleReportsFalse(t *testing.T) {
 }
 
 func TestPrepareOpSlot_CancelCancelsAndReportsTrue(t *testing.T) {
+	t.Parallel()
 	var s prepareOpSlot
 	cancelled := false
 	s.claim(func() { cancelled = true })
@@ -49,6 +52,7 @@ func TestPrepareOpSlot_CancelCancelsAndReportsTrue(t *testing.T) {
 }
 
 func TestPrepareOpSlot_ForceCancel(t *testing.T) {
+	t.Parallel()
 	var s prepareOpSlot
 	cancelled := false
 	s.claim(func() { cancelled = true })
@@ -122,6 +126,7 @@ func sha256Hex(s string) string {
 // --- Worktrees (worktree.list, D1) ------------------------------------------------------------
 
 func TestWorktrees_MainAndLinked(t *testing.T) {
+	t.Parallel()
 	skipWithoutGitQueries(t)
 	dir := initWorktreeTestRepo(t)
 	wtPath := filepath.Join(t.TempDir(), "linked")
@@ -149,6 +154,7 @@ func TestWorktrees_MainAndLinked(t *testing.T) {
 // --- WorktreeAddPreflight (D4) -----------------------------------------------------------------
 
 func TestWorktreeAddPreflight_Clean(t *testing.T) {
+	t.Parallel()
 	skipWithoutGitQueries(t)
 	dir := initWorktreeTestRepo(t)
 	entry := newWorktreeTestEntry(t, dir, "")
@@ -164,6 +170,7 @@ func TestWorktreeAddPreflight_Clean(t *testing.T) {
 }
 
 func TestWorktreeAddPreflight_BranchCheckedOutElsewhere(t *testing.T) {
+	t.Parallel()
 	skipWithoutGitQueries(t)
 	dir := initWorktreeTestRepo(t)
 	wtPath := filepath.Join(t.TempDir(), "linked")
@@ -184,6 +191,7 @@ func TestWorktreeAddPreflight_BranchCheckedOutElsewhere(t *testing.T) {
 // --- WorktreeRemovePreflight / RunOp worktreeRemove (D8/F7/F8) ----------------------------------
 
 func TestWorktreeRemovePreflight_MainAndCurrentBlocked(t *testing.T) {
+	t.Parallel()
 	skipWithoutGitQueries(t)
 	dir := initWorktreeTestRepo(t)
 	entry := newWorktreeTestEntry(t, dir, "")
@@ -208,6 +216,7 @@ func TestWorktreeRemovePreflight_MainAndCurrentBlocked(t *testing.T) {
 // token re-checked against a freshly-read status"): no token -> refused; wrong token -> refused;
 // the worktree survives both refusals; the correct token (the worktree's own basename) succeeds.
 func TestRunOp_WorktreeRemove_DirtyRequiresConfirmation(t *testing.T) {
+	t.Parallel()
 	skipWithoutGitQueries(t)
 	dir := initWorktreeTestRepo(t)
 	wtPath := filepath.Join(t.TempDir(), "feature-wt")
@@ -266,6 +275,7 @@ func TestRunOp_WorktreeRemove_DirtyRequiresConfirmation(t *testing.T) {
 }
 
 func TestRunOp_WorktreeRemove_MainWorktreeBlocked(t *testing.T) {
+	t.Parallel()
 	skipWithoutGitQueries(t)
 	dir := initWorktreeTestRepo(t)
 	entry := newWorktreeTestEntry(t, dir, "")
@@ -279,6 +289,7 @@ func TestRunOp_WorktreeRemove_MainWorktreeBlocked(t *testing.T) {
 }
 
 func TestRunOp_WorktreeAdd_NewBranch(t *testing.T) {
+	t.Parallel()
 	skipWithoutGitQueries(t)
 	dir := initWorktreeTestRepo(t)
 	entry := newWorktreeTestEntry(t, dir, "")
@@ -306,6 +317,7 @@ func TestRunOp_WorktreeAdd_NewBranch(t *testing.T) {
 // TestRunOp_WorktreeAdd_BlockedNeverSpawns proves a blocked preflight never reaches git at all —
 // an unresolvable start point must leave no worktree behind.
 func TestRunOp_WorktreeAdd_BlockedNeverSpawns(t *testing.T) {
+	t.Parallel()
 	skipWithoutGitQueries(t)
 	dir := initWorktreeTestRepo(t)
 	entry := newWorktreeTestEntry(t, dir, "")
@@ -328,6 +340,7 @@ func TestRunOp_WorktreeAdd_BlockedNeverSpawns(t *testing.T) {
 // --- RunPrepare (D9-D14) — every test here injects fakePrepareRunner; none spawns a real shell ---
 
 func TestRunPrepare_NotConfigured(t *testing.T) {
+	t.Parallel()
 	skipWithoutGitQueries(t)
 	dir := initWorktreeTestRepo(t)
 	entry := newWorktreeTestEntry(t, dir, "")
@@ -349,6 +362,7 @@ func TestRunPrepare_NotConfigured(t *testing.T) {
 // worktree.prepare with a mismatched scriptSha256 answers ScriptChanged and spawns nothing (fake
 // Runner fails the test if called)".
 func TestRunPrepare_ScriptChangedNeverSpawns(t *testing.T) {
+	t.Parallel()
 	skipWithoutGitQueries(t)
 	dir := initWorktreeTestRepo(t)
 	entry := newWorktreeTestEntry(t, dir, "npm ci")
@@ -367,6 +381,7 @@ func TestRunPrepare_ScriptChangedNeverSpawns(t *testing.T) {
 }
 
 func TestRunPrepare_NotAWorktree(t *testing.T) {
+	t.Parallel()
 	skipWithoutGitQueries(t)
 	dir := initWorktreeTestRepo(t)
 	script := "npm ci"
@@ -386,6 +401,7 @@ func TestRunPrepare_NotAWorktree(t *testing.T) {
 }
 
 func TestRunPrepare_AlreadyRunning(t *testing.T) {
+	t.Parallel()
 	skipWithoutGitQueries(t)
 	dir := initWorktreeTestRepo(t)
 	script := "npm ci"
@@ -412,6 +428,7 @@ func TestRunPrepare_AlreadyRunning(t *testing.T) {
 // TestRunPrepare_SuccessPassesEnv proves the happy path end to end against the fake runner: the
 // correct shell/env reach Spec, and the worktree's own path/branch are threaded through.
 func TestRunPrepare_SuccessPassesEnv(t *testing.T) {
+	t.Parallel()
 	skipWithoutGitQueries(t)
 	dir := initWorktreeTestRepo(t)
 	wtPath := filepath.Join(t.TempDir(), "prepared-wt")

@@ -174,6 +174,7 @@ func findEntry(files []gitsession.ReviewFileEntry, path string) (gitsession.Revi
 // returned paths equal a real three-dot diff, and a file deleted on the BASE after divergence
 // (not by the branch) is absent — asserted against git itself.
 func TestIntegration_ReviewFilesIsTheThreeDotRange(t *testing.T) {
+	t.Parallel()
 	incSkipWithoutGit(t)
 	dir := t.TempDir()
 	runGitIn(t, dir, "init", "-q", "-b", "main")
@@ -242,6 +243,7 @@ func splitLinesNonEmpty(s string) []string {
 // marking a.txt reviewed and landing an unrelated commit, review.fileDiff reports "unchanged" with
 // no git diff spawn at all.
 func TestIntegration_MarkThenNothingChangesTakesTheUnchangedPath(t *testing.T) {
+	t.Parallel()
 	dir, _, _ := buildMainFeatureFixture(t)
 
 	realRunner := gitclient.NewExecRunner()
@@ -290,6 +292,7 @@ func TestIntegration_MarkThenNothingChangesTakesTheUnchangedPath(t *testing.T) {
 // TestIntegration_MarkThenEditTakesTheFastPath is D7 tier 1's own proof: an ordinary commit
 // editing the reviewed file takes the fast path, and the badge/status agree.
 func TestIntegration_MarkThenEditTakesTheFastPath(t *testing.T) {
+	t.Parallel()
 	dir, _, _ := buildMainFeatureFixture(t)
 	server, sockPath, _, _ := newIntegrationServer(t)
 	client := pairAndReady(t, server, sockPath, "fast-client")
@@ -321,6 +324,7 @@ func TestIntegration_MarkThenEditTakesTheFastPath(t *testing.T) {
 // real socket: the reviewed commit is amended away (unreachable but present), and the delta is
 // still exact via the stored blob.
 func TestIntegration_MarkThenAmendTakesTheSlowPath(t *testing.T) {
+	t.Parallel()
 	dir, _, _ := buildMainFeatureFixture(t)
 	server, sockPath, _, _ := newIntegrationServer(t)
 	client := pairAndReady(t, server, sockPath, "slow-amend-client")
@@ -346,6 +350,7 @@ func TestIntegration_MarkThenAmendTakesTheSlowPath(t *testing.T) {
 // after the amended-away commit is actually garbage collected (exit 128, not 1), the slow path is
 // still correct.
 func TestIntegration_MarkThenPruneStillTakesTheSlowPath(t *testing.T) {
+	t.Parallel()
 	dir, _, _ := buildMainFeatureFixture(t)
 	server, sockPath, _, _ := newIntegrationServer(t)
 	client := pairAndReady(t, server, sockPath, "slow-prune-client")
@@ -372,6 +377,7 @@ func TestIntegration_MarkThenPruneStillTakesTheSlowPath(t *testing.T) {
 // TestIntegration_PartialRangesSurviveAnInsertion is D10's own whole claim, over the socket: a
 // partial mark's ranges shift correctly when unrelated lines are inserted above them.
 func TestIntegration_PartialRangesSurviveAnInsertion(t *testing.T) {
+	t.Parallel()
 	incSkipWithoutGit(t)
 	dir := t.TempDir()
 	runGitIn(t, dir, "init", "-q", "-b", "main")
@@ -433,6 +439,7 @@ func itoa(n int) string {
 // TestIntegration_UnmarkingPartOfAFullFileDemotesIt is D10's full->partial demotion, over the
 // socket: a fully-reviewed file, unmarking a sub-range, leaves the complement reviewed.
 func TestIntegration_UnmarkingPartOfAFullFileDemotesIt(t *testing.T) {
+	t.Parallel()
 	dir, _, _ := buildMainFeatureFixture(t)
 	server, sockPath, _, _ := newIntegrationServer(t)
 	client := pairAndReady(t, server, sockPath, "demote-client")
@@ -464,6 +471,7 @@ func TestIntegration_UnmarkingPartOfAFullFileDemotesIt(t *testing.T) {
 // file marked reviewed, then rewritten, reports snapshotUnavailable — never "unchanged", never an
 // error — and a ranged mark on it is refused.
 func TestIntegration_BinarySnapshotDegradesHonestly(t *testing.T) {
+	t.Parallel()
 	incSkipWithoutGit(t)
 	dir := t.TempDir()
 	runGitIn(t, dir, "init", "-q", "-b", "main")
@@ -529,6 +537,7 @@ func TestIntegration_BinarySnapshotDegradesHonestly(t *testing.T) {
 // snapshots that path at lineCount 0 the same way a binary file does — the same "given absent =>
 // whole file" bug applied here too, silently refusing every mark on a deleted file.
 func TestIntegration_DeletedFileCanBeMarkedReviewed(t *testing.T) {
+	t.Parallel()
 	dir, _, _ := buildMainFeatureFixture(t)
 	runGitIn(t, dir, "checkout", "-q", "feature")
 	runGitIn(t, dir, "rm", "-q", "a.txt")
@@ -560,6 +569,7 @@ func TestIntegration_DeletedFileCanBeMarkedReviewed(t *testing.T) {
 // TestIntegration_TwoConnectionsShareReviewState is D12's own shared-state claim: a mark on
 // connection A is visible in connection B's next review.files.
 func TestIntegration_TwoConnectionsShareReviewState(t *testing.T) {
+	t.Parallel()
 	dir, _, _ := buildMainFeatureFixture(t)
 	server, sockPath, _, _ := newIntegrationServer(t)
 	clientA := pairAndReady(t, server, sockPath, "shared-a")
@@ -583,6 +593,7 @@ func TestIntegration_TwoConnectionsShareReviewState(t *testing.T) {
 // branch beginning with "-", and a branch not in the ref snapshot are all E_BAD_REQUEST naming the
 // field, never a spawn.
 func TestIntegration_ReviewRefusalsAreBadRequests(t *testing.T) {
+	t.Parallel()
 	dir, _, _ := buildMainFeatureFixture(t)
 	server, sockPath, _, _ := newIntegrationServer(t)
 	client := pairAndReady(t, server, sockPath, "refusals-client")
@@ -604,6 +615,7 @@ func TestIntegration_ReviewRefusalsAreBadRequests(t *testing.T) {
 // future contributor is most likely to break: force-moving an UNRELATED branch fires refsChanged,
 // and every mark is still there afterward.
 func TestIntegration_RefsChangedDoesNotDropReviewState(t *testing.T) {
+	t.Parallel()
 	dir, _, _ := buildMainFeatureFixture(t)
 	server, sockPath, _, _ := newIntegrationServer(t)
 	client := pairAndReady(t, server, sockPath, "refschanged-client")

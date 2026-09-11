@@ -113,6 +113,7 @@ func differentialRunnerPath(t *testing.T) string {
 }
 
 func TestDifferential(t *testing.T) {
+	t.Parallel()
 	if os.Getenv("KIRA_GIT_DIFFERENTIAL") != "1" {
 		t.Skip("set KIRA_GIT_DIFFERENTIAL=1 to run the Go<->Bun differential fuzz test")
 	}

@@ -114,6 +114,7 @@ func runOutput(t *testing.T, dir string, args ...string) string {
 // an ordinary, correct call: the second call must see its own real content, not corruption left
 // behind by the first.
 func TestBlob_NewlineInRevDoesNotDesyncTheSharedSession(t *testing.T) {
+	t.Parallel()
 	skipWithoutGitQueries(t)
 	dir := t.TempDir()
 	runGitQ(t, dir, "init", "-q", "-b", "main")
@@ -145,6 +146,7 @@ func TestBlob_NewlineInRevDoesNotDesyncTheSharedSession(t *testing.T) {
 // TestGoToTarget_LivePresentAndUnchanged proves the "live, no drift" branch: a file on disk,
 // identical to rev's own version, answers hunks=nil (never a rewritten line).
 func TestGoToTarget_LivePresentAndUnchanged(t *testing.T) {
+	t.Parallel()
 	skipWithoutGitQueries(t)
 	dir, rev := initGoToTargetRepo(t)
 	e := newQueriesTestEntry(t, dir)
@@ -167,6 +169,7 @@ func TestGoToTarget_LivePresentAndUnchanged(t *testing.T) {
 // TestGoToTarget_LiveEditedAboveTheCursor proves the drift re-map's own hunks are non-nil once the
 // checkout diverges from rev — the extension maps the caller's line across exactly these hunks.
 func TestGoToTarget_LiveEditedAboveTheCursor(t *testing.T) {
+	t.Parallel()
 	skipWithoutGitQueries(t)
 	dir, rev := initGoToTargetRepo(t)
 	e := newQueriesTestEntry(t, dir)
@@ -191,6 +194,7 @@ func TestGoToTarget_LiveEditedAboveTheCursor(t *testing.T) {
 // TestGoToTarget_HistoricalPathNotOnDiskButBlobExists proves the "historical" branch: a path
 // deleted since rev is not on disk, but its blob still exists at rev.
 func TestGoToTarget_HistoricalPathNotOnDiskButBlobExists(t *testing.T) {
+	t.Parallel()
 	skipWithoutGitQueries(t)
 	dir, rev := initGoToTargetRepo(t)
 	e := newQueriesTestEntry(t, dir)
@@ -207,6 +211,7 @@ func TestGoToTarget_HistoricalPathNotOnDiskButBlobExists(t *testing.T) {
 // TestGoToTarget_UnavailableNeitherOnDiskNorInRevision proves the third branch: a path that was
 // never tracked at rev and does not exist on disk either.
 func TestGoToTarget_UnavailableNeitherOnDiskNorInRevision(t *testing.T) {
+	t.Parallel()
 	skipWithoutGitQueries(t)
 	dir, rev := initGoToTargetRepo(t)
 	e := newQueriesTestEntry(t, dir)
@@ -223,6 +228,7 @@ func TestGoToTarget_UnavailableNeitherOnDiskNorInRevision(t *testing.T) {
 // TestGoToTarget_PathEscapingRootIsRefused proves the one place this phase resolves a path
 // against a worktree root refuses one that escapes it (F11).
 func TestGoToTarget_PathEscapingRootIsRefused(t *testing.T) {
+	t.Parallel()
 	skipWithoutGitQueries(t)
 	dir, rev := initGoToTargetRepo(t)
 	e := newQueriesTestEntry(t, dir)
@@ -238,6 +244,7 @@ func TestGoToTarget_PathEscapingRootIsRefused(t *testing.T) {
 // database alone decides, and no host method may join(repoId, path) against a bare repo's own
 // RepoID (which is the git dir, not a worktree root, G3 D7).
 func TestGoToTarget_BareRepoAlwaysTakesTheHistoricalBranch(t *testing.T) {
+	t.Parallel()
 	skipWithoutGitQueries(t)
 	srcDir, rev := initGoToTargetRepo(t)
 

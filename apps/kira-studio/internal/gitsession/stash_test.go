@@ -51,6 +51,7 @@ func initGlobalStashTestRepo(t *testing.T) (dir, globalSha, stackSha string) {
 // gitsession-level half): an empty bucket answers exit 0 with empty for-each-ref output (probe
 // P10), so GlobalStashList must stop there — zero `log` spawns.
 func TestGlobalStashList_EmptyBucketSpawnsNoLog(t *testing.T) {
+	t.Parallel()
 	skipWithoutGitQueries(t)
 	dir := t.TempDir()
 	runGitQ(t, dir, "init", "-q", "-b", "main")
@@ -80,6 +81,7 @@ func TestGlobalStashList_EmptyBucketSpawnsNoLog(t *testing.T) {
 // real git repo: a global entry answers Scope="global", Ref=gitops.GlobalStashRef(sha), Index=-1
 // (the sentinel — a global entry has no stack position).
 func TestGlobalStashList_ScopeRoundTrip(t *testing.T) {
+	t.Parallel()
 	skipWithoutGitQueries(t)
 	dir, globalSha, _ := initGlobalStashTestRepo(t)
 	entry := newQueriesTestEntry(t, dir)
@@ -114,6 +116,7 @@ func TestGlobalStashList_ScopeRoundTrip(t *testing.T) {
 // found when the caller asks the OTHER scope — the two buckets are addressed independently, never
 // merged into one search space.
 func TestResolveStashEntryScoped_ScopeRoutingIsExact(t *testing.T) {
+	t.Parallel()
 	skipWithoutGitQueries(t)
 	dir, globalSha, stackSha := initGlobalStashTestRepo(t)
 	entry := newQueriesTestEntry(t, dir)
@@ -157,6 +160,7 @@ func TestResolveStashEntryScoped_ScopeRoutingIsExact(t *testing.T) {
 // TestStashShow_GlobalScope proves stash.show's own scope threading: a global entry's file tree
 // renders through the exact same query a stack entry's does, with no other change (D12).
 func TestStashShow_GlobalScope(t *testing.T) {
+	t.Parallel()
 	skipWithoutGitQueries(t)
 	dir, globalSha, _ := initGlobalStashTestRepo(t)
 	entry := newQueriesTestEntry(t, dir)

@@ -5,6 +5,7 @@ import "testing"
 // TestLiteralMatcher_Probe10 pins upstream probe 10's own four rows (F15/D3's own worked example)
 // -- the whole-word literal boundary check must agree with JS's (?<!\w)/(?!\w) wrapping exactly.
 func TestLiteralMatcher_Probe10(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name    string
 		needle  string
@@ -27,6 +28,7 @@ func TestLiteralMatcher_Probe10(t *testing.T) {
 }
 
 func TestLiteralMatcher_PlainSubstring(t *testing.T) {
+	t.Parallel()
 	m := newLiteralMatcher("widget", false, false)
 	if !m.match("the widget cache") {
 		t.Fatal("expected a plain substring match")
@@ -37,6 +39,7 @@ func TestLiteralMatcher_PlainSubstring(t *testing.T) {
 }
 
 func TestLiteralMatcher_CaseSensitive(t *testing.T) {
+	t.Parallel()
 	m := newLiteralMatcher("widget", false, false)
 	if m.match("WIDGET") {
 		t.Fatal("case-sensitive matcher must not match a differently-cased occurrence")
@@ -44,6 +47,7 @@ func TestLiteralMatcher_CaseSensitive(t *testing.T) {
 }
 
 func TestLiteralMatcher_CaseInsensitive(t *testing.T) {
+	t.Parallel()
 	m := newLiteralMatcher("widget", true, false)
 	if !m.match("add WIDGETS to the list") {
 		t.Fatal("case-insensitive matcher must match regardless of case")
@@ -51,6 +55,7 @@ func TestLiteralMatcher_CaseInsensitive(t *testing.T) {
 }
 
 func TestLiteralMatcher_WholeWordRejectsPartialWordMatch(t *testing.T) {
+	t.Parallel()
 	m := newLiteralMatcher("widget", true, true)
 	if m.match("subwidgetary refactor noted") {
 		t.Fatal("whole-word matcher must not match a mid-word occurrence")
@@ -64,6 +69,7 @@ func TestLiteralMatcher_WholeWordRejectsPartialWordMatch(t *testing.T) {
 // U+212A KELVIN SIGN in JavaScript (foldRune keeps the original rune when a non-ASCII code
 // point's uppercase form collapses to ASCII), unlike Go's own (?i)k.
 func TestLiteralMatcher_KelvinSign(t *testing.T) {
+	t.Parallel()
 	m := newLiteralMatcher("k", true, false)
 	kelvin := "K" // KELVIN SIGN
 	if m.match(kelvin) {
@@ -75,6 +81,7 @@ func TestLiteralMatcher_KelvinSign(t *testing.T) {
 }
 
 func TestLiteralMatcher_OverlappingOccurrences(t *testing.T) {
+	t.Parallel()
 	// "aaa" contains two overlapping occurrences of "aa" at byte offsets 0 and 1 -- a whole-word
 	// search must consider both rather than skip past one via a len(needle)-sized stride.
 	m := newLiteralMatcher("aa", false, true)
@@ -87,6 +94,7 @@ func TestLiteralMatcher_OverlappingOccurrences(t *testing.T) {
 }
 
 func TestBoundaryOK(t *testing.T) {
+	t.Parallel()
 	s := "fix (#123)"
 	// "#123" starts at byte 5, ends at byte 9.
 	if !boundaryOK(s, 5, 9) {
@@ -102,6 +110,7 @@ func TestBoundaryOK(t *testing.T) {
 }
 
 func TestFoldRune(t *testing.T) {
+	t.Parallel()
 	if foldRune('a') != 'A' {
 		t.Fatalf("foldRune('a') = %q, want 'A'", foldRune('a'))
 	}
@@ -120,6 +129,7 @@ func TestFoldRune(t *testing.T) {
 }
 
 func TestIsWordByte(t *testing.T) {
+	t.Parallel()
 	for _, b := range []byte("aZ_9") {
 		if !isWordByte(b) {
 			t.Fatalf("isWordByte(%q) = false, want true", b)

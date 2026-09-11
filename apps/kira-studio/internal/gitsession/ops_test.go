@@ -20,6 +20,7 @@ import (
 // legal values, and every notUndoable entry must carry a real, non-empty reason (never a
 // placeholder — §7.12's "we never present an undo we cannot honour").
 func TestOpTable_EveryEntryStatesAnUndoPolicy(t *testing.T) {
+	t.Parallel()
 	if len(opTable) != 22 {
 		t.Fatalf("opTable has %d entries, want exactly 22 (D5, G28 adds globalStashSave/globalStashRemove)", len(opTable))
 	}
@@ -46,6 +47,7 @@ func TestOpTable_EveryEntryStatesAnUndoPolicy(t *testing.T) {
 // entries (globalStashSave, globalStashRemove, D17) — a kind absent here answers
 // ErrUnservedOpKind, never a stub.
 func TestOpTable_ServesExactlyTheTwentyTwoNamedKinds(t *testing.T) {
+	t.Parallel()
 	want := []string{
 		"checkout", "branchCreate", "branchDelete", "branchRename",
 		"tagCreate", "tagDelete", "revert", "opContinue", "opAbort", "opSkip",
@@ -73,6 +75,7 @@ func TestOpTable_ServesExactlyTheTwentyTwoNamedKinds(t *testing.T) {
 // real undo record for — G28 D17 adds globalStashRemove to the six G26 already established
 // (branchDelete, tagDelete, stashDrop, reset, cherryPick, stackSet).
 func TestOpTable_UndoableKindsAreExactlySevenNamedKinds(t *testing.T) {
+	t.Parallel()
 	var undoable []string
 	for kind, spec := range opTable {
 		if spec.Undo.Kind == gitpreflight.Undoable {
@@ -126,6 +129,7 @@ func initStashConflictRepo(t *testing.T) (dir string) {
 // through to ClassifyOpError's generic "Unknown" default. The stash entry must still exist
 // afterward (the stash is ALWAYS kept on a conflicting pop/apply).
 func TestRunOp_StashPopConflict_Reclassifies(t *testing.T) {
+	t.Parallel()
 	skipWithoutGitQueries(t)
 	dir := initStashConflictRepo(t)
 	entry := newQueriesTestEntry(t, dir)
@@ -193,6 +197,7 @@ func initAutoStashRepo(t *testing.T) (dir string) {
 // order — the argv sequence that lets RunOp's single e.Repo.Write chain never leave a window where
 // the tree is stashed and the switch never happened (F6).
 func TestPrepareCheckout_AutoStash_DirtyProducesStashThenSwitch(t *testing.T) {
+	t.Parallel()
 	skipWithoutGitQueries(t)
 	dir := initAutoStashRepo(t)
 	if err := os.WriteFile(filepath.Join(dir, "f.txt"), []byte("line1\nDIRTY\n"), 0o644); err != nil {
@@ -231,6 +236,7 @@ func TestPrepareCheckout_AutoStash_DirtyProducesStashThenSwitch(t *testing.T) {
 // stash argv entirely, rather than spawning `stash push` on nothing (probe P16: that prints "No
 // local changes to save" and creates no entry — a confusing no-op announcement).
 func TestPrepareCheckout_AutoStash_CleanTreeOneArgv(t *testing.T) {
+	t.Parallel()
 	skipWithoutGitQueries(t)
 	dir := initAutoStashRepo(t)
 	entry := newQueriesTestEntry(t, dir)
@@ -257,6 +263,7 @@ func TestPrepareCheckout_AutoStash_CleanTreeOneArgv(t *testing.T) {
 // untracked-only dirty path that the target checkout would create sets includeUntracked, so the
 // stash argv carries -u.
 func TestPrepareCheckout_AutoStash_UntrackedOnly_IncludesDashU(t *testing.T) {
+	t.Parallel()
 	skipWithoutGitQueries(t)
 	dir := initAutoStashRepo(t)
 	if err := os.WriteFile(filepath.Join(dir, "new.txt"), []byte("main's own untracked collision\n"), 0o644); err != nil {
@@ -288,6 +295,7 @@ func TestPrepareCheckout_AutoStash_UntrackedOnly_IncludesDashU(t *testing.T) {
 // TestPrepareCheckout_AutoStash_BothFlagsRefusedWithZeroSpawns is D3 step 1's own proof: AutoStash
 // and DiscardLocalChanges together refuse BEFORE any spawn at all — not merely before any WRITE.
 func TestPrepareCheckout_AutoStash_BothFlagsRefusedWithZeroSpawns(t *testing.T) {
+	t.Parallel()
 	skipWithoutGitQueries(t)
 	dir := initAutoStashRepo(t)
 	runner := newArgSpawnCountingRunner("stash", "switch", "status", "rev-parse", "diff", "for-each-ref")
@@ -323,6 +331,7 @@ func TestPrepareCheckout_AutoStash_BothFlagsRefusedWithZeroSpawns(t *testing.T) 
 // probe P17's own reason: `stash push` mid-conflict fails with EMPTY stderr, which
 // ClassifyOpError could only ever call Unknown.
 func TestPrepareCheckout_AutoStash_InProgressRefusesWithNoArgv(t *testing.T) {
+	t.Parallel()
 	skipWithoutGitQueries(t)
 	dir := initMidMergeRepo(t)
 	entry := newQueriesTestEntry(t, dir)
@@ -347,6 +356,7 @@ func TestPrepareCheckout_AutoStash_InProgressRefusesWithNoArgv(t *testing.T) {
 // list (never popped), tagged with the ORIGIN branch (main), and the working tree is clean on the
 // new branch.
 func TestRunOp_AutoStash_DoesNotPopBack(t *testing.T) {
+	t.Parallel()
 	skipWithoutGitQueries(t)
 	dir := initAutoStashRepo(t)
 	if err := os.WriteFile(filepath.Join(dir, "f.txt"), []byte("line1\nDIRTY\n"), 0o644); err != nil {
@@ -394,6 +404,7 @@ func TestRunOp_AutoStash_DoesNotPopBack(t *testing.T) {
 // TestPrepareGlobalStashSave_CleanTreeAnswersNothingToStash is §7.1 item 7's own exit criterion:
 // a clean working tree (no source sha given) answers NothingToStash with no write at all.
 func TestPrepareGlobalStashSave_CleanTreeAnswersNothingToStash(t *testing.T) {
+	t.Parallel()
 	skipWithoutGitQueries(t)
 	dir := t.TempDir()
 	runGitQ(t, dir, "init", "-q", "-b", "main")
@@ -432,6 +443,7 @@ func TestPrepareGlobalStashSave_CleanTreeAnswersNothingToStash(t *testing.T) {
 // TestPrepareGlobalStashSave_EmptyOrMultilineLabelRefuses proves the label validation runs before
 // any spawn at all.
 func TestPrepareGlobalStashSave_EmptyOrMultilineLabelRefuses(t *testing.T) {
+	t.Parallel()
 	skipWithoutGitQueries(t)
 	dir := t.TempDir()
 	runGitQ(t, dir, "init", "-q", "-b", "main")
@@ -463,6 +475,7 @@ func TestPrepareGlobalStashSave_EmptyOrMultilineLabelRefuses(t *testing.T) {
 // after saving, the working tree is UNCHANGED (still dirty, exact same content) and a new global
 // entry exists with the typed label.
 func TestRunOp_GlobalStashSave_FromWorkingTree_CopiesNeverDrops(t *testing.T) {
+	t.Parallel()
 	skipWithoutGitQueries(t)
 	dir := t.TempDir()
 	runGitQ(t, dir, "init", "-q", "-b", "main")
@@ -517,6 +530,7 @@ func TestRunOp_GlobalStashSave_FromWorkingTree_CopiesNeverDrops(t *testing.T) {
 // criterion: `update-ref -d` on an absent ref exits 0 silently, so the required existence check
 // must catch this BEFORE any write.
 func TestPrepareGlobalStashRemove_AbsentRefAnswersNotFoundWithNoWrite(t *testing.T) {
+	t.Parallel()
 	skipWithoutGitQueries(t)
 	dir := t.TempDir()
 	runGitQ(t, dir, "init", "-q", "-b", "main")
@@ -546,6 +560,7 @@ func TestPrepareGlobalStashRemove_AbsentRefAnswersNotFoundWithNoWrite(t *testing
 // table" proof: removing an entry then undoing it recreates the SAME ref at the SAME object via a
 // single update-ref argv.
 func TestRunOp_GlobalStashRemove_UndoReplaysExactlyOneUpdateRef(t *testing.T) {
+	t.Parallel()
 	skipWithoutGitQueries(t)
 	dir, globalSha, _ := initGlobalStashTestRepo(t)
 	entry := newQueriesTestEntry(t, dir)
@@ -598,6 +613,7 @@ func TestRunOp_GlobalStashRemove_UndoReplaysExactlyOneUpdateRef(t *testing.T) {
 // refsChanged event of any kind involved (this fixture has no live watcher), so the only thing
 // that can make that call see fresh state is UndoRun's own invalidation.
 func TestUndoRun_InvalidatesRefsCache(t *testing.T) {
+	t.Parallel()
 	skipWithoutGitQueries(t)
 	dir := t.TempDir()
 	runGitQ(t, dir, "init", "-q", "-b", "main")
@@ -667,6 +683,7 @@ func TestUndoRun_InvalidatesRefsCache(t *testing.T) {
 // so undoing "x|y"'s delete would have silently stomped branch "y"'s own remote/merge config back
 // to a stale snapshot.
 func TestCaptureBranchDeleteUndo_PipeInBranchNameDoesNotOverCaptureUnrelatedConfig(t *testing.T) {
+	t.Parallel()
 	skipWithoutGitQueries(t)
 	dir := t.TempDir()
 	runGitQ(t, dir, "init", "-q", "-b", "main")
@@ -703,6 +720,7 @@ func TestCaptureBranchDeleteUndo_PipeInBranchNameDoesNotOverCaptureUnrelatedConf
 // (copy-never-drop) and preserves its own origin-branch tag under the NEW label, rather than
 // re-stamping it with whatever branch is checked out now.
 func TestRunOp_GlobalStashSave_PromoteExistingStackEntry_PreservesOriginBranch(t *testing.T) {
+	t.Parallel()
 	skipWithoutGitQueries(t)
 	dir := t.TempDir()
 	runGitQ(t, dir, "init", "-q", "-b", "main")
@@ -771,6 +789,7 @@ var resetLabelPattern = regexp.MustCompile(`^Reset \((soft|mixed|hard)\) to `)
 // each of the three modes, resetting to an ancestor of a clean HEAD so no mode ever needs a
 // confirmToken.
 func TestPrepareReset_LabelMatchesTheWebviewPattern(t *testing.T) {
+	t.Parallel()
 	skipWithoutGitQueries(t)
 	dir := t.TempDir()
 	runGitQ(t, dir, "init", "-q", "-b", "main")
@@ -856,6 +875,7 @@ func initMidMergeRepo(t *testing.T) (dir string) {
 // Asserting MERGE_HEAD survives the refusal is the proof the gate actually works, not merely that
 // an error came back.
 func TestRunOp_ResetMidMerge_IsRefused(t *testing.T) {
+	t.Parallel()
 	skipWithoutGitQueries(t)
 	dir := initMidMergeRepo(t)
 	mergeHead := filepath.Join(dir, ".git", "MERGE_HEAD")
@@ -919,6 +939,7 @@ func initEmptyCherryPickRepo(t *testing.T) (dir, topicSha string) {
 // detection is what turns it into a real EmptyCherryPick — with CHERRY_PICK_HEAD still set
 // afterward, exactly as the banner's own Continue/Skip choice needs.
 func TestRunOp_EmptyCherryPick_Reclassifies(t *testing.T) {
+	t.Parallel()
 	skipWithoutGitQueries(t)
 	dir, topicSha := initEmptyCherryPickRepo(t)
 	entry := newQueriesTestEntry(t, dir)

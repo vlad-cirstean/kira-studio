@@ -7,6 +7,7 @@ import (
 )
 
 func TestTranslate_DotExcludesJSFourNotJustLF(t *testing.T) {
+	t.Parallel()
 	got, err := translate(".")
 	if err != nil {
 		t.Fatalf("translate: %v", err)
@@ -23,6 +24,7 @@ func TestTranslate_DotExcludesJSFourNotJustLF(t *testing.T) {
 }
 
 func TestTranslate_WhitespaceClassIsWiderThanRE2Native(t *testing.T) {
+	t.Parallel()
 	source, err := translate(`\s`)
 	if err != nil {
 		t.Fatalf("translate: %v", err)
@@ -50,6 +52,7 @@ func TestTranslate_WhitespaceClassIsWiderThanRE2Native(t *testing.T) {
 }
 
 func TestTranslate_UnicodePropertyEscapeIsIdentityNotClass(t *testing.T) {
+	t.Parallel()
 	// Without the `u` flag, JS's \p is just an identity escape for the literal letter 'p' -- NOT
 	// a Unicode property class (which RE2 would otherwise happily interpret \p{L} as).
 	source, err := translate(`\p{L}`)
@@ -66,6 +69,7 @@ func TestTranslate_UnicodePropertyEscapeIsIdentityNotClass(t *testing.T) {
 }
 
 func TestTranslate_UnicodeEscapes(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		pattern string
 		want    rune
@@ -87,6 +91,7 @@ func TestTranslate_UnicodeEscapes(t *testing.T) {
 }
 
 func TestTranslate_MalformedUnicodeEscapeIsIdentityEscape(t *testing.T) {
+	t.Parallel()
 	source, err := translate(`\u`)
 	if err != nil {
 		t.Fatalf("translate: %v", err)
@@ -98,6 +103,7 @@ func TestTranslate_MalformedUnicodeEscapeIsIdentityEscape(t *testing.T) {
 }
 
 func TestTranslate_ControlEscapes(t *testing.T) {
+	t.Parallel()
 	source, err := translate(`\cA`)
 	if err != nil {
 		t.Fatalf("translate: %v", err)
@@ -118,6 +124,7 @@ func TestTranslate_ControlEscapes(t *testing.T) {
 }
 
 func TestTranslate_BareNulEscape(t *testing.T) {
+	t.Parallel()
 	source, err := translate(`\0`)
 	if err != nil {
 		t.Fatalf("translate: %v", err)
@@ -129,6 +136,7 @@ func TestTranslate_BareNulEscape(t *testing.T) {
 }
 
 func TestTranslate_UnknownIdentityEscapeBecomesLiteral(t *testing.T) {
+	t.Parallel()
 	source, err := translate(`\q`)
 	if err != nil {
 		t.Fatalf("translate: %v", err)
@@ -140,6 +148,7 @@ func TestTranslate_UnknownIdentityEscapeBecomesLiteral(t *testing.T) {
 }
 
 func TestTranslate_KnownPassthroughEscapesAreUnchanged(t *testing.T) {
+	t.Parallel()
 	for _, esc := range []string{`\d`, `\D`, `\w`, `\W`, `\b`, `\B`, `\n`, `\t`} {
 		if _, err := translate(esc); err != nil {
 			t.Fatalf("translate(%q): unexpected error %v", esc, err)
@@ -148,6 +157,7 @@ func TestTranslate_KnownPassthroughEscapesAreUnchanged(t *testing.T) {
 }
 
 func TestTranslate_RejectsLookaroundAndBackreferences(t *testing.T) {
+	t.Parallel()
 	for _, pattern := range []string{"(?=x)", "(?!x)", "(?<=x)", "(?<!x)", `(a)\1`, `(?<name>a)\k<name>`} {
 		_, err := translate(pattern)
 		if !errors.Is(err, ErrUnsupportedPattern) {
@@ -157,6 +167,7 @@ func TestTranslate_RejectsLookaroundAndBackreferences(t *testing.T) {
 }
 
 func TestTranslate_NamedCaptureGroupIsNotLookbehind(t *testing.T) {
+	t.Parallel()
 	source, err := translate(`(?<name>foo)`)
 	if err != nil {
 		t.Fatalf("translate(%q): unexpected error %v", `(?<name>foo)`, err)
@@ -167,6 +178,7 @@ func TestTranslate_NamedCaptureGroupIsNotLookbehind(t *testing.T) {
 }
 
 func TestTranslate_LookaroundInsideClassIsLiteral(t *testing.T) {
+	t.Parallel()
 	// Inside a character class, '(' '?' '=' are all ordinary literal members -- not lookaround.
 	source, err := translate(`[(?=]`)
 	if err != nil {
@@ -179,6 +191,7 @@ func TestTranslate_LookaroundInsideClassIsLiteral(t *testing.T) {
 }
 
 func TestWrapWholeWord_Probe10OverRegexMode(t *testing.T) {
+	t.Parallel()
 	// Row 7/matcher.test.ts's own regex+wholeWord case: "widget" as a regex, matched against
 	// "Fix the widget cache" (match) and "subwidgetary refactor noted" (no match).
 	source, err := translate("widget")
@@ -199,6 +212,7 @@ func TestWrapWholeWord_Probe10OverRegexMode(t *testing.T) {
 // FindStringIndex disagrees with JS here, because JS backtracks into the SECOND alternative when
 // the first's boundary fails. The consuming rewrite must not have that bug.
 func TestWrapWholeWord_AlternationBacktrackCase(t *testing.T) {
+	t.Parallel()
 	source, err := translate("foo|foobar")
 	if err != nil {
 		t.Fatalf("translate: %v", err)
@@ -211,6 +225,7 @@ func TestWrapWholeWord_AlternationBacktrackCase(t *testing.T) {
 }
 
 func TestWrapWholeWord_AnchoredStart(t *testing.T) {
+	t.Parallel()
 	source, err := translate("^foo")
 	if err != nil {
 		t.Fatalf("translate: %v", err)
@@ -226,6 +241,7 @@ func TestWrapWholeWord_AnchoredStart(t *testing.T) {
 }
 
 func TestWrapWholeWord_AnchoredEnd(t *testing.T) {
+	t.Parallel()
 	source, err := translate("bar$")
 	if err != nil {
 		t.Fatalf("translate: %v", err)
@@ -241,6 +257,7 @@ func TestWrapWholeWord_AnchoredEnd(t *testing.T) {
 }
 
 func TestWrapWholeWord_AnchoredAlternationDoesNotOverAnchor(t *testing.T) {
+	t.Parallel()
 	// "^foo|bar" must still let "bar" match anywhere, whole-word -- the anchor optimisation must
 	// not fire when only ONE branch of a top-level alternation is anchored.
 	source, err := translate("^foo|bar")
@@ -255,6 +272,7 @@ func TestWrapWholeWord_AnchoredAlternationDoesNotOverAnchor(t *testing.T) {
 }
 
 func TestHasTopLevelAlternation(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		source string
 		want   bool

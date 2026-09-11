@@ -31,6 +31,7 @@ func blockerKinds(bs []gitpreflight.CherryPickBlocker) []string {
 }
 
 func TestClassifyCherryPick_DirtyTreeMatrix(t *testing.T) {
+	t.Parallel()
 	t.Run("A: unrelated unstaged dirt is tolerated — no blocker, clean verdict", func(t *testing.T) {
 		in := cherryPickBase()
 		in.Dirty = gitpreflight.ResetDirty{Staged: []string{}, Unstaged: []string{"b.txt"}, Untracked: []string{}}
@@ -103,6 +104,7 @@ func TestClassifyCherryPick_DirtyTreeMatrix(t *testing.T) {
 }
 
 func TestClassifyCherryPick_BlockerOrdering(t *testing.T) {
+	t.Parallel()
 	inProgress := &gitpreflight.InProgressOperation{Kind: gitpreflight.InProgressMerge, ConflictedPaths: []string{}}
 	twoParents := []gitpreflight.RevertParentChoice{
 		{ParentNumber: 1, Sha: "p1", Subject: "mainline work"},
@@ -139,6 +141,7 @@ func TestClassifyCherryPick_BlockerOrdering(t *testing.T) {
 }
 
 func TestClassifyCherryPick_Mainline(t *testing.T) {
+	t.Parallel()
 	twoParents := []gitpreflight.RevertParentChoice{
 		{ParentNumber: 1, Sha: "p1", Subject: "mainline work"},
 		{ParentNumber: 2, Sha: "p2", Subject: "feature work"},
@@ -186,6 +189,7 @@ func TestClassifyCherryPick_Mainline(t *testing.T) {
 }
 
 func TestClassifyCherryPick_AlreadyAppliedIsAdvisory(t *testing.T) {
+	t.Parallel()
 	t.Run("alreadyApplied true with everything else clean ⇒ still verdict clean, no blocker", func(t *testing.T) {
 		in := cherryPickBase()
 		in.AlreadyApplied = true
@@ -203,6 +207,7 @@ func TestClassifyCherryPick_AlreadyAppliedIsAdvisory(t *testing.T) {
 }
 
 func TestClassifyCherryPick_PredictionFoldsIntoVerdict(t *testing.T) {
+	t.Parallel()
 	t.Run("a conflicting prediction ⇒ willConflict, when nothing else blocks", func(t *testing.T) {
 		in := cherryPickBase()
 		in.Prediction = gitpreflight.RevertPrediction{Kind: "conflicts", Paths: []string{"a.txt"}}
@@ -233,6 +238,7 @@ func TestClassifyCherryPick_PredictionFoldsIntoVerdict(t *testing.T) {
 }
 
 func TestClassifyCherryPick_DetachedHead(t *testing.T) {
+	t.Parallel()
 	t.Run("detachedHead true with everything else clean ⇒ still verdict clean", func(t *testing.T) {
 		in := cherryPickBase()
 		in.DetachedHead = true

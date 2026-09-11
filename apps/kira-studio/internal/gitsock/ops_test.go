@@ -181,6 +181,7 @@ func hasCheckoutBlocker(blockers []gitpreflight.CheckoutBlocker, kind string) bo
 }
 
 func TestIntegration_RefsList(t *testing.T) {
+	t.Parallel()
 	f := buildOpsFixtureRepo(t)
 	server, sockPath, _, _ := newIntegrationServer(t)
 	client := pairAndReady(t, server, sockPath, "refs-client")
@@ -272,6 +273,7 @@ func TestIntegration_RefsList(t *testing.T) {
 }
 
 func TestIntegration_StatusAndInProgressBanner(t *testing.T) {
+	t.Parallel()
 	f := buildOpsFixtureRepo(t)
 	server, sockPath, _, _ := newIntegrationServer(t)
 	client := pairAndReady(t, server, sockPath, "status-client")
@@ -342,6 +344,7 @@ func TestIntegration_StatusAndInProgressBanner(t *testing.T) {
 }
 
 func TestIntegration_CheckoutPreflightAndRun(t *testing.T) {
+	t.Parallel()
 	f := buildOpsFixtureRepo(t)
 	server, sockPath, _, _ := newIntegrationServer(t)
 	client := pairAndReady(t, server, sockPath, "checkout-client")
@@ -441,6 +444,7 @@ func TestIntegration_CheckoutPreflightAndRun(t *testing.T) {
 }
 
 func TestIntegration_RevertPreflightAndConflict(t *testing.T) {
+	t.Parallel()
 	f := buildOpsFixtureRepo(t)
 	server, sockPath, _, _ := newIntegrationServer(t)
 	client := pairAndReady(t, server, sockPath, "revert-client")
@@ -486,6 +490,7 @@ func TestIntegration_RevertPreflightAndConflict(t *testing.T) {
 }
 
 func TestIntegration_UndoBranchDeleteRestoresTracking(t *testing.T) {
+	t.Parallel()
 	f := buildOpsFixtureRepo(t)
 	server, sockPath, _, _ := newIntegrationServer(t)
 	client := pairAndReady(t, server, sockPath, "undo-branch-client")
@@ -546,6 +551,7 @@ func pairAndReadyWithLabel(t *testing.T, server *Server, sockPath, clientID, lab
 }
 
 func TestIntegration_UndoSlotIsSharedAndAttributed(t *testing.T) {
+	t.Parallel()
 	f := buildOpsFixtureRepo(t)
 	server, sockPath, _, _ := newIntegrationServer(t)
 	clientA := pairAndReadyWithLabel(t, server, sockPath, "undo-window-a", "undo-window-a")
@@ -583,6 +589,7 @@ func TestIntegration_UndoSlotIsSharedAndAttributed(t *testing.T) {
 }
 
 func TestIntegration_UnservedOpKindIsRefused(t *testing.T) {
+	t.Parallel()
 	f := buildOpsFixtureRepo(t)
 	server, sockPath, _, _ := newIntegrationServer(t)
 	client := pairAndReady(t, server, sockPath, "unserved-client")
@@ -606,6 +613,7 @@ func TestIntegration_UnservedOpKindIsRefused(t *testing.T) {
 // (rpcstream's own "result simply not delivered anywhere"). Driven through an injected Runner that
 // blocks the checkout's own write spawn until the test releases it, so the race is deterministic.
 func TestIntegration_WriteSurvivesClientCancel(t *testing.T) {
+	t.Parallel()
 	f := buildOpsFixtureRepo(t)
 	realRunner := gitclient.NewExecRunner()
 

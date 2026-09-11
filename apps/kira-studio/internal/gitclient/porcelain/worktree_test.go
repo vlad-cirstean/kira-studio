@@ -21,6 +21,7 @@ func nul(parts ...string) []byte {
 // for byte as observed against real git 2.43.0: `worktree <path>\0HEAD <sha>\0branch <ref>\0\0`
 // repeated, with no trailing content beyond the stream's own closing double-NUL.
 func TestParseWorktreeList_Golden(t *testing.T) {
+	t.Parallel()
 	raw := nul(
 		"worktree /repo", "HEAD aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "branch refs/heads/main", "",
 		"worktree /repo-wt", "HEAD bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "branch refs/heads/feature", "",
@@ -49,6 +50,7 @@ func TestParseWorktreeList_Golden(t *testing.T) {
 // `prunable <reason>` attribute lines, each carrying free text (git's own lock reason / prune
 // diagnosis) that must survive through unmodified.
 func TestParseWorktreeList_LockedAndPrunable(t *testing.T) {
+	t.Parallel()
 	raw := nul(
 		"worktree /repo", "HEAD aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "branch refs/heads/main", "",
 		"worktree /repo-locked", "HEAD bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "branch refs/heads/m5branch",
@@ -76,6 +78,7 @@ func TestParseWorktreeList_LockedAndPrunable(t *testing.T) {
 // TestParseWorktreeList_DetachedAndBare covers the two boolean-only attributes — no trailing value,
 // no "branch" line at all for either.
 func TestParseWorktreeList_DetachedAndBare(t *testing.T) {
+	t.Parallel()
 	raw := nul(
 		"worktree /repo.git", "bare", "",
 		"worktree /repo-detached", "HEAD aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "detached", "",
@@ -99,6 +102,7 @@ func TestParseWorktreeList_DetachedAndBare(t *testing.T) {
 // literal newline byte inside a path (legal on Linux/macOS filesystems) must pass straight through
 // rather than being treated as any kind of separator — this parser never splits on '\n' at all.
 func TestParseWorktreeList_NewlineInPath(t *testing.T) {
+	t.Parallel()
 	raw := nul(
 		"worktree /repo/weird\npath", "HEAD aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "branch refs/heads/main", "",
 	)
@@ -114,6 +118,7 @@ func TestParseWorktreeList_NewlineInPath(t *testing.T) {
 // TestParseWorktreeList_UnknownAttributeIgnored: a future git version's own new attribute line must
 // never abort parsing or be misfiled onto an adjacent field (D1's own WorktreeEntry doc comment).
 func TestParseWorktreeList_UnknownAttributeIgnored(t *testing.T) {
+	t.Parallel()
 	raw := nul(
 		"worktree /repo", "HEAD aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "branch refs/heads/main",
 		"some-future-attribute value nobody expects yet", "",
@@ -132,6 +137,7 @@ func TestParseWorktreeList_UnknownAttributeIgnored(t *testing.T) {
 // assume) must not panic; a record with no trailing double-NUL is still flushed once at end of
 // input, since ParseWorktreeList consumes a complete already-read buffer, never a streaming one.
 func TestParseWorktreeList_TruncatedInput(t *testing.T) {
+	t.Parallel()
 	if records, err := porcelain.ParseWorktreeList(nil); err != nil || len(records) != 0 {
 		t.Fatalf("empty input: records=%+v err=%v", records, err)
 	}
@@ -155,6 +161,7 @@ func TestParseWorktreeList_TruncatedInput(t *testing.T) {
 // Byte literals only (D12) -- no test here depends on the host filesystem's own normalization
 // behaviour.
 func TestParseWorktreeList_PathComposesToNFC(t *testing.T) {
+	t.Parallel()
 	decomposedE := string([]byte{0x65, 0xcc, 0x81}) // "e" + U+0301, decomposed "é"
 	composedE := string([]byte{0xc3, 0xa9})         // U+00E9, composed "é"
 

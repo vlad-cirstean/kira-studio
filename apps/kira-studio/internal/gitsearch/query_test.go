@@ -6,6 +6,7 @@ import (
 )
 
 func TestCompile_EmptyTextMatchesNothing(t *testing.T) {
+	t.Parallel()
 	m, err := Compile(Query{Text: ""})
 	if err != nil {
 		t.Fatalf("Compile: %v", err)
@@ -17,6 +18,7 @@ func TestCompile_EmptyTextMatchesNothing(t *testing.T) {
 }
 
 func TestCompile_LiteralMode(t *testing.T) {
+	t.Parallel()
 	m, err := Compile(Query{Text: "widget"})
 	if err != nil {
 		t.Fatalf("Compile: %v", err)
@@ -39,6 +41,7 @@ func TestCompile_LiteralMode(t *testing.T) {
 }
 
 func TestCompile_RegexMode(t *testing.T) {
+	t.Parallel()
 	m, err := Compile(Query{Text: "wid(get|ening)", Regex: true})
 	if err != nil {
 		t.Fatalf("Compile: %v", err)
@@ -49,6 +52,7 @@ func TestCompile_RegexMode(t *testing.T) {
 }
 
 func TestCompile_UnsupportedPattern(t *testing.T) {
+	t.Parallel()
 	_, err := Compile(Query{Text: "(?=x)", Regex: true})
 	if !errors.Is(err, ErrUnsupportedPattern) {
 		t.Fatalf("Compile error = %v, want ErrUnsupportedPattern", err)
@@ -56,6 +60,7 @@ func TestCompile_UnsupportedPattern(t *testing.T) {
 }
 
 func TestCompile_ShaPrefix(t *testing.T) {
+	t.Parallel()
 	m, err := Compile(Query{Text: "218224"})
 	if err != nil {
 		t.Fatalf("Compile: %v", err)
@@ -84,6 +89,7 @@ func TestCompile_ShaPrefix(t *testing.T) {
 }
 
 func TestCompile_RegexCaseSensitivity(t *testing.T) {
+	t.Parallel()
 	sensitive, err := Compile(Query{Text: "WIDGET", Regex: true, CaseSensitive: true})
 	if err != nil {
 		t.Fatalf("Compile: %v", err)
@@ -102,6 +108,7 @@ func TestCompile_RegexCaseSensitivity(t *testing.T) {
 }
 
 func TestIsHexPrefixText(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		text string
 		want bool

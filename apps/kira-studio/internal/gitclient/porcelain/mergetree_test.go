@@ -7,6 +7,7 @@ import (
 )
 
 func TestMergeTreeArgs(t *testing.T) {
+	t.Parallel()
 	got := porcelain.MergeTreeArgs("HEAD", "topic", "")
 	want := []string{"merge-tree", "--write-tree", "--messages", "--name-only", "HEAD", "topic"}
 	if len(got) != len(want) {
@@ -31,6 +32,7 @@ func TestMergeTreeArgs(t *testing.T) {
 }
 
 func TestParseMergeTreeOutput_Clean(t *testing.T) {
+	t.Parallel()
 	pred, err := porcelain.ParseMergeTreeOutput(readDiffFixture(t, "mergeTree/clean.bin"), 0)
 	if err != nil {
 		t.Fatalf("ParseMergeTreeOutput: %v", err)
@@ -44,6 +46,7 @@ func TestParseMergeTreeOutput_Clean(t *testing.T) {
 }
 
 func TestParseMergeTreeOutput_Conflicts(t *testing.T) {
+	t.Parallel()
 	pred, err := porcelain.ParseMergeTreeOutput(readDiffFixture(t, "mergeTree/conflict.bin"), 1)
 	if err != nil {
 		t.Fatalf("ParseMergeTreeOutput: %v", err)
@@ -60,6 +63,7 @@ func TestParseMergeTreeOutput_Conflicts(t *testing.T) {
 }
 
 func TestParseMergeTreeOutput_RealFailureIsAnError(t *testing.T) {
+	t.Parallel()
 	if _, err := porcelain.ParseMergeTreeOutput([]byte("fatal: bad revision"), 128); err == nil {
 		t.Fatal("expected an error for an exit code outside {0,1} — that is a real failure, D14")
 	}

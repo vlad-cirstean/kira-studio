@@ -7,6 +7,7 @@ import (
 )
 
 func TestLeftRightCountArgs(t *testing.T) {
+	t.Parallel()
 	got := porcelain.LeftRightCountArgs("abc1234", "HEAD")
 	want := []string{"rev-list", "--count", "--left-right", "abc1234...HEAD"}
 	if len(got) != len(want) {
@@ -24,6 +25,7 @@ func TestLeftRightCountArgs(t *testing.T) {
 }
 
 func TestParseLeftRightCount(t *testing.T) {
+	t.Parallel()
 	left, right, err := porcelain.ParseLeftRightCount([]byte("3\t5\n"))
 	if err != nil {
 		t.Fatalf("ParseLeftRightCount: %v", err)
@@ -34,6 +36,7 @@ func TestParseLeftRightCount(t *testing.T) {
 }
 
 func TestParseLeftRightCount_Zero(t *testing.T) {
+	t.Parallel()
 	left, right, err := porcelain.ParseLeftRightCount([]byte("0\t0"))
 	if err != nil {
 		t.Fatalf("ParseLeftRightCount: %v", err)
@@ -44,6 +47,7 @@ func TestParseLeftRightCount_Zero(t *testing.T) {
 }
 
 func TestParseLeftRightCount_Garbage(t *testing.T) {
+	t.Parallel()
 	if _, _, err := porcelain.ParseLeftRightCount([]byte("not a count")); err == nil {
 		t.Fatal("want an error over garbage input")
 	}
@@ -56,6 +60,7 @@ func TestParseLeftRightCount_Garbage(t *testing.T) {
 }
 
 func TestRangeSubjectsArgs(t *testing.T) {
+	t.Parallel()
 	got := porcelain.RangeSubjectsArgs("abc1234", "HEAD", 10)
 	want := []string{"log", "--format=%H%x1f%s", "-z", "-11", "abc1234..HEAD"}
 	if len(got) != len(want) {
@@ -87,6 +92,7 @@ func rangeSubjectsFixture(n int) []byte {
 }
 
 func TestParseRangeSubjects_AtCap(t *testing.T) {
+	t.Parallel()
 	raw := rangeSubjectsFixture(10)
 	commits, truncated, err := porcelain.ParseRangeSubjects(raw, 10)
 	if err != nil {
@@ -104,6 +110,7 @@ func TestParseRangeSubjects_AtCap(t *testing.T) {
 }
 
 func TestParseRangeSubjects_OverCap(t *testing.T) {
+	t.Parallel()
 	raw := rangeSubjectsFixture(11) // cap+1, the read this package always performs
 	commits, truncated, err := porcelain.ParseRangeSubjects(raw, 10)
 	if err != nil {
@@ -118,6 +125,7 @@ func TestParseRangeSubjects_OverCap(t *testing.T) {
 }
 
 func TestParseRangeSubjects_Empty(t *testing.T) {
+	t.Parallel()
 	commits, truncated, err := porcelain.ParseRangeSubjects([]byte{}, 10)
 	if err != nil {
 		t.Fatalf("ParseRangeSubjects: %v", err)

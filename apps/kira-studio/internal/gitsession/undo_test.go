@@ -10,6 +10,7 @@ import (
 // next op (Set(nil) is unconditional, whoever calls it).
 
 func TestUndoSlot_PeekEmpty(t *testing.T) {
+	t.Parallel()
 	var slot gitpreflight.UndoSlot
 	if got := slot.Peek(); got != nil {
 		t.Fatalf("got %+v, want nil", got)
@@ -17,6 +18,7 @@ func TestUndoSlot_PeekEmpty(t *testing.T) {
 }
 
 func TestUndoSlot_SetThenPeek(t *testing.T) {
+	t.Parallel()
 	var slot gitpreflight.UndoSlot
 	record := &gitpreflight.UndoRecord{ID: "u1", Label: "Deleted branch feature"}
 	slot.Set(record)
@@ -30,6 +32,7 @@ func TestUndoSlot_SetThenPeek(t *testing.T) {
 }
 
 func TestUndoSlot_TakeReturnsAndClears(t *testing.T) {
+	t.Parallel()
 	var slot gitpreflight.UndoSlot
 	record := &gitpreflight.UndoRecord{ID: "u1"}
 	slot.Set(record)
@@ -44,6 +47,7 @@ func TestUndoSlot_TakeReturnsAndClears(t *testing.T) {
 }
 
 func TestUndoSlot_TakeTwiceReturnsNilSecondTime(t *testing.T) {
+	t.Parallel()
 	var slot gitpreflight.UndoSlot
 	slot.Set(&gitpreflight.UndoRecord{ID: "u1"})
 
@@ -58,6 +62,7 @@ func TestUndoSlot_TakeTwiceReturnsNilSecondTime(t *testing.T) {
 }
 
 func TestUndoSlot_TakeIDMismatch(t *testing.T) {
+	t.Parallel()
 	var slot gitpreflight.UndoSlot
 	record := &gitpreflight.UndoRecord{ID: "u1"}
 	slot.Set(record)
@@ -75,6 +80,7 @@ func TestUndoSlot_TakeIDMismatch(t *testing.T) {
 // slot" at the mechanism level: Set(nil) is unconditional, regardless of who calls it or what was
 // there before.
 func TestUndoSlot_ClearedByTheNextOp(t *testing.T) {
+	t.Parallel()
 	var slot gitpreflight.UndoSlot
 	slot.Set(&gitpreflight.UndoRecord{ID: "u1", Label: "Deleted branch old"})
 	slot.Set(nil) // the "next op" clearing it, whether or not it was itself undoable.
@@ -86,6 +92,7 @@ func TestUndoSlot_ClearedByTheNextOp(t *testing.T) {
 // TestUndoRecord_SnapshotFor_Attribution proves D7/F9's own contract: the label is byte-identical
 // for the originating connection, and gains a SUFFIX (never a prefix) for any other reader.
 func TestUndoRecord_SnapshotFor_Attribution(t *testing.T) {
+	t.Parallel()
 	record := &gitpreflight.UndoRecord{
 		ID: "u1", Label: "Deleted branch feature", RecoverySha: "abc123",
 		OriginConn: "conn-a", OriginLabel: "repo-review",
@@ -105,6 +112,7 @@ func TestUndoRecord_SnapshotFor_Attribution(t *testing.T) {
 // TestUndoRecord_SnapshotFor_NoOriginLabel proves a record with no origin label (a raw socket
 // client that sent none) gets no suffix at all — never "(window: )".
 func TestUndoRecord_SnapshotFor_NoOriginLabel(t *testing.T) {
+	t.Parallel()
 	record := &gitpreflight.UndoRecord{ID: "u1", Label: "Deleted tag v1", OriginConn: "conn-a"}
 	other := record.SnapshotFor("conn-b")
 	if other.Label != "Deleted tag v1" {

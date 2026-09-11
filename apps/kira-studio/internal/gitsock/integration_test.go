@@ -268,11 +268,10 @@ func newIntegrationServer(t *testing.T) (server *Server, sockPath string, client
 func newIntegrationServerWithRunner(t *testing.T, gitRunner gitclient.Runner) (server *Server, sockPath string, clientsRepo *repos.GitClientsRepo, registry *gitsession.Registry) {
 	t.Helper()
 	kiraHome := t.TempDir()
-	t.Setenv("KIRA_HOME", kiraHome)
 
-	db, err := storage.Open()
+	db, err := storage.OpenAt(kiraHome)
 	if err != nil {
-		t.Fatalf("storage.Open: %v", err)
+		t.Fatalf("storage.OpenAt: %v", err)
 	}
 	t.Cleanup(func() { _ = db.Close() })
 
@@ -355,6 +354,7 @@ func approveHead(server *Server, errCh chan<- error) {
 }
 
 func TestIntegration_FullPairingAndRPCLifecycle(t *testing.T) {
+	t.Parallel()
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not on PATH")
 	}
@@ -561,6 +561,7 @@ func openRepoOK(t *testing.T, c *testClient, repoDir string) gitrpc.RepoOpenResu
 // reaches EVERY connection holding a repository, not just the one that triggered it, with the
 // contract's exact payload.
 func TestIntegration_RepoChangedReachesEveryHolder(t *testing.T) {
+	t.Parallel()
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not on PATH")
 	}
@@ -603,6 +604,7 @@ func TestIntegration_RepoChangedReachesEveryHolder(t *testing.T) {
 // "no production accessor that exists only for a test" seam) rather than reaching into the
 // registry's own state from a different package.
 func TestIntegration_RefcountAndDisconnectTeardown(t *testing.T) {
+	t.Parallel()
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not on PATH")
 	}
@@ -655,6 +657,7 @@ func TestIntegration_RefcountAndDisconnectTeardown(t *testing.T) {
 // still-present primary key and finishPairing answered pairingDenied — this asserts "ready"
 // instead, and that the Connected editors list shows exactly one, un-revoked row afterward.
 func TestIntegration_RevokeThenRepairReachesReady(t *testing.T) {
+	t.Parallel()
 	server, sockPath, clientsRepo, _ := newIntegrationServer(t)
 
 	_, firstToken := pairFreshWithToken(t, server, sockPath, "repair-1")
@@ -706,6 +709,7 @@ func TestIntegration_RevokeThenRepairReachesReady(t *testing.T) {
 // would unblock, so this specifically exercises the Broker.Shutdown() half of the fix, not just
 // the allConns half (TestServer_Close_ReturnsPromptlyWithASilentConnection covers that one).
 func TestServer_Close_ReturnsPromptlyWithAPendingPairingRequest(t *testing.T) {
+	t.Parallel()
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not on PATH")
 	}
@@ -760,6 +764,7 @@ func TestServer_Close_ReturnsPromptlyWithAPendingPairingRequest(t *testing.T) {
 // forever with no deadline) — the allConns half of the fix, closing it directly, unlike the
 // pairing-broker case above.
 func TestServer_Close_ReturnsPromptlyWithASilentConnection(t *testing.T) {
+	t.Parallel()
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not on PATH")
 	}

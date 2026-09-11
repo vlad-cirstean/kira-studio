@@ -98,6 +98,7 @@ func newTestRegistry() *Registry {
 // --- Acquire/release: refcount, linger, re-acquire ------------------------------------------------
 
 func TestRegistry_TwoAcquiresSameRepoOneEntry(t *testing.T) {
+	t.Parallel()
 	reg := newTestRegistry()
 	e1, release1, err := reg.Acquire(context.Background(), "/usr/bin/git", "/repo")
 	if err != nil {
@@ -115,6 +116,7 @@ func TestRegistry_TwoAcquiresSameRepoOneEntry(t *testing.T) {
 }
 
 func TestRegistry_OneReleaseKeepsEntryAliveWhileSecondHolds(t *testing.T) {
+	t.Parallel()
 	reg := newTestRegistry()
 	reg.LingerFor = time.Millisecond
 
@@ -142,6 +144,7 @@ func TestRegistry_OneReleaseKeepsEntryAliveWhileSecondHolds(t *testing.T) {
 }
 
 func TestRegistry_ReleaseToZeroArmsLingerNotImmediateTeardown(t *testing.T) {
+	t.Parallel()
 	reg := newTestRegistry()
 	reg.LingerFor = time.Hour // long enough that this test would time out if teardown were immediate.
 
@@ -163,6 +166,7 @@ func TestRegistry_ReleaseToZeroArmsLingerNotImmediateTeardown(t *testing.T) {
 }
 
 func TestRegistry_ReacquireInsideLingerWindowReusesEntryAndCancelsTimer(t *testing.T) {
+	t.Parallel()
 	reg := newTestRegistry()
 	reg.LingerFor = 200 * time.Millisecond
 
@@ -190,6 +194,7 @@ func TestRegistry_ReacquireInsideLingerWindowReusesEntryAndCancelsTimer(t *testi
 }
 
 func TestRegistry_ExpiryTearsDownAndLaterAcquireBuildsNewEntry(t *testing.T) {
+	t.Parallel()
 	reg := newTestRegistry()
 	factory, count := newFakeWatcherFactory()
 	reg.NewWatcher = factory
@@ -233,6 +238,7 @@ func TestRegistry_ExpiryTearsDownAndLaterAcquireBuildsNewEntry(t *testing.T) {
 }
 
 func TestRegistry_ReleaseTwiceIsANoOp(t *testing.T) {
+	t.Parallel()
 	reg := newTestRegistry()
 	reg.LingerFor = time.Hour
 
@@ -258,6 +264,7 @@ func TestRegistry_ReleaseTwiceIsANoOp(t *testing.T) {
 // exists to keep valid — stays alive. A re-acquire inside the window reuses the same entry and
 // restarts cat-file lazily, exactly as it already does on first use.
 func TestRegistry_ReleaseToZeroClosesCatFileButKeepsWatcherAndCaches(t *testing.T) {
+	t.Parallel()
 	reg := newTestRegistry()
 	reg.LingerFor = time.Hour
 
@@ -299,6 +306,7 @@ func TestRegistry_ReleaseToZeroClosesCatFileButKeepsWatcherAndCaches(t *testing.
 }
 
 func TestRegistry_CloseTearsDownEverythingImmediately(t *testing.T) {
+	t.Parallel()
 	reg := newTestRegistry()
 	reg.LingerFor = time.Hour
 

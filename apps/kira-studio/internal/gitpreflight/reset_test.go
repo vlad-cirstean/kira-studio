@@ -25,6 +25,7 @@ func resetBase() gitpreflight.ClassifyResetInput {
 }
 
 func TestClassifyReset_DestroysMatrix(t *testing.T) {
+	t.Parallel()
 	t.Run("soft never destroys, regardless of how dirty the tree is", func(t *testing.T) {
 		in := resetBase()
 		in.Mode = "soft"
@@ -133,6 +134,7 @@ func TestClassifyReset_DestroysMatrix(t *testing.T) {
 }
 
 func TestClassifyReset_LeavingGaining(t *testing.T) {
+	t.Parallel()
 	t.Run("leaving === 0 forces the commit list empty even if the caller passed one", func(t *testing.T) {
 		in := resetBase()
 		in.Leaving = 0
@@ -172,6 +174,7 @@ func TestClassifyReset_LeavingGaining(t *testing.T) {
 }
 
 func TestClassifyReset_Blockers(t *testing.T) {
+	t.Parallel()
 	inProgress := &gitpreflight.InProgressOperation{Kind: gitpreflight.InProgressMerge, ConflictedPaths: []string{}}
 
 	t.Run("an in-progress operation blocks, even against an otherwise clean soft reset", func(t *testing.T) {
@@ -225,6 +228,7 @@ func TestClassifyReset_Blockers(t *testing.T) {
 }
 
 func TestClassifyReset_DetachedHead(t *testing.T) {
+	t.Parallel()
 	t.Run("branch: nil carries through untouched — the caller's own signal for 'HEAD only'", func(t *testing.T) {
 		in := resetBase()
 		in.Branch = nil
