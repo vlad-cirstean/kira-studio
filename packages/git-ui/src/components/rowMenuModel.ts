@@ -178,13 +178,27 @@ export function buildRefMenu(ctx: RefMenuContext): MenuSection[] {
       gatedItem('checkoutRef', 'Checkout', 'checkout', ctx.inProgress, 'codicon-check'),
       gatedItem('deleteRef', 'Delete tag', 'tagDelete', ctx.inProgress, 'codicon-trash', true),
     ];
+    // G32 round-3 functional-correctness review, finding #4: tagPush/tagDeleteRemote are the two
+    // OpRequest kinds opTable has never served (RunOp's write path has no askpass wiring — see
+    // commands.ts's own MutatingEntry doc comment for the tracked "move both to remote.run"
+    // fix) — these two items were offered enabled anyway, so a click always rejected with
+    // E_UNKNOWN_METHOD and the rejection was discarded, a silent no-op with no toast, no error, no
+    // announcement. Disabled with a reason until that server-side move actually lands, rather than
+    // offering an action that can never succeed.
+    const TAG_REMOTE_OPS_UNSUPPORTED = 'Not supported yet';
     for (const remote of ctx.knownRemotes) {
-      items.push(plainItem(`pushRef:${remote}`, `Push to ${remote}`, 'codicon-cloud'));
+      items.push({
+        id: `pushRef:${remote}`,
+        label: `Push to ${remote}`,
+        disabled: true,
+        disabledReason: TAG_REMOTE_OPS_UNSUPPORTED,
+        icon: 'codicon-cloud',
+      });
       items.push({
         id: `deleteRemoteRef:${remote}`,
         label: `Delete on ${remote}`,
-        disabled: false,
-        disabledReason: undefined,
+        disabled: true,
+        disabledReason: TAG_REMOTE_OPS_UNSUPPORTED,
         icon: 'codicon-trash',
         danger: true,
       });

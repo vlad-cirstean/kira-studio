@@ -158,3 +158,30 @@ describe('buildGlobalStashMenu — D12/D13 never contains stashPop or stashDrop'
     expect(sections[0]?.items[0]?.label).toBe('Apply here (from main)');
   });
 });
+
+// G32 round-3 functional-correctness review, finding #4: tagPush/tagDeleteRemote are the two
+// OpRequest kinds the server has never served (RunOp's write path has no askpass wiring) — the row
+// menu used to offer them enabled anyway, so a click always rejected silently (no toast, no
+// announcement). Disabled with a visible reason until the server-side move to remote.run lands.
+describe('buildRefMenu — tag remote actions are disabled, not silently broken', () => {
+  test('Push to <remote> and Delete on <remote> are disabled with a reason, for every known remote', () => {
+    const sections = buildRefMenu(branchCtx({ kind: 'tag', knownRemotes: ['origin', 'upstream'] }));
+    const items = sections[0]?.items ?? [];
+    for (const remote of ['origin', 'upstream']) {
+      const push = items.find((i) => i.id === `pushRef:${remote}`);
+      const del = items.find((i) => i.id === `deleteRemoteRef:${remote}`);
+      expect(push?.disabled).toBe(true);
+      expect(push?.disabledReason).toBeTruthy();
+      expect(del?.disabled).toBe(true);
+      expect(del?.disabledReason).toBeTruthy();
+    }
+  });
+
+  test('no known remotes -> neither item appears at all', () => {
+    const sections = buildRefMenu(branchCtx({ kind: 'tag', knownRemotes: [] }));
+    const ids = sections[0]?.items.map((i) => i.id) ?? [];
+    expect(ids.some((id) => id.startsWith('pushRef:') || id.startsWith('deleteRemoteRef:'))).toBe(
+      false,
+    );
+  });
+});
