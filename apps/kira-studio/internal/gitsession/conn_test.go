@@ -268,3 +268,48 @@ func TestConn_ReviewWalkDoesNotDisturbTheGraphWalk(t *testing.T) {
 		t.Fatal("ReviewWalkFor does not return the SECOND review walk after replacement")
 	}
 }
+
+// TestConn_MarkWalksStaleRacesSafelyWithWalkRebuild is G32 round-3 architecture/security review,
+// finding #6's own regression proof. Walk's own `*slot = w` / `(*slot).dispose(); *slot = nil`
+// (rebuilding pair.graph/pair.review on a spec change) only ever runs under c.mu — but
+// markWalksStale used to read those same two fields AFTER releasing c.mu, exactly the "in the real
+// system" scenario Open's own entry.Subscribe callback creates: refsChanged fires on the watcher's
+// notification goroutine, concurrently with an RPC handler goroutine rebuilding a walk via
+// graph.stream/review.stream. One goroutine repeatedly alternates the graph slot between two specs
+// (forcing repeated dispose-and-replace, exactly Walk's own mutation path) while a second
+// concurrently calls markWalksStale — go test -race is what actually proves this, by flagging the
+// unsynchronized read/write pre-fix and staying silent post-fix.
+func TestConn_MarkWalksStaleRacesSafelyWithWalkRebuild(t *testing.T) {
+	skipWithoutGitWalk(t)
+	repoDir := initWalkRepo(t, 6)
+	conn, _, repoID := newWalkTestConn(t, repoDir)
+	defer conn.Close()
+
+	if _, err := conn.Walk(repoID, "git", porcelain.WalkSpec{Scope: "all"}, 0, nil); err != nil {
+		t.Fatalf("initial Walk: %v", err)
+	}
+
+	stop := make(chan struct{})
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		specs := []porcelain.WalkSpec{{Scope: "all"}, {Scope: "head"}}
+		for i := 0; ; i++ {
+			select {
+			case <-stop:
+				return
+			default:
+			}
+			if _, err := conn.Walk(repoID, "git", specs[i%2], 0, nil); err != nil {
+				return
+			}
+		}
+	}()
+
+	for i := 0; i < 500; i++ {
+		conn.markWalksStale(repoID)
+	}
+	close(stop)
+	wg.Wait()
+}

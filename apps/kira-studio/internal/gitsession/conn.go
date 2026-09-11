@@ -382,17 +382,29 @@ func (c *Conn) ReviewWalkFor(repoID string) (*Walk, bool) {
 // markWalksStale marks BOTH slots of repoID's walk pair stale (D5) — called by Open's own
 // subscriber on refsChanged, in place of reaching into a single walk. Never takes a walk's own mu
 // (MarkStale's own doc): the subscriber's goroutine must not block behind a page read.
+//
+// G32 round-3 architecture/security review, finding #6: pair.graph/pair.review themselves — the
+// walkPair's own *Walk fields, not the walks it points to — are c.mu-protected state (Walk's own
+// `*slot = w` / `(*slot).dispose(); *slot = nil` above only ever runs under c.mu). This used to
+// read them AFTER releasing c.mu, racing against a concurrent Walk() call rebuilding either slot —
+// exactly the unsynchronized concurrent read/write go test -race exists to catch. Both fields are
+// snapshotted into locals while c.mu is still held; MarkStale itself (an atomic store, walk.go)
+// still runs outside the lock, preserving the original "never block behind a page read" property.
 func (c *Conn) markWalksStale(repoID string) {
 	c.mu.Lock()
 	pair, ok := c.walks[repoID]
+	var graph, review *Walk
+	if ok {
+		graph, review = pair.graph, pair.review
+	}
 	c.mu.Unlock()
 	if !ok {
 		return
 	}
-	if pair.graph != nil {
-		pair.graph.MarkStale()
+	if graph != nil {
+		graph.MarkStale()
 	}
-	if pair.review != nil {
-		pair.review.MarkStale()
+	if review != nil {
+		review.MarkStale()
 	}
 }
