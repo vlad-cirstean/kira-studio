@@ -25,6 +25,14 @@ export const FAKE_REPO_ROOT = '/fake/repo';
 export const FAKE_REPO_ID = '/fake/repo';
 export const FAKE_SHA = '2222222222222222222222222222222222222222';
 export const FAKE_SUBJECT = 'Add the graph column fixture';
+// G32 round-3 performance review, finding #7's own regression fixture: a second, independent
+// (zero-parent) commit — `streamTwoChunksThenEnd` below streams it as its OWN chunk, so a test can
+// observe what CommitGrid.vue does when a second `graph.stream` chunk lands with the same lane
+// count as the first (both are lane-0 roots — see lanes.ts's own "route into a free lane" pass:
+// neither has a parent link to continue, so each independently claims the lowest free lane, which
+// is lane 0 both times).
+export const FAKE_SHA_2 = '3333333333333333333333333333333333333333';
+export const FAKE_SUBJECT_2 = 'A second, same-lane commit';
 export const OTHER_REPO_ID = '/fake/other-repo';
 /** `dateFormat.ts`'s own `WIDEST_SAMPLE_TIMESTAMP` (`Date.UTC(2024, 11, 30, 22, 48)`) — kept as a
  *  literal here rather than imported, since that constant is not exported (nothing outside that
@@ -36,12 +44,30 @@ function wrap(body: unknown): unknown {
   return encode({ version: CONTRACT_VERSION, body }, 'base64').payload;
 }
 
-function buildPackedChunk(): PackedCommitChunk {
-  const shaBytes = Buffer.from(FAKE_SHA, 'hex');
-  const subjectBytes = Buffer.from(FAKE_SUBJECT, 'utf8');
+/** Builds a single-commit, zero-parent `PackedCommitChunk` at row `from` (row `from` to `to`,
+ *  always `from + 1`) — shared by `buildPackedChunk` (the one-chunk fixture's own row 0) and
+ *  `streamTwoChunksThenEnd`'s two same-lane chunks below.
+ *
+ *  `dictionary`/`dictionaryBase` default to the one-chunk fixture's own shape (both identity
+ *  strings, freshly interned from an empty store). A SECOND chunk in the same stream reusing the
+ *  same two strings must NOT re-declare them: `CommitStore.appendPacked` (packages/git-core/src/
+ *  store/commitStore.ts) asserts `chunk.dictionaryBase === interner.size` — the delta-encoding
+ *  contract `commitStore.ts`'s own doc comment states ("dictionary holds only strings interned
+ *  SINCE dictionaryBase"). `streamTwoChunksThenEnd` passes `dictionaryBase: 2, dictionary: []`
+ *  for its second chunk accordingly, referencing the first chunk's already-interned indices 0/1
+ *  via `identityIds` alone. */
+function buildPackedChunkAt(
+  sha: string,
+  subject: string,
+  from: number,
+  dictionary: readonly string[] = ['Fake Author', 'fake@example.com'],
+  dictionaryBase = 0,
+): PackedCommitChunk {
+  const shaBytes = Buffer.from(sha, 'hex');
+  const subjectBytes = Buffer.from(subject, 'utf8');
   return {
-    from: 0,
-    to: 1,
+    from,
+    to: from + 1,
     shaWidthBytes: 20,
     shas: shaBytes.buffer.slice(shaBytes.byteOffset, shaBytes.byteOffset + shaBytes.byteLength),
     parentOffsets: Uint32Array.from([0, 0]).buffer,
@@ -53,10 +79,14 @@ function buildPackedChunk(): PackedCommitChunk {
       subjectBytes.byteOffset + subjectBytes.byteLength,
     ),
     subjectOffsets: Uint32Array.from([0, subjectBytes.byteLength]).buffer,
-    dictionaryBase: 0,
-    dictionary: ['Fake Author', 'fake@example.com'],
+    dictionaryBase,
+    dictionary: [...dictionary],
     decorations: [],
   };
+}
+
+function buildPackedChunk(): PackedCommitChunk {
+  return buildPackedChunkAt(FAKE_SHA, FAKE_SUBJECT, 0);
 }
 
 function buildResponses(): {
@@ -64,6 +94,7 @@ function buildResponses(): {
   repoList: (id: number) => unknown;
   repoOpen: (id: number) => unknown;
   streamChunkThenEnd: (id: number) => readonly [unknown, unknown];
+  streamTwoChunksThenEnd: (id: number) => readonly [unknown, unknown, unknown];
   graphRefresh: (id: number) => unknown;
   graphStatus: (id: number) => unknown;
   repoChanged: (kind: 'refsChanged' | 'worktreeChanged', repoId: string) => unknown;
@@ -128,6 +159,37 @@ function buildResponses(): {
       });
       return [wrap({ t: 'chunk', id, chunk }), wrap({ t: 'end', id })] as const;
     },
+    // G32 round-3 performance review, finding #7's own fixture: two chunks, each one independent
+    // zero-parent commit at lane 0 (see FAKE_SHA_2's own doc comment above) — `graph-columns.spec
+    // .ts`'s own single-chunk fixture cannot exercise "does a SECOND chunk trigger a redundant
+    // column rebuild", since there is only ever one chunk to begin with.
+    streamTwoChunksThenEnd: (id) => {
+      const chunk1 = encodeStreamPayload('graph.stream', {
+        repoId: FAKE_REPO_ID,
+        seq: 0,
+        from: 0,
+        to: 1,
+        source: 'git',
+        remaining: 1,
+        exhausted: false,
+        commits: buildPackedChunkAt(FAKE_SHA, FAKE_SUBJECT, 0),
+      });
+      const chunk2 = encodeStreamPayload('graph.stream', {
+        repoId: FAKE_REPO_ID,
+        seq: 1,
+        from: 1,
+        to: 2,
+        source: 'git',
+        remaining: 0,
+        exhausted: true,
+        commits: buildPackedChunkAt(FAKE_SHA_2, FAKE_SUBJECT_2, 1, [], 2),
+      });
+      return [
+        wrap({ t: 'chunk', id, chunk: chunk1 }),
+        wrap({ t: 'chunk', id, chunk: chunk2 }),
+        wrap({ t: 'end', id }),
+      ] as const;
+    },
     // G-UX D10: `GraphViewState.refresh()`'s own `graph.refresh` request — `#runLoad`'s resync
     // then re-opens `graph.stream` from the current `loadedRows` (already answered generically by
     // `streamChunkThenEnd` above, reused verbatim: its `from: 0` on an already-1-row store is
@@ -160,14 +222,27 @@ function buildResponses(): {
  * onto `window.__graphRefreshCalls`) and exposes `window.__emitRepoChanged(kind, repoId?)` —
  * `graph-columns.spec.ts`'s own auto-refresh case dispatches a `repo.changed` event through it and
  * polls `window.__graphRefreshCalls` rather than driving a real watcher.
+ *
+ * `options.streamMode` (G32 round-3 performance review, finding #7): `'oneChunk'` (default) is
+ * every existing spec's own fixture, unchanged. `'twoChunksSameLane'` streams `FAKE_SHA` as
+ * before, then withholds the second chunk (`FAKE_SHA_2`) and the stream's own `end` frame until
+ * the test calls `window.__releaseSecondGraphChunk()` — giving a spec a real pause point between
+ * the two chunks landing, which "dispatch every frame back to back" cannot offer (there is no
+ * async boundary a test could otherwise observe between them).
  */
-export function buildFakeGraphHostInitScript(): string {
+export function buildFakeGraphHostInitScript(options?: {
+  readonly streamMode?: 'oneChunk' | 'twoChunksSameLane';
+}): string {
   const responses = buildResponses();
+  const streamMode = options?.streamMode ?? 'oneChunk';
   const data = {
     appInit: responses.appInit(0),
     repoList: responses.repoList(0),
     repoOpen: responses.repoOpen(0),
-    stream: responses.streamChunkThenEnd(0),
+    stream:
+      streamMode === 'twoChunksSameLane'
+        ? responses.streamTwoChunksThenEnd(0)
+        : responses.streamChunkThenEnd(0),
     graphRefresh: responses.graphRefresh(0),
     graphStatus: responses.graphStatus(0),
     repoChangedRefs: responses.repoChanged('refsChanged', FAKE_REPO_ID),
@@ -189,6 +264,7 @@ export function buildFakeGraphHostInitScript(): string {
   return `
     (() => {
       const FIXTURES = ${fixtureJson};
+      const STREAM_MODE = ${JSON.stringify(streamMode)};
       window.__graphRefreshCalls = [];
 
       function withId(template, id) {
@@ -200,6 +276,12 @@ export function buildFakeGraphHostInitScript(): string {
       function dispatch(envelope) {
         window.dispatchEvent(new MessageEvent('message', { data: envelope }));
       }
+
+      // G32 round-3 performance review, finding #7: holds the second chunk + the stream's own
+      // 'end' frame back until the test explicitly calls window.__releaseSecondGraphChunk() —
+      // giving a spec a real pause point to act in between the two chunks landing, which
+      // dispatching every frame back to back in one synchronous pass cannot offer.
+      window.__releaseSecondGraphChunk = () => {};
 
       window.__emitRepoChanged = (kind, repoId) => {
         const key =
@@ -242,6 +324,15 @@ export function buildFakeGraphHostInitScript(): string {
             return;
           }
           if (body.t === 'open' && body.method === 'graph.stream') {
+            if (STREAM_MODE === 'twoChunksSameLane') {
+              const [chunk1Envelope, chunk2Envelope, endEnvelope] = FIXTURES.stream;
+              dispatch(withId(chunk1Envelope, body.id));
+              window.__releaseSecondGraphChunk = () => {
+                dispatch(withId(chunk2Envelope, body.id));
+                dispatch(withId(endEnvelope, body.id));
+              };
+              return;
+            }
             const [chunkEnvelope, endEnvelope] = FIXTURES.stream;
             dispatch(withId(chunkEnvelope, body.id));
             dispatch(withId(endEnvelope, body.id));

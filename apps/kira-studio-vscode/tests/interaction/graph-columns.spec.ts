@@ -295,4 +295,49 @@ test.describe('graph grid columns', () => {
       expect(Math.abs(after - before)).toBeLessThanOrEqual(rowHeight);
     });
   });
+
+  // G32 round-3 performance review, finding #7: `CommitGrid.vue`'s own `handleChunkLayout` used to
+  // call `rebuildColumns()` — a real SlickGrid `setColumns()` structural rebuild, which destroys
+  // and recreates every `.slick-header-column` node from scratch (`createColumnHeaders()`'s own
+  // `Utils.emptyElement` + rebuild, confirmed against `node_modules/slickgrid`'s own source) — on
+  // EVERY streamed chunk, even when the chunk's own lane count had not changed since the previous
+  // rebuild. `fakeGraphHost.ts`'s own `'twoChunksSameLane'` stream mode holds its second chunk
+  // back until the test calls `window.__releaseSecondGraphChunk()`, giving this test a real pause
+  // point to stamp a marker attribute onto the header nodes right after the first chunk's own
+  // (correct, lane-count-establishing) rebuild but before the second, same-lane (0) chunk lands —
+  // if the second chunk still triggers a rebuild, `createColumnHeaders()` wipes the marker along
+  // with the rest of the old header nodes.
+  test.describe('column rebuild is gated on lane count actually changing', () => {
+    test('a second chunk at the same lane count does not rebuild the header columns', async ({
+      page,
+    }) => {
+      await page.addInitScript(buildFakeGraphHostInitScript({ streamMode: 'twoChunksSameLane' }));
+      await page.goto(`${server.url}/graph`);
+      await expect(
+        page.locator('[data-testid="commit-grid"] .slick-row[data-row="0"]'),
+      ).toBeVisible();
+      await page.keyboard.press('Escape');
+      await expect(page.locator('[data-testid="detail-region"]')).toHaveCount(0);
+
+      const headers = page.locator('[data-testid="commit-grid"] .slick-header-column');
+      await expect(headers).toHaveCount(4);
+      await headers.evaluateAll((nodes) => {
+        for (const node of nodes) node.setAttribute('data-rebuild-marker', 'still-here');
+      });
+
+      await page.evaluate(() =>
+        (window as { __releaseSecondGraphChunk?: () => void }).__releaseSecondGraphChunk?.(),
+      );
+      await expect(
+        page.locator('[data-testid="commit-grid"] .slick-row[data-row="1"]'),
+      ).toBeVisible();
+
+      await expect(headers).toHaveCount(4);
+      const stillMarked = await headers.evaluateAll(
+        (nodes) =>
+          nodes.filter((n) => n.getAttribute('data-rebuild-marker') === 'still-here').length,
+      );
+      expect(stillMarked).toBe(4);
+    });
+  });
 });

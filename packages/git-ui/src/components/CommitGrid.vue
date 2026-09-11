@@ -272,6 +272,18 @@ function updateHandlePositions(): void {
   handleLeftDate.value = handleLeftAuthor.value + widths.value.author;
 }
 
+/** G32 round-3 performance review, finding #7: `handleChunkLayout` (below) used to call
+ *  `rebuildColumns()` unconditionally on EVERY streamed chunk, even though its own doc comment
+ *  says the only reason it needs to is "`laneCount` grew" — a full `setColumns()` is a real
+ *  SlickGrid structural rebuild (new header cells, a fresh column-position stylesheet, `left`
+ *  offsets recomputed for every column), and a large history streams in dozens of 500-row chunks
+ *  whose lane count is unchanged from the previous chunk far more often than not. Tracked here
+ *  (rather than inside `rebuildColumns` itself) because every OTHER caller — the `detailOpen`
+ *  watcher, `scheduleResize`'s own host-width changes, mount — has its own unconditional reason to
+ *  rebuild regardless of lane count (compact mode changes the column set's shape; a resize changes
+ *  `messageWidth`), so only `handleChunkLayout`'s call is gated. */
+let lastRebuiltLaneCount = -1;
+
 function rebuildColumns(): void {
   // G-UX (item 9): resizeCanvas() BEFORE setColumns() — SlickGrid's own cached canvas width has
   // to already reflect the host's current size before the new column set (and its `left` offsets)
@@ -282,6 +294,7 @@ function rebuildColumns(): void {
   grid?.resizeCanvas();
   grid?.setColumns(currentColumns());
   updateHandlePositions();
+  lastRebuiltLaneCount = props.graphView.laneCount.value;
 }
 
 function setColumnWidth(column: keyof ColumnWidths, next: number): void {
@@ -481,7 +494,7 @@ let layoutCompleteMarked = false;
  *  invalidate exactly the rows that changed rather than the whole grid. */
 function handleChunkLayout(range: LayoutRange): void {
   if (!grid) return;
-  rebuildColumns();
+  if (props.graphView.laneCount.value !== lastRebuiltLaneCount) rebuildColumns();
   const rows: number[] = [];
   for (let row = range.from; row < range.to; row++) rows.push(row);
   grid.invalidateRows(rows);
@@ -622,6 +635,10 @@ onMounted(() => {
     rowTopOffsetRenderType: 'transform', // matches how --kv-row-height drives row positioning
   });
   grid = instance;
+  // Matches the laneCount currentColumns() just used to build the grid's initial column set above
+  // — otherwise the very first streamed chunk would trigger one redundant rebuild even when its
+  // laneCount already agrees with what mount just built.
+  lastRebuiltLaneCount = props.graphView.laneCount.value;
 
   // W14/V2: SlickGrid's own internal structural elements — `_focusSink`/`_focusSink2` (two
   // invisible divs it binds its own keyboard handling to) and, less obviously, six `.slick-pane`,
