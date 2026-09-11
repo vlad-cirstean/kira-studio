@@ -3,19 +3,18 @@
 See the [README](../README.md) for what the app is and how to run it.
 
 This doc is the P12 deliverable named by SPEC.md §2's two hard requirements (§2.1 "Silky UI",
-§2.2 "Small RAM footprint"): where each budget is measured, whether that measurement is automated
-or manual, and the numbers recorded from a real run. It is expected to be re-measured, not
-rewritten from scratch — `docs/v1/plans/P12-hardening.md` is the frozen design record; this file is
-the living one.
+§2.2 "Small RAM footprint"): where each budget is measured, whether measurement is automated or
+manual, and the numbers from a real run. Re-measure it; don't rewrite it from scratch —
+`docs/v1/plans/P12-hardening.md` is the frozen design record, this file is the living one.
 
-§2.1's numbers were originally captured on this repo's Linux/Xvfb dev container (headless,
+§2.1's numbers were first captured on this repo's Linux/Xvfb dev container (headless,
 software-rendered Chromium), 2026-08-23, and re-measured 2026-08-26 on the macOS/Colima dev machine
-described in §2.2 — see the scroll-response methodology note in §2.1 for why the two environments'
+described in §2.2 — see §2.1's scroll-response methodology note for why the two environments'
 numbers aren't directly comparable on the scroll-response row specifically. macOS **packaged**
 numbers (§3's manual procedures, run against the built app rather than this dev build) are still
-not recorded — no opportunity to run them has come up yet; §3 documents the procedure and what to
-fill in. **Every Go-side wall-clock figure in §2.5-§2.8 predates Go 1.26's Green Tea GC** — see
-§2.11's own caveat, below, for exactly which of those numbers that affects and which it doesn't.
+not recorded — no opportunity to run them yet; §3 documents the procedure and what to fill in.
+**Every Go-side wall-clock figure in §2.5-§2.8 predates Go 1.26's Green Tea GC** — see §2.11's own
+caveat below for exactly which of those numbers that affects and which it doesn't.
 
 ## 1. Budget table
 
@@ -56,21 +55,20 @@ fill in. **Every Go-side wall-clock figure in §2.5-§2.8 predates Go 1.26's Gre
 
 Re-measured 2026-08-26 on this environment (the macOS/Colima dev machine) as part of P47's checkpoint,
 alongside the assertion split below and the D13 table in the P47 note — the previous "not yet run" /
-"fails" entries this row replaces predate that split and this note.
+"fails" entries this row replaces predate both.
 
-**Console keystroke → completion popup.** Docker/Colima is available on this environment (the
-macOS dev machine this file's numbers now come from), so the Postgres-backed
-`tests/ui/budgets.spec.ts` suite runs in full rather than self-skipping; the row above is a real
-measurement, not a carry-over.
+**Console keystroke → completion popup.** Docker/Colima is available here (the macOS dev machine
+this file's numbers now come from), so the Postgres-backed `tests/ui/budgets.spec.ts` suite runs in
+full rather than self-skipping; the row above is a real measurement, not a carry-over.
 
 **P29 (scroll rendering gap) — resolved, numbers recorded.** `budgets.spec.ts`'s horizontal
 scroll-response measurement and wide-table (`app.scroll_grid`, 60 columns x 5000 rows) vertical
 measurement, the deterministic column/row overscan-coverage invariants, the DOM-cell bound, and the
-sub-row-scroll-mutates-nothing check (docs/v1/plans/P29-scroll-render-gap.md §5) all pass in this
-environment; the table above carries the horizontal and wide-table-vertical p50/p95 pairs L-A's row
-was outstanding for. `.grid-row { contain: layout }` (D8) was left in place; P47's own before/after
-measurement below (same instrumentation, same machine) shows no isolable regression attributable to
-removing it, so there was no basis to revisit D8's call here.
+sub-row-scroll-mutates-nothing check (docs/v1/plans/P29-scroll-render-gap.md §5) all pass here; the
+table above carries the horizontal and wide-table-vertical p50/p95 pairs L-A's row was outstanding
+for. `.grid-row { contain: layout }` (D8) stays in place; P47's own before/after measurement below
+(same instrumentation, same machine) shows no isolable regression from removing it, so no basis to
+revisit D8's call here.
 
 **P47 (`@tanstack/vue-virtual` migration) — before/after, work p50 (D13).** Baseline captured this
 session before the migration (Step 0 of `docs/v1/plans/P47-tanstack-virtual-spike.md`), after
@@ -96,28 +94,28 @@ overscan-coverage invariants pass, the DOM-cell bound passes, no D13 metric regr
 passes. **Verdict: go.**
 
 **Scroll-response methodology note (contradicts plan D6's assumption).** The plan expected scroll
-response to be gated on p95, the same way the other three interaction budgets are. In practice,
-a script-driven `el.scrollTop = x` assignment's native `scroll` event dispatch is deferred by
-Chromium to the next "update the rendering" frame step — the same per-frame cadence
-`requestAnimationFrame` uses. On this environment's headless, software-rendered display (no real
-120 Hz cadence, closer to 60 Hz), roughly half of every 20 steps land right after that boundary and
-pay a full extra frame regardless of how fast the app's own work is; forcing every step to start
-right after a frame (a double-rAF wait) makes every sample jump to ~one frame period, confirming
-this is a frame-scheduling artifact, not app work. So p95 over a mix of "no wait" / "one frame
-wait" samples doesn't measure app work at all here (the same reason `perf.spec.ts`'s existing rAF
-tripwire can't demonstrate 8 ms either). `budgets.spec.ts` therefore asserts on **p50** (unaffected
-by whether a step straddled a frame boundary) and keeps a looser `max ≤ 50 ms` sanity bound instead
-of gating on p95; the p95 number above is logged, not gated. This should be re-checked against a
-real macOS display before relying on p95 anywhere in this environment's history.
+response gated on p95, like the other three interaction budgets. In practice, a script-driven
+`el.scrollTop = x` assignment's native `scroll` event dispatch is deferred by Chromium to the next
+"update the rendering" frame step — the same per-frame cadence `requestAnimationFrame` uses. On
+this headless, software-rendered display (no real 120 Hz cadence, closer to 60 Hz), roughly half of
+every 20 steps land right after that boundary and pay a full extra frame regardless of how fast the
+app's own work is; forcing every step to start right after a frame (a double-rAF wait) makes every
+sample jump to ~one frame period, confirming this is a frame-scheduling artifact, not app work. So
+p95 over a mix of "no wait" / "one frame wait" samples doesn't measure app work at all here (the
+same reason `perf.spec.ts`'s existing rAF tripwire can't demonstrate 8 ms either). So
+`budgets.spec.ts` asserts **p50** (unaffected by whether a step straddled a frame boundary) and
+keeps a looser `max ≤ 50 ms` sanity bound instead of gating on p95; the p95 number above is logged,
+not gated. Re-check this against a real macOS display before relying on p95 anywhere in this
+environment's history.
 
-**macOS re-run (2026-08-24), scroll response — resolved.** The finding recorded here at the time
-(macOS's compositor saturating the e2e delta with a full frame period on every one of 20 steps,
-where the Xvfb container above only hit it on roughly half) was the motivating case for
+**macOS re-run (2026-08-24), scroll response — resolved.** The finding recorded here at the time —
+macOS's compositor saturating the e2e delta with a full frame period on every one of 20 steps,
+where the Xvfb container above hit it on only about half — motivated
 `tests/e2e/support/measure.ts`'s work/e2e split (`61ba523`): gating on the work delta — DataGrid.vue's
-own scroll-work mark to DOM-committed, which excludes both frame-scheduling hops described in the
-methodology note above — removes exactly the compositor-cadence noise this paragraph diagnosed. The
-table above reflects that gate; scroll response now passes on this same macOS machine (work
-p50=2.2 ms, e2e p50 still logged at 4.8 ms for comparison).
+own scroll-work mark to DOM-committed, which excludes both frame-scheduling hops described above —
+removes exactly the compositor-cadence noise this paragraph diagnosed. The table above reflects
+that gate; scroll response now passes on this same macOS machine (work p50=2.2 ms, e2e p50 still
+logged at 4.8 ms for comparison).
 
 **P57 M5 (Wails/Go migration) — re-measured on the webkit/mocked tier, `tests/ui/budgets.spec.ts` and
 `tests/ui/perf.spec.ts`.** `tests/e2e/budgets.spec.ts` and `tests/e2e/perf.spec.ts` both ported —
@@ -165,15 +163,15 @@ came from):
   above, which held all three to 8 ms) — the P29 overscan-coverage invariants these two scenarios
   primarily exist to prove are unaffected by that choice; only the exact-timing budget claim differs.
 
-**One check does not port: `perf.spec.ts`'s "L2 budget: never exceeded after loading twenty distinct
+**One check doesn't port: `perf.spec.ts`'s "L2 budget: never exceeded after loading twenty distinct
 pages."** `window.__kiraCacheStats` looks like a pure-renderer hook but isn't — it wraps a real
 `DATA_OP.cacheStats` request answered by the `engine` child process's own `src/engine/cache/pages.ts`
-`ByteLru`, which does not run at all in this tier. A mock could only echo a hand-picked
+`ByteLru`, which doesn't run at all in this tier. A mock could only echo a hand-picked
 `{bytes, budgetBytes}` pair, making "usage ≤ budget" true by fixture construction rather than by the
 real eviction algorithm. Replaced by `tests/unit/engine-cache.spec.ts` (new, P57 M5): a direct,
 dependency-free unit test of `ByteLru`/`pages.ts`/`counts.ts` (no browser, no mock, no engine
 process, `bun test tests/unit`) asserting the exact budget-respecting behaviour rather than "≤ some
-number after 20 real page loads." (That TypeScript test itself did not survive the P58 port: P58a A21
+number after 20 real page loads." (That TypeScript test itself didn't survive the P58 port: P58a A21
 deleted `tests/unit/engine-cache.spec.ts` along with the `src/engine/` it tested, and the same
 budget-respecting behaviour is now asserted directly in Go, against the real cache the app ships —
 `apps/kira-studio/internal/enginecache/lru_test.go`'s `TestByteLru_*` cases — with no port-side gap left to
@@ -219,7 +217,7 @@ and the "after" column of 1 was what `requestAnimationFrame` does to eight synch
 0` reading was separately unfalsifiable: that harness drives `scrollTop` from the main thread, so
 the DOM's scroll offset and the main thread's own knowledge of it are the same value by
 construction — the condition that produces the real symptom (WebKit's scrolling thread moving the
-composited layer ahead of what the main thread has rendered, during a real momentum scroll) cannot
+composited layer ahead of what the main thread has rendered, during a real momentum scroll) can't
 occur when a script is doing the scrolling.
 
 **The corrected picture.** The rAF deferral is reverted — `observeScrollElementOffset` is back to
@@ -229,7 +227,7 @@ Two mechanisms replace it, aimed at what actually governs the symptom on real ha
 - **Runway** — the row axis's overscan (`OVERSCAN_PX`, 560 px) was symmetric and direction-blind.
   `rowRangeExtractor` (`views/shared/page/columns.ts`) extends it asymmetrically toward the scroll
   direction, scaled by a measured velocity, capped in *cells* so a wide table can't blow the DOM-size
-  budget. At zero velocity it is byte-identical to the old symmetric window — every at-rest budget in
+  budget. At zero velocity it's byte-identical to the old symmetric window — every at-rest budget in
   this file is unchanged by it.
 - **Throughput** — `renderRows` (`DataGrid.vue`) now returns a reference-stable `RowVM` object for a
   row nothing relevant changed about, and rows render through `GridRow.vue`, a child component whose
@@ -240,11 +238,11 @@ Both are sandbox-provable as *mechanisms* — `tests/ui/budgets.spec.ts` gates D
 staying exactly what it was, D3's cell cap holding under a synthetic high velocity, and D4's own
 render-count property (a row updates only if its signature actually changed). **Neither is provable
 as *the fix* from this tier.** Whether either one moves the user's actual perceived lag is a
-real-hardware question this environment cannot answer — see the protocol below.
+real-hardware question this environment can't answer — see the protocol below.
 
 **The lesson.** A passing scroll-response budget (§2.1) and a visible fling lag are measurements of
 different things, and pass 1 additionally paired a refuted mechanism with an instrument that could
-not have disproven it either way. The general shape — an instrument that cannot observe the
+not have disproven it either way. The general shape — an instrument that can't observe the
 phenomenon produces a confident, wrong conclusion — is the same failure
 `docs/WEBVIEW-SCROLL-MEMORY.md` §2.1 hit and fixed first, for the memory half.
 
@@ -254,7 +252,7 @@ animation frame, the real native `scroll` events observed, a measured px/frame v
 `uncoveredPx`, and Vue's own update duration — all read from a *real* fling on *real* hardware, which
 this environment has never been able to produce (`docs/WEBVIEW-SCROLL-MEMORY.md` §9's own
 `CGEventPost` injector never got a TCC grant, but that gap was for driving momentum from *outside*
-the process; this probe lives inside the page and lets the human supply the momentum instead). It is
+the process; this probe lives inside the page and lets the human supply the momentum instead). It's
 reachable from a dev build's View → Open DevTools (`internal/shell/menutemplate.go`). Protocol:
 
 1. `bun run dev`, open a 50 000+-row table at page size 10 000, comfortable density.
@@ -296,13 +294,13 @@ by the Electron-to-Wails cutover) passed no explicit `width`/`height`, only `min
 **1.21×** (900×600 vs 1024×640). `docs/WEBVIEW-SCROLL-MEMORY.md` §7's old "min 900×600" parenthetical
 undersold the first-launch number and omitted the floor one; both are now recorded there directly.
 
-**F14 — the area premise is a projection, not a measurement, and this pass does not change that.**
+**F14 — the area premise is a projection, not a measurement, and this pass doesn't change that.**
 `docs/WEBVIEW-SCROLL-MEMORY.md` never varied window size — every figure in it came from one 1440×960
 harness — so "cost scales with viewport area" is a mechanism-level inference from that document's own
 tile-coverage-rect explanation, not something either document has measured. No macOS hardware was
 available to this implementing pass either, so the area ladder that would settle it (that document's
 §7/§9) remains unrun. **Nothing in this section should be read as a memory-cost number for the new
-default** — only F13's ratios are measured; the megabytes they might translate to are not.
+default** — only F13's ratios are measured; the megabytes they might translate to aren't.
 
 **Real Mac verification pending, same as everywhere else in this chapter.** This sandbox has no live
 screen backend to test the clamp against for real (Wails v3.0.0-beta.16's `*application.App` has no
@@ -316,7 +314,7 @@ unit-tested but its effect on an actual first launch is unverified on any platfo
 **Superseded 2026-09 (P29 §3.1): the two-engine comparison below can no longer be run as written.**
 `window.__kiraGridEngine` and the incumbent `DataGrid.vue`/`@tanstack/vue-virtual` grid it switched
 away from are both deleted — the SlickGrid cutover this section's own A/B fed into is complete
-(`bd6c369`, `402f42e`), and there is exactly one grid engine in the tree now. The recorded numbers,
+(`bd6c369`, `402f42e`), and there's exactly one grid engine in the tree now. The recorded numbers,
 the finding (SlickGrid's own wheel handler ate trackpad momentum), and the reasoning below stay as
 the evidence for that cutover; steps 1-5's two-engine comparison itself is history, not a protocol to
 re-run. Step 6's `window.__kiraGridTuning` A/B, and every A/B further down this section, still work
@@ -325,7 +323,7 @@ build where the hooks are actually compiled in** (P29 F1 gates `window.__kira*` 
 `__KIRA_DEBUG_HOOKS__`): `bun run dev` (`wails3 task dev`)'s Vite dev server, or a native build via
 `build:dev`/`build:test` — **never** a packaged `.dmg`, where they're gone by design.
 
-**What this section is not: it does not say the fast-scroll lag is fixed.** Pass A
+**What this section isn't: it doesn't say the fast-scroll lag is fixed.** Pass A
 (`docs/v1.1/plans/P22-slickgrid-migration-plan.md`) built a second, additive grid —
 `views/grid/SlickGridHost.vue`, wrapping `6pac/SlickGrid`'s core engine — behind
 `window.__kiraGridEngine === 'slick'`, mounted by `views/grid/DataView.vue` instead of the
@@ -337,14 +335,14 @@ that the new bridge decodes real data correctly, the decode-cache stays pinned t
 covers at least what the incumbent's does for the same fixture, and — the item this phase's own
 brief singled out — closing the tab actually tears the grid down (`grid.destroy(true)`, no leaked
 `.slick-viewport`, no leaked `<style>` element, `__kiraRetention()` back at its pre-open reading).
-**None of that is the same claim as "the reported lag is gone."** §7.4(a)/(b) of the plan split those
+**None of that's the same claim as "the reported lag is gone."** §7.4(a)/(b) of the plan split those
 two claims into separate columns on purpose; this section is the protocol for the second one, which
 only real hardware can answer.
 
 **The gate.** Per the plan's own §7.4(b): PASS authorises Pass B (feature parity + cutover);
-INCONCLUSIVE or FAIL do not, and hand the question to the plan's §11 (a runway-only fix, or a
+INCONCLUSIVE or FAIL don't, and hand the question to the plan's §11 (a runway-only fix, or a
 conclusion that no DOM grid can help — see that section for the reasoning). **The result of this A/B
-is not yet known — it has never been run.** Whoever runs it should update this section, and the
+isn't yet known — it has never been run.** Whoever runs it should update this section, and the
 plan's own §7.4(b)/§8.6, with the real numbers and the real verdict once it has been.
 
 **Protocol — one build, both engines, the same real fling twice (superseded, kept verbatim as the
@@ -370,7 +368,7 @@ two-finger flick.
    answers the original report; the numbers are what keep that read honest (§9's own discipline,
    restated in the plan's own §7.4(b) header).
 6. **Still directly runnable today** (a live console line, no rebuild — the two-engine comparison
-   above is not a prerequisite): `window.__kiraGridTuning.maxLeadPxOverride = 4000` (§7.3 step 6's
+   above isn't a prerequisite): `window.__kiraGridTuning.maxLeadPxOverride = 4000` (§7.3 step 6's
    own cheap next experiment) is a five-minute test that costs nothing and separates "the renderer
    is too slow" from "the runway is too short" — see the plan's §7.4(b) INCONCLUSIVE branch for the
    full reasoning.
@@ -379,7 +377,7 @@ two-finger flick.
 trackpad momentum.** `enableMouseWheelScrollHandler` (default `true`) quantizes every wheel/trackpad
 tick to `deltaY * rowHeight` in JS instead of letting the native `scroll` listener (already bound,
 already sufficient — see the plan's F3 addendum) and WebKit's own momentum physics drive `scrollTop`
-directly. That is what read on macOS as "that fluid velocity sensitive mac scroll is gone." Fixed by
+directly. That's what read on macOS as "that fluid velocity sensitive mac scroll is gone." Fixed by
 `enableMouseWheelScrollHandler: false` in `SlickGridHost.vue`'s grid options; frozen-pane sync and
 this app's own velocity/runway logic are unaffected, since both already run off native `scroll`, not
 off SlickGrid's wheel-specific internals.
@@ -388,7 +386,7 @@ off SlickGrid's wheel-specific internals.
 gzip): the launch chunk grew from **353.31 KB to 397.64 KB** (**+44.33 KB**), and the CSS asset from
 21.75 KB to 22.90 KB (**+1.15 KB**) — **+45.48 KB total**, against the plan's own **≤45 000 B**
 ceiling (§7.4(a) item 7) and its **~42 KB JS / ~1.3 KB CSS** projection (F9). This is **~480 B (about
-1%) over the plan's stated ceiling** — flagged here plainly rather than rounded away. It is not
+1%) over the plan's stated ceiling** — flagged here plainly rather than rounded away. It isn't
 F9's own named failure mode: an isolated re-measurement of `{ SlickGrid, SlickEventHandler }` alone
 (the only two named imports from `slickgrid` anywhere in the tree) reproduces F9's own ~42 KB figure
 almost exactly (41 960 B gzip, esbuild@0.28.2, this session) — so nothing pulled in `SlickDataView`
@@ -437,7 +435,7 @@ cap) removes the 10 ms throttle-deferral branch entirely. `scrollTrace.ts` also 
 engine (a stale comment claimed otherwise; nothing actually called `noteNotify()` on this path), so the
 protocol below was unusable for this engine until that was fixed first, alone, ahead of the batch cap.
 
-**What this phase can and cannot claim from the sandbox alone.** The mechanism is confirmed and
+**What this phase can and can't claim from the sandbox alone.** The mechanism is confirmed and
 refined from SlickGrid's own source, and the batch a single render pass can be forced to build is now
 provably bounded independent of fling distance (`tests/ui/slick-grid.spec.ts`'s own convergence
 assertion: the mounted `.slick-cell` count after a jump well past the whole runway grows over several
@@ -460,7 +458,7 @@ were found *during* an attempt to run that exact protocol):
 3. **The A/B on `MAX_NEW_CELLS_PER_RENDER` itself**, batch cap live:
    `window.__kiraGridTuning.maxNewCellsPerRenderOverride = 150` (small — more, cheaper chase frames),
    then `= 2200` (equal to `CELL_BUDGET` — no capping at all, today's pre-fix behaviour in effect), same
-   flick each time. If the gap/drop tracks this dial — worse at 2200, better at 150 — that is the
+   flick each time. If the gap/drop tracks this dial — worse at 2200, better at 150 — that's the
    direct, decisive real-hardware confirmation of the mechanism.
 4. **Isolate `forceSyncScrolling` from the batch cap**: `window.__kiraGridTuning.
    forceSyncScrollingOverride` now toggles it live (`true`/`false`), so this no longer needs a
@@ -491,7 +489,7 @@ both engines, with real WebKit computed-style checks and Chromium CDP paint-coun
 paints (~89% cell-sized) without the declaration, 3,399 (0% cell-sized) with it restored, matching the
 incumbent grid's own profile; geometry confirmed byte-identical either way. Fixed by restoring
 `contain: layout;` to `.slick-grid-host .slick-row`. **Still not confirmed on real macOS hardware**:
-paint count is not the same claim as reduced frame stutter — the original real-Mac recording left
+paint count isn't the same claim as reduced frame stutter — the original real-Mac recording left
 ~73% of frame wall-clock time unattributed to anything a WebContent-process trace can see (likely
 GPU-process rasterization/compositing downstream of paint count), so a fresh real-Mac Timeline
 recording of the same hard-fling scenario, before/after this fix, is still needed and is the next step
@@ -521,19 +519,19 @@ drive), so a same-frame-token fix would be right in one engine/input-path and wr
 Live-tunable (`window.__kiraGridTuning.chaseQuietMsOverride`, `0` = the exact pre-fix policy) so the
 A/B below needs one build, not a rebuild per variant. `__kiraScrollTrace` also gained the signal this
 protocol is judged by: `frameMs` (the frame-duration series itself), `renderCount` per frame, a
-`renderMs` that is now a **sum reset every frame** (before this pass it was a single sticky value
+`renderMs` that's now a **sum reset every frame** (before this pass it was a single sticky value
 that never reset — a no-render frame silently reported the *previous* frame's cost, and a doubled
 frame reported only its second render's own cost), and — the pacing signal specifically —
 **`mean`/`stddev` on every `ScrollTraceStats` block**, not just p50/p95/max. **"Proper pacing" is a
 statement about spread; a percentile alone can't answer it, which is why `frameMs.stddev` is the
 number every step below is actually judged by, not `frameMs.mean`.**
 
-**Do not compare a `renderMs` figure recorded before this pass to one recorded after it — they are
+**Don't compare a `renderMs` figure recorded before this pass to one recorded after it — they're
 not the same quantity.** Every `renderMs`/`renderCount` number in this document's history before P22
 iter2-pacing landed came from the sticky, never-reset field; treat every one of them as an
 order-of-magnitude sanity check only, never as a baseline this protocol's own numbers should match.
 
-*What this pass is allowed to claim from the sandbox alone, and what it is not.* Provable here: that
+*What this pass is allowed to claim from the sandbox alone, and what it isn't.* Provable here: that
 the chase collided with the scroll render under the old policy (measured, two engines); that after
 the fix it provably never does (`tests/ui/slick-grid.spec.ts`'s T1, gated against a real WebKit
 reproduction, with T3 proving the harness would have caught the old behaviour); that the trace now
@@ -543,7 +541,7 @@ no longer re-enters `render()` against a torn-down grid (T4, verified to throw
 to pass stably three runs in a row with it in place). **Nothing here claims the fix reduces perceived
 stutter, or that `frameMs.stddev` actually falls on real hardware — this investigation's own history
 (`forceSyncScrolling`, `0865ef6` → `18a2cc4`, directly above) is the standing reason a sandbox-plausible
-fix does not get to certify itself. The fix is not confirmed working until a real Mac trace, run
+fix doesn't get to certify itself. The fix isn't confirmed working until a real Mac trace, run
 through the protocol below, says so.**
 
 *The three readings that would refute this pass — stated before running, not after* (the plan's own
@@ -560,13 +558,13 @@ per-frame runway cap, both console lines.
 **Protocol — same build, same 50 000+-row table at page size 10 000, comfortable density, one hard
 two-finger flick per run, momentum allowed to die,
 `copy(JSON.stringify(__kiraScrollTrace.stop()))`.** Extends §2.1c's own protocol above (same setup,
-minus its now-dead engine-switch step — there is one engine now, so no reload-to-switch is needed)
+minus its now-dead engine-switch step — there's one engine now, so no reload-to-switch is needed)
 rather than replacing it.
 
 **Report for every run:** `summary.frameMs` `{mean, stddev, p50, p95, max}` — the pacing number and
 the point of the whole exercise; `summary.renderCountHistogram`; `summary.renderMs` (now a per-frame
 sum); `summary.uncoveredPx`; `summary.pxPerFrame`; `summary.scrollEventsHistogram`; the share of
-`scrollTopAtEvent[].afterRaf` that is `true` (§3 F2's own correction: this session's sandbox found
+`scrollTopAtEvent[].afterRaf` that's `true` (§3 F2's own correction: this session's sandbox found
 `true` on essentially every event under a wheel-driven scroll in WebKit, the opposite of this
 module's original premise — a real-Mac `true` share is expected, not a bug signal, until this
 protocol's own first reading says otherwise); and one sentence on whether the motion *felt*
@@ -576,56 +574,56 @@ different. The perceptual sentence is what answers the report; the numbers keep 
    accounting in __kiraScrollTrace`) **— no pacing fix yet.** This is the first trace in this
    engine's history whose `renderMs` is a real per-frame sum rather than a sticky last-render value.
    The decisive reading is `renderCountHistogram`: a substantial share of frames at 2 confirms the
-   doubling on real hardware. Refuting reading (a) above if it does not.
+   doubling on real hardware. Refuting reading (a) above if it doesn't.
 2. **With the pacing fix landed**, same gesture. `renderCountHistogram` should be ~all-1 during the
    fling; `frameMs.stddev` and `renderMs` p95 should both fall; `uncoveredPx` p95 must not rise
    materially. Refuting reading (b) if the histogram clears but `frameMs.stddev` stays flat.
 3. **The chase-quiescence A/B, live, no rebuild:** `window.__kiraGridTuning.chaseQuietMsOverride = 0`
    (pre-fix behaviour), then unset (24, the default), then `= 48`. Same flick each time. If
-   `frameMs.stddev` tracks this dial, that is the direct, decisive confirmation of the mechanism —
+   `frameMs.stddev` tracks this dial, that's the direct, decisive confirmation of the mechanism —
    and whatever this step says is what re-sets `CHASE_QUIET_MS` (provisional, like every other
    runway constant before it).
 4. **The runway-growth-cap A/B:** `window.__kiraGridTuning.maxNewLeadCellsPerRenderOverride = 600`
    (neutral/today's default), then `= 200`, then `= 100`. Read `frameMs.stddev` **and**
    `uncoveredPx` p95 *together* — this dial trades one against the other by design (smaller, more
    even runway steps vs. slower convergence), and a setting that lowers stddev while pushing
-   `uncoveredPx` past the baseline is not an improvement. Set `MAX_NEW_LEAD_CELLS_PER_RENDER` from
+   `uncoveredPx` past the baseline isn't an improvement. Set `MAX_NEW_LEAD_CELLS_PER_RENDER` from
    whatever this step says, or leave it neutral (its shipped default) if it says nothing. Refuting
    reading (c) if `uncoveredPx` regresses materially anywhere in this pass.
 5. **Re-run this section's own step 4** (`forceSyncScrollingOverride` true/false) — the chase fix
-   changes what synchronous scrolling costs per frame, so the earlier verdict recorded above does not
+   changes what synchronous scrolling costs per frame, so the earlier verdict recorded above doesn't
    carry over.
 6. **A Safari Web Inspector Timeline recording alongside step 2**, same capture shape as the one that
    found the `contain: layout` bug. Look specifically for whether the rAF-attributed script records
    that used to sit adjacent to the scroll-attributed ones are gone — a confirmation of de-stacking
    independent of the app's own instrumentation, worth having because refuting reading (a) is a real
-   possibility and the app's own trace is not a neutral witness to it.
+   possibility and the app's own trace isn't a neutral witness to it.
 7. Update this section with the real numbers and verdict, and update
    `docs/v1.1/plans/P22-slickgrid-migration-plan-iter2-pacing.md` §7/§10 to match. **This entry is
-   not that update** — it is the protocol, written before anyone has run it on real hardware, exactly
+   not that update** — it's the protocol, written before anyone has run it on real hardware, exactly
    like `forceSyncScrolling`'s own history two sections above should be a reminder to keep it that
    way until a real trace actually reports back.
 
 **P22 iter2-onset: the gesture-onset artifact, a correction to the pacing gate, and how to A/B
 both.** After the pacing fix above landed, real-hardware feedback was that the grid "feels really
 good" at a consistent ~30ms/frame, with one small artifact left: at the very *start* of a fast
-fling — peak velocity, before deceleration begins — there is a brief, visible moment, a few frames
-long, where content isn't fully rendered. Once deceleration starts it is gone. This entry extends
-the protocol above (same setup, same build, same gesture); it is not a new section, and it does not
+fling — peak velocity, before deceleration begins — there's a brief, visible moment, a few frames
+long, where content isn't fully rendered. Once deceleration starts it's gone. This entry extends
+the protocol above (same setup, same build, same gesture); it isn't a new section, and it doesn't
 supersede anything above.
 
-*What was wrong, and it was not the chase.* SlickGrid binds its own viewport `scroll` listener
+*What was wrong, and it wasn't the chase.* SlickGrid binds its own viewport `scroll` listener
 inside `finishInitialization()` (`slickgrid` `dist/esm/index.js:7572`, reached from the constructor
 because `explicitInitialization: false`). `SlickGridHost.vue` binds its own `onViewportScroll` on
 that same element only *after* `new KiraSlickGrid(...)` returns. Two non-capturing listeners on one
 target fire in registration order, so SlickGrid's `handleScroll` — and the synchronous `render()` →
 `getRenderedRange()` → `velocity()` it drives — **always ran one sample ahead of the host's own
-sampling of the very event that triggered it**. Mid-fling that is invisible (velocity barely moves
-frame to frame). At the first render of a fresh gesture it is not: the only sample on hand was taken
+sampling of the very event that triggered it**. Mid-fling that's invisible (velocity barely moves
+frame to frame). At the first render of a fresh gesture it isn't: the only sample on hand was taken
 *before* the gesture, so the sampler's own 150ms at-rest test fires and `velocity()` returns
 `{0, 0}`. The grid sizes its runway as if standing still — `target` collapses to the base runway,
 the per-call new-cell budget (~50 rows at 12 mounted columns) is left entirely unspent, and
-`getRenderedRange` does not even flag a deficit, because the range it returned *does* reach that
+`getRenderedRange` doesn't even flag a deficit, because the range it returned *does* reach that
 collapsed target. One whole frame of runway-building is lost at the exact moment a fling needs it
 most, **on every gesture** — which is why the artifact appeared at the start of every fling and not
 only the first one in a tab. The fix samples the viewport at the point of consumption, so no render
@@ -634,9 +632,9 @@ can run on a sample older than the event that triggered it.
 *The alternative that was considered and rejected, stated so nobody re-proposes it.* Letting the
 first catch-up render after a rest-to-motion transition bypass the quiescence gate. It reintroduces
 exactly one doubled frame per gesture, at the moment the user is most sensitive, on a "was it idle?"
-heuristic that a main-thread stall can false-positive mid-fling — and it cannot help on the frame
-that actually matters, because on the onset frame the pre-fix code does not *want* a chase at all
-(`chaseWanted` is false, since `target` collapsed), so there is nothing for a bypass to release. The
+heuristic that a main-thread stall can false-positive mid-fling — and it can't help on the frame
+that actually matters, because on the onset frame the pre-fix code doesn't *want* a chase at all
+(`chaseWanted` is false, since `target` collapsed), so there's nothing for a bypass to release. The
 shipped fix never touches the chase gate.
 
 *The correction to the pacing pass, found while measuring this one, and the more important half of
@@ -650,52 +648,52 @@ which is precisely a frame the main thread is already behind on. The gate then o
 unnoticed because the gate was never really being asked: the stale sampler above reported *zero*
 velocity on much of a fast fling, `target` collapsed, no chase was wanted, and the gate was passing
 its own test by not being exercised. So the wall-clock gate is now joined by a **per-frame** one a
-slow frame cannot outrun — a catch-up render additionally requires that no native `scroll` event
+slow frame can't outrun — a catch-up render additionally requires that no native `scroll` event
 arrived between the previous animation frame and this one, read as a sequence number rather than a
 duration (the refinement the plan's own §10 anticipated). It stays ordering-agnostic: it never asks
 whether the scroll render or the chase ran first inside a frame, only whether a scroll event
-happened across the last one. It is strictly conservative — it can only ever *delay* a chase, never
+happened across the last one. It's strictly conservative — it can only ever *delay* a chase, never
 release one — and its cost is that after a fling stops the chase converges from the second quiet
 frame rather than the first.
 
-*What the sandbox is allowed to claim here, and what it is not.* Provable here, and proved
+*What the sandbox is allowed to claim here, and what it isn't.* Provable here, and proved
 (`tests/ui/slick-grid.spec.ts`, the `P22 iter2-onset` test): that under the old policy a frame's
 runway velocity is *exactly* the previous frame's measured `pxPerFrame`, for the whole length of a
 fling (the one-sample lag is measured, not inferred); that after the fix no render sizes its runway
 at rest while the viewport is moving, across three rest-to-motion transitions; that the pacing
 invariant still holds on that same recording (no frame renders twice); and that removing the new
 per-frame gate re-introduces doubled frames on the same fling, so the invariant holds *because* of
-it. **Nothing here claims the onset artifact is gone. It is not confirmed fixed until a real Mac
+it. **Nothing here claims the onset artifact is gone. It isn't confirmed fixed until a real Mac
 says so — this investigation's own history (`forceSyncScrolling`, `0865ef6` → `18a2cc4`) is the
-standing reason a sandbox-plausible fix does not get to certify itself.**
+standing reason a sandbox-plausible fix doesn't get to certify itself.**
 
 *The readings that would refute this pass, stated before running.* **(a)** `staleVelocityFrames` on
 the baseline (with `freshVelocitySampleOverride = false`) is ~0 during a real fling — then the
-sampler was not stale on real hardware, the mechanism does not occur there, and the fix is aimed at
+sampler wasn't stale on real hardware, the mechanism doesn't occur there, and the fix is aimed at
 nothing. **(b)** `staleVelocityFrames` goes to 0 and the onset artifact is still visible — then the
-runway's cold start was not what produced it; the remaining suspects are the per-call new-cell cap
-(the runway still needs ~2 budget-capped frames to converge, which this fix shortens but does not
+runway's cold start wasn't what produced it; the remaining suspects are the per-call new-cell cap
+(the runway still needs ~2 budget-capped frames to converge, which this fix shortens but doesn't
 eliminate) and the GPU-process bucket §7.4 hands forward. **(c)** `renderCountHistogram` gains
-2-render frames after this pass — then the new per-frame gate is not doing what the sandbox says it
+2-render frames after this pass — then the new per-frame gate isn't doing what the sandbox says it
 does, and `chaseFrameGateOverride` is the first thing to A/B.
 
 **Protocol — same build, same table, same gesture as the pacing protocol above.** Report
 `summary.staleVelocityFrames`, `summary.runwayVelocity` `{mean, p50, p95, max}` **next to**
-`summary.pxPerFrame`'s own (the gap between the two is the runway's input lag, and it is what this
+`summary.pxPerFrame`'s own (the gap between the two is the runway's input lag, and it's what this
 pass closes), plus everything the pacing protocol above already asks for, and one sentence on
 whether the onset artifact is still there.
 
 1. **Baseline, live, no rebuild:** `window.__kiraGridTuning.freshVelocitySampleOverride = false`,
    then one hard flick from a dead stop. Expect `staleVelocityFrames` >= 1 per gesture and
-   `runwayVelocity` visibly lagging `pxPerFrame`. Refuting reading (a) if it does not.
+   `runwayVelocity` visibly lagging `pxPerFrame`. Refuting reading (a) if it doesn't.
 2. **Unset it** (the shipped default) and repeat the same flick. `staleVelocityFrames` should be 0
    and `runwayVelocity` should track `pxPerFrame`. **The reading that matters is the perceptual
    one: is the few-frames-of-unrendered-content at the very start of the fling still there?**
-   Refuting reading (b) if the numbers move and the artifact does not.
+   Refuting reading (b) if the numbers move and the artifact doesn't.
 3. **The per-frame chase gate A/B:** `window.__kiraGridTuning.chaseFrameGateOverride = false`, same
    flick, then unset. Read `renderCountHistogram` and `frameMs.stddev`. If the histogram gains
    2-render frames with it off, the sandbox measurement reproduces on real hardware and the gate is
-   load-bearing; if it does not, the wall-clock gate was sufficient there and this half can be
+   load-bearing; if it doesn't, the wall-clock gate was sufficient there and this half can be
    reconsidered (do **not** simply delete it — a threshold shorter than a frame is wrong in
    principle whether or not this particular gesture exposes it).
 4. **Re-run steps 3 and 4 of the pacing protocol above** (`chaseQuietMsOverride`,
@@ -707,11 +705,11 @@ whether the onset artifact is still there.
    standing start, and this fix removes the *wasted* first frame but not the cap itself. Raising
    `maxNewCellsPerRenderOverride` for one run is the console-line experiment that says whether the
    cap is the remaining term; **it trades directly against the single-frame batch cost the
-   iter2-scroll-gaps pass existed to bound**, so a win there is a re-opened trade-off, not a free
+   iter2-scroll-gaps pass existed to bound**, so a win there's a re-opened trade-off, not a free
    fix.
 6. Fold the result into this section and update
-   `docs/v1.1/plans/P22-slickgrid-migration-plan-iter2-pacing.md` §11. **This entry is not that
-   update** — it is the protocol, written before anyone has run it on real hardware.
+   `docs/v1.1/plans/P22-slickgrid-migration-plan-iter2-pacing.md` §11. **This entry isn't that
+   update** — it's the protocol, written before anyone has run it on real hardware.
 
 **The ceiling, restated so nobody re-derives it** (the plan's own §7.4): even the calmest frames in
 the post-`fce3e54` recording — before the heavy scroll-dispatch bursts start, with no chase firing —
@@ -719,18 +717,18 @@ ran **23.5-24.5 ms**, past the 16.7 ms a 60 Hz budget allows, with composite + s
 accounting for only a few ms of that. **~18-20 ms of even the best frame is in the GPU-process
 bucket**, invisible to `__kiraScrollTrace`, to a WebContent-process Timeline, and to this sandbox.
 Nothing in this pass — or the two before it — can reach it. This is a measured floor from the tools
-available, not a proven hard ceiling; Xcode Instruments, which this project does not have access to,
+available, not a proven hard ceiling; Xcode Instruments, which this project doesn't have access to,
 is what would settle whether it's addressable at all. This is exactly why the pass optimises
 **variance**, per the user's own stated goal ("smooth, ideally 60fps, but it can be lower with proper
 pacing"), rather than average frame rate.
 
 ### 2.2 Memory budget — `tests/e2e/memory.spec.ts` (removed)
 
-**Status: the budget fails in this environment no matter what, on non-app-controllable process
+**Status: the budget fails here no matter what, on non-app-controllable process
 overhead — `tests/e2e/memory.spec.ts` was removed rather than kept red forever.** This section stays
 as the documented structural finding that justifies the removal, not a bug report. Per plan decision
 D21 ("If the 350 MB budget still fails after every pre-approved lever in §4 has been pulled, the
-implementing session stops and reports the per-process breakdown. It does not relax the assertion,
+implementing session stops and reports the per-process breakdown. It doesn't relax the assertion,
 re-scope the scenario, or redesign the process model."), the test's assertion was left unmodified
 through every lever pull below and failed every time; carrying a permanently-red assertion in the
 suite stopped being useful once every lever P12 pre-approved had been exhausted, so the spec itself
@@ -787,13 +785,13 @@ directories, so deferring the import here defers each driver's load until a conn
 is actually created. Result: baseline engine RSS dropped to ~119 MB (this is the number reflected
 in the baseline table above). ~32 MB recovered — real, but small next to the ~450 MB gap to budget.
 
-**P32 note: the Kafka driver is native, not JS, and its memory is not reclaimable the way the
+**P32 note: the Kafka driver is native, not JS, and its memory isn't reclaimable the way the
 other five drivers' is.** `@confluentinc/kafka-javascript` replaced `kafkajs` as the Kafka driver
 in P32 — the numbers above predate that swap and were measured with the pure-JS `kafkajs`. Once a
 Kafka connection is created and L-A's lazy import pulls the native addon into the engine process,
 its compiled code and librdkafka's own internal buffers (per-connection socket/protocol state, not
 V8 heap) stay resident for the life of the process; V8's garbage collector has no visibility into
-that memory and disconnecting the adapter does not release it back to the OS the way closing a
+that memory and disconnecting the adapter doesn't release it back to the OS the way closing a
 `pg`/`mongodb`/`ioredis` connection does. This is a property of loading any native Node addon, not
 a P32-specific leak — it just means L-A's "lazy load defers the cost" framing is slightly
 optimistic for Kafka specifically: the deferred cost, once paid, is paid for the rest of the
@@ -815,15 +813,15 @@ P32's other unverified-in-this-sandbox items).
 **L-D after the Wails/Go migration.** The 252 MB this row used to carry was an electron-builder
 `--dir` arm64 build with `electronLanguages: ['en']` — a build that no longer exists, so the figure
 was retired rather than carried forward against a different bundle. The measurement is now
-`du -sh "apps/kira-studio/bin/Kira Studio.app"` (§3), and it has not been taken: no macOS hardware in this
+`du -sh "apps/kira-studio/bin/Kira Studio.app"` (§3), and it hasn't been taken: no macOS hardware in this
 environment.
 
 **L-D after P58f M10.** `scripts/vendor-node.sh` and the `runtime/` tree it populated are gone
-outright, not merely trimmed — there is no vendored Node runtime or engine-child bundle left to
+outright, not merely trimmed — there's no vendored Node runtime or engine-child bundle left to
 weigh at all, only the one Go binary plus its embedded frontend assets. **Not available in this
 session**: no macOS hardware here either, and no projection is offered — a projection built from an
-earlier spike bundle's own different layout was tried once already for this row and was not a sound
-basis for declaring the > 300 MB trigger fired or unfired; that reasoning does not improve by
+earlier spike bundle's own different layout was tried once already for this row and wasn't a sound
+basis for declaring the > 300 MB trigger fired or unfired; that reasoning doesn't improve by
 reapplying it. Record the real `du -sh` number in §3 on the next macOS run.
 
 Per D21: every pre-approved lever has been evaluated against real measurements; only L-A fired and
@@ -837,12 +835,12 @@ of total RSS) — not silently patched.
 
 **Status: measured, and explicitly NOT a G1 verdict.** P52 §3.3 defines G1 against a real macOS
 arm64 build (the same machine P51 part 4 used) matching WKWebView's helper processes, because
-that is the platform this migration ships on. This sandbox is Linux x86_64 with WebKitGTK
+that's the platform this migration ships on. This sandbox is Linux x86_64 with WebKitGTK
 2.52.3 — a structurally different webview implementation from WKWebView, not a stand-in for it.
 The numbers below are real, reproducible measurements of the real M1 walking skeleton, kept here
-because they are the first concrete evidence that §0.2's stated risk ("the system-webview saving
-might be smaller than the vendored-Node cost that replaces Electron's own Node") is not
-hypothetical — but per P52 §15, **P53 does not start until this same procedure is re-run on real
+because they're the first concrete evidence that §0.2's stated risk ("the system-webview saving
+might be smaller than the vendored-Node cost that replaces Electron's own Node") isn't
+hypothetical — but per P52 §15, **P53 doesn't start until this same procedure is re-run on real
 macOS hardware and produces a recorded go/amber/no-go verdict.** Nothing below substitutes for
 that.
 
@@ -854,7 +852,7 @@ measured with the app's real instrument, not a one-off script. **Cross-checked a
 --forest`**, which is how the process set below was actually discovered (see note below) — a
 single self-reported number is exactly what P51 §3.7 warns against.
 
-**The process set was not obvious, confirming §3.3's own warning — just not in the way §3.3
+**The process set wasn't obvious, confirming §3.3's own warning — just not in the way §3.3
 anticipated.** On macOS, the warning is that WKWebView's helper processes are *not* children of
 the app in the pid-tree sense and must be found by matching the `.app` bundle instead. On Linux,
 the opposite structural surprise showed up: WebKitGTK's `WebKitNetworkProcess` and
@@ -871,7 +869,7 @@ are directly comparable in shape (not platform) to §2.2's table.
 **Configuration (1)'s scaffold was removed in P29.** `apps/kira-studio/blank/` and the
 `KIRA_G1_BLANK=1` swap in `main.go` were dead weight in the shipped binary years after this gate
 closed (§2.4 already recorded the verdict), and had bit-rotted since — the page's hand-copied
-`Call.ByID` numeric id predates `-names` bindings and could not be trusted without repair. The
+`Call.ByID` numeric id predates `-names` bindings and couldn't be trusted without repair. The
 numbers below are kept as the historical record; rebuilding configuration (1) would need a fresh
 static page written against the current `-names`-generated bindings, not a restore of the deleted
 one.
@@ -901,15 +899,15 @@ reads against a real, empty Go SQLite database — §3.2's actual G1 scenario): 
 
 **Secondary hard check (§3.3): the engine child's own RSS, ping-only idle, must be ≤ 150 MB.**
 Measured 45-46 MB in both configurations — **passes**, and this half of the check is genuinely
-platform-independent (it is the same vendored Node binary answering the same one op, regardless
+platform-independent (it's the same vendored Node binary answering the same one op, regardless
 of which webview surrounds it), unlike the headline number above.
 
-**What this Linux number does and does not say.** Read literally against §2.2's 620-626 MB
+**What this Linux number does and doesn't say.** Read literally against §2.2's 620-626 MB
 Electron baseline, configuration (2)'s 689.5 MB is *higher*, not lower — on this platform, this
-build is not smaller than Electron. The reason is legible in the table: `WebKitWebProcess` alone
+build isn't smaller than Electron. The reason is legible in the table: `WebKitWebProcess` alone
 (252.7-317.8 MB) is a full, separate WebKitGTK library instance, not a thin OS-supplied surface —
 structurally closer to Electron's own Browser+GPU cost than to what WKWebView is expected to cost
-on macOS, where it is a shared system framework most of whose weight is already resident for any
+on macOS, where it's a shared system framework most of whose weight is already resident for any
 app using it. **This is exactly why P52 §0.2 refused to let this migration proceed past a scaffold
 without measuring the real target platform first** — a Linux-only measurement would have made the
 opposite (wrong) case for a "go" here, and the real macOS number could easily go either way from
@@ -965,7 +963,7 @@ is authorized to start.**
    contains them in the first place.
 3. **`internal/metrics.MatchingPIDs`' plain executable-path substring match over-counts on macOS.**
    WKWebView's helper processes (`com.apple.WebKit.WebContent`/`.GPU`/`.Networking`) are reparented
-   to `launchd` (`ppid=1`) — there is no pid-tree relationship to this app — so a naive
+   to `launchd` (`ppid=1`) — there's no pid-tree relationship to this app — so a naive
    `"com.apple.WebKit"` substring match also matches *every other running app's* idle WebKit
    helpers. Confirmed concretely on this machine: it silently added ~87 MB from Messages' and
    Notes' own background helpers, inflating a real 261.7 MB reading to a reported ≈300 MB — a
@@ -984,13 +982,13 @@ is authorized to start.**
 **One measurement-methodology note, not a bug:** config (1) must be launched the same way real users
 launch the app — via Finder/`open` (LaunchServices) — for `responsibility_get_pid_responsible_for_pid`
 to attribute WebKit helpers correctly at all; a directly-`exec`'d binary (e.g. `./kira-studio-shell &`
-from a shell) does not establish the same responsibility chain, and undercounts by omitting the
+from a shell) doesn't establish the same responsibility chain, and undercounts by omitting the
 helpers entirely (observed directly: an `exec`'d blank-config run found only 2 of the real 5
 processes). `KIRA_G1_BLANK=1` can still reach a `open`-launched process via `launchctl setenv
 KIRA_G1_BLANK 1` beforehand (`launchctl unsetenv` after) — LaunchServices doesn't otherwise pass
 through a launching shell's own environment.
 
-**What this does not close:** `apps/kira-studio/build/darwin/Taskfile.yml`'s directories for `linux`, `windows`,
+**What this doesn't close:** `apps/kira-studio/build/darwin/Taskfile.yml`'s directories for `linux`, `windows`,
 `ios`, `android` and `docker` were `wails3 init`'s default scaffold, unconditionally generated
 regardless of target — never wired to anything this macOS-only app needs. Removed in this pass
 (`apps/kira-studio/Taskfile.yml`'s `includes:` now lists only `common`/`darwin`), along with the now-dead
@@ -1039,9 +1037,9 @@ collection).
 
 The wire-side comparison (1.33x vs 10.87x) is the one D5 was decided on and reproduces cleanly.
 The heap side confirms the same direction and a similar order of magnitude to the ~48x figure it
-replaces, but the two numbers are not the same instrument measuring the same call shape as
+replaces, but the two numbers aren't the same instrument measuring the same call shape as
 whatever produced the original 48x, so treat 40.9x as this fixture's own honest number rather than
-a reproduction of that exact figure. Go's own 6.86x is not "6.86x worse than raw" in a way that
+a reproduction of that exact figure. Go's own 6.86x isn't "6.86x worse than raw" in a way that
 matters at runtime — `json.Marshal`'s base64 encoder allocates one intermediate string plus the
 final byte slice, both short-lived, against a Node engine that additionally builds and then walks
 a ~2000-entry-per-buffer JS object graph.
@@ -1068,7 +1066,7 @@ shelf alternatives weighed against these numbers, and the recommendation are
 §8.4 re-run, not a copy of its own measurements.
 
 **Method.** Four fixtures — the two configurable page sizes, the maximum page size, and a wide
-worst case — built through a verbatim copy of the real `internal/page` codec (`internal/` cannot be
+worst case — built through a verbatim copy of the real `internal/page` codec (`internal/` can't be
 imported outside the module, so a copy is the only way to measure it from a throwaway program; this
 is the P58a M2 / §2.5 convention, and nothing here is committed to the repo). The timed unit is the
 real production call, `json.Marshal(wireResponse{Kind:"res", ID, OK:true, Payload:
@@ -1093,12 +1091,12 @@ an empty result set, a NULL-only column, and — the one case that fails silentl
 if fudged — a page with no truncated rows at all, since a nil `[]byte` marshals as `null` where a
 non-nil empty one marshals as `""`, and `port.ts`'s `toTypedArray` hands that straight to
 `Uint8Array.fromBase64`). The wall-clock speedup (7-15x here; the P4 plan's own run on different
-hardware saw 6-12x) is not the number to lean on given GC noise at the larger sizes; the allocation
+hardware saw 6-12x) isn't the number to lean on given GC noise at the larger sizes; the allocation
 ratio is the steady result, converging from paying 2.4-3.1x the frame's own size in transient
 allocation down to almost exactly 1.00x — one buffer, no intermediate copies.
 
 **What base64 itself still costs, and what a binary envelope would additionally buy — unaffected by
-this change, so not re-measured here.** This commit does not touch a single byte on the wire, so
+this change, so not re-measured here.** This commit doesn't touch a single byte on the wire, so
 the P4 plan's own wire-size, gzip, and frontend-decode measurements (its F12 and F13) carry over
 unchanged: base64 inflates the wire by **1.33-1.36x** over raw bytes and that inflation **survives
 gzip at roughly the same ratio** (a fixed 4:3 alphabet expansion of already-high-entropy bytes is
@@ -1108,11 +1106,11 @@ view** under a JavaScriptCore proxy for the app's real WKWebView, scaling with f
 every buffer of every column is copied into a fresh typed array before the first cell is read. A
 binary envelope replacing that copy with a zero-copy view over the received bytes would remove that
 whole pass (down to 0.02-0.14 ms in the same plan's measurement) and the 25-33% of wire bytes base64
-adds — genuine remaining costs this commit does not touch. The P4 plan's recommendation (§4, R5) is
+adds — genuine remaining costs this commit doesn't touch. The P4 plan's recommendation (§4, R5) is
 to specify that envelope now (§5) and build it only when one of three named triggers fires — a
 budget regression with frame decode implicated, a page-kind or default-size change that moves the
 typical frame an order of magnitude, or an actual frontend/backend network split — because today's
-numbers, even before this commit, did not clear that bar, and this commit closes roughly 85-90% of
+numbers, even before this commit, didn't clear that bar, and this commit closes roughly 85-90% of
 the Go-side gap to that binary envelope on its own, with no protocol change, no frontend change, and
 no fixture regeneration.
 
@@ -1145,7 +1143,7 @@ repo. Allocation is `runtime.MemStats.TotalAlloc` delta, timed in a separate pas
 (interleaving `ReadMemStats` calls into the timed loop measurably inflates the smallest fixture).
 Each figure is the median of dozens-to-thousands of in-process repetitions — 500 down to 8 on the
 Go encode side for the same reason §2.6 gave (GC pressure at the largest fixture; the allocation
-pass at `10,000 × 40` cannot run hundreds of times in a reasonable session and still ran only 8),
+pass at `10,000 × 40` can't run hundreds of times in a reasonable session and still ran only 8),
 2,000 down to 50 on the frontend decode side, run under Bun/JavaScriptCore — **this is a proxy for
 the app's real WKWebView, not a claim that the two are identical**, repeating §2.6's own framing of
 that same instrument. Raw buffer bytes are each page's own `ByteSize` field, unchanged by the
@@ -1218,7 +1216,7 @@ own file identifier (P11 D5) means `FinishedBytes()` goes straight to `Send` wit
 framing step: a length-prefixed header design would have needed to write that header in front of
 the already-finished buffer, which — because FlatBuffers builds back-to-front and a header can't be
 prepended in place — would have forced a second copy of the entire frame, doubling the wide
-fixture's ~27 MB `memcpy` on every single response. That copy is what D5 avoids, and it is not
+fixture's ~27 MB `memcpy` on every single response. That copy is what D5 avoids, and it isn't
 visible in either of these two tables precisely because it never happens.
 
 **What this re-run confirms, and what is worth noting as a surprise.** The frontend decode win is
@@ -1230,9 +1228,9 @@ base64 materialization. The wire-byte reduction (~24-25% at every size, convergi
 absolute overhead as the fixture grows) matches F12's prediction just as closely. The one number
 that does *not* land where a reader might assume it would: **Go-side encode wall-clock time is
 slower after this change, not faster** — 1.3x to 2.5x slower across these four fixtures, driven by
-the allocation cost detailed above, not by anything algorithmically worse. This is not a surprise
+the allocation cost detailed above, not by anything algorithmically worse. This isn't a surprise
 against what the P11 plan itself said going in — F15 explicitly called the remaining Go-side prize
-"real but modest" and stated plainly that "this phase is not primarily a Go-side CPU play" — but it
+"real but modest" and stated plainly that "this phase isn't primarily a Go-side CPU play" — but it
 is worth stating plainly here rather than leaving the encode row to be misread as a win to match
 the decode row. Nothing above changes L2's own accounting: `ChunkByteSize` still returns the
 identical number either format (§8.3's `byteSize` assertion, P11 D9), so this section's numbers are
@@ -1273,14 +1271,14 @@ timing/allocation passes):
 | 10,000 × 12 | 5.89 ms / 4.18x | 685 µs / **1.06x** | 8.6x |
 | 10,000 × 40 | 63.35 ms / 3.95x | 7.09 ms / **1.06x** | 8.9x |
 
-This is not just a smaller regression — it clears the original §2.6 JSON+base64 baseline outright,
+This isn't just a smaller regression — it clears the original §2.6 JSON+base64 baseline outright,
 on both axes that baseline was measured on. Against §2.6's own numbers (41.3 µs/1.045x, 382.8
 µs/1.016x, 3.96 ms/1.002x, 36.95 ms/1.000x), the fixed FlatBuffers encoder is now **5.2-7.7x faster**
 in wall-clock time at every fixture size, with an allocation ratio (1.06-1.18x) in the same band as
 JSON's own (1.00-1.05x) rather than 4-6.5x above it. Combined with §2.7's wire-byte and frontend-
-decode numbers (both unaffected by this section — the wire format didn't change), there is no
+decode numbers (both unaffected by this section — the wire format didn't change), there's no
 remaining axis on which the pre-P11 JSON+base64 codec beats the current one. §2.7's own framing —
-"this phase is not primarily a Go-side CPU play" — was right about F15's original C3 scope; this
+"this phase isn't primarily a Go-side CPU play" — was right about F15's original C3 scope; this
 follow-up closes the one number that stayed a genuine regression rather than leaving it as accepted
 cost.
 
@@ -1304,10 +1302,10 @@ deleted after each run, nothing measurement-only committed), heap read via `Heap
 app ships on** — a proxy for the app's own allocations against the app's own real code, not a claim
 of equivalence with a packaged build. The renderer-retention probe (`window.__kiraRetention`, C1)
 is the deterministic, engine-independent cross-check for the same claims — it counts structures
-directly (Map sizes), not bytes an engine chooses to report, so it is quoted alongside the heap
+directly (Map sizes), not bytes an engine chooses to report, so it's quoted alongside the heap
 number wherever the two measure the same thing.
 
-**F2's own baseline, re-run** (same fixtures, same method; the boot-heap absolute is not
+**F2's own baseline, re-run** (same fixtures, same method; the boot-heap absolute isn't
 comparable session-to-session — a different Chromium build/host each run, F1's own caveat — the
 deltas are what matters and are compared to F2 directly):
 
@@ -1327,7 +1325,7 @@ widens with page size because C3's pruning caps retained rows at the rendered wi
 how many more rows the page holds, so the fixed cost (the window) becomes a shrinking fraction of a
 bigger page while the eliminated cost (the rest of the page) grows with it.
 
-**The probe, on the same scenario, showing what the heap number cannot.** A synthetic 100-document
+**The probe, on the same scenario, showing what the heap number can't.** A synthetic 100-document
 page, no scroll: `parseCacheRows`/`decodeCacheRows` sit at **100** (the whole page) immediately
 after load — VirtualList's own exact-height math needs every *expanded* row's line count to build
 its offset table, and every document defaults to expanded (P27 D2), so the first pass is a genuine,
@@ -1347,11 +1345,11 @@ instead of the 38.8 MB (400 000 matches) / 96.2 MB (a million) F6 measured with 
 from **1,052,840 B / 334.51 KB gzip** (C1-C4 landed, before the `/*#__PURE__*/` pass) to
 **1,050,930 B / 333.97 KB gzip** after — **-1,910 B (-0.18%)**. Smaller than F7's own zod-aliased-
 to-a-stub A/B estimate (70,103 B): that measurement removed the whole zod runtime plus every schema
-wholesale, which a pure annotation on unused declarations alone cannot recover once Rollup traces
+wholesale, which a pure annotation on unused declarations alone can't recover once Rollup traces
 the real dependency graph — several of the 135 schemas turn out reachable from something real, not
 only the two `safeParse` call sites F7 audited by hand. The `decodePath`/`pathTail` Set lookup
-(replacing `nodeKindSchema.safeParse` on a render path) is not separately measured in bundle bytes
-— it is a CPU-time fix (F7's own 1 443 ns/call figure), not a retention one.
+(replacing `nodeKindSchema.safeParse` on a render path) isn't separately measured in bundle bytes
+— it's a CPU-time fix (F7's own 1 443 ns/call figure), not a retention one.
 
 **C7 (multi-page frame sharing), the exact P11 OQ-1 shape, before and after, this session:** a
 two-statement `Run all` (two 3 000-row pages, one frame) followed by "Close other results".
@@ -1371,10 +1369,10 @@ other result is closed — freeing exactly that page's own share.
    uses CodeMirror), and opening one ordinary grid tab — the single most common first action in any
    real session — costs +1.02 MB more (6.89 MB), with two live `.cm-editor` instances confirmed
    present in the DOM at that point (the WHERE and ORDER BY boxes). Splitting the chunk would move
-   that ~1 MB (not 407 KB — bundle size and parsed/retained heap are not 1:1) from before first
+   that ~1 MB (not 407 KB — bundle size and parsed/retained heap aren't 1:1) from before first
    paint to the first tab open, which happens within seconds of launch in essentially every real
    session. This phase measures *retained* memory (§0.1), not boot latency — a code the user is
-   about to load anyway staying loaded is not a retention win, and P6 (Vapor mode) is explicitly
+   about to load anyway staying loaded isn't a retention win, and P6 (Vapor mode) is explicitly
    this repo's owner for boot-time/parse-time concerns, not P5.
 2. **D9 (`sessionQueueBytes`/`sessionMaxInFlightOps`): declined — no change.** Instrumented
    `Session.queuedBytes`' peak directly (a temporary, uncommitted `go test` inside
@@ -1386,9 +1384,9 @@ other result is closed — freeing exactly that page's own share.
    (3,715,570 B, F4), against a writer whose `conn.Send` is deliberately slower than production so
    frames genuinely pile up. **Peak: 35.4 MiB**, against the 32 MiB `sessionQueueBytes` budget —
    reached and briefly exceeded (`enqueueResponse`'s own "a single frame must still get through"
-   rule lets one more frame in past the ceiling), not a ceiling nothing approaches. That is the
+   rule lets one more frame in past the ceiling), not a ceiling nothing approaches. That's the
    budget working as designed, not evidence it should move either direction — D9's own bar
-   ("change the constant only if the peak justifies it") is not cleared by a peak that confirms the
+   ("change the constant only if the peak justifies it") isn't cleared by a peak that confirms the
    existing number rather than contradicting it.
 
 ### 2.10 P12 round 1 — bundle size re-measured, P18's own "unchanged in size" claim now stale
@@ -1430,8 +1428,8 @@ pre-Green-Tea collector** — not just §2.3's Linux walking-skeleton RSS and §
 gate G1 result, but also §2.5's transient-heap row, §2.6's before/after wall-clock and allocation
 table, §2.7's Go encode time/`TotalAlloc` table, and §2.8's fixed-regression table. §2.3/§2.4
 genuinely need the real macOS hardware §2.4's own methodology note requires, which this sandbox
-does not have; §2.5-§2.8 need no such hardware — they are pure in-module Go benchmarks (throwaway
-programs run in this sandbox, per each section's own "Method" note) — but this phase does not
+doesn't have; §2.5-§2.8 need no such hardware — they're pure in-module Go benchmarks (throwaway
+programs run in this sandbox, per each section's own "Method" note) — but this phase doesn't
 re-measure them either, since P19's own scope is a dependency and toolchain bump, not a re-run of
 P4's/P58a's/P11's own measurement procedures.
 
@@ -1445,7 +1443,7 @@ independent and stand as measured. Every Go-side wall-clock figure (the encode "
 since wall-clock time includes whatever GC work ran concurrently with or was triggered by the
 measured call — these need re-measurement before being read as current, same as §2.3/§2.4. §2.7's
 frontend decode timings are a different case again: they run under Bun/JavaScriptCore, not Go, so
-there is no Go GC in that measured window at all — unaffected by this caveat either way. Read
+there's no Go GC in that measured window at all — unaffected by this caveat either way. Read
 §2.5-§2.8's Go-side wall-clock numbers as historical baselines from before this GC change, and
 their allocation numbers (and the frontend decode timings) as still current, until whoever next
 re-runs these throwaway measurement programs (or the real-Mac procedure, §3, for §2.3/§2.4)
@@ -1476,7 +1474,7 @@ that with a Unix socket plus FlatBuffers framing, so `docs/v1.3/SPEC.md` carried
 asking for re-measurement, not re-derivation. G3 built the probe (`TestGraphStreamPerf`) and G8
 extended it to nine (`TestG8PerfBaseline`), both in `apps/kira-studio/internal/gitsock/`. Both are
 **opt-in** — `KIRA_GIT_PERF=1`, skipped in `-short`, skipped without `git` on `PATH` — and **assert
-nothing**: each prints one `key=value` line. That is a decision, not an omission: a hard threshold
+nothing**: each prints one `key=value` line. That's a decision, not an omission: a hard threshold
 in a suite that also runs on real macOS hardware would be flaky in exactly the way
 "re-measurement, not re-derivation" warns against.
 
@@ -1502,7 +1500,7 @@ chunks leave within about 2 ms of each other, because a whole page (`logsession.
 by `git log` plus parsing, **not** by the socket and not by FlatBuffers, so further transport
 optimisation would buy nothing and a page-size change is the lever that would. Third, a page is
 ~422 KB in 10 chunks of ~42 KB — three orders of magnitude under the 8 MiB frame cap, so frame
-sizing is not a live constraint.
+sizing isn't a live constraint.
 
 **Not measured on real hardware.** These are container numbers, like every other figure in §2. The
 macOS equivalents belong in §3's manual procedures, which have still not been run.
@@ -1539,16 +1537,16 @@ tolerance band, which technically trips exit criterion #9's own "materially larg
 investigating" clause by absolute size — but a *shrink* of this shape is exactly what removing
 duplicated CSS in favour of shared components predicts, not evidence that anything was duplicated
 rather than replaced (the failure mode #9 was actually watching for). No further investigation
-follows from this number; it is recorded here so the exit criterion is no longer an open item.
+follows from this number; it's recorded here so the exit criterion is no longer an open item.
 
 **Not measured on real hardware**, like every other figure in this section — the macOS-packaged
-build's own CSS asset was not separately verified, on the standing assumption (§2.13's own note)
+build's own CSS asset wasn't separately verified, on the standing assumption (§2.13's own note)
 that a container Vite build and a packaged one produce byte-identical CSS output.
 
 ## 3. Manual procedures (macOS, packaged build)
 
-Not yet run — no macOS hardware available in this environment. Run these once on macOS 14+ arm64
-and record the results here. **Rewritten for the Wails/Go bundle at P57 M8**: the steps below are a
+Not yet run — no macOS hardware here. Run these once on macOS 14+ arm64 and record the results
+here. **Rewritten for the Wails/Go bundle at P57 M8**: the steps below are a
 re-pointed procedure, not a re-measurement — nothing in this section has been executed on real
 hardware since the migration, and no number in this file changed as a result of the rewrite.
 
@@ -1556,7 +1554,7 @@ hardware since the migration, and no number in this file changed as a result of 
 darwin:package:dmg`, then `scripts/sign-bundle.sh`; see `docs/PACKAGING.md`) produces both
 **`apps/kira-studio/bin/Kira Studio.app`** and, around it, **`Kira Studio.dmg`** — the shipped
 artifact as of P10. electron-builder's `dist/mac-arm64/` output, its `app.asar` and its
-`out/main/` entry points no longer exist. As of P58f M10 there is also no `Contents/MacOS/runtime/`
+`out/main/` entry points no longer exist. As of P58f M10 there's also no `Contents/MacOS/runtime/`
 tree of any kind — no vendored Node runtime, no engine-child bundle — since every adapter now runs
 natively inside the one Go binary. The only measurement-relevant path inside the bundle is
 `Contents/MacOS/Kira Studio` itself.
@@ -1564,7 +1562,7 @@ natively inside the one Go binary. The only measurement-relevant path inside the
 **Packaged cold start** (target: ≤ 1500 ms median of 3 warm launches):
 1. `bun run package`.
 2. Launch `apps/kira-studio/bin/Kira Studio.app` 3 times via Finder or `open`, discarding the first
-   (Gatekeeper's quarantine scan of an ad-hoc-signed bundle on first launch is not the app's cost).
+   (Gatekeeper's quarantine scan of an ad-hoc-signed bundle on first launch isn't the app's cost).
    Launch it the way a user would rather than `exec`ing the binary — §2.4's own methodology note
    records that a directly-`exec`'d run is a structurally different process set on macOS.
 3. Read the cold-start line from `~/.kira-studio/logs/kira-<YYYY-MM-DD>.log` for each of the 3
@@ -1586,9 +1584,9 @@ packaged check is what's left):
    `Ticker` sum CPU and, on darwin, **`ri_phys_footprint`** (not RSS — since P7,
    `internal/metrics/probe_darwin.go` reads `proc_pid_rusage(RUSAGE_INFO_V2)` per pid per tick)
    across the app's own process set every 5 s (`metrics.Interval`) and emit it as `kira:app:metrics`.
-   There is no separate manual command to run for the headline number, and no per-process breakdown
-   — it is one app-wide figure by construction (§2.2's per-process table has no equivalent here).
-3. **Optional second opinion — not the same instrument as step 2, and the two numbers are not
+   There's no separate manual command to run for the headline number, and no per-process breakdown
+   — it's one app-wide figure by construction (§2.2's per-process table has no equivalent here).
+3. **Optional second opinion — not the same instrument as step 2, and the two numbers aren't
    directly comparable.** `cd apps/kira-studio && go run ./cmd/g1measure` (its `-anchor`/`-helper`
    defaults are `metrics.AnchorNeedles`/`HelperNeedles`; min of 10 samples 1 s apart) and a plain
    `ps -o rss=` sum both report **RSS**, never phys_footprint — `cmd/g1measure/main.go` sums
@@ -1600,8 +1598,8 @@ packaged check is what's left):
    phys_footprint reading is *not* a like-for-like comparison against it — record the RSS figure
    (step 3) against the budget, and record the status-bar figure too if in doubt which one a future
    reader will want. As of P58f M10 the process set for either instrument is just the `Kira Studio`
-   binary and the `com.apple.WebKit.*` helpers (there is no vendored Node process left to include).
-   Do not grep `com.apple.WebKit` by hand unfiltered: it also matches every *other* running app's
+   binary and the `com.apple.WebKit.*` helpers (there's no vendored Node process left to include).
+   Don't grep `com.apple.WebKit` by hand unfiltered: it also matches every *other* running app's
    idle WebKit helpers, the over-count §2.4's third bug records (≈ 87 MB of other apps on that
    machine) and the reason `metrics.AppProcessSet` exists.
 4. Record both figures if in doubt, and label each with which instrument it came from: `<RSS total>
@@ -1609,9 +1607,9 @@ packaged check is what's left):
 
 **Window-bounds debounce timer on close (F8, D8)** — now `apps/kira-studio/internal/shell/window.go`: the
 resize/move debouncer (300 ms, `boundsDebounce`) is cancelled on `events.Common.WindowClosing`, and
-again by `Attach`'s detach at quit. **The Electron-era symptom this check watched for does not carry
+again by `Attach`'s detach at quit. **The Electron-era symptom this check watched for doesn't carry
 over.** It looked for the process lingering on an unref'd-but-still-pending `setTimeout`; a pending
-Go `time.AfterFunc` never holds process exit, so "exits promptly" cannot fail here and is not worth
+Go `time.AfterFunc` never holds process exit, so "exits promptly" can't fail here and isn't worth
 a manual run. What is still worth verifying by hand is D8's deliberate *non-flush*: move the
 packaged app's window and let it settle (> 300 ms, so that rectangle is persisted), move it again
 and quit within 300 ms of that second move, then relaunch and confirm the window comes back at the
@@ -1619,16 +1617,16 @@ and quit within 300 ms of that second move, then relaunch and confirm the window
 the old check, not re-measured.
 
 **Op-log reconciliation on an engine crash (F10, D10)** — **no manual procedure any more, as of
-P58f M10.** There is no separate engine child process left to kill: every adapter runs in-process
+P58f M10.** There's no separate engine child process left to kill: every adapter runs in-process
 inside the one Go binary, so "kill the child" is no longer a distinct failure mode — it would mean
 killing the whole app. The reconciliation this check protected now happens at two levels instead,
 both covered by automated tests rather than a manual run: (1) `adapterhost.Host.safeRun` (P58 D16)
 recovers a panic inside any single adapter call into a normal failed op (`E_INTERNAL`) on that op's
-own `op:end`, so one adapter's crash cannot leave that op stuck `running`; (2) `internal/oplog`'s
+own `op:end`, so one adapter's crash can't leave that op stuck `running`; (2) `internal/oplog`'s
 `Wiring.finishInFlight` — generalised from "the engine child died" to "the event source is done"
 (P58f D9) — finishes any row still `running` when the op-event channel itself closes, e.g. at
 shutdown. A hard kill of the whole process (SIGKILL, OOM, a panic outside `safeRun`) still leaves
-`running` rows on next launch, same as before P58f; there is nothing left this manual procedure
+`running` rows on next launch, same as before P58f; there's nothing left this manual procedure
 would exercise that `apps/kira-studio/internal/adapterhost` and `apps/kira-studio/internal/oplog`'s own unit tests don't
 already cover.
 
@@ -1638,17 +1636,17 @@ past 30 days in `~/.kira-studio/logs/`, relaunching the packaged app, and confir
 gone while newer ones remain.
 
 **App size (lever L-D)** — `du -sh "apps/kira-studio/bin/Kira Studio.app"`, against the > 300 MB trigger. See
-§2.2's lever table for what that row currently does and does not claim.
+§2.2's lever table for what that row currently does and doesn't claim.
 
 ## 4. P13's nonfunctional sweep — the three items P12 handed forward
 
-The three items §4 previously handed to P13 are resolved as of P13; the two below whose coverage
+The three items §4 handed to P13 are resolved as of P13; the two below whose coverage
 lived in `tests/e2e/leaks.spec.ts` moved to Go with the rest of the L2/L3 cache (P58a A21, per
 §2.1) and are now asserted directly against the real cache in
 `apps/kira-studio/internal/enginecache/lru_test.go`'s `TestByteLru_*` cases, not a browser-driven scenario.
 
 1. **`src/engine/cache/counts.ts`'s `store` was a plain `Map<string, StoredCount>`** with no byte
-   budget or eviction policy — **fixed (F19, D19)**. It is now a `ByteLru` sharing L2's shape:
+   budget or eviction policy — **fixed (F19, D19)**. It's now a `ByteLru` sharing L2's shape:
    `L3_BUDGET_BYTES = 256 * 1024`, a nominal `COUNT_ENTRY_BYTES = 128` per entry, ≈ 2 048 entries
    before eviction, ported unchanged into `apps/kira-studio/internal/enginecache`. The original browser-driven
    proof (now retired) drove 2 500 distinct `{path, filter}` combinations through `data.count()` and
