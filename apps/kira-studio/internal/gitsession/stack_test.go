@@ -961,6 +961,46 @@ func TestRestackSlot_ForceCancel(t *testing.T) {
 	}
 }
 
+// TestCommitResolves_NewlineRecordedBaseDoesNotDesyncSharedSession is G32 round-3
+// architecture/security review, finding #2's own regression proof: recordedBase (commitResolves'
+// own sha argument) is read straight out of branch.<name>.kirastackbase — this file's own
+// DetectCycleFrom/resolveStackBase doc comments already treat a hand-edited config as a real
+// threat model, and git config values may legally contain a literal newline. Before the fix,
+// commitResolves passed sha+"^{commit}" straight to the shared cat-file session's Check (one
+// line in, one line out); a newline embedded in sha made git read it as TWO --batch-check
+// queries while Check only ever consumes ONE response — the second, leftover response line then
+// silently answers the very next, wholly unrelated Check call on this same session, for the life
+// of the RepoEntry (the exact desync shape G31-ARCH2 already fixed for Blob/blobOID/blobOIDs).
+func TestCommitResolves_NewlineRecordedBaseDoesNotDesyncSharedSession(t *testing.T) {
+	skipWithoutGitStack(t)
+	dir, _ := initLinearStackRepo(t)
+	entry := newStackTestEntryWithRunner(t, gitclient.NewExecRunner(), dir)
+	ctx := context.Background()
+
+	mainSha := revParseStack(t, dir, "main")
+
+	// A hand-edited kirastackbase-shaped value carrying an embedded newline plus a bogus second
+	// line naming something that resolves to nothing at all.
+	malicious := mainSha + "\nnosuchref-at-all"
+
+	if _, err := entry.commitResolves(ctx, malicious); err != nil {
+		t.Fatalf("commitResolves(malicious): %v", err)
+	}
+
+	// Without the fix, Check's own response for the malicious query's SECOND line ("missing", for
+	// "nosuchref-at-all") is left unread in the session's buffered reader and silently answers
+	// THIS call instead of its own real query for mainSha — reporting mainSha as not resolving,
+	// which is false.
+	ok, err := entry.commitResolves(ctx, mainSha)
+	if err != nil {
+		t.Fatalf("commitResolves(mainSha): %v", err)
+	}
+	if !ok {
+		t.Fatal("commitResolves(mainSha) = false after a newline-carrying recordedBase, want true " +
+			"-- the shared cat-file session was desynced by the earlier malicious query's leftover response")
+	}
+}
+
 func TestRestackPreflight_RecordedBaseFallsBackToMergeBase(t *testing.T) {
 	skipWithoutGitStack(t)
 	dir := t.TempDir()

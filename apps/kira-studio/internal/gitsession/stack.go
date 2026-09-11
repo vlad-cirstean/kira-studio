@@ -174,7 +174,18 @@ func (e *RepoEntry) Stacks(ctx context.Context) (gitpreflight.StackListResult, e
 // session — the same existence check UndoRun already uses for a RecoverySha, reused here for D14/F4's
 // own "recordedBase, when it still resolves" rule. false (never an error) for an empty sha, a torn-
 // down entry, or anything catfile.ErrMissing reports.
-func (e *RepoEntry) commitResolves(sha string) (bool, error) {
+//
+// G32 round-3 architecture/security review, finding #2: unlike RecoverySha (always an ObjectID this
+// package captured itself), sha here is recordedBase — read straight out of
+// branch.<name>.kirastackbase, a config value a hand-edited .git/config can set to anything at all,
+// newline included (this file's own DetectCycleFrom/resolveStackBase doc comments already assume a
+// hand-edited config is a real threat model). session.Check's --batch-check protocol is one line in,
+// one line out (catfile/session.go); a newline anywhere in `sha + "^{commit}"` makes git read it as
+// TWO requests while only one response gets consumed here, and the leftover response line then
+// answers the NEXT unrelated caller sharing this same session — silently, for the life of the
+// RepoEntry, exactly the desync G31-ARCH2 already fixed for Blob/blobOID/blobOIDs's own rev/path
+// inputs. Routed through the same CheckOneShot escape hatch those fixes established.
+func (e *RepoEntry) commitResolves(ctx context.Context, sha string) (bool, error) {
 	if sha == "" {
 		return false, nil
 	}
@@ -182,7 +193,14 @@ func (e *RepoEntry) commitResolves(sha string) (bool, error) {
 	if session == nil {
 		return false, ErrRepoTornDown
 	}
-	if _, err := session.Check(sha + "^{commit}"); err != nil {
+	full := sha + "^{commit}"
+	var err error
+	if strings.ContainsRune(full, '\n') {
+		_, err = session.CheckOneShot(ctx, full)
+	} else {
+		_, err = session.Check(full)
+	}
+	if err != nil {
 		if errors.Is(err, catfile.ErrMissing) {
 			return false, nil
 		}
@@ -197,7 +215,7 @@ func (e *RepoEntry) commitResolves(sha string) (bool, error) {
 // stack before this phase, or whose recorded base has since been gc'd.
 func (e *RepoEntry) resolveBranchBase(ctx context.Context, parent, branch, recordedBase string) (gitpreflight.RestackBaseInfo, error) {
 	if recordedBase != "" {
-		ok, err := e.commitResolves(recordedBase)
+		ok, err := e.commitResolves(ctx, recordedBase)
 		if err != nil {
 			return gitpreflight.RestackBaseInfo{}, err
 		}
