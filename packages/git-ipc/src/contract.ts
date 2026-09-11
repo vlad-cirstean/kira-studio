@@ -2191,8 +2191,12 @@ export type Contract = {
     'graph.stream': {
       params: {
         repoId: string;
-        /** Ignored when `range` is present — a ranged walk has no cache to resume from (§5.4's
-         *  exclusion, made structural). */
+        /** Honored the same way with `range` present or absent (G32 round-3 performance review,
+         *  finding #1 — this field used to be structurally documented as ignored for a ranged
+         *  request, but the server reuses the same walk, and so the same row cache, across every
+         *  `graph.stream` call for one range spec exactly like the graph's own non-ranged walk;
+         *  `review.ts`'s own `loadMore` needs this to resume past what it already applied instead
+         *  of re-streaming the whole range from row 0 on every page). */
         resumeThroughRow?: number;
         /** Present ⇒ walk `<base>..<branch>` instead of the repo's `graph.scope` rev set,
          *  against this repo's own separate review walk. Chunk shape is byte-for-byte the same. */

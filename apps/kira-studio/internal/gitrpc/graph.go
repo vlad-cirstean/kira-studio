@@ -217,9 +217,20 @@ func resolveWalkRequest(c *gitsession.Conn, repoID string, rng *CommitRangeParam
 // handleGraphStream serves graph.stream: upstream's streamGraph, via gitsession.Walk.Stream
 // (D14) — every emitted StreamChunk is packed to a FlatBuffer (gitstore.EncodeChunkFrame) and
 // handed to rpcstream's emit as the chunk envelope's out-of-band blob (D4/D5). `range` present
-// (D10) streams the review walk instead of the graph's; resumeThroughRow is never read on the
-// ranged path (D11) — a ranged walk has no persisted cache to resume from, only whatever this
-// walk's own store already holds, which Stream replays regardless.
+// (D10) streams the review walk instead of the graph's.
+//
+// resumeThroughRow used to be forced nil on this path (D11's own "a ranged walk has no persisted
+// cache to resume from" — true, but conflated "nothing PERSISTED across a cold reopen" with
+// "nothing the CLIENT already has in memory"). G32 round-3 performance review, finding #1: Conn.
+// Walk reuses the SAME *Walk (and so the same w.store/w.marks cache) across every graph.stream
+// call for one range spec, exactly like the graph's own non-ranged walk — review.ts's own
+// loadMore does a graph.loadMore (pages the walk) followed immediately by a graph.stream re-open,
+// and that re-open used to always start at row 0, re-sending and re-decoding every row already
+// applied from the walk's own cache, THROWN AWAY AND REBUILT client-side each time (packedStream.
+// ts's own from===0-with-existing-rows reset rule) — quadratic in the number of pages loaded.
+// resumeThroughRow is now honored exactly like the non-ranged path: Walk.Stream's own clamping
+// (a value past what is cached, or with no matching dictionary mark, safely falls back to 0) is
+// what actually makes trusting it safe, not whether the walk happens to be ranged.
 func (r *Router) handleGraphStream(ctx context.Context, c *gitsession.Conn, params json.RawMessage, emit func(payload any, blob []byte) error) error {
 	var p GraphStreamParams
 	if err := json.Unmarshal(params, &p); err != nil {
@@ -246,11 +257,7 @@ func (r *Router) handleGraphStream(ctx context.Context, c *gitsession.Conn, para
 		return mapConnError(err)
 	}
 
-	resumeThroughRow := p.ResumeThroughRow
-	if p.Range != nil {
-		resumeThroughRow = nil
-	}
-	return w.Stream(ctx, resumeThroughRow, ChunkRows, func(chunk gitsession.StreamChunk) error {
+	return w.Stream(ctx, p.ResumeThroughRow, ChunkRows, func(chunk gitsession.StreamChunk) error {
 		blob := gitstore.EncodeChunkFrame(chunk.Packed)
 		payload := graphChunk{
 			RepoID: p.RepoID, Seq: chunk.Seq, From: chunk.From, To: chunk.To,

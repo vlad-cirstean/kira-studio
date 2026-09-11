@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -327,6 +328,95 @@ func TestIntegration_GraphStreamResumesFromCache(t *testing.T) {
 	if got := atomic.LoadInt32(&logs); got != afterFirst {
 		t.Fatalf("'git log' spawns after a fully-cached resume = %d, want unchanged from %d", got, afterFirst)
 	}
+}
+
+// TestIntegration_RangedGraphStreamResumesFromCache is G32 round-3 performance review finding
+// #1's own regression proof: handleGraphStream used to force resumeThroughRow to nil whenever
+// range was present, so review.ts's own loadMore -> re-open sequence re-streamed the WHOLE
+// range from row 0 on every page, even though Conn.Walk reuses the same walk (and so the same
+// row cache) for a ranged spec exactly like the non-ranged graph. Mirrors
+// TestIntegration_GraphStreamResumesFromCache above, but over a range walk with a small pageSize
+// (600 total commits at pageSize 300 forces two real pages) and asserts the resumed chunk starts
+// at row 300, not row 0 — logsession's own persistent-process design (one `git log` spawn for
+// the walk's whole life, ReadPage just pulling more from its already-running stdout, not
+// spawning again per page) makes a spawn-count assertion the wrong signal here, unlike the
+// non-ranged test above; the wire-level `From`/`Source` on each resumed chunk is what actually
+// proves whether a full or a partial replay happened.
+func TestIntegration_RangedGraphStreamResumesFromCache(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not on PATH")
+	}
+	server, sockPath, _, _ := newIntegrationServer(t)
+	repoDir := buildFastImportRepo(t, 600)
+	baseCmd := exec.Command("git", "rev-parse", "main~599") // the very first (oldest) commit.
+	baseCmd.Dir = repoDir
+	baseOut, err := baseCmd.Output()
+	if err != nil {
+		t.Fatalf("git rev-parse main~599: %v", err)
+	}
+	base := strings.TrimSpace(string(baseOut))
+
+	client := pairAndReady(t, server, sockPath, "ranged-resume-client")
+	result := openRepoOK(t, client, repoDir)
+	repoID := result.Repo.RepoID
+	rangeParams := map[string]any{"base": base, "branch": "main"}
+
+	id1 := client.openStream("graph.stream", map[string]any{
+		"repoId": repoID, "range": rangeParams, "pageSize": 300,
+	})
+	client.sendCredit(id1, 10)
+	firstChunks := drainStreamToEnd(t, client)
+	if len(firstChunks) == 0 {
+		t.Fatal("expected at least one chunk from the first (ranged) stream")
+	}
+
+	requestOK(t, client, "graph.loadMore", map[string]any{
+		"repoId": repoID, "pages": 1, "range": rangeParams, "pageSize": 300,
+	})
+	loaded := rangeStatusOK(t, client, repoID, rangeParams).Loaded
+	if loaded <= 300 {
+		t.Fatalf("loaded = %d after loadMore, want > 300 (a real second page landed)", loaded)
+	}
+
+	id2 := client.openStream("graph.stream", map[string]any{
+		"repoId": repoID, "range": rangeParams, "pageSize": 300, "resumeThroughRow": 300,
+	})
+	client.sendCredit(id2, 10)
+	chunks := drainStreamToEnd(t, client)
+	if len(chunks) == 0 {
+		t.Fatalf("resumed ranged stream produced no chunks, want the cached [300,%d) range replayed", loaded)
+	}
+	sawFrom300 := false
+	for _, f := range chunks {
+		var payload graphChunkPayload
+		if err := json.Unmarshal(f.Body.Chunk, &payload); err != nil {
+			t.Fatalf("unmarshal chunk payload: %v", err)
+		}
+		if payload.Source != "cache" {
+			t.Fatalf("resumed chunk source = %q, want cache", payload.Source)
+		}
+		if payload.From == 0 {
+			t.Fatal("resumed ranged stream re-sent row 0 -- resumeThroughRow was ignored, the exact bug this test guards against")
+		}
+		if payload.From == 300 {
+			sawFrom300 = true
+		}
+	}
+	if !sawFrom300 {
+		t.Fatal("resumed ranged stream never emitted a chunk starting at row 300 (the resume point)")
+	}
+}
+
+// rangeStatusOK is graphStatusOK's own ranged counterpart — graph.status with a range param
+// reports the REVIEW walk's counters, never the graph's (handleGraphStatus's own D10 note).
+func rangeStatusOK(t *testing.T, c *testClient, repoID string, rangeParams map[string]any) graphStatusResult {
+	t.Helper()
+	resp := requestOK(t, c, "graph.status", map[string]any{"repoId": repoID, "range": rangeParams})
+	var result graphStatusResult
+	if err := json.Unmarshal(resp.Result, &result); err != nil {
+		t.Fatalf("unmarshal graph.status (ranged) result: %v", err)
+	}
+	return result
 }
 
 func TestIntegration_WalksArePrivatePerConnection(t *testing.T) {

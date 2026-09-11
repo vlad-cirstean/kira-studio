@@ -333,7 +333,21 @@ export class ReviewSessionState {
     }
   }
 
-  async #open(repoId: string, branch: string, base: string): Promise<void> {
+  /** `resumeThroughRow` defaults to this session's own currently-loaded row count — mirrors
+   *  `GraphViewState.openStream`'s own default exactly (G32 round-3 performance review, finding
+   *  #1): `loadMore`'s own re-open must resume past what it already applied, not restart the
+   *  whole ranged walk from row 0 (the server now honors this for a ranged request the same way
+   *  it always has for the graph's own). A genuine fresh open (`setTarget`/`setBase`/
+   *  `acknowledgeStaleReview`, each after its own `#packed.reset()`) passes the default
+   *  unchanged — 0, since there is nothing loaded yet to resume past. `#applyChunk`'s own
+   *  corrupted-stream recovery passes 0 explicitly instead, the same distrust-everything restart
+   *  `GraphViewState`'s own recovery already uses. */
+  async #open(
+    repoId: string,
+    branch: string,
+    base: string,
+    resumeThroughRow: number = this.#packed.loadedRows.value,
+  ): Promise<void> {
     this.#streamController?.abort();
     const controller = new AbortController();
     this.#streamController = controller;
@@ -341,7 +355,7 @@ export class ReviewSessionState {
     try {
       await this.#bridge.stream(
         'graph.stream',
-        { repoId, range },
+        { repoId, range, resumeThroughRow },
         (chunk) => this.#applyChunk(repoId, branch, base, chunk),
         controller.signal,
       );
@@ -359,7 +373,10 @@ export class ReviewSessionState {
     await this.#packed.applyChunk(chunk, {
       onCorrupted: async () => {
         if (this.repoId.value === repoId && this.branch.value === branch && this.#base === base) {
-          await this.#open(repoId, branch, base);
+          // Distrust everything and restart from row 0 — the same recovery GraphViewState's own
+          // onCorrupted uses, not the default (current loadedRows), since what's already applied
+          // is exactly what a corrupted chunk casts doubt on.
+          await this.#open(repoId, branch, base, 0);
         }
       },
     });
