@@ -75,6 +75,11 @@ type ghState struct {
 	snapshot      []ghclient.PR
 	snapshotAt    time.Time
 	snapshotValid bool
+	// snapshotFetch is G32 round-3 performance review, finding #6's own single-flight: non-nil
+	// while one goroutine's OpenPulls call for this repo is in flight, so a concurrent cache-miss
+	// caller (BranchPicker.vue's own PR_ENSURE_SNAPSHOT_CONCURRENCY fires up to 6 branch.resolvePr
+	// RPCs at once on a cold cache) waits on the SAME fetch instead of starting its own.
+	snapshotFetch *snapshotFetch
 
 	branch map[string]ghBranchEntry
 
@@ -94,6 +99,44 @@ type ghState struct {
 
 func newGhState() *ghState {
 	return &ghState{branch: make(map[string]ghBranchEntry), commit: make(map[string]ghCommitEntry)}
+}
+
+// snapshotFetch is one in-flight ensureSnapshot call's shared outcome (finding #6, above) — the
+// leader that starts it fills in prs/status and closes done; every follower that arrived while it
+// was running just waits on done and reads the same result, so a cold cache costs exactly one
+// OpenPulls call no matter how many goroutines missed the cache at once.
+type snapshotFetch struct {
+	done   chan struct{}
+	prs    []ghclient.PR
+	status ghclient.Status
+}
+
+// claimSnapshotFetch returns the fetch to wait on. leader is true for the one caller responsible
+// for actually running OpenPulls and calling finishSnapshotFetch; every other concurrent caller
+// gets leader=false and the same *snapshotFetch to block on.
+func (s *ghState) claimSnapshotFetch() (fetch *snapshotFetch, leader bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.snapshotFetch != nil {
+		return s.snapshotFetch, false
+	}
+	f := &snapshotFetch{done: make(chan struct{})}
+	s.snapshotFetch = f
+	return f, true
+}
+
+// finishSnapshotFetch records the leader's result on fetch (waking every follower blocked on
+// fetch.done) and clears s.snapshotFetch, so the next cache miss after this one starts a fresh
+// fetch rather than replaying this fetch's result forever.
+func (s *ghState) finishSnapshotFetch(fetch *snapshotFetch, prs []ghclient.PR, status ghclient.Status) {
+	fetch.prs = prs
+	fetch.status = status
+	s.mu.Lock()
+	if s.snapshotFetch == fetch {
+		s.snapshotFetch = nil
+	}
+	s.mu.Unlock()
+	close(fetch.done)
 }
 
 // drop is the refsChanged handler's own call (D6/D15): the snapshot, per-branch cache, per-commit
@@ -266,6 +309,15 @@ func (e *RepoEntry) githubEnabled() bool {
 // for ghSnapshotTTL — the one bulk read this feature makes, serving the graph indicator's own
 // pre-seed, the branch-picker badges and search's synchronous PR-record match all at once (D6/F16).
 // Never called at repo open (D13).
+//
+// G32 round-3 performance review, finding #6: a cold cache (repo open, or every ghSnapshotTTL
+// expiry) is exactly when the client's own PR_ENSURE_SNAPSHOT_CONCURRENCY fan-out
+// (packages/git-ui/src/state/pr.ts) fires up to 6 concurrent branch.resolvePr RPCs at once to warm
+// the branch picker — before claimSnapshotFetch/finishSnapshotFetch existed, every one of those 6
+// goroutines independently missed snapshotGet and ran its own full OpenPulls fetch (each up to 3
+// `gh` spawns + REST calls), for identical data. The single-flight below makes only the first
+// caller (the "leader") actually fetch; every other concurrent caller waits on that same fetch and
+// shares its result.
 func (e *RepoEntry) ensureSnapshot(ctx context.Context) ([]ghclient.PR, ghclient.Status) {
 	if prs, ok := e.gh.snapshotGet(); ok {
 		return prs, ghclient.Status{Kind: ghclient.KindOK}
@@ -280,14 +332,23 @@ func (e *RepoEntry) ensureSnapshot(ctx context.Context) ([]ghclient.PR, ghclient
 	if !ok {
 		return nil, ghclient.Status{Kind: "disabled"}
 	}
+
+	fetch, leader := e.gh.claimSnapshotFetch()
+	if !leader {
+		<-fetch.done
+		return fetch.prs, fetch.status
+	}
+
 	prs, status := e.ghClient.OpenPulls(ctx, repo)
+	if status.OK() {
+		e.gh.snapshotPut(prs)
+	} else if isRateLimitedStatus(status) {
+		e.gh.armBreaker(status)
+	}
+	e.gh.finishSnapshotFetch(fetch, prs, status)
 	if !status.OK() {
-		if isRateLimitedStatus(status) {
-			e.gh.armBreaker(status)
-		}
 		return nil, status
 	}
-	e.gh.snapshotPut(prs)
 	return prs, status
 }
 

@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -355,5 +356,131 @@ func TestResolveCommitPr_NonGitHubRemoteNeverSpawns(t *testing.T) {
 	}
 	if f.ghRunner.count() != 0 {
 		t.Fatalf("gh runner was invoked %d times for a non-GitHub remote, want 0", f.ghRunner.count())
+	}
+}
+
+// --- single-flight on a cold-cache snapshot fetch ---------------------------------------------------
+
+// singleFlightGhRunner is TestEnsureSnapshot_SingleFlightOnColdCache's own fake Runner. Every "api"
+// call whose path is the repo-wide open-PR snapshot's own (`pulls?state=open`) is counted; the
+// FIRST one to arrive blocks on release until the test lets it through, so the test can reliably
+// get many goroutines racing ensureSnapshot's own cache-miss branch at once before any of them
+// actually finishes — a second (bug-reproducing) call to this same endpoint would simply return
+// immediately rather than blocking, so it shows up as an extra count rather than a deadlock.
+// Every other call (the discovery probes) answers immediately, unthrottled.
+type singleFlightGhRunner struct {
+	mu            sync.Mutex
+	snapshotCalls int
+	entered       chan struct{}
+	release       chan struct{}
+	result        ghclient.Result
+}
+
+func newSingleFlightGhRunner(result ghclient.Result) *singleFlightGhRunner {
+	return &singleFlightGhRunner{entered: make(chan struct{}), release: make(chan struct{}), result: result}
+}
+
+func (r *singleFlightGhRunner) Run(_ context.Context, _ string, spec ghclient.Spec) (ghclient.Result, error) {
+	if len(spec.Args) == 0 || spec.Args[0] != "api" || !strings.Contains(spec.Args[len(spec.Args)-1], "pulls?state=open") {
+		return ghclient.Result{ExitCode: 0, Stdout: []byte("gh version 2.42.0 (2024-01-08)\n")}, nil
+	}
+
+	r.mu.Lock()
+	r.snapshotCalls++
+	first := r.snapshotCalls == 1
+	r.mu.Unlock()
+
+	if first {
+		close(r.entered)
+		<-r.release
+	}
+	return r.result, nil
+}
+
+func (r *singleFlightGhRunner) snapshotCallCount() int {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.snapshotCalls
+}
+
+// TestEnsureSnapshot_SingleFlightOnColdCache is G32 round-3 performance review, finding #6's own
+// regression proof: PR_ENSURE_SNAPSHOT_CONCURRENCY (packages/git-ui/src/state/pr.ts) fires up to 6
+// concurrent branch.resolvePr RPCs at once to warm a branch picker on a cold cache. Before
+// claimSnapshotFetch/finishSnapshotFetch existed, ensureSnapshot's own cache-miss branch had no
+// coordination between concurrent callers at all, so all 6 independently ran their own full
+// OpenPulls fetch. This fires 6 concurrent ensureSnapshot calls, holds the first real fetch open
+// until every goroutine has had a chance to reach the cache-miss branch, then releases it — and
+// asserts the gh runner's own snapshot endpoint was reached exactly once, with every caller still
+// getting the SAME correct snapshot back.
+func TestEnsureSnapshot_SingleFlightOnColdCache(t *testing.T) {
+	reg := NewRegistry(githubRemoteRunner{url: "https://github.com/acme/widgets.git"})
+	watcherCh := make(chan *fakeWatcher, 1)
+	reg.NewWatcher = func(gitclient.RepoSummary) (Watcher, error) {
+		w := newFakeWatcher()
+		watcherCh <- w
+		return w, nil
+	}
+	store := gitreview.NewStore(filepath.Join(t.TempDir(), "review.db"))
+	reg.Review = store
+	t.Cleanup(func() { _ = store.Close() })
+
+	runner := newSingleFlightGhRunner(ghclient.Result{ExitCode: 0, Stdout: threePullsJSON()})
+	reg.Gh = ghclient.NewClient(ghclient.NewDiscovery(fakeGhLocator{}, runner, ghclient.NewRealClock()), runner)
+
+	entry, release, err := reg.Acquire(context.Background(), "git", "/repo")
+	if err != nil {
+		t.Fatalf("Acquire: %v", err)
+	}
+	t.Cleanup(release)
+	t.Cleanup(reg.Close)
+	<-watcherCh
+
+	ctx := context.Background()
+	// Warm githubRepo's own cache first (a single git spawn, via githubRemoteRunner -- never
+	// touches the gh runner this test is counting) so every concurrent ensureSnapshot call below
+	// exercises only the thing this test is about: the snapshot fetch itself, not a second,
+	// unrelated race in githubRepo's own remoteChecked check.
+	if _, ok := entry.githubRepo(ctx); !ok {
+		t.Fatal("githubRepo: want a recognised GitHub remote for a github.com origin")
+	}
+
+	const concurrency = 6
+	type outcome struct {
+		prs    []ghclient.PR
+		status ghclient.Status
+	}
+	results := make([]outcome, concurrency)
+	var wg sync.WaitGroup
+	wg.Add(concurrency)
+	for i := 0; i < concurrency; i++ {
+		go func(i int) {
+			defer wg.Done()
+			prs, status := entry.ensureSnapshot(ctx)
+			results[i] = outcome{prs: prs, status: status}
+		}(i)
+	}
+
+	select {
+	case <-runner.entered:
+	case <-time.After(2 * time.Second):
+		t.Fatal("no goroutine ever reached the snapshot fetch -- ensureSnapshot never called OpenPulls")
+	}
+	// Give every other goroutine a chance to reach ensureSnapshot's own cache-miss branch while the
+	// leader's fetch is still held open -- this is what actually exercises the race the fix closes,
+	// rather than relying on scheduling luck to serialize the calls.
+	time.Sleep(20 * time.Millisecond)
+	close(runner.release)
+	wg.Wait()
+
+	if got := runner.snapshotCallCount(); got != 1 {
+		t.Fatalf("gh runner's open-PR snapshot endpoint was called %d times for %d concurrent ensureSnapshot calls on a cold cache, want 1", got, concurrency)
+	}
+	for i, r := range results {
+		if r.status.Kind != ghclient.KindOK {
+			t.Fatalf("results[%d].status = %+v, want KindOK", i, r.status)
+		}
+		if len(r.prs) != 3 {
+			t.Fatalf("results[%d].prs has %d entries, want 3 -- every caller must see the leader's own fetched snapshot", i, len(r.prs))
+		}
 	}
 }
