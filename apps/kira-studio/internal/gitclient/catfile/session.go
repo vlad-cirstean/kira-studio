@@ -118,6 +118,41 @@ func (p *persistentProcess) request(line string, readResp func(*bufio.Reader) er
 	return nil
 }
 
+// requestPipelined is request's own multi-line counterpart, CheckMany's own use (G32 round-3
+// performance review, finding #4): request's write-then-read ordering deadlocks once a batch is
+// large enough to fill BOTH this process's own pipe to the child (our write blocks) AND the
+// child's stdout pipe back to us (git blocks writing responses to a reader that hasn't started
+// draining, since we're still mid-write) — reachable in practice via CheckMany at roughly a
+// thousand-plus revs (RangeFiles on a monorepo branch touching that many already-reviewed files).
+// Pipelining the write on its own goroutine, concurrent with readResp below, removes the ordering
+// constraint entirely — exactly what --batch-check's own "many requests, one write, streamed
+// answers" protocol exists to allow. Held under the same mu, for the same "one request in flight"
+// reason request's own doc comment gives.
+func (p *persistentProcess) requestPipelined(lines string, readResp func(*bufio.Reader) error) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if err := p.ensureStarted(); err != nil {
+		return err
+	}
+	writeErrCh := make(chan error, 1)
+	go func() {
+		_, werr := io.WriteString(p.stdin, lines)
+		writeErrCh <- werr
+	}()
+	respErr := readResp(p.reader)
+	writeErr := <-writeErrCh
+	if writeErr != nil {
+		p.fail()
+		return writeErr
+	}
+	if respErr != nil {
+		p.fail()
+		return respErr
+	}
+	p.failures = 0
+	return nil
+}
+
 func (p *persistentProcess) close() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -199,7 +234,7 @@ func (s *Session) CheckMany(revs []string) ([]ObjectInfo, error) {
 		sb.WriteByte('\n')
 	}
 	infos := make([]ObjectInfo, len(revs))
-	err := s.check.request(sb.String(), func(r *bufio.Reader) error {
+	err := s.check.requestPipelined(sb.String(), func(r *bufio.Reader) error {
 		for i := range revs {
 			info, found, rerr := readHeader(r)
 			if rerr != nil {

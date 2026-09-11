@@ -418,3 +418,53 @@ func TestSession_KilledProcess_FailsQueuedRequestsRatherThanHanging(t *testing.T
 		}
 	}
 }
+
+// TestSession_CheckMany_LargeBatchDoesNotDeadlock is G32 round-3 performance review finding #4's
+// own regression proof: CheckMany used to write its entire batch to the child's stdin before
+// reading a single response line back. Past roughly a thousand-plus revs, the child's own stdout
+// pipe back to us fills (nothing has started draining it yet) and git blocks writing further
+// responses; our own write to its stdin then blocks too, since git has stopped reading it —
+// deadlock, forever, with no ctx on this path to time it out. A real `git cat-file --batch-check`
+// process is used (not a fake): the pipe buffers this depends on are a real OS/kernel property,
+// not something a fake reader/writer would reproduce.
+func TestSession_CheckMany_LargeBatchDoesNotDeadlock(t *testing.T) {
+	skipWithoutGit(t)
+	dir := initRepo(t)
+	sess := catfile.NewSession(catfile.Deps{Runner: gitclient.NewExecRunner(), GitPath: "git", Dir: dir}, 0)
+	defer sess.Close()
+
+	const n = 20000
+	revs := make([]string, n)
+	for i := range revs {
+		revs[i] = "HEAD"
+	}
+
+	done := make(chan struct {
+		infos []catfile.ObjectInfo
+		err   error
+	}, 1)
+	go func() {
+		infos, err := sess.CheckMany(revs)
+		done <- struct {
+			infos []catfile.ObjectInfo
+			err   error
+		}{infos, err}
+	}()
+
+	select {
+	case r := <-done:
+		if r.err != nil {
+			t.Fatalf("CheckMany: %v", r.err)
+		}
+		if len(r.infos) != n {
+			t.Fatalf("got %d results, want %d", len(r.infos), n)
+		}
+		for i, info := range r.infos {
+			if info.OID == "" {
+				t.Fatalf("result[%d] is a zero ObjectInfo -- HEAD must resolve", i)
+			}
+		}
+	case <-time.After(20 * time.Second):
+		t.Fatal("CheckMany on a large batch hung instead of returning -- the write/read pipe deadlock")
+	}
+}
