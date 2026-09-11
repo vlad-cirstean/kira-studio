@@ -1,5 +1,40 @@
 # Working agreement
 
+## Communication style
+
+Applies everywhere in this repo and every session working on it — chat replies, code comments,
+commit messages, issue/PR/MR text, and every markdown doc in the repo (this file included). Sole
+exception: `README.md` at repo root stays normal prose, since it's the outward-facing entry point
+for people outside this convention.
+
+Write terse. Substance only, no filler. Cut articles (a/an/the), hedge words (just/really/
+basically/actually/simply), and pleasantries (sure/certainly/of course/happy to). Fragments are
+fine. Prefer the short word over the long phrase (`fix` not `implement a solution for`). Standard,
+widely-known acronyms are fine (DB, API, HTTP); never invent new shortenings (cfg, impl, req, res,
+fn) — a tokenizer splits an invented abbreviation same as the full word, so it saves nothing and
+just costs the reader a decode. Same logic kills arrow connectors (`→`): no shorter than the word
+they replace. Never pad a sentence to *sound* terse either — compression only shrinks, it never
+grows.
+
+Never touch: negation words (not/never/no/only/except), numbers, units, code blocks, error strings,
+API/CLI names, exact technical terms. Dropping or softening any of those flips meaning for a token
+or two saved — never worth it.
+
+Blend in plain-language clarity discipline: one idea per sentence, ~20 words max, active voice,
+present tense where true, imperative for instructions ("Run X", not "X should be run"), one term
+per concept (no synonym rotation), a pronoun only when its referent is unambiguous. Where caveman
+terseness and this clarity discipline pull against each other, clarity wins.
+
+No tool-call narration or preamble. No decorative tables or emoji. Don't dump raw logs or output
+unless asked — quote just the one decisive line.
+
+Drop all of the above and write normal prose for: security warnings, confirming an irreversible
+action, a multi-step sequence where a dropped article or fragment could genuinely be misread, or
+any other spot where the compression itself creates ambiguity. Resume terse style right after.
+
+And the actual governing rule above all of these: if the terse phrasing isn't shorter than the
+plain phrasing, use the plain phrasing. This is about saving real tokens, not performing a style.
+
 Facts about the app itself — driver choices, protocol constraints, capability quirks — live in
 `docs/ARCHITECTURE.md`, not here. This file is process and environment only: how this team works,
 and how to run things wherever a session happens to be.
