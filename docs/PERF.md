@@ -1678,6 +1678,15 @@ this container, 4 cores, no Docker (container-backed cases self-skip — see `do
 P1-test-suite-speed.md` §0/§1 for the full method). CI's own container-tests/ui numbers still need
 a real run to confirm — not re-measured here.
 
+**`bun run test:ui` (`ui` + `ui-timing` projects, 252 tests), measured live in v1.4 P6's own
+session** — the number P1 itself left open (its §5 above: "no working frontend build in this
+container to run Playwright against"; this session has one from P4/P5's own work): **5m4s wall
+clock** (4 cores, no Docker, real WebKit via `bunx playwright install webkit`), 252/252 passed. `time`
+reports `user 11m41s` against `real 5m4s` — confirms `ui`'s own `workers: '100%'` parallelism is
+doing real work (≈2.3x on 4 logical cores), not serializing. This is the number P6's own plan
+(`docs/v1.4/plans/P6-visual-regression.md`) cites as the suite cost its new `visual` project adds
+five more boots on top of, not a fresh unknown.
+
 **`go test ./apps/kira-studio/...`, non-container packages**: 50.4s → 35.9s (−29%). Go already runs
 packages concurrently, so wall clock ≈ the slowest package; the win is per-package, not a global
 multiplier.
