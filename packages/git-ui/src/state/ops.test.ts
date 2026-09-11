@@ -10,6 +10,7 @@ import type {
   RemoteOpResult,
   RequestKey,
   ResultOf,
+  RevertPreflight,
   StashEntry,
   StatusSummary,
   StreamChunkOf,
@@ -350,5 +351,70 @@ describe('OpsState — post-checkout pull prompt', () => {
     await tick();
     await ops.runCheckout('feature', 'detach');
     expect(ops.pendingPostCheckoutPull.value).toBeUndefined();
+  });
+});
+
+// G32 round-3 functional-correctness review, finding #7: every #confirm* dialog above (checkout,
+// revert, reset, cherry-pick, stash apply/pop, pull, force push) opens a promise that only
+// resolves once the user actually clicks a button — arbitrarily long real-world wall-clock time,
+// during which App.vue's "Open in graph" can call OpsState.setRepoId() directly (it does not wait
+// on `busy`, since revealCommitInGraph is independent of whatever operation is mid-confirm). Before
+// this fix, resolving a stale dialog against the now-active repo would run op.run/#applyResult with
+// the OLD repoId's preflight/route but write results into whatever OpsState now considers current —
+// cross-repo data corruption. Exercises the pattern via runRevert; the same guard shape is applied
+// identically at every other #confirm* call site.
+describe('OpsState — a stale confirm dialog no-ops if the active repo changed while it was open', () => {
+  test('runRevert never calls op.run when the repo changes before the revert dialog resolves', async () => {
+    const OTHER_REPO = '/repos/b';
+    const transport = new FakeTransport();
+    const bridge = new BridgeClient(transport);
+    const refs = new RefsState(bridge);
+    const ops = new OpsState(bridge, refs);
+
+    const preflight: RevertPreflight = {
+      shas: ['sha1'],
+      mainlineRequired: [],
+      dirtyPaths: [],
+      inProgress: null,
+      prediction: { kind: 'clean' },
+      predictedFor: 'sha1',
+      detachedHead: false,
+      verdict: 'willConflict',
+      blockers: [],
+    };
+
+    transport.onRequest = (method) => {
+      switch (method) {
+        case 'status.get':
+          return STATUS;
+        case 'undo.peek':
+          return { slot: null };
+        case 'preflight.revert':
+          return preflight;
+        default:
+          throw new Error(`unscripted request: ${method}`);
+      }
+    };
+    ops.setRepoId(REPO);
+    await tick();
+
+    const runPromise = ops.runRevert(['sha1']);
+    // runRevert's willConflict verdict awaits #confirmRevert before doing anything else.
+    await tick();
+    expect(ops.pendingRevert.value).toBeDefined();
+
+    // The active repo changes while the dialog is still open — e.g. the user clicked "Open in
+    // graph" on a commit from a different repo entirely.
+    ops.setRepoId(OTHER_REPO);
+    await tick();
+
+    // Now the (stale) dialog resolves, as if the user had just clicked its confirm button.
+    ops.resolveRevertDialog({ mainline: undefined, noCommit: false });
+    await runPromise;
+
+    const revertAttempted = transport.calls.some(
+      (c) => c.method === 'op.run' && (c.params as { op: { kind: string } }).op.kind === 'revert',
+    );
+    expect(revertAttempted).toBe(false);
   });
 });

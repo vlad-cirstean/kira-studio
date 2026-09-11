@@ -443,7 +443,7 @@ export class OpsState {
             autoStash: auto.autoStash,
           },
         });
-        this.#applyResult(result);
+        this.#applyResult(repoId, result);
         if (!result.ok) {
           this.announcement.value = composeOpFailureAnnouncement('Checkout', result.error);
           return;
@@ -464,6 +464,15 @@ export class OpsState {
       let discardLocalChanges = false;
       if (preflight.verdict === 'blocked') {
         const route = await this.#confirmCheckout(preflight);
+        // G32 round-3 functional-correctness review, finding #7: the active repo can change
+        // while this dialog is open (e.g. "Open in graph" calls repo.open directly, independent
+        // of this method's own busy hold) — proceeding on a route the user chose for a DIFFERENT
+        // repo than the one now active would run this repo's write against the right repo (repoId
+        // is still passed explicitly below) but apply its result to whatever repo IS now active
+        // (#applyResult's own guard would in fact refuse that), so the honest outcome is to
+        // abandon the route rather than silently completing an action the user has since
+        // navigated away from.
+        if (this.#repoId !== repoId) return;
         if (route === null) {
           this.announcement.value = 'Checkout cancelled.';
           return;
@@ -477,6 +486,7 @@ export class OpsState {
           // required field, never a new behavior: this route never auto-stashes, it stash-and-
           // carries, exactly as it always has.
           await this.#stashAndCarry(
+            repoId,
             () =>
               this.#bridge.request('op.run', {
                 repoId,
@@ -499,7 +509,7 @@ export class OpsState {
         repoId,
         op: { kind: 'checkout', target, mode, discardLocalChanges, autoStash: false },
       });
-      this.#applyResult(result);
+      this.#applyResult(repoId, result);
       this.announcement.value = result.ok
         ? composeCheckoutAnnouncement(preflight, target)
         : composeOpFailureAnnouncement('Checkout', result.error);
@@ -534,6 +544,12 @@ export class OpsState {
       upstreamShortName: upstreamRef.replace(/^refs\/remotes\//, ''),
       behind: targetTrack.behind,
     });
+    // G32 round-3 functional-correctness review, finding #7: unlike the other #confirm* dialogs
+    // above, this method never captures its own `repoId` and needs no re-check here — its only
+    // effect after the dialog resolves is `runPull(remote, target)`, which independently
+    // re-validates identity via its own fresh `this.#repoId` capture at entry. If the active repo
+    // changed while this dialog was open, `runPull` simply pulls (or no-ops) against whatever repo
+    // is active now, exactly as if the user had triggered it directly from the toolbar.
     if (!proceed) return;
     await this.runPull(remote, target);
   }
@@ -585,6 +601,9 @@ export class OpsState {
       let noCommit = false;
       if (preflight.verdict !== 'clean' || preflight.mainlineRequired.length > 0) {
         const route = await this.#confirmRevert(preflight);
+        // G32 round-3 functional-correctness review, finding #7: same guard as runCheckout's own
+        // #confirmCheckout above — the active repo can change while this dialog is open.
+        if (this.#repoId !== repoId) return;
         if (route === null) {
           this.announcement.value = 'Revert cancelled.';
           return;
@@ -596,7 +615,7 @@ export class OpsState {
         repoId,
         op: { kind: 'revert', shas, mainline, noCommit },
       });
-      this.#applyResult(result);
+      this.#applyResult(repoId, result);
       this.announcement.value = result.ok
         ? composeRevertAnnouncement(shas, noCommit)
         : composeOpFailureAnnouncement('Revert', result.error);
@@ -657,6 +676,9 @@ export class OpsState {
         return;
       }
       const route = await this.#confirmReset(preflight);
+      // G32 round-3 functional-correctness review, finding #7: same guard as runCheckout's own
+      // #confirmCheckout above — the active repo can change while this dialog is open.
+      if (this.#repoId !== repoId) return;
       if (route === null) {
         this.announcement.value = 'Reset cancelled.';
         return;
@@ -672,7 +694,7 @@ export class OpsState {
             paths: [],
           },
         });
-        this.#applyResult(push);
+        this.#applyResult(repoId, push);
         if (!push.ok) {
           this.announcement.value = composeOpFailureAnnouncement('Stash', push.error);
           return;
@@ -689,7 +711,7 @@ export class OpsState {
           confirmToken: route.stashFirst ? undefined : route.token,
         },
       });
-      this.#applyResult(result);
+      this.#applyResult(repoId, result);
       this.announcement.value = result.ok
         ? composeResetAnnouncement(route.mode, target)
         : composeOpFailureAnnouncement('Reset', result.error);
@@ -764,6 +786,9 @@ export class OpsState {
         preflight.alreadyApplied
       ) {
         const route = await this.#confirmCherryPick(preflight);
+        // G32 round-3 functional-correctness review, finding #7: same guard as runCheckout's own
+        // #confirmCheckout above — the active repo can change while this dialog is open.
+        if (this.#repoId !== repoId) return;
         if (route === null) {
           this.announcement.value = 'Cherry-pick cancelled.';
           return;
@@ -775,7 +800,7 @@ export class OpsState {
         repoId,
         op: { kind: 'cherryPick', sha, mainline, noCommit },
       });
-      this.#applyResult(result);
+      this.#applyResult(repoId, result);
       const mismatch = this.#reconcileCherryPick(preflight.prediction, result);
       this.announcement.value = mismatch
         ? composeCherryPickMismatchAnnouncement(mismatch)
@@ -863,7 +888,7 @@ export class OpsState {
         repoId,
         op: { kind: 'stashPush', ...input },
       });
-      this.#applyResult(result);
+      this.#applyResult(repoId, result);
       let pushed = true;
       if (result.ok) {
         const after = await this.#bridge.request('stash.list', { repoId });
@@ -914,6 +939,9 @@ export class OpsState {
       });
       if (preflight.verdict !== 'clean') {
         const proceed = await this.#confirmStashPop(verb, preflight);
+        // G32 round-3 functional-correctness review, finding #7: same guard as runCheckout's own
+        // #confirmCheckout above — the active repo can change while this dialog is open.
+        if (this.#repoId !== repoId) return undefined;
         if (!proceed) {
           this.announcement.value = `Stash ${verb} cancelled.`;
           return undefined;
@@ -924,7 +952,7 @@ export class OpsState {
           ? { kind: 'stashApply', sha: entry.sha, restoreIndex }
           : { kind: 'stashPop', sha: entry.sha, index: entry.index, restoreIndex };
       const result = await this.#bridge.request('op.run', { repoId, op });
-      this.#applyResult(result);
+      this.#applyResult(repoId, result);
       const mismatch = this.#reconcileStashPop(verb, preflight.prediction, result);
       this.announcement.value = composeStashAnnouncement(
         verb,
@@ -1215,14 +1243,21 @@ export class OpsState {
    * the field's doc comment names. This is a deliberate, documented deviation from that comment's
    * literal reading — see `docs/plans/P9.md`'s own Findings.
    */
+  /** `repoId` is the CALLER's own captured repo id (`runCheckout`/`runPull`), a required
+   *  parameter rather than a fresh `this.#repoId` read (G32 round-3 functional-correctness
+   *  review, finding #7): reading it fresh here used to let this whole sequence — stash push,
+   *  the caller's own `runMiddle` (checkout/pull), stash pop — silently disagree with the
+   *  identity `runMiddle`'s own closure was built against, if the active repo changed between
+   *  the caller's confirm dialog opening and this method actually running (e.g. "Open in graph"
+   *  switching repos mid-dialog). One shared identity for the whole sequence, checked again after
+   *  each await below — via `#applyResult`'s own guard for the push/pop halves, and explicitly
+   *  for the `runMiddle` half, which writes `#refs`/`statusSummary` directly. */
   async #stashAndCarry(
+    repoId: string,
     runMiddle: () => Promise<CarryMiddleResult>,
     actionLabel: string,
     announceMiddleOk: () => string,
   ): Promise<void> {
-    const repoId = this.#repoId;
-    if (repoId === undefined) return;
-
     // G31 round-2 functional-correctness review, finding #1 (high): the stash-list snapshot
     // taken AFTER stashPush is not, by itself, proof that stashPush created anything — an
     // untracked-only dirty tree makes `git stash push` (no `-u`) print "No local changes to
@@ -1244,17 +1279,22 @@ export class OpsState {
         paths: [],
       },
     });
-    this.#applyResult(pushResult);
+    this.#applyResult(repoId, pushResult);
     if (!pushResult.ok) {
       this.announcement.value = composeOpFailureAnnouncement('Stash', pushResult.error);
       return;
     }
 
     const middle = await runMiddle();
-    this.#refs.applyHead(middle.head);
-    const current = this.statusSummary.value;
-    if (current)
-      this.statusSummary.value = { ...current, head: middle.head, inProgress: middle.inProgress };
+    // Same identity guard as #applyResult's own (this write isn't routed through it, since
+    // CarryMiddleResult isn't an OpResult) — a repo switch during runMiddle must not land its
+    // head/inProgress on whatever repo is displayed now.
+    if (this.#repoId === repoId) {
+      this.#refs.applyHead(middle.head);
+      const current = this.statusSummary.value;
+      if (current)
+        this.statusSummary.value = { ...current, head: middle.head, inProgress: middle.inProgress };
+    }
     if (!middle.ok) {
       this.announcement.value = `${composeOpFailureAnnouncement(actionLabel, middle.error)} Your changes are stashed — see the stash list.`;
       return;
@@ -1286,7 +1326,7 @@ export class OpsState {
       repoId,
       op: { kind: 'stashPop', sha: top.sha, index: top.index, restoreIndex: false },
     });
-    this.#applyResult(popResult);
+    this.#applyResult(repoId, popResult);
     const mismatch = this.#reconcileStashPop('pop', preflight.prediction, popResult);
     this.announcement.value = mismatch
       ? composeStashAnnouncement('pop', top, popResult, mismatch)
@@ -1396,7 +1436,7 @@ export class OpsState {
     this.busy.value = true;
     try {
       const result = await this.#bridge.request('undo.run', { repoId, id: slot.id });
-      this.#applyResult(result);
+      this.#applyResult(repoId, result);
       this.announcement.value = result.ok
         ? composeUndoAnnouncement(slot.label)
         : composeOpFailureAnnouncement('Undo', result.error);
@@ -1476,6 +1516,9 @@ export class OpsState {
 
     if (preflight.blockers.length > 0) {
       const proceed = await this.#confirmPull(preflight);
+      // G32 round-3 functional-correctness review, finding #7: same guard as runCheckout's own
+      // #confirmCheckout above — the active repo can change while this dialog is open.
+      if (this.#repoId !== repoId) return;
       if (!proceed) {
         this.announcement.value = 'Pull cancelled.';
         return;
@@ -1484,6 +1527,7 @@ export class OpsState {
       this.busy.value = true;
       try {
         await this.#stashAndCarry(
+          repoId,
           () =>
             this.#bridge.request('remote.run', {
               repoId,
@@ -1588,6 +1632,9 @@ export class OpsState {
     });
     if (this.#repoId !== repoId) return;
     const route = await this.#confirmForcePush({ remote, branch, preflight });
+    // G32 round-3 functional-correctness review, finding #7: same guard as runCheckout's own
+    // #confirmCheckout above — the active repo can change while this dialog is open.
+    if (this.#repoId !== repoId) return;
     if (route === null) {
       this.announcement.value = 'Force push cancelled.';
       return;
@@ -1696,7 +1743,7 @@ export class OpsState {
     this.busy.value = true;
     try {
       const result = await this.#bridge.request('op.run', { repoId, op });
-      this.#applyResult(result);
+      this.#applyResult(repoId, result);
       this.announcement.value = result.ok
         ? (announceOk(true) ?? `${actionLabel} succeeded`)
         : composeOpFailureAnnouncement(actionLabel, result.error);
@@ -1708,8 +1755,18 @@ export class OpsState {
 
   /** Step 4's synchronous half (W12's own doc comment): applies `head`/`inProgress`/`undo`
    *  before the matching `repo.changed` event — which always follows a real op — has a chance to
-   *  arrive and trigger `RefsState.reload()`/`refreshStatus()`'s own, fuller reconcile. */
-  #applyResult(result: OpResult): void {
+   *  arrive and trigger `RefsState.reload()`/`refreshStatus()`'s own, fuller reconcile.
+   *
+   *  `repoId` is the CALLING op's own captured repo id, not read fresh here (G32 round-3
+   *  functional-correctness review, finding #7): every caller already awaited at least one
+   *  request or dialog before reaching this point, during which the active repo can have changed
+   *  (`App.vue`'s "Open in graph" calls `repo.open` directly, independent of any op's own `busy`
+   *  hold). Applying a stale op's own head/inProgress/undo into `RefsState`/`statusSummary` after
+   *  such a switch would silently corrupt the NOW-displayed repo's state with another repo's own
+   *  result — the same identity check `refreshStatus`/`refreshUndo`/`#runRemote`/
+   *  `runWorktreePrepare` already apply to their own writes. */
+  #applyResult(repoId: string, result: OpResult): void {
+    if (this.#repoId !== repoId) return;
     this.#refs.applyHead(result.head);
     const current = this.statusSummary.value;
     this.statusSummary.value = current
