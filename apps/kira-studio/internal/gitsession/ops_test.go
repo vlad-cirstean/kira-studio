@@ -656,6 +656,48 @@ func TestUndoRun_InvalidatesRefsCache(t *testing.T) {
 	}
 }
 
+// TestCaptureBranchDeleteUndo_PipeInBranchNameDoesNotOverCaptureUnrelatedConfig is G32 round-3
+// architecture/security review, finding #3's own regression proof. gitops.BranchConfigRegexpArgs
+// used to splice the branch name straight into a POSIX ERE unescaped; "|" is a legal git branch-
+// name character (check-ref-format forbids space/~/^/:/?/*/[/\/".."/"@{", but not "|"), and ERE
+// gives "|" the LOWEST precedence of any operator — `^branch\.x|y\.` parses as "starts with
+// branch.x, OR contains y. anywhere", not "starts with branch.x|y.". Deleting a branch literally
+// named "x|y" therefore over-captured a wholly unrelated branch "y"'s own config into "x|y"'s undo
+// record — and that record's Replay unconditionally `git config`-SETs every captured key on undo,
+// so undoing "x|y"'s delete would have silently stomped branch "y"'s own remote/merge config back
+// to a stale snapshot.
+func TestCaptureBranchDeleteUndo_PipeInBranchNameDoesNotOverCaptureUnrelatedConfig(t *testing.T) {
+	skipWithoutGitQueries(t)
+	dir := t.TempDir()
+	runGitQ(t, dir, "init", "-q", "-b", "main")
+	runGitQ(t, dir, "commit", "-q", "--allow-empty", "-m", "c1")
+	runGitQ(t, dir, "branch", "x|y")
+	runGitQ(t, dir, "branch", "y")
+	runGitQ(t, dir, "config", "--local", "branch.x|y.remote", "origin")
+	runGitQ(t, dir, "config", "--local", "branch.y.remote", "origin2")
+
+	entry := newQueriesTestEntry(t, dir)
+	ctx := context.Background()
+
+	undo := entry.captureBranchDeleteUndo(ctx, ConnID("branch-delete-undo-test-conn"), "test", "x|y")
+	if undo == nil {
+		t.Fatal("captureBranchDeleteUndo returned nil")
+	}
+
+	sawOwnConfig := false
+	for _, argv := range undo.Replay {
+		if len(argv) >= 2 && argv[0] == "config" && strings.HasPrefix(argv[1], "branch.y.") {
+			t.Fatalf("undo replay for deleting %q captured unrelated branch %q's own config (%v)", "x|y", "y", argv)
+		}
+		if len(argv) >= 2 && argv[0] == "config" && strings.HasPrefix(argv[1], "branch.x|y.") {
+			sawOwnConfig = true
+		}
+	}
+	if !sawOwnConfig {
+		t.Fatalf("undo replay never captured x|y's own branch.x|y.* config at all: %v", undo.Replay)
+	}
+}
+
 // TestRunOp_GlobalStashSave_PromoteExistingStackEntry_PreservesOriginBranch is D10 step 3's own
 // proof: promoting an existing STACK entry into the bucket keeps the source in the stack
 // (copy-never-drop) and preserves its own origin-branch tag under the NEW label, rather than
