@@ -450,6 +450,49 @@ describe('ipc rpc — streams', () => {
     server.dispose();
   });
 
+  test("emit registers at most one 'abort' listener for a stream's whole life, not one per chunk (G32-PERF8)", async () => {
+    const [a, b] = createInMemoryChannelPair();
+    let addEventListenerCalls = 0;
+    const originalAddEventListener: typeof AbortSignal.prototype.addEventListener =
+      AbortSignal.prototype.addEventListener;
+    AbortSignal.prototype.addEventListener = function (
+      this: AbortSignal,
+      ...callArgs: Parameters<typeof originalAddEventListener>
+    ): ReturnType<typeof originalAddEventListener> {
+      addEventListenerCalls++;
+      return originalAddEventListener.apply(this, callArgs);
+    };
+
+    try {
+      const handlers = stubHandlers(
+        {},
+        {
+          'graph.stream': async (_params, { emit }) => {
+            for (let i = 0; i < 25; i++) await emit(chunkFor(i));
+          },
+        },
+      );
+      const server = createRpcServer(a, handlers);
+      const client = createRpcClient(b);
+
+      const received: number[] = [];
+      await client.stream('graph.stream', { repoId: 'r1' }, (chunk) => {
+        received.push((chunk as StreamChunkOf<'graph.stream'>).seq);
+      });
+
+      expect(received).toHaveLength(25);
+      // One shared listener for the whole stream, not one per emitted chunk -- 25 chunks with the
+      // old per-emit addEventListener would report 25 (each self-removing only once the signal
+      // actually fires, which this stream, ending normally, never does).
+      expect(addEventListenerCalls).toBeLessThanOrEqual(1);
+
+      client.dispose();
+      server.dispose();
+    } finally {
+      AbortSignal.prototype.addEventListener = originalAddEventListener;
+    }
+  });
+
   test('rawStreamChunks: true delivers the still-wire-shaped chunk without decoding it (G32-PERF5)', async () => {
     const [a, b] = createInMemoryChannelPair();
     const shas = new ArrayBuffer(20);

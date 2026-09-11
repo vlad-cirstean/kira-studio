@@ -417,14 +417,21 @@ export function createRpcServer(channel: MessageChannelLike, handlers: ServerHan
     creditGates.set(id, gate);
     let seq = 0;
 
+    // G32 round-3 performance review, finding #8: `emit` used to call `addEventListener('abort',
+    // …, { once: true })` on EVERY invocation — once per chunk. `{ once: true }` only removes a
+    // listener once the event actually fires, so a stream that never aborts (the common case)
+    // left one dangling listener attached for every chunk it ever emitted, for its whole life —
+    // thousands of listeners piling up on one `AbortSignal` across a large `graph.stream` walk.
+    // The signal only ever fires once regardless of how many chunks are emitted, so one shared
+    // "aborted" promise — built once here, outside the per-chunk closure — is all `emit` needs to
+    // race against.
+    const aborted = new Promise<void>((resolve) => {
+      controller.signal.addEventListener('abort', () => resolve(), { once: true });
+    });
+
     async function emit(chunk: unknown): Promise<void> {
       if (controller.signal.aborted) return;
-      await Promise.race([
-        gate.acquire(),
-        new Promise<void>((resolve) =>
-          controller.signal.addEventListener('abort', () => resolve(), { once: true }),
-        ),
-      ]);
+      await Promise.race([gate.acquire(), aborted]);
       if (controller.signal.aborted) return;
       post(channel, { t: 'chunk', id, seq, chunk: encodeStreamPayload(method, chunk) });
       seq++;
