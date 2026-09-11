@@ -31,9 +31,18 @@ const TagRefsFormat = RefsFormat + "%1f%(contents:subject)%1f%(contents:body)%00
 const tagRefsFieldCount = 13
 
 // HeadsRefsArgs is refs.list's branches+remote-branches spawn — committer-date order, upstream's
-// own sort for the branch picker.
+// own sort for the branch picker. --exclude (G32 round-3 functional-correctness review, finding
+// #5) drops refs/remotes/<remote>/HEAD, the symbolic pointer every `git clone`d repo carries —
+// left in, it showed as a phantom third badge alongside the real default branch's own remote
+// tracking badge, appeared in the branch picker as a checkout-able row, and actually attempting
+// that checkout failed outright ("HEAD" is not a legal branch name). Verified against real git
+// 2.43: --exclude combines with the positive refs/heads/refs/remotes patterns rather than
+// replacing them.
 func HeadsRefsArgs() []string {
-	return []string{"for-each-ref", "--format=" + RefsFormat, "--sort=-committerdate", "refs/heads", "refs/remotes"}
+	return []string{
+		"for-each-ref", "--format=" + RefsFormat, "--sort=-committerdate",
+		"--exclude=refs/remotes/*/HEAD", "refs/heads", "refs/remotes",
+	}
 }
 
 // TagRefsArgs is refs.list's tags-only spawn — version-aware sort (§7.9: v10 after v9, which git

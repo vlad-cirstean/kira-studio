@@ -1,6 +1,7 @@
 package porcelain_test
 
 import (
+	"os/exec"
 	"strings"
 	"testing"
 
@@ -180,5 +181,48 @@ func TestParseRefRows_WorktreePathComposesToNFC(t *testing.T) {
 	want := "/repo/caf" + composedE
 	if rows[0].CheckedOutIn == nil || *rows[0].CheckedOutIn != want {
 		t.Fatalf("CheckedOutIn = %v, want %q (composed)", rows[0].CheckedOutIn, want)
+	}
+}
+
+// setupRepoWithRemoteHead builds a repo with a real bare remote and runs `git remote set-head`
+// against it — the exact condition every `git clone`d repo is already in, and the one that
+// produces the symbolic refs/remotes/<remote>/HEAD pointer TestHeadsRefsArgs_
+// ExcludesRemoteHeadPointer and TestLogSessionArgs_ExcludesRemoteHeadDecoration (G32 round-3
+// functional-correctness review, finding #5) are about.
+func setupRepoWithRemoteHead(t *testing.T) *repoBuilder {
+	t.Helper()
+	b := newRepoBuilder(t)
+	b.commit("f.txt", "hello\n", "c1")
+	remoteDir := t.TempDir()
+	init := exec.Command("git", "init", "-q", "--bare", "-b", "main")
+	init.Dir = remoteDir
+	if out, err := init.CombinedOutput(); err != nil {
+		t.Fatalf("git init --bare: %v\n%s", err, out)
+	}
+	b.git("remote", "add", "origin", remoteDir)
+	b.git("push", "-q", "-u", "origin", "main")
+	b.git("remote", "set-head", "origin", "main")
+	return b
+}
+
+func TestHeadsRefsArgs_ExcludesRemoteHeadPointer(t *testing.T) {
+	b := setupRepoWithRemoteHead(t)
+	out := captureRaw(t, b.dir, porcelain.HeadsRefsArgs())
+	if strings.Contains(string(out), "refs/remotes/origin/HEAD") {
+		t.Fatalf("HeadsRefsArgs output still contains the symbolic origin/HEAD pointer:\n%s", out)
+	}
+	if !strings.Contains(string(out), "refs/remotes/origin/main") {
+		t.Fatalf("HeadsRefsArgs output missing the real refs/remotes/origin/main:\n%s", out)
+	}
+}
+
+func TestLogSessionArgs_ExcludesRemoteHeadDecoration(t *testing.T) {
+	b := setupRepoWithRemoteHead(t)
+	out := captureRaw(t, b.dir, porcelain.LogSessionArgs(porcelain.WalkSpec{}))
+	if strings.Contains(string(out), "refs/remotes/origin/HEAD") {
+		t.Fatalf("LogSessionArgs output still decorates a commit with the symbolic origin/HEAD pointer:\n%s", out)
+	}
+	if !strings.Contains(string(out), "refs/remotes/origin/main") {
+		t.Fatalf("LogSessionArgs output missing the real refs/remotes/origin/main decoration:\n%s", out)
 	}
 }

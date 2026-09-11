@@ -17,9 +17,16 @@ const FieldCount = 10
 // logBaseArgs is the walk's fixed argv prefix, shared by every consumer of LogFormat: decorate=
 // full is load-bearing (short ref names cannot be classified — see parseDecorationToken),
 // topo-order is what makes the graph's lanes meaningful, and -z is what makes RecordSplitter's
-// NUL-delimited framing correct.
+// NUL-delimited framing correct. --decorate-refs-exclude (G32 round-3 functional-correctness
+// review, finding #5, the log-decoration half — HeadsRefsArgs' own doc comment covers the
+// refs.list half) drops refs/remotes/<remote>/HEAD, the symbolic pointer every `git clone`d repo
+// carries, from %D before parseDecorationToken ever sees it — without this the default branch's
+// graph row carried a duplicate, phantom "origin/HEAD" badge alongside its real tracking badge.
 func logBaseArgs() []string {
-	return []string{"log", "--decorate=full", "--topo-order", "-z", "--format=" + LogFormat}
+	return []string{
+		"log", "--decorate=full", "--decorate-refs-exclude=refs/remotes/*/HEAD",
+		"--topo-order", "-z", "--format=" + LogFormat,
+	}
 }
 
 // RangeToken builds a RangeSpec's own two-dot `<base>..<branch>` token — the range walk's and
@@ -90,12 +97,16 @@ const ScanFieldCount = 11
 // LogSessionArgs makes, with ScanFormat in place of LogFormat — this is what makes upstream probe
 // 11's ordering property hold: the paging walk and the scan are the same --topo-order walk over
 // the same rev set, so the loaded rows are a PREFIX of the scan's sequence and git-ui's
-// buildCommitHits can concatenate the two halves without sorting anything. --decorate=full is kept
-// even though ParseScanRecord discards %D unparsed (D2) — dropping it would change %D's own
-// *content*, and the whole point of this function is that its argv differs from LogSessionArgs' in
-// exactly one token (the format string).
+// buildCommitHits can concatenate the two halves without sorting anything. --decorate=full (and
+// its own --decorate-refs-exclude, logBaseArgs' own doc comment) is kept even though
+// ParseScanRecord discards %D unparsed (D2) — dropping either would change %D's own *content*,
+// and the whole point of this function is that its argv differs from LogSessionArgs' in exactly
+// one token (the format string).
 func LogScanArgs(spec WalkSpec) []string {
-	args := []string{"log", "--decorate=full", "--topo-order", "-z", "--format=" + ScanFormat}
+	args := []string{
+		"log", "--decorate=full", "--decorate-refs-exclude=refs/remotes/*/HEAD",
+		"--topo-order", "-z", "--format=" + ScanFormat,
+	}
 	return append(args, WalkArgs(spec)...)
 }
 
