@@ -259,7 +259,19 @@ type resolvedCommit struct {
 // re-check host-side immediately before the write. Exit 128 is a resolution failure, never a spawn
 // error to propagate: `show -s` on an unresolvable ref exits non-zero with real stderr, cleanly
 // distinguishable from a genuine spawn failure.
+//
+// G32 round-3 architecture/security review, finding #4: ref reaches ShowMetadataArgs as a bare
+// argv token — a leading "-" would let it be read by `git show` as a flag of its own (e.g.
+// --output=<path>, an arbitrary-file-write primitive) rather than the rev it is meant to be, and
+// none of resolveCommit's four callers (PreflightReset, PreflightCherryPick,
+// WorktreeAddPreflight's startPointRef, prepareReset's own re-check) ever ran it through anything
+// resembling gitrpc's own validRefArg first. Every one of them already treats "does not resolve" as
+// an ordinary, expected outcome — so the minimal fix is to answer exactly that way here too (nil,
+// nil), rather than inventing a new error path each of the four would have to separately learn.
 func (e *RepoEntry) resolveCommit(ctx context.Context, ref string) (*resolvedCommit, error) {
+	if ref == "" || strings.HasPrefix(ref, "-") {
+		return nil, nil
+	}
 	res, err := e.runAllowingExit(ctx, porcelain.ShowMetadataArgs(ref), 0, 128)
 	if err != nil {
 		return nil, err

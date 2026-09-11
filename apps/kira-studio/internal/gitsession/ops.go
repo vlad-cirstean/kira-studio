@@ -21,6 +21,29 @@ import (
 // validates this, but the write path did not.
 var ErrInvalidResetMode = errors.New("gitsession: reset mode must be soft, mixed, or hard")
 
+// ErrInvalidOpArg mirrors gitrpc's own validRefArg (review.go): every read-side RPC that lets a
+// client-supplied ref/sha/name reach a git argv already runs it through validRefArg first
+// (non-empty, no leading "-") before D8's "the one entrance a client-supplied ref name reaches an
+// argv" — op.run's own write path never had the same guard, even though its prepare* functions
+// below splice OpRequest fields into argv exactly the same way (G32 round-3 architecture/security
+// review, finding #4). A value beginning with "-" would be read by git as a flag of its own rather
+// than the name/rev/sha it is meant to be — many git subcommands scan their WHOLE argv for
+// dash-prefixed tokens, not just a leading one, so this applies at every position, not only the
+// first.
+var ErrInvalidOpArg = errors.New("gitsession: op.run: argument must not be empty or begin with '-'")
+
+// validOpArg is ErrInvalidOpArg's own check, called at each prepare* function's own point of use —
+// deliberately not one blanket check in RunOp, since which OpRequest fields matter (and whether a
+// given field is even required to be non-empty) is entirely kind-specific, the same reason opTable
+// dispatches Prepare per kind at all. A field already independently validated by resolving against
+// a real, existing ref (stackSet's Parent/Branch, worktreeAdd's Path) needs no separate call here.
+func validOpArg(field, value string) error {
+	if value == "" || strings.HasPrefix(value, "-") {
+		return fmt.Errorf("%w (%s)", ErrInvalidOpArg, field)
+	}
+	return nil
+}
+
 // OpRequest is op.run's own request — the Go decode of @kira/git-ipc's own twenty-four-member
 // OpRequest union (G28 D17 adds globalStashSave/globalStashRemove), flattened into one struct (a
 // field absent from the wire JSON for a given kind simply decodes to its zero value, which no
@@ -308,6 +331,15 @@ var opTable = map[string]opSpec{
 // (D1) — the entry stays in the stash list, tagged with the CURRENT branch via git's own reflog-
 // subject convention, cross-branch apply (D5) is the deliberate, user-initiated recovery path.
 func prepareCheckout(ctx context.Context, e *RepoEntry, _ ConnID, _ string, op OpRequest) (prepared, error) {
+	// G32 round-3 architecture/security review, finding #4: op.Target reaches SwitchArgs/
+	// SwitchDetachArgs/SwitchCreateTrackingArgs as a bare argv token below — unresolved (the "sha"
+	// fallback in resolveCheckoutTarget) when it does not match a known branch/tag/remote-branch
+	// name, so a leading "-" was never actually screened out on this path the way it is for the
+	// read-side RPCs.
+	if err := validOpArg("target", op.Target); err != nil {
+		return prepared{}, err
+	}
+
 	// D3 step 1: refuse both at once, no write at all. Guessing which the user meant would be
 	// worse than asking again.
 	if op.AutoStash && op.DiscardLocalChanges {
@@ -382,6 +414,14 @@ func prepareCheckout(ctx context.Context, e *RepoEntry, _ ConnID, _ string, op O
 }
 
 func prepareBranchCreate(_ context.Context, _ *RepoEntry, _ ConnID, _ string, op OpRequest) (prepared, error) {
+	// G32 round-3 architecture/security review, finding #4: both reach BranchCreateArgs/
+	// BranchCreateAndSwitchArgs as bare argv tokens.
+	if err := validOpArg("name", op.Name); err != nil {
+		return prepared{}, err
+	}
+	if err := validOpArg("startPoint", op.StartPoint); err != nil {
+		return prepared{}, err
+	}
 	if !op.Checkout {
 		return prepared{argvList: [][]string{gitops.BranchCreateArgs(op.Name, op.StartPoint, op.Track)}}, nil
 	}
@@ -400,6 +440,11 @@ func prepareBranchCreate(_ context.Context, _ *RepoEntry, _ ConnID, _ string, op
 // is captured FIRST (before either the delete or the re-parent writes), widened by
 // captureBranchDeleteUndo itself to also restore every child's own prior pointer.
 func prepareBranchDelete(ctx context.Context, e *RepoEntry, conn ConnID, connLabel string, op OpRequest) (prepared, error) {
+	// G32 round-3 architecture/security review, finding #4: reaches BranchDeleteArgs/
+	// BranchRevParseArgs as a bare argv token.
+	if err := validOpArg("name", op.Name); err != nil {
+		return prepared{}, err
+	}
 	undo := e.captureBranchDeleteUndo(ctx, conn, connLabel, op.Name)
 
 	argv := [][]string{gitops.BranchDeleteArgs(op.Name, op.Force)}
@@ -444,6 +489,14 @@ func prepareBranchDelete(ctx context.Context, e *RepoEntry, conn ConnID, connLab
 // child (by the fresh stack config, never a cache) and rewrites its kirastackparent value to the
 // new name, appended after the rename itself so a rename failure never leaves a half-applied fix-up.
 func prepareBranchRename(ctx context.Context, e *RepoEntry, _ ConnID, _ string, op OpRequest) (prepared, error) {
+	// G32 round-3 architecture/security review, finding #4: both reach BranchRenameArgs as bare
+	// argv tokens.
+	if err := validOpArg("from", op.From); err != nil {
+		return prepared{}, err
+	}
+	if err := validOpArg("to", op.To); err != nil {
+		return prepared{}, err
+	}
 	config, err := e.rawStackConfig(ctx)
 	if err != nil {
 		return prepared{}, err
@@ -456,15 +509,35 @@ func prepareBranchRename(ctx context.Context, e *RepoEntry, _ ConnID, _ string, 
 }
 
 func prepareTagCreate(_ context.Context, _ *RepoEntry, _ ConnID, _ string, op OpRequest) (prepared, error) {
+	// G32 round-3 architecture/security review, finding #4: both reach TagCreateArgs as bare argv
+	// tokens.
+	if err := validOpArg("name", op.Name); err != nil {
+		return prepared{}, err
+	}
+	if err := validOpArg("target", op.Target); err != nil {
+		return prepared{}, err
+	}
 	return prepared{argvList: [][]string{gitops.TagCreateArgs(op.Name, op.Target, op.Message, op.Force)}}, nil
 }
 
 func prepareTagDelete(ctx context.Context, e *RepoEntry, conn ConnID, connLabel string, op OpRequest) (prepared, error) {
+	// G32 round-3 architecture/security review, finding #4: reaches TagDeleteArgs as a bare argv
+	// token.
+	if err := validOpArg("name", op.Name); err != nil {
+		return prepared{}, err
+	}
 	undo := e.captureTagDeleteUndo(ctx, conn, connLabel, op.Name)
 	return prepared{argvList: [][]string{gitops.TagDeleteArgs(op.Name)}, undo: undo}, nil
 }
 
 func prepareRevert(_ context.Context, _ *RepoEntry, _ ConnID, _ string, op OpRequest) (prepared, error) {
+	// G32 round-3 architecture/security review, finding #4: each sha reaches RevertArgs as a bare
+	// argv token.
+	for _, sha := range op.Shas {
+		if err := validOpArg("shas", sha); err != nil {
+			return prepared{}, err
+		}
+	}
 	return prepared{argvList: [][]string{gitops.RevertArgs(op.Shas, op.Mainline, op.NoCommit)}}, nil
 }
 
@@ -473,6 +546,13 @@ func prepareStashPush(_ context.Context, _ *RepoEntry, _ ConnID, _ string, op Op
 }
 
 func prepareStashApply(_ context.Context, _ *RepoEntry, _ ConnID, _ string, op OpRequest) (prepared, error) {
+	// G32 round-3 architecture/security review, finding #4: unlike pop/drop/branch (position-
+	// addressed, verified against a fresh rev-parse before writing), apply accepts a raw sha
+	// directly (probe 8) — it reaches StashApplyArgs as a bare argv token with no resolution step
+	// at all.
+	if err := validOpArg("sha", op.Sha); err != nil {
+		return prepared{}, err
+	}
 	return prepared{argvList: [][]string{gitops.StashApplyArgs(op.Sha, op.RestoreIndex)}}, nil
 }
 
@@ -524,7 +604,17 @@ func prepareStashDrop(ctx context.Context, e *RepoEntry, conn ConnID, connLabel 
 // `stash branch` applies but silently never drops" finding is precisely the desired behaviour for
 // a keep-forever bucket entry.
 func prepareStashBranch(ctx context.Context, e *RepoEntry, _ ConnID, _ string, op OpRequest) (prepared, error) {
+	// G32 round-3 architecture/security review, finding #4: op.Branch reaches StashBranchArgs/
+	// StashBranchByShaArgs as a bare argv token on both arms below; op.Sha reaches
+	// StashBranchByShaArgs the same way on the global arm only (the stack arm addresses by
+	// position, verified fresh by stashPositionMismatch, never by op.Sha itself).
+	if err := validOpArg("branch", op.Branch); err != nil {
+		return prepared{}, err
+	}
 	if op.Scope == porcelain.StashScopeGlobal {
+		if err := validOpArg("sha", op.Sha); err != nil {
+			return prepared{}, err
+		}
 		return prepared{argvList: [][]string{gitops.StashBranchByShaArgs(op.Branch, op.Sha)}}, nil
 	}
 	mismatch, err := stashPositionMismatch(ctx, e, op.Index, op.Sha)
@@ -577,6 +667,12 @@ func prepareGlobalStashSave(ctx context.Context, e *RepoEntry, _ ConnID, _ strin
 		}
 		newSha = sha
 	} else {
+		// G32 round-3 architecture/security review, finding #4: op.Sha ends up as GlobalStashSetArgs'
+		// own third, bare argv token below (via newSha, always a real git-produced sha at that point
+		// — but resolveStashEntryAnyScope's own lookup is worth guarding here too, defense in depth).
+		if err := validOpArg("sha", op.Sha); err != nil {
+			return prepared{}, err
+		}
 		source, err := e.resolveStashEntryAnyScope(ctx, op.Sha)
 		if err != nil {
 			if errors.Is(err, ErrStashNotFound) {
@@ -623,6 +719,13 @@ func prepareGlobalStashSave(ctx context.Context, e *RepoEntry, _ ConnID, _ strin
 //  3. The delete itself uses the expected-old-value form (GlobalStashDeleteArgs), so a concurrent
 //     change to the same ref refuses rather than silently deleting whatever now sits there.
 func prepareGlobalStashRemove(ctx context.Context, e *RepoEntry, conn ConnID, connLabel string, op OpRequest) (prepared, error) {
+	// G32 round-3 architecture/security review, finding #4: op.Sha reaches
+	// GlobalStashRefExistsArgs/GlobalStashDeleteArgs/GlobalStashSetArgs (the undo replay) as a bare
+	// argv token — GlobalStashRef(sha) itself always starts with the dash-free "refs/kira/
+	// globalstash/" prefix, but sha ALSO appears a second time, un-prefixed, as the following token.
+	if err := validOpArg("sha", op.Sha); err != nil {
+		return prepared{}, err
+	}
 	existsRaw, err := e.runOne(ctx, gitops.GlobalStashRefExistsArgs(op.Sha))
 	if err != nil {
 		return prepared{}, err
@@ -760,6 +863,12 @@ func shortSha7(sha string) string {
 // stale pre-flight is exactly as possible here (git DOES refuse a second cherry-pick mid-sequence,
 // but not every in-progress kind — the host-side gate covers all of them uniformly).
 func prepareCherryPick(ctx context.Context, e *RepoEntry, conn ConnID, connLabel string, op OpRequest) (prepared, error) {
+	// G32 round-3 architecture/security review, finding #4: reaches CherryPickArgs as a bare argv
+	// token, with no resolution step of its own (unlike reset's op.Target, which resolveCommit now
+	// guards).
+	if err := validOpArg("sha", op.Sha); err != nil {
+		return prepared{}, err
+	}
 	statusResult, inProgress, err := e.statusAndInProgress(ctx)
 	if err != nil {
 		return prepared{}, err

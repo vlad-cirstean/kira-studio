@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitclient"
@@ -229,4 +230,115 @@ func trimNLReset(s string) string {
 		s = s[:len(s)-1]
 	}
 	return s
+}
+
+// TestPreflightReset_RejectsOptionInjectingTargetPreventsArbitraryFileWrite and
+// TestOpRunReset_RejectsOptionInjectingTargetPreventsArbitraryFileWrite are G32 round-3
+// architecture/security review, finding #4's own regression proof. Both preflight.reset and
+// op.run(reset) resolve their own target through gitsession's shared resolveCommit, which runs
+// `git show -s --decorate=full -z --format=<fmt> <target>` — target reaches that argv as a bare,
+// unguarded token. Confirmed empirically against a real git: `--output=<path>` is honoured there
+// exactly like any other `git show` invocation, writing the command's own output to an
+// attacker-chosen path — a real arbitrary-file-write primitive, not a hypothetical one. Both tests
+// prove the canary file is never created and the request is refused before any git process for
+// that argv is spawned.
+func TestPreflightReset_RejectsOptionInjectingTargetPreventsArbitraryFileWrite(t *testing.T) {
+	dir := t.TempDir()
+	resetSmokeGit(t, dir, "init", "-q", "-b", "main")
+	resetSmokeGit(t, dir, "commit", "-q", "--allow-empty", "-m", "base")
+
+	handlers, repoID := resetSmokeConn(t, dir)
+	ctx := context.Background()
+
+	canary := filepath.Join(t.TempDir(), "pwned-preflight-reset")
+	maliciousTarget := "--output=" + canary
+
+	resetParams, _ := json.Marshal(PreflightResetParams{RepoID: repoID, Target: maliciousTarget, Mode: "mixed"})
+	preflightAny, err := handlers.Request(ctx, "preflight.reset", resetParams)
+	if err != nil {
+		t.Fatalf("preflight.reset: %v", err)
+	}
+	preflight, ok := preflightAny.(gitpreflight.ResetPreflight)
+	if !ok {
+		t.Fatalf("preflight.reset result = %T, want gitpreflight.ResetPreflight", preflightAny)
+	}
+	unknownTarget := false
+	for _, b := range preflight.Blockers {
+		if b == "unknownTarget" {
+			unknownTarget = true
+		}
+	}
+	if preflight.Verdict != "blocked" || !unknownTarget {
+		t.Fatalf("preflight.reset treated an option-injecting target as resolvable: %+v", preflight)
+	}
+	if _, statErr := os.Stat(canary); statErr == nil {
+		t.Fatalf("preflight.reset: canary file %s was created — --output= reached a real git show", canary)
+	}
+}
+
+func TestOpRunReset_RejectsOptionInjectingTargetPreventsArbitraryFileWrite(t *testing.T) {
+	dir := t.TempDir()
+	resetSmokeGit(t, dir, "init", "-q", "-b", "main")
+	resetSmokeGit(t, dir, "commit", "-q", "--allow-empty", "-m", "base")
+	headBefore, err := exec.Command("git", "-C", dir, "rev-parse", "HEAD").Output()
+	if err != nil {
+		t.Fatalf("rev-parse HEAD: %v", err)
+	}
+
+	handlers, repoID := resetSmokeConn(t, dir)
+	ctx := context.Background()
+
+	canary := filepath.Join(t.TempDir(), "pwned-op-run-reset")
+	maliciousTarget := "--output=" + canary
+
+	opParams, _ := json.Marshal(map[string]any{
+		"repoId": repoID,
+		"op":     map[string]any{"kind": "reset", "mode": "mixed", "target": maliciousTarget},
+	})
+	opAny, err := handlers.Request(ctx, "op.run", opParams)
+	if err != nil {
+		t.Fatalf("op.run: %v", err)
+	}
+	opRes, ok := opAny.(gitsession.OpResult)
+	if !ok || opRes.OK || opRes.Error == nil || opRes.Error.Kind != "NotFound" {
+		t.Fatalf("op.run result = %+v, want ok=false error.kind=NotFound (target does not resolve)", opAny)
+	}
+
+	if _, statErr := os.Stat(canary); statErr == nil {
+		t.Fatalf("op.run reset: canary file %s was created — --output= reached a real git show", canary)
+	}
+	headAfter, err := exec.Command("git", "-C", dir, "rev-parse", "HEAD").Output()
+	if err != nil {
+		t.Fatalf("rev-parse HEAD: %v", err)
+	}
+	if string(headBefore) != string(headAfter) {
+		t.Fatalf("HEAD moved despite the reset being refused: before=%q after=%q", headBefore, headAfter)
+	}
+}
+
+// TestOpRunCherryPick_RejectsOptionInjectingSha is the same finding's proof for a field with no
+// resolveCommit step of its own: cherryPick's sha reaches gitops.CherryPickArgs directly. Proves
+// the request is refused with validOpArg's own message and CHERRY_PICK_HEAD is never created.
+func TestOpRunCherryPick_RejectsOptionInjectingSha(t *testing.T) {
+	dir := t.TempDir()
+	resetSmokeGit(t, dir, "init", "-q", "-b", "main")
+	resetSmokeGit(t, dir, "commit", "-q", "--allow-empty", "-m", "base")
+
+	handlers, repoID := resetSmokeConn(t, dir)
+	ctx := context.Background()
+
+	opParams, _ := json.Marshal(map[string]any{
+		"repoId": repoID,
+		"op":     map[string]any{"kind": "cherryPick", "sha": "--no-commit"},
+	})
+	_, err := handlers.Request(ctx, "op.run", opParams)
+	if err == nil {
+		t.Fatal("op.run cherryPick: expected an error for an option-injecting sha, got nil")
+	}
+	if !strings.Contains(err.Error(), "must not be empty or begin with '-'") {
+		t.Fatalf("op.run cherryPick: expected a validOpArg rejection, got: %v", err)
+	}
+	if _, statErr := os.Stat(filepath.Join(dir, ".git", "CHERRY_PICK_HEAD")); statErr == nil {
+		t.Fatal("op.run cherryPick: CHERRY_PICK_HEAD exists — the malicious sha reached a real spawn")
+	}
 }

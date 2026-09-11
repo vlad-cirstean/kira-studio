@@ -40,6 +40,12 @@ func (r *Router) handleOpRun(ctx context.Context, c *gitsession.Conn, params jso
 		if errors.Is(err, gitsession.ErrInvalidResetMode) {
 			return nil, ipcerr.BadRequest("gitrpc: op.run: " + err.Error())
 		}
+		// G32 round-3 architecture/security review, finding #4: validOpArg's own refusals (ops.go)
+		// are client input errors, exactly like ErrInvalidResetMode just above — never a git spawn
+		// failure for mapGitError's own table to classify.
+		if errors.Is(err, gitsession.ErrInvalidOpArg) {
+			return nil, ipcerr.BadRequest("gitrpc: op.run: " + err.Error())
+		}
 		return nil, mapGitError(err)
 	}
 	return result, nil
