@@ -292,12 +292,6 @@ func (e *RepoEntry) setHead(h gitclient.HeadState) {
 	e.headMu.Unlock()
 }
 
-// CatFile returns this entry's cat-file batch session (D11), starting it lazily on first use — a
-// connection that never reads a blob or a commit's metadata never spawns the two extra
-// `cat-file` processes. No production caller reaches this in G3 (its first is G4's commit.detail/
-// commit.fileDiff/blob reads); it exists now so RepoEntry's own teardown has somewhere real to
-// tear down, per SPEC §6 putting the cat-file session in the shared (per-repo, not per-connection)
-// box.
 // invalidateAfterWrite drops exactly what a completed local write can have invalidated, without
 // waiting for the watcher's own debounced signal (F5/D7): the same four drops note() makes on
 // refsChanged. It is a second line of defence for OUR OWN writes, for the case a watch was lost
