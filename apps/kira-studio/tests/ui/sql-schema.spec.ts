@@ -5,6 +5,7 @@ import { IPC } from './support/ipcChannels';
 import {
   APP_PATH,
   appSchemaColumnsSnapshot,
+  connectAndExpandControl,
   DB_PATH,
   orderItemsFixture,
   postgresConnectionSummary,
@@ -35,6 +36,30 @@ function postgresCreateArgs(name: string, color: string) {
     autoExplain: false,
     throttlePerSec: 0,
   };
+}
+
+// P4: no expandRow calls at all — the honest-degradation case a root console gets when the
+// connection was never expanded in the tree first (right-click a still-collapsed connection row
+// and choose "Open query console" directly).
+async function connectPostgresOnly(page: Page, name: string, color: string): Promise<void> {
+  await page.click('[data-testid="add-connection"]');
+  await page.click('[data-testid="connection-kind-postgres"]');
+  await page.fill('[data-testid="connection-name"]', name);
+  await page.fill('[data-testid="connection-host"]', '127.0.0.1');
+  await page.fill('[data-testid="connection-port"]', '5432');
+  await page.fill('[data-testid="connection-database"]', 'kira_test');
+  await page.fill('[data-testid="connection-username"]', 'postgres');
+  await page.click(`[data-testid="color-${color}"]`);
+  await page.click('[data-testid="connection-save"]');
+  await expect(page.locator('[data-testid="connection-dialog"]')).toHaveCount(0);
+
+  const connRow = connectionRow(page);
+  await expect(connRow).toBeVisible();
+  await openRowMenu(page, '');
+  await page.click('[data-testid="menu-item-connect"]');
+  await expect(connRow.locator('.status-dot')).toHaveAttribute('data-status', 'connected', {
+    timeout: 10_000,
+  });
 }
 
 async function connectAndExpandPostgres(page: Page, name: string, color: string): Promise<void> {
@@ -168,6 +193,40 @@ test('Schema (DDL)… dialog stages until Save (D3)', async ({ relaunch }) => {
   await openSchemaDialog();
   await expect(dialog.locator('.cm-content')).toContainText('CREATE TABLE users');
   await expect(summary).toContainText('2 tables, 5 columns');
+});
+
+// P4: the DDL editor's :autocomplete was hardcoded false — flipped on with no completionSources,
+// so lang-sql's own dialect-correct keyword/type-name source applies here the same way it does
+// for a console with no schema at all (D5's "override replaces language-data sources wholesale"
+// applies in reverse: no override at all means lang-sql stays in charge).
+test('the Schema (DDL) editor now offers keyword completion (P4)', async ({ relaunch }) => {
+  const CONNECTION_ID = 'conn-sql-schema-ddl-autocomplete';
+  const CONNECTION_SUMMARY = postgresConnectionSummary(CONNECTION_ID, 'Schema DB', 'red');
+  const CONTROL: ControlSnapshot[] = [
+    { channel: IPC.connectionsList, response: [] },
+    {
+      channel: IPC.connectionsCreate,
+      args: postgresCreateArgs('Schema DB', 'red'),
+      response: CONNECTION_SUMMARY,
+    },
+    ...orderItemsFixture(CONNECTION_ID).control,
+  ];
+  const { window: page } = await relaunch({ control: CONTROL });
+
+  await connectAndExpandPostgres(page, 'Schema DB', 'red');
+  await openRowMenu(page, '');
+  await page.click('[data-testid="menu-item-schema"]');
+  const dialog = page.locator('[data-testid="schema-dialog"]');
+  await expect(dialog).toBeVisible();
+
+  await dialog.locator('.cm-content').click();
+  await page.keyboard.type('sel');
+  // G20 D7: every CodeMirrorHost's tooltip escapes its own container to `document.body`
+  // (theme.ts/CodeMirrorHost.vue's own tooltips({ parent: document.body })) — it renders outside
+  // the dialog's DOM subtree entirely, so the locator must be page-scoped, not dialog-scoped.
+  const tooltip = page.locator('.cm-tooltip-autocomplete');
+  await expect(tooltip).toBeVisible({ timeout: 5_000 });
+  await expect(tooltip).toContainText('SELECT');
 });
 
 // P12 round 1 finding #14: Save had no catch at all — a rejected schemaSet became an unhandled
@@ -340,6 +399,97 @@ test('with no DDL document, table names and columns complete from the cache (D4/
   expect(control.log().filter((e) => e.channel === IPC.treeSchemaColumns).length).toBe(
     schemaColumnsCalls,
   );
+
+  expect(consoleErrors).toEqual([]);
+});
+
+// P4: a console opened at the connection ROOT (right-click the connection row itself, not a
+// table/schema row) used to get no schema-aware completion at all — containerPathFor/
+// consoleRelationNames both bailed the instant the path had no database:/schema: segment, even
+// though the tree already had everything cached. This fixture's own kira_test database has TWO
+// schemas (analytics, app — DB_CHILDREN), so the schema half of the fix can't resolve a single
+// container here (correctly ambiguous, no "public"); this proves the OTHER half instead — the
+// relation-names union fallback (completion.ts's rootRelationNames) still surfaces order_items and
+// customers, because the tree already has them loaded from expanding APP_PATH below, and a root
+// console no longer throws that away.
+test('a console opened at the connection root still completes table names from whatever the tree already has loaded (P4)', async ({
+  relaunch,
+  consoleErrors,
+}) => {
+  const CONNECTION_ID = 'conn-sql-schema-root';
+  const CONNECTION_SUMMARY = postgresConnectionSummary(CONNECTION_ID, 'Schema DB', 'amber');
+  const CONTROL: ControlSnapshot[] = [
+    { channel: IPC.connectionsList, response: [] },
+    {
+      channel: IPC.connectionsCreate,
+      args: postgresCreateArgs('Schema DB', 'amber'),
+      response: CONNECTION_SUMMARY,
+    },
+    ...orderItemsFixture(CONNECTION_ID).control,
+  ];
+  const { window: page } = await relaunch({ control: CONTROL });
+
+  await connectAndExpandPostgres(page, 'Schema DB', 'amber');
+  // Loads order_items/customers into treeState.children for APP_PATH — the data a root console's
+  // relation-names union now reads instead of discarding.
+  await expandRow(page, APP_PATH);
+
+  await openRowMenu(page, '');
+  await page.click('[data-testid="menu-item-open-console"]');
+  const view = page.locator('[data-testid="console-view"]');
+  await expect(view).toBeVisible();
+
+  const tooltip = page.locator('.cm-tooltip-autocomplete');
+  await typeInto(view, page, 'select * from ');
+  await page.keyboard.press('Control+Space');
+  await expect(tooltip).toBeVisible({ timeout: 5_000 });
+  await expect(tooltip).toContainText('order_items');
+  await expect(tooltip).toContainText('customers');
+  await page.keyboard.press('Escape');
+
+  // Keyword completion is untouched, same as every other console.
+  await clearAndType(view, page, 'sel');
+  await expect(tooltip).toBeVisible({ timeout: 5_000 });
+  await expect(tooltip).toContainText('SELECT');
+  await page.keyboard.press('Escape');
+
+  expect(consoleErrors).toEqual([]);
+});
+
+// P4: the honest-degradation boundary — a root console opened on a connection that was NEVER
+// expanded in the tree has nothing cached to offer (no round trip fired to find out), so it falls
+// all the way through to lang-sql's own keyword source, same as before this phase.
+test('a console opened at the connection root with nothing expanded gets keywords only (P4)', async ({
+  relaunch,
+  consoleErrors,
+}) => {
+  const CONNECTION_ID = 'conn-sql-schema-root-cold';
+  const CONNECTION_SUMMARY = postgresConnectionSummary(CONNECTION_ID, 'Schema DB', 'cyan');
+  const CONTROL: ControlSnapshot[] = [
+    { channel: IPC.connectionsList, response: [] },
+    {
+      channel: IPC.connectionsCreate,
+      args: postgresCreateArgs('Schema DB', 'cyan'),
+      response: CONNECTION_SUMMARY,
+    },
+    // connectPostgresOnly needs the connect response; the treeChildren snapshots this also
+    // provides are deliberately never consumed — nothing here is ever expanded.
+    ...connectAndExpandControl(CONNECTION_ID),
+  ];
+  const { window: page } = await relaunch({ control: CONTROL });
+
+  await connectPostgresOnly(page, 'Schema DB', 'cyan');
+  await openRowMenu(page, '');
+  await page.click('[data-testid="menu-item-open-console"]');
+  const view = page.locator('[data-testid="console-view"]');
+  await expect(view).toBeVisible();
+
+  const tooltip = page.locator('.cm-tooltip-autocomplete');
+  await clearAndType(view, page, 'sel');
+  await expect(tooltip).toBeVisible({ timeout: 5_000 });
+  await expect(tooltip).toContainText('SELECT');
+  await expect(tooltip).not.toContainText('order_items');
+  await page.keyboard.press('Escape');
 
   expect(consoleErrors).toEqual([]);
 });

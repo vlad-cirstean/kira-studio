@@ -1,8 +1,8 @@
-import type { CompletionSource } from '@codemirror/autocomplete';
+import type { Completion, CompletionSource } from '@codemirror/autocomplete';
 import { keywordCompletionSource, schemaCompletionSource } from '@codemirror/lang-sql';
 import type { RelationColumns } from '@shared/domain/tree';
 import { dialectObjectFor } from '../../editor/languages';
-import type { SqlDialect } from '../shared/sqlIdent';
+import { identNeedsQuoting, quoteIdent, type SqlDialect } from '../shared/sqlIdent';
 import { type DdlSchema, defaultSchemaFor, namespaceFromCached, toSqlNamespace } from './ddl';
 
 // P18 (v1.1) D1 — why this is a "language service", not a language server.
@@ -28,28 +28,46 @@ import { type DdlSchema, defaultSchemaFor, namespaceFromCached, toSqlNamespace }
 // bare identifiers are exactly what the keyword/schema sources already cover.
 const RELATION_POSITION_RE = /\b(from|join|update|into|table)\s+$/i;
 
-function relationCompletionSource(relations: readonly string[]): CompletionSource {
+// P4: a relation name needing quotes (case-sensitive, a reserved word) gets `apply` set to its
+// quoted form, the same identNeedsQuoting/quoteIdent rule namespaceFromCached (ddl.ts) and
+// views/grid/filterCompletion.ts's own column completions already follow — `label` stays bare so
+// matching/highlighting still works against the plain name.
+function relationCompletionSource(
+  relations: readonly string[],
+  dialect: SqlDialect,
+): CompletionSource {
   return (context) => {
     if (relations.length === 0) return null;
     const word = context.matchBefore(/[\w."]*/) ?? { from: context.pos, to: context.pos, text: '' };
     const before = context.state.sliceDoc(0, word.from);
     if (!RELATION_POSITION_RE.test(before)) return null;
-    return { from: word.from, options: relations.map((label) => ({ label, type: 'class' })) };
+    return {
+      from: word.from,
+      options: relations.map((label): Completion => {
+        const completion: Completion = { label, type: 'class' };
+        return identNeedsQuoting(dialect, label)
+          ? { ...completion, apply: quoteIdent(dialect, label) }
+          : completion;
+      }),
+    };
   };
 }
 
-/** P19 D14, widened by P22c D4: layered, not all-or-nothing. A DDL document (`schema`) still wins
- *  wholesale when one has any tables — today's schemaCompletionSource + keyword pair, now with the
- *  relation source ranked after them so a document's own real column-aware completions are never
- *  shadowed by a bare table name. With no document, `cached` (P22c: the metadata cache's own
+/** P19 D14, widened by P22c D4 and P4: layered, not all-or-nothing. A DDL document (`schema`) still
+ *  wins wholesale when one has any tables — today's schemaCompletionSource + keyword pair, now with
+ *  the relation source ranked after them so a document's own real column-aware completions are
+ *  never shadowed by a bare table name. With no document, `cached` (P22c: the metadata cache's own
  *  columns for this console's container, state/schemaColumns.ts's cachedRelationsFor) fills in the
  *  identical schema-aware completion — table names, `table.` column completion, alias resolution —
- *  with no manual step. Only once BOTH are empty does `relations` (consoleRelationNames —
- *  completion.ts's own tree-cache read, mirroring mongoCompletionSource's identical technique for
- *  collections) fall back to table names alone, paired with an explicit keyword source the same
- *  reason D5/F3 already gives (`override` replaces language-data sources wholesale). All three
- *  empty is exactly today's `undefined` — deliberate, not a gap to patch by having the language
- *  service query the database itself: D5 keeps the "no introspection from the language layer"
+ *  with no manual step, ALSO paired with `relations` (P4): a root-opened console's cached container
+ *  and its wider set of tree-loaded relation names (completion.ts's own root branch) don't have to
+ *  be the same container, so a name the cache doesn't cover but the tree already does is not
+ *  discarded. Only once BOTH `schema` and `cached` are empty does `relations`
+ *  (consoleRelationNames — completion.ts's own tree-cache read, mirroring mongoCompletionSource's
+ *  identical technique for collections) carry the whole load alone, paired with an explicit keyword
+ *  source the same reason D5/F3 already gives (`override` replaces language-data sources wholesale).
+ *  All three empty is exactly today's `undefined` — deliberate, not a gap to patch by having the
+ *  language service query the database itself: D5 keeps the "no introspection from the language layer"
  *  rule, and this file's diagnostics/hover providers read the same effective schema (D6), so
  *  completion never disagrees with them about what the console knows. */
 export function sqlCompletionSources(
@@ -73,17 +91,27 @@ export function sqlCompletionSources(
       // exactly today's `upperCaseKeywords: true` behaviour (languages.ts), made explicit rather
       // than implicit.
       keywordCompletionSource(dialectObject, true),
-      relationCompletionSource(relations),
+      relationCompletionSource(relations, dialect),
     ];
   }
   if (cached.length > 0) {
     return [
-      schemaCompletionSource({ dialect: dialectObject, schema: namespaceFromCached(cached) }),
+      schemaCompletionSource({
+        dialect: dialectObject,
+        schema: namespaceFromCached(cached, dialect),
+      }),
       keywordCompletionSource(dialectObject, true),
+      // P4: was missing here with no stated reason — relations from a container OTHER than the
+      // cached one (the common shape for a root-opened console, completion.ts's own root branch)
+      // were silently discarded even though the document branch above already offers this.
+      relationCompletionSource(relations, dialect),
     ];
   }
   if (relations.length > 0) {
-    return [relationCompletionSource(relations), keywordCompletionSource(dialectObject, true)];
+    return [
+      relationCompletionSource(relations, dialect),
+      keywordCompletionSource(dialectObject, true),
+    ];
   }
   return undefined;
 }

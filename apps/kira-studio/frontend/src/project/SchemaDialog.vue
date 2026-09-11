@@ -126,12 +126,18 @@ async function onSave(): Promise<void> {
         override that: a schema that doesn't exist yet, or a connection this app can't introspect.
       </span>
       <div class="editor-wrap">
+        <!-- P4: :autocomplete alone (no completionSources) is enough to get lang-sql's own
+             dialect-correct keyword/type-name completion here — useful for hand-typing VARCHAR,
+             NUMERIC(10,2), REFERENCES, NOT NULL. Relation/column completion from what's being
+             typed in THIS document is a separate, larger piece of work (project/ may not import
+             views/, per biome.json, so it needs its own state/schemas.ts dispatch export) and is
+             left for a later phase. -->
         <CodeMirrorHost
           :doc="draft"
           language="sql"
           :sql-dialect="dialect"
           :read-only="false"
-          :autocomplete="false"
+          :autocomplete="true"
           @update:doc="onDocChange"
         />
       </div>

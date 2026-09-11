@@ -1720,13 +1720,23 @@ copy of it; and `views/shared/page/columns.ts`'s `columnHeaderTooltip`/`GUTTER_W
 behind the grid and the console's own tabular result, ending three different spellings of the same
 two numbers the two had drifted into.
 
-**The SQL console's language service is DDL-driven, never introspective.** P18 (v1.1)'s
-completion/diagnostics/hover providers (`views/console/sqlLanguageService.ts`,
-`sqlDiagnostics.ts`, `sqlHover.ts`) read only a per-connection `DdlSchema` parsed from a user-pasted
-DDL document (`connection_ddl`, below) via `@codemirror/lang-sql`'s own per-dialect Lezer parser —
-no schema introspection over a live connection, ever, even though the renderer already has live
-column metadata in reach (`runtime[tabId].meta`, the WHERE/ORDER BY boxes' own completion source).
-With no DDL document, a SQL console stays byte-for-byte what it was before this phase.
+**The SQL console's language service is layered, not DDL-only.** P18 (v1.1)'s completion/
+diagnostics/hover providers (`views/console/sqlLanguageService.ts`, `sqlDiagnostics.ts`,
+`sqlHover.ts`) read one `DdlSchema` (`state/schemaColumns.ts`'s `effectiveSchema`), itself layered
+in precedence order: a user-pasted DDL document (`connection_ddl`, below), parsed via
+`@codemirror/lang-sql`'s own per-dialect Lezer parser, still wins wholesale the moment it declares
+any table; with none, P22c's metadata cache (`state/schemaColumns.ts`'s `schemaColumnsState`,
+filled from the same `kira:tree:schemaColumns` call the tree's own container rows already warm)
+fills in real column-aware completion with no manual step; with neither, P4 falls back to bare
+relation names read straight from the tree's own already-loaded node cache
+(`views/console/completion.ts`'s `consoleRelationNames`) — including at a connection's own root
+(`path === ''`, no `database:`/`schema:` segment to key a cache on), where P4's
+`rootContainerPathFor`/`rootRelationNames` resolve the single container a root console actually
+runs against (or union whatever containers the tree already has loaded) from data already in the
+renderer, never a new round trip. Only when all three are empty does a console fall back to
+`@codemirror/lang-sql`'s own bare keyword completion, unchanged from before P18. No schema
+introspection is ever issued *from the language layer itself* — every fetch above is triggered by a
+view's own lifecycle hook (tab activation, tree expansion), never from a `CompletionSource`.
 
 **EXPLAIN crosses the wire as an ordinary result page, never a new op.** P18 (v1.1)'s Explain
 button and auto-explain toggle (`connections.auto_explain`, below) both compose a dialect's own

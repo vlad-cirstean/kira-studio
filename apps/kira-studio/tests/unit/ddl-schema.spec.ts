@@ -227,7 +227,7 @@ describe('namespaceFromCached — P22c D4: RelationColumns[] -> lang-sql namespa
     const relations: RelationColumns[] = [
       { name: 'users', kind: 'table', columns: [col({ name: 'id' }), col({ name: 'email' })] },
     ];
-    const ns = namespaceFromCached(relations) as Record<string, unknown>;
+    const ns = namespaceFromCached(relations, 'postgres') as Record<string, unknown>;
     expect(Object.keys(ns)).toEqual(['users']);
     expect((ns.users as { label: string }[]).map((c) => c.label)).toEqual(['id', 'email']);
   });
@@ -237,7 +237,7 @@ describe('namespaceFromCached — P22c D4: RelationColumns[] -> lang-sql namespa
       { name: 'users', kind: 'table', columns: [col({ name: 'id' })] },
       { name: 'active_users', kind: 'view', columns: [col({ name: 'id', dataType: 'bigint' })] },
     ];
-    const ns = namespaceFromCached(relations) as Record<
+    const ns = namespaceFromCached(relations, 'postgres') as Record<
       string,
       { label: string; detail?: string }[]
     >;
@@ -246,12 +246,12 @@ describe('namespaceFromCached — P22c D4: RelationColumns[] -> lang-sql namespa
   });
 
   test('an empty relation list produces an empty namespace', () => {
-    expect(namespaceFromCached([])).toEqual({});
+    expect(namespaceFromCached([], 'postgres')).toEqual({});
   });
 
   test('a relation with no columns still gets a (empty) namespace entry', () => {
     const relations: RelationColumns[] = [{ name: 'empty_view', kind: 'view', columns: [] }];
-    const ns = namespaceFromCached(relations) as Record<string, unknown[]>;
+    const ns = namespaceFromCached(relations, 'postgres') as Record<string, unknown[]>;
     expect(ns.empty_view).toEqual([]);
   });
 
@@ -263,13 +263,36 @@ describe('namespaceFromCached — P22c D4: RelationColumns[] -> lang-sql namespa
         columns: [col({ name: 'total' }), col({ name: 'id', isPrimaryKey: true })],
       },
     ];
-    const ns = namespaceFromCached(relations) as Record<
+    const ns = namespaceFromCached(relations, 'postgres') as Record<
       string,
       { label: string; boost?: number }[]
     >;
     const byLabel = Object.fromEntries((ns.orders ?? []).map((c) => [c.label, c.boost ?? 0]));
     expect(byLabel.id).toBe(1);
     expect(byLabel.total).toBe(0);
+  });
+
+  // P4: a column needing quotes (a reserved word, here) gets `apply` set to its quoted form —
+  // label stays bare so matching/highlighting still works — the same identNeedsQuoting/quoteIdent
+  // rule views/grid/filterCompletion.ts's own column completions already follow.
+  test('a column needing quotes gets a quoted `apply`, mysql backtick vs. postgres double-quote', () => {
+    const relations: RelationColumns[] = [
+      { name: 'orders', kind: 'table', columns: [col({ name: 'order' }), col({ name: 'total' })] },
+    ];
+    const pg = namespaceFromCached(relations, 'postgres') as Record<
+      string,
+      { label: string; apply?: string }[]
+    >;
+    const pgByLabel = Object.fromEntries((pg.orders ?? []).map((c) => [c.label, c.apply]));
+    expect(pgByLabel.order).toBe('"order"');
+    expect(pgByLabel.total).toBeUndefined();
+
+    const mysql = namespaceFromCached(relations, 'mysql') as Record<
+      string,
+      { label: string; apply?: string }[]
+    >;
+    const mysqlByLabel = Object.fromEntries((mysql.orders ?? []).map((c) => [c.label, c.apply]));
+    expect(mysqlByLabel.order).toBe('`order`');
   });
 });
 

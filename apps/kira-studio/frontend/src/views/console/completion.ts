@@ -47,13 +47,16 @@ function mongoCollectionNames(connectionId: string, path: string): string[] {
 
 const RELATION_CONTAINER_KINDS = new Set(['database', 'schema']);
 
+const RELATION_NODE_KINDS = new Set(['table', 'view', 'matview']);
+
 // P19 D14: mongoCollectionNames' own technique, carried to SQL — reads the tree's own cache, no
 // new round trip, no new cache, an empty list is the honest degradation. Walks the console's own
 // path back to the last database:/schema: segment (a table/view/matview console keeps its parent
 // container in its own path; a console opened on the container itself already ends there) and
-// reads whatever that row's own children already are. A console opened from the connection root
-// has no such segment and yields []; project/state/tree.ts's own F19 finding means this can never
-// see 'column' nodes (they moved into the definition view), only relation names.
+// reads whatever that row's own children already are. project/state/tree.ts's own F19 finding
+// means this can never see 'column' nodes (they moved into the definition view), only relation
+// names. P4: a console opened from the connection root has no such segment — rootRelationNames
+// below is its own branch, not this function degrading to [].
 export function consoleRelationNames(connectionId: string, path: string): string[] {
   let segments: PathSegment[];
   try {
@@ -68,12 +71,29 @@ export function consoleRelationNames(connectionId: string, path: string): string
       break;
     }
   }
-  if (cut < 0) return [];
+  if (cut < 0) return path === '' ? rootRelationNames(connectionId) : [];
   const containerPath = encodePath(segments.slice(0, cut + 1));
   const nodes = treeState.children[rowKey(connectionId, containerPath)] ?? [];
-  return nodes
-    .filter((n) => n.kind === 'table' || n.kind === 'view' || n.kind === 'matview')
-    .map((n) => n.name);
+  return nodes.filter((n) => RELATION_NODE_KINDS.has(n.kind)).map((n) => n.name);
+}
+
+/** P4: the root has no single database:/schema: container to scope relation names to (a
+ *  connection can have many) — schemaColumns.ts's rootContainerPathFor picks one for the cached-
+ *  columns supply, but this is the wider, zero-I/O fallback: the union of relation names across
+ *  EVERY container already loaded for this connection in the tree cache, deduped. Strictly a
+ *  superset of what a root console offered before this fix (nothing), and it's what makes a table
+ *  the user already expanded in the tree show up in a root console's completion even when
+ *  rootContainerPathFor can't pick a single container to cache columns for. */
+function rootRelationNames(connectionId: string): string[] {
+  const prefix = rowKey(connectionId, '');
+  const names = new Set<string>();
+  for (const key of Object.keys(treeState.children)) {
+    if (!key.startsWith(prefix)) continue;
+    for (const node of treeState.children[key] ?? []) {
+      if (RELATION_NODE_KINDS.has(node.kind)) names.add(node.name);
+    }
+  }
+  return [...names];
 }
 
 // P22c D8: the last db.<collection>.<method>( call before the cursor — the field-name position

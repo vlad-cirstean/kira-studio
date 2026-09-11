@@ -1,7 +1,7 @@
 import type { Completion } from '@codemirror/autocomplete';
 import type { SQLDialect, SQLNamespace } from '@codemirror/lang-sql';
 import type { RelationColumns } from '@shared/domain/tree';
-import type { SqlDialect } from '../shared/sqlIdent';
+import { identNeedsQuoting, quoteIdent, type SqlDialect } from '../shared/sqlIdent';
 import {
   childrenOf,
   isKeyword,
@@ -394,17 +394,32 @@ export function toSqlNamespace(schema: DdlSchema): SQLNamespace {
  *  schemaCompletionSource cannot tell which supply it got, and alias resolution / `table.`
  *  completion / qualified paths all work identically. Unqualified only: a schema-wide fetch is
  *  scoped to one container already, so there is no second schema/database level to nest under the
- *  way a DDL document's own `table.schema` can produce. */
-export function namespaceFromCached(relations: readonly RelationColumns[]): SQLNamespace {
+ *  way a DDL document's own `table.schema` can produce.
+ *
+ *  P4: labels stay bare (matching/highlighting wants the plain name); a column needing quotes
+ *  (case-sensitive, a reserved word) gets `apply` set to its quoted form — the same
+ *  identNeedsQuoting/quoteIdent call views/grid/filterCompletion.ts already makes for the data
+ *  view's own filter box, so accepting `"order"` here and accepting it there produce the same
+ *  bytes. Without this, a cache-fed completion (unlike the DDL-document branch, which was never in
+ *  scope for this fix) inserted such a column bare and produced invalid SQL. */
+export function namespaceFromCached(
+  relations: readonly RelationColumns[],
+  dialect: SqlDialect,
+): SQLNamespace {
   const ns: Record<string, SQLNamespace> = {};
   for (const rc of relations) {
-    ns[rc.name] = rc.columns.map((col) => ({
-      label: col.name,
-      type: 'property',
-      detail: col.dataType,
-      // D10's own precedent: primary-key columns sort first.
-      boost: col.isPrimaryKey ? 1 : 0,
-    }));
+    ns[rc.name] = rc.columns.map((col) => {
+      const completion: Completion = {
+        label: col.name,
+        type: 'property',
+        detail: col.dataType,
+        // D10's own precedent: primary-key columns sort first.
+        boost: col.isPrimaryKey ? 1 : 0,
+      };
+      return identNeedsQuoting(dialect, col.name)
+        ? { ...completion, apply: quoteIdent(dialect, col.name) }
+        : completion;
+    });
   }
   return ns;
 }
