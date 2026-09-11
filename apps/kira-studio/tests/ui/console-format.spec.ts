@@ -169,7 +169,9 @@ async function consoleText(view: Locator): Promise<string> {
   return view.locator('.cm-content').innerText();
 }
 
-test('Query console — Format reformats a Postgres statement in place', async ({ relaunch }) => {
+test('Query console — Format reformats a long Postgres statement across lines', async ({
+  relaunch,
+}) => {
   const CONNECTION_ID = 'conn-console-format-pg';
   const CONNECTION_SUMMARY = postgresConnectionSummary(CONNECTION_ID, 'Format DB', 'green');
   const FIXTURE = orderItemsFixture(CONNECTION_ID);
@@ -190,7 +192,14 @@ test('Query console — Format reformats a Postgres statement in place', async (
   const view = page.locator('[data-testid="console-view"]');
   await expect(view).toBeVisible();
 
-  await typeInto(view, page, 'SELECT a,b FROM t WHERE a=1 AND b IN (SELECT x FROM y)');
+  // v1.4: long enough that its whitespace-collapsed form still exceeds compactIfShortEnough's own
+  // width threshold, so this stays real multi-line coverage of the underlying sql-formatter call
+  // rather than exercising the new compact path (that's covered separately below).
+  await typeInto(
+    view,
+    page,
+    'SELECT a,b,c,d,e FROM t WHERE a=1 AND b IN (SELECT x FROM y) AND c=2 ORDER BY a',
+  );
 
   const before = Date.now();
   await page.click('[data-testid="console-format"]');
@@ -204,8 +213,40 @@ test('Query console — Format reformats a Postgres statement in place', async (
   const lines = text.split('\n');
   expect(lines[0]).toBe('SELECT');
   expect(lines).toContain('  a,');
-  expect(lines).toContain('  b');
+  expect(lines).toContain('  b,');
   expect(lines).toContain('FROM');
+  expect(text.endsWith(';')).toBe(true);
+});
+
+// v1.4 follow-up: sql-formatter's own default puts every clause on its own line unconditionally,
+// even for `select * from products` — reported as Format looking broken for exactly the queries
+// people try it on first. compactIfShortEnough (format.ts) keeps a short, safe-to-collapse
+// statement on one line instead.
+test('Query console — Format keeps a short, simple statement on one line', async ({ relaunch }) => {
+  const CONNECTION_ID = 'conn-console-format-compact';
+  const CONNECTION_SUMMARY = postgresConnectionSummary(CONNECTION_ID, 'Format Compact DB', 'grey');
+  const FIXTURE = orderItemsFixture(CONNECTION_ID);
+
+  const CONTROL: ControlSnapshot[] = [
+    { channel: IPC.connectionsList, response: [] },
+    {
+      channel: IPC.connectionsCreate,
+      args: postgresCreateArgs('Format Compact DB', 'grey'),
+      response: CONNECTION_SUMMARY,
+    },
+    ...FIXTURE.control,
+  ];
+
+  const { window: page } = await relaunch({ control: CONTROL });
+  await connectAndExpandPostgres(page, 'Format Compact DB', 'grey');
+  await openConsoleFromMenu(page, ORDER_ITEMS_PATH);
+  const view = page.locator('[data-testid="console-view"]');
+  await expect(view).toBeVisible();
+
+  await typeInto(view, page, 'select * from products');
+  await page.click('[data-testid="console-format"]');
+  await expect(view.locator('.cm-content')).toHaveText('select * from products;');
+  await expect(view.locator('.cm-line')).toHaveCount(1);
 });
 
 test('Query console — Format on unparseable SQL leaves the text untouched', async ({
@@ -285,8 +326,9 @@ test('Query console — one unparseable statement no longer blocks the rest (P19
 
   const text = await consoleText(view);
   expect(text).toContain('\\dt'); // the broken statement, verbatim
-  const lines = text.split('\n');
-  expect(lines[0]).toBe('select'); // the first statement still reformatted (keywordCase: preserve)
+  // v1.4: short enough to compact onto one line — still proof the first statement was reformatted
+  // (spacing normalized, ';' synthesized), just not spread across multiple lines any more.
+  expect(text).toContain('select a, b from t;');
 });
 
 // P19 T12/D13/F19: keywordCase: 'preserve' (P13 D4) means Format only ever changes whitespace —
