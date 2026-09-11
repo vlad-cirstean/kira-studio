@@ -62,29 +62,6 @@ function firstLine(message: string): string {
   return idx === -1 ? message : message.slice(0, idx);
 }
 
-// sql-formatter puts every clause and every selected column on its own line unconditionally, even
-// for a single-table `select * from products` — reported as Format "not working" for exactly the
-// queries most people try it on first. COMPACT_LINE_WIDTH is where a whitespace-collapsed
-// statement stops being worth keeping on one line; sql-formatter's own multi-line expansion is
-// still what a genuinely complex statement gets.
-const COMPACT_LINE_WIDTH = 80;
-
-// A statement is only ever compacted when its raw text contains none of a quote character or a
-// comment marker. A string/identifier literal's internal whitespace must never be touched by the
-// blind `\s+` collapse below (sql-formatter renders a literal as one opaque token, but that token
-// can itself contain multiple spaces, or even a real embedded newline, that must survive exactly
-// as written) and a `--` line comment collapsed onto the same line as what follows it would
-// silently comment that out. Declining to compact a query with either is a much smaller cost than
-// ever corrupting one — the same "decline rather than risk it" call this codebase already makes
-// elsewhere for a case it can't fully reason about.
-const COMPACT_UNSAFE_RE = /['"`$]|--|\/\*/;
-
-function compactIfShortEnough(expanded: string, stmtText: string): string {
-  if (COMPACT_UNSAFE_RE.test(stmtText)) return expanded;
-  const compact = expanded.replace(/\s+/g, ' ').trim();
-  return compact.length <= COMPACT_LINE_WIDTH ? compact : expanded;
-}
-
 // D5: one statement's own text, matched, method-checked and argument-beautified the same way
 // lintMongoConsole (lint.ts) already walks it — a format refusal here uses the linter's own
 // wording so a diagnostic and a format refusal never contradict each other.
@@ -189,11 +166,9 @@ export async function formatConsoleText(kind: ConnectionKind, text: string): Pro
     }
     formatOne = (stmtText) => {
       try {
-        const expanded = mod.formatDialect(stmtText, {
-          dialect: sqlDialectObject,
-          ...SQL_FORMAT_OPTIONS,
-        });
-        return { text: compactIfShortEnough(expanded, stmtText) };
+        return {
+          text: mod.formatDialect(stmtText, { dialect: sqlDialectObject, ...SQL_FORMAT_OPTIONS }),
+        };
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         return { reason: firstLine(message) };
@@ -218,23 +193,9 @@ export async function formatConsoleText(kind: ConnectionKind, text: string): Pro
   // terminator (sql-split.ts) — so `stmt.text` never carries its own ';'. A plain join(';\n\n')
   // therefore emits N-1 semicolons for N statements, silently deleting the document's last one on
   // every press: a regression against P13's whole-document formatDialect call, which preserved
-  // every ';' it was given.
-  //
-  // v1.4 follow-up: SQL statements now always end formatted with ';', even when the original had
-  // none — reported as Format "not doing anything" for a query typed without one, the common case
-  // for a single ad-hoc statement. Mongo keeps the original "only if it was already there" rule
-  // (D12's own behavior): a Mongo statement's own `;` is a real statement separator a user chose to
-  // type, not a SQL terminator this app should be inventing.
-  const endedWithTerminator = kind === 'mongodb' ? /;\s*$/.test(text) : true;
+  // every ';' it was given. The terminator is now a property of the SOURCE, not of the join: a
+  // document that ended in ';' still does, one that did not still does not.
+  const endedWithTerminator = /;\s*$/.test(text);
   const joined = out.join(';\n\n');
-  return { text: endedWithTerminator ? appendTerminator(joined) : joined, ok: true, failures };
-}
-
-// A synthesized ';' can never land after a trailing '--' line comment on the joined text's last
-// line — a line comment runs to the end of its line unconditionally, so `... -- note;` would
-// comment the terminator out along with the note, an invisible no-op instead of a working
-// statement. The terminator goes on its own new line instead; everywhere else it appends directly.
-function appendTerminator(text: string): string {
-  const lastLine = text.slice(text.lastIndexOf('\n') + 1);
-  return lastLine.includes('--') ? `${text}\n;` : `${text};`;
+  return { text: endedWithTerminator ? `${joined};` : joined, ok: true, failures };
 }
