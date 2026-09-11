@@ -42,51 +42,50 @@ and how to run things wherever a session happens to be.
 **Opus plans, a Sonnet subagent implements — this session only orchestrates.**
 
 - The **main session runs on Sonnet and orchestrates only** — it doesn't implement, edit code, or
-  fix findings directly. Its job is spawning the right subagents in order, carrying context between
-  them, and tracking progress; the actual writing always happens in a subagent.
-- Each phase (the current chapter's `SPEC.md` phasing table — `docs/v1.3/` today) gets an
-  Opus-authored plan committed under that same chapter's `plans/` before implementation starts —
-  spawn an **Opus subagent** (`Agent` tool,
-  `model: "opus"`) whose only job is writing that plan. If a phase has no plan there, don't
-  implement from the spec directly; get the plan written and committed first.
+  fix findings directly. Its job: spawn the right subagents in order, carry context between them,
+  and track progress. The actual writing always happens in a subagent.
+- Each phase (the current chapter's `SPEC.md` phasing table — `docs/v1.3/` today) needs an
+  Opus-authored plan committed under that chapter's `plans/` before implementation starts — spawn
+  an **Opus subagent** (`Agent` tool, `model: "opus"`) whose only job is writing that plan. No plan
+  there means no implementing straight from the spec; get the plan written and committed first.
 - **Once the plan lands, spawn a Sonnet subagent** (`model: "sonnet"`) to implement it. Default to
-  **one sequential subagent for the whole phase** — a fresh subagent starts cold, so the prompt to
-  it must carry the plan and whatever prior-phase context it needs, not assume it remembers
+  **one sequential subagent for the whole phase** — a fresh subagent starts cold, so its prompt
+  must carry the plan and whatever prior-phase context it needs; never assume it remembers
   anything. **Parallel subagents only when the plan's work is genuinely independent** (unrelated
   adapters, non-overlapping fixes) — never split one continuous, order-dependent piece of work
-  across subagents just to run it concurrently.
+  across subagents to run it concurrently.
 - **Implement the whole plan first, then test once and fix what's found** — don't gate every
   intermediate commit on the full test suite. Fast checks (typecheck, lint, build) are cheap and
-  fine per-commit; an expensive suite (end-to-end/UI, a real-hardware check) runs once near the end
-  of the phase, with fixes landing as follow-up commits. Commits still land incrementally as work
-  completes, for a legible history — only *when* the expensive verification happens changes, not
-  whether the result has to be correct or whether commits stay granular.
-- **The loop per phase:** check for a plan → spawn an Opus subagent to write one if missing → spawn
+  fine per-commit; an expensive suite (end-to-end/UI, a real-hardware check) runs once near phase
+  end, with fixes landing as follow-up commits. Commits still land incrementally as work completes,
+  for legible history — only *when* the expensive verification happens changes, not whether the
+  result must be correct or commits stay granular.
+- **The loop per phase:** check for a plan, spawn an Opus subagent to write one if missing, spawn
   a Sonnet subagent (or several, only if genuinely parallelizable) to implement the whole phase, and
   wait for it before moving on. One phase at a time, in order — never parallelize or batch phases.
 - **Multiple passes/iterations/rounds means repeat the whole loop that many times**, not run it once
   and treat extras as optional. Each pass plans against the *current* tree (on top of everything the
   previous pass landed, never the pre-phase state) and gets its own file under the current
   chapter's `plans/` (a phase's plan plus `-iter2`/`-iter3` suffixes), so what each round found
-  stays legible. A
-  planning pass should re-read the current source rather than trust the previous pass's summary
-  prose, and say plainly when a pass finds nothing real rather than manufacture a finding.
+  stays legible. A planning pass re-reads the current source rather than trusting the previous
+  pass's summary prose, and states plainly when a pass finds nothing real rather than manufacturing
+  a finding.
 - **"Code review"** (once a phase or batch is otherwise complete, on request) means three **Opus
   subagents in parallel**, one per dimension: (1) architecture/structure/maintainability/security,
   (2) functional correctness and business logic, (3) performance and resource efficiency. Each only
   reports findings, never fixes. Then one sequential Sonnet subagent fixes every finding (parallel
   only for a batch genuinely isolated from each other). Repeat the whole three-agent cycle for as
-  many rounds as asked — a round that finds nothing real should say so rather than manufacture a
-  finding. No findings document survives a round once fixed — each finding is fixed and committed
-  one at a time, so the commit log is the durable record; carry forward only a genuinely still-open
-  item (see "Known open items"), never a running narrative of what each round found.
+  many rounds as asked — a round finding nothing real should say so, not manufacture a finding. No
+  findings document survives a round once fixed — each finding gets fixed and committed one at a
+  time, so the commit log is the durable record. Carry forward only a genuinely still-open item (see
+  "Known open items"), never a running narrative of what each round found.
 - No per-phase PRs. One feature branch per chapter.
 - **Best practices throughout, no shortcuts** — no stubbed error handling, no `TODO: fix later`, no
-  skipped validation to make something demo. Scope left out of a phase is left out entirely, not
+  skipped validation to make something demo. Scope left out of a phase stays out entirely, never
   half-implemented.
 - **Reach for an existing, well-maintained library before hand-rolling non-trivial infrastructure**
   — a parser, a virtualizer, a positioning engine, retry/backoff, and similar. This repo already
-  relies on CodeMirror, zod, sql-formatter and SlickGrid rather than reimplementing them; a
+  relies on CodeMirror, zod, sql-formatter and SlickGrid rather than reimplementing them. A
   hand-rolled version earns its keep only against a real requirement no library meets (e.g.
   spelling-preserving timestamp re-encoding) — name that requirement when declining a library, not
   just that existing code already works.
@@ -94,15 +93,15 @@ and how to run things wherever a session happens to be.
   non-commercial-only tier, no functionality gated behind a paid/Enterprise tier. Check the license
   at the package level *and* for the specific feature used, not just the headline badge (AG Grid
   Community's own license is fine; the context menu/range selection/clipboard features this app
-  needed are Enterprise-only, hence declined). Applies to every new dependency.
+  needed are Enterprise-only, so declined). Applies to every new dependency.
 - **Measure when there's a real, concrete question at stake, not as a default ritual.** A
   real-hardware trace, CDP tracing, or a byte-for-byte bundle comparison earns its keep when a
   claimed fix, regression, or cost genuinely can't be checked another way. Don't extend that rigor
-  to routine changes or to every declined option — a short honest estimate or a plain read of the
+  to routine changes or every declined option — a short honest estimate or a plain read of the
   code's/library's stated behavior is enough there. Skip a measurement that wouldn't change the
   decision.
 - **Comments: very concise, only where truly necessary.** Add one only when the code can't say it
-  for itself — a non-obvious *why*, a constraint, a workaround. Never restate what the code shows.
+  — a non-obvious *why*, a constraint, a workaround. Never restate what the code shows.
 - **Unit tests exist only for advanced, complex or deeply nested logic — this app has very little.**
   Default to *no dedicated unit test*. A test earns its keep only guarding something genuinely hard
   to get right: a parser/splitter with several interacting rules, cursor/pagination boundary
@@ -110,10 +109,10 @@ and how to run things wherever a session happens to be.
   encrypt-then-decrypt, concurrency (ordering, backpressure, cancellation, races), or a decision
   structure too large to hold in your head. Everything else gets nothing: CRUD round-trips (even
   integration-shaped), one/two-condition validation, required-field/enum guards, thin pass-through
-  wrappers, constructors/builders, format round-trips with no edge case, single bad-input →
-  single-error paths, anything that mostly restates a short function body. A single `if` guarding
-  one obvious case isn't complexity. When torn between two similar tests, delete. Applies going
-  forward, not as a retroactive cleanup.
+  wrappers, constructors/builders, format round-trips with no edge case,
+  single-bad-input-to-single-error paths, anything that mostly restates a short function body. A
+  single `if` guarding one obvious case isn't complexity. When torn between two similar tests,
+  delete. Applies going forward, not as a retroactive cleanup.
 - **The adapter conformance suites are exempt from that bar, not an application of it.**
   `apps/kira-studio/internal/adapters/*/*_test.go` are the sole successor to the deleted
   `packages/db-fixtures/*.spec.ts` files — nothing else exercises a Go adapter capability by
@@ -124,7 +123,7 @@ and how to run things wherever a session happens to be.
   permutation matrix. A *complete* suite runs only on-demand and in CI — the full auth/config
   permutation matrix per adapter (root vs. least-privilege user, with/without password, with/without
   the database-equivalent field) plus error-handling verification, deliberately comprehensive since
-  it's opt-in rather than part of every local run. Extend the complete suite's own harness for new
+  it's opt-in, not part of every local run. Extend the complete suite's own harness for new
   functional coverage (load/write/delete/filter/DDL, per adapter) rather than building a parallel
   mechanism — it's designed for that (P25's own `Scenario`/`Requires` seam, populated by P26).
 - **Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/)** —
@@ -137,14 +136,14 @@ and how to run things wherever a session happens to be.
   how this team works, not a one-off result. When you touch this file, remove what's gone stale too
   — a fixed tool's workaround, a pointer to a deleted file/subsystem, a question a later phase
   already resolved. "Known open items" is the one durable exception — keep an item only while
-  genuinely open, delete it the moment it's resolved rather than marking it done in place.
+  genuinely open, delete it the moment it's resolved, not marked done in place.
 
 ## `.github/workflows/` changes can't be pushed from here
 
-The git push credential used in this environment is an OAuth App token without the `workflow`
-scope, so GitHub rejects *any* push — including unrelated commits stacked on top — once a commit
-in it touches a file under `.github/workflows/`. This is enforced by GitHub itself regardless of
-what the diff actually does; there's no way to grant the scope from inside a session.
+The git push credential here is an OAuth App token without the `workflow` scope, so GitHub rejects
+*any* push — including unrelated commits stacked on top — once a commit touches a file under
+`.github/workflows/`. GitHub enforces this regardless of what the diff does; no way to grant the
+scope from inside a session.
 
 So: never commit a change to `.github/workflows/*` directly. Instead, write the intended diff as a
 new file under `docs/pending-changes/` (create the directory if it doesn't exist) — the target
@@ -152,24 +151,24 @@ workflow file's path as the filename with `.patch` appended (e.g.
 `docs/pending-changes/.github__workflows__release.yml.patch`), containing a normal `git diff`-style
 patch plus a one-line note of why. Commit and push that `docs/` file like anything else (it isn't
 under `.github/workflows/`, so it doesn't trip the scope check). The user applies the patch to the
-real workflow file themselves, from an environment with proper push credentials, and pushes it —
-at which point the corresponding file under `docs/pending-changes/` is deleted (by whoever applies
-it, in the same commit that applies it). A pending-changes entry that's still there means it hasn't
-been applied yet; don't recreate one that already exists for the same target file, and don't let
-this workaround become an excuse to touch workflow files more often than the task actually needs.
+real workflow file, from an environment with proper push credentials, and pushes it — then whoever
+applies it deletes the corresponding `docs/pending-changes/` file, in the same commit. A
+pending-changes entry still there means it hasn't been applied yet; don't recreate one that already
+exists for the same target file, and don't let this workaround become an excuse to touch workflow
+files more often than the task needs.
 
 ## Known open items
 
 - **First-launch window-size clamp (P22 D6(a)) still can't apply to the very first window a fresh
   install opens** (round-2 review finding 4). `main.go`'s `openWindow` now resolves
-  `app.Screen.GetPrimary()` fresh per call rather than once before `app.Run()`, which does let
+  `app.Screen.GetPrimary()` fresh per call rather than once before `app.Run()`, which lets
   `shell.DefaultBounds` see a real work area for a window opened well after `Run()` (Dock-reopen
-  minting a fresh window, "New Window" when there's nothing to cascade from) — but every window
-  opened at startup is still built before `app.Run()` even runs (main.go's own top comment), and on
-  macOS the screen cache isn't populated until `ApplicationDidFinishLaunching` fires, strictly
-  after `Run()` is called. So a genuinely first-ever launch still gets the unclamped 1280×800
-  default until the window is resized once. Closing this needs deferring startup window creation
-  until after that event fires — a materially larger structural change than this fix.
+  minting a fresh window, "New Window" with nothing to cascade from). But every window opened at
+  startup is still built before `app.Run()` even runs (main.go's own top comment), and on macOS the
+  screen cache isn't populated until `ApplicationDidFinishLaunching` fires, strictly after `Run()`
+  is called. So a genuinely first-ever launch still gets the unclamped 1280×800 default until the
+  window is resized once. Fixing this needs deferring startup window creation until after that
+  event fires — a materially larger structural change than this fix.
 
 ## Docker (for `packages/db-fixtures/`'s container fixtures, used directly by `apps/kira-studio/tests/e2e-real/`)
 
@@ -181,7 +180,7 @@ this workaround become an excuse to touch workflow files more often than the tas
   no systemd there either.
 - **Docker Hub blob downloads are blocked here.** `production.cloudfront.docker.com` (the CDN every
   Hub blob redirects to) and `quay.io` both 403 through the outbound proxy, so a direct pull
-  resolves the manifest and then can never fetch a layer. **`mirror.gcr.io` is not blocked** —
+  resolves the manifest but never fetches a layer. **`mirror.gcr.io` is not blocked** —
   `packages/db-fixtures/support/*.ts` hardcode plain Hub names, so pull the mirrored name once per
   session and re-tag it locally rather than editing source:
   ```
@@ -191,7 +190,7 @@ this workaround become an excuse to touch workflow files more often than the tas
   docker tag mirror.gcr.io/confluentinc/cp-kafka:8.0.7 confluentinc/cp-kafka:8.0.7
   ```
   Rule: a Docker Hub *official* image (no namespace — `mariadb`, `mysql`, `postgres`, `redis`,
-  `mongo`) lives under `library/` on the real registry, so the mirror path needs that prefix; an
+  `mongo`) lives under `library/` on the real registry, so the mirror path needs that prefix. An
   already-namespaced image (`clickhouse/clickhouse-server`, `confluentinc/cp-kafka`,
   `localstack/localstack`) mirrors at the same path with no prefix. Confirmed for every image this
   repo uses. ClickHouse needs one further workaround on top — see the ClickHouse section below.
@@ -202,10 +201,10 @@ this workaround become an excuse to touch workflow files more often than the tas
   Playwright via its plain Node CLI entrypoint (`node node_modules/.bin/playwright test
   --project=e2e-real`), never `bunx playwright test`. **There is no vendored Node runtime any more**
   (removed P58f M10) to bundle a standalone capture script against, so the old capture tools
-  (`scripts/capture-postgres-tree.ts`, `scripts/capture-tree.ts`) are deleted with it — capturing a
+  (`scripts/capture-postgres-tree.ts`, `scripts/capture-tree.ts`) are deleted with it. Capturing a
   genuinely new `tests/ui/` fixture shape needs a one-off capture mode in
-  `apps/kira-studio/internal/ipcfixture`'s Go generator that hasn't been built yet (only the six
-  committed per-adapter fixture generators exist, see below).
+  `apps/kira-studio/internal/ipcfixture`'s Go generator, not yet built (only the six committed
+  per-adapter fixture generators exist, see below).
 
 ## `apps/kira-studio/tests/ipc/` — building and testing in this environment (P50, updated P57, backend moved to Go P58f)
 
@@ -271,8 +270,8 @@ See `docs/ARCHITECTURE.md`'s Storage section for the cipher, the key and the env
   fallback. `apps/kira-studio/tests/e2e-real/`'s fixture sets it for every real-backend test.
 - Without it, Linux secret storage is **unavailable** — a password-bearing save fails visibly
   rather than silently falling back to plaintext. Deliberate, not a bug to work around.
-- **On macOS the variable is ignored outright** — the real Keychain is used and this can never
-  weaken it, even if accidentally left set. `apps/kira-studio/tests/ui/secrets.spec.ts`'s "keychain
+- **On macOS the app ignores the variable outright** — it uses the real Keychain, so leaving it set
+  accidentally can never weaken it. `apps/kira-studio/tests/ui/secrets.spec.ts`'s "keychain
   available" scenario guards this.
 
 ## The git module — running and testing it here (G1-G29)
@@ -291,9 +290,9 @@ running it here.
   server builds one over its own temp `KIRA_HOME` — never the fixed path.
 - **The perf probes are opt-in and assert nothing.**
   `KIRA_GIT_PERF=1 go test -run 'TestGraphStreamPerf|TestG8PerfBaseline' ./apps/kira-studio/internal/gitsock/ -v`
-  prints one `key=value` line per probe. Asserting a threshold was declined deliberately: this
-  container's numbers and a real Mac's are not comparable, so a hard bound would be flaky in
-  exactly the way it's meant to guard against. Record numbers in the commit message and, when they
+  prints one `key=value` line per probe. No threshold assertion, deliberately: this container's
+  numbers and a real Mac's aren't comparable, so a hard bound would be flaky in exactly the way
+  it's meant to guard against. Record numbers in the commit message and, when they
   answer a stated budget, in `docs/PERF.md`.
 - **The FSEvents watcher is `darwin && cgo`** (`internal/gitclient/watcher_fsevents_darwin.go`), so
   a Linux run exercises the `fsnotify` companion instead. Both satisfy the same seam and both are
@@ -302,10 +301,10 @@ running it here.
   extension bundle and drives the real emitted webview documents in headless Chromium (a layout
   project asserting rendered box heights, and an interaction project); `bun run test:unit` covers
   the extension's and `packages/git-*`'s in-source specs alongside everything else.
-- **The scoped Go race run** for a git-chapter phase is the git packages actually in play plus
+- **The scoped Go race run** for a git-chapter phase is the git packages in play plus
   `internal` itself for the layering test, not the whole tree — `docs/v1.3/SPEC.md`'s own "Full
   verification scope" note fixes the list and the reason. The unscoped tree stays worth running
-  occasionally as a backstop, just not per phase.
+  occasionally as a backstop, not per phase.
 
 ## Wails v3 / Go — building and testing in this environment (P51, P52, P55)
 
@@ -323,8 +322,8 @@ running it here.
 - **`wails.io`/`v3.wails.io` are 403-blocked**, on real macOS hardware too — organizational proxy
   policy, not a sandbox artifact. `proxy.golang.org` is reachable, which is all the Go toolchain
   needs. **Read the installed module source under
-  `$(go env GOPATH)/pkg/mod/github.com/wailsapp/wails/v3@<version>/` instead of the docs site** — it
-  is the real source for the exact pinned version.
+  `$(go env GOPATH)/pkg/mod/github.com/wailsapp/wails/v3@<version>/` instead of the docs site** —
+  it's the real source for the exact pinned version.
 - **`go test ./apps/kira-studio/internal/...` / `go build ./apps/kira-studio/internal/...` need
   nothing but the Go toolchain** — every cgo call this app makes (a handful of darwin-only files in
   `internal/secrets`, `internal/metrics`, `internal/localauth`, `internal/gitclient`'s FSEvents
@@ -340,9 +339,9 @@ running it here.
   build is `CGO_ENABLED=1`. So a `darwin && cgo` file is compiled, vetted and tested by nobody
   until a human builds on a Mac. Treat that as a **design** constraint, not just a testing gap: for
   code whose whole purpose is to work on a path nobody exercises interactively, prefer a pure-Go
-  implementation this container can actually build and test —
-  `internal/startupfail` chose an argv-only `osascript` spawn over a cgo `NSAlert` shim for exactly
-  this reason, and it is checkable in CI as a result.
+  implementation this container can build and test — `internal/startupfail` chose an argv-only
+  `osascript` spawn over a cgo `NSAlert` shim for exactly this reason, and it's checkable in CI as
+  a result.
 - **Regenerate bindings via `wails3 task common:generate:bindings`** (or `scripts/setup.sh`, which
   calls it) — never a hand-typed `wails3 generate bindings` flag list, which has already drifted
   from the task's real flags once. `apps/kira-studio/frontend/bindings/**` are real Vite import
