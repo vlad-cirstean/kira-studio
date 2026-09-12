@@ -1037,28 +1037,17 @@ defineExpose({ scrollToRow, focusGrid, scrollToTopRow, getViewportTop });
 
 /* A border-only ref badge (tag/remote/stash/overflow — every `refBadges.ts` kind except
    `.kv-badge-local`, which used to always fill its own OPAQUE background and so never depend on
-   the row's) carries its own decoration colour as both `color` and `border-color`, tuned against
-   the row's *un*selected background. A selected row with, say, a green `v1.0.0` tag badge fails
-   contrast for real (P5 W14's own axe scan on the commit-detail pane's populated state, the first
-   scan to select a row carrying this particular badge kind) — fixed with the row's own selected-
-   foreground, already verified high-contrast against `--kv-row-selected-bg`, for both properties
-   so the badge's outline stays visible too. (G21 D5: the sha column's own copy of this same fix
-   was deleted along with the column itself.)
-
-   G-UX (item 2b): `.kv-badge-local.kv-badge-lane-tinted` joins this list — its own background is
-   a *translucent* lane wash now (the per-lane rules below), not the opaque fill the comment above
-   still describes for the untinted case, so it DOES depend on whatever sits underneath it once a
-   lane is known; scoped to `.kv-badge-lane-tinted` only so a local badge with no lane data yet
-   (rare — the layout worker has not attached a colour to this row) keeps its today-established
-   look, unaffected. */
-.kv-commit-grid .slick-row.kv-row-selected .kv-badge-remote,
-.kv-commit-grid .slick-row.kv-row-selected .kv-badge-tag,
-.kv-commit-grid .slick-row.kv-row-selected .kv-badge-stash,
-.kv-commit-grid .slick-row.kv-row-selected .kv-badge-overflow,
-.kv-commit-grid .slick-row.kv-row-selected .kv-badge-local.kv-badge-lane-tinted {
-  color: var(--kv-row-selected-fg);
-  border-color: var(--kv-row-selected-fg);
-}
+   the row's) used to carry its own decoration colour as both `color` and `border-color`, tuned
+   against the row's *un*selected background — a selected row with, say, a green `v1.0.0` tag
+   badge failed contrast for real (P5 W14's own axe scan), fixed at the time with the row's own
+   selected-foreground for both properties.
+   P7 (git graph polish): that whole fix is gone, not merely inapplicable — every badge kind now
+   fills its own OPAQUE background (this file's own `.kv-badge-remote`/`-tag`/`-stash`/`-overflow`/
+   `-local.kv-badge-lane-tinted.kv-lane-N` rules above), so a chip's own contrast against its own
+   fill no longer depends on the row underneath it, selected or not — the same property
+   `.kv-badge-local`'s untinted case already had. Forcing `--kv-row-selected-fg` here now would
+   actively fight the shared `--kv-badge-fg` label colour every kind uses, so the override is
+   removed rather than kept dormant. */
 
 /* W14's roving tabindex focuses a real row node (not a hidden sink) — it needs a visible
    indicator of its own, the same token every other focusable edge in this grid already uses. */
@@ -1189,6 +1178,15 @@ defineExpose({ scrollToRow, focusGrid, scrollToTopRow, getViewportTop });
   flex-shrink: 0;
 }
 
+/* P7 (git graph polish): chips read as real buttons now — boxy (a small, button-matching
+   radius, not the old fully-rounded pill), a bolder colored border, and text pinned to
+   `--kv-badge-fg` (VS Code's own generic "text on a colored badge" token, white in virtually
+   every real theme) always, regardless of kind. Every kind below now fills its own background
+   with a `color-mix(... , black)` of its existing `-fg` hue rather than staying transparent-
+   outline, specifically so a fixed white/near-white label stays legible against it in both the
+   dark and light theme variants (`vscode-tokens.css`'s own light-theme block already redefines
+   these same `-fg` tokens per theme — darkening them here for a fill adapts automatically,
+   no new tokens needed). */
 .kv-badge {
   display: inline-flex;
   align-items: center;
@@ -1198,15 +1196,13 @@ defineExpose({ scrollToRow, focusGrid, scrollToTopRow, getViewportTop });
   line-height: 16px;
   font-size: 10px;
   white-space: nowrap;
-  border: 1px solid transparent;
+  color: var(--kv-badge-fg);
+  border: 2px solid transparent;
 }
 
-.kv-badge-pill {
-  border-radius: 9px;
-}
-
+.kv-badge-pill,
 .kv-badge-square {
-  border-radius: 3px;
+  border-radius: var(--kv-radius-sm);
 }
 
 .kv-badge-dashed {
@@ -1236,30 +1232,31 @@ defineExpose({ scrollToRow, focusGrid, scrollToTopRow, getViewportTop });
 }
 
 /* §7's "no colour-only meaning" — every distinct token below pairs with a distinct shape/glyph
-   already chosen in refBadges.ts's badgeSpecFor, this file only supplies the colour. */
+   already chosen in refBadges.ts's badgeSpecFor, this file only supplies the colour. Every kind
+   now fills its own background (never just an outline) so the shared `--kv-badge-fg` label stays
+   readable regardless of kind or theme — see this block's own opening comment. */
 .kv-badge-local {
   background-color: var(--kv-badge-local-bg);
   border-color: var(--kv-badge-local-bg);
-  color: var(--kv-badge-fg);
 }
 
 .kv-badge-remote {
-  color: var(--kv-badge-remote-fg);
+  background-color: color-mix(in srgb, var(--kv-badge-remote-fg) 35%, black);
   border-color: var(--kv-badge-remote-fg);
 }
 
 .kv-badge-tag {
-  color: var(--kv-badge-tag-fg);
+  background-color: color-mix(in srgb, var(--kv-badge-tag-fg) 35%, black);
   border-color: var(--kv-badge-tag-fg);
 }
 
 .kv-badge-stash {
-  color: var(--kv-badge-stash-fg);
+  background-color: color-mix(in srgb, var(--kv-badge-stash-fg) 35%, black);
   border-color: var(--kv-badge-stash-border);
 }
 
 .kv-badge-overflow {
-  color: var(--kv-row-fg);
+  background-color: var(--kv-badge-bg);
   border-color: var(--kv-panel-border);
 }
 
@@ -1273,22 +1270,22 @@ defineExpose({ scrollToRow, focusGrid, scrollToTopRow, getViewportTop });
 }
 
 .kv-badge-pr--open {
-  color: var(--kv-badge-pr-open-fg);
+  background-color: color-mix(in srgb, var(--kv-badge-pr-open-fg) 35%, black);
   border-color: var(--kv-badge-pr-open-fg);
 }
 
 .kv-badge-pr--draft {
-  color: var(--kv-badge-pr-draft-fg);
+  background-color: color-mix(in srgb, var(--kv-badge-pr-draft-fg) 35%, black);
   border-color: var(--kv-badge-pr-draft-fg);
 }
 
 .kv-badge-pr--merged {
-  color: var(--kv-badge-pr-merged-fg);
+  background-color: color-mix(in srgb, var(--kv-badge-pr-merged-fg) 35%, black);
   border-color: var(--kv-badge-pr-merged-fg);
 }
 
 .kv-badge-pr--closed {
-  color: var(--kv-badge-pr-closed-fg);
+  background-color: color-mix(in srgb, var(--kv-badge-pr-closed-fg) 35%, black);
   border-color: var(--kv-badge-pr-closed-fg);
 }
 
@@ -1336,46 +1333,39 @@ defineExpose({ scrollToRow, focusGrid, scrollToTopRow, getViewportTop });
 .kv-badge-lane-tinted.kv-lane-7 .kv-badge-icon { color: var(--kv-graph-lane-7); }
 
 /* G-UX (item 2b): the literal ask's "easy to spot" half — a *filled* local badge (unlike the
-   outline kinds above) takes its own background from the lane too, not just its border/icon, so
-   the badge itself reads as "this lane's branch" at a glance. `color-mix(... 22%, transparent)`
-   rather than a solid `--kv-graph-lane-N` fill: several lanes are near-white and would fail text
-   contrast as a solid fill/label colour (the same reason the outline kinds above never tint their
-   label) — a translucent wash lets the row's own background show through, so the badge's own text
-   can stay at the row's ordinary foreground token instead of needing a lane-specific one. Three
-   properties (background/color/border-color), one rule per lane, at `(0,3,0)` specificity —
-   higher than `.kv-badge-local`'s own plain rule above, so this wins whenever a lane is known
-   without needing `!important`. */
+   outline kinds above, before P7) takes its own background from the lane too, not just its
+   border/icon, so the badge itself reads as "this lane's branch" at a glance.
+   P7 (git graph polish): `color-mix(... 22%, transparent)` — a translucent wash meant to let the
+   row's own background show through while `color: var(--kv-row-fg)` handled contrast — is gone.
+   Every lane hue is now mixed toward black instead (`.kv-badge-remote`/`-tag`/`-stash`'s own new
+   rules just above use the identical formula against their own kind colour), which is what makes
+   a solid fill safe for several lanes that are near-white in hue: no `color` override needed here
+   any more, `.kv-badge`'s own shared `--kv-badge-fg` wins by cascade order alone. One rule per
+   lane, at `(0,3,0)` specificity — higher than `.kv-badge-local`'s own plain rule above, so this
+   still wins whenever a lane is known, without needing `!important`. */
 .kv-badge-local.kv-badge-lane-tinted.kv-lane-0 {
-  background-color: color-mix(in srgb, var(--kv-graph-lane-0) 22%, transparent);
-  color: var(--kv-row-fg);
+  background-color: color-mix(in srgb, var(--kv-graph-lane-0) 35%, black);
 }
 .kv-badge-local.kv-badge-lane-tinted.kv-lane-1 {
-  background-color: color-mix(in srgb, var(--kv-graph-lane-1) 22%, transparent);
-  color: var(--kv-row-fg);
+  background-color: color-mix(in srgb, var(--kv-graph-lane-1) 35%, black);
 }
 .kv-badge-local.kv-badge-lane-tinted.kv-lane-2 {
-  background-color: color-mix(in srgb, var(--kv-graph-lane-2) 22%, transparent);
-  color: var(--kv-row-fg);
+  background-color: color-mix(in srgb, var(--kv-graph-lane-2) 35%, black);
 }
 .kv-badge-local.kv-badge-lane-tinted.kv-lane-3 {
-  background-color: color-mix(in srgb, var(--kv-graph-lane-3) 22%, transparent);
-  color: var(--kv-row-fg);
+  background-color: color-mix(in srgb, var(--kv-graph-lane-3) 35%, black);
 }
 .kv-badge-local.kv-badge-lane-tinted.kv-lane-4 {
-  background-color: color-mix(in srgb, var(--kv-graph-lane-4) 22%, transparent);
-  color: var(--kv-row-fg);
+  background-color: color-mix(in srgb, var(--kv-graph-lane-4) 35%, black);
 }
 .kv-badge-local.kv-badge-lane-tinted.kv-lane-5 {
-  background-color: color-mix(in srgb, var(--kv-graph-lane-5) 22%, transparent);
-  color: var(--kv-row-fg);
+  background-color: color-mix(in srgb, var(--kv-graph-lane-5) 35%, black);
 }
 .kv-badge-local.kv-badge-lane-tinted.kv-lane-6 {
-  background-color: color-mix(in srgb, var(--kv-graph-lane-6) 22%, transparent);
-  color: var(--kv-row-fg);
+  background-color: color-mix(in srgb, var(--kv-graph-lane-6) 35%, black);
 }
 .kv-badge-local.kv-badge-lane-tinted.kv-lane-7 {
-  background-color: color-mix(in srgb, var(--kv-graph-lane-7) 22%, transparent);
-  color: var(--kv-row-fg);
+  background-color: color-mix(in srgb, var(--kv-graph-lane-7) 35%, black);
 }
 
 /* G19 D2: F2 found this cell had no overflow safety net at all — unlike
