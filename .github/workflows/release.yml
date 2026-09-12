@@ -39,6 +39,14 @@ jobs:
           test "$(sed -n 's/^  version: *"\([^"]*\)".*/\1/p' "$CONFIG" | head -1)" = "$TAG"
           echo "app version set to $TAG (from tag $GITHUB_REF_NAME)"
 
+          # G10 D21: the extension manifest's own version, kept in lockstep with config.yml's — S9
+          # asserts the two agree. Anchored to the top-level "version" key at two-space indent, the
+          # same idiom as the config.yml rewrite above.
+          VSCODE_PKG=apps/kira-studio-vscode/package.json
+          perl -i -pe 's/^(  "version": )"[^"]*"/$1"'"$TAG"'"/' "$VSCODE_PKG"
+          test "$(sed -n 's/^  "version": *"\([^"]*\)".*/\1/p' "$VSCODE_PKG" | head -1)" = "$TAG"
+          echo "extension version set to $TAG (from tag $GITHUB_REF_NAME)"
+
       - name: Generate Wails bindings (P20 D7 — routed through scripts/setup.sh)
         run: sh scripts/setup.sh
 
