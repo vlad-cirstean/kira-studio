@@ -68,7 +68,7 @@ jobs:
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
-      - name: Install GTK4/WebKitGTK headers (wails3 CLI build requirement on Linux — AGENTS.md)
+      - name: Install GTK4/WebKitGTK headers (wails3 CLI build requirement on Linux — CLAUDE.md)
         run: sudo apt-get update && sudo apt-get install -y libgtk-4-dev libwebkitgtk-6.0-dev pkg-config
       - run: bun install --frozen-lockfile
       - name: Cache wails3 CLI (v1.4 P1 — go.mod-keyed, OS-specific binary)
@@ -85,7 +85,7 @@ jobs:
           key: wails-bindings-${{ hashFiles('go.mod') }}
       - name: Generate Wails bindings
         run: sh scripts/setup.sh
-      - name: Install WebKit and its system libraries (AGENTS.md)
+      - name: Install WebKit and its system libraries (CLAUDE.md)
         run: |
           bunx playwright install webkit
           sudo apt-get install -y libevent-2.1-7t64 libgstreamer-plugins-bad1.0-0 libflite1 gstreamer1.0-libav

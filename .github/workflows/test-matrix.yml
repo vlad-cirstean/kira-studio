@@ -29,7 +29,7 @@ jobs:
           go-version-file: go.mod
       - name: Run the auth/config permutation matrix
         # GitHub's own runners reach Docker Hub directly — --mirror is a sandbox-only workaround
-        # for the outbound proxy documented in AGENTS.md, so it is deliberately omitted here,
+        # for the outbound proxy documented in CLAUDE.md, so it is deliberately omitted here,
         # matching db-compat.yml's own comment for the identical reason. A scheduled run has no
         # workflow_dispatch inputs at all, so `inputs.kind` reads empty rather than its declared
         # default — treated the same as "all".

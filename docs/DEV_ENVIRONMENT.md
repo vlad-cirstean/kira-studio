@@ -4,14 +4,24 @@ How to build, run and test this repo in whatever sandbox/container a session hap
 credential and tooling constraints, container quirks, per-subsystem run instructions. Not app
 facts: those live in `docs/ARCHITECTURE.md`. Not team process: that lives in `CLAUDE.md`.
 
-## Git push: `.github/workflows/` changes can't be pushed from here
+## Check the OS at session start
 
-The git push credential here is an OAuth App token without the `workflow` scope, so GitHub rejects
-*any* push — including unrelated commits stacked on top — once a commit touches a file under
-`.github/workflows/`. GitHub enforces this regardless of what the diff does; no way to grant the
-scope from inside a session.
+`uname -s`. A real Mac session carries full capabilities and permissions — a push credential with
+the `workflow` scope (the `.github/workflows/` restriction below doesn't apply), the real macOS
+Keychain, Colima for containers. A Linux sandbox/container session is the constrained case: every
+restriction in this file assumes Linux unless its own section says otherwise. Check once, before
+assuming a constraint below applies to the current session.
 
-So: never commit a change to `.github/workflows/*` directly. Instead:
+## Git push: `.github/workflows/` changes can't be pushed from a Linux sandbox
+
+On a Linux sandbox session, the git push credential is an OAuth App token without the `workflow`
+scope, so GitHub rejects *any* push — including unrelated commits stacked on top — once a commit
+touches a file under `.github/workflows/`. GitHub enforces this regardless of what the diff does;
+no way to grant the scope from inside such a session. Confirmed not to apply on a real Mac session
+(2026-09-12): a Mac session's push credential carries the `workflow` scope, so a commit touching
+`.github/workflows/*` pushes normally there — skip the workaround below entirely.
+
+On a Linux sandbox: never commit a change to `.github/workflows/*` directly. Instead:
 
 - **Modifying an existing workflow file**: write the intended diff as a new file under
   `docs/pending-changes/` (create the directory if it doesn't exist) — the target workflow file's
