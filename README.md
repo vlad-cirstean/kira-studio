@@ -314,8 +314,8 @@ not a spec suite of its own — no `xvfb` is needed for any tier.
   backend, no container, no VS Code.
 - **`apps/kira-studio/tests/e2e-real/`** — four specs against a real `-tags server` Go binary, run
   via `bun run test:e2e-real`, which deliberately launches Playwright through plain Node rather than
-  `bunx` (`node node_modules/.bin/playwright test --project=e2e-real`) — see `AGENTS.md`'s Docker
-  section for why.
+  `bunx` (`node node_modules/.bin/playwright test --project=e2e-real`) — see
+  `docs/DEV_ENVIRONMENT.md`'s Docker section for why.
 - **`bun run test:go`** — the Go test suite (`go test ./...`), including the Testcontainers-backed
   cases against real engines; container-backed cases self-skip without Docker. With Colima, start
   it first: `colima start --cpu 4 --memory 6 --disk 40`. The git packages need no container at all
@@ -395,6 +395,10 @@ chapter (`docs/v1/SPEC.md` is the v1 record — see `docs/v1/README.md`).
 - [`docs/design/kira-design-system/`](docs/design/kira-design-system/) — the workbench visual
   reference (design artboards).
 - [`AGENTS.md`](AGENTS.md) — the working agreement for changes to this repo.
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — how the app actually works today, plus known
+  open limitations.
+- [`docs/DEV_ENVIRONMENT.md`](docs/DEV_ENVIRONMENT.md) — building, running and testing this repo in
+  whatever sandbox a session happens to be in.
 - [`scripts/demo-dbs/README.md`](scripts/demo-dbs/README.md) — local fixture databases.
 
 ## Not shipped

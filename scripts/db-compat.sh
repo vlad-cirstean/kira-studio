@@ -103,7 +103,7 @@ if [ -z "$FILTERED" ]; then
   exit 2
 fi
 
-# --- AGENTS.md's mirror.gcr.io workaround: pull the mirrored name, retag it locally -----------
+# --- docs/DEV_ENVIRONMENT.md's mirror.gcr.io workaround: pull the mirrored name, retag it locally
 # The rule: an unnamespaced official image (postgres, mysql, mariadb, mongo, redis) lives under
 # library/ on the real registry, so the mirror path needs that prefix; an already-namespaced one
 # (clickhouse/clickhouse-server, confluentinc/cp-kafka, localstack/localstack) mirrors at the same
