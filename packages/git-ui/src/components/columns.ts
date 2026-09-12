@@ -128,6 +128,10 @@ function messageFormatter(
     const prs = prCtx.prsFor(dataContext.sha);
     const prBadge = prs !== undefined ? buildPrBadge(prs) : null;
     if (badges !== null || prBadge !== null) {
+      // P7 (item 1): the same condition that decides whether the badges-row element exists at
+      // all also decides whether the row is tall enough to show it — `rowMetadata` below makes
+      // the identical `decoration.length > 0 || hasPr` check, cheaply, without building this DOM.
+      cell.classList.add('kv-cell-message--has-badges');
       const badgesRow = document.createElement('span');
       badgesRow.className = 'kv-message-badges-row';
       if (badges !== null) badgesRow.appendChild(badges);
@@ -281,10 +285,34 @@ export function buildColumns(
  *  `RowSelectionModel` — see `CommitGrid.vue`'s doc comment), `head`/`stash` from `decorationAt` —
  *  the single source `docs/plans/P4.md` W8 promises ("the single source is `decorationAt`, not a
  *  second heuristic" — in particular, never a guess from the subject line, which an ordinary
- *  commit could coincidentally match). */
+ *  commit could coincidentally match).
+ *
+ *  P7 (item 1): also `getItemMetadata`'s `height`, now that `CommitGrid.vue` turns on
+ *  `enableVariableRowHeight` — `expandedRowHeight`/`prsFor` are optional so every existing caller
+ *  of `rowMetadata` that only needs the class behaviour keeps compiling; only `CommitGrid.vue`
+ *  passes real ones. */
 export interface RowMetadataContext {
   readonly store: CommitStore;
   readonly isSelected: (row: number) => boolean;
+  readonly expandedRowHeight?: () => number;
+  readonly prsFor?: (sha: string) => readonly PrRecord[] | undefined;
+}
+
+/** P7 (item 1): whether row `row` renders a ref/PR badge strip at all — the exact condition
+ *  `messageFormatter` above uses to decide whether to build `.kv-message-badges-row` (and add
+ *  `kv-cell-message--has-badges`), recomputed here cheaply (no DOM: `planBadges`'s own exhaustive
+ *  `badgeSpecFor` switch means every decoration kind, `head` included, always produces a visible
+ *  badge, so `decoration.length > 0` alone is a complete proxy) rather than calling
+ *  `buildRefBadges`/`buildPrBadge` a second time just to check emptiness. */
+function rowHasBadges(
+  ctx: RowMetadataContext,
+  row: number,
+  decoration: readonly DecorationRef[],
+): boolean {
+  if (decoration.length > 0) return true;
+  if (ctx.prsFor === undefined) return false;
+  const sha = ctx.store.commitAt(row).sha;
+  return (ctx.prsFor(sha)?.length ?? 0) > 0;
 }
 
 export function rowMetadata(ctx: RowMetadataContext, row: number): ItemMetadata | null {
@@ -293,7 +321,12 @@ export function rowMetadata(ctx: RowMetadataContext, row: number): ItemMetadata 
   const decoration = ctx.store.decorationAt(row);
   if (decoration.some(isHeadDecoration)) classes.push('kv-row-head');
   if (decoration.some(isStashDecoration)) classes.push('kv-row-stash');
-  return classes.length > 0 ? { cssClasses: classes.join(' ') } : null;
+  const hasBadges = ctx.expandedRowHeight !== undefined && rowHasBadges(ctx, row, decoration);
+  if (classes.length === 0 && !hasBadges) return null;
+  return {
+    cssClasses: classes.length > 0 ? classes.join(' ') : undefined,
+    height: hasBadges ? ctx.expandedRowHeight?.() : undefined,
+  };
 }
 
 /**
@@ -304,10 +337,8 @@ export function rowMetadata(ctx: RowMetadataContext, row: number): ItemMetadata 
  * captured values so this data view always answers with the store's/selection's *current* state,
  * matching the plan's own sketch (`getLength: () => graphView.loadedRows.value`).
  */
-export interface CommitDataViewDeps {
-  readonly store: CommitStore;
+export interface CommitDataViewDeps extends RowMetadataContext {
   readonly loadedRows: () => number;
-  readonly isSelected: (row: number) => boolean;
 }
 
 export function createCommitDataView(deps: CommitDataViewDeps): CustomDataView<CommitRecord> {

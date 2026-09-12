@@ -103,6 +103,74 @@ test.describe('graph grid columns', () => {
     ).toContainText('Add the graph column fixture');
   });
 
+  // P7 (item 1): row height only grows for a row that actually carries a ref/PR badge, and the
+  // graph column's own node sits on the subject line in both cases, not the row's own midpoint —
+  // `fakeGraphHost.ts`'s `'oneDecoratedOneNot'` stream mode gives one real undecorated row and one
+  // real tag-decorated row to compare directly, rather than asserting a computed number in
+  // isolation (that's what `rowSvg.test.ts`'s own unit coverage already does).
+  test.describe('row height and graph-node alignment (item 1)', () => {
+    async function bootDecoratedGraph(page: import('@playwright/test').Page): Promise<void> {
+      await page.addInitScript(buildFakeGraphHostInitScript({ streamMode: 'oneDecoratedOneNot' }));
+      await page.goto(`${server.url}/graph`);
+      await expect(
+        page.locator('[data-testid="commit-grid"] .slick-row[data-row="1"]'),
+      ).toBeVisible();
+      await page.keyboard.press('Escape');
+      await expect(page.locator('[data-testid="detail-region"]')).toHaveCount(0);
+    }
+
+    test('an undecorated row is shorter than a row with a ref badge', async ({ page }) => {
+      await bootDecoratedGraph(page);
+
+      const plainHeight = await page
+        .locator('[data-testid="commit-grid"] .slick-row[data-row="0"]')
+        .evaluate((el) => el.getBoundingClientRect().height);
+      const decoratedHeight = await page
+        .locator('[data-testid="commit-grid"] .slick-row[data-row="1"]')
+        .evaluate((el) => el.getBoundingClientRect().height);
+
+      expect(decoratedHeight).toBeGreaterThan(plainHeight);
+    });
+
+    // The real regression this guards: the bullet used to sit at the row's own literal midpoint
+    // (`rowHeight / 2`), which drifts away from the subject line the taller a decorated row gets.
+    // Asserted against the real, rendered subject text box in both rows — not a computed offset —
+    // so a future change to the badge/subject CSS is caught here even if the arithmetic in
+    // `graphColumn.ts`/`rowSvg.ts` is not itself touched.
+    for (const row of [0, 1] as const) {
+      test(`row ${row}'s graph node is vertically centred on its own subject line`, async ({
+        page,
+      }) => {
+        await bootDecoratedGraph(page);
+
+        const { nodeCy, subjectMidY, rowTop } = await page.evaluate((rowIndex) => {
+          const rowEl = document.querySelector(
+            `[data-testid="commit-grid"] .slick-row[data-row="${rowIndex}"]`,
+          );
+          const circle = rowEl?.querySelector('.kv-graph-svg circle');
+          const subject = rowEl?.querySelector('.kv-message-subject');
+          if (!rowEl || !circle || !subject) {
+            throw new Error(`row ${rowIndex}: missing row/circle/subject element`);
+          }
+          const rowRect = rowEl.getBoundingClientRect();
+          const subjectRect = subject.getBoundingClientRect();
+          const cy = Number(circle.getAttribute('cy'));
+          return {
+            nodeCy: rowRect.top + cy,
+            subjectMidY: subjectRect.top + subjectRect.height / 2,
+            rowTop: rowRect.top,
+          };
+        }, row);
+
+        // A couple of px of slack for sub-pixel text-box rounding — the real assertion is that the
+        // node sits ON the subject line, not floating 8px above it the way `rowHeight / 2` used to
+        // once the row grew a badge track.
+        expect(Math.abs(nodeCy - subjectMidY)).toBeLessThanOrEqual(2);
+        expect(rowTop).toBeGreaterThanOrEqual(0); // sanity: real geometry, not all-zero in a hidden tab
+      });
+    }
+  });
+
   // G-UX D2 (item 1b): a click on an unselected row opens the detail pane on the FIRST click, not
   // the second — F2's own regression this guards.
   test('one click on an unselected row opens the detail pane', async ({ page }) => {

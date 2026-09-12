@@ -65,26 +65,34 @@ function readSlice(
  * `LayoutStore.segmentsInRow` on every call — W3 made that query allocation-free precisely so
  * this line could be written; a fresh array per row, at up to tens of thousands of rendered rows
  * across a scroll session, is exactly the allocation churn `segmentsInRow`'s own contract exists
- * to avoid. `rowHeight` is an accessor (`() => rowHeightPx(tokenReader)`, `CommitGrid.vue`), not a
- * captured value, so a `--kv-row-height` theme change is reflected on the next render without
- * rebuilding this formatter.
+ * to avoid.
+ *
+ * P7 (item 1): `rowHeight` is now `(row) => number` rather than a fixed accessor — since row
+ * height varies with badge presence (`CommitGrid.vue`'s `enableVariableRowHeight`), the caller
+ * passes `grid.getRowHeight(row)` so this formatter always draws into the row's own real height,
+ * not a stale grid-wide default. `compactRowHeight` feeds `rowSvg.ts`'s `nodeCenterY` (the node's
+ * y, anchored to the subject line rather than the row's own midpoint — a `--kv-row-height-compact`
+ * theme change is reflected on the next render without rebuilding this formatter, same as before).
  */
 export function createGraphFormatter(
   layout: LayoutStore,
   store: CommitStore,
-  rowHeight: () => number,
+  rowHeight: (row: number) => number,
+  compactRowHeight: () => number,
 ): Formatter<CommitRecord> {
   const reusable: EdgeSegment[] = [];
   return (row) => {
     const wrapper = document.createElement('div');
     wrapper.className = 'kv-graph-cell';
+    const total = rowHeight(row);
+    const nodeCenterY = total - compactRowHeight() / 2;
     const samples = window.__kiraRowBuildSamplesMs;
     if (samples) {
       const start = performance.now();
-      wrapper.appendChild(buildRowSvg(readSlice(layout, store, row, reusable), rowHeight()));
+      wrapper.appendChild(buildRowSvg(readSlice(layout, store, row, reusable), total, nodeCenterY));
       samples.push(performance.now() - start);
     } else {
-      wrapper.appendChild(buildRowSvg(readSlice(layout, store, row, reusable), rowHeight()));
+      wrapper.appendChild(buildRowSvg(readSlice(layout, store, row, reusable), total, nodeCenterY));
     }
     return wrapper;
   };

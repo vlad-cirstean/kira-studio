@@ -114,8 +114,21 @@ export function laneX(lane: number): number {
  * comment). So a merge-in edge runs straight down its own `fromLane` for its own row and every
  * pass-through row, and only bends — the same bezier shape the straight/branch-out case uses,
  * reflected top-to-bottom — in its final row, meeting the node it converges into.
+ *
+ * P7 (item 1): every "the node's own y" reference below (there is no other kind of `rowHeight/2`
+ * read in this function — each one is confirmed by its own local variable name: `yEnd`/`yStart`/
+ * `yTop`/`yBottom` at the node, never at a row boundary) is `nodeCenterY`, a second, separate
+ * parameter — the node no longer sits at the row's literal midpoint once row height varies with
+ * badge presence (`planNode`'s own doc comment has the full formula). Row-boundary values
+ * (`-overdraw`, `rowHeight + overdraw`) are untouched — those are genuinely about the row's own
+ * top/bottom, not the node.
  */
-export function edgeCommand(segment: EdgeSegment, row: number, rowHeight: number): string {
+export function edgeCommand(
+  segment: EdgeSegment,
+  row: number,
+  rowHeight: number,
+  nodeCenterY: number,
+): string {
   const overdraw = GEOMETRY.overdraw;
 
   if (segment.kind === EDGE_KIND_MERGE_IN) {
@@ -124,7 +137,7 @@ export function edgeCommand(segment: EdgeSegment, row: number, rowHeight: number
       const xFrom = laneX(segment.fromLane);
       const xTo = laneX(segment.toLane);
       const yStart = -overdraw;
-      const yEnd = rowHeight / 2;
+      const yEnd = nodeCenterY;
       if (xFrom === xTo) return `M${fmt(xFrom)},${fmt(yStart)} V${fmt(yEnd)}`;
       const midY = (yStart + yEnd) / 2;
       return (
@@ -133,7 +146,7 @@ export function edgeCommand(segment: EdgeSegment, row: number, rowHeight: number
       );
     }
     const x = laneX(segment.fromLane);
-    const yTop = row === segment.fromRow ? rowHeight / 2 : -overdraw;
+    const yTop = row === segment.fromRow ? nodeCenterY : -overdraw;
     const yBottom = rowHeight + overdraw;
     return `M${fmt(x)},${fmt(yTop)} V${fmt(yBottom)}`;
   }
@@ -141,7 +154,7 @@ export function edgeCommand(segment: EdgeSegment, row: number, rowHeight: number
   if (row === segment.fromRow) {
     const xFrom = laneX(segment.fromLane);
     const xTo = laneX(segment.toLane);
-    const yStart = rowHeight / 2;
+    const yStart = nodeCenterY;
     const yEnd = rowHeight + overdraw;
     if (xFrom === xTo) return `M${fmt(xFrom)},${fmt(yStart)} V${fmt(yEnd)}`;
     const midY = (yStart + yEnd) / 2;
@@ -154,7 +167,7 @@ export function edgeCommand(segment: EdgeSegment, row: number, rowHeight: number
   const x = laneX(segment.toLane);
   const isEnd = segment.toRow !== UNRESOLVED_ROW && row === segment.toRow;
   const yTop = -overdraw;
-  const yBottom = isEnd ? rowHeight / 2 : rowHeight + overdraw;
+  const yBottom = isEnd ? nodeCenterY : rowHeight + overdraw;
   return `M${fmt(x)},${fmt(yTop)} V${fmt(yBottom)}`;
 }
 
@@ -169,11 +182,15 @@ export interface EdgePathPlan {
  *  Two *different* lanes sharing a colour (legal once `laneCount` exceeds the palette size) are
  *  concatenated into the same path too — same visual result, one fewer element, and nothing reads
  *  lane identity back out of an already-drawn path. */
-export function planEdgePaths(slice: RowSlice, rowHeight: number): readonly EdgePathPlan[] {
+export function planEdgePaths(
+  slice: RowSlice,
+  rowHeight: number,
+  nodeCenterY: number,
+): readonly EdgePathPlan[] {
   const commandsByColor = new Map<number, string[]>();
   for (let i = 0; i < slice.segmentCount; i++) {
     const segment = slice.segments[i] as EdgeSegment;
-    const command = edgeCommand(segment, slice.row, rowHeight);
+    const command = edgeCommand(segment, slice.row, rowHeight, nodeCenterY);
     const existing = commandsByColor.get(segment.color);
     if (existing) existing.push(command);
     else commandsByColor.set(segment.color, [command]);
@@ -209,11 +226,21 @@ export interface NodeShapePlan {
 /** §5.3's fifth decision, the three node shapes: filled circle (ordinary), filled circle plus an
  *  unfilled ring (merge — `store.parentsOf(row).length > 1`), unfilled dashed ring alone (stash —
  *  `decorationAt(row)` carries the `stash` kind). Empty for a row with no layout yet
- *  (`slice.lane === undefined`) — nothing to draw, not a guessed lane. */
-export function planNode(slice: RowSlice, rowHeight: number): readonly NodeShapePlan[] {
+ *  (`slice.lane === undefined`) — nothing to draw, not a guessed lane.
+ *
+ *  P7 (item 1): `cy` is `nodeCenterY`, not `rowHeight / 2` — the row's own true midpoint stopped
+ *  being where the commit-message subject sits the moment a badge could make the row taller
+ *  without moving the subject (`CommitGrid.vue`'s `.kv-cell-message`: the subject is always the
+ *  LAST grid track, always 18px, always the same distance from the row's own bottom edge no
+ *  matter what — if anything — sits above it). The caller (`graphColumn.ts`) computes
+ *  `nodeCenterY = rowHeight - compactRowHeight / 2`: algebraically this is exactly the subject's
+ *  own vertical centre in both regimes (reduces to `compactRowHeight / 2` — today's already-
+ *  correct single-line case — when `rowHeight === compactRowHeight`), so this module stays
+ *  ignorant of which CSS regime produced the number it's handed. */
+export function planNode(slice: RowSlice, nodeCenterY: number): readonly NodeShapePlan[] {
   if (slice.lane === undefined) return [];
   const cx = laneX(slice.lane);
-  const cy = rowHeight / 2;
+  const cy = nodeCenterY;
   const color = slice.color;
 
   // G19 D1 / G21 D1: the HEAD ring is additive — appended to whichever shapes this kind already
@@ -329,11 +356,20 @@ function buildNodeElement(plan: NodeShapePlan): SVGCircleElement {
 
 /** Builds one row's `<svg>` — sized to the *current* graph column width (`slice.laneCount`, the
  *  store's own high-water mark, not a per-row value, so every row's SVG stays the same width as
- *  the column SlickGrid itself sized via `columns.ts`) and `rowHeight` (`--kv-row-height`, the
- *  same value the grid takes as its own `rowHeight` option, so lanes and rows cannot drift).
- *  `overflow: visible` (`CommitGrid.vue`'s `<style>`) is what lets the `GEOMETRY.overdraw`
- *  fragments `edgeCommand` emits actually paint past this element's own bounds. */
-export function buildRowSvg(slice: RowSlice, rowHeight: number): SVGSVGElement {
+ *  the column SlickGrid itself sized via `columns.ts`) and `rowHeight` (this row's own real
+ *  height — `CommitGrid.vue`'s `grid.getRowHeight(row)`, P7 (item 1) — so lanes and rows cannot
+ *  drift). `overflow: visible` (`CommitGrid.vue`'s `<style>`) is what lets the `GEOMETRY.overdraw`
+ *  fragments `edgeCommand` emits actually paint past this element's own bounds.
+ *
+ *  `nodeCenterY` (P7, item 1) is this row's own node-anchor y (`planNode`'s own doc comment has
+ *  the formula) — passed in rather than derived here so a caller only ever computes it once per
+ *  row, from values (`rowHeight`, the compact token) this module has no other reason to know
+ *  about. */
+export function buildRowSvg(
+  slice: RowSlice,
+  rowHeight: number,
+  nodeCenterY: number,
+): SVGSVGElement {
   const width = graphColumnWidth(slice.laneCount);
   const svg = document.createElementNS(SVG_NS, 'svg');
   svg.setAttribute('class', 'kv-graph-svg');
@@ -344,9 +380,10 @@ export function buildRowSvg(slice: RowSlice, rowHeight: number): SVGSVGElement {
   // G-UX (item 1): the HEAD halo paints UNDER the row's own edges (a soft backdrop the edges
   // still read clearly on top of); every other node shape — including the HEAD ring itself —
   // paints on top of the edges, as before.
-  const nodes = planNode(slice, rowHeight);
+  const nodes = planNode(slice, nodeCenterY);
   for (const plan of nodes) if (plan.isHeadHalo) svg.appendChild(buildNodeElement(plan));
-  for (const plan of planEdgePaths(slice, rowHeight)) svg.appendChild(buildPathElement(plan));
+  for (const plan of planEdgePaths(slice, rowHeight, nodeCenterY))
+    svg.appendChild(buildPathElement(plan));
   for (const plan of nodes) if (!plan.isHeadHalo) svg.appendChild(buildNodeElement(plan));
 
   return svg;

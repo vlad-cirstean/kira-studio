@@ -105,6 +105,9 @@ describe('planNode — G19 D1 HEAD ring', () => {
 
 describe('edgeCommand — G21 D3c EDGE_KIND_MERGE_IN', () => {
   const rowHeight = 22;
+  // P7 (item 1): deliberately NOT rowHeight / 2 (11) — proves edgeCommand actually consumes this
+  // as its own parameter rather than silently re-deriving the node's y from rowHeight.
+  const nodeCenterY = 16;
 
   function mergeInSegment(overrides: Partial<EdgeSegment> = {}): EdgeSegment {
     return {
@@ -119,33 +122,33 @@ describe('edgeCommand — G21 D3c EDGE_KIND_MERGE_IN', () => {
   }
 
   test('its own row (fromRow): a vertical run in fromLane, centre to bottom — no bend yet', () => {
-    const d = edgeCommand(mergeInSegment(), 3, rowHeight);
-    // A vertical run ("V", no curve "C") starting at the row's centre, in fromLane (1) — not
+    const d = edgeCommand(mergeInSegment(), 3, rowHeight, nodeCenterY);
+    // A vertical run ("V", no curve "C") starting at the node's own centre, in fromLane (1) — not
     // toLane (0), unlike the ordinary straight/branch-out case.
     expect(d).not.toContain('C');
-    expect(d.startsWith(`M${laneX(1)},${rowHeight / 2}`)).toBe(true);
+    expect(d.startsWith(`M${laneX(1)},${nodeCenterY}`)).toBe(true);
   });
 
   test('a pass-through row: a full-height vertical run, still in fromLane', () => {
-    const d = edgeCommand(mergeInSegment(), 4, rowHeight);
+    const d = edgeCommand(mergeInSegment(), 4, rowHeight, nodeCenterY);
     expect(d).not.toContain('C');
     expect(d.startsWith(`M${laneX(1)},${-GEOMETRY.overdraw}`)).toBe(true);
   });
 
-  test('its target row (toRow): the bend — a curve from fromLane into toLane, top to centre', () => {
-    const d = edgeCommand(mergeInSegment(), 5, rowHeight);
+  test('its target row (toRow): the bend — a curve from fromLane into toLane, top to the node', () => {
+    const d = edgeCommand(mergeInSegment(), 5, rowHeight, nodeCenterY);
     expect(d).toContain('C');
     // Starts at the top of the row in fromLane (mirroring the ordinary case's own start-at-
-    // centre-in-fromLane) and ends at the row's own centre in toLane — the node it converges
-    // into — not the bottom.
+    // centre-in-fromLane) and ends at the node's own centre in toLane — the node it converges
+    // into — not the row's bottom.
     expect(d.startsWith(`M${laneX(1)},${-GEOMETRY.overdraw}`)).toBe(true);
-    expect(d.endsWith(`${laneX(0)},${rowHeight / 2}`)).toBe(true);
+    expect(d.endsWith(`${laneX(0)},${nodeCenterY}`)).toBe(true);
   });
 
   test('a straight edge is unaffected by the merge-in branch — unchanged shape', () => {
     const segment = mergeInSegment({ kind: EDGE_KIND_STRAIGHT, fromLane: 0, toLane: 0 });
-    const d = edgeCommand(segment, 3, rowHeight);
+    const d = edgeCommand(segment, 3, rowHeight, nodeCenterY);
     expect(d).not.toContain('C'); // same lane, no bend needed either way
-    expect(d.startsWith(`M${laneX(0)},${rowHeight / 2}`)).toBe(true);
+    expect(d.startsWith(`M${laneX(0)},${nodeCenterY}`)).toBe(true);
   });
 });

@@ -27,7 +27,7 @@ import type { SearchState } from '../state/search.ts';
 import type { SelectionState } from '../state/selection.ts';
 import type { StackState } from '../state/stack.ts';
 import { type ColumnWidths, type DateFormat, DEFAULT_COLUMN_WIDTHS } from '../state/viewState.ts';
-import { rowHeightPx, TokenReader } from '../theme/readTokens.ts';
+import { compactRowHeightPx, rowHeightPx, TokenReader } from '../theme/readTokens.ts';
 import { buildColumns, createCommitDataView } from './columns.ts';
 import { formatAbsoluteDate, formatRelativeDate, measureAbsoluteDateWidth } from './dateFormat.ts';
 import { composeRowLabel } from './rowAccessibility.ts';
@@ -137,8 +137,18 @@ function minWidthFor(column: keyof ColumnWidths): number {
 // (props.graphView is assumed stable for the life of one CommitGrid — a repo switch remounts
 // this component rather than swapping graphView underneath it) and a rowHeight accessor so a
 // `--kv-row-height` change is picked up on the next render without rebuilding this formatter.
-const graphFormatter = createGraphFormatter(props.graphView.layout, props.graphView.store, () =>
-  rowHeightPx(tokenReader),
+// P7 (item 1): `rowHeight` is now per-row (`grid.getRowHeight(row)`, since rows vary), read
+// through `grid` itself rather than a fixed token — `grid` is declared above and assigned in
+// `onMounted`, before any row is ever actually rendered, so this closure never sees it undefined
+// in practice; the `?? compactRowHeightPx` fallback only matters for a formatter call that could
+// theoretically race construction. `compactRowHeight` feeds `nodeCenterY`'s own formula (§1.3 of
+// the plan): the node's y always sits `compactRowHeight / 2` above the row's own bottom edge,
+// regardless of how tall the row actually is.
+const graphFormatter = createGraphFormatter(
+  props.graphView.layout,
+  props.graphView.store,
+  (row) => grid?.getRowHeight(row) ?? compactRowHeightPx(tokenReader),
+  () => compactRowHeightPx(tokenReader),
 );
 
 // Positions of the two drag handles (message|author, author|date), recomputed whenever the
@@ -621,10 +631,18 @@ onMounted(() => {
     store: props.graphView.store,
     loadedRows: () => props.graphView.loadedRows.value,
     isSelected: (row) => props.selection.row.value === row,
+    // P7 (item 1): a row with a ref/PR badge gets the taller, expanded height —
+    // `rowMetadata`/`rowHasBadges` (columns.ts) are what actually decide "does this row have one".
+    expandedRowHeight: () => rowHeightPx(tokenReader),
+    prsFor: (sha) => props.pr?.bySha.value.get(sha),
   });
 
   const instance = new SlickGrid<CommitRecord>(host.value, dataView, currentColumns(), {
-    rowHeight: rowHeightPx(tokenReader), // §6.1 — never a literal in this file
+    // P7 (item 1): the grid-level default is now the COMPACT height — an undecorated row (no
+    // ref/PR badge) is the common case, and `getItemMetadata` only ever asks for the taller,
+    // expanded one explicitly (`enableVariableRowHeight` below).
+    rowHeight: compactRowHeightPx(tokenReader), // §6.1 — never a literal in this file
+    enableVariableRowHeight: true, // P7 (item 1): height varies with whether a row has a badge
     enableCellNavigation: false, // §6.6 navigates rows, not cells (see handleKeyDown's doc comment)
     enableColumnReorder: false, // §6.2: resizable, not reorderable — no SortableJS in the loop
     enableHtmlRendering: false, // formatters return elements; no innerHTML, nothing to sanitize
@@ -718,7 +736,11 @@ onMounted(() => {
     // as they left it; `.kv-cell-date`'s own ellipsis is the safety net for that case).
     remeasureDateWidth();
     if (!grid) return;
-    grid.setOptions({ rowHeight: rowHeightPx(tokenReader) });
+    grid.setOptions({ rowHeight: compactRowHeightPx(tokenReader) });
+    // P7 (item 1): the token driving `rowHeightProvider` (via `getItemMetadata`'s `height`) just
+    // changed for every row that has one, without a row-count change — exactly the case
+    // `invalidateRowHeights`'s own doc comment calls out as needing an explicit call.
+    grid.invalidateRowHeights();
     grid.invalidateAllRows();
     grid.render();
   });
@@ -1098,19 +1120,26 @@ defineExpose({ scrollToRow, focusGrid, scrollToTopRow, getViewportTop });
 
 /* G-UX (item 2b): the literal ask — badges above the message, on their own line, rather than
    fighting it for horizontal space (item 2a's `.kv-ref-badges` `max-width` cap was the quick,
-   low-risk stopgap; this supersedes it). A 2-row CSS Grid, not a flex column: `grid-template-rows`
-   reserves BOTH rows unconditionally, so a commit with no badges (most rows) still puts its
-   subject on row 2 — the same baseline every other row's subject sits on — with nothing rendered
-   in row 1 at all, not an empty placeholder element (`columns.ts`'s own `messageFormatter` skips
-   `.kv-message-badges-row` entirely for an undecorated row; the grid track being empty costs
-   nothing js-side). `16px`/`18px` match `--kv-row-height`'s own `36px` (`density.css`) minus this
-   cell's vertical padding. */
+   low-risk stopgap; this supersedes it). A 2-row CSS Grid, not a flex column. `18px` matches
+   `--kv-row-height-compact`'s own `20px` (`density.css`) minus this cell's vertical padding; the
+   subject stays `grid-row: 2` either way (`.kv-message-subject`, below) so it never has to move.
+   `16px`/`18px` together match `--kv-row-height`'s own `36px` minus the same padding.
+   P7 (item 1): the badges track is collapsed to `0` by default — a commit with no badges (most
+   rows) is now genuinely single-line, not merely visually empty on a still-full-height row. Only
+   `.kv-cell-message--has-badges` (`columns.ts`'s own `messageFormatter`, set in the same branch
+   that decides whether `.kv-message-badges-row` is even built) reserves the 16px track; the row's
+   own real height comes from `getItemMetadata`'s `height` (`columns.ts`'s `rowMetadata`), which
+   uses the identical condition — the two can never disagree about whether a row is tall. */
 .kv-cell-message {
   display: grid;
-  grid-template-rows: 16px 18px;
+  grid-template-rows: 0 18px;
   align-items: center;
   min-width: 0;
   overflow: hidden;
+}
+
+.kv-cell-message.kv-cell-message--has-badges {
+  grid-template-rows: 16px 18px;
 }
 
 /* The row-1 strip — ref badges then the PR badge, sharing one flex row and one `overflow: hidden`

@@ -11,9 +11,10 @@
  * `fontColor`. `white` (seti's default/unknown icon) is deliberately NOT `#d4d7d6`: that is
  * invisible on a light VS Code theme. It resolves to the host's own muted foreground instead, so
  * the fallback icon follows the user's theme exactly as every other muted glyph in this panel
- * already does. `ignore` has no `ui-variables.less` entry of its own — `#6d8086` (`grey-light`)
- * gives ignored files the dimmed look they are meant to have, and `definitions.json` does use the
- * `ignore` color key (verified against the shipped package), so the entry is real, not dead.
+ * already does. `ignore` is `#41535b` — VS Code's own real `vs-seti-icon-theme.json` value for its
+ * ignored/git/npm-ignored icon set (P7, fetched and confirmed directly against microsoft/vscode;
+ * this file previously guessed `#6d8086`/`grey-light`, since `seti-ui@1.11.0`'s own
+ * `ui-variables.less` has no `ignore` entry of its own to copy).
  */
 import { themeIcons } from 'seti-icons';
 
@@ -27,7 +28,7 @@ const themed = themeIcons({
   yellow: '#cbcb41',
   grey: '#4d5a5e',
   'grey-light': '#6d8086',
-  ignore: '#6d8086',
+  ignore: '#41535b',
   white: 'var(--kv-description-fg)',
 });
 
@@ -77,6 +78,35 @@ const GO_TOOLING_FILENAMES = new Set(['go.mod', 'go.sum', 'go.work', 'go.work.su
  *  to drive `GO_TOOLING_FILENAMES`' lookup through the real `themed()` call above. */
 const GO_EXTENSION_LOOKUP_NAME = 'main.go';
 
+/** P7 (item 3): a test/spec file keeps its language's ordinary glyph, colored orange instead of
+ *  that language's ordinary color — VS Code's own real `vs-seti-icon-theme.json`
+ *  (`iconDefinitions`: `_typescript_1`/`_react_1`/`_javascript_1` share their non-`_1` sibling's
+ *  `fontCharacter` verbatim, only `fontColor` differs, always `#e37933`). `seti-icons@0.0.4`'s own
+ *  bundled `definitions.json` is stale here for the TypeScript/TSX pair (still yellow) though
+ *  already correct for the JS pair (already orange, so deliberately NOT listed below — adding an
+ *  already-correct entry only risks drifting from the package's own value later); it also has no
+ *  entry at all for `.cjs`/`.mjs` test/spec files, which VS Code does map. Matched against the
+ *  lower-cased basename's suffix, the same longest-match-first shape `seti-icons`' own extension
+ *  walk uses, so `foo.test.ts` matches `.test.ts` before any shorter `.ts` handling ever runs. */
+const TEST_FILE_ORANGE = '#e37933';
+const TEST_FILE_COLOR_OVERRIDES: readonly string[] = [
+  '.test.ts',
+  '.spec.ts',
+  '.test.tsx',
+  '.spec.tsx',
+  '.test.cjs',
+  '.spec.cjs',
+  '.test.mjs',
+  '.spec.mjs',
+];
+
+function testFileColorOverride(basename: string): string | undefined {
+  const lower = basename.toLowerCase();
+  return TEST_FILE_COLOR_OVERRIDES.some((suffix) => lower.endsWith(suffix))
+    ? TEST_FILE_ORANGE
+    : undefined;
+}
+
 /** `path` may be a full repo-relative path — `seti-icons`' own `getDetails` slices from
  *  `fileName.indexOf('.')`, so handing it a full path would poison extension matching against any
  *  dot elsewhere in the path (a dotted directory segment). The basename is taken here, once, so
@@ -86,5 +116,5 @@ export function setiIconFor(path: string): SetiFileIcon {
   const basename = path.slice(path.lastIndexOf('/') + 1);
   const lookupName = GO_TOOLING_FILENAMES.has(basename) ? GO_EXTENSION_LOOKUP_NAME : basename;
   const { svg, color } = themed(lookupName);
-  return { maskUrl: maskUrlFor(svg), color };
+  return { maskUrl: maskUrlFor(svg), color: testFileColorOverride(basename) ?? color };
 }

@@ -17,7 +17,7 @@
  * which dispatches a real, wire-correct `repo.changed` event frame so `graph-columns.spec.ts` can
  * drive the auto-refresh path end to end without a real watcher or a real `git` process.
  */
-import type { PackedCommitChunk } from '@kira/git-ipc';
+import type { DecorationRef, PackedCommitChunk } from '@kira/git-ipc';
 import { CONTRACT_VERSION } from '@kira/git-ipc';
 import { encode, encodeStreamPayload } from '@kira/git-ipc/codec';
 
@@ -62,6 +62,10 @@ function buildPackedChunkAt(
   from: number,
   dictionary: readonly string[] = ['Fake Author', 'fake@example.com'],
   dictionaryBase = 0,
+  // P7 (item 1): a single row's own decoration, chunk-relative row 0 always (this fixture only
+  // ever builds one-row chunks — `commitStore.ts`'s `appendPacked` reads `chunk.decorations`
+  // keyed by the chunk-local index `i`, never the global store row `from + i`).
+  decoration: readonly DecorationRef[] = [],
 ): PackedCommitChunk {
   const shaBytes = Buffer.from(sha, 'hex');
   const subjectBytes = Buffer.from(subject, 'utf8');
@@ -81,7 +85,7 @@ function buildPackedChunkAt(
     subjectOffsets: Uint32Array.from([0, subjectBytes.byteLength]).buffer,
     dictionaryBase,
     dictionary: [...dictionary],
-    decorations: [],
+    decorations: decoration.length > 0 ? [[0, decoration]] : [],
   };
 }
 
@@ -95,6 +99,7 @@ function buildResponses(): {
   repoOpen: (id: number) => unknown;
   streamChunkThenEnd: (id: number) => readonly [unknown, unknown];
   streamTwoChunksThenEnd: (id: number) => readonly [unknown, unknown, unknown];
+  streamOneDecoratedOneNot: (id: number) => readonly [unknown, unknown, unknown];
   graphRefresh: (id: number) => unknown;
   graphStatus: (id: number) => unknown;
   repoChanged: (kind: 'refsChanged' | 'worktreeChanged', repoId: string) => unknown;
@@ -190,6 +195,39 @@ function buildResponses(): {
         wrap({ t: 'end', id }),
       ] as const;
     },
+    // P7 (item 1): row 0 undecorated (compact height), row 1 carries a real ref decoration (a
+    // lightweight tag — the simplest `DecorationRef` kind, no PR/stack lookups involved) so
+    // `graph-columns.spec.ts` can assert the two rows' real, rendered heights differ and that
+    // each row's own graph-column node sits on its own subject line, not the row's midpoint.
+    streamOneDecoratedOneNot: (id) => {
+      const chunk1 = encodeStreamPayload('graph.stream', {
+        repoId: FAKE_REPO_ID,
+        seq: 0,
+        from: 0,
+        to: 1,
+        source: 'git',
+        remaining: 1,
+        exhausted: false,
+        commits: buildPackedChunkAt(FAKE_SHA, FAKE_SUBJECT, 0),
+      });
+      const chunk2 = encodeStreamPayload('graph.stream', {
+        repoId: FAKE_REPO_ID,
+        seq: 1,
+        from: 1,
+        to: 2,
+        source: 'git',
+        remaining: 0,
+        exhausted: true,
+        commits: buildPackedChunkAt(FAKE_SHA_2, FAKE_SUBJECT_2, 1, [], 2, [
+          { kind: 'tag', name: 'v1' },
+        ]),
+      });
+      return [
+        wrap({ t: 'chunk', id, chunk: chunk1 }),
+        wrap({ t: 'chunk', id, chunk: chunk2 }),
+        wrap({ t: 'end', id }),
+      ] as const;
+    },
     // G-UX D10: `GraphViewState.refresh()`'s own `graph.refresh` request — `#runLoad`'s resync
     // then re-opens `graph.stream` from the current `loadedRows` (already answered generically by
     // `streamChunkThenEnd` above, reused verbatim: its `from: 0` on an already-1-row store is
@@ -228,10 +266,13 @@ function buildResponses(): {
  * before, then withholds the second chunk (`FAKE_SHA_2`) and the stream's own `end` frame until
  * the test calls `window.__releaseSecondGraphChunk()` — giving a spec a real pause point between
  * the two chunks landing, which "dispatch every frame back to back" cannot offer (there is no
- * async boundary a test could otherwise observe between them).
+ * async boundary a test could otherwise observe between them). `'oneDecoratedOneNot'` (P7, item 1)
+ * streams both `FAKE_SHA`/`FAKE_SHA_2` immediately, one after the other with no pause point —
+ * `FAKE_SHA` undecorated, `FAKE_SHA_2` carrying a real tag decoration — so a spec can compare the
+ * two rows' own real, rendered heights and node positions directly.
  */
 export function buildFakeGraphHostInitScript(options?: {
-  readonly streamMode?: 'oneChunk' | 'twoChunksSameLane';
+  readonly streamMode?: 'oneChunk' | 'twoChunksSameLane' | 'oneDecoratedOneNot';
 }): string {
   const responses = buildResponses();
   const streamMode = options?.streamMode ?? 'oneChunk';
@@ -242,7 +283,9 @@ export function buildFakeGraphHostInitScript(options?: {
     stream:
       streamMode === 'twoChunksSameLane'
         ? responses.streamTwoChunksThenEnd(0)
-        : responses.streamChunkThenEnd(0),
+        : streamMode === 'oneDecoratedOneNot'
+          ? responses.streamOneDecoratedOneNot(0)
+          : responses.streamChunkThenEnd(0),
     graphRefresh: responses.graphRefresh(0),
     graphStatus: responses.graphStatus(0),
     repoChangedRefs: responses.repoChanged('refsChanged', FAKE_REPO_ID),
@@ -331,6 +374,13 @@ export function buildFakeGraphHostInitScript(options?: {
                 dispatch(withId(chunk2Envelope, body.id));
                 dispatch(withId(endEnvelope, body.id));
               };
+              return;
+            }
+            if (STREAM_MODE === 'oneDecoratedOneNot') {
+              const [chunk1Envelope, chunk2Envelope, endEnvelope] = FIXTURES.stream;
+              dispatch(withId(chunk1Envelope, body.id));
+              dispatch(withId(chunk2Envelope, body.id));
+              dispatch(withId(endEnvelope, body.id));
               return;
             }
             const [chunkEnvelope, endEnvelope] = FIXTURES.stream;

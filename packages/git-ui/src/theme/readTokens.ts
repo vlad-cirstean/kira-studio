@@ -15,7 +15,15 @@
 // scale follow VS Code's own font settings, and CommitGrid.vue's own measured date-column width
 // (`dateFormat.ts`'s `measureAbsoluteDateWidth`) is genuinely font-dependent, not computable from
 // a character count, so a live font change has to reach it through this same change signal.
-const TOKEN_NAMES = ['--kv-row-height', '--kv-font-size', '--kv-font-family'] as const;
+// P7 (item 1): `--kv-row-height-compact` joins them — the height an undecorated (no ref/PR badge)
+// row now uses, read the same way and re-notified on the same theme-change signal as the expanded
+// token it sits beside.
+const TOKEN_NAMES = [
+  '--kv-row-height',
+  '--kv-row-height-compact',
+  '--kv-font-size',
+  '--kv-font-family',
+] as const;
 
 export type TokenName = (typeof TOKEN_NAMES)[number];
 export type TokenMap = Readonly<Record<TokenName, string>>;
@@ -92,14 +100,31 @@ export class TokenReader {
  *  stylesheet loaded), never in a mounted app. */
 const FALLBACK_ROW_HEIGHT = 36;
 
+/** The default `--kv-row-height-compact` (`density.css`) — `compactRowHeightPx`'s own fallback,
+ *  same reasoning as `FALLBACK_ROW_HEIGHT`. */
+const FALLBACK_ROW_HEIGHT_COMPACT = 20;
+
 /**
  * `--kv-row-height` as an actual pixel number (W6, W8) — the one numeric read every consumer of
  * this token needs, so the `parseFloat("22px")` lives in exactly one place rather than once per
  * caller. A malformed or missing value (an environment with no theme CSS loaded) falls back to
  * `density.css`'s own default rather than propagating `NaN` into SlickGrid's `rowHeight` option
- * or the graph column's geometry.
+ * or the graph column's geometry. P7 (item 1): now the height a row with a ref/PR badge uses —
+ * SlickGrid's own grid-level default became `compactRowHeightPx` below, the more common case.
  */
 export function rowHeightPx(reader: TokenReader): number {
   const parsed = Number.parseFloat(reader.tokens['--kv-row-height']);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : FALLBACK_ROW_HEIGHT;
+}
+
+/**
+ * `--kv-row-height-compact` as an actual pixel number — P7 (item 1)'s own new read, mirroring
+ * `rowHeightPx` exactly. This is the height an undecorated row (no ref/PR badge) uses, and the
+ * grid's own default `rowHeight` option now that variable row height is on
+ * (`enableVariableRowHeight`, `CommitGrid.vue`) — SlickGrid falls back to the grid-level default
+ * for any row `getItemMetadata` does not explicitly give a taller `height` to.
+ */
+export function compactRowHeightPx(reader: TokenReader): number {
+  const parsed = Number.parseFloat(reader.tokens['--kv-row-height-compact']);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : FALLBACK_ROW_HEIGHT_COMPACT;
 }
