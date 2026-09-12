@@ -49,7 +49,7 @@
 - **`data-testid`s are added, never removed or renamed.** Every existing `tree-*`, `keyvalue-*`,
   `upload-*` and `menu-item-*` testid still exists after this phase and still identifies the same
   thing. New ones follow the `browse-<thing>` convention.
-- Comments per AGENTS.md: only where the code cannot say it for itself. Five existing comments
+- Comments per CLAUDE.md: only where the code cannot say it for itself. Five existing comments
   become false as a result of this phase and are rewritten in the same commits
   (`VirtualList.vue:150-154`, `project/grouping.ts:67-69` and `:114-121`,
   `redis/catalog.ts:45-47`, `s3/index.ts:24-27`).
@@ -448,7 +448,7 @@ level), `browse-up`, `browse-crumb`, `browse-filter`, `browse-upload`, `browse-c
 | D7 | **`isLeafKind(kind, keyBrowser = false)`** — kind plus one boolean, defaulted so no existing call changes meaning. `project/state/tree.ts` and `project/filterTree.ts` pass `caps?.keyBrowser === true`. | F12/F13/F24. Keeps `grouping.ts` pure (it still imports nothing from `state/`), keeps the guard in the one place P19 and P23 already put theirs, and covers the on-disk-cache case those two phases both had to cover. |
 | D8 | **Redis's and S3's `children()` implementations are not touched.** They keep enumerating namespaces/keys and prefixes/objects. | F11(b), verbatim. The Browse panel is the second, live caller — precisely the distinction `kafka/index.ts:68-73` draws between a level with no caller left (P19's columns, deleted) and one with a caller (P23's partitions, kept). Deleting them would mean inventing a second listing API for data the adapter already returns. |
 | D9 | **`revealPath` truncates to the deepest ancestor the tree actually renders**, selecting and scrolling to that row instead of a row that does not exist. | F20. "Reveal in project panel" names the panel; revealing the Redis database or S3 bucket an item lives in is the honest answer once the panel stops holding the item. The truncation reuses `isLeafKind` rather than hard-coding kinds, so it stays correct for any future cut. |
-| D10 | **The four dead tree menus (`namespaceMenu`, `prefixMenu`, `keyMenu`, `objectMenu`) are deleted from `project/menus.ts` and rebuilt in `views/browse/menu.ts`; `uploadMenuItem` moves to `state/objectStore.ts` and is shared.** | F19 + AGENTS.md's "scope left out of a phase is left out entirely, not half-implemented" — leaving unreachable menu builders behind would be exactly the dead code P39 spent three iterations removing. The one genuinely shared piece is `uploadMenuItem`, whose two call sites now sit on opposite sides of the `project/ → views/` rule (F14); `state/objectStore.ts` already owns `openUploadDialog` and already exists *because* `project/menus.ts` needed to reach S3 actions without importing `views/` (SPEC.md:1121-1124), so it is the file that rule already chose for this. |
+| D10 | **The four dead tree menus (`namespaceMenu`, `prefixMenu`, `keyMenu`, `objectMenu`) are deleted from `project/menus.ts` and rebuilt in `views/browse/menu.ts`; `uploadMenuItem` moves to `state/objectStore.ts` and is shared.** | F19 + CLAUDE.md's "scope left out of a phase is left out entirely, not half-implemented" — leaving unreachable menu builders behind would be exactly the dead code P39 spent three iterations removing. The one genuinely shared piece is `uploadMenuItem`, whose two call sites now sit on opposite sides of the `project/ → views/` rule (F14); `state/objectStore.ts` already owns `openUploadDialog` and already exists *because* `project/menus.ts` needed to reach S3 actions without importing `views/` (SPEC.md:1121-1124), so it is the file that rule already chose for this. |
 
 ### The dedicated panel
 
@@ -539,11 +539,11 @@ nowhere to go.
 
 ## 5. Verification
 
-**Say plainly what this box can and cannot do.** Per AGENTS.md: `bun run lint`, `bun run typecheck`
+**Say plainly what this box can and cannot do.** Per CLAUDE.md: `bun run lint`, `bun run typecheck`
 and `bun run build` all run here. Playwright runs here **only after** the Electron binary is
-installed by hand with `curl` (AGENTS.md's "Electron binary" section), and it must be invoked
+installed by hand with `curl` (CLAUDE.md's "Electron binary" section), and it must be invoked
 **directly** — `bun run test:ui` fires `pretest:ui` → `scripts/native-electron-build.sh`, which
-cannot fetch Electron's C++ headers through this environment's proxy (AGENTS.md F20) and fails
+cannot fetch Electron's C++ headers through this environment's proxy (CLAUDE.md F20) and fails
 before a single spec runs. The working invocation here is:
 
 ```

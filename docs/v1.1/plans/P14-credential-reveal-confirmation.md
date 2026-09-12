@@ -102,7 +102,7 @@ Three prior phases bear directly on this one and are read as current fact, not r
   different threat model, and not what the SPEC row asks for.
 - **Scrubbing plaintext from renderer memory after a reveal.** The draft must hold the value to save
   it; `closeDialog()` already drops the draft (`state/connections.ts:135-138`). Zeroing JS strings is
-  not a thing JS offers, and pretending otherwise would be exactly the stub `AGENTS.md` forbids.
+  not a thing JS offers, and pretending otherwise would be exactly the stub `CLAUDE.md` forbids.
 - **Any change to the cipher, the envelope, the keychain item, or the schema.** Nothing about how a
   secret is *stored* moves.
 
@@ -204,7 +204,7 @@ password.
 
 This is not hypothetical breakage invented by P14 — **URI-mode edits already have exactly this
 behaviour today**, for exactly the same reason. But "already broken somewhere else" is not a licence
-(`AGENTS.md`: no shortcuts), so D3 fixes it properly for both modes rather than extending the wart.
+(`CLAUDE.md`: no shortcuts), so D3 fixes it properly for both modes rather than extending the wart.
 
 ### 1.6 What this sandbox can and cannot do — measured, not assumed
 
@@ -525,7 +525,7 @@ second time for the same human within seconds of the first, which trains people 
 `main.go` constructs it beside `secrets.New()` (`main.go:86`) and passes it into `connections.Deps`
 (`:124`), which is where `Cipher` already lives.
 
-**D9 — One unit test, for the decision table only.** `AGENTS.md`'s bar: a cgo wrapper and a bound-call
+**D9 — One unit test, for the decision table only.** `CLAUDE.md`'s bar: a cgo wrapper and a bound-call
 passthrough are plumbing. The gate is a small state machine over *(OS availability, grace deadline,
 clock, confirmed flag)* whose wrong answers are silent and security-relevant — a grace that never
 expires, a `confirmed` flag honoured while OS auth is available, a cancelled prompt recording a
@@ -533,7 +533,7 @@ grant. With `now` and `evaluate` injected (D8) it is a pure table test with no d
 and no UI. Cases: first call prompts; second inside the window does not; a call past the deadline
 prompts again; a cancelled prompt records nothing and the next call prompts again; `confirmed: true`
 is ignored while OS auth is available; `confirmed: true` grants once and records nothing while OS
-auth is unavailable. One comment above the file naming the rule it guards, per `AGENTS.md`.
+auth is unavailable. One comment above the file naming the rule it guards, per `CLAUDE.md`.
 
 **D10 — Repair the `internal/secrets` build tags in a separate first commit.** `keyring_darwin.go:1`
 and `keychain_darwin_test.go:1` become `//go:build darwin && cgo`; a new nine-line
@@ -590,7 +590,7 @@ anything depends on them.
 - `internal/bridge/connections.go`: `ConnectionsRevealArgs`, `ConnectionsTestArgs`, and the two
   updated method signatures. `Reveal` keeps its never-errors contract.
 - `wails3 generate bindings -b -i -ts` from `apps/kira-studio/` — the method set changed, and
-  `AGENTS.md`'s Wails section makes this a prerequisite for the frontend build, not just for `go run`.
+  `CLAUDE.md`'s Wails section makes this a prerequisite for the frontend build, not just for `go run`.
 - `frontend/src/bridge/control.ts`: `connectionsReveal(id, confirmed)` returning the new shape;
   `connectionsTest(input, id)`.
 
@@ -620,7 +620,7 @@ the code that makes them true):
 - `docs/PACKAGING.md`'s ad-hoc-signing paragraph (`:152-157`) gains a sentence: whether
   `LAContext.evaluatePolicy` is honoured for an ad-hoc-signed bundle is F7 item 1's open question,
   and the app degrades to the in-app confirm if it is not.
-- `AGENTS.md` gains nothing. This is a phase result, and it belongs in this file — its own rule.
+- `CLAUDE.md` gains nothing. This is a phase result, and it belongs in this file — its own rule.
 
 ---
 
@@ -687,7 +687,7 @@ make, and the reason D8 keeps that file mechanical and logic-free.
 
 ### 6.3 What a human must run on a real Mac, once
 
-The phase is not fully closed until these are recorded (in this file, per `AGENTS.md`'s rule that a
+The phase is not fully closed until these are recorded (in this file, per `CLAUDE.md`'s rule that a
 phase's findings live in its own plan doc). Build with `bun run package` (`CGO_ENABLED=1`, ad-hoc
 signed) and launch the bundle.
 
@@ -724,7 +724,7 @@ bun run lint && bun run typecheck && bun run build
 bun run test:ui
 ```
 
-`wails3` and the GTK4/WebKitGTK headers do not persist across containers — re-run `AGENTS.md`'s Wails
+`wails3` and the GTK4/WebKitGTK headers do not persist across containers — re-run `CLAUDE.md`'s Wails
 setup first, pinning the `go.mod` version, never `@latest`. `bunx playwright install webkit` is needed
 before the first `test:ui`. No Docker and no `xvfb` are required by anything in this phase.
 
@@ -757,7 +757,7 @@ before the first `test:ui`. No Docker and no `xvfb` are required by anything in 
     five scenarios); no other test was added, and the two now-dead `Reveal` snapshots in
     `interaction.spec.ts`/`preconnect.spec.ts` are deleted rather than left mocking an impossible call.
 12. `docs/ARCHITECTURE.md`'s Storage and multi-window sections and `docs/PACKAGING.md`'s ad-hoc
-    paragraph are true again; `AGENTS.md` is untouched.
+    paragraph are true again; `CLAUDE.md` is untouched.
 13. §6.1's rows are green from this sandbox; §6.3's are recorded here or the phase closes with §6.3
     named as an open item, P7's own closing discipline.
 

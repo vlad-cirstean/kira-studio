@@ -494,7 +494,7 @@ is real, versioned and worth handling deliberately. §6's CH-1 probe measures th
 
 ### 1.7 All three adapters need `runWithAbortRace`, for three different reasons
 
-`AGENTS.md`'s P58a findings state the rule and predict this section:
+`CLAUDE.md`'s P58a findings state the rule and predict this section:
 
 > *"Any future Go adapter built on a context-native driver (mysql-family's `go-sql-driver/mysql`,
 > ClickHouse's `clickhouse-go` — both honour ctx cancellation the same way pgx does) needs this same
@@ -516,7 +516,7 @@ not**"* — correct with one caller, wrong with four. That is P39's own threshol
 
 ### 1.8 Flipping four kinds breaks five other packages' tests, and the fix should be structural
 
-`AGENTS.md`'s P58a findings again, in the general form its author intended:
+`CLAUDE.md`'s P58a findings again, in the general form its author intended:
 
 > *"Flipping a kind's `nativeKinds` bit is a breaking change for any **other** package's test that
 > used that kind as a 'definitely still forwards to the child' placeholder — grep for the literal
@@ -552,7 +552,7 @@ test pass against a routing table production never uses.
 
 ### 1.9 The four `tests/db/support/*.ts` files: three cannot be deleted, one can — today
 
-`AGENTS.md`'s P58a findings record the mistake this section exists to avoid: the plan claimed
+`CLAUDE.md`'s P58a findings record the mistake this section exists to avoid: the plan claimed
 `tests/db/support/postgres.ts`'s *"only consumer goes"* with the spec, and by implementation time
 four other files depended on it. *"General lesson: a plan's own 'its only consumer' claim about a
 shared support file is a snapshot, not a standing fact."*
@@ -677,7 +677,7 @@ statement on the same adapter succeeds (§5.4).
 Both were checked in this sandbox for this plan, and both make P58b cheaper than the parent plan
 assumes.
 
-1. **This sandbox's Bun now has `node:sqlite`.** `AGENTS.md`'s SQLite section says *"This sandbox's
+1. **This sandbox's Bun now has `node:sqlite`.** `CLAUDE.md`'s SQLite section says *"This sandbox's
    own Bun (1.3.x) lacks `node:sqlite`, so `bun test tests/db/sqlite.spec.ts` here reports the
    legible `SQLITE_UNAVAILABLE_MESSAGE` failure rather than actually running the suite"*, and
    P58 §1.10's second non-portable point repeats it. `bun --version` is **1.4.0** and
@@ -694,7 +694,7 @@ assumes.
    `@testcontainers/clickhouse`'s hardcoded `nofile: {hard: 262144}`, this sandbox's fixed 20 000
    ceiling, and `tests/ipc/clickhouse/container.ts`'s `NoUlimitClickHouseContainer` subclass
    **have no Go counterpart and the workaround simply disappears**. A whole paragraph of
-   `AGENTS.md`'s Docker section becomes historical for the Go tier, and §8 requires recording that.
+   `CLAUDE.md`'s Docker section becomes historical for the Go tier, and §8 requires recording that.
    The `mirror.gcr.io` retag is unaffected — it is a daemon-level fact and applies unchanged.
 
 Two further module facts, recorded because §6's TC-2 probe should confirm rather than assume them:
@@ -789,7 +789,7 @@ assumed; whatever it turns out to be, the *contract* — a dropped tail is refus
 `sqlite.spec.ts` 40 is the test.
 
 **B10 — SQLite gets its own `testsupport/sqlite.go`, and it is the only fixture in the Go tier with
-no Docker gate.** The TypeScript precedent is explicit (`AGENTS.md`'s SQLite section: *"a temp-file
+no Docker gate.** The TypeScript precedent is explicit (`CLAUDE.md`'s SQLite section: *"a temp-file
 fixture (`mkdtemp` + `node:sqlite`), not a Testcontainers harness — there is no container to start,
 no image to pull, no daemon to reach"*), and the Go version is simpler still because it needs no
 runtime-availability gate either. It does need `StartSqlite(t)`/`StopSqlite()` and a `TestMain`,
@@ -835,7 +835,7 @@ drivers), and `postgres/query.go` becomes its first caller rather than its owner
 P58a §4.11's *"it does not [stay a shared helper]"*, which was correct with one caller.
 
 **B15 — `internal/adapters/testsupport` gains a generic memo and one documented rule, and three new
-fixtures use them.** The rule, from `AGENTS.md`'s P58a findings, restated as code rather than prose:
+fixtures use them.** The rule, from `CLAUDE.md`'s P58a findings, restated as code rather than prose:
 *a fixture's teardown is never registered with `t.Cleanup`; it is an exported `StopX()` called from
 the package's own `TestMain` after `m.Run()`.* A small generic (`type fixture[T any]` with
 `get(t, start) T` and `stop(terminate func(T))`) makes the shape hard to get wrong, and the existing
@@ -853,7 +853,7 @@ and the support deletion is re-checked at implementation time.** §1.9. `mariadb
 `mysql.spec.ts`, `sqlite.spec.ts`, `clickhouse.spec.ts` each go in the commit **after** their Go
 successor is green (P58 D12's third rule, P58a A21's discipline). Of the four support modules only
 `clickhouse.ts` has no other consumer; the other three stay. §9's commit 24 re-runs the grep before
-deleting, because §1.9's table is a snapshot and `AGENTS.md` says so.
+deleting, because §1.9's table is a snapshot and `CLAUDE.md` says so.
 
 **B18 — the four `caps` literals are ported value for value, and exactly one value changes.**
 `mariadbCaps` and `mysqlCaps` stay two separate literals with identical values (P34 D10: *"if MySQL's
@@ -887,7 +887,7 @@ connection unconditionally (`auth.go:400-430`), with no opt-in gate, so the opti
 that reads like a control. `mysql/client.ts`'s `applyEngineOptions` becomes empty and the MySQL
 profile keeps existing only for its server label — a smaller profile, honestly. `errors.ts`'s
 `RSA_KEY_MESSAGE` and its two errno branches (45044, 45063) go with it. This lands in
-`docs/ARCHITECTURE.md`'s per-engine section and in `AGENTS.md`'s P58b findings as a **capability
+`docs/ARCHITECTURE.md`'s per-engine section and in `CLAUDE.md`'s P58b findings as a **capability
 loss**, alongside P58 §7's list, and `mysql.spec.ts` 2b is rewritten to assert the new behaviour
 rather than deleted.
 
@@ -983,7 +983,7 @@ docs/ARCHITECTURE.md                        EDITED  per-database mapping (SQLite
                                                     Per-engine facts (PostgreSQL/MariaDB/MySQL,
                                                     SQLite, ClickHouse), Stack's driver line
 docs/v1/plans/P58b-mysql-sqlite-clickhouse.md EDITED  M6.0 results, then M6.1-M6.4 results (§9)
-AGENTS.md                                   EDITED  the P58b findings entry; the SQLite section's
+CLAUDE.md                                   EDITED  the P58b findings entry; the SQLite section's
                                                     Bun-1.3 paragraph and the ClickHouse ulimit
                                                     paragraph both become historical for the Go tier
 ```
@@ -1116,7 +1116,7 @@ pool already has free"*).
 | `client.go` | `client.ts` | `resolveTarget` (fields or URI; `sslmode` → `http`/`https`, warn-and-ignore for anything else; port defaults to 8123), the four fixed settings as URL parameters on every request (`default_format=JSONCompactStringsEachRowWithNamesAndTypes`, `output_format_json_validate_utf8=1`, `show_table_uuid_in_table_create_query_if_not_nil=0`, `date_time_output_format=simple`), `database=<db>` as a URL parameter (the construction-time default the TypeScript client held), and `X-ClickHouse-User`/`X-ClickHouse-Key` for credentials. `Handle{client, url, defaultDatabase, readOnly}` |
 | `query.go` | `query.ts` | The three entry points, one for one: `streamQuery` (the `JSONCompactStringsEachRowWithNamesAndTypes` reader — line 1 names, line 2 types, everything after is a JSON array of strings, with the `ᴺᵁᴸᴸ` sentinel decoded to nil), `runCommand` (no `FORMAT` appended — an `INSERT`'s own `FORMAT` names the *input* format), and `runCatalogQuery` (`FORMAT JSON` with `param_<name>` bound values, `ctx.SetCommand`, the `readonly=2` setting when the connection is read-only). All three take a `queryID` and register it with `track`; all three run inside `adapters.RunWithAbortRace` (§1.7) |
 | `read.go` | `read.ts` | `QuoteIdent` (backticks, NUL guard), `unwrapType` (recursive `Nullable(...)`/`LowCardinality(...)` in either nesting order), `baseTypeName`, `TypeClassFor` with its four sets ported as `map[string]bool`, `computeOrderBySql` (a requested sort, else the table's own `sorting_key` verbatim), the `E_UNSUPPORTED` refusal of any non-offset cursor with its message verbatim, and the `PagePosition{Strategy: "offset", NextToken: nil, PrevToken: nil}` literal (§1.1) |
-| `catalog.go` | `catalog.ts` | The `system.databases`/`system.tables`/`system.columns`/`system.data_skipping_indices` queries with `{db:String}`/`{tbl:String}` parameters, `kindForEngine`, `toColumnMeta` (nullability from the type string; `isPrimaryKey` **always false**, D18/D23), `splitTopLevelCommas` (depth-tracking, not a plain split), and `listCheckConstraints` — a small parser over the `CREATE TABLE` text, because `system.constraints` does not exist on the server this adapter is tested against. That parser is the one thing in this package that clears `AGENTS.md`'s unit-test bar on its own (§5.5) |
+| `catalog.go` | `catalog.ts` | The `system.databases`/`system.tables`/`system.columns`/`system.data_skipping_indices` queries with `{db:String}`/`{tbl:String}` parameters, `kindForEngine`, `toColumnMeta` (nullability from the type string; `isPrimaryKey` **always false**, D18/D23), `splitTopLevelCommas` (depth-tracking, not a plain split), and `listCheckConstraints` — a small parser over the `CREATE TABLE` text, because `system.constraints` does not exist on the server this adapter is tested against. That parser is the one thing in this package that clears `CLAUDE.md`'s unit-test bar on its own (§5.5) |
 | `definition.go` | `definition.ts` | `create_table_query` verbatim, `buildTableSection`'s five/six rows, the two `notes` strings verbatim |
 | `console.go` | `console.ts` | `isRowReturning`'s comment-stripping regex plus the seven-keyword test, verbatim — the HTTP interface gives no cheap "will this return rows" signal, and appending `FORMAT` to an `INSERT` would be a different statement |
 | `mutate.go` | `mutate.ts` | `assertInsertOnly` with its message verbatim, `literalFor`'s backslash escaping, `renderInsert`'s union-of-columns single statement (B13), and `affectedRows = writtenRows > 0 ? writtenRows : len(inserts)`. `writtenRows` comes from the `X-ClickHouse-Summary` response header's JSON, which is where `@clickhouse/client`'s `result.summary.written_rows` came from |
@@ -1189,7 +1189,7 @@ The four fixtures, each seeding from the existing `.sql` file unchanged (P58 D12
 | `clickhouse.go` | `clickhouse/clickhouse-server:26.3` — **no ulimit workaround** (§1.12) | `0010_clickhouse_seed.sql`, statement by statement over HTTP as `kira_admin` | the three users: `kira_admin` (ACCESS MANAGEMENT), `kira` (SELECT/INSERT/ALTER DELETE on `kira_test`, SELECT on `system` and `default`), `kira_ro` (SELECT only) — scenario 43's server-side read-only assertion and scenario 7's cancel assertion are both meaningless without them |
 
 All four keep the `IsDockerAvailable` gate except `sqlite.go`, which needs nothing. All four pull
-their images through `mirror.gcr.io` **in the daemon**, per `AGENTS.md`'s Docker section — no Go code
+their images through `mirror.gcr.io` **in the daemon**, per `CLAUDE.md`'s Docker section — no Go code
 references the mirror.
 
 ### 4.6 The router flip, and what else it touches
@@ -1330,7 +1330,7 @@ are what B11 is being judged on:
   three-character string `'nan'` not null. This is the single most direct test of the format choice
   B11 rests on.
 
-**Unit-level, against `AGENTS.md`'s bar.** Exactly one thing in P58b clears it without argument:
+**Unit-level, against `CLAUDE.md`'s bar.** Exactly one thing in P58b clears it without argument:
 `clickhouse/catalog.go`'s `listCheckConstraints` + `splitTopLevelCommas` — a small parenthesis-aware
 parser over `CREATE TABLE` text with several interacting lexical rules (backtick-quoted names with
 doubled backticks, nested parentheses, `ASSUME` deliberately excluded). It gets a table-driven Go
@@ -1338,7 +1338,7 @@ unit test with the cases the TypeScript regex's behaviour implies, written befor
 Everything else in this sub-phase is covered by §5.3–§5.5 against a real container, which is where
 it belongs. In particular: no unit test for `unwrapType`, `typeClassFor`, `quoteIdent` or
 `toCellText` — each is a short function whose behaviour the acceptance suite already pins on real
-values, and `AGENTS.md`'s rule is explicit that *"a branch is not complexity."*
+values, and `CLAUDE.md`'s rule is explicit that *"a branch is not complexity."*
 
 ### 5.6 `tests/e2e-real/` gains exactly one spec, and it is C1b's vehicle
 
@@ -1377,7 +1377,7 @@ wiring is identical to MariaDB's and P58 §5.5's restraint applies.
 
 Four throwaway Go programs under the scratch directory (**never committed; no product code lands in
 M6.0**), each answering one question with a printed PASS/FAIL. The deliverable is a findings
-subsection appended to this document (§9 commit 1) and, for anything surprising, an `AGENTS.md`
+subsection appended to this document (§9 commit 1) and, for anything surprising, an `CLAUDE.md`
 entry. Ordering: TC-2 first (everything else needs containers), then MY-1, CH-1, SQ-1 — SQ-1 last
 only because it needs no Docker and can run while an image pulls.
 
@@ -1408,7 +1408,7 @@ changed. So C1b is written for the `tests/e2e-real/` substitute P58a actually us
 `-tags server` Go binary, real bindings, real containers, real UI code paths, reached over
 `http://127.0.0.1` from a headless browser tab — and **not** for `xdotool`/`import -window`
 screenshot steps that cannot run here. Every step below is either a `tests/e2e-real/` assertion or a
-shell observation made in the same Bash invocation as the app run (`AGENTS.md`, P51: a background
+shell observation made in the same Bash invocation as the app run (`CLAUDE.md`, P51: a background
 process started in one invocation cannot be signalled from a later one; budget 150 s).
 
 **Preparation** (one Bash invocation)
@@ -1449,7 +1449,7 @@ process started in one invocation cannot be signalled from a later one; budget 1
     still serves a read (P58a A15). If MariaDB also flips, `MarkAllErrored` was not narrowed — or was
     narrowed against a stale `nativeKinds` snapshot.
 
-**Recording.** C1b is recorded in the M6.4 commit message and in `AGENTS.md`'s P58b findings entry,
+**Recording.** C1b is recorded in the M6.4 commit message and in `CLAUDE.md`'s P58b findings entry,
 naming which of steps 5–12 passed and which could not be run, per P55 §10 / P56 §6 / P57 §6 / P58a
 §13's standard of recording *"not available in this session"* rather than leaving it implied. Steps
 11–12 are the load-bearing ones: they are the only evidence in the entire phase that P58 D4's
@@ -1506,9 +1506,9 @@ coexistence property holds in a running app rather than in a router unit test.
      three test-only.
    - **`tests/db/`** — four spec deletions, one support deletion. **`tests/e2e-real/`** — two new
      files.
-   - **`docs/`, `AGENTS.md`** — per §3.
+   - **`docs/`, `CLAUDE.md`** — per §3.
    - **`src/`, `tests/ui/`, `tests/ipc/`, `package.json`, `scripts/`, `.github/`** — nothing.
-8. `AGENTS.md` gains a **"P58b implementation findings"** entry on the P52–P58a pattern, carrying at
+8. `CLAUDE.md` gains a **"P58b implementation findings"** entry on the P52–P58a pattern, carrying at
    minimum: M6.0's four probe results; whether B7 and B11 survived their probes; the
    `testcontainers-go` ClickHouse module's ulimit finding (§1.12 — and the corresponding paragraph of
    the existing Docker/ClickHouse sections marked historical **for the Go tier**, not deleted, since
@@ -1597,7 +1597,7 @@ M6.2–M6.4's commit lists; its **R4** (probes before the work they inform) is w
 29. `test: delete tests/db/clickhouse.spec.ts and its now-unused support module` — **re-grep first**
     (B17, §1.9's snapshot caveat).
 30. `docs: P58b findings — three dialects, two driver corrections and the coexistence proof` —
-    `AGENTS.md`, `docs/ARCHITECTURE.md`, and this document's §12/§13.
+    `CLAUDE.md`, `docs/ARCHITECTURE.md`, and this document's §12/§13.
 
 **Why MySQL/MariaDB first and ClickHouse last.** MySQL/MariaDB is the adapter closest to Postgres —
 same keyset planner, same side-connection cancel, same catalog shape — so it is the one most likely
@@ -1657,7 +1657,7 @@ documentation change, because the documentation change spans all six sub-phases.
 §1.11 and B22. `go-sql-driver/mysql` requests the server's RSA public key over a plaintext connection
 unconditionally; the option P34 D3/D5 introduced *because* that is an MITM window becomes a control
 that controls nothing. P58b removes it and records the change as a loss in `docs/ARCHITECTURE.md`
-and `AGENTS.md`, and rewrites `mysql.spec.ts` 2b to pin the new behaviour. P58 §7's *"what gets
+and `CLAUDE.md`, and rewrites `mysql.spec.ts` 2b to pin the new behaviour. P58 §7's *"what gets
 worse"* list should gain this item — it is the first genuine *security-posture* regression the phase
 has produced, as opposed to a behavioural or ergonomic one, and it deserves to be in the same list
 as the loss of process isolation rather than only in a sub-phase plan.

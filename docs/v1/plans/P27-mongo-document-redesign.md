@@ -60,11 +60,11 @@
 - **Every value stays losslessly editable.** Canonical extended JSON is what makes an int32 come
   back as an int32. Nothing in this phase silently downgrades a type on the way through the editor
   (D14, D16).
-- Comments per AGENTS.md: only where the code cannot say it for itself. Every `D` below that
+- Comments per CLAUDE.md: only where the code cannot say it for itself. Every `D` below that
   encodes a non-obvious constraint gets one line at its implementation site.
 - Run `bun run lint`, `bun run typecheck` (all three projects) and `bun run build` on every step;
   `xvfb-run -a bun run test:ui` from step 5 on, and `bun run test:db` on step 4 (the only step that
-  changes an adapter). Per `AGENTS.md`, container-backed suites cannot run in Claude Code's Linux
+  changes an adapter). Per `CLAUDE.md`, container-backed suites cannot run in Claude Code's Linux
   web container — they must be run on the macOS/Colima box before this phase is called done.
 - Commits follow Conventional Commits, one per step of §4.
 
@@ -742,7 +742,7 @@ docs/
 
 - [ ] `bun run lint`, `bun run typecheck` (all three) and `bun run build` clean.
 - [ ] `xvfb-run -a bun run test:ui` and `bun run test:db` green on the macOS/Colima box (per
-      `AGENTS.md`, neither can run in Claude Code's Linux web container).
+      `CLAUDE.md`, neither can run in Claude Code's Linux web container).
 - [ ] SPEC.md §8.7, §8.10 and §11 describe what shipped.
 
 ## 9. Open questions for the user

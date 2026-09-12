@@ -2,7 +2,7 @@ package clickhouse
 
 import "testing"
 
-// TestListCheckConstraints is the one thing in this package that clears AGENTS.md's unit-test bar
+// TestListCheckConstraints is the one thing in this package that clears CLAUDE.md's unit-test bar
 // on its own (§5.5 of docs/v1/plans/P58b-mysql-sqlite-clickhouse.md): a small parenthesis-aware
 // parser over CREATE TABLE text with several interacting lexical rules — backtick-quoted names
 // with doubled backticks, nested parentheses inside the CHECK expression, and 'ASSUME' deliberately

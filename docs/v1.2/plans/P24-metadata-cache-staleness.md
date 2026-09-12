@@ -530,7 +530,7 @@ docs. Order matters: the Go freshness rule must exist before the connect-side de
 
 ## 4. Verification plan
 
-`AGENTS.md`'s testing bar names *"cache eviction/invalidation with interacting rules"* as one of the
+`CLAUDE.md`'s testing bar names *"cache eviction/invalidation with interacting rules"* as one of the
 few things that genuinely earns dedicated tests. That is exactly what this phase is, so §4.2 is not
 optional and is written first.
 
@@ -601,7 +601,7 @@ rather than pretending otherwise.
   connect/disconnect cycle and must stay green, which is the integration-level check available.
 - **A wall-clock regression.** D2 records the limit; constructing an NTP step in a test would pin
   behaviour nobody depends on.
-- **Byte-level cache-size measurement.** `AGENTS.md`: measure when a real question is at stake.
+- **Byte-level cache-size measurement.** `CLAUDE.md`: measure when a real question is at stake.
   D6's table is a statement about *when* rows are deleted, checkable by reading them back, which
   §4.2 and §4.3 do.
 

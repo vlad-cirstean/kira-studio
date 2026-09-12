@@ -16,7 +16,7 @@
 > is built from; **`@wailsio/runtime` is not installed in `node_modules`** (checked), so there was no
 > npm `dist/` to read and the module cache is the only source. Two facts were additionally
 > **executed** (§1.6, §1.12); those are marked *probed*. `wails.io`/`v3.wails.io` remain 403-blocked
-> from both of this project's environments (AGENTS.md, P51).
+> from both of this project's environments (CLAUDE.md, P51).
 
 ## 0. What this phase is, and what it is not
 
@@ -72,7 +72,7 @@ against, which is the single most expensive state this phase can reach.
 
 > **C1 — the Wails-only boot proof.** Before any deletion milestone starts, the Wails app must
 > boot with the rewritten bridge and demonstrate, in one run: the renderer hydrating from real Go
-> services, the engine status pill leaving `'connecting'` (AGENTS.md's P56 finding — the specific
+> services, the engine status pill leaving `'connecting'` (CLAUDE.md's P56 finding — the specific
 > symptom this phase exists to clear), a real connect, a table opening with rows over the `engine`
 > Stream, and a quit that acks inside the 2 s window. **The Electron app is still whole and
 > buildable at that moment**, so a failure at C1 costs three renderer files and nothing else.
@@ -277,7 +277,7 @@ tier can mock the control plane at the HTTP boundary in readable terms. D13.
 
 The generated bindings import from the bare path `"/wails/runtime.js"` — a path Wails' own asset
 server resolves inside a real webview, and which `vite.wails.config.ts:76` already marks
-`external: [/^\/wails\//]` so Rollup leaves it literal (AGENTS.md's P52 finding).
+`external: [/^\/wails\//]` so Rollup leaves it literal (CLAUDE.md's P52 finding).
 
 **TypeScript cannot resolve it.** Today that costs nothing, because the only importer is
 `shell/frontend/shim/kira-bridge.ts`, and `shell/` is in **no** tsconfig: `tsconfig.node.json`
@@ -543,7 +543,7 @@ source file and version it was transcribed from.
 `injectKiraShim` plugin and its `shim` rollup input.** The shim's own header says it exists *"so the
 real, unmodified src/renderer can boot inside a real Wails webview without src/ ever being
 touched"*. P57 touches `src/`, so the reason is spent. Deleting it removes the whole
-`transformIndexHtml` mechanism AGENTS.md's P52 findings describe as fragile (inline module scripts
+`transformIndexHtml` mechanism CLAUDE.md's P52 findings describe as fragile (inline module scripts
 silently not bundled; CSP `script-src 'self'` blocking srcless scripts), which is a real
 simplification and not merely a tidy-up. Checked: nothing else imports it.
 
@@ -557,7 +557,7 @@ collapse too (§4.7).
 **D11 — the bundle identity becomes the shipping identity in one milestone, all four places at
 once.** §1.13. `Info.plist`'s `CFBundleIdentifier`/`CFBundleName`, `Taskfile.yml`'s `APP_NAME`,
 `main.go`'s `Name`/`Description`. Splitting these across milestones would produce a bundle whose
-plist and Taskfile disagree, which AGENTS.md's P52 findings already record as a real
+plist and Taskfile disagree, which CLAUDE.md's P52 findings already record as a real
 code-signing-breaking failure mode (*"a `CFBundleExecutable` mismatch breaking code signing"*).
 
 **D12 — the Keychain service name does **not** change.** It stays `Kira Studio Safe Storage`
@@ -698,7 +698,7 @@ tests/unit/support/window.ts    REPLACED by a bindings module mock (§5.3)
 docs/ARCHITECTURE.md            EDITED   Stack, Invariants, Process model, Storage, Security, Testing
 docs/PACKAGING.md               REWRITTEN
 docs/PERF.md                    EDITED   §2.1 re-measured, §3 procedures, L-D app size
-AGENTS.md                       EDITED   P57 findings; Electron/Kafka/secrets sections rewritten
+CLAUDE.md                       EDITED   P57 findings; Electron/Kafka/secrets sections rewritten
 docs/v1/SPEC.md                 EDITED   P52-P57 rows
 ```
 
@@ -880,7 +880,7 @@ repeated 12 times would be unreadable and would break if either tree moves.
 `NO_TIMEOUT` policy and `onCacheStats` are all transport-agnostic.
 
 `workbench/state/engine.ts`: **unchanged**. `await ready` then `await request('ping')` works exactly
-as written against the new `port.ts` (D1/D3). This file is the one AGENTS.md's P56 findings call out
+as written against the new `port.ts` (D1/D3). This file is the one CLAUDE.md's P56 findings call out
 as stuck on `'connecting'` forever; it is fixed by the transport underneath it, with no edit — which
 is the cleanest possible demonstration that D1 held.
 
@@ -1036,7 +1036,7 @@ repo already ships.
 
 The script must fail with a named message if `shell/runtime/node/bin/node` is absent, pointing at
 `scripts/vendor-node.sh`, since `shell/runtime/` is git-ignored and a fresh container will not have
-it (AGENTS.md, P56 §10).
+it (CLAUDE.md, P56 §10).
 
 ### 4.12 `tests/ipc/support/harness.ts` (D15)
 
@@ -1145,7 +1145,7 @@ they are 95 and ~55 lines and this plan has not read `release.yml` in full.
   (P52 §11 — *not* gated); §3's manual procedures rewritten for the new bundle, including the
   cold-start read (the `WindowRuntimeReady` log line P56 §1.5 established is the measurement point);
   L-D's app-size row.
-- **`AGENTS.md`**: a **"P57 implementation findings"** entry (§8, criterion 10); the **Electron
+- **`CLAUDE.md`**: a **"P57 implementation findings"** entry (§8, criterion 10); the **Electron
   binary (for `tests/e2e/`)** section deleted outright; the **`KIRA_INSECURE_SECRETS`** section
   rewritten (its subject moves from `src/main/secret-cipher.ts` to `internal/secrets`, and the
   behaviour is unchanged per P52 §6.5); the **Native Kafka driver** section rewritten (no
@@ -1278,7 +1278,7 @@ downgrade and is labelled as one.
 
 ### 5.7 The boot smoke test (C1's instrument)
 
-There is no devtools or remote-debugging story in this sandbox (AGENTS.md, P52 findings), so the
+There is no devtools or remote-debugging story in this sandbox (CLAUDE.md, P52 findings), so the
 practical instrument is the one every phase from P52 has used: start `wails3 task dev` under Xvfb
 inside **one** Bash invocation, poll rather than sleep, `xdotool search --name` for the window id,
 `import -window <id>` a PNG, and read it back. Reading the screenshot is what distinguishes "the app
@@ -1289,7 +1289,7 @@ import, a binding name typo) whose only cheap symptom is a blank window.
 C1's checklist, all in one run:
 
 1. The window renders the real workbench (screenshot).
-2. The status pill leaves `'connecting'` — AGENTS.md's P56 finding says it is currently stuck there
+2. The status pill leaves `'connecting'` — CLAUDE.md's P56 finding says it is currently stuck there
    forever and that this is expected until `port.ts` is rewired. It leaving `'connecting'` is the
    single clearest signal that D2/D3 worked.
 3. A connect against a real adapter reaches `connected`.
@@ -1362,7 +1362,7 @@ here, with what this plan changes about them:
 ## 8. Acceptance criteria
 
 1. **C1 is recorded** (§0.3, §5.7) — all six items, with the screenshot, **before** any deletion
-   milestone started. The commit message or AGENTS.md entry says so explicitly.
+   milestone started. The commit message or CLAUDE.md entry says so explicitly.
 2. `bun run lint`, `bun run typecheck` (all four projects), `bun run test:unit`, `bun run test:go`
    are green.
 3. `bun run test:ipc:be` is green under the vendored Node, and **`git diff --stat tests/ipc` shows
@@ -1381,7 +1381,7 @@ here, with what this plan changes about them:
    shell/internal/secrets` still returns a hit (D12).
 9. Both CI workflows are updated and reference no deleted script (§4.14). A dry read of each file
    end to end, not a patch from §4.14's table.
-10. `AGENTS.md` gains a **"P57 implementation findings"** entry on the P52–P56 pattern. Six things
+10. `CLAUDE.md` gains a **"P57 implementation findings"** entry on the P52–P56 pattern. Six things
     are already worth writing down before implementation starts, and should be confirmed or
     corrected there:
     - **`WailsSocket.send()` throws on a `CONNECTING` socket and silently drops on a closed one**
@@ -1399,7 +1399,7 @@ here, with what this plan changes about them:
     - **The generated bindings' `/wails/runtime.js` import is invisible to `tsc` until a file inside
       a tsconfig's `include` imports them** — the failure appears the moment `control.ts` does, and
       looks like a Vite problem.
-11. `docs/` and `AGENTS.md` are updated per §4.15, including the **`docs/v1/SPEC.md` rows for
+11. `docs/` and `CLAUDE.md` are updated per §4.15, including the **`docs/v1/SPEC.md` rows for
     P52–P57**, which P52 §14 owed for P52 and which were never written.
 
 ## 9. Sequencing
@@ -1418,7 +1418,7 @@ first (everything after it imports the bindings) and M8 last.
 - **M1 — `port.ts`.** The transport swap (§4.1), plus `bridge-port.spec.ts` (§5.4) and the shared
   fake socket. Wails-side only; `control.ts` still reads `window.kira`, so the app still boots on
   the shim and the *data* plane can be smoke-tested on its own. First because it is the half that
-  clears AGENTS.md's stuck-pill finding, and because a working data plane makes M2's failures
+  clears CLAUDE.md's stuck-pill finding, and because a working data plane makes M2's failures
   unambiguous.
 - **M2 — `control.ts` and `events.ts`.** The bindings rewrite, `unwrap` (D5), `Events.On`, the
   `plain()` removals in both files (D4), `env.d.ts`, `events.ts`, `ipc.ts`'s reduction (D7). Ends
@@ -1454,19 +1454,19 @@ tests are gone".
 
 ## 10. Environment notes for the implementing session
 
-- **A fresh container has none of the toolchain** (AGENTS.md, P52 findings). Go, plus
+- **A fresh container has none of the toolchain** (CLAUDE.md, P52 findings). Go, plus
   `apt-get install -y libgtk-4-dev libwebkitgtk-6.0-dev pkg-config` for anything that builds
   `internal/shell` or the root `main` package (P56's finding, which retired P53's
   "`./internal/...` needs nothing but the toolchain").
 - **Install `wails3` pinned**: `go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-beta.15`,
-  `export PATH=$PATH:$(go env GOPATH)/bin`. AGENTS.md's P55 finding: `@latest` resolved to beta.16
+  `export PATH=$PATH:$(go env GOPATH)/bin`. CLAUDE.md's P55 finding: `@latest` resolved to beta.16
   and skewed the generator against the runtime. In the session that wrote this plan, `wails3
   version` already reported `v3.0.0-beta.15` and **both** beta.15 and beta.16 were present in the
   module cache — so a stale `@latest` install is a live hazard here, not a hypothetical.
 - **The `-names` flag changes every generated file** (D13). Regenerating is not optional after that
   decision, and `shell/frontend/bindings` is git-ignored (`shell/.gitignore:4`), so a fresh
   container has no bindings at all until `wails3 generate bindings` runs — and `bun run build` fails
-  with an unresolvable-import error, not a stale-bindings warning (AGENTS.md, P53 findings).
+  with an unresolvable-import error, not a stale-bindings warning (CLAUDE.md, P53 findings).
 - **`shell/runtime/` is git-ignored and must be populated**: `scripts/vendor-node.sh` for
   `runtime/node/bin/node`, `bun run build:engine` for `runtime/engine/engine.cjs`. After P56 D12 the
   app refuses to start without the engine bundle, and after §4.11 the backend test tier refuses to
@@ -1479,7 +1479,7 @@ tests are gone".
   install is what makes the types readable to `tsc`; the `src/*.ts` files are what make them
   readable to a human.
 - **A background process started in one shell invocation cannot be signalled from a later one**
-  (AGENTS.md, P51) — start, poll, screenshot and tear down a `wails3 task dev` run inside a single
+  (CLAUDE.md, P51) — start, poll, screenshot and tear down a `wails3 task dev` run inside a single
   Bash invocation with a 120–150 s timeout, since the first build takes ~60 s.
 - **Screenshotting the headless WebKitGTK window** (`xdotool search --name`, `import -window <id>`)
   is the only way to tell a rendered app from a blank page in this sandbox, and after M1–M3 a blank
@@ -1647,7 +1647,7 @@ porting at this fidelity versus consolidating overlapping coverage.
     credential-note rendering, plus the failed/succeeded-save behavior when unavailable) — its
     other 7 checks were genuinely storage-layer, not UI, and are covered instead by
     `shell/internal/storage/repos/secrets_test.go` and `connections/service_test.go`. Two real
-    environment findings surfaced getting these green, both now in `AGENTS.md`: **WebKit is
+    environment findings surfaced getting these green, both now in `CLAUDE.md`: **WebKit is
     actually installable here** (`bunx playwright install webkit` + a few `apt-get` packages)
     correcting this document's own §5.6/M5-done claim that it isn't — every remaining `tests/ui/`
     spec should be verified against real WebKit, not a Chromium override; and **`window.kira` is
@@ -1689,7 +1689,7 @@ porting at this fidelity versus consolidating overlapping coverage.
     a `global` binding's accelerator is "never a local keydown handler"), and the Command Palette
     itself has no button either, so even the palette-routed commands are unreachable. A third,
     genuinely new environment finding surfaced getting the keyboard-chord scenarios green, now in
-    `AGENTS.md`: **Playwright's bundled WebKit reports `navigator.userAgent` as `Macintosh`
+    `CLAUDE.md`: **Playwright's bundled WebKit reports `navigator.userAgent` as `Macintosh`
     unconditionally, regardless of the real host OS** — `renderer/shortcuts/keys.ts`'s `isMac` read
     inside the page therefore disagrees with the test runner's own `process.platform` (`'linux'`
     here), so the original file's `process.platform === 'darwin'` ternary for
@@ -1708,7 +1708,7 @@ porting at this fidelity versus consolidating overlapping coverage.
     doc-recommended workaround rather than re-plumbed once the fix landed, since both specs assert
     real backend state after the reload, not the UI row count the race affects. E2 must run under
     plain Node (`node node_modules/@playwright/test/cli.js test --project=e2e-real`), never `bunx
-    playwright test` — the same Postgres-Testcontainers-hangs-under-Bun finding `AGENTS.md` already
+    playwright test` — the same Postgres-Testcontainers-hangs-under-Bun finding `CLAUDE.md` already
     documents. `s3-download-real.spec.ts` (E3) remains conditional per the amendment, pending
     tests/db/ coverage decisions (task #11).
 - **`budgets`, `perf`, `leaks` — also done, and §5.6's "re-create" guess was wrong.** None of
@@ -1874,9 +1874,9 @@ now resolve real `@bindings`/`@bindings-internal` imports that didn't exist when
 `e2e-smoke` renamed `ui` and moved to `ubuntu-latest` (D5/§4.14 — webkit needs no macOS); the
 keychain-prep step is deleted (`safeStorage` is gone); gains the same bindings-generation step
 (`test:ui` also calls `bun run build`) plus `bunx playwright install webkit` and the system
-libraries AGENTS.md names (`libevent-2.1-7t64`, `libgstreamer-plugins-bad1.0-0`, `libflite1`,
+libraries CLAUDE.md names (`libevent-2.1-7t64`, `libgstreamer-plugins-bad1.0-0`, `libflite1`,
 `gstreamer1.0-libav`) and the Linux-only GTK4/WebKitGTK headers the `wails3` CLI itself needs to
-`go install` (AGENTS.md — needed even though the *app* targets macOS only, because building the
+`go install` (CLAUDE.md — needed even though the *app* targets macOS only, because building the
 CLI does not). `db-unit-tests` unchanged. `package-smoke`: `bun run package:mac:dir` → `bun run
 package`, gains Go setup, `scripts/vendor-node.sh` and `bun run build:engine` (main.go refuses to
 start without both, though packaging itself doesn't launch the app — kept for parity with a real
@@ -1960,7 +1960,7 @@ parallel (isolated worktrees, each briefed with this session's own verified grou
 actual bundle layout, the actual `AnchorNeedles` mechanics, the actual Keychain design — rather
 than left to rediscover it independently and risk drifting from what M5-M7 actually built), then
 reviewed and merged by hand exactly like every other subagent contribution this session; the
-fourth (`AGENTS.md`) and the `docs/v1/SPEC.md` row were written directly.
+fourth (`CLAUDE.md`) and the `docs/v1/SPEC.md` row were written directly.
 
 - **`docs/ARCHITECTURE.md`** — the Stack table, Invariants (D18's bulk-data rewrite), Process model
   (redrawn diagram: webview / Go shell / Node engine child, the two wire planes, the twelve bound
@@ -2000,7 +2000,7 @@ fourth (`AGENTS.md`) and the `docs/v1/SPEC.md` row were written directly.
   narrow scope for this pass): §1's budget table still asserts against `tests/e2e/startup.spec.ts`,
   which no longer exists, across several rows that would need one coherent pass together, not a
   spot fix that would leave the table internally inconsistent.
-- **`AGENTS.md`** — the "Electron binary (for `tests/e2e/`)" section deleted outright (both its
+- **`CLAUDE.md`** — the "Electron binary (for `tests/e2e/`)" section deleted outright (both its
   subject and `tests/e2e/` itself are gone); the `tests/ipc/`, Secrets/`KIRA_INSECURE_SECRETS`,
   Native Kafka driver and SQLite-adapter sections rewritten for the Go/vendored-Node mechanisms
   that actually run today (no more `ELECTRON_RUN_AS_NODE`, no more ABI rebuilds, no more `xvfb`

@@ -25,7 +25,7 @@
 > executing pre-request/test scripts, applying any `auth` block, drag-reorder in the tree, moving an
 > item between folders, multi-select, a collection-settings surface, Postman Collection **v2.0.0**
 > import, `.postman_environment.json` import, Postman API/cloud sync, filesystem watching or
-> external-edit detection. Nothing here is half-built toward any of them (`AGENTS.md`: *"Scope left
+> external-edit detection. Nothing here is half-built toward any of them (`CLAUDE.md`: *"Scope left
 > out of a phase is left out entirely, not half-implemented"*).
 >
 > **Every claim below was re-read against the tree, not inherited from `P1`/`P2`/`P3`'s prose.**
@@ -539,7 +539,7 @@ applied, exactly as P3 D4 was.
 ## 4. Decisions
 
 ### D1 — No new library, and here is the check rather than the assertion
-`AGENTS.md` requires reaching for a maintained library first and **naming the requirement** when
+`CLAUDE.md` requires reaching for a maintained library first and **naming the requirement** when
 declining one. Four candidates were real enough to weigh.
 
 - **`github.com/rbretecher/go-postman-collection` (MIT).** The only Go library for this format worth
@@ -930,7 +930,7 @@ schema"*. Import's rule:
 - `info.schema` explicitly naming `v2.0.0` or `v1` → **refuse**, with a message naming the version
   found and suggesting Postman's own upgrade. v2.0's `url` is string-only and it has no
   `options.raw.language` at all, so "supporting" it would mean a second translation table that is
-  half-tested by construction — precisely `AGENTS.md`'s *"left out entirely, not half-implemented"*.
+  half-tested by construction — precisely `CLAUDE.md`'s *"left out entirely, not half-implemented"*.
 
 Export always writes
 `"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"` — the string
@@ -1237,7 +1237,7 @@ and the spec gains a third `describe` using the existing `extractGoStringSet`
 
 Twelve commits. C1–C4 add capability with nothing mounted (each builds and tests on its own); C5–C6
 make the feature exist; C7–C10 are one user-visible slice each; C11–C12 are the tests and the docs.
-Per `AGENTS.md`, run the fast checks (`lint`, `typecheck`, `build`, `go build`/`go vet`) per commit
+Per `CLAUDE.md`, run the fast checks (`lint`, `typecheck`, `build`, `go build`/`go vet`) per commit
 and the expensive suites once at the end.
 
 ### C1 — `feat(postman): the Collection v2.1 format, read and written`
@@ -1258,7 +1258,7 @@ so the migration is covered by construction.
 ### C3 — `feat(bridge): CollectionsService`
 `bridge/collections.go`'s nine methods (D11), the `main.go` service line, `control.ts`'s nine
 wrappers, bindings regenerated via `wails3 task common:generate:bindings` (never a hand-typed flag
-list — `AGENTS.md`'s `-names` warning), plus `tests/ui/support/ipcChannels.ts`'s nine names,
+list — `CLAUDE.md`'s `-names` warning), plus `tests/ui/support/ipcChannels.ts`'s nine names,
 `mockRuntime.ts`'s nine FQNs and the `collectionsList: '[]'` wildcard (F11).
 
 ### C4 — `feat(shared): the saved-request document and a request's collection identity`
@@ -1321,7 +1321,7 @@ lossiness boundaries from D6.
 `apps/kira-studio/frontend/bindings/**` must be regenerated or the Vite build fails on an
 unresolvable import.
 
-Two bindings checks, from `AGENTS.md`'s own warnings and P2/P3's precedent:
+Two bindings checks, from `CLAUDE.md`'s own warnings and P2/P3's precedent:
 
 1. The generated `collectionsservice.ts` must call
    `$Call.ByName("…bridge.CollectionsService.List", …)`, not `$Call.ByID(<n>, …)` — a `-names`-less
@@ -1335,7 +1335,7 @@ Two bindings checks, from `AGENTS.md`'s own warnings and P2/P3's precedent:
    assuming.
 
 ### 6.2 The Go tests, and what they deliberately do not cover
-`internal/postman` is `AGENTS.md`'s named category — *"a parser/splitter with several interacting
+`internal/postman` is `CLAUDE.md`'s named category — *"a parser/splitter with several interacting
 rules"* over a real wire format, where every failure mode is silent (a dropped `event[]` is invisible
 until someone opens the export in Postman; a scrambled `sort_order` looks like the user's own
 ordering). `repos/collections.go`'s tree/ordering/cascade arithmetic is the second half of the same
@@ -1382,7 +1382,7 @@ category.
 4. **`SaveRequest` sheds exactly the changed members from `origin_json`** and leaves the rest.
 
 **Explicitly not tested:** that `CreateCollection` then `List` returns the collection; that `Rename`
-renames; that a required field's absence is refused. Each is `AGENTS.md`'s *"everything else gets
+renames; that a required field's absence is refused. Each is `CLAUDE.md`'s *"everything else gets
 nothing"* — CRUD round-trips and one-condition guards.
 
 ### 6.3 The new UI spec — `tests/ui/collections.spec.ts`

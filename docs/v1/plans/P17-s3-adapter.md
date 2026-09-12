@@ -5,7 +5,7 @@
 > but never got its own phase; this closes the last v1-scoped-but-unbuilt engine. Read the row's
 > silence on edit/delete the same way P9's row was read: this phase is **read-only browsing**.
 >
-> **Written retroactively.** AGENTS.md requires the Opus plan be committed before implementation;
+> **Written retroactively.** CLAUDE.md requires the Opus plan be committed before implementation;
 > for P17 the Sonnet main session implemented first and this document was authored afterwards
 > against the shipped tree. It is written as the plan the phase *should* have had, not as a
 > description of what happens to exist — where the implementation diverges from what this plan

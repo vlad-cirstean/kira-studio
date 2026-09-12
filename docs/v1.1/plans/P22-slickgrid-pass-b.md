@@ -1211,11 +1211,11 @@ uncovered. At stage 3 the indirection collapses to the SlickGrid form and `ENGIN
 | `column-range.spec.ts` | **kept, unchanged.** `columnRangeExtractor` still serves `ConsoleResultGrid.vue` (§6) |
 | `column-widths-cache.spec.ts` | **kept, unchanged.** `initialWidths`' memoisation still serves both grids |
 | `kira-slick-grid.spec.ts` | **kept, unchanged.** `clampColumnOverscan` is untouched by this pass |
-| `slick-data-source.spec.ts` | **kept and extended.** D1 adds the insert-region `values` and the `rowColumns` metadata path; D4 adds `displayPositionOf`/`rowAtDisplayPosition` moving into this module — display ↔ page translation across a filter is exactly AGENTS.md's *"cursor/pagination arithmetic with real boundary cases"* bar |
+| `slick-data-source.spec.ts` | **kept and extended.** D1 adds the insert-region `values` and the `rowColumns` metadata path; D4 adds `displayPositionOf`/`rowAtDisplayPosition` moving into this module — display ↔ page translation across a filter is exactly CLAUDE.md's *"cursor/pagination arithmetic with real boundary cases"* bar |
 | `match-index.spec.ts` | **kept, unchanged.** `createMatchIndex` is D12's content source |
 | `page-store-cell-cache.spec.ts` | **kept, unchanged.** It names `DataGrid.vue` in a comment; the comment updates |
 | **`row-sig.spec.ts`** | **retired, in the same commit that deletes `rowVm.ts`.** It tests `sameRowSig`, the memo key for `renderRows`' reference-stable `RowVM` reuse — an optimisation for Vue's `shouldUpdateComponent` bail-out that has no counterpart once there is no per-row Vue component. It is testing an implementation detail that ceases to exist; there is no behaviour underneath it to re-home. **Retired with the reason, not silently deleted** |
-| **new: `slick-selection.spec.ts`** | **added.** `selectionFromRanges`/`rangesFromSelection` — four kinds, the ±1 gutter offset, the display↔page row translation, the empty case, the row-mode union. Interacting rules over index arithmetic; earns its keep by AGENTS.md's bar |
+| **new: `slick-selection.spec.ts`** | **added.** `selectionFromRanges`/`rangesFromSelection` — four kinds, the ±1 gutter offset, the display↔page row translation, the empty case, the row-mode union. Interacting rules over index arithmetic; earns its keep by CLAUDE.md's bar |
 
 **No behavioural coverage is lost anywhere.** The only two removals are `row-sig.spec.ts` (an
 implementation detail that stops existing) and two `data-null` attribute assertions (rewritten as
@@ -1479,7 +1479,7 @@ this pass touches the per-frame path.
   SlickGrid, delivered as Pass A (spike) → three scroll-performance iterations → Pass B (parity,
   cutover, deletion of the incumbent), with the plan files named. The table is the phase index, so it
   should say where P22 ended up.
-- **`AGENTS.md`** — **no change, deliberately.** Its "Known open items" list is `None.` and its own
+- **`CLAUDE.md`** — **no change, deliberately.** Its "Known open items" list is `None.` and its own
   rule is that a one-off result from finishing a phase *"goes elsewhere or nowhere."* The two things
   a reader might want carried forward — the deferred console grid and §9.3's real-Mac reading — are
   plan-doc and `docs/PERF.md` items respectively, exactly where that rule sends them. Adding either
@@ -1606,7 +1606,7 @@ construction at `:611-660`, listener binding at `:945-991`, `createDraggable` at
 `docs/v1.1/plans/P22-grid-library-survey.md`, `docs/v1.1/plans/P22-grid-library-evaluation.md`,
 `docs/v1.1/plans/P22-webview-scroll-performance-iter2-rendering.md`,
 `docs/v1.1/plans/P5-ram-usage.md`, `docs/ARCHITECTURE.md`, `docs/PERF.md`,
-`docs/v1.1/WEBVIEW-SCROLL-MEMORY.md`, `docs/v1.1/SPEC.md`, `AGENTS.md`.
+`docs/v1.1/WEBVIEW-SCROLL-MEMORY.md`, `docs/v1.1/SPEC.md`, `CLAUDE.md`.
 
 ---
 

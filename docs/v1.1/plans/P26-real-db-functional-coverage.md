@@ -2,7 +2,7 @@
 
 > **What this phase is.** P25 built a two-tier real-container test harness and populated it with
 > auth/config cases only, deliberately leaving `Scenario`/`Requires` as an unused seam for exactly
-> this phase (P25 §3.2, and the `AGENTS.md` bullet that names P26 by number). This phase decides
+> this phase (P25 §3.2, and the `CLAUDE.md` bullet that names P26 by number). This phase decides
 > what *functional* coverage — data load, write, delete, filter/query, and DDL where the adapter has
 > a DDL surface at all — is worth running against a real container per adapter, and attaches it to
 > that harness rather than building a parallel mechanism.
@@ -266,7 +266,7 @@ wrong reason, and looks thorough.
 
 P25's split is by **cost**, and the same criterion resolves cleanly here into one rule:
 
-> **Tier 1 gets one assertion per declared capability that has none today.** `AGENTS.md`'s
+> **Tier 1 gets one assertion per declared capability that has none today.** `CLAUDE.md`'s
 > adapter-conformance carve-out already says per-capability coverage belongs in
 > `adapters/*/*_test.go` "even where it reads like a CRUD round-trip" — a capability the UI branches
 > on and no test exercises is precisely what that carve-out is for. Cost: round trips on a container
@@ -307,7 +307,7 @@ finding, restated as a practice.
   per-dialect string, so a universal driver would be a parameter table pretending to be a driver.
 - **No new tier, no second env var.** A functional scenario expensive enough to need one belongs in
   `Requires`, per P25 §3.2's own last bullet. Nothing proposed here is.
-- **No mocks or fakes.** Real containers throughout, per `AGENTS.md`. The two existing in-package
+- **No mocks or fakes.** Real containers throughout, per `CLAUDE.md`. The two existing in-package
   fakes (`s3/catalog_test.go`, `redis/catalog_test.go`) stay where they are.
 - **No `Preview` coverage.** Every writable adapter already has a "preview never executes" test with
   byte-exact expected text; adding a second is the "when torn between two similar tests, delete"
@@ -539,7 +539,7 @@ is short rather than padded with a filter test against a store that cannot filte
 1. `TestRedis_ReadOnlyConnection_ConsoleAllowsReadsRefusesWrites` — Redis is the **only** adapter
    whose read-only enforcement is per-command, resolved against the server's own `COMMAND` table
    (`client.go:173-190`, `console.go:132`). That mechanism is genuinely non-obvious — it is exactly
-   the "decision structure worth guarding" `AGENTS.md`'s test bar describes — and it has no
+   the "decision structure worth guarding" `CLAUDE.md`'s test bar describes — and it has no
    container-backed test at all (`console_test.go` is 70 lines of tokenizer unit tests). Assert that
    on a read-only connection `Execute("GET …")` succeeds, `Execute("SET …")` is refused, and the
    value is unchanged afterwards.
@@ -659,8 +659,8 @@ This adapter getting one scenario is the correct outcome, not a gap being left o
 | `s3/authmatrix_test.go` | 4 scenarios on 2 existing rows |
 | `kafka/authmatrix_test.go` | 2 scenarios on 1 existing row |
 | `sqs/authmatrix_test.go` | 1 scenario on 1 existing row |
-| `AGENTS.md` | its two-tier bullet ends `"…for new functional coverage (load/write/delete/filter/DDL, per adapter, P26) rather than building a parallel mechanism"` — a forward reference that is stale once this lands. Drop the `P26` pointer, keep the rule |
-| `docs/ARCHITECTURE.md` | its Testing section (`:1008`) enumerates the suites and does **not** mention the two-tier split or `KIRA_TEST_MATRIX` at all — P25 documented it in `AGENTS.md` only. One short paragraph, since ARCHITECTURE.md is the authoritative "what suites exist" doc and the complete tier stops being a footnote once it carries functional coverage |
+| `CLAUDE.md` | its two-tier bullet ends `"…for new functional coverage (load/write/delete/filter/DDL, per adapter, P26) rather than building a parallel mechanism"` — a forward reference that is stale once this lands. Drop the `P26` pointer, keep the rule |
+| `docs/ARCHITECTURE.md` | its Testing section (`:1008`) enumerates the suites and does **not** mention the two-tier split or `KIRA_TEST_MATRIX` at all — P25 documented it in `CLAUDE.md` only. One short paragraph, since ARCHITECTURE.md is the authoritative "what suites exist" doc and the complete tier stops being a footnote once it carries functional coverage |
 
 **Explicitly unchanged, verified:** `scripts/test-matrix.sh` (runs whole packages),
 `package.json`, `docs/pending-workflows/test-matrix.yml`, `.github/workflows/ci.yml`, every
@@ -670,7 +670,7 @@ This adapter getting one scenario is the correct outcome, not a gap being left o
 
 ## 5. Implementation order
 
-Per `AGENTS.md`: one sequential subagent for the whole phase, implement first and verify once at the
+Per `CLAUDE.md`: one sequential subagent for the whole phase, implement first and verify once at the
 end. The per-adapter work *is* genuinely independent, but the shared library is a common dependency
 and the phase is small enough that parallelism would cost more in context-carrying than it saves.
 
@@ -681,7 +681,7 @@ and the phase is small enough that parallelism would cost more in context-carryi
    commit covering both tiers for that adapter, so a bisect lands on one adapter.
 4. **mongo, redis** — each one commit, both tiers.
 5. **s3, kafka, sqs** — Tier-2 only; one commit together is fine, they share no code.
-6. **The two doc edits** (`AGENTS.md`, `docs/ARCHITECTURE.md`), last, so they describe what actually
+6. **The two doc edits** (`CLAUDE.md`, `docs/ARCHITECTURE.md`), last, so they describe what actually
    landed.
 7. **Verify once** — §6.
 
@@ -695,7 +695,7 @@ directly in `redis/authmatrix_test.go`'s own comments, and assert what the serve
 
 ## 6. Verification
 
-Per `AGENTS.md`'s implement-then-test-once rule.
+Per `CLAUDE.md`'s implement-then-test-once rule.
 
 1. `go build ./apps/kira-studio/internal/...` and `go vet ./apps/kira-studio/internal/...` — the
    env-gate design (P25 §2.2) means every matrix file stays compiled and vetted on an ordinary run,
@@ -707,7 +707,7 @@ Per `AGENTS.md`'s implement-then-test-once rule.
    duration in the phase's closing commit message — it is the one number worth measuring here,
    because it is the one that decides whether the tier split held.
 3. `KIRA_TEST_MATRIX=1 sh scripts/test-matrix.sh --mirror` — the full complete tier, all nine rows.
-   `--mirror` per `AGENTS.md`'s Docker section; the runner needs no flag for the new scenarios.
+   `--mirror` per `CLAUDE.md`'s Docker section; the runner needs no flag for the new scenarios.
 4. Spot-check the skip logic once: `go test -run AuthMatrix -v` on one package **without** the env
    var must skip before any container starts, and `-count=1` must be used for every gated run
    (`scripts/test-matrix.sh` already passes it, with db-compat.sh's own documented reason).
@@ -783,7 +783,7 @@ least-privilege principal, because a fixture's own admin credentials hide this e
 why §1.4 is a source read rather than a container run, and why §3's Tier-2 scenarios hang off
 least-privilege rows specifically. `docs/v1.1/plans/P16-db-compat-suite.md` — the on-demand runner
 whose shape `scripts/test-matrix.sh` already follows and which §0 declines to cross with.
-`AGENTS.md` — the adapter-conformance carve-out (§2.3's Tier-1 rule is an application of it), the
+`CLAUDE.md` — the adapter-conformance carve-out (§2.3's Tier-1 rule is an application of it), the
 two-tier convention P25 recorded there, the measure-with-purpose rule (§6 step 2 is the one
 measurement that would change a decision), the implement-then-test-once rule (§5, §6), and the
 comments rule. `docs/ARCHITECTURE.md` — its Testing section, read to confirm §4's last row (the

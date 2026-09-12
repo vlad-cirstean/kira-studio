@@ -120,7 +120,7 @@ that channel, and nothing needs to change.
 - **The renderer still opens no window.** *New Window* is a menu item handled in Go, not a
   renderer-initiated `window.open`. `Harden()`'s
   `JavaScriptCanOpenWindowsAutomatically: Disabled` (`internal/shell/security.go:25`) is unchanged.
-- **Tests only where AGENTS.md's bar is met.** Two earn their keep here (D13); nothing else in this
+- **Tests only where CLAUDE.md's bar is met.** Two earn their keep here (D13); nothing else in this
   phase gets one.
 
 ---
@@ -654,7 +654,7 @@ given. One signature change, at the one call site, rather than three parameters 
 
 **D12 — Cross-window page staleness is documented, not fixed.** §0.3.
 
-**D13 — Two tests, and only two.** Against AGENTS.md's bar (`concurrency — ordering, backpressure,
+**D13 — Two tests, and only two.** Against CLAUDE.md's bar (`concurrency — ordering, backpressure,
 cancellation, races` and `cache eviction/invalidation with rules that interact`):
 
 1. **The layout lost-update rule** (C7): concurrent non-overlapping patches must both survive. This
@@ -729,7 +729,7 @@ Fixes F4 without adding a second window yet.
   `DELETE FROM tabs WHERE window_key = ?`, then inserts with that key. This is the one-line change
   that kills F6.
 - `TabsService.List`/`Save` take `windowKey` in their args structs. The generated bindings are
-  regenerated (`wails3 generate bindings -b -i -ts` — AGENTS.md's Wails section).
+  regenerated (`wails3 generate bindings -b -i -ts` — CLAUDE.md's Wails section).
 - A `windowKey` that names no `windows` row is rejected with `ipcerr.BadRequest` rather than
   silently writing orphan rows the foreign key would reject anyway with a worse message.
 
@@ -767,7 +767,7 @@ Fixes F7.
 - `state/layout.ts` subscribes and applies, guarding against re-emitting its own patch — the same
   shape `state/settings.ts:43-47` already uses for `onSettingsChanged`.
 - **Test (D13.1):** two concurrent `Set` calls patching disjoint leaves; both must survive. One
-  comment line above it naming the rule, per AGENTS.md.
+  comment line above it naming the rule, per CLAUDE.md.
 
 ### C8 — `fix(lifecycle): quit waits for every window's flush, not the first`
 
@@ -786,7 +786,7 @@ Fixes F3, restoring `18fe7bb^:src/main/index.ts:47-60`'s behaviour (D7).
 - While here, fix one line of stale prose the commit necessarily touches: `bridge/lifecycle.go:3`
   claims *"lifecycle\_test.go uses a recorder"* and `bridge/events.go:39` claims *"events\_test.go
   can drive them"* — neither file exists (`ls internal/bridge/*_test.go` → `connections_test.go`,
-  `files_test.go` only). Both were pruned against AGENTS.md's test bar and the comments were left
+  `files_test.go` only). Both were pruned against CLAUDE.md's test bar and the comments were left
   behind. Correct the two sentences rather than resurrecting the files.
 
 ### C9 — `fix(menu): a menu command goes to the focused window`

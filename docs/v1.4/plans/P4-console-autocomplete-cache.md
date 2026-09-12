@@ -189,7 +189,7 @@ housekeeping.
 ## 11. Verification
 
 Fast checks per commit (`go build`/`vet` N/A this phase — frontend-only; `bun run typecheck`,
-`bun run lint`), AGENTS.md's default. `bun test` for the new pure-function unit coverage, `bun run
+`bun run lint`), CLAUDE.md's default. `bun test` for the new pure-function unit coverage, `bun run
 test:ui` for the new/updated Playwright cases plus the full existing `console`/`autocomplete`/
 `sql-schema` suites (no regression in what already passes), and `budgets.spec.ts`'s own number
 re-recorded against `docs/PERF.md` if it moves.

@@ -11,7 +11,7 @@ import "context"
 // Go driver this package's adapters use (pgx, go-sql-driver/mysql, an HTTP request's own ctx,
 // modernc.org/sqlite) honours ctx natively and would otherwise race its own cancellation against —
 // and often win before — the adapter's own explicit server-side kill, the one place a real
-// cancellation is meant to happen (P58a's own AGENTS.md findings: pgx first, generalised here for
+// cancellation is meant to happen (P58a's own CLAUDE.md findings: pgx first, generalised here for
 // mysql-family/clickhouse/sqlite in P58b — three more reasons, one helper, §1.7 of
 // docs/v1/plans/P58b-mysql-sqlite-clickhouse.md).
 //

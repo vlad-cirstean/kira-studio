@@ -369,7 +369,7 @@ class — both verified — so removing it is safe rather than merely tidy.
 
 **Alternative considered:** put `.kv-skin-kira` on `.kv-app` as well, keeping the class. Rejected: a
 class applied to every root is a `:root` selector with extra steps, and it leaves the same trap for
-the next author who writes a rule outside a root (F2 was exactly that). `AGENTS.md`'s "scope left
+the next author who writes a rule outside a root (F2 was exactly that). `CLAUDE.md`'s "scope left
 out is left out entirely, not half-implemented" points the same way.
 
 ### D2 — `scripts/check-tokens.sh` grows to cover `--kv-*` and `--kui-*`
@@ -616,11 +616,11 @@ it to switch.
 
 **No `PersistedViewState` bump.** Nothing here is persisted.
 
-**No new dependency**, so `AGENTS.md`'s license discipline has nothing new to check and `NOTICES.md`
+**No new dependency**, so `CLAUDE.md`'s license discipline has nothing new to check and `NOTICES.md`
 is untouched. `primitives.css` and `tokens.css` are this repo's own files; nothing is copied from a
 third party.
 
-**No first-paint risk, and no measurement is warranted** (`AGENTS.md`: "measure when there's a real,
+**No first-paint risk, and no measurement is warranted** (`CLAUDE.md`: "measure when there's a real,
 concrete question at stake"). The concrete question the SPEC row raises is whether loading real
 kira-ui CSS/fonts threatens the ≤300 ms budget `docs/PERF.md` §2.13 records. Read off the code:
 
@@ -714,7 +714,7 @@ second.
 11. **`refactor(git-ui): one dialog field rule, not twenty-eight`** — D9.
 12. **`feat(git-ui): LAW 08's font roles reach the graph panel`** — D10.
 13. **`test(vscode): rendered-geometry coverage for the Kira Studio parity batch`** — §6 Tier 2, run
-    once at the end per `AGENTS.md`'s "implement the whole plan first, then test once."
+    once at the end per `CLAUDE.md`'s "implement the whole plan first, then test once."
 
 Per-commit fast checks: `bun run lint` (now including D2's guard), `bun run typecheck`. Once, at
 step 13: `bun run test:unit`, `bun run test:webview`. No Go run is needed — nothing Go-side changes
@@ -923,6 +923,6 @@ are the places to push back.
 
 12. **`scripts/check-tokens.sh` grows rather than the repo gaining stylelint.** **Recommendation:
     grow the script.** Its own header already records that stylelint is not in this toolchain, the
-    two new passes are the same eight-line grep-and-`comm` shape, and `AGENTS.md`'s "reach for a
+    two new passes are the same eight-line grep-and-`comm` shape, and `CLAUDE.md`'s "reach for a
     library before hand-rolling non-trivial infrastructure" does not bite on a `comm` of two sorted
     name lists.

@@ -51,7 +51,7 @@ was checked against source read in this container, never against prose.
 | Settings UI is one dialog with a hard-coded section list and a draft/Save model | `workbench/SettingsDialog.vue:81` (`const sections = ['Appearance','Data','Cache','Advanced'] as const`), `:47-48` (frozen `baseline` + reactive `draft`), `:66-79` (`pendingPatch`/`isDirty`) |
 | Global dialogs mount in `App.vue`, not inside a view | `App.vue:68-73` — six `v-if`-gated dialog components at the template root, incl. an always-mounted `<ConfirmDialog />` |
 | The window registry can answer "is any window open", but only on the native shell | `internal/shell/registry.go:57` `Any()`, `:69` `Keys()` — populated by `main.go`'s window-creation paths only |
-| A `-tags server` build serves the whole bound surface + data stream over real TCP, no window | `AGENTS.md`'s Wails section; `tests/e2e-real/fixtures.ts:66-72` (`go build -tags server`), `:133-160` (per-test `KIRA_HOME` under `tmpdir()`, per-test free port, `WAILS_SERVER_HOST=127.0.0.1`) |
+| A `-tags server` build serves the whole bound surface + data stream over real TCP, no window | `CLAUDE.md`'s Wails section; `tests/e2e-real/fixtures.ts:66-72` (`go build -tags server`), `:133-160` (per-test `KIRA_HOME` under `tmpdir()`, per-test free port, `WAILS_SERVER_HOST=127.0.0.1`) |
 | The e2e tier already isolates `KIRA_HOME` per test and refuses to run outside `tmpdir()` | `tests/e2e-real/fixtures.ts:121-126` and `:135-139` |
 | Go-side layering is enforced by a test that auto-enumerates packages | `internal/layering_test.go:29-33` — every `internal/*` package must not import `internal/bridge`, except the four named composition/transport packages |
 | Root workspaces are three globs, not `packages/*` | `package.json:8-12` — `["apps/*/frontend", "packages/shared", "packages/api-core"]` |
@@ -130,17 +130,17 @@ was checked against source read in this container, never against prose.
 ### 0.4 Ground rules
 
 - Every decision in §2 cites a finding; every finding in §1 cites something read or run here.
-- `AGENTS.md`'s rules apply in full: **no stubbed error handling, no `TODO: fix later`, no skipped
+- `CLAUDE.md`'s rules apply in full: **no stubbed error handling, no `TODO: fix later`, no skipped
   validation.** Scope left out of this phase is left out *entirely* — which is why §3.3's method
   table has three entries and no placeholders, and why §5.5's migrated-but-unwired files are
   unwired rather than half-wired.
-- **Comments very concise, only where the code cannot say it itself** (`AGENTS.md`).
-- **Tests only where the bar is met** (`AGENTS.md`: concurrency/ordering/backpressure/cancellation,
+- **Comments very concise, only where the code cannot say it itself** (`CLAUDE.md`).
+- **Tests only where the bar is met** (`CLAUDE.md`: concurrency/ordering/backpressure/cancellation,
   cache/eviction rules, crypto beyond encrypt-then-decrypt, boundary arithmetic). G1 clears that bar
   in exactly three places — framing boundary arithmetic, the pairing broker's queue/timeout/cooldown
   state machine, and the handshake's branch table — and nowhere else. A CRUD round-trip against
   `git_clients` gets no test.
-- **Reach for a library before hand-rolling** (`AGENTS.md`). §2 D3 records where that rule was
+- **Reach for a library before hand-rolling** (`CLAUDE.md`). §2 D3 records where that rule was
   applied and where it declines, with the requirement named.
 - Commits are Conventional Commits, granular, landing as work completes.
 
@@ -394,7 +394,7 @@ hand-rolled decoder). A fixed 4-byte big-endian prefix is what `encoding/binary.
 Node's `Buffer.readUInt32BE` both do in one call on each side, and it carries arbitrary bytes
 unchanged, which is precisely what §6 needs.
 
-**No library is used for the framing.** `AGENTS.md` requires naming the requirement when declining
+**No library is used for the framing.** `CLAUDE.md` requires naming the requirement when declining
 one: the requirement is that the *same* framing be implemented twice, once in Go and once in
 TypeScript, with byte-identical behaviour and no shared runtime — and there is no single library
 present in both dependency graphs that does this. Each side is ~40 lines against `binary.BigEndian`
@@ -412,10 +412,10 @@ it releases the lock — so it is stored on the `gitsock.Server` and closed only
 
 F1's import fix is mandatory. F3's two gaps (`Stream` has no emitter; `Emit` is unreachable) are
 **not** fixed in G1: G1 registers no stream handler and emits no event, so a fix here would be code
-with no caller, which `AGENTS.md`'s "scope left out is left out entirely" forbids as squarely as a
+with no caller, which `CLAUDE.md`'s "scope left out is left out entirely" forbids as squarely as a
 stub does. Both are handed to G2/G3 in §11 with the exact shape the fix should take.
 
-`session_test.go` ports with it. Its two credit-gate tests clear `AGENTS.md`'s bar (a counting
+`session_test.go` ports with it. Its two credit-gate tests clear `CLAUDE.md`'s bar (a counting
 semaphore's grant/acquire ordering and its cancellation path); `TestSession_Emit_EventCrosses` is
 kept because it is the only thing that exercises the `evt` encode path at all, and deleting it would
 leave `Emit` both unreachable *and* unproven.
@@ -463,7 +463,7 @@ SPEC §3.3 fixes the storage side; this fixes the rest:
   and a miss compares the presented token against a fixed dummy hash so a missing client and a wrong
   token are not distinguishable by timing.
 
-This clears `AGENTS.md`'s "crypto beyond encrypt-then-decrypt" test bar, so mint/verify/revoke gets
+This clears `CLAUDE.md`'s "crypto beyond encrypt-then-decrypt" test bar, so mint/verify/revoke gets
 one focused test (§8.1).
 
 ### D7 — Migration 16, `git_clients`, exactly the SPEC's columns
@@ -488,7 +488,7 @@ Timestamps are epoch-millisecond integers, matching every other table in this sc
 is nullable because "not revoked" is genuinely the absence of a revocation, not a sentinel.
 `label` is what the *Connected editors* pane shows and comes from `hello.client.label`; it is
 **clamped to 200 bytes on write** — the pane renders it, and an unbounded client-supplied string
-into a table this app displays is the kind of thing `AGENTS.md`'s "no skipped validation" covers.
+into a table this app displays is the kind of thing `CLAUDE.md`'s "no skipped validation" covers.
 
 ### D8 — The pairing broker is a queue with an injected clock; "no window open" is not a state it knows about
 
@@ -579,7 +579,7 @@ with a `default` returning `ipcerr.New("E_UNKNOWN_METHOD", "…")`. There is no 
 `E_NOT_IMPLEMENTED` per method.
 
 This matters: a 33-entry table where 30 entries return "not implemented" *is* the half-implemented
-scope `AGENTS.md` forbids, and it would also have to be re-touched by every one of G2–G10. One
+scope `CLAUDE.md` forbids, and it would also have to be re-touched by every one of G2–G10. One
 `default` arm is the honest statement "this server does not serve that method", it is the same
 answer a genuinely wrong method name gets, and it needs no edit as later phases fill the table in.
 
@@ -731,7 +731,7 @@ states a retry cannot improve (the user must install a matching build, or approv
 and both surface through the extension's status. `tokenRejected` does **not** stop it — it clears
 the stored token and immediately re-dials (D18's loop).
 
-**No backoff library.** `AGENTS.md` requires naming the requirement: the two candidate shapes here
+**No backoff library.** `CLAUDE.md` requires naming the requirement: the two candidate shapes here
 are a `setTimeout` loop inside `activate()`'s disposable lifetime, and a dependency. The extension
 bundle is shipped inside a DMG and `packages/host-vscode` today has exactly one runtime
 dependency-free profile (`external: ["vscode"]`, F18); ~15 lines of `setTimeout` with a jittered
@@ -856,7 +856,7 @@ Handler bodies, in full — this is the whole of G1's git surface:
 - **`repo.close`** — validate `RepoID != ""`, then `deps.Client.CloseRepo(repoID)`; result
   `struct{}{}` (matching `contract.ts:879-882`'s `Record<string, never>`).
 
-**No test.** Three thin dispatch arms over already-tested code is squarely inside `AGENTS.md`'s
+**No test.** Three thin dispatch arms over already-tested code is squarely inside `CLAUDE.md`'s
 "thin pass-through wrappers … single bad-input → single-error paths" exclusion. The behaviour that
 matters here is proven end-to-end (§8.1), not in a unit test that restates the switch.
 
@@ -933,7 +933,7 @@ The service is appended to `main.go:215-237`'s list as
 and `events.Attach`'s `bridge.Sources` (`main.go:176`) gains `Git: gitSock`.
 
 **Bindings must be regenerated** (`wails3 task common:generate:bindings`, or `scripts/setup.sh`) —
-`AGENTS.md` is emphatic that `-names` is load-bearing and that `frontend/bindings/**` are real Vite
+`CLAUDE.md` is emphatic that `-names` is load-bearing and that `frontend/bindings/**` are real Vite
 import targets, so a missing regeneration fails the frontend build outright.
 
 ---
@@ -1223,7 +1223,7 @@ it rather than merely adjacent.
 
 Nine commits. `bun run lint`, `bun run typecheck`, `go build ./apps/kira-studio/internal/...` and
 `go test ./apps/kira-studio/internal/...` run after **each**; the expensive tier (§8.1's e2e) runs
-once at C8, per `AGENTS.md`'s "implement the whole plan first, then test once".
+once at C8, per `CLAUDE.md`'s "implement the whole plan first, then test once".
 
 - **C1** `feat(git): port rpcstream and the read-only gitclient subset from the superseded branch`
   — §3.4 + §3.2. Two package copies, one import fix, `watcher.go` deliberately absent, the
@@ -1387,7 +1387,7 @@ make it a bad trade here:
 2. **The TS half is ~85 % mechanical file movement** (§5.1: four package copies and a global
    specifier rewrite) and ~15 % genuinely new code (`socketChannel.ts`, `extension.ts`). Parallelism
    buys wall-clock on the mechanical part and costs correctness on the part that matters.
-3. **`AGENTS.md` is explicit**: parallel subagents "only when the plan's work is genuinely
+3. **`CLAUDE.md` is explicit**: parallel subagents "only when the plan's work is genuinely
    independent (unrelated adapters, non-overlapping fixes)". A client and a server for one new
    protocol are the textbook case of *not* that.
 
@@ -1425,7 +1425,7 @@ them:
 ## 11. Handed forward
 
 Open items this phase found and deliberately did not close. Each belongs in the named phase's own
-plan, not in `AGENTS.md`.
+plan, not in `CLAUDE.md`.
 
 - **`rpcstream.Handlers.Stream` cannot emit a chunk** (F3.1). `session.go:33`'s signature has no
   emitter, and `handleOpen` (`:143-166`) builds a credit gate that only `handleCredit` can reach.

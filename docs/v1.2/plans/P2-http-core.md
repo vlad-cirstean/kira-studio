@@ -10,7 +10,7 @@
 > Postman-format import/export (P4), curl parse/generate (P5), response history (P6), the raw
 > byte-level inspector and raw editor (P7), the DNS/connect/TLS/TTFB timeline (P8, so P2 reports
 > exactly one elapsed-ms figure), gRPC (P9). Nothing here is half-built toward those
-> (`AGENTS.md`: *"Scope left out of a phase is left out entirely, not half-implemented"*).
+> (`CLAUDE.md`: *"Scope left out of a phase is left out entirely, not half-implemented"*).
 >
 > **Every claim below was re-read against the tree, not inherited from `P1-shared-ui-shell.md`'s
 > prose.** Base: branch `claude/feature-v1-2` at `94521a5`. File:line citations point at that
@@ -348,7 +348,7 @@ must not pretend to have decoded.
 ## 4. Decisions
 
 ### D1 — No new library, and here is the check rather than the assertion
-`AGENTS.md` requires reaching for a maintained library first and **naming the requirement** when
+`CLAUDE.md` requires reaching for a maintained library first and **naming the requirement** when
 declining one.
 
 - **A Go HTTP client library** (`resty`, `req`, `heimdall`). Declined on requirements, not licence.
@@ -618,7 +618,7 @@ FlatBuffers types and Wails bindings — too much machinery for two lists of eig
 asserts `RenderableTabKinds`' keys equal `RENDERABLE_TAB_KINDS` and `opKinds`' keys equal
 `opKindSchema`'s members. This is the same technique `mockRuntime.spec.ts` already uses against the
 generated bindings (`mockRuntime.ts:85-90`), so it is a precedented shape, not a new one. It clears
-`AGENTS.md`'s unit-test bar on its own terms: a cross-language invariant whose failure mode is
+`CLAUDE.md`'s unit-test bar on its own terms: a cross-language invariant whose failure mode is
 *silent* (a row dropped with a `warn` nobody reads, `repos/tabs.go:57-60`), not a CRUD round-trip.
 
 ### D11 — Status-code hints: one shared table, rendered inline, coloured by class
@@ -711,7 +711,7 @@ every Studio tab has a live connection record (a tab whose connection is deleted
 
 Ten commits. C1–C4 add capability with nothing yet mounted (each typechecks and builds on its own);
 C5 is the one that makes the feature exist; C6–C8 are additive layers on a working feature; C9–C10
-are the test and the docs. Per `AGENTS.md`, run the fast checks (`lint`, `typecheck`, `build`) per
+are the test and the docs. Per `CLAUDE.md`, run the fast checks (`lint`, `typecheck`, `build`) per
 commit and the expensive suites once at the end.
 
 ### C1 — `feat(shared): the HTTP request/response domain`
@@ -730,7 +730,7 @@ error mapping per D8), the `main.go:190-204` registration, `'http'` added to `op
 (`packages/shared/domain/ops.ts`) and `opKinds` (`model/ops.go`), `control.ts`'s `httpSend`, the
 `IPC.httpSend`/`FQN_SUFFIX_BY_IPC_KEY.httpSend` pair in `tests/ui/support/`, and a bindings
 regeneration (`wails3 task common:generate:bindings` via `scripts/setup.sh` — **never** a hand-typed
-flag list, `AGENTS.md`'s `-names` warning has a real subject this phase). The frontend has a callable
+flag list, `CLAUDE.md`'s `-names` warning has a real subject this phase). The frontend has a callable
 `control.httpSend` with no caller yet.
 
 ### C4 — `refactor(workbench): shared chrome stops assuming a tab has a connection`
@@ -781,7 +781,7 @@ F19's header-order limitation recorded as a known property, not a bug.
 bound service's method set, so `apps/kira-studio/frontend/bindings/**` must be regenerated or the
 Vite build fails on an unresolvable import.
 
-Two bindings-specific checks, both from `AGENTS.md`'s own warnings and F11:
+Two bindings-specific checks, both from `CLAUDE.md`'s own warnings and F11:
 
 1. The regenerated `httpservice.ts` must call `$Call.ByName("…bridge.HttpService.Send", …)`, not
    `$Call.ByID(<n>, …)` — a `-names`-less regeneration silently breaks **every** `tests/ui` spec at
@@ -817,7 +817,7 @@ the table without rewriting it (D9's rule).
 
 ### 6.3 The Go test, and what it deliberately does not cover
 `internal/httpclient/client_test.go` against `net/http/httptest`. It exists because `Send` is a
-decision structure with several interacting rules over a real protocol — `AGENTS.md`'s own
+decision structure with several interacting rules over a real protocol — `CLAUDE.md`'s own
 "parser/splitter with several interacting rules" category — not because it is a CRUD round-trip.
 Five cases, one per rule that is genuinely easy to get wrong:
 
@@ -832,7 +832,7 @@ Five cases, one per rule that is genuinely easy to get wrong:
 
 **Explicitly not tested:** that a GET returns 200, that the status-hint table maps 404 to its own
 string, that the method enum rejects an unknown method. Each is a lookup or a one-condition guard —
-`AGENTS.md`'s "everything else gets nothing".
+`CLAUDE.md`'s "everything else gets nothing".
 
 ### 6.4 What only a real Mac and a real network can settle
 1. A real request to a real host over the shipping desktop transport (the custom URI scheme, not

@@ -139,7 +139,7 @@ Eight items, eight fixes, and nothing else.
 ### 0.4 Ground rules
 
 - Every decision in §2 cites a finding; every finding in §1 cites something read or **run** here.
-- `AGENTS.md` applies in full: **no stubbed error handling, no `TODO: fix later`, no skipped
+- `CLAUDE.md` applies in full: **no stubbed error handling, no `TODO: fix later`, no skipped
   validation.** Scope left out is left out entirely.
 - **Layering:** no `internal/git*` package may import `internal/bridge` or Wails.
   `TestDomainPackagesDoNotImportBridge` stays green. D4's notification work lives in `main.go`,
@@ -149,7 +149,7 @@ Eight items, eight fixes, and nothing else.
   rejected in D4).
 - **Comments: very concise, only where the code cannot say it itself.** D1's four `biome-ignore`
   lines are the exception that earns its keep — each states *why* a value import is load-bearing.
-- **Tests only where `AGENTS.md`'s bar is met.** D11 says, per item, whether one is warranted and
+- **Tests only where `CLAUDE.md`'s bar is met.** D11 says, per item, whether one is warranted and
   why. Exactly one new test is added, and §D11 argues it against the bar by name.
 - Commits are Conventional Commits, granular, landing as work completes.
 
@@ -642,7 +642,7 @@ import — `/^import type\s+[A-Za-z_$][\w$]*\s+from\s+['"].*\.vue['"]/m` — nam
 and explaining the failure in one sentence. Named type imports (`import type { FindBarHost } from
 '…vue'`) are deliberately not matched: F3 found one and it is legitimate.
 
-Why this file, and why a test at all — argued against `AGENTS.md`'s bar rather than around it:
+Why this file, and why a test at all — argued against `CLAUDE.md`'s bar rather than around it:
 
 - It lives in `apps/kira-studio-vscode/src` because that directory is already in `test:unit`'s
   globs and already contains the exact precedent: `commands.test.ts` reads `package.json` **and two
@@ -1106,7 +1106,7 @@ change, plus a round trip and a race with the panel's own boot.
 
 ### D11 — What gets a test, and what does not
 
-`AGENTS.md`'s bar, per item.
+`CLAUDE.md`'s bar, per item.
 
 | Item | Test | Why |
 |---|---|---|

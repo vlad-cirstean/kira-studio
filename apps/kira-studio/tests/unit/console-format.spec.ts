@@ -1,7 +1,7 @@
 // P13 D10: formatConsoleText's Mongo branch is a composed statement parser (mongoStatement.ts) +
 // argument splitter + emitter (ejson.ts's beautifyShellText) with real boundary cases — nested
 // constructor calls, an empty argument list, a trailing comma — the "parser or splitter with
-// several interacting lexical rules" AGENTS.md's own bar names explicitly. The SQL branch is a
+// several interacting lexical rules" CLAUDE.md's own bar names explicitly. The SQL branch is a
 // per-kind dialect lookup plus a library call, plumbing well below that bar, and is covered by
 // tests/ui/console-format.spec.ts alone.
 //

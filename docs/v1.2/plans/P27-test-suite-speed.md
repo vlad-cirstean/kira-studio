@@ -47,8 +47,8 @@ latency specs are moved out of the way so that is safe.
 The P27 row and the brief that produced it contain four factual claims that measurement did not
 support. They are corrected here rather than carried forward.
 
-1. **"`AGENTS.md` mentions `go test -p 1` in some validation instructions."** It does not, at
-   `0be9f3e`. `rg -- '-p 1'` across `AGENTS.md`, `docs/`, `scripts/`, `.githooks/` and
+1. **"`CLAUDE.md` mentions `go test -p 1` in some validation instructions."** It does not, at
+   `0be9f3e`. `rg -- '-p 1'` across `CLAUDE.md`, `docs/`, `scripts/`, `.githooks/` and
    `package.json` returns nothing; `package.json:34` is a bare `"test:go": "go test ./..."`. There
    is no `-p` pin anywhere in the repo, and `go test` has been running at its default
    (`-p` = `GOMAXPROCS` = 4 here) all along. **There is no leftover serialization to remove** —
@@ -65,7 +65,7 @@ support. They are corrected here rather than carried forward.
 
 ### 0.4 Not in scope
 
-- **No test is deleted, skipped, merged, or had an assertion relaxed.** `AGENTS.md`'s testing
+- **No test is deleted, skipped, merged, or had an assertion relaxed.** `CLAUDE.md`'s testing
   philosophy and its explicit carve-out for the adapter conformance suites stay in force.
 - **No tooling migration.** Playwright stays Playwright, `go test` stays `go test`, `bun test` stays
   `bun test`, WebKit stays the `ui` project's browser.
@@ -295,7 +295,7 @@ Two files, one test each. That is small enough to isolate.
 
 ### F12 — `scripts/setup.sh`'s caching claim is true, verified rather than assumed
 
-`AGENTS.md` claims `scripts/setup.sh` re-runs the expensive steps only on a real staleness check.
+`CLAUDE.md` claims `scripts/setup.sh` re-runs the expensive steps only on a real staleness check.
 Measured:
 
 - **first `bun run setup`** in a fresh worktree: **4.43 s** — bun install, `go mod download`, and
@@ -504,7 +504,7 @@ makes the tradeoff clearly favourable, the measurement to redo is in F7.
 | Lever | Measurement | Verdict |
 |---|---|---|
 | Cache/skip `bun run build:test` | 2.5 s cold, 2.3 s warm, of a 351 s tier (F13) | **0.7 %.** Declined — adds a stale-`dist/` failure mode for under two seconds |
-| Make `scripts/setup.sh` / bindings generation cache properly | It already does: 4.43 s first, **0.135 s** second, bindings step skipped (F12) | Nothing to fix. `AGENTS.md`'s claim verified, not assumed |
+| Make `scripts/setup.sh` / bindings generation cache properly | It already does: 4.43 s first, **0.135 s** second, bindings step skipped (F12) | Nothing to fix. `CLAUDE.md`'s claim verified, not assumed |
 | Replace `waitForTimeout` with polling across the UI suite | 59 sites, ≈ 15-20 s of 672.9 s; most are deliberate frame pacing (F14) | **2-3 %,** and a bulk rewrite would change what several specs measure. Declined as a phase lever |
 
 ### D9 — Container reuse across `go test` invocations is declined, with its cost stated
@@ -515,7 +515,7 @@ container startup from a *repeat* run.
 
 Declined, because these are not read-only fixtures. `adapters/mysqlfamily`, `adapters/postgres`,
 `adapters/sqlite`, `adapters/mongo` and `adapters/s3` all exercise mutate and DDL paths
-(`AGENTS.md`: *"mutate, and DDL round trips where the engine has a DDL surface at all"*), so a
+(`CLAUDE.md`: *"mutate, and DDL round trips where the engine has a DDL surface at all"*), so a
 reused container carries the previous run's writes into the next one. That manufactures exactly the
 class of bug this repo's testing philosophy is built to catch — a test that passes only because of
 what ran before it — and it makes a first run and a second run different tests. A 25 s saving does
@@ -536,7 +536,7 @@ else — say so in the commit message rather than half-doing it.
 ## 3. Commit sequence
 
 Conventional Commits, one concern each. `bun run lint` and `bun run typecheck` per commit; the two
-expensive tiers run once at the end per `AGENTS.md`'s cadence rule, with fixes as follow-ups.
+expensive tiers run once at the end per `CLAUDE.md`'s cadence rule, with fixes as follow-ups.
 
 | # | Commit | Covers |
 |---|---|---|
@@ -572,7 +572,7 @@ Confirm with `playwright test --list` per project — 243 and 2 — before trust
 
 ### 4.2 Unit tests
 
-**None added.** Every change here is a test-harness or configuration change; `AGENTS.md`'s bar
+**None added.** Every change here is a test-harness or configuration change; `CLAUDE.md`'s bar
 ("unit tests exist only for advanced, complex or deeply nested logic") excludes all of it. `Prewarm`
 is a `WaitGroup` over an existing mutex-guarded memo; the readiness polls are loops with a deadline.
 

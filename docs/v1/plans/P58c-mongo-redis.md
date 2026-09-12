@@ -152,7 +152,7 @@ about because it removes work rather than adding it.
   `\uXXXX`, numbers including a leading `-`, identifiers over `[A-Za-z_$]`), a recursive-descent
   parser over objects/arrays/values with JSON5-style trailing commas, a closed six-entry BSON
   constructor table, and a second pass (`resolveEjsonWrappers`) that walks the parsed tree replacing
-  thirteen extended-JSON wrapper shapes. It clears `AGENTS.md`'s unit-test bar without argument and
+  thirteen extended-JSON wrapper shapes. It clears `CLAUDE.md`'s unit-test bar without argument and
   P58 D11 already says so.
 - `redis/console.ts`'s `tokenize` is **33 lines** (`console.ts:15-48`): whitespace-separated tokens
   with optional single/double quoting and backslash escapes inside quotes, and one error
@@ -252,7 +252,7 @@ to fix and no part of this plan should "unify" the two page-position constructio
 
 ### 1.4 `bson.MarshalExtJSON` is not obviously `EJSON.stringify`, and three specific ways it can differ
 
-This is the largest single risk in the MongoDB half, it is the exact hazard `AGENTS.md`'s P58b M6.3
+This is the largest single risk in the MongoDB half, it is the exact hazard `CLAUDE.md`'s P58b M6.3
 finding warns about (*"an M6.0-style probe is only as complete as the specific inputs it tried"*),
 and it is why MG-1 is written the way §6 writes it.
 
@@ -273,7 +273,7 @@ each of which changes what a user sees:
    `0003_mongo_seed.ts:22` writes `price: (i + 1) * 1.5`, and at `i = 1` that is the JS number `3`,
    stored as a BSON double. So the document view's rendering of `widgets` changes for one in three
    documents on the day M7.3 lands. This is a *gain* in fidelity, not a regression, and it must be
-   recorded as a deliberate behaviour change in `docs/ARCHITECTURE.md` and `AGENTS.md` rather than
+   recorded as a deliberate behaviour change in `docs/ARCHITECTURE.md` and `CLAUDE.md` rather than
    discovered by a user — the same standard P58b B4/B22 held its two losses to.
 2. **HTML escaping.** Go's `encoding/json` escapes `<`, `>` and `&` by default and
    `MarshalExtJSON`'s third parameter is what turns that off. JS's `JSON.stringify` never escapes
@@ -354,7 +354,7 @@ this plan:
   `adapters.RunWithAbortRace`.
 - **The liveness check in the cancel test is already id-keyed, and must stay that way.**
   `mongo.spec.ts` 22 polls `{currentOp: 1, 'command.comment': opId}` — a tracked operation id, not a
-  text pattern over the statement. That is exactly what `AGENTS.md`'s P58b M6.4 finding says a
+  text pattern over the statement. That is exactly what `CLAUDE.md`'s P58b M6.4 finding says a
   server-side liveness poll must do (*"a server-side liveness poll must check a value the checking
   statement's own text cannot itself satisfy"*), and the Go port must not "simplify" it into a
   `$where`/`ns`/command-text match, which is how the ClickHouse version went wrong. §5.3 states it as
@@ -410,7 +410,7 @@ rather than argument.
 ### 1.8 Flipping `"mongodb"` and `"redis"`: the grep, done before writing §3
 
 `grep -rn '"mongodb"\|"redis"' shell/internal --include=*.go`, run for this plan exactly as
-`AGENTS.md`'s P58a/P58b findings require:
+`CLAUDE.md`'s P58a/P58b findings require:
 
 | File:line | What it is | Fate |
 |---|---|---|
@@ -449,7 +449,7 @@ started by `tests/e2e-real/support/mongo.ts` → `tests/db/support/mongo.ts`, ex
 `SIGKILL`s the Node engine child and asserts MongoDB's status dot flips to `error` while MariaDB's
 stays `connected` and still serves a read after a `page.reload()`.
 
-`AGENTS.md`'s P58b findings call that *"the first time P58 D4's coexistence property has been proven
+`CLAUDE.md`'s P58b findings call that *"the first time P58 D4's coexistence property has been proven
 in a running app, not only in `adapterhost`'s own router unit tests."* **The moment
 `nativeKinds["mongodb"] = true` lands, it proves nothing**: both connections are native, the Node
 child serves neither, both survive the kill, and the assertion `data-status = "error"` fails —
@@ -473,10 +473,10 @@ having cost an iteration:
   `[data-path="database:kira_test"]` ambiguity disappears. Do not re-introduce it by reusing the
   MariaDB row's own locator shape.
 - **The Kafka container is heavier than Mongo's.** `confluentinc/cp-kafka:8.0.7` via `mirror.gcr.io`
-  (already namespaced — no `library/` prefix, `AGENTS.md`'s Docker section). Budget accordingly in
+  (already namespaced — no `library/` prefix, `CLAUDE.md`'s Docker section). Budget accordingly in
   the one Bash invocation §7 runs in.
 - **The `-tags server` binary loads the Kafka native addon through the vendored Node, not Bun.**
-  `AGENTS.md`'s Native Kafka driver section: the addon loads under the vendored real Node with no
+  `CLAUDE.md`'s Native Kafka driver section: the addon loads under the vendored real Node with no
   rebuild step, which is exactly the runtime the engine child uses. **Kafka has no fallback pairing
   left to fall back to**: RabbitMQ, this section's original named alternative, was dropped from v1's
   scope entirely (see the parent plan's amendment note) before this sub-phase implemented. If the
@@ -508,7 +508,7 @@ mandate ends with a spec deletion and this plan should not inherit a precedent t
    costs one line. OQ-2 asks whether that is in scope; this plan's §8 assumes yes.
 
 **And the "its only consumer goes" claim, re-grepped for P58c's own two support modules** — the
-mistake `AGENTS.md`'s P58a findings name explicitly (*"a plan's own 'its only consumer' claim about a
+mistake `CLAUDE.md`'s P58a findings name explicitly (*"a plan's own 'its only consumer' claim about a
 shared support file is a snapshot, not a standing fact"*):
 
 | Support file | Consumers other than its own `tests/db/*.spec.ts` | Fate |
@@ -598,7 +598,7 @@ verbatim**, exactly as P58a §1.7 and P58b §1.11 said of theirs. Its per-engine
 `{currentOp: 1, 'command.comment': opId}` (§1.6 — already id-keyed, keep it that way); **redis has
 none, and correctly so**, because there is no server-side kill to observe (§1.7).
 
-**The false-positive-fixture trap, in its P58c form.** `AGENTS.md` records this pattern twice
+**The false-positive-fixture trap, in its P58c form.** `CLAUDE.md` records this pattern twice
 (P58a's Postgres `analytics.events`, P58b M6.2's `kira_analytics.events` — both had a real primary
 key, so both "no PK" tests passed vacuously) and once as a non-recurrence (M6.3's SQLite, which
 already shipped a genuine `no_pk_rowid`). Neither MongoDB nor Redis has a primary-key concept, so the
@@ -636,7 +636,7 @@ already shipped a genuine `no_pk_rowid`). Neither MongoDB nor Redis has a primar
   skew to manage. TC-3 confirms they start *here*.
 - **Images**: `mongo:7` and `redis:7` (the exact tags the TypeScript fixtures use —
   `tests/db/support/mongo.ts:9`, `tests/db/support/redis.ts:9`). Both are Docker Hub *official*
-  images, so both mirror under `library/` (`AGENTS.md`'s Docker section):
+  images, so both mirror under `library/` (`CLAUDE.md`'s Docker section):
   `mirror.gcr.io/library/mongo:7` and `mirror.gcr.io/library/redis:7`, retagged in the daemon. No Go
   code references the mirror.
 - **`mongo:7`'s double-boot wait strategy.** `tests/db/support/mongo.ts:48` waits for
@@ -676,7 +676,7 @@ shape that preserves both **field order** — observable in the document view, i
 what makes Go's rendering strictly more faithful than the TypeScript's (a stored double `3.0` renders
 `{"$numberDouble":"3.0"}` here where JS renders `{"$numberInt":"3"}`). That divergence **is a
 behaviour change users will see on `widgets`' own `price` field**, it is a gain rather than a loss,
-and it lands in `docs/ARCHITECTURE.md`'s MongoDB section and `AGENTS.md`'s P58c findings as a named
+and it lands in `docs/ARCHITECTURE.md`'s MongoDB section and `CLAUDE.md`'s P58c findings as a named
 change — the same standard P58b B4/B22 held its two losses to. `escapeHTML: false` gets its own Go
 test with a `<`-bearing document, because the fixture has no such value and the default would
 otherwise go unnoticed until a user stored one. MG-1 settles the byte-level question before M7.3
@@ -793,7 +793,7 @@ sloppiness to a reader who does not know why; all three keep their comments.
 because it is D11's peer — 33 lines against 338 — but because it is the console's entire input path
 and has three interacting rules (single **and** double quoting, backslash escapes that are only
 honoured inside quotes, and an unterminated-quote error) whose interaction is exactly the shape
-`AGENTS.md`'s bar names. Note the one behaviour that reads as a bug and is not: a backslash inside
+`CLAUDE.md`'s bar names. Note the one behaviour that reads as a bug and is not: a backslash inside
 quotes drops the backslash and keeps the next character *whatever it is* (`console.ts:28-30`) — there
 is no escape table, unlike `literal.ts`'s. Port it as written.
 
@@ -872,7 +872,7 @@ immediately before it, and each is followed by the full `tests/e2e-real/` sweep 
 
 **C20 — `tests/db/{mongo,redis}.spec.ts` are deleted in the commit *after* their Go successors are
 green**, per adapter, per P58 D12's third rule and P58a A21's discipline — **and** M7.4's closeout
-records in `AGENTS.md` whether P58b's own four deletions (§1.10) are still outstanding. This plan
+records in `CLAUDE.md` whether P58b's own four deletions (§1.10) are still outstanding. This plan
 does not delete another sub-phase's specs on its own initiative; OQ-1 asks whether it should.
 
 **C21 — `tests/db/support/{mongo,redis}.ts` are kept, their consumers are named, and the grep is
@@ -966,7 +966,7 @@ docs/ARCHITECTURE.md                        EDITED  per-database mapping (the Re
                                                     left over from P58b — OQ-2), the MongoDB/Redis
                                                     per-engine section, the Stack driver line
 docs/v1/plans/P58c-mongo-redis.md           EDITED  §12 M7.0 results, then §13 M7.1-M7.4 results
-AGENTS.md                                   EDITED  the P58c findings entry
+CLAUDE.md                                   EDITED  the P58c findings entry
 ```
 
 ## 4. Designs
@@ -999,7 +999,7 @@ the TypeScript happily produces a `NaN` value, which BSON encodes as a double Na
 `strconv.ParseFloat` returns an error. **Return `E_QUERY "invalid number \"1.2.3\" at position N"`**
 rather than silently substituting NaN — this is a deliberate, narrow improvement, it is the only
 place C4's "byte-identical messages" rule gains a message the TypeScript never had, and it gets a
-test case and a line in `AGENTS.md`'s findings.
+test case and a line in `CLAUDE.md`'s findings.
 
 **The parser.** `ParseValue` dispatch order matters and is asserted by the console: `{` → object,
 `[` → array, string, number, then identifier — where `true`/`false`/`null`/`undefined` are handled
@@ -1168,7 +1168,7 @@ Four cases carry more weight than the rest:
 |---|---|
 | **`_id` text round-trips through the parser** (new, C3) | For **every** document in `widgets` (ObjectId `_id`s) and `mutate_probe` (integer `_id`s): `ParseFilterObject(IDText(doc))`-as-a-filter must match exactly that one document. This is the structural version of §1.5's four-way closure requirement, and it is the one test that would catch a `MarshalExtJSON`/`literal.go` disagreement before a user hits it through *Copy `_id`* |
 | **EJSON rendering is byte-stable across every fixture type** (new, C2) | The document body text for a `widgets` document must contain the exact wrappers for its ObjectId, its Date, its double `price`, its array `tags` and its nested `meta` — asserted as literal strings, not by re-parsing. Plus one `<`-bearing document proving `escapeHTML` is off. MG-1 produces the expected strings; this test pins them |
-| **cancel, asserted server-side via `killOp`** (spec 22, ported, **must not be softened**) | A slow operation is started through `RunOp`; the test polls `{currentOp: 1, 'command.comment': opId}` **through a separate root client** until it appears; `CancelOp` is called; `Cancel` returns **`true`**; the op rejects with `E_QUERY` (the server killed it — *not* `E_CANCELLED`, which would mean the local abort won, and `mongo.spec.ts:807-809`'s comment says exactly that); and the poll is repeated until it is **gone**, with a bounded deadline. The second poll is the assertion. **The predicate is a tracked op id, never a text pattern over the command** — `AGENTS.md`'s P58b M6.4 self-match finding, applied before it can recur |
+| **cancel, asserted server-side via `killOp`** (spec 22, ported, **must not be softened**) | A slow operation is started through `RunOp`; the test polls `{currentOp: 1, 'command.comment': opId}` **through a separate root client** until it appears; `CancelOp` is called; `Cancel` returns **`true`**; the op rejects with `E_QUERY` (the server killed it — *not* `E_CANCELLED`, which would mean the local abort won, and `mongo.spec.ts:807-809`'s comment says exactly that); and the poll is repeated until it is **gone**, with a bounded deadline. The second poll is the assertion. **The predicate is a tracked op id, never a text pattern over the command** — `CLAUDE.md`'s P58b M6.4 self-match finding, applied before it can recur |
 | **field order survives a read** (new, C2) | A `widgets` document's rendered body has its keys in insertion order (`_id`, `name`, `price`, `active`, `createdAt`, `tags`, `meta`). A `bson.M` decode would pass every other test in the file and fail this one |
 
 C24 governs every mutating case: `mutate_probe`, `literal_probe` and `slow_probe` are created per
@@ -1195,10 +1195,10 @@ C23 governs every mutating case: they run against **db index 1**.
 **Not ported:** spec 22 (the partially-failed-mutate cache invalidation) — its subject moved to
 `adapterhost` in P58a M4 and is covered by `data_test.go`'s
 `TestDispatcher_Mutate_InvalidatesEvenOnFailure`. §1.12 says so; recording it here is what makes the
-deletion checkable rather than a judgement call, per `AGENTS.md`'s standard (*"the thing to check is
+deletion checkable rather than a judgement call, per `CLAUDE.md`'s standard (*"the thing to check is
 that the Go test actually covers the same assertion"*).
 
-### 5.5 Unit-level, against `AGENTS.md`'s bar
+### 5.5 Unit-level, against `CLAUDE.md`'s bar
 
 Exactly two things in P58c clear it, and P58 §5.4's own table already named the first:
 
@@ -1214,7 +1214,7 @@ complexity."*
 
 ### 5.6 `tests/e2e-real/` — the full suite, after every flip, and this is not optional
 
-`AGENTS.md`'s P58b M6.4 finding, restated as this sub-phase's own rule because P58c is where it is
+`CLAUDE.md`'s P58b M6.4 finding, restated as this sub-phase's own rule because P58c is where it is
 most likely to bite:
 
 > **A `tests/e2e-real/*.spec.ts` regression sweep must be re-run in full after every `nativeKinds`
@@ -1254,11 +1254,11 @@ already re-pointed, so there is nothing new to add (§7).
 
 Four throwaway Go programs under the scratch directory (**never committed; no product code lands in
 M7.0**), each answering one question with a printed PASS/FAIL. The deliverable is a findings
-subsection appended to this document (§9 commit 1) and, for anything surprising, an `AGENTS.md`
+subsection appended to this document (§9 commit 1) and, for anything surprising, an `CLAUDE.md`
 entry. Ordering: TC-3 first (everything else needs containers), then MG-1 and MG-2 against the Mongo
 container it proves, then RD-1.
 
-**The probes below are written against `AGENTS.md`'s own hardest-won lesson about probes**, from
+**The probes below are written against `CLAUDE.md`'s own hardest-won lesson about probes**, from
 P58b M6.3: *"an M6.0-style probe is only as complete as the specific inputs it tried."* SQ-1 tested a
 garbage `'not a date'` string and concluded "no coercion" — true for that input, false in general,
 and the real bug was found later by probing a *valid-looking* value. MG-1 and RD-1 are therefore
@@ -1286,7 +1286,7 @@ checkpoint C1c is written for the `tests/e2e-real/` substitute both predecessors
 real `-tags server` Go binary, real bindings, real containers, real UI code paths, reached over
 `http://127.0.0.1` from a headless browser tab — and **not** for `xdotool`/`import -window` steps that
 cannot run here. Every step is either a `tests/e2e-real/` assertion or a shell observation made in
-the **same** Bash invocation as the app run (`AGENTS.md`, P51; budget 150 s).
+the **same** Bash invocation as the app run (`CLAUDE.md`, P51; budget 150 s).
 
 **Preparation** (one Bash invocation)
 
@@ -1337,7 +1337,7 @@ the **same** Bash invocation as the app run (`AGENTS.md`, P51; budget 150 s).
     a real `ttlMs`/`memoryBytes` header. First Go-built `KeyValuePage`, first native
     `caps.keyBrowser` engine, first native `TreeChildren.Truncated` producer.
 
-**Recording.** Checkpoint C1c is recorded in the M7.4 commit message and in `AGENTS.md`'s P58c
+**Recording.** Checkpoint C1c is recorded in the M7.4 commit message and in `CLAUDE.md`'s P58c
 findings entry, naming which of steps 5–14 passed and which could not be run, per P55 §10 / P56 §6 /
 P57 §6 / P58a §13 / P58b §13's standard of recording *"not available in this session"* rather than
 leaving it implied. Steps 12, 13 and 14 are the load-bearing ones.
@@ -1397,9 +1397,9 @@ leaving it implied. Steps 12, 13 and 14 are the load-bearing ones.
      two test-only.
    - **`tests/db/`** — two spec deletions, no support deletions. **`tests/e2e-real/`** — one edited
      spec, one deleted support file, one new one.
-   - **`docs/`, `AGENTS.md`** — per §3.
+   - **`docs/`, `CLAUDE.md`** — per §3.
    - **`src/`, `tests/ui/`, `tests/ipc/`, `package.json`, `scripts/`, `.github/`** — nothing.
-8. `AGENTS.md` gains a **"P58c implementation findings"** entry on the P52–P58b pattern, carrying at
+8. `CLAUDE.md` gains a **"P58c implementation findings"** entry on the P52–P58b pattern, carrying at
    minimum: M7.0's four probe results; whether C2's byte-level rendering claim survived MG-1 and
    **what the integral-double divergence actually looks like on `widgets`**; whether C10's RESP2 pin
    was necessary; the two placeholder moves (C14, C15) and the general lesson that **a placeholder
@@ -1483,7 +1483,7 @@ first; its **R1** is P58f's and does not bind here.
     import. Seven of ten. **Full `tests/e2e-real/` sweep runs here.**
 24. `test: delete tests/db/redis.spec.ts, its subject now in Go` (C20) — **re-grep first**.
 25. `docs: P58c findings — a document codec, a key/value adapter and two placeholders that had to
-    move` — `AGENTS.md`, `docs/ARCHITECTURE.md`, and this document's §12/§13. **Checkpoint C1c runs
+    move` — `CLAUDE.md`, `docs/ARCHITECTURE.md`, and this document's §12/§13. **Checkpoint C1c runs
     before this commit** and its result is recorded in it.
 
 **Why `literal.go` gets its own milestone.** P58 D11 says it is written first; this plan makes it a
@@ -1549,7 +1549,7 @@ discards. It is a **gain** — the document view stops lying about what is store
 SQLite cancellation. But it is also the first entry on either list that changes what an existing
 user sees on an existing document with no capability attached to it, which is a slightly different
 kind of item than either list currently holds. **P58c interim: record it as a gain, in
-`docs/ARCHITECTURE.md` and `AGENTS.md`, and pin it with a test** (§5.3). If the parent's author
+`docs/ARCHITECTURE.md` and `CLAUDE.md`, and pin it with a test** (§5.3). If the parent's author
 would rather the Go side reproduce the TypeScript's lossy rendering for continuity, that is a
 materially larger job (a JS-number-semantics emulation layer over every numeric BSON value) and must
 be decided before M7.3, not after.
@@ -1819,7 +1819,7 @@ real API-shape finding:
 ## 13. M7.1–M7.4 results
 
 All four milestones landed with no plan revision needed beyond what §12 already flagged. Full
-details, findings and the exact commits are in `AGENTS.md`'s own P58c M7.1/M7.3/M7.4 findings
+details, findings and the exact commits are in `CLAUDE.md`'s own P58c M7.1/M7.3/M7.4 findings
 entries; this section is the short version, for a reader of this plan alone.
 
 - **M7.1** (shared lifts): `TestKindNodeServed` moved off `mongodb` onto `kafka` (C14);

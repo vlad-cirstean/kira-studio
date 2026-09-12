@@ -2,7 +2,7 @@
 
 > **The phase, in SPEC.md's own words** (`docs/v1.1/SPEC.md:36`, P21 row): *"Sweep the repository's
 > own documentation — `docs/ARCHITECTURE.md`, `docs/PERF.md`, `docs/PACKAGING.md`, `README.md`,
-> `AGENTS.md`'s "Known open items", and any other doc `docs/v1/README.md`'s own discipline points at
+> `CLAUDE.md`'s "Known open items", and any other doc `docs/v1/README.md`'s own discipline points at
 > — for drift against the tree as it actually stands once P1-P20 have landed, and fix whatever's gone
 > stale: outdated architecture descriptions, superseded perf numbers, packaging steps P10 changed
 > underneath them, version and dependency mentions P19 just superseded, and so on."* Why: *"The
@@ -68,7 +68,7 @@ The five files the SPEC row names, plus everything `docs/v1/README.md`'s own dis
 | `docs/PACKAGING.md` | 365 | F1-F14 | SPEC row; P20's own §5 D13 named it as a deferred handoff |
 | `docs/ARCHITECTURE.md` | 1097 | F15-F25 | SPEC row; both READMEs call it authoritative for today |
 | `README.md` | 268 | F26-F36 | SPEC row |
-| `AGENTS.md` | 310 | F37-F40 | SPEC row ("Known open items", plus what else proved stale) |
+| `CLAUDE.md` | 310 | F37-F40 | SPEC row ("Known open items", plus what else proved stale) |
 | `docs/PERF.md` | 1025 | F41-F47 | SPEC row |
 | `docs/v1/README.md` | 18 | F48 | the SPEC row's *"any other doc `docs/v1/README.md`'s own discipline points at"* — and the discipline statement itself has drifted |
 | `scripts/demo-dbs/README.md` | — | F49 | linked from `README.md:253`'s Documentation list |
@@ -78,7 +78,7 @@ The five files the SPEC row names, plus everything `docs/v1/README.md`'s own dis
 ### 0.3 Not in this phase
 
 - **`.github/workflows/*.yml`.** This session's GitHub credential lacks the `workflow` OAuth scope
-  (`AGENTS.md:107-110`). F11/F12 are fixed by correcting `docs/PACKAGING.md`'s *prose about* those
+  (`CLAUDE.md:107-110`). F11/F12 are fixed by correcting `docs/PACKAGING.md`'s *prose about* those
   files, never by editing them. Nothing in this phase moves a staged workflow live.
 - **`docs/v1.1/SPEC.md` and `docs/v1/SPEC.md`.** Both READMEs freeze them: *"kept exactly as
   originally written once a phase starts. Neither is retro-edited to track a later change."* P21
@@ -104,10 +104,10 @@ The five files the SPEC row names, plus everything `docs/v1/README.md`'s own dis
    are historical stanzas. Correct a *path*, a *file name*, or a *claim about the present tense*
    inside one; never change a number, a date, or a verdict. New numbers go in a new stanza (D4) —
    the same convention §2.6 → §2.7 → §2.8 already established in that file.
-3. **Prune while you are in there** (`AGENTS.md:91-103`). A sentence whose subject no longer exists
+3. **Prune while you are in there** (`CLAUDE.md:91-103`). A sentence whose subject no longer exists
    is deleted, not annotated with "(removed)".
-4. **No new sections in `AGENTS.md`.** It is process-and-environment only; an app fact goes to
-   `docs/ARCHITECTURE.md` (`AGENTS.md:3-5`, `:91-96`).
+4. **No new sections in `CLAUDE.md`.** It is process-and-environment only; an app fact goes to
+   `docs/ARCHITECTURE.md` (`CLAUDE.md:3-5`, `:91-96`).
 5. **Say plainly what was checked and did not fire.** §5.3 lists the claims this sweep verified as
    *correct*; the implementer should not "improve" them.
 
@@ -175,7 +175,7 @@ This is the worst file in the repository. P20's own plan named it as a deliberat
   `setup.sh:99-104`), so the task is the single authority.
 - **Fix**: quote the task's real command, and point at `wails3 task common:generate:bindings` (or
   `bun run setup`) as the thing a human should actually run. Same correction applies to
-  `docs/ARCHITECTURE.md:697` (F19) and `AGENTS.md:275` (F39) — three copies of one drifting string,
+  `docs/ARCHITECTURE.md:697` (F19) and `CLAUDE.md:275` (F39) — three copies of one drifting string,
   which is itself the argument for citing the task rather than the flags.
 
 ### F5 — §2's task table and §5 still document a Docker cross-compile path P20 deleted
@@ -289,7 +289,7 @@ This is the worst file in the repository. P20's own plan named it as a deliberat
 
 - **Doc says**: nothing. §7 describes the live workflows as if they were final.
 - **Tree shows** two staged, finished-but-unapplied sets, both blocked on the same missing
-  `workflow` OAuth scope (`AGENTS.md:107-116`):
+  `workflow` OAuth scope (`CLAUDE.md:107-116`):
   - `docs/v1.1/plans/p16-pending-ci-workflow/db-compat.yml` — P16's `workflow_dispatch`-only
     compatibility-suite workflow;
   - `docs/v1.1/plans/p19-pending-ci-workflow/{ci,release}.yml` — P19's `actions/{checkout,setup-go,
@@ -297,7 +297,7 @@ This is the worst file in the repository. P20's own plan named it as a deliberat
     binding-generation blocks through `sh scripts/setup.sh` and the corrected `ci.yml` step name.
     Confirmed by `diff .github/workflows/ci.yml docs/v1.1/plans/p19-pending-ci-workflow/ci.yml`:
     five `uses:` bumps and two inline blocks replaced.
-- **Fix**: add a short §7 note pointing at `AGENTS.md`'s Known open items and each staged README.
+- **Fix**: add a short §7 note pointing at `CLAUDE.md`'s Known open items and each staged README.
   Do not duplicate the `git mv` instructions — each staged README already carries them.
 
 ### F13 — §7's `checks` row describes a binding step that is about to change
@@ -454,7 +454,7 @@ structural home in a file whose whole job is to be the current-state reference.
 - **Fix**: extend that paragraph — the same coverage also runs on demand against the version
   extremes; name the script, the override mechanism, and the connection-dialog note. Keep
   "no CI wiring" but make it accurate: the `workflow_dispatch` workflow is written and staged, not
-  live (cross-reference `AGENTS.md`'s Known open items rather than restating the OAuth reason).
+  live (cross-reference `CLAUDE.md`'s Known open items rather than restating the OAuth reason).
 
 ### F24 — the `tests/ui/` coverage sentence stops at pre-v1.1 subjects
 
@@ -614,14 +614,14 @@ not "stale" but **wrong**: they state engine behaviour the opposite of what ship
 
 - **Doc says** (`:187-190`): *"**`apps/kira-studio/tests/e2e-real/`** — **two specs** against a real
   `-tags server` Go binary, deliberately launched through plain Node rather than `bunx` … **rather
-  than through a `package.json` script** — see `AGENTS.md`'s Docker section for why."*
+  than through a `package.json` script** — see `CLAUDE.md`'s Docker section for why."*
 - **Tree shows** four specs / six tests (F18), and `package.json:29` —
   `"test:e2e-real": "bun run build && node node_modules/.bin/playwright test
   --config=apps/kira-studio/playwright.config.ts --project=e2e-real"`, added by P20 (its D12).
   The *plain-Node* reason still holds — the script itself invokes `node node_modules/.bin/playwright`,
   never `bunx` — but "rather than through a `package.json` script" is now false.
 - **Fix**: four specs; and the script exists and preserves the plain-Node invocation, which is the
-  point `AGENTS.md:148-153` actually makes.
+  point `CLAUDE.md:148-153` actually makes.
 
 ### F35 — the script table omits three scripts
 
@@ -654,9 +654,9 @@ not "stale" but **wrong**: they state engine behaviour the opposite of what ship
 
 ---
 
-## 4. Findings — `AGENTS.md`
+## 4. Findings — `CLAUDE.md`
 
-`AGENTS.md` came out of this sweep in the best shape of the five. Its Docker, ClickHouse, SQLite and
+`CLAUDE.md` came out of this sweep in the best shape of the five. Its Docker, ClickHouse, SQLite and
 Wails/Go sections were re-read line by line against the tree and are accurate; see §5.3.
 
 ### F37 — the p19 Known-open-item understates what is staged
@@ -886,14 +886,14 @@ scale.
 
 | | Decision | Why |
 |---|---|---|
-| **D1** | **Every fix is in place, in the doc's own voice and structure.** No new top-level sections anywhere except `docs/PERF.md` §2.12 (D4). | Five files, ~50 findings; a restructure would make the diff unreviewable and would fight `AGENTS.md:91-103`'s prune-don't-append rule. |
+| **D1** | **Every fix is in place, in the doc's own voice and structure.** No new top-level sections anywhere except `docs/PERF.md` §2.12 (D4). | Five files, ~50 findings; a restructure would make the diff unreviewable and would fight `CLAUDE.md:91-103`'s prune-don't-append rule. |
 | **D2** | **`docs/v1.1/SPEC.md` and `docs/v1/SPEC.md` are not touched. `docs/v1/README.md` is.** | Both READMEs freeze the SPECs and the plans. A README is the folder's explainer, and F48 is a statement about *where the live ledger is* — precisely the thing a README owes a reader. |
-| **D3** | **No `.github/workflows/*` edit.** F11/F12 are fixed by correcting prose about those files. | No `workflow` OAuth scope (`AGENTS.md:107-110`); the staged sets and their `git mv` instructions already exist and are correct. |
+| **D3** | **No `.github/workflows/*` edit.** F11/F12 are fixed by correcting prose about those files. | No `workflow` OAuth scope (`CLAUDE.md:107-110`); the staged sets and their `git mv` instructions already exist and are correct. |
 | **D4** | **`docs/PERF.md` §2.11 is not edited. A new §2.12 records the P21 re-measurement.** | A measurement stanza is a dated record (§0.4 rule 2). §2.6 → §2.7 → §2.8 established this exact pattern in this exact file. |
 | **D5** | **New capability prose goes where the file's own structure already puts that kind of fact** — P17 and P9 into `docs/ARCHITECTURE.md`'s "UI architecture", P16 into its "Testing", never into a new "v1.1 features" section. | That file is organised by subsystem so a future session can look something up (`:3-8`). A phase-shaped section would defeat it, and would age the same way `docs/PACKAGING.md`'s did. |
 | **D6** | **`README.md` gets one line per feature, no rationale.** Depth lives in `docs/ARCHITECTURE.md`. | It is the product README; `README.md:231-233` already delegates. |
 | **D7** | **The three linked READMEs (F49-F51) get one-line corrections only.** | They are in scope because `README.md`'s Documentation section links them, not because they are drifting broadly. Each has exactly one wrong claim. |
-| **D8** | **Cite the Taskfile task, not the binding flag list, in all three places it appears** (F4/F19/F39). | The same string has now gone stale in `docs/PACKAGING.md`, `docs/ARCHITECTURE.md` and `AGENTS.md` simultaneously. One authority (`common:generate:bindings`) cannot drift three ways. `AGENTS.md` already recommends this; the other two should follow it. |
+| **D8** | **Cite the Taskfile task, not the binding flag list, in all three places it appears** (F4/F19/F39). | The same string has now gone stale in `docs/PACKAGING.md`, `docs/ARCHITECTURE.md` and `CLAUDE.md` simultaneously. One authority (`common:generate:bindings`) cannot drift three ways. `CLAUDE.md` already recommends this; the other two should follow it. |
 | **D9** | **Where two standing docs disagree, make them agree by pointing one at the other** rather than duplicating the fact. F36 (dev loop), F29 (prefetch), F27/F28/F15 (driver + cancel facts) all become: `docs/ARCHITECTURE.md` states it, `README.md` summarises and links. | It is how the drift happened. Two copies of a fact drift; one copy plus a link does not. |
 | **D10** | **Do not fix `cmd/g1measure` to report footprint.** Record the RSS-vs-footprint divergence in `docs/PERF.md` (F43) and hand the code question to §10. | §0.3: this phase changes docs. Changing the gate-G1 instrument would also invalidate §2.3/§2.4's comparability, which is a real decision needing its own phase. |
 
@@ -932,7 +932,7 @@ touches `docs/PACKAGING.md:63-65` — land that half here, in the same commit, s
 together.
 
 ### C6 — `docs(agents): widen the conformance-suite glob and note P20's revision of the staged workflows`
-**File:** `AGENTS.md`. **Findings:** F37-F39. Nothing else in the file is touched (F40).
+**File:** `CLAUDE.md`. **Findings:** F37-F39. Nothing else in the file is touched (F40).
 
 ### C7 — `docs: fix the three stale paths in the linked READMEs`
 **Files:** `scripts/demo-dbs/README.md`, `docs/design/kira-design-system/README.md`,
@@ -951,8 +951,8 @@ Small enough to be one commit; keep it separate from C5 so the product README's 
 | `tests/ui` count (F17) | `npx playwright test --config=apps/kira-studio/playwright.config.ts --project=ui --list` | `Total: 72 tests in 25 files` |
 | `e2e-real` count (F18) | `… --project=e2e-real --list` | `Total: 6 tests in 4 files` |
 | verify-packaging skip lines (F10) | `sh scripts/verify-packaging.sh` | the two `skipped A1/A3/A5/N2` / `skipped A4/N3` notes, then `all checks passed` |
-| No deleted script survives in prose | `grep -rn "install-deps.sh\|wails-dev-setup.sh\|codesign:skip\|build:docker" README.md AGENTS.md docs/ARCHITECTURE.md docs/PACKAGING.md docs/PERF.md` | zero hits (`docs/v1*/plans/**` is frozen history and will still match — exclude it) |
-| No `cd shell` / `shell/` path survives | `grep -rn "cd shell\|\`shell/" README.md AGENTS.md docs/*.md` | zero hits |
+| No deleted script survives in prose | `grep -rn "install-deps.sh\|wails-dev-setup.sh\|codesign:skip\|build:docker" README.md CLAUDE.md docs/ARCHITECTURE.md docs/PACKAGING.md docs/PERF.md` | zero hits (`docs/v1*/plans/**` is frozen history and will still match — exclude it) |
+| No `cd shell` / `shell/` path survives | `grep -rn "cd shell\|\`shell/" README.md CLAUDE.md docs/*.md` | zero hits |
 | No superseded version survives | `grep -rn "1\.25\.0\|beta\.15" docs/PACKAGING.md docs/ARCHITECTURE.md README.md` | zero hits |
 | Formatting | `bun run lint` | clean |
 
@@ -990,7 +990,7 @@ that is right:
   table, Zod claim, and Playwright parallelism — all verified (F25).
 - `docs/PERF.md`'s §2.11 bundle figures — re-measured, current (F46). Its Green Tea caveat, widened
   by P12 round 2, is accurate and complete.
-- `AGENTS.md`'s Docker, `tests/ipc/`, ClickHouse, SQLite and Wails/Go sections (F40).
+- `CLAUDE.md`'s Docker, `tests/ipc/`, ClickHouse, SQLite and Wails/Go sections (F40).
 - `README.md`'s Requirements (Go 1.27+, the `go.mod`-read `wails3` pin) — P20 already fixed this;
   `README.md:101` is correct.
 - `README.md`'s Install section and top-level layout block — the `.dmg`/`.app` paths, `bun run
@@ -1023,7 +1023,7 @@ that is right:
       Settings bullet matches `model/settings.go`; the five v1.1 capabilities each have a bullet;
       ⌘N / ⇧⌘N / ⇧⌥F are listed; "multiple windows" is out of the not-shipped list; the script table
       gains `test:e2e-real`, `test:compat` and `generate:wire`.
-- [ ] `AGENTS.md`'s conformance glob covers every adapter package; the p19 Known-open item names
+- [ ] `CLAUDE.md`'s conformance glob covers every adapter package; the p19 Known-open item names
       P20's revision; both Known-open items are still genuinely open (verified by diff); nothing else
       in the file changed.
 - [ ] The three linked READMEs each have their one stale claim corrected.
@@ -1050,9 +1050,9 @@ that is right:
    the same session.
 4. **Two CI workflow bumps remain staged** (F12, F37). Nothing in P21 changes that; a session whose
    push credential carries the `workflow` scope should apply both per their own READMEs and then
-   delete both `AGENTS.md` Known-open bullets.
+   delete both `CLAUDE.md` Known-open bullets.
 5. **Observation, not a finding: `docs/v1.1/plans/` has no plan doc for P2, P10, or either P12
-   iteration** — P12's SPEC row and `AGENTS.md:29-39` both call for one file per pass. Not P21's to
+   iteration** — P12's SPEC row and `CLAUDE.md:29-39` both call for one file per pass. Not P21's to
    fix (a plan doc is written before its phase, and those phases are done), and nothing in the
    standing docs is wrong because of it — recorded here because a reader counting plan files against
    the phasing table will notice the gap and should know it is known.

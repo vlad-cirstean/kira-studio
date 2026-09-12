@@ -104,7 +104,7 @@ its statements matter here and all three survive:
 - **Any wire-format change.** Requests stay JSON, responses stay FlatBuffers (P11 D3/D5). C7's
   buffer-copy fix is a *decode-side* change; not one byte on the wire moves.
 - **`.github/workflows/*.yml`** — same `workflow`-scope constraint P1 D10, P3 D15, P4 §0.3 and P11
-  record, and `AGENTS.md`'s one Known-open-item.
+  record, and `CLAUDE.md`'s one Known-open-item.
 - **Editing P4's or P11's plan docs.** `docs/v1.1/README.md`: plans are never retro-edited.
   `docs/ARCHITECTURE.md` and `docs/PERF.md` are what get repointed.
 
@@ -114,7 +114,7 @@ its statements matter here and all three survive:
   number measured here.** No generic advice.
 - **Nothing lands without a before/after from C1's probe**, or a stated reason the probe cannot see
   it (bundle size is the one such case; it has its own `du`/build-output measurement).
-- `AGENTS.md`'s standing rules: no stubs, no `TODO`, no half-implemented scope. Comments only where
+- `CLAUDE.md`'s standing rules: no stubs, no `TODO`, no half-implemented scope. Comments only where
   the code cannot say it itself. **Unit tests only for genuinely complex logic** — of everything
   below, exactly one change clears that bar (C4's cap interacting with the priority-window pass),
   and it is named explicitly.
@@ -466,7 +466,7 @@ Stated explicitly so a later pass does not re-derive them. Each was read, not as
 | **D8** | **Split the CodeMirror editor stack into its own async chunk**, behind `defineAsyncComponent` at `editor/CodeMirrorHost.vue`'s consumers — **only if C8's measurement shows a boot-heap win**; otherwise land nothing and record the number. | F3: 407 469 bytes, 38.9% of a single un-split chunk, parsed at boot whether or not an editor is ever mounted. But `AutocompleteField.vue` (the grid's filter box) and `OperationsPanel.vue` both mount it, so the deferral may end at the first tab open rather than at boot — which is a measurement, not a guess. This is the one step in the plan gated on its own measurement, and it is last for that reason. |
 | **D9** | **Do not change `sessionQueueBytes`/`sessionQueueFrames` without a high-water measurement** (P4 OQ-3). Instrument `Session.queuedBytes`' peak under a worst case, record it, and change the constant only if the peak justifies it. | P4 D8 declined it for want of a measurement and handed it here. `session.go:28-45`'s 32 MiB budget sits in front of Wails' own 8 MiB one, so the difference is retained Go bytes — but `sessionMaxInFlightOps` and the renderer's own drain rate may mean the queue never holds more than a frame or two, in which case the constant is a ceiling nothing approaches and changing it buys nothing real. |
 | **D10** | **Do not evict a cold tab's page, do not add a renderer-side byte budget with eviction, and do not touch `internal/enginecache`.** | §0.1: L-B/D21 was answered *no* twice on a stated interaction-budget trade, and nothing measured here changes that trade. Every fix above frees memory **nothing is reading**; a byte budget with eviction would free memory something is about to read, which is the thing that was declined. |
-| **D11** | **Record the numbers in `docs/PERF.md` §2.9 and repoint `docs/ARCHITECTURE.md`'s Caching and UI-architecture sections** where D2/D3/D7 change a fact those files state. Do not rewrite §2.2 or §2.4. | `AGENTS.md`: app facts live in `docs/ARCHITECTURE.md`; `docs/PERF.md` is the living measurement record and §2.6/§2.7 are the standing precedent for a before/after section. §2.2/§2.4 measure a different thing (total RSS) and stay as they are. |
+| **D11** | **Record the numbers in `docs/PERF.md` §2.9 and repoint `docs/ARCHITECTURE.md`'s Caching and UI-architecture sections** where D2/D3/D7 change a fact those files state. Do not rewrite §2.2 or §2.4. | `CLAUDE.md`: app facts live in `docs/ARCHITECTURE.md`; `docs/PERF.md` is the living measurement record and §2.6/§2.7 are the standing precedent for a before/after section. §2.2/§2.4 measure a different thing (total RSS) and stay as they are. |
 
 ---
 
@@ -563,7 +563,7 @@ back must show it still expanded (add this to the document scenario if it is not
    when capped. Prev/next and the filter toggle operate over the retained set.
 4. `matchedRowsOf` and `createMatchIndex` need no change — they read whatever array they are given.
 
-**This is the one change in the plan that earns a unit test** (`AGENTS.md`'s bar: "cursor/pagination
+**This is the one change in the plan that earns a unit test** (`CLAUDE.md`'s bar: "cursor/pagination
 arithmetic with real boundary cases" — here, a cap interacting with a two-pass scanner whose second
 pass rebuilds from row 0 and whose contract is that the final array is strictly ascending). One
 `tests/unit/` spec over `runChunkedScan` covering: cap reached inside the priority window; cap
@@ -614,7 +614,7 @@ only when `r.pagesLength() > 1`, copy each decoded chunk's four buffers into the
 (`.slice()`) so each page owns its bytes. `ReadResponse` (`:267-277`) is untouched.
 
 Keep the copy in one small helper next to `decodeChunk` (`:31-40`) with a one-line comment naming
-*why* — this is precisely the case `AGENTS.md` says a comment is for, because the code cannot say
+*why* — this is precisely the case `CLAUDE.md` says a comment is for, because the code cannot say
 "the alternative pins the whole frame."
 
 **Verify:** `console.spec.ts` (multi-statement `Run all`) green; C1's probe shows the distinct

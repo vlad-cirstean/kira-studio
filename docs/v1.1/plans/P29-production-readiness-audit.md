@@ -60,7 +60,7 @@
 
 ## 1. What was actually searched — including what turned up nothing
 
-`AGENTS.md`'s multiple-passes rule says a pass that finds nothing real should say so rather than
+`CLAUDE.md`'s multiple-passes rule says a pass that finds nothing real should say so rather than
 manufacture a finding. Most of this table is that sentence, per search.
 
 | Search | Where | Result |
@@ -73,7 +73,7 @@ manufacture a finding. Most of this table is that sentence, per search.
 | `os.Getenv` / `os.LookupEnv` | non-test Go | 5: `KIRA_HOME` (`config/paths.go:12`), `KIRA_DEV` (`config/env.go:14`), `KIRA_INSECURE_SECRETS` (`secrets/cipher.go:40`), `KIRA_G1_BLANK` (`main.go:361`), `KIRA_IPC_FIXTURES` (`ipcfixture/write.go:17`, test-only package). Each is adjudicated individually — §2.2, §2.4, §2.5, §4. |
 | `localhost` / `127.0.0.1` / `0.0.0.0` / `http://` / `ws://` | `frontend/src` | 0 |
 | `localhost` / `127.0.0.1` | non-test Go | 4, all *default host values for a user-entered connection form* (`mongo/client.go:81`, `kafka/client.go:54`, `redis/client.go:70`, `mysqlfamily/client.go:56`). Not dev endpoints. |
-| `//go:build` tags | all Go | 13, all `darwin`/`cgo`/platform splits. **No repo-owned `server` tag exists** — `-tags server` (`AGENTS.md`, `tests/e2e-real/fixtures.ts:68`) selects *Wails'* own headless platform, so there is no repo source that a `server` build turns on. §4. |
+| `//go:build` tags | all Go | 13, all `darwin`/`cgo`/platform splits. **No repo-owned `server` tag exists** — `-tags server` (`CLAUDE.md`, `tests/e2e-real/fixtures.ts:68`) selects *Wails'* own headless platform, so there is no repo source that a `server` build turns on. §4. |
 | `innerHTML` / `eval(` / `new Function` | `frontend/src` | 0. `SlickGridHost.vue:1742` records that the `innerHTML` branch was deliberately removed because cell text is untrusted database content. |
 | `test.only` / `describe.only` / `it.only` | `tests/**` | 0. Every `test.skip` (5) and `t.Skip` (17) is environment-conditional (Docker absent, `KIRA_TEST_MATRIX` unset, no outbound network) with a message naming the condition. |
 | tracked build artefacts | `git ls-files` | 0 binaries, 0 `.dmg`/`.app`/`.log`. Largest tracked files are the app icons and plan docs. `dist`, `test-results/`, `playwright-report/`, `.tools/` all gitignored. |
@@ -141,7 +141,7 @@ document less trustworthy:
 
 What it is **not**: it is not a bundle-size problem worth measuring. `scrollTrace.ts` is 368 lines,
 `main.ts`'s probe block ~180; minified and gzipped this is single-digit kilobytes inside a binary
-that already embeds a WebKit-driven desktop app. Per `AGENTS.md`'s measure-with-purpose rule, a
+that already embeds a WebKit-driven desktop app. Per `CLAUDE.md`'s measure-with-purpose rule, a
 byte-for-byte bundle comparison is **not** taken here, because the decision does not turn on it —
 saying so plainly is better than producing a number nobody acts on.
 
@@ -244,7 +244,7 @@ unused:
 
 - It is **already bit-rotted**. `blank/index.html`'s comment describes measuring *"Wails +
   WKWebView/WebKitGTK + Go + the vendored Node child"* — the Node child was deleted in P58f. And
-  it calls `Call.ByID(3273072800)` with a hand-copied bound-method id, while `AGENTS.md` records
+  it calls `Call.ByID(3273072800)` with a hand-copied bound-method id, while `CLAUDE.md` records
   that bindings are generated with `-names`, i.e. every real call site emits `Call.ByName(...)`.
   Whether that numeric id still resolves has not been true-by-construction since the generator flag
   changed. It could not be trusted for a measurement today without repair.
@@ -351,14 +351,14 @@ be wrong about the other, and wrong in the unsafe direction.
 
 **Severity: low, and honestly so.** The product ships macOS only, and `probe`'s `darwin` branch
 (`cipher.go:125-130`) never consults `insecureEnv` at all — so on the shipped platform this
-variable is structurally inert, which `AGENTS.md` already states and
+variable is structurally inert, which `CLAUDE.md` already states and
 `tests/ui/secrets.spec.ts`'s "keychain available" scenario already guards. This is a
 consistency fix on a developer-facing path, not a shipped vulnerability, and should be described
 that way rather than dressed up.
 
 **The fix.** One line: `if insecureEnv != "" && insecureEnv != "0" && insecureEnv != "false"`.
 `internal/secrets/cipher_test.go` has **no** test for `probe` today — it calls it only as a helper
-to build a cipher (`cipher_test.go:19`). This is one of the few places `AGENTS.md`'s unit-test bar
+to build a cipher (`cipher_test.go:19`). This is one of the few places `CLAUDE.md`'s unit-test bar
 is met on its own terms (a decision table whose *unsafe* branch is the one being changed), so add a
 small table test over `probe`'s three `goos` branches and the `""`/`"0"`/`"false"`/`"1"` inputs.
 
@@ -384,7 +384,7 @@ that echoes its input is the realistic shape). Listing this as a confirmed leak 
 manufacturing a finding; listing it as an unverified invariant on a path that writes to disk for 30
 days is accurate.
 
-**The fix — verify first, and get the verification nearly for free.** `AGENTS.md` exempts the
+**The fix — verify first, and get the verification nearly for free.** `CLAUDE.md` exempts the
 adapter conformance suites from the unit-test bar and says to extend the complete suite's own
 harness rather than build a parallel mechanism. That harness is
 `internal/adapters/testsupport/matrix.go`'s `RunMatrix`, it already receives the resolved `cfg`,
@@ -488,7 +488,7 @@ comments carry real reasoning that must survive. **The fix is a referent rewrite
 change *"mirrors `DataGrid.vue`'s own `rowAtDisplayPosition`"* to name `SlickGridHost.vue` /
 `views/grid/slick/dataSource.ts` where the logic actually lives now, and where the referent is
 genuinely historical (*"the incumbent tanstack grid had no equivalent hazard"*) mark it as history
-rather than pretending it is current. Per `AGENTS.md`'s comments rule, any comment that only
+rather than pretending it is current. Per `CLAUDE.md`'s comments rule, any comment that only
 restates what the code shows gets deleted instead of rewritten.
 
 This is the lowest-priority item in the phase and should be the last commit, so that abandoning it
@@ -507,7 +507,7 @@ the deliverable; a bare "fine" is not one.
 | `scrollTrace.ts`'s hot-path `note*` calls | `scrollTrace.ts:189/198/214/226/244`, called from `SlickGridHost.vue:616` and `kiraSlickGrid.ts:332/483` | Every one returns immediately on `if (!recording) return`. The residual cost in a production build is one boolean load per scroll event — correctly gated already, and gating it further would need the define in more TS programs (§2.1) for no measurable gain. |
 | `scrollTrace.stop()`'s clipboard write | `scrollTrace.ts:359-364` | Only reachable after an explicit `start()`, wrapped in `try/catch` with a `.catch(() => {})`, and documented as the way to get JSON out of a build whose inspector will not attach. It cannot fire unasked. |
 | `console.warn` at `scrollTrace.ts:352` | same | The only `console.*` in the frontend. It is the operator-facing error message of an interactive tool, in a module that only exists in dev/test builds after §2.1. Removing it would make `stop()` fail silently. |
-| `//go:build server` (`-tags server`) | Wails-owned; used by `tests/e2e-real/fixtures.ts:68`, `playwright.config.ts:40` | **No repo source is gated on it** — verified: the tag appears in this repo only in comments and build invocations. It selects Wails' own headless platform, is opt-in at *compile* time, and the packaging path passes `-tags production` and never `server`. It is also the only way to get a real bound-call surface under test in a sandbox with no display (`AGENTS.md`). A packaged build cannot be talked into it. |
+| `//go:build server` (`-tags server`) | Wails-owned; used by `tests/e2e-real/fixtures.ts:68`, `playwright.config.ts:40` | **No repo source is gated on it** — verified: the tag appears in this repo only in comments and build invocations. It selects Wails' own headless platform, is opt-in at *compile* time, and the packaging path passes `-tags production` and never `server`. It is also the only way to get a real bound-call surface under test in a sandbox with no display (`CLAUDE.md`). A packaged build cannot be talked into it. |
 | `KIRA_INSECURE_SECRETS` | `secrets/cipher.go:40/131` | `probe`'s `darwin` branch (`cipher.go:125-130`) never reads it — on the only platform this app ships on, the variable is structurally inert, so even a machine with it globally exported cannot weaken the Keychain. Without it on Linux, secret storage is *unavailable* and a password-bearing save fails visibly rather than silently degrading. That is the correct posture. (§2.5 fixes only the `"0"` parsing.) |
 | `KIRA_HOME` | `config/paths.go:11-14` | A user-facing data-directory override, not a dev flag; every Go test and both Playwright real-backend fixtures depend on it for isolation, and `tests/e2e-real/fixtures.ts:130-133` refuses to run unless it points under the OS tmpdir. Redirecting your own app's data directory grants no authority you did not already have. |
 | `KIRA_IPC_FIXTURES`, `KIRA_TEST_MATRIX`, `KIRA_COMPAT_IMAGE_*` | `ipcfixture/write.go:17`, `testsupport/matrix.go:23`, `testsupport/images.go:14` | All three live in packages **no non-test file imports** (verified). They cannot be read by the app because their code is not in the app. |
@@ -516,7 +516,7 @@ the deliverable; a bare "fine" is not one.
 | `debug.Stack()` on adapter/data-frame panic | `adapterhost/host.go:176`, `adapterhost/dataframe.go:73` | The recover boundary that turns a driver panic into a failed op instead of a dead app. A goroutine stack in the app log is the diagnostic that makes such a crash actionable; it carries function names and file paths, not connection state. |
 | `settleWindow` / `killGrace` as package `var`s | `preconnect/supervisor.go:39-45` | Lowered by `supervisor_internal_test.go` so two tests do not each cost 2s. Documented as deliberate (P55 §2 D9, following P54 D10), unexported, and unreachable from any shipped path — a test seam, not a runtime knob. |
 | `InsecureSkipVerify: true` for `sslmode=require`/`prefer` | `postgres/client.go:81`, `mysqlfamily/client.go:104`, `redis/client.go:80`, `mongo/client.go:50` | This is **libpq's actual semantics**, not a weakened check: `require` means "encrypt, do not verify"; `verify-full` is the mode that verifies, and all four adapters implement it with a real verifying `tls.Config` (`postgres/client.go:83` sets `ServerName`). Each site carries a `//nolint:gosec` with the reason. Every adapter also *fails loudly* on an unrecognised `sslmode` rather than falling back to plaintext (`postgres/client.go:85-89` and siblings) — the genuinely dangerous behaviour, correctly avoided. `redis/client_test.go:52-56` already regression-guards `verify-full`. |
-| 462 `data-testid` attributes across 68 components | `frontend/src/**` | They ship, and they should. Stripping them needs a compiler plugin (a new dependency, `AGENTS.md`'s library bar applies) and would change the DOM that `tests/ui` — which runs the production build — asserts against, trading a real regression risk for zero security benefit and a few kilobytes. `tests/ui/support/mockRuntime.ts`'s whole request-interception layer is keyed on this markup. |
+| 462 `data-testid` attributes across 68 components | `frontend/src/**` | They ship, and they should. Stripping them needs a compiler plugin (a new dependency, `CLAUDE.md`'s library bar applies) and would change the DOM that `tests/ui` — which runs the production build — asserts against, trading a real regression risk for zero security benefit and a few kilobytes. `tests/ui/support/mockRuntime.ts`'s whole request-interception layer is keyed on this markup. |
 | `log.Fatalf` × 8 in `main.go` | `main.go:75-108`, `:342-356` | Each is a startup step with no possible recovery and no window to report into yet (`EnsureLayout`, `logging.Init`, `storage.Open`, repo construction, settings read, window list/create, `app.Run`). Failing loudly with a named cause beats a half-initialised app. |
 | The app log's content | ~40 `slog` sites across `internal/` | Every one was read. They log ids, counts, scopes, durations, error *kinds* and driver error text — never a password, never a full DSN, never a settings value. Retention is bounded (`logging/sweep.go`, fixed 30 days by mtime, deliberately *not* the user's op-log setting), files are `0600` in a `0700` directory (`logging/log.go:43/60`). §2.6 is the one open question about that content, and it is about adapter error strings, not about these call sites. |
 | `wails3 dev` port `9245`, `WAILS_VITE_PORT` | `vite.config.ts:13-19`, `Taskfile.yml` | Dev-server config in build files, bound to `127.0.0.1`, never read by shipped code. |
@@ -525,7 +525,7 @@ the deliverable; a bare "fine" is not one.
 
 ## 5. Implementation order
 
-One phase, sequential, one commit per item — `AGENTS.md`'s conventional-commit format. Fast checks
+One phase, sequential, one commit per item — `CLAUDE.md`'s conventional-commit format. Fast checks
 (`bun run lint`, `bun run typecheck`, `go build ./apps/kira-studio/internal/...`) per commit; the
 expensive suites once at the end (§6).
 
@@ -533,7 +533,7 @@ expensive suites once at the end (§6).
 |---|---|---|
 | **C1** | `chore(shell): delete the P52 gate-G1 blank-page scaffold` (§2.2) | delete `apps/kira-studio/blank/`; `main.go` (drop `//go:embed blank/index.html`, `blankAssets`, the `KIRA_G1_BLANK` branch, `assetHandler()` itself, and the `io/fs`+`os` imports); `apps/kira-studio/README.md:26-27`; one note in `docs/PERF.md` §2.3 |
 | **C2** | `fix(bridge): report the Wails version from build info, not a stale literal` (§2.3) | `internal/bridge/app.go` |
-| **C3** | `refactor(config): derive dev mode from the production build tag` (§2.4) | new `internal/config/prod.go`, `internal/config/prod_default.go`; `internal/config/env.go` (delete the `os.Executable` heuristic and the fail-open branch). `internal/config/` has no test file today; a two-line `IsDev()` needs none under `AGENTS.md`'s bar |
+| **C3** | `refactor(config): derive dev mode from the production build tag` (§2.4) | new `internal/config/prod.go`, `internal/config/prod_default.go`; `internal/config/env.go` (delete the `os.Executable` heuristic and the fail-open branch). `internal/config/` has no test file today; a two-line `IsDev()` needs none under `CLAUDE.md`'s bar |
 | **C4** | `fix(secrets): treat KIRA_INSECURE_SECRETS=0/false as off` (§2.5) | `internal/secrets/cipher.go:132`; a new `probe` table test in `internal/secrets/cipher_test.go` |
 | **C5** | `test(adapters): assert a failed connect never echoes the password` (§2.6) | `internal/adapters/testsupport/matrix.go` (`RunMatrix`'s failure branch, plus a URI-mode password extraction helper) |
 | **C6** | `build(frontend): gate the Playwright debug hooks behind a build-time flag` (§2.1) | `frontend/vite.config.ts` (function form + `define`); `frontend/src/env.d.ts`; `frontend/src/main.ts:225-268`; `frontend/package.json`; root `package.json`; `apps/kira-studio/tests/e2e-real/fixtures.ts:65` |
@@ -551,9 +551,9 @@ are gated. C9 is last and is the one item that can be dropped without consequenc
 ## 6. Verification plan
 
 1. **Per commit** — `bun run lint`, `bun run typecheck`, `go build ./apps/kira-studio/internal/...`
-   (cgo-free, fast — `AGENTS.md`).
+   (cgo-free, fast — `CLAUDE.md`).
 2. **After C5** — `KIRA_TEST_MATRIX=1 sh scripts/test-matrix.sh` against real containers (pulled
-   via `mirror.gcr.io` per `AGENTS.md`). This is the run that answers §2.6. Record the verdict in
+   via `mirror.gcr.io` per `CLAUDE.md`). This is the run that answers §2.6. Record the verdict in
    this document's own §2.6 as "verified clean" or as a named adapter failure — the phase is not
    complete with the question open.
 3. **After C6** — `bun run test:ui` and `bun run test:ipc:fe` must pass **unchanged**. Every spec in
@@ -572,7 +572,7 @@ are gated. C9 is last and is the one item that can be dropped without consequenc
 6. **On real macOS hardware, once, at the end** — build and package (`bun run package`), confirm
    the app launches, and confirm from the packaged app's own webview that `window.__kiraCount` is
    `undefined` while the app is fully functional. This is the only claim in the phase that a sandbox
-   cannot settle: `AGENTS.md` records that `/wails/runtime` is unreachable over plain HTTP from a
+   cannot settle: `CLAUDE.md` records that `/wails/runtime` is unreachable over plain HTTP from a
    desktop build on Linux. Also confirm, in a `wails3 task dev` build, that
    `__kiraScrollTrace.start()` still works from View → Open DevTools — the property §4 justifies
    keeping.
@@ -587,7 +587,7 @@ are gated. C9 is last and is the one item that can be dropped without consequenc
   `scroll-trace.spec.ts` and half of `slick-grid.spec.ts` with them.
 - **It does not build a log/error redactor.** §2.6 verifies first. Building a scrubbing layer with
   no evidence any driver echoes a credential would be exactly the speculative infrastructure
-  `AGENTS.md` warns against, and it would add a silent failure mode (a redactor that mangles a
+  `CLAUDE.md` warns against, and it would add a silent failure mode (a redactor that mangles a
   legitimate error) in exchange for a hypothetical.
 - **It does not strip `data-testid`.** §4 gives the reasoning: new dependency, real regression risk
   against a suite that runs the production build, no security benefit.
@@ -607,7 +607,7 @@ are gated. C9 is last and is the one item that can be dropped without consequenc
 
 Read in full for this plan, at `f4a81d6`:
 
-- `AGENTS.md` (process rules, and the `KIRA_INSECURE_SECRETS` / `-tags server` / bindings sections)
+- `CLAUDE.md` (process rules, and the `KIRA_INSECURE_SECRETS` / `-tags server` / bindings sections)
 - `apps/kira-studio/main.go`, `apps/kira-studio/README.md`, `apps/kira-studio/blank/index.html`
 - `apps/kira-studio/internal/config/{env,paths}.go`, `internal/logging/{log,sweep}.go`,
   `internal/secrets/cipher.go`, `internal/shell/{security,menutemplate}.go`,

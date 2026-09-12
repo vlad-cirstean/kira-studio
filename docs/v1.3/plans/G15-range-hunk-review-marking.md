@@ -152,7 +152,7 @@ feature cannot avoid:
 ### 0.4 Ground rules
 
 - Every decision in §2 cites a finding; every finding in §1 cites something read or **run** here.
-- `AGENTS.md` applies in full: **no stubbed error handling, no `TODO: fix later`, no skipped
+- `CLAUDE.md` applies in full: **no stubbed error handling, no `TODO: fix later`, no skipped
   validation.** Scope left out is left out entirely.
 - **Layering:** `proxyHandlers.ts` and `goToFile.ts` never import `vscode` (their own doc comments
   say why). D11 keeps that true: the new controller is `vscode`-facing and reaches
@@ -162,7 +162,7 @@ feature cannot avoid:
 - **No shell, no subprocess.** This phase spawns nothing.
 - **Comments: very concise, only where the code cannot say it for itself.** The two that earn their
   keep are named in §4.
-- **Tests only where `AGENTS.md`'s bar is met.** D10 argues the one new test file against the bar by
+- **Tests only where `CLAUDE.md`'s bar is met.** D10 argues the one new test file against the bar by
   name, and says explicitly what gets nothing.
 - Commits are Conventional Commits, granular, landing as work completes.
 
@@ -231,7 +231,7 @@ is a hard, named rejection at manifest-parse time (`menusExtensionPoint.ts:1086`
 with `code --install-extension <path>` (G10). Proposed APIs are available to an extension running
 out of a development host or launched behind `--enable-proposed-api`, neither of which describes a
 user who installed the extension and opened VS Code normally. Requiring a per-launch CLI flag to
-make a review feature appear is not shippable, and `AGENTS.md`'s "no shortcuts / scope left out is
+make a review feature appear is not shippable, and `CLAUDE.md`'s "no shortcuts / scope left out is
 left out entirely" forbids half-shipping it behind a flag and calling it done.
 
 `diffEditor.renderGutterMenu` itself defaults to **`true`**, so the gutter strip *is* on screen for
@@ -481,7 +481,7 @@ hunk reviewed' / 'mark this hunk unreviewed', with already-reviewed hunks visibl
 **Rejected: enable the proposed APIs anyway.** `enabledApiProposals` in our manifest plus
 `--enable-proposed-api vladcirstean.kira-studio-vscode` on every VS Code launch. It would give a
 pixel-perfect copy of the built-in gutter. It is rejected because a feature that only exists when the
-user launches their editor from a terminal with a flag is not shipped, and `AGENTS.md` forbids
+user launches their editor from a terminal with a flag is not shipped, and `CLAUDE.md` forbids
 half-implementing scope. It is also fragile: proposed APIs change without notice between releases,
 and SPEC §3.4's hard-lockstep posture is about *removing* version guesswork, not adding a second axis
 of it.
@@ -495,7 +495,7 @@ so the approximation never has to be exact.
 
 The new controller's doc comment states F2/F3/F4 in three sentences, with the proposal names, so the
 next reader does not re-derive this investigation. That comment is one of the two in this phase that
-earn their keep under `AGENTS.md`'s bar.
+earn their keep under `CLAUDE.md`'s bar.
 
 ### D2 — Three routes to two commands: selection (exact, primary), hunk hover (the gutter stand-in), CodeLens (inline, opt-in)
 
@@ -793,7 +793,7 @@ the sidebar occasionally behind.
 
 ### D10 — Exactly one new test file, and what deliberately gets none
 
-`AGENTS.md`'s bar: a test earns its keep only for "a parser/splitter with several interacting rules,
+`CLAUDE.md`'s bar: a test earns its keep only for "a parser/splitter with several interacting rules,
 cursor/pagination boundary arithmetic, … or a decision structure too large to hold in your head."
 
 **`reviewRanges.test.ts` clears it, and is the only new test.** `normalizeRanges`/`unionRanges`/

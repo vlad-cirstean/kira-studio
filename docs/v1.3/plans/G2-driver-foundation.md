@@ -132,18 +132,18 @@ Everything in §9's table, but the ones most likely to be mistaken for G2 work:
 ### 0.4 Ground rules
 
 - Every decision in §2 cites a finding; every finding in §1 cites something read or run here.
-- `AGENTS.md` applies in full: **no stubbed error handling, no `TODO: fix later`, no skipped
+- `CLAUDE.md` applies in full: **no stubbed error handling, no `TODO: fix later`, no skipped
   validation.** Scope left out of this phase is left out *entirely*. This is why `Spec` grows no
   `Stdin`/`Env` fields (§10), why no capability cache is added (D16), and why the `Stream` emitter
   stays G3's.
 - **Comments very concise, only where the code cannot say it itself.**
-- **Tests only where `AGENTS.md`'s bar is met** — concurrency (ordering, backpressure, cancellation,
+- **Tests only where `CLAUDE.md`'s bar is met** — concurrency (ordering, backpressure, cancellation,
   races), cache/eviction rules with interacting conditions, boundary arithmetic, a decision
   structure too large to hold in your head. G2 clears that bar in exactly four places: the streaming
   runner's cancellation/kill path, the watcher's classification + debounce, the registry's
   refcount × linger × re-acquire interaction, and the subscriber fan-out's coalescing under a slow
   consumer. Nothing else gets a dedicated test.
-- **Reach for a library before hand-rolling** (`AGENTS.md`). D7 records where that rule is applied
+- **Reach for a library before hand-rolling** (`CLAUDE.md`). D7 records where that rule is applied
   (`fsnotify`) and D8/D10 record where it declines, with the requirement named.
 - Commits are Conventional Commits, granular, landing as work completes; each one compiles and its
   own tests pass (§6).
@@ -610,12 +610,12 @@ the wall is not.
 
 ### D7 — `github.com/fsnotify/fsnotify v1.10.1`, and no other new dependency
 
-`AGENTS.md`: reach for an existing, well-maintained library before hand-rolling non-trivial
+`CLAUDE.md`: reach for an existing, well-maintained library before hand-rolling non-trivial
 infrastructure. Hand-rolling `inotify`/`kqueue` bindings is squarely that, and SPEC §6 names
 `fsnotify` by name. Checks performed here:
 
 - **License**: BSD-3-Clause (`LICENSE`: "Copyright © 2012 The Go Authors … Copyright © fsnotify
-  Authors"), fully open source, no dual-licensing or gated features — `AGENTS.md`'s bar.
+  Authors"), fully open source, no dual-licensing or gated features — `CLAUDE.md`'s bar.
 - **Dependency cost**: `go.mod` requires only `golang.org/x/sys`, already indirect here at
   `go.mod:119`. No cgo. Both backends this project can hit (kqueue on darwin, inotify on linux) are
   in-tree.
@@ -638,7 +638,7 @@ SPEC §2's `gitclient` row does not list a watcher; SPEC §6 says the watcher is
 This also keeps `gitsession` free of `fsnotify` entirely, which is what lets `registry_test.go` drive
 the refcount and linger logic against a fake watcher without touching the filesystem.
 
-**No library for the debounce.** `AGENTS.md` requires naming the requirement when declining one: the
+**No library for the debounce.** `CLAUDE.md` requires naming the requirement when declining one: the
 requirement is a *leading-window* debounce (fire 200 ms after the **first** event of a burst, not
 200 ms after the last — upstream's `watcher.ts:118-137`, so a continuous `git fetch --prune` cannot
 starve the signal indefinitely) that also coalesces two independent signal kinds. That is ~25 lines
@@ -716,7 +716,7 @@ clears the window.
 
 No mutex, no injected clock: the timer is real and 200 ms, and the test asserts *"one signal arrives
 within a generous timeout after a burst of N writes"*, not *"exactly 200 ms elapsed"* — a timing
-assertion this container cannot make honestly anyway (`AGENTS.md`'s note about this container's slow
+assertion this container cannot make honestly anyway (`CLAUDE.md`'s note about this container's slow
 reaping is the same class of hazard).
 
 ### D12 — `Registry.Acquire`/release, with a 5-minute linger at refcount zero and teardown after it
@@ -773,7 +773,7 @@ type RepoEntry struct {
 }
 ```
 
-Per `AGENTS.md` ("scope left out of a phase is left out entirely"), there are no zero-valued fields
+Per `CLAUDE.md` ("scope left out of a phase is left out entirely"), there are no zero-valued fields
 standing in for later phases. SPEC §6's diagram is the destination, not a struct literal to
 transcribe.
 
@@ -856,7 +856,7 @@ Resolving F17. G2 adds nothing to `capabilities.go`.
 - **`capabilitiesForVersion`** (`mergeTreeWriteTree`/`commitGraph`/`sparseCheckout` version floors,
   `capabilities.ts:28-41`) is derived from the version discovery already resolved and is consumed
   first by **G5**'s `merge-tree --write-tree` conflict prediction. Writing it here produces three
-  booleans nothing reads, which is `AGENTS.md`'s "scope left out is left out entirely".
+  booleans nothing reads, which is `CLAUDE.md`'s "scope left out is left out entirely".
 - **The per-binary cache** is a comparison against a value already cached for 30 s
   (`discovery.go:195`). There is nothing to cache.
 - **The per-repo cache** is keyed upstream by `GitDriver.generation` (`driver.ts:194-201`), a counter
@@ -991,7 +991,7 @@ unchanged.
 
 **`runner_test.go`**: the four `buildEnv`/`buildArgv` tests are updated to the new expected slices
 (they are the reason to have them — `:10-12`'s own rationale). `TestExecRunner_Run`'s four subtests
-are kept, re-expressed over `Run`. New subtests, meeting `AGENTS.md`'s concurrency/cancellation bar
+are kept, re-expressed over `Run`. New subtests, meeting `CLAUDE.md`'s concurrency/cancellation bar
 and nothing beyond it:
 
 - **stdout streams**: `Start` a `git log --format=%H` (or, if the fixture is small, `cat-file
@@ -1101,7 +1101,7 @@ the `Emit` doc comment updated to name `gitsession`'s fan-out as its production 
 `Handlers` stays gitrpc's own two-function struct (`handlers.go:20-23`) — G1 §3.4's layering
 resolution is unchanged and still correct: `gitrpc` must not import `internal/bridge`.
 
-**No test.** Still thin dispatch over already-tested code (`AGENTS.md`'s pass-through exclusion);
+**No test.** Still thin dispatch over already-tested code (`CLAUDE.md`'s pass-through exclusion);
 the behaviour that matters is §3.9's end-to-end proof.
 
 ### 3.8 `internal/gitsock/` — edited (D19)
@@ -1155,7 +1155,7 @@ replacing `main.go:98-106`. `gitclient.NewClient` is deleted along with `Client`
 and the bound-service list is unchanged.
 
 **No bindings regeneration is needed**: `bridge.GitClientsService`'s method set does not change, and
-`AGENTS.md`'s `-names` warning applies only when it does.
+`CLAUDE.md`'s `-names` warning applies only when it does.
 
 ---
 
@@ -1194,8 +1194,8 @@ BSD-3-Clause, is cgo-free, and needs no dependency this repo does not already ha
 
 Seven commits. `go build ./apps/kira-studio/internal/...` and
 `go test ./apps/kira-studio/internal/...` run after **each** — they are fast and need nothing but
-the Go toolchain (`AGENTS.md`). `bun run lint`/`typecheck` run once at the end and must be
-unchanged (§4). The expensive tier (§7.1(d)) runs once at C7, per `AGENTS.md`'s "implement the whole
+the Go toolchain (`CLAUDE.md`). `bun run lint`/`typecheck` run once at the end and must be
+unchanged (§4). The expensive tier (§7.1(d)) runs once at C7, per `CLAUDE.md`'s "implement the whole
 plan first, then test once".
 
 - **C1** `feat(gitclient): streaming runner primitive, full env/argv hygiene, process-group kill`
@@ -1249,7 +1249,7 @@ Linux/inotify is the backend exercised here; §7.2 covers what that leaves unpro
 
 **(b) `go test ./apps/kira-studio/internal/gitsession/...` — pure Go, fake watcher, no filesystem.**
 Refcount × linger × re-acquire, `Conn` dedupe, and the subscriber fan-out's coalescing and
-slow-consumer isolation (§3.5). These are `AGENTS.md`'s named test-worthy categories — cache
+slow-consumer isolation (§3.5). These are `CLAUDE.md`'s named test-worthy categories — cache
 eviction with interacting rules, and concurrency/backpressure — and they are the phase's most
 intricate state.
 
@@ -1362,7 +1362,7 @@ here for three reasons:
    discrepancy surfaces at C6 — the one commit neither agent would own.
 2. **C6 is a single atomic swap across four packages** (§6). It cannot be parallelised at all, it is
    where every real risk in the phase lives, and it wants the whole of C1–C5 in one head.
-3. **`AGENTS.md` is explicit**: parallel subagents "only when the plan's work is genuinely
+3. **`CLAUDE.md` is explicit**: parallel subagents "only when the plan's work is genuinely
    independent (unrelated adapters, non-overlapping fixes)". A driver rewrite and the session layer
    built on top of it are the textbook case of *not* that.
 
@@ -1404,7 +1404,7 @@ them:
 ## 10. Handed forward
 
 Open items this phase found and deliberately did not close. Each belongs in the named phase's own
-plan, not in `AGENTS.md`.
+plan, not in `CLAUDE.md`.
 
 - **`Spec` has no `Stdin` and no `Env`, by design.** `cat-file --batch` needs a writable stdin
   (`catFile.ts:237-247`) and G7's askpass needs per-spawn env additions merged over the hygiene set

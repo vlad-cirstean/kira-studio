@@ -127,7 +127,7 @@ The tree as of `e63bc2c` (`test(ui): the credential reveal gate`), branch
   a feature dialog driven by its own state module and mounted in `App.vue` — is
   `workbench/UploadObjectDialog.vue` (`App.vue:18`, `:59`).
 - **Two unit tests, both earned, and no more.** The recipe decision table (D4) is the
-  "decision structure large enough that no one can hold it in their head" `AGENTS.md` names
+  "decision structure large enough that no one can hold it in their head" `CLAUDE.md` names
   outright, and the `dataType` bound parser is a small lexer with real boundary cases. Everything
   else — a dialog, a loop calling `data.mutate`, a library call — gets nothing.
 - **Comments only where the code cannot say it for itself.** Four are owed: why the faker entry
@@ -615,7 +615,7 @@ no accelerator**: P13 added `view.format` to the seven-file menu/accelerator pat
 is a keystroke-frequency editing verb; generating a thousand rows is not, and a command-palette
 entry (`shortcuts/state.ts`) is the whole of what this needs.
 
-**D12 — Two unit tests, and only two.** `AGENTS.md`'s bar names "a decision structure large enough
+**D12 — Two unit tests, and only two.** `CLAUDE.md`'s bar names "a decision structure large enough
 that no one can hold it in their head" — D4's seven-rule table with a ~25-entry name heuristic is
 that, and getting rule 2 wrong (generating a value for a `serial` PK) breaks every run on every table
 with a sequence. `parseTypeBounds` (D5) is the second: a small lexer over five per-dialect type
@@ -689,13 +689,13 @@ Nothing here imports `@faker-js/faker`: a recipe is an **id**, resolved to a cal
   `int unsigned`, `bigint`, `Nullable(FixedString(16))`, `Enum8('a' = 1, 'b,c' = 2)` (the quoted
   comma), and an unrecognised type returning empty bounds rather than throwing.
 
-A one-line comment above the file states which rule it guards, per `AGENTS.md`.
+A one-line comment above the file states which rule it guards, per `CLAUDE.md`.
 
 ### C5 — `test(postgres): a multi-row insert plan commits atomically`
 
 `apps/kira-studio/internal/adapters/postgres/postgres_test.go`, one new function beside the existing
 mutation tests (`:594-940`). This is the adapter-tier half the phase brief asks for, and it belongs
-under the conformance-suite exemption (`AGENTS.md`'s "per-capability coverage … even where it reads
+under the conformance-suite exemption (`CLAUDE.md`'s "per-capability coverage … even where it reads
 like a CRUD round-trip"), not the general unit-test bar:
 
 - Build a 200-op insert plan against `app.customers` (`0001_seed.sql:224-227` — a `serial` PK, a
@@ -708,7 +708,7 @@ like a CRUD round-trip"), not the general unit-test bar:
 
 No new test for ClickHouse's `renderInsert`: `clickhouse/mutate.go:40-68` already collapses a
 multi-op plan by construction and `clickhouse_test.go` already exercises `Mutate`; a second
-assertion of the same union-and-pad rule would be the duplication `AGENTS.md` says to prune.
+assertion of the same union-and-pad rule would be the duplication `CLAUDE.md` says to prune.
 
 ### C6 — `test(ui): the fake-data generator dialog`
 
@@ -737,7 +737,7 @@ mock already speaks (`ipc/support/types.ts:49-60`'s `LogicalPortResponse` has bo
 `postgresFixture.ts:409`), same `relaunch({control, stream})` shape, same
 `[data-testid="grid-cell"][data-row=…][data-column=…]` assertions.
 
-**No new fixture capture is needed**, which matters: `AGENTS.md` records that the one-off capture
+**No new fixture capture is needed**, which matters: `CLAUDE.md` records that the one-off capture
 tool does not exist in this tree right now, so a phase needing a fresh capture would be blocked.
 `COMPOSITE_PK_META` (`postgresFixture.ts:353-397`) already carries the full `ObjectMeta` — two
 NOT-NULL integer PK columns with `defaultExpr: null`, one nullable `text`, and a real unique PK index
@@ -829,7 +829,7 @@ go build ./apps/kira-studio/internal/... && go test ./apps/kira-studio/internal/
 `.d.ts` files and a `./locale/*` exports entry, so this should be clean on the first build, but it is
 the thing worth watching. **[verified here]** this container has no Playwright browsers cached, so
 `bunx playwright install webkit` plus the system libraries its post-install warning names must run
-before the first `test:ui`. C5 needs Docker for its Postgres container — `AGENTS.md`'s Docker section
+before the first `test:ui`. C5 needs Docker for its Postgres container — `CLAUDE.md`'s Docker section
 covers starting `dockerd` and pulling `postgres` through `mirror.gcr.io/library/`.
 
 ---

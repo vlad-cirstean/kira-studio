@@ -55,7 +55,7 @@
   `cell-editor-*` testid still exists after this phase and still identifies the same thing; the
   new ones follow the `console-<thing>` / `<prefix>search-<thing>` conventions already in
   `views/console/` and `views/grid/` (F19).
-- Comments per AGENTS.md: only where the code cannot say it for itself. Four existing comments
+- Comments per CLAUDE.md: only where the code cannot say it for itself. Four existing comments
   become false as a result of this phase's changes and are rewritten in the same commits
   (`ConsoleView.vue:234-237`, `ConsoleResultGrid.vue:11-22` and `:107-110`, `state.ts:23-31`).
 - `bun run lint`, `bun run typecheck` (node, web, db, electron-db) and `bun run build` stay green
@@ -328,11 +328,11 @@ per-result markup, and **no** console find-widget coverage at all (`grep -rl "co
 tests/ui` → nothing).
 
 **F18 — `tests/ui/sqlite.spec.ts` is the one console-touching UI spec that actually runs in this
-sandbox, and it already opens a console and runs a statement.** AGENTS.md's SQLite section:
+sandbox, and it already opens a console and runs a statement.** CLAUDE.md's SQLite section:
 *"`tests/ui/sqlite.spec.ts` runs unconditionally (no Docker gate at all) — the one DB-backed UI
 spec that actually executes in Claude Code's own Linux web container."* Its console paragraph is
 `sqlite.spec.ts:105-115`. Every other console spec is Postgres/MySQL/ClickHouse/Mongo/Redis-backed
-and Docker-gated, and Docker image pulls return `403` through this environment's proxy (AGENTS.md),
+and Docker-gated, and Docker image pulls return `403` through this environment's proxy (CLAUDE.md),
 so **`console.spec.ts` cannot be run here at all**. That is a fact about where this phase's
 verification can and cannot happen, not a reason to skip it (§5).
 
@@ -526,7 +526,7 @@ ConsoleView.vue's results area, after this phase:
 
 | # | Decision | Rationale |
 |---|----------|-----------|
-| D18 | **Each behavior commit edits the specs it invalidates; one final commit adds the new coverage.** Invalidated: `console.spec.ts:229-236` and `interaction.spec.ts:714-717` (both `console-result-grid` → `console-result-tab` counts, plus a chip click to reach the second result). New: console result-set scenarios in `console.spec.ts`, a read-only-panel block in `cell-editor.spec.ts`'s existing console step (`:872-886`), and **a short addition to `sqlite.spec.ts`'s existing console paragraph** (`:105-115`). | F17/F18. The `sqlite.spec.ts` addition is the deliberate one: it is the only console coverage that runs without Docker (AGENTS.md), so without it every new behavior in this phase is unverifiable in this environment and in any CI box without a working image pull. It stays short — toggle on, run twice, two chips, close one, one chip, open Find and see a count — and does not duplicate `console.spec.ts`'s deeper scenarios. |
+| D18 | **Each behavior commit edits the specs it invalidates; one final commit adds the new coverage.** Invalidated: `console.spec.ts:229-236` and `interaction.spec.ts:714-717` (both `console-result-grid` → `console-result-tab` counts, plus a chip click to reach the second result). New: console result-set scenarios in `console.spec.ts`, a read-only-panel block in `cell-editor.spec.ts`'s existing console step (`:872-886`), and **a short addition to `sqlite.spec.ts`'s existing console paragraph** (`:105-115`). | F17/F18. The `sqlite.spec.ts` addition is the deliberate one: it is the only console coverage that runs without Docker (CLAUDE.md), so without it every new behavior in this phase is unverifiable in this environment and in any CI box without a working image pull. It stays short — toggle on, run twice, two chips, close one, one chip, open Find and see a count — and does not duplicate `console.spec.ts`'s deeper scenarios. |
 | D19 | **SPEC.md is edited by the implementing session; ARCHITECTURE.md is not.** §8.6 gains the viewer-mode sentence; §8.15 gains the result-set strip, the new/reuse toggle and the find toolbar; §10's P40 row moves from "Not yet planned — queued" to what was built; §11's `views/` block names `console/search.ts` and the console's now-shared find widget. | Standing practice (P19/P21/P24/P31/P39). ARCHITECTURE.md is explicitly *"facts about the app itself — driver/dependency choices, protocol-level constraints, capability quirks"* (its own §1) and has no renderer section; nothing in this phase is an engine, storage or process fact, so adding one would be the first exception to that split rather than a documentation improvement. Said plainly so a reader does not think it was forgotten. |
 | D20 | **Nothing under `views/shared/page/`, `theme/primitives/`, `src/engine/`, `src/main/`, `src/preload/` or `src/shared/protocol/` is modified**, and `biome.json` is unchanged. | §0. The one shared-folder change in the whole phase is the two new props on `views/shared/celleditor/`'s two components (D11), both optional and both defaulting to today's behavior. |
 
@@ -582,9 +582,9 @@ after the console work so a reviewer meets the console's own read-only wiring la
 
 ## 5. Verification
 
-**Say plainly what this box can and cannot do.** Per AGENTS.md: `bun run lint`, `bun run typecheck`
+**Say plainly what this box can and cannot do.** Per CLAUDE.md: `bun run lint`, `bun run typecheck`
 and `bun run build` all run here. `bunx playwright test` runs here **only after** the Electron
-binary is installed by hand with `curl` (AGENTS.md's "Electron binary" section — `bun install` does
+binary is installed by hand with `curl` (CLAUDE.md's "Electron binary" section — `bun install` does
 not fetch it in this environment), and even then every Docker-backed spec self-skips, because image
 pulls return `403` through this environment's proxy. Concretely for this phase:
 

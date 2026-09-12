@@ -20,7 +20,7 @@ const wallClockBudgetTitles = /150ms sandbox gate|interaction budgets|perf tripw
 // fully parallel. `browserName: 'webkit'` matches what a packaged build actually embeds
 // (WKWebView on macOS, WebKitGTK on Linux); a fresh Claude Code Linux container has no WebKit
 // binary preinstalled, but `bunx playwright install webkit` plus the system libs its own
-// post-install warning names (AGENTS.md) fetches and runs a real one, so `playwright test
+// post-install warning names (CLAUDE.md) fetches and runs a real one, so `playwright test
 // --project=ui` verifies against the genuine target with no chromium override needed.
 // `ipc-frontend` keeps its name, `testDir` and settings; only its mocking mechanism moves
 // (D13/D14) once its seven specs are re-pointed.

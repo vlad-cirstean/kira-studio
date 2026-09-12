@@ -223,7 +223,7 @@ allow other distribution pick their standard OS font"*).
   under *Not shipped* (`README.md:304-305`). So in the shipped app `-apple-system` resolves to SF
   Pro and **every entry after it is inert**.
 - **The development and CI environment is Linux**, and it renders the app for real: `tests/ui`
-  drives headless Chromium against a static build (`AGENTS.md`, `apps/kira-studio/tests/ui/`), and
+  drives headless Chromium against a static build (`CLAUDE.md`, `apps/kira-studio/tests/ui/`), and
   `tests/e2e-real` drives a `-tags server` binary in a plain Playwright tab. There
   `-apple-system`/`BlinkMacSystemFont`/`Segoe*` all miss and `system-ui` is what catches — which is
   precisely the entry the row's quoted string drops. A stack ending in a bare `sans-serif` can never
@@ -699,7 +699,7 @@ Menlo's metrics and is what the re-run re-checks.
 
 Conventional Commits, one concern each. `bun run lint` (including `scripts/check-tokens.sh`),
 `bun run typecheck` and `bun run build` per commit; `bun run test:ui` runs once near the end per
-`AGENTS.md`'s cadence rule.
+`CLAUDE.md`'s cadence rule.
 
 | # | Commit | Covers |
 |---|---|---|
@@ -723,7 +723,7 @@ lands as its own follow-up commit after `test:ui` — not folded into T3.
 ### 4.1 Unit (`bun run test:unit`)
 
 **None added.** Every change in this phase is a CSS custom-property value or a token rename;
-`AGENTS.md` names exactly this class as "gets nothing". `fonts.ts`'s probing functions are untouched
+`CLAUDE.md` names exactly this class as "gets nothing". `fonts.ts`'s probing functions are untouched
 (D8) and keep whatever coverage they have.
 
 ### 4.2 Lint / build
@@ -764,7 +764,7 @@ New file, `tests/ui/font-roles.spec.ts` (cases 1-2), plus one addition to an exi
 ### 4.4 What is deliberately not verified
 
 - **How the sans face actually looks on a real Mac.** This sandbox cannot build or render the app
-  (`AGENTS.md`: no `wails3`, no display); `-apple-system` never resolves here, so every `tests/ui`
+  (`CLAUDE.md`: no `wails3`, no display); `-apple-system` never resolves here, so every `tests/ui`
   run measures the Linux end of D3's chain. §4.3 case 2's assertions are written to be
   face-independent for exactly that reason — they compare *which token* an element resolved to, not
   which family name came back.

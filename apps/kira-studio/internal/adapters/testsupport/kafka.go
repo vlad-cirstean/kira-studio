@@ -25,7 +25,7 @@ const (
 
 const (
 	// kafkaImage mirrors packages/db-fixtures/support/kafka.ts's own IMAGE (P32 D25) — already namespaced (no
-	// library/ prefix), per AGENTS.md's Docker section.
+	// library/ prefix), per CLAUDE.md's Docker section.
 	kafkaImage = "confluentinc/cp-kafka:8.0.7"
 	// kafkaPublicPort is the module's own exposed PLAINTEXT listener (kafka.go's publicPort,
 	// unexported by testcontainers-go/modules/kafka).

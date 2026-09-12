@@ -331,7 +331,7 @@ Confirmed all four shapes present and enforced in the single writer of each:
   - One residue, dev-only: the `-tags server` build has no native shell, so nothing ever deletes a
     row, and `WindowsRepo.EnsureExists` (`windows.go:106-136`, called from `bridge/windows.go:35`)
     mints one for any `?window=<key>` a browser tab asks for. That build exists only for
-    `tests/e2e-real/` and sandbox work (`AGENTS.md`'s Wails section), against a `t.TempDir()`
+    `tests/e2e-real/` and sandbox work (`CLAUDE.md`'s Wails section), against a `t.TempDir()`
     `KIRA_HOME`, so it accumulates nothing that outlives a test run. Recorded, not fixed.
 
 ### F12 — The remaining eight tables grow only when a person creates something
@@ -494,7 +494,7 @@ disable and no correctness question, unlike (c).
 **(c) A `command_truncated` flag, because Re-run exists.** F5 is the reason this is not a pure
 storage change. Storing a silently-truncated command would let **Re-run** execute the first 64 KiB
 of a script as though it were the whole thing — a genuinely destructive outcome, and precisely the
-"stubbed behaviour" `AGENTS.md` forbids. So the truncation is *recorded*, the same way both history
+"stubbed behaviour" `CLAUDE.md` forbids. So the truncation is *recorded*, the same way both history
 tables record theirs (`BodyStorageTruncated`, `RequestBodyStorageTruncated`, `MessagesElided`,
 `MetadataElided`): a `command_truncated INTEGER NOT NULL DEFAULT 0` column, surfaced on
 `model.OpRecord`/`opRecordSchema` as `commandTruncated`, and read by `OperationsPanel.vue` to
@@ -673,7 +673,7 @@ same function D5(a) already edits and because it was measured rather than assume
 
 Conventional Commits, one concern each. `go build ./... && go vet ./...` plus `bun run typecheck`
 per commit; the full `bun run test:go` / `test:unit` / `test:ui` run once near the end, per
-`AGENTS.md`'s cadence rule.
+`CLAUDE.md`'s cadence rule.
 
 | # | Commit | Covers |
 |---|---|---|
@@ -688,7 +688,7 @@ per commit; the full `bun run test:go` / `test:unit` / `test:ui` run once near t
 
 Ordering notes: **T1 before T2** — the sweep reads a column that has to exist and be backfilled
 first. **T1 before T3** — the frontend reads a field the bindings do not carry until T1
-regenerates them (`AGENTS.md`: regenerate via `wails3 task common:generate:bindings`, never a
+regenerates them (`CLAUDE.md`: regenerate via `wails3 task common:generate:bindings`, never a
 hand-typed flag list, and `-names` is load-bearing). T4 and T5 are independent of everything and of
 each other. T6 lands after T1-T5 so a single run covers all of them.
 
@@ -703,7 +703,7 @@ Bindings regenerated after T1 and confirmed to carry `commandTruncated` on `OpRe
 
 ### 4.2 Go (`bun run test:go`) — the cases this phase owes
 
-Per `AGENTS.md`'s bar, three of the four items below are "cache eviction/invalidation with
+Per `CLAUDE.md`'s bar, three of the four items below are "cache eviction/invalidation with
 interacting rules", which the bar names explicitly as earning a test; the fourth is argued
 separately.
 
@@ -751,7 +751,7 @@ separately.
 **No test is added for**: `metadata_cache`, `api_variable_history`, `api_response_history` or
 `grpc_call_history` (their caps are unchanged and already covered by `metadata_cache_test.go`,
 `variables_test.go`, `response_history_test.go`, `grpc_history_test.go`); D5(b)'s reclaim pass
-(a threshold and one pragma call — `AGENTS.md`'s "a single `if` guarding one obvious case isn't
+(a threshold and one pragma call — `CLAUDE.md`'s "a single `if` guarding one obvious case isn't
 complexity"); or any of F11/F12's already-bounded tables, which this phase does not touch.
 
 ### 4.3 Unit (`bun run test:unit`)
@@ -777,7 +777,7 @@ and the one behaviour a user could hit; asserting it is cheaper than reasoning a
   arithmetic, not measured; writing 500 maximal ops in a test to observe ~35 MiB of overshoot would
   prove multiplication.
 - **Anything about how this looks on a real Mac.** This sandbox cannot build or render the app
-  (`AGENTS.md`'s Wails section); T3's surface is two `disabled` clauses and §4.4 is the substitute.
+  (`CLAUDE.md`'s Wails section); T3's surface is two `disabled` clauses and §4.4 is the substitute.
 
 ---
 

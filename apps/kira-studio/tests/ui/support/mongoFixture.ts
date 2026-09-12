@@ -6,7 +6,7 @@ import { IPC } from './ipcChannels';
 // Real captures against a real Mongo 7 container, seeded with packages/db-fixtures/fixtures/0003_mongo_seed.ts
 // (the same seed packages/db-fixtures/mongo.spec.ts and tests/e2e/mongo.spec.ts use) — via
 // `bun scripts/capture-tree.ts mongo --recipe-file ...` (scripts/capture-tree.ts), not hand-written
-// (P50 D5's discipline). Confirmed here, a real environment finding: unlike Postgres (AGENTS.md's
+// (P50 D5's discipline). Confirmed here, a real environment finding: unlike Postgres (CLAUDE.md's
 // Docker section — its own forListeningPorts() wait strategy hangs under `bun run` in this
 // sandbox), Mongo's container (Wait.forLogMessage, no forListeningPorts()) starts and this whole
 // capture completes fine under plain `bun run` — no esbuild/vendored-Node workaround needed for

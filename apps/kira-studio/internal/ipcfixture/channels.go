@@ -7,7 +7,7 @@
 package ipcfixture
 
 // The six IPC channels every committed fixture needs (P58f §4.3(a)) — grepped verbatim from
-// packages/shared/protocol/ipc.ts's IPC map, never inferred from the TypeScript identifier (AGENTS.md's
+// packages/shared/protocol/ipc.ts's IPC map, never inferred from the TypeScript identifier (CLAUDE.md's
 // P52-P56 finding: ENGINE_OP.configureCache is 'cache:configure', not 'engine:configure-cache').
 const (
 	channelConnectionsList    = "kira:connections:list"

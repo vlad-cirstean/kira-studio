@@ -432,7 +432,7 @@ need real AWS.
 
 ### 1.10 Flipping `"sqs"` and `"s3"`: the grep, and the debt P58c already paid
 
-`grep -rn '"sqs"\|"s3"' shell/internal --include=*.go`, run for this plan exactly as `AGENTS.md`'s
+`grep -rn '"sqs"\|"s3"' shell/internal --include=*.go`, run for this plan exactly as `CLAUDE.md`'s
 P58a findings require:
 
 | File | What it is | Fate |
@@ -494,7 +494,7 @@ never set.
    `Truncated` producer and the second engine whose Browse tab can show the truncation strip.**
 
 **And the "its only consumer" claim, re-grepped for P58d's own two support modules** — the mistake
-`AGENTS.md`'s P58a findings name explicitly (*"a plan's own 'its only consumer' claim about a shared
+`CLAUDE.md`'s P58a findings name explicitly (*"a plan's own 'its only consumer' claim about a shared
 support file is a snapshot, not a standing fact"*):
 
 | Support file | Consumers other than its own `tests/db/*.spec.ts` | Fate |
@@ -570,7 +570,7 @@ and S3 25–28, the four download scenarios, which are the **only** automated co
 
 ### 1.14 The false-positive-fixture trap, in its P58d form — and it is a *sequencing* trap, not a schema one
 
-`AGENTS.md` records this pattern twice for P58a/P58b (a "no primary key" test pointed at a table that
+`CLAUDE.md` records this pattern twice for P58a/P58b (a "no primary key" test pointed at a table that
 had one) and P58c found two sharper equivalents of its own. Neither adapter here has a primary-key
 concept, so the literal trap does not transfer. Its two real equivalents do, and the SQS one is
 **worse than anything the phase has hit so far**, because it is a property of the protocol rather
@@ -629,7 +629,7 @@ carrying a seed nothing reads.
   finding).
 - **The image is `localstack/localstack:3`** (`tests/db/support/{sqs,s3}.ts`), **already
   namespaced** — so it mirrors at `mirror.gcr.io/localstack/localstack:3` with **no `library/`
-  prefix** (`AGENTS.md`'s Docker section names this exact image in its rule).
+  prefix** (`CLAUDE.md`'s Docker section names this exact image in its rule).
 - **`SERVICES=s3,sqs`** is worth setting on the container: LocalStack 3's community image starts
   every emulator by default, and the two the fixture needs are a small fraction of them. TC-4
   measures the difference rather than asserting one.
@@ -731,7 +731,7 @@ The Go re-derivation:
 The **widening**, stated rather than smuggled: SQS now maps `InvalidAccessKeyId` to `E_AUTH` where
 the TypeScript let it fall through to `E_QUERY`. The asymmetry in the two TS lists is an oversight —
 SigV4 rejects an unknown access key identically for both services — and a single list is the point of
-**P58d D2**. Recorded in `AGENTS.md`'s P58d findings.
+**P58d D2**. Recorded in `CLAUDE.md`'s P58d findings.
 
 **P58d D5 — the endpoint override is `Options.BaseEndpoint`; S3 additionally sets
 `Options.UsePathStyle = true` whenever an override is present, and never otherwise.** §1.6, and this
@@ -767,7 +767,7 @@ region is the host, which reads oddly and is deliberate: `client.ts`). The regio
 ports byte-identically: `a region is required (the "database" field)`. The behaviour change — a
 nonexistent profile is `config.SharedConfigProfileNotExistError` at connect rather than a failed read
 at first use — is a gain (the Test button reports it) and is recorded as a named change in
-`docs/ARCHITECTURE.md` and `AGENTS.md`, the same standard **P58b B4/B22** and **P58c C2** held their
+`docs/ARCHITECTURE.md` and `CLAUDE.md`, the same standard **P58b B4/B22** and **P58c C2** held their
 own changes to.
 
 **P58d D8 — the SQS `headers` cell is built by a hand-written encoder over
@@ -798,7 +798,7 @@ in `sqs/index.ts`/`read.ts` and **neither survives translation**:
    `container/list`), popped from the front on overflow, all under one mutex.
 
 Neither of these is a design decision so much as a translation hazard, and both are exactly the class
-of thing `AGENTS.md`'s own findings say gets lost in a port that "reads correct".
+of thing `CLAUDE.md`'s own findings say gets lost in a port that "reads correct".
 
 **P58d D10 — SQS's two `GetQueueUrl`-counting scenarios keep their assertions and change their
 vantage point: a counting reverse proxy in `testsupport`, keyed on the `X-Amz-Target` header.**
@@ -1006,7 +1006,7 @@ docs/ARCHITECTURE.md                        EDITED  the per-database mapping tab
                                                     cells P58c left stale (§1.11, OQ-2); the Stack
                                                     driver line; the SQS and S3 per-engine sections
 docs/v1/plans/P58d-sqs-s3.md                EDITED  §12 M8.0 results, then §13 M8.1-M8.3 results
-AGENTS.md                                   EDITED  the P58d findings entry
+CLAUDE.md                                   EDITED  the P58d findings entry
 ```
 
 ## 4. Designs
@@ -1232,7 +1232,7 @@ key/prefix logic rather than about a driver.
 
 **P58d D23** governs every mutating case: they run against `mutable-bucket`.
 
-### 5.5 Unit-level, against `AGENTS.md`'s own bar — nothing qualifies, and that is the honest answer
+### 5.5 Unit-level, against `CLAUDE.md`'s own bar — nothing qualifies, and that is the honest answer
 
 **P58d adds no Go unit test at all.** It is the first sub-phase in P58 for which that is true, and the
 reason is structural rather than a judgement call:
@@ -1267,7 +1267,7 @@ the difference that P58d has no parser at all, so the count goes to zero rather 
 `"kafka"`, `mariadb-real.spec.ts`'s coexistence half already connects Kafka as its Node-served side,
 and Kafka stays Node-served through P58d. **P58d needs no equivalent of P58c C14 or C15.**
 
-**The full suite still runs after every flip**, per `AGENTS.md`'s P58b M6.4 finding, restated as this
+**The full suite still runs after every flip**, per `CLAUDE.md`'s P58b M6.4 finding, restated as this
 sub-phase's rule:
 
 > A `tests/e2e-real/*.spec.ts` regression sweep must be re-run in full after every `nativeKinds`
@@ -1312,11 +1312,11 @@ it. §10 OQ-5 asks the parent's author to amend §5.5 so P58f does not re-propos
 
 Five throwaway Go programs under the scratch directory (**never committed; no product code lands in
 M8.0**), each answering one question with a printed PASS/FAIL. The deliverable is a findings
-subsection appended to this document (§9 commit 1) and, for anything surprising, an `AGENTS.md`
+subsection appended to this document (§9 commit 1) and, for anything surprising, an `CLAUDE.md`
 entry. Ordering: TC-4 first (everything else needs a container), then AWS-1 and AWS-2, then AWS-3,
 then AWS-4 last (it needs both seeders).
 
-**These probes are written against `AGENTS.md`'s own hardest-won lesson**, from P58b M6.3:
+**These probes are written against `CLAUDE.md`'s own hardest-won lesson**, from P58b M6.3:
 *"an M6.0-style probe is only as complete as the specific inputs it tried."* Probes AWS-1(c), AWS-3(d)
 and AWS-4 are therefore written as **input inventories**, not capability checks.
 
@@ -1344,7 +1344,7 @@ re-pointed the vehicle owed a re-run of the proof.
   and both keep passing, unmodified, after each of P58d's two flips — which §5.6's mandatory full
   sweep verifies twice.
 - **P58 D4's coexistence property is already proven twice in a running app**, by checkpoint C1b and
-  again by checkpoint C1c (`AGENTS.md`'s P58c entry records all 14 steps passing). A third run of the
+  again by checkpoint C1c (`CLAUDE.md`'s P58c entry records all 14 steps passing). A third run of the
   same proof against the same pairing would be ceremony.
 
 **What P58d does owe, and gets as acceptance criteria rather than as a numbered checkpoint** (§8's
@@ -1412,10 +1412,10 @@ coexistence proof, and calling it one would devalue the two that are.
    - **`shell/main.go`** — two blank imports. **`shell/go.mod`/`go.sum`** — five AWS modules,
      `github.com/google/uuid` promoted from indirect to direct, nothing test-only.
    - **`tests/db/`** — two spec deletions, at most one support deletion and one fixture deletion.
-   - **`docs/`, `AGENTS.md`** — per §3.
+   - **`docs/`, `CLAUDE.md`** — per §3.
    - **`src/`, `tests/ui/`, `tests/ipc/`, `tests/e2e-real/`, `package.json`, `scripts/`,
      `.github/`** — nothing.
-7. `AGENTS.md` gains a **"P58d implementation findings"** entry on the P52–P58c pattern, carrying at
+7. `CLAUDE.md` gains a **"P58d implementation findings"** entry on the P52–P58c pattern, carrying at
    minimum: M8.0's five probe results; whether AWS-1(e) confirmed that a cancelled `context.Context`
    really aborts an in-flight SDK request (**P58d D3**'s premise); whether the SDK's default checksum
    calculation needed an override (**P58d D6**); the two JavaScript guarantees that did not survive
@@ -1501,7 +1501,7 @@ its **R1** is P58f's and does not bind here.
 19. `test: delete tests/db/s3.spec.ts, its subject now in Go` (**P58d D20**) — **re-grep first**;
     `support/s3.ts` and `fixtures/0007_s3_seed.ts` go with it only if the grep is clean.
 20. `docs: P58d findings — two AWS adapters, one SDK, and the first real file transfer` —
-    `AGENTS.md`, `docs/ARCHITECTURE.md` (including the two mapping-table cells P58c left stale, per
+    `CLAUDE.md`, `docs/ARCHITECTURE.md` (including the two mapping-table cells P58c left stale, per
     §8 criterion 8's grep form), and this document's §12/§13.
 
 **Why SQS before S3.** Three reasons, in order of weight. SQS is the smaller adapter (671 lines to
@@ -1560,7 +1560,7 @@ needs, and because a future reader diffing the two plans would otherwise trust t
 auth-failure scenario (both scenario 2s are URI-parse failures); and producing a genuine SigV4
 rejection would need either real AWS or a LocalStack `ENFORCE_IAM` configuration whose fidelity is
 itself unproven. **P58d interim: port the mapping on the strength of the SDK's own error codes
-(AWS-2 prints them), record the gap in `AGENTS.md`, and add no test.** If the parent's author wants
+(AWS-2 prints them), record the gap in `CLAUDE.md`, and add no test.** If the parent's author wants
 the gap closed, the cheapest honest vehicle is a `ENFORCE_IAM=1` LocalStack variant in a single
 scenario, and it should be scoped as its own piece of work rather than absorbed here.
 
@@ -1586,7 +1586,7 @@ decision (a test-only code path in the shell) rather than a test.
 - **Docker**: `nohup dockerd > /tmp/dockerd.log 2>&1 & disown` here; `colima start` on macOS. P58d
   needs exactly **one** image: **`localstack/localstack:3`**, which is **already namespaced**, so it
   mirrors at `mirror.gcr.io/localstack/localstack:3` with **no `library/` prefix** —
-  `AGENTS.md`'s Docker section names this exact image in its own rule. The `tests/e2e-real/` sweeps
+  `CLAUDE.md`'s Docker section names this exact image in its own rule. The `tests/e2e-real/` sweeps
   additionally need `mariadb:11.4` (official → `library/`), `postgres:17` (official → `library/`) and
   `confluentinc/cp-kafka:8.0.7` (already namespaced → no prefix).
 - **LocalStack is slow to start.** The TypeScript fixtures allow 120 s

@@ -68,7 +68,7 @@ per `docs/v1.1/README.md`'s standing rule.
 | P3 landed | `apps/` + `packages/` exist, no `shell/` or `src/`; `go.mod:1` is `module github.com/kirathecat/kira-studio` |
 | Tracked tree clean at authoring time | `git status --porcelain` → empty |
 | Go tiers green at baseline | `go test ./apps/kira-studio/internal/adapterhost/... ./apps/kira-studio/internal/page/... ./apps/kira-studio/internal/enginecache/...` → `ok`, `ok`, and **`internal/page` reports `[no test files]`** (F16) |
-| Wails source read, not guessed | `$(go env GOPATH)/pkg/mod/github.com/wailsapp/wails/v3@v3.0.0-beta.15/` — `pkg/application/stream.go`, `stream_transport.go`, `stream_session.go`, `stream_server.go`, `stream_prelude_{desktop,server}.go`, `application_server.go`, `application_options.go`, `transport_http.go`, and `internal/assetserver/bundledassets/runtime.debug.js`. `v3.wails.io` is 403-blocked from every box here (`AGENTS.md`), so the pinned module *is* the documentation |
+| Wails source read, not guessed | `$(go env GOPATH)/pkg/mod/github.com/wailsapp/wails/v3@v3.0.0-beta.15/` — `pkg/application/stream.go`, `stream_transport.go`, `stream_session.go`, `stream_server.go`, `stream_prelude_{desktop,server}.go`, `application_server.go`, `application_options.go`, `transport_http.go`, and `internal/assetserver/bundledassets/runtime.debug.js`. `v3.wails.io` is 403-blocked from every box here (`CLAUDE.md`), so the pinned module *is* the documentation |
 | Data-plane surface | 8 data ops (`data:{read,count,invalidate,preview,mutate,execute,objectDownload}` + the three local ops `ping`/`cache:stats`/`cache:clear`), 4 page kinds, 12 bound control services |
 | Measurements are reproducible and were run here | §2's method, fixture and programs are described in F10; nothing was committed to the repo (the P58a M2 convention `docs/PERF.md` §2.5 records) |
 
@@ -115,13 +115,13 @@ one everywhere it appears.
   claim could not be verified here, the finding says so and names what would verify it (F13's
   JavaScriptCore-not-WKWebView caveat; F3's server-mode claim, verified by reading the source and by
   the existence of `tests/e2e-real/`, not by running a split deployment).
-- `AGENTS.md`'s standing rules apply: no stubs, no dual-format compatibility paths, comments only
+- `CLAUDE.md`'s standing rules apply: no stubs, no dual-format compatibility paths, comments only
   where the code cannot speak for itself, Conventional Commits.
 - **No new unit test is added by this phase.** C1 is a change whose entire correctness claim is
   "the bytes are identical", and the cheapest honest proof of that is a byte-for-byte comparison
   run during implementation (§8.3) plus `tests/e2e-real/`, which is the *only* place in the
   repository where the real Go encoder meets the real frontend decoder (F16). A serialize-then-
-  deserialize unit test is explicitly listed in `AGENTS.md` as not clearing the bar, and would
+  deserialize unit test is explicitly listed in `CLAUDE.md` as not clearing the bar, and would
   prove less than the check §8.3 specifies.
 - **This phase's commit sequence is short, and that is the correct shape, not an under-delivery.**
   The SPEC row's deliverable is an analysis plus a recommendation plus whatever low-risk work falls
@@ -222,7 +222,7 @@ controls.
 So: **the "split the frontend and backend over a real network" scenario has an existing,
 first-class answer in the framework, requiring zero application changes and zero frontend
 changes** — and `apps/kira-studio/tests/e2e-real/` is already built on exactly that build tag
-(`AGENTS.md`'s Wails section: *"it serves the whole bound-call surface and the data-plane stream
+(`CLAUDE.md`'s Wails section: *"it serves the whole bound-call surface and the data-plane stream
 over a real TCP listener with no webview"*).
 
 **What it does not carry, stated so the next session does not over-read this finding:**
@@ -330,7 +330,7 @@ Three flows assume "the Go side's machine" and "the user's machine" are the same
   the object to it — on the Go side's filesystem. Split the two and this flow silently writes to
   the wrong machine.
 - **Secrets.** `internal/secrets` is the OS keychain of whatever machine the Go side runs on
-  (`AGENTS.md`'s secrets section). A remote backend holding every user's database passwords in one
+  (`CLAUDE.md`'s secrets section). A remote backend holding every user's database passwords in one
   keychain is a different product decision, not a port.
 - **Pre-connect.** `internal/preconnect` supervises locally spawned processes (SSH tunnels and the
   like) with process-group kills.
@@ -481,7 +481,7 @@ only indirectly:
 | `adapterhost/*_test.go` | the frame envelope and the session queue, with trivial payloads |
 | `internal/ipcfixture` | the Go codec's *decode* accessors (`page.IsNull`/`page.CellText`) — it records logical pages, so the JSON chunk encoding never reaches the fixture (F7) |
 | `tests/ui`, `tests/ipc` frontend halves | `port.ts`'s decoder against `mockStreamBrowser.js`'s **JS** encoder — never against Go's |
-| **`tests/e2e-real/sqlite-real.spec.ts`** | **the real `-tags server` binary's real Go encoder against the real `port.ts` decoder in a real browser tab** — and per `AGENTS.md` it runs unconditionally here, Docker-free |
+| **`tests/e2e-real/sqlite-real.spec.ts`** | **the real `-tags server` binary's real Go encoder against the real `port.ts` decoder in a real browser tab** — and per `CLAUDE.md` it runs unconditionally here, Docker-free |
 
 That table is why §8.3 makes `tests/e2e-real` a required gate for C1 rather than an optional extra,
 and why the byte-identity check is done directly rather than trusted to the suites.
@@ -498,7 +498,7 @@ it does to backpressure; and what it costs to migrate given F7's three implement
 
 **Cannot run on the desktop transport.** gRPC requires HTTP/2 with trailers over a real socket. The
 desktop plane is a custom-URI-scheme handler intercepted inside the native process
-(`AGENTS.md`: *"`pkg/application/linux_cgo.go` registers `wails://` as a custom URI scheme
+(`CLAUDE.md`: *"`pkg/application/linux_cgo.go` registers `wails://` as a custom URI scheme
 intercepted inside the native process, so `curl` or a plain browser tab can never exercise real
 bindings there"*), and browsers cannot originate gRPC regardless — the browser answer is gRPC-Web,
 which needs a translating proxy or an Envoy-class sidecar in front of the backend.
@@ -674,7 +674,7 @@ payload         concatenated buffers; every uint32-typed section starts on a 4-b
   poll natively, server mode as `websocket.MessageBinary` (F2, F3) — so the choice is portable
   across the split by construction.
 - **Backward compatibility: none, deliberately.** Both ends ship together in one binary; a
-  dual-format decoder would be exactly the "stubbed compatibility path" `AGENTS.md` forbids. The
+  dual-format decoder would be exactly the "stubbed compatibility path" `CLAUDE.md` forbids. The
   magic word exists so a stale cached frontend fails loudly instead of misparsing — the same reason
   Wails' own `streamMagic` exists.
 - **Blast radius when it is built** (F7): Go encoder in `internal/page`; decoder in `port.ts`;
@@ -695,7 +695,7 @@ payload         concatenated buffers; every uint32-typed section starts on a 4-b
 | **D6** | **Remove both `json.Marshaler` boundaries from the page codec: `Uint32LE` and the four page `MarshalJSON` methods, replaced by plain struct tags and `[]byte` buffers.** Output stays byte-identical. | F11: 6–12x encode, allocations from 2.3–3.8× the frame to 1.00×, on a cost paid per page *view* including every server-side cache hit (F14). F7: nothing outside `internal/page` reads `Offsets`/`Truncated` directly — only the `IsNull`/`CellText` accessors — so the change is contained to one package. |
 | **D7** | **Do not cache encoded frames alongside cached pages.** | F14: it would roughly double L2's memory against the same user-visible budget, immediately before P5 (RAM), to save work C1 already reduces 8x. |
 | **D8** | **Do not retune `adapterhost.Session`'s 32 MiB/64-frame queue, and do not remove its writer goroutine.** | F15: both observations (a 32 MiB budget in front of Wails' 8 MiB one; A18's data-race rationale not matching this Wails version's documented `Send`) are real, but neither has a measurement showing benefit, and the session also owns the per-op context and the in-flight semaphore. P5 owns RAM; OQ-3 hands it over with the specific numbers. |
-| **D9** | **Record the measurements in `docs/PERF.md` §2.6 and the protocol decision in `docs/ARCHITECTURE.md`, and fix the "WebSocket" the Process-model diagram claims.** | `AGENTS.md`: facts about the app belong in `docs/ARCHITECTURE.md`, and `docs/PERF.md` §2.5 is the standing precedent for a before/after encoding measurement. F2: on a desktop build the data plane is a held poll plus a POST, and only a `-tags server` build makes it a real WebSocket — the diagram currently says the opposite. |
+| **D9** | **Record the measurements in `docs/PERF.md` §2.6 and the protocol decision in `docs/ARCHITECTURE.md`, and fix the "WebSocket" the Process-model diagram claims.** | `CLAUDE.md`: facts about the app belong in `docs/ARCHITECTURE.md`, and `docs/PERF.md` §2.5 is the standing precedent for a before/after encoding measurement. F2: on a desktop build the data plane is a held poll plus a POST, and only a `-tags server` build makes it a real WebSocket — the diagram currently says the opposite. |
 
 ---
 
@@ -764,8 +764,8 @@ Verify: §8.1 (`bun run lint` formats Markdown), plus §9's greps.
 3. Note the layered backpressure bounds (F5) as app-level *and* transport-level, since the section
    currently states the app's and Wails' bounds without saying which one binds first.
 
-`AGENTS.md` is not touched: its one "Known open items" entry (CI workflows) is unaffected, and
-`AGENTS.md`'s own rule sends findings to the phase plan, which is this file.
+`CLAUDE.md` is not touched: its one "Known open items" entry (CI workflows) is unaffected, and
+`CLAUDE.md`'s own rule sends findings to the phase plan, which is this file.
 
 Verify: §8.1, plus §9.
 
@@ -785,7 +785,7 @@ git status --porcelain          # must be empty
 ```
 
 `go build ./...` additionally compiles the root `main` package, which imports Wails and needs the
-GTK4/WebKitGTK headers on Linux (`AGENTS.md`'s Wails section). Use the narrow form for the loop.
+GTK4/WebKitGTK headers on Linux (`CLAUDE.md`'s Wails section). Use the narrow form for the loop.
 
 Baseline to regress against, measured at `4dd3cc2`: all of the above exit 0;
 `go test ./apps/kira-studio/internal/adapterhost/...` and `.../enginecache/...` report `ok`, and
@@ -803,7 +803,7 @@ node node_modules/.bin/playwright test --config=apps/kira-studio/playwright.conf
 
 The last one is the gate that matters and is **not optional for C1**: `tests/e2e-real/`'s
 `sqlite-real.spec.ts` is the only place in the repository where the real Go encoder meets the real
-`port.ts` decoder (F16), it runs unconditionally and Docker-free here, and per `AGENTS.md` it must
+`port.ts` decoder (F16), it runs unconditionally and Docker-free here, and per `CLAUDE.md` it must
 be launched through plain Node's Playwright CLI, never `bunx`.
 
 ### 8.3 The byte-identity proof — C1's actual correctness claim

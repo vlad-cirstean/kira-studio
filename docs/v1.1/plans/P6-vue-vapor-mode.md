@@ -111,7 +111,7 @@ Two facts from earlier phases matter here and both survive:
   splitting); the numbers in §3 are measured against that same un-split shape and are not an
   argument about it.
 - **`.github/workflows/*.yml`** — same `workflow`-scope constraint P1 D10, P3 D15, P4 §0.3, P5 §0.3
-  and `AGENTS.md`'s one Known-open-item record.
+  and `CLAUDE.md`'s one Known-open-item record.
 - **Editing P5's or any earlier plan doc.** `docs/v1.1/README.md`: plans are never retro-edited.
 
 ### 0.4 Ground rules
@@ -122,7 +122,7 @@ Two facts from earlier phases matter here and both survive:
 - The experiments in §3 were run in throwaway copies of this tree under
   `/tmp/.../scratchpad/` — **no file in this repository was modified to produce them**, and none of
   them is proposed for landing.
-- `AGENTS.md`'s standing rules apply to the one commit §7 proposes: Conventional Commits, no
+- `CLAUDE.md`'s standing rules apply to the one commit §7 proposes: Conventional Commits, no
   stubs, comments only where the code cannot say it itself.
 
 ---
@@ -537,10 +537,10 @@ Stated explicitly so a later pass does not re-derive them. Each was read or run,
 | **D2** | **Selective adoption is rejected on its own merits, not merely deferred with the rest.** | E5: partial adoption ships both runtimes plus interop — **+67.9 kB raw / +24.2 kB gzip to vaporise one component**, against a whole-app Vapor saving that is itself negative (+15.6 kB / +5.2 kB). F9: there is no "distinct region" to give it — `CodiconIcon` is in 37 of 72 SFCs, `VirtualList` in 9 parents, and upstream explicitly recommends against exactly the mixed nesting this tree would require. F6: the one global directive would need two implementations and a per-*call-site* choice across 134 sites. |
 | **D3** | **The rendering-performance premise does not hold for this app, and that is the decisive finding — not the release status.** | F8: `docs/ARCHITECTURE.md:66-67` already excludes row data from reactivity; `DataGrid.vue:1250,1756` renders plain elements from a memoised view-model array with no per-cell component and no per-cell binding; both grids are virtualized by a mode-neutral library; `docs/PERF.md` §2.1 records scroll work at **p50 2.2 / 6.2 / 5.1 ms across its three scroll rows against an 8 ms budget, passing**. Vapor removes a cost this app does not pay. Even if 3.6.0 shipped stable tomorrow, D1 would still be *decline*, for this reason. |
 | **D4** | **Record the four concrete blockers by name** — the `ObjectDirective` (F6), the four `$el` template refs (F7), the interop-ordering assumption in `CellEditorView.vue` (E4), and the negative bundle delta (E5) — **as the checklist any future re-evaluation starts from.** | §6 needs a starting point that is not "read the whole tree again". These four are what a future Vapor attempt has to answer first, and three of them were only found by running the app. |
-| **D5** | **Do not "fix" anything in service of a mode the app does not use.** `v-tooltip` stays an `ObjectDirective`; the four `$el` refs stay; `vite.config.ts:11` stays `vue()` with no `features` block. | `AGENTS.md`: scope left out of a phase is left out entirely, not half-implemented. Every one of those changes is a no-op-or-worse under the renderer that ships, and a half-ported directive is exactly the kind of "ready for later" debt that is never collected. |
+| **D5** | **Do not "fix" anything in service of a mode the app does not use.** `v-tooltip` stays an `ObjectDirective`; the four `$el` refs stay; `vite.config.ts:11` stays `vue()` with no `features` block. | `CLAUDE.md`: scope left out of a phase is left out entirely, not half-implemented. Every one of those changes is a no-op-or-worse under the renderer that ships, and a half-ported directive is exactly the kind of "ready for later" debt that is never collected. |
 | **D6** | **`CellEditorView.vue`'s non-null assumption is handed to P12 (code review) by name, not fixed here.** The finding: `CellEditorDock.vue:17,21` gates on `v-if="cell"` while `CellEditorView.vue:46,49,87` assumes `props.cell` is non-null; the guarantee is the parent's render ordering, which is not a guarantee the child states or the types check. | It is genuinely latent — it cannot fire under VDOM, so there is no bug to fix in P6's scope, and P6 must not smuggle a defensive rewrite of a shared view into a docs phase. But it is exactly the kind of implicit-invariant finding P12's correctness round exists to catch, and it should not be lost with this document. |
 | **D7** | **P19 (dependency bump) bumps `vue` to 3.6.x when it is stable, and must leave the renderer in VDOM mode**: no `features.vapor` in `vite.config.ts`, no `vapor` attribute in any SFC, `main.ts:205` stays `createApp(...)`. E1 shows the 3.6 upgrade itself is uneventful for this app; `@vitejs/plugin-vue@6.0.8` needs no bump for it (peer `^3.2.25` admits 3.6.0). | P19's row says "bump every dependency … to the latest available stable release". Vue 3.6 will be that. Vapor is 100% opt-in and stays off — this decision must not be reversed as a side effect of a version bump, which is precisely how an unexamined assumption gets re-created in the opposite direction. |
-| **D8** | **Land exactly one change for this phase: the decision, recorded in `docs/ARCHITECTURE.md`.** No code, no config, no comment in `vite.config.ts`. | `AGENTS.md`: app facts live in `docs/ARCHITECTURE.md`, and "the renderer is VDOM-mode Vue, deliberately" is an app fact a future session would otherwise re-derive from scratch — this document plus §6's trigger is the durable record, and one line in the authoritative file is what points at it. A code comment would be a comment about something the code does not do, which is the kind `AGENTS.md` says not to write. |
+| **D8** | **Land exactly one change for this phase: the decision, recorded in `docs/ARCHITECTURE.md`.** No code, no config, no comment in `vite.config.ts`. | `CLAUDE.md`: app facts live in `docs/ARCHITECTURE.md`, and "the renderer is VDOM-mode Vue, deliberately" is an app fact a future session would otherwise re-derive from scratch — this document plus §6's trigger is the durable record, and one line in the authoritative file is what points at it. A code comment would be a comment about something the code does not do, which is the kind `CLAUDE.md` says not to write. |
 
 ---
 
@@ -592,7 +592,7 @@ One file, `docs/ARCHITECTURE.md`, two touches:
    outside the VDOM's per-binding model (pointing at the existing no-reactivity-on-row-data
    invariant, `:66-67`) and that partial adoption would ship both runtimes; and that a Vue 3.6
    upgrade keeps VDOM mode. Keep it to a few sentences and let the plan doc carry the evidence —
-   `AGENTS.md` is explicit that a phase's findings live in its plan, not bolted into another file.
+   `CLAUDE.md` is explicit that a phase's findings live in its plan, not bolted into another file.
 
 Do **not** change: `package.json`'s `vue`/`@vitejs/plugin-vue`/`vite` pins,
 `apps/kira-studio/frontend/vite.config.ts`, `main.ts`, `workbench/state/tooltip.ts`, or any SFC.

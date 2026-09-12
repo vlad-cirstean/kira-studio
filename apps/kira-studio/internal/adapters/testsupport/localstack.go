@@ -15,7 +15,7 @@ import (
 )
 
 // LocalStackImage mirrors packages/db-fixtures/support/{sqs,s3}.ts's own IMAGE — already namespaced (no
-// library/ prefix), per AGENTS.md's Docker section.
+// library/ prefix), per CLAUDE.md's Docker section.
 const (
 	LocalStackImage           = "localstack/localstack:4"
 	localStackPort            = "4566/tcp"

@@ -7,7 +7,7 @@ import (
 
 // ServerMajor's parsing has several interacting lexical rules (a "-suffix" flavour tag, a
 // namespaced image with a "/" before the tag's ":", a tagless digest pin, a bare name with no
-// tag at all) — AGENTS.md's bar for a dedicated unit test. ImageFor itself is a two-line
+// tag at all) — CLAUDE.md's bar for a dedicated unit test. ImageFor itself is a two-line
 // getenv-or-default and gets nothing.
 func TestServerMajor(t *testing.T) {
 	cases := []struct {

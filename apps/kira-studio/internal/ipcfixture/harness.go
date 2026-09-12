@@ -47,7 +47,7 @@ type App struct {
 func NewApp(t *testing.T) *App {
 	t.Helper()
 	t.Setenv("KIRA_HOME", t.TempDir())
-	// Required on Linux (AGENTS.md's Secrets section) — the real macOS Keychain path is untestable
+	// Required on Linux (CLAUDE.md's Secrets section) — the real macOS Keychain path is untestable
 	// here, and every fixture scenario needs a working cipher to store a connection's password.
 	t.Setenv("KIRA_INSECURE_SECRETS", "1")
 

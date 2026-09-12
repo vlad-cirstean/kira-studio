@@ -427,7 +427,7 @@ introduce is described in §5 as a conditional, not as a commitment.
 | D15 | **`lru-cache` — do not adopt.** | F19: `lru-cache` does support `maxSize`/`sizeCalculation`, so the byte budgeting is a fair match. What it does not carry is the two things `ByteLru` exists for: `deleteWhere(pred)` over `{connectionId, path, label}` metadata (`lru.ts:82-92`), which *is* the entire invalidation vocabulary — `cache/index.ts:76-101` is four different predicate shapes over it — and the half-budget refusal with its own warning (`lru.ts:56-63`), which exists so one 40 MB page cannot evict a 64 MB cache. Both would come back as adapter code around the library, so the 115 lines do not go away, they just move and gain a dependency underneath. |
 | D16 | **No library gap exists in `src/main/` or `src/engine/`, and the patterns that superficially invite one are each deliberate.** | F19/F20, as one decision because each sub-case has the same shape — the obvious library would undo a measured decision. The adapter registry's lazy `import()` map exists because eager imports cost >100 MB of engine RSS (`registry.ts:5-12`), so any eagerly-resolving plugin/DI framework regresses it. The IPC registry is eleven function calls and an 11-line `deps.ts`; there is no container to introduce. `utilityProcess.fork` is Electron's own API and the no-auto-respawn policy (`engine-host.ts:70-71`) removes the case a supervisor or retry library serves. `electron-log` already covers logging behind a three-line façade. There is no HTTP surface at all (F20), so the entire framework/middleware/request-validation family is inapplicable. |
 | D17 | **"No clear win" is this spike's expected and accepted outcome, and this plan does not manufacture one to justify itself.** | P47 D15's reasoning, generalised: the failure mode of a survey phase is a session that has read ten library docs deciding it would be embarrassing to recommend none of them. Ten were considered; the outcome is eight "no", one "already adopted", one "revisit later", and two dependency-free defects found by reading the code they would have replaced (D4, D5). That second half is the actual value of the exercise — the survey found real work, just not the work it was nominally looking for. |
-| D18 | **This phase produces no code and edits no file but its own; `docs/PERF.md`'s overstated wording (D2) is recorded here and handed on, not fixed here.** | AGENTS.md's "scope left out of a phase is left out entirely, not half-implemented", plus the standing practice (P47 D18, P29 D17) that the phasing table is a record of what shipped. A plan-only phase that quietly edits `PERF.md` in passing would be doing implementation under a `docs:` commit and would make its own scope statement false. The correction belongs to whichever phase next has a legitimate reason to touch `PERF.md` §2.1 — most likely §5.1's, if that is greenlit and re-measures the console. |
+| D18 | **This phase produces no code and edits no file but its own; `docs/PERF.md`'s overstated wording (D2) is recorded here and handed on, not fixed here.** | CLAUDE.md's "scope left out of a phase is left out entirely, not half-implemented", plus the standing practice (P47 D18, P29 D17) that the phasing table is a record of what shipped. A plan-only phase that quietly edits `PERF.md` in passing would be doing implementation under a `docs:` commit and would make its own scope statement false. The correction belongs to whichever phase next has a legitimate reason to touch `PERF.md` §2.1 — most likely §5.1's, if that is greenlit and re-measures the console. |
 
 ## 4. Verdict table
 
@@ -499,7 +499,7 @@ projects) and `bun run build` green:
    such assertion exists), or the change is unfalsifiable.
 5. `tests/ui/redis.spec.ts`, `kafka.spec.ts`, `sqs.spec.ts` and `rabbitmq.spec.ts` locate rows by
    `data-testid`, so they become the regression guard for free — but they are Docker-gated and
-   cannot run in this sandbox (AGENTS.md), which must be recorded as verification debt rather than
+   cannot run in this sandbox (CLAUDE.md), which must be recorded as verification debt rather than
    glossed.
 
 ### 5.3 The overlay-positioning consolidation (D12) — only when X fires
@@ -523,7 +523,7 @@ weakened to accommodate it, per P47 D17. None of the ten cleared (a).
 
 - **Any code change at all.** This phase is the analysis (D18). §5's step lists are conditional
   sketches, not a plan of record; if either is greenlit it gets its own phase and its own
-  Opus-authored plan per AGENTS.md.
+  Opus-authored plan per CLAUDE.md.
 - **Editing `docs/PERF.md` to correct D2's wording.** Handed on, not done here (D18).
 - **Re-running P47's measurements.** D1's verdict rests on the numbers already recorded at
   `PERF.md:78-82` read against D14's own threshold, which is a reading exercise, not a measuring

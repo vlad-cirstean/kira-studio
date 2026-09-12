@@ -11,7 +11,7 @@
 > `shell/go.mod` pins — with `file:line` citations, the same way P55 §1.1 cited
 > `keybase/go-keychain`. Four of them were additionally **executed** in this sandbox (§1.7); those
 > are marked *probed*. `wails.io`/`v3.wails.io` remain 403-blocked from both of this project's
-> environments (AGENTS.md, P51), so the module cache is the only source and there was nothing else
+> environments (CLAUDE.md, P51), so the module cache is the only source and there was nothing else
 > to check against.
 
 ## 0. What this phase is, and what it is not
@@ -318,7 +318,7 @@ unsubscribe (`On` returns its unsubscribe func).
 
 `pkg/application` is cgo on every platform (`linux_cgo.go`, `application_darwin.go`), so any
 `internal/…` package that imports it makes `go build ./internal/...` require
-`libgtk-4-dev`/`libwebkitgtk-6.0-dev`/`pkg-config` on Linux — ending the property AGENTS.md's P53
+`libgtk-4-dev`/`libwebkitgtk-6.0-dev`/`pkg-config` on Linux — ending the property CLAUDE.md's P53
 finding records (*"`go test ./internal/...` … need nothing but the Go toolchain"*). Today
 `internal/bridge` imports no Wails at all (checked: `app.go`, `connections.go`, `engine.go`,
 `filters.go`, `layout.go`, `ops.go`, `settings.go`, `tabs.go`, `tree.go` import only `appcore`,
@@ -387,11 +387,11 @@ pending write on quit). All five port; the D8 non-flush stays deliberate.
 - `enginehost` has `AttachStream(Sink) (detach func())`, `SendData([]byte) error`, `Sink` =
   `interface{ Send(frame []byte) error }` (`stream.go:18-20`, `:38`, `:74`), plus `Subscribe()`,
   `Call`, `CallTimeout`, `Alive`, `PID`, `Stop`.
-- **`main.go`'s `resolveEngine()` still points at `testdata/engine-ping.mjs`** — AGENTS.md's P55
+- **`main.go`'s `resolveEngine()` still points at `testdata/engine-ping.mjs`** — CLAUDE.md's P55
   finding says so and the source confirms it (`main.go:181-204`). `shell/runtime/engine/engine.cjs`
   (6.3 MB, built by `bun run build:engine`) and `shell/runtime/node/bin/node` are both present in
   this checkout. D12.
-- `internal/enginetest/testdata/engine-fixture.mjs` — checked, per AGENTS.md's instruction not to
+- `internal/enginetest/testdata/engine-fixture.mjs` — checked, per CLAUDE.md's instruction not to
   trust P55's plan table. It currently answers `adapter:connect`, `adapter:disconnect`,
   `adapter:test`, `adapter:children`, `adapter:describe`, `adapter:definition`, `adapter:cancel`,
   `cache:configure` and **six** `fixture:` ops (`release-slow`, `emit-op-start`, `emit-op-end`,
@@ -473,21 +473,21 @@ check hits the 2 s timeout and the handshake is never actually observed working.
 file, not a `src/` one.
 
 **D12 — `resolveEngine()` switches to the real bundled engine, and its absence is a hard startup
-failure.** AGENTS.md's P55 finding leaves this open and guesses "cutover, most likely". It belongs
+failure.** CLAUDE.md's P55 finding leaves this open and guesses "cutover, most likely". It belongs
 here instead: P56's own row is *"the `engine` Stream"*, and a Stream whose far side answers only
 `ping` cannot be exercised end to end — the acceptance check "open a table and see rows" is the
 whole point of the row. P54's `stdio_main_integration_test.go` already proved the bundle correct
 under a bare `node`. So `resolveEngine()` looks for `runtime/engine/engine.cjs` (beside the
 executable first, then in the source tree) and fails with a message naming `bun run build:engine`;
 `testdata/engine-ping.mjs` is **deleted**, since keeping a second candidate would be exactly the
-half-state `AGENTS.md` rules out. Named alternative if this proves disruptive: keep the flip but
+half-state `CLAUDE.md` rules out. Named alternative if this proves disruptive: keep the flip but
 gate the acceptance check, not the code.
 
 **D13 — the shared engine fixture gains one op, `fixture:echo-data`.** P52 §13's `bridge/stream`
 row demands *"frame passthrough integrity for a ≥1 MB payload"* and *"demux by tag"*. The existing
 fixture answers control-channel ops; nothing in it echoes a **data-tagged** frame back on the data
 tag. `fixture:echo-data` answers on whichever tag it arrived on with the payload verbatim, which is
-what makes "byte-identical, never unmarshalled" assertable. Checked first, per AGENTS.md's P55
+what makes "byte-identical, never unmarshalled" assertable. Checked first, per CLAUDE.md's P55
 finding: the fixture already has six `fixture:` ops, and this is a seventh, not a duplicate.
 
 **D14 — the menu is a Wails-free template rendered by a Wails-dependent builder.**
@@ -501,7 +501,7 @@ hide behind `SetAccelerator`'s silent failure.
 **D15 — `bridge/stream.go` passes the Wails `StreamConn` straight through as the `enginehost.Sink`,
 and does not translate `ErrStreamFull`.** Wails' `Send` **blocks** rather than returning
 `ErrStreamFull` (`stream.go:234-240`; `TrySend` is the non-blocking one, `:243-251` — the same
-correction AGENTS.md's P54 finding already records against P52 §7.2). enginehost's own bounded queue
+correction CLAUDE.md's P54 finding already records against P52 §7.2). enginehost's own bounded queue
 (64 frames / 32 MiB, `stream.go:27-30`) plus a blocking sink is precisely P52 §7.2's stated
 backpressure policy: the queue fills, the read loop stops draining the engine's stdout, and the OS
 pipe pushes back on the engine. `enginehost`'s `ErrStreamFull` retry path stays exercised by P54's
@@ -864,7 +864,7 @@ func (s *OpsService) Cancel(args OpsCancelArgs) error
 ```
 
 Each guards its own bare-id/limit arguments with `ipcerr.BadRequest` before calling anything, per
-the AGENTS.md P55 finding that a bridge method taking a bare id string gets an explicit guard rather
+the CLAUDE.md P55 finding that a bridge method taking a bare id string gets an explicit guard rather
 than relying on the service below to fail legibly: `Replace` rejects an empty `connectionId`
 (`"connectionId is required"`, matching `filters.go`'s existing `List`), `Cancel` rejects an empty
 `opId` (`"opId is required"`).
@@ -1390,7 +1390,7 @@ being ported, not a target:
   Electron app unchanged through the coexistence window; P57 deletes `src/main`.
 - `src/shared/protocol/ipc.ts`, `src/shared/domain/shortcuts.ts`, `queries.ts`,
   `src/shared/protocol/engine-ops.ts` — **read only**, for the literal channel strings, chords and
-  op names this plan requires be read rather than inferred (AGENTS.md's P54 finding).
+  op names this plan requires be read rather than inferred (CLAUDE.md's P54 finding).
 - `src/preload/index.ts`, `src/renderer/bridge/control.ts`, `src/renderer/state/tabs.ts`,
   `src/renderer/project/ConnectionDialog.vue`, `src/renderer/state/objectStore.ts` — **read only**,
   to establish what the renderer actually consumes (§1.1's dead-channel finding, §1.3's ack path,
@@ -1424,7 +1424,7 @@ only in comments, which are updated to say it is gone.
    `package.json` change. `bun run lint` and `bun run typecheck:node` pass (both should be near
    no-ops, which is itself the check that this held).
 5. `wails3 generate bindings -b -i -ts` regenerated from `shell/` **pinned to the go.mod version**
-   (`go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-beta.15` — AGENTS.md's P55 finding
+   (`go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-beta.15` — CLAUDE.md's P55 finding
    about `@latest` skewing to beta.16), then `bun run build:engine && bun run build:wails` succeeds.
 6. **The app boots and the shell works**: the menu shows four sections with working accelerators; a
    menu item's channel reaches the renderer (the shim already subscribes to all 19); the window
@@ -1437,7 +1437,7 @@ only in comments, which are updated to say it is gone.
    stated explicitly rather than implied.
 8. The Electron app still builds and runs (`bun run build`) — the coexistence rule, in force until
    P57.
-9. `AGENTS.md` gains a **"P56 implementation findings"** entry on the same pattern as P52–P55's.
+9. `CLAUDE.md` gains a **"P56 implementation findings"** entry on the same pattern as P52–P55's.
    Five things are already worth writing down before implementation starts and should be confirmed
    or corrected there:
    - **`go build ./internal/...` now needs `libgtk-4-dev`/`libwebkitgtk-6.0-dev`/`pkg-config` on
@@ -1494,12 +1494,12 @@ M5 could be reordered freely among themselves.
 
 ## 10. Environment notes for the implementing session
 
-- **A fresh container has none of the toolchain** (AGENTS.md, P52 findings). M0–M2 need only the Go
+- **A fresh container has none of the toolchain** (CLAUDE.md, P52 findings). M0–M2 need only the Go
   toolchain plus cgo for `mattn/go-sqlite3`. **From M3 on, `go build ./internal/...` itself needs**
   `apt-get install -y libgtk-4-dev libwebkitgtk-6.0-dev pkg-config`, because `internal/shell`
   imports `pkg/application` (§1.8). This is new in P56 and retires the P53 finding.
 - **Install `wails3` pinned**: `go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-beta.15`
-  with `export PATH=$PATH:$(go env GOPATH)/bin`. AGENTS.md's P55 finding: `@latest` resolved to
+  with `export PATH=$PATH:$(go env GOPATH)/bin`. CLAUDE.md's P55 finding: `@latest` resolved to
   beta.16 in that session, a silent skew between the bindings generator and the vendored runtime.
 - **The Wails source is already in the module cache** at
   `$(go env GOPATH)/pkg/mod/github.com/wailsapp/wails/v3@v3.0.0-beta.15/`. Read it there;
@@ -1513,9 +1513,9 @@ M5 could be reordered freely among themselves.
   (`application.go:49-51`). Write them to tolerate that: unique event names, always unsubscribe, and
   never call `Run()`.
 - **A background process started in one shell invocation cannot be signalled from a later one** in
-  this sandbox (AGENTS.md, P51) — start, poll, test and tear down a `wails3 task dev` run inside a
+  this sandbox (CLAUDE.md, P51) — start, poll, test and tear down a `wails3 task dev` run inside a
   single Bash invocation with a 120–150 s timeout, since the first build takes ~60 s.
 - **Screenshotting a headless WebKitGTK window** (`xdotool search --name`, `import -window <id>`,
-  AGENTS.md's P52 findings) is still the practical way to tell "the real app rendered" from "blank
+  CLAUDE.md's P52 findings) is still the practical way to tell "the real app rendered" from "blank
   page because JS threw" here, and is the only way criterion 6's menu/window checks can be
   approximated on Linux at all. The real answers are §6's macOS checks.

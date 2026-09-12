@@ -225,7 +225,7 @@ export function flattenTreeRows(
 }
 
 /** §8's explicit render cap — 500 rows, then a "Show all N files" row, never a second
- *  virtualizer (`AGENTS.md`'s prefer-a-library rule; see the plan's own escalation ladder). */
+ *  virtualizer (`CLAUDE.md`'s prefer-a-library rule; see the plan's own escalation ladder). */
 export const FILE_TREE_ROW_CAP = 500;
 
 export interface CappedRows {

@@ -133,7 +133,7 @@ earlier plan.
   string command line — `gitclient/runner.go`'s own discipline, and `internal/gitvsix` is written
   to the same rule. The `.vsix` path is a filesystem path this app produced; it is still passed as
   a single argv element and never interpolated into anything.
-- **Tests only where `AGENTS.md`'s bar is met.** This phase clears it in exactly two places: the
+- **Tests only where `CLAUDE.md`'s bar is met.** This phase clears it in exactly two places: the
   installer's probe-order/argv/outcome decision structure (a real decision table with five
   outcomes and two fallible spawns), and the palette-audit drift guard (an enforcement test in the
   spirit of `layering_test.go` and `verify-packaging.sh`, not a unit test of a function body).
@@ -381,7 +381,7 @@ with a SHA-256 pin is the *only* way to pin it. `@vscode/vsce` is an ordinary np
 `bun.lock` plus `bunfig.toml`'s `exact = true` already give it a stronger pin (a full integrity
 hash per transitive package) than a hand-rolled fetcher would, and `bun install --frozen-lockfile`
 in CI already installs it before `bun run package` runs. Building a second dependency-acquisition
-path for something the lockfile handles is the kind of hand-rolled infrastructure `AGENTS.md` tells
+path for something the lockfile handles is the kind of hand-rolled infrastructure `CLAUDE.md` tells
 us to reach for a library instead of.
 
 Cost, measured rather than estimated (F7): +120 MB and +5 s on a `node_modules` that is already
@@ -880,9 +880,9 @@ committed checklist: a checklist cannot fail CI, and SPEC explicitly hands futur
 responsibility of registering their own command — they need something that *stops them*, not
 something they must remember to read.
 
-Why this clears `AGENTS.md`'s test bar despite not being "advanced logic": it is the same category
+Why this clears `CLAUDE.md`'s test bar despite not being "advanced logic": it is the same category
 as `internal/layering_test.go` (auto-enumerating packages to enforce a boundary) and
-`scripts/check-tokens.sh` — an invariant guard, not a unit test of a function body. `AGENTS.md`'s
+`scripts/check-tokens.sh` — an invariant guard, not a unit test of a function body. `CLAUDE.md`'s
 bar governs *behavioural* tests.
 
 ### D21 — Version agreement is asserted, and the release workflow writes both files
@@ -976,7 +976,7 @@ file's existing `toWire*` shape.
 existing `application.NewService(&bridge.GitClientsService{…})` literal at `:299`.
 
 **Bindings must be regenerated** — `wails3 task common:generate:bindings` (or `scripts/setup.sh`).
-`AGENTS.md` is emphatic that `-names` is load-bearing and that `frontend/bindings/**` are real Vite
+`CLAUDE.md` is emphatic that `-names` is load-bearing and that `frontend/bindings/**` are real Vite
 import targets; two new bound methods without a regeneration fail the frontend build outright.
 
 ### 3.3 The extension
@@ -1078,7 +1078,7 @@ carries `Contents/Resources/kira-version.vsix`, installed from the *Connected ed
 **`docs/PACKAGING.md`** — §1 gains the `.vsix` step; §3/§5 gain S9/A6; §4's human checklist gains
 the install walkthrough (§6.3 below is the source text).
 
-**`AGENTS.md`** — no change. Nothing here is a standing rule about how the team works.
+**`CLAUDE.md`** — no change. Nothing here is a standing rule about how the team works.
 
 ---
 
@@ -1243,7 +1243,7 @@ Estimated shape: C1–C2 are the riskiest to get *quietly* wrong (F4's ignore tr
 ordering) and the cheapest to verify; C5–C7 are the largest diff; C8 is short but must be run with
 its deliberate breakages rather than assumed.
 
-Per `AGENTS.md`: implement the whole plan, then run the expensive verification once (§6.1(g)/(h))
+Per `CLAUDE.md`: implement the whole plan, then run the expensive verification once (§6.1(g)/(h))
 and land fixes as follow-up commits. Fast checks (`typecheck:git`, `lint`, `build:vscode`) per
 commit.
 

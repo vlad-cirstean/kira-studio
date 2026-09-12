@@ -175,7 +175,7 @@ Neither of these needed a change. PostgreSQL and MySQL/MariaDB are the two real,
 ### 1.4 Reproduced against real containers, before and after
 
 All four runs below used this phase's own worktree, Docker images pulled via `mirror.gcr.io` per
-`AGENTS.md`'s Docker section (`postgres:17-alpine`, `mysql:8.4`, `mariadb:11.4`), and a role/user
+`CLAUDE.md`'s Docker section (`postgres:17-alpine`, `mysql:8.4`, `mariadb:11.4`), and a role/user
 shaped like a real least-privilege application account — not the fixtures' own admin/superuser
 credentials, since (per §1.2) the bug is specifically invisible to an account whose name happens to
 match an existing database.
@@ -287,7 +287,7 @@ tree node gets spuriously marked "connected", which is correct).
 
 ### 1.7 Regression tests added
 
-Per `AGENTS.md`'s carve-out — *"the adapter conformance suites are exempt from [the no-dedicated-
+Per `CLAUDE.md`'s carve-out — *"the adapter conformance suites are exempt from [the no-dedicated-
 unit-test] bar… keep per-capability coverage there even where it reads like a CRUD round-trip"* —
 both adapter conformance suites already contained a numbered "auth failure" case
 (`TestPostgres_AuthFailure`, `postgres_test.go:111-127` pre-phase; the `"auth failure"` subtest,
@@ -424,7 +424,7 @@ so `Testing…`/`OK — <version>` (both short, never truncated) get no tooltip 
 ### 4.1 Go gate
 
 All run from this phase's own isolated worktree, against real Docker containers pulled via
-`mirror.gcr.io` per `AGENTS.md`'s Docker section (`postgres:17-alpine`, `mysql:8.4`, `mariadb:11.4`,
+`mirror.gcr.io` per `CLAUDE.md`'s Docker section (`postgres:17-alpine`, `mysql:8.4`, `mariadb:11.4`,
 `clickhouse/clickhouse-server:26.3`, `confluentinc/cp-kafka:8.0.7`).
 
 | Check | Command | Result |
@@ -512,7 +512,7 @@ errors}.go`, `internal/adapters/{clickhouse,redis,mongo}/client.go`,
 
 **In-repo**: `docs/ARCHITECTURE.md` (the Adapter contract and per-engine sections, read in full
 before touching any adapter's connect path; the Postgres/MariaDB/MySQL tree-shape facts §1.5/§1.6
-cite), `AGENTS.md` (the adapter-conformance-suite test-bar carve-out §1.7 follows, the "measure when
+cite), `CLAUDE.md` (the adapter-conformance-suite test-bar carve-out §1.7 follows, the "measure when
 there's a real question at stake" rule this phase's container reproductions satisfy),
 `docs/v1.1/plans/P23-library-adoption.md` (this plan doc's own structural precedent, and
 `workbench/state/tooltip.ts`'s own header comment, which P23 verified and this phase re-read before

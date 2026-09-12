@@ -827,7 +827,7 @@ blur through the same draft mechanism the name/value cells already use (`Variabl
 | **variable entry** | **in** | The row asks for it; F10 shows Postman already carries one and this app silently drops it on round-trip, so the field also closes a real fidelity gap |
 | **environment** | **in** | Same row; environments are app-local so there is no round-trip question at all, just a column and a field |
 | collection / folder / saved request | **out** | A collection's Postman `info.description` lives untouched inside `origin_json` (`postman/collection.go:62-67`) and this app has never edited it. Making it editable means a column, an origin-merge on write, and a UI — and, unlike a variable, nothing here is *lost* today. Recorded as a follow-on, not folded in |
-| the four request tables' rows (headers, params, urlencoded, form-data) | **out** | This is P4 §8 OQ-10 verbatim, and it is a genuinely different change: four `HttpBodyWire`/`SavedRequest` shapes, `httpRequestTabStateSchema`, the Go body model, `postman/write.go`'s four row builders and `FieldRowsTable.vue`'s column layout. P4 OQ-10 already says *"the change still belongs where the tables live"*. It stays open, unchanged, and this phase does not half-do it (AGENTS.md: *"scope left out of a phase is left out entirely, not half-implemented"*) |
+| the four request tables' rows (headers, params, urlencoded, form-data) | **out** | This is P4 §8 OQ-10 verbatim, and it is a genuinely different change: four `HttpBodyWire`/`SavedRequest` shapes, `httpRequestTabStateSchema`, the Go body model, `postman/write.go`'s four row builders and `FieldRowsTable.vue`'s column layout. P4 OQ-10 already says *"the change still belongs where the tables live"*. It stays open, unchanged, and this phase does not half-do it (CLAUDE.md: *"scope left out of a phase is left out entirely, not half-implemented"*) |
 
 ### D16 — One new tab kind, `variable-set`, reused by path; the environments **list** stays a dialog (item 3)
 
@@ -1101,7 +1101,7 @@ Pure logic first, then Go's twin and the masking fix, then storage, then the sur
 lint`, `bun run typecheck`, `bun run build` per commit; `go build ./...` + `go test
 ./apps/kira-studio/internal/apivars/... ./apps/kira-studio/internal/bridge/...
 ./apps/kira-studio/internal/storage/...` per Go commit; `bun run test:unit` after R1/R2/R8;
-`bun run test:ui` **once**, after R14 (AGENTS.md's implement-then-test cadence).
+`bun run test:ui` **once**, after R14 (CLAUDE.md's implement-then-test cadence).
 
 | # | Commit | Items | Touches | Risk |
 |---|---|---|---|---|
@@ -1158,7 +1158,7 @@ New corpus cases (each passing on both sides, or one of them fails):
 10. `{{missing | upper}}` in a URL with `sanitizeUrlSpan` → `{{missing%20%7C%20upper}}` (D11), and
     the assertion that `new URL(...)` parses it.
 
-### 4.2 New unit coverage, held to AGENTS.md's bar
+### 4.2 New unit coverage, held to CLAUDE.md's bar
 
 These earn tests because they are multi-rule scanners and a reconciler, not CRUD:
 
@@ -1196,7 +1196,7 @@ plumbing:
   and one carrying a new plaintext records exactly one history row.
 
 Nothing else gets a unit test: the migration, the bridge wrappers, the tab-registry entry and the
-Vue components are CRUD, pass-through or DOM behaviour (AGENTS.md).
+Vue components are CRUD, pass-through or DOM behaviour (CLAUDE.md).
 
 ### 4.3 The Go/TS parity checks
 
@@ -1389,7 +1389,7 @@ live preview re-resolves the whole tab state on every keystroke (`HttpRequestVie
 fast path is one `indexOf('|')` over a name-length string when no pipe is present, which is every
 reference that exists today, so the added cost for the common case is a single scan of ~10
 characters per reference per keystroke. **Resolved: no memoization.** A cache keyed on a string
-that changes on every keystroke is the wrong shape, and AGENTS.md's *"measure when there's a real
+that changes on every keystroke is the wrong shape, and CLAUDE.md's *"measure when there's a real
 question at stake"* rule says this is not one.
 
 **OQ-2 — transform arguments will be asked for.** `truncate:20`, `default:foo`, `replace:a:b`,
@@ -1515,5 +1515,5 @@ the masking surfaces), `P15b-request-builder-editor-behavior.md` (D1/D3/D4 — t
 overlay and the completion seams this phase extends by one prop),
 `P16-sql-grid-consistency-search.md` (D6/D14 and its §5 — the select-height rule, the name-only
 filter rule, and the "the masking analysis this phase owes" section shape), `P4-collections.md`
-(D14/D16, F13 and §8 OQ-10). `AGENTS.md`'s library-first rule, unit-test bar (§4.2) and
+(D14/D16, F13 and §8 OQ-10). `CLAUDE.md`'s library-first rule, unit-test bar (§4.2) and
 implement-then-test cadence (§3).

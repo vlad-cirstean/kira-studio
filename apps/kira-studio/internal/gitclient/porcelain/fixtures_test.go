@@ -14,7 +14,7 @@ import (
 )
 
 // The golden corpus (D15): committed raw-byte recordings of real `git log`/`for-each-ref` output,
-// regenerated only under KIRA_GIT_FIXTURES=write (mirroring KIRA_IPC_FIXTURES=write, AGENTS.md).
+// regenerated only under KIRA_GIT_FIXTURES=write (mirroring KIRA_IPC_FIXTURES=write, CLAUDE.md).
 // Deterministic fixed identity + fixed dates + fixed tree content make every commit's own sha
 // reproducible run to run, which is what makes a regenerated .bin byte-identical to the committed
 // one.
@@ -189,7 +189,7 @@ func (b *repoBuilder) commitStaged(message string) string {
 
 // commitSigned adds name/content and commits it SSH-signed against testdata/keys/
 // fixtureSigningKey — a fixed, checked-in, throwaway key (never the machine's own, per D15/
-// AGENTS.md), so the resulting signature bytes, and therefore the commit's own sha, are
+// CLAUDE.md), so the resulting signature bytes, and therefore the commit's own sha, are
 // reproducible across machines and reruns. The key is copied to a fresh 0600 temp file first:
 // ssh-keygen (which `git`'s own gpg.format=ssh shells out to for the actual signing) refuses a
 // key file with group/other permissions, and a git checkout does not reliably preserve the

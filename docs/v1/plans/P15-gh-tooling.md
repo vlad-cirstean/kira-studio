@@ -30,7 +30,7 @@
   `refusing to allow ... to create or update workflow ... without 'workflow' scope` at push time.
   If that happens, do **not** work around it by renaming the files or moving them out of
   `.github/workflows/`: stop, report it, and let the user push that commit or grant the scope.
-- **Commits follow Conventional Commits** (`AGENTS.md`): `ci:` for the workflows and the hook,
+- **Commits follow Conventional Commits** (`CLAUDE.md`): `ci:` for the workflows and the hook,
   `docs:` for the documentation edits. The phase's last step is to land its commits on the v1
   feature branch per SPEC.md §12.
 - Run `bun run lint`, `bun run typecheck` and `bunx electron-vite build` before committing (the
@@ -552,11 +552,11 @@ P15 does **not**:
    §1/§3 defer both past v1, and the release workflow needs no other credential.
 3. **Run the DB suite (or Docker/Colima) in CI** (D6), or add a Linux/Windows job to make it
    possible. macOS-only is in the phase's own spec line.
-4. **Add any hook other than `pre-commit`** — no `commit-msg` (no commitlint dependency; AGENTS.md
+4. **Add any hook other than `pre-commit`** — no `commit-msg` (no commitlint dependency; CLAUDE.md
    is the convention and a human follows it), no `pre-push`, no `post-merge` install hook.
 5. **Add repository-management files** — issue/PR templates, `CODEOWNERS`, `dependabot.yml`,
    `SECURITY.md`, `CONTRIBUTING.md`, labels, or branch-protection configuration. None is named by
-   the spec line, and `AGENTS.md` already is this repo's contribution agreement.
+   the spec line, and `CLAUDE.md` already is this repo's contribution agreement.
 6. **Change `src/`, `tests/`, `playwright.config.ts`, `biome.json`, or `tsconfig*.json`.** If the
    first CI run exposes a genuine repo bug, report it — do not fold a code fix into a tooling
    phase.

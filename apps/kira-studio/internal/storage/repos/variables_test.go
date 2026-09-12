@@ -14,7 +14,7 @@ import (
 
 // P5 §6.2: four cases, each guarding arithmetic or an invariant rather than a CRUD round-trip —
 // that CreateEnvironment then ListEnvironments returns it, that RenameEnvironment renames, that a
-// missing name is refused, that the cipher round-trips a string: each is AGENTS.md's "everything
+// missing name is refused, that the cipher round-trips a string: each is CLAUDE.md's "everything
 // else gets nothing".
 
 // newVariablesRepo mirrors newCollectionsRepo's shape: a real migrated database, plus the real

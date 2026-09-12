@@ -188,7 +188,7 @@ Three recently-landed phases matter here, and only one of them is a constraint:
 - **A false positive is worse than a missing diagnostic.** A language service that underlines valid
   SQL will be turned off and never turned back on. Every diagnostic rule in D7 is bounded by what the
   DDL can actually prove, and every one of them is a **warning**, never an error.
-- **Unit tests only where `AGENTS.md`'s bar is genuinely met.** Two are earned and named in D21; the
+- **Unit tests only where `CLAUDE.md`'s bar is genuinely met.** Two are earned and named in D21; the
   rest of the phase is covered by `tests/ui/`.
 - **Comments only where the code cannot say it for itself.** Five are owed and each is named at its
   decision.
@@ -211,7 +211,7 @@ plan documents and not two parallel agents:
   adds a second button to.
 
 Sequential, not parallel, because both passes edit `ConsoleView.vue`'s `#toolbar` and `#strips` slots
-and both add a field to `ConsoleViewRuntime` — `AGENTS.md`'s own rule (*"never split a single
+and both add a field to `ConsoleViewRuntime` — `CLAUDE.md`'s own rule (*"never split a single
 continuous, order-dependent piece of work across subagents just to run it concurrently"*) applies to
 exactly this. The split earns its keep for a different reason: each pass is independently shippable
 and independently revertible, and a Sonnet subagent carrying fifteen commits' worth of context across
@@ -660,7 +660,7 @@ Nothing about those two numbers can share a threshold.
 `Page` and already stores it under a result key. Therefore: no `Adapter` method, no `Caps` field, no
 `data:` op, no `wire.fbs` edit, no `bun run generate:wire`, and none of the six committed
 `tests/ipc/<adapter>/<adapter>.fixture.ts` files need regenerating — which matters, because
-`AGENTS.md` records that there is **no one-off fixture-capture tool in the tree right now**, so a phase
+`CLAUDE.md` records that there is **no one-off fixture-capture tool in the tree right now**, so a phase
 that needed a fresh capture would be blocked on building one first.
 
 ---
@@ -1134,7 +1134,7 @@ saying plainly rather than discovering it mid-implementation.
 
 **D21 — Two unit tests, both genuinely earned; everything else is `tests/ui/`.**
 
-`AGENTS.md`'s bar names *"a parser or splitter with several interacting lexical rules"* and *"a
+`CLAUDE.md`'s bar names *"a parser or splitter with several interacting lexical rules"* and *"a
 decision structure large enough that no one can hold it in their head"*. Two things here clear it, and
 nothing else does:
 
@@ -1153,7 +1153,7 @@ nothing else does:
 
 Not tested in isolation: the completion source (it is lang-sql's, F1/F2), the hover (a lookup), the
 statement composer (a lookup table), the settings leaf, the migration, the repo (a CRUD round trip —
-`AGENTS.md` names that category explicitly).
+`CLAUDE.md` names that category explicitly).
 
 ---
 
@@ -1179,7 +1179,7 @@ exported from `editor/languages.ts`, called by `languageExtension` unchanged. Th
   service list (the fourteenth), emitting on Set the way `FiltersService` does (D4).
 - `packages/shared/domain/schema.ts` — the wire shape + zod schema.
 - Regenerate bindings (`wails3 generate bindings -b -i -ts` from `apps/kira-studio/`) — required before
-  any frontend build, per `AGENTS.md`.
+  any frontend build, per `CLAUDE.md`.
 - `frontend/src/bridge/control.ts` + `frontend/src/state/schemas.ts` — the renderer-side store and its
   event subscription.
 
@@ -1277,7 +1277,7 @@ warning with its **Show plan** action.
 control-plane mock already answers arbitrary channels through `CHANNEL_TO_FQN`. The postgres fixture
 (`orderItemsFixture`) and `console.spec.ts:132-260`'s open-a-console-from-the-tree flow are the pattern
 to follow, and P13's own `console-format.spec.ts` is the closest sibling. **No new port fixture capture
-is needed** — no scenario runs a statement — which matters, per `AGENTS.md`'s note that there is no
+is needed** — no scenario runs a statement — which matters, per `CLAUDE.md`'s note that there is no
 one-off capture tool in the tree.
 
 1. **The dialog round-trips.** Open **Schema (DDL)…** from the connection context menu, type a two-table
@@ -1353,7 +1353,7 @@ go build ./apps/kira-studio/... && go test ./apps/kira-studio/internal/...
 ```
 
 Both passes need `wails3 generate bindings -b -i -ts` from `apps/kira-studio/` before the first
-frontend build (C2 and C13 each change a bound service's method set) — `AGENTS.md`'s Wails section is
+frontend build (C2 and C13 each change a bound service's method set) — `CLAUDE.md`'s Wails section is
 explicit that missing bindings fail the Vite build with an unresolvable import, not a stale-bindings
 surprise. `bunx playwright install webkit` plus the libraries its post-install warning names must run
 before the first `test:ui` in a fresh container.

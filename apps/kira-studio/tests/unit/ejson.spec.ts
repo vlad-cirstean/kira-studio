@@ -3,7 +3,7 @@
 // fix — nothing caught a throw from either (ContextMenu.vue's onItemClick is never awaited by its
 // own @click binding). This module had zero prior test coverage despite detectWrapper() covering
 // every BSON extended-JSON wrapper this app recognises (P27 D13) — exactly the "parser with
-// several interacting lexical rules" AGENTS.md's own bar keeps. Confirmed empirically first
+// several interacting lexical rules" CLAUDE.md's own bar keeps. Confirmed empirically first
 // (a real Mongo-shaped document through every wrapper below, deeply nested) that none of them
 // throws; this file pins that finding so a future wrapper addition/change can't silently regress
 // it back into a synchronous throw that a caller with no try/catch would swallow.
@@ -187,7 +187,7 @@ describe("parseIdLabel — DocumentPage.ids' own EJSON text", () => {
 // P22b D11: the third copy format — Relaxed Extended JSON only ever changes number/date
 // representation (spec-defined, not this app's own invention); every other wrapper is byte-
 // identical to canonical. Interacting per-type rules over a recursive walk is exactly
-// AGENTS.md's "parser with several interacting rules" bar.
+// CLAUDE.md's "parser with several interacting rules" bar.
 describe('toRelaxedText — canonical -> Relaxed Extended JSON v2', () => {
   test('$numberInt/$numberLong/a finite $numberDouble unwrap to a bare JSON number', () => {
     expect(toRelaxedText('{"a":{"$numberInt":"5"},"b":{"$numberLong":"123"}}')).toBe(

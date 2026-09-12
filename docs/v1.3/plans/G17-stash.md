@@ -356,7 +356,7 @@ Three considerations, weighed against each other rather than picked from:
   waved past.** `WalkSpec.StashShas`/`IncludeStash`, `walk.go`'s cache-key inclusion of both, and
   `stashRows.ts`'s complete filter were all clearly built *for* this integration, by whoever ported
   `git-core`/`gitclient/porcelain` wholesale — and a default-`true` setting that silently does
-  nothing is exactly the shape AGENTS.md's own git-core-cleanup precedent (commit `90b85c05`'s own
+  nothing is exactly the shape CLAUDE.md's own git-core-cleanup precedent (commit `90b85c05`'s own
   message: "a user-editable setting that silently does nothing is worse than no setting") argues
   against leaving in place.
 
@@ -695,7 +695,7 @@ One new table row for `"conflicts in index"` → `StashIndexConflict`.
 line of the same file, a stash pushed on one, `stash pop` run after switching), asserting the result
 is `OpResult{OK: false, Error: &OpError{Kind: "StashConflict", ...}}`, never `Unknown`, and that the
 stash entry still exists afterward (`stash list` unchanged) — the concurrency/interacting-rules
-carve-out AGENTS.md names applies directly here (D6 is genuinely new logic, not a thin wrapper).
+carve-out CLAUDE.md names applies directly here (D6 is genuinely new logic, not a thin wrapper).
 
 ### 3.10 `apps/kira-studio/internal/gitrpc/ops.go` — **not edited**
 

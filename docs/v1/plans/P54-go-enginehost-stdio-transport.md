@@ -236,7 +236,7 @@ genuinely ports, and it is not optional"*; it is one line in the spawner and thi
 
 **D14 — `enginehost` never imports Wails.** The renderer-facing sink is a one-method interface
 (`Sink`) defined here. This keeps `go test ./internal/...` free of the GTK/WebKit dev headers — the
-exact distinction `AGENTS.md`'s P53 findings tell the next session to preserve — and lets the stream
+exact distinction `CLAUDE.md`'s P53 findings tell the next session to preserve — and lets the stream
 tests use a fake sink that can be made full, closed or slow on demand.
 
 ## 3. The wire format
@@ -874,7 +874,7 @@ packaging — **P57**.
 
 ## 9. Environment notes for the implementing session
 
-- Per `AGENTS.md`'s P52/P53 findings, **a fresh container has none of the toolchain.** This phase is
+- Per `CLAUDE.md`'s P52/P53 findings, **a fresh container has none of the toolchain.** This phase is
   almost entirely `./internal/...` work, which needs only the Go toolchain — `enginehost` imports no
   cgo at all. A bare `go build ./...`/`go test ./...` compiles the root `main` package, which imports
   Wails and does need `apt-get install -y libgtk-4-dev libwebkitgtk-6.0-dev pkg-config`. Prefer
@@ -889,8 +889,8 @@ packaging — **P57**.
   `wails.io`/`v3.wails.io` are 403-blocked from both of this project's environments.
 - `wails3 generate bindings` is **not** needed for this phase: no bound service method's signature
   changes (`EngineService.Status()` is untouched). It *is* needed before the next
-  `bun run build:wails`, per `AGENTS.md`'s P53 finding, if the tree is otherwise stale.
-- **`AGENTS.md` owes a "P54 implementation findings" entry** on the same pattern as P52's and P53's.
+  `bun run build:wails`, per `CLAUDE.md`'s P53 finding, if the tree is otherwise stale.
+- **`CLAUDE.md` owes a "P54 implementation findings" entry** on the same pattern as P52's and P53's.
   Two things are already worth writing down before implementation starts, and should be confirmed or
   corrected there: that stdout is the frame channel and therefore `console` must be repointed
   (§1.3), and that `application.StreamConn.Send` blocks while `TrySend` is the `ErrStreamFull`

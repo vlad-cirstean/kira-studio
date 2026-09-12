@@ -1,5 +1,5 @@
 // P17 D21/D22: the bulk `.env` editor's own parse/serialize/reconcile — a real parser and a real
-// reconciler, not CRUD, so this earns the unit-test bar AGENTS.md sets (§4.2 of the plan).
+// reconciler, not CRUD, so this earns the unit-test bar CLAUDE.md sets (§4.2 of the plan).
 
 import { describe, expect, test } from 'bun:test';
 import {

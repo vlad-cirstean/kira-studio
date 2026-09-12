@@ -9,7 +9,7 @@ import (
 )
 
 // FixtureWriteEnv is capture.ts's FIXTURE_WRITE_ENV, ported verbatim (P58f §4.6/D15) so the muscle
-// memory and the AGENTS.md line survive the port unchanged.
+// memory and the CLAUDE.md line survive the port unchanged.
 const FixtureWriteEnv = "KIRA_IPC_FIXTURES"
 
 // IsWriteMode is capture.ts's isFixtureWriteMode.

@@ -155,7 +155,7 @@ So the SPEC row's item 11 is real work, not a flag flip — but the reason it wa
 across `frontend/src` returns only `views/console/ConsoleView.vue`; the request body editor
 (`RequestBodyPane.vue:120-133`) passes none. `@codemirror/autocomplete@6.20.3` is already a
 dependency (root `package.json` devDependencies), so `closeBrackets()` costs nothing to adopt where
-it is correct — which is `AGENTS.md`'s library-first rule applied literally.
+it is correct — which is `CLAUDE.md`'s library-first rule applied literally.
 
 Both files also share one rule worth preserving: a *whole-document/whole-field* selection is a
 "replace everything" gesture, not a wrap (`editor/wrapSelection.ts:28`, `theme/wrapSelection.ts:32`,
@@ -416,7 +416,7 @@ Two independent halves, matching the two `wrapSelection` implementations:
 **(a) The body editor gets the library's own `closeBrackets()`.** `CodeMirrorHost` gains
 `autoCloseBrackets?: boolean` (default `false`, so every existing host is untouched), resolving to
 `[closeBrackets(), keymap.of(closeBracketsKeymap)]` from `@codemirror/autocomplete` — already a
-pinned dependency (F3), and `AGENTS.md`'s library-first rule makes hand-rolling this a decision that
+pinned dependency (F3), and `CLAUDE.md`'s library-first rule makes hand-rolling this a decision that
 would need defending rather than the default. `RequestBodyPane.vue` passes `auto-close-brackets` on
 both of its editor hosts (`:120-133`).
 
@@ -553,7 +553,7 @@ D1 refactors `resolve`'s classification branch into a named function; that corpu
 **unedited** is the proof the refactor changed no rule. `go test ./apps/kira-studio/internal/apivars/...`
 reads the same corpus and should be run once alongside it.
 
-**New unit coverage** (`packages/api-core/test/`), held to `AGENTS.md`'s bar — these are a
+**New unit coverage** (`packages/api-core/test/`), held to `CLAUDE.md`'s bar — these are a
 multi-rule scanner and a precedence table, not CRUD:
 
 1. `splitTemplateSpans` offsets: adjacent references, an unterminated `{{`, an empty `{{}}`, a
@@ -707,5 +707,5 @@ D2 paints from).
 completion/hover/lint prop seams this phase extends by one), `docs/v1.2/plans/P13-api-ui-check.md`
 (structure, and its OQ-4's "no codepoints from CSS" rule), `docs/v1.2/plans/P12-studio-api-modularization.md`
 (the `biome.json` import boundaries §0.2 and D4/D6 are written to), and part 1
-(`docs/v1.2/plans/P15-request-builder-ux.md`), whose M3/M7 this phase assumes. `AGENTS.md`'s
+(`docs/v1.2/plans/P15-request-builder-ux.md`), whose M3/M7 this phase assumes. `CLAUDE.md`'s
 library-first rule (D5(a)), unit-test bar (§4) and implement-then-test cadence (§3).

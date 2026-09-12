@@ -19,4 +19,4 @@ outranks both, and `ARCHITECTURE.md` is authoritative for behavior over `SPEC.md
 did — it just does not otherwise change what earlier phases already said about themselves.
 
 `docs/v1/` and `docs/v1.1/` stay in the repository as history; nothing here retroactively edits
-either, and `AGENTS.md` now points at this folder's `SPEC.md` as the live phasing record instead.
+either, and `CLAUDE.md` now points at this folder's `SPEC.md` as the live phasing record instead.

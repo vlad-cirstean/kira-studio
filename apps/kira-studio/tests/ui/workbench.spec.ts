@@ -8,7 +8,7 @@ import { expect, test } from './fixtures';
 // so those five scenarios have no equivalent here and are not ported; they are also not covered
 // by tests/e2e/sqlite.spec.ts (the one full-stack anchor D16 keeps, and D16's own rule is that
 // its assertions do not grow to cover what this port drops), so this is a real, acknowledged
-// coverage loss — see docs/AGENTS.md's P57 findings (M8) and P57-cutover.md §7. Only the two
+// coverage loss — see docs/CLAUDE.md's P57 findings (M8) and P57-cutover.md §7. Only the two
 // scenarios below asserted pure rendering with no relaunch-persistence claim.
 
 test('the workbench is inset from the window edge on two sides, none from the title bar (P31 D8)', async ({

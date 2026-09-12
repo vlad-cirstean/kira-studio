@@ -63,11 +63,11 @@
   steps 4–6's file directly, `view-state.spec.ts` drives `views/keyvalue/state.ts`'s and
   `views/browse/state.ts`'s `load()` through steps 8–10, and `scan.spec.ts` covers step 13's
   `views/shared/page/scan.ts`. `tests/db/`, `tests/electron-db/` and `tests/ui/` cannot run in this
-  sandbox (AGENTS.md's Docker/Electron notes) — they are unchanged by this phase apart from step
+  sandbox (CLAUDE.md's Docker/Electron notes) — they are unchanged by this phase apart from step
   10's one behavioural fix, and §5 says what a machine with Docker must re-run before this is called
   done.
 - **No new dependency.** Nothing here needs one.
-- Comments per AGENTS.md: only where the code cannot say it for itself. Each new shared module gets
+- Comments per CLAUDE.md: only where the code cannot say it for itself. Each new shared module gets
   one header comment naming the copies it replaces (P39's own convention, so the next audit can tell
   extraction from coincidence); the call sites lose the comments that used to explain the copy.
 - Conventional Commits, one per step of §4: `refactor(...)`, `fix(...)`, `build(lint):`, `docs:`.
@@ -1004,7 +1004,7 @@ Runnable in this sandbox, after **every** commit:
   `scan.spec.ts` (step 13), `column-range.spec.ts` (step 17), plus the new keyset-position cases
   added in step 5.
 
-Not runnable here (AGENTS.md's Docker and Electron-binary notes) and therefore recorded as owed:
+Not runnable here (CLAUDE.md's Docker and Electron-binary notes) and therefore recorded as owed:
 
 - `bun test tests/db` — steps 1–7 touch every adapter's read/console path. The pre-existing
   12 pass / 10 fail baseline P39 recorded is the bar: same counts, zero resolution errors.

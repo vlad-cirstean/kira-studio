@@ -1,6 +1,6 @@
 # G33 — Docs update: the v1.3 chapter's closeout
 
-> **Phase row (SPEC.md:346), abbreviated:** the root `README.md` (silent on git), `docs/ARCHITECTURE.md` (git as a real, shipped subsystem — transport, session model, package list), `AGENTS.md` (new environment/convention notes), and this chapter's own `Known open items` / `Out of scope` sweep. Explicitly **not** in scope: `docs/v1.3/plans/G<N>-*.md`. **No new code.**
+> **Phase row (SPEC.md:346), abbreviated:** the root `README.md` (silent on git), `docs/ARCHITECTURE.md` (git as a real, shipped subsystem — transport, session model, package list), `CLAUDE.md` (new environment/convention notes), and this chapter's own `Known open items` / `Out of scope` sweep. Explicitly **not** in scope: `docs/v1.3/plans/G<N>-*.md`. **No new code.**
 
 > **Run out of order, by explicit instruction.** Normally G33 depends on G30–G32. The user asked for this docs phase **first**; the three review rounds run later, in a separate pass. HEAD is `2c092795`; **G1–G29 are shipped, merged and verified** and are treated as ground truth throughout. Two parts of the row's scope are therefore only *partially* completable now and are handed forward explicitly in §6 — nothing in this plan guesses at what a future review round might find.
 
@@ -12,7 +12,7 @@
 |---|---|
 | `README.md` — the git module gets its own feature section, plus requirements/scripts/tests/layout/docs sweeps | — |
 | `docs/ARCHITECTURE.md` — a new `## Git module (v1.3)` section (transport, session model, package list), plus Storage/Process-model/Testing/bound-service integration | — |
-| `AGENTS.md` — the durable environment facts G1–G29 actually produced, plus a chapter-pointer staleness sweep | The review rounds' own notes (G30–G32 haven't run) |
+| `CLAUDE.md` — the durable environment facts G1–G29 actually produced, plus a chapter-pointer staleness sweep | The review rounds' own notes (G30–G32 haven't run) |
 | `docs/v1.3/SPEC.md` — `Known open items` and `Out of scope for v1.3` swept against what **G1–G29** closed | Anything only G30–G32 would close |
 | `docs/PERF.md` — one new `§2.13` recording G3/G8's transport re-baseline (see §3.5 for why this is in scope, not creep) | Real-hardware macOS numbers (§3 has never been run) |
 | — | `docs/v1.3/plans/G<N>-*.md` — historical records, untouched |
@@ -65,15 +65,15 @@ Everything else is a false positive (`VS Code Dark Modern` tokens `:30`, `git-ig
 |---|---|---|
 | `:1942` | "registers **fifteen** bound services under `internal/bridge/`" and enumerates them | `main.go:317–338` registers **22**; six are v1.2's (`GrpcService`, `CollectionsService`, `VariablesService`, `ResponseHistoryService`, `GrpcHistoryService`, `DataGripService`) and one is v1.3's `GitClientsService` |
 | `:1772` | "**Two processes**: the webview … and the Go shell" | True of Studio/Api; the git module adds a third process over a second transport |
-| `:2182` | "Its `workflow_dispatch` CI workflow is written and staged, not live (`AGENTS.md`'s Known open items)" | **Dead pointer** — `AGENTS.md:124–135`'s Known open items holds only the window-clamp item. The staged file is `docs/pending-workflows/test-matrix.yml` |
+| `:2182` | "Its `workflow_dispatch` CI workflow is written and staged, not live (`CLAUDE.md`'s Known open items)" | **Dead pointer** — `CLAUDE.md:124–135`'s Known open items holds only the window-clamp item. The staged file is `docs/pending-workflows/test-matrix.yml` |
 | `:2129` | "Four suites, under `apps/kira-studio/tests/`" | A fifth exists under `apps/kira-studio-vscode/tests/` |
 | `:542–603` | The `kira.db` schema block | Missing `git_clients` (migration `0016_g1_git_clients.sql`) and `git_repo_settings` (`0017_g18_git_repo_settings.sql`) |
 | `:849–865` | The "every table is growth-bounded" table (headed "all nineteen tables") | Two tables added since; the table needs both rows |
 | `:11–13` | "Where this file and `docs/v1/SPEC.md` disagree…" | Four chapters exist now |
 
-### 1.3 `AGENTS.md` (300 lines) — the precedent notes, and what G1–G29 genuinely produced
+### 1.3 `CLAUDE.md` (300 lines) — the precedent notes, and what G1–G29 genuinely produced
 
-**The two precedents the SPEC row names.** The `docs/pending-changes/` note is **`AGENTS.md:105–122`**, its own `##` section titled "`.github/workflows/` changes can't be pushed from here" (commit `78653447`). The "verification-scope" note is **not** in this file — it is `docs/v1.3/SPEC.md:351–364`, "**Full verification scope, 2026-09-07**". So "same spirit" means: *a durable, mid-chapter operational rule, written where it belongs, in the host document's own register* — not "both live in AGENTS.md".
+**The two precedents the SPEC row names.** The `docs/pending-changes/` note is **`CLAUDE.md:105–122`**, its own `##` section titled "`.github/workflows/` changes can't be pushed from here" (commit `78653447`). The "verification-scope" note is **not** in this file — it is `docs/v1.3/SPEC.md:351–364`, "**Full verification scope, 2026-09-07**". So "same spirit" means: *a durable, mid-chapter operational rule, written where it belongs, in the host document's own register* — not "both live in CLAUDE.md".
 
 **The file's own governing rules, which constrain what may be added (`:1–5`, `:96–103`):**
 - *"Facts about the app itself — driver choices, protocol constraints, capability quirks — live in `docs/ARCHITECTURE.md`, not here. This file is process and environment only."*
@@ -84,14 +84,14 @@ Everything else is a false positive (`VS Code Dark Modern` tokens `:30`, `git-ig
 
 | Candidate (source) | Verdict |
 |---|---|
-| **`CGO_ENABLED=1 GOOS=darwin` cannot cross-compile here** — `clang: error: unsupported option '-arch'` inside `runtime/cgo`; `CGO_ENABLED=0 GOOS=darwin GOARCH=arm64` succeeds (G29 plan `:7`, `:33–34`, `:177–178`, measured, not reasoned) | **ADD.** A durable environment fact about *this container*, with a real design consequence (it is why `startupfail` is pure-Go `osascript` rather than a cgo `NSAlert`). Textbook `AGENTS.md` content |
+| **`CGO_ENABLED=1 GOOS=darwin` cannot cross-compile here** — `clang: error: unsupported option '-arch'` inside `runtime/cgo`; `CGO_ENABLED=0 GOOS=darwin GOARCH=arm64` succeeds (G29 plan `:7`, `:33–34`, `:177–178`, measured, not reasoned) | **ADD.** A durable environment fact about *this container*, with a real design consequence (it is why `startupfail` is pure-Go `osascript` rather than a cgo `NSAlert`). Textbook `CLAUDE.md` content |
 | **Running/testing the git module here** — the git Go tests need only a real `git ≥ 2.38` on `PATH` and a `t.TempDir()` (no Docker, no display); `KIRA_HOME` scopes the *socket* as well as the DB; the perf probes are `KIRA_GIT_PERF=1` and assert nothing; FSEvents is `darwin && cgo` so Linux runs the `fsnotify` companion; `test:webview` needs no VS Code and no `xvfb` | **ADD**, as one new `##` section, mirroring the existing per-topic sections (`Docker`, `tests/ipc/`, `ClickHouse`, `SQLite`, `Secrets`, `Wails v3 / Go`) |
-| **`internal/gitclient` belongs in the `darwin && cgo` package list** (`AGENTS.md:262`) | **ADD** (one identifier into an existing list) — `docs/ARCHITECTURE.md:53` already names it; `AGENTS.md` says only "any package that later follows the same pattern" |
+| **`internal/gitclient` belongs in the `darwin && cgo` package list** (`CLAUDE.md:262`) | **ADD** (one identifier into an existing list) — `docs/ARCHITECTURE.md:53` already names it; `CLAUDE.md` says only "any package that later follows the same pattern" |
 | **Chapter pointers are stale** — `:12–13`, `:33`, `:98` all say `docs/v1.2/SPEC.md` / `docs/v1.2/plans/`; `:46` says "One feature branch for all of v1" | **FIX.** This is precisely the file's own `:100–102` instruction ("remove what's gone stale too — a pointer to a deleted file/subsystem") |
-| G27's NFC tier-1/tier-2 rule; G28's `refs/kira/*` namespace; G23's conformance-corpus twin rule; G16's rendered-box-height guard | **DECLINE for `AGENTS.md`.** Every one is a *fact about the app*, which `AGENTS.md:3–5` explicitly routes to `docs/ARCHITECTURE.md`. All four are in this plan's ARCHITECTURE additions instead |
+| G27's NFC tier-1/tier-2 rule; G28's `refs/kira/*` namespace; G23's conformance-corpus twin rule; G16's rendered-box-height guard | **DECLINE for `CLAUDE.md`.** Every one is a *fact about the app*, which `CLAUDE.md:3–5` explicitly routes to `docs/ARCHITECTURE.md`. All four are in this plan's ARCHITECTURE additions instead |
 | Review-round findings | **Cannot be done** — G30–G32 have not run (§6) |
 
-**`AGENTS.md`'s own `Known open items` (`:124–135`)** holds one item: the first-launch window-size clamp (P22 D6(a)). **Still genuinely open.** G29 touched `main.go`'s boot sequence for *failure alerts*; it did not defer startup window creation past `ApplicationDidFinishLaunching`, which is what closing it needs. **Keep verbatim.**
+**`CLAUDE.md`'s own `Known open items` (`:124–135`)** holds one item: the first-launch window-size clamp (P22 D6(a)). **Still genuinely open.** G29 touched `main.go`'s boot sequence for *failure alerts*; it did not defer startup window creation past `ApplicationDidFinishLaunching`, which is what closing it needs. **Keep verbatim.**
 
 ### 1.4 `docs/v1.3/SPEC.md` — the two sections, item by item
 
@@ -113,7 +113,7 @@ Both matchers are pinned by one shared corpus, `packages/git-core/testdata/searc
 
 (Note: these are **v1.3's** G3 and G8, both shipped, not v1.1 phases.) `TestGraphStreamPerf` exists at `internal/gitsock/graphstream_test.go:593` (G3); `TestG8PerfBaseline` at `internal/gitsock/perf_test.go:71` (G8), nine subtests. Both are gated `KIRA_GIT_PERF=1` + `!testing.Short()` + `git` on `PATH`, and **assert nothing** by deliberate decision (G8 D12: "a hard assertion in a suite that also runs on real macOS hardware would be flaky in exactly the way that note warns against").
 
-The numbers were recorded in commit `5729795d`'s message — the durable record `AGENTS.md:43–45` names — and G8's plan `§12` was left with pre-phase figures only, because that session was instructed not to edit its own plan doc ("flagged for the orchestrator to carry over"). **That carry-over never happened.** The measured results:
+The numbers were recorded in commit `5729795d`'s message — the durable record `CLAUDE.md:43–45` names — and G8's plan `§12` was left with pre-phase figures only, because that session was instructed not to edit its own plan doc ("flagged for the orchestrator to carry over"). **That carry-over never happened.** The measured results:
 
 ```
 P-a graph.stream, 1 conn:          n=20000 chunks=10 firstChunk=218ms total=220ms meanBytes/chunk=42167
@@ -199,7 +199,7 @@ dependency at all**, and no sidecar (P58b M6.4); see
 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)'s ClickHouse section.
 ```
 
-*Why here:* the claim names a dependency the repo does not have (`go.mod` has no `clickhouse-go`), directly contradicting `docs/ARCHITECTURE.md:224–231`. `AGENTS.md:100–102` asks a doc-touching pass to remove what has gone stale.
+*Why here:* the claim names a dependency the repo does not have (`go.mod` has no `clickhouse-go`), directly contradicting `docs/ARCHITECTURE.md:224–231`. `CLAUDE.md:100–102` asks a doc-touching pass to remove what has gone stale.
 
 ---
 
@@ -918,11 +918,11 @@ re-derivation" warns against. Their numbers are in `docs/PERF.md` §2.13.
 ```
 
 (c) Fix the dead pointer at `:2181–2182`. Replace "Its `workflow_dispatch` CI workflow is written
-and staged, not live (`AGENTS.md`'s Known open items)." with:
+and staged, not live (`CLAUDE.md`'s Known open items)." with:
 
 ```markdown
 Its `workflow_dispatch` CI workflow is written and staged, not live — `docs/pending-workflows/test-matrix.yml`,
-staged rather than committed for the push-scope reason `AGENTS.md`'s own `.github/workflows/`
+staged rather than committed for the push-scope reason `CLAUDE.md`'s own `.github/workflows/`
 section explains.
 ```
 
@@ -941,7 +941,7 @@ originally written rather than corrected to match later reality — see each cha
 
 ---
 
-### 3.3 `AGENTS.md`
+### 3.3 `CLAUDE.md`
 
 ---
 
@@ -954,7 +954,7 @@ originally written rather than corrected to match later reality — see each cha
 | `:46` | `No per-phase PRs. One feature branch for all of v1.` | `No per-phase PRs. One feature branch per chapter.` |
 | `:98` | ``belongs in that phase's plan doc under `docs/v1.2/plans/``` | ``belongs in that phase's plan doc under the current chapter's `plans/``` |
 
-*Why:* `AGENTS.md:100–102` — "When you touch this file, remove what's gone stale too — … a pointer
+*Why:* `CLAUDE.md:100–102` — "When you touch this file, remove what's gone stale too — … a pointer
 to a deleted file/subsystem". Three chapters have passed since these were written.
 
 ---
@@ -1042,7 +1042,7 @@ this file's own "keep an item only while genuinely open" rule in the opposite di
 ```markdown
 ## Known open items
 
-Both items this section carried through the chapter are closed and removed, per `AGENTS.md`'s
+Both items this section carried through the chapter are closed and removed, per `CLAUDE.md`'s
 "keep an item only while genuinely open, delete it the moment it's resolved" rule. **RE2 vs. JS
 `RegExp` in search** was closed by G23, with a stronger answer than this section asked for — a
 literal query runs no regex engine at all, a regex query is translated construct by construct with
@@ -1057,7 +1057,7 @@ open questions here.
 - **G30-G32's own findings have not been swept into this section yet.** G33 was run *ahead* of the
   three review rounds by explicit instruction (see `docs/v1.3/plans/G33-docs-update.md`), so its
   sweep covers what **G1-G29** closed and nothing more. Whatever round 3 leaves genuinely open
-  belongs here, and this section — together with `AGENTS.md`'s own environment/convention notes —
+  belongs here, and this section — together with `CLAUDE.md`'s own environment/convention notes —
   gets one further pass once G32 finishes. That pass is the chapter's actual last act.
 ```
 
@@ -1098,7 +1098,7 @@ cell, before the ` | G30, G31, G32 | new` column separators:
 
 ```
 . **Run out of order, 2026-09-09**: at the user's explicit instruction this phase ran *before*
-G30-G32 rather than after them, so its `AGENTS.md` pass and its "Known open items" sweep cover
+G30-G32 rather than after them, so its `CLAUDE.md` pass and its "Known open items" sweep cover
 G1-G29 only. The review rounds' own contribution to both is a follow-up pass once G30-G32 land —
 see `docs/v1.3/plans/G33-docs-update.md` §6
 ```
@@ -1222,12 +1222,12 @@ If taken, R9's `docs/v1.3/` entry gains "(see `docs/v1.3/README.md`)" to match t
 | A4 | `docs/ARCHITECTURE.md` | Storage: two `review.db` paragraphs | Insert after `:786` | Yes |
 | A5 | `docs/ARCHITECTURE.md` | Process model: name the third process | Replace `:1772–1773` | Yes |
 | A6 | `docs/ARCHITECTURE.md` | Bound services: fifteen → twenty-two, grouped by module, `GitClientsService` named | Replace `:1941–1948` | Yes |
-| A7 | `docs/ARCHITECTURE.md` | Testing: five suites; webview tier; git Go coverage; fix the dead `AGENTS.md` pointer | Edit `:2129–2132`, `:2181–2182`, insert at `:2276` | Yes |
+| A7 | `docs/ARCHITECTURE.md` | Testing: five suites; webview tier; git Go coverage; fix the dead `CLAUDE.md` pointer | Edit `:2129–2132`, `:2181–2182`, insert at `:2276` | Yes |
 | A8 | `docs/ARCHITECTURE.md` | Header: generalise "`docs/v1/SPEC.md`" to any chapter's SPEC | Replace `:11–14` | Recommended |
-| M1 | `AGENTS.md` | Chapter-pointer staleness sweep (4 spots) | Edit `:12–13`, `:33`, `:46`, `:98` | Yes |
-| M2 | `AGENTS.md` | `GOOS=darwin` + `CGO_ENABLED` fact; name `internal/gitclient` in the cgo list | Insert after `:266`; edit `:261–263` | Yes |
-| M3 | `AGENTS.md` | **New `## The git module — running and testing it here` section** | Insert between `:239` and `:241` | Yes |
-| M4 | `AGENTS.md` | `Known open items` | **No change** — still genuinely open | n/a |
+| M1 | `CLAUDE.md` | Chapter-pointer staleness sweep (4 spots) | Edit `:12–13`, `:33`, `:46`, `:98` | Yes |
+| M2 | `CLAUDE.md` | `GOOS=darwin` + `CGO_ENABLED` fact; name `internal/gitclient` in the cgo list | Insert after `:266`; edit `:261–263` | Yes |
+| M3 | `CLAUDE.md` | **New `## The git module — running and testing it here` section** | Insert between `:239` and `:241` | Yes |
+| M4 | `CLAUDE.md` | `Known open items` | **No change** — still genuinely open | n/a |
 | S1 | `docs/v1.3/SPEC.md` | `## Known open items` — delete both resolved items, add the G30–G32 forward note | Replace `:444–453` | Yes |
 | S2 | `docs/v1.3/SPEC.md` | `## Out of scope for v1.3` — rewrite all three bullets, bullet 3 substantively | Replace `:433–442` | Yes |
 | S3 | `docs/v1.3/SPEC.md` | G33 phasing row: record the out-of-order run | Append to `:346`'s cell | Recommended |
@@ -1267,7 +1267,7 @@ Docs-only, so verification is correctness of claims and links, not a test suite.
    `docs/PERF.md`. A trivial loop over Markdown link targets is enough.
 4. **No dangling cross-reference is created or left.** `docs/PERF.md` §2.13 must exist if S1 cites
    it; the ARCHITECTURE Git module section must exist if S1 and the README cite it. Re-grep for
-   `AGENTS.md`'s Known open items as a *citation target* after A7 lands — the one dead pointer is
+   `CLAUDE.md`'s Known open items as a *citation target* after A7 lands — the one dead pointer is
    the only occurrence.
 5. **`bun run lint`** still passes (Biome does not lint Markdown, but this catches an accidental
    non-doc edit for free). No typecheck/test run is warranted; nothing they cover changed.
@@ -1283,18 +1283,18 @@ Docs-only, so verification is correctness of claims and links, not a test suite.
 
 ### 6.1 The two things this pass could only half-do, and why
 
-**(a) `AGENTS.md`'s "notes the three review rounds produced" — not started, because there is
+**(a) `CLAUDE.md`'s "notes the three review rounds produced" — not started, because there is
 nothing to fold in.** The SPEC row asks for the environment/convention notes G30–G32 produce.
 **G30, G31 and G32 have not run.** There are no findings, and manufacturing what a review round
-"probably" finds would be exactly the fabrication `AGENTS.md:41–42` forbids ("a round that finds
+"probably" finds would be exactly the fabrication `CLAUDE.md:41–42` forbids ("a round that finds
 nothing real should say so rather than manufacture a finding"). What §3.3 delivers instead is every
 durable environment/convention note **G1–G29's own shipped work** actually produced — the darwin
 cgo cross-compile constraint (measured in G29), the git module's operational section, and the
-chapter-pointer staleness sweep. **Follow-up required after G32:** re-read `AGENTS.md` against the
+chapter-pointer staleness sweep. **Follow-up required after G32:** re-read `CLAUDE.md` against the
 three rounds' findings and append only what is a *standing rule* for how this team works or a
 *durable fact about this environment* — routing anything that is a fact about the app to
-`docs/ARCHITECTURE.md` instead, per `AGENTS.md:3–5`, and anything that is one round's discovery to
-that round's commit log, per `AGENTS.md:43–45`.
+`docs/ARCHITECTURE.md` instead, per `CLAUDE.md:3–5`, and anything that is one round's discovery to
+that round's commit log, per `CLAUDE.md:43–45`.
 
 **(b) `docs/v1.3/SPEC.md`'s "Known open items" sweep — done for G1–G29, one pass still owed.** Both
 items the section carried are closed and removed (§3.4 S1), each with cited evidence from shipped
@@ -1306,7 +1306,7 @@ genuinely open, and delete anything the rounds themselves closed. That pass is t
 last act, and G33's own SPEC row should probably be read as covering it.
 
 **A note on sequencing for whoever runs that pass.** It is a small, well-bounded follow-up — one
-more read of `AGENTS.md` and one more read of two SPEC sections — not a re-run of G33. Nothing in
+more read of `CLAUDE.md` and one more read of two SPEC sections — not a re-run of G33. Nothing in
 §3.1, §3.2, §3.5 or §3.6 needs revisiting: README, ARCHITECTURE and PERF describe **shipped code**,
 and a review round that changes shipped behaviour would need to update them the same way any phase
 does, which is ordinary practice rather than a G33 debt.
@@ -1315,8 +1315,8 @@ does, which is ordinary practice rather than a G33 debt.
 
 | Item | Status | Owner |
 |---|---|---|
-| **First-launch window-size clamp** (`AGENTS.md:126–135`, P22 D6(a)) | Still open. Closing it needs startup window creation deferred past `ApplicationDidFinishLaunching` — a structural change no G-phase made | Unowned; left in `AGENTS.md` verbatim |
-| **`docs/pending-changes/.github__workflows__release.yml.patch`** is still present, i.e. still unapplied | Self-documenting by `AGENTS.md:120`'s own convention ("a pending-changes entry that's still there means it hasn't been applied yet"). No doc change warranted — it needs a human with push credentials, not a note | The user |
+| **First-launch window-size clamp** (`CLAUDE.md:126–135`, P22 D6(a)) | Still open. Closing it needs startup window creation deferred past `ApplicationDidFinishLaunching` — a structural change no G-phase made | Unowned; left in `CLAUDE.md` verbatim |
+| **`docs/pending-changes/.github__workflows__release.yml.patch`** is still present, i.e. still unapplied | Self-documenting by `CLAUDE.md:120`'s own convention ("a pending-changes entry that's still there means it hasn't been applied yet"). No doc change warranted — it needs a human with push credentials, not a note | The user |
 | **`docs/pending-workflows/test-matrix.yml`** is staged, not live | Same shape. A7 fixes only the *pointer* to it, which was dead; the workflow itself still needs applying | The user |
 | **`docs/PERF.md` §3's macOS packaged-build procedures have never been run** — no macOS hardware in this environment | Long-standing (`docs/PERF.md:14–16`), not created by v1.3. §2.13's closing line records that the git numbers share this limit rather than implying otherwise | Unowned; needs real hardware |
 | **G8's own plan `§12` still holds only pre-phase baseline figures**, because that session was told not to edit its plan doc and flagged the carry-over for the orchestrator, which never happened | **Deliberately left as-is.** `docs/v1.3/plans/` is explicitly out of scope for this phase, and a plan doc is a historical record, not a living one. §3.5's `docs/PERF.md` §2.13 is where those numbers now live durably — which is the better home regardless | Closed by relocation, not by editing the plan |
@@ -1328,6 +1328,6 @@ does, which is ordinary practice rather than a G33 debt.
 
 - `/home/user/kira-studio/README.md`
 - `/home/user/kira-studio/docs/ARCHITECTURE.md`
-- `/home/user/kira-studio/AGENTS.md`
+- `/home/user/kira-studio/CLAUDE.md`
 - `/home/user/kira-studio/docs/v1.3/SPEC.md`
 - `/home/user/kira-studio/docs/PERF.md`

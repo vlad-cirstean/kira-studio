@@ -5,7 +5,7 @@ driver/dependency choices, protocol constraints, capability quirks, structural r
 behind them — organized by subsystem/engine so a future session can look something up without
 reconstructing it from phase-history prose. Environment-specific operational notes (running
 Docker in Claude Code's own sandbox, working around a proxy block, which env var a headless
-Linux box needs) belong in `AGENTS.md`, not here.
+Linux box needs) belong in `CLAUDE.md`, not here.
 
 The tree outranks this file — if they disagree, the tree is right and this file needs
 fixing, not the other way around. Where this file and any chapter's `SPEC.md` disagree (`docs/v1/`,
@@ -17,7 +17,7 @@ originally written rather than corrected to match later reality — see each cha
 **Related documents:** [`docs/PERF.md`](PERF.md) (performance budgets and measured results),
 [`docs/PACKAGING.md`](PACKAGING.md) (macOS build and packaging verification),
 [`docs/design/kira-design-system/`](design/kira-design-system/) (the workbench visual reference),
-[`AGENTS.md`](../AGENTS.md) (the working agreement for changes to this repo).
+[`CLAUDE.md`](../CLAUDE.md) (the working agreement for changes to this repo).
 
 ## Stack
 
@@ -2577,7 +2577,7 @@ runs the identical conformance packages against every supported kind's oldest an
 image, sixteen (kind, min|max) pairs, via `testsupport.ImageFor`'s env-var override, running every
 pair even after an earlier one fails. Its `workflow_dispatch` CI workflow is written and staged, not
 live — `docs/pending-workflows/test-matrix.yml`, staged rather than committed for the push-scope
-reason `AGENTS.md`'s own `.github/workflows/` section explains. The version floor/ceiling this proves also surfaces to the
+reason `CLAUDE.md`'s own `.github/workflows/` section explains. The version floor/ceiling this proves also surfaces to the
 user: `packages/shared/domain/connection.ts`'s `MIN_SERVER_VERSION` map, rendered per kind by
 `apps/kira-studio/frontend/src/project/ConnectionDialog.vue`.
 
@@ -2727,7 +2727,7 @@ own secrets.
 ## Known open items
 
 Kept only while genuinely open — delete an item the moment it's resolved, never mark it done in
-place. `AGENTS.md` states the process rule; this is the list itself.
+place. `CLAUDE.md` states the process rule; this is the list itself.
 
 - **First-launch window-size clamp (P22 D6(a)) still can't apply to the very first window a fresh
   install opens** (round-2 review finding 4). `main.go`'s `openWindow` now resolves

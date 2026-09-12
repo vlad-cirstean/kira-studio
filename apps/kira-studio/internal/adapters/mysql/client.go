@@ -14,6 +14,6 @@ import (
 // AllowPublicKeyRetrieval-style gate at all — it requests the server's RSA public key over
 // plaintext unconditionally whenever caching_sha2_password needs it, so this option would be a
 // no-op that reads like a real control. Recorded as a capability loss in
-// docs/ARCHITECTURE.md's per-engine section and AGENTS.md's P58b findings, not silently dropped.
+// docs/ARCHITECTURE.md's per-engine section and CLAUDE.md's P58b findings, not silently dropped.
 func applyEngineOptions(_ *sqldriver.Config, _ model.ResolvedConnectionConfig, _ mysqlfamily.LogFunc) {
 }

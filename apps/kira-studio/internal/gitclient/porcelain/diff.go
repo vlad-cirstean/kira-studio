@@ -143,7 +143,7 @@ var lfsPointerRe = regexp.MustCompile(`^version https://git-lfs\.github\.com/spe
 // ParseFileDiffBody parses one file's unified patch (FileDiffArgs' own stdout — always exactly one
 // file, since the argv always pathspecs to it) into ParsedBody. The hunk state machine enforces
 // its own counts invariant: a hunk whose header disagrees with its actual line counts is an error,
-// never a half-rendered result (AGENTS.md's "no skipped validation").
+// never a half-rendered result (CLAUDE.md's "no skipped validation").
 func ParseFileDiffBody(raw []byte) (ParsedBody, error) {
 	if len(raw) == 0 {
 		return ParsedBody{Kind: ParsedEmpty, EmptyReason: "identical"}, nil
@@ -264,7 +264,7 @@ func parseHunkCount(numStr, countStr []byte) (start, count int, err error) {
 // (from rest) as its own oldLines/newLines counts call for — a `\ No newline at end of file` marker
 // attaches to the line before it and is not itself counted. Returns how many of rest were
 // consumed. A hunk whose header count is never satisfied by rest's actual content (EOF or the next
-// "@@" reached first) is an error — the counts invariant AGENTS.md's "no skipped validation" rule
+// "@@" reached first) is an error — the counts invariant CLAUDE.md's "no skipped validation" rule
 // exists for.
 func parseOneHunk(m [][]byte, rest [][]byte) (DiffHunk, int, error) {
 	oldStart, oldLines, err := parseHunkCount(m[1], m[2])

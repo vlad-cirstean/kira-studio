@@ -1120,7 +1120,7 @@ are independently revertable. If a reviewer wants the minimal change, T15 alone 
 ## 3. Commit sequence
 
 Conventional Commits, one concern each, in dependency order. `bun run lint`, `bun run typecheck`
-and `bun run build` per commit; the UI suite runs once near the end per `AGENTS.md`'s cadence rule.
+and `bun run build` per commit; the UI suite runs once near the end per `CLAUDE.md`'s cadence rule.
 
 | # | Commit | Covers |
 |---|---|---|
@@ -1161,7 +1161,7 @@ to exist).
   (which is what D12's index mapping depends on).
 - **Selection geometry**: whatever unit coverage `views/grid/slick/selection.ts` has today follows
   the file to `views/shared/slick/` in T5 with its import path updated and no case changed. If it
-  has none, none is added — `AGENTS.md`'s bar, and these are the same functions the data grid has
+  has none, none is added — `CLAUDE.md`'s bar, and these are the same functions the data grid has
   been exercising through `tests/ui` since P22.
 - **No new unit test for the clipboard formats** — `rowsToJson` already exists and is unchanged;
   D6's "copy all as JSON" is a `map`+`join` over it.
@@ -1373,5 +1373,5 @@ completion/lint/hover wiring), `docs/v1.1/plans/P27-active-filter-indicator-colo
 cited inline by `views/grid/slick/selection.ts` and `slickTheme.css`,
 `docs/v1.2/plans/P16-sql-grid-consistency-search.md` and
 `docs/v1.2/plans/P18-history-grpc-parity-mode-buttons-env-colour.md` (this plan's structural
-models), `docs/v1.1/SPEC.md`'s P13 and P18 rows, `docs/v1.2/SPEC.md`'s P19 row, and `AGENTS.md`'s
+models), `docs/v1.1/SPEC.md`'s P13 and P18 rows, `docs/v1.2/SPEC.md`'s P19 row, and `CLAUDE.md`'s
 test-bar and verification-cadence rules.

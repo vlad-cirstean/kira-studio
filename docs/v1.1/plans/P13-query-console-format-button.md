@@ -110,7 +110,7 @@ plan-shaped commit sequence, which §5 follows.
   `BeautifyResult` (`:3-9`); the toolbar button is `AppButton`; the strip is `MessageStrip`; the
   command is `registerCommand`. Nothing new is invented that the console already has a spelling for.
 - **No unit test for the SQL path** — calling a library and mapping five kinds onto five dialect
-  objects is a lookup table, explicitly below `AGENTS.md`'s bar. **One unit test for the Mongo
+  objects is a lookup table, explicitly below `CLAUDE.md`'s bar. **One unit test for the Mongo
   formatter** is genuinely earned: it is a composed parser/emitter over a hand-written grammar with
   real boundary cases (nested constructor calls, an empty argument list, a trailing comma). D10.
 - **Comments only where the code cannot say it for itself.** Three are owed: why the dialect map is
@@ -328,7 +328,7 @@ serves it with `application.AssetFileServerFS` — a plain file server over the 
 `DIST_DIR` and maps `.js` to `text/javascript`. `vite.config.ts:10` sets `base: './'`, so chunk URLs
 stay relative to the importing chunk. The one path this does **not** prove is the packaged desktop
 build's custom `wails://` URI scheme, which no tier in this repo exercises
-(`AGENTS.md`'s Wails section: `/wails/*` is unreachable over plain HTTP from a desktop build) — §6.3
+(`CLAUDE.md`'s Wails section: `/wails/*` is unreachable over plain HTTP from a desktop build) — §6.3
 makes that a named manual check on a real Mac rather than an assumption.
 
 ### F10 — The existing menu test already guards a new accelerator, so the chord needs no new test
@@ -480,7 +480,7 @@ mechanism — one ref, one strip, no runtime-shape change and no fifth store fie
 to ignore. The message is `BeautifyResult.reason`, and for the SQL path that reason is **the first
 line of the library's error only** (F5): the full nearley dump is never shown.
 
-**D10 — One unit test, for the Mongo formatter only.** `AGENTS.md`'s bar: a per-kind dialect lookup
+**D10 — One unit test, for the Mongo formatter only.** `CLAUDE.md`'s bar: a per-kind dialect lookup
 and a library call are plumbing; a composed statement parser + argument splitter + emitter with
 nested-constructor, empty-argument-list and trailing-comma boundaries is the "parser or splitter with
 several interacting lexical rules" the bar names explicitly. `tests/unit/` is where
@@ -571,7 +571,7 @@ for); two arguments (`updateOne({…},{$set:{…}})`); no arguments (`db.c.count
 constructor argument (`{_id: ObjectId("…")}`) proving the call is carried whole and never re-parsed; a
 trailing comma; two `;`-separated statements; an unsupported method and an unbalanced brace, each
 returning `ok: false` with the linter's own wording. A one-line comment above the file states which
-rule it guards, per `AGENTS.md`.
+rule it guards, per `CLAUDE.md`.
 
 ### C6 — `test(ui): the console Format button`
 
@@ -600,7 +600,7 @@ the Mongo and Redis console tests, whose fixtures already exist (`support/mongoF
 
 No new fixture capture is needed — **no scenario runs a statement**, so no `execute` port snapshot is
 required at all; the boot/connect control snapshots those helpers already export are the whole setup.
-This matters: `AGENTS.md` records that there is no one-off capture tool in the tree right now, so a
+This matters: `CLAUDE.md` records that there is no one-off capture tool in the tree right now, so a
 phase that needed a fresh capture would be blocked.
 
 Four scenarios:
@@ -648,14 +648,14 @@ Two, both cheap, both required by the discipline this phase inherits rather than
    rather than a hypothetical.
 
 Add a short subsection to `docs/PERF.md` §2 only if figure 1 lands materially away from F3 — otherwise
-this plan is the record, per `AGENTS.md`'s "a discovery from finishing one phase belongs in that
+this plan is the record, per `CLAUDE.md`'s "a discovery from finishing one phase belongs in that
 phase's own plan doc."
 
 ### 6.3 The one thing a human must run on a real Mac
 
 **Confirm the lazy chunk loads in the packaged desktop build.** F9 proves the chunk is served by the
 Go asset handler and by `tests/ui`'s static server, but neither exercises the custom `wails://` URI
-scheme the shipped app actually uses, and no tier in this repo can (`AGENTS.md`, Wails section). The
+scheme the shipped app actually uses, and no tier in this repo can (`CLAUDE.md`, Wails section). The
 check is thirty seconds: open a console in a `bun run dev` or packaged build, press Format once, and
 confirm the text reformats rather than nothing happening. A failure here would be a
 `import()`-resolution problem under the custom scheme, and the fallback is a static import at F3's

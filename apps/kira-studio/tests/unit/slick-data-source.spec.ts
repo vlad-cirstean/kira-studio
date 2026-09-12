@@ -16,7 +16,7 @@ import {
 // it, and this file never exercised that half — a plain static import is correct here now.
 
 // P22 spike C3: display-position <-> page-row translation across a filter, the insert-row region
-// past the page end, and the "handle must be truthy" invariant — exactly AGENTS.md's own bar for a
+// past the page end, and the "handle must be truthy" invariant — exactly CLAUDE.md's own bar for a
 // dedicated unit test ("cursor/pagination arithmetic with real boundary cases").
 
 describe('rowHandleAt/dataLength (P22 spike D1) — display-position -> RowHandle translation', () => {

@@ -1,6 +1,6 @@
 # P43 (iteration 3) — Functionality review: the deferred four, load ordering, and the tests this box can actually run
 
-> **Iteration 3 of three — the last round of this phase.** AGENTS.md's multi-pass convention: Opus
+> **Iteration 3 of three — the last round of this phase.** CLAUDE.md's multi-pass convention: Opus
 > researches and writes a plan, Sonnet implements it, three times, each round written against the
 > tree the previous round actually left behind. Iteration 1 is complete (`d78429a`…`ad3377c`,
 > eleven commits, `docs/v1/plans/P43-functionality-review.md`). Iteration 2 is complete
@@ -84,7 +84,7 @@
   gains `"../../src/renderer/env.d.ts"` (commit 2, D37) — a type-resolution fix, not a new project.
 - **`data-testid`s are added, never removed or renamed.** New ones follow each surface's existing
   prefix convention (`grid-header-select`, `document-tree-line`'s existing one reused).
-- Comments per AGENTS.md: only where the code cannot say it for itself. **Three existing comments
+- Comments per CLAUDE.md: only where the code cannot say it for itself. **Three existing comments
   are already false in the tree and are rewritten in the commits that touch their code**
   (`DocumentView.vue:763-767`'s claim that the row click publishes to the cell editor,
   `SearchToolbar.vue:96-102`'s claim about which transition D34's reset covers, and
@@ -725,7 +725,7 @@ D-numbers continue from iteration 2, which ended at **D35**.
 
 | # | Decision | Rationale |
 |---|----------|-----------|
-| D36 | **`repos/metadata-cache.ts` gets a real `bun:test` spec, built on a `drizzle-orm/sqlite-proxy` instance over `bun:sqlite`**, in `tests/db/metadata-cache.spec.ts`. It creates `connections` + `metadata_cache` with `0001_init.sql`'s own DDL, not a migration runner. | F34. `preconnect.spec.ts` already establishes that `tests/db/` is not synonymous with "needs Docker"; this is the second such spec and the first over `src/main/storage/`. Building the proxy by hand rather than calling `openDb()` is deliberate: `openDb()` hard-codes `dbPath()` **and** requires `node:sqlite`, which this box's Bun lacks (AGENTS.md's SQLite section) — `bun:sqlite` is always present and the proxy in `db.ts:71-85` is the only thing the repo functions actually depend on. Restating the two tables' DDL inline rather than importing `migrations/index.ts` avoids `?raw` (a Vite transform `bun test` has no loader for) and keeps the spec readable; the schema is pinned by the `metadataCache` Drizzle table the repo imports either way, so a drift between them is a type error, not a silent pass. |
+| D36 | **`repos/metadata-cache.ts` gets a real `bun:test` spec, built on a `drizzle-orm/sqlite-proxy` instance over `bun:sqlite`**, in `tests/db/metadata-cache.spec.ts`. It creates `connections` + `metadata_cache` with `0001_init.sql`'s own DDL, not a migration runner. | F34. `preconnect.spec.ts` already establishes that `tests/db/` is not synonymous with "needs Docker"; this is the second such spec and the first over `src/main/storage/`. Building the proxy by hand rather than calling `openDb()` is deliberate: `openDb()` hard-codes `dbPath()` **and** requires `node:sqlite`, which this box's Bun lacks (CLAUDE.md's SQLite section) — `bun:sqlite` is always present and the proxy in `db.ts:71-85` is the only thing the repo functions actually depend on. Restating the two tables' DDL inline rather than importing `migrations/index.ts` avoids `?raw` (a Vite transform `bun test` has no loader for) and keeps the spec readable; the schema is pinned by the `metadataCache` Drizzle table the repo imports either way, so a drift between them is a type error, not a silent pass. |
 | D37 | **`state/runState.ts` gets a real `bun:test` spec** in `tests/db/run-state.spec.ts`, stubbing `globalThis.window` before a dynamic `import()` of `state/ops` and `state/runState`; `tests/db/tsconfig.json`'s `include` gains `"../../src/renderer/env.d.ts"`. | F34. The stub is four lines and is honest about why it exists (`bridge/control.ts:33` reads `window.kira` at module scope, and `bridge/port.ts:29` registers a `window` listener) — this is not a mock of the code under test, which never touches either. The `tsconfig` line is the smaller of the two ways to make `window.kira` resolve under the `tests/db` project; the alternative — a fifth typecheck project with its own `package.json` script — is the new build step §0 forbids. Verified in this sandbox, not assumed: `tsgo --noEmit -p tests/db/tsconfig.json` exits 0 with the spec present, and `bun test` passes. Rejected: waiting for P44's "sparse unit tests" phase. Iteration 2 handed this to P44 on the assumption that a harness had to be built first; there is no harness to build, and a phase whose §5 had to write *"no spec, anywhere"* twice should not end without closing the two it can. |
 | D38 | **A truncated `children` refresh drops the connection+path row it declined to replace**, by calling the `dropCached` that `tree-service.ts:86`/`:108`/`:128` already call for an unusable cached payload. | F38. The alternative — leaving the stale row — makes iteration 2's D22 self-defeating: D22 refuses to *write* a short answer precisely so the app never serves one it knows is wrong, and then serves an older one it also knows is wrong, without even the strip. Dropping is the honest operation and costs one round trip on a level the user has just been told is incomplete. Dropping the whole row (rather than only its `children` key) matches every other drop in the file and matches the table's own shape — the unique index is `(connection_id, path)` and `describe`/`definition` share the row (`repos/metadata-cache.ts:8-10`); a partial-key delete would be a new operation for one caller. Rejected: caching the truncated list *with* a stored `truncated` flag — iteration 2's D22 argued that down already (it would put a field in a payload `treeNodeArraySchema` has no place for), and nothing found this round changes it. |
 
@@ -862,11 +862,11 @@ numbered commits touch.**
 
 ## 5. Verification
 
-**Say plainly what this box can and cannot do.** Per AGENTS.md: `bun run lint`, `bun run typecheck`
+**Say plainly what this box can and cannot do.** Per CLAUDE.md: `bun run lint`, `bun run typecheck`
 and `bunx electron-vite build` all run here (`bun run typecheck` was run against the tree at
 `78fc6d5` while writing this plan — exit 0, all four projects). Playwright runs here **only**
 because the Electron binary is installed by hand (`node_modules/electron/dist/electron`; if a fresh
-container loses it, re-install with `curl` per AGENTS.md's "Electron binary" section). It must be
+container loses it, re-install with `curl` per CLAUDE.md's "Electron binary" section). It must be
 invoked **directly** — `bun run test:ui` fires `pretest:ui` → `scripts/native-electron-build.sh`,
 which cannot fetch Electron's C++ headers through this environment's proxy and fails before a single
 spec runs. The working invocation here is:

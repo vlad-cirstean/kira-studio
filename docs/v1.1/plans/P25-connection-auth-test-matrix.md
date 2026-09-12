@@ -19,7 +19,7 @@
 > container** in an isolated worktree — real `mongo:8.3`, `redis:8.10`,
 > `clickhouse/clickhouse-server:26.3`, `postgres:17-alpine`, `mysql:8.4`, `mariadb:11.4`,
 > `localstack/localstack:4` and a purpose-built SASL_PLAINTEXT `confluentinc/cp-kafka:8.0.7`, all
-> pulled via `mirror.gcr.io` per `AGENTS.md`'s Docker section. §1 quotes the exact transcripts.
+> pulled via `mirror.gcr.io` per `CLAUDE.md`'s Docker section. §1 quotes the exact transcripts.
 > Where something could **not** be reproduced here, §1 says so plainly and the claim is withheld
 > (§1.5's SCRAM broker, §1.6's SQLite file-permission cases).
 >
@@ -292,7 +292,7 @@ error mapping is correct** — it simply has no test anywhere in the repo (`kafk
 auth case at all, and `testsupport/kafka.go:122-126` builds a `Host`/`Port`-only config against a
 PLAINTEXT broker). Rows 3–5 are the bug.
 
-**Why a half-filled pair is a real state, not a typo.** Per `AGENTS.md`'s secrets section, on Linux
+**Why a half-filled pair is a real state, not a typo.** Per `CLAUDE.md`'s secrets section, on Linux
 without `KIRA_INSECURE_SECRETS` secret storage is *unavailable* — a password-bearing save fails
 rather than silently degrading. A Kafka connection can therefore legitimately reach the adapter
 with its username present and its password absent, at which point this app silently drops the
@@ -414,7 +414,7 @@ coverage is exactly the P24 pattern, even though the path itself turns out to be
 ### 1.6 Genuinely clean: ClickHouse and SQLite
 
 Both were investigated to the same depth and neither has a bug of this class. Stated plainly, per
-`AGENTS.md`'s rule against manufacturing a finding.
+`CLAUDE.md`'s rule against manufacturing a finding.
 
 **ClickHouse — clean.** `resolveTarget` already defaults the database to ClickHouse's
 always-present `default` (`clickhouse/client.go:113`), overriding it only for a non-empty value
@@ -797,7 +797,7 @@ Modelled directly on P16's on-demand compatibility runner, which is this repo's 
 for exactly this problem — a real-container matrix that must not run on every PR.
 
 **`scripts/test-matrix.sh`**, sourcing `scripts/lib.sh` like `db-compat.sh` does, with the same
-proven structure: `--only <kind>`, `--mirror` (AGENTS.md's `mirror.gcr.io` retag workaround),
+proven structure: `--only <kind>`, `--mirror` (CLAUDE.md's `mirror.gcr.io` retag workaround),
 `--no-pull`; pull every image up front before running anything; run each adapter package with
 `KIRA_TEST_MATRIX=1 go test -count=1 -timeout 30m`; **do not** `set -e` across rows, so one failing
 adapter still produces a full result table. `db-compat.sh`'s own comments explain each of those
@@ -924,13 +924,13 @@ What that phase would add, and why each piece already has somewhere to go:
 ### 3.3 What the harness deliberately does not do
 
 - **No shared "run every scenario against every adapter" driver.** It reads as thorough and is a
-  combinatorial trap — the brief's own warning, and `AGENTS.md`'s "measure/build only when it's
+  combinatorial trap — the brief's own warning, and `CLAUDE.md`'s "measure/build only when it's
   worth it". Scenarios are attached to cases explicitly, one line each, so a table row always
   states the cost it is buying.
 - **No abstraction over `model.ResolvedConnectionConfig`.** `Config func(base) base` is a plain
   mutation of the struct the adapters already take. A per-adapter config builder DSL would be a
   second vocabulary for a struct that is already the vocabulary.
-- **No new mock or fake layer.** Every case is a real container, per `AGENTS.md`'s
+- **No new mock or fake layer.** Every case is a real container, per `CLAUDE.md`'s
   adapter-conformance carve-out and this repo's existing practice. The two existing in-package
   fakes (`s3/catalog_test.go`'s `prefixLister`, `redis/catalog_test.go`) stay where they are for the
   truncation arithmetic they were built for.
@@ -971,7 +971,7 @@ CRUD surface would be wrong for half the adapters.
 ## 4. Implementation order, for whoever picks this up
 
 Four fixes and one test-infrastructure build. The fixes are genuinely independent of each other
-(four different packages), so per `AGENTS.md` they are the rare case where parallel subagents are
+(four different packages), so per `CLAUDE.md` they are the rare case where parallel subagents are
 defensible — but every one of them needs §2's harness to have a home for its regression test, so
 the harness lands first.
 
@@ -984,7 +984,7 @@ the harness lands first.
    §1.5b/c `awscfg` error coding.
 4. **The nine `authmatrix_test.go` files** — §2.4–§2.9's tables.
 5. **`scripts/test-matrix.sh`, the `package.json` script, `test-matrix.yml`** — §2.10.
-6. **Verify once, at the end**, per `AGENTS.md`'s implement-then-test-once rule: `go build`/`go vet`
+6. **Verify once, at the end**, per `CLAUDE.md`'s implement-then-test-once rule: `go build`/`go vet`
    `./apps/kira-studio/internal/...`, then `bun run test:go` (which must be *unchanged* in duration
    — if it got slower, the gate is wrong), then `KIRA_TEST_MATRIX=1 sh scripts/test-matrix.sh
    --mirror` for the full matrix. `bun run lint`/`typecheck`/`build` are untouched by this phase
@@ -1000,7 +1000,7 @@ the assertion rather than preserving the old code.
 ## 5. Sources
 
 **Reproduced here** (this phase's own isolated worktree, 2026-09-03), all via
-`testsupport.Start*` against images pulled through `mirror.gcr.io` per `AGENTS.md`'s Docker
+`testsupport.Start*` against images pulled through `mirror.gcr.io` per `CLAUDE.md`'s Docker
 section: `mongo:8.3` (§1.2 — a user created in `admin`, a read-only user scoped to one database,
 and the URI-mode `?authSource=admin` control), `redis:8.10` (§1.3 — five ACL shapes via
 `ACL SETUSER`, plus non-numeric and out-of-range db indexes),
@@ -1028,7 +1028,7 @@ Adapter contract) and `caps.go`; every adapter's `caps.go`, `client.go`, `adapte
 `internal/adapters/testsupport/*.go` (all nineteen files, for the fixture/privilege posture in
 §2.3); every `internal/adapters/*/*_test.go` (for §2.1's and §2.4–§2.9's *exists* markers);
 `internal/connections/input.go`; `internal/ipcfixture/`; `apps/kira-studio/tests/e2e-real/`
-(postgres, mariadb, sqlite and multiwindow specs only — confirming `AGENTS.md`'s "spot-checks a
+(postgres, mariadb, sqlite and multiwindow specs only — confirming `CLAUDE.md`'s "spot-checks a
 scenario or two per kind"); `frontend/src/project/ConnectionDialog.vue:125-165` (how `options`
 is populated, which is what makes §1.2's fix reachable or not); `scripts/db-compat.sh`,
 `.github/workflows/{ci,db-compat}.yml` and `package.json` (§2.10's precedent).
@@ -1038,7 +1038,7 @@ methodology (reproduce against a real container with a purpose-created least-pri
 before asserting anything, because the fixture's own admin credentials hide this entire bug class)
 is the method §1.1 follows, and its §1.3.1 read of clickhouse/redis/mongo is what §1.2 and §1.3
 extended past `Connect`'s first line. `docs/v1.1/plans/P16-db-compat-suite.md` — the on-demand
-real-container suite this phase's §2.10 is modelled on rather than reinvented. `AGENTS.md` — the
+real-container suite this phase's §2.10 is modelled on rather than reinvented. `CLAUDE.md` — the
 adapter-conformance test-bar carve-out (§2.1's six Tier-1 cases), the measure-with-purpose rule
 (§2.3's declined AWS rows, the one place a measurement changed the plan), the
 implement-then-test-once rule (§4 step 6), and the Docker/secrets sections (§1.4's

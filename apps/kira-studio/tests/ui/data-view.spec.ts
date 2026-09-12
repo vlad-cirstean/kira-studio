@@ -37,7 +37,7 @@ import { connectionRow, expandRow, findRow, openRowMenu } from './support/tree';
 //   cross-process persistence check. `tests/ui/fixtures.ts`'s own header comment already rules
 //   this out for the whole tier — there is nothing to persist to.
 // - `OpRecordLike`/`getOps()`/`window.kira.opsRecent()` throughout: `window.kira` no longer
-//   exists post-M2/M3 (AGENTS.md P57 finding), so this has no live call to make at all. Every
+//   exists post-M2/M3 (CLAUDE.md P57 finding), so this has no live call to make at all. Every
 //   place the original used an op-log count to prove "a real round trip happened" or "zero round
 //   trips happened" is replaced by `stream.ops()` (this tier's own `mockStream.ts` handle, which
 //   records every `PortRequest` the UI actually sent, independent of the op log) filtered by
@@ -1639,7 +1639,7 @@ test('data view — pagination, count, projection, sort, filter, search, stop, N
   // already sitting in memory (no real per-chunk IPC/Postgres latency pacing it out the way the
   // original's real backend did), so the whole ~80ms, 5-rAF-chunk scan reliably completes before
   // this test's own next line of Playwright code runs, every time — not an occasional race to
-  // work around (AGENTS.md's redis.frontend.spec.ts `expect.poll` finding was that kind of gap;
+  // work around (CLAUDE.md's redis.frontend.spec.ts `expect.poll` finding was that kind of gap;
   // this one is structural, not timing-sensitive-but-eventually-hit). There is no window left to
   // interact inside any more. D38 just above already anticipated exactly this in its own comment
   // ("no reliable window... what's left is the invariant that actually matters end to end") for
@@ -1681,7 +1681,7 @@ test('data view — pagination, count, projection, sort, filter, search, stop, N
 
   // Both errors this test deliberately triggers (the invalid-filter syntax error, the mid-flight
   // cancellation) travel the data-plane WebSocket, not a bound call — unlike a handled
-  // control-plane rejection (AGENTS.md's P57 finding), neither produces a real HTTP 422 for
+  // control-plane rejection (CLAUDE.md's P57 finding), neither produces a real HTTP 422 for
   // Chromium/WebKit's devtools to log, so this stays a plain empty-array assertion.
   expect(consoleErrors).toEqual([]);
 });

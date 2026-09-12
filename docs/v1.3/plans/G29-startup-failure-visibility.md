@@ -54,7 +54,7 @@ Any degraded/partial boot mode (D6); a UI panel for a failure occurring *after* 
 
 ### 0.4 Ground rules
 
-`AGENTS.md` in full. Every spawn in this repo is argv-only with no shell (`gitclient`, `ghclient`, `gitvsix`, `gitprepare`); this one is too — and here it matters more than usual, because the strings being passed are **untrusted error text** that can contain quotes, backslashes and newlines. Not one character of app-supplied data is ever interpolated into an AppleScript source string (D4). Per `AGENTS.md`'s testing bar, the parts that earn tests are the classification table and the argv construction — both are decision structures with many arms, not thin wrappers.
+`CLAUDE.md` in full. Every spawn in this repo is argv-only with no shell (`gitclient`, `ghclient`, `gitvsix`, `gitprepare`); this one is too — and here it matters more than usual, because the strings being passed are **untrusted error text** that can contain quotes, backslashes and newlines. Not one character of app-supplied data is ever interpolated into an AppleScript source string (D4). Per `CLAUDE.md`'s testing bar, the parts that earn tests are the classification table and the argv construction — both are decision structures with many arms, not thin wrappers.
 
 ---
 
@@ -122,7 +122,7 @@ SPEC explicitly asks. Traced end to end:
 
 ### F11 — Everything the message needs is available at every site, with no initialisation
 
-`buildinfo.Version` is a plain package `var` (`buildinfo/buildinfo.go:15`), link-stamped at build time; `config.KiraHome()`/`LogsDir()`/`DbPath()` are pure functions that cannot fail (`config/paths.go:11-38` — `os.UserHomeDir`'s error already falls back to `"."`). All four are usable at `main.go:83`, before *anything* has been set up. What is **not** available: any support email, issue-tracker URL or contact address — `grep` over `README.md`/`AGENTS.md`/`docs/ARCHITECTURE.md` finds only the CI badge's repo URL. The message therefore points at the log folder and the version, and invents no support channel (D5).
+`buildinfo.Version` is a plain package `var` (`buildinfo/buildinfo.go:15`), link-stamped at build time; `config.KiraHome()`/`LogsDir()`/`DbPath()` are pure functions that cannot fail (`config/paths.go:11-38` — `os.UserHomeDir`'s error already falls back to `"."`). All four are usable at `main.go:83`, before *anything* has been set up. What is **not** available: any support email, issue-tracker URL or contact address — `grep` over `README.md`/`CLAUDE.md`/`docs/ARCHITECTURE.md` finds only the CI badge's repo URL. The message therefore points at the log folder and the version, and invents no support channel (D5).
 
 ### F12 — The schema-too-new case is the only failure with a genuinely actionable, non-bug cause, and its two numbers are trapped in a string
 
@@ -249,7 +249,7 @@ Each site was examined for a degraded mode rather than assumed uniform:
 - `EnsureLayout`, `logging.Init` — nothing downstream works without `KIRA_HOME`. Fatal.
 - `storage.Open` — no database, no settings, no windows, no tabs, no connections. Fatal. (The schema-too-new arm is the case where continuing would be *actively dangerous*: it exists precisely to avoid a newer database being written by older code.)
 - `repos.New` — the app's entire data access layer. Fatal.
-- `Settings.GetAll` (`:179`) — *technically* degradable: `GetAll` already returns `model.DefaultSettings()` merged with stored rows (`storage/repos/settings.go:53`), and `main.go:120-127` already treats the identical failure as `slog.Warn` + defaults (F7). Left fatal: a `Query` failure here means the DB is broken in a way that will resurface within seconds, and quietly booting with silently-defaulted settings is a worse user experience than an honest refusal. Changing it is a behaviour change, and `AGENTS.md`'s "scope left out is left out entirely" applies.
+- `Settings.GetAll` (`:179`) — *technically* degradable: `GetAll` already returns `model.DefaultSettings()` merged with stored rows (`storage/repos/settings.go:53`), and `main.go:120-127` already treats the identical failure as `slog.Warn` + defaults (F7). Left fatal: a `Query` failure here means the DB is broken in a way that will resurface within seconds, and quietly booting with silently-defaulted settings is a worse user experience than an honest refusal. Changing it is a behaviour change, and `CLAUDE.md`'s "scope left out is left out entirely" applies.
 - `Windows.List` (`:554`) — degradable by minting an unpersisted record. Left fatal, same reasoning.
 - `Windows.Create` (`:560`) — the most plausible degrade (open the window without persisting it). Left fatal, same reasoning; recorded in §9 as a real candidate.
 - `app.Run` / `StepPlatform` — nothing to degrade to.
@@ -346,7 +346,7 @@ None added. No `go.mod` change, no npm/bun change, no `flatc` regeneration, no m
 6. **`main.go`** — the eight call sites and the `"log"` import removal, in one commit; the `ErrorHandler` in a second.
 7. **Verification sweep** — `go vet ./apps/kira-studio/...`; `go test` over the SPEC-scoped git package set **plus `internal/startupfail`, `internal/storage`, `internal/storage/repos` and `internal`** (the layering test); `GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build ./apps/kira-studio/internal/startupfail/` (the cross-compile claim D3 rests on); `sh scripts/verify-packaging.sh` (check S8 — the `os.Getenv` guard); `bun run lint`.
 
-Steps 2–5 are strictly sequential (each builds on the previous type). Nothing here is parallelisable; per `AGENTS.md`, one sequential Sonnet subagent implements the whole phase.
+Steps 2–5 are strictly sequential (each builds on the previous type). Nothing here is parallelisable; per `CLAUDE.md`, one sequential Sonnet subagent implements the whole phase.
 
 ---
 
@@ -442,7 +442,7 @@ Any degraded or partial boot (D6); a recovery/repair action of any kind (no "res
 - **F7 — `Settings.GetAll()` is fatal at `main.go:181` and `slog.Warn` + zero values at `main.go:120-127`.** Two defensible postures for one call; worth a deliberate decision rather than an accident.
 - **F8 — `os.Exit` at the late boot sites skips `teardown` (`main.go:274-295`) entirely**, leaving the git socket bound, the askpass broker live, `connectionsSvc` started, and the metrics/oplog tickers running. Survivable by design (`gitsock`'s `flock` stale-socket recovery, SPEC §3.2) but never stated as intentional anywhere.
 - **F6 — Wails calls `os.Exit(1)` itself at `application.go:96` and `webview_window_darwin.go:1755`**, bypassing `main` entirely. G29 makes these *visible* via `ErrorHandler`; it does not make them *recoverable*, and nothing else in the tree accounts for them.
-- **`AGENTS.md`'s "Known open items" first-launch window-size clamp** is a startup-ordering item in the same neighbourhood (windows created before `app.Run()`), untouched here.
+- **`CLAUDE.md`'s "Known open items" first-launch window-size clamp** is a startup-ordering item in the same neighbourhood (windows created before `app.Run()`), untouched here.
 
 **Future work this phase deliberately leaves open:**
 
@@ -461,7 +461,7 @@ Any degraded or partial boot (D6); a recovery/repair action of any kind (no "res
 
 **10.2 — Logging *and* alerting, rather than alerting alone.** **Recommendation: both, as D2.** SPEC's premise was that these failures reach the log file; they do not (F1). Fixing the alert without fixing the log record would leave a user who dismisses the alert with nothing to attach to a bug report, and would leave the phase's own stated premise still false.
 
-**10.3 — All nine steps stay hard-fatal.** **Recommendation: as designed (D6).** Two sites (`Settings.GetAll`, `Windows.Create`) are genuinely degradable, and each is recorded in §9 with the shape a future change would take. Taking them now would make this phase a behaviour change to boot semantics rather than a visibility change, against `AGENTS.md`'s "scope left out is left out entirely."
+**10.3 — All nine steps stay hard-fatal.** **Recommendation: as designed (D6).** Two sites (`Settings.GetAll`, `Windows.Create`) are genuinely degradable, and each is recorded in §9 with the shape a future change would take. Taking them now would make this phase a behaviour change to boot semantics rather than a visibility change, against `CLAUDE.md`'s "scope left out is left out entirely."
 
 **10.4 — Wiring `application.Options.ErrorHandler`.** **Recommendation: wire it (D7).** ~10 lines for the only coverage of two real pre-window fatal paths that `main.go` structurally cannot see (F6). The `*FatalError` type assertion and the `sync.Once` are what keep it from firing on ordinary errors or twice.
 

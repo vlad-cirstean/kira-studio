@@ -75,7 +75,7 @@ The SPEC row's framing is right in outline and wrong in one load-bearing detail:
 The second thing the investigation settles is the **scope boundary** (D1). Three of the four
 combinations of {macOS, Linux} × {`KEYCHAIN`, `KEEPASS`} are reachable in pure Go with what this
 repo already depends on. The fourth — Linux + `KEYCHAIN` — needs `libsecret` over cgo, which this
-repo's own Go code is deliberately free of (`AGENTS.md`: *"the product's own Go code is entirely
+repo's own Go code is deliberately free of (`CLAUDE.md`: *"the product's own Go code is entirely
 cgo-free"*), and lands the decrypted password in a store (`internal/secrets` on Linux) that
 **does not exist** unless `KIRA_INSECURE_SECRETS=1` is set. It is out of scope, named as such, and
 refused with a specific message rather than half-implemented.
@@ -440,7 +440,7 @@ Salsa20/ChaCha20 inner-stream unprotection, and — decisively for F8 — expose
 a public `Passphrase []byte` field holding `sha256(password)`, whose `buildCompositeKey()` then
 takes `sha256` of it. So `&gokeepasslib.DBCredentials{Passphrase: sha256(mainKeyBytes)[:]}` is
 byte-exactly `KdbxPassword`, with **no lossy `[]byte → string` conversion** of a main key that may
-not be valid UTF-8. `AGENTS.md`'s library rule is satisfied here rather than argued around: nothing
+not be valid UTF-8. `CLAUDE.md`'s library rule is satisfied here rather than argued around: nothing
 about KDBX is hand-rolled.
 
 **The IntelliJ-specific glue — nothing exists in Go, and the closest thing is AGPL.** Four
@@ -459,7 +459,7 @@ is a feature request, closed without implementation, and it explicitly gives up 
 (*"Passwords are intentionally not included in DataGrip exports"* — true of *exports*, not of a
 live profile, which is what this phase reads).
 
-So the glue is hand-rolled, and `AGENTS.md` asks for the requirement to be named rather than
+So the glue is hand-rolled, and `CLAUDE.md` asks for the requirement to be named rather than
 "existing code already works": **there is no Go library for the IntelliJ Platform credential-store
 layout at all, the only complete implementation is AGPL-3.0 Swift and cannot be vendored into an
 MIT repository, and the glue itself is ~150 lines of format-following code** (an XML struct
@@ -775,9 +775,9 @@ in the clipboard, and validates it the same way the picker's result is validated
 directory; must contain `.idea/dataSources.xml`, or *be* a `.idea` directory containing it — both
 are accepted, since users routinely navigate one level too deep).
 
-### D14 — Tests: one Go suite, and it is the kind `AGENTS.md` says earns its keep
+### D14 — Tests: one Go suite, and it is the kind `CLAUDE.md` says earns its keep
 
-`AGENTS.md`'s bar exempts almost everything and names *"a parser/splitter with several interacting
+`CLAUDE.md`'s bar exempts almost everything and names *"a parser/splitter with several interacting
 rules"*, *"a decision structure too large to hold in your head"*, and *"crypto beyond
 encrypt-then-decrypt"*. This phase is all three: a two-file XML correlation, a three-signal engine
 cascade with a dozen outcomes, macro expansion, and a two-stage decrypt (AES-CBC unwrap → KDBX
@@ -826,7 +826,7 @@ credential-store commits (G5-G8) must land before the importer (G9) that calls t
 `bun run lint`, `bun run typecheck`, `bun run build`; `go build ./apps/kira-studio/internal/...`,
 `go vet ./apps/kira-studio/internal/...`. **Bindings must be regenerated** at B1 —
 `wails3 task common:generate:bindings` via `scripts/setup.sh`, never a hand-typed flag list, and
-never without `-names` (`AGENTS.md`'s own warning: a `-names`-less regeneration silently breaks
+never without `-names` (`CLAUDE.md`'s own warning: a `-names`-less regeneration silently breaks
 every `tests/ui/` spec at the first bound call with an error that points nowhere near bindings).
 
 ### 4.2 Go — `internal/datagrip` (`bun run test:go`), the cases this phase owes
@@ -1075,7 +1075,7 @@ Repository claims are against the tree at `origin/claude/feature-v1-2` (`593fd26
 
 **This repository**
 
-- `AGENTS.md` — the library-adoption rule, the only-fully-open-source rule, the testing bar, the cgo-free note, the bindings `-names` warning, the `KIRA_INSECURE_SECRETS` section
+- `CLAUDE.md` — the library-adoption rule, the only-fully-open-source rule, the testing bar, the cgo-free note, the bindings `-names` warning, the `KIRA_INSECURE_SECRETS` section
 - `docs/ARCHITECTURE.md` — the Storage section (the cipher, the envelope, the per-platform secret-storage story)
 - `apps/kira-studio/internal/postman/{parse.go,testdata/}` — the importer shape this phase copies
 - `apps/kira-studio/internal/bridge/{files.go,collections.go}`; `apps/kira-studio/internal/shell/app.go` — the `Dialogs` seam, `ChooseOpen`'s cancel convention, `ImportReport`/`ImportWarning`

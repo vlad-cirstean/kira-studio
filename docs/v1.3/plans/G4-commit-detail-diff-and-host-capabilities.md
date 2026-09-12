@@ -130,7 +130,7 @@ Everything in §9's table, but the ones most likely to be mistaken for G4 work:
 
 - **`review.open`** — the seventh host-capability method. It reveals the *review* webview view,
   which is not registered until G6; answering it before that view exists is a stub, which
-  `AGENTS.md` forbids. D11 states this in full.
+  `CLAUDE.md` forbids. D11 states this in full.
 - **Any parser G4's own four methods do not read.** No `status --porcelain=v2`, no `stash list`,
   no `merge-tree`, no full `for-each-ref`. Each still lands with its consumer (G5/G8).
 - **`refs.list`, `status.get`, `undo.peek`, `stash.list`.** Still rejecting on every repo open
@@ -149,16 +149,16 @@ Everything in §9's table, but the ones most likely to be mistaken for G4 work:
 ### 0.4 Ground rules
 
 - Every decision in §2 cites a finding; every finding in §1 cites something read or run here.
-- `AGENTS.md` applies in full: **no stubbed error handling, no `TODO: fix later`, no skipped
+- `CLAUDE.md` applies in full: **no stubbed error handling, no `TODO: fix later`, no skipped
   validation.** Scope left out of this phase is left out *entirely*.
 - **Comments very concise, only where the code cannot say it itself.**
-- **Tests only where `AGENTS.md`'s bar is met.** G4 clears it in five places and nowhere else
+- **Tests only where `CLAUDE.md`'s bar is met.** G4 clears it in five places and nowhere else
   (D16): the two `diff-tree` record parsers' non-uniform framing, the unified-diff hunk state
   machine and its counts invariant, `SplitTrailerBlock`'s paragraph rule, the two caches' eviction
   and invalidation, and the `file.goToTarget` decision procedure (as an integration test against
   real git, which is the only thing that can prove it).
 - **Reach for a library before hand-rolling.** Nothing here is a library's job: every new file is
-  a parser for one specific `git` output format, which is `AGENTS.md`'s own named exception.
+  a parser for one specific `git` output format, which is `CLAUDE.md`'s own named exception.
 - **Fixture repositories scope their git config to themselves.** `git -C <tmpdir> config` /
   `--local` / per-spawn `-c` / env only — **never `git config --global`**, which a prior phase's
   implementation agent leaked into real commits. D15 makes this concrete and, as it happens,
@@ -266,7 +266,7 @@ ported … Each lands with the RPC that reads it (G4/G5/G8)". Correct, and G4 is
 
 The second part is smaller and easier to miss: G3's §3.1 file table lists `ShowMetadataArgs` among
 `log.go`'s contents, and the shipped `log.go` does not have it (`grep -rn "ShowMetadata"` finds
-nothing in `apps/kira-studio/internal/`). That is the right call under `AGENTS.md` — it had no
+nothing in `apps/kira-studio/internal/`). That is the right call under `CLAUDE.md` — it had no
 caller in G3 — but it means `commit.detail`'s very first spawn is an argv builder that does not
 exist yet. It is three lines, it belongs beside `LogFormat` (whose format string it reuses
 verbatim), and this plan names it so it is not rediscovered as a surprise.
@@ -633,7 +633,7 @@ func (e *RepoEntry) GoToTarget(ctx context.Context, rev, path string) (GoToTarge
 They belong here because they need what only the entry has: the reader gate (`e.Repo.Read`), the
 lazily-started cat-file session (`e.CatFile()`), the two caches (D7), and the identity that says
 where the worktree is. `gitrpc` decodes params, calls one of these, and marshals — which is why it
-still earns no dedicated test (`AGENTS.md`'s pass-through exclusion), and why the proof is §7.1's
+still earns no dedicated test (`CLAUDE.md`'s pass-through exclusion), and why the proof is §7.1's
 integration tier.
 
 ### D7 — Two caches on the shared entry: detail by entries and invalidated, diff by bytes and not
@@ -717,7 +717,7 @@ session otherwise.
 
 It is three dozen lines with a real caller and a real (if rare) case behind it. Leaving it out
 would mean a legal repository path whose "Go to file" throws an unrecognised-protocol error, which
-is precisely the "skipped validation" `AGENTS.md` forbids.
+is precisely the "skipped validation" `CLAUDE.md` forbids.
 
 ### D11 — Six of the seven host-capability methods are wired here; `review.open` is G6's, and is not stubbed
 
@@ -804,7 +804,7 @@ provide(key) -> connection.request('file.read', {repoId, rev, path}) -> content 
 
 ### D15 — The golden corpus grows, and its builder stops inheriting the machine's git config
 
-Resolving F13, and making `AGENTS.md`'s "never touch global git config" structurally true rather
+Resolving F13, and making `CLAUDE.md`'s "never touch global git config" structurally true rather
 than merely intended.
 
 **The fix**: `fixtures_test.go`'s `repoBuilder.git` sets, in the spawn's own environment,
@@ -829,7 +829,7 @@ argv taken from this package's own builders so recorder and parser cannot drift:
 
 ### D16 — What gets a test, and what does not
 
-`AGENTS.md`'s bar, applied honestly. **Tested:**
+`CLAUDE.md`'s bar, applied honestly. **Tested:**
 
 - `porcelain/difftree.go` — the non-uniform `-z` framing where one logical entry spans three
   records, in both invocations, plus the empty-third-field rename shape and a binary `-\t-\t`.
@@ -849,7 +849,7 @@ argv taken from this package's own builders so recorder and parser cannot drift:
   `file.goToTarget`'s three branches (§3.7). This is the phase's real end-to-end proof.
 
 **Not tested, deliberately**: `gitrpc`'s handlers (thin dispatch over the above), the two ports
-(direct `vscode` wraps, `AGENTS.md`'s "thin pass-through wrappers"), `proxyHandlers`'
+(direct `vscode` wraps, `CLAUDE.md`'s "thin pass-through wrappers"), `proxyHandlers`'
 forwarders, and the `repoId → root` map (a two-line `Map`).
 
 ### D17 — The file tree is folded in the webview; the server produces a flat list
@@ -1064,7 +1064,7 @@ that this plan did not sanction.
 
 Six commits. `go build ./apps/kira-studio/internal/...`, `go test
 ./apps/kira-studio/internal/...`, `bun run lint` and `bun run typecheck` run after **each** — they
-are fast. The expensive tier (§7.1(f)–(h)) runs once at C6, per `AGENTS.md`'s "implement the whole
+are fast. The expensive tier (§7.1(f)–(h)) runs once at C6, per `CLAUDE.md`'s "implement the whole
 plan first, then test once".
 
 - **C1** `feat(gitclient): diff-tree, unified-diff and commit-show parsing`
@@ -1219,7 +1219,7 @@ same call, and G3 — materially larger than this — carried it through success
    agent that did not write C4's queries cannot land it against a compiler, only against this
    plan's prose.
 2. **The phase is one dependency chain.** Parsers → queries → handlers → contract → extension. That
-   is `AGENTS.md`'s textbook case of *not* "genuinely independent (unrelated adapters,
+   is `CLAUDE.md`'s textbook case of *not* "genuinely independent (unrelated adapters,
    non-overlapping fixes)".
 3. **The one piece that looks separable is not worth separating.** C2 (`ReadOneShot`) and C3
    (`rpcstream`'s guard) are each independent of the rest, but they are a few dozen lines apiece —

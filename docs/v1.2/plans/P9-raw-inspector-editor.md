@@ -10,7 +10,7 @@
 > a rendered exchange alongside a P8 history entry (D7, OQ-2), a raw view for a send that *failed*
 > (D14, OQ-7), a secret-reveal gate on the raw pane (D6, OQ-4), a live two-way raw request pane
 > (D8, OQ-5), and raw editing of `formdata`/`file` bodies (D10, OQ-6). Nothing here is half-built
-> toward any of them (`AGENTS.md`: *"Scope left out of a phase is left out entirely, not
+> toward any of them (`CLAUDE.md`: *"Scope left out of a phase is left out entirely, not
 > half-implemented"*).
 >
 > **Every claim below was re-read against the tree, not inherited from P2's/P7's/P8's prose.**
@@ -471,7 +471,7 @@ same two-pass trick with a `strings.Builder` in place of the `countWriter` — n
 ## 4. Decisions
 
 ### D1 — The library check, stated rather than asserted
-`AGENTS.md` requires reaching for a maintained library first and **naming the requirement** when
+`CLAUDE.md` requires reaching for a maintained library first and **naming the requirement** when
 declining one. Four questions here; three answered "the stdlib already has it", one answered "no,
 and here is the requirement".
 
@@ -701,7 +701,7 @@ labelled.
 **Refused for**: `formdata` and `file`. The toolbar button and the palette entry are disabled with
 `v-tooltip`: *"A form-data or binary body has no text form that can be edited and parsed back — a
 file part is bytes on disk, not text. Its wire form is in the response pane's Raw view."* That is
-`AGENTS.md`'s *"scope left out is left out entirely"* — the alternative (generate an elided body
+`CLAUDE.md`'s *"scope left out is left out entirely"* — the alternative (generate an elided body
 that the parser would then take literally) would silently replace a 4 MB upload with the string
 `[… 4194304 bytes of report.csv …]`.
 
@@ -753,7 +753,7 @@ The grammar, in full:
 Errors are a single `{ error: string }` (P7's `ParsedCurl` shape), warnings a `CurlWarning`-shaped
 list so the dialog's `ImportReportStrip.vue` renders them with no change.
 
-**This earns a dedicated unit test** under `AGENTS.md`'s *"a parser/splitter with several
+**This earns a dedicated unit test** under `CLAUDE.md`'s *"a parser/splitter with several
 interacting rules"* clause — the same clause P7 D17 invoked — and nothing else in this phase does.
 
 ### D12 — The inspector: a fourth response-pane segment, and no renaming
@@ -836,7 +836,7 @@ Declined here and recorded as OQ-7 rather than half-built.
 ## 5. Implementation order
 
 Nine commits. C1–C3 add capability with nothing mounted; C4 makes the inspector exist; C5–C7 build
-the editor bottom-up; C8–C9 are the tests and the docs. Per `AGENTS.md`, run the fast checks
+the editor bottom-up; C8–C9 are the tests and the docs. Per `CLAUDE.md`, run the fast checks
 (`lint`, `typecheck`, `build`) per commit and the expensive suites once at the end.
 
 ### C1 — `feat(shared): the raw-exchange domain`
@@ -900,7 +900,7 @@ It becomes a statement that P9 measured the lift and declined it, with OQ-1's sh
 `go build ./... && go vet ./... && go test ./apps/kira-studio/internal/...`.
 `bun run setup` first in a fresh container.
 
-Two bindings checks, both from `AGENTS.md`'s own warnings:
+Two bindings checks, both from `CLAUDE.md`'s own warnings:
 
 1. C3 changes a **Go-internal** signature (`ResolveRequest`) and no bound service's method set, so
    `apps/kira-studio/frontend/bindings/**` must come back **byte-identical** after
@@ -946,7 +946,7 @@ reintroducing the field.
 
 **Explicitly not tested:** that `DumpRequestOut` works (stdlib), that a `none` body renders nothing,
 that the pane's strings are spelled correctly. Each is a one-condition guard or restates a short
-function body — `AGENTS.md`'s *"everything else gets nothing"*.
+function body — `CLAUDE.md`'s *"everything else gets nothing"*.
 
 ### 6.3 The unit spec — `tests/unit/http-raw-parse.spec.ts`
 D11's grammar is *"a parser with several interacting rules"*, so it gets a corpus in the shape
@@ -1017,7 +1017,7 @@ P1's own checklist line took.
    not blocking.
 5. **A real secret in a header, through a real Touch ID prompt.** *Not run* — no macOS hardware, no
    Keychain, no biometric backend in this Linux sandbox (`KIRA_INSECURE_SECRETS=1`'s own dev
-   fallback, AGENTS.md). `bridge/http.go`'s `maskWireSecrets` and the *Copy as curl* reveal gate are
+   fallback, CLAUDE.md). `bridge/http.go`'s `maskWireSecrets` and the *Copy as curl* reveal gate are
    two independent code paths (one masks `Wire.Request` unconditionally; the other decrypts and
    reveals only after `localauth.Authorizer.Authorize`), verified independently — but never
    end-to-end against a real prompt.

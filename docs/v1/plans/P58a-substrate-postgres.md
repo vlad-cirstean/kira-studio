@@ -131,7 +131,7 @@ server (base64, P58 D5) for Postgres.
 
 Swapping the body outright at M2, as P58 D5's text reads, means every Node-served page fails
 `assertChunkStructure` from M2 until P58f. That is not a hypothetical: it is exactly the failure
-`AGENTS.md`'s P57 findings entry describes (*"every real data-view read failed downstream with
+`CLAUDE.md`'s P57 findings entry describes (*"every real data-view read failed downstream with
 `chunk.data is not a Uint8Array`"*), which is why `reviveChunks` exists at all.
 
 A9 resolves it: `toTypedArray` accepts a `string` (base64) **or** an index-keyed object, deleted
@@ -279,19 +279,19 @@ server, which is exactly what M0 is for.
   `go test ./internal/adapters/... ./internal/page/... ./internal/enginecache/...` and never `./...`.
   cgo is still on (`mattn/go-sqlite3` is already a dependency of `internal/storage`), so
   `CGO_ENABLED=0` is not an option for the module as a whole.
-- **Docker, the mirror and the retag are daemon-level** (`AGENTS.md`'s Docker section):
+- **Docker, the mirror and the retag are daemon-level** (`CLAUDE.md`'s Docker section):
   `nohup dockerd > /tmp/dockerd.log 2>&1 & disown`, then
   `docker pull mirror.gcr.io/library/postgres:17-alpine && docker tag mirror.gcr.io/library/postgres:17-alpine postgres:17-alpine`.
   `testcontainers-go` asks for `postgres:17-alpine` and the daemon already has it. **No Go code
   references the mirror.**
-- **The Bun/testcontainers hang has no Go analogue** — `AGENTS.md` records it as specific to
+- **The Bun/testcontainers hang has no Go analogue** — `CLAUDE.md` records it as specific to
   `bun run`, and it is the reason `scripts/capture-postgres-tree.ts` exists at all. M0's TC-1 is
   what turns "expected to be simpler" into a recorded fact.
 - **`shell/frontend/bindings` is git-ignored** and must be regenerated in a fresh container before
   `bun run build` resolves its imports. P58a changes no bound method *signature*, so one
   regeneration per fresh container is enough.
 - **A background process started in one shell invocation cannot be signalled from a later one**
-  (`AGENTS.md`, P51). C1's app run — start, screenshot, exercise, tear down — is one Bash
+  (`CLAUDE.md`, P51). C1's app run — start, screenshot, exercise, tear down — is one Bash
   invocation with a 120–150 s timeout.
 
 ## 2. Decisions
@@ -434,7 +434,7 @@ explicit M4 acceptance check (§8) and is an optional extra step in C1 (§7).
 caches are configured with the same `settings.cache.l2BudgetMb`, so summing it would report 128 MB
 for a 64 MB setting and the Settings → Cache dialog would show a budget the user never set. The
 router reports the configured budget once. This is a "silently wrong number" of exactly the class
-`AGENTS.md`'s P57 findings warn about, and it is temporary by construction.
+`CLAUDE.md`'s P57 findings warn about, and it is temporary by construction.
 
 **A17 — `ping` keeps being answered by the Node child through P58a.** `src/renderer/workbench/
 state/engine.ts:18` pings over the data plane and reads `pong.enginePid` into the status pill; the
@@ -471,7 +471,7 @@ files to put side by side.
 
 **A21 — `tests/db/postgres.spec.ts`, `tests/unit/sql-text.spec.ts` and
 `tests/unit/engine-cache.spec.ts` are deleted inside P58a, each in the commit after its Go successor
-is green, and never before.** P58 D12's third rule and `AGENTS.md`'s own standard (*"deleting a test
+is green, and never before.** P58 D12's third rule and `CLAUDE.md`'s own standard (*"deleting a test
 whose subject moved is correct; the thing to check is that the Go test actually covers the same
 assertion"*). §5.3's and §5.4's tables are that check, written before the deletion rather than
 recalled after it.
@@ -549,7 +549,7 @@ tests/ipc/**                                UNCHANGED  P58a ports no fixture gen
 package.json                                EDITED M5 last commit: `test:db` loses its postgres arm
 docs/PERF.md                                EDITED M2  the re-taken inflation measurement
 docs/ARCHITECTURE.md                        EDITED M4  the bulk-data invariant (P58 D3)
-AGENTS.md                                   EDITED M5  the P58a findings entry
+CLAUDE.md                                   EDITED M5  the P58a findings entry
 ```
 
 ## 4. Designs
@@ -1218,7 +1218,7 @@ Two Go-only additions, both because the port creates the risk: `EncodePageToken`
 **unpadded** base64url (a padded token would be a silently different string), and
 `RequestFingerprint` is stable across repeated calls with the same input.
 
-**`sqlmutate_test.go`** — no TypeScript oracle exists, and three cases clear `AGENTS.md`'s bar
+**`sqlmutate_test.go`** — no TypeScript oracle exists, and three cases clear `CLAUDE.md`'s bar
 because A4 says they will otherwise be wrong invisibly: `RenderRowOp` emits INSERT columns in wire
 order; `whereFromKey` emits WHERE terms in wire order with `IS NULL` for nils; `OrderedOps` is
 stable within a kind. The fixture is spec test 21's exact three-op plan and its three exact expected
@@ -1265,11 +1265,11 @@ The second poll is the assertion — the first only proves the query started.
 
 Four throwaway programs under `/tmp` (never committed; **no product code lands in M0**), each
 answering one question with a printed PASS/FAIL. The deliverable is a findings section appended to
-this document and, for anything surprising, an `AGENTS.md` entry.
+this document and, for anything surprising, an `CLAUDE.md` entry.
 
 | Probe | What it runs | Asserts | If it fails |
 |---|---|---|---|
-| **TC-1** | `testcontainers-go` + `modules/postgres` starting `postgres:17-alpine` (mirror-retagged), running `SELECT 1`, terminating | The container starts and the wait strategy resolves in this sandbox — i.e. `AGENTS.md`'s Bun/testcontainers hang genuinely has no Go analogue (P58 §4.10 says "confirm, do not assume") | The Go test tier needs a hand-rolled `docker run` harness instead of `testcontainers-go`, which changes A19 and P58 D12's mechanism for all six sub-phases → stop and raise it |
+| **TC-1** | `testcontainers-go` + `modules/postgres` starting `postgres:17-alpine` (mirror-retagged), running `SELECT 1`, terminating | The container starts and the wait strategy resolves in this sandbox — i.e. `CLAUDE.md`'s Bun/testcontainers hang genuinely has no Go analogue (P58 §4.10 says "confirm, do not assume") | The Go test tier needs a hand-rolled `docker run` harness instead of `testcontainers-go`, which changes A19 and P58 D12's mechanism for all six sub-phases → stop and raise it |
 | **PG-1** | `pgx.Connect`; read `conn.PgConn().PID()`; start `SELECT pg_sleep(30)` on it in a goroutine; open a **second** `pgx.Conn` and run `SELECT pg_cancel_backend($1)` with that pid; assert the first query returns SQLSTATE `57014` and that `pg_stat_activity` shows no `pg_sleep` afterwards | The whole cancellation design: the pid is reachable, the side connection works, and the cancelled query's error carries `57014` so `mapError` produces `E_CANCELLED` | P58 §1.8's own named alternative, `pgconn.CancelRequest`, with its unencrypted-socket caveat recorded — and `postgres/caps.go`'s `Cancel` re-examined |
 | **PG-2** | On one `pgx.Conn`: a typed catalog-style query (`SELECT oid::text, relname FROM pg_class LIMIT 1`) **and** a text-mode data query over a table with `bytea`, `numeric`, `timestamptz`, `json` and NULL columns, scanning every column as `*string`; print the exact text of each | Identity/text-mode scanning is available per query on the same connection, and the server's own text form arrives unconverted — including `bytea` as `\x…`, which `NormalizeCellText` rewrites to `0x…` | `ConnSet` needs a second, text-mode connection per database, which changes `client.go`'s shape and doubles the backend count — a real design change, recorded before M5 starts |
 | **JS-1** | Marshal a struct with a `[]byte`, a `[]uint32` and a `Uint32LE` | `[]byte` → base64 string; `[]uint32` → a JSON number array; `Uint32LE` → base64 of LE bytes. Pure Go, no container, two minutes | P58 D5's encoding needs rethinking before M2 — but this is a confirmation, not a discovery: it is stated in P58 §8's criterion-11 list and this makes it a checked fact |
@@ -1291,14 +1291,14 @@ change if deferred to its own sub-phase, unlike Kafka's.
 ## 7. C1 — the checklist
 
 The parent's §0.3 states C1 in a paragraph and its §9 M5 in a sentence. This is the step-by-step
-version. **All of it runs in one Bash invocation** (`AGENTS.md`, P51: a background process started in
+version. **All of it runs in one Bash invocation** (`CLAUDE.md`, P51: a background process started in
 one invocation cannot be signalled from a later one), with a 150-second tool timeout.
 
 **Preparation**
 
 1. `nohup dockerd > /tmp/dockerd.log 2>&1 & disown`; wait for `API listen on /var/run/docker.sock`.
 2. Pull and retag both images: `postgres:17-alpine` and `mariadb:11.4`, each via
-   `mirror.gcr.io/library/…` (`AGENTS.md`'s Docker section).
+   `mirror.gcr.io/library/…` (`CLAUDE.md`'s Docker section).
 3. Start both containers with the `tests/db/` seed fixtures (`0001_seed.sql`, `0002_mariadb_seed.sql`).
 4. `apt-get install -y libgtk-4-dev libwebkitgtk-6.0-dev pkg-config xdotool imagemagick`;
    `go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-beta.15` (**pinned**, P55's finding);
@@ -1351,7 +1351,7 @@ one invocation cannot be signalled from a later one), with a 150-second tool tim
     **Postgres** connection stays connected and still serves a read (A15). If Postgres also flips,
     `MarkAllErrored` was not narrowed.
 
-**Recording.** C1 is recorded in the M5 commit message and in `AGENTS.md`'s P58a findings entry,
+**Recording.** C1 is recorded in the M5 commit message and in `CLAUDE.md`'s P58a findings entry,
 naming which of steps 6–21 passed and which could not be run, per P55 §10 / P56 §6 / P57 §6's
 standard of recording "not available in this session" rather than leaving it implied.
 
@@ -1391,7 +1391,7 @@ standard of recording "not available in this session" rather than leaving it imp
 5. `git diff --stat tests/ui tests/ipc` is empty.
 6. `git diff --stat shell/internal/oplog shell/internal/enginehost` shows only the new
    `enginehost` sink adapter, if one was needed there rather than in `adapterhost`.
-7. `AGENTS.md` gains a **"P58a implementation findings"** entry on the P52–P57 pattern, carrying at
+7. `CLAUDE.md` gains a **"P58a implementation findings"** entry on the P52–P57 pattern, carrying at
    minimum: M0's four results; whether `testcontainers-go` behaves in this sandbox (and therefore
    how much of the Docker section's Bun-specific prose becomes historical); pgx's text-mode answer;
    and anything the router turned up about the seam.
@@ -1466,7 +1466,7 @@ M5) is why M0 is first.
     here**; the commit message records its result.
 29. `test: delete tests/db/postgres.spec.ts, its subject now in Go` (A21), plus `package.json`'s
     `test:db` postgres arm.
-30. `docs: P58a findings — the substrate, the router and the Postgres pathfinder` — `AGENTS.md`.
+30. `docs: P58a findings — the substrate, the router and the Postgres pathfinder` — `CLAUDE.md`.
 
 **Why M2 before M3 and M4.** M2 is the only milestone that touches `src/`, and isolating it makes
 §5.2's assertion meaningful for every milestone after it (P58 §9's own reasoning). It also has to
@@ -1566,7 +1566,7 @@ that spans all six sub-phases.
 ## 12. M0 results (run for real in this sandbox)
 
 All five probes pass, run against `postgres:17-alpine` and `confluentinc/cp-kafka:8.0.7` (both
-pulled via `mirror.gcr.io` and retagged, per `AGENTS.md`'s Docker section — the daemon was already
+pulled via `mirror.gcr.io` and retagged, per `CLAUDE.md`'s Docker section — the daemon was already
 running in this session with no `dockerd` bootstrap needed). Two results are genuine findings that
 change or sharpen an §1/§6 claim rather than merely confirming one; both are folded back into the
 relevant design section, not just recorded here.
@@ -1625,11 +1625,11 @@ All five milestones are done. `go test ./... -race` is green across every packag
 `bun run typecheck` (all four projects), `bun run test:unit`, `bun run test:go`, `bun run test:ui`
 (36/36), and `bun run test:ipc:fe` (8/8) are all green. `nativeKinds` is `{"postgres": true}`.
 `tests/db/postgres.spec.ts` is deleted. `tests/db/support/postgres.ts` is **not** deleted, a
-deliberate deviation from §8's own M5 bullet — AGENTS.md's own P58a findings section explains why
+deliberate deviation from §8's own M5 bullet — CLAUDE.md's own P58a findings section explains why
 (other tests gained real dependencies on it since this plan was written). Real bugs found and
 fixed during implementation — a local-abort/pgx-context-cancellation race in the Cancel path, a
 missing base64 branch in `toTypedArray`, a stale `build:wails` script reference, and three
-placeholder `"postgres"` kind literals in pre-existing M4 tests — are written up in AGENTS.md's own
+placeholder `"postgres"` kind literals in pre-existing M4 tests — are written up in CLAUDE.md's own
 "P58a — Go substrate + Postgres adapter" findings section rather than duplicated here.
 
 **C1, recorded.** This sandbox has no real X display for §7's own literal `xdotool`/screenshot

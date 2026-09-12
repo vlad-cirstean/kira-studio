@@ -1,6 +1,6 @@
 // P12 D15: the first test in this repo to exercise a migration against seeded data, because it is
 // the first migration that touches data rather than adding to it (D14's own reasoning: 0010 is a
-// real, irreversible rename of user data, not a fresh CREATE TABLE). AGENTS.md's test bar admits
+// real, irreversible rename of user data, not a fresh CREATE TABLE). CLAUDE.md's test bar admits
 // this by name — "an irreversible data migration" — as a one-time proof, not ongoing CRUD coverage.
 package migrations_test
 

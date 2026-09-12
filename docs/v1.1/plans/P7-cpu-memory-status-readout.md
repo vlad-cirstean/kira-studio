@@ -101,12 +101,12 @@ on real hardware, and this phase **adds** to them. §2.4's 261.7 MB is an RSS nu
 ### 0.4 Ground rules
 
 - **Evidence or a flag, never a guess.** Every macOS claim below is marked **[verified]** with a
-  source, or **[unverified]** with what would settle it. AGENTS.md's "evidence-based plans, not
+  source, or **[unverified]** with what would settle it. CLAUDE.md's "evidence-based plans, not
   hypothetical ones" is the reason F9 exists as an open question rather than a finding.
 - **The platform-specific surface stays as small as it can be.** Everything that can be arithmetic
   in a shared file is arithmetic in a shared file, because §1.4 proves nothing darwin-specific in
   this package can be compiled, vetted, or tested from this sandbox.
-- **Tests only where AGENTS.md's bar is met.** Two earn their keep here (C1's clamp/monotonicity
+- **Tests only where CLAUDE.md's bar is met.** Two earn their keep here (C1's clamp/monotonicity
   rules and C6's unit calibration) and each carries the one-line comment naming the rule it
   guards. Nothing else in this phase gets a test.
 
@@ -174,7 +174,7 @@ core count**, with a create-time tag guarding pid reuse (`21796b9`) and a core-c
 ### 1.3 What each `gopsutil` call actually does on darwin
 
 Read from the pinned module source (`go.mod:19`, `github.com/shirou/gopsutil/v4 v4.26.7`) at
-`$(go env GOPATH)/pkg/mod/github.com/shirou/gopsutil/v4@v4.26.7/`, per AGENTS.md's "read the
+`$(go env GOPATH)/pkg/mod/github.com/shirou/gopsutil/v4@v4.26.7/`, per CLAUDE.md's "read the
 installed module source" rule:
 
 | Call | darwin implementation | Cost |
@@ -404,7 +404,7 @@ readings. A single failed read therefore does one of two things:
 process set on a real Mac. `docs/PERF.md` §2.4 shows it succeeding for all three
 `com.apple.WebKit.*` helpers, so this may be rare in practice. **It is a defect regardless** — an
 unchecked syscall return feeding a delta is not something to leave in place on the grounds that it
-probably does not fire, per AGENTS.md's "no shortcuts".
+probably does not fire, per CLAUDE.md's "no shortcuts".
 
 ### F3 — Nothing clamps the result, in either direction
 
@@ -588,7 +588,7 @@ platform-independent, hence unit-testable here.
 ## 6. Implementation order
 
 One Sonnet subagent, sequentially — every commit touches `internal/metrics`, so there is nothing
-genuinely parallelizable here (AGENTS.md's default).
+genuinely parallelizable here (CLAUDE.md's default).
 
 ### C1 — `refactor(metrics): a per-process probe seam, with the delta rules made explicit`
 
@@ -608,7 +608,7 @@ Shared code only; compiles and is tested on Linux.
 - `NewSampler`'s existing signature keeps working for non-darwin/tests by defaulting to the
   `gopsutil` probe.
 
-**Test (earns its keep, per AGENTS.md — a subtle rule nothing else catches):** extend
+**Test (earns its keep, per CLAUDE.md — a subtle rule nothing else catches):** extend
 `sampler_test.go` with the monotonicity/clamp rules — a backwards-going counter contributes 0 and
 does not subtract from another pid's genuine delta; a pid the probe failed on last tick does not
 produce a lifetime-sized spike when it succeeds this tick; the normalized result never leaves
@@ -671,7 +671,7 @@ and asserts the probe's `cpuSeconds` delta agrees with `syscall.Getrusage(syscal
 `Utime`+`Stime` delta (a `Timeval` — seconds and microseconds, unambiguous) to within a loose
 tolerance.
 
-**This clears AGENTS.md's bar and the comment above it must say why:** the mach-timebase conversion
+**This clears CLAUDE.md's bar and the comment above it must say why:** the mach-timebase conversion
 is the one thing in this package that can be wrong by a factor of ~41.7 on Apple silicon while
 looking entirely plausible, no other test can see it, and §2.4 records that Apple's own header
 documents no unit for these fields. It is also the check that would catch a Rosetta-slice
@@ -697,7 +697,7 @@ footprint sum next to §2.4's RSS sum for the same idle scenario, the idle CPU r
 Activity Monitor's CPU-load pane, and the C6 calibration result (including the observed
 `mach_timebase_info` numer/denom). **If the measurement does not happen, this commit does not
 happen** and the phase closes with it named as an open item — a plan that reports numbers it did
-not take would be exactly the thing AGENTS.md forbids.
+not take would be exactly the thing CLAUDE.md forbids.
 
 ---
 

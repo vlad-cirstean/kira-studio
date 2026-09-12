@@ -394,7 +394,7 @@ chapter (`docs/v1/SPEC.md` is the v1 record — see `docs/v1/README.md`).
   [`plans/`](docs/v1/plans/), one implementation plan per phase, P0 through P58f.
 - [`docs/design/kira-design-system/`](docs/design/kira-design-system/) — the workbench visual
   reference (design artboards).
-- [`AGENTS.md`](AGENTS.md) — the working agreement for changes to this repo.
+- [`CLAUDE.md`](CLAUDE.md) — the working agreement for changes to this repo.
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — how the app actually works today, plus known
   open limitations.
 - [`docs/DEV_ENVIRONMENT.md`](docs/DEV_ENVIRONMENT.md) — building, running and testing this repo in

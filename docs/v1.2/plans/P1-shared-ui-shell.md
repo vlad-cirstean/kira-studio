@@ -9,7 +9,7 @@
 > **No HTTP functionality lands here.** No request sending, no collections format, no storage, no
 > curl, no protocols. What lands is the shell, plus an Http mode that is genuinely empty — an empty
 > left panel and an empty content area, both built from the existing `EmptyState` primitive. That is
-> the proof the seam works, not a stub of a feature (`AGENTS.md`: *"Scope left out of a phase is left
+> the proof the seam works, not a stub of a feature (`CLAUDE.md`: *"Scope left out of a phase is left
 > out entirely, not half-implemented"*).
 >
 > **Every claim below was re-read against the tree, not inferred from `SPEC.md`'s prose.** Base:
@@ -66,7 +66,7 @@
   why none is needed rather than deferring one.
 - **Any bridge/bindings change.** No bound-service method is added or altered, so
   `wails3 task common:generate:bindings` output is unchanged and `tests/ui/support/mockRuntime.ts`'s
-  `CHANNEL_TO_FQN` table needs no new entry (`AGENTS.md`'s `-names` warning has no subject here).
+  `CHANNEL_TO_FQN` table needs no new entry (`CLAUDE.md`'s `-names` warning has no subject here).
 - **A second persisted panel width for Http.** Both modes share
   `layoutState.panel.project` in P1 (§2 F20, §8 OQ-1).
 - **Renaming the View menu's "Toggle Project Panel"** (`internal/shell/menutemplate.go:74`) or adding
@@ -359,7 +359,7 @@ panel slot therefore share one width unless the schema grows a second entry.
 - **No migration, no `TabsRepo` change, no Go model change.** F17 + F18.
 - **No bindings regeneration.** No bound-service method changes, so
   `tests/ui/support/mockRuntime.ts`'s `CHANNEL_TO_FQN` gains no entry and the `-names` failure mode
-  `AGENTS.md` warns about has no subject here.
+  `CLAUDE.md` warns about has no subject here.
 - **The data plane is untouched.** No edit to `internal/adapterhost/`, `bridge/stream.go` or
   `frontend/src/bridge/`. If a commit in §5 seems to need one, re-read §2.
 - **A second left panel is not being added.** `docs/v1/plans/P41-…md:225-231` (F15) established that
@@ -376,7 +376,7 @@ panel slot therefore share one width unless the schema grows a second entry.
 ## 4. Decisions
 
 ### D1 — No new library, and here is the check rather than the assertion
-`AGENTS.md` requires reaching for a maintained library before hand-rolling non-trivial
+`CLAUDE.md` requires reaching for a maintained library before hand-rolling non-trivial
 infrastructure, and requires naming the requirement when declining one.
 
 - **A docking/tab-layout library** (`dockview`, `golden-layout`, `rc-dock` — all MIT, so the decline
@@ -532,7 +532,7 @@ owns it. Revisited in §8 OQ-1 when Http's panel actually has content worth sizi
 ## 5. Implementation order
 
 Ten commits. C1–C4 are pure refactors of Studio with no rendered-output change; C5–C8 add the mode
-seam and the title bar; C9–C10 are the test and the docs. Per `AGENTS.md`, run the fast checks
+seam and the title bar; C9–C10 are the test and the docs. Per `CLAUDE.md`, run the fast checks
 (`lint`, `typecheck`, `build`) per commit and the expensive suites once at the end.
 
 ### C1 — `refactor(theme): TreeHost, with the sticky band moved beside it`
@@ -599,7 +599,7 @@ tab-kind registry as the successor to `MainView.vue`'s dispatch chain.
 `bun run lint`, `bun run typecheck`, `bun run build`, `bun run test:unit`, `bun run test:ui`,
 `bun run test:ipc:fe`, plus `go build ./... && go vet ./... && go test ./apps/kira-studio/internal/...`
 (the Go side of this phase is one file plus its test and needs no GTK/WebKit headers —
-`AGENTS.md`'s fast-loop note). `scripts/setup.sh` first in a fresh container.
+`CLAUDE.md`'s fast-loop note). `scripts/setup.sh` first in a fresh container.
 
 ### 6.2 The new spec — and why it is real here, not a mock of a mock
 `tests/ui/` drives the real built bundle in real WebKit over a static file server, with both wire

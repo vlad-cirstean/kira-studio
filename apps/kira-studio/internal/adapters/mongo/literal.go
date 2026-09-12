@@ -570,7 +570,7 @@ func looksLikeEJSONWrapper(d bson.D) bool {
 // decodes it into the real BSON value the wrapper denotes.
 //
 // The wrapper is wrapped in a one-field document ({"v": <wrapper>}) before marshalling, exactly
-// like IDText's own MarshalExtJSON direction (P58c M7.0/MG-2 findings, AGENTS.md): the extJSON
+// like IDText's own MarshalExtJSON direction (P58c M7.0/MG-2 findings, CLAUDE.md): the extJSON
 // reader only special-cases a `$oid`/`$date`/… shape when it appears as a *field's* value inside a
 // document, not at the very top level being decoded directly into a scalar — a top-level `{"$oid":
 // "..."}` decodes as an ordinary two-key-lookalike document, silently failing to resolve, which is

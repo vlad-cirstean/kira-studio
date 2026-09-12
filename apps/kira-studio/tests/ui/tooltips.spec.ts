@@ -15,7 +15,7 @@ import { connectionRow, expandRow, findRow, openRowMenu } from './support/tree';
 // `test.describe.configure({ timeout: 300_000 })` existed only to stand up and tear down a real
 // Docker Postgres container — nothing to port, there is no container in this tier. Its
 // `createConnection` helper was a raw `page.evaluate(() => window.kira.connectionsCreate(...))`
-// call, the pre-migration escape hatch — `window.kira` no longer exists post-M2/M3 (AGENTS.md's
+// call, the pre-migration escape hatch — `window.kira` no longer exists post-M2/M3 (CLAUDE.md's
 // P57 finding), so both connections here are created through the real dialog instead, the same
 // flow mutations.spec.ts's own read-only-connection scenario already uses. Everything else is one
 // continuous session with no relaunch(), so it all ports unchanged: the app-owned tooltip

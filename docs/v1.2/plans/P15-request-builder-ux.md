@@ -652,7 +652,7 @@ clears 38 px — OQ-4.
 ## 3. Commit sequence
 
 Shared theme work first (it is what the rest consumes), then the Api surfaces, then workbench
-chrome. Per `AGENTS.md`: `bun run lint`, `bun run typecheck` and `bun run build` per commit;
+chrome. Per `CLAUDE.md`: `bun run lint`, `bun run typecheck` and `bun run build` per commit;
 `tests/ui` runs **once** at the end (§4), with fixes as follow-up commits.
 
 | # | Commit | Item | Touches | Risk |
@@ -854,5 +854,5 @@ and `parts/{_dlgcss.html,_style.css}` (the `.box` spec, LAW 01/07/09/12),
 OQ-5), `docs/v1.2/plans/P12-studio-api-modularization.md` (the import boundaries `biome.json`
 enforces), `docs/v1.1/plans/P27-active-filter-indicator-color.md` (F6's precedent check, citation
 discipline), `docs/v1.1/plans/P28-settings-panel-overhaul.md` (the `.p-textarea` promotion D5
-follows). `docs/v1.2/SPEC.md`'s P15 row and its Studio/Api module-boundary section. `AGENTS.md`'s
+follows). `docs/v1.2/SPEC.md`'s P15 row and its Studio/Api module-boundary section. `CLAUDE.md`'s
 comment, unit-test-bar, library-first and implement-then-test-at-the-end rules drive §3 and §4.

@@ -2,14 +2,14 @@
 
 > **The phase, in the user's own words** (SPEC.md:1065): *"SPEC.md and its `plans/` are retired as
 > v1 history rather than a living spec; whatever in them is still true and durable moves into
-> `ARCHITECTURE.md`, which `AGENTS.md` points to and which itself points out to the general docs
+> `ARCHITECTURE.md`, which `CLAUDE.md` points to and which itself points out to the general docs
 > (`PACKAGING.md`, `PERF.md`); the `docs/` folder structure is reconsidered to match"*, with the
 > *why* column recording the framing directly: *"spec and its plans are now 'an element of the past
 > of v1'."*
 >
 > **Two of that sentence's clauses are already true, and finding that out changes the whole shape of
 > the phase.** `ARCHITECTURE.md`, `PACKAGING.md` and `PERF.md` all exist (F50) — this phase
-> originates none of them, and inventing content for them would be the wrong reading. `AGENTS.md`
+> originates none of them, and inventing content for them would be the wrong reading. `CLAUDE.md`
 > already points at `ARCHITECTURE.md`, six times (F61). What is *not* true is the part nobody
 > spelled out: **`ARCHITECTURE.md` currently defers to `SPEC.md` for four live facts and names
 > SPEC.md authoritative in its own second paragraph** (F52). That inversion — not a missing file, not
@@ -68,7 +68,7 @@
   green after every commit**, including the pure-documentation ones — the same discipline every prior
   phase used. `bun test tests/unit` is re-run after commits 11 and 12. Conventional Commits, one per
   step of §4.
-- Comments per AGENTS.md: only where the code cannot say it for itself. `tests/unit/support/window.ts`
+- Comments per CLAUDE.md: only where the code cannot say it for itself. `tests/unit/support/window.ts`
   gets one header comment, because the hazard it exists to prevent (F58) is invisible from the code.
 
 ---
@@ -89,8 +89,8 @@ docs/v1/PACKAGING.md
 docs/v1/PERF.md
 docs/v1/SPEC.md
 
-$ wc -l AGENTS.md README.md docs/v1/*.md
-   199 AGENTS.md
+$ wc -l CLAUDE.md README.md docs/v1/*.md
+   199 CLAUDE.md
    245 README.md
    203 docs/v1/ARCHITECTURE.md
    220 docs/v1/PACKAGING.md
@@ -211,8 +211,8 @@ $ grep -rn "docs/v1/SPEC\.md" --exclude-dir=node_modules --exclude-dir=.git --ex
 ./README.md:195:… skipping main entirely — see `docs/v1/SPEC.md` §4 for the
 ./README.md:217:See [`docs/v1/SPEC.md`](docs/v1/SPEC.md) §11 for the full directory breakdown.
 ./README.md:221:- [`docs/v1/SPEC.md`](docs/v1/SPEC.md) — the full specification: scope, architecture …
-./AGENTS.md:11:- Each phase (see `docs/v1/SPEC.md` §10 phasing table) gets an Opus-authored plan
-./AGENTS.md:199:Full spec: `docs/v1/SPEC.md`. Current-state architecture reference: `docs/v1/ARCHITECTURE.md`.
+./CLAUDE.md:11:- Each phase (see `docs/v1/SPEC.md` §10 phasing table) gets an Opus-authored plan
+./CLAUDE.md:199:Full spec: `docs/v1/SPEC.md`. Current-state architecture reference: `docs/v1/ARCHITECTURE.md`.
 ./docs/v1/ARCHITECTURE.md:3:This is the **current-state** companion to `docs/v1/SPEC.md`. …
 
 $ grep -ro "docs/v1/plans/" --exclude-dir=node_modules --exclude-dir=.git --exclude-dir=out . | wc -l
@@ -265,7 +265,7 @@ The distinction that matters is **"a live fact about the system as it exists tod
 | 9 Testing | **live, and wrong** | *"**No unit tests.** Two suites only."* (`:926`). P44 added `tests/unit/`; `tests/electron-db/` has existed since P32. There are four test directories. |
 | 10 Phasing | **history — and still accruing** | See F56. |
 | 11 Repository layout | **live tree, history annotations** | The tree is real (*"This is the tree as built"*, `:1072`) but its annotations are ~80 % phase narrative — *"(P39) contextMenu.ts and layout.ts joined this folder from workbench/"*, *"Iteration 2 also found, but left unfixed…"*. It is also **stale**: the `tests/` block (`:1306-1311`) lists `db/`, `electron-db/`, `ui/` and no `unit/`, and `docs/` is a bare entry with no children. |
-| 12 Working agreement | **live, and duplicated** | Both bullets restate what `AGENTS.md` already says (branch policy, no per-phase PRs). |
+| 12 Working agreement | **live, and duplicated** | Both bullets restate what `CLAUDE.md` already says (branch policy, no per-phase PRs). |
 
 ### F56 — §10's phasing table is not finished history. P45 and P46 are queued *in it*, today.
 
@@ -276,7 +276,7 @@ $ tail -3 <the §10 table>
 | **P46 Disable unnecessary Chromium/Electron features** | … | Not yet planned — queued |
 ```
 
-`AGENTS.md:11` depends on this: *"Each phase (see `docs/v1/SPEC.md` §10 phasing table) gets an
+`CLAUDE.md:11` depends on this: *"Each phase (see `docs/v1/SPEC.md` §10 phasing table) gets an
 Opus-authored plan…"*. The table is simultaneously (a) the definitive record of what P0–P44
 shipped — the only durable record of decisions like P43's D46 (`Caps.maxPageSize`) and P44's D49
 (`tests/unit/` vs `tests/db/`) — and (b) the live backlog the next phase is read out of.
@@ -407,12 +407,12 @@ ignore). `f660ffd`'s own commit message records that it had to fix these same tw
 This is why the `design/` move is its own commit (D59) with its own verification, not folded in
 with the three `.md` files.
 
-### F61 — Non-finding: `AGENTS.md` already points at `ARCHITECTURE.md`, and already splits process from facts.
+### F61 — Non-finding: `CLAUDE.md` already points at `ARCHITECTURE.md`, and already splits process from facts.
 
-The mandate's *"which `AGENTS.md` points to"* is already satisfied, six times over:
+The mandate's *"which `CLAUDE.md` points to"* is already satisfied, six times over:
 
 ```
-$ grep -n "ARCHITECTURE\.md" AGENTS.md
+$ grep -n "ARCHITECTURE\.md" CLAUDE.md
 4:live in `docs/v1/ARCHITECTURE.md`, not here. This file is process and environment only …
 111:See `docs/v1/ARCHITECTURE.md`'s Kafka section for *why* …
 140:See `docs/v1/ARCHITECTURE.md`'s SQLite section for what the adapter itself relies on
@@ -421,12 +421,12 @@ $ grep -n "ARCHITECTURE\.md" AGENTS.md
 199:Full spec: `docs/v1/SPEC.md`. Current-state architecture reference: `docs/v1/ARCHITECTURE.md`.
 ```
 
-`AGENTS.md:3-5` already states the division of labour this phase is meant to establish: *"Facts about
+`CLAUDE.md:3-5` already states the division of labour this phase is meant to establish: *"Facts about
 the app itself … live in `docs/v1/ARCHITECTURE.md`, not here. This file is process and environment
-only."* So AGENTS.md needs **two** changes, not a restructure: the six paths, and line 199's framing
+only."* So CLAUDE.md needs **two** changes, not a restructure: the six paths, and line 199's framing
 — *"Full spec: `docs/v1/SPEC.md`"* is the last place in a live document that calls SPEC.md the spec.
 
-Recorded as a non-finding so a later phase reads the small AGENTS.md diff as sufficient rather than
+Recorded as a non-finding so a later phase reads the small CLAUDE.md diff as sufficient rather than
 as an oversight.
 
 ---
@@ -435,10 +435,10 @@ as an oversight.
 
 | # | Decision | Why |
 |---|---|---|
-| **D57** | **`docs/v1/SPEC.md` and `docs/v1/plans/` do not move. Their paths are unchanged, byte-for-byte, and no `git mv` touches either.** The restructure is the inverse: the living documents move *out* of `docs/v1/`. | F54 is decisive. 56 in-repo citations name `docs/v1/plans/` by path, six of them in live `src/`/`tests/` comments explaining why a piece of code is shaped as it is; `docs/v1/SPEC.md` is named by README ×4, AGENTS.md ×2 and ARCHITECTURE.md ×1. A move dangles all of them, and the only way to un-dangle the 50 inside `docs/v1/` is to rewrite frozen history to name a path that did not exist when it was written — the exact falsification "retired as history" exists to prevent (§0). Against that cost, a move buys nothing: `docs/v1/` **already** says "v1" (F51). A folder does not become history by being renamed; it becomes history by containing only history and saying so (D61). |
+| **D57** | **`docs/v1/SPEC.md` and `docs/v1/plans/` do not move. Their paths are unchanged, byte-for-byte, and no `git mv` touches either.** The restructure is the inverse: the living documents move *out* of `docs/v1/`. | F54 is decisive. 56 in-repo citations name `docs/v1/plans/` by path, six of them in live `src/`/`tests/` comments explaining why a piece of code is shaped as it is; `docs/v1/SPEC.md` is named by README ×4, CLAUDE.md ×2 and ARCHITECTURE.md ×1. A move dangles all of them, and the only way to un-dangle the 50 inside `docs/v1/` is to rewrite frozen history to name a path that did not exist when it was written — the exact falsification "retired as history" exists to prevent (§0). Against that cost, a move buys nothing: `docs/v1/` **already** says "v1" (F51). A folder does not become history by being renamed; it becomes history by containing only history and saying so (D61). |
 | **D58** | **`ARCHITECTURE.md`, `PACKAGING.md` and `PERF.md` move up to `docs/`.** `docs/v1/` is then left holding exactly the v1 record: `SPEC.md`, `plans/`. Target tree in §3. | This is the whole of "the `docs/` folder structure is reconsidered to match," and it is what makes the structure self-describing: **`docs/*.md` is living, `docs/v1/` is the v1 record.** It also repairs five references that have dangled since `f660ffd` (F53) — `verify-packaging.sh:65,67` and `PERF.md:208` already say `docs/PACKAGING.md`; `PACKAGING.md:111,113` already say `docs/PERF.md`. Twenty-six reference sites change, all listed in commit 2, none of them mechanical consumers (F54). |
 | **D59** | **`docs/v1/design/` moves to `docs/design/`, in its own commit**, with `biome.json:16` and `.gitignore:157,159` updated in that same commit and the exclusion re-verified by running `bun run lint` and `git status` before and after. | The design system is a living reference, not a phase record: its own README describes a rebuild command (`node build.mjs`) and `ViewChrome.vue:12,81` cites it as the current authority for view-chrome layout ("LAW 12"). Leaving it inside the v1 *record* folder would contradict D58's rule on its first application. Its own commit because two of its six reference sites are behavioral, and `f660ffd`'s commit message records those same two as a thing it nearly got wrong (F60). Bonus: `SPEC.md:351`, `primitives.css:1` and `tokens.css:55` already say `docs/design/kira-design-system/` and become correct (F53). |
-| **D60** | **"Retired as history" means exactly three things, and nothing more.** (1) **SPEC.md loses its normative role.** `ARCHITECTURE.md:7`'s *"SPEC.md is authoritative for behavior"* inverts: `ARCHITECTURE.md` is authoritative for what the app is today, the tree is authoritative over both, and SPEC.md is the record of what v1 was specified to be. (2) **No historical record is ever retro-edited** — not a plan file, not a §10 row — so a path named in one is read as "as of that phase" (D61 says this once, in the banner). (3) **§10's ledger keeps accruing rows**, and `AGENTS.md`'s plan-per-phase convention keeps writing into `docs/v1/plans/`. | (1) is the mandate's own sentence. (2) is the only reading under which the word "history" means anything — a record edited to match the present is not a record. (3) is forced by F56: P46 is queued in that table right now, six live `src/` comments cite plan files as live rationale, and there is no second place in this repo where a phase's outcome is written down. Freezing the ledger would not retire history; it would end it. The alternative considered and rejected — a new `docs/plans/` for post-v1 phases — splits one continuously-numbered sequence across two directories *and* makes six already-dangling `docs/plans/P1x-*.md` references resolve to a directory that exists but lacks the file, which is worse than dangling. |
+| **D60** | **"Retired as history" means exactly three things, and nothing more.** (1) **SPEC.md loses its normative role.** `ARCHITECTURE.md:7`'s *"SPEC.md is authoritative for behavior"* inverts: `ARCHITECTURE.md` is authoritative for what the app is today, the tree is authoritative over both, and SPEC.md is the record of what v1 was specified to be. (2) **No historical record is ever retro-edited** — not a plan file, not a §10 row — so a path named in one is read as "as of that phase" (D61 says this once, in the banner). (3) **§10's ledger keeps accruing rows**, and `CLAUDE.md`'s plan-per-phase convention keeps writing into `docs/v1/plans/`. | (1) is the mandate's own sentence. (2) is the only reading under which the word "history" means anything — a record edited to match the present is not a record. (3) is forced by F56: P46 is queued in that table right now, six live `src/` comments cite plan files as live rationale, and there is no second place in this repo where a phase's outcome is written down. Freezing the ledger would not retire history; it would end it. The alternative considered and rejected — a new `docs/plans/` for post-v1 phases — splits one continuously-numbered sequence across two directories *and* makes six already-dangling `docs/plans/P1x-*.md` references resolve to a directory that exists but lacks the file, which is worse than dangling. |
 | **D61** | **A new `docs/v1/README.md` is the archive banner** — twenty-odd lines, no content of its own: what this folder is, that it is the v1 record and not a specification, that `docs/ARCHITECTURE.md` is authoritative for current behavior, that every path named inside is as-of-that-phase and may have moved since, and that §10's phasing table is the one part still being appended to. `SPEC.md`'s own front matter (`:1-12`) is rewritten to say the same in three lines and to fix its stale *"P0–P31 implemented"* status and its `docs/plans/` pointer. | A banner file is how the two rules in D60 get stated **once** instead of 49 times, and it is the piece that makes D57's "don't move it" honest — the folder announces what it is instead of relying on its name. Rewriting SPEC.md's front matter is the one edit this phase makes to SPEC.md's body outside §10, and it is navigational, not historical: lines 1–12 are a reader's-guide header, not a record of anything. |
 | **D62** | **`ARCHITECTURE.md` absorbs six bodies from SPEC.md**, each replacing a stub or filling a gap, in five commits (§4 commits 4–8): §4 Process architecture → replaces `ARCHITECTURE.md:199-203`; §6 Storage → replaces `:193-197`; §7 Caching → **new**, there is nothing today; §5 + §5.1 → the mapping table replaces the pointer at `:27-28` (§5's illustrative `Caps` block is *not* copied — `:15-44` already carries the accurate one, F55); §3 Stack + §2's six "rules that follow" + §9 Testing → new; §11's tree → new, re-derived from the actual tree. | This is the mandate's *"whatever in them is still true and durable moves into `ARCHITECTURE.md`."* The selection is F55's verdict column, filtered to what `ARCHITECTURE.md` does not already own. Each body is a self-contained section, so each is one commit and one revert. |
 | **D63** | **`ARCHITECTURE.md` deliberately does *not* absorb §8's 604 lines verbatim.** It gains one **UI architecture** section of roughly 60–80 lines carrying the durable *structure* — which view kinds exist and what selects one (page kind, never connection kind); the tab-identity rule (`{id, connectionId, path, kind, state}`, identity is `id` not `path`, §8.4); the session-restore reconnect gate; the staged-pending-changes model for SQL grids versus immediate writes everywhere else (§8.14 vs §8.7–8.9); the cell editor as a panel five view kinds mount rather than a tab kind; the Browse panel's one-level-at-a-time model and why it exists (§8.18, `caps.keyBrowser`); and the shared find/chunked-scan machinery. It does **not** restate per-dialog field lists, per-menu row inventories, or mockup-versus-shipped narrative, and it says so in its own text, pointing at `docs/v1/SPEC.md` §8 for the v1-era detail and at `tests/ui/` for what is actually asserted. | §8 is 44 % of SPEC.md and the fastest-rotting part of it. Copying it wholesale would recreate the living-spec this phase exists to retire — a 600-line prose restatement of UI behavior whose real source of truth is the code plus 26 Playwright specs, and which the very next UI phase makes stale. Distilling the structural rules keeps what a future session actually needs to look up (why a Redis bucket is a leaf, why a tab reopens rather than reuses) and drops what it would be misled by. Stated as a decision, at length, so a later phase reads the omission as chosen (§6). |
@@ -469,7 +469,7 @@ docs/                                   docs/
 The rule the shape encodes: **`docs/*.md` is living and gets corrected; `docs/v1/` is the record of
 v1 and gets appended to, never rewritten.**
 
-`AGENTS.md` (repo root, process and environment only) and `README.md` (repo root, the front door)
+`CLAUDE.md` (repo root, process and environment only) and `README.md` (repo root, the front door)
 are unchanged in location and unchanged in role.
 
 ---
@@ -497,7 +497,7 @@ independent of all of it (11–12), and the §10 row is written last (13), per t
    (26 sites, from F52/F53/F54's greps):
    - `README.md` — lines 11, 100, 139, 223, 225, 238 (`docs/v1/PACKAGING.md` ×4,
      `docs/v1/PERF.md` ×2).
-   - `AGENTS.md` — lines 4, 111, 140, 163, 181, 199.
+   - `CLAUDE.md` — lines 4, 111, 140, 163, 181, 199.
    - `.github/workflows/ci.yml:71`; `.github/workflows/release.yml:40,51,60`;
      `electron-builder.yml:45`.
    - `src/engine/cache/counts.ts:9`, `src/engine/adapters/registry.ts:11`, `src/main/window.ts:31`
@@ -557,13 +557,13 @@ independent of all of it (11–12), and the §10 row is written last (13), per t
    two lines saying what this document now is. `ARCHITECTURE.md:1-13`'s opening inverted: it is
    authoritative for current behavior, the tree outranks both, `docs/v1/SPEC.md` is the record of
    what v1 was specified to be, and a "Related documents" block points out to `docs/PACKAGING.md`,
-   `docs/PERF.md`, `docs/design/`, `README.md` and `AGENTS.md` — the pointer structure the mandate
+   `docs/PERF.md`, `docs/design/`, `README.md` and `CLAUDE.md` — the pointer structure the mandate
    names. **No `docs/v1/plans/` file is touched** (D65).
 
-10. **`docs: AGENTS.md and README point at the new docs layout`** — D67/F61.
-    `AGENTS.md:199` rewritten — *"Full spec: `docs/v1/SPEC.md`"* is the last live sentence calling
+10. **`docs: CLAUDE.md and README point at the new docs layout`** — D67/F61.
+    `CLAUDE.md:199` rewritten — *"Full spec: `docs/v1/SPEC.md`"* is the last live sentence calling
     SPEC.md the spec; it becomes a pointer to `docs/ARCHITECTURE.md` as the current-state reference
-    and `docs/v1/` as the v1 record. `AGENTS.md:11`'s *"see `docs/v1/SPEC.md` §10 phasing table"*
+    and `docs/v1/` as the v1 record. `CLAUDE.md:11`'s *"see `docs/v1/SPEC.md` §10 phasing table"*
     stays — that is F56's live backlog and it is still correct. `README.md`: the Documentation
     section restructured to the two-tier shape (§3), the layout block gains `tests/unit` and a
     corrected `docs/` line, the script table gains `typecheck:unit`/`test:unit` and stops saying
@@ -652,7 +652,7 @@ repo's own convention.
 - **Copying SPEC.md §8's 604 lines into `ARCHITECTURE.md`.** D63. The distilled structural section
   replaces it deliberately.
 - **Copying SPEC.md §10 (the ledger) or §12 (the working agreement) anywhere.** §10 stays put and
-  keeps accruing (D60 rule 3). §12's two bullets already exist in `AGENTS.md` — *"One feature branch
+  keeps accruing (D60 rule 3). §12's two bullets already exist in `CLAUDE.md` — *"One feature branch
   for all of v1. No per-phase PRs"* — and a third copy is how they drift apart.
 - **Rewriting `PACKAGING.md` or `PERF.md`.** D64. Both are current and own their subjects.
   `PERF.md`'s unrun macOS rows and `PACKAGING.md` §4's *"not yet run"* human checklist are honest
@@ -698,14 +698,14 @@ repo's own convention.
 - [ ] `docs/ARCHITECTURE.md` has sections covering: adapter contract, per-engine facts, the §5.1
       mapping table, process model, storage, caching, stack, invariants, testing, UI architecture,
       repository layout — and a Related-documents block naming `docs/PACKAGING.md`, `docs/PERF.md`,
-      `docs/design/`, `README.md`, `AGENTS.md` and `docs/v1/`.
+      `docs/design/`, `README.md`, `CLAUDE.md` and `docs/v1/`.
 - [ ] `docs/ARCHITECTURE.md`'s testing section names four test directories and states D66's rule.
 - [ ] `docs/v1/README.md` exists and states: this is the v1 record, `docs/ARCHITECTURE.md` is
       authoritative for current behavior, paths inside are as-of-that-phase, §10's table is still
       appended to.
 - [ ] `SPEC.md`'s front-matter status line no longer reads *"P0–P31 implemented"* and no longer
       points at `docs/plans/`.
-- [ ] `AGENTS.md:199` no longer calls `docs/v1/SPEC.md` the full spec; `AGENTS.md:11`'s §10 pointer
+- [ ] `CLAUDE.md:199` no longer calls `docs/v1/SPEC.md` the full spec; `CLAUDE.md:11`'s §10 pointer
       is unchanged and still resolves.
 - [ ] `README.md` no longer says *"deliberately no unit tests"*, no longer lists credential
       encryption or unit tests under "Not in v1", no longer calls S3 read-only, and its script table

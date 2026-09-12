@@ -76,7 +76,7 @@
 - **Defaults are not restated in code.** Electron 43.4.1 already defaults `webviewTag`,
   `webSecurity`, `allowRunningInsecureContent`, `experimentalFeatures`, `nodeIntegrationInWorker`,
   `nodeIntegrationInSubFrames`, `navigateOnDragDrop` and `plugins` the way this app wants them
-  (F63). Writing them out again is comment-noise that AGENTS.md's comment rule exists to prevent, and
+  (F63). Writing them out again is comment-noise that CLAUDE.md's comment rule exists to prevent, and
   it protects against nothing — a pinned Electron cannot change its own defaults. They are pinned in
   a test instead (D69), which *does* catch the case that matters: a future session editing
   `webPreferences` by hand, or an Electron bump changing a default.
@@ -90,7 +90,7 @@
   (`tests/ui/{sqlite,startup,smoke,connections,workbench}.spec.ts`, plus the new
   `tests/ui/hardening.spec.ts` from commit 1 onward) is re-run after every commit. `bun test tests/unit`
   is re-run after commits 1, 2, 5 and 7. Conventional Commits, one per step of §4.
-- Comments per AGENTS.md: only where the code cannot say it for itself. `security.ts` earns exactly
+- Comments per CLAUDE.md: only where the code cannot say it for itself. `security.ts` earns exactly
   three — the clipboard allowlist (a reader will otherwise "simplify" it to a deny-all and break
   paste), the `file://` fuse hazard, and why `will-frame-navigate` rather than `will-navigate`.
 
@@ -483,7 +483,7 @@ is nothing to disable. (`scripts/verify-packaging.sh` S1/S2 already guard the up
 
 | # | Decision | Why |
 |---|---|---|
-| **D69** | **Defaults that are already correct are not restated in `webPreferences`. They are pinned by a test instead** — `tests/ui/hardening.spec.ts` asserts `webContents.getLastWebPreferences()` deep-equals the exact expected object (F63's "reported" list). | Restating eight already-correct defaults is the comment-noise AGENTS.md's comment rule exists to prevent, and it guards against nothing: a pinned Electron cannot change its own defaults mid-version. What *can* go wrong is a future session editing the `webPreferences` literal, or an Electron bump moving a default — and a deep-equality assertion catches both, in one line, where eight extra config keys catch neither. The three options this phase actually changes (`devTools`, `spellcheck`, `webgl`) are **not** in that reported set (F63), so each gets its own assertion rather than riding on this one. |
+| **D69** | **Defaults that are already correct are not restated in `webPreferences`. They are pinned by a test instead** — `tests/ui/hardening.spec.ts` asserts `webContents.getLastWebPreferences()` deep-equals the exact expected object (F63's "reported" list). | Restating eight already-correct defaults is the comment-noise CLAUDE.md's comment rule exists to prevent, and it guards against nothing: a pinned Electron cannot change its own defaults mid-version. What *can* go wrong is a future session editing the `webPreferences` literal, or an Electron bump moving a default — and a deep-equality assertion catches both, in one line, where eight extra config keys catch neither. The three options this phase actually changes (`devTools`, `spellcheck`, `webgl`) are **not** in that reported set (F63), so each gets its own assertion rather than riding on this one. |
 | **D70** | **`devTools: !app.isPackaged`.** DevTools stays fully available unpackaged (`bun run dev`, every Playwright run) and is impossible to open in a packaged build, `openDevTools()` included. | F64 measured both halves: the keyboard path is *already* closed by `menu.ts`'s gating (no shortcut opened DevTools with a custom menu), so this closes the one remaining path — the programmatic one, which was open. Nothing in a packaged renderer can currently call `openDevTools()` (no node integration, not on the `contextBridge` surface), so this is defence in depth rather than a live hole; it is worth one word because it turns "no caller exists today" into "no caller can exist." |
 | **D71** | **A permission handler pair that denies everything except exactly `clipboard-read` and `clipboard-sanitized-write`**, installed on `session.defaultSession` once, after `app.whenReady()`. Both `setPermissionRequestHandler` and `setPermissionCheckHandler` consult one shared `Set`. | F67: today everything is granted, including notifications and geolocation, because no handler exists. F68: deny-all breaks copy and paste across `copyText`'s 38 call sites, the grid's paste path and sixteen test assertions, and the two names were isolated by running them one at a time rather than read off a list. One `Set` for both handlers means the allowlist can never drift between the two — the failure mode where a request is granted and the later check is not. |
 | **D72** | **`setWindowOpenHandler` denies unconditionally; `will-frame-navigate` allows only the app's own base URL (`process.env.ELECTRON_RENDERER_URL ?? 'file://'`); `will-attach-webview` denies unconditionally.** | F65/F66: both holes are open right now and both were reproduced against the shipped renderer, not a toy. F65 also shows there is no caller to break — zero `window.open`, zero `target="_blank"`, zero `<a href>` in the whole renderer, and file pickers are native `dialog` modals over IPC, not popups. `will-frame-navigate` rather than `will-navigate` because it fires first and covers sub-frames too (F66); the base-URL allowance is what keeps `wc.reload()` and Vite's dev-server full reloads working, verified. `will-attach-webview` is one line and makes `webviewTag: false` unbypassable. |
@@ -673,7 +673,7 @@ convention.
    Verify: `bun run verify:packaging` → all checks passed, and confirm S6/S7 actually fire by
    temporarily breaking each and reverting. Full gates. **The packaged half is macOS-owed** (§8):
    `package:mac` cannot run here (no macOS, and `prepackage:mac`'s native rebuild is blocked in this
-   sandbox — AGENTS.md's Kafka section).
+   sandbox — CLAUDE.md's Kafka section).
 
 9. **`docs(architecture): the renderer's security surface`** — a new section in
    `docs/ARCHITECTURE.md`, placed after **Process model**: what is turned off and the one-sentence
@@ -809,7 +809,7 @@ these other than by adding tests is not done.
 1. **The three fuses have never been verified on a packaged artifact.** They were measured against a
    *copied Electron binary* running the real `out/main/index.js` (F71), which is strong evidence and
    not the same thing as `dist/mac-arm64/Kira Studio.app`. `package:mac` needs macOS, and
-   `prepackage:mac`'s native Kafka rebuild is blocked in this sandbox regardless (AGENTS.md). **Owner:
+   `prepackage:mac`'s native Kafka rebuild is blocked in this sandbox regardless (CLAUDE.md). **Owner:
    whoever next runs `bun run package:mac` on the macOS box.** What to check: the app launches;
    `ELECTRON_RUN_AS_NODE=1 "Kira Studio.app/Contents/MacOS/Kira Studio" -e "…"` does not run as Node;
    `--inspect` prints no *"Debugger listening"*; `codesign -dv` still reports `Signature=adhoc` (the

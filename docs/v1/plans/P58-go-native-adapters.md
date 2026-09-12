@@ -49,7 +49,7 @@
    `scripts/vendor-node.sh` and the vendored Node runtime deleted; `bun run build:engine` and its
    esbuild `--external` list deleted; `scripts/run-db-tests.sh`'s two-runtime split and
    `scripts/run-ipc-backend.sh` deleted; the Kafka native-module packaging gap
-   (`AGENTS.md`'s P57 findings, still open) deleted along with the addon that caused it.
+   (`CLAUDE.md`'s P57 findings, still open) deleted along with the addon that caused it.
 
 ### 0.2 Not in this phase
 
@@ -74,7 +74,7 @@
 ### 0.3 Why this is six sub-phases, not one — and the checkpoint that gates the deletion
 
 P51–P57 split a comparably-sized migration into six phases, each with its own Opus plan, and
-`AGENTS.md` forbids batching unrelated work into one phase. P58 is *larger* than P52–P57's `src/main`
+`CLAUDE.md` forbids batching unrelated work into one phase. P58 is *larger* than P52–P57's `src/main`
 port by line count (14 847 lines of engine TypeScript against P52's 3 406 lines of `src/main`), and
 its risk is differently shaped: P52–P57 ported code whose behaviour was already pinned by a passing
 test suite in the same language; P58 ports code whose behaviour is pinned by 12 888 lines of specs
@@ -124,7 +124,7 @@ The sub-phases:
 | **P58f** | Cutover | `src/engine/`, `internal/enginehost/`, the vendored Node, the build and packaging steps, the test tiers and the docs. Everything whose removal is only safe once all ten kinds are native |
 
 **Each sub-phase gets its own Opus plan under `docs/v1/plans/` before implementation**, per
-`AGENTS.md`. That is not double-planning: it is this repo's own established shape for adapter work —
+`CLAUDE.md`. That is not double-planning: it is this repo's own established shape for adapter work —
 P8 (mongo), P9 (redis), P10 (kafka/sqs), P17 (s3), P34 (mysql), P35 (sqlite), P36 (clickhouse) and
 P37 (rabbitmq) each got a dedicated plan for a *single* adapter, because a single adapter's driver
 semantics are enough material for one. This document settles what those plans must not relitigate:
@@ -349,7 +349,7 @@ clients from each other. D7 decides on that basis.
 | RabbitMQ | **no library — `net/http`** | **researched** | The adapter has *no dependency today*: it speaks the `rabbitmq_management` HTTP API over `fetch`. `docs/ARCHITECTURE.md`'s RabbitMQ section explains why AMQP was never a candidate (AMQP 0-9-1 has no list-queues/list-exchanges/list-bindings at all). Go's own `net/http` + `net/url` covers it entirely, and `url.PathEscape` is a better home for the `%2F` default-vhost rule than a hand-rolled `encodeSegment()`. **This makes RabbitMQ the simplest of the eleven, not the hardest** — the opposite of the intuition its 1 209 lines suggest |
 | Test containers | `github.com/testcontainers/testcontainers-go` | **researched** | Modules exist for postgres, mysql, mariadb, redis, mongodb, kafka, rabbitmq, clickhouse and localstack, all actively maintained through 2026. D12 |
 
-**What is not a driver problem and must not be treated as one:** `AGENTS.md`'s Docker section
+**What is not a driver problem and must not be treated as one:** `CLAUDE.md`'s Docker section
 (`mirror.gcr.io` retagging, the ClickHouse `ulimit` subclass, the `403` on
 `production.cloudfront.docker.com`) describes **daemon- and image-level** facts. Retagging happens
 in the Docker daemon, so every one of those workarounds applies to `testcontainers-go` unchanged and
@@ -455,7 +455,7 @@ and the fourth is decisive:
 
 1. **`cache:stats` is an unsolicited push** (`PORT_EVENT.cacheStats`, emitted at up to 1 Hz by
    `cache/index.ts`'s throttled emitter and consumed by the status bar and the settings dialog).
-   Bound calls are request/response only; a push needs `Events.On` — and `AGENTS.md`'s P57 findings
+   Bound calls are request/response only; a push needs `Events.On` — and `CLAUDE.md`'s P57 findings
    record, twice and emphatically, that `tests/ui/`'s `mockRuntime.ts` *"has no `Events.On`
    (push-event) mechanism at all — a structural gap, not a per-scenario mocking gap."* Moving
    `cache:stats` onto events would make it structurally untestable in the tier that tests it.
@@ -556,7 +556,7 @@ detection, produce with key and headers. Consumer-group **membership** is not ne
 *Why franz-go:*
 
 - **It is pure Go.** No cgo, no `librdkafka`, no `.node` addon, no ABI question, and — directly —
-  `AGENTS.md`'s still-open finding that *"no build step in this repository vendors
+  `CLAUDE.md`'s still-open finding that *"no build step in this repository vendors
   `@confluentinc/kafka-javascript`'s native module … a real packaged build today would have Kafka
   connections fail at `require()` time"* stops existing rather than being fixed. That finding's own
   closing words are *"plausibly moot once a future phase removes the Node engine sidecar entirely"*;
@@ -602,7 +602,7 @@ detection, produce with key and headers. Consumer-group **membership** is not ne
   consumption, which is the shape franz-go serves best and kafka-go serves least.
 
 *What M0 must prove before P58e starts* (a throwaway Go program against a real `confluentinc/cp-kafka`
-container, pulled via `mirror.gcr.io` per `AGENTS.md`): list topics with partition metadata; list and
+container, pulled via `mirror.gcr.io` per `CLAUDE.md`): list topics with partition metadata; list and
 describe groups; read start/end offsets; resolve offsets by timestamp; consume a bounded batch from
 two named partitions at exact start offsets **without any group ever appearing in `ListGroups`**;
 read `HighWatermark` off a fetch; produce a record with a key and two headers; describe a topic's
@@ -676,7 +676,7 @@ calls (`ObjectId(...)`, `ISODate(...)`, `Decimal128(...)`, `Long(...)`). Its own
 reason: *"No eval, no Function, no third-party expression evaluator — user-supplied console/filter
 text must never reach a JS evaluator."* The same rule holds in Go and for the same reason. This is
 the single largest piece of genuinely original logic in the eleven adapters, it is the one place a
-subtle port bug would be least visible, and it clears `AGENTS.md`'s own unit-test bar without
+subtle port bug would be least visible, and it clears `CLAUDE.md`'s own unit-test bar without
 argument (*"a parser or splitter with several interacting lexical rules"*) — so it gets a real Go
 unit test with the same cases the existing tokenizer's behaviour implies, written before the port.
 
@@ -708,7 +708,7 @@ sequence against the same containers and writes the same fixture modules, so:
 - the anti-drift guarantee survives with its exact wording intact.
 
 The fixture files' formatting convention (raw `JSON.stringify` then `bunx biome check --write`,
-`AGENTS.md`'s note) carries over — a Go writer emits the same shape and the same Biome pass runs
+`CLAUDE.md`'s note) carries over — a Go writer emits the same shape and the same Biome pass runs
 after it. The adapter-specific non-determinism freezes already recorded (`sortStreamByKey` for
 kafka's arrival-order interleave, ClickHouse's `.inner_id.<uuid>`, kafka's coordinator host:port,
 redis's HSCAN reordering) must be reproduced in the Go generator, and are the most likely thing to be
@@ -856,7 +856,7 @@ docs/ARCHITECTURE.md                      EDITED     Stack, Invariants, Adapter 
                                                      facts, Process model, Caching, Testing
 docs/PACKAGING.md                         EDITED
 docs/PERF.md                              EDITED     the inflation measurement, re-taken
-AGENTS.md                                 EDITED     P58 findings; Docker/Kafka/SQLite/ClickHouse/
+CLAUDE.md                                 EDITED     P58 findings; Docker/Kafka/SQLite/ClickHouse/
                                                      RabbitMQ/tests-ipc sections rewritten
 docs/v1/SPEC.md                           EDITED     the P58 row + its missing sqlite (§1.2)
 ```
@@ -1045,7 +1045,7 @@ var nativeKinds = map[model.ConnectionKind]bool{ /* grows M5 -> M9 */ }
   both sides, so `cache:stats` must report the **sum** and `cache:clear` must clear **both**. This is
   the single ugliest thing in the transition and it is temporary by construction — but leaving it
   implicit would produce a status bar that under-reports cache size for five sub-phases, which is
-  exactly the kind of silently-wrong number `AGENTS.md`'s P57 findings warn about (the
+  exactly the kind of silently-wrong number `CLAUDE.md`'s P57 findings warn about (the
   `byteSize: 0` fixture that made every leak assertion pass vacuously).
 - **The kind of a connection id** is already known Go-side: `internal/connections`' state map and
   `ConnectionsRepo.Get` both carry it, so the router needs no new storage.
@@ -1088,7 +1088,7 @@ One function body in `src/renderer/bridge/port.ts` (§4.2). Nothing else. `data.
   `docs/v1/plans/p57-pending-ci-workflows/` is still present at the end of P57, meaning that session's
   push lacked the `workflow` OAuth scope. P58 makes them staler (`test:db`, `test:ipc:be`,
   `build:engine` all disappear). M11 must either land both files or extend that same staged directory
-  with a P58 revision and say plainly in `AGENTS.md` that it is still pending. Silently leaving two
+  with a P58 revision and say plainly in `CLAUDE.md` that it is still pending. Silently leaving two
   broken workflows is not an option; leaving them broken *and unrecorded* is the failure mode to
   avoid.
 
@@ -1097,7 +1097,7 @@ One function body in `src/renderer/bridge/port.ts` (§4.2). Nothing else. `data.
 `testcontainers-go` per engine, with `shell/internal/adapters/testsupport/` as the Go analogue of
 `tests/db/support/`. Three carried-over facts, none of which needs re-deriving:
 
-- **`mirror.gcr.io` retagging is a daemon-level workaround** (`AGENTS.md`'s Docker section) and
+- **`mirror.gcr.io` retagging is a daemon-level workaround** (`CLAUDE.md`'s Docker section) and
   applies unchanged: the Go module asks for `postgres:17`, the daemon already has that tag pointing
   at the mirrored image. No Go code references the mirror.
 - **ClickHouse's `ulimit` problem** (`@testcontainers/clickhouse` hardcoding
@@ -1107,7 +1107,7 @@ One function body in `src/renderer/bridge/port.ts` (§4.2). Nothing else. `data.
   counterpart and the workaround simply disappears. **Check, do not assume in either direction.**
 - **The Bun/testcontainers hang has no Go analogue.** P57's finding was specific to `bun run`;
   `testcontainers-go` runs under the Go toolchain. Expect the postgres wait strategy to just work,
-  and record it in `AGENTS.md` when it does, because a whole paragraph of that file becomes historical.
+  and record it in `CLAUDE.md` when it does, because a whole paragraph of that file becomes historical.
 
 Go tests gate on Docker the way `isDockerAvailable()` does today: a helper that skips with a legible
 message, never a silent pass.
@@ -1119,7 +1119,7 @@ message, never a silent pass.
 - **`tests/ui/`** entirely — 36 tests across 18 spec files, both wire planes mocked. D1 and D5 keep
   the mocked shapes valid; `tests/ui/support/mockStreamBrowser.js` needs its chunk fields emitted as
   base64 rather than index-keyed objects, which is a fixture-generator change, not a spec change.
-  (And per `AGENTS.md`'s P57 finding about `byteSize: 0`: the generator must compute *real* byte
+  (And per `CLAUDE.md`'s P57 finding about `byteSize: 0`: the generator must compute *real* byte
   sizes with `page.ts`'s own formula, which it already does after that fix — do not regress it while
   changing the encoding.)
 - **`tests/ipc/**/*.frontend.spec.ts`** (7 specs) and **`tests/ipc/**/*.fixture.ts`** (7 modules) —
@@ -1139,7 +1139,7 @@ message, never a silent pass.
   `build:engine` prerequisites.
 - **`tests/unit/`**'s renderer specs — unchanged except the two whose subject moves to Go
   (`engine-cache.spec.ts`, `sql-text.spec.ts`), each deleted only after its Go successor asserts the
-  same cases, per `AGENTS.md`'s "deleting a test whose subject moved is correct; the thing to check
+  same cases, per `CLAUDE.md`'s "deleting a test whose subject moved is correct; the thing to check
   is that the Go test actually covers the same assertion."
 
 ### 5.2 The `src/` non-change, asserted
@@ -1168,7 +1168,7 @@ Two additions to the ported list, both because the Go port creates the risk:
 | a cancel followed immediately by an unrelated query on the same adapter succeeds | sqlite | D8's `sqlite3_interrupt` connection-wide hazard, exactly the shape of mattn/go-sqlite3#488/#745 |
 | a browse never creates group state (`ListGroups` is unchanged before and after) | kafka | P10 D6's promise, made structural by P32 and re-proven against a different client |
 
-### 5.4 Unit-level Go tests, against `AGENTS.md`'s bar
+### 5.4 Unit-level Go tests, against `CLAUDE.md`'s bar
 
 The bar is deliberately high (*"a unit test now exists only for genuinely complex or deeply-nested
 logic — parsers, cursor/pagination boundary arithmetic, cache eviction, crypto, concurrency"*).
@@ -1226,7 +1226,7 @@ available in this session"** rather than leaving it implied.
 | **A real S3 download through the AppKit save panel** | Wails' dialogs are AppKit and need a user; still the coverage `s3.spec.ts` took with it (P57 D16) | An object downloads to a chosen path, written by Go this time |
 | **A Kafka connection in a packaged build** | The thing the current native-module gap would break | Connect, browse a topic, produce a message — the first time this has ever been verifiable in a packaged bundle |
 
-That last row is worth naming as a milestone in itself: `AGENTS.md` currently records that *"a real
+That last row is worth naming as a milestone in itself: `CLAUDE.md` currently records that *"a real
 packaged build today would have Kafka connections fail at `require()` time."* P58 is the phase that
 makes that sentence false, and the check is what proves it.
 
@@ -1291,7 +1291,7 @@ of `src/engine/`. That is the entire list, and §5.2 checks it rather than asser
    as losses (D7).
 5. **SQLite gains real cancellation** — `caps.cancel` flips from a permanent `false` to `true` (D8).
 6. **Ten npm runtime dependencies leave.** `package.json`'s `dependencies` reduces to `zod`.
-7. **`AGENTS.md`'s "Bun is tooling only" becomes literally true** — no shipped JavaScript executes
+7. **`CLAUDE.md`'s "Bun is tooling only" becomes literally true** — no shipped JavaScript executes
    outside the webview.
 8. **The bundle loses a whole Node runtime and a V8 isolate** from both disk and baseline RSS.
 9. **Int64 offsets, native UTF-8, and typed nulls** remove three whole classes of JS-side workaround
@@ -1314,7 +1314,7 @@ of `src/engine/`. That is the entire list, and §5.2 checks it rather than asser
 
 1. **C1 is recorded** (§0.3) — one Postgres connection served entirely in Go while the Node child
    still serves the other ten kinds in the same session, with the six-item checklist of §9 M5. The
-   commit message or `AGENTS.md` entry says so explicitly.
+   commit message or `CLAUDE.md` entry says so explicitly.
 2. **C2 is recorded** before M10 starts — a full manual pass across all eleven kinds leaves the
    engine child's request counter at zero.
 3. `bun run lint`, `bun run typecheck` (all four projects), `bun run test:unit`, `bun run test:go`,
@@ -1325,13 +1325,13 @@ of `src/engine/`. That is the entire list, and §5.2 checks it rather than asser
    (D13).
 6. `git diff --stat src/ -- ':!src/renderer/bridge/port.ts' ':!src/engine'` is empty (§5.2).
 7. `grep -rn "enginehost\|vendor-node\|build:engine\|runtime/node\|src/engine" shell/ src/ scripts/ package.json docs/ tests/`
-   returns nothing outside historical references in `docs/v1/plans/` and `AGENTS.md`'s findings logs.
+   returns nothing outside historical references in `docs/v1/plans/` and `CLAUDE.md`'s findings logs.
 8. `package.json`'s `dependencies` is `{"zod": …}` and nothing else; `trustedDependencies` is gone.
 9. `bun run build && bun run package` produces a signed bundle with **no** `Contents/MacOS/runtime/`;
    `bun run verify:packaging` exits 0 against it (macOS only — otherwise recorded as unavailable).
 10. `docs/PERF.md` carries a **re-taken** measurement replacing the 11×/48× inflation figures, plus
     new bundle-size and RSS numbers or an explicit note that the hardware was unavailable.
-11. `AGENTS.md` gains a **"P58 implementation findings"** entry on the P52–P57 pattern, and the
+11. `CLAUDE.md` gains a **"P58 implementation findings"** entry on the P52–P57 pattern, and the
     sections whose subject this phase removes are rewritten rather than left: **Native Kafka driver**
     (no addon at all now), **SQLite adapter** (no `node:sqlite`, no Bun gate, and cancellation now
     exists), **`tests/ipc/`** (no vendored Node, no `run-ipc-backend.sh`), **Docker** (whichever
@@ -1383,7 +1383,7 @@ adapters; M10–M11 are the cutover.** Hard rules, in priority order:
   `MarshalExtJSON` matching the current `EJSON` output for the fixture documents, plus `killOp`;
   `aws-sdk-go-v2` aborting a `GetObject` mid-body; `net/http` reaching the management API with a
   `%2F` vhost. Plus: `testcontainers-go` starting every one of the eleven images in this sandbox,
-  which is what tells us how much of `AGENTS.md`'s Docker section survives. **No product code lands in
+  which is what tells us how much of `CLAUDE.md`'s Docker section survives. **No product code lands in
   M0.** Its deliverable is a findings section in this document's successor entries, and — if the
   Kafka probe fails — D7's fallback taken *explicitly*, with its cgo cost written down.
 - **M1 — `internal/adapters`: contract, caps, errors, registry, live map, `sqltext.go`,
@@ -1442,7 +1442,7 @@ adapters; M10–M11 are the cutover.** Hard rules, in priority order:
   `src/engine` and `tests/db` includes, and the packaging/`verify-packaging.sh` changes of §4.9.
   Also D13's fixture-generator port, which must be green **before** the TypeScript backend specs are
   deleted, not after — the same M5-before-M6 discipline P57 §9's second hard rule established.
-- **M11 — documentation and CI.** §3's doc list in full, the `AGENTS.md` findings entry (§8 criterion
+- **M11 — documentation and CI.** §3's doc list in full, the `CLAUDE.md` findings entry (§8 criterion
   11), the SPEC row and its missing sqlite, `docs/PERF.md`'s re-taken numbers, and the workflows
   (§4.9) — landed if the session's push scope allows, staged and recorded if not. Last, so it
   describes what actually landed.

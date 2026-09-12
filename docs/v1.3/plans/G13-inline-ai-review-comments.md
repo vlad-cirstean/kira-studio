@@ -136,7 +136,7 @@ Everything in §9's table, but the ones most likely to be mistaken for G13 work:
 ### 0.4 Ground rules
 
 - Every decision in §2 cites a finding; every finding in §1 cites something read or run here.
-- `AGENTS.md` in full: **no stubbed error handling, no `TODO: fix later`, no skipped validation.**
+- `CLAUDE.md` in full: **no stubbed error handling, no `TODO: fix later`, no skipped validation.**
   Every degraded state this phase can reach is a *named* value the UI and the export render
   (`CommentAnchor`'s `removed`/`stale` are the sharpest examples), never a silently wrong line
   number.
@@ -150,7 +150,7 @@ Everything in §9's table, but the ones most likely to be mistaken for G13 work:
 - **Layering.** Everything new stays inside `internal/gitreview` and `internal/gitsession`; neither
   reaches `internal/bridge`, so `TestDomainPackagesDoNotImportBridge` passes with **nothing added to
   `packagesExemptFromBridgeCheck`** — a checklist item (§7.4), not an assumption.
-- **Tests only where `AGENTS.md`'s bar is met** (D18). This phase clears it in exactly **one**
+- **Tests only where `CLAUDE.md`'s bar is met** (D18). This phase clears it in exactly **one**
   place, and says plainly why everything else gets nothing.
 - **Fixture repositories scope their git config to themselves** — `incFixtureEnv()`
   (`GIT_CONFIG_GLOBAL=/dev/null`, `GIT_CONFIG_SYSTEM=/dev/null`, `-c commit.gpgsign=false`).
@@ -671,7 +671,7 @@ Resolving F4/F8/F9. The reasoning, in order:
 3. **A coarse, whole-file-only comment is not what SPEC asked for.** Its table is
    `(session, file, **line range**, text, created_at)`. Whole-file anchoring would satisfy the
    *table* and not the feature.
-4. **VS Code's Comments API is the platform's own answer** (F8), and `AGENTS.md`'s "reach for an
+4. **VS Code's Comments API is the platform's own answer** (F8), and `CLAUDE.md`'s "reach for an
    existing, well-maintained implementation before hand-rolling" applies to a host API at least as
    strongly as to a library.
 
@@ -908,7 +908,7 @@ Four things it deliberately does **not** do:
 
 ### D15 — Validation at the entrance, with no defaults that could guess wrong
 
-`AGENTS.md`'s "no skipped validation", applied to every field this phase adds:
+`CLAUDE.md`'s "no skipped validation", applied to every field this phase adds:
 
 | Field | Rule | Where |
 |---|---|---|
@@ -975,7 +975,7 @@ there is no `tooLarge` arm on this result to degrade into.
 
 ### D18 — What gets a test, and what does not
 
-`AGENTS.md`'s bar, applied honestly. This phase is mostly CRUD, and the plan says so.
+`CLAUDE.md`'s bar, applied honestly. This phase is mostly CRUD, and the plan says so.
 
 **Tested — one Go suite:**
 
@@ -995,11 +995,11 @@ there is no `tooLarge` arm on this result to degrade into.
 - **`ProjectRanges` reuse.** The projection arithmetic is called **unchanged** and is already covered
   by G11's `project_test.go`, including the two behaviours this phase leans on (an all-deleted range
   projecting to nothing; clamping past EOF, probe P2). A second table over the same function would
-  restate a suite that already exists — `AGENTS.md`'s "when torn between two similar tests, delete",
+  restate a suite that already exists — `CLAUDE.md`'s "when torn between two similar tests, delete",
   reached before writing one. The prompt for this plan asks this question explicitly: **the answer is
   no new projection test; the tier selection above is what earns coverage.**
 - **`gitreview`'s comment store** — `AddComment`/`Comments`/`RemoveComment`/`ClearComments` are a CRUD
-  round trip over four columns and one index, which `AGENTS.md` names as getting nothing ("CRUD
+  round trip over four columns and one index, which `CLAUDE.md` names as getting nothing ("CRUD
   round-trips (even integration-shaped)"). The one non-obvious property — the FK cascade and the
   session scoping of `remove`/`clear` — is asserted once over the socket in §3.4, where it is proved
   end to end rather than in isolation.
@@ -1295,14 +1295,14 @@ an API, not a package. No FlatBuffers schema change, so `bun run generate:wire` 
 **`go.mod`, `go.sum` and `bun.lock` are expected to be byte-identical after this phase.** A diff in
 any of them is a signal something was reached for that this plan did not sanction.
 
-`AGENTS.md`'s licence bar therefore has nothing new to check at the package or the feature level.
+`CLAUDE.md`'s licence bar therefore has nothing new to check at the package or the feature level.
 
 ---
 
 ## 6. Implementation order
 
 Seven commits. `go build ./apps/kira-studio/internal/...`, `bun run lint` and `bun run typecheck` run
-after **each** — they are fast. The expensive tier (§7.1) runs once at C7, per `AGENTS.md`'s
+after **each** — they are fast. The expensive tier (§7.1) runs once at C7, per `CLAUDE.md`'s
 "implement the whole plan first, then test once".
 
 - **C1** `feat(gitreview): review_comment, its store, and the AI-paste formatter`
@@ -1541,7 +1541,7 @@ There is no perf budget in this phase to re-baseline.
 call and all twelve carried it through.
 
 1. **The phase is one dependency chain.** The store and the formatter → the anchor machine → the
-   contract → the two clients → the proof. That is `AGENTS.md`'s textbook case of *not* "genuinely
+   contract → the two clients → the proof. That is `CLAUDE.md`'s textbook case of *not* "genuinely
    independent (unrelated adapters, non-overlapping fixes)".
 2. **C3 is a single atomic thought.** A contract bump that reshapes an existing method touches Go,
    `git-ipc`, the extension and the webview in one breath; splitting it across agents means one of
@@ -1654,7 +1654,7 @@ should see it because it was decided, not because it was convenient. (The commit
 
 **As planned**: the Comments API. It is the platform's own primitive for this exact feature, it gives
 the gutter "+", a multi-line editor and inline rendering for roughly the code a hand-rolled command
-would cost, and `AGENTS.md`'s "reach for an existing implementation before hand-rolling" points
+would cost, and `CLAUDE.md`'s "reach for an existing implementation before hand-rolling" points
 straight at it.
 
 **The alternative**: `kiraVersion.addReviewComment` + `showInputBox`, with existing comments visible

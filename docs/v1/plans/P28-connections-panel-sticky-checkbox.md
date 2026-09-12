@@ -58,11 +58,11 @@
 - **No unit-test tier.** SPEC §9 line 618 is explicit — *"No unit tests. Two suites only."* The pure
   modules this phase adds are covered through `tests/ui/`, with the geometry exposed as DOM
   attributes so a Playwright assertion can be exact rather than impressionistic (D9).
-- Comments per AGENTS.md: only where the code cannot say it for itself. The band's `min(...)`
+- Comments per CLAUDE.md: only where the code cannot say it for itself. The band's `min(...)`
   formula (D4) and the "kept candidates are always a prefix" invariant (D3) each get one line.
 - Run `bun run lint`, `bun run typecheck` (all three projects) and `bun run build` on every step;
   `xvfb-run -a bun run test:ui` from step 1 on. `bun run test:db` is unaffected but must still be
-  green at the end. Per `AGENTS.md`, container-backed suites cannot run in Claude Code's Linux web
+  green at the end. Per `CLAUDE.md`, container-backed suites cannot run in Claude Code's Linux web
   container — `tests/ui/tree.spec.ts` is Postgres-backed and must be run on the macOS/Colima box
   before this phase is called done.
 - Commits follow Conventional Commits, one per step of §4.
@@ -397,7 +397,7 @@ DROP TABLE connection_filters;
 |---|----------|-----------|
 | D10 | **The persisted model is a set of exclusions — `{ hiddenKinds, hiddenPaths }` — not a rule list, not an allowlist.** | Exclusions are the only model where a box that is *not* ticked has no consequence, which is what makes "everything you have not touched is visible, including objects created tomorrow" true. Today's `show` rules do the reverse (`filter.ts:43-46`), and that surprise — one `show` rule silently hiding every future table of that kind — is unrepresentable here. It also keeps the stored set proportional to what the user actually clicked rather than to the size of the database. |
 | D11 | **A checkbox hides a node by its *path*, not its name.** | The dialog shows a tree; a name-based hide would fire on the `public` schema of every database when the user unticked one of them, which is visibly not what they clicked. Paths are already the tree's identity everywhere (`TreeNode.path`, `rowKey()`, `treeState.expanded`), so this needs no new key and no new escaping — and unlike a glob it cannot be confused by an object whose name legitimately contains `*` or `?` (a Mongo collection or an S3 prefix can). |
-| D12 | **`connection_filters` is replaced by `connection_tree_filters (connection_id, scope, value)` in migration `0005`, and existing rows are dropped, not migrated.** | A pattern is a matcher over names; a checkbox entry is an identity. There is no honest conversion between them without resolving every pattern against a tree the migration cannot see. v1 has not shipped (`package.json` `"version": "0.1.0"`, one feature branch for all of v1 per AGENTS.md), the data is a per-connection view preference, and the alternative — keeping the pattern evaluator alive beside the set so old rows still apply — would ship exactly the two-filter-systems outcome this phase exists to end. Reusing the old table by stuffing a path into a column named `pattern` beside a meaningless `is_regex` was rejected for the same reason: the column names would lie. |
+| D12 | **`connection_filters` is replaced by `connection_tree_filters (connection_id, scope, value)` in migration `0005`, and existing rows are dropped, not migrated.** | A pattern is a matcher over names; a checkbox entry is an identity. There is no honest conversion between them without resolving every pattern against a tree the migration cannot see. v1 has not shipped (`package.json` `"version": "0.1.0"`, one feature branch for all of v1 per CLAUDE.md), the data is a per-connection view preference, and the alternative — keeping the pattern evaluator alive beside the set so old rows still apply — would ship exactly the two-filter-systems outcome this phase exists to end. Reusing the old table by stuffing a path into a column named `pattern` beside a meaningless `is_regex` was rejected for the same reason: the column names would lie. |
 | D13 | **Hiding a container hides its subtree implicitly; no descendant entries are written.** | `buildRows` only walks the children of rows it emits (`state/tree.ts:307-318`), so a hidden node's subtree is never reached — the containment is a property of the renderer, not something the model has to encode. Writing descendants would make the set unbounded for no behavioural gain. |
 | D14 | **`grouping.ts` gains `labelForKind(kind, connectionKind, form)` and becomes the single source of kind labels; `GROUPED_KINDS`' own labels derive from it.** | F12: the app currently knows how to name five kinds, in a table that also encodes folder order, plus a hardcoded three-entry map inside the dialog (`FiltersDialog.vue:17-21`). The checkbox list needs a name for every kind present. One function, consumed by the folders and the dialog alike, is the P27-D26 rule applied to labels: the second consumer is what forces the extraction, and MariaDB's `function` → *"Routines"* override (`grouping.ts:20`) is precisely the per-connection-kind case that must not be duplicated. |
 | D15 | **Unticking a container removes every now-redundant hidden path beneath it; re-ticking it restores the whole subtree.** | Keeps the set minimal (D10) and, more importantly, keeps it *legible*: a tri-state parent whose children secretly remember an older selection is the classic checkbox-tree trap, where re-ticking a box does not restore what you saw a moment ago. |
@@ -668,7 +668,7 @@ docs/
 
 - [ ] `bun run lint`, `bun run typecheck` (all three) and `bun run build` clean.
 - [ ] `xvfb-run -a bun run test:ui` green on the macOS/Colima box, `bun run test:db` green and
-      untouched (per `AGENTS.md`, neither container-backed suite can run in Claude Code's Linux web
+      untouched (per `CLAUDE.md`, neither container-backed suite can run in Claude Code's Linux web
       container).
 - [ ] No spec file declares its own `findRow`/`expandRow`/`openRowMenu` any more.
 - [ ] SPEC.md §8.3, §9.2 and §11 describe what shipped.

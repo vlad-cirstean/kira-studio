@@ -1095,7 +1095,7 @@ de-duplication; it would only be feature removal if it were the last copy.
 ## 6. Commit sequence
 
 Shared-primitive promotions first (they are what everything else consumes), then the mechanical
-fixes, then the per-surface work, protocol by protocol. Per `AGENTS.md`, `bun run lint`,
+fixes, then the per-surface work, protocol by protocol. Per `CLAUDE.md`, `bun run lint`,
 `bun run typecheck` and `bun run build` run per commit; `tests/ui` runs once at the end (§7).
 
 | # | Commit | Touches | Risk |
@@ -1133,7 +1133,7 @@ M1 must precede M4 and M6. M2 is independent and could land first. M11 must foll
 undefined `var(--kira-…)` across `frontend/src`. This is the guard, not a one-off check — it is what
 turns F1 from a fixed bug into a closed class.
 
-**`tests/ui/`, once at the end** (`AGENTS.md`'s implement-then-test cadence). The specs that must
+**`tests/ui/`, once at the end** (`CLAUDE.md`'s implement-then-test cadence). The specs that must
 change, from `grep`ping the retiring testids:
 
 | Spec | Why |
@@ -1167,7 +1167,7 @@ not"* — this file is Api-only).
   question is `protocompile`'s, not the UI's.
 - **A real macOS render.** Every measurement above is read out of CSS against the token scale; the
   three findings that are *height* claims (F4's 26-in-28, F9's h-md-in-a-row, F21's stacked
-  `flex: 1` empties) are arithmetic over `tokens.css`, not screenshots. `AGENTS.md`'s own note about
+  `flex: 1` empties) are arithmetic over `tokens.css`, not screenshots. `CLAUDE.md`'s own note about
   `--kira-titlebar-h` — *"a plausible-sounding 'standard' figure … has been wrong here"* — is why
   this phase changes **no** token value and only moves call sites onto existing ones.
 - **A visual diff of the Studio migrations in M1/M8.** The declarations are compared textually and
@@ -1179,7 +1179,7 @@ not"* — this file is Api-only).
 ## 8. What this phase deliberately does not do
 
 - **Does not change a single value in `tokens.css`.** Every fix moves a call site onto an existing
-  token; none moves a token. (`AGENTS.md`'s `--kira-titlebar-h` history is the standing warning.)
+  token; none moves a token. (`CLAUDE.md`'s `--kira-titlebar-h` history is the standing warning.)
 - **Does not add a component to `theme/primitives/`.** D1/D2/D9 add *classes to `primitives.css`*,
   which is the design system's own stylesheet and the file P28 M4 set the precedent in. No `.vue`
   primitive is created or has a prop added — the line every Api phase from P8 onward has held.
@@ -1287,5 +1287,5 @@ SegmentedControl,TextField,ViewChrome,ViewHeader,PopoverPanel,TreeHost}.vue`;
 `P9-row-coloring-settings.md` (decision format). `docs/v1.2/plans/P11-grpc-support.md` (§6.5's two
 handed-forward items, D14's Schema-pane reasoning, D15's caps) and
 `P12-studio-api-modularization.md` (F21–F25, §8 OQ-1/OQ-3, D12's history-store factory).
-`docs/v1.2/SPEC.md`'s P13 row and its Studio/Api module-boundary section. `AGENTS.md`'s
+`docs/v1.2/SPEC.md`'s P13 row and its Studio/Api module-boundary section. `CLAUDE.md`'s
 comment, unit-test-bar, library-first and implement-then-test-at-the-end rules drive §7 and §6.

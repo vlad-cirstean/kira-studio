@@ -53,7 +53,7 @@
   `IconButton`'s existing corner slot rather than a new badge style. Item 12's red rail reuses the
   gutter's existing `::before` rail idiom. A new component appears in exactly two places in this
   phase, both because §11 forbids a sideways `views/*` → `views/*` import.
-- **No half-implementations (AGENTS.md).** A fix applies to every occurrence of its problem —
+- **No half-implementations (CLAUDE.md).** A fix applies to every occurrence of its problem —
   item 15's overlapping count badge is on *two* toolbars, item 7's staleness is in *four* search
   toolbars, item 6's toggle goes to every in-page search toolbar that lacks it — or it is named in
   §6 and left entirely alone.
@@ -61,11 +61,11 @@
   the already-loaded page; item 7's re-scan is triggered *by* a page the view already fetched, never
   the other way round.
 - **No new dependency.** Every item is solvable with what is already in `package.json`.
-- Comments per AGENTS.md: only where the code cannot say it for itself. Each `D` that encodes a
+- Comments per CLAUDE.md: only where the code cannot say it for itself. Each `D` that encodes a
   non-obvious constraint gets one line at its site.
 - `bun run lint`, `bun run typecheck` (all three projects) and `bun run build` stay green after every
   commit. `xvfb-run -a bun run test:ui` for the four container-free specs (`smoke`, `startup`,
-  `workbench`, `connections`) is runnable anywhere; everything else needs Docker/Colima (AGENTS.md).
+  `workbench`, `connections`) is runnable anywhere; everything else needs Docker/Colima (CLAUDE.md).
 - Conventional Commits, one per step of §4.
 
 ---
@@ -596,7 +596,7 @@ adjacent, and everything else is independent — no commit here blocks another.
 ## 5. Tests
 
 `tests/db/` is untouched: no adapter behaviour, SQL, protocol or engine change exists in this phase
-apart from item 1's `caps` literal, which `tests/db/*.spec.ts` does not assert on. Per AGENTS.md,
+apart from item 1's `caps` literal, which `tests/db/*.spec.ts` does not assert on. Per CLAUDE.md,
 only `smoke`, `startup`, `workbench` and `connections` can run without Docker — everything else must
 be run in the macOS/Colima environment or CI before this phase is called done.
 

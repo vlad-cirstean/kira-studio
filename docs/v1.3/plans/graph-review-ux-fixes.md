@@ -157,7 +157,7 @@ Because `FileTree.vue` is the single component behind **both** trees (`DetailPan
 `FileTree.vue:11-17`'s "one component, one anatomy" note from G21 D11), one change fixes both panels
 the user named.
 
-**License survey (against `AGENTS.md`'s "only fully open-source libraries", checked at package *and*
+**License survey (against `CLAUDE.md`'s "only fully open-source libraries", checked at package *and*
 feature level):**
 
 | Source | License | Ships | Verdict |
@@ -208,7 +208,7 @@ returns nothing; the Go server has never heard of it. The `Dialogs` port
 (`git-core/src/ports/dialogs.ts`) has exactly **two** consumers (`proxyHandlers.ts:245`,
 `extension.ts:648`) and one test fake (`ports/testFakes.ts:143`). Removing the feature removes the
 whole port cleanly — leaving the port behind with no caller would be dead code, which
-`AGENTS.md`'s "scope left out is left out entirely, not half-implemented" argues against.
+`CLAUDE.md`'s "scope left out is left out entirely, not half-implemented" argues against.
 
 ### F6 — Item 5: "Open in graph" is swallowed before VS Code can see it
 
@@ -481,7 +481,7 @@ export function setiIconFor(path: string): { maskUrl: string; color: string }
 * **No dynamic `import()`** — CSP is `script-src 'nonce-…'` with no `'strict-dynamic'`, so a
   code-split chunk would be blocked. The 144 KB of icon data is a static import; that is ≈40 KB
   gzipped and a low-single-digit-millisecond parse, which does not threaten §5.1's ≤300 ms
-  first-paint budget (a plain read of the cost, per `AGENTS.md`'s "measure only when a real
+  first-paint budget (a plain read of the cost, per `CLAUDE.md`'s "measure only when a real
   question is at stake").
 
 **`FileTree.vue`:**
@@ -968,7 +968,7 @@ structural/wire changes land first and nothing downstream has to be re-touched.
 11. **`feat(git-ui): the search row moves below the toolbar and reuses KuiSearchInput`** — item 9
     (depends on 2 for `toggleSearch`).
 12. **`test(vscode): interaction coverage for the nine ux fixes`** — the spec/fixture changes, run
-    once at the end per `AGENTS.md`'s "implement the whole plan first, then test once".
+    once at the end per `CLAUDE.md`'s "implement the whole plan first, then test once".
 
 Per-commit fast checks: `bun run lint`, `bun run typecheck`. Once, at step 12:
 `bun run test:unit`, `bun run test:webview`, `go test ./...` (step 2's constant only).
@@ -1156,5 +1156,5 @@ places to push back.
 
 10. **`repo.pick` is removed from the wire, not just from the UI.** **Recommendation: remove it.**
     Leaving it would leave `Dialogs`, `VsCodeDialogs` and `FakeDialogs` as a port with zero
-    consumers, which `AGENTS.md`'s "left out entirely, not half-implemented" argues against, and it
+    consumers, which `CLAUDE.md`'s "left out entirely, not half-implemented" argues against, and it
     would leave a live wire method a future phase could re-surface by accident.

@@ -23,4 +23,4 @@ is authoritative for behavior over `SPEC.md`.
 already said about itself.
 
 Earlier chapters stay in the repository as history; nothing here retroactively edits them, and
-`AGENTS.md` now points at this folder's `SPEC.md` as the live phasing record instead.
+`CLAUDE.md` now points at this folder's `SPEC.md` as the live phasing record instead.

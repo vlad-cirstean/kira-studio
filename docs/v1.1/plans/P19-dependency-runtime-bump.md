@@ -85,7 +85,7 @@ already assumes the opposite.
   own. P12's plan should be written knowing that.
 
 Nothing in this plan is contingent on that decision. It is recorded here because the plan doc and
-the commit log are this repo's durable record (`AGENTS.md`), and a silently-reordered phase list is
+the commit log are this repo's durable record (`CLAUDE.md`), and a silently-reordered phase list is
 exactly the kind of thing that reads as an accident a year later.
 
 ### 0.2 Baseline
@@ -102,7 +102,7 @@ below:
 
 One pre-existing failure is carried, not caused: `TestFixture_Redis`
 (`apps/kira-studio/internal/ipcfixture/redis_test.go`) fails against a fresh `redis:7` container
-here with a one-key count drift (`AGENTS.md`, Known open items). It is directly relevant to C8 —
+here with a one-key count drift (`CLAUDE.md`, Known open items). It is directly relevant to C8 —
 see F16.
 
 ### 0.3 Scope
@@ -127,7 +127,7 @@ see F16.
   here revisits that.
 - **A `renovate.json` / `dependabot.yml`.** The repo has neither (`.github/` holds only
   `workflows/`). Adding automated dependency PRs is a process change, not a version bump, and
-  `AGENTS.md`'s "no per-phase PRs, one feature branch" makes bot PRs an awkward fit. Handed forward
+  `CLAUDE.md`'s "no per-phase PRs, one feature branch" makes bot PRs an awkward fit. Handed forward
   as OQ-3.
 - **Bumping the `macos-15` runner image to `macos-26`.** Available and GA, and deliberately not
   taken — see F18. It changes the macOS SDK the shipped binary links against, which is a product
@@ -137,7 +137,7 @@ see F16.
   stay exactly as they are. Changing them without a driver floor moving would be fabricating a
   claim, which is precisely what P16 §2's "the published minimum is the verified minimum" rule
   forbids.
-- **New tests.** `AGENTS.md`'s bar is explicit and a dependency bump generates no logic to test.
+- **New tests.** `CLAUDE.md`'s bar is explicit and a dependency bump generates no logic to test.
   The existing suites — six adapter conformance packages, `tests/ui`, `tests/unit`, `tests/ipc`,
   `tests/e2e-real`, `verify:packaging` — *are* this phase's test. The one new artefact is a
   regenerated fixture, if C8 moves one (C9).
@@ -154,7 +154,7 @@ see F16.
   Concretely, for TypeScript 6: setting `rootDir` explicitly because the default moved is adapting
   to a config-format change (in scope, that is literally what the SPEC row asks for). Setting
   `noUncheckedSideEffectImports: false` to silence a new check is turning the upgrade off, and
-  `AGENTS.md`'s "best practices throughout, no shortcuts" forbids it — if that is what it takes,
+  `CLAUDE.md`'s "best practices throughout, no shortcuts" forbids it — if that is what it takes,
   the bump is deferred with a reason instead.
 - **Never weaken an assertion to make a bump pass.** Same rule P16 §2 set for version assertions,
   applied to the whole phase. If a bumped library changes behaviour, either the app changes to match
@@ -205,7 +205,7 @@ in scope.
 
 **T4 is a good design and this phase must not break it.** Because the CLI version is derived from
 `go.mod`, bumping Wails is a one-line change that propagates to the dev script and both workflows
-automatically. `AGENTS.md` is emphatic about why: an `@latest` install once resolved a beta ahead of
+automatically. `CLAUDE.md` is emphatic about why: an `@latest` install once resolved a beta ahead of
 the runtime library and silently skewed the bindings generator. Nothing in this phase should
 introduce a second, independent Wails pin.
 
@@ -224,7 +224,7 @@ The SPEC row asks for "the Node/Bun runtime versions pinned anywhere". Searched 
   i.e. it already floats to whatever Bun is current on the day the job runs.
 - The only Bun *version* string in the repo is the **type package** `bun-types` at
   `package.json:58`, and it is already `1.4.0` — which is Bun's own current `latest` (§2.3).
-- **There is no vendored Node runtime any more** (`AGENTS.md`, P58f M10) and nothing at runtime
+- **There is no vendored Node runtime any more** (`CLAUDE.md`, P58f M10) and nothing at runtime
   depends on Node or Bun: every adapter is native Go (`docs/ARCHITECTURE.md:27`).
 
 **So the Node/Bun clause of the SPEC row has no work in it** beyond confirming `bun-types` matches
@@ -345,7 +345,7 @@ why they are bumped by `go get -u ./...` rather than pinned by hand.
 **The Go toolchain jump is provably runnable in this sandbox.** `GOTOOLCHAIN` is `auto` here and
 `GOTOOLCHAIN=go1.27.1 go version` downloaded and ran `go1.27.1 linux/amd64` successfully on
 2026-09-02. So raising `go.mod:3` to `1.27.0` does not strand a Sonnet implementer on a box with
-Go 1.25 installed — the toolchain fetches itself from `proxy.golang.org`, which `AGENTS.md` already
+Go 1.25 installed — the toolchain fetches itself from `proxy.golang.org`, which `CLAUDE.md` already
 confirms is reachable. CI needs no change either: both workflows use
 `actions/setup-go` with `go-version-file: go.mod`, which reads the new directive.
 
@@ -466,7 +466,7 @@ surface, and what it touches here:
 
 **`vite.config.ts` is the only Vite config in the repo** (one `find` result) and Playwright does not
 run a Vite dev server — `tests/ui` and `tests/ipc:fe` drive a static file server against
-`frontend/dist` (`AGENTS.md`), so the dev-server half of Vite 8 is not on any test path.
+`frontend/dist` (`CLAUDE.md`), so the dev-server half of Vite 8 is not on any test path.
 
 ### F6 — Both Vite plugins already declare Vite 8 support
 
@@ -533,10 +533,10 @@ API change. Still, **three things move together and there is no way to move one*
   `"/wails/runtime.js"` onto for typechecking),
 - the `wails3` CLI, which `scripts/wails-dev-setup.sh:40-52` reinstalls automatically the moment
   `go.mod` and the installed binary disagree — and which must then **regenerate the bindings** with
-  the exact flags `AGENTS.md` insists on: `wails3 generate bindings -clean=true -b -names -ts -i`
+  the exact flags `CLAUDE.md` insists on: `wails3 generate bindings -clean=true -b -names -ts -i`
   from `apps/kira-studio/`.
 
-`AGENTS.md` is unusually loud about `-names` being load-bearing: without it every generated call
+`CLAUDE.md` is unusually loud about `-names` being load-bearing: without it every generated call
 site emits `$Call.ByID(<n>, …)` instead of `$Call.ByName("<fqn>", …)`, and
 `tests/ui/support/mockRuntime.ts`'s whole interception layer is keyed on the `ByName` FQN — a
 `-names`-less regeneration silently breaks every `tests/ui/` spec at the first bound call with an
@@ -597,7 +597,7 @@ Not a general changelog — the four items with a real call site here.
 4. **`asynctimerchan` GODEBUG permanently removed (Go 1.27); `time` channels are always
    unbuffered.** Grep for timer-channel patterns in `internal/preconnect`, `internal/connections`
    and `internal/adapterhost` — the process-group-kill and stream-drain code is the only place with
-   real timing structure. `AGENTS.md` already warns those tests poll with multi-second timeouts
+   real timing structure. `CLAUDE.md` already warns those tests poll with multi-second timeouts
    because this container's init reaps slowly; that guidance stands and must not be tightened.
 
 Not applicable: the `crypto` random-parameter changes (this repo passes `crypto/rand` implicitly, at
@@ -689,14 +689,14 @@ Two mechanisms make this different from a library bump:
    against real containers and committed under `apps/kira-studio/tests/ipc/<adapter>/`. `serverVersion`
    is masked (`ipcfixture/frozen.go`'s `MaskContinuationTokens` replaces it with a placeholder), so a
    version string change alone is absorbed — but **content shape is not masked**. `frozen.go:323`
-   already documents drift from a floating tag resolving to a different patch, and **`AGENTS.md`'s
+   already documents drift from a floating tag resolving to a different patch, and **`CLAUDE.md`'s
    Known open items records that `TestFixture_Redis` already fails against a fresh `redis:7`
    container in this sandbox with a one-key count drift** (`"12 keys"`/`"11"` expected vs
    `"13 keys"`/`"12"` got, reproduced on two independent fresh containers).
 
 So `redis:7` → `redis:8.10` and `mongo:7` → `mongo:8.3` are the two bumps that plausibly require
 regenerating a fixture (`KIRA_IPC_FIXTURES=write go test ./apps/kira-studio/internal/ipcfixture/...`,
-then `bunx biome check --write` on the written file — `AGENTS.md`). `localstack:3` → `:4` affects
+then `bunx biome check --write` on the written file — `CLAUDE.md`). `localstack:3` → `:4` affects
 `sqs` (which does have a committed fixture) and `s3` (which does not).
 
 **And the pre-existing redis failure is a trap worth naming:** an implementer bumping `redis:7` will
@@ -715,7 +715,7 @@ the two live workflows, plus two more in the staged
 
 These are unambiguously "pinned tool versions" in the SPEC row's sense, and unambiguously stale.
 
-**But `AGENTS.md`'s Known open items says this session's GitHub push access lacks the `workflow`
+**But `CLAUDE.md`'s Known open items says this session's GitHub push access lacks the `workflow`
 OAuth scope, which GitHub requires for any commit touching `.github/workflows/*.yml`** — that is
 precisely why P16's finished `db-compat.yml` sits under `docs/v1.1/plans/p16-pending-ci-workflow/`
 instead of in `.github/workflows/`.
@@ -821,7 +821,7 @@ say "check some, defer the rest".
 
 ### D2 — The exception log is §5.3 of this document, and nowhere else
 
-`AGENTS.md`: *"No findings document survives a round once it's fixed"* and a phase's discoveries
+`CLAUDE.md`: *"No findings document survives a round once it's fixed"* and a phase's discoveries
 belong *"in that phase's own plan doc"*. So there is no `DEPENDENCIES.md`, no `deferred.json`, no
 comment block in `package.json`. §5.3 is the record.
 
@@ -843,7 +843,7 @@ phase is allowed to walk away from, because nothing else depends on it moving.
 F5, F6. One config key renamed at `apps/kira-studio/frontend/vite.config.ts:40`; both plugins already
 declare `vite ^8`; no custom plugins, no `esbuild` config, no AMD/SystemJS output. The deprecation
 shim would keep the old key working — **use the new name anyway**, since shipping on a deprecated
-alias is exactly the kind of half-migration `AGENTS.md` rules out.
+alias is exactly the kind of half-migration `CLAUDE.md` rules out.
 
 The acceptance bar for C6 is not "it builds": it is that the built bundle still has the **two
 separate dynamic-import chunks** and that the recorded sizes are re-measured (F20, §7.2).
@@ -938,11 +938,11 @@ F17. Attempt C11 normally. If `git push` is refused for lack of the `workflow` O
 two edited workflow files to `docs/v1.1/plans/p19-pending-ci-workflow/` with a short README
 mirroring P16's (what the change is, why it is here, the exact `git mv` a scoped session runs to
 apply it), restore `.github/workflows/*` to their committed state, and add one bullet to
-`AGENTS.md`'s Known open items. The `db-compat.yml` half of the change lands normally either way.
+`CLAUDE.md`'s Known open items. The `db-compat.yml` half of the change lands normally either way.
 
 ### D13 — No new tests
 
-`AGENTS.md`'s bar. A version bump produces no parser, no cursor arithmetic, no cache-eviction rule,
+`CLAUDE.md`'s bar. A version bump produces no parser, no cursor arithmetic, no cache-eviction rule,
 no concurrency structure — nothing that clears it. The existing suites are the test. The only new
 *artefact* is a regenerated `ipcfixture` fixture if C8 moves one (C9), which is generated, not
 written.
@@ -1043,7 +1043,7 @@ default, revert the commit entirely, leave `typescript` at 5.9.3, and record it 
 D9. `testsupport/mongo.go:23` → `mongo:8.3`; `testsupport/redis.go:19` → `redis:8.10`;
 `testsupport/localstack.go:20` → `localstack/localstack:4`.
 **Gate:** `go test ./apps/kira-studio/internal/adapters/{mongo,redis,sqs,s3}/... -count=1` against
-real containers, pulled via `mirror.gcr.io` per `AGENTS.md`. The version assertions derive from the
+real containers, pulled via `mirror.gcr.io` per `CLAUDE.md`. The version assertions derive from the
 image tag and should follow automatically (F16); if one does not, that is a `ServerMajor` parsing
 bug worth fixing, not an assertion to relax.
 
@@ -1051,7 +1051,7 @@ bug worth fixing, not an assertion to relax.
 
 Only if C8 changes a committed fixture's content. `KIRA_IPC_FIXTURES=write go test
 ./apps/kira-studio/internal/ipcfixture/...` then `bunx biome check --write` on the written
-`.fixture.ts` files (`AGENTS.md`). **Before regenerating, reproduce `TestFixture_Redis`'s
+`.fixture.ts` files (`CLAUDE.md`). **Before regenerating, reproduce `TestFixture_Redis`'s
 pre-existing failure on the unchanged tree** (F16) so the commit message can say honestly whether
 the bump caused a change, absorbed a known failure, or neither.
 
@@ -1079,7 +1079,7 @@ Only what P19 *actually* invalidated, not a general sweep (that is P20's row):
   Go 1.26's Green Tea GC is now the default under which every RSS/CPU figure in that document was
   *not* measured (F12 item 2). **Do not fabricate re-measured Go-side numbers** — say the figures
   predate the GC change and leave re-measurement to whoever runs the P5/P7 procedures on a Mac.
-- `AGENTS.md` — only if C9 resolved the `TestFixture_Redis` item (delete it, per `AGENTS.md`'s own
+- `CLAUDE.md` — only if C9 resolved the `TestFixture_Redis` item (delete it, per `CLAUDE.md`'s own
   rule that a resolved item is removed rather than marked done), or if D12's staging fallback fired
   (add one bullet).
 
@@ -1148,7 +1148,7 @@ allowed to silently undo that.** The rule, in order of cost:
    it skipped.
 
 Docker in this sandbox: start the daemon (`nohup dockerd > /tmp/dockerd.log 2>&1 & disown`), pull
-through `mirror.gcr.io` and re-tag — `AGENTS.md`'s Docker section has the exact prefix rule
+through `mirror.gcr.io` and re-tag — `CLAUDE.md`'s Docker section has the exact prefix rule
 (`library/` for unnamespaced official images, none for already-namespaced ones). `db-compat.sh`'s
 own `--mirror` flag does this automatically for the matrix.
 
@@ -1210,7 +1210,7 @@ Stated so it is not mistaken for coverage this phase has:
 - [ ] `biome.json:2`'s `$schema` matches the installed Biome (F19).
 - [ ] C12's doc edits cover only what this phase actually invalidated, with no fabricated
       measurements.
-- [ ] `AGENTS.md`'s Known open items reflects reality: the `TestFixture_Redis` item deleted if C9
+- [ ] `CLAUDE.md`'s Known open items reflects reality: the `TestFixture_Redis` item deleted if C9
       resolved it, a staging bullet added only if D12 fired.
 - [ ] The out-of-order note (§0.1) is carried into the phase's closing summary so P12's plan author
       sees it.
@@ -1235,7 +1235,7 @@ Stated so it is not mistaken for coverage this phase has:
 - **OQ-3 — Automated dependency updates.** This sweep found 17 stale pins accumulated across roughly
   one chapter of work, several of them (the CI action majors, `biome.json`'s `$schema`, the three
   default images) invisible to anyone reading only `package.json`. A Renovate/Dependabot config
-  would surface them continuously — but `AGENTS.md`'s "no per-phase PRs, one feature branch for all
+  would surface them continuously — but `CLAUDE.md`'s "no per-phase PRs, one feature branch for all
   of v1" makes bot PRs an awkward fit, so this needs a process decision before a config file.
 - **OQ-4 — The `macos-15` → `macos-26` runner migration.** Deferred here for SDK reasons (F18). It
   needs its own decision — does the app still support macOS 14 when built against the macOS 26 SDK,

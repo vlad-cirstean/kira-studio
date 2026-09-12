@@ -144,7 +144,7 @@ export const test = base.extend<KiraFixtures>({
     const env: NodeJS.ProcessEnv = {
       ...process.env,
       KIRA_HOME: kiraHome,
-      // Linux has no real keychain backing (AGENTS.md) — same Linux-only development fallback
+      // Linux has no real keychain backing (CLAUDE.md) — same Linux-only development fallback
       // tests/e2e/fixtures.ts already sets, a no-op on macOS.
       KIRA_INSECURE_SECRETS: '1',
       // Non-negotiable (§8): bind to 127.0.0.1 always, set explicitly rather than trusted as a

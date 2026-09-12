@@ -124,14 +124,14 @@ Everything in §10's table, but the ones most likely to be mistaken for G12 work
 ### 0.4 Ground rules
 
 - Every decision in §2 cites a finding; every finding in §1 cites something read or **run** here.
-- `AGENTS.md` applies in full: **no stubbed error handling, no `TODO: fix later`, no skipped
+- `CLAUDE.md` applies in full: **no stubbed error handling, no `TODO: fix later`, no skipped
   validation.** Scope left out is left out entirely, not half-implemented.
 - **Layering:** no new or changed code in an `internal/git*` package may import `internal/bridge`.
   `TestDomainPackagesDoNotImportBridge` (`internal/layering_test.go`) is the guard and must stay
   green. D8's window activation lives in `main.go`, which already imports both sides — that is the
   only place in the tree where it can honestly live.
 - **Comments: very concise, only where the code cannot say it itself.**
-- **Tests only where `AGENTS.md`'s bar is met.** D17 says, per item, whether one is warranted and
+- **Tests only where `CLAUDE.md`'s bar is met.** D17 says, per item, whether one is warranted and
   why. Most of these are wiring fixes and get none; four get a real test each, and each of those
   four is in a category the bar names by name (ordering/framing, a decision structure, a parser-ish
   round trip).
@@ -706,7 +706,7 @@ Both are needed. (b) is the correctness fix; (a) is the structural one that stop
 future change ever puts an `await` between the unsubscribe and `createRpcClient`.
 
 **This is the one place in the phase where a test is unambiguously earned** (D17): frame ordering
-across a subscriber handover is exactly `AGENTS.md`'s "concurrency (ordering, backpressure,
+across a subscriber handover is exactly `CLAUDE.md`'s "concurrency (ordering, backpressure,
 cancellation, races)" category, and the bug is invisible to every other tier.
 
 ### D6 — The webview boots against a connected transport, and an `app.init` failure is retryable and visible
@@ -1126,12 +1126,12 @@ Three rules the conversion follows, so it does not become an accessibility regre
 
 ### D17 — What gets a test, and what does not
 
-`AGENTS.md`'s bar, applied per item rather than as a blanket. **Four tests, and the reason each one
+`CLAUDE.md`'s bar, applied per item rather than as a blanket. **Four tests, and the reason each one
 clears the bar:**
 
 | # | Test | Why it earns its place |
 |---|---|---|
-| **D5** | `packages/git-ipc/src/socketChannel.test.ts` gains: two frames delivered in one `socket.on('data')` pass with the subscriber swapped between them arrive **both**, in order | Frame ordering across a subscriber handover — `AGENTS.md`'s named "concurrency (ordering…)" category, and the exact bug that shipped. Invisible to typecheck, to the Go tier, and to any tier without a real socket |
+| **D5** | `packages/git-ipc/src/socketChannel.test.ts` gains: two frames delivered in one `socket.on('data')` pass with the subscriber swapped between them arrive **both**, in order | Frame ordering across a subscriber handover — `CLAUDE.md`'s named "concurrency (ordering…)" category, and the exact bug that shipped. Invisible to typecheck, to the Go tier, and to any tier without a real socket |
 | **D3** | `internal/gitsock`'s existing integration tier gains one test: pair → revoke → re-dial with the token (`tokenRejected`) → re-dial with none → approve → **`ready`**, and the client list shows one un-revoked row | A decision structure with a persistence side effect, whose failure mode is a silent `pairingDenied`. Reproduced above as a probe; this is its permanent form. Runs here, no VS Code needed |
 | **D11** | `apps/kira-studio-vscode/src/virtualKey.test.ts` (new) — `encodeKey`/`decodeKey` round trip over a corpus: an absolute repo root, a path with a space, a non-ASCII filename, a rename's `originalPath` | A format round trip **with** a real edge case (the leading `/` that threw), in a host this container cannot run. Exactly the case the bar keeps rather than deletes |
 | **D1** | `apps/kira-studio-vscode/src/commands.test.ts`'s existing contract cross-checks extend to the new `editor.openRangeDiff` key | Not a new test — one more assertion in the file that already keeps the manifest, the table and Go's `opTable` in agreement. Free |

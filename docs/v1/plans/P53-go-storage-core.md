@@ -19,7 +19,7 @@ delivers "a **complete, tested** Go subsystem verified by Go tests against real 
 what makes it legitimate for `SecretsRepo`, `SavedQueriesRepo`, `FilterHistoryRepo` and
 `MetadataCacheRepo` to have no production caller at the end of this phase. **Nothing here is a
 stub**: every method is fully implemented and covered by a test against a real database. What is
-missing is a caller, not an implementation, and `AGENTS.md`'s no-stubs rule is about the latter.
+missing is a caller, not an implementation, and `CLAUDE.md`'s no-stubs rule is about the latter.
 
 ## 1. What the diff against `src/main/storage/` found
 
@@ -751,14 +751,14 @@ counter (P55 — `OpsRepo.Prune` is the primitive it will call); `TreeService`'s
 
 ## 9. Environment notes for the implementing session
 
-- Per `AGENTS.md`'s P52 findings, **a fresh container has none of the toolchain**. For storage work
+- Per `CLAUDE.md`'s P52 findings, **a fresh container has none of the toolchain**. For storage work
   specifically, the SQLite driver is cgo but needs no GTK, so `go test ./internal/...` and
   `go build ./internal/...` work with nothing installed. A bare `go test ./...` compiles the root
   `main` package, which imports Wails and therefore does need
   `apt-get install -y libgtk-4-dev libwebkitgtk-6.0-dev pkg-config` on Linux. Add that distinction
-  to `AGENTS.md`'s P52-findings list — it is exactly the kind of environment fact that section
+  to `CLAUDE.md`'s P52-findings list — it is exactly the kind of environment fact that section
   exists to stop the next session re-deriving.
-- `github.com/google/go-cmp` comes from `proxy.golang.org`, which is not blocked (P51/`AGENTS.md`).
+- `github.com/google/go-cmp` comes from `proxy.golang.org`, which is not blocked (P51/`CLAUDE.md`).
   It is the **only** dependency this phase adds, and it is test-only.
 - Inserting 20 050 rows for the hard-cap test should be one transaction with one prepared statement;
   done that way it runs in well under a second and needs no `testing.Short()` gate.

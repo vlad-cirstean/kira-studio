@@ -13,7 +13,7 @@ import (
 
 // P8 §6.2: seven cases, each guarding a rule genuinely easy to get wrong when three caps and a
 // generated scope column interact (Record is "cache eviction with interacting rules",
-// AGENTS.md's own named category) — not CRUD round trips. Explicitly not tested here: that List
+// CLAUDE.md's own named category) — not CRUD round trips. Explicitly not tested here: that List
 // returns what Record inserted, that Delete deletes, that Get decodes a snapshot it just wrote,
 // that a missing tabId is refused — each a CRUD round trip or a one-condition guard.
 

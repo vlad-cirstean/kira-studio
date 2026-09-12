@@ -13,7 +13,7 @@
 > cross-request "why is this endpoint slower than that one" comparison view (D11, OQ-3), a
 > timing-based assertion/threshold (OQ-4), byte-level capture of anything (P9 OQ-1, untouched — §3),
 > per-hop *request* headers (D9, OQ-6), and a merged Raw+Timeline pane (D11, OQ-2). Nothing here is
-> half-built toward any of them (`AGENTS.md`: *"Scope left out of a phase is left out entirely, not
+> half-built toward any of them (`CLAUDE.md`: *"Scope left out of a phase is left out entirely, not
 > half-implemented"*).
 >
 > **Every claim below was re-read against the tree, not inherited from P2's/P8's/P9's prose.**
@@ -631,7 +631,7 @@ a numeric phase table with no bar at all, which loses proportionality but keeps 
 ## 4. Decisions
 
 ### D1 — The library check, stated rather than asserted
-`AGENTS.md` requires reaching for a maintained library first and **naming the requirement** when
+`CLAUDE.md` requires reaching for a maintained library first and **naming the requirement** when
 declining one. Two questions here.
 
 - **Collecting per-phase timings: `net/http/httptrace`, adopted.** Stdlib, a dependency by
@@ -1069,7 +1069,7 @@ So the phase is instrumentation plus one refactor of a collector, and §6.6 pins
 ## 5. Implementation order
 
 Seven commits. C1–C2 add capability with nothing mounted; C3–C4 make it visible; C5 is the one
-cross-cutting change, deliberately isolated and droppable; C6–C7 are tests and docs. Per `AGENTS.md`,
+cross-cutting change, deliberately isolated and droppable; C6–C7 are tests and docs. Per `CLAUDE.md`,
 run the fast checks (`lint`, `typecheck`, `build`) per commit and the expensive suites once at the
 end.
 
@@ -1132,7 +1132,7 @@ previously unmasked**. Also resolve P9 OQ-7's forward pointer.
 thing in `httpclient` written from more than one goroutine, and a missing lock would pass every
 functional assertion and fail intermittently in production.
 
-Two bindings checks, both from `AGENTS.md`'s warnings and both learned from P9 C3's own note that
+Two bindings checks, both from `CLAUDE.md`'s warnings and both learned from P9 C3's own note that
 `apps/kira-studio/frontend/bindings/**` is git-ignored (so there is no tracked baseline to diff —
 inspect the regenerated output directly):
 
@@ -1148,7 +1148,7 @@ Also confirm `bun run build` reports the **same four** lazy chunks `docs/ARCHITE
 and no fifth — this phase adds no dependency and no `await import()`.
 
 ### 6.2 The Go tests — `internal/httpclient/timeline_test.go`
-This earns dedicated tests under `AGENTS.md`'s *"cursor/pagination boundary arithmetic"* and
+This earns dedicated tests under `CLAUDE.md`'s *"cursor/pagination boundary arithmetic"* and
 *"concurrency (ordering, backpressure, cancellation, races)"* clauses: the bucketing is
 order-dependent across two goroutines and the phase arithmetic has two measured traps (F8, F9).
 Seven cases:
@@ -1179,13 +1179,13 @@ two pin that the difference between the fields is intended.
 
 **Explicitly not tested**: that `httptrace` fires (stdlib), that a `float64` rounds, that an absent
 phase marshals to a missing key (a `json` tag). Each restates a short function body —
-`AGENTS.md`'s *"everything else gets nothing"*.
+`CLAUDE.md`'s *"everything else gets nothing"*.
 
 ### 6.3 No new unit spec
 Nothing in this phase is renderer-side logic with interacting rules. The pane's arithmetic is
 `startOffsetMs / totalMs` percentages over data Go already validated; P9 earned
 `http-raw-parse.spec.ts` because it shipped a *parser*, and this phase ships none. Adding a spec that
-asserts a division would be the *"restates a short function body"* case `AGENTS.md` names.
+asserts a division would be the *"restates a short function body"* case `CLAUDE.md` names.
 
 ### 6.4 The UI spec — `tests/ui/http-timeline.spec.ts`
 `tests/ui` drives the real built bundle in real WebKit with both wire planes mocked. Five tests:
@@ -1229,7 +1229,7 @@ recorded here as unrunnable, with what was measured or reasoned instead, in the 
    Nothing in the bucketing is length-dependent (F11 exercised the limit path with three), but a
    real chain crossing several origins is the natural smoke test.
 5. **A real secret in a URL, confirming D14's masking end to end.** *Not run* — no macOS Keychain
-   here (`KIRA_INSECURE_SECRETS=1`, AGENTS.md). `maskSecrets` is a pure function over
+   here (`KIRA_INSECURE_SECRETS=1`, CLAUDE.md). `maskSecrets` is a pure function over
    `usedSecrets` and is unit-testable, and F16's finding was verified by reading the persisted
    path rather than by writing a real secret into a real database.
 

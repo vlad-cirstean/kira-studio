@@ -40,7 +40,7 @@
 
 - **One driver, not two.** `kafkajs` leaves `dependencies` in the same commit the new client lands.
   A "keep kafkajs for the one call the new client lacks" compromise is exactly the half-implementation
-  AGENTS.md forbids, and it would keep a broken-on-Kafka-4 protocol implementation in the shipped
+  CLAUDE.md forbids, and it would keep a broken-on-Kafka-4 protocol implementation in the shipped
   bundle.
 - **No capability may quietly become a lie.** `caps.ts` is a contract (§5). Anything this migration
   cannot deliver either keeps working by another route, or `caps`/`notes` change to say so in the
@@ -53,11 +53,11 @@
   over the network from this container, and says which. Everything that needs a live broker or a
   macOS box is marked *must be confirmed during implementation* and has a named step that confirms
   it. `bun run test:db` and `xvfb-run -a bun run test:ui` **cannot be run in Claude Code's Linux web
-  container** — Docker Hub's blob CDN is blocked there (`AGENTS.md:43-48`), so no testcontainer ever
+  container** — Docker Hub's blob CDN is blocked there (`CLAUDE.md:43-48`), so no testcontainer ever
   starts. This phase additionally cannot even *build* the native module there (F20).
 - **Cancellation stays real.** §5's rule — *"Cancellation is never 'stop showing the result'"* —
   and `adapter.ts:37-38`. The mechanism changes shape (D22); it does not weaken.
-- **Comments per AGENTS.md:** only where the code cannot say it for itself. Every `D` below that
+- **Comments per CLAUDE.md:** only where the code cannot say it for itself. Every `D` below that
   encodes a non-obvious constraint (a required-but-unused `group.id`, an ABI marker, an offset
   numeric range) gets exactly one line at its implementation site.
 - **The test runner bends around the driver, not the other way round.** Bun cannot load this
@@ -296,8 +296,8 @@ response 403`; `https://electronjs.org/headers/…` likewise; `https://nodejs.or
 returns **200** and `https://github.com/electron/electron/releases/download/v43.4.1/SHASUMS256.txt`
 returns **302**, so this is a specific host denial, not general egress. The headers are *not*
 published as GitHub release assets either (probed `node-v43.4.1-headers.tar.gz`,
-`node-headers-v43.4.1.tar.gz`, `iojs-v43.4.1-headers.tar.gz` → all **404**), so AGENTS.md's
-curl-the-binary-from-GitHub workaround (`AGENTS.md:57-63`) has no analogue here. **The Electron-ABI
+`node-headers-v43.4.1.tar.gz`, `iojs-v43.4.1-headers.tar.gz` → all **404**), so CLAUDE.md's
+curl-the-binary-from-GitHub workaround (`CLAUDE.md:57-63`) has no analogue here. **The Electron-ABI
 build of this module can only be produced on the macOS/Colima box.**
 
 **F21 — Bun cannot load this addon, and the ABI number was never the real obstacle. Probed to a
@@ -367,7 +367,7 @@ cluster id); `:192-197` asserts the topic definition's sections are exactly
 `:204-214` asserts the group definition's three sections and its committed offsets;
 `:334-336` documents kafkajs's own retry backoff as the reason scenario 11 needs a 20 s timeout.
 `tests/ui/kafka.spec.ts` skips cleanly when Docker is unavailable (`:26-31`), while
-`tests/db/kafka.spec.ts:81` **throws** instead — neither can run in this container (`AGENTS.md:43-48`).
+`tests/db/kafka.spec.ts:81` **throws** instead — neither can run in this container (`CLAUDE.md:43-48`).
 
 ## 2. Shapes introduced in this plan
 
@@ -480,7 +480,7 @@ files:
 | D5 | **`electron-builder.yml` keeps `npmRebuild: false`, and the Electron-ABI build is produced by `scripts/native-electron-build.sh` before packaging** (wired as a `prepackage:mac` script). | electron-builder's rebuild step shells out to the detected package manager; this repo uses Bun, which electron-builder does not support as a rebuild driver. An explicit script keeps the mechanism visible, makes the same build available to `bun run dev` and `test:ui` (which need it just as much — they run the real Electron), and matches the repo's existing script-driven verification style (`scripts/verify-packaging.sh`). The `npmRebuild: false` **comment** must change: its claim ("no native production dependency exists") is now false even though the setting is right. |
 | D6 | **`scripts/native-electron-build.sh` guarantees one binary for one ABI — Electron's.** It reads `node_modules/electron/abi_version`, compares it with the `.native-abi` marker beside the built module, and exits, restores from `.cache/native/…/<abi>.node`, or runs `electron-rebuild --only @confluentinc/kafka-javascript`. Wired as `predev`, `pretest:ui`, `pretest:db:kafka` and `prepackage:mac` — **not** `pretest:db`, which after D27 runs no Kafka code at all. | F21 settles what P10's D15 only observed: Bun cannot load a NAN addon at any ABI, so there is no second runtime to serve and no ABI switching to arbitrate. Every consumer of this driver — `bun run dev`, `test:ui`, the packaged app, and the Kafka suite under `ELECTRON_RUN_AS_NODE=1` (D27) — is Electron at ABI 148. The marker keeps the common case at one `cat`; the cache keyed by ABI means an Electron upgrade rebuilds once and a downgrade is a file copy. `@electron/rebuild` is added as a devDependency for this and nothing else. |
 | D7 | **`asarUnpack` gains the `.node`, and `files` excludes the vendored librdkafka sources, `src/`, `util/`, `examples/`, `ci/` and `build/Release/{obj.target,.deps}`.** | Electron cannot `dlopen` from inside an asar archive — the same constraint that already unpacks `out/main/engine.js` (`electron-builder.yml:12-16`). The exclusions drop ~11 MB of C sources and ~8 MB of `.o` intermediates (F19) that are pure build residue; the L-D bundle budget has 48 MB of headroom (252 of 300 MB) and this phase should spend a few MB of it on a runtime binary, not on object files. `verify-packaging.sh` gains an A6 check that the `.node` is present and unpacked, so a future `files` edit cannot silently break the packaged app. |
-| D8 | **`docs/v1/PACKAGING.md` §2 and `AGENTS.md` are updated by the implementing session**: PACKAGING.md's `npmRebuild` bullet is rewritten, and AGENTS.md gains a short "Native Kafka driver (librdkafka)" section stating that the driver loads only under Electron's ABI and never under Bun (F21), the `native-electron-build.sh` step, and F20's finding that the Electron-ABI build cannot be produced in Claude Code's Linux web container. | AGENTS.md already carries exactly this genre of hard-won environment fact for Docker (`:32-48`), the Electron binary (`:50-70`) and secrets (`:72-92`); an agent that hits "was compiled against a different Node.js version" with no note to read will burn an hour rediscovering F19/F20. Standing practice is that the implementing session makes the doc edits (P27 D34, P24 D41). |
+| D8 | **`docs/v1/PACKAGING.md` §2 and `CLAUDE.md` are updated by the implementing session**: PACKAGING.md's `npmRebuild` bullet is rewritten, and CLAUDE.md gains a short "Native Kafka driver (librdkafka)" section stating that the driver loads only under Electron's ABI and never under Bun (F21), the `native-electron-build.sh` step, and F20's finding that the Electron-ABI build cannot be produced in Claude Code's Linux web container. | CLAUDE.md already carries exactly this genre of hard-won environment fact for Docker (`:32-48`), the Electron binary (`:50-70`) and secrets (`:72-92`); an agent that hits "was compiled against a different Node.js version" with no note to read will burn an hour rediscovering F19/F20. Standing practice is that the implementing session makes the doc edits (P27 D34, P24 D41). |
 
 ### Topic B — which API surface, and the adapter rewrite
 
@@ -527,7 +527,7 @@ files:
 | D32 | **No wire, renderer, IPC, storage or cache change.** `StreamPage`, `KafkaStreamFilter`, the offset-window page token, `data.read` and the L2 cache key are untouched. | The phase is a driver swap plus one loop rewrite; keeping the wire fixed is what lets `tests/ui/kafka.spec.ts` and the stream view act as an untouched regression surface, and means no L2 invalidation on upgrade. |
 | D33 | **SQS is out of scope entirely, and the plan says so in `docs/v1/SPEC.md`'s P32 row when it is updated.** | The user's note names Kafka only; SQS uses `@aws-sdk/client-sqs`, shares no client code, and `sqs/read.ts` never reads the Kafka stream filter (`shared/domain/streamFilter.ts:5-8`). The only thing the two share is the `StreamPage` shape, which D32 freezes. |
 | D34 | **SPEC.md edits are made by the implementing session:** §5.1's Kafka row cancel mechanism (`:186`) becomes *"close the assigned consumer, `AbortSignal`"*; §8.11's Kafka topic definition sentence (`:507`) gains the DescribeConfigs caveat; §11's `tests/` layout gains `electron-db/` with one line saying why it exists (D27); §10's P32 row (`:695`) gets its outcome column **only once implemented**. §3's driver line (`:99-101`) finally becomes true and needs no edit. | Standing practice (P27 D34, P24 D41, P22 D11): the phasing table records what shipped, and the plan does not pre-write it. |
-| D35 | **Every step keeps `bun run lint`, `bun run typecheck` (all three projects) and `bun run build` green, and the phase is not done until `bun run test:db` and `xvfb-run -a bun run test:ui` are green on the macOS/Colima box.** | AGENTS.md's Docker note (`:43-48`) plus F20: neither the container suites nor the Electron-ABI build can happen in Claude Code's Linux web container. Saying "tests pass" on the strength of a typecheck would be the exact shortcut §0 forbids. |
+| D35 | **Every step keeps `bun run lint`, `bun run typecheck` (all three projects) and `bun run build` green, and the phase is not done until `bun run test:db` and `xvfb-run -a bun run test:ui` are green on the macOS/Colima box.** | CLAUDE.md's Docker note (`:43-48`) plus F20: neither the container suites nor the Electron-ABI build can happen in Claude Code's Linux web container. Saying "tests pass" on the strength of a typecheck would be the exact shortcut §0 forbids. |
 
 ## 4. Implementation order
 
@@ -587,7 +587,7 @@ Steps 1–2 are the environment gate, 3–8 the adapter, 9–11 the tests and fi
     the image bump to `cp-kafka:8.0.x` and its comment (D25), scenarios 17–20 (D30) and the F25
     assertion updates (D29). This is the first point where the whole stack is exercised against
     Kafka 4; run `bun run test:db`, `bun run test:db:kafka` and `bun run test:ui` on the macOS box.
-12. **`docs: SPEC.md, PACKAGING.md, PERF.md and AGENTS.md for P32`** — D4, D8, D18, D34 (not the
+12. **`docs: SPEC.md, PACKAGING.md, PERF.md and CLAUDE.md for P32`** — D4, D8, D18, D34 (not the
     §10 outcome column, which is written once the phase is verified green).
 
 ## 5. Tests
@@ -636,7 +636,7 @@ behaviour change, step 11's is new assertions with no conversion noise.
 
 - **`bun run test:db` cannot run here.** `tests/db/kafka.spec.ts:81` throws when Docker is
   unavailable, and Docker Hub's blob CDN (`production.cloudfront.docker.com`) is blocked by the
-  outbound network policy, so no image layer can ever be fetched (`AGENTS.md:43-48`). This is a
+  outbound network policy, so no image layer can ever be fetched (`CLAUDE.md:43-48`). This is a
   network-policy limit, not a configuration problem, and no amount of `dockerd` fiddling changes it.
 - **`xvfb-run -a bun run test:ui` cannot run the Kafka spec here** for the same reason (it skips
   cleanly, `tests/ui/kafka.spec.ts:26-31`), and after this phase it additionally cannot run the app
@@ -738,7 +738,7 @@ docs/
   v1/PERF.md                        MOD  one note: the Kafka driver is native and not reclaimable
                                          once loaded (D4)
   v1/plans/P32-kafka-client-migration.md   NEW  this document
-AGENTS.md                           MOD  new "Native Kafka driver (librdkafka)" section: Electron's
+CLAUDE.md                           MOD  new "Native Kafka driver (librdkafka)" section: Electron's
                                          ABI only (never bun), native-electron-build.sh, the
                                          test:db:kafka runner, and F20's blocked-headers finding (D8)
 ```
@@ -794,7 +794,7 @@ AGENTS.md                           MOD  new "Native Kafka driver (librdkafka)" 
 - [ ] `bun run package:mac:dir` produces an `.app` whose `app.asar.unpacked` contains the `.node`,
       whose `app.asar` contains none, and whose size is still under the 300 MB L-D budget;
       `bun run verify:packaging` passes including the new A6.
-- [ ] AGENTS.md tells the next agent, before they hit it, that the Electron-ABI build cannot be
+- [ ] CLAUDE.md tells the next agent, before they hit it, that the Electron-ABI build cannot be
       produced in Claude Code's Linux web container.
 
 **Overall**

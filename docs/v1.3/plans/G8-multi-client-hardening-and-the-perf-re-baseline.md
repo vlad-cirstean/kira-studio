@@ -109,10 +109,10 @@ Everything in §9's table, but the ones most likely to be mistaken for G8 work:
 
 - Every decision in §2 cites a finding; every finding in §1 cites something read or **run** here,
   with the command and its output.
-- `AGENTS.md` applies in full: **no stubbed error handling, no `TODO: fix later`, no skipped
+- `CLAUDE.md` applies in full: **no stubbed error handling, no `TODO: fix later`, no skipped
   validation.** Scope left out is left out entirely.
 - **Comments very concise, only where the code cannot say it itself.**
-- **Tests only where `AGENTS.md`'s bar is met** — and this phase is squarely inside the bar's own
+- **Tests only where `CLAUDE.md`'s bar is met** — and this phase is squarely inside the bar's own
   first-named category ("concurrency (ordering, backpressure, cancellation, races)"), which is why
   it is almost entirely tests. D9 states what still does *not* earn one.
 - **Fixture repositories scope their git config to themselves** — `git -C <tmpdir>`, `--local`,
@@ -635,7 +635,7 @@ is true of one clause and has been read as covering all five.
 
 ### D9 — What gets a test, and what does not
 
-`AGENTS.md`'s bar names "concurrency (ordering, backpressure, cancellation, races)" first, which is
+`CLAUDE.md`'s bar names "concurrency (ordering, backpressure, cancellation, races)" first, which is
 this entire phase. The discipline that keeps it from becoming a test dump is a rule, applied per
 test: **a test earns its place only if it can fail for a concurrency reason.** Concretely:
 
@@ -666,7 +666,7 @@ M3's "no goroutine leak" and M6's "no orphaned git children" need a containment 
 and declined: `go.uber.org/goleak` (BSD-3, well maintained, and the repo already carries test-only
 modules — `go-cmp`, `testcontainers-go` — so precedent is not the obstacle).
 
-**The requirement it does not meet**, named as `AGENTS.md` requires: goleak's model is
+**The requirement it does not meet**, named as `CLAUDE.md` requires: goleak's model is
 package-scoped verification at `TestMain`, which in `gitsock` would sit on top of 71 existing tests
 that spawn real `git`, real `fsnotify` watchers and real SQLite — every one of which parks
 goroutines goleak would need a hand-maintained `IgnoreTopFunction` list to tolerate, and that list
@@ -1050,7 +1050,7 @@ the one library that was considered (`go.uber.org/goleak`) and the requirement i
 Ten commits. `go build ./apps/kira-studio/internal/...` and
 `go test ./apps/kira-studio/internal/gitsession/ ./apps/kira-studio/internal/gitsock/` run after
 **each** — both are fast enough for a per-commit loop. D16's two-run race pass happens once, at C9,
-per `AGENTS.md`'s "implement the whole plan first, then test once".
+per `CLAUDE.md`'s "implement the whole plan first, then test once".
 
 - **C1** `fix(gitsession): release, never store, a repo.open that finishes after its connection closed`
   — §3.1's `closed` flag and `Open`'s new arm, plus `TestConcurrent_OpenRacingCloseNeverLeaksAHold`
@@ -1279,7 +1279,7 @@ so it is examined properly rather than declined by precedent.
 **The case for splitting** is real: after C1–C6 land, the four new `gitsock` files (matrix, revoke,
 recovery, perf) share no source file, no type and no helper, and D15 exists precisely to keep it
 that way. One implementer per matrix scenario, or a 2/2 split (M1–M4 + M5 against M6 + perf), would
-be genuinely independent work in `AGENTS.md`'s own terms.
+be genuinely independent work in `CLAUDE.md`'s own terms.
 
 **Three things make it the wrong trade anyway:**
 

@@ -2,7 +2,7 @@
 
 How to build, run and test this repo in whatever sandbox/container a session happens to be in —
 credential and tooling constraints, container quirks, per-subsystem run instructions. Not app
-facts: those live in `docs/ARCHITECTURE.md`. Not team process: that lives in `AGENTS.md`.
+facts: those live in `docs/ARCHITECTURE.md`. Not team process: that lives in `CLAUDE.md`.
 
 ## Git push: `.github/workflows/` changes can't be pushed from here
 

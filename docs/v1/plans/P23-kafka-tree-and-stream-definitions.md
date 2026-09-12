@@ -10,7 +10,7 @@
 > stop being tree rows and *reappear* in the topic's definition view, which is P19's own ground
 > rule — *"Nothing the tree stops showing may become unreachable… This is a relocation, not a
 > deletion"* — applied to a second engine. Splitting them would ship a phase that deletes the only
-> place partition metadata is visible, which is precisely the half-implementation AGENTS.md rules
+> place partition metadata is visible, which is precisely the half-implementation CLAUDE.md rules
 > out. Filing it as a **P19 addendum** was the real alternative and was rejected: both halves
 > reverse explicit `## 5 Explicitly out of scope` bullets of P19 (*"Folders for Redis, Kafka, SQS
 > and S3 levels"*, *"A definition view for … kafka topics"*), and the P18 §9 / P19 §9 addendum test
@@ -49,7 +49,7 @@
 - **A definition load must never poll an SQS queue.** SPEC §5.1's hard rule is that SQS *reads* are
   never automatic. `GetQueueAttributes` is not `ReceiveMessage` and makes nothing invisible — D9
   states that explicitly, because the definition tab *does* auto-load on mount.
-- Comments per AGENTS.md: only where the code cannot say it for itself.
+- Comments per CLAUDE.md: only where the code cannot say it for itself.
 - Run `bun run lint`, `bun run typecheck` and `bun run build` throughout; `bun run test:db` matters
   from step 2 on (this phase does change adapters); `xvfb-run -a bun run test:ui` from step 1 on.
 

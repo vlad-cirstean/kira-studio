@@ -43,7 +43,7 @@
 > (D8 — P3 D4's path-not-bytes rule is not weakened here); **importing a curl command into the
 > *current* tab** (D12 opens a new one — non-destructive by construction); **`--config`/`-K` files,
 > `--proxy`, client certificates, cookie jars, `--resolve`, rate limits** (D7's warned list).
-> Nothing here is half-built toward any of them (`AGENTS.md`: *"Scope left out of a phase is left
+> Nothing here is half-built toward any of them (`CLAUDE.md`: *"Scope left out of a phase is left
 > out entirely, not half-implemented"*).
 >
 > **Every claim below was re-read against the tree, and every library and curl claim was measured
@@ -316,7 +316,7 @@ Declined on requirement:
   in the browser, it needs two WASM files to work, `tree-sitter.wasm` and `tree-sitter-bash.wasm`,
   which it will request from the root directory of your web server"*, plus a `topLevelAwait` bundler
   flag. This app is not served from a web server root — on Linux the desktop build intercepts
-  `wails://` inside the native process (`AGENTS.md`'s Wails section), and the bundle's chunk count
+  `wails://` inside the native process (`CLAUDE.md`'s Wails section), and the bundle's chunk count
   is a stated property (`docs/ARCHITECTURE.md:697`). Unpacked package size: 3.59 MB.
 
 ### F6 — *Measured*: every published TypeScript/JavaScript curl **parser** mis-parses input this app must handle
@@ -326,7 +326,7 @@ Installed from the real registry and run against a fixed set of commands. What c
 |---|---|---|---|
 | `curl-parser-ts` | 0.3.0, 2025-05-30 (3,793/wk) | MIT | **`url` is wrong on the commonest paste.** For a DevTools-shaped command with `\`-continuations it returned `url: "Authorization: Bearer abc.def"`. For `-F 'file=@/tmp/report.csv;type=text/csv'` it returned `url: "file=@/tmp/report.csv;type=text/csv"`; for `--data-binary @/tmp/blob.bin`, `url: "@/tmp/blob.bin"`. Even on the one-line JSON case it invents `Content-Type: application/x-www-form-urlencoded` for a `--data-raw` body, splits the query string out of the URL into a separate `query` map, mis-sets `-G` to POST, and produces `url: ""` with a header named `$'X-A` for an ANSI-C-quoted command. Its declared repository (`hp77-creator/curl-parser-ts`) does not resolve from this session. |
 | `@scrape-do/curl-parser` | 0.4.3, 2026-07-29 (2,486/wk) | MIT | **The published build does not load at all**, in ESM or CJS: `dist/index.js` imports `./dist/shellwords` with no extension → `ERR_MODULE_NOT_FOUND`. Repo `scrape-do/curl-parser`, 2 stars. |
-| `parse-curl` | 0.2.6, **2017-11-17** (14,544/wk) | **none declared** | An absent `license` field fails `AGENTS.md`'s *"only fully open-source libraries"* rule before behaviour matters. Behaviour is also insufficient: it returns only `{method, header, url}` — the body is dropped for `-d`, `--data-raw`, `-F` and `--data-binary` alike — and it loses the URL entirely on an ANSI-C-quoted command. |
+| `parse-curl` | 0.2.6, **2017-11-17** (14,544/wk) | **none declared** | An absent `license` field fails `CLAUDE.md`'s *"only fully open-source libraries"* rule before behaviour matters. Behaviour is also insufficient: it returns only `{method, header, url}` — the body is dropped for `-d`, `--data-raw`, `-F` and `--data-binary` alike — and it loses the URL entirely on an ANSI-C-quoted command. |
 | `curl-parser-js` | 0.0.3, 2017-12-01 (13/wk) | MIT | Regex-based by its own description; effectively unused and unmaintained. Not probed further. |
 | `killlowkey/parse-curl` (Go) | last pushed 2023-01-12 | **none declared** | 15 stars, 5 KB, a port of the 2017 JS package above. Fails the same licence rule, and D2 means Go is not the home anyway. |
 
@@ -498,7 +498,7 @@ explicit action, never fetched on mount — F9 of P5's hazard does not apply).
 ## 4. Decisions
 
 ### D1 — The shell-quoting half is `shlex`; the curl-flag half is written here. Both sides of that, with the measurement
-`AGENTS.md`: *"Reach for an existing, well-maintained library before hand-rolling non-trivial
+`CLAUDE.md`: *"Reach for an existing, well-maintained library before hand-rolling non-trivial
 infrastructure… a hand-rolled version earns its keep only against a real requirement no library
 meets — name that requirement when declining a library."* Two separate problems, two different
 answers, and the split is the whole point.
@@ -522,7 +522,7 @@ solves the *generation* escaping, which nothing else on the list even attempts. 
 - **`curl-parser-ts`, `@scrape-do/curl-parser`, `parse-curl`, `curl-parser-js`,
   `killlowkey/parse-curl`** (F6) — measured wrong on the shapes that matter (a DevTools paste, a
   `-F` file field, a `--data-binary @file`, an ANSI-C-quoted command), and two of the five declare
-  **no licence at all**, which fails `AGENTS.md`'s open-source rule before behaviour is even
+  **no licence at all**, which fails `CLAUDE.md`'s open-source rule before behaviour is even
   reached. One of the five does not load at all as published.
 - **`shell-quote`** (F7) — the highest-usage package in the whole search, declined on three measured
   behaviours, of which one is decisive: **a line continuation and an empty `-d ''` produce the
@@ -543,7 +543,7 @@ which every published parser therefore cannot target. On top of that, D8's mode-
 on this app's own `Content-Type` precedence (§1.6/F11) and D15's generation turns on
 `buildURLEncoded`'s own both-halves encoding (F13) — three facts that live in this repository, not
 in any package. The flag walk itself is a table plus one loop; what earns the dedicated tests is not
-its size but its interacting rules, which is exactly `AGENTS.md`'s *"a parser/splitter with several
+its size but its interacting rules, which is exactly `CLAUDE.md`'s *"a parser/splitter with several
 interacting rules"* clause (D17).
 
 ### D2 — Both directions are **pure renderer TypeScript**, under `http/curl/`. No Go, in either direction
@@ -907,7 +907,7 @@ curl puts on the wire either way (F12), so nothing is lost. This is also what ma
 property hold.
 
 ### D17 — What gets a dedicated test, and what does not
-`AGENTS.md`'s bar: a test earns its keep only guarding *"a parser/splitter with several interacting
+`CLAUDE.md`'s bar: a test earns its keep only guarding *"a parser/splitter with several interacting
 rules"* among a short list. This phase contains one of those and several things that are not, and
 the split is deliberate:
 
@@ -959,7 +959,7 @@ toolbar `IconButton` and a `v-if`; both go the permitted direction.
 ## 5. Implementation order
 
 Nine commits. C1–C4 add capability with nothing mounted (each builds and typechecks on its own);
-C5–C6 are one user-visible slice each; C7–C9 are the tests and the docs. Per `AGENTS.md`, run the
+C5–C6 are one user-visible slice each; C7–C9 are the tests and the docs. Per `CLAUDE.md`, run the
 fast checks (`lint`, `typecheck`, `build`) per commit and the expensive suites once at the end.
 **No Go command is needed at any point** (F1/D2), and **no bindings regeneration** (F16).
 
@@ -1080,7 +1080,7 @@ Six scenarios, all against the real built bundle, none needing a `mockRuntime.ts
 - **The actual OS authentication prompt.** `tests/ui` mocks the outcome, as
   `credential-reveal.spec.ts` and `http-variables.spec.ts` already do; that a real Touch ID sheet
   appears once and its 5-minute grace then covers a second *Copy as curl* is a macOS check
-  (`AGENTS.md`: there is no Linux keychain backend at all, so a Linux run needs
+  (`CLAUDE.md`: there is no Linux keychain backend at all, so a Linux run needs
   `KIRA_INSECURE_SECRETS=1` and takes the `confirmation-required` path instead).
 - **The clipboard.** `navigator.clipboard.writeText` needs a focused, secure context; the `tests/ui`
   assertions are made against the store's own state, not by reading the system clipboard back.

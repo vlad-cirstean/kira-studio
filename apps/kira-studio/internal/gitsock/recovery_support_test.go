@@ -181,7 +181,7 @@ func launchGitsockHelper(t *testing.T, kiraHome, repoDir string) *exec.Cmd {
 
 // killAndReap SIGKILLs cmd (no cleanup runs, exactly like a real crash) and waits for the kernel to
 // reap it -- kill(pid, 0) can answer "alive" against a not-yet-reaped zombie for a moment even after
-// SIGKILL lands (AGENTS.md's own note on this sandbox's slow init), so this polls rather than
+// SIGKILL lands (CLAUDE.md's own note on this sandbox's slow init), so this polls rather than
 // assuming cmd.Wait() alone is instantaneous.
 func killAndReap(t *testing.T, cmd *exec.Cmd) {
 	t.Helper()

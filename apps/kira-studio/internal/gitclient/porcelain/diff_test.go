@@ -181,7 +181,7 @@ func TestParseFileDiffBody_LFSPointer(t *testing.T) {
 
 // TestParseFileDiffBody_HunkCountsDisagree proves the counts invariant: a hunk whose header
 // promises more lines than the body actually supplies before EOF must fail loudly, never
-// half-render (AGENTS.md's "no skipped validation").
+// half-render (CLAUDE.md's "no skipped validation").
 func TestParseFileDiffBody_HunkCountsDisagree(t *testing.T) {
 	t.Parallel()
 	raw := []byte("diff --git a/f.txt b/f.txt\nindex 111..222 100644\n--- a/f.txt\n+++ b/f.txt\n@@ -1,3 +1,3 @@\n line1\n-line2\n")

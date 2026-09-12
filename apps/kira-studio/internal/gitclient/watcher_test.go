@@ -209,7 +209,7 @@ drain:
 }
 
 // TestRepoWatcher_BurstCoalesces proves D11's coalescing: a burst of N ref-creating commands
-// produces far fewer than N signals — the honest assertion, not an exact count (AGENTS.md's own
+// produces far fewer than N signals — the honest assertion, not an exact count (CLAUDE.md's own
 // note on timing assertions this container cannot make honestly).
 func TestRepoWatcher_BurstCoalesces(t *testing.T) {
 	dir, _, w := newWatcherFixture(t)

@@ -418,7 +418,7 @@ directory. One comment referenced it by name outside the package itself:
 `connections.Service.Create`'s random id assignment — updated from *"…own random `id.New()`
 assignment…"* to *"…own random `uuid.NewString()` assignment…"*, since the sentence is a statement
 about current source, not phase history, and leaving it naming a deleted function would be exactly
-the kind of drift `AGENTS.md`'s "no shortcuts" bar exists to catch. Historical plan docs that
+the kind of drift `CLAUDE.md`'s "no shortcuts" bar exists to catch. Historical plan docs that
 mention `internal/id` in prose (`docs/v1/plans/P53-go-storage-core.md`,
 `docs/v1.1/plans/P19-dependency-runtime-bump.md` F12) are left as written, per this repo's own
 convention that a plan doc is a point-in-time record, not a living one (`docs/ARCHITECTURE.md`'s own
@@ -442,13 +442,13 @@ to `go.mod`'s `v3.0.0-beta.16`, bindings regenerated).
 | Typecheck (web/vue-tsc) | `bun run typecheck:web` | clean |
 | Typecheck (unit project) | `bun run typecheck:unit` | clean |
 | Build | `bun run build` | succeeds; launch chunk 404.35 kB gzip (+5.88 kB / +1.48%, §1.4) |
-| Unit tests | `bun run test:unit` | 223 pass — **8 pre-existing failures, unrelated to this phase**: all in `tests/unit/bridge-port.spec.ts` (`bridge/port.ts`'s Stream transport, a `close()`/timeout race), a file this phase never touches. Confirmed pre-existing, not introduced: `git stash`-ing this phase's entire diff and re-running reproduces the identical 8 failures on the unmodified tree. `AGENTS.md`'s "Known open items" says "None" as of this phase's base commit, so this is a newly-surfaced, pre-existing flake worth a follow-up, not something this phase caused or should paper over |
+| Unit tests | `bun run test:unit` | 223 pass — **8 pre-existing failures, unrelated to this phase**: all in `tests/unit/bridge-port.spec.ts` (`bridge/port.ts`'s Stream transport, a `close()`/timeout race), a file this phase never touches. Confirmed pre-existing, not introduced: `git stash`-ing this phase's entire diff and re-running reproduces the identical 8 failures on the unmodified tree. `CLAUDE.md`'s "Known open items" says "None" as of this phase's base commit, so this is a newly-surfaced, pre-existing flake worth a follow-up, not something this phase caused or should paper over |
 | UI — targeted (popovers, menus, submenus, tooltips) | `playwright test --project=ui tabs.spec.ts tooltips.spec.ts tree.spec.ts definition.spec.ts console.spec.ts autocomplete.spec.ts data-view.spec.ts interaction.spec.ts` | **24/24 pass**, including the new submenu-offscreen regression test |
 | UI — full suite | `playwright test --project=ui` (all 25 spec files, 78 tests) | **77/78 pass.** The one failure, `perf.spec.ts`'s `p95 < 80ms` scroll-frame-time tripwire (`p95=85ms` under full-suite parallel load), is a grid-scroll timing test — a file this phase does not touch, explicitly out of scope (§0) — and reproduces green in isolation (`p95=70ms`, single worker, no contention), consistent with that spec's own comment about being *"loose enough to not chase this sandbox's own baseline cadence"* rather than a hard, always-reproducible number. Not a regression this phase caused |
 
 The unit-test-layer coverage for the old pure-arithmetic `anchoredPosition()` function
 (`tests/unit/anchored-position.spec.ts`, 8 cases across both strategies) was **deleted, not
-ported**. `AGENTS.md`'s own bar — *"unit tests exist only for advanced, complex or deeply nested
+ported**. `CLAUDE.md`'s own bar — *"unit tests exist only for advanced, complex or deeply nested
 logic"* — applied cleanly to the old file precisely because the flip/clamp arithmetic was pure and
 self-contained; that arithmetic no longer lives in this repo's own code, it lives in
 `@floating-ui/dom`, which ships its own (considerably larger) upstream test suite. Re-deriving
@@ -516,7 +516,7 @@ contract and `LICENSE` for BSD-3-Clause; this repo's own pre-phase `theme/anchor
 cited by file:line above against the base commit `48c3abc`.
 
 **In-repo**: `docs/ARCHITECTURE.md` ("UI architecture", Invariants, Testing sections, read in full
-before touching `theme/`/`workbench/`), `AGENTS.md` (the unit-test bar, the toolchain bootstrap
+before touching `theme/`/`workbench/`), `CLAUDE.md` (the unit-test bar, the toolchain bootstrap
 steps), `docs/v1.1/plans/P22-grid-library-survey.md` (§0.1's measurement method, followed for the
 bundle-size table), `docs/v1.1/plans/P19-dependency-runtime-bump.md` (the "every pin gets checked"
 convention this phase's `go mod tidy` verification follows, and F12's now-superseded

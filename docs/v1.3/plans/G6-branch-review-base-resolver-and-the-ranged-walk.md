@@ -147,10 +147,10 @@ Everything in §9's table, but the ones most likely to be mistaken for G6 work:
 ### 0.4 Ground rules
 
 - Every decision in §2 cites a finding; every finding in §1 cites something read or run here.
-- `AGENTS.md` applies in full: **no stubbed error handling, no `TODO: fix later`, no skipped
+- `CLAUDE.md` applies in full: **no stubbed error handling, no `TODO: fix later`, no skipped
   validation.** Scope left out of this phase is left out *entirely*.
 - **Comments very concise, only where the code cannot say it itself.**
-- **Tests only where `AGENTS.md`'s bar is met** (D16). G6 clears it in three places and nowhere else.
+- **Tests only where `CLAUDE.md`'s bar is met** (D16). G6 clears it in three places and nowhere else.
 - **No shell, ever.** Every new spawn is argv-only through `gitclient`'s existing runner, exactly
   like every spawn G2–G5 added.
 - **Fixture repositories scope their git config to themselves** — G5 D19's `fixtureEnv()`
@@ -432,7 +432,7 @@ SPEC's "Settings ownership" section names exactly three server-owned settings �
 disagreeing about them is a correctness or safety issue). Two windows disagreeing about which
 branch to *offer as a comparison base* is a preference, not a hazard; and the setting is already
 declared in the extension's own manifest, where a per-window setting belongs. Shipping the setting
-unread would be `AGENTS.md`'s "half-implemented" in its purest form.
+unread would be `CLAUDE.md`'s "half-implemented" in its purest form.
 
 ### D2 — The ranged walk is the **same `Walk` type with a `Range` spec** — not a second type, not a second code path
 
@@ -801,7 +801,7 @@ worth.
 | `graph.refresh` | **no `range` parameter exists**, in the contract or here |
 
 `graph.status` deserves a word, because `packages/git-ui` never sends a range to it
-(`state/review.ts` calls only `graph.stream` and `graph.loadMore`) and `AGENTS.md` forbids
+(`state/review.ts` calls only `graph.stream` and `graph.loadMore`) and `CLAUDE.md` forbids
 uncalled code. The rule it forbids is *building machinery no caller exercises*; here the machinery
 — the review walk — is built and fully exercised by this phase, and `graph.status`'s range arm is
 six lines over it. Serving two of three range-bearing params and refusing the third would be an
@@ -932,7 +932,7 @@ and upstream registers it in P7 for the same reason.
 
 ### D16 — What gets a test, and what does not
 
-`AGENTS.md`'s bar, applied honestly. **Tested:**
+`CLAUDE.md`'s bar, applied honestly. **Tested:**
 
 - **`gitreview.ResolveBase`** — the phase's one genuine decision table, and the piece upstream
   unit-tests exhaustively. One named case per rule: the same-name fall-through
@@ -951,7 +951,7 @@ and upstream registers it in P7 for the same reason.
   the phase's real end-to-end proof.**
 
 **Not tested, deliberately**: `porcelain/review.go`'s three argv builders and `ParseCount`
-(`AGENTS.md`'s "thin pass-through" and "constructors/builders"; one returns a literal slice, one is
+(`CLAUDE.md`'s "thin pass-through" and "constructors/builders"; one returns a literal slice, one is
 `strconv.Atoi` over a trimmed line — all four are exercised for real by the integration tier),
 `gitrpc`'s handler and `validRefArg` (thin dispatch and a two-condition guard — the refusal is
 asserted once in integration), `gitsession/review.go`'s orchestration (its branches *are* the four
@@ -1194,7 +1194,7 @@ that this plan did not sanction.
 
 Eight commits. `go build ./apps/kira-studio/internal/...`, `bun run lint` and `bun run typecheck`
 run after **each** — they are fast. The expensive tier (§7.1(f)–(i)) runs once at C8, per
-`AGENTS.md`'s "implement the whole plan first, then test once".
+`CLAUDE.md`'s "implement the whole plan first, then test once".
 
 - **C1** `feat(gitclient): merge-base, ranged-count and origin/HEAD argv`
   — §3.1 + §3.2. Nothing imports them yet.
@@ -1411,7 +1411,7 @@ Three things are structurally out of reach in this container, unchanged from G3�
 call and all five carried it through.
 
 1. **The phase is one dependency chain.** argv → the pure resolver → the session's four outcomes →
-   the walk pair → the router → the extension → the proof. That is `AGENTS.md`'s textbook case of
+   the walk pair → the router → the extension → the proof. That is `CLAUDE.md`'s textbook case of
    *not* "genuinely independent (unrelated adapters, non-overlapping fixes)".
 2. **C5 is where the phase's one real risk lives.** The walk pair touches a structure four
    integration tests already drive, and its correctness claim is a *negative* one ("the graph is

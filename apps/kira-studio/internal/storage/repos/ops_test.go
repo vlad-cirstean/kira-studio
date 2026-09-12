@@ -12,7 +12,7 @@ import (
 
 // P23 §4.2 case 1: op_log's caps now interact four ways (age cut, row cap, byte budget, per-row
 // truncation), and the sweep (D2) is only *safe* because the truncation (D1) holds — "cache
-// eviction/invalidation with interacting rules", AGENTS.md's own named category, not CRUD round
+// eviction/invalidation with interacting rules", CLAUDE.md's own named category, not CRUD round
 // trips. There was no ops_test.go before this phase; Prune's two pre-existing passes are pinned
 // here too, as regression cases, since Prune is being restructured for the first time.
 

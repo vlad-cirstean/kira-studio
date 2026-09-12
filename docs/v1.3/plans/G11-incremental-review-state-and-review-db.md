@@ -131,7 +131,7 @@ Everything in §9's table, but the ones most likely to be mistaken for G11 work:
 ### 0.4 Ground rules
 
 - Every decision in §2 cites a finding; every finding in §1 cites something read or run here.
-- `AGENTS.md` in full: **no stubbed error handling, no `TODO: fix later`, no skipped validation.**
+- `CLAUDE.md` in full: **no stubbed error handling, no `TODO: fix later`, no skipped validation.**
   Every degraded state this phase can reach is a *named* value the UI renders (D10's
   `snapshotUnavailable` is the sharpest example), never a silent empty result.
 - **No shell, ever.** Every new spawn goes through `gitclient`'s existing `Runner`/`Spec` with an
@@ -141,7 +141,7 @@ Everything in §9's table, but the ones most likely to be mistaken for G11 work:
   stdlib; `modernc.org/sqlite` is already a direct require (`storage/db.go:12`). `go.mod` and
   `bun.lock` are expected to be byte-identical after this phase — a diff in either is a signal
   something was reached for that this plan did not sanction.
-- **Tests only where `AGENTS.md`'s bar is met** (D18). G11 clears it in four places and nowhere else.
+- **Tests only where `CLAUDE.md`'s bar is met** (D18). G11 clears it in four places and nowhere else.
 - **Fixture repositories scope their git config to themselves** — G5 D19's `fixtureEnv()`
   (`GIT_CONFIG_GLOBAL=/dev/null`, `GIT_CONFIG_SYSTEM=/dev/null`, `-c commit.gpgsign=false`).
   **Never `git config --global` or `--system`.** Every `review.db` a test opens lives under
@@ -287,7 +287,7 @@ So, given the snapshot→current patch, every old line number has an exact answe
   unchanged regions shift uniformly, which is what a unified diff *means*.
 
 That is arithmetic, not a heuristic, and it makes the whole family of content-hash schemes
-unnecessary. It is also, on its own, exactly the "cursor/pagination boundary arithmetic" `AGENTS.md`
+unnecessary. It is also, on its own, exactly the "cursor/pagination boundary arithmetic" `CLAUDE.md`
 names as deserving a real unit test (D18).
 
 ### F8 — There is one SQLite idiom in this repo, and it is small enough to mirror deliberately
@@ -639,7 +639,7 @@ the one `review.files` uses for every file — turning an N-spawn list into N pi
 `unchanged` on the wire rather than folding it into `fast` is deliberate: a reader of a
 `deltaSource: "fast"` response should be able to conclude a `git diff` actually ran.
 
-**This is precisely `AGENTS.md`'s "a decision structure too large to hold in your head"** — three
+**This is precisely `CLAUDE.md`'s "a decision structure too large to hold in your head"** — three
 tiers × four content kinds × three exit codes, with two of the branches (128 and
 `snapshotUnavailable`) unreachable from any happy path. It gets a real Go unit test over a real
 fixture repository (D18), not an integration test that happens to cover one arm.
@@ -678,7 +678,7 @@ getting it in there means `hash-object -w`, i.e. writing loose objects into the 
 answer a read.
 
 **Rejected: a hand-rolled Go diff.** SPEC forecloses it (*"reusing `gitclient`'s existing spawn
-discipline … rather than a hand-rolled Go diff algorithm"*), and `AGENTS.md`'s library rule points the
+discipline … rather than a hand-rolled Go diff algorithm"*), and `CLAUDE.md`'s library rule points the
 same way: git is the diff implementation this chapter already depends on, and a second one would have
 to agree with it exactly for the two paths to be interchangeable.
 
@@ -997,14 +997,14 @@ which is the test doing its job.
 
 ### D18 — What gets a test, and what does not
 
-`AGENTS.md`'s bar, applied honestly. **Tested:**
+`CLAUDE.md`'s bar, applied honestly. **Tested:**
 
 - **`gitreview.ProjectRanges`** (`project_test.go`) — F7's arithmetic. A table over: a range entirely
   before every hunk (identity); entirely after (shifted by the total delta); spanning a hunk;
   containing only deleted lines (drops out entirely); containing only added lines (impossible as
   input, asserted as a no-op); a hunk at line 1; a hunk at EOF; two hunks with opposite-sign deltas;
   an empty hunk list (identity); and a range that runs past `newLineCount` (clamped). *"Cursor/
-  pagination boundary arithmetic"* is `AGENTS.md`'s own named category.
+  pagination boundary arithmetic"* is `CLAUDE.md`'s own named category.
 - **`gitreview` range algebra** (`ranges_test.go`) — `Normalize`/`Union`/`Subtract`/`Expand` over
   adjacent, overlapping, touching, contained, disjoint and reversed inputs. Interval-set arithmetic
   with several interacting rules; the same category.
@@ -1014,7 +1014,7 @@ which is the test doing its job.
   unreachable but present); `slow` after the snapshot commit is genuinely pruned
   (`reflog expire --expire=now --all && gc --prune=now`, giving exit 128); `snapshotUnavailable` for a
   binary snapshot whose sha was rewritten; and `noSnapshot` for a file with no record. **This is D7's
-  whole correctness claim** and `AGENTS.md`'s "a decision structure too large to hold in your head",
+  whole correctness claim** and `CLAUDE.md`'s "a decision structure too large to hold in your head",
   named explicitly by this plan's own prompt.
 - **`gitreview.Store` round-trip and reaper** (`store_test.go`) — mark → read back → re-mark
   (replacement, not accumulation) → unmark-a-sub-range (demotes `full` to `partial`) → `Purge`
@@ -1024,8 +1024,8 @@ which is the test doing its job.
   **The phase's real end-to-end proof.**
 
 **Not tested, deliberately:** `NoIndexDiffArgs`/`IsAncestorArgs` (literal slices —
-`AGENTS.md`'s "constructors/builders"; both are exercised for real by the integration tier), the flate
-encode/decode round trip (`AGENTS.md`'s "format round-trips with no edge case" — the one real edge, a
+`CLAUDE.md`'s "constructors/builders"; both are exercised for real by the integration tier), the flate
+encode/decode round trip (`CLAUDE.md`'s "format round-trips with no edge case" — the one real edge, a
 length mismatch, is a single `if` in the decoder), `gitrpc`'s three handlers (thin dispatch; their
 refusals are asserted once each in integration), `migrate.go` (a structural copy of a runner
 `storage/migrations/*_test.go` already covers, and its one interesting branch — refusing a newer
@@ -1295,13 +1295,13 @@ phases needed a follow-up commit for exactly this mirror.
 
 **No new dependency, in either language.** `compress/flate`, `database/sql`, `embed`, `os`,
 `path/filepath`, `sync`, `time` are stdlib; `modernc.org/sqlite` is already a direct require
-(`storage/db.go:12`) and stays cgo-free on every platform, so `AGENTS.md`'s fast Linux loop is
+(`storage/db.go:12`) and stays cgo-free on every platform, so `CLAUDE.md`'s fast Linux loop is
 unaffected. No FlatBuffers schema change, so `bun run generate:wire` is not run.
 
 **`go.mod`, `go.sum` and `bun.lock` are expected to be byte-identical after this phase.** A diff in any
 of them is a signal something was reached for that this plan did not sanction.
 
-`AGENTS.md`'s licence bar therefore has nothing new to check at the package or the feature level — the
+`CLAUDE.md`'s licence bar therefore has nothing new to check at the package or the feature level — the
 one library involved (`modernc.org/sqlite`) was already checked when `internal/storage` and the sqlite
 adapter adopted it.
 
@@ -1310,7 +1310,7 @@ adapter adopted it.
 ## 6. Implementation order
 
 Eight commits. `go build ./apps/kira-studio/internal/...`, `bun run lint` and `bun run typecheck` run
-after **each** — they are fast. The expensive tier (§7.1(e)–(h)) runs once at C8, per `AGENTS.md`'s
+after **each** — they are fast. The expensive tier (§7.1(e)–(h)) runs once at C8, per `CLAUDE.md`'s
 "implement the whole plan first, then test once".
 
 - **C1** `feat(gitreview): line-range algebra and the snapshot-to-current projection`
@@ -1536,7 +1536,7 @@ nothing here is on that path.
 and all ten carried it through.
 
 1. **The phase is one dependency chain.** The pure arithmetic → the store → the reaper → the argv →
-   the three-tier selection → the router → the UI → the proof. That is `AGENTS.md`'s textbook case of
+   the three-tier selection → the router → the UI → the proof. That is `CLAUDE.md`'s textbook case of
    *not* "genuinely independent (unrelated adapters, non-overlapping fixes)".
 2. **C5 is where the phase's real risk lives.** The three-tier selection is a decision structure whose
    correctness depends on holding C1's projection semantics, C2's record shape and C4's exit-code

@@ -40,7 +40,7 @@
   green**, and `xvfb-run -a bun run test:ui` green from step 7 on. `tests/db/` is untouched: no
   adapter, engine, protocol or SQL change exists in this phase, and no file under `tests/db/`
   (fixtures included — see D14) is edited.
-- Comments per AGENTS.md: only where the code cannot say it for itself. Each constant introduced
+- Comments per CLAUDE.md: only where the code cannot say it for itself. Each constant introduced
   below carries exactly one line explaining the number, replacing the five-line prose comment
   `DataGrid.vue:46-51` currently carries.
 - Conventional Commits, one per step of §4: `perf(grid):`, `test(ui):`, `docs:`.

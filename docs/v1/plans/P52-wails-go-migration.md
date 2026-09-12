@@ -47,7 +47,7 @@ vendored-Node cost that replaces Electron's own embedded Node. That possibility 
 
 ### 0.3 Granularity: six phases, one set of decisions
 
-A 3 600-line rewrite is not one phase. Per `AGENTS.md`, genuinely separate chunks of work get
+A 3 600-line rewrite is not one phase. Per `CLAUDE.md`, genuinely separate chunks of work get
 separately-numbered phases (P4–P12 were split that way), and each phase gets its own Opus plan
 committed before implementation.
 
@@ -59,7 +59,7 @@ This document is therefore **both**:
    bridge design, the storage design, the Keychain choice and the project layout, decided once,
    here, so no later session has to make an architectural judgement call mid-implementation.
 
-P53–P57 each still get their own (thin) Opus plan, per `AGENTS.md`, whose job is to sequence the
+P53–P57 each still get their own (thin) Opus plan, per `CLAUDE.md`, whose job is to sequence the
 work against the *then-current* tree and record what that pass found — **not** to reopen §5–§9 of
 this document.
 
@@ -175,7 +175,7 @@ shippable that whole time. Reasons, in order of weight:
    unchanged. There is no duplication to pay for.
 3. Each of P53–P56 delivers a **complete, tested** Go subsystem verified by Go tests against real
    SQLite / a real engine child. None of them needs the renderer, so none of them needs a
-   half-populated bridge with a "not migrated yet" branch in it — which `AGENTS.md`'s no-stubs rule
+   half-populated bridge with a "not migrated yet" branch in it — which `CLAUDE.md`'s no-stubs rule
    would rightly reject.
 
 The renderer is built **twice** during the window, from one source tree: `electron.vite.config.ts`
@@ -196,7 +196,7 @@ P57 deletes `electron.vite.config.ts`, `electron-builder.yml`, `scripts/native-e
 the `electron*` devDependencies, `electron-log`, and every `*:mac`/`dev`/`build` script that names
 them.
 
-**Go toolchain in this repo's environments.** Per `AGENTS.md`'s P51 section: `go install
+**Go toolchain in this repo's environments.** Per `CLAUDE.md`'s P51 section: `go install
 github.com/wailsapp/wails/v3/cmd/wails3@latest` via `proxy.golang.org` (not blocked), Go's own
 toolchain auto-upgrades to whatever the module demands, and the Linux sandbox additionally needs
 `apt-get install -y libgtk-4-dev libwebkitgtk-6.0-dev pkg-config` for the CLI's own build. `wails3
@@ -376,7 +376,7 @@ enforced by the type system plus one explicit check instead of a schema object.
   (§7.3). Both entry points are whole and independently built for the duration of the coexistence
   window; P57 deletes `index.ts`. This is deliberately not an `if (transport === …)` branch inside
   one file — a temporary conditional in the engine's entry point is exactly the kind of half-state
-  `AGENTS.md` rules out, and two small complete files cost less than one file with a mode flag.
+  `CLAUDE.md` rules out, and two small complete files cost less than one file with a mode flag.
 - Nothing else under `src/engine/` changes. Re-verified for this document: `index.ts` is the only
   file there importing anything from `electron` (`import type { MessagePortMain }`, type-only).
 
@@ -516,7 +516,7 @@ Keychain item attributes, all of which matter:
 **Flagged honestly:** this is a library choice made from prior knowledge of these three packages,
 not from a build in this session (P52 §3.4 forbids one). The P53/P55 implementer must pin an exact
 version, confirm the attribute API surface against the pulled source under `$GOPATH/pkg/mod`
-(`proxy.golang.org` is reachable, `AGENTS.md`), and — if `keybase/go-keychain` turns out not to
+(`proxy.golang.org` is reachable, `CLAUDE.md`), and — if `keybase/go-keychain` turns out not to
 expose non-synchronizable generic passwords — fall back to `99designs/keyring`'s macOS backend
 rather than to `zalando/go-keyring`, which cannot meet the requirement at all.
 
@@ -554,7 +554,7 @@ verbatim.
   secure than it is, and it would need a passphrase prompt in a headless CI container.
 - **linux, variable unset**: `{available: false, backend: 'unavailable'}` and a password-bearing
   write is **refused**, exactly as today (P25 D13). This is the behaviour every password-bearing
-  test in this repo depends on, and `AGENTS.md`'s secrets section documents it.
+  test in this repo depends on, and `CLAUDE.md`'s secrets section documents it.
 - **Any other platform**: unavailable, with today's message.
 
 The `probeStatus` → `createSecretCipher` → one-shot-at-startup shape survives, minus the
@@ -803,7 +803,7 @@ around 170 MB against Electron's recorded 252 MB. Install size is explicitly not
 `electron-rebuild`, no ABI matching, no `CKJS_LINKING=dynamic`, because part 4 proved the addon
 arrives as a **downloaded prebuild** for the standard Node ABI. `scripts/native-electron-build.sh`
 is deleted at P57. **Do not forget npm's newer default-deny on install scripts**
-(`npm install-scripts approve @confluentinc/kafka-javascript`, part 4 and `AGENTS.md`) — a bare
+(`npm install-scripts approve @confluentinc/kafka-javascript`, part 4 and `CLAUDE.md`) — a bare
 `npm install` silently leaves `build/Release/*.node` missing.
 
 ### 10.2 `scripts/verify-packaging.sh`, rewritten per §3.4's mapping
@@ -1007,7 +1007,7 @@ Required coverage, by package — this is the acceptance criterion for each phas
 - `docs/PERF.md`: §2.3 (the G1 numbers, written at P52 regardless of outcome), §2.1 re-measured
   against the webkit tier, §3's manual procedures rewritten for the new bundle, L-D's app-size row.
 - `docs/PACKAGING.md`: rewritten for `task darwin:package` + `scripts/sign-bundle.sh`.
-- `AGENTS.md`: the P51 environment section gains the Go toolchain / `bun run test:go` / vendored-Node
+- `CLAUDE.md`: the P51 environment section gains the Go toolchain / `bun run test:go` / vendored-Node
   workflow; the Electron-binary, `KIRA_INSECURE_SECRETS` and native-Kafka sections are rewritten or
   deleted as their subjects change.
 - `docs/v1/SPEC.md`: a P52 row, and the P51 row's status updated from "plan only" to "superseded for
@@ -1028,6 +1028,6 @@ macOS — all fixed, not worked around). Config (2), the actual G1 scenario, mea
 against the ≤ 300 MB threshold — a real, wide margin, and a ≈58% reduction against Electron's
 620–626 MB baseline. **P53 is authorized to start.**
 
-Everything after G1 is ordinary phased work under `AGENTS.md`'s normal loop: each of P53–P57 gets its
+Everything after G1 is ordinary phased work under `CLAUDE.md`'s normal loop: each of P53–P57 gets its
 own Opus plan sequencing that phase against the then-current tree, implemented by Sonnet, with the
 architectural decisions in §4–§10 of this document treated as settled rather than re-derived.

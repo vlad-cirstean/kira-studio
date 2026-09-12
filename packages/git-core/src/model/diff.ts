@@ -5,7 +5,7 @@
  * second diff, commit → working tree (`mapLineAcrossDiff`, the drift re-map "Go to file" needs on
  * its live-file branch — see `docs/plans/P5.md`'s "The second map"). Both are pure, synchronous,
  * framework-free — `packages/core`'s standing rule — and are exhaustively unit tested rather than
- * left to integration tests, per `AGENTS.md`'s "cursor/page arithmetic with real boundary cases"
+ * left to integration tests, per `CLAUDE.md`'s "cursor/page arithmetic with real boundary cases"
  * clause.
  */
 import type { FileChange } from './commit.ts';

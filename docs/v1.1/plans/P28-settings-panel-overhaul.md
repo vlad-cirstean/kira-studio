@@ -416,7 +416,7 @@ The user said *"multiline textarea"*; this plan takes that literally, and the co
 - `CodeMirrorHost` is also built to fill its container and emit `update:doc` (`CodeMirrorHost.vue:28-66`);
   wiring it into a 4-row dialog field needs a sizing wrapper and a `'' ↔ null` adapter around the
   existing `preconnectText` computed.
-- Per `AGENTS.md`'s library-first rule, the requirement is named rather than waved at: **a `<textarea>`
+- Per `CLAUDE.md`'s library-first rule, the requirement is named rather than waved at: **a `<textarea>`
   is not a hand-rolled editor, it is the platform control**, and the library that *is* already here
   brings nothing this field can use. If shell highlighting is ever wanted, that is a separate
   decision with a separate dependency, not a side effect of adding a tab.
@@ -543,7 +543,7 @@ Justified, not assumed:
   interactive use through immediately and paces only *sustained* traffic, which is what a server-side
   limit actually cares about.
 
-**Library: `golang.org/x/time/rate`.** Per `AGENTS.md`'s library-first rule, checked first:
+**Library: `golang.org/x/time/rate`.** Per `CLAUDE.md`'s library-first rule, checked first:
 `golang.org/x/time` is **not** in the module graph today (`go.mod:110-114` has only
 `crypto`, `mod`, `sync`, `sys`, `text`; zero `go.sum` entries), so it is a new **direct** dependency —
 `go get golang.org/x/time@latest`. It is BSD-3-Clause, maintained by the Go team, has no dual license,
@@ -672,7 +672,7 @@ pacing requests.
   `throttlePerSec: 0`.
 - **S5.3 (bindings)** `wails3 task common:generate:bindings` (via `scripts/setup.sh`) — required
   because `bindings/.../internal/storage/model/models.ts` and `.../internal/connections/models.ts`
-  both carry `ConnectionFields`. Never hand-edited; `-names` is load-bearing (`AGENTS.md`).
+  both carry `ConnectionFields`. Never hand-edited; `-names` is load-bearing (`CLAUDE.md`).
 - **S5.4 (dependency)** `go get golang.org/x/time` — moves it from absent to a direct require.
 - **S5.5 (the limiter)** New `internal/adapterhost/throttle.go`: a `throttleRegistry`
   (`sync.RWMutex` + `map[string]*rate.Limiter`) with `set(id, perSec)` (deleting on `0`) and
@@ -709,7 +709,7 @@ Independent and low-risk first; the backend-touching feature last, exactly as th
 M1-M4 are mutually independent and could be reordered freely. M5 must precede M8 (the tab must exist
 before the field goes on it). M6 must precede M7 (the limiter needs a value to read) and M8.
 
-Per `AGENTS.md`, fast checks (`bun run lint`, `bun run typecheck`, `bun run build`,
+Per `CLAUDE.md`, fast checks (`bun run lint`, `bun run typecheck`, `bun run build`,
 `go build ./apps/kira-studio/internal/...`) run per commit; the expensive suites run once at the end
 (§7).
 
@@ -720,7 +720,7 @@ Per `AGENTS.md`, fast checks (`bun run lint`, `bun run typecheck`, `bun run buil
 **Go, once M7 lands.**
 
 - `go test ./apps/kira-studio/internal/adapterhost/...` — new `throttle_test.go`. This test **earns
-  its keep** under `AGENTS.md`'s own bar, which names *"concurrency (ordering, backpressure,
+  its keep** under `CLAUDE.md`'s own bar, which names *"concurrency (ordering, backpressure,
   cancellation, races)"* as one of the few categories that does; it is not a CRUD round-trip. Five
   cases:
   1. burst-then-pace — rate 50/s, burst 1, five sequential ops: total elapsed ≥ ~80 ms and all five
@@ -740,7 +740,7 @@ Per `AGENTS.md`, fast checks (`bun run lint`, `bun run typecheck`, `bun run buil
 
 **Frontend, per commit.** `bun run lint`, `bun run typecheck`, `bun run build`.
 
-**`tests/ui/`, once at the end** (`AGENTS.md`'s implement-then-test cadence):
+**`tests/ui/`, once at the end** (`CLAUDE.md`'s implement-then-test cadence):
 
 - Updated: `settings-apply-on-save.spec.ts` (§2.3), and the six specs in §4.4.
 - New `tests/ui/connection-dialog-tabs.spec.ts`:
@@ -761,7 +761,7 @@ Per `AGENTS.md`, fast checks (`bun run lint`, `bun run typecheck`, `bun run buil
 - Add a short paragraph on the per-connection throttle beside the existing auto-explain one.
 - No `NOTICES.md` entry: that file covers bundled *icon assets* only, and `golang.org/x/time` is a Go
   module, not a shipped asset.
-- No `AGENTS.md` change: nothing here is a standing process rule.
+- No `CLAUDE.md` change: nothing here is a standing process rule.
 
 ---
 
@@ -820,5 +820,5 @@ above was read against that commit before being cited.
 architecture items 2-3 build on), `P27-active-filter-indicator-color.md` (format and citation
 discipline), `P24`/`P29` (section structure). `docs/v1.1/SPEC.md` has no P28 row — its phasing table
 ends at P22, and P23-P30 are user-directed phases carried by their plan docs alone; this doc quotes
-the user's own words in place of a SPEC row. `AGENTS.md`'s library-first, open-source-only,
+the user's own words in place of a SPEC row. `CLAUDE.md`'s library-first, open-source-only,
 measure-with-purpose, unit-test-bar and implement-then-test-at-the-end rules drive §5.3, §7 and §6.

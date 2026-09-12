@@ -1,0 +1,22 @@
+# Why: the push credential in this environment is an OAuth App token without the `workflow`
+# scope, so GitHub rejects any push that includes a commit touching .github/workflows/* — this
+# hunk renames an AGENTS.md reference to CLAUDE.md, matching the repo-wide AGENTS.md -> CLAUDE.md
+# rename (Claude Code auto-loads CLAUDE.md, not AGENTS.md, so the file was renamed and every
+# reference updated).
+#
+# Apply from the repo root (e.g. `git apply docs/pending-changes/.github__workflows__db-compat.yml.patch`),
+# then delete this file, and commit + push both together yourself.
+
+diff --git a/.github/workflows/db-compat.yml b/.github/workflows/db-compat.yml
+index eb686aaf..16ee302f 100644
+--- a/.github/workflows/db-compat.yml
++++ b/.github/workflows/db-compat.yml
+@@ -27,7 +27,7 @@ jobs:
+           go-version-file: go.mod
+       - name: Run the compatibility matrix
+         # GitHub's own runners reach Docker Hub directly — --mirror is a sandbox-only workaround
+-        # for the outbound proxy documented in AGENTS.md, so it is deliberately omitted here.
++        # for the outbound proxy documented in CLAUDE.md, so it is deliberately omitted here.
+         run: |
+           set -eu
+           ARGS=""

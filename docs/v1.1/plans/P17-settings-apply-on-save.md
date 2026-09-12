@@ -98,7 +98,7 @@ its test technique, not its code (§6.1).
 - **No new dependency and no new store.** The draft lives in the component's own `setup` scope,
   because the component is already destroyed and recreated on every open (`StatusBar.vue:142`'s
   `v-if="settingsOpen"`), which is precisely the lifetime a draft wants (D1).
-- **No unit test.** Per `AGENTS.md`'s bar: a per-leaf object diff and a clone are plumbing, not
+- **No unit test.** Per `CLAUDE.md`'s bar: a per-leaf object diff and a clone are plumbing, not
   "genuinely hard to get right" logic. D10 states what guards them instead, and D2 explains the one
   design choice that removes the bug class a diff test would have been guarding against.
 - **This phase is a net deletion in the component.** `fontFamilyDraft`, `onFontFamilyChange`,
@@ -524,11 +524,11 @@ commits repainting the whole app's font) evaporates: a draft write repaints noth
 **P9's OQ-2 is answered: no.** Row colouring gets no preview swatch. Its real feedback is the grid,
 which is one *Save* away — exactly as it was one dialog-close away before this phase, since the modal
 covered the grid either way (P9 §OQ-2's own observation). Adding a colour to the preview strip would
-be a new widget the SPEC row did not ask for, and `AGENTS.md`'s "scope left out is left out entirely"
+be a new widget the SPEC row did not ask for, and `CLAUDE.md`'s "scope left out is left out entirely"
 applies.
 
 ### D10 — One new `tests/ui/` spec; no unit test
-`AGENTS.md`'s bar excludes a clone, a per-leaf object diff, and a form's dirty flag — none is a
+`CLAUDE.md`'s bar excludes a clone, a per-leaf object diff, and a form's dirty flag — none is a
 parser, cursor arithmetic, a cache-eviction rule, crypto or concurrency, and D2's generic diff is
 short enough to read in one screen. The `tests/ui/` spec in §6.1 exercises the whole mechanism
 end-to-end against the real bundle, which is where the behaviour this phase is judged on actually
@@ -582,7 +582,7 @@ rather than by the click. Its comment about F8's wildcard stays true and stays p
 **No `docs/ARCHITECTURE.md` change.** Its settings coverage is the storage-table line
 (`:453`) and the app-wide/per-window split (`:809`), and P17 changes neither: settings are still
 app-wide, still one row per leaf, still broadcast on commit. When a *commit* happens is a UI
-behaviour, and the plan doc plus the commit log are its record (`AGENTS.md`).
+behaviour, and the plan doc plus the commit log are its record (`CLAUDE.md`).
 
 ---
 

@@ -152,7 +152,7 @@ The structural answers are the three that always apply plus one that is new:
    that commit necessarily also carries the constant retirement and the e2e rewrite, because leaving
    either for a later commit means shipping a red tree.
 2. **The Go acceptance spec lands and fails before the adapter** (**P58 D12** / its **R3**).
-3. **The full `tests/e2e-real/` sweep runs after the flip** (`AGENTS.md`'s P58b M6.4 finding).
+3. **The full `tests/e2e-real/` sweep runs after the flip** (`CLAUDE.md`'s P58b M6.4 finding).
 4. **New:** checkpoint C2 is recorded *after* the flip and *before* anything in P58f
    (parent **R1**), and §7 designs the instrument it needs.
 
@@ -188,10 +188,10 @@ adapters have either one cursor or none.
 
 **"The one carrying the still-open native-module packaging gap."** §1.14 locates the gap precisely
 (two shell scripts, four blocks, exact lines) and finds that the parent's own quotation of it —
-*"`AGENTS.md`'s still-open finding that no build step in this repository vendors
-`@confluentinc/kafka-javascript`'s native module"* — **no longer appears in `AGENTS.md` at all**
-(`grep -n "vendors\|require() time\|packaged build" AGENTS.md` returns nothing); it was trimmed in
-`385167c` (*"docs: trim AGENTS.md verbosity, move app facts to ARCHITECTURE.md"*). The gap itself is
+*"`CLAUDE.md`'s still-open finding that no build step in this repository vendors
+`@confluentinc/kafka-javascript`'s native module"* — **no longer appears in `CLAUDE.md` at all**
+(`grep -n "vendors\|require() time\|packaged build" CLAUDE.md` returns nothing); it was trimmed in
+`385167c` (*"docs: trim CLAUDE.md verbosity, move app facts to ARCHITECTURE.md"*). The gap itself is
 still live, in `scripts/verify-packaging.sh` and `scripts/sign-bundle.sh`.
 
 **What the justification understates.** "Isolating it late" is presented as a scheduling convenience
@@ -206,7 +206,7 @@ of them are work:
 | **Checkpoint C2** becomes possible for the first time, and is owed before P58f starts | §7, **P58e E24** |
 | `MarkAllErrored`'s Node-served narrowing (**P58a A15**) becomes a no-op for every connection | §1.9 |
 
-`AGENTS.md`'s own P58d findings entry called this out in advance and this plan is the collection of
+`CLAUDE.md`'s own P58d findings entry called this out in advance and this plan is the collection of
 that debt: *"P58e (Kafka's own sub-phase) should expect the opposite: both placeholders point at
 Kafka, and it inherits the cost this phase never had to pay."*
 
@@ -436,7 +436,7 @@ All **researched** — read out of the module cache at
 ### 1.8 Two silent behaviour changes the port introduces, both invisible until they fire
 
 Neither is a design *choice*; both are properties of the Go client that differ from librdkafka's, and
-both are the class of thing `AGENTS.md`'s own findings say gets lost in a port that "reads correct".
+both are the class of thing `CLAUDE.md`'s own findings say gets lost in a port that "reads correct".
 
 **1. Idempotent producing is on by default in franz-go and off by default in librdkafka.** An
 idempotent producer must first issue `InitProducerId`, which the broker answers only once
@@ -472,7 +472,7 @@ distinguish.
 
 ### 1.9 Flipping `"kafka"`: the grep, and the placeholder debt P58c/P58d deferred here
 
-`grep -rn 'kafka' shell/internal --include=*.go`, run for this plan exactly as `AGENTS.md`'s P58a
+`grep -rn 'kafka' shell/internal --include=*.go`, run for this plan exactly as `CLAUDE.md`'s P58a
 findings require (*"Flipping a kind's `nativeKinds` bit is a cross-package breaking change. Grep the
 literal kind string across `internal/` before flipping it"*). **Three hits, and one of them is the
 problem:**
@@ -552,7 +552,7 @@ is a deterministic failure in the flip's own commit, not a flake.
 
 > The Node-served half is Kafka, not MongoDB (P58c C15) … Kafka is the last of the ten kinds to go
 > native (P58e), **so this is the last re-pointing this vehicle needs before P58f retires the whole
-> coexistence concept** — see AGENTS.md's P58a/P58b/P58c findings for why "the kind that goes native
+> coexistence concept** — see CLAUDE.md's P58a/P58b/P58c findings for why "the kind that goes native
 > last" is the rule.
 
 The file's own author anticipated P58f retiring it. What the file does *not* anticipate is that P58e
@@ -567,7 +567,7 @@ one in `tests/ipc/`.
 
 ### 1.11 The "its only consumer" re-grep, and the two files that must survive the spec deletion
 
-The mistake `AGENTS.md`'s P58a findings name explicitly (*"a plan's own 'its only consumer' claim
+The mistake `CLAUDE.md`'s P58a findings name explicitly (*"a plan's own 'its only consumer' claim
 about a shared support file is a snapshot, not a standing fact"*), and which **P58d D20** turned into
 a procedure. `grep -rln "support/kafka\|0005_kafka_seed" tests/ scripts/ package.json`:
 
@@ -662,7 +662,7 @@ the blocks for P58f. §10 OQ-4 asks the parent's author to confirm the split.
   reasoning (P32 D25: *"bumped from 7.6.1 (Kafka 3.6) to the 8.0 line (Apache Kafka 4.0) — a phase
   whose entire premise is Kafka 4 protocol compatibility that only ever ran against Kafka 3.6
   verified nothing"*). Already namespaced, so it mirrors at
-  `mirror.gcr.io/confluentinc/cp-kafka:8.0.7` with **no `library/` prefix** — `AGENTS.md`'s Docker
+  `mirror.gcr.io/confluentinc/cp-kafka:8.0.7` with **no `library/` prefix** — `CLAUDE.md`'s Docker
   section names this exact image in its own rule, as its worked example.
 - **`testcontainers-go/modules/kafka@v0.44.0`, read in full (230 lines).** `Run(ctx, img, opts...)`
   sets fifteen `KAFKA_*` env vars, replaces the entrypoint with a wait-for-script shim, copies a
@@ -677,7 +677,7 @@ the blocks for P58f. §10 OQ-4 asks the parent's author to confirm the split.
   2. **`validateKRaftVersion` short-circuits for any image that is not `confluentinc/confluent-local`**
      (`kafka.go:210-213`: *"do not validate if the image is not the official one"*), so
      `confluentinc/cp-kafka:8.0.7` passes through untouched.
-  3. **It sets no ulimits** — the ClickHouse subclass problem (`AGENTS.md`'s ClickHouse section) has
+  3. **It sets no ulimits** — the ClickHouse subclass problem (`CLAUDE.md`'s ClickHouse section) has
      no analogue here.
   Against that: `IBM/sarama` + gokrb5 in its `go.mod` (§1.13), and a log-regex wait strategy that is
   a Kafka-4.0 message this repo has never asserted against from Go. KF-4(a) settles the latter.
@@ -946,7 +946,7 @@ than ported.** Four parts:
 3. **The 10-line Electron/`dr_cb`/`Nan::NewBuffer`/`ToLocalChecked` comment is deleted, not ported.**
    Its entire subject — a NAN addon adopting a malloc'd buffer under Electron's V8 sandbox — has no
    Go analogue whatsoever. This is one of the clearest "the migration deletes a workaround" moments
-   in the phase and belongs in `AGENTS.md`'s findings entry.
+   in the phase and belongs in `CLAUDE.md`'s findings entry.
 4. **No separate producer client.** The TypeScript builds a fresh `Producer` per mutate because the
    compat wrapper forced `dr_cb`. In Go the adapter's own long-lived client produces directly; the
    only client that stays ephemeral is the browse consumer (**P58e E5**), for a real API reason.
@@ -1119,7 +1119,7 @@ committed-offsets-with-no-members state the CLI's `--reset-offsets --to-earliest
 a live container.
 
 **P58e E26 — the window arithmetic is extracted into one pure function and gets P58e's single Go unit
-test.** §5.5 argues it against `AGENTS.md`'s bar rather than assuming it. Briefly: the bar names
+test.** §5.5 argues it against `CLAUDE.md`'s bar rather than assuming it. Briefly: the bar names
 *"cursor/pagination arithmetic with real boundary cases"* and *"a decision structure large enough that
 no one can hold it in their head"*, and the window advance/clamp/`hasMore` computation is both — it
 has four interacting inputs (the frozen windows, the records actually delivered, the per-partition
@@ -1203,7 +1203,7 @@ docs/ARCHITECTURE.md                        EDITED  the Stack line's "only kind 
                                                     Kafka per-engine section; the S3 section's
                                                     "only Kafka is left for P58e" (§8 criterion 8)
 docs/v1/plans/P58e-kafka.md                 EDITED  §12 M9.0 results, then §13 M9.1-M9.4 results
-AGENTS.md                                   EDITED  the P58e findings entry; the "Native Kafka
+CLAUDE.md                                   EDITED  the P58e findings entry; the "Native Kafka
                                                     driver" section, whose subject is gone
 ```
 
@@ -1519,7 +1519,7 @@ own topic, never `empty-topic`.
   posture unchanged and says so.
 - **Packaging.** No bundle change; **P58e E22** touches two strings and no check.
 
-### 5.5 Unit-level, against `AGENTS.md`'s own bar — exactly one test qualifies
+### 5.5 Unit-level, against `CLAUDE.md`'s own bar — exactly one test qualifies
 
 **P58e adds one Go unit test.** P58d added none and said why; P58c added two (its parsers). The
 reasoning here is neither, and it is worth doing in the open because "one" looks like a compromise
@@ -1566,7 +1566,7 @@ change in the whole of P58 — P58a, P58b, P58c and P58d each asserted the tier 
 met it. P58e cannot, and the reason is not that this plan is less disciplined but that the property
 the file tests **ceases to exist** in M9.3's commit.
 
-**The full suite still runs after the flip**, per `AGENTS.md`'s P58b M6.4 finding, restated as this
+**The full suite still runs after the flip**, per `CLAUDE.md`'s P58b M6.4 finding, restated as this
 sub-phase's rule:
 
 > A `tests/e2e-real/*.spec.ts` regression sweep must be re-run in full after every `nativeKinds`
@@ -1585,7 +1585,7 @@ run in before.
 
 Three throwaway Go programs under the scratch directory (**never committed; no product code lands in
 M9.0**), each answering one question with a printed PASS/FAIL. The deliverable is a findings section
-appended to this document (§12) and, for anything surprising, an `AGENTS.md` entry.
+appended to this document (§12) and, for anything surprising, an `CLAUDE.md` entry.
 
 **Why three and not five.** §1.3 is the ledger. P58d's M8.0 ran five probes because **nothing** about
 its two adapters' driver had been exercised in this repo: the container, the request shape, the
@@ -1598,7 +1598,7 @@ time that claim is established (once in the parent's research, once in KF-1). Th
 satisfied; running it again would satisfy a ceremony, not the rule.
 
 What *is* open is the set of questions KF-1 did not ask, and each of the three probes below maps to
-one row of §1.3's "not asked" block. They are written against `AGENTS.md`'s hardest-won lesson, from
+one row of §1.3's "not asked" block. They are written against `CLAUDE.md`'s hardest-won lesson, from
 P58b M6.3: *"an M6.0-style probe is only as complete as the specific inputs it tried."* KF-3 and
 KF-4 are therefore **input inventories**, not capability checks.
 
@@ -1707,7 +1707,7 @@ session"* written out rather than implied, per the parent's §6 discipline:
    one level, open one object, and disconnect. `sqlite` needs no container; the other nine need
    `postgres:17`, `mariadb:11.4`, `mysql:8.4`, `clickhouse/clickhouse-server:26.3`, `mongo`,
    `redis:7`, `localstack/localstack:3` (×2, sqs and s3) and `confluentinc/cp-kafka:8.0.7` — all
-   mirror-pulled per `AGENTS.md`'s Docker section. **Where a container cannot be brought up in the
+   mirror-pulled per `CLAUDE.md`'s Docker section. **Where a container cannot be brought up in the
    session, that kind is recorded as unavailable rather than skipped silently**, because an
    unexercised kind is precisely the failure C2 exists to catch.
 3. Additionally exercise the three paths a per-kind pass misses: a **cancel** (press stop on a long
@@ -1784,9 +1784,9 @@ the checkpoint the parent already declared for exactly this moment.
    - **`tests/db/`** — one spec deletion, **no support or fixture deletion**.
    - **`tests/e2e-real/`** — one spec, one test inside it.
    - **`scripts/`** — three files, message strings and one script body.
-   - **`docs/`, `AGENTS.md`** — per §3.
+   - **`docs/`, `CLAUDE.md`** — per §3.
    - **`src/`, `tests/ui/`, `tests/ipc/`, `package.json`, `.github/`** — nothing.
-7. `AGENTS.md` gains a **"P58e implementation findings"** entry on the P52–P58d pattern, carrying at
+7. `CLAUDE.md` gains a **"P58e implementation findings"** entry on the P52–P58d pattern, carrying at
    minimum: M9.0's three probe results; whether KF-2(a) confirmed that a cancelled `context.Context`
    really unblocks an in-flight `PollRecords` promptly and through `Fetches.Err()` rather than a
    returned error (**P58e E3**'s premise); which signal KF-3 showed franz-go actually gives for the
@@ -1797,7 +1797,7 @@ the checkpoint the parent already declared for exactly this moment.
    was not an option — the general lesson being *the last kind to go native is where a
    "definitely-not-native" placeholder finally costs something, and the cost is a test constructor,
    not a rename*); the collection of P58d's own predicted debt, quoted; and **the fact that the
-   `AGENTS.md` "Native Kafka driver" section's whole subject is gone** — that section is **rewritten,
+   `CLAUDE.md` "Native Kafka driver" section's whole subject is gone** — that section is **rewritten,
    not left**, per the parent's §8 criterion 11.
 8. `docs/ARCHITECTURE.md` is updated, and **criterion 8 is phrased as a grep rather than as a prose
    claim**, because the prose form failed twice before P58d made it mechanical (§1.12):
@@ -1820,7 +1820,7 @@ the checkpoint the parent already declared for exactly this moment.
 9. This document gains its own **§12 M9.0 results** and **§13 M9.1–M9.4 results** sections, the way
    P58a's, P58b's, P58c's and P58d's §12/§13 record what actually happened — **including checkpoint
    C2's own per-kind table** and including any decision that turned out wrong.
-10. **`AGENTS.md`'s "Native Kafka driver — building and testing in this environment (P32, resolved
+10. **`CLAUDE.md`'s "Native Kafka driver — building and testing in this environment (P32, resolved
     P57)" section is rewritten or deleted**, because after M9.3 there is no native addon in any path
     the app takes. Its two remaining true statements (Bun cannot load the addon; a native npm package's
     install script may silently not run) belong elsewhere or nowhere: the first is only about
@@ -1888,7 +1888,7 @@ milestone rather than P58f's first.
     (§1.11). Also `scripts/run-db-tests.sh` reduced to its Bun half (**P58e E19**), which is the same
     commit because the script's Node half exists only for the file being deleted.
 12. `chore(packaging): the Kafka native-module note is no longer true` — **P58e E22**, two strings.
-13. `docs: P58e findings — the last adapter, and checkpoint C2` — `AGENTS.md` (including the
+13. `docs: P58e findings — the last adapter, and checkpoint C2` — `CLAUDE.md` (including the
     rewritten/deleted "Native Kafka driver" section, criterion 10), `docs/ARCHITECTURE.md` (per §8
     criterion 8's grep form), and this document's §12/§13 **including checkpoint C2's per-kind
     table**.
@@ -1983,7 +1983,7 @@ add one.** §5.4. The `cp-kafka` container runs `PLAINTEXT` with no ACLs; produc
 ACLs enabled. Neither language's suite has such a scenario today, and **P58d OQ-4** took the same
 disposition for the AWS pair. **P58e interim: port the mapping on the strength of `kerr`'s own named
 codes (KF-4 prints the real shapes for the branches that *are* reachable), record the gap in
-`AGENTS.md`, and add no test.** If the parent's author wants the gap closed, the cheapest honest
+`CLAUDE.md`, and add no test.** If the parent's author wants the gap closed, the cheapest honest
 vehicle is a second container customizer enabling SASL/PLAIN in one scenario, and it should be scoped
 as its own piece of work — noting it would then close the gap for *one* of the three adapters that
 have it.
@@ -2017,7 +2017,7 @@ this sub-phase.
 - **Docker**: `nohup dockerd > /tmp/dockerd.log 2>&1 & disown` here; `colima start` on macOS. P58e's
   adapter work needs exactly **one** image: **`confluentinc/cp-kafka:8.0.7`**, which is **already
   namespaced**, so it mirrors at `mirror.gcr.io/confluentinc/cp-kafka:8.0.7` with **no `library/`
-  prefix** — `AGENTS.md`'s Docker section uses this exact image as its own worked example of that
+  prefix** — `CLAUDE.md`'s Docker section uses this exact image as its own worked example of that
   rule. M9.3's sweep additionally needs `mariadb:11.4` and `postgres:17` (both official →
   `library/`). **Checkpoint C2 (M9.4) needs all nine container-backed kinds' images**, which is the
   largest image set any single milestone in this phase has required; budget a session for it and
@@ -2040,7 +2040,7 @@ this sub-phase.
 - **franz-go, kadm, kmsg and `modules/kafka` are already in this box's module cache** (§1.13), so
   M9.1's `go get` is a cache hit and every §1.7 claim can be re-checked by reading
   `$(go env GOPATH)/pkg/mod/github.com/twmb/franz-go@v1.21.6/` rather than fetching anything —
-  the same technique `AGENTS.md`'s Wails section prescribes for a docs site that is 403-blocked.
+  the same technique `CLAUDE.md`'s Wails section prescribes for a docs site that is 403-blocked.
 - **A background process started in one shell invocation cannot be signalled from a later one**
   (P51's finding, still true). M9.3's sweep and M9.4's checkpoint C2 pass — start, exercise, kill,
   read the log — are **one** Bash invocation each, with a 150 s+ timeout, polling a log file rather
@@ -2301,7 +2301,7 @@ and the very same log file carried ordinary `INFO`-level lines from the run itse
 adapters' own LocalStack endpoint-override notices) — proof the grep would have caught a `WARN` line
 had one fired, rather than passing vacuously against an empty or silent log. The pass ran as a
 throwaway, uncommitted `tests/e2e-real/` script, per the parent's own §6 discipline and checkpoint
-C1c's own precedent (`AGENTS.md`'s "Checkpoint C1c" entry) — it existed only to produce this
+C1c's own precedent (`CLAUDE.md`'s "Checkpoint C1c" entry) — it existed only to produce this
 evidence once, not to become a fourth permanent spec in that tier.
 
 **M9.4 — the deletions and the packaging fixes, both exactly as scoped.** The re-grep §1.11
@@ -2312,7 +2312,7 @@ scripts/ package.json` still shows `tests/e2e-real/support/kafka.ts` and
 `tests/db/kafka.spec.ts` was deleted. `scripts/run-db-tests.sh` collapsed to one line (`bun test
 tests/db`); the remaining `tests/db/` suite (mariadb/mysql/sqlite, 114 tests) still passes in full,
 and `clickhouse.spec.ts`'s one failure is this sandbox's pre-existing `ulimit`/`rlimit` restriction
-(`AGENTS.md`'s ClickHouse section), unrelated to the deletion. `scripts/verify-packaging.sh`'s and
+(`CLAUDE.md`'s ClickHouse section), unrelated to the deletion. `scripts/verify-packaging.sh`'s and
 `scripts/sign-bundle.sh`'s Kafka notes were corrected to say the module is unused rather than "a
 known gap"/"will fail at runtime" — **P58e E22**'s own framing ("message-string corrections only, no
 logic change") held exactly as written; the surrounding A2/A4 comments were also corrected, since

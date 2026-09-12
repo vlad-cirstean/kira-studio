@@ -14,7 +14,7 @@ import (
 )
 
 // clearAwsEnv mirrors sqs/authmatrix_test.go's own — this sandbox's outbound proxy injects
-// placeholder AWS_* credentials (AGENTS.md), which would otherwise mask the "no credentials
+// placeholder AWS_* credentials (CLAUDE.md), which would otherwise mask the "no credentials
 // anywhere" case §1.5a's transcript needs.
 var clearAwsEnv = &testsupport.Principal{
 	Name: "clear ambient AWS env",
@@ -84,7 +84,7 @@ func TestS3_AuthMatrix(t *testing.T) {
 			// Every functional s3 test today runs URI mode (testsupport/s3.go's own config is
 			// URI-only). Fields mode otherwise reaches Connect and stops — awscfg's fields branch
 			// (Resolve, fields-mode arm) had never served a data-plane request before this. Relies on
-			// the sandbox's own ambient placeholder AWS_* env (AGENTS.md), which LocalStack accepts
+			// the sandbox's own ambient placeholder AWS_* env (CLAUDE.md), which LocalStack accepts
 			// unconditionally (P25 §2.3, measured) — no clearAwsEnv Principal here.
 			Name: "fields mode, region set, ambient credentials",
 			Config: func(c model.ResolvedConnectionConfig) model.ResolvedConnectionConfig {

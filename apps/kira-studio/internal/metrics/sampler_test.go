@@ -74,7 +74,7 @@ func TestCpuDeltaPercent_ZeroLogicalCPUs_ReturnsZero(t *testing.T) {
 }
 
 // C1's own clamp/monotonicity rules (P7 plan §6, C1) — the one test this phase's refactor earns
-// per AGENTS.md's bar, since each subtest below guards a rule nothing else in the package checks:
+// per CLAUDE.md's bar, since each subtest below guards a rule nothing else in the package checks:
 // a per-pid delta cannot go negative and drag down another pid's genuine usage, a pid recovering
 // from a probe failure cannot manufacture a lifetime-sized spike out of a stale baseline it no
 // longer has, and the normalized result can never leave the range StatusBar.vue renders unclamped.

@@ -82,7 +82,7 @@ func resolveKeysetColumnMeta(target ReadTarget, name string) (model.ColumnMeta, 
 // terms, so wrapping every fetched column in one defeats the coercion — a NULL stays NULL, an
 // INTEGER/REAL/BLOB value actually stored in a temporally-declared column (D21's own dynamic-typing
 // point) still comes back as int64/float64/[]byte untouched, and a TEXT value comes back byte for
-// byte, valid-looking date string included. Confirmed empirically (see AGENTS.md's P58b findings)
+// byte, valid-looking date string included. Confirmed empirically (see CLAUDE.md's P58b findings)
 // against all six combinations before this landed, not assumed from reading the driver's source.
 func selectExpr(ident string) string {
 	return "CASE WHEN typeof(" + ident + ") = 'text' THEN " + ident + " || '' ELSE " + ident + " END"

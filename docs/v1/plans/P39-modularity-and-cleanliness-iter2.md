@@ -55,11 +55,11 @@
   appears in this phase**: a `views/shared/useConnectionGate.ts` composable — and `views/shared/`
   already holds one composable of exactly that shape (`useEditBuffer.ts`, P27), so it is a second
   instance of an established pattern, not a new one.
-- **No half-migrations (AGENTS.md).** A helper that is hoisted leaves **no** copy behind; an alias
+- **No half-migrations (CLAUDE.md).** A helper that is hoisted leaves **no** copy behind; an alias
   that is adopted is adopted everywhere it applies in the same step.
 - **No new dependency.** One new build-config entry (`resolve.alias` for `main`/`preload`), one new
   `tsconfig.json` `paths` block, one new `biome.json` override. Nothing added to `package.json`.
-- Comments per AGENTS.md: only where the code cannot say it for itself. Steps that delete a stale
+- Comments per CLAUDE.md: only where the code cannot say it for itself. Steps that delete a stale
   comment (§1A F5) delete it rather than rewriting it into something equally decorative.
 - `bun run lint`, `bun run typecheck` (node, web, db) and `bun run build` stay green after **every**
   commit. Conventional Commits, one per step of §4.
@@ -387,7 +387,7 @@ rewritten to `@shared/*` and everything was run:
 | `bun run typecheck` (node + web + db + electron-db) | green |
 | `bun run build` | green |
 | `bun run lint` | 62 errors, **all** `assist/source/organizeImports` — `biome check --write` fixes every one, then `bun run lint` is clean |
-| `bun test tests/db` | **12 pass / 10 fail**, zero `Cannot find module`; identical to the unmodified repo's own `12 pass / 10 fail`, failing only at `isDockerAvailable()` and `node:sqlite` — the two documented sandbox gates (AGENTS.md) |
+| `bun test tests/db` | **12 pass / 10 fail**, zero `Cannot find module`; identical to the unmodified repo's own `12 pass / 10 fail`, failing only at `isDockerAvailable()` and `node:sqlite` — the two documented sandbox gates (CLAUDE.md) |
 | `bunx esbuild tests/electron-db/kafka.spec.ts --bundle …` (the `test:db:kafka` build step) | green, 9.9mb bundle |
 
 *Step 4 — what the emitted bundle actually does, measured.* `out/` was diffed against a baseline
@@ -684,7 +684,7 @@ resolve: { alias: { '@shared': resolve(__dirname, 'src/shared') } },
 | D2 | **The three factory-backed page modules keep their five-line re-export block.** | F1's cheaper half, and the alternative is worse: `export * from` would leak the store's internals, and a barrel would hide which module owns which page type. Five `export const x = store.x` lines are the honest cost of "a factory returns an object, a module exports names." Recorded so iteration 3 does not re-open it. |
 | D3 | **`views/shared/pageSearch.ts` gains `createPageSearch()`; `grid/search.ts`, `documents/search.ts` and `keyvalue/search.ts` each call it once** and lose their `createSearchState` destructure, their re-export line and their hand-written `pageSearchApi` literal. `createSearchState` stops being exported from `pageScan.ts` (it gains exactly one caller: `createPageSearch`). | F2. D9 made the toolbar generic and left every view to assemble the API by hand — the same six ingredients, in the same order, three times. Putting the assembly beside the interface it satisfies is the point of having declared that interface. |
 | D4 | **`views/shared/pageScan.ts` gains `eachMatch(pattern, text, emit)`; the three per-row bodies call it.** | F3. The zero-width-match guard is a one-line invariant with a subtle failure mode (a hung frame loop on `/x*/`) written out three times with an identical comment. One copy is how it stays correct in all three. Each view keeps its own `out.push({...})` — the per-row fields are the only thing that genuinely differs. |
-| D5 | **`compilePattern` loses its `export`; its comment is corrected to describe what it does.** | F4. Nothing imports it, and its claim to be *"the contract every search toolbar depends on"* is false — the toolbars depend on `runSearch`. A comment that names a relationship the code does not have is worse than no comment (AGENTS.md). |
+| D5 | **`compilePattern` loses its `export`; its comment is corrected to describe what it does.** | F4. Nothing imports it, and its claim to be *"the contract every search toolbar depends on"* is false — the toolbars depend on `runSearch`. A comment that names a relationship the code does not have is worse than no comment (CLAUDE.md). |
 | D6 | **The three F5 stragglers are cleared:** `searchFilter.ts:8`'s reference to the deleted `SearchToolbar.vue` is corrected to `PageSearchToolbar.vue`; `runStreamSearch` → `runSearch`; `documentMenu`/`keyValueMenu`/`streamMenu` → `rowMenu`. | F5. D24's own argument, applied to the three places it stopped short of: *"the folder already says `documents`, so `documents/docPage.ts` says it twice."* `documents/menu.ts`'s `documentMenu` says it twice for the same reason, and `grid/menu.ts:271` already established `rowMenu` as this codebase's name for exactly this concept. All three are typecheck-guarded renames across 8 call sites. |
 
 ### The view components
@@ -798,7 +798,7 @@ already assert the behavior these steps must not change, and an assertion writte
 refactor proves only that the new code does what the new code does.
 
 Unlike iteration 1, several claims here **were** executed in this box (`node_modules` present) —
-those are marked ▶ and their outputs are in §1D/§1E. Per AGENTS.md, only `smoke`, `startup`,
+those are marked ▶ and their outputs are in §1D/§1E. Per CLAUDE.md, only `smoke`, `startup`,
 `workbench`, `connections`, `secrets` and `sqlite` run without Docker; everything else needs the
 macOS/Colima box or CI. **The phase is not done until the full `test:ui` and `test:db` suites have
 been run green in an environment that can run them** — before the phase is called finished, not step

@@ -303,7 +303,7 @@ var checkConstraintRE = regexp.MustCompile(`(?is)^CONSTRAINT\s+(` + "`" + `(?:[^
 // does not exist on the server this adapter is built/tested against (checked against
 // clickhouse/clickhouse-server:26.3), so this parses CHECK constraints out of the CREATE TABLE DDL
 // text itself instead of querying a catalog table. This is the one thing in this package that
-// clears AGENTS.md's unit-test bar on its own (§5.5): a small parenthesis-aware parser with several
+// clears CLAUDE.md's unit-test bar on its own (§5.5): a small parenthesis-aware parser with several
 // interacting lexical rules.
 func listCheckConstraints(createTableQuery string) []constraintRow {
 	start := strings.IndexByte(createTableQuery, '(')

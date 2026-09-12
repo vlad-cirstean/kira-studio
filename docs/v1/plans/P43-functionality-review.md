@@ -1,7 +1,7 @@
 # P43 (iteration 1) — Functionality review: data handling, panel-to-panel state, error surfacing
 
 > **Iteration 1 of three.** The user asked for this phase to run **three full rounds**
-> (AGENTS.md's multi-pass convention): Opus researches and writes a plan, Sonnet implements it,
+> (CLAUDE.md's multi-pass convention): Opus researches and writes a plan, Sonnet implements it,
 > repeated three times, each round working against the tree the previous round actually left
 > behind. This file is round one; `-iter2.md` and `-iter3.md` will follow, written against what
 > this round lands, not against this file's prose.
@@ -45,7 +45,7 @@
   the code do the right thing — not by hiding a symptom, greying out a control, or adding a
   comment describing the defect.
 - **Every behavior change carries its own spec edit in the same commit.** `tests/ui/sqlite.spec.ts`
-  is the one DB-backed UI spec that runs for real in this sandbox (AGENTS.md's SQLite section), and
+  is the one DB-backed UI spec that runs for real in this sandbox (CLAUDE.md's SQLite section), and
   four of this round's findings are observable through it — those get **real, executed** coverage
   here rather than Docker-gated coverage that nobody can run. §5 says exactly which.
 - **P39's layering rules stand.** `biome.json`'s seven `overrides` are unchanged by this phase.
@@ -56,7 +56,7 @@
   field.** Every fix below is renderer-internal or engine-internal.
 - **`data-testid`s are added, never removed or renamed.** New ones follow each view's existing
   prefix convention (`data-action-error`, `document-action-error`, …).
-- Comments per AGENTS.md: only where the code cannot say it for itself. Three existing comments
+- Comments per CLAUDE.md: only where the code cannot say it for itself. Three existing comments
   become false as a result of this phase and are rewritten in the same commits
   (`StreamView.vue:149-153`, `cellSelection.ts:24-30`, `resultPages.ts:18-22`).
 - `bun run lint`, `bun run typecheck` (node, web, db, electron-db) and `bun run build` stay green
@@ -585,10 +585,10 @@ round commits.
 
 ## 5. Verification
 
-**Say plainly what this box can and cannot do.** Per AGENTS.md: `bun run lint`, `bun run typecheck`
+**Say plainly what this box can and cannot do.** Per CLAUDE.md: `bun run lint`, `bun run typecheck`
 and `bun run build` all run here. Playwright runs here **only** because the Electron binary is
 already installed by hand (`node_modules/electron/dist/electron` exists at `ee9c655`; if a fresh
-container loses it, re-install with `curl` per AGENTS.md's "Electron binary" section). It must be
+container loses it, re-install with `curl` per CLAUDE.md's "Electron binary" section). It must be
 invoked **directly** — `bun run test:ui` fires `pretest:ui` → `scripts/native-electron-build.sh`,
 which cannot fetch Electron's C++ headers through this environment's proxy and fails before a
 single spec runs. The working invocation here is:

@@ -204,7 +204,7 @@ After §3 there is no runtime consumer, `columnOffsets`/`columnRangeExtractor`/
 three-field structural type in `rowRangeBounds` lets the dependency leave `package.json` entirely.
 
 Pass B §6 measured that dependency at **6 911 B gzip** (`vue` external), this repo, this codebase.
-That number is reused rather than re-measured, per `AGENTS.md`'s measure-with-purpose rule — the
+That number is reused rather than re-measured, per `CLAUDE.md`'s measure-with-purpose rule — the
 decision in §3 does not rest on it, and re-measuring would not change it.
 
 ### F7 — `.p-td` has no `flex-shrink: 0`, which is why stream/key-value columns cannot exceed the viewport
@@ -253,7 +253,7 @@ Five reasons, in descending weight:
    question SlickGrid answers natively. **That** is the duplication, and it is real.
 2. **A real defect, already solved next door.** F4.
 3. **The largest row source in the app is here.** F3.
-4. **It retires a dependency.** F6. `AGENTS.md`'s library-first rule is about not hand-rolling
+4. **It retires a dependency.** F6. `CLAUDE.md`'s library-first rule is about not hand-rolling
    infrastructure a library provides; removing a second virtualizer whose whole job is subsumed by a
    library already in the tree is that rule applied, not an exception to it.
 5. **It is what the user asked for, and it is achievable without touching the hard-won host.** F1,
@@ -398,7 +398,7 @@ recorded for the grid.
 ### 3.6 Step-by-step
 
 Each step is one commit. Fast checks (`bunx tsc --noEmit`, `bunx biome check`, `bun run build`) per
-commit; the expensive suite runs once at C8, per `AGENTS.md`'s implement-then-test convention.
+commit; the expensive suite runs once at C8, per `CLAUDE.md`'s implement-then-test convention.
 
 - **C1 — `ConsoleSlickGrid.vue`, mounted but not yet the default.** Create the file per §3.5, wired
   into `ConsoleResultGrid.vue` behind a plain `v-if` on a module-local constant so both branches
@@ -449,7 +449,7 @@ commit; the expensive suite runs once at C8, per `AGENTS.md`'s implement-then-te
   `observeScrollElementOffset` (`:175-…`) and `MAX_OVERSCAN_COLUMNS` (`:22`); replace `columns.ts:3`'s
   `import type { Range }` with the three-field structural type `rowRangeBounds` (`:297`) actually
   uses; delete `tests/unit/column-range.spec.ts` (its only subject is gone —
-  `AGENTS.md`'s "no findings document survives" discipline applied to a test whose subject was
+  `CLAUDE.md`'s "no findings document survives" discipline applied to a test whose subject was
   deleted, not a coverage cut); remove `@tanstack/vue-virtual` from `package.json:50` and refresh
   `bun.lock`. `OVERSCAN_PX` (`:20`) **stays** — `kiraSlickGrid.ts:12,449` uses it.
 - **C8 — tests and docs.** §3.7, §11.
@@ -492,7 +492,7 @@ and why:
 | `tests/ui/console.spec.ts:257,377,470`, `console-explain.spec.ts`, `leaks.spec.ts:349` | `[data-testid="console-result-grid"]` stays on `ConsoleResultGrid.vue`'s root — **unchanged**, all of them |
 | `tests/unit/column-range.spec.ts` | **Deleted** with its subject (C7) |
 | `tests/unit/console-result-cap.spec.ts`, `match-index.spec.ts`, `page-store-cell-cache.spec.ts` | Unchanged — none touch the renderer |
-| **New** | None. `AGENTS.md`'s unit-test bar: the new file is a host wiring an existing engine to an existing store; there is no parser, no boundary arithmetic, no cache-eviction rule and no concurrency in it. The arithmetic that *would* qualify (`rowRangeBounds`, `clampColumnOverscan`, `dataSource`'s display-position mapping) is already covered by `kira-slick-grid.spec.ts` and `slick-data-source.spec.ts` and is reused, not rewritten |
+| **New** | None. `CLAUDE.md`'s unit-test bar: the new file is a host wiring an existing engine to an existing store; there is no parser, no boundary arithmetic, no cache-eviction rule and no concurrency in it. The arithmetic that *would* qualify (`rowRangeBounds`, `clampColumnOverscan`, `dataSource`'s display-position mapping) is already covered by `kira-slick-grid.spec.ts` and `slick-data-source.spec.ts` and is reused, not rewritten |
 
 **A locator note that matters**: `tests/ui/support/grid.ts` scopes every helper under
 `[data-testid="data-grid"]` (`:24`, `:43`, `:80`), so a second SlickGrid instance in the console
@@ -526,7 +526,7 @@ over pointer events, persisting into `tab.state.columnWidths` via `widthFor` (`:
    column at `flex: 1` and `.p-td` at the default `flex-shrink: 1` (F7), the row always fits the
    container. Nothing scrolls sideways, so nothing desynchronizes, so the frozen-pane and
    header-sync wins SlickGrid brings do not apply.
-3. **Its hand-rolled resize is ~20 lines and works.** `AGENTS.md`'s library-first rule asks for a
+3. **Its hand-rolled resize is ~20 lines and works.** `CLAUDE.md`'s library-first rule asks for a
    library before hand-rolling *non-trivial infrastructure*; a fixed-schema pointer-drag over five
    known column keys is not that, and replacing it would mean adopting the whole 2D widget for it.
 
@@ -708,7 +708,7 @@ answer is sharper than "maybe":
 `DocumentView`, `KeyValueView`, `StreamView`, and both non-tabular console branches — **stays on
 `VirtualList`**, and nothing from SlickGrid is borrowed for them. The one genuinely available
 borrow, `rowRangeBounds` into `VirtualList`'s overscan, is **not proposed here**: nobody has reported
-a fling artifact in any of these views, `AGENTS.md`'s measure-with-purpose rule says not to instrument
+a fling artifact in any of these views, `CLAUDE.md`'s measure-with-purpose rule says not to instrument
 a question nobody is asking, and the cheap constant overscan is the right default until someone does.
 It is recorded in §12 as available, with the file and function named, so a future report has a
 one-file answer waiting.
@@ -772,7 +772,7 @@ that typechecks, so C5 and C6 landed as one commit instead of two.
 succeed with `@tanstack/vue-virtual` absent from `node_modules` (`bun install` after the
 `package.json` edit), which is the real proof the dependency is gone rather than merely unimported.
 
-### 10.2 Suite gate (once, at C8, per `AGENTS.md`)
+### 10.2 Suite gate (once, at C8, per `CLAUDE.md`)
 `bun run test:ui` and `bun run test:unit`. Expected deltas: `column-range.spec.ts` gone;
 `console.spec.ts`/`cell-editor.spec.ts` adjusted per §3.8. **Known pre-existing failures that must
 not be attributed to this phase**: any flake bisected as pre-existing in P22 Pass B's postscript
@@ -816,12 +816,12 @@ already unmounts per result chip, so the hook exists).
 2. **`docs/ARCHITECTURE.md`'s dependency listing** — remove `@tanstack/vue-virtual` wherever it is
    named as a current dependency.
 3. **`docs/v1.1/plans/P22-slickgrid-pass-b.md` §6** — do **not** rewrite it. It was a correct
-   decision for that pass, and `AGENTS.md`'s discipline is that each plan records what its own pass
+   decision for that pass, and `CLAUDE.md`'s discipline is that each plan records what its own pass
    knew. Add one line at the end of §6 pointing at this document as the reopening, and let §3.2 here
    carry the correction to its reason 4.
 4. **`docs/PERF.md`** — no change unless §10.3's two-instance trace finds something. If it does, it
    gets its own sub-section under §2.1c, not an edit to the existing A/B record.
-5. **`AGENTS.md`** — no change. Nothing here is a standing rule.
+5. **`CLAUDE.md`** — no change. Nothing here is a standing rule.
 
 ---
 
@@ -883,4 +883,4 @@ All read this session at `dd1b51c`.
 `tests/unit/console-result-cap.spec.ts`.
 
 **Prior plans**: `docs/v1.1/plans/P22-slickgrid-pass-b.md` (§0, §1, §2 F1-F14, §3, §4, §5 D0/D5/D9,
-§6, §7, §14), `docs/PERF.md` §2.1a, §2.1c, `docs/ARCHITECTURE.md:40`, `AGENTS.md`.
+§6, §7, §14), `docs/PERF.md` §2.1a, §2.1c, `docs/ARCHITECTURE.md:40`, `CLAUDE.md`.

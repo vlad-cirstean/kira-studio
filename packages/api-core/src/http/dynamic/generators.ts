@@ -8,7 +8,7 @@
 // up — `Record<FakeName, ...>` over a `const`-asserted tuple's derived union means a tuple entry
 // with no record line, or a record line whose key is not a tuple entry, is a `tsc` error, not
 // something a test has to catch. That is why this file has no accompanying unit test (§6.2/
-// AGENTS.md: a 57-entry map of one-line faker calls whose completeness the compiler already
+// CLAUDE.md: a 57-entry map of one-line faker calls whose completeness the compiler already
 // proves is exactly the "thin pass-through wrapper" category that earns nothing).
 //
 // F11: every call below was executed against the installed `@faker-js/faker@10.6.0` before being

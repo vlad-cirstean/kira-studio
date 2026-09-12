@@ -75,11 +75,11 @@
   placeholder and its named `{name:Type}` parameters require the adapter to declare a type per
   placeholder (F3), so this adapter renders SQL literals on **both** paths (D27) — with a ClickHouse-
   correct escaper, since `'` alone is not enough here (F28, F39).
-- Comments per `AGENTS.md`: only where the code cannot say it for itself — in particular D24's
+- Comments per `CLAUDE.md`: only where the code cannot say it for itself — in particular D24's
   "why there is no update", D27's backslash escape, D20's "why there is no keyset", and D19's
   `default_format` trick, none of which anyone re-derives from the code.
 - Run `bun run lint`, `bun run typecheck` (all three projects) and `bun run build` on every commit.
-  `tests/db/clickhouse.spec.ts` **needs Docker** (unlike P35's), so per `AGENTS.md` it cannot be
+  `tests/db/clickhouse.spec.ts` **needs Docker** (unlike P35's), so per `CLAUDE.md` it cannot be
   executed in Claude Code's Linux web container; items that depend on a live server are flagged
   **verify-on-container** in §8, exactly as P34 flagged them.
 - Commits follow Conventional Commits, one per step of §4.
@@ -706,14 +706,14 @@ export interface ReadTarget {
 | D34 | **`tests/db/support/clickhouse.ts` uses `@testcontainers/clickhouse@12.1.0` and pins `clickhouse/clickhouse-server:26.3`.** Same memoized one-container-per-process shape, same `stop()`-resets-the-memo discipline, same `resolveDockerHost()` import. | F47: the preset exists, at the exact `testcontainers` version already pinned, and it carries the two things a hand-rolled `GenericContainer` would get wrong — the `Wait.forHttp('/')` predicate on `"Ok.\n"` (which is the real readiness signal, and needs no credentials) and the `nofile` ulimit bump that prevents a *"Too many open files"* flake. P16 already converted Postgres/MariaDB/Redis onto their presets for the same reason; there is no argument for regressing on a new engine. F48 is the pin: 26.3 is the current LTS with the longest remaining support window. F50 is the harness discipline this file inherits unchanged, including the memo reset that `support/mysql.ts:196-201` explains. |
 | D35 | **The fixture seeds as the container's own privileged user and returns a config for a second, unprivileged `kira` user with `GRANT SELECT, INSERT, ALTER DELETE ON kira_test.*`.** A third user, `kira_ro`, gets `SELECT` only. | Mirrors `support/mysql.ts`'s own root-seeds/app-user-connects split (§6e), which exists to prove the adapter needs no elevated privilege. It also makes scenario 7's cancel assertion meaningful: F9's *"read-only users can only stop their own queries"* is only a real finding if the connection under test is not a superuser. `kira_ro` is what scenario 2c asserts `readonly`-independent server-side refusal against. |
 | D36 | **`0010_clickhouse_seed.sql` is a port of `0008_mysql_seed.sql`, not a copy** (§2's list), plus six ClickHouse-only tables that each earn a scenario: `dup_keys`, `wide_types`, `generated_cols`, `commented`, `no_sorting_key`, `big_rows`. | `0002_mariadb_seed.sql`'s own header states the parity principle (*"deliberately kept in parity with 0001_seed.sql so the two spec files can assert the same things"*), and it is what makes an eighth adapter prove the abstraction rather than merely exist. Every divergence is a documented engine difference: no PK, no FK, no UNIQUE, no AUTO_INCREMENT, no sequences, no routines. `dup_keys` is the most important table in the fixture — two rows with an identical `ORDER BY` tuple, which is F16 turned into an assertion and therefore the direct evidence for D23. `big_rows` is `INSERT INTO big_rows SELECT number, … FROM numbers(1000000)` — one statement, no chunking, none of MariaDB's `seq_1_to_N` or MySQL's six-way digit cross join (P34 D28). |
-| D37 | **`tests/ui/clickhouse.spec.ts` is Docker-gated like every engine's UI spec except SQLite's**, and is a small, deliberate subset of `tests/ui/mysql.spec.ts` whose two load-bearing assertions are the backtick-quoted *Filter by this value* (D29) and the **disabled `− row` button with an engine-specific tooltip** (D31). | P35 D35's unconditional spec was possible only because a temp file needs no container; ClickHouse needs one, so the standing `AGENTS.md` caveat applies and the plan says so up front rather than discovering it in CI. The two assertions are chosen because each is a seam where a missing branch fails *silently*: `sqlDialectFor` returning `undefined` would emit double-quoted identifiers that ClickHouse would happily accept as identifiers and then fail to match (P34 F22's failure mode, one level subtler here), and an un-gated `− row` would produce F37's silent no-op. |
+| D37 | **`tests/ui/clickhouse.spec.ts` is Docker-gated like every engine's UI spec except SQLite's**, and is a small, deliberate subset of `tests/ui/mysql.spec.ts` whose two load-bearing assertions are the backtick-quoted *Filter by this value* (D29) and the **disabled `− row` button with an engine-specific tooltip** (D31). | P35 D35's unconditional spec was possible only because a temp file needs no container; ClickHouse needs one, so the standing `CLAUDE.md` caveat applies and the plan says so up front rather than discovering it in CI. The two assertions are chosen because each is a seam where a missing branch fails *silently*: `sqlDialectFor` returning `undefined` would emit double-quoted identifiers that ClickHouse would happily accept as identifiers and then fail to match (P34 F22's failure mode, one level subtler here), and an un-gated `− row` would produce F37's silent no-op. |
 | D38 | **The demo stack gains a ninth compose service (`clickhouse/clickhouse-server:26.3`, host port 8124 — 8123 is free but 8124 keeps the "host port ≠ container port where a second engine could collide" convention `mysql:3307` set) with its own `init.sql`/`seed.sql` and a `seed.sh` stanza.** | F49: eight services and eight stanzas is the established shape, and unlike SQLite (P35 D36, where there was nothing to containerize) ClickHouse is an ordinary server. The seed is the same e-commerce model as the other relational engines, re-expressed in MergeTree terms — which is itself useful documentation of what this adapter does and does not offer. |
 
 ### Topic G — cross-cutting
 
 | # | Decision | Rationale |
 |---|----------|-----------|
-| D39 | **Docs the implementing session edits:** SPEC §1 (ClickHouse joins the in-scope engine list, and §1's write-path sentence gains "ClickHouse tables get **add row** only"), §5.1's table (a ClickHouse row: tree levels, `tabular`, *"`LIMIT/OFFSET` only — MergeTree has no unique row key to build a keyset cursor on"*, *"yes (`count()` reads part metadata)"*, *"`KILL QUERY WHERE query_id = …` on a second HTTP request"*), §5's `Caps` prose (a sentence naming ClickHouse as the first tabular adapter with `canUpdate`/`canDelete` false), §11's adapters tree, `shared/caps.ts:100-110`'s per-kind table, `README.md`'s engine table plus a footnote, and `AGENTS.md` (a short section: the driver is pure JS so nothing in the native-build path applies, the DB suite needs Docker, and `@clickhouse/client` is the app's first *added* dependency since P32 that needs no rebuild step). The §10 phasing row is updated **only once the phase is implemented**. | Standing practice (P34 D33, P35 D37). `AGENTS.md` earns a section for the inverse of P32's reason: a future session seeing a *new dependency* in an app that has been burned by one will reasonably assume `scripts/native-electron-build.sh` needs a line, and the file should say it does not. |
+| D39 | **Docs the implementing session edits:** SPEC §1 (ClickHouse joins the in-scope engine list, and §1's write-path sentence gains "ClickHouse tables get **add row** only"), §5.1's table (a ClickHouse row: tree levels, `tabular`, *"`LIMIT/OFFSET` only — MergeTree has no unique row key to build a keyset cursor on"*, *"yes (`count()` reads part metadata)"*, *"`KILL QUERY WHERE query_id = …` on a second HTTP request"*), §5's `Caps` prose (a sentence naming ClickHouse as the first tabular adapter with `canUpdate`/`canDelete` false), §11's adapters tree, `shared/caps.ts:100-110`'s per-kind table, `README.md`'s engine table plus a footnote, and `CLAUDE.md` (a short section: the driver is pure JS so nothing in the native-build path applies, the DB suite needs Docker, and `@clickhouse/client` is the app's first *added* dependency since P32 that needs no rebuild step). The §10 phasing row is updated **only once the phase is implemented**. | Standing practice (P34 D33, P35 D37). `CLAUDE.md` earns a section for the inverse of P32's reason: a future session seeing a *new dependency* in an app that has been burned by one will reasonably assume `scripts/native-electron-build.sh` needs a line, and the file should say it does not. |
 | D40 | **No change to `scheduler/`, `cache/`, `adapters/live.ts`, `adapters/sql-text.ts`, `main/`, or any `Page` *variant*.** The single exception is D28's additive `ColumnDescriptor.generated`, which is named here rather than buried. | §11's claim that a new engine is one folder. ClickHouse returns the same `TabularPage` the other SQL adapters do. P35 D38 made the stronger "no protocol change at all" claim and could keep it; this phase cannot, and the honest thing is to say which claim broke and why (D28) rather than to let a reader discover it in the diff. |
 
 ## 4. Implementation order
@@ -721,7 +721,7 @@ export interface ReadTarget {
 Each step is one commit and must leave `bun run lint`, `bun run typecheck` (all three projects) and
 `bun run build` green. Steps 1–3 are the engine, 4–6 the app surface, 7–9 the tests, 10–11 demo data
 and docs. Steps 7–9 need Docker and cannot be executed in Claude Code's Linux web container
-(`AGENTS.md`); everything else can.
+(`CLAUDE.md`); everything else can.
 
 1. **`feat(shared): the clickhouse connection kind`** — `shared/domain/connection.ts` (the enum
    entry and `DEFAULT_PORT.clickhouse = 8123`; deliberately no `FILE_KINDS`/`AWS_STYLE_KINDS`
@@ -738,7 +738,7 @@ and docs. Steps 7–9 need Docker and cannot be executed in Claude Code's Linux 
 3. **`feat(engine): the ClickHouse adapter`** — the whole of `adapters/clickhouse/` (ten files) plus
    the one `registry.ts` loader line (D3–D8, D14–D27). This is the phase's large commit; the
    `Adapter` interface admits no partial implementation, and a half-adapter with `E_UNSUPPORTED`
-   stubs is exactly what `AGENTS.md`'s "scope left out is left out entirely" forbids.
+   stubs is exactly what `CLAUDE.md`'s "scope left out is left out entirely" forbids.
 4. **`feat(shared,renderer): generated columns are not insertable`** — `ColumnDescriptor.generated`
    and its zod field, the ClickHouse adapter setting it, **the SQLite adapter setting it**, and
    `pendingChanges.ts`'s `addInsertRow` call sites (`DataToolbar.vue`'s `onAddRow`,
@@ -1020,7 +1020,7 @@ docs/
   v1/SPEC.md                        MOD  §1, §5, §5.1, §11 (D39) — phasing row once implemented
   v1/design/kira-design-system/parts/_icons.html   MOD  + the i-clickhouse symbol (D32)
   v1/plans/P36-clickhouse-adapter.md    NEW  this document
-AGENTS.md                           MOD  + the "@clickhouse/client is pure JS" note (D39)
+CLAUDE.md                           MOD  + the "@clickhouse/client is pure JS" note (D39)
 README.md                           MOD  + the ClickHouse engine row and footnote (D39)
 package.json                        MOD  + @clickhouse/client (dependency),
                                          + @testcontainers/clickhouse (devDependency)
@@ -1106,7 +1106,7 @@ package.json                        MOD  + @clickhouse/client (dependency),
       pass in an environment with no Docker; `clickhouse` **skips cleanly** there rather than
       erroring.
 - [ ] **verify-on-container:** `bun test tests/db/clickhouse.spec.ts` green against a live
-      `clickhouse/clickhouse-server:26.3`. Per `AGENTS.md` this cannot run in Claude Code's Linux web
+      `clickhouse/clickhouse-server:26.3`. Per `CLAUDE.md` this cannot run in Claude Code's Linux web
       container (the outbound policy blocks Docker Hub's blob CDN), so it must be run on the
       macOS/Colima box or in CI before the phase is called done.
 - [ ] **verify-on-container:** the four facts this plan reasons about from documentation rather than
@@ -1118,7 +1118,7 @@ package.json                        MOD  + @clickhouse/client (dependency),
 - [ ] **verify-on-container:** `tests/ui/clickhouse.spec.ts` end to end.
 - [ ] `bash scripts/demo-dbs/seed.sh` brings the ninth service up and seeds it, and a connection to
       `localhost:8124` browses it.
-- [ ] SPEC §1, §5, §5.1, §11, `shared/caps.ts`'s table, the README and `AGENTS.md` all describe what
+- [ ] SPEC §1, §5, §5.1, §11, `shared/caps.ts`'s table, the README and `CLAUDE.md` all describe what
       shipped.
 
 ## 9. Open questions for the user

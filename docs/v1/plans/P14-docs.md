@@ -28,7 +28,7 @@
 - **No screenshots** (D2), **no badges** (D8). Both need P15's CI/release work or macOS hardware
   that does not exist in this environment; inventing either is exactly the "needs revisiting later"
   outcome the phase exists to avoid.
-- **Commits follow Conventional Commits** (`AGENTS.md`): `docs:` for the documentation work, with a
+- **Commits follow Conventional Commits** (`CLAUDE.md`): `docs:` for the documentation work, with a
   separate `chore:` commit if the `package.json` line in D9 is applied. The phase's last step is to
   land its commits on the v1 feature branch per SPEC.md §12.
 - Run `bun run lint` before committing. If `package.json` was touched, also run `bun run typecheck`
@@ -116,7 +116,7 @@ here is what each one is) are both that; `src/engine/` is not.
 | `docs/PACKAGING.md` | **MOD**, one line | Same backlink (D4). Its content is current. |
 | `scripts/demo-dbs/README.md` | **MOD**, one sentence | State that Kafka/SQS are not part of this stack (D7). |
 | `docs/design/vscode-modern-ui/README.md` | **NO CHANGE** | Design-reference manifest, accurate, not user/dev docs (D10). |
-| `AGENTS.md` | **NO CHANGE** | Working agreement, out of scope; the README links to it. |
+| `CLAUDE.md` | **NO CHANGE** | Working agreement, out of scope; the README links to it. |
 | `package.json` | **MOD**, one line | Add `"license": "MIT"` (D9). |
 | `docs/plans/P14-docs.md` | **NEW** | This document. |
 
@@ -310,7 +310,7 @@ A short link list, since these are the "expected in-repo locations" a reader wil
 - `docs/PACKAGING.md` — macOS build, electron-builder config, verification checklist.
 - `docs/plans/` — one implementation plan per phase, P0–P14.
 - `docs/design/vscode-modern-ui/` — the workbench visual reference (design artboards).
-- `AGENTS.md` — the working agreement for changes to this repo.
+- `CLAUDE.md` — the working agreement for changes to this repo.
 - `scripts/demo-dbs/README.md` — local fixture databases.
 
 ### 2.10 Not in v1
@@ -343,7 +343,7 @@ reference. A real screenshot set is a later, deliberate addition — not somethi
 connection dialog shows it) nor tabulated (it has no capabilities to tabulate). Reality 2/3.
 
 **D4 — Cross-links are added in both directions, minimally.** The README links `docs/SPEC.md`,
-`docs/PERF.md`, `docs/PACKAGING.md`, `docs/plans/`, `AGENTS.md`, `LICENSE` and
+`docs/PERF.md`, `docs/PACKAGING.md`, `docs/plans/`, `CLAUDE.md`, `LICENSE` and
 `scripts/demo-dbs/README.md`. In return, `docs/PERF.md` and `docs/PACKAGING.md` each gain **one
 line** near the top — a "See the [README](../README.md) for what the app is and how to run it"
 pointer. No other edit to either file: P13 rewrote PERF.md and P12 wrote PACKAGING.md, and both are
@@ -401,7 +401,7 @@ P14 does **not**:
 2. **Add per-folder READMEs** anywhere under `src/` or `tests/` (D1).
 3. **Add `CONTRIBUTING.md`, `CHANGELOG.md`, `SECURITY.md`, `CODE_OF_CONDUCT.md`, issue/PR templates,
    or anything under `.github/`.** Repository tooling is P15's deliverable; a CONTRIBUTING file
-   would also duplicate `AGENTS.md`, which is this repo's actual working agreement.
+   would also duplicate `CLAUDE.md`, which is this repo's actual working agreement.
 4. **Add badges, screenshots, GIFs, or a logo** (D2, D8).
 5. **Document features that do not exist.** No S3 usage instructions, no export-to-CSV, no SSH
    tunnel, no light mode, no auto-update, no remappable keybindings — every one of these is on
@@ -427,7 +427,7 @@ There is no test suite for prose, so verification is a read-through against expl
    `scripts/demo-dbs/README.md`, or `tests/db/support/docker.ts`.
 2. **Link check.** Every relative link in the README resolves to a file that exists
    (`docs/SPEC.md`, `docs/PERF.md`, `docs/PACKAGING.md`, `docs/plans/`,
-   `docs/design/vscode-modern-ui/`, `AGENTS.md`, `LICENSE`, `scripts/demo-dbs/README.md`), and the
+   `docs/design/vscode-modern-ui/`, `CLAUDE.md`, `LICENSE`, `scripts/demo-dbs/README.md`), and the
    two new backlinks in PERF.md/PACKAGING.md resolve to `../README.md`.
 3. **Capability check.** The engine table matches all six `caps.ts` files field for field, including
    the three `writable: false` engines and the two `sql: false` ones.
@@ -458,7 +458,7 @@ There is no test suite for prose, so verification is a read-through against expl
 - [ ] README's test section names Colima for `test:db` and the `xvfb-run` wrapper for headless
       `test:ui`, and states that there are no unit tests by design (SPEC §9).
 - [ ] README links `docs/SPEC.md`, `docs/PERF.md`, `docs/PACKAGING.md`, `docs/plans/`,
-      `docs/design/vscode-modern-ui/`, `AGENTS.md`, `scripts/demo-dbs/README.md`, `LICENSE`.
+      `docs/design/vscode-modern-ui/`, `CLAUDE.md`, `scripts/demo-dbs/README.md`, `LICENSE`.
 - [ ] README contains no badge, no image, no screenshot, no link to a Releases page.
 - [ ] `docs/SPEC.md:4`'s status line is corrected (D5); no other change to §1–§10.
 - [ ] `docs/SPEC.md` §11's "not yet applied" preamble is corrected (D6); the tree listing and the
@@ -482,7 +482,7 @@ There is no test suite for prose, so verification is a read-through against expl
 README.md                                REWRITE — §2: title/status, engines, features, install,
                                                    development, tests, architecture, docs index,
                                                    not-in-v1, license.
-AGENTS.md                                unchanged
+CLAUDE.md                                unchanged
 LICENSE                                  unchanged
 package.json                             MOD — "license": "MIT" after "author" (D9).
 docs/

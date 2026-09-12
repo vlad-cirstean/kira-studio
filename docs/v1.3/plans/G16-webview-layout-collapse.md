@@ -106,7 +106,7 @@ Plus the guard SPEC explicitly requires: a rendered-geometry test tier for the w
 - **The guard must load the real document.** A harness that hand-rolls an approximation of
   `html.ts`'s output is precisely the kind of proxy-for-the-real-thing that let G14 pass. D10
   extracts the document builder so the test uses the genuine article.
-- **AGENTS.md's test bar applies.** Two new Go tests, because pagination-boundary arithmetic is one
+- **CLAUDE.md's test bar applies.** Two new Go tests, because pagination-boundary arithmetic is one
   of the named carve-outs. No new TypeScript unit test, because the client-side changes here are
   three-line guards, not complex logic — D11 says so explicitly rather than leaving it implied.
 
@@ -650,7 +650,7 @@ root `playwright-report/` directory the studio config already writes.
 
 **Gets one:**
 
-- `logsession/session_test.go` — one new test for D6's exact-multiple case. AGENTS.md names
+- `logsession/session_test.go` — one new test for D6's exact-multiple case. CLAUDE.md names
   "cursor/pagination boundary arithmetic" as a carve-out from the no-unit-tests default, and this is
   literally that.
 - `gitsession/walk_test.go` — one new test for D5: a cache-replay re-stream ends with
@@ -662,7 +662,7 @@ root `playwright-report/` directory the studio config already writes.
 
 - **D8's no-progress break.** Three lines, one comparison. Testing it means faking `BridgeClient`
   *and* `LayoutClient` (whose default constructs a Worker) inside a package that is not currently in
-  `test:unit`'s glob at all. AGENTS.md: "A single `if` guarding one obvious case isn't complexity"
+  `test:unit`'s glob at all. CLAUDE.md: "A single `if` guarding one obvious case isn't complexity"
   and "when torn between two similar tests, delete." The Go-level guard already covers the condition
   that produces the spin.
 - **D9's template conditions.** One-condition render guards.
@@ -988,7 +988,7 @@ shipping a known hang.
 ### 10.4 Should `test:webview` join the routine loop?
 
 It costs a 1.1s build plus a few seconds of Chromium and it is the only thing in this repo that can
-see a collapsed panel. There is no CI config in the tree to add it to, and AGENTS.md's guidance is
+see a collapsed panel. There is no CI config in the tree to add it to, and CLAUDE.md's guidance is
 that expensive suites run once near the end of a phase. It is not expensive. Recommendation: run it
 alongside `bun run typecheck`/`lint` in every phase that touches `packages/git-ui` or
 `apps/kira-studio-vscode/src/html.ts` — but that is a standing-convention change, which is a human's

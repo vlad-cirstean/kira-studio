@@ -56,7 +56,7 @@
   **command registry in `renderer/state/`** — and `state/tabRuntime.ts:1-6` and
   `shortcuts/commands.ts:1-4` are two existing instances of exactly that inversion, so it is a
   third instance of an established pattern, not a new one.
-- **No half-migrations (AGENTS.md).** A helper that is hoisted leaves no copy behind; a module that
+- **No half-migrations (CLAUDE.md).** A helper that is hoisted leaves no copy behind; a module that
   moves takes every importer and every comment that names it in the same commit.
 - **No new dependency, no new build step.** One new `renderer/state/` module, one new
   `views/definition/` module, one new `views/shared/page/` folder, four new `biome.json` overrides.
@@ -65,7 +65,7 @@
   NUL-escape fix there; there is nothing of that kind left (`file $(git ls-files 'src/*'
   'tests/*')` reports no non-text file anywhere in the repo — re-verified). No new tests, no
   restructuring, in `tests/db/` or anywhere else.
-- Comments per AGENTS.md: only where the code cannot say it for itself. §4.13 **deletes or
+- Comments per CLAUDE.md: only where the code cannot say it for itself. §4.13 **deletes or
   corrects** eighteen comments that name files which no longer exist, rather than rewriting them
   into something equally decorative.
 - `bun run lint`, `bun run typecheck` (node, web, db, electron-db) and `bun run build` stay green
@@ -92,7 +92,7 @@ testing each against the tree:
 Iteration 2's D6 fixed exactly this class of straggler — but only the single instance it happened
 to trip over (`views/shared/searchFilter.ts:8`'s reference to the deleted `SearchToolbar.vue`).
 Eighteen more survived in nine files, and six of them are in one file. A comment that points at a
-path a reader cannot open is worse than no comment (AGENTS.md), and these are the ones a future
+path a reader cannot open is worse than no comment (CLAUDE.md), and these are the ones a future
 session will follow first.
 
 **F2 — `views/grid/search.ts`'s re-export block is two-thirds dead, and the live third makes the
@@ -655,7 +655,7 @@ export function resolveDatabaseTablePath(
 
 | # | Decision | Rationale |
 |---|----------|-----------|
-| D1 | **The eighteen stale path references of F1 are corrected to the file's current path, or deleted where the sentence no longer says anything.** Nine files, five dead paths. | F1. Three of the five paths were moved by P39 itself, so this is the phase cleaning up after its own two rounds — and iteration 2's D6 already set the precedent by fixing the one instance it happened to hit. A comment naming a file a reader cannot open is worse than no comment (AGENTS.md); `StreamSearchToolbar.vue`'s six references to a component iteration 1 *deleted* are the sharpest case, because the sentences ("same placement law as…", "identical ref/onMounted pair") are still true of `views/shared/page/SearchToolbar.vue`. |
+| D1 | **The eighteen stale path references of F1 are corrected to the file's current path, or deleted where the sentence no longer says anything.** Nine files, five dead paths. | F1. Three of the five paths were moved by P39 itself, so this is the phase cleaning up after its own two rounds — and iteration 2's D6 already set the precedent by fixing the one instance it happened to hit. A comment naming a file a reader cannot open is worse than no comment (CLAUDE.md); `StreamSearchToolbar.vue`'s six references to a component iteration 1 *deleted* are the sharpest case, because the sentences ("same placement law as…", "identical ref/onMounted pair") are still true of `views/shared/page/SearchToolbar.vue`. |
 | D2 | **`views/grid/search.ts` drops its `export { isSearchFiltering, searchFilterState, setSearchFiltering }` block and the import that feeds it; `DataGrid.vue:49` imports `setSearchFiltering` from `../shared/page/searchFilter` like its four siblings.** The three `export type { SearchHandle, SearchQuery }` lines go with it. | F2/F3/F6. Two of the three re-exported values have no importer at all, and the third makes the grid the only view reaching the shared toggle through an intermediary — a P31 migration aid that outlived its migration by three phases. Removing the block also removes the last thing `searchFilter.ts:7-9`'s comment describes incorrectly, so that comment is deleted rather than corrected a third time. Five lines of diff, `typecheck` is the proof. |
 | D3 | **`createSearchState` moves from `pageScan.ts` into `pageSearch.ts` and stops being exported.** | F4, and iteration 2's D3's actual intent. As an un-export it was impossible (its caller is another module); as a move it is right on the merits — `pageScan.ts` is the rAF-chunked scanner and `createSearchState` is a reactive per-tab record with a tab-close cleanup registration, which is `pageSearch.ts`'s subject. After the move `pageScan.ts` exports exactly `SearchQuery`, `SearchHandle`, `eachMatch` and `runChunkedScan` — one concern. |
 | D4 | **The seven F5 constants lose their `export` keyword.** Types and Zod schemas are **not** touched. | F5, and iteration 2's D27 one level down: its scan covered `export function` and missed `export const`. Each is used only inside its own module; dropping `export` is proven safe by `typecheck` and stops `pendingState` in particular from advertising a writable reactive store that every one of its own eleven uses reaches through an accessor. Zod schemas in `shared/` are excluded deliberately — a schema is a published shape like a type, and unexporting forty of them would be churn dressed as tidiness (§6). |
@@ -761,7 +761,7 @@ existing suites already assert the behavior these steps must not change, and an 
 alongside a refactor proves only that the new code does what the new code does. Sparse unit tests
 are their own queued phase (P41), and `tests/db/` is out of scope for it and for this.
 
-Claims marked ▶ were executed in this box and their output is in §1. Per AGENTS.md only `smoke`,
+Claims marked ▶ were executed in this box and their output is in §1. Per CLAUDE.md only `smoke`,
 `startup`, `workbench`, `connections`, `secrets` and `sqlite` run without Docker here; everything
 else needs the macOS/Colima box or CI. **The phase is not done until the full `test:ui` and
 `test:db` suites have been run green in an environment that can run them** — before the phase is

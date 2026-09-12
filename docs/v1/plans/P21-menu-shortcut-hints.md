@@ -44,7 +44,7 @@
 - **Scope is menus and bindings.** No adapter changes, no engine changes, no IPC changes beyond the
   one channel `Ctrl/Cmd+N` needs. Exactly one new *menu row* is added in the whole phase (D12's
   grid-cell **Paste**, which surfaces a handler that already exists and already has a key).
-- Comments per AGENTS.md: only where the code cannot say it for itself.
+- Comments per CLAUDE.md: only where the code cannot say it for itself.
 - Run `bun run lint`, `bun run typecheck` and `bun run build` throughout; `xvfb-run -a bun run
   test:ui` from step 4 on. `bun run test:db` is untouched — no adapter changes in this phase.
 
@@ -122,7 +122,7 @@ binding by id, never by display string.**
 Rejected: `shortcut?: string` set ad-hoc per call site. It is three lines of work and it makes the
 one failure this phase exists to prevent — a menu that prints `⌘D` next to an action `⌘D` does not
 perform — invisible to the compiler, to lint, and to both test suites. A doc-comment convention
-does not catch it. AGENTS.md's "no shortcuts" rule applies to the plan as much as the code.
+does not catch it. CLAUDE.md's "no shortcuts" rule applies to the plan as much as the code.
 
 The shape:
 
@@ -560,7 +560,7 @@ the alternative (print nothing) hides the app's single most-used binding.
 - **Making the document / key/value / stream / operations views keyboard-actionable.** This is the
   single largest thing left out, and D6 is why: each needs a focusable container, a focus ring, and
   arrow-key row navigation before `Delete`/`⌘C`/`Enter` mean anything there. Doing it half-way —
-  a keydown handler on a container nothing can focus — is exactly the stubbing AGENTS.md forbids.
+  a keydown handler on a container nothing can focus — is exactly the stubbing CLAUDE.md forbids.
   Follow-up phase, named.
 - **Arrow-key navigation in the project tree.** Same reason; `tree.open` is reachable after a click
   selects a row, which is the flow the tree already has.

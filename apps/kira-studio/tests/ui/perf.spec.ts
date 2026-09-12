@@ -40,7 +40,7 @@ import { expandRow, findRow, openRowMenu } from './support/tree';
 // process; a mock can only echo back a hand-picked `{bytes, budgetBytes}` pair, which would make
 // "usage <= budget" true by fixture construction rather than by the real eviction algorithm
 // actually bounding anything — the same category of vacuous pass this repo's own low-value-test
-// policy (AGENTS.md) warns against, just discovered at the fixture-design stage instead of at
+// policy (CLAUDE.md) warns against, just discovered at the fixture-design stage instead of at
 // review. This is a genuinely different situation from `docs/PERF.md` §2.2's memory.spec.ts removal
 // (a real, measured, non-app-controllable cost) — here the *mechanism under test* simply does not
 // exist in this tier, the same category as `hardening.spec.ts` having no subject.

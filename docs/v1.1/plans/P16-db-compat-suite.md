@@ -48,7 +48,7 @@
 > `clickhouse/clickhouse-server:26.9`, `mongo:9`, `redis:9`, `localstack/localstack:5` are all 404
 > today). No version number in §3 is assumed to map to a pullable image; each was asked.
 >
-> **The final step is a real run, not a simulation.** §6 requires starting `dockerd` per AGENTS.md,
+> **The final step is a real run, not a simulation.** §6 requires starting `dockerd` per CLAUDE.md,
 > pulling ~18 images through `mirror.gcr.io`, and running the whole conformance corpus 18 times.
 > That is on the order of an hour or two of wall clock in this sandbox and it is the deliverable,
 > not a formality — the version table is a hypothesis until it runs green.
@@ -160,7 +160,7 @@ those five settings exists", and there is no page that states that per-setting.
 
 ### 1.2 The conformance suites, and the fixture harness underneath them
 
-**[verified in source]** AGENTS.md:80-87 names
+**[verified in source]** CLAUDE.md:80-87 names
 `internal/adapters/{postgres,mysqlfamily,sqlite,clickhouse}/*_test.go` as the sole successors to the
 deleted `packages/db-fixtures/*.spec.ts` files. That list is now understated — every one of the ten
 adapters has a per-capability conformance file of the same shape:
@@ -211,7 +211,7 @@ The TypeScript fixture harness still pins its own copies for `apps/kira-studio/t
 `packages/db-fixtures/support/postgres.ts:10` (`postgres:17-alpine`), `mariadb.ts:10`
 (`mariadb:11.4`), `kafka.ts:17` (`confluentinc/cp-kafka:8.0.7`). Those are deliberately **out of
 scope**: `e2e-real` is a wiring tier that spot-checks a scenario or two per kind
-(`AGENTS.md:83-84`), not a conformance suite, and running *it* twice per kind would double the
+(`CLAUDE.md:83-84`), not a conformance suite, and running *it* twice per kind would double the
 slowest tier in the repo for no version coverage the Go suites don't already give.
 
 ### 1.4 Six version assertions that hard-pin today's image
@@ -242,7 +242,7 @@ case really runs). `ci.yml` triggers on `push` to `main`, `pull_request` to `mai
 `workflow_dispatch`.
 
 **There is no `e2e-real` npm script at all.** `playwright.config.ts:47-58` defines the project;
-AGENTS.md:140-143 documents the invocation as `node node_modules/.bin/playwright test
+CLAUDE.md:140-143 documents the invocation as `node node_modules/.bin/playwright test
 --project=e2e-real` (plain Node, never `bunx`, because of the documented Bun/testcontainers hang);
 and nothing in `ci.yml` runs it. **That is the repo's existing precedent for "on-demand": a tier
 that exists, is documented, and is simply never wired to a trigger.** P16 follows it and adds one
@@ -620,7 +620,7 @@ second assertion set. `go test ./apps/kira-studio/internal/adapters/postgres/...
 suite; the only thing P16 adds is a way to tell it which image to start.
 
 Rejected: a build-tagged parallel suite. It would drift from the real one within a phase or two, and
-AGENTS.md:80-87 is emphatic that the conformance suites are *the* per-capability coverage — a second
+CLAUDE.md:80-87 is emphatic that the conformance suites are *the* per-capability coverage — a second
 copy would immediately violate that.
 
 ### D2 — One image-override accessor in `testsupport`, keyed by kind, defaulting to today's pin
@@ -715,7 +715,7 @@ scripts/db-compat.sh [--only <kind>] [--min|--max] [--mirror] [--no-pull]
 ```
 
 - The matrix from D3 lives in the script as a plain newline-delimited list — `kind|extreme|package|env assignments` — one line per invocation, easy to read and to diff against §3.
-- `--mirror` implements AGENTS.md:118-135 verbatim: for each image, `docker pull
+- `--mirror` implements CLAUDE.md:118-135 verbatim: for each image, `docker pull
   mirror.gcr.io/<library/>?<name>:<tag>` then `docker tag … <plain name>`, inserting `library/`
   **only** for unnamespaced official images (`postgres`, `mysql`, `mariadb`, `mongo`, `redis`) and
   never for already-namespaced ones (`clickhouse/clickhouse-server`, `confluentinc/cp-kafka`,
@@ -805,7 +805,7 @@ into §3/§6 of this document:
    is cheap and dialect-neutral; otherwise raise the floor (F3/F4 are exactly this, decided ahead of
    the run).
 
-**Weakening an assertion so a version passes is not on the list.** AGENTS.md:56-58.
+**Weakening an assertion so a version passes is not on the list.** CLAUDE.md:56-58.
 
 ---
 
@@ -825,7 +825,7 @@ is where most of the wall clock lives.
 - **A unit test is warranted here and only here.** `ServerMajor`'s parsing has several interacting
   lexical rules (`17-alpine`, `12.3`, `clickhouse/clickhouse-server:26.8` — a `:` in the tag
   position but a `/` in the name, `localstack/localstack:latest`, a digest pin with no tag,
-  a bare name with no `:`), which is exactly AGENTS.md:62-70's "a parser with several interacting
+  a bare name with no `:`), which is exactly CLAUDE.md:62-70's "a parser with several interacting
   lexical rules" category. `ImageFor` itself gets nothing — it is a two-line getenv-or-default.
 
 ### C2 — `test(adapters): assert the server version the image actually pins`
@@ -855,7 +855,7 @@ is where most of the wall clock lives.
 
 ### C6 — the real run, and whatever it produces
 
-Not one commit — however many the findings need, each one its own commit per AGENTS.md's
+Not one commit — however many the findings need, each one its own commit per CLAUDE.md's
 one-finding-one-commit discipline, with §3 and §6 of this document updated in the same commit that
 changes a published minimum. §6 is the procedure.
 
@@ -868,19 +868,19 @@ daemon, ~18 real container starts, and roughly 12-15 GB of pulled images.
 
 ### 6.1 Bringing Docker up in this sandbox
 
-Per AGENTS.md:109-116, once per fresh container, as root:
+Per CLAUDE.md:109-116, once per fresh container, as root:
 
 ```
 nohup dockerd > /tmp/dockerd.log 2>&1 & disown
 ```
 
 then poll `docker info` / `/tmp/dockerd.log` for `API listen on /var/run/docker.sock`. **Do
-everything in one Bash invocation** (AGENTS.md:266-271 — a process started in one invocation cannot
+everything in one Bash invocation** (CLAUDE.md:266-271 — a process started in one invocation cannot
 be signalled from a later one), with a correspondingly long tool timeout.
 
 ### 6.2 Pulling through the mirror
 
-AGENTS.md:118-135: Docker Hub blob downloads 403 through this sandbox's proxy;
+CLAUDE.md:118-135: Docker Hub blob downloads 403 through this sandbox's proxy;
 `mirror.gcr.io` does not. `scripts/db-compat.sh --mirror` does the pull-and-retag for every image in
 the matrix. The `library/` rule matters and the script encodes it:
 
@@ -950,8 +950,8 @@ After the run, in the same commits that carry the fixes:
 - **§3's second table (the UI note strings) and `MIN_SERVER_VERSION` are updated together** — the
   note must never claim a version the suite did not prove.
 - A short **"What the first run found"** subsection is appended to §6 listing each finding and the
-  commit that fixed it. Per AGENTS.md:91-103 that belongs *here*, in this plan doc, never in
-  AGENTS.md.
+  commit that fixed it. Per CLAUDE.md:91-103 that belongs *here*, in this plan doc, never in
+  CLAUDE.md.
 
 ### 6.6 What must not regress
 
@@ -965,7 +965,7 @@ After the run, in the same commits that carry the fixes:
 ### 6.7 What the first run found
 
 Run in this sandbox 2026-09-01/02, staged per kind through `scripts/db-compat.sh --mirror`
-(images pulled once, then re-run `--no-pull` after each fix) — dockerd started per AGENTS.md,
+(images pulled once, then re-run `--no-pull` after each fix) — dockerd started per CLAUDE.md,
 every image pulled through `mirror.gcr.io` and retagged, no image required a workaround beyond
 that. **All sixteen pairs pass green** as of the final run; three real findings surfaced along the
 way, all fixed under D10:
@@ -1026,7 +1026,7 @@ and 18, mongo 4.4 and 8.3, redis 7.0 and 8.8, mysql 8.0 and 9.7).
       now stricter than before.
 - [x] `scripts/db-compat.sh` runs all sixteen pairs, does not abort on the first failure, prints one
       summary table, exits non-zero on any failure, and passes `-count=1`.
-- [x] `--mirror` applies AGENTS.md's `library/` rule correctly for all eight image names.
+- [x] `--mirror` applies CLAUDE.md's `library/` rule correctly for all eight image names.
 - [x] `.github/workflows/db-compat.yml` has `workflow_dispatch` and nothing else; `ci.yml` is
       untouched; no CI job references `test:compat`.
 - [x] `MIN_SERVER_VERSION` lives in `packages/shared/domain/connection.ts` beside `DEFAULT_PORT`;

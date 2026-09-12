@@ -65,7 +65,7 @@
   P41's: §3 names each one, §4 puts the spec edit it invalidates **in the same commit**, and §7 is
   the phase's own acceptance test.
 - **Where the code contradicts the report, the plan says so and stops** rather than inventing a
-  bug to fix (item 6, item 4's routing, item 12's supposed simplicity). AGENTS.md's multi-pass note
+  bug to fix (item 6, item 4's routing, item 12's supposed simplicity). CLAUDE.md's multi-pass note
   is explicit that a pass should "say plainly when a pass turns up nothing real"; the same applies
   to a single item inside a pass.
 - **P39's layering rules stand** (`biome.json:60-208`, re-read in full). Two of this phase's items
@@ -82,7 +82,7 @@
   `cell-editor-generate` (D29), `cell-editor-byte-badge` disappears from the *cell editor's* mount
   only (D31, the document view keeps its own), and `cell-editor-format` moves from a `<select>` to
   a `<button>` trigger (D27).
-- Comments per AGENTS.md: only where the code cannot say it for itself. Five existing comments
+- Comments per CLAUDE.md: only where the code cannot say it for itself. Five existing comments
   become false and are rewritten in the same commits that falsify them
   (`CellEditorView.vue:148-153`, `:347-351`, `ConsoleResultGrid.vue:155-159`,
   `shared/domain/tabs.ts:55-60`, `connColor.ts:1-6`).
@@ -671,7 +671,7 @@ ConsoleView.vue's results area after this phase (item 2/3):
 | # | Decision | Rationale |
 |---|----------|-----------|
 | D15 | **Drag-select is `mousedown` on a cell → `mouseenter` on cells while held → `mouseup` anywhere.** `mousedown` (primary button, no Shift) sets a drag anchor and a `cell` selection; each `mouseenter` while dragging writes `{ kind: 'range', anchorRow, anchorCol, row, col }`; a document-level `mouseup` ends it. **Shift-click is untouched** — a Shift-modified `mousedown` falls through to `onCellClick`'s existing extend path. | F12/F13. The drag writes exactly the selection shape shift-click already writes, so copy, the cell menu, the cell-editor publication and `isSelected` need no changes at all — which is what keeps this a small commit. Keeping `mousedown` and `click` as separate paths (rather than moving all selection onto pointer events) means the existing keyboard, context-menu and nav-button behaviours are untouched; a guard flag makes `onCellClick` a no-op when a drag actually produced a range, so a real drag can never be clobbered by the trailing `click`. `.grid-cell` is already `user-select: none` (F12), so there is no native text selection to suppress. |
-| D16 | **The drag auto-scrolls at the grid's edges**: while dragging, a `requestAnimationFrame` loop scrolls the container when the pointer is within 24 px of an edge, and the extension continues off whichever cell the pointer then enters. | Without it the gesture stops at the viewport, because `mouseenter` only ever fires on rendered rows — a drag-select that cannot reach row 60 of a 40-row viewport is exactly the half-implementation AGENTS.md forbids. The loop exists only while a button is held and stops on `mouseup`, so it costs nothing in the steady state; `budgets.spec.ts`'s scroll-response budget is re-run as the guard (§5). |
+| D16 | **The drag auto-scrolls at the grid's edges**: while dragging, a `requestAnimationFrame` loop scrolls the container when the pointer is within 24 px of an edge, and the extension continues off whichever cell the pointer then enters. | Without it the gesture stops at the viewport, because `mouseenter` only ever fires on rendered rows — a drag-select that cannot reach row 60 of a 40-row viewport is exactly the half-implementation CLAUDE.md forbids. The loop exists only while a button is held and stops on `mouseup`, so it costs nothing in the steady state; `budgets.spec.ts`'s scroll-response budget is re-run as the guard (§5). |
 | D17 | **The corner cell selects the whole grid as a `range`**, not as a row selection: `{ kind: 'range', anchorRow: 0, anchorCol: 0, row: rowCount - 1, col: columnOrder.length - 1 }`. It gains `role="button"`, `aria-label="Select all cells"`, `data-testid="grid-select-all"` and a pointer cursor. No keyboard shortcut is added. | F14/F14a. The `range` choice is not a style preference: `isSelected` resolves a `row` selection with `Array.includes` (O(rows) per rendered cell per render), so a whole-page row selection would put a 100 000-element scan inside the render loop of every visible cell. A range is two comparisons, and it is the shape copy and the cell menu already understand. No shortcut because `Ctrl/Cmd+A` is a real decision about focus scope (the grid vs. an open inline editor vs. the cell editor's CodeMirror) that the user did not ask for — §6. |
 | D18 | **Both land in one commit.** | They are the same selection model in the same file with the same spec block, and item 8's `range` choice is only defensible in the light of item 7's — a reviewer needs to see them together. Everything else about the grid stays put: no drag-select on the gutter or the header (§6). |
 
@@ -871,11 +871,11 @@ imports it); 10 before 12 (the format picker's hover text renders through the st
 
 ## 5. Verification
 
-**Say plainly what this box can and cannot do.** Per AGENTS.md: `bun run lint`, `bun run typecheck`
+**Say plainly what this box can and cannot do.** Per CLAUDE.md: `bun run lint`, `bun run typecheck`
 and `bun run build` all run here. Playwright runs here **only after** the Electron binary is
-installed by hand with `curl` (AGENTS.md's "Electron binary" section), and it must be invoked
+installed by hand with `curl` (CLAUDE.md's "Electron binary" section), and it must be invoked
 **directly** — `bun run test:ui` fires `pretest:ui` → `scripts/native-electron-build.sh`, which
-cannot fetch Electron's C++ headers through this environment's proxy (AGENTS.md F20) and fails
+cannot fetch Electron's C++ headers through this environment's proxy (CLAUDE.md F20) and fails
 before a single spec runs. The working invocation here is:
 
 ```

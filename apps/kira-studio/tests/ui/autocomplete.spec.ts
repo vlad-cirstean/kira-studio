@@ -42,7 +42,7 @@ import { connectionRow, expandRow, findRow, openRowMenu } from './support/tree';
 // scripts/capture-tree.ts generalizes the Postgres-only scripts/capture-postgres-tree.ts to any
 // packages/db-fixtures/support/<adapter>.ts fixture — see its own header comment.
 //
-// A genuine environment finding surfaced capturing these: AGENTS.md's Docker section confirms
+// A genuine environment finding surfaced capturing these: CLAUDE.md's Docker section confirms
 // Postgres's own `forListeningPorts()` wait strategy hangs indefinitely under `bun run`'s
 // testcontainers integration in this sandbox. MariaDB, Mongo and Redis do **not** — all three
 // containers started and every capture used here completed fine under plain `bun run`

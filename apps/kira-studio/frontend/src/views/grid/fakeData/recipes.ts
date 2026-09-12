@@ -107,7 +107,7 @@ function fallbackForTypeClass(typeClass: TypeClass): Recipe {
 }
 
 // D4's seven-rule decision table, stopping at the first match — the "decision structure large
-// enough that no one can hold it in their head" AGENTS.md names outright, and the subject of C4's
+// enough that no one can hold it in their head" CLAUDE.md names outright, and the subject of C4's
 // one recipe unit test.
 export function recipeFor(descriptor: ColumnDescriptor, meta: ObjectMeta | null): ColumnPlan {
   // rule 1: a GENERATED/computed column — the server fills it in (P36 D28).

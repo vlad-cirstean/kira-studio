@@ -204,7 +204,7 @@ a replacement has to clear.
 
 ### 2.2 The Kafka native addon, stated precisely
 
-`AGENTS.md`'s "Native Kafka driver" section and `docs/v1/SPEC.md`'s Kafka passage record a finding
+`CLAUDE.md`'s "Native Kafka driver" section and `docs/v1/SPEC.md`'s Kafka passage record a finding
 that is easy to overstate in this phase's favor, so state it exactly:
 
 - **`@confluentinc/kafka-javascript`'s own build (`util/configure.js`) always attempts a native
@@ -394,7 +394,7 @@ What still has to be designed:
   scenario 1 asserts `true`/`'keychain'` on darwin and fails loudly rather than skipping. The renderer
   shows `reason` verbatim in the connection dialog.
 - **An equivalent to the `KIRA_INSECURE_SECRETS` Linux dev fallback** (P25 D13, documented in
-  `AGENTS.md`). Linux is never a supported platform for this app — it is this repo's dev/CI
+  `CLAUDE.md`). Linux is never a supported platform for this app — it is this repo's dev/CI
   environment only — but every password-bearing test needs *something* there, or the suite loses its
   dev environment. Today that something is Chromium's `basic_text` obfuscation via `safeStorage
   .setUsePlainTextEncryption(true)`, which has no Go analogue and would need to be invented (a

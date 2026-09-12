@@ -48,12 +48,12 @@
   drift"*, `sql-text.ts:5-7`) and `mysql-family/` (P34's shared-core-plus-thin-profile precedent) are
   all existing answers to exactly the questions §1 asks. No new architectural concept is introduced
   by this phase.
-- **No half-migrations (AGENTS.md).** A module that moves takes *every* importer with it in the same
+- **No half-migrations (CLAUDE.md).** A module that moves takes *every* importer with it in the same
   commit; a helper that is hoisted leaves **no** copy behind. If a finding cannot be fixed
   everywhere it occurs, it is named in §6 and left entirely alone.
 - **No new dependency, no new build step, no new lint mechanism.** Every step is a file move, an
   import-path edit, a deletion, or a factoring-out with the same public shape.
-- Comments per AGENTS.md: only where the code cannot say it for itself. A moved file keeps its
+- Comments per CLAUDE.md: only where the code cannot say it for itself. A moved file keeps its
   existing comments verbatim; a new shared module gets one header comment naming what it replaced,
   the way `views/shared/searchFilter.ts:4-9` does.
 - `bun run lint`, `bun run typecheck` (node, web, db) and `bun run build` stay green after **every**
@@ -505,7 +505,7 @@ export function safeInt(value: number, label: string): number;
 | D16 | **`unsupported(kind, what)` in `adapters/errors.ts`; the twenty `E_UNSUPPORTED` capability stubs call it.** Each keeps its exact message text. | F18. Twenty throws of a two-part sentence, one of which (`sqlite/index.ts:257`) already templated the kind. The helper is `never`-returning so the call sites stay one line and TypeScript still narrows after them. Message text is preserved verbatim because it reaches the user through the op log (`main/oplog.ts`) — this is a refactor, not a copy edit. |
 | D17 | **`resolveProjection` and `safeInt` move into `engine/adapters/sql-text.ts`;** the four (respectively four) copies are deleted. `resolveProjection` takes `ColumnMeta[]` rather than each adapter's own `ReadTarget`. | F19, and `sql-text.ts:5-7` already commissions exactly this: *"The genuinely shared, driver-agnostic glue both SQL adapters' `read.ts` call — kept out of the adapter folders because duplicating it would guarantee they drift."* They drifted anyway, in the harmless direction (Postgres's copy grew two comment lines the others lack). Taking the column list instead of `ReadTarget` is required — the four `ReadTarget`s genuinely differ (`postgres/catalog.ts:261`, `mysql-family/catalog.ts:307`, `sqlite/catalog.ts:291`, `clickhouse/catalog.ts:260`) — and costs one argument at four call sites. |
 | D18 | **`postgres/catalog.ts:10`'s `'../../adapters/errors'` becomes `'../errors'`.** | F20's last line: it resolves to the same module and differs from all eight siblings for no reason. |
-| D19 | **No adapter folder gains or loses a file to satisfy the "fixed shape"** beyond D14's two new `errors.ts`. `kafka/produce.ts` keeps its name; `redis/`/`s3/` still have no `definition.ts`; `mongo`/`redis`/`s3`/`sqs` still have no `query.ts`. | F20. The remaining shape differences are facts about the engines — `caps.definition` is permanently false for Redis and S3 (ARCHITECTURE.md), a Kafka write *is* a produce and naming it `mutate.ts` would make the file lie about what it does, and an adapter with no SQL has no `query.ts` to write. §11's sentence describes the shape where the shape applies; inventing empty files to satisfy a table is the kind of shortcut AGENTS.md rules out. |
+| D19 | **No adapter folder gains or loses a file to satisfy the "fixed shape"** beyond D14's two new `errors.ts`. `kafka/produce.ts` keeps its name; `redis/`/`s3/` still have no `definition.ts`; `mongo`/`redis`/`s3`/`sqs` still have no `query.ts`. | F20. The remaining shape differences are facts about the engines — `caps.definition` is permanently false for Redis and S3 (ARCHITECTURE.md), a Kafka write *is* a produce and naming it `mutate.ts` would make the file lie about what it does, and an adapter with no SQL has no `query.ts` to write. §11's sentence describes the shape where the shape applies; inventing empty files to satisfy a table is the kind of shortcut CLAUDE.md rules out. |
 
 ### Cleanup and naming
 
@@ -593,7 +593,7 @@ new assertion written alongside a refactor proves only that the new code does wh
 does. What each step owes is *which existing suite re-confirms its area, run green*. (Sparse unit
 tests are their own queued phase.)
 
-Per AGENTS.md, only `smoke`, `startup`, `workbench`, `connections`, `secrets` and `sqlite` run
+Per CLAUDE.md, only `smoke`, `startup`, `workbench`, `connections`, `secrets` and `sqlite` run
 without Docker; everything else needs the macOS/Colima box or CI, and this authoring box has no
 `node_modules` at all. **The phase is not done until the full `test:ui` and `test:db` suites have
 been run green in an environment that can run them** — not step by step, but before the phase is

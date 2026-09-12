@@ -1,4 +1,4 @@
-// P4 §6.2: internal/postman is AGENTS.md's named category — a parser with several interacting
+// P4 §6.2: internal/postman is CLAUDE.md's named category — a parser with several interacting
 // rules over a real wire format, where every failure mode is silent (a dropped event[] is
 // invisible until someone opens the export in Postman; a scrambled sort_order looks like the
 // user's own ordering). The one assertion that matters is D6's rule at scale:

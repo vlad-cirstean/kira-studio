@@ -52,7 +52,7 @@ verified against the code they produced.
 3. Add a `darwin && cgo` FSEvents implementation (§3.2, D1/D8/D9/D10).
 4. Resolve symlinks once, at watcher construction, so FSEvents' realpath-only event paths can
    possibly match (§3.1, D7, F9 — the single highest-probability way to get this phase wrong).
-5. Add the two tests that the new seam makes possible and that meet `AGENTS.md`'s bar (§3.4).
+5. Add the two tests that the new seam makes possible and that meet `CLAUDE.md`'s bar (§3.4).
 6. Change nothing else — not `gitsession`, not `gitrpc`, not `gitsock`, not one line of TypeScript,
    not `CONTRACT_VERSION` (§4, D11).
 
@@ -78,13 +78,13 @@ verified against the code they produced.
 ### 0.4 Ground rules
 
 - Every decision in §2 cites a finding; every finding in §1 cites something read or run here.
-- `AGENTS.md` applies in full: no stubbed error handling, no `TODO: fix later`, no skipped
+- `CLAUDE.md` applies in full: no stubbed error handling, no `TODO: fix later`, no skipped
   validation. Where the FSEvents file cannot be verified here, the plan says so — it does not
   compensate with a stub or a "best effort" path.
 - **Reach for a library before hand-rolling.** D1 applies it; D2 and D3 record where it declines,
-  naming the requirement, as `AGENTS.md` requires.
+  naming the requirement, as `CLAUDE.md` requires.
 - Comments very concise, only where the code cannot say it itself.
-- Tests only where `AGENTS.md`'s bar is met. This phase clears it in exactly two new places (§3.4);
+- Tests only where `CLAUDE.md`'s bar is met. This phase clears it in exactly two new places (§3.4);
   everything else is the existing suite, unchanged.
 
 ---
@@ -153,7 +153,7 @@ Read in this container at `$(go env GOMODCACHE)/github.com/fsnotify/fsevents@v0.
 - **`go.mod` is two lines**: `module github.com/fsnotify/fsevents`, `go 1.17`. No requires. Nothing
   new enters the dependency graph beyond the module itself.
 - **BSD-3-Clause** (`LICENSE`, read in full: the three-clause Google/Go text). Fully open source, no
-  dual licensing, no gated feature — `AGENTS.md`'s bar.
+  dual licensing, no gated feature — `CLAUDE.md`'s bar.
 - **Published 2024-05-14** (`proxy.golang.org/.../@v/v0.2.0.info`), under the same GitHub org as the
   `fsnotify` this repo already depends on.
 - **API surface used**: `EventStream{Paths, Flags, Latency, Device, Resume, Events}`, `Start()`,
@@ -177,7 +177,7 @@ Also read here, at `notify@v0.9.3`:
 - Its `tree_recursive.go`/`tree_nonrecursive.go` bookkeeping exists to emulate recursion on backends
   that lack it. We want one recursive root and no emulation.
 
-### F6 — This repo already has three darwin+cgo packages, with a documented convention — so `AGENTS.md`'s fast loop is **not** the invariant this phase threatens
+### F6 — This repo already has three darwin+cgo packages, with a documented convention — so `CLAUDE.md`'s fast loop is **not** the invariant this phase threatens
 
 This is the decisive finding, and it inverts the prompt's own working assumption.
 
@@ -198,7 +198,7 @@ Their own comments already state the whole doctrine this phase needs, in the rep
 - `evaluate_other.go`: *"`New()`'s own startup log line is what makes a build that accidentally ships
   this way say so out loud."*
 
-So: **`AGENTS.md`'s load-bearing property is "`go test ./apps/kira-studio/internal/...` on Linux needs
+So: **`CLAUDE.md`'s load-bearing property is "`go test ./apps/kira-studio/internal/...` on Linux needs
 nothing but the Go toolchain", and G9 preserves it exactly** — a `darwin`-tagged file is invisible to
 a Linux build. What G9 does *not* preserve, because it was never true, is the literal reading
 "the product's own Go code is entirely cgo-free": three packages already break that on macOS, and
@@ -407,7 +407,7 @@ lines; nothing else enters the graph (F4: the module has no requires of its own)
 
 `fsevents` is chosen because it is the only maintained Go binding to the API SPEC's G9 row names, it
 is under the same org as the dependency it sits beside, it is BSD-3-Clause with no gated features
-(`AGENTS.md`'s licence bar checked at the package level *and* for the feature used — the whole
+(`CLAUDE.md`'s licence bar checked at the package level *and* for the feature used — the whole
 package is one licence and one feature), it has zero transitive cost, and its nine-symbol surface is
 small enough that F13's "unstable" warning is a legible risk rather than an open-ended one.
 
@@ -415,7 +415,7 @@ small enough that F13's "unstable" warning is a legible risk rather than an open
 
 - It is the backend for `!darwin || !cgo` (D5). Dropping it would leave the Linux dev/test loop with
   either no watcher at all or a hand-rolled inotify binding — a strictly worse outcome than today,
-  and `AGENTS.md`'s library rule says so.
+  and `CLAUDE.md`'s library rule says so.
 - It is what keeps `watcher_test.go`'s existing real-repository tests (`TestRepoWatcher_*`) running
   and meaningful in this container.
 - It is what makes `CGO_ENABLED=0 GOOS=darwin go vet` type-check (F7): the darwin-no-cgo build gets a
@@ -424,7 +424,7 @@ small enough that F13's "unstable" warning is a legible risk rather than an open
 
 ### D2 — `rjeczalik/notify` is declined, and the reason is its silent kqueue fallback, not its cgo requirement
 
-`AGENTS.md` requires naming the requirement when declining a library. The requirement is: **a darwin
+`CLAUDE.md` requires naming the requirement when declining a library. The requirement is: **a darwin
 build must never silently use kqueue.** That is the entire subject of this phase.
 
 `notify` fails it by construction (F5): `watcher_kqueue.go`'s build tag includes `darwin && !cgo`,
@@ -442,7 +442,7 @@ recursive-tree emulation is machinery this design does not want (F10).
 
 `github.com/ebitengine/purego` (v0.11.0, resolvable through the proxy here) can call C from Go on
 darwin without cgo, so a cgo-free FSEvents binding is *theoretically* possible. It is declined
-because **no such binding exists** — `AGENTS.md`'s rule is "reach for an existing, well-maintained
+because **no such binding exists** — `CLAUDE.md`'s rule is "reach for an existing, well-maintained
 library", and there is none to reach for. Writing one means hand-rolling CoreFoundation FFI:
 `CFStringCreateWithCString`/`CFArrayCreate` marshalling, `dispatch_queue_create`, and a
 `purego.NewCallback` trampoline for `FSEventStreamCallback` with its five raw pointer arguments —
@@ -675,14 +675,14 @@ What must **not** be claimed, by this plan, by the implementing agent, or in a c
   confirmation with a sharp expected value (near zero, ref-count-independent) rather than an open
   question with an unbounded one.
 
-### D13 — `AGENTS.md` needs no change; `docs/ARCHITECTURE.md:50` is already inaccurate and its wording is a human call (§11)
+### D13 — `CLAUDE.md` needs no change; `docs/ARCHITECTURE.md:50` is already inaccurate and its wording is a human call (§11)
 
-- **`AGENTS.md`:** its actual sentence is about *this environment* — "`go test`/`go build
+- **`CLAUDE.md`:** its actual sentence is about *this environment* — "`go test`/`go build
   ./apps/kira-studio/internal/...` need nothing but the Go toolchain … so prefer
   `./apps/kira-studio/internal/...` for a fast loop". That remains true and unqualified after G9
   (D4). The parenthetical justification ("the product's own Go code is entirely cgo-free") is the
   imprecise part, and it was already imprecise before this phase (F6). **This plan does not edit
-  `AGENTS.md`** — it is the orchestrating session's file and the change is a wording question, not
+  `CLAUDE.md`** — it is the orchestrating session's file and the change is a wording question, not
   an engineering one. §11 puts the proposed one-line wording in front of a human.
 - **`docs/ARCHITECTURE.md:50`** — *"The whole product binary is cgo-free for its own code — only
   Wails' own macOS bindings still need `CGO_ENABLED=1`"* — is **already false** (`internal/secrets`,
@@ -781,7 +781,7 @@ every existing `TestRepoWatcher_*` test in `watcher_test.go` must pass unchanged
 run against the fsnotify backend here, as they do today, and their continued passing is what proves
 §3.3's move is behaviour-preserving.
 
-**Two added**, each meeting `AGENTS.md`'s bar and neither restating a short function body:
+**Two added**, each meeting `CLAUDE.md`'s bar and neither restating a short function body:
 
 1. **`TestRepoWatcher_SymlinkedRepoStillClassifies`** — creates a fixture repo, makes a symlink to
    its parent directory, `Identify`s **through the symlink** so `CommonDir` is the unresolved path,
@@ -911,7 +911,7 @@ unscoped, this command fails inside Wails and always has (F7).
 container that reads `watcher_fsevents_darwin.go`'s bytes at all, and all it establishes is that the
 file parses and is formatted.
 
-**(e) `go build ./apps/kira-studio/internal/...` — green, and cgo-free**, i.e. `AGENTS.md`'s fast
+**(e) `go build ./apps/kira-studio/internal/...` — green, and cgo-free**, i.e. `CLAUDE.md`'s fast
 loop is intact (D4). A quick confirmation that the darwin file really is excluded:
 `go list -f '{{.GoFiles}}' ./apps/kira-studio/internal/gitclient` must not mention it.
 
@@ -1021,7 +1021,7 @@ measurement that has been open since G2 F10.
 The phase is three commits in one package. There is no independent second lane: C2 is written against
 C1's seam, and the only two files that could plausibly be split (`watcher_fsevents_darwin.go` and
 `watcher_fsnotify.go`) are the two implementations of the *same* interface — the exact case
-`AGENTS.md` names as not genuinely independent. Splitting them across agents would also put the
+`CLAUDE.md` names as not genuinely independent. Splitting them across agents would also put the
 unverifiable file in a head that never compiled the seam it implements, which is the worst possible
 allocation of this phase's one real risk.
 
@@ -1046,7 +1046,7 @@ are counter-intuitive:
 | Tuning `Latency`, `debounceWindow`, or the four-slot read pool | §10, on evidence from §7.3 |
 | Changing what P-i measures, or making it a real fd proxy | impossible (F14); it stays as the Linux inotify record it is |
 | Any wire/contract change, any `CONTRACT_VERSION` bump | D11 — and a bump is a signal to stop, not to proceed |
-| Editing `AGENTS.md` or `docs/ARCHITECTURE.md` | §11, a human call |
+| Editing `CLAUDE.md` or `docs/ARCHITECTURE.md` | §11, a human call |
 | Editing `docs/v1.3/SPEC.md`, or retro-editing G2's or G8's plan docs | house rule; this plan is the record |
 | A Linux/Windows FSEvents equivalent, or dropping `fsnotify` | D1 — fsnotify is the non-darwin backend and stays |
 | Shipping, `.vsix` packaging, DMG bundling | G10 |
@@ -1082,7 +1082,7 @@ are counter-intuitive:
 
 ## 11. Two things that want a human call, not an engineering one
 
-**(a) `AGENTS.md`'s cgo sentence.** Today it reads:
+**(a) `CLAUDE.md`'s cgo sentence.** Today it reads:
 
 > **`go test ./apps/kira-studio/internal/...` / `go build ./apps/kira-studio/internal/...` need
 > nothing but the Go toolchain** — the product's own Go code is entirely cgo-free
@@ -1099,8 +1099,8 @@ tightened:
 > build never sees — `internal/secrets`, `internal/metrics`, `internal/localauth`, `internal/gitclient`
 > — each with a `!darwin || !cgo` companion so `CGO_ENABLED=0 GOOS=darwin go vet` still type-checks.
 
-**This plan does not make that edit.** `AGENTS.md` is process/environment and belongs to the
-orchestrating session; it is also `AGENTS.md`'s own rule that a phase's discovery belongs in the
+**This plan does not make that edit.** `CLAUDE.md` is process/environment and belongs to the
+orchestrating session; it is also `CLAUDE.md`'s own rule that a phase's discovery belongs in the
 phase's plan doc, which is where it is. The call is: tighten it, or leave it and accept that a future
 reader may take the literal reading at face value.
 

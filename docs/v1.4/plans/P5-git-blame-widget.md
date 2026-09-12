@@ -19,7 +19,7 @@ probed directly against a real repo, this always produces exactly one, fully-hea
 abbreviated-header continuation lines — those only appear when a single invocation's output touches
 the same commit more than once, which a one-line request cannot). A whole-file incremental cache
 would need invalidation logic (on edit, on save, on `repo.changed`) for a benefit this widget never
-uses — one more root-container-style trap `AGENTS.md`'s "no speculative abstraction" rule exists to
+uses — one more root-container-style trap `CLAUDE.md`'s "no speculative abstraction" rule exists to
 head off.
 
 **A dirty buffer is never blamed against its own live content.** Probed: plain `git blame -L
@@ -131,7 +131,7 @@ convention as `log_test.go`/`difftree_test.go`) asserts each fixture's parsed `S
 more test, no fixture
 needed (pure byte literal, mirrors `TestParseWorktreeList_UnknownAttributeIgnored`): a hand-built
 single hunk carrying an attribute line this parser doesn't recognise must not error or misfile a
-later field. This is the "several interacting rules" case `AGENTS.md`'s testing bar names — five-plus
+later field. This is the "several interacting rules" case `CLAUDE.md`'s testing bar names — five-plus
 attribute lines, two optional flag lines, one sentinel-sha branch — real coverage, not a placeholder.
 
 ## 3. `internal/gitsession`: `RepoEntry.BlameLine`
@@ -402,7 +402,7 @@ carries the user to the view that does. No new `resolvePr` call site.
 
 ## 9. Verification
 
-Fast checks per commit (`go build`/`go vet`, `bun run typecheck`, `bun run lint`), `AGENTS.md`'s
+Fast checks per commit (`go build`/`go vet`, `bun run typecheck`, `bun run lint`), `CLAUDE.md`'s
 default. `go test ./internal/gitclient/... ./internal/gitsession/... ./internal/gitrpc/...` for the
 new Go coverage. `bun test` (workspace-wide — the new `git-ipc`/extension pure-logic specs).
 `KIRA_GIT_FIXTURES=write` run once to generate the three new fixtures, committed, then the suite

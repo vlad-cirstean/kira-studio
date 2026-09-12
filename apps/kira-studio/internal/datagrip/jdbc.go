@@ -10,7 +10,7 @@ import (
 
 // defaultPort mirrors packages/shared/domain/connection.ts's DEFAULT_PORT — kept as its own copy
 // here rather than a cross-language import, the same way every other Go package in this repo
-// re-states a handful of adapter constants (see AGENTS.md's per-adapter port literals).
+// re-states a handful of adapter constants (see CLAUDE.md's per-adapter port literals).
 var defaultPort = map[string]int{
 	"postgres":   5432,
 	"mariadb":    3306,

@@ -98,7 +98,7 @@ See §8 for the full argued list. The headline exclusions: **no automatic PR re-
 - **Staleness is always derived from git, never from stored plan state.** This one rule is what makes a partial restack safe (§D8): losing the plan, restarting the app, or resolving a conflict by hand in a terminal all leave a state the next `stack.list` reads correctly.
 - **Nothing this phase adds may ever rewrite a branch the user did not name.** P16 is the concrete hazard; D7 is the concrete refusal.
 - **Every git failure is classified from stderr text, never from an exit code** — `ClassifyOpError`'s existing rule, extended by two rows and no exceptions (D5).
-- `AGENTS.md` in full: no stubbed error handling, no skipped validation, named constants, table tests.
+- `CLAUDE.md` in full: no stubbed error handling, no skipped validation, named constants, table tests.
 
 ---
 

@@ -73,12 +73,12 @@
   connection (D6).
 - **Preview and execution are the same text.** §8.14's rule, applied to a REST adapter: `preview()`
   renders `POST <path>` plus the exact JSON body `mutate()` will send, byte for byte (D25).
-- Comments per `AGENTS.md`: only where the code cannot say it for itself — in particular D8's
+- Comments per `CLAUDE.md`: only where the code cannot say it for itself — in particular D8's
   `%2F` rule, D15's hidden default exchange, D22's `MAX_CELL_BYTES + 1` truncation trick, D25's
   `amq.default` spelling, and D26's "why there is no delete". None of those is re-derivable from the
   code.
 - Run `bun run lint`, `bun run typecheck` (all three projects) and `bun run build` on every commit.
-  `tests/db/rabbitmq.spec.ts` **needs Docker**, so per `AGENTS.md` it cannot be executed in Claude
+  `tests/db/rabbitmq.spec.ts` **needs Docker**, so per `CLAUDE.md` it cannot be executed in Claude
   Code's Linux web container; items that depend on a live broker are flagged **verify-on-container**
   in §8, exactly as P34/P36 flagged theirs.
 - Commits follow Conventional Commits, one per step of §4.
@@ -543,7 +543,7 @@ const props = defineProps<{ tabId: string; kind: 'kafka' | 'sqs' | 'rabbitmq' }>
 
 | # | Decision | Rationale |
 |---|----------|-----------|
-| D41 | **Docs the implementing session edits:** SPEC **§1** (RabbitMQ joins the in-scope engine list; the write-path sentence gains RabbitMQ among the immediate-apply engines, insert-only), **§5** (a sentence naming RabbitMQ as the third engine with permanently-false update/delete flags, and the first whose reason is "a message has no identity at all"), **§5.1** (a RabbitMQ row: *vhost → queues (ungrouped), exchanges (folder); bindings in the definition view* / `stream` / *"one poll per press — `basic.get` batches of ≤500 through the management API, no addressable position"* / *"no (`messages` is a snapshot)"* / *"`AbortSignal` on the HTTP request"*, plus the read-policy paragraph extended from "SQS read policy" to cover RabbitMQ's requeue-and-redeliver effect), **§8.9** (the stream view's third engine: routing key/properties/exchange columns, publish through the default exchange, no per-message delete), **§8.10** (an **Exchange** row in the right-click table), **§8.11** (the queue/exchange definition sections), **§11** (`adapters/rabbitmq/` in the tree, plus `'exchange'` noted in `shared/domain/tree.ts`), `shared/caps.ts`'s per-kind table, `README.md`'s engine table plus a footnote, and `AGENTS.md` (a "RabbitMQ adapter (HTTP management API, P37)" section: no dependency at all; the image must be a `-management` tag; the `%2F` vhost rule; the Docker gate; polling requeues). The **§10 phasing row is updated only once the phase is implemented.** | Standing practice (P34 D33, P35 D37, P36 D39). `AGENTS.md` earns a section for the same reason ClickHouse's did, inverted twice over: a future session will reasonably assume a message broker needs a driver and a build step, and the file should say it needs neither — and will reasonably reach for a plain `rabbitmq:4` image, which has no management plugin and therefore no API at all. |
+| D41 | **Docs the implementing session edits:** SPEC **§1** (RabbitMQ joins the in-scope engine list; the write-path sentence gains RabbitMQ among the immediate-apply engines, insert-only), **§5** (a sentence naming RabbitMQ as the third engine with permanently-false update/delete flags, and the first whose reason is "a message has no identity at all"), **§5.1** (a RabbitMQ row: *vhost → queues (ungrouped), exchanges (folder); bindings in the definition view* / `stream` / *"one poll per press — `basic.get` batches of ≤500 through the management API, no addressable position"* / *"no (`messages` is a snapshot)"* / *"`AbortSignal` on the HTTP request"*, plus the read-policy paragraph extended from "SQS read policy" to cover RabbitMQ's requeue-and-redeliver effect), **§8.9** (the stream view's third engine: routing key/properties/exchange columns, publish through the default exchange, no per-message delete), **§8.10** (an **Exchange** row in the right-click table), **§8.11** (the queue/exchange definition sections), **§11** (`adapters/rabbitmq/` in the tree, plus `'exchange'` noted in `shared/domain/tree.ts`), `shared/caps.ts`'s per-kind table, `README.md`'s engine table plus a footnote, and `CLAUDE.md` (a "RabbitMQ adapter (HTTP management API, P37)" section: no dependency at all; the image must be a `-management` tag; the `%2F` vhost rule; the Docker gate; polling requeues). The **§10 phasing row is updated only once the phase is implemented.** | Standing practice (P34 D33, P35 D37, P36 D39). `CLAUDE.md` earns a section for the same reason ClickHouse's did, inverted twice over: a future session will reasonably assume a message broker needs a driver and a build step, and the file should say it needs neither — and will reasonably reach for a plain `rabbitmq:4` image, which has no management plugin and therefore no API at all. |
 | D42 | **No change to `scheduler/`, `cache/`, `adapters/live.ts`, `adapters/sql-text.ts`, `main/`, any `Page` variant, any Zod page schema, or any other adapter.** The two exceptions are named: D34's additive `NodeKind`, and D32's four view branches. | §11's claim that a new engine is one folder. RabbitMQ returns the same `StreamPage` Kafka and SQS already return, on the same `'batch'` strategy SQS already uses, so the L2 cache key, the MessagePort transfer and the op-log path are all untouched. P36 could not make the stronger claim and said so; this phase can make it for everything except one enum member, and says which. |
 
 ## 4. Implementation order
@@ -551,7 +551,7 @@ const props = defineProps<{ tabId: string; kind: 'kafka' | 'sqs' | 'rabbitmq' }>
 Each step is one commit and must leave `bun run lint`, `bun run typecheck` (all three projects) and
 `bun run build` green. Steps 1–2 are the engine, 3–5 the app surface, 6–8 the tests, 9–10 demo data
 and docs. Steps 6–8 need Docker and cannot be executed in Claude Code's Linux web container
-(`AGENTS.md`); everything else can. **There is no dependency commit** — P36's step 2 has no
+(`CLAUDE.md`); everything else can. **There is no dependency commit** — P36's step 2 has no
 counterpart here, because D1 adds nothing to `dependencies` (only step 6 touches `package.json`, for
 one devDependency).
 
@@ -569,7 +569,7 @@ one devDependency).
    `index.ts`, `caps.ts`, `client.ts`, `query.ts`, `catalog.ts`, `read.ts`, `mutate.ts`,
    `definition.ts`, `errors.ts`) plus the one `registry.ts` loader line (D4–D9, D14–D31). This is the
    phase's large commit; the `Adapter` interface admits no partial implementation, and a half-adapter
-   with `E_UNSUPPORTED` stubs is exactly what `AGENTS.md`'s "scope left out is left out entirely"
+   with `E_UNSUPPORTED` stubs is exactly what `CLAUDE.md`'s "scope left out is left out entirely"
    forbids.
 3. **`feat(renderer): RabbitMQ's tree — virtual hosts, exchanges and their menu`** —
    `project/grouping.ts` (the `database` → "Virtual host" per-connection-kind override, `exchange`'s
@@ -824,7 +824,7 @@ docs/
                                          once implemented
   v1/design/kira-design-system/parts/_icons.html  MOD  + the i-rabbitmq symbol (D33)
   v1/plans/P37-rabbitmq-adapter.md  NEW  this document
-AGENTS.md                           MOD  + the "RabbitMQ adapter (HTTP management API)" section (D41)
+CLAUDE.md                           MOD  + the "RabbitMQ adapter (HTTP management API)" section (D41)
 README.md                           MOD  + the RabbitMQ engine row and footnote (D41)
 package.json                        MOD  + @testcontainers/rabbitmq (devDependency) — and NOTHING
                                          in `dependencies` (D1)
@@ -895,7 +895,7 @@ package.json                        MOD  + @testcontainers/rabbitmq (devDependen
 - [ ] `xvfb-run -a bun run test:ui` — `smoke`, `startup`, `workbench`, `connections` and `sqlite`
       pass in an environment with no Docker; `rabbitmq` **skips cleanly** there rather than erroring.
 - [ ] **verify-on-container:** `bun test tests/db/rabbitmq.spec.ts` green against a live
-      `rabbitmq:4.3.5-management-alpine`. Per `AGENTS.md` this cannot run in Claude Code's Linux web
+      `rabbitmq:4.3.5-management-alpine`. Per `CLAUDE.md` this cannot run in Claude Code's Linux web
       container (the outbound policy blocks Docker Hub's blob CDN), so it must be run on the
       macOS/Colima box or in CI before the phase is called done.
 - [ ] **verify-on-container:** the five facts this plan reasons about from source and documentation
@@ -909,7 +909,7 @@ package.json                        MOD  + @testcontainers/rabbitmq (devDependen
 - [ ] `bash scripts/demo-dbs/seed.sh` brings the tenth service up and seeds it, and a connection to
       `localhost:15672` browses it.
 - [ ] SPEC §1, §5, §5.1, §8.9, §8.10, §8.11, §11, `shared/caps.ts`'s table, the README and
-      `AGENTS.md` all describe what shipped.
+      `CLAUDE.md` all describe what shipped.
 
 ## 9. Open questions for the user
 

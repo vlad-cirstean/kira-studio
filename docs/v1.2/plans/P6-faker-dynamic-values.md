@@ -58,7 +58,7 @@
 > response history (P8), the raw inspector (P9), the timeline (P10), gRPC (P11). Also explicitly
 > not here: argument syntax (`{{$randomInt:1,100}}` — D10), a way to pin one generated value across
 > two occurrences (§8 OQ-2), any locale but `en`, any seed/determinism control, and any pre-request
-> scripting. Nothing is half-built toward any of them (`AGENTS.md`: *"Scope left out of a phase is
+> scripting. Nothing is half-built toward any of them (`CLAUDE.md`: *"Scope left out of a phase is
 > left out entirely, not half-implemented"*).
 >
 > **Every claim below was re-read against the tree, and the one bundling question was measured
@@ -367,7 +367,7 @@ references were dynamic ones stage 1 could not name.
 ### F10 — *Verified safe*: no wire change, therefore no bindings step and no mock-runtime edit
 Nothing in §0.1 adds a bound method, a `Deps` field, a struct field or a `packages/shared` type. So:
 `apps/kira-studio/frontend/bindings/**` needs no regeneration (P5 C5's mandatory `scripts/setup.sh`
-does **not** apply this phase — `AGENTS.md`'s `-names` warning has nothing to bite on);
+does **not** apply this phase — `CLAUDE.md`'s `-names` warning has nothing to bite on);
 `tests/ui/support/ipcChannels.ts` and `mockRuntime.ts` gain no channel, no FQN and no
 `WILDCARD_DEFAULTS` entry (P5's `variablesList`/`variablesListEnvironments` wildcards already cover
 the boot path §6.3's new spec takes); `tests/unit/go-ts-vocabulary-parity.spec.ts` stays
@@ -402,7 +402,7 @@ with no entry in the record fails `tsc` with a missing-property error; an entry 
 the tuple fails with an excess-property error. This is the same guarantee P15 gets from
 `fakerCall`'s `default`-less `switch` over `GeneratorId` (`generate.ts:83-136`), and it is why §6.2
 adds **no** test for the dispatch table: `bun run typecheck` already cannot pass with it wrong.
-`AGENTS.md`'s bar names *"thin pass-through wrappers"* as the category that gets nothing, and a
+`CLAUDE.md`'s bar names *"thin pass-through wrappers"* as the category that gets nothing, and a
 58-entry map of one-line faker calls whose completeness the compiler proves is squarely that.
 
 ---
@@ -440,7 +440,7 @@ adds **no** test for the dispatch table: `bun run typecheck` already cannot pass
 ## 4. Decisions
 
 ### D1 — No new library, and the check rather than the assertion
-`AGENTS.md` requires reaching for a maintained library first and **naming the requirement** when
+`CLAUDE.md` requires reaching for a maintained library first and **naming the requirement** when
 declining one. Here the library question is mostly already answered — `@faker-js/faker` *is* the
 library, adopted in v1.1 P15 and named by the SPEC row itself — so what is left is three narrower
 candidates, weighed honestly:
@@ -492,7 +492,7 @@ Four properties this buys, each of which was a requirement rather than a nicety:
    in the shared fixture. D18's parity guard is not weakened; it is simply not extended to a branch
    Go does not have.
 4. **Go gains no dead parameter.** Adding a resolver argument to `httpvars.Resolve` that nothing
-   could ever supply is precisely the half-implementation `AGENTS.md` forbids.
+   could ever supply is precisely the half-implementation `CLAUDE.md` forbids.
 
 **Why `resolved` and not a fifth kind.** `ReferenceKind` is a four-member union mirrored in Go
 (`resolve.go:13-18`) and used by the corpus JSON. A generated reference is, from every consumer's
@@ -593,7 +593,7 @@ arbitrary:
   plurals** (`$randomLoremSentences`, `$randomLoremParagraphs`, `$randomLoremLines`,
   `$randomLoremText`). Every one of these *does* have a working faker call — they fail (b), not (a).
   They are names a user would have to be told exist before they would ever type one, generating text
-  no API contract asks for. `AGENTS.md`'s no-gold-plating rule is the reason they are absent, and
+  no API contract asks for. `CLAUDE.md`'s no-gold-plating rule is the reason they are absent, and
   §8 OQ-4 states exactly what adding one later costs: one tuple entry, one record line, nothing else.
 - **`$randomCreditCardMask`.** Postman returns a 4-digit tail; faker's nearest
   (`finance.creditCardNumber()`) is a full number, which is a different thing wearing the same name.
@@ -731,7 +731,7 @@ current time in ISO-8601 UTC. Neither is random, so neither goes through faker: 
 `String(Math.floor(Date.now() / 1000))` and `new Date().toISOString()`. They live in the same
 `GENERATORS` record as everything else (D7 explains why they are not split out), with a one-line
 comment saying they read the clock rather than the RNG — the one place in that file where a comment
-earns its keep under `AGENTS.md`'s rule, because a reader would otherwise wonder why two entries
+earns its keep under `CLAUDE.md`'s rule, because a reader would otherwise wonder why two entries
 ignore their `f` argument.
 
 `$randomDatePast`/`Future`/`Recent` are the opposite and *do* go through faker, ISO-formatted with
@@ -747,7 +747,7 @@ timestamp rather than P15's column-type-dependent truncation.
 - **It would be real parsing.** A separator, an argument list, quoting, escaping, per-generator
   arity and per-generator type coercion — a genuinely new grammar inside the reference name, on top
   of an engine whose whole virtue (P5 D1) is having no expression language.
-- **The consequence for tests, stated plainly because `AGENTS.md` asks for it**: with no argument
+- **The consequence for tests, stated plainly because `CLAUDE.md` asks for it**: with no argument
   syntax there is **no new parsing in this phase at all** — the scanner is byte-identical and only
   the `$` branch's *action* changes. So the parser-shaped test the brief asked about does not apply,
   and the one unit test §6.2 does add is for a different property (per-occurrence freshness), not
@@ -781,7 +781,7 @@ Read-only: nothing here edits, saves, or reaches Go.
 **The alternative — ship no UI at all and let P13 do it — was weighed and declined.** P13 is a
 consistency/polish pass over surfaces that exist, not the phase that invents a missing one, and a
 dynamic-values feature whose vocabulary is documented only in a plan file is not shippable. The
-counter-pressure (`AGENTS.md`'s no-gold-plating, and the SPEC row asking only for resolution) is why
+counter-pressure (`CLAUDE.md`'s no-gold-plating, and the SPEC row asking only for resolution) is why
 the surface is one read-only dialog reusing an existing primitive and an existing menu seam, rather
 than an autocomplete inside the URL and body editors — which is the genuinely expensive version,
 touches CodeMirror, and is handed to P13/§8 OQ-7 instead.
@@ -820,7 +820,7 @@ is no error state to design.
 ## 5. Implementation order
 
 Seven commits. C1–C2 add capability with nothing mounted (each builds and tests on its own); C3–C5
-are one user-visible slice each; C6–C7 are the tests and the docs. Per `AGENTS.md`, run the fast
+are one user-visible slice each; C6–C7 are the tests and the docs. Per `CLAUDE.md`, run the fast
 checks (`lint`, `typecheck`, `build`) per commit and the expensive suites once at the end.
 **No Go command is needed at any point** (F9), and **no bindings regeneration** (F10).
 
@@ -895,7 +895,7 @@ inside `index-*.js`, means the eager/lazy split in D5 leaked and the fix is in `
 static import where a dynamic one belongs).
 
 ### 6.2 The unit tests, and what deliberately gets none
-`AGENTS.md`'s bar: a test earns its keep only for *"a parser/splitter with several interacting
+`CLAUDE.md`'s bar: a test earns its keep only for *"a parser/splitter with several interacting
 rules"*, *"a decision structure too large to hold in your head"* and similar; *"thin pass-through
 wrappers"* and *"anything that mostly restates a short function body"* get nothing.
 
@@ -930,7 +930,7 @@ Go has no dynamic branch to be in parity with):
    interaction between the five branches, which is the part of the scanner a change to one branch
    can break in another.
 
-Three, not more: `AGENTS.md`'s *"when torn between two similar tests, delete"*.
+Three, not more: `CLAUDE.md`'s *"when torn between two similar tests, delete"*.
 
 ### 6.3 The new UI spec — `tests/ui/http-dynamic-values.spec.ts`
 Its own file (§0.3). `tests/ui` drives the real built bundle in real WebKit with both wire planes
@@ -964,7 +964,7 @@ variables fixture, and `httpSend` is an existing channel.
 Short, because this phase is renderer-only and `tests/ui` runs the real bundle in real WebKit.
 
 1. **The lazy chunk loading through Wails' own `wails://` asset handler** rather than over the
-   plain HTTP file server `tests/ui` uses. `AGENTS.md` records that `/wails/runtime` and the custom
+   plain HTTP file server `tests/ui` uses. `CLAUDE.md` records that `/wails/runtime` and the custom
    scheme are unreachable from a desktop build on Linux, so no tier here can observe it.
    **Stands in for it:** *Generate data…* already fetches a chunk the identical way in production
    (`views/grid/fakeData/generate.ts`'s `await import()`, shipped since v1.1 P15), and §6.3's tests

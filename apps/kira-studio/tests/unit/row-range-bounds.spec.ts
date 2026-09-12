@@ -7,7 +7,7 @@ import {
 } from '../../frontend/src/views/shared/page/columns';
 
 // Finding 4 (round 2) — this arithmetic's real coverage (P22 iter2 D3: velocity-adaptive,
-// direction-biased row overscan — cursor/pagination-style boundary cases, AGENTS.md's own bar for
+// direction-biased row overscan — cursor/pagination-style boundary cases, CLAUDE.md's own bar for
 // a dedicated unit test) was genuinely lost, not "moved", when tests/unit/row-range.spec.ts was
 // deleted in P22 Pass B's cutover (commit 52b8a80) — kiraSlickGrid.ts and kira-slick-grid.spec.ts
 // both carried a stale, circular comment claiming the coverage lived in kira-slick-grid.spec.ts,

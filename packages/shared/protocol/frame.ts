@@ -26,7 +26,7 @@ import * as wire from './wire';
 // The renderer<->engine data plane's TypeScript end (P11): the mirror of Go's internal/page/
 // encode.go and internal/adapterhost/frame.go. Every response, error and event frame this process
 // receives comes through decodeFrame, which checks the "KIF1" file identifier and throws on
-// anything else — there is no JSON fallback (AGENTS.md forbids a compatibility shim).
+// anything else — there is no JSON fallback (CLAUDE.md forbids a compatibility shim).
 
 function decodeChunk(c: wire.Chunk): TextColumnChunk {
   const data = c.dataArray();

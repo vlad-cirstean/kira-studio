@@ -4,7 +4,7 @@
 > passes (broad landscape, then a deep dive with real measurements — both under `docs/v1.4/plans/`'s
 > discipline, not repeated here). **Session override, this chapter only**: per explicit user
 > instruction, this plan and its implementation are both done by the orchestrating session directly,
-> not handed to a Sonnet implementer subagent — `AGENTS.md`'s own "Opus plans, Sonnet implements"
+> not handed to a Sonnet implementer subagent — `CLAUDE.md`'s own "Opus plans, Sonnet implements"
 > line stays written as-is; only this chapter's practice departs from it.
 
 ## 0. Baseline and the one fact that reshapes the phase
@@ -104,8 +104,8 @@ mid-test on).
 4. Move `ipcfixture/testdata/*.fixture.json` alongside each destination, resolved through the same
    root helper from step 2.
 5. Delete `internal/ipcfixture` once empty. `KIRA_IPC_FIXTURES=write go test ./apps/kira-studio/...`
-   (AGENTS.md's documented regen command) now runs each generator inside its adapter's own suite —
-   update that AGENTS.md line to the new invocation once this lands.
+   (CLAUDE.md's documented regen command) now runs each generator inside its adapter's own suite —
+   update that CLAUDE.md line to the new invocation once this lands.
 
 ## 4. CI: cut the `ui-timing` → `ui` dependency edge
 
@@ -184,7 +184,7 @@ paired (styling half vs. wire half) — co-locate if it's cheap, don't delete ei
 
 ## 9. Verification
 
-Fast checks (`go build`, `go vet`, `bun run typecheck`, `bun run lint`) per commit, as AGENTS.md's
+Fast checks (`go build`, `go vet`, `bun run typecheck`, `bun run lint`) per commit, as CLAUDE.md's
 default. The expensive check for this phase specifically **is** the phase's own subject — run
 `go test ./...` (both with and without `-race` on the touched packages) and `bun run test:ui` once
 near the end, confirm the new `t.Parallel()` runs are race-clean, and record the before/after

@@ -58,12 +58,12 @@ import { connectionRow, expandRow, findRow, openRowMenu } from './support/tree';
 //    keyboard path *or* UI button surviving underneath: the Command Palette itself has no reachable
 //    affordance besides that same broken push event (no button opens it), so even the commands it
 //    would otherwise reach (`runCommand('view.find')` et al.) are unreachable from here. This is the
-//    same root cause as (1) above, not a second, unrelated gap — worth a line in `AGENTS.md` since it
+//    same root cause as (1) above, not a second, unrelated gap — worth a line in `CLAUDE.md` since it
 //    will recur for any future port touching a `global: true` shortcut or a live `control.onXxx`
 //    push. The two view-level behaviours this would have exercised a second way (Run Statement/Run
 //    All, grid refresh) are already covered by `console.spec.ts` and the toolbar-button paths below,
 //    so nothing about the underlying *feature* goes untested — only the menu-triggering mechanism.
-// 3. **`window.kira`-based helpers have no replacement** (confirmed P57 finding, `AGENTS.md`):
+// 3. **`window.kira`-based helpers have no replacement** (confirmed P57 finding, `CLAUDE.md`):
 //    `createConnection()`'s raw `window.kira.connectionsCreate(...)` call becomes a real
 //    dialog-driven creation (`connectAndExpand`, matching `console.spec.ts`'s own helper); `getOps()`
 //    (`window.kira.opsRecent`) has nothing to port onto given (1) above.
@@ -77,7 +77,7 @@ import { connectionRow, expandRow, findRow, openRowMenu } from './support/tree';
 // `navigator.clipboard.writeText`/`readText` interface either way, so this changes nothing about
 // what's under test, only which implementation answers it.
 //
-// A second, more surprising environment finding, worth its own line in `AGENTS.md`:
+// A second, more surprising environment finding, worth its own line in `CLAUDE.md`:
 // **Playwright's bundled WebKit reports `navigator.userAgent` as `Macintosh` unconditionally**,
 // confirmed by direct experiment (`Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)
 // AppleWebKit/605.1.15 …`) regardless of the actual host OS this sandbox runs on (Linux).

@@ -95,7 +95,7 @@ colouring in one window repaints the grid in every open window, with no P9 work 
   tree at the cited `file:line`, or **[verified here]** where it was executed in this sandbox.
 - **No new dependency, no new abstraction.** The whole phase is one schema field, one Go field, two
   repo lines, one checkbox, one early return and one table row.
-- **No unit test.** `AGENTS.md`'s bar — a boolean setting and a lookup-table row are not
+- **No unit test.** `CLAUDE.md`'s bar — a boolean setting and a lookup-table row are not
   "genuinely complex or deeply-nested logic"; the `tests/ui/` spec in §6 is the guard, and it is the
   only new test this phase adds.
 - **Comments only where the code cannot say it for itself.** Exactly one comment is genuinely owed:
@@ -310,7 +310,7 @@ plumbing come free: `SettingsDialog.vue:24-36`'s open-time `initialSettings` clo
 revert-to-defaults button will read. **Recommendation: implement P9 now, against today's pattern.**
 
 **D8 — One new test, in `tests/ui/`.** Three assertions in one spec (§6). No unit test: per
-`AGENTS.md`, a boolean leaf and a lookup-table row are plumbing, and the Go repo's per-leaf
+`CLAUDE.md`, a boolean leaf and a lookup-table row are plumbing, and the Go repo's per-leaf
 read/write is a CRUD round-trip the bar explicitly excludes.
 
 ---

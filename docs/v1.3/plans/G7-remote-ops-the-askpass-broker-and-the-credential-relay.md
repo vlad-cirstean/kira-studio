@@ -185,7 +185,7 @@ Everything in §9's table, but the ones most likely to be mistaken for G7 work:
 ### 0.4 Ground rules
 
 - Every decision in §2 cites a finding; every finding in §1 cites something read or run here.
-- `AGENTS.md` applies in full: **no stubbed error handling, no `TODO: fix later`, no skipped
+- `CLAUDE.md` applies in full: **no stubbed error handling, no `TODO: fix later`, no skipped
   validation.** Scope left out of this phase is left out *entirely*.
 - **No shell in any git spawn.** argv-only through `os/exec`, exactly as `gitclient` has done since
   G2. The one `sh` script this phase writes is not a git spawn — it is the shim `git` itself execs,
@@ -194,7 +194,7 @@ Everything in §9's table, but the ones most likely to be mistaken for G7 work:
   that outlives one prompt (D9). G1's pairing-token posture — salted hash only, never reversible —
   is the bar; a credential clears it by never being retained at all.
 - **Comments very concise, only where the code cannot say it itself.**
-- **Tests only where `AGENTS.md`'s bar is met** (D24). G7 clears it in eight places.
+- **Tests only where `CLAUDE.md`'s bar is met** (D24). G7 clears it in eight places.
 - **Fixture repositories scope their git config to themselves** — G4 D15's `fixtureEnv()`
   (`GIT_CONFIG_GLOBAL=/dev/null`, `GIT_CONFIG_SYSTEM=/dev/null`, `-c commit.gpgsign=false`), copied
   by every new fixture builder, *including the bare-remote builder this phase adds*. **Never
@@ -1295,7 +1295,7 @@ never runs a background fetch.
 
 ### D24 — What gets a test, and what does not
 
-`AGENTS.md`'s bar, applied honestly. **Tested:**
+`CLAUDE.md`'s bar, applied honestly. **Tested:**
 
 - **`gitaskpass` (broker + shim + helper), end to end over a real socket, with the helper-process
   seam** — the answer path; the dismissal path; the broker-timeout path; the owning-connection-dies
@@ -1325,7 +1325,7 @@ never runs a background fetch.
   remote**. **This is the phase's real end-to-end proof.**
 
 **Not tested, deliberately**: `gitops`' argv builders (each returns one literal slice —
-`AGENTS.md`'s "thin pass-through"; proven by the integration tier running them), `gitrpc`'s handlers
+`CLAUDE.md`'s "thin pass-through"; proven by the integration tier running them), `gitrpc`'s handlers
 (thin dispatch), the ref-snapshot diff (a map comparison exercised by every integration fetch), and
 `gitclient`'s two new `Spec` fields (a field appended to an env slice and a callback called in a
 loop — exercised by every remote-op test).
@@ -1588,7 +1588,7 @@ Remove `kiraVersion.protectedBranches` and `kiraVersion.fetch.autoInterval` from
 `workbench/SettingsDialog.vue`'s existing **Connected editors** section gains a "Git remote
 operations" sub-label with two controls — protected-branch patterns (one per line) and auto-fetch
 interval in minutes — following the file's own `draft`/`pendingPatch`/`resetLeaf` conventions
-verbatim. Bindings are regenerated per `AGENTS.md` (`wails3 task common:generate:bindings`, with
+verbatim. Bindings are regenerated per `CLAUDE.md` (`wails3 task common:generate:bindings`, with
 `-names`) if and only if a bound service's method set changes; adding leaves to `model.Settings`
 does not change one, so this is expected to be a plain frontend edit.
 
@@ -1618,7 +1618,7 @@ The only new *runtime* artefacts are the broker's own temp directory, its `sh` s
 
 Ten commits. `go build ./apps/kira-studio/internal/...`, `go test` over the packages touched, `bun
 run lint` and `bun run typecheck` run after **each** — they are fast. The expensive tier (§7.1) runs
-once at C10, per `AGENTS.md`'s "implement the whole plan first, then test once".
+once at C10, per `CLAUDE.md`'s "implement the whole plan first, then test once".
 
 - **C1** `feat(gitclient): a stderr tee, per-spec env, and a session-detached spawn`
   — §3.1 + §3.2 (D5/D6/D11). Three fields and one word; kept its own commit because it is the one
@@ -1822,7 +1822,7 @@ and all six carried it through.
 1. **The phase is one dependency chain with an unusually tight centre.** The broker (C2) is
    meaningless without the runner's new env field (C1) and unreachable without `main.go`'s dispatch
    (C3); the executor (C8) needs the argv, the classifier, the pre-flights, the settings *and* the
-   broker at once. That is `AGENTS.md`'s textbook case of *not* "genuinely independent".
+   broker at once. That is `CLAUDE.md`'s textbook case of *not* "genuinely independent".
 2. **C8 is where the phase's real risk lives** and it is a risk of *interaction*, not of volume: the
    shared slot, the detached context, the credential relay's four bounds and the progress tee all
    meet in `RunRemote`, and its correctness claims are negative ones ("this cannot hang", "this

@@ -44,7 +44,7 @@
 - **No half-implementations.** A discrepancy that is fixed is fixed everywhere it occurs — four
   hand-rolled page-size pickers, five duplicated definition-section stylesheets, three byte
   formatters — or it is named in §6 and left entirely alone.
-- Comments per AGENTS.md: only where the code cannot say it for itself. Every `D` below that
+- Comments per CLAUDE.md: only where the code cannot say it for itself. Every `D` below that
   encodes a non-obvious constraint gets one line at its implementation site, never a paraphrase.
 - Run `bun run lint`, `bun run typecheck` (all three projects) and `bun run build` throughout;
   `xvfb-run -a bun run test:ui` from step 3 on. `bun run test:db` is untouched — no adapter,

@@ -5,7 +5,7 @@ import { planWarnings, recipeFor } from '../../frontend/src/views/grid/fakeData/
 import { parseTypeBounds } from '../../frontend/src/views/grid/fakeData/typeBounds';
 import type { Recipe } from '../../frontend/src/views/grid/fakeData/types';
 
-// P15 D12: guards the two subjects AGENTS.md's unit-test bar actually names — recipeFor's
+// P15 D12: guards the two subjects CLAUDE.md's unit-test bar actually names — recipeFor's
 // seven-rule decision table (a "decision structure large enough that no one can hold it in their
 // head") and parseTypeBounds's small per-dialect lexer (real boundary cases, not restated logic).
 

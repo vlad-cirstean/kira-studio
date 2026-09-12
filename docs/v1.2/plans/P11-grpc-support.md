@@ -12,7 +12,7 @@
 > transports, server-side TLS client certificates, gRPC `auth` beyond metadata, compare-two-calls
 > (P8 D12's dialog stays HTTP-only), Postman-format import/export of a gRPC request (F22 — the
 > format has no representation for one), and `.proto` *editing* of any kind. Nothing here is
-> half-built toward any of them (`AGENTS.md`: *"Scope left out of a phase is left out entirely, not
+> half-built toward any of them (`CLAUDE.md`: *"Scope left out of a phase is left out entirely, not
 > half-implemented"*).
 >
 > **Every claim below was re-read against the tree, not inherited from P2's/P4's/P8's/P9's/P10's
@@ -78,7 +78,7 @@
 | `apps/kira-studio/tests/ui/support/mockRuntime.ts` | one `emitWailsEvent` helper (F20) and the new FQN entries |
 | `apps/kira-studio/tests/unit/go-ts-vocabulary-parity.spec.ts` | the two widened vocabularies |
 | `docs/ARCHITECTURE.md` | the gRPC paragraph, the dependency row, the two corrected forward pointers |
-| `AGENTS.md` | nothing — no new environment fact (§3) |
+| `CLAUDE.md` | nothing — no new environment fact (§3) |
 
 ### 0.2 Out of scope, explicitly
 
@@ -480,12 +480,12 @@ Measured by building minimal programs that reference each set and comparing agai
 
 So this is the largest single dependency addition the app has taken — and it is the *same order* as
 what is already linked in for the database side, in a binary that already links ten adapters.
-`AGENTS.md` requires naming the cost rather than discovering it; §6.1 makes the packaged-app size
+`CLAUDE.md` requires naming the cost rather than discovering it; §6.1 makes the packaged-app size
 delta an explicit check, and OQ-7 records the one lever if it ever matters (`protocompile` is only
 needed for the `.proto` source path and is ~1 MB of the total; the rest is not separable).
 
 Licences, checked at package level: `grpc-go` Apache-2.0, `protobuf-go` BSD-3-Clause,
-`protocompile` Apache-2.0. All fully open source with no gated tier — `AGENTS.md`'s own rule.
+`protocompile` Apache-2.0. All fully open source with no gated tier — `CLAUDE.md`'s own rule.
 
 ### F16 — *Verified by running it*: `grpc.NewClient` is lazy, which is what makes a per-call connection affordable
 ```
@@ -620,7 +620,7 @@ method picker's type-ahead, so the browser needs no new primitive either. **`pri
 ## 4. Decisions
 
 ### D1 — The library check, stated rather than asserted
-`AGENTS.md` requires reaching for a maintained library first and **naming the requirement** when
+`CLAUDE.md` requires reaching for a maintained library first and **naming the requirement** when
 declining one. Four questions.
 
 - **The gRPC transport: `google.golang.org/grpc` v1.83.2, adopted.** The reference implementation,
@@ -925,7 +925,7 @@ what keeps it protocol-neutral rather than becoming a two-protocol module.
 
 ### D10 — Secrets: the checklist, field by field
 Every place a resolved secret could reach persistence, a copyable surface, or a log — with what
-this phase does about each. `AGENTS.md` and §0.3 make this a hard requirement, not a review item.
+this phase does about each. `CLAUDE.md` and §0.3 make this a hard requirement, not a review item.
 
 | Carrier | Risk | What happens |
 |---|---|---|
@@ -1187,7 +1187,7 @@ Stated as an invariant with a check behind it, the way P10 D16 stated its own.
 
 Eleven commits — the largest phase in this chapter, and the sequence is chosen so the first five
 add capability with nothing mounted, C6–C9 make it visible one surface at a time, and C10–C11 are
-tests and docs. Per `AGENTS.md`, run the fast checks (`lint`, `typecheck`, `build`, `go build`,
+tests and docs. Per `CLAUDE.md`, run the fast checks (`lint`, `typecheck`, `build`, `go build`,
 `go vet`) per commit and the expensive suites once at the end.
 
 ### C1 — `chore(deps): grpc-go, protobuf-go and protocompile`
@@ -1267,7 +1267,7 @@ OQ-9 and P10 OQ-8** so the wrong claim does not outlive this phase.
 **`-race` is not optional.** D8's coalescing buffer is written by the goroutine reading the stream
 and read by the flush timer; `grpc-go` invokes nothing of ours concurrently, but the timer is ours.
 
-Two bindings checks, both from `AGENTS.md`'s warnings and both learned from P9/P10's own notes
+Two bindings checks, both from `CLAUDE.md`'s warnings and both learned from P9/P10's own notes
 (`apps/kira-studio/frontend/bindings/**` is git-ignored, so inspect the regenerated output directly):
 
 1. Confirm the regenerated `grpcservice.ts` calls `$Call.ByName("…bridge.GrpcService.Call", …)` and
@@ -1281,13 +1281,13 @@ records and no fifth — this phase adds no `await import()`.
 
 **One size check, once**, because F15 measured that this is the app's largest single dependency
 addition: record the packaged `.app` size before and after and put the delta in the commit message
-for C1. It is not a budget and it is not repeated; it is the number `AGENTS.md` requires be named
+for C1. It is not a budget and it is not repeated; it is the number `CLAUDE.md` requires be named
 rather than discovered.
 
 ### 6.2 The Go tests
 Driven against a real in-process `grpc.Server` registered from a `protocompile`-compiled descriptor
 with no generated code — the technique the probes proved (F1, F5). This earns dedicated tests under
-`AGENTS.md`'s *"a parser/splitter with several interacting rules"* and *"concurrency (ordering,
+`CLAUDE.md`'s *"a parser/splitter with several interacting rules"* and *"concurrency (ordering,
 backpressure, cancellation, races)"* clauses; everything that would merely restate a short function
 body is listed at the end as deliberately untested.
 
@@ -1332,7 +1332,7 @@ JSON containing only the HTTP items, and reports the skip (F22, D12).
 
 **Explicitly not tested**: that `grpc-go` dials, that `protojson` round-trips a scalar, that a
 defaulted SQL column defaults, that the `Schema` struct marshals. Each restates a short function
-body or a library's own contract — `AGENTS.md`'s *"everything else gets nothing"*.
+body or a library's own contract — `CLAUDE.md`'s *"everything else gets nothing"*.
 
 ### 6.3 No new unit spec
 Nothing this phase adds to the renderer is logic with interacting rules: stage-1 substitution is
@@ -1386,7 +1386,7 @@ unrunnable, with what was measured or reasoned instead, in the shape P9 §6.5 an
    window is a judgement (D8) that a real firehose should confirm, and D15's 10,000-message live
    ceiling with it.
 5. **A real secret in real metadata, end to end.** *Not run* — no macOS Keychain here
-   (`KIRA_INSECURE_SECRETS=1`, `AGENTS.md`). D10's masking is a pure function over the resolver's
+   (`KIRA_INSECURE_SECRETS=1`, `CLAUDE.md`). D10's masking is a pure function over the resolver's
    `Used()` map and is unit-testable; the persisted-form claim is verified by reading what `Record`
    is handed, exactly as P8 F3 and P10 F16 were.
 6. **The packaged `.app` size delta** (§6.1). *Not run* — no macOS packaging here. F15's

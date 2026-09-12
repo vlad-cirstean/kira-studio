@@ -458,7 +458,7 @@ preserving today's behaviour for everything under `tests/ui/` (D2).
 ```
 
 `test:ipc:fe` deliberately has **no `pre` hook**. `pretest:ui` runs `native-electron-build.sh`, which
-cannot fetch Electron's C++ headers in this sandbox (AGENTS.md's Kafka section, F20) — and the
+cannot fetch Electron's C++ headers in this sandbox (CLAUDE.md's Kafka section, F20) — and the
 mocked frontend tier loads no adapter at all, so it needs no native driver by construction. That
 makes it the one Playwright command in this repo that runs unconditionally in Claude Code's Linux
 containers.
@@ -488,7 +488,7 @@ gives each file its own container via the module memo (F11 reason 2, inverted in
 
 | # | Decision | Rationale |
 |---|----------|-----------|
-| **D1** | **The backend tier is its own suite — `tests/ipc/**/*.backend.spec.ts`, run by `bun run test:ipc:be` under `ELECTRON_RUN_AS_NODE=1 electron`. It does not join `tests/db/`.** It *reuses* `tests/db/support/*`'s container lifecycle and `tests/db/fixtures/*`'s seed data by direct import, exactly as `tests/electron-db/kafka.spec.ts:18-21` already does, so no container is stood up twice within a run and no seed data is duplicated. `tests/db/` itself is not edited. | Four grounds, the first two mechanical. **(a) `bun run test:db` is `bun test tests/db` — a directory glob** (`package.json:29`). A `node:test` file dropped in that directory would be picked up by Bun and fail on the spot. `tests/electron-db/` exists for precisely this reason and its own header says so (`kafka.spec.ts:23-28`: *"this suite left Bun for `ELECTRON_RUN_AS_NODE=1 electron` … because Bun cannot load the native driver at any ABI"*). **(b) The runtime is not negotiable.** The tier must cover sqlite (this repo's Bun lacks `node:sqlite` — AGENTS.md's SQLite section) and kafka (Bun cannot load the driver at any ABI — ARCHITECTURE.md:199-206). Both work under Electron-as-node; F8 measured it. **(c) F12 — `bun test` runs a directory's files in one process**, so folding in would share `engine/cache.ts`'s L2 singleton and `adapters/live.ts`'s registry between a suite that asserts cache behaviour and a suite that bypasses the cache entirely. **(d) Different subject.** `tests/db/`'s scope is stated in ARCHITECTURE.md:545-556 and SPEC.md §9.1 as *the adapter against a real container*; F2 shows the new tier's subject is the four layers above the adapter. P44 D49's practical half applies verbatim too: `bun run test:db` cannot go green in any box without Docker, so burying a differently-gated tier inside it destroys that tier's own signal. **What D1 does *not* say:** it does not put the backend half in a *different folder from its frontend twin*. The user's binding rule is colocation of the two halves and the fixture, and §2.1 honours it literally — "separate suite" here means a separate command, runtime and tsconfig include, not a separate directory from the file that shares its fixture. |
+| **D1** | **The backend tier is its own suite — `tests/ipc/**/*.backend.spec.ts`, run by `bun run test:ipc:be` under `ELECTRON_RUN_AS_NODE=1 electron`. It does not join `tests/db/`.** It *reuses* `tests/db/support/*`'s container lifecycle and `tests/db/fixtures/*`'s seed data by direct import, exactly as `tests/electron-db/kafka.spec.ts:18-21` already does, so no container is stood up twice within a run and no seed data is duplicated. `tests/db/` itself is not edited. | Four grounds, the first two mechanical. **(a) `bun run test:db` is `bun test tests/db` — a directory glob** (`package.json:29`). A `node:test` file dropped in that directory would be picked up by Bun and fail on the spot. `tests/electron-db/` exists for precisely this reason and its own header says so (`kafka.spec.ts:23-28`: *"this suite left Bun for `ELECTRON_RUN_AS_NODE=1 electron` … because Bun cannot load the native driver at any ABI"*). **(b) The runtime is not negotiable.** The tier must cover sqlite (this repo's Bun lacks `node:sqlite` — CLAUDE.md's SQLite section) and kafka (Bun cannot load the driver at any ABI — ARCHITECTURE.md:199-206). Both work under Electron-as-node; F8 measured it. **(c) F12 — `bun test` runs a directory's files in one process**, so folding in would share `engine/cache.ts`'s L2 singleton and `adapters/live.ts`'s registry between a suite that asserts cache behaviour and a suite that bypasses the cache entirely. **(d) Different subject.** `tests/db/`'s scope is stated in ARCHITECTURE.md:545-556 and SPEC.md §9.1 as *the adapter against a real container*; F2 shows the new tier's subject is the four layers above the adapter. P44 D49's practical half applies verbatim too: `bun run test:db` cannot go green in any box without Docker, so burying a differently-gated tier inside it destroys that tier's own signal. **What D1 does *not* say:** it does not put the backend half in a *different folder from its frontend twin*. The user's binding rule is colocation of the two halves and the fixture, and §2.1 honours it literally — "separate suite" here means a separate command, runtime and tsconfig include, not a separate directory from the file that shares its fixture. |
 | **D2** | **The frontend tier runs `fullyParallel: true` at `workers: '50%'`. The `tests/ui/` tier stays `fullyParallel: false, workers: 1`, byte-for-byte. The backend tier runs one Electron process per spec file, sequentially, with a concurrency knob defaulting to 1.** One `playwright.config.ts` with two projects, not two config files. | **The frontend tier: measured, not argued.** F9 — four concurrent real Electron apps, `--fully-parallel`, five repeats: **20/20 pass, 25.6 s, zero flakes**. It contends over nothing: no container, no socket, no adapter; per-test `KIRA_HOME` (`tests/ui/fixtures.ts:29-33`) and per-`KIRA_HOME` Chromium `userData` (`src/main/index.ts:24-26`) mean no shared profile or singleton lock. **`tests/ui/` stays serial** for the reason F11 gives first: `budgets`/`perf`/`memory`/`startup`/`leaks` assert wall-clock and RSS numbers, and CPU contention from concurrent Electron apps would make them flake — the user's own *"if they don't flake"* clause, applied honestly. Container cost (F11.2) and `fullyParallel`'s within-file semantics against a shared `beforeAll` container (F11.3) each reinforce it. **One config, because F10 measured that Playwright 1.62.1 honours a per-project `workers` limit** (`playwright/types/test.d.ts:752`, inside `TestProject`) — the scratch two-project run showed the serial project strictly sequential while the parallel one overlapped. Two config files would have been the fallback and are not needed. **The backend tier is not parallelised, and the reason is in the helpers, not in caution.** Every container helper is a module-scope memo (`support/mariadb.ts:28-33`, `support/redis.ts:27-32`, `support/sqlite.ts:37-42`); parallel *within* a process would hand concurrent tests one container and one `engine/cache.ts` singleton, and `engine/adapters/live.ts` keys live adapters by `connectionId`, which every fixture in a given adapter folder shares. Across *processes* it is safe by construction — separate registries, separate memos, separate containers — so `run-ipc-backend.sh` takes a concurrency argument; it defaults to **1** because N concurrent processes means N concurrent database containers plus N Electron runtimes, and this tier's value is correctness, not wall clock. |
 
 ### The rest
@@ -512,7 +512,7 @@ gives each file its own container via the module memo (F11 reason 2, inverted in
 
 | Spec | Lines | Kept because |
 |---|---|---|
-| **`tests/ui/sqlite.spec.ts`** | 604 | **The Docker-free anchor.** It is the only DB-backed UI spec with no `isDockerAvailable()` gate (`grep -n "isDockerAvailable\|test.skip" tests/ui/sqlite.spec.ts` → no output), so it is the one full-stack proof that executes in *every* environment this repo runs in, including this sandbox — AGENTS.md's SQLite section calls this out by name. It also happens to be the spec that would benefit least from splitting: its content is overwhelmingly frontend already (selection edge caps `:238-297`, context-menu keyboard nav `:149-190`, the cell editor's format picker `:336-350`, console result chips `:374-407`, column virtualisation `:446-467`, word wrap `:418-431`), riding on a backend so cheap that removing it saves nothing. Splitting it would trade the repo's only universally-runnable full-stack proof for no wall-clock win. |
+| **`tests/ui/sqlite.spec.ts`** | 604 | **The Docker-free anchor.** It is the only DB-backed UI spec with no `isDockerAvailable()` gate (`grep -n "isDockerAvailable\|test.skip" tests/ui/sqlite.spec.ts` → no output), so it is the one full-stack proof that executes in *every* environment this repo runs in, including this sandbox — CLAUDE.md's SQLite section calls this out by name. It also happens to be the spec that would benefit least from splitting: its content is overwhelmingly frontend already (selection edge caps `:238-297`, context-menu keyboard nav `:149-190`, the cell editor's format picker `:336-350`, console result chips `:374-407`, column virtualisation `:446-467`, word wrap `:418-431`), riding on a backend so cheap that removing it saves nothing. Splitting it would trade the repo's only universally-runnable full-stack proof for no wall-clock win. |
 | **`tests/ui/mongo.spec.ts`** | 404 | **The Docker-backed anchor, and the document page kind.** Something has to keep proving the Testcontainers-plus-real-container path still wires all the way through, and it cannot be sqlite. Mongo is the pick because its page kind (`DocumentPage`) is covered by nothing else in the kept set, it carries a real write path end to end (edit `:160-184`, delete `:185-203`, delete-via-menu `:194`), a real cancel (`:208`), a console (`:228`) and P27's render tripwires (`:346-397`). Postgres was the other candidate and is not available: there is no `tests/ui/postgres.spec.ts` — Postgres drives `data-view`/`console`/`cell-editor`/`tree`/`interaction`/`budgets`, all of which stay untouched anyway (§7), so the Docker full-stack proof has to come from an adapter spec. |
 | **`tests/ui/s3.spec.ts`** | 736 | **The widest stack of the ten.** It is the only spec that exercises `src/main/ipc/files.ts` — a real `dialog.showSaveDialog` on download (`:306-350`) and a real `dialog.showOpenDialog` on upload (`:492-539`) — and the only one covering `DATA_OP.objectDownload`, whose whole contract is that *the engine writes the file itself and bytes never transit main or the renderer* (`data-ops.ts:21-23`, `engine/data.ts:159-178`). A mocked port cannot honestly stand in for that: the mock would answer `{ bytes: n }` while no file appeared on disk, and the assertion that matters is the file. It also covers the object-store tree, the `KeyValuePage` shape reused for an object, the browse tab, delete, the read-only guard, and the over-limit/binary refusals — three main-process surfaces (`files.ts`, `tree.ts`, `connections.ts`) in one spec. |
 
@@ -525,7 +525,7 @@ gives each file its own container via the module memo (F11 reason 2, inverted in
   without residue, which makes it the ideal *pilot-adjacent* split, not the anchor.
 - **`kafka.spec.ts`** — tempting as the `StreamPage` anchor, and rejected for the same reason it is
   the hardest spec in the repo to run: it needs Docker **and** an `electron-rebuild` that cannot
-  fetch Electron's C++ headers here (AGENTS.md F20). Making the phase's only stream-kind full-stack
+  fetch Electron's C++ headers here (CLAUDE.md F20). Making the phase's only stream-kind full-stack
   proof depend on the least-runnable gate in the repo is the wrong trade. `sqs.spec.ts`'s split keeps
   the stream kind's *backend* covered in `tests/ipc/`, and `kafka.spec.ts`'s own split keeps its
   frontend covered with no native driver at all.
@@ -653,7 +653,7 @@ covered twice or not at all** (D9).
    split (§4.1's reasons, in one paragraph each). **No assertion in any of the three changes.** Plus
    the acceptance sweep in §8.
 7. **`docs: record P50's IPC-boundary split`** — `docs/ARCHITECTURE.md`'s Testing section (§7 below),
-   `AGENTS.md`'s new environment section, and `docs/v1/SPEC.md`'s P50 row rewritten from *queued* to
+   `CLAUDE.md`'s new environment section, and `docs/v1/SPEC.md`'s P50 row rewritten from *queued* to
    what actually landed. Docs last, as P44 §4 established, so the prose describes the tree rather
    than the plan.
 
@@ -773,7 +773,7 @@ things in it:
    project runs `fullyParallel` because it contends over nothing (per-test `KIRA_HOME`, per-`KIRA_HOME`
    Chromium profile, no socket at all).
 
-`AGENTS.md` gains a short section in its own register (environment, not architecture): the backend
+`CLAUDE.md` gains a short section in its own register (environment, not architecture): the backend
 tier's esbuild-plus-`ELECTRON_RUN_AS_NODE` invocation and the `__dirname` fixture-copy it needs
 (F8), the fact that `test:ipc:fe` is the one Playwright command that runs here without the blocked
 `electron-rebuild`, and which adapters' backend halves stay Docker-gated.
@@ -824,7 +824,7 @@ repository conventions rather than as details of one phase.
 
 **What was proven here, for real, at `b1e6eae`** — the four probes of §1, all run under
 `xvfb-run` / `ELECTRON_RUN_AS_NODE=1 electron` after installing the Electron binary by the curl
-workaround AGENTS.md's Electron section documents, and all deleted afterwards:
+workaround CLAUDE.md's Electron section documents, and all deleted afterwards:
 
 | Probe | Result |
 |---|---|
@@ -836,14 +836,14 @@ workaround AGENTS.md's Electron section documents, and all deleted afterwards:
 **What could not be run here, and needs CI or the macOS/Colima box:**
 
 1. **Every adapter fixture except sqlite's.** Docker image pulls return 403 through this sandbox's
-   proxy (AGENTS.md's Docker section), so **not one of the seven `*.fixture.ts` files can be
+   proxy (CLAUDE.md's Docker section), so **not one of the seven `*.fixture.ts` files can be
    generated here.** The pilot (commit 1) is therefore Docker-gated in this sandbox exactly as
    `tests/db/mariadb.spec.ts` is, and `tests/ipc/support/harness.spec.ts` exists precisely so that
    commit 1 still has a Docker-free proof of the *harness* (§5). **Owner: whoever runs the macOS
    Colima box.** This is the phase's largest piece of owed verification and it should be stated in
    the SPEC.md row in the same terms P48's row uses.
 2. **Kafka's backend half needs the native ABI rebuild on top of Docker**, which cannot fetch
-   Electron's C++ headers here (AGENTS.md F20). Its *frontend* half is expected to run here — that is
+   Electron's C++ headers here (CLAUDE.md F20). Its *frontend* half is expected to run here — that is
    the payoff of commit 5 and should be confirmed on the first run rather than assumed.
 3. **The `--repeat-each` flake sweep for the real seven-adapter frontend tier.** F9 measured four
    copies of one probe. The real tier will have ~20 frontend specs; the implementer should run

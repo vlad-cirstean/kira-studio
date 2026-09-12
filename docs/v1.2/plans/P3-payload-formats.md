@@ -15,12 +15,12 @@
 > here: a response-side binary/file *viewer* or a Save-response-to-file action (§4 D14, §8 OQ-3), a
 > Description column on any key/value table (§8 OQ-5), an Auth tab (P2 §8 OQ-5, still open), a
 > per-request timeout (§8 OQ-2). Nothing here is half-built toward any of them
-> (`AGENTS.md`: *"Scope left out of a phase is left out entirely, not half-implemented"*).
+> (`CLAUDE.md`: *"Scope left out of a phase is left out entirely, not half-implemented"*).
 >
 > **Every claim below was re-read against the tree, not inherited from `P2-http-core.md`'s prose.**
 > Base: branch `claude/feature-v1-2` at `e7826cd`. File:line citations point at that content. Wails
 > internals were read from the installed module at
-> `$(go env GOPATH)/pkg/mod/github.com/wailsapp/wails/v3@v3.0.0-beta.16/`, per `AGENTS.md`'s
+> `$(go env GOPATH)/pkg/mod/github.com/wailsapp/wails/v3@v3.0.0-beta.16/`, per `CLAUDE.md`'s
 > instruction to read the pinned source rather than the 403-blocked docs site.
 >
 > **The one-sentence design.** A file's bytes never enter the renderer or the IPC bridge — the
@@ -425,7 +425,7 @@ produce. §4 D6 uses this.
 ## 4. Decisions
 
 ### D1 — No new library, and here is the check rather than the assertion
-`AGENTS.md` requires reaching for a maintained library first and **naming the requirement** when
+`CLAUDE.md` requires reaching for a maintained library first and **naming the requirement** when
 declining one. Five candidates were real enough to weigh:
 
 - **A multipart-building library** (`github.com/technoweenie/multipartstreamer`, `go-resty`'s
@@ -867,7 +867,7 @@ This is the phase brief's fourth question, answered *out*, on three grounds:
    to write the bytes Go already discarded (the response body is currently returned as a string and
    the `*http.Response` is closed, `client.go:246`), and a decision about the 10 MiB transfer cap
    (`client.go:35`) — because "save the response" on a truncated body would save the wrong thing.
-   That is a real feature with a real design, and `AGENTS.md`'s *"left out entirely, not
+   That is a real feature with a real design, and `CLAUDE.md`'s *"left out entirely, not
    half-implemented"* applies.
 
 What P3 *does* change on the response side is D13 and nothing else. §8 OQ-3 carries the rest
@@ -900,7 +900,7 @@ surfaces call one shared `views/httprequest/files.ts` helper wrapping `control.f
 
 Twelve commits. C1 adds capability with no caller; C2 rewires the existing feature with no
 user-visible change; C3 is the shared-state correction that must precede the schema widening; C4–C10
-are one user-visible slice each; C11–C12 are the tests and the docs. Per `AGENTS.md`, run the fast
+are one user-visible slice each; C11–C12 are the tests and the docs. Per `CLAUDE.md`, run the fast
 checks (`lint`, `typecheck`, `build`, `go build`/`go vet`) per commit and the expensive suites once
 at the end.
 
@@ -917,7 +917,7 @@ C2 took.
 `views/httprequest/state.ts:42-56` translating the still-two-mode state onto the union
 (`'none'` → `{mode:'none'}`, `'json'` → `{mode:'raw', rawLanguage:'json', raw: state.body}`);
 bindings regenerated via `wails3 task common:generate:bindings` (never a hand-typed flag list —
-`AGENTS.md`'s `-names` warning). **No user-visible change** except D7's `Content-Type` fix, which is
+`CLAUDE.md`'s `-names` warning). **No user-visible change** except D7's `Content-Type` fix, which is
 stated in the commit body. `tests/ui/http-request.spec.ts:81-87`'s send-args assertion changes by
 exactly two keys and nothing else in that spec moves.
 
@@ -988,7 +988,7 @@ normalization, which is a property of every tab kind now, not just this one.
 argument struct, so `apps/kira-studio/frontend/bindings/**` must be regenerated or the Vite build
 fails on a type that no longer exists.
 
-Two bindings checks, from `AGENTS.md`'s own warnings and P2 §6.1's precedent:
+Two bindings checks, from `CLAUDE.md`'s own warnings and P2 §6.1's precedent:
 
 1. The regenerated `httpservice.ts` must still call `$Call.ByName("…bridge.HttpService.Send", …)`,
    not `$Call.ByID(<n>, …)` — a `-names`-less regeneration silently breaks **every** `tests/ui` spec
@@ -1034,7 +1034,7 @@ The existing `tests/ui/http-request.spec.ts` is edited in exactly one place acro
 
 ### 6.3 The Go tests, and what they deliberately do not cover
 `internal/httpclient/body_test.go` against `net/http/httptest`. It exists because `buildBody` is
-`AGENTS.md`'s named category — *"a parser/splitter with several interacting rules"* over a real wire
+`CLAUDE.md`'s named category — *"a parser/splitter with several interacting rules"* over a real wire
 format, where the failure modes are silent (a wrong `Content-Length` hangs the request; a missing
 `GetBody` fails only on a 307; a chunked upload is rejected only by some servers). Seven cases, one
 per rule that is genuinely easy to get wrong:
@@ -1061,7 +1061,7 @@ per rule that is genuinely easy to get wrong:
 
 **Explicitly not tested:** that `text` maps to `text/plain` (a table lookup — D12's parity test is
 the guard that matters there), that a `none` body sends nothing, that the mode enum rejects an
-unknown string. Each is `AGENTS.md`'s *"everything else gets nothing"*.
+unknown string. Each is `CLAUDE.md`'s *"everything else gets nothing"*.
 
 ### 6.4 What only a real Mac and a real network can settle
 1. **The native picker** in a real Wails window, for both a form-data file row and a binary body —

@@ -38,7 +38,7 @@
 > `packages/db-fixtures`. §3 is the tree; §4 is the mapping.
 >
 > **`tests/db/` should move, and the reason is not aesthetics.** Three separate documents
-> (`AGENTS.md`, `docs/ARCHITECTURE.md`, `README.md`) each carry a sentence explaining that
+> (`CLAUDE.md`, `docs/ARCHITECTURE.md`, `README.md`) each carry a sentence explaining that
 > `tests/db/` is not a test suite. A directory that needs three standing disclaimers is misfiled,
 > and under the target tree its two consumer sets sit in different top-level trees on opposite
 > sides of the language boundary — which is the definition of a shared package here (F12/D5).
@@ -105,7 +105,7 @@ repository change; it is the same class of note P1's F4 made.
 - **Every decision in §6 cites a finding in §1-§2, and every finding cites something read or run.**
   Where evidence could not be obtained here, the finding says so and names the verification step
   (F8 — `bun run dev` end-to-end is macOS-only and cannot be proven in this container).
-- `AGENTS.md`'s standing rules apply: no stubs, comments only where the code cannot speak for
+- `CLAUDE.md`'s standing rules apply: no stubs, comments only where the code cannot speak for
   itself, Conventional Commits, no new unit tests (nothing here clears that bar — this phase moves
   files and edits configuration; `bun run lint`, `bun run typecheck`, `bun run build`, `go build`
   and the existing suites are the proof).
@@ -120,7 +120,7 @@ repository change; it is the same class of note P1's F4 made.
 
 ### F1 — The canonical Wails v3 layout, read from the pinned CLI's own templates rather than the docs
 
-`v3.wails.io` is 403-blocked from every box here (`AGENTS.md`), so the shape was read from the
+`v3.wails.io` is 403-blocked from every box here (`CLAUDE.md`), so the shape was read from the
 installed module: `$(go env GOPATH)/pkg/mod/github.com/wailsapp/wails/v3@v3.0.0-beta.15/internal/templates/`.
 `wails3 init -t vue` produces exactly this:
 
@@ -458,7 +458,7 @@ Consumers, verified by grep rather than by the docs' description of them:
 | `tests/db/support/{postgres,sqlite,mariadb}.ts` themselves | `resolve(__dirname, '../fixtures/…')` — **internal**, so `fixtures/` and `support/` must move together or not at all |
 
 **Three separate documents each carry a standing sentence explaining that this directory is not what
-its name says** — `AGENTS.md:113` (*"for `tests/db/`'s container fixtures"*),
+its name says** — `CLAUDE.md:113` (*"for `tests/db/`'s container fixtures"*),
 `docs/ARCHITECTURE.md:773` (*"`tests/db/` is a shared fixture corpus now, not a spec suite"*),
 `README.md:169` (*"a shared fixture corpus … not a spec suite of its own"*). A directory that needs
 three disclaimers is misfiled, and P1 F18's *"keep"* was correct for an audit whose charter excluded
@@ -576,7 +576,7 @@ commented-out scaffold blocks (P1 F15.3), `scripts/demo-dbs/`, and every depende
 
 ```
 kira-studio/
-├── AGENTS.md  LICENSE  NOTICES.md  README.md
+├── CLAUDE.md  LICENSE  NOTICES.md  README.md
 ├── biome.json  bunfig.toml  bun.lock  package.json      # workspace root
 ├── go.mod  go.sum                                       # module github.com/kirathecat/kira-studio
 ├── tsconfig.json                                        # workspace solution (files:[], references)
@@ -944,7 +944,7 @@ both targets move with the package.
 | `docs/v1/plans/p58-pending-ci-workflows/README.md` | record that P3 revised both in place, per that directory's own standing instruction |
 | `.github/workflows/{ci,release}.yml` | **not touched** (D15). They are two generations stale already (P1 F10) and reference `bun run test:e2e`, `test:db`, `package:mac`, `app.asar.unpacked/`, `dist/mac-arm64/` — none of which exist. The move adds nothing to that backlog |
 | `README.md` | Install/Development/Tests/Architecture + the top-level layout block (`:209-224`) — rewritten against §3 |
-| `AGENTS.md` | every `shell/`, `src/renderer`, `src/shared`, `tests/db`, `tests/ipc` path in the Docker, `tests/ipc/`, ClickHouse, SQLite, secrets and Wails sections; and the "Known open items" entries P3 closes (see D16) |
+| `CLAUDE.md` | every `shell/`, `src/renderer`, `src/shared`, `tests/db`, `tests/ipc` path in the Docker, `tests/ipc/`, ClickHouse, SQLite, secrets and Wails sections; and the "Known open items" entries P3 closes (see D16) |
 | `docs/ARCHITECTURE.md` | Stack table rows (renderer build, DB tests), Testing section, the `src/shared` mirror references |
 | `docs/PACKAGING.md` | ~25 `shell/…` and `scripts/…` references (`:8-12,17-43,66-95,130-134,149,221,254,274`) |
 | `docs/PERF.md` | `shell/blank`, `shell/cmd/g1measure` references in §2.3 |
@@ -963,7 +963,7 @@ both targets move with the package.
 | **D3** | **Create no empty directories.** Root `internal/` and further `packages/*` are named in §3 as reserved locations and created when something first moves there. | Nothing is shared between backends *yet*; splitting `internal/` on speculation is exactly the over-engineering §0.3 excludes. Naming the convention costs nothing and prevents the next session inventing a different one. |
 | **D4** | **All four test suites move to `apps/kira-studio/tests/`**, with `playwright.config.ts` and `tsconfig.tests.json` alongside them. | F5: every one of the four is bound to this app by path, binary or fixture generator — none would survive a second app without re-scoping. The marginal cost is near zero: their `../../src/renderer/…` and `../../../shell/…` paths must change anyway because both trees move. **The counter-argument, recorded**: root `tests/` reads fine with one app, and this makes `bun run test:ui` a `cd`. C4 is a standalone commit so it can be dropped without unpicking anything else if the implementer disagrees — but then say so, rather than skipping it silently. |
 | **D5** | **`tests/db/` → `packages/db-fixtures/`**, `fixtures/` and `support/` moving together, with no `package.json`. | F12: it holds no specs, needs a standing disclaimer in three separate documents, and its two consumer sets end up in different top-level trees on opposite sides of the language boundary. No `package.json` because `tests/e2e-real/support/*.ts` must keep importing it by relative path (F11's Playwright constraint). |
-| **D6** | **`scripts/` stays at the repo root**, including the three app-specific `.sh` files. | F15: all three are invoked from the root `package.json`'s `scripts`, which is where the workspace's entry points live and where CI calls them. Moving them under the app buys ownership clarity and costs edits in `package.json`, `README.md`, `AGENTS.md`, `docs/PACKAGING.md`, `tests/e2e-real/fixtures.ts` and both staged workflows. Revisit when a second app needs its own — recorded, not silently skipped. |
+| **D6** | **`scripts/` stays at the repo root**, including the three app-specific `.sh` files. | F15: all three are invoked from the root `package.json`'s `scripts`, which is where the workspace's entry points live and where CI calls them. Moving them under the app buys ownership clarity and costs edits in `package.json`, `README.md`, `CLAUDE.md`, `docs/PACKAGING.md`, `tests/e2e-real/fixtures.ts` and both staged workflows. Revisit when a second app needs its own — recorded, not silently skipped. |
 | **D7** | **`@shared/*` stays a tsconfig `paths` alias**, retargeted at `packages/shared/*`. 187 import sites are untouched. | F11: Vite, Bun and **Playwright** all resolve it from `paths` today; Playwright does not transform files under `node_modules`, so a workspace package exporting raw `.ts` would resolve and then fail to parse in `tests/ui`'s 31 import sites. OQ-2 holds the package-name migration, with the instruction to verify that claim before acting on it. |
 | **D8** | **`PACKAGE_MANAGER` defaults to `bun`, and the npm/pnpm/yarn task variants are deleted** — twelve tasks collapse into `install:frontend:deps`, `build:frontend`, `dev:frontend`. | F6/F17: the npm default does not degrade to a no-op, it npm-installs the *workspace root* and prunes 331 bun-installed packages. Changing only the default leaves the destructive path one env var away; deleting the variants turns it into a "task not found". This is the SPEC row's "standardize on bun" made structural rather than declarative. |
 | **D9** | **`install:frontend:deps` runs `bun install` at the workspace root** (`dir: {{.WORKSPACE_ROOT}}`), not in the app's `frontend/`. | One lockfile and one `node_modules` for the whole monorepo is the point of declaring `workspaces` at all; a `bun install` inside a workspace member resolves to the root anyway, and pointing the task there makes its `sources` (`package.json`, `bun.lock`, `apps/*/frontend/package.json`) name real files instead of the three that never existed under `shell/frontend/`. |
@@ -973,7 +973,7 @@ both targets move with the package.
 | **D13** | **`tsconfig.node.json` → `apps/kira-studio/tsconfig.tests.json`; `tsconfig.web.json` → `apps/kira-studio/frontend/tsconfig.json`; `typecheck:node` → `typecheck:tests`.** | F16, and P1's OQ-2 hands exactly this forward. `node` has not described that project since Electron left — its `include` is every test tier plus the shared contract. `src/renderer`'s own rename in the same OQ resolves for free: the directory ceases to exist. |
 | **D14** | **Delete `out/` on disk, `.gitignore`'s stock Next.js `out` line, and `biome.json`'s `"!out"`. Fold `shell/.gitignore` into `apps/kira-studio/.gitignore` and drop its `runtime` line. Change nothing else in `.gitignore`.** | F17: `out/` holds pre-cutover residue including copies of three fixtures that no longer exist anywhere in the repository, and nothing writes it; keeping the ignore line would silently swallow a future `apps/<x>/out`. The `runtime` line survives a subsystem P58f deleted. P1 F16's reasoning for declining the *wider* boilerplate sweep (glob-semantics risk around `!dist`/`dist` vs `frontend/dist`) still holds and is declined again. |
 | **D15** | **`.github/workflows/*.yml` are not touched; the staged copies under `docs/v1/plans/p58-pending-ci-workflows/` are updated to the new paths.** | P1 F10/D10: this session's push token lacks the `workflow` OAuth scope and GitHub rejects any commit touching those files outright. The staged files are ordinary `docs/` content and are the mechanism by which the fix eventually lands; leaving them naming `shell/go.mod` and `cd shell` would ship a broken workflow whenever someone finally applies them. |
-| **D16** | **Close both of `AGENTS.md`'s "Known open items" that this phase resolves, and P1's OQ-2/OQ-6 with them.** | The `shell/build/Taskfile.yml` item is answered by F6 with a measurement and fixed by D8-D10; P1's OQ-2 (Electron-era names) is answered by the move itself. The CI-workflow item stays open — D15 does not change its blocker. `AGENTS.md`'s own rule is to delete a resolved item rather than mark it done in place. |
+| **D16** | **Close both of `CLAUDE.md`'s "Known open items" that this phase resolves, and P1's OQ-2/OQ-6 with them.** | The `shell/build/Taskfile.yml` item is answered by F6 with a measurement and fixed by D8-D10; P1's OQ-2 (Electron-era names) is answered by the move itself. The CI-workflow item stays open — D15 does not change its blocker. `CLAUDE.md`'s own rule is to delete a resolved item rather than mark it done in place. |
 
 ---
 
@@ -1013,7 +1013,7 @@ git mv apps/kira-studio/go.mod go.mod && git mv apps/kira-studio/go.sum go.sum
 7. `scripts/{wails-dev-setup.sh,sign-bundle.sh,verify-packaging.sh}` — the `shell/` paths (F13-F15),
    **including S2's `src/` grep, which does not break yet but is repointed in C2**.
 
-Verify: `go build ./...` (needs the GTK4/WebKitGTK headers `AGENTS.md` names, because the root
+Verify: `go build ./...` (needs the GTK4/WebKitGTK headers `CLAUDE.md` names, because the root
 package imports Wails; use `go build ./apps/kira-studio/internal/... ./apps/kira-studio/cmd/...` for
 the fast loop) → `go vet` → `go test ./apps/kira-studio/internal/storage/... ./apps/kira-studio/internal/adapterhost/...`
 → then §8's block. **`git mv` before editing** so the rename is recorded as a rename.
@@ -1136,7 +1136,7 @@ modulo the moves.
 ### C8 — `docs: the apps/ + packages/ layout, and the fixed dev loop`
 
 Everything in §5.8's documentation rows: `README.md` (Install / Development / Tests / Architecture /
-the layout block), `AGENTS.md` (every moved path, plus D16's two closed open items),
+the layout block), `CLAUDE.md` (every moved path, plus D16's two closed open items),
 `docs/ARCHITECTURE.md` (Stack table, Testing section, `packages/shared` mirror references),
 `docs/PACKAGING.md`, `docs/PERF.md`, `apps/kira-studio/README.md`,
 `scripts/demo-dbs/README.md`, and the three files under
@@ -1159,7 +1159,7 @@ git status --porcelain          # must be empty — no generated dir leaked past
 ```
 
 `go build ./...` additionally compiles the root `main` package, which imports Wails and needs
-GTK4/WebKitGTK headers on Linux (`AGENTS.md`'s Wails section has the `apt-get` line). Use the
+GTK4/WebKitGTK headers on Linux (`CLAUDE.md`'s Wails section has the `apt-get` line). Use the
 narrow form for the loop and run `./...` once at the end if the headers are present.
 
 **Baseline to regress against**, measured at `f9511d2`: `bun run lint` → "Checked 304 files";
@@ -1246,20 +1246,20 @@ document:
 9. `KIRA_IPC_FIXTURES` read mode is green — `cd apps/kira-studio && go test ./internal/ipcfixture/...`
    finds the committed fixtures at `apps/kira-studio/tests/ipc/<adapter>/`.
 10. Every `bun run <script>` named anywhere in `README.md`, `apps/kira-studio/README.md`,
-    `scripts/**`, `AGENTS.md`, `docs/ARCHITECTURE.md` or `docs/PACKAGING.md` exists in
+    `scripts/**`, `CLAUDE.md`, `docs/ARCHITECTURE.md` or `docs/PACKAGING.md` exists in
     `package.json`'s `scripts`. Checked mechanically:
     ```sh
     comm -23 \
-      <(grep -rho 'bun run [a-z:0-9-]*' README.md apps/kira-studio/README.md scripts/ AGENTS.md docs/ARCHITECTURE.md docs/PACKAGING.md | sed 's/bun run //' | sort -u) \
+      <(grep -rho 'bun run [a-z:0-9-]*' README.md apps/kira-studio/README.md scripts/ CLAUDE.md docs/ARCHITECTURE.md docs/PACKAGING.md | sed 's/bun run //' | sort -u) \
       <(node -p "Object.keys(require('./package.json').scripts).join('\n')" | sort -u)
     ```
     must print nothing.
-11. `grep -rn 'src/renderer\|src/shared\|tests/db\|shell/' README.md AGENTS.md NOTICES.md docs/ARCHITECTURE.md docs/PACKAGING.md docs/PERF.md scripts/ apps/ packages/ --exclude-dir=node_modules --exclude-dir=dist --exclude-dir=bindings`
+11. `grep -rn 'src/renderer\|src/shared\|tests/db\|shell/' README.md CLAUDE.md NOTICES.md docs/ARCHITECTURE.md docs/PACKAGING.md docs/PERF.md scripts/ apps/ packages/ --exclude-dir=node_modules --exclude-dir=dist --exclude-dir=bindings`
     returns nothing. (`docs/v1/` is excluded by policy and still matches; that is expected.)
 12. §8.1 is green after every commit; §8.2 has either been run or has a **stated** reason it could
     not be (no macOS, no Docker, no WebKit). `bun run dev` end to end is macOS-only (F8) — say that,
     do not report it as passed.
-13. `AGENTS.md`'s "Known open items" no longer contains the `shell/build/Taskfile.yml` entry, and
+13. `CLAUDE.md`'s "Known open items" no longer contains the `shell/build/Taskfile.yml` entry, and
     carries a P3 findings section with, at minimum: what `npm install` in a `package.json`-less
     directory actually does (F6), the `-b`/`-names` divergence and why both flags are load-bearing
     (F7), the two silent-failure surfaces and their positive checks (F10/F14, §8.3), and the

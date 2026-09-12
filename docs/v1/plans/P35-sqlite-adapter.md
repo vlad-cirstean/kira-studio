@@ -63,7 +63,7 @@
   protocol and one driver. SQLite shares neither with anything (D17); the only shared code is
   `adapters/sql-text.ts`, whose row-value keyset predicate and `LIMIT n OFFSET m` were **verified
   to run** against SQLite 3.53.1 in this sandbox, unchanged (F17 note, D17).
-- Comments per `AGENTS.md`: only where the code cannot say it for itself — in particular D3's
+- Comments per `CLAUDE.md`: only where the code cannot say it for itself — in particular D3's
   BigInt rule, D6's "do not touch the file" pragmas and D9's dropped-tail check, none of which
   anyone re-derives from the code.
 - Run `bun run lint`, `bun run typecheck` (all three projects) and `bun run build` on every commit.
@@ -163,7 +163,7 @@ outright), and this container's Node 22.22.2 does have `node:sqlite`.
 
 **F13 — `better-sqlite3` would not hit P32's exact wall, and still loses.** `npm view` reports
 `better-sqlite3@13.0.3` depending on `node-addon-api ^8` — an N-API addon, so unlike
-`@confluentinc/kafka-javascript` (a NAN/V8 addon, `AGENTS.md`'s "Native Kafka driver" section) it is
+`@confluentinc/kafka-javascript` (a NAN/V8 addon, `CLAUDE.md`'s "Native Kafka driver" section) it is
 not ABI-locked per runtime. It would still add: a native dependency to a packaged app, a
 `prebuild-install` download per platform/arch, an `asarUnpack` entry, and a second SQLite build
 alongside the one Electron already links. Against a builtin, and with F10 unaffected either way,
@@ -467,14 +467,14 @@ export interface ReadTarget {
 | D32 | **`tests/db/support/sqlite.ts` is a temp-file fixture, not a container**: `mkdtemp` → create the file → run `0009_sqlite_seed.sql` through `node:sqlite` → insert 1,000,000 `big_rows` with one recursive CTE → `ANALYZE big_rows` only → return a `ResolvedConnectionConfig` with `database: <path>`. `stop()` removes the directory and resets the memo. | F40: this is the whole harness. No image pin, no healthcheck, no double-boot wait strategy, no root-versus-app-user split, no `resolveDockerHost()` — a file-based engine makes the fixture strictly simpler than any of the other seven, which is the first place SPEC §10's "where SQLite's model actually fits it" cashes out. F11 measures the 1M-row insert at ~1 s, so unlike MariaDB's `seq_1_to_N` or MySQL's chunked cross join there is no reason to gate it behind an option. `ANALYZE` on `big_rows` only, mirroring `0002_mariadb_seed.sql:6-8`'s own note, is what lets scenario 6 still assert a `null` estimate elsewhere (F20). The memo reset is `support/mariadb.ts:144-149`'s Playwright-worker reason, unchanged. |
 | D33 | **The suite's gate is `sqliteAvailable()`, not `isDockerAvailable()`** — a legible skip naming the runtime requirement when `node:sqlite` is missing, mirroring `DOCKER_UNAVAILABLE_MESSAGE`'s discipline. | F12: the one thing this suite needs that the environment might not have is a Bun with `node:sqlite` (1.4+). Everything else runs anywhere — which makes `tests/db/sqlite.spec.ts` the first DB spec on this branch that is not Docker-gated at all. |
 | D34 | **`0009_sqlite_seed.sql` is a port of `0002`, not a copy** (§2's list), plus four SQLite-only tables that each earn a scenario: `no_pk_rowid`, `without_rowid`, `generated_cols`, `fts_docs`. | `0002`'s own header states the parity principle (*"deliberately kept in parity with 0001_seed.sql so the two spec files can assert the same things"*) and it is what makes a seventh adapter prove the abstraction rather than just exist. Every divergence here is a documented engine difference — no routines, no sequences, no storage engines, no charsets — and the four additions are exactly the four findings that have no analogue anywhere else in the repo (F23, F18, F17/F24). |
-| D35 | **`tests/ui/sqlite.spec.ts` must not skip.** It creates its own temp database through the same support module and runs unconditionally. | F39/F40: it needs no container, so it is the first engine UI spec that actually executes in CI *and* in Claude Code's Linux web container — the environment where, per `AGENTS.md`, every other engine's UI spec self-skips. That makes the dialect assertion (D28) and the file-path dialog (D14) genuinely covered rather than covered-in-principle. |
+| D35 | **`tests/ui/sqlite.spec.ts` must not skip.** It creates its own temp database through the same support module and runs unconditionally. | F39/F40: it needs no container, so it is the first engine UI spec that actually executes in CI *and* in Claude Code's Linux web container — the environment where, per `CLAUDE.md`, every other engine's UI spec self-skips. That makes the dialect assertion (D28) and the file-path dialog (D14) genuinely covered rather than covered-in-principle. |
 | D36 | **The demo stack gains a `scripts/demo-dbs/sqlite/` seed run by `bun` (no compose service), producing a gitignored `kira-demo.sqlite` beside it, and `seed.sh` prints the absolute path to paste into the dialog.** `docker-compose.yml` is not touched. | F41: there is no service to add — the artefact a SQLite connection needs is a file on the developer's own disk, which no container can put there. The seed script uses `node:sqlite`, the same module the adapter uses, so the demo file is created by exactly the code path the app will read it with. `docker ps` staying eight services rather than showing a phantom ninth is the honest picture. |
 
 ### Topic F — cross-cutting
 
 | # | Decision | Rationale |
 |---|----------|-----------|
-| D37 | **Docs the implementing session edits:** SPEC §1 (SQLite leaves the deferred list — and the stale `MySQL` in that same sentence goes with it, F39), §5.1's table (a SQLite row whose cancel column reads *"none — SQLite has no interruptible statement"*), §6 (one sentence mirroring the S3 paragraph: `database` holds the absolute file path, `host`/`port`/`username`/`password` unused), §11's adapters tree, `shared/caps.ts:100-110`'s per-kind table, `README.md:22-31`'s engine table plus a footnote, and `AGENTS.md` (a short section: `tests/db/sqlite.spec.ts` needs Bun 1.4+, needs no Docker, and is the one DB spec that runs in the web container). The §10 phasing row is updated **only once the phase is implemented**. | Standing practice (P34 D33, P27 D34). `AGENTS.md` earns a section because F12 is exactly the class of environment fact that file exists to record — a future session hitting *"No such built-in module"* under an old Bun should find the answer there, not re-derive it. |
+| D37 | **Docs the implementing session edits:** SPEC §1 (SQLite leaves the deferred list — and the stale `MySQL` in that same sentence goes with it, F39), §5.1's table (a SQLite row whose cancel column reads *"none — SQLite has no interruptible statement"*), §6 (one sentence mirroring the S3 paragraph: `database` holds the absolute file path, `host`/`port`/`username`/`password` unused), §11's adapters tree, `shared/caps.ts:100-110`'s per-kind table, `README.md:22-31`'s engine table plus a footnote, and `CLAUDE.md` (a short section: `tests/db/sqlite.spec.ts` needs Bun 1.4+, needs no Docker, and is the one DB spec that runs in the web container). The §10 phasing row is updated **only once the phase is implemented**. | Standing practice (P34 D33, P27 D34). `CLAUDE.md` earns a section because F12 is exactly the class of environment fact that file exists to record — a future session hitting *"No such built-in module"* under an old Bun should find the answer there, not re-derive it. |
 | D38 | **No change to `scheduler/`, `cache/`, `shared/protocol/`, any `Page` shape, or `main/` beyond D15's optional filters payload.** | §11's claim that a new engine is one folder. SQLite returns the same `TabularPage` the other SQL adapters do, and `adapters/live.ts` has never known a kind. |
 
 ## 4. Implementation order
@@ -492,7 +492,7 @@ and docs. Nothing here needs Docker; steps 5–7 need a Bun/Node with `node:sqli
 2. **`feat(engine): the SQLite adapter`** — the whole of `adapters/sqlite/` (ten files) plus the
    one `registry.ts` loader line (D1–D9, D17–D27). This is the phase's large commit; the `Adapter`
    interface admits no partial implementation, and a half-adapter with `E_UNSUPPORTED` stubs is
-   exactly what `AGENTS.md`'s "no shortcuts, scope left out is left out entirely" forbids.
+   exactly what `CLAUDE.md`'s "no shortcuts, scope left out is left out entirely" forbids.
 3. **`feat(main): file-open dialog filters`** — `main/ipc/files.ts`'s optional payload,
    `preload/index.ts`, `renderer/bridge/control.ts` (D15). `state/objectStore.ts` unchanged, which
    is the acceptance criterion.
@@ -695,7 +695,7 @@ docs/
   v1/SPEC.md                        MOD  §1, §5.1, §6, §11 (D37) — phasing row once implemented
   v1/design/kira-design-system/parts/_icons.html   MOD  + the i-sqlite symbol (D30)
   v1/plans/P35-sqlite-adapter.md    NEW  this document
-AGENTS.md                           MOD  + the node:sqlite / Bun 1.4 environment note (D37)
+CLAUDE.md                           MOD  + the node:sqlite / Bun 1.4 environment note (D37)
 README.md                           MOD  + the SQLite engine row and footnote (D37)
 package.json                         --  UNCHANGED — no dependency, no devDependency (D1)
 ```
@@ -766,7 +766,7 @@ package.json                         --  UNCHANGED — no dependency, no devDepe
       as they do under Node 24 (D3). Both were measured only under Electron in this sandbox.
 - [ ] `bash scripts/demo-dbs/seed.sh` produces `kira-demo.sqlite` and prints a path the dialog
       accepts, with no compose service added.
-- [ ] SPEC §1, §5.1, §6, §11, `shared/caps.ts`'s table, the README and `AGENTS.md` all describe what
+- [ ] SPEC §1, §5.1, §6, §11, `shared/caps.ts`'s table, the README and `CLAUDE.md` all describe what
       shipped.
 
 ## 9. Open questions for the user

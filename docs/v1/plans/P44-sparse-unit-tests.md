@@ -79,7 +79,7 @@
   `tests/unit/tsconfig.json` project, a `typecheck:unit` script folded into `bun run typecheck`, a
   `test:unit` script, and one line in the root `tsconfig.json`'s `references` — mirroring exactly how
   `tests/db/tsconfig.json` is already wired into `typecheck:db` and `test:db`.
-- Comments per AGENTS.md: only where the code cannot say it for itself. In a spec file that means
+- Comments per CLAUDE.md: only where the code cannot say it for itself. In a spec file that means
   the *why this is a unit test and not a Playwright test* header each file carries (D50), and
   nothing else — never a comment restating what an `expect` already reads as.
 - `bun run lint`, `bun run typecheck` (node, web, db, **unit** — five projects after commit 1, via
@@ -138,7 +138,7 @@ $ grep -n '"test:db"' package.json
 ```
 
 which **cannot go green in any box without Docker** — `sqlite.spec.ts` fails on the missing
-`node:sqlite` (AGENTS.md's SQLite section) and every Testcontainers spec self-skips. Iteration 3's
+`node:sqlite` (CLAUDE.md's SQLite section) and every Testcontainers spec self-skips. Iteration 3's
 own §5 conceded this in as many words (`:880-884`): *"`bun test tests/db` as a whole still does not
 go green in this box … so commits 1–3 are verified by naming their files explicitly."*
 
@@ -235,7 +235,7 @@ Two functions carry the logic:
 **Why a unit test rather than the existing coverage.** There is existing coverage — inside
 `tests/db/postgres.spec.ts`, `mysql.spec.ts`, `mariadb.spec.ts`, `sqlite.spec.ts` and
 `clickhouse.spec.ts`, every one of which is Testcontainers-backed or `node:sqlite`-backed and
-**none of which has ever run in this sandbox** (AGENTS.md's Docker section; image pulls return 403).
+**none of which has ever run in this sandbox** (CLAUDE.md's Docker section; image pulls return 403).
 Worse, that coverage is *incidental*: those suites page through real tables and assert rows, so they
 exercise the eligible-and-correct path and never the three refusal paths. Driving "mixed sort
 directions must disqualify keyset" through a live Postgres means constructing the sort in the UI or
@@ -441,7 +441,7 @@ Verified rather than assumed, and the answer is **no**, on two independent groun
 2. **Going through `GENERATORS` is character-for-character what `tests/ui/sqlite.spec.ts:320-331`
    already does**, and — decisively — **that spec is not Docker-gated and runs unconditionally in
    this sandbox on every Playwright run** (`grep -n "isDockerAvailable\|test.skip"
-   tests/ui/sqlite.spec.ts` → no output; AGENTS.md's SQLite section: *"the one DB-backed UI spec
+   tests/ui/sqlite.spec.ts` → no output; CLAUDE.md's SQLite section: *"the one DB-backed UI spec
    that actually executes in Claude Code's own Linux web container"*). The assertion there is the
    real one:
 
@@ -677,7 +677,7 @@ only doc this phase's numbered commits touch.**
 
 ## 5. Verification
 
-**Say plainly what this box can and cannot do — and then say the good news.** Per AGENTS.md:
+**Say plainly what this box can and cannot do — and then say the good news.** Per CLAUDE.md:
 `bun run lint`, `bun run typecheck` and `bunx electron-vite build` all run here (`bun run typecheck`
 was run against the tree at `158fcba` while writing this plan — exit 0, all four projects). Docker
 image pulls return 403, so every Testcontainers spec self-skips; `tests/electron-db/kafka.spec.ts`

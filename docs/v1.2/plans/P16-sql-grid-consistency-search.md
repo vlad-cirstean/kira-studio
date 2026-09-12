@@ -852,7 +852,7 @@ response wire). Matches are numbered across the targets in order, and `goTo` cal
 own `scrollRangeIntoView`. Splitting them into two independent bars would give the Raw pane two
 "1 of 3" counters for one document the user reads as one.
 
-**Why not `@codemirror/search`.** It is not a dependency (F10), and AGENTS.md's library-first rule
+**Why not `@codemirror/search`.** It is not a dependency (F10), and CLAUDE.md's library-first rule
 asks for the requirement no library meets to be named rather than the reverse: the requirement here
 is *this app's own toolbar chrome and its own `--kira-search-match` pair* — `@codemirror/search`
 ships its own panel DOM, its own keymap and its own `.cm-searchMatch` styling, all of which would
@@ -956,7 +956,7 @@ phase that has its own migration story to work out.
 ## 3. Commit sequence
 
 Shared theme/token work first (the rest consumes it), then Studio's grid, then Api's search. Per
-`AGENTS.md`: `bun run lint`, `bun run typecheck` and `bun run build` per commit; `tests/ui` runs
+`CLAUDE.md`: `bun run lint`, `bun run typecheck` and `bun run build` per commit; `tests/ui` runs
 **once** at the end (§4), with fixes as follow-up commits.
 
 | # | Commit | Item | Touches | Risk |
@@ -1285,7 +1285,7 @@ cause"* treatment on restore. Deliberately not done; the affordance is a lens, n
 `views/httprequest/{ResponsePane,FieldRowsTable,ResponseHistoryList,RawExchangePane,HttpRequestView}.vue`,
 `api/{VariablesDialog,EnvironmentsDialog,DynamicValuesDialog,VariableRow,CollectionsPanel,SaveRequestDialog,EnvironmentSelect}.vue`,
 `workbench/{SettingsDialog,GenerateDataDialog}.vue`, `internal/bridge/http.go`,
-`packages/api-core/src/http/substitute.ts`, `biome.json`, `scripts/check-tokens.sh`, `AGENTS.md`.
+`packages/api-core/src/http/substitute.ts`, `biome.json`, `scripts/check-tokens.sh`, `CLAUDE.md`.
 
 **Read for a specific claim:** `slickgrid@5.20.0/dist/styles/css/slick.grid.css` and
 `dist/esm/index.js` (`createColumnHeaders`' `m.sortable` gate, `updateViewportOverflow`'s

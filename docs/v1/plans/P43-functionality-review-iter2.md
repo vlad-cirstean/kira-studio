@@ -1,6 +1,6 @@
 # P43 (iteration 2) — Functionality review: pagination edges, cache lifetimes, and P42's own landing
 
-> **Iteration 2 of three.** AGENTS.md's multi-pass convention: Opus researches and writes a plan,
+> **Iteration 2 of three.** CLAUDE.md's multi-pass convention: Opus researches and writes a plan,
 > Sonnet implements it, three times, each round written against the tree the previous round
 > actually left behind. Iteration 1 is complete, implemented, committed and pushed (eleven
 > commits, `d78429a`…`ad3377c`); its plan is `docs/v1/plans/P43-functionality-review.md`. This file
@@ -55,7 +55,7 @@
   the code do the right thing — not by hiding a symptom, greying out a control, or adding a
   comment describing the defect.
 - **Every behavior change carries its own spec edit in the same commit.** `tests/ui/sqlite.spec.ts`
-  is the one DB-backed UI spec that runs for real in this sandbox (AGENTS.md's SQLite section), and
+  is the one DB-backed UI spec that runs for real in this sandbox (CLAUDE.md's SQLite section), and
   four of this round's twelve commits are observable through it — those get **real, executed**
   coverage here rather than Docker-gated coverage nobody in this box can run. §5 says exactly
   which, and is blunt about the rest.
@@ -71,7 +71,7 @@
   persisted (D22).
 - **`data-testid`s are added, never removed or renamed.** New ones follow each view's existing
   prefix convention (`browse-truncated`, `cell-editor-generate-ulid` already exists, …).
-- Comments per AGENTS.md: only where the code cannot say it for itself. Four existing comments
+- Comments per CLAUDE.md: only where the code cannot say it for itself. Four existing comments
   become false as a result of this phase and are rewritten in the same commits that falsify them
   (`redis/read.ts:14`'s *"mirrors MAX_PAGE_SIZE discipline"*, `documents/state.ts:69-73`'s claim
   about what a bare `load()` re-fetches, `generate.ts:12-13`'s *"the same rule every Crockford
@@ -776,7 +776,7 @@ correct for a console document).
    **Spec edits in this commit:** `tests/electron-db/kafka.spec.ts` gains a scenario that browses a
    topic to exhaustion and asserts the final page's `position.hasMore` is `false` and its
    `nextToken` is `null`. Docker **and** native-driver gated — the one commit in this round that
-   cannot be executed anywhere in this sandbox at all (AGENTS.md's Kafka section); §5 says so.
+   cannot be executed anywhere in this sandbox at all (CLAUDE.md's Kafka section); §5 says so.
 4. **`fix(toolbar): a running op is never masked by a faster sibling on the same tab`** — D19.
    `state/runState.ts:34-46` only. No spec edit — §5 explains why no assertion in this repo can
    observe it deterministically, rather than pretending one can.
@@ -869,10 +869,10 @@ precondition of the change rather than a record of it.
 
 ## 5. Verification
 
-**Say plainly what this box can and cannot do.** Per AGENTS.md: `bun run lint`, `bun run typecheck`
+**Say plainly what this box can and cannot do.** Per CLAUDE.md: `bun run lint`, `bun run typecheck`
 and `bun run build` all run here. Playwright runs here **only** because the Electron binary is
 installed by hand (`node_modules/electron/dist/electron`; if a fresh container loses it, re-install
-with `curl` per AGENTS.md's "Electron binary" section). It must be invoked **directly** —
+with `curl` per CLAUDE.md's "Electron binary" section). It must be invoked **directly** —
 `bun run test:ui` fires `pretest:ui` → `scripts/native-electron-build.sh`, which cannot fetch
 Electron's C++ headers through this environment's proxy and fails before a single spec runs. The
 working invocation here is:
@@ -895,8 +895,8 @@ not help commit 5 (see below), but iteration 3 should know the door exists.
 | `smoke`, `startup`, `connections`, `workbench`, `secrets` | Yes (no DB). |
 | `tests/db/preconnect.spec.ts` | Yes — a Docker-free `bun:test` over `src/main/preconnect.ts`. The only one. |
 | `data-view`, `mutations`, `mongo`, `redis`, `s3`, `sqs`, `clickhouse`, `cell-editor`, `console`, `tree`, … | **No** — Postgres/Mongo/Redis/LocalStack/ClickHouse containers; they `test.skip()` cleanly rather than fail. |
-| `tests/db/*` (except `preconnect`) | **No** — Testcontainers, same `403`. `tests/db/sqlite.spec.ts` additionally needs a Bun with `node:sqlite`, which this box's Bun lacks (AGENTS.md). |
-| `tests/electron-db/kafka.spec.ts` | **No, twice over** — Docker *and* a native addon rebuilt for Electron's ABI, which `electron-rebuild` cannot fetch headers for here (AGENTS.md F20). |
+| `tests/db/*` (except `preconnect`) | **No** — Testcontainers, same `403`. `tests/db/sqlite.spec.ts` additionally needs a Bun with `node:sqlite`, which this box's Bun lacks (CLAUDE.md). |
+| `tests/electron-db/kafka.spec.ts` | **No, twice over** — Docker *and* a native addon rebuilt for Electron's ABI, which `electron-rebuild` cannot fetch headers for here (CLAUDE.md F20). |
 
 **Be blunt about the consequence.** Four of this round's twelve commits (7, 8, 9, 12) are verifiable
 here *for real* against SQLite. Commit 3 is verifiable **nowhere in this sandbox** — not even

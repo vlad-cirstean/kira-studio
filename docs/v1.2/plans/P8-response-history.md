@@ -12,7 +12,7 @@
 > (§8 OQ-3), comparing entries belonging to *different* requests (OQ-4), replaying a stored entry as
 > a new send (OQ-5), saving a stored response to a file (OQ-9), rendering a stored binary body (D5,
 > OQ-2), and any new Advanced setting (D6, OQ-1). Nothing here is half-built toward any of them
-> (`AGENTS.md`: *"Scope left out of a phase is left out entirely, not half-implemented"*).
+> (`CLAUDE.md`: *"Scope left out of a phase is left out entirely, not half-implemented"*).
 >
 > **Every claim below was re-read against the tree, not inherited from P2's/P4's/P5's prose.** Base:
 > branch `claude/feature-v1-2` at `6aa0699` (*"docs(plan): fill in P7's acceptance checklist"*).
@@ -397,7 +397,7 @@ width and the scrim `DialogFrame` gives (P4's `SaveRequestDialog`, `ConnectionDi
 ## 4. Decisions
 
 ### D1 — The library check, stated rather than asserted
-`AGENTS.md` requires reaching for a maintained library first and **naming the requirement** when
+`CLAUDE.md` requires reaching for a maintained library first and **naming the requirement** when
 declining one. Two questions here, one answered yes and one no.
 
 - **A text-diff / merge view for "comparable against each other": `@codemirror/merge` (MIT),
@@ -871,7 +871,7 @@ No virtualization: the list is capped at 20 rows by construction (D6), which is 
 
 Eight commits. C1–C3 add capability with nothing mounted (each typechecks and builds on its own);
 C4 is the one that makes browsing exist; C5–C6 are additive layers on a working feature; C7–C8 are
-the tests and the docs. Per `AGENTS.md`, run the fast checks (`lint`, `typecheck`, `build`) per
+the tests and the docs. Per `CLAUDE.md`, run the fast checks (`lint`, `typecheck`, `build`) per
 commit and the expensive suites once at the end.
 
 ### C1 — `feat(shared): the response-history domain`
@@ -892,7 +892,7 @@ methods, D5's two body rules, D6's three caps), `repos/repos.go`'s one field and
 `FQN_SUFFIX_BY_IPC_KEY` entries plus a `historyList: '[]'` `WILDCARD_DEFAULTS` row (F11's
 sibling reasoning — `mode-switch.spec.ts` and both existing `http-request*` specs boot without a
 history fixture), and a bindings regeneration via `scripts/setup.sh` (**never** a hand-typed flag
-list, `AGENTS.md`'s `-names` warning). After this commit a send records and nothing shows it.
+list, `CLAUDE.md`'s `-names` warning). After this commit a send records and nothing shows it.
 
 ### C4 — `feat(http): browse a request's past responses`
 `views/httprequest/history.ts` (D11), `ResponseHistoryList.vue` (D15), `ResponsePane.vue`'s
@@ -932,7 +932,7 @@ Stack table's chunk note gains `@codemirror/merge` with its measured gzip size.
 args and adds a bound service, so `apps/kira-studio/frontend/bindings/**` must be regenerated or the
 Vite build fails on an unresolvable import.
 
-Two bindings checks, both from `AGENTS.md`'s own warnings:
+Two bindings checks, both from `CLAUDE.md`'s own warnings:
 
 1. the regenerated `responsehistoryservice.ts` must call
    `$Call.ByName("…bridge.ResponseHistoryService.List", …)`, not `$Call.ByID(<n>, …)` — a
@@ -946,7 +946,7 @@ Also confirm `bun run build` still reports the **expected** chunk set: three laz
 `index-*.js` beyond this phase's own eager code.
 
 ### 6.2 The Go test — `repos/response_history_test.go`
-It exists because `Record` is **cache eviction with interacting rules** — `AGENTS.md`'s own named
+It exists because `Record` is **cache eviction with interacting rules** — `CLAUDE.md`'s own named
 category, and the one place three caps can silently disagree — not because it is a CRUD round trip.
 Seven cases, one per rule that is genuinely easy to get wrong:
 
@@ -969,7 +969,7 @@ Seven cases, one per rule that is genuinely easy to get wrong:
 
 **Explicitly not tested:** that `List` returns what `Record` inserted, that `Delete` deletes, that
 `Get` decodes a snapshot it just wrote, that a missing `tabId` is refused. Each is a CRUD round trip
-or a one-condition guard — `AGENTS.md`'s *"everything else gets nothing"*.
+or a one-condition guard — `CLAUDE.md`'s *"everything else gets nothing"*.
 
 ### 6.3 The UI spec — `tests/ui/http-history.spec.ts`
 `tests/ui` drives the real built bundle in real WebKit with both wire planes mocked. Three tests,

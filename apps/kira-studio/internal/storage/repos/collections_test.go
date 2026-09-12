@@ -12,7 +12,7 @@ import (
 
 // P4 §6.2: four cases, each guarding arithmetic rather than CRUD. Deliberately not tested — that
 // CreateCollection then List returns the collection, that Rename renames, that a required field's
-// absence is refused: each is AGENTS.md's "everything else gets nothing".
+// absence is refused: each is CLAUDE.md's "everything else gets nothing".
 
 func newCollectionsRepo(t *testing.T) *repos.CollectionsRepo {
 	return &repos.CollectionsRepo{DB: newRepos(t).DB}

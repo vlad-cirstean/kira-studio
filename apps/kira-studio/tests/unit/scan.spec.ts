@@ -203,7 +203,7 @@ describe('runChunkedScan — frame semantics (P44 F45)', () => {
 });
 
 // P5 C4/F6: runChunkedScan's own cap (opts.cap here, MAX_SCAN_MATCHES in production) — the one
-// change in this phase that clears AGENTS.md's "genuinely complex logic" bar (a cap interacting
+// change in this phase that clears CLAUDE.md's "genuinely complex logic" bar (a cap interacting
 // with a two-pass scanner whose second pass rebuilds from row 0 and whose contract is that the
 // final array is strictly ascending).
 describe('runChunkedScan — the match cap (P5 C4/F6)', () => {

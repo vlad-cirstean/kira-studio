@@ -78,7 +78,7 @@ This is a **reconsideration**, not an implementation phase. It produces:
 
 ### 0.3 Ground rules carried forward
 
-- **`AGENTS.md`'s rule against manufacturing findings applies to this document specifically.** It was
+- **`CLAUDE.md`'s rule against manufacturing findings applies to this document specifically.** It was
   commissioned as a second opinion, and the honest default outcome of a second opinion is
   "the first one holds". §6 says exactly that for four of the five avenues examined, and says why
   each was examined rather than assumed.

@@ -109,7 +109,7 @@ test('real backend through a plain browser tab: connect, tree, rows', async ({
     timeout: 15_000,
   });
 
-  // A handled bound-call error is a real HTTP 422 under Wails (AGENTS.md P57 finding) — nothing in
+  // A handled bound-call error is a real HTTP 422 under Wails (CLAUDE.md P57 finding) — nothing in
   // this scenario should trigger one, so the console should carry nothing at all, not even that.
   expect(consoleErrors).toEqual([]);
 });

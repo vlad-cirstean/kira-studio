@@ -1037,7 +1037,7 @@ row element that commit reshapes. U20 and U21 are otherwise independent of every
 ### 4.1 Unit (`bun run test:unit`)
 
 - **`headerValueCompletions`** — no dedicated test. It is a table lookup with a case-fold;
-  `AGENTS.md` names exactly this class ("thin pass-through wrappers", "format round-trips with no
+  `CLAUDE.md` names exactly this class ("thin pass-through wrappers", "format round-trips with no
   edge case") as getting nothing. Its behaviour is covered end to end by §4.3 case 2.
 - **No unit test for D16/D17.** Both are a three-line watcher over a length, and the behaviour that
   matters (did the viewport move?) is only observable in a real layout — §4.3 cases 13 and 14 are
@@ -1047,7 +1047,7 @@ row element that commit reshapes. U20 and U21 are otherwise independent of every
   `;` still does; one that does not still does not; a multi-statement document keeps every internal
   `;` and its trailing one; a document where every statement fails is returned byte-identical. This
   earns its keep: it is boundary arithmetic over a splitter's own contract, which is on the right
-  side of `AGENTS.md`'s bar and is exactly the class of thing that regressed here.
+  side of `CLAUDE.md`'s bar and is exactly the class of thing that regressed here.
 - **The param-description key maintenance (D7)** — **yes**, one case: renaming a param moves its
   description; deleting one prunes the orphan; a duplicate name shares one entry (the documented
   limitation, pinned so it cannot silently change).

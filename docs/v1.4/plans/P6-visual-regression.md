@@ -17,10 +17,10 @@ measurement specifically to avoid a new dependency. `toHaveScreenshot` costs not
 axis: `@playwright/test` 1.62.1 is already a dependency, and the API (`animations`, `caret`,
 `stylePath`, `mask`, `maxDiffPixelRatio`) exists in the installed version.
 
-**AGENTS.md's "fully open-source" rule** (its own §92-96) is, read literally, a *library license*
+**CLAUDE.md's "fully open-source" rule** (its own §92-96) is, read literally, a *library license*
 policy ("Applies to every new dependency") — it does not name services or CI infrastructure, so it
 does not strictly forbid a hosted visual-diff SaaS the way it forbids an Enterprise-gated npm
-package. The sharper, directly-applicable reason to decline one anyway: **`AGENTS.md`'s own
+package. The sharper, directly-applicable reason to decline one anyway: **`CLAUDE.md`'s own
 "`.github/workflows/` changes can't be pushed from here" section** — this session's push credential
 has no `workflow` scope, so any CI wiring a hosted service needs (a new job, a repo secret, an
 upload step) cannot be committed directly; it has to ship as a `docs/pending-changes/*.patch` file
@@ -33,14 +33,14 @@ continuation of `mode-switch.spec.ts`'s own precedent, and of this repo's total 
 outbound telemetry/third-party service dependency anywhere else in the stack.
 
 One more standing statement worth addressing rather than leaving for a reviewer to find:
-`AGENTS.md`'s Wails section states `//go:build server` is "preferred over `xvfb`/`xdotool`/
+`CLAUDE.md`'s Wails section states `//go:build server` is "preferred over `xvfb`/`xdotool`/
 screenshot techniques" for **sandbox boot proofs** — a different problem (proving a GUI app boots
 in a session with no display) than a CI-side pixel-diff test tier running against a real, installed
 WebKit. Not in tension with this phase.
 
 **Decision: `expect(page).toHaveScreenshot()`, in a new Playwright project, no new dependency.**
 
-**Suite cost, measured, not estimated** (AGENTS.md's own "measure when there's a real, concrete
+**Suite cost, measured, not estimated** (CLAUDE.md's own "measure when there's a real, concrete
 question" bar — "how expensive is the tier this phase sits after" is exactly that question, and
 P1 itself left it unmeasured): `bun run test:ui` (`ui` + `ui-timing`, 252 tests) runs in **5m4s**
 wall clock in this container (4 cores, no Docker, real WebKit) — measured live during this phase's
@@ -135,7 +135,7 @@ height: 960})` already runs on every boot every `visual` spec reuses via the sha
 
 **Diff threshold**: left at Playwright's own default (`maxDiffPixelRatio`/`threshold` unset) for
 this landing — tuning it preemptively with no observed false-positive rate would be exactly the
-"measure … not as a default ritual" AGENTS.md warns against. If CI produces a real flaky diff once
+"measure … not as a default ritual" CLAUDE.md warns against. If CI produces a real flaky diff once
 this runs for real, that failure is the concrete question to measure against, and the fix (a looser
 ratio, or narrowing a spec's own capture region with `clip`) lands then.
 
@@ -211,7 +211,7 @@ look at, before assuming a genuine regression.
 
 ## 7. CI wiring — staged as a patch, never committed directly
 
-`AGENTS.md`'s own "`.github/workflows/` changes can't be pushed from here" rule: this session's push
+`CLAUDE.md`'s own "`.github/workflows/` changes can't be pushed from here" rule: this session's push
 credential lacks the `workflow` scope, so `.github/workflows/ci.yml` cannot be edited directly from
 here. Per that section's own documented mechanism, write the intended diff as
 `docs/pending-changes/.github__workflows__ci.yml.patch` — a minimal addition to the existing `ui`
@@ -220,7 +220,7 @@ job (same runner, same already-installed WebKit/apt packages, no new job needed)
 `playwright-report/` failure-artifact upload (`ci.yml:95-99`) to also capture `test-results/` (where
 a screenshot mismatch's actual/expected/diff PNGs land) — `path: |\n  playwright-report/\n
 test-results/`. One-line note at the top of the patch file explaining why (the same convention
-AGENTS.md's own example shows), and this phase's own commit message says explicitly that a
+CLAUDE.md's own example shows), and this phase's own commit message says explicitly that a
 `docs/pending-changes/` entry still needs the user to apply it — this phase's own git history is the
 record, not a separate tracking note.
 
@@ -236,7 +236,7 @@ one-liners.
 
 ## 9. Explicitly out of scope
 
-- **A hosted visual-diff service.** §0's own closing argument — not ruled out by AGENTS.md's literal
+- **A hosted visual-diff service.** §0's own closing argument — not ruled out by CLAUDE.md's literal
   wording, but a strictly worse cost/dependency shape than the in-repo approach for this repo's own
   constraints (the workflow-push restriction applies to CI wiring either way; a hosted service adds
   an external account/secret on top).

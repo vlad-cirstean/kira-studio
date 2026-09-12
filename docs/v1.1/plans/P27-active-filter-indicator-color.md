@@ -314,7 +314,7 @@ undefined"` — same pattern, same file family, not a new idiom):
 ## 4. Verification plan
 
 Fast checks per commit (`bun run lint`, `bun run typecheck`, `bun run build`), then — once every
-view above is fixed — the relevant `tests/ui/` specs run once as a batch per `AGENTS.md`'s cadence
+view above is fixed — the relevant `tests/ui/` specs run once as a batch per `CLAUDE.md`'s cadence
 rule: `data-view.spec.ts`, `autocomplete.spec.ts`, `interaction.spec.ts` (all three exercise
 `filter-where-input`/`filter-orderby-input`), plus a full `--project=ui` run to catch anything
 unanticipated, with results and any fixes recorded directly in the implementation commit(s) — this
@@ -337,5 +337,5 @@ TextField,AutocompleteField}.vue`, `views/grid/{DataToolbar,FilterToolbar,DataGr
 SearchToolbar.vue`, `project/{FiltersDialog,menus}.ts/.vue`, `packages/shared/domain/tabs.ts`, all
 cited by file:line above against the base commit `e2d3b87`. `docs/ARCHITECTURE.md` was checked for
 an existing colour-token convention section and has none (colour conventions live in `tokens.css`/
-`primitives.css` directly, per §2.1's citations); `AGENTS.md`'s "implement the whole plan first,
+`primitives.css` directly, per §2.1's citations); `CLAUDE.md`'s "implement the whole plan first,
 then test once" cadence rule (§0/§4 above) drives this phase's own verification ordering.

@@ -58,7 +58,7 @@
 ### 0.1 Baseline
 
 - Branch `claude/feature-v1-1-p5-onwards-2isfzt` at `fce3e54`, source re-read in this session (not
-  trusted from the prior pass's prose — AGENTS.md's own rule for a pass-N plan).
+  trusted from the prior pass's prose — CLAUDE.md's own rule for a pass-N plan).
 - Predecessors: `P22-slickgrid-migration-plan.md` (Pass A), then
   `P22-slickgrid-migration-plan-iter2-scroll-gaps.md` (the per-call batch cap + chase, D1-D5, plus
   its §10 postscript on the dropped `contain: layout`). This is the **third** planning pass on the
@@ -720,7 +720,7 @@ row, `dataSource.ts:56-61`), which `tests/unit/slick-data-source.spec.ts` alread
 Alongside it, resolve §4.4 item 3: either add the two missing rail rules to `slickTheme.css` or
 correct `dataSource.ts:181-184`'s comment. **Recommendation: add the rules** — they are two
 declarations, they are what the comment already promises, and Pass B needs them; leaving a class
-emitted with no CSS behind it is the half-implemented shape AGENTS.md rules out.
+emitted with no CSS behind it is the half-implemented shape CLAUDE.md rules out.
 
 ### D7 — The two visual-parity defects in the port. **Implement item 1; implement item 2 as its own commit, re-measured.** (§4.4 items 1-2)
 
@@ -811,7 +811,7 @@ frame's `renderMs` must be ≥ the max single render it contains when `renderCou
 `frameMs` must be present and non-zero after the first frame.
 
 **T6 — unit coverage.** Only if D2's lead cap is extracted as a pure helper does it earn a case in
-`tests/unit/kira-slick-grid.spec.ts` beside `clampColumnOverscan`/`countNewRows`. Per AGENTS.md's
+`tests/unit/kira-slick-grid.spec.ts` beside `clampColumnOverscan`/`countNewRows`. Per CLAUDE.md's
 bar, the `getRenderedRange` restructure and the chase gate are **not** on their own test-worthy —
 T1/T3 cover the behaviour that matters and a unit test of `min(a, b)` restates the code. **Do not
 invent one.**

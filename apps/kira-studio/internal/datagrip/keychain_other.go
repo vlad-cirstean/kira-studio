@@ -20,7 +20,7 @@ func serviceNameForDataSource(uuid string) string {
 
 // readKeychainPassword has no implementation outside darwin+cgo (D1): the Linux default backend
 // is the freedesktop Secret Service over libsecret, which needs cgo — this repo's Go is
-// deliberately cgo-free (AGENTS.md) — and Windows does not ship this app at all. Both refuse by
+// deliberately cgo-free (CLAUDE.md) — and Windows does not ship this app at all. Both refuse by
 // name (case 23) rather than silently reporting "not found", which would be indistinguishable
 // from a real miss.
 func readKeychainPassword(uuid string) (password, username string, err error) {

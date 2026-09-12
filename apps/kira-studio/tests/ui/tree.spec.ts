@@ -25,7 +25,7 @@ import { connectionRow, expandRow, findRow, openRowMenu, treeContainer } from '.
 // container, no Docker: every connect/tree/filter response comes from a canned ControlSnapshot.
 //
 // Every raw `window.kira.*` call the original used is gone (P57 M2/M3 — window.kira no longer
-// exists, AGENTS.md/P57-cutover.md §11) and is replaced one of two ways:
+// exists, CLAUDE.md/P57-cutover.md §11) and is replaced one of two ways:
 //   - `window.kira.connectionsCreate(...)` (used for speed, bypassing the dialog) becomes driving
 //     the real add-connection dialog — the same convention mutations.spec.ts/definition.spec.ts
 //     already use.

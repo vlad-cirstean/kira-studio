@@ -312,7 +312,7 @@ type RelationColumns struct {
   Caps"*), so this needs no per-kind branching anywhere above the adapter.
 - **Five implementations**, each a widened form of a query that file already contains (F9), landing
   as one commit per engine.
-- **The conformance suites cover it per adapter**, which is `AGENTS.md`'s explicit exemption from
+- **The conformance suites cover it per adapter**, which is `CLAUDE.md`'s explicit exemption from
   the unit-test bar: *"nothing else exercises a Go adapter capability by capability."*
 
 ### D2 — One cache row per container, under the existing `metadata_cache` (F5, F8)
@@ -358,7 +358,7 @@ Three properties, each deliberate:
 
 **Bridge.** `internal/bridge/tree.go` gains `SchemaColumns(args TreeDescribeArgs)` — the same
 four-field args struct `Describe` and `Definition` already share (`tree.go:26-32`). Bindings are
-regenerated with `wails3 task common:generate:bindings` (`AGENTS.md`: `-names` is load-bearing).
+regenerated with `wails3 task common:generate:bindings` (`CLAUDE.md`: `-names` is load-bearing).
 
 **Frontend store.** New `state/schemaColumns.ts` — *not* under `views/`, because three different
 views will read it and `views/<kind>/*` may not import another `views/<kind>/*` (`biome.json`), and
@@ -562,7 +562,7 @@ The `!` on V10 is deliberate: `fillDdlFromConnection` is a removed public export
 
 ### 4.1 Go — adapter conformance (`bun run test:go`, and the real-container suites)
 
-`AGENTS.md` exempts these from the unit-test bar explicitly: *"nothing else exercises a Go adapter
+`CLAUDE.md` exempts these from the unit-test bar explicitly: *"nothing else exercises a Go adapter
 capability by capability."* Per SQL adapter, in `internal/adapters/<kind>/*_test.go`:
 
 - `SchemaColumns` on a container with two tables and a view returns all three, each with its columns
@@ -575,7 +575,7 @@ capability by capability."* Per SQL adapter, in `internal/adapters/<kind>/*_test
 - The non-SQL kinds report the capability false and the method is not implemented.
 
 `internal/adapters/testsupport` already provisions the containers; `P25`'s complete-suite harness
-(`Scenario`/`Requires`) is the seam for the permission case, per `AGENTS.md`.
+(`Scenario`/`Requires`) is the seam for the permission case, per `CLAUDE.md`.
 
 ### 4.2 Go — the cache (`bun run test:go`)
 
@@ -597,7 +597,7 @@ capability by capability."* Per SQL adapter, in `internal/adapters/<kind>/*_test
 - **`namespaceFromCached`** — **yes.** It is a shape transform with real interacting rules
   (unqualified vs. schema-qualified relations, a view and a table with the same column name,
   `defaultSchema` resolution, an empty relation) feeding a third-party completion engine whose
-  behaviour depends on getting the shape exactly right. That is on the right side of `AGENTS.md`'s
+  behaviour depends on getting the shape exactly right. That is on the right side of `CLAUDE.md`'s
   bar; `toSqlNamespace`'s own existing coverage is the model.
 - **`effectiveSchema`'s precedence** — **yes**, three cases: document wins over cache; cache fills
   when the document is empty; both empty yields the empty schema. It is the merge rule three
@@ -629,7 +629,7 @@ capability by capability."* Per SQL adapter, in `internal/adapters/<kind>/*_test
 
 ### 4.5 Real backend (`tests/e2e-real`)
 
-One scenario, Postgres and SQLite (the two the suite runs unconditionally, `AGENTS.md`): connect,
+One scenario, Postgres and SQLite (the two the suite runs unconditionally, `CLAUDE.md`): connect,
 expand a schema, open a console **without opening any table**, and assert a column of an unopened
 table completes. This is the case the mocked tier cannot prove, because it is exactly the
 "the adapter really did return this in one query" claim.

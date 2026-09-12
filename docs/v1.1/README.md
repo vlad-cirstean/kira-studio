@@ -18,5 +18,5 @@ both, and `ARCHITECTURE.md` is authoritative for behavior over `SPEC.md`.
 `SPEC.md`'s phasing table keeps accruing rows as new phases land, the same way `docs/v1/SPEC.md`'s
 did — it just does not otherwise change what earlier phases already said about themselves.
 
-`docs/v1/` stays in the repository as history; nothing here retroactively edits it, and `AGENTS.md`
+`docs/v1/` stays in the repository as history; nothing here retroactively edits it, and `CLAUDE.md`
 now points at this folder's `SPEC.md` as the live phasing record instead.

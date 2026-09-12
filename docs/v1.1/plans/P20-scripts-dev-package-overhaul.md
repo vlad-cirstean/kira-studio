@@ -44,7 +44,7 @@
 > (`go.mod:3`, raised by P19) the generator then emits **52 warnings** — *"package requires newer Go
 > version go1.27 (application built with go1.26)"* — one per package it could not fully type-check.
 > `GOTOOLCHAIN=go1.27.0 go install` produces a clean run. `scripts/wails-dev-setup.sh:52` has no
-> such pin (F7). This is the *toolchain-skew* twin of the `@latest` hazard `AGENTS.md:255` already
+> such pin (F7). This is the *toolchain-skew* twin of the `@latest` hazard `CLAUDE.md:255` already
 > warns about, and nothing in the repo guards it.
 >
 > **`bun run dev` and `bun run package` are provably, hard-broken off macOS**, and the cause is
@@ -62,7 +62,7 @@
 > `PATH`-plus-`$(go env GOPATH)/bin` bootstrap appears **six** times; the "install the pinned wails3,
 > then generate bindings" block appears **four** times (once as a script, three times copy-pasted
 > into CI); and there are **three different `generate bindings` flag lists** across five call sites,
-> with CI's three all omitting `-clean=true` that `AGENTS.md:269` calls the pinned invocation (F8,
+> with CI's three all omitting `-clean=true` that `CLAUDE.md:269` calls the pinned invocation (F8,
 > F9, F14, F15).
 >
 > **What is *not* broken, said plainly rather than padded into a finding.** P3's bun standardisation
@@ -125,7 +125,7 @@ is no longer the stale tree F6 describes. (2) `$(go env GOPATH)/bin/wails3` was 
   `apps/kira-studio/README.md:13-18`'s wrong step order are all listed in §5 and **fixed only where
   they are a script's own contract**; the rest is P21's charter, which is why P20 lands before it.
 - Editing `.github/workflows/*.yml` directly (D9 — same `workflow` OAuth-scope constraint P3's D15
-  and `AGENTS.md`'s "Known open items" record). The **staged** copies under
+  and `CLAUDE.md`'s "Known open items" record). The **staged** copies under
   `docs/v1.1/plans/p19-pending-ci-workflow/` *are* edited.
 - `.gitignore`'s stock Node/Next/Nuxt/Gatsby boilerplate (P3 F17/D14 declined it; declined again —
   nothing here needs it and the glob-semantics risk around `dist`/`!dist` has not changed).
@@ -136,7 +136,7 @@ is no longer the stale tree F6 describes. (2) `$(go env GOPATH)/bin/wails3` was 
 - **Every decision in §4 cites a finding in §2, and every finding cites a file:line, a command run
   in this container, or a controlled experiment whose Taskfile is written out.** Where evidence could
   not be obtained here it says so and names the macOS step that would obtain it (§6.3).
-- `AGENTS.md`'s standing rules apply: no stubs, comments only where the code cannot speak for itself,
+- `CLAUDE.md`'s standing rules apply: no stubs, comments only where the code cannot speak for itself,
   Conventional Commits, and **no new unit tests** — nothing in this phase clears that bar; it edits
   shell scripts and YAML, and §6's gate is the proof.
 - **Run §6.1's block after every commit**, not once at the end.
@@ -413,7 +413,7 @@ and the run prints only its `Processed: 562 Packages, 14 Services, 44 Methods…
 **Honest limit on this one.** For *this* codebase the two CLIs produced byte-identical bindings
 (`diff -rq` → 0 differences). The defect is that the type-checker is silently degrading on every
 package in the app: nothing guarantees it stays benign, and the failure mode when it is not is
-precisely the one `AGENTS.md:275-281` spends six lines warning about — a binding that generates
+precisely the one `CLAUDE.md:275-281` spends six lines warning about — a binding that generates
 "successfully" and is wrong. `GOTOOLCHAIN=local` is **not** the fix: the base toolchain here is
 go1.24.7 (`cd /tmp && go version`), and `GOTOOLCHAIN=local go install` refuses with
 *"requires go >= 1.25.0 (running go 1.24.7; GOTOOLCHAIN=local)"*. The version must be read from
@@ -430,7 +430,7 @@ go1.24.7 (`cd /tmp && go version`), and `GOTOOLCHAIN=local go install` refuses w
 | `.github/workflows/release.yml:48` | `-b -i -ts -names` |
 | *(staged)* `docs/v1.1/plans/p19-pending-ci-workflow/{ci.yml:36,ci.yml:65,release.yml:48}` | `-b -i -ts -names` |
 
-`AGENTS.md:269-271` names one invocation as *the* pinned one — *"the exact flags
+`CLAUDE.md:269-271` names one invocation as *the* pinned one — *"the exact flags
 `scripts/wails-dev-setup.sh` uses — `wails3 generate bindings -clean=true -b -names -ts -i` … never a
 shorter hand-typed version"*. **CI's three all drop `-clean=true`.** On a fresh runner checkout that
 happens to be harmless (there is nothing to clean), which is exactly why it has survived — but it is
@@ -556,7 +556,7 @@ PACKAGE_SCRIPT="$(node -p "require('./package.json').scripts['package'] || ''")"
 ```
 
 `README.md:98-108`'s Requirements list is Go, Bun, Xcode CLT and optionally Colima — no Node.
-`AGENTS.md` says the vendored Node runtime was deleted in P58f. With `set -eu` (`:17`) a missing
+`CLAUDE.md` says the vendored Node runtime was deleted in P58f. With `set -eu` (`:17`) a missing
 `node` aborts the script at line 41, before any check runs, and `bun run verify:packaging` fails on a
 machine that satisfies every documented prerequisite. P3's F14 spotted this and deliberately left it;
 it is in scope now. (It happens to be installed in this container — `/opt/node22/bin/node`, v22.22.2
@@ -602,7 +602,7 @@ build flags. Harmless in practice (F11 measured `-f` as output-neutral here) and
 ### F17 — `package.json`'s script block: one real gap, one cosmetic asymmetry
 
 - **No entry point for the `e2e-real` tier.** `apps/kira-studio/playwright.config.ts:44-52` defines
-  the project; nothing in `package.json:11-32` runs it; `AGENTS.md:150-153` gives the raw command
+  the project; nothing in `package.json:11-32` runs it; `CLAUDE.md:150-153` gives the raw command
   (`node node_modules/.bin/playwright test --project=e2e-real`, deliberately *not* `bunx`) and
   P16's plan already recorded *"There is no `e2e-real` npm script at all."* Two phases have now
   written that sentence instead of adding the script.
@@ -767,12 +767,12 @@ tasks:
 | **D6** | **`scripts/install-deps.sh` and `scripts/wails-dev-setup.sh` merge into one `scripts/setup.sh`; a new sourced `scripts/lib.sh` holds `ROOT_DIR`, `require_cmd`, `ensure_gopath_on_path`, `pinned_wails_version` and `go_directive`; all five remaining scripts source it.** `apps/kira-studio/tests/e2e-real/fixtures.ts:61` is repointed in the same commit. | F14/F15/F16: four copies of the `ROOT_DIR` idiom, two scripts silently requiring the caller's cwd, two `command -v` preflights, and six `$(go env GOPATH)/bin` bootstraps. The two scripts are already only ever invoked as a pair (`package.json:13`) and already documented as one step (`README.md:147`). This is the SPEC row's "single shared implementation", made structural. |
 | **D7** | **CI's three inline blocks become `sh scripts/setup.sh`**, applied to the **staged** `docs/v1.1/plans/p19-pending-ci-workflow/{ci,release}.yml` only. | F8/F9: three copy-pasted reimplementations, all missing `-clean=true`, all missing the toolchain pin, one citing a directory P3 deleted. Routing CI through the same script leaves **one** binding-generation flag list in the repository — `build/Taskfile.yml:81` — which is what P3's D11 asked for and did not get. `scripts/setup.sh` is idempotent and fast on a warm tree, so it is a safe superset of what the inline block did. |
 | **D8** | **`scripts/setup.sh` generates bindings by delegating to `wails3 task common:generate:bindings`** (P3 D11's *preferred* branch), not by carrying its own flag list. | F8. P3's stated reason for allowing the fallback was a possible chicken-and-egg with a not-yet-installed `wails3`; that is gone, because `setup.sh` installs the pinned CLI immediately above, and D3 has just given the task a correct fingerprint so a warm call is a no-op rather than a 30-second regeneration. **If the implementer measures a cold `bun run dev` materially slower this way, take the fallback — one shared invocation in `lib.sh`, called by both — and say which was taken, in the commit message**, exactly as P3's F13 required. |
-| **D9** | **`.github/workflows/*.yml` are not touched; the staged copies under `docs/v1.1/plans/p19-pending-ci-workflow/` carry P20's edits, and that directory's README records it.** | Same `workflow` OAuth-scope blocker `AGENTS.md`'s "Known open items" and P3's D15 record. Leaving the staged files carrying the inline block would ship F8/F9 forward the moment someone applies them. |
+| **D9** | **`.github/workflows/*.yml` are not touched; the staged copies under `docs/v1.1/plans/p19-pending-ci-workflow/` carry P20's edits, and that directory's README records it.** | Same `workflow` OAuth-scope blocker `CLAUDE.md`'s "Known open items" and P3's D15 record. Leaving the staged files carrying the inline block would ship F8/F9 forward the moment someone applies them. |
 | **D10** | **`verify-packaging.sh:41`'s `node -p` becomes a POSIX `sed` read of `package.json`.** The S5 `case` pattern (`*"wails3 task darwin:package:dmg"*`) is unchanged. | F13: `node` is not in `README.md`'s Requirements and has not been a declared dependency since P58f deleted the vendored runtime; with `set -eu` its absence aborts the script before any check runs. `bun -e` would work but adds a second way to read JSON — the script already parses YAML with `sed` at `:89`. |
 | **D11** | **`apps/kira-studio/frontend/package.json` gains `"type": "module"`.** | F18: Vite names this exact remedy in a warning printed on every build and every dev start. P3's §5.2 config was deliberately written to work under both loaders (`fileURLToPath(new URL(…, import.meta.url))`, never `__dirname`), so the switch is safe; `bun run build`, `bun run build:dev` and `vite dev` were all exercised this session and are the proof gate. |
-| **D12** | **Add `test:e2e-real` to `package.json`, in `AGENTS.md`'s plain-Node form.** | F17: the project exists in `playwright.config.ts:44-52`, `AGENTS.md:150-153` documents why it must **not** be `bunx`, and two phases have written "there is no script for it" rather than adding one. `node node_modules/.bin/playwright` is not a contradiction of D10 — the Playwright CLI is a Node program either way; what D10 removes is a *shell script* depending on Node. |
+| **D12** | **Add `test:e2e-real` to `package.json`, in `CLAUDE.md`'s plain-Node form.** | F17: the project exists in `playwright.config.ts:44-52`, `CLAUDE.md:150-153` documents why it must **not** be `bunx`, and two phases have written "there is no script for it" rather than adding one. `node node_modules/.bin/playwright` is not a contradiction of D10 — the Playwright CLI is a Node program either way; what D10 removes is a *shell script* depending on Node. |
 | **D13** | **Fix the four stale contract lines in F21** — `wails-dev-setup.sh`'s header (which moves into `setup.sh`), `apps/kira-studio/README.md:13-18`'s inverted order, the staged `ci.yml:30` step name, and `README.md:101`'s `Go 1.25+` → `Go 1.27+`. **Everything else in `README.md`, `docs/PACKAGING.md` and `docs/ARCHITECTURE.md` is left to P21.** | These four are a script's own contract or a build instruction that does not work; the rest is drift, and P20 exists before P21 precisely so P21 documents a workflow that works rather than the other way round. `README.md:147`'s script-table row must change anyway because `install-deps.sh` ceases to exist (D6). |
-| **D14** | **`AGENTS.md:269-281`'s Wails fix-note is rewritten to name the task, not the script**, and gains one sentence on the `GOTOOLCHAIN` pin. The `-names` paragraph is kept verbatim — it is still true and still the expensive lesson. | D8 makes `build/Taskfile.yml:81` the single definition, so a note pointing at `scripts/wails-dev-setup.sh` would point at a deleted file. F7 is a standing environment rule (`AGENTS.md`'s own charter: *"how to run things in whichever box a session happens to be on"*), not a phase finding, so it belongs there rather than only here. |
+| **D14** | **`CLAUDE.md:269-281`'s Wails fix-note is rewritten to name the task, not the script**, and gains one sentence on the `GOTOOLCHAIN` pin. The `-names` paragraph is kept verbatim — it is still true and still the expensive lesson. | D8 makes `build/Taskfile.yml:81` the single definition, so a note pointing at `scripts/wails-dev-setup.sh` would point at a deleted file. F7 is a standing environment rule (`CLAUDE.md`'s own charter: *"how to run things in whichever box a session happens to be on"*), not a phase finding, so it belongs there rather than only here. |
 
 ---
 
@@ -815,7 +815,7 @@ reports a toolchain older than the go directive (F7); regenerate bindings via
 `wails3 task common:generate:bindings` (D8) when the stamp at
 `apps/kira-studio/.task/bindings.stamp` is absent or differs; write the stamp on success. The Linux
 GTK preflight (`wails-dev-setup.sh:46-51`) moves across unchanged — it is still required and
-`AGENTS.md:250-253` still depends on it.
+`CLAUDE.md:250-253` still depends on it.
 
 Verify: `rm -rf apps/kira-studio/frontend/bindings apps/kira-studio/.task && bun run setup` →
 regenerates; `bun run setup` again → says nothing about bindings and does not reinstall; then §6.1
@@ -864,7 +864,7 @@ docs/v1.1/plans/p19-pending-ci-workflow/` returns nothing.
 
 `apps/kira-studio/frontend/package.json` — `"type": "module"` (D11). `package.json` — add
 `test:e2e-real` (D12). `apps/kira-studio/README.md:13-18` — bindings before build. `README.md:101`
-(`Go 1.27+`) and `:147` (the script-table row `install-deps.sh` made obsolete). `AGENTS.md:269-281`
+(`Go 1.27+`) and `:147` (the script-table row `install-deps.sh` made obsolete). `CLAUDE.md:269-281`
 per D14.
 
 Verify: `bun run build`, `bun run build:dev` and a live `wails3 task common:dev:frontend` all run
@@ -886,7 +886,7 @@ git status --porcelain          # must be empty
 
 **Baseline measured at `d63648f`, this session:** all five green, `git status --porcelain` empty.
 `go build ./...` compiles the root `main` package, which imports Wails and needs the GTK4/WebKitGTK
-headers `AGENTS.md:250-253` names; they are present in this container.
+headers `CLAUDE.md:250-253` names; they are present in this container.
 
 ### 6.2 Once, at the end — everything obtainable off macOS
 
@@ -944,7 +944,7 @@ grep -rl  '"/wails/runtime.js"'    apps/kira-studio/frontend/bindings/**/bridge/
 
 Then `bun run test:ui`, whose `tests/ui/support/mockRuntime.ts` builds `CHANNEL_TO_FQN` from exactly
 those `ByName` strings — a `-names`-less regeneration surfaces there as
-`Error: no CHANNEL_TO_FQN entry for undefined` and nowhere else (`AGENTS.md:275-281`).
+`Error: no CHANNEL_TO_FQN entry for undefined` and nowhere else (`CLAUDE.md:275-281`).
 
 **Freshness (new, F4/F6).** The regeneration must be *provably* triggered by a dependency-only
 change, since that is the exact case that failed:
@@ -1013,7 +1013,7 @@ document:
     passed.** If they still fail on hardware, the failure output opens a P20 iteration-2 plan rather
     than being patched blind.
 11. `git status --porcelain` is clean and the diff contains **no** `.github/workflows/` file.
-12. `AGENTS.md`'s Wails section names the task rather than the deleted script, carries the
+12. `CLAUDE.md`'s Wails section names the task rather than the deleted script, carries the
     `GOTOOLCHAIN` rule, and keeps the `-names` paragraph verbatim. Its "Known open items" is
     unchanged apart from that — both CI-workflow entries stay open (D9 does not clear their blocker).
 
@@ -1033,7 +1033,7 @@ hardware; §6.3 is its checklist and §7 item 10 its escalation path.**
 directory, which the `apps/` monorepo shape (P3 D2) breaks for anyone, not only this repo. D5 routes
 around it by deleting the only caller. If a future phase ever wants real cross-compilation back, the
 upstream fix is a module-root walk, and `v3.wails.io` being 403-blocked from every box here
-(`AGENTS.md:257`) means the issue would have to be filed from the GitHub side. **Owner: whoever needs
+(`CLAUDE.md:257`) means the issue would have to be filed from the GitHub side. **Owner: whoever needs
 non-macOS builds.**
 
 **OQ-3 — `install:frontend:deps` still runs `bun install` twice per cold `bun run dev`.** D1 makes

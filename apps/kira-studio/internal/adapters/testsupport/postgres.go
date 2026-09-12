@@ -22,9 +22,9 @@ import (
 )
 
 // DockerUnavailableMessage mirrors packages/db-fixtures/support/docker.ts's own DOCKER_UNAVAILABLE_MESSAGE,
-// re-pointed at this environment's own startup procedure (AGENTS.md's Docker section) rather than
+// re-pointed at this environment's own startup procedure (CLAUDE.md's Docker section) rather than
 // Colima's, since this is the Go test tier, not the dev machine's.
-const DockerUnavailableMessage = "Docker daemon unreachable — see AGENTS.md's Docker section for " +
+const DockerUnavailableMessage = "Docker daemon unreachable — see CLAUDE.md's Docker section for " +
 	"how to start it (nohup dockerd, or colima start on macOS) and retry."
 
 const dockerProbeTimeout = 5 * time.Second

@@ -123,7 +123,7 @@
 
 ### 0.5 Two passes, and why the split is real
 
-`AGENTS.md`: *"Default to one sequential subagent for the whole phase… Use multiple subagents in
+`CLAUDE.md`: *"Default to one sequential subagent for the whole phase… Use multiple subagents in
 parallel only when the plan's own work is genuinely independent and parallelizable."* The split here
 is **not** parallelism. It is a sequential gate with a human measurement in the middle:
 
@@ -134,7 +134,7 @@ is **not** parallelism. It is a sequential gate with a human measurement in the 
 - **Pass B — feature parity (§8).** Only if the gate passes. Editing, selection, menus, clipboard,
   keyboard, inserts, search, then the cutover and the `tests/ui/` selector rewrite.
 
-Per `AGENTS.md`'s multiple-passes rule, **Pass B gets its own plan file**
+Per `CLAUDE.md`'s multiple-passes rule, **Pass B gets its own plan file**
 (`P22-slickgrid-migration-plan-iter2.md`), written by an Opus subagent against the tree *after* Pass
 A lands and *with* the real-hardware numbers in hand — not against this document's guesses. §8 is
 therefore a complete design (so the size of the bet is visible now, and so Pass A's seams are built
@@ -973,7 +973,7 @@ change.
 
 **C3 — `feat(grid): a SlickGrid data source over frozen pages`**
 D1 + D2. `views/grid/slick/dataSource.ts` and its types. Pure logic, no DOM. Its unit test
-(`tests/unit/slick-data-source.spec.ts`) is one of the few this repo's `AGENTS.md` bar actually
+(`tests/unit/slick-data-source.spec.ts`) is one of the few this repo's `CLAUDE.md` bar actually
 admits — display-position ↔ page-row translation across a filter, the insert-row region past the
 page end, and the "handle must be truthy" invariant are exactly *"cursor/pagination arithmetic with
 real boundary cases"*.
@@ -1066,7 +1066,7 @@ attempt to run it, and the fix — a per-`render()`-call new-cell budget with se
 
 ## 8. Pass B — feature parity and cutover (design, not yet the commit list)
 
-Authorised only by §7.4(b) PASS. **Per `AGENTS.md`'s multiple-passes rule this gets its own plan
+Authorised only by §7.4(b) PASS. **Per `CLAUDE.md`'s multiple-passes rule this gets its own plan
 file, written against the post-Pass-A tree and with the hardware numbers in hand.** What follows is
 the design that plan must implement and the seams Pass A must therefore leave in place — not the
 commit list a Sonnet subagent executes.
@@ -1300,4 +1300,4 @@ per-import-set entry files, for every figure in F9.
 `docs/v1.1/plans/P22-webview-scroll-performance.md`, `docs/v1.1/plans/P5-ram-usage.md`,
 `docs/v1.1/plans/P18-sql-language-server-explain.md`,
 `docs/v1.1/plans/P13-query-console-format-button.md`, `docs/ARCHITECTURE.md`, `docs/PERF.md`,
-`docs/v1.1/WEBVIEW-SCROLL-MEMORY.md`, `AGENTS.md`.
+`docs/v1.1/WEBVIEW-SCROLL-MEMORY.md`, `CLAUDE.md`.

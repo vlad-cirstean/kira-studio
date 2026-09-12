@@ -21,7 +21,7 @@
 - **The existing dark theme does not move by one pixel.** Step 2 tokenises fifteen literals; every one of them must resolve to the identical computed colour it has today. The one deliberate exception is named in D15 (`CommandPalette.vue`'s scrim, 0.3 → 0.5) and is recorded in its commit message. `tests/ui/*.spec.ts` are the guard: they run unchanged, and none of them may need touching.
 - **A theme is CSS, not JavaScript.** No palette object exists in TS beyond a five-row metadata table (id, label, `isDark`, `windowBackground`) that main needs for the two things CSS cannot reach — the native window background and `nativeTheme` (D20). A UI test asserts the table and the CSS agree, so the one duplication in the phase cannot drift (§5, scenario 12).
 - **Every token that exists is set by every theme.** No theme may rely on `:root`'s defaults for a colour token — a partially-defined palette that inherits three greys from the dark theme is the failure mode this whole phase exists to avoid. Step 3's CSS is checked for totality by a test that enumerates the token names and reads all five themes (§5, scenario 11).
-- Comments per `AGENTS.md`: only where the code cannot say it for itself — in particular D9's three inversions, D11's olive derivation, D14's Latte strip-foreground rule, D19's `dark` flag on the CodeMirror theme, and D33's one-leaf reset. None of those is re-derivable from the code.
+- Comments per `CLAUDE.md`: only where the code cannot say it for itself — in particular D9's three inversions, D11's olive derivation, D14's Latte strip-foreground rule, D19's `dark` flag on the CodeMirror theme, and D33's one-leaf reset. None of those is re-derivable from the code.
 - Run `bun run lint`, `bun run typecheck` (all three projects) and `bun run build` on every commit. **Nothing in this phase needs Docker**: `tests/ui/theme.spec.ts` drives the settings dialog and never opens a connection, so unlike P34–P37 the whole phase — tests included — is executable in Claude Code's Linux web container under `xvfb-run`. There is no verify-on-container list.
 - Commits follow Conventional Commits, one per step of §4.
 
@@ -513,7 +513,7 @@ This is the last phase in §10's table, so the docs commit is also the point at 
 - **`docs/v1/PACKAGING.md:52`** — the `electronLanguages` justification drops *"dark-mode-only"* and keeps *"English-only v1"* (D33).
 - **`docs/v1/design/kira-design-system/`** — `parts/_style.css`'s header, `parts/bodies/System.html`'s new section 01b, `parts/bodies/SettingsDialog.html`'s picker row, `README.md`'s Themes bullet, and all sixteen regenerated `.dc.html` files (D34/D35).
 - **`README.md`** — line 12's *"Dark mode only"* becomes *"Five themes — Kira Dark plus Catppuccin Latte/Frappé/Macchiato/Mocha; no automatic OS-appearance switching"*, and the Settings bullet's Appearance list gains *theme*.
-- **`AGENTS.md`** — **unchanged**. It is process and environment only, and this phase adds no environment step: no container, no driver, no credential, nothing that needs a per-engine section.
+- **`CLAUDE.md`** — **unchanged**. It is process and environment only, and this phase adds no environment step: no container, no driver, no credential, nothing that needs a per-engine section.
 
 ## 9. Open questions for the user
 

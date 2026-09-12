@@ -41,7 +41,7 @@
 > per-variable `enabled` checkboxes, folder-level and item-level `variable[]` promotion, recursive
 > variable expansion, variable substitution into a local file path, and drag-reorder in the
 > collections **tree** (P4 §8 OQ-9 is untouched — D14 explains why this phase does not close it).
-> Nothing here is half-built toward any of them (`AGENTS.md`: *"Scope left out of a phase is left out
+> Nothing here is half-built toward any of them (`CLAUDE.md`: *"Scope left out of a phase is left out
 > entirely, not half-implemented"*).
 >
 > **Every claim below was re-read against the tree, not inherited from prose.** Base: branch
@@ -122,7 +122,7 @@
   §8 OQ-6.
 - **A per-variable `enabled` checkbox.** Postman has one; the SPEC's P5 row lists name, value, the
   secret checkbox, history and reordering, and not this. Adding a column nothing writes is the
-  half-implementation `AGENTS.md` forbids. §8 OQ-5.
+  half-implementation `CLAUDE.md` forbids. §8 OQ-5.
 - **Folder-level, item-level and `url.variable` promotion.** Only collection-level `variable[]` is
   promoted (D15); the other three levels stay inert in `origin_json` exactly as P4 left them, and
   keep being counted `variables_inert`.
@@ -437,7 +437,7 @@ atomic with the collection it belongs to.
 ## 4. Decisions
 
 ### D1 — No new library, and here is the check rather than the assertion
-`AGENTS.md` requires reaching for a maintained library first and **naming the requirement** when
+`CLAUDE.md` requires reaching for a maintained library first and **naming the requirement** when
 declining one. Three candidates were real enough to weigh.
 
 - **A template engine for the substitution** — `handlebars`, `mustache`, or Go's `text/template`.
@@ -630,7 +630,7 @@ So, concretely:
   variables store, cleared on dialog close. It is never written to tab state, never to `tabs.state_json`,
   never to a collection row. This mirrors P14 §0.3's own honest limit — *"Scrubbing plaintext from
   renderer memory after a reveal"* is not something JS offers, and pretending otherwise would be the
-  stub `AGENTS.md` forbids — so the plan says what it does (drops the reference) rather than claiming
+  stub `CLAUDE.md` forbids — so the plan says what it does (drops the reference) rather than claiming
   to zero anything.
 - **Nothing logs a resolved value.** `internal/httpvars` `slog`s the *count* of secrets resolved and
   their **names**, never their values, and only at `Debug`. `connections.Service.Reveal`'s own
@@ -762,7 +762,7 @@ work around it:
 - **Marking a variable secret when the cipher is unavailable fails the save**, with the cipher's own
   reason surfaced in the dialog's `MessageStrip` — the same treatment `ConnectionDialog` gives a
   failed password save. Writing the plaintext into `value` "for now" would be the exact
-  silently-weaker-than-it-looks behaviour `AGENTS.md` and `secrets/cipher.go:24-27` both refuse.
+  silently-weaker-than-it-looks behaviour `CLAUDE.md` and `secrets/cipher.go:24-27` both refuse.
 - **A secret whose decrypt fails at send time** (a keychain reset, a database copied from another
   machine) resolves to nothing: the reference stays literal, the send proceeds, and the failure is
   reported once per send at `slog.Warn` naming the variable, not the value. Refusing the send would
@@ -1070,7 +1070,7 @@ Two facts P5 hands it:
 
 Fourteen commits. C1–C5 add capability with nothing mounted (each builds and tests on its own);
 C6–C11 are one user-visible slice each; C12 closes P4's hand-off; C13–C14 are the tests and the docs.
-Per `AGENTS.md`, run the fast checks (`lint`, `typecheck`, `build`, `go build`/`go vet`) per commit and
+Per `CLAUDE.md`, run the fast checks (`lint`, `typecheck`, `build`, `go build`/`go vet`) per commit and
 the expensive suites once at the end.
 
 ### C1 — `feat(shared): the variable, environment and reveal-outcome domain`
@@ -1098,7 +1098,7 @@ cipher round trip for a secret value (D5), `Reveal`/`RevealHistory` over the inj
 ### C5 — `feat(bridge): VariablesService`
 `bridge/variables.go`'s thirteen methods (D19), `appcore/deps.go`'s one field, the `main.go` wiring
 (`httpvars.New` + the service line), `control.ts`'s thirteen wrappers, bindings regenerated via
-`wails3 task common:generate:bindings` (never a hand-typed flag list — `AGENTS.md`'s `-names`
+`wails3 task common:generate:bindings` (never a hand-typed flag list — `CLAUDE.md`'s `-names`
 warning), plus `tests/ui/support/ipcChannels.ts`'s thirteen names, `mockRuntime.ts`'s thirteen FQNs
 and the two `'[]'` wildcards (F9).
 
@@ -1164,7 +1164,7 @@ substitution, its ordering against `op_log.command`, and the export's secret-val
 `apps/kira-studio/frontend/bindings/**` must be regenerated or the Vite build fails on an
 unresolvable import.
 
-Two bindings checks, from `AGENTS.md`'s own warnings and P2/P3/P4's precedent:
+Two bindings checks, from `CLAUDE.md`'s own warnings and P2/P3/P4's precedent:
 
 1. The generated `variablesservice.ts` must call
    `$Call.ByName("…bridge.VariablesService.List", …)`, not `$Call.ByID(<n>, …)` — a `-names`-less
@@ -1178,7 +1178,7 @@ Also verify, once, by reading the generated `httpvars` model: `RevealResult.Valu
 not a pointer, and **no** generated type exposes `secret_value` — the bridge never returns it.
 
 ### 6.2 The Go and unit tests, and what they deliberately do not cover
-`AGENTS.md`'s bar: a test earns its keep only for *"a parser/splitter with several interacting
+`CLAUDE.md`'s bar: a test earns its keep only for *"a parser/splitter with several interacting
 rules"*, *"cursor/pagination boundary arithmetic"*, *"crypto beyond encrypt-then-decrypt"* and
 similar. Three things here qualify; the CRUD does not.
 
@@ -1220,7 +1220,7 @@ round-trip:
 
 **Explicitly not tested:** that `CreateEnvironment` then `ListEnvironments` returns it; that
 `RenameEnvironment` renames; that a missing name is refused; that the cipher round-trips a string.
-Each is `AGENTS.md`'s *"everything else gets nothing"* — CRUD round-trips, one-condition guards, and
+Each is `CLAUDE.md`'s *"everything else gets nothing"* — CRUD round-trips, one-condition guards, and
 encrypt-then-decrypt.
 
 ### 6.3 The new UI spec — `tests/ui/http-variables.spec.ts`

@@ -12,7 +12,7 @@ import { IPC } from './support/ipcChannels';
 // (tests/ui/fixtures.ts's own header comment), and the guarantee is now covered more precisely at
 // the layer that actually implements it — apps/kira-studio/internal/storage/repos/secrets_test.go's real
 // AES-256-GCM round trip and apps/kira-studio/internal/connections/service_test.go's
-// TestPasswordThreeStateConvention (AGENTS.md's P57 finding).
+// TestPasswordThreeStateConvention (CLAUDE.md's P57 finding).
 //
 // What *is* pure UI and ports here: connectionsSecretsStatus()'s three backend shapes and
 // ConnectionDialog.vue's `connection-credential-note` rendering for each, plus the failed/
@@ -155,7 +155,7 @@ test('the unavailable path fails loudly and safely', async ({ relaunch, consoleE
   // every handled business-rule error with a genuine HTTP 422 (`pkg/application/transport_http.go`
   // — confirmed in the module cache, not assumed), and Chromium/WebKit's own devtools log any
   // non-2xx fetch as "Failed to load resource" regardless of whether the page's JS handles it
-  // (AGENTS.md's P57 finding; the same phenomenon `mockRuntime.ts`'s own `/wails/custom.js` comment
+  // (CLAUDE.md's P57 finding; the same phenomenon `mockRuntime.ts`'s own `/wails/custom.js` comment
   // documents for a 404). So the real assertion is "no line *other than* that one expected,
   // already-handled 422" — the one thing this tier can still prove.
   expect(consoleErrors).toEqual([

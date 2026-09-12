@@ -12,7 +12,7 @@
 > CodeMirror and nothing in this phase reopens it), anything from the shelved v1.3 Git module
 > (`docs/v1.3/` does not exist on this branch — see F1), any change to what a request *does*, any
 > new bound method, any new tab kind, any new dependency, and — decisively — **`packages/api-ui`**,
-> which D6 declines with a measurement rather than half-builds (`AGENTS.md`: *"Scope left out of a
+> which D6 declines with a measurement rather than half-builds (`CLAUDE.md`: *"Scope left out of a
 > phase is left out entirely, not half-implemented"*).
 >
 > **Every claim below was re-read against the tree, not inherited from an earlier phase's prose.**
@@ -72,7 +72,7 @@
 | `apps/kira-studio/tests/ui/*.spec.ts`, `tests/ui/support/mockRuntime.ts`, `tests/unit/*` | the renamed mode value, the renamed testids, the split parity spec (D19) |
 | `docs/ARCHITECTURE.md` | the module-boundary section rewritten for the shipped shape; the storage table names; the rename's own migration paragraph |
 | `docs/v1.2/SPEC.md` | **untouched** — `docs/v1.2/README.md` forbids retro-editing a spec (F2); this plan is where P12 re-scopes itself |
-| `AGENTS.md` | nothing — no new environment fact |
+| `CLAUDE.md` | nothing — no new environment fact |
 
 ### 0.2 Out of scope, explicitly
 
@@ -126,7 +126,7 @@
   that it type-checks and tests with no `apps/` on its path at all (§6.2).
 - **The pre-commit hook runs `bun run lint` and `bun run typecheck`** (`.githooks/pre-commit`), so
   every commit in §5 is green on both by construction. The expensive suites run once at the end,
-  per `AGENTS.md`.
+  per `CLAUDE.md`.
 
 ---
 
@@ -272,7 +272,7 @@ alias block, `frontend/tsconfig.json:15`'s `paths` (plus its `include` of
 everything is hoisted from the root manifest, so a new package that declares `zod`/`shlex`/
 `@faker-js/faker` is the first in this repo to name its own runtime deps.
 
-`frontend/bindings/**` is gitignored and regenerated (`AGENTS.md`), so no committed file depends on
+`frontend/bindings/**` is gitignored and regenerated (`CLAUDE.md`), so no committed file depends on
 its layout except through the two aliases.
 
 ### 1.9 The tests, and which files cover both modules
@@ -785,7 +785,7 @@ adding to it:
 5. `DELETE FROM api_collections WHERE id = ?` and assert the items, variables and both history
    tables cascaded — the property the rename could most plausibly break silently.
 
-This is a case `AGENTS.md`'s test bar admits by name (*"a decision structure too large to hold in
+This is a case `CLAUDE.md`'s test bar admits by name (*"a decision structure too large to hold in
 your head"* is not the argument; **"an irreversible data migration"** is the argument, and the file
 is a one-time proof, not ongoing CRUD coverage).
 
@@ -863,7 +863,7 @@ plan can see; each has a decided answer rather than a hope.
 | 4 | A **restored tab** whose `state_json` carries an `itemId` pointing at a renamed table's row | Unaffected. Ids are unchanged; only the table's *name* moves. `tabs.kind` (`'http-request'`/`'grpc-request'`) is untouched by D1, so `hydrateTabs`'s per-kind `parseState` still matches |
 | 5 | A tab open in **Api mode when the app quits**, restored by a build where `AppMode` is `'api'` | Unaffected — mode is derived from the boot tab's kind (`state/tabs.ts:216`), never stored (F3) |
 | 6 | A **stale `frontend/bindings/` tree** after the Go package rename | F29: `rm -rf` before regenerating, as part of C9 |
-| 7 | The regenerated bindings come back **without `-names`** | `AGENTS.md`'s standing warning: every `tests/ui/` spec fails at the first bound call of boot with *"no CHANNEL_TO_FQN entry for undefined"*, and nothing about the failure points at bindings. C9 checks one generated file for `$Call.ByName(` before moving on (§6.1) |
+| 7 | The regenerated bindings come back **without `-names`** | `CLAUDE.md`'s standing warning: every `tests/ui/` spec fails at the first bound call of boot with *"no CHANNEL_TO_FQN entry for undefined"*, and nothing about the failure points at bindings. C9 checks one generated file for `$Call.ByName(` before moving on (§6.1) |
 | 8 | A file this phase moves is treated by git as **binary** | Only `views/grpcrequest/GrpcRequestView.vue` was ever in that state, and `ccd1f25` fixed it; `file` reports it UTF-8 text at this base. D8 does not move it anyway. The standing rule is §0.3's: nothing this phase writes introduces a control character |
 | 9 | `packages/api-core` accidentally keeps working because Vite resolves through the app | D16 rule (e) plus §6.2's standalone `tsgo` run — the failure mode is *silence*, so it needs a check that runs outside the app's graph |
 | 10 | The scripted rename hits a **protocol** name by accident | §6.4's four negative greps and four positive ones, run as a commit gate on C9 |
@@ -883,7 +883,7 @@ Fourteen commits. The sequence is chosen so that the two risky pieces — the st
 the package extraction — land alone, early enough to be reverted without unpicking anything after
 them, and so no commit leaves `lint`/`typecheck` red (the pre-commit hook runs both).
 
-Per `AGENTS.md`: fast checks (`bun run lint`, `bun run typecheck`, `bun run build`,
+Per `CLAUDE.md`: fast checks (`bun run lint`, `bun run typecheck`, `bun run build`,
 `go build ./...`, `go vet ./...`) per commit; the expensive suites once, at C13.
 
 ### C1 — `refactor(api): delete dead code and narrow the module's export surface`
@@ -934,7 +934,7 @@ The rename commit, and the one with the `!`. `frontend/src/http/` → `frontend/
 `internal/httpvars` → `internal/apivars` (+ `Deps.ApiVars`); `AppMode` `'http'` → `'api'` and the
 mode label; the four TS type renames of D3; every `http.*` command id → `api.*`; `HttpStart.vue` →
 `api/ApiStart.vue` with D2's one-line subtitle. Bindings regenerated (`wails3 task
-common:generate:bindings`, never a hand-typed flag list — `AGENTS.md`). **No table names in this
+common:generate:bindings`, never a hand-typed flag list — `CLAUDE.md`). **No table names in this
 commit** — C10 owns those, so a revert of either is clean.
 
 > Executed as a scripted, reviewed set of `git mv`s plus targeted replacements, never a blind
@@ -962,7 +962,7 @@ dialog changes.
 D19/D21: the nine UI specs' mechanical string updates, `mockRuntime.ts`, the parity spec split.
 **This is where the expensive suites run for the first time** — `test:ui`, `test:ipc:fe`,
 `test:unit`, `go test -race ./apps/kira-studio/internal/...` — with fixes landing as follow-up
-commits per `AGENTS.md`.
+commits per `CLAUDE.md`.
 
 ### C14 — `docs(architecture): the Api module, its boundary, and what still couples it to Studio`
 `docs/ARCHITECTURE.md`: the module-boundary section rewritten to describe the shipped shape (three
@@ -978,12 +978,12 @@ questions outlives this phase as still-open.
 ### 6.1 What runs here
 `bun run lint`, `bun run typecheck`, `bun run build`, `bun run test:unit`, `bun run test:ui`,
 `bun run test:ipc:fe`, plus `go build ./... && go vet ./... && go test ./apps/kira-studio/internal/...`.
-`bun run setup` first in a fresh container (`AGENTS.md`'s Wails/Go section — the toolchain does not
+`bun run setup` first in a fresh container (`CLAUDE.md`'s Wails/Go section — the toolchain does not
 persist between sessions).
 
 `bun install` must be re-run after C7, since `workspaces` changed (F28).
 
-**Two bindings checks at C9**, both from `AGENTS.md`'s standing warnings and both cheap:
+**Two bindings checks at C9**, both from `CLAUDE.md`'s standing warnings and both cheap:
 
 1. `rm -rf apps/kira-studio/frontend/bindings` before `wails3 task common:generate:bindings`, so
    no stale `internal/httpvars/` tree survives the Go package rename (F29). Never a hand-typed
@@ -1038,7 +1038,7 @@ The same rule stated for Go: `bridge/http_test.go`, `bridge/grpc_test.go`,
 package/import/table names.
 
 ### 6.6 What is deliberately not measured
-No bundle-size comparison, no launch-time trace. `AGENTS.md`: *"Skip a measurement that wouldn't
+No bundle-size comparison, no launch-time trace. `CLAUDE.md`: *"Skip a measurement that wouldn't
 change the decision."* Moving 1,999 lines between two directories inside the same Vite graph cannot
 move either number, and no decision here turns on them. The one measurement this phase *does* take
 (F8's 90/287) is the one that decides D6.

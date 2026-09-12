@@ -72,7 +72,7 @@ verified against the code they produced.
 | `flatbuffers` is already a dependency on both sides | `go.mod:15` `github.com/google/flatbuffers v25.9.23+incompatible`; `packages/git-ipc/package.json` `"flatbuffers": "25.9.23"` |
 | Generated TS is already excluded from biome | `biome.json:19` — `"!packages/git-ipc/src/generated"` |
 | The layering test auto-enumerates, and exempts only transport/composition packages | `internal/layering_test.go:29-44` — `internal`, `internal/bridge`, `internal/ipcfixture`, `internal/shell`, `internal/bridge/rpcstream`, `internal/gitsock` |
-| This repo already has the committed-fixture-with-a-regenerator pattern | `AGENTS.md`'s `tests/ipc` section — `KIRA_IPC_FIXTURES=write go test ./apps/kira-studio/internal/ipcfixture/...`; `internal/postman/testdata`, `internal/datagrip/testdata`, `internal/apivars/testdata` |
+| This repo already has the committed-fixture-with-a-regenerator pattern | `CLAUDE.md`'s `tests/ipc` section — `KIRA_IPC_FIXTURES=write go test ./apps/kira-studio/internal/ipcfixture/...`; `internal/postman/testdata`, `internal/datagrip/testdata`, `internal/apivars/testdata` |
 | `internal/page/encode.go` already solved little-endian column encoding for FlatBuffers | `page/encode.go:13-20` (`hostIsLittleEndian`) and `createUint32Vector`'s fast path |
 | `go build ./apps/kira-studio/internal/...` is clean; git here is 2.43.0; Go is 1.27.0 | run here |
 
@@ -153,10 +153,10 @@ Everything in §9's table, but the ones most likely to be mistaken for G3 work:
 ### 0.4 Ground rules
 
 - Every decision in §2 cites a finding; every finding in §1 cites something read or run here.
-- `AGENTS.md` applies in full: **no stubbed error handling, no `TODO: fix later`, no skipped
+- `CLAUDE.md` applies in full: **no stubbed error handling, no `TODO: fix later`, no skipped
   validation.** Scope left out of this phase is left out *entirely*.
 - **Comments very concise, only where the code cannot say it itself.**
-- **Tests only where `AGENTS.md`'s bar is met.** G3 clears it in six places and nowhere else: the
+- **Tests only where `CLAUDE.md`'s bar is met.** G3 clears it in six places and nowhere else: the
   record splitter's chunk-boundary state, the log record/decoration parser (a decision structure
   with several interacting rules, against a golden corpus), the `cat-file --batch` framing state
   machine, the paged walk's page-boundary arithmetic and `--skip`/staleness interaction, the
@@ -367,7 +367,7 @@ mid-array must queue the remainder — *"stopping mid-array without queuing the 
 drop them, never to be seen again once the underlying bytes are gone. See this phase's Findings for
 how this was actually caught."*
 
-That is `AGENTS.md`'s "cursor/pagination boundary arithmetic" category verbatim, and it is the
+That is `CLAUDE.md`'s "cursor/pagination boundary arithmetic" category verbatim, and it is the
 single most likely thing to get wrong in the port.
 
 ### F14 — `cat-file --batch` needs a writable stdin, which G2 deliberately did not build
@@ -389,7 +389,7 @@ Deterministic is literal: with a fixed author/committer identity, fixed dates an
 content, git's object hashes are reproducible, so a regenerated fixture is byte-identical.
 
 This repo's own precedent for "committed fixture plus an env-gated regenerator" is
-`KIRA_IPC_FIXTURES=write go test ./apps/kira-studio/internal/ipcfixture/...` (`AGENTS.md`), with
+`KIRA_IPC_FIXTURES=write go test ./apps/kira-studio/internal/ipcfixture/...` (`CLAUDE.md`), with
 `internal/postman/testdata`, `internal/datagrip/testdata` and `internal/apivars/testdata` as three
 more instances of committed testdata beside a Go test.
 
@@ -408,7 +408,7 @@ them immediately issue a request:
 Each is `void this.reload()` / `void this.refreshStatus()` with no `catch`, so a rejection is an
 unhandled promise rejection in the webview. Selecting a row adds `commit.detail` (G4). None of this
 can be fixed in `packages/git-ui`, which SPEC §5 requires to stay **unchanged**, and none of it can
-be papered over in the extension without stubbing a server method client-side, which `AGENTS.md`
+be papered over in the extension without stubbing a server method client-side, which `CLAUDE.md`
 forbids.
 
 G1 D13 rejected registering the views in *its* phase on exactly this ground ("that ships a visibly
@@ -737,7 +737,7 @@ func ParseRefSnapshot(records [][]byte) (map[string]string, error)
 ```
 
 Reason: `refs.list`'s parser is G5's, it is the largest of the porcelain parsers, and half-porting it
-here to serve a comparison that needs two fields is precisely the half-implementation `AGENTS.md`
+here to serve a comparison that needs two fields is precisely the half-implementation `CLAUDE.md`
 forbids. The snapshot is complete in itself, it is strictly cheaper than upstream's (no `%(upstream:
 track)`, which costs git a reachability computation per ref), and when G5 lands the full parser the
 snapshot keeps its own query rather than acquiring a dependency on one.
@@ -962,7 +962,7 @@ Resolving F15, with this repo's own pattern rather than a new one.
 - **`KIRA_GIT_FIXTURES=write go test ./apps/kira-studio/internal/gitclient/porcelain/...`**
   regenerates all eight from real `git`, byte-identically run to run (fixed identity, fixed
   `GIT_AUTHOR_DATE`/`GIT_COMMITTER_DATE`, fixed tree content ⇒ deterministic object ids). Mirrors
-  `KIRA_IPC_FIXTURES=write` (`AGENTS.md`) in spelling and in intent.
+  `KIRA_IPC_FIXTURES=write` (`CLAUDE.md`) in spelling and in intent.
 - **The recorder builds its argv from `porcelain`'s own builders**, never from a copied string —
   upstream's rule (`recordPorcelain.ts:7-10`), and the thing that stops a fixture from silently
   ceasing to represent what the parser is fed.
@@ -1141,7 +1141,7 @@ stderr drain are G2's and stay exactly as they are.
 `(*gitclient.Repo).Read`, injected rather than imported so the package stays testable without a
 registry, and so D10's "short spawns through the gate, the paused one direct" is visible in the type.
 
-`session_test.go` covers, and covers only, what `AGENTS.md`'s bar admits:
+`session_test.go` covers, and covers only, what `CLAUDE.md`'s bar admits:
 
 - **the page boundary** (F13): a page size that lands mid-chunk, the remainder delivered by the
   *next* `ReadPage` and none dropped — asserted by counting records against a repository whose
@@ -1197,7 +1197,7 @@ covers it with no change to `packagesExemptFromBridgeCheck`.
 | `graph.go` | new — the four handlers, `range` refusal, the 500-row emit loop |
 | `handlers.go` | `Request` gains three cases; `Stream` gains `graph.stream` and keeps its `E_UNKNOWN_METHOD` default; `Handlers.Stream`'s signature mirrors D5's |
 
-**No dedicated test.** Still thin dispatch over tested code (`AGENTS.md`'s pass-through exclusion);
+**No dedicated test.** Still thin dispatch over tested code (`CLAUDE.md`'s pass-through exclusion);
 the behaviour that matters is §3.9's.
 
 ### 3.9 `internal/gitsock/` — edited
@@ -1327,7 +1327,7 @@ something was reached for that this plan did not sanction.
 
 Ten commits. `go build ./apps/kira-studio/internal/...`, `go test ./apps/kira-studio/internal/...`,
 `bun run lint` and `bun run typecheck` run after **each** — they are fast. The expensive tier
-(§7.1(e)–(g)) runs once at C10, per `AGENTS.md`'s "implement the whole plan first, then test once".
+(§7.1(e)–(g)) runs once at C10, per `CLAUDE.md`'s "implement the whole plan first, then test once".
 
 - **C1** `feat(gitclient): porcelain record splitting and the log walk's parsers`
   — §3.1 in full, including the fixture recorder and the committed corpus. Nothing imports it yet.
@@ -1511,7 +1511,7 @@ It is still the wrong trade, for three reasons:
    `graphChunkCodec.ts`. Splitting by language is splitting a format down the middle; D16's fixture
    catches a disagreement, but only after both halves are written, and the fix is then a negotiation
    between two agents rather than an edit.
-3. **`AGENTS.md` is explicit**: parallel subagents "only when the plan's work is genuinely
+3. **`CLAUDE.md` is explicit**: parallel subagents "only when the plan's work is genuinely
    independent (unrelated adapters, non-overlapping fixes)". A parser, the store built on it, the
    wire format built on that, and the session state built on all three are the textbook case of not
    that.
@@ -1546,7 +1546,7 @@ Everything from C6 onward stays sequential behind all of it.
 ## 10. Handed forward
 
 Open items this phase found and deliberately did not close. Each belongs in the named phase's own
-plan, not in `AGENTS.md`.
+plan, not in `CLAUDE.md`.
 
 - **`catfile` has no production caller until G4** (D11). `RepoEntry` constructs it lazily and tears
   it down; **G4** supplies `commit.detail`/`commit.fileDiff`/blob reads. If G4 finds the session's

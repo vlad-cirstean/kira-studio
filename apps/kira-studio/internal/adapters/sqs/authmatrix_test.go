@@ -22,7 +22,7 @@ import (
 
 // clearAwsEnv is a Principal that unsets AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY/AWS_PROFILE for
 // the duration of one subtest (t.Setenv-style auto-restore) — this sandbox's own outbound proxy
-// injects placeholder AWS_* credentials (AGENTS.md), which would otherwise mask the "no
+// injects placeholder AWS_* credentials (CLAUDE.md), which would otherwise mask the "no
 // credentials anywhere" case §1.5a's transcript needs.
 var clearAwsEnv = &testsupport.Principal{
 	Name: "clear ambient AWS env",

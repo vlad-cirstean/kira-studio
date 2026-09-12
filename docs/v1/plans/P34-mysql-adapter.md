@@ -55,11 +55,11 @@
   file that knows which kinds are SQL.
 - **MySQL is asked, never imitated.** `SHOW CREATE TABLE` output and `information_schema` rows are
   rendered verbatim, exactly as `mariadb/definition.ts:97-101` already promises.
-- Comments per AGENTS.md: only where the code cannot say it for itself. Every `D` below that
+- Comments per CLAUDE.md: only where the code cannot say it for itself. Every `D` below that
   encodes a non-obvious constraint gets one line at its implementation site — in particular D3's
   RSA/TLS interaction, which nobody will re-derive from the code.
 - Run `bun run lint`, `bun run typecheck` (all three projects) and `bun run build` on every commit.
-  **Per `AGENTS.md`, `tests/db/mysql.spec.ts` cannot run in Claude Code's Linux web container at
+  **Per `CLAUDE.md`, `tests/db/mysql.spec.ts` cannot run in Claude Code's Linux web container at
   all** — the outbound policy blocks `production.cloudfront.docker.com`, so `docker pull` can
   resolve the `mysql:8.4` manifest but never fetch its layers, and the suite hangs on a container
   that never starts. Every container-backed assertion in §5 must be run on the macOS/Colima box
@@ -424,7 +424,7 @@ export function quoteIdent(dialect: SqlDialect | undefined, name: string): strin
 
 | # | Decision | Rationale |
 |---|----------|-----------|
-| D12 | **The MySQL adapter's documented server floor is MySQL 8.0.16**, stated in the caps table and the README; the adapter does not probe the version and does not degrade below it — a `definition()` call against an older server surfaces the server's own error. | F8: the only version-sensitive query in the whole adapter is `definition.ts:42-51`'s join to `information_schema.CHECK_CONSTRAINTS`, which MySQL added in 8.0.16 (2019). MySQL 5.7 reached end of life in October 2023. Adding a version probe and a second constraint query for a server nobody should be running is exactly the kind of speculative branch AGENTS.md's "no shortcuts, and scope left out is left out entirely" cuts against — the honest move is to name the floor. |
+| D12 | **The MySQL adapter's documented server floor is MySQL 8.0.16**, stated in the caps table and the README; the adapter does not probe the version and does not degrade below it — a `definition()` call against an older server surfaces the server's own error. | F8: the only version-sensitive query in the whole adapter is `definition.ts:42-51`'s join to `information_schema.CHECK_CONSTRAINTS`, which MySQL added in 8.0.16 (2019). MySQL 5.7 reached end of life in October 2023. Adding a version probe and a second constraint query for a server nobody should be running is exactly the kind of speculative branch CLAUDE.md's "no shortcuts, and scope left out is left out entirely" cuts against — the honest move is to name the floor. |
 | D13 | **`typeClassFor` and `typeClassForField` are not forked.** | F11: the `json` branch (`read.ts:40`) and the `field.type === 'JSON'` branch (`console.ts:50`) are dead against MariaDB and live against MySQL. The same code is simply more correct on the newer engine; a fork would produce two files that differ by nothing. F12 likewise: the `\b`-anchored regexes already classify `int` and `int(11)` identically. |
 | D14 | **`information_schema_stats_expiry` is left at the server's default; the adapter never issues `SET SESSION`.** The tree detail is already `~N rows` (`catalog.ts:74-76`) and `describe().rowEstimate` is already documented as an estimate. | F16: setting it to 0 would make every tree expansion open every table's storage-engine statistics — a real cost on a large schema, paid on every connection, to sharpen a number the UI already renders with a tilde. §2.1's frame budget and §2.2's "the tree is lazy" both point the other way. What this does change is a **test** assertion (D30): MySQL's cached statistics mean scenario 6 cannot assert an exact `rowEstimate` for a small table the way `mariadb.spec.ts:294` does. Raised as open question 6. |
 | D15 | **`SHOW CREATE TABLE` / `SHOW CREATE VIEW` passthrough is unchanged** (`definition.ts:102-151`), including its two notes. | Both engines answer the same statements with the same result-column names (`Create Table` / `Create View`), and the whole point of `definition.ts:97-101` is that the server is asked, not imitated. MySQL's output differs in content — `utf8mb4_0900_ai_ci` collations, version-gated `/*!80000 … */` comments, no implicit `json_valid()` CHECK — and rendering that verbatim is correct, not a divergence to handle. |
@@ -769,7 +769,7 @@ package.json                        MOD  + @testcontainers/mysql@12.1.0 (devDepe
 
 - [ ] `bun run lint`, `bun run typecheck` (all three projects) and `bun run build` clean.
 - [ ] `bun run test:db` and `xvfb-run -a bun run test:ui` green **on the macOS/Colima box or in
-      CI** — per `AGENTS.md` neither can run in Claude Code's Linux web container, and this phase
+      CI** — per `CLAUDE.md` neither can run in Claude Code's Linux web container, and this phase
       adds a container-backed suite that has never been executed anywhere else.
 - [ ] `docker compose -f scripts/demo-dbs/docker-compose.yml up -d` brings MySQL up alongside
       MariaDB with no port conflict, and `scripts/demo-dbs/seed.sh` seeds it.

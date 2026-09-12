@@ -1,4 +1,4 @@
-// P9 D11: the raw HTTP/1.1 parser is "a parser with several interacting rules" (AGENTS.md's own
+// P9 D11: the raw HTTP/1.1 parser is "a parser with several interacting rules" (CLAUDE.md's own
 // bar for a dedicated test) — the request-line/header/body grammar, D10's Content-Type → mode
 // table, and the two warning cases interact enough to earn a corpus, the same shape P7 D17 took
 // for curl. Not JSON-shaped (http-curl.spec.ts's own reasoning: an HttpRequestTabState is naturally

@@ -15,7 +15,7 @@ import (
 // §6.2: seven cases guarding the bucketing (order-dependent across two goroutines, F14) and the
 // two measured phase-arithmetic traps (F8, F9) — not CRUD round trips. Explicitly not tested:
 // that httptrace fires at all (stdlib), that a float64 rounds, that an absent phase marshals to a
-// missing key (a json tag) — each restates a short function body (AGENTS.md).
+// missing key (a json tag) — each restates a short function body (CLAUDE.md).
 
 // threeHopChain serves a same-host 301->302->307->200 chain — F1's own shape, which is also what
 // makes hops 1-3 connection-reused (§6.2 case 2 rides on this same server).
@@ -309,7 +309,7 @@ func TestTimeline_HeaderCapTruncatesAndFlagsElision(t *testing.T) {
 //
 // 16 concurrent sends of the same 3-redirect chain, each asserting four hops with the right
 // statuses — the collector's own proof that it is race-free (run this file with -race, per
-// AGENTS.md's testing rules for concurrency: ordering, backpressure, cancellation, races).
+// CLAUDE.md's testing rules for concurrency: ordering, backpressure, cancellation, races).
 
 func TestTimeline_ConcurrentSendsDoNotRace(t *testing.T) {
 	base := threeHopChain(t)

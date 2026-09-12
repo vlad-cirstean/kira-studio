@@ -280,7 +280,7 @@ under `shell/`, so this is free.
 
 **D12 — engine op names move to an exported `internal/enginehost/ops.go`.** `config.go` currently
 holds `configureCacheOp = "cache:configure"` unexported, and P55 adds six more call sites across two
-packages. AGENTS.md's P54 finding is explicit that these literals must be read from
+packages. CLAUDE.md's P54 finding is explicit that these literals must be read from
 `src/shared/protocol/engine-ops.ts` rather than inferred; one exported block, each constant
 carrying its TS identifier in a comment, is the way to make that check happen once instead of seven
 times. Verified for this plan against `engine-ops.ts:9-19`: `adapter:connect`, `adapter:disconnect`,
@@ -1071,13 +1071,13 @@ and nothing else.**
 
 | Bridge work | Phase | Reason |
 |---|---|---|
-| `ConnectionsService` — all 12 methods | **P55** | `States()` and `SecretsStatus()` are stubs *today*, with comments naming P55. Building the full state machine and leaving `States()` returning `[]model.ConnectionState{}` behind it is precisely the half-state `AGENTS.md` rules out. Once those two are real, the other ten are the same service's own surface and cost nothing extra |
+| `ConnectionsService` — all 12 methods | **P55** | `States()` and `SecretsStatus()` are stubs *today*, with comments naming P55. Building the full state machine and leaving `States()` returning `[]model.ConnectionState{}` behind it is precisely the half-state `CLAUDE.md` rules out. Once those two are real, the other ten are the same service's own surface and cost nothing extra |
 | `TreeService` — `Children`/`Describe`/`Definition`/`Invalidate` | **P55** | Same rule: `internal/tree` exists in this phase or it does not |
 | `bridge/events.go` (17 push channels), `bridge/stream.go`, `bridge/files.go`, `bridge/queries.go`, `bridge/lifecycle.go`, `SettingsService.Set` + its cache re-push (P54 D11), `OpsService.Cancel` | **P56** | None of them has a P55 service behind it. `OpsService.Cancel` in particular is a bare `host.Call(OpCancel, …)` passthrough with nothing in `internal/oplog` to build on |
 
 `main.go`'s `Services:` list gains `bridge.TreeService`. **`wails3 generate bindings -b -i -ts` must
 be re-run from `shell/` before the next `bun run build:wails`** — `ConnectionsService`'s method set
-changes and `TreeService` is new, and AGENTS.md's P53 finding is explicit that a missing generated
+changes and `TreeService` is new, and CLAUDE.md's P53 finding is explicit that a missing generated
 binding is a hard Vite resolve failure, not a stale-types warning.
 
 `appcore.Deps` gains exactly two fields:
@@ -1202,18 +1202,18 @@ is first only because it is cheap and makes every later milestone's failures leg
    dialog shows the real secret-storage status for the platform, and a connect attempt against the
    real engine produces `connecting` → `connected`/`error` with an op-log row to match.
 8. The Electron app still builds and runs (`bun run build`) — the coexistence rule.
-9. `AGENTS.md` gains a **"P55 implementation findings"** entry on the same pattern as P52/P53/P54's.
+9. `CLAUDE.md` gains a **"P55 implementation findings"** entry on the same pattern as P52/P53/P54's.
    Three things are already worth writing down before implementation starts and should be confirmed
    or corrected there: `keybase/go-keychain v0.0.1`'s six gotchas (§1.1), that the darwin secrets
    file cannot be compiled or vetted from the Linux sandbox at all (criterion 4), and that
    `KIRA_INSECURE_SECRETS` now selects a Go AES-256-GCM path under a hardcoded key rather than
-   Electron's `basic_text` — the existing AGENTS.md "Secrets / `KIRA_INSECURE_SECRETS`" section
+   Electron's `basic_text` — the existing CLAUDE.md "Secrets / `KIRA_INSECURE_SECRETS`" section
    describes the Electron build and stays true for it, but now needs a sentence saying the Wails
    build honours the same variable through its own implementation.
 
 ## 11. Environment notes for the implementing session
 
-- **A fresh container has none of the toolchain** (AGENTS.md, P52 findings). This phase is almost
+- **A fresh container has none of the toolchain** (CLAUDE.md, P52 findings). This phase is almost
   entirely `./internal/...` work: `go build ./internal/...` and `go test ./internal/...` need only
   the Go toolchain plus cgo for `mattn/go-sqlite3`'s amalgamation. A bare `go build ./...`
   additionally compiles the root `main` package, which imports Wails and needs

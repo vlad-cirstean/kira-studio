@@ -80,7 +80,7 @@ Authored against `claude/feature-v1-3-headless-git` at `27f8f9b0` (G1–G24 comp
 
 ### 0.4 Ground rules
 
-Design decisions are decisions, not defaults — there is no upstream to defer to. `AGENTS.md` in full: no stubbed error handling, no skipped validation. The prepare script's own code is held to the same standard as the git spawn path: named constants, an explicit env table with a reason per entry, a `Runner` seam so tests never spawn a real shell, a golden argv test.
+Design decisions are decisions, not defaults — there is no upstream to defer to. `CLAUDE.md` in full: no stubbed error handling, no skipped validation. The prepare script's own code is held to the same standard as the git spawn path: named constants, an explicit env table with a reason per entry, a `Runner` seam so tests never spawn a real shell, a golden argv test.
 
 ---
 

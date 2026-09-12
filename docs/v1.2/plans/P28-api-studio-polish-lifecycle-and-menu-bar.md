@@ -10,14 +10,14 @@ capability the chapter's spec did not already promise. It is the same shape as P
 
 ### 0.1 Where this plan lives, and why
 
-`AGENTS.md` gives each phase in `docs/v1.2/SPEC.md`'s phasing table its own Opus-authored plan under
+`CLAUDE.md` gives each phase in `docs/v1.2/SPEC.md`'s phasing table its own Opus-authored plan under
 `docs/v1.2/plans/` before implementation starts. This batch is not part of the v1.3 git chapter: every
 item lands in Studio or Api code that predates it (`views/grid/`, `views/console/`,
 `views/documents/`, `views/httprequest/`, `api/`, `packages/api-core/`, `theme/`), plus one fix in
 `internal/shell/`. The v1.2 table already numbers seven such user-driven batches (P15, P15b, P16,
 P17, P18, P19, P22/P22b/P22c) and ends at P27, so this is **P28**, with a matching row added to
 `docs/v1.2/SPEC.md`'s phasing table. It is deliberately *not* filed as a "code review" round:
-`AGENTS.md` reserves that name for the three-parallel-Opus-agents process, and these items came from
+`CLAUDE.md` reserves that name for the three-parallel-Opus-agents process, and these items came from
 a person using the app, not from a review pass.
 
 ### 0.2 Ground rules
@@ -31,7 +31,7 @@ a person using the app, not from a review pass.
 - **No item is allowed to grow into a feature.** Item 11 (search in the request panel) and item 16c
   (environment management as a tab) are the two with real structural weight; both are scoped in D11
   and D16c to reuse machinery that already exists rather than build a parallel one.
-- Tests only where `AGENTS.md`'s bar is genuinely met — see D19.
+- Tests only where `CLAUDE.md`'s bar is genuinely met — see D19.
 
 ### 0.3 Not in this phase
 
@@ -583,7 +583,7 @@ labelled format, two of the three preserve types, and there is no copy button. C
 labelled leaves — or adding a "with types" variant beside formats that already say what they are —
 would be a change nobody asked for, dressed as a fix.
 
-The rule this follows is `AGENTS.md`'s own, stated for planning passes and applying just as well
+The rule this follows is `CLAUDE.md`'s own, stated for planning passes and applying just as well
 here: *"say plainly when a pass finds nothing real rather than manufacture a finding."* If the
 control exists in a build this plan was written against and not in the tree, naming it (a
 screenshot, a testid, where it sits) makes this a one-line change.
@@ -784,7 +784,7 @@ not moved off the panel.
 
 ### D19 — Exactly two tests, and why every other item gets none
 
-Against `AGENTS.md`'s bar ("advanced, complex or deeply nested logic… default to *no* dedicated unit
+Against `CLAUDE.md`'s bar ("advanced, complex or deeply nested logic… default to *no* dedicated unit
 test"):
 
 **Gets a test:**
@@ -814,14 +814,14 @@ capability the chapter's spec did not already promise. It is the same shape as P
 
 ### 0.1 Where this plan lives, and why
 
-`AGENTS.md` gives each phase in `docs/v1.2/SPEC.md`'s phasing table its own Opus-authored plan under
+`CLAUDE.md` gives each phase in `docs/v1.2/SPEC.md`'s phasing table its own Opus-authored plan under
 `docs/v1.2/plans/` before implementation starts. This batch is not part of the v1.3 git chapter: every
 item lands in Studio or Api code that predates it (`views/grid/`, `views/console/`,
 `views/documents/`, `views/httprequest/`, `api/`, `packages/api-core/`, `theme/`), plus one fix in
 `internal/shell/`. The v1.2 table already numbers seven such user-driven batches (P15, P15b, P16,
 P17, P18, P19, P22/P22b/P22c) and ends at P27, so this is **P28**, with a matching row added to
 `docs/v1.2/SPEC.md`'s phasing table. It is deliberately *not* filed as a "code review" round:
-`AGENTS.md` reserves that name for the three-parallel-Opus-agents process, and these items came from
+`CLAUDE.md` reserves that name for the three-parallel-Opus-agents process, and these items came from
 a person using the app, not from a review pass.
 
 ### 0.2 Ground rules
@@ -835,7 +835,7 @@ a person using the app, not from a review pass.
 - **No item is allowed to grow into a feature.** Item 11 (search in the request panel) and item 16c
   (environment management as a tab) are the two with real structural weight; both are scoped in D11
   and D16c to reuse machinery that already exists rather than build a parallel one.
-- Tests only where `AGENTS.md`'s bar is genuinely met — see D19.
+- Tests only where `CLAUDE.md`'s bar is genuinely met — see D19.
 
 ### 0.3 Not in this phase
 
@@ -1387,7 +1387,7 @@ labelled format, two of the three preserve types, and there is no copy button. C
 labelled leaves — or adding a "with types" variant beside formats that already say what they are —
 would be a change nobody asked for, dressed as a fix.
 
-The rule this follows is `AGENTS.md`'s own, stated for planning passes and applying just as well
+The rule this follows is `CLAUDE.md`'s own, stated for planning passes and applying just as well
 here: *"say plainly when a pass finds nothing real rather than manufacture a finding."* If the
 control exists in a build this plan was written against and not in the tree, naming it (a
 screenshot, a testid, where it sits) makes this a one-line change.
@@ -1588,7 +1588,7 @@ not moved off the panel.
 
 ### D19 — Exactly two tests, and why every other item gets none
 
-Against `AGENTS.md`'s bar ("advanced, complex or deeply nested logic… default to *no* dedicated unit
+Against `CLAUDE.md`'s bar ("advanced, complex or deeply nested logic… default to *no* dedicated unit
 test"):
 
 **Gets a test:**

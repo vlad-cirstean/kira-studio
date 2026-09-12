@@ -156,12 +156,12 @@ Everything in §9's table, but the ones most likely to be mistaken for G5 work:
 ### 0.4 Ground rules
 
 - Every decision in §2 cites a finding; every finding in §1 cites something read or run here.
-- `AGENTS.md` applies in full: **no stubbed error handling, no `TODO: fix later`, no skipped
+- `CLAUDE.md` applies in full: **no stubbed error handling, no `TODO: fix later`, no skipped
   validation.** Scope left out of this phase is left out *entirely*.
 - **Comments very concise, only where the code cannot say it itself.**
-- **Tests only where `AGENTS.md`'s bar is met** (D18). G5 clears it in six places and nowhere else.
+- **Tests only where `CLAUDE.md`'s bar is met** (D18). G5 clears it in six places and nowhere else.
 - **Reach for a library before hand-rolling.** Nothing here is a library's job: every new file is
-  either a parser for one specific `git` output format (`AGENTS.md`'s own named exception) or a
+  either a parser for one specific `git` output format (`CLAUDE.md`'s own named exception) or a
   decision table with several interacting rules.
 - **Fixture repositories scope their git config to themselves** — G4 D15's `fixtureEnv()`
   (`GIT_CONFIG_GLOBAL=/dev/null`, `GIT_CONFIG_SYSTEM=/dev/null`, `-c commit.gpgsign=false`),
@@ -397,7 +397,7 @@ linked-worktree detection, the in-progress banner and the undo slot — and no p
 Shipping them in G5 anyway would mean a `git push` running with `GIT_TERMINAL_PROMPT=0` and no
 credential broker: against any authenticated remote it fails immediately rather than hanging, so it
 would not *hang*, but it would fail for every user of a private remote with an error the UI has no
-remedy for. That is `AGENTS.md`'s "half-implemented" exactly.
+remedy for. That is `CLAUDE.md`'s "half-implemented" exactly.
 
 ### F14 — Three of this phase's commands have non-zero or empty exits that are ordinary outcomes
 
@@ -538,7 +538,7 @@ those has a phase that owns its RPC, and each will add one file to this package 
 anything G5 wrote.
 
 **The alternative, rejected**: build the whole package's shape now with the six unbuilt classifiers
-present as unimplemented stubs. `AGENTS.md` forbids it in two separate clauses ("no stubbed error
+present as unimplemented stubs. `CLAUDE.md` forbids it in two separate clauses ("no stubbed error
 handling, no `TODO: fix later`" and "Scope left out of a phase is left out entirely, not
 half-implemented"), and there is no cost to deferring: nothing about `ClassifyCheckout`'s signature
 or `UndoSlot`'s shape changes when `ClassifyReset` arrives beside them. The only thing that *would*
@@ -643,7 +643,7 @@ the failure mode Go cannot catch, so one test does:
 `TestOpTable_EveryEntryStatesAnUndoPolicy` asserts every entry's `Undo.Kind` is one of the two
 legal values and that every `notUndoable` carries a non-empty reason. It is four lines and it is
 the only thing standing where `tsc` stood upstream, so it is worth the exception to
-`AGENTS.md`'s test bar — and it is named in D18 as such.
+`CLAUDE.md`'s test bar — and it is named in D18 as such.
 
 The reasons themselves are ported verbatim from `undo/slot.ts:35-61` for the ten served kinds, so
 G12/G13 inherit strings the UI already renders.
@@ -993,7 +993,7 @@ source, and a move would be a diff in five files that changes nothing anyone can
 
 ### D18 — What gets a test, and what does not
 
-`AGENTS.md`'s bar, applied honestly. **Tested:**
+`CLAUDE.md`'s bar, applied honestly. **Tested:**
 
 - **`porcelain/refs.go`** — the eleven- and thirteen-field records with their two different
   framings, the trailing-empty-field case (a branch's `%(taggerdate:unix)` is empty *and last*,
@@ -1025,7 +1025,7 @@ source, and a move would be a diff in five files that changes nothing anyone can
 - **`gitsock` integration** — §3.8's tests over a real socket against real repositories. **This is
   the phase's real end-to-end proof.**
 
-**Not tested, deliberately**: `gitops`' argv builders (each returns one literal slice — `AGENTS.md`'s
+**Not tested, deliberately**: `gitops`' argv builders (each returns one literal slice — `CLAUDE.md`'s
 "thin pass-through" and "constructors/builders"; their correctness is proven by the integration
 tier actually running them), `gitrpc`'s handlers (thin dispatch), `gitpreflight/status.go`'s folds
 (a switch with one arm per marker, exercised by every integration test), and `gitops/conflict.go`'s
@@ -1298,7 +1298,7 @@ did not sanction.
 
 Seven commits. `go build ./apps/kira-studio/internal/...`, `go test
 ./apps/kira-studio/internal/...`, `bun run lint` and `bun run typecheck` run after **each** — they
-are fast. The expensive tier (§7.1(g)–(i)) runs once at C7, per `AGENTS.md`'s "implement the whole
+are fast. The expensive tier (§7.1(g)–(i)) runs once at C7, per `CLAUDE.md`'s "implement the whole
 plan first, then test once".
 
 - **C1** `feat(gitclient): for-each-ref, status --porcelain=v2 and merge-tree parsing`
@@ -1462,7 +1462,7 @@ Three things are structurally out of reach in this container:
 call, and G3 — comparable in size to this — carried it through successfully.
 
 1. **The phase is one dependency chain.** Parsers → classifiers → argv builders → the executor →
-   the handlers → the deletion. That is `AGENTS.md`'s textbook case of *not* "genuinely independent
+   the handlers → the deletion. That is `CLAUDE.md`'s textbook case of *not* "genuinely independent
    (unrelated adapters, non-overlapping fixes)".
 2. **C5 is where every earlier commit meets.** `RunOp` needs `gitops`' argv, `gitpreflight`'s
    policy, `porcelain`'s parsers and `RepoEntry`'s new state at once; an agent that did not write

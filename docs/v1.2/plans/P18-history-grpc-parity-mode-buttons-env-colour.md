@@ -938,7 +938,7 @@ from scratch"*):
 ## 3. Commit sequence
 
 Shared/domain and Go first (what the rest consumes), then the Api surfaces, then workbench chrome,
-then tests. Per `AGENTS.md`: `bun run lint`, `bun run typecheck` and `bun run build` per commit;
+then tests. Per `CLAUDE.md`: `bun run lint`, `bun run typecheck` and `bun run build` per commit;
 `bun run test:go` after each Go commit; `tests/ui` runs **once** at the end (§4), with fixes as
 follow-up commits.
 
@@ -1154,7 +1154,7 @@ Shared: `packages/shared/domain/{http,grpc,response-history,grpc-history,variabl
 Tests: `tests/ui/{http-history,grpc-request,api-ui-consistency,mode-switch}.spec.ts`,
 `tests/unit/{go-ts-vocabulary-parity,tree-state}.spec.ts`.
 Docs: `docs/v1.2/SPEC.md`, `docs/v1.2/plans/{P8,P15,P15b,P16,P17}*.md`,
-`docs/design/kira-design-system/README.md` and `parts/_style.css`, `AGENTS.md`.
+`docs/design/kira-design-system/README.md` and `parts/_style.css`, `CLAUDE.md`.
 
 **Measured, not assumed.** `@vscode/codicons@0.0.46-24`'s `codicon.ttf` was parsed directly
 (`head`, `hhea`, `OS/2`, `cmap`, `loca`, `glyf`) for F18's numbers: `unitsPerEm 300`, `hhea`

@@ -104,7 +104,7 @@ Submenus. `docs/v1.3/SPEC.md`. Any wire, contract or Go change.
 
 ### 0.4 Ground rules
 
-`AGENTS.md` in full. Where a `Kui*` component exists and fits, the local override is **deleted**,
+`CLAUDE.md` in full. Where a `Kui*` component exists and fits, the local override is **deleted**,
 not adjusted around — a local class that re-declares `height`/`padding`/`border` on a `KuiButton` is
 the exact defect this phase exists to close, and leaving one behind would hand the next phase the
 same problem in a smaller form. Where something stays bespoke, §2's decision names the concrete
@@ -979,7 +979,7 @@ surfaces. Dialog *content* layout beyond the scale rename. Submenus (`KuiContext
 at G19 D3 and nothing needs one). A `Kui*` tree, listbox, badge, chip or status primitive. Keyboard
 shortcuts rendered inside menu rows (Kira's `.shortcut` slot — this app's menus have no per-item
 chords). Any `CONTRACT_VERSION`, wire, contract or Go change. A dedicated unit test for any of this:
-it is styling and markup, which `AGENTS.md`'s testing bar excludes by name; the two existing
+it is styling and markup, which `CLAUDE.md`'s testing bar excludes by name; the two existing
 Playwright tiers plus D16's lint guard are the coverage. `docs/v1.3/SPEC.md`.
 
 ---
@@ -1064,7 +1064,7 @@ right-clicking a file still opens two of them.
 **Recommendation: extend the script (D16).** The repo has no stylelint and the script's own comment
 already explains why (not in this toolchain); a third grep-and-`comm` pass costs about ten lines and
 closes F5's class of defect permanently. Adding a linter to the toolchain for one rule is the wrong
-trade, and `AGENTS.md`'s "reach for a library" rule is about non-trivial infrastructure, which a
+trade, and `CLAUDE.md`'s "reach for a library" rule is about non-trivial infrastructure, which a
 `comm` of two sorted greps is not.
 
 ---

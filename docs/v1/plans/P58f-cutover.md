@@ -26,7 +26,7 @@ session against real containers, plus a cancel, a settings save and a cache clea
 `grep -c 'routed a connection request to the Node engine child'` returning **0** against a log that
 demonstrably carried other lines from the same run. The parent's **R1** (*"nothing in M10 starts
 before C2 is recorded"*) is satisfied, in writing, with a per-kind table in
-`docs/v1/plans/P58e-kafka.md` §13 and in `AGENTS.md`'s P58e findings.
+`docs/v1/plans/P58e-kafka.md` §13 and in `CLAUDE.md`'s P58e findings.
 
 The Node engine child still spawns on every launch, still costs a vendored Node runtime in the
 bundle, still runs an esbuild step in every build, and answers exactly **one** `ping` per page load.
@@ -42,7 +42,7 @@ runtime dependencies, the routing indirection inside `adapterhost.Router`, the `
 fixture-generator port, which must be green before those backend specs are deleted, not after.
 
 **M11 — documentation and CI.** `docs/ARCHITECTURE.md`, `docs/PACKAGING.md`, `docs/PERF.md`,
-`AGENTS.md`'s P58f findings entry plus every section whose subject M10 removes, `docs/v1/SPEC.md`'s
+`CLAUDE.md`'s P58f findings entry plus every section whose subject M10 removes, `docs/v1/SPEC.md`'s
 P58 row, and `.github/workflows/{ci,release}.yml` — landed if the session's push scope allows,
 re-staged and recorded if not.
 
@@ -201,7 +201,7 @@ page the app actually caches lives in Go's `enginecache`, unreported. `Router.me
 (A16) does sum both — but only on the pull path nobody uses.
 
 This is precisely the failure the parent's own §4.6 named (*"a status bar that under-reports cache
-size for five sub-phases… exactly the kind of silently-wrong number `AGENTS.md`'s P57 findings warn
+size for five sub-phases… exactly the kind of silently-wrong number `CLAUDE.md`'s P57 findings warn
 about"*) and its mitigation covered the wrong half. **P58f D12** fixes it, and it must be fixed
 rather than merely inherited, because after M10 there is no producer at all and the readout would
 stay `null` forever.
@@ -259,7 +259,7 @@ reachable`) does not anticipate this. **P58f D3** decides it.
 - `scripts/capture-tree.ts` (231 lines) and `scripts/capture-postgres-tree.ts` (248 lines) both
   `import { openHarness } from '../tests/ipc/support/harness'`, which dynamically imports
   `src/engine/control.ts` and `src/engine/rpc.ts`. They are the *"capture, don't hand-write"* tools
-  `AGENTS.md`'s Docker section names by path for building a `tests/ui/` fixture from a real shape
+  `CLAUDE.md`'s Docker section names by path for building a `tests/ui/` fixture from a real shape
   (P50 D5). Their subject is gone at M10.
 - `tests/unit/catalog-listing.spec.ts` (145 lines, 9 tests) imports
   `src/engine/adapters/{redis/catalog,s3/catalog}` and is the **only** coverage anywhere of the
@@ -267,7 +267,7 @@ reachable`) does not anticipate this. **P58f D3** decides it.
   against the Go side: `internal/adapters/redis/catalog.go:193` and
   `internal/adapters/s3/catalog.go:120` both carry the conjunction, and the only Go assertion is
   `s3_test.go:172`'s *negative* case (`Truncated == nil` for an ordinary listing). The positive
-  branch has no Go coverage. This is exactly the class `AGENTS.md`'s testing bar keeps
+  branch has no Go coverage. This is exactly the class `CLAUDE.md`'s testing bar keeps
   (*"a decision structure… interacting rules"*), and its own header explains why a live assertion is
   impractical (*"a namespace/prefix big enough to survive `MAX_SCAN_ROUNDS`… without seeding 200 000
   keys"*). **P58f D14**.
@@ -325,7 +325,7 @@ Not a P58f-created problem, but M11 owns it and the list should be explicit rath
    Node), Zod guarding `src/engine/{control,rpc,data,stdio-main}.ts`, and *"the engine child keeps
    writing to stdout/stderr, which the shell pipes into the same sink"*.
 
-`AGENTS.md` carries the matching cgo error twice (`:205`, `:238`).
+`CLAUDE.md` carries the matching cgo error twice (`:205`, `:238`).
 
 ### 1.14 The CI workflows are two generations stale
 
@@ -372,7 +372,7 @@ deliberately.
 | P58c OQ-2 | the ARCHITECTURE mapping table's SQLite Cancel cell | **Closed** — fixed in P58d, mechanically, via a grep-shaped criterion |
 | P58c OQ-3 | where `mariadb-real.spec.ts`'s coexistence pairing stops; whether to rename the file | **P58f D3** |
 | P58c OQ-4 | Mongo's `$numberDouble` rendering gain has no slot in the parent's §7 lists | **P58f D17** (M11) — added to "what gets better" |
-| P58c OQ-5 | a placeholder parked on the next kind's kind is inherited debt | **Closed** — the rule was written down and P58e paid the bill; M11 carries the lesson into `AGENTS.md` |
+| P58c OQ-5 | a placeholder parked on the next kind's kind is inherited debt | **Closed** — the rule was written down and P58e paid the bill; M11 carries the lesson into `CLAUDE.md` |
 | P58d OQ-1 | as P58c OQ-1 | **P58f D1** |
 | P58d OQ-2 | the ARCHITECTURE table edit required twice, made never | **Closed** — fixed in P58d; the grep-criterion form is adopted here too (§6) |
 | P58d OQ-3 | P58c's "only `Truncated` producer" claim was wrong | **Closed** — recorded |
@@ -576,7 +576,7 @@ with `ENFORCE_IAM=1` whose fidelity to real AWS is itself unproven, plus a SASL/
 `cp-kafka` variant. That is new test infrastructure for three adapters in a sub-phase whose job is
 deletion, and it would close the gap for one adapter at a time at real per-container cost.
 
-M11's `AGENTS.md` entry carries it forward as **named, deliberate, post-P58 work**, in the same
+M11's `CLAUDE.md` entry carries it forward as **named, deliberate, post-P58 work**, in the same
 sentence for all three adapters, so a future session finds one item rather than three scattered
 sub-phase OQs. It is a good candidate for P59's functional-correctness round to re-price.
 
@@ -593,7 +593,7 @@ Three constraints on (2), each of which has already cost this repo a real bug:
 
 - **`chunkByteSize` (`:95-102`) must keep reading real byte lengths, not base64 string lengths.** It
   mirrors `src/shared/protocol/page.ts`'s formula exactly, and P57's `byteSize: 0` incident
-  (`AGENTS.md`) is what happens when it stops. Compute the sizes from the typed arrays *before*
+  (`CLAUDE.md`) is what happens when it stops. Compute the sizes from the typed arrays *before*
   encoding and carry them, rather than deriving them from the encoded strings.
 - **`Uint32Array` must be encoded as base64 of its little-endian bytes, not of its decimal digits.**
   That is `page.Uint32LE.MarshalJSON`'s contract (`internal/page/chunk.go:38`), and the browser side
@@ -741,11 +741,11 @@ the pull path with `r.cache.Stats()` directly, because `DATA_OP.cacheStats` is s
 `data-ops.ts` even if nothing issues it.
 
 *The gate:* this is the one M10 change with no automated coverage — `tests/ui/`'s mock has no
-`Events.On` analogue (`AGENTS.md`'s P57 finding, and the cache-budget scenarios were moved to
+`Events.On` analogue (`CLAUDE.md`'s P57 finding, and the cache-budget scenarios were moved to
 `shell/internal/enginecache/*_test.go` for exactly this reason). So it needs a **manual check in
 §6's list**: open the app, open a table, page it, and watch the status bar's cache size move off
 zero. A Go unit test over `AttachStream` → a fake `StreamSession` capturing frames is worth having as
-well, and clears `AGENTS.md`'s bar on the concurrency clause (a subscription's lifetime tied to a
+well, and clears `CLAUDE.md`'s bar on the concurrency clause (a subscription's lifetime tied to a
 session's).
 
 ---
@@ -781,7 +781,7 @@ shapes are already byte-identical to the fixture's (`{nodes, source, truncated}`
 cache-aside for the first time.
 
 *Third, the generator inherits the capture-tool role.* D15's two dev scripts die with the harness;
-the Go generator's write mode replaces them, and `AGENTS.md`'s Docker section is rewritten to point
+the Go generator's write mode replaces them, and `CLAUDE.md`'s Docker section is rewritten to point
 at it.
 
 ---
@@ -789,7 +789,7 @@ at it.
 **P58f D14 — `tests/unit/catalog-listing.spec.ts` is ported to Go, not deleted, and the port extracts one small seam per adapter.**
 
 §1.11: the truncation conjunction in `redis/catalog.go:193` and `s3/catalog.go:120` has no positive
-Go coverage; the only Go assertion is the negative case. `AGENTS.md`'s bar keeps this test explicitly
+Go coverage; the only Go assertion is the negative case. `CLAUDE.md`'s bar keeps this test explicitly
 (interacting rules, a boundary nobody can reach live without seeding 200 000 keys), and the parent's
 own §5.1 rule — *"deleting a test whose subject moved is correct; the thing to check is that the Go
 test actually covers the same assertion"* — is a rule about **checking**, not a licence.
@@ -821,10 +821,10 @@ port."* Adding one more loss to that list to save two interface declarations is 
 
 Both scripts import `tests/ipc/support/harness.ts`, which imports `src/engine/{control,rpc}.ts`.
 They are manual dev tools, not suite members, and their value — *"capture, don't hand-write"*, P50 D5
-— is real: `AGENTS.md`'s Docker section names `capture-postgres-tree.ts` by path as the answer to
+— is real: `CLAUDE.md`'s Docker section names `capture-postgres-tree.ts` by path as the answer to
 "I need a real captured shape for a `tests/ui/` fixture."
 
-The Go generator (§4) already does exactly this for six adapters. M11 rewrites that `AGENTS.md`
+The Go generator (§4) already does exactly this for six adapters. M11 rewrites that `CLAUDE.md`
 paragraph to point at it, and §4.6 requires the generator's write mode to be usable for a one-off
 capture (an adapter + a scenario list) rather than only for the six committed fixtures. That
 preserves the capability with less machinery: one Go tool instead of two esbuild-bundled TypeScript
@@ -876,7 +876,7 @@ The edits M11 owes, each with the §1.13 finding it answers, plus the ones the p
    contradiction with the Process-model section, and the "Go never unmarshals a data-plane frame"
    sentence goes with it.
 2. **Stack** — the Engine build / Engine runtime rows delete; the "Package manager" row's *"the
-   engine runs on a vendored real Node"* becomes `AGENTS.md`'s *"Bun is tooling only"*, now
+   engine runs on a vendored real Node"* becomes `CLAUDE.md`'s *"Bun is tooling only"*, now
    literally true (parent §7-better item 7); the Validation row's TypeScript half narrows to
    connection-dialog input (D17 of the parent); the driver line's `mattn/go-sqlite3` becomes
    `modernc.org/sqlite` **and claims the cgo-free product code** (§1.13 item 2); the Logging row
@@ -996,7 +996,7 @@ subject than the TypeScript harness had: the real `connections.Service` produces
 `metadata_cache` table (no stand-in). D13's own §5.6 regenerate-and-diff guard becomes cheap:
 the assertion path and the write path are the same code, gated on an env var.
 
-`t.Setenv("KIRA_INSECURE_SECRETS", "1")` is required on Linux (`AGENTS.md`'s Secrets section), the
+`t.Setenv("KIRA_INSECURE_SECRETS", "1")` is required on Linux (`CLAUDE.md`'s Secrets section), the
 same way `tests/e2e-real/`'s fixture sets it.
 
 ### 4.3 The four pieces of shared machinery
@@ -1005,7 +1005,7 @@ same way `tests/e2e-real/`'s fixture sets it.
 per harness instance, mapping each `IPC.*` wire literal to the bridge method that answers it. This is
 the direct successor to `enginehost/ops.go`'s own constant table and it earns the same discipline:
 **grep `src/shared/protocol/ipc.ts` for each literal; never infer it from the TypeScript identifier**
-(`AGENTS.md`'s P52–P56 finding, which was earned on `ENGINE_OP.configureCache` being
+(`CLAUDE.md`'s P52–P56 finding, which was earned on `ENGINE_OP.configureCache` being
 `'cache:configure'` and not `'engine:configure-cache'`). Six channels cover every committed fixture:
 `connectionsList`, `connectionsStates`, `connectionsConnect`, `treeChildren`, `treeDescribe`,
 `treeDefinition` — plus `opsCancel` where a spec captures it. The M10 implementer must re-derive the
@@ -1028,13 +1028,13 @@ would otherwise be found by a confusing diff:
   fixtures contain SQL and JSON text. Use `json.Encoder` with `SetEscapeHTML(false)`.
 - **Go sorts `map` keys and preserves `struct` field order.** Every snapshot type must be a struct
   with fields declared in the order the renderer's own builder produces them — **never**
-  `map[string]any`. This is not cosmetic: `AGENTS.md`'s P57 finding records that
+  `map[string]any`. This is not cosmetic: `CLAUDE.md`'s P57 finding records that
   `mockRuntime.ts`'s `canonical()` sorts only *top-level* keys, so a nested `args` object whose key
   order differs from the real call's still 422s as `E_FIXTURE_MISS`. When in doubt, run
   `test:ipc:fe` once — the miss message echoes `JSON.stringify(callArgs)` verbatim.
 - **`json.MarshalIndent(v, "", "  ")` is close to `JSON.stringify(v, null, 2)` but not identical.**
   It does not have to be: `bunx biome check --write` runs over the written file afterwards and
-  normalises formatting without reordering keys — the same step `AGENTS.md` already prescribes for
+  normalises formatting without reordering keys — the same step `CLAUDE.md` already prescribes for
   the TypeScript writer. Biome must run before the file is committed and before `bun run lint`.
 
 **(d) `frozen.go`, per adapter — the named non-determinism list.** D13's §5.6 second guard
@@ -1044,7 +1044,7 @@ silent freeze"*). Carried over from the TypeScript specs, re-derived at implemen
 | Adapter | Frozen | Why |
 |---|---|---|
 | all six | connection summary `host`→`'fixture-host'`, `port`→`0`, `createdAt`/`updatedAt`→a fixed ISO, `since`→`0` | Testcontainers assigns a fresh host port every run |
-| kafka | coordinator `host`→`'fixture-broker-host'`, `port`→`0`; the page sorted by key (`sortStreamByKey`) | a read fans across both partitions and interleaves by arrival, not by key/offset (`AGENTS.md`'s `tests/ipc/` section) |
+| kafka | coordinator `host`→`'fixture-broker-host'`, `port`→`0`; the page sorted by key (`sortStreamByKey`) | a read fans across both partitions and interleaves by arrival, not by key/offset (`CLAUDE.md`'s `tests/ipc/` section) |
 | clickhouse | the materialized view's `.inner_id.<uuid>` | generated per container |
 | redis | HSCAN field order and per-round counts | *not stable across two identically-seeded fresh containers* — reconfirmed independently in P58c M7.0 against a real Go client |
 | all six | any `serverVersion` matched by pattern rather than compared | image tags move |
@@ -1087,12 +1087,12 @@ tier on a promise. The honest sequence (§6's commits 12–15):
 ### 4.6 What the write mode must also serve (D15)
 
 `KIRA_IPC_FIXTURES=write` becomes a Go env check with the same name and value, so the muscle memory
-and the `AGENTS.md` line survive. Beyond the six committed fixtures, the generator must be usable for
+and the `CLAUDE.md` line survive. Beyond the six committed fixtures, the generator must be usable for
 a **one-off capture** — an adapter plus an ad-hoc scenario list, printing a logical page or a tree
 result to stdout — because that is what `scripts/capture-{tree,postgres-tree}.ts` did and what
-`AGENTS.md`'s Docker section names by path. A `-run TestCapture_<Adapter>` test reading a scenario
+`CLAUDE.md`'s Docker section names by path. A `-run TestCapture_<Adapter>` test reading a scenario
 JSON from an env var or a `testdata/` file is enough; it does not need the two scripts' full recipe
-grammar, and M11 rewrites the `AGENTS.md` paragraph to describe whatever actually lands.
+grammar, and M11 rewrites the `CLAUDE.md` paragraph to describe whatever actually lands.
 
 ---
 
@@ -1159,7 +1159,7 @@ path), `tests/db/support/{docker,postgres,mariadb,sqlite,kafka}.ts` + `fixtures/
 
 `enginetest.Host(t)` boots `testdata/engine-fixture.mjs` under a real Node. Its three consumers are
 the last Node dependency in the Go suite, and after M10 the whole Go test suite runs on the Go
-toolchain plus Docker and nothing else — worth claiming in `AGENTS.md`.
+toolchain plus Docker and nothing else — worth claiming in `CLAUDE.md`.
 
 - **`adapterhost/integration_test.go`** — `TestForwardToChild_RealEngineChild`. Its own comment says
   it exists to prove *"the seam where `Router.AttachStream` wires a Session in as the child's Sink
@@ -1288,7 +1288,7 @@ still running, which is what makes the deletion in phase 4 mechanical rather tha
     stale `tests/unit/engine-cache.spec.ts` reference at `:171` (that file has not existed since
     P58a M3). New bundle-size/RSS numbers if macOS is available, an explicit "not available in this
     session" line if not.
-22. `docs: P58f findings, and P58's own closeout` — `AGENTS.md`'s P58f entry (§7 criterion 11's
+22. `docs: P58f findings, and P58's own closeout` — `CLAUDE.md`'s P58f entry (§7 criterion 11's
     list), its rewritten Docker / `tests/ipc/` / SQLite / Wails-Go sections, the two stale
     `mattn/go-sqlite3` cgo claims (`:205`, `:238`), plus **amendment notes appended to
     `docs/v1/plans/P58-go-native-adapters.md`** for C2's definition (D2), D6/D8's superseded driver
@@ -1297,7 +1297,7 @@ still running, which is what makes the deletion in phase 4 mechanical rather tha
 23. `docs: SPEC.md — the P58 row's outcome` — **P58f D16**. Column 2 untouched; column 3 rewritten.
 24. `ci: workflows for a build with no Node` — **P58f D17**/the parent's §4.9. Landed if the
     session's push scope allows; otherwise the staged directory gains a P58-current revision
-    (renamed from `p57-pending-ci-workflows/`, since it is no longer P57's), and `AGENTS.md`'s own
+    (renamed from `p57-pending-ci-workflows/`, since it is no longer P57's), and `CLAUDE.md`'s own
     finding is updated to say the update is *still* pending and now two generations behind.
 
 ---
@@ -1308,7 +1308,7 @@ The parent's §8 lists twelve criteria for the whole phase. **Criteria 1–4 are
 P58a–P58e**; criteria **5–12 are P58f's and none is satisfiable before it completes.** The M9.4
 agent's own final report claimed *"§8 criteria 5-10 were correctly P58f's and untouched"* —
 **cross-checked, and that claim is right as far as it goes but two short**: criteria 11 and 12
-(`AGENTS.md`'s findings entry and `docs/ARCHITECTURE.md`'s update, including the rewritten bulk-data
+(`CLAUDE.md`'s findings entry and `docs/ARCHITECTURE.md`'s update, including the rewritten bulk-data
 invariant) are also P58f's, and criterion 10's `docs/PERF.md` half is *partly* discharged already
 (P58a M2 recorded the re-taken inflation measurement in §2.5; the bundle-size and RSS halves are
 still owed).
@@ -1316,16 +1316,16 @@ still owed).
 | # | Parent §8 criterion | Status | P58f's obligation |
 |---|---|---|---|
 | 1 | C1 recorded | **done** (P58a §7) | none |
-| 2 | C2 recorded before M10 | **done** (P58e §13, `AGENTS.md`) | ratify the amended definition (**D2**) |
+| 2 | C2 recorded before M10 | **done** (P58e §13, `CLAUDE.md`) | ratify the amended definition (**D2**) |
 | 3 | lint, typecheck, test:unit, test:go, test:ui, test:ipc:fe green | re-run | `typecheck` is now three projects, not four (`typecheck:db` goes); `test:ipc:be`/`test:db` no longer exist |
 | 4 | `go test ./internal/adapters/...` green per engine, or Docker stated | **done** per sub-phase | re-run; state unavailability per engine |
 | 5 | no `tests/ipc` fixture or frontend-spec change | **not satisfiable — amended by D13** | every fixture diff attributed by name; exactly one frontend-spec assertion changed (`kafka.frontend.spec.ts:127`), listed |
 | 6 | `git diff --stat src/` empty except `port.ts` | **not satisfiable — amended by D18** | the whole-phase `src/` diff is `port.ts`, `SettingsDialog.vue`, `shared/domain/settings.ts`, plus `src/engine/`'s deletion. **P58f's own commits touch exactly those three files** |
-| 7 | `grep -rn "enginehost\|vendor-node\|build:engine\|runtime/node\|src/engine" shell/ src/ scripts/ package.json docs/ tests/` returns nothing outside `docs/v1/plans/` and `AGENTS.md`'s findings logs | **P58f** | the phase's single sharpest instrument. Run it and paste the output |
+| 7 | `grep -rn "enginehost\|vendor-node\|build:engine\|runtime/node\|src/engine" shell/ src/ scripts/ package.json docs/ tests/` returns nothing outside `docs/v1/plans/` and `CLAUDE.md`'s findings logs | **P58f** | the phase's single sharpest instrument. Run it and paste the output |
 | 8 | `package.json`'s `dependencies` is `{"zod"}`; `trustedDependencies` gone | **P58f** | plus `@types/pg` and four `@testcontainers/*` devDependencies |
 | 9 | a signed bundle with no `Contents/MacOS/runtime/`; `verify:packaging` exits 0 | **P58f, macOS only** | otherwise recorded as unavailable, per the parent's §6 discipline |
 | 10 | `docs/PERF.md` re-taken numbers | **partly done** | the inflation figures are in §2.5 already; bundle size and RSS are still owed (macOS) |
-| 11 | `AGENTS.md` gains a P58 findings entry; the sections whose subject this phase removes are rewritten | **P58f** | see below |
+| 11 | `CLAUDE.md` gains a P58 findings entry; the sections whose subject this phase removes are rewritten | **P58f** | see below |
 | 12 | `docs/ARCHITECTURE.md` updated per §3, **including the rewritten bulk-data invariant (D3)**, the rewritten "Why a separate engine process", the SQLite `caps.cancel` sentence and the Kafka capability recovery; SPEC.md's P58 row | **P58f** | **D17**, **D16**. Note the bulk-data invariant is the one item D3 required *in the same commit as the code* and that never landed (§1.13 item 1) |
 
 **Criterion 12, in grep form** (P58d OQ-2's lesson, and the form P58d/P58e both used):
@@ -1340,7 +1340,7 @@ grep -n "Bulk data passes through the Go process" docs/ARCHITECTURE.md
 ```
 returns nothing (D3's replacement is what stands).
 
-**Criterion 11's own list**, for the `AGENTS.md` entry — things a future session would otherwise
+**Criterion 11's own list**, for the `CLAUDE.md` entry — things a future session would otherwise
 re-derive:
 
 - **Deleting a directory is the easy half; finding its type dependencies is the hard half.**
@@ -1359,7 +1359,7 @@ re-derive:
 - **The Go test suite has no Node dependency left** — `enginetest`'s `engine-fixture.mjs` was the
   last one (§5.4).
 - **The product's own Go code is cgo-free** (`modernc.org/sqlite` for both the adapter and app
-  storage); only Wails' own macOS bindings still need `CGO_ENABLED=1`. `AGENTS.md`'s own
+  storage); only Wails' own macOS bindings still need `CGO_ENABLED=1`. `CLAUDE.md`'s own
   `mattn/go-sqlite3` claims at `:205` and `:238` were stale before this phase started.
 - **Both `tests/db/` and `tests/ipc/` survive P58 as something other than what they were**: the
   first as a shared fixture corpus two other tiers read; the second with a Go backend half.
@@ -1444,7 +1444,7 @@ around it. In order of how much trouble each would cause an M10 implementer who 
   noting in that commit's message.
 - **Docker images for commits 12–14**: `mariadb:11.4`, `mysql:8.4`,
   `clickhouse/clickhouse-server:26.3`, `redis:7`, `localstack/localstack:3`,
-  `confluentinc/cp-kafka:8.0.7` — all mirror-pulled and retagged per `AGENTS.md`'s Docker section
+  `confluentinc/cp-kafka:8.0.7` — all mirror-pulled and retagged per `CLAUDE.md`'s Docker section
   (`library/` for the unnamespaced ones, none for the rest). Kafka needs
   `kafka.WithClusterID(...)` and `KAFKA_AUTO_CREATE_TOPICS_ENABLE=false` (P58e M9.0 KF-4(a)/(d)) —
   `testsupport/kafka.go` already does both.

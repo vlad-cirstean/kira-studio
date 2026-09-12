@@ -217,7 +217,7 @@ CONSOLE ERRORS: []
 
 Everything load-bearing is in there:
 
-- **`ENGINE PILL: ok`** — this is P56's own named symptom (AGENTS.md: *"the status bar stuck on
+- **`ENGINE PILL: ok`** — this is P56's own named symptom (CLAUDE.md: *"the status bar stuck on
   'engine connecting' forever"*). It can only turn `ok` if `bridge/port.ts` opened
   `JSONStream("engine")` over the WebSocket, framed a `ping`, reached the Node engine through
   `bridge/stream.go` → `enginehost`, and got a reply. **The data plane is real.**
@@ -243,7 +243,7 @@ mocked tier can never produce it.
 ### 3.4 A real *network* adapter, in a real container
 
 Same harness, `postgres:17-alpine` via Testcontainers (pulled through `mirror.gcr.io` and re-tagged
-per AGENTS.md), host/port typed into the real connection dialog:
+per CLAUDE.md), host/port typed into the real connection dialog:
 
 ```
 POSTGRES CONTAINER UP: localhost 32796
@@ -254,7 +254,7 @@ CONSOLE ERRORS: []
   1 passed (6.9s)
 ```
 
-The container fixture must be driven under **plain Node**, not Bun — AGENTS.md's existing
+The container fixture must be driven under **plain Node**, not Bun — CLAUDE.md's existing
 `@testcontainers/postgresql`-hangs-under-Bun finding applies verbatim. Invoke as
 `node node_modules/@playwright/test/cli.js test …`, not `bunx playwright test`.
 
@@ -538,7 +538,7 @@ Three constraints the implementing session must not miss:
   credential. A server-mode binary exposes the entire bound surface, including secrets and file
   services, to anyone who can reach the port. This binary is a **test artifact and must never be
   packaged or shipped**; the tier should assert its own bind address rather than trusting a default.
-- **Run the container-backed spec under plain Node**, not `bunx` (§3.4, and AGENTS.md's existing
+- **Run the container-backed spec under plain Node**, not `bunx` (§3.4, and CLAUDE.md's existing
   Bun/testcontainers finding).
 - **`cwd` must be `shell/`** (or the binary must sit beside `runtime/`) for `resolveEngine()`.
 
@@ -556,7 +556,7 @@ Nothing yet — this document is a recommendation, not an amendment. If accepted
 - **§7's "what gets worse" item 1** ("The full-stack tier is gone") is softened, honestly and
   specifically — it becomes "reduced from 23 specs to 2–3, with native-shell coverage genuinely
   gone and wire-level coverage genuinely kept".
-- **AGENTS.md**'s P51 Wails section should gain the `-tags server` finding directly, since its
+- **CLAUDE.md**'s P51 Wails section should gain the `-tags server` finding directly, since its
   current last bullet (*"`curl` or a plain browser tab can never exercise real Wails bindings this
   way, on this platform"*) is true as written but reliably read as broader than it is. The
   correction is one sentence: *that is true of a desktop build; a `-tags server` build serves the

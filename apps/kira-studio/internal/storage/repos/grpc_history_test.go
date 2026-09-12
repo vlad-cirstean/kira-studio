@@ -10,7 +10,7 @@ import (
 )
 
 // P11 §6.2: the four caps, each asserted on the boundary — mirrors response_history_test.go's own
-// "cache eviction with interacting rules" posture (AGENTS.md), not CRUD round trips.
+// "cache eviction with interacting rules" posture (CLAUDE.md), not CRUD round trips.
 
 func newGrpcHistoryRepo(t *testing.T) *repos.GrpcHistoryRepo {
 	t.Helper()

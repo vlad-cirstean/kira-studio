@@ -15,7 +15,7 @@ import (
 )
 
 // --- Repo.Write / Repo.Read: ordering, bounded concurrency, cancellation ----------------------
-// AGENTS.md's own bar for a dedicated unit test ("concurrency: ordering, backpressure,
+// CLAUDE.md's own bar for a dedicated unit test ("concurrency: ordering, backpressure,
 // cancellation, races") is exactly what this section is for.
 
 func newTestRepo() *Repo {

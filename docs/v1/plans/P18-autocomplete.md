@@ -24,7 +24,7 @@
 - **Surfaces with no free-text identifier input get nothing.** Forcing a completion affordance onto
   Redis/Kafka/SQS/S3 would mean inventing a query surface this app deliberately does not have
   (realities #5, #6). §5 records that as an explicit non-goal, not an omission.
-- Comments per AGENTS.md: only where the code cannot say it for itself. Every `D` below that
+- Comments per CLAUDE.md: only where the code cannot say it for itself. Every `D` below that
   encodes a non-obvious constraint gets one line at its implementation site, not a paraphrase of
   this document.
 - Run `bun run lint`, `bun run typecheck` and `bun run build` throughout; `xvfb-run -a bun run

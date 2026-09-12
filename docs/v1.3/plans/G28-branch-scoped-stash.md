@@ -112,7 +112,7 @@ See §8 for the full argued list. Headline exclusions: **no auto-pop of the auto
 - **Nothing is ever silently destroyed.** Auto-stash *moves* work into an entry that is named, tagged with its origin branch, and one right-click from coming back. Auto-detach *moves HEAD*, and says so loudly. `globalStashSave` **copies**; it never drops its source (D10).
 - **Storage that promises "keep this forever" must be durable against the tools the user already runs.** P7 is why the obvious design is rejected; P8 is why the chosen one is not (D8).
 - **Every git failure is classified from stderr text, never from an exit code** — with the two documented exceptions this codebase already has (`reclassifyStashPop`'s post-write status read, `stashPositionMismatch`'s pre-write verify), both of which G28 reuses rather than duplicating.
-- `AGENTS.md` in full: no stubbed error handling, no skipped validation, named constants, table tests.
+- `CLAUDE.md` in full: no stubbed error handling, no skipped validation, named constants, table tests.
 
 ---
 

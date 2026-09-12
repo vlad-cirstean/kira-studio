@@ -283,7 +283,7 @@ test('connection dialog CRUD, colors, and D7/D9 secret handling', async ({ relau
   await expect(row.locator('.status-dot')).toHaveAttribute('data-status', 'disconnected');
 
   // D9 ("connectionsList never carries a password") is no longer checkable from here: there is
-  // no `window.kira` any more (AGENTS.md's P57 finding) and no live wire to query — this tier's
+  // no `window.kira` any more (CLAUDE.md's P57 finding) and no live wire to query — this tier's
   // `connectionsList` fixture is data this test itself wrote, so re-reading it back would only
   // prove the fixture matches itself. The real guarantee now lives at the layer that actually
   // implements it: `connectionSummarySchema.omit({ password: true })` (shared/domain/connection.ts)
@@ -323,7 +323,7 @@ test('connection dialog CRUD, colors, and D7/D9 secret handling', async ({ relau
   await expect(page.locator('[data-testid="connection-dialog"]')).toHaveCount(0);
 
   // What the backend actually stripped the password down to is this test's own fixture
-  // (URI_CONNECTION), not something to re-query here (no `window.kira` any more — AGENTS.md's
+  // (URI_CONNECTION), not something to re-query here (no `window.kira` any more — CLAUDE.md's
   // P57 finding) — so what's left to prove from the UI is that the renderer displays whatever it
   // was handed correctly: the row renders, and re-opening it for edit still shows URI mode.
   const uriConnRow = await connectionRow(page, 'URI Connection');

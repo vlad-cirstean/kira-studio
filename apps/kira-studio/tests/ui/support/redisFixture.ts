@@ -4,7 +4,7 @@ import { IPC } from './ipcChannels';
 
 // Real capture of a real Redis 7 container's connect() response — via
 // `bun scripts/capture-tree.ts redis --recipe-file ...` (scripts/capture-tree.ts), not
-// hand-written (P50 D5). Confirmed here, a real environment finding: unlike Postgres (AGENTS.md's
+// hand-written (P50 D5). Confirmed here, a real environment finding: unlike Postgres (CLAUDE.md's
 // Docker section), Redis's container starts and this capture completes fine under plain
 // `bun run` too — no esbuild/vendored-Node workaround needed for this adapter.
 //

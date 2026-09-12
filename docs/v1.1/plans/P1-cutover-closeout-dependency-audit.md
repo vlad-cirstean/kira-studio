@@ -13,7 +13,7 @@
 > **The cutover half of that row is already done, and this plan does not re-plan it.** `src/engine`,
 > `internal/enginehost` and `shell/runtime/` are gone from the tree — implemented under
 > `docs/v1/SPEC.md`'s P58 row (P58f M10-M11) before this chapter opened, and walked through
-> criterion by criterion in `docs/v1/plans/P58f-cutover.md` §7 and `AGENTS.md`'s "P58f
+> criterion by criterion in `docs/v1/plans/P58f-cutover.md` §7 and `CLAUDE.md`'s "P58f
 > implementation findings" section. §0.1 records the evidence. Everything below is the audit.
 >
 > **The dependency audit's headline is that there is nothing to remove.** Every one of
@@ -62,7 +62,7 @@ Verified against the tree at this plan's authoring commit (`9c2a10a`), not taken
 | The vendored Node runtime is not in the repository | `git ls-files shell/runtime` → **empty**. (A `shell/runtime/{node,engine}` tree still exists *on disk* in this container — untracked, gitignored by `shell/.gitignore`'s `runtime` line, pre-cutover residue. See F4.) |
 | The tree is green today | `bun run lint` → "Checked 304 files … No fixes applied"; `bun run typecheck` → all three projects exit 0; `cd shell && go build ./internal/... ./cmd/...` → exit 0; `go vet ./internal/... ./cmd/...` → exit 0; `git status --porcelain` → clean |
 
-`docs/v1/plans/P58f-cutover.md` §7 is the criterion-by-criterion walkthrough, and `AGENTS.md`'s
+`docs/v1/plans/P58f-cutover.md` §7 is the criterion-by-criterion walkthrough, and `CLAUDE.md`'s
 "P58f implementation findings — cutover" section is its record. **P1 adds nothing to that work.**
 
 ### 0.2 Scope
@@ -86,7 +86,7 @@ Verified against the tree at this plan's authoring commit (`9c2a10a`), not taken
 - **Every removal in §4 cites a finding in §1-§3, and every finding cites a command that was
   actually run.** Where the evidence is ambiguous, the finding says so and the decision is
   "investigate further during implementation" — never a verdict this plan does not have (F14).
-- `AGENTS.md`'s standing rules apply: no stubs, comments only where the code cannot speak for
+- `CLAUDE.md`'s standing rules apply: no stubs, comments only where the code cannot speak for
   itself, Conventional Commits, no new unit tests (nothing here clears that bar).
 - Run the §5 verification block after **every** commit, not once at the end. Each commit in §4 is
   independently green.
@@ -172,7 +172,7 @@ records it: *"`bun add -d @typescript/native-preview` (binary `tsgo`) **and** `t
 (required by `vue-tsc` and by Volar). If a stable `typescript@7` is published and `tsgo`'s job is
 subsumed, that is a later cleanup."* `docs/ARCHITECTURE.md`'s Stack table still carries that
 position as current: *"TypeScript 7 (native compiler) for `.ts` … converge on one toolchain once
-`vue-tsc` runs on TS7."* `AGENTS.md`'s P57 findings add a second, still-live behavioural note
+`vue-tsc` runs on TS7."* `CLAUDE.md`'s P57 findings add a second, still-live behavioural note
 (`tsgo` applies a `"paths"` mapping to every file it reaches, where Bun's `mock.module` does not).
 So it is a deliberate, still-documented choice, not vestige.
 
@@ -254,14 +254,14 @@ in the repository changes either way. Worth knowing because a stale `node_module
 | `lint` / `format` | `.githooks/pre-commit`; live + staged `ci.yml`/`release.yml` |
 | `typecheck` (+ `:node`, `:web`, `:unit`) | `.githooks/pre-commit`; live + staged `ci.yml`/`release.yml` |
 | `test:ui` | staged `ci.yml`'s `ui` job |
-| `test:ipc:fe` | **no CI job, live or staged.** Referenced only by `AGENTS.md:135` and `README.md:188` |
+| `test:ipc:fe` | **no CI job, live or staged.** Referenced only by `CLAUDE.md:135` and `README.md:188` |
 | `test:unit` | live `ci.yml:69`; staged `ci.yml`'s `container-tests` job |
 | `test:go` | staged `ci.yml`'s `checks` and `container-tests` jobs |
 | `package` | staged `ci.yml`/`release.yml`; `scripts/verify-packaging.sh`'s S5 check greps for it |
 | `verify:packaging` | live `ci.yml:30,94`, `release.yml:50`; staged equivalents |
 
 `playwright.config.ts` defines three projects — `ui`, `ipc-frontend`, `e2e-real`. Two have scripts
-(`test:ui`, `test:ipc:fe`); `e2e-real` deliberately has none, because `AGENTS.md`'s Docker section
+(`test:ui`, `test:ipc:fe`); `e2e-real` deliberately has none, because `CLAUDE.md`'s Docker section
 requires it to be launched through plain Node (`node node_modules/.bin/playwright test
 --project=e2e-real`), never `bunx`.
 
@@ -273,7 +273,7 @@ is 13 live files under `tests/ipc/`. D9 records it as an optional one-line addit
 
 | File | Referenced by | Post-cutover shape? |
 |---|---|---|
-| `scripts/wails-dev-setup.sh` | `predev`; `docs/PACKAGING.md` §1; `AGENTS.md` | **Yes.** Its own header records the P58f revision (*"there is no vendored Node runtime or bundled engine to check for any more"*), and it checks exactly two things: the pinned `wails3` version read out of `shell/go.mod`, and `shell/frontend/bindings`. No Node, no engine bundle. |
+| `scripts/wails-dev-setup.sh` | `predev`; `docs/PACKAGING.md` §1; `CLAUDE.md` | **Yes.** Its own header records the P58f revision (*"there is no vendored Node runtime or bundled engine to check for any more"*), and it checks exactly two things: the pinned `wails3` version read out of `shell/go.mod`, and `shell/frontend/bindings`. No Node, no engine bundle. |
 | `scripts/sign-bundle.sh` | `package` | **Yes.** Header records the P58f revision; the body is one `codesign --force --deep --sign -` plus a `--verify` over `shell/bin/Kira Studio.app` — the Wails bundle path, no nested `runtime/node` target. |
 | `scripts/verify-packaging.sh` | `verify:packaging` | **Mostly.** See below. |
 
@@ -333,7 +333,7 @@ Confirmed line by line against the live `package.json`:
 | `:117,121` | Install via `bun run package:mac`, artifacts in `dist/mac-arm64/` | `bun run package` → `shell/bin/Kira Studio.app`; nothing lands in `dist/` (`docs/PACKAGING.md` §1) |
 | `:171` | *"Five suites … `unit/`, `db/`, `electron-db/`, `ipc/`, `e2e/`"* | four directories, none named `electron-db` or `e2e`: `unit/`, `db/` (fixtures only), `ipc/`, `ui/`, `e2e-real/` |
 | `:182-184` | `tests/electron-db/`, `bun run test:db:kafka`, Electron's Node ABI | all gone with P57/P58 |
-| `:186-191` | `test:ipc:be`, *"no Electron renderer"*, `test:e2e` under `xvfb-run` | `test:ipc:be` is gone (the backend half is Go: `shell/internal/ipcfixture`); `AGENTS.md:133` records that no tier needs `xvfb` |
+| `:186-191` | `test:ipc:be`, *"no Electron renderer"*, `test:e2e` under `xvfb-run` | `test:ipc:be` is gone (the backend half is Go: `shell/internal/ipcfixture`); `CLAUDE.md:133` records that no tier needs `xvfb` |
 | `:138` | `bun run dev` → *"electron-vite dev"* | `bun run build && cd shell && wails3 task dev` |
 | `:159` | `verify:packaging` → *"the packaging config"* | there is no packaging config file; it asserts properties of the bundle |
 | `:131,237` | *"the electron-builder config"* | deleted in P57 M7 (`docs/PACKAGING.md` opening) |
@@ -350,7 +350,7 @@ and Architecture prose is a documentation phase, not a script audit.
 
 - `:8` and `:11` — *"the repo root's `bun run build:wails` (see `../vite.wails.config.ts`)"*. Neither
   the script nor the file exists (`ls vite*.config.ts` → `vite.config.ts` only). This is the exact
-  trap `AGENTS.md`'s P58b findings already recorded once (*"`tests/e2e-real/fixtures.ts` was calling
+  trap `CLAUDE.md`'s P58b findings already recorded once (*"`tests/e2e-real/fixtures.ts` was calling
   a `bun run build:wails` script that no longer existed"*).
 - `:12` — `sh scripts/vendor-node.sh`, deleted in P58f M10 (`docs/PACKAGING.md` opening line).
 - `:3-5` — *"being built to replace Electron's `src/main`/`src/preload`"* — done, two chapters ago.
@@ -365,7 +365,7 @@ from `src/renderer`"*. D8 fixes both.
 `bun run package:mac`, `bun run package:mac:dir`,
 `app.asar.unpacked/out/main/engine.js`, `dist/mac-arm64/`, `dist/*.blockmap`, `dist/*.dmg` and
 `safeStorage` — none of which exist. That is two generations stale, exactly as
-`AGENTS.md`'s P57 findings and `docs/v1/plans/p58-pending-ci-workflows/README.md` record.
+`CLAUDE.md`'s P57 findings and `docs/v1/plans/p58-pending-ci-workflows/README.md` record.
 
 **This session cannot fix them**: its push token lacks the `workflow` OAuth scope, and GitHub
 rejects any commit touching `.github/workflows/*.yml` outright. The staged replacements in
@@ -602,7 +602,7 @@ staleness removal. Not done here; §9 OQ-2 covers it alongside `src/renderer`.
 
 - **`tests/db/`** — name is misleading (it holds no specs), but it is live: `fixtures/*.sql` are read
   by literal path from five Go files under `shell/internal/adapters/testsupport/`, and
-  `support/*.ts` are re-exported by `tests/e2e-real/support/`. `AGENTS.md` and
+  `support/*.ts` are re-exported by `tests/e2e-real/support/`. `CLAUDE.md` and
   `docs/ARCHITECTURE.md` both already document what it became. Renaming it would mean editing Go
   path literals. **Keep.**
 - **`shell/blank/index.html`** — not scaffolding residue: it is `//go:embed`ed by `shell/main.go:52`
@@ -636,7 +636,7 @@ staleness removal. Not done here; §9 OQ-2 covers it alongside `src/renderer`.
 | # | Decision | Why |
 |---|---|---|
 | **D1** | **No `package.json` dependency is removed, and none is moved between buckets.** | F1: all 31 entries have a live consumer. F18: the `dependencies`/`devDependencies` split has no effect post-Electron. An audit whose honest result is "nothing to remove" says so rather than manufacturing a deletion. |
-| **D2** | **`tsgo` (`@typescript/native-preview`) stays. `typecheck:node` and `typecheck:unit` are unchanged.** The SPEC row's named example is recorded as investigated-and-false in `AGENTS.md`, with F2's numbers. | F2: it is the sole typechecker for 72 files / ≈20 400 lines that `vue-tsc` never sees. The available alternative — repoint both scripts at the already-installed `tsc` and drop the package — is a toolchain-policy change that contradicts `docs/ARCHITECTURE.md`'s Stack table and costs ≈4.75 s on every pre-commit. That is a decision for the user (§9 OQ-1), not for a staleness audit. |
+| **D2** | **`tsgo` (`@typescript/native-preview`) stays. `typecheck:node` and `typecheck:unit` are unchanged.** The SPEC row's named example is recorded as investigated-and-false in `CLAUDE.md`, with F2's numbers. | F2: it is the sole typechecker for 72 files / ≈20 400 lines that `vue-tsc` never sees. The available alternative — repoint both scripts at the already-installed `tsc` and drop the package — is a toolchain-policy change that contradicts `docs/ARCHITECTURE.md`'s Stack table and costs ≈4.75 s on every pre-commit. That is a decision for the user (§9 OQ-1), not for a staleness audit. |
 | **D3** | **Delete `src/shared/format.ts` and `src/shared/vite-raw.d.ts`.** | F12: zero importers each, confirmed by exhaustive grep; both died with `src/engine`; neither is visible to Biome or `tsgo` as dead. |
 | **D4** | **Delete the root `build/` directory (`build/icon.png`, `build/icon.svg`) and update `docs/PACKAGING.md:223`'s provenance sentence.** | F13: byte-identical duplicates of two tracked files under `shell/build/`; no tooling reads the root path; an electron-builder-era convention outliving its tool. |
 | **D5** | **In `shell/build/`: delete the `frontend:vendor:puppertino` task; delete `config.yml`'s `other:` placeholder block; reword `config.yml`'s `comments:` line. Leave every other Taskfile task alone and record F14's open question in the plan's §9.** | F14/F15: puppertino is unreferenced, targets non-existent paths and fetches third-party CSS mid-build. The `install/build/dev:frontend` chain *is* referenced by `darwin:build:native`'s `deps`, and whether it is skipped by fingerprint or would fail cannot be determined without macOS (`shell/.task/checksum/` shows it has never run here) — so it is investigated, not removed. |
@@ -644,7 +644,7 @@ staleness removal. Not done here; §9 OQ-2 covers it alongside `src/renderer`.
 | **D7** | **Fix `scripts/demo-dbs/README.md:14`'s `bun run test:db` reference.** No file under `scripts/demo-dbs/` is deleted. | F7: one stale script name in an otherwise-live, documented developer tool. |
 | **D8** | **Bring the *script surface* of `README.md` current (Requirements, Install, Development table, Tests, the top-level layout block, and the three Electron-shell sentences those sections rest on), and fix `shell/README.md` and `shell/main.go:42`.** Leave README's engine table, Features list and per-engine footnotes alone. | F8/F9: `README.md` is the only human-facing documentation of the `scripts` block and it documents eight scripts that do not exist, four directories that do not exist, and a `dist/` output path nothing writes. `docs/ARCHITECTURE.md` and `docs/PACKAGING.md` were brought current by P58f M11; README was missed. Bounding it to the script surface keeps this an audit; a full README accuracy pass is its own phase (§9 OQ-4), the same bound `docs/v1/plans/P45-docs-cleanup.md` D67 set for the same file. |
 | **D9** | **In `docs/v1/plans/p58-pending-ci-workflows/release.yml`: remove the `KIRA_STRICT_UPDATE_CHECK` `env:` block and reword the step name. Update that directory's `README.md` to say P1 revised it.** Adding a `test:ipc:fe` step to the staged `ci.yml` is **optional** and, if taken, gets its own line in that README. | F10: `verify-packaging.sh` no longer reads that variable, so the staged file would ship a misleading env var whenever it is finally applied. The staged directory's own README instructs later phases to revise **in place** and update the generation count — this follows that instruction. F5: the `test:ipc:fe` gap is coverage, not staleness. |
-| **D10** | **Nothing in P1 touches `.github/workflows/*.yml`.** | F10: this session's token lacks the `workflow` OAuth scope and GitHub rejects such commits outright; `AGENTS.md` records the same rejection twice. Nothing P1 removes is named by either live workflow, so no staged change beyond D9 is owed. |
+| **D10** | **Nothing in P1 touches `.github/workflows/*.yml`.** | F10: this session's token lacks the `workflow` OAuth scope and GitHub rejects such commits outright; `CLAUDE.md` records the same rejection twice. Nothing P1 removes is named by either live workflow, so no staged change beyond D9 is owed. |
 | **D11** | **Run `go mod tidy` and commit its result — the `kmsg` promotion.** No indirect require is hand-edited. | F3: `internal/adapters/kafka/definition.go:13` imports it directly. The phase brief's own rule: indirect deps are Go's to manage. |
 | **D12** | **`src/renderer`, `src/shared`, `tests/db`, `tsconfig.node.json` keep their names and locations.** | F11/F17/F18: each still serves its purpose; each rename is a rename, and SPEC scopes this section to constructs that *no longer serve a purpose*. Blast radius is measured in F11 and handed to §9 OQ-2 for P2's architecture round. |
 
@@ -718,7 +718,7 @@ and this commit changes only inputs.
 
 Also, in this commit, carry out F14's investigation and write down the result:
 `cd shell && wails3 task -x --dry darwin:build 2>&1 | tee /tmp/p1-taskgraph.txt`. Record what
-happens to `common:build:frontend` in the commit message and in the `AGENTS.md` note (C7). If the
+happens to `common:build:frontend` in the commit message and in the `CLAUDE.md` note (C7). If the
 command cannot run in the implementing environment, say **that**, explicitly, rather than guessing.
 
 ### C5 — `docs: README.md — the post-cutover script and test surface` (D8)
@@ -746,7 +746,7 @@ plan's F8 table:
   (`bun run test:ui`, WebKit against the built bundle), `tests/ipc/` (`bun run test:ipc:fe` for the
   frontend half; the backend half is Go — `shell/internal/ipcfixture`, run by `bun run test:go` with
   `KIRA_IPC_FIXTURES=write` to regenerate), `tests/e2e-real/` (a real `-tags server` Go binary,
-  launched through plain Node per `AGENTS.md`, deliberately without a `package.json` script), plus
+  launched through plain Node per `CLAUDE.md`, deliberately without a `package.json` script), plus
   `bun run test:go` for the Go suite. Delete the `tests/electron-db/`, `test:db:kafka`,
   `test:ipc:be` and `xvfb-run` paragraphs. `tests/db/` is described as what it is now: a shared
   fixture corpus, not a suite.
@@ -781,14 +781,14 @@ bun run --silent 2>/dev/null | head -40   # or: node -p "Object.keys(require('./
 
 Verify: §6's block; `grep -rn 'build:wails\|vite\.wails\.config\|vendor-node' . --exclude-dir=node_modules --exclude-dir=.git --exclude-dir=docs/v1` returns nothing.
 
-### C7 — `docs: P1 audit findings — AGENTS.md, staged workflows` (D2, D9)
+### C7 — `docs: P1 audit findings — CLAUDE.md, staged workflows` (D2, D9)
 
 1. `docs/v1/plans/p58-pending-ci-workflows/release.yml`: delete the `env: KIRA_STRICT_UPDATE_CHECK:
    '1'` block on the `verify:packaging` step and reword the step name (there is no strict mode).
 2. `docs/v1/plans/p58-pending-ci-workflows/README.md`: add a line recording that P1 revised
    `release.yml` in place, per that README's own standing instruction. Do **not** claim a new
    "generation" — this is a correction to the staged content, not a new generation of it.
-3. `AGENTS.md`: add a `## P1 (v1.1) implementation findings — dependency, script and folder audit`
+3. `CLAUDE.md`: add a `## P1 (v1.1) implementation findings — dependency, script and folder audit`
    section, immediately before the closing "Current-state architecture reference" paragraph, in the
    same voice as the P58x sections. It must carry, at minimum:
    - **The `tsgo` verdict and its numbers** (F2) — so nobody re-opens it from the SPEC row alone.
@@ -802,7 +802,7 @@ Verify: §6's block; `grep -rn 'build:wails\|vite\.wails\.config\|vendor-node' .
    - **The near-miss pair** `src/shared/format.ts` (dead) vs `src/renderer/format.ts` (live, five
      importers), as a worked example of why a bare `grep format` is not evidence.
 
-Verify: `bun run lint`; `git diff --stat` shows only `AGENTS.md` and two files under
+Verify: `bun run lint`; `git diff --stat` shows only `CLAUDE.md` and two files under
 `docs/v1/plans/p58-pending-ci-workflows/`.
 
 ---
@@ -819,7 +819,7 @@ cd shell && go build ./internal/... ./cmd/... && go vet ./internal/... ./cmd/...
 ```
 
 `go build ./...` (rather than `./internal/... ./cmd/...`) additionally compiles the root `main`
-package, which imports Wails and therefore needs GTK4/WebKitGTK headers on Linux — `AGENTS.md`'s
+package, which imports Wails and therefore needs GTK4/WebKitGTK headers on Linux — `CLAUDE.md`'s
 Wails section has the `apt-get` line. Use the narrower form for the loop; run the full `./...` once
 at the end if the headers are available.
 
@@ -827,7 +827,7 @@ Once, at the end of the phase:
 
 ```sh
 bun run test:unit                       # 12 files, no external resource
-bun run test:ui                         # needs `bunx playwright install webkit` + its system libs (AGENTS.md)
+bun run test:ui                         # needs `bunx playwright install webkit` + its system libs (CLAUDE.md)
 bun run test:ipc:fe
 cd shell && go test ./... && cd ..      # container-backed cases self-skip without Docker
 ```
@@ -861,7 +861,7 @@ as passed.
   actually covered.
 - **Deleting `shell/blank/`, `shell/cmd/g1measure/`, `scripts/demo-dbs/` or anything under
   `tests/`** (F18).
-- **Any new test.** Nothing here clears `AGENTS.md`'s bar — these are deletions of unreferenced
+- **Any new test.** Nothing here clears `CLAUDE.md`'s bar — these are deletions of unreferenced
   files and edits to prose, all of which `bun run typecheck` / `bun run build` / `go build` already
   guard.
 
@@ -901,7 +901,7 @@ document:
    and is recorded in §9.)
 8. `docs/v1/plans/p58-pending-ci-workflows/release.yml` no longer sets `KIRA_STRICT_UPDATE_CHECK`,
    and that directory's `README.md` records P1's revision.
-9. `AGENTS.md` has a P1 findings section carrying at least the five items C7 lists — including the
+9. `CLAUDE.md` has a P1 findings section carrying at least the five items C7 lists — including the
    `tsgo` verdict with its measured numbers, and an honest statement of what F14's investigation
    did or did not establish.
 10. §6's verification block is green, and the end-of-phase test commands have either been run or
