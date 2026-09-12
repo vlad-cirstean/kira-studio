@@ -113,7 +113,17 @@ import type { EventKey, RequestKey, StreamKey } from './contract.ts';
 // caller exists yet, only the extension's own host-side status bar -- 'proxyHandlers.ts' still
 // gained a plain forward entry since 'ServerHandlers.requests' is total over 'RequestKey'. No new
 // event, no new capability, no new 'UiActionKind' member, no SQL migration.
-export const CONTRACT_VERSION = 34;
+// P7 item 2 (2026-09-12): 34 -> 35, for one new Go-served request, 'working.detail' -- the
+// uncommitted-changes strip's click-through file list (params: repoId; result: {files:
+// FileChange[]}, composed server-side the same way 'commit.detail' composes its own). A real
+// webview caller exists this time (the new WorkingDetailPane), so this is a plain forward in
+// 'proxyHandlers.ts' too, no different in kind from 'blame.line's own bump. One new
+// extension-only request, 'editor.openWorkingDiff' (never reaches the Go server, answered
+// entirely inside the extension exactly like 'editor.openRangeDiff') -- included in
+// 'REQUEST_KEY_MAP' below for the same total-over-'RequestKey' exhaustiveness reason every request
+// key is, but does not itself require this version bump (extension-only methods never did). No new
+// event, no new capability, no new 'UiActionKind' member, no SQL migration.
+export const CONTRACT_VERSION = 35;
 
 export class ContractVersionMismatchError extends Error {
   readonly received: number;
@@ -214,6 +224,8 @@ const REQUEST_KEY_MAP: Record<RequestKey, true> = {
   'file.read': true,
   'file.goToTarget': true,
   'blame.line': true,
+  'working.detail': true,
+  'editor.openWorkingDiff': true,
   'repoSettings.get': true,
   'repoSettings.set': true,
   'settings.setGitPath': true,

@@ -1716,6 +1716,33 @@ export type Contract = {
         readonly summary: string;
       };
     };
+    /** P7 (item 2): the uncommitted-changes strip's click-through — every staged/unstaged/
+     *  untracked change against HEAD (or the empty tree, when HEAD is unborn), in the identical
+     *  `FileChange` shape `commit.detail` already produces, so `FileTree.vue` renders it with no
+     *  new component logic. No `sha`, `parents`, `author` or `subject` — the working tree is not a
+     *  commit, which is exactly why this is its own request rather than a `commit.detail` call
+     *  with a synthetic sha. */
+    'working.detail': {
+      params: { repoId: string };
+      result: { readonly files: readonly FileChange[] };
+    };
+    /** P7 (item 2): opens the working-tree diff for one file — the one path this whole contract
+     *  intentionally sends a LIVE on-disk `vscode.Uri.file(...)` for (every other `editor.*`
+     *  method's own left/right documents are immutable history). Answered entirely inside the
+     *  extension, exactly like `editor.openRangeDiff` — the Go server never sees this method, so it
+     *  needed no `CONTRACT_VERSION` bump of its own. `status === 'deleted'` (no live file exists to
+     *  diff against) falls back to revealing the file in VS Code's own Source Control view instead
+     *  of opening a diff. */
+    'editor.openWorkingDiff': {
+      params: {
+        repoId: string;
+        path: string;
+        originalPath?: string;
+        status: FileChangeKind;
+        pinned?: boolean;
+      };
+      result: Record<string, never>;
+    };
     'commit.fileDiff': {
       params: {
         repoId: string;

@@ -8,8 +8,13 @@
  *    is the real filename, because that is what VS Code resolves the language mode from.
  * 2. Content is cached by VS Code per URI and never invalidated: a `<rev>:<path>` blob is
  *    immutable, so this provider fires no `onDidChange` and needs no emitter.
- * 3. `vscode.diff` is always given two virtual (or empty) URIs, never the live working file —
- *    both sides of a historical diff are historical.
+ * 3. `vscode.diff` is given two virtual (or empty) URIs for every *historical* diff — both sides
+ *    of a commit-to-commit comparison are historical, so neither is ever the live working file.
+ *    P7 (item 2) is the one deliberate exception: the uncommitted-changes strip's own diff has a
+ *    genuinely live right-hand side by definition, so `editor.openWorkingDiff`
+ *    (`proxyHandlers.ts`) is the first caller to pass `openDiff` a `{kind: 'file'}` `DocumentRef` —
+ *    `toUri`'s own `'file'` case already existed for `reveal` (`goToFile.ts`), just never fed into
+ *    a diff before now.
  * 4. `capabilities` is the constant below; `resolveConflict` (§7.11, D15) is two commands and no
  *    UI of ours — `workbench.view.scm` to reveal the SCM view, then `vscode.open` on the
  *    conflicted file, which is what routes it into the three-way merge editor when the user has

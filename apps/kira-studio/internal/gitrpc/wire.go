@@ -207,6 +207,20 @@ type BlameLineParams struct {
 	Line   int    `json:"line"`
 }
 
+// WorkingDetailParams is working.detail's own request (P7, item 2) — the uncommitted-changes
+// strip's click-through, mirroring commit.detail's own params minus the sha this method has none
+// of.
+type WorkingDetailParams struct {
+	RepoID string `json:"repoId"`
+}
+
+// workingDetailResult is working.detail's own wire result — a bare `readonly FileChange[]` at the
+// contract layer, wrapped in one field here purely because a JSON-RPC result is always an object,
+// never a bare array (the same reason commit.fileDiff's own result wraps its FileDiffBody).
+type workingDetailResult struct {
+	Files []porcelain.FileChange `json:"files"`
+}
+
 // graphChunk is graph.stream's chunk envelope — @kira/git-ipc's own StreamChunkOf<'graph.stream'>
 // field for field, with `commits` replaced by the D4 marker above.
 type graphChunk struct {

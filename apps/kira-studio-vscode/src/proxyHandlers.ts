@@ -383,6 +383,35 @@ export function createProxyHandlers(deps: CreateProxyHandlersDeps): ServerHandle
       const shortSha = sha.slice(0, 7);
       return editor.openAllChanges({ title: `All changes in ${shortSha}`, files });
     },
+    // P7 (item 2): the uncommitted-changes strip's own per-file diff-open — never touches the Go
+    // server (the same "answered entirely inside the extension" shape editor.openRangeDiff already
+    // uses). The left side is HEAD's own content, via the identical virtual-document machinery
+    // documentRefsFor already uses (`file.read` already accepts any git-resolvable `rev`, "HEAD"
+    // included — it is not restricted to a sha `commit.detail` already named). The right side is
+    // DocumentRef's existing `{kind: 'file'}` — a real, live `vscode.Uri.file(...)` — which is
+    // deliberately correct here: a working-tree diff has no "historical" side to be honest about,
+    // and editorIntegration.ts's own `toUri` already resolves that kind (goToFile.ts's `reveal`
+    // call already uses it; this is only the first time `openDiff` itself does).
+    'editor.openWorkingDiff': async ({ repoId, path, originalPath, status, pinned }) => {
+      const root = repoRoots.get(repoId);
+      if (!root) throw new Error(`editor.openWorkingDiff: unknown repoId ${repoId}`);
+      const oldPath = originalPath ?? path;
+      const left: DocumentRef =
+        status === 'added'
+          ? { kind: 'empty', label: basename(oldPath) }
+          : { kind: 'virtual', key: virtualKey(repoId, 'HEAD', oldPath), label: basename(oldPath) };
+      const right: DocumentRef =
+        status === 'deleted'
+          ? { kind: 'empty', label: basename(path) }
+          : { kind: 'file', path: join(root, path) };
+      await editor.openDiff({
+        left,
+        right,
+        title: `${basename(path)} (HEAD ↔ Working Tree)`,
+        pinned: pinned === true,
+      });
+      return {};
+    },
     // D4/D11: the server resolves the on-disk-vs-object-database decision and (for a live file)
     // the drift hunks; the line arithmetic itself stays here, over @kira/git-core's already-tested
     // mapLineAcrossDiff — never a second, unproven Go implementation of the same trickiest math.
@@ -535,6 +564,7 @@ export function createProxyHandlers(deps: CreateProxyHandlersDeps): ServerHandle
     // (blameWidget.ts) calls this. Same "plain forwarder, ServerHandlers.requests is total over
     // RequestKey" shape as file.read/file.goToTarget just above.
     'blame.line': forward('blame.line'),
+    'working.detail': forward('working.detail'),
     // G18 D4: the per-repo settings dialog's own two requests — plain forwards, same as every
     // other repoId-addressed request; the server is the sole owner of this storage.
     'repoSettings.get': forward('repoSettings.get'),

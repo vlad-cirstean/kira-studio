@@ -212,3 +212,25 @@ func (r *Router) handleBlameLine(ctx context.Context, c *gitsession.Conn, params
 	}
 	return line, nil
 }
+
+// handleWorkingDetail is working.detail's own handler (P7, item 2) — no size guard needed
+// (unlike commit.fileDiff/file.read): a FileChange list is bounded by the working tree's own dirty
+// set, the same order of magnitude status.get already returns uncapped-and-unguarded today.
+func (r *Router) handleWorkingDetail(ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
+	var p WorkingDetailParams
+	if err := json.Unmarshal(params, &p); err != nil {
+		return nil, ipcerr.BadRequest("gitrpc: working.detail: invalid params")
+	}
+	if p.RepoID == "" {
+		return nil, ipcerr.BadRequest("gitrpc: working.detail: repoId is required")
+	}
+	entry, err := entryFor(c, p.RepoID)
+	if err != nil {
+		return nil, err
+	}
+	files, err := entry.WorkingDetail(ctx)
+	if err != nil {
+		return nil, mapDetailError(err)
+	}
+	return workingDetailResult{Files: files}, nil
+}

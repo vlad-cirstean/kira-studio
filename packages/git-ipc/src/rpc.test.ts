@@ -168,6 +168,8 @@ function stubHandlers(
       'file.read': notImplemented,
       'file.goToTarget': notImplemented,
       'blame.line': notImplemented,
+      'working.detail': notImplemented,
+      'editor.openWorkingDiff': notImplemented,
       'repoSettings.get': notImplemented,
       'repoSettings.set': notImplemented,
       'settings.setGitPath': notImplemented,

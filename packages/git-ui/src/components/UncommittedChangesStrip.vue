@@ -22,10 +22,13 @@
  * glyph itself reuses `rowSvg.ts`'s own stash shape (an unfilled dashed ring, lane-coloured) —
  * dashed reads as "not a real commit" the same way it already does for a stash entry.
  *
- * No click action in v1 — informational only (a count, and a tooltip naming every changed path,
- * honouring `dirtyTruncated`). Wiring a click to actually open the changes would need a new IPC
- * method: `editor.openAllChanges` requires a `sha`, which "uncommitted" does not have — out of
- * scope for "make it visible."
+ * P7 (item 2): now clickable — a real `<button>`, not a hand-rolled `role="button"` div, so focus/
+ * `Enter`/`Space` activation and the accessible name (its own text content) all come from the
+ * platform rather than being reimplemented. `role="status"` is dropped from the outer element for
+ * exactly that reason: a live-region role on a focusable, interactive control is the wrong ARIA
+ * shape (the count updating is no longer the only thing this element does). `@click` emits
+ * `select`, which `App.vue` routes to `WorkingDetailState.select(true)` — the IPC method the
+ * original v1 note said this needed, `working.detail`, now exists.
  */
 import { computed, onBeforeUnmount, ref } from 'vue';
 import { GEOMETRY, graphColumnWidth } from '../graph/geometry.ts';
@@ -37,6 +40,13 @@ import type { OpsState } from '../state/ops.ts';
 const props = defineProps<{
   graphView: GraphViewState;
   opsState: OpsState;
+}>();
+
+const emit = defineEmits<{
+  /** P7 (item 2): the strip was clicked/activated — `App.vue` routes this to
+   *  `WorkingDetailState.select(true)`, mirroring how a stash row's click routes to
+   *  `stashState.select(sha)`. */
+  (e: 'select'): void;
 }>();
 
 /** Cheap: the checked-out branch's own HEAD decoration is essentially always within the first
@@ -115,7 +125,13 @@ const tooltipText = computed(() => {
 </script>
 
 <template>
-  <div v-if="visible" class="kv-uncommitted-strip" role="status" data-testid="uncommitted-strip">
+  <button
+    v-if="visible"
+    type="button"
+    class="kv-uncommitted-strip"
+    data-testid="uncommitted-strip"
+    @click="emit('select')"
+  >
     <div class="kv-uncommitted-strip-gutter" :style="{ width: `${gutterWidth}px` }">
       <svg
         v-if="nodeCx !== undefined"
@@ -141,7 +157,7 @@ const tooltipText = computed(() => {
     >
       {{ totalCount }} uncommitted {{ totalCount === 1 ? 'change' : 'changes' }}
     </span>
-  </div>
+  </button>
 </template>
 
 <style>
@@ -149,9 +165,24 @@ const tooltipText = computed(() => {
   flex-shrink: 0;
   display: flex;
   align-items: center;
+  width: 100%;
   height: 22px;
+  border: none;
   border-bottom: 1px solid var(--kv-panel-border);
+  background-color: var(--kv-panel-bg);
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.kv-uncommitted-strip:hover {
   background-color: var(--kv-row-hover-bg);
+}
+
+.kv-uncommitted-strip:focus-visible {
+  outline: 1px solid var(--kv-focus-border);
+  outline-offset: -1px;
 }
 
 .kv-uncommitted-strip-gutter {

@@ -124,7 +124,15 @@ package gitrpc
 // host-side status bar; packages/git-ipc's proxyHandlers.ts still gained a plain forward entry
 // since ServerHandlers['requests'] is total over RequestKey. No new event, no new capability, no
 // new UiActionKind member, no SQL migration.
-const ContractVersion = 34
+// P7 item 2 (2026-09-12): 34 -> 35, for one new Go-served request, working.detail -- the
+// uncommitted-changes strip's click-through file list (internal/gitclient/porcelain's new
+// WorkingNumstatArgs/WorkingNameStatusArgs, RepoEntry.WorkingDetail, composed the same way
+// CommitDetail composes commit.detail's own). A real webview caller exists this time (the new
+// WorkingDetailPane), so this is a plain forward in proxyHandlers.ts too, no different in kind
+// from blame.line's own bump. No new event, no new capability, no new UiActionKind member, no SQL
+// migration. editor.openWorkingDiff (the same item's diff-open action) is extension-only, answered
+// entirely inside the extension exactly like editor.openRangeDiff -- it needs no bump of its own.
+const ContractVersion = 35
 
 // Protocol is the handshake envelope's own version (SPEC §3.3's "protocol":1), distinct from
 // ContractVersion — it never changes unless the hello/ready exchange itself is redesigned.

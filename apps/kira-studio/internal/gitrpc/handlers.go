@@ -152,6 +152,8 @@ func (r *Router) ForConn(c *gitsession.Conn) Handlers {
 				return r.handleFileGoToTarget(ctx, c, params)
 			case "blame.line":
 				return r.handleBlameLine(ctx, c, params)
+			case "working.detail":
+				return r.handleWorkingDetail(ctx, c, params)
 			case "refs.list":
 				return r.handleRefsList(ctx, c, params)
 			case "status.get":

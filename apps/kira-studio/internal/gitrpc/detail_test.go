@@ -168,3 +168,47 @@ func TestBlameLine_RejectsMissingParams(t *testing.T) {
 		}
 	}
 }
+
+// TestWorkingDetail_DispatchReachesTheHandler proves "working.detail" reaches handleWorkingDetail
+// through the real method-string dispatch (handlers.go's switch), not E_UNKNOWN_METHOD, end to end
+// against a real repo with a real staged change.
+func TestWorkingDetail_DispatchReachesTheHandler(t *testing.T) {
+	dir := t.TempDir()
+	resetSmokeGit(t, dir, "init", "-q", "-b", "main")
+	if err := os.WriteFile(filepath.Join(dir, "f.txt"), []byte("one\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	resetSmokeGit(t, dir, "add", "f.txt")
+	resetSmokeGit(t, dir, "commit", "-q", "-m", "base")
+	if err := os.WriteFile(filepath.Join(dir, "staged.txt"), []byte("new\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	resetSmokeGit(t, dir, "add", "staged.txt")
+
+	handlers, repoID := detailSecurityConn(t, dir)
+
+	params, _ := json.Marshal(WorkingDetailParams{RepoID: repoID})
+	result, err := handlers.Request(context.Background(), "working.detail", params)
+	if err != nil {
+		t.Fatalf("working.detail: %v", err)
+	}
+	wrapped, ok := result.(workingDetailResult)
+	if !ok {
+		t.Fatalf("working.detail: result = %T, want workingDetailResult", result)
+	}
+	if len(wrapped.Files) != 1 || wrapped.Files[0].Path != "staged.txt" {
+		t.Fatalf("working.detail: Files = %+v, want one added staged.txt", wrapped.Files)
+	}
+}
+
+// TestWorkingDetail_RejectsMissingParams proves the params-validation guard: an empty repoId is
+// E_BAD_REQUEST, never reaching entry.WorkingDetail at all.
+func TestWorkingDetail_RejectsMissingParams(t *testing.T) {
+	params, _ := json.Marshal(WorkingDetailParams{RepoID: ""})
+	dir := t.TempDir()
+	resetSmokeGit(t, dir, "init", "-q", "-b", "main")
+	handlers, _ := detailSecurityConn(t, dir)
+	if _, err := handlers.Request(context.Background(), "working.detail", params); err == nil {
+		t.Fatalf("working.detail(empty repoId): expected E_BAD_REQUEST, got nil")
+	}
+}

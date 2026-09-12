@@ -800,5 +800,57 @@ func TestFixtures_Regenerate(t *testing.T) {
 		writeFixture(t, "blame/uncommitted.bin", captureRaw(t, b.dir, porcelain.BlameLineArgs("f.txt", 1)))
 	}
 
+	// --- workingDiff/mixed.{numstat,nameStatus}.bin (P7, item 2): a staged add plus an unstaged
+	// modify against HEAD — plain `git diff`, not `diff-tree`, confirming ParseNumstatRecords/
+	// ParseNameStatusRecords' own `-z` framing (established against diff-tree output) is identical
+	// against plain diff's, since both use the same underlying diff machinery. Untracked files are
+	// deliberately absent from this fixture: plain `git diff` never reports them regardless of
+	// framing, which is exactly why gitsession.WorkingDetail sources them from `git status`
+	// separately rather than from this spawn. ---
+	{
+		b := newRepoBuilder(t)
+		b.commit("a.txt", "a\n", "initial")
+		b.writeFile("a.txt", "a\nmodified\n")
+		b.writeFile("staged.txt", "new\n")
+		b.add("staged.txt")
+		writeFixture(t, "workingDiff/mixed.numstat.bin", captureRaw(t, b.dir, porcelain.WorkingNumstatArgs("HEAD")))
+		writeFixture(t, "workingDiff/mixed.nameStatus.bin", captureRaw(t, b.dir, porcelain.WorkingNameStatusArgs("HEAD")))
+	}
+
+	// --- workingDiff/renamed.{numstat,nameStatus}.bin: an unstaged rename (via a plain `mv`, never
+	// staged) — the one shape commit.detail's own diff-tree fixtures cannot produce (a rename is
+	// only ever staged there), confirming -M still detects an unstaged rename against the working
+	// tree. ---
+	{
+		b := newRepoBuilder(t)
+		b.commit("old.txt", "line one\nline two\nline three\n", "initial")
+		b.mv("old.txt", "renamed.txt")
+		writeFixture(t, "workingDiff/renamed.numstat.bin", captureRaw(t, b.dir, porcelain.WorkingNumstatArgs("HEAD")))
+		writeFixture(t, "workingDiff/renamed.nameStatus.bin", captureRaw(t, b.dir, porcelain.WorkingNameStatusArgs("HEAD")))
+	}
+
+	// --- workingDiff/unbornHead.{numstat,nameStatus}.bin: a fresh, zero-commit repo — the
+	// EmptyTreeSHA base gitsession.WorkingDetail uses when statusResult.Branch.Unborn. ---
+	{
+		dir := t.TempDir()
+		initCmd := exec.Command("git", "init", "-q", "-b", "main")
+		initCmd.Dir = dir
+		initCmd.Env = fixtureEnv()
+		if out, err := initCmd.CombinedOutput(); err != nil {
+			t.Fatalf("git init: %v\n%s", err, out)
+		}
+		if err := os.WriteFile(filepath.Join(dir, "staged.txt"), []byte("new\n"), 0o644); err != nil {
+			t.Fatalf("write staged.txt: %v", err)
+		}
+		addCmd := exec.Command("git", "add", "staged.txt")
+		addCmd.Dir = dir
+		addCmd.Env = fixtureEnv()
+		if out, err := addCmd.CombinedOutput(); err != nil {
+			t.Fatalf("git add: %v\n%s", err, out)
+		}
+		writeFixture(t, "workingDiff/unbornHead.numstat.bin", captureRaw(t, dir, porcelain.WorkingNumstatArgs(porcelain.EmptyTreeSHA)))
+		writeFixture(t, "workingDiff/unbornHead.nameStatus.bin", captureRaw(t, dir, porcelain.WorkingNameStatusArgs(porcelain.EmptyTreeSHA)))
+	}
+
 	t.Log("golden corpus regenerated under testdata/ — run `bunx biome check --write` is not needed (Go-only); re-run tests without KIRA_GIT_FIXTURES to verify")
 }

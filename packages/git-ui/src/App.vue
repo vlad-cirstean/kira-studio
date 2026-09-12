@@ -11,6 +11,8 @@
  * visible surface — everything else the strip showed now has a real UI equivalent (the repo
  * picker's own label, the rendered rows themselves).
  */
+
+import type { FileChangeKind } from '@kira/git-core';
 import { SETTINGS } from '@kira/git-core';
 import type { EventPayload, HostKind, StashEntry, Transport, UiActionKind } from '@kira/git-ipc';
 import {
@@ -67,6 +69,7 @@ import StashDetailPane from './components/StashDetailPane.vue';
 import type { SearchOption } from './components/searchResultsModel.ts';
 import { childOf, parentOf } from './components/stackListModel.ts';
 import UncommittedChangesStrip from './components/UncommittedChangesStrip.vue';
+import WorkingDetailPane from './components/WorkingDetailPane.vue';
 import { DetailState } from './state/detail.ts';
 import { createDetailActions, type DetailActions } from './state/detailActions.ts';
 import { GraphViewState } from './state/graphView.ts';
@@ -92,6 +95,7 @@ import {
   type PersistedViewState,
   type ViewStateStore,
 } from './state/viewState.ts';
+import { WorkingDetailState } from './state/working.ts';
 import { WorktreeState } from './state/worktrees.ts';
 
 const props = defineProps<{
@@ -148,6 +152,11 @@ const opsState = new OpsState(bridge, refsState, stackState);
 // `docs/plans/P9.md` W13: one `StashState` for the life of this component, exactly like
 // `refsState`/`opsState` above — reset via `setRepoId` rather than replaced.
 const stashState = new StashState(bridge);
+// P7 (item 2): one `WorkingDetailState` for the life of this component, exactly like `stashState`
+// above — reset via `setRepoId` rather than replaced. Independent of `SelectionState` the same way
+// `stashState` conceptually is (a stash reuses `SelectionState` only because it is a real graph
+// row; the working tree is not one at all).
+const workingState = new WorkingDetailState(bridge);
 // G25 D1: one `WorktreeState` for the life of this component, exactly like `stashState` above —
 // reset via `setRepoId` rather than replaced.
 const worktreeState = new WorktreeState(bridge);
@@ -304,6 +313,9 @@ watch(
       detailState.select(sha);
       stashState.select(null);
     }
+    // P7 (item 2): selecting any real commit/stash row always clears a working-tree selection —
+    // mirrors how selecting a commit already clears `stashState` above.
+    workingState.select(false);
     // G24 D9: PrState.select runs for every selection change, stash entries included — a stash
     // sha simply resolves to "no PR" (or `disabled`) same as any other commit the server has
     // never heard of as a PR head; no special-casing needed here.
@@ -318,6 +330,7 @@ watch(
     refsState.setRepoId(repoId);
     opsState.setRepoId(repoId);
     stashState.setRepoId(repoId);
+    workingState.setRepoId(repoId);
     worktreeState.setRepoId(repoId);
     searchState.setRepoId(repoId);
     repoSettingsState.setRepoId(repoId);
@@ -334,6 +347,14 @@ watch(detailState.announcement, (text) => {
 
 watch(opsState.announcement, (text) => {
   liveAnnouncement.value = text;
+});
+
+// P7 (item 2): re-fetches the open working-tree pane's own file list on the same signal the
+// strip's own count already reacts to (`OpsState.statusSummary`, refreshed on every
+// `repo.changed`) — a no-op via `WorkingDetailState.refresh`'s own `selected` guard when the pane
+// is not the one currently open.
+watch(opsState.statusSummary, () => {
+  workingState.refresh();
 });
 
 // `docs/plans/P11.md` W13/W14: `GraphViewState.revealSha`'s own progress text, forwarded into the
@@ -1173,9 +1194,38 @@ function openDetail(): void {
  *  with the embedded diff itself. `Esc` now always closes the pane in one step; the native diff
  *  editor VS Code now owns has its own, unrelated `Esc` handling. */
 const selectionIsStash = computed(() => stashState.selected.value !== undefined);
+// P7 (item 2): the strip's own selection wins over a stale row selection — checked first in the
+// template's own v-else-if chain, mirroring selectionIsStash's own priority pattern.
+const selectionIsWorking = computed(() => workingState.selected.value);
 
 function closeDetail(): void {
   detailOpen.value = false;
+}
+
+/** P7 (item 2): the strip's own click handler — opens the pane (mirrors `openDetail`/a stash
+ *  row's click, both of which force `detailOpen` true rather than merely toggling it) and selects
+ *  the working tree. `selection.clear()` deselects any highlighted grid row, which fires the
+ *  `selection.sha` watch above and clears `detailState`/`stashState` via their own existing
+ *  null-selection path — no separate clearing logic needed here. */
+function onSelectWorking(): void {
+  selection.clear();
+  workingState.select(true);
+  detailOpen.value = true;
+}
+
+/** P7 (item 2): the working-tree pane's own file-open action — `editor.openWorkingDiff` never
+ *  touches the Go server (answered entirely inside the extension), so this is a direct bridge
+ *  request, not a `DetailActions` method (whose `openInEditor` is shaped for a commit's sha/
+ *  parentIndex, neither of which the working tree has). */
+async function openWorkingDiff(params: {
+  path: string;
+  originalPath: string | undefined;
+  status: FileChangeKind;
+  pinned: boolean;
+}): Promise<void> {
+  const repoId = repoState.value?.activeRepo.value?.repoId;
+  if (!repoId) return;
+  await bridge.request('editor.openWorkingDiff', { repoId, ...params });
 }
 
 /** G-UX D9: `/`/`Ctrl/Cmd+F` (moved up from `SearchBox.vue`, which used to own this listener for
@@ -1288,7 +1338,9 @@ const initialScrollRowProp = computed(() =>
   initialScrollRow.value === undefined ? {} : { initialScrollRow: initialScrollRow.value },
 );
 
-const hasSelection = computed(() => selection.row.value >= 0);
+// P7 (item 2): the strip's own selection has no row at all, so it must widen this check directly
+// rather than through `selection.row` — mirrors `selectionIsWorking`'s own reasoning.
+const hasSelection = computed(() => selection.row.value >= 0 || workingState.selected.value);
 
 // G20 D2: this root's own KuiTooltip instance and listener set — independent of ReviewView.vue's
 // (two separate webview documents cannot share one singleton, G19 F3).
@@ -1316,6 +1368,7 @@ onBeforeUnmount(() => {
   refsState.dispose();
   opsState.dispose();
   stashState.dispose();
+  workingState.dispose();
   worktreeState.dispose();
   stackState.dispose();
   searchState.dispose();
@@ -1466,7 +1519,11 @@ onBeforeUnmount(() => {
         </div>
         <main class="kv-body">
           <section class="kv-graph-region" data-testid="graph-region" aria-label="Commit graph">
-            <UncommittedChangesStrip :graph-view="graphView" :ops-state="opsState" />
+            <UncommittedChangesStrip
+              :graph-view="graphView"
+              :ops-state="opsState"
+              @select="onSelectWorking"
+            />
             <CommitGrid
               ref="commitGridRef"
               :graph-view="graphView"
@@ -1515,6 +1572,13 @@ onBeforeUnmount(() => {
               @keydown="handleDetailHandleKeydown"
             ></div>
             <p v-if="!hasSelection" class="kv-detail-empty">Select a commit to see its details.</p>
+            <WorkingDetailPane
+              v-else-if="selectionIsWorking && actions"
+              :working-state="workingState"
+              :store="graphView.store"
+              :actions="actions"
+              :open-file="openWorkingDiff"
+            />
             <StashDetailPane
               v-else-if="selectionIsStash && actions"
               :stash="stashState"
@@ -1534,6 +1598,13 @@ onBeforeUnmount(() => {
         <div v-if="detailOpen && breakpoint === 'overlay'" class="kv-detail-drawer">
           <aside class="kv-detail-region" data-testid="detail-region" aria-label="Commit detail">
             <p v-if="!hasSelection" class="kv-detail-empty">Select a commit to see its details.</p>
+            <WorkingDetailPane
+              v-else-if="selectionIsWorking && actions"
+              :working-state="workingState"
+              :store="graphView.store"
+              :actions="actions"
+              :open-file="openWorkingDiff"
+            />
             <StashDetailPane
               v-else-if="selectionIsStash && actions"
               :stash="stashState"
