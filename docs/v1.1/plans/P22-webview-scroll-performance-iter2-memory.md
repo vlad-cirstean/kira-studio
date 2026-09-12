@@ -2,7 +2,7 @@
 
 > **Why this document exists.** The user, on real macOS hardware with a real trackpad: *"When I
 > scroll memory of the webview spikes a lot and then it goes back, but I'd like this considered by
-> another opus agent."* `docs/WEBVIEW-SCROLL-MEMORY.md` investigated that phenomenon rigorously and
+> another opus agent."* `docs/v1.1/WEBVIEW-SCROLL-MEMORY.md` investigated that phenomenon rigorously and
 > closed it as "not ours to fix"; P22's first pass picked up its two named avenues and closed both
 > (one decline, one UX change honestly not sold as a memory fix). This is the requested second,
 > skeptical opinion on that closure — not a restatement of it.
@@ -716,7 +716,7 @@ permanently parked.
 Two commits' worth of doc work, plus one real-Mac session that is not a commit.
 
 **C1 — `docs: correct WEBVIEW-SCROLL-MEMORY's tile mechanism, and name the knobs`**
-`docs/WEBVIEW-SCROLL-MEMORY.md`: add §2 F2's refutation beside §5.4/§7's *"coverage rect expands with
+`docs/v1.1/WEBVIEW-SCROLL-MEMORY.md`: add §2 F2's refutation beside §5.4/§7's *"coverage rect expands with
 velocity"* wording, in that document's own `> **Refuted.**` style; add F3's `cohortLifeTimeSeconds`
 identification beside §7's *"~2 s"* observation; add §5's knob table to §7 avenue 2 in place of
 *"largely private API"*. Note in §9 that its `CGEventPost` blocker has a way around it (F5) and cite

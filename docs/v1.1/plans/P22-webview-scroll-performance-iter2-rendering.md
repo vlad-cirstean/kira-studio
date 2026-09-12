@@ -63,7 +63,7 @@
   `views/shared/page/columns.ts`, `views/grid/page.ts`, `views/shared/page/store.ts`.
 - `@tanstack/virtual-core@3.17.8`, `vue@3.5.42` — every claim below about library behaviour is read
   from `node_modules/` in this checkout and cited by file and line.
-- `docs/WEBVIEW-SCROLL-MEMORY.md` — the *memory* investigation. Closed, real-hardware, not reopened
+- `docs/v1.1/WEBVIEW-SCROLL-MEMORY.md` — the *memory* investigation. Closed, real-hardware, not reopened
   here. Its **methodology** is the standard this plan is trying to meet; several of its *verdicts*
   are about `ri_phys_footprint` and are re-examined in §3 F12 because per-frame cost is a different
   question that was never asked.
@@ -692,7 +692,7 @@ what replaced it, and — the part that earns the section its place — that a p
 number and a visible fling lag remain measurements of different things, now with the *reason* stated
 in terms of main-thread vs. scrolling-thread scroll (§1.2) rather than only "different things".
 
-Add a `docs/WEBVIEW-SCROLL-MEMORY.md` §9 cross-reference too: that document's "real momentum
+Add a `docs/v1.1/WEBVIEW-SCROLL-MEMORY.md` §9 cross-reference too: that document's "real momentum
 scrolling is untested" gap is half-closed by D2 for the rendering side, and the reason its own
 approach failed (external injection, TCC) does not apply to an in-page probe (F14).
 
@@ -879,7 +879,7 @@ arrive *with* the numbers, not instead of them.
 8. D3's and D4's runtime toggles work from the console and are documented in §7.3's protocol.
 9. `docs/PERF.md` §2.1a is rewritten, not appended to, and no longer records a refuted root cause as
    resolved.
-10. `docs/WEBVIEW-SCROLL-MEMORY.md` §9 notes that the rendering half's momentum gap is addressed by
+10. `docs/v1.1/WEBVIEW-SCROLL-MEMORY.md` §9 notes that the rendering half's momentum gap is addressed by
     an in-page probe, and why that route was not available to an external harness.
 11. **Nothing in this document claims the user's symptom is fixed.** The claim this phase is allowed
     to make is: the mechanism pass 1 named does not exist, two mechanisms that plausibly do have

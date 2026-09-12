@@ -244,13 +244,13 @@ real-hardware question this environment can't answer — see the protocol below.
 different things, and pass 1 additionally paired a refuted mechanism with an instrument that could
 not have disproven it either way. The general shape — an instrument that can't observe the
 phenomenon produces a confident, wrong conclusion — is the same failure
-`docs/WEBVIEW-SCROLL-MEMORY.md` §2.1 hit and fixed first, for the memory half.
+`docs/v1.1/WEBVIEW-SCROLL-MEMORY.md` §2.1 hit and fixed first, for the memory half.
 
 **What a real measurement needs, and how to take it.** `window.__kiraScrollTrace`
 (`views/grid/scrollTrace.ts`) is an in-page probe, not a `tests/ui/` instrument: it records, per
 animation frame, the real native `scroll` events observed, a measured px/frame velocity, live
 `uncoveredPx`, and Vue's own update duration — all read from a *real* fling on *real* hardware, which
-this environment has never been able to produce (`docs/WEBVIEW-SCROLL-MEMORY.md` §9's own
+this environment has never been able to produce (`docs/v1.1/WEBVIEW-SCROLL-MEMORY.md` §9's own
 `CGEventPost` injector never got a TCC grant, but that gap was for driving momentum from *outside*
 the process; this probe lives inside the page and lets the human supply the momentum instead). It's
 reachable from a dev build's View → Open DevTools (`internal/shell/menutemplate.go`). Protocol:
@@ -291,11 +291,11 @@ replaces.
 by the Electron-to-Wails cutover) passed no explicit `width`/`height`, only `minWidth: 900, minHeight:
 600` — so Electron's own 800×600 default, clamped up to 900×600 at first launch. Against Wails'
 1280×800: a first-launch-only **1.90×** (540 000 px² vs 1 024 000 px²), and a floor ratio of only
-**1.21×** (900×600 vs 1024×640). `docs/WEBVIEW-SCROLL-MEMORY.md` §7's old "min 900×600" parenthetical
+**1.21×** (900×600 vs 1024×640). `docs/v1.1/WEBVIEW-SCROLL-MEMORY.md` §7's old "min 900×600" parenthetical
 undersold the first-launch number and omitted the floor one; both are now recorded there directly.
 
 **F14 — the area premise is a projection, not a measurement, and this pass doesn't change that.**
-`docs/WEBVIEW-SCROLL-MEMORY.md` never varied window size — every figure in it came from one 1440×960
+`docs/v1.1/WEBVIEW-SCROLL-MEMORY.md` never varied window size — every figure in it came from one 1440×960
 harness — so "cost scales with viewport area" is a mechanism-level inference from that document's own
 tile-coverage-rect explanation, not something either document has measured. No macOS hardware was
 available to this implementing pass either, so the area ladder that would settle it (that document's

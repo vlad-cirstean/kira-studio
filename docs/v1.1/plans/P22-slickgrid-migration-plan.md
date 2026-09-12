@@ -85,7 +85,7 @@
 
 ### 0.3 Not in this phase
 
-- **The memory half.** `docs/WEBVIEW-SCROLL-MEMORY.md` and
+- **The memory half.** `docs/v1.1/WEBVIEW-SCROLL-MEMORY.md` and
   `P22-webview-scroll-performance-iter2-memory.md` closed it: the ~1 GB CoreAnimation/IOSurface
   plateau is WebKit compositor tile behaviour for the scrolled layer, near-independent of what paints
   inside it. **SlickGrid is credited with zero here**, exactly as every candidate in the survey was
@@ -1185,7 +1185,7 @@ Properties of the app's own JS/DOM that do not depend on a compositor:
 
 ### 9.3 What this migration is *not* expected to change, and must not be credited with
 
-**Memory.** `docs/WEBVIEW-SCROLL-MEMORY.md` and `P22-webview-scroll-performance-iter2-memory.md`
+**Memory.** `docs/v1.1/WEBVIEW-SCROLL-MEMORY.md` and `P22-webview-scroll-performance-iter2-memory.md`
 closed that half: the plateau is WebKit compositor tile pooling driven by the scrolled layer's
 geometry and velocity, essentially independent of what paints inside it. SlickGrid produces the same
 input to that machinery — a tall scroller with a mounted band inside it — and D4's runway raises the
@@ -1300,4 +1300,4 @@ per-import-set entry files, for every figure in F9.
 `docs/v1.1/plans/P22-webview-scroll-performance.md`, `docs/v1.1/plans/P5-ram-usage.md`,
 `docs/v1.1/plans/P18-sql-language-server-explain.md`,
 `docs/v1.1/plans/P13-query-console-format-button.md`, `docs/ARCHITECTURE.md`, `docs/PERF.md`,
-`docs/WEBVIEW-SCROLL-MEMORY.md`, `AGENTS.md`.
+`docs/v1.1/WEBVIEW-SCROLL-MEMORY.md`, `AGENTS.md`.

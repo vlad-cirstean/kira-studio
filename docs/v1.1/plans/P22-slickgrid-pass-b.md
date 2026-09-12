@@ -1606,7 +1606,7 @@ construction at `:611-660`, listener binding at `:945-991`, `createDraggable` at
 `docs/v1.1/plans/P22-grid-library-survey.md`, `docs/v1.1/plans/P22-grid-library-evaluation.md`,
 `docs/v1.1/plans/P22-webview-scroll-performance-iter2-rendering.md`,
 `docs/v1.1/plans/P5-ram-usage.md`, `docs/ARCHITECTURE.md`, `docs/PERF.md`,
-`docs/WEBVIEW-SCROLL-MEMORY.md`, `docs/v1.1/SPEC.md`, `AGENTS.md`.
+`docs/v1.1/WEBVIEW-SCROLL-MEMORY.md`, `docs/v1.1/SPEC.md`, `AGENTS.md`.
 
 ---
 

@@ -2486,7 +2486,7 @@ tiling knob; the `WKWebViewConfiguration` is built and `autorelease`d inside one
 `MacOptions` has only `ActivationPolicy` and terminate-on-last-window-closed — macOS is the one
 platform with no engine-flags escape hatch. `NativeWindow()` reaches Wails' private ObjC
 `WebviewWindow` subclass, whose `webView` ivar is castable, but there is nothing to set once you
-have it: the coverage-rect/tile-pooling behaviour `docs/WEBVIEW-SCROLL-MEMORY.md` §7 describes lives
+have it: the coverage-rect/tile-pooling behaviour `docs/v1.1/WEBVIEW-SCROLL-MEMORY.md` §7 describes lives
 in WebCore, below anything `WKWebView`/`WKWebViewConfiguration`/`WKPreferences` expose publicly.
 Full citations: `docs/v1.1/plans/P22-webview-scroll-performance.md` §3 F8–F11. **A bounded SPI-header
 grep on a real Mac (that plan's §6.2 C6) is still pending** — no macOS SDK is reachable from this

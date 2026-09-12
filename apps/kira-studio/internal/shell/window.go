@@ -120,7 +120,7 @@ func Options(sec SecurityOptions, w model.WindowRecord, primaryWorkArea *applica
 // The motivation is UX, not memory: an unconditional 1280×800 first-launch window is edge-to-edge
 // on a same-size laptop panel, overlapping the menu bar and Dock, which is a real bug on its own
 // regardless of anything else. Its effect on WEBVIEW-SCROLL-MEMORY.md's reported plateau is real
-// but small and unmeasured in magnitude (docs/WEBVIEW-SCROLL-MEMORY.md §7 F14) — this is not the
+// but small and unmeasured in magnitude (docs/v1.1/WEBVIEW-SCROLL-MEMORY.md §7 F14) — this is not the
 // fix for that symptom, and it is first-launch-only besides (a window that has ever been resized
 // never sees this default again).
 func DefaultBounds(work *application.Rect) (width, height int) {

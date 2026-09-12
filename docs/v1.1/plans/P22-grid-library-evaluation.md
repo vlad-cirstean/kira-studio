@@ -25,7 +25,7 @@
 > bundle discipline and against the actual feature surface of `views/grid/`. It is a comparison and a
 > recommendation, not a migration plan; §7 sketches shape and risk only.
 >
-> **What it is not.** It is not a re-litigation of the memory half. `docs/WEBVIEW-SCROLL-MEMORY.md`
+> **What it is not.** It is not a re-litigation of the memory half. `docs/v1.1/WEBVIEW-SCROLL-MEMORY.md`
 > and `P22-webview-scroll-performance-iter2-memory.md` concluded the ~1 GB CoreAnimation/IOSurface
 > plateau is governed by WebKit's own compositor tile geometry and retention rules, essentially
 > independent of what technique paints the content inside the scroller. **Every candidate below is
@@ -588,7 +588,7 @@ range selection against AG Grid's event surface. Absent (a), (b) and (c) are moo
 
 ### D6 — The memory half: **no candidate is credited, and this is not re-litigated.**
 
-`docs/WEBVIEW-SCROLL-MEMORY.md` and `P22-webview-scroll-performance-iter2-memory.md` established that
+`docs/v1.1/WEBVIEW-SCROLL-MEMORY.md` and `P22-webview-scroll-performance-iter2-memory.md` established that
 the ~1 GB plateau is WebKit compositor tile pooling governed by layer geometry and velocity, largely
 independent of the JS/DOM technique painting inside the scroller. Every candidate here produces a
 tall scroller with a mounted band inside it; **none changes the input to that machinery.** F4 adds a
@@ -730,7 +730,7 @@ Documentation and licensing:
 - [TanStack Table](https://github.com/TanStack/table) · [vxe-table](https://github.com/x-extends/vxe-table) · [vxe-table `README.en.md`](https://github.com/x-extends/vxe-table/blob/main/README.en.md)
 - [Glide Data Grid](https://github.com/glideapps/glide-data-grid) · [SVAR Vue DataGrid](https://svar.dev/blog/svar-vue-data-grid-released/)
 
-In-repo, cited throughout: `docs/ARCHITECTURE.md`, `docs/PERF.md`, `docs/WEBVIEW-SCROLL-MEMORY.md`,
+In-repo, cited throughout: `docs/ARCHITECTURE.md`, `docs/PERF.md`, `docs/v1.1/WEBVIEW-SCROLL-MEMORY.md`,
 `docs/v1.1/plans/P22-webview-scroll-performance-iter2-rendering.md`,
 `docs/v1.1/plans/P22-webview-scroll-performance-iter2-memory.md`,
 `docs/v1.1/plans/P13-query-console-format-button.md`,

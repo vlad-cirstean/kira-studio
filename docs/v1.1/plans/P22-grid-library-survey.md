@@ -36,7 +36,7 @@
 >    theming.
 >
 > **What this document does not do.** It does not re-open the memory half.
-> `docs/WEBVIEW-SCROLL-MEMORY.md` and `P22-webview-scroll-performance-iter2-memory.md` closed it:
+> `docs/v1.1/WEBVIEW-SCROLL-MEMORY.md` and `P22-webview-scroll-performance-iter2-memory.md` closed it:
 > the ~1 GB CoreAnimation/IOSurface plateau is WebKit compositor tile behaviour for the scrolled
 > layer, near-independent of what paints inside it. **No candidate here is credited with fixing it**
 > (§7 records the single honest wrinkle and moves on). And it does not overturn
@@ -433,7 +433,7 @@ regular-table all need, so it is not a differentiator.
 
 ## 7. The memory half, once
 
-`docs/WEBVIEW-SCROLL-MEMORY.md` §5–§7 and `P22-webview-scroll-performance-iter2-memory.md` established
+`docs/v1.1/WEBVIEW-SCROLL-MEMORY.md` §5–§7 and `P22-webview-scroll-performance-iter2-memory.md` established
 the ~1 GB plateau is WebKit compositor tile pooling driven by the scrolled layer's geometry and the
 scroll velocity, and that varying painted content changed it by ~0 %. **Every DOM candidate in §8
 produces the same input to that machinery: a tall scroller with a mounted band inside it. None is
@@ -673,7 +673,7 @@ and commit-search APIs for stars/forks/issues/`pushed_at` and commit authorship;
 - [regular-table README](https://cdn.jsdelivr.net/npm/regular-table@0.9.0/README.md) · [Lumino API docs](https://lumino.readthedocs.io/) · [`@tupilabs/vue-lumino`](https://github.com/tupilabs/vue-lumino)
 - [Glide Data Grid](https://github.com/glideapps/glide-data-grid) · [VisActor/VTable](https://github.com/VisActor/VTable) · [canvas-datagrid](https://github.com/TonyGermaneri/canvas-datagrid) · [SVAR Vue DataGrid](https://github.com/svar-widgets/vue-grid)
 
-**In-repo**: `docs/ARCHITECTURE.md`, `docs/PERF.md`, `docs/WEBVIEW-SCROLL-MEMORY.md`,
+**In-repo**: `docs/ARCHITECTURE.md`, `docs/PERF.md`, `docs/v1.1/WEBVIEW-SCROLL-MEMORY.md`,
 `docs/v1.1/plans/P22-grid-library-evaluation.md`,
 `docs/v1.1/plans/P22-webview-scroll-performance-iter2-rendering.md`,
 `docs/v1.1/plans/P22-webview-scroll-performance-iter2-memory.md`,

@@ -3,7 +3,7 @@
 > **The phase, in SPEC.md's own words** (`docs/v1.1/SPEC.md`, P22 row): two problems in the data
 > grid's fast-scroll behaviour — *"(1) **Rendering lag**: rows visibly take a moment to render/catch
 > up when scrolling fast — a fresh problem with no prior investigation in this repo […] (2)
-> **WKWebView memory churn during sustained scroll**: `docs/WEBVIEW-SCROLL-MEMORY.md` already
+> **WKWebView memory churn during sustained scroll**: `docs/v1.1/WEBVIEW-SCROLL-MEMORY.md` already
 > investigated this rigorously […] This phase picks up its two named untried avenues instead of
 > repeating that ground."*
 >
@@ -79,7 +79,7 @@
   library behaviour.
 - `github.com/wailsapp/wails/v3 v3.0.0-beta.16` (`go.mod:29`), read from the module cache for every
   claim below about the shell's configuration surface. `beta.15` is also present and was diffed.
-- `docs/WEBVIEW-SCROLL-MEMORY.md` — a closed, real-hardware investigation of the memory half. **This
+- `docs/v1.1/WEBVIEW-SCROLL-MEMORY.md` — a closed, real-hardware investigation of the memory half. **This
   plan builds on it and does not re-open it.**
 
 ### 0.2 Scope

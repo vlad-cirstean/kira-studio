@@ -84,7 +84,7 @@ func (c *CloseFlushCoordinator) Ack(key string) {
 //     macosWebviewWindow.destroy() exists but is called from nowhere in the library, and its C
 //     body is byte-identical to close()'s; there is no exported Destroy on *WebviewWindow* at
 //     all. So closing a window never guarantees its WKWebView's own WebContent/GPU/Networking
-//     XPC helper processes (docs/WEBVIEW-SCROLL-MEMORY.md §2.2 names all three) actually exit —
+//     XPC helper processes (docs/v1.1/WEBVIEW-SCROLL-MEMORY.md §2.2 names all three) actually exit —
 //     confirmed as a known, unfixable-from-Go limitation of this exact Wails version, not
 //     something this app's own code was doing wrong. This is the "does not actually terminate"
 //     half of the report, and it stays true for a genuine Close() below (a real limitation, not
