@@ -135,6 +135,13 @@ export const IPC = {
   repoMapRegenerate: 'kira:repomap:regenerate',
   repoMapInstallClaudeCode: 'kira:repomap:installClaudeCode',
 
+  codeWorkspaceListRepos: 'kira:codeWorkspace:listRepos',
+  codeWorkspaceImportRepo: 'kira:codeWorkspace:importRepo',
+  codeWorkspaceRenameRepo: 'kira:codeWorkspace:renameRepo',
+  codeWorkspaceRemoveRepo: 'kira:codeWorkspace:removeRepo',
+  codeWorkspaceListFiles: 'kira:codeWorkspace:listFiles',
+  codeWorkspaceReadFile: 'kira:codeWorkspace:readFile',
+
   connectionState: 'kira:connection:state',
   connectionMetadataInvalidated: 'kira:connection:metadataInvalidated',
   connectionsChanged: 'kira:connections:changed',

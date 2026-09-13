@@ -120,10 +120,16 @@ function emptyTreeState(): RepoTreeState {
   };
 }
 
-// One entry per open repo workspace — plain module-level state (not `reactive()` at the top
-// level, mirroring project/state/tree.ts's own per-connection map shape), each value itself
-// reactive so a component reading through it re-renders on change.
-const byRepo = new Map<string, RepoTreeState>();
+// One entry per open repo workspace. The Map itself must be `reactive()`, not just each value —
+// visibleRepoRows' first read (from RepoFileTree.vue's `rows` computed, evaluated on initial
+// render before ensureRepoTreeLoaded's onMounted has run) hits `byRepo.get(repoId)` while the
+// entry doesn't exist yet and returns `[]` early, without ever touching a `.tree` property to
+// depend on. A plain (non-reactive) Map makes that `.get()` itself untracked, so Vue never
+// reruns the computed once `stateFor` later creates the entry and `refreshRepoTree` populates it
+// — the tree would silently never render. Wrapping the Map in `reactive()` makes `.get()` itself
+// a tracked read (Vue 3's native Map/Set support), so the computed correctly reruns once the
+// entry is set.
+const byRepo = reactive(new Map<string, RepoTreeState>());
 
 function stateFor(repoId: string): RepoTreeState {
   let state = byRepo.get(repoId);

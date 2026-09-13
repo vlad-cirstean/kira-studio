@@ -140,6 +140,13 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   repoMapSetEnabled: 'RepoMapService.SetEnabled',
   repoMapRegenerate: 'RepoMapService.Regenerate',
   repoMapInstallClaudeCode: 'RepoMapService.InstallClaudeCode',
+
+  codeWorkspaceListRepos: 'CodeWorkspaceService.ListRepos',
+  codeWorkspaceImportRepo: 'CodeWorkspaceService.ImportRepo',
+  codeWorkspaceRenameRepo: 'CodeWorkspaceService.RenameRepo',
+  codeWorkspaceRemoveRepo: 'CodeWorkspaceService.RemoveRepo',
+  codeWorkspaceListFiles: 'CodeWorkspaceService.ListFiles',
+  codeWorkspaceReadFile: 'CodeWorkspaceService.ReadFile',
 };
 
 /** ipc.ts's legacy channel string (what every `ControlSnapshot.channel` and fixture is keyed by,
@@ -288,6 +295,10 @@ const WILDCARD_DEFAULTS: Readonly<Record<string, string>> = Object.freeze({
     probed: [],
     error: '',
   }),
+  // C5: main.ts's bootstrap() joins hydrateCodeRepos() to the same unconditional-every-boot
+  // Promise.all as hydrateGitClients()/hydrateRepoMap() above, same reasoning — a spec that never
+  // imports a repository gets "nothing imported yet", not a fixture miss.
+  [IPC.codeWorkspaceListRepos]: '[]',
 });
 
 interface CallRequestBody {
