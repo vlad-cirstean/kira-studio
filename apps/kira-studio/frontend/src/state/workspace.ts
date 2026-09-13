@@ -2,6 +2,7 @@ import type { AppMode } from '@shared/domain/mode';
 import { repoWorkspaceKey, type WorkspaceKey } from '@shared/domain/workspace';
 import { reactive } from 'vue';
 import { control } from '../bridge/control';
+import { disposeGitTransport } from '../repo/git/transport';
 import { setMode } from './mode';
 import { ensureWorkspaceShell } from './repoTabs';
 import { closeWorkspaceTabs } from './tabs';
@@ -49,5 +50,10 @@ export function closeRepoWorkspace(repoId: string): void {
   closeWorkspaceTabs(key);
   workspaceState.openRepos = workspaceState.openRepos.filter((id) => id !== repoId);
   void control.codeWorkspaceCloseWorkspace(repoId).catch(() => {});
+  // C10 §8/S17: the pinned graph tab's own transport is cached per repo workspace, independent of
+  // the tab's own mount/unmount (a tab switch alone must not tear it down — RepoGraphView.vue's
+  // own doc comment) — closing the workspace itself is the one event that actually ends it. A
+  // no-op when the graph tab was never mounted (no transport was ever created).
+  disposeGitTransport(repoId);
   if (workspaceState.active === key) activateWorkspace('studio');
 }
