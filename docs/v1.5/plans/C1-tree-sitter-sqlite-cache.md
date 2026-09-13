@@ -17,11 +17,21 @@ external scanners; 7 of the 10 grammars this phase needs ship a `scanner.c`. cgo
 priced in §1 — and materially cheaper here than for a `darwin && cgo` file, because this code
 compiles, vets and tests on Linux in the dev container.
 
-**D2 — Storage: one SQLite file per repository under `${KIRA_HOME}/codeindex/`, never a table in
-`kira.db`.** Same reasoning `review.db` already established (`docs/ARCHITECTURE.md` Storage):
-per-repo volume and volatility, nothing like settings/tab state. One more reason specific to this
-cache: `kira.db` runs `SetMaxOpenConns(1)`, so a reindex writing through it would serialise ahead
-of every debounced tab save. Dropping one repository's cache is `os.Remove` of one file. §5.
+**D2 — Storage: one shared SQLite file, `${KIRA_HOME}/codeindex.db`, `repo_id`-scoped, never a
+table in `kira.db`.** A second file at all follows `review.db`'s own precedent
+(`docs/ARCHITECTURE.md` Storage) — a different lifecycle from settings/tab state, and `kira.db`
+runs `SetMaxOpenConns(1)`, so a reindex writing through it would serialise ahead of every debounced
+tab save. `review.db` itself is one shared file across every repository, not a per-repository
+split — so a shared `codeindex.db` follows that precedent exactly rather than departing from it.
+Every row carries `repo_id` (`gitclient`'s own repository identity), and the connection pool is
+sized independently of `kira.db`'s (`SetMaxOpenConns(4)`, matching §8's worker-pool bound) — WAL
+already serves concurrent readers alongside one writer, and §8 already serialises writes through
+one application-level goroutine, so nothing here needs kira.db's single-connection posture in the
+first place. Dropping one repository's cache is `DELETE FROM file WHERE repo_id = ?`, cascading to
+`file_block`/`symbol`/`reference` via existing foreign keys — not `os.Remove` of a file, the
+tradeoff a shared file makes: simpler operational story (one file, one set of migrations, one
+connection pool) at the cost of an SQL delete instead of an instant unlink; `_auto_vacuum
+=INCREMENTAL` (already in the DSN, §5.1) is what reclaims the freed pages afterward. §5.
 
 **D3 — Reparse on change: its own worktree watcher, not the git-status watcher.** The existing
 watcher cannot serve this, for two independent reasons, both checked in the tree rather than
@@ -46,7 +56,7 @@ that imports tree-sitter, and the only cgo one outside the existing `darwin && c
 
 **In scope**: the grammar set and its cgo dependency (§1), the two packages (§2), language and
 dialect resolution including SFC injection (§3), query-based extraction over vendored upstream
-`tags.scm` (§4), the per-repository cache file and its schema (§5), enumeration and reconcile (§6),
+`tags.scm` (§4), the shared, `repo_id`-scoped cache file and its schema (§5), enumeration and reconcile (§6),
 the worktree watcher and incremental reparse (§7), bounds and the idle-cache reaper (§5.4),
 tests (§11), doc updates (§12).
 
@@ -173,7 +183,7 @@ apps/kira-studio/internal/codeparse/        cgo; the only package importing tree
   edit.go          whole-file old/new content to one InputEdit
 
 apps/kira-studio/internal/codeindex/        pure Go
-  db.go            per-repository cache file: path, DSN, lazy open, chmod
+  db.go            the shared cache file: path, DSN, lazy open, chmod, pool size
   migrate.go       forward-only schema_version runner
   migrations/      0001_c1_init.sql + embed.go
   store.go         file/block/symbol/reference read and write
@@ -306,17 +316,23 @@ Monarch grammars for that, per SPEC's C3 row).
 
 ## 5. The cache
 
-### 5.1 One file per repository
+### 5.1 One shared file, `repo_id`-scoped
 
-`${KIRA_HOME}/codeindex/<first 16 hex of sha256(RepoID)>.db`, mode 0600, in a 0700 directory the
-package creates itself. `RepoID` is `gitclient`'s own absolute-git-dir identity, NFC-normalized
-(tier 1), so two spellings of one repository share one cache file.
+`${KIRA_HOME}/codeindex.db`, mode 0600 — one file for every repository the app ever opens, not one
+per repository. `RepoID` (`gitclient`'s own absolute-git-dir identity, NFC-normalized, tier 1) is a
+column on every table below, the same way `git_repo_settings` already scopes rows by repository
+inside `kira.db` (`docs/ARCHITECTURE.md` Storage) — so two spellings of one repository share one
+set of rows, and dropping a repository's data is `DELETE FROM file WHERE repo_id = ?`, cascading to
+`file_block`/`symbol`/`reference` (§5.4).
 
-Not a table in `kira.db`, for three reasons, the first two of which `review.db` already established:
-a parse cache is per-repository, order-of-100-MB and rewritten constantly, where `kira.db` holds
-settings, tabs and connections; deleting one repository's cache is `os.Remove` of one file rather
-than a cascading delete competing with live writers; and `kira.db` runs `SetMaxOpenConns(1)`, so
-every reindex statement would queue ahead of the debounced tab save on the same one connection.
+Not a table in `kira.db`, for two reasons: a parse cache is order-of-100-MB and rewritten
+constantly, where `kira.db` holds settings, tabs and connections (the same lifecycle split
+`review.db` established — `docs/ARCHITECTURE.md` Storage); and `kira.db` runs
+`SetMaxOpenConns(1)`, so every reindex statement would queue ahead of the debounced tab save on the
+same one connection. `codeindex.db` gets its **own** pool, `SetMaxOpenConns(4)` matching §8's
+worker-pool bound — WAL already lets readers proceed concurrently alongside one writer, and §8
+already serialises writes through one application-level goroutine, so nothing here needs
+`kira.db`'s single-connection posture to begin with.
 
 The DSN is `internal/storage/db.go`'s six pragmas verbatim, the same way `gitreview/db.go` copies
 them: `_busy_timeout=5000`, `_foreign_keys=1`, `_auto_vacuum=INCREMENTAL`,
@@ -337,13 +353,16 @@ for a `for` loop. Same refusal on a `schema_version` newer than the binary knows
 
 ```sql
 CREATE TABLE meta (
-  key   TEXT PRIMARY KEY,
-  value TEXT NOT NULL
-);  -- repo_id, repo_root, parser_fingerprint, created_at, last_used_at, last_full_sync_at
+  repo_id TEXT NOT NULL,
+  key     TEXT NOT NULL,
+  value   TEXT NOT NULL,
+  PRIMARY KEY (repo_id, key)
+);  -- per repo_id: repo_root, parser_fingerprint, created_at, last_used_at, last_full_sync_at
 
 CREATE TABLE file (
   id            INTEGER PRIMARY KEY AUTOINCREMENT,
-  path          TEXT    NOT NULL UNIQUE,  -- repository-relative, git's own bytes (tier 2: never
+  repo_id       TEXT    NOT NULL,
+  path          TEXT    NOT NULL,         -- repository-relative, git's own bytes (tier 2: never
                                           -- NFC-normalized, see gitpath)
   language      TEXT    NOT NULL,         -- this app's own language id (§3.1)
   size_bytes    INTEGER NOT NULL,
@@ -352,8 +371,10 @@ CREATE TABLE file (
   parse_status  TEXT    NOT NULL,         -- 'ok' | 'tooLarge' | 'binary' | 'unreadable'
   has_error     INTEGER NOT NULL,         -- root node HasError: parsed, with ERROR nodes in it
   line_count    INTEGER NOT NULL,
-  parsed_at     INTEGER NOT NULL          -- unix millis
+  parsed_at     INTEGER NOT NULL,         -- unix millis
+  UNIQUE (repo_id, path)                  -- a path is only unique within its own repository
 );
+CREATE INDEX file_repo ON file (repo_id);
 
 CREATE TABLE file_block (                 -- injected regions: SFC and HTML only
   id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -370,6 +391,8 @@ CREATE INDEX file_block_file ON file_block (file_id, start_byte);
 CREATE TABLE symbol (
   id         INTEGER PRIMARY KEY AUTOINCREMENT,
   file_id    INTEGER NOT NULL REFERENCES file(id) ON DELETE CASCADE,
+  repo_id    TEXT    NOT NULL,            -- denormalized from file: every lookup here is by
+                                          -- repository, and this avoids a join on the hot path
   block_id   INTEGER REFERENCES file_block(id) ON DELETE CASCADE,  -- NULL outside an SFC block
   parent_id  INTEGER REFERENCES symbol(id) ON DELETE CASCADE,      -- enclosing symbol, by range
   kind       TEXT    NOT NULL,            -- §4.2's closed set
@@ -386,11 +409,12 @@ CREATE TABLE symbol (
   name_start_column INTEGER NOT NULL
 );
 CREATE INDEX symbol_file ON symbol (file_id, start_byte);
-CREATE INDEX symbol_name ON symbol (name);
+CREATE INDEX symbol_name ON symbol (repo_id, name);
 
 CREATE TABLE reference (
   id         INTEGER PRIMARY KEY AUTOINCREMENT,
   file_id    INTEGER NOT NULL REFERENCES file(id) ON DELETE CASCADE,
+  repo_id    TEXT    NOT NULL,            -- denormalized from file, same reason as symbol.repo_id
   block_id   INTEGER REFERENCES file_block(id) ON DELETE CASCADE,
   kind       TEXT    NOT NULL,            -- 'call' | 'type' | 'implementation' | 'import'
   name       TEXT    NOT NULL,
@@ -400,8 +424,12 @@ CREATE TABLE reference (
   start_column INTEGER NOT NULL
 );
 CREATE INDEX reference_file ON reference (file_id, start_byte);
-CREATE INDEX reference_name ON reference (name);
+CREATE INDEX reference_name ON reference (repo_id, name);
 ```
+
+`file_block` carries no `repo_id` of its own — every lookup reaches it through `file_id`, never
+directly by repository, so the denormalization `symbol`/`reference` need (their own hot lookup path
+is by name *within* a repository) doesn't apply to it.
 
 Positions are stored twice on purpose: byte offsets are what tree-sitter and a reparse work in,
 row/column points are what a UI needs. Tree-sitter's column is a **byte** column; converting to
@@ -433,10 +461,12 @@ bound:
 - **Per repository: one row per source file**, which is the repository's own size — the count bound.
   Every reconcile deletes rows for files that left the enumeration, so a rename or a deletion frees
   its rows in the same pass that notices it.
-- **Per `${KIRA_HOME}/codeindex/`: a cache file untouched for 14 days is deleted**, swept on any
-  `Open` — the same idle window and the same open-time sweep `gitreview` uses. Every `Open` writes
-  `meta.last_used_at`, which moves the file's mtime, so the sweep's oracle is the file's own mtime
-  and needs no database open per candidate.
+- **Per repository inside `codeindex.db`: a repository untouched for 14 days has its rows deleted**
+  — `DELETE FROM file WHERE repo_id = ? AND repo_id NOT IN (recently used)`, cascading to
+  `file_block`/`symbol`/`reference` — swept on any `Open`, the same idle window `gitreview` uses.
+  Every `Open` writes that repository's own `meta.last_used_at` row, which is the sweep's oracle;
+  unlike a per-repository file, this is a query over `meta` rather than a directory listing's mtimes,
+  and reclaiming the freed pages is `_auto_vacuum=INCREMENTAL`'s job (§5.1), not `os.Remove`'s.
 
 ## 6. Enumeration and reconcile
 
@@ -543,8 +573,10 @@ in a different module. The local cache is about forty lines and owns the `Close`
 
 ## 8. Concurrency, cancellation, resources
 
-- **One `Index` per repository**, not shared with `gitsession`'s registry. A `*tree_sitter.Parser`
-  is not safe for concurrent use, so each worker owns its own parser per language, created lazily.
+- **One `Index` per repository**, not shared with `gitsession`'s registry — a logical handle scoped
+  to one `repo_id`, over the one shared `codeindex.db` connection pool every `Index` in the process
+  opens together (§5.1). A `*tree_sitter.Parser` is not safe for concurrent use, so each worker
+  owns its own parser per language, created lazily.
 - **Worker count is `min(4, runtime.NumCPU())`** — the same bound and the same reason
   `gitclient.maxConcurrentReads` picks 4: cap how much of the machine a background reindex takes,
   not maximise throughput. The app's "silky UI" invariant is the thing being protected.
@@ -643,7 +675,7 @@ No Playwright work of any kind: this phase has no renderer surface.
 
 - **`docs/ARCHITECTURE.md` Stack table**: one row for the tree-sitter binding and grammar set — cgo,
   the ABI range, why the pure-Go candidates were declined, the measured binary delta.
-- **`docs/ARCHITECTURE.md` Storage**: the per-repository cache file beside the `review.db`
+- **`docs/ARCHITECTURE.md` Storage**: the shared, `repo_id`-scoped cache file beside the `review.db`
   paragraph it parallels, plus one row in the growth-bounds table (§5.4).
 - **`docs/ARCHITECTURE.md` git-module watcher paragraph**: it currently claims the repo watcher
   covers "plus the worktree". It does not (D3); correct that sentence rather than leaving two
