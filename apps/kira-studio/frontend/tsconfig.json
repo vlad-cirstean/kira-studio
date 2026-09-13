@@ -6,6 +6,10 @@
     "strict": true,
     "noEmit": true,
     "verbatimModuleSyntax": true,
+    // C10: git-ui/git-ipc source is now compiled from this project too (S9's workspace deps) —
+    // both packages' own .ts files use explicit ".ts" import specifiers (their own tsconfig.json
+    // already sets this), so this project needs the identical flag to follow those imports.
+    "allowImportingTsExtensions": true,
     "skipLibCheck": true,
     "lib": ["ESNext", "DOM", "DOM.Iterable"],
     "types": ["vite/client"],
