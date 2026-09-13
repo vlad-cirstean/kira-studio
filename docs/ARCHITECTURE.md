@@ -44,7 +44,7 @@ originally written rather than corrected to match later reality — see each cha
 | Git module transport (v1.3) | A Unix domain socket plus `internal/bridge/rpcstream`'s correlated-RPC-with-credits protocol — JSON control frames, FlatBuffers bulk payloads (`"KIG1"`) | The git module is **headless**: the backend is in this binary, the frontend is a separately-installed VS Code extension (`apps/kira-studio-vscode`) reached over `${KIRA_HOME}/git.sock`. **The transport itself took no new runtime dependency** — `net` and `encoding/json` plus the FlatBuffers runtimes P11 already put in the graph. What the module *did* add: `github.com/fsnotify/fsevents` (the darwin repo watcher, `darwin && cgo`, G9), `golang.org/x/text/unicode/norm` (NFC path normalization, G27), and `@vscode/vsce` as a build-time-only packager. See the Git module section below |
 | Code parsing (C1, extraction fixes C2) | `github.com/tree-sitter/go-tree-sitter` (the official cgo binding) plus ten upstream grammar modules — java, python, javascript, typescript+tsx, go, rust, html, css, json, svelte, all MIT | `internal/codeparse` is the only package in the repo importing tree-sitter, and the only unconditionally-cgo one (every other cgo file in the app is a `darwin && cgo`-gated exception, below) — a real, priced cost: a C compiler becomes a build requirement for this package and anything importing it, and `CGO_ENABLED=0` no longer builds such a caller. Declined every pure-Go alternative found: `gotreesitter` is a from-scratch reimplementation of the parse-table interpreter and every external scanner (3.9x slower per its own README, with 3 of 206 grammars already degraded), a materially different risk than `modernc.org/sqlite`'s mechanical transpilation of the same upstream C; `malivvan/tree-sitter` (a wasm build under `wazero`, the right architecture) is 5 stars/3 commits/self-described pre-release; building that wasm ourselves would mean owning a toolchain and a regeneration script for a capability the packaged darwin build already has via cgo. Every grammar reports ABI 14, inside the binding's own compatible range [13, 15] (`TREE_SITTER_MIN_COMPATIBLE_LANGUAGE_VERSION`/`TREE_SITTER_LANGUAGE_VERSION`), checked at construction. Binary size delta measured the same way P11's own gRPC dependency was (a minimal program against a `println` baseline, `linux/amd64`, no flags): **+6.6 MB** for the grammar registry alone. Vue has no grammar of its own (no Go module exists) and is parsed as an HTML container with per-block injection instead. **C2** compiles TypeScript and TSX against javascript's own vendored `tags.scm` first, then their own — upstream ships the TypeScript file as an *addition* to the JavaScript one (signature/abstract/interface patterns only, no `; inherits:` header), so the TypeScript file alone indexed almost nothing; composing both is what makes a plain class, function, method or call show up in a `.ts`/`.tsx` file at all. C2 also adds four small repo-authored `queries/<lang>/c2_implements.scm` files (TypeScript, TSX, JavaScript, Python) beside the vendored `tags.scm`s — the only hand-written query text in the package (§4.1's own "no hand-written queries" gets a narrow, named exception here) — recovering `implements`/`extends`/base-class relationships no vendored pattern expresses for those four languages, through the same `@reference.implementation` capture Java and Rust's own vendored queries already use |
 | MCP server (C3) | `github.com/modelcontextprotocol/go-sdk` (Apache-2.0, MIT for un-relicensed contributions), v1.7.0, over the SDK's own **Streamable HTTP** transport, not stdio | The protocol org's own reference implementation, at a stable v1 — the axis that matters for a wire format that keeps moving; `mark3labs/mcp-go` (MIT, real and widely used, but the second implementation, not the reference one) and hand-rolling JSON-RPC framing were both declined (`CLAUDE.md`'s library-first rule finds nothing hand-rolling would earn its keep against here — stdio framing, initialize/capabilities, tool listing, cancellation and schema validation are exactly what the SDK already does). Streamable HTTP, not the SDK's own stdio transport, because the server is one long-running process serving as many concurrent clients/tool calls as connect (`internal/repomap`), never a process spawned fresh per client; the SDK's own `auth.RequireBearerToken` middleware gates every request, reused rather than hand-rolled for the same reason. `mcp.AddTool[In, Out]` derives each tool's input schema from a Go struct's own tags, so every tool's schema has exactly one source. Binary size delta measured the same way as `codeparse`'s own row, above, comparing the whole `cmd/kira-studio` binary before/after (no separate helper binary exists, see the `internal/repomap` section below): **+12.38 MB** (`linux/amd64`, unstripped) for `internal/repomap`, `internal/mcpauth`, `internal/mcpinstall` and the SDK's own dependency graph (`golang.org/x/oauth2`, `google/jsonschema-go`, `segmentio/encoding`, `yosida95/uritemplate`, `golang-jwt/jwt`) |
-| Native file viewer (C5) | `monaco-editor` (MIT, pinned 0.56.0), npm | Added to the root `package.json`'s `dependencies`, beside `slickgrid` — the precedent for a bundled runtime UI library. **Viewer-only**: reached through `edcore.main.js`'s modern equivalent in this pinned version — the package restructured its internal layout entirely since the plan researching this phase was written (no `edcore.main.js` exists any more; `monaco-editor/features/register.all.js` is upstream's own "every standard contribution, no language service, no worker" bundle, verified against the source) — never the package root (`editor.main.js`, which still pulls in all four language *services* and every one of ~180 language grammars eagerly). Exactly one worker ships (`editor.worker`, backing `IEditorWorkerService` — reserved for C6's diff-editor widget), confirmed by inspecting a real `bun run build`'s `dist/assets` for a second `*worker*.js` that never appears. Nineteen languages get a registered Monarch grammar (`views/repo/monacoEntry.ts`'s own import list); `.json`/`.jsonc` reuse the JavaScript grammar (Monaco ships no JSON basic-language in this version either); `.vue`/`.svelte` color as plain HTML (no grammar exists for either). See "Native code workspace (C5)" below |
+| Native file viewer + diff (C5/C6) | `monaco-editor` (MIT, pinned 0.56.0), npm | Added to the root `package.json`'s `dependencies`, beside `slickgrid` — the precedent for a bundled runtime UI library. **Viewer-only, still read-only in C6**: reached through `edcore.main.js`'s modern equivalent in this pinned version — the package restructured its internal layout entirely since the plan researching C5 was written (no `edcore.main.js` exists any more; `monaco-editor/features/register.all.js` is upstream's own "every standard contribution, no language service, no worker" bundle, verified against the source) — never the package root (`editor.main.js`, which still pulls in all four language *services* and every one of ~180 language grammars eagerly). Exactly one worker ships (`editor.worker`, backing `IEditorWorkerService`); C5 shipped the chunk and confirmed it exists in `dist/assets`, and **C6's diff editor (`mod.editor.createDiffEditor`, `hideUnchangedRegions.enabled`/`renderSideBySide` both on, `renderMarginRevertIcon`/`renderGutterMenu` both off) is its first real consumer** — the diff contribution was already inside `register.all.js`, so the Monaco chunk is unchanged by C6 (measured, `bun run build`: `monacoEntry-*.js` 3.81 MB raw / 972 KB gzip and `editor.worker-*.js` 300 KB raw, identical to C5's own recorded figures). Nineteen languages get a registered Monarch grammar (`views/repo/monacoEntry.ts`'s own import list); `.json`/`.jsonc` reuse the JavaScript grammar (Monaco ships no JSON basic-language in this version either); `.vue`/`.svelte` color as plain HTML (no grammar exists for either). See "Native code workspace (C5)" and "Diff tabs and navigation (C6)" below |
 
 Driver libraries — the best-maintained option per engine, **Go-native for all ten kinds as of P58e
 M9.3** (checkpoint C2): `jackc/pgx/v5` (postgres), `go-sql-driver/mysql` (mariadb/mysql, via a shared
@@ -1033,11 +1033,89 @@ never interleaved with another open repo's or with studio/api's shared strip.
   Exactly one worker ships (`editor.worker`, backing `IEditorWorkerService`) — never a language-
   service worker, which is what actually disables IntelliSense/diagnostics rather than merely
   hiding its UI.
-- **C6 (a separate phase, its own plan) adds diff tabs and code navigation on top of this shell** —
-  Monaco's definition/hover extension points, a `codeindex.Index` per open repository, and a
-  worktree-vs-HEAD diff-editor tab. Nothing in this phase is a placeholder waiting on C6 except the
-  graph tab itself (C9's own hand-off, above); the file viewer, the tree and tab isolation are
-  complete and usable on their own.
+**Diff tabs and navigation (C6): a real index per open repository, go-to-definition/hover, and a
+worktree-vs-HEAD diff tab — still entirely read-only.**
+
+- **The index lifecycle is a port of `repomap.Server`'s own sequence, into `codeworkspace.Session`.**
+  `Session` grows a `*codeindex.Index`, a `*codegraph.Graph`, a `*codeindex.Watcher` and a lazily-
+  built `*catfile.Session`; `EnsureIndex` starts them idempotently and returns immediately — the
+  initial sync of a large repository takes far longer than an IPC call may — closing a readiness
+  channel exactly once regardless of outcome (a failed sync still opens the gate with a partial
+  index, honest rather than hanging). Two callers: `OpenWorkspace` (the warm-up path, fired from
+  `openRepoWorkspace`/the restore loop, fire-and-forget) and `Definitions` itself, so a navigation
+  request that somehow arrives first is still correct.
+- **`Registry.Open` now reuses a session when its Root/GitPath are unchanged**, rebuilding (closing
+  the old one first) only on a real change — C5's stateless "rebuild on every request" would tear
+  down a live index and two `cat-file` processes on every tree refresh. `Registry.Close`/`CloseAll`
+  do real work now too: stopping the index, watcher and catfile session, called from
+  `CloseWorkspace`, `RemoveRepo`, and process teardown (`CodeWorkspaceService.Shutdown`, beside
+  `bridge.StopRepoMap`).
+- **The per-repository sync flock moved from `internal/repomap` into `internal/codeindex`**
+  (`SyncLock`/`AcquireSyncLock`/`SyncLockPath`, exported) — both the embedded/headless repo-map
+  server and a native workspace's own index share the identical discipline
+  (`${KIRA_HOME}/codeindex-sync-<slug>.lock`, `LOCK_EX` around the initial `Sync` only, a stuck lock
+  degrades rather than hangs) without a third copy of the same ~70 lines.
+- **Byte-to-UTF-16 conversion lives in Go** (`internal/codeworkspace/textpos.go`'s `LineIndex`) —
+  `codegraph` speaks bytes and byte columns; the workspace service is the one place that already
+  reads file bytes (`ReadFile`) and so the one place that can convert honestly. Lines split on `\n`
+  only (a CRLF line's own `\r` stays part of the line's bytes but is never itself an addressable
+  Monaco column — both directions clamp just before it); one UTF-16 unit per rune at or below
+  U+FFFF, two for a surrogate pair (a column landing between the pair's two halves clamps to the
+  first, never the second); an invalid UTF-8 byte is exactly one UTF-16 unit, not a special case,
+  since that's what `utf8.DecodeRune`'s own `RuneError`/`size==1` answer already gives; a tab is one
+  unit, never expanded; every input clamps into range rather than erroring. The renderer only ever
+  sends/receives Monaco's own 1-based line and 1-based UTF-16 column — it never sees a byte offset.
+- **Navigation resolves through `codegraph.Query.Byte`, not `.Point`** — the byte path alone carries
+  `innermostReferenceNode`, the fallback that resolves a method call when the cursor sits on the
+  method name but the stored reference range starts at the receiver (a limit `repomap`'s own
+  `Point`-only path, forced there by having no bytes, cannot avoid). `Definitions`
+  (`internal/codeworkspace/nav.go`) checks the index's readiness non-blocking — an in-flight sync
+  answers `status: "indexing"` immediately, never a wait, since a hover that hangs is worse than one
+  that says "still building" and gets asked again on the next dwell — and answers `"unavailable"`
+  for a file the index genuinely has no row for (an unparsed language, C1's 2 MiB parse cap, a path
+  added since the last sync), checked by a real `codeindex.GetFile` lookup rather than a string
+  match on `codegraph`'s own error text.
+- **One provider pair answers both hover and go-to-definition** (`views/repo/navigation.ts`) —
+  `Definitions` returns the resolved name plus every candidate `Target`; the definition provider
+  maps them to `Location[]`, the hover renders them as one `IMarkdownString` with each target's own
+  `Rule`/`Confidence` printed on every line (never only on a low-confidence one), following
+  `internal/repomap/render.go`'s own discipline that a `repoWide` guess must never read like a fact.
+  One scheme-scoped `LanguageFilter` (`{ scheme: 'kira-repo', hasAccessToAllModels: true }`) covers
+  every open repo-file/repo-diff model in every registered language plus plaintext.
+  `gotoLocation.multipleDefinitions` is `'goto'`, never Monaco's default `'peek'` — standalone
+  Monaco's peek preview resolves a candidate through `ITextModelService`, which in the standalone
+  build only finds already-created models, so a cross-file candidate with no open tab would render
+  an empty preview pane; `'goto'` jumps through the editor opener instead, which needs no model at
+  all, and the hover keeps every candidate honestly visible regardless.
+- **Model URIs are built with `Uri.from`, not string interpolation** (`views/repo/monaco.ts`,
+  `kira-repo://<repoId>/<path>`) — the editor opener has to recover `(repoId, path)` from a `Uri`
+  the other direction, and a path containing a space, `#`, `?` or `%` does not survive a plain
+  template-literal round trip; `Uri.from` escapes correctly and `uri.authority`/`uri.path` give the
+  decoded values back. A model's own navigability is a `WeakMap` keyed by the model object, not a
+  URI-shape check: the diff editor's HEAD-side model is deliberately never recorded (its content is
+  a different revision than the index describes, so answering a definition there would be a lie);
+  the diff's worktree side is, since it's byte-identical to what the index parsed.
+- **The diff tab** (`repo-diff`, `views/repo/RepoDiffView.vue`) reads a path's HEAD-vs-worktree
+  content (`internal/codeworkspace/diff.go`'s `ReadDiff`) — the worktree side through the existing
+  `ReadFile` classification, the HEAD side through the session's own lazily-built `catfile.Session`
+  at the identical 8 MiB gate, so the two sides can never disagree about what's too large. No status
+  field on the wire: the two sides already say what happened (HEAD missing means added, worktree
+  missing means deleted). Mounted with `mod.editor.createDiffEditor`, `readOnly`/`domReadOnly`
+  (blocking the keyboard and paste, same as the file viewer) plus **`renderMarginRevertIcon: false`
+  and `renderGutterMenu: false`** — not cosmetic: both surface revert/apply affordances that would
+  otherwise let a user trigger a write from a widget built for the extension's own read-write use,
+  the second enforcement layer beyond `readOnly` itself. `hideUnchangedRegions.enabled` and
+  `renderSideBySide` are both on; `diffAlgorithm` is left at its pinned default (never
+  `'advanced-wasm'`/`'advanced-external'`, which resolve an external computer this bundle doesn't
+  ship). The tab carries no session state (`repoDiffTabStateSchema` is `{}`, like `repo-graph`) — a
+  restored diff tab re-reads both sides and opens at Monaco's own first change, which is where a
+  diff is read from anyway. "Open changes" (the tree's own context menu, gated on the same status
+  glyph the tree already colors from) opens it as a permanent tab, never the preview slot.
+- **The diff editor is `editor.worker`'s first real consumer.** C5 shipped the chunk and confirmed
+  it exists in `dist/assets`, but a read-only file viewer never asks `IEditorWorkerService` for
+  anything; the diff editor computes its diff there. Measured chunk delta (`bun run build`): the
+  diff contribution was already inside `register.all.js` (C5's own bundle), so the Monaco chunk size
+  is unchanged by this phase — confirmed, not just assumed, against a real build.
 
 **Why a content snapshot and not just a commit sha.** The trivial case — nothing rewritten since
 the last review — is `git merge-base --is-ancestor <lastReviewedSha> HEAD`; when that succeeds an
@@ -2991,3 +3069,17 @@ place. `CLAUDE.md` states the process rule; this is the list itself.
   exists for either, so a `<script>` block's contents color as HTML text, not as TypeScript/
   JavaScript — the alternative is a hand-written SFC Monarch grammar, which `CLAUDE.md`'s
   library-reuse-first rule declines.
+- **A repository open in the native workspace while the embedded repo-map MCP server serves the
+  same repository parses every saved file twice** (C6 §3.1). Two independent `codeindex.Index`
+  instances in one process, each with its own watcher, each reacting to the identical file-save
+  event. Harmless — `codeindex.Store.ReplaceFile` is transactional, and the shared `codeindex.db`
+  is WAL-mode with a busy timeout precisely for two pools in one process — and bounded (one extra
+  parse per save, not per keystroke), but real; threading one `*codeindex.Index` through both
+  features would couple two independent lifecycles for a savings that has never mattered in
+  practice. The per-repository sync *flock* (`internal/codeindex.AcquireSyncLock`) only covers each
+  side's own *initial* sync, by design — it is not a general single-parser guarantee.
+- **A C6 navigation position can drift by a line if the worktree file changed after the tab
+  opened** (§4's own honest limit, `internal/codeworkspace/textpos.go`). The byte/UTF-16 conversion
+  is always computed against the file's bytes *on disk right now*, not the bytes Monaco's model
+  last loaded; the watcher keeps the index converging on the same signal, so the window is narrow,
+  but a hover or jump landing mid-drift can be off by a line until the next sync catches up.

@@ -19,6 +19,30 @@ const REPO = {
 
 const FILE_LISTING = { paths: ['a.ts', 'b.ts'], status: {}, truncated: false };
 
+// C6 §10/§16: 'c.ts' carries a status glyph, so its row gets an "Open changes" entry — the other
+// two rows above stay unchanged, gating the entry off for anything the tree doesn't color.
+const FILE_LISTING_WITH_STATUS = {
+  paths: ['a.ts', 'b.ts', 'c.ts'],
+  status: { 'c.ts': 'M' },
+  truncated: false,
+};
+
+const DIFF_SNAP: ControlSnapshot = {
+  channel: IPC.codeWorkspaceReadDiff,
+  args: { id: REPO.id, path: 'c.ts' },
+  response: {
+    path: 'c.ts',
+    language: 'typescript',
+    head: { kind: 'found', text: 'export const c = 1;\n', bytes: 20, limitBytes: 8 * 1024 * 1024 },
+    worktree: {
+      kind: 'found',
+      text: 'export const c = 2;\n',
+      bytes: 20,
+      limitBytes: 8 * 1024 * 1024,
+    },
+  },
+};
+
 function readFileSnap(path: string, text: string): ControlSnapshot {
   return {
     channel: IPC.codeWorkspaceReadFile,
@@ -100,4 +124,43 @@ test('a repo workspace: pinned graph tab, preview-slot reuse, promotion, and stu
   await page.locator('[data-testid="mode-tab"][data-mode="studio"]').click();
   await expect(page.locator('[data-testid="tab-strip-empty"]')).toBeVisible();
   await expect(page.locator('[data-testid="tab-strip-row"] [data-testid="tab"]')).toHaveCount(0);
+});
+
+// C6 §10/§16: the diff tab's own vocabulary and a real createDiffEditor mount under WebKit — the
+// one thing neither typecheck nor a Go test can reach. The diff algorithm itself is Monaco's, so
+// this asserts only that "Open changes" opens a second, permanent tab with the diff host rendered.
+test('a repo workspace: "Open changes" opens a diff tab', async ({ relaunch }) => {
+  const { window: page } = await relaunch({
+    control: [
+      { channel: IPC.codeWorkspaceListRepos, response: [REPO] },
+      {
+        channel: IPC.codeWorkspaceListFiles,
+        args: { id: REPO.id },
+        response: FILE_LISTING_WITH_STATUS,
+      },
+      DIFF_SNAP,
+    ],
+  });
+
+  await repoRow(page).dblclick();
+  await expect(treeRow(page, 'c.ts')).toBeVisible();
+
+  await treeRow(page, 'c.ts').click({ button: 'right' });
+  const menu = page.locator('[data-testid="context-menu"]');
+  await expect(menu).toBeVisible();
+  await menu.locator('[data-testid="menu-item-open-changes"]').click();
+
+  // A permanent tab (never the preview slot) — the pinned graph tab plus this one, two total.
+  await expect(tab(page)).toHaveCount(2);
+  const diffTab = tab(page, 'repo-diff');
+  await expect(diffTab).toHaveCount(1);
+  await expect(diffTab).toHaveAttribute('data-preview', 'false');
+  await expect(diffTab).toContainText('c.ts (Working Tree)');
+  await expect(page.locator('[data-testid="repo-diff-editor"]')).toBeVisible();
+
+  // A row with no status glyph gets no "Open changes" entry at all (§8.4's own gate).
+  await page.keyboard.press('Escape');
+  await treeRow(page, 'a.ts').click({ button: 'right' });
+  await expect(page.locator('[data-testid="context-menu"]')).toBeVisible();
+  await expect(page.locator('[data-testid="menu-item-open-changes"]')).toHaveCount(0);
 });
