@@ -8,8 +8,14 @@
  * toolbar buttons shows, and what a hover says. G11 D10's server-side union/subtract is what
  * actually computes the stored state — the client never predicts it and never writes
  * `reviewedRanges` from this module's output.
+ *
+ * C11 S1: moved here from `apps/kira-studio-vscode/src/reviewRanges.ts`, unchanged, so both the
+ * extension and the native app share one implementation. `DiffHunk`/`LineRange` are this
+ * package's own model types (structural copies of `@kira/git-ipc`'s wire shapes) rather than an
+ * import of the wire package itself — no behaviour change.
  */
-import type { DiffHunk, LineRange } from '@kira/git-ipc';
+import type { DiffHunk } from './diff.ts';
+import type { LineRange } from './review.ts';
 
 /** A plain `{start,end}×{line,character}` shape — `vscode.Selection` narrowed to what
  *  `selectionToRange` needs, so this module needs no `vscode` import. */

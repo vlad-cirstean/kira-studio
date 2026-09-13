@@ -7,7 +7,8 @@
  * shifted one. All pure, no `vscode` import, runs under plain `bun test`.
  */
 import { describe, expect, test } from 'bun:test';
-import type { DiffHunk, DiffLine, LineRange } from '@kira/git-ipc';
+import type { DiffHunk, DiffLine } from './diff.ts';
+import type { LineRange } from './review.ts';
 import {
   clampRanges,
   coverage,

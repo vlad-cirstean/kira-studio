@@ -91,9 +91,20 @@ export type {
   BaseCandidate,
   BaseResolutionCore,
   BaseResolutionReason,
+  LineRange,
   ResolveBaseInput,
 } from './model/review.ts';
 export { resolveBase } from './model/review.ts';
+export type { SelectionShape } from './model/reviewRanges.ts';
+export {
+  clampRanges,
+  coverage,
+  hunkChangeBlock,
+  normalizeRanges,
+  selectionToRange,
+  subtractRanges,
+  unionRanges,
+} from './model/reviewRanges.ts';
 export type { StashEntry } from './model/stash.ts';
 export type {
   FileStatusCode,

@@ -17,19 +17,19 @@
  * `reviewRanges.ts` is the pure algebra beneath it, importable and testable with no extension host.
  */
 import { basename } from 'node:path';
-import type { DiffHunk, EventPayload, FileDiffBody, LineRange } from '@kira/git-ipc';
-import * as vscode from 'vscode';
-import type { ConnectionManager, ConnectionState } from './connection.ts';
-import { memoizedSetter } from './memoizedSetter.ts';
-import { SCHEME } from './ports/editorIntegration.ts';
-import { reviewAnchorFor } from './reviewComments.ts';
 import {
   clampRanges,
   coverage,
   hunkChangeBlock,
   normalizeRanges,
   selectionToRange,
-} from './reviewRanges.ts';
+} from '@kira/git-core';
+import type { DiffHunk, EventPayload, FileDiffBody, LineRange } from '@kira/git-ipc';
+import * as vscode from 'vscode';
+import type { ConnectionManager, ConnectionState } from './connection.ts';
+import { memoizedSetter } from './memoizedSetter.ts';
+import { SCHEME } from './ports/editorIntegration.ts';
+import { reviewAnchorFor } from './reviewComments.ts';
 import { decodeKey, encodeKey, parseVirtualKey, virtualKey } from './virtualKey.ts';
 
 const MARK_REVIEWED_COMMAND = 'kiraVersion.markSelectionReviewed';

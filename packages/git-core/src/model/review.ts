@@ -14,6 +14,14 @@
  */
 import type { RefKind, RefRecord } from './ref.ts';
 
+/** 1-based, inclusive, both ends. Always new-side (branch-tip) line numbers on the wire — a
+ *  structural copy of `@kira/git-ipc`'s own `LineRange` (G11 D10), kept here so `reviewRanges.ts`
+ *  needs no dependency on the wire package (C11 S1). */
+export interface LineRange {
+  readonly start: number;
+  readonly end: number;
+}
+
 export type BaseResolutionReason =
   /** §6.8 step 1: the branch's upstream, and it names a *different* branch. */
   | 'upstream'
