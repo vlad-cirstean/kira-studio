@@ -3,22 +3,57 @@
 > **What this phase is.** `docs/v1.5/SPEC.md`'s C3 row turned into steps, from research against the
 > real C1/C2 tree (`internal/codeindex`, `internal/codegraph`, their schema and public API) plus
 > direct probes of every candidate dependency (Go module proxy version lists and `go.mod` files,
-> each SDK's own `LICENSE`), the real `claude` CLI in this container (2.1.270), VS Code's own MCP
-> documentation, and `bun run`'s actual cwd/echo behaviour. This phase adds no parsing, no indexing
+> each SDK's own `LICENSE`), the real `claude` CLI in this container (2.1.270), and `bun run`'s
+> actual cwd/echo behaviour. **Post-plan correction:** an earlier draft also proposed a VS Code MCP
+> registration flow (§0 D6, §7.3) — dropped outright as a misreading; MCP install UI is Claude Code
+> CLI only. This phase adds no parsing, no indexing
 > logic and no resolution logic: it is a protocol server in front of C2's `Graph`, plus the settings
 > surface that registers it. Its consumers are AI clients — starting with this repo's own sessions
 > (C4 documents it, C5 dogfoods it, C6 A/B-tests it).
 
 ## 0. What SPEC left open, and how each is resolved
 
-**D1 — The server is a Go binary, `apps/kira-studio/cmd/kira-repo-map`. `bun run` is its
-user-facing launch command, never its language.** The graph is Go; moving real logic into Bun would
-mean a second SQLite reader, a second copy of C2's resolver (tiers, per-language rules, kind
-matrix, ranking — `codegraph/resolve.go` alone), and two implementations drifting against one
-schema. `docs/ARCHITECTURE.md`'s own Stack row ("Bun: tooling only — nothing at runtime depends on
-it") already names the posture. So: one Go binary, two launch paths — `bun run mcp:repo-map` in
-this repo (a `package.json` script that builds then execs it), and the same binary shipped inside
-`Kira Studio.app` for an installed user. §3.
+**D1 — The server is a Go binary/package, `apps/kira-studio/cmd/kira-repo-map` plus
+`internal/repomap`. `bun run` is one of two launch paths, never the language.** The graph is Go;
+moving real logic into Bun would mean a second SQLite reader, a second copy of C2's resolver (tiers,
+per-language rules, kind matrix, ranking — `codegraph/resolve.go` alone), and two implementations
+drifting against one schema. `docs/ARCHITECTURE.md`'s own Stack row ("Bun: tooling only — nothing at
+runtime depends on it") already names the posture. §3.
+
+**Correction (post-plan, twice over) — transport and process model.** Two real misreadings in the
+original draft, both now fixed:
+
+1. **Transport is MCP's Streamable HTTP, not stdio.** The user was explicit: "it's just one server
+   serving multiple clients, like the git extension" (`git.sock`, below) — a long-running process
+   many clients call into, not one spawned fresh per connection and torn down when that connection
+   closes. stdio is inherently one-client-per-process (the SDK's own stdio transport ties one
+   `Server.Run` to one pair of pipes); Streamable HTTP is the SDK's own alternative built for exactly
+   this shape (§1.1's table already lists it as a supported transport — no new dependency). §3, §5.
+2. **Two independent instances of the same code, not a repo-agnostic singleton.** `git.sock` is one
+   socket for the whole app, multiplexing every open repository by `RepoID` inside its own protocol
+   — this server has no equivalent multi-repository protocol (D4 still holds: one process resolves
+   and serves exactly one repository, §9 restates why staying single-repo is the right scope for this
+   phase) and therefore no equivalent single-instance-for-the-machine shape either. Instead:
+   - **Embedded**, inside the running `Kira Studio.app`/`wails3 task dev` process itself, started and
+     stopped by the app in step with the `codeIntel.mcpServerEnabled` setting (on while the app is
+     running and the toggle is on; off the moment either isn't) — the same "the app owns this
+     listener's lifecycle" posture `git.sock` already has (`main.go`'s own `gitSock.Start()`/
+     `Close()`, never fatal on failure). This is the instance the Settings tab's Claude Code command
+     points at.
+   - **Headless**, `bun run mcp:repo-map` — a wholly separate OS process, not managed by any setting,
+     living exactly as long as it is left running; C6's own A/B worktrees (and anyone developing on
+     this repo without the GUI open) use this path, unchanged from the original plan's own D4/§3.1
+     reasoning.
+
+   Both are the same server code (`internal/repomap`) constructed twice, never one shared listener:
+   each resolves its own repository, binds its own port, and mints its own token (D8) independently
+   — running both against different repositories on one machine at once is normal and uncoordinated,
+   exactly as running two `git status` processes against two repositories needs no coordination
+   either.
+
+So: one Go package, two constructors calling the same server, two launch paths — `bun run
+mcp:repo-map` (a `package.json` script that builds then execs the standalone binary) and an
+in-process instance the Wails app starts itself. §3.
 
 **D2 — `github.com/modelcontextprotocol/go-sdk`, the official SDK, v1.7.0.** Apache-2.0 (MIT for
 un-relicensed contributions), stable v1, stdio transport built in, typed tool registration that
@@ -39,27 +74,114 @@ worktrees the desktop app has never opened, and "headless, for development insid
 nothing if it first needs a GUI to have run. `Store.ListRepos` stays the fallback for a machine with
 no `git` on `PATH`, where serving an already-indexed repository read-only is still possible. §4.
 
-**D5 — Isolation is structural, not asserted.** stdio only: no port, no socket, no listener of any
-kind. The server never opens `kira.db` and never touches `git.sock`/`git.sock.lock`. It opens
-`codeindex.db` — WAL, multi-process by design, read-write so the `-shm` file can be created (C1
-§5.1's own forward note to this phase) — and takes one `flock`ed lock file per repository around
-its *initial* sync so two concurrent server processes never parse one repository twice. §5.
+**D5 — Isolation is structural, not asserted, adjusted for a real listener.** The original draft's
+strongest line here — "no port, no socket, no listener of any kind" — is no longer true (D1's
+correction) and is replaced rather than kept: the listener is real, so what actually bounds it is
+named instead. **Loopback only** — `127.0.0.1`, never `0.0.0.0`, never reachable off-machine.
+**Unprivileged, collision-tolerant port selection**: try one fixed default first, fall back to an
+OS-assigned ephemeral port (`:0`) on `EADDRINUSE` — needed because two instances (embedded and
+headless, or two headless instances against two repositories) may run on one machine at once, and a
+fixed port would make the second one simply fail. **Every request checked** (D8) — a loopback port
+with no authentication is still any local process's for the asking, which is exactly the gap D8
+closes; unlike `git.sock` (a Unix domain socket, restrictable by filesystem permissions to begin
+with) this is a TCP port, reachable by any local user or process on the machine, so the per-request
+check carries real weight here, not defense in depth for its own sake. The server never opens
+`kira.db` and never touches `git.sock`/`git.sock.lock` — both claims are unaffected by the transport
+change, since neither one was ever about stdio specifically. It opens `codeindex.db` — WAL,
+multi-process by design, read-write so the `-shm` file can be created (C1 §5.1's own forward note to
+this phase) — and takes one `flock`ed lock file per repository around its *initial* sync so two
+concurrent server processes (embedded and headless both indexing the same repository, say) never
+parse one repository twice. §5.
 
-**D6 — Both install flows shell out to the client's own CLI, argv-only, never write another
-program's config file.** Claude Code: `claude mcp add …`, verified against the real CLI. VS Code:
-`code --add-mcp '<json>'`, registering with **VS Code's own MCP client surface** (Copilot agent
-mode), not with `apps/kira-studio-vscode`. §7.2, §7.3 — §7.3 argues that reading of SPEC's row.
+**D6 — One install flow, Claude Code only, shelling out to its own CLI, argv-only, never writing
+another program's config file.** `claude mcp add …`, verified against the real CLI. §7.2.
+**Correction (post-plan):** an earlier draft of this plan also proposed registering this server
+with VS Code's own MCP client surface (`code --add-mcp '<json>'`, Copilot agent mode). That was a
+misreading of SPEC's row and is dropped outright — no VS Code MCP registration is attempted by this
+phase, in any form. `internal/mcpinstall` has exactly one client. Separately, and unrelated to MCP
+at all: the **already-shipped** "Install VS Code Integration" button (`internal/gitvsix`, installs
+the Kira Studio `.vsix` extension) gets one small transparency enhancement — showing the command it
+is about to run before the button, the same principle applied to the Claude Code flow above, no new
+capability. §7.5.
 
-**D7 — "Disabled by default" gates the app-integrated path, not the process.** One settings leaf,
-`codeIntel.mcpServerEnabled`, default false. While off, the pane shows the toggle and nothing else —
-no command, no Install button. The binary and the `bun run` script work regardless of it: the
-setting lives in `kira.db`, the server is a separate process an MCP client launches, and an agent's
-tools silently breaking because someone toggled a checkbox in another app is worse than useless.
-§7.1.
+**D7 — "Disabled by default" now genuinely starts and stops a listener, resolved.** Settled by the
+user directly, superseding the original draft's "gates the UI, not the process" framing (which was
+written for the stdio design, where the binary running was inert without something choosing to
+spawn it). One settings leaf, `codeIntel.mcpServerEnabled`, default false, still — but now, per D1's
+corrected two-instance model, it controls the **embedded** instance's actual lifecycle: off means no
+listener exists at all inside the running app; flipping it on starts one (resolving the app process's
+own repository, minting a token, binding a port), flipping it off — or quitting the app — stops it,
+mirroring `git.sock`'s own start-at-boot/close-at-shutdown shape but gated by this setting rather than
+unconditional. The **headless** `bun run mcp:repo-map` instance is entirely untouched by this leaf
+(D1): it is not managed by any app setting, and runs for exactly as long as it is left running,
+independent of whether the embedded one is on, off, or the app is even open. Manual config for any
+MCP client besides Claude Code stays out of scope regardless of instance. §7.1.
+
+**D8 — Static-token authentication, added post-plan, adjusted once more for HTTP.** A loopback TCP
+port (D1/D5's correction) is reachable by any local process, not just whatever Claude Code spawned —
+unlike a stdio pipe, which only the process that spawned it can ever write to. A static token closes
+that: every request must carry it, or the server refuses to act on it. Same threat model
+`git_clients` pairing already exists for on the git socket side (`docs/ARCHITECTURE.md` Storage:
+`git_clients(id, label, token_hash, token_salt, …)`, only `sha256(salt‖token)` ever at rest,
+`internal/gitsock/token.go`'s exact shape) — but **one token per server instance, not a pairing
+table**: each instance (D1) has exactly one caller worth trusting (whatever `claude mcp add`
+registered against it), not several paired identities to individually revoke.
+
+**Where it lives, and why not `git_clients`/`kira.db`.** A new package, `internal/mcpauth`, mints and
+verifies the token (`crypto/rand` 32 bytes, base64url on the wire, sha256(salt‖token) at rest —
+`gitsock/token.go`'s own shape, not re-derived) and persists only the hash+salt, as one small JSON
+file per repository under `KIRA_HOME` — `mcp-repo-map-<first 12 hex of sha256(repo_id)>-token.json`,
+mode 0600, the exact naming convention `codeindex-sync-<…>.lock` (§5) already established — rather
+than a `kira.db` table. Per-repository, not one global file: D1's corrected model has independent
+instances, potentially several on one machine at once, each with its own token; a global file would
+make enabling the embedded instance for repository A silently able to authenticate a request against
+repository B's server too. Not the settings-leaf pattern either (§7.1's leaf is a single user-typed
+boolean patched through `SettingsRepo`; a server-generated, per-repository secret doesn't fit that
+shape, and a `[]byte` hash/salt pair is awkward as a JSON-encoded settings value). Not a `kira.db`
+table: D5 keeps "`kira.db` is never opened" literal — a token table would mean either a real (if
+narrow) `kira.db` dependency for the server, or threading a second connection pool past `kira.db`'s
+own `SetMaxOpenConns(1)` for a two-column read, for no benefit a file doesn't already give.
+
+**Lifecycle.** Minted the moment the **embedded** instance's `codeIntel.mcpServerEnabled` flips
+false→true (`bridge.RepoMapService.SetEnabled`, one call: patch the leaf, resolve the app's own
+repository, mint, persist to that repository's file, start the listener, return the plaintext for
+display) — the plaintext exists in exactly one place at rest — nowhere; it is held in memory for the
+running app process's life and shown in the Settings tab, never written to disk itself, never logged.
+An app restart with the leaf already `true` loads the existing hash+salt and starts the listener
+without minting again (a previously-registered Claude Code command keeps working across restarts),
+but the plaintext is then unknown to this process — `Regenerate` (same mint call, no leaf write)
+covers exactly that case, overwriting the file: there is no revocation list for a single token, so
+"regenerate" and "revoke-then-reissue" are one operation, and a stale registered command simply fails
+the per-request check afterward. The **headless** instance mints (or loads) its own token against its
+own resolved repository the same way, on process startup, with no settings leaf involved at all
+(D1/D7) — it prints the plaintext once, in its own ready-to-copy command, to its own stdout (§3.1).
+
+**Delivery: an HTTP header, not a CLI flag.** `claude mcp add`'s real CLI (2.1.270, this container)
+supports `--transport http <url> --header "Authorization: Bearer …"` for exactly this (confirmed via
+`claude mcp add --help`'s own example: `claude mcp add --transport http corridor
+https://app.corridor.dev/api/mcp --header "Authorization: Bearer ..."`). §7.2's shown/installed
+command carries the token this way. An argv flag would be visible to any other local user via `ps`;
+an HTTP header sent only over the loopback connection is not (still visible to a sufficiently
+privileged local observer capturing loopback traffic or reading `claude`'s own on-disk MCP config,
+worth naming rather than overclaiming "unobservable" — the token's job is to stop an arbitrary local
+process from *calling* the server, not to defend against a privileged one reading the machine).
+
+**Per-request check.** The SDK's own `auth.RequireBearerToken` middleware (`github.com/
+modelcontextprotocol/go-sdk/auth`, already in the dependency graph via D2 — no new library) wraps the
+`StreamableHTTPHandler` on every instance: a `TokenVerifier` reads that repository's `internal/
+mcpauth` file, `subtle.ConstantTimeCompare`s the presented header against the stored hash+salt
+(`AllowMissingExpiration: true` — this token carries no `exp` claim, D8's own token is not
+OAuth-shaped), and rejects with `401` plus a `WWW-Authenticate` header (the middleware's own behaviour)
+on any miss — missing header, malformed header, wrong token, or no token file at all (an instance
+whose settings toggle was never turned on, or a headless instance that failed to mint, simply has
+nothing to compare against and rejects every request). This is strictly a per-request gate now, not a
+startup-only check (D5's own note: "the token gates 'can this process do anything at all,' not 'who
+is connecting to what'" no longer quite fits a multi-request listener — restated as "no request does
+anything until it presents the token," checked by the SDK's own middleware on every one).
 
 **In scope**: the SDK (§1), the layout (§2), the process shape and both launch paths (§3), repository
-resolution and indexing (§4), isolation (§5), the tool surface (§6), settings plus both install
-flows (§7), concurrency and logging (§8), tests (§11), docs (§12).
+resolution and indexing (§4), isolation (§5), the tool surface (§6), settings plus the Claude Code
+install flow (§7), concurrency and logging (§8), tests (§11), docs (§12).
 
 **Not attempted** (§9): any new graph capability, file content over MCP, MCP resources or prompts,
 HTTP/SSE transport, non-macOS packaging, a multi-repository server.
@@ -98,21 +220,33 @@ file's own preamble states is sufficient.
 ### 1.2 API surface actually used
 
 `mcp.NewServer(*Implementation, *ServerOptions)`, `mcp.AddTool[In, any](server, *Tool, handler)`,
-`server.Run(ctx, &mcp.StdioTransport{})`, `*mcp.CallToolResult` with `*mcp.TextContent`, and
-`mcp.NewInMemoryTransports()` plus `mcp.NewClient` for §11's conformance test. `Out = any` is
-deliberate: the SDK generates **no** output schema for `any`, so a tool returns text only (§6.3
-argues why). `ServerOptions.Instructions` carries §6.0's one paragraph. Exact field names are
-pinned at S1 against the tagged version and the handler signatures compile or they do not — no
-guess survives the first build.
+`*mcp.CallToolResult` with `*mcp.TextContent`, and `mcp.NewInMemoryTransports()` plus `mcp.NewClient`
+for §11's conformance test (in-memory transport is transport-agnostic to the tool layer, so the
+conformance test is unaffected by the HTTP correction below). `Out = any` is deliberate: the SDK
+generates **no** output schema for `any`, so a tool returns text only (§6.3 argues why).
+`ServerOptions.Instructions` carries §6.0's one paragraph.
+
+**Transport, corrected: `mcp.NewStreamableHTTPHandler(getServer func(*http.Request) *Server, *mcp.
+StreamableHTTPOptions)` (`StreamableHTTPOptions.Stateless: true`), not `&mcp.StdioTransport{}`.** The
+handler is a plain `http.Handler`; `getServer` returns the same one `*mcp.Server` for every request —
+correct here because a `Graph` holds no mutable state and is already safe for concurrent use (§8), so
+there is nothing session-scoped for `Stateless` to lose. Wrapped in `github.com/
+modelcontextprotocol/go-sdk/auth`'s own `RequireBearerToken(verifier, opts)` middleware (D8) before
+being mounted on a `net/http.ServeMux` at `/mcp`, served by a plain `net/http.Server{Addr:
+"127.0.0.1:<port>"}` (D5). All of this is the same module D2 already took; no new dependency. Exact
+field/method names are pinned at S1 against the tagged version and the handler signatures compile or
+they do not — no guess survives the first build.
 
 ## 2. Where the code lives
 
 ```
 apps/kira-studio/cmd/kira-repo-map/
-  main.go          flags, logging to stderr, repo resolution, serve; the only main package
+  main.go          flags, logging to stderr, token check (D8), repo resolution, serve; the only main package
 
-apps/kira-studio/internal/repomap/         the server: pure Go, no cgo of its own
+apps/kira-studio/internal/repomap/         the server: pure Go, no cgo of its own; one constructor,
+                                            two callers (cmd/kira-repo-map, apps/kira-studio/main.go)
   server.go        mcp.Server construction, tool registration, instructions
+  http.go          StreamableHTTPHandler, auth middleware, net/http.Server, port bind+fallback (§5)
   repo.go          cwd/--repo to RepoID+root; ListRepos fallback; degraded mode
   index.go         background Sync, the readiness gate, Watch, the per-repo sync flock
   lock_unix.go     //go:build unix — flock
@@ -121,19 +255,30 @@ apps/kira-studio/internal/repomap/         the server: pure Go, no cgo of its ow
   tools.go         the six tools: argument structs, handlers
   render.go        Target/Site/Node to compact text (§6.3)
 
+apps/kira-studio/internal/mcpauth/         D8: mint/verify/persist the static token — no DB, one
+  token.go         JSON file per repository under KIRA_HOME, hash+salt only, gitsock/token.go's own
+                    crypto shape; used by internal/repomap (per-request verify) and internal/bridge
+                    (mint on enable)
+
 apps/kira-studio/internal/mcpinstall/       desktop side only; never linked into the server
-  install.go       Status/command strings/Install for both clients, Deps-shaped like gitvsix
+  install.go       Status/command string/Install for Claude Code only, Deps-shaped like gitvsix
   exec.go          argv-only spawn, bounded stderr (gitvsix/exec.go's shape)
 
 scripts/mcp-repo-map.ts                     the bun wrapper (§3.1)
-apps/kira-studio/internal/bridge/repomap.go RepoMapService
-apps/kira-studio/frontend/src/state/repomap.ts + SettingsDialog.vue section
+apps/kira-studio/internal/bridge/repomap.go RepoMapService — owns the embedded instance's lifecycle
+apps/kira-studio/frontend/src/state/repomap.ts + SettingsDialog.vue's own Code intelligence tab
 ```
 
+No `Contents/MacOS/kira-repo-map` helper binary and no `common:build:repomap` packaging task (§3.2's
+correction): the embedded instance runs inside `Kira Studio.app`'s own executable, since `main.go`
+now imports `internal/repomap` directly — there is nothing separate left to copy into the bundle.
+`cmd/kira-repo-map` remains, but only as the headless dev binary `scripts/mcp-repo-map.ts` builds
+on demand; it is never packaged.
+
 Layering: `repomap` and `mcpinstall` import nothing from `internal/bridge`
-(`internal/layering_test.go` covers this automatically). `mcpinstall` imports `internal/gitvsix` for
-one thing only — the `code` probe order, exported for it (§7.3) — rather than keeping a second copy
-of that list.
+(`internal/layering_test.go` covers this automatically). `mcpinstall` imports nothing from
+`internal/gitvsix` either — the two packages solve unrelated problems (Claude Code CLI registration
+vs. a VS Code `.vsix` install) and share no probe order worth factoring out.
 
 ## 3. Process shape
 
@@ -156,42 +301,69 @@ Two scripts in the root `package.json`:
    `--`, `SIGINT` and `SIGTERM`.
 3. Exit with the child's own exit code.
 
-Three properties this depends on, each verified rather than assumed:
+Two properties this depends on, each verified rather than assumed:
 
-- **`bun run` prints nothing to stdout.** The `$ <command>` echo goes to a TTY only, and the
-  registered command uses `--silent` regardless. One stray byte on stdout corrupts the JSON-RPC
-  stream, so this is load-bearing, not hygiene.
 - **`bun run` executes a script with cwd set to the `package.json` directory**, checked by running
   `bun run lint` from `apps/kira-studio/` and watching a root-relative path in the script resolve.
   So under this launch path the server's cwd is always that worktree's root — which is exactly the
   repository the caller means, including for a linked worktree. An agent whose own cwd is a
   subdirectory still lands on the right repository.
 - **First build is expensive.** `codeparse` is cgo over ~34 MB of generated C (C1 §1.3), so a cold
-  cache is minutes and an MCP client's startup timeout (Claude Code: `MCP_TIMEOUT`, 30 s default)
-  will kill it. This is why `mcp:repo-map:build` exists as a separate script: run it once after a
+  cache is minutes. This is why `mcp:repo-map:build` exists as a separate script: run it once after a
   fresh clone, before registering. `docs/DEV_ENVIRONMENT.md` says so (§12).
+
+**Correction: stdout is no longer reserved for protocol bytes (D1/D5's HTTP correction).** The
+original draft's strongest claim here — "one stray byte on stdout corrupts the JSON-RPC stream" — was
+true only for the stdio transport and no longer applies: the wire protocol now travels over the HTTP
+port, not stdio, so the binary's own stdout is free to be a normal log stream. It is put to use for
+exactly that: on a successful bind, the binary logs its own listening URL and a ready-to-copy Claude
+Code registration command (D8's own per-instance token, minted or loaded for this repository) to
+stdout, e.g.:
+
+```
+Repo map MCP server listening on http://127.0.0.1:<port>/mcp
+Register with:
+  claude mcp add --transport http kira-repo-map http://127.0.0.1:<port>/mcp --header "Authorization: Bearer <token>"
+```
+
+— the headless equivalent of what the Settings tab shows for the embedded instance (§7.4), surfaced
+as a log line since there is no dialog to render it into. `--silent` on the registered `bun run`
+script is no longer load-bearing for protocol correctness, only for not duplicating `bun run`'s own
+`$ <command>` echo ahead of the binary's own first log line.
 
 Nothing else moves into TypeScript. The wrapper holds no logic worth testing and no protocol
 knowledge at all.
 
-### 3.2 Packaged: a helper binary inside the bundle
+### 3.2 Embedded: the same server, inside `Kira Studio.app`'s own process
 
-`Contents/MacOS/kira-repo-map`, beside the app binary — not `Contents/Resources/`, which is where
-the `.vsix` correctly lives *because it is data*. Apple's layout puts helper executables in `MacOS/`,
-and `scripts/sign-bundle.sh`'s `codesign --deep` already signs every nested executable there.
+No separate packaged binary (the original draft's `Contents/MacOS/kira-repo-map` helper is dropped
+along with it, §2's own correction): `apps/kira-studio/main.go` imports `internal/repomap` directly,
+the same package `cmd/kira-repo-map` imports, and constructs a second instance in-process. D7 governs
+its lifecycle: constructed and started when `codeIntel.mcpServerEnabled` is (or becomes) `true`,
+stopped when it becomes `false` or the app quits — mirroring `git.sock`'s own `Start`/`Close` shape
+(`main.go`'s existing call sites), never fatal on failure (a bind failure, or a repository this
+process's cwd doesn't resolve to, is logged and leaves the toggle showing a degraded state rather
+than crashing the app, §4.1's own note on this).
 
-Packaging mirrors `common:build:vsix` exactly: a `common:build:repomap` task with the same `sources:`
-fingerprinting, a `deps:` entry on `package`/`package:universal`, a copy step in `create:app:bundle`
-(and the `.dev.app` variant's own conditional copy), a `lipo` of the two arch builds on the universal
-path — the same cgo cross-build constraints the app binary already lives with, since C1 made the app
-cgo. `scripts/verify-packaging.sh` gains one assertion that the helper exists and is executable.
+**What repository does the embedded instance resolve?** The same `gitclient.Identify` call the
+standalone binary makes, against the running app process's own cwd — there is no other repository
+concept for the app to draw on today (native git mode, and any UI for picking "the current
+repository," is C8/C5's job, both explicitly future phases; C1/C2 remain library phases with no
+caller in the live app until C5 "dogfoods it," this phase's own reading list). This works correctly
+for `wails3 task dev` run from this repository's own root (cwd is the repo root, C4/C5/C6's own
+dogfooding loop), and is honestly limited for a packaged `Kira Studio.app` launched from
+`/Applications` by a real end user, whose cwd is very unlikely to be a git worktree at all — in that
+case `Identify` fails, the embedded instance simply does not start, and the Settings tab says why
+("no repository found at the app's own working directory; use `bun run mcp:repo-map` for now").
+Recorded as a known limitation (`docs/ARCHITECTURE.md`), not silently accepted: real repository
+selection for the embedded instance is exactly the gap C5's own dogfooding work is expected to close,
+not this phase's to invent ahead of it.
 
-Measured at S5 and recorded in that commit message, the way C1 recorded its own: the helper's size,
-and the bundle delta. Expected to be modest — C1 measured the whole grammar registry at +6.6 MB — but
-it is a real number for a bundle that will carry the parse tables twice once C5 links `codeindex`
-into the app. If that number turns out large, collapsing the helper into an argv subcommand of the
-app binary is a later phase's call; it is not free today (the app binary embeds `frontend/dist`, so
-building it for a headless dev launch would require a frontend build first).
+Since the embedded instance lives inside the same process as `bridge.RepoMapService`, there is no
+cross-process discovery to build for it: `Status()` reads the running instance's port and (when held)
+plaintext token directly out of the Go value the service already holds a reference to — no port file,
+no second read of the token file it just wrote. A port/token *file* is still real (D8, and D5's port
+selection), but its only reader is that repository's own future process restart, not the GUI.
 
 ### 3.3 Why the logic is not in Bun
 
@@ -262,12 +434,22 @@ rows. A miss exits with a message naming both causes (no git, no indexed reposit
 
 Concrete, mechanism by mechanism:
 
-- **No port, no socket, no listener.** stdio transport only. `wails3 task dev`'s Vite port, the
-  Wails dev server and `${KIRA_HOME}/git.sock` are untouched because nothing here binds anything.
+- **Loopback only, own port, own path.** `127.0.0.1:<port>`, never `0.0.0.0` — not reachable from
+  another machine regardless of the token. `wails3 task dev`'s Vite port and the Wails dev server's
+  own port are untouched because this binds a different one; a fixed default is tried first
+  (`internal/repomap`'s own constant) and an OS-assigned ephemeral port (`:0`) is the fallback on
+  `EADDRINUSE`, so a second instance on one machine (embedded plus headless, or two headless
+  instances against two repositories) never simply fails to start over a port clash (D1/D5's
+  correction).
 - **`git.sock.lock` is never taken.** That flock elects the one instance that serves the git socket
-  (`docs/ARCHITECTURE.md`); this server serves no socket and must never contend for it.
-- **`kira.db` is never opened.** The server reads no settings (D7), so the app's own
-  `SetMaxOpenConns(1)` database is outside its process entirely.
+  (`docs/ARCHITECTURE.md`); this server serves a different port entirely and must never contend for
+  that lock.
+- **`kira.db` is opened only by the embedded instance's own host process, never by `internal/
+  repomap` itself.** `internal/repomap` (and `cmd/kira-repo-map`, the headless binary) still reads no
+  settings and never touches `kira.db` — the setting that starts/stops the embedded instance is read
+  by `bridge.RepoMapService`, which already has a `kira.db` connection like every other bridge
+  service; the server package's own isolation from `kira.db` is unchanged; the app process instance
+  it lives in was never isolated from `kira.db` to begin with.
 - **`codeindex.db` is opened read-write, shared, via `codeindex.OpenStoreAt`.** Two OS processes on
   one WAL database is SQLite's own design, not a stretch of it: readers and one writer proceed
   concurrently through the `-shm` index, cross-process locking is POSIX advisory locks on the
@@ -283,13 +465,19 @@ Concrete, mechanism by mechanism:
   stat-only pass over fresh rows. On deadline it proceeds anyway and serves what exists: a stuck
   lock must degrade, never hang. `syscall.Flock` on `unix`, a documented no-op elsewhere — stdlib,
   no dependency, the same build-tag shape `codeindex/watch_*.go` already uses.
-- **Contention today is zero**, stated honestly: nothing in the desktop app opens `codeindex.db` yet
-  (C1 and C2 are both library phases with no caller), so until C5 this server is the only process
-  touching the file. The mechanisms above are what make it stay correct when C5 lands, not what
-  makes it work now.
+- **Contention is real starting this phase, corrected from the original draft.** The original text
+  claimed "nothing in the desktop app opens `codeindex.db` yet... until C5 this server is the only
+  process touching the file" — true for the headless instance alone, but the embedded instance (D1's
+  correction) is exactly the desktop app opening it, from this phase on, not from C5. The mechanisms
+  above (WAL, the sync flock, `_busy_timeout`) are what make that correct starting now, not a
+  forward-looking note for later.
 - **`KIRA_HOME` remains the escape hatch.** Pointing the server at a different home gives it a
   private cache, which is worth knowing for a debugging session but is not the default — sharing the
   cache with the desktop app is the whole point of "no second parse pipeline".
+- **Every request is bearer-checked (D8).** A loopback port is still any local process's for the
+  asking; `auth.RequireBearerToken` rejects anything not carrying that instance's own token before it
+  reaches a tool handler, which is what actually stands in for "no port, no socket, no listener" as
+  this phase's isolation guarantee against an unintended local caller.
 
 ## 6. Tool surface
 
@@ -396,12 +584,22 @@ One leaf, `codeIntel.mcpServerEnabled`, boolean, default false:
 - `internal/storage/repos/settings.go`: one `leaf(stored, "codeIntel.mcpServerEnabled", …)` in
   `GetAll` and one `upsertSettingsLeaf` branch in `Set` — the hand-listed key set stays hand-listed.
 
-**What "disabled" means, precisely.** Off: the pane shows the toggle, one sentence of explanation,
-and nothing else — no command text, no Install button. On: the two commands appear as copyable text,
-each with its Install button *below* it. The server process itself never reads this setting: it is
-launched by an MCP client, not by the app, and a tool surface that vanishes because a checkbox moved
-in a GUI is a worse failure than an unused registration. SPEC's "enabling is never a silent action"
-is honoured by the pane's ordering, which §11 tests.
+**Its own settings tab, not a section of an existing one.** `SettingsDialog.vue`'s sections
+(`Appearance`, `Data`, `Cache`, `Connected editors`, `Git`, `Advanced`) are each already one
+specific surface; this is a new one, **Code intelligence**, added to that list rather than folded
+into `Connected editors` (which stays git-client pairing plus the unrelated VS Code `.vsix` button,
+§7.5) or `Advanced`. Its entire content is the toggle and, when on, the one Claude Code
+command-and-button pair — nothing else lives on this tab.
+
+**What "disabled" means, precisely — corrected (D7).** Off: no embedded listener exists at all, and
+the tab shows the toggle, one sentence of explanation, and nothing else — no command text, no Install
+button. On: the app starts the embedded instance (§3.2) and the command appears as copyable text,
+with its Install button *below* it — or, when enabled but no repository was resolvable at the app's
+own cwd (§3.2), a plain sentence saying so instead of a command that would not work. Unlike the
+original draft's stdio-era reasoning ("the server process itself never reads this setting... launched
+by an MCP client, not by the app"), the setting now directly owns whether the embedded listener runs
+at all — restated in D7. SPEC's "enabling is never a silent action" is honoured by the tab's
+ordering, which §11 tests.
 
 **The toggle applies immediately**, bypassing the dialog's draft/Save flow — the same posture
 `onRevokeGitClient` and `onInstallVsCodeIntegration` already take, for the same reason G12 D9 gives:
@@ -411,26 +609,38 @@ reveal two instant actions, it belongs on the action side of that line, and the 
 
 ### 7.2 Claude Code CLI
 
-**Command shown (packaged app):**
+**Command shown (embedded instance, app running, toggle on):**
 
 ```
-claude mcp add --scope user kira-repo-map -- "/Applications/Kira Studio.app/Contents/MacOS/kira-repo-map"
+claude mcp add --transport http --scope user kira-repo-map http://127.0.0.1:<port>/mcp --header "Authorization: Bearer <token>"
 ```
 
-Verified against the real CLI (2.1.270): `claude mcp add [-s local|user|project] <name> <command>
-[args...]`, stdio by default, `--` separating the server's own argv.
+Verified against the real CLI (2.1.270), `claude mcp add --help`'s own documented shape and example:
+`claude mcp add [-s local|user|project] [-t stdio|sse|http] [-H header...] <name> <commandOrUrl>
+[args...]` — `-t/--transport http` with a URL positional (not a spawned command) registers a remote
+HTTP server, `-H/--header` attaches one header verbatim to every request the CLI itself makes.
+`<port>` and `<token>` come from the running embedded instance directly (§3.2 — no file read, no
+re-resolution): `<port>` is whatever it actually bound (D5's fallback may have moved it off the
+default), `<token>` is D8's plaintext, known only while held in this app process's memory (empty —
+see below — right after a restart until `Regenerate` is clicked).
 
-**`--scope user`, not `local` or `project`**, and this follows from where the button lives. `local`
-scope is keyed to the directory the command runs in; the desktop app has no current repository to
-supply one (native git mode is C8). `project` writes a committed `.mcp.json` into someone's
-repository, which an app-driven button has no business doing. `user` registers once, and the server
-resolves its repository per launch from the client's own cwd (§4.1) — so one registration serves
-every checkout on the machine.
+**`--scope user`, not `local` or `project`.** `local` scope is keyed to the directory the *client*
+runs in, not the server's — irrelevant here since the server is a URL, not a spawned command; `user`
+is the natural "register this once for this machine" scope for a remote endpoint. `project` writes a
+committed `.mcp.json` into someone's repository, which an app-driven button has no business doing.
 
-**Install button**: re-resolves everything, then spawns
-`[claudePath, "mcp", "add", "--scope", "user", "kira-repo-map", "--", binPath]` — argv only, never a
-shell, 30 s timeout, bounded stderr in the outcome. Never writes `~/.claude.json` directly: that file
-is the CLI's own live private format, and the CLI is right there.
+**Install button**: re-resolves everything, then spawns `[claudePath, "mcp", "add", "--transport",
+"http", "--scope", "user", "kira-repo-map", url, "--header", "Authorization: Bearer " + token]` —
+argv only, never a shell (the header is one argv element; there is no shell to inject into even
+though it contains a space), 30 s timeout, bounded stderr in the outcome. Never writes `~/.claude.json`
+directly: that file is the CLI's own live private format, and the CLI is right there.
+
+**When no plaintext token is held** (an app restart with the setting already on — D8's own lifecycle
+note): the tab shows a **Regenerate** action in place of the command and Install button. Clicking it
+calls `RepoMapService.Regenerate`, which mints a fresh token for the already-running embedded
+instance, persists it, and returns it for display — the same command then renders normally. This is
+the one extra state the HTTP-token design adds versus the original stdio draft, and is unavoidable: a
+stored hash cannot be turned back into its own plaintext.
 
 **Finding `claude`** has the same launchd-PATH problem `gitvsix` documented for `code` (a
 Finder-launched app gets `/usr/bin:/bin:/usr/sbin:/sbin`). Same probe shape: `LookPath` first, then
@@ -439,88 +649,123 @@ Finder-launched app gets `/usr/bin:/bin:/usr/sbin:/sbin`). Same probe shape: `Lo
 **not** a failure state here — the command is already on screen to copy, which is strictly better
 than `gitvsix`'s Finder-reveal fallback and needs no fallback of its own.
 
-**Dev builds** (`wails3 task dev`, no bundle beside the executable) have no helper binary to name.
-The pane says so — `gitvsix`'s `notBundled` precedent, honestly — and points at the repo's own path
-instead, with no button:
+**Dev builds** (`wails3 task dev`) show the exact same shape — there is no "no bundle beside the
+executable" case anymore (§3.2's correction: the embedded instance is this same app process, dev or
+packaged, not a separate bundled binary) — so §7.2's command and Install button behave identically
+whether the running app is a dev build or a packaged one.
+
+**Headless (`bun run mcp:repo-map`)**: not surfaced by the Settings tab at all (§3.2, D1) — it prints
+its own equivalent command to its own stdout on startup (§3.1):
 
 ```
-claude mcp add kira-repo-map -- bun run --silent mcp:repo-map
+claude mcp add --transport http kira-repo-map http://127.0.0.1:<port>/mcp --header "Authorization: Bearer <token>"
 ```
 
-That form is also what C4 documents and what C6's A/B arms use: run inside a worktree, it lands in
-that directory's `local` scope, so Arm A is registered and Arm B is not, on one machine, with no
-shared state between them. `--silent` is not optional (§3.1).
+That form is also what C4 documents and what C6's A/B arms use: each worktree's own `bun run
+mcp:repo-map` mints its own token and (via port fallback) its own port, so Arm A and Arm B register as
+two independently-named servers with no shared state between them, on one machine, at the same time.
 
-### 7.3 VS Code
+### 7.3 VS Code MCP registration — dropped
 
-**The interpretation, stated rather than papered over.** SPEC's row says "registering it as a VS Code
-extension's MCP server", which admits two readings. VS Code has had a first-class MCP client since
-1.102 (Copilot agent mode): workspace `.vscode/mcp.json`, a user-profile `mcp.json`, and a
-`code --add-mcp '<json>'` CLI flag. The other reading — `apps/kira-studio-vscode` registering the
-server through `vscode.lm.registerMcpServerDefinitionProvider` — is rejected: it has **no
-command-shown-first form at all** (the registration would be code inside an extension, not a command
-a user runs), it makes an MCP feature depend on installing a git extension it has nothing to do with,
-and it puts a second copy of the registration logic in TypeScript. So: register with VS Code's own
-MCP surface.
-
-**Command shown:**
-
-```
-code --add-mcp '{"name":"kira-repo-map","type":"stdio","command":"/Applications/Kira Studio.app/Contents/MacOS/kira-repo-map"}'
-```
-
-**Install button**: spawns `[codePath, "--add-mcp", jsonString]` — the JSON is one argv element, so
-there is no quoting hazard in the spawn; the single quotes exist only in the displayed, copy-pasteable
-rendering. `codePath` comes from `gitvsix`'s existing probe order, exported for this caller as
-`gitvsix.CodeCandidates()` rather than copied. Same 30 s timeout, same bounded-stderr outcome, same
-"not found means show the command" posture as §7.2.
-
-`code --add-mcp` is documented by VS Code but was not executable in this planning container (no
-`code` here). Verify it on a real machine at S4 before the copy is finalised; if the flag's shape
-differs, the fallback is the documented file (`~/Library/Application Support/Code/User/mcp.json`),
-shown as a path plus the JSON block to paste — still command-first, still no config file written
-behind another program's back.
+An earlier draft of this plan proposed a second install flow here, registering this server with VS
+Code's own MCP client surface (`code --add-mcp '<json>'`, Copilot agent mode since 1.102). **That
+reading is wrong and the flow is dropped outright, in any form.** The actual ask was narrower: MCP
+config/install UI is Claude Code CLI only. No workspace `.vscode/mcp.json`, no user-profile
+`mcp.json`, no `code --add-mcp`, no `gitvsix.CodeCandidates()` export for this purpose —
+`internal/mcpinstall` has exactly one client, Claude Code (§7.2). Nothing in this phase touches VS
+Code's MCP surface at all.
 
 ### 7.4 Wiring
 
-`bridge.RepoMapService` (`internal/bridge/repomap.go`), shaped like `GitClientsService`: a
-`RepoMapInstaller` interface declared where it is consumed, `Status()` returning the resolved binary
-path, both rendered command strings and both client-availability probes, plus
-`InstallClaudeCode(ctx)` / `InstallVsCode(ctx)` returning named outcome values and never a Go error —
-`connections.Service.Reveal`'s precedent, already applied twice. Registered in `main.go` beside
-`GitClientsService`. Bindings regenerated with `wails3 task common:generate:bindings`, never a
-hand-typed flag list.
+`bridge.RepoMapService` (`internal/bridge/repomap.go`), shaped like `GitClientsService`, now also
+owning the embedded instance's actual lifecycle (D7's correction) rather than only rendering a
+command for a process it never touches: it holds a `*repomap.Server` reference once started, `nil`
+while off. `Status()` returns whether it is running, its resolved repository's root (or the reason it
+isn't running — no repository resolved, a bind failure), its port, whether a plaintext token is
+currently held (false right after an app restart until `Regenerate`, since a hash cannot be reversed),
+the rendered Claude Code command string (empty unless running with a plaintext held) and the
+`claude` CLI's own probe. `SetEnabled(ctx, enabled)` patches the settings leaf and: on false→true,
+resolves the repository, mints a fresh D8 token, starts `internal/repomap`'s embedded constructor,
+keeps the `*repomap.Server` and plaintext in memory; on true→false, stops it and drops the reference. Every false→true transition mints fresh regardless
+of whether a token file already exists for that repository (D8's own "regenerated when the toggle
+turns on" framing, taken literally and consistently for both the toggle and app-boot-with-the-leaf-
+already-true — the one exception being app boot itself, which loads rather than mints, §3.2/D8, since
+no explicit toggle click happened there). `Regenerate(ctx)` mints a
+fresh token for the already-running instance without touching the setting or its lifecycle (the
+restart-recovery path). `InstallClaudeCode(ctx)` returns a named outcome value and never a Go error —
+`connections.Service.Reveal`'s precedent, already applied twice (`gitvsix.Installer.Install`,
+`GitClientsService.Approve`/`Deny`). Registered in `main.go` beside `GitClientsService`; `main.go`'s
+own shutdown path calls `Stop` the same way it closes `gitSock`. Bindings regenerated with `wails3
+task common:generate:bindings`, never a hand-typed flag list.
 
-Renderer: `frontend/src/state/repomap.ts` (status + install actions, the shape `gitClients.ts`
-already has) and one new `Code intelligence` section in `SettingsDialog.vue`, laid out strictly as
-toggle, then command, then button, per command.
+Renderer: `frontend/src/state/repomap.ts` (status + `setEnabled`/`regenerate`/`installClaudeCode`,
+the shape `gitClients.ts` already has) and one new **Code intelligence** tab in `SettingsDialog.vue`'s
+own section list (§7.1), laid out strictly as toggle, then command, then button — the tab calls
+`setEnabled` directly from the toggle (bypassing draft/Save, §7.1) and shows a **Regenerate** action
+in place of the command whenever enabled is true but no plaintext token is currently held.
+
+### 7.5 Unrelated, but touched: the existing VS Code `.vsix` install button gets command visibility
+
+Separate feature, separate button, mentioned here only because the same transparency principle
+applies and this phase is already touching `SettingsDialog.vue`'s `Connected editors` tab's
+neighbourhood. The **already-shipped** "Install VS Code Integration" button
+(`internal/gitvsix.Installer`, `Connected editors` tab) runs `code --install-extension <vsixPath>
+--force` (or `open -R <vsixPath>` when `code` isn't found) but today shows the user neither command
+before the click — only the outcome after. This phase adds that visibility: render the command
+string (`gitvsix.Status`'s own `CodePath`/`VsixPath` are already both known pre-click) above the
+existing button, mirroring the Claude Code command-then-button order this plan already uses
+elsewhere. No change to `gitvsix.Installer.Install`'s own resolution or spawn logic — this is
+display-only, in `SettingsDialog.vue` and, if the exact command string needs the resolved paths
+verbatim, one small addition to `GitVsixStatus`'s wire shape (`bridge/gitclients.go`).
 
 ## 8. Concurrency, cancellation, logging
 
-- One `Graph`, no mutable state, safe for concurrent tool calls (C2 §8); the SDK may run handlers
-  concurrently and nothing here assumes otherwise.
+- One `Graph`, no mutable state, safe for concurrent tool calls (C2 §8); the SDK's stateless HTTP
+  handler (§1.2) runs handlers concurrently across every connected client by construction, and
+  nothing here assumes otherwise — this is what "one server, many clients" (D1) actually rests on.
 - Every handler takes the SDK's `ctx` straight through to `codegraph` and `database/sql`, so a
-  client-cancelled call stops mid-query.
-- **Nothing writes to stdout except the SDK.** `log/slog` to stderr with a `scope` attribute
-  (`gitclient`'s convention), no `fmt.Print*` anywhere in `cmd/kira-repo-map` or `internal/repomap`.
-  Level from `KIRA_REPO_MAP_LOG` (`error` default) — a stdio server's stderr is the client's log
-  file, so quiet by default.
-- `SIGINT`/`SIGTERM` cancel the root context: watcher closed, `Index.Close()`, `Store.Close()`, lock
-  released. The bun wrapper forwards both.
-- Flags: `--repo <path>` and `--version`. Nothing else — every bound in §4.2 and §6.2 is a constant,
-  and a knob nobody has asked for is scope that stayed out.
+  client-cancelled request stops mid-query.
+- **Logging, corrected: stdout is no longer reserved (§3.1).** `cmd/kira-repo-map`'s headless binary
+  logs its listening URL and ready-to-copy command to stdout on a successful bind (§3.1); routine
+  operational logging (`log/slog`, `gitclient`'s own `scope`-attribute convention, level from
+  `KIRA_REPO_MAP_LOG`, `error` default) still goes to stderr in both the headless and embedded
+  instance, same posture as before, just no longer load-bearing for protocol correctness the way it
+  was under stdio.
+- `SIGINT`/`SIGTERM` (headless) and `bridge.RepoMapService.Stop`/app shutdown (embedded) both cancel
+  the same root context: HTTP server shut down, watcher closed, `Index.Close()`, `Store.Close()`, lock
+  released. The bun wrapper forwards both signals to the headless binary.
+- Flags (`cmd/kira-repo-map` only — the embedded instance takes its equivalents as constructor
+  arguments, never flags): `--repo <path>` and `--version`. No `--port` — §5's default-then-fallback
+  selection is automatic, and a knob nobody has asked for is scope that stayed out.
 
 ## 9. Explicitly out of scope
 
 - **Any new graph capability.** This phase adds no operation `codegraph` does not already expose, and
   changes neither `codeparse` nor `codeindex`'s schema.
 - **File contents, MCP resources, MCP prompts, sampling, roots.**
-- **HTTP/SSE transport.** stdio is what a CLI-launched, per-invocation, local server needs; a network
-  listener would also undo §5's first isolation claim.
-- **A multi-repository server.** One process, one repository, resolved at launch. An agent works in a
-  checkout; a server that could answer about any indexed repository would need a repository argument
-  on every tool and would happily answer about code the caller never opened.
-- **Non-macOS packaging.** The app is macOS-packaged; the Linux/dev path is `bun run`.
+- **stdio transport.** Corrected out of the original draft's *in-scope* column into this one (D1):
+  HTTP is what "one server, many clients" (the user's own framing) actually needs; stdio ties one
+  process to one client by construction.
+- **A multi-repository server, revisited and kept out on purpose.** D1's HTTP correction raised the
+  question of whether one persistent process should now serve requests scoped to whichever repository
+  each one names, since it no longer exits after a single client disconnects. Decided against: nothing
+  about serving many *clients* requires serving many *repositories* — HTTP already gives "one process,
+  arbitrarily many concurrent callers" against the one repository it resolved at startup (§8), which is
+  all D1's correction actually asked for. Real multi-repository support would mean a repository
+  argument on every tool, per-repository auth and sync-lock bookkeeping inside one process instead of
+  one file each, and a cache-eviction story for repositories no longer in use — a materially bigger
+  phase than this one, with no concrete user of it today (C4-C6 each work with one repository, or one
+  worktree, at a time). One process still resolves and serves exactly one repository (D4 unchanged);
+  a user or agent working across several repositories runs several server instances, each on its own
+  port (D5).
+- **Non-macOS packaging.** Moot for the embedded instance (§3.2's correction: no separate binary is
+  packaged at all); the headless binary is a Go build, cross-platform already, and this phase adds no
+  platform-specific packaging for it.
+- **A process-manager UI** (start/stop/restart button, health indicator beyond the plain running
+  boolean §7.4's `Status()` already returns). The toggle is the only lifecycle control this phase
+  adds.
+- **Any VS Code MCP registration** (an earlier plan draft's mistaken D6 — see §7.3). No
+  `.vscode/mcp.json`, no user-profile `mcp.json`, no `code --add-mcp`, in any form.
 - **Auto-registration.** Nothing registers itself on launch, ever. That is what "command visible
   first, button second" means.
 - **Reading the enable setting from the server** (D7).
@@ -530,30 +775,36 @@ toggle, then command, then button, per command.
 Each step builds, passes `go vet` and `bun run lint`, and carries its own tests where §11 calls for
 them. Expensive verification runs once at S6, per `CLAUDE.md`.
 
-**S1 — SDK plus a server that serves one tool.** Add `github.com/modelcontextprotocol/go-sdk` to
-`go.mod`. `cmd/kira-repo-map/main.go` (flags, slog to stderr, signals) and `internal/repomap`'s
-`server.go`/`repo.go`/`index.go`: repository resolution, background `Sync`, the readiness gate, the
-sync flock, `Watch`, and `outline_file` as the single registered tool. Working increment: a real MCP
-server an editor can register and call.
+**S1 — SDK plus a server that serves one tool, over HTTP.** Add `github.com/modelcontextprotocol/
+go-sdk` to `go.mod`. `cmd/kira-repo-map/main.go` (flags, slog to stderr, the startup token check,
+signals) and `internal/repomap`'s `server.go`/`http.go`/`repo.go`/`index.go`: repository resolution,
+background `Sync`, the readiness gate, the sync flock, `Watch`, port bind-with-fallback, the
+`auth.RequireBearerToken`-wrapped `StreamableHTTPHandler`, and `outline_file` as the single registered
+tool. `internal/mcpauth`'s mint/verify/persist. Working increment: a real MCP server over HTTP an
+editor can register and call.
 
 **S2 — The remaining five tools.** `locator.go`, `tools.go`, `render.go`: §6.1's rules, the five
-tools, §6.3's rendering, the tightened limits, the Go-implementations message, `IsError` semantics.
-Tests per §11.1 and §11.2.
+tools, §6.3's rendering, the tightened limits, the Go-implementations message, `IsError` semantics —
+all transport-agnostic, unaffected by S1's HTTP correction. Tests per §11.1 and §11.2.
 
-**S3 — The bun launch path.** `scripts/mcp-repo-map.ts` plus the two `package.json` scripts. Verify
-by hand that a registered `bun run --silent mcp:repo-map` connects from a real client and that
-stdout carries protocol bytes only.
+**S3 — The bun launch path.** `scripts/mcp-repo-map.ts` plus the two `package.json` scripts, plus the
+startup log line (§3.1) with the ready-to-copy command. Verify by hand that a registered `bun run
+mcp:repo-map` binds, logs a working command, and a real client connects to it over HTTP.
 
-**S4 — `internal/mcpinstall` plus the bridge service.** Command rendering for both clients, both
-probes (`claude` candidates here, `gitvsix.CodeCandidates()` exported for `code`), both installs,
-named outcomes; `bridge/repomap.go`, `main.go` registration, regenerated bindings. Verify §7.3's
-`code --add-mcp` on a real machine at this step.
+**S4 — `internal/mcpinstall` plus the bridge service, now owning the embedded instance's lifecycle.**
+Command rendering for Claude Code (HTTP transport + header, §7.2), its probe (`claude` candidates),
+its install, named outcomes; `bridge/repomap.go`'s `RepoMapService` — `SetEnabled` starts/stops an
+embedded `*repomap.Server`, `Status`/`Regenerate` per §7.4 — `main.go` registration (construction on
+boot if the leaf is already `true`, `Stop` wired into the existing shutdown path beside `gitSock`),
+regenerated bindings. No VS Code MCP work here (§7.3).
 
-**S5 — Settings leaf, the settings section, packaging.** The leaf through all four layers
-(`settings.ts`, `model`, `repos`, the dialog), `state/repomap.ts`, the `Code intelligence` section in
-toggle/command/button order, the Playwright spec (§11.4). Then `common:build:repomap`, the
-`create:app:bundle` copies, the universal `lipo`, the `verify-packaging.sh` assertion; record the
-measured helper size and bundle delta in this commit message.
+**S5 — Settings leaf, the settings tab, and the vsix-button command visibility.** The leaf through
+all four layers (`settings.ts`, `model`, `repos`, the dialog), `state/repomap.ts`, the new **Code
+intelligence** tab in toggle/command/button (or Regenerate) order, the Playwright spec (§11.4); the
+small `Connected editors` tab enhancement from §7.5 (show the VS Code `.vsix` install command before
+its existing button). No packaging task (§3.2's correction removed it) — instead, measure and record
+in this commit's message the `cmd/kira-studio` app binary's size delta from linking in
+`internal/repomap` plus the MCP SDK, the same kind of number C1 recorded for its own grammar registry.
 
 **S6 — Docs and verification.** §12's updates, then §13's full pass.
 
@@ -571,15 +822,21 @@ Against `CLAUDE.md`'s bar, file by file. What earns a test:
    second process holding the flock makes the first wait; a held lock past the deadline degrades to
    serving instead of hanging; `Close` during a pending wait. Concurrency, ordering and cancellation:
    named in the bar explicitly.
-3. **One conformance smoke test over `mcp.NewInMemoryTransports()`** — a real client against a real
+3. **`internal/mcpauth`'s mint/verify round trip and `internal/repomap/http.go`'s auth wiring** — a
+   minted token verifies against its own stored record and no other; a wrong or missing bearer header
+   is rejected before a tool handler ever runs (a fake handler that would fail the test if reached).
+   The one place a request could reach the index despite carrying no valid token.
+4. **One conformance smoke test over `mcp.NewInMemoryTransports()`** — a real client against a real
    server over a seeded `codeindex.Store` (the same `ReplaceFile` seeding C2's own tests use):
    `ListTools` returns exactly the six advertised names, and each tool called once returns a
-   non-error result. Not per-tool coverage — the equivalent of C1's one-line-per-grammar smoke parse,
-   guarding the thing a compiler cannot: a schema the SDK rejects at registration, or a renamed tool.
-4. **One Playwright UI spec** — with the toggle off, no command text and no Install button exist;
-   turning it on reveals, per client, the command *before* the button in DOM order. This is SPEC's
-   own non-negotiable ("enabling is never a silent action"), and DOM order is the only place it is
-   actually enforced.
+   non-error result. In-memory transport bypasses HTTP/auth entirely (by design — this test is about
+   the tool registration surface, not the network layer, which item 3 already covers) — not per-tool
+   coverage either, the equivalent of C1's one-line-per-grammar smoke parse, guarding the thing a
+   compiler cannot: a schema the SDK rejects at registration, or a renamed tool.
+5. **One Playwright UI spec** — with the toggle off, no command text and no Install button exist on
+   the Code intelligence tab; turning it on reveals the Claude Code command *before* the button in
+   DOM order. This is SPEC's own non-negotiable ("enabling is never a silent action"), and DOM order
+   is the only place it is actually enforced.
 
 What gets nothing: `render.go` (string formatting with no edge case), the six handlers themselves
 (thin pass-throughs over `codegraph`, covered incidentally by 3), argument clamping (one bound each,
@@ -590,19 +847,23 @@ share).
 
 ## 12. Documentation to update
 
-- **`docs/ARCHITECTURE.md` Stack table**: one row for the MCP SDK — official, Apache-2.0, stdio, why
-  `mcp-go` and hand-rolling were declined, and the helper binary's measured size.
-- **`docs/ARCHITECTURE.md`**, a new subsection after the `codegraph` one: the server's process shape,
-  both launch paths, repository resolution and self-indexing, the six tools, and §5's isolation
-  mechanisms including the per-repository sync lock file under `${KIRA_HOME}`.
+- **`docs/ARCHITECTURE.md` Stack table**: one row for the MCP SDK — official, Apache-2.0, Streamable
+  HTTP (corrected from stdio), why `mcp-go` and hand-rolling were declined, and the app binary's
+  measured size delta.
+- **`docs/ARCHITECTURE.md`**, a new subsection after the `codegraph` one: the two-instance process
+  shape (embedded, owned by the app's own lifecycle; headless, `bun run`), repository resolution and
+  self-indexing (including the embedded instance's cwd-based limitation, §3.2), the six tools, and
+  §5's isolation mechanisms — loopback binding, port fallback, per-request bearer auth, the
+  per-repository sync lock file under `${KIRA_HOME}`.
 - **`docs/ARCHITECTURE.md` Storage**: `codeindex.db` now genuinely has two processes on it; name the
   lock file beside it.
+- **`docs/ARCHITECTURE.md` Known open items**: the embedded instance's repository resolution is
+  cwd-based only (§3.2) — real "current repository" selection for a packaged app is C5/C8's job, not
+  this phase's.
 - **`docs/DEV_ENVIRONMENT.md`**: a `repo-map MCP server` section — run `bun run mcp:repo-map:build`
-  once after a fresh clone (the cold cgo build outruns an MCP client's startup timeout), register
-  with `claude mcp add kira-repo-map -- bun run --silent mcp:repo-map`, and `KIRA_REPO_MAP_LOG` for
-  stderr logging.
-- **`docs/PACKAGING.md`**: the helper binary in `Contents/MacOS/`, its build task, and the
-  `verify-packaging.sh` assertion.
+  once after a fresh clone (the cold cgo build outruns a slow first index), register with the command
+  `bun run mcp:repo-map` prints on its own stdout, and `KIRA_REPO_MAP_LOG` for stderr logging.
+- **No `docs/PACKAGING.md` change** — §3.2's correction: no separate helper binary is packaged.
 - **No `NOTICES.md` change** — §1.1.
 - **`CLAUDE.md` is C4's job, not this phase's.** No section here.
 
@@ -623,6 +884,6 @@ tool-call latency, and the rendered output of one `find_references` on a name wi
 honest measure of whether §6.3's format is actually cheaper than reading the files, before C5 starts
 depending on it.
 
-Verify by hand, because no test can: `bun run --silent mcp:repo-map` emits nothing on stdout before
-the first protocol byte, and the Settings section renders command-before-button for both clients on
-a real packaged build.
+Verify by hand, because no test can: `bun run mcp:repo-map` prints a working, copy-pasteable
+registration command on a successful bind, and the Code intelligence tab renders command-before-button
+(or Regenerate) on a real dev build with the toggle exercised on and off.
