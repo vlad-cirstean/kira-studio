@@ -43,6 +43,7 @@ originally written rather than corrected to match later reality — see each cha
 | Outbound gRPC client (P11) | `google.golang.org/grpc` + `google.golang.org/protobuf` (`dynamicpb`/`protojson`/`protodesc`/`protoregistry`, grpc-go's own reflection client) + `bufbuild/protocompile`, all in `apps/kira-studio/internal/grpcclient/` — **no generated `.pb.go` code, no `protoc`/`buf` build step** | dynamic, schema-at-runtime: a method is discovered via server reflection or a supplied `.proto` (compiled by `protocompile`, the same compiler `buf` uses, with no codegen), then called through `dynamicpb`/`protojson` against a descriptor `grpc.NewClient` never needed ahead of time. Unary and server-streaming only — client- and bidi-streaming are out of scope. The largest single dependency this app has taken, **≈14.2 MB** of binary (measured `linux/amd64`, no flags) — the *same order* as `pgx` + `mongo-driver/v2` + both AWS SDK clients + `franz-go` combined (≈13.5 MB), in a binary that already links ten database adapters. Every descriptor source (a reflection round-trip, a compiled `.proto`) gets its **own** private `*protoregistry.Files` — never `protoregistry.GlobalFiles`, which panics outright on a duplicate file path, a realistic outcome for two users' `.proto` files both declaring the same `package` |
 | Git module transport (v1.3) | A Unix domain socket plus `internal/bridge/rpcstream`'s correlated-RPC-with-credits protocol — JSON control frames, FlatBuffers bulk payloads (`"KIG1"`) | The git module is **headless**: the backend is in this binary, the frontend is a separately-installed VS Code extension (`apps/kira-studio-vscode`) reached over `${KIRA_HOME}/git.sock`. **The transport itself took no new runtime dependency** — `net` and `encoding/json` plus the FlatBuffers runtimes P11 already put in the graph. What the module *did* add: `github.com/fsnotify/fsevents` (the darwin repo watcher, `darwin && cgo`, G9), `golang.org/x/text/unicode/norm` (NFC path normalization, G27), and `@vscode/vsce` as a build-time-only packager. See the Git module section below |
 | Code parsing (C1, extraction fixes C2) | `github.com/tree-sitter/go-tree-sitter` (the official cgo binding) plus ten upstream grammar modules — java, python, javascript, typescript+tsx, go, rust, html, css, json, svelte, all MIT | `internal/codeparse` is the only package in the repo importing tree-sitter, and the only unconditionally-cgo one (every other cgo file in the app is a `darwin && cgo`-gated exception, below) — a real, priced cost: a C compiler becomes a build requirement for this package and anything importing it, and `CGO_ENABLED=0` no longer builds such a caller. Declined every pure-Go alternative found: `gotreesitter` is a from-scratch reimplementation of the parse-table interpreter and every external scanner (3.9x slower per its own README, with 3 of 206 grammars already degraded), a materially different risk than `modernc.org/sqlite`'s mechanical transpilation of the same upstream C; `malivvan/tree-sitter` (a wasm build under `wazero`, the right architecture) is 5 stars/3 commits/self-described pre-release; building that wasm ourselves would mean owning a toolchain and a regeneration script for a capability the packaged darwin build already has via cgo. Every grammar reports ABI 14, inside the binding's own compatible range [13, 15] (`TREE_SITTER_MIN_COMPATIBLE_LANGUAGE_VERSION`/`TREE_SITTER_LANGUAGE_VERSION`), checked at construction. Binary size delta measured the same way P11's own gRPC dependency was (a minimal program against a `println` baseline, `linux/amd64`, no flags): **+6.6 MB** for the grammar registry alone. Vue has no grammar of its own (no Go module exists) and is parsed as an HTML container with per-block injection instead. **C2** compiles TypeScript and TSX against javascript's own vendored `tags.scm` first, then their own — upstream ships the TypeScript file as an *addition* to the JavaScript one (signature/abstract/interface patterns only, no `; inherits:` header), so the TypeScript file alone indexed almost nothing; composing both is what makes a plain class, function, method or call show up in a `.ts`/`.tsx` file at all. C2 also adds four small repo-authored `queries/<lang>/c2_implements.scm` files (TypeScript, TSX, JavaScript, Python) beside the vendored `tags.scm`s — the only hand-written query text in the package (§4.1's own "no hand-written queries" gets a narrow, named exception here) — recovering `implements`/`extends`/base-class relationships no vendored pattern expresses for those four languages, through the same `@reference.implementation` capture Java and Rust's own vendored queries already use |
+| MCP server (C3) | `github.com/modelcontextprotocol/go-sdk` (Apache-2.0, MIT for un-relicensed contributions), v1.7.0, over the SDK's own **Streamable HTTP** transport, not stdio | The protocol org's own reference implementation, at a stable v1 — the axis that matters for a wire format that keeps moving; `mark3labs/mcp-go` (MIT, real and widely used, but the second implementation, not the reference one) and hand-rolling JSON-RPC framing were both declined (`CLAUDE.md`'s library-first rule finds nothing hand-rolling would earn its keep against here — stdio framing, initialize/capabilities, tool listing, cancellation and schema validation are exactly what the SDK already does). Streamable HTTP, not the SDK's own stdio transport, because the server is one long-running process serving as many concurrent clients/tool calls as connect (`internal/repomap`), never a process spawned fresh per client; the SDK's own `auth.RequireBearerToken` middleware gates every request, reused rather than hand-rolled for the same reason. `mcp.AddTool[In, Out]` derives each tool's input schema from a Go struct's own tags, so every tool's schema has exactly one source. Binary size delta measured the same way as `codeparse`'s own row, above, comparing the whole `cmd/kira-studio` binary before/after (no separate helper binary exists, see the `internal/repomap` section below): **+12.38 MB** (`linux/amd64`, unstripped) for `internal/repomap`, `internal/mcpauth`, `internal/mcpinstall` and the SDK's own dependency graph (`golang.org/x/oauth2`, `google/jsonschema-go`, `segmentio/encoding`, `yosida95/uritemplate`, `golang-jwt/jwt`) |
 
 Driver libraries — the best-maintained option per engine, **Go-native for all ten kinds as of P58e
 M9.3** (checkpoint C2): `jackc/pgx/v5` (postgres), `go-sql-driver/mysql` (mariadb/mysql, via a shared
@@ -840,7 +841,13 @@ extraction logic — not a grammar or query change, both already covered — wou
 produces, plus every vendored *and* repo-authored query file's own bytes) is checked on every sync;
 a mismatch truncates and rebuilds that one repository's rows rather than trusting them under a
 changed extraction contract. A repository untouched for 14 days has its rows swept the same way, on
-any open, the same idle window `review.db` uses. **Schema version is 2 as of C2**: `reference` also
+any open, the same idle window `review.db` uses. **C3's repo-map MCP server has two independent
+instances that can each open this file at once** — an embedded one inside this app's own process
+and a headless one (`bun run mcp:repo-map`), below — and a per-repository lock file,
+`${KIRA_HOME}/codeindex-sync-<first 12 hex of sha256(repo_id)>.lock`, keeps two instances from
+parsing one repository's initial sync twice; WAL, `_busy_timeout` and the connection pool are what
+make the file itself safe under that, unchanged from C1's own design. **Schema version is 2 as of
+C2**: `reference` also
 carries the identifier's own range (`name_start_byte`/`name_end_byte`/`name_start_row`/
 `name_start_column`), separate from the reference node's own range — for a Java `method_invocation`
 or a JavaScript member call, that node range starts at the receiver, before the method name, so a
@@ -853,9 +860,9 @@ briefly *wrong*. See `internal/codegraph`, directly below, for what reads this r
 
 **`internal/codegraph` (C2) computes the code graph live over `codeindex.db`'s own rows — no edge
 table, ever.** `Graph` is built from a `*codeindex.Store` plus a `repo_id`, never from an `Index` —
-the same seam that lets C3's MCP server (a separate process, no `gitclient.Runner`, no watcher)
-open the identical file and answer without a worktree present; `Sync` writes `meta.repo_root` on
-every pass precisely so that process can map a path to a `repo_id` at all. An edge table would be
+the same seam that lets C3's repo-map MCP server (below) open the identical file and, in its
+degraded no-`git` mode, answer without a worktree present at all; `Sync` writes `meta.repo_root` on
+every pass precisely so that path can map to a `repo_id` with no `gitclient.Runner` in hand. An edge table would be
 derived, cross-file state: saving one file can change which definition a reference in an
 *unrelated* file resolves to (resolution can fall back repository-wide), so keeping it correct
 would mean recomputing far more than the changed file on every save — against a watcher whose
@@ -904,6 +911,45 @@ word-under-cursor name, resolved against the same file's symbols — SPEC's own 
 case, at the cost of one optional field and no new parsing. Nothing cross-component resolves: no
 prop flow, no Angular DI, no JSX element-to-component edge — each would need a type system or a
 hand-written identifier query this phase never adds.
+
+**`internal/repomap` (C3) is an MCP protocol server in front of `codegraph.Graph` — no new parsing,
+no new resolution logic, just a wire format.** `github.com/modelcontextprotocol/go-sdk` (Apache-2.0,
+the protocol org's own reference implementation, v1.7.0) over MCP's Streamable HTTP transport, never
+stdio: the server is one long-running process serving as many concurrent clients/tool calls as
+connect, not a process spawned fresh per client (stdio ties one process to one client by
+construction, which is the wrong shape for "an agent keeps calling this while it works"). Six tools,
+one per `codegraph` operation this chapter's own SPEC row names plus `outline_file` — `find_definition`,
+`find_references`, `find_implementations`, `search_symbols`, `search_files`, `outline_file` — each a
+thin argument-to-`Query` translation (`locator.go`'s five resolution rules: an explicit `file`+`line`,
+a `file`+`symbol` hint, or `symbol` alone resolved through `SearchSymbols`, ambiguity returned as
+candidates rather than a silent top-hit guess) and a grep-like text rendering (`render.go`) that
+prints every `Target`'s own `Rule`/`Confidence` rather than hiding C2's honesty markers behind a
+clean-looking result.
+
+**Two independent instances of the same server code, never a shared listener.** *Embedded*: started
+and stopped by this app's own process, in step with the `codeIntel.mcpServerEnabled` setting — on
+while the app is running and the toggle is on, off the moment either isn't (`internal/bridge/
+repomap.go`'s `RepoMapService`, `main.go`'s own `StartRepoMapIfEnabled`/`StopRepoMap` calls beside
+`gitSock.Start`/`Close`). Its repository is resolved from this process's own working directory via
+`gitclient.Identify` — correct for `wails3 task dev` run from this repository's own root (this
+chapter's own dogfooding loop), honestly limited for a packaged app launched from `/Applications`
+(Known open items, below). *Headless*: `bun run mcp:repo-map`, a wholly separate OS process, not
+managed by any setting, resolving its own repository from `--repo` or its own cwd — the path C4-C6
+use for developing on this repo, or any repository, without the GUI open. Each instance binds its
+own port (a fixed default first, an OS-assigned ephemeral one on conflict — never `0.0.0.0`, always
+`127.0.0.1`) and mints its own static bearer token (`internal/mcpauth`: `crypto/rand`, base64url on
+the wire, `sha256(salt‖token)` at rest — `git_clients`' own trust-store shape, one JSON file per
+repository under `KIRA_HOME` rather than a database table, since `kira.db` is never opened by this
+server package and a `codeindex.db` table would mean a second connection pool for a two-column read).
+Every request is checked — the SDK's own `auth.RequireBearerToken` middleware wraps the tool
+handler — because a loopback TCP port, unlike `git.sock`'s Unix domain socket, is any local process's
+for the asking regardless of who is meant to be the only caller.
+
+**Registration is Claude Code CLI only** (`internal/mcpinstall`, `claude mcp add --transport http
+--scope user <name> <url> --header "Authorization: Bearer <token>"`, verified against the real CLI):
+the Settings dialog's Code intelligence tab shows the command before its Install button, never the
+reverse, and the button re-resolves `claude`'s own location fresh on every click rather than trusting
+a cached probe. No VS Code MCP registration of any kind is attempted.
 
 **Why a content snapshot and not just a commit sha.** The trivial case — nothing rewritten since
 the last review — is `git merge-base --is-ancestor <lastReviewedSha> HEAD`; when that succeeds an
@@ -2835,3 +2881,10 @@ place. `CLAUDE.md` states the process rule; this is the list itself.
   assembled from stored rows at all, let alone compared against an interface's. A data limit, not
   an effort estimate: closing it needs a receiver-capturing query and a schema column, not more
   resolver logic.
+- **The repo-map MCP server's embedded instance resolves its repository from this app process's own
+  working directory only** (C3 §3.2). Correct for `wails3 task dev` run from this repository's own
+  root; a packaged `Kira Studio.app` launched from `/Applications` has a cwd that is very unlikely
+  to be a git worktree at all, so the embedded instance simply does not start for a real end user
+  today, and the Code intelligence tab says why. Real "current repository" selection for a packaged
+  app is native git mode's job (C8) or C5's own dogfooding wiring, not invented ahead of either; the
+  headless `bun run mcp:repo-map` path works for any repository regardless.

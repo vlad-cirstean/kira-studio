@@ -250,3 +250,37 @@ running it here.
   data-plane stream over a real TCP listener with no webview and no scheme registration at all —
   this repo's established substitute for GUI-driven boot proofs in a sandbox with no display,
   preferred over `xvfb`/`xdotool`/screenshot techniques. `tests/e2e-real/` is built on it.
+
+## repo-map MCP server — running and registering it in this environment (C3)
+
+- **Run `bun run mcp:repo-map:build` once after a fresh clone, before registering with any MCP
+  client.** `internal/codeparse`'s cgo build (above) is the same ~34 MB-of-generated-C cost here;
+  the separate build script exists precisely so a client's own connection attempt isn't the first
+  thing to pay it. `bun run mcp:repo-map` (no `:build`) always rebuilds too (Go's own build cache
+  makes a no-op rebuild sub-second) and then execs the binary — the one command to actually run it.
+- **`bun run mcp:repo-map` blocks in the foreground, serving HTTP, and prints its own registration
+  command to stdout once bound** — it is not a one-shot script. Run it in the background (this
+  environment's own "start, poll, test, kill inside one invocation" rule, above) if a following
+  command needs to register against it or call it with `curl` in the same session.
+- **Register the real `claude` CLI against it** with the exact command the process prints, e.g.
+  `claude mcp add --transport http kira-repo-map http://127.0.0.1:8765/mcp --header "Authorization:
+  Bearer <token>"` — verified in this environment against a real `claude` (2.1.270): `claude mcp
+  list` reports the server "✓ Connected" once running. `claude mcp remove kira-repo-map -s user`
+  cleans up the global `~/.claude.json` entry afterward — leaving a stale registration behind
+  confuses a later, unrelated session in the same container.
+- **`KIRA_REPO_MAP_LOG`** (`debug`/`info`/`warn`/`error`, default `error`) controls stderr verbosity
+  for both the headless and embedded instance — a stdio server's stderr used to be the client's
+  literal log file; now merely conventional, since Streamable HTTP means stdout is free too (the
+  process's own startup banner and registration command use it deliberately, §3.1 of the plan).
+- **The embedded instance needs a real git repository at the app process's own working directory**
+  (C3 §3.2) — `wails3 task dev` run from this repository's own root resolves correctly; a `go build
+  -tags server` boot proof (above) run from anywhere else won't have one to find, and the Code
+  intelligence tab will show the "no repository found" error rather than a command. Use the
+  headless path (`bun run mcp:repo-map --repo <path>`) to exercise the server against an arbitrary
+  checkout in this environment instead.
+- **The Playwright UI tier needs `webkit` explicitly fetched** (unrelated to this phase, but hit
+  while verifying its own spec): this container ships only Chromium preinstalled.
+  `bunx playwright install webkit` downloads the browser itself; its own post-install warning names
+  the missing system libraries (`apt-get install libevent-2.1-7t64 libgstreamer-plugins-bad1.0-0
+  libflite1 gstreamer1.0-libav` at the time of writing) — install exactly those, not a generic
+  `playwright install-deps`, which pulls far more than `webkit` alone needs.
