@@ -37,6 +37,9 @@ type locatorFields struct {
 	Line   int    `json:"line,omitempty" jsonschema:"1-based line number within file."`
 	Column int    `json:"column,omitempty" jsonschema:"1-based BYTE column within line (not a character or UTF-16 column). Defaults to 1."`
 	Symbol string `json:"symbol,omitempty" jsonschema:"Symbol name — a hint alongside file, or, alone, resolved by searching the index for an exact name match."`
+	// OmitSource is C8 plan D8's opt-out: zero value (false) means "include" — every hit keeps
+	// its own source-line continuation.
+	OmitSource bool `json:"omitSource,omitempty" jsonschema:"Omit the source line printed under each hit. Default false — each hit is followed by its own line of code, indented."`
 }
 
 func (f locatorFields) args() locateArgs {
@@ -57,7 +60,7 @@ func (s *Server) resolve(ctx context.Context, f locatorFields, emptyMsg func() s
 		result, _, _ := errResult(res.msg)
 		return codegraph.Query{}, result, nil
 	case res.ambiguous != nil:
-		src := s.sourceForTargets(ctx, false, res.ambiguous)
+		src := s.sourceForTargets(ctx, f.OmitSource, res.ambiguous)
 		result, _, _ := textResult(renderAmbiguous(f.Symbol, res.ambiguous, src))
 		return codegraph.Query{}, result, nil
 	case res.empty:
@@ -97,7 +100,7 @@ func (s *Server) findDefinition(ctx context.Context, _ *mcp.CallToolRequest, in 
 	if q.Point != nil {
 		resolvedFrom = position(q.Path, codegraph.Point{Row: q.Point.Row, Column: q.Point.Column})
 	}
-	src := s.sourceForTargets(ctx, false, targets)
+	src := s.sourceForTargets(ctx, in.OmitSource, targets)
 	return textResult(renderDefinitions(name, resolvedFrom, targets, src))
 }
 
@@ -153,7 +156,7 @@ func (s *Server) findReferences(ctx context.Context, _ *mcp.CallToolRequest, in 
 	if name == "" && len(refs.Sites) > 0 {
 		name = refs.Sites[0].Name
 	}
-	src := s.sourceForSites(ctx, false, refs.Sites)
+	src := s.sourceForSites(ctx, in.OmitSource, refs.Sites)
 	return textResult(renderReferences(name, refs.Sites, refs.Total, refs.Truncated, src))
 }
 
@@ -186,18 +189,19 @@ func (s *Server) findImplementations(ctx context.Context, _ *mcp.CallToolRequest
 	if file, ok, err := s.store.GetFile(ctx, s.repoID, q.Path); err == nil && ok {
 		language = file.Language
 	}
-	src := s.sourceForTargets(ctx, false, targets)
+	src := s.sourceForTargets(ctx, in.OmitSource, targets)
 	return textResult(renderImplementations(name, language, targets, src))
 }
 
 // --- search_symbols ---
 
 type searchSymbolsArgs struct {
-	Query     string   `json:"query" jsonschema:"Symbol name to search for (prefix match by default)."`
-	Substring bool     `json:"substring,omitempty" jsonschema:"Match query anywhere in the name, not just as a prefix."`
-	Kinds     []string `json:"kinds,omitempty" jsonschema:"Restrict to these symbol kinds, e.g. function, method, class."`
-	Languages []string `json:"languages,omitempty" jsonschema:"Restrict to these languages."`
-	Limit     int      `json:"limit,omitempty" jsonschema:"Max results. Default 30, max 200."`
+	Query      string   `json:"query" jsonschema:"Symbol name to search for (prefix match by default)."`
+	Substring  bool     `json:"substring,omitempty" jsonschema:"Match query anywhere in the name, not just as a prefix."`
+	Kinds      []string `json:"kinds,omitempty" jsonschema:"Restrict to these symbol kinds, e.g. function, method, class."`
+	Languages  []string `json:"languages,omitempty" jsonschema:"Restrict to these languages."`
+	Limit      int      `json:"limit,omitempty" jsonschema:"Max results. Default 30, max 200."`
+	OmitSource bool     `json:"omitSource,omitempty" jsonschema:"Omit the source line printed under each hit. Default false — each hit is followed by its own line of code, indented."`
 }
 
 const (
@@ -219,7 +223,7 @@ func (s *Server) searchSymbols(ctx context.Context, _ *mcp.CallToolRequest, in s
 	if err != nil {
 		return nil, nil, err
 	}
-	src := s.sourceForTargets(ctx, false, targets)
+	src := s.sourceForTargets(ctx, in.OmitSource, targets)
 	return textResult(renderSymbolSearch(in.Query, targets, src))
 }
 
