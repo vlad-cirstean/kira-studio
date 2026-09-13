@@ -25,6 +25,7 @@ import {
   type KeyValueTabRecord,
   type KeyValueTabState,
   type RepoFileTabState,
+  type RepoGraphTabState,
   type StreamTabRecord,
   type StreamTabState,
   TAB_KIND_MODE,
@@ -812,6 +813,13 @@ export function patchBrowseTabState(id: string, patch: Partial<BrowseTabState>):
 // since Monaco's own scroll events fire far more often than the line actually changes.
 export function patchRepoFileTabState(id: string, patch: Partial<RepoFileTabState>): void {
   patchTabState(id, 'repo-file', patch, { skipUnchanged: true });
+}
+
+// C10 §8 (S13): TabViewStateStore's own write() — git-ui re-serializes its whole PersistedViewState
+// on nearly every interaction (scroll, selection, column resize), so this skips a save when the
+// value is reference-unchanged, the same posture patchRepoFileTabState's own revealLine follows.
+export function patchRepoGraphTabState(id: string, patch: Partial<RepoGraphTabState>): void {
+  patchTabState(id, 'repo-graph', patch, { skipUnchanged: true });
 }
 
 export function markHydrated(id: string): void {
