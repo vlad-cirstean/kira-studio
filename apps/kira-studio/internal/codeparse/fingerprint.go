@@ -26,11 +26,18 @@ var fingerprintModules = []string{
 	"github.com/tree-sitter-grammars/tree-sitter-svelte",
 }
 
+// extractionVersion bumps whenever a change to this package's own extraction logic — as opposed to
+// a grammar or query-file change, both already covered below — alters what a parse produces (§2.5).
+// Without it, a change like referenceKinds gaining a new entry would alter extraction while leaving
+// the fingerprint identical, and stale rows would survive a Sync that should have rebuilt them.
+const extractionVersion = 2
+
 // Fingerprint hashes every grammar module version this binary actually linked (via
 // debug.ReadBuildInfo — the version actually built with, not a hand-copied go.mod string that
-// could drift) plus every embedded tags.scm file's own bytes (§5.3). codeindex compares this
-// against its own stored meta.parser_fingerprint on open: a mismatch means the extraction contract
-// changed under the stored rows, and the cache is truncated and rebuilt rather than trusted.
+// could drift), extractionVersion, plus every embedded query file's own bytes (§5.3, §2.5).
+// codeindex compares this against its own stored meta.parser_fingerprint on open: a mismatch means
+// the extraction contract changed under the stored rows, and the cache is truncated and rebuilt
+// rather than trusted.
 func Fingerprint() (string, error) {
 	info, ok := debug.ReadBuildInfo()
 	if !ok {
@@ -45,13 +52,16 @@ func Fingerprint() (string, error) {
 	for _, mod := range fingerprintModules {
 		fmt.Fprintf(h, "%s@%s\n", mod, versions[mod])
 	}
+	fmt.Fprintf(h, "extractionVersion=%d\n", extractionVersion)
 
-	paths := make([]string, 0, len(querySourcePaths))
+	var paths []string
 	seen := map[string]bool{}
-	for _, p := range querySourcePaths {
-		if !seen[p] {
-			seen[p] = true
-			paths = append(paths, p)
+	for _, ps := range querySourcePaths {
+		for _, p := range ps {
+			if !seen[p] {
+				seen[p] = true
+				paths = append(paths, p)
+			}
 		}
 	}
 	sort.Strings(paths)

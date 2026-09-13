@@ -7,3 +7,9 @@ class Greeter {
 function helper(name) {
   return "hi " + name;
 }
+
+class Robot extends Greeter {
+  build() {
+    return new Greeter();
+  }
+}

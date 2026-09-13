@@ -28,6 +28,9 @@ func TestExtractGoldenFixtures(t *testing.T) {
 		refs []refRow
 	}{
 		{
+			// Robot extends Person, and Robot.build() constructs one (§2.2/§2.4): exercises
+			// referenceKinds' new "class" entry (both the superclass and the `new` site) on top of
+			// the pre-existing interface/implements/call coverage.
 			id: Java, file: "testdata/extract/sample.java",
 			syms: []symRow{
 				{"interface", "Greeter", -1},
@@ -35,36 +38,60 @@ func TestExtractGoldenFixtures(t *testing.T) {
 				{"class", "Person", -1},
 				{"method", "greet", 2},
 				{"method", "helper", 2},
+				{"class", "Robot", -1},
+				{"method", "build", 5},
 			},
 			refs: []refRow{
 				{"implementation", "Greeter"},
 				{"call", "helper"},
+				{"class", "Person"},
+				{"class", "Person"},
 			},
 		},
 		{
+			// Robot(Greeter) exercises §2.3's C2-authored c2_implements.scm — Python's own tags.scm
+			// has no base-class pattern at all.
 			id: Python, file: "testdata/extract/sample.py",
 			syms: []symRow{
 				{"class", "Greeter", -1},
 				{"function", "greet", 0},
 				{"function", "helper", -1},
+				{"class", "Robot", -1},
+				{"function", "greet", 3},
 			},
-			refs: []refRow{{"call", "helper"}},
+			refs: []refRow{
+				{"call", "helper"},
+				{"implementation", "Greeter"},
+				{"call", "helper"},
+			},
 		},
 		{
+			// Robot extends Greeter (§2.3's c2_implements.scm) and constructs one (§2.2's "class"
+			// referenceKinds entry, already vendored in javascript's own tags.scm but dropped
+			// before this phase).
 			id: JavaScript, file: "testdata/extract/sample.js",
 			syms: []symRow{
 				{"class", "Greeter", -1},
 				{"method", "greet", 0},
 				{"function", "helper", -1},
+				{"class", "Robot", -1},
+				{"method", "build", 3},
 			},
-			refs: []refRow{{"call", "helper"}},
+			refs: []refRow{
+				{"call", "helper"},
+				{"implementation", "Greeter"},
+				{"class", "Greeter"},
+			},
 		},
 		{
 			// TypeScript's own vendored tags.scm is deliberately thin (§4.1/§9: only what
 			// upstream ships, nothing hand-written) — it has no pattern for a plain
 			// class_declaration/function_declaration/method_definition or a predefined-type
-			// annotation, only their abstract/signature-only/interface counterparts. The
-			// fixture is written to exercise exactly what it does capture, honestly.
+			// annotation, only their abstract/signature-only/interface counterparts. §2.1 composes
+			// javascript's own tags.scm ahead of it, which is what makes Robot's plain
+			// class/method/call and helper2's plain function show up at all; §2.3's
+			// c2_implements.scm adds the second "implementation" reference, for Robot's own
+			// `implements Greeter`.
 			id: TypeScript, file: "testdata/extract/sample.ts",
 			syms: []symRow{
 				{"interface", "Greeter", -1},
@@ -72,8 +99,17 @@ func TestExtractGoldenFixtures(t *testing.T) {
 				{"class", "Person", -1},
 				{"method", "greet", 2},
 				{"function", "helper", -1},
+				{"class", "Robot", -1},
+				{"method", "greet", 5},
+				{"function", "helper2", -1},
 			},
-			refs: []refRow{{"type", "Greeter"}, {"type", "Greeter"}},
+			refs: []refRow{
+				{"implementation", "Greeter"},
+				{"type", "Greeter"},
+				{"type", "Greeter"},
+				{"implementation", "Greeter"},
+				{"call", "helper2"},
+			},
 		},
 		{
 			id: Go, file: "testdata/extract/sample.go",

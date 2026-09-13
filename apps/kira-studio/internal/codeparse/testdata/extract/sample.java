@@ -11,3 +11,9 @@ class Person implements Greeter {
         return "hi " + name;
     }
 }
+
+class Robot extends Person {
+    void build() {
+        Person p = new Person();
+    }
+}
