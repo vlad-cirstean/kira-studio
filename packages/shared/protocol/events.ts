@@ -11,6 +11,8 @@ export const CHANNEL = {
   toggleProjectPanel: 'kira:menu:toggle-project-panel',
   toggleOperationsPanel: 'kira:menu:toggle-operations-panel',
   commandPalette: 'kira:menu:command-palette',
+  // C9 D5: ⌘P's fuzzy file finder — the View menu item above Command Palette.
+  quickOpen: 'kira:menu:quick-open',
   tabNext: 'kira:menu:tab-next',
   tabPrev: 'kira:menu:tab-prev',
   tabClose: 'kira:menu:tab-close',

@@ -27,6 +27,8 @@ export const SHORTCUTS = {
   'view.toggleProjectPanel': { chord: { key: 'B', cmdOrCtrl: true }, global: true },
   'view.toggleOperationsPanel': { chord: { key: 'J', cmdOrCtrl: true }, global: true },
   'view.commandPalette': { chord: { key: 'P', cmdOrCtrl: true, shift: true }, global: true },
+  // C9 D5: VS Code's own ⌘P/⌘⇧P split — files vs commands. Free: no existing binding used ⌘P.
+  'view.quickOpen': { chord: { key: 'P', cmdOrCtrl: true }, global: true },
   'view.find': { chord: { key: 'F', cmdOrCtrl: true }, global: true },
   'view.refresh': { chord: { key: 'F5' }, global: true },
   'view.run': { chord: { key: 'Return', cmdOrCtrl: true }, global: true },

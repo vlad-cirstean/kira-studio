@@ -60,6 +60,8 @@ onMounted(() => {
     control.onToggleProjectPanel(toggleProjectPanel),
     control.onToggleOperationsPanel(toggleOperationsPanel),
     control.onCommandPalette(togglePalette),
+    // C9 S1: stub, wired to the real quick-open store at S5.
+    control.onQuickOpen(() => {}),
     control.onTabNext(activateNextTab),
     control.onTabPrev(activatePrevTab),
     control.onTabClose(closeActiveTab),

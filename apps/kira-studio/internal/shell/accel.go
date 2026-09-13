@@ -42,6 +42,7 @@ var Shortcuts = map[string]Chord{
 	"view.toggleProjectPanel":    {Key: "B", CmdOrCtrl: true},
 	"view.toggleOperationsPanel": {Key: "J", CmdOrCtrl: true},
 	"view.commandPalette":        {Key: "P", CmdOrCtrl: true, Shift: true},
+	"view.quickOpen":             {Key: "P", CmdOrCtrl: true},
 	"view.find":                  {Key: "F", CmdOrCtrl: true},
 	"view.refresh":               {Key: "F5"},
 	"view.run":                   {Key: "Return", CmdOrCtrl: true},

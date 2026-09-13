@@ -19,6 +19,9 @@ const (
 	ChannelToggleProjectPanel     = "kira:menu:toggle-project-panel"
 	ChannelToggleOperationsPanel  = "kira:menu:toggle-operations-panel"
 	ChannelCommandPalette         = "kira:menu:command-palette"
+	// ChannelQuickOpen is C9 D5's own channel — ⌘P's fuzzy file finder, the View menu item directly
+	// above Command Palette.
+	ChannelQuickOpen = "kira:menu:quick-open"
 	ChannelTabNext                = "kira:menu:tab-next"
 	ChannelTabPrev                = "kira:menu:tab-prev"
 	ChannelTabClose               = "kira:menu:tab-close"

@@ -91,6 +91,7 @@ const studioControl = {
   onToggleProjectPanel: (cb: () => void): (() => void) => on(CHANNEL.toggleProjectPanel, cb),
   onToggleOperationsPanel: (cb: () => void): (() => void) => on(CHANNEL.toggleOperationsPanel, cb),
   onCommandPalette: (cb: () => void): (() => void) => on(CHANNEL.commandPalette, cb),
+  onQuickOpen: (cb: () => void): (() => void) => on(CHANNEL.quickOpen, cb),
   onTabNext: (cb: () => void): (() => void) => on(CHANNEL.tabNext, cb),
   onTabPrev: (cb: () => void): (() => void) => on(CHANNEL.tabPrev, cb),
   onTabClose: (cb: () => void): (() => void) => on(CHANNEL.tabClose, cb),
