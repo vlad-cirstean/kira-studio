@@ -57,7 +57,8 @@ func (s *Server) resolve(ctx context.Context, f locatorFields, emptyMsg func() s
 		result, _, _ := errResult(res.msg)
 		return codegraph.Query{}, result, nil
 	case res.ambiguous != nil:
-		result, _, _ := textResult(renderAmbiguous(f.Symbol, res.ambiguous))
+		src := s.sourceForTargets(ctx, false, res.ambiguous)
+		result, _, _ := textResult(renderAmbiguous(f.Symbol, res.ambiguous, src))
 		return codegraph.Query{}, result, nil
 	case res.empty:
 		result, _, _ := textResult(emptyMsg())
@@ -96,7 +97,8 @@ func (s *Server) findDefinition(ctx context.Context, _ *mcp.CallToolRequest, in 
 	if q.Point != nil {
 		resolvedFrom = position(q.Path, codegraph.Point{Row: q.Point.Row, Column: q.Point.Column})
 	}
-	return textResult(renderDefinitions(name, resolvedFrom, targets))
+	src := s.sourceForTargets(ctx, false, targets)
+	return textResult(renderDefinitions(name, resolvedFrom, targets, src))
 }
 
 // --- find_references ---
@@ -151,7 +153,8 @@ func (s *Server) findReferences(ctx context.Context, _ *mcp.CallToolRequest, in 
 	if name == "" && len(refs.Sites) > 0 {
 		name = refs.Sites[0].Name
 	}
-	return textResult(renderReferences(name, refs.Sites, refs.Total, refs.Truncated))
+	src := s.sourceForSites(ctx, false, refs.Sites)
+	return textResult(renderReferences(name, refs.Sites, refs.Total, refs.Truncated, src))
 }
 
 // --- find_implementations ---
@@ -183,7 +186,8 @@ func (s *Server) findImplementations(ctx context.Context, _ *mcp.CallToolRequest
 	if file, ok, err := s.store.GetFile(ctx, s.repoID, q.Path); err == nil && ok {
 		language = file.Language
 	}
-	return textResult(renderImplementations(name, language, targets))
+	src := s.sourceForTargets(ctx, false, targets)
+	return textResult(renderImplementations(name, language, targets, src))
 }
 
 // --- search_symbols ---
@@ -215,7 +219,8 @@ func (s *Server) searchSymbols(ctx context.Context, _ *mcp.CallToolRequest, in s
 	if err != nil {
 		return nil, nil, err
 	}
-	return textResult(renderSymbolSearch(in.Query, targets))
+	src := s.sourceForTargets(ctx, false, targets)
+	return textResult(renderSymbolSearch(in.Query, targets, src))
 }
 
 // --- search_files ---

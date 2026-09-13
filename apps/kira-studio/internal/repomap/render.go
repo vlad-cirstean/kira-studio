@@ -8,10 +8,34 @@ import (
 )
 
 // position renders a Point 1-based (§6.0's own stated convention: "positions are 1-based lines");
-// column is likewise 1-based here, still a byte column (C2's own convention, unconverted — this
-// server never reads file bytes, so it cannot convert one, §6.1 rule 2).
+// column is likewise 1-based here, still a byte column (C2's own convention, unconverted — C8
+// reads one line per hit to print it back, never a whole file, and deliberately still does not
+// convert a byte column to a UTF-16 one; §6.1 rule 2, C8 plan §8).
 func position(path string, p codegraph.Point) string {
 	return fmt.Sprintf("%s:%d:%d", path, p.Row+1, p.Column+1)
+}
+
+// writeSource appends one hit's own source line, indented four spaces so it can never be mistaken
+// for a hit line (every hit line starts with a path, and a repository-relative path never starts
+// with a space). Nothing is written when src has no entry for path/row — a nil src (omitSource)
+// included, since sourceLines.at answers false for a nil map.
+func writeSource(b *strings.Builder, src sourceLines, path string, row int) {
+	ln, ok := src.at(path, row)
+	if !ok {
+		return
+	}
+	b.WriteString("\n    ")
+	if ln.Note != "" {
+		b.WriteString("[no source: " + ln.Note + "]")
+		return
+	}
+	if ln.Stale {
+		b.WriteString("[stale] ")
+	}
+	b.WriteString(ln.Text)
+	if ln.Truncated {
+		b.WriteString("…")
+	}
 }
 
 // targetLabel renders a Target's own kind/name/container — "method Index.Sync" when Container is
@@ -31,7 +55,7 @@ func renderTargetLine(t codegraph.Target) string {
 }
 
 // renderDefinitions is find_definition's own shape.
-func renderDefinitions(name, resolvedFrom string, targets []codegraph.Target) string {
+func renderDefinitions(name, resolvedFrom string, targets []codegraph.Target, src sourceLines) string {
 	if len(targets) == 0 {
 		return fmt.Sprintf("no definitions found for %q", name)
 	}
@@ -48,13 +72,14 @@ func renderDefinitions(name, resolvedFrom string, targets []codegraph.Target) st
 	for _, t := range targets {
 		b.WriteByte('\n')
 		b.WriteString(renderTargetLine(t))
+		writeSource(&b, src, t.Path, t.NameSpan.Start.Row)
 	}
 	return b.String()
 }
 
 // renderReferences is find_references' own shape — Truncated always reported with the real total
 // (§6.3).
-func renderReferences(name string, sites []codegraph.Site, total int, truncated bool) string {
+func renderReferences(name string, sites []codegraph.Site, total int, truncated bool, src sourceLines) string {
 	if total == 0 {
 		return fmt.Sprintf("no references found for %q", name)
 	}
@@ -76,6 +101,7 @@ func renderReferences(name string, sites []codegraph.Site, total int, truncated 
 		} else {
 			b.WriteString(fmt.Sprintf("%s   %s", loc, s.Kind))
 		}
+		writeSource(&b, src, s.Path, s.NameSpan.Start.Row)
 	}
 	return b.String()
 }
@@ -86,7 +112,7 @@ func renderReferences(name string, sites []codegraph.Site, total int, truncated 
 const goImplementationsNote = "Go interfaces are structural; implementations are not derivable from the index."
 
 // renderImplementations is find_implementations' own shape.
-func renderImplementations(name, language string, targets []codegraph.Target) string {
+func renderImplementations(name, language string, targets []codegraph.Target, src sourceLines) string {
 	if language == "go" && len(targets) == 0 {
 		return goImplementationsNote
 	}
@@ -103,12 +129,13 @@ func renderImplementations(name, language string, targets []codegraph.Target) st
 	for _, t := range targets {
 		b.WriteByte('\n')
 		b.WriteString(renderTargetLine(t))
+		writeSource(&b, src, t.Path, t.NameSpan.Start.Row)
 	}
 	return b.String()
 }
 
 // renderSymbolSearch is search_symbols' own shape.
-func renderSymbolSearch(query string, targets []codegraph.Target) string {
+func renderSymbolSearch(query string, targets []codegraph.Target, src sourceLines) string {
 	if len(targets) == 0 {
 		return fmt.Sprintf("no symbols matching %q", query)
 	}
@@ -121,6 +148,7 @@ func renderSymbolSearch(query string, targets []codegraph.Target) string {
 	for _, t := range targets {
 		b.WriteByte('\n')
 		b.WriteString(renderTargetLine(t))
+		writeSource(&b, src, t.Path, t.NameSpan.Start.Row)
 	}
 	return b.String()
 }
@@ -182,12 +210,13 @@ func renderOutline(path string, nodes []codegraph.Node) string {
 
 // renderAmbiguous is §6.1 rule 4's several-exact-hits case: candidates plus one line telling the
 // caller to re-call with file — no silent pick of the top hit.
-func renderAmbiguous(symbol string, candidates []codegraph.Target) string {
+func renderAmbiguous(symbol string, candidates []codegraph.Target, src sourceLines) string {
 	var b strings.Builder
 	b.WriteString(fmt.Sprintf("%d symbols named %q — re-call with file set to one of these:", len(candidates), symbol))
 	for _, t := range candidates {
 		b.WriteByte('\n')
 		b.WriteString(renderTargetLine(t))
+		writeSource(&b, src, t.Path, t.NameSpan.Start.Row)
 	}
 	return b.String()
 }
