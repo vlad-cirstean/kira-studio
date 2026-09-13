@@ -63,7 +63,7 @@ func run() int {
 	fmt.Printf("Repo map MCP server listening on %s\n", srv.URL())
 	if plain, minted := srv.Token(); minted {
 		fmt.Println("Register with:")
-		fmt.Printf("  claude mcp add --transport http kira-repo-map %s --header \"Authorization: Bearer %s\"\n", srv.URL(), plain)
+		fmt.Printf("  claude mcp add --transport http --scope user kira-repo-map %s --header \"Authorization: Bearer %s\"\n", srv.URL(), plain)
 	} else {
 		fmt.Println("Using this repository's existing token (unchanged since it was last minted).")
 		fmt.Println("If it is not already registered with Claude Code, delete this repository's mcp-repo-map-*-token.json under KIRA_HOME and restart to mint a fresh one.")
