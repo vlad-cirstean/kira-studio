@@ -109,8 +109,8 @@ func extractSymbols(root *sitter.Node, source []byte, id ID) ([]Symbol, []Refere
 				refKind = strings.TrimPrefix(name, "reference.")
 				n := capture.Node
 				refNode = &n
-			// "doc" and anything else (§4.1: upstream #strip!/#set-adjacent! doc captures) are
-			// ignored entirely — C1 never reads doc text (§4.3).
+				// "doc" and anything else (§4.1: upstream #strip!/#set-adjacent! doc captures) are
+				// ignored entirely — C1 never reads doc text (§4.3).
 			}
 		}
 

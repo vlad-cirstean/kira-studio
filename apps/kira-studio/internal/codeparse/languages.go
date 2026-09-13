@@ -11,8 +11,8 @@ import (
 	"sync"
 	"unsafe"
 
-	sitter "github.com/tree-sitter/go-tree-sitter"
 	tssvelte "github.com/tree-sitter-grammars/tree-sitter-svelte/bindings/go"
+	sitter "github.com/tree-sitter/go-tree-sitter"
 	tscss "github.com/tree-sitter/tree-sitter-css/bindings/go"
 	tsgo "github.com/tree-sitter/tree-sitter-go/bindings/go"
 	tshtml "github.com/tree-sitter/tree-sitter-html/bindings/go"

@@ -14,7 +14,7 @@ var queryFS embed.FS
 // QuerySource is one vendored tags.scm's provenance (§4.1): a future license or version audit
 // reads this table instead of re-deriving it from go.mod and file paths.
 type QuerySource struct {
-	Language      ID
+	Language       ID
 	UpstreamModule string
 	UpstreamPath   string
 	ModuleVersion  string

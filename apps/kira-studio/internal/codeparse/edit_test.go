@@ -27,7 +27,7 @@ func TestDeriveEdit(t *testing.T) {
 			wantOK: true,
 			want: sitter.InputEdit{
 				StartByte: 0, OldEndByte: 0, NewEndByte: 1,
-				StartPosition: sitter.Point{Row: 0, Column: 0},
+				StartPosition:  sitter.Point{Row: 0, Column: 0},
 				OldEndPosition: sitter.Point{Row: 0, Column: 0},
 				NewEndPosition: sitter.Point{Row: 0, Column: 1},
 			},

@@ -145,7 +145,7 @@ func TestInjectParentIndexAcrossBlocks(t *testing.T) {
 
 	want := []symRow{
 		{"class", "First", -1},
-		{"method", "one", 0},  // nested in this same block's own "First", combined index 0.
+		{"method", "one", 0}, // nested in this same block's own "First", combined index 0.
 		{"class", "Second", -1},
 		{"method", "two", 2}, // nested in the SECOND block's "Second" (combined index 2), never
 		// index 0 ("First") — the exact collision a missing offset would produce.
