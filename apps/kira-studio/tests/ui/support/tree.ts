@@ -67,7 +67,15 @@ async function clearStickyBand(page: Page, container: Locator, target: Locator):
   // DOM, and the caller's subsequent click hangs waiting for a row that will never come back).
   // Bringing it into the natural viewport first is a no-op for the ordinary "in view but under
   // the band" case (already handled below) and a real fix for the above-viewport case.
-  await target.scrollIntoViewIfNeeded();
+  //
+  // The count() check above only proves the row was attached at that instant — the virtual list
+  // can still detach and re-render it (a still-settling search/filter update, an overscan window
+  // recompute) before this line's own action runs, which throws "Element is not attached to the
+  // DOM" instead of the auto-retrying wait most Playwright actions get. toPass() re-resolves and
+  // retries the locator action itself rather than trusting the earlier snapshot.
+  await expect(async () => {
+    await target.scrollIntoViewIfNeeded();
+  }).toPass({ timeout: 5_000 });
   const band = page.locator('[data-testid="tree-sticky-band"]');
   if ((await band.count()) === 0) return;
   const bandHeight = await band.evaluate((el) => {

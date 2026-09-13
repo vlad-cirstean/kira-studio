@@ -32,7 +32,11 @@ export default defineConfig({
   // `ipc-frontend` actually get every core; `ui-timing` and `e2e-real` still narrow themselves down
   // via their own explicit `workers`.
   workers: '100%',
-  retries: 0,
+  // 1 on CI (the first attempt plus one retry) to absorb shared-runner timing noise without
+  // masking a real bug for long — a test that stays flaky still shows up as "flaky", not silently
+  // green, in the html reporter. 0 locally: a dev loop wants the fastest, most direct failure
+  // signal, and the CPU contention/shared-runner conditions retries exist for are rare locally.
+  retries: process.env.CI ? 1 : 0,
   timeout: 60_000,
   reporter: [['list'], ['html', { open: 'never' }]],
   outputDir: 'test-results',
