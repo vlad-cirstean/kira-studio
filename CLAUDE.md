@@ -144,3 +144,36 @@ duplicated here; this file only points at them.
 - **`.github/workflows/` can't be pushed from this session** (an OAuth scope limit, not a policy
   choice) — see `docs/DEV_ENVIRONMENT.md`'s own section for the constraint and the
   `docs/pending-changes/`/`docs/pending-workflows/` workaround before touching a workflow file.
+
+## Repo-map MCP server
+
+Code navigation over this repository's own tree-sitter graph (C3, `internal/repomap`), served as MCP
+tools: `find_definition`, `find_references`, `find_implementations`, `search_symbols`,
+`search_files`, `outline_file`. Ask it instead of opening whole files to find a symbol — the tokens
+that saves are the point.
+
+**Use it when working in this repository.** Standing expectation, not a demo: register it at session
+start and navigate with it.
+
+Headless setup, for a session with no GUI:
+
+1. `bun run mcp:repo-map:build` — once per clone, since the first build is slow (cgo).
+2. `bun run mcp:repo-map` — rebuilds (cached, sub-second), then serves in the foreground; background
+   it if a later command in the same invocation must reach it. It serves this worktree's root.
+   `bun run mcp:repo-map --repo <path>` serves another checkout instead.
+3. Run the registration command it prints on startup:
+   `claude mcp add --transport http --scope user kira-repo-map http://127.0.0.1:8765/mcp --header
+   "Authorization: Bearer <token>"`. Copy it, never retype it — the token is per repository, and the
+   port falls back off 8765 when something else holds it.
+
+Each repository's token is stored hashed under `KIRA_HOME`, so a later run reuses it and prints a
+note instead of a command; an already-registered client keeps working. To mint a fresh one, delete
+that repository's `mcp-repo-map-*-token.json` and restart the server.
+
+**Log what dogfooding finds** in `docs/v1.5/mcp-repo-map-issues.md`. Trivial (config, registration,
+wiring): fix inline, log one line. Non-trivial (wrong result, missing tool, crash): log a full entry
+and fix nothing in that phase — the next phase waits for a dedicated fix pass to close it.
+
+Development use only. The shipped end-user surface — the Settings dialog's Code intelligence tab —
+is product, not process; `docs/ARCHITECTURE.md` describes it and how the server works,
+`docs/DEV_ENVIRONMENT.md` covers log level, cleanup and this container's own quirks.
