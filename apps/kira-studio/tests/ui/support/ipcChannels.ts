@@ -20,6 +20,7 @@ export const IPC = {
   toggleProjectPanel: 'kira:menu:toggle-project-panel',
   toggleOperationsPanel: 'kira:menu:toggle-operations-panel',
   commandPalette: 'kira:menu:command-palette',
+  quickOpen: 'kira:menu:quick-open',
   tabNext: 'kira:menu:tab-next',
   tabPrev: 'kira:menu:tab-prev',
   tabClose: 'kira:menu:tab-close',

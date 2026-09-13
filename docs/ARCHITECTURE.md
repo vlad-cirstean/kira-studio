@@ -45,6 +45,7 @@ originally written rather than corrected to match later reality — see each cha
 | Code parsing (C1, extraction fixes C2) | `github.com/tree-sitter/go-tree-sitter` (the official cgo binding) plus ten upstream grammar modules — java, python, javascript, typescript+tsx, go, rust, html, css, json, svelte, all MIT | `internal/codeparse` is the only package in the repo importing tree-sitter, and the only unconditionally-cgo one (every other cgo file in the app is a `darwin && cgo`-gated exception, below) — a real, priced cost: a C compiler becomes a build requirement for this package and anything importing it, and `CGO_ENABLED=0` no longer builds such a caller. Declined every pure-Go alternative found: `gotreesitter` is a from-scratch reimplementation of the parse-table interpreter and every external scanner (3.9x slower per its own README, with 3 of 206 grammars already degraded), a materially different risk than `modernc.org/sqlite`'s mechanical transpilation of the same upstream C; `malivvan/tree-sitter` (a wasm build under `wazero`, the right architecture) is 5 stars/3 commits/self-described pre-release; building that wasm ourselves would mean owning a toolchain and a regeneration script for a capability the packaged darwin build already has via cgo. Every grammar reports ABI 14, inside the binding's own compatible range [13, 15] (`TREE_SITTER_MIN_COMPATIBLE_LANGUAGE_VERSION`/`TREE_SITTER_LANGUAGE_VERSION`), checked at construction. Binary size delta measured the same way P11's own gRPC dependency was (a minimal program against a `println` baseline, `linux/amd64`, no flags): **+6.6 MB** for the grammar registry alone. Vue has no grammar of its own (no Go module exists) and is parsed as an HTML container with per-block injection instead. **C2** compiles TypeScript and TSX against javascript's own vendored `tags.scm` first, then their own — upstream ships the TypeScript file as an *addition* to the JavaScript one (signature/abstract/interface patterns only, no `; inherits:` header), so the TypeScript file alone indexed almost nothing; composing both is what makes a plain class, function, method or call show up in a `.ts`/`.tsx` file at all. C2 also adds four small repo-authored `queries/<lang>/c2_implements.scm` files (TypeScript, TSX, JavaScript, Python) beside the vendored `tags.scm`s — the only hand-written query text in the package (§4.1's own "no hand-written queries" gets a narrow, named exception here) — recovering `implements`/`extends`/base-class relationships no vendored pattern expresses for those four languages, through the same `@reference.implementation` capture Java and Rust's own vendored queries already use |
 | MCP server (C3) | `github.com/modelcontextprotocol/go-sdk` (Apache-2.0, MIT for un-relicensed contributions), v1.7.0, over the SDK's own **Streamable HTTP** transport, not stdio | The protocol org's own reference implementation, at a stable v1 — the axis that matters for a wire format that keeps moving; `mark3labs/mcp-go` (MIT, real and widely used, but the second implementation, not the reference one) and hand-rolling JSON-RPC framing were both declined (`CLAUDE.md`'s library-first rule finds nothing hand-rolling would earn its keep against here — stdio framing, initialize/capabilities, tool listing, cancellation and schema validation are exactly what the SDK already does). Streamable HTTP, not the SDK's own stdio transport, because the server is one long-running process serving as many concurrent clients/tool calls as connect (`internal/repomap`), never a process spawned fresh per client; the SDK's own `auth.RequireBearerToken` middleware gates every request, reused rather than hand-rolled for the same reason. `mcp.AddTool[In, Out]` derives each tool's input schema from a Go struct's own tags, so every tool's schema has exactly one source. Binary size delta measured the same way as `codeparse`'s own row, above, comparing the whole `cmd/kira-studio` binary before/after (no separate helper binary exists, see the `internal/repomap` section below): **+12.38 MB** (`linux/amd64`, unstripped) for `internal/repomap`, `internal/mcpauth`, `internal/mcpinstall` and the SDK's own dependency graph (`golang.org/x/oauth2`, `google/jsonschema-go`, `segmentio/encoding`, `yosida95/uritemplate`, `golang-jwt/jwt`) |
 | Native file viewer + diff (C5/C6) | `monaco-editor` (MIT, pinned 0.56.0), npm | Added to the root `package.json`'s `dependencies`, beside `slickgrid` — the precedent for a bundled runtime UI library. **Viewer-only, still read-only in C6**: reached through `edcore.main.js`'s modern equivalent in this pinned version — the package restructured its internal layout entirely since the plan researching C5 was written (no `edcore.main.js` exists any more; `monaco-editor/features/register.all.js` is upstream's own "every standard contribution, no language service, no worker" bundle, verified against the source) — never the package root (`editor.main.js`, which still pulls in all four language *services* and every one of ~180 language grammars eagerly). Exactly one worker ships (`editor.worker`, backing `IEditorWorkerService`); C5 shipped the chunk and confirmed it exists in `dist/assets`, and **C6's diff editor (`mod.editor.createDiffEditor`, `hideUnchangedRegions.enabled`/`renderSideBySide` both on, `renderMarginRevertIcon`/`renderGutterMenu` both off) is its first real consumer** — the diff contribution was already inside `register.all.js`, so the Monaco chunk is unchanged by C6 (measured, `bun run build`: `monacoEntry-*.js` 3.81 MB raw / 972 KB gzip and `editor.worker-*.js` 300 KB raw, identical to C5's own recorded figures). Nineteen languages get a registered Monarch grammar (`views/repo/monacoEntry.ts`'s own import list); `.json`/`.jsonc` reuse the JavaScript grammar (Monaco ships no JSON basic-language in this version either); `.vue`/`.svelte` color as plain HTML (no grammar exists for either). See "Native code workspace (C5)" and "Diff tabs and navigation (C6)" below |
+| Quick open fuzzy matching (C9) | `fuzzysort` (MIT, pinned 4.0.2), npm, zero transitive dependencies | Added to the root `package.json`'s `dependencies`, statically imported (`repo/state/quickOpen.ts`) rather than behind Monaco's dynamic `import()` boundary — measured 8.4 KB gzip, not the ~972 KB payload that boundary exists for. Declined: the app's own three substring filters (`CommandPalette.vue`, the tree's own name filter, `search_files`'s SQL `LIKE`) are not fuzzy matchers at all; Monaco's own internal `fuzzyScorer.js` ships no typings for that module and no item-level (basename-vs-path) ranking on top of it. See "Quick open (C9)" below |
 
 Driver libraries — the best-maintained option per engine, **Go-native for all ten kinds as of P58e
 M9.3** (checkpoint C2): `jackc/pgx/v5` (postgres), `go-sql-driver/mysql` (mariadb/mysql, via a shared
@@ -1191,6 +1192,60 @@ worktree-vs-HEAD diff tab — still entirely read-only.**
   it; the diff editor runs it against `getModifiedEditor()` specifically, since
   `IStandaloneDiffEditor` itself has no `getAction` and the worktree pane is the one whose content
   matches the file on disk.
+
+**Quick open (C9): ⌘P, fuzzy file finder, renderer-side matching over C5's own tree listing.**
+
+- **No new enumeration — reads `repo/state/fileTree.ts`'s already-loaded `paths` array**
+  (`repoTreePaths`, a five-line accessor beside `repoTreeTruncated`/`repoTreeError`). That array is
+  already `codeworkspace.ListFiles` → `codeindex.EnumerateAll`'s own output, so quick open inherits
+  the project tree's exact snapshot rather than a second, independently-stale one: refreshed on
+  workspace open and on the tree's own Refresh action, never live (Known open items, below). A
+  lower-layer read was declined on two grounds: a new Go binding would re-run `git ls-files` for
+  bytes the renderer already holds, and `codegraph`'s indexed file table (the *parseable* subset,
+  C1's own `Enumerate`) would silently exclude `README.md`, `Taskfile.yml`, every `.json`/`.md` —
+  files SPEC's row explicitly wants reachable.
+- **Matching is `fuzzysort` (MIT, 4.0.2, zero transitive dependencies), a direct dependency,
+  entirely in the renderer — no Go call, no IPC per keystroke.** Every substring filter already in
+  this app (`CommandPalette.vue`, the tree's own name filter, `codegraph.SearchFiles`'s SQL `LIKE`
+  — the last one says so in its own MCP tool schema: *"not a fuzzy finder"*) was declined as not
+  fuzzy at all; Monaco's own internal `base/common/fuzzyScorer.js` was declined too — reachable, MIT,
+  the literal VS Code algorithm, but shipping no typings for that module under this repo's `strict`
+  config, and only the string scorer, not VS Code's item-level basename-vs-path ranking on top of
+  it. Measured against this repository's own 2,176-path listing (`fuzzysort@4.0.2`,
+  `keys:['name','path']`, 20 iterations after 3 warm-ups): a 1.2 ms snapshot build and a 2.15 ms
+  worst-case (1-character) query — client-side wins outright at this and larger realistic scales,
+  and a Go round trip would add per-keystroke IPC serialization to beat 2 ms of local work.
+- **A per-repo `fuzzysort` snapshot over both `name` and `path`, cached on the tree's own `paths`
+  array reference** — `refreshRepoTree` assigns a fresh array on every reload, so reference equality
+  is an exact, versioning-free invalidation signal. Built lazily on first ⌘P for that repo, dropped
+  in `dropQuickOpen` beside `dropRepoTree`'s own call site (`state/coderepos.ts`'s `removeCodeRepo`).
+- **Ranking: `Math.max(nameScore, pathScore × 0.8) − depth × a small constant`.** A basename hit
+  outranks the same characters merely scattered across a path (typing `repotabs` should surface
+  `state/repoTabs.ts` over a deep file that only contains those letters across directory names) but
+  a path-only match still surfaces (`state/repo` still finds files under `state/repo/`); the depth
+  term is small enough against `fuzzysort`'s 0..1 scale to break only a near-tie, never promote a
+  worse match. No recency term — deferred whole (Known open items, below), the seam being exactly
+  one more term in this expression when a later phase adds a persisted per-repo MRU.
+- **Two caps, both surfaced, never silent**: `QUICK_OPEN_MAX_RESULTS` (50) bounds both `fuzzysort`'s
+  own sort work and what a keyboard-driven list can navigate; `QUICK_OPEN_MAX_CANDIDATES` (50,000)
+  slices the matched-against list for a repository past D3's measured knee (worst-case query time
+  34.78 ms at 50k candidates, 144.06 ms at 200k) — a dim footer row says so, the same posture the
+  tree's own `MaxListedFiles` truncation already takes.
+- **`repo/QuickOpen.vue` is a new component, not an extension of `CommandPalette.vue`.** The two
+  share only chrome (a `p-float` backdrop, an input, a keyboard-driven list, mirrored CSS classes
+  rather than a shared base component) — matching, ranking, scope, and row shape (two-part,
+  basename plus a dim, start-ellipsised parent directory) all differ. Matched characters are bolded
+  via `fuzzysort.highlight`'s callback form, rendered as literal spans — never `v-html`, so a path
+  containing `<` cannot inject markup.
+- **⌘P is gated on the active workspace itself (`repoIdOfWorkspace(workspaceState.active)`), not on
+  a mounted component** — reachable with the project panel collapsed, unlike `repo.search`'s
+  `registerCommand` shape (which is meaningless without that panel, since it switches its segmented
+  control). Opening also loads the tree itself (`ensureRepoTreeLoaded`) rather than assuming the
+  panel already has, so a fresh window with the panel collapsed still populates the list.
+- **Opening reuses C7's own convention**: `openRepoFileTab(repoId, path, { preview })`, no `reveal`
+  (a file has no line to reveal). Enter and a single click preview; ⇧Enter and a double-click open a
+  permanent tab — ⇧Enter is quick open's own addition, since a keyboard palette has no double-click
+  to mirror the tree/search views' own promotion gesture.
 
 **Why a content snapshot and not just a commit sha.** The trivial case — nothing rewritten since
 the last review — is `git merge-base --is-ancestor <lastReviewedSha> HEAD`; when that succeeds an
@@ -3168,3 +3223,14 @@ place. `CLAUDE.md` states the process rule; this is the list itself.
   posture C5's project tree already takes for its own listing.
 - **C7's search cannot match a pattern spanning multiple lines.** The scanner hands the matcher one
   line at a time (`^`/`$` anchor per line, D5); a `--multiline`-equivalent search is out of scope.
+- **C9's quick open (⌘P) has no recency ranking and no MRU.** SPEC's row names recency as a ranking
+  need; the `scoreFn` seam is one term wide when a later phase wants it (C9 D2 rule 3), but building
+  it now needs a persisted per-repo history this phase does not add.
+- **C9's quick open matches only the same tree listing C5's project tree already holds** — it does
+  not re-enumerate. A file created since the tree's last refresh is not quick-openable until one
+  (workspace open, or the panel's own Refresh) happens — the same snapshot-freshness posture the
+  tree itself already has, above, not a new staleness this phase introduces.
+- **C9's quick open matches only the first 50,000 candidate files** (`QUICK_OPEN_MAX_CANDIDATES`) in
+  a repository past that size, and says so (a dim footer row) rather than searching the rest —
+  D3's measured knee (34.78 ms worst-case query at 50k, 144.06 ms at 200k, on this app's own
+  hardware) between "sub-frame" and "perceptible."

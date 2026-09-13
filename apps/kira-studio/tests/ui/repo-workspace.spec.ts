@@ -257,3 +257,64 @@ test('a repo workspace: search streams results out of order and opens a match', 
   await expect(previewTab).toHaveAttribute('data-preview', 'true');
   await expect(previewTab).toContainText('a.ts');
 });
+
+// C9 §7: the one UI case a Go test or typecheck can't reach — the CHANNEL.quickOpen subscription,
+// the D6 workspace gate, genuinely fuzzy (non-contiguous) matching, the basename-vs-path ranking
+// rule, and the Enter/⇧Enter preview-vs-permanent open. The scoreFn arithmetic and item build
+// themselves are unit-test-exempt (§7's own bar) — this only exercises what those can't.
+test('a repo workspace: quick open fuzzy-finds and opens a file', async ({ relaunch }) => {
+  const QO_PATHS = ['alpha.ts', 'state/repoTabs.ts', 'repo/tabs/other.ts', 'repo/tabs/extra.ts'];
+  const { window: page } = await relaunch({
+    control: [
+      { channel: IPC.codeWorkspaceListRepos, response: [REPO] },
+      {
+        channel: IPC.codeWorkspaceListFiles,
+        args: { id: REPO.id },
+        response: { paths: QO_PATHS, status: {}, truncated: false },
+      },
+      readFileSnap('alpha.ts', 'export const alpha = 1;\n'),
+    ],
+  });
+
+  const quickOpen = () => page.locator('[data-testid="quick-open"]');
+  const items = () => page.locator('[data-testid="quick-open-item"]');
+  const input = page.locator('[data-testid="quick-open-input"]');
+
+  // D6: ⌘P while Studio is active (no repo workspace) opens nothing.
+  await emitWailsEvent(page, IPC.quickOpen, null);
+  await expect(quickOpen()).toHaveCount(0);
+
+  await repoRow(page).dblclick();
+
+  // Renders with every fixture file, unfiltered, on open (D8 loads the tree itself).
+  await emitWailsEvent(page, IPC.quickOpen, null);
+  await expect(quickOpen()).toBeVisible();
+  await expect(items()).toHaveCount(QO_PATHS.length);
+
+  // A non-contiguous subsequence query matches — the one behavioural claim of D2 worth pinning:
+  // genuinely fuzzy, not the substring filter C9 declined (CommandPalette.vue's own). 'rte' is
+  // never a literal substring of 'repo/tabs/extra.ts' (r, then t from 'tabs', then e from 'extra').
+  await input.fill('rte');
+  await expect(items()).toHaveCount(1);
+  await expect(items().first()).toHaveAttribute('data-path', 'repo/tabs/extra.ts');
+
+  // A basename match outranks a path-only match for the same query (§3.2 rule 1): 'repotabs' is
+  // a literal prefix of 'repoTabs.ts' but only a scattered subsequence of 'repo/tabs/other.ts'.
+  await input.fill('repotabs');
+  await expect(items().first()).toHaveAttribute('data-path', 'state/repoTabs.ts');
+
+  // Enter opens a preview tab; re-opening and pressing ⇧Enter promotes it to permanent (D7 — the
+  // palette's own keyboard equivalent of the tree/search views' single-click/double-click split).
+  await input.fill('alpha');
+  await expect(items()).toHaveCount(1);
+  await input.press('Enter');
+  await expect(quickOpen()).toHaveCount(0);
+  const fileTab = tab(page, 'repo-file');
+  await expect(fileTab).toHaveAttribute('data-preview', 'true');
+
+  await emitWailsEvent(page, IPC.quickOpen, null);
+  await input.fill('alpha');
+  await input.press('Shift+Enter');
+  await expect(quickOpen()).toHaveCount(0);
+  await expect(fileTab).toHaveAttribute('data-preview', 'false');
+});
