@@ -26,6 +26,11 @@ jobs:
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
+      - name: Cache bun install (keyed on the lockfile, so an unchanged dependency set skips re-download)
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
       - run: bun install --frozen-lockfile
       - name: Cache wails3 CLI (v1.4 P1 — go.mod-keyed, OS-specific binary)
         uses: actions/cache@v4
@@ -56,10 +61,15 @@ jobs:
             ./apps/kira-studio/internal/datagrip/...
       - run: bun run verify:packaging
 
-  ui:
+  # Builds and caches the Linux wails3 CLI once, so `ui` and `container-tests` — both ubuntu-latest,
+  # both otherwise independent of each other — don't race to `go install` the same binary in
+  # parallel on a go.mod-hash cache miss. Their own "Cache wails3 CLI"/"Cache generated Wails
+  # bindings" steps still run (a job's cache isn't visible until restored on that job's own runner),
+  # but land as cache hits instead of rebuilding.
+  wails-linux-cli:
     needs: checks
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
       - uses: oven-sh/setup-bun@v2
@@ -68,8 +78,16 @@ jobs:
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
-      - name: Install GTK4/WebKitGTK headers (wails3 CLI build requirement on Linux — CLAUDE.md)
-        run: sudo apt-get update && sudo apt-get install -y libgtk-4-dev libwebkitgtk-6.0-dev pkg-config
+      - name: Install & cache GTK4/WebKitGTK headers (wails3 CLI build requirement on Linux — CLAUDE.md)
+        uses: awalsh128/cache-apt-pkgs-action@v1
+        with:
+          packages: libgtk-4-dev libwebkitgtk-6.0-dev pkg-config
+          version: 1.0
+      - name: Cache bun install (keyed on the lockfile, so an unchanged dependency set skips re-download)
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
       - run: bun install --frozen-lockfile
       - name: Cache wails3 CLI (v1.4 P1 — go.mod-keyed, OS-specific binary)
         uses: actions/cache@v4
@@ -85,10 +103,56 @@ jobs:
           key: wails-bindings-${{ hashFiles('go.mod') }}
       - name: Generate Wails bindings
         run: sh scripts/setup.sh
+
+  ui:
+    needs: [checks, wails-linux-cli]
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - name: Install & cache GTK4/WebKitGTK headers (wails3 CLI build requirement on Linux — CLAUDE.md)
+        uses: awalsh128/cache-apt-pkgs-action@v1
+        with:
+          packages: libgtk-4-dev libwebkitgtk-6.0-dev pkg-config
+          version: 1.0
+      - name: Cache bun install (keyed on the lockfile, so an unchanged dependency set skips re-download)
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+      - run: bun install --frozen-lockfile
+      - name: Cache wails3 CLI (v1.4 P1 — go.mod-keyed, OS-specific binary)
+        uses: actions/cache@v4
+        with:
+          path: ~/go/bin/wails3
+          key: wails3-${{ runner.os }}-${{ hashFiles('go.mod') }}
+      - name: Cache generated Wails bindings (v1.4 P1 — platform-independent output, shared across OSes)
+        uses: actions/cache@v4
+        with:
+          path: |
+            apps/kira-studio/frontend/bindings
+            apps/kira-studio/.task
+          key: wails-bindings-${{ hashFiles('go.mod') }}
+      - name: Generate Wails bindings
+        run: sh scripts/setup.sh
+      - name: Cache Playwright browsers (keyed on the lockfile, which pins the @playwright/test version)
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('bun.lock') }}
       - name: Install WebKit and its system libraries (CLAUDE.md)
-        run: |
-          bunx playwright install webkit
-          sudo apt-get install -y libevent-2.1-7t64 libgstreamer-plugins-bad1.0-0 libflite1 gstreamer1.0-libav libavif16
+        run: bunx playwright install webkit
+      - name: Install & cache WebKit's runtime libraries (CLAUDE.md)
+        uses: awalsh128/cache-apt-pkgs-action@v1
+        with:
+          packages: libevent-2.1-7t64 libgstreamer-plugins-bad1.0-0 libflite1 gstreamer1.0-libav libavif16
+          version: 1.0
       - run: bun run test:ui
       - name: IPC frontend tests (v1.4 P1 — previously in no CI job; consumes the fixtures internal/adapters/*'s own suites generate, closing the anti-drift gap)
         run: bun run test:ipc:fe
@@ -104,19 +168,36 @@ jobs:
           retention-days: 7
 
   container-tests:
-    needs: checks
+    needs: [checks, wails-linux-cli]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
+      - name: Restore cached Testcontainers images (keyed on the pinned image tags, so an unchanged adapter-test image set skips re-pulling)
+        id: docker-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/docker-images.tar
+          key: docker-${{ runner.os }}-${{ hashFiles('apps/kira-studio/internal/adapters/testsupport/*.go') }}
+      - name: Load cached Testcontainers images
+        if: steps.docker-cache.outputs.cache-hit == 'true'
+        run: docker load -i ~/docker-images.tar
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
-      - name: Install GTK4/WebKitGTK headers (wails3 CLI build requirement on Linux — CLAUDE.md)
-        run: sudo apt-get update && sudo apt-get install -y libgtk-4-dev libwebkitgtk-6.0-dev pkg-config
+      - name: Install & cache GTK4/WebKitGTK headers (wails3 CLI build requirement on Linux — CLAUDE.md)
+        uses: awalsh128/cache-apt-pkgs-action@v1
+        with:
+          packages: libgtk-4-dev libwebkitgtk-6.0-dev pkg-config
+          version: 1.0
+      - name: Cache bun install (keyed on the lockfile, so an unchanged dependency set skips re-download)
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
       - run: bun install --frozen-lockfile
       - name: Cache wails3 CLI (v1.4 P1 — go.mod-keyed, OS-specific binary)
         uses: actions/cache@v4
@@ -137,6 +218,15 @@ jobs:
         run: sudo sysctl -w fs.inotify.max_user_instances=8192
       - name: Go adapter tests against real Testcontainers (Docker is available on this runner)
         run: bun run test:go
+      - name: Save pulled Testcontainers images (always() so a partial pull from a failed run still seeds the next one)
+        if: always() && steps.docker-cache.outputs.cache-hit != 'true'
+        run: docker save $(docker images -q) -o ~/docker-images.tar
+      - name: Cache pulled Testcontainers images
+        if: always() && steps.docker-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ~/docker-images.tar
+          key: docker-${{ runner.os }}-${{ hashFiles('apps/kira-studio/internal/adapters/testsupport/*.go') }}
 
   package-smoke:
     needs: checks
@@ -151,6 +241,11 @@ jobs:
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
+      - name: Cache bun install (keyed on the lockfile, so an unchanged dependency set skips re-download)
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
       - run: bun install --frozen-lockfile
       - name: Cache wails3 CLI (v1.4 P1 — go.mod-keyed, OS-specific binary)
         uses: actions/cache@v4
