@@ -149,13 +149,8 @@ jobs:
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('bun.lock') }}
-      - name: Install WebKit and Chromium and their system libraries (CLAUDE.md — webkit is what `ui`/`ui-timing`/`visual` run against, chromium is what `ipc-frontend` runs against per playwright.config.ts)
-        run: bunx playwright install webkit chromium
-      - name: Install & cache WebKit's runtime libraries (CLAUDE.md)
-        uses: awalsh128/cache-apt-pkgs-action@v1
-        with:
-          packages: libevent-2.1-7t64 libgstreamer-plugins-bad1.0-0 libflite1 gstreamer1.0-libav libavif16
-          version: 1.0
+      - name: Install WebKit and Chromium with their system libraries (CLAUDE.md — webkit is what `ui`/`ui-timing`/`visual` run against, chromium is what `ipc-frontend` runs against per playwright.config.ts; --with-deps delegates to Playwright's own per-browser dependency list rather than a hand-maintained apt package list that already fell out of sync once when chromium was added)
+        run: bunx playwright install --with-deps webkit chromium
       - run: bun run test:ui
       - name: IPC frontend tests (v1.4 P1 — previously in no CI job; consumes the fixtures internal/adapters/*'s own suites generate, closing the anti-drift gap)
         run: bun run test:ipc:fe
