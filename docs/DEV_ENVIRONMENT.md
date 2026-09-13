@@ -263,9 +263,9 @@ running it here.
   environment's own "start, poll, test, kill inside one invocation" rule, above) if a following
   command needs to register against it or call it with `curl` in the same session.
 - **Register the real `claude` CLI against it** with the exact command the process prints, e.g.
-  `claude mcp add --transport http kira-repo-map http://127.0.0.1:8765/mcp --header "Authorization:
-  Bearer <token>"` — verified in this environment against a real `claude` (2.1.270): `claude mcp
-  list` reports the server "✓ Connected" once running. `claude mcp remove kira-repo-map -s user`
+  `claude mcp add --transport http --scope user kira-repo-map http://127.0.0.1:8765/mcp --header
+  "Authorization: Bearer <token>"` — verified in this environment against a real `claude` (2.1.270):
+  `claude mcp list` reports the server "✓ Connected" once running. `claude mcp remove kira-repo-map -s user`
   cleans up the global `~/.claude.json` entry afterward — leaving a stale registration behind
   confuses a later, unrelated session in the same container.
 - **`KIRA_REPO_MAP_LOG`** (`debug`/`info`/`warn`/`error`, default `error`) controls stderr verbosity
