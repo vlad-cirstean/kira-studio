@@ -15,9 +15,12 @@ import { describe, expect, test } from 'bun:test';
 import type { PageCursor } from '@shared/protocol/data-ops';
 import type { KeyValuePage, TextColumnChunk } from '@shared/protocol/page';
 import { isReactive } from 'vue';
+import { restoreAfterEach } from './support/restoreAfterEach';
 
 const { control } = await import('../../frontend/src/bridge/control');
+restoreAfterEach(control);
 const { data } = await import('../../frontend/src/bridge/data');
+restoreAfterEach(data);
 const { openBrowseTab, openKeyValueTab, openDataTab, findKeyValueTab, findDataTab } = await import(
   '../../frontend/src/state/tabs'
 );

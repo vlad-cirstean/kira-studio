@@ -9,25 +9,14 @@
 // shared window stub, same as run-state.spec.ts.
 import './support/window';
 
-import { afterEach, describe, expect, test } from 'bun:test';
+import { describe, expect, test } from 'bun:test';
 import { isReactive } from 'vue';
 import type { OpRecord } from '../../../../packages/shared/domain/ops';
+import { restoreAfterEach } from './support/restoreAfterEach';
 
 const { control } = await import('../../frontend/src/bridge/control');
 const { opsState, hydrateOps } = await import('../../frontend/src/state/ops');
-
-// `control` is one shared singleton object across the whole bun test process (Bun's module
-// registry, not per-file) — overwriting opsRecent/onOpUpdate below leaks into every spec that
-// imports control afterwards unless restored. Confirmed: bridge-unwrap.spec.ts's own generic
-// "every control method rejects" loop picked up this file's last override (opsRecent resolving
-// with the op-1/t3 fixture below) on CI, whose file-discovery order runs this file first — a
-// difference from local runs, where the opposite order let it go unnoticed.
-const originalOpsRecent = control.opsRecent;
-const originalOnOpUpdate = control.onOpUpdate;
-afterEach(() => {
-  (control as { opsRecent: typeof control.opsRecent }).opsRecent = originalOpsRecent;
-  (control as { onOpUpdate: typeof control.onOpUpdate }).onOpUpdate = originalOnOpUpdate;
-});
+restoreAfterEach(control);
 
 function record(partial: Partial<OpRecord> & Pick<OpRecord, 'id' | 'tabId' | 'status'>): OpRecord {
   return {

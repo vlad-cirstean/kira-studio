@@ -9,8 +9,10 @@ import { describe, expect, test } from 'bun:test';
 import type { ConnectionSummary } from '@shared/domain/connection';
 import { createTabularPageBuilder, MAX_CELL_BYTES } from '@shared/protocol/page';
 import { ExplainTruncatedError, parseExplainPages } from '../../frontend/src/views/console/plan';
+import { restoreAfterEach } from './support/restoreAfterEach';
 
 const { data } = await import('../../frontend/src/bridge/data');
+restoreAfterEach(data);
 const { connectionsState } = await import('../../frontend/src/state/connections');
 const { openConsoleTab } = await import('../../frontend/src/state/tabs');
 const { run, runtime, explain } = await import('../../frontend/src/views/console/state');

@@ -7,8 +7,10 @@
 import './support/window';
 
 import { describe, expect, test } from 'bun:test';
+import { restoreAfterEach } from './support/restoreAfterEach';
 
 const { data } = await import('../../frontend/src/bridge/data');
+restoreAfterEach(data);
 const { openDocumentTab, openKeyValueTab, openStreamTab } = await import(
   '../../frontend/src/state/tabs'
 );

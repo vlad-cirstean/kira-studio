@@ -9,8 +9,10 @@ import './support/window';
 
 import { describe, expect, test } from 'bun:test';
 import type { ConnectionState } from '@shared/domain/connection';
+import { restoreAfterEach } from './support/restoreAfterEach';
 
 const { data } = await import('../../frontend/src/bridge/data');
+restoreAfterEach(data);
 const { connectionsState } = await import('../../frontend/src/state/connections');
 const { openStreamTab } = await import('../../frontend/src/state/tabs');
 const { applyStreamFilter, runCount, runtime } = await import(

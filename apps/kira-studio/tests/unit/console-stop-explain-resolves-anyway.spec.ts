@@ -12,8 +12,10 @@ import { describe, expect, test } from 'bun:test';
 import type { ConnectionSummary } from '@shared/domain/connection';
 import type { ExecuteResponse } from '@shared/protocol/data-ops';
 import { createTabularPageBuilder, type Page, unpagedPosition } from '@shared/protocol/page';
+import { restoreAfterEach } from './support/restoreAfterEach';
 
 const { data } = await import('../../frontend/src/bridge/data');
+restoreAfterEach(data);
 const { connectionsState } = await import('../../frontend/src/state/connections');
 const { openConsoleTab } = await import('../../frontend/src/state/tabs');
 const { run, stop, runtime } = await import('../../frontend/src/views/console/state');
