@@ -1,3 +1,8 @@
+export {
+  BLOB_FRAME_DISCRIMINANT,
+  MalformedBlobFrameError,
+  parseBlobFrameBody,
+} from './blobFrame.ts';
 export type { BufferEncoding, EncodedMessage } from './codec.ts';
 export { decode, dedupeTransferList, encode, VSCODE_WEBVIEW_BUFFER_ENCODING } from './codec.ts';
 export type {
@@ -115,6 +120,8 @@ export type {
   WireError,
 } from './rpc.ts';
 export { createRpcClient, createRpcServer, RpcError } from './rpc.ts';
+export type { StreamChannel, StreamSocketLike } from './streamChannel.ts';
+export { createStreamChannel, StreamFrameDeliveryError } from './streamChannel.ts';
 export type { Transport, TransportErrorCode } from './transport.ts';
 export { TransportError } from './transport.ts';
 export type { ContractChannel, VersionedEnvelope } from './validate.ts';
