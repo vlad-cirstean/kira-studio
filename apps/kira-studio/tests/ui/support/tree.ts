@@ -108,8 +108,17 @@ export async function findRow(page: Page, path: string): Promise<Locator> {
   const container = treeContainer(page);
   const target = page.locator(`[data-testid="tree-row"][data-path="${path}"]`);
   if ((await target.count()) > 0) {
-    await clearStickyBand(page, container, target);
-    return target;
+    try {
+      await clearStickyBand(page, container, target);
+      return target;
+    } catch {
+      // The row was only momentarily attached (overscan churn right after whatever click
+      // triggered this findRow) — clearStickyBand's scrollIntoViewIfNeeded has nothing to act
+      // on once it's gone, and retrying that same action never brings it back on its own, since
+      // nothing drives the scroll toward where it would remount. Falling through to the
+      // scroll-search loop below (which actively drives the scroll, the same recovery every
+      // off-screen row already relies on) is what actually recovers it.
+    }
   }
   await scrollAndSettle(container, 'reset');
   for (let i = 0; i < 80; i++) {

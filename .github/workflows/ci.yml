@@ -187,6 +187,10 @@ jobs:
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
+      - name: Give git a global author identity (gitsession/gitsock exercise production code that shells out to real git commit-creating commands — restack, global-stash promote — through gitclient's own exec runner, which unlike the tests' own fixture helpers never sets GIT_AUTHOR_*/GIT_COMMITTER_* itself; every dev machine already has one from ordinary git use, a fresh runner doesn't)
+        run: |
+          git config --global user.name "CI"
+          git config --global user.email "ci@kira-studio.test"
       - name: Install & cache GTK4/WebKitGTK headers (wails3 CLI build requirement on Linux — CLAUDE.md)
         uses: awalsh128/cache-apt-pkgs-action@v1
         with:
@@ -212,6 +216,8 @@ jobs:
           key: wails-bindings-${{ hashFiles('go.mod') }}
       - name: Generate Wails bindings
         run: sh scripts/setup.sh
+      - name: Build frontend bundle (main.go's `//go:embed all:frontend/dist` needs this directory to exist before Go can even compile the root package — checks (macOS) covers this via its own `bun run build`, but container-tests' `go test ./...` reaches the same package and needs it too)
+        run: bun run build
       - run: bun run test:unit
       - name: Raise the inotify instance limit (v1.4 P1 — internal/gitsock and internal/gitsession now run t.Parallel(); each open repo holds one fsnotify watcher = one inotify instance, and Ubuntu's stock 128 is low enough for the parallel suite to exhaust it and hang rather than fail cleanly, confirmed by reproducing the hang at 128 and it clearing at 8192)
         run: sudo sysctl -w fs.inotify.max_user_instances=8192
