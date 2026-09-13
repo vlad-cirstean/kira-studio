@@ -162,8 +162,16 @@ func processScriptOrStyle(
 		*firstErr = err
 		return
 	}
+	// ParentIndex, as extractSymbols returns it, is local to syms — an index into THIS block's
+	// own slice, not the combined *symbols slice multiple blocks accumulate into. Offset every
+	// non-root reference by the combined slice's length before this block's own symbols land in
+	// it, or two different blocks' local index 0 would collide once concatenated.
+	base := len(*symbols)
 	for i := range syms {
 		syms[i].BlockIndex = blockIndex
+		if syms[i].ParentIndex >= 0 {
+			syms[i].ParentIndex += base
+		}
 	}
 	for i := range refs {
 		refs[i].BlockIndex = blockIndex

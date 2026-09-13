@@ -115,6 +115,50 @@ func TestInjectGoldenFixtures(t *testing.T) {
 	}
 }
 
+// TestInjectParentIndexAcrossBlocks guards a real bug found while wiring the store (S5): each
+// block's own extractSymbols call returns ParentIndex values local to ITS OWN slice, but
+// injectBlocks accumulates every block's symbols into one combined slice — a second block's own
+// local index 0 collides with the first block's, unless offset by the combined slice's length
+// before that block's symbols are appended. Two plain <script> tags, each with one class holding
+// one nested method, is the minimal fixture that can tell a correct offset apart from a stale one.
+func TestInjectParentIndexAcrossBlocks(t *testing.T) {
+	src, err := os.ReadFile("testdata/inject/multiscript.html")
+	if err != nil {
+		t.Fatalf("read fixture: %v", err)
+	}
+	lang, err := languageFor(HTML)
+	if err != nil {
+		t.Fatalf("languageFor: %v", err)
+	}
+	parser := sitter.NewParser()
+	defer parser.Close()
+	if err := parser.SetLanguage(lang); err != nil {
+		t.Fatalf("SetLanguage: %v", err)
+	}
+	tree := parser.Parse(src, nil)
+	defer tree.Close()
+
+	_, syms, _, err := injectBlocks(tree, src, HTML)
+	if err != nil {
+		t.Fatalf("injectBlocks: %v", err)
+	}
+
+	want := []symRow{
+		{"class", "First", -1},
+		{"method", "one", 0},  // nested in this same block's own "First", combined index 0.
+		{"class", "Second", -1},
+		{"method", "two", 2}, // nested in the SECOND block's "Second" (combined index 2), never
+		// index 0 ("First") — the exact collision a missing offset would produce.
+	}
+	got := make([]symRow, len(syms))
+	for i, s := range syms {
+		got[i] = symRow{s.Kind, s.Name, s.ParentIndex}
+	}
+	if !equalSymRows(got, want) {
+		t.Fatalf("symbols mismatch:\n got:  %+v\n want: %+v", got, want)
+	}
+}
+
 func equalBlockRows(a, b []blockRow) bool {
 	if len(a) != len(b) {
 		return false
