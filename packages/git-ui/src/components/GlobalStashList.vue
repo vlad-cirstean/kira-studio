@@ -16,7 +16,7 @@ import type { StashState } from '../state/stash.ts';
 import { formatRelativeDate } from './dateFormat.ts';
 import RowContextMenu from './RowContextMenu.vue';
 import { capItems } from './refListModel.ts';
-import { buildGlobalStashMenu } from './rowMenuModel.ts';
+import { buildGlobalStashMenu, buildReadOnlyStashMenu } from './rowMenuModel.ts';
 import { globalRowModel } from './stashListModel.ts';
 
 const props = defineProps<{
@@ -24,6 +24,10 @@ const props = defineProps<{
   ops: OpsState;
   inProgress: InProgressOperation | null;
   currentBranch?: string | null;
+  /** C10 §4.2/§4.3 (S6): `false` under the native read-only graph — hides the header's "Save to
+   *  global stash…" button (`globalStashSave`, a write) and falls the row menu back to
+   *  `buildReadOnlyStashMenu` (Show changes only) instead of `buildGlobalStashMenu`. */
+  writeCapability: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -52,7 +56,9 @@ function openMenuFromButton(entry: StashEntry, event: MouseEvent): void {
 const stashMenuSections = computed(() => {
   const entry = stashMenu.value?.entry;
   if (!entry) return [];
-  return buildGlobalStashMenu(props.inProgress, entry, props.currentBranch ?? null);
+  return props.writeCapability
+    ? buildGlobalStashMenu(props.inProgress, entry, props.currentBranch ?? null)
+    : buildReadOnlyStashMenu();
 });
 
 async function onMenuSelect(id: string): Promise<void> {
@@ -83,6 +89,7 @@ async function onMenuSelect(id: string): Promise<void> {
     <div class="kv-branch-section-title kv-global-stash-title">
       <span>Global stash</span>
       <KuiButton
+        v-if="writeCapability"
         variant="icon"
         icon="codicon-add"
         v-kui-tooltip="'Save to global stash…'"

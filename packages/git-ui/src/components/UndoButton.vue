@@ -19,6 +19,9 @@ const props = defineProps<{
   ops: OpsState;
   clipboardEnabled: boolean;
   copy: (text: string, whatCopied: string) => void;
+  /** C10 §4.2/§4.3: `false` under the native read-only graph — undo (`undo.run`) is a write, and
+   *  SPEC names it explicitly as one to hide. */
+  writeCapability: boolean;
 }>();
 
 async function undo(): Promise<void> {
@@ -27,7 +30,7 @@ async function undo(): Promise<void> {
 </script>
 
 <template>
-  <div v-if="ops.undoSlot.value" class="kv-undo">
+  <div v-if="writeCapability && ops.undoSlot.value" class="kv-undo">
     <KuiButton
       icon="codicon-discard"
       v-kui-tooltip="composeUndoTooltip(ops.undoSlot.value.label)"

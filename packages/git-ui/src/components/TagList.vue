@@ -13,13 +13,16 @@ import { computed, ref } from 'vue';
 import type { OpsState } from '../state/ops.ts';
 import RowContextMenu from './RowContextMenu.vue';
 import type { RefListSection } from './refListModel.ts';
-import { buildRefMenu } from './rowMenuModel.ts';
+import { buildReadOnlyRefMenu, buildRefMenu } from './rowMenuModel.ts';
 
 const props = defineProps<{
   section: RefListSection;
   ops: OpsState;
   knownRemotes: readonly string[];
   inProgress: InProgressOperation | null;
+  /** C10 §4.2/§4.3 (S6): `false` under the native read-only graph — the row menu falls back to
+   *  `buildReadOnlyRefMenu` (empty) instead of `buildRefMenu`. */
+  writeCapability: boolean;
 }>();
 
 const emit = defineEmits<(e: 'checked-out') => void>();
@@ -52,13 +55,15 @@ function openRefMenuFromButton(row: RefRow, event: MouseEvent): void {
 const refMenuSections = computed(() => {
   const entry = refMenu.value;
   if (!entry) return [];
-  return buildRefMenu({
-    kind: 'tag',
-    shortName: entry.row.shortName,
-    isHead: false,
-    knownRemotes: props.knownRemotes,
-    inProgress: props.inProgress,
-  });
+  return props.writeCapability
+    ? buildRefMenu({
+        kind: 'tag',
+        shortName: entry.row.shortName,
+        isHead: false,
+        knownRemotes: props.knownRemotes,
+        inProgress: props.inProgress,
+      })
+    : buildReadOnlyRefMenu();
 });
 
 async function onRefMenuSelect(id: string): Promise<void> {

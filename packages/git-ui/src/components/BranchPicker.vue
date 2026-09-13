@@ -35,7 +35,7 @@ import {
   remoteCheckoutLabel,
   remoteCheckoutTarget,
 } from './refListModel.ts';
-import { buildRefMenu, remoteNamesFrom } from './rowMenuModel.ts';
+import { buildReadOnlyRefMenu, buildRefMenu, remoteNamesFrom } from './rowMenuModel.ts';
 import StackList from './StackList.vue';
 import StashList from './StashList.vue';
 import { childOf, parentOf } from './stackListModel.ts';
@@ -51,6 +51,11 @@ const props = defineProps<{
   stack: StackState;
   /** G25 D6/D14 — see `WorktreeList.vue`'s own doc comment. */
   openWorktreeWindowCapability: boolean;
+  /** C10 §4.2/§4.3 (S6/S7): `false` under the native read-only graph — this picker's own ref menu
+   *  falls back to `buildReadOnlyRefMenu`, and the flag threads on into every child section
+   *  (`TagList`/`StashList`/`GlobalStashList`/`WorktreeList`/`StackList`) that owns a write
+   *  affordance of its own. */
+  writeCapability: boolean;
   /** G24 D9's own branch-tip badge — optional so a caller with nothing to show yet gets a plain,
    *  badge-free picker (mirrors `CommitGrid.vue`'s own `pr` prop). */
   pr?: PrState;
@@ -193,6 +198,7 @@ const refMenuSections = computed(() => {
   // never a stack member (buildRefMenu itself already returns before reading `stack` for those
   // two kinds, but computing it only for `branch` here keeps `parentOf`/`childOf` from ever
   // running against a row that could not possibly answer anything).
+  if (!props.writeCapability) return buildReadOnlyRefMenu();
   const stackResult = { stacks: props.stack.stacks.value, orphans: props.stack.orphans.value };
   return buildRefMenu({
     kind: entry.row.kind,
@@ -458,6 +464,7 @@ onBeforeUnmount(() => {
           :ops="ops"
           :known-remotes="knownRemotes"
           :in-progress="ops.statusSummary.value?.inProgress ?? null"
+          :write-capability="writeCapability"
           @checked-out="close"
         />
 
@@ -466,6 +473,7 @@ onBeforeUnmount(() => {
           :ops="ops"
           :in-progress="ops.statusSummary.value?.inProgress ?? null"
           :current-branch="refs.currentBranchName.value ?? null"
+          :write-capability="writeCapability"
           @branch-from-stash="(entry) => emit('branchFromStash', entry)"
           @save-entry-to-global-stash="(entry) => emit('saveEntryToGlobalStash', entry)"
         />
@@ -475,6 +483,7 @@ onBeforeUnmount(() => {
           :ops="ops"
           :in-progress="ops.statusSummary.value?.inProgress ?? null"
           :current-branch="refs.currentBranchName.value ?? null"
+          :write-capability="writeCapability"
           @branch-from-stash="(entry) => emit('branchFromStash', entry)"
           @save-global-stash="emit('saveGlobalStash')"
         />
@@ -483,6 +492,7 @@ onBeforeUnmount(() => {
           :worktrees="worktrees"
           :ops="ops"
           :open-worktree-window-capability="openWorktreeWindowCapability"
+          :write-capability="writeCapability"
           @switch-worktree="(path) => emit('switchWorktree', path)"
           @open-worktree-window="(path) => emit('openWorktreeWindow', path)"
           @create-worktree="emit('createWorktree')"
@@ -492,6 +502,7 @@ onBeforeUnmount(() => {
           :stack="stack"
           :ops="ops"
           :pr="pr"
+          :write-capability="writeCapability"
           @open-restack-dialog="(branch) => emit('openRestackDialog', branch)"
           @open-set-parent-dialog="(branch) => emit('openSetStackParentDialog', branch)"
         />

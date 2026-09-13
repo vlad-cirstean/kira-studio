@@ -46,6 +46,11 @@ const props = defineProps<{
   open: boolean;
   repoSettingsState: RepoSettingsState;
   dateFormat: DateFormat;
+  /** C10 §4.4: `false` under the native read-only graph — hides the Pull section (`strategy`
+   *  configures `remote.pull`, a write this host's transport never issues). Graph scope/page size
+   *  stay: genuine read-side controls, and `repoSettings.set` itself stays allowed at layer 1
+   *  (§4.4) since it only ever writes Kira's own SQLite, never the repository. */
+  writeCapability: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -251,7 +256,7 @@ async function save(): Promise<void> {
       </label>
     </section>
 
-    <section class="kv-repo-settings-section">
+    <section v-if="writeCapability" class="kv-repo-settings-section">
       <h3 class="kv-repo-settings-heading">Pull</h3>
       <label class="kv-dialog-field">
         Strategy

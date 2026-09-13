@@ -56,6 +56,9 @@ import NoRepositoryPanel from './components/NoRepositoryPanel.vue';
 import RowContextMenu from './components/RowContextMenu.vue';
 import { remoteCheckoutTarget } from './components/refListModel.ts';
 import {
+  buildReadOnlyRefMenu,
+  buildReadOnlyRowMenu,
+  buildReadOnlyStashMenu,
   buildRefMenu,
   buildRowMenu,
   buildStashMenu,
@@ -481,12 +484,15 @@ const commitMenuSections = computed<MenuSection[]>(() => {
   const state = contextMenuState.value;
   if (!state) return [];
   const commit = graphView.store.commitAt(state.row);
-  return buildRowMenu({
-    sha: commit.sha,
-    decorations: commit.decoration,
-    inProgress: opsState.statusSummary.value?.inProgress ?? null,
-    clipboardEnabled: actions.value?.capabilities.clipboard ?? false,
-  });
+  const clipboardEnabled = actions.value?.capabilities.clipboard ?? false;
+  return actions.value?.capabilities.write
+    ? buildRowMenu({
+        sha: commit.sha,
+        decorations: commit.decoration,
+        inProgress: opsState.statusSummary.value?.inProgress ?? null,
+        clipboardEnabled,
+      })
+    : buildReadOnlyRowMenu(clipboardEnabled);
 });
 
 async function onCommitMenuSelect(id: string): Promise<void> {
@@ -547,11 +553,13 @@ const stashMenuSections = computed<MenuSection[]>(() => {
   if (!stashContextMenuState.value) return [];
   const entry = stashEntryForContextMenu();
   if (!entry) return [];
-  return buildStashMenu(
-    opsState.statusSummary.value?.inProgress ?? null,
-    entry,
-    refsState.currentBranchName.value,
-  );
+  return actions.value?.capabilities.write
+    ? buildStashMenu(
+        opsState.statusSummary.value?.inProgress ?? null,
+        entry,
+        refsState.currentBranchName.value,
+      )
+    : buildReadOnlyStashMenu();
 });
 
 function stashEntryForContextMenu(): StashEntry | undefined {
@@ -698,6 +706,7 @@ function handleGridRefContextMenu(detail: {
 const refMenuSections = computed<MenuSection[]>(() => {
   const state = refContextMenuState.value;
   if (!state) return [];
+  if (!actions.value?.capabilities.write) return buildReadOnlyRefMenu();
   const isHead =
     state.kind === 'branch' &&
     refsState.branches.value.some((row) => row.shortName === state.name && row.isHead);
@@ -1649,77 +1658,85 @@ onBeforeUnmount(() => {
           @select="onStashMenuSelect"
           @close="stashContextMenuState = undefined"
         />
-        <div
-          v-if="forceDeleteRefCandidate"
-          ref="forceDeletePanelEl"
-          class="kv-branch-force-delete kv-branch-force-delete--floating"
-          :style="forceDeletePanelStyle"
-        >
-          <span>“{{ forceDeleteRefCandidate.name }}” is not fully merged.</span>
-          <KuiButton variant="danger" @click="confirmForceDeleteRef">Force delete</KuiButton>
-          <KuiButton @click="forceDeleteRefCandidate = undefined">Cancel</KuiButton>
-        </div>
-        <RenameRefDialog
-          :open="renameRefDialogState.open"
-          :current-name="renameRefDialogState.currentName"
-          :ops="opsState"
-          @close="renameRefDialogState = { open: false, currentName: '' }"
-        />
-        <BranchDialog
-          :open="branchDialogState.open"
-          :start-point="branchDialogState.startPoint"
-          :ops="opsState"
-          @close="branchDialogState = { open: false, startPoint: '' }"
-        />
-        <TagDialog
-          :open="tagDialogState.open"
-          :target="tagDialogState.target"
-          :existing-tags="refsState.tags.value"
-          :ops="opsState"
-          @close="tagDialogState = { open: false, target: '' }"
-        />
-        <CheckoutDialog :ops="opsState" />
-        <RevertDialog :ops="opsState" />
-        <ResetDialog :ops="opsState" />
-        <CherryPickDialog :ops="opsState" />
-        <ForcePushDialog :ops="opsState" />
-        <PullDialog :ops="opsState" />
-        <PostCheckoutPullDialog :ops="opsState" />
-        <StashDialog
-          :ops="opsState"
-          :create-open="stashCreateOpen"
-          :include-untracked-default="stashIncludeUntrackedDefault"
-          :branch-target="stashBranchTarget"
-          :save-open="globalStashSaveOpen"
-          :save-source-entry="globalStashSaveSourceEntry"
-          @close-create="stashCreateOpen = false"
-          @close-branch="stashBranchTarget = undefined"
-          @close-save="
-            globalStashSaveOpen = false;
-            globalStashSaveSourceEntry = undefined;
-          "
-        />
-        <WorktreeDialog
-          :worktrees="worktreeState"
-          :ops="opsState"
-          :refs="refsState"
-          :create-open="worktreeCreateOpen"
-          :base-path-default="worktreeBasePathDefault"
-          :prepare-script="worktreePrepareScript"
-          :run-prepare-script-capability="actions?.capabilities.runPrepareScript ?? false"
-          @close-create="worktreeCreateOpen = false"
-        />
-        <StackDialog
-          :stack="stackState"
-          :ops="opsState"
-          :refs="refsState"
-          :target="stackDialogTarget"
-          @close="stackDialogTarget = undefined"
-        />
+        <!-- C10 §4.2/§4.3: every dialog below except RepoSettingsDialog exists to confirm one
+             write. With every entry point that could open one hidden (the read-only menu
+             builders, the toolbar's write buttons above), mounting them is dead code — removed
+             from this template under this v-if, not from the package, so VS Code (write: true)
+             keeps every one of them unchanged. -->
+        <template v-if="actions?.capabilities.write">
+          <div
+            v-if="forceDeleteRefCandidate"
+            ref="forceDeletePanelEl"
+            class="kv-branch-force-delete kv-branch-force-delete--floating"
+            :style="forceDeletePanelStyle"
+          >
+            <span>“{{ forceDeleteRefCandidate.name }}” is not fully merged.</span>
+            <KuiButton variant="danger" @click="confirmForceDeleteRef">Force delete</KuiButton>
+            <KuiButton @click="forceDeleteRefCandidate = undefined">Cancel</KuiButton>
+          </div>
+          <RenameRefDialog
+            :open="renameRefDialogState.open"
+            :current-name="renameRefDialogState.currentName"
+            :ops="opsState"
+            @close="renameRefDialogState = { open: false, currentName: '' }"
+          />
+          <BranchDialog
+            :open="branchDialogState.open"
+            :start-point="branchDialogState.startPoint"
+            :ops="opsState"
+            @close="branchDialogState = { open: false, startPoint: '' }"
+          />
+          <TagDialog
+            :open="tagDialogState.open"
+            :target="tagDialogState.target"
+            :existing-tags="refsState.tags.value"
+            :ops="opsState"
+            @close="tagDialogState = { open: false, target: '' }"
+          />
+          <CheckoutDialog :ops="opsState" />
+          <RevertDialog :ops="opsState" />
+          <ResetDialog :ops="opsState" />
+          <CherryPickDialog :ops="opsState" />
+          <ForcePushDialog :ops="opsState" />
+          <PullDialog :ops="opsState" />
+          <PostCheckoutPullDialog :ops="opsState" />
+          <StashDialog
+            :ops="opsState"
+            :create-open="stashCreateOpen"
+            :include-untracked-default="stashIncludeUntrackedDefault"
+            :branch-target="stashBranchTarget"
+            :save-open="globalStashSaveOpen"
+            :save-source-entry="globalStashSaveSourceEntry"
+            @close-create="stashCreateOpen = false"
+            @close-branch="stashBranchTarget = undefined"
+            @close-save="
+              globalStashSaveOpen = false;
+              globalStashSaveSourceEntry = undefined;
+            "
+          />
+          <WorktreeDialog
+            :worktrees="worktreeState"
+            :ops="opsState"
+            :refs="refsState"
+            :create-open="worktreeCreateOpen"
+            :base-path-default="worktreeBasePathDefault"
+            :prepare-script="worktreePrepareScript"
+            :run-prepare-script-capability="actions?.capabilities.runPrepareScript ?? false"
+            @close-create="worktreeCreateOpen = false"
+          />
+          <StackDialog
+            :stack="stackState"
+            :ops="opsState"
+            :refs="refsState"
+            :target="stackDialogTarget"
+            @close="stackDialogTarget = undefined"
+          />
+        </template>
         <RepoSettingsDialog
           :open="repoSettingsDialogOpen"
           :repo-settings-state="repoSettingsState"
           :date-format="dateFormat"
+          :write-capability="actions?.capabilities.write ?? false"
           @close="repoSettingsDialogOpen = false"
           @update:date-format="dateFormat = $event"
         />

@@ -264,6 +264,12 @@ defineExpose({
 const stashDisabled = computed(
   () => (props.opsState.statusSummary.value?.isClean ?? true) || props.opsState.busy.value,
 );
+
+// C10 §4.2/§4.3 (S7): `false` under the native read-only graph — hides Fetch/Pull/Push/Stash/
+// cancel-remote-op/cancel-worktree-prepare/Undo below, every one of them a write. Defaults to
+// `false` (the conservative value, same as every other capability gate in this file) while
+// `actions` has not resolved yet.
+const write = computed(() => props.actions?.capabilities.write ?? false);
 </script>
 
 <template>
@@ -281,6 +287,7 @@ const stashDisabled = computed(
       :worktrees="worktreeState"
       :stack="stackState"
       :open-worktree-window-capability="openWorktreeWindowCapability"
+      :write-capability="write"
       :pr="prState"
       @branch-from-stash="(entry) => emit('branch-from-stash', entry)"
       @save-global-stash="emit('save-global-stash')"
@@ -303,7 +310,7 @@ const stashDisabled = computed(
     <span class="kv-toolbar-separator" aria-hidden="true"></span>
     <RefreshButton ref="refreshButtonRef" :graph-view="graphView" :repo-state="repoState" />
 
-    <template v-if="hasRemote">
+    <template v-if="write && hasRemote">
       <span class="kv-toolbar-separator" aria-hidden="true"></span>
       <KuiButton
         icon="codicon-cloud-download"
@@ -361,16 +368,26 @@ const stashDisabled = computed(
       </div>
     </template>
 
-    <span class="kv-toolbar-separator" aria-hidden="true"></span>
-    <KuiButton
-      icon="codicon-inbox"
-      :disabled="stashDisabled"
-      v-kui-tooltip="'Stash changes'"
-      data-testid="stash-changes-button"
-      @click="emit('stash-changes')"
-    >
-      Stash
-    </KuiButton>
+    <template v-if="write">
+      <span class="kv-toolbar-separator" aria-hidden="true"></span>
+      <KuiButton
+        icon="codicon-inbox"
+        :disabled="stashDisabled"
+        v-kui-tooltip="'Stash changes'"
+        data-testid="stash-changes-button"
+        @click="emit('stash-changes')"
+      >
+        Stash
+      </KuiButton>
+    </template>
+
+    <!-- C10 §4.3/§14 OQ2: the toolbar hides every write affordance uniformly rather than
+         disabling any of them with a reason (§4.2 layer 3) — this note is the one place that
+         explains why, for a user arriving from the VS Code extension who might otherwise wonder
+         where Fetch/Pull/Push/Stash/Undo went. -->
+    <span v-if="!write" class="kv-toolbar-readonly-note" data-testid="read-only-note">
+      Read-only view — use the VS Code extension to make changes
+    </span>
 
     <span class="kv-toolbar-spacer" aria-hidden="true"></span>
 
@@ -393,7 +410,7 @@ const stashDisabled = computed(
       @click="emit('open-repo-settings')"
     />
 
-    <div v-if="remoteBusy" class="kv-remote-progress" data-testid="remote-progress">
+    <div v-if="write && remoteBusy" class="kv-remote-progress" data-testid="remote-progress">
       <span class="codicon codicon-loading kv-remote-progress-spin" aria-hidden="true"></span>
       <span class="kv-remote-progress-label">{{ progressText }}</span>
       <KuiButton
@@ -411,7 +428,7 @@ const stashDisabled = computed(
          never cancels the run), which is exactly when this strip becomes the only visible
          indicator that one is still going. -->
     <div
-      v-if="opsState.activeWorktreePreparePath.value !== undefined"
+      v-if="write && opsState.activeWorktreePreparePath.value !== undefined"
       class="kv-remote-progress"
       data-testid="worktree-prepare-progress"
     >
@@ -426,7 +443,12 @@ const stashDisabled = computed(
       />
     </div>
 
-    <UndoButton :ops="opsState" :clipboard-enabled="actions?.capabilities.clipboard ?? false" :copy="copy" />
+    <UndoButton
+      :ops="opsState"
+      :clipboard-enabled="actions?.capabilities.clipboard ?? false"
+      :write-capability="write"
+      :copy="copy"
+    />
   </div>
 </template>
 
@@ -472,6 +494,17 @@ const stashDisabled = computed(
 
 .kv-toolbar-spacer {
   flex: 1;
+}
+
+/* C10 §4.3/§14 OQ2: the read-only note — same muted, small-text treatment as the description-fg
+   text used elsewhere in this toolbar (kv-toolbar-restacking above), never an error/warning color:
+   this is expected, permanent state, not a problem. */
+.kv-toolbar-readonly-note {
+  color: var(--kv-description-fg);
+  font-size: var(--kv-t-sm);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* G19 D3a: the toolbar-button look now comes from @kira/kira-ui's own KuiButton (theme/

@@ -21,6 +21,11 @@ const props = defineProps<{
   /** G24 D9's own branch-tip badge — optional so a caller with nothing to show yet gets a
    *  plain, badge-free list (mirrors `BranchPicker.vue`'s own `pr` prop). */
   pr?: PrState;
+  /** C10 §4.2/§4.3: `false` under the native read-only graph — hides Restack/Set stack parent/
+   *  Remove from stack, all writes (`stackSet`/`stack.restack`), the same fate the row-menu
+   *  precedent (`buildReadOnlyRefMenu`) gives the identical actions reached from a ref's own
+   *  context menu. The list itself (base/branch/PR/track/stale) stays visible — a read. */
+  writeCapability: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -69,6 +74,7 @@ async function removeFromStack(branch: string): Promise<void> {
       <div class="kv-stack-header">
         <span class="kv-stack-base" v-kui-tooltip="`Base: ${summary.base}`">{{ summary.base }}</span>
         <KuiButton
+          v-if="writeCapability"
           class="kv-stack-restack"
           :disabled="!summary.needsRestack"
           @click="requestRestack(summary.branches[summary.branches.length - 1]?.name ?? summary.base)"
@@ -108,6 +114,7 @@ async function removeFromStack(branch: string): Promise<void> {
           </span>
         </div>
         <KuiButton
+          v-if="writeCapability"
           variant="icon"
           v-kui-tooltip="'Set stack parent…'"
           aria-label="Set stack parent"
@@ -116,6 +123,7 @@ async function removeFromStack(branch: string): Promise<void> {
           <span class="codicon codicon-list-tree" aria-hidden="true"></span>
         </KuiButton>
         <KuiButton
+          v-if="writeCapability"
           variant="icon"
           v-kui-tooltip="'Remove from stack'"
           aria-label="Remove from stack"
@@ -136,6 +144,7 @@ async function removeFromStack(branch: string): Promise<void> {
           <span class="kv-stack-orphan-reason">{{ row.orphanReason }}</span>
         </div>
         <KuiButton
+          v-if="writeCapability"
           variant="icon"
           v-kui-tooltip="'Set stack parent…'"
           aria-label="Set stack parent"

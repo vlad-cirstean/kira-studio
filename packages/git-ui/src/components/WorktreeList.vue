@@ -23,6 +23,12 @@ const props = defineProps<{
   ops: OpsState;
   /** Gates the "Open in New Window" row action (D6/D14) — `false` in the harness. */
   openWorktreeWindowCapability: boolean;
+  /** C10 §4.2/§4.3: `false` under the native read-only graph — hides create/switch/remove, every
+   *  one of which is a write (create/remove are `op.run`; switch is a checkout). The worktree
+   *  list itself stays visible (a read); "Open in New Window" is already `false` natively via
+   *  `openWorktreeWindowCapability` above, and-ed with this one for the same reason that row is
+   *  hidden even where a future host reported both true independently. */
+  writeCapability: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -109,7 +115,11 @@ async function confirmRemove(): Promise<void> {
   <div class="kv-branch-section" aria-label="Worktrees">
     <div class="kv-branch-section-title">
       Worktrees
-      <KuiButton class="kv-worktree-create" @click="emit('create-worktree')">
+      <KuiButton
+        v-if="writeCapability"
+        class="kv-worktree-create"
+        @click="emit('create-worktree')"
+      >
         Create Worktree…
       </KuiButton>
     </div>
@@ -127,7 +137,7 @@ async function confirmRemove(): Promise<void> {
         <span class="kv-worktree-path">{{ entry.path }}</span>
       </div>
       <KuiButton
-        v-if="!entry.isCurrent"
+        v-if="writeCapability && !entry.isCurrent"
         variant="icon"
         v-kui-tooltip="'Switch to this worktree'"
         aria-label="Switch to this worktree"
@@ -136,7 +146,7 @@ async function confirmRemove(): Promise<void> {
         <span class="codicon codicon-arrow-swap" aria-hidden="true"></span>
       </KuiButton>
       <KuiButton
-        v-if="openWorktreeWindowCapability"
+        v-if="writeCapability && openWorktreeWindowCapability"
         variant="icon"
         v-kui-tooltip="'Open in new window'"
         aria-label="Open in new window"
@@ -145,7 +155,7 @@ async function confirmRemove(): Promise<void> {
         <span class="codicon codicon-empty-window" aria-hidden="true"></span>
       </KuiButton>
       <KuiButton
-        v-if="!entry.isMain && !entry.isCurrent"
+        v-if="writeCapability && !entry.isMain && !entry.isCurrent"
         variant="icon"
         v-kui-tooltip="'Remove worktree'"
         aria-label="Remove worktree"

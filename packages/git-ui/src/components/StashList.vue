@@ -20,7 +20,7 @@ import type { StashState } from '../state/stash.ts';
 import { formatRelativeDate } from './dateFormat.ts';
 import RowContextMenu from './RowContextMenu.vue';
 import { capItems } from './refListModel.ts';
-import { buildStashMenu } from './rowMenuModel.ts';
+import { buildReadOnlyStashMenu, buildStashMenu } from './rowMenuModel.ts';
 import { isAutoStash, originLabel, stashLabel } from './stashListModel.ts';
 
 const props = defineProps<{
@@ -30,6 +30,9 @@ const props = defineProps<{
   /** G28 D5: the currently checked-out branch — `undefined`/`null` for a detached HEAD. Drives
    *  the origin-branch chip and `buildStashMenu`'s own cross-branch Apply label/Pop suppression. */
   currentBranch?: string | null;
+  /** C10 §4.2/§4.3 (S6): `false` under the native read-only graph — the row menu falls back to
+   *  `buildReadOnlyStashMenu` (Show changes only) instead of `buildStashMenu`. */
+  writeCapability: boolean;
 }>();
 
 /** Bubbled to `BranchPicker.vue` → `App.vue`, which owns `StashDialog.vue`'s branch-mode state —
@@ -62,7 +65,9 @@ function openMenuFromButton(entry: StashEntry, event: MouseEvent): void {
 const stashMenuSections = computed(() => {
   const entry = stashMenu.value?.entry;
   if (!entry) return [];
-  return buildStashMenu(props.inProgress, entry, props.currentBranch ?? null);
+  return props.writeCapability
+    ? buildStashMenu(props.inProgress, entry, props.currentBranch ?? null)
+    : buildReadOnlyStashMenu();
 });
 
 async function onMenuSelect(id: string): Promise<void> {
