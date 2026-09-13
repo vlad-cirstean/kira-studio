@@ -48,8 +48,22 @@ func newStreamConnID() gitsession.ConnID {
 // to stage a write; admitting it would let a UI bug render a confirm dialog whose confirm button
 // then fails at this layer — a worse experience than the action simply not existing.
 //
-// review.* is deliberately absent too — C11's own surface, out of scope here (§9); undo.peek is
-// admitted because UndoButton.vue reads it to render a label even when undo itself is hidden.
+// The nine review.* methods below (C11 §3) look like writes but never touch the repository: every
+// one is a thin decode-validate-delegate onto gitsession.RepoEntry whose only persistence is
+// review.db, a second SQLite file under KIRA_HOME (gitreview/db.go) — internal/gitreview has no
+// exec.Command, no os.WriteFile and no git invocation of any kind; its only writes are
+// INSERT/UPDATE/DELETE against review_session/review_file/review_range/review_comment. The git
+// work these handlers do perform is read-only porcelain (cat-file, merge-base --is-ancestor,
+// diff) — no update-index, no write-tree, no commit-tree, no ref update, no working-tree write,
+// anywhere in the review path. This is the same shape as repoSettings.set below: a name that says
+// "write" whose writes land in Kira's own storage, never the user's repository.
+//
+// review.session.save/.load are NOT here — handlers.go has no case for either (contract.go's own
+// history note: they resume the extension's own context.workspaceState and never reach this
+// server), so they stay refused as defence in depth even though nothing routes them anyway.
+// review.open/editor.openRangeDiff are likewise absent — answered host-side, never forwarded here.
+// undo.peek is admitted because UndoButton.vue reads it to render a label even when undo itself is
+// hidden.
 var readOnlyMethods = map[string]struct{}{
 	"app.init": {}, "repo.open": {}, "repo.close": {},
 	"graph.status": {}, "graph.loadMore": {}, "graph.refresh": {},
@@ -60,6 +74,9 @@ var readOnlyMethods = map[string]struct{}{
 	"commit.resolvePr": {}, "branch.resolvePr": {},
 	"worktree.list": {}, "stack.list": {},
 	"repoSettings.get": {}, "repoSettings.set": {}, // §4.4: writes only Kira's own SQLite.
+	"review.resolveBase": {}, "review.files": {}, "review.fileDiff": {}, "review.mark": {},
+	"review.comment.add": {}, "review.comment.list": {}, "review.comment.remove": {},
+	"review.comment.clear": {}, "review.comment.export": {}, // review.db only — see above.
 }
 
 // readOnlyStreamMethods is layer 1's own allowlist for the one streaming method — graph.stream is
