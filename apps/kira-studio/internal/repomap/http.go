@@ -61,7 +61,10 @@ func (s *Server) bindHTTP() error {
 // request, fail-closed.
 func (s *Server) tokenVerifier() auth.TokenVerifier {
 	return func(_ context.Context, token string, _ *http.Request) (*auth.TokenInfo, error) {
-		if len(s.token.Hash) == 0 || !mcpauth.Verify(token, s.token) {
+		s.tokenMu.RLock()
+		rec := s.token
+		s.tokenMu.RUnlock()
+		if len(rec.Hash) == 0 || !mcpauth.Verify(token, rec) {
 			return nil, auth.ErrInvalidToken
 		}
 		return &auth.TokenInfo{}, nil

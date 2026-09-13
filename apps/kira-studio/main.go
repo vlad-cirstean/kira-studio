@@ -37,6 +37,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitvsix"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/localauth"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/logging"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/mcpinstall"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/metrics"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/oplog"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/preconnect"
@@ -244,6 +245,12 @@ func main() {
 	deps.Events = emitter
 	dialogs, attachDialogs := shell.NewDeferredDialogs()
 
+	// C3 §7.4/D7: the repo-map MCP server's embedded instance — owned by this app's own lifecycle,
+	// same posture as gitSock just above. StartIfEnabled's own failure (no repository resolved at
+	// this process's cwd, a bind conflict) is logged, never fatal, mirroring gitSock.Start().
+	repoMapSvc := &bridge.RepoMapService{Deps: deps, Installer: mcpinstall.New(mcpinstall.Deps{})}
+	bridge.StartRepoMapIfEnabled(repoMapSvc)
+
 	events := bridge.NewEvents(emitter)
 	eventsDetach := events.Attach(bridge.Sources{Connections: connectionsSvc, Oplog: oplogWiring, Metrics: metricsTicker, Git: gitSock})
 
@@ -275,6 +282,7 @@ func main() {
 		}
 		oplogWiring.Stop()
 		connectionsSvc.Shutdown()
+		bridge.StopRepoMap(repoMapSvc)
 		if err := gitSock.Close(); err != nil {
 			slog.Warn("close git socket", "scope", "shutdown", "err", err)
 		}
@@ -332,6 +340,7 @@ func main() {
 			application.NewService(&bridge.GrpcHistoryService{Deps: deps}),
 			application.NewService(&bridge.DataGripService{Deps: deps}),
 			application.NewService(&bridge.GitClientsService{Deps: deps, Sock: gitSock, Broker: gitSock.Broker(), Vsix: gitvsix.New(gitvsix.Deps{})}),
+			application.NewService(repoMapSvc),
 			application.NewService(&bridge.LifecycleService{Flusher: quitter, WindowFlusher: closeFlush}),
 		},
 		Assets: application.AssetOptions{

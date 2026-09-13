@@ -40,12 +40,19 @@ type GitSettings struct {
 	GitPath string `json:"gitPath"`
 }
 
+// CodeIntelSettings mirrors C3 §7.1's one leaf — the embedded repo-map MCP server instance's
+// persisted on/off record (internal/bridge/repomap.go owns the actual start/stop side effect).
+type CodeIntelSettings struct {
+	McpServerEnabled bool `json:"mcpServerEnabled"`
+}
+
 type Settings struct {
 	Appearance AppearanceSettings `json:"appearance"`
 	Data       DataSettings       `json:"data"`
 	Cache      CacheSettings      `json:"cache"`
 	Advanced   AdvancedSettings   `json:"advanced"`
 	Git        GitSettings        `json:"git"`
+	CodeIntel  CodeIntelSettings  `json:"codeIntel"`
 }
 
 // DefaultSettings mirrors packages/shared/domain/settings.ts's defaultSettings verbatim.
@@ -71,6 +78,7 @@ func DefaultSettings() Settings {
 			FetchAutoIntervalMinutes: 0,
 			GitPath:                  "",
 		},
+		CodeIntel: CodeIntelSettings{McpServerEnabled: false},
 	}
 }
 
@@ -105,12 +113,18 @@ type GitPatch struct {
 	GitPath                  *string   `json:"gitPath,omitempty"`
 }
 
+// CodeIntelPatch mirrors CodeIntelSettings' own `.partial()` shape (C3 §7.1).
+type CodeIntelPatch struct {
+	McpServerEnabled *bool `json:"mcpServerEnabled,omitempty"`
+}
+
 type SettingsPatch struct {
 	Appearance *AppearancePatch `json:"appearance,omitempty"`
 	Data       *DataPatch       `json:"data,omitempty"`
 	Cache      *CachePatch      `json:"cache,omitempty"`
 	Advanced   *AdvancedPatch   `json:"advanced,omitempty"`
 	Git        *GitPatch        `json:"git,omitempty"`
+	CodeIntel  *CodeIntelPatch  `json:"codeIntel,omitempty"`
 }
 
 // ValidRowDensity mirrors settings.ts's rowDensitySchema.

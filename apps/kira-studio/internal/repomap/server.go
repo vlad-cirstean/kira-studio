@@ -69,10 +69,12 @@ type Config struct {
 type Server struct {
 	repoID string
 	root   string
-	token  mcpauth.Record
-	// tokenPlain/tokenMinted are the TokenProvider's own extra return values, kept for the caller
-	// to read back (Server.Token()) — e.g. main.go's own startup log line (§3.1), or
-	// bridge.RepoMapService's Status() (§7.4).
+
+	// tokenMu guards token/tokenPlain/tokenMinted: Regenerate (bridge.RepoMapService's own restart-
+	// recovery action, §0 D8) mutates these on a live, already-serving instance, concurrently with
+	// tokenVerifier reading them on every in-flight request (http.go).
+	tokenMu     sync.RWMutex
+	token       mcpauth.Record
 	tokenPlain  string
 	tokenMinted bool
 	log         *slog.Logger
@@ -284,9 +286,24 @@ func (s *Server) RepoID() string { return s.repoID }
 // Root returns the repository's worktree root.
 func (s *Server) Root() string { return s.root }
 
-// Token returns the plaintext token (empty unless this construction actually minted a fresh one —
-// a hash cannot be reversed, §0 D8) and whether it was freshly minted.
-func (s *Server) Token() (plain string, minted bool) { return s.tokenPlain, s.tokenMinted }
+// Token returns the plaintext token (empty unless this construction — or a subsequent SetToken —
+// actually minted a fresh one; a hash cannot be reversed, §0 D8) and whether one is currently held.
+func (s *Server) Token() (plain string, minted bool) {
+	s.tokenMu.RLock()
+	defer s.tokenMu.RUnlock()
+	return s.tokenPlain, s.tokenMinted
+}
+
+// SetToken replaces this instance's own live auth record — bridge.RepoMapService's Regenerate
+// action (§0 D8's restart-recovery path), safe to call while requests are in flight: the very next
+// request to arrive is checked against the new record, never a stale in-memory copy.
+func (s *Server) SetToken(rec mcpauth.Record, plain string) {
+	s.tokenMu.Lock()
+	defer s.tokenMu.Unlock()
+	s.token = rec
+	s.tokenPlain = plain
+	s.tokenMinted = true
+}
 
 // Close stops the HTTP listener, the watcher, the index and the store, releasing the sync lock if
 // still held. Idempotent.

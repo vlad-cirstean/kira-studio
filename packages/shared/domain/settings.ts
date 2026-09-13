@@ -90,8 +90,18 @@ export const gitSettingsSchema = /*#__PURE__*/ z.object({
 });
 export type GitSettings = z.infer<typeof gitSettingsSchema>;
 
+// C3 §7.1: one leaf, default false. The embedded repo-map MCP server instance's own on/off switch
+// (internal/bridge/repomap.go owns the actual start/stop side effect; this leaf is only the
+// persisted, cross-restart record of "should it be on"). A new section on its own, not folded into
+// `advanced` or `git` — C5-C7 add their own code-intelligence leaves beside it.
+export const codeIntelSettingsSchema = /*#__PURE__*/ z.object({
+  mcpServerEnabled: z.boolean().default(false),
+});
+export type CodeIntelSettings = z.infer<typeof codeIntelSettingsSchema>;
+
 // `.default(...)` on every new section is load-bearing: an older kira.sqlite has a settings
-// row with no `data`/`cache`/`advanced`/`git` keys, and that row must still parse on next launch.
+// row with no `data`/`cache`/`advanced`/`git`/`codeIntel` keys, and that row must still parse on
+// next launch.
 export const settingsSchema = /*#__PURE__*/ z.object({
   appearance: appearanceSettingsSchema,
   data: dataSettingsSchema.default({ defaultPageSize: 100 }),
@@ -102,6 +112,7 @@ export const settingsSchema = /*#__PURE__*/ z.object({
     fetchAutoIntervalMinutes: 0,
     gitPath: '',
   }),
+  codeIntel: codeIntelSettingsSchema.default({ mcpServerEnabled: false }),
 });
 export type Settings = z.infer<typeof settingsSchema>;
 
@@ -111,6 +122,7 @@ export const settingsPatchSchema = /*#__PURE__*/ z.object({
   cache: cacheSettingsSchema.partial().optional(),
   advanced: advancedSettingsSchema.partial().optional(),
   git: gitSettingsSchema.partial().optional(),
+  codeIntel: codeIntelSettingsSchema.partial().optional(),
 });
 export type SettingsPatch = z.infer<typeof settingsPatchSchema>;
 
@@ -136,5 +148,8 @@ export const defaultSettings: Settings = {
     protectedBranches: ['main', 'master', 'release/*'],
     fetchAutoIntervalMinutes: 0,
     gitPath: '',
+  },
+  codeIntel: {
+    mcpServerEnabled: false,
   },
 };
