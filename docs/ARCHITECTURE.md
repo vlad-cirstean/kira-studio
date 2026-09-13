@@ -46,6 +46,7 @@ originally written rather than corrected to match later reality — see each cha
 | MCP server (C3) | `github.com/modelcontextprotocol/go-sdk` (Apache-2.0, MIT for un-relicensed contributions), v1.7.0, over the SDK's own **Streamable HTTP** transport, not stdio | The protocol org's own reference implementation, at a stable v1 — the axis that matters for a wire format that keeps moving; `mark3labs/mcp-go` (MIT, real and widely used, but the second implementation, not the reference one) and hand-rolling JSON-RPC framing were both declined (`CLAUDE.md`'s library-first rule finds nothing hand-rolling would earn its keep against here — stdio framing, initialize/capabilities, tool listing, cancellation and schema validation are exactly what the SDK already does). Streamable HTTP, not the SDK's own stdio transport, because the server is one long-running process serving as many concurrent clients/tool calls as connect (`internal/repomap`), never a process spawned fresh per client; the SDK's own `auth.RequireBearerToken` middleware gates every request, reused rather than hand-rolled for the same reason. `mcp.AddTool[In, Out]` derives each tool's input schema from a Go struct's own tags, so every tool's schema has exactly one source. Binary size delta measured the same way as `codeparse`'s own row, above, comparing the whole `cmd/kira-studio` binary before/after (no separate helper binary exists, see the `internal/repomap` section below): **+12.38 MB** (`linux/amd64`, unstripped) for `internal/repomap`, `internal/mcpauth`, `internal/mcpinstall` and the SDK's own dependency graph (`golang.org/x/oauth2`, `google/jsonschema-go`, `segmentio/encoding`, `yosida95/uritemplate`, `golang-jwt/jwt`) |
 | Native file viewer + diff (C5/C6) | `monaco-editor` (MIT, pinned 0.56.0), npm | Added to the root `package.json`'s `dependencies`, beside `slickgrid` — the precedent for a bundled runtime UI library. **Viewer-only, still read-only in C6**: reached through `edcore.main.js`'s modern equivalent in this pinned version — the package restructured its internal layout entirely since the plan researching C5 was written (no `edcore.main.js` exists any more; `monaco-editor/features/register.all.js` is upstream's own "every standard contribution, no language service, no worker" bundle, verified against the source) — never the package root (`editor.main.js`, which still pulls in all four language *services* and every one of ~180 language grammars eagerly). Exactly one worker ships (`editor.worker`, backing `IEditorWorkerService`); C5 shipped the chunk and confirmed it exists in `dist/assets`, and **C6's diff editor (`mod.editor.createDiffEditor`, `hideUnchangedRegions.enabled`/`renderSideBySide` both on, `renderMarginRevertIcon`/`renderGutterMenu` both off) is its first real consumer** — the diff contribution was already inside `register.all.js`, so the Monaco chunk is unchanged by C6 (measured, `bun run build`: `monacoEntry-*.js` 3.81 MB raw / 972 KB gzip and `editor.worker-*.js` 300 KB raw, identical to C5's own recorded figures). Nineteen languages get a registered Monarch grammar (`views/repo/monacoEntry.ts`'s own import list); `.json`/`.jsonc` reuse the JavaScript grammar (Monaco ships no JSON basic-language in this version either); `.vue`/`.svelte` color as plain HTML (no grammar exists for either). See "Native code workspace (C5)" and "Diff tabs and navigation (C6)" below |
 | Quick open fuzzy matching (C9) | `fuzzysort` (MIT, pinned 4.0.2), npm, zero transitive dependencies | Added to the root `package.json`'s `dependencies`, statically imported (`repo/state/quickOpen.ts`) rather than behind Monaco's dynamic `import()` boundary — measured 8.4 KB gzip, not the ~972 KB payload that boundary exists for. Declined: the app's own three substring filters (`CommandPalette.vue`, the tree's own name filter, `search_files`'s SQL `LIKE`) are not fuzzy matchers at all; Monaco's own internal `fuzzyScorer.js` ships no typings for that module and no item-level (basename-vs-path) ranking on top of it. See "Quick open (C9)" below |
+| Git graph in the native workspace (C10) | The four `packages/*` workspaces the VS Code extension already used — `@kira/git-ui`, `@kira/git-ipc`, `@kira/git-core`, `@kira/kira-ui` — added to `apps/kira-studio/frontend/package.json` as `workspace:*`, plus `seti-icons` (a `git-ui` dependency) | No reimplementation and no new runtime dependency of its own: `git-ui` publishes `main: ./src/index.ts` and compiles from source the same way `@shared` does, so there is no separate build step, but its `.vue` files now typecheck under `typecheck:web` too. Statically imported (`RepoGraphView.vue`), not behind a dynamic `import()` boundary — the graph is the pinned first tab of every repo workspace, not an occasional feature — so its cost lands in the eager `index-*.js`/`index-*.css` bundle rather than a lazy chunk: measured (`bun run build`, this phase's own before/after), **+507 KB raw / +159 KB gzip** JS and **+72 KB raw / +11 KB gzip** CSS, plus one new `layout.worker-*.js` chunk (5 KB raw, git-ui's own graph lane-layout worker, loaded as a Worker script the same way `editor.worker` already is, so it carries no separate gzip line). The `monacoEntry-*.js` chunk (C5/C6) is untouched — Monaco's own dynamic-import boundary is unaffected. See "Git graph in the native workspace (C10)" below |
 
 Driver libraries — the best-maintained option per engine, **Go-native for all ten kinds as of P58e
 M9.3** (checkpoint C2): `jackc/pgx/v5` (postgres), `go-sql-driver/mysql` (mariadb/mysql, via a shared
@@ -2552,13 +2553,17 @@ array views, landing at +0.01–1.7% over raw buffer bytes with no transient hea
 
 ## Git module (v1.3)
 
-The third top-level module, beside `studio` and `api`, and the one that runs **headless**: the git
-logic lives in this Go binary, and the frontend is a separately-installed VS Code extension
-connecting as an external client. Kira Studio's own Wails window has no git mode, no git tab and no
-git panel. Its only git-facing surfaces are the Settings dialog's *Connected editors* pane
-(pairing, revocation, extension install) and its *Git* section (the two server-owned remote-op
-settings below) — both there because Kira Studio is the trust authority and owner of those
-settings, not because a git UI crept in.
+The third top-level module, beside `studio` and `api`, and the one whose *backend* runs headless: the
+git logic lives in this Go binary, and the primary frontend is a separately-installed VS Code
+extension connecting as an external client. **As of C10, Kira Studio's own Wails window also mounts
+a second, read-only frontend onto the identical backend** — the pinned first tab of every repo
+workspace shows the same commit graph the VS Code extension does, over a second, in-process
+transport (see "Git graph in the native workspace (C10)" below). The window's other git-facing
+surfaces are unchanged: the Settings dialog's *Connected editors* pane (pairing, revocation,
+extension install) and its *Git* section (the two server-owned remote-op settings below) — both
+there because Kira Studio is the trust authority and owner of those settings, not because a
+read-write git UI crept in. The native mount is provably read-only (below); nothing in this window
+can write to a repository through any route the VS Code extension can.
 
 **Why headless, structurally.** An in-process Wails stream is unreachable from another process, and
 the frontend this module wanted already existed as a VS Code extension. So the module was cut at a
@@ -2883,6 +2888,78 @@ the ad-hoc signature is applied, so the signature covers it; and the *Connected 
 matching every other spawn in this module — with a reveal-in-Finder fallback when the `code` CLI
 isn't on `PATH`. The filename carries no version: the version lives inside the manifest, where
 `code` reads it.
+
+### Git graph in the native workspace (C10)
+
+The pinned first tab of every repo workspace (`views/repo/RepoGraphView.vue`, reserved empty by C5)
+mounts `packages/git-ui`'s own graph — the identical Vue components the VS Code extension runs,
+`mount()` called unchanged — directly into the native window. No reimplementation, and no fork of
+`git-ui`: every edit that phase made to the package is additive (three read-only menu builders
+beside the five existing ones, a `write` capability threaded through the same handful of components
+that already thread `openWorktreeWindow`/`runPrepareScript`), so the VS Code extension's own
+behaviour (`capabilities.write: true`) is unchanged.
+
+**A second, in-process Wails stream, not the socket.** `internal/bridge/gitstream.go`'s
+`ServeGitStream` mirrors `ServeEngineStream` over the identical `gitrpc.Router` `internal/gitsock`
+already serves — one handler table, two transports, exactly the precedent `internal/gitsock` and
+`internal/bridge` already were named as peers of (`internal/layering_test.go`'s own comment). No
+handshake, no pairing token, no `git_clients` row: the peer is this process's own webview, not an
+external client the trust store exists to gate, and a pairing prompt for "should this window ever
+talk to me" has no question behind it when the asker is Kira Studio's own renderer. Reusing
+`git.sock` itself was rejected outright — `gitsock.Server.Start`'s own flock means a *second*
+window would get no listener at all, the opposite of what an in-process, per-process stream needs.
+On the TypeScript side, `packages/git-ipc/src/streamChannel.ts` is `socketChannel.ts`'s sibling: the
+same blob-frame body shape (`blobFrame.ts`, shared by both), but no length prefix, no `recvBuffer`,
+no drain loop — a Wails stream is message-framed already, so the machinery that exists solely to
+turn a byte stream back into frames is simply absent.
+
+**The read-only boundary is three layers, and only one of them is load-bearing.**
+`readOnlyMethods` in `gitstream.go` is a default-deny **allowlist**, not a denylist: a method the
+allowlist has not named is refused with `E_READ_ONLY` before the shared router handler is ever
+called, so a future contract addition is refused by construction rather than admitted by omission —
+`gitstream_test.go` pins both directions (every allowlisted method reaches the handler; every write
+method from `git-ui`'s real surface — `op.run`'s 24 kinds, the five `remote.run` kinds, `undo.run`,
+`worktree.prepare`, `stack.restack`, `settings.setGitPath`, the `review.*` write methods — is
+refused **and never reaches the handler**, asserted with a spy). Layer two is a handful of explicit
+throwing entries in `repo/git/hostHandlers.ts` (`credential.provide`, `editor.resolveConflict`,
+`settings.setGitPath`, `worktree.openWindow`) for methods that never reach Go under VS Code either.
+Layer three is the UI simply not offering a write affordance at all (`capabilities.write: false`
+hides every mutating toolbar button, dialog and row-menu item) — a convenience and an honesty
+measure, never the boundary itself; layer one holds regardless of what any Vue component believes.
+
+**Three repository identities, and the one mapping that matters.** `CodeRepo.ID` (`code_repos.id`)
+is what every native tab/workspace call speaks; `gitclient.RepoSummary.RepoID` is what `git-ui` and
+every `gitrpc` method speak; the two are never equal and never interchangeable
+(`internal/codeworkspace/session.go` states the trap outright). `repo/git/hostHandlers.ts`'s
+`gitRepoIdFor`/`codeRepoIdFor` are the only conversion this app has, both returning `undefined` on a
+miss rather than guessing — exact, not heuristic, since `RepoSummary.repoId` is already stored from
+the same `gitclient.Identify` call `repo.open` itself runs.
+
+**A commit diff extends the existing `repo-diff` tab kind rather than forking a second one.**
+`repoDiffTabStateSchema` (`packages/shared/domain/tabs.ts`) grew a nullable revision pair —
+`left`/`right`/`leftLabel`/`rightLabel`, all null for C6's original HEAD-vs-worktree comparison,
+non-null for a commit diff (`openRepoCommitDiffTab`, keyed by its own revision-pair lookup so two
+different commits' diffs of the same file never collide into one tab) — and `RepoDiffView.vue`
+branches once at the top of its own mount, reading both sides via two `file.read` calls over the git
+transport instead of `control.codeWorkspaceReadDiff`, reshaped into the same
+found/missing/binary/tooLarge classification the working-tree comparison already uses. A root
+commit's "no parent" side reads git's own well-known empty-tree object id rather than a literal
+`null`, so `file.read`'s existing "missing" classification handles it with no new schema state.
+
+**The one repo-graph tab persists its own view state across a tab switch.** C5's tab views unmount
+when a tab is switched away from; without `git-ui`'s own `ViewStateStore` seam, that would re-walk
+the graph cold every time. `repo/git/viewStateStore.ts`'s `TabViewStateStore` backs it with the
+pinned tab's own persisted state (`repoGraphTabStateSchema`'s `viewState` field, a permissive
+`z.unknown()` passthrough — `git-ui`'s own `parsePersistedViewState` is the sole validator of that
+version-6 shape, not a second implementation of it here). The transport itself is cached one per
+repo workspace (`repo/git/transport.ts`'s `gitTransportFor`), independent of the tab's own mount
+lifecycle, and disposed only when the workspace closes.
+
+**Theme.** `git-ui`'s whole colour layer is `--kv-X: var(--vscode-X, <VS Code Dark literal>)`; with
+no `--vscode-*` defined at all it would render VS Code Dark inside a light Kira window regardless of
+the host's own theme. `theme/vscode-bridge.css` defines those names from Kira's own `--kira-*`
+tokens (several of which are themselves already a direct port of the identical VS Code workbench
+colour id), additive and with zero changes to `git-ui`'s own token layer.
 
 ## Renderer security surface
 
@@ -3234,3 +3311,11 @@ place. `CLAUDE.md` states the process rule; this is the list itself.
   a repository past that size, and says so (a dim footer row) rather than searching the rest —
   D3's measured knee (34.78 ms worst-case query at 50k, 144.06 ms at 200k, on this app's own
   hardware) between "sub-frame" and "perceptible."
+- **The native graph and the VS Code extension hold independent `gitsession.Conn`s over the same
+  repository** (C10 §8). Correct by design — each connection's own hold/refcount is exactly what
+  lets `repo.close` release only that connection's share (`internal/gitrpc/handlers.go`) — but it
+  means a repository can be open twice in one process, each with its own watcher subscription, the
+  same shape C6 already recorded for `codeindex` above (a repository open in the native workspace
+  while the embedded repo-map MCP server serves the same repository parses every saved file twice).
+  Harmless (each connection's own hold is independently refcounted and released) and bounded, but
+  real.
