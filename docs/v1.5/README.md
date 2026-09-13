@@ -21,7 +21,7 @@ guessed now. Like v1.3's git chapter, this is one cohesive subsystem, so it uses
   in place rather than getting deleted. A non-trivial open entry blocks the next phase from
   starting until fixed.
 - **`mcp-ab-test.md`** — the design, and eventually the results, of a real with/without comparison
-  of the MCP server's effect on token usage, run on C6.
+  of the MCP server's effect on token usage, run on C7.
 
 Same discipline as every earlier chapter folder: kept as originally written once a phase starts.
 None is retro-edited to track a later change, so a path or a fact named inside any of them is true

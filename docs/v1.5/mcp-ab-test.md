@@ -7,8 +7,9 @@ correctness or speed — measured on real implementation, not a synthetic benchm
 
 ## Design
 
-Run C6 (ripgrep search: in-file plus repository-wide) **twice**, from the same base commit (v1.5
-at C4 complete, before C5/C6 exist), on two isolated worktrees:
+Run C7 (repository search: in-file plus repository-wide, Go-native — no ripgrep, see
+`docs/v1.5/SPEC.md`'s Grounding section) **twice**, from the same base commit (v1.5 at C6 complete,
+before C7/C8 exist), on two isolated worktrees:
 
 - **Arm A**: repo-map MCP server running and registered for that worktree.
 - **Arm B**: identical setup, MCP server not registered (its default-off state).
@@ -20,13 +21,13 @@ Both arms get:
 2. Once both plans land, the same Sonnet implementation handoff, run in parallel, each
    implementing its own arm's plan to completion (build, tests, verification) on its own branch.
 
-C6 was chosen (over a smaller synthetic task) for being real, bounded, and genuinely
-navigation-dependent: it needs the agent to find and choose between two real file-listing
-sources (a fresh `.gitignore`-aware walk vs. reusing C1's own enumeration), locate the existing
-`CommandPalette.vue` fuzzy-match precedent, and wire results into C5's file-opener — real
-decisions, not scripted lookups. Smaller than C8 (the git-graph phase, ~30 Vue files + ~20 Go
-files) on purpose: two full parallel implementations of something C8-sized was judged too
-expensive to run twice for a measurement.
+C7 was chosen (over a smaller synthetic task) for being real, bounded, and genuinely
+implementation-dependent: it needs the agent to choose a Go-native search implementation (a
+hand-rolled walk-and-scan over C1's or C8's own file-enumeration source vs. a pure-Go search
+library, weighed against `CLAUDE.md`'s library-reuse bar), design how matches stream back, and
+wire a result click into C5's workspace as a preview tab — real decisions, not scripted lookups.
+Smaller than C9 (the git-graph phase, ~30 Vue files + ~20 Go files) on purpose: two full parallel
+implementations of something C9-sized was judged too expensive to run twice for a measurement.
 
 ## Metrics
 
@@ -47,4 +48,5 @@ For each stage (planning, implementation), each arm:
 
 ## Results
 
-_Not yet run — pending C3 (MCP server) and C4 (docs) landing first._
+_Not yet run — pending C6 (diff tabs and code navigation) landing, so the base commit has the full
+C5+C6 workspace this test's own task (C7, search) opens results into._
