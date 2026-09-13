@@ -40,6 +40,10 @@ type Session struct {
 	ready   chan struct{} // closed when the initial Sync has finished, success or not
 	cancel  context.CancelFunc
 
+	// searchCancel is C7 D8's own one-in-flight-per-workspace state: beginSearch cancels whatever
+	// this workspace's previous search was running, under the same mutex as every other field here.
+	searchCancel context.CancelFunc
+
 	closeOnce sync.Once
 }
 
@@ -206,19 +210,24 @@ func (s *Session) catfileSession() *catfile.Session {
 }
 
 // Close stops this session's watcher, index and catfile session, and cancels its own sync
-// context. Idempotent.
+// context plus any in-flight search (C7 D8). Idempotent.
 func (s *Session) Close() {
 	s.closeOnce.Do(func() {
 		s.mu.Lock()
 		cancel := s.cancel
+		searchCancel := s.searchCancel
 		watcher := s.watcher
 		index := s.index
 		cf := s.catfile
 		s.watcher, s.index, s.graph, s.catfile = nil, nil, nil, nil
+		s.searchCancel = nil
 		s.mu.Unlock()
 
 		if cancel != nil {
 			cancel()
+		}
+		if searchCancel != nil {
+			searchCancel()
 		}
 		if watcher != nil {
 			_ = watcher.Close()
@@ -230,4 +239,33 @@ func (s *Session) Close() {
 			cf.Close()
 		}
 	})
+}
+
+// beginSearch cancels this workspace's previous search, if any (C7 D8: one in flight per
+// workspace — starting a new one is by construction the only way a user's single query box can
+// mean "stop the old one and run this instead"), and returns the context the new one runs under.
+// Rooted at context.Background(), not any per-call ctx: StartSearch's own bound call returns long
+// before a full-worktree scan finishes, so the search must outlive it — CancelSearch and
+// Session.Close are the only two ways this context ever ends.
+func (s *Session) beginSearch() context.Context {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.searchCancel != nil {
+		s.searchCancel()
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	s.searchCancel = cancel
+	return ctx
+}
+
+// CancelSearch stops this workspace's own in-flight search (if any) — a no-op otherwise. Takes no
+// search id (D8: the bound service's CancelSearch(workspace id) always means "stop whatever this
+// panel is running", never a specific search).
+func (s *Session) CancelSearch() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.searchCancel != nil {
+		s.searchCancel()
+		s.searchCancel = nil
+	}
 }
