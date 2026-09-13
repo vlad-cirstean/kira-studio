@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"os"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/codeparse"
 )
@@ -32,6 +33,14 @@ type FileRow struct {
 	HasError    bool
 	LineCount   int
 	ParsedAt    int64
+}
+
+// MatchesDisk is §5.3's staleness comparison — size_bytes and mtime_unix_ns must both agree with
+// info, the same two fields Index.isStale already compared inline. C8's source-line reader
+// (repomap/source.go) reuses this exact rule via GetFile rather than re-deriving it, so "does this
+// row still match disk" has one definition, not two that could drift apart.
+func (f FileRow) MatchesDisk(info os.FileInfo) bool {
+	return info.Size() == f.SizeBytes && info.ModTime().UnixNano() == f.MtimeUnixNs
 }
 
 // SymbolRow is one symbol table row, as read back.

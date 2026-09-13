@@ -213,7 +213,7 @@ func (idx *Index) isStale(relPath string, existingByPath map[string]FileRow) boo
 		// is what removes its row, once `git ls-files` itself stops reporting it too.
 		return false
 	}
-	return info.Size() != existing.SizeBytes || info.ModTime().UnixNano() != existing.MtimeUnixNs
+	return !existing.MatchesDisk(info)
 }
 
 // parseOne reads, classifies and (when supported) parses one file, returning the FileWrite the
