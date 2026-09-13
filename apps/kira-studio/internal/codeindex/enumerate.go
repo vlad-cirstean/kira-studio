@@ -18,16 +18,33 @@ type EnumeratedFile struct {
 	Language codeparse.ID
 }
 
-// Enumerate lists every tracked-plus-untracked-but-not-ignored file in root (§6): tracked plus
-// untracked-but-not-ignored is exactly the set worth indexing, and .gitignore semantics are git's
-// own — a second implementation (or a third-party matcher) would drift. Filtered to §3.1's
-// extension map inline: anything git reports that Detect doesn't recognise is not enumerated, not
-// parsed, and gets no row.
-//
-// gitPath and runner come from the caller rather than this package running discovery itself:
-// gitclient's own locator is macOS-only, and injection is what lets a test run against the git on
-// PATH here.
+// Enumerate lists every tracked-plus-untracked-but-not-ignored file in root that codeparse.Detect
+// recognises (§3.1's extension map) — Enumerate is now a thin filter over EnumerateAll (D6),
+// keeping exactly one `ls-files` invocation shape in the codebase rather than two independently
+// drifting ones.
 func Enumerate(ctx context.Context, runner gitclient.Runner, gitPath, root string) ([]EnumeratedFile, error) {
+	paths, err := EnumerateAll(ctx, runner, gitPath, root)
+	if err != nil {
+		return nil, err
+	}
+	files := make([]EnumeratedFile, 0, len(paths))
+	for _, p := range paths {
+		lang, ok := codeparse.Detect(p)
+		if !ok {
+			continue
+		}
+		files = append(files, EnumeratedFile{Path: p, Language: lang})
+	}
+	return files, nil
+}
+
+// EnumerateAll lists every tracked-plus-untracked-but-not-ignored file in root (§6), unfiltered —
+// C5 §7.1's own project tree needs this: a tree that must show README.md/Taskfile.yml alongside
+// every parseable source file has no use for C1's parseable-extension filter, but the argv, the
+// gitclient.Spec shape and the tier-2 path-byte rule (D2: git's own bytes, never NFC-normalized)
+// stay identical to Enumerate's — .gitignore semantics are git's own, and a second implementation
+// (or a third-party matcher) would drift.
+func EnumerateAll(ctx context.Context, runner gitclient.Runner, gitPath, root string) ([]string, error) {
 	args := []string{"ls-files", "-z", "--cached", "--others", "--exclude-standard"}
 	res, err := gitclient.Run(ctx, runner, gitPath, gitclient.Spec{Dir: root, Args: args, ReadOnly: true})
 	if cerr := gitclient.Classify(ctx, args, res, err); cerr != nil {
@@ -38,15 +55,5 @@ func Enumerate(ctx context.Context, runner gitclient.Runner, gitPath, root strin
 	if out == "" {
 		return nil, nil
 	}
-
-	paths := strings.Split(out, "\x00")
-	files := make([]EnumeratedFile, 0, len(paths))
-	for _, p := range paths {
-		lang, ok := codeparse.Detect(p)
-		if !ok {
-			continue
-		}
-		files = append(files, EnumeratedFile{Path: p, Language: lang})
-	}
-	return files, nil
+	return strings.Split(out, "\x00"), nil
 }
