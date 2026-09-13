@@ -1,4 +1,8 @@
-import { defaultRepoDiffTabState, defaultRepoFileTabState } from '@shared/domain/tabs';
+import {
+  asRepoDiffTab,
+  defaultRepoDiffTabState,
+  defaultRepoFileTabState,
+} from '@shared/domain/tabs';
 import { repoWorkspaceKey } from '@shared/domain/workspace';
 import { requestReveal } from '../views/repo/reveal';
 import { tabsForWorkspace } from './mode';
@@ -8,6 +12,7 @@ import {
   type OpenTabResult,
   openTab,
   patchRepoFileTabState,
+  tabsState,
 } from './tabs';
 
 export interface OpenRepoFileOpts {
@@ -53,6 +58,51 @@ export function openRepoDiffTab(repoId: string, path: string): OpenTabResult {
     workspaceId: repoWorkspaceKey(repoId),
     preview: false,
   });
+}
+
+// C10 §6.1 (S15): a *commit* diff — two revisions of one path, neither of which is the worktree.
+// openTab's own dedupe key is (workspaceId, kind, connectionId, path) alone (openRepoDiffTab
+// above relies on exactly that), which would collide two different commits' diffs of the same
+// file into one tab. This wrapper does its own lookup over the revision pair as well, then
+// delegates with reuse:false so openTab's own key stays exactly what C5 defined — a second commit
+// diff of the same file is a second tab, never a silent replacement of the first.
+export function openRepoCommitDiffTab(
+  repoId: string,
+  path: string,
+  left: string,
+  right: string,
+  labels: { left: string; right: string },
+  pinned: boolean,
+): OpenTabResult {
+  const workspaceId = repoWorkspaceKey(repoId);
+  const existing = tabsState.tabs.find((t) => {
+    if ((t.workspaceId ?? null) !== workspaceId || t.path !== path) return false;
+    const diff = asRepoDiffTab(t);
+    return diff !== null && diff.state.left === left && diff.state.right === right;
+  });
+  if (existing) {
+    activateTab(existing.id);
+    // §5.2 rule 1's own "a permanent open promotes the workspace's current preview tab" —
+    // openTab's own reuse branch does this; this wrapper's own reuse path needs the identical
+    // rule since it never reaches openTab's.
+    if (pinned && tabsState.previewIdByWorkspace[workspaceId] === existing.id) {
+      tabsState.previewIdByWorkspace[workspaceId] = null;
+    }
+    return { id: existing.id, reused: true };
+  }
+  return openTab(
+    'repo-diff',
+    null,
+    path,
+    () =>
+      defaultRepoDiffTabState({
+        left,
+        right,
+        leftLabel: labels.left,
+        rightLabel: labels.right,
+      }),
+    { reuse: false, workspaceId, preview: !pinned },
+  );
 }
 
 // C5 §6.1: creates repoId's own pinned graph tab if it has none, and activates it only when the

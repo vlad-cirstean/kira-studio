@@ -156,7 +156,16 @@ function repoFileTitle(tab: TabRecord): string {
 
 // C6 §8.1: same basename-only reasoning as repoFileTitle, plus a suffix distinguishing a diff tab
 // from a file tab open on the identical path (openTab's own dedupe key lets both coexist).
+// C10 §6.1: a commit diff (revision pair present, openRepoCommitDiffTab) is titled with both
+// short shas instead, so two commits' diffs of the same file read as genuinely different tabs,
+// not two tabs both saying "(Working Tree)".
 function repoDiffTitle(tab: TabRecord): string {
+  const diff = tab as RepoDiffTabRecord; // this kind's own title(), per TabKindDef's own table
+  if (diff.state.left !== null && diff.state.right !== null) {
+    const left = diff.state.leftLabel ?? diff.state.left.slice(0, 7);
+    const right = diff.state.rightLabel ?? diff.state.right.slice(0, 7);
+    return `${repoFileTitle(tab)} (${left} ↔ ${right})`;
+  }
   return `${repoFileTitle(tab)} (Working Tree)`;
 }
 
