@@ -67,3 +67,38 @@ OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWA
 
 Copyright for `seti-icons` belongs to Elvis Wolcott; copyright for the underlying `seti-ui` icon
 set and palette belongs to the Seti UI contributors (Jesse Weed and contributors).
+
+## tree-sitter grammars and vendored tags.scm queries
+
+Kira Studio's code intelligence layer (`internal/codeparse`) parses source files with ten upstream
+tree-sitter grammar modules — Java, Python, JavaScript, TypeScript (and TSX), Go, Rust, HTML, CSS,
+JSON (all `github.com/tree-sitter/tree-sitter-<language>`), and Svelte
+(`github.com/tree-sitter-grammars/tree-sitter-svelte`) — via the official
+`github.com/tree-sitter/go-tree-sitter` binding. All eleven modules are MIT-licensed:
+
+```
+MIT License
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
+associated documentation files (the "Software"), to deal in the Software without restriction,
+including without limitation the rights to use, copy, modify, merge, publish, distribute,
+sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or
+substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT
+NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT
+OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+```
+
+Symbol extraction (`internal/codeparse/queries/*/tags.scm`) vendors each grammar's own upstream
+`queries/tags.scm` verbatim — the same queries GitHub's own code navigation uses — for the six
+languages where one exists (Java, Python, JavaScript, TypeScript, Go, Rust; TSX reuses TypeScript's
+file). Each file's own upstream repository and pinned module version is also recorded in
+`internal/codeparse/queries.go`'s `Provenance` table. Copyright for each grammar and its queries
+belongs to the tree-sitter project and that grammar's own listed authors; see each grammar module's
+own `LICENSE` file for the exact copyright line.
