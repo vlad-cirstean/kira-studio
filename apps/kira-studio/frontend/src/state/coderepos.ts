@@ -2,6 +2,7 @@ import type { RepoSummary } from '@shared/domain/repo';
 import { reactive } from 'vue';
 import { control } from '../bridge/control';
 import { dropRepoTree } from '../repo/state/fileTree';
+import { dropRepoSearch } from '../repo/state/search';
 import { closeRepoWorkspace } from './workspace';
 
 // C5 §3.4: the repo list store, ConnectionsRepo's own shape for a repository entry — hydrate,
@@ -46,4 +47,5 @@ export async function removeCodeRepo(id: string): Promise<void> {
   codeReposState.records = codeReposState.records.filter((r) => r.id !== id);
   closeRepoWorkspace(id);
   dropRepoTree(id);
+  dropRepoSearch(id);
 }
