@@ -28,9 +28,28 @@ function wireWorker(mod: MonacoModule): void {
 // rather than building a second theme and a change listener for a setting that doesn't exist.
 const REPO_THEME_NAME = 'kira-repo';
 
+// C6 dogfooding finding (§13.5's own live-verification pass, real WebKit — the engine the packaged
+// app's WKWebView actually embeds, matching playwright.config.ts's own choice of `webkit` for
+// UI-fidelity projects): WebKit's `getComputedStyle` canonicalises a custom property's own color
+// value to its shortest hex form — tokens.css's `--kira-fg: #cccccc` comes back as `#ccc` — and
+// Monaco's `defineTheme` validates every color strictly, throwing on the 3-digit shorthand
+// ("Illegal value for token color: #ccc") and aborting `loadMonaco()` entirely, silently: no error
+// surface, no editor, just an empty container (not merely a missing worker, C5's own described
+// failure mode). Chromium does not canonicalise the same property, which is why this went
+// unnoticed until a real WebKit run. Expanding a 3/4-digit shorthand to its 6/8-digit form here is
+// the fix — Monaco's own validator accepts either as long as it's full-length.
+function expandHexShorthand(color: string): string {
+  const m = /^#([0-9a-fA-F]{3,4})$/.exec(color);
+  if (!m) return color;
+  return `#${m[1]
+    .split('')
+    .map((c) => c + c)
+    .join('')}`;
+}
+
 function cssVar(name: string, fallback: string): string {
   const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-  return value || fallback;
+  return expandHexShorthand(value || fallback);
 }
 
 function defineTheme(mod: MonacoModule): void {
