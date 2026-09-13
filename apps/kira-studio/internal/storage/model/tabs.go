@@ -18,6 +18,10 @@ type TabRecord struct {
 	State        json.RawMessage `json:"state"`
 	Order        int             `json:"order"`
 	Active       bool            `json:"active"`
+	// WorkspaceID is C5 §3.1/§4.2's own tab-isolation dimension: nil for every studio/api tab
+	// (workspaceKeyOf's own `??` fallback then derives the workspace from Kind, exactly as
+	// today), "repo:<code_repos.id>" for a tab scoped to that repository's own workspace.
+	WorkspaceID *string `json:"workspaceId"`
 }
 
 // RenderableTabKinds mirrors tabs.ts's RENDERABLE_TAB_KINDS — a row of any other kind is dropped
@@ -39,9 +43,18 @@ var RenderableTabKinds = map[string]bool{
 	// environment is created/renamed/duplicated/deleted/reordered. Same F8 warning as the line
 	// above: forget this and a row of this kind is silently dropped on restore.
 	"environments": true,
+	// C5 §3.1/§6.2: the two kinds that live inside a repo workspace, never studio/api's own strip
+	// — the pinned git-graph placeholder and an opened repository file. Same F8 warning: forget
+	// either and a row of that kind is silently dropped on restore.
+	"repo-graph": true,
+	"repo-file":  true,
 }
 
-// IsRenderableTabKind reports whether kind is one of the seven renderable tab kinds.
+// repoTabKinds is the subset of RenderableTabKinds that must carry a non-nil WorkspaceID (D2) —
+// every other kind derives its workspace from TAB_KIND_MODE instead.
+var repoTabKinds = map[string]bool{"repo-graph": true, "repo-file": true}
+
+// IsRenderableTabKind reports whether kind is one of the renderable tab kinds.
 func IsRenderableTabKind(kind string) bool {
 	return RenderableTabKinds[kind]
 }
@@ -73,6 +86,9 @@ func (t TabRecord) Validate() error {
 	}
 	if !IsJSONObject(t.State) {
 		return fmt.Errorf("model: tab %q: state must be a JSON object", t.ID)
+	}
+	if repoTabKinds[t.Kind] && (t.WorkspaceID == nil || *t.WorkspaceID == "") {
+		return fmt.Errorf("model: tab %q: kind %q requires a workspaceId", t.ID, t.Kind)
 	}
 	return nil
 }

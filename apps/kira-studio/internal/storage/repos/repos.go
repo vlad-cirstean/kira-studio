@@ -28,6 +28,7 @@ type Repos struct {
 	GrpcHistory     *GrpcHistoryRepo
 	GitClients      *GitClientsRepo
 	GitRepoSettings *GitRepoSettingsRepo
+	CodeRepos       *CodeReposRepo
 
 	stmts []*sql.Stmt // every prepared statement below, for Close.
 }
@@ -73,6 +74,7 @@ func New(db *sql.DB) (*Repos, error) {
 		GrpcHistory:     &GrpcHistoryRepo{DB: db},
 		GitClients:      &GitClientsRepo{DB: db},
 		GitRepoSettings: &GitRepoSettingsRepo{DB: db},
+		CodeRepos:       &CodeReposRepo{DB: db},
 		stmts:           []*sql.Stmt{settingsSelectAll, layoutSelectAll, tabsSelectAll, opsInsert, opsUpdate},
 	}, nil
 }

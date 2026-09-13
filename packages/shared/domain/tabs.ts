@@ -30,6 +30,11 @@ export const tabKindSchema = /*#__PURE__*/ z.enum([
   // 'variable-set' rather than folded into it with an empty ownerId: that kind is "the rows of one
   // owner", this one is "the owners", and one tab of each can be open at the same time.
   'environments',
+  // C5 §6.2: the permanently pinned, unclosable first tab every repo workspace reserves for the
+  // git graph — an honest placeholder view here, replaced by C9's own mount (one TAB_VIEWS line).
+  'repo-graph',
+  // C5 §8: one opened repository file, read-only, rendered by Monaco (§9).
+  'repo-file',
 ]);
 export type TabKind = z.infer<typeof tabKindSchema>;
 
@@ -49,7 +54,17 @@ export const RENDERABLE_TAB_KINDS: readonly TabKind[] = [
   'grpc-request',
   'variable-set',
   'environments',
+  'repo-graph',
+  'repo-file',
 ];
+
+// C5 D2/§4.1: TAB_KIND_MODE's value type widens from AppMode to TabScope — 'repo' is a sentinel
+// meaning "this kind's workspace comes from the record's own workspaceId, never from the kind",
+// since two repositories share the exact same two repo kinds (a mode, unlike a workspace, can
+// never be per-instance). tabsForMode(mode: AppMode) compares for equality against an AppMode, so
+// a repo tab can never match a mode's strip — the isolation is enforced by the value, not only by
+// a filter someone has to remember to write.
+export type TabScope = AppMode | 'repo';
 
 // P1 D5: a tab's mode is a total function of its kind — no mode column, no migration. This lives
 // in shared/domain/ (not state/tabKinds.ts) because it must be importable with no Vue-state side
@@ -58,7 +73,7 @@ export const RENDERABLE_TAB_KINDS: readonly TabKind[] = [
 // 'studio'; 'http-request' (P2) and 'grpc-request' (P11 D2) both map to 'api' (P12 D2: renamed
 // from 'http') — the SPEC's "hosted through the same shell" is satisfied by a second kind inside
 // the existing mode, not a third mode.
-export const TAB_KIND_MODE: Record<TabKind, AppMode> = {
+export const TAB_KIND_MODE: Record<TabKind, TabScope> = {
   data: 'studio',
   definition: 'studio',
   console: 'studio',
@@ -70,6 +85,8 @@ export const TAB_KIND_MODE: Record<TabKind, AppMode> = {
   'grpc-request': 'api',
   'variable-set': 'api',
   environments: 'api',
+  'repo-graph': 'repo',
+  'repo-file': 'repo',
 };
 
 const pageSizeSchema = /*#__PURE__*/ z.union([
@@ -218,12 +235,31 @@ export type VariableSetTabState = z.infer<typeof variableSetTabStateSchema>;
 export const environmentsTabStateSchema = /*#__PURE__*/ z.object({});
 export type EnvironmentsTabState = z.infer<typeof environmentsTabStateSchema>;
 
+// C5 §6.2: the pinned graph placeholder carries no state of its own — an empty object, like
+// EnvironmentsTabState above, so parseState has something to validate against.
+export const repoGraphTabStateSchema = /*#__PURE__*/ z.object({});
+export type RepoGraphTabState = z.infer<typeof repoGraphTabStateSchema>;
+
+// C5 §9.3/§12: revealLine is the one thing worth remembering across a restore — which line Monaco
+// was showing — restored on mount and re-patched (debounced) as the user scrolls, mirroring
+// DataTabState's own scrollTop. `.default(null)` keeps a tab saved before this field existed
+// restorable, the same discipline every other added tab-state field follows.
+export const repoFileTabStateSchema = /*#__PURE__*/ z.object({
+  revealLine: z.number().int().min(1).nullable().default(null),
+});
+export type RepoFileTabState = z.infer<typeof repoFileTabStateSchema>;
+
 const tabRecordBase = {
   id: z.string(),
   connectionId: z.string().nullable(),
   path: z.string(), // encoded NodePath, '' for a connection-scoped tab
   order: z.number().int(),
   active: z.boolean(),
+  // C5 D2/§4.2: null for every studio/api tab (workspaceKeyOf's own `??` fallback derives the
+  // workspace from `kind` instead, exactly as before this field existed) — 'repo:<code_repos.id>'
+  // for a tab scoped to that repository's own workspace. One line here so every union member
+  // carries it, rather than repeating it on the two repo kinds alone.
+  workspaceId: z.string().nullable().default(null),
 };
 
 export const tabRecordSchema = /*#__PURE__*/ z.discriminatedUnion('kind', [
@@ -278,6 +314,16 @@ export const tabRecordSchema = /*#__PURE__*/ z.discriminatedUnion('kind', [
     kind: z.literal('environments'),
     state: environmentsTabStateSchema,
   }),
+  /*#__PURE__*/ z.object({
+    ...tabRecordBase,
+    kind: z.literal('repo-graph'),
+    state: repoGraphTabStateSchema,
+  }),
+  /*#__PURE__*/ z.object({
+    ...tabRecordBase,
+    kind: z.literal('repo-file'),
+    state: repoFileTabStateSchema,
+  }),
 ]);
 export type TabRecord = z.infer<typeof tabRecordSchema>;
 export type DataTabRecord = Extract<TabRecord, { kind: 'data' }>;
@@ -291,6 +337,8 @@ export type HttpRequestTabRecord = Extract<TabRecord, { kind: 'http-request' }>;
 export type GrpcRequestTabRecord = Extract<TabRecord, { kind: 'grpc-request' }>;
 export type VariableSetTabRecord = Extract<TabRecord, { kind: 'variable-set' }>;
 export type EnvironmentsTabRecord = Extract<TabRecord, { kind: 'environments' }>;
+export type RepoGraphTabRecord = Extract<TabRecord, { kind: 'repo-graph' }>;
+export type RepoFileTabRecord = Extract<TabRecord, { kind: 'repo-file' }>;
 
 export function asDataTab(tab: TabRecord | null | undefined): DataTabRecord | null {
   return tab && tab.kind === 'data' ? tab : null;
@@ -326,6 +374,14 @@ export function asGrpcRequestTab(tab: TabRecord | null | undefined): GrpcRequest
 
 export function asVariableSetTab(tab: TabRecord | null | undefined): VariableSetTabRecord | null {
   return tab && tab.kind === 'variable-set' ? tab : null;
+}
+
+export function asRepoGraphTab(tab: TabRecord | null | undefined): RepoGraphTabRecord | null {
+  return tab && tab.kind === 'repo-graph' ? tab : null;
+}
+
+export function asRepoFileTab(tab: TabRecord | null | undefined): RepoFileTabRecord | null {
+  return tab && tab.kind === 'repo-file' ? tab : null;
 }
 
 export function defaultDataTabState(pageSize: PageSize): DataTabState {
@@ -370,6 +426,14 @@ export function defaultStreamTabState(pageSize: PageSize = 100): StreamTabState 
 
 export function defaultBrowseTabState(): BrowseTabState {
   return { levelPath: '' };
+}
+
+export function defaultRepoGraphTabState(): RepoGraphTabState {
+  return {};
+}
+
+export function defaultRepoFileTabState(revealLine: number | null = null): RepoFileTabState {
+  return { revealLine };
 }
 
 /** 'order_items' — the path tail's name; the connection name is rendered separately. */

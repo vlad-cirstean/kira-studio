@@ -10,7 +10,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 )
 
-const tabsSelectAllSQL = `SELECT id, connection_id, path, kind, state_json, "order", active FROM tabs WHERE window_key = ? ORDER BY "order" ASC`
+const tabsSelectAllSQL = `SELECT id, connection_id, path, kind, state_json, "order", active, workspace_id FROM tabs WHERE window_key = ? ORDER BY "order" ASC`
 
 type TabsRepo struct {
 	DB *sql.DB
@@ -42,10 +42,11 @@ func (r *TabsRepo) List(windowKey string) ([]model.TabRecord, error) {
 		var (
 			id, path, kind, stateJSON string
 			connectionID              sql.NullString
+			workspaceID               sql.NullString
 			order                     int
 			active                    bool
 		)
-		if err := rows.Scan(&id, &connectionID, &path, &kind, &stateJSON, &order, &active); err != nil {
+		if err := rows.Scan(&id, &connectionID, &path, &kind, &stateJSON, &order, &active, &workspaceID); err != nil {
 			return nil, fmt.Errorf("repos/tabs: scan: %w", err)
 		}
 		if !model.IsJSONObject([]byte(stateJSON)) {
@@ -63,6 +64,10 @@ func (r *TabsRepo) List(windowKey string) ([]model.TabRecord, error) {
 		if connectionID.Valid {
 			v := connectionID.String
 			rec.ConnectionID = &v
+		}
+		if workspaceID.Valid {
+			v := workspaceID.String
+			rec.WorkspaceID = &v
 		}
 		out = append(out, rec)
 	}
@@ -109,8 +114,8 @@ func (r *TabsRepo) Save(windowKey string, records []model.TabRecord) error {
 	for i, rec := range records {
 		keep = append(keep, rec.ID)
 		if _, err := tx.Exec(
-			`INSERT INTO tabs (id, connection_id, path, kind, state_json, "order", active, window_key)
-			 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+			`INSERT INTO tabs (id, connection_id, path, kind, state_json, "order", active, window_key, workspace_id)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 			 ON CONFLICT(id) DO UPDATE SET
 			   connection_id = excluded.connection_id,
 			   path          = excluded.path,
@@ -118,8 +123,9 @@ func (r *TabsRepo) Save(windowKey string, records []model.TabRecord) error {
 			   state_json    = excluded.state_json,
 			   "order"       = excluded."order",
 			   active        = excluded.active,
-			   window_key    = excluded.window_key`,
-			rec.ID, rec.ConnectionID, rec.Path, rec.Kind, string(rec.State), i, rec.Active, windowKey,
+			   window_key    = excluded.window_key,
+			   workspace_id  = excluded.workspace_id`,
+			rec.ID, rec.ConnectionID, rec.Path, rec.Kind, string(rec.State), i, rec.Active, windowKey, rec.WorkspaceID,
 		); err != nil {
 			return fmt.Errorf("repos/tabs: upsert %s: %w", rec.ID, err)
 		}
