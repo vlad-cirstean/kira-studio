@@ -146,8 +146,8 @@ jobs:
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('bun.lock') }}
-      - name: Install WebKit and its system libraries (CLAUDE.md)
-        run: bunx playwright install webkit
+      - name: Install WebKit and Chromium and their system libraries (CLAUDE.md — webkit is what `ui`/`ui-timing`/`visual` run against, chromium is what `ipc-frontend` runs against per playwright.config.ts)
+        run: bunx playwright install webkit chromium
       - name: Install & cache WebKit's runtime libraries (CLAUDE.md)
         uses: awalsh128/cache-apt-pkgs-action@v1
         with:
