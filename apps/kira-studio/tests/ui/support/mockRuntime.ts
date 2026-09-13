@@ -151,6 +151,8 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   codeWorkspaceCloseWorkspace: 'CodeWorkspaceService.CloseWorkspace',
   codeWorkspaceReadDiff: 'CodeWorkspaceService.ReadDiff',
   codeWorkspaceDefinitions: 'CodeWorkspaceService.Definitions',
+  codeWorkspaceStartSearch: 'CodeWorkspaceService.StartSearch',
+  codeWorkspaceCancelSearch: 'CodeWorkspaceService.CancelSearch',
 };
 
 /** ipc.ts's legacy channel string (what every `ControlSnapshot.channel` and fixture is keyed by,
@@ -309,6 +311,10 @@ const WILDCARD_DEFAULTS: Readonly<Record<string, string>> = Object.freeze({
   // above carries.
   [IPC.codeWorkspaceOpenWorkspace]: 'null',
   [IPC.codeWorkspaceCloseWorkspace]: 'null',
+  // C7: CancelSearch is fire-and-forget from the renderer's own point of view (the panel's own
+  // Stop button awaits it but never asserts on its echo) — void, the same reasoning
+  // codeWorkspaceCloseWorkspace's own wildcard just above carries.
+  [IPC.codeWorkspaceCancelSearch]: 'null',
 });
 
 interface CallRequestBody {

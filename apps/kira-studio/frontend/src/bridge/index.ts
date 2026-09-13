@@ -45,11 +45,13 @@ import type {
   SortSpec,
 } from '@shared/domain/queries';
 import type {
+  CodeSearchEvent,
   DiffContent,
   FileContent,
   FileListing,
   NavResult,
   RepoSummary,
+  SearchRequest,
 } from '@shared/domain/repo';
 import type { RepoMapInstallResult, RepoMapStatus } from '@shared/domain/repomap';
 import type { ConnectionDdl } from '@shared/domain/schema';
@@ -414,6 +416,17 @@ const studioControl = {
     unwrap<Awaited<ReturnType<typeof CodeWorkspaceService.Definitions>>>(
       CodeWorkspaceService.Definitions({ id, path, line, column }),
     ).then((r) => trust<NavResult>({ ...r, targets: r.targets ?? [] })),
+
+  // C7 §5/D7: StartSearch returns as soon as the background scan starts — its own searchId is how
+  // the renderer matches a later onCodeSearch event to the run that's waiting on it. windowKey
+  // addresses the coalesced push channel at this window only, exactly like grpcCall.
+  codeWorkspaceStartSearch: (id: string, req: SearchRequest): Promise<{ searchId: string }> =>
+    unwrap(CodeWorkspaceService.StartSearch({ id, windowKey, ...req })).then((r) =>
+      trust<{ searchId: string }>(r),
+    ),
+  codeWorkspaceCancelSearch: (id: string): Promise<void> =>
+    unwrap(CodeWorkspaceService.CancelSearch({ id })),
+  onCodeSearch: (cb: (event: CodeSearchEvent) => void): (() => void) => on(CHANNEL.codeSearch, cb),
 };
 
 // P12 D11: one exported object, composed from Studio's 67 methods and the module's own 39

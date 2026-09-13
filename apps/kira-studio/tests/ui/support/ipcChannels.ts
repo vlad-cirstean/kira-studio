@@ -145,6 +145,11 @@ export const IPC = {
   codeWorkspaceCloseWorkspace: 'kira:codeWorkspace:closeWorkspace',
   codeWorkspaceReadDiff: 'kira:codeWorkspace:readDiff',
   codeWorkspaceDefinitions: 'kira:codeWorkspace:definitions',
+  codeWorkspaceStartSearch: 'kira:codeWorkspace:startSearch',
+  codeWorkspaceCancelSearch: 'kira:codeWorkspace:cancelSearch',
+  // C7 D7: the coalesced search-results push channel, EmitTo'd to one window — grpcCall's own
+  // shape just above.
+  codeSearch: 'kira:code:search',
 
   connectionState: 'kira:connection:state',
   connectionMetadataInvalidated: 'kira:connection:metadataInvalidated',
