@@ -25,7 +25,24 @@ jobs:
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
+      - name: Cache bun install (keyed on the lockfile, so an unchanged dependency set skips re-download)
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
       - run: bun install --frozen-lockfile
+      - name: Cache wails3 CLI (v1.4 P1 — go.mod-keyed, OS-specific binary; same key as ci.yml's checks/package-smoke, so a release right after a merge to main usually finds it already warm)
+        uses: actions/cache@v4
+        with:
+          path: ~/go/bin/wails3
+          key: wails3-${{ runner.os }}-${{ hashFiles('go.mod') }}
+      - name: Cache generated Wails bindings (v1.4 P1 — platform-independent output, shared across OSes)
+        uses: actions/cache@v4
+        with:
+          path: |
+            apps/kira-studio/frontend/bindings
+            apps/kira-studio/.task
+          key: wails-bindings-${{ hashFiles('go.mod') }}
 
       # The one place a build reads a version (apps/kira-studio/Taskfile.yml's APP_VERSION): from
       # here it is linked into the binary and stamped into the bundle's Info.plist, and

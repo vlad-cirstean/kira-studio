@@ -22,6 +22,18 @@ jobs:
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@v7
+      # Best-effort: the cache holds whichever images the first run after an image-pin change
+      # happened to pull, not the full kind/extreme matrix — a later run selecting a different
+      # `kind`/`extreme` still pulls what it needs, just not preloaded from this cache.
+      - name: Restore cached Docker images (keyed on the pinned image tags, so an unchanged min/max image set skips re-pulling)
+        id: docker-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/docker-images.tar
+          key: docker-${{ runner.os }}-${{ hashFiles('scripts/db-compat.sh') }}
+      - name: Load cached Docker images
+        if: steps.docker-cache.outputs.cache-hit == 'true'
+        run: docker load -i ~/docker-images.tar
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
@@ -40,3 +52,12 @@ jobs:
             both|*) ;;
           esac
           sh scripts/db-compat.sh $ARGS
+      - name: Save pulled Docker images (always() so a partial pull from a failed run still seeds the next one)
+        if: always() && steps.docker-cache.outputs.cache-hit != 'true'
+        run: docker save $(docker images -q) -o ~/docker-images.tar
+      - name: Cache pulled Docker images
+        if: always() && steps.docker-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ~/docker-images.tar
+          key: docker-${{ runner.os }}-${{ hashFiles('scripts/db-compat.sh') }}
