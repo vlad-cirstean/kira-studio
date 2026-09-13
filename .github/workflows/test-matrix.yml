@@ -1,0 +1,73 @@
+name: Auth/config test matrix (on demand + release tags)
+
+# P25 §2.10 (docs/v1.1/plans/P25-connection-auth-test-matrix.md): workflow_dispatch, exactly like
+# db-compat.yml's own precedent, PLUS a run on every release tag — the one deliberate difference
+# from db-compat.yml, which is dispatch-only. Tying it to release.yml's own `v*.*.*` tag pattern
+# gives this suite real CI coverage at the one point it matters most (cutting a release) without
+# putting ten containers and a role matrix on every pull request, and without the always-on cost
+# (and the noisy off-hours failures) a nightly cron carried.
+# ci.yml is not edited and does not reference this file — ordinary CI stays byte-identical, the
+# same "no push, no pull_request" posture P16 D6 required of db-compat.yml.
+on:
+  workflow_dispatch:
+    inputs:
+      kind:
+        description: 'Single kind (postgres, mysqlfamily, clickhouse, mongo, redis, kafka, sqs, s3, sqlite), or "all"'
+        default: 'all'
+  push:
+    tags: ['v*.*.*'] # same pattern release.yml matches on, so a release tag exercises this too
+
+permissions:
+  contents: read
+
+jobs:
+  test-matrix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v7
+      # Best-effort: the cache holds whichever images the first run after an image-pin change
+      # happened to pull, not the full kind matrix — a later run selecting a different `kind`
+      # still pulls what it needs, just not preloaded from this cache.
+      - name: Restore cached Docker images (keyed on the pinned image tags, so an unchanged image set skips re-pulling)
+        id: docker-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/docker-images.tar
+          key: docker-${{ runner.os }}-${{ hashFiles('scripts/test-matrix.sh') }}
+      - name: Load cached Docker images
+        if: steps.docker-cache.outputs.cache-hit == 'true'
+        run: docker load -i ~/docker-images.tar
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - name: Run the auth/config permutation matrix
+        # GitHub's own runners reach Docker Hub directly — --mirror is a sandbox-only workaround
+        # for the outbound proxy documented in CLAUDE.md, so it is deliberately omitted here,
+        # matching db-compat.yml's own comment for the identical reason. A tag-push run has no
+        # workflow_dispatch inputs at all, so `inputs.kind` reads empty rather than its declared
+        # default — treated the same as "all".
+        #
+        # round-2 finding 10: `inputs.kind` is bound through `env:` (below) rather than
+        # interpolated directly into the run block, and `$KIND` is quoted — the standard fix for
+        # GitHub Actions' untrusted-`${{ }}`-in-`run:` script-injection shape. Low real risk here
+        # (workflow_dispatch already requires write access), but worth doing before this file is
+        # ever copied into .github/workflows/ (see this directory's own README).
+        env:
+          KIND: ${{ inputs.kind }}
+        run: |
+          set -eu
+          ARGS=""
+          if [ -n "$KIND" ] && [ "$KIND" != "all" ]; then
+            ARGS="--only $KIND"
+          fi
+          sh scripts/test-matrix.sh $ARGS
+      - name: Save pulled Docker images (always() so a partial pull from a failed run still seeds the next one)
+        if: always() && steps.docker-cache.outputs.cache-hit != 'true'
+        run: docker save $(docker images -q) -o ~/docker-images.tar
+      - name: Cache pulled Docker images
+        if: always() && steps.docker-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ~/docker-images.tar
+          key: docker-${{ runner.os }}-${{ hashFiles('scripts/test-matrix.sh') }}

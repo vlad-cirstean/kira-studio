@@ -1,0 +1,629 @@
+<script setup lang="ts">
+import {
+  bodyBadgeLabel,
+  canEditAsRaw,
+  defaultContentTypeFor,
+  generateRawRequest,
+  httpRequestTitle,
+  isDirty,
+  isDynamicName,
+  isFakeName,
+  looksLikeCurlCommand,
+  parseQuery,
+  splitUrl,
+  toSavedRequest,
+} from '@kira/api-core';
+import { type HttpMethod, httpMethodToken } from '@shared/domain/http';
+import type { HttpRequestTabRecord } from '@shared/domain/tabs';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import EnvironmentSelect from '../../api/EnvironmentSelect.vue';
+import MethodSelect from '../../api/MethodSelect.vue';
+import {
+  collectionIdFor,
+  openSaveDialog,
+  savedRequestFor,
+  saveRequest,
+} from '../../api/state/collections';
+import { applyCurlToTab, openCopyAsCurlDialog } from '../../api/state/curl';
+import { openEditRawDialog } from '../../api/state/raw';
+import { variableSupport } from '../../api/state/variableCompletion';
+import {
+  activeEnvironmentColor,
+  activeEnvironmentId,
+  ensureVariablesLoaded,
+  mergedValuesAndSecrets,
+} from '../../api/state/variables';
+import { patchHttpRequestTabState } from '../../api/tabs';
+import VariablesOverviewPanel from '../../api/VariablesOverviewPanel.vue';
+import { DEFAULT_FIND_OPTIONS, type FindOptions, findRanges } from '../../editor/findRanges';
+import type { RangeHighlight } from '../../editor/variableHighlight';
+import { registerCommand } from '../../shortcuts/commands';
+import AppButton from '../../theme/primitives/AppButton.vue';
+import AutocompleteField from '../../theme/primitives/AutocompleteField.vue';
+import { templateToken } from '../../theme/primitives/completion';
+import IconButton from '../../theme/primitives/IconButton.vue';
+import PanelSearchBox from '../../theme/primitives/PanelSearchBox.vue';
+import PanelSplitter from '../../theme/primitives/PanelSplitter.vue';
+import SegmentedControl from '../../theme/primitives/SegmentedControl.vue';
+import ViewChrome from '../../theme/primitives/ViewChrome.vue';
+import ResponseFindBar, {
+  type FindBarHost,
+  type FindBarTarget,
+} from '../shared/ResponseFindBar.vue';
+import QueryParamsTable from './QueryParamsTable.vue';
+import RequestBodyPane from './RequestBodyPane.vue';
+import RequestHeadersTable from './RequestHeadersTable.vue';
+import ResponsePane from './ResponsePane.vue';
+import { resolveForExport, resolveTabState, runtime, send, stop } from './state';
+
+// MainView.vue keys this component by tab.id — same discipline as every other *View.vue.
+const props = defineProps<{ tab: HttpRequestTabRecord }>();
+
+const rt = computed(() => runtime[props.tab.id]);
+const running = computed(() => rt.value?.status === 'running');
+
+const title = computed(() => httpRequestTitle(props.tab.state));
+
+// D12/P17 D19: a method chip coloured per-method (not per-family any more — httpMethodToken
+// replaces httpMethodClass outright, F13/D19), over .p-method's new tinted-background rule. P4
+// D16's own reasoning still holds: the map lives in the shared domain beside statusClass, since
+// the collections tree's own row needs it too and `http/**` may not import `views/**`.
+const methodToken = computed(() => httpMethodToken(props.tab.state.method));
+
+function onMethodChange(method: HttpMethod): void {
+  patchHttpRequestTabState(props.tab.id, { method });
+}
+
+// P28 D11: the request panel's own half of the find bar. The bar itself is hoisted above the
+// request/response split (template below) and asks which panel it is searching; the response half
+// stays inside ResponsePane, which owns its three documents and their editor hosts. Request scope
+// searches the body editor — the params/headers tables already have their own filter box (P16
+// D13's #toolbar-2 PanelSearchBox), which is a different and better affordance for rows than a
+// match-stepping find is.
+//
+// Component-local, not tab state: a lens over what is on screen, the same rule the response pane's
+// own find bar already follows (P16 D11).
+const requestFindOpen = ref(false);
+const requestBodyRef = ref<{
+  findableDoc: string | null;
+  findHost: FindBarHost | null;
+} | null>(null);
+const requestFindBarRef = ref<{
+  query: string;
+  currentGlobal: number;
+  options: FindOptions;
+} | null>(null);
+
+function toggleRequestFind(): void {
+  requestFindOpen.value = !requestFindOpen.value;
+}
+function closeRequestFind(): void {
+  requestFindOpen.value = false;
+}
+
+/** Empty whenever the body pane is not showing a text editor (params/headers/urlencoded/form-data/
+ *  binary), which is what makes the bar honestly report "0 of 0" there rather than searching a
+ *  document that is not on screen. */
+const requestFindTargets = computed<readonly FindBarTarget[]>(() => {
+  if (!requestFindOpen.value) return [];
+  const doc = requestBodyRef.value?.findableDoc;
+  if (doc === null || doc === undefined) return [];
+  return [{ doc, host: requestBodyRef.value?.findHost ?? null }];
+});
+
+/** Paints exactly the matches the bar counts and steps through. Read synchronously here (not
+ *  inside the returned closure) so this computed's own identity changes when the query, the
+ *  options or the current match does — which is what makes CodeMirrorHost repaint. */
+const requestFindHighlights = computed<((doc: string) => readonly RangeHighlight[]) | undefined>(
+  () => {
+    if (!requestFindOpen.value) return undefined;
+    const bar = requestFindBarRef.value;
+    const query = bar?.query ?? '';
+    if (!query) return undefined;
+    const current = bar?.currentGlobal ?? -1;
+    const options = bar?.options ?? DEFAULT_FIND_OPTIONS;
+    return (doc: string) => findRanges(doc, query, current, options);
+  },
+);
+
+function onUrlInput(value: string): void {
+  patchHttpRequestTabState(props.tab.id, { url: value });
+}
+
+// P28 D12: pasting a curl command into the request bar builds the request from it, reusing P7's
+// own parser (packages/api-core/src/http/curl/parse.ts) rather than adding a second one. Two
+// escape hatches, both deliberate: text that does not look like a command pastes normally, and
+// text that looks like one but that the parser rejects ALSO pastes normally — a paste is never
+// silently swallowed.
+function onUrlPaste(text: string, e: ClipboardEvent): void {
+  if (!looksLikeCurlCommand(text)) return;
+  if (!applyCurlToTab(props.tab.id, text)) return;
+  e.preventDefault();
+}
+
+// P4 D15: dirtiness is a computation over two things already in memory — the tab's own state and
+// the cached saved document — not a stored flag there would be something to set, clear, migrate or
+// get wrong. `savedRequestFor` answers null for a tab bound to nothing, and for D14's orphan case
+// (a row deleted in this window or another), which is what makes Save fall back to Save as…
+const saved = computed(() => savedRequestFor(props.tab.state.itemId));
+const dirty = computed(() => isDirty(props.tab.state, saved.value));
+const canSave = computed(() => props.tab.state.itemId !== null && saved.value !== null);
+
+function onSave(): void {
+  const itemId = props.tab.state.itemId;
+  if (!itemId || !saved.value) {
+    onSaveAs();
+    return;
+  }
+  void saveRequest(itemId, props.tab.state.name || title.value, toSavedRequest(props.tab.state));
+}
+
+function onSaveAs(): void {
+  openSaveDialog(
+    props.tab.id,
+    props.tab.state.name || title.value,
+    toSavedRequest(props.tab.state),
+  );
+}
+
+function onSend(): void {
+  void send(props.tab.id);
+}
+
+// P7 D10: computes the frozen resolution exactly as send() does (resolveForExport — this file's
+// own './state', P6 D7's short-circuit preserved) and hands the store a plain result; the dialog
+// itself never reaches into views/** to get it. defaultContentType is P3 D7's own per-mode table,
+// computed here rather than inside @kira/api-core's curl/ so that package keeps its no-app-import property.
+async function onCopyAsCurl(): Promise<void> {
+  const resolution = await resolveForExport(props.tab.id);
+  if (!resolution) return;
+  openCopyAsCurlDialog(
+    resolution.method,
+    resolution.resolved,
+    resolution.deferredNames,
+    defaultContentTypeFor(props.tab.state.bodyMode, props.tab.state.codeLanguage),
+    collectionId.value,
+    activeEnvironmentId.value,
+  );
+}
+
+// P9 D10: the raw editor has no text form for a formdata/file body (a file part is bytes on disk,
+// not text) — disabled with a tooltip naming why, rather than generating an elided body the parser
+// would take literally.
+const canEditRaw = computed(() => canEditAsRaw(props.tab.state.bodyMode));
+const editRawTooltip = computed(() =>
+  canEditRaw.value
+    ? 'Edit as raw HTTP…'
+    : 'A form-data or binary body has no text form that can be edited and parsed back — a file part is bytes on disk, not text. Its wire form is in the response pane’s Raw view.',
+);
+
+// P9 D9: the buffer is generated pre-substitution, from the tab's own text — {{variables}} appear
+// literally. defaultContentType mirrors onCopyAsCurl's own computation, over the *unresolved* tab
+// state (never the live preview's resolved values — D9's whole point is that this is what the user
+// typed, not what would be sent).
+function onEditRaw(): void {
+  if (!canEditRaw.value) return;
+  const initialText = generateRawRequest(
+    props.tab.state,
+    defaultContentTypeFor(props.tab.state.bodyMode, props.tab.state.codeLanguage),
+  );
+  openEditRawDialog(props.tab.id, initialText, props.tab.state.bodyMode, props.tab.state.url);
+}
+
+// P5 D6/D7/D17: the same resolution send() runs, over the tab's *current* state — a live preview
+// of what would actually go out, without ever sending anything or reaching Go (a secret name is
+// classified 'deferred' and never appears here, D5: its plaintext never enters the renderer to
+// begin with). Only 'unknown' and an *uncatalogued* 'dynamic' reference are a warning — 'deferred'
+// is correct and will resolve fine at send time, a catalogued 'dynamic' name will too (P6 D8), and
+// 'resolved' needs no callout at all.
+//
+// P6 F2/D8: this computed calls resolveTabState with exactly three arguments, never four —
+// generation must never be a side effect of typing (the chip re-runs on every keystroke). A
+// catalogued $name is told apart from an unrecognised one by isDynamicName's Set lookup alone, so
+// the preview stays a pure function of the tab's text: no await, no chunk load, nothing generated.
+const collectionId = computed(() => collectionIdFor(props.tab.state));
+watch(
+  [collectionId, activeEnvironmentId],
+  ([cid, eid]) => {
+    void ensureVariablesLoaded('collection', cid);
+    void ensureVariablesLoaded('environment', eid);
+  },
+  { immediate: true },
+);
+// P15b D4: one computed, over the same collectionId/activeEnvironmentId this file already watches
+// (immediately above) — rangeHighlights/hoverAt/candidates for the URL field, the request body
+// editor, and (via FieldRowsTable's own props) the header/param/form-data value cells.
+const variables = computed(() => variableSupport(collectionId.value, activeEnvironmentId.value));
+
+const unresolvedRefs = computed(() => {
+  const { values, secretNames } = mergedValuesAndSecrets(
+    collectionId.value,
+    activeEnvironmentId.value,
+  );
+  const refs = resolveTabState(props.tab.state, values, secretNames).refs;
+  const byName = new Map(
+    refs
+      // P28 D15(a): a catalogued dynamic reference is either spelling. substitute.ts's own
+      // isDynamicReference classifies both `$name` and `fake.*` as 'dynamic', but this filter
+      // only ever consulted isDynamicName ($-prefixed), so all 57 FAKE_NAMES were counted into the
+      // "unresolved" chip as unknown dynamic values. They are generated at send time, not looked
+      // up, and are never missing.
+      .filter(
+        (r) =>
+          r.kind === 'unknown' ||
+          (r.kind === 'dynamic' && !isDynamicName(r.name) && !isFakeName(r.name)),
+      )
+      .map((r) => [r.name, r]),
+  );
+  return [...byName.values()];
+});
+const unresolvedTooltip = computed(() =>
+  unresolvedRefs.value
+    .map((r) => (r.kind === 'dynamic' ? `${r.name} — unknown dynamic value` : r.name))
+    .join(', '),
+);
+
+function onStop(): void {
+  stop(props.tab.id);
+}
+
+const paramsCount = computed(() => parseQuery(splitUrl(props.tab.state.url).query).length);
+const headersCount = computed(() => props.tab.state.headers.filter((h) => h.enabled).length);
+
+// D12: a count badge per segment — SegmentedControl has no dedicated count slot, so it is baked
+// into the label text instead of widening that shared primitive for one caller.
+const REQUEST_PANE_OPTIONS = computed(() => [
+  {
+    value: 'params' as const,
+    label: paramsCount.value > 0 ? `Params (${paramsCount.value})` : 'Params',
+    testid: 'http-request-pane-params',
+  },
+  {
+    value: 'headers' as const,
+    label: headersCount.value > 0 ? `Headers (${headersCount.value})` : 'Headers',
+    testid: 'http-request-pane-headers',
+  },
+  {
+    value: 'body' as const,
+    label: bodyBadgeLabel(props.tab.state),
+    testid: 'http-request-pane-body',
+  },
+]);
+
+function setRequestPane(pane: 'params' | 'headers' | 'body'): void {
+  patchHttpRequestTabState(props.tab.id, { requestPane: pane });
+}
+
+// P16 D13: the request tables' own filter — Studio's own idiom (toolbar-search toggling a
+// SearchToolbar row) applied here: an always-present filter row above a three-row headers table
+// would be chrome for its own sake, so it's a toggle in #toolbar-2 instead. Shown only while the
+// visible pane is actually a row table (Params, Headers, or Body in urlencoded/form-data mode) —
+// the raw/code/binary/JSON body modes have nothing this filter could match. Component-local, not
+// tab state: a lens, not a setting (§8 OQ-8's own rule for every filter this phase adds).
+const fieldFilterOpen = ref(false);
+const fieldFilterQuery = ref('');
+
+// P17 D20/item 8: the unified overview panel's own open flag — component-local, same "a lens, not
+// a setting" rule as fieldFilterOpen just above.
+const overviewOpen = ref(false);
+const showFieldFilterToggle = computed(
+  () =>
+    props.tab.state.requestPane !== 'body' ||
+    props.tab.state.bodyMode === 'urlencoded' ||
+    props.tab.state.bodyMode === 'formdata',
+);
+function toggleFieldFilter(): void {
+  fieldFilterOpen.value = !fieldFilterOpen.value;
+  // D13's own rule: closing the row must restore every hidden row.
+  if (!fieldFilterOpen.value) fieldFilterQuery.value = '';
+}
+
+// P22b D7: unlike fieldFilterOpen above, this is persisted per tab (httpRequestTabStateShape's
+// own fieldDescriptions) rather than a component-local lens — OQ-1's own resolution: a user who
+// wants the description column always visible should not have to reopen it on every tab restore.
+// One flag shared by every row table this tab renders (Params, Headers, and — through
+// RequestBodyPane — urlencoded/form-data), matching the single toggle the row asks for.
+function toggleFieldDescriptions(): void {
+  patchHttpRequestTabState(props.tab.id, { fieldDescriptions: !props.tab.state.fieldDescriptions });
+}
+
+// D6: 0 means "the default half" — PanelSplitter itself needs a real pixel size.
+const DEFAULT_REQUEST_PANE_HEIGHT = 260;
+const requestPaneHeight = computed(
+  () => props.tab.state.requestPaneHeight || DEFAULT_REQUEST_PANE_HEIGHT,
+);
+function onResizeRequestPane(size: number): void {
+  patchHttpRequestTabState(props.tab.id, { requestPaneHeight: size });
+}
+
+// F15: view.run (⌘Return) and view.refresh (the refresh shortcut) both already route through
+// this per-mounted-view registry with no menu/accelerator change (D13) — they both just trigger
+// Send here, same as ConsoleView.vue registers Run/Run all onto the same two channels' shape.
+let unregisterCommands: Array<() => void> = [];
+onMounted(() => {
+  unregisterCommands = [
+    registerCommand('view.run', onSend),
+    registerCommand('view.refresh', onSend),
+    // D15: the palette's own Save request entry, view-scoped exactly like the two above — a no-op
+    // when no request tab is mounted, which is runCommand's documented behaviour.
+    registerCommand('api.save', onSave),
+    // P7 D10: same view-scoped shape as api.save above.
+    registerCommand('api.copyAsCurl', onCopyAsCurl),
+    // P9 D8: same view-scoped shape — a no-op with no request tab mounted, and here also a no-op
+    // (not an error) for a formdata/file body, matching the toolbar button's own disabled state.
+    registerCommand('api.editRaw', onEditRaw),
+  ];
+});
+onUnmounted(() => {
+  for (const off of unregisterCommands) off();
+});
+</script>
+
+<template>
+  <div class="http-request-view" data-testid="http-request-view">
+    <ViewChrome
+      :tab="tab"
+      icon="globe"
+      :name="title"
+      target-testid="http-request-target"
+      refresh-testid="http-request-refresh"
+      stop-testid="http-request-stop"
+      :can-stop="running"
+      :env-color="activeEnvironmentColor"
+      @refresh="onSend"
+      @stop="onStop"
+    >
+      <template #badges>
+        <span class="p-chip p-method" :class="methodToken" data-testid="http-method-chip">{{ tab.state.method }}</span>
+        <!-- D15: the dirty mark sits beside the name here and deliberately *not* on the tab strip,
+             which renders purely from TAB_KINDS — a dirty(tab) registry member that seven of the
+             eight kinds would answer false to is shared machinery for a cosmetic gain (§8 OQ-8). -->
+        <span v-if="dirty" class="dirty-mark" data-testid="http-dirty" v-tooltip="'Unsaved changes'">•</span>
+        <span
+          v-if="unresolvedRefs.length > 0"
+          class="p-chip warn"
+          data-testid="http-unresolved-chip"
+          v-tooltip="unresolvedTooltip"
+        >
+          {{ unresolvedRefs.length }} unresolved
+        </span>
+      </template>
+
+      <!-- P22b D3: Save moves to the slot ViewHeader already reserves for exactly this — #badges
+           renders before the push and shifts position whenever the dirty mark or unresolved chip
+           changes width. P15 D7 (OQ-2)'s own "first control ever placed in a view head" comment
+           now lives here, since the control moved. Same testid/disabled/tooltip, only the slot
+           moved. -->
+      <template #head-trailing>
+        <AppButton
+          icon="save"
+          data-testid="http-save"
+          :disabled="canSave && !dirty"
+          v-tooltip="canSave ? 'Save request' : 'Save request to a collection'"
+          @click="onSave"
+        >
+          Save
+        </AppButton>
+      </template>
+
+      <template #toolbar>
+        <MethodSelect
+          :model-value="tab.state.method"
+          testid="http-method-select"
+          @update:model-value="onMethodChange"
+        />
+        <div class="url-field">
+          <AutocompleteField
+            :model-value="tab.state.url"
+            placeholder="https://api.example.com/users"
+            data-testid="http-url"
+            :candidates="variables.candidates"
+            :token-at="templateToken"
+            :range-highlights="variables.rangeHighlights"
+            :hover-at="variables.hoverAt"
+            @update:model-value="onUrlInput"
+            @paste-text="onUrlPaste"
+            @enter="onSend"
+          />
+        </div>
+        <AppButton
+          icon="play"
+          variant="primary"
+          data-testid="http-send"
+          :disabled="running"
+          v-tooltip="'Send'"
+          @click="onSend"
+        >
+          Send
+        </AppButton>
+      </template>
+
+      <template #toolbar-end>
+        <IconButton
+          icon="terminal"
+          aria-label="Copy as curl"
+          v-tooltip="'Copy as curl…'"
+          data-testid="http-copy-as-curl"
+          @click="onCopyAsCurl"
+        />
+        <IconButton
+          icon="code"
+          aria-label="Edit as raw HTTP"
+          :disabled="!canEditRaw"
+          v-tooltip="editRawTooltip"
+          data-testid="http-edit-raw"
+          @click="onEditRaw"
+        />
+      </template>
+
+      <template #toolbar-2>
+        <SegmentedControl
+          :model-value="tab.state.requestPane"
+          :options="REQUEST_PANE_OPTIONS"
+          data-testid="http-request-pane-toggle"
+          @update:model-value="setRequestPane"
+        />
+        <IconButton
+          v-if="showFieldFilterToggle"
+          icon="search"
+          :active="fieldFilterOpen"
+          v-tooltip="'Filter'"
+          data-testid="http-field-filter-toggle"
+          @click="toggleFieldFilter"
+        />
+        <IconButton
+          v-if="showFieldFilterToggle"
+          icon="note"
+          :active="tab.state.fieldDescriptions"
+          v-tooltip="tab.state.fieldDescriptions ? 'Hide descriptions' : 'Show descriptions'"
+          data-testid="http-field-descriptions-toggle"
+          @click="toggleFieldDescriptions"
+        />
+        <IconButton
+          icon="search"
+          :active="requestFindOpen"
+          aria-label="Find in request"
+          v-tooltip="'Find in the request body'"
+          data-testid="http-request-find-toggle"
+          @click="toggleRequestFind"
+        />
+        <div class="overview-anchor">
+          <IconButton
+            icon="variable-group"
+            :active="overviewOpen"
+            aria-label="Variables"
+            v-tooltip="'Variables'"
+            data-testid="http-variables-overview-toggle"
+            @click="overviewOpen = !overviewOpen"
+          />
+          <VariablesOverviewPanel
+            v-if="overviewOpen"
+            :collection-id="collectionId"
+            :environment-id="activeEnvironmentId"
+            @close="overviewOpen = false"
+          />
+        </div>
+        <EnvironmentSelect />
+      </template>
+
+      <!-- P28 D11: above the request panel it searches, not floating over it — LAW 03, the same
+           placement rule the response pane's own bar and the data views' SearchToolbar follow. -->
+      <ResponseFindBar
+        v-if="requestFindOpen"
+        ref="requestFindBarRef"
+        :targets="requestFindTargets"
+        @close="closeRequestFind"
+      />
+
+      <div class="request-response-split">
+        <div class="request-pane" :style="{ flex: `0 0 ${requestPaneHeight}px` }" data-testid="http-request-pane">
+          <PanelSearchBox
+            v-if="fieldFilterOpen && showFieldFilterToggle"
+            v-model="fieldFilterQuery"
+            placeholder="Filter"
+            testid="http-field-filter"
+          />
+          <QueryParamsTable
+            v-if="tab.state.requestPane === 'params'"
+            :tab="tab"
+            :variables="variables"
+            :filter-query="fieldFilterQuery"
+            :show-descriptions="tab.state.fieldDescriptions"
+          />
+          <RequestHeadersTable
+            v-else-if="tab.state.requestPane === 'headers'"
+            :tab="tab"
+            :variables="variables"
+            :filter-query="fieldFilterQuery"
+            :show-descriptions="tab.state.fieldDescriptions"
+          />
+          <RequestBodyPane
+            v-else
+            ref="requestBodyRef"
+            :tab="tab"
+            :variables="variables"
+            :find-highlights="requestFindHighlights"
+            :filter-query="fieldFilterQuery"
+            :show-descriptions="tab.state.fieldDescriptions"
+          />
+        </div>
+
+        <PanelSplitter
+          class="request-splitter"
+          orientation="row"
+          :size="requestPaneHeight"
+          :min="120"
+          :max="800"
+          divider
+          @resize="onResizeRequestPane"
+        />
+
+        <div class="response-pane-slot" data-testid="http-response-pane-slot">
+          <ResponsePane :tab="tab" />
+        </div>
+      </div>
+    </ViewChrome>
+  </div>
+</template>
+
+<style scoped>
+.overview-anchor {
+  position: relative;
+  display: flex;
+}
+
+.http-request-view {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* P15 D4: TextField's inheritAttrs: false lands a call site's own class/style on the inner
+   <input>, never the wrapping .p-input box that actually sizes it (F3) — the app's existing
+   wrapper + :deep(.p-input) idiom, used at ten other call sites, fixes it here too. Was
+   `style="flex: 1"` directly on <TextField>, which landed on the input (already flex: 1) and did
+   nothing — the URL field never grew with the window. */
+.url-field {
+  flex: 1;
+  min-width: 0;
+}
+.url-field :deep(.p-input) {
+  width: 100%;
+}
+
+.request-response-split {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.request-pane {
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Mirrors views/shared/celleditor/CellEditorDock.vue's own .cell-splitter comment: the workbench
+   grid gives a splitter its size from a gap row; inside a view there is no gap band, so the
+   track carries its own explicit height. P22 D13 (F22): the request/response boundary used to be
+   4px of nothing until the pointer crossed it — `divider` (above) draws the line this comment
+   never reached. */
+.request-splitter {
+  height: var(--kira-s-2);
+  flex-shrink: 0;
+}
+
+.dirty-mark {
+  color: var(--kira-warn);
+  font-size: var(--kira-t-lg);
+  line-height: 1;
+}
+
+.response-pane-slot {
+  flex: 1;
+  min-height: 0;
+}
+</style>

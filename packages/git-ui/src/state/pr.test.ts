@@ -1,0 +1,349 @@
+import { describe, expect, test } from 'bun:test';
+import type {
+  EventKey,
+  EventPayload,
+  GhStatus,
+  ParamsOf,
+  RequestKey,
+  ResultOf,
+  StreamChunkOf,
+  StreamKey,
+  StreamParamsOf,
+  Transport,
+} from '@kira/git-ipc';
+import { BridgeClient } from '../bridge/client.ts';
+import { PrState } from './pr.ts';
+
+/** Same fake `Transport` shape `repoSettings.test.ts` already established — request() is scripted
+ *  per call via `onRequest`, and `deferred` lets a test control exactly when each call's own
+ *  promise resolves (needed for the stale-response test below). */
+class FakeTransport implements Transport {
+  onRequest: (method: RequestKey, params: unknown) => unknown = () => {
+    throw new Error('unscripted request');
+  };
+  readonly calls: Array<{ method: RequestKey; params: unknown }> = [];
+  #handlers = new Map<EventKey, Set<(payload: unknown) => void>>();
+
+  request<K extends RequestKey>(method: K, params: ParamsOf<K>): Promise<ResultOf<K>> {
+    this.calls.push({ method, params });
+    return Promise.resolve(this.onRequest(method, params) as ResultOf<K>);
+  }
+
+  on<K extends EventKey>(method: K, handler: (payload: EventPayload<K>) => void): () => void {
+    let set = this.#handlers.get(method);
+    if (!set) {
+      set = new Set();
+      this.#handlers.set(method, set);
+    }
+    const wrapped = handler as (payload: unknown) => void;
+    set.add(wrapped);
+    return () => set?.delete(wrapped);
+  }
+
+  emit<K extends EventKey>(method: K, payload: EventPayload<K>): void {
+    for (const handler of this.#handlers.get(method) ?? []) {
+      handler(payload);
+    }
+  }
+
+  stream<K extends StreamKey>(
+    _method: K,
+    _params: StreamParamsOf<K>,
+    _onChunk: (chunk: StreamChunkOf<K>) => void,
+  ): Promise<void> {
+    return Promise.reject(new Error('not used by these tests'));
+  }
+
+  dispose(): void {}
+}
+
+function tick(ms = 0): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+const REPO = '/repos/a';
+
+describe('PrState — per-commit selection debounce', () => {
+  test('selecting several shas within the debounce window issues exactly one request, for the last one', async () => {
+    const transport = new FakeTransport();
+    const bridge = new BridgeClient(transport);
+    const pr = new PrState(bridge);
+    pr.setRepoId(REPO);
+    transport.calls.length = 0; // setRepoId itself issues no request; keep the assertion focused.
+
+    transport.onRequest = () => ({ kind: 'ok', prs: [] });
+    pr.select('sha1');
+    pr.select('sha2');
+    pr.select('sha3');
+    await tick(350);
+
+    const resolveCalls = transport.calls.filter((c) => c.method === 'commit.resolvePr');
+    expect(resolveCalls.length).toBe(1);
+    expect(resolveCalls[0]?.params).toEqual({ repoId: REPO, sha: 'sha3' });
+    pr.dispose();
+  });
+});
+
+describe('PrState — stale-response drop', () => {
+  test('an older selection’s response landing after a newer one is selected is dropped', async () => {
+    const transport = new FakeTransport();
+    const bridge = new BridgeClient(transport);
+    const pr = new PrState(bridge);
+    pr.setRepoId(REPO);
+
+    let resolveFirst: ((v: unknown) => void) | undefined;
+    transport.onRequest = (_method, params) => {
+      const sha = (params as { sha: string }).sha;
+      if (sha === 'sha-old') {
+        return new Promise((resolve) => {
+          resolveFirst = resolve;
+        });
+      }
+      return Promise.resolve({
+        kind: 'ok',
+        prs: [
+          {
+            number: 2,
+            title: 'new',
+            url: 'u',
+            state: 'open',
+            headRef: 'b',
+            headSha: sha,
+            baseRef: 'main',
+            updatedAt: 0,
+          },
+        ],
+      });
+    };
+
+    pr.select('sha-old');
+    await tick(350); // let the debounce fire and the request actually start (and hang).
+
+    pr.select('sha-new');
+    await tick(350); // sha-new's own request resolves immediately (a plain Promise.resolve).
+
+    expect(pr.selected.value?.kind).toBe('ok');
+    if (pr.selected.value?.kind === 'ok') {
+      expect(pr.selected.value.prs[0]?.headSha).toBe('sha-new');
+    }
+
+    // Now let the stale sha-old response land — it must NOT overwrite sha-new's own result.
+    resolveFirst?.({
+      kind: 'ok',
+      prs: [
+        {
+          number: 1,
+          title: 'old',
+          url: 'u',
+          state: 'open',
+          headRef: 'b',
+          headSha: 'sha-old',
+          baseRef: 'main',
+          updatedAt: 0,
+        },
+      ],
+    });
+    await tick(10);
+
+    expect(pr.selected.value?.kind).toBe('ok');
+    if (pr.selected.value?.kind === 'ok') {
+      expect(pr.selected.value.prs[0]?.headSha).toBe('sha-new');
+    }
+    pr.dispose();
+  });
+});
+
+describe('PrState — refsChanged clears everything', () => {
+  test('a repo.changed refsChanged event empties bySha/byBranch/selected/status and bumps generation', async () => {
+    const transport = new FakeTransport();
+    const bridge = new BridgeClient(transport);
+    const pr = new PrState(bridge);
+    pr.setRepoId(REPO);
+
+    transport.onRequest = () => ({
+      kind: 'ok',
+      prs: [
+        {
+          number: 1,
+          title: 't',
+          url: 'u',
+          state: 'open',
+          headRef: 'b',
+          headSha: 'sha1',
+          baseRef: 'main',
+          updatedAt: 0,
+        },
+      ],
+    });
+    pr.select('sha1');
+    await tick(350);
+    expect(pr.bySha.value.size).toBe(1);
+    expect(pr.selected.value?.kind).toBe('ok');
+
+    const genBefore = pr.generation.value;
+    transport.emit('repo.changed', { repoId: REPO, kind: 'refsChanged' });
+
+    expect(pr.bySha.value.size).toBe(0);
+    expect(pr.byBranch.value.size).toBe(0);
+    expect(pr.selected.value).toBeUndefined();
+    expect(pr.generation.value).toBeGreaterThan(genBefore);
+    pr.dispose();
+  });
+});
+
+describe('PrState — a disabled repo never re-requests', () => {
+  test('once a lookup answers "disabled", every later selection/branch resolve skips the network entirely', async () => {
+    const transport = new FakeTransport();
+    const bridge = new BridgeClient(transport);
+    const pr = new PrState(bridge);
+    pr.setRepoId(REPO);
+
+    transport.onRequest = () => ({ kind: 'disabled' });
+    pr.select('sha1');
+    await tick(350);
+    expect(pr.selected.value?.kind).toBe('disabled');
+    const callsAfterFirst = transport.calls.length;
+
+    pr.select('sha2');
+    await tick(350);
+    expect(pr.selected.value?.kind).toBe('disabled');
+    // No new request at all — the synchronous disabled short-circuit in select() fired instead.
+    expect(transport.calls.length).toBe(callsAfterFirst);
+
+    await pr.resolveBranch('feature');
+    expect(transport.calls.length).toBe(callsAfterFirst);
+    expect(pr.byBranch.value.has('feature')).toBe(false);
+    pr.dispose();
+  });
+
+  test('a repo change clears the disabled memo', async () => {
+    const transport = new FakeTransport();
+    const bridge = new BridgeClient(transport);
+    const pr = new PrState(bridge);
+    pr.setRepoId(REPO);
+    transport.onRequest = () => ({ kind: 'disabled' });
+    pr.select('sha1');
+    await tick(350);
+    expect(pr.selected.value?.kind).toBe('disabled');
+
+    pr.setRepoId('/repos/b');
+    transport.onRequest = () => ({ kind: 'ok', prs: [] });
+    pr.select('sha1');
+    await tick(350);
+    expect(pr.selected.value?.kind).toBe('ok');
+    pr.dispose();
+  });
+});
+
+describe('PrState — unavailable surfaces GhStatus', () => {
+  test('an unavailable resolve sets status but not bySha', async () => {
+    const transport = new FakeTransport();
+    const bridge = new BridgeClient(transport);
+    const pr = new PrState(bridge);
+    pr.setRepoId(REPO);
+    const gh: GhStatus = { kind: 'unauthenticated', reason: 'run `gh auth login`' };
+    transport.onRequest = () => ({ kind: 'unavailable', gh });
+
+    pr.select('sha1');
+    await tick(350);
+
+    expect(pr.selected.value).toEqual({ kind: 'unavailable', gh });
+    expect(pr.status.value).toEqual(gh);
+    expect(pr.bySha.value.has('sha1')).toBe(false);
+    pr.dispose();
+  });
+});
+
+describe('PrState — ensureSnapshot warms only uncached branches', () => {
+  test('a branch already in byBranch is not re-requested', async () => {
+    const transport = new FakeTransport();
+    const bridge = new BridgeClient(transport);
+    const pr = new PrState(bridge);
+    pr.setRepoId(REPO);
+    transport.onRequest = (_method, params) => ({
+      kind: 'ok',
+      prs: [
+        {
+          number: 1,
+          title: 't',
+          url: 'u',
+          state: 'open',
+          headRef: (params as { branch: string }).branch,
+          headSha: 's',
+          baseRef: 'main',
+          updatedAt: 0,
+        },
+      ],
+    });
+
+    await pr.ensureSnapshot(['main', 'feature']);
+    expect(transport.calls.filter((c) => c.method === 'branch.resolvePr').length).toBe(2);
+
+    await pr.ensureSnapshot(['main', 'feature', 'third']);
+    const resolveCalls = transport.calls.filter((c) => c.method === 'branch.resolvePr');
+    expect(resolveCalls.length).toBe(3); // only "third" is new.
+    pr.dispose();
+  });
+});
+
+// G31 round-2 performance review, finding #3: a branch whose resolvePr answer came back "ok" with
+// no PR at all never landed in byBranch (only a real PrRecord goes in there), so ensureSnapshot's
+// own dedup filter (!byBranch.has(name) && !#branchRequests.has(name)) failed forever and every
+// PR-less branch was re-requested on every ensureSnapshot call, indefinitely.
+describe('PrState — resolveBranch caches a "no PR" answer', () => {
+  test('a branch that resolves to no PR is not re-requested by a later ensureSnapshot', async () => {
+    const transport = new FakeTransport();
+    const bridge = new BridgeClient(transport);
+    const pr = new PrState(bridge);
+    pr.setRepoId(REPO);
+    transport.onRequest = () => ({ kind: 'ok', prs: [] });
+
+    await pr.ensureSnapshot(['no-pr-branch']);
+    expect(transport.calls.filter((c) => c.method === 'branch.resolvePr').length).toBe(1);
+    expect(pr.byBranch.value.has('no-pr-branch')).toBe(false);
+
+    await pr.ensureSnapshot(['no-pr-branch']);
+    await pr.resolveBranch('no-pr-branch');
+    expect(transport.calls.filter((c) => c.method === 'branch.resolvePr').length).toBe(1);
+    pr.dispose();
+  });
+});
+
+// G30 round-1 performance review, finding #1: ensureSnapshot used to Promise.all every branch at
+// once — a repo with hundreds of branches fired hundreds of concurrent branch.resolvePr requests
+// with nothing capping it anywhere in the stack. Proves the worker-pool bound: with 20 branches to
+// warm and every request left hanging, no more than 6 are ever in flight at once.
+describe('PrState — ensureSnapshot bounds its own fan-out', () => {
+  test('never more than 6 branch.resolvePr requests are in flight at once', async () => {
+    const transport = new FakeTransport();
+    const bridge = new BridgeClient(transport);
+    const pr = new PrState(bridge);
+    pr.setRepoId(REPO);
+
+    const resolvers: Array<(v: unknown) => void> = [];
+    transport.onRequest = () =>
+      new Promise((resolve) => {
+        resolvers.push(resolve);
+      });
+
+    const branches = Array.from({ length: 20 }, (_, i) => `branch-${i}`);
+    const done = pr.ensureSnapshot(branches);
+
+    // Draining the whole queue in batches proves the cap holds throughout (not just at the very
+    // first tick) — each resolved worker immediately picks up the next branch, so a broken cap
+    // would show up as a batch bigger than 6 on a later iteration too.
+    let resolvedCount = 0;
+    while (resolvedCount < branches.length) {
+      await tick(10); // let every worker that's going to start this round actually start.
+      expect(resolvers.length).toBeGreaterThan(0);
+      expect(resolvers.length).toBeLessThanOrEqual(6);
+      const batch = resolvers.splice(0, resolvers.length);
+      for (const resolve of batch) resolve({ kind: 'ok', prs: [] });
+      resolvedCount += batch.length;
+    }
+    await done;
+
+    expect(transport.calls.filter((c) => c.method === 'branch.resolvePr').length).toBe(20);
+    pr.dispose();
+  });
+});

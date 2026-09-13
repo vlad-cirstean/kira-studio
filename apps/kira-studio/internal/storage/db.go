@@ -1,0 +1,106 @@
+// Package storage owns the Go build's SQLite database: opening it, migrating it, and the
+// hot-path repo queries. Go analogue of src/main/storage/{db,migrate}.ts.
+package storage
+
+import (
+	"database/sql"
+	"fmt"
+	"net/url"
+	"os"
+
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/config"
+	_ "modernc.org/sqlite"
+)
+
+// DB wraps the single *sql.DB connection this app ever opens.
+//
+// modernc.org/sqlite is a pure-Go transpilation of the same upstream SQLite amalgamation
+// mattn/go-sqlite3 links via cgo — same engine, no cgo toolchain needed to build this binary
+// (the sqlite adapter package already made this switch for the external-file browsing path;
+// this is the same driver, same DSN-based pragma convention, applied to the app's own database).
+// SetMaxOpenConns(1): this app's database is a small, single-writer configuration store, and
+// serialising every statement onto one connection removes the SQLITE_BUSY class of bug entirely
+// at no measurable cost (P52 §5.2).
+type DB struct {
+	*sql.DB
+}
+
+// buildDSN sets the startup pragmas through the DSN query string rather than as Exec statements
+// after Open — unlike mattn/go-sqlite3's Go-side options, modernc.org/sqlite takes pragmas this
+// way (see adapters/sqlite/client.go's buildDSN), and doing it here means every connection the
+// pool ever opens carries them, not just the first.
+//
+// P23 D5(a)/D6: _auto_vacuum=INCREMENTAL and journal_size_limit are new. Both were measured
+// (P23 F16/F17) against the pinned modernc.org/sqlite driver before being added here:
+//
+//   - _auto_vacuum only takes on a brand-new database (PRAGMA auto_vacuum reads back 2) and is
+//     inert on an existing one (reads back 0, unchanged) — so this needs no version gate and can
+//     never half-convert a database that already exists. INCREMENTAL rather than FULL: FULL
+//     reorganises pages on every commit, a cost paid constantly on a store that commits on every
+//     keystroke-debounced tab save, for a benefit (reclaiming freed pages) wanted only
+//     occasionally. INCREMENTAL puts freed pages on the freelist and leaves the reclaim decision
+//     to repos.Maintenance.Reclaim, run once at startup.
+//   - journal_size_limit(4194304) truncates kira.db-wal back down after a commit, rather than
+//     leaving it at its session high-water mark forever (SQLITE_DEFAULT_JOURNAL_SIZE_LIMIT is -1
+//     in the pinned amalgamation). 4 MiB is not chosen, it is derived: 1,000 pages
+//     (SQLITE_DEFAULT_WAL_AUTOCHECKPOINT) at SQLite's 4 KiB default page size is exactly the size
+//     the WAL is expected to reach between two automatic checkpoints, so this never truncates a
+//     WAL doing its ordinary job. modernc.org/sqlite has no _journal_size_limit shorthand — this
+//     goes through the generic _pragma= list, which F17 measured to apply before _journal_mode and
+//     to read back correctly.
+func buildDSN(path string) string {
+	q := url.Values{}
+	q.Set("_busy_timeout", "5000")
+	q.Set("_foreign_keys", "1")
+	q.Set("_auto_vacuum", "INCREMENTAL")
+	q.Set("_pragma", "journal_size_limit(4194304)")
+	q.Set("_journal_mode", "WAL")
+	q.Set("_synchronous", "NORMAL")
+	return "file:" + path + "?" + q.Encode()
+}
+
+// Open creates KIRA_HOME if needed, opens (or creates) the database file at the trimmed
+// permissions the Electron build uses, applies the four startup pragmas, and runs every pending
+// migration.
+func Open() (*DB, error) {
+	return OpenAt(config.KiraHome())
+}
+
+// OpenAt is Open against an explicit home dir instead of $KIRA_HOME. Exists so a test can pass its
+// own t.TempDir() directly rather than t.Setenv("KIRA_HOME", …) — Go's testing package panics if
+// t.Setenv runs in a test that called t.Parallel() (or whose parent did), so a test wanting both
+// isolation and parallelism needs the dir threaded explicitly (v1.4 P1).
+func OpenAt(home string) (*DB, error) {
+	if err := config.EnsureLayoutAt(home); err != nil {
+		return nil, fmt.Errorf("storage: ensure layout: %w", err)
+	}
+
+	path := config.DbPathAt(home)
+	sqlDB, err := sql.Open("sqlite", buildDSN(path))
+	if err != nil {
+		return nil, fmt.Errorf("storage: open %s: %w", path, err)
+	}
+	sqlDB.SetMaxOpenConns(1)
+
+	// database/sql's Open is lazy — the file does not exist on disk until the first real
+	// connection, so Ping (which forces one, applying the DSN pragmas above) must run before the
+	// chmod below, not after.
+	if err := sqlDB.Ping(); err != nil {
+		_ = sqlDB.Close()
+		return nil, fmt.Errorf("storage: open %s: %w", path, err)
+	}
+
+	// Unconditional, not only on create: tightens permissions on an existing loose file too,
+	// mirroring db.ts's own comment.
+	if err := os.Chmod(path, 0o600); err != nil {
+		_ = sqlDB.Close()
+		return nil, fmt.Errorf("storage: chmod %s: %w", path, err)
+	}
+
+	db := &DB{sqlDB}
+	if err := db.migrate(); err != nil {
+		_ = sqlDB.Close()
+		return nil, err
+	}
+	return db, nil
+}

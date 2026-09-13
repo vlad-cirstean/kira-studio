@@ -1,0 +1,131 @@
+<script setup lang="ts">
+import type { PaletteColor } from '@shared/domain/color';
+import type { TabRecord } from '@shared/domain/tabs';
+import { computed } from 'vue';
+import { connectionRecord } from '../../state/connections';
+import { useRunState } from '../../state/runState';
+import { connColorVar } from '../connColor';
+import IconButton from './IconButton.vue';
+import RunState from './RunState.vue';
+import ViewHeader from './ViewHeader.vue';
+
+// The view-head + rail + toolbar + run-state trio every non-grid view opens with (LAW 09/10/12
+// in docs/design/kira-design-system). Refresh/Stop live here rather than in each view's own
+// toolbar slot because "Stop always follows Refresh, disabled when idle" is a chrome-level rule,
+// not a per-view choice — six views implementing it separately is exactly how three of them
+// drifted into showing Stop only while running instead of merely disabling it.
+const props = withDefaults(
+  defineProps<{
+    tab: TabRecord;
+    icon: string;
+    iconColor?: string;
+    path?: string;
+    name: string;
+    canRefresh?: boolean;
+    canStop?: boolean;
+    /** P28 D16(a): whether this view has a Refresh/Stop pair at all. `canRefresh: false` says
+     *  "cannot refresh *right now*" and correctly renders a disabled button; a variables or
+     *  environments tab has no such operation in the first place, and rendering two permanently
+     *  dead buttons for it is not the same statement. Defaults true, so every existing view is
+     *  byte-identical. */
+    showRunControls?: boolean;
+    // Forwarded to ViewHeader — see its own props for what each targets. refreshTestid/stopTestid
+    // cover the two built-in buttons below, which predate this component and had per-view names.
+    targetTestid?: string;
+    nameTestid?: string;
+    refreshTestid?: string;
+    stopTestid?: string;
+    // P48 D8: the grid's own `data-testid="data-toolbar"`/`"filter-toolbar"` (pre-dating this
+    // component) survive on the bands themselves rather than a nested `.p-toolbar` the grid would
+    // otherwise have to keep — nesting `.p-toolbar` inside `.p-toolbar` doubles the band height and
+    // border.
+    toolbarTestid?: string;
+    toolbar2Testid?: string;
+    // P18 D17/D19: an Api view's active environment colour — LAW 07's rail/dot, from a source other
+    // than a connection. Mutually exclusive with `connection` below in practice (an Api tab's
+    // `tab.connectionId` is always empty, F20 #6) but resolved independently rather than assumed:
+    // when provided (even 'none'), it drives the rail/dot instead of `connection`, which is exactly
+    // how the reserved-but-empty slot in Api mode becomes the "a query console's own connection
+    // indicator" analogue the design system's LAW 07 describes.
+    envColor?: PaletteColor;
+  }>(),
+  // P28 D16(a): an EXPLICIT default, not an omitted one. A type-only `defineProps` compiles
+  // `showRunControls?: boolean` to a Boolean prop, and Vue casts an absent Boolean prop to
+  // `false` — so `v-if="showRunControls !== false"` silently removed the Refresh/Stop group from
+  // every view that does not pass it, which is all of them but one. Caught by tooltips.spec.ts
+  // and definition.spec.ts, both of which wait on a button that had stopped existing.
+  { showRunControls: true },
+);
+
+const emit = defineEmits<{ refresh: []; stop: [] }>();
+
+// P2 D14/F8: `connection?.color ?? null` used to fold "no connection at all" (an HTTP request
+// tab) and "a connection with no colour assigned" into the same `null` — ViewHeader's own
+// `connColor !== undefined` guard then rendered a dot for both. `undefined` only for the former.
+const connection = computed(() => connectionRecord(props.tab.connectionId));
+
+// P18 D19: the merged rail/dot colour — envColor (an Api view) when given, else the tab's own
+// connection colour (a Studio view, preserving F8's own null-vs-undefined distinction: `null` for
+// "has a connection with no colour assigned", `undefined` for "no connection at all" — only the
+// former still renders a dot, as a 'none' ring), else undefined when neither applies.
+const railColor = computed<PaletteColor | null | undefined>(() => {
+  if (props.envColor !== undefined) return props.envColor;
+  return connection.value ? (connection.value.color ?? null) : undefined;
+});
+
+const runState = useRunState(() => props.tab.id);
+</script>
+
+<template>
+  <ViewHeader
+    :icon="icon"
+    :icon-color="iconColor"
+    :path="path"
+    :name="name"
+    :conn-color="railColor"
+    :conn-kind="connection?.kind"
+    :target-testid="targetTestid"
+    :name-testid="nameTestid"
+  >
+    <slot name="badges" />
+    <template #trailing>
+      <slot name="head-trailing" />
+    </template>
+  </ViewHeader>
+
+  <div class="p-toolbar-rail" :style="{ '--kira-rail': connColorVar(railColor) }" />
+  <div class="p-toolbar" :class="{ last: !$slots['toolbar-2'] }" :data-testid="toolbarTestid">
+    <div v-if="showRunControls" class="group">
+      <IconButton icon="refresh" v-tooltip="'Refresh'" :data-testid="refreshTestid" :disabled="canRefresh === false" @click="emit('refresh')" />
+      <!-- DataToolbar.vue's hand-rolled Stop already tints itself red only while a cancellable op
+           is in flight (`is-live`, keyed off the same boolean that also drives `disabled`) — this
+           shared Stop never got that treatment, so every non-grid view's Stop looked identically
+           muted whether idle or running. `canStop` is exactly "there is a live op to cancel", the
+           same signal DataToolbar keys off, so it doubles as the is-live flag here too. -->
+      <IconButton
+        icon="debug-stop"
+        :class="{ 'is-live': !!canStop }"
+        v-tooltip="'Stop'"
+        :data-testid="stopTestid"
+        :disabled="!canStop"
+        @click="emit('stop')"
+      />
+    </div>
+    <slot name="toolbar" />
+    <span class="p-push" />
+    <!-- P22 D4: RunState moves ahead of #toolbar-end so a consumer's own last control (the pager,
+         in every view that hosts one) really is the toolbar's right-most element. LAW 12 still
+         holds: RunState's label reserves its own min-width (P16 D2), so it can reflow neither the
+         push to its left nor #toolbar-end to its right. -->
+    <RunState :status="runState.status" :elapsed-ms="runState.elapsedMs" />
+    <div class="group">
+      <slot name="toolbar-end" />
+    </div>
+  </div>
+  <div v-if="$slots['toolbar-2']" class="p-toolbar last" :data-testid="toolbar2Testid">
+    <slot name="toolbar-2" />
+  </div>
+
+  <slot name="strips" />
+  <slot />
+</template>

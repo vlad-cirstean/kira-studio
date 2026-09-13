@@ -1,0 +1,25 @@
+{
+  "info": {
+    "name": "Malformed items",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    { "name": "neither a folder nor a request" },
+    {
+      "name": "both members",
+      "item": [
+        { "name": "child", "request": { "method": "GET", "url": "https://api.example.com/child" } }
+      ],
+      "request": { "method": "DELETE", "url": "https://api.example.com/ignored" }
+    },
+    {
+      "name": "nameless below",
+      "item": [{ "request": { "method": "GET", "url": "https://api.example.com/v1/derived/name" } }]
+    },
+    { "request": "https://api.example.com/root-string" },
+    {
+      "name": "custom method",
+      "request": { "method": "PROPFIND", "url": "https://api.example.com/dav" }
+    }
+  ]
+}

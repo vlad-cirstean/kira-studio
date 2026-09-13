@@ -1,0 +1,212 @@
+<script setup lang="ts">
+/**
+ * `docs/plans/P6.md` W16: §7.11's "make it impossible to miss" — flagged in this phase's own plan
+ * as needing extra care, so this file is deliberately conservative: it reads nothing but
+ * `ops.statusSummary.value.inProgress` (the one place `classifyInProgress`'s precedence table
+ * already lives, in `core`), and touches no state of its own beyond which of its three actions is
+ * mid-request.
+ *
+ * Persistent, above the graph, present for exactly as long as `inProgress !== null` — reactive
+ * through `OpsState.refreshStatus`'s own `repo.changed` subscription (W12), which is what makes
+ * "Continue re-enables without a manual refresh once the last conflict is staged" true: the
+ * watcher already fires on an `index` touch (`git add` is exactly that), `refreshStatus` re-reads
+ * `unmergedCount`, and this component is a plain `computed` over the result — there is nothing
+ * here to explicitly "recheck".
+ *
+ * `role="status"`, not `role="alert"` (W20's own reasoning, restated here since it is easy to get
+ * backwards): `alert` is for a message that appears and is gone: an assertive region that *stays
+ * on screen* for the length of an entire git operation is a screen-reader trap, re-announcing
+ * itself on every incidental change unless the AT's own heuristics happen to suppress it. `status`
+ * still announces on appearance (the whole point) without demanding attention indefinitely.
+ */
+import { describeInProgress } from '@kira/git-core';
+import { KuiButton } from '@kira/kira-ui';
+import { computed, ref } from 'vue';
+import type { OpsState } from '../state/ops.ts';
+
+const props = defineProps<{
+  ops: OpsState;
+  resolveConflictEnabled: boolean;
+  resolveConflict: (path: string) => Promise<void>;
+}>();
+
+const inProgress = computed(() => props.ops.statusSummary.value?.inProgress ?? null);
+const busyAction = ref<'resolve' | 'continue' | 'skip' | 'abort' | undefined>(undefined);
+
+const CONTINUE_REASON_ID = 'kv-conflict-continue-reason';
+
+async function onResolve(): Promise<void> {
+  const op = inProgress.value;
+  const path = op?.conflictedPaths[0];
+  if (!path || busyAction.value) return;
+  busyAction.value = 'resolve';
+  try {
+    await props.resolveConflict(path);
+  } finally {
+    busyAction.value = undefined;
+  }
+}
+
+async function onContinue(): Promise<void> {
+  if (busyAction.value) return;
+  busyAction.value = 'continue';
+  try {
+    await props.ops.continueOp();
+  } finally {
+    busyAction.value = undefined;
+  }
+}
+
+async function onAbort(): Promise<void> {
+  if (busyAction.value) return;
+  busyAction.value = 'abort';
+  try {
+    await props.ops.abortOp();
+  } finally {
+    busyAction.value = undefined;
+  }
+}
+
+/** `docs/plans/P10.md` W13, §7.11's third sequencer verb — rendered only when `canSkip` is true
+ *  (cherry-pick and revert only, probe 6), the same gate `core`'s own `InProgressOperation.canSkip`
+ *  already computes. */
+async function onSkip(): Promise<void> {
+  if (busyAction.value) return;
+  busyAction.value = 'skip';
+  try {
+    await props.ops.skipOp();
+  } finally {
+    busyAction.value = undefined;
+  }
+}
+
+const PATH_DISPLAY_CAP = 20;
+</script>
+
+<template>
+  <div v-if="inProgress" class="kv-conflict-banner" role="status" data-testid="conflict-banner">
+    <div class="kv-conflict-banner-row">
+      <span class="codicon codicon-warning kv-conflict-banner-icon" aria-hidden="true"></span>
+      <span class="kv-conflict-banner-title">{{ describeInProgress(inProgress) }}</span>
+      <span v-if="inProgress.unmergedCount > 0" class="kv-conflict-banner-count">
+        {{ inProgress.unmergedCount }} unresolved {{ inProgress.unmergedCount === 1 ? "file" : "files" }}
+      </span>
+
+      <span class="kv-conflict-banner-spacer"></span>
+
+      <KuiButton
+        v-if="resolveConflictEnabled"
+        :disabled="inProgress.unmergedCount === 0 || busyAction !== undefined"
+        @click="onResolve"
+      >
+        Resolve in VS Code
+      </KuiButton>
+      <KuiButton
+        v-if="inProgress.canContinue"
+        :disabled="inProgress.unmergedCount > 0 || busyAction !== undefined"
+        :aria-describedby="inProgress.unmergedCount > 0 ? CONTINUE_REASON_ID : undefined"
+        @click="onContinue"
+      >
+        Continue
+      </KuiButton>
+      <KuiButton
+        v-if="inProgress.canSkip"
+        :disabled="busyAction !== undefined"
+        @click="onSkip"
+      >
+        Skip
+      </KuiButton>
+      <KuiButton
+        v-if="inProgress.canAbort"
+        variant="danger"
+        :disabled="busyAction !== undefined"
+        @click="onAbort"
+      >
+        Abort
+      </KuiButton>
+    </div>
+
+    <p v-if="inProgress.unmergedCount > 0" :id="CONTINUE_REASON_ID" class="kv-conflict-banner-reason">
+      Resolve the remaining {{ inProgress.unmergedCount }}
+      {{ inProgress.unmergedCount === 1 ? "file" : "files" }} first, then Continue{{
+        inProgress.canSkip ? ", or Skip this commit and move on." : "."
+      }}
+    </p>
+    <p v-else-if="inProgress.canSkip" class="kv-conflict-banner-reason">
+      No conflicts remain. Continue to commit this change, or Skip if it is already present.
+    </p>
+
+    <ul v-if="inProgress.conflictedPaths.length > 0" class="kv-conflict-banner-paths">
+      <li v-for="path in inProgress.conflictedPaths.slice(0, PATH_DISPLAY_CAP)" :key="path">
+        <code>{{ path }}</code>
+      </li>
+      <li v-if="inProgress.conflictedPaths.length > PATH_DISPLAY_CAP" class="kv-conflict-banner-more">
+        +{{ inProgress.conflictedPaths.length - PATH_DISPLAY_CAP }} more
+      </li>
+    </ul>
+  </div>
+</template>
+
+<style>
+.kv-conflict-banner {
+  flex-shrink: 0;
+  padding: var(--kv-s-2) var(--kv-s-4);
+  /* W20: not `--kv-overlay-bg` — that token is a translucent modal-backdrop scrim (rgba black at
+   * a fixed alpha, meant to sit *behind* an opaque dialog, not to host text of its own); over a
+   * light theme's own bright app background it blends to a middling gray that this banner's own
+   * `--kv-description-fg`/`--kv-diff-deleted-fg` text (both tuned for contrast against a real
+   * panel background) fails against (axe's own `color-contrast` scan, vscode-light/
+   * high-contrast-light). This banner is persistent chrome, not a transient dimmer, so it gets
+   * the same opaque panel background every other persistent, text-bearing surface in this app
+   * already renders correctly on.
+   */
+  background-color: var(--kv-panel-bg);
+  border-bottom: 1px solid var(--kv-panel-border);
+}
+
+.kv-conflict-banner-row {
+  display: flex;
+  align-items: center;
+  gap: var(--kv-s-2);
+}
+
+.kv-conflict-banner-icon {
+  color: var(--kv-diff-modified-fg);
+}
+
+.kv-conflict-banner-title {
+  font-weight: 600;
+}
+
+.kv-conflict-banner-count {
+  color: var(--kv-description-fg);
+  font-size: 0.9em;
+}
+
+.kv-conflict-banner-spacer {
+  flex: 1;
+}
+
+/* G34: `.kv-conflict-banner-button` is gone — it re-declared a `KuiButton`'s own box (F9's class
+   of defect in the G34 plan, found by its own exit-criteria sweep rather than its file-by-file
+   table); the default `KuiButton` box, `variant="danger"` for Abort, is this shape already. */
+
+.kv-conflict-banner-reason {
+  margin: var(--kv-s-1) 0 0;
+  font-size: 0.85em;
+  color: var(--kv-description-fg);
+}
+
+.kv-conflict-banner-paths {
+  margin: var(--kv-s-1) 0 0;
+  padding-left: var(--kv-s-5);
+  max-height: 80px;
+  overflow-y: auto;
+  font-family: var(--kv-mono-font-family);
+  font-size: 0.85em;
+}
+
+.kv-conflict-banner-more {
+  color: var(--kv-description-fg);
+}
+</style>

@@ -1,0 +1,98 @@
+<script setup lang="ts">
+/**
+ * §5.1.1's explicit "load more" affordance — pages of `pageSize` rows, never infinite scroll.
+ * A plain click calls `graphView.loadMore()`; an Alt/Option-click ("do the bigger thing", the
+ * workbench's own modifier convention) calls `graphView.loadAll()` instead. Both share one
+ * `loading` state on `GraphViewState`, so a second press while either is in flight is a no-op —
+ * the native `disabled` attribute plus the `loading` guard in `handlePress` cover it twice.
+ *
+ * Deliberately has no live region of its own: W14 owns "one polite live region" announcing both
+ * load-more and refresh outcomes, and a second region here would fight it (plan lines ~1325-6).
+ */
+import { KuiButton } from '@kira/kira-ui';
+import { computed } from 'vue';
+import type { GraphViewState } from '../state/graphView.ts';
+
+const props = defineProps<{
+  graphView: GraphViewState;
+  pageSize: number;
+}>();
+
+const formatter = new Intl.NumberFormat();
+
+function fmt(n: number): string {
+  return formatter.format(n);
+}
+
+const isLoading = computed(() => props.graphView.loading.value !== 'idle');
+
+const buttonLabel = computed(() => {
+  const remaining = props.graphView.remaining.value;
+  if (isLoading.value) {
+    return `Loading… (${fmt(remaining)} remaining)`;
+  }
+  if (remaining < props.pageSize) {
+    return `Load the last ${fmt(remaining)}`;
+  }
+  return `Load ${fmt(props.pageSize)} more (${fmt(remaining)} remaining)`;
+});
+
+function handlePress(event: MouseEvent): void {
+  if (isLoading.value) return;
+  if (event.altKey) {
+    void props.graphView.loadAll();
+  } else {
+    void props.graphView.loadMore();
+  }
+}
+
+function handleCancel(): void {
+  props.graphView.cancelLoad();
+}
+</script>
+
+<template>
+  <!-- G16 D9: `remaining > 0` guards against F7's zero-chunk hole — a re-stream that emits no
+       chunk leaves no server-side signal to correct, so this is the one place that hole can be
+       closed. Kept visible while a load is in flight (`isLoading`) so Cancel does not vanish
+       mid-load. -->
+  <div
+    v-if="!graphView.exhausted.value && (isLoading || graphView.remaining.value > 0)"
+    class="kv-load-more"
+  >
+    <KuiButton
+      class="kv-load-more-button"
+      :disabled="isLoading"
+      v-kui-tooltip="'Alt-click to load everything remaining — this keeps every loaded commit in memory.'"
+      @click="handlePress"
+    >
+      {{ buttonLabel }}
+    </KuiButton>
+    <KuiButton
+      v-if="isLoading"
+      class="kv-load-more-cancel"
+      aria-label="Cancel loading"
+      @click="handleCancel"
+    >
+      Cancel
+    </KuiButton>
+  </div>
+</template>
+
+<style>
+.kv-load-more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--kv-s-2);
+  padding: var(--kv-s-2) var(--kv-s-4);
+  flex-shrink: 0;
+}
+
+/* G34: `.kv-load-more-button`/`.kv-load-more-cancel` no longer re-declare a `KuiButton`'s own
+   box (height/padding/border/border-radius) — the default box is this shape now. Cancel keeps
+   its one genuine distinction, the underline. */
+.kv-load-more-cancel {
+  text-decoration: underline;
+}
+</style>

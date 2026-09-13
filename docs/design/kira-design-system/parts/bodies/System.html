@@ -1,0 +1,440 @@
+<style>
+  body { overflow: auto; }
+    /* ---------- sheet chrome ---------- */
+    .sheet { padding: var(--s-6) 24px 40px; max-width: 100%; }
+    .sheet-title { font-size: 20px; font-weight: 600; letter-spacing: -0.01em; margin: 0; }
+    .sheet-sub { font-size: var(--t-md); color: var(--fg-muted); margin: 6px 0 0; max-width: 780px; }
+    .sec { margin-top: 32px; }
+    .sec-head { display: flex; align-items: baseline; gap: var(--s-4); border-bottom: var(--bw) solid var(--border); padding-bottom: var(--s-3); margin-bottom: var(--s-5); }
+    .sec-num { font-family: var(--font-mono); font-size: var(--t-xs); color: var(--fg-disabled); }
+    .sec-title { font-size: var(--t-lg); font-weight: 600; }
+    .sec-note { font-size: var(--t-sm); color: var(--fg-muted); margin-left: auto; }
+    .rule { font-size: var(--t-sm); color: var(--fg-muted); margin: 0 0 var(--s-4); }
+    .rule b { color: var(--fg); font-weight: 600; }
+    .tokname { font-family: var(--font-mono); font-size: var(--t-xs); color: var(--fg-disabled); }
+
+    /* ---------- specimen frames ---------- */
+    .specs { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: var(--s-5); }
+    .spec { display: flex; flex-direction: column; gap: var(--s-3); }
+    .spec-label { font-family: var(--font-mono); font-size: var(--t-xs); color: var(--fg-disabled); text-transform: uppercase; letter-spacing: 0.06em; }
+    .stage { background: var(--bg); border: var(--bw) solid var(--border); border-radius: var(--r); padding: var(--s-4); display: flex; align-items: center; gap: var(--s-3); min-height: 46px; }
+
+    /* ---------- scale visualisers ---------- */
+    .swatch { display: flex; flex-direction: column; gap: var(--s-2); }
+    .swatch-chip { height: 40px; border-radius: var(--r-sm); border: var(--bw) solid var(--border-strong); }
+    .swatch-name { font-family: var(--font-mono); font-size: var(--t-xs); color: var(--fg); }
+    .swatch-hex { font-family: var(--font-mono); font-size: var(--t-xs); color: var(--fg-disabled); }
+
+    .ladder { display: flex; flex-direction: column; gap: var(--s-3); }
+    .ladder-row { display: flex; align-items: center; gap: var(--s-4); }
+    .ladder-key { width: 72px; flex-shrink: 0; font-family: var(--font-mono); font-size: var(--t-xs); color: var(--fg-disabled); }
+    .ladder-bar { background: var(--accent); border-radius: 2px; height: 10px; }
+    .ladder-use { font-size: var(--t-sm); color: var(--fg-muted); }
+
+    .lawlist { display: flex; flex-direction: column; gap: var(--s-3); margin: 0; padding: 0; list-style: none; }
+    .law { display: flex; gap: var(--s-4); font-size: var(--t-md); }
+    .law-n { font-family: var(--font-mono); font-size: var(--t-xs); color: var(--accent); flex-shrink: 0; width: 18px; padding-top: 3px; }
+    .law-t { color: var(--fg-muted); }
+    .law-t b { color: var(--fg); font-weight: 600; }
+    .law-t code { font-family: var(--font-mono); font-size: var(--t-sm); color: var(--info); }
+</style>
+
+  <h1 class="sheet-title">Kira Studio — Design System</h1>
+  <p class="sheet-sub">
+    Colour and radius already exist in <span class="mono" style="color:var(--info)">src/renderer/theme/tokens.css</span> and are reproduced here unchanged.
+    Type, space and control height are new — the app has no scale for any of the three today, which is why forty components each
+    invented their own. Connection colour is re-derived. Every other artboard on this canvas is built from the twelve primitives
+    and sixteen laws below and nothing else: they all load this one stylesheet, so a change here is a change everywhere.
+  </p>
+
+  <!-- ========== 1. COLOUR ========== -->
+  <div class="sec">
+    <div class="sec-head">
+      <span class="sec-num">01</span>
+      <span class="sec-title">Colour</span>
+      <span class="sec-note">unchanged — already tokenised and consistent</span>
+    </div>
+    <div style="display:grid; grid-template-columns:repeat(9, minmax(0,1fr)); gap:var(--s-4)">
+      <div class="swatch"><div class="swatch-chip" style="background:#181818"></div><span class="swatch-name">bg-chrome</span><span class="swatch-hex">#181818</span></div>
+      <div class="swatch"><div class="swatch-chip" style="background:#1f1f1f"></div><span class="swatch-name">bg</span><span class="swatch-hex">#1f1f1f</span></div>
+      <div class="swatch"><div class="swatch-chip" style="background:#202020"></div><span class="swatch-name">bg-elevated</span><span class="swatch-hex">#202020</span></div>
+      <div class="swatch"><div class="swatch-chip" style="background:#313131"></div><span class="swatch-name">bg-input</span><span class="swatch-hex">#313131</span></div>
+      <div class="swatch"><div class="swatch-chip" style="background:#2b2b2b"></div><span class="swatch-name">border</span><span class="swatch-hex">#2b2b2b</span></div>
+      <div class="swatch"><div class="swatch-chip" style="background:#2a2d2e"></div><span class="swatch-name">hover</span><span class="swatch-hex">#2a2d2e</span></div>
+      <div class="swatch"><div class="swatch-chip" style="background:#04395e"></div><span class="swatch-name">select</span><span class="swatch-hex">#04395e</span></div>
+      <div class="swatch"><div class="swatch-chip" style="background:#0078d4"></div><span class="swatch-name">accent</span><span class="swatch-hex">#0078d4</span></div>
+      <div class="swatch"><div class="swatch-chip" style="background:#cccccc"></div><span class="swatch-name">fg</span><span class="swatch-hex">#cccccc</span></div>
+    </div>
+    <div style="display:grid; grid-template-columns:repeat(9, minmax(0,1fr)); gap:var(--s-4); margin-top:var(--s-4)">
+      <div class="swatch"><div class="swatch-chip" style="background:#9d9d9d"></div><span class="swatch-name">fg-muted</span><span class="swatch-hex">#9d9d9d</span></div>
+      <div class="swatch"><div class="swatch-chip" style="background:#6e6e6e"></div><span class="swatch-name">fg-disabled</span><span class="swatch-hex">#6e6e6e</span></div>
+      <div class="swatch"><div class="swatch-chip" style="background:#23d18b"></div><span class="swatch-name">ok</span><span class="swatch-hex">#23d18b</span></div>
+      <div class="swatch"><div class="swatch-chip" style="background:#cca700"></div><span class="swatch-name">warn</span><span class="swatch-hex">#cca700</span></div>
+      <div class="swatch"><div class="swatch-chip" style="background:#f14c4c"></div><span class="swatch-name">error</span><span class="swatch-hex">#f14c4c</span></div>
+      <div class="swatch"><div class="swatch-chip" style="background:#3794ff"></div><span class="swatch-name">info</span><span class="swatch-hex">#3794ff</span></div>
+      <div class="swatch"><div class="swatch-chip" style="background:#569cd6"></div><span class="swatch-name">sx-keyword</span><span class="swatch-hex">#569cd6</span></div>
+      <div class="swatch"><div class="swatch-chip" style="background:#ce9178"></div><span class="swatch-name">sx-string</span><span class="swatch-hex">#ce9178</span></div>
+      <div class="swatch"><div class="swatch-chip" style="background:#6a9955"></div><span class="swatch-name">sx-comment</span><span class="swatch-hex">#6a9955</span></div>
+    </div>
+  </div>
+
+  <!-- ========== 2. CONNECTION COLOUR ========== -->
+  <div class="sec">
+    <div class="sec-head">
+      <span class="sec-num">02</span>
+      <span class="sec-title">Connection colour</span>
+      <span class="sec-note">re-derived — twelve hues at one lightness and one chroma</span>
+    </div>
+    <p class="rule">
+      <b>A connection colour is a label, not a highlight.</b> The old set was mixed saturated brand colours,
+      so <span class="mono" style="color:#c75450">red</span> and
+      <span class="mono" style="color:#4b7bec">blue</span> shouted while
+      <span class="mono" style="color:#6e7681">grey</span> disappeared — twelve different loudnesses for
+      twelve equal things. The new set is generated: every hue is <code>oklch(0.72 0.09 h)</code>, eleven
+      hues evenly spaced around the wheel plus a near-neutral grey at <code>C 0.012</code>. Same perceived
+      lightness, same perceived saturation, so no connection can out-shout another and all twelve read as
+      one family against <code>bg</code>.
+    </p>
+
+    <div class="spec-label" style="margin-bottom:var(--s-3)">BEFORE — hand-picked, uneven</div>
+    <div style="display:grid; grid-template-columns:repeat(12, minmax(0,1fr)); gap:var(--s-3); opacity:0.75">
+      <div class="swatch"><div class="swatch-chip" style="background:#c75450"></div><span class="swatch-name">red</span><span class="swatch-hex">#c75450</span></div>
+      <div class="swatch"><div class="swatch-chip" style="background:#cc7832"></div><span class="swatch-name">orange</span><span class="swatch-hex">#cc7832</span></div>
+      <div class="swatch"><div class="swatch-chip" style="background:#bfa23a"></div><span class="swatch-name">amber</span><span class="swatch-hex">#bfa23a</span></div>
+      <div class="swatch"><div class="swatch-chip" style="background:#91a93e"></div><span class="swatch-name">olive</span><span class="swatch-hex">#91a93e</span></div>
+      <div class="swatch"><div class="swatch-chip" style="background:#499c54"></div><span class="swatch-name">green</span><span class="swatch-hex">#499c54</span></div>
+      <div class="swatch"><div class="swatch-chip" style="background:#2aa198"></div><span class="swatch-name">teal</span><span class="swatch-hex">#2aa198</span></div>
+      <div class="swatch"><div class="swatch-chip" style="background:#3592c4"></div><span class="swatch-name">cyan</span><span class="swatch-hex">#3592c4</span></div>
+      <div class="swatch"><div class="swatch-chip" style="background:#4b7bec"></div><span class="swatch-name">blue</span><span class="swatch-hex">#4b7bec</span></div>
+      <div class="swatch"><div class="swatch-chip" style="background:#6c71c4"></div><span class="swatch-name">indigo</span><span class="swatch-hex">#6c71c4</span></div>
+      <div class="swatch"><div class="swatch-chip" style="background:#9876aa"></div><span class="swatch-name">violet</span><span class="swatch-hex">#9876aa</span></div>
+      <div class="swatch"><div class="swatch-chip" style="background:#c066b0"></div><span class="swatch-name">magenta</span><span class="swatch-hex">#c066b0</span></div>
+      <div class="swatch"><div class="swatch-chip" style="background:#6e7681"></div><span class="swatch-name">grey</span><span class="swatch-hex">#6e7681</span></div>
+    </div>
+
+    <div class="spec-label" style="margin:var(--s-6) 0 var(--s-3)">AFTER — oklch(0.72 0.09 h), normative</div>
+    <div style="display:grid; grid-template-columns:repeat(12, minmax(0,1fr)); gap:var(--s-3)">
+      <div class="swatch"><div class="swatch-chip" style="background:#d78e88"></div><span class="swatch-name">red</span><span class="swatch-hex">#d78e88</span></div>
+      <div class="swatch"><div class="swatch-chip" style="background:#d1966d"></div><span class="swatch-name">orange</span><span class="swatch-hex">#d1966d</span></div>
+      <div class="swatch"><div class="swatch-chip" style="background:#bca260"></div><span class="swatch-name">amber</span><span class="swatch-hex">#bca260</span></div>
+      <div class="swatch"><div class="swatch-chip" style="background:#9fad6b"></div><span class="swatch-name">olive</span><span class="swatch-hex">#9fad6b</span></div>
+      <div class="swatch"><div class="swatch-chip" style="background:#7db485"></div><span class="swatch-name">green</span><span class="swatch-hex">#7db485</span></div>
+      <div class="swatch"><div class="swatch-chip" style="background:#5fb7a5"></div><span class="swatch-name">teal</span><span class="swatch-hex">#5fb7a5</span></div>
+      <div class="swatch"><div class="swatch-chip" style="background:#58b4c4"></div><span class="swatch-name">cyan</span><span class="swatch-hex">#58b4c4</span></div>
+      <div class="swatch"><div class="swatch-chip" style="background:#7ba8dc"></div><span class="swatch-name">blue</span><span class="swatch-hex">#7ba8dc</span></div>
+      <div class="swatch"><div class="swatch-chip" style="background:#979fdd"></div><span class="swatch-name">indigo</span><span class="swatch-hex">#979fdd</span></div>
+      <div class="swatch"><div class="swatch-chip" style="background:#b296d2"></div><span class="swatch-name">violet</span><span class="swatch-hex">#b296d2</span></div>
+      <div class="swatch"><div class="swatch-chip" style="background:#cb8eb6"></div><span class="swatch-name">magenta</span><span class="swatch-hex">#cb8eb6</span></div>
+      <div class="swatch"><div class="swatch-chip" style="background:#9fa5ac"></div><span class="swatch-name">grey</span><span class="swatch-hex">#9fa5ac</span></div>
+    </div>
+
+    <p class="rule" style="margin:var(--s-5) 0 0">
+      <b>No colour is the default.</b> A new connection has none, and most stay that way; colour is
+      what you reach for when two of the twelve look alike enough to be dangerous. The rail slot is
+      always 2px whether or not it is painted, so a coloured and an uncoloured connection align to the
+      same pixel and nothing shifts when one is assigned.
+    </p>
+    <p class="rule" style="margin:var(--s-4) 0 0">
+      <b>Where it is allowed to appear.</b> The group rail in the tree, the rail on a tab, the rail
+      capping the primary toolbar — so the colour is present in the view you are actually working in, not
+      only in the chrome you selected from — the dot before the connection name in a view header, and the
+      dot on an operations row. Not the top of the editor panel: the tab strip holds tabs from several
+      connections at once, and a rail above it would colour the panel for whichever one is in front. Nowhere else: not a panel background, not text, not a border.
+      There is <b>one</b> palette and no intensity setting; twelve hues already share a lightness and a
+      chroma, so there is nothing left to turn up or down.
+    </p>
+  </div>
+
+  <!-- ========== 3. TYPE ========== -->
+  <div class="sec">
+    <div class="sec-head">
+      <span class="sec-num">03</span>
+      <span class="sec-title">Type</span>
+      <span class="sec-note">new — replaces 6 unrelated sizes (9 / 10 / 11 / 12 / 13 / 14px)</span>
+    </div>
+    <p class="rule">
+      <b>Two roles.</b> Chrome — tree, tabs, toolbars, status bar, dialogs — is set in the UI face.
+      Data — grid cells, values, identifiers, editors, durations — is set in mono. The app currently
+      sets <i>everything</i> in SF Mono, including buttons and labels; that is the single largest reason
+      it does not read as a designed product.
+    </p>
+    <div style="display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:32px">
+      <div>
+        <div class="spec-label" style="margin-bottom:var(--s-3)">UI — <span style="text-transform:none">-apple-system / SF Pro Text</span></div>
+        <div class="ladder">
+          <div class="ladder-row"><span class="ladder-key">t-lg 13</span><span style="font-size:13px; font-weight:600">Connection settings</span><span class="ladder-use" style="margin-left:auto">titles</span></div>
+          <div class="ladder-row"><span class="ladder-key">t-md 12</span><span style="font-size:12px">public.customers</span><span class="ladder-use" style="margin-left:auto">content, tree</span></div>
+          <div class="ladder-row"><span class="ladder-key">t-sm 11</span><span style="font-size:11px; color:var(--fg-muted)">Refresh · Filter · Columns</span><span class="ladder-use" style="margin-left:auto">chrome controls</span></div>
+          <div class="ladder-row"><span class="ladder-key">t-xs 10</span><span style="font-size:10px; color:var(--fg-muted)">12 tables</span><span class="ladder-use" style="margin-left:auto">metadata</span></div>
+        </div>
+      </div>
+      <div>
+        <div class="spec-label" style="margin-bottom:var(--s-3)">DATA — <span style="text-transform:none">SF Mono</span></div>
+        <div class="ladder">
+          <div class="ladder-row"><span class="ladder-key">t-md 12</span><span class="mono" style="font-size:12px">a3f9c1e4-77b2</span><span class="ladder-use" style="margin-left:auto">cell values</span></div>
+          <div class="ladder-row"><span class="ladder-key">t-md 12</span><span class="mono" style="font-size:12px; color:var(--fg-disabled)">NULL</span><span class="ladder-use" style="margin-left:auto">null / empty</span></div>
+          <div class="ladder-row"><span class="ladder-key">t-sm 11</span><span class="mono" style="font-size:11px; color:var(--fg-muted)">SELECT * FROM orders</span><span class="ladder-use" style="margin-left:auto">queries, logs</span></div>
+          <div class="ladder-row"><span class="ladder-key">t-xs 10</span><span class="mono" style="font-size:10px; color:var(--fg-muted)">uuid · 412 ms</span><span class="ladder-use" style="margin-left:auto">types, timings</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== 4. SPACE ========== -->
+  <div class="sec">
+    <div class="sec-head">
+      <span class="sec-num">04</span>
+      <span class="sec-title">Space</span>
+      <span class="sec-note">new — replaces ~19 ad-hoc padding pairs</span>
+    </div>
+    <p class="rule"><b>Six steps, and a rule for each.</b> A padding value that is not on this list is a bug.</p>
+    <div class="ladder">
+      <div class="ladder-row"><span class="ladder-key">s-1  2px</span><div class="ladder-bar" style="width:2px"></div><span class="ladder-use">hairline separation — adjacent tabs, segmented dividers</span></div>
+      <div class="ladder-row"><span class="ladder-key">s-2  4px</span><div class="ladder-bar" style="width:4px"></div><span class="ladder-use">inside a control — icon to its label</span></div>
+      <div class="ladder-row"><span class="ladder-key">s-3  6px</span><div class="ladder-bar" style="width:6px"></div><span class="ladder-use">between sibling controls; horizontal padding of a small control</span></div>
+      <div class="ladder-row"><span class="ladder-key">s-4  8px</span><div class="ladder-bar" style="width:8px"></div><span class="ladder-use">between control groups; panel padding; grid cell padding</span></div>
+      <div class="ladder-row"><span class="ladder-key">s-5 12px</span><div class="ladder-bar" style="width:12px"></div><span class="ladder-use">between sections within a panel; dialog button padding</span></div>
+      <div class="ladder-row"><span class="ladder-key">s-6 16px</span><div class="ladder-bar" style="width:16px"></div><span class="ladder-use">dialog padding; page gutters</span></div>
+    </div>
+  </div>
+
+  <!-- ========== 5. SIZE ========== -->
+  <div class="sec">
+    <div class="sec-head">
+      <span class="sec-num">05</span>
+      <span class="sec-title">Size</span>
+      <span class="sec-note">new — replaces 18 / 20 / 22 / 24 / 26 / 28 / 32px used interchangeably</span>
+    </div>
+    <p class="rule"><b>Five heights.</b> A control picks one; it never invents a sixth. Icons always sit in a <span class="mono" style="color:var(--info)">16px</span> box regardless of the control's height, so glyphs line up across every surface.</p>
+    <div style="display:flex; align-items:flex-end; gap:var(--s-5); flex-wrap:wrap">
+      <div class="spec" style="width:auto"><span class="spec-label">h-xs · 18</span><div class="stage" style="min-height:0"><span class="p-chip" style="background:rgba(35,209,139,0.15); color:var(--ok)"><svg class="icon" style="width:8px;height:8px"><use href="#i-dot"/></svg>connected</span><span class="p-count">12</span></div></div>
+      <div class="spec" style="width:auto"><span class="spec-label">h-sm · 22</span><div class="stage" style="min-height:0"><button class="p-btn is-hover"><span class="icon-box"><svg class="icon"><use href="#i-refresh"/></svg></span>Refresh</button><button class="p-iconbtn"><svg class="icon"><use href="#i-columns"/></svg></button></div></div>
+      <div class="spec" style="width:auto"><span class="spec-label">h-md · 26</span><div class="stage" style="min-height:0"><span class="p-input" style="width:150px"><span>orders</span></span></div></div>
+      <div class="spec" style="width:auto"><span class="spec-label">h-lg · 30</span><div class="stage" style="min-height:0"><button class="p-dlgbtn primary">Connect</button><button class="p-dlgbtn">Cancel</button></div></div>
+      <div class="spec" style="width:auto"><span class="spec-label">h-row · 22 / 26</span><div class="stage" style="min-height:0; flex-direction:column; align-items:stretch; gap:0; width:180px"><div class="p-row is-selected"><span class="icon-box" style="color:var(--info)"><svg class="icon"><use href="#i-table"/></svg></span>customers</div><div class="p-row"><span class="icon-box" style="color:var(--info)"><svg class="icon"><use href="#i-table"/></svg></span>orders</div></div></div>
+    </div>
+  </div>
+
+  <!-- ========== 6. SHAPE ========== -->
+  <div class="sec">
+    <div class="sec-head">
+      <span class="sec-num">06</span>
+      <span class="sec-title">Shape</span>
+      <span class="sec-note">unchanged — already tokenised (96% of radii use a token)</span>
+    </div>
+    <div style="display:flex; gap:var(--s-5); flex-wrap:wrap">
+      <div class="spec" style="width:auto"><span class="spec-label">r-sm · 4</span><div style="width:120px; height:52px; background:var(--bg-input); border:var(--bw) solid var(--border-strong); border-radius:4px"></div><span class="ladder-use">controls</span></div>
+      <div class="spec" style="width:auto"><span class="spec-label">r · 6</span><div style="width:120px; height:52px; background:var(--bg); border:var(--bw) solid var(--border); border-radius:6px"></div><span class="ladder-use">panel surfaces</span></div>
+      <div class="spec" style="width:auto"><span class="spec-label">r-lg · 8</span><div style="width:120px; height:52px; background:var(--bg-elevated); border:var(--bw) solid var(--border-strong); border-radius:8px"></div><span class="ladder-use">dialogs</span></div>
+      <div class="spec" style="width:auto"><span class="spec-label">r-pill · 10</span><div style="width:120px; height:52px; background:var(--bg-input); border:var(--bw) solid var(--border-strong); border-radius:10px"></div><span class="ladder-use">status chips</span></div>
+    </div>
+  </div>
+
+  <!-- ========== 7. ENGINE MARKS ========== -->
+  <div class="sec">
+    <div class="sec-head">
+      <span class="sec-num">07</span>
+      <span class="sec-title">Engine marks</span>
+      <span class="sec-note">eight — drawn here, not vendored</span>
+    </div>
+    <p class="rule">
+      These are <b>our own redrawings</b> of each engine's mark, not the official brand assets: one 16px viewBox,
+      one <code>currentColor</code> path each, no fills or gradients, so an engine mark obeys law 02 and takes the
+      connection colour like any other icon. Holes — Slonik's eye, the sea lion's eye, the leaf's midrib — are cut
+      with <code>fill-rule="evenodd"</code> rather than painted in the background colour, so they stay right on a
+      hovered or selected row. Shipping the real trademarked marks instead is a licensing decision, not a design one;
+      if that decision is made, these are drop-in replacements at the same size and weight.
+    </p>
+    <div style="display:flex; gap:var(--s-5); flex-wrap:wrap">
+      <div class="spec" style="width:auto"><span class="spec-label">PostgreSQL</span><div class="stage" style="gap:var(--s-5); align-items:center"><svg viewBox="0 0 16 16" width="13" height="13"><use href="#i-postgres"/></svg><svg viewBox="0 0 16 16" width="16" height="16"><use href="#i-postgres"/></svg><svg viewBox="0 0 16 16" width="28" height="28"><use href="#i-postgres"/></svg></div></div><div class="spec" style="width:auto"><span class="spec-label">MariaDB · MySQL</span><div class="stage" style="gap:var(--s-5); align-items:center"><svg viewBox="0 0 16 16" width="13" height="13"><use href="#i-mariadb"/></svg><svg viewBox="0 0 16 16" width="16" height="16"><use href="#i-mariadb"/></svg><svg viewBox="0 0 16 16" width="28" height="28"><use href="#i-mariadb"/></svg></div></div><div class="spec" style="width:auto"><span class="spec-label">MongoDB</span><div class="stage" style="gap:var(--s-5); align-items:center"><svg viewBox="0 0 16 16" width="13" height="13"><use href="#i-mongodb"/></svg><svg viewBox="0 0 16 16" width="16" height="16"><use href="#i-mongodb"/></svg><svg viewBox="0 0 16 16" width="28" height="28"><use href="#i-mongodb"/></svg></div></div><div class="spec" style="width:auto"><span class="spec-label">Redis</span><div class="stage" style="gap:var(--s-5); align-items:center"><svg viewBox="0 0 16 16" width="13" height="13"><use href="#i-redis"/></svg><svg viewBox="0 0 16 16" width="16" height="16"><use href="#i-redis"/></svg><svg viewBox="0 0 16 16" width="28" height="28"><use href="#i-redis"/></svg></div></div><div class="spec" style="width:auto"><span class="spec-label">Kafka</span><div class="stage" style="gap:var(--s-5); align-items:center"><svg viewBox="0 0 16 16" width="13" height="13"><use href="#i-kafka"/></svg><svg viewBox="0 0 16 16" width="16" height="16"><use href="#i-kafka"/></svg><svg viewBox="0 0 16 16" width="28" height="28"><use href="#i-kafka"/></svg></div></div><div class="spec" style="width:auto"><span class="spec-label">Amazon SQS</span><div class="stage" style="gap:var(--s-5); align-items:center"><svg viewBox="0 0 16 16" width="13" height="13"><use href="#i-sqs"/></svg><svg viewBox="0 0 16 16" width="16" height="16"><use href="#i-sqs"/></svg><svg viewBox="0 0 16 16" width="28" height="28"><use href="#i-sqs"/></svg></div></div><div class="spec" style="width:auto"><span class="spec-label">Amazon S3</span><div class="stage" style="gap:var(--s-5); align-items:center"><svg viewBox="0 0 16 16" width="13" height="13"><use href="#i-s3"/></svg><svg viewBox="0 0 16 16" width="16" height="16"><use href="#i-s3"/></svg><svg viewBox="0 0 16 16" width="28" height="28"><use href="#i-s3"/></svg></div></div><div class="spec" style="width:auto"><span class="spec-label">ClickHouse</span><div class="stage" style="gap:var(--s-5); align-items:center"><svg viewBox="0 0 16 16" width="13" height="13"><use href="#i-clickhouse"/></svg><svg viewBox="0 0 16 16" width="16" height="16"><use href="#i-clickhouse"/></svg><svg viewBox="0 0 16 16" width="28" height="28"><use href="#i-clickhouse"/></svg></div></div>
+    </div>
+  </div>
+
+  <!-- ========== 7. PRIMITIVES ========== -->
+  <div class="sec">
+    <div class="sec-head">
+      <span class="sec-num">08</span>
+      <span class="sec-title">Primitives</span>
+      <span class="sec-note">thirteen — every screen is built from these and nothing else</span>
+    </div>
+    <p class="rule">
+      Today <span class="mono" style="color:var(--info)">.icon-button</span> is defined independently in three files and
+      there are eight different button class names. Each primitive below is defined <b>once</b>; components consume it and
+      never restate its height, padding or hover.
+    </p>
+
+    <div style="display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:var(--s-6) 32px">
+
+      <!-- P1 -->
+      <div class="spec">
+        <span class="spec-label">P1 · icon button — h-sm</span>
+        <div class="stage">
+          <button class="p-iconbtn"><svg class="icon"><use href="#i-refresh"/></svg></button>
+          <button class="p-iconbtn is-hover"><svg class="icon"><use href="#i-refresh"/></svg></button>
+          <button class="p-iconbtn is-active"><svg class="icon"><use href="#i-refresh"/></svg></button>
+          <button class="p-iconbtn is-focus"><svg class="icon"><use href="#i-refresh"/></svg></button>
+          <button class="p-iconbtn is-disabled"><svg class="icon"><use href="#i-refresh"/></svg></button>
+          <span class="ladder-use" style="margin-left:auto">rest · hover · pressed · focus · disabled</span>
+        </div>
+      </div>
+
+      <!-- P2 -->
+      <div class="spec">
+        <span class="spec-label">P2 · toolbar button — h-sm</span>
+        <div class="stage">
+          <button class="p-btn"><span class="icon-box"><svg class="icon"><use href="#i-filter"/></svg></span>Filter</button>
+          <button class="p-btn is-hover"><span class="icon-box"><svg class="icon"><use href="#i-filter"/></svg></span>Filter</button>
+          <button class="p-btn is-active"><span class="icon-box"><svg class="icon"><use href="#i-filter"/></svg></span>Filter</button>
+          <button class="p-btn is-disabled"><span class="icon-box"><svg class="icon"><use href="#i-filter"/></svg></span>Filter</button>
+        </div>
+      </div>
+
+      <!-- P3 -->
+      <div class="spec">
+        <span class="spec-label">P3 · dialog button — h-md</span>
+        <div class="stage">
+          <button class="p-dlgbtn primary">Connect</button>
+          <button class="p-dlgbtn primary is-hover">Connect</button>
+          <button class="p-dlgbtn">Cancel</button>
+          <button class="p-dlgbtn is-disabled">Test</button>
+        </div>
+      </div>
+
+      <!-- P4 -->
+      <div class="spec">
+        <span class="spec-label">P4 · input — h-md</span>
+        <div class="stage" style="flex-wrap:wrap">
+          <span class="p-input" style="width:112px">5432</span>
+          <span class="p-input is-placeholder" style="width:112px">hostname</span>
+          <span class="p-input is-focus" style="width:112px">localhost</span>
+          <span class="p-input is-error" style="width:112px">-1</span>
+        </div>
+      </div>
+
+      <!-- P5 -->
+      <div class="spec">
+        <span class="spec-label">P5 · select — h-sm</span>
+        <div class="stage">
+          <span class="p-select">200 rows<span class="icon-box"><svg class="icon"><use href="#i-chevron-down"/></svg></span></span>
+          <span class="p-select is-hover">200 rows<span class="icon-box"><svg class="icon"><use href="#i-chevron-down"/></svg></span></span>
+          <span class="p-select is-open">200 rows<span class="icon-box"><svg class="icon"><use href="#i-chevron-down"/></svg></span></span>
+        </div>
+      </div>
+
+      <!-- P6 -->
+      <div class="spec">
+        <span class="spec-label">P6 · segmented — h-sm</span>
+        <div class="stage">
+          <span class="p-seg"><span class="on">Grid</span><span>JSON</span><span>Text</span></span>
+          <span class="p-seg"><span>Grid</span><span class="on">JSON</span><span>Text</span></span>
+        </div>
+      </div>
+
+      <!-- P7 -->
+      <div class="spec">
+        <span class="spec-label">P7 · tab — h-md</span>
+        <div class="stage" style="gap:var(--s-1)">
+          <span class="p-tab is-active"><span class="kind" style="background:#c75450"></span>orders<span class="icon-box" style="opacity:.6"><svg class="icon"><use href="#i-close"/></svg></span></span>
+          <span class="p-tab is-hover"><span class="kind" style="background:#c75450"></span>customers</span>
+          <span class="p-tab"><span class="kind" style="background:#9876aa"></span>sessions</span>
+        </div>
+      </div>
+
+      <!-- P8 -->
+      <div class="spec">
+        <span class="spec-label">P8 · list row — h-row</span>
+        <div class="stage" style="flex-direction:column; align-items:stretch; gap:0">
+          <div class="p-row"><span class="icon-box" style="color:var(--info)"><svg class="icon"><use href="#i-table"/></svg></span>customers</div>
+          <div class="p-row is-hover"><span class="icon-box" style="color:var(--info)"><svg class="icon"><use href="#i-table"/></svg></span>orders</div>
+          <div class="p-row is-selected"><span class="icon-box" style="color:var(--info)"><svg class="icon"><use href="#i-table"/></svg></span>order_items</div>
+          <div class="p-row is-disabled"><span class="icon-box"><svg class="icon"><use href="#i-table"/></svg></span>archived_2019</div>
+        </div>
+      </div>
+
+      <!-- P9 -->
+      <div class="spec">
+        <span class="spec-label">P9 · badge · count · status chip — h-xs</span>
+        <div class="stage">
+          <span class="p-badge">uuid</span>
+          <span class="p-badge">timestamptz</span>
+          <span class="p-count">12</span>
+          <span class="p-chip" style="background:rgba(35,209,139,0.15); color:var(--ok)"><svg class="icon" style="width:8px;height:8px"><use href="#i-dot"/></svg>connected</span>
+          <span class="p-chip" style="background:rgba(241,76,76,0.15); color:var(--error)"><svg class="icon" style="width:8px;height:8px"><use href="#i-dot"/></svg>failed</span>
+        </div>
+      </div>
+
+      <!-- P10 -->
+      <div class="spec">
+        <span class="spec-label">P10 · status bar item — h-xs</span>
+        <div class="stage" style="background:var(--bg-chrome)">
+          <span class="p-status"><span class="icon-box"><svg class="icon"><use href="#i-sidebar"/></svg></span>Project</span>
+          <span class="p-status is-on"><span class="icon-box"><svg class="icon"><use href="#i-panel"/></svg></span>Operations</span>
+          <span class="p-status is-hover"><span class="icon-box"><svg class="icon"><use href="#i-panel"/></svg></span>Cell editor</span>
+        </div>
+      </div>
+
+      <!-- P11 -->
+      <div class="spec">
+        <span class="spec-label">P11 · menu item — h-row</span>
+        <div class="stage" style="background:var(--bg-elevated); border-radius:var(--r-lg); flex-direction:column; align-items:stretch; gap:0; width:100%">
+          <div class="p-menu is-hover"><span class="icon-box"><svg class="icon"><use href="#i-copy"/></svg></span>Copy cell<span class="kbd">⌘C</span></div>
+          <div class="p-menu"><span class="icon-box"><svg class="icon"><use href="#i-refresh"/></svg></span>Reload table<span class="kbd">⌘R</span></div>
+          <div class="p-menu" style="color:var(--error)"><span class="icon-box"><svg class="icon"><use href="#i-trash"/></svg></span>Delete row<span class="kbd">⌘⌫</span></div>
+        </div>
+      </div>
+
+      <!-- P12 -->
+      <div class="spec">
+        <span class="spec-label">P12 · panel surface — r · 6</span>
+        <div class="stage" style="padding:var(--s-4)">
+          <div class="p-panel" style="width:100%">
+            <div class="p-panel-head"><span>Operations</span><span class="p-count" style="margin-left:auto">3</span></div>
+            <div class="p-panel-body">
+              <div class="p-row"><span class="icon-box" style="color:var(--ok)"><svg class="icon"><use href="#i-dot"/></svg></span><span class="mono" style="font-size:11px">SELECT * FROM orders</span><span class="mono" style="font-size:10px; color:var(--fg-disabled); margin-left:auto">412 ms</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- P13 -->
+      <div class="spec">
+        <span class="spec-label">P13 · run state — 11px ring + elapsed</span>
+        <div class="stage">
+          <span class="run-state"><span class="ring"></span>412 ms</span>
+          <span class="run-state is-running"><span class="ring"></span>1.8 s</span>
+          <span class="run-state is-error"><span class="ring"></span>failed</span>
+          <span class="ladder-use" style="margin-left:auto">idle · running · failed</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ========== 9. LAWS ========== -->
+  <div class="sec">
+    <div class="sec-head">
+      <span class="sec-num">09</span>
+      <span class="sec-title">Composition laws</span>
+      <span class="sec-note">sixteen — what makes two unrelated screens look like one app</span>
+    </div>
+    <ol class="lawlist">
+      <li class="law"><span class="law-n">01</span><span class="law-t"><b>A toolbar is 28px tall</b>, holds only <code>h-sm</code> controls, separates siblings by <code>s-3</code>, groups by <code>s-4</code>, and pads its ends by <code>s-4</code>. Every toolbar in the app — data, DDL, console, stream — is the same object.</span></li>
+      <li class="law"><span class="law-n">02</span><span class="law-t"><b>Every icon occupies a 16px box</b> with a 13px glyph inside it. Icons are never sized to their control; only the box's container changes.</span></li>
+      <li class="law"><span class="law-n">03</span><span class="law-t"><b>One border colour per role.</b> <code>border</code> outlines surfaces, <code>border-strong</code> outlines things you type into or press. Nothing else draws a border.</span></li>
+      <li class="law"><span class="law-n">04</span><span class="law-t"><b>Hover is <code>hover</code>, selection is <code>select</code>, pressed is <code>bg-input</code>.</b> No component invents its own hover tint or lightens a background by hand.</span></li>
+      <li class="law"><span class="law-n">05</span><span class="law-t"><b>Focus is always the same ring</b> — 1px <code>focus</code>, inset on filled controls, outset on buttons. It is never a colour change alone.</span></li>
+      <li class="law"><span class="law-n">06</span><span class="law-t"><b>Panels float on <code>bg-chrome</code>.</b> A panel is <code>bg</code> + 1px <code>border</code> + <code>r</code>, separated from its neighbours by <code>s-2</code>. No shadows anywhere in the workbench; shadows belong to dialogs and menus only.</span></li>
+      <li class="law"><span class="law-n">07</span><span class="law-t"><b>Connection colour is a 2px rail and a 5px dot, nothing else</b> — the tree group, the tab, the cap on the primary toolbar, the dot in a view header and on an operations row. It caps the toolbar rather than the panel because the tab strip above carries several connections at once. Never a background, never text, never a border. Most connections have no colour, and the rail slot stays reserved so nothing moves when one is set.</span></li>
+      <li class="law"><span class="law-n">08</span><span class="law-t"><b>Mono is for data.</b> If a string came out of a database — a value, an identifier, a query, a duration — it is mono. If the app wrote it, it is UI.</span></li>
+      <li class="law"><span class="law-n">09</span><span class="law-t"><b>Every editor opens with the same three rows</b> in the same order: a <code>view-head</code> naming the target, then the primary toolbar, then — where the view can be narrowed — the filter toolbar. Grid, documents, key/value, stream, console and DDL differ only in what sits inside those rows, never in the rows themselves.</span></li>
+      <li class="law"><span class="law-n">10</span><span class="law-t"><b>The left edge of a toolbar is fixed.</b> Refresh, then <b>Stop</b>, then the separator. Stop is always present — disabled when nothing is running, red-lit while it is — so the way to cancel is in the same place in every view rather than appearing only once work starts.</span></li>
+      <li class="law"><span class="law-n">11</span><span class="law-t"><b>Rows of data are one object.</b> <code>thead</code>/<code>th</code>/<code>tbody</code>/<code>tr</code>/<code>td</code> with <code>h-row</code> rows and mono cells serve the grid, key/value fields, stream messages and console results alike. A "different kind of data" is not a reason for a different table.</span></li>
+      <li class="law"><span class="law-n">12</span><span class="law-t"><b>Work in progress is a ring and an elapsed time, in the toolbar that started it.</b> A bar across the top of the view only said "something is happening"; the ring sits beside Refresh, Run or Poll, so it says <i>which</i> thing — and the number next to it is the only place a duration is reported. Idle keeps the same slot, as a still ring holding the last duration, so nothing reflows when work starts. The view never blanks.</span></li>
+      <li class="law"><span class="law-n">13</span><span class="law-t"><b>Three strips, one shape.</b> <code>strip err</code> for what failed, <code>strip warn</code> for what is about to be destructive, <code>strip note</code> for what the view is quietly doing. Each is 26px, sits directly under the toolbars, carries an icon, one sentence, and — when there is one — the action that resolves it. Errors never open a dialog.</span></li>
+      <li class="law"><span class="law-n">14</span><span class="law-t"><b>No custom title bar.</b> macOS draws it. The status bar is the app's only full-width chrome: on the left, one readout answering <i>where the caret is</i> — the selected cell, field, document or line — then cache and latency, then the panel toggles and settings as icon-only buttons behind a hairline. Row counts, pending edits, durations and read-only live in the toolbars, and are never repeated here; the editor status line was deleted for saying all of it twice.</span></li>
+      <li class="law"><span class="law-n">15</span><span class="law-t"><b>Empty is a state, not a blank.</b> Every empty region says what is missing and offers the one action that fills it — no tabs, no connections, no results and no matching rows all use the same centred object.</span></li>
+      <li class="law"><span class="law-n">16</span><span class="law-t"><b>Filter narrows the query; search walks what you already have.</b> The filter row is part of the view and cannot be closed — closing it hid the reason a table looked short. Search never issues a query: it walks the rows that are already fetched, and says so next to the field.</span></li>
+    </ol>
+  </div>
+
+</div>

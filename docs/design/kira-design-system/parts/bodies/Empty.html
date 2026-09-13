@@ -1,0 +1,57 @@
+<style>
+  .start { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; padding: var(--s-6); }
+  .start-inner { width: 560px; max-width: 100%; }
+  .start-title { font-size: 20px; font-weight: 500; color: var(--fg); letter-spacing: -0.01em; }
+  .start-sub { font-size: var(--t-lg); color: var(--fg-muted); margin-top: var(--s-3); }
+  .start-list { display: flex; flex-direction: column; }
+  .col-label { font-size: var(--t-sm); color: var(--fg-disabled); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: var(--s-3); }
+  .start-row { height: var(--h-md); display: flex; align-items: center; gap: var(--s-3); padding: 0 var(--s-3); border-radius: var(--r-sm); color: var(--fg); font-size: var(--t-md); cursor: pointer; }
+  .start-row:hover, .start-row.is-hover { background: var(--hover); }
+  .kbd { font-family: var(--font-mono); font-size: var(--t-xs); color: var(--fg-disabled); padding: 1px 5px; border: var(--bw) solid var(--border-strong); border-radius: 3px; }
+  .rail-dot { width: 2px; height: 13px; border-radius: 1px; flex-shrink: 0; }
+</style>
+<div class="app">
+  <div class="workbench">
+{{SIDEBAR}}
+    <div class="col">
+      <div class="p-panel editor">
+
+
+        <!-- With no tab open the strip is not hidden — it keeps its height and
+             shows the one control that still applies, so the layout does not
+             jump the moment the first tab appears. -->
+        <div class="tabstrip">
+          <span class="sm dim" style="padding-left:var(--s-2)">No tabs open</span>
+          <button class="p-iconbtn push" title="New console"><svg class="icon"><use href="#i-plus"/></svg></button>
+        </div>
+
+        <div class="start">
+          <div class="start-inner">
+            <div class="start-title">Kira Studio</div>
+            <div class="start-sub">Pick something from the tree on the left, or reopen one of these.</div>
+
+            <!-- Recent tables and nothing else. A start page that also lists every
+                 command duplicates the palette and the menus, and turns the one
+                 useful thing here — what you were last looking at — into a column. -->
+            <div class="col-label" style="margin-top:var(--s-6)">Recent tables</div>
+            <div class="start-list">
+              <div class="start-row is-hover"><span class="rail-dot" style="background:var(--conn-red)"></span><span class="icon-box" style="color:var(--info)"><svg class="icon"><use href="#i-table"/></svg></span><span>public.orders</span><span class="push xs dim">prod-analytics · 4 m ago</span></div>
+              <div class="start-row"><span class="rail-dot" style="background:var(--conn-red)"></span><span class="icon-box" style="color:var(--info)"><svg class="icon"><use href="#i-table"/></svg></span><span>public.customers</span><span class="push xs dim">prod-analytics · 1 h ago</span></div>
+              <div class="start-row"><span class="rail-dot" style="background:var(--conn-violet)"></span><span class="icon-box" style="color:var(--conn-violet)"><svg class="icon"><use href="#i-doc"/></svg></span><span>app.sessions</span><span class="push xs dim">staging-mongo · yesterday</span></div>
+              <div class="start-row"><span class="rail-dot" style="background:var(--conn-red)"></span><span class="icon-box" style="color:var(--info)"><svg class="icon"><use href="#i-table"/></svg></span><span>public.order_items</span><span class="push xs dim">prod-analytics · yesterday</span></div>
+              <!-- No colour is the default, so a recent row often has no rail at all.
+                   The row still lines up: the rail slot is always reserved. -->
+              <div class="start-row"><span class="rail-dot"></span><span class="icon-box" style="color:var(--info)"><svg class="icon"><use href="#i-table"/></svg></span><span>analytics.daily_revenue</span><span class="push xs dim">warehouse · yesterday</span></div>
+              <div class="start-row"><span class="rail-dot" style="background:var(--conn-violet)"></span><span class="icon-box" style="color:var(--conn-violet)"><svg class="icon"><use href="#i-doc"/></svg></span><span>app.accounts</span><span class="push xs dim">staging-mongo · 2 d ago</span></div>
+              <div class="start-row"><span class="rail-dot"></span><span class="icon-box" style="color:var(--info)"><svg class="icon"><use href="#i-table"/></svg></span><span>public.shipments</span><span class="push xs dim">warehouse · 3 d ago</span></div>
+              <div class="start-row"><span class="rail-dot" style="background:var(--conn-red)"></span><span class="icon-box" style="color:var(--info)"><svg class="icon"><use href="#i-table"/></svg></span><span>public.products</span><span class="push xs dim">prod-analytics · 4 d ago</span></div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+{{OPS}}
+    </div>
+  </div>
+{{STATUSBAR}}
+</div>

@@ -1,0 +1,96 @@
+<style>
+  .msg-body { font-family: var(--font-mono); font-size: var(--t-sm); color: var(--fg-muted); }
+</style>
+<div class="app">
+  <div class="workbench">
+{{SIDEBAR}}
+    <div class="col">
+      <div class="p-panel editor" style="--rail:var(--conn-amber)">
+
+
+        <div class="tabstrip">
+          <span class="p-tab"><span class="tab-rail" style="background:var(--conn-red)"></span><span class="icon-box" style="color:var(--info)"><svg class="icon"><use href="#i-table"/></svg></span><span class="tab-name"><span class="tab-schema">public.</span>orders</span></span>
+          <span class="p-tab is-active"><span class="tab-rail" style="background:var(--conn-amber)"></span><span class="icon-box" style="color:var(--conn-amber)"><svg class="icon"><use href="#i-stream"/></svg></span><span class="tab-name">order.shipped</span><span class="icon-box" style="opacity:.6"><svg class="icon"><use href="#i-close"/></svg></span></span>
+          <span class="p-tab"><span class="tab-rail" style="background:var(--conn-cyan)"></span><span class="icon-box" style="color:var(--conn-cyan)"><svg class="icon"><use href="#i-queue"/></svg></span><span class="tab-name">refunds-dlq</span></span>
+          <button class="p-iconbtn" style="margin-left:var(--s-2)"><svg class="icon"><use href="#i-plus"/></svg></button>
+        </div>
+
+        <div class="view-head">
+          <span class="conn-dot" style="--rail:var(--conn-amber)" title="Connection colour"></span>
+          <span class="icon-box" style="color:var(--conn-amber)"><svg class="icon"><use href="#i-stream"/></svg></span>
+          <span class="view-target"><span class="path">events-kafka / topics / </span>order.shipped</span>
+          <span class="p-badge">6 partitions</span>
+          <span class="p-badge">offset 48 210</span>
+          <span class="p-badge">lag 12</span>
+          <span class="p-badge">visibility 30 s</span>
+        </div>
+
+        <!-- LAW 07 — the connection's colour caps the toolbar, not the panel.
+             The tab strip carries tabs from several connections at once, so a
+             rail above it would be claiming the whole panel for one of them;
+             the toolbar belongs to the view in front of you and nothing else.
+             With no colour the slot is still 2px, so nothing shifts. -->
+        <div class="toolbar-rail"></div>
+        <div class="toolbar">
+          <div class="group">
+            <!-- Poll is the primary verb here, so it is a labelled button and not
+                 a bare refresh glyph — polling is not a free, repeatable read. -->
+            <button class="p-btn is-active"><span class="icon-box"><svg class="icon"><use href="#i-swap"/></svg></span>Poll</button>
+            <button class="p-iconbtn" title="Stop polling" style="color:var(--error)"><svg class="icon"><use href="#i-stop"/></svg></button>
+            <span class="run-state is-running" title="Polling"><span class="ring"></span>240 ms</span>
+          </div>
+          <div class="sep"></div>
+          <div class="group">
+            <span class="p-select">from: latest<span class="icon-box"><svg class="icon"><use href="#i-chevron-down"/></svg></span></span>
+            <span class="p-select">50 messages<span class="icon-box"><svg class="icon"><use href="#i-chevron-down"/></svg></span></span>
+            <span class="p-select">all partitions<span class="icon-box"><svg class="icon"><use href="#i-chevron-down"/></svg></span></span>
+          </div>
+          <div class="sep"></div>
+          <div class="group">
+            <span class="p-input ui" style="width:220px"><span class="icon-box"><svg class="icon"><use href="#i-search"/></svg></span><span class="ph">Search key or body</span></span>
+            <span class="p-seg"><span class="on">Body</span><span>Headers</span></span>
+          </div>
+          <div class="group push">
+            <span class="p-chip ok">polling · 3 s ago</span>
+          </div>
+        </div>
+
+        <!-- The one destructive truth of this view, stated once, at the top,
+             where it is read before the first Poll — not buried in a tooltip. -->
+        <div class="strip warn">
+          <span class="icon-box"><svg class="icon"><use href="#i-warning"/></svg></span>
+          <span>Each poll <b>consumes</b> messages from the queue for the length of the visibility timeout (30 s). This is not a stable browse position — a second poll returns different messages.</span>
+          <span class="strip-action"><button class="p-btn">What this means</button></span>
+        </div>
+
+        <div class="p-panel" style="flex:1; min-height:0; border:none; border-radius:0">
+          <div class="thead">
+            <div class="th gutter" style="width:44px"></div>
+            <div class="th" style="width:74px"><span class="name">part</span></div>
+            <div class="th" style="width:96px"><span class="name">offset</span></div>
+            <div class="th" style="width:180px"><span class="name">key</span></div>
+            <div class="th" style="width:176px"><span class="name">timestamp</span></div>
+            <div class="th" style="width:120px"><span class="name">headers</span></div>
+            <div class="th" style="flex:1"><span class="name">body</span><span class="p-badge">json</span></div>
+          </div>
+          <div class="tbody">
+            <div class="tr"><div class="td gutter" style="width:44px">1</div><div class="td num" style="width:74px">2</div><div class="td num" style="width:96px">48 210</div><div class="td" style="width:180px">ord_a3f9c1e4</div><div class="td" style="width:176px">08:14:02.331</div><div class="td muted" style="width:120px">trace-id +2</div><div class="td msg-body" style="flex:1">{"orderId":"a3f9c1e4","carrier":"DHL","eta":"2026-08-25"}</div></div>
+            <div class="tr"><div class="td gutter" style="width:44px">2</div><div class="td num" style="width:74px">0</div><div class="td num" style="width:96px">48 209</div><div class="td" style="width:180px">ord_b7c2d0a9</div><div class="td" style="width:176px">08:13:58.902</div><div class="td muted" style="width:120px">trace-id +2</div><div class="td msg-body" style="flex:1">{"orderId":"b7c2d0a9","carrier":"UPS","eta":"2026-08-24"}</div></div>
+            <div class="tr"><div class="td gutter" style="width:44px">3</div><div class="td num" style="width:74px">5</div><div class="td num" style="width:96px">48 208</div><div class="td null" style="width:180px">null</div><div class="td" style="width:176px">08:13:51.117</div><div class="td empty" style="width:120px"></div><div class="td msg-body" style="flex:1">{"orderId":"c9e1f207","carrier":"DPD","eta":"2026-08-26"}</div></div>
+            <div class="tr"><div class="td gutter" style="width:44px">4</div><div class="td num" style="width:74px">2</div><div class="td num" style="width:96px">48 207</div><div class="td" style="width:180px">ord_d40b8ac3</div><div class="td" style="width:176px">08:13:44.508</div><div class="td muted" style="width:120px">trace-id +3</div><div class="td msg-body" style="flex:1">{"orderId":"d40b8ac3","carrier":"DHL","eta":"2026-08-25","gift":true}</div></div>
+            <div class="tr"><div class="td gutter" style="width:44px">5</div><div class="td num" style="width:74px">1</div><div class="td num" style="width:96px">48 206</div><div class="td" style="width:180px">ord_e15c7bd1</div><div class="td" style="width:176px">08:13:39.774</div><div class="td muted" style="width:120px">trace-id +2</div><div class="td msg-body" style="flex:1">{"orderId":"e15c7bd1","carrier":"Royal Mail","eta":"2026-08-27"}</div></div>
+            <div class="tr"><div class="td gutter" style="width:44px">6</div><div class="td num" style="width:74px">3</div><div class="td num" style="width:96px">48 205</div><div class="td" style="width:180px">ord_f2a6e3c8</div><div class="td" style="width:176px">08:13:31.290</div><div class="td muted" style="width:120px">trace-id +2</div><div class="td msg-body" style="flex:1">{"orderId":"f2a6e3c8","carrier":"UPS","eta":"2026-08-24"}</div></div>
+            <div class="tr"><div class="td gutter" style="width:44px">7</div><div class="td num" style="width:74px">4</div><div class="td num" style="width:96px">48 204</div><div class="td" style="width:180px">ord_0b8d41fa</div><div class="td" style="width:176px">08:13:22.061</div><div class="td muted" style="width:120px">trace-id +4</div><div class="td msg-body" style="flex:1">{"orderId":"0b8d41fa","carrier":"DHL","eta":"2026-08-25","fragile":true}</div></div>
+            <div class="tr"><div class="td gutter" style="width:44px">8</div><div class="td num" style="width:74px">0</div><div class="td num" style="width:96px">48 203</div><div class="td" style="width:180px">ord_1c9e52ab</div><div class="td" style="width:176px">08:13:14.833</div><div class="td muted" style="width:120px">trace-id +2</div><div class="td msg-body" style="flex:1">{"orderId":"1c9e52ab","carrier":"DPD","eta":"2026-08-26"}</div></div>
+            <div class="tr"><div class="td gutter" style="width:44px">9</div><div class="td num" style="width:74px">5</div><div class="td num" style="width:96px">48 202</div><div class="td" style="width:180px">ord_2da063bc</div><div class="td" style="width:176px">08:13:05.412</div><div class="td muted" style="width:120px">trace-id +2</div><div class="td msg-body" style="flex:1">{"orderId":"2da063bc","carrier":"DHL","eta":"2026-08-25"}</div></div>
+            <div class="tr"><div class="td gutter" style="width:44px">10</div><div class="td num" style="width:74px">2</div><div class="td num" style="width:96px">48 201</div><div class="td" style="width:180px">ord_3eb174cd</div><div class="td" style="width:176px">08:12:57.940</div><div class="td muted" style="width:120px">trace-id +2</div><div class="td msg-body" style="flex:1">{"orderId":"3eb174cd","carrier":"UPS","eta":"2026-08-24"}</div></div>
+            <div class="tr"><div class="td gutter" style="width:44px">11</div><div class="td num" style="width:74px">1</div><div class="td num" style="width:96px">48 200</div><div class="td" style="width:180px">ord_4fc285de</div><div class="td" style="width:176px">08:12:49.106</div><div class="td muted" style="width:120px">trace-id +2</div><div class="td msg-body" style="flex:1">{"orderId":"4fc285de","carrier":"DPD","eta":"2026-08-26"}</div></div>
+            <div class="tr"><div class="td gutter" style="width:44px">12</div><div class="td num" style="width:74px">3</div><div class="td num" style="width:96px">48 199</div><div class="td" style="width:180px">ord_50d396ef</div><div class="td" style="width:176px">08:12:40.677</div><div class="td muted" style="width:120px">trace-id +3</div><div class="td msg-body" style="flex:1">{"orderId":"50d396ef","carrier":"DHL","eta":"2026-08-25"}</div></div>
+          </div>
+        </div>
+      </div>
+{{OPS}}
+    </div>
+  </div>
+{{STATUSBAR}}
+</div>

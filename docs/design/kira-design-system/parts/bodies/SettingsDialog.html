@@ -1,0 +1,92 @@
+<style>
+{{DLGCSS}}
+  .dlg-box { max-width: 780px; height: 100%; }
+  .set-body { flex: 1; min-height: 0; display: flex; }
+  .set-nav { width: 176px; flex-shrink: 0; border-right: var(--bw) solid var(--border); padding: var(--s-3) var(--s-2); display: flex; flex-direction: column; gap: 1px; }
+  .set-pane { flex: 1; min-width: 0; padding: var(--s-5); display: flex; flex-direction: column; gap: var(--s-5); overflow: hidden; }
+  .set-group { display: flex; flex-direction: column; gap: var(--s-4); }
+  .set-item { display: flex; align-items: flex-start; gap: var(--s-5); }
+  .set-item .lab { width: 168px; flex-shrink: 0; padding-top: 5px; }
+  .set-item .lab b { display: block; font-size: var(--t-md); color: var(--fg); font-weight: 400; }
+  .set-item .lab span { display: block; margin-top: 2px; }
+  .set-item .ctl { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--s-2); }
+  .preview { border: var(--bw) solid var(--border); border-radius: var(--r-sm); overflow: hidden; }
+</style>
+<div class="dlg">
+  <div class="dlg-box">
+    <div class="dlg-title"><span class="icon-box muted"><svg class="icon"><use href="#i-gear"/></svg></span><span>Settings</span><button class="p-iconbtn push"><svg class="icon"><use href="#i-close"/></svg></button></div>
+
+    <div class="set-body">
+      <div class="set-nav">
+        <span class="p-input ui" style="margin-bottom:var(--s-3)"><span class="icon-box"><svg class="icon"><use href="#i-search"/></svg></span><span class="ph">Search</span></span>
+        <span class="p-row is-selected"><span class="icon-box"><svg class="icon"><use href="#i-string"/></svg></span>Appearance</span>
+        <span class="p-row"><span class="icon-box"><svg class="icon"><use href="#i-table"/></svg></span>Data grid</span>
+        <span class="p-row"><span class="icon-box"><svg class="icon"><use href="#i-terminal"/></svg></span>Console</span>
+        <span class="p-row"><span class="icon-box"><svg class="icon"><use href="#i-db"/></svg></span>Connections</span>
+        <span class="p-row"><span class="icon-box"><svg class="icon"><use href="#i-checklist"/></svg></span>Operations</span>
+        <span class="p-row"><span class="icon-box"><svg class="icon"><use href="#i-lock"/></svg></span>Safety</span>
+        <span class="p-row"><span class="icon-box"><svg class="icon"><use href="#i-more"/></svg></span>Advanced</span>
+      </div>
+
+      <div class="set-pane">
+        <!-- Every setting reads as a sentence with its consequence underneath, so
+             nobody has to guess what "Row density: compact" costs them. -->
+        <div class="set-group">
+          <div class="sec-label" style="padding-top:0">Typography</div>
+          <div class="set-item">
+            <div class="lab"><b>Interface font</b><span class="help">Menus, toolbars, tree, labels.</span></div>
+            <div class="ctl"><span class="p-select bordered" style="justify-content:space-between">System (SF Pro Text)<span class="icon-box"><svg class="icon"><use href="#i-chevron-down"/></svg></span></span></div>
+          </div>
+          <div class="set-item">
+            <div class="lab"><b>Data font</b><span class="help">Grid cells, editors, anything that came out of a database.</span></div>
+            <div class="ctl"><span class="p-select bordered" style="justify-content:space-between">SF Mono<span class="icon-box"><svg class="icon"><use href="#i-chevron-down"/></svg></span></span></div>
+          </div>
+          <div class="set-item">
+            <div class="lab"><b>Data font size</b></div>
+            <div class="ctl" style="flex-direction:row; align-items:center; gap:var(--s-4)">
+              <span class="p-seg md"><span>–</span><span class="on" style="min-width:44px">12 px</span><span>+</span></span>
+              <span class="help">9–24 px</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="set-group">
+          <div class="sec-label">Density</div>
+          <div class="set-item">
+            <div class="lab"><b>Row height</b><span class="help">Applies to the tree, the grid and every list.</span></div>
+            <div class="ctl">
+              <span class="p-seg md" style="align-self:flex-start"><span class="on">Compact · 22 px</span><span>Comfortable · 28 px</span></span>
+              <div class="preview" style="margin-top:var(--s-2)">
+                <div class="thead"><div class="th gutter" style="width:36px"></div><div class="th" style="width:150px"><span class="name">id</span></div><div class="th" style="flex:1"><span class="name">email</span></div></div>
+                <div class="tr"><div class="td gutter" style="width:36px">1</div><div class="td" style="width:150px">c1d0-88ae</div><div class="td" style="flex:1">rowan.brooks@example.com</div></div>
+                <div class="tr"><div class="td gutter" style="width:36px">2</div><div class="td" style="width:150px">7f2b-19cd</div><div class="td" style="flex:1">amari.osei@example.com</div></div>
+                <div class="tr"><div class="td gutter" style="width:36px">3</div><div class="td" style="width:150px">2ba9-64d1</div><div class="td" style="flex:1">noa.lindqvist@example.com</div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="set-group">
+          <div class="sec-label">Connection colours</div>
+          <div class="set-item">
+            <!-- One palette, no intensity setting: twelve hues already sit at the same
+                 lightness and chroma, so there is nothing left to turn up or down.
+                 No colour is the default — a connection only gets one if you pick it. -->
+            <div class="lab"><b>Palette</b><span class="help">The twelve colours a connection can be given. Assigned per connection, in its dialog or from its context menu.</span></div>
+            <div class="ctl">
+              <div class="swatches">
+                <span class="sw none" title="No colour — the default"></span><span class="sw" style="background:var(--conn-red)"></span><span class="sw" style="background:var(--conn-orange)"></span><span class="sw" style="background:var(--conn-amber)"></span><span class="sw" style="background:var(--conn-olive)"></span><span class="sw" style="background:var(--conn-green)"></span><span class="sw" style="background:var(--conn-teal)"></span><span class="sw" style="background:var(--conn-cyan)"></span><span class="sw" style="background:var(--conn-blue)"></span><span class="sw" style="background:var(--conn-indigo)"></span><span class="sw" style="background:var(--conn-violet)"></span><span class="sw" style="background:var(--conn-magenta)"></span><span class="sw" style="background:var(--conn-grey)"></span>
+              </div>
+              <span class="help">Where it shows: the group rail in the tree, the rail on a tab, the cap on the view’s toolbar, and the dot on an operations row. Nowhere else.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="dlg-foot">
+      <span class="help">Stored in <span class="mono">~/.kira-studio/kira.sqlite</span> · changes apply immediately</span>
+      <span class="push" style="display:flex; gap:var(--s-3)"><button class="p-dlgbtn">Reset section</button><button class="p-dlgbtn primary">Done</button></span>
+    </div>
+  </div>
+</div>

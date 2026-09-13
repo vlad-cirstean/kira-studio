@@ -76,7 +76,6 @@ web_modules/
 
 # Next.js build output
 .next
-out
 
 # Nuxt.js build / generate output
 .nuxt
@@ -141,3 +140,28 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+
+# Playwright
+test-results/
+playwright-report/
+
+# macOS
+.DS_Store
+
+# Claude Code agent worktrees — isolated scratch checkouts for background
+# subagents (see .claude/worktrees/*), never repo content.
+.claude/
+
+# Design canvas — the seeded page is a 3 MB build product (it bundles the
+# canvas editor). Rebuild it with docs/design/kira-design-system/build.mjs
+# and the design skill's seed-canvas.mjs; the design itself lives in parts/.
+docs/design/*/[a-z]*-design-system.html
+
+# SQLite demo database — a build product of scripts/demo-dbs/sqlite/seed.ts,
+# regenerated on demand (P35 D36); the other seven engines' demo data lives
+# in containers instead, so this is the one on-disk artifact of the set.
+scripts/demo-dbs/sqlite/*.sqlite
+
+# flatc compiler, fetched on demand by scripts/generate-wire.sh (P11 D12) — the code it
+# generates is committed, the compiler itself is not.
+.tools/

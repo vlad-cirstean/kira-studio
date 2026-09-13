@@ -1,0 +1,160 @@
+{
+  "info": {
+    "name": "Every body mode",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "raw text",
+      "request": {
+        "method": "POST",
+        "url": "https://api.example.com/raw-text",
+        "body": {
+          "mode": "raw",
+          "raw": "plain <b>text</b> & more",
+          "options": { "raw": { "language": "text" } }
+        }
+      }
+    },
+    {
+      "name": "raw no language",
+      "request": {
+        "method": "POST",
+        "url": "https://api.example.com/raw-nolang",
+        "body": { "mode": "raw", "raw": "no options member at all" }
+      }
+    },
+    {
+      "name": "raw javascript",
+      "request": {
+        "method": "POST",
+        "url": "https://api.example.com/raw-js",
+        "body": {
+          "mode": "raw",
+          "raw": "const x = 1;",
+          "options": { "raw": { "language": "javascript" } }
+        }
+      }
+    },
+    {
+      "name": "raw json",
+      "request": {
+        "method": "POST",
+        "url": "https://api.example.com/raw-json",
+        "body": { "mode": "raw", "raw": "{\"a\":1}", "options": { "raw": { "language": "json" } } }
+      }
+    },
+    {
+      "name": "raw html",
+      "request": {
+        "method": "POST",
+        "url": "https://api.example.com/raw-html",
+        "body": { "mode": "raw", "raw": "<p>hi</p>", "options": { "raw": { "language": "html" } } }
+      }
+    },
+    {
+      "name": "raw xml",
+      "request": {
+        "method": "POST",
+        "url": "https://api.example.com/raw-xml",
+        "body": { "mode": "raw", "raw": "<root/>", "options": { "raw": { "language": "xml" } } }
+      }
+    },
+    {
+      "name": "raw unknown language",
+      "request": {
+        "method": "POST",
+        "url": "https://api.example.com/raw-unknown",
+        "body": { "mode": "raw", "raw": "SELECT 1", "options": { "raw": { "language": "sql" } } }
+      }
+    },
+    {
+      "name": "urlencoded",
+      "request": {
+        "method": "POST",
+        "url": "https://api.example.com/urlencoded",
+        "body": {
+          "mode": "urlencoded",
+          "urlencoded": [
+            { "key": "grant_type", "value": "password", "description": "the oauth grant" },
+            { "key": "scope", "value": "read", "disabled": true }
+          ]
+        }
+      }
+    },
+    {
+      "name": "formdata",
+      "request": {
+        "method": "POST",
+        "url": "https://api.example.com/formdata",
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "caption",
+              "value": "a text row",
+              "type": "text",
+              "description": "the caption"
+            },
+            { "key": "notype", "value": "type is absent, so text" },
+            {
+              "key": "single",
+              "type": "file",
+              "src": "/Users/someone/report.csv",
+              "contentType": "text/csv"
+            },
+            {
+              "key": "many",
+              "type": "file",
+              "src": ["/Users/someone/a.png", "/Users/someone/b.png"]
+            },
+            { "key": "none", "type": "file", "src": null }
+          ]
+        }
+      }
+    },
+    {
+      "name": "file with src",
+      "request": {
+        "method": "PUT",
+        "url": "https://api.example.com/file-src",
+        "body": { "mode": "file", "file": { "src": "payload.bin" } }
+      }
+    },
+    {
+      "name": "file with content only",
+      "request": {
+        "method": "PUT",
+        "url": "https://api.example.com/file-content",
+        "body": { "mode": "file", "file": { "src": null, "content": "aGVsbG8=" } }
+      }
+    },
+    {
+      "name": "graphql",
+      "request": {
+        "method": "POST",
+        "url": "https://api.example.com/graphql",
+        "body": {
+          "mode": "graphql",
+          "graphql": {
+            "query": "query Order($id: ID!) { order(id: $id) { id } }",
+            "variables": "{\"id\":\"42\"}",
+            "operationName": "Order"
+          }
+        }
+      }
+    },
+    {
+      "name": "disabled body",
+      "request": {
+        "method": "POST",
+        "url": "https://api.example.com/disabled-body",
+        "body": { "mode": "raw", "raw": "not sent by Postman", "disabled": true }
+      }
+    },
+    {
+      "name": "no body at all",
+      "request": { "method": "GET", "url": "https://api.example.com/no-body" }
+    }
+  ]
+}

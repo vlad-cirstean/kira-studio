@@ -1,0 +1,6 @@
+{
+  "info": {
+    "name": "Hand written, no schema member"
+  },
+  "item": [{ "name": "one", "request": { "method": "GET", "url": "https://api.example.com/one" } }]
+}

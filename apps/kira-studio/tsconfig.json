@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "paths": {
+      "@shared/*": ["../../packages/shared/*"],
+      "@bindings/*": [
+        "./frontend/bindings/github.com/kirathecat/kira-studio/apps/kira-studio/internal/bridge/*"
+      ],
+      "@bindings-internal/*": [
+        "./frontend/bindings/github.com/kirathecat/kira-studio/apps/kira-studio/internal/*"
+      ]
+    }
+  },
+  "files": [],
+  "references": [
+    { "path": "./frontend" },
+    { "path": "./tsconfig.tests.json" },
+    { "path": "./tests/unit" }
+  ]
+}

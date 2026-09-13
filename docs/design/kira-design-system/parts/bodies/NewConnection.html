@@ -1,0 +1,38 @@
+<style>
+{{KINDCSS}}
+  .kind-grid { grid-template-columns: repeat(3, 1fr); }
+  body { background: rgba(0,0,0,0.32); }
+  .dlg { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: var(--s-6); }
+  .dlg-box { width: 100%; max-width: 620px; background: var(--bg-elevated); border: var(--bw) solid var(--border-strong); border-radius: var(--r-lg); box-shadow: var(--shadow-float); display: flex; flex-direction: column; overflow: hidden; }
+  .dlg-title { height: var(--h-lg); flex-shrink: 0; display: flex; align-items: center; gap: var(--s-3); padding: 0 var(--s-4) 0 var(--s-5); border-bottom: var(--bw) solid var(--border); font-size: var(--t-lg); color: var(--fg); }
+  .dlg-body { padding: var(--s-5); display: flex; flex-direction: column; gap: var(--s-5); }
+  .dlg-foot { height: 46px; flex-shrink: 0; display: flex; align-items: center; gap: var(--s-3); padding: 0 var(--s-5); border-top: var(--bw) solid var(--border); }
+  .steps { display: flex; align-items: center; gap: var(--s-3); font-size: var(--t-sm); }
+  .step { display: flex; align-items: center; gap: var(--s-2); color: var(--fg-disabled); }
+  .step.on { color: var(--fg); }
+  .step .n { width: 16px; height: 16px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: var(--t-xs); background: var(--bg-input); color: var(--fg-muted); }
+  .step.on .n { background: var(--accent); color: var(--accent-fg); }
+</style>
+<div class="dlg">
+  <div class="dlg-box">
+    <div class="dlg-title">
+      <span class="icon-box muted"><svg class="icon"><use href="#i-plus"/></svg></span>
+      <span>New connection</span>
+      <!-- Step 1 of 2 is shown because the flow now HAS two steps: pick the
+           engine, then fill in only that engine's fields. -->
+      <span class="steps push"><span class="step on"><span class="n">1</span>Engine</span><span class="dim">›</span><span class="step"><span class="n">2</span>Details</span></span>
+      <button class="p-iconbtn" style="margin-left:var(--s-3)"><svg class="icon"><use href="#i-close"/></svg></button>
+    </div>
+    <div class="dlg-body">
+      <span class="p-input ui md is-focus"><span class="icon-box"><svg class="icon"><use href="#i-search"/></svg></span><span class="ph">Search engines</span></span>
+{{KINDS}}
+    </div>
+    <div class="dlg-foot">
+      <button class="p-dlgbtn"><span class="icon-box"><svg class="icon"><use href="#i-code"/></svg></span>Paste a URI</button>
+      <span class="push" style="display:flex; gap:var(--s-3)">
+        <button class="p-dlgbtn">Cancel</button>
+        <button class="p-dlgbtn primary">Continue<span class="icon-box"><svg class="icon"><use href="#i-chevron-right"/></svg></span></button>
+      </span>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Redacted fixture (P25 §4.3) — see dataSources.xml in this directory for citations. Adds a
+     local-only entry ("ghost") with no counterpart in dataSources.xml, to cover case 3: a source
+     present only in the local file must never produce a phantom row. -->
+<project version="4">
+  <component name="dataSourceStorageLocal" created-in="DB-243.22562.220">
+    <data-source name="pg-main" uuid="11111111-0000-0000-0000-000000000001">
+      <database-info product="PostgreSQL" version="" dbms="POSTGRES" exact-version="0">
+        <identifier-quote-string>&quot;</identifier-quote-string>
+      </database-info>
+      <case-sensitivity plain-identifiers="lower" quoted-identifiers="exact" />
+      <secret-storage>master_key</secret-storage>
+      <user-name>app</user-name>
+      <auth-provider>no-auth</auth-provider>
+    </data-source>
+    <data-source name="my-legacy" uuid="11111111-0000-0000-0000-000000000002">
+      <secret-storage>master_key</secret-storage>
+      <user-name>legacy_ro</user-name>
+    </data-source>
+    <data-source name="maria-orders" uuid="11111111-0000-0000-0000-000000000003">
+      <database-info product="MariaDB" version="" dbms="MARIADB" exact-version="0" />
+      <secret-storage>memory</secret-storage>
+      <user-name>orders</user-name>
+    </data-source>
+    <data-source name="app-coverage" uuid="11111111-0000-0000-0000-000000000004">
+      <database-info product="SQLite" version="" dbms="SQLITE" exact-version="0" />
+      <secret-storage>forget</secret-storage>
+    </data-source>
+    <data-source name="ch-events" uuid="11111111-0000-0000-0000-000000000005">
+      <secret-storage>master_key</secret-storage>
+      <user-name>events_writer</user-name>
+    </data-source>
+    <data-source name="mongo-catalog" uuid="11111111-0000-0000-0000-000000000006">
+      <database-info product="MongoDB" version="" dbms="MONGO" exact-version="0" />
+      <secret-storage>master_key</secret-storage>
+      <user-name>catalog</user-name>
+    </data-source>
+    <data-source name="ghost" uuid="11111111-0000-0000-0000-00000000dead">
+      <secret-storage>master_key</secret-storage>
+      <user-name>ghost</user-name>
+    </data-source>
+  </component>
+</project>

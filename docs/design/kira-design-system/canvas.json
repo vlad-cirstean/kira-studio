@@ -1,0 +1,36 @@
+{
+  "artboards": [
+    { "file": "System.dc.html", "x": 0, "y": 0, "w": 1280, "h": 2900, "title": "Design system — tokens, primitives, laws", "print": "flow" },
+
+    { "file": "Main.dc.html", "x": 0, "y": 3060, "w": 1440, "h": 900, "title": "Data grid — SQL table" },
+    { "file": "Empty.dc.html", "x": 1520, "y": 3060, "w": 1440, "h": 900, "title": "No tab open" },
+    { "file": "FirstRun.dc.html", "x": 3040, "y": 3060, "w": 1440, "h": 900, "title": "First run — no connections" },
+
+    { "file": "Documents.dc.html", "x": 0, "y": 4080, "w": 1440, "h": 900, "title": "Documents — MongoDB" },
+    { "file": "KeyValue.dc.html", "x": 1520, "y": 4080, "w": 1440, "h": 900, "title": "Key / value — Redis" },
+    { "file": "Stream.dc.html", "x": 3040, "y": 4080, "w": 1440, "h": 900, "title": "Stream — Kafka / SQS" },
+
+    { "file": "Console.dc.html", "x": 0, "y": 5100, "w": 1440, "h": 900, "title": "SQL console" },
+    { "file": "Ddl.dc.html", "x": 1520, "y": 5100, "w": 1440, "h": 900, "title": "DDL — read-only" },
+    { "file": "CellEditor.dc.html", "x": 3040, "y": 5100, "w": 1440, "h": 900, "title": "Cell editor panel" },
+
+    { "file": "NewConnection.dc.html", "x": 0, "y": 6120, "w": 900, "h": 620, "title": "New connection — step 1, pick an engine" },
+    { "file": "ConnectionDialog.dc.html", "x": 980, "y": 6120, "w": 900, "h": 760, "title": "New connection — step 2, PostgreSQL only" },
+    { "file": "SettingsDialog.dc.html", "x": 1960, "y": 6120, "w": 1000, "h": 680, "title": "Settings" },
+    { "file": "FiltersDialog.dc.html", "x": 3040, "y": 6120, "w": 900, "h": 480, "title": "Tree filters" },
+
+    { "file": "Toolbars.dc.html", "x": 0, "y": 7140, "w": 1280, "h": 1040, "title": "Toolbars — every band, every state", "print": "flow" },
+    { "file": "Menus.dc.html", "x": 1400, "y": 7140, "w": 1280, "h": 1511, "title": "Menus, palettes and popovers", "print": "flow" }
+  ],
+  "annotations": [
+    { "id": "note-brief", "x": 1400, "y": 0, "w": 300, "text": "The complaint was internal consistency, not direction: \"nothing looks the same between 2 things\". So the fix starts here — one type scale, one spacing scale, five control heights, thirteen primitives, sixteen laws. Every artboard on this canvas loads this exact stylesheet, so nothing on them can drift from it." },
+    { "id": "note-screens", "x": 1400, "y": 320, "w": 300, "text": "Read the screens as a set. The tab strip, view header, toolbar row, table and status bar are the same objects everywhere — only the verbs inside them change per engine. Every view reports its own progress in its own toolbar: a ring and an elapsed time next to the button that started the work." },
+    { "id": "note-nochrome", "x": 1400, "y": 620, "w": 300, "text": "No custom title bar — macOS draws it. Panel toggles moved to the right of the status bar next to Settings, icon-only, behind a hairline: things you toggle are never mixed with things you read." },
+    { "id": "note-stop", "x": 1400, "y": 900, "w": 300, "text": "Stop now sits immediately after Refresh in every view, always present — greyed when idle, red while running. Cancelling is in one place instead of appearing only once work starts." },
+    { "id": "note-colour", "x": 1400, "y": 1180, "w": 300, "text": "Connection colours were re-derived: oklch(0.72 0.09 h), eleven evenly-spaced hues plus a near-neutral grey. One lightness, one chroma — no connection can shout louder than another, and there is nothing to turn up or down. Most connections have none: no colour is the default, and the 2px rail slot stays reserved either way. The rail caps the view's toolbar, not the panel — the tab strip above it belongs to several connections at once. Section 02 shows before and after." },
+    { "id": "note-conn", "x": 4560, "y": 6120, "w": 300, "text": "Adding a connection is two steps now. Step 1 is a grid of engines with icons; step 2 is a dialog carrying only that engine's fields — no \"Kind\" dropdown, no fields belonging to another database." },
+    { "id": "note-empty", "x": 4560, "y": 3060, "w": 300, "text": "Two different empties. \"No tab open\" keeps the workbench and lists only the tables you had open recently — one column, nothing invented. \"First run\" has no tree to fall back on, so the engine picker is the page." },
+    { "id": "note-toolbars", "x": 2760, "y": 7140, "w": 300, "text": "The toolbar sheet is the proof: data, filter and search bands in every state, then the six view toolbars stacked so their identical left edge is visible at a glance. The filter row is permanent — Clear, never close — and search only ever walks the rows already fetched." }
+  ],
+  "launch": { "view": "canvas" }
+}

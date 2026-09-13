@@ -1,0 +1,14 @@
+        <div class="conn-group off" style="--rail:var(--conn-red)">
+          <div class="p-row"><span class="twist"><svg class="icon"><use href="#i-chevron-right"/></svg></span><span class="icon-box"><span class="state off"></span></span><span class="tree-label muted">prod-analytics</span><span class="p-badge push">postgres 16</span></div>
+        </div>
+        <div class="conn-group" style="--rail:var(--conn-amber)">
+          <div class="p-row"><span class="twist"><svg class="icon"><use href="#i-chevron-down"/></svg></span><span class="icon-box"><span class="state live"></span></span><span class="tree-label" style="font-weight:600">events-kafka</span><span class="p-badge push">kafka 3.7</span></div>
+          <div class="p-row" style="padding-left:22px"><span class="twist"><svg class="icon"><use href="#i-chevron-down"/></svg></span><span class="tree-label muted">Topics</span><span class="p-count push">17</span></div>
+          <div class="p-row" style="padding-left:38px"><span class="twist hidden"></span><span class="icon-box" style="color:var(--conn-amber)"><svg class="icon"><use href="#i-stream"/></svg></span><span class="tree-label">order.created</span></div>
+          <div class="p-row is-selected" style="padding-left:38px"><span class="twist hidden"></span><span class="icon-box" style="color:var(--conn-amber)"><svg class="icon"><use href="#i-stream"/></svg></span><span class="tree-label">order.shipped</span></div>
+          <div class="p-row" style="padding-left:38px"><span class="twist hidden"></span><span class="icon-box" style="color:var(--conn-amber)"><svg class="icon"><use href="#i-stream"/></svg></span><span class="tree-label">payment.settled</span></div>
+          <div class="p-row" style="padding-left:22px"><span class="twist"><svg class="icon"><use href="#i-chevron-right"/></svg></span><span class="tree-label muted">Consumer groups</span><span class="p-count push">4</span></div>
+        </div>
+        <div class="conn-group off" style="--rail:var(--conn-cyan)">
+          <div class="p-row"><span class="twist"><svg class="icon"><use href="#i-chevron-right"/></svg></span><span class="icon-box"><span class="state off"></span></span><span class="tree-label muted">eu-west-1 queues</span><span class="p-badge push">sqs</span></div>
+        </div>

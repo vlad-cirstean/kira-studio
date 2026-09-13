@@ -1,0 +1,109 @@
+<div class="app">
+  <div class="workbench">
+{{SIDEBAR}}
+    <div class="col">
+      <div class="p-panel editor" style="--rail:var(--conn-red)">
+
+
+        <div class="tabstrip">
+          <span class="p-tab is-active"><span class="tab-rail" style="background:var(--conn-red)"></span><span class="icon-box" style="color:var(--info)"><svg class="icon"><use href="#i-table"/></svg></span><span class="tab-name"><span class="tab-schema">public.</span>orders</span><span class="icon-box" style="opacity:.6"><svg class="icon"><use href="#i-close"/></svg></span></span>
+          <span class="p-tab"><span class="tab-rail" style="background:var(--conn-red)"></span><span class="icon-box" style="color:var(--info)"><svg class="icon"><use href="#i-table"/></svg></span><span class="tab-name"><span class="tab-schema">public.</span>customers</span></span>
+          <span class="p-tab"><span class="tab-rail" style="background:var(--conn-red)"></span><span class="icon-box"><svg class="icon"><use href="#i-code"/></svg></span><span class="tab-name">orders DDL</span></span>
+          <span class="p-tab"><span class="tab-rail" style="background:var(--conn-violet)"></span><span class="icon-box"><svg class="icon"><use href="#i-doc"/></svg></span><span class="tab-name">sessions</span></span>
+          <span class="p-tab"><span class="tab-rail" style="background:var(--conn-red)"></span><span class="icon-box"><svg class="icon"><use href="#i-terminal"/></svg></span><span class="tab-name">Console 1</span></span>
+          <button class="p-iconbtn" style="margin-left:var(--s-2)"><svg class="icon"><use href="#i-plus"/></svg></button>
+        </div>
+
+        <!-- ===== VIEW HEADER — LAW 09. The grid had no header row at all, so the
+             only place the connection was named was the tab rail's colour. It now
+             opens like every other view: who, what, and how big. ===== -->
+        <div class="view-head">
+          <span class="conn-dot" style="--rail:var(--conn-red)" title="Connection colour"></span>
+          <span class="icon-box" style="color:var(--info)"><svg class="icon"><use href="#i-table"/></svg></span>
+          <span class="view-target"><span class="path">prod-analytics / analytics / public / </span>orders</span>
+          <span class="p-badge">table</span>
+          <span class="p-badge">9 412 rows</span>
+          <span class="p-badge">11 columns</span>
+          <span class="p-badge">read-write</span>
+          <span class="p-chip push" style="background:var(--bg-input); color:var(--fg-muted)"><svg class="icon" style="width:11px;height:11px"><use href="#i-key"/></svg>primary key id</span>
+        </div>
+
+        <!-- ===== DATA TOOLBAR — LAW 01 ===== -->
+        <!-- LAW 07 — the connection's colour caps the toolbar, not the panel.
+             The tab strip carries tabs from several connections at once, so a
+             rail above it would be claiming the whole panel for one of them;
+             the toolbar belongs to the view in front of you and nothing else.
+             With no colour the slot is still 2px, so nothing shifts. -->
+        <div class="toolbar-rail"></div>
+        <div class="toolbar">
+          <div class="group">
+            <button class="p-iconbtn is-hover" title="Refresh"><svg class="icon"><use href="#i-refresh"/></svg></button>
+            <!-- FIX-10: Stop sits immediately after Refresh, in the same group, and is
+                 always present — greyed when nothing is running, red-lit while it is. -->
+            <button class="p-iconbtn is-disabled" title="Nothing running"><svg class="icon"><use href="#i-stop"/></svg></button>
+            <!-- LAW 12 — the ring and the elapsed time live beside the button that
+                 starts the work. Idle: a static ring holding the last duration. -->
+            <span class="run-state" title="Last fetch took 412 ms"><span class="ring"></span>412 ms</span>
+          </div>
+          <div class="sep"></div>
+          <!-- FIX-1: the pager states WHERE YOU ARE in absolute row terms. -->
+          <div class="group">
+            <button class="p-iconbtn is-disabled"><svg class="icon"><use href="#i-chev-ll"/></svg></button>
+            <button class="p-iconbtn is-disabled"><svg class="icon"><use href="#i-chev-l"/></svg></button>
+            <span class="mono sm">1–200</span>
+            <span class="sm dim">of</span>
+            <span class="mono sm muted">9 412</span>
+            <button class="p-iconbtn"><svg class="icon"><use href="#i-chev-r"/></svg></button>
+            <button class="p-iconbtn"><svg class="icon"><use href="#i-chev-rr"/></svg></button>
+            <span class="p-select">200 / page<span class="icon-box"><svg class="icon"><use href="#i-chevron-down"/></svg></span></span>
+          </div>
+          <div class="sep"></div>
+          <div class="group">
+            <button class="p-btn"><span class="icon-box"><svg class="icon"><use href="#i-columns"/></svg></span>Columns<span class="p-count">8 / 11</span></button>
+            <button class="p-btn"><span class="icon-box"><svg class="icon"><use href="#i-code"/></svg></span>Preview SQL</button>
+          </div>
+          <!-- FIX-3: pending edits stated as a count with both actions beside them.
+               Commit is the only accent-filled control on the whole screen. -->
+          <div class="group push">
+            <span class="p-chip warn">2 rows edited</span>
+            <button class="p-btn"><span class="icon-box"><svg class="icon"><use href="#i-undo"/></svg></span>Revert</button>
+            <button class="p-btn primary"><span class="icon-box"><svg class="icon"><use href="#i-save"/></svg></span>Commit</button>
+          </div>
+        </div>
+
+        <!-- ===== FILTER TOOLBAR — same 28px object, second row. Permanent: it has no
+             close button, so the row the grid depends on never disappears and the
+             layout never shifts under you. "Clear" empties it; nothing hides it. ===== -->
+        <div class="toolbar">
+          <button class="p-iconbtn" title="Saved &amp; recent filters"><svg class="icon"><use href="#i-history"/></svg></button>
+          <span class="p-input is-focus" style="flex:1; min-width:0"><span class="dim" style="font-family:var(--font-ui)">WHERE</span><span class="mono">status = 'paid' AND total &gt; 50</span></span>
+          <span class="p-input" style="width:230px"><span class="dim" style="font-family:var(--font-ui)">ORDER BY</span><span class="mono">placed_at DESC</span></span>
+          <span class="p-chip info" title="Sort came from clicking the placed_at header"><svg class="icon" style="width:11px;height:11px"><use href="#i-sort"/></svg>from header</span>
+          <button class="p-btn primary" style="height:var(--h-sm)">Apply</button>
+          <button class="p-btn" style="height:var(--h-sm)" title="Empty both fields and refetch">Clear</button>
+        </div>
+
+        <!-- ===== GRID ===== -->
+        <div class="p-panel" style="flex:1; min-height:0; border:none; border-radius:0">
+          <div class="thead">
+            <div class="th gutter" style="width:44px"></div>
+            <!-- FIX-8: keys are labelled PK / FK, never inferred from colour alone -->
+            <div class="th" style="width:196px"><span class="name">id</span><span class="key">PK</span><span class="p-badge">uuid</span></div>
+            <div class="th" style="width:186px"><span class="name">customer_id</span><span class="key">FK</span><span class="p-badge">uuid</span></div>
+            <div class="th" style="width:104px"><span class="name">status</span><span class="p-badge">text</span></div>
+            <div class="th" style="width:104px"><span class="name">total</span><span class="p-badge">numeric</span></div>
+            <div class="th" style="width:76px"><span class="name">currency</span></div>
+            <div class="th" style="width:186px"><span class="name">placed_at</span><span class="icon-box" style="color:var(--info)"><svg class="icon" style="width:11px;height:11px"><use href="#i-sort"/></svg></span><span class="p-badge">timestamptz</span></div>
+            <div class="th" style="width:150px"><span class="name">shipped_at</span></div>
+            <div class="th" style="flex:1"><span class="name">notes</span><span class="p-badge">text</span></div>
+          </div>
+          <div class="tbody">
+{{GRID_ROWS}}
+          </div>
+        </div>
+      </div>
+{{OPS}}
+    </div>
+  </div>
+{{STATUSBAR}}
+</div>

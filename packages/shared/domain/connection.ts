@@ -1,0 +1,186 @@
+import { z } from 'zod';
+import { capsSchema } from '../caps';
+import { PALETTE_COLOR_CHOICES, type PaletteColor, paletteColorSchema } from './color';
+
+export const connectionKindSchema = /*#__PURE__*/ z.enum([
+  'postgres',
+  'mariadb',
+  'mysql',
+  'sqlite',
+  'clickhouse',
+  'mongodb',
+  'redis',
+  'kafka',
+  'sqs',
+  's3',
+]); // all v1 kinds; every one has an adapter as of P36 (rabbitmq dropped, see P58 findings)
+export type ConnectionKind = z.infer<typeof connectionKindSchema>;
+
+// The connection dialog's default port per kind (D27's "kind-driven default port", not a
+// second hardcoded number per adapter). Kinds with no conventional default port are absent.
+export const DEFAULT_PORT: Partial<Record<ConnectionKind, number>> = {
+  postgres: 5432,
+  mariadb: 3306,
+  mysql: 3306,
+  // P36 D10: the HTTP interface, not the native protocol's 9000 — the only port the app's driver
+  // (@clickhouse/client, HTTP-only) can ever speak to.
+  clickhouse: 8123,
+  mongodb: 27017,
+  redis: 6379,
+  kafka: 9092,
+};
+
+// P16: the minimum server version each adapter's client library (and this app's own catalog SQL)
+// actually supports — the verified floor of the on-demand compatibility suite
+// (docs/v1.1/plans/P16-db-compat-suite.md §3), not a marketing claim. SQS/S3 have no server
+// version at all (AWS's APIs are versionless), so they have no entry.
+export const MIN_SERVER_VERSION: Partial<Record<ConnectionKind, string>> = {
+  postgres: 'Requires PostgreSQL 14 or newer.',
+  mariadb: 'Requires MariaDB 10.11 or newer.',
+  mysql: 'Requires MySQL 8.0 or newer.',
+  clickhouse: 'Requires ClickHouse 25.3 or newer.',
+  mongodb: 'Requires MongoDB 4.4 or newer.',
+  redis: 'Requires Redis 7.0 or newer.',
+  kafka: 'Requires Apache Kafka 3.4 or newer.',
+  sqlite: 'Reads any SQLite 3 database file — no server required.',
+};
+
+// P28 §5.3: 0 (unlimited) or 0.01-1000 commands/sec — a token-bucket rate, not a minimum
+// interval, so a user reacting to "keep it under N/s" types the same number the server told them.
+export const CONNECTION_THROTTLE_RANGE = { min: 0.01, max: 1000 } as const;
+
+// P18 D18: promoted to domain/color.ts as paletteColorSchema/PaletteColor/PALETTE_COLOR_CHOICES —
+// one palette *by construction* now that an environment's colour (this phase) draws from the same
+// set. These three names stay as aliases so nothing in Studio (or its call sites' comments) has to
+// change.
+export const connectionColorSchema = paletteColorSchema; // D18; matches --kira-conn-* in
+// tokens.css. 'none' is a real, stored value (the design system's own default — "no colour is the
+// default, the rail slot stays reserved either way") rather than the field being nullable, so no
+// DB/schema change is needed to add it.
+export type ConnectionColor = PaletteColor;
+
+/** P42 D34/D35: the *offered* subset, not the storable one — `connectionColorSchema` above stays
+ *  whole on purpose (F27: a connection saved with a retired colour must keep parsing, listing and
+ *  painting its own rail, or "trim the palette" silently deletes connections on next launch).
+ *  Six hues chosen for a 42° minimum adjacent OKLCH hue gap (F28/F28a) at the app's one fixed
+ *  lightness/chroma (`oklch(0.72 0.09 h)`) — roughly double the full eleven-hue ring's own worst
+ *  gap (25.6°, blue↔indigo), which is what makes a 2px tab rail or a 5px status dot legible at
+ *  all. Retired from the picker: `orange`, `olive`, `teal`, `indigo`, `violet`. */
+export const CONNECTION_COLOR_CHOICES: readonly ConnectionColor[] = PALETTE_COLOR_CHOICES;
+
+export const connectionModeSchema = /*#__PURE__*/ z.enum(['fields', 'uri']);
+export type ConnectionMode = z.infer<typeof connectionModeSchema>;
+
+// The plain object shape, with no refinement — kept separate so both connectionInputSchema
+// (which adds the fields/uri superRefine below) and connectionSummarySchema (which cannot
+// .omit() from a refined schema) can each build off it independently.
+const connectionFieldsSchema = /*#__PURE__*/ z.object({
+  name: z.string().trim().min(1).max(120),
+  kind: connectionKindSchema,
+  color: connectionColorSchema,
+  mode: connectionModeSchema,
+  readOnly: z.boolean(),
+  host: z.string().trim().nullable(),
+  port: z.number().int().min(1).max(65535).nullable(),
+  database: z.string().nullable(),
+  username: z.string().nullable(),
+  password: z.string().nullable(), // present on the way IN only; never on the way OUT (D9)
+  uri: z.string().nullable(),
+  options: /*#__PURE__*/ z.record(z.string(), z.unknown()),
+  // P11: optional shell command run before connect (e.g. a port-forward). A first-class column
+  // rather than an options_json key — options round-trips through the connection URI and the
+  // Copy URI menu item, and a shell command must never be settable by pasting a URI.
+  preconnect: z.string().trim().min(1).max(2000).nullable().default(null),
+  // Misc-fixes: overrides P11/D5's settle-window auto-detection with an explicit per-connection
+  // choice. false (default) = "run each time it tries to connect" — a fresh instance is spawned
+  // on every connect attempt and its exit is never monitored, whether or not it happens to still
+  // be alive at the settle window. true = "run once, and disconnect the db when it dies" — always
+  // arm() once the adapter connects, regardless of what the settle-window race resolved to (a
+  // no-op if the script already exited, since there's nothing left to monitor).
+  preconnectSidecar: z.boolean().default(false),
+  // P18 (v1.1) D18: runs the connection's own EXPLAIN before every SELECT a console run issues on
+  // it, warning (never blocking) when the threshold or a structural issue fires. A first-class
+  // column rather than an options_json key — the same reason preconnect above is one: `options`
+  // round-trips through the connection URI and the Copy URI menu item, and a behaviour that issues
+  // an extra statement per run must not be switchable on by pasting a URI.
+  autoExplain: z.boolean().default(false),
+  // P28 §5.3: commands/sec this connection is paced to; 0 = unlimited. `.default(0)` is
+  // load-bearing the same way preconnect's and autoExplain's are — an older stored row has no
+  // such key. The real {0} ∪ [0.01, 1000] bound (a value in (0, 0.01) makes no practical sense
+  // and is rejected) lives in the Go input validator (connections/input.go's Validate) and the
+  // dialog's own field error, matching every other numeric field's split between "this schema
+  // parses a stored row" and "Save enforces the real bound".
+  throttlePerSec: z.number().min(0).max(CONNECTION_THROTTLE_RANGE.max).default(0),
+});
+
+// SQS and S3 have no host/port at all (P10's D8, P17's own D8/D9 mirror) — fields mode repurposes
+// `database` for the AWS region and `username` for the named profile instead, per §5.1's "named
+// AWS profile" wording.
+export const AWS_STYLE_KINDS: ReadonlySet<ConnectionKind> = new Set(['sqs', 's3']);
+
+// Kinds whose "connection" is a local file path, not a network endpoint (P35 D10/D11). Fields
+// mode repurposes `database` for the absolute path; host/port/username/password are unused.
+export const FILE_KINDS: ReadonlySet<ConnectionKind> = new Set(['sqlite']);
+
+export const connectionInputSchema = connectionFieldsSchema.superRefine((input, ctx) => {
+  if (input.mode === 'fields') {
+    if (FILE_KINDS.has(input.kind)) {
+      const path = input.database?.trim() ?? '';
+      if (!path) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['database'],
+          message: 'A database file is required.',
+        });
+      } else if (!path.startsWith('/')) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['database'],
+          message: 'The database file must be an absolute path.',
+        });
+      }
+    } else {
+      if (!AWS_STYLE_KINDS.has(input.kind) && !input.host) {
+        ctx.addIssue({ code: 'custom', path: ['host'], message: 'Host is required.' });
+      }
+      if (!AWS_STYLE_KINDS.has(input.kind) && !input.port) {
+        ctx.addIssue({ code: 'custom', path: ['port'], message: 'Port is required.' });
+      }
+    }
+  } else {
+    if (!input.uri || input.uri.trim() === '') {
+      ctx.addIssue({ code: 'custom', path: ['uri'], message: 'A connection URI is required.' });
+    }
+  }
+});
+
+export type ConnectionInput = z.infer<typeof connectionInputSchema>;
+
+// What the renderer gets. Note the absence of `password` — this is D9 enforced by the type.
+export const connectionSummarySchema = connectionFieldsSchema.omit({ password: true }).extend({
+  id: z.string(),
+  sortOrder: z.number(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+export type ConnectionSummary = z.infer<typeof connectionSummarySchema>;
+
+export const connectionStatusSchema = /*#__PURE__*/ z.enum([
+  'disconnected',
+  'connecting',
+  'connected',
+  'error',
+]);
+export type ConnectionStatus = z.infer<typeof connectionStatusSchema>;
+
+export const connectionStateSchema = /*#__PURE__*/ z.object({
+  connectionId: z.string(),
+  status: connectionStatusSchema,
+  serverVersion: z.string().nullable(),
+  error: z.string().nullable(),
+  since: z.number(), // epoch ms
+  // Non-null only while connected — the toolbar's projection menu (Step 9) reads this to
+  // decide whether server-side projection actually applies.
+  caps: capsSchema.nullable(),
+});
+export type ConnectionState = z.infer<typeof connectionStateSchema>;

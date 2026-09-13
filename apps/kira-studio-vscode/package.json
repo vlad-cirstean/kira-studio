@@ -1,0 +1,504 @@
+{
+  "name": "kira-studio-vscode",
+  "displayName": "Kira Version",
+  "description": "Kira Studio's git graph, branch review and remote operations, inside VS Code.",
+  "publisher": "vladcirstean",
+  "license": "MIT",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "main": "./dist/extension.cjs",
+  "engines": {
+    "vscode": "^1.134.0"
+  },
+  "categories": [
+    "SCM Providers"
+  ],
+  "icon": "resources/icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kirathecat/kira-studio"
+  },
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "extensionKind": [
+    "workspace"
+  ],
+  "dependencies": {
+    "@kira/git-core": "workspace:*",
+    "@kira/git-ipc": "workspace:*",
+    "@kira/git-ui": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/vscode": "1.134.0"
+  },
+  "contributes": {
+    "viewsContainers": {
+      "panel": [
+        {
+          "id": "kiraVersion",
+          "title": "Kira",
+          "icon": "resources/icon.svg"
+        }
+      ],
+      "activitybar": [
+        {
+          "id": "kiraVersionReview",
+          "title": "Kira Version",
+          "icon": "resources/review-icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "kiraVersion": [
+        {
+          "id": "kiraVersion.graph",
+          "name": "Graph",
+          "type": "webview"
+        }
+      ],
+      "kiraVersionReview": [
+        {
+          "id": "kiraVersion.review",
+          "name": "Kira Version",
+          "type": "webview"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "kiraVersion.showConnectionStatus",
+        "title": "Show Connection Status",
+        "category": "Kira Version"
+      },
+      {
+        "command": "kiraVersion.openRepository",
+        "title": "Open Repository",
+        "category": "Kira Version"
+      },
+      {
+        "command": "kiraVersion.focusGraph",
+        "title": "Open Kira",
+        "category": "Kira Version",
+        "icon": "$(git-branch)"
+      },
+      {
+        "command": "kiraVersion.reviewBranch",
+        "title": "Review Branch Changes",
+        "category": "Kira Version"
+      },
+      {
+        "command": "kiraVersion.refresh",
+        "title": "Refresh",
+        "category": "Kira Version"
+      },
+      {
+        "command": "kiraVersion.toggleFileReviewed",
+        "title": "Toggle File Reviewed",
+        "category": "Kira Version"
+      },
+      {
+        "command": "kiraVersion.addReviewComment",
+        "title": "Add Review Comment",
+        "category": "Kira Version"
+      },
+      {
+        "command": "kiraVersion.copyReviewComments",
+        "title": "Copy Review Comments",
+        "category": "Kira Version"
+      },
+      {
+        "command": "kiraVersion.submitReviewComment",
+        "title": "Submit Review Comment",
+        "category": "Kira Version"
+      },
+      {
+        "command": "kiraVersion.deleteReviewComment",
+        "title": "Delete Review Comment",
+        "category": "Kira Version"
+      },
+      {
+        "command": "kiraVersion.goToFileFromDiff",
+        "title": "Go to File",
+        "category": "Kira Version",
+        "icon": "$(go-to-file)"
+      },
+      {
+        "command": "kiraVersion.openCommitInGraph",
+        "title": "Open Commit in Graph",
+        "category": "Kira Version",
+        "icon": "$(git-commit)"
+      },
+      {
+        "command": "kiraVersion.markSelectionReviewed",
+        "title": "Mark Selection Reviewed",
+        "category": "Kira Version",
+        "icon": "$(check)"
+      },
+      {
+        "command": "kiraVersion.markSelectionUnreviewed",
+        "title": "Mark Selection Unreviewed",
+        "category": "Kira Version",
+        "icon": "$(circle-slash)"
+      },
+      {
+        "command": "kiraVersion.checkout",
+        "title": "Checkout…",
+        "category": "Kira Version"
+      },
+      {
+        "command": "kiraVersion.createBranch",
+        "title": "Create Branch…",
+        "category": "Kira Version"
+      },
+      {
+        "command": "kiraVersion.deleteBranch",
+        "title": "Delete Branch…",
+        "category": "Kira Version"
+      },
+      {
+        "command": "kiraVersion.renameBranch",
+        "title": "Rename Branch…",
+        "category": "Kira Version"
+      },
+      {
+        "command": "kiraVersion.createTag",
+        "title": "Create Tag…",
+        "category": "Kira Version"
+      },
+      {
+        "command": "kiraVersion.deleteTag",
+        "title": "Delete Tag…",
+        "category": "Kira Version"
+      },
+      {
+        "command": "kiraVersion.deleteRemoteBranch",
+        "title": "Delete Remote Branch…",
+        "category": "Kira Version"
+      },
+      {
+        "command": "kiraVersion.revertCommit",
+        "title": "Revert Commit…",
+        "category": "Kira Version"
+      },
+      {
+        "command": "kiraVersion.continueOperation",
+        "title": "Continue Operation",
+        "category": "Kira Version"
+      },
+      {
+        "command": "kiraVersion.abortOperation",
+        "title": "Abort Operation",
+        "category": "Kira Version"
+      },
+      {
+        "command": "kiraVersion.skipCommit",
+        "title": "Skip Commit",
+        "category": "Kira Version"
+      },
+      {
+        "command": "kiraVersion.undo",
+        "title": "Undo Last Operation",
+        "category": "Kira Version"
+      },
+      {
+        "command": "kiraVersion.fetch",
+        "title": "Fetch",
+        "category": "Kira Version"
+      },
+      {
+        "command": "kiraVersion.pull",
+        "title": "Pull",
+        "category": "Kira Version"
+      },
+      {
+        "command": "kiraVersion.push",
+        "title": "Push",
+        "category": "Kira Version"
+      },
+      {
+        "command": "kiraVersion.forcePush",
+        "title": "Force Push…",
+        "category": "Kira Version"
+      },
+      {
+        "command": "kiraVersion.cancelRemoteOperation",
+        "title": "Cancel Remote Operation",
+        "category": "Kira Version"
+      },
+      {
+        "command": "kiraVersion.stashChanges",
+        "title": "Stash Changes…",
+        "category": "Kira Version"
+      },
+      {
+        "command": "kiraVersion.applyStash",
+        "title": "Apply Stash…",
+        "category": "Kira Version"
+      },
+      {
+        "command": "kiraVersion.popStash",
+        "title": "Pop Stash…",
+        "category": "Kira Version"
+      },
+      {
+        "command": "kiraVersion.dropStash",
+        "title": "Drop Stash…",
+        "category": "Kira Version"
+      },
+      {
+        "command": "kiraVersion.createBranchFromStash",
+        "title": "Create Branch from Stash…",
+        "category": "Kira Version"
+      },
+      {
+        "command": "kiraVersion.resetToCommit",
+        "title": "Reset to Commit…",
+        "category": "Kira Version"
+      },
+      {
+        "command": "kiraVersion.cherryPickCommit",
+        "title": "Cherry-pick Commit…",
+        "category": "Kira Version"
+      },
+      {
+        "command": "kiraVersion.createWorktree",
+        "title": "Create Worktree…",
+        "category": "Kira Version"
+      },
+      {
+        "command": "kiraVersion.removeWorktree",
+        "title": "Remove Worktree…",
+        "category": "Kira Version"
+      },
+      {
+        "command": "kiraVersion.setStackParent",
+        "title": "Set Stack Parent…",
+        "category": "Kira Version"
+      },
+      {
+        "command": "kiraVersion.restackStack",
+        "title": "Restack this Stack…",
+        "category": "Kira Version"
+      },
+      {
+        "command": "kiraVersion.goToStackParent",
+        "title": "Go to Parent Branch",
+        "category": "Kira Version"
+      },
+      {
+        "command": "kiraVersion.goToStackChild",
+        "title": "Go to Child Branch",
+        "category": "Kira Version"
+      },
+      {
+        "command": "kiraVersion.saveGlobalStash",
+        "title": "Save to Global Stash…",
+        "category": "Kira Version"
+      },
+      {
+        "command": "kiraVersion.removeGlobalStash",
+        "title": "Remove from Global Stash…",
+        "category": "Kira Version"
+      },
+      {
+        "command": "kiraVersion.toggleSearch",
+        "title": "Toggle Search",
+        "category": "Kira Version"
+      }
+    ],
+    "menus": {
+      "scm/title": [
+        {
+          "command": "kiraVersion.focusGraph",
+          "group": "navigation"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "kiraVersion.goToFileFromDiff",
+          "group": "navigation@-99",
+          "when": "isInDiffEditor && resourceScheme == kira-version"
+        },
+        {
+          "command": "kiraVersion.openCommitInGraph",
+          "group": "navigation@-98",
+          "when": "isInDiffEditor && resourceScheme == kira-version"
+        },
+        {
+          "command": "kiraVersion.markSelectionReviewed",
+          "group": "navigation@-97",
+          "when": "isInDiffEditor && kiraVersion.inReviewDiff && kiraVersion.reviewSelection != full"
+        },
+        {
+          "command": "kiraVersion.markSelectionUnreviewed",
+          "group": "navigation@-97",
+          "when": "isInDiffEditor && kiraVersion.inReviewDiff && kiraVersion.reviewSelection == full"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "kiraVersion.markSelectionReviewed",
+          "group": "kiraVersion@1",
+          "when": "kiraVersion.inReviewDiff"
+        },
+        {
+          "command": "kiraVersion.markSelectionUnreviewed",
+          "group": "kiraVersion@1",
+          "when": "kiraVersion.inReviewDiff"
+        }
+      ],
+      "comments/commentThread/context": [
+        {
+          "command": "kiraVersion.submitReviewComment",
+          "group": "inline",
+          "when": "commentController == kiraVersion.reviewComments"
+        }
+      ],
+      "comments/comment/title": [
+        {
+          "command": "kiraVersion.deleteReviewComment",
+          "group": "inline",
+          "when": "commentController == kiraVersion.reviewComments"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "kiraVersion.submitReviewComment",
+          "when": "false"
+        },
+        {
+          "command": "kiraVersion.deleteReviewComment",
+          "when": "false"
+        }
+      ]
+    },
+    "keybindings": [
+      {
+        "command": "kiraVersion.goToStackParent",
+        "key": "alt+up",
+        "when": "focusedView == 'kiraVersion.graph'"
+      },
+      {
+        "command": "kiraVersion.goToStackChild",
+        "key": "alt+down",
+        "when": "focusedView == 'kiraVersion.graph'"
+      },
+      {
+        "command": "kiraVersion.toggleSearch",
+        "key": "ctrl+alt+f",
+        "mac": "cmd+alt+f",
+        "when": "focusedView == 'kiraVersion.graph'"
+      },
+      {
+        "command": "kiraVersion.toggleSearch",
+        "key": "ctrl+f",
+        "mac": "cmd+f",
+        "when": "focusedView == 'kiraVersion.graph'"
+      }
+    ],
+    "colors": [
+      {
+        "id": "kiraVersion.graphLane0",
+        "description": "Kira Version: commit graph lane colour 0.",
+        "defaults": {
+          "dark": "#096db3",
+          "light": "#1b99f3",
+          "highContrast": "#0a78c7",
+          "highContrastLight": "#0a78c7"
+        }
+      },
+      {
+        "id": "kiraVersion.graphLane1",
+        "description": "Kira Version: commit graph lane colour 1.",
+        "defaults": {
+          "dark": "#c2380a",
+          "light": "#f56738",
+          "highContrast": "#d53e0b",
+          "highContrastLight": "#d53e0b"
+        }
+      },
+      {
+        "id": "kiraVersion.graphLane2",
+        "description": "Kira Version: commit graph lane colour 2.",
+        "defaults": {
+          "dark": "#3196dd",
+          "light": "#1d72af",
+          "highContrast": "#50a5e2",
+          "highContrastLight": "#155684"
+        }
+      },
+      {
+        "id": "kiraVersion.graphLane3",
+        "description": "Kira Version: commit graph lane colour 3.",
+        "defaults": {
+          "dark": "#e16d47",
+          "light": "#bd461f",
+          "highContrast": "#e58261",
+          "highContrastLight": "#913618"
+        }
+      },
+      {
+        "id": "kiraVersion.graphLane4",
+        "description": "Kira Version: commit graph lane colour 4.",
+        "defaults": {
+          "dark": "#7fb2d7",
+          "light": "#285b80",
+          "highContrast": "#96c0de",
+          "highContrastLight": "#1c4059"
+        }
+      },
+      {
+        "id": "kiraVersion.graphLane5",
+        "description": "Kira Version: commit graph lane colour 5.",
+        "defaults": {
+          "dark": "#da9f8b",
+          "light": "#88422b",
+          "highContrast": "#e2b2a2",
+          "highContrastLight": "#612f1f"
+        }
+      },
+      {
+        "id": "kiraVersion.graphLane6",
+        "description": "Kira Version: commit graph lane colour 6.",
+        "defaults": {
+          "dark": "#aec5d5",
+          "light": "#2f495b",
+          "highContrast": "#c6d6e2",
+          "highContrastLight": "#1d2e39"
+        }
+      },
+      {
+        "id": "kiraVersion.graphLane7",
+        "description": "Kira Version: commit graph lane colour 7.",
+        "defaults": {
+          "dark": "#d9beb5",
+          "light": "#623e32",
+          "highContrast": "#e3d0c9",
+          "highContrastLight": "#3d271f"
+        }
+      },
+      {
+        "id": "kiraVersion.reviewedLineBackground",
+        "description": "Kira Version: whole-line tint for a range/hunk already marked reviewed, in the modified pane of a branch review diff (G15).",
+        "defaults": {
+          "dark": "rgba(46,160,67,0.15)",
+          "light": "rgba(31,136,61,0.10)",
+          "highContrast": "rgba(46,160,67,0.25)",
+          "highContrastLight": "rgba(31,136,61,0.20)"
+        }
+      },
+      {
+        "id": "kiraVersion.reviewedLineOverviewRuler",
+        "description": "Kira Version: overview ruler mark for a range/hunk already marked reviewed (G15) — the only surface that answers \"how much of this file have I read\" without scrolling.",
+        "defaults": {
+          "dark": "rgba(46,160,67,0.8)",
+          "light": "rgba(31,136,61,0.8)",
+          "highContrast": "rgba(46,160,67,0.9)",
+          "highContrastLight": "rgba(31,136,61,0.9)"
+        }
+      }
+    ]
+  }
+}
