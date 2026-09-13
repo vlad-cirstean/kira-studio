@@ -4,7 +4,7 @@
 > real tree plus direct probes of every candidate dependency (Go module proxy version lists and
 > `go.mod` files, upstream grammar sources, the binding's own `api.h` and `query.go`). Backend
 > only: two new Go packages, no renderer code, no bound service, no wire contract, no user-visible
-> surface. Its consumers are C2 (graph), C3 (Monaco definition provider) and C7 (MCP server).
+> surface. Its consumers are C2 (graph), C5 (Monaco definition provider) and C3 (MCP server).
 
 ## 0. What SPEC left open, and how each is resolved
 
@@ -62,7 +62,7 @@ tests (§11), doc updates (§12).
 
 **Not attempted** (§9 states why for each): any cross-file resolution, any framework-specific
 inference, syntax highlighting, a `.scm` query written by hand, a bound service or renderer
-surface, and any caller that opens an index — C1 is a library; C2 and C7 are its first callers.
+surface, and any caller that opens an index — C1 is a library; C2 and C3 are its first callers.
 
 ## 1. The binding and the grammars
 
@@ -166,8 +166,8 @@ impossible for anything cgo, and the shell has always been built on a Mac.
 Every `Parser`, `Tree`, `Query` and `QueryCursor` allocates C memory and must be `Close`d. One
 invariant makes that checkable rather than hoped for: **no `*tree_sitter.Tree` and no
 `*tree_sitter.Node` ever leaves `internal/codeparse`.** Callers receive plain Go structs
-(`Symbol`, `Reference`, `Block`, byte offsets and points). This also keeps `codeindex`, C2, C3 and
-C7 free of tree lifetimes entirely.
+(`Symbol`, `Reference`, `Block`, byte offsets and points). This also keeps `codeindex`, C2, C5 and
+C3 free of tree lifetimes entirely.
 
 ## 2. Where the code lives
 
@@ -311,8 +311,8 @@ Duplicates are real — several patterns can capture one node, e.g. go's `type_s
 Named so C2 inherits a line rather than a guess: no scope or binding analysis (`locals.scm` is not
 vendored), no type information, no signature or parameter list, no doc text, no import resolution
 (an import is stored as a `reference` row carrying the literal text, never resolved to a file), no
-cross-file link of any kind, no framework inference, and no highlight tokens (C3 uses Monaco's
-Monarch grammars for that, per SPEC's C3 row).
+cross-file link of any kind, no framework inference, and no highlight tokens (C5 uses Monaco's
+Monarch grammars for that, per SPEC's C5 row).
 
 ## 5. The cache
 
@@ -337,10 +337,10 @@ already serialises writes through one application-level goroutine, so nothing he
 The DSN is `internal/storage/db.go`'s six pragmas verbatim, the same way `gitreview/db.go` copies
 them: `_busy_timeout=5000`, `_foreign_keys=1`, `_auto_vacuum=INCREMENTAL`,
 `_pragma=journal_size_limit(4194304)`, `_journal_mode=WAL`, `_synchronous=NORMAL`. WAL carries more
-weight here than anywhere else in the app: C7's MCP server is a **separate process** reading the
+weight here than anywhere else in the app: C3's MCP server is a **separate process** reading the
 same file while the app writes it, which is exactly what WAL plus a busy timeout is for. One note
-handed forward to C7 rather than solved here: a read-only SQLite connection to a WAL database still
-needs to create the `-shm` file, so C7 opens this file read-write and never writes, rather than
+handed forward to C3 rather than solved here: a read-only SQLite connection to a WAL database still
+needs to create the `-shm` file, so C3 opens this file read-write and never writes, rather than
 `mode=ro`.
 
 Migrations are forward-only numbered SQL under `internal/codeindex/migrations/` with the same
@@ -433,7 +433,7 @@ is by name *within* a repository) doesn't apply to it.
 
 Positions are stored twice on purpose: byte offsets are what tree-sitter and a reparse work in,
 row/column points are what a UI needs. Tree-sitter's column is a **byte** column; converting to
-Monaco's UTF-16 column is C3's job, stated here so nobody converts twice.
+Monaco's UTF-16 column is C5's job, stated here so nobody converts twice.
 
 ### 5.3 Freshness and the parser fingerprint
 
@@ -556,10 +556,10 @@ is parsed from scratch. Re-splitting an SFC container is itself incremental; onl
 **Extraction after a reparse is always whole-file**, and the rows are replaced wholesale (§6). The
 incremental parse buys parse time, and — the structural reason it is worth doing at all —
 `Tree.ChangedRanges(oldTree)` comes back from it, which is exactly the input C2 needs to invalidate
-only the affected part of its graph and C3 needs to re-decorate only the affected part of a buffer.
+only the affected part of its graph and C5 needs to re-decorate only the affected part of a buffer.
 C1 returns those ranges on its reparse result and stores none of them.
 
-No editor-facing edit API lands here: C3 owns keystroke-level edits, and when it arrives it feeds
+No editor-facing edit API lands here: C5 owns keystroke-level edits, and when it arrives it feeds
 real `InputEdit`s into the same `Session` path this derivation already feeds.
 
 ### 7.3 Resident trees
@@ -592,14 +592,14 @@ in a different module. The local cache is about forty lines and owns the `Close`
 - **Any resolution.** A reference row carries a name and a range, never a target. Linking names
   across files, and every framework-specific rule for doing so, is C2's row.
 - **Angular inline `template:` strings and Vue directive semantics** (§3.2, §3.1).
-- **Syntax highlighting.** No `highlights.scm` is vendored; C3 uses Monaco's Monarch grammars.
+- **Syntax highlighting.** No `highlights.scm` is vendored; C5 uses Monaco's Monarch grammars.
 - **Hand-written queries.** Only upstream `tags.scm` files are vendored. If a language's upstream
   query proves thin, a later phase can add to it with its own reasoning; inventing one here would
   make the first thing this repo maintains a query language it has never shipped.
 - **A bound service, a wire contract, or any renderer code.** Nothing in
   `apps/kira-studio/frontend`, no `internal/bridge` change, no bindings regeneration.
 - **Any caller.** No app code opens an `Index` in this phase. This is a library phase whose first
-  callers are C2 and C7, deliberately, rather than a half-wired UI path.
+  callers are C2 and C3, deliberately, rather than a half-wired UI path.
 - **A settings key.** Budgets in §5.4 and §7.3 are constants; `settings` is a closed, hand-listed
   key set and nothing in C1 needs a user-facing knob yet.
 

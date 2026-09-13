@@ -1,0 +1,7 @@
+class Greeter:
+    def greet(self, name):
+        return helper(name)
+
+
+def helper(name):
+    return "hi " + name
