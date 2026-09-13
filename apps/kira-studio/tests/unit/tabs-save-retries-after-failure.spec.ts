@@ -13,8 +13,10 @@
 import './support/window';
 
 import { describe, expect, test } from 'bun:test';
+import { restoreAfterEach } from './support/restoreAfterEach';
 
 const { control } = await import('../../frontend/src/bridge/control');
+restoreAfterEach(control);
 const { activateTab, openStreamTab } = await import('../../frontend/src/state/tabs');
 
 function flush(): Promise<void> {

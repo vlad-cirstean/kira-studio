@@ -9,8 +9,10 @@ import './support/window';
 
 import { describe, expect, test } from 'bun:test';
 import type { ApiVariable } from '@shared/domain/variables';
+import { restoreAfterEach } from './support/restoreAfterEach';
 
 const { control } = await import('../../frontend/src/bridge/control');
+restoreAfterEach(control);
 const { ensureVariablesLoaded, mergedValuesAndSecrets } = await import(
   '../../frontend/src/api/state/variables'
 );

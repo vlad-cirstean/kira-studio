@@ -16,9 +16,11 @@ import {
   createTabularPageBuilder,
   unpagedPosition,
 } from '../../../../packages/shared/protocol/page';
+import { restoreAfterEach } from './support/restoreAfterEach';
 
 const { setPage } = await import('../../frontend/src/views/grid/page');
 const { data } = await import('../../frontend/src/bridge/data');
+restoreAfterEach(data);
 const { stageNull, commitPending, previewPending } = await import(
   '../../frontend/src/views/grid/pendingChanges'
 );
