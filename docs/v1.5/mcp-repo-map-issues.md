@@ -22,7 +22,13 @@ the chapter's own record of what dogfooding actually found, not a scratch TODO l
 
 ## Log
 
-_No entries yet — starts at C5._
+- **Trivial (C5)**: registering `kira-repo-map` mid-session (`claude mcp add`) never surfaces its six
+  tools as native tool calls in this harness — a subagent's tool registry is fixed at spawn, so a
+  server added after spawn needs a session restart to appear via `ToolSearch`. Not a server bug: the
+  server itself answers correctly (verified via direct `POST /mcp` JSON-RPC). Worked around by calling
+  it over HTTP directly (`tools/call` JSON-RPC) for this phase's navigation instead of native tool
+  wrappers — same server, same answers, just invoked through `curl` instead of a `mcp__kira-repo-map__*`
+  tool. No fix needed in the server/registration itself.
 
 <!--
 Entry template:
