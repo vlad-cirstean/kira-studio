@@ -184,7 +184,7 @@ func newServer(ctx context.Context, cfg Config, home string, store *codeindex.St
 const serverVersion = "0.0.0"
 
 // instructions is §6.0's own one paragraph: the steer that decides whether any of this pays off.
-const instructions = "These tools answer navigation questions from a pre-built index without reading files; prefer them to opening a file to find a definition. Positions are 1-based lines; a column, where given, is a 1-based byte column. Results are name-resolved, not type-resolved, and each carries its own confidence and the rule that produced it."
+const instructions = "These tools answer navigation questions from a pre-built index; prefer them to opening a file to find a definition. Positions are 1-based lines; a column, where given, is a 1-based byte column. Each hit is followed by its own line of source, indented, read from the file at that position and truncated at 512 bytes with a trailing `…`; `[stale]` marks a file changed since it was indexed, `[no source: …]` a line that could not be read. Pass `omitSource` to drop them. Results are name-resolved, not type-resolved, and each carries its own confidence and the rule that produced it."
 
 // buildMCPServer constructs the six-tool mcp.Server (§6) — pure registration, no I/O of its own;
 // every handler closes over s and calls into s.graph/s.store through the readiness gate.
@@ -197,11 +197,11 @@ func (s *Server) buildMCPServer() *mcp.Server {
 
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "find_definition",
-		Description: "Find where a symbol is defined. Give file+line(+column), file+symbol, or symbol alone.",
+		Description: "Find where a symbol is defined. Give file+line(+column), file+symbol, or symbol alone. Each hit includes its own source line.",
 	}, s.findDefinition)
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "find_references",
-		Description: "Find occurrences of a symbol across the repository. Give file+line(+column), file+symbol, or symbol alone.",
+		Description: "Find occurrences of a symbol across the repository. Give file+line(+column), file+symbol, or symbol alone. Each hit includes its own source line.",
 	}, s.findReferences)
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "find_implementations",

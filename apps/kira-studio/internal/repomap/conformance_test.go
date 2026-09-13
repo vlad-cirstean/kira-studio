@@ -2,6 +2,7 @@ package repomap
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -111,14 +112,23 @@ func TestConformanceListToolsAndCallEach(t *testing.T) {
 			if err != nil {
 				t.Fatalf("CallTool(%s): %v", c.name, err)
 			}
-			if res.IsError {
-				text := ""
-				if len(res.Content) > 0 {
-					if tc, ok := res.Content[0].(*mcp.TextContent); ok {
-						text = tc.Text
-					}
+			text := ""
+			if len(res.Content) > 0 {
+				if tc, ok := res.Content[0].(*mcp.TextContent); ok {
+					text = tc.Text
 				}
+			}
+			if res.IsError {
 				t.Fatalf("CallTool(%s) returned IsError: %s", c.name, text)
+			}
+			if c.name == "find_definition" {
+				// root is a t.TempDir() with no main.go on disk (the seeded row is metadata
+				// only) — an exact reproduction of C8 plan D5's missing-file case. Pin it
+				// explicitly rather than let it pass silently: "a deleted file must not turn a
+				// navigation answer into an error" is the whole of D5.
+				if !strings.Contains(text, "[no source: file not found]") {
+					t.Errorf("find_definition response missing D5's safe-failure note, got: %s", text)
+				}
 			}
 		})
 	}
