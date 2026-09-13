@@ -1,6 +1,7 @@
 // C5 §9.1/§9.3: the lazy bootstrap this app's whole Monaco surface goes through — one worker
-// wiring, one theme, one model cache. `RepoFileView.vue` (S12) is the only caller.
-type MonacoModule = typeof import('./monacoEntry');
+// wiring, one theme, one model cache. RepoFileView.vue/RepoDiffView.vue (C6 §8.1) call loadMonaco;
+// navigation.ts (C6 §8.2) is the other consumer of the resolved module type.
+export type MonacoModule = typeof import('./monacoEntry');
 
 // D2 (from format.ts's own precedent): memoised so only the first repo file tab ever pays the
 // import cost — every studio/api session never downloads this chunk at all.
@@ -65,13 +66,64 @@ export function loadMonaco(): Promise<MonacoModule> {
 
 export { REPO_THEME_NAME };
 
-// §9.3: one model per open file tab, keyed by a stable `kira-repo://<repoId>/<path>` URI —
+// §9.3/C6 D6: one model per open file tab, keyed by a stable `kira-repo://<repoId>/<path>` URI —
 // disposed through the tab kind's existing dropResources hook (closeTab already blind-calls it for
 // every registered kind), so model disposal needs no new lifecycle.
 const modelCache = new Map<string, import('monaco-editor').editor.ITextModel>();
 
-export function repoFileUri(repoId: string, path: string): string {
-  return `kira-repo://${repoId}/${path}`;
+// C6 D6: built with `Uri.from`, not string interpolation — the editor opener (navigation.ts) has
+// to recover (repoId, path) from a Uri the *other* direction, and a path containing a space, '#',
+// '?' or '%' does not survive a plain template-literal round trip. `Uri.from` escapes correctly
+// and `uri.authority`/`uri.path` give the decoded values straight back.
+export function repoFileUriObject(
+  mod: MonacoModule,
+  repoId: string,
+  path: string,
+): import('monaco-editor').Uri {
+  return mod.Uri.from({ scheme: 'kira-repo', authority: repoId, path: `/${path}` });
+}
+
+export function repoFileUri(mod: MonacoModule, repoId: string, path: string): string {
+  return repoFileUriObject(mod, repoId, path).toString();
+}
+
+// C6 §8.3: the diff editor's own two sides share one scheme with the file viewer (so navigation's
+// one selector covers both) but need distinct model identities — `query` tells them apart without
+// a second scheme.
+export function repoDiffUris(
+  mod: MonacoModule,
+  repoId: string,
+  path: string,
+): { head: import('monaco-editor').Uri; worktree: import('monaco-editor').Uri } {
+  return {
+    head: mod.Uri.from({
+      scheme: 'kira-repo',
+      authority: repoId,
+      path: `/${path}`,
+      query: 'side=head',
+    }),
+    worktree: mod.Uri.from({
+      scheme: 'kira-repo',
+      authority: repoId,
+      path: `/${path}`,
+      query: 'side=worktree',
+    }),
+  };
+}
+
+// C6 D7: navigability is a WeakMap keyed by the model object, not a URI-shape check — the diff
+// editor's HEAD side is deliberately never recorded here (its content is a different revision than
+// the index describes, so answering a definition there would be a lie); the diff's worktree side
+// and every plain file-tab model are, since both are byte-identical to what the index parsed.
+const repoLocations = new WeakMap<
+  import('monaco-editor').editor.ITextModel,
+  { repoId: string; path: string }
+>();
+
+export function repoLocationOf(
+  model: import('monaco-editor').editor.ITextModel,
+): { repoId: string; path: string } | undefined {
+  return repoLocations.get(model);
 }
 
 export function getOrCreateModel(
@@ -79,11 +131,13 @@ export function getOrCreateModel(
   uri: string,
   text: string,
   language: string,
+  location?: { repoId: string; path: string },
 ): import('monaco-editor').editor.ITextModel {
   const existing = modelCache.get(uri);
   if (existing && !existing.isDisposed()) return existing;
   const model = mod.editor.createModel(text, language, mod.Uri.parse(uri));
   modelCache.set(uri, model);
+  if (location) repoLocations.set(model, location);
   return model;
 }
 

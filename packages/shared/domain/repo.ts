@@ -46,3 +46,52 @@ export const fileContentSchema = /*#__PURE__*/ z.object({
   language: z.string(),
 });
 export type FileContent = z.infer<typeof fileContentSchema>;
+
+// C6 §5/D12: one side of a HEAD-vs-worktree diff — the same four-value classification
+// fileContentSchema already uses for the worktree side, so the diff view reuses one vocabulary
+// rather than inventing a second. No status field on the diff as a whole: the two sides already
+// say what happened (HEAD missing means added, worktree missing means deleted, both present means
+// modified).
+export const diffSideSchema = /*#__PURE__*/ z.object({
+  kind: /*#__PURE__*/ z.enum(['found', 'binary', 'tooLarge', 'missing']),
+  text: z.string(),
+  bytes: z.number(),
+  limitBytes: z.number(),
+});
+export type DiffSide = z.infer<typeof diffSideSchema>;
+
+export const diffContentSchema = /*#__PURE__*/ z.object({
+  path: z.string(),
+  language: z.string(),
+  head: diffSideSchema,
+  worktree: diffSideSchema,
+});
+export type DiffContent = z.infer<typeof diffContentSchema>;
+
+// C6 §6/D2: one definition candidate — codegraph's own Rule/Confidence carried through untouched
+// (internal/repomap/render.go's discipline: a repoWide guess must never read like a fact). The
+// span is Monaco's own 1-based line / 1-based UTF-16 column already, ready to use as an IRange.
+export const navTargetSchema = /*#__PURE__*/ z.object({
+  path: z.string(),
+  language: z.string(),
+  kind: z.string(),
+  name: z.string(),
+  container: z.string(),
+  rule: z.string(),
+  confidence: /*#__PURE__*/ z.enum(['exact', 'scoped', 'repoWide']),
+  startLine: z.number(),
+  startColumn: z.number(),
+  endLine: z.number(),
+  endColumn: z.number(),
+});
+export type NavTarget = z.infer<typeof navTargetSchema>;
+
+// C6 §6/D8: status is checked non-blocking on every call — 'indexing' while the initial sync is
+// still running (never waited on), 'unavailable' when the file isn't in the index at all,
+// otherwise 'ready' with zero or more targets.
+export const navResultSchema = /*#__PURE__*/ z.object({
+  status: /*#__PURE__*/ z.enum(['ready', 'indexing', 'unavailable']),
+  name: z.string(),
+  targets: z.array(navTargetSchema),
+});
+export type NavResult = z.infer<typeof navResultSchema>;

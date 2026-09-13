@@ -147,6 +147,10 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   codeWorkspaceRemoveRepo: 'CodeWorkspaceService.RemoveRepo',
   codeWorkspaceListFiles: 'CodeWorkspaceService.ListFiles',
   codeWorkspaceReadFile: 'CodeWorkspaceService.ReadFile',
+  codeWorkspaceOpenWorkspace: 'CodeWorkspaceService.OpenWorkspace',
+  codeWorkspaceCloseWorkspace: 'CodeWorkspaceService.CloseWorkspace',
+  codeWorkspaceReadDiff: 'CodeWorkspaceService.ReadDiff',
+  codeWorkspaceDefinitions: 'CodeWorkspaceService.Definitions',
 };
 
 /** ipc.ts's legacy channel string (what every `ControlSnapshot.channel` and fixture is keyed by,
@@ -299,6 +303,12 @@ const WILDCARD_DEFAULTS: Readonly<Record<string, string>> = Object.freeze({
   // Promise.all as hydrateGitClients()/hydrateRepoMap() above, same reasoning — a spec that never
   // imports a repository gets "nothing imported yet", not a fixture miss.
   [IPC.codeWorkspaceListRepos]: '[]',
+  // C6 §8.5: openRepoWorkspace/closeRepoWorkspace call these fire-and-forget on every workspace
+  // open/close (state/workspace.ts's own comment: "a failed index start must never block opening a
+  // workspace") — no spec asserts on their own echo, the same reasoning opsCancel's own wildcard
+  // above carries.
+  [IPC.codeWorkspaceOpenWorkspace]: 'null',
+  [IPC.codeWorkspaceCloseWorkspace]: 'null',
 });
 
 interface CallRequestBody {

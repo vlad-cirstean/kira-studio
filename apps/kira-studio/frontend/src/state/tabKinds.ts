@@ -31,6 +31,7 @@ import {
   defaultDefinitionTabState,
   defaultDocumentTabState,
   defaultKeyValueTabState,
+  defaultRepoDiffTabState,
   defaultRepoFileTabState,
   defaultStreamTabState,
   definitionTabStateSchema,
@@ -42,9 +43,11 @@ import {
   type KeyValueTabRecord,
   type KeyValueTabState,
   keyValueTabStateSchema,
+  type RepoDiffTabState,
   type RepoFileTabRecord,
   type RepoFileTabState,
   type RepoGraphTabState,
+  repoDiffTabStateSchema,
   repoFileTabStateSchema,
   repoGraphTabStateSchema,
   type StreamTabRecord,
@@ -65,7 +68,7 @@ import { dropForTab as dropConsoleResultPagesForTab } from '../views/console/res
 import { drop as dropDocumentPagesForTab } from '../views/documents/page';
 import { drop as dropGridPagesForTab } from '../views/grid/page';
 import { drop as dropKeyValuePagesForTab } from '../views/keyvalue/page';
-import { dropRepoFileTab } from '../views/repo/editors';
+import { dropRepoDiffTab, dropRepoFileTab } from '../views/repo/editors';
 import { monacoLanguageFor } from '../views/repo/language';
 import { drop as dropStreamPagesForTab } from '../views/stream/page';
 import { codeRepoRecord } from './coderepos';
@@ -146,6 +149,12 @@ function noDrop(): void {
 function repoFileTitle(tab: TabRecord): string {
   const idx = tab.path.lastIndexOf('/');
   return idx < 0 ? tab.path : tab.path.slice(idx + 1);
+}
+
+// C6 §8.1: same basename-only reasoning as repoFileTitle, plus a suffix distinguishing a diff tab
+// from a file tab open on the identical path (openTab's own dedupe key lets both coexist).
+function repoDiffTitle(tab: TabRecord): string {
+  return `${repoFileTitle(tab)} (Working Tree)`;
 }
 
 // §9.4's own language id, mapped down to one of three tab-strip icons — the same coarse-bucket
@@ -397,5 +406,19 @@ export const TAB_KINDS: { [K in TabKind]: TabKindDef<K> } = {
     dropResources: (tabId) => dropRepoFileTab(tabId),
     menuExtras: () => [],
     parseState: parseStateWith(repoFileTabStateSchema),
+  },
+  // C6 §8.1: a HEAD-vs-worktree diff, opened from "Open changes" — read-only, mirroring
+  // 'repo-file''s shape exactly. No badge, no pinned: a read-only tab, like 'definition''s own
+  // precedent.
+  'repo-diff': {
+    mode: TAB_KIND_MODE['repo-diff'],
+    title: repoDiffTitle,
+    icon: () => 'git-compare',
+    railColor: () => undefined,
+    defaultState: (): RepoDiffTabState => defaultRepoDiffTabState(),
+    duplicateState: (): RepoDiffTabState => ({}),
+    dropResources: (tabId) => dropRepoDiffTab(tabId),
+    menuExtras: () => [],
+    parseState: parseStateWith(repoDiffTabStateSchema),
   },
 };

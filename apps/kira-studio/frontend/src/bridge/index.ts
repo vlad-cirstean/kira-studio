@@ -44,7 +44,13 @@ import type {
   SavedQuery,
   SortSpec,
 } from '@shared/domain/queries';
-import type { FileContent, FileListing, RepoSummary } from '@shared/domain/repo';
+import type {
+  DiffContent,
+  FileContent,
+  FileListing,
+  NavResult,
+  RepoSummary,
+} from '@shared/domain/repo';
 import type { RepoMapInstallResult, RepoMapStatus } from '@shared/domain/repomap';
 import type { ConnectionDdl } from '@shared/domain/schema';
 import type { SecretStorageStatus } from '@shared/domain/secrets';
@@ -389,6 +395,25 @@ const studioControl = {
     ).then((r) => trust<FileListing>({ ...r, paths: r.paths ?? [], status: r.status ?? {} })),
   codeWorkspaceReadFile: (id: string, path: string): Promise<FileContent> =>
     unwrap(CodeWorkspaceService.ReadFile({ id, path })).then((r) => trust<FileContent>(r)),
+
+  // C6 §7/§8.5: the index lifecycle (fire-and-forget from the renderer's own point of view — a
+  // failed start/stop must never block opening or leaving a workspace) plus the diff/navigation
+  // reads.
+  codeWorkspaceOpenWorkspace: (id: string): Promise<void> =>
+    unwrap(CodeWorkspaceService.OpenWorkspace({ id })),
+  codeWorkspaceCloseWorkspace: (id: string): Promise<void> =>
+    unwrap(CodeWorkspaceService.CloseWorkspace({ id })),
+  codeWorkspaceReadDiff: (id: string, path: string): Promise<DiffContent> =>
+    unwrap(CodeWorkspaceService.ReadDiff({ id, path })).then((r) => trust<DiffContent>(r)),
+  codeWorkspaceDefinitions: (
+    id: string,
+    path: string,
+    line: number,
+    column: number,
+  ): Promise<NavResult> =>
+    unwrap<Awaited<ReturnType<typeof CodeWorkspaceService.Definitions>>>(
+      CodeWorkspaceService.Definitions({ id, path, line, column }),
+    ).then((r) => trust<NavResult>({ ...r, targets: r.targets ?? [] })),
 };
 
 // P12 D11: one exported object, composed from Studio's 67 methods and the module's own 39

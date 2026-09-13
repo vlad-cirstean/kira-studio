@@ -1,4 +1,4 @@
-import { defaultRepoFileTabState } from '@shared/domain/tabs';
+import { defaultRepoDiffTabState, defaultRepoFileTabState } from '@shared/domain/tabs';
 import { repoWorkspaceKey } from '@shared/domain/workspace';
 import { tabsForWorkspace } from './mode';
 import {
@@ -32,6 +32,19 @@ export function openRepoFileTab(
   // only does real work for a reused tab (and is a same-value no-op, via skipUnchanged, otherwise).
   if (revealLine !== null) patchRepoFileTabState(result.id, { revealLine });
   return result;
+}
+
+// C6 §8.1/D9: "Open changes" opens a permanent tab, never the preview slot — a single tree click
+// already owns the preview slot for the file viewer, so this context-menu action behaves like the
+// menu's existing "Open" (permanent). openTab's dedupe key is (workspaceId, kind, connectionId,
+// path), so a diff tab and a file tab for the same path coexist, and a second "Open changes"
+// activates the existing one rather than opening a duplicate.
+export function openRepoDiffTab(repoId: string, path: string): OpenTabResult {
+  return openTab('repo-diff', null, path, defaultRepoDiffTabState, {
+    reuse: true,
+    workspaceId: repoWorkspaceKey(repoId),
+    preview: false,
+  });
 }
 
 // C5 §6.1: creates repoId's own pinned graph tab if it has none, and activates it only when the

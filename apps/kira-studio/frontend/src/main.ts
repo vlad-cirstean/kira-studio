@@ -308,6 +308,9 @@ async function bootstrap(): Promise<void> {
   for (const repoId of [...workspaceState.openRepos]) {
     if (liveRepoIds.has(repoId)) {
       ensureWorkspaceShell(repoId);
+      // C6 §8.5: a restored session indexes what it restored — same fire-and-forget posture as
+      // openRepoWorkspace's own call.
+      void control.codeWorkspaceOpenWorkspace(repoId).catch(() => {});
     } else {
       closeRepoWorkspace(repoId);
     }

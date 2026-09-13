@@ -141,6 +141,10 @@ export const IPC = {
   codeWorkspaceRemoveRepo: 'kira:codeWorkspace:removeRepo',
   codeWorkspaceListFiles: 'kira:codeWorkspace:listFiles',
   codeWorkspaceReadFile: 'kira:codeWorkspace:readFile',
+  codeWorkspaceOpenWorkspace: 'kira:codeWorkspace:openWorkspace',
+  codeWorkspaceCloseWorkspace: 'kira:codeWorkspace:closeWorkspace',
+  codeWorkspaceReadDiff: 'kira:codeWorkspace:readDiff',
+  codeWorkspaceDefinitions: 'kira:codeWorkspace:definitions',
 
   connectionState: 'kira:connection:state',
   connectionMetadataInvalidated: 'kira:connection:metadataInvalidated',

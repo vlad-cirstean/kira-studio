@@ -35,6 +35,9 @@ export const tabKindSchema = /*#__PURE__*/ z.enum([
   'repo-graph',
   // C5 §8: one opened repository file, read-only, rendered by Monaco (§9).
   'repo-file',
+  // C6 §7/§8.1: a HEAD-vs-worktree diff, opened from the tree's own "Open changes" action —
+  // read-only, rendered by Monaco's diff editor.
+  'repo-diff',
 ]);
 export type TabKind = z.infer<typeof tabKindSchema>;
 
@@ -56,6 +59,7 @@ export const RENDERABLE_TAB_KINDS: readonly TabKind[] = [
   'environments',
   'repo-graph',
   'repo-file',
+  'repo-diff',
 ];
 
 // C5 D2/§4.1: TAB_KIND_MODE's value type widens from AppMode to TabScope — 'repo' is a sentinel
@@ -87,6 +91,7 @@ export const TAB_KIND_MODE: Record<TabKind, TabScope> = {
   environments: 'api',
   'repo-graph': 'repo',
   'repo-file': 'repo',
+  'repo-diff': 'repo',
 };
 
 const pageSizeSchema = /*#__PURE__*/ z.union([
@@ -249,6 +254,13 @@ export const repoFileTabStateSchema = /*#__PURE__*/ z.object({
 });
 export type RepoFileTabState = z.infer<typeof repoFileTabStateSchema>;
 
+// C6 §8.1/D10: a diff tab carries no session state — a restored tab re-reads both sides and opens
+// at Monaco's own first change, which is where a diff is read from anyway (unlike repo-file's
+// revealLine, a diff is navigated by change, not by line). An empty object, like
+// repoGraphTabStateSchema above, so parseState has something to validate against.
+export const repoDiffTabStateSchema = /*#__PURE__*/ z.object({});
+export type RepoDiffTabState = z.infer<typeof repoDiffTabStateSchema>;
+
 const tabRecordBase = {
   id: z.string(),
   connectionId: z.string().nullable(),
@@ -324,6 +336,11 @@ export const tabRecordSchema = /*#__PURE__*/ z.discriminatedUnion('kind', [
     kind: z.literal('repo-file'),
     state: repoFileTabStateSchema,
   }),
+  /*#__PURE__*/ z.object({
+    ...tabRecordBase,
+    kind: z.literal('repo-diff'),
+    state: repoDiffTabStateSchema,
+  }),
 ]);
 export type TabRecord = z.infer<typeof tabRecordSchema>;
 export type DataTabRecord = Extract<TabRecord, { kind: 'data' }>;
@@ -339,6 +356,7 @@ export type VariableSetTabRecord = Extract<TabRecord, { kind: 'variable-set' }>;
 export type EnvironmentsTabRecord = Extract<TabRecord, { kind: 'environments' }>;
 export type RepoGraphTabRecord = Extract<TabRecord, { kind: 'repo-graph' }>;
 export type RepoFileTabRecord = Extract<TabRecord, { kind: 'repo-file' }>;
+export type RepoDiffTabRecord = Extract<TabRecord, { kind: 'repo-diff' }>;
 
 export function asDataTab(tab: TabRecord | null | undefined): DataTabRecord | null {
   return tab && tab.kind === 'data' ? tab : null;
@@ -382,6 +400,10 @@ export function asRepoGraphTab(tab: TabRecord | null | undefined): RepoGraphTabR
 
 export function asRepoFileTab(tab: TabRecord | null | undefined): RepoFileTabRecord | null {
   return tab && tab.kind === 'repo-file' ? tab : null;
+}
+
+export function asRepoDiffTab(tab: TabRecord | null | undefined): RepoDiffTabRecord | null {
+  return tab && tab.kind === 'repo-diff' ? tab : null;
 }
 
 export function defaultDataTabState(pageSize: PageSize): DataTabState {
@@ -434,6 +456,10 @@ export function defaultRepoGraphTabState(): RepoGraphTabState {
 
 export function defaultRepoFileTabState(revealLine: number | null = null): RepoFileTabState {
   return { revealLine };
+}
+
+export function defaultRepoDiffTabState(): RepoDiffTabState {
+  return {};
 }
 
 /** 'order_items' — the path tail's name; the connection name is rendered separately. */

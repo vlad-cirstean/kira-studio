@@ -1,6 +1,7 @@
 import type { AppMode } from '@shared/domain/mode';
 import { repoWorkspaceKey, type WorkspaceKey } from '@shared/domain/workspace';
 import { reactive } from 'vue';
+import { control } from '../bridge/control';
 import { setMode } from './mode';
 import { ensureWorkspaceShell } from './repoTabs';
 import { closeWorkspaceTabs } from './tabs';
@@ -26,23 +27,27 @@ export function activateWorkspace(key: WorkspaceKey): void {
   workspaceState.active = key;
 }
 
-// C5 §4.2: opens repoId's own workspace — adds it to the switcher (a no-op if already open),
-// ensures its pinned graph tab exists (§6.1), then activates it.
+// C5 §4.2/C6 §8.5: opens repoId's own workspace — adds it to the switcher (a no-op if already
+// open), ensures its pinned graph tab exists (§6.1), starts its index (fire-and-forget: a failed
+// index start must never block opening a workspace whose tree and viewer work regardless), then
+// activates it.
 export function openRepoWorkspace(repoId: string): void {
   if (!workspaceState.openRepos.includes(repoId)) {
     workspaceState.openRepos = [...workspaceState.openRepos, repoId];
   }
   ensureWorkspaceShell(repoId);
+  void control.codeWorkspaceOpenWorkspace(repoId).catch(() => {});
   activateWorkspace(repoWorkspaceKey(repoId));
 }
 
 // C5 §4.2: closes every one of repoId's own tabs (its pinned graph tab included — closeWorkspaceTabs
 // is the one path that bypasses the pin guard, since tearing down the whole workspace is not the
 // same act as closing one of its tabs) and drops it from the switcher. Falls back to Studio when
-// the closed workspace was the active one.
+// the closed workspace was the active one. C6 §8.5: also stops repoId's own index/watcher.
 export function closeRepoWorkspace(repoId: string): void {
   const key = repoWorkspaceKey(repoId);
   closeWorkspaceTabs(key);
   workspaceState.openRepos = workspaceState.openRepos.filter((id) => id !== repoId);
+  void control.codeWorkspaceCloseWorkspace(repoId).catch(() => {});
   if (workspaceState.active === key) activateWorkspace('studio');
 }

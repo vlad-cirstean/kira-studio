@@ -11,6 +11,7 @@ import EmptyState from '../../theme/primitives/EmptyState.vue';
 import { registerEditor, unmountEditor } from './editors';
 import { monacoLanguageFor } from './language';
 import { getOrCreateModel, loadMonaco, REPO_THEME_NAME, repoFileUri } from './monaco';
+import { ensureNavigationRegistered } from './navigation';
 
 const props = defineProps<{ tab: RepoFileTabRecord }>();
 
@@ -48,12 +49,16 @@ async function mount(): Promise<void> {
   }
 
   const mod = await loadMonaco();
+  ensureNavigationRegistered(mod);
   // Unmounted (tab closed/switched away) while the read/import above was in flight.
   if (!container.value) return;
 
-  const uri = repoFileUri(repoId, props.tab.path);
+  const uri = repoFileUri(mod, repoId, props.tab.path);
   const language = monacoLanguageFor(props.tab.path);
-  const model = getOrCreateModel(mod, uri, content.text, language);
+  const model = getOrCreateModel(mod, uri, content.text, language, {
+    repoId,
+    path: props.tab.path,
+  });
 
   const editor = mod.editor.create(container.value, {
     model,
@@ -68,6 +73,13 @@ async function mount(): Promise<void> {
     codeLens: false,
     renderValidationDecorations: 'off',
     scrollBeyondLastLine: false,
+    // C6 D4: never Monaco's own peek widget for a multi-candidate result — standalone Monaco's
+    // peek preview resolves each candidate through ITextModelService, which in the standalone
+    // build only finds already-created models, so a cross-file candidate with no open tab would
+    // render an empty preview pane. 'goto' jumps to the first (best-ranked) candidate through the
+    // editor opener instead, which needs no model at all. Honesty is preserved by the hover, which
+    // lists every candidate with its own rule/confidence.
+    gotoLocation: { multipleDefinitions: 'goto' },
     fontFamily: settingsState.appearance.fontFamily,
     fontSize: settingsState.appearance.fontSize,
   });
