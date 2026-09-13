@@ -1,0 +1,155 @@
+// C5 §15.1: the preview/pin interaction in state/tabs.ts — the one piece of this phase's own
+// tab-scoping rewrite that is genuinely several interacting rules over one mutable structure
+// (CLAUDE.md's own testing bar), tested directly against openTab/closeTab/moveTab/closeOthers/
+// closeAll rather than through any UI.
+import './support/window';
+
+import { describe, expect, test } from 'bun:test';
+import { restoreAfterEach } from './support/restoreAfterEach';
+
+const { control } = await import('../../frontend/src/bridge/control');
+restoreAfterEach(control);
+(control as unknown as { tabsSave: typeof control.tabsSave }).tabsSave = () => Promise.resolve();
+
+const { defaultRepoFileTabState } = await import('../../../../packages/shared/domain/tabs');
+const { repoWorkspaceKey } = await import('../../../../packages/shared/domain/workspace');
+const { tabsForWorkspace } = await import('../../frontend/src/state/mode');
+const {
+  closeAll,
+  closeOthers,
+  closeTab,
+  createPinnedRepoGraphTab,
+  duplicateTab,
+  isPreview,
+  moveTab,
+  openTab,
+  tabsState,
+} = await import('../../frontend/src/state/tabs');
+
+// Every test gets its own fresh workspace ids — tabsState.tabs is one shared module-level array
+// with no per-test reset, so reusing a workspace id across tests would leak tabs between them.
+let workspaceCounter = 0;
+function freshWorkspace() {
+  workspaceCounter += 1;
+  return repoWorkspaceKey(`test-${workspaceCounter}`);
+}
+
+function openFile(workspace: string, path: string, preview: boolean) {
+  return openTab('repo-file', null, path, () => defaultRepoFileTabState(), {
+    reuse: true,
+    workspaceId: workspace,
+    preview,
+  });
+}
+
+describe('C5 §5.2: the preview slot', () => {
+  test('a preview open replaces the slot tab in its own array position', () => {
+    const ws = freshWorkspace();
+    const a = openFile(ws, 'a.ts', false); // permanent, anchors position 0
+    const b = openFile(ws, 'b.ts', true); // preview at position 1
+    const c = openFile(ws, 'c.ts', false); // permanent at position 2
+    expect(tabsForWorkspace(ws).map((t) => t.id)).toEqual([a.id, b.id, c.id]);
+
+    const d = openFile(ws, 'd.ts', true); // replaces b's preview, in b's own position
+    expect(tabsForWorkspace(ws).map((t) => t.id)).toEqual([a.id, d.id, c.id]);
+    expect(tabsState.tabs.find((t) => t.id === b.id)).toBeUndefined();
+    expect(isPreview(d.id)).toBe(true);
+  });
+
+  test('a permanent open never evicts a preview tab', () => {
+    const ws = freshWorkspace();
+    const preview = openFile(ws, 'p.ts', true);
+    const permanent = openFile(ws, 'q.ts', false);
+    expect(tabsForWorkspace(ws).map((t) => t.id)).toEqual([preview.id, permanent.id]);
+    expect(isPreview(preview.id)).toBe(true);
+  });
+
+  test('reopening the same path activates rather than duplicating', () => {
+    const ws = freshWorkspace();
+    const first = openFile(ws, 'same.ts', true);
+    const countBefore = tabsState.tabs.length;
+    const second = openFile(ws, 'same.ts', false);
+    expect(second.id).toBe(first.id);
+    expect(second.reused).toBe(true);
+    expect(tabsState.tabs.length).toBe(countBefore);
+  });
+
+  test('a permanent reopen of the current preview tab promotes it (clears the slot)', () => {
+    const ws = freshWorkspace();
+    const tab = openFile(ws, 'promote.ts', true);
+    expect(isPreview(tab.id)).toBe(true);
+    openFile(ws, 'promote.ts', false);
+    expect(isPreview(tab.id)).toBe(false);
+  });
+
+  test('closing the preview tab clears the slot', () => {
+    const ws = freshWorkspace();
+    const tab = openFile(ws, 'closeme.ts', true);
+    expect(isPreview(tab.id)).toBe(true);
+    closeTab(tab.id);
+    expect(tabsState.previewIdByWorkspace[ws]).toBeNull();
+  });
+
+  test("two workspaces' preview slots are independent", () => {
+    const wsA = freshWorkspace();
+    const wsB = freshWorkspace();
+    const a = openFile(wsA, 'x.ts', true);
+    const b = openFile(wsB, 'x.ts', true); // same relative path, different repo
+    expect(isPreview(a.id)).toBe(true);
+    expect(isPreview(b.id)).toBe(true);
+    expect(a.id).not.toBe(b.id); // dedupe key includes workspaceId — never collapsed together
+  });
+});
+
+describe('C5 §6.1: the pinned tab', () => {
+  test('tabsForWorkspace puts the pinned tab first after a moveTab that tried to drag another tab in front of it', () => {
+    const ws = freshWorkspace();
+    const graph = createPinnedRepoGraphTab(ws);
+    const file1 = openFile(ws, 'f1.ts', false);
+    const file2 = openFile(ws, 'f2.ts', false);
+
+    // Attempt to drag file2 in front of the pinned graph tab — moveTab must refuse outright since
+    // the drop target (graph) is pinned.
+    moveTab(file2.id, graph.id);
+
+    const order = tabsForWorkspace(ws).map((t) => t.id);
+    expect(order[0]).toBe(graph.id);
+    expect(order).toEqual([graph.id, file1.id, file2.id]);
+  });
+
+  test('moveTab on the pinned tab itself is a no-op', () => {
+    const ws = freshWorkspace();
+    const graph = createPinnedRepoGraphTab(ws);
+    const file1 = openFile(ws, 'g1.ts', false);
+    const before = tabsState.tabs.map((t) => t.id);
+    moveTab(graph.id, file1.id);
+    expect(tabsState.tabs.map((t) => t.id)).toEqual(before);
+  });
+
+  test('closeTab, closeOthers and closeAll all leave the pinned tab alive', () => {
+    const ws = freshWorkspace();
+    const graph = createPinnedRepoGraphTab(ws);
+    const file1 = openFile(ws, 'h1.ts', false);
+    const file2 = openFile(ws, 'h2.ts', false);
+
+    closeTab(graph.id); // §6.1: a pinned tab never closes.
+    expect(tabsState.tabs.some((t) => t.id === graph.id)).toBe(true);
+
+    closeOthers(file1.id);
+    expect(tabsState.tabs.some((t) => t.id === graph.id)).toBe(true);
+    expect(tabsState.tabs.some((t) => t.id === file2.id)).toBe(false);
+
+    closeAll();
+    expect(tabsState.tabs.some((t) => t.id === graph.id)).toBe(true);
+    expect(tabsForWorkspace(ws).filter((t) => t.id !== graph.id).length).toBe(0);
+  });
+
+  test('duplicateTab refuses a pinned tab', () => {
+    const ws = freshWorkspace();
+    const graph = createPinnedRepoGraphTab(ws);
+    const countBefore = tabsState.tabs.length;
+    const result = duplicateTab(graph.id);
+    expect(result).toBe(graph.id);
+    expect(tabsState.tabs.length).toBe(countBefore);
+  });
+});

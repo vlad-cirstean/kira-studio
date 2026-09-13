@@ -26,10 +26,10 @@ originally written rather than corrected to match later reality — see each cha
 | Shell | **Wails v3** (`v3.0.0-beta.16`), Go | a custom, hidden-inset title bar (`Mac.TitleBar: application.MacTitleBarHiddenInset`, P1) drawn by `workbench/TitleBar.vue` over a full-size-content window — not the OS-drawn bar; macOS 14+, `arm64` only |
 | Language | TypeScript 6 (`tsc`/`vue-tsc`) for `.ts` and `.vue`; **Go** for the shell | pinned below TypeScript 7 on purpose — TS7 ships no stable programmatic compiler API until 7.1, and `vue-tsc` (which `bun run typecheck:web` runs) consumes that API in-process; `@typescript/native-preview`'s `tsgo` binary (`typecheck:tests`/`typecheck:unit`) is a separate, already-latest-upstream tool in the meantime. Converge on one toolchain once TS 7.1 ships and `vue-tsc` adopts it (P19 F2/F4) |
 | Package manager / scripts / test runner | Bun | tooling only — every adapter is native Go, so nothing at runtime depends on it |
-| Renderer build | Vite (`vite build`, `apps/kira-studio/frontend/vite.config.ts`) | builds `apps/kira-studio/frontend/src` straight into `apps/kira-studio/frontend/dist`, which `apps/kira-studio/main.go` embeds via `//go:embed all:frontend/dist` and serves through Wails' `AssetOptions.Handler`. Lazily-imported chunks, still split under Vite 8/Rolldown (P19 C6): the query console's SQL Format button reaches `sql-formatter` only through `views/console/sqlFormatterEntry.ts`'s `await import()` (~37 KB gzip); the data grid's Generate data… dialog and, as of P6, Api mode's own send path and its dynamic-values reference dialog all reach `@faker-js/faker/locale/en` — but through **two** one-line entry files, `views/grid/fakeData/fakerEntry.ts` and `packages/api-core/src/http/dynamic/fakerEntry.ts`, duplicated rather than shared because the latter is P12 D16(e)'s own no-app-import package, not just P1 D7's biome rule. Rolldown folds the two content-identical entry files into one shared stub chunk and gives the underlying locale data its own shared chunk beneath it (`en-*.js`, ~155 KB gzip — the same bytes the single pre-P6 `fakerEntry-*.js` chunk carried, just reorganised into two files instead of one, not duplicated); `packages/api-core/src/http/dynamic/generators.ts`, P6's own 58-entry `$name` → faker-call dispatch table, is genuinely new code and gets a third lazy chunk of its own (~0.8 KB gzip). A fourth, as of P8: the response-history pane's **Compare** action reaches `@codemirror/merge` only through `views/httprequest/mergeEntry.ts`'s own one-line `await import()` (~29 KB, ~10 KB gzip). All four are fetched on first use — the first *Generate data…* open, the first send referencing a `{{$name}}`, the first open of the dynamic-values dialog, or the first **Compare** press — and none costs a launch or grows `index-*.js` by anything but each phase's own eager app code |
+| Renderer build | Vite (`vite build`, `apps/kira-studio/frontend/vite.config.ts`) | builds `apps/kira-studio/frontend/src` straight into `apps/kira-studio/frontend/dist`, which `apps/kira-studio/main.go` embeds via `//go:embed all:frontend/dist` and serves through Wails' `AssetOptions.Handler`. Lazily-imported chunks, still split under Vite 8/Rolldown (P19 C6): the query console's SQL Format button reaches `sql-formatter` only through `views/console/sqlFormatterEntry.ts`'s `await import()` (~37 KB gzip); the data grid's Generate data… dialog and, as of P6, Api mode's own send path and its dynamic-values reference dialog all reach `@faker-js/faker/locale/en` — but through **two** one-line entry files, `views/grid/fakeData/fakerEntry.ts` and `packages/api-core/src/http/dynamic/fakerEntry.ts`, duplicated rather than shared because the latter is P12 D16(e)'s own no-app-import package, not just P1 D7's biome rule. Rolldown folds the two content-identical entry files into one shared stub chunk and gives the underlying locale data its own shared chunk beneath it (`en-*.js`, ~155 KB gzip — the same bytes the single pre-P6 `fakerEntry-*.js` chunk carried, just reorganised into two files instead of one, not duplicated); `packages/api-core/src/http/dynamic/generators.ts`, P6's own 58-entry `$name` → faker-call dispatch table, is genuinely new code and gets a third lazy chunk of its own (~0.8 KB gzip). A fourth, as of P8: the response-history pane's **Compare** action reaches `@codemirror/merge` only through `views/httprequest/mergeEntry.ts`'s own one-line `await import()` (~29 KB, ~10 KB gzip). A fifth, as of C5: the native code workspace's Monaco viewer reaches `monaco-editor` only through `views/repo/monacoEntry.ts`'s own dynamic import, triggered by the first repo file tab any session opens — studio/api sessions never fetch it. Measured (`bun run build`): `monacoEntry-*.js` 3.81 MB raw / **972 KB gzip**, plus `monacoEntry-*.css` 162 KB raw / 24.6 KB gzip and one `editor.worker-*.js` (300 KB raw, loaded as a Worker script rather than a page asset, so it carries no separate gzip line in Vite's report) — each of the 19 registered languages' own Monarch grammar data lands in its own further-lazy sub-chunk (0.4-3.7 KB gzip each), fetched only once a file of that language is actually opened. All five chunks are fetched on first use — the first *Generate data…* open, the first send referencing a `{{$name}}`, the first open of the dynamic-values dialog, the first **Compare** press, or the first repo file opened — and none costs a launch or grows `index-*.js` by anything but each phase's own eager app code |
 | UI | Vue 3 (`<script setup>`, Composition API) | VDOM mode — Vapor mode evaluated and declined in P6 (`docs/v1.1/plans/P6-vue-vapor-mode.md`) |
 | Styling | Tailwind (v4, CSS-first config) | tokens mirror VS Code Dark Modern |
-| Text editing / viewing | CodeMirror 6 | definition tab's Source pane, cell editor, document view, command preview |
+| Text editing / viewing | CodeMirror 6 (studio/api surfaces) + `monaco-editor` (C5's native code workspace) | CodeMirror: definition tab's Source pane, cell editor, document view, command preview — unchanged, and keeps that role: nothing here migrates to Monaco. Monaco: **viewer-only**, read-only repository files opened from C5's project tree — see the "Native code workspace (C5)" section below for why the two coexist rather than one replacing the other (different embedding shapes: CodeMirror's per-surface compartments vs. Monaco's own model/worker lifecycle, and Monaco's bundle cost is not one every studio/api session should pay) |
 | Icons | `@vscode/codicons` | UI chrome |
 | Validation | Zod (TypeScript side) / hand-written model decoders (Go side) | Zod's remaining TypeScript-side job is connection-dialog input — the engine wire protocol it used to guard (`src/engine/{control,rpc,data,stdio-main}.ts`) went with `src/engine/`'s deletion (P58f). Rows read back out of SQLite are validated in Go (`apps/kira-studio/internal/storage/model/`) |
 | Lint + format | Biome, default rules | single tool, no ESLint/Prettier |
@@ -44,6 +44,7 @@ originally written rather than corrected to match later reality — see each cha
 | Git module transport (v1.3) | A Unix domain socket plus `internal/bridge/rpcstream`'s correlated-RPC-with-credits protocol — JSON control frames, FlatBuffers bulk payloads (`"KIG1"`) | The git module is **headless**: the backend is in this binary, the frontend is a separately-installed VS Code extension (`apps/kira-studio-vscode`) reached over `${KIRA_HOME}/git.sock`. **The transport itself took no new runtime dependency** — `net` and `encoding/json` plus the FlatBuffers runtimes P11 already put in the graph. What the module *did* add: `github.com/fsnotify/fsevents` (the darwin repo watcher, `darwin && cgo`, G9), `golang.org/x/text/unicode/norm` (NFC path normalization, G27), and `@vscode/vsce` as a build-time-only packager. See the Git module section below |
 | Code parsing (C1, extraction fixes C2) | `github.com/tree-sitter/go-tree-sitter` (the official cgo binding) plus ten upstream grammar modules — java, python, javascript, typescript+tsx, go, rust, html, css, json, svelte, all MIT | `internal/codeparse` is the only package in the repo importing tree-sitter, and the only unconditionally-cgo one (every other cgo file in the app is a `darwin && cgo`-gated exception, below) — a real, priced cost: a C compiler becomes a build requirement for this package and anything importing it, and `CGO_ENABLED=0` no longer builds such a caller. Declined every pure-Go alternative found: `gotreesitter` is a from-scratch reimplementation of the parse-table interpreter and every external scanner (3.9x slower per its own README, with 3 of 206 grammars already degraded), a materially different risk than `modernc.org/sqlite`'s mechanical transpilation of the same upstream C; `malivvan/tree-sitter` (a wasm build under `wazero`, the right architecture) is 5 stars/3 commits/self-described pre-release; building that wasm ourselves would mean owning a toolchain and a regeneration script for a capability the packaged darwin build already has via cgo. Every grammar reports ABI 14, inside the binding's own compatible range [13, 15] (`TREE_SITTER_MIN_COMPATIBLE_LANGUAGE_VERSION`/`TREE_SITTER_LANGUAGE_VERSION`), checked at construction. Binary size delta measured the same way P11's own gRPC dependency was (a minimal program against a `println` baseline, `linux/amd64`, no flags): **+6.6 MB** for the grammar registry alone. Vue has no grammar of its own (no Go module exists) and is parsed as an HTML container with per-block injection instead. **C2** compiles TypeScript and TSX against javascript's own vendored `tags.scm` first, then their own — upstream ships the TypeScript file as an *addition* to the JavaScript one (signature/abstract/interface patterns only, no `; inherits:` header), so the TypeScript file alone indexed almost nothing; composing both is what makes a plain class, function, method or call show up in a `.ts`/`.tsx` file at all. C2 also adds four small repo-authored `queries/<lang>/c2_implements.scm` files (TypeScript, TSX, JavaScript, Python) beside the vendored `tags.scm`s — the only hand-written query text in the package (§4.1's own "no hand-written queries" gets a narrow, named exception here) — recovering `implements`/`extends`/base-class relationships no vendored pattern expresses for those four languages, through the same `@reference.implementation` capture Java and Rust's own vendored queries already use |
 | MCP server (C3) | `github.com/modelcontextprotocol/go-sdk` (Apache-2.0, MIT for un-relicensed contributions), v1.7.0, over the SDK's own **Streamable HTTP** transport, not stdio | The protocol org's own reference implementation, at a stable v1 — the axis that matters for a wire format that keeps moving; `mark3labs/mcp-go` (MIT, real and widely used, but the second implementation, not the reference one) and hand-rolling JSON-RPC framing were both declined (`CLAUDE.md`'s library-first rule finds nothing hand-rolling would earn its keep against here — stdio framing, initialize/capabilities, tool listing, cancellation and schema validation are exactly what the SDK already does). Streamable HTTP, not the SDK's own stdio transport, because the server is one long-running process serving as many concurrent clients/tool calls as connect (`internal/repomap`), never a process spawned fresh per client; the SDK's own `auth.RequireBearerToken` middleware gates every request, reused rather than hand-rolled for the same reason. `mcp.AddTool[In, Out]` derives each tool's input schema from a Go struct's own tags, so every tool's schema has exactly one source. Binary size delta measured the same way as `codeparse`'s own row, above, comparing the whole `cmd/kira-studio` binary before/after (no separate helper binary exists, see the `internal/repomap` section below): **+12.38 MB** (`linux/amd64`, unstripped) for `internal/repomap`, `internal/mcpauth`, `internal/mcpinstall` and the SDK's own dependency graph (`golang.org/x/oauth2`, `google/jsonschema-go`, `segmentio/encoding`, `yosida95/uritemplate`, `golang-jwt/jwt`) |
+| Native file viewer (C5) | `monaco-editor` (MIT, pinned 0.56.0), npm | Added to the root `package.json`'s `dependencies`, beside `slickgrid` — the precedent for a bundled runtime UI library. **Viewer-only**: reached through `edcore.main.js`'s modern equivalent in this pinned version — the package restructured its internal layout entirely since the plan researching this phase was written (no `edcore.main.js` exists any more; `monaco-editor/features/register.all.js` is upstream's own "every standard contribution, no language service, no worker" bundle, verified against the source) — never the package root (`editor.main.js`, which still pulls in all four language *services* and every one of ~180 language grammars eagerly). Exactly one worker ships (`editor.worker`, backing `IEditorWorkerService` — reserved for C6's diff-editor widget), confirmed by inspecting a real `bun run build`'s `dist/assets` for a second `*worker*.js` that never appears. Nineteen languages get a registered Monarch grammar (`views/repo/monacoEntry.ts`'s own import list); `.json`/`.jsonc` reuse the JavaScript grammar (Monaco ships no JSON basic-language in this version either); `.vue`/`.svelte` color as plain HTML (no grammar exists for either). See "Native code workspace (C5)" below |
 
 Driver libraries — the best-maintained option per engine, **Go-native for all ten kinds as of P58e
 M9.3** (checkpoint C2): `jackc/pgx/v5` (postgres), `go-sql-driver/mysql` (mariadb/mysql, via a shared
@@ -564,8 +565,17 @@ op_log(id, connection_id, tab_id, started_at, duration_ms, kind, status, rows,
                                                        -- command_truncated added by migration 15)
 ui_layout(key, value)                                   -- panel sizes, visibility (app-wide)
 windows(key, order, bounds_json)                        -- one row per workbench (P8)
-tabs(id, connection_id, path, kind, state_json, order, active, window_key)  -- session restore,
-                                                       -- window_key ON DELETE CASCADE into windows
+tabs(id, connection_id, path, kind, state_json, order, active, window_key, workspace_id)
+                                                       -- session restore, window_key ON DELETE
+                                                       -- CASCADE into windows. workspace_id (C5,
+                                                       -- migration 0018): NULL for every studio/api
+                                                       -- tab (unchanged since before this column
+                                                       -- existed), 'repo:<code_repos.id>' for one
+                                                       -- scoped to that repository's own workspace
+                                                       -- -- a key, not a row reference, so no FK;
+                                                       -- CodeReposRepo.Remove deletes that
+                                                       -- workspace's tab rows in the same
+                                                       -- transaction instead
 api_collections(id, name, sort_order, origin_json, variables_promoted,
                  created_at, updated_at)                -- P4; variables_promoted added P5
 api_items(id, collection_id, parent_id, kind, name, sort_order, method, url, protocol,
@@ -623,7 +633,19 @@ git_repo_settings(repo_id, key, value)                  -- G18; per-(repository,
                                                        -- sentinel (a real RepoID can never be
                                                        -- empty), so the one non-per-repo key
                                                        -- needs no schema change
+code_repos(id, name, root, repo_id, sort_order, created_at)  -- C5, migration 0018; a repo entry
+                                                       -- imported into the native code workspace
+                                                       -- -- a parallel list to `connections`, never
+                                                       -- an extension of it (a repository needs
+                                                       -- none of that table's other fields).
+                                                       -- repo_id (gitclient's own identity, UNIQUE)
+                                                       -- is what tabs.workspace_id's 'repo:<id>'
+                                                       -- values key off this table's own `id`, not
+                                                       -- repo_id itself
 ```
+
+`kira.db` is at migration **0018** as of C5 (`0018_c5_code_repos.sql`) — `code_repos` plus
+`tabs.workspace_id` (above).
 
 Migrations are forward-only numbered SQL files (`apps/kira-studio/internal/storage/migrations/`) applied on
 startup. Table access is hand-written `database/sql` in `apps/kira-studio/internal/storage/repos/` — there is
@@ -951,6 +973,72 @@ the Settings dialog's Code intelligence tab shows the command before its Install
 reverse, and the button re-resolves `claude`'s own location fresh on every click rather than trusting
 a cached probe. No VS Code MCP registration of any kind is attempted.
 
+**Native code workspace (C5): repo import, tab isolation, project tree, Monaco viewer — read-only
+throughout.** Import a git repository into the same `ProjectPanel.vue` a database connection lives
+in (`code_repos`, above) and click it to open it as its own independent workspace: its own tab set,
+never interleaved with another open repo's or with studio/api's shared strip.
+
+- **Tab isolation is a new orthogonal *workspace* dimension, not a new `AppMode`.** Two open
+  repositories share the exact same two tab kinds (`repo-graph`, `repo-file`), which a mode-per-kind
+  mapping (`TAB_KIND_MODE`) structurally cannot express — so `TabRecord` gained one nullable field,
+  `workspaceId`, and one derivation, `workspaceKeyOf(tab) = tab.workspaceId ?? TAB_KIND_MODE[tab.kind]`,
+  replaces the mode filter everywhere a tab set is read (`state/mode.ts`). `null` is every tab that
+  existed before this phase, so studio/api behave byte-identically — the only thing that changed
+  under them is that the record they are filtered by is now computed by a function with a `??` in
+  it, not a plain lookup.
+- **The preview slot is one entry per workspace** (`tabsState.previewIdByWorkspace`, in-memory
+  only, like `tabsState.hydrated`) — VS Code's own convention: a single click opens a file into one
+  shared, replaceable preview tab (rendered in italics); a double-click, or a second single-click
+  reuse, promotes it to a permanent tab. A permanent open never evicts a preview tab; a new preview
+  open closes the old preview tab and splices the new one into its exact array position, rather
+  than mutating the closed tab's own record in place, so the one existing close path
+  (`closeTab`, which frees page stores/runtime) still runs.
+- **The pin is a property of the tab *kind*, not a per-tab flag.** `repo-graph` is the only pinned
+  kind (`TabKindDef.pinned`) — permanently first (`tabsForWorkspace`'s own stable partition, pinned
+  tabs first in array order, then the rest), unclosable, un-reorderable, un-duplicable. This phase
+  builds the mechanism and an honest placeholder view for that slot (`views/repo/RepoGraphView.vue`,
+  *"The commit graph for this repository is not available yet"* — no stubbed handler, no `TODO`);
+  **C9 replaces exactly one `TAB_VIEWS['repo-graph']` line** with the real `packages/git-ui` mount.
+- **The file list is `codeindex.EnumerateAll`** (`internal/codeindex`, C1's own `Enumerate`
+  widened to drop its parseable-extension filter, D6) — the same `git ls-files -z --cached --others
+  --exclude-standard` argv, so a project tree and C1's own parse pipeline can never disagree about
+  what ".gitignore semantics" means. Capped at 200,000 paths (an honest IPC-payload limit, not a
+  UI virtualization one — `theme/primitives/TreeHost.vue` already virtualizes the rendered rows).
+  **Refresh is on workspace open and an explicit Refresh action only — nothing live.** `codeindex`'s
+  own worktree watcher covers only directories holding parseable files (C1's own scope), which is
+  not the signal a *complete* file tree needs, and a second worktree watcher just for a tree refresh
+  would spend a watcher's worth of complexity on a button (Known open items, below).
+- **Read-only, enforced in three places**, each independently: the bound service
+  (`internal/bridge/codeworkspace.go`, `CodeWorkspaceService`) has no write method at all, and
+  every git invocation inside `internal/codeworkspace` builds its `gitclient.Spec` with
+  `ReadOnly: true`; every Monaco instance sets `readOnly: true` and `domReadOnly: true`, so neither
+  the keyboard nor a paste can mutate a model; no tab kind here defines a `badge`, a dirty flag, a
+  save action or a commit action — `definition`'s own existing no-badge shape is the precedent, not
+  a new convention.
+- **Path safety** (`internal/codeworkspace/paths.go`'s `ValidateRelPath`): every path crossing the
+  bound service is repository-relative, rejected outright for an absolute path or a `..` segment,
+  then resolved with `filepath.EvalSymlinks` and required to stay under the session's own root — a
+  repository can contain a symlink pointing anywhere on the machine, so resolving before the
+  containment check (not after joining alone) is what actually prevents this read-only viewer from
+  being used to read `~/.ssh/id_rsa`.
+- **Monaco (`monaco-editor`, viewer-only) renders the file** — see the Stack table's own row above
+  for the package-layout correction this phase found (no `edcore.main.js` in the pinned version;
+  `monaco-editor/features/register.all.js` is its real equivalent) and the measured chunk size.
+  Nineteen languages get a registered Monarch grammar (`views/repo/monacoEntry.ts`'s own import
+  list: typescript, javascript, java, python, go, rust, html, css, scss, less, markdown, yaml, xml,
+  shell, sql, dockerfile, ini, graphql, protobuf); `.json`/`.jsonc` reuse the JavaScript grammar
+  (Monaco ships no JSON basic-language in this version either — its JSON coloring lives inside the
+  excluded JSON language *service*); `.vue`/`.svelte` color as plain HTML (no Monaco grammar exists
+  for either, so a `<script>` block colors as HTML text, not TypeScript — Known open items, below).
+  Exactly one worker ships (`editor.worker`, backing `IEditorWorkerService`) — never a language-
+  service worker, which is what actually disables IntelliSense/diagnostics rather than merely
+  hiding its UI.
+- **C6 (a separate phase, its own plan) adds diff tabs and code navigation on top of this shell** —
+  Monaco's definition/hover extension points, a `codeindex.Index` per open repository, and a
+  worktree-vs-HEAD diff-editor tab. Nothing in this phase is a placeholder waiting on C6 except the
+  graph tab itself (C9's own hand-off, above); the file viewer, the tree and tab isolation are
+  complete and usable on their own.
+
 **Why a content snapshot and not just a commit sha.** The trivial case — nothing rewritten since
 the last review — is `git merge-base --is-ancestor <lastReviewedSha> HEAD`; when that succeeds an
 ordinary `git diff` is exact and cheap, and the stored blob is never read at all. The case this
@@ -1227,13 +1315,18 @@ collections, nothing protocol-specific had landed yet), and the seam is delibera
 thing that works: `TAB_KIND_MODE` (`packages/shared/domain/tabs.ts`) is a total, hand-maintained
 map from `TabKind` to `AppMode`, so no `mode` column, migration or Go change exists — a
 tab's mode is derived, never stored, the same shape the "page kind, never database type" rule
-above already uses. `state/mode.ts`'s `modeState` is a plain selection (`setMode`); `tabsState`
-(`state/tabs.ts`) keeps one active tab **per mode** (`activeIdByMode: Record<AppMode, string |
-null>`, not a single app-wide id), and `activateTab`/`closeTab`/`closeOthers`/`closeToTheRight`/
-`closeAll`/`stepTab` are all scoped to the current mode's own slice of the one shared `tabs` array.
-Switching mode touches no `TabRecord`, schedules no save, issues no IPC — the two modes cannot
-drift, cannot double-persist into each other, and (per-window `tabs.window_key` scoping,
-unaffected) cannot leak tabs across a window.
+above already uses. `state/mode.ts`'s `modeState` is a plain selection (`setMode`); `activateTab`/
+`closeTab`/`closeOthers`/`closeToTheRight`/`closeAll`/`stepTab` are all scoped to the current
+workspace's own slice of the one shared `tabs` array. Switching mode touches no `TabRecord`,
+schedules no save, issues no IPC — the two modes cannot drift, cannot double-persist into each
+other, and (per-window `tabs.window_key` scoping, unaffected) cannot leak tabs across a window.
+
+**C5 widened this from "per mode" to "per workspace"** (see "Native code workspace (C5)" above) —
+`TAB_KIND_MODE`'s value type is `TabScope = AppMode | 'repo'` now, a repo tab's real workspace
+comes from `TabRecord.workspaceId` instead (`workspaceKeyOf`), and `tabsState.activeIdByWorkspace`/
+`previewIdByWorkspace` replaced the old per-mode-only maps. Nothing above changed in effect for
+studio/api: `workspaceId` is `null` for both, so `workspaceKeyOf` falls straight back to
+`TAB_KIND_MODE[kind]` and every one of these six functions is byte-identical for them.
 
 **The left panel is a shell with pluggable content; the tree host is a separate, mode-agnostic
 primitive.** `theme/primitives/PanelShell.vue` (P12 D10: moved out of `workbench/panels/`, since
@@ -2888,3 +2981,13 @@ place. `CLAUDE.md` states the process rule; this is the list itself.
   today, and the Code intelligence tab says why. Real "current repository" selection for a packaged
   app is native git mode's job (C8) or C5's own dogfooding wiring, not invented ahead of either; the
   headless `bun run mcp:repo-map` path works for any repository regardless.
+- **C5's native project tree does not follow the filesystem** (§7.1). It refreshes on workspace
+  open and on an explicit Refresh action only — a file created, deleted or modified outside the app
+  is not reflected until one of those happens. `codeindex`'s own worktree watcher covers only
+  directories holding parseable files, which is not the signal a complete file tree needs, and a
+  second worktree watcher just for a tree refresh would spend a watcher's worth of complexity on a
+  button.
+- **`.vue`/`.svelte` files color as plain HTML in C5's Monaco viewer** (§9.4). No Monaco grammar
+  exists for either, so a `<script>` block's contents color as HTML text, not as TypeScript/
+  JavaScript — the alternative is a hand-written SFC Monarch grammar, which `CLAUDE.md`'s
+  library-reuse-first rule declines.
