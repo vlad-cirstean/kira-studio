@@ -35,6 +35,9 @@ export const CHANNEL = {
   // G1 §3.6/D19: the pairing prompt's live queue snapshot and the Connected editors pane's list.
   gitPairing: 'kira:git:pairing',
   gitClientsChanged: 'kira:git:clients',
+  // C7 D7: a repository-wide search's coalesced file groups, delivered via EmitTo (one window
+  // only) — grpcCall's own shape, restated for a payload that shares no field with it.
+  codeSearch: 'kira:code:search',
 } as const;
 
 /** Summed across every process metrics.Sample covers (P56's ticker) — a single app-wide readout

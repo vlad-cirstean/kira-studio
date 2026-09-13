@@ -95,3 +95,67 @@ export const navResultSchema = /*#__PURE__*/ z.object({
   targets: z.array(navTargetSchema),
 });
 export type NavResult = z.infer<typeof navResultSchema>;
+
+// C7 §3.1: a repository-wide search request — Monaco's own find-widget vocabulary (case/whole-word/
+// regex), so the panel's own options read the same as the in-file find widget (D13).
+export const searchRequestSchema = /*#__PURE__*/ z.object({
+  query: z.string(),
+  regex: z.boolean(),
+  caseSensitive: z.boolean(),
+  wholeWord: z.boolean(),
+});
+export type SearchRequest = z.infer<typeof searchRequestSchema>;
+
+// C7 §3.1/D6: one match within one file. line/column/endColumn are Monaco's own 1-based line and
+// 1-based UTF-16 column (the identical rules internal/codeworkspace/textpos.go's LineIndex uses).
+// preview is the line's own text (EOL stripped, possibly windowed, §3.5) with
+// previewMatchStart/End as UTF-16 offsets *into preview*, so the renderer highlights without
+// re-deriving anything; truncatedStart/End say which side (if any) was windowed away — the string
+// itself never carries an ellipsis, so a copied preview is always real file text.
+export const searchMatchSchema = /*#__PURE__*/ z.object({
+  line: z.number(),
+  column: z.number(),
+  endColumn: z.number(),
+  preview: z.string(),
+  previewMatchStart: z.number(),
+  previewMatchEnd: z.number(),
+  truncatedStart: z.boolean(),
+  truncatedEnd: z.boolean(),
+});
+export type SearchMatch = z.infer<typeof searchMatchSchema>;
+
+// C7 §3.1: one file's own group of matches, streamed as codeworkspace.Search finds them.
+// truncated means this file alone hit MaxMatchesPerFile.
+export const fileMatchesSchema = /*#__PURE__*/ z.object({
+  path: z.string(),
+  matches: z.array(searchMatchSchema),
+  truncated: z.boolean(),
+});
+export type FileMatches = z.infer<typeof fileMatchesSchema>;
+
+// C7 §3.1: one search run's own summary, reported in the panel's status line (D4: the skip count
+// is surfaced, never silent) — truncated here means the *whole run* hit MaxSearchMatches and
+// stopped early, distinct from a single FileMatches' own per-file truncated flag.
+export const searchStatsSchema = /*#__PURE__*/ z.object({
+  filesScanned: z.number(),
+  filesMatched: z.number(),
+  filesSkipped: z.number(),
+  matches: z.number(),
+  truncated: z.boolean(),
+});
+export type SearchStats = z.infer<typeof searchStatsSchema>;
+
+// C7 D7: ChannelCodeSearch's own payload — one coalesced batch of file groups. seq is the index of
+// the first file group in this batch (the renderer merges by path, not by seq, but the field stays
+// for the same future-reviewer-detects-a-gap reason GrpcCallEvent's own seq exists);
+// stats/error are set only on the terminal event (done: true), which always fires exactly once,
+// even with nothing pending and even on cancel.
+export const codeSearchEventSchema = /*#__PURE__*/ z.object({
+  searchId: z.string(),
+  seq: z.number(),
+  files: z.array(fileMatchesSchema),
+  done: z.boolean(),
+  stats: searchStatsSchema.nullish(),
+  error: /*#__PURE__*/ z.object({ code: z.string(), message: z.string() }).nullish(),
+});
+export type CodeSearchEvent = z.infer<typeof codeSearchEventSchema>;
