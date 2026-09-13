@@ -1,6 +1,7 @@
 import type { ControlSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
 import { IPC } from './support/ipcChannels';
+import { emitWailsEvent } from './support/mockRuntime';
 
 // C5 §15: the cheapest proof of this phase's one real claim a unit test can't reach — a repo
 // workspace's own isolated, pinned-plus-preview tab strip, and that studio's own strip never shows
@@ -163,4 +164,96 @@ test('a repo workspace: "Open changes" opens a diff tab', async ({ relaunch }) =
   await treeRow(page, 'a.ts').click({ button: 'right' });
   await expect(page.locator('[data-testid="context-menu"]')).toBeVisible();
   await expect(page.locator('[data-testid="menu-item-open-changes"]')).toHaveCount(0);
+});
+
+// C7 §10: the one UI case a Go test or typecheck can't reach — the CHANNEL.codeSearch
+// subscription, the out-of-order merge-by-path (D11), and the result-click-to-preview-tab path
+// (D12). Everything upstream of the event stream (the scanner itself, the coalescer) has its own
+// coverage (search_test.go, the Go package's own layering); this only exercises what those can't.
+test('a repo workspace: search streams results out of order and opens a match', async ({
+  relaunch,
+}) => {
+  const { window: page } = await relaunch({
+    control: [
+      { channel: IPC.codeWorkspaceListRepos, response: [REPO] },
+      { channel: IPC.codeWorkspaceListFiles, args: { id: REPO.id }, response: FILE_LISTING },
+      readFileSnap('a.ts', 'export const a = 1;\n'),
+      { channel: IPC.codeWorkspaceStartSearch, response: { searchId: 'search-1' } },
+    ],
+  });
+
+  await repoRow(page).dblclick();
+  await page.locator('[data-testid="repo-view-search"]').click();
+
+  const queryInput = page.locator('[data-testid="repo-search-query"]');
+  await queryInput.fill('const');
+  await queryInput.press('Enter');
+
+  // 'b.ts' arrives first — enumeration order, not path order — but the store's own binary insert
+  // (D11) must still land it after 'a.ts' once both are in.
+  await emitWailsEvent(page, IPC.codeSearch, {
+    searchId: 'search-1',
+    seq: 0,
+    files: [
+      {
+        path: 'b.ts',
+        matches: [
+          {
+            line: 1,
+            column: 8,
+            endColumn: 13,
+            preview: 'export const b = 2;',
+            previewMatchStart: 7,
+            previewMatchEnd: 12,
+            truncatedStart: false,
+            truncatedEnd: false,
+          },
+        ],
+        truncated: false,
+      },
+    ],
+    done: false,
+  });
+  await expect(page.locator('[data-testid="repo-search-file-row"]')).toHaveCount(1);
+
+  await emitWailsEvent(page, IPC.codeSearch, {
+    searchId: 'search-1',
+    seq: 1,
+    files: [
+      {
+        path: 'a.ts',
+        matches: [
+          {
+            line: 1,
+            column: 8,
+            endColumn: 13,
+            preview: 'export const a = 1;',
+            previewMatchStart: 7,
+            previewMatchEnd: 12,
+            truncatedStart: false,
+            truncatedEnd: false,
+          },
+        ],
+        truncated: false,
+      },
+    ],
+    done: true,
+    stats: { filesScanned: 2, filesMatched: 2, filesSkipped: 0, matches: 2, truncated: false },
+  });
+
+  const fileRows = page.locator('[data-testid="repo-search-file-row"]');
+  await expect(fileRows).toHaveCount(2);
+  await expect(fileRows.nth(0)).toHaveAttribute('data-path', 'a.ts');
+  await expect(fileRows.nth(1)).toHaveAttribute('data-path', 'b.ts');
+
+  await expect(page.locator('[data-testid="repo-search-status"]')).toContainText(
+    '2 results in 2 files',
+  );
+
+  // A single click on a match row opens a preview tab (§7.3's own onSelect/onOpen split).
+  await page.locator('[data-testid="repo-search-match-row"][data-path="a.ts"]').click();
+  const previewTab = tab(page, 'repo-file');
+  await expect(previewTab).toHaveCount(1);
+  await expect(previewTab).toHaveAttribute('data-preview', 'true');
+  await expect(previewTab).toContainText('a.ts');
 });
