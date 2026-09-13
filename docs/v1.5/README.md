@@ -14,6 +14,12 @@ v1.4's `P` numbering. It holds:
 - **`SPEC.md`** — the phases this chapter is built against, one row per phase.
 - **`plans/`** — one implementation plan per phase, committed before that phase's implementation
   starts and never edited afterward. None is written as part of this chapter spec.
+- **`mcp-repo-map-issues.md`** — starting C5, every phase dogfoods the repo-map MCP server (C3) for
+  its own implementation work and logs what it finds. A living log, unlike `plans/`: entries close
+  in place rather than getting deleted. A non-trivial open entry blocks the next phase from
+  starting until fixed.
+- **`mcp-ab-test.md`** — the design, and eventually the results, of a real with/without comparison
+  of the MCP server's effect on token usage, run on C6.
 
 Same discipline as every earlier chapter folder: kept as originally written once a phase starts.
 None is retro-edited to track a later change, so a path or a fact named inside any of them is true
