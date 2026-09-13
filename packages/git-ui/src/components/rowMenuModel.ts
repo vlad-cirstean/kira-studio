@@ -275,6 +275,49 @@ export function buildRefMenu(ctx: RefMenuContext): MenuSection[] {
 }
 
 /**
+ * C10 §4.3/§6 (S6): the native read-only graph's own per-commit menu — copy sha and copy message
+ * *only*, the exact `buildReviewRowMenu` precedent above, verbatim, kept as its own function for
+ * the same reason that doc comment gives (a reader never has to check a table of conditions
+ * against `buildRowMenu`, there is just a second, smaller function). Every mutating item
+ * (checkout/create branch/create tag/revert/reset/cherry-pick) is a write; C10's native surface
+ * hides them rather than disabling them (`docs/v1.5/plans/C10-git-graph-native.md` §4.2 layer 3).
+ */
+export function buildReadOnlyRowMenu(clipboardEnabled: boolean): MenuSection[] {
+  if (!clipboardEnabled) return [];
+  return [
+    {
+      items: [
+        plainItem('copySha', 'Copy SHA', 'codicon-copy'),
+        plainItem('copyMessage', 'Copy commit message', 'codicon-copy'),
+      ],
+    },
+  ];
+}
+
+/**
+ * C10 §4.3 (S6): the native read-only graph's own ref-badge menu (branch, remote-tracking branch,
+ * or tag) — always empty. Every item `buildRefMenu` offers is a write (checkout/rename/delete/push
+ * tag/delete on remote/stack set-parent-or-remove-or-restack/go to parent-or-child branch, the
+ * last two because both resolve a branch and call `runCheckout` despite the navigational name) or
+ * is "Review branch changes", which routes to `review.open` and has no native surface until C11
+ * (§9) — so unlike the commit row and stash row, there is no read item left to keep. Takes no
+ * context: there is nothing here that varies by ref kind or stack membership to gate.
+ */
+export function buildReadOnlyRefMenu(): MenuSection[] {
+  return [];
+}
+
+/**
+ * C10 §4.3 (S6): the native read-only graph's own stash-row menu — "Show changes" only, for both
+ * a per-branch stash row (`buildStashMenu`) and a global-stash row (`buildGlobalStashMenu`); the
+ * two differ only in their mutating items (apply/pop/drop/create branch/save-to-global vs.
+ * apply/create-branch/remove-from-global), all hidden here.
+ */
+export function buildReadOnlyStashMenu(): MenuSection[] {
+  return [{ items: [plainItem('stashShow', 'Show changes', 'codicon-eye')] }];
+}
+
+/**
  * `docs/plans/P9.md` W14: §7.6's per-stash menu — Apply, Pop, Drop, Branch (all gated on
  * `canRunOp`, exactly as every other stack-mutating action is; `stashDrop` reads as un-gated in
  * practice only because `core`'s own `GATED_OP_KINDS` never lists it — see `model/operation.ts`'s

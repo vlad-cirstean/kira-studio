@@ -2,6 +2,9 @@ import { describe, expect, test } from 'bun:test';
 import type { StashEntry } from '@kira/git-ipc';
 import {
   buildGlobalStashMenu,
+  buildReadOnlyRefMenu,
+  buildReadOnlyRowMenu,
+  buildReadOnlyStashMenu,
   buildRefMenu,
   buildStashMenu,
   type RefMenuContext,
@@ -183,5 +186,57 @@ describe('buildRefMenu — tag remote actions are disabled, not silently broken'
     expect(ids.some((id) => id.startsWith('pushRef:') || id.startsWith('deleteRemoteRef:'))).toBe(
       false,
     );
+  });
+});
+
+// C10 §4.2/§4.3/§11 (S6): the three read-only builders must never emit an item whose id maps to
+// an OpRequest kind (or, for a ref, anything the picker/graph would otherwise wire to a write) —
+// UI layer 3 of the read-only boundary. The Go allowlist (gitstream_test.go) is what actually
+// enforces the boundary; these three cases just pin that this layer stays honest with it.
+const WRITE_CAPABLE_ROW_IDS = [
+  'checkoutDetached',
+  'createBranchHere',
+  'createTagHere',
+  'revertThisCommit',
+  'resetToThisCommit',
+  'cherryPickThisCommit',
+];
+const WRITE_CAPABLE_STASH_IDS = [
+  'stashApply',
+  'stashPop',
+  'stashDrop',
+  'stashBranch',
+  'stashSaveGlobal',
+  'globalStashRemove',
+];
+
+describe('C10 read-only menu builders emit no write-capable item', () => {
+  test('buildReadOnlyRowMenu: only Copy SHA / Copy commit message', () => {
+    const sections = buildReadOnlyRowMenu(true);
+    const ids = sections.flatMap((s) => s.items.map((i) => i.id));
+    expect(ids).toEqual(['copySha', 'copyMessage']);
+    for (const writeId of WRITE_CAPABLE_ROW_IDS) {
+      expect(ids).not.toContain(writeId);
+    }
+  });
+
+  test('buildReadOnlyRefMenu: no items at all, for any ref kind', () => {
+    for (const kind of ['branch', 'remoteBranch', 'tag'] as const) {
+      const sections = buildReadOnlyRefMenu();
+      const ids = sections.flatMap((s) => s.items.map((i) => i.id));
+      expect(ids).toEqual([]);
+      // kind is unused by the function itself (it takes no context) — looping over it here just
+      // documents that the empty result holds regardless of which row a caller invokes it for.
+      void kind;
+    }
+  });
+
+  test('buildReadOnlyStashMenu: only Show changes', () => {
+    const sections = buildReadOnlyStashMenu();
+    const ids = sections.flatMap((s) => s.items.map((i) => i.id));
+    expect(ids).toEqual(['stashShow']);
+    for (const writeId of WRITE_CAPABLE_STASH_IDS) {
+      expect(ids).not.toContain(writeId);
+    }
   });
 });
