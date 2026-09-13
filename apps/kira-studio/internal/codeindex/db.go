@@ -58,14 +58,16 @@ type Store struct {
 	sqlDB  *sql.DB
 }
 
-// Open opens (lazily) codeindex.db under $KIRA_HOME.
-func Open() *Store { return OpenAt(config.KiraHome()) }
+// OpenStore returns a Store that will open (lazily) codeindex.db under $KIRA_HOME. Named OpenStore
+// rather than Open — Index's own Open (index.go) is the constructor most callers reach for; this
+// one exists to hand that constructor a shared Store, typically once per process.
+func OpenStore() *Store { return OpenStoreAt(config.KiraHome()) }
 
-// OpenAt is Open against an explicit home dir instead of $KIRA_HOME — a test's own t.TempDir()
-// rather than KIRA_HOME (mirrors internal/storage.OpenAt's own reason: Go's testing package
-// panics if t.Setenv runs in a test that called t.Parallel(), so isolation plus parallelism needs
-// the dir threaded explicitly).
-func OpenAt(home string) *Store {
+// OpenStoreAt is OpenStore against an explicit home dir instead of $KIRA_HOME — a test's own
+// t.TempDir() rather than KIRA_HOME (mirrors internal/storage.OpenAt's own reason: Go's testing
+// package panics if t.Setenv runs in a test that called t.Parallel(), so isolation plus
+// parallelism needs the dir threaded explicitly).
+func OpenStoreAt(home string) *Store {
 	return &Store{path: filepath.Join(home, "codeindex.db")}
 }
 

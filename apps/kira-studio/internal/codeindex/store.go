@@ -77,27 +77,64 @@ func boolToInt(b bool) int64 {
 	return 0
 }
 
-// ReplaceFile deletes w.RepoID/w.Path's existing row (cascading to its blocks/symbols/references
-// via the schema's own ON DELETE CASCADE) and inserts the fresh set, all in one transaction — a
-// partial per-symbol update would buy nothing and would need its own invalidation rules (§6).
-//
-// Symbols insert in two passes: the first assigns every row its real database id (parent_id left
-// NULL), the second fixes parent_id now that codeparse.Symbol.ParentIndex (an index into w.Symbols
-// itself, -1 for none) can be translated into a real id. block_id needs no such fixup — it is
-// resolved directly from the block-id slice built while inserting w.Blocks, in the same order.
+// replaceFileBatch is §6's own transaction size: "writes batch into transactions of 256 files."
+const replaceFileBatch = 256
+
+// ReplaceFile is ReplaceFiles for a single file — a test or a one-off caller's convenience.
 func (s *Store) ReplaceFile(ctx context.Context, w FileWrite) error {
+	return s.ReplaceFiles(ctx, []FileWrite{w})
+}
+
+// ReplaceFiles writes every w in ws, chunked into transactions of at most replaceFileBatch files
+// (§6) — each file's own rows are still replaced wholesale within its own chunk's transaction
+// (delete this file's symbols/blocks/references, insert the new ones): a partial per-symbol
+// update would buy nothing and would need its own invalidation rules.
+func (s *Store) ReplaceFiles(ctx context.Context, ws []FileWrite) error {
 	db, err := s.conn()
 	if err != nil {
 		return err
 	}
+	for start := 0; start < len(ws); start += replaceFileBatch {
+		end := start + replaceFileBatch
+		if end > len(ws) {
+			end = len(ws)
+		}
+		if err := replaceFilesTx(ctx, db, ws[start:end]); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// replaceFilesTx writes one batch inside a single transaction.
+//
+// Each file's symbols insert in two passes: the first assigns every row its real database id
+// (parent_id left NULL), the second fixes parent_id now that codeparse.Symbol.ParentIndex (an
+// index into that file's own Symbols slice, -1 for none) can be translated into a real id.
+// block_id needs no such fixup — it is resolved directly from the block-id slice built while
+// inserting that file's own Blocks, in the same order.
+func replaceFilesTx(ctx context.Context, db *sql.DB, ws []FileWrite) error {
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
-		return fmt.Errorf("codeindex: begin replace file: %w", err)
+		return fmt.Errorf("codeindex: begin replace files: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }() // no-op once Commit has succeeded.
 
+	for _, w := range ws {
+		if err := replaceOneFileTx(ctx, tx, w); err != nil {
+			return err
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("codeindex: commit replace files: %w", err)
+	}
+	return nil
+}
+
+func replaceOneFileTx(ctx context.Context, tx *sql.Tx, w FileWrite) error {
 	if _, err := tx.ExecContext(ctx, `DELETE FROM file WHERE repo_id = ? AND path = ?`, w.RepoID, w.Path); err != nil {
-		return fmt.Errorf("codeindex: delete existing file: %w", err)
+		return fmt.Errorf("codeindex: delete existing file %s: %w", w.Path, err)
 	}
 
 	res, err := tx.ExecContext(ctx, `
@@ -107,11 +144,11 @@ func (s *Store) ReplaceFile(ctx context.Context, w FileWrite) error {
 		w.RepoID, w.Path, w.Language, w.SizeBytes, w.MtimeUnixNs, w.ContentSHA,
 		string(w.ParseStatus), boolToInt(w.HasError), w.LineCount, w.ParsedAt)
 	if err != nil {
-		return fmt.Errorf("codeindex: insert file: %w", err)
+		return fmt.Errorf("codeindex: insert file %s: %w", w.Path, err)
 	}
 	fileID, err := res.LastInsertId()
 	if err != nil {
-		return fmt.Errorf("codeindex: file last insert id: %w", err)
+		return fmt.Errorf("codeindex: file %s last insert id: %w", w.Path, err)
 	}
 
 	blockIDs := make([]int64, len(w.Blocks))
@@ -122,11 +159,11 @@ func (s *Store) ReplaceFile(ctx context.Context, w FileWrite) error {
 			fileID, string(b.Kind), string(b.Language), b.StartByte, b.EndByte,
 			b.StartPoint.Row, b.StartPoint.Column)
 		if err != nil {
-			return fmt.Errorf("codeindex: insert file_block[%d]: %w", i, err)
+			return fmt.Errorf("codeindex: insert file_block %s[%d]: %w", w.Path, i, err)
 		}
 		id, err := r.LastInsertId()
 		if err != nil {
-			return fmt.Errorf("codeindex: file_block[%d] last insert id: %w", i, err)
+			return fmt.Errorf("codeindex: file_block %s[%d] last insert id: %w", w.Path, i, err)
 		}
 		blockIDs[i] = id
 	}
@@ -147,11 +184,11 @@ func (s *Store) ReplaceFile(ctx context.Context, w FileWrite) error {
 			sym.EndPoint.Row, sym.EndPoint.Column,
 			sym.NameStartByte, sym.NameEndByte, sym.NameStart.Row, sym.NameStart.Column)
 		if err != nil {
-			return fmt.Errorf("codeindex: insert symbol[%d]: %w", i, err)
+			return fmt.Errorf("codeindex: insert symbol %s[%d]: %w", w.Path, i, err)
 		}
 		id, err := r.LastInsertId()
 		if err != nil {
-			return fmt.Errorf("codeindex: symbol[%d] last insert id: %w", i, err)
+			return fmt.Errorf("codeindex: symbol %s[%d] last insert id: %w", w.Path, i, err)
 		}
 		symbolIDs[i] = id
 	}
@@ -161,7 +198,7 @@ func (s *Store) ReplaceFile(ctx context.Context, w FileWrite) error {
 		}
 		if _, err := tx.ExecContext(ctx, `UPDATE symbol SET parent_id = ? WHERE id = ?`,
 			symbolIDs[sym.ParentIndex], symbolIDs[i]); err != nil {
-			return fmt.Errorf("codeindex: link symbol[%d] parent: %w", i, err)
+			return fmt.Errorf("codeindex: link symbol %s[%d] parent: %w", w.Path, i, err)
 		}
 	}
 
@@ -175,12 +212,8 @@ func (s *Store) ReplaceFile(ctx context.Context, w FileWrite) error {
 			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			fileID, w.RepoID, blockID, ref.Kind, ref.Name,
 			ref.StartByte, ref.EndByte, ref.StartPoint.Row, ref.StartPoint.Column); err != nil {
-			return fmt.Errorf("codeindex: insert reference[%d]: %w", i, err)
+			return fmt.Errorf("codeindex: insert reference %s[%d]: %w", w.Path, i, err)
 		}
-	}
-
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("codeindex: commit replace file: %w", err)
 	}
 	return nil
 }
@@ -188,12 +221,31 @@ func (s *Store) ReplaceFile(ctx context.Context, w FileWrite) error {
 // DeleteFile removes repoID/path's row (cascading to its blocks/symbols/references) — reconcile's
 // own call for a path that left enumeration (§6 step 3).
 func (s *Store) DeleteFile(ctx context.Context, repoID, path string) error {
+	return s.DeleteFiles(ctx, repoID, []string{path})
+}
+
+// DeleteFiles removes every one of repoID/paths' rows in a single transaction — reconcile's own
+// batch call for every path that left enumeration in one Sync pass (§6 step 3).
+func (s *Store) DeleteFiles(ctx context.Context, repoID string, paths []string) error {
+	if len(paths) == 0 {
+		return nil
+	}
 	db, err := s.conn()
 	if err != nil {
 		return err
 	}
-	if _, err := db.ExecContext(ctx, `DELETE FROM file WHERE repo_id = ? AND path = ?`, repoID, path); err != nil {
-		return fmt.Errorf("codeindex: delete file: %w", err)
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("codeindex: begin delete files: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	for _, path := range paths {
+		if _, err := tx.ExecContext(ctx, `DELETE FROM file WHERE repo_id = ? AND path = ?`, repoID, path); err != nil {
+			return fmt.Errorf("codeindex: delete file %s: %w", path, err)
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("codeindex: commit delete files: %w", err)
 	}
 	return nil
 }
