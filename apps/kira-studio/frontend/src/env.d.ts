@@ -10,3 +10,14 @@ declare module '*.vue' {
   const component: DefineComponent<Record<string, never>, Record<string, never>, unknown>;
   export default component;
 }
+
+// C5 §9.4/D9: monaco-editor 0.56.0 ships a sibling .d.ts for every `register.js` (the language
+// registration entry points, all typed already) but not for the Monarch data module itself
+// (`<lang>.js`, e.g. `languages/definitions/javascript/javascript.js`) — views/repo/monacoEntry.ts
+// dynamically imports this one directly (D9's JSON-reuses-JavaScript's-grammar trick), which is
+// the only place this app reaches past a `register.js` boundary.
+declare module 'monaco-editor/languages/definitions/javascript/javascript.js' {
+  import type { languages } from 'monaco-editor';
+  export const language: languages.IMonarchLanguage;
+  export const conf: languages.LanguageConfiguration;
+}

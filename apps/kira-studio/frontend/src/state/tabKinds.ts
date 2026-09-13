@@ -65,6 +65,8 @@ import { dropForTab as dropConsoleResultPagesForTab } from '../views/console/res
 import { drop as dropDocumentPagesForTab } from '../views/documents/page';
 import { drop as dropGridPagesForTab } from '../views/grid/page';
 import { drop as dropKeyValuePagesForTab } from '../views/keyvalue/page';
+import { dropRepoFileTab } from '../views/repo/editors';
+import { monacoLanguageFor } from '../views/repo/language';
 import { drop as dropStreamPagesForTab } from '../views/stream/page';
 import { codeRepoRecord } from './coderepos';
 import { connectionRecord } from './connections';
@@ -144,6 +146,18 @@ function noDrop(): void {
 function repoFileTitle(tab: TabRecord): string {
   const idx = tab.path.lastIndexOf('/');
   return idx < 0 ? tab.path : tab.path.slice(idx + 1);
+}
+
+// §9.4's own language id, mapped down to one of three tab-strip icons — the same coarse-bucket
+// idea RepoTreeRow.vue's own extension map uses, deliberately not the identical five buckets
+// (a tab strip icon and a tree-row icon are different glance surfaces, D9's own "different
+// purposes" reasoning applied one level further).
+function repoFileIcon(tab: TabRecord): string {
+  const lang = monacoLanguageFor(tab.path);
+  if (lang === 'json') return 'json';
+  if (lang === 'markdown') return 'markdown';
+  if (lang === 'plaintext') return 'file';
+  return 'file-code';
 }
 
 // P3 D3: every parseState below is a one-liner over the schema its own kind already imports —
@@ -370,16 +384,17 @@ export const TAB_KINDS: { [K in TabKind]: TabKindDef<K> } = {
     parseState: parseStateWith(repoGraphTabStateSchema),
     pinned: true,
   },
-  // C5 §8/§9: one opened repository file. Icon/dropResources are upgraded at S11/S10 once the
-  // language registry and the Monaco model cache exist; both are correct no-ops until then.
+  // C5 §8/§9: one opened repository file, rendered by Monaco (read-only, §11).
   'repo-file': {
     mode: TAB_KIND_MODE['repo-file'],
     title: repoFileTitle,
-    icon: () => 'file',
+    icon: repoFileIcon,
     railColor: () => undefined,
     defaultState: (): RepoFileTabState => defaultRepoFileTabState(),
     duplicateState: (tab: RepoFileTabRecord): RepoFileTabState => ({ ...tab.state }),
-    dropResources: noDrop,
+    // §9.3: disposes the live editor widget (if any) and the cached model — RepoFileView.vue's
+    // own unmount (a mere tab switch) never reaches this; only an actual close does.
+    dropResources: (tabId) => dropRepoFileTab(tabId),
     menuExtras: () => [],
     parseState: parseStateWith(repoFileTabStateSchema),
   },

@@ -102,3 +102,41 @@ file). Each file's own upstream repository and pinned module version is also rec
 `internal/codeparse/queries.go`'s `Provenance` table. Copyright for each grammar and its queries
 belongs to the tree-sitter project and that grammar's own listed authors; see each grammar module's
 own `LICENSE` file for the exact copyright line.
+
+## monaco-editor
+
+Kira Studio's native code-viewing workspace (C5, `views/repo/`) renders opened repository files
+read-only with [`monaco-editor`](https://www.npmjs.com/package/monaco-editor) (npm, pinned
+0.56.0) — the editor component that also powers Visual Studio Code, reached only through
+`views/repo/monacoEntry.ts`'s own dynamic `import()` boundary (studio/api sessions never download
+this chunk). Its bundled icon font, `codicon.ttf` (pulled in transitively by
+`monaco-editor/features/register.all.js`'s own `codicon.css`), ships and is credited here the same
+way `seti-icons` is above — a second, independent copy of the codicon glyphs from this app's own
+`@vscode/codicons` dependency (CodiconIcon.vue), since Monaco's internal widgets (the find toolbar,
+inline suggestions) reference their own bundled copy rather than this app's.
+
+`monaco-editor` is licensed under the MIT License:
+
+```
+The MIT License (MIT)
+
+Copyright (c) 2016 - present Microsoft Corporation
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
