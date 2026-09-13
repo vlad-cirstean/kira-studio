@@ -132,22 +132,31 @@ func (li *LineIndex) Position(row, byteColumn int) (line, column int) {
 	if target > end {
 		target = end
 	}
+	return row + 1, utf16Units(li.data[start:target]) + 1
+}
 
-	units := 1
-	off := start
-	for off < target {
-		r, size := utf8.DecodeRune(li.data[off:end])
+// utf16Units counts how many UTF-16 code units b's runes encode to, under rules 2/3 above: one
+// unit per rune at or below U+FFFF, two for a surrogate pair, one per invalid UTF-8 byte. Extracted
+// out of Position's own loop (C7 S1) so the search scanner — which has one line in hand, not a
+// whole file, and so cannot call LineIndex.Position directly — computes a match's column with the
+// exact same rules rather than a second implementation that could quietly disagree with it on a
+// line containing a non-ASCII rune.
+func utf16Units(b []byte) int {
+	units := 0
+	off := 0
+	for off < len(b) {
+		r, size := utf8.DecodeRune(b[off:])
 		if r == utf8.RuneError && size <= 1 {
-			units++
+			units++ // rule 3: one invalid byte, one UTF-16 unit.
 			off++
 			continue
 		}
 		if r > 0xFFFF {
-			units += 2
+			units += 2 // rule 2: a surrogate pair.
 		} else {
 			units++
 		}
 		off += size
 	}
-	return row + 1, units
+	return units
 }
