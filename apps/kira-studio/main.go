@@ -26,6 +26,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/appcore"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/bridge"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/buildinfo"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/codeindex"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/codeworkspace"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/config"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/connections"
@@ -252,6 +253,18 @@ func main() {
 	repoMapSvc := &bridge.RepoMapService{Deps: deps, Installer: mcpinstall.New(mcpinstall.Deps{})}
 	bridge.StartRepoMapIfEnabled(repoMapSvc)
 
+	// C6 §3.1/§7: one *codeindex.Store per process for the native code workspace's own
+	// Index/Graph — opens nothing until first use (db.go's ensureOpen). The embedded repo-map
+	// server above keeps opening its own Store over the same file; two pools in one process are
+	// exactly what WAL plus _busy_timeout=5000 (buildDSN) exist for, rather than threading one
+	// Store through RepoMapService's own start/stop lifecycle and coupling two independent
+	// features for no gain.
+	codeIndexStore := codeindex.OpenStore()
+	codeWorkspaceSvc := &bridge.CodeWorkspaceService{
+		Deps: deps, Discovery: gitDiscovery, Runner: gitRunner, Registry: codeworkspace.NewRegistry(),
+		IndexStore: codeIndexStore,
+	}
+
 	events := bridge.NewEvents(emitter)
 	eventsDetach := events.Attach(bridge.Sources{Connections: connectionsSvc, Oplog: oplogWiring, Metrics: metricsTicker, Git: gitSock})
 
@@ -284,6 +297,7 @@ func main() {
 		oplogWiring.Stop()
 		connectionsSvc.Shutdown()
 		bridge.StopRepoMap(repoMapSvc)
+		codeWorkspaceSvc.Shutdown()
 		if err := gitSock.Close(); err != nil {
 			slog.Warn("close git socket", "scope", "shutdown", "err", err)
 		}
@@ -342,12 +356,11 @@ func main() {
 			application.NewService(&bridge.DataGripService{Deps: deps}),
 			application.NewService(&bridge.GitClientsService{Deps: deps, Sock: gitSock, Broker: gitSock.Broker(), Vsix: gitvsix.New(gitvsix.Deps{})}),
 			application.NewService(repoMapSvc),
-			// C5 §3.3: the native code-viewing workspace's own bound service — Discovery/Runner
-			// mirror gitrpc's own seam rather than reusing gitRegistry (this workspace needs one
-			// read-only runner and the resolved git.path, never gitsession's refcounted lifecycle).
-			application.NewService(&bridge.CodeWorkspaceService{
-				Deps: deps, Discovery: gitDiscovery, Runner: gitRunner, Registry: codeworkspace.NewRegistry(),
-			}),
+			// C5 §3.3/C6 §7: the native code-viewing workspace's own bound service — Discovery/
+			// Runner mirror gitrpc's own seam rather than reusing gitRegistry (this workspace
+			// needs one read-only runner and the resolved git.path, never gitsession's refcounted
+			// lifecycle).
+			application.NewService(codeWorkspaceSvc),
 			application.NewService(&bridge.LifecycleService{Flusher: quitter, WindowFlusher: closeFlush}),
 		},
 		Assets: application.AssetOptions{
