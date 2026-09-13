@@ -5,6 +5,7 @@ import type { RepoFileTabRecord } from '@shared/domain/tabs';
 import { repoIdOfWorkspace, type WorkspaceKey } from '@shared/domain/workspace';
 import { onMounted, onUnmounted, ref } from 'vue';
 import { control } from '../../bridge/control';
+import { registerCommand } from '../../shortcuts/commands';
 import { settingsState } from '../../state/settings';
 import { patchRepoFileTabState } from '../../state/tabs';
 import EmptyState from '../../theme/primitives/EmptyState.vue';
@@ -22,6 +23,7 @@ const errorMessage = ref('');
 const container = ref<HTMLElement | null>(null);
 
 let disposeCursorSub: (() => void) | null = null;
+let unregisterFind: (() => void) | null = null;
 
 // §11: every Monaco instance is readOnly/domReadOnly — neither the keyboard nor a paste can
 // mutate a model. The rest of the option set mirrors §9.3 verbatim (no minimap/suggestions/
@@ -120,6 +122,15 @@ async function mount(): Promise<void> {
   });
   disposeCursorSub = () => sub.dispose();
 
+  // C7 D13/§6: no second find UI — features/register.all.js already ships Monaco's own find
+  // widget (case/word/regex toggles, match navigation and highlighting all included), so this
+  // view's whole in-file-search deliverable is registering the app-wide `view.find` command onto
+  // it, the exact lifecycle ConsoleView.vue and seven other views already use for this command id.
+  unregisterFind = registerCommand('view.find', () => {
+    editor.focus();
+    void editor.getAction('actions.find')?.run();
+  });
+
   state.value = 'found';
 }
 
@@ -131,6 +142,8 @@ onMounted(() => void mount());
 onUnmounted(() => {
   disposeCursorSub?.();
   disposeCursorSub = null;
+  unregisterFind?.();
+  unregisterFind = null;
   unmountEditor(props.tab.id);
 });
 

@@ -54,6 +54,9 @@ export const paletteCommands: PaletteCommand[] = [
   { id: 'toggle-project-panel', label: 'Toggle project panel', run: toggleProjectPanel },
   { id: 'toggle-operations-panel', label: 'Toggle operations panel', run: toggleOperationsPanel },
   { id: 'view.find', label: 'Find', run: () => runCommand('view.find') },
+  // C7 S10: registered by RepoPanel.vue while mounted — a no-op outside a repo workspace, the
+  // same view-scoped shape every other runCommand entry in this list already has.
+  { id: 'repo.search', label: 'Search in repository', run: () => runCommand('repo.search') },
   { id: 'view.refresh', label: 'Refresh', run: () => runCommand('view.refresh') },
   { id: 'view.run', label: 'Run statement', run: () => runCommand('view.run') },
   { id: 'view.run-all', label: 'Run all', run: () => runCommand('view.run-all') },

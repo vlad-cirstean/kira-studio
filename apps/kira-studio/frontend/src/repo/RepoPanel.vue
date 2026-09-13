@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { repoIdOfWorkspace } from '@shared/domain/workspace';
-import { computed, reactive } from 'vue';
+import { computed, onMounted, onUnmounted, reactive } from 'vue';
+import { registerCommand } from '../shortcuts/commands';
 import { codeRepoRecord } from '../state/coderepos';
 import { workspaceState } from '../state/workspace';
 import IconButton from '../theme/primitives/IconButton.vue';
@@ -34,6 +35,20 @@ const viewOptions = [
 function onRefresh(): void {
   void refreshRepoTree(repoId.value);
 }
+
+// C7 S10: `repo.search`'s own palette entry (shortcuts/state.ts) — this panel is the whole of a
+// repo workspace's own left panel, mounted for as long as that workspace is open, so there is no
+// tab-scoping question the way view.find's per-view registration has.
+let unregisterSearchCommand: (() => void) | null = null;
+onMounted(() => {
+  unregisterSearchCommand = registerCommand('repo.search', () => {
+    view.value = 'search';
+  });
+});
+onUnmounted(() => {
+  unregisterSearchCommand?.();
+  unregisterSearchCommand = null;
+});
 </script>
 
 <template>

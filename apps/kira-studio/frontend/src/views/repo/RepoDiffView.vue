@@ -6,6 +6,7 @@ import type { RepoDiffTabRecord } from '@shared/domain/tabs';
 import { repoIdOfWorkspace, type WorkspaceKey } from '@shared/domain/workspace';
 import { onMounted, onUnmounted, ref } from 'vue';
 import { control } from '../../bridge/control';
+import { registerCommand } from '../../shortcuts/commands';
 import { settingsState } from '../../state/settings';
 import EmptyState from '../../theme/primitives/EmptyState.vue';
 import { registerDiffEditor, unmountEditor } from './editors';
@@ -19,6 +20,7 @@ type ViewState = 'loading' | 'found' | 'binary' | 'tooLarge' | 'bothMissing' | '
 const state = ref<ViewState>('loading');
 const errorMessage = ref('');
 const container = ref<HTMLElement | null>(null);
+let unregisterFind: (() => void) | null = null;
 
 // §11: read-only, unchanged from the file viewer — readOnly/domReadOnly block the keyboard and
 // paste; renderMarginRevertIcon/renderGutterMenu are the second layer, hiding the revert/apply
@@ -92,6 +94,15 @@ async function mount(): Promise<void> {
   editor.setModel({ original, modified });
   registerDiffEditor(props.tab.id, [headUri.toString(), worktreeUri.toString()], editor);
 
+  // C7 D13/§6: the modified (worktree) pane, never the HEAD pane — it's the side whose content
+  // matches the file on disk (C6 D7's own reasoning for which side is navigable), and
+  // IStandaloneDiffEditor itself has no getAction, so this has to reach through to one pane.
+  const modifiedEditor = editor.getModifiedEditor();
+  unregisterFind = registerCommand('view.find', () => {
+    modifiedEditor.focus();
+    void modifiedEditor.getAction('actions.find')?.run();
+  });
+
   state.value = 'found';
 }
 
@@ -100,6 +111,8 @@ onMounted(() => void mount());
 // A mere tab switch away — the widget disposes, the models survive in editors.ts until an actual
 // close calls TAB_KINDS['repo-diff'].dropResources.
 onUnmounted(() => {
+  unregisterFind?.();
+  unregisterFind = null;
   unmountEditor(props.tab.id);
 });
 </script>
