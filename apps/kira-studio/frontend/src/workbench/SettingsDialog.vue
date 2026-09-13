@@ -17,6 +17,12 @@ import { formatBytes, formatRelative } from '../format';
 import { cacheStatsState } from '../state/cacheStats';
 import { confirmDialog } from '../state/confirmDialog';
 import { gitClientsState, installVsCodeIntegration, revokeGitClient } from '../state/gitClients';
+import {
+  installRepoMapClaudeCode,
+  regenerateRepoMapToken,
+  repoMapState,
+  setRepoMapEnabled,
+} from '../state/repomap';
 import { patchSettings, settingsState } from '../state/settings';
 import CodiconIcon from '../theme/CodiconIcon.vue';
 import AppButton from '../theme/primitives/AppButton.vue';
@@ -99,7 +105,15 @@ const isDirty = computed(() => Object.keys(pendingPatch.value).length > 0);
 // revoke must take effect immediately") and the two server-owned git settings that used to share
 // its template branch moved to their own 'Git' section, so no tab mixes instant actions with
 // settings that apply on Save.
-const sections = ['Appearance', 'Data', 'Cache', 'Connected editors', 'Git', 'Advanced'] as const;
+const sections = [
+  'Appearance',
+  'Data',
+  'Cache',
+  'Connected editors',
+  'Git',
+  'Code intelligence',
+  'Advanced',
+] as const;
 type Section = (typeof sections)[number];
 const activeSection = ref<Section>('Appearance');
 
@@ -144,6 +158,56 @@ const vsixOutcomeMessage = computed(() => {
       return `VS Code refused the install: ${result.detail}. Reveal the file in Finder and drag it onto VS Code instead.`;
     case 'revealFailed':
       return `Couldn't reveal the file automatically. Find it at ${result.vsixPath}.`;
+    default:
+      return null;
+  }
+});
+
+// C3 §7.1/D7: same instant-action posture as onRevokeGitClient/onInstallVsCodeIntegration above —
+// the toggle bypasses draft/Save entirely, since SetEnabled both persists the leaf and starts/stops
+// the embedded instance in one call.
+const repoMapToggling = ref(false);
+async function onToggleRepoMapEnabled(enabled: boolean): Promise<void> {
+  repoMapToggling.value = true;
+  try {
+    await setRepoMapEnabled(enabled);
+  } finally {
+    repoMapToggling.value = false;
+  }
+}
+
+const repoMapRegenerating = ref(false);
+async function onRegenerateRepoMapToken(): Promise<void> {
+  repoMapRegenerating.value = true;
+  try {
+    await regenerateRepoMapToken();
+  } finally {
+    repoMapRegenerating.value = false;
+  }
+}
+
+const repoMapInstalling = ref(false);
+async function onInstallRepoMapClaudeCode(): Promise<void> {
+  repoMapInstalling.value = true;
+  try {
+    await installRepoMapClaudeCode();
+  } finally {
+    repoMapInstalling.value = false;
+  }
+}
+
+// §7.2's own outcome copy — mcpinstall's three-value vocabulary, verbatim where it's a fixed
+// string.
+const repoMapInstallMessage = computed(() => {
+  const result = repoMapState.installResult;
+  if (!result) return null;
+  switch (result.outcome) {
+    case 'installed':
+      return 'Registered with Claude Code.';
+    case 'notFound':
+      return "Claude Code's CLI isn't available. Copy the command above and run it yourself once it is installed.";
+    case 'installFailed':
+      return `Claude Code refused the registration: ${result.detail}. Copy the command above and run it yourself.`;
     default:
       return null;
   }
@@ -624,16 +688,23 @@ async function onSave(): Promise<void> {
               <p v-if="!gitClientsState.vsix.bundled" class="muted-note" data-testid="git-vsix-not-bundled">
                 The extension ships inside the packaged app. This build has none.
               </p>
-              <AppButton
-                v-else
-                kind="dialog"
-                class="action-button"
-                :disabled="vsixInstalling"
-                data-testid="git-vsix-install-button"
-                @click="onInstallVsCodeIntegration"
-              >
-                {{ gitClientsState.vsix.codeAvailable ? 'Install VS Code Integration' : 'Reveal Extension in Finder' }}
-              </AppButton>
+              <template v-else>
+                <!-- C3 §7.5: the same command-before-button transparency the Code intelligence
+                     tab's Claude Code flow uses, applied here too — unrelated feature, same
+                     principle. -->
+                <p class="mono command-text" data-testid="git-vsix-command">
+                  {{ gitClientsState.vsix.command }}
+                </p>
+                <AppButton
+                  kind="dialog"
+                  class="action-button"
+                  :disabled="vsixInstalling"
+                  data-testid="git-vsix-install-button"
+                  @click="onInstallVsCodeIntegration"
+                >
+                  {{ gitClientsState.vsix.codeAvailable ? 'Install VS Code Integration' : 'Reveal Extension in Finder' }}
+                </AppButton>
+              </template>
               <p v-if="vsixOutcomeMessage" class="helper-text" data-testid="git-vsix-outcome">
                 {{ vsixOutcomeMessage }}
               </p>
@@ -762,6 +833,68 @@ async function onSave(): Promise<void> {
                 time, never cached, so a change here takes effect on the next one.</span
               >
             </label>
+          </template>
+
+          <template v-else-if="activeSection === 'Code intelligence'">
+            <!-- C3 §7.1/§7.4: instant-action only, same posture as Connected editors — this leaf
+                 (codeIntel.mcpServerEnabled) both persists and starts/stops the embedded repo-map
+                 MCP server in one call, so it belongs on the action side of the draft/Save line,
+                 never mixed with it. Toggle, then command, then button, strictly in that DOM order
+                 (§11.4/SPEC's own "enabling is never a silent action"). -->
+            <label class="field checkbox">
+              <Checkbox
+                :model-value="settingsState.codeIntel.mcpServerEnabled"
+                :disabled="repoMapToggling"
+                data-testid="settings-code-intel-enabled"
+                @update:model-value="onToggleRepoMapEnabled"
+              />
+              <span>Enable the repository-map MCP server</span>
+              <span class="helper-text"
+                >Lets an AI coding assistant navigate this checkout's code (definitions,
+                references, file outlines) from a pre-built index, without reading every file
+                itself. Starts and stops with this toggle.</span
+              >
+            </label>
+
+            <template v-if="settingsState.codeIntel.mcpServerEnabled">
+              <p v-if="repoMapState.status.error" class="muted-note" data-testid="repomap-error">
+                {{ repoMapState.status.error }}
+              </p>
+              <template v-else-if="repoMapState.status.running && repoMapState.status.command">
+                <p class="mono command-text" data-testid="repomap-command">
+                  {{ repoMapState.status.command }}
+                </p>
+                <AppButton
+                  kind="dialog"
+                  class="action-button"
+                  :disabled="repoMapInstalling"
+                  data-testid="repomap-install-button"
+                  @click="onInstallRepoMapClaudeCode"
+                >
+                  {{ repoMapState.status.claudeAvailable ? 'Register with Claude Code' : 'Copy command above' }}
+                </AppButton>
+                <p v-if="repoMapInstallMessage" class="helper-text" data-testid="repomap-install-outcome">
+                  {{ repoMapInstallMessage }}
+                </p>
+              </template>
+              <template v-else-if="repoMapState.status.running">
+                <!-- §0 D8: an app restart loaded the existing token's hash+salt but the plaintext
+                     itself is unknown to this process — a hash cannot be reversed. -->
+                <p class="muted-note" data-testid="repomap-no-token">
+                  This server restarted since it was last enabled; its registration command needs a
+                  fresh token to show again.
+                </p>
+                <AppButton
+                  kind="dialog"
+                  class="action-button"
+                  :disabled="repoMapRegenerating"
+                  data-testid="repomap-regenerate-button"
+                  @click="onRegenerateRepoMapToken"
+                >
+                  Regenerate token
+                </AppButton>
+              </template>
+            </template>
           </template>
 
           <template v-else-if="activeSection === 'Advanced'">
@@ -1008,6 +1141,21 @@ async function onSave(): Promise<void> {
 
 .mono {
   font-family: var(--kira-font-data);
+}
+
+/* Command-before-button transparency (C3 §7.2/§7.5): a copyable, wrapped command string, shown
+   ahead of every Install button that follows one. */
+.command-text {
+  margin: 0;
+  padding: var(--kira-s-2);
+  background: var(--kira-bg-input);
+  border: var(--kira-border-width) solid var(--kira-border);
+  border-radius: var(--kira-radius-sm);
+  font-size: var(--kira-t-xs);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-all;
+  user-select: all;
 }
 
 .muted-note {

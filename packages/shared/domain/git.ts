@@ -37,12 +37,15 @@ export type GitPairingActionResult = z.infer<typeof gitPairingActionResultSchema
 
 // G10 D14: the Install VS Code Integration button's own domain — gitvsix.Status/Result's wire
 // projections. codeAvailable is advisory only (the pane's pre-click render); InstallVsCodeIntegration
-// re-resolves everything itself and is the sole authority.
+// re-resolves everything itself and is the sole authority. command is C3 §7.5's own addition —
+// the exact command the button is about to run, shown before the click; "" only when nothing is
+// bundled (no button renders at all in that state either).
 export const gitVsixStatusSchema = /*#__PURE__*/ z.object({
   bundled: z.boolean(),
   vsixPath: z.string(),
   codeAvailable: z.boolean(),
   probed: z.array(z.string()),
+  command: z.string(),
 });
 export type GitVsixStatus = z.infer<typeof gitVsixStatusSchema>;
 

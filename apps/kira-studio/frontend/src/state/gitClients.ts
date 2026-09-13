@@ -20,6 +20,7 @@ const DEFAULT_VSIX_STATUS: GitVsixStatus = {
   vsixPath: '',
   codeAvailable: false,
   probed: [],
+  command: '',
 };
 
 export const gitClientsState = reactive({

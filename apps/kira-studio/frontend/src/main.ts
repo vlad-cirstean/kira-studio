@@ -10,6 +10,7 @@ import { initCacheStats } from './state/cacheStats';
 import { hydrateConnections } from './state/connections';
 import { hydrateGitClients } from './state/gitClients';
 import { hydrateOps } from './state/ops';
+import { hydrateRepoMap } from './state/repomap';
 import { hydrateTabs } from './state/tabs';
 import './theme/base.css';
 import { hydrateLayout } from './state/layout';
@@ -289,6 +290,7 @@ async function bootstrap(): Promise<void> {
     hydrateSettings(),
     hydrateConnections(),
     hydrateGitClients(),
+    hydrateRepoMap(),
     hydrateOps(),
     hydrateTabs(),
   ]);

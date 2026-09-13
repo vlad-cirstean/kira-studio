@@ -10,6 +10,7 @@ import * as LifecycleService from '@bindings/lifecycleservice.js';
 import type * as WailsModels from '@bindings/models.js';
 import * as OpsService from '@bindings/opsservice.js';
 import * as QueriesService from '@bindings/queriesservice.js';
+import * as RepoMapService from '@bindings/repomapservice.js';
 import * as SchemaService from '@bindings/schemaservice.js';
 import * as SettingsService from '@bindings/settingsservice.js';
 import * as TabsService from '@bindings/tabsservice.js';
@@ -42,6 +43,7 @@ import type {
   SavedQuery,
   SortSpec,
 } from '@shared/domain/queries';
+import type { RepoMapInstallResult, RepoMapStatus } from '@shared/domain/repomap';
 import type { ConnectionDdl } from '@shared/domain/schema';
 import type { SecretStorageStatus } from '@shared/domain/secrets';
 import type { Settings, SettingsPatch } from '@shared/domain/settings';
@@ -272,6 +274,15 @@ const studioControl = {
     unwrap(GitClientsService.InstallVsCodeIntegration()).then((r) =>
       trust<GitVsixInstallResult>(r),
     ),
+
+  repoMapStatus: (): Promise<RepoMapStatus> =>
+    unwrap(RepoMapService.Status()).then((r) => trust<RepoMapStatus>(r)),
+  repoMapSetEnabled: (enabled: boolean): Promise<RepoMapStatus> =>
+    unwrap(RepoMapService.SetEnabled({ enabled })).then((r) => trust<RepoMapStatus>(r)),
+  repoMapRegenerate: (): Promise<RepoMapStatus> =>
+    unwrap(RepoMapService.Regenerate()).then((r) => trust<RepoMapStatus>(r)),
+  repoMapInstallClaudeCode: (): Promise<RepoMapInstallResult> =>
+    unwrap(RepoMapService.InstallClaudeCode()).then((r) => trust<RepoMapInstallResult>(r)),
 
   opsRecent: (limit: number): Promise<OpRecord[]> =>
     unwrap(OpsService.Recent({ limit })).then((r) => trust<OpRecord[]>(r ?? [])),

@@ -135,6 +135,11 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   gitPairingDeny: 'GitClientsService.Deny',
   gitVsixStatus: 'GitClientsService.VsixStatus',
   gitVsixInstall: 'GitClientsService.InstallVsCodeIntegration',
+
+  repoMapStatus: 'RepoMapService.Status',
+  repoMapSetEnabled: 'RepoMapService.SetEnabled',
+  repoMapRegenerate: 'RepoMapService.Regenerate',
+  repoMapInstallClaudeCode: 'RepoMapService.InstallClaudeCode',
 };
 
 /** ipc.ts's legacy channel string (what every `ControlSnapshot.channel` and fixture is keyed by,
@@ -270,6 +275,18 @@ const WILDCARD_DEFAULTS: Readonly<Record<string, string>> = Object.freeze({
     vsixPath: '',
     codeAvailable: false,
     probed: [],
+    command: '',
+  }),
+  // C3: hydrateRepoMap() joins the same unconditional-every-boot list as gitVsixStatus/
+  // gitClientsList just above, same reasoning — nothing in tests/ui/ seeds a repo-map fixture, so
+  // "off, nothing running" is the honest default for a dev-server run under Playwright.
+  [IPC.repoMapStatus]: JSON.stringify({
+    running: false,
+    repo: '',
+    command: '',
+    claudeAvailable: false,
+    probed: [],
+    error: '',
   }),
 });
 

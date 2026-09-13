@@ -130,6 +130,11 @@ export const IPC = {
   gitVsixStatus: 'kira:git:vsix:status',
   gitVsixInstall: 'kira:git:vsix:install',
 
+  repoMapStatus: 'kira:repomap:status',
+  repoMapSetEnabled: 'kira:repomap:setEnabled',
+  repoMapRegenerate: 'kira:repomap:regenerate',
+  repoMapInstallClaudeCode: 'kira:repomap:installClaudeCode',
+
   connectionState: 'kira:connection:state',
   connectionMetadataInvalidated: 'kira:connection:metadataInvalidated',
   connectionsChanged: 'kira:connections:changed',
