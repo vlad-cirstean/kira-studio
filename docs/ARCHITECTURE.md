@@ -42,7 +42,7 @@ originally written rather than corrected to match later reality — see each cha
 | Outbound HTTP client (P2, body modes P3, request timeline P10) | plain `net/http` (`apps/kira-studio/internal/httpclient/`), **no client/retry/URL-parsing/multipart-builder dependency at all** | the same "no driver dependency" shape the ClickHouse adapter already established (below): one package-level `*http.Client`, a 30s timeout applied via `context.WithTimeout` rather than `Client.Timeout` (so the Stop button and a timeout abort an in-flight body read the same way), redirects followed and every hop recorded up to 10, TLS verification always on, `http.ProxyFromEnvironment`. Reachable only from Go — the webview's own `fetch` is never used (`docs/ARCHITECTURE.md`'s own "Go owns the network" invariant, below). P3 adds every body mode this app's request builder supports — none/raw/code/urlencoded/formdata/file (`internal/httpclient/body.go`) — over the same one dependency-free package: a two-pass `mime/multipart` writer computes an *exact* `Content-Length` from a fixed boundary's deterministic framing before streaming a single byte, so a form-data or binary send is never chunked and never guesses. P10 adds one `net/http/httptrace.ClientTrace`, stdlib, installed once per send: every redirect hop's own DNS/connect/TLS/wait/download phases, bucketed by the same `checkRedirect` that already threads `Response.Redirects` through (below) |
 | Outbound gRPC client (P11) | `google.golang.org/grpc` + `google.golang.org/protobuf` (`dynamicpb`/`protojson`/`protodesc`/`protoregistry`, grpc-go's own reflection client) + `bufbuild/protocompile`, all in `apps/kira-studio/internal/grpcclient/` — **no generated `.pb.go` code, no `protoc`/`buf` build step** | dynamic, schema-at-runtime: a method is discovered via server reflection or a supplied `.proto` (compiled by `protocompile`, the same compiler `buf` uses, with no codegen), then called through `dynamicpb`/`protojson` against a descriptor `grpc.NewClient` never needed ahead of time. Unary and server-streaming only — client- and bidi-streaming are out of scope. The largest single dependency this app has taken, **≈14.2 MB** of binary (measured `linux/amd64`, no flags) — the *same order* as `pgx` + `mongo-driver/v2` + both AWS SDK clients + `franz-go` combined (≈13.5 MB), in a binary that already links ten database adapters. Every descriptor source (a reflection round-trip, a compiled `.proto`) gets its **own** private `*protoregistry.Files` — never `protoregistry.GlobalFiles`, which panics outright on a duplicate file path, a realistic outcome for two users' `.proto` files both declaring the same `package` |
 | Git module transport (v1.3) | A Unix domain socket plus `internal/bridge/rpcstream`'s correlated-RPC-with-credits protocol — JSON control frames, FlatBuffers bulk payloads (`"KIG1"`) | The git module is **headless**: the backend is in this binary, the frontend is a separately-installed VS Code extension (`apps/kira-studio-vscode`) reached over `${KIRA_HOME}/git.sock`. **The transport itself took no new runtime dependency** — `net` and `encoding/json` plus the FlatBuffers runtimes P11 already put in the graph. What the module *did* add: `github.com/fsnotify/fsevents` (the darwin repo watcher, `darwin && cgo`, G9), `golang.org/x/text/unicode/norm` (NFC path normalization, G27), and `@vscode/vsce` as a build-time-only packager. See the Git module section below |
-| Code parsing (C1) | `github.com/tree-sitter/go-tree-sitter` (the official cgo binding) plus ten upstream grammar modules — java, python, javascript, typescript+tsx, go, rust, html, css, json, svelte, all MIT | `internal/codeparse` is the only package in the repo importing tree-sitter, and the only unconditionally-cgo one (every other cgo file in the app is a `darwin && cgo`-gated exception, below) — a real, priced cost: a C compiler becomes a build requirement for this package and anything importing it, and `CGO_ENABLED=0` no longer builds such a caller. Declined every pure-Go alternative found: `gotreesitter` is a from-scratch reimplementation of the parse-table interpreter and every external scanner (3.9x slower per its own README, with 3 of 206 grammars already degraded), a materially different risk than `modernc.org/sqlite`'s mechanical transpilation of the same upstream C; `malivvan/tree-sitter` (a wasm build under `wazero`, the right architecture) is 5 stars/3 commits/self-described pre-release; building that wasm ourselves would mean owning a toolchain and a regeneration script for a capability the packaged darwin build already has via cgo. Every grammar reports ABI 14, inside the binding's own compatible range [13, 15] (`TREE_SITTER_MIN_COMPATIBLE_LANGUAGE_VERSION`/`TREE_SITTER_LANGUAGE_VERSION`), checked at construction. Binary size delta measured the same way P11's own gRPC dependency was (a minimal program against a `println` baseline, `linux/amd64`, no flags): **+6.6 MB** for the grammar registry alone. Vue has no grammar of its own (no Go module exists) and is parsed as an HTML container with per-block injection instead |
+| Code parsing (C1, extraction fixes C2) | `github.com/tree-sitter/go-tree-sitter` (the official cgo binding) plus ten upstream grammar modules — java, python, javascript, typescript+tsx, go, rust, html, css, json, svelte, all MIT | `internal/codeparse` is the only package in the repo importing tree-sitter, and the only unconditionally-cgo one (every other cgo file in the app is a `darwin && cgo`-gated exception, below) — a real, priced cost: a C compiler becomes a build requirement for this package and anything importing it, and `CGO_ENABLED=0` no longer builds such a caller. Declined every pure-Go alternative found: `gotreesitter` is a from-scratch reimplementation of the parse-table interpreter and every external scanner (3.9x slower per its own README, with 3 of 206 grammars already degraded), a materially different risk than `modernc.org/sqlite`'s mechanical transpilation of the same upstream C; `malivvan/tree-sitter` (a wasm build under `wazero`, the right architecture) is 5 stars/3 commits/self-described pre-release; building that wasm ourselves would mean owning a toolchain and a regeneration script for a capability the packaged darwin build already has via cgo. Every grammar reports ABI 14, inside the binding's own compatible range [13, 15] (`TREE_SITTER_MIN_COMPATIBLE_LANGUAGE_VERSION`/`TREE_SITTER_LANGUAGE_VERSION`), checked at construction. Binary size delta measured the same way P11's own gRPC dependency was (a minimal program against a `println` baseline, `linux/amd64`, no flags): **+6.6 MB** for the grammar registry alone. Vue has no grammar of its own (no Go module exists) and is parsed as an HTML container with per-block injection instead. **C2** compiles TypeScript and TSX against javascript's own vendored `tags.scm` first, then their own — upstream ships the TypeScript file as an *addition* to the JavaScript one (signature/abstract/interface patterns only, no `; inherits:` header), so the TypeScript file alone indexed almost nothing; composing both is what makes a plain class, function, method or call show up in a `.ts`/`.tsx` file at all. C2 also adds four small repo-authored `queries/<lang>/c2_implements.scm` files (TypeScript, TSX, JavaScript, Python) beside the vendored `tags.scm`s — the only hand-written query text in the package (§4.1's own "no hand-written queries" gets a narrow, named exception here) — recovering `implements`/`extends`/base-class relationships no vendored pattern expresses for those four languages, through the same `@reference.implementation` capture Java and Rust's own vendored queries already use |
 
 Driver libraries — the best-maintained option per engine, **Go-native for all ten kinds as of P58e
 M9.3** (checkpoint C2): `jackc/pgx/v5` (postgres), `go-sql-driver/mysql` (mariadb/mysql, via a shared
@@ -835,11 +835,75 @@ blocks/symbols/references) rather than a file removal, reclaimed afterward by th
 `_auto_vacuum=INCREMENTAL` pragma every SQLite file in this app already sets. WAL matters more here
 than anywhere else in the app: C3's MCP server is a **separate process** reading this file while the
 studio app writes it. A stored `meta.parser_fingerprint` (a hash over every grammar module version
-actually linked plus every vendored query file's own bytes) is checked on every sync; a mismatch —
-a grammar or query upgrade changing what a parse produces — truncates and rebuilds that one
-repository's rows rather than trusting them under a changed extraction contract. A repository
-untouched for 14 days has its rows swept the same way, on any open, the same idle window
-`review.db` uses.
+actually linked, an `extractionVersion` constant bumped whenever a change to `codeparse`'s own
+extraction logic — not a grammar or query change, both already covered — would alter what a parse
+produces, plus every vendored *and* repo-authored query file's own bytes) is checked on every sync;
+a mismatch truncates and rebuilds that one repository's rows rather than trusting them under a
+changed extraction contract. A repository untouched for 14 days has its rows swept the same way, on
+any open, the same idle window `review.db` uses. **Schema version is 2 as of C2**: `reference` also
+carries the identifier's own range (`name_start_byte`/`name_end_byte`/`name_start_row`/
+`name_start_column`), separate from the reference node's own range — for a Java `method_invocation`
+or a JavaScript member call, that node range starts at the receiver, before the method name, so a
+cursor placed on the name itself matched nothing before this. The migration
+(`0002_c2_reference_name_range.sql`) is a `DELETE FROM file` (cascading to every table below it)
+plus a `DROP`/`CREATE TABLE reference`, not an `ALTER TABLE ... ADD COLUMN` — a defaulted column
+would leave every pre-existing row claiming an identifier at byte 0, and since the fingerprint bump
+above rebuilds those rows at the next `Sync` regardless, a briefly *empty* cache beats one that is
+briefly *wrong*. See `internal/codegraph`, directly below, for what reads this range.
+
+**`internal/codegraph` (C2) computes the code graph live over `codeindex.db`'s own rows — no edge
+table, ever.** `Graph` is built from a `*codeindex.Store` plus a `repo_id`, never from an `Index` —
+the same seam that lets C3's MCP server (a separate process, no `gitclient.Runner`, no watcher)
+open the identical file and answer without a worktree present; `Sync` writes `meta.repo_root` on
+every pass precisely so that process can map a path to a `repo_id` at all. An edge table would be
+derived, cross-file state: saving one file can change which definition a reference in an
+*unrelated* file resolves to (resolution can fall back repository-wide), so keeping it correct
+would mean recomputing far more than the changed file on every save — against a watcher whose
+`ChangedRanges` is already best-effort. Rows stay the single source of truth; every query is a
+function over them, evaluated fresh, with no result cached across calls.
+
+Three operations, plus the search/outline companions SPEC's C3 row also needs (so C3 never reaches
+into `codeindex` directly): `DefinitionOf`, `ImplementationsOf`, `ReferencesTo`, `SymbolAt`,
+`Outline`, `SearchSymbols`, `SearchFiles`. Resolution is name plus scope-tier plus rank, **never
+type inference or import resolution** — a repository with two unrelated `Client` types gets both,
+labelled honestly rather than silently guessed. A reference resolves against every same-named
+symbol in the repository, kept only from the tightest non-empty tier of three: same file, same
+scope unit, repository-wide — confidence is `exact` (one candidate, tier 0/1), `scoped` (several,
+tier 0/1) or `repoWide` (tier 2) accordingly, and every `Target` carries the rule that placed it
+(e.g. `sameFile.enclosing`, `sameDirectory`, `repoWide`) for a caller to render or log. The scope
+unit and its one extra rule are per language family:
+
+| Language family | Scope unit (tier 1) | Extra rule |
+|---|---|---|
+| Go | directory (a package) | An unexported name (lower-case first rune) never reaches tier 2 — no same-directory candidate is a real "no result," not a repo-wide guess |
+| Java | directory | A candidate whose file basename equals the name ranks first, for `type`/`class`/`implementation` references only — Java requires it for a public type |
+| Python | directory | none |
+| JavaScript, TypeScript, TSX, Vue, Svelte | file, then directory | A candidate whose file basename (minus extension, `index` excluded) equals the name ranks first — the default-export convention |
+| Rust | file, then directory | none |
+
+Stated plainly, the graph's own honest limits: two same-named methods on unrelated types are
+indistinguishable (no reference carries a receiver, no symbol carries a type); a Java/JavaScript
+member call's stored reference range starts at the receiver, so a cursor placed before the method
+name still resolves through the wider node span rather than the identifier itself; a builtin or an
+external (`node_modules`) name resolves to nothing rather than erroring; and a same-name shadowing
+local is not distinguished from its outer binding beyond same-file containment order, since no
+`locals.scm` exists to tell them apart.
+
+`ImplementationsOf` answers "explicit `implements`/`extends`/base-class relationships," differently
+per language because the stored evidence differs: Java, TypeScript, TSX, JavaScript and Python
+recover an implementer by containment (the innermost enclosing symbol around an `implementation`
+reference elsewhere named the target, and the same rows read the other way for what a concrete type
+itself declares); Rust has no containing symbol to recover at all, so every matching reference *is*
+the impl block's own location, reported directly; Go returns nothing (Known open items, below).
+
+A Vue/Svelte SFC's `<script setup>` block is an ordinary module for every one of these operations —
+a definition there has a `block_id` and participates in cross-file resolution exactly like a `.ts`
+file. A position inside a `template` block has no reference row to hit at all (no vendored query
+emits one for HTML/Vue/Svelte template regions), so `DefinitionOf` falls back to the caller's own
+word-under-cursor name, resolved against the same file's symbols — SPEC's own stated navigation
+case, at the cost of one optional field and no new parsing. Nothing cross-component resolves: no
+prop flow, no Angular DI, no JSX element-to-component edge — each would need a type system or a
+hand-written identifier query this phase never adds.
 
 **Why a content snapshot and not just a commit sha.** The trivial case — nothing rewritten since
 the last review — is `git merge-base --is-ancestor <lastReviewedSha> HEAD`; when that succeeds an
@@ -2764,3 +2828,10 @@ place. `CLAUDE.md` states the process rule; this is the list itself.
   is called. So a genuinely first-ever launch still gets the unclamped 1280×800 default until the
   window is resized once. Fixing this needs deferring startup window creation until after that
   event fires — a materially larger structural change than this fix.
+
+- **`codegraph.ImplementationsOf` returns nothing for Go** (C2 §6/D4). Go's interfaces are
+  structural, so the only correct answer is a method-set comparison — but C1's `method_declaration`
+  capture stores a method's *name* only, never its receiver type, so a type's method set can't be
+  assembled from stored rows at all, let alone compared against an interface's. A data limit, not
+  an effort estimate: closing it needs a receiver-capturing query and a schema column, not more
+  resolver logic.
