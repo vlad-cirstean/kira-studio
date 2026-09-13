@@ -75,7 +75,7 @@ func TestInjectGoldenFixtures(t *testing.T) {
 			tree := parser.Parse(src, nil)
 			defer tree.Close()
 
-			blocks, syms, refs, err := Inject(tree, src, c.id)
+			blocks, syms, refs, err := injectBlocks(tree, src, c.id)
 			if err != nil {
 				t.Fatalf("Inject: %v", err)
 			}

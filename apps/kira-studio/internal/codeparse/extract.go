@@ -17,8 +17,8 @@ type Point struct {
 func pointOf(p sitter.Point) Point { return Point{Row: int(p.Row), Column: int(p.Column)} }
 
 // Symbol is one definition (§4.2). ParentIndex is this file's own containment parent, an index
-// into the same slice Extract returns (-1 for none) — a plain Go int rather than inventing a row
-// id before storage exists, so codeindex assigns real ids only once it writes the transaction.
+// into the same slice extractSymbols returns (-1 for none) — a plain Go int rather than inventing
+// a row id before storage exists, so codeindex assigns real ids only once it writes the transaction.
 type Symbol struct {
 	Kind       string // §4.2's closed set
 	Name       string
@@ -33,9 +33,9 @@ type Symbol struct {
 
 	ParentIndex int
 
-	// BlockIndex is -1 (Extract's own default: a top-level symbol, not part of any injected
-	// block) unless Inject overwrites it with the position of the block it was extracted from
-	// (§3.2) — an index into that call's own returned []Block, not a database id.
+	// BlockIndex is -1 (extractSymbols' own default: a top-level symbol, not part of any
+	// injected block) unless injectBlocks overwrites it with the position of the block it was
+	// extracted from (§3.2) — an index into that call's own returned []Block, not a database id.
 	BlockIndex int
 }
 
@@ -64,12 +64,12 @@ var referenceKinds = map[string]bool{
 	"call": true, "type": true, "implementation": true, "import": true,
 }
 
-// Extract runs id's vendored tags.scm query (S2) over root and returns the file's own symbols
+// extractSymbols runs id's vendored tags.scm query (S2) over root and returns the file's own symbols
 // (parent-linked by range containment) and references, deduplicated by (kind, name, startByte,
 // endByte) — real duplicates exist upstream, e.g. Go's type_spec and type_declaration patterns
 // both capturing one node (§4.2). Returns (nil, nil, nil) for a language with no symbol query
 // (HasSymbolQuery false) — not an error, exactly like html/css/json/svelte's own file-only rows.
-func Extract(root *sitter.Node, source []byte, id ID) ([]Symbol, []Reference, error) {
+func extractSymbols(root *sitter.Node, source []byte, id ID) ([]Symbol, []Reference, error) {
 	if !HasSymbolQuery(id) {
 		return nil, nil, nil
 	}

@@ -22,7 +22,7 @@ const (
 const Unsupported ID = "unsupported"
 
 // Block is one region an SFC/HTML container splits into (§3.2) — a plain Go struct; the tree
-// parsed over its range, if any, never survives past Inject's own call (§1.4).
+// parsed over its range, if any, never survives past injectBlocks' own call (§1.4).
 type Block struct {
 	Kind       BlockKind
 	Language   ID // the grammar actually used, or Unsupported
@@ -31,7 +31,7 @@ type Block struct {
 	StartPoint Point
 }
 
-// Inject splits containerTree (already parsed with containerLang's own grammar — html for .vue/
+// injectBlocks splits containerTree (already parsed with containerLang's own grammar — html for .vue/
 // .html, svelte for .svelte) into its script/style/template blocks, parses each supported
 // script/style block over the SAME source buffer via SetIncludedRanges (§3.2 step 4: every
 // resulting byte offset and point is already in FILE coordinates, never the block's own), and
@@ -39,8 +39,8 @@ type Block struct {
 // this function returns, so no tree-sitter type survives into the result (§1.4).
 //
 // Returned Symbol/Reference values carry BlockIndex set to the position of their own block in the
-// returned slice; Extract's own top-level call (never made here) leaves BlockIndex at -1.
-func Inject(containerTree *sitter.Tree, source []byte, containerLang ID) ([]Block, []Symbol, []Reference, error) {
+// returned slice; extractSymbols' own top-level call (never made here) leaves BlockIndex at -1.
+func injectBlocks(containerTree *sitter.Tree, source []byte, containerLang ID) ([]Block, []Symbol, []Reference, error) {
 	var blocks []Block
 	var symbols []Symbol
 	var references []Reference
@@ -157,7 +157,7 @@ func processScriptOrStyle(
 	}
 	defer blockTree.Close()
 
-	syms, refs, err := Extract(blockTree.RootNode(), source, lang)
+	syms, refs, err := extractSymbols(blockTree.RootNode(), source, lang)
 	if err != nil {
 		*firstErr = err
 		return
@@ -230,7 +230,7 @@ func tagName(startTag *sitter.Node, source []byte) string {
 
 // attrValue reads one attribute's value off a start_tag by name (case-insensitive, matching HTML's
 // own attribute-name convention). present is true and value is "" for a bare boolean attribute
-// (e.g. Vue's `<script setup>`, with no `="..."` at all) — the distinction Inject's own setup
+// (e.g. Vue's `<script setup>`, with no `="..."` at all) — the distinction injectBlocks' own setup
 // detection needs, since a present-but-empty value must not be confused with an absent attribute.
 func attrValue(startTag *sitter.Node, source []byte, name string) (value string, present bool) {
 	count := startTag.NamedChildCount()

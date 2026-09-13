@@ -133,7 +133,7 @@ func TestExtractGoldenFixtures(t *testing.T) {
 			tree := parser.Parse(src, nil)
 			defer tree.Close()
 
-			syms, refs, err := Extract(tree.RootNode(), src, c.id)
+			syms, refs, err := extractSymbols(tree.RootNode(), src, c.id)
 			if err != nil {
 				t.Fatalf("Extract: %v", err)
 			}
