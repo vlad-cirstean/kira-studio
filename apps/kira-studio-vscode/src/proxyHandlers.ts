@@ -234,6 +234,9 @@ export function createProxyHandlers(deps: CreateProxyHandlersDeps): ServerHandle
           // read fresh on every app.init, never cached (trust can change mid-session).
           openWorktreeWindow: true,
           runPrepareScript: isWorkspaceTrusted(),
+          // C10 D6: this host's transport forwards every request straight to the socket, which
+          // accepts writes — unchanged from before C10 added the flag.
+          write: true,
         },
       };
     },

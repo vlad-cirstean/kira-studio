@@ -68,6 +68,7 @@ describe('ipc codec', () => {
         resolveConflict: true,
         openWorktreeWindow: true,
         runPrepareScript: true,
+        write: true,
       },
     };
     const encodedParams = encode(params);

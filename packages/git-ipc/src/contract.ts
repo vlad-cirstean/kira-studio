@@ -12,8 +12,10 @@
  */
 
 /** Which shell mounted the UI bundle. `"harness"` is a real value, not a test-only stand-in —
- *  the harness is a first-class Transport consumer (§8.4, C4). */
-export type HostKind = 'vscode' | 'harness';
+ *  the harness is a first-class Transport consumer (§8.4, C4). `"kira"` (C10) is Kira Studio's own
+ *  native workspace, mounting these same components read-only over an in-process Wails stream —
+ *  see `docs/v1.5/plans/C10-git-graph-native.md`. */
+export type HostKind = 'vscode' | 'harness' | 'kira';
 
 // ---------------------------------------------------------------------------------------
 // Structural copies of core's wire-relevant types — kept honest by wireConformance.test.ts.
@@ -1491,6 +1493,11 @@ export type Contract = {
            *  defence in depth — NOT the primary control (D10/D11 are). VS Code:
            *  `vscode.workspace.isTrusted`; the harness: `true`. */
           readonly runPrepareScript: boolean;
+          /** C10 §4.2/§4.3: whether this host's transport accepts a write RPC at all. `true` for
+           *  VS Code and the harness (unchanged); `false` for the native `'kira'` host, whose
+           *  transport's Go side refuses every write with `E_READ_ONLY` regardless of this flag —
+           *  this is UI-layer 3 (hide, don't disable), never the boundary itself. */
+          readonly write: boolean;
         };
       };
     };
