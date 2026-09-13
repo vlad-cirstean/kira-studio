@@ -88,7 +88,7 @@ jobs:
       - name: Install WebKit and its system libraries (CLAUDE.md)
         run: |
           bunx playwright install webkit
-          sudo apt-get install -y libevent-2.1-7t64 libgstreamer-plugins-bad1.0-0 libflite1 gstreamer1.0-libav
+          sudo apt-get install -y libevent-2.1-7t64 libgstreamer-plugins-bad1.0-0 libflite1 gstreamer1.0-libav libavif16
       - run: bun run test:ui
       - name: IPC frontend tests (v1.4 P1 — previously in no CI job; consumes the fixtures internal/adapters/*'s own suites generate, closing the anti-drift gap)
         run: bun run test:ipc:fe
@@ -115,7 +115,23 @@ jobs:
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
+      - name: Install GTK4/WebKitGTK headers (wails3 CLI build requirement on Linux — CLAUDE.md)
+        run: sudo apt-get update && sudo apt-get install -y libgtk-4-dev libwebkitgtk-6.0-dev pkg-config
       - run: bun install --frozen-lockfile
+      - name: Cache wails3 CLI (v1.4 P1 — go.mod-keyed, OS-specific binary)
+        uses: actions/cache@v4
+        with:
+          path: ~/go/bin/wails3
+          key: wails3-${{ runner.os }}-${{ hashFiles('go.mod') }}
+      - name: Cache generated Wails bindings (v1.4 P1 — platform-independent output, shared across OSes)
+        uses: actions/cache@v4
+        with:
+          path: |
+            apps/kira-studio/frontend/bindings
+            apps/kira-studio/.task
+          key: wails-bindings-${{ hashFiles('go.mod') }}
+      - name: Generate Wails bindings
+        run: sh scripts/setup.sh
       - run: bun run test:unit
       - name: Raise the inotify instance limit (v1.4 P1 — internal/gitsock and internal/gitsession now run t.Parallel(); each open repo holds one fsnotify watcher = one inotify instance, and Ubuntu's stock 128 is low enough for the parallel suite to exhaust it and hang rather than fail cleanly, confirmed by reproducing the hang at 128 and it clearing at 8192)
         run: sudo sysctl -w fs.inotify.max_user_instances=8192
