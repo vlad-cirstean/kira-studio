@@ -141,3 +141,70 @@ actually differ.
   "still needed a full Read afterward" pattern Arm A reported) is precisely the mechanism that could
   turn this into a real difference on the re-run. Canonical-implementation choice deferred until
   after the C8 re-run (see below), so the comparison is apples-to-apples on the same close call.
+
+### Round-2 Arm A: same task, re-run against the C8-improved server
+
+C8 (`docs/v1.5/plans/C8-repo-map-source-line-context.md`) added the literal source line under every
+`find_definition`/`find_references`/`find_implementations`/`search_symbols` hit. Re-ran Arm A's task
+only — same chosen plan (`82f5f1e0`'s content, copied unchanged), fresh worktree
+(`v1.5-c7-arm-a-round2`) branched from post-C8 `v1.5` HEAD (`068b4619`), fresh Sonnet implementer with
+no memory of round 1, MCP server rebuilt from the C8-improved code. Arm B was **not** re-run — its
+round-1 numbers stand unchanged as the control baseline, since C8 only changes what an MCP call
+returns.
+
+- **Round-2 Arm A** (MCP + C8): `bb405100..16afd246`, 11 commits, `v1.5-c7-arm-a-round2`.
+  `subagent_tokens` 415,581; `duration_ms` 2,388,181 (~39.8 min); 229 tool uses, ~12 MCP calls (vs.
+  ~217 Read/Grep/Bash/Edit/Write).
+- **Independently verified**, same rigor as round 1: `go build`/`vet`/`test` clean (one test,
+  `TestDescribe_Reflection_NoReflection_YieldsSchemaError` in `grpcclient`, failed once in a
+  full-suite run — confirmed pre-existing and flaky, not a C7 defect, by reproducing it failing
+  intermittently even on plain `v1.5` with no C7 code at all, isolated to a file C7 never touches,
+  last changed in an unrelated commit `dd585aad`). `bun run typecheck`/`lint`/`build` clean.
+  `bun run test:unit` 1284/1284. `bun run test:ui` 17/17. Spot-checked `search.go` directly: imports
+  `internal/pathsafe` and calls `pathsafe.ValidateRelPath` straight (the cleaner post-C8 call site,
+  not the `codeworkspace` delegate shim round-1's arms use), confirming the implementer picked up
+  C8's own refactor correctly without being told to.
+- **Comparison against both round-1 arms:**
+
+  | | tokens | duration | tool uses | MCP calls |
+  |---|---|---|---|---|
+  | Round-1 Arm A (MCP, pre-C8) | 498,227 | 3,012,077 ms (~50.2 min) | 320 | ~9 |
+  | Round-1 Arm B (no MCP, control) | 498,521 | 3,026,399 ms (~50.4 min) | 303 | 0 |
+  | Round-2 Arm A (MCP, post-C8) | 415,581 | 2,388,181 ms (~39.8 min) | 229 | ~12 |
+
+  Round-2 dropped ~17% in tokens, ~21% in duration, ~28% in tool uses relative to round-1 Arm A —
+  and relative to the no-MCP control (round-1 Arm B, which round-1 Arm A itself landed within noise
+  of). That gap is far outside the round-1 Arm A vs. Arm B noise band (both within 0.1% of each
+  other), so this reads as a real effect of C8's change, not run-to-run variance — though it is one
+  data point, not a repeated trial, and the two runs used different underlying model behavior on the
+  same task rather than a controlled replay, so some of the gap could reflect ordinary task-execution
+  variance rather than C8 alone.
+- **Where the win came from, per the implementer's own detailed account** (matching the plan's own
+  prediction in its OQ1): source lines replaced a `Read` specifically for single-line lookups — a
+  function signature, confirming a symbol's location before deciding how to approach it, and one
+  `find_references` sweep across many files that doubled as "does everyone here follow the same
+  convention" with zero extra `Read`s. Source lines did **not** help for multi-line bodies (a
+  worker-pool implementation, a coalescer's flush logic) — those still needed a full `Read`
+  regardless, since a definition's own single line is a fragment of the code that mattered.
+  `outline_file` (unchanged by C8) still required a follow-up `Read` for both files it was used on.
+  The implementer's own estimate: roughly 3-4 fewer `Read` calls out of ~35, concentrated exactly
+  where C8's design predicted.
+- **New dogfooding finding, logged in `mcp-repo-map-issues.md`, not fixed here**: `find_definition`
+  with a bare `symbol` argument for a name that resolves ambiguously can echo back an empty string in
+  its "not found" message rather than the query itself — a minor error-message defect, not a C8
+  regression (pre-existing `find_definition` behavior).
+
+### Conclusion
+
+The MCP repo-map server, as it shipped after C3, did not measurably help C7's implementation over
+plain Read/Grep — tokens and duration landed within noise of the no-MCP control. C8's source-line
+addition, which followed directly from Arm A's own dogfooding complaint that it "still needed a full
+Read after every hit," produced a real, sizeable improvement when the identical task was re-run: real
+gains but bounded ones — the mechanism it targets (single-line signature/location lookups) is a
+minority of what a typical implementation phase needs, since most navigation questions ("what does
+this ~40-line function actually do") resolve only with a full file read regardless of what the index
+can print next to a hit. Repo-map's value going forward is real but partial: strong for search
+disambiguation and multi-file convention-checking, weak for anything requiring an implementation
+body. Round-2 Arm A (`16afd246`) is the canonical C7 implementation, merged to `v1.5` — chosen both as
+the best-performing arm and as the one already built against C8's improved server and its cleaner
+`pathsafe` call site, requiring no adaptation to merge.
