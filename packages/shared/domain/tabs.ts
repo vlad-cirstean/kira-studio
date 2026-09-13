@@ -240,9 +240,18 @@ export type VariableSetTabState = z.infer<typeof variableSetTabStateSchema>;
 export const environmentsTabStateSchema = /*#__PURE__*/ z.object({});
 export type EnvironmentsTabState = z.infer<typeof environmentsTabStateSchema>;
 
-// C5 §6.2: the pinned graph placeholder carries no state of its own — an empty object, like
-// EnvironmentsTabState above, so parseState has something to validate against.
-export const repoGraphTabStateSchema = /*#__PURE__*/ z.object({});
+// C5 §6.2: the pinned graph placeholder carried no state of its own at first — an empty object,
+// like EnvironmentsTabState above. C10 §8 replaces the placeholder with the real mounted graph,
+// which needs to persist across a tab switch (C5's tab views unmount on switch — a cold remount
+// would re-walk the graph and lose scroll/selection): `viewState` holds git-ui's own
+// `PersistedViewState` (version-6 shape: repoId, loadedRows, detailOpen, scrollRow, selectedSha,
+// columnWidths, dateFormat, detailWidth, fileListMode, four search toggles, searchOpen). A
+// permissive passthrough rather than re-deriving that shape here — git-ui's own
+// `parsePersistedViewState` (already shipped, `index.ts`) is the sole validator, so this schema
+// does not become a second, drift-prone implementation of the same version-6 contract.
+export const repoGraphTabStateSchema = /*#__PURE__*/ z.object({
+  viewState: z.unknown().nullable().default(null),
+});
 export type RepoGraphTabState = z.infer<typeof repoGraphTabStateSchema>;
 
 // C5 §9.3/§12: revealLine is the one thing worth remembering across a restore — which line Monaco
@@ -254,11 +263,19 @@ export const repoFileTabStateSchema = /*#__PURE__*/ z.object({
 });
 export type RepoFileTabState = z.infer<typeof repoFileTabStateSchema>;
 
-// C6 §8.1/D10: a diff tab carries no session state — a restored tab re-reads both sides and opens
-// at Monaco's own first change, which is where a diff is read from anyway (unlike repo-file's
-// revealLine, a diff is navigated by change, not by line). An empty object, like
-// repoGraphTabStateSchema above, so parseState has something to validate against.
-export const repoDiffTabStateSchema = /*#__PURE__*/ z.object({});
+// C6 §8.1/D10: a diff tab carried no session state at first — a restored tab re-read both sides
+// and opened at Monaco's own first change. C10 §6.1 extends this, rather than forking a second
+// diff-tab kind, to also address a *commit* diff: the revision pair. Both null (the default) is
+// C6's own HEAD-vs-worktree comparison, unchanged; a commit diff's `RepoDiffView.vue` branch reads
+// `left`/`right` as the two revisions and `leftLabel`/`rightLabel` as their short-sha display text.
+// `.default(null)` on every field keeps a tab saved before this phase restorable — the same
+// discipline `repoFileTabStateSchema`'s own `revealLine` already follows.
+export const repoDiffTabStateSchema = /*#__PURE__*/ z.object({
+  left: z.string().nullable().default(null),
+  right: z.string().nullable().default(null),
+  leftLabel: z.string().nullable().default(null),
+  rightLabel: z.string().nullable().default(null),
+});
 export type RepoDiffTabState = z.infer<typeof repoDiffTabStateSchema>;
 
 const tabRecordBase = {
@@ -451,15 +468,30 @@ export function defaultBrowseTabState(): BrowseTabState {
 }
 
 export function defaultRepoGraphTabState(): RepoGraphTabState {
-  return {};
+  return { viewState: null };
 }
 
 export function defaultRepoFileTabState(revealLine: number | null = null): RepoFileTabState {
   return { revealLine };
 }
 
-export function defaultRepoDiffTabState(): RepoDiffTabState {
-  return {};
+/**
+ * With no arguments, C6's own HEAD-vs-worktree comparison (every field null) — every existing
+ * caller of `defaultRepoDiffTabState()` is unaffected. C10's `openRepoCommitDiffTab` (S15) is the
+ * one caller that supplies the revision pair.
+ */
+export function defaultRepoDiffTabState(revision?: {
+  left: string;
+  right: string;
+  leftLabel: string;
+  rightLabel: string;
+}): RepoDiffTabState {
+  return {
+    left: revision?.left ?? null,
+    right: revision?.right ?? null,
+    leftLabel: revision?.leftLabel ?? null,
+    rightLabel: revision?.rightLabel ?? null,
+  };
 }
 
 /** 'order_items' — the path tail's name; the connection name is rendered separately. */

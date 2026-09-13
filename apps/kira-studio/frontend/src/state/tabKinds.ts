@@ -33,6 +33,7 @@ import {
   defaultKeyValueTabState,
   defaultRepoDiffTabState,
   defaultRepoFileTabState,
+  defaultRepoGraphTabState,
   defaultStreamTabState,
   definitionTabStateSchema,
   documentTabStateSchema,
@@ -43,9 +44,11 @@ import {
   type KeyValueTabRecord,
   type KeyValueTabState,
   keyValueTabStateSchema,
+  type RepoDiffTabRecord,
   type RepoDiffTabState,
   type RepoFileTabRecord,
   type RepoFileTabState,
+  type RepoGraphTabRecord,
   type RepoGraphTabState,
   repoDiffTabStateSchema,
   repoFileTabStateSchema,
@@ -384,8 +387,10 @@ export const TAB_KINDS: { [K in TabKind]: TabKindDef<K> } = {
       codeRepoRecord(repoIdOfWorkspace((tab.workspaceId as WorkspaceKey) ?? ''))?.name ?? 'Graph',
     icon: () => 'source-control',
     railColor: () => undefined,
-    defaultState: (): RepoGraphTabState => ({}),
-    duplicateState: (): RepoGraphTabState => ({}),
+    defaultState: (): RepoGraphTabState => defaultRepoGraphTabState(),
+    // Never actually reached (`pinned: true` refuses duplication, state/tabs.ts), but a real
+    // default rather than `{}` keeps this consistent with every other kind's own duplicateState.
+    duplicateState: (_tab: RepoGraphTabRecord): RepoGraphTabState => defaultRepoGraphTabState(),
     dropResources: noDrop,
     // No project-panel reveal (this kind has no path to reveal) and no other repo-graph-specific
     // action exists yet — §6.2's placeholder is a reserved slot, not a half-built feature.
@@ -416,7 +421,10 @@ export const TAB_KINDS: { [K in TabKind]: TabKindDef<K> } = {
     icon: () => 'git-compare',
     railColor: () => undefined,
     defaultState: (): RepoDiffTabState => defaultRepoDiffTabState(),
-    duplicateState: (): RepoDiffTabState => ({}),
+    // C10: a commit diff's revision pair must survive duplication — resetting to `{}` (pre-C10)
+    // would silently turn a duplicated commit-diff tab into a HEAD-vs-worktree one, the same
+    // "copy the tab's own current state" shape `repo-file`'s own duplicateState already follows.
+    duplicateState: (tab: RepoDiffTabRecord): RepoDiffTabState => ({ ...tab.state }),
     dropResources: (tabId) => dropRepoDiffTab(tabId),
     menuExtras: () => [],
     parseState: parseStateWith(repoDiffTabStateSchema),
