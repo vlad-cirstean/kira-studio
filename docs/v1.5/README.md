@@ -2,14 +2,16 @@
 
 v1.4 shipped six independent reliability/tooling/feature phases (`docs/v1.4/SPEC.md`). This folder
 holds the next chapter, **code intelligence** — a fourth top-level subsystem beside `studio`, `api`
-and the headless `git` module: a native, in-app code-navigation surface (file tree, Monaco-backed
-file/diff viewing, ripgrep search, quick-open, tree-sitter-derived go-to-definition/implementation)
-with the v1.3 git graph mounted directly inside Kira Studio's own shell instead of only the
-separately-installed VS Code extension, plus a local MCP server that exposes the same code graph to
-an AI client. The graph's code-review layer (inline comment threads over a diff) lands too, deferred
-to the chapter's last phase rather than alongside the rest of the graph. Like v1.3's git chapter,
-this is one cohesive subsystem, so it uses a fresh phase prefix (C1, C2, …) rather than continuing
-v1.4's `P` numbering. It holds:
+and the headless `git` module: a native, read-only, VS Code-like workspace per imported repository
+(a filesystem project tree, tabs with preview/permanent/pinned behavior, Monaco-backed file/diff
+viewing, in-file and repository-wide Go-native search, quick-open, tree-sitter-derived
+go-to-definition/implementation) with the v1.3 git graph mounted as that workspace's own pinned first
+tab instead of living only in the separately-installed VS Code extension, plus a local MCP server
+that exposes the same code graph to an AI client. The graph's code-review layer (inline AI-feedback
+gutter icons, comment threads over a diff) lands too, deferred to the chapter's last phase rather
+than alongside the rest of the graph, its own placement in the workspace resolved then rather than
+guessed now. Like v1.3's git chapter, this is one cohesive subsystem, so it uses a fresh phase prefix
+(C1, C2, …) rather than continuing v1.4's `P` numbering. It holds:
 
 - **`SPEC.md`** — the phases this chapter is built against, one row per phase.
 - **`plans/`** — one implementation plan per phase, committed before that phase's implementation
