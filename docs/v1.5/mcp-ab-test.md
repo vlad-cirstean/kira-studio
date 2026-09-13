@@ -100,5 +100,44 @@ actually differ.
 
 ### Implementation stage
 
-_Running — Arm A (MCP) and Arm B (no MCP) both implementing `82f5f1e0`'s plan in parallel, in their
-respective worktrees._
+- **Arm A** (MCP): `d8040ce6..3b4236d0`, 11 commits, `v1.5-c7-arm-a`. `subagent_tokens` 498,227;
+  `duration_ms` 3,012,077 (~50.2 min); 320 tool uses (~9 repo-map MCP calls — 1 `tools/list`, 6
+  `outline_file` on the six new/touched Go files, 2 `find_references`/`find_definition` — vs.
+  ~60-70+ Read/Grep/Bash). Self-reported honestly: `outline_file` saved a discovery step on
+  unfamiliar Go files but every file still needed a full `Read` after it for exact shapes; the two
+  `find_references`/`find_definition` calls were the clearest wins (confirmed all 4 real callers of
+  `openRepoFileTab` in one call). No MCP use on the ~25 Vue/TS files touched.
+- **Arm B** (no MCP): `82f5f1e0..ab4cc36a`, 11 commits, `v1.5-c7-arm-b`. `subagent_tokens` 498,521;
+  `duration_ms` 3,026,399 (~50.4 min); 303 tool uses (~90 Read, ~20 Grep, ~110 Bash), 0 MCP calls.
+- **Independently verified both** (not just trusting each arm's own report): `go build ./...`,
+  `go vet ./...`, `go test ./apps/kira-studio/internal/...` green for both; `bun run typecheck`,
+  `bun run lint` (same one pre-existing unrelated info-level note in both,
+  `UncommittedChangesStrip.vue`), `bun run build` green for both; `bun run test:unit` 1284/1284 pass
+  for both; `bun run test:ui` (repo-workspace/tabs/mode-switch/smoke/connection-dialog-tabs) 17/17
+  pass for both — including Arm B's own self-reported `mode-switch.spec.ts` flake, which passed
+  clean on this independent re-run, confirming it was a load-based flake and not a real C7 defect.
+- **Tokens and duration came out within noise of each other** (498,227 vs. 498,521 tokens; 50.2 vs.
+  50.4 min) — MCP availability did not measurably change implementation-stage cost on this task,
+  despite Arm A spending real tool calls on repo-map queries instead of Read/Grep. This is the
+  headline finding: with a fixed plan, an already-warm mental model of the codebase (both arms had
+  just read the same six Go files and ~25 Vue/TS files during dogfooding/verification), and a task
+  this size, repo-map's targeted-answer savings on the *files it was used on* didn't show up as a
+  measurable end-to-end win, because it wasn't used on most of the phase's own surface area (the
+  Vue/TS side) and the Go side still needed full reads regardless per Arm A's own admission.
+- **Convergence, spot-checked directly** (not just from each arm's self-report): both independently
+  implemented `ValidateRelPath` as the sole gate on every candidate path (`search.go:274` in Arm A,
+  `search.go:265` in Arm B) and `bufio.Scanner` with the identical `maxSearchLineBytes = 1 * 1024 *
+  1024` cap (Arm A `search.go:26`, Arm B `search.go:25`) — the plan's two decisive safety points from
+  the planning-stage comparison both landed correctly and identically in both implementations.
+  Genuine implementation-level divergences, none safety-relevant: Arm A's `CancelSearch` uses the
+  existing `session()` helper; Arm B's uses a plain `Registry.Lookup` (the plan left `CancelSearch`'s
+  signature under-specified — both are reasonable, neither is wrong); Arm B removed a redundant
+  `stripCR` after discovering `bufio.Scanner`'s default split already strips it, a cleanup Arm A
+  didn't make (dead code, not a defect); Arm A's in-file search binds Monaco's `view.find`, Arm B's
+  binds `StartFindAction` directly — same outcome (opens Monaco's own find widget on a read-only
+  editor), different call site, both correct per the plan's own D13.
+- **Verdict**: no measurable MCP win on this phase, and no regression either. Proceeding to C8
+  (source-line context on repo-map results) as planned — the improvement C8 targets (avoiding the
+  "still needed a full Read afterward" pattern Arm A reported) is precisely the mechanism that could
+  turn this into a real difference on the re-run. Canonical-implementation choice deferred until
+  after the C8 re-run (see below), so the comparison is apples-to-apples on the same close call.
