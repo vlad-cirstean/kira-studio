@@ -31,8 +31,9 @@ export const TAB_VIEWS: Record<TabKind, Component> = {
   'grpc-request': GrpcRequestTabView,
   'variable-set': VariableSetTabView,
   environments: EnvironmentsTabView,
-  // C5 §6.2/§12: the pinned graph placeholder (real content today, replaced wholesale by C9) and
-  // the file viewer (a no-op placeholder until S12's Monaco mount lands, S10's own note).
+  // C5 §6.2/§12: the pinned graph tab (a placeholder at C5, replaced wholesale by C10 with the
+  // real @kira/git-ui mount) and the file viewer (a no-op placeholder until S12's Monaco mount
+  // lands, S10's own note).
   'repo-graph': RepoGraphTabView,
   'repo-file': RepoFileTabView,
   // C6 §8.1: the HEAD-vs-worktree diff mount.
