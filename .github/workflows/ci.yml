@@ -16,6 +16,7 @@ concurrency:
 
 jobs:
   checks:
+    name: checks (macOS)
     runs-on: macos-15
     timeout-minutes: 15
     steps:
@@ -67,6 +68,7 @@ jobs:
   # bindings" steps still run (a job's cache isn't visible until restored on that job's own runner),
   # but land as cache hits instead of rebuilding.
   wails-linux-cli:
+    name: wails-linux-cli (Linux)
     needs: checks
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -105,6 +107,7 @@ jobs:
         run: sh scripts/setup.sh
 
   ui:
+    name: ui (Linux)
     needs: [checks, wails-linux-cli]
     runs-on: ubuntu-latest
     timeout-minutes: 25
@@ -168,6 +171,7 @@ jobs:
           retention-days: 7
 
   container-tests:
+    name: container-tests (Linux)
     needs: [checks, wails-linux-cli]
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -229,6 +233,7 @@ jobs:
           key: docker-${{ runner.os }}-${{ hashFiles('apps/kira-studio/internal/adapters/testsupport/*.go') }}
 
   package-smoke:
+    name: package-smoke (macOS)
     needs: checks
     if: github.event_name != 'pull_request'
     runs-on: macos-15
