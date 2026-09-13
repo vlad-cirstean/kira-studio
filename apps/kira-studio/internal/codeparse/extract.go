@@ -39,13 +39,20 @@ type Symbol struct {
 	BlockIndex int
 }
 
-// Reference is one use (§4.2) — never a resolution target, only a name and a range.
+// Reference is one use (§4.2) — never a resolution target, only a name and a range. NameStartByte/
+// NameEndByte/NameStart are the identifier's own range (C2 §2.4) — for a Java method_invocation or
+// a JavaScript member call, the reference node's own range (StartByte/EndByte) starts before the
+// name and would otherwise never match a cursor placed on it.
 type Reference struct {
-	Kind       string // 'call' | 'type' | 'implementation' | 'import'
+	Kind       string // 'call' | 'type' | 'implementation' | 'import' | 'class'
 	Name       string
 	StartByte  int
 	EndByte    int
 	StartPoint Point
+
+	NameStartByte int
+	NameEndByte   int
+	NameStart     Point
 
 	// BlockIndex: see Symbol.BlockIndex.
 	BlockIndex int
@@ -61,7 +68,7 @@ var definitionKinds = map[string]bool{
 }
 
 var referenceKinds = map[string]bool{
-	"call": true, "type": true, "implementation": true, "import": true,
+	"call": true, "type": true, "implementation": true, "import": true, "class": true,
 }
 
 // extractSymbols runs id's vendored tags.scm query (S2) over root and returns the file's own symbols
@@ -142,12 +149,15 @@ func extractSymbols(root *sitter.Node, source []byte, id ID) ([]Symbol, []Refere
 				continue
 			}
 			ref := Reference{
-				Kind:       refKind,
-				Name:       string(source[nameNode.StartByte():nameNode.EndByte()]),
-				StartByte:  int(refNode.StartByte()),
-				EndByte:    int(refNode.EndByte()),
-				StartPoint: pointOf(refNode.StartPosition()),
-				BlockIndex: -1,
+				Kind:          refKind,
+				Name:          string(source[nameNode.StartByte():nameNode.EndByte()]),
+				StartByte:     int(refNode.StartByte()),
+				EndByte:       int(refNode.EndByte()),
+				StartPoint:    pointOf(refNode.StartPosition()),
+				NameStartByte: int(nameNode.StartByte()),
+				NameEndByte:   int(nameNode.EndByte()),
+				NameStart:     pointOf(nameNode.StartPosition()),
+				BlockIndex:    -1,
 			}
 			key := [4]any{ref.Kind, ref.Name, ref.StartByte, ref.EndByte}
 			if !seenRef[key] {
