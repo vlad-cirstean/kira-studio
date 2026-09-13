@@ -1,5 +1,6 @@
 import { defaultRepoDiffTabState, defaultRepoFileTabState } from '@shared/domain/tabs';
 import { repoWorkspaceKey } from '@shared/domain/workspace';
+import { requestReveal } from '../views/repo/reveal';
 import { tabsForWorkspace } from './mode';
 import {
   activateTab,
@@ -11,10 +12,13 @@ import {
 
 export interface OpenRepoFileOpts {
   preview: boolean;
-  reveal?: { line: number };
+  // C7 D12/§7.4: column/endColumn widen the reveal beyond repoFileTabStateSchema's own persisted
+  // `revealLine` — a search result (or a go-to-definition match) carries a column worth restoring
+  // a cursor to within this session, not across a restart.
+  reveal?: { line: number; column?: number; endColumn?: number };
 }
 
-// C5 §5.2: the repo workspace's own file-open entry point — every tree row click and future
+// C5 §5.2: the repo workspace's own file-open entry point — every tree row click and every
 // search/quick-open match (§12) routes through this, never openTab directly, so the preview/pin
 // rules stay in exactly one place (openTab itself, §15.1's own unit-tested mechanism).
 export function openRepoFileTab(
@@ -31,6 +35,10 @@ export function openRepoFileTab(
   // §5.2 rule 1: "Apply reveal either way" — a fresh tab's makeState() already carries it, so this
   // only does real work for a reused tab (and is a same-value no-op, via skipUnchanged, otherwise).
   if (revealLine !== null) patchRepoFileTabState(result.id, { revealLine });
+  // D12: requestReveal is what actually moves the cursor when the tab's editor is already mounted
+  // and active (a reused tab this call didn't just create) — patchRepoFileTabState above only ever
+  // updates persisted state, which RepoFileView.vue reads on mount, not on an existing mount.
+  if (opts.reveal) requestReveal(result.id, opts.reveal);
   return result;
 }
 

@@ -12,6 +12,7 @@ import { registerEditor, unmountEditor } from './editors';
 import { monacoLanguageFor } from './language';
 import { getOrCreateModel, loadMonaco, REPO_THEME_NAME, repoFileUri } from './monaco';
 import { ensureNavigationRegistered } from './navigation';
+import { consumeReveal } from './reveal';
 
 const props = defineProps<{ tab: RepoFileTabRecord }>();
 
@@ -85,12 +86,31 @@ async function mount(): Promise<void> {
   });
   registerEditor(props.tab.id, uri, editor);
 
-  // §9.3/§12: revealLine restore — the line the tab was last showing (a restored session, or a
-  // reused tab a search/quick-open match jumped into, §5.2).
-  const revealLine = props.tab.state.revealLine;
-  if (revealLine !== null) {
-    editor.revealLineInCenter(revealLine);
-    editor.setPosition({ lineNumber: revealLine, column: 1 });
+  // §9.3/§12, widened by C7 D12: a pending reveal (a search result or go-to-definition match that
+  // arrived while this tab wasn't mounted) wins over the persisted revealLine — the mount-time
+  // case D12's own fix doesn't change, since consumeReveal only ever has something to give when a
+  // reveal request preceded this exact mount.
+  const pendingReveal = consumeReveal(props.tab.id);
+  if (pendingReveal) {
+    if (pendingReveal.column === undefined) {
+      editor.revealLineInCenter(pendingReveal.line);
+      editor.setPosition({ lineNumber: pendingReveal.line, column: 1 });
+    } else {
+      const range = {
+        startLineNumber: pendingReveal.line,
+        startColumn: pendingReveal.column,
+        endLineNumber: pendingReveal.line,
+        endColumn: pendingReveal.endColumn ?? pendingReveal.column,
+      };
+      editor.setSelection(range);
+      editor.revealRangeInCenter(range);
+    }
+  } else {
+    const revealLine = props.tab.state.revealLine;
+    if (revealLine !== null) {
+      editor.revealLineInCenter(revealLine);
+      editor.setPosition({ lineNumber: revealLine, column: 1 });
+    }
   }
 
   // Debounced patch (patchRepoFileTabState's own skipUnchanged) — re-persists revealLine as the

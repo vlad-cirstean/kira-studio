@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
+import { openRepoFileTab } from '../state/repoTabs';
 import { settingsState } from '../state/settings';
 import IconButton from '../theme/primitives/IconButton.vue';
 import TextField from '../theme/primitives/TextField.vue';
@@ -82,9 +83,16 @@ function onToggleCollapse(row: RepoSearchRowVm): void {
   toggleRepoSearchCollapse(props.repoId, row.path);
 }
 
-// S9 wires this to openRepoFileTab with a reveal — a deliberate no-op for now (S8's own working
-// increment: a query returns streamed results, clicking one does nothing yet).
-function onOpen(_row: RepoSearchRowVm, _preview: boolean): void {}
+// §7.4/D12: a single click opens a preview tab, double-click/Enter a permanent one — the tree's
+// own onSelect/onOpen split (RepoSearchRow.vue already resolved which this is). The reveal moves
+// the cursor whether the tab is freshly opened or already mounted and active (D12's own fix).
+function onOpen(row: RepoSearchRowVm, preview: boolean): void {
+  if (row.kind !== 'match' || row.line === undefined || row.column === undefined) return;
+  void openRepoFileTab(props.repoId, row.path, {
+    preview,
+    reveal: { line: row.line, column: row.column, endColumn: row.endColumn },
+  });
+}
 </script>
 
 <template>
