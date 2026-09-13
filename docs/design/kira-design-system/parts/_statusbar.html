@@ -1,0 +1,17 @@
+  <!-- ===== STATUS BAR — no title bar above the app; macOS draws the system one.
+       Panel toggles moved to the RIGHT, icon-only, in the same group as Settings,
+       separated from the read-outs by a hairline so "things I toggle" and
+       "things I read" are never mixed. ===== -->
+  <div class="statusbar">
+    <div class="side">__SB_LEFT__</div>
+    <div class="side">
+      <span class="p-status"><span class="icon-box"><svg class="icon"><use href="#i-db"/></svg></span><span class="mono xs">cache 18.4 MB</span></span>
+      <span class="p-status"><span class="icon-box"><span class="state live"></span></span><span class="mono xs">4 ms</span></span>
+      <span class="sb-toggles">
+        <span class="p-status is-on" title="Connections"><span class="icon-box"><svg class="icon"><use href="#i-sidebar"/></svg></span></span>
+        <span class="p-status" title="Cell editor"><span class="icon-box"><svg class="icon"><use href="#i-string"/></svg></span></span>
+        <span class="p-status is-on" title="Operations"><span class="icon-box"><svg class="icon"><use href="#i-panel"/></svg></span></span>
+        <span class="p-status" title="Settings"><span class="icon-box"><svg class="icon"><use href="#i-gear"/></svg></span></span>
+      </span>
+    </div>
+  </div>

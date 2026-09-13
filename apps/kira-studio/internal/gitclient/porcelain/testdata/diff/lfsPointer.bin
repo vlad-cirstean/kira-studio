@@ -1,0 +1,9 @@
+diff --git a/asset.bin b/asset.bin
+new file mode 100644
+index 0000000..5cd9577
+--- /dev/null
++++ b/asset.bin
+@@ -0,0 +1,3 @@
++version https://git-lfs.github.com/spec/v1
++oid sha256:5e44102a3521f3fea5053f4837c91589afba392a633f4c5e6ae825dc5609f706
++size 12345

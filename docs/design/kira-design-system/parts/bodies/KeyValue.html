@@ -1,0 +1,91 @@
+<div class="app">
+  <div class="workbench">
+{{SIDEBAR}}
+    <div class="col">
+      <div class="p-panel editor" style="--rail:var(--conn-green)">
+
+
+        <div class="tabstrip">
+          <span class="p-tab"><span class="tab-rail" style="background:var(--conn-red)"></span><span class="icon-box" style="color:var(--info)"><svg class="icon"><use href="#i-table"/></svg></span><span class="tab-name"><span class="tab-schema">public.</span>orders</span></span>
+          <span class="p-tab is-active"><span class="tab-rail" style="background:var(--conn-green)"></span><span class="icon-box" style="color:var(--conn-green)"><svg class="icon"><use href="#i-key"/></svg></span><span class="tab-name">session:a44c</span><span class="icon-box" style="opacity:.6"><svg class="icon"><use href="#i-close"/></svg></span></span>
+          <span class="p-tab"><span class="tab-rail" style="background:var(--conn-green)"></span><span class="icon-box" style="color:var(--conn-green)"><svg class="icon"><use href="#i-key"/></svg></span><span class="tab-name">leaderboard:eu</span></span>
+          <button class="p-iconbtn" style="margin-left:var(--s-2)"><svg class="icon"><use href="#i-plus"/></svg></button>
+        </div>
+
+        <div class="view-head">
+          <span class="conn-dot" style="--rail:var(--conn-green)" title="Connection colour"></span>
+          <span class="icon-box" style="color:var(--conn-green)"><svg class="icon"><use href="#i-key"/></svg></span>
+          <span class="view-target"><span class="path">local-redis / db0 / </span><span class="mono">session:a44c</span></span>
+          <span class="p-badge">hash</span>
+          <!-- TTL is a live countdown, not a raw number: a key that is about to
+               vanish should look like one. -->
+          <span class="p-chip warn"><svg class="icon" style="width:11px;height:11px"><use href="#i-history"/></svg>expires in 4 m 12 s</span>
+          <span class="p-badge">2.1 KB</span>
+          <span class="p-badge">read-write</span>
+        </div>
+
+        <!-- LAW 07 — the connection's colour caps the toolbar, not the panel.
+             The tab strip carries tabs from several connections at once, so a
+             rail above it would be claiming the whole panel for one of them;
+             the toolbar belongs to the view in front of you and nothing else.
+             With no colour the slot is still 2px, so nothing shifts. -->
+        <div class="toolbar-rail"></div>
+        <div class="toolbar">
+          <div class="group">
+            <button class="p-iconbtn is-hover" title="Refresh"><svg class="icon"><use href="#i-refresh"/></svg></button>
+            <button class="p-iconbtn is-disabled" title="Nothing running"><svg class="icon"><use href="#i-stop"/></svg></button>
+            <span class="run-state" title="Last scan took 3 ms"><span class="ring"></span>3 ms</span>
+          </div>
+          <div class="sep"></div>
+          <div class="group">
+            <button class="p-iconbtn is-disabled"><svg class="icon"><use href="#i-arrow-l"/></svg></button>
+            <span class="mono sm">1–14</span>
+            <span class="sm dim">of</span>
+            <span class="mono sm muted">≈ 14</span>
+            <button class="p-iconbtn is-disabled"><svg class="icon"><use href="#i-arrow-r"/></svg></button>
+            <button class="p-btn" title="HLEN — the figure above comes from the SCAN cursor"><span class="icon-box"><svg class="icon"><use href="#i-hash"/></svg></span>Exact count</button>
+          </div>
+          <div class="sep"></div>
+          <div class="group">
+            <span class="p-input ui" style="width:200px"><span class="icon-box"><svg class="icon"><use href="#i-search"/></svg></span><span class="ph">MATCH pattern</span></span>
+            <button class="p-btn" title="HSCAN session:a44c MATCH * COUNT 200"><span class="icon-box"><svg class="icon"><use href="#i-code"/></svg></span>Preview command</button>
+          </div>
+          <div class="group push">
+            <button class="p-btn"><span class="icon-box"><svg class="icon"><use href="#i-history"/></svg></span>Set TTL</button>
+            <button class="p-btn" style="color:var(--error)"><span class="icon-box"><svg class="icon"><use href="#i-trash"/></svg></span>Delete key</button>
+          </div>
+        </div>
+
+        <!-- The key/value table is the SAME table object as the SQL grid.
+             Only the column set changes with the Redis type:
+             hash → field | value · list → index | value · zset → score | member -->
+        <div class="p-panel" style="flex:1; min-height:0; border:none; border-radius:0">
+          <div class="thead">
+            <div class="th gutter" style="width:44px"></div>
+            <div class="th" style="width:240px"><span class="name">field</span><span class="p-badge">hash key</span></div>
+            <div class="th" style="flex:1"><span class="name">value</span></div>
+            <div class="th" style="width:90px"><span class="name">size</span></div>
+          </div>
+          <div class="tbody">
+            <div class="tr"><div class="td gutter" style="width:44px">1</div><div class="td" style="width:240px">userId</div><div class="td" style="flex:1">u_9002</div><div class="td num" style="width:90px">6 B</div></div>
+            <div class="tr"><div class="td gutter" style="width:44px">2</div><div class="td" style="width:240px">email</div><div class="td" style="flex:1">rowan.brooks@example.com</div><div class="td num" style="width:90px">24 B</div></div>
+            <div class="tr"><div class="td gutter" style="width:44px">3</div><div class="td sel" style="width:240px">region</div><div class="td sel" style="flex:1">eu-west-1</div><div class="td num" style="width:90px">9 B</div></div>
+            <div class="tr"><div class="td gutter" style="width:44px">4</div><div class="td" style="width:240px">createdAt</div><div class="td" style="flex:1">2026-08-23T07:58:41Z</div><div class="td num" style="width:90px">20 B</div></div>
+            <div class="tr"><div class="td gutter" style="width:44px">5</div><div class="td" style="width:240px">loginCount</div><div class="td" style="flex:1">148</div><div class="td num" style="width:90px">3 B</div></div>
+            <div class="tr"><div class="td gutter" style="width:44px">6</div><div class="td" style="width:240px">device</div><div class="td" style="flex:1">{"os":"macOS 15.2","app":"3.4.1"}</div><div class="td num" style="width:90px">33 B</div></div>
+            <div class="tr"><div class="td gutter" style="width:44px">7</div><div class="td" style="width:240px">csrfToken</div><div class="td" style="flex:1">c81f4a2e9b7d0356af12cc84e6b09d71</div><div class="td num" style="width:90px">32 B</div></div>
+            <div class="tr"><div class="td gutter" style="width:44px">8</div><div class="td" style="width:240px">refreshToken</div><div class="td" style="flex:1">eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1XzkwMDIiLCJpYXQiOjE3…</div><div class="td num" style="width:90px">1.4 KB</div></div>
+            <div class="tr"><div class="td gutter" style="width:44px">9</div><div class="td" style="width:240px">lastPath</div><div class="td" style="flex:1">/dashboard/reports</div><div class="td num" style="width:90px">18 B</div></div>
+            <div class="tr"><div class="td gutter" style="width:44px">10</div><div class="td" style="width:240px">impersonatedBy</div><div class="td null" style="flex:1">nil</div><div class="td num" style="width:90px">0 B</div></div>
+            <div class="tr"><div class="td gutter" style="width:44px">11</div><div class="td" style="width:240px">flags</div><div class="td empty" style="flex:1"></div><div class="td num" style="width:90px">0 B</div></div>
+            <div class="tr"><div class="td gutter" style="width:44px">12</div><div class="td" style="width:240px">locale</div><div class="td" style="flex:1">en-GB</div><div class="td num" style="width:90px">5 B</div></div>
+            <div class="tr"><div class="td gutter" style="width:44px">13</div><div class="td" style="width:240px">tz</div><div class="td" style="flex:1">Europe/Bucharest</div><div class="td num" style="width:90px">16 B</div></div>
+            <div class="tr"><div class="td gutter" style="width:44px">14</div><div class="td" style="width:240px">userAgent</div><div class="td" style="flex:1">Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 …<span class="p-chip" style="margin-left:var(--s-3); background:var(--bg-input); color:var(--fg-disabled)">truncated</span></div><div class="td num" style="width:90px">312 B</div></div>
+          </div>
+        </div>
+      </div>
+{{OPS}}
+    </div>
+  </div>
+{{STATUSBAR}}
+</div>

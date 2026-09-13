@@ -1,0 +1,357 @@
+/**
+ * D25 — "One schema in `core`, generating `contributes.configuration` for VS Code at build time.
+ * Defined at P3, before ~15 settings accrete in two places; a future host's own settings surface
+ * would generate from the same schema rather than inventing a second one." `SETTINGS` below is
+ * that one place; `scripts/gen-settings.ts` reads `toVsCodeConfiguration()` to keep
+ * `packages/host-vscode/package.json` in step with it.
+ *
+ * The keys this file defines are exactly the keys P3 consumes — each later phase adds its own
+ * with its own consumer; the schema's value is being the one place, not being complete on day
+ * one.
+ */
+import { assert } from '../util/assert.ts';
+
+/** Which shell mounted the UI bundle — a structural copy of `@kira/git-ipc`'s `HostKind`
+ *  (ipc may not import core and core may not import ipc, per §3.1's B3; kept honest by
+ *  `tests/unit/ipc/wireConformance.test.ts`, same as `SettingsSnapshot`/`HeadState`/
+ *  `DecorationRef`). */
+export type HostKind = 'vscode' | 'harness';
+
+/** `docs/plans/P7.md` W7/D43: `"stringArray"` is the first array-valued setting type — added for
+ *  `kiraVersion.review.baseCandidates` (§6.8) exclusively; nothing else in the schema needs it
+ *  yet. */
+export type SettingType = 'string' | 'number' | 'boolean' | 'enum' | 'stringArray';
+
+export interface SettingDef<T> {
+  readonly key: string;
+  readonly type: SettingType;
+  readonly default: T;
+  /** Becomes the VS Code setting description verbatim. */
+  readonly description: string;
+  readonly enum?: readonly string[];
+  readonly minimum?: number;
+  readonly maximum?: number;
+  readonly scope?: 'window' | 'resource';
+  /** G14 D6/G18 D10: where a setting's value comes from. `"extension"` (the default, when
+   *  omitted) is a key this extension contributes and owns; `"host"` is a key the *editor* owns,
+   *  which we only read; `"repo"` (G18) is a key stored server-side, per repository, edited from
+   *  the git-ui RepoSettingsDialog rather than VS Code settings.json. Both `"host"` and `"repo"`
+   *  keys are deliberately absent from `contributes.configuration` (`toVsCodeConfiguration()`
+   *  below skips both), since contributing either would be a duplicate declaration of a setting
+   *  this extension does not itself own the value of. */
+  readonly source?: 'extension' | 'host' | 'repo';
+  /** G18 D10/D14: meaningful only when `source === 'repo'`. `true` for exactly one key
+   *  (`kiraVersion.log.level`) — its stored value is shared across every repository this
+   *  installation opens, not scoped by repoId, even though it lives in the same per-repo storage
+   *  and dialog as the other six `'repo'`-sourced keys (a reserved sentinel row, not a schema
+   *  change — storage/repos.GitRepoSettingsRepo's own D14). The dialog surfaces this to the user
+   *  (a visible note, not a hidden implementation detail) rather than presenting it as if its
+   *  value varied per repo. */
+  readonly instanceWide?: boolean;
+}
+
+export const SETTINGS = {
+  // G18 D1/D15: kiraVersion.git.path used to live here — it is server-owned (unchanged verdict)
+  // but its wiring was dead until this phase fixed it (Discovery.Status(ctx, "") hardcoded at
+  // every call site). Its fixed home is kira.db's existing `settings` table, surfaced in Kira
+  // Studio's own "Git" settings section — not this schema, and not the new per-repo dialog either
+  // (it answers "where is the git binary on this machine", not a per-repo fact). Leaving a dead
+  // declaration here after wiring the real one would recreate the exact "a setting that silently
+  // does nothing" anti-pattern this fix exists to close out.
+  //
+  // G18 D1/D10: the seven keys below all moved from VS Code settings.json into a new per-repo
+  // table (storage/repos.GitRepoSettingsRepo), edited from git-ui's own RepoSettingsDialog —
+  // `source: 'repo'` is what drops each out of `contributes.configuration` (toVsCodeConfiguration
+  // below). kiraVersion.log.level is the one exception among the seven: it is not actually a
+  // per-repo fact (`instanceWide: true`, D14) even though it lives in the same table and dialog.
+  // G24 D16: whether the GitHub PR indicator/badges/search-arm/reaper re-resolve are active for
+  // this repository at all — genuinely per-repo (unlike log.level), default true. Off means no
+  // `gh` probe, no spawn, no cache fill, no badge: both commit.resolvePr/branch.resolvePr answer
+  // {kind:'disabled'} outright.
+  'kiraVersion.github.enabled': {
+    key: 'kiraVersion.github.enabled',
+    type: 'boolean',
+    default: true,
+    description:
+      'Show pull request status for this repository (requires the GitHub CLI, `gh`, to be ' +
+      'installed and authenticated). Off disables every gh probe, spawn and badge for this repo.',
+    source: 'repo',
+  },
+  'kiraVersion.graph.pageSize': {
+    key: 'kiraVersion.graph.pageSize',
+    type: 'number',
+    default: 5000,
+    description: 'How many commits a single Load more page fetches.',
+    minimum: 100,
+    maximum: 50000,
+    source: 'repo',
+  },
+  'kiraVersion.graph.scope': {
+    key: 'kiraVersion.graph.scope',
+    type: 'enum',
+    default: 'all',
+    description: 'Whether the graph shows every ref ("all") or only the current HEAD\'s ancestry.',
+    enum: ['all', 'head'],
+    source: 'repo',
+  },
+  'kiraVersion.log.level': {
+    key: 'kiraVersion.log.level',
+    type: 'enum',
+    default: 'info',
+    description: "Verbosity of kira-version's own diagnostic log.",
+    enum: ['off', 'error', 'warn', 'info', 'debug'],
+    source: 'repo',
+    // G18 D14: shared across every repository this installation opens, not scoped by repoId —
+    // the dialog renders a visible note driven by this flag rather than presenting the field as
+    // if it varied per repo.
+    instanceWide: true,
+  },
+  'kiraVersion.review.baseCandidates': {
+    key: 'kiraVersion.review.baseCandidates',
+    type: 'stringArray',
+    default: ['main', 'master'],
+    description:
+      'Branch review (§6.8): candidate base branches to compare against, in order, tried ' +
+      "after the branch's own upstream and the repository's detected default branch " +
+      '(origin/HEAD) both fail to resolve.',
+    source: 'repo',
+  },
+  'kiraVersion.pull.strategy': {
+    key: 'kiraVersion.pull.strategy',
+    type: 'enum',
+    default: 'auto',
+    enum: ['auto', 'ff-only', 'merge', 'rebase'],
+    description:
+      'How Pull integrates fetched commits. "auto" follows your git configuration ' +
+      '(branch.<name>.rebase, then pull.rebase, then pull.ff), falling back to fast-forward-only.',
+    source: 'repo',
+  },
+  'kiraVersion.stash.includeUntracked': {
+    key: 'kiraVersion.stash.includeUntracked',
+    type: 'boolean',
+    default: false,
+    description:
+      'Whether the Stash dialog\'s "include untracked files" box starts checked. Untracked ' +
+      'files are restored by a checkout, not a merge, so a pop can fail on a name collision ' +
+      'even when the merge itself is clean (§7.6).',
+    source: 'repo',
+  },
+  // G25 D10: the worktree prepare script and its own path pre-fill — two more `source: 'repo'`
+  // leaves, same table, same dialog. The sha256-pinned approval this script requires before it
+  // can run (D11) is DELIBERATELY absent from this schema entirely: it is a server-only key this
+  // extension never reads, writes, or even names — repoSettings.set cannot write it, and no
+  // setting in this file could ever expose it.
+  'kiraVersion.worktree.prepareScript': {
+    key: 'kiraVersion.worktree.prepareScript',
+    type: 'string',
+    default: '',
+    description:
+      'A shell command run automatically after creating a worktree (e.g. "npm ci"). Runs as ' +
+      'your own login shell with your own permissions — treat it exactly like a command you ' +
+      'would type into a terminal yourself. Empty disables the feature entirely: no shell is ' +
+      'ever spawned. The exact script text is always shown before it runs for the first time, ' +
+      'and any edit here requires re-approving it.',
+    source: 'repo',
+  },
+  'kiraVersion.worktree.basePath': {
+    key: 'kiraVersion.worktree.basePath',
+    type: 'string',
+    default: '',
+    description:
+      'Pre-fills the "Create Worktree" dialog\'s path field. Purely a convenience — never a ' +
+      'security boundary, and never validated as an existing directory.',
+    source: 'repo',
+  },
+  'kiraVersion.stash.showInGraph': {
+    key: 'kiraVersion.stash.showInGraph',
+    type: 'boolean',
+    default: true,
+    description:
+      'Whether stash entries appear as nodes in the commit graph. When off, the walk drops ' +
+      'refs/stash entirely and stashes are visible only in the stash list.',
+    source: 'repo',
+  },
+  // G28 D16: the one new leaf this phase adds — read CLIENT-SIDE ONLY (the server never consults
+  // it, so a stale or absent value can only ever produce the old CheckoutDialog, never an
+  // unexpected write). One behaviour, one switch: no separate setting for auto-detach (§10.7's own
+  // reasoning) — that route is announced loudly enough on its own that a preference would be
+  // solving a visibility problem with a switch.
+  'kiraVersion.checkout.autoStash': {
+    key: 'kiraVersion.checkout.autoStash',
+    type: 'boolean',
+    default: true,
+    description:
+      'When a branch switch is blocked by uncommitted changes, automatically stash them and ' +
+      'switch anyway instead of asking. The stash is tagged with the branch you switched FROM ' +
+      'and is never popped back automatically — bring it back deliberately from the stash list, ' +
+      'even onto a different branch. Off restores the old dialog (discard / stash and carry / ' +
+      'cancel).',
+    source: 'repo',
+  },
+  'workbench.tree.indent': {
+    key: 'workbench.tree.indent',
+    type: 'number',
+    default: 8,
+    source: 'host',
+    minimum: 0,
+    maximum: 40,
+    description:
+      "VS Code's own tree indentation, read (never contributed) so Kira Version's file trees " +
+      'line up with the Explorer beside them.',
+  },
+} as const satisfies Record<string, SettingDef<unknown>>;
+
+export type SettingKey = keyof typeof SETTINGS;
+
+const SETTING_KEYS = Object.keys(SETTINGS) as readonly SettingKey[];
+
+/** The set of legal values for a def, derived from its `type`/`enum` rather than its `default` —
+ *  `default`'s own literal type (e.g. exactly `5000`) is one legal value, not the type. */
+type ValueOfDef<D extends SettingDef<unknown>> = D['type'] extends 'string'
+  ? string
+  : D['type'] extends 'boolean'
+    ? boolean
+    : D['type'] extends 'number'
+      ? number
+      : D['type'] extends 'stringArray'
+        ? readonly string[]
+        : D['enum'] extends readonly (infer E)[]
+          ? E
+          : never;
+
+export type SettingValue<K extends SettingKey> = ValueOfDef<(typeof SETTINGS)[K]>;
+
+export type Settings = { readonly [K in SettingKey]: SettingValue<K> };
+
+function isSettingKey(key: string): key is SettingKey {
+  return Object.hasOwn(SETTINGS, key);
+}
+
+/** The canonical default for every key, straight from `SETTINGS` — the single cast below just
+ *  restates what `SETTINGS`'s own `satisfies` clause already guarantees element-by-element. */
+export function defaultSettings(): Settings {
+  // `as unknown as Settings`: once a `stringArray` key's value type is a literal array tuple
+  // (`readonly ["main", "master"]`), TypeScript's "sufficient overlap" check on a direct `as
+  // Settings` no longer holds against `Object.fromEntries`'s inferred `{[k: string]: ...}`
+  // shape, even though every member is in fact assignable — the same guarantee `SETTINGS`'s own
+  // `satisfies` clause already establishes element-by-element.
+  return Object.fromEntries(
+    SETTING_KEYS.map((key) => [key, SETTINGS[key].default]),
+  ) as unknown as Settings;
+}
+
+export interface CoerceProblem {
+  readonly key: string;
+  readonly reason: 'unknown key' | 'wrong type' | 'out of range' | 'unknown enum member';
+}
+
+export interface CoerceResult {
+  readonly settings: Settings;
+  readonly problems: readonly CoerceProblem[];
+}
+
+type CoerceOne =
+  | { readonly ok: true; readonly value: unknown }
+  | { readonly ok: false; readonly reason: CoerceProblem['reason'] };
+
+function coerceOne(def: SettingDef<unknown>, value: unknown): CoerceOne {
+  switch (def.type) {
+    case 'string':
+      return typeof value === 'string' ? { ok: true, value } : { ok: false, reason: 'wrong type' };
+    case 'boolean':
+      return typeof value === 'boolean' ? { ok: true, value } : { ok: false, reason: 'wrong type' };
+    case 'number': {
+      if (typeof value !== 'number' || !Number.isFinite(value)) {
+        return { ok: false, reason: 'wrong type' };
+      }
+      if (def.minimum !== undefined && value < def.minimum)
+        return { ok: false, reason: 'out of range' };
+      if (def.maximum !== undefined && value > def.maximum)
+        return { ok: false, reason: 'out of range' };
+      return { ok: true, value };
+    }
+    case 'enum': {
+      if (typeof value !== 'string') return { ok: false, reason: 'wrong type' };
+      const members: readonly string[] | undefined = def.enum;
+      assert(members !== undefined, `SETTINGS[${def.key}]: type "enum" without an enum list`);
+      if (!members.includes(value)) return { ok: false, reason: 'unknown enum member' };
+      return { ok: true, value };
+    }
+    case 'stringArray': {
+      // Never-partly-valid, exactly like every other type: one non-string member and the
+      // WHOLE array falls back to the default, rather than silently dropping just that member.
+      if (!Array.isArray(value) || !value.every((v) => typeof v === 'string')) {
+        return { ok: false, reason: 'wrong type' };
+      }
+      return { ok: true, value };
+    }
+  }
+}
+
+/**
+ * Never throws and never returns a partly-valid object: a wrong type, an out-of-range number
+ * or an unknown enum member falls back to that key's default and is reported in
+ * `problems`, which the host logs. A user with `"pageSize": "lots"` in their settings.json gets
+ * a working panel and a log line, not a dead one.
+ */
+export function coerceSettings(raw: Readonly<Record<string, unknown>>): CoerceResult {
+  const settings = defaultSettings() as Record<string, unknown>;
+  const problems: CoerceProblem[] = [];
+
+  for (const rawKey of Object.keys(raw)) {
+    if (!isSettingKey(rawKey)) {
+      problems.push({ key: rawKey, reason: 'unknown key' });
+      continue;
+    }
+    const outcome = coerceOne(SETTINGS[rawKey], raw[rawKey]);
+    if (outcome.ok) {
+      settings[rawKey] = outcome.value;
+    } else {
+      problems.push({ key: rawKey, reason: outcome.reason });
+    }
+  }
+
+  return { settings: settings as Settings, problems };
+}
+
+export interface VsCodeConfigurationSchema {
+  readonly properties: Record<string, unknown>;
+}
+
+/** Drives `scripts/gen-settings.ts`: one JSON Schema property per setting. Any key with a
+ *  `source` (G14 D6's `'host'`, G18 D10's `'repo'`) is skipped — this extension reads or edits
+ *  those values, but VS Code's own settings.json is not where either lives, so contributing one
+ *  into `contributes.configuration` would be a duplicate declaration of a setting owned
+ *  elsewhere (the editor itself, or, since G18, kira.db's own per-repo/server-owned storage). */
+export function toVsCodeConfiguration(): VsCodeConfigurationSchema {
+  const properties: Record<string, unknown> = {};
+
+  for (const key of SETTING_KEYS) {
+    const def: SettingDef<unknown> = SETTINGS[key];
+    if (def.source !== undefined) continue;
+
+    const property: Record<string, unknown> = {
+      type: def.type === 'enum' ? 'string' : def.type === 'stringArray' ? 'array' : def.type,
+      default: def.default,
+      description: def.description,
+    };
+    if (def.type === 'stringArray') property.items = { type: 'string' };
+    if (def.enum !== undefined) property.enum = def.enum;
+    if (def.minimum !== undefined) property.minimum = def.minimum;
+    if (def.maximum !== undefined) property.maximum = def.maximum;
+    if (def.scope !== undefined) property.scope = def.scope;
+
+    properties[key] = property;
+  }
+
+  return { properties };
+}
+
+/** G18 D10: the seven keys `source: 'repo'` marks — exactly the settings
+ * `RepoSettingsDialog.vue`/`RepoSettingsState` show/carry, and the eight keys D11's migration
+ * covers minus `kiraVersion.git.path` (which never lived in this schema — D15). Schema-driven
+ * rather than a hand-maintained list in `git-ui`, the same "one schema, one place" reason this
+ * dialog is schema.ts's second consumer at all. */
+export function repoSettingKeys(): readonly SettingKey[] {
+  return SETTING_KEYS.filter((key) => SETTINGS[key].source === 'repo');
+}

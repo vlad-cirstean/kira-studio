@@ -1,0 +1,15 @@
+/*
+ * @vscode/codicons, the icon font VS Code itself ships.
+ *
+ * This used to be a hand-maintained subset of glyph rules ("only the ones actually referenced"),
+ * copied in one class at a time as new icons were wired up. That approach silently rotted: by the
+ * time of the G-UX graph/review UI fixes, 25+ classes already referenced elsewhere in this app
+ * (codicon-cloud-download/repo-pull/repo-push/inbox for the toolbar's Fetch/Pull/Push/Stash
+ * buttons, codicon-loading/codicon-sync + codicon-modifier-spin for every progress spinner —
+ * including its @keyframes, which the subset never had at all — codicon-close, codicon-clear-all,
+ * codicon-pass-filled, codicon-circle-large-filled/outline, codicon-comment-discussion,
+ * codicon-file-code, and more) had no glyph rule and rendered as empty boxes. Importing the
+ * upstream stylesheet directly — the same one VS Code itself ships — makes every codicon class
+ * available and keeps it that way; nothing here needs hand-copying again.
+ */
+@import "@vscode/codicons/dist/codicon.css";

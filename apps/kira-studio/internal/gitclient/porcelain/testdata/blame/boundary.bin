@@ -1,0 +1,13 @@
+f86700cbc8a500774aaca3d7b290aeec17ddce81 1 1 1
+author Kira Fixture
+author-mail <fixture@kira.test>
+author-time 1609459200
+author-tz +0000
+committer Kira Fixture
+committer-mail <fixture@kira.test>
+committer-time 1609459200
+committer-tz +0000
+summary first commit
+boundary
+filename f.txt
+	line one

@@ -1,0 +1,181 @@
+services:
+  # postgresql://kira:kira@localhost:5432/kira
+  postgres:
+    image: postgres:16-alpine
+    container_name: kira-postgres
+    environment:
+      POSTGRES_USER: kira
+      POSTGRES_PASSWORD: kira
+      POSTGRES_DB: kira
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - kira-pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kira -d kira"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  # mariadb://kira:kira@localhost:3306/kira (root password: root)
+  mariadb:
+    image: mariadb:11
+    container_name: kira-mariadb
+    environment:
+      MARIADB_USER: kira
+      MARIADB_PASSWORD: kira
+      MARIADB_DATABASE: kira
+      MARIADB_ROOT_PASSWORD: root
+    ports:
+      - "3306:3306"
+    volumes:
+      - ./mariadb/init.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - kira-mariadb-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  # mysql://kira:kira@localhost:3307/kira (root password: root) — 3307, not 3306: that's
+  # mariadb's port in this same file, and the whole point of the demo stack is every engine up
+  # at once.
+  mysql:
+    image: mysql:8.4
+    container_name: kira-mysql
+    environment:
+      MYSQL_USER: kira
+      MYSQL_PASSWORD: kira
+      MYSQL_DATABASE: kira
+      MYSQL_ROOT_PASSWORD: root
+    ports:
+      - "3307:3306"
+    volumes:
+      - ./mysql/init.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - kira-mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-u", "root", "-proot", "--silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  # clickhouse://kira:kira@localhost:8124/kira — host port 8124, not 8123: that's the container's
+  # own HTTP port, and the demo stack's own convention is "host port ≠ container port where a
+  # second engine could collide" (mysql's 3307 sets it). The image grants CLICKHOUSE_USER full
+  # access, same as every other engine's single always-admin demo user.
+  clickhouse:
+    image: clickhouse/clickhouse-server:26.3
+    container_name: kira-clickhouse
+    environment:
+      CLICKHOUSE_USER: kira
+      CLICKHOUSE_PASSWORD: kira
+      CLICKHOUSE_DB: kira
+    ports:
+      - "8124:8123"
+    volumes:
+      - ./clickhouse/init.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - kira-clickhouse-data:/var/lib/clickhouse
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "-O", "/dev/null", "http://localhost:8123/ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  # mongodb://localhost:27017/kira (no auth)
+  mongo:
+    image: mongo:7
+    container_name: kira-mongo
+    environment:
+      MONGO_INITDB_DATABASE: kira
+    ports:
+      - "27017:27017"
+    volumes:
+      - ./mongo/init.js:/docker-entrypoint-initdb.d/init.js:ro
+      - kira-mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  # redis://localhost:6379/0 (no auth; appendonly persistence)
+  redis:
+    image: redis:7-alpine
+    container_name: kira-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - kira-redis-data:/data
+    command: ["redis-server", "--appendonly", "yes"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  # localhost:9092 (no auth, PLAINTEXT)
+  # Single-node KRaft broker (no ZooKeeper) — same image/mode as @testcontainers/kafka's harness
+  # (packages/db-fixtures/support/kafka.ts, P10's D15): apache/kafka's listener never opens under a plain
+  # Compose bootstrap either, so this stays on confluentinc/cp-kafka.
+  kafka:
+    image: confluentinc/cp-kafka:7.6.1
+    container_name: kira-kafka
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9093
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+      # Fixed, arbitrary base64 UUID — a KRaft cluster ID, not a secret; every demo run just needs
+      # the same one so a restarted broker recognizes its own persisted log dir.
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+    volumes:
+      - kira-kafka-data:/var/lib/kafka/data
+    healthcheck:
+      # Not kafka-broker-api-versions (every other service's healthcheck is a native binary; this
+      # one's a JVM wrapper script) — at a 2s interval it was bootstrapping a fresh 256MB-heap JVM
+      # ~30x/minute indefinitely, sustaining ~65-100% CPU on this one container alone. A bare
+      # /dev/tcp connect attempt confirms the broker's listener is accepting connections, which is
+      # all this healthcheck is used for (no service in this file gates on it via depends_on), at
+      # effectively zero cost.
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/localhost/9092'"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+  # sqs://test:test@us-east-1?endpoint=http://localhost:4566 (LocalStack's fixed dummy keys) —
+  # one LocalStack instance serves both SQS and S3 (P17), same image/mode as
+  # @testcontainers/localstack's own harnesses (packages/db-fixtures/support/sqs.ts, packages/db-fixtures/support/s3.ts).
+  sqs:
+    image: localstack/localstack:3
+    container_name: kira-sqs
+    ports:
+      - "4566:4566"
+    environment:
+      SERVICES: sqs,s3
+      PERSISTENCE: 1
+    volumes:
+      - kira-sqs-data:/var/lib/localstack
+    healthcheck:
+      test: ["CMD", "bash", "-c", "curl -sf http://localhost:4566/_localstack/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+volumes:
+  kira-pg-data:
+  kira-mariadb-data:
+  kira-mysql-data:
+  kira-clickhouse-data:
+  kira-mongo-data:
+  kira-redis-data:
+  kira-kafka-data:
+  kira-sqs-data:

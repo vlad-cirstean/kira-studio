@@ -1,0 +1,193 @@
+package repos
+
+import (
+	"database/sql"
+	"encoding/json"
+	"errors"
+	"fmt"
+
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
+)
+
+// WindowsRepo reads and writes the `windows` table (P8 D1/D4) — one row per workbench that is
+// either open right now or was the last time the app quit, and the table `tabs.window_key`
+// scopes tab ownership against (F6's fix).
+type WindowsRepo struct {
+	DB *sql.DB
+}
+
+// List returns every window record in `order`. Not a hot boot path (read once at startup, per
+// window record), so — unlike SettingsRepo/LayoutRepo/TabsRepo — this has no prepared statement.
+func (r *WindowsRepo) List() ([]model.WindowRecord, error) {
+	rows, err := r.DB.Query(`SELECT key, "order", bounds_json, mode FROM windows ORDER BY "order" ASC`)
+	if err != nil {
+		return nil, fmt.Errorf("repos/windows: query: %w", err)
+	}
+	defer rows.Close()
+
+	out := []model.WindowRecord{}
+	for rows.Next() {
+		var (
+			key        string
+			order      int
+			boundsJSON sql.NullString
+			mode       string
+		)
+		if err := rows.Scan(&key, &order, &boundsJSON, &mode); err != nil {
+			return nil, fmt.Errorf("repos/windows: scan: %w", err)
+		}
+		rec := model.WindowRecord{Key: key, Order: order, Mode: model.NormalizeMode(mode)}
+		if boundsJSON.Valid && boundsJSON.String != "" {
+			var b model.WindowBounds
+			if err := json.Unmarshal([]byte(boundsJSON.String), &b); err == nil {
+				rec.Bounds = &b
+			}
+		}
+		out = append(out, rec)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("repos/windows: rows: %w", err)
+	}
+	return out, nil
+}
+
+// Exists reports whether key names a live `windows` row — the check bridge.TabsService uses to
+// reject an unrecognised window key with a real E_BAD_REQUEST rather than letting a bad key
+// surface as a raw FOREIGN KEY constraint failure from TabsRepo.Save's insert.
+func (r *WindowsRepo) Exists(key string) (bool, error) {
+	var one int
+	err := r.DB.QueryRow(`SELECT 1 FROM windows WHERE key = ?`, key).Scan(&one)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("repos/windows: exists %s: %w", key, err)
+	}
+	return true, nil
+}
+
+// Create inserts a new window record. The caller mints the key (D2: a UUID the shell owns).
+func (r *WindowsRepo) Create(rec model.WindowRecord) error {
+	if err := rec.Validate(); err != nil {
+		return fmt.Errorf("repos/windows: %w", err)
+	}
+	var boundsJSON any
+	if rec.Bounds != nil {
+		encoded, err := json.Marshal(rec.Bounds)
+		if err != nil {
+			return fmt.Errorf("repos/windows: encode bounds: %w", err)
+		}
+		boundsJSON = string(encoded)
+	}
+	if _, err := r.DB.Exec(
+		`INSERT INTO windows (key, "order", bounds_json) VALUES (?, ?, ?)`,
+		rec.Key, rec.Order, boundsJSON,
+	); err != nil {
+		return fmt.Errorf("repos/windows: insert %s: %w", rec.Key, err)
+	}
+	return nil
+}
+
+// EnsureExists creates a `windows` row for key if one doesn't already exist, ordered after every
+// row already present, with no stored bounds — idempotent, and a no-op when the row is already
+// there.
+//
+// On the native shell every window's row already exists by the time this could ever be called:
+// main.go's own openWindow/openNewWindow/reopenWindow always call Create before the window's URL
+// (and therefore the renderer that would ask) exists at all (D2). A `-tags server` build has no
+// such shell — nothing native ever creates a window, so a browser tab pointed at an arbitrary
+// `?window=<key>` (tests/e2e-real's multiwindow-real.spec.ts, or a developer's own tab) is the
+// only thing that ever tells the backend that key exists, and TabsService's own checkWindow
+// rejects an unregistered key outright rather than silently writing orphan rows (C4) — so the
+// renderer calls WindowsService.Ensure once at boot, before it asks for anything window-scoped,
+// and this is what that becomes on the Go side. Runs inside one transaction (matching LayoutRepo.Set's
+// C7 fix) so two concurrent Ensure calls for the same brand-new key can't both observe "absent"
+// and then race each other's INSERT.
+func (r *WindowsRepo) EnsureExists(key string) error {
+	tx, err := r.DB.Begin()
+	if err != nil {
+		return fmt.Errorf("repos/windows: ensure begin: %w", err)
+	}
+	defer tx.Rollback() //nolint:errcheck
+
+	var exists bool
+	if err := tx.QueryRow(`SELECT EXISTS(SELECT 1 FROM windows WHERE key = ?)`, key).Scan(&exists); err != nil {
+		return fmt.Errorf("repos/windows: ensure exists %s: %w", key, err)
+	}
+	if !exists {
+		var maxOrder sql.NullInt64
+		if err := tx.QueryRow(`SELECT MAX("order") FROM windows`).Scan(&maxOrder); err != nil {
+			return fmt.Errorf("repos/windows: ensure max order: %w", err)
+		}
+		order := 0
+		if maxOrder.Valid {
+			order = int(maxOrder.Int64) + 1
+		}
+		if _, err := tx.Exec(
+			`INSERT INTO windows (key, "order", bounds_json) VALUES (?, ?, NULL)`, key, order,
+		); err != nil {
+			return fmt.Errorf("repos/windows: ensure insert %s: %w", key, err)
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("repos/windows: ensure commit: %w", err)
+	}
+	return nil
+}
+
+// GetMode reads one window's stored mode (P22 D12), normalised the same way List does. Used by
+// bridge.WindowsService.Ensure — the one call the renderer already makes before it asks for
+// anything window-scoped, so this is the boot-time seam that carries `mode` to the frontend
+// without a second round trip.
+func (r *WindowsRepo) GetMode(key string) (string, error) {
+	var mode string
+	err := r.DB.QueryRow(`SELECT mode FROM windows WHERE key = ?`, key).Scan(&mode)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", fmt.Errorf("repos/windows: %s: no such window", key)
+	}
+	if err != nil {
+		return "", fmt.Errorf("repos/windows: get mode %s: %w", key, err)
+	}
+	return model.NormalizeMode(mode), nil
+}
+
+// SetMode persists one window's app mode (P22 D12) — the per-window analogue of SetBounds below,
+// written on shutdown/mode-debounce rather than on every mode click (F20's own invariant: a mode
+// switch itself schedules no write).
+func (r *WindowsRepo) SetMode(key string, mode string) error {
+	res, err := r.DB.Exec(`UPDATE windows SET mode = ? WHERE key = ?`, model.NormalizeMode(mode), key)
+	if err != nil {
+		return fmt.Errorf("repos/windows: update mode %s: %w", key, err)
+	}
+	if n, err := res.RowsAffected(); err == nil && n == 0 {
+		return fmt.Errorf("repos/windows: %s: no such window", key)
+	}
+	return nil
+}
+
+// SetBounds persists one window's rectangle — the per-window analogue of the single
+// `window.bounds` leaf LayoutRepo used to own for every window there had ever been (F5).
+func (r *WindowsRepo) SetBounds(key string, b model.WindowBounds) error {
+	encoded, err := json.Marshal(b)
+	if err != nil {
+		return fmt.Errorf("repos/windows: encode bounds: %w", err)
+	}
+	res, err := r.DB.Exec(`UPDATE windows SET bounds_json = ? WHERE key = ?`, string(encoded), key)
+	if err != nil {
+		return fmt.Errorf("repos/windows: update %s: %w", key, err)
+	}
+	if n, err := res.RowsAffected(); err == nil && n == 0 {
+		return fmt.Errorf("repos/windows: %s: no such window", key)
+	}
+	return nil
+}
+
+// Delete removes one window's row, cascading its tabs (`tabs.window_key ... ON DELETE CASCADE`,
+// foreign_keys is on — storage/db.go). D5: the caller decides whether deleting is the right move
+// (only when another window remains) — this method just does it.
+func (r *WindowsRepo) Delete(key string) error {
+	if _, err := r.DB.Exec(`DELETE FROM windows WHERE key = ?`, key); err != nil {
+		return fmt.Errorf("repos/windows: delete %s: %w", key, err)
+	}
+	return nil
+}

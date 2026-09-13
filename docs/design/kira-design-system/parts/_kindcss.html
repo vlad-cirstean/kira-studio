@@ -1,0 +1,8 @@
+  .kind-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--s-3); }
+  .kind { padding: var(--s-5) var(--s-4); border: var(--bw) solid var(--border); border-radius: var(--r); background: var(--bg); display: flex; flex-direction: column; align-items: flex-start; gap: var(--s-2); cursor: pointer; }
+  .kind:hover, .kind.is-hover { background: var(--hover); border-color: var(--border-strong); }
+  .kind.is-hover { outline: var(--bw) solid var(--focus); outline-offset: -1px; }
+  .kind.is-off { opacity: 0.4; cursor: default; }
+  .kind-ic { display: flex; margin-bottom: var(--s-2); }
+  .kind-name { font-size: var(--t-lg); color: var(--fg); }
+  .kind-sub { font-size: var(--t-sm); color: var(--fg-disabled); line-height: 1.4; }

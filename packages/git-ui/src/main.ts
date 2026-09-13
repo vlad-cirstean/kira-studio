@@ -1,0 +1,94 @@
+import type { EventPayload, HostKind, Transport, UiActionKind } from '@kira/git-ipc';
+import { vKuiTooltip } from '@kira/kira-ui';
+import { createApp, type App as VueApp } from 'vue';
+import AppRoot from './App.vue';
+import ReviewView from './components/review/ReviewView.vue';
+import type { ReviewTarget } from './state/review.ts';
+import type { ViewStateStore } from './state/viewState.ts';
+// G16 D1/D2: the document-level height chain and gutter reset. Imported first so it is the base
+// every other stylesheet layers onto.
+import './theme/app-shell.css';
+import './icons/codicon.css';
+import './theme/vscode-tokens.css';
+import './theme/density.css';
+// G19 D3: bridges --kv-* onto @kira/kira-ui's own --kui-* vocabulary, plus that package's own
+// component CSS (theme/controls.css) — loaded once, here, for every consumer in this bundle.
+import './theme/kui-bridge.css';
+import '@kira/kira-ui/theme/controls.css';
+// G34 D1: colourless structural tokens — hoisted to :root, the app's one scale for both roots.
+import './theme/kira-structure.css';
+
+export interface MountHandle {
+  unmount(): void;
+}
+
+export interface MountOptions {
+  readonly transport: Transport;
+  readonly viewState: ViewStateStore;
+  readonly host: HostKind;
+  /** `docs/plans/P7.md` W9: which root to mount — `AppRoot` (the panel, P0-P6) or `ReviewView`
+   *  (the sidebar, §6.8). Defaults to `"graph"` so every pre-P7 call site (and every test that
+   *  constructs `MountOptions` without this field) keeps mounting exactly what it always did. */
+  readonly view?: 'graph' | 'review';
+  /** Only meaningful when `view === "review"` — the cold-bootstrap arm of D40's "how the view
+   *  learns which branch to review" (see `ReviewView.vue`'s own doc comment). `undefined`/`null`
+   *  is the "no branch yet" state; ignored entirely for `view: "graph"`. */
+  readonly target?: ReviewTarget | null;
+  /** G10 D19: only meaningful when `view === "graph"` — the exact mirror of `target` above, for a
+   *  palette command that fired while the graph webview was cold (`panelView.ts`'s own
+   *  `#pendingUiAction`/bootstrap-island arm). `undefined`/`null` means no action is pending. G14
+   *  D10: renamed from `pendingAction` and grown an optional `target`, mirroring `ui.action`'s own
+   *  shape. */
+  readonly pendingUiAction?: {
+    action: UiActionKind;
+    target?: { repoId: string; sha: string };
+  } | null;
+  /** G-UX (item 13): the connection state as of the host's own cold resolve — meaningful for
+   *  BOTH views (unlike `target`/`pendingUiAction` above), so it flows through `mount()`'s own
+   *  `...rest` spread into whichever root is mounted, rather than being picked apart per branch.
+   *  `App.vue`/`ReviewView.vue` each construct their own `BridgeClient` seeded with this, then keep
+   *  it live via the `connection.changed` event — see that class's own doc comment. Named
+   *  `hostConnectionState`, not `connectionState`: both root components already have an unrelated
+   *  local of that name (`BridgeClient.connectionState`, the cold-boot `app.init` success/failure
+   *  signal), and a same-named prop would collide with it as a Vue template key. */
+  readonly hostConnectionState: EventPayload<'connection.changed'>['state'];
+}
+
+/**
+ * Mounts the app shell into `container`, wired to `transport` and `viewState`, told which
+ * `host` it is running under. Hosts and the harness call this rather than each owning their
+ * own bootstrap — the UI is mounted unchanged everywhere (§8.4), only these pieces differ.
+ * `viewState` is what P3 W9 adds: without it, the panel would have to keep
+ * `retainContextWhenHidden` on to avoid losing scroll/selection/loaded-row state every time a
+ * VS Code webview is hidden and recreated (§2.1). `view` is what P7 W9 adds: one build, one
+ * entry (§6.8/D41) — the host's own injected initial state says which root this call mounts,
+ * never a second bundle. Both are breaking changes to the one function every host and the
+ * harness calls, and both were made the same way: every call site moves in the same commit.
+ */
+export function mount(container: Element, opts: MountOptions): MountHandle {
+  // §5.1 perf budgets are measured from navigation start (the implicit start of a
+  // timeOrigin-relative measure); this marks the point the app's own bundle has parsed
+  // and begun mounting. App.vue/ReviewView.vue each mark first-paint once mounted (W18 needs it
+  // from both roots).
+  performance.mark('kira:page-parsed');
+  performance.measure('kira:page-parsed', undefined, 'kira:page-parsed');
+
+  const { view = 'graph', target, pendingUiAction, ...rest } = opts;
+  const app: VueApp =
+    view === 'review'
+      ? createApp(ReviewView, { ...rest, target })
+      : createApp(AppRoot, { ...rest, pendingUiAction });
+  // G20 D2: `v-kui-tooltip` — replaces every native `title`/`:title` attribute in this bundle.
+  app.directive('kui-tooltip', vKuiTooltip);
+  // G16 D1/D2: the other half of app-shell.css's `.kv-mount-root` rule — the class and the rule
+  // are useless apart, and they live in two files because the class must follow whatever
+  // container the host hands us, not a naming convention two packages have to agree on.
+  container.classList.add('kv-mount-root');
+  app.mount(container);
+  return {
+    unmount(): void {
+      app.unmount();
+      container.classList.remove('kv-mount-root');
+    },
+  };
+}

@@ -1,0 +1,105 @@
+<script setup lang="ts">
+import { computed, onMounted, ref } from 'vue';
+import CodeMirrorHost from '../../editor/CodeMirrorHost.vue';
+import { connectionRecord } from '../../state/connections';
+import { findDataTab } from '../../state/tabs';
+import CodiconIcon from '../../theme/CodiconIcon.vue';
+import IconButton from '../../theme/primitives/IconButton.vue';
+import PopoverPanel from '../../theme/primitives/PopoverPanel.vue';
+import { sqlDialectFor } from '../shared/sqlIdent';
+import { previewPending } from './pendingChanges';
+
+const props = defineProps<{ tabId: string }>();
+const emit = defineEmits<{ close: [] }>();
+
+const statements = ref<string[]>([]);
+const loading = ref(true);
+const error = ref<string | null>(null);
+
+// P31 D40/F36: a blank line between statements — the trailing `;` on the last one is unchanged.
+const doc = computed(() => statements.value.join(';\n\n') + (statements.value.length ? ';' : ''));
+
+const sqlDialect = computed(() =>
+  sqlDialectFor(connectionRecord(findDataTab(props.tabId)?.connectionId)?.kind),
+);
+
+onMounted(async () => {
+  const tab = findDataTab(props.tabId);
+  if (!tab?.connectionId) {
+    loading.value = false;
+    return;
+  }
+  try {
+    statements.value = await previewPending(tab.connectionId, tab.path, props.tabId);
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : String(err);
+  } finally {
+    loading.value = false;
+  }
+});
+
+function close(): void {
+  emit('close');
+}
+</script>
+
+<template>
+  <PopoverPanel
+    anchor="right"
+    :width="480"
+    test-id="preview-command-panel"
+    backdrop-test-id="preview-command-backdrop"
+    @close="close"
+  >
+    <div class="preview-panel-inner">
+      <div class="preview-panel-header p-panel-head">
+        <span class="icon-box"><CodiconIcon name="code" :size="13" /></span>
+        <span>Preview SQL</span>
+        <IconButton
+          icon="close"
+          class="p-push"
+          v-tooltip="'Close'"
+          data-testid="preview-command-close"
+          @click="close"
+        />
+      </div>
+      <div v-if="loading" class="preview-panel-loading p-sm muted">Loading…</div>
+      <div v-else-if="error" class="preview-panel-error p-sm" data-testid="preview-command-error">
+        {{ error }}
+      </div>
+      <div v-else-if="statements.length === 0" class="preview-panel-empty p-sm muted">
+        No pending changes.
+      </div>
+      <div v-else class="preview-panel-body">
+        <CodeMirrorHost :doc="doc" language="sql" :sql-dialect="sqlDialect" :read-only="true" />
+      </div>
+    </div>
+  </PopoverPanel>
+</template>
+
+<style scoped>
+.preview-panel-inner {
+  max-height: 360px;
+  display: flex;
+  flex-direction: column;
+}
+
+.preview-panel-header {
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.preview-panel-loading,
+.preview-panel-empty {
+  padding: var(--kira-s-4);
+}
+
+.preview-panel-error {
+  padding: var(--kira-s-4);
+  color: var(--kira-error);
+}
+
+.preview-panel-body {
+  height: 240px;
+}
+</style>

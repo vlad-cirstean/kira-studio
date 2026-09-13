@@ -1,0 +1,128 @@
+<div class="app">
+  <div class="workbench">
+{{SIDEBAR}}
+    <div class="col">
+      <div class="p-panel editor" style="--rail:var(--conn-red)">
+        <div class="tabstrip">
+          <span class="p-tab is-active"><span class="tab-rail" style="background:var(--conn-red)"></span><span class="icon-box" style="color:var(--info)"><svg class="icon"><use href="#i-table"/></svg></span><span class="tab-name"><span class="tab-schema">public.</span>customers</span><span class="icon-box" style="opacity:.6"><svg class="icon"><use href="#i-close"/></svg></span></span>
+          <span class="p-tab"><span class="tab-rail" style="background:var(--conn-red)"></span><span class="icon-box" style="color:var(--info)"><svg class="icon"><use href="#i-table"/></svg></span><span class="tab-name"><span class="tab-schema">public.</span>orders</span></span>
+          <button class="p-iconbtn" style="margin-left:var(--s-2)"><svg class="icon"><use href="#i-plus"/></svg></button>
+        </div>
+
+        <!-- same view header as every other editor — LAW 09 -->
+        <div class="view-head">
+          <span class="conn-dot" style="--rail:var(--conn-red)" title="Connection colour"></span>
+          <span class="icon-box" style="color:var(--info)"><svg class="icon"><use href="#i-table"/></svg></span>
+          <span class="view-target"><span class="path">prod-analytics / analytics / public / </span>customers</span>
+          <span class="p-badge">table</span>
+          <span class="p-badge">2 108 rows</span>
+          <span class="p-badge">9 columns</span>
+          <span class="p-badge">read-write</span>
+          <span class="p-chip push" style="background:var(--bg-input); color:var(--fg-muted)"><svg class="icon" style="width:11px;height:11px"><use href="#i-key"/></svg>primary key id</span>
+        </div>
+
+        <!-- LAW 07 — the connection's colour caps the toolbar, not the panel.
+             The tab strip carries tabs from several connections at once, so a
+             rail above it would be claiming the whole panel for one of them;
+             the toolbar belongs to the view in front of you and nothing else.
+             With no colour the slot is still 2px, so nothing shifts. -->
+        <div class="toolbar-rail"></div>
+        <div class="toolbar">
+          <div class="group">
+            <button class="p-iconbtn is-hover" title="Refresh"><svg class="icon"><use href="#i-refresh"/></svg></button>
+            <button class="p-iconbtn" style="color:var(--error)" title="Stop"><svg class="icon"><use href="#i-stop"/></svg></button>
+            <span class="run-state is-running" title="Fetching"><span class="ring"></span>0.4 s</span>
+          </div>
+          <div class="sep"></div>
+          <div class="group">
+            <button class="p-iconbtn is-disabled"><svg class="icon"><use href="#i-chev-ll"/></svg></button>
+            <button class="p-iconbtn is-disabled"><svg class="icon"><use href="#i-chev-l"/></svg></button>
+            <span class="mono sm">1–200</span><span class="sm dim">of</span><span class="mono sm muted">2 108</span>
+            <button class="p-iconbtn"><svg class="icon"><use href="#i-chev-r"/></svg></button>
+            <button class="p-iconbtn"><svg class="icon"><use href="#i-chev-rr"/></svg></button>
+          </div>
+          <div class="sep"></div>
+          <div class="group">
+            <button class="p-btn"><span class="icon-box"><svg class="icon"><use href="#i-columns"/></svg></span>Columns<span class="p-count">5 / 9</span></button>
+          </div>
+          <div class="group push">
+            <span class="p-chip warn">1 row edited</span>
+            <button class="p-btn"><span class="icon-box"><svg class="icon"><use href="#i-undo"/></svg></span>Revert</button>
+            <button class="p-btn primary"><span class="icon-box"><svg class="icon"><use href="#i-save"/></svg></span>Commit</button>
+          </div>
+        </div>
+
+        <!-- the filter row is part of the grid, not an option: same object as on
+             every table view, empty here rather than hidden. -->
+        <div class="toolbar">
+          <button class="p-iconbtn" title="Saved &amp; recent filters"><svg class="icon"><use href="#i-history"/></svg></button>
+          <span class="p-input" style="flex:1; min-width:0"><span class="dim" style="font-family:var(--font-ui)">WHERE</span><span class="ph">no filter — showing every row</span></span>
+          <span class="p-input" style="width:230px"><span class="dim" style="font-family:var(--font-ui)">ORDER BY</span><span class="ph">table order</span></span>
+          <button class="p-btn primary" style="height:var(--h-sm)">Apply</button>
+          <button class="p-btn" style="height:var(--h-sm)" title="Empty both fields and refetch">Clear</button>
+        </div>
+        <div class="p-panel" style="flex:1; min-height:0; border:none; border-radius:0">
+          <div class="thead">
+            <div class="th gutter" style="width:44px"></div>
+            <div class="th" style="width:200px"><span class="name">id</span><span class="key">PK</span><span class="p-badge">uuid</span></div>
+            <div class="th" style="width:190px"><span class="name">email</span><span class="p-badge">citext</span></div>
+            <div class="th" style="width:150px"><span class="name">name</span><span class="p-badge">text</span></div>
+            <div class="th" style="width:110px"><span class="name">tier</span></div>
+            <div class="th" style="flex:1"><span class="name">preferences</span><span class="p-badge">jsonb</span></div>
+          </div>
+          <div class="tbody">
+            <div class="tr"><div class="td gutter" style="width:44px">1</div><div class="td" style="width:200px">c1d0-88ae-4f30-b7a2</div><div class="td" style="width:190px">rowan.brooks@example.com</div><div class="td" style="width:150px">Rowan Brooks</div><div class="td" style="width:110px">gold</div><div class="td" style="flex:1">{"theme":"dark","digest":"weekly",…}</div></div>
+            <div class="tr"><div class="td gutter" style="width:44px">2</div><div class="td" style="width:200px">7f2b-19cd-4e88-a301</div><div class="td" style="width:190px">amari.osei@example.com</div><div class="td" style="width:150px">Amari Osei</div><div class="td" style="width:110px">silver</div><div class="td null" style="flex:1">NULL</div></div>
+            <!-- the selected cell is the ONLY thing the panel below is about -->
+            <div class="tr"><div class="td gutter" style="width:44px">3</div><div class="td" style="width:200px">2ba9-64d1-4c07-8e55</div><div class="td" style="width:190px">noa.lindqvist@example.com</div><div class="td" style="width:150px">Noa Lindqvist</div><div class="td" style="width:110px">gold</div><div class="td sel" style="flex:1">{"theme":"system","digest":"daily",…}</div></div>
+            <div class="tr"><div class="td gutter" style="width:44px">4</div><div class="td" style="width:200px">5e07-2ab4-4910-bc63</div><div class="td" style="width:190px">yusuf.karim@example.com</div><div class="td" style="width:150px">Yusuf Karim</div><div class="td" style="width:110px">bronze</div><div class="td empty" style="flex:1"></div></div>
+            <div class="tr"><div class="td gutter" style="width:44px">5</div><div class="td" style="width:200px">9c14-7de2-4b53-af80</div><div class="td" style="width:190px">imani.reyes@example.com</div><div class="td" style="width:150px">Imani Reyes</div><div class="td" style="width:110px">gold</div><div class="td" style="flex:1">{"theme":"light","digest":"never",…}</div></div>
+            <div class="tr"><div class="td gutter" style="width:44px">6</div><div class="td" style="width:200px">a3d5-91fe-4c62-b074</div><div class="td" style="width:190px">tobias.hale@example.com</div><div class="td" style="width:150px">Tobias Hale</div><div class="td" style="width:110px">silver</div><div class="td null" style="flex:1">NULL</div></div>
+            <div class="tr"><div class="td gutter" style="width:44px">7</div><div class="td" style="width:200px">b6e8-40ac-4d15-9f27</div><div class="td" style="width:190px">sana.qureshi@example.com</div><div class="td" style="width:150px">Sana Qureshi</div><div class="td" style="width:110px">gold</div><div class="td" style="flex:1">{"theme":"dark","digest":"weekly",…}</div></div>
+            <div class="tr"><div class="td gutter" style="width:44px">8</div><div class="td" style="width:200px">d81f-53bc-4a09-6e14</div><div class="td" style="width:190px">eli.nakamura@example.com</div><div class="td" style="width:150px">Eli Nakamura</div><div class="td" style="width:110px">bronze</div><div class="td" style="flex:1">{"theme":"system","digest":"daily",…}</div></div>
+            <div class="tr"><div class="td gutter" style="width:44px">9</div><div class="td" style="width:200px">f04a-7c31-4b68-25d9</div><div class="td" style="width:190px">mira.abadi@example.com</div><div class="td" style="width:150px">Mira Abadi</div><div class="td" style="width:110px">gold</div><div class="td" style="flex:1">{"theme":"dark","digest":"never",…}</div></div>
+            <div class="tr"><div class="td gutter" style="width:44px">10</div><div class="td" style="width:200px">3b7c-e620-4f41-8ca5</div><div class="td" style="width:190px">kai.oyelaran@example.com</div><div class="td" style="width:150px">Kai Oyelaran</div><div class="td" style="width:110px">silver</div><div class="td null" style="flex:1">NULL</div></div>
+            <div class="tr"><div class="td gutter" style="width:44px">11</div><div class="td" style="width:200px">6d9e-b842-4053-71fb</div><div class="td" style="width:190px">lena.varga@example.com</div><div class="td" style="width:150px">Lena Varga</div><div class="td" style="width:110px">gold</div><div class="td" style="flex:1">{"theme":"light","digest":"weekly",…}</div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== CELL EDITOR ===== the panel says WHICH cell it holds in the
+           grid's own vocabulary (column · type · row), then gets out of the way -->
+      <div class="p-panel" style="height:230px; flex-shrink:0">
+        <div class="view-head" style="border-bottom:var(--bw) solid var(--border)">
+          <span class="icon-box"><svg class="icon"><use href="#i-string"/></svg></span>
+          <span class="view-target"><span class="path">public.customers / </span>preferences<span class="path"> · row 3</span></span>
+          <span class="p-badge">jsonb</span>
+          <span class="p-badge">1.2 KB</span>
+            <span class="p-badge ok">valid JSON</span>
+          <span class="group" style="display:flex; align-items:center; gap:var(--s-3); margin-left:var(--s-4)">
+            <span class="p-select">Auto — JSON<span class="icon-box"><svg class="icon"><use href="#i-chevron-down"/></svg></span></span>
+            <button class="p-iconbtn is-active" title="Pretty-print"><svg class="icon"><use href="#i-tree"/></svg></button>
+            <button class="p-iconbtn" title="Compact"><svg class="icon"><use href="#i-flat"/></svg></button>
+            <button class="p-iconbtn" title="Reset to stored value"><svg class="icon"><use href="#i-discard"/></svg></button>
+          </span>
+          <span class="push" style="display:flex; align-items:center; gap:var(--s-3)">
+            <span class="p-chip warn">modified</span>
+            <button class="p-btn">Cancel</button>
+            <button class="p-btn primary">Apply to cell</button>
+            <button class="p-iconbtn" title="Hide cell editor"><svg class="icon"><use href="#i-chevron-down"/></svg></button>
+          </span>
+        </div>
+        <div class="code">
+          <div class="gutter-col">1<br>2<br>3<br>4<br>5<br>6<br>7<br>8<br>9</div>
+<pre>{
+  <span class="p">"theme"</span><span class="o">:</span> <span class="s">"system"</span>,
+  <span class="p">"digest"</span><span class="o">:</span> <span class="s">"daily"</span>,
+  <span class="p">"locale"</span><span class="o">:</span> <span class="s">"sv-SE"</span>,
+  <span class="p">"channels"</span><span class="o">:</span> [<span class="s">"email"</span>, <span class="s">"push"</span>],
+  <span class="p">"quietHours"</span><span class="o">:</span> { <span class="p">"from"</span><span class="o">:</span> <span class="s">"22:00"</span>, <span class="p">"to"</span><span class="o">:</span> <span class="s">"07:00"</span> },
+  <span class="p">"betaOptIn"</span><span class="o">:</span> <span class="k">true</span>,
+  <span class="p">"unsubscribedAt"</span><span class="o">:</span> <span class="k">null</span>
+}</pre>
+        </div>
+      </div>
+    </div>
+  </div>
+{{STATUSBAR}}
+</div>

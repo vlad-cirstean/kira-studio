@@ -1,0 +1,69 @@
+/*
+ * G19 D3: bridges Kira Studio's own `--kira-*` token layer onto `packages/kira-ui`'s `--kui-*`
+ * semantic vocabulary — the other half of the same contract `packages/git-ui`'s own
+ * `theme/kui-bridge.css` proves (that file, from `--kv-*`; this one, from `--kira-*`). Loaded so
+ * the contract is real and satisfiable from both hosts; nothing in this app's own UI imports
+ * `@kira/kira-ui` yet (§8 item 1's own explicit non-goal for this phase) — this file alone stays
+ * inert until something does. Every right-hand side is an existing `--kira-*` token
+ * (`theme/tokens.css`); no new colour is invented here.
+ *
+ * G34 D3/F15 (see the G34 plan): brought up to date with everything G21 D2 added to the
+ * `packages/git-ui` side of this contract (`--kui-z-modal`, `--kui-overlay-bg`, the
+ * `--kui-button-*` triple) plus the vocabulary G34 itself adds (`--kui-fg-subtle`,
+ * `--kui-bg-input`, `--kui-border-strong`, `--kui-border-width`, `--kui-active-bg`,
+ * `--kui-radius-float`, `--kui-control-h-sm`, `--kui-control-inline-h`, `--kui-icon-box`,
+ * `--kui-icon-size`, `--kui-font-*`, `--kui-space-5`/`-6`, `--kui-shadow-float`) — the contract
+ * this file's own header promises ("real and satisfiable from both hosts") was not actually true
+ * from G21 through G34 (this file was missing all three G21 additions); it is again now.
+ */
+:root {
+  --kui-fg: var(--kira-fg);
+  --kui-fg-muted: var(--kira-fg-muted);
+  --kui-fg-subtle: var(--kira-fg-subtle);
+  --kui-bg-panel: var(--kira-bg-elevated);
+  --kui-bg-input: var(--kira-bg-input);
+  --kui-border: var(--kira-border);
+  --kui-border-strong: var(--kira-border-strong);
+  --kui-border-width: var(--kira-border-width);
+  --kui-hover-bg: var(--kira-hover);
+  --kui-active-bg: var(--kira-bg-input);
+  --kui-selected-bg: var(--kira-select);
+  --kui-selected-fg: var(--kira-accent-fg);
+  --kui-danger-fg: var(--kira-error);
+  --kui-focus-border: var(--kira-focus);
+  --kui-radius: var(--kira-radius-sm); /* interactive controls — Kira's sm tier, 4px */
+  --kui-radius-float: var(--kira-radius); /* menus/popovers/dialogs — Kira's own panel tier, 6px */
+  --kui-control-h: var(--kira-control-h);
+  --kui-control-h-sm: var(--kira-control-h-sm);
+  --kui-control-inline-h: var(--kira-control-inline-h);
+  --kui-icon-box: var(--kira-icon-box);
+  --kui-icon-size: 13px; /* Kira's own CodiconIcon default */
+  --kui-font-ui: var(--kira-font-ui);
+  --kui-font-size: var(--kira-t-md);
+  --kui-font-size-sm: var(--kira-t-sm);
+  --kui-font-size-xs: var(--kira-t-xs);
+  --kui-space-1: var(--kira-s-1);
+  --kui-space-2: var(--kira-s-2);
+  --kui-space-3: var(--kira-s-3);
+  --kui-space-4: var(--kira-s-4);
+  --kui-space-5: var(--kira-s-5);
+  --kui-space-6: var(--kira-s-6);
+  --kui-shadow-float: var(--kira-shadow-dialog);
+  /* G20 D6: mapped from this app's own real `--kira-z-*` ladder — inert today, same as every
+     other token above (nothing in this app consumes a `packages/kira-ui` floating surface yet).
+     `--kui-z-modal` aliases `--kira-z-dialog` — this app's ladder never grew a rung named
+     "modal", `--kira-z-dialog` is the one that plays that role (DialogFrame.vue). */
+  --kui-z-popover: var(--kira-z-popover);
+  --kui-z-menu: var(--kira-z-menu);
+  --kui-z-modal: var(--kira-z-dialog);
+  --kui-z-tooltip: var(--kira-z-tooltip);
+  /* G21 D2: KuiDialog's backdrop and KuiButton's `primary` variant — the real filled-button
+     triple every dialog's own submit action already used before this phase, not the row-
+     selection colour `--kui-selected-*` maps to. No `--kira-*` token names a dialog backdrop
+     (DialogFrame.vue draws its own scrim as a literal) — transcribed here, not invented: the
+     same value that component already renders, not a new one picked for this file. */
+  --kui-overlay-bg: rgb(0 0 0 / 0.5);
+  --kui-button-bg: var(--kira-accent);
+  --kui-button-fg: var(--kira-accent-fg);
+  --kui-button-hover-bg: var(--kira-accent);
+}

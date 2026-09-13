@@ -1,0 +1,349 @@
+/**
+ * `docs/plans/P4.md` W14's "one polite live region" — pure text composition for the two events it
+ * announces (Load-more's own doc comment in `LoadMoreButton.vue` names both: "the Load-more result
+ * ... and Refresh completion"). Kept separate from `App.vue`, which only owns *when* to set the
+ * region's text (watching `GraphViewState.loading`'s transitions back to `"idle"`), so the exact
+ * wording is unit-testable on its own, the same split `rowAccessibility.ts` makes for a row's
+ * accessible name.
+ *
+ * `docs/plans/P6.md` W12 adds the op-outcome half: every announcement `ops.ts` produces — success
+ * or failure — is composed here too, per that phase's own rule that a destructive action which
+ * silently does nothing is the same failure mode §6.4 already named for the clipboard.
+ */
+import type {
+  CheckoutPreflight,
+  OpErrorKind,
+  OpResult,
+  ResetMode,
+  StashEntry,
+} from '@kira/git-ipc';
+import { originLabel, stashLabel } from '../components/stashListModel.ts';
+
+const COUNT_FORMATTER = new Intl.NumberFormat();
+
+/** `LoadMoreButton.vue`'s own `fmt` helper, duplicated rather than imported: that one is a private
+ *  detail of a `.vue` SFC's `<script setup>` block, not an exported function, and both call sites
+ *  want the same "grouped thousands" formatting the plan's own example ("5,000 more loaded,
+ *  122,400 remaining") shows. */
+export function formatCount(count: number): string {
+  return COUNT_FORMATTER.format(count);
+}
+
+/** The plan's own worked example, generalized: "N more loaded, M remaining" — or, once the
+ *  history is fully loaded, "N more loaded, history fully loaded" rather than "0 remaining",
+ *  which reads as if nothing happened. */
+export function composeLoadMoreAnnouncement(
+  added: number,
+  remaining: number,
+  exhausted: boolean,
+): string {
+  const addedText = `${formatCount(added)} more loaded`;
+  return exhausted
+    ? `${addedText}, history fully loaded`
+    : `${addedText}, ${formatCount(remaining)} remaining`;
+}
+
+/** §6.2's refresh action, completed: a keyboard user who cannot see the toolbar spinner stop has
+ *  no other way to learn a refresh finished (or how many commits it re-walked). */
+export function composeRefreshAnnouncement(totalLoaded: number): string {
+  const noun = totalLoaded === 1 ? 'commit' : 'commits';
+  return `Refreshed — ${formatCount(totalLoaded)} ${noun} loaded`;
+}
+
+/** `docs/plans/P11.md` W13: `GraphViewState.revealSha`'s own live-region text — §5.1.1's
+ *  "selecting such a result loads the pages up to it" can be several seconds of paging on a large
+ *  repository, which must not read as a hang to a user who cannot see the toolbar's own loading
+ *  indicator. There is no `"found"` text: the row selection that follows a successful reveal
+ *  already moves real focus onto it, and that row's own composed accessible name
+ *  (`rowAccessibility.ts`) is the completion signal — a second announcement here would only repeat
+ *  it. A hit that is *not* found (the history paged to exhaustion without it — most likely a stale
+ *  hit from before a force-push) gets nothing else at all otherwise, which is the silent-no-op
+ *  failure mode §6.4 already names for the clipboard. */
+export function composeRevealSearchHitAnnouncement(outcome: 'loading' | 'notFound'): string {
+  return outcome === 'loading'
+    ? 'Loading history to find the selected result…'
+    : 'Result not found — it may no longer exist in this repository';
+}
+
+/** A short name for `target`, the way every P6 confirmation reads it: a raw sha is shortened,
+ *  anything else (a branch, tag, or remote-branch name) is shown exactly as given. */
+function shortTarget(target: string): string {
+  return /^[0-9a-f]{20,40}$/i.test(target) ? target.slice(0, 7) : target;
+}
+
+/** §7.5's own two silent-success verdicts, given a voice: `cleanCarry` is "proceed with no
+ *  prompt", not "proceed with no acknowledgement" — the carried files are still worth a sentence,
+ *  just not a dialog. */
+export function composeCheckoutAnnouncement(preflight: CheckoutPreflight, target: string): string {
+  const where = preflight.detaches ? `${shortTarget(target)} (detached)` : shortTarget(target);
+  if (preflight.verdict === 'cleanCarry') {
+    const n = preflight.carried.length;
+    return `Checked out ${where} — ${n} local ${n === 1 ? 'change' : 'changes'} carried over`;
+  }
+  return `Checked out ${where}`;
+}
+
+/** G28 D16: the auto-stash announcement — mandatory, never decoration, since the working tree
+ *  reads as clean on the new branch and this sentence is the only place the user learns where
+ *  their work went. `fileCount` is summed from the blocked-tracked/blocked-untracked blocker
+ *  paths the pre-flight already reported (the exact set the server's own `stash push` swept).
+ *  `fromBranch` is the ORIGIN branch (where the switch started, not the target) — matching D1's
+ *  own tagging: the entry is tagged with the branch it came FROM. */
+export function composeAutoStashAnnouncement(fileCount: number, fromBranch: string): string {
+  const noun = fileCount === 1 ? 'file' : 'files';
+  return (
+    `Stashed ${fileCount} ${noun} from ${fromBranch}` +
+    ` — the stash is tagged ${fromBranch}; apply it back from the stash list.`
+  );
+}
+
+/** G28 D6: the auto-detach announcement — mandatory, the entire safety story for landing a user
+ *  in a detached HEAD they did not directly ask for. Names both the branch and the worktree path
+ *  that already holds it. */
+export function composeAutoDetachAnnouncement(target: string, worktreePath: string): string {
+  return (
+    `${shortTarget(target)} is checked out in ${worktreePath} — HEAD is now detached at its ` +
+    `commit. Create a branch here, or switch to another branch, when you're done.`
+  );
+}
+
+/** §7.10: a `noCommit` revert stages rather than commits, and the toolbar's live region is the
+ *  only way a keyboard/screen-reader user learns which one just happened. */
+export function composeRevertAnnouncement(shas: readonly string[], noCommit: boolean): string {
+  const subject =
+    shas.length === 1 ? `commit ${shortTarget(shas[0] ?? '')}` : `${shas.length} commits`;
+  return noCommit ? `Reverted ${subject} — changes staged, not committed` : `Reverted ${subject}`;
+}
+
+/** `docs/plans/P10.md` W10: §7.7's own reset, given a voice — the target's subject is not carried
+ *  here (the live region names *what was done*, not the full advisory the dialog already showed
+ *  and the user already read before confirming). */
+export function composeResetAnnouncement(mode: ResetMode, target: string): string {
+  return `Reset (${mode}) to ${shortTarget(target)}`;
+}
+
+/** `docs/plans/P10.md` W10, §7.10's own `noCommit` wording reused verbatim for cherry-pick
+ *  (§7.13 states the same "staged, not committed" outcome for `--no-commit`). */
+export function composeCherryPickAnnouncement(sha: string, noCommit: boolean): string {
+  const subject = `commit ${shortTarget(sha)}`;
+  return noCommit
+    ? `Cherry-picked ${subject} — changes staged, not committed`
+    : `Cherry-picked ${subject}`;
+}
+
+/** `docs/plans/P10.md` W10, hard part 7's own answer, given a voice: `CherryPickPreflight`'s
+ *  `merge-tree` prediction inherits D57's whole posture (P9's own stash-pop precedent) — exact
+ *  about the merge, reconciled after the fact by `runOp`'s read-back, never swallowed. No
+ *  `stashKept` half exists here (unlike `StashPredictionMismatch`): a cherry-pick never touches
+ *  the stash, so this is its own, one-field-simpler shape rather than a forced reuse. */
+export interface CherryPickPredictionMismatch {
+  readonly predicted: 'clean' | 'conflicts';
+  readonly actual: 'clean' | 'conflicts' | 'refused';
+}
+
+export function composeCherryPickMismatchAnnouncement(
+  mismatch: CherryPickPredictionMismatch,
+): string {
+  const predictedText = mismatch.predicted === 'clean' ? 'a clean apply' : 'conflicts';
+  const actualText =
+    mismatch.actual === 'clean'
+      ? 'applied cleanly'
+      : mismatch.actual === 'conflicts'
+        ? 'conflicted'
+        : 'was refused';
+  return (
+    `This cherry-pick ${actualText}, though the pre-flight predicted ${predictedText} — the tree ` +
+    'changed in between.'
+  );
+}
+
+const OP_ERROR_TEXT: Record<OpErrorKind, string> = {
+  AuthFailed: 'authentication failed',
+  NonFastForward: 'not a fast-forward',
+  Conflict: 'conflicts need resolving',
+  DirtyWorktree: 'the working tree has local changes',
+  UntrackedWouldBeOverwritten: 'untracked files would be overwritten',
+  LockHeld: 'the repository is locked by another process',
+  NotFound: 'not found',
+  AlreadyExists: 'already exists',
+  NotFullyMerged: 'not fully merged',
+  WorktreeConflict: 'checked out in another worktree',
+  OperationInProgress: 'another operation is in progress',
+  RemoteRefMissing: 'the remote ref is missing',
+  HookRejected: 'a hook rejected it',
+  LeaseViolation: 'the remote moved since it was last checked',
+  RemoteRefUpdated: 'the remote moved since it was last fetched',
+  NetworkFailed: 'a network error occurred',
+  RemoteNotFound: 'the remote repository was not found',
+  ProtectedBranch: 'the branch is protected',
+  Cancelled: 'it was cancelled',
+  StashConflict: 'it merged with conflicts — the stash was kept',
+  StashIndexConflict: 'the index already has conflicts — try again without restoring it',
+  StashUntrackedCollision: 'untracked files were in the way — the stash was kept',
+  ConfirmationRequired: 'the typed confirmation was missing or did not match',
+  EmptyCherryPick: 'this change is already present on this branch',
+  MainlineRequired: 'a merge commit needs a parent chosen first',
+  /** G25 D15, probe M5: `worktree remove` on a locked worktree. Kept distinct from `LockHeld`'s
+   *  own phrase above — this names the remedy (unlock it), not "wait and retry". */
+  WorktreeLocked: 'the worktree is locked',
+  /** G26 D5/D10: this phase's own one new `OpErrorKind`, produced exclusively by `stackSet`'s
+   *  own cycle check — never by rebase itself. */
+  StackCycle: 'that would make a branch its own ancestor',
+  /** G28 D10: `globalStashSave` from the current working tree with nothing dirty — this phase's
+   *  own one new `OpErrorKind`. */
+  NothingToStash: 'there is nothing to save — the working tree is clean',
+  /** G30 round-1 functional-correctness review, finding #2: this round's own one new
+   *  `OpErrorKind`, produced exclusively by a pull whose target branch was checked out away from
+   *  between the fetch and the merge/rebase. */
+  BranchChanged: 'a different branch is checked out now',
+  Unknown: 'an unexpected error occurred',
+};
+
+/** Every op failure the live region reports — including one that never reached git at all (a
+ *  gated action, `op.run`'s own guard) — reads the same way: what was attempted, then why it
+ *  didn't happen. A silent failure is the clipboard's own failure mode (§6.4), applied here. */
+export function composeOpFailureAnnouncement(
+  action: string,
+  error: { readonly kind: OpErrorKind; readonly message: string } | undefined,
+): string {
+  if (!error) return `${action} failed.`;
+  return `${action} failed — ${OP_ERROR_TEXT[error.kind]}.`;
+}
+
+/** `docs/plans/P9.md` W13: git's own `No local changes to save` no-op (probe 10) exits 0 with no
+ *  error, so a plain "succeeded" announcement would be the silent-no-op failure mode §6.4 already
+ *  named for the clipboard — `pushed` is `ops.ts`'s own before/after stash-count comparison,
+ *  the only way to tell the two outcomes apart. */
+export function composeStashPushAnnouncement(pushed: boolean): string {
+  return pushed ? 'Changes stashed' : 'Nothing to stash — the working tree matched HEAD';
+}
+
+/** §7.6's concrete answer to hard part 1: non-null only when an executed pop/apply disagreed with
+ *  the prediction the user was shown (a race between pre-flight and write, or a gap pre-flight
+ *  could not see — never a false positive, since `composeStashAnnouncement` never compares at all
+ *  when the prediction itself was `"unknown"`). `stashKept` is a fact for every failure mode P9
+ *  probed (conflict, untracked collision, local-overwrite refusal) — the stash always survives —
+ *  except a genuinely CLEAN `pop` (as opposed to `apply`), which removes it exactly as intended
+ *  even when that clean outcome is itself the surprise (`predicted: "conflicts"`). */
+export interface StashPredictionMismatch {
+  readonly predicted: 'clean' | 'conflicts';
+  readonly actual: 'clean' | 'conflicts' | 'refused';
+  readonly stashKept: boolean;
+}
+
+const STASH_DROP_UNDO_LABEL_PREFIX = 'Dropped stash@{';
+
+/** `docs/plans/P9.md` W15: undoing a dropped stash does not restore it to its old stack position
+ *  — probe 9 found it always lands back at `stash@{0}` — so the generic "Undone: `<label>`" text
+ *  would read as if `stash@{2}` (say) came back exactly as it was, which a user watching for that
+ *  position would take as a sign the undo failed. Detected from the slot's own `label` rather
+ *  than a dedicated field: `UndoSlotSnapshot` carries no "kind" to switch on, and
+ *  `RepoService`'s stash-drop undo capture is the only call site that ever begins a label this
+ *  way (mirrored exactly in the harness's own mock bridge). */
+export function composeUndoAnnouncement(label: string): string {
+  return label.startsWith(STASH_DROP_UNDO_LABEL_PREFIX)
+    ? 'Restored as stash@{0}'
+    : `Undone: ${label}`;
+}
+
+/** `docs/plans/P10.md` W14, hard part 1's own table, given a voice: the undo button's tooltip is
+ *  the one place a user learns *what a reset's undo actually restores* before they need it, and
+ *  the three modes are not interchangeable (probe 5's own finding — a mixed reset's undo does not
+ *  bring back what was staged, because that index state was never written to the object database
+ *  at all). Detected from `UndoRecord.label`'s own text, the same way `composeUndoAnnouncement`
+ *  detects a dropped stash above: `RepoService`'s reset undo capture (mirrored in the harness's
+ *  own mock bridge) is the only call site that ever labels a record `Reset (<mode>) to …`, so the
+ *  label doubles as the mode carrier without a dedicated field. Every other undoable op — cherry-
+ *  pick's `reset --keep` included — keeps the plain, generic caveat this file has always used:
+ *  §7.12's own "does not restore uncommitted work" already covers what a cherry-pick's undo
+ *  cannot bring back (unrelated dirt `--keep` never touched), so it needs no mode table of its
+ *  own. */
+const RESET_UNDO_LABEL_PATTERN = /^Reset \((soft|mixed|hard)\) to /;
+
+const RESET_UNDO_TOOLTIP_SUFFIX: Record<ResetMode, string> = {
+  soft: 'restores the branch pointer, index, and working tree — a full round trip',
+  mixed: 'restores the commits; what was staged before the reset is not recoverable',
+  hard: 'restores the commits — does not restore uncommitted work',
+};
+
+const DEFAULT_UNDO_TOOLTIP_SUFFIX = 'one level, does not restore uncommitted work';
+
+export function composeUndoTooltip(label: string): string {
+  const resetMatch = label.match(RESET_UNDO_LABEL_PATTERN);
+  const mode = resetMatch?.[1] as ResetMode | undefined;
+  const suffix = mode ? RESET_UNDO_TOOLTIP_SUFFIX[mode] : DEFAULT_UNDO_TOOLTIP_SUFFIX;
+  return `${label} — ${suffix}`;
+}
+
+/** §7.6's own worked example, given a voice: *"This pop conflicted, though the pre-flight
+ *  predicted a clean apply — the tree changed in between. Your stash was kept."* A `mismatch`
+ *  takes priority over the plain success/failure text — it is the more specific, more surprising
+ *  fact, and staying silent about it (rendering only the generic failure text `StashConflict`
+ *  already has in `OP_ERROR_TEXT`) is exactly the "silently rendering the outcome" §7.6 rules
+ *  out. With no mismatch, this reads exactly like `composeOpFailureAnnouncement`'s own output for
+ *  a failure, or a short "Applied"/"Popped" sentence for a plain, agreeing success. */
+/** G28 D5: `currentBranch` (optional — every pre-G28 call site keeps working with no clause at
+ *  all) adds a `"(from <origin>)"` parenthetical whenever `entry`'s own origin branch differs
+ *  from it — the cross-branch apply's own "you're not where this came from" reminder, on the
+ *  SAME sentence shape every other outcome already uses rather than a second, separate
+ *  announcement. `label` now reads `stashLabel(entry)` (the user's own text, stripped of git's
+ *  own "On &lt;b&gt;: " framing) rather than the position-addressed `stash@{N}` — correct for a
+ *  global entry too, whose `index` is D17's own `-1` sentinel and would otherwise render as
+ *  `stash@{-1}`. */
+export function composeStashAnnouncement(
+  verb: 'apply' | 'pop',
+  entry: StashEntry,
+  result: OpResult,
+  mismatch: StashPredictionMismatch | null,
+  currentBranch?: string | null,
+): string {
+  const label = stashLabel(entry);
+  // currentBranch OMITTED (not merely a detached-HEAD `null`) means "the caller does not know" —
+  // every pre-G28 call site, none of which pass this argument at all — so the clause is
+  // suppressed rather than comparing against `undefined` (which would never equal a real branch
+  // name and so would ALWAYS add the clause, breaking every existing announcement's wording).
+  const origin = currentBranch === undefined ? undefined : originLabel(entry, currentBranch);
+  const originClause = origin === undefined ? '' : ` (from ${origin})`;
+  const actionLabel = verb === 'apply' ? 'Stash apply' : 'Stash pop';
+  if (mismatch) {
+    const predictedText = mismatch.predicted === 'clean' ? 'a clean apply' : 'conflicts';
+    const actualText =
+      mismatch.actual === 'clean'
+        ? 'applied cleanly'
+        : mismatch.actual === 'conflicts'
+          ? 'conflicted'
+          : 'was refused';
+    const keptText = mismatch.stashKept ? ' Your stash was kept.' : '';
+    return (
+      `This ${verb}${originClause} ${actualText}, though the pre-flight predicted ${predictedText}` +
+      ` — the tree changed in between.${keptText}`
+    );
+  }
+  if (!result.ok) return composeOpFailureAnnouncement(actionLabel, result.error);
+  return verb === 'apply' ? `Applied ${label}${originClause}` : `Popped ${label}${originClause}`;
+}
+
+/** G26 D8/D11: `stack.restack`'s own live-region text — a full success, a paused conflict
+ *  (`stoppedAt` set), and a cancellation (`stoppedAt` undefined but `remaining` non-empty) all read
+ *  differently. `StackList.vue`'s own paused-restack strip renders the same "paused on X" text
+ *  inline, not just the live region — kept as one function so the two can never disagree. */
+export function composeRestackAnnouncement(
+  restacked: readonly string[],
+  stoppedAt: string | undefined,
+  remaining: readonly string[],
+): string {
+  if (stoppedAt !== undefined) {
+    const doneText = restacked.length > 0 ? `${restacked.length} restacked so far — ` : '';
+    return (
+      `Restack paused on ${stoppedAt} — ${doneText}resolve the conflict, then Continue, then ` +
+      `Restack again to finish the remaining ${remaining.length}.`
+    );
+  }
+  if (remaining.length > 0) {
+    return `Restack cancelled after ${restacked.length} — ${remaining.length} branch${remaining.length === 1 ? '' : 'es'} left. Restack again to finish.`;
+  }
+  if (restacked.length === 0) return 'Already up to date — nothing to restack.';
+  return restacked.length === 1
+    ? `Restacked ${restacked[0]}`
+    : `Restacked ${restacked.length} branches`;
+}

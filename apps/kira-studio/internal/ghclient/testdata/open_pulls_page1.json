@@ -1,0 +1,13 @@
+[
+  {
+    "number": 1,
+    "title": "First open PR",
+    "html_url": "https://github.com/o/r/pull/1",
+    "state": "open",
+    "draft": false,
+    "merged_at": null,
+    "head": { "ref": "feature-1", "sha": "sha1" },
+    "base": { "ref": "main" },
+    "updated_at": "2026-03-01T00:00:00Z"
+  }
+]

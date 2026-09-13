@@ -1,0 +1,140 @@
+// packages/shared/protocol/wire.fbs
+//
+// The data-plane response wire format (P11). Go encoder: apps/kira-studio/internal/page/encode.go
+// plus apps/kira-studio/internal/adapterhost/frame.go. TypeScript decoder:
+// packages/shared/protocol/frame.ts. Regenerate both with scripts/generate-wire.sh.
+//
+// Renderer -> Go frames are NOT covered here: they stay JSON text (P11 D3).
+//
+// Named `wire.fbs`, not `page.fbs` (P11 plan §5's literal name): flatc's TypeScript generator
+// names its top-level entry-point file after the schema *filename*, not just the `namespace`
+// below. `page.fbs` would have generated a top-level `page.ts` that collides with (and silently
+// overwrites) the existing hand-written packages/shared/protocol/page.ts. Naming the schema file
+// to match `namespace wire;` makes flatc merge the entry-point and namespace-barrel into a single
+// `wire.ts` at the output root, with every generated type under `wire/*.ts` instead.
+
+namespace wire;
+
+// ---- page vocabulary (mirrors packages/shared/protocol/page.ts) ----
+
+enum TypeClass : ubyte { number, text, boolean, temporal, binary, json, other }
+enum Strategy  : ubyte { keyset, offset, cursor, offsetWindow, batch }
+enum RedisType : ubyte { string_, hash, list, set_, zset, stream, object }
+enum Source    : ubyte { cache, server }
+
+table ColumnDescriptor {
+  name:string (required);
+  data_type:string (required);
+  type_class:TypeClass;
+  nullable:bool;
+  is_primary_key:bool;
+  generated:bool;
+}
+
+table PagePosition {
+  offset:int = null;            // optional scalar: null == PagePosition.offset === null
+  page_size:int;
+  has_more:bool;
+  next_token:string;            // absent == null
+  prev_token:string;            // absent == null
+  strategy:Strategy;
+}
+
+// P11 D4: offsets/truncated are [uint], never [ubyte] -- a [uint] vector is 4-byte aligned by
+// construction, which is what lets the generated TypeScript hand back a zero-copy Uint32Array view
+// instead of throwing RangeError (P4 F13).
+table Chunk {
+  data:[ubyte] (required);
+  offsets:[uint] (required);    // rowCount + 1 entries
+  nulls:[ubyte] (required);     // ceil(rowCount / 8) bytes, 1 = NULL
+  truncated:[uint] (required);  // sorted row indices; usually empty, never absent
+}
+
+table TabularPage {
+  columns:[ColumnDescriptor] (required);
+  row_count:int;
+  chunks:[Chunk] (required);    // index-aligned with columns
+  position:PagePosition (required);
+  truncated_cells:int;
+  byte_size:double;             // P11 D6
+  fetched_at:double;            // epoch ms
+}
+
+table DocumentPage {
+  position:PagePosition (required);
+  ids:Chunk (required);
+  bodies:Chunk (required);
+  row_count:int;
+  byte_size:double;
+  fetched_at:double;
+}
+
+table KeyValuePage {
+  position:PagePosition (required);
+  redis_type:RedisType;
+  ttl_ms:double = null;         // optional scalar
+  memory_bytes:double = null;   // optional scalar
+  fields:Chunk (required);
+  values:Chunk (required);
+  row_count:int;
+  byte_size:double;
+  fetched_at:double;
+}
+
+table StreamPage {
+  position:PagePosition (required);
+  keys:Chunk (required);
+  headers:Chunk (required);
+  attrs:Chunk (required);
+  timestamps:Chunk (required);
+  bodies:Chunk (required);
+  row_count:int;
+  byte_size:double;
+  fetched_at:double;
+  visibility_timeout_seconds:int = null;   // optional scalar; SQS-only
+}
+
+union PageBody { TabularPage, DocumentPage, KeyValuePage, StreamPage }
+
+// A one-field wrapper so a union can live inside a vector (ExecuteResponse.pages) without the
+// parallel types-vector/values-vector shape flatc emits for [PageBody] -- simpler in both languages.
+table Page { body:PageBody; }
+
+// ---- response payloads (mirrors adapterhost/wire.go + data-ops.ts) ----
+
+table ReadResponse           { page:Page (required); source:Source; }
+table CountResponse          { value:double; exact:bool; at:double; stale:bool; source:Source; }
+table PreviewResponse        { statements:[string] (required); }
+table MutateResponse         { affected_rows:int; }
+table ExecuteResponse        { pages:[Page] (required); }
+table ObjectDownloadResponse { bytes:double; }
+table PingPayload            { pong:bool; engine_pid:int; at:double; }
+table CacheStats {
+  l2_bytes:double; l2_budget_bytes:double; l2_entries:int;
+  l2_hits:int; l2_misses:int; l3_entries:int;
+}
+// data:invalidate and cache:clear answer `{}` today (dataframe.go's struct{}{}).
+table EmptyResponse {}
+
+union Payload {
+  ReadResponse, CountResponse, PreviewResponse, MutateResponse, ExecuteResponse,
+  ObjectDownloadResponse, PingPayload, CacheStats, EmptyResponse
+}
+
+// ---- the frame (mirrors packages/shared/protocol/port.ts) ----
+
+enum FrameKind : ubyte { res, evt }
+
+table Error { message:string (required); code:string; }
+
+table Frame {
+  kind:FrameKind;
+  id:int;              // res only; 0 on an evt frame
+  ok:bool;             // res only
+  topic:string;        // evt only ("cache:stats")
+  error:Error;         // present iff kind == res && !ok
+  payload:Payload;
+}
+
+root_type Frame;
+file_identifier "KIF1";   // P11 D5 -- bump the digit on any incompatible change

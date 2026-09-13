@@ -1,0 +1,168 @@
+package model
+
+import "fmt"
+
+type AppearanceSettings struct {
+	FontFamily  string `json:"fontFamily"`
+	FontSize    int    `json:"fontSize"`
+	RowDensity  string `json:"rowDensity"`
+	WordWrap    bool   `json:"wordWrap"`
+	RowColoring bool   `json:"rowColoring"`
+}
+
+type DataSettings struct {
+	DefaultPageSize int `json:"defaultPageSize"`
+}
+
+type CacheSettings struct {
+	L2BudgetMb int `json:"l2BudgetMb"`
+}
+
+type AdvancedSettings struct {
+	OpLogRetentionDays int `json:"opLogRetentionDays"`
+	// P18 D14/D20: an estimated-rows-read threshold, never a cost unit — settings.ts's own
+	// EXPENSIVE_QUERY_ROWS_RANGE comment carries the full argument.
+	ExpensiveQueryRows int `json:"expensiveQueryRows"`
+}
+
+// GitSettings mirrors G7 D16's two server-owned git leaves: two windows disagreeing about either
+// is a correctness/safety issue (a force-push confirmation that only one window enforces, an
+// auto-fetch cadence that differs per viewer), so both live here rather than as VS Code settings.
+type GitSettings struct {
+	ProtectedBranches []string `json:"protectedBranches"`
+	// FetchAutoIntervalMinutes is minutes between automatic background fetches; 0 disables it.
+	FetchAutoIntervalMinutes int `json:"fetchAutoIntervalMinutes"`
+	// GitPath is G18 D15's fix: this leaf was always classified server-owned but its wiring was
+	// dead (Discovery.Status(ctx, "") hardcoded at every call site) until this phase. Empty means
+	// "auto-discover" — gitclient.Discovery's own existing contract, unvalidated beyond "is a
+	// string" (a bad path is tolerated the same way Discovery's own probe already falls through
+	// its classified-error states rather than pre-validating).
+	GitPath string `json:"gitPath"`
+}
+
+type Settings struct {
+	Appearance AppearanceSettings `json:"appearance"`
+	Data       DataSettings       `json:"data"`
+	Cache      CacheSettings      `json:"cache"`
+	Advanced   AdvancedSettings   `json:"advanced"`
+	Git        GitSettings        `json:"git"`
+}
+
+// DefaultSettings mirrors packages/shared/domain/settings.ts's defaultSettings verbatim.
+func DefaultSettings() Settings {
+	return Settings{
+		Appearance: AppearanceSettings{
+			FontFamily:  "Menlo, monospace",
+			FontSize:    12,
+			RowDensity:  "comfortable",
+			WordWrap:    true,
+			RowColoring: true,
+		},
+		Data:  DataSettings{DefaultPageSize: 100},
+		Cache: CacheSettings{L2BudgetMb: 64},
+		Advanced: AdvancedSettings{
+			OpLogRetentionDays: 30,
+			ExpensiveQueryRows: 100_000,
+		},
+		// docs/v1.3/plans/G7 D16: the same three-pattern default upstream's own
+		// kiraVersion.protectedBranches carried, before this phase moved it server-side.
+		Git: GitSettings{
+			ProtectedBranches:        []string{"main", "master", "release/*"},
+			FetchAutoIntervalMinutes: 0,
+			GitPath:                  "",
+		},
+	}
+}
+
+// AppearancePatch, DataPatch, CachePatch and AdvancedPatch mirror settings.ts's `.partial()`
+// per-section patch shapes — every leaf is optional, present only when the caller means to
+// change it (D15: SettingsRepo.Set writes only the leaves actually patched).
+type AppearancePatch struct {
+	FontFamily  *string `json:"fontFamily,omitempty"`
+	FontSize    *int    `json:"fontSize,omitempty"`
+	RowDensity  *string `json:"rowDensity,omitempty"`
+	WordWrap    *bool   `json:"wordWrap,omitempty"`
+	RowColoring *bool   `json:"rowColoring,omitempty"`
+}
+
+type DataPatch struct {
+	DefaultPageSize *int `json:"defaultPageSize,omitempty"`
+}
+
+type CachePatch struct {
+	L2BudgetMb *int `json:"l2BudgetMb,omitempty"`
+}
+
+type AdvancedPatch struct {
+	OpLogRetentionDays *int `json:"opLogRetentionDays,omitempty"`
+	ExpensiveQueryRows *int `json:"expensiveQueryRows,omitempty"`
+}
+
+// GitPatch mirrors GitSettings' own `.partial()` shape (G7 D16).
+type GitPatch struct {
+	ProtectedBranches        *[]string `json:"protectedBranches,omitempty"`
+	FetchAutoIntervalMinutes *int      `json:"fetchAutoIntervalMinutes,omitempty"`
+	GitPath                  *string   `json:"gitPath,omitempty"`
+}
+
+type SettingsPatch struct {
+	Appearance *AppearancePatch `json:"appearance,omitempty"`
+	Data       *DataPatch       `json:"data,omitempty"`
+	Cache      *CachePatch      `json:"cache,omitempty"`
+	Advanced   *AdvancedPatch   `json:"advanced,omitempty"`
+	Git        *GitPatch        `json:"git,omitempty"`
+}
+
+// ValidRowDensity mirrors settings.ts's rowDensitySchema.
+func ValidRowDensity(v string) bool {
+	return v == "compact" || v == "comfortable"
+}
+
+// ValidPageSize mirrors settings.ts's pageSizeSchema (shared with tabs.ts's per-kind page sizes).
+func ValidPageSize(v int) bool {
+	switch v {
+	case 10, 100, 1000, 10000:
+		return true
+	default:
+		return false
+	}
+}
+
+// InRange returns a predicate matching settings.ts's z.number().int().min(lo).max(hi).
+func InRange(lo, hi int) func(int) bool {
+	return func(v int) bool { return v >= lo && v <= hi }
+}
+
+var (
+	validL2BudgetMb               = InRange(8, 1024)
+	validOpLogRetentionDays       = InRange(1, 365)
+	validExpensiveQueryRows       = InRange(1_000, 1_000_000_000)
+	validFetchAutoIntervalMinutes = InRange(0, 1440)
+)
+
+// Validate checks every leaf the caller actually patched against settings.ts's bounds, naming
+// the offending leaf in the error — fontFamily and fontSize have no bounds in the TS schema
+// either, so they are accepted as-is.
+func (p SettingsPatch) Validate() error {
+	if p.Appearance != nil && p.Appearance.RowDensity != nil && !ValidRowDensity(*p.Appearance.RowDensity) {
+		return fmt.Errorf("model: appearance.rowDensity: invalid value %q", *p.Appearance.RowDensity)
+	}
+	if p.Data != nil && p.Data.DefaultPageSize != nil && !ValidPageSize(*p.Data.DefaultPageSize) {
+		return fmt.Errorf("model: data.defaultPageSize: invalid value %d", *p.Data.DefaultPageSize)
+	}
+	if p.Cache != nil && p.Cache.L2BudgetMb != nil && !validL2BudgetMb(*p.Cache.L2BudgetMb) {
+		return fmt.Errorf("model: cache.l2BudgetMb: out of range value %d", *p.Cache.L2BudgetMb)
+	}
+	if p.Advanced != nil {
+		if p.Advanced.OpLogRetentionDays != nil && !validOpLogRetentionDays(*p.Advanced.OpLogRetentionDays) {
+			return fmt.Errorf("model: advanced.opLogRetentionDays: out of range value %d", *p.Advanced.OpLogRetentionDays)
+		}
+		if p.Advanced.ExpensiveQueryRows != nil && !validExpensiveQueryRows(*p.Advanced.ExpensiveQueryRows) {
+			return fmt.Errorf("model: advanced.expensiveQueryRows: out of range value %d", *p.Advanced.ExpensiveQueryRows)
+		}
+	}
+	if p.Git != nil && p.Git.FetchAutoIntervalMinutes != nil && !validFetchAutoIntervalMinutes(*p.Git.FetchAutoIntervalMinutes) {
+		return fmt.Errorf("model: git.fetchAutoIntervalMinutes: out of range value %d", *p.Git.FetchAutoIntervalMinutes)
+	}
+	return nil
+}

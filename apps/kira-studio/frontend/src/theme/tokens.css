@@ -1,0 +1,233 @@
+/* VS Code Dark Modern derived tokens (SPEC.md §8.1). */
+:root {
+  --kira-bg: #1f1f1f; /* editor.background */
+  --kira-bg-elevated: #202020; /* editorWidget.background */
+  --kira-bg-chrome: #181818; /* sideBar / statusBar / titleBar / panel */
+  --kira-bg-input: #313131; /* input + dropdown */
+  --kira-fg: #cccccc;
+  --kira-fg-muted: #9d9d9d;
+  /* Tertiary, non-interactive text: separators, captions, row numbers, NULL markers, empty-state
+     copy. Not a disabled control — WCAG 1.4.3 exempts those, which is why --kira-fg-disabled below
+     may stay under 4.5:1 and this may not. 4.77:1 on --kira-bg, 4.72:1 on --kira-bg-elevated. */
+  --kira-fg-subtle: #8a8a8a;
+  --kira-fg-disabled: #6e6e6e; /* :disabled / .is-disabled only */
+  --kira-border: #2b2b2b; /* contrastBorder / panel.border */
+  --kira-border-strong: #313131; /* widget.border */
+  --kira-focus: #0078d4;
+  --kira-accent: #0078d4; /* button.background */
+  --kira-accent-fg: #ffffff;
+  --kira-select: #04395e; /* list.activeSelectionBackground */
+  --kira-hover: #2a2d2e; /* list.hoverBackground */
+  --kira-badge: #616161;
+  --kira-scrollbar: #79797966;
+  --kira-error: #f14c4c;
+  --kira-warn: #cca700;
+  --kira-ok: #23d18b;
+  --kira-info: #3794ff;
+  /* P39 D15: the grid/document/keyvalue/stream search toolbars' match tint + solid current-match
+     pair, hoisted out of four scoped stylesheets that had grown the same two declarations
+     independently (P31 D20/D21). Values are the expressions already in use, so no colour changes. */
+  --kira-search-match: color-mix(in srgb, var(--kira-warn) 25%, transparent);
+  --kira-search-match-current: var(--kira-warn);
+  /* P19 D17: "a filter/sort/projection is applied right now". Deliberately NOT --kira-accent:
+     that token means primary action / focus / selection everywhere else, and the three filter
+     fields that carry this cue paint their own value through a CodeMirror overlay in
+     --kira-syntax-keyword (#569cd6) and --kira-syntax-name (#9cdcfe) — within 8 degrees of hue of
+     --kira-accent's own #0078d4, so "this filter is on" was indistinguishable from "this is part
+     of the query". P19 D17 picked #4ec9b0 (teal, ~168deg) as the one hue no syntax token and no
+     other state colour occupied.
+     P22 D9 re-picks it as gold/amber at the user's request. #e0a33c (~34deg): 5.94:1 on
+     --kira-bg-input and 7.56:1 on --kira-bg; 44deg clear of --kira-warn (#cca700), which is NOT
+     available for this because it is simultaneously --kira-search-match,
+     --kira-search-match-current and the unresolved-{{variable}} colour, and three of this token's
+     own call sites sit inside or beside a search-highlight surface; and clearly above
+     --kira-conn-amber/--kira-conn-orange in chroma, which LAW 07 reserves for connection identity
+     (P19 D17 declined that palette for the same reason). No second token: the row offers the
+     option, but all three consumers mean the same thing ("this view is narrowed/reordered/
+     selected right now"). slickTheme.css's sort chevron stays excluded, per its own comment.
+     P22b D4 (below) is the other half of this swap, not a coincidence: moving this token off
+     #4ec9b0 is what frees that hue back up for --kira-var-resolved. */
+  --kira-state-on: #e0a33c;
+  /* P22b D4: "this {{reference}} will produce a value". P15b D2 painted it --kira-syntax-name
+     under a no-new-tokens constraint; --kira-syntax-name is byte-identical to
+     --kira-syntax-property (#9cdcfe), so in a JSON body — the default body mode — a resolved
+     reference was indistinguishable from the keys around it and only a FAILURE (--kira-warn) had
+     a colour. #4ec9b0 is the hue P19 D17 measured as free of every syntax token and every state
+     colour; it is available again now that P22 D9 (above) has moved --kira-state-on to gold. */
+  --kira-var-resolved: #4ec9b0;
+
+  /* Layout tokens for the reworked "detached" chrome: rounded, floating panels, thin borders.
+     Radius tier system (VS Code Modern UI, docs/design/kira-design-system): sm for interactive
+     controls (buttons, tabs, inputs, chips), the bare token for panel-level surfaces, lg for
+     floating modal dialogs, pill for status-style chips. */
+  --kira-radius-sm: 4px;
+  --kira-radius: 6px;
+  --kira-radius-lg: 8px;
+  --kira-radius-pill: 10px;
+  /* Drives both the whitespace between workbench panels AND the splitter's own draggable track
+     width (WorkbenchShell.vue) — shrinking this fixes both "gap too big" and "resize bar too
+     thick" at once, since they were the same 4px measurement stacked three times (grid gap +
+     splitter track + grid gap) between any two panels. */
+  --kira-gap: 2px;
+  /* App chrome <-> window edge (P31 D8) — deliberately not --kira-gap, which also sets the
+     splitter track width; raising that would thicken every resize bar. */
+  --kira-window-inset: 6px;
+  --kira-border-width: 1px;
+  /* P1 D2/C8: the custom title bar (workbench/TitleBar.vue), on top of `Mac.TitleBarHidden`
+     (internal/shell/window.go). --kira-titlebar-inset-left clears the macOS traffic-light cluster
+     — a real-Mac measurement this repo's Linux sandbox cannot take (§6.3), so it lands in this one
+     token to adjust once rather than a value repeated at every call site.
+     Three same-session attempts at shrinking this below 36px, all reverted:
+     `MacTitleBarHiddenInset`'s `UseToolbar: true` layout genuinely needed the fix window.go's own
+     comment describes (switching to `MacTitleBarHidden`), but 28px — guessed as "the standard
+     macOS title-bar height" — was ALSO wrong even under `MacTitleBarHidden`, reported against the
+     real build as the bar's own content sitting crowded against its top edge rather than centred.
+     36px was the value that fixed that. The actual cause of the "off-centre" read turned out to
+     be one region over: WorkbenchShell.vue's own padding-top (6px, P31 D8) put dead space between
+     the title bar's bottom edge and the panel content right below it. That padding-top is now 0.
+     This token only needs a SMALL nudge to visually rebalance that removed space, not a full 1:1
+     pixel transfer — 38px, not 42px (a same-session overcorrection, reverted: adding the entire
+     6px back made the bar read as tall again, the exact complaint this whole change was meant to
+     fix). Do not change this again without a real screenshot (or better, a real measurement)
+     confirming it first — a plausible-sounding "standard" figure, and a plausible-sounding "exact"
+     compensation, have both been wrong here.
+     Own token below (--kira-titlebar-h), loosely coupled to the other chrome bars via
+     --kira-bar-h — each bar can diverge later by pointing its own token at a literal
+     instead, without touching the others. */
+  --kira-bar-h: 34px;
+  --kira-titlebar-h: var(--kira-bar-h);
+  --kira-tabbar-h: var(--kira-bar-h);
+  --kira-toolbar-h: var(--kira-bar-h);
+  --kira-statusbar-h: 20px;
+  /* P22 D1: the one bar --kira-bar-h's own family missed — .p-view-head was still a literal 28px,
+     one bar shorter than the 34px .p-toolbar directly beneath it in every view (F2(c)). */
+  --kira-viewhead-h: var(--kira-bar-h);
+  --kira-titlebar-inset-left: 78px;
+  --kira-shadow: 0 2px 8px rgb(0 0 0 / 0.32);
+  --kira-shadow-dialog: 0 8px 28px rgb(0 0 0 / 0.45);
+
+  /* Appearance tokens: defaults here, overwritten at runtime from `settings` (Step 6).
+     --kira-font-family is the *channel* the Appearance "Data font" control writes; the two roles
+     below are what stylesheets reference. (P26) */
+  --kira-font-family: Menlo, monospace;
+  --kira-font-size: 12px;
+  --kira-row-height: 28px; /* comfortable; compact = 22px */
+
+  /* P26: two font roles over the one channel above, restoring the design system's own
+     --font-ui / --font-mono pair (docs/design/kira-design-system/parts/_style.css:29-30) that the
+     port to this file collapsed into one token. LAW 08 decides which a surface gets: "Mono is for
+     data. If a string came out of a database — a value, an identifier, a query, a duration — it is
+     mono. If the app wrote it, it is UI."
+     --kira-font-data is user-customizable (it is --kira-font-family); --kira-font-ui is FIXED and
+     has no Settings control by design — see docs/v1.2/plans/P26-interface-font-split.md D3. */
+  --kira-font-data: var(--kira-font-family);
+  --kira-font-ui:
+    -apple-system, BlinkMacSystemFont, "Segoe WPC", "Segoe UI", system-ui, "Ubuntu", "Droid Sans",
+    sans-serif;
+
+  /* P16 design system (docs/design/kira-design-system): one type scale, one space
+     scale, one control-height scale, shared verbatim by every primitive in
+     primitives.css instead of each component inventing its own. --kira-t-md tracks
+     the user's Appearance font-size setting; the other three steps are fixed
+     offsets from it so the scale never falls out of sync with that setting. */
+  /* P22 D1: the three fixed steps become real offsets from --kira-font-size (F2(d) — they were
+     literals, so the comment above was false for them; only --kira-t-md moved with Appearance). At
+     the 12px default every value below is unchanged. --kira-t-xl stays a literal: it sizes
+     empty-state headings, not controls, and deriving it would grow a heading by the same absolute
+     amount as body copy — the wrong ratio for a heading. */
+  --kira-t-xs: calc(var(--kira-font-size) - 2px); /* 10px at the 12px default */
+  --kira-t-sm: calc(var(--kira-font-size) - 1px); /* 11px */
+  --kira-t-md: var(--kira-font-size);
+  --kira-t-lg: calc(var(--kira-font-size) + 1px); /* 13px */
+  --kira-t-xl: 20px;
+
+  --kira-s-1: 2px;
+  --kira-s-2: 4px;
+  --kira-s-3: 6px;
+  --kira-s-4: 8px;
+  --kira-s-5: 12px;
+  --kira-s-6: 16px;
+
+  --kira-h-xs: 18px;
+  --kira-h-sm: 22px;
+  --kira-h-md: 26px;
+  --kira-h-lg: 30px;
+  --kira-icon-box: 16px;
+
+  /* P22 D1: the *control* half of the role layer --kira-bar-h (above) is the *bar* half of. The
+     --kira-h-* scale is the vocabulary of sizes that exist; these name which size each family of
+     controls uses, so "make every form control one step taller" is one edit here rather than
+     re-picking a step in a dozen rules (this file's own scale comment above already claimed this
+     property; it was true of the steps and not of the roles). Every alias resolves to exactly what
+     its consumers used before this commit — this commit changes no rendered control height. */
+  --kira-control-h: var(
+    --kira-h-sm
+  ); /* toolbar density: input, select, segmented, button, icon button, row */
+  --kira-control-h-lg: var(
+    --kira-h-md
+  ); /* dialog density: .md variants, dialog button, tab, panel head, table head */
+  --kira-control-h-sm: var(--kira-h-xs); /* chip / badge / count / status density */
+  --kira-control-inline-h: 14px; /* drawn inside a control or a bar: checkbox box, toolbar separator, tab rail */
+
+  /* §8.12 connection color palette — softened to oklch(0.72 0.09 h): one lightness
+     and one chroma for all eleven hues plus a near-neutral grey, so no connection
+     shouts louder than another (P16 design system). */
+  --kira-conn-red: #d78e88;
+  --kira-conn-orange: #d1966d;
+  --kira-conn-amber: #bca260;
+  --kira-conn-olive: #9fad6b;
+  --kira-conn-green: #7db485;
+  --kira-conn-teal: #5fb7a5;
+  --kira-conn-cyan: #58b4c4;
+  --kira-conn-blue: #7ba8dc;
+  --kira-conn-indigo: #979fdd;
+  --kira-conn-violet: #b296d2;
+  --kira-conn-magenta: #cb8eb6;
+  --kira-conn-grey: #9fa5ac;
+
+  /* P17 D19: eight method-colour aliases, borrowed from the connection palette above rather than
+     new hues — it was already tuned for "one lightness and one chroma for N things, so none
+     shouts louder than another", exactly the property seven HTTP methods need. GET/POST/PUT/DELETE
+     keep the hue family they read as today (blue/green/amber/red, ex-httpMethodClass's info/ok/
+     warn/err); PATCH moves off amber (shared with PUT under the old four-family map) onto violet,
+     which is what "each a distinct colour" requires. An indirection, not `var(--kira-conn-blue)`
+     at each call site: colour means *connection identity* in Studio, and a method is a different
+     vocabulary that happens to want the same hues (the same reasoning `--kira-search-match`
+     already applied to `--kira-warn`). */
+  --kira-method-get: var(--kira-conn-blue);
+  --kira-method-post: var(--kira-conn-green);
+  --kira-method-put: var(--kira-conn-amber);
+  --kira-method-patch: var(--kira-conn-violet);
+  --kira-method-delete: var(--kira-conn-red);
+  --kira-method-head: var(--kira-conn-teal);
+  --kira-method-options: var(--kira-conn-cyan);
+  --kira-method-other: var(--kira-conn-grey);
+
+  /* Syntax tokens for CodeMirror (§3's editor surfaces: DDL, cell editor, document view,
+     command preview, console). Dark Modern's default token colours. */
+  --kira-syntax-comment: #6a9955;
+  --kira-syntax-string: #ce9178;
+  --kira-syntax-number: #b5cea8;
+  --kira-syntax-keyword: #569cd6;
+  --kira-syntax-control: #c586c0;
+  --kira-syntax-name: #9cdcfe;
+  --kira-syntax-property: #9cdcfe;
+  --kira-syntax-function: #dcdcaa;
+  --kira-syntax-tag: #569cd6;
+  --kira-syntax-attribute: #9cdcfe;
+  --kira-syntax-operator: #d4d4d4;
+  --kira-syntax-punctuation: #cccccc;
+  --kira-syntax-meta: #808080;
+  --kira-syntax-invalid: #f14c4c;
+  /* P28 D17(c): the floating-surface stacking ladder, as tokens rather than five bare literals
+     spread across PopoverPanel/DialogFrame/ContextMenu/AutocompleteField/AppTooltip. Two orderings
+     changed with the move: a popover now outranks a dialog (one opened from inside a dialog used
+     to paint underneath it), and a context menu outranks the autocomplete popup (the two used to
+     tie at 200, so DOM order decided which won). Rungs are 50 apart so a surface can be inserted
+     between two without renumbering the ladder. */
+  --kira-z-popover: 100;
+  --kira-z-dialog: 200;
+  --kira-z-menu: 300;
+  --kira-z-autocomplete: 350;
+  --kira-z-tooltip: 400;
+}

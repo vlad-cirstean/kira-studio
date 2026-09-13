@@ -1,0 +1,314 @@
+import type { EventKey, RequestKey, StreamKey } from './contract.ts';
+
+/**
+ * Boundary validation. Per §3.5, a contract mismatch must fail loudly rather than
+ * half-work — so this throws, it does not degrade.
+ */
+// G10 D9: 16 -> 17 for one new event, 'ui.action' — the palette's own route into an already-
+// mounted webview (see contract.ts's own doc comment on UiActionKind). This is the one place G10
+// touches the wire contract; every other change this phase makes is packaging mechanics.
+// G11 D1: 17 -> 18 for three new requests (review.files, review.fileDiff, review.mark) and one new
+// UiActionKind member ('toggleFileReviewed').
+// G12 D1: 18 -> 19 for one new request, 'editor.openRangeDiff' — a two-revision diff for the
+// review sidebar's Files pane, answered entirely inside the extension (never emitted or parsed by
+// the Go server), the same "extension-answered but the sole compatibility authority still moves"
+// precedent G10 D9 set for 'ui.action'.
+// G13 D1: 19 -> 20 for five new requests ('review.comment.add/list/remove/clear/export'),
+// 'editor.openRangeDiff's reshaped params (D8), and two new UiActionKind members
+// ('copyReviewComments', 'refreshReviewComments').
+// G14 D6/D10: 20 -> 21, one bump for two reasons landing in the same phase. D6:
+// SettingsSnapshot gains the host-owned 'workbench.tree.indent' member. D10: UiActionKind gains
+// 'revealCommit' and 'ui.action' gains an optional 'target' naming the commit to reveal — both
+// extension-side only (the Go server neither emits nor parses either), the same "the sole
+// compatibility authority still moves" precedent G10 D9/G12 D1 set.
+// G18 D5: 21 -> 22, for three new requests (repoSettings.get/set, settings.setGitPath) and one
+// new event (repoSettings.changed) — seven kiraVersion.* settings move out of
+// contributes.configuration into their own per-repo store (D1/D3/D4); git.path's own dead
+// server-side wiring is fixed in the same phase (D15) and its one-time migration leg needs its
+// own tiny server-only request (D11) since git.path was never part of the per-repo store
+// repoSettings.set writes. SettingsSnapshot narrows to its one remaining member
+// (workbench.tree.indent); the seven moved keys now live in the new RepoSettingsSnapshot.
+// G19 D11b: 22 -> 23, for two new requests ('review.session.save'/'review.session.load') — the
+// review sidebar's durable "back to branch selection" resume point, additive only, answered
+// entirely inside the extension against `context.workspaceState` and never reaching the Go
+// backend (the same "extension-answered but the sole compatibility authority still moves"
+// precedent G10 D9/G12 D1/G14 D6/D10 already established). No existing method's shape changes.
+// G21 D8/D12/D13: 23 -> 24, one bump for three additive changes landing across this phase's own
+// commits (stated here so it is never discovered piecemeal in a diff): one new request,
+// 'editor.openAllChanges' (D8, the "Open all changes" multi-file diff, extension-answered like
+// every 'editor.*' request before it); 'editor.openDiff' gains optional 'pinned' (D13) and
+// 'fallbackSha' (D12, the stash-untracked-file retry); 'editor.openRangeDiff' gains the same
+// optional 'pinned' (D13). No existing method's shape changes — every addition is optional.
+// G22 D10: 24 -> 25, for two new UiActionKind members ('resetSelected', 'cherryPickSelected'),
+// the palette's own route into ResetDialog.vue/CherryPickDialog.vue, neither of which had one.
+// This is the only wire change this phase makes: every result/param/error shape
+// 'preflight.reset'/'preflight.cherryPick'/'op.run's reset/cherryPick kinds serve already existed
+// at CONTRACT_VERSION 24. Moves for the same reason 'ui.action' first did (G10 D9): this constant
+// is the sole compatibility authority, even though the Go server neither emits nor parses
+// 'ui.action' at all.
+// G23 D6/D13: 25 -> 26, for one new 'SearchRunResult' member, 'unsupportedPattern' -- a
+// `regex`-mode pattern using lookahead/lookbehind/a backreference, syntax the Go tail scan's RE2
+// engine cannot express at all (docs/v1.3/SPEC.md:446-450's own "a hit's presence must not depend
+// on which page happens to be loaded"). Unlike every earlier bump in this history, the Go server
+// now actually serves 'search.run' for the first time -- this is the phase that ports upstream's
+// P11 tail scan into internal/gitsearch, not merely a contract-shape change for a method the
+// extension already answered on its own.
+// G24 D14: 26 -> 27, for two new Go-served requests ('commit.resolvePr', 'branch.resolvePr'), four
+// new wire types (GhStatus/PrRecord/PrLookupResult and the state string union it carries), and one
+// new RepoSettingsSnapshot member ('kiraVersion.github.enabled'). Additive only -- SearchMatchField
+// is untouched (F9: the wire's own search-field union is commits-only, the PR fields live entirely
+// in git-core's client-side SearchField instead).
+// G25 D16 (2026-09-09): 27 -> 28, for worktree support -- no upstream design existed for this
+// phase at all (this chapter's own SPEC row was a placeholder). Six new requests ('worktree.list',
+// 'preflight.worktreeAdd', 'preflight.worktreeRemove', 'worktree.prepare',
+// 'worktree.cancelPrepare', 'worktree.openWindow' -- the last answered entirely inside the
+// extension, the same "editor.*-shaped" precedent 'editor.openDiff' already set), one new event
+// ('worktree.progress'), two new 'OpRequest' kinds ('worktreeAdd', 'worktreeRemove'), one new
+// 'OpErrorKind' member ('WorktreeLocked' -- 'worktree.prepare's own four synthetic refusals live
+// in a SEPARATE, dedicated 'WorktreePrepareErrorKind' instead, spending none of this budget), two
+// new capabilities ('openWorktreeWindow', 'runPrepareScript'), one new 'UiActionKind' member
+// ('createWorktree'), and two new 'RepoSettingsSnapshot' members ('kiraVersion.worktree.
+// prepareScript', 'kiraVersion.worktree.basePath'). Deliberately absent from every wire type this
+// phase touches: the prepare script's own sha256-pinned approval -- a server-only key, reachable
+// only through the Go server's own dedicated storage accessors, never through 'repoSettings.get'/
+// 'set' or any 'OpRequest'/'OpResult' shape (D11/F15).
+// G26 D17 (2026-09-09): 28 -> 29, for four new Go-served requests ('stack.list',
+// 'preflight.restack', 'stack.restack', 'stack.cancelRestack'), one new event ('stack.progress'),
+// nine new wire types ('StackBranchState', 'StackBranch', 'StackSummary', 'StackListResult',
+// 'RestackBlocker', 'RestackPlanEntry', 'RestackPreflight', 'RestackResult', 'RestackProgress'),
+// one new 'OpRequest' kind ('stackSet'), one new 'OpErrorKind' member ('StackCycle' -- produced
+// exclusively by 'stackSet's own cycle check, never by rebase itself), and three new
+// 'UiActionKind' members ('restackStack', 'checkoutStackParent', 'checkoutStackChild'). No new
+// capability, no new setting, no SQL migration (this phase's own §8 explicit non-goals).
+// G28 D17 (2026-09-09): 29 -> 30, for branch-scoped stash -- auto-stash on checkout, cross-branch
+// apply, auto-detach on worktree conflict, and a durable global stash bucket. One new Go-served
+// request ('globalStash.list' -> {entries: StashEntry[]}, reusing the existing result shape
+// verbatim); three requests widen their params with an optional 'scope' ('stack'|'global', absent
+// = 'stack') -- 'stash.show', 'preflight.stashPop', 'preflight.stashBranch'; two new 'OpRequest'
+// kinds ('globalStashSave', 'globalStashRemove'); one new 'OpRequest' field
+// ('checkout.autoStash'); two new 'CheckoutPreflight.routes' members ('autoStash', 'detachHere')
+// and one new 'WorktreeAddPreflight.routes' member ('detachHere') -- all three additive to an
+// EXISTING string-array field, no new wire type; one new 'OpErrorKind' member
+// ('NothingToStash'); one new 'UiActionKind' member ('saveGlobalStash'); one new
+// 'RepoSettingsSnapshot' member ('kiraVersion.checkout.autoStash', read client-side only). 'StashEntry'
+// itself widens by two fields ('scope', 'ref') rather than forking a parallel 'GlobalStashEntry'
+// type -- so, notably, ZERO new wire interfaces. No SQL migration, no watcher change, no new
+// 'ClassifyOpError' stderr row (this phase's own explicit non-goals).
+// G-UX D4/D9 (2026-09-09): 30 -> 31, for two graph/review UX fixes' wire impact. 'repo.pick' is
+// REMOVED from 'Contract["requests"]' -- the workspace's own folders are now the only source of
+// repositories, so the native-folder-picker fallback has no wire method left to reach (D4). One
+// new 'UiActionKind' member, 'toggleSearch' -- the palette's route to toggling the graph panel's
+// search row (D9). No new capability, no new setting, no SQL migration.
+// G30 round-1 code review (2026-09-09): 31 -> 32, one new 'OpErrorKind' member, 'BranchChanged' --
+// remote.run's pull integrate phase now refuses (rather than silently writing to the wrong
+// branch) when HEAD changed out from under it between the fetch and the merge/rebase (finding
+// #2). No new request, no new capability, no SQL migration.
+// G-UX D13 (item 13): 32 -> 33, one new event, 'connection.changed' -- pushes the connection
+// state that used to reach only the extension's own status bar into both webviews themselves, so
+// a panel that stays open through a drop shows it too. No new request, no new capability, no SQL
+// migration.
+// P5 (2026-09-11): 33 -> 34, for one new Go-served request, 'blame.line' -- the status-bar blame
+// widget's own one-line-at-a-time query (params: repoId/path/line; result: sha/author/
+// authorTimeSeconds/summary, 'sha' the all-zero sentinel for an uncommitted line). No webview
+// caller exists yet, only the extension's own host-side status bar -- 'proxyHandlers.ts' still
+// gained a plain forward entry since 'ServerHandlers.requests' is total over 'RequestKey'. No new
+// event, no new capability, no new 'UiActionKind' member, no SQL migration.
+// P7 item 2 (2026-09-12): 34 -> 35, for one new Go-served request, 'working.detail' -- the
+// uncommitted-changes strip's click-through file list (params: repoId; result: {files:
+// FileChange[]}, composed server-side the same way 'commit.detail' composes its own). A real
+// webview caller exists this time (the new WorkingDetailPane), so this is a plain forward in
+// 'proxyHandlers.ts' too, no different in kind from 'blame.line's own bump. One new
+// extension-only request, 'editor.openWorkingDiff' (never reaches the Go server, answered
+// entirely inside the extension exactly like 'editor.openRangeDiff') -- included in
+// 'REQUEST_KEY_MAP' below for the same total-over-'RequestKey' exhaustiveness reason every request
+// key is, but does not itself require this version bump (extension-only methods never did). No new
+// event, no new capability, no new 'UiActionKind' member, no SQL migration.
+export const CONTRACT_VERSION = 35;
+
+export class ContractVersionMismatchError extends Error {
+  readonly received: number;
+
+  constructor(received: number) {
+    super(
+      `ipc contract version mismatch: this build expects ${CONTRACT_VERSION}, received ${received}`,
+    );
+    this.name = 'ContractVersionMismatchError';
+    this.received = received;
+  }
+}
+
+export function validateVersion(received: number): void {
+  if (received !== CONTRACT_VERSION) {
+    throw new ContractVersionMismatchError(received);
+  }
+}
+
+export interface VersionedEnvelope<T> {
+  readonly version: number;
+  readonly body: T;
+}
+
+export function wrapVersioned<T>(body: T): VersionedEnvelope<T> {
+  return { version: CONTRACT_VERSION, body };
+}
+
+export function unwrapVersioned<T>(envelope: VersionedEnvelope<T>): T {
+  validateVersion(envelope.version);
+  return envelope.body;
+}
+
+// ---------------------------------------------------------------------------------------
+// assertContractShape — a per-key structural check on arrival.
+// ---------------------------------------------------------------------------------------
+
+/**
+ * The complete method-name lists, mirroring `Contract`'s keys. TypeScript's own exhaustiveness
+ * checking cannot reach across a wire, so these are the runtime half of the same guarantee — but
+ * a plain `Set<RequestKey>` literal is only checked for *extra* keys, not missing ones (adding a
+ * key to `Contract["requests"]` and forgetting it here compiles cleanly, and previously did:
+ * `docs/plans/P8.md` W21 found all four `remote.*` requests and `remote.progress` missing from
+ * these three sets, silently failing every `assertContractShape` call for them since W17 added
+ * them to `Contract` (`RpcError: ipc contract shape error … unknown request method`) with nothing
+ * short of an E2E test through the real codec ever exercising this path to catch it — `mockBridge`
+ * calls its handlers directly, `repoService`'s own integration tests never round-trip through
+ * `assertContractShape`). Built through a `Record<Key, true>` rather than an array literal so a
+ * *missing* key is a compile error too — TypeScript's mapped-type checker requires every key of
+ * `RequestKey`/`EventKey`/`StreamKey` to be present, which a bare array can never enforce.
+ */
+const REQUEST_KEY_MAP: Record<RequestKey, true> = {
+  'app.init': true,
+  'repo.list': true,
+  'repo.open': true,
+  'repo.close': true,
+  'graph.status': true,
+  'graph.loadMore': true,
+  'graph.refresh': true,
+  'commit.detail': true,
+  'commit.fileDiff': true,
+  'editor.openDiff': true,
+  'editor.openRangeDiff': true,
+  'editor.openAllChanges': true,
+  'editor.goToFile': true,
+  'clipboard.write': true,
+  'refs.list': true,
+  'status.get': true,
+  'preflight.checkout': true,
+  'preflight.revert': true,
+  'op.run': true,
+  'undo.peek': true,
+  'undo.run': true,
+  'editor.resolveConflict': true,
+  'review.resolveBase': true,
+  'review.open': true,
+  'review.files': true,
+  'review.fileDiff': true,
+  'review.mark': true,
+  'review.comment.add': true,
+  'review.comment.list': true,
+  'review.comment.remove': true,
+  'review.comment.clear': true,
+  'review.comment.export': true,
+  'remote.pullPreflight': true,
+  'remote.pushPreflight': true,
+  'remote.run': true,
+  'remote.cancel': true,
+  'credential.provide': true,
+  'stash.list': true,
+  'stash.show': true,
+  'preflight.stashPop': true,
+  'preflight.stashBranch': true,
+  'globalStash.list': true,
+  'preflight.reset': true,
+  'preflight.cherryPick': true,
+  'search.run': true,
+  'file.read': true,
+  'file.goToTarget': true,
+  'blame.line': true,
+  'working.detail': true,
+  'editor.openWorkingDiff': true,
+  'repoSettings.get': true,
+  'repoSettings.set': true,
+  'settings.setGitPath': true,
+  'review.session.save': true,
+  'review.session.load': true,
+  'commit.resolvePr': true,
+  'branch.resolvePr': true,
+  'worktree.list': true,
+  'preflight.worktreeAdd': true,
+  'preflight.worktreeRemove': true,
+  'worktree.prepare': true,
+  'worktree.cancelPrepare': true,
+  'worktree.openWindow': true,
+  'stack.list': true,
+  'preflight.restack': true,
+  'stack.restack': true,
+  'stack.cancelRestack': true,
+};
+const EVENT_KEY_MAP: Record<EventKey, true> = {
+  'repo.changed': true,
+  'settings.changed': true,
+  'connection.changed': true,
+  'review.target': true,
+  'remote.progress': true,
+  'credential.request': true,
+  'ui.action': true,
+  'repoSettings.changed': true,
+  'worktree.progress': true,
+  'stack.progress': true,
+};
+const STREAM_KEY_MAP: Record<StreamKey, true> = {
+  'graph.stream': true,
+};
+const REQUEST_KEYS: ReadonlySet<RequestKey> = new Set(Object.keys(REQUEST_KEY_MAP) as RequestKey[]);
+const EVENT_KEYS: ReadonlySet<EventKey> = new Set(Object.keys(EVENT_KEY_MAP) as EventKey[]);
+const STREAM_KEYS: ReadonlySet<StreamKey> = new Set(Object.keys(STREAM_KEY_MAP) as StreamKey[]);
+
+export type ContractChannel = 'request' | 'event' | 'stream';
+
+export class ContractShapeError extends Error {
+  readonly channel: ContractChannel;
+  readonly method: string;
+
+  constructor(channel: ContractChannel, method: string, reason: string) {
+    super(`ipc contract shape error on ${channel} '${method}': ${reason}`);
+    this.name = 'ContractShapeError';
+    this.channel = channel;
+    this.method = method;
+  }
+}
+
+function keysForChannel(channel: ContractChannel): ReadonlySet<string> {
+  switch (channel) {
+    case 'request':
+      return REQUEST_KEYS;
+    case 'event':
+      return EVENT_KEYS;
+    case 'stream':
+      return STREAM_KEYS;
+  }
+}
+
+/**
+ * A per-key structural check on arrival, not a schema library: the wire is trusted-but-
+ * versioned between two halves of one build (§3.5). `validateVersion` rules out a stale build
+ * talking to a fresh one; this rules out the one thing a version number alone cannot catch — a
+ * method name or a `kind` discriminant that could not have come from this contract at all.
+ * It does not re-validate every field, since a single build's own type-checker already
+ * guarantees that; it exists for the boundary between two different builds.
+ */
+export function assertContractShape(
+  channel: ContractChannel,
+  method: string,
+  payload: unknown,
+): void {
+  if (!keysForChannel(channel).has(method)) {
+    throw new ContractShapeError(channel, method, `unknown ${channel} method`);
+  }
+  if (payload === null || typeof payload !== 'object') {
+    throw new ContractShapeError(channel, method, 'payload is not an object');
+  }
+  const record = payload as Record<string, unknown>;
+  if ('kind' in record && typeof record.kind !== 'string') {
+    throw new ContractShapeError(channel, method, "'kind' discriminant is not a string");
+  }
+}

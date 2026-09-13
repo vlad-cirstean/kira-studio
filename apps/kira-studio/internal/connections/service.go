@@ -1,0 +1,692 @@
+// Package connections is the Go analogue of src/main/connections.ts: the full connection
+// lifecycle service — CRUD, the in-memory connection-state map, connect/disconnect wired to
+// internal/preconnect and internal/adapterhost, and the in-flight-connect dedupe.
+package connections
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"log/slog"
+	"reflect"
+	"sort"
+	"sync"
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/ipcerr"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/localauth"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/notify"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/preconnect"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/secrets"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/repos"
+)
+
+// Backend is the slice of adapter lifecycle operations this service calls through instead of
+// straight into internal/adapterhost (A11's per-consumer-interface discipline — the same shape as
+// tree.Backend and bridge.Canceller). *adapterhost.Router satisfies this structurally; a two-line
+// fake can too, which is what keeps this package's own tests simple. Three methods: Test and
+// Connect each need their own method (they resolve config differently and return different
+// shapes), and Disconnect covers all three fire-and-forget call sites (onPreconnectExit, Remove,
+// Disconnect).
+type Backend interface {
+	// Connect resolves cfg.Kind to a live adapter and returns what the caller needs to build the
+	// connected state.
+	Connect(ctx context.Context, cfg model.ResolvedConnectionConfig) (ConnectResult, error)
+	// Test probes cfg without ever registering a live adapter — control.ts's handleTest:
+	// connect, read the server version, unconditionally disconnect. A real Go error, not a
+	// never-throws contract; Test (below) is what wraps it into TestResult.
+	Test(ctx context.Context, cfg model.ResolvedConnectionConfig) (serverVersion string, err error)
+	// Disconnect is fire-and-forget at every call site today, so it stays that shape here.
+	Disconnect(ctx context.Context, connectionID string) error
+	// SetThrottle installs (perSec > 0) or clears (perSec == 0) connectionID's command rate limit
+	// (P28 §5.5). Called just before Connect (attemptConnect) and, when the connection is
+	// currently connected, after a successful Update — so tuning the limit while hitting it
+	// applies live, with no disconnect/reconnect round trip.
+	SetThrottle(connectionID string, perSec float64)
+}
+
+// ConnectResult is engine-ops.ts's adapter:connect success payload, the part attemptConnect
+// actually reads (serverVersion, caps) — Caps stays untyped because both a native adapter's
+// adapters.Caps and a Node-forwarded connection's raw decoded JSON land here.
+type ConnectResult struct {
+	ServerVersion string
+	Caps          any
+}
+
+// TestResult mirrors connections.ts's ConnectionTestResult — the shape Service.Test builds from
+// Backend.Test's (serverVersion, error) return, matching the JSON the renderer already expects.
+type TestResult struct {
+	OK            bool    `json:"ok"`
+	ServerVersion *string `json:"serverVersion,omitempty"`
+	Error         *string `json:"error,omitempty"`
+}
+
+// RevealResult mirrors reveal()'s never-throws contract (P25 D9). Outcome is P14 D6's own
+// discriminant — revealed | cancelled | confirmation-required | error — the renderer switches on
+// it rather than inferring the case from which of Password/Error is set.
+type RevealResult struct {
+	Password *string `json:"password"`
+	Error    *string `json:"error"`
+	Outcome  string  `json:"outcome"`
+}
+
+const (
+	revealOutcomeRevealed             = "revealed"
+	revealOutcomeCancelled            = "cancelled"
+	revealOutcomeConfirmationRequired = "confirmation-required"
+	revealOutcomeError                = "error"
+)
+
+// revealReason is LAContext.evaluatePolicy's localizedReason (P14 D11) — macOS prefixes it with
+// "Kira Studio is trying to …" inside its own sheet, so this reads as a sentence fragment, not a
+// standalone label.
+const revealReason = "reveal a saved connection password."
+
+// Authorizer is P14's reveal gate (internal/localauth.Authorizer satisfies this) — an interface
+// here, not the concrete type, so tests can inject a fake outcome sequence without a real clock or
+// OS-auth probe wired through.
+type Authorizer interface {
+	Authorize(reason string, confirmed bool) (localauth.Outcome, error)
+}
+
+// Deps is everything the service needs from the rest of the app.
+type Deps struct {
+	Conns      *repos.ConnectionsRepo
+	Secrets    *repos.SecretsRepo
+	Metadata   *repos.MetadataCacheRepo
+	Cipher     *secrets.Cipher
+	Auth       Authorizer
+	Backend    Backend
+	Preconnect *preconnect.Supervisor
+}
+
+// attempt is one in-flight Connect(id) call, shared by every caller that asks for the same id
+// while it is running (D11: at most one in-flight connect per connection).
+type attempt struct {
+	done  chan struct{}
+	state model.ConnectionState
+	err   error
+}
+
+// Service is the Go analogue of connections.ts's ConnectionsService.
+type Service struct {
+	deps Deps
+
+	mu       sync.Mutex
+	states   map[string]model.ConnectionState
+	inFlight map[string]*attempt
+
+	stateChanged        notify.Emitter[model.ConnectionState]
+	metadataInvalidated notify.Emitter[string]
+	listChanged         notify.Emitter[[]model.ConnectionSummary]
+}
+
+func New(d Deps) *Service {
+	return &Service{
+		deps:     d,
+		states:   make(map[string]model.ConnectionState),
+		inFlight: make(map[string]*attempt),
+	}
+}
+
+// Start wires the preconnect exit handler (D14: split from New so main.go controls wiring order
+// and every test can attach its own listener before the first event).
+func (s *Service) Start() {
+	s.deps.Preconnect.OnExit(s.onPreconnectExit)
+}
+
+// Shutdown kills every live pre-connect process. Called from main's before-quit.
+func (s *Service) Shutdown() {
+	s.deps.Preconnect.StopAll()
+}
+
+// onPreconnectExit is preconnect.ts:154-168's port: any exit while armed means the connection can
+// no longer reach its target — best-effort disconnect the adapter and surface why.
+func (s *Service) onPreconnectExit(exit preconnect.Exit) {
+	// D6: the best-effort adapter:disconnect runs on its own goroutine, exactly as
+	// connections.ts:155's `void … .catch(() => {})` does — this handler must not block the
+	// shared preconnect exit-emitter goroutine for however long that disconnect takes.
+	go func() {
+		_ = s.deps.Backend.Disconnect(context.Background(), exit.ConnectionID)
+	}()
+
+	detail := "(exit unknown)"
+	if exit.Code != nil {
+		detail = fmt.Sprintf("(exit %d)", *exit.Code)
+	}
+	if exit.Signal != "" {
+		detail = fmt.Sprintf("(signal %s)", exit.Signal)
+	}
+	tail := ""
+	if exit.LastStderr != nil && *exit.LastStderr != "" {
+		tail = ": " + *exit.LastStderr
+	}
+	msg := fmt.Sprintf("Pre-connect script exited %s%s — connection dropped.", detail, tail)
+	s.emitState(model.ConnectionState{ConnectionID: exit.ConnectionID, Status: "error", Error: &msg, Since: nowMillis()})
+}
+
+func nowMillis() int64 { return time.Now().UnixMilli() }
+
+// errorMessage extracts the human message a *ipcerr.Error (or any other error) carries, for the
+// state/result string fields that surface a failure's text rather than propagate a Go error —
+// the Go analogue of `err instanceof Error ? err.message : String(err)`.
+func errorMessage(err error) string {
+	var ie *ipcerr.Error
+	if errors.As(err, &ie) {
+		return ie.Message
+	}
+	return err.Error()
+}
+
+// wrapErr satisfies P55 §2 D5: every error crossing out of this package is an *ipcerr.Error. An
+// error that already is one (or wraps one, e.g. repos/secrets' fmt.Errorf-wrapped E_SECRET_STORE)
+// passes through with its original code and message; anything else becomes E_INTERNAL.
+func wrapErr(err error) error {
+	if err == nil {
+		return nil
+	}
+	var ie *ipcerr.Error
+	if errors.As(err, &ie) {
+		return ie
+	}
+	return ipcerr.Internal(err.Error())
+}
+
+func (s *Service) emitState(state model.ConnectionState) {
+	s.mu.Lock()
+	s.states[state.ConnectionID] = state
+	s.mu.Unlock()
+	s.stateChanged.Emit(state)
+}
+
+// emitListChanged broadcasts the authoritative list after any mutation — the renderer store
+// otherwise only ever sees a connection created/changed through its own dialog wrappers, never
+// one created via a direct call. Run synchronously (unlike connections.ts:96's `void
+// emitListChanged()` fire-and-forget): a local list query never blocks long enough to need its
+// own goroutine, and a synchronous broadcast is strictly easier to reason about, not a behaviour
+// change a caller could observe. Failure is swallowed — a broadcast is best-effort and must not
+// turn a successful mutation into a reported error.
+func (s *Service) emitListChanged() {
+	list, err := s.deps.Conns.List()
+	if err != nil {
+		return
+	}
+	s.listChanged.Emit(list)
+}
+
+func (s *Service) List() ([]model.ConnectionSummary, error) {
+	list, err := s.deps.Conns.List()
+	if err != nil {
+		return nil, wrapErr(err)
+	}
+	return list, nil
+}
+
+func (s *Service) Create(in Input) (model.ConnectionSummary, error) {
+	if err := in.Validate(); err != nil {
+		return model.ConnectionSummary{}, err
+	}
+
+	// In fields mode `uri` is not authoritative — never store or return it, even if the draft
+	// still carries a stale value (D9's guarantee that List never leaks a password must hold
+	// regardless of what the caller sends).
+	var uri *string
+	if in.Mode == "uri" {
+		uri = in.URI
+	}
+	password := in.Password
+	if in.Mode == "uri" && uri != nil && *uri != "" {
+		stripped, pw := stripURIPassword(*uri)
+		uri = &stripped
+		// P2 R2: only a password actually typed into the URI's own userinfo overrides whatever
+		// the caller sent — a passwordless URI (the common case: D7 always strips one out before
+		// ever showing it back to the user) says nothing about the password, so in.Password's own
+		// three-state value (nil/""/replace) must stand, not be silently discarded in its favor.
+		if pw != nil {
+			password = pw
+		}
+	}
+
+	// P25 D6: encrypt the secret before writing anything — a failure here (cipher unavailable)
+	// leaves no row behind at all. P21 round 3 finding 4: the row and its password are now written
+	// by the same INSERT statement (InsertWithSecret) rather than as two separate writes, so a
+	// failure that used to land *between* them — leaving a passwordless connection row committed
+	// while the caller was told the create had failed — can no longer happen.
+	var storedSecret *string
+	if password != nil {
+		encrypted, err := s.deps.Cipher.Encrypt(secrets.ScopeConnection, *password)
+		if err != nil {
+			return model.ConnectionSummary{}, err
+		}
+		storedSecret = &encrypted
+	}
+
+	fields := in.ConnectionFields
+	fields.URI = uri
+	id := uuid.NewString()
+	created, err := s.deps.Conns.InsertWithSecret(id, fields, model.NowISO(), storedSecret)
+	if err != nil {
+		return model.ConnectionSummary{}, wrapErr(err)
+	}
+	s.emitListChanged()
+	return created, nil
+}
+
+func (s *Service) Update(id string, in Input) (model.ConnectionSummary, error) {
+	if err := in.Validate(); err != nil {
+		return model.ConnectionSummary{}, err
+	}
+
+	// P21 round 2 architecture/security finding 2: read the stored row before it's overwritten,
+	// so a live connection's destination and ReadOnly flag can be compared against the draft
+	// below. A connected adapter and both cache layers are stamped with the config resolved at
+	// Connect time and never revisit it — editing them here would otherwise silently do nothing
+	// (ReadOnly) or serve the old destination's cached data under the new one's name.
+	existing, err := s.deps.Conns.Get(id)
+	if err != nil {
+		return model.ConnectionSummary{}, wrapErr(err)
+	}
+	if existing == nil {
+		return model.ConnectionSummary{}, ipcerr.Internal(fmt.Sprintf("connection %s not found", id))
+	}
+
+	var uri *string
+	if in.Mode == "uri" {
+		uri = in.URI
+	}
+	// Three-state convention: nil = unchanged, "" = clear, non-empty = replace.
+	password := in.Password
+	if in.Mode == "uri" && uri != nil && *uri != "" {
+		stripped, pw := stripURIPassword(*uri)
+		uri = &stripped
+		// P2 R2: only a password actually typed into the URI's own userinfo overrides whatever
+		// the caller sent — a passwordless URI (the common case: D7 always strips one out before
+		// ever showing it back to the user) says nothing about the password, so in.Password's own
+		// three-state value (nil/""/replace) must stand. The old unconditional override silently
+		// discarded an explicit "" clear the moment the URI itself had no password to report,
+		// which is every URI-mode save that doesn't retype credentials by hand.
+		if pw != nil {
+			password = pw
+		}
+	}
+
+	// P25 D6: encrypt before writing anything — a failure here (cipher unavailable) means Update
+	// never runs, leaving every other field exactly as it was rather than a half-applied edit.
+	// P21 round 3 finding 4: the row and its password are now written by the same UPDATE statement
+	// (UpdateWithSecret) rather than as two separate writes in opposite orders — writing the secret
+	// first and the rest of the row second (the old order) meant a Conns.Update failure left the
+	// *new* password stored against the *old* host/port/database, the same "old destination's
+	// password on a new destination" state destinationUnchanged below exists to prevent, just
+	// reached by a different path. hasSecret carries the three-state Input.Password contract
+	// through to the single combined statement: false leaves the stored password untouched.
+	hasSecret := password != nil
+	var storedSecret *string
+	if hasSecret && *password != "" {
+		encrypted, err := s.deps.Cipher.Encrypt(secrets.ScopeConnection, *password)
+		if err != nil {
+			return model.ConnectionSummary{}, wrapErr(err)
+		}
+		storedSecret = &encrypted
+	}
+
+	fields := in.ConnectionFields
+	fields.URI = uri
+	updated, err := s.deps.Conns.UpdateWithSecret(id, fields, model.NowISO(), hasSecret, storedSecret)
+	if err != nil {
+		return model.ConnectionSummary{}, wrapErr(err)
+	}
+
+	// P21 round 2 architecture/security finding 2: destinationUnchanged is the same denylist Test
+	// already trusts to decide whether the old destination's password may be injected — it is a
+	// deliberate denylist (not host/port/database alone) so a future new field defaults to gated.
+	// ReadOnly is the one field it excludes on purpose (safe to change without re-gating Test's
+	// password injection) that still needs to force a reconnect here: it is captured once into
+	// the adapter at Connect time (postgres/mysqlfamily/sqlite/redis/sqs/kafka each read their own
+	// captured copy), so toggling it on a live connection was otherwise silently inert.
+	if s.StateOf(id).Status == "connected" &&
+		(!destinationUnchanged(in, existing.ConnectionFields) || in.ReadOnly != existing.ReadOnly) {
+		// Disconnect (which already drops the enginecache's pages/counts for this connection,
+		// adapterhost/router.go's own DropConnection) then reconnect — attemptConnect moves the
+		// connection's metadata_cache epoch forward (P24 D6) and emits the invalidation on its own,
+		// exactly the sequence setConnectionReadOnly's frontend precedent runs for the read-only-
+		// only case. A failed reconnect lands the connection in its normal "error" state, which the
+		// UI already renders — never a silent no-op.
+		if _, err := s.Disconnect(id); err != nil {
+			slog.Warn(fmt.Sprintf("disconnect before reconnect failed for %s: %s", id, err), "scope", "connections")
+		}
+		if _, err := s.Connect(id); err != nil {
+			slog.Warn(fmt.Sprintf("reconnect after update failed for %s: %s", id, err), "scope", "connections")
+		}
+	} else if s.StateOf(id).Status == "connected" {
+		// P28 §5.5: applies live, but only while actually connected — an edit to a disconnected
+		// connection has nothing running to pace yet, and attemptConnect installs the right value
+		// on the next connect regardless. Skipped above when a reconnect already happened, since
+		// attemptConnect installs the current throttle itself.
+		s.deps.Backend.SetThrottle(id, fields.ThrottlePerSec)
+	}
+	s.emitListChanged()
+	return updated, nil
+}
+
+func (s *Service) Duplicate(id string) (model.ConnectionSummary, error) {
+	existing, err := s.deps.Conns.Get(id)
+	if err != nil {
+		return model.ConnectionSummary{}, wrapErr(err)
+	}
+	if existing == nil {
+		return model.ConnectionSummary{}, ipcerr.Internal(fmt.Sprintf("connection %s not found", id))
+	}
+	newID := uuid.NewString()
+	fields := existing.ConnectionFields
+	fields.Name = duplicateName(fields.Name)
+	// P25 D11 (a raw column copy, not decrypt-then-re-encrypt — the plaintext is never used, so
+	// there is no reason for this path to need the OS key at all) plus the review finding's own
+	// atomicity fix: the new row and its copied password column are now written by the very same
+	// INSERT statement (InsertDuplicateWithSecret, P21 round 3 finding 4's precedent), never as two
+	// separate writes — a crash between them can no longer leave a passwordless duplicate behind.
+	created, err := s.deps.Conns.InsertDuplicateWithSecret(id, newID, fields, model.NowISO())
+	if err != nil {
+		return model.ConnectionSummary{}, wrapErr(err)
+	}
+	s.emitListChanged()
+	return created, nil
+}
+
+func (s *Service) Remove(id string) error {
+	current := s.StateOf(id)
+	if current.Status == "connected" || current.Status == "connecting" {
+		_ = s.deps.Backend.Disconnect(context.Background(), id)
+	}
+	s.deps.Preconnect.Stop(id)
+	if err := s.deps.Conns.Delete(id); err != nil { // cascades filters, metadata cache, saved queries
+		return wrapErr(err)
+	}
+	if err := s.deps.Secrets.Delete(id); err != nil {
+		return wrapErr(err)
+	}
+	s.mu.Lock()
+	delete(s.states, id)
+	s.mu.Unlock()
+	s.emitListChanged()
+	return nil
+}
+
+func (s *Service) Reorder(ids []string) ([]model.ConnectionSummary, error) {
+	reordered, err := s.deps.Conns.Reorder(ids)
+	if err != nil {
+		return nil, wrapErr(err)
+	}
+	s.emitListChanged()
+	return reordered, nil
+}
+
+// Reveal never errors (P25 D9): the renderer's edit dialog has no error handling around this
+// call, so an undecryptable stored secret — or a failed/declined authentication — must not become
+// an unhandled failure, only a RevealResult whose Outcome names what happened.
+//
+// P14 D6: confirmed is honoured only when the gate itself reports OS authentication unavailable —
+// Authorizer.Authorize enforces that (it ignores confirmed whenever it can actually evaluate), so
+// this method never has to re-check which branch produced a grant.
+func (s *Service) Reveal(id string, confirmed bool) RevealResult {
+	outcome, err := s.deps.Auth.Authorize(revealReason, confirmed)
+	if err != nil {
+		msg := errorMessage(err)
+		slog.Warn(fmt.Sprintf("local authentication errored before reveal of %s: %s", id, msg), "scope", "connections")
+		return RevealResult{Outcome: revealOutcomeError, Error: &msg}
+	}
+	switch outcome {
+	case localauth.Cancelled:
+		// D11: the user cancelled on purpose — no message, that would be nagging.
+		return RevealResult{Outcome: revealOutcomeCancelled}
+	case localauth.Unavailable:
+		return RevealResult{Outcome: revealOutcomeConfirmationRequired}
+	}
+
+	password, err := s.deps.Secrets.Get(id)
+	if err != nil {
+		msg := errorMessage(err)
+		slog.Warn(fmt.Sprintf("secret reveal failed for %s: %s", id, msg), "scope", "connections")
+		return RevealResult{Outcome: revealOutcomeError, Error: &msg}
+	}
+	slog.Info(fmt.Sprintf("secret revealed for %s", id), "scope", "connections")
+	return RevealResult{Outcome: revealOutcomeRevealed, Password: password}
+}
+
+// destinationUnchanged reports whether the draft still points at the same place, over the same
+// route, as the stored row. Test only injects the stored secret when this holds (see the comment
+// on Test below): a draft edited to reach a different destination must never get the old
+// destination's password handed to it.
+//
+// P12 round 2 finding #1: compares every ConnectionFields member EXCEPT the ones genuinely
+// cosmetic/safe to change without re-gating (Name, Color, ReadOnly, AutoExplain) — deny-list, not
+// allow-list. Round 1's original fix (host/port/database/URI only) and this finding
+// (Preconnect/PreconnectSidecar/Options, e.g. sslmode or an S3 endpoint) are the same bug class:
+// a field left out of an allowlist defaults to "leaked" instead of "gated". A denylist means a
+// future new field defaults to gated instead of forgotten.
+//
+// P28 §5.5: ThrottlePerSec joins the exception list deliberately, not by oversight — it paces
+// commands against whatever destination is already resolved, so it never changes what a
+// destination-unchanged edit actually connects to. Leaving it out of the compare (the same way
+// Name/Color/ReadOnly/AutoExplain are) is what keeps "edit the throttle → Test connection" still
+// injecting the stored password instead of silently testing with none.
+func destinationUnchanged(in Input, stored model.ConnectionFields) bool {
+	return in.Kind == stored.Kind &&
+		in.Mode == stored.Mode &&
+		equalPtr(in.Host, stored.Host) &&
+		equalPtr(in.Port, stored.Port) &&
+		equalPtr(in.Database, stored.Database) &&
+		equalPtr(in.Username, stored.Username) &&
+		equalPtr(in.URI, stored.URI) &&
+		reflect.DeepEqual(in.Options, stored.Options) &&
+		equalPtr(in.Preconnect, stored.Preconnect) &&
+		in.PreconnectSidecar == stored.PreconnectSidecar
+}
+
+// equalPtr reports whether two pointers are both nil or both point at equal values.
+func equalPtr[T comparable](a, b *T) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	return *a == *b
+}
+
+// Test never errors: a test run is never armed and never leaves a process behind, however it
+// ended (the deferred Stop mirrors connections.ts:348-351's `finally`). It still runs the same
+// Validate() Create/Update do (P2 R1: this was the one Input-accepting entry point that skipped
+// it) — without that, an out-of-range Port reaches postgres/client.go's `uint16(*cfg.Port)`
+// unchecked and silently wraps around to a different, in-range port instead of being rejected.
+//
+// P14 D3: existingID is the dialog's editingId, optional. Since D1 stopped pre-filling the draft's
+// password on open, testing an existing connection the user hasn't retyped credentials for would
+// otherwise probe with no password at all — resolving the stored secret here, server-side, fixes
+// that properly for both fields and URI mode (URI mode already had this exact gap before P14, for
+// the same reason: an unchanged draft carries `password: null`). Not gated (D2): Test uses the
+// secret without displaying it, the same footing as Connect. A missing or undecryptable secret
+// here is not fatal — resolveFromInput/Backend.Test below still run and report failure the normal
+// way, exactly as an actually-wrong password would.
+//
+// P12 round 1 finding #1 (widened by round 2 finding #1): the stored secret is only injected when
+// destinationUnchanged holds — otherwise "Edit connection → change Host (or Preconnect, or
+// Options["sslmode"]/["endpoint"]) → Test" would decrypt the old destination's password and send
+// it down whatever route the draft currently points at, with no auth gate on this path at all
+// (Test is deliberately not auth-gated, see above). An edited destination instead tests with no
+// password, same as a brand-new draft.
+func (s *Service) Test(in Input, existingID string) TestResult {
+	if in.Password == nil && existingID != "" {
+		if existing, err := s.deps.Conns.Get(existingID); err == nil && existing != nil &&
+			destinationUnchanged(in, existing.ConnectionFields) {
+			if pw, err := s.deps.Secrets.Get(existingID); err == nil {
+				in.Password = pw
+			}
+		}
+	}
+	if err := in.Validate(); err != nil {
+		msg := errorMessage(err)
+		return TestResult{OK: false, Error: &msg}
+	}
+	r := resolveFromInput(in)
+	defer s.deps.Preconnect.Stop(r.config.ID)
+
+	if r.preconnect != nil {
+		if _, err := s.deps.Preconnect.Start(r.config.ID, *r.preconnect); err != nil {
+			msg := errorMessage(err)
+			return TestResult{OK: false, Error: &msg}
+		}
+	}
+	serverVersion, err := s.deps.Backend.Test(context.Background(), r.config)
+	if err != nil {
+		msg := errorMessage(err)
+		return TestResult{OK: false, Error: &msg}
+	}
+	return TestResult{OK: true, ServerVersion: &serverVersion}
+}
+
+// Connect deduplicates concurrent calls for the same id (D11): every caller that arrives while an
+// attempt is already running gets that same attempt's result instead of starting a second one.
+func (s *Service) Connect(id string) (model.ConnectionState, error) {
+	s.mu.Lock()
+	if a, ok := s.inFlight[id]; ok {
+		s.mu.Unlock()
+		<-a.done
+		return a.state, a.err
+	}
+	a := &attempt{done: make(chan struct{})}
+	s.inFlight[id] = a
+	s.mu.Unlock()
+
+	a.state, a.err = s.doConnect(id)
+	close(a.done)
+
+	s.mu.Lock()
+	if s.inFlight[id] == a {
+		delete(s.inFlight, id)
+	}
+	s.mu.Unlock()
+
+	return a.state, a.err
+}
+
+// doConnect is connections.ts:170-231's port. Only the pre-checks below (the row not existing, or
+// a real read failure) return a Go error; everything attemptConnect can fail on becomes this
+// connection's error *state* instead, exactly as the TS's catch block does.
+func (s *Service) doConnect(id string) (model.ConnectionState, error) {
+	summary, err := s.deps.Conns.Get(id)
+	if err != nil {
+		return model.ConnectionState{}, wrapErr(err)
+	}
+	if summary == nil {
+		return model.ConnectionState{}, ipcerr.Internal(fmt.Sprintf("connection %s not found", id))
+	}
+
+	s.emitState(model.ConnectionState{ConnectionID: id, Status: "connecting", Since: nowMillis()})
+
+	state, connErr := s.attemptConnect(id)
+	if connErr == nil {
+		return state, nil
+	}
+
+	msg := errorMessage(connErr)
+	errState := model.ConnectionState{ConnectionID: id, Status: "error", Error: &msg, Since: nowMillis()}
+	s.emitState(errState)
+	return errState, nil
+}
+
+// attemptConnect is doConnect's try block: resolve, optionally start the pre-connect script, call
+// the engine, optionally arm the sidecar, and on success push a metadata invalidation (P24 D6: the
+// connection's own metadata_cache rows are no longer deleted here — the new epoch this state's
+// Since carries is what internal/tree.Service's freshness rule treats every existing row as stale
+// against, so each path re-fetches lazily, once, the first time a user actually opens it, rather
+// than every row being deleted upfront and re-read whether or not anything ever asks for it again).
+func (s *Service) attemptConnect(id string) (model.ConnectionState, error) {
+	r, err := resolve(s.deps.Conns, s.deps.Secrets, id)
+	if err != nil {
+		return model.ConnectionState{}, err
+	}
+
+	started := false
+	if r.preconnect != nil {
+		if _, err := s.deps.Preconnect.Start(id, *r.preconnect); err != nil {
+			return model.ConnectionState{}, err
+		}
+		started = true
+	}
+
+	// P28 §5.5: installed just before Connect, from the summary already read above.
+	s.deps.Backend.SetThrottle(id, r.throttlePerSec)
+	result, err := s.deps.Backend.Connect(context.Background(), r.config)
+	if err != nil {
+		if started {
+			s.deps.Preconnect.Stop(id)
+		}
+		return model.ConnectionState{}, err
+	}
+
+	if r.preconnectSidecar {
+		// D7 (§4.4): overrides the settle-window auto-detection — always arm() here. A no-op if
+		// the script already exited; may synchronously flip this connection to 'error' via
+		// onPreconnectExit if it died between Start and here.
+		s.deps.Preconnect.Arm(id)
+	}
+	if afterArm := s.StateOf(id); afterArm.Status == "error" {
+		return afterArm, nil
+	}
+
+	state := model.ConnectionState{
+		ConnectionID: id, Status: "connected", ServerVersion: &result.ServerVersion,
+		Since: nowMillis(), Caps: result.Caps,
+	}
+	s.emitState(state)
+	// D11 (Step 6a numbering): the renderer's own in-memory copies (the tree's expanded set,
+	// schemaColumnsState) drop on this push regardless — only the persisted L1 rows survive now
+	// (P24 D6), so a path the user re-opens this session reads through to a fresh server answer.
+	s.metadataInvalidated.Emit(id)
+	return state, nil
+}
+
+func (s *Service) Disconnect(id string) (model.ConnectionState, error) {
+	s.deps.Preconnect.Stop(id)
+	_ = s.deps.Backend.Disconnect(context.Background(), id)
+	// Cached metadata stays — "metadata stays, it is on disk".
+	state := model.ConnectionState{ConnectionID: id, Status: "disconnected", Since: nowMillis()}
+	s.emitState(state)
+	return state, nil
+}
+
+// States returns every known state sorted by connection id (D7): Go map iteration is randomised,
+// so a literal port of `[...states.values()]` would hand the renderer a different order on every
+// call.
+func (s *Service) States() []model.ConnectionState {
+	s.mu.Lock()
+	out := make([]model.ConnectionState, 0, len(s.states))
+	for _, st := range s.states {
+		out = append(out, st)
+	}
+	s.mu.Unlock()
+	sort.Slice(out, func(i, j int) bool { return out[i].ConnectionID < out[j].ConnectionID })
+	return out
+}
+
+func (s *Service) StateOf(id string) model.ConnectionState {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if st, ok := s.states[id]; ok {
+		return st
+	}
+	return model.ConnectionState{ConnectionID: id, Status: "disconnected", Since: nowMillis()}
+}
+
+func (s *Service) SecretsStatus() secrets.Status { return s.deps.Cipher.Status() }
+
+func (s *Service) OnStateChange(fn func(model.ConnectionState)) (unsubscribe func()) {
+	return s.stateChanged.Subscribe(fn)
+}
+
+func (s *Service) OnMetadataInvalidated(fn func(connectionID string)) (unsubscribe func()) {
+	return s.metadataInvalidated.Subscribe(fn)
+}
+
+func (s *Service) OnListChanged(fn func([]model.ConnectionSummary)) (unsubscribe func()) {
+	return s.listChanged.Subscribe(fn)
+}

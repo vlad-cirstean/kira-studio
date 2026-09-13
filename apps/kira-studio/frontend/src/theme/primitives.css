@@ -1,0 +1,1091 @@
+/* P16 design system (docs/design/kira-design-system) translated into reusable
+   classes on the real token set (tokens.css), so every view consumes the same
+   thirteen primitives and composition laws instead of redefining its own
+   button/input/row/toolbar. Ported 1:1 from parts/_style.css's P1-P12 and its
+   named LAWs — see that file for the rationale behind each measurement. */
+
+.mono {
+  font-family: var(--kira-font-data);
+}
+.muted {
+  color: var(--kira-fg-muted);
+}
+.dim {
+  color: var(--kira-fg-subtle);
+}
+.p-sm {
+  font-size: var(--kira-t-sm);
+}
+.p-xs {
+  font-size: var(--kira-t-xs);
+}
+.p-push {
+  margin-left: auto;
+}
+.icon-box {
+  width: var(--kira-icon-box);
+  height: var(--kira-icon-box);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+/* ---------- P1 icon button ---------- */
+.p-iconbtn {
+  height: var(--kira-control-h);
+  width: var(--kira-control-h);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--kira-radius-sm);
+  color: var(--kira-fg-muted);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.p-iconbtn:hover,
+.p-iconbtn.is-hover {
+  background: var(--kira-hover);
+  color: var(--kira-fg);
+}
+.p-iconbtn.is-active {
+  background: var(--kira-bg-input);
+  color: var(--kira-fg);
+}
+.p-iconbtn:disabled,
+.p-iconbtn.is-disabled {
+  color: var(--kira-fg-disabled);
+  cursor: default;
+}
+/* A Stop button tints itself red exactly while there's a live op it could actually cancel
+   (DataToolbar.vue's original `.p-iconbtn.is-live`, ported here so ViewChrome.vue's shared
+   Stop — used by every non-grid view — gets the same cue instead of looking permanently
+   muted). `is-live` and `:disabled` are mutually exclusive by construction (both callers key
+   both off the same boolean), so there's no specificity fight between the two rules. */
+.p-iconbtn.is-live {
+  color: var(--kira-error);
+}
+
+/* ---------- P2 text button ---------- */
+.p-btn {
+  height: var(--kira-control-h);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kira-s-2);
+  padding: 0 var(--kira-s-3);
+  border-radius: var(--kira-radius-sm);
+  color: var(--kira-fg-muted);
+  font-size: var(--kira-t-sm);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.p-btn:hover,
+.p-btn.is-hover {
+  background: var(--kira-hover);
+  color: var(--kira-fg);
+}
+.p-btn.is-active {
+  background: var(--kira-bg-input);
+  color: var(--kira-fg);
+}
+.p-btn.primary {
+  background: var(--kira-accent);
+  color: var(--kira-accent-fg);
+}
+.p-btn:disabled,
+.p-btn.is-disabled {
+  color: var(--kira-fg-disabled);
+  cursor: default;
+}
+/* P22 D3: was `color: var(--kira-fg-disabled)` alone, which on a .primary button left #6e6e6e on
+   the accent fill — 1.13:1, an invisible label (F5). .p-dlgbtn's own :disabled has always used
+   opacity for exactly this reason; this brings .p-btn onto the same rule, which dims the fill and
+   the label together and can never invert a contrast ratio whatever the tone. */
+.p-btn.primary:disabled,
+.p-btn.primary.is-disabled {
+  color: var(--kira-accent-fg);
+  opacity: 0.45;
+}
+
+/* ---------- P3 dialog button (h-md, the only bordered button) ---------- */
+.p-dlgbtn {
+  height: var(--kira-control-h-lg);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--kira-s-2);
+  padding: 0 var(--kira-s-5);
+  border-radius: var(--kira-radius-sm);
+  border: var(--kira-border-width) solid var(--kira-border-strong);
+  background: var(--kira-bg-input);
+  color: var(--kira-fg);
+  font-size: var(--kira-t-sm);
+  cursor: pointer;
+}
+.p-dlgbtn.primary {
+  background: var(--kira-accent);
+  border-color: var(--kira-accent);
+  color: var(--kira-accent-fg);
+}
+.p-dlgbtn:disabled,
+.p-dlgbtn.is-disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* ---------- P4 input ---------- */
+.p-input {
+  height: var(--kira-control-h);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kira-s-2);
+  /* P16 D7: 8px, the inset every other text surface in the app uses (.p-toolbar, .p-view-head,
+     .p-th/.p-td, .slick-cell/.slick-header-column) — this was the one outlier at 6px. Goes on the
+     box, never on `.p-input input` below: AutocompleteField.vue paints a read-only CodeMirror
+     overlay behind the real <input>, both inside `.input-wrap`, with the two engines' first glyph
+     aligned on the same pixel — padding on the inner <input> would break that alignment. */
+  padding: 0 var(--kira-s-4);
+  border-radius: var(--kira-radius-sm);
+  border: var(--kira-border-width) solid var(--kira-border-strong);
+  background: var(--kira-bg-input);
+  color: var(--kira-fg);
+  font-family: var(--kira-font-data);
+  font-size: var(--kira-t-sm);
+}
+.p-input.md {
+  height: var(--kira-control-h-lg);
+}
+.p-input.ui {
+  /* P26: was the app's one hard-coded font stack (the design system's --font-ui, verbatim). Now
+     the same token every other chrome surface resolves through, so the interface font has exactly
+     one definition in the repo. */
+  font-family: var(--kira-font-ui);
+}
+.p-input:focus-within,
+.p-input.is-focus {
+  border-color: var(--kira-focus);
+  outline: var(--kira-border-width) solid var(--kira-focus);
+  outline-offset: -1px;
+}
+/* P24 D36: was an inline :style — the one place in the app a colour could never be themed,
+   overridden, or seen in the stylesheet. */
+.p-input.is-invalid {
+  border-color: var(--kira-error);
+}
+.p-input input {
+  background: none;
+  border: none;
+  outline: none;
+  color: inherit;
+  font: inherit;
+  min-width: 0;
+  flex: 1;
+}
+.p-input .ph,
+.p-input input::placeholder {
+  /* P16 D8: was --kira-fg-disabled (2.55:1 on --kira-bg-input — the worst-contrast text in the
+     app, and this is neither a disabled control nor the reserved-word set D9 renames — a
+     placeholder/prefix is the most-read low-contrast text in both modes). --kira-fg-muted clears
+     4.80:1 here and is still a visible step below --kira-fg, so "this is a hint" still reads. */
+  color: var(--kira-fg-muted);
+}
+/* P27: a filter/sort field's own prefix label ("WHERE", "ORDER BY", "SORT", "FILTER", "offset",
+   "since") used to render in this exact same disabled grey regardless of whether the field held
+   an applied value — no visual difference between "nothing is filtered/sorted" and "this view is
+   filtered/sorted right now." Each caller (FilterToolbar.vue, DocumentView.vue, StreamView.vue)
+   decides "active" off its own persisted tab state, not the live edit buffer.
+   P19 D18: moved off `--kira-accent` onto `--kira-state-on` (tokens.css) — three of these five
+   call sites sit beside a CodeMirror syntax overlay painting the field's own value in
+   --kira-syntax-keyword/--kira-syntax-name, both within 8 degrees of --kira-accent's own hue, so
+   "this filter is on" read as indistinguishable from "this is part of the query". */
+.p-input .ph.ph-active {
+  color: var(--kira-state-on);
+}
+
+/* Hide the OS-native up/down spinner — .p-input .stepper below draws the app's own. */
+.p-input input[type="number"] {
+  -moz-appearance: textfield;
+}
+.p-input input[type="number"]::-webkit-inner-spin-button,
+.p-input input[type="number"]::-webkit-outer-spin-button {
+  appearance: none;
+  margin: 0;
+}
+/* P42: the stepper takes the field's own right edge (no dead gutter of input background beyond
+   it) — the input's own right padding moves onto .stepper's right corner radius instead. */
+.p-input.has-stepper {
+  padding-right: 0;
+}
+.p-input.has-stepper input {
+  padding-right: var(--kira-s-2);
+}
+.p-input .stepper {
+  display: flex;
+  flex-direction: column;
+  align-self: stretch;
+  flex-shrink: 0;
+  border-left: var(--kira-border-width) solid var(--kira-border);
+  border-top-right-radius: var(--kira-radius-sm);
+  border-bottom-right-radius: var(--kira-radius-sm);
+  overflow: hidden;
+}
+/* P42 F16: each button's content box is ~8px tall; TextField.vue's chevron icon is sized to fit
+   it (9px). overflow:hidden is a guard against the glyph spilling out again if a height token
+   moves — the icon's own :size prop is the actual fix, since its inline style would win over any
+   font-size set here. */
+.p-input .step-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  width: 16px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--kira-fg-muted);
+  cursor: pointer;
+  line-height: 0;
+  overflow: hidden;
+}
+.p-input .step-btn:hover {
+  color: var(--kira-fg);
+  background: var(--kira-hover);
+}
+.p-input .step-btn:active {
+  background: var(--kira-select);
+}
+
+/* ---------- P28 textarea ---------- */
+/* Promoted from StreamComposeMessage.vue's scoped .p-input-styled — the design-system's plain
+   multiline text control, for content with no CodeMirror language (a shell pre-connect command,
+   a free-text message body): a real <textarea>, not a hand-rolled editor. */
+.p-textarea {
+  width: 100%;
+  border: var(--kira-border-width) solid var(--kira-border);
+  border-radius: var(--kira-radius);
+  background: var(--kira-bg-input);
+  color: var(--kira-fg);
+  font-family: var(--kira-font-data);
+  font-size: var(--kira-t-sm);
+  /* P16 D7: 4px vertical, 8px horizontal — matches .p-input's own gutter (its multiline sibling
+     was tighter still, by another 2px). */
+  padding: var(--kira-s-2) var(--kira-s-4);
+  resize: vertical;
+  box-sizing: border-box;
+}
+
+/* ---------- P15 checkbox ---------- */
+/* Ported from docs/design/kira-design-system/parts/_dlgcss.html's own `.box`/`.box.on` — the one
+   checkbox object the design system already specified with no primitive consuming it. The real
+   <input> is the styled box (appearance: none), not a sibling hidden input — see Checkbox.vue's
+   own comment for why. margin-top/flex-shrink match `.box` exactly: a checkbox beside a wrapped
+   label sits flush with the label's first line, and never shrinks in a flex row. */
+.p-check {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--kira-control-inline-h);
+  height: var(--kira-control-inline-h);
+  margin-top: var(--kira-s-1);
+  flex-shrink: 0;
+}
+.p-check input[type="checkbox"] {
+  appearance: none;
+  margin: 0;
+  width: var(--kira-control-inline-h);
+  height: var(--kira-control-inline-h);
+  border-radius: 3px;
+  border: var(--kira-border-width) solid var(--kira-border-strong);
+  background: var(--kira-bg-input);
+  cursor: pointer;
+}
+.p-check input[type="checkbox"]:checked,
+.p-check input[type="checkbox"]:indeterminate {
+  background: var(--kira-accent);
+  border-color: var(--kira-accent);
+}
+.p-check input[type="checkbox"]:focus-visible {
+  outline: var(--kira-border-width) solid var(--kira-focus);
+  outline-offset: 1px;
+}
+.p-check input[type="checkbox"]:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+.p-check .glyph {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--kira-accent-fg);
+  pointer-events: none;
+}
+
+/* ---------- P13 dialog body ---------- */
+/* The column wrapper every DialogFrame consumer puts inside .dialog-body (which is the scroll
+   container and deliberately has no padding of its own). Promoted from the identical
+   `.dialog-body-inner` in FiltersDialog.vue/ConnectionDialog.vue/SchemaDialog.vue. */
+.p-dialog-body {
+  display: flex;
+  flex-direction: column;
+  padding: var(--kira-s-5);
+  gap: var(--kira-s-4);
+}
+/* A dialog whose body is a LIST of rows, not a form of fields — the rows carry their own
+   padding, so the wrapper only insets them from the frame. */
+.p-dialog-body.list {
+  padding: var(--kira-s-2);
+  gap: var(--kira-s-1);
+}
+
+/* ---------- P13 dialog footer actions ---------- */
+/* Promoted from the eleven identical/near-identical local `.footer-actions` rules across Studio
+   and Api dialogs — see each consumer for what, if anything, it still overrides locally. */
+.p-dialog-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--kira-s-3);
+}
+.p-dialog-actions.end {
+  justify-content: flex-end;
+  width: 100%;
+}
+
+/* ---------- P13 key/value row ---------- */
+/* The name/value row shared by the response headers pane, the gRPC metadata pane and the
+   timeline's per-hop header list — promoted from three byte-identical local copies. */
+.p-kv-row {
+  display: flex;
+  gap: var(--kira-s-3);
+  font-size: var(--kira-t-xs);
+}
+.p-kv-name {
+  color: var(--kira-fg-muted);
+  flex-shrink: 0;
+  min-width: 160px;
+}
+.p-kv-value {
+  overflow-wrap: anywhere;
+}
+
+/* ---------- P5 select ---------- */
+/* `appearance: none` + a manual background-image arrow only restyles the CLOSED control — the
+   opened option list is still a native, unstyled OS popup (a plain <select>'s listbox has no
+   CSS-reachable shadow boundary in the standard model), which is exactly the "still looks like
+   the system one" complaint: click it open and the app's dark theme vanishes. `appearance:
+   base-select` (Chromium's Customizable Select API — supported here since this app targets a
+   single pinned Electron/Chromium build, not arbitrary browsers) turns the popup into a normal,
+   CSS-reachable ::picker(select) part with plain <option> children and its own ::picker-icon part
+   for the arrow, so both halves can be themed like everything else. An unsupporting engine drops
+   every `base-select`/`::picker`-based declaration below as invalid and falls back to nothing
+   (a bare, unstyled native control) rather than this file's previous appearance:none + manual-SVG
+   approach — acceptable since, again, the Chromium version here is pinned, not guessed at. */
+.p-select {
+  height: var(--kira-control-h);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kira-s-2);
+  padding: 0 var(--kira-s-2) 0 var(--kira-s-3);
+  border-radius: var(--kira-radius-sm);
+  color: var(--kira-fg-muted);
+  font-size: var(--kira-t-sm);
+  cursor: pointer;
+  flex-shrink: 0;
+  appearance: base-select;
+}
+.p-select::picker-icon {
+  color: var(--kira-fg-muted);
+}
+.p-select::picker(select) {
+  appearance: base-select;
+  margin-top: var(--kira-s-1);
+  padding: var(--kira-s-1);
+  background: var(--kira-bg-elevated);
+  border: var(--kira-border-width) solid var(--kira-border-strong);
+  border-radius: var(--kira-radius-sm);
+  box-shadow: var(--kira-shadow);
+}
+.p-select option {
+  padding: var(--kira-s-2) var(--kira-s-3);
+  border-radius: var(--kira-radius-sm);
+  color: var(--kira-fg);
+  background: none;
+}
+.p-select option:hover {
+  background: var(--kira-hover);
+}
+.p-select option:checked {
+  background: var(--kira-select);
+  color: var(--kira-fg);
+}
+.p-select.bordered {
+  /* P16 D6: height inherited from .p-select (h-sm) — ten call sites, and only four actually sit
+     beside h-md controls; .md below is the opt-in for those, matching .p-input/.p-input.md and
+     .p-seg/.p-seg.md. */
+  border: var(--kira-border-width) solid var(--kira-border-strong);
+  background-color: var(--kira-bg-input);
+  color: var(--kira-fg);
+  padding: 0 var(--kira-s-2) 0 var(--kira-s-3);
+  padding-right: calc(var(--kira-s-2) + 14px);
+}
+.p-select.md {
+  height: var(--kira-control-h-lg);
+}
+.p-select:focus-visible {
+  border-color: var(--kira-focus);
+  outline: var(--kira-border-width) solid var(--kira-focus);
+  outline-offset: -1px;
+}
+.p-select:disabled {
+  color: var(--kira-fg-disabled);
+  cursor: default;
+}
+/* Only visible on .p-select.bordered — the borderless variant has no border to recolour, same as
+   every other state rule above it. */
+.p-select.is-invalid {
+  border-color: var(--kira-error);
+}
+
+/* ---------- P6 segmented ---------- */
+.p-seg {
+  display: inline-flex;
+  height: var(--kira-control-h);
+  border: var(--kira-border-width) solid var(--kira-border-strong);
+  border-radius: var(--kira-radius-sm);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.p-seg.md {
+  height: var(--kira-control-h-lg);
+}
+.p-seg > * {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 var(--kira-s-3);
+  color: var(--kira-fg-muted);
+  font-size: var(--kira-t-sm);
+  cursor: pointer;
+  white-space: nowrap;
+  border: none;
+  background: none;
+}
+.p-seg > * + * {
+  border-left: var(--kira-border-width) solid var(--kira-border-strong);
+}
+.p-seg > .on {
+  background: var(--kira-bg-input);
+  color: var(--kira-fg);
+}
+
+/* ---------- P7 tab ---------- */
+.p-tab {
+  height: var(--kira-control-h-lg);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kira-s-2);
+  padding: 0 var(--kira-s-3);
+  border-radius: var(--kira-radius-sm);
+  border: var(--kira-border-width) solid transparent;
+  color: var(--kira-fg-muted);
+  font-size: var(--kira-t-sm);
+  cursor: pointer;
+  max-width: 210px;
+  flex-shrink: 0;
+}
+.p-tab.is-active {
+  background: var(--kira-bg-elevated);
+  border-color: var(--kira-border-strong);
+  color: var(--kira-fg);
+}
+
+/* ---------- P8 row ---------- */
+.p-row {
+  height: var(--kira-control-h);
+  display: flex;
+  align-items: center;
+  gap: var(--kira-s-2);
+  padding: 0 var(--kira-s-3);
+  border-radius: var(--kira-radius-sm);
+  color: var(--kira-fg);
+  font-size: var(--kira-t-md);
+  cursor: pointer;
+}
+.p-row:hover,
+.p-row.is-hover {
+  background: var(--kira-hover);
+}
+.p-row.is-selected {
+  background: var(--kira-select);
+}
+
+/* ---------- P9 badge / count / chip ---------- */
+.p-badge {
+  height: var(--kira-control-h-sm);
+  display: inline-flex;
+  align-items: center;
+  padding: 0 var(--kira-s-3);
+  border-radius: var(--kira-radius-sm);
+  background: var(--kira-bg-input);
+  color: var(--kira-fg-muted);
+  font-family: var(--kira-font-data);
+  font-size: var(--kira-t-xs);
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.p-count {
+  min-width: var(--kira-control-h-sm);
+  height: var(--kira-control-h-sm);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 5px;
+  border-radius: var(--kira-radius-pill);
+  background: var(--kira-badge);
+  color: #f0f0f0;
+  font-family: var(--kira-font-data);
+  font-size: var(--kira-t-xs);
+  flex-shrink: 0;
+}
+.p-chip {
+  height: var(--kira-control-h-sm);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 var(--kira-s-3);
+  border-radius: var(--kira-radius-pill);
+  font-size: var(--kira-t-xs);
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.p-chip.warn {
+  background: rgba(204, 167, 0, 0.16);
+  color: var(--kira-warn);
+}
+.p-chip.err {
+  background: rgba(241, 76, 76, 0.16);
+  color: var(--kira-error);
+}
+.p-chip.ok {
+  background: rgba(35, 209, 139, 0.14);
+  color: var(--kira-ok);
+}
+.p-chip.info {
+  background: rgba(55, 148, 255, 0.16);
+  color: var(--kira-info);
+}
+
+/* P17 D19 gave these a 16% tint to match `.p-chip`'s four status variants above, so a method
+   chip would read at the same weight a status chip does — colour only — no layout of its own —
+   so it composes onto either a `.p-chip` (the method chip in HttpRequestView.vue's head,
+   ResponseHistoryList.vue's row, CollectionRow.vue's tree row) or `.p-select.bordered`
+   (MethodSelect.vue's own trigger button, D18) without either consumer duplicating the
+   seven-plus-one colour rule.
+   P22 D7: the fill is dropped. The user reports it as the problem on the method *select*, where
+   a tinted pill inside an already-bordered control reads as a second, competing control —
+   coloured text on the control's own neutral ground is the treatment asked for. Applied to all
+   five `.p-method` sites (F12: they are all Api — Studio's tree has no method/kind chip, only an
+   EngineIcon and a `.p-count`) so a method never has two looks in one window.
+   `.p-chip.warn/.err/.ok/.info` above are NOT changed — they are status, not method. */
+.p-method.get {
+  color: var(--kira-method-get);
+}
+.p-method.post {
+  color: var(--kira-method-post);
+}
+.p-method.put {
+  color: var(--kira-method-put);
+}
+.p-method.patch {
+  color: var(--kira-method-patch);
+}
+.p-method.delete {
+  color: var(--kira-method-delete);
+}
+.p-method.head {
+  color: var(--kira-method-head);
+}
+.p-method.options {
+  color: var(--kira-method-options);
+}
+.p-method.other {
+  color: var(--kira-method-other);
+}
+
+/* ---------- P10 status-bar item ---------- */
+.p-status {
+  height: var(--kira-control-h-sm);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kira-s-2);
+  padding: 0 var(--kira-s-3);
+  border-radius: var(--kira-radius-sm);
+  color: var(--kira-fg);
+  font-size: var(--kira-t-sm);
+  cursor: pointer;
+  border: none;
+  background: none;
+}
+.p-status.is-on {
+  background: var(--kira-bg-input);
+}
+.p-status:hover,
+.p-status.is-hover {
+  background: var(--kira-hover);
+}
+
+/* ---------- P11 floating surface (menu / dialog / popover) ---------- */
+.p-float {
+  background: var(--kira-bg-elevated);
+  border: var(--kira-border-width) solid var(--kira-border-strong);
+  border-radius: var(--kira-radius);
+  box-shadow: var(--kira-shadow-dialog);
+  overflow: hidden;
+}
+.p-menu-label {
+  height: var(--kira-control-h-sm);
+  display: flex;
+  align-items: center;
+  padding: 0 var(--kira-s-3);
+  font-size: var(--kira-t-xs);
+  color: var(--kira-fg-subtle);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.p-sep {
+  height: var(--kira-border-width);
+  background: var(--kira-border-strong);
+  margin: var(--kira-s-2) 0;
+}
+
+/* ---------- P22 D8: completion popup — one specification, expressed twice. AutocompleteField.vue
+   (plain fields) consumes these classes directly; CodeMirror draws its own <ul>/<li> for the
+   console/DDL/cell editors with no seam to hand it a Vue component (F14), so editor/theme.ts
+   mirrors these exact values onto CodeMirror's own `.cm-tooltip-autocomplete` DOM instead of
+   sharing the class. Change one, change the other — editor/theme.ts's own header comment points
+   back here. Hoisted verbatim out of AutocompleteField.vue's old scoped `.autocomplete-suggestions`
+   /`.sugg-*` rules (F13) — no visual change to that popup, only the CodeMirror one gains parity. */
+.p-completion {
+  /* P26: explicit, because this block used to get its family from `body` — which was the data
+     font until P26 moved `body` to --kira-font-ui. Completion items are identifiers (tables,
+     columns, SQL keywords, header names), and the CodeMirror popup this one is required to match
+     (editor/theme.ts, P22 D8) names the data font directly. Without this line the two popups
+     would silently diverge the moment `body` changed. */
+  font-family: var(--kira-font-data);
+  padding: var(--kira-s-1);
+  min-width: 200px;
+  max-width: min(480px, 90vw);
+  max-height: 240px;
+  overflow-y: auto;
+}
+.p-completion-row {
+  display: flex;
+  align-items: center;
+  gap: var(--kira-s-2);
+  padding: var(--kira-s-2) var(--kira-s-3);
+  border-radius: var(--kira-radius-sm);
+  font-size: var(--kira-t-sm);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.p-completion-row.is-on {
+  background: var(--kira-select);
+  color: var(--kira-fg);
+}
+.p-completion-icon {
+  flex-shrink: 0;
+  color: var(--kira-fg-muted);
+}
+.p-completion-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.p-completion-detail {
+  margin-left: auto;
+  padding-left: var(--kira-s-3);
+  color: var(--kira-fg-muted);
+  font-size: var(--kira-t-xs);
+  flex-shrink: 0;
+}
+/* No plain-popup consumer today (AutocompleteField.vue's own candidates carry no match-highlight
+   concept) — declared here anyway so the one CodeMirror consumer (editor/theme.ts's
+   .cm-completionMatchedText) still reads its colour off this shared spec rather than a literal. */
+.p-completion-match {
+  color: var(--kira-syntax-function);
+}
+
+/* ---------- P12 panel ---------- */
+.p-panel {
+  border: var(--kira-border-width) solid var(--kira-border);
+  border-radius: var(--kira-radius);
+  background: var(--kira-bg);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.p-panel-head {
+  height: var(--kira-control-h-lg);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--kira-s-2);
+  padding: 0 var(--kira-s-3);
+  border-bottom: var(--kira-border-width) solid var(--kira-border);
+  font-size: var(--kira-t-sm);
+  color: var(--kira-fg-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* ---------- LAW: a toolbar is --kira-toolbar-h, holds only h-sm controls ---------- */
+.p-toolbar {
+  height: var(--kira-toolbar-h);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--kira-s-3);
+  padding: 0 var(--kira-s-4);
+  border-bottom: var(--kira-border-width) solid var(--kira-border);
+}
+.p-toolbar.last {
+  border-bottom: none;
+}
+.p-toolbar .group {
+  display: flex;
+  align-items: center;
+  gap: var(--kira-s-3);
+  min-width: 0;
+}
+.p-toolbar .sep {
+  width: var(--kira-border-width);
+  height: var(--kira-control-inline-h);
+  background: var(--kira-border-strong);
+  margin: 0 var(--kira-s-1);
+  flex-shrink: 0;
+}
+
+/* ---------- LAW: connection colour is a 2px rail — tree, tab, toolbar cap.
+   Nothing else: no tint, no background, no full border. No colour assigned
+   is the default; the slot stays reserved either way so nothing shifts when
+   a colour is set. Consumers set --kira-rail to a `var(--kira-conn-*)` (or
+   leave it unset for "no colour"). ---------- */
+.p-toolbar-rail {
+  height: 2px;
+  flex-shrink: 0;
+  background: var(--kira-rail, transparent);
+}
+.p-conn-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--kira-rail, transparent);
+}
+.p-conn-dot.none {
+  background: none;
+  border: 1px solid var(--kira-fg-disabled);
+}
+.p-tab-rail {
+  width: 2px;
+  height: var(--kira-control-inline-h);
+  border-radius: 1px;
+  flex-shrink: 0;
+  background: var(--kira-rail, transparent);
+}
+.p-tree-rail {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--kira-rail, transparent);
+}
+
+/* ---------- view header — every non-grid view opens with this ---------- */
+.p-view-head {
+  /* P22 D1: was a literal 28px, one bar shorter than .p-toolbar's 34px directly beneath it in
+     every view — fb7476e's own bar-role family (tokens.css) missed this one bar (F2(c)). The one
+     deliberate rendered height change in this commit. */
+  height: var(--kira-viewhead-h);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--kira-s-3);
+  padding: 0 var(--kira-s-4);
+  border-bottom: var(--kira-border-width) solid var(--kira-border);
+}
+.p-view-target {
+  font-size: var(--kira-t-md);
+  color: var(--kira-fg);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.p-view-target .path {
+  color: var(--kira-fg-subtle);
+}
+
+/* ---------- LAW: work-in-progress is a ring + elapsed time in the toolbar
+   that started the work, not a bar across the top of the view. Idle keeps
+   the same slot as a static ring holding the last duration, so the toolbar
+   never reflows when work starts. ---------- */
+.p-run-state {
+  display: flex;
+  align-items: center;
+  gap: var(--kira-s-2);
+  font-family: var(--kira-font-data);
+  font-size: var(--kira-t-xs);
+  color: var(--kira-fg-subtle);
+}
+/* LAW 12: the label's width changes as elapsed time ticks up (the widest is
+   "9999 ms", 7 characters); reserve that width so it never reflows controls
+   to its left. 7ch tracks the monospace font-family above with no token. */
+.p-run-state .label {
+  min-width: 7ch;
+  text-align: right;
+}
+.p-run-state .ring {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  border: 1.5px solid var(--kira-border-strong);
+}
+.p-run-state.is-running {
+  color: var(--kira-info);
+}
+.p-run-state.is-running .ring {
+  border-color: var(--kira-accent) transparent var(--kira-accent) var(--kira-accent);
+  animation: p-spin 0.7s linear infinite;
+}
+.p-run-state.is-error {
+  color: var(--kira-error);
+}
+.p-run-state.is-error .ring {
+  border-color: var(--kira-error);
+}
+@keyframes p-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ---------- strips: error / warning / note ---------- */
+.p-strip {
+  flex-shrink: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--kira-s-3);
+  padding: var(--kira-s-3) var(--kira-s-4);
+  font-size: var(--kira-t-sm);
+  line-height: 1.45;
+  border-bottom: var(--kira-border-width) solid var(--kira-border);
+}
+.p-strip.err {
+  background: rgba(241, 76, 76, 0.1);
+  color: #f3a3a3;
+}
+.p-strip.warn {
+  background: rgba(204, 167, 0, 0.1);
+  color: #d9c47a;
+}
+.p-strip.note {
+  background: rgba(55, 148, 255, 0.08);
+  color: #a8c8ee;
+}
+.p-strip .strip-action {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+/* ---------- tabular body shared by grid / kv / stream / console ---------- */
+.p-thead {
+  height: var(--kira-control-h-lg);
+  flex-shrink: 0;
+  display: flex;
+  background: var(--kira-bg-elevated);
+  border-bottom: var(--kira-border-width) solid var(--kira-border-strong);
+}
+.p-th {
+  display: flex;
+  align-items: center;
+  gap: var(--kira-s-2);
+  padding: 0 var(--kira-s-4);
+  border-right: var(--kira-border-width) solid var(--kira-border);
+  font-size: var(--kira-t-sm);
+  color: var(--kira-fg-muted);
+  overflow: hidden;
+  white-space: nowrap;
+}
+.p-th .name {
+  color: var(--kira-fg);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.p-th .key {
+  color: var(--kira-warn);
+  font-family: var(--kira-font-data);
+  font-size: var(--kira-t-xs);
+}
+.p-td {
+  display: flex;
+  align-items: center;
+  padding: 0 var(--kira-s-4);
+  border-right: var(--kira-border-width) solid var(--kira-border);
+  border-bottom: var(--kira-border-width) solid var(--kira-border);
+  font-family: var(--kira-font-data);
+  font-size: var(--kira-t-md);
+  color: var(--kira-fg);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.p-td.gutter {
+  justify-content: flex-end;
+  color: var(--kira-fg-subtle);
+  font-size: var(--kira-t-xs);
+  background: var(--kira-bg-elevated);
+  border-right-color: var(--kira-border-strong);
+  position: relative;
+}
+.p-td.null {
+  color: var(--kira-fg-subtle);
+  font-style: italic;
+}
+.p-td.num {
+  justify-content: flex-end;
+}
+.p-td.sel {
+  background: var(--kira-select);
+  outline: var(--kira-border-width) solid var(--kira-focus);
+  outline-offset: -1px;
+}
+.p-td.edited {
+  color: var(--kira-warn);
+}
+.p-td.fk {
+  color: var(--kira-info);
+}
+
+/* ---------- status bar — toggles live on the RIGHT, icon-only ---------- */
+.p-statusbar {
+  height: var(--kira-statusbar-h);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--kira-s-3);
+}
+.p-statusbar .side {
+  display: flex;
+  align-items: center;
+  gap: var(--kira-s-1);
+}
+/* ---------- empty state ---------- */
+.p-empty {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--kira-s-4);
+  color: var(--kira-fg-subtle);
+}
+/* P22 D1: stays a literal — an empty-state illustration glyph, not a control, so the role scale
+   does not reach it. */
+.p-empty .big {
+  width: 24px;
+  height: 24px;
+}
+.p-empty .label {
+  font-size: var(--kira-t-md);
+  color: var(--kira-fg-muted);
+}
+
+/* ---------- P13 disclosure — a <details> whose marker is the app's own chevron ---------- */
+/* Codepoints confirmed against the installed @vscode/codicons version's own codicon.css
+   (.codicon-chevron-right:before/.codicon-chevron-down:before), not from memory. */
+.p-disclosure > summary {
+  list-style: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: var(--kira-s-2);
+}
+.p-disclosure > summary::-webkit-details-marker {
+  display: none;
+}
+.p-disclosure > summary::before {
+  content: "\eab6";
+  /* biome-ignore lint/a11y/useGenericFontNames: this is the app's icon font (codicon), not text. */
+  font-family: codicon;
+  font-size: 13px;
+}
+.p-disclosure[open] > summary::before {
+  content: "\eab4";
+}
+
+/* ---------- definition-view sections (P24 D31) ---------- */
+/* Shared by the five views/definition/*Section.vue components (Columns/Indexes/Constraints/
+   Validation/Properties), collapsing five near-identical <style scoped> blocks into one. The
+   section title adopts .p-panel-head's own idiom (uppercase/muted/t-sm/letter-spacing) instead of
+   bold text — the design system never uses it anywhere; hierarchy comes from colour, size, case
+   and letter-spacing alone. `.def-table td`'s border-right
+   is deliberately NOT here: Validation/Properties are plain key-value tables with no column
+   dividers, so that stays a per-file addition in the three components that do want it (Columns/
+   Indexes/Constraints) rather than a shared rule that would draw one where it isn't wanted. */
+.def-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kira-s-3);
+}
+.def-section-head {
+  display: flex;
+  align-items: center;
+  gap: var(--kira-s-3);
+}
+.def-section-title {
+  font-size: var(--kira-t-sm);
+  color: var(--kira-fg-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.def-empty {
+  color: var(--kira-fg-muted);
+  margin: 0;
+}
+.def-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--kira-t-md);
+}
+/* Only Columns/Indexes/Constraints render a <thead> — this has no effect on Validation/Properties,
+   which have no `.def-head-row` element for it to match. */
+.def-head-row th {
+  text-align: left;
+  padding: var(--kira-s-2) var(--kira-s-3);
+  background: var(--kira-bg-elevated);
+  border-bottom: var(--kira-border-width) solid var(--kira-border-strong);
+  border-right: var(--kira-border-width) solid var(--kira-border);
+  color: var(--kira-fg-muted);
+  font-size: var(--kira-t-sm);
+  white-space: nowrap;
+}
+.def-head-row th:last-child {
+  border-right: none;
+}
+.def-row {
+  border-bottom: var(--kira-border-width) solid var(--kira-border);
+}
+.def-row:hover {
+  background: var(--kira-hover);
+}
+.def-table td {
+  padding: var(--kira-s-2) var(--kira-s-3);
+  vertical-align: middle;
+  color: var(--kira-fg);
+}

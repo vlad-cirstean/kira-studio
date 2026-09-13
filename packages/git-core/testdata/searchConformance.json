@@ -1,0 +1,455 @@
+{
+  "_comment": "G23 D9: the shared conformance corpus asserted by BOTH engines -- packages/git-core/src/search/conformance.test.ts (compileQuery + matchCommitFields) and apps/kira-studio/internal/gitsearch/conformance_test.go (Compile + MatchFields). Seeded from matcher.test.ts's own TOGGLE_ROWS table (rows 1-7, 9), extended with probe 10's punctuation-edge rows, the sha-prefix floor, a body-only hit, the empty-body guard, three dialect-rewrite rows (\\s over NBSP, . excluding CR, \\p as an identity escape), a \\u escape row, three unsupported-pattern rows (lookahead/lookbehind/backreference), and D5's regex+wholeWord alternation-backtrack case. A phase touching SearchMatchField or whole-word semantics adds rows HERE first (docs/v1.3/plans/G23-search.md, section 9).",
+  "rows": [
+    {
+      "name": "row1-default-widget-cache",
+      "query": { "text": "widget", "caseSensitive": false, "wholeWord": false, "regex": false },
+      "subject": "Fix the widget cache",
+      "body": "",
+      "authorName": "Kira Fixture",
+      "authorEmail": "fixture@kira-version.test",
+      "committerName": "Kira Fixture",
+      "committerEmail": "fixture@kira-version.test",
+      "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expect": { "supported": true, "fields": ["subject"] }
+    },
+    {
+      "name": "row1-default-add-widgets",
+      "query": { "text": "widget", "caseSensitive": false, "wholeWord": false, "regex": false },
+      "subject": "add WIDGETS to the list",
+      "body": "",
+      "authorName": "Kira Fixture",
+      "authorEmail": "fixture@kira-version.test",
+      "committerName": "Kira Fixture",
+      "committerEmail": "fixture@kira-version.test",
+      "sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "expect": { "supported": true, "fields": ["subject"] }
+    },
+    {
+      "name": "row1-default-subwidgetary",
+      "query": { "text": "widget", "caseSensitive": false, "wholeWord": false, "regex": false },
+      "subject": "subwidgetary refactor noted",
+      "body": "",
+      "authorName": "Kira Fixture",
+      "authorEmail": "fixture@kira-version.test",
+      "committerName": "Kira Fixture",
+      "committerEmail": "fixture@kira-version.test",
+      "sha": "cccccccccccccccccccccccccccccccccccccccc",
+      "expect": { "supported": true, "fields": ["subject"] }
+    },
+    {
+      "name": "row1-default-unrelated-no-match",
+      "query": { "text": "widget", "caseSensitive": false, "wholeWord": false, "regex": false },
+      "subject": "unrelated change to build config",
+      "body": "",
+      "authorName": "Kira Fixture",
+      "authorEmail": "fixture@kira-version.test",
+      "committerName": "Kira Fixture",
+      "committerEmail": "fixture@kira-version.test",
+      "sha": "dddddddddddddddddddddddddddddddddddddddd",
+      "expect": { "supported": true, "fields": [] }
+    },
+
+    {
+      "name": "row2-case-sensitive-widget-cache",
+      "query": { "text": "widget", "caseSensitive": true, "wholeWord": false, "regex": false },
+      "subject": "Fix the widget cache",
+      "body": "",
+      "authorName": "Kira Fixture",
+      "authorEmail": "fixture@kira-version.test",
+      "committerName": "Kira Fixture",
+      "committerEmail": "fixture@kira-version.test",
+      "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expect": { "supported": true, "fields": ["subject"] }
+    },
+    {
+      "name": "row2-case-sensitive-subwidgetary",
+      "query": { "text": "widget", "caseSensitive": true, "wholeWord": false, "regex": false },
+      "subject": "subwidgetary refactor noted",
+      "body": "",
+      "authorName": "Kira Fixture",
+      "authorEmail": "fixture@kira-version.test",
+      "committerName": "Kira Fixture",
+      "committerEmail": "fixture@kira-version.test",
+      "sha": "cccccccccccccccccccccccccccccccccccccccc",
+      "expect": { "supported": true, "fields": ["subject"] }
+    },
+    {
+      "name": "row2-case-sensitive-add-widgets-no-match",
+      "query": { "text": "widget", "caseSensitive": true, "wholeWord": false, "regex": false },
+      "subject": "add WIDGETS to the list",
+      "body": "",
+      "authorName": "Kira Fixture",
+      "authorEmail": "fixture@kira-version.test",
+      "committerName": "Kira Fixture",
+      "committerEmail": "fixture@kira-version.test",
+      "sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "expect": { "supported": true, "fields": [] }
+    },
+
+    {
+      "name": "row3-whole-word-widget-cache",
+      "query": { "text": "widget", "caseSensitive": false, "wholeWord": true, "regex": false },
+      "subject": "Fix the widget cache",
+      "body": "",
+      "authorName": "Kira Fixture",
+      "authorEmail": "fixture@kira-version.test",
+      "committerName": "Kira Fixture",
+      "committerEmail": "fixture@kira-version.test",
+      "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expect": { "supported": true, "fields": ["subject"] }
+    },
+    {
+      "name": "row3-whole-word-subwidgetary-no-match",
+      "query": { "text": "widget", "caseSensitive": false, "wholeWord": true, "regex": false },
+      "subject": "subwidgetary refactor noted",
+      "body": "",
+      "authorName": "Kira Fixture",
+      "authorEmail": "fixture@kira-version.test",
+      "committerName": "Kira Fixture",
+      "committerEmail": "fixture@kira-version.test",
+      "sha": "cccccccccccccccccccccccccccccccccccccccc",
+      "expect": { "supported": true, "fields": [] }
+    },
+    {
+      "name": "row3-whole-word-add-widgets-no-match",
+      "query": { "text": "widget", "caseSensitive": false, "wholeWord": true, "regex": false },
+      "subject": "add WIDGETS to the list",
+      "body": "",
+      "authorName": "Kira Fixture",
+      "authorEmail": "fixture@kira-version.test",
+      "committerName": "Kira Fixture",
+      "committerEmail": "fixture@kira-version.test",
+      "sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "expect": { "supported": true, "fields": [] }
+    },
+
+    {
+      "name": "row4-case-sensitive-whole-word-add-widgets",
+      "query": { "text": "WIDGETS", "caseSensitive": true, "wholeWord": true, "regex": false },
+      "subject": "add WIDGETS to the list",
+      "body": "",
+      "authorName": "Kira Fixture",
+      "authorEmail": "fixture@kira-version.test",
+      "committerName": "Kira Fixture",
+      "committerEmail": "fixture@kira-version.test",
+      "sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "expect": { "supported": true, "fields": ["subject"] }
+    },
+    {
+      "name": "row4-case-sensitive-whole-word-widget-cache-no-match",
+      "query": { "text": "WIDGETS", "caseSensitive": true, "wholeWord": true, "regex": false },
+      "subject": "Fix the widget cache",
+      "body": "",
+      "authorName": "Kira Fixture",
+      "authorEmail": "fixture@kira-version.test",
+      "committerName": "Kira Fixture",
+      "committerEmail": "fixture@kira-version.test",
+      "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expect": { "supported": true, "fields": [] }
+    },
+
+    {
+      "name": "row5-regex-alternation-widget-cache",
+      "query": {
+        "text": "wid(get|ening)",
+        "caseSensitive": false,
+        "wholeWord": false,
+        "regex": true
+      },
+      "subject": "Fix the widget cache",
+      "body": "",
+      "authorName": "Kira Fixture",
+      "authorEmail": "fixture@kira-version.test",
+      "committerName": "Kira Fixture",
+      "committerEmail": "fixture@kira-version.test",
+      "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expect": { "supported": true, "fields": ["subject"] }
+    },
+    {
+      "name": "row5-regex-alternation-unrelated-no-match",
+      "query": {
+        "text": "wid(get|ening)",
+        "caseSensitive": false,
+        "wholeWord": false,
+        "regex": true
+      },
+      "subject": "unrelated change to build config",
+      "body": "",
+      "authorName": "Kira Fixture",
+      "authorEmail": "fixture@kira-version.test",
+      "committerName": "Kira Fixture",
+      "committerEmail": "fixture@kira-version.test",
+      "sha": "dddddddddddddddddddddddddddddddddddddddd",
+      "expect": { "supported": true, "fields": [] }
+    },
+
+    {
+      "name": "row6-regex-case-sensitive-add-widgets",
+      "query": { "text": "WIDGET", "caseSensitive": true, "wholeWord": false, "regex": true },
+      "subject": "add WIDGETS to the list",
+      "body": "",
+      "authorName": "Kira Fixture",
+      "authorEmail": "fixture@kira-version.test",
+      "committerName": "Kira Fixture",
+      "committerEmail": "fixture@kira-version.test",
+      "sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "expect": { "supported": true, "fields": ["subject"] }
+    },
+    {
+      "name": "row6-regex-case-sensitive-widget-cache-no-match",
+      "query": { "text": "WIDGET", "caseSensitive": true, "wholeWord": false, "regex": true },
+      "subject": "Fix the widget cache",
+      "body": "",
+      "authorName": "Kira Fixture",
+      "authorEmail": "fixture@kira-version.test",
+      "committerName": "Kira Fixture",
+      "committerEmail": "fixture@kira-version.test",
+      "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expect": { "supported": true, "fields": [] }
+    },
+
+    {
+      "name": "row7-regex-whole-word-widget-cache",
+      "query": { "text": "widget", "caseSensitive": false, "wholeWord": true, "regex": true },
+      "subject": "Fix the widget cache",
+      "body": "",
+      "authorName": "Kira Fixture",
+      "authorEmail": "fixture@kira-version.test",
+      "committerName": "Kira Fixture",
+      "committerEmail": "fixture@kira-version.test",
+      "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expect": { "supported": true, "fields": ["subject"] }
+    },
+    {
+      "name": "row7-regex-whole-word-subwidgetary-no-match",
+      "query": { "text": "widget", "caseSensitive": false, "wholeWord": true, "regex": true },
+      "subject": "subwidgetary refactor noted",
+      "body": "",
+      "authorName": "Kira Fixture",
+      "authorEmail": "fixture@kira-version.test",
+      "committerName": "Kira Fixture",
+      "committerEmail": "fixture@kira-version.test",
+      "sha": "cccccccccccccccccccccccccccccccccccccccc",
+      "expect": { "supported": true, "fields": [] }
+    },
+
+    {
+      "name": "row9-whole-word-hash-123",
+      "query": { "text": "#123", "caseSensitive": false, "wholeWord": true, "regex": false },
+      "subject": "fix (#123) parsing bug",
+      "body": "",
+      "authorName": "Kira Fixture",
+      "authorEmail": "fixture@kira-version.test",
+      "committerName": "Kira Fixture",
+      "committerEmail": "fixture@kira-version.test",
+      "sha": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "expect": { "supported": true, "fields": ["subject"] }
+    },
+    {
+      "name": "row9-whole-word-widget-cache-no-match",
+      "query": { "text": "#123", "caseSensitive": false, "wholeWord": true, "regex": false },
+      "subject": "Fix the widget cache",
+      "body": "",
+      "authorName": "Kira Fixture",
+      "authorEmail": "fixture@kira-version.test",
+      "committerName": "Kira Fixture",
+      "committerEmail": "fixture@kira-version.test",
+      "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expect": { "supported": true, "fields": [] }
+    },
+
+    {
+      "name": "probe10-hash-paren-partial-no-match",
+      "query": { "text": "(#12", "caseSensitive": false, "wholeWord": true, "regex": false },
+      "subject": "fix (#123) parsing bug",
+      "body": "",
+      "authorName": "Kira Fixture",
+      "authorEmail": "fixture@kira-version.test",
+      "committerName": "Kira Fixture",
+      "committerEmail": "fixture@kira-version.test",
+      "sha": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "expect": { "supported": true, "fields": [] }
+    },
+    {
+      "name": "probe10-version-dot-match",
+      "query": { "text": "v1.2", "caseSensitive": false, "wholeWord": true, "regex": false },
+      "subject": "tag v1.2.0 here",
+      "body": "",
+      "authorName": "Kira Fixture",
+      "authorEmail": "fixture@kira-version.test",
+      "committerName": "Kira Fixture",
+      "committerEmail": "fixture@kira-version.test",
+      "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expect": { "supported": true, "fields": ["subject"] }
+    },
+
+    {
+      "name": "sha-prefix-hit",
+      "query": { "text": "218224", "caseSensitive": false, "wholeWord": false, "regex": false },
+      "subject": "sha prefix commit",
+      "body": "",
+      "authorName": "Kira Fixture",
+      "authorEmail": "fixture@kira-version.test",
+      "committerName": "Kira Fixture",
+      "committerEmail": "fixture@kira-version.test",
+      "sha": "218224aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expect": { "supported": true, "fields": ["sha"] }
+    },
+    {
+      "name": "sha-prefix-below-floor-no-match",
+      "query": { "text": "218", "caseSensitive": false, "wholeWord": false, "regex": false },
+      "subject": "sha prefix commit",
+      "body": "",
+      "authorName": "Kira Fixture",
+      "authorEmail": "fixture@kira-version.test",
+      "committerName": "Kira Fixture",
+      "committerEmail": "fixture@kira-version.test",
+      "sha": "218224aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expect": { "supported": true, "fields": [] }
+    },
+
+    {
+      "name": "body-only-hit",
+      "query": { "text": "Zebra", "caseSensitive": false, "wholeWord": false, "regex": false },
+      "subject": "routine maintenance",
+      "body": "Renames the internal Zebra module.",
+      "authorName": "Kira Fixture",
+      "authorEmail": "fixture@kira-version.test",
+      "committerName": "Kira Fixture",
+      "committerEmail": "fixture@kira-version.test",
+      "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expect": { "supported": true, "fields": ["body"] }
+    },
+
+    {
+      "name": "empty-body-guard",
+      "query": { "text": "x*", "caseSensitive": false, "wholeWord": false, "regex": true },
+      "subject": "no letters here at all",
+      "body": "",
+      "authorName": "Kira Fixture",
+      "authorEmail": "fixture@kira-version.test",
+      "committerName": "Kira Fixture",
+      "committerEmail": "fixture@kira-version.test",
+      "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expect": {
+        "supported": true,
+        "fields": ["subject", "authorName", "authorEmail", "committerName", "committerEmail"]
+      }
+    },
+
+    {
+      "name": "regex-whitespace-class-matches-nbsp",
+      "query": { "text": "a\\sb", "caseSensitive": false, "wholeWord": false, "regex": true },
+      "subject": "a b",
+      "body": "",
+      "authorName": "Kira Fixture",
+      "authorEmail": "fixture@kira-version.test",
+      "committerName": "Kira Fixture",
+      "committerEmail": "fixture@kira-version.test",
+      "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expect": { "supported": true, "fields": ["subject"] }
+    },
+
+    {
+      "name": "regex-dot-excludes-cr-no-match",
+      "query": { "text": "a.b", "caseSensitive": false, "wholeWord": false, "regex": true },
+      "subject": "a\rb",
+      "body": "",
+      "authorName": "Kira Fixture",
+      "authorEmail": "fixture@kira-version.test",
+      "committerName": "Kira Fixture",
+      "committerEmail": "fixture@kira-version.test",
+      "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expect": { "supported": true, "fields": [] }
+    },
+
+    {
+      "name": "regex-p-is-identity-escape-not-unicode-class-match",
+      "query": { "text": "\\p{L}", "caseSensitive": false, "wholeWord": false, "regex": true },
+      "subject": "the p{L} suffix",
+      "body": "",
+      "authorName": "Kira Fixture",
+      "authorEmail": "fixture@kira-version.test",
+      "committerName": "Kira Fixture",
+      "committerEmail": "fixture@kira-version.test",
+      "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expect": { "supported": true, "fields": ["subject"] }
+    },
+    {
+      "name": "regex-p-is-identity-escape-not-unicode-class-no-match",
+      "query": { "text": "\\p{L}", "caseSensitive": false, "wholeWord": false, "regex": true },
+      "subject": "hello",
+      "body": "",
+      "authorName": "Kira Fixture",
+      "authorEmail": "fixture@kira-version.test",
+      "committerName": "Kira Fixture",
+      "committerEmail": "fixture@kira-version.test",
+      "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expect": { "supported": true, "fields": [] }
+    },
+
+    {
+      "name": "regex-unicode-escape-4digit",
+      "query": { "text": "\\u0041", "caseSensitive": true, "wholeWord": false, "regex": true },
+      "subject": "contains A here",
+      "body": "",
+      "authorName": "Kira Fixture",
+      "authorEmail": "fixture@kira-version.test",
+      "committerName": "Kira Fixture",
+      "committerEmail": "fixture@kira-version.test",
+      "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expect": { "supported": true, "fields": ["subject"] }
+    },
+
+    {
+      "name": "regex-wholeword-alternation-backtrack",
+      "query": { "text": "foo|foobar", "caseSensitive": false, "wholeWord": true, "regex": true },
+      "subject": "foobar",
+      "body": "",
+      "authorName": "Kira Fixture",
+      "authorEmail": "fixture@kira-version.test",
+      "committerName": "Kira Fixture",
+      "committerEmail": "fixture@kira-version.test",
+      "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expect": { "supported": true, "fields": ["subject"] }
+    },
+
+    {
+      "name": "unsupported-lookahead",
+      "query": { "text": "(?=x)", "caseSensitive": false, "wholeWord": false, "regex": true },
+      "subject": "anything",
+      "body": "",
+      "authorName": "Kira Fixture",
+      "authorEmail": "fixture@kira-version.test",
+      "committerName": "Kira Fixture",
+      "committerEmail": "fixture@kira-version.test",
+      "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expect": { "supported": false, "fields": [] }
+    },
+    {
+      "name": "unsupported-lookbehind",
+      "query": { "text": "(?<=x)", "caseSensitive": false, "wholeWord": false, "regex": true },
+      "subject": "anything",
+      "body": "",
+      "authorName": "Kira Fixture",
+      "authorEmail": "fixture@kira-version.test",
+      "committerName": "Kira Fixture",
+      "committerEmail": "fixture@kira-version.test",
+      "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expect": { "supported": false, "fields": [] }
+    },
+    {
+      "name": "unsupported-backreference",
+      "query": { "text": "(a)\\1", "caseSensitive": false, "wholeWord": false, "regex": true },
+      "subject": "aa",
+      "body": "",
+      "authorName": "Kira Fixture",
+      "authorEmail": "fixture@kira-version.test",
+      "committerName": "Kira Fixture",
+      "committerEmail": "fixture@kira-version.test",
+      "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expect": { "supported": false, "fields": [] }
+    }
+  ]
+}

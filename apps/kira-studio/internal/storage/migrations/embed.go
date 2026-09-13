@@ -1,0 +1,62 @@
+// Package migrations embeds the schema migration(s). The app has never shipped, so there is no
+// installed base with a partially-applied schema to preserve — what were five incremental steps
+// (0001_init through 0005_p28_tree_filters) are collapsed into the single 0001_init.sql that
+// produces the exact same final schema in one shot (verified table-by-table via
+// PRAGMA table_info/foreign_key_list/index_list against the old five-file sequence before they
+// were deleted).
+package migrations
+
+import (
+	"embed"
+	"sort"
+)
+
+//go:embed *.sql
+var files embed.FS
+
+// Migration is one forward-only schema step.
+type Migration struct {
+	Version int
+	Name    string
+	SQL     string
+}
+
+// names lists the embedded files in the exact order they must apply, rather than trusting
+// directory listing order.
+var names = []struct {
+	version int
+	name    string
+	file    string
+}{
+	{1, "init", "0001_init.sql"},
+	{2, "p8_windows", "0002_p8_windows.sql"},
+	{3, "p18_connection_ddl", "0003_p18_connection_ddl.sql"},
+	{4, "p18_auto_explain", "0004_p18_auto_explain.sql"},
+	{5, "p28_throttle", "0005_p28_throttle.sql"},
+	{6, "p4_collections", "0006_p4_collections.sql"},
+	{7, "p5_variables", "0007_p5_variables.sql"},
+	{8, "p8_response_history", "0008_p8_response_history.sql"},
+	{9, "p11_grpc", "0009_p11_grpc.sql"},
+	{10, "p12_api_rename", "0010_p12_api_rename.sql"},
+	{11, "p17_variable_description", "0011_p17_variable_description.sql"},
+	{12, "p18_environment_color", "0012_p18_environment_color.sql"},
+	{13, "p21r3_history_bytes_index", "0013_p21r3_history_bytes_index.sql"},
+	{14, "p22_window_mode", "0014_p22_window_mode.sql"},
+	{15, "p23_op_log_bytes", "0015_p23_op_log_bytes.sql"},
+	{16, "g1_git_clients", "0016_g1_git_clients.sql"},
+	{17, "g18_git_repo_settings", "0017_g18_git_repo_settings.sql"},
+}
+
+// All returns every migration in ascending version order.
+func All() ([]Migration, error) {
+	out := make([]Migration, 0, len(names))
+	for _, n := range names {
+		b, err := files.ReadFile(n.file)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, Migration{Version: n.version, Name: n.name, SQL: string(b)})
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Version < out[j].Version })
+	return out, nil
+}

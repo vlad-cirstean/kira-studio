@@ -1,0 +1,937 @@
+<script setup lang="ts">
+import type { ConnectionKind } from '@shared/domain/connection';
+import { splitSqlStatements, statementAtCursor } from '@shared/domain/sql-split';
+import type { ConsoleTabRecord } from '@shared/domain/tabs';
+import { pathTail } from '@shared/domain/tree';
+import { computed, nextTick, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue';
+import CodeMirrorHost from '../../editor/CodeMirrorHost.vue';
+import type { EditorLanguageId } from '../../editor/languages';
+import { dialectObjectFor } from '../../editor/languages';
+import { registerCommand } from '../../shortcuts/commands';
+import { connectionRecord } from '../../state/connections';
+import { openContextMenu } from '../../state/contextMenu';
+import {
+  cachedRelationsFor,
+  containerPathFor,
+  effectiveSchema,
+  ensureSchemaColumns,
+} from '../../state/schemaColumns';
+import { ddlSchemaFor, ensureDdl } from '../../state/schemas';
+import CodiconIcon from '../../theme/CodiconIcon.vue';
+import AppButton from '../../theme/primitives/AppButton.vue';
+import IconButton from '../../theme/primitives/IconButton.vue';
+import MessageStrip from '../../theme/primitives/MessageStrip.vue';
+import ViewChrome from '../../theme/primitives/ViewChrome.vue';
+import { wheelToHorizontal } from '../../wheelScroll';
+import CellEditorDock from '../shared/celleditor/CellEditorDock.vue';
+import SearchToolbar from '../shared/page/SearchToolbar.vue';
+import {
+  backslashEscapesFor,
+  dollarQuotingFor,
+  type SqlDialect,
+  sqlDialectFor,
+} from '../shared/sqlIdent';
+import { useConnectionGate } from '../shared/useConnectionGate';
+import ConsoleResultGrid from './ConsoleResultGrid.vue';
+import ConsoleSavedMenu from './ConsoleSavedMenu.vue';
+import { consoleCompletionSources } from './completion';
+import ExplainResultView from './ExplainResultView.vue';
+import { isExplainable } from './explain';
+import { canFormatConsole, formatConsoleText } from './format';
+import { consoleLintSource } from './lint';
+import { getPage } from './resultPages';
+import { type Match, pageSearchApi } from './search';
+import { sqlHoverSource } from './sqlHover';
+import {
+  clearAutoExplain,
+  closeOtherResults,
+  closeResult,
+  closeResultsToTheRight,
+  explain,
+  run,
+  runtime,
+  setActiveResult,
+  setNewResultSet,
+  setSearchOpen,
+  setText,
+  showAutoExplainPlan,
+  stop,
+  toggleSearchOpen,
+} from './state';
+
+// MainView.vue keys this component by tab.id — same discipline as DefinitionView.vue/DataView.vue.
+const props = defineProps<{ tab: ConsoleTabRecord }>();
+
+// A console tab hydrates without loading anything (there is nothing to load until a statement
+// runs), so no onLoad is passed.
+const { needsReconnect, onReconnectAndLoad } = useConnectionGate(() => props.tab);
+
+const rt = computed(() => runtime[props.tab.id]);
+const running = computed(() => rt.value?.status === 'running');
+
+const targetTail = computed(() => pathTail(props.tab.path));
+
+const connectionKind = computed<ConnectionKind | undefined>(
+  () => connectionRecord(props.tab.connectionId)?.kind,
+);
+
+const dialect = computed(() => sqlDialectFor(connectionKind.value));
+
+// F10/P21 round 1: the one place backslashEscapes/dollarQuoting are paired for every
+// splitSqlStatements/statementAtCursor call below — dollarQuoting is Postgres-only (a MySQL
+// identifier containing two `$` used to read as an unterminated dollar-quote open tag and swallow
+// the rest of the document into one statement).
+function splitOptionsFor(d: SqlDialect | undefined) {
+  return { backslashEscapes: backslashEscapesFor(d), dollarQuoting: dollarQuotingFor(d) };
+}
+
+// P18 addendum D23: realities #10's wart, fixed as a side effect of needing per-engine behaviour
+// at all — a Mongo shell command has been coloured by the SQL grammar since P5.5. `language`
+// (not a hardcoded "sql") now drives both highlighting and, via `completionSources`, what
+// autocomplete offers.
+const language = computed<EditorLanguageId>(() => {
+  if (connectionKind.value === 'mongodb') return 'mongo';
+  if (connectionKind.value === 'redis') return 'redis';
+  if (dialect.value !== undefined) return 'sql';
+  return 'plain';
+});
+
+// P18 (v1.1) C5/D5: a SQL console's own DDL document, loaded once per connection and re-parsed
+// only when its text actually changes (state/schemas.ts's own memoisation) — undefined dialect
+// (a non-SQL console) never fires the load at all. `documentDdlSchema` is the hand-authored
+// document alone — D4's completion still takes it as a separate, first-priority argument, so it
+// must not be pre-merged with the cache the way `ddlSchema` below is for lint/hover.
+watch(
+  () => [props.tab.connectionId, dialect.value] as const,
+  ([connectionId, d]) => {
+    if (connectionId && d) void ensureDdl(connectionId);
+  },
+  { immediate: true },
+);
+const documentDdlSchema = computed(() => ddlSchemaFor(props.tab.connectionId ?? '', dialect.value));
+
+// P22c D3: this console's own container (the schema/database its path resolves to) — the same
+// container consoleRelationNames (completion.ts) already resolves relation names against.
+const containerPath = computed(() =>
+  props.tab.connectionId ? containerPathFor(props.tab.connectionId, props.tab.path) : null,
+);
+
+// P22c D3/D5: warms this container's cached columns once per (connection, container) — a view's
+// own lifecycle hook, never a CompletionSource, never on a keystroke. Resolves from the Go-side
+// cache with no connection when one is cached (F7); a no-op when already loaded or in flight.
+watch(
+  () => [props.tab.connectionId, containerPath.value] as const,
+  ([connectionId, path]) => {
+    if (connectionId && path) void ensureSchemaColumns(connectionId, path);
+  },
+  { immediate: true },
+);
+
+// P22c D6: the effective schema diagnostics/hover read — the hand-authored document wins
+// wholesale when it has any tables; otherwise the cached columns for this container fill in.
+// Completion (below) reads the raw document and the raw cache separately instead (D4), since
+// schemaCompletionSource wants a namespace and lang-sql's alias resolution needs the tree's own
+// relation names as a distinct fallback layer — but this is the one place lint/hover read, so
+// they can never disagree with completion about what the console knows.
+const ddlSchema = computed(() =>
+  effectiveSchema(props.tab.connectionId ?? '', containerPath.value ?? '', documentDdlSchema.value),
+);
+
+// D21/D22: undefined for any kind with no console at all, which a mounted ConsoleView never
+// actually has (caps.sql gates the tab) — `language.value !== 'plain'` covers that without
+// special-casing kafka/sqs/s3. The SQL branch is undefined with no DDL document, no cached
+// columns and no tree relations for this connection — lang-sql's own keyword source stays in
+// charge, byte-for-byte today's behaviour with none of the three (P22c D4).
+const completionSources = computed(() => {
+  if (!connectionKind.value || language.value === 'plain') return undefined;
+  if (language.value === 'sql') {
+    const connectionId = props.tab.connectionId;
+    const cached =
+      connectionId && containerPath.value
+        ? cachedRelationsFor(connectionId, containerPath.value)
+        : [];
+    return consoleCompletionSources(
+      connectionKind.value,
+      connectionId,
+      props.tab.path,
+      documentDdlSchema.value,
+      connectionRecord(connectionId)?.database,
+      cached,
+    );
+  }
+  return consoleCompletionSources(connectionKind.value, props.tab.connectionId, props.tab.path);
+});
+
+// D24: one lexical linter per engine, scoped to this console's own text — undefined for any tab
+// this view never actually mounts for (caps.sql gates the tab), so `connectionKind.value` is
+// always postgres/mariadb/mysql/mongodb/redis in practice.
+const lintSource = computed(() => consoleLintSource(connectionKind.value, ddlSchema.value));
+
+// C6/D8: undefined with no DDL document (D5) or a non-SQL kind — CodeMirrorHost's own hoverSource
+// prop is additive, so every other console stays exactly as it was.
+const hoverSource = computed(() => {
+  const dialectObject = dialect.value && dialectObjectFor(dialect.value);
+  if (!dialectObject) return undefined;
+  return sqlHoverSource(dialectObject, ddlSchema.value);
+});
+
+const cursorPos = ref(0);
+const savedMenuOpen = ref(false);
+// D9: the console runtime has no actionError field (rt.status === 'error' means the last *run*
+// failed, F11) — a format failure is a client-side text operation with nowhere else to go, so it
+// gets its own component-local strip instead of a runtime-shape change.
+const formatError = ref<string | null>(null);
+// P19 D13: the two silent no-ops F19 named — a partial failure (some statements formatted, one
+// didn't) reads as a warn strip rather than err (the press still did something useful), and a
+// byte-identical result (an already-formatted document) says so explicitly rather than looking
+// like the button did nothing.
+const formatWarning = ref<string | null>(null);
+const formatNote = ref<string | null>(null);
+const canFormat = computed(() => canFormatConsole(connectionKind.value));
+
+// P21 round 2 performance finding 9: statementAtCursorText used to call statementAtCursor
+// directly, which re-splits the *entire* document (a quote/comment/dollar-quote state machine
+// over every character) on every access — and both this and canExplain/explainTooltip below are
+// template-bound, so it re-ran on every render, meaning every character typed *and every bare
+// caret move* triggered a full document split. docs/PERF.md's own "Console keystroke -> completion
+// popup" measurement (43.4ms p50 against a 50ms budget, the least headroom of any interaction in
+// the app) sits on exactly this path. Splitting the document is now its own computed, depending
+// only on the document text and dialect (not cursorPos) — a genuine keystroke still re-splits
+// once, unavoidably, but a caret move alone (arrow keys, a click) no longer does, since Vue's own
+// computed caching skips re-running this one when cursorPos is the only thing that changed.
+const splitStatementsForText = computed(() => {
+  if (dialect.value === undefined) return [];
+  return splitSqlStatements(props.tab.state.text, splitOptionsFor(dialect.value));
+});
+
+// P18 (v1.1) C12/D12: the statement the cursor is currently in, undefined for a non-SQL console —
+// the single source both the Explain button's disabled state and onExplain() itself read, so the
+// two can never disagree about which statement is "current". Now a cheap O(statement count) scan
+// over the already-split list above, not a re-split — this is the one that reruns on every caret
+// move, so it must stay cheap regardless of document size.
+const statementAtCursorText = computed<string | undefined>(() => {
+  if (dialect.value === undefined) return undefined;
+  const statements = splitStatementsForText.value;
+  const cursor = cursorPos.value;
+  for (const s of statements) {
+    if (cursor >= s.start && cursor <= s.end) return s.text;
+  }
+  return statements[statements.length - 1]?.text;
+});
+// D12: disabled-with-tooltip, not hidden — Explain applies to this *console*, just not to this
+// statement, which is a state (like the format button's own disabled-on-empty-text), not a
+// capability like Redis having no Format button at all.
+// P12 round 1 finding #5: explain() now shares run()'s own opId/status bookkeeping (so it's
+// cancellable and shows a busy state) — running must gate this button too, or starting Explain
+// while a run is already in flight would silently steal rt.opId out from under it, and the run's
+// own eventual response would then read as superseded and get its results discarded.
+const canExplain = computed(
+  () =>
+    !running.value &&
+    statementAtCursorText.value !== undefined &&
+    isExplainable(statementAtCursorText.value),
+);
+const explainTooltip = computed(() => {
+  if (running.value) return 'A run is already in progress';
+  return canExplain.value
+    ? 'Explain the statement under the cursor'
+    : 'Put the cursor in a SELECT or WITH statement to explain it';
+});
+// D9's own precedent: a component-local strip, not a runtime-shape change (the manual button's
+// own failure is shown; auto-explain's failure path — C14 — degrades silently instead, D19 rule 6).
+const explainError = ref<string | null>(null);
+
+// P18 (v1.1) C14/D19: the compact message the auto-explain strip shows — the row estimate (when
+// this dialect reports one) plus the first warn-severity issue, e.g. `Estimated to read 184,153
+// rows · full table scan on "orders" with a filter`. P12 round 1 finding #8: 'truncated' has no
+// plan to summarize — its own message says the check itself couldn't run, not that it found
+// nothing.
+const autoExplainMessage = computed(() => {
+  const state = rt.value?.autoExplain;
+  if (!state) return '';
+  if (state.kind === 'truncated') {
+    return "This query's plan was too large to check for problems — it will still run normally.";
+  }
+  const worst = state.plans[state.worstIndex]?.plan;
+  if (!worst) return '';
+  const parts: string[] = [];
+  if (worst.estimatedRowsRead !== undefined) {
+    parts.push(`Estimated to read ${worst.estimatedRowsRead.toLocaleString()} rows`);
+  }
+  const firstWarning = worst.issues.find((i) => i.severity === 'warn');
+  if (firstWarning) parts.push(firstWarning.message);
+  return parts.join(' · ') || 'This query may be expensive to run';
+});
+const canShowAutoExplainPlan = computed(() => rt.value?.autoExplain?.kind === 'plans');
+
+function onShowAutoExplainPlan(): void {
+  showAutoExplainPlan(props.tab.id);
+}
+// Typed as the bare exposed shape (rather than InstanceType<typeof CodeMirrorHost>) so this ref
+// doesn't read as a type-only use of the CodeMirrorHost import — same convention as
+// ConsoleSavedMenu.vue's promptInput/views/shared/page/SearchToolbar.vue's own template ref.
+const editorHost = ref<{ focus: () => void; setCursor: (pos: number) => void } | null>(null);
+// The saved-queries popover unmounts its own focused entry on close (ConsoleSavedMenu's apply()
+// closes right after loading), and nothing else in the tree reclaims focus — without this the
+// editor is left unfocused (DOM focus falls to <body>) right after a saved query loads, even
+// though the whole point of loading one is to keep working in the editor.
+function onSavedMenuClose(): void {
+  savedMenuOpen.value = false;
+  void nextTick(() => editorHost.value?.focus());
+}
+
+// P18 addendum D20: the editor's own doc is a shallowRef, not `tab.state.text` directly — binding
+// the template to the tab's reactive text made this view's whole render effect (toolbar, strips,
+// status line, every mounted ConsoleResultGrid) re-run on every keystroke, for no benefit
+// CodeMirrorHost's own equality-guarded `doc` watcher didn't already provide. `lastEmitted` is a
+// plain variable, not a ref — comparing against it is what lets an external write (a saved-query
+// load, tab hydration) still reach the editor while a self-triggered echo does not.
+const localDoc = shallowRef(props.tab.state.text);
+let lastEmitted = props.tab.state.text;
+
+// P12 round 1 finding #7: the three strips below are stale the moment the text they describe is
+// gone — not only on a keystroke (onDocChange), but also on any *external* text replacement
+// (ConsoleSavedMenu's apply(), this view's own onFormat() below), both of which call setText()
+// directly and go through CodeMirrorHost's external-sync path, which deliberately never re-emits
+// update:doc (the watcher below is what notices those instead). Shared so neither path can drift.
+function resetStalePreviewState(): void {
+  formatError.value = null;
+  formatWarning.value = null;
+  formatNote.value = null;
+  explainError.value = null;
+  // D19: the auto-explain strip clears on the next document edit, same as the two above.
+  clearAutoExplain(props.tab.id);
+}
+
+function onDocChange(text: string): void {
+  lastEmitted = text;
+  setText(props.tab.id, text);
+  resetStalePreviewState();
+}
+
+watch(
+  () => props.tab.state.text,
+  (text) => {
+    if (text === lastEmitted) return;
+    localDoc.value = text;
+    resetStalePreviewState();
+  },
+);
+
+// Item 4 (regression pass, task batch P46-4): the console has no Refresh button — Run/Run all are
+// its own two start verbs (see the #toolbar comment above) — so they're what now carries the
+// gate's own job: pressing either on a restored/disconnected tab reconnects first, exactly what
+// the removed "Reconnect & load" gate used to require a separate press for.
+async function ensureConnectedForRun(): Promise<void> {
+  if (needsReconnect.value) await onReconnectAndLoad();
+}
+
+function runStatement(): void {
+  // P12 round 2 finding #4: the toolbar's Run button is disabled while running (below), but the
+  // command (⌘↵/palette) had no such gate — two overlapping runs raced explainOpId/opId bookkeeping.
+  if (running.value) return;
+  const stmt = statementAtCursor(
+    props.tab.state.text,
+    cursorPos.value,
+    splitOptionsFor(dialect.value),
+  );
+  if (!stmt) return;
+  void (async () => {
+    await ensureConnectedForRun();
+    await run(props.tab.id, [stmt.text]);
+  })();
+}
+
+function runAll(): void {
+  if (running.value) return;
+  const statements = splitSqlStatements(props.tab.state.text, splitOptionsFor(dialect.value)).map(
+    (s) => s.text,
+  );
+  if (statements.length === 0) return;
+  void (async () => {
+    await ensureConnectedForRun();
+    await run(props.tab.id, statements);
+  })();
+}
+
+function onStop(): void {
+  stop(props.tab.id);
+}
+
+// P19 D12(3): maps the caret across the reformat by statement INDEX, not offset — formatting
+// rewrites every offset in the document, so an offset means nothing afterwards, whereas the
+// statement the user was working in is exactly what they expect to still be under the caret (and
+// what Run statement itself reads, P13 OQ-2). Exact whenever the statement count is preserved,
+// which D13 guarantees (a statement Format couldn't format is emitted verbatim, never dropped).
+function onFormat(): void {
+  const kind = connectionKind.value;
+  if (!kind || !canFormat.value) return;
+  const splitOptions = splitOptionsFor(dialect.value);
+  const before = splitSqlStatements(props.tab.state.text, splitOptions);
+  const beforeIndex = before.findIndex(
+    (s) => cursorPos.value >= s.start && cursorPos.value <= s.end,
+  );
+  const originalText = props.tab.state.text;
+  void (async () => {
+    const result = await formatConsoleText(kind, originalText);
+    // Explicit, not left to the watch() above alone: an already-formatted document formats to
+    // byte-identical text, which never triggers that watcher (props.tab.state.text doesn't
+    // change) — Format succeeding is still a "next action" that should clear a stale explain/
+    // auto-explain strip even when the text itself doesn't move (P12 round 1 finding #7).
+    resetStalePreviewState();
+    if (!result.ok) {
+      formatError.value = result.reason ?? 'could not format this query';
+      return;
+    }
+    setText(props.tab.id, result.text);
+    if (beforeIndex >= 0) {
+      const after = splitSqlStatements(result.text, splitOptions);
+      const target = after[beforeIndex];
+      void nextTick(() => editorHost.value?.setCursor(target?.start ?? 0));
+    }
+    // D13: set only after setText's own reactive round trip has settled — the
+    // props.tab.state.text watcher above also calls resetStalePreviewState() whenever the text
+    // actually changed (a partial-success/full-success reformat always does), which would
+    // otherwise wipe these strips the instant they're set.
+    void nextTick(() => {
+      if (result.failures.length > 0) {
+        const first = result.failures[0];
+        if (first) {
+          const formattedCount = before.length - result.failures.length;
+          formatWarning.value = `Formatted ${formattedCount} of ${before.length} statements — statement ${first.index + 1} could not be parsed: ${first.reason}`;
+        }
+      } else if (result.text === originalText) {
+        // F19's other silent no-op: keywordCase: 'preserve' (P13 D4) means Format only ever
+        // touches whitespace — pressing it on an already-indented document changes nothing, and
+        // without this nothing distinguished "already formatted" from "the button is dead".
+        // P22b D13: reworded to name the reason rather than assert a bare null result — once D12
+        // fixed the semicolon-deletion bug, this note is the whole remaining substance of "Format
+        // looks broken" (F19): the difference between "the button is dead" and "the button ran
+        // and there was nothing to change".
+        formatNote.value =
+          'Already formatted — indentation only; keywords keep the case you typed (ClickHouse identifiers).';
+      }
+    });
+  })();
+}
+
+function onExplain(): void {
+  const kind = connectionKind.value;
+  const stmt = statementAtCursorText.value;
+  if (!kind || !stmt || !canExplain.value) return;
+  void (async () => {
+    await ensureConnectedForRun();
+    const result = await explain(props.tab.id, kind, stmt);
+    explainError.value = result.ok ? null : result.reason;
+  })();
+}
+
+// --- search: the shared find toolbar over the active result set (P40 D8/D9). Mirrors
+// KeyValueView.vue's own onToggleSearch/onCloseSearch discipline exactly. -----------------------
+function onToggleSearch(): void {
+  toggleSearchOpen(props.tab.id);
+}
+function onCloseSearch(): void {
+  setSearchOpen(props.tab.id, false);
+}
+
+const resultGridRef = ref<{
+  goToMatch: (match: Match) => void;
+  expandAll: () => void;
+  collapseAll: () => void;
+} | null>(null);
+// Item (regression pass, task batch P46-4): expand-all/collapse-all only make sense while the
+// active result is document-shaped (Mongo) — same getPage(key)?.kind check iconForResult below
+// already makes, just gating a different pair of buttons instead of an icon.
+const activeResultIsDocument = computed(
+  () => getPage(rt.value?.activeKey ?? '')?.kind === 'document',
+);
+// P18 D17: the find toolbar resolves a Page (search.ts's activePage) and a plan result set is not
+// one — gated off here the same way the expand/collapse-all pair above is gated on document-ness,
+// rather than left to just silently find nothing.
+const activeResultIsPlan = computed(
+  () => rt.value?.results.find((r) => r.key === rt.value?.activeKey)?.kind === 'plan',
+);
+function onExpandAllResults(): void {
+  resultGridRef.value?.expandAll();
+}
+function onCollapseAllResults(): void {
+  resultGridRef.value?.collapseAll();
+}
+function onGoToMatch(match: Match): void {
+  resultGridRef.value?.goToMatch(match);
+}
+
+let unregisterCommands: Array<() => void> = [];
+
+onMounted(() => {
+  unregisterCommands = [
+    registerCommand('view.run', runStatement),
+    registerCommand('view.run-all', runAll),
+    registerCommand('view.format', onFormat),
+    registerCommand('view.explain', onExplain),
+    registerCommand('view.find', onToggleSearch),
+  ];
+});
+
+onUnmounted(() => {
+  for (const off of unregisterCommands) off();
+});
+
+// P42 D6: a leading icon per result set's own page kind — the only thing that says which kind a
+// chip holds once a Mongo or Redis console can produce more than one kind of result set at once.
+const RESULT_KIND_ICON: Record<string, string> = {
+  tabular: 'table',
+  document: 'json',
+  keyvalue: 'symbol-key',
+};
+// P18 D17: a plan result set has no Page at all (getPage(key) resolves undefined), so its icon is
+// resolved from ConsoleResult.kind directly rather than through resultPages.ts's own map.
+function iconForResult(key: string): string {
+  if (rt.value?.results.find((r) => r.key === key)?.kind === 'plan') return 'list-tree';
+  return RESULT_KIND_ICON[getPage(key)?.kind ?? ''] ?? 'table';
+}
+
+function onResultMiddleClick(key: string): void {
+  closeResult(props.tab.id, key);
+}
+
+// P42 D8: the same three items TabStrip.vue's own tab row leads with, over one tab's result sets
+// instead of the app's whole tab list — disabled rather than hidden when they would be a no-op.
+function onResultContextMenu(e: MouseEvent, key: string, index: number): void {
+  const total = rt.value?.results.length ?? 0;
+  openContextMenu(e, [
+    {
+      type: 'item',
+      id: 'close',
+      label: 'Close',
+      icon: 'close',
+      run: () => closeResult(props.tab.id, key),
+    },
+    {
+      type: 'item',
+      id: 'close-other-results',
+      label: 'Close others',
+      disabled: total <= 1,
+      run: () => closeOtherResults(props.tab.id, key),
+    },
+    {
+      type: 'item',
+      id: 'close-results-to-the-right',
+      label: 'Close to the right',
+      disabled: index >= total - 1,
+      run: () => closeResultsToTheRight(props.tab.id, key),
+    },
+  ]);
+}
+
+const resultStripRef = ref<HTMLElement | null>(null);
+function onResultStripWheel(e: WheelEvent): void {
+  if (wheelToHorizontal(resultStripRef.value, e)) e.preventDefault();
+}
+
+const statusLine = computed(() => {
+  const r = rt.value;
+  if (!r) return '';
+  if (r.status === 'running') return 'Running…';
+  if (r.status === 'cancelled') return 'Cancelled';
+  if (r.status === 'idle' && r.results.length > 0) {
+    return `${r.results.length} result${r.results.length === 1 ? '' : 's'}`;
+  }
+  return '';
+});
+</script>
+
+<template>
+  <div class="console-view" data-testid="console-view" :data-path="tab.path">
+    <ViewChrome
+      :tab="tab"
+      icon="terminal"
+      :name="targetTail?.name ?? tab.path ?? 'Console'"
+      target-testid="console-target"
+      refresh-testid="console-refresh"
+      stop-testid="console-stop"
+      :can-refresh="needsReconnect"
+      :can-stop="running"
+      @refresh="onReconnectAndLoad"
+      @stop="onStop"
+    >
+      <!-- The console's search_path/schema control and the "writes go to production" chip from
+           Console.html both need tracked data this app does not have yet (no per-console
+           schema, no per-connection write-warning flag) — skipped rather than faked. Refresh
+           itself still isn't a third start verb (Run/Run all cover that, and now reconnect on
+           their own — see runStatement/runAll above): it stays disabled whenever there's nothing
+           to reconnect, and is only ever the reconnect trigger while gated, so it's never a dead,
+           permanently-grey button sitting in the rail for no reason a user can see. -->
+      <template #toolbar>
+        <AppButton
+          icon="play"
+          variant="primary"
+          data-testid="console-run-statement"
+          :disabled="running"
+          v-tooltip="'Run the statement under the cursor'"
+          @click="runStatement"
+        >
+          Run
+        </AppButton>
+        <AppButton
+          icon="run-all"
+          data-testid="console-run-all"
+          :disabled="running"
+          v-tooltip="'Run every statement in the editor'"
+          @click="runAll"
+        >
+          Run all
+        </AppButton>
+        <AppButton
+          v-if="canFormat"
+          icon="indent"
+          data-testid="console-format"
+          :disabled="!tab.state.text.trim()"
+          v-tooltip="'Format the query text'"
+          @click="onFormat"
+        >
+          Format
+        </AppButton>
+        <!-- P18 D12: SQL-only (unlike Format, which also covers the Mongo console) — absent, not
+             disabled, on a non-SQL console; disabled-with-tooltip (not hidden) on a SQL console
+             whose statement at the cursor isn't a SELECT/WITH, since Explain applies to this
+             console and just not to this particular statement. -->
+        <AppButton
+          v-if="dialect"
+          icon="list-tree"
+          data-testid="console-explain"
+          :disabled="!canExplain"
+          v-tooltip="explainTooltip"
+          @click="onExplain"
+        >
+          Explain
+        </AppButton>
+        <div class="sep"></div>
+        <!-- P40 D6, default re-flipped back on P46-2: append a new result set instead of replacing
+             the current ones. On (appending) by default and per-tab, shown unpressed — pressing
+             this is what makes a run replace the last result set instead of stacking a new one,
+             so the pressed/"active" look tracks *replace* mode, the inverse of the stored flag. -->
+        <IconButton
+          icon="layers"
+          :active="!tab.state.newResultSet"
+          data-testid="console-new-result-toggle"
+          v-tooltip="
+            tab.state.newResultSet
+              ? 'Running adds a new result set — click to replace instead'
+              : 'Running replaces the current result sets — click to add a new one instead'
+          "
+          @click="setNewResultSet(tab.id, !tab.state.newResultSet)"
+        />
+        <div class="sep"></div>
+        <div class="saved-anchor">
+          <AppButton
+            icon="bookmark"
+            data-testid="console-saved-toggle"
+            v-tooltip="'Saved queries'"
+            @click="savedMenuOpen = !savedMenuOpen"
+          >
+            Saved queries
+          </AppButton>
+          <!-- PopoverPanel.vue anchors itself to its own DOM parent (see its own comment) — this menu
+               used to render several levels away from its trigger button (a direct child of
+               ViewChrome's default slot, down by .editor-body), so it opened pinned to a corner
+               of the window instead of under "Saved queries" (task #58). Wrapping it here next to
+               its button, the same shape every other toolbar menu already uses, fixes that. -->
+          <ConsoleSavedMenu v-if="savedMenuOpen" :tab-id="tab.id" @close="onSavedMenuClose" />
+        </div>
+        <div class="sep"></div>
+        <!-- D17: the find toolbar resolves a Page — a plan result set is not one, so the button
+             is gated off the same way expand/collapse-all above is gated on document-ness. -->
+        <IconButton
+          v-if="!activeResultIsPlan"
+          icon="search"
+          :active="!!rt?.searchOpen"
+          v-tooltip="'Find in the active result set'"
+          data-testid="console-search"
+          @click="onToggleSearch"
+        />
+        <!-- The autocommit/transaction segmented control from Console.html needs a per-console
+             transaction-mode field that doesn't exist anywhere in tab or connection state —
+             skipped rather than wiring a control with nowhere to store its value. -->
+      </template>
+
+      <template #strips>
+        <MessageStrip v-if="rt?.status === 'error' && rt.error" tone="err" data-testid="console-error">
+          {{ rt.error.message }}
+        </MessageStrip>
+        <MessageStrip v-if="formatError" tone="err" data-testid="console-format-error">
+          {{ formatError }}
+        </MessageStrip>
+        <MessageStrip v-if="formatWarning" tone="warn" data-testid="console-format-warning">
+          {{ formatWarning }}
+        </MessageStrip>
+        <MessageStrip v-if="formatNote" tone="note" data-testid="console-format-note">
+          {{ formatNote }}
+        </MessageStrip>
+        <MessageStrip v-if="explainError" tone="err" data-testid="console-explain-error">
+          {{ explainError }}
+        </MessageStrip>
+        <!-- P18 D19: warns, never blocks — the query underneath this strip already ran (or is
+             running). "Show plan" pushes the plan this strip already parsed, no second round trip. -->
+        <MessageStrip v-if="rt?.autoExplain" tone="warn" data-testid="console-auto-explain">
+          <span class="auto-explain-message">{{ autoExplainMessage }}</span>
+          <button
+            v-if="canShowAutoExplainPlan"
+            type="button"
+            class="auto-explain-action"
+            data-testid="console-auto-explain-show-plan"
+            @click="onShowAutoExplainPlan"
+          >
+            Show plan
+          </button>
+        </MessageStrip>
+      </template>
+
+      <!-- Item 4/2 (regression pass, task batch P46-3/4): every other gated view replaced its
+           whole ViewChrome (header, toolbar and all) with the reconnect gate — item 4 fixed that
+           inconsistency for them, and the console never had a Refresh button to carry the same
+           reconnect-or-continue job, only Run/Run all (see runStatement/runAll above). With those
+           two now reconnecting on demand, the console's own separate "Reconnect & load" gate had
+           nothing left to gate — the editor already stayed visible behind it (item 2), and running
+           a restored tab's query now reconnects itself, so the button was just a second, redundant
+           way to do what pressing Run already does. Removed rather than kept as a no-op. -->
+      <div class="editor-body">
+        <CodeMirrorHost
+          ref="editorHost"
+          :doc="localDoc"
+          :language="language"
+          :sql-dialect="dialect"
+          :read-only="false"
+          :autocomplete="language !== 'plain'"
+          :completion-sources="completionSources"
+          :lint-source="lintSource"
+          :hover-source="hoverSource"
+          keep-selection-on-external-sync
+          @update:doc="onDocChange"
+          @update:cursor="cursorPos = $event"
+        />
+      </div>
+
+      <div v-if="rt && rt.results.length > 0" class="results-body" data-testid="console-results">
+        <!-- Console.html's own console body shows one result at a time behind a strip, rather
+             than stacking every statement's page — D2. Each chip is a result *set*, addressed by
+             its stable key (state.ts's resultPageKey/nextSeq), not by position, so closing one
+             doesn't re-key its siblings. -->
+        <div class="result-strip-row p-toolbar">
+          <div
+            ref="resultStripRef"
+            class="result-strip"
+            data-testid="console-result-strip"
+            @wheel="onResultStripWheel"
+          >
+            <button
+              v-for="(result, i) in rt.results"
+              :key="result.key"
+              type="button"
+              class="p-tab result-tab"
+              :class="{ 'is-active': result.key === rt.activeKey }"
+              data-testid="console-result-tab"
+              :data-active="result.key === rt.activeKey"
+              @click="setActiveResult(tab.id, result.key)"
+              @auxclick.middle="onResultMiddleClick(result.key)"
+              @contextmenu.prevent="onResultContextMenu($event, result.key, i)"
+            >
+              <CodiconIcon :name="iconForResult(result.key)" :size="13" class="result-tab-icon" />
+              <span class="result-tab-title">Result {{ i + 1 }}</span>
+              <span
+                class="result-close"
+                role="button"
+                aria-label="Close result"
+                data-testid="console-result-close"
+                @click.stop="closeResult(tab.id, result.key)"
+              >
+                <CodiconIcon name="close" :size="11" />
+              </span>
+            </button>
+          </div>
+          <span class="p-sm muted p-push" data-testid="console-status">{{ statusLine }}</span>
+          <!-- Item (regression pass, task batch P46-4): only shown for a document-shaped (Mongo)
+               result — DocumentView.vue's own expand-all/collapse-all pair, needed here now that
+               a document row's only other way to reveal its full body (the cell editor dock) is
+               gone as a redundant second copy of this same DocumentTree (P42 D11). -->
+          <template v-if="activeResultIsDocument">
+            <IconButton
+              icon="expand-all"
+              v-tooltip="'Expand all'"
+              data-testid="console-expand-all"
+              @click="onExpandAllResults"
+            />
+            <IconButton
+              icon="collapse-all"
+              v-tooltip="'Collapse all'"
+              data-testid="console-collapse-all"
+              @click="onCollapseAllResults"
+            />
+          </template>
+        </div>
+        <SearchToolbar
+          v-if="rt.searchOpen && !activeResultIsPlan"
+          :tab-id="tab.id"
+          testid-prefix="console-"
+          row-noun="rows"
+          :api="pageSearchApi"
+          @go-to-match="onGoToMatch"
+          @close="onCloseSearch"
+        />
+        <div class="result-grid">
+          <!-- D17: a plan result set renders through its own view — reusing the strip/close/
+               eviction machinery above, but never ConsoleResultGrid, which resolves a Page that a
+               plan result set does not have. -->
+          <ExplainResultView v-if="rt.activeKey && activeResultIsPlan" :page-key="rt.activeKey" />
+          <ConsoleResultGrid
+            v-else-if="rt.activeKey"
+            ref="resultGridRef"
+            :page-key="rt.activeKey"
+            :tab-id="tab.id"
+            :connection-id="tab.connectionId"
+            :path="tab.path"
+          />
+        </div>
+      </div>
+
+      <!-- P40 D11: a console result has no addressable row/table to write back to at all — a
+           viewer, not an editor refusing this particular cell (F12/F13). -->
+      <CellEditorDock :tab-id="tab.id" :read-only="true" />
+    </ViewChrome>
+  </div>
+</template>
+
+<style scoped>
+.console-view {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.saved-anchor {
+  position: relative;
+}
+
+/* p-strip.err already carries the error's own look; only the parent's error message text needs
+   pre-wrap so a long adapter error still wraps instead of scrolling. */
+.p-strip.err {
+  white-space: pre-wrap;
+  font-family: var(--kira-font-data);
+}
+
+.auto-explain-message {
+  flex: 1;
+}
+
+.auto-explain-action {
+  border: none;
+  background: none;
+  padding: 0;
+  color: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+  font-size: inherit;
+  flex-shrink: 0;
+}
+
+.editor-body {
+  flex: 1 1 40%;
+  min-height: 0;
+  border-bottom: var(--kira-border-width) solid var(--kira-border);
+}
+
+/* P40 D7: flex:1 (not a fixed height) so the active result's grid always reaches the panel's
+   bottom edge — DataView.vue's own .grid-area rule (F1: the fixed-height .result-panel this used
+   to be left an empty band below the last row whenever a result had fewer rows than that height). */
+.results-body {
+  flex: 1 1 60%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* One .p-tab chip per result set (P40 D3) — the same "chip with a nested close span" markup
+   TabStrip.vue's own tab strip uses, since a result set *is* a tab in every way that matters
+   here. The trailing status text keeps data-testid="console-status": the "N results" /
+   "Running…" / "Cancelled" line the deleted .status-line bar used to own (D4, wording
+   revised on the P46-2 regression pass — "result sets" read as a second, unrelated concept
+   sitting right next to a strip of chips already called "results" everywhere else in the UI).
+   P42 D6: a step smaller than the app's primary tabs (--kira-h-sm/--kira-t-xs vs. --kira-h-md/
+   --kira-t-sm) — the only way a secondary, in-panel strip actually reads as secondary — and
+   scrollable under the wheel once new-result-by-default (D5) means a working session accumulates
+   chips. No .p-tab-rail: every result set in one console belongs to the same connection, so a
+   colour rail here would carry no information the main tab strip's own rail doesn't already.
+   Item 6: the status text used to sit *inside* the same scrolling flex row as the chips
+   themselves, `.p-push`ed to the far end of that row's *content* — once enough chips
+   accumulated to overflow the strip, that end sat off past the visible edge, so the status text
+   (the running/result-count readout) scrolled out of view along with the chips that pushed past
+   it. Splitting the chips into their own scrollable child, sized to the *remaining* width by
+   `flex: 1; min-width: 0`, keeps `.result-strip-row` itself unscrolled and exactly toolbar-width —
+   `.p-push`'s margin-left: auto now pushes within that fixed-width row, not the chips' own
+   scrolling content, so the status text stays pinned in view no matter how many chips pile up. */
+.result-strip-row {
+  gap: var(--kira-s-2);
+}
+
+.result-strip {
+  display: flex;
+  align-items: center;
+  gap: var(--kira-s-2);
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.result-strip::-webkit-scrollbar {
+  display: none;
+}
+
+.result-tab {
+  height: var(--kira-h-sm);
+  font-size: var(--kira-t-xs);
+  max-width: 140px;
+}
+
+.result-tab:hover:not(.is-active) {
+  background: var(--kira-hover);
+}
+
+.result-tab-icon {
+  flex-shrink: 0;
+}
+
+.result-tab-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.result-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+  border-radius: var(--kira-radius-sm);
+  opacity: 0;
+}
+
+.result-tab:hover .result-close,
+.result-tab.is-active .result-close {
+  opacity: 1;
+}
+
+.result-close:hover {
+  background: var(--kira-hover);
+}
+
+.result-grid {
+  flex: 1;
+  min-height: 0;
+}
+</style>

@@ -1,0 +1,380 @@
+package gitclient
+
+import (
+	"bytes"
+	"context"
+	"errors"
+	"io"
+	"os"
+	"testing"
+	"time"
+)
+
+// --- fakes shared by this file -------------------------------------------------------------
+
+type fakeLocator struct {
+	path   string
+	probed []string
+	found  bool
+}
+
+func (f fakeLocator) Locate(string) (string, []string, bool) { return f.path, f.probed, f.found }
+
+type fakeRunner struct {
+	// keyed by the joined Args, so a test can script different output per subcommand if needed.
+	result Result
+	err    error
+	calls  int
+	// startCtx, when set, blocks Start until it observes ctx.Done() — the seam
+	// TestDiscovery_VersionProbeTimesOut needs to prove D5's timeout without a real 5s sleep.
+	blockOnCtx bool
+}
+
+func (f *fakeRunner) Start(ctx context.Context, gitPath string, spec Spec) (Process, error) {
+	f.calls++
+	if f.blockOnCtx {
+		<-ctx.Done()
+		return nil, ctx.Err()
+	}
+	if f.err != nil {
+		return nil, f.err
+	}
+	return &fakeProcess{result: f.result}, nil
+}
+
+// fakeProcess is the canned-bytes Process discovery_test.go's fakes construct — Run(ctx, r, ...)
+// drains it exactly like a real execProcess.
+type fakeProcess struct {
+	result Result
+}
+
+func (p *fakeProcess) Stdout() io.ReadCloser { return io.NopCloser(bytes.NewReader(p.result.Stdout)) }
+func (p *fakeProcess) Stdin() io.WriteCloser { return nil }
+func (p *fakeProcess) Wait() (Result, error) {
+	return Result{Stderr: p.result.Stderr, ExitCode: p.result.ExitCode}, nil
+}
+func (p *fakeProcess) Close() error { return nil }
+
+type fakeClock struct{ now time.Time }
+
+func (f *fakeClock) Now() time.Time          { return f.now }
+func (f *fakeClock) advance(d time.Duration) { f.now = f.now.Add(d) }
+
+// --- parseGitVersion / versionLess -----------------------------------------------------------
+
+func TestParseGitVersion(t *testing.T) {
+	cases := []struct {
+		in     string
+		want   string
+		wantOk bool
+	}{
+		{"git version 2.42.0\n", "2.42.0", true},
+		{"git version 2.42.0 (Apple Git-135)\n", "2.42.0", true},
+		{"not git output at all\n", "", false},
+		{"", "", false},
+	}
+	for _, c := range cases {
+		got, ok := parseGitVersion(c.in)
+		if got != c.want || ok != c.wantOk {
+			t.Errorf("parseGitVersion(%q) = (%q, %v), want (%q, %v)", c.in, got, ok, c.want, c.wantOk)
+		}
+	}
+}
+
+func TestVersionLess(t *testing.T) {
+	cases := []struct {
+		a, b string
+		want bool
+	}{
+		{"2.37.9", "2.38.0", true},
+		{"2.38.0", "2.38.0", false},
+		{"2.39.0", "2.38.0", false},
+		{"2.38.0.windows.1", "2.38.0", false},
+		{"1.9.9", "2.38.0", true},
+	}
+	for _, c := range cases {
+		if got := versionLess(c.a, c.b); got != c.want {
+			t.Errorf("versionLess(%q, %q) = %v, want %v", c.a, c.b, got, c.want)
+		}
+	}
+}
+
+// --- Discovery.Status: classification ---------------------------------------------------------
+
+func TestDiscovery_NotFound(t *testing.T) {
+	d := NewDiscovery(fakeLocator{found: false, probed: []string{"a", "b"}}, &fakeRunner{}, &fakeClock{})
+	status := d.Status(context.Background(), "")
+	if status.Kind != "notFound" {
+		t.Fatalf("Kind = %q, want notFound", status.Kind)
+	}
+	if len(status.Probed) != 2 {
+		t.Fatalf("Probed = %v, want the locator's own list", status.Probed)
+	}
+}
+
+func TestDiscovery_TooOld(t *testing.T) {
+	runner := &fakeRunner{result: Result{ExitCode: 0, Stdout: []byte("git version 2.30.1\n")}}
+	d := NewDiscovery(fakeLocator{found: true, path: "/usr/bin/git"}, runner, &fakeClock{})
+	status := d.Status(context.Background(), "")
+	if status.Kind != "tooOld" {
+		t.Fatalf("Kind = %q, want tooOld", status.Kind)
+	}
+	if status.Detected != "2.30.1" || status.Required != RequiredVersion || status.SettingID != GitPathSettingID {
+		t.Fatalf("status = %+v, want detected/required/settingId populated", status)
+	}
+}
+
+func TestDiscovery_OK(t *testing.T) {
+	runner := &fakeRunner{result: Result{ExitCode: 0, Stdout: []byte("git version 2.42.0\n")}}
+	d := NewDiscovery(fakeLocator{found: true, path: "/opt/homebrew/bin/git"}, runner, &fakeClock{})
+	status := d.Status(context.Background(), "")
+	if status.Kind != "ok" || status.Version != "2.42.0" || status.Path != "/opt/homebrew/bin/git" {
+		t.Fatalf("status = %+v, want ok/2.42.0/opt/homebrew/bin/git", status)
+	}
+}
+
+func TestDiscovery_UnusableOnSpawnFailure(t *testing.T) {
+	runner := &fakeRunner{err: errors.New("permission denied")}
+	d := NewDiscovery(fakeLocator{found: true, path: "/usr/bin/git"}, runner, &fakeClock{})
+	status := d.Status(context.Background(), "")
+	if status.Kind != "unusable" || status.Reason == "" {
+		t.Fatalf("status = %+v, want unusable with a reason", status)
+	}
+}
+
+// TestDiscovery_VersionProbeTimesOut proves D5 without a real 5s sleep: probe's own
+// context.WithTimeout(ctx, versionProbeTimeout) inherits the sooner of the two deadlines, so a
+// caller ctx with a short timeout of its own makes the fake's blocked Start observe Done() (and
+// DeadlineExceeded) almost immediately, well under versionProbeTimeout itself.
+func TestDiscovery_VersionProbeTimesOut(t *testing.T) {
+	runner := &fakeRunner{blockOnCtx: true}
+	d := NewDiscovery(fakeLocator{found: true, path: "/usr/bin/git"}, runner, &fakeClock{})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
+	defer cancel()
+
+	start := time.Now()
+	status := d.Status(ctx, "")
+	if elapsed := time.Since(start); elapsed >= versionProbeTimeout {
+		t.Fatalf("Status took %v, want well under versionProbeTimeout (%v)", elapsed, versionProbeTimeout)
+	}
+	if status.Kind != "unusable" || status.Reason == "" {
+		t.Fatalf("status = %+v, want unusable with a reason", status)
+	}
+}
+
+// TestDiscovery_CancelledCallerContextIsNotCachedAsUnusable proves G31 round-2 architecture/
+// security review finding #1 — a regression from ARCH-10 (c5ea760): a caller cancelling its own
+// ctx (not probe's internal versionProbeTimeout) while the --version probe is in flight must not
+// poison the 30s cache with an "unusable" verdict for every OTHER connection's app.init/repo.open.
+// Without the fix, fakeRunner's blockOnCtx path returning ctx.Err() (context.Canceled) landed in
+// the generic `err != nil` branch, got cached as unusable, and the fresh, uncancelled caller below
+// would be served that poisoned entry instead of triggering its own probe.
+func TestDiscovery_CancelledCallerContextIsNotCachedAsUnusable(t *testing.T) {
+	runner := &fakeRunner{blockOnCtx: true}
+	d := NewDiscovery(fakeLocator{found: true, path: "/usr/bin/git"}, runner, &fakeClock{})
+
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan GitStatus, 1)
+	go func() { done <- d.Status(ctx, "") }()
+	cancel() // caller cancellation, not a timeout — versionProbeTimeout (5s) never elapses.
+
+	var status GitStatus
+	select {
+	case status = <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("Status did not return promptly after its ctx was cancelled")
+	}
+	if status.Kind != "unusable" {
+		t.Fatalf("Kind = %q, want unusable (for THIS caller's own aborted request)", status.Kind)
+	}
+
+	// A fresh, healthy caller with its own uncancelled ctx must get a real probe, not the
+	// cancelled caller's cached leftovers.
+	runner.blockOnCtx = false
+	runner.result = Result{ExitCode: 0, Stdout: []byte("git version 2.42.0\n")}
+	fresh := d.Status(context.Background(), "")
+	if fresh.Kind != "ok" {
+		t.Fatalf("second Status (fresh ctx) = %+v, want kind=ok -- the cancelled caller's "+
+			"result must not have been cached", fresh)
+	}
+	if runner.calls != 2 {
+		t.Fatalf("runner.calls = %d, want 2 (the fresh caller must trigger its own probe, "+
+			"not reuse a cached result)", runner.calls)
+	}
+}
+
+func TestDiscovery_UnusableOnUnparseableVersion(t *testing.T) {
+	runner := &fakeRunner{result: Result{ExitCode: 0, Stdout: []byte("garbage\n")}}
+	d := NewDiscovery(fakeLocator{found: true, path: "/usr/bin/git"}, runner, &fakeClock{})
+	status := d.Status(context.Background(), "")
+	if status.Kind != "unusable" {
+		t.Fatalf("Kind = %q, want unusable", status.Kind)
+	}
+}
+
+// --- Discovery.Status: TTL caching, via the fake Clock (D2) ------------------------------------
+
+func TestDiscovery_CachesWithinTTL(t *testing.T) {
+	runner := &fakeRunner{result: Result{ExitCode: 0, Stdout: []byte("git version 2.42.0\n")}}
+	clock := &fakeClock{}
+	d := NewDiscovery(fakeLocator{found: true, path: "/usr/bin/git"}, runner, clock)
+
+	d.Status(context.Background(), "")
+	clock.advance(discoveryTTL - time.Second)
+	d.Status(context.Background(), "")
+
+	if runner.calls != 1 {
+		t.Fatalf("runner.calls = %d, want 1 (second call should be served from cache)", runner.calls)
+	}
+}
+
+func TestDiscovery_ReprobesAfterTTL(t *testing.T) {
+	runner := &fakeRunner{result: Result{ExitCode: 0, Stdout: []byte("git version 2.42.0\n")}}
+	clock := &fakeClock{}
+	d := NewDiscovery(fakeLocator{found: true, path: "/usr/bin/git"}, runner, clock)
+
+	d.Status(context.Background(), "")
+	clock.advance(discoveryTTL + time.Second)
+	d.Status(context.Background(), "")
+
+	if runner.calls != 2 {
+		t.Fatalf("runner.calls = %d, want 2 (cache should have expired)", runner.calls)
+	}
+}
+
+func TestDiscovery_ConfiguredPathChangeBypassesCache(t *testing.T) {
+	runner := &fakeRunner{result: Result{ExitCode: 0, Stdout: []byte("git version 2.42.0\n")}}
+	clock := &fakeClock{}
+	d := NewDiscovery(fakeLocator{found: true, path: "/usr/bin/git"}, runner, clock)
+
+	d.Status(context.Background(), "/a/git")
+	d.Status(context.Background(), "/b/git")
+
+	if runner.calls != 2 {
+		t.Fatalf("runner.calls = %d, want 2 (a changed git.path must not reuse the old cache)", runner.calls)
+	}
+}
+
+// --- darwinLocator: the probe order and the Command Line Tools gate (D3) -----------------------
+
+func fakeStat(files map[string]bool) func(string) (os.FileInfo, error) {
+	return func(path string) (os.FileInfo, error) {
+		if files[path] {
+			return fakeExecutableFileInfo{}, nil
+		}
+		return nil, os.ErrNotExist
+	}
+}
+
+type fakeExecutableFileInfo struct{ os.FileInfo }
+
+func (fakeExecutableFileInfo) IsDir() bool       { return false }
+func (fakeExecutableFileInfo) Mode() os.FileMode { return 0o755 }
+
+func TestDarwinLocator_ConfiguredPathWins(t *testing.T) {
+	l := &darwinLocator{
+		lookPath:      func(string) (string, error) { return "", os.ErrNotExist },
+		stat:          fakeStat(map[string]bool{"/custom/git": true}),
+		cltsInstalled: func() bool { return true },
+	}
+	path, _, found := l.Locate("/custom/git")
+	if !found || path != "/custom/git" {
+		t.Fatalf("Locate(configured) = (%q, _, %v), want (/custom/git, _, true)", path, found)
+	}
+}
+
+func TestDarwinLocator_PATHWins(t *testing.T) {
+	l := &darwinLocator{
+		lookPath:      func(string) (string, error) { return "/usr/local/bin/git", nil },
+		stat:          fakeStat(nil),
+		cltsInstalled: func() bool { return true },
+	}
+	path, probed, found := l.Locate("")
+	if !found || path != "/usr/local/bin/git" {
+		t.Fatalf("Locate = (%q, %v, %v), want PATH's own resolution", path, probed, found)
+	}
+}
+
+func TestDarwinLocator_PATHResolvingToShimDoesNotShortCircuit(t *testing.T) {
+	// The trap this whole locator exists to avoid: LookPath("git") landing on the Command Line
+	// Tools shim must NOT be accepted at the PATH step — it must fall through to the final,
+	// gated step instead.
+	cltsChecked := false
+	l := &darwinLocator{
+		lookPath: func(string) (string, error) { return "/usr/bin/git", nil },
+		stat:     fakeStat(map[string]bool{"/usr/bin/git": true}),
+		cltsInstalled: func() bool {
+			cltsChecked = true
+			return true
+		},
+	}
+	path, _, found := l.Locate("")
+	if !found || path != "/usr/bin/git" {
+		t.Fatalf("Locate = (%q, _, %v), want the shim resolved via the gated final step", path, found)
+	}
+	if !cltsChecked {
+		t.Fatal("cltsInstalled was never consulted — the PATH hit on the shim short-circuited the gate")
+	}
+}
+
+func TestDarwinLocator_NeverStatsShimWhenCLToolsMissing(t *testing.T) {
+	// D3's actual safety property: when Command Line Tools are not installed, isExecutable must
+	// never even be asked about /usr/bin/git — asking (a stat) is harmless, but this proves the
+	// gate is checked BEFORE any attempt to touch that path at all, matching the plan's "probe
+	// xcode-select -p first and never spawn the shim blind."
+	statCalls := []string{}
+	l := &darwinLocator{
+		lookPath: func(string) (string, error) { return "", os.ErrNotExist },
+		stat: func(path string) (os.FileInfo, error) {
+			statCalls = append(statCalls, path)
+			return nil, os.ErrNotExist
+		},
+		cltsInstalled: func() bool { return false },
+	}
+	_, probed, found := l.Locate("")
+	if found {
+		t.Fatal("Locate found something with no candidate ever satisfied")
+	}
+	for _, p := range statCalls {
+		if p == clToolsShim {
+			t.Fatalf("stat was called on %s despite Command Line Tools being reported absent", clToolsShim)
+		}
+	}
+	last := probed[len(probed)-1]
+	if last == clToolsShim {
+		t.Fatalf("probed's last entry is the bare shim path %q, want it annotated as skipped", last)
+	}
+}
+
+func TestDarwinLocator_HomebrewBeforeUsrLocalBeforeShim(t *testing.T) {
+	l := &darwinLocator{
+		lookPath:      func(string) (string, error) { return "", os.ErrNotExist },
+		stat:          fakeStat(map[string]bool{"/usr/local/bin/git": true}),
+		cltsInstalled: func() bool { return true },
+	}
+	path, probed, found := l.Locate("")
+	if !found || path != "/usr/local/bin/git" {
+		t.Fatalf("Locate = (%q, %v, %v), want /usr/local/bin/git", path, probed, found)
+	}
+	// /opt/homebrew/bin must have been probed (and missed) before /usr/local/bin was accepted.
+	if len(probed) < 2 || probed[len(probed)-2] != "/opt/homebrew/bin/git" {
+		t.Fatalf("probed = %v, want /opt/homebrew/bin/git probed immediately before the match", probed)
+	}
+}
+
+func TestDarwinLocator_NotFoundListsEveryStepProbed(t *testing.T) {
+	l := &darwinLocator{
+		lookPath:      func(string) (string, error) { return "", os.ErrNotExist },
+		stat:          fakeStat(nil),
+		cltsInstalled: func() bool { return true },
+	}
+	_, probed, found := l.Locate("/configured/git")
+	if found {
+		t.Fatal("Locate found something with every candidate stubbed absent")
+	}
+	// configured, PATH, homebrew, usr/local, shim = 5 entries.
+	if len(probed) != 5 {
+		t.Fatalf("probed = %v, want 5 entries (one per probe step)", probed)
+	}
+}

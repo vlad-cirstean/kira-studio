@@ -1,0 +1,13 @@
+a967f68fb8bb2ebfaebdd1c7f74bd72f810988f8 2 2 1
+author Kira Fixture
+author-mail <fixture@kira.test>
+author-time 1609459260
+author-tz +0000
+committer Kira Fixture
+committer-mail <fixture@kira.test>
+committer-time 1609459260
+committer-tz +0000
+summary second commit
+previous f86700cbc8a500774aaca3d7b290aeec17ddce81 f.txt
+filename f.txt
+	line two
