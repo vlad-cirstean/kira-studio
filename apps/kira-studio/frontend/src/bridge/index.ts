@@ -1,4 +1,5 @@
 import * as AppService from '@bindings/appservice.js';
+import * as CodeWorkspaceService from '@bindings/codeworkspaceservice.js';
 import * as ConnectionsService from '@bindings/connectionsservice.js';
 import * as DataGripService from '@bindings/datagripservice.js';
 import * as EngineService from '@bindings/engineservice.js';
@@ -43,6 +44,7 @@ import type {
   SavedQuery,
   SortSpec,
 } from '@shared/domain/queries';
+import type { FileContent, FileListing, RepoSummary } from '@shared/domain/repo';
 import type { RepoMapInstallResult, RepoMapStatus } from '@shared/domain/repomap';
 import type { ConnectionDdl } from '@shared/domain/schema';
 import type { SecretStorageStatus } from '@shared/domain/secrets';
@@ -368,6 +370,25 @@ const studioControl = {
     unwrap(SchemaService.Set({ connectionId, ddl })).then((r) => trust<ConnectionDdl>(r)),
   onSchemaChanged: (cb: (ddl: ConnectionDdl) => void): (() => void) =>
     on(CHANNEL.schemaChanged, cb),
+
+  // C5 §3.3: the native code-viewing workspace's bound surface — repo import/rename/remove plus
+  // the two read primitives (ListFiles/ReadFile). A rejected ImportRepo/RenameRepo call carries a
+  // structured ipcerr (E_INVALID/E_ALREADY_IMPORTED/E_NOT_FOUND/E_GIT_UNAVAILABLE) that unwrap()
+  // already turns into a rejected promise — every call site here just lets it propagate.
+  codeWorkspaceListRepos: (): Promise<RepoSummary[]> =>
+    unwrap(CodeWorkspaceService.ListRepos()).then((r) => trust<RepoSummary[]>(r ?? [])),
+  codeWorkspaceImportRepo: (path: string): Promise<RepoSummary> =>
+    unwrap(CodeWorkspaceService.ImportRepo({ path })).then((r) => trust<RepoSummary>(r)),
+  codeWorkspaceRenameRepo: (id: string, name: string): Promise<RepoSummary> =>
+    unwrap(CodeWorkspaceService.RenameRepo({ id, name })).then((r) => trust<RepoSummary>(r)),
+  codeWorkspaceRemoveRepo: (id: string): Promise<void> =>
+    unwrap(CodeWorkspaceService.RemoveRepo({ id })),
+  codeWorkspaceListFiles: (id: string): Promise<FileListing> =>
+    unwrap<Awaited<ReturnType<typeof CodeWorkspaceService.ListFiles>>>(
+      CodeWorkspaceService.ListFiles({ id }),
+    ).then((r) => trust<FileListing>({ ...r, paths: r.paths ?? [], status: r.status ?? {} })),
+  codeWorkspaceReadFile: (id: string, path: string): Promise<FileContent> =>
+    unwrap(CodeWorkspaceService.ReadFile({ id, path })).then((r) => trust<FileContent>(r)),
 };
 
 // P12 D11: one exported object, composed from Studio's 67 methods and the module's own 39

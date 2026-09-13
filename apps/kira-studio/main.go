@@ -26,6 +26,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/appcore"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/bridge"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/buildinfo"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/codeworkspace"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/config"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/connections"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/enginecache"
@@ -341,6 +342,12 @@ func main() {
 			application.NewService(&bridge.DataGripService{Deps: deps}),
 			application.NewService(&bridge.GitClientsService{Deps: deps, Sock: gitSock, Broker: gitSock.Broker(), Vsix: gitvsix.New(gitvsix.Deps{})}),
 			application.NewService(repoMapSvc),
+			// C5 §3.3: the native code-viewing workspace's own bound service — Discovery/Runner
+			// mirror gitrpc's own seam rather than reusing gitRegistry (this workspace needs one
+			// read-only runner and the resolved git.path, never gitsession's refcounted lifecycle).
+			application.NewService(&bridge.CodeWorkspaceService{
+				Deps: deps, Discovery: gitDiscovery, Runner: gitRunner, Registry: codeworkspace.NewRegistry(),
+			}),
 			application.NewService(&bridge.LifecycleService{Flusher: quitter, WindowFlusher: closeFlush}),
 		},
 		Assets: application.AssetOptions{
