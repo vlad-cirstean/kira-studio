@@ -149,6 +149,12 @@ export function repoTreeTruncated(repoId: string): boolean {
   return byRepo.get(repoId)?.truncated ?? false;
 }
 
+// C9 D1: quick open's own candidate list — the same flat array the tree already holds, so quick
+// open inherits its snapshot exactly rather than re-enumerating.
+export function repoTreePaths(repoId: string): readonly string[] {
+  return byRepo.get(repoId)?.paths ?? [];
+}
+
 export function repoTreeError(repoId: string): string | null {
   return byRepo.get(repoId)?.error ?? null;
 }
