@@ -50,6 +50,23 @@ type SymbolRow struct {
 	NameStartRow, NameStartColumn int
 }
 
+// ReferenceRow is one reference table row, as read back — SymbolRow's own shape, less ParentID
+// (a reference has no containment parent of its own) and EndRow/EndColumn (§2.4: only the
+// reference node's start point is stored, same as before C2; NameStartByte/NameEndByte/
+// NameStartRow/NameStartColumn are new, the identifier's own range).
+type ReferenceRow struct {
+	ID                            int64
+	FileID                        int64
+	RepoID                        string
+	BlockID                       *int64
+	Kind                          string
+	Name                          string
+	StartByte, EndByte            int
+	StartRow, StartColumn         int
+	NameStartByte, NameEndByte    int
+	NameStartRow, NameStartColumn int
+}
+
 // FileWrite bundles one file's whole parse result — everything ReplaceFile needs to write it in
 // one transaction (§6: "a file's rows are replaced wholesale... delete this file's symbols,
 // blocks and references, insert the new ones").
@@ -208,10 +225,12 @@ func replaceOneFileTx(ctx context.Context, tx *sql.Tx, w FileWrite) error {
 			blockID = blockIDs[ref.BlockIndex]
 		}
 		if _, err := tx.ExecContext(ctx, `
-			INSERT INTO reference (file_id, repo_id, block_id, kind, name, start_byte, end_byte, start_row, start_column)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			INSERT INTO reference (file_id, repo_id, block_id, kind, name, start_byte, end_byte, start_row, start_column,
+			                         name_start_byte, name_end_byte, name_start_row, name_start_column)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			fileID, w.RepoID, blockID, ref.Kind, ref.Name,
-			ref.StartByte, ref.EndByte, ref.StartPoint.Row, ref.StartPoint.Column); err != nil {
+			ref.StartByte, ref.EndByte, ref.StartPoint.Row, ref.StartPoint.Column,
+			ref.NameStartByte, ref.NameEndByte, ref.NameStart.Row, ref.NameStart.Column); err != nil {
 			return fmt.Errorf("codeindex: insert reference %s[%d]: %w", w.Path, i, err)
 		}
 	}

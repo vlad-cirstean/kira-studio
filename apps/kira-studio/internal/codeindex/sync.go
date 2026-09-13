@@ -50,6 +50,12 @@ func (idx *Index) Sync(ctx context.Context) (SyncStats, error) {
 	if err := idx.checkFingerprint(ctx); err != nil {
 		return stats, err
 	}
+	// meta.repo_root (C2 §4.1): a second process (C3's MCP server) has no gitclient.Runner and
+	// no way to reach gitclient's own identity function, so this is the only path from a
+	// worktree path to a repo_id once that process opens the same codeindex.db.
+	if err := idx.store.SetMeta(ctx, idx.repoID, repoRootKey, idx.root); err != nil {
+		return stats, err
+	}
 
 	enumerated, err := Enumerate(ctx, idx.runner, idx.gitPath, idx.root)
 	if err != nil {
@@ -301,6 +307,10 @@ func classifyAndRead(path string) (content []byte, sha [32]byte, status ParseSta
 
 // parserFingerprintKey is the meta key §5.3 names.
 const parserFingerprintKey = "parser_fingerprint"
+
+// repoRootKey is C2 §4.1's meta key: a repository's own worktree root, so Store.ListRepos can map
+// a path to a repo_id without gitclient (C3's own separate process has no Runner).
+const repoRootKey = "repo_root"
 
 // checkFingerprint is §5.3's own freshness check: a mismatch against the stored
 // meta.parser_fingerprint means the extraction contract changed under this repository's stored

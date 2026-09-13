@@ -26,6 +26,7 @@ var names = []struct {
 	file    string
 }{
 	{1, "c1_init", "0001_c1_init.sql"},
+	{2, "c2_reference_name_range", "0002_c2_reference_name_range.sql"},
 }
 
 // All returns every migration in ascending version order.
