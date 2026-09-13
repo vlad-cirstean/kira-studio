@@ -16,10 +16,11 @@
  *
  * G3 plan D4 adds a second frame *body* shape the read side must recognise: a blob frame, whose
  * first byte is `0x00` (a JSON frame's first byte is always `{`, so the two can never collide) —
- * `0x00 | uint32BE headerLen | headerJSON | blob…to the end of the frame`. `substituteBlob` below
- * finds the single `{"$blob":true}` marker gitrpc's own payload embeds (this file never learns
- * what a graph chunk is) and replaces it with the blob bytes as a fresh `ArrayBuffer`. `post` is
- * unchanged: the client here never sends a blob (D4) — only `internal/bridge/rpcstream` does.
+ * `0x00 | uint32BE headerLen | headerJSON | blob…to the end of the frame`. `parseBlobFrameBody`
+ * (`blobFrame.ts`, shared with `streamChannel.ts` — C10 S1) finds the single `{"$blob":true}`
+ * marker gitrpc's own payload embeds (this file never learns what a graph chunk is) and replaces
+ * it with the blob bytes as a fresh `ArrayBuffer`. `post` is unchanged: the client here never
+ * sends a blob (D4) — only `internal/bridge/rpcstream` does.
  *
  * `onMessage` has a single current subscriber, not an independent listener per call — the same
  * "one reader, sequential ownership" invariant `gitsock/frame.go`'s `conn` keeps on the Go side
@@ -32,7 +33,16 @@
  * than dropped (G12 D5a); see `MAX_PENDING_FRAMES` below.
  */
 import type { Socket } from 'node:net';
+import {
+  BLOB_FRAME_DISCRIMINANT,
+  MalformedBlobFrameError,
+  parseBlobFrameBody,
+} from './blobFrame.ts';
 import type { MessageChannelLike } from './rpc.ts';
+
+// Re-exported for existing callers (socketChannel.test.ts) — the type now lives in blobFrame.ts
+// (C10 S1), shared with streamChannel.ts, but this stays the socket channel's own public surface.
+export { MalformedBlobFrameError };
 
 export const MAX_FRAME_BYTES = 8 * 1024 * 1024; // D1: 8 MiB, matching gitsock's own cap.
 
@@ -50,17 +60,6 @@ export class FrameTooLargeError extends Error {
       `socketChannel: frame of ${declaredLength} bytes exceeds the ${MAX_FRAME_BYTES}-byte cap`,
     );
     this.name = 'FrameTooLargeError';
-  }
-}
-
-/** Thrown (and the socket destroyed) on a blob frame this file cannot make sense of: a header
- *  length pointing past the frame's end, a header that is not valid JSON, or a header with no
- *  `{"$blob":true}` marker (or more than one) for the frame's own single blob to fill — the same
- *  hard-error posture as `FrameTooLargeError`, never a silent truncation or a guessed substitution. */
-export class MalformedBlobFrameError extends Error {
-  constructor(reason: string) {
-    super(`socketChannel: malformed blob frame: ${reason}`);
-    this.name = 'MalformedBlobFrameError';
   }
 }
 
@@ -88,45 +87,6 @@ export class FrameDeliveryError extends Error {
     super(`socketChannel: frame delivery failed: ${reason}`);
     this.name = 'FrameDeliveryError';
   }
-}
-
-const BLOB_FRAME_DISCRIMINANT = 0x00;
-const BLOB_HEADER_LEN_OFFSET = 1;
-const BLOB_HEADER_START = 5; // 1 discriminant byte + 4-byte big-endian header length.
-
-function isBlobMarker(value: unknown): value is { readonly $blob: true } {
-  return (
-    value !== null && typeof value === 'object' && (value as { $blob?: unknown }).$blob === true
-  );
-}
-
-/** Walks message the same shape `codec.ts`'s three traversals do, replacing the single
- *  `{"$blob":true}` marker with blob. Lives here rather than in `codec.ts` because it is a
- *  property of *this channel's* framing (D4), not of the buffer encodings `codec.ts` owns. */
-function substituteBlob(value: unknown, blob: ArrayBuffer, seen: { count: number }): unknown {
-  if (isBlobMarker(value)) {
-    seen.count++;
-    return blob;
-  }
-  if (Array.isArray(value)) return value.map((item) => substituteBlob(item, blob, seen));
-  if (value !== null && typeof value === 'object') {
-    return Object.fromEntries(
-      Object.entries(value).map(([key, item]) => [key, substituteBlob(item, blob, seen)]),
-    );
-  }
-  return value;
-}
-
-function substituteBlobRoot(message: unknown, blob: ArrayBuffer): unknown {
-  const seen = { count: 0 };
-  const result = substituteBlob(message, blob, seen);
-  if (seen.count === 0) {
-    throw new MalformedBlobFrameError('header JSON carries no "$blob" marker');
-  }
-  if (seen.count > 1) {
-    throw new MalformedBlobFrameError('header JSON carries more than one "$blob" marker');
-  }
-  return result;
 }
 
 export function createSocketChannel(socket: Socket): SocketChannel {
@@ -177,27 +137,8 @@ export function createSocketChannel(socket: Socket): SocketChannel {
       recvBuffer = recvBuffer.subarray(frameEnd);
 
       if (body.byteLength > 0 && body[0] === BLOB_FRAME_DISCRIMINANT) {
-        if (body.byteLength < BLOB_HEADER_START) {
-          socket.destroy(new MalformedBlobFrameError('frame is too short for a header length'));
-          return;
-        }
-        const headerLen = body.readUInt32BE(BLOB_HEADER_LEN_OFFSET);
-        const headerEnd = BLOB_HEADER_START + headerLen;
-        if (headerEnd > body.byteLength) {
-          socket.destroy(new MalformedBlobFrameError('declared header length exceeds the frame'));
-          return;
-        }
-        const headerBytes = body.subarray(BLOB_HEADER_START, headerEnd);
-        const blobBytes = body.subarray(headerEnd);
-        // A fresh, exactly-sized ArrayBuffer — never a view into recvBuffer, which is mutated/
-        // reused as soon as this callback returns.
-        const blob = blobBytes.buffer.slice(
-          blobBytes.byteOffset,
-          blobBytes.byteOffset + blobBytes.byteLength,
-        ) as ArrayBuffer;
         try {
-          const message: unknown = JSON.parse(headerBytes.toString('utf8'));
-          deliver(substituteBlobRoot(message, blob));
+          deliver(parseBlobFrameBody(body));
         } catch (err) {
           socket.destroy(err instanceof Error ? err : new MalformedBlobFrameError(String(err)));
           return;
