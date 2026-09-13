@@ -268,6 +268,12 @@ running it here.
   `claude mcp list` reports the server "✓ Connected" once running. `claude mcp remove kira-repo-map -s user`
   cleans up the global `~/.claude.json` entry afterward — leaving a stale registration behind
   confuses a later, unrelated session in the same container.
+- **Responses now carry a source line under each hit (C8)**: `find_definition`, `find_references`,
+  `find_implementations` and `search_symbols` each follow a hit's own grep-style line with one
+  indented line of the actual code at that position (truncated at 512 bytes, `[stale]`/
+  `[no source: ...]` markers where it can't be read honestly) — a `curl` recipe against this server
+  now sees that extra line in `result.content[0].text`; pass `"omitSource": true` in a tool call's
+  arguments for the old compact shape.
 - **`KIRA_REPO_MAP_LOG`** (`debug`/`info`/`warn`/`error`, default `error`) controls stderr verbosity
   for both the headless and embedded instance — a stdio server's stderr used to be the client's
   literal log file; now merely conventional, since Streamable HTTP means stdout is free too (the

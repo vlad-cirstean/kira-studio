@@ -948,6 +948,23 @@ candidates rather than a silent top-hit guess) and a grep-like text rendering (`
 prints every `Target`'s own `Rule`/`Confidence` rather than hiding C2's honesty markers behind a
 clean-looking result.
 
+**C8 adds one source line under each hit — the one place this server reads a file's own bytes,
+never a whole file.** `find_definition`, `find_references`, `find_implementations` and
+`search_symbols` (plus the ambiguous-candidates list, since disambiguating between same-named
+symbols is exactly what a source line is for) each follow a hit line with the literal line of code
+at that position, indented four spaces: `source.go`'s `Server.sourceFor` groups hits by file and
+reads each in one forward pass (`bufio.Reader.ReadSlice`, not `bufio.Scanner`, so one
+minified/vendored line's own length can't silently drop every later hit's source line in the same
+file), through `internal/pathsafe`'s containment check. A line is truncated at 512 bytes with a
+trailing `…` (truncated, never omitted — an over-long line's head is still informative), staleness
+is stamped by comparing the indexed row against `os.Stat` (`codeindex.FileRow.MatchesDisk`, the same
+rule `Index.isStale` uses) and printed as a `[stale] ` prefix, and every failure mode (a deleted
+file, a symlink escaping the repository, a NUL byte) degrades to a `[no source: <reason>]` note
+rather than an error — a navigation answer never turns into a tool failure because a file changed
+underneath it. `omitSource` restores the exact pre-C8 compact shape for a caller that wants it.
+`outline_file` and `search_files` are unchanged, so `outline_file`'s own "without reading its bytes"
+still holds and, post-C8, is the sentence naming the cheap tool.
+
 **Two independent instances of the same server code, never a shared listener.** *Embedded*: started
 and stopped by this app's own process, in step with the `codeIntel.mcpServerEnabled` setting — on
 while the app is running and the toggle is on, off the moment either isn't (`internal/bridge/
@@ -1015,12 +1032,16 @@ never interleaved with another open repo's or with studio/api's shared strip.
   the keyboard nor a paste can mutate a model; no tab kind here defines a `badge`, a dirty flag, a
   save action or a commit action — `definition`'s own existing no-badge shape is the precedent, not
   a new convention.
-- **Path safety** (`internal/codeworkspace/paths.go`'s `ValidateRelPath`): every path crossing the
-  bound service is repository-relative, rejected outright for an absolute path or a `..` segment,
-  then resolved with `filepath.EvalSymlinks` and required to stay under the session's own root — a
+- **Path safety** (`ValidateRelPath`, `internal/pathsafe` since C8): every path crossing the bound
+  service is repository-relative, rejected outright for an absolute path or a `..` segment, then
+  resolved with `filepath.EvalSymlinks` and required to stay under the session's own root — a
   repository can contain a symlink pointing anywhere on the machine, so resolving before the
   containment check (not after joining alone) is what actually prevents this read-only viewer from
-  being used to read `~/.ssh/id_rsa`.
+  being used to read `~/.ssh/id_rsa`. `internal/codeworkspace/paths.go` keeps the name as a
+  two-line delegate (`internal/pathsafe`'s own doc comment covers why: a leaf package, this
+  package's precedent, so `internal/repomap`'s source-line reader can validate a path without
+  pulling all of `codeworkspace` — `catfile`/`porcelain`, the whole `Session` type — into the
+  headless `cmd/kira-repo-map` binary for one pure function).
 - **Monaco (`monaco-editor`, viewer-only) renders the file** — see the Stack table's own row above
   for the package-layout correction this phase found (no `edcore.main.js` in the pinned version;
   `monaco-editor/features/register.all.js` is its real equivalent) and the measured chunk size.
