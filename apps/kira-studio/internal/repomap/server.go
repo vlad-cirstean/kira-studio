@@ -31,11 +31,6 @@ import (
 // timeout path doesn't cost 25s of real wall-clock time.
 var readyTimeout = 25 * time.Second
 
-// syncLockTimeout bounds how long a second instance waits for the first's initial-sync flock
-// before proceeding anyway (§5) — a stuck lock degrades, it never hangs. A var for the same reason
-// as readyTimeout.
-var syncLockTimeout = 5 * time.Minute
-
 // DefaultPort is the port every instance tries first (§5); a second instance on one machine falls
 // back to an OS-assigned ephemeral one automatically (http.go).
 const DefaultPort = 8765
@@ -91,7 +86,7 @@ type Server struct {
 	// initial sync is a real sequence, not just a test artifact: SetEnabled(false) or app shutdown
 	// can land at any point).
 	lockMu sync.Mutex
-	lock   *fileLock
+	lock   *codeindex.SyncLock
 
 	ready     chan struct{}
 	readyOnce sync.Once
@@ -170,9 +165,7 @@ func newServer(ctx context.Context, cfg Config, home string, store *codeindex.St
 		return nil, err
 	}
 
-	slug := mcpauth.Slug(resolved.repoID)
-	lockPath := lockPathFor(home, slug)
-	go s.runInitialSync(runCtx, lockPath)
+	go s.runInitialSync(runCtx, home)
 
 	watcher, err := idx.Watch()
 	if err != nil {
@@ -230,17 +223,13 @@ func (s *Server) buildMCPServer() *mcp.Server {
 	return srv
 }
 
-// lockPathFor names the per-repository sync-lock file (§5): `codeindex-sync-<slug>.lock`, the same
-// slug internal/mcpauth's own token file uses, both derived from repo_id the same way.
-func lockPathFor(home, slug string) string {
-	return home + "/codeindex-sync-" + slug + ".lock"
-}
-
-// runInitialSync runs behind the per-repository flock (§5), then closes the readiness gate exactly
-// once regardless of outcome — a Sync error still opens the gate (a tool call then gets whatever
-// codegraph can answer from an empty or partial index, which is honest; it does not hang forever).
-func (s *Server) runInitialSync(ctx context.Context, lockPath string) {
-	lock, acquired, err := acquireLock(lockPath, syncLockTimeout)
+// runInitialSync runs behind the per-repository flock (§5, now internal/codeindex.AcquireSyncLock
+// — C6 S1/D11 moved it there so codeworkspace's own index lifecycle shares the identical
+// discipline), then closes the readiness gate exactly once regardless of outcome — a Sync error
+// still opens the gate (a tool call then gets whatever codegraph can answer from an empty or
+// partial index, which is honest; it does not hang forever).
+func (s *Server) runInitialSync(ctx context.Context, home string) {
+	lock, acquired, err := codeindex.AcquireSyncLock(home, s.repoID, codeindex.DefaultSyncLockTimeout)
 	if err != nil {
 		s.log.Warn("repo-map sync lock", "scope", "repomap", "repo", s.repoID, "err", err)
 	}
@@ -253,7 +242,7 @@ func (s *Server) runInitialSync(ctx context.Context, lockPath string) {
 
 	stats, err := s.idx.Sync(ctx)
 	if lock != nil {
-		lock.release()
+		lock.Release()
 		s.lockMu.Lock()
 		s.lock = nil
 		s.lockMu.Unlock()
@@ -320,7 +309,7 @@ func (s *Server) Close() error {
 		s.lock = nil
 		s.lockMu.Unlock()
 		if lock != nil {
-			lock.release()
+			lock.Release()
 		}
 		s.idx.Close()
 		_ = s.store.Close()

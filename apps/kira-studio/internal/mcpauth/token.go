@@ -122,8 +122,9 @@ func LoadOrMint(path string) (plain string, rec Record, minted bool, err error) 
 }
 
 // Slug returns the first 12 hex characters of sha256(id) — the naming convention
-// `codeindex-sync-<…>.lock` already established (§5), reused verbatim here and by
-// internal/repomap's own sync-lock file so both names derive from one repo_id the same way.
+// `codeindex-sync-<…>.lock` already established (§5) and now owned by
+// internal/codeindex.SyncLockPath (C6 S1), reused verbatim here so both names derive from one
+// repo_id the same way. Keep this comment and SyncLockPath's own in sync if either changes.
 func Slug(id string) string {
 	sum := sha256.Sum256([]byte(id))
 	return fmt.Sprintf("%x", sum[:6])
