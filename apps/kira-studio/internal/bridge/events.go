@@ -47,6 +47,11 @@ const (
 	// D19) — the pairing prompt's live queue snapshot, and the Connected editors pane's list.
 	ChannelGitPairing        = "kira:git:pairing"
 	ChannelGitClientsChanged = "kira:git:clients"
+	// ChannelCodeSearch is C7 D7's own push channel — a repository-wide search's coalesced file
+	// groups, delivered with EmitTo (one window only) exactly the shape ChannelGrpcCall (P11 D8)
+	// established: flush on 60ms/256 matches/the terminal event, one producer (StartSearch's own
+	// goroutine), no Sources entry.
+	ChannelCodeSearch = "kira:code:search"
 )
 
 // ChannelEngineState is declared for completeness and deliberately never emitted: nothing in

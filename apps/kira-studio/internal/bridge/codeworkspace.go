@@ -4,6 +4,8 @@ import (
 	"context"
 	"log/slog"
 	"path/filepath"
+	"sync"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/appcore"
@@ -312,4 +314,194 @@ func (s *CodeWorkspaceService) Shutdown() {
 	if s.IndexStore != nil {
 		_ = s.IndexStore.Close()
 	}
+}
+
+// ---- C7 D7: the coalescing search-results push channel ----
+
+const (
+	searchCoalesceInterval   = 60 * time.Millisecond
+	searchCoalesceMaxMatches = 256
+)
+
+// CodeSearchEventErr mirrors GrpcCallEventErr's own shape — a structured code/message pair, the
+// same convention every other terminal-event error in this package uses.
+type CodeSearchEventErr struct {
+	Code    string `json:"code"`
+	Message string `json:"message"`
+}
+
+// CodeSearchEvent is ChannelCodeSearch's own payload (packages/shared/domain/repo.ts's
+// codeSearchEventSchema, field for field) — one coalesced batch of a repository-wide search's
+// file groups. seq is the index of the first file group in this batch (D11: the renderer merges
+// by path, not by seq, but the field stays for the same future-reviewer-detects-a-gap reason
+// GrpcCallEvent's own seq exists); stats/error are set only on the terminal event.
+type CodeSearchEvent struct {
+	SearchID string                      `json:"searchId"`
+	Seq      int                         `json:"seq"`
+	Files    []codeworkspace.FileMatches `json:"files"`
+	Done     bool                        `json:"done"`
+	Stats    *codeworkspace.SearchStats  `json:"stats,omitempty"`
+	Error    *CodeSearchEventErr         `json:"error,omitempty"`
+}
+
+// searchCoalescer is grpcCoalescer's own rules (D8's shape, restated here per D7 rather than
+// generifying grpcCoalescer — that would rewrite a shipped, -race-tested path for one new caller's
+// benefit, and the two payloads share no field), with one difference: it flushes on an accumulated
+// *match* count across possibly many file groups, not a message count, since one file group can
+// itself carry up to MaxMatchesPerFile matches.
+type searchCoalescer struct {
+	emit      appcore.Emitter
+	windowKey string
+	searchID  string
+
+	mu             sync.Mutex
+	pending        []codeworkspace.FileMatches
+	pendingMatches int
+	nextSeq        int
+	timer          *time.Timer
+	done           bool
+}
+
+func newSearchCoalescer(emit appcore.Emitter, windowKey, searchID string) *searchCoalescer {
+	return &searchCoalescer{emit: emit, windowKey: windowKey, searchID: searchID}
+}
+
+// push is codeworkspace.Search's own onFile callback — documented there as "may be called
+// concurrently from different worker goroutines," which is exactly what this mutex covers.
+func (c *searchCoalescer) push(fm codeworkspace.FileMatches) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.done {
+		return
+	}
+	c.pending = append(c.pending, fm)
+	c.pendingMatches += len(fm.Matches)
+	if c.pendingMatches >= searchCoalesceMaxMatches {
+		c.flushLocked(false, nil, nil)
+		return
+	}
+	if c.timer == nil {
+		c.timer = time.AfterFunc(searchCoalesceInterval, c.onTimer)
+	}
+}
+
+func (c *searchCoalescer) onTimer() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.done || len(c.pending) == 0 {
+		return
+	}
+	c.flushLocked(false, nil, nil)
+}
+
+// finish is the terminal flush — always sent, even with nothing pending, so the panel's own
+// "Searching…" state can never strand (D7).
+func (c *searchCoalescer) finish(stats *codeworkspace.SearchStats, errInfo *CodeSearchEventErr) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.done {
+		return
+	}
+	c.flushLocked(true, stats, errInfo)
+	c.done = true
+}
+
+func (c *searchCoalescer) flushLocked(done bool, stats *codeworkspace.SearchStats, errInfo *CodeSearchEventErr) {
+	if c.timer != nil {
+		c.timer.Stop()
+		c.timer = nil
+	}
+	seq := c.nextSeq
+	files := c.pending
+	if files == nil {
+		files = []codeworkspace.FileMatches{}
+	}
+	c.pending = nil
+	c.pendingMatches = 0
+	c.nextSeq += len(files)
+	c.emit.EmitTo(c.windowKey, ChannelCodeSearch, CodeSearchEvent{
+		SearchID: c.searchID, Seq: seq, Files: files, Done: done, Stats: stats, Error: errInfo,
+	})
+}
+
+// CodeWorkspaceSearchArgs is StartSearch's own args — windowKey addresses the coalesced push
+// channel at the one window that asked (EmitTo, D7), exactly like GrpcCallArgs.WindowKey.
+type CodeWorkspaceSearchArgs struct {
+	ID            string `json:"id"`
+	WindowKey     string `json:"windowKey"`
+	Query         string `json:"query"`
+	Regex         bool   `json:"regex"`
+	CaseSensitive bool   `json:"caseSensitive"`
+	WholeWord     bool   `json:"wholeWord"`
+}
+
+type CodeWorkspaceSearchHandle struct {
+	SearchID string `json:"searchId"`
+}
+
+// StartSearch validates args, compiles the pattern before returning (codeworkspace.ValidatePattern
+// — a bad regex is E_INVALID on this call, never a stream error the panel has to render twice),
+// mints a search id, and starts one goroutine running codeworkspace.Search followed by the
+// coalescer's terminal flush. It returns the handle immediately — a full-worktree scan takes far
+// longer than an IPC call may (OpenWorkspace's own posture). StartSearch does NOT call
+// EnsureIndex: text search is independent of C2's graph, and searching a repository must not start
+// parsing one.
+func (s *CodeWorkspaceService) StartSearch(ctx context.Context, args CodeWorkspaceSearchArgs) (CodeWorkspaceSearchHandle, error) {
+	if args.ID == "" {
+		return CodeWorkspaceSearchHandle{}, ipcerr.BadRequest("id is required")
+	}
+	if args.WindowKey == "" {
+		return CodeWorkspaceSearchHandle{}, ipcerr.BadRequest("windowKey is required")
+	}
+	if args.Query == "" {
+		return CodeWorkspaceSearchHandle{}, ipcerr.BadRequest("query is required")
+	}
+	req := codeworkspace.SearchRequest{
+		Query:         args.Query,
+		Regex:         args.Regex,
+		CaseSensitive: args.CaseSensitive,
+		WholeWord:     args.WholeWord,
+	}
+	if err := codeworkspace.ValidatePattern(req); err != nil {
+		return CodeWorkspaceSearchHandle{}, ipcerr.New("E_INVALID", err.Error())
+	}
+
+	sess, _, err := s.session(ctx, args.ID)
+	if err != nil {
+		return CodeWorkspaceSearchHandle{}, err
+	}
+
+	searchID := uuid.NewString()
+	coalescer := newSearchCoalescer(s.Deps.Events, args.WindowKey, searchID)
+	// sess.BeginSearch(), not ctx: this bound call returns long before a full-worktree scan
+	// finishes, so the search must outlive it — CancelSearch/Session.Close are the only two ways
+	// this context ever ends (D8).
+	searchCtx := sess.BeginSearch()
+
+	go func() {
+		stats, err := codeworkspace.Search(searchCtx, sess, req, coalescer.push)
+		if err != nil {
+			coalescer.finish(&stats, &CodeSearchEventErr{Code: "E_INTERNAL", Message: err.Error()})
+			return
+		}
+		coalescer.finish(&stats, nil)
+	}()
+
+	return CodeWorkspaceSearchHandle{SearchID: searchID}, nil
+}
+
+// CancelSearch stops args.ID's own in-flight search (D8: the workspace's one search, never a
+// specific search id — the renderer always means "stop what this panel is running"). Uses
+// Registry.Peek rather than s.session(): a search can only be running for a workspace that
+// already opened a session (StartSearch itself resolved one), so this must not create a fresh one
+// the way Open's normal fallback would, and stopping a search must not depend on git being
+// reachable right now the way every read path's own availability check does.
+func (s *CodeWorkspaceService) CancelSearch(args CodeWorkspaceIDArgs) error {
+	if args.ID == "" {
+		return ipcerr.BadRequest("id is required")
+	}
+	if sess := s.Registry.Peek(args.ID); sess != nil {
+		sess.CancelSearch()
+	}
+	return nil
 }

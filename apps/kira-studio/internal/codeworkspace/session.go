@@ -81,6 +81,16 @@ func (r *Registry) Open(repoID, root string, runner gitclient.Runner, gitPath st
 	return s
 }
 
+// Peek returns repoID's own live session, or nil if none is open — C7's CancelSearch's own
+// accessor: stopping a search must never create a session the way Open's normal fallback would,
+// and must not depend on git being reachable right now the way every read path's own availability
+// check does.
+func (r *Registry) Peek(repoID string) *Session {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.sessions[repoID]
+}
+
 // Close stops repoID's own session (if any) and drops the map entry — called by RemoveRepo and by
 // CloseWorkspace (state/workspace.ts's closeRepoWorkspace).
 func (r *Registry) Close(repoID string) {
@@ -241,13 +251,15 @@ func (s *Session) Close() {
 	})
 }
 
-// beginSearch cancels this workspace's previous search, if any (C7 D8: one in flight per
+// BeginSearch cancels this workspace's previous search, if any (C7 D8: one in flight per
 // workspace — starting a new one is by construction the only way a user's single query box can
 // mean "stop the old one and run this instead"), and returns the context the new one runs under.
 // Rooted at context.Background(), not any per-call ctx: StartSearch's own bound call returns long
 // before a full-worktree scan finishes, so the search must outlive it — CancelSearch and
-// Session.Close are the only two ways this context ever ends.
-func (s *Session) beginSearch() context.Context {
+// Session.Close are the only two ways this context ever ends. Exported (the plan's own §4.3 names
+// it lowercase, but internal/bridge — a separate package — is its one caller alongside Close, so it
+// must be; disclosed as a plan correction, not a design change).
+func (s *Session) BeginSearch() context.Context {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.searchCancel != nil {

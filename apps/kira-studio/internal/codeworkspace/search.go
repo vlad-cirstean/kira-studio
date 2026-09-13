@@ -147,6 +147,14 @@ func newMatcher(req SearchRequest) (matcher, error) {
 	return regexMatcher{re: re}, nil
 }
 
+// ValidatePattern compiles req's own pattern without running any search — StartSearch's own
+// "compile before returning" step (§5), so a bad regex is E_INVALID on the bound call itself,
+// never a stream error the panel would have to render a second way.
+func ValidatePattern(req SearchRequest) error {
+	_, err := newMatcher(req)
+	return err
+}
+
 // searchWorkers: a user-initiated foreground scan, unlike codeindex.syncWorkers' background
 // reindex — min(NumCPU, 8) rather than that function's deliberate 4, since this only ever runs
 // while the user is actively waiting on it, but still capped so a search never starves the index
