@@ -13,8 +13,13 @@ const props = withDefaults(
     /** True hides the search box and #body in favour of #empty — the mode's own gate on
      *  whether it has anything to search or show (Studio: connectionsState.records.length). */
     empty?: boolean;
+    /** C7 §7.1: false hides the magnifier toggle and the search box entirely — the repo panel's
+     *  own Search mode has its own query field (RepoSearchView.vue) and this panel-level filter
+     *  box would read as a second, confusing query field beside it. Default true: every existing
+     *  caller is unaffected. */
+    searchable?: boolean;
   }>(),
-  { search: '', empty: false },
+  { search: '', empty: false, searchable: true },
 );
 
 const emit = defineEmits<{
@@ -39,6 +44,7 @@ function toggleSearch(): void {
 // selected, so a printable keystroke lands here via bubbling — this redirects it into the
 // panel's own search box rather than making the user click into Search first.
 function onPanelKeydown(e: KeyboardEvent): void {
+  if (!props.searchable) return; // C7 §7.1: no filter box to redirect a keystroke into.
   if (e.defaultPrevented || e.isComposing) return;
   // Cmd/Ctrl/Alt-held combos are shortcuts (or menu accelerators, which arrive over IPC and
   // never reach here anyway) — never type-ahead candidates. Shift is left out on purpose so
@@ -73,6 +79,7 @@ function onPanelKeydown(e: KeyboardEvent): void {
     <div class="p-panel-head">
       <slot name="title" />
       <IconButton
+        v-if="searchable"
         icon="search"
         class="p-push"
         :active="showSearch"
@@ -85,7 +92,7 @@ function onPanelKeydown(e: KeyboardEvent): void {
     </div>
     <template v-if="!empty">
       <PanelSearchBox
-        v-if="showSearch"
+        v-if="searchable && showSearch"
         :model-value="search"
         @update:model-value="emit('update:search', $event)"
       />
