@@ -130,6 +130,34 @@ export function repoDiffUris(
   };
 }
 
+// C10 §6.1: a commit diff's own two sides — keyed by revision, not by "head"/"worktree", since two
+// different commits' diffs of the same path must never collide on one cached model (getOrCreateModel
+// returns whatever is already cached at a URI, ignoring the text it was just handed on a cache
+// hit). `left`/`right` are the tab's own revision-pair fields (repoDiffTabStateSchema, S8) —
+// already the exact strings a commit sha, or (for a root commit) the well-known empty-tree sha.
+export function repoRevisionDiffUris(
+  mod: MonacoModule,
+  repoId: string,
+  path: string,
+  left: string,
+  right: string,
+): { left: import('monaco-editor').Uri; right: import('monaco-editor').Uri } {
+  return {
+    left: mod.Uri.from({
+      scheme: 'kira-repo',
+      authority: repoId,
+      path: `/${path}`,
+      query: `rev=${left}`,
+    }),
+    right: mod.Uri.from({
+      scheme: 'kira-repo',
+      authority: repoId,
+      path: `/${path}`,
+      query: `rev=${right}`,
+    }),
+  };
+}
+
 // C6 D7: navigability is a WeakMap keyed by the model object, not a URI-shape check — the diff
 // editor's HEAD side is deliberately never recorded here (its content is a different revision than
 // the index describes, so answering a definition there would be a lie); the diff's worktree side
