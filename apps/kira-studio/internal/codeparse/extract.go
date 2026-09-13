@@ -8,7 +8,7 @@ import (
 )
 
 // Point is a zero-based row/column position (§5.2). Column is a tree-sitter BYTE column;
-// converting to a UTF-16 column is a caller's job (C3's), stated here so nobody converts twice.
+// converting to a UTF-16 column is a caller's job (C5's), stated here so nobody converts twice.
 type Point struct {
 	Row    int
 	Column int
@@ -32,6 +32,11 @@ type Symbol struct {
 	NameStart     Point
 
 	ParentIndex int
+
+	// BlockIndex is -1 (Extract's own default: a top-level symbol, not part of any injected
+	// block) unless Inject overwrites it with the position of the block it was extracted from
+	// (§3.2) — an index into that call's own returned []Block, not a database id.
+	BlockIndex int
 }
 
 // Reference is one use (§4.2) — never a resolution target, only a name and a range.
@@ -41,6 +46,9 @@ type Reference struct {
 	StartByte  int
 	EndByte    int
 	StartPoint Point
+
+	// BlockIndex: see Symbol.BlockIndex.
+	BlockIndex int
 }
 
 // definitionKinds/referenceKinds are §4.2's closed sets. A capture suffix outside either map is
@@ -121,6 +129,7 @@ func Extract(root *sitter.Node, source []byte, id ID) ([]Symbol, []Reference, er
 				NameStartByte: int(nameNode.StartByte()),
 				NameEndByte:   int(nameNode.EndByte()),
 				NameStart:     pointOf(nameNode.StartPosition()),
+				BlockIndex:    -1,
 			}
 			key := [4]any{sym.Kind, sym.Name, sym.StartByte, sym.EndByte}
 			if !seenSym[key] {
@@ -138,6 +147,7 @@ func Extract(root *sitter.Node, source []byte, id ID) ([]Symbol, []Reference, er
 				StartByte:  int(refNode.StartByte()),
 				EndByte:    int(refNode.EndByte()),
 				StartPoint: pointOf(refNode.StartPosition()),
+				BlockIndex: -1,
 			}
 			key := [4]any{ref.Kind, ref.Name, ref.StartByte, ref.EndByte}
 			if !seenRef[key] {
