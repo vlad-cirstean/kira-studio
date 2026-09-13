@@ -1,5 +1,6 @@
 import { reactive } from 'vue';
 import { openApiRequestTab, openGrpcRequestTab } from '../api/tabs';
+import { openQuickOpen } from '../repo/state/quickOpen';
 import { openCreateDialog } from '../state/connections';
 import { toggleOperationsPanel, toggleProjectPanel } from '../state/layout';
 import { activeTab } from '../state/mode';
@@ -57,6 +58,10 @@ export const paletteCommands: PaletteCommand[] = [
   // C7 S10: registered by RepoPanel.vue while mounted — a no-op outside a repo workspace, the
   // same view-scoped shape every other runCommand entry in this list already has.
   { id: 'repo.search', label: 'Search in repository', run: () => runCommand('repo.search') },
+  // C9 D6: gated on the active workspace directly (openQuickOpen's own repoIdOfWorkspace check),
+  // not the registerCommand/runCommand shape repo.search above uses — quick open needs no mounted
+  // panel to be meaningful, unlike repo.search's segmented-control switch.
+  { id: 'repo.quickOpen', label: 'Quick Open…', run: openQuickOpen },
   { id: 'view.refresh', label: 'Refresh', run: () => runCommand('view.refresh') },
   { id: 'view.run', label: 'Run statement', run: () => runCommand('view.run') },
   { id: 'view.run-all', label: 'Run all', run: () => runCommand('view.run-all') },
