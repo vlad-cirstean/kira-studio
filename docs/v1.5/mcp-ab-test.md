@@ -18,8 +18,16 @@ Both arms get:
 
 1. The same Opus planning prompt, word-for-word, run in parallel — one plan per arm, each
    committed to its own worktree/branch.
-2. Once both plans land, the same Sonnet implementation handoff, run in parallel, each
-   implementing its own arm's plan to completion (build, tests, verification) on its own branch.
+2. **Pick the better of the two plans** (correctness, completeness, fit with C5/C6's shipped
+   shape) and use that single plan for both arms' implementation. Implementing two different
+   plans would let a plan-quality difference explain an implementation-time or token difference —
+   the number would then reflect "which plan was better," not "does the MCP server help." Using
+   one plan for both makes the implementation stage's only variable the MCP server's presence.
+   Note which plan won and why, but discard the losing plan's own implementation-relevant content
+   — it does not get built.
+3. The same Sonnet implementation handoff, run in parallel, each implementing the **one chosen
+   plan** to completion (build, tests, verification) on its own branch — Arm A with the MCP
+   server registered, Arm B without.
 
 C7 was chosen (over a smaller synthetic task) for being real, bounded, and genuinely
 implementation-dependent: it needs the agent to choose a Go-native search implementation (a
@@ -31,12 +39,17 @@ implementations of something C9-sized was judged too expensive to run twice for 
 
 ## Metrics
 
-For each stage (planning, implementation), each arm:
+Planning stage (both plans, before one is picked): `subagent_tokens` and `duration_ms` per arm,
+tool-call count/shape, and which plan was chosen plus why — recorded for transparency, but not
+the headline number (see Design step 2: a plan-quality gap would confound it).
 
-- `subagent_tokens` and `duration_ms` from that agent's own completion report.
+Implementation stage (the number this test is actually for — one plan, two arms):
+
+- `subagent_tokens` and `duration_ms` from each arm's own completion report.
 - Tool-call count and shape (how much of it is repo-map queries vs. Read/Grep/Glob) for Arm A.
-- Whether the two arms converge on materially the same design/implementation, or diverge, and if
-  they diverge, whether one is meaningfully more correct.
+- Whether the two arms converge on materially the same implementation, or diverge, and if they
+  diverge, whether one is meaningfully more correct — with a fixed plan, a divergence here is
+  itself a finding about what the MCP server changed.
 
 ## Mechanics still to confirm at run time
 
