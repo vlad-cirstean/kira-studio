@@ -24,6 +24,8 @@
     "build:test": "cd apps/kira-studio/frontend && bun run build:test",
     "build:vscode": "bun run scripts/build-vscode.ts",
     "package:vscode": "bun run scripts/package-vscode.ts",
+    "mcp:repo-map": "bun run scripts/mcp-repo-map.ts",
+    "mcp:repo-map:build": "go build -o apps/kira-studio/bin/kira-repo-map ./apps/kira-studio/cmd/kira-repo-map",
     "lint": "biome check . && sh scripts/check-tokens.sh",
     "format": "biome check --write .",
     "typecheck": "sh -c 'bun run typecheck:tests & p1=$!; bun run typecheck:web & p2=$!; bun run typecheck:unit & p3=$!; bun run typecheck:api-core & p4=$!; bun run typecheck:git & p5=$!; fail=0; wait $p1 || fail=1; wait $p2 || fail=1; wait $p3 || fail=1; wait $p4 || fail=1; wait $p5 || fail=1; exit $fail'",
