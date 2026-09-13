@@ -6,6 +6,8 @@ import { openApiRequestTab } from './api/tabs';
 import { control } from './bridge/control';
 import ConnectionDialog from './project/ConnectionDialog.vue';
 import DataGripImportDialog from './project/DataGripImportDialog.vue';
+import QuickOpen from './repo/QuickOpen.vue';
+import { openQuickOpen } from './repo/state/quickOpen';
 import CommandPalette from './shortcuts/CommandPalette.vue';
 import { runCommand } from './shortcuts/commands';
 import { togglePalette } from './shortcuts/state';
@@ -60,8 +62,7 @@ onMounted(() => {
     control.onToggleProjectPanel(toggleProjectPanel),
     control.onToggleOperationsPanel(toggleOperationsPanel),
     control.onCommandPalette(togglePalette),
-    // C9 S1: stub, wired to the real quick-open store at S5.
-    control.onQuickOpen(() => {}),
+    control.onQuickOpen(openQuickOpen),
     control.onTabNext(activateNextTab),
     control.onTabPrev(activatePrevTab),
     control.onTabClose(closeActiveTab),
@@ -93,6 +94,7 @@ onUnmounted(() => {
   <ConfirmDialog />
   <ContextMenu />
   <CommandPalette />
+  <QuickOpen />
   <AppTooltip />
 </template>
 
