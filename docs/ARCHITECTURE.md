@@ -1137,6 +1137,60 @@ worktree-vs-HEAD diff tab — still entirely read-only.**
   anything; the diff editor computes its diff there. Measured chunk delta (`bun run build`): the
   diff contribution was already inside `register.all.js` (C5's own bundle), so the Monaco chunk size
   is unchanged by this phase — confirmed, not just assumed, against a real build.
+- **A reveal (a search result, or a go-to-definition candidate) now applies to a tab whose editor
+  is already mounted and active, not only on mount** (C7 D12, `views/repo/reveal.ts`) — the case
+  the paragraph above left implicit. `RepoFileView.vue` still applies its own persisted
+  `state.revealLine` on mount, but `openRepoFileTab`'s reveal option now also calls
+  `requestReveal`, which moves the cursor immediately (`setSelection` +
+  `revealRangeInCenterIfOutsideViewport`) when that tab's editor is already live, and stores the
+  request for the next mount to consume otherwise. Before this, a match inside the file already
+  open and active moved nothing at all.
+
+**Search (C7): Go-native, repository-wide and in-file, still entirely read-only.**
+
+- **No search library — RE2 (stdlib `regexp`) plus `git ls-files` plus a bounded worker pool
+  already written twice in this repo *is* the library answer.** A text search is four parts:
+  pattern matching (RE2 — linear time, so a user-typed pattern can never hang the app), ignore
+  semantics (`codeindex.EnumerateAll`, the same `git ls-files -z --cached --others
+  --exclude-standard` the project tree already uses — D2), concurrency (a channel-fed worker pool
+  shaped exactly like `codeindex.Sync`'s own `parseStale`), and a scanner (`internal/codeworkspace/
+  search.go`, hand-rolled because this is where the app's own rules actually live: binary/size/
+  long-line gates, UTF-16 columns, preview windowing). An indexed engine
+  (`sourcegraph/zoekt`, `google/codesearch`) was declined for building and serving a *second* index
+  this chapter doesn't need, when the whole point is grepping the worktree as it is right now.
+- **Enumeration is unchanged and unwidened — the same `codeindex.EnumerateAll` the project tree
+  already calls.** `.git` internals are never reported (git's own rule), and a repository that
+  commits its dependencies (a vendored `vendor/` tree) gets them searched, because they're part of
+  what that repository is — a hardcoded skip list would be wrong in both directions, hiding a
+  deliberately-committed tree and missing everything it doesn't happen to name.
+- **Three skip rules, cheapest first, and the skip count is always reported, never silent**
+  (`FilesSkipped` in the status line): a path failing `pathsafe.ValidateRelPath` (the same
+  containment check every other read in this chapter goes through — a search touches every file in
+  the worktree, unlike the tree, which only reads what's clicked, so a committed symlink pointing
+  at `~/.ssh/id_rsa` is a real risk here, not a theoretical one); a NUL byte in the first 8 KiB (the
+  identical rule `ReadFile`/`codeindex.classifyAndRead` already use) or a file over `MaxReadBytes`
+  reused verbatim (a match in a file the viewer can't open is a result nobody can click); a NUL
+  found only later, checked once per matching line rather than once per line scanned, which drops
+  the whole file including matches already collected for it.
+- **A match's column is computed by `utf16Units`, extracted out of `LineIndex.Position` (C7 S1)** —
+  the scanner has one line in hand, not a whole file, so it cannot call `LineIndex` directly, but it
+  must use the identical UTF-16 rules or a result click could land the cursor a column off on any
+  line with a non-ASCII rune.
+- **Results stream over a new coalescing push channel, `kira:code:search`** — `ChannelGrpcCall`'s
+  own D8 shape restated (flush on 60 ms/an accumulated match count/the terminal event, which always
+  fires even on cancel), `EmitTo`'d to the one window that asked. One search in flight per
+  workspace (`Session.BeginSearch`/`CancelSearch`): starting a new one cancels whatever that
+  workspace's previous search was running, and `Session.Close` cancels it too — not a queue, since
+  the UI has exactly one query box per workspace.
+- **The results surface is the repo panel's own left-panel Files/Search switch, not a new tab
+  kind** — a user clicks several results in turn, and an opened file takes over the main area, so a
+  results-in-a-tab design would lose the list behind the first click with no way back but the tab
+  strip. Costs no new tab-kind vocabulary at all.
+- **In-file search is Monaco's own find widget** (`features/register.all.js` already ships it) —
+  `RepoFileView.vue`/`RepoDiffView.vue` each just register the existing `view.find` command onto
+  it; the diff editor runs it against `getModifiedEditor()` specifically, since
+  `IStandaloneDiffEditor` itself has no `getAction` and the worktree pane is the one whose content
+  matches the file on disk.
 
 **Why a content snapshot and not just a commit sha.** The trivial case — nothing rewritten since
 the last review — is `git merge-base --is-ancestor <lastReviewedSha> HEAD`; when that succeeds an
@@ -3104,3 +3158,13 @@ place. `CLAUDE.md` states the process rule; this is the list itself.
   is always computed against the file's bytes *on disk right now*, not the bytes Monaco's model
   last loaded; the watcher keeps the index converging on the same signal, so the window is narrow,
   but a hover or jump landing mid-drift can be off by a line until the next sync catches up.
+- **C7's repository-wide search has no include/exclude filter.** A repository that commits its
+  dependencies (a vendored `vendor/` tree) searches them, because enumeration is unchanged
+  `codeindex.EnumerateAll` — the right answer is a glob library (`bmatcuk/doublestar` or
+  `gobwas/glob`, both MIT, since `path.Match` has no `**`) plus a two-field UI, deferred whole
+  rather than half-built.
+- **C7's search results are a point-in-time snapshot with no live update.** A file changed,
+  created or deleted after a search ran is not reflected until the search is re-run — the same
+  posture C5's project tree already takes for its own listing.
+- **C7's search cannot match a pattern spanning multiple lines.** The scanner hands the matcher one
+  line at a time (`^`/`$` anchor per line, D5); a `--multiline`-equivalent search is out of scope.

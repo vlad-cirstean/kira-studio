@@ -50,6 +50,15 @@ the chapter's own record of what dogfooding actually found, not a scratch TODO l
   (verified: same-file/`sameDirectory` calls resolve `exact`, a name matched only by search resolves
   `repoWide` — identical behaviour to a `.ts` file, since both go through the same `codegraph`
   engine once past the template/script boundary).
+- **Non-trivial (C7, round-2 re-run against the C8-improved server)**: `find_definition` called
+  with `symbol` alone (no `file`) for `grpcCoalescer` — a real, unexported Go type
+  (`internal/bridge/grpc.go:364`) — returned `no definitions found for ""`, the empty string in
+  quotes rather than the query itself (`"grpcCoalescer"`). `search_symbols` found it immediately at
+  the same position. Not investigated further (the C8-improved server's own resolution logic, not
+  this chapter's own code, is out of this phase's scope), but worth a fix pass: at minimum the error
+  message should echo the query it failed to resolve; ideally bare-`symbol` resolution for a type
+  (as opposed to a function/method) should work the same way `search_symbols` already proves it's
+  indexed. Worked around by falling back to `search_symbols` for this one lookup.
 
 <!--
 Entry template:
