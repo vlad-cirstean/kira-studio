@@ -152,19 +152,39 @@ tools: `find_definition`, `find_references`, `find_implementations`, `search_sym
 `search_files`, `outline_file`. Ask it instead of opening whole files to find a symbol — the tokens
 that saves are the point.
 
-**Use it when working in this repository.** Standing expectation, not a demo: register it at session
-start and navigate with it.
+**Use it when working in this repository.** Standing expectation, not a demo: start it and navigate
+with it.
 
 Headless setup, for a session with no GUI:
 
 1. `bun run mcp:repo-map:build` — once per clone, since the first build is slow (cgo).
 2. `bun run mcp:repo-map` — rebuilds (cached, sub-second), then serves in the foreground; background
-   it if a later command in the same invocation must reach it. It serves this worktree's root.
+   it, since the next steps need the same shell. It serves this worktree's root.
    `bun run mcp:repo-map --repo <path>` serves another checkout instead.
-3. Run the registration command it prints on startup:
-   `claude mcp add --transport http --scope user kira-repo-map http://127.0.0.1:8765/mcp --header
-   "Authorization: Bearer <token>"`. Copy it, never retype it — the token is per repository, and the
-   port falls back off 8765 when something else holds it.
+3. `claude mcp add --transport http --scope user kira-repo-map http://127.0.0.1:8765/mcp --header
+   "Authorization: Bearer <token>"` — the command it prints on startup. **In an agent-harness
+   session (this one, and every subagent spawned in it) this registers but never actually surfaces
+   the six tools** — the tool manifest here is fixed when the session starts, not read from MCP
+   config at runtime, confirmed by checking a genuinely fresh sibling session: it saw zero MCP
+   servers configured, not just this one missing. Run the command anyway (`claude mcp list` then
+   reports "✓ Connected", useful as a smoke check the server itself is healthy) but don't expect
+   `ToolSearch` or a native `mcp__kira-repo-map__*` tool call to work.
+4. **Call it over plain HTTP/JSON-RPC instead** — the actual working path in this harness:
+   ```
+   curl -s http://127.0.0.1:8765/mcp -H "Authorization: Bearer <token>" \
+     -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" \
+     -d '{"jsonrpc":"2.0","id":1,"method":"tools/call",
+          "params":{"name":"search_symbols","arguments":{"query":"<name>","limit":10}}}'
+   ```
+   Response arrives as one `event: message` / `data: {...}` line (SSE framing over a single
+   response, not a stream) — the payload is standard JSON-RPC, `result.content[0].text` is the
+   answer. `tools/list` (no `params` needed beyond `{}`) returns every tool's real name and
+   JSON Schema — read a tool's actual `inputSchema` before calling it rather than guessing a
+   parameter name (`search_symbols` takes `query`, not `symbol`, for instance). The same six tools
+   as the native surface: `find_definition`, `find_references`, `find_implementations`,
+   `search_symbols`, `search_files`, `outline_file`. The token savings this server exists for come
+   from the response being a targeted answer instead of a whole file, which curl doesn't change —
+   only the transport is manual, not the value.
 
 Each repository's token is stored hashed under `KIRA_HOME`, so a later run reuses it and prints a
 note instead of a command; an already-registered client keeps working. To mint a fresh one, delete
