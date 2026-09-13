@@ -1,6 +1,8 @@
 import type { RepoSummary } from '@shared/domain/repo';
 import { reactive } from 'vue';
 import { control } from '../bridge/control';
+import { dropRepoTree } from '../repo/state/fileTree';
+import { closeRepoWorkspace } from './workspace';
 
 // C5 §3.4: the repo list store, ConnectionsRepo's own shape for a repository entry — hydrate,
 // import, rename, remove. No connect/disconnect lifecycle (a repository is a path, not a live
@@ -35,7 +37,13 @@ export async function renameCodeRepo(id: string, name: string): Promise<void> {
   if (idx >= 0) codeReposState.records[idx] = repo;
 }
 
+// The Go side already dropped this repo's own tab rows in the same transaction (CodeReposRepo.Remove)
+// — this is the frontend half of that: the workspace's own in-memory tabs (and its file-tree cache)
+// would otherwise point at a repository that no longer exists, and closeRepoWorkspace is a no-op
+// when the workspace was never open in the first place.
 export async function removeCodeRepo(id: string): Promise<void> {
   await control.codeWorkspaceRemoveRepo(id);
   codeReposState.records = codeReposState.records.filter((r) => r.id !== id);
+  closeRepoWorkspace(id);
+  dropRepoTree(id);
 }

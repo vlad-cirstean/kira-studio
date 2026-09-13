@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { nextTick, ref } from 'vue';
+import { computed, nextTick, ref } from 'vue';
 import FiltersDialog from '../../project/FiltersDialog.vue';
 import ProjectTree from '../../project/ProjectTree.vue';
 import SchemaDialog from '../../project/SchemaDialog.vue';
@@ -26,6 +26,14 @@ import TextField from '../../theme/primitives/TextField.vue';
 const reposCollapsed = ref(false);
 const selectedRepoId = ref<string | null>(null);
 const importError = ref<string | null>(null);
+
+// §3.4: "The panel search filters repo names by substring alongside the tree's own filtering" —
+// the same treeState.search box, read here too rather than a second search field.
+const filteredRepos = computed(() => {
+  const query = treeState.search.trim().toLowerCase();
+  if (!query) return codeReposState.records;
+  return codeReposState.records.filter((r) => r.name.toLowerCase().includes(query));
+});
 
 async function onImport(): Promise<void> {
   importError.value = null;
@@ -164,7 +172,7 @@ function onRepoContextMenu(e: MouseEvent, id: string, name: string, root: string
         </button>
         <div v-if="!reposCollapsed" class="repo-list">
           <div
-            v-for="repo in codeReposState.records"
+            v-for="repo in filteredRepos"
             :key="repo.id"
             class="repo-row"
             :class="{ selected: selectedRepoId === repo.id }"
