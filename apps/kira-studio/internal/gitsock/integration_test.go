@@ -151,18 +151,28 @@ func (c *testClient) request(method string, params any) wireFrame {
 	env := wireEnvelope{Version: gitrpc.ContractVersion, Body: wireFrame{T: "req", ID: id, Method: method, Params: paramsJSON}}
 	c.sendRaw(env)
 
-	raw, err := readFrame(c.r)
-	if err != nil {
-		c.t.Fatalf("read response: %v", err)
+	// The op this request triggers can itself emit an 'evt' frame (repo.changed) before its own
+	// 'res' arrives — the production client (git-ipc's rpc.ts, createRpcClient) dispatches every
+	// frame by its own T and only matches 'res' frames against a pending request id, so an 'evt'
+	// never gets mistaken for a response. Mirror that here instead of trusting positional order:
+	// skip any interleaved event rather than failing on its zero-value id.
+	for {
+		raw, err := readFrame(c.r)
+		if err != nil {
+			c.t.Fatalf("read response: %v", err)
+		}
+		var respEnv wireEnvelope
+		if err := json.Unmarshal(raw, &respEnv); err != nil {
+			c.t.Fatalf("unmarshal response: %v\n%s", err, raw)
+		}
+		if respEnv.Body.T == "evt" {
+			continue
+		}
+		if respEnv.Body.ID != id {
+			c.t.Fatalf("response id %d, want %d", respEnv.Body.ID, id)
+		}
+		return respEnv.Body
 	}
-	var respEnv wireEnvelope
-	if err := json.Unmarshal(raw, &respEnv); err != nil {
-		c.t.Fatalf("unmarshal response: %v\n%s", err, raw)
-	}
-	if respEnv.Body.ID != id {
-		c.t.Fatalf("response id %d, want %d", respEnv.Body.ID, id)
-	}
-	return respEnv.Body
 }
 
 // openStream sends an 'open' frame for method and returns its id — the caller grants credit and
