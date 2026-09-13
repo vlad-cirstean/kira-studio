@@ -2,6 +2,7 @@ import type { RepoSummary } from '@shared/domain/repo';
 import { reactive } from 'vue';
 import { control } from '../bridge/control';
 import { dropRepoTree } from '../repo/state/fileTree';
+import { dropQuickOpen } from '../repo/state/quickOpen';
 import { dropRepoSearch } from '../repo/state/search';
 import { closeRepoWorkspace } from './workspace';
 
@@ -48,4 +49,5 @@ export async function removeCodeRepo(id: string): Promise<void> {
   closeRepoWorkspace(id);
   dropRepoTree(id);
   dropRepoSearch(id);
+  dropQuickOpen(id);
 }
