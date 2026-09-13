@@ -1,6 +1,8 @@
 // Package codeindex is the SQLite-backed symbol/reference cache C1 builds over internal/
-// codeparse's output (docs/v1.5/plans/C1-tree-sitter-sqlite-cache.md). Pure Go — codeparse is the
-// only cgo package this phase adds.
+// codeparse's output (docs/v1.5/plans/C1-tree-sitter-sqlite-cache.md). Pure Go on every platform
+// except its own darwin watcher backend (watch_fsevents_darwin.go, darwin && cgo — the same
+// exception gitclient's own repo watcher makes, with the same working !darwin || !cgo companion);
+// codeparse is the only package this phase adds that is unconditionally cgo.
 package codeindex
 
 import (
@@ -112,8 +114,10 @@ func (s *Store) ensureOpen() (*sql.DB, error) {
 		return nil, err
 	}
 
-	// S7 wires reaper.go's idle-repository sweep in here, after migrate — matching gitreview's
-	// own ensureOpen ordering (schema first, then a sweep that assumes it).
+	if err := sweepIdleRepos(sqlDB); err != nil {
+		_ = sqlDB.Close()
+		return nil, fmt.Errorf("codeindex: startup sweep: %w", err)
+	}
 
 	s.sqlDB = sqlDB
 	return s.sqlDB, nil

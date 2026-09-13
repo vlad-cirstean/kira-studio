@@ -101,11 +101,21 @@ func (idx *Index) Sync(ctx context.Context) (SyncStats, error) {
 		stats.FilesDeleted = len(deleted)
 	}
 
-	if err := idx.store.SetMeta(ctx, idx.repoID, "last_full_sync_at",
-		strconv.FormatInt(time.Now().UnixMilli(), 10)); err != nil {
+	now := strconv.FormatInt(time.Now().UnixMilli(), 10)
+	if err := idx.store.SetMeta(ctx, idx.repoID, "last_full_sync_at", now); err != nil {
+		return stats, err
+	}
+	if err := idx.touch(ctx, now); err != nil {
 		return stats, err
 	}
 	return stats, nil
+}
+
+// touch records this repository as just used (§5.4's idle-repository sweep oracle, reaper.go) —
+// called by every Sync and by the watcher's own per-event work, so a repository under active,
+// watcher-driven editing with no full Sync in between still counts as recently used.
+func (idx *Index) touch(ctx context.Context, nowMillis string) error {
+	return idx.store.SetMeta(ctx, idx.repoID, "last_used_at", nowMillis)
 }
 
 func (idx *Index) absPath(relPath string) string {
@@ -200,10 +210,16 @@ func (idx *Index) isStale(relPath string, existingByPath map[string]FileRow) boo
 	return info.Size() != existing.SizeBytes || info.ModTime().UnixNano() != existing.MtimeUnixNs
 }
 
-// parseOne reads, classifies and (when supported) parses one file, returning the FileWrite Sync
-// hands to the store. A read/stat failure is reported as parse_status='unreadable' rather than a
-// hard error — Sync's own job is to make the cache agree with disk, and one unreadable file (a
-// permission change, a broken symlink) must not abort the whole pass.
+// parseOne reads, classifies and (when supported) parses one file, returning the FileWrite the
+// caller hands to the store — Sync's own stale-file pass and the watcher's per-file reparse both
+// go through this one path. A read/stat failure is reported as parse_status='unreadable' rather
+// than a hard error — the caller's job is to make the cache agree with disk, and one unreadable
+// file (a permission change, a broken symlink) must not abort a whole Sync pass.
+//
+// Reparse rather than Parse: Session.Reparse already falls back to a fresh Parse when nothing is
+// resident for this path (first sync, or an evicted entry), so calling it unconditionally here —
+// rather than branching on whether this is "the first time" — gets every file the incremental
+// path for free the moment something keeps its tree resident (a prior Sync, or the watcher).
 func (idx *Index) parseOne(ctx context.Context, relPath string, lang codeparse.ID) (FileWrite, error) {
 	full := idx.absPath(relPath)
 	info, statErr := os.Stat(full)
@@ -221,7 +237,7 @@ func (idx *Index) parseOne(ctx context.Context, relPath string, lang codeparse.I
 		return w, nil
 	}
 
-	result, err := idx.session.Parse(ctx, full, content, lang)
+	result, err := idx.session.Reparse(ctx, full, content, lang)
 	if err != nil {
 		// A genuine parse-pipeline error (a bad grammar registration, a cancelled context) is
 		// still reported as unreadable rather than aborting the whole Sync — the file's row is

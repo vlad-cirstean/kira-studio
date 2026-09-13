@@ -42,6 +42,7 @@ originally written rather than corrected to match later reality — see each cha
 | Outbound HTTP client (P2, body modes P3, request timeline P10) | plain `net/http` (`apps/kira-studio/internal/httpclient/`), **no client/retry/URL-parsing/multipart-builder dependency at all** | the same "no driver dependency" shape the ClickHouse adapter already established (below): one package-level `*http.Client`, a 30s timeout applied via `context.WithTimeout` rather than `Client.Timeout` (so the Stop button and a timeout abort an in-flight body read the same way), redirects followed and every hop recorded up to 10, TLS verification always on, `http.ProxyFromEnvironment`. Reachable only from Go — the webview's own `fetch` is never used (`docs/ARCHITECTURE.md`'s own "Go owns the network" invariant, below). P3 adds every body mode this app's request builder supports — none/raw/code/urlencoded/formdata/file (`internal/httpclient/body.go`) — over the same one dependency-free package: a two-pass `mime/multipart` writer computes an *exact* `Content-Length` from a fixed boundary's deterministic framing before streaming a single byte, so a form-data or binary send is never chunked and never guesses. P10 adds one `net/http/httptrace.ClientTrace`, stdlib, installed once per send: every redirect hop's own DNS/connect/TLS/wait/download phases, bucketed by the same `checkRedirect` that already threads `Response.Redirects` through (below) |
 | Outbound gRPC client (P11) | `google.golang.org/grpc` + `google.golang.org/protobuf` (`dynamicpb`/`protojson`/`protodesc`/`protoregistry`, grpc-go's own reflection client) + `bufbuild/protocompile`, all in `apps/kira-studio/internal/grpcclient/` — **no generated `.pb.go` code, no `protoc`/`buf` build step** | dynamic, schema-at-runtime: a method is discovered via server reflection or a supplied `.proto` (compiled by `protocompile`, the same compiler `buf` uses, with no codegen), then called through `dynamicpb`/`protojson` against a descriptor `grpc.NewClient` never needed ahead of time. Unary and server-streaming only — client- and bidi-streaming are out of scope. The largest single dependency this app has taken, **≈14.2 MB** of binary (measured `linux/amd64`, no flags) — the *same order* as `pgx` + `mongo-driver/v2` + both AWS SDK clients + `franz-go` combined (≈13.5 MB), in a binary that already links ten database adapters. Every descriptor source (a reflection round-trip, a compiled `.proto`) gets its **own** private `*protoregistry.Files` — never `protoregistry.GlobalFiles`, which panics outright on a duplicate file path, a realistic outcome for two users' `.proto` files both declaring the same `package` |
 | Git module transport (v1.3) | A Unix domain socket plus `internal/bridge/rpcstream`'s correlated-RPC-with-credits protocol — JSON control frames, FlatBuffers bulk payloads (`"KIG1"`) | The git module is **headless**: the backend is in this binary, the frontend is a separately-installed VS Code extension (`apps/kira-studio-vscode`) reached over `${KIRA_HOME}/git.sock`. **The transport itself took no new runtime dependency** — `net` and `encoding/json` plus the FlatBuffers runtimes P11 already put in the graph. What the module *did* add: `github.com/fsnotify/fsevents` (the darwin repo watcher, `darwin && cgo`, G9), `golang.org/x/text/unicode/norm` (NFC path normalization, G27), and `@vscode/vsce` as a build-time-only packager. See the Git module section below |
+| Code parsing (C1) | `github.com/tree-sitter/go-tree-sitter` (the official cgo binding) plus ten upstream grammar modules — java, python, javascript, typescript+tsx, go, rust, html, css, json, svelte, all MIT | `internal/codeparse` is the only package in the repo importing tree-sitter, and the only unconditionally-cgo one (every other cgo file in the app is a `darwin && cgo`-gated exception, below) — a real, priced cost: a C compiler becomes a build requirement for this package and anything importing it, and `CGO_ENABLED=0` no longer builds such a caller. Declined every pure-Go alternative found: `gotreesitter` is a from-scratch reimplementation of the parse-table interpreter and every external scanner (3.9x slower per its own README, with 3 of 206 grammars already degraded), a materially different risk than `modernc.org/sqlite`'s mechanical transpilation of the same upstream C; `malivvan/tree-sitter` (a wasm build under `wazero`, the right architecture) is 5 stars/3 commits/self-described pre-release; building that wasm ourselves would mean owning a toolchain and a regeneration script for a capability the packaged darwin build already has via cgo. Every grammar reports ABI 14, inside the binding's own compatible range [13, 15] (`TREE_SITTER_MIN_COMPATIBLE_LANGUAGE_VERSION`/`TREE_SITTER_LANGUAGE_VERSION`), checked at construction. Binary size delta measured the same way P11's own gRPC dependency was (a minimal program against a `println` baseline, `linux/amd64`, no flags): **+6.6 MB** for the grammar registry alone. Vue has no grammar of its own (no Go module exists) and is parsed as an HTML container with per-block injection instead |
 
 Driver libraries — the best-maintained option per engine, **Go-native for all ten kinds as of P58e
 M9.3** (checkpoint C2): `jackc/pgx/v5` (postgres), `go-sql-driver/mysql` (mariadb/mysql, via a shared
@@ -821,6 +822,24 @@ inclusive line ranges expressed in the **snapshot's** coordinates rather than th
 and `review_comment`, the flat file/line AI-comment list, anchored by both a commit sha and that
 path's blob oid at that commit. Sessions are purged after 14 days idle — returning after that
 window starts clean, by design rather than as an error case.
+
+**A third SQLite file, `codeindex.db`, the same reason as the second (C1).** The tree-sitter parse
+cache — per-file declarations, references and injected-block ranges over every repository this
+process has indexed — lives in its own file for the same lifecycle reason `review.db` does:
+order-of-100-MB, rewritten constantly, nothing like settings/tab state, and `kira.db`'s own
+`SetMaxOpenConns(1)` would serialise a reindex behind every debounced tab save. Unlike `review.db`,
+this is **one shared file across every repository**, not one review session's own state — every
+table carries a `repo_id` column instead, `SetMaxOpenConns(4)` matches the reindex worker pool's own
+size, and dropping one repository's data is `DELETE FROM file WHERE repo_id = ?` (cascading to its
+blocks/symbols/references) rather than a file removal, reclaimed afterward by the same
+`_auto_vacuum=INCREMENTAL` pragma every SQLite file in this app already sets. WAL matters more here
+than anywhere else in the app: C3's MCP server is a **separate process** reading this file while the
+studio app writes it. A stored `meta.parser_fingerprint` (a hash over every grammar module version
+actually linked plus every vendored query file's own bytes) is checked on every sync; a mismatch —
+a grammar or query upgrade changing what a parse produces — truncates and rebuilds that one
+repository's rows rather than trusting them under a changed extraction contract. A repository
+untouched for 14 days has its rows swept the same way, on any open, the same idle window
+`review.db` uses.
 
 **Why a content snapshot and not just a commit sha.** The trivial case — nothing rewritten since
 the last review — is `git merge-base --is-ancestor <lastReviewedSha> HEAD`; when that succeeds an
@@ -2232,9 +2251,15 @@ GitServer (internal/gitsock)
 - **The reader/writer gate is unchanged** from the single-client design; it now serializes across
   connections instead of within one, which is the whole point of moving it onto the shared entry.
 - **One watcher per repository, fanned out.** It covers `HEAD`, `refs/**`, `packed-refs`, `index`,
-  `FETCH_HEAD`, `MERGE_HEAD`, `rebase-*`, `CHERRY_PICK_HEAD`, `REVERT_HEAD` and `sequencer` plus
-  the worktree, debounced 200 ms, delivered to each subscriber over its own coalescing buffered
-  channel so one slow client cannot stall the watcher for the others. **The darwin backend is
+  `FETCH_HEAD`, `MERGE_HEAD`, `rebase-*`, `CHERRY_PICK_HEAD`, `REVERT_HEAD` and `sequencer` —
+  `commonDir`/`gitDir` only, never the worktree itself, corrected here since an earlier version of
+  this paragraph claimed otherwise: a source file saved by an editor produces no event on this
+  watcher at all, checked directly against `watcher_fsnotify.go`/`watcher_fsevents_darwin.go`'s own
+  `newBackend`, and its output (`chan Signal`, two values) has no path to carry even if it did.
+  C1's own worktree watcher (`internal/codeindex`) is a second, independent one for exactly this
+  gap — see Storage, above, and the git-module transport row's own `fsevents` entry. Debounced
+  200 ms, delivered to each subscriber over its own coalescing buffered channel so one slow client
+  cannot stall the watcher for the others. **The darwin backend is
   FSEvents** (`gitclient/watcher_fsevents_darwin.go`, `darwin && cgo`), with the `fsnotify`
   implementation kept as the real `!darwin || !cgo` companion a Linux dev/test loop actually runs.
   The reason is a resource bound, not a preference: `fsnotify`'s kqueue path needs one open file

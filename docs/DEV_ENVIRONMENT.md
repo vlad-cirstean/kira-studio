@@ -193,14 +193,19 @@ running it here.
   needs. **Read the installed module source under
   `$(go env GOPATH)/pkg/mod/github.com/wailsapp/wails/v3@<version>/` instead of the docs site** —
   it's the real source for the exact pinned version.
-- **`go test ./apps/kira-studio/internal/...` / `go build ./apps/kira-studio/internal/...` need
-  nothing but the Go toolchain** — every cgo call this app makes (a handful of darwin-only files in
-  `internal/secrets`, `internal/metrics`, `internal/localauth`, `internal/gitclient`'s FSEvents
-  repo watcher, and any package that later follows the same pattern) is behind a `darwin && cgo`
-  build tag with a real, working `!darwin || !cgo` companion, invisible to a Linux build;
-  `modernc.org/sqlite` (the sqlite adapter and the app's own storage) is cgo-free on every
-  platform. Only the `apps/kira-studio` `main` package imports Wails and needs the GTK/WebKit
-  headers, so prefer `./apps/kira-studio/internal/...` for a fast loop.
+- **`go test ./apps/kira-studio/internal/...` / `go build ./apps/kira-studio/internal/...` need a C
+  compiler as of C1** — `internal/codeparse` (the tree-sitter binding plus ten grammar modules) is
+  unconditionally cgo, not behind any build tag, since parsing needs the same C runtime and
+  grammars on every platform this app runs on; `gcc`/`clang` is present in this container and in
+  every environment that already builds the Wails shell, and the first build compiles roughly 34 MB
+  of generated C once (Go's build cache absorbs every build after). `CGO_ENABLED=0` no longer
+  builds a package that imports it. Every *other* cgo call this app makes (a handful of darwin-only
+  files in `internal/secrets`, `internal/metrics`, `internal/localauth`, `internal/gitclient`'s and
+  `internal/codeindex`'s own FSEvents watchers) is still behind a `darwin && cgo` build tag with a
+  real, working `!darwin || !cgo` companion, invisible to a Linux build; `modernc.org/sqlite` (the
+  sqlite adapter and the app's own storage) stays cgo-free on every platform. Only the
+  `apps/kira-studio` `main` package imports Wails and needs the GTK/WebKit headers on top of that,
+  so prefer `./apps/kira-studio/internal/...` for a fast loop.
 - **`GOOS=darwin` cross-compiles here only with `CGO_ENABLED=0`.** A pure-Go package builds and
   vets for `darwin/arm64` from this container (`GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build
   ./…`, exit 0); a cgo one cannot be built for darwin here at all (`CGO_ENABLED=1 GOOS=darwin`
