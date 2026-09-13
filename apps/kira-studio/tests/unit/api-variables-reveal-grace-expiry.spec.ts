@@ -8,8 +8,10 @@
 import './support/window';
 
 import { describe, expect, test } from 'bun:test';
+import { restoreAfterEach } from './support/restoreAfterEach';
 
 const { control } = await import('../../frontend/src/bridge/control');
+restoreAfterEach(control);
 const { revealVariable, revealedValues, clearRevealed } = await import(
   '../../frontend/src/api/state/variables'
 );

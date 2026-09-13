@@ -9,8 +9,10 @@
 import './support/window';
 
 import { describe, expect, test } from 'bun:test';
+import { restoreAfterEach } from './support/restoreAfterEach';
 
 const { control } = await import('../../frontend/src/bridge/control');
+restoreAfterEach(control);
 const { revealHistoryEntry, revealedHistoryValues, openHistoryMenu, closeHistoryMenu } =
   await import('../../frontend/src/api/state/variables');
 const { copyAsCurlDialogState, openCopyAsCurlDialog, revealSecretValues, currentCurlCommand } =

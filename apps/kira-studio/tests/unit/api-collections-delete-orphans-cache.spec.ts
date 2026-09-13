@@ -13,8 +13,10 @@ import './support/window';
 
 import { describe, expect, test } from 'bun:test';
 import type { CollectionItemSummary, CollectionSummary } from '@shared/domain/collections';
+import { restoreAfterEach } from './support/restoreAfterEach';
 
 const { control } = await import('../../frontend/src/bridge/control');
+restoreAfterEach(control);
 const { collectionsState, deleteRow, fetchSavedRequest, savedRequestFor } = await import(
   '../../frontend/src/api/state/collections'
 );
