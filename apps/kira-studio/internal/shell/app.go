@@ -4,6 +4,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapterhost"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/appcore"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/bridge"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitrpc"
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/events"
 )
@@ -126,6 +127,15 @@ func NewDeferredDialogs() (d bridge.Dialogs, attach func(app *application.App, w
 func RegisterEngineStream(app *application.App, router *adapterhost.Router) {
 	app.HandleStream(bridge.StreamName, func(c *application.StreamConn) {
 		bridge.ServeEngineStream(router, c)
+	})
+}
+
+// RegisterGitStream registers the second named stream (C10 §3.2/§3.3) — StreamName's peer,
+// carrying gitrpc's own wire protocol read-only (bridge.ServeGitStream's own allowlist) instead of
+// forwarding to the Node engine child.
+func RegisterGitStream(app *application.App, router *gitrpc.Router) {
+	app.HandleStream(bridge.GitStreamName, func(c *application.StreamConn) {
+		bridge.ServeGitStream(router, c)
 	})
 }
 

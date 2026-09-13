@@ -140,22 +140,27 @@ func main() {
 		slog.Warn("start askpass broker", "scope", "startup", "err", err)
 		askpassBroker = nil
 	}
+	// C10 §3.3/§10 S5: hoisted out of gitsock.Deps.Router literal so the native git stream
+	// (shell.RegisterGitStream, below) can share the exact same Router — one handler table served
+	// over two transports (the socket, for external clients; the in-process Wails stream, for this
+	// app's own renderer), never two independently constructed ones.
+	gitRouter := gitrpc.New(gitrpc.Deps{
+		Discovery: gitDiscovery, Runner: gitRunner, Registry: gitRegistry, ServerVersion: buildinfo.Version,
+		Askpass: askpassBroker,
+		// G18 D11: the settings.setGitPath migration leg's own write path — the exact
+		// SettingsRepo.Set(SettingsPatch{Git: &GitPatch{GitPath: ...}}) shape D11 names,
+		// reused rather than reinvented.
+		SetGitPath: func(gitPath string) error {
+			_, err := repositories.Settings.Set(model.SettingsPatch{Git: &model.GitPatch{GitPath: &gitPath}})
+			return err
+		},
+	})
 	gitSock := gitsock.New(gitsock.Deps{
-		SocketPath: filepath.Join(config.KiraHome(), "git.sock"),
-		LockPath:   filepath.Join(config.KiraHome(), "git.sock.lock"),
-		Clients:    repositories.GitClients,
-		Registry:   gitRegistry,
-		Router: gitrpc.New(gitrpc.Deps{
-			Discovery: gitDiscovery, Runner: gitRunner, Registry: gitRegistry, ServerVersion: buildinfo.Version,
-			Askpass: askpassBroker,
-			// G18 D11: the settings.setGitPath migration leg's own write path — the exact
-			// SettingsRepo.Set(SettingsPatch{Git: &GitPatch{GitPath: ...}}) shape D11 names,
-			// reused rather than reinvented.
-			SetGitPath: func(gitPath string) error {
-				_, err := repositories.Settings.Set(model.SettingsPatch{Git: &model.GitPatch{GitPath: &gitPath}})
-				return err
-			},
-		}),
+		SocketPath:    filepath.Join(config.KiraHome(), "git.sock"),
+		LockPath:      filepath.Join(config.KiraHome(), "git.sock.lock"),
+		Clients:       repositories.GitClients,
+		Registry:      gitRegistry,
+		Router:        gitRouter,
 		ServerVersion: buildinfo.Version,
 		Now:           time.Now,
 	})
@@ -491,6 +496,7 @@ func main() {
 	})
 
 	shell.RegisterEngineStream(app, router)
+	shell.RegisterGitStream(app, gitRouter)
 
 	windowDeps := shell.WindowDeps{Windows: repositories.Windows, StartedAt: startedAt}
 

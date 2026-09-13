@@ -12,6 +12,10 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/ipcerr"
 )
 
+// GitStreamName is the second named stream (docs/v1.5/plans/C10-git-graph-native.md §3.2) —
+// StreamName's peer, carrying gitrpc's own wire protocol instead of adapterhost's.
+const GitStreamName = "git"
+
 // nativeClientID/nativeLabel identify the native graph's own gitsession.Conn in the same two
 // slots an external gitsock client's handshake would fill (ClientID/ClientLabel) — used only for
 // attribution (e.g. the undo slot's "made in this window" label), never for trust: there is no
