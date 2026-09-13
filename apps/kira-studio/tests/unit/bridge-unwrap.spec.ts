@@ -57,15 +57,39 @@ describe('apps/kira-studio/frontend/src/bridge/control.ts — unwrap (P57 D5)', 
     // return no promise — everything else in `control` is a request/response call unwrap must
     // guard (§4.2 rule 1). Four placeholder arguments cover every method's arity; none of
     // control.ts's own wrapper bodies inspect argument shape before handing them to the binding.
+    // Temporary diagnostic (remove once understood): this fails on CI's Linux runners on a method
+    // that keeps changing round to round as each found offender gets fixed — three found and
+    // fixed so far (opsRecent, tabsSave, variablesList, all leaked stubs from other spec files
+    // overriding a control method without restoring it), each via a different TypeScript cast
+    // style, and it still fails. Rather than keep spending one CI round-trip per offender, collect
+    // every one that resolves instead of rejects in a single pass, so whatever is left surfaces
+    // all at once.
     const checked: string[] = [];
+    const offenders: { name: string; value: unknown }[] = [];
     for (const [name, member] of Object.entries(control)) {
       if (typeof member !== 'function') continue;
       if (name.startsWith('on') || name === 'appFlushed' || name === 'windowFlushed') continue;
       const result = (member as (...args: unknown[]) => unknown)('a', 'b', 'c', 'd');
       if (!result || typeof (result as Promise<unknown>).then !== 'function') continue;
       checked.push(name);
-      await expect(result as Promise<unknown>).rejects.toMatchObject({ code: 'E_QUERY' });
+      const outcome = await (result as Promise<unknown>).then(
+        (value) => ({ ok: true as const, value }),
+        (error) => ({ ok: false as const, error }),
+      );
+      if (outcome.ok) {
+        offenders.push({ name, value: outcome.value });
+      } else {
+        try {
+          expect(outcome.error).toMatchObject({ code: 'E_QUERY' });
+        } catch {
+          offenders.push({ name, value: outcome.error });
+        }
+      }
     }
+    if (offenders.length > 0) {
+      console.error('bridge-unwrap diagnostic round 3 — every remaining offender:', offenders);
+    }
+    expect(offenders).toEqual([]);
     // A regression that stops wrapping every method (or a Object.entries change that stops
     // reaching them) should fail loudly here rather than silently checking zero methods.
     expect(checked.length).toBeGreaterThan(30);
