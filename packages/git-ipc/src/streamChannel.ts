@@ -41,14 +41,21 @@ export { MalformedBlobFrameError };
  */
 export interface StreamSocketLike {
   binaryType: string;
-  onopen: (() => void) | null;
+  // biome-ignore lint/suspicious/noExplicitAny: cross-project structural type — see interface doc above.
+  onopen: ((ev: any) => void) | null;
   // biome-ignore lint/suspicious/noExplicitAny: cross-project structural type — see interface doc above.
   onmessage: ((ev: any) => void) | null;
   // biome-ignore lint/suspicious/noExplicitAny: cross-project structural type — see interface doc above.
   onclose: ((ev: any) => void) | null;
   // biome-ignore lint/suspicious/noExplicitAny: cross-project structural type — see interface doc above.
   onerror: ((ev: any) => void) | null;
-  send(data: string | ArrayBufferLike | ArrayBufferView): void;
+  // `ArrayBuffer`, not `ArrayBufferLike` — the latter includes `SharedArrayBuffer`, which the DOM
+  // lib's own real `WebSocket.send` overload does not accept, breaking structural assignability
+  // for that arm of `Stream()`'s own `WailsSocket | WebSocket` return type. `post()` below only
+  // ever sends a string in practice (the client never encodes a blob — this file's own header
+  // comment); the wider signature is kept for fidelity to what a real socket accepts, not because
+  // anything here constructs an ArrayBuffer to send.
+  send(data: string | ArrayBuffer | ArrayBufferView<ArrayBuffer>): void;
   close(): void;
 }
 

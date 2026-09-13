@@ -20,7 +20,7 @@ class MockSocket implements StreamSocketLike {
   readonly sent: unknown[] = [];
   closed = false;
 
-  send(data: string | ArrayBufferLike | ArrayBufferView): void {
+  send(data: string | ArrayBuffer | ArrayBufferView<ArrayBuffer>): void {
     this.sent.push(data);
   }
 
