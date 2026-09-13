@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue';
+import { openRepoFileTab } from '../state/repoTabs';
 import { wrapSelectionOnType } from '../theme/wrapSelection';
 import {
   closeQuickOpen,
@@ -39,10 +40,10 @@ watch(activeIndex, () => {
   });
 });
 
-// C9 S5: the palette lists and filters; opening a row does nothing yet — S6 wires the real
-// openRepoFileTab call in its place.
-function openRow(_row: QuickOpenRow, _preview: boolean): void {
-  closeQuickOpen();
+// D7: the repo's own file-open entry point, verbatim — no `reveal`, since a file has no line to
+// reveal (openRepoFileTab skips both patchRepoFileTabState and requestReveal without it).
+function openRow(row: QuickOpenRow, preview: boolean): void {
+  void openRepoFileTab(quickOpenState.repoId, row.path, { preview });
 }
 
 function runOpenAt(index: number, preview: boolean): void {
