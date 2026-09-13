@@ -3,6 +3,7 @@ import { TAB_KIND_MODE, type TabRecord } from '@shared/domain/tabs';
 import type { WorkspaceKey } from '@shared/domain/workspace';
 import { computed, reactive } from 'vue';
 import { control } from '../bridge/control';
+import { TAB_KINDS } from './tabKinds';
 import { tabsState } from './tabs';
 import { workspaceState } from './workspace';
 
@@ -66,11 +67,21 @@ export function workspaceKeyOf(tab: TabRecord): WorkspaceKey {
   return (tab.workspaceId as WorkspaceKey | null) ?? (TAB_KIND_MODE[tab.kind] as AppMode);
 }
 
-/** Every tab in workspace `key`, in array order — tabsForMode's own generalisation. The pinned-
- *  first partition (§6.1) joins this at S7; until then this is a plain filter, exactly like
- *  tabsForMode was. */
+/** Every tab in workspace `key` — tabsForMode's own generalisation, widened to a genuine stable
+ *  partition (§6.1): every pinned-kind tab of `key` first (in their existing relative order), then
+ *  the rest (ditto), regardless of where each sits in `tabsState.tabs`. Computed here rather than
+ *  relied on as an insertion-order invariant, so the guarantee survives any past or future
+ *  tab-insertion path (splice, restore, moveTab) without each one having to remember to preserve
+ *  it. Two-pass filter/concat, not a comparator sort — a sort's stability is not a property to lean
+ *  on here. */
 export function tabsForWorkspace(key: WorkspaceKey): TabRecord[] {
-  return tabsState.tabs.filter((t) => workspaceKeyOf(t) === key);
+  const pinned: TabRecord[] = [];
+  const rest: TabRecord[] = [];
+  for (const t of tabsState.tabs) {
+    if (workspaceKeyOf(t) !== key) continue;
+    (TAB_KINDS[t.kind].pinned ? pinned : rest).push(t);
+  }
+  return [...pinned, ...rest];
 }
 
 export const activeTab = computed<TabRecord | null>(() => {

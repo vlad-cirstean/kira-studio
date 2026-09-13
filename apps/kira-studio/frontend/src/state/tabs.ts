@@ -366,17 +366,12 @@ export function openTab<S>(
     if (evictedId !== null) {
       // §5.2 rule 3: close-then-insert at the evicted tab's own array position, never mutate its
       // kind in place — closeTab is the one path that frees page stores/runtime for a
-      // discriminated-union record. Clamped to be at or after the workspace's own pinned tabs
-      // (§5.2's last paragraph) so a preview can never land left of the graph tab, defensively —
-      // the evicted tab is never itself pinned (a pinned kind is never opened through the preview
-      // path), so in practice this clamp never actually moves the insert point.
+      // discriminated-union record. No clamp against the workspace's pinned tab here: rendering
+      // order comes from tabsForWorkspace's own computed partition (§6.1, state/mode.ts) and no
+      // longer depends on where a tab physically sits in this array, so this insert can never land
+      // a tab left of the graph tab visually regardless of index.
       const evictedIdx = tabsState.tabs.findIndex((t) => t.id === evictedId);
-      const minIdx = tabsState.tabs.reduce(
-        (max, t, i) =>
-          workspaceKeyOf(t) === workspaceKey && TAB_KINDS[t.kind].pinned ? i + 1 : max,
-        0,
-      );
-      const insertAt = Math.max(evictedIdx < 0 ? tabsState.tabs.length : evictedIdx, minIdx);
+      const insertAt = evictedIdx < 0 ? tabsState.tabs.length : evictedIdx;
       tabsState.tabs.splice(insertAt, 0, record);
       closeTab(evictedId);
     } else {
