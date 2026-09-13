@@ -7,15 +7,18 @@ import { data } from './bridge/data';
 import { knownConnectionIds } from './project/state/tree';
 import { initAppMetrics } from './state/appMetrics';
 import { initCacheStats } from './state/cacheStats';
+import { codeReposState, hydrateCodeRepos } from './state/coderepos';
 import { hydrateConnections } from './state/connections';
 import { hydrateGitClients } from './state/gitClients';
 import { hydrateOps } from './state/ops';
 import { hydrateRepoMap } from './state/repomap';
+import { ensureWorkspaceShell } from './state/repoTabs';
 import { hydrateTabs } from './state/tabs';
 import './theme/base.css';
 import { hydrateLayout } from './state/layout';
 import { hydrateMode } from './state/mode';
 import { hydrateSettings } from './state/settings';
+import { closeRepoWorkspace, workspaceState } from './state/workspace';
 import { planCount as consolePlanCount } from './views/console/explainResults';
 import {
   pageStoreEntries as consolePageStoreEntries,
@@ -289,11 +292,26 @@ async function bootstrap(): Promise<void> {
     hydrateLayout(),
     hydrateSettings(),
     hydrateConnections(),
+    hydrateCodeRepos(),
     hydrateGitClients(),
     hydrateRepoMap(),
     hydrateOps(),
     hydrateTabs(),
   ]);
+  // C5 §4.2: hydrateTabs() already derived workspaceState.openRepos from the restored tabs
+  // themselves, but it cannot yet tell a live repo from one removed since this window last saved
+  // (state/tabs.ts has no reason to depend on state/coderepos.ts otherwise) — now that
+  // hydrateCodeRepos() has resolved alongside it, drop an orphaned workspace outright and give
+  // every surviving one its pinned graph tab (§6.1), exactly like openRepoWorkspace does for one
+  // opened interactively.
+  const liveRepoIds = new Set(codeReposState.records.map((r) => r.id));
+  for (const repoId of [...workspaceState.openRepos]) {
+    if (liveRepoIds.has(repoId)) {
+      ensureWorkspaceShell(repoId);
+    } else {
+      closeRepoWorkspace(repoId);
+    }
+  }
   createApp(App).directive('tooltip', vTooltip).mount('#app');
 }
 

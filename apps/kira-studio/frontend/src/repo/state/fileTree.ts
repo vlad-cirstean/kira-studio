@@ -1,0 +1,200 @@
+import type { FileStatusCode } from '@shared/domain/repo';
+import { reactive } from 'vue';
+import { control } from '../../bridge/control';
+import type { StickyRowLike } from '../../theme/primitives/stickyBand';
+
+// C5 §7.2: the flat path list -> row model fold. No single-child directory compaction (VS Code's
+// `a/b/c` collapsing) — deliberately declined: it complicates the fold, the expand set and reveal,
+// for a cosmetic gain (§7.2's own note, so a later phase adds it on purpose rather than by
+// accident).
+interface FileNode {
+  name: string;
+  path: string; // repository-relative, '' only for the synthetic root
+  isDir: boolean;
+  children: FileNode[];
+}
+
+function buildTree(paths: readonly string[]): FileNode[] {
+  const root: FileNode = { name: '', path: '', isDir: true, children: [] };
+  const dirs = new Map<string, FileNode>([['', root]]);
+
+  for (const p of paths) {
+    const segments = p.split('/');
+    let parent = root;
+    let acc = '';
+    for (let i = 0; i < segments.length - 1; i++) {
+      acc = acc ? `${acc}/${segments[i]}` : segments[i];
+      let node = dirs.get(acc);
+      if (!node) {
+        node = { name: segments[i], path: acc, isDir: true, children: [] };
+        dirs.set(acc, node);
+        parent.children.push(node);
+      }
+      parent = node;
+    }
+    parent.children.push({
+      name: segments[segments.length - 1],
+      path: p,
+      isDir: false,
+      children: [],
+    });
+  }
+
+  sortChildren(root);
+  return root.children;
+}
+
+// Directories before files, each localeCompare-sorted case-insensitive (§7.2).
+function sortChildren(node: FileNode): void {
+  node.children.sort((a, b) => {
+    if (a.isDir !== b.isDir) return a.isDir ? -1 : 1;
+    return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+  });
+  for (const child of node.children) if (child.isDir) sortChildren(child);
+}
+
+function subtreeMatches(node: FileNode, query: string): boolean {
+  if (node.name.toLowerCase().includes(query)) return true;
+  return node.isDir && node.children.some((c) => subtreeMatches(c, query));
+}
+
+export interface RepoTreeRowVm extends StickyRowLike {
+  key: string;
+  name: string;
+  path: string;
+  isDir: boolean;
+  status: FileStatusCode | undefined;
+  matched: boolean;
+}
+
+function flatten(
+  nodes: readonly FileNode[],
+  depth: number,
+  expanded: ReadonlySet<string>,
+  status: Readonly<Record<string, string>>,
+  query: string,
+  out: RepoTreeRowVm[],
+): void {
+  for (const node of nodes) {
+    const matched = query !== '' && node.name.toLowerCase().includes(query);
+    if (query !== '' && !matched && !(node.isDir && subtreeMatches(node, query))) continue;
+    // §7.2: the search box force-expands matching ancestors.
+    const isExpanded =
+      node.isDir && (expanded.has(node.path) || (query !== '' && subtreeMatches(node, query)));
+    out.push({
+      key: node.path || '/',
+      name: node.name,
+      path: node.path,
+      depth,
+      hasChildren: node.isDir && node.children.length > 0,
+      expanded: isExpanded,
+      isDir: node.isDir,
+      status: status[node.path] as FileStatusCode | undefined,
+      matched,
+    });
+    if (node.isDir && isExpanded) flatten(node.children, depth + 1, expanded, status, query, out);
+  }
+}
+
+interface RepoTreeState {
+  paths: string[];
+  status: Record<string, string>;
+  truncated: boolean;
+  tree: FileNode[];
+  expanded: Set<string>;
+  loaded: boolean;
+  loading: boolean;
+  error: string | null;
+}
+
+function emptyTreeState(): RepoTreeState {
+  return {
+    paths: [],
+    status: {},
+    truncated: false,
+    tree: [],
+    expanded: new Set(),
+    loaded: false,
+    loading: false,
+    error: null,
+  };
+}
+
+// One entry per open repo workspace — plain module-level state (not `reactive()` at the top
+// level, mirroring project/state/tree.ts's own per-connection map shape), each value itself
+// reactive so a component reading through it re-renders on change.
+const byRepo = new Map<string, RepoTreeState>();
+
+function stateFor(repoId: string): RepoTreeState {
+  let state = byRepo.get(repoId);
+  if (!state) {
+    state = reactive(emptyTreeState()) as RepoTreeState;
+    byRepo.set(repoId, state);
+  }
+  return state;
+}
+
+/** True once repoId's listing has loaded at least once — RepoPanel.vue's own loading gate. */
+export function isRepoTreeLoaded(repoId: string): boolean {
+  return byRepo.get(repoId)?.loaded ?? false;
+}
+
+export function repoTreeTruncated(repoId: string): boolean {
+  return byRepo.get(repoId)?.truncated ?? false;
+}
+
+export function repoTreeError(repoId: string): string | null {
+  return byRepo.get(repoId)?.error ?? null;
+}
+
+// C5 §7.1: refresh on workspace open and on an explicit Refresh action — nothing live (recorded in
+// docs/ARCHITECTURE.md's Known open items).
+export async function refreshRepoTree(repoId: string): Promise<void> {
+  const state = stateFor(repoId);
+  state.loading = true;
+  state.error = null;
+  try {
+    const listing = await control.codeWorkspaceListFiles(repoId);
+    state.paths = listing.paths;
+    state.status = listing.status;
+    state.truncated = listing.truncated;
+    state.tree = buildTree(listing.paths);
+    // §7.2: "the repo root's own children expanded on first open" — only on the very first load,
+    // so a later Refresh never re-expands whatever the user has since collapsed.
+    if (!state.loaded) {
+      for (const node of state.tree) if (node.isDir) state.expanded.add(node.path);
+    }
+    state.loaded = true;
+  } catch (err) {
+    state.error = err instanceof Error ? err.message : String(err);
+  } finally {
+    state.loading = false;
+  }
+}
+
+export function ensureRepoTreeLoaded(repoId: string): void {
+  const state = stateFor(repoId);
+  if (state.loaded || state.loading) return;
+  void refreshRepoTree(repoId);
+}
+
+export function toggleRepoDir(repoId: string, path: string): void {
+  const state = byRepo.get(repoId);
+  if (!state) return;
+  if (state.expanded.has(path)) state.expanded.delete(path);
+  else state.expanded.add(path);
+}
+
+export function visibleRepoRows(repoId: string, search: string): RepoTreeRowVm[] {
+  const state = byRepo.get(repoId);
+  if (!state) return [];
+  const rows: RepoTreeRowVm[] = [];
+  flatten(state.tree, 0, state.expanded, state.status, search.trim().toLowerCase(), rows);
+  return rows;
+}
+
+/** Drops repoId's own cached tree — RemoveRepo's own cleanup (a removed repo's tree state must not
+ *  outlive it, however briefly, in this module-level map). */
+export function dropRepoTree(repoId: string): void {
+  byRepo.delete(repoId);
+}

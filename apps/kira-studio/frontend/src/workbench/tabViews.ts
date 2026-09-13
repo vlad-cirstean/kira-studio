@@ -10,6 +10,8 @@ import DataTabView from '../views/grid/DataView.vue';
 import GrpcRequestTabView from '../views/grpcrequest/GrpcRequestView.vue';
 import HttpRequestTabView from '../views/httprequest/HttpRequestView.vue';
 import KeyValueTabView from '../views/keyvalue/KeyValueView.vue';
+import RepoFileTabView from '../views/repo/RepoFileView.vue';
+import RepoGraphTabView from '../views/repo/RepoGraphView.vue';
 import StreamTabView from '../views/stream/StreamView.vue';
 
 // P1 D4: the component half of the tab-kind registry — split from state/tabKinds.ts because
@@ -28,4 +30,8 @@ export const TAB_VIEWS: Record<TabKind, Component> = {
   'grpc-request': GrpcRequestTabView,
   'variable-set': VariableSetTabView,
   environments: EnvironmentsTabView,
+  // C5 §6.2/§12: the pinned graph placeholder (real content today, replaced wholesale by C9) and
+  // the file viewer (a no-op placeholder until S12's Monaco mount lands, S10's own note).
+  'repo-graph': RepoGraphTabView,
+  'repo-file': RepoFileTabView,
 };

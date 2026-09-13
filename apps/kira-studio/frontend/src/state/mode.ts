@@ -1,8 +1,10 @@
 import type { AppMode } from '@shared/domain/mode';
 import { TAB_KIND_MODE, type TabRecord } from '@shared/domain/tabs';
+import type { WorkspaceKey } from '@shared/domain/workspace';
 import { computed, reactive } from 'vue';
 import { control } from '../bridge/control';
 import { tabsState } from './tabs';
+import { workspaceState } from './workspace';
 
 // P1 D5: mode is a derived view over the one tab list, not a second state tree — the smallest
 // thing that works. Switching mode touches no TabRecord, schedules no save, issues no IPC
@@ -28,10 +30,18 @@ let writeTimer: ReturnType<typeof setTimeout> | null = null;
  *  (hydration is not a user action, and must not re-schedule a write of the value it just read). */
 export function hydrateMode(mode: AppMode): void {
   modeState.active = mode;
+  // C5 §4.2: "workspaceState.active starts at the window's already-persisted mode" — a repo
+  // workspace is never persisted, so boot always resolves to whichever of studio/api was stored.
+  workspaceState.active = mode;
 }
 
+// C5 §4.2: setMode still writes only modeState/windows.mode (a two-value column, unchanged) — but
+// also brings the workspace switcher to the same value, since studio/api are two of the possible
+// WorkspaceKeys. Leaving a repo workspace via the mode tabs (not via closeRepoWorkspace) goes
+// through this same path.
 export function setMode(mode: AppMode): void {
   modeState.active = mode;
+  workspaceState.active = mode;
   if (writeTimer) clearTimeout(writeTimer);
   writeTimer = setTimeout(() => {
     writeTimer = null;
@@ -39,12 +49,31 @@ export function setMode(mode: AppMode): void {
   }, MODE_WRITE_DEBOUNCE_MS);
 }
 
-/** Every tab whose kind belongs to `mode` — what a mode's own tab strip renders. */
+/** Every tab whose kind belongs to `mode` — what a mode's own tab strip renders. A repo tab can
+ *  never match: TAB_KIND_MODE['repo-graph' | 'repo-file'] is the fixed sentinel `'repo'`, which is
+ *  never equal to an AppMode (D2 — the isolation is enforced by the value, not only by this
+ *  filter). Kept for any caller that only ever means "studio" or "api"; tabsForWorkspace below is
+ *  the general form the tab strip itself now uses. */
 export function tabsForMode(mode: AppMode): TabRecord[] {
   return tabsState.tabs.filter((t) => TAB_KIND_MODE[t.kind] === mode);
 }
 
+// C5 D2/§4.1: the actual workspace a tab belongs to — its own explicit workspaceId when set (every
+// repo tab), else its kind's fixed mode (every studio/api tab, `null` today and forever unless a
+// later phase adds per-connection isolation there too, §13). This one function is what replaces
+// the mode filter at every read site tabsState used to scope by mode alone.
+export function workspaceKeyOf(tab: TabRecord): WorkspaceKey {
+  return (tab.workspaceId as WorkspaceKey | null) ?? (TAB_KIND_MODE[tab.kind] as AppMode);
+}
+
+/** Every tab in workspace `key`, in array order — tabsForMode's own generalisation. The pinned-
+ *  first partition (§6.1) joins this at S7; until then this is a plain filter, exactly like
+ *  tabsForMode was. */
+export function tabsForWorkspace(key: WorkspaceKey): TabRecord[] {
+  return tabsState.tabs.filter((t) => workspaceKeyOf(t) === key);
+}
+
 export const activeTab = computed<TabRecord | null>(() => {
-  const id = tabsState.activeIdByMode[modeState.active];
+  const id = tabsState.activeIdByWorkspace[workspaceState.active];
   return tabsState.tabs.find((t) => t.id === id) ?? null;
 });

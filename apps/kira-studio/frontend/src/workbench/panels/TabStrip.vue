@@ -3,7 +3,7 @@ import type { TabRecord } from '@shared/domain/tabs';
 import { computed, nextTick, ref, watch } from 'vue';
 import { copyText } from '../../clipboard';
 import { openContextMenu } from '../../state/contextMenu';
-import { modeState, tabsForMode } from '../../state/mode';
+import { tabsForWorkspace } from '../../state/mode';
 import { TAB_KINDS } from '../../state/tabKinds';
 import {
   activateTab,
@@ -12,12 +12,18 @@ import {
   closeTab,
   closeToTheRight,
   duplicateTab,
+  isPreview,
   moveTab,
   tabsState,
 } from '../../state/tabs';
+import { workspaceState } from '../../state/workspace';
 import CodiconIcon from '../../theme/CodiconIcon.vue';
 import { connColorVar } from '../../theme/connColor';
 import { wheelToHorizontal } from '../../wheelScroll';
+
+function isPinned(tab: TabRecord): boolean {
+  return TAB_KINDS[tab.kind].pinned === true;
+}
 
 // P1 D4/C4: title/icon/rail all read the tab-kind registry now — TabStrip.vue no longer knows
 // what a 'data' tab's icon is, or that a tab's colour comes from its connection.
@@ -43,7 +49,9 @@ function onClick(tab: TabRecord): void {
   activateTab(tab.id);
 }
 
+// §6.1: a pinned tab has no middle-click close.
 function onMiddleClick(tab: TabRecord): void {
+  if (isPinned(tab)) return;
   closeTab(tab.id);
 }
 
@@ -55,7 +63,22 @@ function onClose(e: MouseEvent, tab: TabRecord): void {
 // §8.10's Tab row: Close · Close others · Close to the right · Close all · — · Duplicate tab ·
 // Copy name · plus whatever the tab's own kind appends (D22) — Studio's kinds all append
 // "Reveal in project panel" (F11); an Api tab kind supplies its own menuExtras, or none.
+// §6.1: a pinned tab's own menu is reduced to just "Copy name" — every other action either
+// no-ops on it (Close, Duplicate tab) or doesn't apply to it (Close others/to the right/all never
+// touch a pinned tab either way, but offering them here would read as an empty promise).
 function onContextMenu(e: MouseEvent, tab: TabRecord): void {
+  if (isPinned(tab)) {
+    openContextMenu(e, [
+      {
+        type: 'item',
+        id: 'copy-name',
+        label: 'Copy name',
+        icon: 'copy',
+        run: () => copyText(titleFor(tab)),
+      },
+    ]);
+    return;
+  }
   openContextMenu(e, [
     {
       type: 'item',
@@ -99,16 +122,16 @@ function onContextMenu(e: MouseEvent, tab: TabRecord): void {
   ]);
 }
 
-// P1 D5: this mode's own tabs only — an Api tab is never rendered in Studio's strip, or vice
-// versa (§6.2's "the empty tab-strip state" is this filter returning nothing for a mode with no
-// tab kinds registered yet).
-const tabs = computed(() => tabsForMode(modeState.active));
+// C5 §4.3: the active workspace's own tabs (pinned first, §6.1) — studio/api behave exactly as
+// tabsForMode(modeState.active) always did (no pinned kind exists in either), a repo workspace
+// additionally always shows its pinned graph tab first.
+const tabs = computed(() => tabsForWorkspace(workspaceState.active));
 
 // Selecting a tab from anywhere other than this strip itself (a tree double-click, Cmd/Ctrl+click
 // nav, session restore) previously left the strip's own scroll position untouched — the newly
 // active tab could be selected yet scrolled out of view, with nothing on screen indicating a
 // selection had even happened until the user scrolled the strip by hand to go find it.
-const activeTabId = computed(() => tabsState.activeIdByMode[modeState.active]);
+const activeTabId = computed(() => tabsState.activeIdByWorkspace[workspaceState.active]);
 const stripRef = ref<HTMLElement | null>(null);
 
 watch(
@@ -138,6 +161,8 @@ function onWheel(e: WheelEvent): void {
 // the underlying array moveTab splices.
 const dragId = ref<string | null>(null);
 
+// §6.1: a pinned tab is `draggable="false"` in the template, so it never starts a drag itself —
+// this guard also covers moveTab's own early-return for a pinned *drop target*.
 function onDragStart(id: string): void {
   dragId.value = id;
 }
@@ -165,14 +190,21 @@ function onDragEnd(): void {
       :key="tab.id"
       type="button"
       class="p-tab"
-      :class="{ 'is-active': tab.active, 'is-dragging': dragId === tab.id }"
+      :class="{
+        'is-active': tab.active,
+        'is-dragging': dragId === tab.id,
+        'is-preview': isPreview(tab.id),
+        'is-pinned': isPinned(tab),
+      }"
       data-testid="tab"
       :data-tab-id="tab.id"
       :data-tab-kind="tab.kind"
       :data-active="tab.active"
+      :data-preview="isPreview(tab.id)"
+      :data-pinned="isPinned(tab)"
       :data-color="colorFor(tab)"
       :style="{ '--kira-rail': connColorVar(colorFor(tab)) }"
-      draggable="true"
+      :draggable="!isPinned(tab)"
       @click="onClick(tab)"
       @auxclick.middle="onMiddleClick(tab)"
       @contextmenu.prevent="onContextMenu($event, tab)"
@@ -192,6 +224,7 @@ function onDragEnd(): void {
         data-testid="tab-badge"
       />
       <span
+        v-if="!isPinned(tab)"
         class="tab-close"
         role="button"
         aria-label="Close tab"
@@ -246,6 +279,11 @@ function onDragEnd(): void {
   text-overflow: ellipsis;
   white-space: nowrap;
   min-width: 0;
+}
+
+/* C5 §5.1: the preview-tab affordance — VS Code's own convention for "opened, not yet promoted". */
+.p-tab.is-preview .tab-title {
+  font-style: italic;
 }
 
 .tab-badge {

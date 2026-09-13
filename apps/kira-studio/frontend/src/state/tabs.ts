@@ -1,4 +1,3 @@
-import type { AppMode } from '@shared/domain/mode';
 import {
   asBrowseTab,
   asConsoleTab,
@@ -21,25 +20,29 @@ import {
   defaultDefinitionTabState,
   defaultDocumentTabState,
   defaultKeyValueTabState,
+  defaultRepoGraphTabState,
   defaultStreamTabState,
   type KeyValueTabRecord,
   type KeyValueTabState,
+  type RepoFileTabState,
   type StreamTabRecord,
   type StreamTabState,
   TAB_KIND_MODE,
   type TabKind,
   type TabRecord,
 } from '@shared/domain/tabs';
+import type { WorkspaceKey } from '@shared/domain/workspace';
 import { reactive } from 'vue';
 import { control } from '../bridge/control';
 import { clearPending } from '../views/grid/pendingChanges';
 import { clearSelectedCellFor } from './cellSelection';
 import { connectionsState } from './connections';
 import { consoleDefaultFor } from './consoleDefaults';
-import { modeState, setMode } from './mode';
+import { tabsForWorkspace, workspaceKeyOf } from './mode';
 import { settingsState } from './settings';
 import { TAB_KINDS } from './tabKinds';
 import { cleanupTabRuntime } from './tabRuntime';
+import { activateWorkspace, workspaceState } from './workspace';
 
 // Frees whichever page store(s) a tab could have populated (§2.2) — a plain no-op lookup miss
 // for the stores a tab's own kind never touches, same discipline as calling
@@ -65,11 +68,16 @@ function dropAllPagesForTab(id: string): void {
 // operations panel, none of which may reach into each other — hence renderer/state/, not
 // workbench/state/ or views/grid/.
 export const tabsState = reactive({
-  tabs: [] as TabRecord[], // ordered, all modes interleaved
-  // P1 D5: one active tab per mode, not one app-wide — a tab's own mode is TAB_KIND_MODE[kind].
-  activeIdByMode: { studio: null, api: null } as Record<AppMode, string | null>,
+  tabs: [] as TabRecord[], // ordered, all workspaces interleaved
+  // C5 D2/§4.2: widened from `Record<AppMode, string | null>` to every WorkspaceKey — a tab's own
+  // workspace is workspaceKeyOf(tab), not just TAB_KIND_MODE[tab.kind] any more. 'studio'/'api'
+  // are still always present; a repo key is added the first time a tab of that workspace exists.
+  activeIdByWorkspace: { studio: null, api: null } as Record<WorkspaceKey, string | null>,
   /** In-memory only: a restored tab has not loaded and shows "Reconnect & load" (§8.4). */
   hydrated: new Set<string>(),
+  // C5 §5.1: one entry per workspace, in memory only (like `hydrated` above) — no schema change,
+  // and a restored session comes back with every tab permanent (D3).
+  previewIdByWorkspace: {} as Record<WorkspaceKey, string | null>,
 });
 
 export interface RecentTableEntry {
@@ -220,14 +228,32 @@ export async function hydrateTabs(): Promise<void> {
     return parsed ? ({ ...t, state: parsed } as TabRecord) : t;
   });
   tabsState.tabs = tabs;
-  // One restored active tab per mode (F18: SQL's `active` column has no uniqueness constraint,
-  // so this needs no migration) — same "active, else first" fallback the old single-mode code
-  // used, just scoped to each mode's own subset.
-  for (const mode of ['studio', 'api'] as const) {
-    const modeTabs = tabs.filter((t) => TAB_KIND_MODE[t.kind] === mode);
-    const active = modeTabs.find((t) => t.active) ?? modeTabs[0];
-    tabsState.activeIdByMode[mode] = active?.id ?? null;
+
+  // One restored active tab per workspace actually present among the restored tabs — 'studio'/
+  // 'api' are always seeded (even at zero tabs, matching the old per-mode behavior exactly); a
+  // repo workspace's own entry exists only when it has at least one restored tab.
+  const keys = new Set<WorkspaceKey>(['studio', 'api']);
+  for (const t of tabs) keys.add(workspaceKeyOf(t));
+  for (const key of keys) {
+    const keyTabs = tabs.filter((t) => workspaceKeyOf(t) === key);
+    const active = keyTabs.find((t) => t.active) ?? keyTabs[0];
+    tabsState.activeIdByWorkspace[key] = active?.id ?? null;
   }
+
+  // C5 §4.2: openRepos is every repo workspace with at least one restored tab, in the order its
+  // tabs first appear in the array — nothing new persisted beyond tabs.workspace_id (D2). A repo
+  // whose row was removed since this window last saved is not filtered out here (that would need
+  // this module reaching into state/coderepos.ts, adding a boot-order dependency this file has no
+  // other reason to need) — main.ts's bootstrap calls hydrateCodeRepos() first and then drops an
+  // orphaned repo workspace's tabs itself, once it can name which repo ids are still live.
+  const openRepos: string[] = [];
+  for (const t of tabs) {
+    const key = workspaceKeyOf(t);
+    if (key === 'studio' || key === 'api') continue;
+    const repoId = key.slice('repo:'.length);
+    if (!openRepos.includes(repoId)) openRepos.push(repoId);
+  }
+  workspaceState.openRepos = openRepos;
   // P22 D12: the boot mode used to be derived here, from whichever tab was active app-wide
   // before mode ever had its own persistence ("there is at most one such tab in a pre-P1
   // session, so this is unambiguous" — its own comment already flagged this as a stand-in,
@@ -238,19 +264,20 @@ export async function hydrateTabs(): Promise<void> {
   // connects anything (§8.4).
 }
 
-// Deactivates every other tab of `mode` and marks `id` active, in both the per-tab flag and
-// tabsState.activeIdByMode — the one thing every activation path (open, duplicate, activateTab)
-// shares. Also brings that mode forward (D5: "activating a tab from anywhere brings its mode
-// forward"), which is a no-op when the caller is already in that mode. Goes through setMode
-// (P22 D12), not a direct modeState.active write — so a mode change reached this way (e.g.
-// double-clicking a tree row while in the other mode) is eventually persisted exactly like a
-// mode-tab click is, not silently dropped.
-function setActiveTabId(id: string, mode: AppMode): void {
+// Deactivates every other tab of workspace `key` and marks `id` active, in both the per-tab flag
+// and tabsState.activeIdByWorkspace — the one thing every activation path (open, duplicate,
+// activateTab) shares. Also brings that workspace forward (D5's "activating a tab from anywhere
+// brings its mode forward", generalised to every workspace), which is a no-op when the caller is
+// already there. Goes through activateWorkspace (state/workspace.ts), not a direct modeState write
+// — so a studio/api tab activated this way is eventually persisted exactly like a mode-tab click
+// is, and a repo tab activated this way brings its own workspace forward without touching
+// modeState.active at all (§4.2).
+function setActiveTabId(id: string, key: WorkspaceKey): void {
   for (const t of tabsState.tabs) {
-    if (TAB_KIND_MODE[t.kind] === mode) t.active = t.id === id;
+    if (workspaceKeyOf(t) === key) t.active = t.id === id;
   }
-  tabsState.activeIdByMode[mode] = id;
-  setMode(mode);
+  tabsState.activeIdByWorkspace[key] = id;
+  activateWorkspace(key);
 }
 
 // Result of an open*Tab call: `reused` tells the caller whether an existing tab was activated
@@ -270,19 +297,44 @@ export interface OpenTabResult {
 // share this same sequence for a connectionless tab — `recentKind` stays Studio-only
 // (RecentTableEntry itself requires a real connectionId), so a null id and a recentKind are never
 // both present at once.
+//
+// C5 §4.2/§5.2: `opts.workspaceId` (default null — every studio/api caller's own unchanged
+// behavior) and `opts.preview` (default false — ditto) are the two additions this phase makes.
+// The dedupe key widens to (workspaceId, kind, connectionId, path) — load-bearing: two
+// repositories routinely hold the same relative path, and the old key would collapse them. The
+// preview mechanism lives here, not in state/repoTabs.ts's own openRepoFileTab, because it is
+// kind-agnostic and this is the one place every tab-open already funnels through (§15.1's own
+// unit test targets this file for exactly that reason).
 export function openTab<S>(
   kind: TabRecord['kind'],
   connectionId: string | null,
   path: string,
   makeState: () => S,
-  opts: { reuse: boolean; recentKind?: RecentTableEntry['kind'] },
+  opts: {
+    reuse: boolean;
+    recentKind?: RecentTableEntry['kind'];
+    workspaceId?: string | null;
+    preview?: boolean;
+  },
 ): OpenTabResult {
+  const workspaceId = opts.workspaceId ?? null;
+  const workspaceKey = (workspaceId ?? TAB_KIND_MODE[kind]) as WorkspaceKey;
+
   if (opts.reuse) {
     const existing = tabsState.tabs.find(
-      (t) => t.kind === kind && t.connectionId === connectionId && t.path === path,
+      (t) =>
+        t.kind === kind &&
+        t.connectionId === connectionId &&
+        t.path === path &&
+        (t.workspaceId ?? null) === workspaceId,
     );
     if (existing) {
       activateTab(existing.id);
+      // §5.2 rule 1: a permanent (`preview` false/undefined) open of the workspace's own current
+      // preview tab promotes it — the slot clears, the tab itself is untouched.
+      if (!opts.preview && tabsState.previewIdByWorkspace[workspaceKey] === existing.id) {
+        tabsState.previewIdByWorkspace[workspaceKey] = null;
+      }
       // Reopening (double-click, "recent tables", …) against a connection that's live right
       // now reads as "load this" just as much as a brand-new tab does — without this, a tab
       // left unhydrated by an earlier disconnect (or never hydrated after a session restore)
@@ -304,11 +356,40 @@ export function openTab<S>(
     state: makeState(),
     order: tabsState.tabs.length,
     active: true,
+    workspaceId,
     // `kind` and `makeState()`'s return type agree at every call site below — TabRecord's own
     // discriminated union can't express that generically, so this is asserted rather than typed.
   } as unknown as TabRecord;
-  tabsState.tabs.push(record);
-  setActiveTabId(id, TAB_KIND_MODE[kind]);
+
+  if (opts.preview) {
+    const evictedId = tabsState.previewIdByWorkspace[workspaceKey] ?? null;
+    if (evictedId !== null) {
+      // §5.2 rule 3: close-then-insert at the evicted tab's own array position, never mutate its
+      // kind in place — closeTab is the one path that frees page stores/runtime for a
+      // discriminated-union record. Clamped to be at or after the workspace's own pinned tabs
+      // (§5.2's last paragraph) so a preview can never land left of the graph tab, defensively —
+      // the evicted tab is never itself pinned (a pinned kind is never opened through the preview
+      // path), so in practice this clamp never actually moves the insert point.
+      const evictedIdx = tabsState.tabs.findIndex((t) => t.id === evictedId);
+      const minIdx = tabsState.tabs.reduce(
+        (max, t, i) =>
+          workspaceKeyOf(t) === workspaceKey && TAB_KINDS[t.kind].pinned ? i + 1 : max,
+        0,
+      );
+      const insertAt = Math.max(evictedIdx < 0 ? tabsState.tabs.length : evictedIdx, minIdx);
+      tabsState.tabs.splice(insertAt, 0, record);
+      closeTab(evictedId);
+    } else {
+      // §5.2 rule 4: no preview tab yet — create at the end, set the slot.
+      tabsState.tabs.push(record);
+    }
+    tabsState.previewIdByWorkspace[workspaceKey] = id;
+  } else {
+    // §5.2 rule 2: a permanent open never evicts a preview tab — the slot is untouched.
+    tabsState.tabs.push(record);
+  }
+
+  setActiveTabId(id, workspaceKey);
   // Opened from a live connection (or, for an HTTP tab, from nothing to reconnect at all) —
   // either way there is no Reconnect gate to show.
   tabsState.hydrated.add(id);
@@ -423,6 +504,27 @@ export function openBrowseTab(
   });
 }
 
+// C5 §6.1: creates workspace `workspaceId`'s pinned graph tab — a plain push that never activates
+// it (unlike openTab's own always-active-on-create behavior), so ensureWorkspaceShell
+// (state/repoTabs.ts) can decide separately whether to activate it (only when the workspace has no
+// active tab at all) — a restored session's own active tab must never be stolen by shell creation.
+export function createPinnedRepoGraphTab(workspaceId: string): TabRecord {
+  const id = crypto.randomUUID();
+  const record = {
+    id,
+    connectionId: null,
+    path: '',
+    kind: 'repo-graph',
+    state: defaultRepoGraphTabState(),
+    order: tabsState.tabs.length,
+    active: false,
+    workspaceId,
+  } as unknown as TabRecord;
+  tabsState.tabs.push(record);
+  saveNow();
+  return record;
+}
+
 // Same target, fresh default state — the cheapest possible demonstration of §8.4's identity rule.
 // P1 D4/F12: reads TAB_KINDS[source.kind].duplicateState instead of a seven-branch if/else — each
 // kind's own entry already knows what "fresh" means for it (data/document/keyvalue/stream keep the
@@ -430,6 +532,7 @@ export function openBrowseTab(
 export function duplicateTab(id: string): string {
   const source = tabsState.tabs.find((t) => t.id === id);
   if (!source) return id;
+  if (TAB_KINDS[source.kind].pinned) return id; // §6.1: a pinned tab is never duplicated.
 
   const newId = crypto.randomUUID();
   const def = TAB_KINDS[source.kind];
@@ -444,9 +547,10 @@ export function duplicateTab(id: string): string {
     state: (def.duplicateState as (tab: TabRecord) => TabRecord['state'])(source),
     order: tabsState.tabs.length,
     active: true,
+    workspaceId: source.workspaceId ?? null,
   } as unknown as TabRecord;
   tabsState.tabs.push(record);
-  setActiveTabId(newId, TAB_KIND_MODE[source.kind]);
+  setActiveTabId(newId, workspaceKeyOf(source));
   tabsState.hydrated.add(newId);
   saveNow();
   return newId;
@@ -456,12 +560,14 @@ export function closeTab(id: string): void {
   const idx = tabsState.tabs.findIndex((t) => t.id === id);
   if (idx < 0) return;
   const closed = tabsState.tabs[idx];
-  const mode = TAB_KIND_MODE[closed.kind];
+  if (TAB_KINDS[closed.kind].pinned) return; // §6.1: a pinned tab never closes.
+  const key = workspaceKeyOf(closed);
   const wasActive = closed.active;
-  // Where the closed tab sat among its own mode's tabs, not the whole (multi-mode) array — needed
-  // below to pick "whatever landed in its spot" the same way the pre-mode code did with idx.
-  const modeIdxBefore = tabsState.tabs
-    .filter((t) => TAB_KIND_MODE[t.kind] === mode)
+  // Where the closed tab sat among its own workspace's tabs, not the whole (multi-workspace)
+  // array — needed below to pick "whatever landed in its spot" the same way the pre-workspace
+  // code did with idx.
+  const keyIdxBefore = tabsState.tabs
+    .filter((t) => workspaceKeyOf(t) === key)
     .findIndex((t) => t.id === id);
 
   tabsState.tabs.splice(idx, 1);
@@ -469,71 +575,104 @@ export function closeTab(id: string): void {
   dropAllPagesForTab(id); // §2.2: closing a tab frees its cached page(s) immediately.
   clearSelectedCellFor(id);
   clearPending(id);
+  // §5.2 rule 5: closing the preview tab clears the slot.
+  if (tabsState.previewIdByWorkspace[key] === id) tabsState.previewIdByWorkspace[key] = null;
 
   if (wasActive) {
-    const modeTabs = tabsState.tabs.filter((t) => TAB_KIND_MODE[t.kind] === mode);
-    if (modeTabs.length === 0) {
-      tabsState.activeIdByMode[mode] = null;
+    const keyTabs = tabsState.tabs.filter((t) => workspaceKeyOf(t) === key);
+    if (keyTabs.length === 0) {
+      tabsState.activeIdByWorkspace[key] = null;
     } else {
-      const next = modeTabs[Math.min(modeIdxBefore, modeTabs.length - 1)];
+      const next = keyTabs[Math.min(keyIdxBefore, keyTabs.length - 1)];
       next.active = true;
-      tabsState.activeIdByMode[mode] = next.id;
+      tabsState.activeIdByWorkspace[key] = next.id;
     }
   }
+  saveNow();
+}
+
+// C5 §4.2: closes every tab of workspace `key`, pinned tabs included — the one path that bypasses
+// closeTab's own pin guard, since discarding the whole workspace (closeRepoWorkspace,
+// state/workspace.ts) is a different act from closing one of its tabs. Never called for
+// 'studio'/'api' (those workspaces cannot be closed, only their tabs can).
+export function closeWorkspaceTabs(key: WorkspaceKey): void {
+  const ids = tabsState.tabs.filter((t) => workspaceKeyOf(t) === key).map((t) => t.id);
+  for (const id of ids) {
+    tabsState.hydrated.delete(id);
+    dropAllPagesForTab(id);
+    clearSelectedCellFor(id);
+    clearPending(id);
+  }
+  tabsState.tabs = tabsState.tabs.filter((t) => workspaceKeyOf(t) !== key);
+  delete tabsState.activeIdByWorkspace[key];
+  delete tabsState.previewIdByWorkspace[key];
   saveNow();
 }
 
 export function closeOthers(id: string): void {
   const keep = tabsState.tabs.find((t) => t.id === id);
   if (!keep) return;
-  // Scoped to the kept tab's own mode (D5) — "Close others" in one mode's strip never touches a
-  // tab that isn't even rendered there.
-  const mode = TAB_KIND_MODE[keep.kind];
+  // Scoped to the kept tab's own workspace (D5, generalised) — "Close others" in one workspace's
+  // strip never touches a tab that isn't even rendered there. §6.1: a pinned tab is never closed.
+  const key = workspaceKeyOf(keep);
   const closeIds = new Set(
-    tabsState.tabs.filter((t) => t.id !== id && TAB_KIND_MODE[t.kind] === mode).map((t) => t.id),
+    tabsState.tabs
+      .filter((t) => t.id !== id && workspaceKeyOf(t) === key && !TAB_KINDS[t.kind].pinned)
+      .map((t) => t.id),
   );
   for (const tabId of closeIds) {
     tabsState.hydrated.delete(tabId);
     dropAllPagesForTab(tabId);
     clearSelectedCellFor(tabId);
     clearPending(tabId);
+    if (tabsState.previewIdByWorkspace[key] === tabId) tabsState.previewIdByWorkspace[key] = null;
   }
   tabsState.tabs = tabsState.tabs.filter((t) => !closeIds.has(t.id));
   keep.active = true;
-  tabsState.activeIdByMode[mode] = id;
+  tabsState.activeIdByWorkspace[key] = id;
   saveNow();
 }
 
 export function closeToTheRight(id: string): void {
   const target = tabsState.tabs.find((t) => t.id === id);
   if (!target) return;
-  const mode = TAB_KIND_MODE[target.kind];
-  // "To the right" is a strip-visual concept, so it's computed over this tab's own mode's subset
-  // (its own left-to-right order), not the whole multi-mode array.
-  const modeTabs = tabsState.tabs.filter((t) => TAB_KIND_MODE[t.kind] === mode);
-  const modeIdx = modeTabs.findIndex((t) => t.id === id);
-  const closeIds = new Set(modeTabs.slice(modeIdx + 1).map((t) => t.id));
+  const key = workspaceKeyOf(target);
+  // "To the right" is a strip-visual concept, so it's computed over tabsForWorkspace's own
+  // pinned-first, left-to-right order (§6.1) — for studio/api (no pinned kind ever) this is
+  // identical to the old plain per-mode filter, byte for byte.
+  const keyTabs = tabsForWorkspace(key);
+  const keyIdx = keyTabs.findIndex((t) => t.id === id);
+  const closeIds = new Set(
+    keyTabs
+      .slice(keyIdx + 1)
+      .filter((t) => !TAB_KINDS[t.kind].pinned)
+      .map((t) => t.id),
+  );
   for (const tabId of closeIds) {
     tabsState.hydrated.delete(tabId);
     dropAllPagesForTab(tabId);
     clearSelectedCellFor(tabId);
     clearPending(tabId);
+    if (tabsState.previewIdByWorkspace[key] === tabId) tabsState.previewIdByWorkspace[key] = null;
   }
   tabsState.tabs = tabsState.tabs.filter((t) => !closeIds.has(t.id));
-  const remaining = tabsState.tabs.filter((t) => TAB_KIND_MODE[t.kind] === mode);
+  const remaining = tabsState.tabs.filter((t) => workspaceKeyOf(t) === key);
   if (!remaining.some((t) => t.active)) {
     target.active = true;
-    tabsState.activeIdByMode[mode] = id;
+    tabsState.activeIdByWorkspace[key] = id;
   }
   saveNow();
 }
 
 export function closeAll(): void {
-  // "Close all" always means "in the mode whose strip this menu opened from" (D5) — the current
-  // mode, since a tab's context menu can only ever come from a tab actually rendered there.
-  const mode = modeState.active;
+  // "Close all" always means "in the workspace whose strip this menu opened from" (D5,
+  // generalised) — the current workspace, since a tab's context menu can only ever come from a
+  // tab actually rendered there. §6.1: a pinned tab survives "Close all".
+  const key = workspaceState.active;
   const closeIds = new Set(
-    tabsState.tabs.filter((t) => TAB_KIND_MODE[t.kind] === mode).map((t) => t.id),
+    tabsState.tabs
+      .filter((t) => workspaceKeyOf(t) === key && !TAB_KINDS[t.kind].pinned)
+      .map((t) => t.id),
   );
   for (const tabId of closeIds) {
     tabsState.hydrated.delete(tabId);
@@ -542,26 +681,46 @@ export function closeAll(): void {
     clearPending(tabId);
   }
   tabsState.tabs = tabsState.tabs.filter((t) => !closeIds.has(t.id));
-  tabsState.activeIdByMode[mode] = null;
+  tabsState.previewIdByWorkspace[key] = null;
+  const remaining = tabsState.tabs.filter((t) => workspaceKeyOf(t) === key);
+  if (remaining.length === 0) {
+    // studio/api always land here (no pinned kind exists in either) — byte-identical to the old
+    // unconditional `tabsState.activeIdByMode[mode] = null`.
+    tabsState.activeIdByWorkspace[key] = null;
+  } else if (!remaining.some((t) => t.active)) {
+    // A repo workspace's own pinned graph tab is all that's left and nothing marked it active —
+    // it becomes the active tab rather than leaving the strip with no selection at all.
+    remaining[0].active = true;
+    tabsState.activeIdByWorkspace[key] = remaining[0].id;
+  }
   saveNow();
 }
 
 export function activateTab(id: string): void {
   const target = tabsState.tabs.find((t) => t.id === id);
   if (!target) return;
-  setActiveTabId(id, TAB_KIND_MODE[target.kind]);
+  setActiveTabId(id, workspaceKeyOf(target));
   saveNow();
 }
 
 // Tab-strip drag-reorder: called live on every dragover as the dragged tab crosses another one's
 // midpoint, same "splice out, splice in" shape as ColumnsMenu.vue's own column drag. P1 F15: ids,
-// not indices — the strip now renders a filtered (per-mode) view of tabsState.tabs, so an index
-// into that view no longer addresses the same element in the underlying (multi-mode) array.
+// not indices — the strip now renders a filtered (per-workspace) view of tabsState.tabs, so an
+// index into that view no longer addresses the same element in the underlying array.
 export function moveTab(fromId: string, toId: string): void {
   if (fromId === toId) return;
   const tabs = tabsState.tabs;
   const fromIdx = tabs.findIndex((t) => t.id === fromId);
-  if (fromIdx < 0 || !tabs.some((t) => t.id === toId)) return;
+  const toTab = tabs.find((t) => t.id === toId);
+  if (fromIdx < 0 || !toTab) return;
+  const fromTab = tabs[fromIdx];
+  // §6.1: a pinned tab never moves, and nothing may drop in front of one.
+  if (TAB_KINDS[fromTab.kind].pinned || TAB_KINDS[toTab.kind].pinned) return;
+  // §5.2's own promotion trigger list: starting a drag of the preview tab promotes it before it
+  // splices — a tab you deliberately positioned must not vanish on the next single click.
+  const key = workspaceKeyOf(fromTab);
+  if (tabsState.previewIdByWorkspace[key] === fromId) tabsState.previewIdByWorkspace[key] = null;
+
   const next = [...tabs];
   const [moved] = next.splice(fromIdx, 1);
   const toIdx = next.findIndex((t) => t.id === toId);
@@ -571,12 +730,12 @@ export function moveTab(fromId: string, toId: string): void {
 }
 
 // D11: Control+Tab / Control+Shift+Tab — wraps around at either end, matching the tab strip's own
-// left-to-right visual order, scoped to the current mode's own tabs (D5).
+// left-to-right visual order, scoped to the current workspace's own tabs (D5, generalised).
 function stepTab(delta: 1 | -1): void {
-  const mode = modeState.active;
-  const tabs = tabsState.tabs.filter((t) => TAB_KIND_MODE[t.kind] === mode);
+  const key = workspaceState.active;
+  const tabs = tabsForWorkspace(key);
   if (tabs.length === 0) return;
-  const idx = tabs.findIndex((t) => t.id === tabsState.activeIdByMode[mode]);
+  const idx = tabs.findIndex((t) => t.id === tabsState.activeIdByWorkspace[key]);
   const next = tabs[(idx + delta + tabs.length) % tabs.length];
   activateTab(next.id);
 }
@@ -587,6 +746,13 @@ export function activateNextTab(): void {
 
 export function activatePrevTab(): void {
   stepTab(-1);
+}
+
+// C5 §5.1: what TabStrip.vue renders in italics — a tab is a workspace's own current preview tab.
+export function isPreview(id: string): boolean {
+  const tab = tabsState.tabs.find((t) => t.id === id);
+  if (!tab) return false;
+  return tabsState.previewIdByWorkspace[workspaceKeyOf(tab)] === id;
 }
 
 // D17: a patch that sets every field to the value it already had (DataGrid.vue's scroll-persist
@@ -645,6 +811,12 @@ export function patchStreamTabState(id: string, patch: Partial<StreamTabState>):
 // a tab is already showing (e.g. a duplicate reload) must not schedule a save.
 export function patchBrowseTabState(id: string, patch: Partial<BrowseTabState>): void {
   patchTabState(id, 'browse', patch, { skipUnchanged: true });
+}
+
+// C5 §9.3/§12: revealLine is re-patched (debounced) as the user scrolls/navigates — skipUnchanged
+// since Monaco's own scroll events fire far more often than the line actually changes.
+export function patchRepoFileTabState(id: string, patch: Partial<RepoFileTabState>): void {
+  patchTabState(id, 'repo-file', patch, { skipUnchanged: true });
 }
 
 export function markHydrated(id: string): void {

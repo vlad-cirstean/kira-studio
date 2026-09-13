@@ -132,6 +132,30 @@
       }
     },
     {
+      "includes": ["apps/kira-studio/frontend/src/repo/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["**/views/**"],
+                    "message": "C5 §2: repo/ must not import views/ directly — dispatch through state/repoTabs.ts instead, mirroring project/'s own state/viewCommands.ts rule."
+                  },
+                  {
+                    "group": ["**/http/**", "**/api/**"],
+                    "message": "C5 §2: repo/ must not import http/ or api/ — mirrors project/'s own rule against the same two modules."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
       "includes": ["apps/kira-studio/frontend/src/api/**"],
       "linter": {
         "rules": {

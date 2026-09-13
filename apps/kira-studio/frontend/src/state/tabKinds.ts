@@ -31,6 +31,7 @@ import {
   defaultDefinitionTabState,
   defaultDocumentTabState,
   defaultKeyValueTabState,
+  defaultRepoFileTabState,
   defaultStreamTabState,
   definitionTabStateSchema,
   documentTabStateSchema,
@@ -41,6 +42,11 @@ import {
   type KeyValueTabRecord,
   type KeyValueTabState,
   keyValueTabStateSchema,
+  type RepoFileTabRecord,
+  type RepoFileTabState,
+  type RepoGraphTabState,
+  repoFileTabStateSchema,
+  repoGraphTabStateSchema,
   type StreamTabRecord,
   type StreamTabState,
   streamTabStateSchema,
@@ -53,12 +59,14 @@ import {
   variableSetTabStateSchema,
 } from '@shared/domain/tabs';
 import { pathTail } from '@shared/domain/tree';
+import { repoIdOfWorkspace, type WorkspaceKey } from '@shared/domain/workspace';
 import { revealPath } from '../project/state/tree';
 import { dropForTab as dropConsoleResultPagesForTab } from '../views/console/resultPages';
 import { drop as dropDocumentPagesForTab } from '../views/documents/page';
 import { drop as dropGridPagesForTab } from '../views/grid/page';
 import { drop as dropKeyValuePagesForTab } from '../views/keyvalue/page';
 import { drop as dropStreamPagesForTab } from '../views/stream/page';
+import { codeRepoRecord } from './coderepos';
 import { connectionRecord } from './connections';
 import type { MenuItem } from './contextMenu';
 import { settingsState } from './settings';
@@ -93,6 +101,11 @@ export interface TabKindDef<K extends TabKind = TabKind> {
    *  seven kinds grow no line, and answers a question about a tab you're *not* looking at, which
    *  the view's own live dirty mark cannot). */
   badge?(tab: TabRecord): { icon: string; tooltip: string } | null;
+  /** C5 §6.1: true for exactly one kind (`repo-graph`) — tabsForWorkspace's own stable partition
+   *  (state/mode.ts) puts every pinned tab of a workspace first, and closeTab/closeOthers/
+   *  closeToTheRight/closeAll/duplicateTab/moveTab all guard against it (state/tabs.ts). Absent
+   *  (not `false`) for every other kind, so this costs those kinds no line. */
+  pinned?: true;
 }
 
 const KIND_ICON: Record<string, string> = {
@@ -123,6 +136,14 @@ function revealInProjectPanel(tab: TabRecord): MenuItem[] {
 
 function noDrop(): void {
   // definition/browse have no page store of their own (F12) — nothing to free.
+}
+
+// C5 §7: a repo-file tab's `path` is a plain repository-relative path ('src/main.go'), not an
+// encoded NodePath — tabTitle's own pathTail() expects a "kind:name" segment and would return the
+// whole path unparsed, so this kind gets its own basename-only title instead.
+function repoFileTitle(tab: TabRecord): string {
+  const idx = tab.path.lastIndexOf('/');
+  return idx < 0 ? tab.path : tab.path.slice(idx + 1);
 }
 
 // P3 D3: every parseState below is a one-liner over the schema its own kind already imports —
@@ -330,5 +351,36 @@ export const TAB_KINDS: { [K in TabKind]: TabKindDef<K> } = {
     dropResources: noDrop,
     menuExtras: () => [],
     parseState: parseStateWith(environmentsTabStateSchema),
+  },
+  // C5 §6.2: the pinned graph placeholder — title reads the workspace's own repo name (falling
+  // back to a generic label before that repo's row has loaded, mirroring HttpRequestTabState's own
+  // pre-load convention).
+  'repo-graph': {
+    mode: TAB_KIND_MODE['repo-graph'],
+    title: (tab) =>
+      codeRepoRecord(repoIdOfWorkspace((tab.workspaceId as WorkspaceKey) ?? ''))?.name ?? 'Graph',
+    icon: () => 'source-control',
+    railColor: () => undefined,
+    defaultState: (): RepoGraphTabState => ({}),
+    duplicateState: (): RepoGraphTabState => ({}),
+    dropResources: noDrop,
+    // No project-panel reveal (this kind has no path to reveal) and no other repo-graph-specific
+    // action exists yet — §6.2's placeholder is a reserved slot, not a half-built feature.
+    menuExtras: () => [],
+    parseState: parseStateWith(repoGraphTabStateSchema),
+    pinned: true,
+  },
+  // C5 §8/§9: one opened repository file. Icon/dropResources are upgraded at S11/S10 once the
+  // language registry and the Monaco model cache exist; both are correct no-ops until then.
+  'repo-file': {
+    mode: TAB_KIND_MODE['repo-file'],
+    title: repoFileTitle,
+    icon: () => 'file',
+    railColor: () => undefined,
+    defaultState: (): RepoFileTabState => defaultRepoFileTabState(),
+    duplicateState: (tab: RepoFileTabRecord): RepoFileTabState => ({ ...tab.state }),
+    dropResources: noDrop,
+    menuExtras: () => [],
+    parseState: parseStateWith(repoFileTabStateSchema),
   },
 };
