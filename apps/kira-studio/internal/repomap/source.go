@@ -276,6 +276,18 @@ func (s *Server) sourceForOneFile(ctx context.Context, path string, rows []int) 
 				lines[r] = ln
 			}
 		}
+		// readRows omits a row entirely when its current on-disk line is empty after trimming
+		// (D5 rule 6) — correct for a fresh read (nothing to say), but a stale file can shift a
+		// once-meaningful row onto blank content (any inserted/deleted line above a hit does
+		// this), and silently printing no continuation at all would drop the one honest signal
+		// this caller has that the position may no longer mean what it did (D4). So a stale
+		// file's own missing rows still get an entry — Stale, no text, no note — so writeSource
+		// still emits "[stale]" alone instead of nothing.
+		for _, r := range rows {
+			if _, ok := lines[r]; !ok {
+				lines[r] = sourceLine{Stale: true}
+			}
+		}
 	}
 	return lines
 }
