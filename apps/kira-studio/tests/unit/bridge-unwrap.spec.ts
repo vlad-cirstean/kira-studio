@@ -64,6 +64,20 @@ describe('apps/kira-studio/frontend/src/bridge/control.ts — unwrap (P57 D5)', 
       const result = (member as (...args: unknown[]) => unknown)('a', 'b', 'c', 'd');
       if (!result || typeof (result as Promise<unknown>).then !== 'function') continue;
       checked.push(name);
+      // Temporary diagnostic (remove once the CI-only failure this is chasing is understood): this
+      // reproduces on GH Actions' Linux runners but not locally on macOS or in a matched Linux
+      // Docker container, so log which method resolved instead of rejecting, and with what value,
+      // before the assertion below throws and stops the loop.
+      const outcome = await (result as Promise<unknown>).then(
+        (value) => ({ ok: true as const, value }),
+        (error) => ({ ok: false as const, error }),
+      );
+      if (outcome.ok) {
+        console.error(
+          `bridge-unwrap diagnostic: "${name}" resolved instead of rejecting:`,
+          outcome.value,
+        );
+      }
       await expect(result as Promise<unknown>).rejects.toMatchObject({ code: 'E_QUERY' });
     }
     // A regression that stops wrapping every method (or a Object.entries change that stops
