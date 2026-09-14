@@ -24,6 +24,7 @@ import (
 	_ "github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters/sqs"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/apivars"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/appcore"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/appupdate"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/bridge"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/buildinfo"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/codeindex"
@@ -251,6 +252,12 @@ func main() {
 	emitter, attachEmitter := shell.NewDeferredEmitter()
 	deps.Events = emitter
 	dialogs, attachDialogs := shell.NewDeferredDialogs()
+	browserOpener, attachBrowser := shell.NewDeferredBrowser()
+
+	// P66: the update-availability checker — no network call at all from a dev/test build
+	// (appupdate's own isReleaseBuild guard); owns no goroutine, no ticker, no file handle, so
+	// nothing is added to the quit teardown below.
+	updateChecker := appupdate.NewChecker(buildinfo.Version)
 
 	// C3 §7.4/D7: the repo-map MCP server's embedded instance — owned by this app's own lifecycle,
 	// same posture as gitSock just above. StartIfEnabled's own failure (no repository resolved at
@@ -366,6 +373,7 @@ func main() {
 			// needs one read-only runner and the resolved git.path, never gitsession's refcounted
 			// lifecycle).
 			application.NewService(codeWorkspaceSvc),
+			application.NewService(&bridge.UpdateService{Checker: updateChecker, Browser: browserOpener}),
 			application.NewService(&bridge.LifecycleService{Flusher: quitter, WindowFlusher: closeFlush}),
 		},
 		Assets: application.AssetOptions{
@@ -402,6 +410,7 @@ func main() {
 	})
 
 	attachEmitter(app)
+	attachBrowser(app)
 	quitter.Attach(app)
 
 	// The sheet a Save/Open dialog attaches to is the window that actually asked — Current()

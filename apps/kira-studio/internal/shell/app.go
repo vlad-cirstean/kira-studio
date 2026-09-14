@@ -1,6 +1,8 @@
 package shell
 
 import (
+	"errors"
+
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapterhost"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/appcore"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/bridge"
@@ -118,6 +120,25 @@ func NewDeferredDialogs() (d bridge.Dialogs, attach func(app *application.App, w
 		da.app = app
 		da.window = window
 	}
+}
+
+// browserOpener satisfies bridge.Browser over the real Wails BrowserManager. app is nil until
+// attach runs — see NewDeferredBrowser.
+type browserOpener struct{ app *application.App }
+
+func (b *browserOpener) OpenURL(url string) error {
+	if b.app == nil {
+		return errors.New("no application")
+	}
+	return b.app.Browser.OpenURL(url)
+}
+
+// NewDeferredBrowser is NewDeferredDialogs' counterpart for UpdateService: built into the Services
+// list passed to application.New, before the *App a browser open needs exists. attach must be
+// called with the real *App immediately after New returns.
+func NewDeferredBrowser() (b bridge.Browser, attach func(*application.App)) {
+	bo := &browserOpener{}
+	return bo, func(app *application.App) { bo.app = app }
 }
 
 // RegisterEngineStream registers the one named stream. The handler blocks for the life of the
