@@ -3,12 +3,15 @@
 // separate stand-in file view ever ships in between).
 import type { RepoFileTabRecord } from '@shared/domain/tabs';
 import { repoIdOfWorkspace, type WorkspaceKey } from '@shared/domain/workspace';
-import { onMounted, onUnmounted, ref } from 'vue';
+import { onMounted, onUnmounted, ref, watch } from 'vue';
 import { control } from '../../bridge/control';
+import { gitRepoIdFor } from '../../repo/git/hostHandlers';
+import { gitTransportFor } from '../../repo/git/transport';
 import { registerCommand } from '../../shortcuts/commands';
 import { settingsState } from '../../state/settings';
 import { patchRepoFileTabState } from '../../state/tabs';
 import EmptyState from '../../theme/primitives/EmptyState.vue';
+import { attachBlameAnnotation, type BlameAnnotationHandle } from './blameAnnotation';
 import { registerEditor, unmountEditor } from './editors';
 import { monacoLanguageFor } from './language';
 import { getOrCreateModel, loadMonaco, REPO_THEME_NAME, repoFileUri } from './monaco';
@@ -24,6 +27,8 @@ const container = ref<HTMLElement | null>(null);
 
 let disposeCursorSub: (() => void) | null = null;
 let unregisterFind: (() => void) | null = null;
+let blameHandle: BlameAnnotationHandle | null = null;
+let unwatchInlineBlame: (() => void) | null = null;
 
 // §11: every Monaco instance is readOnly/domReadOnly — neither the keyboard nor a paste can
 // mutate a model. The rest of the option set mirrors §9.3 verbatim (no minimap/suggestions/
@@ -88,6 +93,33 @@ async function mount(): Promise<void> {
   });
   registerEditor(props.tab.id, uri, editor);
 
+  // P62 §4.1: attached after the editor exists, guarded on the setting and on whether this
+  // window has a git record for the repository at all (`gitRepoIdFor`'s own "never guessed"
+  // contract) — a silent no-op either way, never an error surface for a repo file view that has
+  // always worked with no git backing. Read live (not just at mount) so toggling the setting
+  // takes effect on the open tab immediately, the same live-apply `wordWrap` already gets.
+  const gitRepoId = gitRepoIdFor(repoId);
+  // `repoId` narrows to `string` above (past the early-return), but that narrowing doesn't carry
+  // into a nested closure — re-binding to a fresh `const` gives it a plain `string` type of its
+  // own, captured below with no cast needed.
+  const workspaceCodeRepoId: string = repoId;
+  function syncBlameAnnotation(): void {
+    if (settingsState.appearance.inlineBlame && gitRepoId) {
+      if (!blameHandle) {
+        blameHandle = attachBlameAnnotation(mod, editor, {
+          transport: gitTransportFor(workspaceCodeRepoId),
+          gitRepoId,
+          path: props.tab.path,
+        });
+      }
+    } else {
+      blameHandle?.dispose();
+      blameHandle = null;
+    }
+  }
+  syncBlameAnnotation();
+  unwatchInlineBlame = watch(() => settingsState.appearance.inlineBlame, syncBlameAnnotation);
+
   // §9.3/§12, widened by C7 D12: a pending reveal (a search result or go-to-definition match that
   // arrived while this tab wasn't mounted) wins over the persisted revealLine — the mount-time
   // case D12's own fix doesn't change, since consumeReveal only ever has something to give when a
@@ -144,6 +176,10 @@ onUnmounted(() => {
   disposeCursorSub = null;
   unregisterFind?.();
   unregisterFind = null;
+  unwatchInlineBlame?.();
+  unwatchInlineBlame = null;
+  blameHandle?.dispose();
+  blameHandle = null;
   unmountEditor(props.tab.id);
 });
 
