@@ -121,16 +121,19 @@ test('font-roles — data surfaces render in the data font, not the interface fo
   const dataFont = await computedFontFamily(page, '.slick-cell');
   expect(dataFont).not.toBe(uiFont);
 
-  // .cm-scroller — the SQL console editor (F6#10).
+  // .view-lines — the SQL console editor (F6#10). Monaco appends its own built-in fallback list
+  // after the configured family (unlike CodeMirror, which set the family verbatim), so the
+  // computed value is `dataFont` plus extra fallbacks rather than an exact match — the configured
+  // font still wins the actual render since it's first in the list.
   await openRowMenu(page, DB_PATH);
   await page.click('[data-testid="menu-item-open-console"]');
   const sqlConsole = page.locator('[data-testid="console-view"]');
   await expect(sqlConsole).toBeVisible();
   const cmFont = await sqlConsole
-    .locator('.cm-scroller')
+    .locator('.view-lines')
     .first()
     .evaluate((el) => getComputedStyle(el).fontFamily);
-  expect(cmFont).toBe(dataFont);
+  expect(cmFont.startsWith(dataFont)).toBe(true);
   expect(cmFont).not.toBe(uiFont);
 
   // Operations panel's .mono command/duration column (F6, "a query, a duration").
