@@ -251,6 +251,10 @@ function onRowColoringChange(checked: boolean): void {
   draft.appearance.rowColoring = checked;
 }
 
+function onInlineBlameChange(checked: boolean): void {
+  draft.appearance.inlineBlame = checked;
+}
+
 const rowPreviewHeight = computed(() => (draft.appearance.rowDensity === 'compact' ? 22 : 28));
 
 function onDefaultPageSizeChange(e: Event): void {
@@ -610,6 +614,29 @@ async function onSave(): Promise<void> {
                 :disabled="isAtDefault('appearance', 'rowColoring')"
                 v-tooltip="'Reset to default'"
                 @click="resetLeaf('appearance', 'rowColoring')"
+              />
+            </div>
+
+            <div class="field checkbox-row">
+              <label class="field checkbox">
+                <Checkbox
+                  :model-value="draft.appearance.inlineBlame"
+                  data-testid="settings-inline-blame"
+                  @update:model-value="onInlineBlameChange"
+                />
+                <span>Inline blame</span>
+                <span class="helper-text"
+                  >Show who last changed the current line, at the end of that line, in the
+                  repository file viewer.</span
+                >
+              </label>
+              <IconButton
+                icon="discard"
+                class="p-push"
+                data-testid="settings-reset-appearance-inlineBlame"
+                :disabled="isAtDefault('appearance', 'inlineBlame')"
+                v-tooltip="'Reset to default'"
+                @click="resetLeaf('appearance', 'inlineBlame')"
               />
             </div>
           </template>

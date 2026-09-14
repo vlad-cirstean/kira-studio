@@ -8,6 +8,8 @@ type AppearanceSettings struct {
 	RowDensity  string `json:"rowDensity"`
 	WordWrap    bool   `json:"wordWrap"`
 	RowColoring bool   `json:"rowColoring"`
+	// InlineBlame is P62's git-blame annotation toggle in the repo file viewer.
+	InlineBlame bool `json:"inlineBlame"`
 }
 
 type DataSettings struct {
@@ -64,6 +66,7 @@ func DefaultSettings() Settings {
 			RowDensity:  "comfortable",
 			WordWrap:    true,
 			RowColoring: true,
+			InlineBlame: true,
 		},
 		Data:  DataSettings{DefaultPageSize: 100},
 		Cache: CacheSettings{L2BudgetMb: 64},
@@ -91,6 +94,7 @@ type AppearancePatch struct {
 	RowDensity  *string `json:"rowDensity,omitempty"`
 	WordWrap    *bool   `json:"wordWrap,omitempty"`
 	RowColoring *bool   `json:"rowColoring,omitempty"`
+	InlineBlame *bool   `json:"inlineBlame,omitempty"`
 }
 
 type DataPatch struct {

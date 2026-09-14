@@ -33,6 +33,10 @@ export const appearanceSettingsSchema = /*#__PURE__*/ z.object({
   // P9: colour grid cell text by the column's data type. `.default(true)` keeps a pre-P9 stored
   // shape parsing to today's behavior (colouring on).
   rowColoring: z.boolean().default(true),
+  // P62: inline git-blame annotation at the end of the cursor's line in the repo file viewer.
+  // `.default(true)` follows the same discipline as wordWrap/rowColoring above — a stored row
+  // saved before this field existed hydrates with the annotation on.
+  inlineBlame: z.boolean().default(true),
 });
 export type AppearanceSettings = z.infer<typeof appearanceSettingsSchema>;
 
@@ -133,6 +137,7 @@ export const defaultSettings: Settings = {
     rowDensity: 'comfortable',
     wordWrap: true,
     rowColoring: true,
+    inlineBlame: true,
   },
   data: {
     defaultPageSize: 100,
