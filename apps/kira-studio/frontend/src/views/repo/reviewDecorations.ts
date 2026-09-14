@@ -113,7 +113,14 @@ export function attachReviewDecorations(
   modifiedEditor.updateOptions({ glyphMargin: true });
 
   let disposed = false;
-  let loadSeq = 0;
+  // C14-2: separate counters per resource -- loadDiff and loadComments used to share one loadSeq,
+  // so a fast loadComments (single DB read) firing while a slower loadDiff (server-side git diff)
+  // was still in flight bumped the shared counter and made the diff load discard its own result on
+  // resolution, with nothing else left to re-fetch it. Each counter still guarantees its own "a
+  // stale result never clobbers a fresher one" property; the two just can no longer invalidate each
+  // other.
+  let diffSeq = 0;
+  let commentsSeq = 0;
 
   let hunks: readonly DiffHunk[] = [];
   let bodyKind: FileDiffBody['kind'] = 'text';
@@ -290,11 +297,8 @@ export function attachReviewDecorations(
   // file diff — with N open review tabs on one branch, reloading both on every mutation cost N
   // redundant full diffs (a real server-side git diff, review.fileDiff) plus N full branch-wide
   // comment re-fetches (re-anchoring every comment on the branch server-side) for every single
-  // comment click or mark toggle. Both still share one `loadSeq` generation counter: whichever
-  // finishes with a stale `seq` (superseded by a newer loadDiff OR loadComments call, either one
-  // bumps the same counter) bails without touching state — the property that matters, "a slow
-  // in-flight request can never clobber state with an outdated result," holds regardless of which
-  // of the two calls did the superseding.
+  // comment click or mark toggle. C14-2: each now guards against staleness with its own counter
+  // (diffSeq/commentsSeq) rather than one shared one — see those declarations' own comment.
 
   // reviewMarking.ts:245-288's own resolution chain, ported: sinceReview first, retried as `range`
   // only when the file's own reviewedAtSha has moved past what this tab was opened against — the
@@ -305,12 +309,12 @@ export function attachReviewDecorations(
   // full comment list for an editor that has nothing to anchor it against and is showing an error
   // banner instead.
   async function loadDiff(): Promise<boolean> {
-    const seq = ++loadSeq;
+    const seq = ++diffSeq;
     let base: string | null;
     try {
       base = await resolveBase(deps.transport, deps.gitRepoId, deps.review.branch);
     } catch (err) {
-      if (disposed || seq !== loadSeq) return false;
+      if (disposed || seq !== diffSeq) return false;
       // C13-9: a genuine rejection (a transient index.lock conflict, most likely) — resolveBase
       // no longer caches this (see baseMemo's own comment), so the banner's own Retry button (or
       // another load() call, e.g. the repaint fan-out) can genuinely succeed on a later attempt.
@@ -318,7 +322,7 @@ export function attachReviewDecorations(
       showLoadError();
       return false;
     }
-    if (disposed || seq !== loadSeq) return false;
+    if (disposed || seq !== diffSeq) return false;
     if (base === null) {
       // C13-9: a SUCCESSFUL resolution to "no base configured" — permanent, not transient, so
       // Retry (which would just re-resolve the same legitimate null) is actively misleading here.
@@ -337,7 +341,7 @@ export function attachReviewDecorations(
         path: deps.path,
         mode: 'sinceReview',
       });
-      if (disposed || seq !== loadSeq) return false;
+      if (disposed || seq !== diffSeq) return false;
       if (result.reviewedAtSha !== null && result.reviewedAtSha !== deps.leftRev) {
         result = await deps.transport.request('review.fileDiff', {
           repoId: deps.gitRepoId,
@@ -346,10 +350,10 @@ export function attachReviewDecorations(
           path: deps.path,
           mode: 'range',
         });
-        if (disposed || seq !== loadSeq) return false;
+        if (disposed || seq !== diffSeq) return false;
       }
     } catch (err) {
-      if (disposed || seq !== loadSeq) return false;
+      if (disposed || seq !== diffSeq) return false;
       // C13-9: previously uncaught — a rejection here left a silently blank review layer and an
       // unhandled promise rejection in the console, entirely bypassing C12-7's retry-banner
       // mechanism (unlike the review.comment.list call below, which already had a `.catch`).
@@ -366,7 +370,7 @@ export function attachReviewDecorations(
   }
 
   async function loadComments(): Promise<void> {
-    const seq = ++loadSeq;
+    const seq = ++commentsSeq;
     const commentsResult = await deps.transport
       .request('review.comment.list', {
         repoId: deps.gitRepoId,
@@ -374,7 +378,7 @@ export function attachReviewDecorations(
         at: deps.review.branchTip,
       })
       .catch(() => ({ at: deps.review.branchTip, comments: [] as readonly ReviewComment[] }));
-    if (disposed || seq !== loadSeq) return;
+    if (disposed || seq !== commentsSeq) return;
     comments = commentsResult.comments;
     paint();
   }
