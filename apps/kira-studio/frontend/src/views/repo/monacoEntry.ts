@@ -55,6 +55,22 @@ languages.registerTokensProviderFactory('json', {
     (await import('monaco-editor/languages/definitions/javascript/javascript.js')).language,
 });
 
+// P60a §4.2/§7 step 3: `kira-mongo`/`kira-redis` — two Monarch definitions this app owns, a direct
+// transliteration of `editor/languages.ts`'s two hand-written `StreamLanguage`s (`mongoToken`/
+// `redisToken`, kept there verbatim for P60b's console). No upstream grammar exists for either
+// (`monaco-sql-languages` was checked and declined for SQL itself, §4.2 — a fortiori nothing
+// covers a Mongo shell or a flat Redis command line), so this is the "no library for this job
+// exists" case CLAUDE.md's library-first rule expects to be named, not a shortcut around it.
+languages.register({ id: 'kira-mongo' });
+languages.registerTokensProviderFactory('kira-mongo', {
+  create: async () => (await import('./monarch/mongo')).mongoMonarchLanguage,
+});
+
+languages.register({ id: 'kira-redis' });
+languages.registerTokensProviderFactory('kira-redis', {
+  create: async () => (await import('./monarch/redis')).redisMonarchLanguage,
+});
+
 // D7's own one worker: backs `IEditorWorkerService` (C6's diff-editor widget computes its diff
 // here), never a language-service worker — `vs/language/*` is never imported anywhere in this
 // file, which is what keeps the typescript/json/css/html workers from ever existing.

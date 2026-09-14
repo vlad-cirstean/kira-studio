@@ -1,89 +1,11 @@
-// C5 §9.1/§9.3: the lazy bootstrap this app's whole Monaco surface goes through — one worker
-// wiring, one theme, one model cache. RepoFileView.vue/RepoDiffView.vue (C6 §8.1) call loadMonaco;
-// navigation.ts (C6 §8.2) is the other consumer of the resolved module type.
-export type MonacoModule = typeof import('./monacoEntry');
+// C5 §9.1/§9.3: the sole contact point with `monaco-editor` for the repo workspace's own
+// URI/model-cache machinery. P60a §2.1/D2 moved the engine-generic bootstrap (`loadMonaco`,
+// `MonacoModule`, the theme definition) into `editor/monaco.ts`, shared by every editor surface in
+// the app — re-exported here unchanged so this file's own consumers (RepoFileView.vue,
+// RepoDiffView.vue, navigation.ts) need no edit.
+export { loadMonaco, type MonacoModule, REPO_THEME_NAME } from '../../editor/monaco';
 
-// D2 (from format.ts's own precedent): memoised so only the first repo file tab ever pays the
-// import cost — every studio/api session never downloads this chunk at all.
-let monacoModule: Promise<MonacoModule> | undefined;
-
-// D7's own "one worker" guard: label 'editorWorkerService' gets the real worker (it backs
-// IEditorWorkerService — C6's diff-editor widget computes its diff there); anything else throws
-// loudly at first use rather than silently shipping a second worker, in case a future import ever
-// pulls a language service back in.
-function wireWorker(mod: MonacoModule): void {
-  self.MonacoEnvironment = {
-    getWorker(_moduleId: string, label: string): Worker {
-      if (label === 'editorWorkerService') return new mod.EditorWorker();
-      throw new Error(`kira: unexpected Monaco worker label ${label}`);
-    },
-  };
-}
-
-// §9.3: read once from getComputedStyle against tokens.css — this app has one fixed (dark) visual
-// design with no light/dark toggle today (its own tokens.css literally maps each value to VS
-// Code's own theme keys, e.g. "--kira-bg: #1f1f1f; /* editor.background */"), so `base: 'vs-dark'`
-// is correct and there is only one theme to define — the plan's own "two themes, re-applied on an
-// appearance change" describes a light/dark distinction this app does not have; recorded here
-// rather than building a second theme and a change listener for a setting that doesn't exist.
-const REPO_THEME_NAME = 'kira-repo';
-
-// C6 dogfooding finding (§13.5's own live-verification pass, real WebKit — the engine the packaged
-// app's WKWebView actually embeds, matching playwright.config.ts's own choice of `webkit` for
-// UI-fidelity projects): WebKit's `getComputedStyle` canonicalises a custom property's own color
-// value to its shortest hex form — tokens.css's `--kira-fg: #cccccc` comes back as `#ccc` — and
-// Monaco's `defineTheme` validates every color strictly, throwing on the 3-digit shorthand
-// ("Illegal value for token color: #ccc") and aborting `loadMonaco()` entirely, silently: no error
-// surface, no editor, just an empty container (not merely a missing worker, C5's own described
-// failure mode). Chromium does not canonicalise the same property, which is why this went
-// unnoticed until a real WebKit run. Expanding a 3/4-digit shorthand to its 6/8-digit form here is
-// the fix — Monaco's own validator accepts either as long as it's full-length.
-function expandHexShorthand(color: string): string {
-  const m = /^#([0-9a-fA-F]{3,4})$/.exec(color);
-  if (!m) return color;
-  return `#${m[1]
-    .split('')
-    .map((c) => c + c)
-    .join('')}`;
-}
-
-function cssVar(name: string, fallback: string): string {
-  const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-  return expandHexShorthand(value || fallback);
-}
-
-function defineTheme(mod: MonacoModule): void {
-  mod.editor.defineTheme(REPO_THEME_NAME, {
-    base: 'vs-dark',
-    inherit: true,
-    rules: [],
-    colors: {
-      'editor.background': cssVar('--kira-bg', '#1f1f1f'),
-      'editor.foreground': cssVar('--kira-fg', '#cccccc'),
-      'editorWidget.background': cssVar('--kira-bg-elevated', '#202020'),
-      'editorWidget.border': cssVar('--kira-border-strong', '#313131'),
-      'editor.selectionBackground': cssVar('--kira-select', '#04395e'),
-      'editor.lineHighlightBackground': cssVar('--kira-hover', '#2a2d2e'),
-      'editorLineNumber.foreground': cssVar('--kira-fg-muted', '#9d9d9d'),
-      focusBorder: cssVar('--kira-focus', '#0078d4'),
-    },
-  });
-}
-
-/** Loads monaco-editor's chunk exactly once, wires the worker and defines the theme on first
- *  load — every subsequent call reuses the same resolved module. */
-export function loadMonaco(): Promise<MonacoModule> {
-  if (!monacoModule) {
-    monacoModule = import('./monacoEntry').then((mod) => {
-      wireWorker(mod);
-      defineTheme(mod);
-      return mod;
-    });
-  }
-  return monacoModule;
-}
-
-export { REPO_THEME_NAME };
+import type { MonacoModule } from '../../editor/monaco';
 
 // §9.3/C6 D6: one model per open file tab, keyed by a stable `kira-repo://<repoId>/<path>` URI —
 // disposed through the tab kind's existing dropResources hook (closeTab already blind-calls it for
