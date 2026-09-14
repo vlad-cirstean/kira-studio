@@ -33,26 +33,36 @@ export const REPO_THEME_NAME = KIRA_EDITOR_THEME;
 
 // C6 dogfooding finding (§13.5's own live-verification pass, real WebKit — the engine the packaged
 // app's WKWebView actually embeds, matching playwright.config.ts's own choice of `webkit` for
-// UI-fidelity projects): WebKit's `getComputedStyle` canonicalises a custom property's own color
-// value to its shortest hex form — tokens.css's `--kira-fg: #cccccc` comes back as `#ccc` — and
-// Monaco's `defineTheme` validates every color strictly, throwing on the 3-digit shorthand
-// ("Illegal value for token color: #ccc") and aborting `loadMonaco()` entirely, silently: no error
-// surface, no editor, just an empty container (not merely a missing worker, C5's own described
-// failure mode). Chromium does not canonicalise the same property, which is why this went
-// unnoticed until a real WebKit run. Expanding a 3/4-digit shorthand to its 6/8-digit form here is
-// the fix — Monaco's own validator accepts either as long as it's full-length.
-export function expandHexShorthand(color: string): string {
-  const m = /^#([0-9a-fA-F]{3,4})$/.exec(color);
-  if (!m) return color;
-  return `#${m[1]
-    .split('')
-    .map((c) => c + c)
-    .join('')}`;
+// UI-fidelity projects), **widened by a second P60a dogfooding finding**: WebKit's
+// `getComputedStyle` canonicalises a custom property's own color value to whatever it considers
+// its *shortest* serialization — a 3-digit hex shorthand for `--kira-fg: #cccccc` (C6's own
+// finding, `#ccc`), but a bare CSS colour *keyword* when one exactly matches, e.g.
+// `--kira-syntax-meta: #808080` comes back as the literal string `"gray"`. Monaco's `defineTheme`
+// validates a token rule's `foreground` strictly as a hex string, throwing on either form
+// ("Illegal value for token color: #ccc" / "... gray") and rejecting `loadMonaco()`'s own memoised
+// promise *permanently* — every MonacoHost on the page is left showing its pending `<pre>` forever,
+// no error surface at all (worse than C5's own described "missing worker" failure mode, since
+// nothing here even logs past the one console error). Chromium does not canonicalise either way,
+// which is why both forms went unnoticed until a real WebKit run.
+//
+// A canvas 2D context's own `fillStyle` setter/getter accepts the full CSS `<color>` grammar (any
+// keyword, any hex length, `rgb()`/`hsl()`/...) and is spec-required to serialize an opaque colour
+// back out as `#rrggbb` on read — a general normalizer that subsumes the narrower hex-shorthand-only
+// fix this replaces, rather than special-casing named colours as a second regex.
+let normalizeCanvasCtx: CanvasRenderingContext2D | null | undefined;
+export function normalizeColor(color: string): string {
+  if (normalizeCanvasCtx === undefined) {
+    normalizeCanvasCtx = document.createElement('canvas').getContext('2d');
+  }
+  if (!normalizeCanvasCtx) return color; // no canvas 2D support — pass through rather than throw
+  normalizeCanvasCtx.fillStyle = '#000000'; // known-good reset, so an invalid `color` leaves this
+  normalizeCanvasCtx.fillStyle = color;
+  return normalizeCanvasCtx.fillStyle;
 }
 
 export function cssVar(name: string, fallback: string): string {
   const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-  return expandHexShorthand(value || fallback);
+  return normalizeColor(value || fallback);
 }
 
 // P60a §4.4/dogfooding: `fixedOverflowWidgets: true` alone does NOT reparent a hover/suggest
@@ -81,12 +91,21 @@ export function overflowWidgetsContainer(): HTMLElement {
  *  load — every subsequent call reuses the same resolved module. */
 export function loadMonaco(): Promise<MonacoModule> {
   if (!monacoModule) {
-    monacoModule = import('../views/repo/monacoEntry').then(async (mod) => {
-      wireWorker(mod);
-      const { defineKiraTheme } = await import('./monacoTheme');
-      defineKiraTheme(mod);
-      return mod;
-    });
+    monacoModule = import('../views/repo/monacoEntry')
+      .then(async (mod) => {
+        wireWorker(mod);
+        const { defineKiraTheme } = await import('./monacoTheme');
+        defineKiraTheme(mod);
+        return mod;
+      })
+      .catch((err) => {
+        // A rejected memoised promise would otherwise stay rejected for the rest of the page's
+        // life — every MonacoHost that mounts afterwards awaits the same broken promise forever,
+        // stuck on its own pending state with no way to recover short of a full reload. Forgetting
+        // it here means the *next* call retries the import fresh instead.
+        monacoModule = undefined;
+        throw err;
+      });
   }
   return monacoModule;
 }

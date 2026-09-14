@@ -365,7 +365,22 @@ function onInputMouseMove(e: MouseEvent): void {
   // overlay that is already painting the same text at the same viewport coordinates as this real
   // input — exact, and it does not re-assume the monospace grid the overlay's *painted* alignment
   // depends on (font-agnostic, D3(c)).
-  const offset = overlayOffsetAtPoint(overlay, e.clientX, e.clientY);
+  //
+  // Both elements' own `pointer-events` normally point a hit-test at the *input* — the overlay is
+  // `pointer-events: none` (so a real click/drag always reaches the input underneath) and the
+  // input itself paints on top with `z-index: 1` (`.has-overlay` CSS), so caretPositionFromPoint
+  // would otherwise resolve to the input every time, never a text node inside the overlay. Flipped
+  // for the span of this one synchronous hit-test only, restored in a `finally` immediately after
+  // — no real user click/drag is ever at risk of hitting the overlay instead of the input.
+  el.style.pointerEvents = 'none';
+  overlay.style.pointerEvents = 'auto';
+  let offset: number | null;
+  try {
+    offset = overlayOffsetAtPoint(overlay, e.clientX, e.clientY);
+  } finally {
+    overlay.style.pointerEvents = 'none';
+    el.style.pointerEvents = '';
+  }
   const lines = offset === null ? null : props.hoverAt(props.modelValue, offset);
   const key = lines ? JSON.stringify(lines) : null;
   if (key === lastHoverKey) return; // same token (or still no token) as the last move

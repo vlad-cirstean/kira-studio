@@ -338,7 +338,6 @@ onMounted(async () => {
   // Unmounted while the import was in flight — dispose nothing, mount nothing.
   if (!rootRef.value) return;
   mod = resolved;
-  pending.value = false;
 
   model = mod.editor.createModel(props.doc, monacoLanguageIdFor(props.language));
   editor = mod.editor.create(rootRef.value, {
@@ -347,6 +346,10 @@ onMounted(async () => {
     theme: KIRA_EDITOR_THEME,
   });
   decorations = editor.createDecorationsCollection();
+  // Only now — Monaco's own DOM already exists inside `rootRef`, so the pending <pre>'s v-if
+  // removal (Vue's own, batched) never has a window where neither one nor both are showing real
+  // content.
+  pending.value = false;
 
   wrapDisposable = attachWrapOnType(editor, model);
   registerProviders(mod, monacoLanguageIdFor(props.language));
@@ -527,14 +530,34 @@ watch(
 </script>
 
 <template>
-  <pre v-if="pending" class="monaco-host monaco-host-pending" :class="{ 'monaco-host--single-line': singleLine }">{{ doc }}</pre>
+  <!-- A single root, not `pending`'s <pre> and this <div> as two siblings — a multi-root template
+       gets no automatic $attrs fallthrough at all (Vue silently drops every data-testid/class a
+       call site passes on the <MonacoHost> tag, e.g. RawExchangePane's own `data-testid="http-
+       wire-request-editor"`), which every mount site's own drop-in contract (§3) depends on.
+       Monaco mounts into this same div (`rootRef`); the pending <pre> is a child of it, removed by
+       `v-if` the instant `pending` flips false, which is also the instant `editor.create()` has
+       already appended Monaco's own DOM into the same container — briefly (one microtask) both
+       are present, never observably so.
+
+       No `data-testid` of its own on the root, deliberately: a static attribute set here would win
+       Vue's own fallthrough merge over whatever `data-testid` a call site passes on `<MonacoHost>`
+       (`class`/`style` concatenate on fallthrough; every other attribute, the child's own explicit
+       value wins) — exactly the drop-in contract this host exists to keep
+       (`CodeMirrorHost.vue`'s own root carried no `data-testid` for the identical reason). `.monaco-host`
+       (the class, which DOES merge) is what `tests/ui/support/editorText.ts` and every UI spec use
+       instead to find "the Monaco host" generically inside a call site's own more specific one. -->
   <div
-    v-show="!pending"
     ref="rootRef"
     class="monaco-host"
     :class="{ 'monaco-host--single-line': singleLine }"
-    data-testid="monaco-host"
-  ></div>
+  >
+    <pre
+      v-if="pending"
+      class="monaco-host-pending"
+      :class="{ 'monaco-host--single-line': singleLine }"
+      >{{ doc }}</pre
+    >
+  </div>
 </template>
 
 <style scoped>
