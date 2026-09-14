@@ -80,9 +80,9 @@ test('SQL console at rest with syntax-highlighted content (P6)', async ({ relaun
   const view = page.locator('[data-testid="console-view"]');
   await expect(view).toBeVisible();
 
-  await view.locator('.cm-content').click();
+  await view.locator('.view-lines').click();
   await page.keyboard.type(SAMPLE_QUERY);
-  await expect(view.locator('.cm-content')).toContainText('order by total desc');
+  await expect(view.locator('.view-lines')).toContainText('order by total desc');
 
   await expect(page).toHaveScreenshot('console.png');
 });

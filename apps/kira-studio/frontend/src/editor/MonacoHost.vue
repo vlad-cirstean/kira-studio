@@ -224,7 +224,10 @@ function buildCompletionProvider(m: MonacoModule): CompletionItemProvider {
             label: opt.label,
             kind: kindFor(m, opt.type),
             detail: opt.detail,
-            // §4.8: the six BSON constructors' own `#{}` snippet placeholder maps to Monaco's `$0`.
+            // §4.8: a source's own `snippet` (e.g. the six BSON constructors') already uses
+            // Monaco's `$0` placeholder syntax directly (P60b's own port of the console's
+            // completion sources) — passed straight through, only the `InsertAsSnippet` rule
+            // below is this boundary's job.
             insertText: opt.snippet ?? opt.insert ?? opt.label,
             insertTextRules: opt.snippet
               ? m.languages.CompletionItemInsertTextRule.InsertAsSnippet

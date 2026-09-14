@@ -89,7 +89,7 @@ test('mysql (frontend, mocked IPC) — connect, tree, filter-by-value quoting, c
   await page.click('[data-testid="menu-item-open-console"]');
   const consoleView = page.locator('[data-testid="console-view"]');
   await expect(consoleView).toBeVisible();
-  await consoleView.locator('.cm-content').click();
+  await consoleView.locator('.view-lines').click();
   await page.keyboard.type('SELECT 1;');
   await page.click('[data-testid="console-run-statement"]');
   const results = consoleView.locator('[data-testid="console-result-grid"]');

@@ -99,7 +99,7 @@ async function openDefinitionFromMenu(page: Page, path: string): Promise<void> {
 }
 
 async function typeInto(view: Locator, page: Page, text: string): Promise<void> {
-  await view.locator('.cm-content').click();
+  await view.locator('.view-lines').click();
   await page.keyboard.type(text);
 }
 

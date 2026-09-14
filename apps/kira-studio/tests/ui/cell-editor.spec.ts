@@ -1210,7 +1210,7 @@ test("cell editor — owned by the view, never shows another tab's cell", async 
       .locator('[data-testid="tab"][data-tab-kind="console"]')
       .last()
       .getAttribute('data-tab-id')) ?? '';
-  await page.locator('[data-testid="console-view"] .cm-content').click();
+  await page.locator('[data-testid="console-view"] .view-lines').click();
   await page.keyboard.type('select 1 as x;');
   await page.click('[data-testid="console-run-statement"]');
   await expect(page.locator('[data-testid="console-result-grid"]')).toBeVisible();
