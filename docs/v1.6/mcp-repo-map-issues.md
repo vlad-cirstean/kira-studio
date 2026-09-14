@@ -224,7 +224,45 @@ Entries are closed in place (status flips to Fixed, commit noted) rather than de
   {"query":"requestCellFocus"}` returned the one real declaration (`focusRequest.ts:35`). No false
   positives, no misses, nothing missing. No non-trivial finding.
 
+- **P67e (planning)**: same stale-token pattern as P67 above — a server was already alive on 8765
+  with "Using this repository's existing token", unusable (the file under `/root/.kira-studio/`
+  holds only `hash`/`salt`, never the token). Rather than delete the registered token, started a
+  second server with `KIRA_HOME` pointed at this session's scratchpad, which minted and printed a
+  fresh bearer token, and called it over plain HTTP/JSON-RPC per the headless steps. That fresh
+  `KIRA_HOME` meant a cold index — see the non-trivial entry below. Once warm, every call was
+  correct and confirmed this plan's own line numbers independently of the file reads:
+  `search_symbols {"query":"readOnlyRequest"}` → `gitstream.go:108`; `{"query":"readOnlyMethods"}`
+  → `gitstream.go:70`; `{"query":"opTable"}` → `gitsession/ops.go:187` plus
+  `kira-studio-vscode/src/commands.test.ts:113`'s `opTableKinds`; `find_references
+  {"symbol":"readOnlyRequest"}` → 8 references, correctly including the `ServeGitStream`
+  composition at `gitstream.go:182` and all four test call sites. `search_symbols
+  {"query":"ConflictBanner"}` returned nothing — the already-logged P60a `.vue` SFC behavior, not a
+  new defect.
+
 ### Non-trivial
+
+- **P67e (planning) — a query answered against a cold or mid-sync index returns a confident "not
+  found" instead of saying the index isn't ready. Open.**
+
+  Against a server started with an empty `KIRA_HOME` (so the index built from scratch), the first
+  calls answered as if the repository genuinely had no such symbol:
+
+  - `search_symbols {"query":"readOnlyMethods"}` → `no symbols matching "readOnlyMethods"`, though
+    it is declared at `apps/kira-studio/internal/bridge/gitstream.go:70`.
+  - `find_references {"symbol":"readOnlyMethods"}` → `no references found for "readOnlyMethods"`.
+
+  Both answered correctly ~90 seconds later with no restart and no other change, so the index was
+  simply still building. The wording is the problem, not the timing: `repomap/render.go:140`'s
+  `no symbols matching %q` is the same string a real miss produces, and nothing in
+  `internal/repomap` exposes a sync/ready state for a tool response to distinguish the two. A
+  session that trusts the first answer concludes a symbol does not exist and stops looking — the
+  same silent-wrong-answer failure mode as the P63 entry below, from a different cause.
+
+  Narrow in practice (a session reusing `/root/.kira-studio/codeindex.db` starts warm), but it also
+  covers the window right after a large change set lands, which is exactly when a phase navigates
+  most. Fix shape, for the dedicated pass: have the tool responses report "index still syncing"
+  when the initial sync has not completed, rather than an empty result — not a retry loop inside
+  the caller.
 
 - **P63 (planning) — TypeScript `type` aliases are absent from the index; a name shared with Go
   silently resolves to the Go symbol only. Fixed (`54e77579`).**
