@@ -3,7 +3,6 @@ package codeworkspace
 import (
 	"context"
 	"os"
-	"path/filepath"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/codegraph"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/codeindex"
@@ -85,8 +84,17 @@ func Definitions(ctx context.Context, s *Session, store *codeindex.Store, relPat
 	for i, t := range targets {
 		fileLI, ok := lineIndexes[t.Path]
 		if !ok {
-			if fileData, err := os.ReadFile(filepath.Join(s.Root, t.Path)); err == nil { //nolint:gosec // t.Path is codegraph's own indexed, repository-relative path.
-				fileLI = NewLineIndex(fileData)
+			// C13-13: t.Path is codegraph's own indexed path, not re-validated on this read like
+			// relPath is above — a tracked/untracked symlink escaping s.Root at index time would
+			// otherwise have its target's bytes read here (only to count line breaks for a
+			// position, never returned to the caller, but still a real containment gap; the same
+			// class C13-8 already closed in codeindex/sync.go). ValidateRelPath's own failure is
+			// handled exactly like a missing/unreadable file below — fileLI stays nil and the
+			// caller falls back to a byte-offset-derived position instead of failing the whole call.
+			if targetAbs, err := ValidateRelPath(s.Root, t.Path); err == nil {
+				if fileData, err := os.ReadFile(targetAbs); err == nil { //nolint:gosec // targetAbs already validated (ValidateRelPath).
+					fileLI = NewLineIndex(fileData)
+				}
 			}
 			lineIndexes[t.Path] = fileLI
 		}
