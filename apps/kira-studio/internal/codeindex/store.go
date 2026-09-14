@@ -116,20 +116,28 @@ func (s *Store) ReplaceFile(ctx context.Context, w FileWrite) error {
 // (delete this file's symbols/blocks/references, insert the new ones): a partial per-symbol
 // update would buy nothing and would need its own invalidation rules.
 func (s *Store) ReplaceFiles(ctx context.Context, ws []FileWrite) error {
-	db, err := s.conn()
-	if err != nil {
-		return err
-	}
 	for start := 0; start < len(ws); start += replaceFileBatch {
 		end := start + replaceFileBatch
 		if end > len(ws) {
 			end = len(ws)
 		}
-		if err := replaceFilesTx(ctx, db, ws[start:end]); err != nil {
+		if err := s.writeBatch(ctx, ws[start:end]); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+// writeBatch writes one batch (at most replaceFileBatch files) in a single transaction. The
+// pipelined Sync writer (sync.go's parseStale) calls this directly, one batch at a time, as parse
+// results arrive — the same transaction shape ReplaceFiles' own chunking loop uses, so both paths
+// share one write-and-retry behavior.
+func (s *Store) writeBatch(ctx context.Context, ws []FileWrite) error {
+	db, err := s.conn()
+	if err != nil {
+		return err
+	}
+	return replaceFilesTx(ctx, db, ws)
 }
 
 // replaceFilesTx writes one batch inside a single transaction.

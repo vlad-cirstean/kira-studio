@@ -76,20 +76,8 @@ func (idx *Index) Sync(ctx context.Context) (SyncStats, error) {
 		existingByPath[r.Path] = r
 	}
 
-	writes, err := idx.parseStale(ctx, enumerated, existingByPath)
-	if err != nil {
+	if err := idx.parseStale(ctx, enumerated, existingByPath, &stats); err != nil {
 		return stats, err
-	}
-	if err := idx.store.ReplaceFiles(ctx, writes); err != nil {
-		return stats, err
-	}
-	for _, w := range writes {
-		if w.ParseStatus != StatusOK {
-			stats.FilesSkipped++
-		} else {
-			stats.FilesParsed++
-		}
-		stats.ByLanguage[codeparse.ID(w.Language)]++
 	}
 
 	var deleted []string
@@ -130,23 +118,39 @@ func (idx *Index) absPath(relPath string) string {
 }
 
 // parseStale applies §5.3's staleness rule to every enumerated file and parses the stale ones
-// through a bounded worker pool (§8), draining results into one writer (this function itself,
-// single-threaded) — parsing is parallel, but nothing here writes to the store concurrently.
+// through a bounded worker pool (§8), streaming each finished FileWrite to a single writer
+// goroutine (below) that batches them into replaceFileBatch-sized transactions as parsing
+// continues — overlapping the parse and write phases instead of materializing every write before
+// any of them land (P64c §2.1: 3.51s -> ~2.30s on this repository, peak retained heap 153 MiB ->
+// a few). Parsing is parallel; nothing here writes to the store concurrently — exactly one writer
+// goroutine ever calls the store, preserving the single-writer invariant this doc comment already
+// stated before the pipelining (SQLite itself is single-writer, and §1.5's own measurement shows
+// concurrent writers only serialize, never help).
+//
+// stats accumulates in the writer goroutine as each batch lands, rather than in a second pass over
+// a materialized slice — safe because it is the only goroutine that ever touches stats.
+//
+// Error cancellation runs both directions: a parse error stops the writer from waiting on a
+// channel nothing will ever add to again, and a writer error (a batch write that fails) cancels
+// the shared cancelWriter context so parse workers and the enumerator — both blocked sending on a
+// channel the writer has stopped draining — unblock instead of hanging. The first error from
+// either side wins and is returned, matching this function's pre-pipelining firstErr semantics.
 func (idx *Index) parseStale(
-	ctx context.Context, enumerated []EnumeratedFile, existingByPath map[string]FileRow,
-) ([]FileWrite, error) {
+	ctx context.Context, enumerated []EnumeratedFile, existingByPath map[string]FileRow, stats *SyncStats,
+) error {
 	type job struct {
 		path string
 		lang codeparse.ID
 	}
-	type outcome struct {
-		write FileWrite
-		ok    bool // false: parseOne's own C13-8 path-safety skip — no row to write, not an error.
-		err   error
-	}
 
 	jobs := make(chan job)
-	outcomes := make(chan outcome)
+	outcomes := make(chan parseOutcome)
+
+	// writerCtx cancels the parse side (worker sends and the enumerator's own job sends) the
+	// moment the writer goroutine hits an error it cannot recover from, without touching ctx
+	// itself — a cancelled parent ctx still reaches here too, since writerCtx is derived from it.
+	writerCtx, cancelWriter := context.WithCancel(ctx)
+	defer cancelWriter()
 
 	var wg sync.WaitGroup
 	workers := syncWorkers()
@@ -157,8 +161,8 @@ func (idx *Index) parseStale(
 			for j := range jobs {
 				w, ok, err := idx.parseOne(ctx, j.path, j.lang)
 				select {
-				case outcomes <- outcome{write: w, ok: ok, err: err}:
-				case <-ctx.Done():
+				case outcomes <- parseOutcome{write: w, ok: ok, err: err}:
+				case <-writerCtx.Done():
 					return
 				}
 			}
@@ -177,30 +181,85 @@ func (idx *Index) parseStale(
 			}
 			select {
 			case jobs <- job{path: e.Path, lang: e.Language}:
-			case <-ctx.Done():
+			case <-writerCtx.Done():
 				return
 			}
 		}
 	}()
 
-	var writes []FileWrite
+	return idx.writeOutcomes(ctx, outcomes, cancelWriter, stats)
+}
+
+// parseOutcome is one worker's own report back to the writer goroutine — ok is false only for
+// parseOne's C13-8 path-safety skip (no row to write, not an error); every other combination
+// writes a row (err set means abort, otherwise write is ready to batch).
+type parseOutcome struct {
+	write FileWrite
+	ok    bool
+	err   error
+}
+
+// writeOutcomes is parseStale's single writer goroutine — this function's own caller runs it
+// directly (it blocks until outcomes closes), rather than spawning yet another goroutine, since
+// parseStale has nothing left to do but wait for it anyway. Batches FileWrites into
+// replaceFileBatch-sized transactions as they arrive and calls cancelOnErr once, the first time
+// either a parse outcome or a batch write itself fails, so the parse side unblocks instead of
+// hanging on a channel this function has stopped draining productively (it keeps ranging over
+// outcomes after an error purely to let blocked senders finish and the channel close — never
+// writing again once firstErr is set).
+func (idx *Index) writeOutcomes(
+	ctx context.Context, outcomes <-chan parseOutcome, cancelOnErr context.CancelFunc, stats *SyncStats,
+) error {
+	batch := make([]FileWrite, 0, replaceFileBatch)
+	flush := func() error {
+		if len(batch) == 0 {
+			return nil
+		}
+		if err := idx.store.writeBatch(ctx, batch); err != nil {
+			return err
+		}
+		for _, w := range batch {
+			if w.ParseStatus != StatusOK {
+				stats.FilesSkipped++
+			} else {
+				stats.FilesParsed++
+			}
+			stats.ByLanguage[codeparse.ID(w.Language)]++
+		}
+		batch = batch[:0]
+		return nil
+	}
+
 	var firstErr error
 	for o := range outcomes {
+		if firstErr != nil {
+			continue // draining only, so blocked parse workers can finish and outcomes can close.
+		}
 		if o.err != nil {
-			if firstErr == nil {
-				firstErr = o.err
-			}
+			firstErr = o.err
+			cancelOnErr()
 			continue
 		}
 		if !o.ok {
 			continue
 		}
-		writes = append(writes, o.write)
+		batch = append(batch, o.write)
+		if len(batch) >= replaceFileBatch {
+			if err := flush(); err != nil {
+				firstErr = err
+				cancelOnErr()
+			}
+		}
+	}
+	if firstErr == nil {
+		if err := flush(); err != nil {
+			firstErr = err
+		}
 	}
 	if firstErr != nil {
-		return nil, firstErr
+		return firstErr
 	}
-	return writes, ctx.Err()
+	return ctx.Err()
 }
 
 // isStale is §5.3: a file row is stale when its size_bytes or mtime_unix_ns disagrees with disk
