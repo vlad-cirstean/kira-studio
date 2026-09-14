@@ -4,7 +4,7 @@ import { splitSqlStatements } from '@shared/domain/sql-split';
 import { computed, ref } from 'vue';
 import { control } from '../../bridge/control';
 import { copyText } from '../../clipboard';
-import CodeMirrorHost from '../../editor/CodeMirrorHost.vue';
+import MonacoHost from '../../editor/MonacoHost.vue';
 import { connectionRecord, connectionsState } from '../../state/connections';
 import { type MenuItem, openContextMenu } from '../../state/contextMenu';
 import { clearOps, opsState, runningCount, visibleOps } from '../../state/ops';
@@ -198,13 +198,13 @@ function onRowContextMenu(record: OpRecord, event: MouseEvent): void {
       </div>
       <div class="ops-body">
         <!--
-          The expanded command/error detail rows embed a CodeMirrorHost (D18/D19) inside
+          The expanded command/error detail rows embed a MonacoHost (D18/D19, P60a) inside
           VirtualList's fixed row rather than making VirtualList itself variable-height
-          (P2 §0 note 14 leaves it fixed on purpose) — scoped CSS below forces a single
-          non-wrapping line and hides the line-number gutter so it reads like the plain text
-          it replaces, just with SQL syntax highlighting. This prop is JS, not CSS (P24 D34) — it
-          has to stay numerically equal to --kira-h-xs (18px), which .ops-row/.ops-columns/
-          .ops-detail-row and the embedded .cm-editor's own height all use below.
+          (P2 §0 note 14 leaves it fixed on purpose) — `single-line` forces a non-wrapping line
+          and no gutter so it reads like the plain text it replaces, just with SQL syntax
+          highlighting. This prop is JS, not CSS (P24 D34) — it has to stay numerically equal to
+          --kira-h-xs (18px), which .ops-row/.ops-columns/.ops-detail-row and the embedded
+          .monaco-editor's own height all use below.
         -->
         <VirtualList :items="listItems" :row-height="18">
           <template #default="{ item }">
@@ -249,7 +249,7 @@ function onRowContextMenu(record: OpRecord, event: MouseEvent): void {
               <span v-else class="mono truncate" v-tooltip="item.record.command ?? ''">{{ item.record.command ?? '—' }}</span>
             </div>
             <div v-else-if="item.kind === 'detail-command'" class="ops-detail-row ops-detail-cm">
-              <CodeMirrorHost
+              <MonacoHost
                 :doc="
                   item.record.commandTruncated
                     ? `command (truncated at 64 KiB — cannot Re-run): ${item.record.command}`
@@ -258,10 +258,16 @@ function onRowContextMenu(record: OpRecord, event: MouseEvent): void {
                 :language="item.record.kind === 'http' ? 'plain' : 'sql'"
                 :sql-dialect="opSqlDialect(item.record)"
                 :read-only="true"
+                :single-line="true"
               />
             </div>
             <div v-else class="ops-detail-row ops-detail-cm">
-              <CodeMirrorHost :doc="`error: ${item.record.error}`" language="plain" :read-only="true" />
+              <MonacoHost
+                :doc="`error: ${item.record.error}`"
+                language="plain"
+                :read-only="true"
+                :single-line="true"
+              />
             </div>
           </template>
         </VirtualList>
@@ -415,7 +421,7 @@ function onRowContextMenu(record: OpRecord, event: MouseEvent): void {
   padding: 0;
 }
 
-.ops-detail-cm :deep(.cm-editor) {
+.ops-detail-cm :deep(.monaco-editor) {
   height: var(--kira-h-xs);
   font-size: var(--kira-t-sm);
 }
@@ -423,22 +429,15 @@ function onRowContextMenu(record: OpRecord, event: MouseEvent): void {
 /* The detail row is a single fixed-height (20px) line — VirtualList (P2 §0 note 14) has no
    notion of a variable-height row — so a long command can't wrap into view. Horizontal scroll
    (trackpad/shift-wheel/drag, same as the tab strip) is what actually lets you read all of it,
-   rather than clipping it exactly like the collapsed row it replaces. */
-.ops-detail-cm :deep(.cm-scroller) {
+   rather than clipping it exactly like the collapsed row it replaces. `single-line` (above)
+   already turns wordWrap off and the gutter off; this only adds the left/right breathing room
+   `.cm-line`'s own padding used to give each row. */
+.ops-detail-cm :deep(.monaco-scrollable-element) {
   overflow-x: auto;
   overflow-y: hidden;
 }
 
-.ops-detail-cm :deep(.cm-content) {
-  white-space: pre;
-  padding: 0;
-}
-
-.ops-detail-cm :deep(.cm-line) {
+.ops-detail-cm :deep(.view-line) {
   padding: 0 var(--kira-s-4);
-}
-
-.ops-detail-cm :deep(.cm-gutters) {
-  display: none;
 }
 </style>

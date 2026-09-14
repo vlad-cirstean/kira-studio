@@ -4,7 +4,7 @@ import type { DocumentTabRecord, PageSize } from '@shared/domain/tabs';
 import { pathTail } from '@shared/domain/tree';
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { control } from '../../bridge/control';
-import CodeMirrorHost from '../../editor/CodeMirrorHost.vue';
+import MonacoHost from '../../editor/MonacoHost.vue';
 import { registerCommand } from '../../shortcuts/commands';
 import { confirmDialog } from '../../state/confirmDialog';
 import { connectionRecord, connectionsState } from '../../state/connections';
@@ -832,7 +832,7 @@ onUnmounted(() => {
       />
       <template v-else>
       <div v-if="creatingNew" class="new-doc-panel" data-testid="document-new">
-        <CodeMirrorHost v-model:doc="newBuffer.doc.value" language="json" :read-only="false" />
+        <MonacoHost v-model:doc="newBuffer.doc.value" language="json" :read-only="false" />
         <div class="edit-actions">
           <EditBufferActions :buffer="newBuffer" testid-prefix="document-new" :show-compact="false" />
           <span class="edit-actions-spacer"></span>
@@ -946,7 +946,7 @@ onUnmounted(() => {
                   <!-- The editor is the same code surface the definition view and the console views
                        use — the only difference is the language. -->
                   <template v-if="editingRow === item">
-                    <CodeMirrorHost v-model:doc="editBuffer.doc.value" language="json" :read-only="false" />
+                    <MonacoHost v-model:doc="editBuffer.doc.value" language="json" :read-only="false" />
                     <div class="edit-actions">
                       <EditBufferActions :buffer="editBuffer" testid-prefix="document-edit" :show-compact="false" />
                       <span class="edit-actions-spacer"></span>
@@ -966,7 +966,7 @@ onUnmounted(() => {
                   />
                   <!-- D22: a body that doesn't parse (truncated mid-token, or genuinely not an
                        object) falls back to raw text rather than a tree that has nothing to walk. -->
-                  <CodeMirrorHost v-else :doc="rowAt(item)!.body" language="json" :read-only="true" />
+                  <MonacoHost v-else :doc="rowAt(item)!.body" language="json" :read-only="true" />
                 </div>
               </template>
             </DocumentRow>

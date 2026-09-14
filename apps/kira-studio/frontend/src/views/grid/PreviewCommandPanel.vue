@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
-import CodeMirrorHost from '../../editor/CodeMirrorHost.vue';
+import MonacoHost from '../../editor/MonacoHost.vue';
 import { connectionRecord } from '../../state/connections';
 import { findDataTab } from '../../state/tabs';
 import CodiconIcon from '../../theme/CodiconIcon.vue';
@@ -71,7 +71,7 @@ function close(): void {
         No pending changes.
       </div>
       <div v-else class="preview-panel-body">
-        <CodeMirrorHost :doc="doc" language="sql" :sql-dialect="sqlDialect" :read-only="true" />
+        <MonacoHost :doc="doc" language="sql" :sql-dialect="sqlDialect" :read-only="true" />
       </div>
     </div>
   </PopoverPanel>

@@ -2,7 +2,7 @@
 import { type EnvRow, parseEnv, reconcileEnv, serializeEnv } from '@kira/api-core';
 import type { ApiVariable, ApiVariableBulkEntry, VariableScope } from '@shared/domain/variables';
 import { computed, ref } from 'vue';
-import CodeMirrorHost from '../editor/CodeMirrorHost.vue';
+import MonacoHost from '../editor/MonacoHost.vue';
 import { confirmDialog } from '../state/confirmDialog';
 import AppButton from '../theme/primitives/AppButton.vue';
 import MessageStrip from '../theme/primitives/MessageStrip.vue';
@@ -117,7 +117,7 @@ function onCancel(): void {
     </MessageStrip>
 
     <div class="bulk-body">
-      <CodeMirrorHost
+      <MonacoHost
         :doc="text"
         language="plain"
         :read-only="false"

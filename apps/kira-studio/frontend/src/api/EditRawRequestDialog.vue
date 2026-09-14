@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
-import CodeMirrorHost from '../editor/CodeMirrorHost.vue';
+import MonacoHost from '../editor/MonacoHost.vue';
 import AppButton from '../theme/primitives/AppButton.vue';
 import DialogFrame from '../theme/primitives/DialogFrame.vue';
 import MessageStrip from '../theme/primitives/MessageStrip.vue';
 import { applyEditRaw, closeEditRawDialog, editRawDialogState, previewRaw } from './state/raw';
 
 // P9 D8/D9: a raw HTTP/1.1 text buffer the user hand-edits, parsed back into the structured model
-// on Apply — never a second send path (there is exactly one, and it takes tab state). CodeMirrorHost
+// on Apply — never a second send path (there is exactly one, and it takes tab state). MonacoHost
 // editable (RequestBodyPane.vue's own `:read-only="false"` shape), not a plain <textarea>: unlike a
 // single-line curl command, a raw request is genuinely multi-line and benefits from real line
 // numbers (F17 — no new primitive, no new dependency).
@@ -74,7 +74,7 @@ function close(): void {
       <div class="p-sm muted" data-testid="edit-raw-hint">{{ hint }}</div>
 
       <div class="raw-editor">
-        <CodeMirrorHost
+        <MonacoHost
           :doc="text"
           language="plain"
           :read-only="false"

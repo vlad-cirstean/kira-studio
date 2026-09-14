@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue';
-import CodeMirrorHost from '../../editor/CodeMirrorHost.vue';
+import MonacoHost from '../../editor/MonacoHost.vue';
 import { settingsState } from '../../state/settings';
 import CodiconIcon from '../../theme/CodiconIcon.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
@@ -161,7 +161,7 @@ const rawLanguage = computed(() =>
         <span class="p-sm muted">Raw</span>
       </div>
       <div v-if="showRaw" class="raw-body" data-testid="explain-raw">
-        <CodeMirrorHost :doc="plan.raw" :language="rawLanguage" :read-only="true" :autocomplete="false" />
+        <MonacoHost :doc="plan.raw" :language="rawLanguage" :read-only="true" :autocomplete="false" />
       </div>
     </template>
     <p v-else class="no-plan muted">No plan.</p>

@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from 'vue';
 import { control } from '../bridge/control';
 import { data } from '../bridge/data';
-import CodeMirrorHost from '../editor/CodeMirrorHost.vue';
+import MonacoHost from '../editor/MonacoHost.vue';
 import { connectionRecord, connectionsState } from '../state/connections';
 import { closeGenerateDataDialog, fakeDataDialogState } from '../state/fakeData';
 import { findDataTab } from '../state/tabs';
@@ -321,7 +321,7 @@ function onSequenceStartChange(index: number, start: number): void {
           <div v-else-if="previewError" class="p-sm" data-testid="generate-data-preview-error">
             {{ previewError }}
           </div>
-          <CodeMirrorHost
+          <MonacoHost
             v-else
             :doc="previewDoc"
             language="sql"

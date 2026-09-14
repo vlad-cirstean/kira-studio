@@ -4,7 +4,7 @@ import type { HttpCodeLanguage, HttpResponseWire, HttpWireFidelity } from '@shar
 import type { HttpRequestTabRecord } from '@shared/domain/tabs';
 import { computed, ref } from 'vue';
 import { copyText } from '../../clipboard';
-import CodeMirrorHost from '../../editor/CodeMirrorHost.vue';
+import MonacoHost from '../../editor/MonacoHost.vue';
 import type { RangeHighlight } from '../../editor/variableHighlight';
 import EmptyState from '../../theme/primitives/EmptyState.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
@@ -15,7 +15,7 @@ import { runtime } from './state';
 
 // P9 D12/D14/D15: the inspector — the SPEC's own "view the exact bytes sent and received", with
 // its fidelity stated rather than assumed. F16: lives here (views/httprequest/), not http/, because
-// it is mounted from inside ResponsePane.vue and needs CodeMirrorHost/theme/primitives.
+// it is mounted from inside ResponsePane.vue and needs MonacoHost/theme/primitives.
 const props = defineProps<{
   tab: HttpRequestTabRecord;
   /** P16 D11: ResponseFindBar's own painted matches for each of this pane's two documents — the
@@ -174,7 +174,7 @@ defineExpose({
           {{ elisionNote }}
         </MessageStrip>
         <div class="raw-editor">
-          <CodeMirrorHost
+          <MonacoHost
             ref="requestHostRef"
             :doc="requestText"
             language="plain"
@@ -198,7 +198,7 @@ defineExpose({
           />
         </div>
         <div class="raw-editor">
-          <CodeMirrorHost
+          <MonacoHost
             ref="responseHostRef"
             :doc="responseText"
             language="plain"
@@ -245,7 +245,7 @@ defineExpose({
           />
         </div>
         <div class="raw-editor">
-          <CodeMirrorHost
+          <MonacoHost
             ref="requestHostRef"
             :doc="requestText"
             language="plain"
@@ -269,7 +269,7 @@ defineExpose({
           />
         </div>
         <div class="raw-editor">
-          <CodeMirrorHost
+          <MonacoHost
             ref="responseHostRef"
             :doc="responseText"
             language="plain"
