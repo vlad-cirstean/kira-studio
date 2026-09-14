@@ -139,6 +139,74 @@ func (s *Store) ReplaceFiles(ctx context.Context, ws []FileWrite) error {
 // index into that file's own Symbols slice, -1 for none) can be translated into a real id.
 // block_id needs no such fixup — it is resolved directly from the block-id slice built while
 // inserting that file's own Blocks, in the same order.
+// replaceStmts is replaceFilesTx's own batch of prepared statements — one PrepareContext per
+// statement SHAPE for the whole batch (up to replaceFileBatch files), reused by replaceOneFileTx
+// for every file/block/symbol/reference/parent-link write in that batch, instead of a fresh
+// tx.ExecContext (a fresh parse+plan) per row (C12-5: measured 2.6x slower at 100,000 reference-
+// shaped inserts). Each Stmt is tx-scoped (tx.PrepareContext), so it is only ever valid for the one
+// transaction replaceFilesTx opens it under — closed there once that batch is done.
+type replaceStmts struct {
+	deleteFile   *sql.Stmt
+	insertFile   *sql.Stmt
+	insertBlock  *sql.Stmt
+	insertSymbol *sql.Stmt
+	updateParent *sql.Stmt
+	insertRef    *sql.Stmt
+}
+
+func prepareReplaceStmts(ctx context.Context, tx *sql.Tx) (_ *replaceStmts, err error) {
+	var s replaceStmts
+	defer func() {
+		if err != nil {
+			s.Close()
+		}
+	}()
+
+	if s.deleteFile, err = tx.PrepareContext(ctx, `DELETE FROM file WHERE repo_id = ? AND path = ?`); err != nil {
+		return nil, fmt.Errorf("codeindex: prepare delete file: %w", err)
+	}
+	if s.insertFile, err = tx.PrepareContext(ctx, `
+		INSERT INTO file (repo_id, path, language, size_bytes, mtime_unix_ns, content_sha,
+		                   parse_status, has_error, line_count, parsed_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`); err != nil {
+		return nil, fmt.Errorf("codeindex: prepare insert file: %w", err)
+	}
+	if s.insertBlock, err = tx.PrepareContext(ctx, `
+		INSERT INTO file_block (file_id, kind, language, start_byte, end_byte, start_row, start_column)
+		VALUES (?, ?, ?, ?, ?, ?, ?)`); err != nil {
+		return nil, fmt.Errorf("codeindex: prepare insert file_block: %w", err)
+	}
+	if s.insertSymbol, err = tx.PrepareContext(ctx, `
+		INSERT INTO symbol (file_id, repo_id, block_id, parent_id, kind, name,
+		                     start_byte, end_byte, start_row, start_column, end_row, end_column,
+		                     name_start_byte, name_end_byte, name_start_row, name_start_column)
+		VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`); err != nil {
+		return nil, fmt.Errorf("codeindex: prepare insert symbol: %w", err)
+	}
+	if s.updateParent, err = tx.PrepareContext(ctx, `UPDATE symbol SET parent_id = ? WHERE id = ?`); err != nil {
+		return nil, fmt.Errorf("codeindex: prepare update symbol parent: %w", err)
+	}
+	if s.insertRef, err = tx.PrepareContext(ctx, `
+		INSERT INTO reference (file_id, repo_id, block_id, kind, name, start_byte, end_byte, start_row, start_column,
+		                         name_start_byte, name_end_byte, name_start_row, name_start_column)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`); err != nil {
+		return nil, fmt.Errorf("codeindex: prepare insert reference: %w", err)
+	}
+	return &s, nil
+}
+
+// Close releases every prepared statement — safe to call with some fields still nil (a partial
+// batch that failed partway through prepareReplaceStmts).
+func (s *replaceStmts) Close() {
+	for _, stmt := range []*sql.Stmt{
+		s.deleteFile, s.insertFile, s.insertBlock, s.insertSymbol, s.updateParent, s.insertRef,
+	} {
+		if stmt != nil {
+			_ = stmt.Close()
+		}
+	}
+}
+
 func replaceFilesTx(ctx context.Context, db *sql.DB, ws []FileWrite) error {
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
@@ -146,8 +214,14 @@ func replaceFilesTx(ctx context.Context, db *sql.DB, ws []FileWrite) error {
 	}
 	defer func() { _ = tx.Rollback() }() // no-op once Commit has succeeded.
 
+	stmts, err := prepareReplaceStmts(ctx, tx)
+	if err != nil {
+		return err
+	}
+	defer stmts.Close()
+
 	for _, w := range ws {
-		if err := replaceOneFileTx(ctx, tx, w); err != nil {
+		if err := replaceOneFileTx(ctx, stmts, w); err != nil {
 			return err
 		}
 	}
@@ -158,15 +232,12 @@ func replaceFilesTx(ctx context.Context, db *sql.DB, ws []FileWrite) error {
 	return nil
 }
 
-func replaceOneFileTx(ctx context.Context, tx *sql.Tx, w FileWrite) error {
-	if _, err := tx.ExecContext(ctx, `DELETE FROM file WHERE repo_id = ? AND path = ?`, w.RepoID, w.Path); err != nil {
+func replaceOneFileTx(ctx context.Context, stmts *replaceStmts, w FileWrite) error {
+	if _, err := stmts.deleteFile.ExecContext(ctx, w.RepoID, w.Path); err != nil {
 		return fmt.Errorf("codeindex: delete existing file %s: %w", w.Path, err)
 	}
 
-	res, err := tx.ExecContext(ctx, `
-		INSERT INTO file (repo_id, path, language, size_bytes, mtime_unix_ns, content_sha,
-		                   parse_status, has_error, line_count, parsed_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+	res, err := stmts.insertFile.ExecContext(ctx,
 		w.RepoID, w.Path, w.Language, w.SizeBytes, w.MtimeUnixNs, w.ContentSHA,
 		string(w.ParseStatus), boolToInt(w.HasError), w.LineCount, w.ParsedAt)
 	if err != nil {
@@ -179,9 +250,7 @@ func replaceOneFileTx(ctx context.Context, tx *sql.Tx, w FileWrite) error {
 
 	blockIDs := make([]int64, len(w.Blocks))
 	for i, b := range w.Blocks {
-		r, err := tx.ExecContext(ctx, `
-			INSERT INTO file_block (file_id, kind, language, start_byte, end_byte, start_row, start_column)
-			VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		r, err := stmts.insertBlock.ExecContext(ctx,
 			fileID, string(b.Kind), string(b.Language), b.StartByte, b.EndByte,
 			b.StartPoint.Row, b.StartPoint.Column)
 		if err != nil {
@@ -200,11 +269,7 @@ func replaceOneFileTx(ctx context.Context, tx *sql.Tx, w FileWrite) error {
 		if sym.BlockIndex >= 0 {
 			blockID = blockIDs[sym.BlockIndex]
 		}
-		r, err := tx.ExecContext(ctx, `
-			INSERT INTO symbol (file_id, repo_id, block_id, parent_id, kind, name,
-			                     start_byte, end_byte, start_row, start_column, end_row, end_column,
-			                     name_start_byte, name_end_byte, name_start_row, name_start_column)
-			VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		r, err := stmts.insertSymbol.ExecContext(ctx,
 			fileID, w.RepoID, blockID, sym.Kind, sym.Name,
 			sym.StartByte, sym.EndByte, sym.StartPoint.Row, sym.StartPoint.Column,
 			sym.EndPoint.Row, sym.EndPoint.Column,
@@ -222,7 +287,7 @@ func replaceOneFileTx(ctx context.Context, tx *sql.Tx, w FileWrite) error {
 		if sym.ParentIndex < 0 {
 			continue
 		}
-		if _, err := tx.ExecContext(ctx, `UPDATE symbol SET parent_id = ? WHERE id = ?`,
+		if _, err := stmts.updateParent.ExecContext(ctx,
 			symbolIDs[sym.ParentIndex], symbolIDs[i]); err != nil {
 			return fmt.Errorf("codeindex: link symbol %s[%d] parent: %w", w.Path, i, err)
 		}
@@ -233,10 +298,7 @@ func replaceOneFileTx(ctx context.Context, tx *sql.Tx, w FileWrite) error {
 		if ref.BlockIndex >= 0 {
 			blockID = blockIDs[ref.BlockIndex]
 		}
-		if _, err := tx.ExecContext(ctx, `
-			INSERT INTO reference (file_id, repo_id, block_id, kind, name, start_byte, end_byte, start_row, start_column,
-			                         name_start_byte, name_end_byte, name_start_row, name_start_column)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		if _, err := stmts.insertRef.ExecContext(ctx,
 			fileID, w.RepoID, blockID, ref.Kind, ref.Name,
 			ref.StartByte, ref.EndByte, ref.StartPoint.Row, ref.StartPoint.Column,
 			ref.NameStartByte, ref.NameEndByte, ref.NameStart.Row, ref.NameStart.Column); err != nil {
