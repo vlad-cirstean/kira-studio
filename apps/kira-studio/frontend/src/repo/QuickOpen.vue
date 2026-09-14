@@ -4,12 +4,13 @@ import { openRepoFileTab } from '../state/repoTabs';
 import { wrapSelectionOnType } from '../theme/wrapSelection';
 import {
   closeQuickOpen,
+  QUICK_OPEN_MAX_CANDIDATES,
   QUICK_OPEN_MAX_RESULTS,
   type QuickOpenRow,
+  quickOpenIndexTruncated,
   quickOpenLoading,
   quickOpenResults,
   quickOpenState,
-  quickOpenTruncated,
 } from './state/quickOpen';
 
 const inputRef = ref<HTMLInputElement | null>(null);
@@ -18,7 +19,14 @@ const activeIndex = ref(0);
 
 const loading = computed(() => quickOpenLoading());
 const rows = computed(() => quickOpenResults());
-const truncated = computed(() => quickOpenTruncated());
+// C13-7: two independent conditions, worth distinct wording for -- a query-dependent one (this
+// query's own results hit the display cap, so there may be more matches for it specifically) and a
+// query-independent one (the candidate set itself is incomplete, so some files were never
+// searchable at all, regardless of how few real matches this query happens to have).
+const resultsTruncated = computed(
+  () => quickOpenState.query.trim() !== '' && rows.value.length === QUICK_OPEN_MAX_RESULTS,
+);
+const indexTruncated = computed(() => quickOpenIndexTruncated());
 
 watch(
   () => quickOpenState.open,
@@ -121,8 +129,19 @@ function onKeydown(e: KeyboardEvent): void {
             No matching files
           </div>
         </template>
-        <div v-if="truncated" class="palette-empty dim" data-testid="quick-open-truncated">
-          Showing the first {{ QUICK_OPEN_MAX_RESULTS }} of many matches — refine your search
+        <!-- C13-7: distinct wording per cap -- the display cap (this query has more matches than
+             shown) and the candidate-index cap (some files were never searched at all) are
+             different conditions and must never be conflated into one "many matches" claim. -->
+        <div v-if="resultsTruncated" class="palette-empty dim" data-testid="quick-open-truncated">
+          Showing the first {{ QUICK_OPEN_MAX_RESULTS }} matches — refine your search
+        </div>
+        <div
+          v-else-if="indexTruncated"
+          class="palette-empty dim"
+          data-testid="quick-open-index-truncated"
+        >
+          Only searching the first {{ QUICK_OPEN_MAX_CANDIDATES.toLocaleString() }} files — some
+          matches may be missing
         </div>
       </div>
     </div>

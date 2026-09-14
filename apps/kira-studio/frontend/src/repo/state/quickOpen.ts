@@ -59,7 +59,6 @@ interface QuickOpenCache {
   paths: readonly string[]; // D9: reference identity is the invalidation signal
   items: QuickOpenItem[];
   snapshot: SnapshotKeys<QuickOpenItem>;
-  candidatesTruncated: boolean;
 }
 
 // D9: one snapshot per repo, rebuilt only when refreshRepoTree assigns a fresh `paths` array.
@@ -69,10 +68,16 @@ function ensureSnapshot(repoId: string): QuickOpenCache {
   const paths = repoTreePaths(repoId);
   const cached = snapshotCache.get(repoId);
   if (cached && cached.paths === paths) return cached;
+  // C13-7: candidatesTruncated used to also be stored on this cache entry for
+  // quickOpenTruncated() to read back -- but this cache is a plain (non-reactive) Map, so that read
+  // registered no Vue dependency, and the `truncated` computed (QuickOpen.vue) silently froze at
+  // whatever it evaluated to the first time the palette opened. quickOpenTruncated below now
+  // derives the same condition straight from the tracked reactive `paths` array instead, so this
+  // is purely a local slicing bound again, not state anything reads back reactively.
   const candidatesTruncated = paths.length > QUICK_OPEN_MAX_CANDIDATES;
   const items = buildItems(candidatesTruncated ? paths.slice(0, QUICK_OPEN_MAX_CANDIDATES) : paths);
   const snapshot = fuzzysort.snapshot(items, { keys: ['name', 'path'] });
-  const fresh: QuickOpenCache = { paths, items, snapshot, candidatesTruncated };
+  const fresh: QuickOpenCache = { paths, items, snapshot };
   snapshotCache.set(repoId, fresh);
   return fresh;
 }
@@ -109,12 +114,26 @@ export function quickOpenLoading(): boolean {
   return quickOpenState.open && !isRepoTreeLoaded(quickOpenState.repoId);
 }
 
-// §3.4: both the tree's own MaxListedFiles cap and quick open's own candidate cap are surfaced,
-// never silent.
-export function quickOpenTruncated(): boolean {
-  if (!quickOpenState.repoId) return false;
-  if (repoTreeTruncated(quickOpenState.repoId)) return true;
-  return snapshotCache.get(quickOpenState.repoId)?.candidatesTruncated ?? false;
+// C13-7: was `quickOpenTruncated`, reading `snapshotCache.get(repoId)?.candidatesTruncated` for
+// its own half of this condition -- but snapshotCache is a plain (non-reactive) Map, so that read
+// registered no Vue dependency at all. The wrapping `computed` (QuickOpen.vue's own `truncated`)
+// then cached whatever this returned the first time the palette opened for good: `quickOpenState.
+// repoId` and `repoTreeTruncated`'s own reactive Map read were its only two real dependencies, and
+// neither changes when a later tree refresh's `paths` array crosses QUICK_OPEN_MAX_CANDIDATES.
+// Fixed by deriving the candidate-cap half the same way repoTreePaths already does for everything
+// else -- reading the tracked reactive `paths` array directly needs no cache lookup at all.
+//
+// Renamed (not just fixed in place) because this is a query-INDEPENDENT condition -- "the
+// candidate set quick open searches is incomplete" -- distinct from the query-dependent "this
+// query's own results hit the QUICK_OPEN_MAX_RESULTS display cap" (checked by the caller against
+// its own `rows.length`, quickOpenResults's own return). The old single `quickOpenTruncated` name
+// and the UI's single notice conflated the two: a query with 3 real matches in a huge repo used to
+// still claim "first 50 of many matches" merely because the candidate set was capped.
+export function quickOpenIndexTruncated(): boolean {
+  const repoId = quickOpenState.repoId;
+  if (!repoId) return false;
+  if (repoTreeTruncated(repoId)) return true;
+  return repoTreePaths(repoId).length > QUICK_OPEN_MAX_CANDIDATES;
 }
 
 export function quickOpenResults(): QuickOpenRow[] {
