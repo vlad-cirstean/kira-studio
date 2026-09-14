@@ -128,6 +128,10 @@ func TestExtractGoldenFixtures(t *testing.T) {
 				{"constant", "robotConfig", -1},
 				{"function", "buildRobot", -1},
 				{"function", "helper3", -1},
+				// P64b (§2.7/§4.3): a regex-valued module const, invisible before the value list
+				// widened to include (regex) (ternary_expression) (await_expression)
+				// (subscript_expression).
+				{"constant", "OPERATOR_RE", -1},
 			},
 			refs: []refRow{
 				{"implementation", "Greeter"},

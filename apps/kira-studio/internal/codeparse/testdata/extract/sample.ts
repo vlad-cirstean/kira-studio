@@ -41,3 +41,6 @@ export const buildRobot = () => new Robot();
 function helper3(): void {
   const localNote = "not indexed";
 }
+
+// P64b: a regex-valued module const — invisible before §2.7's widened value list.
+const OPERATOR_RE = /[+\-*/]/;
