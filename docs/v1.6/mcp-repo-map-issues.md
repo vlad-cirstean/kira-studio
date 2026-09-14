@@ -239,7 +239,55 @@ Entries are closed in place (status flips to Fixed, commit noted) rather than de
   {"query":"ConflictBanner"}` returned nothing — the already-logged P60a `.vue` SFC behavior, not a
   new defect.
 
+- **P67e (implementation)**: same `ConnectionRefused` at session start as every entry above — no
+  server was running in this container. Ran the headless setup fresh (`bun run mcp:repo-map:build`
+  then `mcp:repo-map` backgrounded); the first start reused a stale hashed token under
+  `/root/.kira-studio/` from an earlier session in this same container (unusable, same as every
+  prior entry), so deleted it and restarted to mint a fresh one, then called it over plain HTTP/
+  JSON-RPC. Used throughout implementation for navigation (`search_symbols`/`find_definition`
+  against `gitstream.go`'s renamed identifiers, both correct and current — `allowedMethods` resolved
+  to `gitstream.go:89`, `allowedRequest` to its own declaration), plus a post-implementation
+  verification pass: `find_references {"symbol":"allowedRequest"}` correctly returned all 7 real
+  call sites across `gitstream.go` and the renamed test functions in `gitstream_test.go`. See the
+  non-trivial entry below for what did not work.
+
 ### Non-trivial
+
+- **P67e (implementation) — `find_references` returns nothing for a package-level variable that is
+  only ever read via `range` or an index expression (`x[k]`), never called. Open.**
+
+  Found on a server confirmed warm (not the already-logged cold-index issue below: `search_symbols`,
+  `find_definition` and `find_references` all answered correctly and immediately for other symbols
+  in the same file during the same session, including `find_references {"symbol":"allowedRequest"}`
+  returning all 7 real call sites). Reproduced on every package-level `map[string]struct{}{}`/
+  `[]string{}` variable in `internal/bridge/gitstream.go`/`gitstream_test.go` that this phase's own
+  rename touched:
+
+  - `find_references {"symbol":"allowedMethods"}` → `no references found for "allowedMethods"`,
+    though it is read at `gitstream.go:146` (`if _, ok := allowedMethods[method]; !ok {`),
+    `gitstream_test.go:60` (`for method := range allowedMethods {`) and
+    `gitstream_classification_coverage_test.go:42` (`for m := range allowedMethods {`).
+  - `find_references {"symbol":"allowedStreamMethods"}` → same empty result, despite
+    `gitstream.go:190`'s `allowedStreamMethods[method]` and
+    `gitstream_classification_coverage_test.go:45`'s `range allowedStreamMethods`.
+  - `find_references {"symbol":"writeMethods"}` and `{"symbol":"hostAnsweredMethods"}` → both empty,
+    despite `range` reads in both `gitstream_test.go` and `gitstream_classification_coverage_test.go`.
+
+  By contrast, `find_definition` resolves every one of these names correctly (e.g.
+  `find_definition {"symbol":"allowedMethods"}` → `gitstream.go:89:5`), and `find_references` on a
+  *called* identifier in the same file (`allowedRequest`) is complete and correct. The gap is
+  specific to reference sites shaped as a `range` clause's subject or an index expression's
+  receiver — a call expression's callee position indexes fine. Impact: a session asking "where is
+  this allowlist actually consulted?" for exactly the four variables this stream's own safety
+  boundary depends on gets a confident, wrong "nowhere" — the same silent-wrong-answer shape as the
+  already-logged cold-index entry below, but from a different, reproducible-when-warm cause (a
+  reference-query gap in `internal/repomap`'s Go tree-sitter capture, not a sync-timing race).
+
+  Not fixed in this phase, per the process above (P67f, already queued next in SPEC.md for the
+  already-open cold-index entry, is the natural place to close this one too — both are
+  `find_references`/indexing gaps in the same package). Fix shape, for that pass: the Go reference
+  query needs a capture for an identifier used as a `range_clause`'s right-hand operand and as an
+  `index_expression`'s operand, not only as a `call_expression`'s function.
 
 - **P67e (planning) — a query answered against a cold or mid-sync index returns a confident "not
   found" instead of saying the index isn't ready. Open.**
