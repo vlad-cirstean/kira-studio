@@ -212,7 +212,7 @@ func renderOutline(path string, nodes []codegraph.Node) string {
 // caller to re-call with file — no silent pick of the top hit.
 func renderAmbiguous(symbol string, candidates []codegraph.Target, src sourceLines) string {
 	var b strings.Builder
-	b.WriteString(fmt.Sprintf("%d symbols named %q — re-call with file set to one of these:", len(candidates), symbol))
+	b.WriteString(fmt.Sprintf("%d symbols named %q — re-call with file or languages set to one of these:", len(candidates), symbol))
 	for _, t := range candidates {
 		b.WriteByte('\n')
 		b.WriteString(renderTargetLine(t))

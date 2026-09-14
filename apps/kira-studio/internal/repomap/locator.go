@@ -12,10 +12,11 @@ import (
 // locateArgs is every navigation tool's own shared input (§6.1) — file/line/column/symbol, plus
 // this Server's own repository root for the absolute-to-relative conversion.
 type locateArgs struct {
-	File   string
-	Line   int
-	Column int
-	Symbol string
+	File      string
+	Line      int
+	Column    int
+	Symbol    string
+	Languages []string
 }
 
 // locateResult is locate's own outcome: exactly one of query (proceed), ambiguous (rule 4's
@@ -86,7 +87,7 @@ func locate(ctx context.Context, graph *codegraph.Graph, root string, args locat
 		return locateResult{query: q}, nil
 
 	case args.Symbol != "":
-		hits, err := graph.SearchSymbols(ctx, codegraph.SymbolSearch{Text: args.Symbol, Limit: defaultSymbolLocateLimit})
+		hits, err := graph.SearchSymbols(ctx, codegraph.SymbolSearch{Text: args.Symbol, Languages: args.Languages, Limit: defaultSymbolLocateLimit})
 		if err != nil {
 			return locateResult{}, err
 		}

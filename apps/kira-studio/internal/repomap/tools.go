@@ -37,13 +37,17 @@ type locatorFields struct {
 	Line   int    `json:"line,omitempty" jsonschema:"1-based line number within file."`
 	Column int    `json:"column,omitempty" jsonschema:"1-based BYTE column within line (not a character or UTF-16 column). Defaults to 1."`
 	Symbol string `json:"symbol,omitempty" jsonschema:"Symbol name — a hint alongside file, or, alone, resolved by searching the index for an exact name match."`
+	// Languages is P64 §2.5: narrows a symbol-alone lookup (no effect when file is given) — the
+	// same field name/type/semantics as search_symbols' own Languages, so a caller that resolves
+	// an ambiguity there already knows the vocabulary here.
+	Languages []string `json:"languages,omitempty" jsonschema:"Restrict a symbol-alone lookup to these languages, e.g. to pick the TypeScript side of a cross-language name collision without a second call. No effect when file is given."`
 	// OmitSource is C8 plan D8's opt-out: zero value (false) means "include" — every hit keeps
 	// its own source-line continuation.
 	OmitSource bool `json:"omitSource,omitempty" jsonschema:"Omit the source line printed under each hit. Default false — each hit is followed by its own line of code, indented."`
 }
 
 func (f locatorFields) args() locateArgs {
-	return locateArgs{File: f.File, Line: f.Line, Column: f.Column, Symbol: f.Symbol}
+	return locateArgs{File: f.File, Line: f.Line, Column: f.Column, Symbol: f.Symbol, Languages: f.Languages}
 }
 
 // resolve runs §6.1's locate against this Server's own graph/root, translating locateResult into
