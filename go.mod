@@ -19,7 +19,7 @@ require (
 	github.com/jackc/pgx/v5 v5.10.0
 	github.com/keybase/go-keychain v0.0.1
 	github.com/moby/moby/api v1.56.0
-	github.com/modelcontextprotocol/go-sdk v1.7.0
+	github.com/modelcontextprotocol/go-sdk v1.8.0
 	github.com/redis/go-redis/v9 v9.22.0
 	github.com/shirou/gopsutil/v4 v4.26.8
 	github.com/testcontainers/testcontainers-go v0.44.0
