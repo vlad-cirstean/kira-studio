@@ -161,7 +161,7 @@ function stateFor(repoId: string): RepoTreeState {
   return state;
 }
 
-/** True once repoId's listing has loaded at least once — RepoPanel.vue's own loading gate. */
+/** True once repoId's listing has loaded at least once — GitPanel.vue's own loading gate. */
 export function isRepoTreeLoaded(repoId: string): boolean {
   return byRepo.get(repoId)?.loaded ?? false;
 }

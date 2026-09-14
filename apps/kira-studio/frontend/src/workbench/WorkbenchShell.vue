@@ -1,24 +1,21 @@
 <script setup lang="ts">
-import { isRepoWorkspace } from '@shared/domain/workspace';
+import { moduleOfWorkspace } from '@shared/domain/workspace';
 import { computed } from 'vue';
 import { layoutState, setOperationsHeight, setProjectWidth } from '../state/layout';
-import { modeState } from '../state/mode';
 import { workspaceState } from '../state/workspace';
 import PanelSplitter from '../theme/primitives/PanelSplitter.vue';
-import { MODES, REPO_WORKSPACE } from './modes';
+import { MODES } from './modes';
 import MainView from './panels/MainView.vue';
 import OperationsPanel from './panels/OperationsPanel.vue';
 import TabStrip from './panels/TabStrip.vue';
 import StatusBar from './StatusBar.vue';
 
 // P1 D6/C6: the left panel mounts whichever mode is active's own self-contained panel component
-// (ProjectPanel for Studio, api/CollectionsPanel for Api) — the shared PanelShell slot Studio
-// used to have all to itself now comes from the registry, not a hardcoded <ProjectPanel />.
-// C5 §4.3: panel dispatch is now by *workspace*, not by mode — RepoPanel for a repo workspace,
-// MODES[modeState.active].panel otherwise (byte-identical to the old dispatch for studio/api).
-const activeModePanel = computed(() =>
-  isRepoWorkspace(workspaceState.active) ? REPO_WORKSPACE.panel : MODES[modeState.active].panel,
-);
+// (ProjectPanel for Studio, api/CollectionsPanel for Api, GitPanel for Git) — the shared
+// PanelShell slot Studio used to have all to itself now comes from the registry, not a hardcoded
+// <ProjectPanel />. P67b §4.1: one dispatch expression, no special case for a repo workspace —
+// moduleOfWorkspace folds a repo key onto 'git' before the registry lookup.
+const activeModePanel = computed(() => MODES[moduleOfWorkspace(workspaceState.active)].panel);
 
 const projectVisible = computed(() => layoutState.panel.project.visible);
 const opsVisible = computed(() => layoutState.panel.operations.visible);

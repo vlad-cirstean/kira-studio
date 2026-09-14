@@ -1,30 +1,22 @@
 <script setup lang="ts">
 import type { AppMode } from '@shared/domain/mode';
-import { repoWorkspaceKey } from '@shared/domain/workspace';
-import { codeRepoRecord } from '../state/coderepos';
+import { moduleOfWorkspace } from '@shared/domain/workspace';
 import { layoutState, toggleOperationsPanel, toggleProjectPanel } from '../state/layout';
-import { modeState, setMode } from '../state/mode';
 import { settingsOpen } from '../state/settings';
-import { activateWorkspace, closeRepoWorkspace, workspaceState } from '../state/workspace';
+import { activateWorkspace, workspaceState } from '../state/workspace';
 import CodiconIcon from '../theme/CodiconIcon.vue';
 import { MODES } from './modes';
 import SettingsDialog from './SettingsDialog.vue';
 
-const MODE_ORDER: AppMode[] = ['studio', 'api'];
+// P67b §4.3: three peer modules — Studio, Api, Git. A repository is an instance inside Git, not a
+// fourth top-level tab of its own (§0's correction); the repo switcher lives in GitPanel.vue now.
+const MODE_ORDER: AppMode[] = ['studio', 'api', 'git'];
 
+// P67b §4.2: clicking Git returns to whichever repository was last active there
+// (workspaceState.lastRepoKey), not to a bare generic landing page — the same "return to where you
+// were" behaviour the repo tabs this replaces used to give for free.
 function onClick(mode: AppMode): void {
-  setMode(mode);
-}
-
-// C5 §4.3: "the mode tabs become a workspace switcher — Studio, Api, then one entry per
-// `openRepos` member (icon source-control, label = repo name, a hover close ×)."
-function onRepoClick(repoId: string): void {
-  activateWorkspace(repoWorkspaceKey(repoId));
-}
-
-function onRepoClose(e: MouseEvent, repoId: string): void {
-  e.stopPropagation();
-  closeRepoWorkspace(repoId);
+  activateWorkspace(mode === 'git' ? (workspaceState.lastRepoKey ?? 'git') : mode);
 }
 </script>
 
@@ -36,7 +28,7 @@ function onRepoClose(e: MouseEvent, repoId: string): void {
         :key="mode"
         type="button"
         class="p-tab mode-tab"
-        :class="{ 'is-active': modeState.active === mode }"
+        :class="{ 'is-active': moduleOfWorkspace(workspaceState.active) === mode }"
         data-testid="mode-tab"
         :data-mode="mode"
         @click="onClick(mode)"
@@ -48,30 +40,6 @@ function onRepoClose(e: MouseEvent, repoId: string): void {
              glyph fill its box, closing that slack. Mode-tab-local, not app-wide (OQ-3/F10). -->
         <span class="icon-box"><CodiconIcon :name="MODES[mode].icon" :size="16" /></span>
         <span class="mode-label">{{ MODES[mode].label }}</span>
-      </button>
-      <!-- C5 §4.3: one entry per open repository, after Studio/Api — overflow with many repos
-           open is left to this row's existing horizontal scroll, noted rather than solved. -->
-      <button
-        v-for="repoId in workspaceState.openRepos"
-        :key="repoId"
-        type="button"
-        class="p-tab mode-tab repo-tab"
-        :class="{ 'is-active': workspaceState.active === `repo:${repoId}` }"
-        data-testid="workspace-repo-tab"
-        :data-repo-id="repoId"
-        @click="onRepoClick(repoId)"
-      >
-        <span class="icon-box"><CodiconIcon name="source-control" :size="16" /></span>
-        <span class="mode-label">{{ codeRepoRecord(repoId)?.name ?? repoId }}</span>
-        <span
-          class="repo-tab-close"
-          role="button"
-          aria-label="Close repository"
-          data-testid="workspace-repo-close"
-          @click="onRepoClose($event, repoId)"
-        >
-          <CodiconIcon name="close" :size="13" />
-        </span>
       </button>
     </div>
 
@@ -208,27 +176,6 @@ function onRepoClose(e: MouseEvent, repoId: string): void {
    components, so every .p-tab user needs its own copy of this or gets none. Same rule
    TabStrip.vue's own `.p-tab:hover:not(.is-active)` uses. */
 .mode-tab:hover:not(.is-active) {
-  background: var(--kira-hover);
-}
-
-/* C5 §4.3: a repo tab's own hover close × — TabStrip.vue's own `.tab-close` hover-reveal shape. */
-.repo-tab-close {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 16px;
-  height: 16px;
-  border-radius: var(--kira-radius-sm);
-  opacity: 0;
-}
-
-.repo-tab:hover .repo-tab-close,
-.repo-tab.is-active .repo-tab-close {
-  opacity: 1;
-}
-
-.repo-tab-close:hover {
   background: var(--kira-hover);
 }
 

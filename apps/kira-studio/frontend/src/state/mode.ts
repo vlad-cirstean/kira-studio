@@ -26,6 +26,14 @@ export const modeState = reactive({ active: 'studio' as AppMode });
 const MODE_WRITE_DEBOUNCE_MS = 150;
 let writeTimer: ReturnType<typeof setTimeout> | null = null;
 
+function scheduleModeWrite(): void {
+  if (writeTimer) clearTimeout(writeTimer);
+  writeTimer = setTimeout(() => {
+    writeTimer = null;
+    void control.windowsSetMode(modeState.active);
+  }, MODE_WRITE_DEBOUNCE_MS);
+}
+
 /** Called once at boot (main.ts's bootstrap, alongside hydrateLayout/hydrateSettings/…), before
  *  the app ever renders — sets the window's own persisted mode without going through `setMode`
  *  (hydration is not a user action, and must not re-schedule a write of the value it just read). */
@@ -36,18 +44,20 @@ export function hydrateMode(mode: AppMode): void {
   workspaceState.active = mode;
 }
 
-// C5 §4.2: setMode still writes only modeState/windows.mode (a two-value column, unchanged) — but
-// also brings the workspace switcher to the same value, since studio/api are two of the possible
-// WorkspaceKeys. Leaving a repo workspace via the mode tabs (not via closeRepoWorkspace) goes
-// through this same path.
-export function setMode(mode: AppMode): void {
+// P67b §4.2: persistence only — modeState/windows.mode (a three-value column since 'git' joined
+// AppMode). Split out of setMode so a repo activation (state/workspace.ts's activateWorkspace) can
+// persist 'git' as the window's module without also clobbering workspaceState.active back to the
+// bare 'git' key and losing which repository was open.
+export function setModule(mode: AppMode): void {
   modeState.active = mode;
+  scheduleModeWrite();
+}
+
+// C5 §4.2: a module tab click — brings the workspace switcher to the same value, since
+// studio/api/git are all valid WorkspaceKeys in their own right (git's bare form: no repo active).
+export function setMode(mode: AppMode): void {
+  setModule(mode);
   workspaceState.active = mode;
-  if (writeTimer) clearTimeout(writeTimer);
-  writeTimer = setTimeout(() => {
-    writeTimer = null;
-    void control.windowsSetMode(modeState.active);
-  }, MODE_WRITE_DEBOUNCE_MS);
 }
 
 /** Every tab whose kind belongs to `mode` — what a mode's own tab strip renders. A repo tab can

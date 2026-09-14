@@ -3,4 +3,7 @@
 //
 // P12 D2: 'http' → 'api' — nothing persists this value (F3), so the rename costs one sed and no
 // migration.
-export type AppMode = 'studio' | 'api';
+//
+// P67b §4.1: 'git' — the third top-level module, beside 'studio' and 'api'. Every repo workspace
+// (workspace.ts's `repo:${string}`) lives inside it; moduleOfWorkspace names the mapping.
+export type AppMode = 'studio' | 'api' | 'git';

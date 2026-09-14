@@ -20,3 +20,9 @@ export function repoIdOfWorkspace(key: WorkspaceKey): string | null {
 export function isRepoWorkspace(key: WorkspaceKey): boolean {
   return key.startsWith(REPO_WORKSPACE_PREFIX);
 }
+
+/** Which top-level module a workspace belongs to. Every repo workspace lives inside 'git'
+ *  (P67b §4.1) — a repo is an instance, not a peer module in its own right. */
+export function moduleOfWorkspace(key: WorkspaceKey): AppMode {
+  return isRepoWorkspace(key) ? 'git' : (key as AppMode);
+}

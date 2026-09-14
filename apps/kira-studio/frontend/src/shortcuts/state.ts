@@ -55,7 +55,7 @@ export const paletteCommands: PaletteCommand[] = [
   { id: 'toggle-project-panel', label: 'Toggle project panel', run: toggleProjectPanel },
   { id: 'toggle-operations-panel', label: 'Toggle operations panel', run: toggleOperationsPanel },
   { id: 'view.find', label: 'Find', run: () => runCommand('view.find') },
-  // C7 S10: registered by RepoPanel.vue while mounted — a no-op outside a repo workspace, the
+  // C7 S10: registered by GitPanel.vue while mounted — a no-op outside a repo workspace, the
   // same view-scoped shape every other runCommand entry in this list already has.
   { id: 'repo.search', label: 'Search in repository', run: () => runCommand('repo.search') },
   // C9 D6: gated on the active workspace directly (openQuickOpen's own repoIdOfWorkspace check),
