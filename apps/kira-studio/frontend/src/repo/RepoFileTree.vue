@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { openContextMenu } from '../state/contextMenu';
 import { openRepoFileTab } from '../state/repoTabs';
 import { settingsState } from '../state/settings';
@@ -24,7 +24,36 @@ watch(
   (id) => ensureRepoTreeLoaded(id),
 );
 
-const rows = computed(() => visibleRepoRows(props.repoId, props.search));
+// C13-6d: project/state/tree.ts's own debounce for the Studio schema tree's identical shape of
+// problem — the input itself (PanelShell's own model-value, bound above props.search) stays
+// instantly responsive, only the expensive filter recompute (a full tree walk, §7.2) waits for
+// typing to settle. 150ms matches that precedent. Measured (200k files, the cap): 538ms per
+// keystroke reactive vs 200ms plain filter cost — debouncing turns "every keystroke pays this"
+// into "one pause pays this", which is what actually fixes the perceived lag.
+const SEARCH_DEBOUNCE_MS = 150;
+const debouncedSearch = ref(props.search);
+let searchDebounceTimer: ReturnType<typeof setTimeout> | undefined;
+watch(
+  () => props.search,
+  (value) => {
+    clearTimeout(searchDebounceTimer);
+    searchDebounceTimer = setTimeout(() => {
+      debouncedSearch.value = value;
+    }, SEARCH_DEBOUNCE_MS);
+  },
+);
+// A workspace/repo switch must not show the new repo's tree filtered by a stale debounce timer
+// still counting down from the previous one.
+watch(
+  () => props.repoId,
+  () => {
+    clearTimeout(searchDebounceTimer);
+    debouncedSearch.value = props.search;
+  },
+);
+onUnmounted(() => clearTimeout(searchDebounceTimer));
+
+const rows = computed(() => visibleRepoRows(props.repoId, debouncedSearch.value));
 
 function onSelect(row: RepoTreeRowVm): void {
   selected.value = row.key;

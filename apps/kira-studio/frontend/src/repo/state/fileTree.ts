@@ -1,5 +1,5 @@
 import type { FileStatusCode } from '@shared/domain/repo';
-import { reactive } from 'vue';
+import { markRaw, reactive } from 'vue';
 import { control } from '../../bridge/control';
 import type { StickyRowLike } from '../../theme/primitives/stickyBand';
 
@@ -9,13 +9,14 @@ import type { StickyRowLike } from '../../theme/primitives/stickyBand';
 // accident).
 interface FileNode {
   name: string;
+  nameLower: string; // C13-6: precomputed once here rather than on every filter-pass visit
   path: string; // repository-relative, '' only for the synthetic root
   isDir: boolean;
   children: FileNode[];
 }
 
 function buildTree(paths: readonly string[]): FileNode[] {
-  const root: FileNode = { name: '', path: '', isDir: true, children: [] };
+  const root: FileNode = { name: '', nameLower: '', path: '', isDir: true, children: [] };
   const dirs = new Map<string, FileNode>([['', root]]);
 
   for (const p of paths) {
@@ -26,14 +27,22 @@ function buildTree(paths: readonly string[]): FileNode[] {
       acc = acc ? `${acc}/${segments[i]}` : segments[i];
       let node = dirs.get(acc);
       if (!node) {
-        node = { name: segments[i], path: acc, isDir: true, children: [] };
+        node = {
+          name: segments[i],
+          nameLower: segments[i].toLowerCase(),
+          path: acc,
+          isDir: true,
+          children: [],
+        };
         dirs.set(acc, node);
         parent.children.push(node);
       }
       parent = node;
     }
+    const name = segments[segments.length - 1];
     parent.children.push({
-      name: segments[segments.length - 1],
+      name,
+      nameLower: name.toLowerCase(),
       path: p,
       isDir: false,
       children: [],
@@ -41,7 +50,11 @@ function buildTree(paths: readonly string[]): FileNode[] {
   }
 
   sortChildren(root);
-  return root.children;
+  // C13-6c: the tree is replaced wholesale on every refresh (never field-mutated afterward — the
+  // only per-node state that changes live, `expanded`/`status`, lives separately on RepoTreeState)
+  // — markRaw so assigning this into `state.tree` (inside this repo's reactive() state object)
+  // doesn't deep-proxy every node, at every level, of what can be a 200,000-entry tree.
+  return markRaw(root.children);
 }
 
 // C13-4: one shared collator instead of a fresh `localeCompare(..., { sensitivity: 'base' })` call
@@ -60,7 +73,7 @@ function sortChildren(node: FileNode): void {
 }
 
 function subtreeMatches(node: FileNode, query: string): boolean {
-  if (node.name.toLowerCase().includes(query)) return true;
+  if (node.nameLower.includes(query)) return true;
   return node.isDir && node.children.some((c) => subtreeMatches(c, query));
 }
 
@@ -82,11 +95,13 @@ function flatten(
   out: RepoTreeRowVm[],
 ): void {
   for (const node of nodes) {
-    const matched = query !== '' && node.name.toLowerCase().includes(query);
-    if (query !== '' && !matched && !(node.isDir && subtreeMatches(node, query))) continue;
+    const matched = query !== '' && node.nameLower.includes(query);
+    // C13-6a: subtreeMatches is a full recursive subtree walk — computed once and reused for both
+    // the skip guard and the expand check below, instead of calling it twice per directory node.
+    const dirMatches = query !== '' && node.isDir && subtreeMatches(node, query);
+    if (query !== '' && !matched && !dirMatches) continue;
     // §7.2: the search box force-expands matching ancestors.
-    const isExpanded =
-      node.isDir && (expanded.has(node.path) || (query !== '' && subtreeMatches(node, query)));
+    const isExpanded = node.isDir && (expanded.has(node.path) || dirMatches);
     out.push({
       key: node.path || '/',
       name: node.name,
