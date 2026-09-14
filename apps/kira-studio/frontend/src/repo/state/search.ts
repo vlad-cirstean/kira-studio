@@ -18,7 +18,7 @@ function defaultOptions(): RepoSearchOptions {
 }
 
 interface RepoSearchState {
-  view: 'files' | 'search';
+  view: 'files' | 'search' | 'review';
   query: string;
   options: RepoSearchOptions;
   searchId: string | null; // null when idle
@@ -58,11 +58,11 @@ function stateFor(repoId: string): RepoSearchState {
   return state;
 }
 
-export function repoSearchView(repoId: string): 'files' | 'search' {
+export function repoSearchView(repoId: string): 'files' | 'search' | 'review' {
   return byRepo.get(repoId)?.view ?? 'files';
 }
 
-export function setRepoSearchView(repoId: string, view: 'files' | 'search'): void {
+export function setRepoSearchView(repoId: string, view: 'files' | 'search' | 'review'): void {
   stateFor(repoId).view = view;
 }
 

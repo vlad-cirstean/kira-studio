@@ -14,15 +14,25 @@
  * stored from the same `gitclient.Identify` call `repo.open` itself runs (C5's import).
  */
 import type {
+  EventKey,
+  EventPayload,
   FileChange,
   GitStatus,
   ParamsOf,
   RequestKey,
   ResultOf,
+  ReviewSessionSnapshot,
   Transport,
 } from '@kira/git-ipc';
 import { codeRepoRecord, codeReposState } from '../../state/coderepos';
-import { openRepoCommitDiffTab, openRepoDiffTab } from '../../state/repoTabs';
+import { layoutState, toggleProjectPanel } from '../../state/layout';
+import {
+  openRepoCommitDiffTab,
+  openRepoDiffTab,
+  openRepoReviewDiffTab,
+} from '../../state/repoTabs';
+import { setRepoSearchView } from '../state/search';
+import { loadReviewSession, saveReviewSession } from './reviewSession';
 
 /** git's own well-known empty-tree object id — `<sha>:<path>` against it always resolves to
  *  `file.read`'s existing `{kind: 'missing'}` classification (the path never existed in an empty
@@ -84,6 +94,9 @@ export interface HostHandlersDeps {
    *  `repo.list`'s `activeRepoId` can report which repository this particular mounted graph is
    *  for (one transport per repo workspace, §8). */
   readonly codeRepoId: string;
+  /** C11 §8.1: this transport's own local event emitter — `review.open`'s handler is the one host
+   *  handler that ever needs to push an event rather than just answer a request. */
+  readonly emitLocal: <K extends EventKey>(method: K, payload: EventPayload<K>) => void;
 }
 
 type HostHandler<K extends RequestKey> = (
@@ -242,11 +255,69 @@ export function createHostHandlers(deps: HostHandlersDeps): HostHandlers {
       return {};
     },
 
-    // Out of scope for this phase (§13) — C11 restores these.
-    'editor.openRangeDiff': readOnlyRefusal('editor.openRangeDiff', 'is C11 scope (review layer)'),
-    'review.open': readOnlyRefusal('review.open', 'is C11 scope (review layer)'),
-    'review.session.save': readOnlyRefusal('review.session.save', 'is C11 scope (review layer)'),
-    'review.session.load': readOnlyRefusal('review.session.load', 'is C11 scope (review layer)'),
+    // C11 §8.2/§7.5: the review sidebar's own diff request — a two-revision comparison, not one
+    // commit's parent-child pair. `right` is always `branchTip` and `left` is always `leftRev`
+    // (the merge base in range mode, the file's own reviewedAtSha in sinceReview mode, §7.2) —
+    // neither `status` nor `originalPath` need special-casing here the way the extension's own
+    // handler needs them: `file.read` already answers `{kind: 'missing'}` for a path that does not
+    // exist at a given revision (an added file's left side, a deleted file's right side) rather
+    // than erroring, and RepoDiffView.vue's existing toDiffSide already renders that as empty
+    // content — a deleted file's diff comes out as a pure "left revision, read-only" (all
+    // deletions, nothing added), matching the file.read classification C6 already renders, with no
+    // new branch. (A renamed file's left-side read against the new `path` at the old revision has
+    // the same gap openRepoCommitDiffTab already has — out of this phase's scope, not a
+    // regression.)
+    'editor.openRangeDiff': async (params) => {
+      const { repoId: gitRepoId, branch, branchTip, leftRev, leftLabel, path, pinned } = params;
+      const codeRepoId = codeRepoIdFor(gitRepoId);
+      if (codeRepoId === undefined) {
+        throw new Error(`hostHandlers: editor.openRangeDiff: unknown git repoId ${gitRepoId}`);
+      }
+      openRepoReviewDiffTab(
+        codeRepoId,
+        path,
+        leftRev,
+        branchTip,
+        { left: leftLabel, right: branch },
+        { branch, branchTip, leftLabel },
+        pinned === true,
+      );
+      return {};
+    },
+
+    // C11 §8.2/§5.3: the panel webview's own entry point — reveal the review segment on this
+    // branch. `repo/state/search.ts` is the existing native precedent for "which segment of the
+    // panel is active" (Files/Search, C7 D9); `review` joins it as this phase's third value (S14
+    // builds the panel's own template branch for it). Always ensures the panel itself is visible —
+    // a collapsed panel showing "Review branch changes" doing nothing would be a worse experience
+    // than the affordance not existing.
+    'review.open': async ({ repoId: gitRepoId, branch }) => {
+      const codeRepoId = codeRepoIdFor(gitRepoId);
+      if (codeRepoId === undefined) {
+        throw new Error(`hostHandlers: review.open: unknown git repoId ${gitRepoId}`);
+      }
+      setRepoSearchView(codeRepoId, 'review');
+      if (!layoutState.panel.project.visible) toggleProjectPanel();
+      deps.emitLocal('review.target', { repoId: gitRepoId, branch });
+      return {};
+    },
+
+    // C11 §8.3: answered entirely inside this host, never reaching Go (§3.3) — the durable half of
+    // "back to branch selection", through the pinned repo-graph tab's own state
+    // (`repo/git/reviewSession.ts`). A codeRepoId miss (repository not open in this window) is a
+    // silent no-op for save (nothing to persist through) and answers `session: null` for load
+    // (nothing to resume), the same posture reviewSession.ts's own functions take.
+    'review.session.save': async ({ repoId: gitRepoId, session }) => {
+      const codeRepoId = codeRepoIdFor(gitRepoId);
+      if (codeRepoId !== undefined) saveReviewSession(codeRepoId, session);
+      return {};
+    },
+    'review.session.load': async ({ repoId: gitRepoId }) => {
+      const codeRepoId = codeRepoIdFor(gitRepoId);
+      const session = codeRepoId === undefined ? null : loadReviewSession(codeRepoId);
+      return { session: session as ReviewSessionSnapshot | null };
+    },
+
     // detailActions.ts D12/G21 D12: no caller remains for editor.goToFile at all — a throw is
     // honest and costs nothing (§5's own table).
     'editor.goToFile': readOnlyRefusal('editor.goToFile', 'has no native caller'),
