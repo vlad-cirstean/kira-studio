@@ -1,9 +1,6 @@
 import type { RepoSummary } from '@shared/domain/repo';
 import { reactive } from 'vue';
 import { control } from '../bridge/control';
-import { dropRepoTree } from '../repo/state/fileTree';
-import { dropQuickOpen } from '../repo/state/quickOpen';
-import { dropRepoSearch } from '../repo/state/search';
 import { closeRepoWorkspace } from './workspace';
 
 // C5 §3.4: the repo list store, ConnectionsRepo's own shape for a repository entry — hydrate,
@@ -40,14 +37,12 @@ export async function renameCodeRepo(id: string, name: string): Promise<void> {
 }
 
 // The Go side already dropped this repo's own tab rows in the same transaction (CodeReposRepo.Remove)
-// — this is the frontend half of that: the workspace's own in-memory tabs (and its file-tree cache)
-// would otherwise point at a repository that no longer exists, and closeRepoWorkspace is a no-op
-// when the workspace was never open in the first place.
+// — this is the frontend half of that: the workspace's own in-memory tabs (and its file-tree/
+// search/quick-open caches, C13-3) would otherwise point at a repository that no longer exists.
+// closeRepoWorkspace is a no-op when the workspace was never open in the first place, but still
+// drops those caches unconditionally (state/workspace.ts), so nothing further is needed here.
 export async function removeCodeRepo(id: string): Promise<void> {
   await control.codeWorkspaceRemoveRepo(id);
   codeReposState.records = codeReposState.records.filter((r) => r.id !== id);
   closeRepoWorkspace(id);
-  dropRepoTree(id);
-  dropRepoSearch(id);
-  dropQuickOpen(id);
 }

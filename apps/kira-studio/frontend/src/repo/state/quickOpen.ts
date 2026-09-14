@@ -141,12 +141,13 @@ export function quickOpenResults(): QuickOpenRow[] {
   return results.map((r) => toRow(r.obj, r[0]));
 }
 
-// C9 D9 cache eviction, wired beside dropRepoTree's own call site (state/coderepos.ts's
-// removeCodeRepo) — a removed repo's snapshot must not outlive it in this module-level cache.
-// Also closes the palette if it happened to be showing repoId (the ordinary case is already
-// covered by the workspaceState.active watch below, since removeCodeRepo always closes the
-// workspace first; this is the same defensive belt-and-suspenders dropRepoTree itself needs none
-// of, because fileTree.ts has no open/closed UI state to reconcile).
+// C9 D9 cache eviction — a removed or closed repo's snapshot must not outlive it in this
+// module-level cache. Called both by the `openRepos` watch below (C13-3: every closeRepoWorkspace,
+// removeCodeRepo included, since it calls closeRepoWorkspace itself) and directly wherever a caller
+// wants the eviction to happen synchronously rather than on the watcher's next flush. Also closes
+// the palette if it happened to be showing repoId (the ordinary case is already covered by the
+// workspaceState.active watch below, since closeRepoWorkspace always clears `active` first when the
+// closed workspace was the active one).
 export function dropQuickOpen(repoId: string): void {
   snapshotCache.delete(repoId);
   if (quickOpenState.open && quickOpenState.repoId === repoId) closeQuickOpen();
@@ -161,5 +162,20 @@ watch(
   (active) => {
     if (quickOpenState.open && repoIdOfWorkspace(active) !== quickOpenState.repoId)
       closeQuickOpen();
+  },
+);
+
+// C13-3: closeRepoWorkspace (state/workspace.ts) drops this repo's own tree/search caches directly,
+// but can't call dropQuickOpen the same way without violating the one-way import direction above —
+// so it's watched here instead. workspaceState.openRepos is always reassigned wholesale (never
+// mutated in place, both call sites), so a plain (non-deep) watch sees the pre-close membership as
+// `previous` and evicts whichever repoId(s) just dropped out.
+watch(
+  () => workspaceState.openRepos,
+  (openRepos, previous) => {
+    if (!previous) return;
+    for (const repoId of previous) {
+      if (!openRepos.includes(repoId)) dropQuickOpen(repoId);
+    }
   },
 );

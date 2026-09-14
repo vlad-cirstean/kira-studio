@@ -3,6 +3,8 @@ import { repoWorkspaceKey, type WorkspaceKey } from '@shared/domain/workspace';
 import { reactive } from 'vue';
 import { control } from '../bridge/control';
 import { disposeGitTransport } from '../repo/git/transport';
+import { dropRepoTree } from '../repo/state/fileTree';
+import { dropRepoSearch } from '../repo/state/search';
 import { setMode } from './mode';
 import { ensureWorkspaceShell } from './repoTabs';
 import { closeWorkspaceTabs } from './tabs';
@@ -45,6 +47,13 @@ export function openRepoWorkspace(repoId: string): void {
 // is the one path that bypasses the pin guard, since tearing down the whole workspace is not the
 // same act as closing one of its tabs) and drops it from the switcher. Falls back to Studio when
 // the closed workspace was the active one. C6 §8.5: also stops repoId's own index/watcher.
+//
+// C13-3: also drops repoId's own file-tree/search caches (previously wired only to
+// removeCodeRepo's own explicit calls, state/coderepos.ts) — measured ~55 MB per 50k-file repo
+// retained forever otherwise, since closing a workspace without deleting the repo never freed
+// either cache. dropQuickOpen is NOT called directly here — repo/state/quickOpen.ts imports this
+// module (workspaceState) and its own doc comment already establishes that import direction as
+// one-way; it instead watches `openRepos` itself and evicts on the same transition.
 export function closeRepoWorkspace(repoId: string): void {
   const key = repoWorkspaceKey(repoId);
   closeWorkspaceTabs(key);
@@ -55,5 +64,7 @@ export function closeRepoWorkspace(repoId: string): void {
   // own doc comment) — closing the workspace itself is the one event that actually ends it. A
   // no-op when the graph tab was never mounted (no transport was ever created).
   disposeGitTransport(repoId);
+  dropRepoTree(repoId);
+  dropRepoSearch(repoId);
   if (workspaceState.active === key) activateWorkspace('studio');
 }
