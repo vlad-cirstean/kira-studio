@@ -2,9 +2,15 @@
 // dependency on anything renderer-only (this file is shared/domain, imported by main and engine
 // too). Sibling of sql-split.ts: same lexical states (quotes, dollar-quotes, comments), reused
 // here to find exactly the two defects a broken statement can have before it ever reaches the
-// adapter — an unterminated quote/comment, and unbalanced parentheses. Deliberately not the
-// Lezer SQL tree's error nodes: one grammar serves every dialect, so its error nodes would flag
-// valid dialect-specific syntax the grammar doesn't model (D24's own rationale).
+// adapter — an unterminated quote/comment, and unbalanced parentheses. Deliberately not a real
+// SQL grammar's error nodes: one lexer serves every dialect, so it never flags valid
+// dialect-specific syntax a narrower grammar wouldn't model (D24's own rationale).
+//
+// P60b §3.1: the quote/comment/dollar-quote scanning itself is `sql-lex.ts`'s `scanSqlSpan` —
+// hoisted out of here (and `sql-split.ts`) into one shared scanner both now call. No behaviour
+// change: this file keeps its own paren-balance/issue-reporting logic exactly.
+import { scanSqlSpan } from './sql-lex';
+
 export interface LintIssue {
   from: number;
   to: number;
@@ -24,9 +30,16 @@ export interface LintSqlOptions {
   dollarQuoting?: boolean;
 }
 
+function spanMessage(kind: 'blockComment' | 'quote' | 'dollarQuote', quoteChar?: string): string {
+  if (kind === 'blockComment') return 'unterminated block comment';
+  if (kind === 'dollarQuote') return 'unterminated dollar-quoted string';
+  return quoteChar === '`' ? 'unterminated quoted identifier' : 'unterminated string literal';
+}
+
 export function lintSql(source: string, options?: LintSqlOptions): LintIssue[] {
   const backslashEscapes = options?.backslashEscapes ?? true;
   const dollarQuoting = options?.dollarQuoting ?? true;
+  const lexOptions = { backslashEscapes, dollarQuoting };
   const issues: LintIssue[] = [];
   const n = source.length;
   let i = 0;
@@ -45,80 +58,21 @@ export function lintSql(source: string, options?: LintSqlOptions): LintIssue[] {
   };
 
   while (i < n) {
-    const c = source[i];
-
-    if (c === '-' && source[i + 1] === '-') {
-      i += 2;
-      while (i < n && source[i] !== '\n') i++;
-      continue;
-    }
-    if (c === '/' && source[i + 1] === '*') {
-      const start = i;
-      i += 2;
-      while (i < n && !(source[i] === '*' && source[i + 1] === '/')) i++;
-      if (i >= n) {
+    const span = scanSqlSpan(source, i, lexOptions);
+    if (span) {
+      if (!span.closed && span.kind !== 'lineComment') {
         issues.push({
-          from: start,
-          to: n,
+          from: span.start,
+          to: span.end,
           severity: 'error',
-          message: 'unterminated block comment',
+          message: spanMessage(span.kind, span.quoteChar),
         });
         break;
       }
-      i += 2;
+      i = span.end;
       continue;
     }
-    // Single/double/back-quoted runs: '' or "" or `` doubles the quote as an escape; a backslash
-    // escaping the next character too is dialect-specific (P2 R2), matching sql-split.ts's own
-    // handling — see LintSqlOptions.backslashEscapes's own doc comment.
-    if (c === "'" || c === '"' || c === '`') {
-      const quote = c;
-      const start = i;
-      i++;
-      let closed = false;
-      while (i < n) {
-        if (backslashEscapes && source[i] === '\\') {
-          i += 2;
-          continue;
-        }
-        if (source[i] === quote) {
-          if (source[i + 1] === quote) {
-            i += 2;
-            continue;
-          }
-          i++;
-          closed = true;
-          break;
-        }
-        i++;
-      }
-      if (!closed) {
-        const kind = quote === '`' ? 'quoted identifier' : 'string literal';
-        issues.push({ from: start, to: n, severity: 'error', message: `unterminated ${kind}` });
-        break;
-      }
-      continue;
-    }
-    // Postgres dollar-quoting: $$ ... $$ or $tag$ ... $tag$.
-    if (c === '$' && dollarQuoting) {
-      const match = /^\$([A-Za-z_][A-Za-z0-9_]*)?\$/.exec(source.slice(i));
-      if (match) {
-        const start = i;
-        const tag = match[0];
-        const closeIdx = source.indexOf(tag, i + tag.length);
-        if (closeIdx < 0) {
-          issues.push({
-            from: start,
-            to: n,
-            severity: 'error',
-            message: 'unterminated dollar-quoted string',
-          });
-          break;
-        }
-        i = closeIdx + tag.length;
-        continue;
-      }
-    }
+    const c = source[i];
     if (c === '(') {
       parenStack.push(i);
       i++;

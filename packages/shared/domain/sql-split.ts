@@ -4,6 +4,12 @@
 // identifier, or a comment. This is a splitter, not a parser — it tracks just enough lexical
 // state (which kind of quote/comment it is inside) to find statement boundaries; it never
 // validates SQL syntax.
+//
+// P60b §3.1: the quote/comment/dollar-quote scanning itself is `sql-lex.ts`'s `scanSqlSpan` —
+// hoisted out of here (and `sql-lint.ts`) into one shared scanner both now call. No behaviour
+// change: this file keeps its own `;`-splitting/backslash-escape/dollar-quoting semantics exactly.
+import { scanSqlSpan } from './sql-lex';
+
 export interface SqlStatement {
   text: string;
   /** Offsets into the original source, not `text` — `text` is trimmed, these are not. */
@@ -28,6 +34,7 @@ export interface SplitSqlOptions {
 export function splitSqlStatements(source: string, options?: SplitSqlOptions): SqlStatement[] {
   const backslashEscapes = options?.backslashEscapes ?? true;
   const dollarQuoting = options?.dollarQuoting ?? true;
+  const lexOptions = { backslashEscapes, dollarQuoting };
   const statements: SqlStatement[] = [];
   const n = source.length;
   let i = 0;
@@ -39,53 +46,12 @@ export function splitSqlStatements(source: string, options?: SplitSqlOptions): S
   };
 
   while (i < n) {
+    const span = scanSqlSpan(source, i, lexOptions);
+    if (span) {
+      i = span.end;
+      continue;
+    }
     const c = source[i];
-
-    if (c === '-' && source[i + 1] === '-') {
-      i += 2;
-      while (i < n && source[i] !== '\n') i++;
-      continue;
-    }
-    if (c === '/' && source[i + 1] === '*') {
-      i += 2;
-      while (i < n && !(source[i] === '*' && source[i + 1] === '/')) i++;
-      i += 2;
-      continue;
-    }
-    // Single/double/back-quoted runs: '' or "" or `` doubles the quote as an escape (every SQL
-    // dialect here honours that); a backslash escaping the next character too is dialect-specific
-    // (P2 R2) — see SplitSqlOptions.backslashEscapes's own doc comment.
-    if (c === "'" || c === '"' || c === '`') {
-      const quote = c;
-      i++;
-      while (i < n) {
-        if (backslashEscapes && source[i] === '\\') {
-          i += 2;
-          continue;
-        }
-        if (source[i] === quote) {
-          if (source[i + 1] === quote) {
-            i += 2;
-            continue;
-          }
-          i++;
-          break;
-        }
-        i++;
-      }
-      continue;
-    }
-    // Postgres dollar-quoting: $$ ... $$ or $tag$ ... $tag$ — a semicolon inside one is not a
-    // statement boundary (function/procedure bodies rely on this).
-    if (c === '$' && dollarQuoting) {
-      const match = /^\$([A-Za-z_][A-Za-z0-9_]*)?\$/.exec(source.slice(i));
-      if (match) {
-        const tag = match[0];
-        const closeIdx = source.indexOf(tag, i + tag.length);
-        i = closeIdx < 0 ? n : closeIdx + tag.length;
-        continue;
-      }
-    }
     if (c === ';') {
       pushIfNonEmpty(i);
       i++;
