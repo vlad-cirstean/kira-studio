@@ -15,6 +15,10 @@ type autoFetchState struct {
 	mu       sync.Mutex
 	timer    *time.Timer
 	disabled bool
+	// everAcquiredNonQuiet is C14-3's own gate: true once at least one non-quiet (real, e.g. a
+	// paired external client) acquirer has held this entry — set by markAcquiredNonQuiet, read by
+	// EnsureAutoFetch. See markAcquiredNonQuiet's own comment for why this exists.
+	everAcquiredNonQuiet bool
 }
 
 // startAutoFetch arms the timer if minutes > 0 — called once, by newRepoEntry, with whatever the
@@ -34,19 +38,47 @@ func (e *RepoEntry) startAutoFetch(minutes int) {
 
 // EnsureAutoFetch re-reads this entry's current settings and arms the timer if the interval is now
 // non-zero (F4/D5) — called from Conn.Open on the path that stores a new hold, and (G31 round-2
-// functional-correctness review, finding #8) from gitrpc's own repoSettings.set handler, the
-// OTHER off→on path: a user flipping fetch.autoInterval from 0 back to a positive value while the
-// repository is already open, with no repo.open in between to reach this any other way.
+// functional-correctness review, finding #8) from Registry.ReconcileAutoFetch, the OTHER off→on
+// path: a user flipping fetch.autoInterval from 0 back to a positive value while the repository is
+// already open, with no repo.open in between to reach this any other way (ReconcileAutoFetch's own
+// comment traces the rest of that call chain up to bridge/settings.go).
 // startAutoFetch already no-ops when a timer is already running or the entry is `disabled` (a
 // fetch that failed once stays off for the entry's life, G7 D23), so calling this redundantly
 // (both an open AND a settings change, or several windows) arms exactly one timer, and this can
-// never resurrect one G7 killed. Exported for gitrpc's own cross-package call; unexported callers
+// never resurrect one G7 killed. Exported for registry.go's own cross-file call; unexported callers
 // within this package (conn.go) use it exactly the same way.
+//
+// C14-3: also no-ops entirely when this entry has never had a non-quiet acquirer (see
+// markAcquiredNonQuiet) — otherwise ReconcileAutoFetch, which arms every constructed entry with no
+// memory of how each was acquired, could arm a repository the native git-graph/review UI alone has
+// ever opened (AcquireQuiet, C13-10), defeating that surface's own "provably read-only" guarantee
+// the moment the user set a positive fetch interval in Settings.
 func (e *RepoEntry) EnsureAutoFetch() {
+	if !e.hasNonQuietAcquirer() {
+		return
+	}
 	_, minutes, _ := e.settings()
 	if minutes > 0 {
 		e.startAutoFetch(minutes)
 	}
+}
+
+// markAcquiredNonQuiet records that this entry has now had at least one non-quiet (real) acquirer
+// — called by Registry.acquire whenever a call reaches it through Acquire, never AcquireQuiet,
+// whether that construction is brand-new or a reuse of an entry AcquireQuiet built. Idempotent and
+// one-directional: once set, never cleared — a repository that has ever had a real acquirer stays
+// eligible for auto-fetch arming for the rest of this entry's life, even if every current
+// connection happens to be quiet right now.
+func (e *RepoEntry) markAcquiredNonQuiet() {
+	e.autoFetch.mu.Lock()
+	e.autoFetch.everAcquiredNonQuiet = true
+	e.autoFetch.mu.Unlock()
+}
+
+func (e *RepoEntry) hasNonQuietAcquirer() bool {
+	e.autoFetch.mu.Lock()
+	defer e.autoFetch.mu.Unlock()
+	return e.autoFetch.everAcquiredNonQuiet
 }
 
 // stopAutoFetch is teardown's own call — permanent, the entry is going away.

@@ -125,6 +125,10 @@ func (reg *Registry) Acquire(ctx context.Context, gitPath, path string) (*RepoEn
 // other respect, REUSED-entry case included: joining an entry someone else already constructed (and
 // may already have armed) is untouched by this — this only ever affects the one moment a brand-new
 // entry is constructed by this call.
+//
+// C14-3: also never marks the entry eligible for a LATER arming (markAcquiredNonQuiet) — an entry
+// only ever acquired quietly stays permanently ineligible for EnsureAutoFetch/ReconcileAutoFetch,
+// even across a settings change, until some real (Acquire) caller reaches it.
 func (reg *Registry) AcquireQuiet(ctx context.Context, gitPath, path string) (*RepoEntry, func(), error) {
 	return reg.acquire(ctx, gitPath, path, true)
 }
@@ -146,6 +150,12 @@ func (reg *Registry) acquire(
 			sl.lingerTimer = nil
 		}
 		sl.refs++
+		// C14-3: a real (non-quiet) Acquire joining an entry AcquireQuiet built (or one that was
+		// already eligible — idempotent either way) makes it eligible for auto-fetch arming from
+		// here on, even though this particular call is only a reuse, not a construction.
+		if !skipInitialAutoFetch {
+			sl.entry.markAcquiredNonQuiet()
+		}
 		return sl.entry, reg.releaseFunc(summary.RepoID), nil
 	}
 
@@ -246,6 +256,11 @@ func (reg *Registry) IsOpen(repoID string) bool {
 // SettingsService.Set already pushes a changed cache budget to Router.PushCacheConfig. Once a
 // repository's own timer has been cleared by pauseAutoFetch (interval read 0 at some point), this
 // is genuinely the ONLY way it can ever restart without a fresh repo.open.
+//
+// C14-3: EnsureAutoFetch itself no-ops for an entry that has never had a non-quiet acquirer, so
+// this fan-out is safe to call unconditionally over every constructed entry regardless of how each
+// was acquired — a repository the native git-graph/review UI alone has ever opened (AcquireQuiet)
+// stays unarmed here exactly as it does everywhere else.
 func (reg *Registry) ReconcileAutoFetch() {
 	reg.mu.Lock()
 	entries := make([]*RepoEntry, 0, len(reg.entries))

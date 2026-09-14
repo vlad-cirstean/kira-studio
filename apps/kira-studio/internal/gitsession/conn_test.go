@@ -383,3 +383,65 @@ func TestConn_DisableAutoFetch_OptsThisConnOutOfArming(t *testing.T) {
 		t.Fatal("an ordinary Conn reopening the native Conn's own (still-unarmed) entry must arm it")
 	}
 }
+
+// TestRegistry_ReconcileAutoFetch_NeverArmsAQuietOnlyEntry is C14-3: a real gap in C13-10's own
+// fix. DisableAutoFetch/AcquireQuiet correctly stopped the native mount's own repo.open from arming
+// a brand-new entry directly, but ReconcileAutoFetch (called from bridge/settings.go whenever the
+// user changes fetch.autoIntervalMinutes in Settings) called EnsureAutoFetch on EVERY constructed
+// entry with no memory of how each was acquired — so a repository opened ONLY through the native
+// git-graph/review UI still got armed the moment the user set a positive interval in Settings,
+// defeating the "provably read-only" guarantee for that surface. This proves: (1) a quiet-only
+// entry stays unarmed across a ReconcileAutoFetch call, and (2) once a real (non-quiet) Conn also
+// opens that same repository, ReconcileAutoFetch can arm it correctly — the "starts quiet-only,
+// later gets a real paired connection" case C14-3's own fix has to handle without over-correcting.
+func TestRegistry_ReconcileAutoFetch_NeverArmsAQuietOnlyEntry(t *testing.T) {
+	t.Parallel()
+	reg := newTestRegistry()
+	reg.LingerFor = time.Hour
+	minutes := 0
+	reg.Settings = func() ([]string, int, string) { return nil, minutes, "" }
+
+	native := NewConn("native", "kira-native", "This window", nil)
+	native.DisableAutoFetch()
+	summary, err := native.Open(context.Background(), reg, "/usr/bin/git", "/repo-quiet-only")
+	if err != nil {
+		t.Fatalf("Open (native): %v", err)
+	}
+	reg.mu.Lock()
+	entry := reg.entries[summary.RepoID].entry
+	reg.mu.Unlock()
+
+	// The user sets a positive fetch interval in Settings — bridge/settings.go's own call.
+	minutes = 5
+	reg.ReconcileAutoFetch()
+
+	entry.autoFetch.mu.Lock()
+	timerAfterReconcile := entry.autoFetch.timer
+	entry.autoFetch.mu.Unlock()
+	if timerAfterReconcile != nil {
+		t.Fatal("ReconcileAutoFetch armed a repository the native (quiet-only) UI alone has ever opened")
+	}
+
+	// A real, paired connection (e.g. a VS Code extension) now also opens the SAME repository —
+	// the entry becomes eligible for arming from this point on.
+	paired := NewConn("paired", "gitsock-client", "Some editor", nil)
+	summary2, err := paired.Open(context.Background(), reg, "/usr/bin/git", "/repo-quiet-only")
+	if err != nil {
+		t.Fatalf("Open (paired): %v", err)
+	}
+	if summary2.RepoID != summary.RepoID {
+		t.Fatalf("expected the paired Conn to join the same entry, got a different RepoID")
+	}
+
+	// The paired Conn's own Open already calls EnsureAutoFetch (line 257) with minutes already
+	// positive, so a ReconcileAutoFetch here is deliberately redundant -- checking it anyway proves
+	// the entry is now durably eligible, not just armed once by coincidence of Open's own call.
+	reg.ReconcileAutoFetch()
+
+	entry.autoFetch.mu.Lock()
+	timerAfterPairedJoin := entry.autoFetch.timer
+	entry.autoFetch.mu.Unlock()
+	if timerAfterPairedJoin == nil {
+		t.Fatal("a repository joined by a real (non-quiet) Conn must become eligible for auto-fetch arming")
+	}
+}

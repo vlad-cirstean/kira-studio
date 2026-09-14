@@ -164,6 +164,11 @@ func newRepoEntry(
 		isOpen:          isOpen,
 		done:            make(chan struct{}),
 	}
+	// C14-3: seeds hasNonQuietAcquirer's own answer — a construction reached via Acquire starts
+	// eligible for auto-fetch arming immediately; one reached via AcquireQuiet starts NOT eligible,
+	// until some later real acquirer calls markAcquiredNonQuiet (Registry.acquire's reuse branch).
+	// No lock needed here: e is not yet reachable from anywhere else.
+	e.autoFetch.everAcquiredNonQuiet = !skipInitialAutoFetch
 	go e.pump()
 	if _, minutes, _ := settings(); minutes > 0 && !skipInitialAutoFetch {
 		e.startAutoFetch(minutes)
