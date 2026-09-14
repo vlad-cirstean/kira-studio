@@ -43,10 +43,83 @@ type SyncStats struct {
 	ByLanguage   map[codeparse.ID]int
 }
 
+// SyncState is one Index's own full-reconcile state (P67f §2.2). A caller that can see it can tell
+// "no rows for that name" from "the index is mid-rebuild" or "the last rebuild failed" — which
+// nothing outside codeindex could do before.
+type SyncState struct {
+	InFlight   bool
+	Generation uint64 // completed full Syncs; 0 means none has finished yet
+	LastErr    error  // the last completed full Sync's own error, nil on success
+	LastDoneAt time.Time
+}
+
+// syncTracker is a counter, not a bool: the initial sync and a watcher rescan can genuinely
+// overlap (server.go starts one in a goroutine while watch.go can start another), so "settled"
+// means the count is back to zero, not that some particular Sync finished.
+type syncTracker struct {
+	mu       sync.Mutex
+	inFlight int
+	settled  chan struct{} // closed exactly while inFlight == 0
+	gen      uint64
+	lastErr  error
+	lastDone time.Time
+}
+
+// beginSync records one more full Sync starting — called once at the top of Sync, before any of
+// its own work.
+func (idx *Index) beginSync() {
+	idx.sync.mu.Lock()
+	defer idx.sync.mu.Unlock()
+	if idx.sync.inFlight == 0 {
+		idx.sync.settled = make(chan struct{})
+	}
+	idx.sync.inFlight++
+}
+
+// endSync records one full Sync's own completion — deferred from Sync, so it runs whether Sync
+// returned nil or an error.
+func (idx *Index) endSync(err error) {
+	idx.sync.mu.Lock()
+	defer idx.sync.mu.Unlock()
+	idx.sync.inFlight--
+	idx.sync.lastErr = err
+	idx.sync.lastDone = time.Now()
+	idx.sync.gen++
+	if idx.sync.inFlight == 0 {
+		close(idx.sync.settled)
+	}
+}
+
+// SyncSettled returns a channel closed once no full Sync is in flight — already closed when none
+// is. Inherently a snapshot: a Sync can begin the instant after it is read.
+func (idx *Index) SyncSettled() <-chan struct{} {
+	idx.sync.mu.Lock()
+	defer idx.sync.mu.Unlock()
+	return idx.sync.settled
+}
+
+// SyncState snapshots the last completed full Sync's own outcome.
+func (idx *Index) SyncState() SyncState {
+	idx.sync.mu.Lock()
+	defer idx.sync.mu.Unlock()
+	return SyncState{
+		InFlight:   idx.sync.inFlight > 0,
+		Generation: idx.sync.gen,
+		LastErr:    idx.sync.lastErr,
+		LastDoneAt: idx.sync.lastDone,
+	}
+}
+
 // Sync is one reconcile pass (§6): enumerate, apply §5.3's staleness rules and parse the stale
-// ones, delete rows for paths that left enumeration, and record meta.last_full_sync_at.
-func (idx *Index) Sync(ctx context.Context) (SyncStats, error) {
-	stats := SyncStats{ByLanguage: map[codeparse.ID]int{}}
+// ones, delete rows for paths that left enumeration, and record meta.last_full_sync_at. Brackets
+// itself against idx.sync (P67f §2.2) so a caller elsewhere (repomap's own waitReady) can wait out
+// or notice this Sync — the initial one and every later watcher-triggered rescan alike, since both
+// go through this one method.
+func (idx *Index) Sync(ctx context.Context) (stats SyncStats, err error) {
+	idx.beginSync()
+	defer func() { idx.endSync(err) }()
+
+	stats = SyncStats{ByLanguage: map[codeparse.ID]int{}}
 
 	if err := idx.checkFingerprint(ctx); err != nil {
 		return stats, err

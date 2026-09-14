@@ -18,6 +18,11 @@ type Index struct {
 	root    string
 	gitPath string
 	runner  gitclient.Runner
+
+	// sync is P67f §2.2's own full-reconcile state — every Sync (the initial one and every later
+	// watcher-triggered rescan alike) brackets itself against it, so a reader can tell "mid-rebuild"
+	// and "last rebuild failed" apart from a genuine empty result.
+	sync syncTracker
 }
 
 // Open returns an Index for one repository. store is the shared codeindex.db handle (§5.1),
@@ -27,7 +32,7 @@ type Index struct {
 // gitclient's own locator is macOS-only, and injection is what lets a test run against the git on
 // PATH (§6).
 func Open(store *Store, runner gitclient.Runner, gitPath, repoID, root string) *Index {
-	return &Index{
+	idx := &Index{
 		store:   store,
 		session: codeparse.NewSession(),
 		repoID:  repoID,
@@ -35,6 +40,11 @@ func Open(store *Store, runner gitclient.Runner, gitPath, repoID, root string) *
 		gitPath: gitPath,
 		runner:  runner,
 	}
+	// Already-closed: a nil channel blocks forever, which would be the wrong default for "nothing
+	// is running" (P67f §2.2).
+	idx.sync.settled = make(chan struct{})
+	close(idx.sync.settled)
+	return idx
 }
 
 // RepoID returns the repository identity this Index was opened for.

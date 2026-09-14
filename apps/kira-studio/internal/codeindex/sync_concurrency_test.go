@@ -5,11 +5,13 @@ import (
 	"errors"
 	"fmt"
 	"runtime"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/codeparse"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitclient"
 )
 
 // P64c §4.2/§4.3: the pipelined writer (sync.go's parseStale/writeOutcomes) is a new goroutine
@@ -160,6 +162,103 @@ func TestParseStale_WriterErrorCancelsSenders(t *testing.T) {
 	if stats.FilesParsed != 0 || stats.FilesSkipped != 0 {
 		t.Fatalf("expected no write to land after a parse-side error: stats=%+v", stats)
 	}
+}
+
+// TestSyncTracker_SettledStateAndGeneration is P67f §5.1: the sync tracker is a counter plus a
+// channel two goroutines touch (CLAUDE.md's own concurrency/ordering/races test bar). Run under
+// -race. Uses a real fixture repository and idx.Sync itself, not a mock — the tracker has no
+// exported hooks of its own outside Sync's own bracket, so exercising it means exercising Sync.
+func TestSyncTracker_SettledStateAndGeneration(t *testing.T) {
+	dir := initFixtureRepo(t)
+	writeFile(t, dir, "a.go", "package p\n\nfunc F() int { return 1 }\n")
+	idx := newTestIndex(t, dir, "repo-sync-tracker")
+	ctx := context.Background()
+
+	// With no Sync running, SyncSettled() is already closed and SyncState().InFlight is false.
+	select {
+	case <-idx.SyncSettled():
+	default:
+		t.Fatal("SyncSettled() open with no Sync ever started")
+	}
+	if st := idx.SyncState(); st.InFlight {
+		t.Fatalf("SyncState().InFlight = true with no Sync ever started: %+v", st)
+	}
+
+	// During a Sync, SyncSettled() is open; it closes when the Sync returns.
+	before := idx.SyncSettled()
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		if _, err := idx.Sync(ctx); err != nil {
+			t.Errorf("sync 1: %v", err)
+		}
+	}()
+	<-done
+	select {
+	case <-before:
+	case <-time.After(2 * time.Second):
+		t.Fatal("SyncSettled() (pre-Sync snapshot) never closed after Sync returned")
+	}
+	if st := idx.SyncState(); st.InFlight || st.Generation != 1 || st.LastErr != nil {
+		t.Fatalf("SyncState() after one clean Sync = %+v, want InFlight=false Generation=1 LastErr=nil", st)
+	}
+
+	// Two overlapping Sync calls leave SyncSettled() open until the second finishes — the
+	// counter, not a bool. writeFile enough new files that both Syncs have real work to overlap
+	// on, rather than racing to finish before the second even starts.
+	for i := 0; i < 50; i++ {
+		writeFile(t, dir, fmt.Sprintf("g%d.go", i), fmt.Sprintf("package p\n\nfunc G%d() int { return %d }\n", i, i))
+	}
+	settled := idx.SyncSettled()
+	var wg sync.WaitGroup
+	wg.Add(2)
+	errs := make(chan error, 2)
+	go func() { defer wg.Done(); _, err := idx.Sync(ctx); errs <- err }()
+	go func() { defer wg.Done(); _, err := idx.Sync(ctx); errs <- err }()
+	wg.Wait()
+	close(errs)
+	for err := range errs {
+		if err != nil {
+			t.Fatalf("overlapping sync: %v", err)
+		}
+	}
+	select {
+	case <-settled:
+	case <-time.After(2 * time.Second):
+		t.Fatal("SyncSettled() never closed after both overlapping Syncs returned")
+	}
+	if st := idx.SyncState(); st.InFlight || st.Generation != 3 {
+		t.Fatalf("SyncState() after two overlapping Syncs = %+v, want InFlight=false Generation=3", st)
+	}
+
+	// A Sync that returns an error records it in LastErr, and a later successful Sync clears it.
+	badDir := t.TempDir() // never git-initialized: Enumerate fails against it.
+	badIdx := newTestIndexNoGitInit(t, badDir, "repo-sync-tracker-bad")
+	if _, err := badIdx.Sync(ctx); err == nil {
+		t.Fatal("Sync against a non-repository directory = nil error, want one")
+	}
+	if st := badIdx.SyncState(); st.LastErr == nil || st.Generation != 1 {
+		t.Fatalf("SyncState() after a failed Sync = %+v, want a non-nil LastErr and Generation=1", st)
+	}
+	runGit(t, badDir, "init", "-q", "-b", "main")
+	if _, err := badIdx.Sync(ctx); err != nil {
+		t.Fatalf("sync after git init: %v", err)
+	}
+	if st := badIdx.SyncState(); st.LastErr != nil || st.Generation != 2 {
+		t.Fatalf("SyncState() after the following successful Sync = %+v, want LastErr=nil Generation=2", st)
+	}
+}
+
+// newTestIndexNoGitInit is newTestIndex without the git-init step (§5.1's own failed-Sync case
+// needs Enumerate to actually fail, which a real git repository never does).
+func newTestIndexNoGitInit(t *testing.T, repoDir, repoID string) *Index {
+	t.Helper()
+	gitPath := requireRealGit(t)
+	store := OpenStoreAt(t.TempDir())
+	t.Cleanup(func() { _ = store.Close() })
+	idx := Open(store, gitclient.NewExecRunner(), gitPath, repoID, repoDir)
+	t.Cleanup(idx.Close)
+	return idx
 }
 
 // TestSync_CancelledContextReturnsPromptly is §4.3's second case: a context cancelled mid-Sync
