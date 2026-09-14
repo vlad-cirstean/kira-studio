@@ -37,6 +37,14 @@ Entries are closed in place (status flips to Fixed, commit noted) rather than de
   results (31 real call sites, no false positives). No fix needed beyond the token remint; noted so
   a future session with two stale token files doesn't waste time guessing which one is live.
 
+- **P62 (planning)**: same `ConnectionRefused` at session start as P60b, same cause and same fix —
+  started the server per the headless steps, deleted the one stale hashed token file under
+  `/root/.kira-studio/`, restarted to mint a fresh bearer token, then called it over plain
+  HTTP/JSON-RPC. `search_symbols` for `BlameLine` returned all four real Go symbols
+  (`porcelain.BlameLine`, `BlameLineArgs`, `RepoEntry.BlameLine`, `gitrpc.BlameLineParams`) with no
+  false positives; `search_symbols` for `attachReviewDecorations` returned the one correct
+  definition. No fix needed.
+
 _No non-trivial entries._
 
 <!--
