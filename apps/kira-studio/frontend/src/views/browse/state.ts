@@ -1,3 +1,4 @@
+import type { PageSize } from '@shared/domain/tabs';
 import { pathParent, type TreeNode } from '@shared/domain/tree';
 import { markRaw } from 'vue';
 import { control } from '../../bridge/control';
@@ -30,6 +31,14 @@ export interface BrowseViewRuntime {
    *  guard grid/documents/keyvalue/stream all keep as `opId`, expressed as a counter because
    *  `kira:tree:children` is not a cancellable engine op and has no op id to compare (D16, above). */
   loadSeq: number;
+  /** P63: the split's value pane — the selected leaf's own pager position. Backs the
+   *  `${tabId}::preview` KeyValueHost (BrowseView.vue registers it), so KeyValuePane's pager has
+   *  somewhere to read/write for a target that is not a real tab. Runtime-only, like `selected`
+   *  itself (§5) — a selection this belongs to never survives a restore either. Reset to page 0
+   *  on every new selection (`selectRow` below); `previewPageSize` persists across selections,
+   *  mirroring how a real KeyValue tab's own page size survives paging through different pages. */
+  previewPageIndex: number;
+  previewPageSize: PageSize;
 }
 
 function defaultRuntime(): BrowseViewRuntime {
@@ -42,6 +51,8 @@ function defaultRuntime(): BrowseViewRuntime {
     filter: '',
     selected: null,
     loadSeq: 0,
+    previewPageIndex: 0,
+    previewPageSize: 100,
   };
 }
 
@@ -126,6 +137,7 @@ async function setLevel(tabId: string, level: string): Promise<void> {
   const rt = ensureRuntime(tabId);
   rt.filter = '';
   rt.selected = null;
+  rt.previewPageIndex = 0;
   patchBrowseTabState(tabId, { levelPath: level === tab.path ? '' : level });
   await load(tabId);
 }
@@ -157,7 +169,11 @@ export function setFilter(tabId: string, filter: string): void {
 
 export function selectRow(tabId: string, path: string | null): void {
   const rt = runtime[tabId];
-  if (rt) rt.selected = path;
+  if (!rt) return;
+  // P63: a new selection previews a different value — its pager starts at page 0, same as
+  // opening a fresh KeyValue tab would (defaultKeyValueTabState's own `pageIndex: 0`).
+  if (rt.selected !== path) rt.previewPageIndex = 0;
+  rt.selected = path;
 }
 
 // P41 D14: an S3 upload/delete lands in a level the project tree no longer renders (F22) — this

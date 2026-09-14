@@ -1,5 +1,5 @@
 // P44 F47: P43 iteration 3 fixed two ordering bugs in the renderer's view-state modules —
-// views/browse/state.ts's load() supersession guard (D39/F35) and views/keyvalue/state.ts's
+// views/browse/state.ts's load() supersession guard (D39/F35) and views/shared/keyvalue/state.ts's
 // cursor-strategy reload fallback (D40/F37) — and both are pinned today only by Docker-gated
 // Playwright steps that cannot deterministically force the race they exist to guard against. The
 // browse guard's own coverage (tests/e2e/s3.spec.ts's "descend then press Up immediately" step)
@@ -35,8 +35,8 @@ const {
   load: loadKeyValue,
   goNext: keyValueGoNext,
   runtime: keyValueRuntime,
-} = await import('../../frontend/src/views/keyvalue/state');
-const { setPage } = await import('../../frontend/src/views/keyvalue/page');
+} = await import('../../frontend/src/views/shared/keyvalue/state');
+const { setPage } = await import('../../frontend/src/views/shared/keyvalue/page');
 const {
   goNext: gridGoNext,
   goPrev: gridGoPrev,
@@ -198,7 +198,7 @@ describe('views/browse/state.ts — load() supersession guard (P44 F47, P43 D39)
   });
 });
 
-describe('views/keyvalue/state.ts — cursor-strategy reload fallback (P44 F47, P43 D40)', () => {
+describe('views/shared/keyvalue/state.ts — cursor-strategy reload fallback (P44 F47, P43 D40)', () => {
   function makeKeyValuePage(strategy: 'offset' | 'cursor'): KeyValuePage {
     return {
       kind: 'keyvalue',
@@ -328,7 +328,7 @@ describe('views/grid/state.ts — pageIndex reverts on a failed or cancelled loa
   });
 });
 
-describe('views/keyvalue/state.ts — pageIndex reverts on a failed load (P2 R2, task #93)', () => {
+describe('views/shared/keyvalue/state.ts — pageIndex reverts on a failed load (P2 R2, task #93)', () => {
   test('10. goNext reverts pageIndex to the previous page when the load fails', async () => {
     const { id } = openKeyValueTab('conn10', 'db0/key:big-list', { newTab: true });
     // biome-ignore lint/suspicious/noExplicitAny: a minimal fake, not the real ReadResponse

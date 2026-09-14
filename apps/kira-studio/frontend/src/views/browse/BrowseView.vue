@@ -1,19 +1,27 @@
 <script setup lang="ts">
 import type { BrowseTabRecord } from '@shared/domain/tabs';
 import { decodePath, encodePath, pathTail, type TreeNode } from '@shared/domain/tree';
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { connectionRecord, connectionsState } from '../../state/connections';
 import { openContextMenu } from '../../state/contextMenu';
 import { openUploadDialog } from '../../state/objectStore';
-import { openKeyValueTab } from '../../state/tabs';
+import { openKeyValueTab, patchBrowseTabState } from '../../state/tabs';
 import CodiconIcon from '../../theme/CodiconIcon.vue';
 import { nodeIcon } from '../../theme/icons';
+import EmptyState from '../../theme/primitives/EmptyState.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
 import MessageStrip from '../../theme/primitives/MessageStrip.vue';
 import PanelSearchBox from '../../theme/primitives/PanelSearchBox.vue';
+import PanelSplitter from '../../theme/primitives/PanelSplitter.vue';
 import ReconnectGate from '../../theme/primitives/ReconnectGate.vue';
 import ViewChrome from '../../theme/primitives/ViewChrome.vue';
 import VirtualList from '../../theme/primitives/VirtualList.vue';
+import {
+  type KeyValueHost,
+  registerKeyValueHost,
+  unregisterKeyValueHost,
+} from '../shared/keyvalue/host';
+import KeyValuePane from '../shared/keyvalue/KeyValuePane.vue';
 import { refreshOrReconnect, useConnectionGate } from '../shared/useConnectionGate';
 import { menuForNode } from './menu';
 import { ascend, descend, goToLevel, load, reload, runtime, selectRow, setFilter } from './state';
@@ -95,6 +103,56 @@ const countText = computed(() => {
   return `${total} item${total === 1 ? '' : 's'}`;
 });
 
+// P63 §2.1/§2.2: the vertical split's own state. `listWidth` mirrors HttpRequestView.vue's own
+// requestPaneHeight persistence idiom — `0` means "the default", so a tab saved before this field
+// existed restores unchanged.
+const DEFAULT_LIST_WIDTH = 320;
+const listWidth = computed(() => props.tab.state.listWidth || DEFAULT_LIST_WIDTH);
+function onResizeList(size: number): void {
+  patchBrowseTabState(props.tab.id, { listWidth: size });
+}
+
+// The detail pane previews the selected row when it's a leaf (hasChildren: false) — a container
+// row, or nothing selected, has no value of its own to show (§2.3).
+const selectedNode = computed<TreeNode | null>(() => {
+  const selected = rt.value?.selected;
+  if (!selected) return null;
+  return rt.value?.nodes.find((n) => n.path === selected) ?? null;
+});
+const previewable = computed(() => !!selectedNode.value && !selectedNode.value.hasChildren);
+const emptyPreviewLabel = computed(() =>
+  targetTail.value?.kind === 'bucket'
+    ? 'Select an object to view it'
+    : 'Select a key to view its value',
+);
+const emptyPreviewIcon = computed(() => (targetTail.value?.kind === 'bucket' ? 'file' : 'tag'));
+
+// §2.2: a non-tab viewKey, registered once for this tab's whole lifetime — its own resolver reads
+// `rt` fresh on every call, so it never needs re-registering as selection changes. `path` reads
+// `rt.selected` directly rather than `selectedNode`/`previewable`: KeyValuePane is only ever
+// mounted while `previewable` holds (below), so a container's own path here is simply never read.
+const previewKey = `${props.tab.id}::preview`;
+registerKeyValueHost(previewKey, (): KeyValueHost | null => {
+  const r = rt.value;
+  if (!r?.selected) return null;
+  return {
+    connectionId: props.tab.connectionId,
+    path: r.selected,
+    pageIndex: r.previewPageIndex,
+    pageSize: r.previewPageSize,
+    patch: (p) => {
+      const target = rt.value;
+      if (!target) return;
+      if (p.pageIndex !== undefined) target.previewPageIndex = p.pageIndex;
+      if (p.pageSize !== undefined) target.previewPageSize = p.pageSize;
+    },
+  };
+});
+onUnmounted(() => unregisterKeyValueHost(previewKey));
+
+// D12 (§2.3 extends it, not replaces it): a single click still just selects the row — the detail
+// pane above reacts to `rt.selected` on its own (KeyValuePane's own watch on its resolved host
+// path), so no separate "load into the right pane" call belongs here.
 function onRowClick(node: TreeNode): void {
   selectRow(props.tab.id, node.path);
 }
@@ -218,44 +276,69 @@ onMounted(() => {
       <!-- Item 4: the reconnect gate used to replace this whole ViewChrome (header, toolbar and
            all) — every other view but the grid's DataView.vue did the same, the one inconsistency
            this fixes. ViewChrome itself (and so its toolbar slots above) now always renders; only
-           the body — the part that actually needs a live connection — swaps for the gate. -->
+           the body — the part that actually needs a live connection — swaps for the gate.
+           P63 §2.1: "the body" is now the whole split (list pane + splitter + detail pane), never
+           just the list — a disconnected connection means neither side has anything live to show. -->
       <ReconnectGate
         v-if="needsReconnect"
         container-testid="browse-reconnect"
         button-testid="browse-reconnect-load"
         @reconnect="onReconnectAndLoad"
       />
-      <div v-else class="p-panel body-panel">
-        <div v-if="!rt || (loading && rt.nodes.length === 0)" class="empty muted">Loading…</div>
-        <div v-else-if="rt.nodes.length === 0" class="empty muted" data-testid="browse-empty">
-          No items
-        </div>
-        <div
-          v-else-if="filteredNodes.length === 0"
-          class="empty muted"
-          data-testid="browse-empty"
-        >
-          No matching items
-        </div>
-        <VirtualList v-else :items="filteredNodes" :row-height="rowHeight" class="body">
-          <template #default="{ item }">
-            <div
-              class="browse-row"
-              data-testid="browse-row"
-              :data-path="item.path"
-              :data-kind="item.kind"
-              :class="{ selected: rt?.selected === item.path }"
-              :style="{ height: `${rowHeight}px` }"
-              @click="onRowClick(item)"
-              @dblclick="onRowOpen(item)"
-              @contextmenu.prevent="onRowContextMenu($event, item)"
-            >
-              <span class="icon-box muted"><CodiconIcon :name="nodeIcon(item.kind)" :size="13" /></span>
-              <span class="row-name">{{ item.name }}</span>
-              <span v-if="item.detail" class="row-detail muted">{{ item.detail }}</span>
+      <div v-else class="browse-body">
+        <div class="list-pane" :style="{ width: `${listWidth}px` }">
+          <div class="p-panel body-panel">
+            <div v-if="!rt || (loading && rt.nodes.length === 0)" class="empty muted">Loading…</div>
+            <div v-else-if="rt.nodes.length === 0" class="empty muted" data-testid="browse-empty">
+              No items
             </div>
-          </template>
-        </VirtualList>
+            <div
+              v-else-if="filteredNodes.length === 0"
+              class="empty muted"
+              data-testid="browse-empty"
+            >
+              No matching items
+            </div>
+            <VirtualList v-else :items="filteredNodes" :row-height="rowHeight" class="body">
+              <template #default="{ item }">
+                <div
+                  class="browse-row"
+                  data-testid="browse-row"
+                  :data-path="item.path"
+                  :data-kind="item.kind"
+                  :class="{ selected: rt?.selected === item.path }"
+                  :style="{ height: `${rowHeight}px` }"
+                  @click="onRowClick(item)"
+                  @dblclick="onRowOpen(item)"
+                  @contextmenu.prevent="onRowContextMenu($event, item)"
+                >
+                  <span class="icon-box muted"><CodiconIcon :name="nodeIcon(item.kind)" :size="13" /></span>
+                  <span class="row-name">{{ item.name }}</span>
+                  <span v-if="item.detail" class="row-detail muted">{{ item.detail }}</span>
+                </div>
+              </template>
+            </VirtualList>
+          </div>
+        </div>
+
+        <PanelSplitter
+          orientation="col"
+          :size="listWidth"
+          :min="220"
+          :max="900"
+          divider
+          @resize="onResizeList"
+        />
+
+        <div class="detail-pane" data-testid="browse-detail-pane">
+          <KeyValuePane v-if="previewable" :view-key="previewKey" />
+          <EmptyState
+            v-else
+            :icon="emptyPreviewIcon"
+            :label="emptyPreviewLabel"
+            data-testid="browse-preview-empty"
+          />
+        </div>
       </div>
     </ViewChrome>
   </div>
@@ -305,6 +388,30 @@ onMounted(() => {
 
 .crumb-sep {
   color: var(--kira-fg-subtle);
+}
+
+/* P63 §2.1: list pane (left) | splitter | detail pane (right) — the vertical split. */
+.browse-body {
+  display: flex;
+  flex-direction: row;
+  flex: 1;
+  min-height: 0;
+}
+
+.list-pane {
+  flex-shrink: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.detail-pane {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .body-panel {

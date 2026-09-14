@@ -3,6 +3,16 @@
 // preview pane (BrowseView.vue). One component renders both, addressed through host.ts's seam
 // (`viewKey`) rather than a real KeyValueTabRecord everywhere.
 //
+// Lives under views/shared/keyvalue/, not views/keyvalue/ (a deviation from the plan's own §6
+// wording, taken during implementation, not guessed at in advance): BrowseView.vue is a different
+// "kind" than KeyValueView.vue, and biome.json's own SPEC §11 rule ("views/<kind>/* must not
+// import another views/<kind>/* — use views/shared/ instead") rejects a views/browse/* file
+// importing views/keyvalue/* directly, checked and confirmed by running `bun run lint` against
+// the straightforward layout — not assumed. This component's own transitive dependencies
+// (state.ts/mutations.ts/page.ts/search.ts/menu.ts/host.ts) moved alongside it for the same
+// reason: KeyValueView.vue (still in views/keyvalue/) reaching into views/shared/keyvalue/ for all
+// of them is exactly what the rule's own "use views/shared/ instead" is for.
+//
 // `tab` (optional) is the one thing that genuinely differs between the two hosts: present, this
 // component wraps itself in its own ViewChrome — the icon/path/name/refresh/stop/reconnect chrome
 // every other main-tab view opens with (KeyValueView.vue's own precedent, byte-identical to
@@ -27,39 +37,39 @@ import {
   OBJECT_BODY_PREVIEW_BYTES,
 } from '@shared/protocol/page';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
-import { formatBytes } from '../../format';
-import { registerCommand } from '../../shortcuts/commands';
+import { formatBytes } from '../../../format';
+import { registerCommand } from '../../../shortcuts/commands';
 import {
   clearSelectedCellFor,
   publishSelectedCell,
   type SelectedCell,
-} from '../../state/cellSelection';
-import { confirmDialog } from '../../state/confirmDialog';
-import { connectionRecord, connectionsState } from '../../state/connections';
-import { openContextMenu } from '../../state/contextMenu';
-import { deleteObject, downloadObject, openUploadDialog } from '../../state/objectStore';
-import { settingsState } from '../../state/settings';
-import { browseInvalidate } from '../../state/viewCommands';
-import CodiconIcon from '../../theme/CodiconIcon.vue';
-import { connColorVar } from '../../theme/connColor';
-import AppButton from '../../theme/primitives/AppButton.vue';
-import EmptyState from '../../theme/primitives/EmptyState.vue';
-import IconButton from '../../theme/primitives/IconButton.vue';
-import MessageStrip from '../../theme/primitives/MessageStrip.vue';
-import PopoverPanel from '../../theme/primitives/PopoverPanel.vue';
-import ReconnectGate from '../../theme/primitives/ReconnectGate.vue';
-import SegmentedControl from '../../theme/primitives/SegmentedControl.vue';
-import TextField from '../../theme/primitives/TextField.vue';
-import ViewChrome from '../../theme/primitives/ViewChrome.vue';
-import VirtualList from '../../theme/primitives/VirtualList.vue';
-import CellEditorDock from '../shared/celleditor/CellEditorDock.vue';
-import { datasetNumber } from '../shared/eventCoords';
-import SearchToolbar from '../shared/page/SearchToolbar.vue';
-import { createMatchIndex } from '../shared/page/search';
-import { setSearchFiltering } from '../shared/page/searchFilter';
-import { pageSizeOptions } from '../shared/page/sizes';
-import { setVisibleRows } from '../shared/page/visibleRows';
-import { refreshOrReconnect, useConnectionGate } from '../shared/useConnectionGate';
+} from '../../../state/cellSelection';
+import { confirmDialog } from '../../../state/confirmDialog';
+import { connectionRecord, connectionsState } from '../../../state/connections';
+import { openContextMenu } from '../../../state/contextMenu';
+import { deleteObject, downloadObject, openUploadDialog } from '../../../state/objectStore';
+import { settingsState } from '../../../state/settings';
+import { browseInvalidate } from '../../../state/viewCommands';
+import CodiconIcon from '../../../theme/CodiconIcon.vue';
+import { connColorVar } from '../../../theme/connColor';
+import AppButton from '../../../theme/primitives/AppButton.vue';
+import EmptyState from '../../../theme/primitives/EmptyState.vue';
+import IconButton from '../../../theme/primitives/IconButton.vue';
+import MessageStrip from '../../../theme/primitives/MessageStrip.vue';
+import PopoverPanel from '../../../theme/primitives/PopoverPanel.vue';
+import ReconnectGate from '../../../theme/primitives/ReconnectGate.vue';
+import SegmentedControl from '../../../theme/primitives/SegmentedControl.vue';
+import TextField from '../../../theme/primitives/TextField.vue';
+import ViewChrome from '../../../theme/primitives/ViewChrome.vue';
+import VirtualList from '../../../theme/primitives/VirtualList.vue';
+import CellEditorDock from '../celleditor/CellEditorDock.vue';
+import { datasetNumber } from '../eventCoords';
+import SearchToolbar from '../page/SearchToolbar.vue';
+import { createMatchIndex } from '../page/search';
+import { setSearchFiltering } from '../page/searchFilter';
+import { pageSizeOptions } from '../page/sizes';
+import { setVisibleRows } from '../page/visibleRows';
+import { refreshOrReconnect, useConnectionGate } from '../useConnectionGate';
 import { keyValueHost } from './host';
 import { rowMenu } from './menu';
 import { addKey, deleteKey, saveValueEdit } from './mutations';

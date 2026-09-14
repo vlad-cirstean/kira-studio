@@ -1,9 +1,9 @@
 import type { PageSize } from '@shared/domain/tabs';
-import { findKeyValueTab, patchKeyValueTabState } from '../../state/tabs';
+import { findKeyValueTab, patchKeyValueTabState } from '../../../state/tabs';
 
-// P63 §2.2: the seam that lets views/keyvalue/ (state.ts, mutations.ts, KeyValuePane.vue) address
-// either a real KeyValue tab or the browse split's preview pane through one shape, instead of
-// reaching into state/tabs.ts's tab-only findKeyValueTab/patchKeyValueTabState directly. A real
+// P63 §2.2: the seam that lets views/shared/keyvalue/ (state.ts, mutations.ts, KeyValuePane.vue)
+// address either a real KeyValue tab or the browse split's preview pane through one shape, instead
+// of reaching into state/tabs.ts's tab-only findKeyValueTab/patchKeyValueTabState directly. A real
 // tab never registers explicitly — resolveTabHost below is keyValueHost's own fallback, so every
 // existing KeyValue tab keeps behaving exactly as it did before this seam existed. Only a
 // non-tab viewKey (BrowseView.vue's own `${tab.id}::preview`) registers one explicitly, backed by

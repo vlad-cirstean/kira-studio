@@ -1,9 +1,9 @@
 import type { PageSize } from '@shared/domain/tabs';
 import type { PageCursor } from '@shared/protocol/data-ops';
-import { data } from '../../bridge/data';
-import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
-import { registerTabReload } from '../../state/viewCommands';
-import { applyLoadFailure, beginOp, createRuntimeStore, stopOp } from '../shared/viewOp';
+import { data } from '../../../bridge/data';
+import { registerTabRuntimeCleanup } from '../../../state/tabRuntime';
+import { registerTabReload } from '../../../state/viewCommands';
+import { applyLoadFailure, beginOp, createRuntimeStore, stopOp } from '../viewOp';
 import { keyValueHost } from './host';
 import { getPage, setPage } from './page';
 

@@ -18,7 +18,7 @@ const { runCount: runDocumentCount, runtime: documentRuntime } = await import(
   '../../frontend/src/views/documents/state'
 );
 const { runCount: runKeyValueCount, runtime: keyValueRuntime } = await import(
-  '../../frontend/src/views/keyvalue/state'
+  '../../frontend/src/views/shared/keyvalue/state'
 );
 const { runCount: runStreamCount, runtime: streamRuntime } = await import(
   '../../frontend/src/views/stream/state'
