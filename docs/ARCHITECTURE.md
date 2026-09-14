@@ -2917,10 +2917,13 @@ turn a byte stream back into frames is simply absent.
 `readOnlyMethods` in `gitstream.go` is a default-deny **allowlist**, not a denylist: a method the
 allowlist has not named is refused with `E_READ_ONLY` before the shared router handler is ever
 called, so a future contract addition is refused by construction rather than admitted by omission —
-`gitstream_test.go` pins both directions (every allowlisted method reaches the handler; every write
-method from `git-ui`'s real surface — `op.run`'s 24 kinds, the five `remote.run` kinds, `undo.run`,
-`worktree.prepare`, `stack.restack`, `settings.setGitPath`, the `review.*` write methods — is
-refused **and never reaches the handler**, asserted with a spy). Layer two is a handful of explicit
+`gitstream_test.go` pins both directions (every allowlisted method reaches the handler; every method
+that genuinely writes the repository from `git-ui`'s real surface — `op.run`'s 24 kinds, the five
+`remote.run` kinds, `undo.run`, `worktree.prepare`, `stack.restack`, `settings.setGitPath` — is
+refused **and never reaches the handler**, asserted with a spy; a separate table covers methods
+refused for the different reason that Go has no handler for them at all). C11 (below) admits the
+nine `review.*` methods to this same allowlist — they read like writes but never touch the
+repository. Layer two is a handful of explicit
 throwing entries in `repo/git/hostHandlers.ts` (`credential.provide`, `editor.resolveConflict`,
 `settings.setGitPath`, `worktree.openWindow`) for methods that never reach Go under VS Code either.
 Layer three is the UI simply not offering a write affordance at all (`capabilities.write: false`
@@ -2960,6 +2963,89 @@ no `--vscode-*` defined at all it would render VS Code Dark inside a light Kira 
 the host's own theme. `theme/vscode-bridge.css` defines those names from Kira's own `--kira-*`
 tokens (several of which are themselves already a direct port of the identical VS Code workbench
 colour id), additive and with zero changes to `git-ui`'s own token layer.
+
+### Code review, ported natively (C11)
+
+C10's native graph left the review sidebar out — `review.open` had no native surface and
+`review.*` was absent from `gitstream.go`'s allowlist by design. C11 builds both, porting
+`git-ui`'s existing `components/review/*`/`state/review*.ts` unchanged (the SPEC requirement) and
+adding the one surface with no portable half: comment threads and review-marking gutter icons over
+Monaco, which have no VS Code equivalent to reuse (that host paints them with its own Comments API
+and native diff editor, neither of which exists here).
+
+**Where the panel lives: a third left-panel segment, not a tab.** `RepoPanel.vue`'s Files/Search
+switch (C7) gains Review as a third `SegmentedControl` option. The alternative — a `repo-review`
+tab kind mirroring `repo-graph` — was rejected because the review workflow is *pick a file → read
+its diff → mark it → pick the next*: splitting the file list into one tab and the diff into another
+costs two tab switches per file and hides the diff being reviewed. The extension's own package.json
+already drew this line the same way (the graph in a `panel` container, the review view in an
+`activitybar` one) — the graph is content, the review view is a navigator driving diffs in the
+editor, and `ReviewView.vue` is built for sidebar width with no viewState it needs to persist
+per-mount (it takes `NullViewStateStore`), corroborating the call. Since `RepoPanel.vue` is one
+persistent component instance across every repo workspace (`WorkbenchShell.vue`'s
+`<component :is="activeModePanel" />` carries no per-repo key, unlike a tab), the mount is tracked
+per `repoId` (`reviewActivatedRepoIds`, `RepoPanel.vue`) rather than with one boolean: switching
+Files ⟷ Review ⟷ Search within the *same* repo never tears the mount down (`v-show`), while
+switching to a *different* repo workspace remounts it — safely, because that remount is exactly
+what the session-resume path below exists for.
+
+**`review.*` is allowlisted because its writes never touch the repository.** Traced through the
+real handler chain (`internal/gitrpc/handlers.go` → `internal/gitsession/{comments,incremental}.go`
+→ `internal/gitreview`), every one of the nine methods (`review.resolveBase`, `review.files`,
+`review.fileDiff`, `review.mark`, `review.comment.add/list/remove/clear/export`) is a thin decode-
+validate-delegate whose only persistence is `review.db` (above) — `internal/gitreview` contains no
+`exec.Command`, no `os.WriteFile` and no git invocation of any kind; its only writes are
+`INSERT`/`UPDATE`/`DELETE` against `review_session`/`review_file`/`review_range`/`review_comment`.
+The git work these handlers do perform is read-only porcelain (`cat-file`, `merge-base
+--is-ancestor`, `diff`) — no `update-index`, no `write-tree`, no `commit-tree`, no ref update,
+anywhere in the path. This is the same shape as `repoSettings.set`'s own pre-existing exception: a
+name that says "write" whose writes land in Kira's own storage, never the user's repository.
+`review.session.save`/`.load` are a separate case — not a Go method at all (`handlers.go` has no
+case for either; they resume the extension's own `context.workspaceState`, replaced here by
+`repo/git/reviewSession.ts`'s use of the pinned graph tab's own state, below) — so they stay
+refused by the allowlist as defence in depth, and `gitstream_test.go`'s own table split reflects
+the two different reasons: `TestReadOnlyRequest_WriteMethodsAreRefused` for a genuine write,
+`TestReadOnlyRequest_HostAnsweredMethodsAreRefused` for a method Go simply has no handler for.
+
+**Anchoring needs no client-side line mapping.** A review diff's right-hand document is always
+`<branchTip>:<path>`, and `LineRange`/`ReviewComment.range` are already defined in exactly those
+coordinates on the wire — cross-revision drift (a comment surviving a rebase, say) is resolved
+entirely server-side (`gitsession/comments.go`'s `anchorOne`: blob-oid equality, then a real `git
+diff` projection, then a stale/removed label as a last resort). `views/repo/reviewDecorations.ts`
+places a decoration at `comment.range.start` and renders `anchor` as a hover label — no mapping of
+its own, which is also what keeps the panel and the editor from ever disagreeing about a position.
+
+**The Monaco layer.** `views/repo/reviewDecorations.ts` attaches to a review diff's modified pane:
+a whole-line background for reviewed ranges, a glyph-margin icon per hunk (actionable/reviewed,
+`GlyphMarginLane.Right`) and per comment (`GlyphMarginLane.Left`, alongside a hover-tracked "+" for
+adding one) — two lanes so a hunk and a comment on the same line never collide. Two things came
+from reading the pinned `monaco-editor@0.56.0` source rather than assuming: `glyphMargin` must be
+set explicitly (the `.d.ts` prose and the registered option default disagree), and the review
+variant disables `hideUnchangedRegions` (0.56.0 has no public API to expand one specific collapsed
+region, so a comment anchored inside one would otherwise be invisible) — C6/C10's plain diff tab
+keeps it enabled, byte-identical. A comment thread opens as an `IViewZone` hosting `ReviewThread.vue`
+(mounted with `createApp`, unmounted with the zone); `kira.review.addComment`/`markReviewed`/
+`markUnreviewed` give the same gestures a context-menu entry and keybinding. `repo/git/transport.ts`
+fans a mutation's success out to every open review surface (`onReviewRepaint`) regardless of which
+half of the UI made the call, since the panel and the editor share one `Transport` per repo
+workspace.
+
+**Session resume goes through the pinned graph tab, not a new mechanism.** The review panel is not
+a tab and so has no persisted state of its own; `repoGraphTabStateSchema` gains a second opaque
+field, `reviewSession`, alongside the existing `viewState` (C10) — `repo/git/reviewSession.ts`
+reads/writes it exactly the way `viewStateStore.ts` does, and the value stays opaque to this host,
+the same discipline `viewState` already follows (`git-ui`'s own `state/review.ts` defines and
+validates the shape). `review.open`'s own native answer switches the panel segment, ensures it is
+visible, and pushes a `review.target` event over `transport.ts`'s new local event bus (§8.1's own
+`review.target`/`ui.action`, composed host-side since Go never emits either) — plus a small pending-
+target map for the one race the local bus can't cover on its own: a first-ever activation mounts
+`RepoReviewView.vue` *after* `review.open` already fired, so the event would otherwise be dropped
+before anything is listening for it.
+
+**What "AI-review feedback" actually is.** SPEC's own phrase names no real integration — there is no
+AI service, API call or AI-authored data anywhere in this repo. The feature is exactly what v1.3
+built: a user writes plain-text comments on lines, they render as gutter icons and threads, and
+`review.comment.export` formats them for pasting into an AI conversation by hand.
 
 ## Renderer security surface
 
