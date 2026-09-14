@@ -190,7 +190,8 @@ Each repository's token is stored hashed under `KIRA_HOME`, so a later run reuse
 note instead of a command; an already-registered client keeps working. To mint a fresh one, delete
 that repository's `mcp-repo-map-*-token.json` and restart the server.
 
-**Log what dogfooding finds** in `docs/v1.5/mcp-repo-map-issues.md`. Trivial (config, registration,
+**Log what dogfooding finds** in the current chapter's own `mcp-repo-map-issues.md` (`docs/v1.6/`
+today). Trivial (config, registration,
 wiring): fix inline, log one line. Non-trivial (wrong result, missing tool, crash): log a full entry
 and fix nothing in that phase — the next phase waits for a dedicated fix pass to close it.
 
