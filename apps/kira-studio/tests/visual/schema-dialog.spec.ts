@@ -74,5 +74,11 @@ test('Schema (DDL) editor at rest (P6)', async ({ relaunch }) => {
   const dialog = page.locator('[data-testid="schema-dialog"]');
   await expect(dialog).toBeVisible();
 
+  // Monaco auto-focuses on mount, so the empty editor shows a blinking caret — its blink is
+  // JS-driven (not a CSS animation Playwright's own animation-disabling catches), so two captures
+  // of the same "at rest" state can legitimately land in different blink phases. Blur onto the
+  // dialog's own static help text first: "at rest" doesn't require focus, and an unfocused editor
+  // renders no caret at all, which is what makes this deterministic.
+  await dialog.locator('.help').first().click();
   await expect(page).toHaveScreenshot('schema-dialog.png');
 });
