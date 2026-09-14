@@ -3424,3 +3424,58 @@ place. `CLAUDE.md` states the process rule; this is the list itself.
   while the embedded repo-map MCP server serves the same repository parses every saved file twice).
   Harmless (each connection's own hold is independently refcounted and released) and bounded, but
   real.
+
+- **`internal/repomap/http.go`'s HTTP server sets no `ReadTimeout`/`WriteTimeout`/`IdleTimeout`**
+  (`bindHTTP`'s `&http.Server{Handler: mux}`). Loopback-only binding narrows who can reach it, but a
+  slow or hung client on that port can still tie up a connection indefinitely — Go's own zero-value
+  defaults for all three.
+- **Native `review.session.save`/`.load` (`repo/git/reviewSession.ts`, backed by the pinned
+  repo-graph tab's own persisted state) has no expiry**, unlike the VS Code extension's own
+  `ReviewSessionStore`, which discards a saved session past `REVIEW_SESSION_TTL_MS` (14 days,
+  `proxyHandlers.ts`, matching `gitreview`'s own `IdleTTL` reaper window). A native resume point can
+  be arbitrarily old and still gets silently reapplied on the next cold mount — no parity fix
+  attempted here, since the pinned tab's state is small (a branch/mode pointer, not the review data
+  itself) and already goes away when the tab or workspace closes.
+
+C14's architecture/security review:
+- **`internal/codeindex/watch.go`'s `Watcher.Close()` doesn't cancel an in-flight full `Sync`** —
+  can block for the sync's whole duration (minutes on a large repo after an fsnotify overflow/
+  rescan trigger), and this stall propagates into several teardown/shutdown code paths, one of which
+  holds `Registry.mu` while blocked.
+- **The initial-sync goroutine in `codeworkspace/session.go`/`repomap/server.go` isn't joined before
+  `Index.Close`/`store.Close()`** — a narrow race where a still-running parse worker can touch
+  already-closed state.
+- **A `Session.EnsureIndex` vs `Close` race can leak a watcher goroutine** in a narrow timing
+  window.
+- **Watcher writes arriving during the initial sync's one large transaction can be dropped** after a
+  5-second busy-timeout on a very large repo (unmeasured, theoretical).
+- **`internal/bridge/gitstream.go`'s `readOnlyMethods` allowlist comment doesn't note that
+  `branch.resolvePr`/`commit.resolvePr` have a `review.db` purge side effect** (deleting a branch's
+  review session when GitHub reports its PR closed/merged) — a one-line comment clarity gap, not a
+  behavior bug.
+
+C14's correctness review:
+- **`review.open`'s pending-target map entry (`hostHandlers.ts`'s `pendingReviewTargetByCodeRepoId`)
+  is never cleared when consumed via the live-event path** (`review.target`, for an already-mounted
+  review view) — only the cold-mount path (`takePendingReviewTarget`) ever drains it. Checked
+  against C14-4's own `RepoPanel.vue` `:key="repoId"` fix: NOT made moot by it — if anything, that
+  fix makes a later cold remount of the same repo (switch away, switch back) more reachable than
+  before, which is exactly when a leftover stale entry could now be replayed. Also never cleared on
+  workspace close. A stale target can theoretically be re-applied on a later cold remount.
+- **`loadComments` in `reviewDecorations.ts` swallows a failed `review.comment.list` request into an
+  empty list with no retry banner**, unlike `loadDiff`'s own C13-9 treatment — a transient failure
+  looks identical to "all comments were deleted."
+
+C14's performance review:
+- **`repo/state/fileTree.ts`'s tree-filter computed has per-row reactive dependency tracking**
+  costing 3-3.5x at the 200,000-file cap (C13-6's `markRaw` covered the tree structure but not the
+  `status`/`expanded` reactive lookups inside the filter).
+- **One comment mutation with N open review diff tabs on the same branch triggers N+1 redundant
+  `review.comment.list` re-anchoring passes** (a server-side cost) — C13-12 fixed the diff-reload
+  fan-out (C14-2 fixed a regression in that same split) but not the comment-reload fan-out.
+- **No debounce on the quick-open palette's keystroke handler** (the project tree got a 150ms
+  debounce in C13-6, quick-open did not) — low severity, 20-35ms per keystroke measured even at the
+  file-count cap.
+- **A restored session on app boot starts every restored repo's index sync with no cross-repo
+  concurrency limiter** — likely fine in practice (incremental after first run) but unmeasured at
+  scale.
