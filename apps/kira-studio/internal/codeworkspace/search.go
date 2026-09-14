@@ -119,6 +119,43 @@ func (m regexMatcher) find(line []byte, from int) (start, end int, ok bool) {
 	return from + loc[0], from + loc[1], true
 }
 
+// matchesOnLine returns up to max non-overlapping matches in line, in order.
+//
+// regexMatcher goes through a single re.FindAllIndex(line, max) call over the WHOLE line rather
+// than scanFile's old find-and-reslice loop (repeated m.find(line[from:], 0) calls): Go's regexp
+// evaluates ^, \A, and \b relative to the start of whatever byte slice it is handed, so re-slicing
+// the line at each match's end presented a false "start of line"/"word boundary" to every
+// subsequent match attempt on that line — `^import` against "importimport" wrongly reported two
+// matches instead of one, and `bar|\bfoo` against "barfoo foo" wrongly reported a mid-word match at
+// a `\b` alternative. FindAllIndex evaluates every match against the real, whole-line context.
+//
+// literalMatcher keeps its existing bytes.Index-based find-and-reslice fast path completely
+// unchanged (bytes.Index has no anchor/boundary state to get wrong) — this loops through it here
+// instead of inline in scanFile, purely to give both matcher kinds one call site.
+func matchesOnLine(m matcher, line []byte, max int) [][]int {
+	if max <= 0 {
+		return nil
+	}
+	if rm, ok := m.(regexMatcher); ok {
+		return rm.re.FindAllIndex(line, max)
+	}
+	locs := make([][]int, 0, 4)
+	from := 0
+	for len(locs) < max {
+		start, end, ok := m.find(line, from)
+		if !ok {
+			break
+		}
+		locs = append(locs, []int{start, end})
+		if end == start {
+			from = start + 1 // zero-width advance — never loop forever on one line.
+		} else {
+			from = end
+		}
+	}
+	return locs
+}
+
 // newMatcher builds §3.3's matcher: a plain literal query goes through bytes.Index; whole-word or
 // case-insensitive or an explicit regex request goes through RE2, built by wrapping the (quoted or
 // raw) pattern in \b(?:…)\b for whole-word and prefixing (?i) for case-insensitivity. A bad regex
@@ -311,13 +348,9 @@ func scanFile(root, relPath string, m matcher, buf []byte) (matches []SearchMatc
 		// stripped before both matching and preview so a CRLF file never matches (or shows) it.
 		raw := bytes.TrimSuffix(scanner.Bytes(), []byte("\r"))
 
-		from := 0
 		lineChecked := false
-		for len(matches) < MaxMatchesPerFile {
-			start, end, ok := m.find(raw, from)
-			if !ok {
-				break
-			}
+		for _, loc := range matchesOnLine(m, raw, MaxMatchesPerFile-len(matches)) {
+			start, end := loc[0], loc[1]
 			if !lineChecked {
 				// Gate 4: checked once per matching line (never per line scanned, never per match
 				// on the same line) — a NUL here means the file's body isn't the ASCII gate 3's
@@ -340,12 +373,6 @@ func scanFile(root, relPath string, m matcher, buf []byte) (matches []SearchMatc
 				TruncatedStart:    truncStart,
 				TruncatedEnd:      truncEnd,
 			})
-
-			if end == start {
-				from = start + 1 // zero-width advance (a*, ^, \b) — never loop forever on one line.
-			} else {
-				from = end
-			}
 		}
 		if len(matches) >= MaxMatchesPerFile {
 			truncated = true

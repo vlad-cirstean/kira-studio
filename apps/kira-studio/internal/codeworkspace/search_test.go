@@ -227,3 +227,44 @@ func TestScanFile_RegexAnchorsPerLine(t *testing.T) {
 		t.Fatalf("matched lines = [%d,%d], want [1,3]", matches[0].Line, matches[1].Line)
 	}
 }
+
+// TestScanFile_RegexAnchorsWithinLine is C12-2: ^ must anchor to the real start of the line even
+// past an earlier match on that same line, not to wherever the previous match happened to end. The
+// old find-and-reslice loop re-sliced the line at each match's end and re-ran the regex against
+// that slice, which made "^" look true again at the slice's own start — wrongly reporting two
+// matches of "^import" against "importimport" instead of one.
+func TestScanFile_RegexAnchorsWithinLine(t *testing.T) {
+	matches, _, skipped := scanContent(t, []byte("importimport\n"),
+		SearchRequest{Query: "^import", Regex: true, CaseSensitive: true})
+	if skipped {
+		t.Fatalf("skipped, want a real scan")
+	}
+	if len(matches) != 1 {
+		t.Fatalf("got %d matches, want exactly 1: %+v", len(matches), matches)
+	}
+	if matches[0].Column != 1 || matches[0].EndColumn != 7 {
+		t.Fatalf("match = [%d,%d], want [1,7] (only the line's real start)", matches[0].Column, matches[0].EndColumn)
+	}
+}
+
+// TestScanFile_WordBoundaryWithinLine is C12-2's other half: the same re-slicing bug made a `\b`
+// alternative in the pattern falsely match mid-word, since the reslice presented a false "start of
+// line" as a false word boundary too. "bar|\bfoo" against "barfoo foo" must match only the real
+// "bar" at the start and the real, boundary-preceded "foo" at the end — never the "foo" embedded
+// inside "barfoo".
+func TestScanFile_WordBoundaryWithinLine(t *testing.T) {
+	matches, _, skipped := scanContent(t, []byte("barfoo foo\n"),
+		SearchRequest{Query: `bar|\bfoo`, Regex: true, CaseSensitive: true})
+	if skipped {
+		t.Fatalf("skipped, want a real scan")
+	}
+	if len(matches) != 2 {
+		t.Fatalf("got %d matches, want exactly 2: %+v", len(matches), matches)
+	}
+	if matches[0].Column != 1 || matches[0].EndColumn != 4 {
+		t.Fatalf("match[0] = [%d,%d], want [1,4] (\"bar\" at the start)", matches[0].Column, matches[0].EndColumn)
+	}
+	if matches[1].Column != 8 || matches[1].EndColumn != 11 {
+		t.Fatalf("match[1] = [%d,%d], want [8,11] (\"foo\" at the end, not the mid-word one)", matches[1].Column, matches[1].EndColumn)
+	}
+}
