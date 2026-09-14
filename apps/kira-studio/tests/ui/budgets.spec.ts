@@ -464,11 +464,20 @@ async function measureKeyToPopup(page: Page, key: string): Promise<number> {
     const w = window as unknown as { __kiraKeyProbe?: Promise<number>; __kiraKeyStart?: number };
     w.__kiraKeyProbe = new Promise<number>((resolve) => {
       const observer = new MutationObserver(() => {
-        if (!document.querySelector('.cm-tooltip-autocomplete')) return;
+        // Monaco's own suggest widget is a persistent DOM node reused across shows — `visible`
+        // toggles as a class, not the node's own presence — so this watches class mutations
+        // (P60b) alongside childList, unlike CodeMirror's own tooltip, which was added/removed
+        // wholesale and only ever needed the latter.
+        if (!document.querySelector('.suggest-widget.visible')) return;
         observer.disconnect();
         resolve(performance.now() - (w.__kiraKeyStart as number));
       });
-      observer.observe(document.body, { childList: true, subtree: true });
+      observer.observe(document.body, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ['class'],
+      });
       w.__kiraKeyStart = performance.now();
     });
   });
@@ -952,12 +961,18 @@ test('interaction budgets — scroll, cell→editor, cached tab switch, cached t
   expect(percentile(expandDeltas, 95)).toBeLessThanOrEqual(1000);
 
   // --- 5. console keystroke -> completion popup visible, p50 <= 50ms (P18 addendum D26) -------
-  await openRowMenu(page, DB_PATH);
+  // APP_PATH (a schema), not DB_PATH (the bare database) — P60b: with no DDL document, a console's
+  // own completion needs a schema-or-deeper container with cached relations (D4/D5); a raw
+  // database node has none (Postgres columns are schema-scoped) and correctly offers no popup at
+  // all (§12.1's own "all three empty: no popup" line) — under CodeMirror this was masked by
+  // `@codemirror/lang-sql`'s own built-in keyword-only fallback, outside this app's completion
+  // architecture. APP_PATH's children are already warmed by step 4 above.
+  await openRowMenu(page, APP_PATH);
   await page.click('[data-testid="menu-item-open-console"]');
   const consoleView = page.locator('[data-testid="console-view"]');
   await expect(consoleView).toBeVisible();
-  const tooltip = page.locator('.cm-tooltip-autocomplete');
-  await consoleView.locator('.cm-content').click();
+  const tooltip = page.locator('.suggest-widget.visible');
+  await consoleView.locator('.view-lines').click();
   await page.keyboard.type('SEL');
   await expect(tooltip).toBeVisible({ timeout: 5_000 });
 
