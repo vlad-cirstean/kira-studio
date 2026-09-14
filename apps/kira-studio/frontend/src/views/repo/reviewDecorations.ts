@@ -21,7 +21,14 @@ import {
   normalizeRanges,
   selectionToRange,
 } from '@kira/git-core';
-import type { DiffHunk, FileDiffBody, LineRange, ReviewComment, Transport } from '@kira/git-ipc';
+import type {
+  DiffHunk,
+  FileDiffBody,
+  LineRange,
+  ResultOf,
+  ReviewComment,
+  Transport,
+} from '@kira/git-ipc';
 import { type App, createApp } from 'vue';
 import { onReviewRepaint } from '../../repo/git/transport';
 import type { MonacoModule } from './monaco';
@@ -62,6 +69,12 @@ export interface ReviewDecorationsHandle {
 // early-returned, permanently disabling the whole review layer for that branch until the app
 // restarted. Evicting the entry on failure lets the next call (this editor's own retry, or
 // another editor's load()) try fresh instead of replaying the same rejection from cache forever.
+//
+// C13-9: a REJECTION is now propagated (not swallowed into a `null` value) so load() can tell it
+// apart from a resolved `base: null` — the legitimate, permanent "no base branch configured for
+// this repository" answer. C12-7's collapse of both into the same cached `null` routed a
+// permanent condition to the same "Couldn't load, click Retry" banner built for transient
+// failures — Retry could never succeed there, since re-resolving just returns the same `null`.
 const baseMemo = new Map<string, Promise<string | null>>();
 
 function resolveBase(transport: Transport, repoId: string, branch: string): Promise<string | null> {
@@ -74,7 +87,7 @@ function resolveBase(transport: Transport, repoId: string, branch: string): Prom
       .catch((err) => {
         baseMemo.delete(key);
         console.error('reviewDecorations: review.resolveBase failed', err);
-        return null;
+        throw err;
       });
     baseMemo.set(key, cached);
   }
@@ -156,21 +169,35 @@ export function attachReviewDecorations(
     errorZoneId = null;
   }
 
-  function showLoadError(): void {
+  // C13-9: one banner zone, two distinct uses — a genuine failure (network/server error, worth a
+  // Retry that can plausibly succeed) and a legitimate, permanent condition (no base branch
+  // configured for this repository, where Retry re-resolving the same answer would only mislead).
+  function showBannerZone(message: string, retryable: boolean): void {
     closeErrorZone();
     const domNode = document.createElement('div');
     domNode.className = 'kira-review-load-error';
-    const message = document.createElement('span');
-    message.textContent = "Couldn't load review data for this file.";
-    const retry = document.createElement('button');
-    retry.type = 'button';
-    retry.className = 'kira-review-load-error-retry';
-    retry.textContent = 'Retry';
-    retry.addEventListener('click', () => void load());
-    domNode.append(message, retry);
+    const span = document.createElement('span');
+    span.textContent = message;
+    domNode.append(span);
+    if (retryable) {
+      const retry = document.createElement('button');
+      retry.type = 'button';
+      retry.className = 'kira-review-load-error-retry';
+      retry.textContent = 'Retry';
+      retry.addEventListener('click', () => void load());
+      domNode.append(retry);
+    }
     modifiedEditor.changeViewZones((accessor) => {
       errorZoneId = accessor.addZone({ afterLineNumber: 0, heightInPx: 28, domNode });
     });
+  }
+
+  function showLoadError(): void {
+    showBannerZone("Couldn't load review data for this file.", true);
+  }
+
+  function showNoBaseConfigured(): void {
+    showBannerZone('No base branch configured for this repository.', false);
   }
 
   function paintAddGlyph(): void {
@@ -262,33 +289,56 @@ export function attachReviewDecorations(
   // same "never silently switch modes under an open tab" rule.
   async function load(): Promise<void> {
     const seq = ++loadSeq;
-    const base = await resolveBase(deps.transport, deps.gitRepoId, deps.review.branch);
-    if (disposed || seq !== loadSeq) return;
-    if (base === null) {
-      // C12-7: visibly surface this instead of a silent empty diff — resolveBase no longer
-      // caches the failure (see baseMemo's own comment), so the banner's own Retry button (or
+    let base: string | null;
+    try {
+      base = await resolveBase(deps.transport, deps.gitRepoId, deps.review.branch);
+    } catch (err) {
+      if (disposed || seq !== loadSeq) return;
+      // C13-9: a genuine rejection (a transient index.lock conflict, most likely) — resolveBase
+      // no longer caches this (see baseMemo's own comment), so the banner's own Retry button (or
       // another load() call, e.g. the repaint fan-out) can genuinely succeed on a later attempt.
+      console.error('reviewDecorations: review.resolveBase failed', err);
       showLoadError();
       return;
     }
-    closeErrorZone();
-    let result = await deps.transport.request('review.fileDiff', {
-      repoId: deps.gitRepoId,
-      branch: deps.review.branch,
-      base,
-      path: deps.path,
-      mode: 'sinceReview',
-    });
     if (disposed || seq !== loadSeq) return;
-    if (result.reviewedAtSha !== null && result.reviewedAtSha !== deps.leftRev) {
+    if (base === null) {
+      // C13-9: a SUCCESSFUL resolution to "no base configured" — permanent, not transient, so
+      // Retry (which would just re-resolve the same legitimate null) is actively misleading here.
+      // Distinct message, no Retry button.
+      showNoBaseConfigured();
+      return;
+    }
+    closeErrorZone();
+
+    let result: ResultOf<'review.fileDiff'>;
+    try {
       result = await deps.transport.request('review.fileDiff', {
         repoId: deps.gitRepoId,
         branch: deps.review.branch,
         base,
         path: deps.path,
-        mode: 'range',
+        mode: 'sinceReview',
       });
       if (disposed || seq !== loadSeq) return;
+      if (result.reviewedAtSha !== null && result.reviewedAtSha !== deps.leftRev) {
+        result = await deps.transport.request('review.fileDiff', {
+          repoId: deps.gitRepoId,
+          branch: deps.review.branch,
+          base,
+          path: deps.path,
+          mode: 'range',
+        });
+        if (disposed || seq !== loadSeq) return;
+      }
+    } catch (err) {
+      if (disposed || seq !== loadSeq) return;
+      // C13-9: previously uncaught — a rejection here left a silently blank review layer and an
+      // unhandled promise rejection in the console, entirely bypassing C12-7's retry-banner
+      // mechanism (unlike the review.comment.list call below, which already had a `.catch`).
+      console.error('reviewDecorations: review.fileDiff failed', err);
+      showLoadError();
+      return;
     }
     hunks = result.body.kind === 'text' ? result.body.hunks : [];
     bodyKind = result.body.kind;
