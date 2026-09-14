@@ -75,7 +75,7 @@ test('per-occurrence freshness: two {{$guid}}s in one send differ, and a second 
   await page.fill('[data-testid="http-url"]', 'https://api.example.com/echo');
   await page.click('[data-testid="http-request-pane-body"]');
   await page.click('[data-testid="http-body-mode-raw"]');
-  const editor = page.locator('[data-testid="http-request-pane"]').locator('.cm-content');
+  const editor = page.locator('[data-testid="http-request-pane"]').locator('.view-lines');
   await editor.click();
   await page.keyboard.insertText('{{$guid}} {{$guid}}');
 

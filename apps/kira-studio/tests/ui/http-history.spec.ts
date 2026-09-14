@@ -1,6 +1,7 @@
 import type { Locator, Page } from '@playwright/test';
 import type { ControlSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
+import { diffEditorText, editorText } from './support/editorText';
 import { IPC } from './support/ipcChannels';
 
 // P8 §6.3: three tests, each seeding historyList (and historyGet where needed) rather than
@@ -141,9 +142,9 @@ test('Http history — browse a request’s past responses', async ({ relaunch }
   await expect(status).toHaveAttribute('data-kira-tip', /no resource at this URL/);
   await expect(page.locator('[data-testid="http-status-hint"]')).toHaveCount(0);
 
-  const bodyEditor = page.locator('[data-testid="http-response-pane"] .response-body .cm-content');
-  await expect(bodyEditor).toBeVisible();
-  expect(await bodyEditor.innerText()).toBe('{\n  "error": "not found"\n}');
+  const bodyEditor = page.locator('[data-testid="http-response-pane"] .response-body');
+  await expect(bodyEditor.locator('[data-testid="monaco-host"]')).toBeVisible();
+  expect(await editorText(bodyEditor)).toBe('{\n  "error": "not found"\n}');
 
   await page.click('[data-testid="http-history-back"]');
   await expect(band).toHaveCount(0);
@@ -269,7 +270,7 @@ test('Http history — restore, and the storage notices', async ({ relaunch }) =
   await rows.nth(1).click();
   await expect(page.locator('[data-testid="http-history-binary-note"]')).toBeVisible();
   await expect(
-    page.locator('[data-testid="http-response-pane"] .response-body .cm-content'),
+    page.locator('[data-testid="http-response-pane"] .response-body [data-testid="monaco-host"]'),
   ).toHaveCount(0);
 
   // Back to History, then the storage-truncated entry: both notices render together (F9).
@@ -397,13 +398,10 @@ test('Http history — compare two responses', async ({ relaunch }) => {
   // Both bodies are pretty-printed (indented) before diffing, since both are JSON — the seeded
   // bodies above are minified, so an unindented render here is a failing assertion (D12).
   const mergeHost = page.locator('[data-testid="http-diff-merge"]');
-  await expect(mergeHost.locator('.cm-merge-a .cm-content')).toBeVisible({ timeout: 10_000 });
-  expect(await mergeHost.locator('.cm-merge-a .cm-content').innerText()).toBe(
-    '{\n  "id": 1,\n  "name": "Ada"\n}',
-  );
-  expect(await mergeHost.locator('.cm-merge-b .cm-content').innerText()).toBe(
-    '{\n  "id": 1,\n  "name": "Ada",\n  "active": true\n}',
-  );
+  await expect(mergeHost.locator('.monaco-diff-editor')).toBeVisible({ timeout: 10_000 });
+  const diffText = await diffEditorText(mergeHost);
+  expect(diffText.original).toBe('{\n  "id": 1,\n  "name": "Ada"\n}');
+  expect(diffText.modified).toBe('{\n  "id": 1,\n  "name": "Ada",\n  "active": true\n}');
 });
 
 // ---- P18 D1: the live-update bug, and its exact repro ----
@@ -672,15 +670,15 @@ test('Http history — a stored entry’s Raw view shows what was sent (P18 D8)'
   await expect(page.locator('[data-testid="http-raw-reconstructed"]')).toBeVisible();
   await expect(page.locator('[data-testid="http-history-request-truncated"]')).toBeVisible();
 
-  const requestEditor = page.locator('[data-testid="http-wire-request-editor"] .cm-content');
-  await expect(requestEditor).toBeVisible();
-  const requestText = await requestEditor.innerText();
+  const requestEditor = page.locator('[data-testid="http-wire-request-editor"]');
+  await expect(requestEditor.locator('[data-testid="monaco-host"]')).toBeVisible();
+  const requestText = await editorText(requestEditor);
   expect(requestText).toContain('POST https://api.example.com/orders HTTP/1.1');
   expect(requestText).toContain('Authorization: Bearer {{token}}');
   expect(requestText).toContain('{}');
 
-  const responseEditor = page.locator('[data-testid="http-wire-response-editor"] .cm-content');
-  const responseText = await responseEditor.innerText();
+  const responseEditor = page.locator('[data-testid="http-wire-response-editor"]');
+  const responseText = await editorText(responseEditor);
   expect(responseText).toContain('201 Created');
   expect(responseText).toContain('{"id":1}');
 });

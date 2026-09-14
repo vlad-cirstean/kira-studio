@@ -3,6 +3,7 @@ import { DATA_OP } from '@shared/protocol/data-ops';
 import type { ColumnDescriptor } from '@shared/protocol/page';
 import type { ControlSnapshot, LogicalPage, PortSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
+import { editorText } from './support/editorText';
 import { IPC } from './support/ipcChannels';
 import {
   DB_PATH as MONGO_DB_PATH,
@@ -770,8 +771,9 @@ test('Query console — two duplicate-named columns render and select their own 
   await expect(secondDupCell).toHaveText('222');
 
   // --- selection: clicking each publishes its own distinct value to the cell-editor dock -----
-  const cellEditorText = () =>
-    page.locator('[data-testid="cell-editor-panel"] .cm-content').innerText();
+  // CellEditorView's own host, migrated to MonacoHost (P60a) — the console's own query editor
+  // right above it stays CodeMirror (P60b) and is untouched by this helper.
+  const cellEditorText = () => editorText(page.locator('[data-testid="cell-editor-panel"]'));
 
   await firstDupCell.click();
   await expect(page.locator('[data-testid="cell-editor"]')).toBeVisible();

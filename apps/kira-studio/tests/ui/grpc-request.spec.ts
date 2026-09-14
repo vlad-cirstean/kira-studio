@@ -2,6 +2,7 @@ import type { Locator, Page } from '@playwright/test';
 import type { ControlSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
 import { acceptConfirm } from './support/dialogs';
+import { editorText } from './support/editorText';
 import { IPC } from './support/ipcChannels';
 import { CHANNEL_TO_FQN, emitWailsEvent } from './support/mockRuntime';
 
@@ -238,9 +239,9 @@ test('gRPC request — choosing a method seeds the Message editor with its templ
 
   // Selecting a method switches the request pane to Message (SchemaBrowser's own selectMethod)…
   await expect(page.locator('[data-testid="grpc-request-pane"]')).toContainText('pageSize');
-  const editor = page.locator('[data-testid="grpc-message-editor"] .cm-content');
-  await expect(editor).toBeVisible();
-  expect(await editor.innerText()).toBe('{\n  "pageSize": 0\n}');
+  const editor = page.locator('[data-testid="grpc-message-editor"]');
+  await expect(editor.locator('[data-testid="monaco-host"]')).toBeVisible();
+  expect(await editorText(editor)).toBe('{\n  "pageSize": 0\n}');
   // …and the toolbar's method chip and select both reflect the chosen method.
   await expect(page.locator('[data-testid="grpc-method-chip"]')).toContainText(
     'demo.Items/ListItems',
@@ -289,8 +290,8 @@ test('gRPC request — a unary call renders its status, message and metadata', a
 
   // A unary call's single message is auto-expanded (D14).
   await expect(page.locator('[data-testid="grpc-message-entry"]')).toHaveCount(1);
-  const messageBody = page.locator('[data-testid="grpc-message-entry"] .cm-content');
-  expect(await messageBody.innerText()).toContain('Hello, Ada!');
+  const messageBody = page.locator('[data-testid="grpc-message-entry"]');
+  expect(await editorText(messageBody)).toContain('Hello, Ada!');
 
   // Both header and trailer groups render (F6).
   await page.click('[data-testid="grpc-response-pane-metadata"]');
@@ -308,7 +309,7 @@ test('gRPC request — a unary call renders its status, message and metadata', a
   await expect(findBar).toBeVisible();
   await page.fill('[data-testid="http-find-input"]', 'Ada');
   await expect(page.locator('[data-testid="http-find-count"]')).toContainText('1 of 1');
-  await expect(messageBody.locator('.cm-kira-find-match-current')).toHaveCount(1);
+  await expect(messageBody.locator('.kira-ed-find-match-current')).toHaveCount(1);
 
   await page.keyboard.press('Escape');
   await expect(findBar).toHaveCount(0);
@@ -679,7 +680,7 @@ test('gRPC request — a request in a collection opens the grpc-request tab kind
   if (!targetBoxBefore || !saveBoxBefore) throw new Error('target/save button has no box');
   expect(targetBoxBefore.x + targetBoxBefore.width).toBeLessThanOrEqual(saveBoxBefore.x);
 
-  const messageEditor = page.locator('[data-testid="grpc-message-editor"] .cm-content');
+  const messageEditor = page.locator('[data-testid="grpc-message-editor"] .view-lines');
   await messageEditor.click();
   await page.keyboard.press('End');
   await page.keyboard.type('0');
@@ -703,8 +704,8 @@ test('gRPC request — Beautify formats the request message', async ({ relaunch 
 
   await page.click('[data-testid="grpc-beautify"]');
   const BEAUTIFIED = '{\n  "a": 1,\n  "b": "two"\n}';
-  const editor = page.locator('[data-testid="grpc-message-editor"] .cm-content');
-  expect(await editor.innerText()).toBe(BEAUTIFIED);
+  const editor = page.locator('[data-testid="grpc-message-editor"]');
+  expect(await editorText(editor)).toBe(BEAUTIFIED);
 });
 
 // P13 D12: clearGrpcHistory has been implemented and bound since P11/P12, reachable from

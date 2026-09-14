@@ -293,13 +293,15 @@ function rightViewport(page: import('@playwright/test').Page) {
 
 // Counts only SlickGrid's OWN per-instance <style> element (F8's own createCssRules/
 // removeCssRules), not every <style> tag in <head> — opening a data tab also mounts
-// FilterToolbar.vue's CodeMirror-based WHERE/ORDER BY fields, and CodeMirror 6's own StyleModule
-// injects one *global*, content-hash-deduplicated <style> the first time any editor uses it, by
-// design never removed (confirmed empirically: its rules are `.ͼ1.cm-focused {...}`, nothing to do
-// with this grid). SlickGrid's own rules are always scoped `.<uid> .slick-header-column { ... }`
-// (createCssRules, dist/esm/index.mjs read this session) — a real signature the CodeMirror one can
-// never share. Module-scope (not nested in the exit-criteria test below) so P22 iter2-pacing's own
-// teardown test (T4) can reuse it without restating it.
+// FilterToolbar.vue's WHERE/ORDER BY fields (Monaco span-painted overlays, P60a), and Monaco's own
+// theme service injects a *global*, never-removed `<style>` (the `.mtk*`/`.monaco-colors` token
+// colour rules `colorize()` and every editor instance share) the first time any editor surface in
+// the session paints anything. SlickGrid's own rules are always scoped
+// `.<uid> .slick-header-column { ... }` (createCssRules, dist/esm/index.mjs read this session) — a
+// real signature no editor's own injected stylesheet can ever share, filtered for below rather than
+// excluded by name (so it stays correct regardless of which editor engine is behind the toolbar's
+// own fields at any given time). Module-scope (not nested in the exit-criteria test below) so P22
+// iter2-pacing's own teardown test (T4) can reuse it without restating it.
 async function slickStyleTagCount(page: import('@playwright/test').Page): Promise<number> {
   return page.evaluate(
     () =>

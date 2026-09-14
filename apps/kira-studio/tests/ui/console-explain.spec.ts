@@ -4,6 +4,7 @@ import { DATA_OP } from '@shared/protocol/data-ops';
 import type { ColumnDescriptor } from '@shared/protocol/page';
 import type { ControlSnapshot, LogicalPage, PortSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
+import { editorText } from './support/editorText';
 import { IPC } from './support/ipcChannels';
 import {
   APP_PATH,
@@ -343,7 +344,9 @@ test('Query console — Raw is one toggle away', async ({ relaunch }) => {
   await expect(raw).toBeVisible();
   // `plan.raw` is the server's own text verbatim, never re-formatted (D16) — F11's JSON is
   // minified, so this checks the raw text exactly as it would come back over the wire.
-  await expect(raw.locator('.cm-content')).toContainText('"Node Type":"Seq Scan"');
+  // ExplainResultView's own host is MonacoHost (P60a); the console's query editor above it stays
+  // CodeMirror (P60b) and is untouched by `typeInto`.
+  expect(await editorText(raw)).toContain('"Node Type":"Seq Scan"');
 });
 
 test('Query console — not explainable (an UPDATE) disables the button', async ({ relaunch }) => {

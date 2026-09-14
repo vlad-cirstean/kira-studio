@@ -1,6 +1,7 @@
 import type { Locator, Page } from '@playwright/test';
 import type { ControlSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
+import { editorText } from './support/editorText';
 import { IPC } from './support/ipcChannels';
 
 // P10 §6.4: the real built bundle, real WebKit, both wire planes mocked — the waterfall (D12),
@@ -316,8 +317,8 @@ test('Http timeline — a stored history entry has a real timeline, and Raw reco
   // snapshot's stage-1 request/response fields rather than the timeline's own separate data.
   await page.click('[data-testid="http-response-pane-raw"]');
   await expect(page.locator('[data-testid="http-raw-reconstructed"]')).toBeVisible();
-  const requestEditor = page.locator('[data-testid="http-wire-request-editor"] .cm-content');
-  expect(await requestEditor.innerText()).toContain('GET https://api.example.com/orders HTTP/1.1');
+  const requestEditor = page.locator('[data-testid="http-wire-request-editor"]');
+  expect(await editorText(requestEditor)).toContain('GET https://api.example.com/orders HTTP/1.1');
 });
 
 test('Http timeline — a failed send carries the timeline it got as far as', async ({

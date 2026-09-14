@@ -1,6 +1,7 @@
 import type { Locator, Page } from '@playwright/test';
 import type { ControlSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
+import { editorText } from './support/editorText';
 import { IPC } from './support/ipcChannels';
 
 // P2 §6.2: three tests, one httpSend snapshot each (F16 — a channel with more than one snapshot
@@ -95,9 +96,9 @@ test('Http request — send, view a JSON response, and Params-table <-> URL sync
   expect(control.log().some((e) => e.channel === IPC.tabsSave)).toBe(true);
 
   // Pretty (default) shows the indented form; Raw shows the compact bytes exactly as sent.
-  const bodyEditor = page.locator('[data-testid="http-response-pane"] .response-body .cm-content');
-  await expect(bodyEditor).toBeVisible();
-  expect(await bodyEditor.innerText()).toBe('{\n  "id": 1,\n  "name": "Ada"\n}');
+  const bodyEditor = page.locator('[data-testid="http-response-pane"] .response-body');
+  await expect(bodyEditor.locator('[data-testid="monaco-host"]')).toBeVisible();
+  expect(await editorText(bodyEditor)).toBe('{\n  "id": 1,\n  "name": "Ada"\n}');
 
   await page.click('[data-testid="http-response-view-raw"]');
   expect(await bodyEditor.innerText()).toBe(RESPONSE_BODY);
@@ -245,8 +246,9 @@ test('Http request — restore from saved state, no reconnect gate', async ({ re
   );
   // requestPane restored to 'body' — the JSON body shows immediately, byte-identical to what was
   // saved (no beautify is ever applied on restore).
-  const bodyEditor = page.locator('[data-testid="http-request-pane"] .cm-content');
-  expect(await bodyEditor.innerText()).toBe('{"name":"gizmo"}');
+  const bodyEditor = page.locator('[data-testid="http-request-pane"]');
+  await expect(bodyEditor.locator('[data-testid="monaco-host"]')).toBeVisible();
+  expect(await editorText(bodyEditor)).toBe('{"name":"gizmo"}');
 
   await page.click('[data-testid="http-request-pane-headers"]');
   const headerRow = page.locator('[data-testid="http-header-row"]').first();

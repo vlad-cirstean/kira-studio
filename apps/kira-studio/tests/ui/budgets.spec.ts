@@ -890,7 +890,7 @@ test('interaction budgets — scroll, cell→editor, cached tab switch, cached t
     const delta = await measureClickToDom(page, {
       click: cellSelector,
       observe: '[data-testid="cell-editor-panel"]',
-      until: { selector: '[data-testid="cell-editor-panel"] .cm-content', text },
+      until: { selector: '[data-testid="cell-editor-panel"] .view-lines', text },
     });
     cellDeltas.push(delta);
   }

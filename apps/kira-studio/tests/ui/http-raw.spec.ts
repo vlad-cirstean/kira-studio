@@ -1,6 +1,7 @@
 import type { Locator, Page } from '@playwright/test';
 import type { ControlSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
+import { editorText } from './support/editorText';
 import { IPC } from './support/ipcChannels';
 
 // P9 §6.4: the real built bundle, real WebKit, both wire planes mocked — the inspector (D12/D14,
@@ -62,15 +63,16 @@ test('Http raw — the inspector, exact fidelity', async ({ relaunch }) => {
   const fidelity = page.locator('[data-testid="http-wire-fidelity"]');
   await expect(fidelity).toContainText('exact bytes this app wrote to the connection');
 
-  const requestEditor = page.locator('[data-testid="http-wire-request-editor"] .cm-content');
-  await expect(requestEditor).toBeVisible();
-  expect(await requestEditor.innerText()).toContain('GET /v2/orders?a=1 HTTP/1.1');
-  expect(await requestEditor.innerText()).toContain('Host: api.example.com');
+  const requestEditor = page.locator('[data-testid="http-wire-request-editor"]');
+  await expect(requestEditor.locator('[data-testid="monaco-host"]')).toBeVisible();
+  const requestEditorText = await editorText(requestEditor);
+  expect(requestEditorText).toContain('GET /v2/orders?a=1 HTTP/1.1');
+  expect(requestEditorText).toContain('Host: api.example.com');
 
   // D5: the response section concatenates the seeded responseHead with the response's own body —
   // a seeded body that does not appear is a failing assertion, not a cosmetic one.
-  const responseEditor = page.locator('[data-testid="http-wire-response-editor"] .cm-content');
-  const responseText = await responseEditor.innerText();
+  const responseEditor = page.locator('[data-testid="http-wire-response-editor"]');
+  const responseText = await editorText(responseEditor);
   expect(responseText).toContain('HTTP/1.1 200 OK');
   expect(responseText).toContain(RESPONSE_BODY);
   expect(responseText.indexOf('HTTP/1.1 200 OK')).toBeLessThan(responseText.indexOf(RESPONSE_BODY));
@@ -105,8 +107,8 @@ test('Http raw — the inspector, http2 and masked', async ({ relaunch }) => {
   const maskingNote = page.locator('[data-testid="http-wire-masking-note"]');
   await expect(maskingNote).toContainText('2 secret values are shown as');
 
-  const requestEditor = page.locator('[data-testid="http-wire-request-editor"] .cm-content');
-  const requestText = await requestEditor.innerText();
+  const requestEditor = page.locator('[data-testid="http-wire-request-editor"]');
+  const requestText = await editorText(requestEditor);
   expect(requestText).toContain('{{token}}');
   // The masked form is what the mocked bridge sent — this pane never has a real secret value to
   // begin with, so the negative assertion is that no plaintext-shaped credential ever appears.
@@ -180,17 +182,17 @@ test('Http raw — a stored entry reconstructs its raw view (P18 D8)', async ({ 
 
   await page.click('[data-testid="http-response-pane-raw"]');
   await expect(page.locator('[data-testid="http-raw-reconstructed"]')).toBeVisible();
-  const requestEditor = page.locator('[data-testid="http-wire-request-editor"] .cm-content');
-  expect(await requestEditor.innerText()).toContain('GET https://api.example.com/orders HTTP/1.1');
-  const responseEditor = page.locator('[data-testid="http-wire-response-editor"] .cm-content');
-  expect(await responseEditor.innerText()).toContain('{"id":1,"name":"Ada"}');
+  const requestEditor = page.locator('[data-testid="http-wire-request-editor"]');
+  expect(await editorText(requestEditor)).toContain('GET https://api.example.com/orders HTTP/1.1');
+  const responseEditor = page.locator('[data-testid="http-wire-response-editor"]');
+  expect(await editorText(responseEditor)).toContain('{"id":1,"name":"Ada"}');
 
   // Switching back to Body still renders the stored entry — the fourth segment did not disturb
   // P8's source swap.
   await page.click('[data-testid="http-response-pane-body"]');
-  const bodyEditor = page.locator('[data-testid="http-response-pane"] .response-body .cm-content');
-  await expect(bodyEditor).toBeVisible();
-  expect(await bodyEditor.innerText()).toBe('{\n  "id": 1,\n  "name": "Ada"\n}');
+  const bodyEditor = page.locator('[data-testid="http-response-pane"] .response-body');
+  await expect(bodyEditor.locator('[data-testid="monaco-host"]')).toBeVisible();
+  expect(await editorText(bodyEditor)).toBe('{\n  "id": 1,\n  "name": "Ada"\n}');
 });
 
 test('Http raw — the editor', async ({ relaunch }) => {
@@ -203,13 +205,15 @@ test('Http raw — the editor', async ({ relaunch }) => {
   const dialog = page.locator('[data-testid="edit-raw-dialog"]');
   await expect(dialog).toBeVisible();
 
-  const editor = dialog.locator('[data-testid="edit-raw-textarea"] .cm-content');
-  await expect(editor).toBeVisible();
+  const editorHost = dialog.locator('[data-testid="edit-raw-textarea"]');
+  await expect(editorHost.locator('[data-testid="monaco-host"]')).toBeVisible();
   // D9: pre-substitution — {{base_url}} appears literally in the generated buffer.
-  expect(await editor.innerText()).toContain('{{base_url}}');
-  expect(await editor.innerText()).toContain('GET https://{{base_url}}/v2/orders HTTP/1.1');
+  const initialText = await editorText(editorHost);
+  expect(initialText).toContain('{{base_url}}');
+  expect(initialText).toContain('GET https://{{base_url}}/v2/orders HTTP/1.1');
 
   // Replace the whole buffer: a changed method and one added header.
+  const editor = editorHost.locator('.view-lines');
   await editor.click();
   await page.keyboard.press('ControlOrMeta+a');
   await page.keyboard.insertText('PUT https://{{base_url}}/v2/orders HTTP/1.1\nX-Added: yes\n\n');

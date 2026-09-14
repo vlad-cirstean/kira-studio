@@ -1,6 +1,7 @@
 import type { Locator, Page } from '@playwright/test';
 import type { ControlSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
+import { editorText } from './support/editorText';
 import { IPC } from './support/ipcChannels';
 
 // Four tests, one httpSend snapshot each (the same one-snapshot-per-test constraint
@@ -22,21 +23,21 @@ async function openBodyPane(page: Page): Promise<void> {
 }
 
 // insertText (a single CDP Input.insertText, not per-character key events) rather than
-// keyboard.type — @codemirror/lang-xml's autoCloseTags input handler only fires for a
-// single-character '>' or '/' keystroke, so per-character typing of an already-closed XML
-// document (this file writes its own closing tags) fights the auto-inserted ones. A one-shot
-// insert never triggers it, landing exactly the literal text.
+// keyboard.type — Monaco's own `locator.fill()` never works on it at all (P60a §9.1), and a
+// one-shot insert also sidesteps any per-keystroke input handler (auto-closing brackets/quotes)
+// that could otherwise fight an already-closed XML document (this file writes its own closing
+// tags) the way CodeMirror's autoCloseTags once did.
 async function typeInto(view: Locator, page: Page, text: string): Promise<void> {
-  await view.locator('.cm-content').click();
+  await view.locator('.view-lines').click();
   await page.keyboard.insertText(text);
 }
 
-/** True when some descendant of `view` (a CodeMirror host) has a token painted in the given
- *  resolved color — the lezer-highlighted-token check, since kiraHighlightStyle (editor/theme.ts)
- *  generates opaque per-rule class names rather than semantic ones, the same technique
- *  row-coloring.spec.ts already uses against a known --kira-syntax-* value. */
+/** True when some descendant of `view` (a MonacoHost) has a token painted in the given resolved
+ *  color — the syntax-highlighted-token check, since `monacoTheme.ts`'s token rules generate
+ *  opaque `mtk*` class names rather than semantic ones, the same technique row-coloring.spec.ts
+ *  already uses against a known --kira-syntax-* value. */
 async function hasTokenColor(view: Locator, rgb: string): Promise<boolean> {
-  return view.locator('.cm-content').evaluate((el, wantRgb) => {
+  return view.locator('.view-lines').evaluate((el, wantRgb) => {
     for (const node of el.querySelectorAll('*')) {
       if (getComputedStyle(node).color === wantRgb) return true;
     }
@@ -77,7 +78,7 @@ test('Http request body — code · XML round-trips through the builder and the 
 
   await page.click('[data-testid="http-body-beautify"]');
   const BEAUTIFIED = '<root>\n  <a>\n    1\n  </a>\n  <b>\n    two\n  </b>\n</root>';
-  expect(await editor.locator('.cm-content').innerText()).toBe(BEAUTIFIED);
+  expect(await editorText(editor)).toBe(BEAUTIFIED);
 
   await expect(page.locator('[data-testid="http-body-content-type-caption"]')).toHaveText(
     'Content-Type: application/xml (auto)',
@@ -241,8 +242,8 @@ test('Http request body — a pre-P3 tab restores into code · JSON', async ({ r
   // (bodyMode: 'code', codeLanguage: 'json'), new presentation.
   await expect(page.locator('[data-testid="http-body-mode-json"]')).toHaveClass(/on/);
   await expect(page.locator('[data-testid="http-body-code-language"]')).toHaveCount(0);
-  const editor = page.locator('[data-testid="http-request-pane"] .cm-content');
-  expect(await editor.innerText()).toBe('{"name":"gizmo"}');
+  const editor = page.locator('[data-testid="http-request-pane"]');
+  expect(await editorText(editor)).toBe('{"name":"gizmo"}');
 
   // The legacy alias's other half: switching to a mode absent from the pre-P3 record renders an
   // empty table rather than throwing.

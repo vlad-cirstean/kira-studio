@@ -17,6 +17,7 @@ import {
   WIDE_TABLE_COLUMNS,
   WIDE_TABLE_ROWS,
 } from './support/cellEditorCaptures';
+import { editorText as sharedEditorText } from './support/editorText';
 import { gridCell, gridCellSelector, gridScroller } from './support/grid';
 import { IPC } from './support/ipcChannels';
 import type { ControlLogEntry } from './support/mockRuntime';
@@ -233,8 +234,11 @@ async function scrollColumnIntoView(
   await page.waitForTimeout(150);
 }
 
+// P60a §9.1/OQ-3: Monaco virtualises lines — this reads the encoded pane's own MonacoHost through
+// its `data-kira-editor-text` debug-hook attribute (`sharedEditorText`, tests/ui/support/editorText.ts)
+// rather than `.view-lines`' rendered-subset-only DOM text.
 async function editorText(page: import('@playwright/test').Page): Promise<string> {
-  return page.locator('[data-testid="cell-editor-panel"] .cm-content').innerText();
+  return sharedEditorText(page.locator('[data-testid="cell-editor-panel"]'));
 }
 
 async function kindOf(page: import('@playwright/test').Page, row: number): Promise<string> {
@@ -398,7 +402,7 @@ test('cell editor — autodetect, beautify, override, NULL/empty/truncated, read
   await page.fill('[data-testid="http-find-input"]', 'tags');
   await expect(panel.locator('[data-testid="http-find-count"]')).toContainText('1 of 1');
   await expect(
-    page.locator('[data-testid="cell-editor-encoded"] .cm-kira-find-match-current'),
+    page.locator('[data-testid="cell-editor-encoded"] .kira-ed-find-match-current'),
   ).toHaveCount(1);
   await page.keyboard.press('Escape');
   await expect(findBar).toHaveCount(0);
@@ -558,7 +562,7 @@ test('cell editor — autodetect, beautify, override, NULL/empty/truncated, read
   // JSON as plain text) makes a hand-typed syntax error surface as "broken JSON, invalid at
   // offset N" rather than silently falling back to a format with no opinion on validity.
   await selectFormat(page, 'json');
-  await page.locator('[data-testid="cell-editor-panel"] .cm-content').click();
+  await page.locator('[data-testid="cell-editor-panel"] .view-lines').click();
   await page.keyboard.press(SELECT_ALL);
   await page.keyboard.type('{"a":}');
   await expect(invalidChip).toBeVisible();
@@ -675,7 +679,7 @@ test('cell editor — autodetect, beautify, override, NULL/empty/truncated, read
   await expect(page.locator('[data-testid="cell-editor-save"]')).toHaveCount(0);
 
   const beforeType = await editorText(page);
-  await page.locator('[data-testid="cell-editor-panel"] .cm-content').click();
+  await page.locator('[data-testid="cell-editor-panel"] .view-lines').click();
   await page.keyboard.press(SELECT_ALL);
   await page.keyboard.type('"edited from the cell editor"');
   expect(await editorText(page)).not.toBe(beforeType);
@@ -697,7 +701,7 @@ test('cell editor — autodetect, beautify, override, NULL/empty/truncated, read
   // to undo it. resetBuffer() now un-stages via SelectedCell.onRevert regardless of that race, so
   // the pending edit must be gone, not just the on-screen text.
   const originalSample = await cellText(page, 0, 'sample');
-  await page.locator('[data-testid="cell-editor-panel"] .cm-content').click();
+  await page.locator('[data-testid="cell-editor-panel"] .view-lines').click();
   await page.keyboard.press(SELECT_ALL);
   await page.keyboard.type('"edited then reverted"');
   await page.click('[data-testid="cell-editor-beautify-reset"]');
@@ -707,7 +711,7 @@ test('cell editor — autodetect, beautify, override, NULL/empty/truncated, read
   await expect(page.locator('[data-testid="toolbar-commit-changes"]')).toHaveCount(0);
 
   // Ctrl+Enter stages immediately, without needing to blur.
-  await page.locator('[data-testid="cell-editor-panel"] .cm-content').click();
+  await page.locator('[data-testid="cell-editor-panel"] .view-lines').click();
   await page.keyboard.press(SELECT_ALL);
   await page.keyboard.type('"edited via ctrl-enter"');
   await page.keyboard.press('Control+Enter');
@@ -822,7 +826,8 @@ test('cell editor — UUID generate, timestamp translate pane, hex/base64 decode
     page.locator('[data-testid="grid-header-cell"][data-column="sample"]'),
   ).toBeVisible();
   const panel = page.locator('[data-testid="cell-editor-panel"]');
-  const encoded = page.locator('[data-testid="cell-editor-encoded"] .cm-content');
+  const encoded = page.locator('[data-testid="cell-editor-encoded"]');
+  const encodedText = () => sharedEditorText(encoded);
 
   // Fixture row order (0001_seed.sql's own INSERT order, already relied on by the sibling test's
   // scenario 2 loop): 3=base64, 4=hex, 5=epochSeconds.
@@ -894,8 +899,8 @@ test('cell editor — UUID generate, timestamp translate pane, hex/base64 decode
   // D15: live and bidirectional — typing in the field updates the encoded box on every
   // keystroke, with no blur.
   await tsField.fill('2030-06-15 12:30:15');
-  await expect(encoded).toHaveText(/^\d+$/);
-  const pickedEpoch = Number(await encoded.innerText());
+  await expect.poll(encodedText).toMatch(/^\d+$/);
+  const pickedEpoch = Number(await encodedText());
   // Round-trips through the reading row (local/UTC), not just a raw number — proves the field
   // and describeTimestamp agree on the same moment.
   await expect(page.locator('[data-testid="cell-editor-timestamp-utc"]')).toContainText('2030');
@@ -921,7 +926,7 @@ test('cell editor — UUID generate, timestamp translate pane, hex/base64 decode
   await selectCell(page, 0, 'ts_a');
   await panel.waitFor();
   await expect(panel).toHaveAttribute('data-detected', 'iso8601');
-  const originalTs = await encoded.innerText();
+  const originalTs = await encodedText();
   expect(originalTs).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(\.\d+)?([+-]\d{2}(:\d{2})?|Z)$/);
   const tsFieldValue = await page
     .locator('[data-testid="cell-editor-timestamp-field"]')
@@ -932,7 +937,7 @@ test('cell editor — UUID generate, timestamp translate pane, hex/base64 decode
   await page
     .locator('[data-testid="cell-editor-timestamp-field"]')
     .fill(`${datePart} ${bumpedHour}:${mm}:${ss}`);
-  const afterHourEdit = await encoded.innerText();
+  const afterHourEdit = await encodedText();
   expect(afterHourEdit).not.toBe(originalTs);
   const suffixFrom = (s: string) => s.replace(/^\d{4}-\d{2}-\d{2}[ T]\d{2}/, '');
   expect(suffixFrom(afterHourEdit)).toBe(suffixFrom(originalTs)); // minute/sec/fraction/offset unchanged
@@ -940,7 +945,7 @@ test('cell editor — UUID generate, timestamp translate pane, hex/base64 decode
 
   // Editing the encoded box back updates the field, again with no blur (D15, the reverse
   // direction).
-  await encoded.click();
+  await encoded.locator('.view-lines').click();
   await page.keyboard.press(SELECT_ALL);
   await page.keyboard.type(originalTs);
   await expect(page.locator('[data-testid="cell-editor-timestamp-field"]')).toHaveValue(
@@ -951,10 +956,10 @@ test('cell editor — UUID generate, timestamp translate pane, hex/base64 decode
 
   // --- zone switch preserves the value (D19): toggling Local -> UTC -> Local must leave the
   // encoded buffer byte-identical. -----------------------------------------------------------
-  const docBeforeZoneToggle = await encoded.innerText();
+  const docBeforeZoneToggle = await encodedText();
   await page.click('[data-testid="cell-editor-timestamp-zone-utc"]');
   await page.click('[data-testid="cell-editor-timestamp-zone-local"]');
-  expect(await encoded.innerText()).toBe(docBeforeZoneToggle);
+  expect(await encodedText()).toBe(docBeforeZoneToggle);
 
   // --- the calendar is app-owned (D18), and exploring it stages nothing (D15) ---------------
   await page.click('[data-testid="cell-editor-timestamp-calendar"]');
@@ -1023,13 +1028,14 @@ test('cell editor — UUID generate, timestamp translate pane, hex/base64 decode
   await selectCell(page, 3, 'sample'); // base64 row: "Hello, World!"
   await panel.waitFor();
   await expect(panel).toHaveAttribute('data-detected', 'base64');
-  const decoded = page.locator('[data-testid="cell-editor-decoded"] .cm-content');
-  await expect(decoded).toContainText('Hello, World!');
+  const decoded = page.locator('[data-testid="cell-editor-decoded"]');
+  const decodedText = () => sharedEditorText(decoded);
+  await expect.poll(decodedText).toContain('Hello, World!');
 
-  await decoded.click();
+  await decoded.locator('.view-lines').click();
   await page.keyboard.press(SELECT_ALL);
   await page.keyboard.type('Goodbye!');
-  await expect(encoded).toHaveText(btoa('Goodbye!'));
+  await expect.poll(encodedText).toBe(btoa('Goodbye!'));
   // Blurring stages the re-encoded value, not the plaintext — the grid must show base64.
   await page.locator('[data-testid="cell-editor-format"]').focus();
   await expect(gridCell(page, 3, 'sample')).toHaveClass(/pending-edit/);
@@ -1038,13 +1044,13 @@ test('cell editor — UUID generate, timestamp translate pane, hex/base64 decode
 
   // The decoded pane's loop guard (D20/F7b): retyping *identical* plaintext is a no-op write —
   // it must not leave the guard permanently armed and silently swallow the next genuine edit.
-  await decoded.click();
+  await decoded.locator('.view-lines').click();
   await page.keyboard.press(SELECT_ALL);
   await page.keyboard.type('Hello, World!'); // re-encodes to the exact same base64 already there
-  await encoded.click();
+  await encoded.locator('.view-lines').click();
   await page.keyboard.press(SELECT_ALL);
   await page.keyboard.type(btoa('Second edit'));
-  await expect(decoded).toContainText('Second edit');
+  await expect.poll(decodedText).toContain('Second edit');
   await page.locator('[data-testid="cell-editor-format"]').focus();
   await page.click('[data-testid="toolbar-discard-changes"]');
 
@@ -1077,7 +1083,7 @@ test('cell editor — UUID generate, timestamp translate pane, hex/base64 decode
   await expect(page.locator('[data-testid="cell-editor-modified"]')).toHaveCount(0);
   await expect(panel).toHaveAttribute('data-dirty', 'false');
   const originalJson = await editorText(page);
-  await page.locator('[data-testid="cell-editor-panel"] .cm-content').click();
+  await page.locator('[data-testid="cell-editor-panel"] .view-lines').click();
   await page.keyboard.press(SELECT_ALL);
   await page.keyboard.type('"escape me"');
   await expect(page.locator('[data-testid="cell-editor-modified"]')).toBeVisible();
@@ -1087,7 +1093,7 @@ test('cell editor — UUID generate, timestamp translate pane, hex/base64 decode
     'data-kira-tip',
     /./,
   );
-  await page.locator('[data-testid="cell-editor-panel"] .cm-content').press('Escape');
+  await page.locator('[data-testid="cell-editor-panel"] .view-lines').press('Escape');
   await expect(page.locator('[data-testid="cell-editor-modified"]')).toHaveCount(0);
   await expect(panel).toHaveAttribute('data-dirty', 'false');
   expect(await editorText(page)).toBe(originalJson);
@@ -1100,12 +1106,13 @@ test('cell editor — UUID generate, timestamp translate pane, hex/base64 decode
   await selectCell(page, 3, 'big_text');
   await panel.waitFor();
   await expect(panel).toHaveAttribute('data-read-only-reason', 'value-truncated');
-  await expect(page.locator('[data-testid="cell-editor-encoded"] .cm-content')).toHaveAttribute(
-    'contenteditable',
-    'false',
-  );
+  // Monaco has no contenteditable surface at all (readOnly + domReadOnly instead sets `readonly`
+  // on its own hidden `textarea.inputarea`, P60a §3.2) — the read-only signal moved there.
+  await expect(
+    page.locator('[data-testid="cell-editor-encoded"] textarea.inputarea'),
+  ).toHaveAttribute('readonly', 'true');
   // The value stays fully readable — only writing it back is refused.
-  await expect(page.locator('[data-testid="cell-editor-encoded"] .cm-content')).not.toBeEmpty();
+  expect(await sharedEditorText(page.locator('[data-testid="cell-editor-encoded"]'))).not.toBe('');
   await gridCell(page, 3, 'big_text').dblclick();
   await expect(page.locator('[data-testid="grid-cell-input"]')).toHaveCount(0);
 

@@ -1,6 +1,7 @@
 import { DATA_OP } from '@shared/protocol/data-ops';
 import type { ControlSnapshot, PortSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
+import { editorText } from './support/editorText';
 import { cellText, gridCell, gutterCell } from './support/grid';
 import { IPC } from './support/ipcChannels';
 import {
@@ -265,8 +266,10 @@ test('mutations — edit, add, delete, preview, commit, discard, read-only guard
   await page.click('[data-testid="toolbar-preview-command"]');
   const previewPanel = page.locator('[data-testid="preview-command-panel"]');
   await expect(previewPanel).toBeVisible();
-  await expect(previewPanel.locator('.cm-content')).toBeVisible({ timeout: 10_000 });
-  const previewText = await previewPanel.locator('.cm-content').innerText();
+  await expect(previewPanel.locator('[data-testid="monaco-host"]')).toBeVisible({
+    timeout: 10_000,
+  });
+  const previewText = await editorText(previewPanel);
   expect(previewText).toContain('INSERT INTO');
   expect(previewText).toContain('composite_pk');
   await page.click('[data-testid="preview-command-close"]');

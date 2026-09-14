@@ -2,6 +2,7 @@ import type { Locator, Page } from '@playwright/test';
 import type { ControlSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
 import { acceptConfirm } from './support/dialogs';
+import { editorText } from './support/editorText';
 import { IPC } from './support/ipcChannels';
 
 // P13 §7: a small, Api-only spec (the SPEC's module-boundary rule — "a single test file covering
@@ -334,8 +335,8 @@ test('the URL field paints a resolved reference and an unknown one differently',
   await page.fill('[data-testid="http-url"]', 'https://{{base_url}}/v1?missing={{not_defined}}');
 
   const overlay = page.locator('.url-field .highlight-overlay');
-  await expect(overlay.locator('.cm-kira-var')).toHaveCount(1);
-  await expect(overlay.locator('.cm-kira-var-unknown')).toHaveCount(1);
+  await expect(overlay.locator('.kira-ed-var')).toHaveCount(1);
+  await expect(overlay.locator('.kira-ed-var-unknown')).toHaveCount(1);
 });
 
 test('hovering a resolved reference shows its value; hovering a secret never does', async ({
@@ -349,7 +350,7 @@ test('hovering a resolved reference shows its value; hovering a secret never doe
 
   await page.fill('[data-testid="http-url"]', 'https://{{base_url}}/{{api_key}}');
 
-  const resolvedSpan = page.locator('.url-field .cm-kira-var');
+  const resolvedSpan = page.locator('.url-field .kira-ed-var');
   await expect(resolvedSpan).toHaveCount(1);
   const resolvedBox = await resolvedSpan.boundingBox();
   if (!resolvedBox) throw new Error('resolved reference span has no box');
@@ -366,7 +367,7 @@ test('hovering a resolved reference shows its value; hovering a secret never doe
   await page.mouse.move(0, 0);
   await expect(hover).toHaveCount(0);
 
-  const secretSpan = page.locator('.url-field .cm-kira-var-secret');
+  const secretSpan = page.locator('.url-field .kira-ed-var-secret');
   await expect(secretSpan).toHaveCount(1);
   const secretBox = await secretSpan.boundingBox();
   if (!secretBox) throw new Error('secret reference span has no box');
@@ -402,28 +403,28 @@ test('the request body: a resolved {{variable}} has a colour of its own, hovers,
   ];
   const { window: page } = await relaunch({ control: CONTROL });
 
-  const body = page.locator('[data-testid="http-request-pane"] .cm-content');
-  await expect(body).toBeVisible();
+  const body = page.locator('[data-testid="http-request-pane"]');
+  await expect(body.locator('[data-testid="monaco-host"]')).toBeVisible();
 
-  const resolvedSpan = body.locator('.cm-kira-var');
-  const unknownSpan = body.locator('.cm-kira-var-unknown');
+  const resolvedSpan = body.locator('.kira-ed-var');
+  const unknownSpan = body.locator('.kira-ed-var-unknown');
   await expect(resolvedSpan).toHaveCount(1);
   await expect(unknownSpan).toHaveCount(1);
 
   // --kira-var-resolved (#4ec9b0) vs --kira-warn (#cca700) vs --kira-syntax-property (#9cdcfe,
   // what the "base"/"missing" JSON keys beside them are painted in) — three distinct colours, not
-  // the two the resolved reference used to share with its own JSON key. kiraHighlightStyle
-  // (editor/theme.ts) generates opaque per-rule class names rather than semantic ones (the same
-  // reason http-request-body.spec.ts's own hasTokenColor() walks every descendant by colour
-  // instead of a class selector), so the key's colour is found the same way here.
+  // the two the resolved reference used to share with its own JSON key. monacoTheme.ts's own token
+  // rules generate opaque `mtk*` class names rather than semantic ones (the same reason
+  // http-request-body.spec.ts's own hasTokenColor() walks every descendant by colour instead of a
+  // class selector), so the key's colour is found the same way here.
   const [resolvedColor, unknownColor, keyColor] = await Promise.all([
     resolvedSpan.evaluate((el) => getComputedStyle(el).color),
     unknownSpan.evaluate((el) => getComputedStyle(el).color),
     body.evaluate((el) => {
-      for (const node of el.querySelectorAll('span')) {
+      for (const node of el.querySelectorAll('.view-lines span')) {
         if (
-          node.classList.contains('cm-kira-var') ||
-          node.classList.contains('cm-kira-var-unknown')
+          node.classList.contains('kira-ed-var') ||
+          node.classList.contains('kira-ed-var-unknown')
         ) {
           continue;
         }
@@ -439,39 +440,42 @@ test('the request body: a resolved {{variable}} has a colour of its own, hovers,
   expect(keyColor).not.toBe('');
   expect(resolvedColor).not.toBe(keyColor);
 
-  // Hovering the resolved reference shows its value — through CodeMirror's own native hover
-  // tooltip (editor/hover.ts's buildHoverSource, `.cm-kira-hover`), not AutocompleteField's own
-  // overlay panel (`autocomplete-hover`): the body editor is a real editable host, wired directly
-  // via CodeMirrorHost's hoverSource prop, not the URL field's read-only-overlay-behind-an-input
-  // trick.
+  // Hovering the resolved reference shows its value — through Monaco's own native hover widget
+  // (MonacoHost.vue's own hover provider, `.monaco-hover`), not AutocompleteField's own overlay
+  // panel (`autocomplete-hover`): the body editor is a real editable host, wired directly via
+  // MonacoHost's hoverSource prop, not the URL field's read-only-overlay-behind-an-input trick.
   const resolvedBox = await resolvedSpan.boundingBox();
   if (!resolvedBox) throw new Error('resolved reference span has no box');
   await page.mouse.move(
     resolvedBox.x + resolvedBox.width / 2,
     resolvedBox.y + resolvedBox.height / 2,
   );
-  const hover = page.locator('.cm-kira-hover');
+  const hover = page.locator('.monaco-hover');
   await expect(hover).toBeVisible();
   await expect(hover).toContainText('api.example.com');
 
-  // Typing {{ inside the body offers names — CodeMirror's own completion popup, since the body
-  // editor is a real editable host, not an AutocompleteField overlay.
-  await body.click();
+  // Typing {{ inside the body offers names — Monaco's own completion popup, since the body editor
+  // is a real editable host, not an AutocompleteField overlay.
+  await body.locator('.view-lines').click();
   await page.keyboard.press('End');
   await page.keyboard.press('End');
   await page.keyboard.type('"x": "{{base');
-  const tooltip = page.locator('.cm-tooltip-autocomplete');
+  const tooltip = page.locator('.suggest-widget.visible');
   await expect(tooltip).toBeVisible({ timeout: 5_000 });
   await expect(tooltip).toContainText('base_url');
 });
 
 // G20 D7: the actual originally-reported bug — the request body's {{variable}} hover tooltip
-// stayed nested inside two `overflow: hidden` ancestors (CodeMirrorHost.vue's own `.cm-host`,
-// HttpRequestView.vue's `.request-pane`) with no `tooltips({ parent: document.body })` facet to
-// escape them, and its z-index (@codemirror/view's own hardcoded 500) had no stated relationship
-// to this app's real `--kira-z-*` ladder. Both are checked as direct DOM/CSS facts rather than
-// pixel geometry — a stronger, viewport-independent proof that D7's fix actually landed, not a
-// coincidence of one particular window size happening to leave enough room.
+// stayed nested inside two `overflow: hidden` ancestors (`MonacoHost.vue`'s own `.monaco-host`,
+// HttpRequestView.vue's `.request-pane`) with no shared, body-level `overflowWidgetsDomNode` to
+// escape them, and its z-index had no stated relationship to this app's real `--kira-z-*` ladder.
+// P60a dogfooding finding: `fixedOverflowWidgets: true` alone does NOT reparent a widget to
+// `document.body` (verified against the pinned Monaco's own `view.js` — it appends the
+// "overflowing" widgets container to the editor's own root DOM node when no explicit
+// `overflowWidgetsDomNode` is supplied); `editor/monaco.ts`'s `overflowWidgetsContainer()` is the
+// fix, a single shared container every MonacoHost instance points at. Both are checked as direct
+// DOM/CSS facts rather than pixel geometry — a stronger, viewport-independent proof that the fix
+// actually landed, not a coincidence of one particular window size happening to leave enough room.
 test('the request body {{variable}} hover escapes the editor pane and adopts the coordinated z-index (G20 D7)', async ({
   relaunch,
 }) => {
@@ -490,10 +494,10 @@ test('the request body {{variable}} hover escapes the editor pane and adopts the
   ];
   const { window: page } = await relaunch({ control: CONTROL });
 
-  const body = page.locator('[data-testid="http-request-pane"] .cm-content');
-  await expect(body).toBeVisible();
+  const body = page.locator('[data-testid="http-request-pane"]');
+  await expect(body.locator('[data-testid="monaco-host"]')).toBeVisible();
 
-  const resolvedSpan = body.locator('.cm-kira-var');
+  const resolvedSpan = body.locator('.kira-ed-var');
   await expect(resolvedSpan).toHaveCount(1);
   const resolvedBox = await resolvedSpan.boundingBox();
   if (!resolvedBox) throw new Error('resolved reference span has no box');
@@ -502,36 +506,35 @@ test('the request body {{variable}} hover escapes the editor pane and adopts the
     resolvedBox.y + resolvedBox.height / 2,
   );
 
-  const hover = page.locator('.cm-kira-hover');
+  const hover = page.locator('.monaco-hover');
   await expect(hover).toBeVisible();
 
   // D7's first half: escapes both named clipping ancestors, and is mounted as a direct child of
-  // <body> — exactly what `tooltips({ parent: document.body })` produces, and what the library's
-  // own pre-fix default (the editor's own DOM node) never did.
-  const [escapesRequestPane, escapesCmHost, escapesAppRoot, isInBody] = await Promise.all([
+  // <body> — exactly what `overflowWidgetsDomNode` produces, and what the library's own pre-fix
+  // default (the editor's own DOM node) never did.
+  const [escapesRequestPane, escapesMonacoHost, escapesAppRoot, isInBody] = await Promise.all([
     hover.evaluate((el) => el.closest('.request-pane') === null),
-    hover.evaluate((el) => el.closest('.cm-host') === null),
+    hover.evaluate((el) => el.closest('.monaco-host') === null),
     // main.ts mounts the whole app onto '#app' — escaping it entirely (not merely its two named
     // ancestors above) is the strongest, wrapper-depth-independent proof that
-    // `tooltips({ parent: document.body })` actually re-parented this tooltip's own container,
-    // rather than merely resolving true by accident of which two specific classes happened to be
-    // checked.
+    // `overflowWidgetsDomNode` actually re-parented this tooltip's own container, rather than
+    // merely resolving true by accident of which two specific classes happened to be checked.
     hover.evaluate((el) => el.closest('#app') === null),
     hover.evaluate((el) => document.body.contains(el)),
   ]);
   expect(escapesRequestPane, 'must not be a descendant of .request-pane').toBe(true);
-  expect(escapesCmHost, 'must not be a descendant of .cm-host').toBe(true);
+  expect(escapesMonacoHost, 'must not be a descendant of .monaco-host').toBe(true);
   expect(escapesAppRoot, 'must not be a descendant of #app at all').toBe(true);
   expect(isInBody, 'the tooltip must still be attached under <body>').toBe(true);
 
-  // D7's second half: the coordinated z-index — theme.ts's own '.cm-tooltip' override replaces
-  // @codemirror/view's hardcoded 500 with a real reference to this app's own top-rung token, so
-  // this must read the *token's* current value, not the library's original literal (asserting
-  // this rather than merely ">= the toolbar's z-index" catches the override silently reverting to
-  // the library's default just as reliably, and ties the two numbers together for real instead of
-  // by coincidence).
+  // D7's second half: the coordinated z-index — MonacoHost.vue's own global `.monaco-hover`
+  // override sets it directly on the widget itself (no un-themed library default in between), so
+  // this must read the *token's* current value, not any library literal (asserting this rather
+  // than merely ">= the toolbar's z-index" catches the override silently reverting to a library
+  // default just as reliably, and ties the two numbers together for real instead of by
+  // coincidence).
   const [tooltipZIndex, expectedZIndex] = await Promise.all([
-    hover.evaluate((el) => getComputedStyle(el.closest('.cm-tooltip') as Element).zIndex),
+    hover.evaluate((el) => getComputedStyle(el).zIndex),
     page.evaluate(() =>
       getComputedStyle(document.documentElement).getPropertyValue('--kira-z-tooltip').trim(),
     ),
@@ -732,12 +735,12 @@ test('the response find bar counts and steps through matches, and Escape clears 
   await expect(page.locator('[data-testid="http-find-count"]')).toHaveText('1 of 2');
   await page.click('[data-testid="http-find-next"]');
   await expect(page.locator('[data-testid="http-find-count"]')).toHaveText('2 of 2');
-  await expect(page.locator('.cm-kira-find-match-current')).toHaveCount(1);
+  await expect(page.locator('.kira-ed-find-match-current')).toHaveCount(1);
 
   await page.keyboard.press('Escape');
   await expect(page.locator('[data-testid="http-find-bar"]')).toHaveCount(0);
-  await expect(page.locator('.cm-kira-find-match')).toHaveCount(0);
-  await expect(page.locator('.cm-kira-find-match-current')).toHaveCount(0);
+  await expect(page.locator('.kira-ed-find-match')).toHaveCount(0);
+  await expect(page.locator('.kira-ed-find-match-current')).toHaveCount(0);
 });
 
 test('filtering the response headers pane, and filtering the request headers table without losing a row’s identity (D12/D13)', async ({
@@ -861,8 +864,8 @@ test('the URL field paints a piped reference resolved and an unrecognised transf
   );
 
   const overlay = page.locator('.url-field .highlight-overlay');
-  await expect(overlay.locator('.cm-kira-var')).toHaveCount(1);
-  await expect(overlay.locator('.cm-kira-var-unknown')).toHaveCount(1);
+  await expect(overlay.locator('.kira-ed-var')).toHaveCount(1);
+  await expect(overlay.locator('.kira-ed-var-unknown')).toHaveCount(1);
 });
 
 test("hovering a piped secret names the transform and shows no value (§5's UI-half security assertion)", async ({
@@ -876,7 +879,7 @@ test("hovering a piped secret names the transform and shows no value (§5's UI-h
 
   await page.fill('[data-testid="http-url"]', 'https://{{base_url}}/{{api_key | base64}}');
 
-  const secretSpan = page.locator('.url-field .cm-kira-var-secret');
+  const secretSpan = page.locator('.url-field .kira-ed-var-secret');
   await expect(secretSpan).toHaveCount(1);
   const secretBox = await secretSpan.boundingBox();
   if (!secretBox) throw new Error('secret reference span has no box');
@@ -1160,13 +1163,13 @@ test('the bulk editor: toggle, edit, live summary and rename warning, Apply thro
   await expect(page.locator('[data-testid="variable-row"]')).toHaveCount(4); // 3 real + trailing
 
   await page.click('[data-testid="variables-bulk-toggle"]');
-  const editor = page.locator('[data-testid="variables-bulk-textarea"] .cm-content');
-  await expect(editor).toBeVisible();
+  const editor = page.locator('[data-testid="variables-bulk-textarea"]');
+  await expect(editor.locator('[data-testid="monaco-host"]')).toBeVisible();
   // The secret's own line is seeded empty, with the fixed marker comment above it (D21) — the
   // seed already proves the renderer never had a plaintext to write out.
-  await expect(editor).toContainText('secret — the value is not shown here');
+  expect(await editorText(editor)).toContain('secret — the value is not shown here');
 
-  await editor.click();
+  await editor.locator('.view-lines').click();
   await page.keyboard.press('ControlOrMeta+a');
   await page.keyboard.insertText(
     [
@@ -1335,8 +1338,8 @@ test('the gRPC target paints a resolved reference and an unknown one differently
   await page.fill('[data-testid="grpc-target"]', '{{target}}/{{not_defined}}');
 
   const overlay = page.locator('.grpc-target-field .highlight-overlay');
-  await expect(overlay.locator('.cm-kira-var')).toHaveCount(1);
-  await expect(overlay.locator('.cm-kira-var-unknown')).toHaveCount(1);
+  await expect(overlay.locator('.kira-ed-var')).toHaveCount(1);
+  await expect(overlay.locator('.kira-ed-var-unknown')).toHaveCount(1);
 });
 
 test('a metadata name cell suggests grpc-timeout (P18 D12)', async ({ relaunch }) => {

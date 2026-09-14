@@ -1,6 +1,7 @@
 import type { Locator, Page } from '@playwright/test';
 import type { ControlSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
+import { editorText } from './support/editorText';
 import { IPC } from './support/ipcChannels';
 
 // P17 §4.4: the end-to-end proof §5 needs, which no unit test can give because it is a property
@@ -110,8 +111,8 @@ test('a piped secret is never resolved client-side — the literal reference rea
   // The mocked response stands in for what Go's stage 2 actually computed (proven server-side by
   // R3's own Go tests) — the Raw pane shows exactly that masked form, and nothing else.
   await page.click('[data-testid="http-response-pane-raw"]');
-  const requestEditor = page.locator('[data-testid="http-wire-request-editor"] .cm-content');
-  const requestText = await requestEditor.innerText();
+  const requestEditor = page.locator('[data-testid="http-wire-request-editor"]');
+  const requestText = await editorText(requestEditor);
   expect(requestText).toContain('{{token | base64}}');
   expect(requestText).not.toContain('sk_live_');
 });
@@ -179,9 +180,7 @@ test('the Raw pane, the timeline hop, and the persisted history entry all show t
   await expect(page.locator('[data-testid="http-status"]')).toContainText('200');
 
   await page.click('[data-testid="http-response-pane-raw"]');
-  const requestText = await page
-    .locator('[data-testid="http-wire-request-editor"] .cm-content')
-    .innerText();
+  const requestText = await editorText(page.locator('[data-testid="http-wire-request-editor"]'));
   expect(requestText).toContain('%7B%7Btoken%20%7C%20base64%7D%7D');
   expect(requestText).not.toContain('sk_live_');
 
@@ -228,9 +227,7 @@ test('a request using both {{secret}} and {{secret | base64}} masks both forms, 
   const maskingNote = page.locator('[data-testid="http-wire-masking-note"]');
   await expect(maskingNote).toContainText('1 secret value is shown as');
 
-  const requestText = await page
-    .locator('[data-testid="http-wire-request-editor"] .cm-content')
-    .innerText();
+  const requestText = await editorText(page.locator('[data-testid="http-wire-request-editor"]'));
   expect(requestText).toContain('{{token}}');
   expect(requestText).toContain('{{token | base64}}');
 });

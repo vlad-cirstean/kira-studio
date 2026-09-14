@@ -1,5 +1,6 @@
 import type { ControlSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
+import { editorText } from './support/editorText';
 import { IPC } from './support/ipcChannels';
 import {
   APP_PATH,
@@ -158,7 +159,7 @@ const CONTROL: ControlSnapshot[] = [
 
 async function switchToSource(view: import('@playwright/test').Locator) {
   await view.locator('[data-testid="definition-pane-source"]').click();
-  await expect(view.locator('.cm-content')).toBeVisible();
+  await expect(view.locator('[data-testid="monaco-host"]')).toBeVisible();
 }
 
 async function switchToStructure(view: import('@playwright/test').Locator) {
@@ -210,7 +211,7 @@ test('Definition tab — Structure/Source, columns menu, notes, read-only, cache
   await expect(definitionView.locator('[data-testid="definition-pane-structure"]')).toHaveClass(
     /on/,
   );
-  await expect(definitionView.locator('.cm-content')).toHaveCount(0);
+  await expect(definitionView.locator('[data-testid="monaco-host"]')).toHaveCount(0);
 
   // --- scenario 2: Structure sections, and the relocated Columns menu ---------------------
   const columnsSection = definitionView.locator('[data-testid="definition-columns"]');
@@ -272,8 +273,8 @@ test('Definition tab — Structure/Source, columns menu, notes, read-only, cache
   // --- scenario 4: highlighting is live (Source pane) ---------------------------------------
   await switchToSource(definitionView);
   await expect(definitionView.locator('[data-testid="definition-pane-source"]')).toHaveClass(/on/);
-  await expect(definitionView.locator('.cm-content')).toContainText('CREATE TABLE app.order_items');
-  expect(await definitionView.locator('.cm-content span').count()).toBeGreaterThan(0);
+  expect(await editorText(definitionView)).toContain('CREATE TABLE app.order_items');
+  expect(await definitionView.locator('.view-lines span').count()).toBeGreaterThan(0);
 
   // --- scenario 4b: search (item U, D14) — find-in-document over Source, a plain substring
   // filter over Structure's own columns/indexes/constraints rows ----------------------------
@@ -297,10 +298,10 @@ test('Definition tab — Structure/Source, columns menu, notes, read-only, cache
   await switchToSource(definitionView);
 
   // --- scenario 5: read-only (Source pane) --------------------------------------------------
-  const beforeType = await definitionView.locator('.cm-content').innerText();
-  await definitionView.locator('.cm-content').click();
+  const beforeType = await editorText(definitionView);
+  await definitionView.locator('.view-lines').click();
   await page.keyboard.type('DROP TABLE x;');
-  expect(await definitionView.locator('.cm-content').innerText()).toBe(beforeType);
+  expect(await editorText(definitionView)).toBe(beforeType);
   await expect(definitionView).toHaveAttribute('data-read-only-reason', 'definition-not-editable');
 
   // --- scenario 6: notes (Source pane) -------------------------------------------------------

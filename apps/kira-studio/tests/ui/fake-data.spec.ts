@@ -1,6 +1,7 @@
 import { DATA_OP } from '@shared/protocol/data-ops';
 import type { ControlSnapshot, PortSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
+import { editorText } from './support/editorText';
 import { gridCell } from './support/grid';
 import { IPC } from './support/ipcChannels';
 import {
@@ -252,8 +253,8 @@ test('fake data generator — gate, defaults, preview, generate, failure', async
 
   await page.click('[data-testid="generate-data-preview-toggle"]');
   const previewBody = page.locator('[data-testid="generate-data-preview"]');
-  await expect(previewBody.locator('.cm-content')).toBeVisible({ timeout: 10_000 });
-  const previewText = await previewBody.locator('.cm-content').innerText();
+  await expect(previewBody.locator('[data-testid="monaco-host"]')).toBeVisible({ timeout: 10_000 });
+  const previewText = await editorText(previewBody);
   expect(previewText).toContain('INSERT INTO "app"."composite_pk"');
 
   // --- scenario 4: generate commits in one batch and the grid reloads -----------------------
