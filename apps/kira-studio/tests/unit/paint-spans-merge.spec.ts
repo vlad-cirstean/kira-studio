@@ -79,6 +79,36 @@ describe('mergeHighlightRanges', () => {
       { from: 5, to: 8, classes: ['kira-ed-var'] },
     ]);
   });
+
+  // A real case colorize() produces (verified against the pinned 0.56.0): it can split one token's
+  // text across two adjacent `mtkN` spans for reasons unrelated to tokenization (an internal render
+  // chunk boundary). A highlight range spanning that boundary must come out as one run, not two
+  // adjacent ones with identical classes — the caller renders one `<span>` per output run, and two
+  // side-by-side `.kira-ed-var-unknown` spans instead of one is a real, user-visible difference to
+  // anything counting or measuring them (`api-ui-consistency.spec.ts`'s own D3 rule 4 test).
+  test('a highlight spanning a same-class base-run boundary coalesces into one run', () => {
+    const base = [
+      { from: 0, to: 6, classes: ['mtk1'] },
+      { from: 6, to: 10, classes: ['mtk1'] },
+    ];
+    const out = mergeHighlightRanges(10, base, [{ from: 2, to: 10, class: 'kira-ed-var-unknown' }]);
+    expect(out).toEqual([
+      { from: 0, to: 2, classes: ['mtk1'] },
+      { from: 2, to: 10, classes: ['mtk1', 'kira-ed-var-unknown'] },
+    ]);
+  });
+
+  test('adjacent base runs with different classes never coalesce, even with the same highlight', () => {
+    const base = [
+      { from: 0, to: 5, classes: ['mtk1'] },
+      { from: 5, to: 10, classes: ['mtk2'] },
+    ];
+    const out = mergeHighlightRanges(10, base, [{ from: 0, to: 10, class: 'kira-ed-var' }]);
+    expect(out).toEqual([
+      { from: 0, to: 5, classes: ['mtk1', 'kira-ed-var'] },
+      { from: 5, to: 10, classes: ['mtk2', 'kira-ed-var'] },
+    ]);
+  });
 });
 
 describe('parseColorizedLine', () => {

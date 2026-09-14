@@ -101,6 +101,31 @@ const WRAP_PAIRS: Record<string, string> = {
 
 function attachWrapOnType(ed: StandaloneCodeEditor, m: TextModel): MonacoDisposable {
   return ed.onKeyDown((e) => {
+    // Ctrl/Cmd+A: handled directly rather than left to Monaco's own `editor.action.selectAll`.
+    // That command's default implementation branches on
+    // `codeEditorService.getFocusedCodeEditor()?.hasTextFocus()` — in WebKit (and apparently only
+    // there) this app's own multi-editor-instance embedding leaves that check false even though
+    // the `.inputarea` textarea genuinely holds DOM focus, so Monaco falls through to its "generic
+    // dom input" branch and runs a native `execCommand('selectAll')` on the hidden textarea
+    // instead of selecting the visible model content — the next keystroke then inserts at the old
+    // cursor position rather than replacing the document (broke Select-All-then-retype, e.g. the
+    // bulk variables editor and the raw HTTP edit dialog). Selecting via the model API sidesteps
+    // that focus-service lookup entirely.
+    // `.toLowerCase()`, not a literal `'a'`: a real Ctrl+A always reports `key: 'a'`, but
+    // `page.keyboard.press('Control+A')` (several specs' own `SELECT_ALL` constant, capitalised)
+    // makes Playwright synthesize the browser event with `key: 'A'` — the literal key name it was
+    // given, not lowercased the way a physical, unshifted keypress would be.
+    if (
+      (e.ctrlKey || e.metaKey) &&
+      !e.altKey &&
+      !e.shiftKey &&
+      e.browserEvent.key.toLowerCase() === 'a'
+    ) {
+      e.preventDefault();
+      e.stopPropagation();
+      ed.setSelection(m.getFullModelRange());
+      return;
+    }
     if (e.ctrlKey || e.metaKey || e.altKey) return;
     const key = e.browserEvent.key;
     const close = WRAP_PAIRS[key];

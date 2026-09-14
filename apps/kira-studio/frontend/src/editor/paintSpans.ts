@@ -68,9 +68,22 @@ export function mergeHighlightRanges(
       if (r.from <= from && from < r.to) classes.push(r.class);
     }
     if (classes.length === 0) continue;
-    out.push({ from, to, classes });
+    // Coalesce into the previous run when it ends exactly here and carries the same classes in the
+    // same order — a `base` cut that falls inside a highlight (e.g. `colorize()`'s own chunking of
+    // one token's text across two `mtkN` spans, unrelated to this function's own callers) would
+    // otherwise split one semantic highlight into two adjacent DOM spans with identical classes.
+    const prev = out[out.length - 1];
+    if (prev && prev.to === from && sameClasses(prev.classes, classes)) {
+      prev.to = to;
+    } else {
+      out.push({ from, to, classes });
+    }
   }
   return out;
+}
+
+function sameClasses(a: readonly string[], b: readonly string[]): boolean {
+  return a.length === b.length && a.every((c, i) => c === b[i]);
 }
 
 // `monaco.editor.colorize()`'s own HTML shape (verified against the pinned 0.56.0's
@@ -79,10 +92,22 @@ export function mergeHighlightRanges(
 // `renderWhitespace` off, so no `mtkw`/`mtkz` width-span case ever appears here), terminated by
 // `<br/>`. AutocompleteField's overlay is always single-line (`singleLine` was CodeMirrorHost's own
 // contract for this component; there is exactly one line to parse.
+//
+// P60a dogfooding finding (mcp-repo-map-issues.md): the same renderer also rewrites every plain
+// U+0020 space into U+00A0 (NBSP) unconditionally, not just inside a 2+-space run — verified
+// against a real `colorize()` call, a single space either side of `|` in `{{base_url | base64}}`
+// came back as NBSP. Not an HTML entity (`&nbsp;` never appears in the string), so it isn't caught
+// by an entity table — decoded back to a plain space explicitly, or every `parsedText === text`
+// comparison downstream would falsely "mismatch" on any colorized text containing a space and lose
+// every range highlight over it (`paintOverlayHtml`'s own shape-changed fallback).
 const TOKEN_SPAN_RE = /<span class="([^"]+)">([\s\S]*?)<\/span>/g;
 
 function decodeEntities(s: string): string {
-  return s.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+  return s
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&')
+    .replace(/\u00a0/g, ' '); // NBSP -> space, see the comment above `TOKEN_SPAN_RE`.
 }
 
 function escapeHtml(s: string): string {
@@ -119,10 +144,22 @@ export async function paintOverlayHtml(
   if (text === '') return '';
   const colorized = await mod.editor.colorize(text, languageId, { tabSize: 2 });
   const { text: parsedText, runs } = parseColorizedLine(colorized);
-  // A colorize() mismatch (a future Monaco version changing its HTML shape) degrades to plain
-  // escaped text rather than silently mis-painting — checked once here, not assumed.
-  if (parsedText !== text) return escapeHtml(text);
-  const merged = mergeHighlightRanges(text.length, runs, ranges);
+  // `plaintext` (the URL field's own language, and every field with no grammar) has no tokenizer,
+  // so colorize() returns the text with no `mtkN` spans at all — `runs` comes back empty and
+  // `parsedText` mismatches (`''` vs. the real text). That is expected, not a shape change to
+  // degrade from: fall back to one classless base run spanning the whole text so `ranges`
+  // (`{{variable}}` colouring, find-match highlights) still paints over plain text. Only an
+  // actual mismatch with a non-trivial `runs` list (colorize() produced spans, but the concatenated
+  // text does not match) means the HTML shape changed under us — that one degrades to plain escaped
+  // text rather than risk mis-painting.
+  const baseRuns =
+    parsedText === text
+      ? runs
+      : runs.length === 0
+        ? [{ from: 0, to: text.length, classes: [] }]
+        : null;
+  if (baseRuns === null) return escapeHtml(text);
+  const merged = mergeHighlightRanges(text.length, baseRuns, ranges);
   let html = '';
   let cursor = 0;
   for (const run of merged) {
