@@ -24,7 +24,7 @@ import {
 import { patchGrpcRequestTabState } from '../../api/tabs';
 import VariablesOverviewPanel from '../../api/VariablesOverviewPanel.vue';
 import { beautifyJson } from '../../beautify';
-import CodeMirrorHost from '../../editor/CodeMirrorHost.vue';
+import MonacoHost from '../../editor/MonacoHost.vue';
 import { registerCommand } from '../../shortcuts/commands';
 import AppButton from '../../theme/primitives/AppButton.vue';
 import AutocompleteField from '../../theme/primitives/AutocompleteField.vue';
@@ -407,7 +407,7 @@ onUnmounted(() => {
 
       <div class="request-response-split">
         <div class="request-pane" :style="{ flex: `0 0 ${requestPaneHeight}px` }" data-testid="grpc-request-pane">
-          <CodeMirrorHost
+          <MonacoHost
             v-if="tab.state.requestPane === 'message'"
             :doc="tab.state.message"
             language="json"

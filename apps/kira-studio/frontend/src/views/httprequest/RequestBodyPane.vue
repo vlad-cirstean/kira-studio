@@ -16,7 +16,7 @@ import {
   variableHoverSource,
 } from '../../api/state/variableCompletion';
 import { patchHttpRequestTabState } from '../../api/tabs';
-import CodeMirrorHost from '../../editor/CodeMirrorHost.vue';
+import MonacoHost from '../../editor/MonacoHost.vue';
 import type { RangeHighlight } from '../../editor/variableHighlight';
 import IconButton from '../../theme/primitives/IconButton.vue';
 import MessageStrip from '../../theme/primitives/MessageStrip.vue';
@@ -55,7 +55,7 @@ const props = defineProps<{
  *  what a user searching for text that happens to sit inside a {{reference}} expects to see.
  *  rangeHighlightPlugin sorts and validates whatever it is handed, so no ordering guarantee is
  *  required of this concatenation beyond that intent. Identity changes whenever either source
- *  does, which is what makes CodeMirrorHost's own watch repaint. */
+ *  does, which is what makes MonacoHost's own watch repaint. */
 const bodyHighlights = computed<((doc: string) => readonly RangeHighlight[]) | undefined>(() => {
   const vars = props.variables?.rangeHighlights;
   const find = props.findHighlights;
@@ -187,7 +187,7 @@ const caption = computed(() =>
       {{ beautifyError }}
     </MessageStrip>
 
-    <CodeMirrorHost
+    <MonacoHost
       v-if="tab.state.bodyMode === 'raw'"
       :doc="tab.state.body"
       ref="rawHostRef"
@@ -200,7 +200,7 @@ const caption = computed(() =>
       auto-close-brackets
       @update:doc="onRawChange"
     />
-    <CodeMirrorHost
+    <MonacoHost
       v-else-if="tab.state.bodyMode === 'code'"
       :doc="tab.state.code"
       ref="codeHostRef"

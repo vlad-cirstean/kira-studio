@@ -1,5 +1,3 @@
-import type { CompletionSource } from '@codemirror/autocomplete';
-import type { HoverTooltipSource } from '@codemirror/view';
 import {
   applyPipeline,
   classifyReference,
@@ -12,7 +10,8 @@ import {
   TRANSFORM_NAMES,
   type TransformName,
 } from '@kira/api-core';
-import { buildHoverSource, formatHoverValue } from '../../editor/hover';
+import type { EditorCompletionSource } from '../../editor/completion';
+import { type ConsoleHoverInfo, formatHoverValue } from '../../editor/hover';
 import type { RangeHighlight } from '../../editor/variableHighlight';
 import { type Completion, templateToken } from '../../theme/primitives/completion';
 import { cachedVariables, mergedValuesAndSecrets } from './variables';
@@ -34,21 +33,22 @@ import { cachedVariables, mergedValuesAndSecrets } from './variables';
 
 const HOVER_VALUE_MAX_LENGTH = 200;
 
-// D2's three classes (editor/theme.ts): resolved and a catalogued dynamic reference (both "this
-// will produce a value") share `.cm-kira-var`; an uncatalogued dynamic reference is painted
-// exactly like `unknown` (D2's own table: "unknown, or an uncatalogued `{{$dynamic}}`"). P17 D12:
-// "catalogued" now means either spelling — `isDynamicName` ($-prefixed) or `isFakeName`
-// (fake.-prefixed).
+// D2's three classes (P60a: MonacoHost.vue's own scoped `.kira-ed-var*`, renamed from
+// `editor/theme.ts`'s `.cm-kira-var*` — same values, byte-identical visual result): resolved and a
+// catalogued dynamic reference (both "this will produce a value") share `.kira-ed-var`; an
+// uncatalogued dynamic reference is painted exactly like `unknown` (D2's own table: "unknown, or
+// an uncatalogued `{{$dynamic}}`"). P17 D12: "catalogued" now means either spelling —
+// `isDynamicName` ($-prefixed) or `isFakeName` (fake.-prefixed).
 function classFor(name: string, kind: ReferenceKind): string {
   switch (kind) {
     case 'resolved':
-      return 'cm-kira-var';
+      return 'kira-ed-var';
     case 'deferred':
-      return 'cm-kira-var-secret';
+      return 'kira-ed-var-secret';
     case 'dynamic':
-      return isDynamicName(name) || isFakeName(name) ? 'cm-kira-var' : 'cm-kira-var-unknown';
+      return isDynamicName(name) || isFakeName(name) ? 'kira-ed-var' : 'kira-ed-var-unknown';
     case 'unknown':
-      return 'cm-kira-var-unknown';
+      return 'kira-ed-var-unknown';
   }
 }
 
@@ -273,32 +273,35 @@ export function variableSupport(collectionId: string, environmentId: string): Va
 // P22b D5: the request body editors (RequestBodyPane.vue's raw/code hosts, GrpcRequestView.vue's
 // message editor) are the single largest place a user writes {{variables}}, and until now they
 // only got rangeHighlights (colouring) — hovering showed nothing, typing `{{` offered nothing.
-// These two adapters give CodeMirrorHost's hoverSource/completionSources seams the same
+// These two adapters give MonacoHost's hoverSource/completionSources seams the same
 // VariableSupport data the plain AutocompleteField fields already use, so the behaviour matches
 // exactly rather than being reimplemented.
 
-// buildHoverSource (editor/hover.ts) already owns the .cm-kira-hover/.cm-kira-hover-line DOM the
-// SQL console's own hover uses — reused rather than duplicated. Its `tree` parameter is SQL-
-// specific and unused here; hoverInfo only needs the doc text and the pointer offset.
+// P60a §3.1: a pure `(doc, offset) => ConsoleHoverInfo | null` — simpler than the CodeMirror shape
+// this replaced (`editor/hover.ts`'s own `buildHoverSource` existed only to turn a lookup like
+// this one into a CodeMirror `HoverTooltipSource`; that glue is gone, MonacoHost.vue plugs this
+// straight into its own hover provider).
 //
 // Real-interaction fix (reported bug — the tooltip's value and its explanation ran together):
-// takes `hoverInfo` (not `hoverAt`) so buildHoverSource gets the value/caption split — `value`
-// renders as its own inset block, `lines` as the caption underneath it (hover.ts's own
-// ConsoleHoverInfo.value doc comment).
-export function variableHoverSource(hoverInfo: VariableSupport['hoverInfo']): HoverTooltipSource {
-  return buildHoverSource((doc, pos) => {
-    const info = hoverInfo(doc, pos);
+// takes `hoverInfo` (not `hoverAt`) so the value/caption split survives — `value` renders as its
+// own inset block, `lines` as the caption underneath it (hover.ts's own ConsoleHoverInfo.value doc
+// comment).
+export function variableHoverSource(
+  hoverInfo: VariableSupport['hoverInfo'],
+): (doc: string, offset: number) => ConsoleHoverInfo | null {
+  return (doc, offset) => {
+    const info = hoverInfo(doc, offset);
     // hoverInfo has no notion of the reference's own span (F5/AutocompleteField.vue's own hover
     // panel gets away with the same simplification, its own comment: "without needing the
-    // token's own span") — a point tooltip at `pos` re-triggers as the mouse moves, which is
+    // token's own span") — a point tooltip at `offset` re-triggers as the mouse moves, which is
     // harmless since the same info comes back for any offset still inside the reference.
-    return info ? { from: pos, to: pos, lines: info.lines, value: info.value } : null;
-  });
+    return info ? { from: offset, to: offset, lines: info.lines, value: info.value } : null;
+  };
 }
 
-// CodeMirror's own icon classes (editor/theme.ts's `.cm-completionIcon-*`) cover exactly the five
-// icons this app's own Completion.icon values use for a variable/transform candidate.
-function completionType(icon: string | undefined): string | undefined {
+// Monaco's own CompletionItemKind covers exactly the two icons this app's own Completion.icon
+// values use for a variable/transform candidate (MonacoHost.vue's own kindFor()).
+function completionType(icon: string | undefined): 'variable' | 'method' | undefined {
   switch (icon) {
     case 'symbol-variable':
       return 'variable';
@@ -318,18 +321,17 @@ function completionType(icon: string | undefined): string | undefined {
 // language, not just JSON, and for `raw`.
 export function variableCompletionSource(
   candidates: VariableSupport['candidates'],
-): CompletionSource {
-  return (context) => {
-    const text = context.state.doc.toString();
-    const token = templateToken(text, context.pos);
+): EditorCompletionSource {
+  return ({ doc, offset }) => {
+    const token = templateToken(doc, offset);
     if (!token) return null;
-    const list = candidates({ text, from: token.from, word: token.word });
+    const list = candidates({ text: doc, from: token.from, word: token.word });
     if (list.length === 0) return null;
     return {
       from: token.from,
       options: list.map((c) => ({
         label: c.label,
-        apply: c.insert ?? c.label,
+        insert: c.insert ?? c.label,
         detail: c.detail,
         type: completionType(c.icon),
       })),
